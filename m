@@ -1,111 +1,45 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 08:08:23 +0000
-Subject: [PULL] Please pull bjdooks' for-rmk/samsung3
-Message-ID: <20100126080823.GA17378@trinity.fluff.org>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Tue, 26 Jan 2010 08:23:24 -0000
+Subject: [PATCH] ARM: RealView SD/MMC Card detection and
+	write-protect	using GPIOLIB
+In-Reply-To: <20100125180440.GD22481@n2100.arm.linux.org.uk>
+References: <20100125125820.5028.29129.stgit@ARM03585.cambridge.arm.com>
+	<20100125180440.GD22481@n2100.arm.linux.org.uk>
+Message-ID: <000001ca9e60$d4487d90$9fca010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platform moves, some minor bugfixing and updates for S3C64XX support.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
 
-The following changes since commit 54b89177ac533dc7439491afd26baf59464b425c:
-  Ben Dooks (1):
-        ARM: Merge next-samsung-s5p6440-iodec
+> No; if it's broken then it's because something's wrong, and I 
+> think there
+> was a mail about that recently.  I don't particularly like 
+> forcing options
+> on when there's better solutions to the problem (like fixing 
+> the cause of
+> the actual breakage.)
 
-are available in the git repository at:
+Actually, the patch description is slightly wrong/misleading.
 
-  git://git.fluff.org/bjdooks/linux.git for-rmk/samsung3
+The original patch did break the card detection on some boards. Also the
+configuration options mentioned do need setting for things to work properly.
+I think it's that the PL061 driver didn't get included in the kernel by the
+original patch. Maybe it should be added to the realview_default config
+files?
 
-Ben Dooks (6):
-      ARM: SAMSUNG: Move more support into plat-samsung
-      ARM: SAMSUNG: Move pmw.c to plat-samsung
-      ARM: SAMSUNG: Move pm-check.c to plat-samsung
-      ARM: S3C64XX: Tidy up common code in s3c64xx_spi_set_info()
-      ARM: S5P6440: Add HSMMC and OTG base addresses to map.h
-      ARM: SAMSUNG: Fix bad use of __initdata for s3c_register_clocks()
+The problem here I think is that someone implemented gpiolib for sdcard
+detection on mach-realview without doing any testing. When I started working
+on a kernel with gpiolib I found the detection broken. After a lot of
+experimentation and discussion with Catalin we decided that the patch I
+submitted was the best way forward.
 
-Mark Brown (4):
-      ARM: SMDK6410: Set up interrupt range for WM835x on 1190-EV1 PMIC board
-      ARM: S3C64XX: Fix dev-audio build
-      ARM: S3C64XX: Staticise audio platform data
-      ARM: SAMSUNG: Staticise gpiolib implementation functions
+If it's not acceptable please suggest something that is.
 
-Maurus Cuelenaere (2):
-      ARM: S3C64XX: Fix typo in s3c-hsotg platform data
-      ARM: SAMSUNG: Fix null pointer dereference in ADC driver
-
-Thomas Abraham (1):
-      ARM: S5PV210: Add serial port support
-
- arch/arm/configs/mini2440_defconfig                |    4 +-
- arch/arm/configs/s3c2410_defconfig                 |    4 +-
- arch/arm/mach-s3c6410/mach-smdk6410.c              |    1 +
- arch/arm/mach-s5p6440/include/mach/map.h           |    8 +
- arch/arm/plat-s3c/Kconfig                          |   44 ------
- arch/arm/plat-s3c/Makefile                         |    5 -
- arch/arm/plat-s3c/include/plat/pm.h                |    4 +-
- arch/arm/plat-s3c/include/plat/regs-serial.h       |   30 ++++
- arch/arm/plat-s3c/pm.c                             |    6 +-
- arch/arm/plat-s3c64xx/dev-audio.c                  |   12 +-
- arch/arm/plat-s3c64xx/dev-spi.c                    |   15 +-
- arch/arm/plat-s3c64xx/include/plat/irqs.h          |    4 +
- arch/arm/plat-samsung/Kconfig                      |   45 ++++++
- arch/arm/plat-samsung/Makefile                     |    5 +
- arch/arm/plat-samsung/adc.c                        |    2 +-
- arch/arm/plat-samsung/clock.c                      |    2 +-
- arch/arm/plat-samsung/gpiolib.c                    |   16 +-
- .../include/plat/dma-core.h                        |    0
- .../include/plat/hwmon.h                           |    0
- .../include/plat/iic-core.h                        |    0
- .../{plat-s3c => plat-samsung}/include/plat/iic.h  |    0
- .../{plat-s3c => plat-samsung}/include/plat/nand.h |    0
- .../include/plat/regs-ac97.h                       |    0
- .../include/plat/regs-adc.h                        |    0
- .../include/plat/regs-iic.h                        |    0
- .../include/plat/regs-irqtype.h                    |    0
- .../include/plat/regs-nand.h                       |    0
- .../include/plat/regs-rtc.h                        |    0
- .../include/plat/regs-s3c2412-iis.h                |    0
- .../include/plat/regs-sdhci.h                      |    0
- .../include/plat/regs-timer.h                      |    0
- .../include/plat/regs-usb-hsotg-phy.h              |    0
- .../include/plat/regs-usb-hsotg.h                  |    0
- .../include/plat/regs-watchdog.h                   |    0
- .../include/plat/sdhci.h                           |    0
- .../include/plat/udc-hs.h                          |    4 +-
- .../include/plat/watchdog-reset.h                  |    0
- arch/arm/{plat-s3c => plat-samsung}/pm-check.c     |    8 +-
- arch/arm/{plat-s3c => plat-samsung}/pwm.c          |    0
- drivers/serial/Kconfig                             |    9 +-
- drivers/serial/Makefile                            |    1 +
- drivers/serial/s5pv210.c                           |  154 ++++++++++++++++++++
- 42 files changed, 297 insertions(+), 86 deletions(-)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/dma-core.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/hwmon.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/iic-core.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/iic.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/nand.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-ac97.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-adc.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-iic.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-irqtype.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-nand.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-rtc.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-s3c2412-iis.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-sdhci.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-timer.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-usb-hsotg-phy.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-usb-hsotg.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-watchdog.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/sdhci.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/udc-hs.h (93%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/watchdog-reset.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/pm-check.c (95%)
- rename arch/arm/{plat-s3c => plat-samsung}/pwm.c (100%)
- create mode 100644 drivers/serial/s5pv210.c
-
+Colin
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Colin Tuckley - ARM Ltd.
+110 Fulbourn Rd
+Cambridge, CB1 9NJ
+Tel: +44 1223 400536 
