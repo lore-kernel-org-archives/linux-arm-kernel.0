@@ -1,46 +1,31 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 26 Jan 2010 19:52:45 +0900
-Subject: [PATCH 3/3] ARM: SMDK64XX: Enable AC97 device
-In-Reply-To: <20100126101921.GE15759@rakim.wolfsonmicro.main>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 26 Jan 2010 10:53:22 +0000
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <1b68c6791001252332l5ee275c9we39c98691ad7692c@mail.gmail.com>
 References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
 	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
-	<1264485101-13782-3-git-send-email-jassisinghbrar@gmail.com>
-	<20100126101921.GE15759@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6791001260252t7f43cb97n710381508040f7d4@mail.gmail.com>
+	<1b68c6791001252332l5ee275c9we39c98691ad7692c@mail.gmail.com>
+Message-ID: <20100126105322.GG15759@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 7:19 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jan 26, 2010 at 02:51:41PM +0900, jassisinghbrar at gmail.com wrote:
->> From: Jassi Brar <jassi.brar@samsung.com>
->>
->> Implementing basic support for Playback/Capture by SMDK's AC97
->> controller with WM9713 codec, this patch adds the ALSA machine
->> driver for AC97 device.
->
-> Might be better to split this into an arch/arm patch and a sound/soc
-> patch - they don't appear to depend on each other so it'd ease merging.
-ok, will do.
+On Tue, Jan 26, 2010 at 04:32:45PM +0900, jassi brar wrote:
+> On Tue, Jan 26, 2010 at 2:51 PM,  <jassisinghbrar@gmail.com> wrote:
 
->> +static int smdk_hifi_hw_params(struct snd_pcm_substream *substream,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_pcm_hw_params *params)
->> +{
->> + ? ? /* CAPTURE - Stereo LineIn
->> + ? ? ?* Currently there is no other way to change ACLink-In slots
->> + ? ? ?* of Wm9713, so we make do with this call.
->> + ? ? ?*/
->> + ? ? /* Slots-3,4*/
->> + ? ? soc_ac97_ops.write(NULL, 0x5c, 0);
->> +
->> + ? ? return 0;
->> +}
->
-> This one needs a bit more explanation - why are you changing the AC97
-> slot? ?Is this a general problem with the S3C AC97 controller? ?It'd
-> also be better to use the symbolic register name rather than a number.
-It is no problem.
-wm9713 can be configured to place data in one of four possible pair of slots
-3-4 or 6-9 or 7-8 or 10-11. This call ensures the selected pair is 3-4(standard
-and compatible with Samsung AC97 controllers). Though we don't need to
-explicitly set this if we drop mic dai_link.
+Please delete irrelevant context when replying to mails, it's much
+easier to find the actual new text in the message that way.
+
+> > + ? ? ? ? ? ? ? ? ? ? ? /* NOTE: If the codec ouputs just one slot,
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* it *seems* our AC97 controller reads the only
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* valid slot(if either 3 or 4) for PCM-In.
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* For such cases, we record Mono.
+> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? ? ? ? ? .channels_min = 1,
+
+>   I would like to remove this anomaly and set channels_min = 2
+
+Why?
+
+>  And remove the second DAI_LINK in machine driver.
+
+Again, why?
