@@ -1,65 +1,58 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 26 Jan 2010 19:39:40 +0800
-Subject: gpio_keys and how PXA27x sets gpio_set_wake() (was Re: sharp
-	c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1)
-In-Reply-To: <1264502668.4480.97.camel@utx.utx.cz>
-References: <20100106071026.GD1382@ucw.cz>
-	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
-	<20100107065230.GA1303@ucw.cz>
-	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
-	<1264275669.9100.11.camel@utx.utx.cz>
-	<1264286611.11766.49.camel@utx.utx.cz>
-	<f17812d71001251958t377e158bxc64aac0cb426110b@mail.gmail.com>
-	<1264500824.4480.79.camel@utx.utx.cz>
-	<f17812d71001260220v5d03b0e1u1e3bc229827c37c8@mail.gmail.com>
-	<1264502668.4480.97.camel@utx.utx.cz>
-Message-ID: <f17812d71001260339h6184c82bj25ff13a168284c24@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 26 Jan 2010 06:40:53 -0500
+Subject: [PATCH 2/4] mmp2: add mfpr setting
+In-Reply-To: <f17812d71001260228jadc2157n63c5283cbd63eb61@mail.gmail.com>
+References: <771cded01001250303vbb38c7dp62e61b64abab89ea@mail.gmail.com>
+	<f17812d71001260228jadc2157n63c5283cbd63eb61@mail.gmail.com>
+Message-ID: <771cded01001260340m377625a1hfd5322c61f2afe9a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/1/26 Stanislav Brabec <utx@penguin.cz>:
-> Eric Miao wrote:
->> 2010/1/26 Stanislav Brabec <utx@penguin.cz>:
+On Tue, Jan 26, 2010 at 5:28 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Mon, Jan 25, 2010 at 7:03 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> From 3c6535a752748cf7e17683d7c37ccf66f245e714 Mon Sep 17 00:00:00 2001
+>> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Date: Mon, 25 Jan 2010 05:18:37 -0500
+>> Subject: [PATCH] mmp2: add mfpr setting
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?arch/arm/mach-mmp/include/mach/mfp-mmp2.h | ? ?4 ++++
+>> ?arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ? ? ?| ? ?7 +++++++
+>> ?2 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> b/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> index 9371510..9f9f814 100644
+>> --- a/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> +++ b/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> @@ -231,6 +231,10 @@
+>> ?/* Codec*/
+>> ?#define GPIO23_GPIO23 ? ? ? ? ?MFP_CFG(GPIO23, AF0)
+>>
+>> +#define GPIO101_GPIO101 ? ? ? ? ? ? ? ?MFP_CFG(GPIO101, AF0)
+>> +
+>> +/* PMIC */
+>> +#define PMIC_PMIC_INT ? ? ? ? ?MFP_CFG(PMIC_INT, AF0)
+>>
+>> ?#endif /* __ASM_MACH_MFP_MMP2_H */
+>>
+>> diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+>> index a9ca93d..561194d 100644
+>> --- a/arch/arm/mach-mmp/mmp2.c
+>> +++ b/arch/arm/mach-mmp/mmp2.c
+>> @@ -28,6 +28,12 @@
+>>
+>> ?#define MFPR_VIRT_BASE (APB_VIRT_BASE + 0x1e000)
+>>
+>> +static struct mfp_addr_map mmp2_addr_map[] __initdata = {
+>> + ? ? ? MFP_ADDR(PMIC_INT, 0x2c4),
+>> +
 >
->> > Handling platform specific edge/level wake setup would only complicate
->> > the code. (In fact, even the PXA270 platform code does not exist yet -
->> > arch/arm/mach-pxa/mfp-pxa2xx.c:__mfp_config_gpio() is not capable to
->> > configure Power Manager Keyboard Wake-Up Enable Register (PKWR).)
->> That's why WAKEUP_ON_EDGE_* is introduced, no need for gpio-keys
->> to know this.
+> Mmm... I'm wondering where're the MFPR addresses for other pins?
 >
-> But WAKEUP_ON_EDGE_* is impossible for GPIO 95,
-> enable_irq_wake()/gpio_set_wake() returns EINVAL and disable_irq_wake()
-> complains on "Unbalanced IRQ 191".
->
+They will be added later.
 
-Now I see, but I don't know why disable_irq_wake() will complains about
-unbalance since it should really manage it well.
-
-A quick dirty solution would be the platform to call keypad_set_wake()
-directly somewhere. Otherwise we have to let gpio_set_wake() to handle
-those keypad GPIOs and to live together with keypad_set_wake() happily,
-which is really difficult.
-
-> In case of Zaurus, gpio_keys.c have to live with wakeup on level (PKWR)
-> when using enable/disable_irq_wake().
->
->> > The problem affects gpio_keys: It is a driver implementing "one key per
->> > gpio". It now handles On/Off and lid switches on Zaurus. Lid switches
->> > are on "normal" GPIOs, On/Off switch is wired to PKWR capable GPIO.
->> Ain't On/Off switch one of the matrix key? And so SPITZ_GPIO_KEY_INT
->> could be used to handle that?
->
-> No. On/Off is connected directly to GPIO 95. Other keys use strobe/sense
-> matrix keypad.
->
-> SPITZ_GPIO_KEY_INT is a bit unspecific. I think it means: Charger was
-> inserted or key was pressed or On/Off was pressed.
->
->
->
-> ________________________________________________________________________
-> Stanislav Brabec
-> http://www.penguin.cz/~utx/zaurus
->
->
+Thanks
+Haojian
