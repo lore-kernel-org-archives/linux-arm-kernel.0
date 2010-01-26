@@ -1,27 +1,155 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Tue, 26 Jan 2010 12:16:17 +0100
-Subject: [PATCH 2/2] HWMON: Add s3c64xx support to s3c-hwmon
-Message-ID: <b2e8f9f71001260316h7fe29effn290648178ff42397@mail.gmail.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Tue, 26 Jan 2010 20:17:25 +0900
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <20100126104723.GF15759@rakim.wolfsonmicro.main>
+References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
+	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+	<20100126104723.GF15759@rakim.wolfsonmicro.main>
+Message-ID: <1b68c6791001260317k44893521vc0310ea35bac8ee1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- drivers/hwmon/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Tue, Jan 26, 2010 at 7:47 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Jan 26, 2010 at 02:51:40PM +0900, jassisinghbrar at gmail.com wrote:
+>
+> This looks good overall, just a few smallish issues:
+>
+>> +static void s3c_ac97_activate(struct snd_ac97 *ac97)
+>> +{
+>> + ? ? u32 ac_glbctrl, stat;
+>> +
+>> + ? ? stat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT) & 0x7;
+>> + ? ? switch (stat) {
+>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_ACTIVE:
+>> + ? ? ? ? ? ? return;
+>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_READY:
+>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_INIT:
+>> + ? ? ? ? ? ? break;
+>> + ? ? default:
+>> + ? ? ? ? ? ? s3c_ac97_cold_reset(ac97);
+>> + ? ? ? ? ? ? s3c_ac97_warm_reset(ac97);
+>> + ? ? ? ? ? ? break;
+>> + ? ? }
+>
+> This automatic cold and warm reset looks a bit fishy - obviously if this
+> code path ever gets hit in normal operation then it's going to seriously
+> disrupt things since it'll reset the CODEC registers. ?A warm reset by
+> itself wouldn't be a problem but I'd rather see explicit cold resets in
+> the callers where that's required.
+Before read/write we need to ensure the link is active. And to reach the
+active state we have to do that as suggested by the FSM shown in SoCs' Manual.
+Also, this helps not relying on codec/core to perform particular steps
+of initializations.
 
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index 68cf877..a8a267c 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -702,7 +702,7 @@ config SENSORS_SHT15
+>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> + ? ? ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
+>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> + ? ? msleep(1);
+>
+> This also looks a bit odd, ACLINKON sounds like bringing up the link
+> which is what a warm reset does.
+As shown in FSM of SoCs manual, this sets the controller state to READY.
+Please have a look at any manual's AC97 chapter.
 
- config SENSORS_S3C
- 	tristate "S3C24XX/S3C64XX Inbuilt ADC"
--	depends on ARCH_S3C2410
-+	depends on ARCH_S3C2410 || ARCH_S3C64XX
- 	help
- 	  If you say yes here you get support for the on-board ADCs of
- 	  the Samsung S3C24XX or S3C64XX series of SoC
--- 
-1.6.6.1
+>> + ? ? INIT_COMPLETION(s3c_ac97.done);
+>> +
+>> + ? ? if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
+>> + ? ? ? ? ? ? printk(KERN_ERR "AC97: Unable to activate!");
+>
+> This looks racy - the INIT_COMPLETION() happens after all the hardware
+> configuration which suggests that if you're unlucky the event which
+> should trigger the completion will have happened before the init. ?A
+> bunch of interrupts arriving at an inconvenient time could trigger this,
+> for example.
+Yes, init needs to be moved early.
+
+> The same idiom appears in the register reads and writes.
+>
+>> + ? ? if (addr != reg)
+>> + ? ? ? ? ? ? printk(KERN_ERR "s3c-ac97: req addr = %02x,"
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? " rep addr = %02x\n", reg, addr);
+>
+> Please don't split error messages over multiple lines, it makes grepping
+> for them harder.
+ok.
+
+>> +static irqreturn_t s3c_ac97_irq(int irq, void *dev_id)
+>> +{
+>> + ? ? u32 ac_glbctrl, ac_glbstat;
+>> +
+>> + ? ? ac_glbstat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT);
+>> +
+>> + ? ? if (ac_glbstat & S3C_AC97_GLBSTAT_CODECREADY) {
+>> +
+>> + ? ? ? ? ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> + ? ? ? ? ? ? ac_glbctrl &= ~S3C_AC97_GLBCTRL_CODECREADYIE;
+>> + ? ? ? ? ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> +
+>> + ? ? ? ? ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> + ? ? ? ? ? ? ac_glbctrl |= (1<<30); /* Clear interrupt */
+>> + ? ? ? ? ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> +
+>> + ? ? ? ? ? ? complete(&s3c_ac97.done);
+>> + ? ? }
+>> +
+>> + ? ? return IRQ_HANDLED;
+>> +}
+>
+> You should only be returning IRQ_HANDLED if you actually handled an
+> interrupt here.
+I'd rather move the intr-clearing out of the block.
+
+>> +#define S3C_AC97_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+>> + ? ? ? ? ? ? SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | \
+>> + ? ? ? ? ? ? SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
+>> + ? ? ? ? ? ? SNDRV_PCM_RATE_48000)
+>
+> SNDRV_PCM_RATE_8000_48000.
+yes.
+
+>> + ? ? ? ? ? ? .capture = {
+>> + ? ? ? ? ? ? ? ? ? ? .stream_name = "AC97 Capture",
+>> + ? ? ? ? ? ? ? ? ? ? /* NOTE: If the codec ouputs just one slot,
+>> + ? ? ? ? ? ? ? ? ? ? ?* it *seems* our AC97 controller reads the only
+>> + ? ? ? ? ? ? ? ? ? ? ?* valid slot(if either 3 or 4) for PCM-In.
+>> + ? ? ? ? ? ? ? ? ? ? ?* For such cases, we record Mono.
+>> + ? ? ? ? ? ? ? ? ? ? ?*/
+>
+> This seems like unsurprising behaviour for an AC97 controller - the slot
+> validity information is there for just this purpose. ?I'd just remove
+> the comment as a result.
+>
+>> + ? ? ? ? ? ? .capture = {
+>> + ? ? ? ? ? ? ? ? ? ? .stream_name = "AC97 Mic Capture",
+>> + ? ? ? ? ? ? ? ? ? ? .channels_min = 1,
+>> + ? ? ? ? ? ? ? ? ? ? /* NOTE: If the codec(like WM9713) can't ouput just
+>> + ? ? ? ? ? ? ? ? ? ? ?* one slot, it *seems* our AC97 controller reads
+>> + ? ? ? ? ? ? ? ? ? ? ?* two slots(if one of them is Slot-6) for MIC also.
+>> + ? ? ? ? ? ? ? ? ? ? ?* For such cases, we record Stereo.
+>> + ? ? ? ? ? ? ? ? ? ? ?*/
+>
+> Similarly here.
+>
+>> + ? ? if (ac97_pdata->cfg_gpio(pdev)) {
+>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to configure gpio\n");
+>> + ? ? ? ? ? ? ret = -EINVAL;
+>> + ? ? ? ? ? ? goto lb3;
+>> + ? ? }
+>
+> Should really check for the function being non-NULL here.
+already checked at the start and probe fails if its NULL
+
+>> +lb5:
+>> + ? ? free_irq(irq_res->start, NULL);
+>
+> Perhaps a better name than 'lb' - err, or fail or something. ?lb means
+> nothing to me at least.
+means label to me :)
+
+>> + ? ? irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> + ? ? if (irq_res)
+>> + ? ? ? ? ? ? free_irq(irq_res->start, NULL);
+>
+> This should never get called if the resources aren't allocated.
+but the static code analyser doesn't understand that.
