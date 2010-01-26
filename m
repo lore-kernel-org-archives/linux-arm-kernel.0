@@ -1,43 +1,18 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 05:23:18 +0000
-Subject: whoever is using ymiao3@marvell.com please stop it
-In-Reply-To: <f17812d71001251730p4747199bhd4176d5835073b56@mail.gmail.com>
-References: <20100125014024.GA4609@trinity.fluff.org>
-	<f17812d71001251730p4747199bhd4176d5835073b56@mail.gmail.com>
-Message-ID: <20100126052317.GY10014@trinity.fluff.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 26 Jan 2010 14:01:15 +0800
+Subject: [PATCH] RFC: make struct platform_driver.id_table const
+In-Reply-To: <4B5E092B.3070801@gmail.com>
+References: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100125013421.GL26562@trinity.fluff.org> <4B5CFEBE.2070906@gmail.com>
+	<20100125074242.GA12480@pengutronix.de> <4B5E092B.3070801@gmail.com>
+Message-ID: <f17812d71001252201n215f2a9y1906fef630726dbe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 09:30:39AM +0800, Eric Miao wrote:
-> That's mine original email, and is invalid now. Everyone please stop using it.
-> 
-> Thanks and sorry to bother.
-> - eric
+I seems to remember a similar patch sent to GregKH weeks ago and
+should be sitting somewhere but this one looks to be more complete.
 
+Uwe, maybe you can file an incremental patch, or GregKH may help
+to drop mine and merge this instead, either way is OK to me.
 
-Hmm, somehow it got insetred into the last email I sent, as I got a bounce
-even though it wasn't aparently to that address.
- 
-> On Mon, Jan 25, 2010 at 9:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > Getting bounces for ymiao3 at marvell.com from marvell.com after replying
-> > to the platform device changes from Uwe Kleine-K???i
-> >
-> > --
-> > Ben
-> >
-> > Q: ? ? ?What's a light-year?
-> > A: ? ? ?One-third less calories than a regular year.
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+- eric
