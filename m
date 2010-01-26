@@ -1,26 +1,22 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 26 Jan 2010 20:57:56 +0900
-Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
-In-Reply-To: <20100126110945.GJ15759@rakim.wolfsonmicro.main>
-References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
-	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
-	<20100126102343.GA24843@trinity.fluff.org>
-	<1b68c6791001260303m38e6e689p2ee8c2c4c6ac2af3@mail.gmail.com>
-	<20100126110945.GJ15759@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6791001260357p62b5c10dpfa2a5ddcae0704dd@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 26 Jan 2010 11:59:04 +0000
+Subject: whoever is using ymiao3@marvell.com please stop it
+In-Reply-To: <20100126113534.GF20792@pengutronix.de>
+References: <20100125014024.GA4609@trinity.fluff.org>
+	<f17812d71001251730p4747199bhd4176d5835073b56@mail.gmail.com>
+	<20100126052317.GY10014@trinity.fluff.org>
+	<20100126113534.GF20792@pengutronix.de>
+Message-ID: <20100126115903.GB32291@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 8:09 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jan 26, 2010 at 08:03:09PM +0900, jassi brar wrote:
->
->> The only reason I didn't submit patch to delete s3c2443-ac97.c is that my
->> ?smdk2443 didn't produce any sound. (btw the s3c2443-ac97.c also fails to do so)
->
-> If they both work equally well please just go ahead and remove the old
-> driver. ?Keeping the old driver around if it doesn't work is likely to
-> result in any fixups going into that.
-ok, will submit a patch for that too.
-Btw, I don't have ln2440sbc and don't know how would it take the change,
-though I sincerely think it should be just fine.
+On Tue, Jan 26, 2010 at 12:35:34PM +0100, Uwe Kleine-K?nig wrote:
+
+> I'd suggest to check if the address is listed in .mailmap and use the
+> first entry for that person.  This would need some work to adapt
+> .mailmap, as .mailmap mainly collects wrong entries.
+
+This breaks when you get multiple people with the same name - I'm not
+the only Mark Brown for example (though I don't think any others are
+actually contributing patches).  It'd be better to add an explicit mail
+address rewriting feature (.forward?).
