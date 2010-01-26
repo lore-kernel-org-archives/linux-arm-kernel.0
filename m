@@ -1,42 +1,49 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 26 Jan 2010 14:23:56 +0300
-Subject: gpio_keys and how PXA27x sets gpio_set_wake() (was Re: sharp
-	c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1)
-In-Reply-To: <1264502668.4480.97.camel@utx.utx.cz>
-References: <20100106071026.GD1382@ucw.cz>
-	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
-	<20100107065230.GA1303@ucw.cz>
-	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
-	<1264275669.9100.11.camel@utx.utx.cz>
-	<1264286611.11766.49.camel@utx.utx.cz>
-	<f17812d71001251958t377e158bxc64aac0cb426110b@mail.gmail.com>
-	<1264500824.4480.79.camel@utx.utx.cz>
-	<f17812d71001260220v5d03b0e1u1e3bc229827c37c8@mail.gmail.com>
-	<1264502668.4480.97.camel@utx.utx.cz>
-Message-ID: <bc64b4641001260323y496bf7cdv507085644fadb0fe@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 26 Jan 2010 11:28:00 +0000
+Subject: [PATCH 2/4] mfd: update irq handler in max8925
+In-Reply-To: <771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
+References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
+	<20100125115930.GE22909@sirena.org.uk>
+	<771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
+Message-ID: <20100126112800.GL15759@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jan 25, 2010 at 10:12:39PM -0500, Haojian Zhuang wrote:
+> On Mon, Jan 25, 2010 at 6:59 AM, Mark Brown
+> > On Mon, Jan 25, 2010 at 06:08:19AM -0500, Haojian Zhuang wrote:
 
-2010/1/26 Stanislav Brabec <utx@penguin.cz>:
-> Eric Miao wrote:
->> > The problem affects gpio_keys: It is a driver implementing "one key per
->> > gpio". It now handles On/Off and lid switches on Zaurus. Lid switches
->> > are on "normal" GPIOs, On/Off switch is wired to PKWR capable GPIO.
->> Ain't On/Off switch one of the matrix key? And so SPITZ_GPIO_KEY_INT
->> could be used to handle that?
->
-> No. On/Off is connected directly to GPIO 95. Other keys use strobe/sense
-> matrix keypad.
->
-> SPITZ_GPIO_KEY_INT is a bit unspecific. I think it means: Charger was
-> inserted or key was pressed or On/Off was pressed.
+> >> + ? ? ? ? ? ? else if (value & irq_data->offs) {
+> >> + ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Noboday cares IRQ #%d. Mask it\n",
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->irq_base + i);
+> >> + ? ? ? ? ? ? ? ? ? ? max8925_set_bits(i2c, irq_data->mask_reg,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_data->offs, irq_data->offs);
 
-This seems to be true. At least they used the same design on tosa and other
-zaurii.
+> > genirq ought to be handling this for you?
 
+> No, genirq doesn't know this. I let the thread_fn to take this job.
 
--- 
-With best wishes
-Dmitry
+This suggests that something is wrong somewhere else - genirq will
+normally warn if an interrupt is reported without being handled which
+looks like what this code is trying to achieve.  Looking at the patch
+I expect you should just be able to drop the test you're doing
+immediately before the quoted code to see if the interrupt is enabled
+and call handle_nested_irq() unconditionally, genirq should generate a
+warning and mask the IRQ if it's not handled which is what your code
+here is doing.
+
+> >> + * clear_irq: operation on clearing status of nIRQ pin in platform
+> >> + * clear_tsc_irq: operation on clearing status of nTIRQ pin in platform
+> >> + */
+
+> > Shouldn't these also be handled by genirq as functions of the interrupt
+> > controller that the chip is chained from?
+
+> Because PMIC IRQ is connected to the special pin of CPU. CPU needs to
+> clear pin status in external. genirq shouldn't take care on it. I have
+> to use this ugly way to clear pin status.
+
+I would expect this to be handled by the special pin on the CPU being an
+irq_chip, or by having the existing interrupt controller handle this pin
+properly.  The need to ack is going to be there for anything that ends
+up hanging off this special IRQ, isn't it?
