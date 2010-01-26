@@ -1,39 +1,22 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 14:52:10 +0000
-Subject: [PATCH 0/4] Add s3c64xx support to touchscreen driver
-In-Reply-To: <b2e8f9f71001221447r56b29abboa81736fb1451cdde@mail.gmail.com>
-References: <b2e8f9f71001221447r56b29abboa81736fb1451cdde@mail.gmail.com>
-Message-ID: <20100126145210.GC9153@trinity.fluff.org>
+Date: Tue, 26 Jan 2010 14:52:49 +0000
+Subject: [PATCH 1/4] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
+In-Reply-To: <b2e8f9f71001221447r7feb098fx2e5b06126c1556da@mail.gmail.com>
+References: <b2e8f9f71001221447r7feb098fx2e5b06126c1556da@mail.gmail.com>
+Message-ID: <20100126145249.GD9153@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2010 at 11:47:05PM +0100, Maurus Cuelenaere wrote:
-> Hi,
+On Fri, Jan 22, 2010 at 11:47:08PM +0100, Maurus Cuelenaere wrote:
+> ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
 > 
-> these patches add support for the s3c64xx platforms to the touchscreen driver.
-> This was based on next-samsung in Ben Dook's tree.
+> This moves mach-s3c2410/include/mach/ts.h to plat-samsung/include/plat/ts.h in
+> order to prepare for s3c64xx support in the touchscreen driver.
 > 
-> These depend on:
-> [PATCH] ARM: SAMSUNG: Fix null pointer dereference in ADC driver
+> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 
-should be in for-rmk/samsung3
- 
-> I'm not quite sure regarding the resources in patch 3, perhaps these should be
-> somehow shared with the ADC driver? (I also can't seem to figure out how the
-> s3c24xx handles this at the moment..)
+git rename detection please.
 
-I'll try and give this some thought, however we're in the middle of some
-reworks in this area and it might take time to think about it.
- 
-> Regards,
-> Maurus Cuelenaere
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
 -- 
 Ben
 
