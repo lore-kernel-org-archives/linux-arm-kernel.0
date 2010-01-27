@@ -1,28 +1,28 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 27 Jan 2010 19:04:29 +0900
-Subject: [PATCH v4 8/8] ARM: S5PV210: Add S5PC110 configuration file
-Message-ID: <1264586669-23096-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 27 Jan 2010 19:04:24 +0900
+Subject: [PATCH v4 7/8] ARM: S5PV210: Add S5PV210 configuration file
+Message-ID: <1264586664-23063-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds S5PC110 default configuration file.
+This patch adds S5PV210 default configuration file.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/configs/s5pc110_defconfig |  892 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/s5pv210_defconfig |  892 ++++++++++++++++++++++++++++++++++++
  1 files changed, 892 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/s5pc110_defconfig
+ create mode 100644 arch/arm/configs/s5pv210_defconfig
 
-diff --git a/arch/arm/configs/s5pc110_defconfig b/arch/arm/configs/s5pc110_defconfig
+diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
 new file mode 100644
-index 0000000..3707401
+index 0000000..514296c
 --- /dev/null
-+++ b/arch/arm/configs/s5pc110_defconfig
++++ b/arch/arm/configs/s5pv210_defconfig
 @@ -0,0 +1,892 @@
 +#
 +# Automatically generated make config: don't edit
 +# Linux kernel version: 2.6.33-rc4
-+# Tue Jan 26 11:13:33 2010
++# Tue Jan 26 11:11:07 2010
 +#
 +CONFIG_ARM=y
 +CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -265,8 +265,8 @@ index 0000000..3707401
 +CONFIG_S3C_GPIO_TRACK=y
 +CONFIG_PLAT_S5P=y
 +CONFIG_CPU_S5PV210=y
-+# CONFIG_MACH_SMDKV210 is not set
-+CONFIG_MACH_SMDKC110=y
++CONFIG_MACH_SMDKV210=y
++# CONFIG_MACH_SMDKC110 is not set
 +
 +#
 +# Processor Type
