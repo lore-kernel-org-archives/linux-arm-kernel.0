@@ -1,667 +1,318 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 27 Jan 2010 11:45:24 +0900
-Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
-In-Reply-To: <1b68c6791001260303m38e6e689p2ee8c2c4c6ac2af3@mail.gmail.com>
-References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
-	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
-	<20100126102343.GA24843@trinity.fluff.org>
-	<1b68c6791001260303m38e6e689p2ee8c2c4c6ac2af3@mail.gmail.com>
-Message-ID: <1b68c6791001261845y7635b92dm2fd4c7ad240d40c7@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 26 Jan 2010 20:17:11 -0700 (MST)
+Subject: [PATCH] OMAP2+ powerdomains/clockdomains: prepare for multi-OMAP
+	configs
+Message-ID: <alpine.DEB.2.00.1001262015210.18597@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 8:03 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
-> On Tue, Jan 26, 2010 at 7:23 PM, Ben Dooks <ben-linux@fluff.org> wrote:
->> On Tue, Jan 26, 2010 at 02:51:40PM +0900, jassisinghbrar at gmail.com wrote:
->>> From: Jassi Brar <jassi.brar@samsung.com>
->>>
->>> Add the AC97 controller driver for Samsung SoCs that have one.
->>>
->>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
->>> ---
->>> ?sound/soc/s3c24xx/Kconfig ? ?| ? ?6 +-
->>> ?sound/soc/s3c24xx/Makefile ? | ? ?3 +-
->>> ?sound/soc/s3c24xx/s3c-ac97.c | ?535 ++++++++++++++++++++++++++++++++++++++++++
->>> ?sound/soc/s3c24xx/s3c-ac97.h | ? 23 ++
->>> ?4 files changed, 565 insertions(+), 2 deletions(-)
->>> ?create mode 100644 sound/soc/s3c24xx/s3c-ac97.c
->>> ?create mode 100644 sound/soc/s3c24xx/s3c-ac97.h
->>>
->>> diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
->>> index b489f1a..ad3690e 100644
->>> --- a/sound/soc/s3c24xx/Kconfig
->>> +++ b/sound/soc/s3c24xx/Kconfig
->>> @@ -32,7 +32,11 @@ config SND_S3C2443_SOC_AC97
->>> ? ? ? select S3C2410_DMA
->>> ? ? ? select AC97_BUS
->>> ? ? ? select SND_SOC_AC97_BUS
->>> -
->>> +
->>> +config SND_S3C_SOC_AC97
->>> + ? ? tristate
->>> + ? ? select SND_SOC_AC97_BUS
->>> +
->>> ?config SND_S3C24XX_SOC_NEO1973_WM8753
->>> ? ? ? tristate "SoC I2S Audio support for NEO1973 - WM8753"
->>> ? ? ? depends on SND_S3C24XX_SOC && MACH_NEO1973_GTA01
->>> diff --git a/sound/soc/s3c24xx/Makefile b/sound/soc/s3c24xx/Makefile
->>> index b744657..b7411bd 100644
->>> --- a/sound/soc/s3c24xx/Makefile
->>> +++ b/sound/soc/s3c24xx/Makefile
->>> @@ -4,12 +4,14 @@ snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
->>> ?snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
->>> ?snd-soc-s3c64xx-i2s-objs := s3c64xx-i2s.o
->>> ?snd-soc-s3c2443-ac97-objs := s3c2443-ac97.o
->>> +snd-soc-s3c-ac97-objs := s3c-ac97.o
->>> ?snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
->>> ?snd-soc-s3c-pcm-objs := s3c-pcm.o
->>>
->>> ?obj-$(CONFIG_SND_S3C24XX_SOC) += snd-soc-s3c24xx.o
->>> ?obj-$(CONFIG_SND_S3C24XX_SOC_I2S) += snd-soc-s3c24xx-i2s.o
->>> ?obj-$(CONFIG_SND_S3C2443_SOC_AC97) += snd-soc-s3c2443-ac97.o
->>> +obj-$(CONFIG_SND_S3C_SOC_AC97) += snd-soc-s3c-ac97.o
->>> ?obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
->>> ?obj-$(CONFIG_SND_S3C64XX_SOC_I2S) += snd-soc-s3c64xx-i2s.o
->>> ?obj-$(CONFIG_SND_S3C_I2SV2_SOC) += snd-soc-s3c-i2s-v2.o
->>> @@ -37,4 +39,3 @@ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC) += snd-soc-s3c24xx-simtec.o
->>> ?obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_HERMES) += snd-soc-s3c24xx-simtec-hermes.o
->>> ?obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_TLV320AIC23) += snd-soc-s3c24xx-simtec-tlv320aic23.o
->>> ?obj-$(CONFIG_SND_S3C64XX_SOC_WM8580) += snd-soc-smdk64xx-wm8580.o
->>> -
->>> diff --git a/sound/soc/s3c24xx/s3c-ac97.c b/sound/soc/s3c24xx/s3c-ac97.c
->>> new file mode 100644
->>> index 0000000..acb8f51
->>> --- /dev/null
->>> +++ b/sound/soc/s3c24xx/s3c-ac97.c
->>> @@ -0,0 +1,535 @@
->>> +/* sound/soc/s3c24xx/s3c-ac97.c
->>> + *
->>> + * ALSA SoC Audio Layer - S3C AC97 Controller driver
->>> + * ? Evolved from s3c2443-ac97.c
->>> + *
->>> + * Copyright (c) 2010 Samsung Electronics Co. Ltd
->>> + * ? Author: Jaswinder Singh <jassi.brar@samsung.com>
->>> + * ? Credits: Graeme Gregory, Sean Choi
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/init.h>
->>> +#include <linux/module.h>
->>> +#include <linux/io.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/clk.h>
->>> +
->>> +#include <sound/soc.h>
->>> +
->>> +#include <plat/regs-ac97.h>
->>> +#include <mach/dma.h>
->>> +#include <plat/audio.h>
->>> +
->>> +#include "s3c-dma.h"
->>> +#include "s3c-ac97.h"
->>> +
->>> +#define AC_CMD_ADDR(x) (x << 16)
->>> +#define AC_CMD_DATA(x) (x & 0xffff)
->>> +
->>> +struct s3c_ac97_info {
->>> + ? ? unsigned ? ? ? ? ? state;
->>> + ? ? struct clk ? ? ? ? *ac97_clk;
->>> + ? ? void __iomem ? ? ? *regs;
->>> + ? ? struct mutex ? ? ? lock;
->>> + ? ? struct completion ?done;
->>> +};
->>> +static struct s3c_ac97_info s3c_ac97;
->>> +
->>> +static struct s3c2410_dma_client s3c_dma_client_out = {
->>> + ? ? .name = "AC97 PCMOut"
->>> +};
->>> +
->>> +static struct s3c2410_dma_client s3c_dma_client_in = {
->>> + ? ? .name = "AC97 PCMIn"
->>> +};
->>> +
->>> +static struct s3c2410_dma_client s3c_dma_client_micin = {
->>> + ? ? .name = "AC97 MicIn"
->>> +};
->>> +
->>> +static struct s3c_dma_params s3c_ac97_pcm_out = {
->>> + ? ? .client ? ? ? ? = &s3c_dma_client_out,
->>> + ? ? .dma_size ? ? ? = 4,
->>> +};
->>> +
->>> +static struct s3c_dma_params s3c_ac97_pcm_in = {
->>> + ? ? .client ? ? ? ? = &s3c_dma_client_in,
->>> + ? ? .dma_size ? ? ? = 4,
->>> +};
->>> +
->>> +static struct s3c_dma_params s3c_ac97_mic_in = {
->>> + ? ? .client ? ? ? ? = &s3c_dma_client_micin,
->>> + ? ? .dma_size ? ? ? = 4,
->>> +};
->>> +
->>> +static void s3c_ac97_cold_reset(struct snd_ac97 *ac97)
->>> +{
->>> + ? ? writel(S3C_AC97_GLBCTRL_COLDRESET,
->>> + ? ? ? ? ? ? ? ? ? ? s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +
->>> + ? ? writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +}
->>> +
->>> +static void s3c_ac97_warm_reset(struct snd_ac97 *ac97)
->>> +{
->>> + ? ? writel(S3C_AC97_GLBCTRL_WARMRESET, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +
->>> + ? ? writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +}
->>
->> It would be nice t osee something to convert a 'struct snd_ac97' to a
->> 'struct s3c_ac97_info' as this is being passed in to most place and
->> would also help if there is ever >1 block.
-> ok, will find a way to do that.
-after looking, I found there is no convenient way to extract driver private
-data from the snd_ac97 structure. Its possible, but after ugly voodoo
-stuff.  Not to forget that no other ASoC ac97 controller driver does
-it either.
-And since we have just 1 AC97 controller in SoCs till date(no plans of
-adding another anytime soon) I think we can live with it?
 
->>> +static void s3c_ac97_activate(struct snd_ac97 *ac97)
->>> +{
->>> + ? ? u32 ac_glbctrl, stat;
->>> +
->>> + ? ? stat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT) & 0x7;
->>> + ? ? switch (stat) {
->>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_ACTIVE:
->>> + ? ? ? ? ? ? return;
->>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_READY:
->>> + ? ? case S3C_AC97_GLBSTAT_MAINSTATE_INIT:
->>> + ? ? ? ? ? ? break;
->>> + ? ? default:
->>> + ? ? ? ? ? ? s3c_ac97_cold_reset(ac97);
->>> + ? ? ? ? ? ? s3c_ac97_warm_reset(ac97);
->>> + ? ? ? ? ? ? break;
->>> + ? ? }
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +
->>> + ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_TRANSFERDATAENABLE;
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? msleep(1);
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? INIT_COMPLETION(s3c_ac97.done);
->>> +
->>> + ? ? if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
->>> + ? ? ? ? ? ? printk(KERN_ERR "AC97: Unable to activate!");
->>> +}
->>> +
->>> +static unsigned short s3c_ac97_read(struct snd_ac97 *ac97,
->>> + ? ? unsigned short reg)
->>> +{
->>> + ? ? u32 ac_glbctrl, ac_codec_cmd;
->>> + ? ? u32 stat, addr, data;
->>> +
->>> + ? ? mutex_lock(&s3c_ac97.lock);
->>> +
->>> + ? ? s3c_ac97_activate(ac97);
->>> +
->>> + ? ? ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> + ? ? ac_codec_cmd = S3C_AC97_CODEC_CMD_READ | AC_CMD_ADDR(reg);
->>> + ? ? writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> +
->>> + ? ? udelay(50);
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? INIT_COMPLETION(s3c_ac97.done);
->>> +
->>> + ? ? if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
->>> + ? ? ? ? ? ? printk(KERN_ERR "AC97: Unable to read!");
->>> +
->>> + ? ? stat = readl(s3c_ac97.regs + S3C_AC97_STAT);
->>> + ? ? addr = (stat >> 16) & 0x7f;
->>> + ? ? data = (stat & 0xffff);
->>> +
->>> + ? ? if (addr != reg)
->>> + ? ? ? ? ? ? printk(KERN_ERR "s3c-ac97: req addr = %02x,"
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? " rep addr = %02x\n", reg, addr);
->>> +
->>> + ? ? mutex_unlock(&s3c_ac97.lock);
->>> +
->>> + ? ? return (unsigned short)data;
->>> +}
->>> +
->>> +static void s3c_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
->>> + ? ? unsigned short val)
->>> +{
->>> + ? ? u32 ac_glbctrl, ac_codec_cmd;
->>> +
->>> + ? ? mutex_lock(&s3c_ac97.lock);
->>> +
->>> + ? ? s3c_ac97_activate(ac97);
->>> +
->>> + ? ? ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> + ? ? ac_codec_cmd = AC_CMD_ADDR(reg) | AC_CMD_DATA(val);
->>> + ? ? writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> +
->>> + ? ? udelay(50);
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? INIT_COMPLETION(s3c_ac97.done);
->>> +
->>> + ? ? if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
->>> + ? ? ? ? ? ? printk(KERN_ERR "AC97: Unable to write!");
->>> +
->>> + ? ? ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> + ? ? ac_codec_cmd |= S3C_AC97_CODEC_CMD_READ;
->>> + ? ? writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
->>> +
->>> + ? ? mutex_unlock(&s3c_ac97.lock);
->>> +}
->>> +
->>> +static irqreturn_t s3c_ac97_irq(int irq, void *dev_id)
->>> +{
->>> + ? ? u32 ac_glbctrl, ac_glbstat;
->>> +
->>> + ? ? ac_glbstat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT);
->>> +
->>> + ? ? if (ac_glbstat & S3C_AC97_GLBSTAT_CODECREADY) {
->>> +
->>> + ? ? ? ? ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ? ? ? ? ac_glbctrl &= ~S3C_AC97_GLBCTRL_CODECREADYIE;
->>> + ? ? ? ? ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? ? ? ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ? ? ? ? ac_glbctrl |= (1<<30); /* Clear interrupt */
->>> + ? ? ? ? ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? ? ? ? ? complete(&s3c_ac97.done);
->>> + ? ? }
->>> +
->>> + ? ? return IRQ_HANDLED;
->>> +}
->>> +
->>> +struct snd_ac97_bus_ops soc_ac97_ops = {
->>> + ? ? .read ? ? ? = s3c_ac97_read,
->>> + ? ? .write ? ? ?= s3c_ac97_write,
->>> + ? ? .warm_reset = s3c_ac97_warm_reset,
->>> + ? ? .reset ? ? ?= s3c_ac97_cold_reset,
->>> +};
->>> +EXPORT_SYMBOL_GPL(soc_ac97_ops);
->>> +
->>> +static int s3c_ac97_hw_params(struct snd_pcm_substream *substream,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_pcm_hw_params *params,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_soc_dai *dai)
->>> +{
->>> + ? ? struct snd_soc_pcm_runtime *rtd = substream->private_data;
->>> + ? ? struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
->>> +
->>> + ? ? if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
->>> + ? ? ? ? ? ? cpu_dai->dma_data = &s3c_ac97_pcm_out;
->>> + ? ? else
->>> + ? ? ? ? ? ? cpu_dai->dma_data = &s3c_ac97_pcm_in;
->>> +
->>> + ? ? return 0;
->>> +}
->>> +
->>> +static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_soc_dai *dai)
->>> +{
->>> + ? ? u32 ac_glbctrl;
->>> + ? ? struct snd_soc_pcm_runtime *rtd = substream->private_data;
->>> + ? ? int channel = ((struct s3c_dma_params *)
->>> + ? ? ? ? ? ? ? rtd->dai->cpu_dai->dma_data)->channel;
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
->>> + ? ? ? ? ? ? ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMINTM_MASK;
->>> + ? ? else
->>> + ? ? ? ? ? ? ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMOUTTM_MASK;
->>> +
->>> + ? ? switch (cmd) {
->>> + ? ? case SNDRV_PCM_TRIGGER_START:
->>> + ? ? case SNDRV_PCM_TRIGGER_RESUME:
->>> + ? ? case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
->>> + ? ? ? ? ? ? if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
->>> + ? ? ? ? ? ? ? ? ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_PCMINTM_DMA;
->>> + ? ? ? ? ? ? else
->>> + ? ? ? ? ? ? ? ? ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_PCMOUTTM_DMA;
->>> + ? ? ? ? ? ? break;
->>> +
->>> + ? ? case SNDRV_PCM_TRIGGER_STOP:
->>> + ? ? case SNDRV_PCM_TRIGGER_SUSPEND:
->>> + ? ? case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
->>> + ? ? ? ? ? ? break;
->>> + ? ? }
->>> +
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
->>> +
->>> + ? ? return 0;
->>> +}
->>> +
->>> +static int s3c_ac97_hw_mic_params(struct snd_pcm_substream *substream,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_pcm_hw_params *params,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_soc_dai *dai)
->>> +{
->>> + ? ? struct snd_soc_pcm_runtime *rtd = substream->private_data;
->>> + ? ? struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
->>> +
->>> + ? ? if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
->>> + ? ? ? ? ? ? return -ENODEV;
->>> + ? ? else
->>> + ? ? ? ? ? ? cpu_dai->dma_data = &s3c_ac97_mic_in;
->>> +
->>> + ? ? return 0;
->>> +}
->>> +
->>> +static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int cmd, struct snd_soc_dai *dai)
->>> +{
->>> + ? ? u32 ac_glbctrl;
->>> + ? ? struct snd_soc_pcm_runtime *rtd = substream->private_data;
->>> + ? ? int channel = ((struct s3c_dma_params *)
->>> + ? ? ? ? ? ? ? rtd->dai->cpu_dai->dma_data)->channel;
->>> +
->>> + ? ? ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> + ? ? ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
->>> +
->>> + ? ? switch (cmd) {
->>> + ? ? case SNDRV_PCM_TRIGGER_START:
->>> + ? ? case SNDRV_PCM_TRIGGER_RESUME:
->>> + ? ? case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
->>> + ? ? ? ? ? ? ac_glbctrl |= S3C_AC97_GLBCTRL_MICINTM_DMA;
->>> + ? ? ? ? ? ? break;
->>> +
->>> + ? ? case SNDRV_PCM_TRIGGER_STOP:
->>> + ? ? case SNDRV_PCM_TRIGGER_SUSPEND:
->>> + ? ? case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
->>> + ? ? ? ? ? ? break;
->>> + ? ? }
->>> +
->>> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->>> +
->>> + ? ? s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
->>> +
->>> + ? ? return 0;
->>> +}
->>> +
->>> +#define S3C_AC97_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
->>> + ? ? ? ? ? ? SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | \
->>> + ? ? ? ? ? ? SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
->>> + ? ? ? ? ? ? SNDRV_PCM_RATE_48000)
->>> +
->>> +static struct snd_soc_dai_ops s3c_ac97_dai_ops = {
->>> + ? ? .hw_params ? ? ?= s3c_ac97_hw_params,
->>> + ? ? .trigger ? ? ? ?= s3c_ac97_trigger,
->>> +};
->>> +
->>> +static struct snd_soc_dai_ops s3c_ac97_mic_dai_ops = {
->>> + ? ? .hw_params ? ? ?= s3c_ac97_hw_mic_params,
->>> + ? ? .trigger ? ? ? ?= s3c_ac97_mic_trigger,
->>> +};
->>> +
->>> +struct snd_soc_dai s3c_ac97_dai[] = {
->>> + ? ? [S3C_AC97_DAI_PCM] = {
->>> + ? ? ? ? ? ? .name = "s3c-ac97",
->>> + ? ? ? ? ? ? .id = S3C_AC97_DAI_PCM,
->>> + ? ? ? ? ? ? .ac97_control = 1,
->>> + ? ? ? ? ? ? .playback = {
->>> + ? ? ? ? ? ? ? ? ? ? .stream_name = "AC97 Playback",
->>> + ? ? ? ? ? ? ? ? ? ? .channels_min = 2,
->>> + ? ? ? ? ? ? ? ? ? ? .channels_max = 2,
->>> + ? ? ? ? ? ? ? ? ? ? .rates = S3C_AC97_RATES,
->>> + ? ? ? ? ? ? ? ? ? ? .formats = SNDRV_PCM_FMTBIT_S16_LE,},
->>> + ? ? ? ? ? ? .capture = {
->>> + ? ? ? ? ? ? ? ? ? ? .stream_name = "AC97 Capture",
->>> + ? ? ? ? ? ? ? ? ? ? /* NOTE: If the codec ouputs just one slot,
->>> + ? ? ? ? ? ? ? ? ? ? ?* it *seems* our AC97 controller reads the only
->>> + ? ? ? ? ? ? ? ? ? ? ?* valid slot(if either 3 or 4) for PCM-In.
->>> + ? ? ? ? ? ? ? ? ? ? ?* For such cases, we record Mono.
->>> + ? ? ? ? ? ? ? ? ? ? ?*/
->>> + ? ? ? ? ? ? ? ? ? ? .channels_min = 1,
->>> + ? ? ? ? ? ? ? ? ? ? .channels_max = 2,
->>> + ? ? ? ? ? ? ? ? ? ? .rates = S3C_AC97_RATES,
->>> + ? ? ? ? ? ? ? ? ? ? .formats = SNDRV_PCM_FMTBIT_S16_LE,},
->>> + ? ? ? ? ? ? .ops = &s3c_ac97_dai_ops,
->>> + ? ? },
->>> + ? ? [S3C_AC97_DAI_MIC] = {
->>> + ? ? ? ? ? ? .name = "s3c-ac97-mic",
->>> + ? ? ? ? ? ? .id = S3C_AC97_DAI_MIC,
->>> + ? ? ? ? ? ? .ac97_control = 1,
->>> + ? ? ? ? ? ? .capture = {
->>> + ? ? ? ? ? ? ? ? ? ? .stream_name = "AC97 Mic Capture",
->>> + ? ? ? ? ? ? ? ? ? ? .channels_min = 1,
->>> + ? ? ? ? ? ? ? ? ? ? /* NOTE: If the codec(like WM9713) can't ouput just
->>> + ? ? ? ? ? ? ? ? ? ? ?* one slot, it *seems* our AC97 controller reads
->>> + ? ? ? ? ? ? ? ? ? ? ?* two slots(if one of them is Slot-6) for MIC also.
->>> + ? ? ? ? ? ? ? ? ? ? ?* For such cases, we record Stereo.
->>> + ? ? ? ? ? ? ? ? ? ? ?*/
->>> + ? ? ? ? ? ? ? ? ? ? .channels_max = 2,
->>> + ? ? ? ? ? ? ? ? ? ? .rates = S3C_AC97_RATES,
->>> + ? ? ? ? ? ? ? ? ? ? .formats = SNDRV_PCM_FMTBIT_S16_LE,},
->>> + ? ? ? ? ? ? .ops = &s3c_ac97_mic_dai_ops,
->>> + ? ? },
->>> +};
->>> +EXPORT_SYMBOL_GPL(s3c_ac97_dai);
->>> +
->>> +static __devinit int s3c_ac97_probe(struct platform_device *pdev)
->>> +{
->>> + ? ? struct resource *mem_res, *dmatx_res, *dmarx_res, *dmamic_res, *irq_res;
->>> + ? ? struct s3c_audio_pdata *ac97_pdata;
->>> + ? ? int ret;
->>> +
->>> + ? ? ac97_pdata = pdev->dev.platform_data;
->>> + ? ? if (!ac97_pdata || !ac97_pdata->cfg_gpio) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "cfg_gpio callback not provided!\n");
->>> + ? ? ? ? ? ? return -EINVAL;
->>> + ? ? }
->>> +
->>> + ? ? /* Check for availability of necessary resource */
->>> + ? ? dmatx_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
->>> + ? ? if (!dmatx_res) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to get AC97-TX dma resource\n");
->>> + ? ? ? ? ? ? return -ENXIO;
->>> + ? ? }
->>> +
->>> + ? ? dmarx_res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
->>> + ? ? if (!dmarx_res) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to get AC97-RX dma resource\n");
->>> + ? ? ? ? ? ? return -ENXIO;
->>> + ? ? }
->>> +
->>> + ? ? dmamic_res = platform_get_resource(pdev, IORESOURCE_DMA, 2);
->>> + ? ? if (!dmamic_res) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to get AC97-MIC dma resource\n");
->>> + ? ? ? ? ? ? return -ENXIO;
->>> + ? ? }
->>> +
->>> + ? ? mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> + ? ? if (!mem_res) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to get register resource\n");
->>> + ? ? ? ? ? ? return -ENXIO;
->>> + ? ? }
->>> +
->>> + ? ? irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->>> + ? ? if (!irq_res) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "AC97 IRQ not provided!\n");
->>> + ? ? ? ? ? ? return -ENXIO;
->>> + ? ? }
->>> +
->>> + ? ? if (!request_mem_region(mem_res->start,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? resource_size(mem_res), "s3c-ac97")) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to request register region\n");
->>> + ? ? ? ? ? ? return -EBUSY;
->>> + ? ? }
->>> +
->>> + ? ? s3c_ac97_pcm_out.channel = dmatx_res->start;
->>> + ? ? s3c_ac97_pcm_out.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
->>> + ? ? s3c_ac97_pcm_in.channel = dmarx_res->start;
->>> + ? ? s3c_ac97_pcm_in.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
->>> + ? ? s3c_ac97_mic_in.channel = dmamic_res->start;
->>> + ? ? s3c_ac97_mic_in.dma_addr = mem_res->start + S3C_AC97_MIC_DATA;
->>> +
->>> + ? ? init_completion(&s3c_ac97.done);
->>> + ? ? mutex_init(&s3c_ac97.lock);
->>> +
->>> + ? ? s3c_ac97.regs = ioremap(mem_res->start, resource_size(mem_res));
->>> + ? ? if (s3c_ac97.regs == NULL) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to ioremap register region\n");
->>> + ? ? ? ? ? ? ret = -ENXIO;
->>> + ? ? ? ? ? ? goto lb1;
->>> + ? ? }
->>> +
->>> + ? ? s3c_ac97.ac97_clk = clk_get(&pdev->dev, "ac97");
->>> + ? ? if (IS_ERR(s3c_ac97.ac97_clk)) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "s3c-ac97 failed to get ac97_clock\n");
->>> + ? ? ? ? ? ? ret = -ENODEV;
->>> + ? ? ? ? ? ? goto lb2;
->>> + ? ? }
->>> + ? ? clk_enable(s3c_ac97.ac97_clk);
->>> +
->>> + ? ? if (ac97_pdata->cfg_gpio(pdev)) {
->>> + ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to configure gpio\n");
->>> + ? ? ? ? ? ? ret = -EINVAL;
->>> + ? ? ? ? ? ? goto lb3;
->>> + ? ? }
->>> +
->>> + ? ? ret = request_irq(irq_res->start, s3c_ac97_irq,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "AC97", NULL);
->>> + ? ? if (ret < 0) {
->>> + ? ? ? ? ? ? printk(KERN_ERR "s3c-ac97: interrupt request failed.\n");
->>> + ? ? ? ? ? ? goto lb4;
->>> + ? ? }
->>> +
->>> + ? ? s3c_ac97_dai[S3C_AC97_DAI_PCM].dev = &pdev->dev;
->>> + ? ? s3c_ac97_dai[S3C_AC97_DAI_MIC].dev = &pdev->dev;
->>> +
->>> + ? ? ret = snd_soc_register_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
->>> + ? ? if (ret)
->>> + ? ? ? ? ? ? goto lb5;
->>> +
->>> + ? ? return 0;
->>> +
->>> +lb5:
->>> + ? ? free_irq(irq_res->start, NULL);
->>> +lb4:
->>> +lb3:
->>> + ? ? clk_disable(s3c_ac97.ac97_clk);
->>> + ? ? clk_put(s3c_ac97.ac97_clk);
->>> +lb2:
->>> + ? ? iounmap(s3c_ac97.regs);
->>> +lb1:
->>> + ? ? release_mem_region(mem_res->start, resource_size(mem_res));
->>> +
->>> + ? ? return ret;
->>> +}
->>> +
->>> +static __devexit int s3c_ac97_remove(struct platform_device *pdev)
->>> +{
->>> + ? ? struct resource *mem_res, *irq_res;
->>> +
->>> + ? ? snd_soc_unregister_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
->>> +
->>> + ? ? irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->>> + ? ? if (irq_res)
->>> + ? ? ? ? ? ? free_irq(irq_res->start, NULL);
->>> +
->>> + ? ? clk_disable(s3c_ac97.ac97_clk);
->>> + ? ? clk_put(s3c_ac97.ac97_clk);
->>> +
->>> + ? ? iounmap(s3c_ac97.regs);
->>> +
->>> + ? ? mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> + ? ? if (mem_res)
->>> + ? ? ? ? ? ? release_mem_region(mem_res->start, resource_size(mem_res));
->>> +
->>> + ? ? return 0;
->>> +}
->>> +
->>> +static struct platform_driver s3c_ac97_driver = {
->>> + ? ? .probe ?= s3c_ac97_probe,
->>> + ? ? .remove = s3c_ac97_remove,
->>> + ? ? .driver = {
->>> + ? ? ? ? ? ? .name = "s3c-ac97",
->>> + ? ? ? ? ? ? .owner = THIS_MODULE,
->>> + ? ? },
->>> +};
->>> +
->>> +static int __init s3c_ac97_init(void)
->>> +{
->>> + ? ? return platform_driver_register(&s3c_ac97_driver);
->>> +}
->>> +module_init(s3c_ac97_init);
->>> +
->>> +static void __exit s3c_ac97_exit(void)
->>> +{
->>> + ? ? platform_driver_unregister(&s3c_ac97_driver);
->>> +}
->>> +module_exit(s3c_ac97_exit);
->>> +
->>> +MODULE_AUTHOR("Jaswinder Singh, <jassi.brar@samsung.com>");
->>> +MODULE_DESCRIPTION("AC97 driver for the Samsung SoC");
->>> +MODULE_LICENSE("GPL");
->>> diff --git a/sound/soc/s3c24xx/s3c-ac97.h b/sound/soc/s3c24xx/s3c-ac97.h
->>> new file mode 100644
->>> index 0000000..2781983
->>> --- /dev/null
->>> +++ b/sound/soc/s3c24xx/s3c-ac97.h
->>> @@ -0,0 +1,23 @@
->>> +/* sound/soc/s3c24xx/s3c-ac97.h
->>> + *
->>> + * ALSA SoC Audio Layer - S3C AC97 Controller driver
->>> + * ? Evolved from s3c2443-ac97.h
->>> + *
->>> + * Copyright (c) 2010 Samsung Electronics Co. Ltd
->>> + * ? Author: Jaswinder Singh <jassi.brar@samsung.com>
->>> + * ? Credits: Graeme Gregory, Sean Choi
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#ifndef __S3C_AC97_H_
->>> +#define __S3C_AC97_H_
->>> +
->>> +#define S3C_AC97_DAI_PCM 0
->>> +#define S3C_AC97_DAI_MIC 1
->>> +
->>> +extern struct snd_soc_dai s3c_ac97_dai[];
->>> +
->>> +#endif /* __S3C_AC97_H_ */
->>> --
->>> 1.6.2.5
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->>
->> Out of interest, how similar are the two blocks and could the s3c2443
->> case be elided into this one with some minimal checks for which one is
->> currently in use?
-> Same except for a few 'dead' bits in 2443.
-> The only reason I didn't submit patch to delete s3c2443-ac97.c is that my
-> ?smdk2443 didn't produce any sound. (btw the s3c2443-ac97.c also fails to do so)
->
+Convert CONFIG_ARCH_OMAP34XX to CONFIG_ARCH_OMAP3, and
+CONFIG_ARCH_OMAP24XX to CONFIG_ARCH_OMAP2, in preparation for Tony's
+multi-OMAP patches.
+
+While here, update some copyrights, convert instances of "34xx" to
+"3xxx" where applicable, and convert preprocessor directives of the
+form
+
+    #if defined(CONFIG_ARCH_OMAP2) | defined(CONFIG_ARCH_OMAP3)
+
+to
+
+    #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+
+for standardization.
+
+This patch is queued for 2.6.34.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/clockdomains.h     |   50 ++++++++++++++++----------------
+ arch/arm/mach-omap2/powerdomains.h     |   16 +++++-----
+ arch/arm/mach-omap2/powerdomains34xx.h |   14 ++++----
+ 3 files changed, 40 insertions(+), 40 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clockdomains.h b/arch/arm/mach-omap2/clockdomains.h
+index fb026da..7db6298 100644
+--- a/arch/arm/mach-omap2/clockdomains.h
++++ b/arch/arm/mach-omap2/clockdomains.h
+@@ -1,8 +1,8 @@
+ /*
+  * OMAP2/3 clockdomains
+  *
+- * Copyright (C) 2008 Texas Instruments, Inc.
+- * Copyright (C) 2008-2009 Nokia Corporation
++ * Copyright (C) 2008-2009 Texas Instruments, Inc.
++ * Copyright (C) 2008-2010 Nokia Corporation
+  *
+  * Written by Paul Walmsley and Jouni H?gander
+  *
+@@ -196,9 +196,9 @@ static struct clkdm_dep mdm_2430_wkdeps[] = {
+ #endif /* CONFIG_ARCH_OMAP2430 */
+ 
+ 
+-/* 34XX-specific possible dependencies */
++/* OMAP3-specific possible dependencies */
+ 
+-#ifdef CONFIG_ARCH_OMAP34XX
++#ifdef CONFIG_ARCH_OMAP3
+ 
+ /* 3430: PM_WKDEP_PER: CORE, IVA2, MPU, WKUP */
+ static struct clkdm_dep per_wkdeps[] = {
+@@ -251,7 +251,7 @@ static struct clkdm_dep usbhost_wkdeps[] = {
+ };
+ 
+ /* 3430 PM_WKDEP_MPU: CORE, IVA2, DSS, PER */
+-static struct clkdm_dep mpu_34xx_wkdeps[] = {
++static struct clkdm_dep mpu_3xxx_wkdeps[] = {
+ 	{
+ 		.clkdm_name = "core_l3_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
+@@ -349,7 +349,7 @@ static struct clkdm_dep neon_wkdeps[] = {
+ };
+ 
+ 
+-/* Sleep dependency source arrays for 34xx-specific clkdms - 34XX only */
++/* Sleep dependency source arrays for OMAP3-specific clkdms */
+ 
+ /* 3430: CM_SLEEPDEP_DSS: MPU, IVA */
+ static struct clkdm_dep dss_sleepdeps[] = {
+@@ -413,7 +413,7 @@ static struct clkdm_dep gfx_sgx_sleepdeps[] = {
+ 	{ NULL },
+ };
+ 
+-#endif /* CONFIG_ARCH_OMAP34XX */
++#endif /* CONFIG_ARCH_OMAP3 */
+ 
+ 
+ /*
+@@ -425,7 +425,7 @@ static struct clkdm_dep gfx_sgx_sleepdeps[] = {
+  * sys_clkout/sys_clkout2.
+  */
+ 
+-#if defined(CONFIG_ARCH_OMAP24XX) | defined(CONFIG_ARCH_OMAP34XX)
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 
+ /* This is an implicit clockdomain - it is never defined as such in TRM */
+ static struct clockdomain wkup_clkdm = {
+@@ -626,18 +626,18 @@ static struct clockdomain dss_2430_clkdm = {
+ 
+ 
+ /*
+- * 34xx clockdomains
++ * OMAP3 clockdomains
+  */
+ 
+-#if defined(CONFIG_ARCH_OMAP34XX)
++#if defined(CONFIG_ARCH_OMAP3)
+ 
+-static struct clockdomain mpu_34xx_clkdm = {
++static struct clockdomain mpu_3xxx_clkdm = {
+ 	.name		= "mpu_clkdm",
+ 	.pwrdm		= { .name = "mpu_pwrdm" },
+ 	.flags		= CLKDM_CAN_HWSUP | CLKDM_CAN_FORCE_WAKEUP,
+ 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(MPU_MOD, OMAP2_CM_CLKSTCTRL),
+ 	.dep_bit	= OMAP3430_EN_MPU_SHIFT,
+-	.wkdep_srcs	= mpu_34xx_wkdeps,
++	.wkdep_srcs	= mpu_3xxx_wkdeps,
+ 	.clktrctrl_mask = OMAP3430_CLKTRCTRL_MPU_MASK,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+ };
+@@ -706,10 +706,10 @@ static struct clockdomain d2d_clkdm = {
+ 
+ /*
+  * XXX add usecounting for clkdm dependencies, otherwise the presence
+- * of a single dep bit for core_l3_34xx_clkdm and core_l4_34xx_clkdm
++ * of a single dep bit for core_l3_3xxx_clkdm and core_l4_3xxx_clkdm
+  * could cause trouble
+  */
+-static struct clockdomain core_l3_34xx_clkdm = {
++static struct clockdomain core_l3_3xxx_clkdm = {
+ 	.name		= "core_l3_clkdm",
+ 	.pwrdm		= { .name = "core_pwrdm" },
+ 	.flags		= CLKDM_CAN_HWSUP,
+@@ -721,10 +721,10 @@ static struct clockdomain core_l3_34xx_clkdm = {
+ 
+ /*
+  * XXX add usecounting for clkdm dependencies, otherwise the presence
+- * of a single dep bit for core_l3_34xx_clkdm and core_l4_34xx_clkdm
++ * of a single dep bit for core_l3_3xxx_clkdm and core_l4_3xxx_clkdm
+  * could cause trouble
+  */
+-static struct clockdomain core_l4_34xx_clkdm = {
++static struct clockdomain core_l4_3xxx_clkdm = {
+ 	.name		= "core_l4_clkdm",
+ 	.pwrdm		= { .name = "core_pwrdm" },
+ 	.flags		= CLKDM_CAN_HWSUP,
+@@ -735,7 +735,7 @@ static struct clockdomain core_l4_34xx_clkdm = {
+ };
+ 
+ /* Another case of bit name collisions between several registers: EN_DSS */
+-static struct clockdomain dss_34xx_clkdm = {
++static struct clockdomain dss_3xxx_clkdm = {
+ 	.name		= "dss_clkdm",
+ 	.pwrdm		= { .name = "dss_pwrdm" },
+ 	.flags		= CLKDM_CAN_HWSUP_SWSUP,
+@@ -829,12 +829,12 @@ static struct clockdomain dpll5_clkdm = {
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
+ };
+ 
+-#endif   /* CONFIG_ARCH_OMAP34XX */
++#endif   /* CONFIG_ARCH_OMAP3 */
+ 
+ #include "clockdomains44xx.h"
+ 
+ /*
+- * Clockdomain hwsup dependencies (34XX only)
++ * Clockdomain hwsup dependencies (OMAP3 only)
+  */
+ 
+ static struct clkdm_autodep clkdm_autodeps[] = {
+@@ -857,7 +857,7 @@ static struct clkdm_autodep clkdm_autodeps[] = {
+ 
+ static struct clockdomain *clockdomains_omap[] = {
+ 
+-#if defined(CONFIG_ARCH_OMAP24XX) | defined(CONFIG_ARCH_OMAP34XX)
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 	&wkup_clkdm,
+ 	&cm_clkdm,
+ 	&prm_clkdm,
+@@ -883,16 +883,16 @@ static struct clockdomain *clockdomains_omap[] = {
+ 	&dss_2430_clkdm,
+ #endif
+ 
+-#ifdef CONFIG_ARCH_OMAP34XX
+-	&mpu_34xx_clkdm,
++#ifdef CONFIG_ARCH_OMAP3
++	&mpu_3xxx_clkdm,
+ 	&neon_clkdm,
+ 	&iva2_clkdm,
+ 	&gfx_3430es1_clkdm,
+ 	&sgx_clkdm,
+ 	&d2d_clkdm,
+-	&core_l3_34xx_clkdm,
+-	&core_l4_34xx_clkdm,
+-	&dss_34xx_clkdm,
++	&core_l3_3xxx_clkdm,
++	&core_l4_3xxx_clkdm,
++	&dss_3xxx_clkdm,
+ 	&cam_clkdm,
+ 	&usbhost_clkdm,
+ 	&per_clkdm,
+diff --git a/arch/arm/mach-omap2/powerdomains.h b/arch/arm/mach-omap2/powerdomains.h
+index faa8fc9..105cbca 100644
+--- a/arch/arm/mach-omap2/powerdomains.h
++++ b/arch/arm/mach-omap2/powerdomains.h
+@@ -23,7 +23,7 @@
+ 
+ /*
+  * This file contains all of the powerdomains that have some element
+- * of software control for the OMAP24xx and OMAP34XX chips.
++ * of software control for the OMAP24xx and OMAP34xx chips.
+  *
+  * This is not an exhaustive listing of powerdomains on the chips; only
+  * powerdomains that can be controlled in software.
+@@ -60,7 +60,7 @@
+ 
+ /* OMAP2/3-common powerdomains */
+ 
+-#if defined(CONFIG_ARCH_OMAP24XX) | defined(CONFIG_ARCH_OMAP34XX)
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 
+ /*
+  * The GFX powerdomain is not present on 3430ES2, but currently we do not
+@@ -94,12 +94,12 @@ static struct powerdomain wkup_omap2_pwrdm = {
+ /* As powerdomains are added or removed above, this list must also be changed */
+ static struct powerdomain *powerdomains_omap[] __initdata = {
+ 
+-#if defined(CONFIG_ARCH_OMAP24XX) | defined(CONFIG_ARCH_OMAP34XX)
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 	&wkup_omap2_pwrdm,
+ 	&gfx_omap2_pwrdm,
+ #endif
+ 
+-#ifdef CONFIG_ARCH_OMAP24XX
++#ifdef CONFIG_ARCH_OMAP2
+ 	&dsp_pwrdm,
+ 	&mpu_24xx_pwrdm,
+ 	&core_24xx_pwrdm,
+@@ -109,12 +109,12 @@ static struct powerdomain *powerdomains_omap[] __initdata = {
+ 	&mdm_pwrdm,
+ #endif
+ 
+-#ifdef CONFIG_ARCH_OMAP34XX
++#ifdef CONFIG_ARCH_OMAP3
+ 	&iva2_pwrdm,
+-	&mpu_34xx_pwrdm,
++	&mpu_3xxx_pwrdm,
+ 	&neon_pwrdm,
+-	&core_34xx_pre_es3_1_pwrdm,
+-	&core_34xx_es3_1_pwrdm,
++	&core_3xxx_pre_es3_1_pwrdm,
++	&core_3xxx_es3_1_pwrdm,
+ 	&cam_pwrdm,
+ 	&dss_pwrdm,
+ 	&per_pwrdm,
+diff --git a/arch/arm/mach-omap2/powerdomains34xx.h b/arch/arm/mach-omap2/powerdomains34xx.h
+index 28228ef..186c013 100644
+--- a/arch/arm/mach-omap2/powerdomains34xx.h
++++ b/arch/arm/mach-omap2/powerdomains34xx.h
+@@ -1,8 +1,8 @@
+ /*
+- * OMAP34XX powerdomain definitions
++ * OMAP3 powerdomain definitions
+  *
+  * Copyright (C) 2007-2008 Texas Instruments, Inc.
+- * Copyright (C) 2007-2009 Nokia Corporation
++ * Copyright (C) 2007-2010 Nokia Corporation
+  *
+  * Written by Paul Walmsley
+  * Debugging and integration fixes by Jouni H?gander
+@@ -32,7 +32,7 @@
+  * 34XX-specific powerdomains, dependencies
+  */
+ 
+-#ifdef CONFIG_ARCH_OMAP34XX
++#ifdef CONFIG_ARCH_OMAP3
+ 
+ /*
+  * Powerdomains
+@@ -59,7 +59,7 @@ static struct powerdomain iva2_pwrdm = {
+ 	},
+ };
+ 
+-static struct powerdomain mpu_34xx_pwrdm = {
++static struct powerdomain mpu_3xxx_pwrdm = {
+ 	.name		  = "mpu_pwrdm",
+ 	.prcm_offs	  = MPU_MOD,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+@@ -75,7 +75,7 @@ static struct powerdomain mpu_34xx_pwrdm = {
+ 	},
+ };
+ 
+-static struct powerdomain core_34xx_pre_es3_1_pwrdm = {
++static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
+ 	.name		  = "core_pwrdm",
+ 	.prcm_offs	  = CORE_MOD,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES1 |
+@@ -93,7 +93,7 @@ static struct powerdomain core_34xx_pre_es3_1_pwrdm = {
+ 	},
+ };
+ 
+-static struct powerdomain core_34xx_es3_1_pwrdm = {
++static struct powerdomain core_3xxx_es3_1_pwrdm = {
+ 	.name		  = "core_pwrdm",
+ 	.prcm_offs	  = CORE_MOD,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES3_1),
+@@ -243,7 +243,7 @@ static struct powerdomain dpll5_pwrdm = {
+ };
+ 
+ 
+-#endif    /* CONFIG_ARCH_OMAP34XX */
++#endif    /* CONFIG_ARCH_OMAP3 */
+ 
+ 
+ #endif
+-- 
+1.6.6.rc2.5.g49666
