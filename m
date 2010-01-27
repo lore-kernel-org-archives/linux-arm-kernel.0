@@ -1,30 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Jan 2010 23:29:55 +0000
-Subject: [RFC PATCH 5/5] gic: initialize interrupts as per argument
-In-Reply-To: <1264620749-24527-6-git-send-email-adharmap@codeaurora.org>
-References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
-	<1264620749-24527-6-git-send-email-adharmap@codeaurora.org>
-Message-ID: <20100127232955.GG29665@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 28 Jan 2010 08:34:11 +0900
+Subject: [PATCH] ARM: MM: Add ARM_L1_CACHE_SHIFT_BY6 for handle inside each
+	ARCH Kconfig
+Message-ID: <1264635251-29987-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 11:32:29AM -0800, adharmap at codeaurora.org wrote:
-> From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
-> 
-> Initialize interrupts as per an argument passed instead of initializing
-> them as active level low triggered interrupts.
-> 
-> Signed-off-by: Abhijeet Dharmapurikar <adharmap@quicinc.com>
-> ---
->  Configuring level triggered interrupts as default may not be correct on
->  some platforms, this changes the default behaviour of the gic_dist_init 
->  function and also adds a flag to indicate whether the default should be level
->  or edge.
+This patch adds ARM_L1_CACHE_SHIFT_BY6 into arch/arm/Kconfig. Basically,
+ARM L1 cache line size is 32Bytes. Therefore, whenever new ARCH which
+has 64Bytes L1 cache line size is added, have to set ARM_L1_CACHE_SHIFT
+to 6. That is, have to add/modify arch/arm/mm/Kconfig.
+This patch is for handle it in each ARCH Kconfig.
 
-Changing the interrupt type for all interrupts is just wrong.  For on-chip
-peripherals, you generally want to use level based interrupts as they're
-the most efficient and simplest way to signal interrupts.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/Kconfig    |    5 +++++
+ arch/arm/mm/Kconfig |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-It should be a per-interrupt thing, and we already have that through
-request_irq() etc.  Other platforms manage this just fine without having
-to have special configuration like this.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a5602ec..c7e98ed 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -161,6 +161,11 @@ config ARCH_MTD_XIP
+ config GENERIC_HARDIRQS_NO__DO_IRQ
+ 	def_bool y
+ 
++config ARM_L1_CACHE_SHIFT_BY6
++	bool
++	help
++	  Setting ARM L1 cache line size to 64 Bytes.
++
+ if OPROFILE
+ 
+ config OPROFILE_ARMV6
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 91617f7..ad0b8d3 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -779,5 +779,5 @@ config CACHE_XSC3L2
+ 
+ config ARM_L1_CACHE_SHIFT
+ 	int
+-	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
++	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX || ARM_L1_CACHE_SHIFT_BY6
+ 	default 5
+-- 
+1.6.2.5
