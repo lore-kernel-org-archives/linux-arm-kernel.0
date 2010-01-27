@@ -1,51 +1,179 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Jan 2010 22:28:43 +0100
-Subject: [PATCH 4/4] zImage: annotate debug functions about corrupted registers
-In-Reply-To: <20100126203835.GC17642@pengutronix.de>
-References: <20100126203835.GC17642@pengutronix.de>
-Message-ID: <1264541323-3454-4-git-send-email-u.kleine-koenig@pengutronix.de>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Wed, 27 Jan 2010 01:15:38 +0100
+Subject: [PATCH 1/2 v3] ARM: SAMSUNG: Move HWMON from plat-s3c24xx to
+	plat-samsung
+In-Reply-To: <20100126145008.GB9153@trinity.fluff.org>
+References: <b2e8f9f71001260316l56cdfc7bv20944b4e3ba3fdf5@mail.gmail.com>
+	<20100126145008.GB9153@trinity.fluff.org>
+Message-ID: <b2e8f9f71001261615tf492c27o12a3c358defbe39f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/compressed/head.S |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Move HWMON platform definition from plat-s3c24xx to plat-samsung
+and adjust mach-bast to use the new s3c_hwmon_set_platdata().
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 15534ea..04bb6b4 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -1016,6 +1016,7 @@ __armv3_mpu_cache_flush:
- phexbuf:	.space	12
- 		.size	phexbuf, . - phexbuf
- 
-+@ phex corrupts {r0, r1, r2, r3}
- phex:		adr	r3, phexbuf
- 		mov	r2, #0
- 		strb	r2, [r3, r1]
-@@ -1030,6 +1031,7 @@ phex:		adr	r3, phexbuf
- 		strb	r2, [r3, r1]
- 		b	1b
- 
-+@ puts corrupts {r0, r1, r2, r3}
- puts:		loadsp	r3
- 1:		ldrb	r2, [r0], #1
- 		teq	r2, #0
-@@ -1044,12 +1046,14 @@ puts:		loadsp	r3
- 		teq	r0, #0
- 		bne	1b
- 		mov	pc, lr
-+@ putc corrupts {r0, r1, r2, r3}
- putc:
- 		mov	r2, r0
- 		mov	r0, #0
- 		loadsp	r3
- 		b	2b
- 
-+@ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
- memdump:	mov	r12, r0
- 		mov	r10, lr
- 		mov	r11, #0
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+Changes since v2:
+remove EXPORT_SYMBOL
+add kerneldoc for s3c_hwmon_set_platdata
+attribute original copyright holder
+
+Changes since v1:
+select S3C_DEV_HWMON for mach-bast config
+
+ arch/arm/mach-s3c2410/Kconfig              |    1 +
+ arch/arm/mach-s3c2410/mach-bast.c          |    2 +-
+ arch/arm/plat-s3c24xx/devs.c               |    8 -----
+ arch/arm/plat-samsung/Kconfig              |    5 +++
+ arch/arm/plat-samsung/Makefile             |    1 +
+ arch/arm/plat-samsung/dev-hwmon.c          |   42 ++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/hwmon.h |   10 ++++++
+ 7 files changed, 60 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-hwmon.c
+
+diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
+index 5547318..ca5c3c6 100644
+--- a/arch/arm/mach-s3c2410/Kconfig
++++ b/arch/arm/mach-s3c2410/Kconfig
+@@ -110,6 +110,7 @@ config ARCH_BAST
+ 	select MACH_BAST_IDE
+ 	select S3C24XX_DCLK
+ 	select ISA
++	select S3C_DEV_HWMON
+ 	select S3C_DEV_USB_HOST
+ 	select S3C_DEV_NAND
+ 	help
+diff --git a/arch/arm/mach-s3c2410/mach-bast.c
+b/arch/arm/mach-s3c2410/mach-bast.c
+index 02b1b62..c8786df 100644
+--- a/arch/arm/mach-s3c2410/mach-bast.c
++++ b/arch/arm/mach-s3c2410/mach-bast.c
+@@ -634,7 +634,7 @@ static void __init bast_map_io(void)
+
+ 	s3c24xx_register_clocks(bast_clocks, ARRAY_SIZE(bast_clocks));
+
+-	s3c_device_hwmon.dev.platform_data = &bast_hwmon_info;
++	s3c_hwmon_set_platdata(&bast_hwmon_info);
+
+ 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
+ 	s3c24xx_init_clocks(0);
+diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+index 986d4e5..67e0db7 100644
+--- a/arch/arm/plat-s3c24xx/devs.c
++++ b/arch/arm/plat-s3c24xx/devs.c
+@@ -319,14 +319,6 @@ struct platform_device s3c_device_adc = {
+ 	.resource	  = s3c_adc_resource,
+ };
+
+-/* HWMON */
+-
+-struct platform_device s3c_device_hwmon = {
+-	.name		= "s3c-hwmon",
+-	.id		= -1,
+-	.dev.parent	= &s3c_device_adc.dev,
+-};
+-
+ /* SDI */
+
+ static struct resource s3c_sdi_resource[] = {
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 1c2fe91..429fe80 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -107,6 +107,11 @@ config S3C_DEV_HSMMC2
+ 	help
+ 	  Compile in platform device definitions for HSMMC channel 2
+
++config S3C_DEV_HWMON
++	bool
++	help
++	    Compile in platform device definitions for HWMON
++
+ config S3C_DEV_I2C1
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index c8c8cae..e0b622e 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -31,6 +31,7 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
+ obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
+ obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
+ obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
++obj-$(CONFIG_S3C_DEV_HWMON)	+= dev-hwmon.o
+ obj-y				+= dev-i2c0.o
+ obj-$(CONFIG_S3C_DEV_I2C1)	+= dev-i2c1.o
+ obj-$(CONFIG_S3C_DEV_FB)	+= dev-fb.o
+diff --git a/arch/arm/plat-samsung/dev-hwmon.c
+b/arch/arm/plat-samsung/dev-hwmon.c
+new file mode 100644
+index 0000000..b3ffb95
+--- /dev/null
++++ b/arch/arm/plat-samsung/dev-hwmon.c
+@@ -0,0 +1,42 @@
++/* linux/arch/arm/plat-samsung/dev-hwmon.c
++ *
++ * Copyright 2008 Simtec Electronics
++ *	Ben Dooks <ben@simtec.co.uk>
++ *	http://armlinux.simtec.co.uk/
++ *
++ * Adapted for HWMON by Maurus Cuelenaere
++ *
++ * Samsung series device definition for HWMON
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++#include <plat/devs.h>
++#include <plat/hwmon.h>
++
++struct platform_device s3c_device_hwmon = {
++	.name		= "s3c-hwmon",
++	.id		= -1,
++	.dev.parent	= &s3c_device_adc.dev,
++};
++
++void __init s3c_hwmon_set_platdata(struct s3c_hwmon_pdata *pd)
++{
++	struct s3c_hwmon_pdata *npd;
++
++	if (!pd) {
++		printk(KERN_ERR "%s: no platform data\n", __func__);
++		return;
++	}
++
++	npd = kmemdup(pd, sizeof(struct s3c_hwmon_pdata), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++
++	s3c_device_hwmon.dev.platform_data = npd;
++}
+diff --git a/arch/arm/plat-samsung/include/plat/hwmon.h
+b/arch/arm/plat-samsung/include/plat/hwmon.h
+index 1ba88ea..c167e44 100644
+--- a/arch/arm/plat-samsung/include/plat/hwmon.h
++++ b/arch/arm/plat-samsung/include/plat/hwmon.h
+@@ -37,5 +37,15 @@ struct s3c_hwmon_pdata {
+ 	struct s3c_hwmon_chcfg	*in[8];
+ };
+
++/**
++ * s3c_hwmon_set_platdata - Set platform data for S3C HWMON device
++ * @pd: Platform data to register to device.
++ *
++ * Register the given platform data for use with the S3C HWMON device.
++ * The call will copy the platform data, so the board definitions can
++ * make the structure itself __initdata.
++ */
++extern void __init s3c_hwmon_set_platdata(struct s3c_hwmon_pdata *pd);
++
+ #endif /* __ASM_ARCH_ADC_HWMON_H */
+
 -- 
-1.6.6
+1.6.6.1
