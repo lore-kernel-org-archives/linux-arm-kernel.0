@@ -1,43 +1,47 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 27 Jan 2010 01:07:48 +0000
-Subject: [PATCH 2/2] HWMON: Add s3c64xx support to s3c-hwmon
-In-Reply-To: <b2e8f9f71001260316h7fe29effn290648178ff42397@mail.gmail.com>
-References: <b2e8f9f71001260316h7fe29effn290648178ff42397@mail.gmail.com>
-Message-ID: <20100127010747.GI9153@trinity.fluff.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 26 Jan 2010 20:30:53 -0500
+Subject: [PATCH 03/10] ARM: LPC32XX: core architecture files
+In-Reply-To: <20100127010335.GH9153@trinity.fluff.org>
+References: <1264551591.6528.6@usb10132>
+	<20100127010335.GH9153@trinity.fluff.org>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E9428@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 12:16:17PM +0100, Maurus Cuelenaere wrote:
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
-Acked-by: Ben Dooks <ben-linux@fluff.org>
-> ---
->  drivers/hwmon/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 68cf877..a8a267c 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -702,7 +702,7 @@ config SENSORS_SHT15
-> 
->  config SENSORS_S3C
->  	tristate "S3C24XX/S3C64XX Inbuilt ADC"
-> -	depends on ARCH_S3C2410
-> +	depends on ARCH_S3C2410 || ARCH_S3C64XX
->  	help
->  	  If you say yes here you get support for the on-board ADCs of
->  	  the Samsung S3C24XX or S3C64XX series of SoC
-> -- 
-> 1.6.6.1
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Tuesday, January 26, 2010 6:04 PM, Ben Dooks wrote:
 
--- 
--- 
-Ben
+Just a couple comments...
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+>> +static int lpc32xx_gpio_dir_in_none(struct gpio_chip *chip,
+>> +	unsigned pin)
+>> +{
+>> +	return -EINVAL;
+>> +}
+> does gpiolib do this for you already?
+
+If the direction_input() or get() methods are not defined the gpiolib
+function gpio_direction_input() will return -EINVAL.  So for output
+only gpio_chip's just don't define those callbacks.
+
+Similar for input only gpio_chip's.  If the set() or direction_output()
+methods are not defined, gpiolib will return -EINVAL.
+
+>> +static void lpc32xx_gpo_set_value(struct gpio_chip *chip, unsigned pin,
+>> +	int value)
+>> +{
+>> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+>> +
+>> +	if (pin < chip->ngpio)
+>> +		__set_gpo_level_p3(group, pin, value);
+>> +}
+>
+> I thought gpiolib would enforce 'if (pin < chip->ngpio)'
+
+Generally yes. gpio_direction_input() and gpio_direction_output() check to
+make sure the 'pin' is in the 'chip' and return -EINVAL if it's not.  The
+gpio_{set/get}_value() functions don't check, but since each gpio is
+associated with a specific gpio_desc the extra check's in this file are
+probably overkill.
+
+Regards,
+Hartley
