@@ -1,49 +1,66 @@
-From: buserror@gmail.com (Michel Pollet)
-Date: Wed, 27 Jan 2010 14:18:43 +0000
-Subject: [PATCH 2/3] ARM: S3C: Configuration override for UART names
-In-Reply-To: <1264601924-18480-1-git-send-email-buserror@gmail.com>
-References: <1264601924-18480-1-git-send-email-buserror@gmail.com>
-Message-ID: <1264601924-18480-2-git-send-email-buserror@gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Wed, 27 Jan 2010 15:39:53 +0100
+Subject: [PATCH v3] input: MXC: add mxc-keypad driver to support the
+	Keypad Port present in the mxc application processors family.
+In-Reply-To: <19296.12024.559688.606548@ipc1.ka-ro>
+References: <1264586106.2463.23.camel@realization>
+	<19296.5728.557535.920849@ipc1.ka-ro>
+	<1264594452.2463.62.camel@realization>
+	<19296.12024.559688.606548@ipc1.ka-ro>
+Message-ID: <1264603193.2463.75.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S3C UART devices  are named s3c2410_serialX and it is
-inconsistent with the kernel at boot time (console=ttySACx)
-This patch allows the config file to override this and
-use the standard name instead.
+On mer, 2010-01-27 at 13:18 +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Alberto Panizzo writes:
+> > > > +	irq = platform_get_irq(pdev, 0);
+> > > > +	if (irq < 0) {
+> > > > +		dev_err(&pdev->dev, "failed to get keypad irq\n");
+> > > > +		return -ENXIO;
+> > > > +	}
+> > > >
+> > > This should be -ENODEV.
+> > > 
+> > Lot of reference keyboard driver use -ENXIO..
+> > May should be better: return irq ?
+> > 
+> Yes, of course. If a function returns an error code that should be
+> promoted to the caller instead of inventing a new error code.
+> 
+> 
+> Lothar Wa?mann
 
-Signed-off-by: Michel Pollet <buserror@gmail.com>
----
- drivers/serial/samsung.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+But, errno.h say:
+#define ENXIO           6                // Device not configured
+#define ENODEV          19               // Operation not supported by device
 
-diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
-index 52e3df1..e3dd135 100644
---- a/drivers/serial/samsung.c
-+++ b/drivers/serial/samsung.c
-@@ -55,7 +55,14 @@
- 
- /* UART name and device definitions */
- 
-+#ifdef CONFIG_S3C_STD_UART_NAMES
-+/* All other SoC use this naming sheme, 
-+   including the kernel earlier at boot time */
- #define S3C24XX_SERIAL_NAME	"ttySAC"
-+#else
-+/* Legacy option */
-+#define S3C24XX_SERIAL_NAME	"s3c2410_serial"
-+#endif
- #define S3C24XX_SERIAL_MAJOR	204
- #define S3C24XX_SERIAL_MINOR	64
- 
-@@ -878,7 +885,7 @@ static struct uart_ops s3c24xx_serial_ops = {
- 
- static struct uart_driver s3c24xx_uart_drv = {
- 	.owner		= THIS_MODULE,
--	.dev_name	= "s3c2410_serial",
-+	.dev_name	= S3C24XX_SERIAL_NAME,
- 	.nr		= CONFIG_SERIAL_SAMSUNG_UARTS,
- 	.cons		= S3C24XX_SERIAL_CONSOLE,
- 	.driver_name	= S3C24XX_SERIAL_NAME,
--- 
-1.6.6
+And looking at the code of platform_get* these functions return only what
+it is written in the platform_device data.
+So the only way these functions fails is a not configured platform_device 
+with IRQ and I/O memory.
+
+Maybe the error outputs are wrong. What about these:
+	if (pdata == NULL) {
+		dev_err(&pdev->dev, "no platform data defined\n");
+		return -ENXIO;
+	}
+
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		dev_err(&pdev->dev, "no irq defined in platform data\n");
+		return -ENXIO;
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "no I/O memory defined in platform data\n");
+		return -ENXIO;
+	}
+
+	res = request_mem_region(res->start, resource_size(res), pdev->name);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "failed to request I/O memory\n");
+		return -EBUSY;
+	}
