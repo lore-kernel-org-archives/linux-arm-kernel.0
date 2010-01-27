@@ -1,24 +1,29 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 27 Jan 2010 20:40:45 +0800
-Subject: [PATCH 2/4] mmp2: add mfpr setting
-In-Reply-To: <771cded01001260340m377625a1hfd5322c61f2afe9a@mail.gmail.com>
-References: <771cded01001250303vbb38c7dp62e61b64abab89ea@mail.gmail.com>
-	<f17812d71001260228jadc2157n63c5283cbd63eb61@mail.gmail.com>
-	<771cded01001260340m377625a1hfd5322c61f2afe9a@mail.gmail.com>
-Message-ID: <f17812d71001270440m253c6e80x899f3346ef90e663@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 27 Jan 2010 15:00:46 +0200
+Subject: [PATCH 0/3] RTC driver for i.MX25
+Message-ID: <cover.1264596212.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 7:40 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Tue, Jan 26, 2010 at 5:28 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Mon, Jan 25, 2010 at 7:03 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->>> From 3c6535a752748cf7e17683d7c37ccf66f245e714 Mon Sep 17 00:00:00 2001
->>> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->>> Date: Mon, 25 Jan 2010 05:18:37 -0500
->>> Subject: [PATCH] mmp2: add mfpr setting
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+These patches add support for the RTC of the i.MX25 chip, which is based on the 
+DryIce block. The driver is based on code from the Freescale i.MX BSP.
 
-Applied to 'mmp2'.
+Also included platform code for i.MX25 chip, and the i.MX25 PDK board.
+
+These patches have been tested on the i.MX25 PDK board.
+
+Baruch Siach (3):
+  rtc: driver for the DryIce block found in i.MX25 chips
+  mx25: add support for the DryIce rtc
+  mx25pdk: platform code for the DryIce RTC module
+
+ arch/arm/mach-mx25/clock.c            |    2 +
+ arch/arm/mach-mx25/devices.c          |   19 ++
+ arch/arm/mach-mx25/devices.h          |    1 +
+ arch/arm/mach-mx25/mx25pdk.c          |    1 +
+ arch/arm/plat-mxc/include/mach/mx25.h |    2 +
+ drivers/rtc/Kconfig                   |   10 +
+ drivers/rtc/Makefile                  |    1 +
+ drivers/rtc/rtc-imxdi.c               |  559 +++++++++++++++++++++++++++++++++
+ 8 files changed, 595 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/rtc/rtc-imxdi.c
