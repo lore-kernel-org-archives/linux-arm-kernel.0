@@ -1,158 +1,124 @@
 From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
-Date: Wed, 27 Jan 2010 14:59:19 +0900
-Subject: [PATCHv2 05/10] ASoC: AC97: SMDK: Add wm9713 machine driver
-Message-ID: <1264571959-15115-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Wed, 27 Jan 2010 14:58:58 +0900
+Subject: [PATCHv2 03/10] ARM: S3C24XX: Update AC97 platform resources
+Message-ID: <1264571938-15054-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-This patch adds the common machine driver for SMDKs that
-have a WM9713 codec attched to the AC97 controller.
+Modify the AC97 platform backend so that the controller can be run
+by the s3c-ac97.c
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- sound/soc/s3c24xx/Kconfig       |    8 +++
- sound/soc/s3c24xx/Makefile      |    2 +
- sound/soc/s3c24xx/smdk_wm9713.c |   97 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 107 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/s3c24xx/smdk_wm9713.c
+ arch/arm/plat-s3c/include/plat/audio.h |    4 +++
+ arch/arm/plat-s3c24xx/devs.c           |   45 ++++++++++++++++++++++++++++++-
+ 2 files changed, 47 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
-index ad3690e..d1c6f93 100644
---- a/sound/soc/s3c24xx/Kconfig
-+++ b/sound/soc/s3c24xx/Kconfig
-@@ -115,3 +115,11 @@ config SND_S3C24XX_SOC_SIMTEC_HERMES
- 	select SND_S3C24XX_SOC_I2S
- 	select SND_SOC_TLV320AIC3X
- 	select SND_S3C24XX_SOC_SIMTEC
-+
-+config SND_SOC_SMDK_WM9713
-+	tristate "SoC AC97 Audio support for SMDK with WM9713"
-+	depends on SND_S3C24XX_SOC && MACH_SMDK6410
-+	select SND_SOC_WM9713
-+	select SND_S3C_SOC_AC97
-+	help
-+	  Sat Y if you want to add support for SoC audio on the SMDK.
-diff --git a/sound/soc/s3c24xx/Makefile b/sound/soc/s3c24xx/Makefile
-index b7411bd..1117678 100644
---- a/sound/soc/s3c24xx/Makefile
-+++ b/sound/soc/s3c24xx/Makefile
-@@ -28,6 +28,7 @@ snd-soc-s3c24xx-simtec-objs := s3c24xx_simtec.o
- snd-soc-s3c24xx-simtec-hermes-objs := s3c24xx_simtec_hermes.o
- snd-soc-s3c24xx-simtec-tlv320aic23-objs := s3c24xx_simtec_tlv320aic23.o
- snd-soc-smdk64xx-wm8580-objs := smdk64xx_wm8580.o
-+snd-soc-smdk-wm9713-objs := smdk_wm9713.o
+diff --git a/arch/arm/plat-s3c/include/plat/audio.h b/arch/arm/plat-s3c/include/plat/audio.h
+index e07c941..ac56821 100644
+--- a/arch/arm/plat-s3c/include/plat/audio.h
++++ b/arch/arm/plat-s3c/include/plat/audio.h
+@@ -16,6 +16,10 @@
+ #define S3C64XX_AC97_GPE  1
+ extern void s3c64xx_ac97_setup_gpio(int);
  
- obj-$(CONFIG_SND_S3C24XX_SOC_JIVE_WM8750) += snd-soc-jive-wm8750.o
- obj-$(CONFIG_SND_S3C24XX_SOC_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
-@@ -39,3 +40,4 @@ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC) += snd-soc-s3c24xx-simtec.o
- obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_HERMES) += snd-soc-s3c24xx-simtec-hermes.o
- obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_TLV320AIC23) += snd-soc-s3c24xx-simtec-tlv320aic23.o
- obj-$(CONFIG_SND_S3C64XX_SOC_WM8580) += snd-soc-smdk64xx-wm8580.o
-+obj-$(CONFIG_SND_SOC_SMDK_WM9713) += snd-soc-smdk-wm9713.o
-diff --git a/sound/soc/s3c24xx/smdk_wm9713.c b/sound/soc/s3c24xx/smdk_wm9713.c
-new file mode 100644
-index 0000000..7dd933f
---- /dev/null
-+++ b/sound/soc/s3c24xx/smdk_wm9713.c
-@@ -0,0 +1,97 @@
-+/*
-+ * smdk_wm9713.c  --  SoC audio for SMDK
-+ *
-+ * Copyright 2010 Samsung Electronics Co. Ltd.
-+ * Author: Jaswinder Singh Brar <jassi.brar@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License, or (at your option) any later version.
-+ *
-+ */
++#define S3C24XX_AC97_GPE0  0 /* gpe0-4 as AC97 */
++#define S3C24XX_AC97_GPE5  0 /* gpe5-9 as AC97 */
++extern void s3c24xx_ac97_setup_gpio(int);
 +
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <sound/soc.h>
+ /**
+  * struct s3c_audio_pdata - common platform data for audio device drivers
+  * @cfg_gpio: Callback function to setup mux'ed pins in I2S/PCM/AC97 mode
+diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+index 986d4e5..3805317 100644
+--- a/arch/arm/plat-s3c24xx/devs.c
++++ b/arch/arm/plat-s3c24xx/devs.c
+@@ -20,6 +20,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -34,9 +35,11 @@
+ #include <plat/udc.h>
+ #include <plat/mci.h>
+ 
++#include <plat/audio.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/regs-spi.h>
++#include <mach/regs-gpio.h>
+ 
+ #include <mach/ts.h>
+ 
+@@ -459,6 +462,10 @@ struct platform_device s3c_device_camif = {
+ 
+ EXPORT_SYMBOL(s3c_device_camif);
+ 
++#endif /* CONFIG_CPU_S32440 */
 +
-+#include "../codecs/wm9713.h"
-+#include "s3c-dma.h"
-+#include "s3c-ac97.h"
++#if defined(CONFIG_CPU_S3C2440) || defined(CONFIG_CPU_S3C2443)
 +
-+static struct snd_soc_card smdk;
-+
-+/*
-+ Playback (HeadPhone):-
-+	Headphone Playback Switch - On
-+	$ amixer cset numid=4 1
-+
-+	Right Headphone Out Mux - Headphone
-+	$ amixer cset numid=92 2
-+	Left Headphone Out Mux - Headphone
-+	$ amixer cset numid=93 2
-+
-+	Right HP Mixer PCM Playback Switch - On
-+	$ amixer cset numid=75 1
-+	Left HP Mixer PCM Playback Switch - On
-+	$ amixer cset numid=81 1
-+
-+ Capture (LineIn):-
-+	Right Capture Source - Line
-+	$ amixer cset numid=86 2
-+	Left Capture Source - Line
-+	$ amixer cset numid=87 2
-+*/
-+
-+static struct snd_soc_dai_link smdk_dai = {
-+	.name = "AC97",
-+	.stream_name = "AC97 PCM",
-+	.cpu_dai = &s3c_ac97_dai[S3C_AC97_DAI_PCM],
-+	.codec_dai = &wm9713_dai[WM9713_DAI_AC97_HIFI],
-+};
-+
-+static struct snd_soc_card smdk = {
-+	.name = "SMDK",
-+	.platform = &s3c24xx_soc_platform,
-+	.dai_link = &smdk_dai,
-+	.num_links = 1,
-+};
-+
-+static struct snd_soc_device smdk_snd_ac97_devdata = {
-+	.card = &smdk,
-+	.codec_dev = &soc_codec_dev_wm9713,
-+};
-+
-+static struct platform_device *smdk_snd_ac97_device;
-+
-+static int __init smdk_init(void)
+ /* AC97 */
+ 
+ static struct resource s3c_ac97_resource[] = {
+@@ -494,17 +501,51 @@ static struct resource s3c_ac97_resource[] = {
+ 
+ static u64 s3c_device_ac97_dmamask = 0xffffffffUL;
+ 
++static int s3c24xx_ac97_cfg_gpe0(struct platform_device *pdev)
 +{
-+	int ret;
++	s3c2410_gpio_cfgpin(S3C2410_GPE0, S3C2443_GPE0_AC_nRESET);
++	s3c2410_gpio_cfgpin(S3C2410_GPE1, S3C2443_GPE1_AC_SYNC);
++	s3c2410_gpio_cfgpin(S3C2410_GPE2, S3C2443_GPE2_AC_BITCLK);
++	s3c2410_gpio_cfgpin(S3C2410_GPE3, S3C2443_GPE3_AC_SDI);
++	s3c2410_gpio_cfgpin(S3C2410_GPE4, S3C2443_GPE4_AC_SDO);
 +
-+	smdk_snd_ac97_device = platform_device_alloc("soc-audio", -1);
-+	if (!smdk_snd_ac97_device)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(smdk_snd_ac97_device,
-+			     &smdk_snd_ac97_devdata);
-+	smdk_snd_ac97_devdata.dev = &smdk_snd_ac97_device->dev;
-+
-+	ret = platform_device_add(smdk_snd_ac97_device);
-+	if (ret)
-+		platform_device_put(smdk_snd_ac97_device);
-+
-+	return ret;
++	return 0;
 +}
 +
-+static void __exit smdk_exit(void)
++static int s3c24xx_ac97_cfg_gpe5(struct platform_device *pdev)
 +{
-+	platform_device_unregister(smdk_snd_ac97_device);
++	s3c2410_gpio_cfgpin(S3C2410_GPE5, S3C2443_GPE5_AC_BITCLK);
++	s3c2410_gpio_cfgpin(S3C2410_GPE6, S3C2443_GPE6_AC_SDI);
++	s3c2410_gpio_cfgpin(S3C2410_GPE7, S3C2443_GPE7_AC_SDO);
++	s3c2410_gpio_cfgpin(S3C2410_GPE8, S3C2443_GPE8_AC_SYNC);
++	s3c2410_gpio_cfgpin(S3C2410_GPE9, S3C2443_GPE9_AC_nRESET);
++
++	return 0;
 +}
 +
-+module_init(smdk_init);
-+module_exit(smdk_exit);
++static struct s3c_audio_pdata s3c_ac97_pdata = {
++	.cfg_gpio = s3c24xx_ac97_cfg_gpe0,
++};
 +
-+/* Module information */
-+MODULE_AUTHOR("Jaswinder Singh Brar, jassi.brar at samsung.com");
-+MODULE_DESCRIPTION("ALSA SoC SMDK+WM9713");
-+MODULE_LICENSE("GPL");
+ struct platform_device s3c_device_ac97 = {
+ 	.name		  = "s3c-ac97",
+ 	.id		  = -1,
+ 	.num_resources	  = ARRAY_SIZE(s3c_ac97_resource),
+ 	.resource	  = s3c_ac97_resource,
+ 	.dev              = {
++		.platform_data = &s3c_ac97_pdata,
+ 		.dma_mask = &s3c_device_ac97_dmamask,
+ 		.coherent_dma_mask = 0xffffffffUL
+ 	}
+ };
+-
+ EXPORT_SYMBOL(s3c_device_ac97);
+ 
+-#endif // CONFIG_CPU_S32440
++void __init s3c24xx_ac97_setup_gpio(int num)
++{
++	if (num == S3C24XX_AC97_GPE0)
++		s3c_ac97_pdata.cfg_gpio = s3c24xx_ac97_cfg_gpe0;
++	else
++		s3c_ac97_pdata.cfg_gpio = s3c24xx_ac97_cfg_gpe5;
++}
++
++#endif
 -- 
 1.6.2.5
