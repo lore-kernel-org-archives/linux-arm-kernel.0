@@ -1,44 +1,67 @@
 From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
-Date: Wed, 27 Jan 2010 15:01:20 +0900
-Subject: [PATCHv2 08/10] ARM: SMDK2443: Enable AC97 device
-Message-ID: <1264572080-24754-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Wed, 27 Jan 2010 15:02:04 +0900
+Subject: [PATCHv2 09/10] ASoC: AC97: LN2440SBC: Switch to s3c-ac97.c
+Message-ID: <1264572124-24790-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Add AC97 controller to platform devices and initialize the AC97 gpios.
+Switch to use s3c-ac97.c AC97 controller driver.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s3c2443/mach-smdk2443.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ sound/soc/s3c24xx/Kconfig            |    7 +++----
+ sound/soc/s3c24xx/ln2440sbc_alc650.c |    4 ++--
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index 039a462..5e7d4ab 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -106,6 +106,9 @@ static struct platform_device *smdk2443_devices[] __initdata = {
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
- 	&s3c_device_hsmmc0,
-+#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
-+	&s3c_device_ac97,
-+#endif
- };
+diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
+index 8b62798..69d143e 100644
+--- a/sound/soc/s3c24xx/Kconfig
++++ b/sound/soc/s3c24xx/Kconfig
+@@ -29,9 +29,6 @@ config SND_S3C_SOC_PCM
  
- static void __init smdk2443_map_io(void)
-@@ -118,6 +121,11 @@ static void __init smdk2443_map_io(void)
- static void __init smdk2443_machine_init(void)
+ config SND_S3C2443_SOC_AC97
+ 	tristate
+-	select S3C2410_DMA
+-	select AC97_BUS
+-	select SND_SOC_AC97_BUS
+ 
+ config SND_S3C_SOC_AC97
+ 	tristate
+@@ -86,8 +83,10 @@ config SND_S3C24XX_SOC_SMDK2443_WM9710
+ config SND_S3C24XX_SOC_LN2440SBC_ALC650
+ 	tristate "SoC AC97 Audio support for LN2440SBC - ALC650"
+ 	depends on SND_S3C24XX_SOC && ARCH_S3C2410
+-	select SND_S3C2443_SOC_AC97
++	select S3C2410_DMA
++	select AC97_BUS
+ 	select SND_SOC_AC97_CODEC
++	select SND_S3C_SOC_AC97
+ 	help
+ 	  Say Y if you want to add support for SoC audio on ln2440sbc
+ 	  with the ALC650.
+diff --git a/sound/soc/s3c24xx/ln2440sbc_alc650.c b/sound/soc/s3c24xx/ln2440sbc_alc650.c
+index d00d359..ffa954f 100644
+--- a/sound/soc/s3c24xx/ln2440sbc_alc650.c
++++ b/sound/soc/s3c24xx/ln2440sbc_alc650.c
+@@ -25,7 +25,7 @@
+ 
+ #include "../codecs/ac97.h"
+ #include "s3c-dma.h"
+-#include "s3c24xx-ac97.h"
++#include "s3c-ac97.h"
+ 
+ static struct snd_soc_card ln2440sbc;
+ 
+@@ -33,7 +33,7 @@ static struct snd_soc_dai_link ln2440sbc_dai[] = {
  {
- 	s3c_i2c0_set_platdata(NULL);
-+
-+#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
-+	s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
-+#endif
-+
- 	platform_add_devices(smdk2443_devices, ARRAY_SIZE(smdk2443_devices));
- 	smdk_machine_init();
- }
+ 	.name = "AC97",
+ 	.stream_name = "AC97 HiFi",
+-	.cpu_dai = &s3c2443_ac97_dai[0],
++	.cpu_dai = &s3c_ac97_dai[S3C_AC97_DAI_PCM],
+ 	.codec_dai = &ac97_dai,
+ },
+ };
 -- 
 1.6.2.5
