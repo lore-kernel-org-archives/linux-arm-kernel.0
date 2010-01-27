@@ -1,191 +1,322 @@
 From: wellsk40@gmail.com (Kevin Wells)
-Date: Tue, 26 Jan 2010 16:20:24 -0800
-Subject: [PATCH 08/10] ARM: LPC32XX: uncompress output and printascii()
-	output functions
-Message-ID: <1264551624.6528.11@usb10132>
+Date: Tue, 26 Jan 2010 16:19:42 -0800
+Subject: [PATCH 02/10] ARM: LPC32XX: arch Kconfig, platform Kconfig, and
+	makefiles
+Message-ID: <1264551582.6528.5@usb10132>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPC32XX uncompress output and printascii() output functions
+LPC32xx architecture Kconfig, platform Kconfig, and makefiles
 
 
 Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
 ---
-  arch/arm/mach-lpc32xx/include/mach/debug-macro.S |   72  
-+++++++++++++++++++
-  arch/arm/mach-lpc32xx/include/mach/entry-macro.S |   81  
-++++++++++++++++++++++
-  2 files changed, 153 insertions(+), 0 deletions(-)
+  arch/arm/mach-lpc32xx/Kconfig       |  158  
++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-lpc32xx/Kconfig.plat  |   98 ++++++++++++++++++++++
+  arch/arm/mach-lpc32xx/Makefile      |    9 ++
+  arch/arm/mach-lpc32xx/Makefile.boot |    4 +
+  4 files changed, 269 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/include/mach/debug-macro.S  
-b/arch/arm/mach-lpc32xx/include/mach/debug-macro.S
+diff --git a/arch/arm/mach-lpc32xx/Kconfig  
+b/arch/arm/mach-lpc32xx/Kconfig
 new file mode 100644
-index 0000000..641daba
+index 0000000..a277885
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/include/mach/debug-macro.S
-@@ -0,0 +1,72 @@
-+/*
-+ * arch/arm/mach-lpc32xx/include/mach/debug-macro.S
-+ *
-+ * Author: Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
-02111-1307  USA
-+ */
++++ b/arch/arm/mach-lpc32xx/Kconfig
+@@ -0,0 +1,158 @@
++if ARCH_LPC32XX
 +
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
++menu "LPC32XX chip options"
 +
-+/*
-+ * NOTE: The UART clock for the selected debug out should be enabled
-+ * in the bootloader if this functionality is used.
-+*/
++config ARCH_LPC32XX_IRAM_SIZE
++	int
++	default 131072 if ARCH_LPC32XX_20
++	default 262144 if ARCH_LPC32XX_30 || ARCH_LPC32XX_40 ||  
+ARCH_LPC32XX_50
 +
-+#ifdef CONFIG_ARCH_LPC32XX_DEBUGO_U3
-+#define UARTDB_BASE UART3_BASE
-+#endif
++choice
++    prompt "Select 32x0 device variation"
++    default ARCH_LPC32XX_50
 +
-+#ifdef CONFIG_ARCH_LPC32XX_DEBUGO_U4
-+#define UARTDB_BASE UART4_BASE
-+#endif
++	config ARCH_LPC32XX_20
++		bool "LPC3220"
++		help
++		 128K IRAM, no ethernet or LCD
 +
-+#ifdef CONFIG_ARCH_LPC32XX_DEBUGO_U5
-+#define UARTDB_BASE UART5_BASE
-+#endif
++	config ARCH_LPC32XX_30
++		bool "LPC3230"
++		help
++		 256K IRAM and LCD, no ethernet
 +
-+#ifdef CONFIG_ARCH_LPC32XX_DEBUGO_U6
-+#define UARTDB_BASE UART6_BASE
-+#endif
++	config ARCH_LPC32XX_40
++		bool "LPC3240"
++		help
++		 256K IRAM and ethernet, no LCD
 +
-+	.macro	addruart,rx
-+	mrc	p15, 0, \rx, c1, c0
-+	tst	\rx, #1				@ MMU enabled?
-+	ldr	\rx, =UARTDB_BASE		@ physical
-+	beq	1003f
-+	ldr	\rx, =io_p2v(UARTDB_BASE)	@ virtual
-+1003:
-+	.endm
++	config ARCH_LPC32XX_50
++		bool "LPC3250"
++		help
++		 256K IRAM and ethernet and LCD
 +
-+	.macro	senduart,rd,rx
-+	str	\rd, [\rx, #0]
-+	.endm
++endchoice
 +
-+	.macro	busyuart,rd,rx
-+1002:
-+	ldr	\rd, [\rx, #0x14]
-+	tst	\rd, #(1 << 6)
-+	beq	1002b
-+	.endm
++menu "Serial port configuration"
 +
-+	.macro	waituart,rd,rx
-+1001:
-+	ldr	\rd, [\rx, #0x14]
-+	tst	\rd, #(1 << 5)
-+	beq	1001b
-+	.endm
-diff --git a/arch/arm/mach-lpc32xx/include/mach/entry-macro.S  
-b/arch/arm/mach-lpc32xx/include/mach/entry-macro.S
++menu "Individual UART enable selections"
++
++config ARCH_LPC32XX_HSUART1_ENABLE
++	bool "Enable high speed UART1"
++	help
++	 Also enable LPC32xx high speed serial support in drivers/serial
++
++config ARCH_LPC32XX_HSUART2_ENABLE
++	bool "Enable high speed UART2"
++	help
++	 Also enable LPC32xx high speed serial support in drivers/serial
++
++config ARCH_LPC32XX_UART3_ENABLE
++	bool "Enable standard UART3"
++	help
++	 Also enable 8250 serial support in drivers/serial
++
++config ARCH_LPC32XX_UART4_ENABLE
++	bool "Enable standard UART4"
++	help
++	 Also enable 8250 serial support in drivers/serial
++
++config ARCH_LPC32XX_UART5_ENABLE
++	bool "Enable standard UART5"
++	default y
++	help
++	 Also enable 8250 serial support in drivers/serial
++
++config ARCH_LPC32XX_UART6_ENABLE
++	bool "Enable standard UART6"
++	help
++	 Also enable 8250 serial support in drivers/serial
++
++config ARCH_LPC32XX_HSUART7_ENABLE
++	bool "Enable high speed UART7"
++	help
++	 Also enable LPC32xx high speed serial support in drivers/serial
++
++endmenu
++
++config ARCH_LPC32XX_UART6_IRDAMODE
++	bool "Use IRDA mode on UART6"
++	depends on ARCH_LPC32XX_UART6_ENABLE
++	help
++		Enables the IrDA modulator for UART6
++
++choice
++	prompt "Kernel uncompress status output UART selection"
++	default ARCH_LPC32XX_UNCOMP_U5
++
++	config ARCH_LPC32XX_UNCOMP_HSU1
++		bool "High speed UART 1"
++		help
++		 Kernel uncompress output is on high speed UART 1
++
++	config ARCH_LPC32XX_UNCOMP_HSU2
++		bool "High speed UART 2"
++		help
++		 Kernel uncompress output is on high speed UART 2
++
++	config ARCH_LPC32XX_UNCOMP_U3
++		bool "Standard UART 3"
++		help
++		 Kernel uncompress output is on standard UART 3
++
++	config ARCH_LPC32XX_UNCOMP_U4
++		bool "Standard UART 4"
++		help
++		 Kernel uncompress output is on standard UART 4
++
++	config ARCH_LPC32XX_UNCOMP_U5
++		bool "Standard UART 5"
++		help
++		 Kernel uncompress output is on standard UART 5
++
++	config ARCH_LPC32XX_UNCOMP_U6
++		bool "Standard UART 6"
++		help
++		 Kernel uncompress output is on standard UART 6
++
++	config ARCH_LPC32XX_UNCOMP_HSU7
++		bool "High speed UART 7"
++		help
++		 Kernel uncompress output is on high speed UART 7
++
++endchoice
++
++choice
++	prompt "debug output (printascii) UART selection"
++	default ARCH_LPC32XX_DEBUGO_U5
++
++	config ARCH_LPC32XX_DEBUGO_U3
++		bool "Standard UART 3"
++		help
++		 printascii messages are output on standard UART 3
++
++	config ARCH_LPC32XX_DEBUGO_U4
++		bool "Standard UART 4"
++		help
++		 printascii messages are output on standard UART 4
++
++	config ARCH_LPC32XX_DEBUGO_U5
++		bool "Standard UART 5"
++		help
++		 printascii messages are output on standard UART 5
++
++	config ARCH_LPC32XX_DEBUGO_U6
++		bool "Standard UART 6"
++		help
++		 printascii messages are output on standard UART 6
++
++endchoice
++
++endmenu
++
++endmenu
++
++source "arch/arm/mach-lpc32xx/Kconfig.plat"
++
++endif
++
+diff --git a/arch/arm/mach-lpc32xx/Kconfig.plat  
+b/arch/arm/mach-lpc32xx/Kconfig.plat
 new file mode 100644
-index 0000000..c0313ae
+index 0000000..a67d1ad
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/include/mach/entry-macro.S
-@@ -0,0 +1,81 @@
-+/*
-+ * arch/arm/mach-lpc32xx/include/mach/entry-macro.S
-+ *
-+ * Author: Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
-02111-1307  USA
-+ */
++++ b/arch/arm/mach-lpc32xx/Kconfig.plat
+@@ -0,0 +1,98 @@
++menu "LPC32XX platform choices"
 +
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <mach/irqs.h>
++choice
++    prompt "Choose your board"
++    default MACH_PHY3250
++    help
++        This menu selects the LPC3250 board to support for this build
 +
-+	.macro	disable_fiq
-+	.endm
++    config MACH_PHY3250
++        bool "Phytec 3250 development board"
++	help
++	    Support for the Phytec 3250 development board
 +
-+	.macro  get_irqnr_preamble, base, tmp
-+	.endm
++endchoice
 +
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
++choice
++	prompt "Phytec LCD module revisions"
++	depends on MACH_PHY3250
++	default PHY3250_QVGA_PANEL_1307_1
++	help
++	  Select one of the supported LCD panel revisions
 +
-+/*
-+ * Return IRQ number in irqnr. Also return processor Z flag status in  
-CPSR
-+ * as set if an interrupt is pending.
-+ */
-+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	/* Get MIC status first */
-+	ldr	\base, =IO_ADDRESS(MIC_BASE)
-+	ldr	\irqstat, [\base, #INTC_STAT]
-+	and	\irqstat, \irqstat, #0xFFFFFFFC
-+	mov	\tmp, #0
++config PHY3250_QVGA_PANEL_1307_0
++	bool "1307.0 QVGA panel (portrait mode RGB565)"
++	help
++	  Use LCD module version 1307.0
 +
-+	/* Drop through to SIC1 or SIC2 if MIC is not pending */
-+	cmp	\irqstat, #0
-+	bne	1000f
++config PHY3250_QVGA_PANEL_1307_1
++	bool "1307.1 QVGA panel (portrait mode RGB565)"
++	help
++	  Use LCD module version 1307.1
 +
-+	/* SIC1 interrupts start at offset 32 */
-+	ldr	\base, =IO_ADDRESS(SIC1_BASE)
-+	ldr	\irqstat, [\base, #INTC_STAT]
-+	mov	\tmp, #32
++endchoice
 +
-+	/* Drop through to SIC2 if SIC1 is not pending */
-+	cmp	\irqstat, #0
-+	bne	1000f
++choice
++	prompt "Phytec CPU module revisions"
++	depends on MACH_PHY3250
++	default PHY3250_CPU_MODULE_1304_1
++	help
++	  Select one of the supported CPU module revisions
 +
-+	/* SIC2 interrupts start at offset 64 */
-+	ldr	\base, =IO_ADDRESS(SIC2_BASE)
-+	ldr	\irqstat, [\base, #INTC_STAT]
-+	mov	\tmp, #64
++config PHY3250_CPU_MODULE_1304_0
++	bool "1304.0 CPU module"
++	help
++	  Use CPU module version 1304.0
 +
-+	/* Safety check only, exit if no status on MIC, SIC1, SIC2 */
-+	cmp	\irqstat, #0
-+	beq	1001f
++config PHY3250_CPU_MODULE_1304_1
++	bool "1304.1 CPU module"
++	help
++	  Use CPU module version 1304.1
 +
-+1000:
-+	/* Returns an pending interrupt between 0 and 95 */
-+	clz	\irqnr, \irqstat
-+	rsb	\irqnr, \irqnr, #31
-+	add	\irqnr, \irqnr, \tmp
++endchoice
 +
-+1001:
-+	teq	\irqstat, #0
-+	.endm
++choice
++	prompt "Phytec Carrier board revisions"
++	depends on MACH_PHY3250
++	default PHY3250_CARRIER_1305_3
++	help
++	  Select one of the supported carrier board revisions
 +
-+	.macro	irq_prio_table
-+	.endm
++config PHY3250_CARRIER_1305_01
++	bool "1305.0 or 1305.1 carrier board"
++	help
++	  Use carrier board version 1305.0 or 1305.1
++
++config PHY3250_CARRIER_1305_2
++	bool "1305.2 carrier board"
++	help
++	  Use carrier board version 1305.2
++
++config PHY3250_CARRIER_1305_3
++	bool "1305.3 carrier board"
++	help
++	  Use carrier board version 1305.3
++
++endchoice
++
++choice
++	prompt "Internal IRAM use"
++	default MACH_LPC32XX_IRAM_RESERVED
++	depends on MACH_PHY3250
++
++config MACH_LPC32XX_IRAM_RESERVED
++	bool "IRAM is not used (reserved)"
++	help
++	  IRAM is not used for video or networking and can be used for
++	  other purposes or drivers
++
++config MACH_LPC32XX_IRAM_FOR_CLCD
++	bool "Use IRAM as a video frame buffer"
++	help
++	  IRAM will be used for the LCD frame buffer. If the required  
+buffer
++	  size is larger than the size of IRAM, then SDRAM will be used
++	  instead.
++
++endchoice
++
++endmenu
+diff --git a/arch/arm/mach-lpc32xx/Makefile  
+b/arch/arm/mach-lpc32xx/Makefile
+new file mode 100644
+index 0000000..9c76c70
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/Makefile
+@@ -0,0 +1,9 @@
++#
++# Makefile for the linux kernel.
++#
++
++obj-y				:= timer.o irq.o common.o serial.o  
+clock.o
++obj-y				+= gpiolib.o pm.o pm_events.o suspend.o
++
++obj-$(CONFIG_MACH_PHY3250)	+= phy3250.o
++
+diff --git a/arch/arm/mach-lpc32xx/Makefile.boot  
+b/arch/arm/mach-lpc32xx/Makefile.boot
+new file mode 100644
+index 0000000..b796b41
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/Makefile.boot
+@@ -0,0 +1,4 @@
++   zreladdr-y	:= 0x80008000
++params_phys-y	:= 0x80000100
++initrd_phys-y	:= 0x82000000
 +
 -- 
 1.6.6
