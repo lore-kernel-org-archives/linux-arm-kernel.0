@@ -1,64 +1,131 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 27 Jan 2010 19:09:50 +0900
-Subject: [PATCH v4 0/8] ARM: S5PV210: Add support for Samsung's S5PV210 CPU
-Message-ID: <009d01ca9f38$df32bdf0$9d9839d0$%kim@samsung.com>
+Date: Wed, 27 Jan 2010 19:04:19 +0900
+Subject: [PATCH v4 6/8] ARM: S5PV210: Add SMDKC110 board support file
+Message-ID: <1264586659-23030-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds SMDKC110 board support file.
 
-This patch set adds support for Samsung's S5PV210 CPU. The S5PV210 integrates
-a ARM Cortex A8 microprocessor with several other peripherals to support
-features such as multimedia, storage, graphics and gaming. The S5PV210 can be
-used in products such as Netbooks and Mobile devices.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv210/Makefile        |    1 +
+ arch/arm/mach-s5pv210/mach-smdkc110.c |   98 +++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/mach-smdkc110.c
 
-This patch set consists of the following patches.
-
-[PATCH v4 1/8] ARM: S5PV210: Add Samsung S5PV210 CPU support
-[PATCH v4 2/8] ARM: S5PV210: Add clock support for S5PV210
-[PATCH v4 3/8] ARM: S5PV210: Add IRQ support	
-[PATCH v4 4/8] ARM: S5PV210: Update Kconfig and Makefiles
-[PATCH v4 5/8] ARM: S5PV210: Add SMDKV210 board support file
-[PATCH v4 6/8] ARM: S5PV210: Add SMDKC110 board support file
-[PATCH v4 7/8] ARM: S5PV210: Add S5PV210 configuration file
-[PATCH v4 8/8] ARM: S5PV210: Add S5PC110 configuration file
-
-
-Changes since v3 :
-
-1. Removed unnecessary CONFIG_CPU_S5PV210_INIT, CONFIG_CPU_S5PV210_CLOCK, and
-CONFIG_S5PC110_XXX_TYPE.
-2. Renamed mach-s5pv210/s5pv210-init.c and s5pv210-clock.c to just
-mach-s5pv210/init.c and clock.c
-3. Common macros are used such as S3C_PA_XXX and S3C_VA_XXX
-4. Renamed S5P_VA_VICx definitions as VA_VICx
-5. Removed unnecessary definitions in the header files like map.h
-6. Added v210 specific debug macros.
-7. Added VIC2 and VIC3 definitions.
-8. Applied Marek's suggestion about ARM_L1_CACHE_SHIFT value changing to 6
-9. Separated serial support patch which can be applied to S5PV210/S5PC110,
-and S5P6442.
-10. Fixed Makefiles as per Ben's suggestion.
-
-
-Changes since v2 :
-
-1. Use SPARSEMEM as Russell suggested.
-2. Fixed code as per comments from Ben in linux-samsung-soc mailing list.
-
-
-Changes since v1 :
-
-1. Removed mach/s5pv210/include/mach/gpio-core.h file.
-2. Removed unused clock gate defines.
-3. Removed machine fixup code from smdkv210 and smdkc110 board support.
-4. Merged Kconfig and Makefiles with other source code patches.
-5. Replaced multiple definition of UART info with macro.
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 3ecb607..8ebf51c 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -17,3 +17,4 @@ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
+ # machine support
+ 
+ obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
++obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
+diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
+new file mode 100644
+index 0000000..ab4869d
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
+@@ -0,0 +1,98 @@
++/* linux/arch/arm/mach-s5pv210/mach-smdkc110.c
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/setup.h>
++#include <asm/mach-types.h>
++
++#include <mach/map.h>
++#include <mach/regs-clock.h>
++
++#include <plat/regs-serial.h>
++#include <plat/s5pv210.h>
++#include <plat/devs.h>
++#include <plat/cpu.h>
++
++/* Following are default values for UCON, ULCON and UFCON UART registers */
++#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
++				 S3C2410_UCON_RXILEVEL |	\
++				 S3C2410_UCON_TXIRQMODE |	\
++				 S3C2410_UCON_RXIRQMODE |	\
++				 S3C2410_UCON_RXFIFO_TOI |	\
++				 S3C2443_UCON_RXERR_IRQEN)
++
++#define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
++
++#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
++				 S5PV210_UFCON_TXTRIG4 |	\
++				 S5PV210_UFCON_RXTRIG4)
++
++static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
++	[0] = {
++		.hwport		= 0,
++		.flags		= 0,
++		.ucon		= S5PV210_UCON_DEFAULT,
++		.ulcon		= S5PV210_ULCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT,
++	},
++	[1] = {
++		.hwport		= 1,
++		.flags		= 0,
++		.ucon		= S5PV210_UCON_DEFAULT,
++		.ulcon		= S5PV210_ULCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT,
++	},
++	[2] = {
++		.hwport		= 2,
++		.flags		= 0,
++		.ucon		= S5PV210_UCON_DEFAULT,
++		.ulcon		= S5PV210_ULCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT,
++	},
++	[3] = {
++		.hwport		= 3,
++		.flags		= 0,
++		.ucon		= S5PV210_UCON_DEFAULT,
++		.ulcon		= S5PV210_ULCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT,
++	},
++};
++
++static struct platform_device *smdkc110_devices[] __initdata = {
++};
++
++static void __init smdkc110_map_io(void)
++{
++	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
++	s3c24xx_init_clocks(24000000);
++	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
++}
++
++static void __init smdkc110_machine_init(void)
++{
++	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
++}
++
++MACHINE_START(SMDKC110, "SMDKC110")
++	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.phys_io	= S3C_PA_UART & 0xfff00000,
++	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
++	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.init_irq	= s5pv210_init_irq,
++	.map_io		= smdkc110_map_io,
++	.init_machine	= smdkc110_machine_init,
++	.timer		= &s3c24xx_timer,
++MACHINE_END
+-- 
+1.6.2.5
