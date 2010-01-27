@@ -1,51 +1,108 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Wed, 27 Jan 2010 18:40:47 +0100
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000701ca9f75$dbe071f0$93a155d0$@deacon@arm.com>
-References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
-	<201001261847.44774.jpihet@mvista.com>
-	<000701ca9f75$dbe071f0$93a155d0$@deacon@arm.com>
-Message-ID: <201001271840.47714.jpihet@mvista.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Wed, 27 Jan 2010 18:42:33 +0100
+Subject: [PATCH v3] input: MXC: add mxc-keypad driver to support the
+	Keypad Port present in the mxc application processors family.
+In-Reply-To: <19296.29180.633167.456022@ipc1.ka-ro>
+References: <1264586106.2463.23.camel@realization>
+	<19296.5728.557535.920849@ipc1.ka-ro>
+	<1264594452.2463.62.camel@realization>
+	<19296.12024.559688.606548@ipc1.ka-ro>
+	<1264603193.2463.75.camel@realization>
+	<19296.21298.394254.553268@ipc1.ka-ro>
+	<1264606159.2463.81.camel@realization>
+	<19296.29180.633167.456022@ipc1.ka-ro>
+Message-ID: <1264614153.2463.134.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi,
+On mer, 2010-01-27 at 18:03 +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Alberto Panizzo writes:
+> > On mer, 2010-01-27 at 15:52 +0100, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Alberto Panizzo writes:
+> > > > On mer, 2010-01-27 at 13:18 +0100, Lothar Wa?mann wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > Alberto Panizzo writes:
+> > > > > > > > +	irq = platform_get_irq(pdev, 0);
+> > > > > > > > +	if (irq < 0) {
+> > > > > > > > +		dev_err(&pdev->dev, "failed to get keypad irq\n");
+> > > > > > > > +		return -ENXIO;
+> > > > > > > > +	}
+> > > > > > > >
+> > > > > > > This should be -ENODEV.
+> > > > > > > 
+> > > > > > Lot of reference keyboard driver use -ENXIO..
+> > > > > > May should be better: return irq ?
+> > > > > > 
+> > > > > Yes, of course. If a function returns an error code that should be
+> > > > > promoted to the caller instead of inventing a new error code.
+> > > > > 
+> > > > > 
+> > > > > Lothar Wa?mann
+> > > > 
+> > > > But, errno.h say:
+> > > > #define ENXIO           6                // Device not configured
+> > > > #define ENODEV          19               // Operation not supported by device
+> > > > 
+> > > What errno.h file is that?
+> > > I have:
+> > > ./include/asm-generic/errno-base.h:#define      ENXIO            6      /* No such device or address */
+> > > ./include/asm-generic/errno-base.h:#define      ENODEV          19      /* No such device */
+> > > 
+> > > AFAIK ENXIO is used when actual I/O has been attempted. But in this
+> > > case the driver is still being configured and did not do any I/O yet.
+> > > 
+> > > 
+> > > Lothar Wa?mann
+> > 
+> > The errno.h that I propose is a googled one and the kernel-one do not explain well..
+> > Not for fighting, I wont understand.
+> > 
+> > In drivers/base/platform.c:
+> > 
+> > /**
+> >  * platform_get_irq - get an IRQ for a device
+> >  * @dev: platform device
+> >  * @num: IRQ number index
+> >  */
+> > int platform_get_irq(struct platform_device *dev, unsigned int num)
+> > {
+> > 	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> > 
+> > 	return r ? r->start : -ENXIO;
+> > }
+> > 
+> > If there isn't the irq resource asked platform_get_irq return ENXIO.
+> > 
+> The POSIX spec says:
+> |[ENXIO]
+> |    No such device or address. Input or output on a special file
+> |refers to a device that does not exist, or makes a request beyond the
+> |capabilities of the device. It may also occur when, for example, a
+> |tape drive is not on-line. 
 
-On Wednesday 27 January 2010 18:26:27 Will Deacon wrote:
-> Hi Jean,
->
-> * Jean Pihet wrote:
-> > Here is the latest version of the patch, after review on the ML.
-> > Adds the Performance Events support for ARMv7 processor, using
-> > the PMNC unit in HW.
->
-> I tested this on a dual-core Cortex-A9 [Realview PBX board].
-> One thing I noticed was that, even if you don't add the PMU IRQs to
-> kernel/pmu.c, perf will still report event counts [I guess this is
-> due to sampling on context switch etc].
-Yes, Perf Events uses the timer interrupts and the scheduler to control the 
-events to be traced. The result is a really low IRQ count, which is good on 
-the Cortex-A8 PMUs units that have the HW problem (known as errata).
+And I am not doing any I/O, while I am requesting something that is beyond
+the capability defined in platform_data.
 
-> However, if the IRQs are 
-> defined, but for some reason we fail to request them, then the
-> armpmu_reserve_hardware function will fail.
-That is the expected behaviour, isn't it?
-Why is the PMU request failing? That is worth investigating. I never had that 
-problem on the Cortex-A8. Is it caused because of the multicore?
+While 
+|[ENODEV]
+|  No such device. An attempt was made to apply an inappropriate function 
+|to a device; for example, trying to read a write-only device such as a printer.
 
-> Actually, the return 
-> value appears to be uninitialised if you don't have any IRQs defined.
-If the PMU request fails the IRQ should not be requested, so I think it is ok. 
-Is that correct?
+And:
+-the device is present (registered in the driver model) 
+-I am not trying to apply an inappropriate function.. 
 
->
-> Anyway, apart from that, it appeared to work fine.
-Good!
+Maybe the problem have to be attacked form another point of view:
+Platform resources are parameters of the driver, the absence of IRQ and IO mem
+would be considered as wrong parameters so the error should be EINVAL.
 
-Thanks for testing!
-Jean
-
-> Tested-by: Will Deacon <will.deacon@arm.com>
->
-> Will
+> 
+> http://www.opengroup.org/onlinepubs/000095399/functions/xsh_chap02_03.html
+> 
+Bookmarked!!!! :)
