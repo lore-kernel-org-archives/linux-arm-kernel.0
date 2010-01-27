@@ -1,62 +1,48 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 27 Jan 2010 15:52:34 +0100
-Subject: [PATCH v3] input: MXC: add mxc-keypad driver to support the
-	Keypad Port present in the mxc application processors family.
-In-Reply-To: <1264603193.2463.75.camel@realization>
-References: <1264586106.2463.23.camel@realization>
-	<19296.5728.557535.920849@ipc1.ka-ro>
-	<1264594452.2463.62.camel@realization>
-	<19296.12024.559688.606548@ipc1.ka-ro>
-	<1264603193.2463.75.camel@realization>
-Message-ID: <19296.21298.394254.553268@ipc1.ka-ro>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 27 Jan 2010 14:58:38 +0000
+Subject: [PATCH 1/3] ARM: S3C2412: SoC has the fractional baud rate
+	register
+In-Reply-To: <1264601924-18480-1-git-send-email-buserror@gmail.com>
+References: <1264601924-18480-1-git-send-email-buserror@gmail.com>
+Message-ID: <20100127145838.GI10014@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 27, 2010 at 02:18:42PM +0000, Michel Pollet wrote:
+> So add it's flag to the UART definition to allow
+> generation of more precise baud rates for the various
+> clock combinations.
 
-Alberto Panizzo writes:
-> On mer, 2010-01-27 at 13:18 +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Alberto Panizzo writes:
-> > > > > +	irq = platform_get_irq(pdev, 0);
-> > > > > +	if (irq < 0) {
-> > > > > +		dev_err(&pdev->dev, "failed to get keypad irq\n");
-> > > > > +		return -ENXIO;
-> > > > > +	}
-> > > > >
-> > > > This should be -ENODEV.
-> > > > 
-> > > Lot of reference keyboard driver use -ENXIO..
-> > > May should be better: return irq ?
-> > > 
-> > Yes, of course. If a function returns an error code that should be
-> > promoted to the caller instead of inventing a new error code.
-> > 
-> > 
-> > Lothar Wa?mann
+Firstly, I'd like to see this read better by placing the subject at the
+front of this description
+
+Secondly, it would be nice to re-wrap it to closer to 77 chars/line.
+
+ 
+> Signed-off-by: Michel Pollet <buserror@gmail.com>
+> ---
+>  drivers/serial/s3c2412.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> But, errno.h say:
-> #define ENXIO           6                // Device not configured
-> #define ENODEV          19               // Operation not supported by device
+> diff --git a/drivers/serial/s3c2412.c b/drivers/serial/s3c2412.c
+> index ce75e28..1700b1a 100644
+> --- a/drivers/serial/s3c2412.c
+> +++ b/drivers/serial/s3c2412.c
+> @@ -102,6 +102,7 @@ static struct s3c24xx_uart_info s3c2412_uart_inf = {
+>  	.name		= "Samsung S3C2412 UART",
+>  	.type		= PORT_S3C2412,
+>  	.fifosize	= 64,
+> +	.has_divslot	= 1,
+>  	.rx_fifomask	= S3C2440_UFSTAT_RXMASK,
+>  	.rx_fifoshift	= S3C2440_UFSTAT_RXSHIFT,
+>  	.rx_fifofull	= S3C2440_UFSTAT_RXFULL,
+> -- 
+> 1.6.6
 > 
-What errno.h file is that?
-I have:
-./include/asm-generic/errno-base.h:#define      ENXIO            6      /* No such device or address */
-./include/asm-generic/errno-base.h:#define      ENODEV          19      /* No such device */
 
-AFAIK ENXIO is used when actual I/O has been attempted. But in this
-case the driver is still being configured and did not do any I/O yet.
-
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
+-- 
+Ben
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
