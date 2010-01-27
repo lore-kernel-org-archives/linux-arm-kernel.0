@@ -1,24 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 27 Jan 2010 14:12:08 -0800
-Subject: [PATCH] Flush dcache before writing into page to avoid alias
-In-Reply-To: <20100127215959.GC15325@Chamillionaire.breakpoint.cc>
-References: <979dd0561001202107v4ddc1eb7xa59a7c16c452f7a2@mail.gmail.com>
-	<20100125133308.GA26799@desktop>
-	<20100125115814.156d401d.akpm@linux-foundation.org>
-	<20100125200004.GF22481@n2100.arm.linux.org.uk>
-	<20100127215959.GC15325@Chamillionaire.breakpoint.cc>
-Message-ID: <20100127141208.dd8244a7.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2010 22:43:09 +0000
+Subject: [PATCH 1/5] gic: prevent gic from crossing NR_IRQ
+In-Reply-To: <1264620749-24527-2-git-send-email-adharmap@codeaurora.org>
+References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
+	<1264620749-24527-2-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20100127224309.GD29665@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2010 22:59:59 +0100
-Sebastian Andrzej Siewior <sebastian@breakpoint.cc> wrote:
-
-> I just wanted to query what the status of this patch is. This patch
-> seems to fix a real bug which causes a test suite to fail on ARM [0].
-> The test suite passes on my VIVT ARM with this patch.
+On Wed, Jan 27, 2010 at 11:32:25AM -0800, adharmap at codeaurora.org wrote:
+> From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
 > 
-> [0] http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=524003
+> The gic code tries to initialize interrupts beyond NR_IRQ. Prevent
+> code from doing that.
 
-I have it queued for 2.6.33, backportable to 2.6.32.x, assuming that
-nobody sees any issues with it.
+NAK.  This is completely the wrong approach.
+
+        /*
+         * Find out how many interrupts are supported.
+         */
+        max_irq = readl(base + GIC_DIST_CTR) & 0x1f;
+        max_irq = (max_irq + 1) * 32;
+
+        /*
+         * The GIC only supports up to 1020 interrupt sources.
+         * Limit this to either the architected maximum, or the
+         * platform maximum.
+         */
+        if (max_irq > max(1020, NR_IRQS))
+                max_irq = max(1020, NR_IRQS);
+...
+        for (i = irq_start; i < gic_data[gic_nr].irq_offset + max_irq; i++) {
+
+This function is broken if irq_start != 0, and needs fixing - max_irq
+needs to be limited to the _minimum_ of 1020 or NR_IRQS - irq_start.
