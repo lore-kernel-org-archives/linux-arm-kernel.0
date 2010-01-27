@@ -1,52 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 27 Jan 2010 05:42:24 +0200
-Subject: [PATCH 02/10] ARM: LPC32XX: arch Kconfig, platform Kconfig,
-	and makefiles
-In-Reply-To: <1264551582.6528.5@usb10132>
-References: <1264551582.6528.5@usb10132>
-Message-ID: <20100127034223.GB31899@tarshish>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 26 Jan 2010 23:02:48 -0500 (EST)
+Subject: Git pull request: Orion/Kirkwood fixes for 2.6.33-rc
+Message-ID: <alpine.LFD.2.00.1001262253170.1681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Russell, please could you pull the following:
 
-On Tue, Jan 26, 2010 at 04:19:42PM -0800, Kevin Wells wrote:
-> LPC32xx architecture Kconfig, platform Kconfig, and makefiles
-> 
-> 
-> Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
-> ---
->  arch/arm/mach-lpc32xx/Kconfig       |  158
-> +++++++++++++++++++++++++++++++++++
->  arch/arm/mach-lpc32xx/Kconfig.plat  |   98 ++++++++++++++++++++++
->  arch/arm/mach-lpc32xx/Makefile      |    9 ++
->  arch/arm/mach-lpc32xx/Makefile.boot |    4 +
->  4 files changed, 269 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/Kconfig
-> b/arch/arm/mach-lpc32xx/Kconfig
-> new file mode 100644
-> index 0000000..a277885
-> --- /dev/null
-> +++ b/arch/arm/mach-lpc32xx/Kconfig
-> @@ -0,0 +1,158 @@
-> +if ARCH_LPC32XX
-> +
-> +menu "LPC32XX chip options"
-> +
-> +config ARCH_LPC32XX_IRAM_SIZE
-> +	int
-> +	default 131072 if ARCH_LPC32XX_20
-> +	default 262144 if ARCH_LPC32XX_30 || ARCH_LPC32XX_40 ||
-> ARCH_LPC32XX_50
-  ^^^^^^^^^^^^^^^
+	git://git.marvell.com/orion for-rmk
 
-You mailer (Balsa?) wraps long lines in this and in other patches, thus 
-corrupting them. Please fix.
+This contains the following fixes:
 
-baruch
+Dirk Teurlings (1):
+      [ARM] Orion5x: add GPIO LED and buttons for wrt350n v2
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Erik Benada (1):
+      [ARM] orion5x: D-link DNS-323 rev. B1 power-off
+
+Lennert Buytenhek (1):
+      [ARM] Orion: fix PCIe inbound window programming when RAM size is not a power of two
+
+Saeed Bishara (1):
+      [ARM] Kirkwood: drive USB VBUS pin on rd88f6192-nas high on boot
+
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c |    6 ++
+ arch/arm/mach-orion5x/dns323-setup.c         |   33 +++++++--
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c     |   79 ++++++++++++++++++++
+ arch/arm/plat-orion/pcie.c                   |    6 ++
+ 4 files changed, 118 insertions(+), 6 deletions(-)
+
+
+Nicolas
