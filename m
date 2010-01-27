@@ -1,22 +1,49 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 28 Jan 2010 08:01:32 +0900
-Subject: [Rev2]Samsung: New driver for AC97 controllers
-In-Reply-To: <20100127204510.GB11601@rakim.wolfsonmicro.main>
-References: <1264571815-14893-1-git-send-email-jassisinghbrar@gmail.com>
-	<20100127204510.GB11601@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6791001271501vf4db64k6fcd09b333def30d@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2010 23:09:58 +0000
+Subject: [PATCH 3/5] gic: Add set_type callback
+In-Reply-To: <1264620749-24527-4-git-send-email-adharmap@codeaurora.org>
+References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
+	<1264620749-24527-4-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20100127230958.GE29665@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 5:45 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Jan 27, 2010 at 02:56:55PM +0900, jassisinghbrar at gmail.com wrote:
->
->> ?A machine driver, for SMDKs with wm9713 as AC97 codec attached, has also
->> been added. The driver is generic enough to be used as such with newer SoCs.
->
-> OK, works for me with a smoke test so I've applied all the sound/soc
-> parts. ?I'll add a commit detailing the CFG jumper settings expected to
-> make it work out of the box on SMDK6410 since that catches quite a few
-> people out.
-Thanks.
+On Wed, Jan 27, 2010 at 11:32:27AM -0800, adharmap at codeaurora.org wrote:
+> +	if (irq > 1020)
+> +		return -1;
+
+*unprintable*.  Always use proper error codes.
+
+> +
+> +	/*
+> +	* Two bits each, calc the register and bit, 16 per 32 bit register
+> +	* accessible long word only
+> +	* But the field is NxN 1xN and rising/falling
+> +	*/
+> +	register_index = (irq/16)<<2;
+> +	bit_index = (irq & 0xF)<<1;
+> +
+> +	spin_lock(&irq_controller_lock);
+> +	reg_value = readl(gic_dist_base(irq) + GIC_DIST_CONFIG +
+> +						register_index);
+> +	/*
+> +	* keep the nxn and 1xn , mask the edge level
+> +	* Edge is 1, level 0
+> +	*/
+> +	reg_value = (reg_value & ~(2<<bit_index));
+> +	if (flow_type & (IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING)) {
+> +		reg_value |= (2<<bit_index);
+> +		writel(reg_value, gic_dist_base(irq) + GIC_DIST_CONFIG
+> +							+ register_index);
+> +		__set_irq_handler_unlocked(irq, handle_edge_irq);
+> +	}
+> +
+> +	if (flow_type & (IRQ_TYPE_LEVEL_HIGH|IRQ_TYPE_LEVEL_LOW)) {
+> +		writel(reg_value, gic_dist_base(irq) + GIC_DIST_CONFIG
+> +							+ register_index);
+> +		__set_irq_handler_unlocked(irq, handle_level_irq);
+> +	}
+
+This needs to exclude the first 32 interrupts, where the interrupt
+configuration is either read-only or banked between multiprocessor
+CPUs.
