@@ -1,24 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Jan 2010 11:12:51 +0000
-Subject: [PATCH 2/4] mfd: update irq handler in max8925
-In-Reply-To: <771cded01001262202s45f28206hd9740279a275898e@mail.gmail.com>
-References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
-	<20100125115930.GE22909@sirena.org.uk>
-	<771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
-	<20100126112800.GL15759@rakim.wolfsonmicro.main>
-	<771cded01001260331u541cc931x361d0719cd8fe00@mail.gmail.com>
-	<20100126120602.GP15759@rakim.wolfsonmicro.main>
-	<771cded01001262202s45f28206hd9740279a275898e@mail.gmail.com>
-Message-ID: <20100127111251.GH22551@rakim.wolfsonmicro.main>
+From: l.fu@pengutronix.de (Luotao Fu)
+Date: Wed, 27 Jan 2010 12:23:56 +0100
+Subject: [PATCH 00/10] ARM: LPC32XX: New architecture support
+In-Reply-To: <1264550302.6528.2@usb10132>
+References: <1264550302.6528.2@usb10132>
+Message-ID: <4B60224C.1070305@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 01:02:09AM -0500, Haojian Zhuang wrote:
+Hi Kevin,
 
-> Updated patch is attached in mail. Now the modification is in below.
-> 1. remove clear_irq() & clear_tsc_irq().
-> 2. remove warning message in max8925_irq().
+Thx for the patches. However most of the patches has linebreaks in them,
+probably broken by you MUA, and are hence unapplyable for me.
 
-This looks OK for me - for what it's worth
+Would you please resend the serie with git send-email are something similar
+which don't break the patch format?
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cheers
+Luotao Fu
+-- 
+Pengutronix e.K.                           | Dipl.-Ing. Luotao Fu        |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
