@@ -1,45 +1,44 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 27 Jan 2010 08:49:12 -0500
-Subject: [PATCH] mmp2: add handling on PMIC IRQ
-Message-ID: <mailman.175.1264572534.2170.linux-arm-kernel@lists.infradead.org>
+From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
+Date: Wed, 27 Jan 2010 15:01:20 +0900
+Subject: [PATCHv2 08/10] ARM: SMDK2443: Enable AC97 device
+Message-ID: <1264572080-24754-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since PMIC INT pin is a special pin of CPU, the status of PMIC INT pin needs
-to be cleared after PMIC IRQ occured. Now append the clear operation in
-irq chip handler.
+From: Jassi Brar <jassi.brar@samsung.com>
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Add AC97 controller to platform devices and initialize the AC97 gpios.
+
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-mmp/irq-mmp2.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2443/mach-smdk2443.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
-index 41b29f6..761abe3 100644
---- a/arch/arm/mach-mmp/irq-mmp2.c
-+++ b/arch/arm/mach-mmp/irq-mmp2.c
-@@ -62,7 +62,9 @@ static void _name_##_unmask_irq(unsigned int irq)			\
- static void _name_##_irq_demux(unsigned int irq, struct irq_desc *desc)	\
- {									\
- 	unsigned long status, mask, n;					\
-+	unsigned long mfpr_pmic, data;					\
- 	mask = __raw_readl(prefix##_MASK);				\
-+	mfpr_pmic = APB_VIRT_BASE + 0x1e000 + 0x2c4;			\
- 	while (1) {							\
- 		status = __raw_readl(prefix##_STATUS) & ~mask;		\
- 		if (status == 0)					\
-@@ -70,6 +72,11 @@ static void _name_##_irq_demux(unsigned int irq,
-struct irq_desc *desc)	\
- 		n = find_first_bit(&status, BITS_PER_LONG);		\
- 		while (n < BITS_PER_LONG) {				\
- 			generic_handle_irq(irq_base + n);		\
-+			if ((irq_base + n) == IRQ_MMP2_PMIC) {		\
-+				data = __raw_readl(mfpr_pmic);		\
-+				__raw_writel(data | (1 << 6), mfpr_pmic); \
-+				__raw_writel(data, mfpr_pmic);		\
-+			}						\
- 			n = find_next_bit(&status, BITS_PER_LONG, n+1);	\
- 		}							\
- 	}								\
+diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
+index 039a462..5e7d4ab 100644
+--- a/arch/arm/mach-s3c2443/mach-smdk2443.c
++++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
+@@ -106,6 +106,9 @@ static struct platform_device *smdk2443_devices[] __initdata = {
+ 	&s3c_device_wdt,
+ 	&s3c_device_i2c0,
+ 	&s3c_device_hsmmc0,
++#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
++	&s3c_device_ac97,
++#endif
+ };
+ 
+ static void __init smdk2443_map_io(void)
+@@ -118,6 +121,11 @@ static void __init smdk2443_map_io(void)
+ static void __init smdk2443_machine_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
++
++#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
++	s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
++#endif
++
+ 	platform_add_devices(smdk2443_devices, ARRAY_SIZE(smdk2443_devices));
+ 	smdk_machine_init();
+ }
 -- 
-1.5.6.5
+1.6.2.5
