@@ -1,36 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jan 2010 11:12:28 +0100
-Subject: defining ZRELADDR as PHYS_OFFSET + TEXT_OFFSET
-Message-ID: <20100127101228.GA17421@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 27 Jan 2010 10:25:36 +0000
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <1b68c6791001261845y7635b92dm2fd4c7ad240d40c7@mail.gmail.com>
+References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
+	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+	<20100126102343.GA24843@trinity.fluff.org>
+	<1b68c6791001260303m38e6e689p2ee8c2c4c6ac2af3@mail.gmail.com>
+	<1b68c6791001261845y7635b92dm2fd4c7ad240d40c7@mail.gmail.com>
+Message-ID: <20100127102536.GA22551@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jan 27, 2010 at 11:45:24AM +0900, jassi brar wrote:
+> On Tue, Jan 26, 2010 at 8:03 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
 
-currently all platforms need to define zreladdr-y in
-arch/arm/mach-$mach/Makefile.boot and PHYS_OFFSET (in
-arch/arm/mach-$mach/include/mach/memory.h).
+> >> It would be nice t osee something to convert a 'struct snd_ac97' to a
+> >> 'struct s3c_ac97_info' as this is being passed in to most place and
+> >> would also help if there is ever >1 block.
 
-Constraints for these are:
+> > ok, will find a way to do that.
 
- TEXTADDR = PAGE_OFFSET + TEXT_OFFSET
- __virt_to_phys(virt) = virt - PAGE_OFFSET + PHYS_OFFSET (at least for
-	"small" virtual addresses)
- ZRELADDR = __virt_to_phys(TEXTADDR)
+> after looking, I found there is no convenient way to extract driver private
+> data from the snd_ac97 structure. Its possible, but after ugly voodoo
+> stuff.  Not to forget that no other ASoC ac97 controller driver does
+> it either.
+> And since we have just 1 AC97 controller in SoCs till date(no plans of
+> adding another anytime soon) I think we can live with it?
 
-(The equallity for __virt_to_phys only holds "normaly" according to
-http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html.
-In practice it holds for addresses of the first bank of RAM which is
-enough for the purposes of this mail.)
+I think this is fine.  It's vanishingly unlikely that we'll see CPUs
+with multiple AC97 controllers and there are plenty of places in the
+core which assume that there will only be a single AC97 bus in the
+system.
 
-So we can deduce ZRELADDR = PHYS_OFFSET + TEXT_OFFSET.
-
-Is there something I missed or is it possible to get rid of zreladdr-y
-in .../Makefile.boot and define it according to the equation above?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Please also let me renew my reminder to cut irrelevant text from
+replies, it really does help with finding the new text in the mail and
+is especially helpful to those of us who read some of our mail on mobile
+phones.
