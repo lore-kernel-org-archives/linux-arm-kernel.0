@@ -1,70 +1,82 @@
-From: buserror@gmail.com (Michel Pollet)
-Date: Wed, 27 Jan 2010 16:38:09 +0000
-Subject: [PATCH 2/2] ARM: S3C: Configuration override for UART names
-In-Reply-To: <1264610289-14412-1-git-send-email-buserror@gmail.com>
-References: <1264610289-14412-1-git-send-email-buserror@gmail.com>
-Message-ID: <1264610289-14412-2-git-send-email-buserror@gmail.com>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Wed, 27 Jan 2010 17:45:06 +0100
+Subject: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
+Message-ID: <4B606D92.9020005@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S3C UART devices  are named s3c2410_serialX and it is
-inconsistent with the kernel at boot time (console=ttySACx)
-This patch allows the config file to override this and
-use the standard name instead.
 
-Signed-off-by: Michel Pollet <buserror@gmail.com>
----
- arch/arm/plat-s3c/Kconfig |    9 +++++++++
- drivers/serial/samsung.c  |    9 ++++++++-
- 2 files changed, 17 insertions(+), 1 deletions(-)
+On a 400MHz ARM11 MPCore system (NEC NaviEngine based) with kernel 
+2.6.32 we found that BogoMIPS/loops per jiffies ~doubles (see below 
+[1]) by adding a nop to __delay():
 
-diff --git a/arch/arm/plat-s3c/Kconfig b/arch/arm/plat-s3c/Kconfig
-index 9e9d028..158257a 100644
---- a/arch/arm/plat-s3c/Kconfig
-+++ b/arch/arm/plat-s3c/Kconfig
-@@ -113,6 +113,15 @@ config S3C_LOWLEVEL_UART_PORT
- 	  this configuration should be between zero and two. The port
- 	  must have been initialised by the boot-loader before use.
- 
-+config S3C_STD_UART_NAMES
-+	bool "Name S3C UART device files as ttySACx"
-+	default n
-+	help
-+	  The kernel and most other SoC use the ttySACx naming scheme
-+	  for UART device file naming. The default for S3C is to use
-+	  s3c2410_serialX, and it confuses a lot of distros; it is also
-+	  inconsistent with the console= kernel parameter.
-+
- # options for gpiolib support
- 
- config S3C_GPIO_SPACE
-diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
-index 52e3df1..e3dd135 100644
---- a/drivers/serial/samsung.c
-+++ b/drivers/serial/samsung.c
-@@ -55,7 +55,14 @@
- 
- /* UART name and device definitions */
- 
-+#ifdef CONFIG_S3C_STD_UART_NAMES
-+/* All other SoC use this naming sheme, 
-+   including the kernel earlier at boot time */
- #define S3C24XX_SERIAL_NAME	"ttySAC"
-+#else
-+/* Legacy option */
-+#define S3C24XX_SERIAL_NAME	"s3c2410_serial"
+--- a/arch/arm/lib/delay.S
++++ b/arch/arm/lib/delay.S
+@@ -41,6 +41,9 @@ ENTRY(__const_udelay)    @ 0 <= r0 <= 0x
+  @ Delay routine
+  ENTRY(__delay)
++#if defined(CONFIG_CPU_V6) && defined(CONFIG_SMP)
++        nop
 +#endif
- #define S3C24XX_SERIAL_MAJOR	204
- #define S3C24XX_SERIAL_MINOR	64
- 
-@@ -878,7 +885,7 @@ static struct uart_ops s3c24xx_serial_ops = {
- 
- static struct uart_driver s3c24xx_uart_drv = {
- 	.owner		= THIS_MODULE,
--	.dev_name	= "s3c2410_serial",
-+	.dev_name	= S3C24XX_SERIAL_NAME,
- 	.nr		= CONFIG_SERIAL_SAMSUNG_UARTS,
- 	.cons		= S3C24XX_SERIAL_CONSOLE,
- 	.driver_name	= S3C24XX_SERIAL_NAME,
--- 
-1.6.6
+          subs    r0, r0, #1
+  #if 0
+          movls    pc, lr
+
+Any ideas what might happen here?
+
+Many thanks and best regards
+
+Dirk
+
+[1] 2.6.32 without and with additional nop in __delay():
+
+====> Clean 2.6.32 without nop in __delay():
+
+...
+Calibrating delay loop... 159.74 BogoMIPS (lpj=798720)
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+Calibrating local timer... 199.98MHz.
+CPU1: Booted secondary processor
+Calibrating delay loop... 159.33 BogoMIPS (lpj=796672)
+CPU2: Booted secondary processor
+Calibrating delay loop... 159.74 BogoMIPS (lpj=798720)
+Brought up 3 CPUs
+SMP: Total of 3 processors activated (478.82 BogoMIPS).
+...
+
+Disassembly:
+
+         |@ Delay routine
+         |ENTRY(__delay)
+C0940600|E2500001  __delay:  subs    r0,r0,#0x1
+C0940604|8AFFFFFD        bhi     0xC0940600       ; __delay
+C0940608|E1A0F00E        cpy     pc,r14
+
+
+
+====> With an additional nop in __delay():
+
+...
+Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+Calibrating local timer... 199.97MHz.
+CPU1: Booted secondary processor
+Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)
+CPU2: Booted secondary processor
+Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)
+Brought up 3 CPUs
+SMP: Total of 3 processors activated (1196.85 BogoMIPS).
+...
+
+Disassembly:
+
+         |@ Delay routine
+         |ENTRY(__delay)
+         |#if defined(CONFIG_CPU_V6) && defined(CONFIG_SMP)
+C0940600|E320F000  __delay:  nop
+         |#endif
+C0940604|E2500001        subs    r0,r0,#0x1
+C0940608|8AFFFFFC        bhi     0xC0940600       ; __delay
+C094060C|E1A0F00E        cpy     pc,r14
