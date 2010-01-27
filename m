@@ -1,1150 +1,1167 @@
 From: wellsk40@gmail.com (Kevin Wells)
-Date: Tue, 26 Jan 2010 16:20:32 -0800
-Subject: [PATCH 10/10] ARM: LPC32XX: Phytec PHY3250 default kernel config
-Message-ID: <1264551632.6528.13@usb10132>
+Date: Tue, 26 Jan 2010 16:19:51 -0800
+Subject: [PATCH 03/10] ARM: LPC32XX: core architecture files
+Message-ID: <1264551591.6528.6@usb10132>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Phytec PHY3250 default kernel config (ramdisk)
+LPC32XX core architecture files
 
 
 Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
 ---
-  arch/arm/configs/phy3250_defconfig | 1124  
-++++++++++++++++++++++++++++++++++++
-  1 files changed, 1124 insertions(+), 0 deletions(-)
+  arch/arm/mach-lpc32xx/gpiolib.c |  455  
++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-lpc32xx/irq.c     |  237 ++++++++++++++++++++
+  arch/arm/mach-lpc32xx/serial.c  |  200 +++++++++++++++++
+  arch/arm/mach-lpc32xx/timer.c   |  187 ++++++++++++++++
+  4 files changed, 1079 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/phy3250_defconfig  
-b/arch/arm/configs/phy3250_defconfig
+diff --git a/arch/arm/mach-lpc32xx/gpiolib.c  
+b/arch/arm/mach-lpc32xx/gpiolib.c
 new file mode 100644
-index 0000000..28bac0e
+index 0000000..615b72f
 --- /dev/null
-+++ b/arch/arm/configs/phy3250_defconfig
-@@ -0,0 +1,1124 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.33-rc5
-+# Mon Jan 25 17:45:35 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
-+
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_LOCK_KERNEL=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_HAVE_KERNEL_GZIP=y
-+CONFIG_HAVE_KERNEL_LZO=y
-+CONFIG_KERNEL_GZIP=y
-+# CONFIG_KERNEL_BZIP2 is not set
-+# CONFIG_KERNEL_LZMA is not set
-+# CONFIG_KERNEL_LZO is not set
-+CONFIG_SWAP=y
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+# CONFIG_BSD_PROCESS_ACCT is not set
-+
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_TINY_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_GROUP_SCHED=y
-+CONFIG_FAIR_GROUP_SCHED=y
-+# CONFIG_RT_GROUP_SCHED is not set
-+CONFIG_USER_SCHED=y
-+# CONFIG_CGROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+CONFIG_SYSFS_DEPRECATED=y
-+CONFIG_SYSFS_DEPRECATED_V2=y
-+# CONFIG_RELAY is not set
-+# CONFIG_NAMESPACES is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_LZO is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+CONFIG_EMBEDDED=y
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+# CONFIG_KALLSYMS_EXTRA_PASS is not set
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+
-+#
-+# Kernel Performance Events And Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_COMPAT_BRK=y
-+CONFIG_SLAB=y
-+# CONFIG_SLUB is not set
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+# CONFIG_MODVERSIONS is not set
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_INLINE_SPIN_TRYLOCK is not set
-+# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK is not set
-+# CONFIG_INLINE_SPIN_LOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_SPIN_UNLOCK is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_READ_TRYLOCK is not set
-+# CONFIG_INLINE_READ_LOCK is not set
-+# CONFIG_INLINE_READ_LOCK_BH is not set
-+# CONFIG_INLINE_READ_LOCK_IRQ is not set
-+# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_READ_UNLOCK is not set
-+# CONFIG_INLINE_READ_UNLOCK_BH is not set
-+# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_WRITE_TRYLOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK_BH is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_WRITE_UNLOCK is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
-+# CONFIG_MUTEX_SPIN_ON_OWNER is not set
-+CONFIG_FREEZER=y
-+
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_DOVE is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+CONFIG_ARCH_LPC32XX=y
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+# CONFIG_ARCH_U8500 is not set
-+
-+#
-+# LPC32XX chip options
-+#
-+CONFIG_ARCH_LPC32XX_IRAM_SIZE=262144
-+# CONFIG_ARCH_LPC32XX_20 is not set
-+# CONFIG_ARCH_LPC32XX_30 is not set
-+# CONFIG_ARCH_LPC32XX_40 is not set
-+CONFIG_ARCH_LPC32XX_50=y
-+
-+#
-+# Serial port configuration
-+#
-+
-+#
-+# Individual UART enable selections
-+#
-+# CONFIG_ARCH_LPC32XX_HSUART1_ENABLE is not set
-+# CONFIG_ARCH_LPC32XX_HSUART2_ENABLE is not set
-+# CONFIG_ARCH_LPC32XX_UART3_ENABLE is not set
-+# CONFIG_ARCH_LPC32XX_UART4_ENABLE is not set
-+CONFIG_ARCH_LPC32XX_UART5_ENABLE=y
-+# CONFIG_ARCH_LPC32XX_UART6_ENABLE is not set
-+# CONFIG_ARCH_LPC32XX_HSUART7_ENABLE is not set
-+# CONFIG_ARCH_LPC32XX_UNCOMP_HSU1 is not set
-+# CONFIG_ARCH_LPC32XX_UNCOMP_HSU2 is not set
-+# CONFIG_ARCH_LPC32XX_UNCOMP_U3 is not set
-+# CONFIG_ARCH_LPC32XX_UNCOMP_U4 is not set
-+CONFIG_ARCH_LPC32XX_UNCOMP_U5=y
-+# CONFIG_ARCH_LPC32XX_UNCOMP_U6 is not set
-+# CONFIG_ARCH_LPC32XX_UNCOMP_HSU7 is not set
-+# CONFIG_ARCH_LPC32XX_DEBUGO_U3 is not set
-+# CONFIG_ARCH_LPC32XX_DEBUGO_U4 is not set
-+CONFIG_ARCH_LPC32XX_DEBUGO_U5=y
-+# CONFIG_ARCH_LPC32XX_DEBUGO_U6 is not set
-+
-+#
-+# LPC32XX platform choices
-+#
-+CONFIG_MACH_PHY3250=y
-+# CONFIG_PHY3250_QVGA_PANEL_1307_0 is not set
-+CONFIG_PHY3250_QVGA_PANEL_1307_1=y
-+# CONFIG_PHY3250_CPU_MODULE_1304_0 is not set
-+CONFIG_PHY3250_CPU_MODULE_1304_1=y
-+# CONFIG_PHY3250_CARRIER_1305_01 is not set
-+# CONFIG_PHY3250_CARRIER_1305_2 is not set
-+CONFIG_PHY3250_CARRIER_1305_3=y
-+CONFIG_MACH_LPC32XX_IRAM_RESERVED=y
-+# CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD is not set
-+
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
-+
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_COMMON_CLKDEV=y
-+
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+CONFIG_TICK_ONESHOT=y
-+# CONFIG_NO_HZ is not set
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+# CONFIG_PREEMPT_NONE is not set
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+CONFIG_PREEMPT=y
-+CONFIG_HZ=100
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=999999
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=tty0 console=ttyS0,115200n81 root=/dev/ram0  
-init=/sbin/init"
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+CONFIG_CPU_IDLE=y
-+CONFIG_CPU_IDLE_GOV_LADDER=y
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+CONFIG_FPE_NWFPE=y
-+# CONFIG_FPE_NWFPE_XP is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+CONFIG_BINFMT_AOUT=y
-+# CONFIG_BINFMT_MISC is not set
-+
-+#
-+# Power management options
-+#
-+CONFIG_PM=y
-+# CONFIG_PM_DEBUG is not set
-+CONFIG_PM_SLEEP=y
-+CONFIG_SUSPEND=y
-+CONFIG_SUSPEND_FREEZER=y
-+# CONFIG_APM_EMULATION is not set
-+# CONFIG_PM_RUNTIME is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+# CONFIG_FW_LOADER is not set
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_CRYPTOLOOP=y
-+
-+#
-+# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
-+#
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=1
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_MG_DISK is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_AD525X_DPOT is not set
-+# CONFIG_ICS932S401 is not set
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_ISL29003 is not set
-+# CONFIG_DS1682 is not set
-+# CONFIG_TI_DAC7512 is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_AT24 is not set
-+CONFIG_EEPROM_AT25=y
-+# CONFIG_EEPROM_LEGACY is not set
-+# CONFIG_EEPROM_MAX6875 is not set
-+# CONFIG_EEPROM_93CX6 is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+CONFIG_SCSI=y
-+CONFIG_SCSI_DMA=y
-+# CONFIG_SCSI_TGT is not set
-+# CONFIG_SCSI_NETLINK is not set
-+CONFIG_SCSI_PROC_FS=y
-+
-+#
-+# SCSI support type (disk, tape, CD-ROM)
-+#
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_CHR_DEV_ST is not set
-+# CONFIG_CHR_DEV_OSST is not set
-+# CONFIG_BLK_DEV_SR is not set
-+# CONFIG_CHR_DEV_SG is not set
-+# CONFIG_CHR_DEV_SCH is not set
-+# CONFIG_SCSI_MULTI_LUN is not set
-+# CONFIG_SCSI_CONSTANTS is not set
-+# CONFIG_SCSI_LOGGING is not set
-+# CONFIG_SCSI_SCAN_ASYNC is not set
-+CONFIG_SCSI_WAIT_SCAN=m
-+
-+#
-+# SCSI Transports
-+#
-+# CONFIG_SCSI_SPI_ATTRS is not set
-+# CONFIG_SCSI_FC_ATTRS is not set
-+# CONFIG_SCSI_SAS_LIBSAS is not set
-+# CONFIG_SCSI_SRP_ATTRS is not set
-+CONFIG_SCSI_LOWLEVEL=y
-+# CONFIG_LIBFC is not set
-+# CONFIG_LIBFCOE is not set
-+# CONFIG_SCSI_DEBUG is not set
-+# CONFIG_SCSI_DH is not set
-+# CONFIG_SCSI_OSD_INITIATOR is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+# CONFIG_INPUT_FF_MEMLESS is not set
-+# CONFIG_INPUT_POLLDEV is not set
-+# CONFIG_INPUT_SPARSEKMAP is not set
-+
-+#
-+# Userland interfaces
-+#
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+# CONFIG_INPUT_TOUCHSCREEN is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+# CONFIG_SERIO is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=4
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-+# CONFIG_SERIAL_8250_EXTENDED is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+# CONFIG_SERIAL_AMBA_PL010 is not set
-+# CONFIG_SERIAL_AMBA_PL011 is not set
-+# CONFIG_SERIAL_MAX3100 is not set
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+# CONFIG_RAW_DRIVER is not set
-+# CONFIG_TCG_TPM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_BOARDINFO=y
-+CONFIG_I2C_COMPAT=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_HELPER_AUTO=y
-+
-+#
-+# I2C Hardware Bus support
-+#
-+
-+#
-+# I2C system bus drivers (mostly embedded / system-on-chip)
-+#
-+# CONFIG_I2C_GPIO is not set
-+# CONFIG_I2C_OCORES is not set
-+CONFIG_I2C_PNX=y
-+# CONFIG_I2C_SIMTEC is not set
-+
-+#
-+# External I2C/SMBus adapter drivers
-+#
-+# CONFIG_I2C_PARPORT_LIGHT is not set
-+# CONFIG_I2C_TAOS_EVM is not set
-+
-+#
-+# Other I2C/SMBus bus drivers
-+#
-+# CONFIG_I2C_PCA_PLATFORM is not set
-+# CONFIG_I2C_STUB is not set
-+
-+#
-+# Miscellaneous I2C Chip support
-+#
-+# CONFIG_SENSORS_TSL2550 is not set
-+# CONFIG_I2C_DEBUG_CORE is not set
-+# CONFIG_I2C_DEBUG_ALGO is not set
-+# CONFIG_I2C_DEBUG_BUS is not set
-+# CONFIG_I2C_DEBUG_CHIP is not set
-+CONFIG_SPI=y
-+# CONFIG_SPI_DEBUG is not set
-+CONFIG_SPI_MASTER=y
-+
-+#
-+# SPI Master Controller Drivers
-+#
-+# CONFIG_SPI_BITBANG is not set
-+# CONFIG_SPI_GPIO is not set
-+CONFIG_SPI_PL022=y
-+# CONFIG_SPI_XILINX is not set
-+# CONFIG_SPI_DESIGNWARE is not set
-+
-+#
-+# SPI Protocol Masters
-+#
-+# CONFIG_SPI_SPIDEV is not set
-+# CONFIG_SPI_TLE62X0 is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+# CONFIG_GPIO_PL061 is not set
-+
-+#
-+# I2C GPIO expanders:
-+#
-+# CONFIG_GPIO_MAX732X is not set
-+# CONFIG_GPIO_PCA953X is not set
-+# CONFIG_GPIO_PCF857X is not set
-+# CONFIG_GPIO_ADP5588 is not set
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+# CONFIG_GPIO_MAX7301 is not set
-+# CONFIG_GPIO_MCP23S08 is not set
-+# CONFIG_GPIO_MC33880 is not set
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+CONFIG_WATCHDOG=y
-+# CONFIG_WATCHDOG_NOWAYOUT is not set
-+
-+#
-+# Watchdog Device Drivers
-+#
-+# CONFIG_SOFT_WATCHDOG is not set
-+CONFIG_PNX4008_WATCHDOG=y
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_TPS65010 is not set
-+# CONFIG_TWL4030_CORE is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_PMIC_DA903X is not set
-+# CONFIG_PMIC_ADP5520 is not set
-+# CONFIG_MFD_WM8400 is not set
-+# CONFIG_MFD_WM831X is not set
-+# CONFIG_MFD_WM8350_I2C is not set
-+# CONFIG_MFD_PCF50633 is not set
-+# CONFIG_MFD_MC13783 is not set
-+# CONFIG_AB3100_CORE is not set
-+# CONFIG_EZX_PCAP is not set
-+# CONFIG_MFD_88PM8607 is not set
-+# CONFIG_AB4500_CORE is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+CONFIG_FB=y
-+# CONFIG_FIRMWARE_EDID is not set
-+# CONFIG_FB_DDC is not set
-+# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-+CONFIG_FB_CFB_FILLRECT=y
-+CONFIG_FB_CFB_COPYAREA=y
-+CONFIG_FB_CFB_IMAGEBLIT=y
-+# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
-+# CONFIG_FB_SYS_FILLRECT is not set
-+# CONFIG_FB_SYS_COPYAREA is not set
-+# CONFIG_FB_SYS_IMAGEBLIT is not set
-+# CONFIG_FB_FOREIGN_ENDIAN is not set
-+# CONFIG_FB_SYS_FOPS is not set
-+# CONFIG_FB_SVGALIB is not set
-+# CONFIG_FB_MACMODES is not set
-+# CONFIG_FB_BACKLIGHT is not set
-+# CONFIG_FB_MODE_HELPERS is not set
-+# CONFIG_FB_TILEBLITTING is not set
-+
-+#
-+# Frame buffer hardware drivers
-+#
-+CONFIG_FB_ARMCLCD=y
-+# CONFIG_FB_S1D13XXX is not set
-+# CONFIG_FB_VIRTUAL is not set
-+# CONFIG_FB_METRONOME is not set
-+# CONFIG_FB_MB862XX is not set
-+# CONFIG_FB_BROADSHEET is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+# CONFIG_FRAMEBUFFER_CONSOLE_ROTATION is not set
-+# CONFIG_FONTS is not set
-+CONFIG_FONT_8x8=y
-+CONFIG_FONT_8x16=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_LOGO_LINUX_CLUT224=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_ARCH_HAS_OHCI=y
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+
-+#
-+# LED drivers
-+#
-+# CONFIG_LEDS_PCA9532 is not set
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_GPIO_PLATFORM=y
-+# CONFIG_LEDS_LP3944 is not set
-+# CONFIG_LEDS_PCA955X is not set
-+# CONFIG_LEDS_DAC124S085 is not set
-+# CONFIG_LEDS_BD2802 is not set
-+# CONFIG_LEDS_LT3593 is not set
-+
-+#
-+# LED Triggers
-+#
-+CONFIG_LEDS_TRIGGERS=y
-+# CONFIG_LEDS_TRIGGER_TIMER is not set
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+# CONFIG_LEDS_TRIGGER_BACKLIGHT is not set
-+# CONFIG_LEDS_TRIGGER_GPIO is not set
-+# CONFIG_LEDS_TRIGGER_DEFAULT_ON is not set
-+
-+#
-+# iptables trigger is under Netfilter config (LED target)
-+#
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+# CONFIG_EXT2_FS_XATTR is not set
-+# CONFIG_EXT2_FS_XIP is not set
-+# CONFIG_EXT3_FS is not set
-+# CONFIG_EXT4_FS is not set
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+# CONFIG_FILE_LOCKING is not set
-+CONFIG_FSNOTIFY=y
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY is not set
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+# CONFIG_AUTOFS4_FS is not set
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+CONFIG_CRAMFS=y
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_ACORN_PARTITION is not set
-+# CONFIG_OSF_PARTITION is not set
-+# CONFIG_AMIGA_PARTITION is not set
-+# CONFIG_ATARI_PARTITION is not set
-+# CONFIG_MAC_PARTITION is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_BSD_DISKLABEL is not set
-+# CONFIG_MINIX_SUBPARTITION is not set
-+# CONFIG_SOLARIS_X86_PARTITION is not set
-+# CONFIG_UNIXWARE_DISKLABEL is not set
-+# CONFIG_LDM_PARTITION is not set
-+# CONFIG_SGI_PARTITION is not set
-+# CONFIG_ULTRIX_PARTITION is not set
-+# CONFIG_SUN_PARTITION is not set
-+# CONFIG_KARMA_PARTITION is not set
-+# CONFIG_EFI_PARTITION is not set
-+# CONFIG_SYSV68_PARTITION is not set
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="iso8859-1"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+CONFIG_NLS_UTF8=y
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+# CONFIG_MAGIC_SYSRQ is not set
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+# CONFIG_DEBUG_FS is not set
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_DEBUG_SLAB is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+# CONFIG_DEBUG_SPINLOCK is not set
-+# CONFIG_DEBUG_MUTEXES is not set
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+# CONFIG_DEBUG_MEMORY_INIT is not set
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+# CONFIG_FTRACE is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+# CONFIG_ARM_UNWIND is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+# CONFIG_OC_ETM is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_DEFAULT_SECURITY_SELINUX is not set
-+# CONFIG_DEFAULT_SECURITY_SMACK is not set
-+# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
-+CONFIG_DEFAULT_SECURITY_DAC=y
-+CONFIG_DEFAULT_SECURITY=""
-+CONFIG_CRYPTO=y
-+
-+#
-+# Crypto core or helper
-+#
-+# CONFIG_CRYPTO_FIPS is not set
-+CONFIG_CRYPTO_ALGAPI=y
-+CONFIG_CRYPTO_ALGAPI2=y
-+CONFIG_CRYPTO_AEAD2=y
-+CONFIG_CRYPTO_BLKCIPHER=y
-+CONFIG_CRYPTO_BLKCIPHER2=y
-+CONFIG_CRYPTO_HASH2=y
-+CONFIG_CRYPTO_RNG=y
-+CONFIG_CRYPTO_RNG2=y
-+CONFIG_CRYPTO_PCOMP=y
-+CONFIG_CRYPTO_MANAGER=y
-+CONFIG_CRYPTO_MANAGER2=y
-+# CONFIG_CRYPTO_GF128MUL is not set
-+# CONFIG_CRYPTO_NULL is not set
-+CONFIG_CRYPTO_WORKQUEUE=y
-+# CONFIG_CRYPTO_CRYPTD is not set
-+# CONFIG_CRYPTO_AUTHENC is not set
-+# CONFIG_CRYPTO_TEST is not set
-+
-+#
-+# Authenticated Encryption with Associated Data
-+#
-+# CONFIG_CRYPTO_CCM is not set
-+# CONFIG_CRYPTO_GCM is not set
-+# CONFIG_CRYPTO_SEQIV is not set
-+
-+#
-+# Block modes
-+#
-+CONFIG_CRYPTO_CBC=y
-+# CONFIG_CRYPTO_CTR is not set
-+# CONFIG_CRYPTO_CTS is not set
-+# CONFIG_CRYPTO_ECB is not set
-+# CONFIG_CRYPTO_LRW is not set
-+# CONFIG_CRYPTO_PCBC is not set
-+# CONFIG_CRYPTO_XTS is not set
-+
-+#
-+# Hash modes
-+#
-+# CONFIG_CRYPTO_HMAC is not set
-+# CONFIG_CRYPTO_XCBC is not set
-+# CONFIG_CRYPTO_VMAC is not set
-+
-+#
-+# Digest
-+#
-+# CONFIG_CRYPTO_CRC32C is not set
-+# CONFIG_CRYPTO_GHASH is not set
-+# CONFIG_CRYPTO_MD4 is not set
-+# CONFIG_CRYPTO_MD5 is not set
-+# CONFIG_CRYPTO_MICHAEL_MIC is not set
-+# CONFIG_CRYPTO_RMD128 is not set
-+# CONFIG_CRYPTO_RMD160 is not set
-+# CONFIG_CRYPTO_RMD256 is not set
-+# CONFIG_CRYPTO_RMD320 is not set
-+# CONFIG_CRYPTO_SHA1 is not set
-+# CONFIG_CRYPTO_SHA256 is not set
-+# CONFIG_CRYPTO_SHA512 is not set
-+# CONFIG_CRYPTO_TGR192 is not set
-+# CONFIG_CRYPTO_WP512 is not set
-+
-+#
-+# Ciphers
-+#
-+CONFIG_CRYPTO_AES=y
-+# CONFIG_CRYPTO_ANUBIS is not set
-+# CONFIG_CRYPTO_ARC4 is not set
-+# CONFIG_CRYPTO_BLOWFISH is not set
-+# CONFIG_CRYPTO_CAMELLIA is not set
-+# CONFIG_CRYPTO_CAST5 is not set
-+# CONFIG_CRYPTO_CAST6 is not set
-+# CONFIG_CRYPTO_DES is not set
-+# CONFIG_CRYPTO_FCRYPT is not set
-+# CONFIG_CRYPTO_KHAZAD is not set
-+# CONFIG_CRYPTO_SALSA20 is not set
-+# CONFIG_CRYPTO_SEED is not set
-+# CONFIG_CRYPTO_SERPENT is not set
-+# CONFIG_CRYPTO_TEA is not set
-+# CONFIG_CRYPTO_TWOFISH is not set
-+
-+#
-+# Compression
-+#
-+# CONFIG_CRYPTO_DEFLATE is not set
-+# CONFIG_CRYPTO_ZLIB is not set
-+# CONFIG_CRYPTO_LZO is not set
-+
-+#
-+# Random Number Generation
-+#
-+CONFIG_CRYPTO_ANSI_CPRNG=y
-+# CONFIG_CRYPTO_HW is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_BITREVERSE=y
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+CONFIG_CRC_CCITT=y
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+CONFIG_CRC32=y
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
++++ b/arch/arm/mach-lpc32xx/gpiolib.c
+@@ -0,0 +1,455 @@
++/*
++ * arch/arm/mach-lpc32xx/gpiolib.c
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
+02111-1307  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <linux/gpio.h>
++
++#include <mach/hardware.h>
++#include <mach/platform.h>
++
++#define GPIO_IOBASE io_p2v(GPIO_BASE)
++
++struct gpio_regs {
++	u32 inp_state;
++	u32 outp_set;
++	u32 outp_clr;
++	u32 dir_set;
++	u32 dir_clr;
++	int pgroup;
++};
++
++/*
++ * GPIO names
++ */
++static char *gpio_p0_names[GPIO_P0_MAX] = {
++	"p0.0", "p0.1", "p0.2", "p0.3",
++	"p0.4", "p0.5", "p0.6", "p0.7"
++};
++
++static char *gpio_p1_names[GPIO_P1_MAX] = {
++	"p1.0", "p1.1", "p1.2", "p1.3",
++	"p1.4", "p1.5", "p1.6", "p1.7",
++	"p1.8", "p1.9", "p1.10", "p1.11",
++	"p1.12", "p1.13", "p1.14", "p1.15",
++	"p1.16", "p1.17", "p1.18", "p1.19",
++	"p1.20", "p1.21", "p1.22", "p1.23",
++};
++
++static char *gpio_p2_names[GPIO_P2_MAX] = {
++	"p2.0", "p2.1", "p2.2", "p2.3",
++	"p2.4", "p2.5", "p2.6", "p2.7",
++	"p2.8", "p2.9", "p2.10", "p2.11",
++	"p2.12"
++};
++
++static char *gpio_p3_names[GPIO_P3_MAX] = {
++	"gpi000", "gpio01", "gpio02", "gpio03",
++	"gpio04", "gpio05"
++};
++
++static char *gpi_p3_names[GPI_P3_MAX] = {
++	"gpi00", "gpi01", "gpi02", "gpi03",
++	"gpi04", "gpi05", "gpi06", "gpi07",
++	"gpi08", "gpi09", "na",    "na",
++	"na",    "na",    "na",    "gpi15",
++	"gpi16", "gpi17", "gpi18", "gpi19",
++	"gpi20", "gpi21", "gpi22", "gpi23",
++	"gpi24", "gpi25", "gpi26", "gpi27"
++};
++
++static char *gpo_p3_names[GPO_P3_MAX] = {
++	"gpo00", "gpo01", "gpo02", "gpo03",
++	"gpo04", "gpo05", "gpo06", "gpo07",
++	"gpo08", "gpo09", "gpo10", "gpo11",
++	"gpo12", "gpo13", "gpo14", "gpo15",
++	"gpo16", "gpo17", "gpo18", "gpo19",
++	"gpo20", "gpo21", "gpo22", "gpo23"
++};
++
++static struct gpio_regs gpio_grp_regs[] = {
++	{
++		.inp_state	= GPIO_P0_INP_STATE(GPIO_IOBASE),
++		.outp_set	= GPIO_P0_OUTP_SET(GPIO_IOBASE),
++		.outp_clr	= GPIO_P0_OUTP_CLR(GPIO_IOBASE),
++		.dir_set	= GPIO_P0_DIR_SET(GPIO_IOBASE),
++		.dir_clr	= GPIO_P0_DIR_CLR(GPIO_IOBASE),
++		.pgroup		= 0,
++	},
++	{
++		.inp_state	= GPIO_P1_INP_STATE(GPIO_IOBASE),
++		.outp_set	= GPIO_P1_OUTP_SET(GPIO_IOBASE),
++		.outp_clr	= GPIO_P1_OUTP_CLR(GPIO_IOBASE),
++		.dir_set	= GPIO_P1_DIR_SET(GPIO_IOBASE),
++		.dir_clr	= GPIO_P1_DIR_CLR(GPIO_IOBASE),
++		.pgroup		= 1,
++	},
++	{
++		.inp_state	= GPIO_P2_INP_STATE(GPIO_IOBASE),
++		.outp_set	= GPIO_P2_OUTP_SET(GPIO_IOBASE),
++		.outp_clr	= GPIO_P2_OUTP_CLR(GPIO_IOBASE),
++		.dir_set	= GPIO_P2_DIR_SET(GPIO_IOBASE),
++		.dir_clr	= GPIO_P2_DIR_CLR(GPIO_IOBASE),
++		.pgroup		= 2,
++	},
++	{
++		.inp_state	= GPIO_P3_INP_STATE(GPIO_IOBASE),
++		.outp_set	= GPIO_P3_OUTP_SET(GPIO_IOBASE),
++		.outp_clr	= GPIO_P3_OUTP_CLR(GPIO_IOBASE),
++		.dir_set	= GPIO_P2_DIR_SET(GPIO_IOBASE),
++		.dir_clr	= GPIO_P2_DIR_CLR(GPIO_IOBASE),
++		.pgroup		= 3,
++	},
++};
++
++struct lpc32xx_gpio_chip {
++	struct gpio_chip	chip;
++	struct gpio_regs	*gpio_grp;
++};
++
++static inline struct lpc32xx_gpio_chip *to_lpc32xx_gpio(
++	struct gpio_chip *gpc)
++{
++	return container_of(gpc, struct lpc32xx_gpio_chip, chip);
++}
++
++static void __set_gpio_dir_p012(struct lpc32xx_gpio_chip *group,
++	unsigned pin, int input)
++{
++	if (input)
++		writel(1 << pin, group->gpio_grp->dir_clr);
++	else
++		writel(1 << pin, group->gpio_grp->dir_set);
++}
++
++static void __set_gpio_dir_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin, int input)
++{
++	u32 u;
++
++	/* P3 GPIO pins are offset in the register to pin mapping */
++	u = (1 << (pin + 25));
++
++	if (input)
++		writel(u, group->gpio_grp->dir_clr);
++	else
++		writel(u, group->gpio_grp->dir_set);
++}
++
++static void __set_gpio_level_p012(struct lpc32xx_gpio_chip *group,
++	unsigned pin, int high)
++{
++	if (high)
++		writel(1 << pin, group->gpio_grp->outp_set);
++	else
++		writel(1 << pin, group->gpio_grp->outp_clr);
++}
++
++static void __set_gpio_level_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin, int high)
++{
++	u32 u;
++
++	/* P3 GPIO pins are offset in the register to pin mapping */
++	u = (1 << (pin + 25));
++
++	if (high)
++		writel(u, group->gpio_grp->outp_set);
++	else
++		writel(u, group->gpio_grp->outp_clr);
++}
++
++static void __set_gpo_level_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin, int high)
++{
++	if (high)
++		writel(1 << pin, group->gpio_grp->outp_set);
++	else
++		writel(1 << pin, group->gpio_grp->outp_clr);
++}
++
++static int __get_gpio_state_p012(struct lpc32xx_gpio_chip *group,
++	unsigned pin)
++{
++	int state;
++
++	state =  (int) readl(group->gpio_grp->inp_state);
++	state = (state >> pin) & 1;
++
++	return state;
++}
++
++static int __get_gpio_state_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin)
++{
++	int state;
++
++	state =  (int) readl(group->gpio_grp->inp_state);
++
++	/* P3 GPIO pin input mapping is not contiguous */
++	if (pin == 5)
++		state = (state >> 24) & 1;
++	else
++		state = (state >> (10 + pin)) & 1;
++
++	return state;
++}
++
++static int __get_gpi_state_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin)
++{
++	int state;
++
++	state =  (int) readl(group->gpio_grp->inp_state);
++	state = (state >> pin) & 1;
++
++	return state;
++}
++
++/*
++ * GENERIC_GPIO primitives.
++ */
++static int lpc32xx_gpio_dir_input(struct gpio_chip *chip,
++	unsigned pin)
++{
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin >= chip->ngpio)
++		return -EINVAL;
++
++	if (group->gpio_grp->pgroup <= 2)
++		__set_gpio_dir_p012(group, pin, 1);
++	else
++		__set_gpio_dir_p3(group, pin, 1);
++
++	return 0;
++}
++
++static int lpc32xx_gpio_dir_in_always(struct gpio_chip *chip,
++	unsigned pin)
++{
++	return 0;
++}
++
++static int lpc32xx_gpio_dir_in_none(struct gpio_chip *chip,
++	unsigned pin)
++{
++	return -EINVAL;
++}
++
++static int lpc32xx_gpio_get_value(struct gpio_chip *chip, unsigned pin)
++{
++	int val = 0;
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin < chip->ngpio) {
++		if (group->gpio_grp->pgroup <= 2)
++			val = __get_gpio_state_p012(group, pin);
++		else
++			val = __get_gpio_state_p3(group, pin);
++	}
++
++	return val;
++}
++
++static int lpc32xx_gpio_get_none(struct gpio_chip *chip, unsigned pin)
++{
++	return 0;
++}
++
++static int lpc32xx_gpi_get_value(struct gpio_chip *chip, unsigned pin)
++{
++	int val = 0;
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin < chip->ngpio)
++		val = __get_gpi_state_p3(group, pin);
++
++	return val;
++}
++
++static int lpc32xx_gpio_dir_output(struct gpio_chip *chip, unsigned  
+pin,
++	int value)
++{
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin >= chip->ngpio)
++		return -EINVAL;
++
++	if (group->gpio_grp->pgroup <= 2)
++		__set_gpio_dir_p012(group, pin, 0);
++	else
++		__set_gpio_dir_p3(group, pin, 0);
++
++	return 0;
++}
++
++static int lpc32xx_gpio_dir_out_none(struct gpio_chip *chip, unsigned  
+pin,
++	int value)
++{
++	return -EINVAL;
++}
++
++static int lpc32xx_gpio_dir_out_always(struct gpio_chip *chip,  
+unsigned pin,
++	int value)
++{
++	return 0;
++}
++
++static void lpc32xx_gpio_set_value(struct gpio_chip *chip, unsigned  
+pin,
++	int value)
++{
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin < chip->ngpio) {
++		if (group->gpio_grp->pgroup <= 2)
++			__set_gpio_level_p012(group, pin, value);
++		else
++			__set_gpio_level_p3(group, pin, value);
++	}
++}
++
++static void lpc32xx_gpo_set_value(struct gpio_chip *chip, unsigned pin,
++	int value)
++{
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	if (pin < chip->ngpio)
++		__set_gpo_level_p3(group, pin, value);
++}
++
++static void lpc32xx_gpo_set_none(struct gpio_chip *chip, unsigned pin,
++	int value)
++{
++	/* NULL function for GPI only pins */
++}
++
++static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
++{
++	if (pin < chip->ngpio)
++		return 0;
++
++	return -EINVAL;
++}
++
++static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
++	{
++		.chip = {
++			.label			= "gpio_p0",
++			.direction_input	=  
+lpc32xx_gpio_dir_input,
++			.get			=  
+lpc32xx_gpio_get_value,
++			.direction_output	=  
+lpc32xx_gpio_dir_output,
++			.set			=  
+lpc32xx_gpio_set_value,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPIO_P0_GRP,
++			.ngpio			= GPIO_P0_MAX,
++			.names			= gpio_p0_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[0],
++	},
++	{
++		.chip = {
++			.label			= "gpio_p1",
++			.direction_input	=  
+lpc32xx_gpio_dir_input,
++			.get			=  
+lpc32xx_gpio_get_value,
++			.direction_output	=  
+lpc32xx_gpio_dir_output,
++			.set			=  
+lpc32xx_gpio_set_value,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPIO_P1_GRP,
++			.ngpio			= GPIO_P1_MAX,
++			.names			= gpio_p1_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[1],
++	},
++	{
++		.chip = {
++			.label			= "gpio_p2",
++			.direction_input	=  
+lpc32xx_gpio_dir_input,
++			.get			=  
+lpc32xx_gpio_get_value,
++			.direction_output	=  
+lpc32xx_gpio_dir_output,
++			.set			=  
+lpc32xx_gpio_set_value,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPIO_P2_GRP,
++			.ngpio			= GPIO_P2_MAX,
++			.names			= gpio_p2_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[2],
++	},
++	{
++		.chip = {
++			.label			= "gpio_p3",
++			.direction_input	=  
+lpc32xx_gpio_dir_input,
++			.get			=  
+lpc32xx_gpio_get_value,
++			.direction_output	=  
+lpc32xx_gpio_dir_output,
++			.set			=  
+lpc32xx_gpio_set_value,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPIO_P3_GRP,
++			.ngpio			= GPIO_P3_MAX,
++			.names			= gpio_p3_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[3],
++	},
++	{
++		.chip = {
++			.label			= "gpi_p3",
++			.direction_input	=  
+lpc32xx_gpio_dir_in_always,
++			.get			= lpc32xx_gpi_get_value,
++			.direction_output	=  
+lpc32xx_gpio_dir_out_none,
++			.set			= lpc32xx_gpo_set_none,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPI_P3_GRP,
++			.ngpio			= GPI_P3_MAX,
++			.names			= gpi_p3_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[3],
++	},
++	{
++		.chip = {
++			.label			= "gpo_p3",
++			.direction_input	=  
+lpc32xx_gpio_dir_in_none,
++			.get			= lpc32xx_gpio_get_none,
++			.direction_output	=  
+lpc32xx_gpio_dir_out_always,
++			.set			= lpc32xx_gpo_set_value,
++			.request		= lpc32xx_gpio_request,
++			.base			= GPO_P3_GRP,
++			.ngpio			= GPO_P3_MAX,
++			.names			= gpo_p3_names,
++			.can_sleep		= 0,
++		},
++		.gpio_grp = &gpio_grp_regs[3],
++	},
++};
++
++void __init lpc32xx_gpio_init(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
++		gpiochip_add(&lpc32xx_gpiochip[i].chip);
++}
+diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
+new file mode 100644
+index 0000000..8a1b57d
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/irq.c
+@@ -0,0 +1,237 @@
++/*
++ * arch/arm/mach-lpc32xx/irq.c
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
+02111-1307  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/err.h>
++#include <linux/io.h>
++
++#include <mach/irqs.h>
++#include <mach/hardware.h>
++#include <mach/platform.h>
++
++/*
++ * Default value represeting the Activation polarity of all internal
++ * interrupt sources
++ */
++#define MIC_APR_DEFAULT		0x3FF0EFE0
++#define SIC1_APR_DEFAULT	0xFBD27186
++#define SIC2_APR_DEFAULT	0x801810C0
++
++/*
++ * Default value represeting the Activation Type of all internal
++ * interrupt sources. All are level senesitive.
++ */
++#define MIC_ATR_DEFAULT		0x00000000
++#define SIC1_ATR_DEFAULT	0x00026000
++#define SIC2_ATR_DEFAULT	0x00000000
++
++static void get_controller(unsigned int irq, unsigned int *base,
++	unsigned int *irqbit)
++{
++	if (irq < 32) {
++		*base = io_p2v(MIC_BASE);
++		*irqbit = 1 << irq;
++	} else if (irq < 64) {
++		*base = io_p2v(SIC1_BASE);
++		*irqbit = 1 << (irq - 32);
++	} else {
++		*base = io_p2v(SIC2_BASE);
++		*irqbit = 1 << (irq - 64);
++	}
++}
++
++static void lpc32xx_mask_irq(unsigned int irq)
++{
++	unsigned int reg, ctrl, mask;
++
++	get_controller(irq, &ctrl, &mask);
++
++	reg = readl(ctrl + INTC_MASK);
++	reg &= ~mask;
++	writel(reg, (ctrl + INTC_MASK));
++}
++
++static void lpc32xx_unmask_irq(unsigned int irq)
++{
++	unsigned int reg, ctrl, mask;
++
++	get_controller(irq, &ctrl, &mask);
++
++	reg = readl(ctrl + INTC_MASK);
++	reg |= mask;
++	writel(reg, (ctrl + INTC_MASK));
++}
++
++static void lpc32xx_mask_ack_irq(unsigned int irq)
++{
++	unsigned int ctrl, mask;
++
++	get_controller(irq, &ctrl, &mask);
++
++	writel(mask, (ctrl + INTC_RAW_STAT));
++}
++
++static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
++{
++	unsigned int reg, ctrl, mask;
++
++	get_controller(irq, &ctrl, &mask);
++
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		/* Rising edge sensitive */
++		reg = readl(ctrl + INTC_POLAR);
++		reg |= mask;
++		writel(reg, (ctrl + INTC_POLAR));
++		reg = readl(ctrl + INTC_ACT_TYPE);
++		reg |= mask;
++		writel(reg, (ctrl + INTC_ACT_TYPE));
++		set_irq_handler(irq, handle_edge_irq);
++		break;
++
++	case IRQ_TYPE_EDGE_FALLING:
++		/* Falling edge sensitive */
++		reg = readl(ctrl + INTC_POLAR);
++		reg &= ~mask;
++		writel(reg, (ctrl + INTC_POLAR));
++		reg = readl(ctrl + INTC_ACT_TYPE);
++		reg |= mask;
++		writel(reg, (ctrl + INTC_ACT_TYPE));
++		set_irq_handler(irq, handle_edge_irq);
++		break;
++
++	case IRQ_TYPE_LEVEL_LOW:
++		/* Low level sensitive */
++		reg = readl(ctrl + INTC_POLAR);
++		reg &= ~mask;
++		writel(reg, (ctrl + INTC_POLAR));
++		reg = readl(ctrl + INTC_ACT_TYPE);
++		reg &= ~mask;
++		writel(reg, (ctrl + INTC_ACT_TYPE));
++		set_irq_handler(irq, handle_level_irq);
++		break;
++
++	case IRQ_TYPE_LEVEL_HIGH:
++		/* High level sensitive */
++		reg = readl(ctrl + INTC_POLAR);
++		reg |= mask;
++		writel(reg, (ctrl + INTC_POLAR));
++		reg = readl(ctrl + INTC_ACT_TYPE);
++		reg &= ~mask;
++		writel(reg, (ctrl + INTC_ACT_TYPE));
++		set_irq_handler(irq, handle_level_irq);
++		break;
++
++	/* Other modes are not supported */
++	default:
++		return -ENOTSUPP;
++	}
++
++	return 0;
++}
++
++static void __init lpc32xx_set_default_mappings(unsigned int base,
++	unsigned int apr, unsigned int atr, unsigned int offset)
++{
++	unsigned int i, lvl, type;
++
++	/* Set activation levels for each interrupt */
++	i = 0;
++	while (i < 32) 	{
++		lvl = ((apr >> i) & 0x1) | (((atr >> i) & 0x1) << 1);
++		switch (lvl) {
++		case 0x0: /* Low polarity and level operation */
++			type = IRQ_TYPE_LEVEL_LOW;
++			break;
++
++		case 0x1: /* High polarity and level operation */
++			type = IRQ_TYPE_LEVEL_HIGH;
++			break;
++
++		case 0x2: /* Low polarity and edge operation */
++			type = IRQ_TYPE_EDGE_FALLING;
++			break;
++
++		case 0x3: /* High polarity and edge operation */
++		default:
++			type = IRQ_TYPE_EDGE_RISING;
++			break;
++		}
++
++		lpc32xx_set_irq_type((offset + i), type);
++		i++;
++	}
++}
++
++static struct irq_chip lpc32xx_irq_chip = {
++	.ack = lpc32xx_mask_ack_irq,
++	.mask = lpc32xx_mask_irq,
++	.unmask = lpc32xx_unmask_irq,
++	.set_type = lpc32xx_set_irq_type,
++};
++
++void __init lpc32xx_init_irq(void)
++{
++	unsigned int i, vloc;
++
++	/* Setup MIC */
++	vloc = io_p2v(MIC_BASE);
++	writel(0, (vloc + INTC_MASK));
++	writel(MIC_APR_DEFAULT, (vloc + INTC_POLAR));
++	writel(MIC_ATR_DEFAULT, (vloc + INTC_ACT_TYPE));
++
++	/* Setup SIC1 */
++	vloc = io_p2v(SIC1_BASE);
++	writel(0, (vloc + INTC_MASK));
++	writel(SIC1_APR_DEFAULT, (vloc + INTC_POLAR));
++	writel(SIC1_ATR_DEFAULT, (vloc + INTC_ACT_TYPE));
++
++	/* Setup SIC2 */
++	vloc = io_p2v(SIC2_BASE);
++	writel(0, (vloc + INTC_MASK));
++	writel(SIC2_APR_DEFAULT, (vloc + INTC_POLAR));
++	writel(SIC2_ATR_DEFAULT, (vloc + INTC_ACT_TYPE));
++
++	/* Configure supported IRQ's */
++	for (i = 0; i < NR_IRQS; i++) {
++		set_irq_flags(i, IRQF_VALID);
++		set_irq_chip(i, &lpc32xx_irq_chip);
++	}
++
++	/* Set default mappings */
++	lpc32xx_set_default_mappings(io_p2v(MIC_BASE), MIC_APR_DEFAULT,
++		MIC_ATR_DEFAULT, 0);
++	lpc32xx_set_default_mappings(io_p2v(SIC1_BASE),  
+SIC1_APR_DEFAULT,
++		SIC1_ATR_DEFAULT, 32);
++	lpc32xx_set_default_mappings(io_p2v(SIC2_BASE),  
+SIC2_APR_DEFAULT,
++		SIC2_ATR_DEFAULT, 64);
++
++	/* mask all interrupts except SUBIRQA and SUBFIQ */
++	writel((1 << IRQ_SUB1IRQ) | (1 << IRQ_SUB2IRQ) |
++			(1 << IRQ_SUB1FIQ) | (1 << IRQ_SUB2FIQ),
++		(io_p2v(MIC_BASE) + INTC_MASK));
++	writel(0, (io_p2v(SIC1_BASE) + INTC_MASK));
++	writel(0, (io_p2v(SIC2_BASE) + INTC_MASK));
++}
+diff --git a/arch/arm/mach-lpc32xx/serial.c  
+b/arch/arm/mach-lpc32xx/serial.c
+new file mode 100644
+index 0000000..1c15121
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/serial.c
+@@ -0,0 +1,200 @@
++/*
++ * arch/arm/mach-lpc32xx/serial.c
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
+02111-1307  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
++#include <linux/serial_reg.h>
++#include <linux/serial_8250.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++
++#include <mach/hardware.h>
++#include <mach/platform.h>
++#include <mach/io.h>
++#include "common.h"
++
++/* Standard 8250/16550 compatible serial ports */
++static struct plat_serial8250_port serial_std_platform_data[] = {
++#ifdef CONFIG_ARCH_LPC32XX_UART5_ENABLE
++	{
++		.membase        = (void *) io_p2v(UART5_BASE),
++		.mapbase        = UART5_BASE,
++		.irq		= IRQ_UART_IIR5,
++		.uartclk	= MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART3_ENABLE
++	{
++		.membase	= (void *) io_p2v(UART3_BASE),
++		.mapbase        = UART3_BASE,
++		.irq		= IRQ_UART_IIR3,
++		.uartclk	= MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART4_ENABLE
++	{
++		.membase	= (void *) io_p2v(UART4_BASE),
++		.mapbase        = UART4_BASE,
++		.irq		= IRQ_UART_IIR4,
++		.uartclk	= MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART6_ENABLE
++	{
++		.membase	= (void *) io_p2v(UART6_BASE),
++		.mapbase        = UART6_BASE,
++		.irq		= IRQ_UART_IIR6,
++		.uartclk	= MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++	{ },
++};
++
++struct uartinit {
++	char *uart_ck_name;
++	u32 ck_mode_mask;
++	u32 pdiv_clk_reg;
++};
++
++static struct uartinit uartinit_data[] __initdata = {
++#ifdef CONFIG_ARCH_LPC32XX_UART5_ENABLE
++	{
++		.uart_ck_name = "uart5_ck",
++		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 5),
++		.pdiv_clk_reg = CLKPWR_UART5_CLK_CTRL(CLKPWR_IOBASE),
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART3_ENABLE
++	{
++		.uart_ck_name = "uart3_ck",
++		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 3),
++		.pdiv_clk_reg = CLKPWR_UART3_CLK_CTRL(CLKPWR_IOBASE),
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART4_ENABLE
++	{
++		.uart_ck_name = "uart4_ck",
++		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 4),
++		.pdiv_clk_reg = CLKPWR_UART4_CLK_CTRL(CLKPWR_IOBASE),
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART6_ENABLE
++	{
++		.uart_ck_name = "uart6_ck",
++		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 6),
++		.pdiv_clk_reg = CLKPWR_UART6_CLK_CTRL(CLKPWR_IOBASE),
++	},
++#endif
++};
++
++static struct platform_device serial_std_platform_device = {
++	.name			= "serial8250",
++	.id			= 0,
++	.dev			= {
++		.platform_data	= serial_std_platform_data,
++	},
++};
++
++static struct platform_device *lpc32xx_serial_devs[] __initdata = {
++	&serial_std_platform_device,
++};
++
++void __init lpc32xx_serial_init(void)
++{
++	u32 tmp, clkmodes = 0;
++	struct clk *clk;
++	void *puart;
++	int i;
++
++	/* UART clocks are off, let clock driver manage them */
++	__raw_writel(0, CLKPWR_UART_CLK_CTRL(CLKPWR_IOBASE));
++
++	for (i = 0; i < ARRAY_SIZE(uartinit_data); i++) {
++		clk = clk_get(NULL, uartinit_data[i].uart_ck_name);
++		if (IS_ERR(clk)) {
++#ifdef CONFIG_DEBUG_LL
++			/* A clock get failure can mean the console  
+might
++			   not work. It's possible this might not even
++			   work. */
++			printascii("Serial port clock get failure!\n");
++#endif
++		} else {
++			clk_enable(clk);
++			serial_std_platform_data[i].uartclk =
++				clk_get_rate(clk);
++		}
++
++		/* Setup UART clock modes for all UARTs, disable  
+autoclock */
++		clkmodes |= uartinit_data[i].ck_mode_mask;
++
++		/* pre-UART clock divider set to 1 */
++		writel(0x0101, uartinit_data[i].pdiv_clk_reg);
++	}
++
++	/* This needs to be done after all UART clocks are setup */
++	writel(clkmodes, UARTCTL_CLKMODE(io_p2v(UART_CTRL_BASE)));
++	for (i = 0; i < ARRAY_SIZE(uartinit_data) - 1; i++) {
++		/* Force a flush of the RX FIFOs to work around a HW  
+bug */
++		puart = serial_std_platform_data[i].membase;
++		writel(0xC1, UART_IIR_FCR(puart));
++		writel(0x00, UART_DLL_FIFO(puart));
++		clkmodes = 64;
++		while (clkmodes--)
++			tmp = readl(UART_DLL_FIFO(puart));
++		writel(0, UART_IIR_FCR(puart));
++	}
++
++	/* IrDA pulsing support on UART6. This only enables the IrDA  
+mux */
++	tmp = readl(UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
++#ifdef CONFIG_ARCH_LPC32XX_UART6_IRDAMODE
++	tmp &= ~UART_UART6_IRDAMOD_BYPASS;
++#else
++	tmp |= UART_UART6_IRDAMOD_BYPASS;
++#endif
++	writel(tmp, UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
++
++	/* Disable UART5->USB transparent mode or USB won't work */
++	tmp = readl(UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
++	tmp &= ~UART_U5_ROUTE_TO_USB;
++	writel(tmp, UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
++
++	platform_add_devices(lpc32xx_serial_devs,
++		ARRAY_SIZE(lpc32xx_serial_devs));
++}
+diff --git a/arch/arm/mach-lpc32xx/timer.c  
+b/arch/arm/mach-lpc32xx/timer.c
+new file mode 100644
+index 0000000..9c06346
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/timer.c
+@@ -0,0 +1,187 @@
++/*
++ * arch/arm/mach-lpc32xx/timer.c
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2009 - 2010 NXP Semiconductors
++ * Copyright (C) 2009 Fontys University of Applied Sciences, Eindhoven
++ *                    Ed Schouten <e.schouten@fontys.nl>
++ *                    Laurens Timmermans <l.timmermans@fontys.nl>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA   
+02111-1307  USA
++ */
++
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/time.h>
++#include <linux/err.h>
++#include <linux/clockchips.h>
++
++#include <asm/mach/time.h>
++
++#include <mach/hardware.h>
++#include <mach/platform.h>
++#include "common.h"
++
++#define TIMER0_IOBASE io_p2v(TIMER0_BASE)
++#define TIMER1_IOBASE io_p2v(TIMER1_BASE)
++
++static cycle_t lpc32xx_clksrc_read(struct clocksource *cs)
++{
++	return (cycle_t)readl(TIMER_TC(TIMER1_IOBASE));
++}
++
++static struct clocksource lpc32xx_clksrc = {
++	.name	= "lpc32xx_clksrc",
++	.shift	= 24,
++	.rating	= 300,
++	.read	= lpc32xx_clksrc_read,
++	.mask	= CLOCKSOURCE_MASK(32),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static int lpc32xx_clkevt_next_event(unsigned long delta,
++    struct clock_event_device *dev)
++{
++	unsigned long flags;
++
++	if (delta < 1)
++		return -ETIME;
++
++	local_irq_save(flags);
++
++	writel(TIMER_CNTR_TCR_RESET, TIMER_TCR(TIMER0_IOBASE));
++	writel(delta, TIMER_PR(TIMER0_IOBASE));
++	writel(TIMER_CNTR_TCR_EN, TIMER_TCR(TIMER0_IOBASE));
++
++	local_irq_restore(flags);
++
++	return 0;
++}
++
++static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
++    struct clock_event_device *dev)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		WARN_ON(1);
++		break;
++
++	case CLOCK_EVT_MODE_ONESHOT:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		/*
++		 * Disable the timer. When using oneshot, we must also
++		 * disable the timer to wait for the first call to
++		 * set_next_event().
++		 */
++		writel(0, TIMER_TCR(TIMER0_IOBASE));
++		break;
++
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		break;
++	}
++}
++
++static struct clock_event_device lpc32xx_clkevt = {
++	.name		= "lpc32xx_clkevt",
++	.features	= CLOCK_EVT_FEAT_ONESHOT,
++	.shift		= 32,
++	.rating		= 300,
++	.set_next_event	= lpc32xx_clkevt_next_event,
++	.set_mode	= lpc32xx_clkevt_mode,
++};
++
++static irqreturn_t lpc32xx_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &lpc32xx_clkevt;
++
++	/* Clear match */
++	writel(TIMER_CNTR_MTCH_BIT(0), TIMER_IR(TIMER0_IOBASE));
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction lpc32xx_timer_irq = {
++	.name		= "LPC32XX Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= lpc32xx_timer_interrupt,
++};
++
++/*
++ * The clock management driver isn't initialized at this point, so the
++ * clocks need to be enabled here manually and then tagged as used in
++ * the clock driver initialization
++ */
++static void __init lpc32xx_timer_init(void)
++{
++	u32 clkrate, pllreg;
++
++	/* Enable timer clock */
++	writel(
++		(CLKPWR_TMRPWMCLK_TIMER0_EN |  
+CLKPWR_TMRPWMCLK_TIMER1_EN),
++		CLKPWR_TIMERS_PWMS_CLK_CTRL_1(CLKPWR_IOBASE));
++
++	/* The clock driver isn't initialized at this point. So  
+determine if
++	   the SYSCLK is driven from the PLL397 or main oscillator and  
+then use
++	   it to compute the PLL frequency and the PCLK divider to get  
+the base
++	   timer rates. This rate is needed to compute the tick rate. */
++	if (clk_is_sysclk_mainosc() != 0)
++		clkrate = MAIN_OSC_FREQ;
++	else
++		clkrate = 397 * CLOCK_OSC_FREQ;
++
++	/* Get ARM HCLKPLL register and convert it into a frequency*/
++	pllreg = readl(CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE)) & 0x1FFFF;
++	clkrate = clk_get_pllrate_from_reg(clkrate, pllreg);
++
++	/* Get PCLK divider and divide ARM PLL clock by it to get timer  
+rate */
++	clkrate = clkrate / clk_get_pclk_div();
++
++	/* Initial timer setup */
++	writel(0, TIMER_TCR(TIMER0_IOBASE));
++	writel(TIMER_CNTR_MTCH_BIT(0), TIMER_IR(TIMER0_IOBASE));
++	writel(1, TIMER_MR0(TIMER0_IOBASE));
++	writel(TIMER_CNTR_MCR_MTCH(0) | TIMER_CNTR_MCR_STOP(0) |
++	    TIMER_CNTR_MCR_RESET(0), TIMER_MCR(TIMER0_IOBASE));
++
++	/* Setup tick interrupt */
++	setup_irq(IRQ_TIMER0, &lpc32xx_timer_irq);
++
++	/* Setup the clockevent structure. */
++	lpc32xx_clkevt.mult = div_sc(clkrate, NSEC_PER_SEC,
++		lpc32xx_clkevt.shift);
++	lpc32xx_clkevt.max_delta_ns = clockevent_delta2ns(-1,
++		&lpc32xx_clkevt);
++	lpc32xx_clkevt.min_delta_ns = clockevent_delta2ns(1,  
+&lpc32xx_clkevt);
++	lpc32xx_clkevt.cpumask = cpumask_of(0);
++	clockevents_register_device(&lpc32xx_clkevt);
++
++	/* Use timer1 as clock source. */
++	writel(TIMER_CNTR_TCR_RESET, TIMER_TCR(TIMER1_IOBASE));
++	writel(0, TIMER_PR(TIMER1_IOBASE));
++	writel(0, TIMER_MCR(TIMER1_IOBASE));
++	writel(TIMER_CNTR_TCR_EN, TIMER_TCR(TIMER1_IOBASE));
++	lpc32xx_clksrc.mult = clocksource_hz2mult(clkrate,
++		lpc32xx_clksrc.shift);
++	clocksource_register(&lpc32xx_clksrc);
++}
++
++struct sys_timer lpc32xx_timer = {
++	.init		= &lpc32xx_timer_init,
++};
++
 -- 
 1.6.6
