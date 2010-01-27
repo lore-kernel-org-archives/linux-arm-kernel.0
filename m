@@ -1,48 +1,81 @@
 From: adharmap@codeaurora.org (adharmap at codeaurora.org)
-Date: Wed, 27 Jan 2010 11:32:26 -0800
-Subject: [PATCH 2/5] gic: add callback for mask_ack
+Date: Wed, 27 Jan 2010 11:32:27 -0800
+Subject: [PATCH 3/5] gic: Add set_type callback
 In-Reply-To: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
 References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <1264620749-24527-3-git-send-email-adharmap@codeaurora.org>
+Message-ID: <1264620749-24527-4-git-send-email-adharmap@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
 
-add gic_mask_ack for faster processing of interrupts.
+Add gic_set_type callback to set an irq as level or edge triggered type
 
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@quicinc.com>
 ---
- arch/arm/common/gic.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/common/gic.c |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index e763c4c..00172c4 100644
+index 00172c4..709cf53 100644
 --- a/arch/arm/common/gic.c
 +++ b/arch/arm/common/gic.c
-@@ -108,6 +108,15 @@ static void gic_unmask_irq(unsigned int irq)
- 	spin_unlock(&irq_controller_lock);
+@@ -165,6 +165,48 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	chip->unmask(irq);
  }
  
-+static void gic_mask_ack_irq(unsigned int irq)
++static int gic_set_type(unsigned int irq, unsigned int flow_type)
 +{
-+	u32 mask = 1 << (irq % 32);
++	unsigned int register_index;
++	unsigned int bit_index;
++	unsigned int reg_value;
++
++	if (irq > 1020)
++		return -1;
++
++	/*
++	* Two bits each, calc the register and bit, 16 per 32 bit register
++	* accessible long word only
++	* But the field is NxN 1xN and rising/falling
++	*/
++	register_index = (irq/16)<<2;
++	bit_index = (irq & 0xF)<<1;
++
 +	spin_lock(&irq_controller_lock);
-+	writel(mask, gic_dist_base(irq) + GIC_DIST_ENABLE_CLEAR + (gic_irq(irq) / 32) * 4);
-+	writel(gic_irq(irq), gic_cpu_base(irq) + GIC_CPU_EOI);
++	reg_value = readl(gic_dist_base(irq) + GIC_DIST_CONFIG +
++						register_index);
++	/*
++	* keep the nxn and 1xn , mask the edge level
++	* Edge is 1, level 0
++	*/
++	reg_value = (reg_value & ~(2<<bit_index));
++	if (flow_type & (IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING)) {
++		reg_value |= (2<<bit_index);
++		writel(reg_value, gic_dist_base(irq) + GIC_DIST_CONFIG
++							+ register_index);
++		__set_irq_handler_unlocked(irq, handle_edge_irq);
++	}
++
++	if (flow_type & (IRQ_TYPE_LEVEL_HIGH|IRQ_TYPE_LEVEL_LOW)) {
++		writel(reg_value, gic_dist_base(irq) + GIC_DIST_CONFIG
++							+ register_index);
++		__set_irq_handler_unlocked(irq, handle_level_irq);
++	}
++
 +	spin_unlock(&irq_controller_lock);
++	return 0;
 +}
 +
- #ifdef CONFIG_SMP
- static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- {
-@@ -160,6 +169,7 @@ static struct irq_chip gic_chip = {
+ static struct irq_chip gic_chip = {
  	.name		= "GIC",
  	.ack		= gic_ack_irq,
- 	.mask		= gic_mask_irq,
-+	.mask_ack	= gic_mask_ack_irq,
- 	.unmask		= gic_unmask_irq,
+@@ -174,6 +216,7 @@ static struct irq_chip gic_chip = {
  #ifdef CONFIG_SMP
  	.set_affinity	= gic_set_cpu,
+ #endif
++	.set_type	= gic_set_type,
+ };
+ 
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 -- 
 1.5.6.3
