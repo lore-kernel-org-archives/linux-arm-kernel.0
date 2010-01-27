@@ -1,26 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Jan 2010 23:50:11 +0000
-Subject: [PATCH] ARM: MM: Add ARM_L1_CACHE_SHIFT_BY6 for handle inside
-	each ARCH Kconfig
-In-Reply-To: <1264635251-29987-1-git-send-email-kgene.kim@samsung.com>
-References: <1264635251-29987-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100127235011.GH29665@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 27 Jan 2010 15:48:18 -0800
+Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
+In-Reply-To: <1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100127154818.de91e255.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 08:34:11AM +0900, Kukjin Kim wrote:
-> This patch adds ARM_L1_CACHE_SHIFT_BY6 into arch/arm/Kconfig. Basically,
-> ARM L1 cache line size is 32Bytes. Therefore, whenever new ARCH which
-> has 64Bytes L1 cache line size is added, have to set ARM_L1_CACHE_SHIFT
-> to 6. That is, have to add/modify arch/arm/mm/Kconfig.
-> This patch is for handle it in each ARCH Kconfig.
+On Mon, 25 Jan 2010 16:37:34 +0100
+Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
 
-(a) please don't introduce new stuff which doesn't appear to be used;
-    if you decide not to send the patch which uses whatever you've
-    added, it goes unnoticed and just adds unnecessary bloat to the
-    kernel.
+> The probe function passes a pointer to a struct fb_info to
+> platform_set_drvdata, so don't interpret the return value of
+> platform_get_drvdata as a pointer to struct imxfb_info.
+> 
+> Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
+> Acked-by: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/video/imxfb.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 66358fa..b4b6dec 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+>   */
+>  static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  {
+> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
+> +	struct fb_info *info = platform_get_drvdata(dev);
+> +	struct imxfb_info *fbi = info->par;
+>  
+>  	pr_debug("%s\n", __func__);
+>  
+> @@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  
+>  static int imxfb_resume(struct platform_device *dev)
+>  {
+> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
+> +	struct fb_info *info = platform_get_drvdata(dev);
+> +	struct imxfb_info *fbi = info->par;
+>  
+>  	pr_debug("%s\n", __func__);
+>  
 
-(b) please drop the 'BY' from the name.
-
-(c) it would make sense to convert the existing users (which would
-    sort point a.)
+What were the runtime effects of this bug?
