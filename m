@@ -1,57 +1,617 @@
 From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
-Date: Wed, 27 Jan 2010 15:01:03 +0900
-Subject: [PATCHv2 07/10] ASoC: AC97: SMDK2443: Switch to s3c-ac97.c
-Message-ID: <1264572063-24722-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Wed, 27 Jan 2010 14:59:08 +0900
+Subject: [PATCHv2 04/10] ASoC: AC97: S3C: Add controller driver
+Message-ID: <1264571948-15084-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Switch to use s3c-ac97.c AC97 controller driver.
+Add the AC97 controller driver for Samsung SoCs that have one.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- sound/soc/s3c24xx/Kconfig           |    4 +++-
- sound/soc/s3c24xx/smdk2443_wm9710.c |    4 ++--
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ sound/soc/s3c24xx/Kconfig    |    6 +-
+ sound/soc/s3c24xx/Makefile   |    3 +-
+ sound/soc/s3c24xx/s3c-ac97.c |  518 ++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/s3c24xx/s3c-ac97.h |   23 ++
+ 4 files changed, 548 insertions(+), 2 deletions(-)
+ create mode 100644 sound/soc/s3c24xx/s3c-ac97.c
+ create mode 100644 sound/soc/s3c24xx/s3c-ac97.h
 
 diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
-index d1c6f93..8b62798 100644
+index b489f1a..ad3690e 100644
 --- a/sound/soc/s3c24xx/Kconfig
 +++ b/sound/soc/s3c24xx/Kconfig
-@@ -75,8 +75,10 @@ config SND_S3C64XX_SOC_WM8580
- config SND_S3C24XX_SOC_SMDK2443_WM9710
- 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
- 	depends on SND_S3C24XX_SOC && MACH_SMDK2443
--	select SND_S3C2443_SOC_AC97
-+	select S3C2410_DMA
-+	select AC97_BUS
- 	select SND_SOC_AC97_CODEC
-+	select SND_S3C_SOC_AC97
- 	help
- 	  Say Y if you want to add support for SoC audio on smdk2443
- 	  with the WM9710.
-diff --git a/sound/soc/s3c24xx/smdk2443_wm9710.c b/sound/soc/s3c24xx/smdk2443_wm9710.c
-index 12b783b..3622588 100644
---- a/sound/soc/s3c24xx/smdk2443_wm9710.c
-+++ b/sound/soc/s3c24xx/smdk2443_wm9710.c
-@@ -21,7 +21,7 @@
+@@ -32,7 +32,11 @@ config SND_S3C2443_SOC_AC97
+ 	select S3C2410_DMA
+ 	select AC97_BUS
+ 	select SND_SOC_AC97_BUS
+-	
++
++config SND_S3C_SOC_AC97
++	tristate
++	select SND_SOC_AC97_BUS
++
+ config SND_S3C24XX_SOC_NEO1973_WM8753
+ 	tristate "SoC I2S Audio support for NEO1973 - WM8753"
+ 	depends on SND_S3C24XX_SOC && MACH_NEO1973_GTA01
+diff --git a/sound/soc/s3c24xx/Makefile b/sound/soc/s3c24xx/Makefile
+index b744657..b7411bd 100644
+--- a/sound/soc/s3c24xx/Makefile
++++ b/sound/soc/s3c24xx/Makefile
+@@ -4,12 +4,14 @@ snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
+ snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
+ snd-soc-s3c64xx-i2s-objs := s3c64xx-i2s.o
+ snd-soc-s3c2443-ac97-objs := s3c2443-ac97.o
++snd-soc-s3c-ac97-objs := s3c-ac97.o
+ snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
+ snd-soc-s3c-pcm-objs := s3c-pcm.o
  
- #include "../codecs/ac97.h"
- #include "s3c-dma.h"
--#include "s3c24xx-ac97.h"
+ obj-$(CONFIG_SND_S3C24XX_SOC) += snd-soc-s3c24xx.o
+ obj-$(CONFIG_SND_S3C24XX_SOC_I2S) += snd-soc-s3c24xx-i2s.o
+ obj-$(CONFIG_SND_S3C2443_SOC_AC97) += snd-soc-s3c2443-ac97.o
++obj-$(CONFIG_SND_S3C_SOC_AC97) += snd-soc-s3c-ac97.o
+ obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
+ obj-$(CONFIG_SND_S3C64XX_SOC_I2S) += snd-soc-s3c64xx-i2s.o
+ obj-$(CONFIG_SND_S3C_I2SV2_SOC) += snd-soc-s3c-i2s-v2.o
+@@ -37,4 +39,3 @@ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC) += snd-soc-s3c24xx-simtec.o
+ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_HERMES) += snd-soc-s3c24xx-simtec-hermes.o
+ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_TLV320AIC23) += snd-soc-s3c24xx-simtec-tlv320aic23.o
+ obj-$(CONFIG_SND_S3C64XX_SOC_WM8580) += snd-soc-smdk64xx-wm8580.o
+-
+diff --git a/sound/soc/s3c24xx/s3c-ac97.c b/sound/soc/s3c24xx/s3c-ac97.c
+new file mode 100644
+index 0000000..ee8ed9d
+--- /dev/null
++++ b/sound/soc/s3c24xx/s3c-ac97.c
+@@ -0,0 +1,518 @@
++/* sound/soc/s3c24xx/s3c-ac97.c
++ *
++ * ALSA SoC Audio Layer - S3C AC97 Controller driver
++ * 	Evolved from s3c2443-ac97.c
++ *
++ * Copyright (c) 2010 Samsung Electronics Co. Ltd
++ * 	Author: Jaswinder Singh <jassi.brar@samsung.com>
++ * 	Credits: Graeme Gregory, Sean Choi
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++
++#include <sound/soc.h>
++
++#include <plat/regs-ac97.h>
++#include <mach/dma.h>
++#include <plat/audio.h>
++
++#include "s3c-dma.h"
 +#include "s3c-ac97.h"
- 
- static struct snd_soc_card smdk2443;
- 
-@@ -29,7 +29,7 @@ static struct snd_soc_dai_link smdk2443_dai[] = {
- {
- 	.name = "AC97",
- 	.stream_name = "AC97 HiFi",
--	.cpu_dai = &s3c2443_ac97_dai[0],
-+	.cpu_dai = &s3c_ac97_dai[S3C_AC97_DAI_PCM],
- 	.codec_dai = &ac97_dai,
- },
- };
++
++#define AC_CMD_ADDR(x) (x << 16)
++#define AC_CMD_DATA(x) (x & 0xffff)
++
++struct s3c_ac97_info {
++	unsigned           state;
++	struct clk         *ac97_clk;
++	void __iomem	   *regs;
++	struct mutex       lock;
++	struct completion  done;
++};
++static struct s3c_ac97_info s3c_ac97;
++
++static struct s3c2410_dma_client s3c_dma_client_out = {
++	.name = "AC97 PCMOut"
++};
++
++static struct s3c2410_dma_client s3c_dma_client_in = {
++	.name = "AC97 PCMIn"
++};
++
++static struct s3c2410_dma_client s3c_dma_client_micin = {
++	.name = "AC97 MicIn"
++};
++
++static struct s3c_dma_params s3c_ac97_pcm_out = {
++	.client		= &s3c_dma_client_out,
++	.dma_size	= 4,
++};
++
++static struct s3c_dma_params s3c_ac97_pcm_in = {
++	.client		= &s3c_dma_client_in,
++	.dma_size	= 4,
++};
++
++static struct s3c_dma_params s3c_ac97_mic_in = {
++	.client		= &s3c_dma_client_micin,
++	.dma_size	= 4,
++};
++
++static void s3c_ac97_activate(struct snd_ac97 *ac97)
++{
++	u32 ac_glbctrl, stat;
++
++	stat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT) & 0x7;
++	if (stat == S3C_AC97_GLBSTAT_MAINSTATE_ACTIVE)
++		return; /* Return if already active */
++
++	INIT_COMPLETION(s3c_ac97.done);
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++
++	ac_glbctrl |= S3C_AC97_GLBCTRL_TRANSFERDATAENABLE;
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
++		printk(KERN_ERR "AC97: Unable to activate!");
++}
++
++static unsigned short s3c_ac97_read(struct snd_ac97 *ac97,
++	unsigned short reg)
++{
++	u32 ac_glbctrl, ac_codec_cmd;
++	u32 stat, addr, data;
++
++	mutex_lock(&s3c_ac97.lock);
++
++	s3c_ac97_activate(ac97);
++
++	INIT_COMPLETION(s3c_ac97.done);
++
++	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++	ac_codec_cmd = S3C_AC97_CODEC_CMD_READ | AC_CMD_ADDR(reg);
++	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++
++	udelay(50);
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
++		printk(KERN_ERR "AC97: Unable to read!");
++
++	stat = readl(s3c_ac97.regs + S3C_AC97_STAT);
++	addr = (stat >> 16) & 0x7f;
++	data = (stat & 0xffff);
++
++	if (addr != reg)
++		printk(KERN_ERR "s3c-ac97: req addr = %02x, rep addr = %02x\n", reg, addr);
++
++	mutex_unlock(&s3c_ac97.lock);
++
++	return (unsigned short)data;
++}
++
++static void s3c_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
++	unsigned short val)
++{
++	u32 ac_glbctrl, ac_codec_cmd;
++
++	mutex_lock(&s3c_ac97.lock);
++
++	s3c_ac97_activate(ac97);
++
++	INIT_COMPLETION(s3c_ac97.done);
++
++	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++	ac_codec_cmd = AC_CMD_ADDR(reg) | AC_CMD_DATA(val);
++	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++
++	udelay(50);
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
++		printk(KERN_ERR "AC97: Unable to write!");
++
++	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++	ac_codec_cmd |= S3C_AC97_CODEC_CMD_READ;
++	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
++
++	mutex_unlock(&s3c_ac97.lock);
++}
++
++static void s3c_ac97_cold_reset(struct snd_ac97 *ac97)
++{
++	writel(S3C_AC97_GLBCTRL_COLDRESET,
++			s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++
++	writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++}
++
++static void s3c_ac97_warm_reset(struct snd_ac97 *ac97)
++{
++	u32 stat;
++
++	stat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT) & 0x7;
++	if (stat == S3C_AC97_GLBSTAT_MAINSTATE_ACTIVE)
++		return; /* Return if already active */
++
++	writel(S3C_AC97_GLBCTRL_WARMRESET, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++
++	writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	msleep(1);
++
++	s3c_ac97_activate(ac97);
++}
++
++static irqreturn_t s3c_ac97_irq(int irq, void *dev_id)
++{
++	u32 ac_glbctrl, ac_glbstat;
++
++	ac_glbstat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT);
++
++	if (ac_glbstat & S3C_AC97_GLBSTAT_CODECREADY) {
++
++		ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++		ac_glbctrl &= ~S3C_AC97_GLBCTRL_CODECREADYIE;
++		writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++		complete(&s3c_ac97.done);
++	}
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl |= (1<<30); /* Clear interrupt */
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	return IRQ_HANDLED;
++}
++
++struct snd_ac97_bus_ops soc_ac97_ops = {
++	.read       = s3c_ac97_read,
++	.write      = s3c_ac97_write,
++	.warm_reset = s3c_ac97_warm_reset,
++	.reset      = s3c_ac97_cold_reset,
++};
++EXPORT_SYMBOL_GPL(soc_ac97_ops);
++
++static int s3c_ac97_hw_params(struct snd_pcm_substream *substream,
++				  struct snd_pcm_hw_params *params,
++				  struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		cpu_dai->dma_data = &s3c_ac97_pcm_out;
++	else
++		cpu_dai->dma_data = &s3c_ac97_pcm_in;
++
++	return 0;
++}
++
++static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
++				struct snd_soc_dai *dai)
++{
++	u32 ac_glbctrl;
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	int channel = ((struct s3c_dma_params *)
++		  rtd->dai->cpu_dai->dma_data)->channel;
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
++		ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMINTM_MASK;
++	else
++		ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMOUTTM_MASK;
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
++			ac_glbctrl |= S3C_AC97_GLBCTRL_PCMINTM_DMA;
++		else
++			ac_glbctrl |= S3C_AC97_GLBCTRL_PCMOUTTM_DMA;
++		break;
++
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		break;
++	}
++
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
++
++	return 0;
++}
++
++static int s3c_ac97_hw_mic_params(struct snd_pcm_substream *substream,
++				      struct snd_pcm_hw_params *params,
++				      struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		return -ENODEV;
++	else
++		cpu_dai->dma_data = &s3c_ac97_mic_in;
++
++	return 0;
++}
++
++static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
++				    int cmd, struct snd_soc_dai *dai)
++{
++	u32 ac_glbctrl;
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	int channel = ((struct s3c_dma_params *)
++		  rtd->dai->cpu_dai->dma_data)->channel;
++
++	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
++	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		ac_glbctrl |= S3C_AC97_GLBCTRL_MICINTM_DMA;
++		break;
++
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		break;
++	}
++
++	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
++
++	s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
++
++	return 0;
++}
++
++static struct snd_soc_dai_ops s3c_ac97_dai_ops = {
++	.hw_params	= s3c_ac97_hw_params,
++	.trigger	= s3c_ac97_trigger,
++};
++
++static struct snd_soc_dai_ops s3c_ac97_mic_dai_ops = {
++	.hw_params	= s3c_ac97_hw_mic_params,
++	.trigger	= s3c_ac97_mic_trigger,
++};
++
++struct snd_soc_dai s3c_ac97_dai[] = {
++	[S3C_AC97_DAI_PCM] = {
++		.name =	"s3c-ac97",
++		.id = S3C_AC97_DAI_PCM,
++		.ac97_control = 1,
++		.playback = {
++			.stream_name = "AC97 Playback",
++			.channels_min = 2,
++			.channels_max = 2,
++			.rates = SNDRV_PCM_RATE_8000_48000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
++		.capture = {
++			.stream_name = "AC97 Capture",
++			.channels_min = 2,
++			.channels_max = 2,
++			.rates = SNDRV_PCM_RATE_8000_48000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
++		.ops = &s3c_ac97_dai_ops,
++	},
++	[S3C_AC97_DAI_MIC] = {
++		.name = "s3c-ac97-mic",
++		.id = S3C_AC97_DAI_MIC,
++		.ac97_control = 1,
++		.capture = {
++			.stream_name = "AC97 Mic Capture",
++			.channels_min = 1,
++			.channels_max = 1,
++			.rates = SNDRV_PCM_RATE_8000_48000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
++		.ops = &s3c_ac97_mic_dai_ops,
++	},
++};
++EXPORT_SYMBOL_GPL(s3c_ac97_dai);
++
++static __devinit int s3c_ac97_probe(struct platform_device *pdev)
++{
++	struct resource *mem_res, *dmatx_res, *dmarx_res, *dmamic_res, *irq_res;
++	struct s3c_audio_pdata *ac97_pdata;
++	int ret;
++
++	ac97_pdata = pdev->dev.platform_data;
++	if (!ac97_pdata || !ac97_pdata->cfg_gpio) {
++		dev_err(&pdev->dev, "cfg_gpio callback not provided!\n");
++		return -EINVAL;
++	}
++
++	/* Check for availability of necessary resource */
++	dmatx_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (!dmatx_res) {
++		dev_err(&pdev->dev, "Unable to get AC97-TX dma resource\n");
++		return -ENXIO;
++	}
++
++	dmarx_res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++	if (!dmarx_res) {
++		dev_err(&pdev->dev, "Unable to get AC97-RX dma resource\n");
++		return -ENXIO;
++	}
++
++	dmamic_res = platform_get_resource(pdev, IORESOURCE_DMA, 2);
++	if (!dmamic_res) {
++		dev_err(&pdev->dev, "Unable to get AC97-MIC dma resource\n");
++		return -ENXIO;
++	}
++
++	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem_res) {
++		dev_err(&pdev->dev, "Unable to get register resource\n");
++		return -ENXIO;
++	}
++
++	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!irq_res) {
++		dev_err(&pdev->dev, "AC97 IRQ not provided!\n");
++		return -ENXIO;
++	}
++
++	if (!request_mem_region(mem_res->start,
++				resource_size(mem_res), "s3c-ac97")) {
++		dev_err(&pdev->dev, "Unable to request register region\n");
++		return -EBUSY;
++	}
++
++	s3c_ac97_pcm_out.channel = dmatx_res->start;
++	s3c_ac97_pcm_out.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
++	s3c_ac97_pcm_in.channel = dmarx_res->start;
++	s3c_ac97_pcm_in.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
++	s3c_ac97_mic_in.channel = dmamic_res->start;
++	s3c_ac97_mic_in.dma_addr = mem_res->start + S3C_AC97_MIC_DATA;
++
++	init_completion(&s3c_ac97.done);
++	mutex_init(&s3c_ac97.lock);
++
++	s3c_ac97.regs = ioremap(mem_res->start, resource_size(mem_res));
++	if (s3c_ac97.regs == NULL) {
++		dev_err(&pdev->dev, "Unable to ioremap register region\n");
++		ret = -ENXIO;
++		goto err1;
++	}
++
++	s3c_ac97.ac97_clk = clk_get(&pdev->dev, "ac97");
++	if (IS_ERR(s3c_ac97.ac97_clk)) {
++		dev_err(&pdev->dev, "s3c-ac97 failed to get ac97_clock\n");
++		ret = -ENODEV;
++		goto err2;
++	}
++	clk_enable(s3c_ac97.ac97_clk);
++
++	if (ac97_pdata->cfg_gpio(pdev)) {
++		dev_err(&pdev->dev, "Unable to configure gpio\n");
++		ret = -EINVAL;
++		goto err3;
++	}
++
++	ret = request_irq(irq_res->start, s3c_ac97_irq,
++					IRQF_DISABLED, "AC97", NULL);
++	if (ret < 0) {
++		printk(KERN_ERR "s3c-ac97: interrupt request failed.\n");
++		goto err4;
++	}
++
++	s3c_ac97_dai[S3C_AC97_DAI_PCM].dev = &pdev->dev;
++	s3c_ac97_dai[S3C_AC97_DAI_MIC].dev = &pdev->dev;
++
++	ret = snd_soc_register_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
++	if (ret)
++		goto err5;
++
++	return 0;
++
++err5:
++	free_irq(irq_res->start, NULL);
++err4:
++err3:
++	clk_disable(s3c_ac97.ac97_clk);
++	clk_put(s3c_ac97.ac97_clk);
++err2:
++	iounmap(s3c_ac97.regs);
++err1:
++	release_mem_region(mem_res->start, resource_size(mem_res));
++
++	return ret;
++}
++
++static __devexit int s3c_ac97_remove(struct platform_device *pdev)
++{
++	struct resource *mem_res, *irq_res;
++
++	snd_soc_unregister_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
++
++	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (irq_res)
++		free_irq(irq_res->start, NULL);
++
++	clk_disable(s3c_ac97.ac97_clk);
++	clk_put(s3c_ac97.ac97_clk);
++
++	iounmap(s3c_ac97.regs);
++
++	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (mem_res)
++		release_mem_region(mem_res->start, resource_size(mem_res));
++
++	return 0;
++}
++
++static struct platform_driver s3c_ac97_driver = {
++	.probe  = s3c_ac97_probe,
++	.remove = s3c_ac97_remove,
++	.driver = {
++		.name = "s3c-ac97",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init s3c_ac97_init(void)
++{
++	return platform_driver_register(&s3c_ac97_driver);
++}
++module_init(s3c_ac97_init);
++
++static void __exit s3c_ac97_exit(void)
++{
++	platform_driver_unregister(&s3c_ac97_driver);
++}
++module_exit(s3c_ac97_exit);
++
++MODULE_AUTHOR("Jaswinder Singh, <jassi.brar@samsung.com>");
++MODULE_DESCRIPTION("AC97 driver for the Samsung SoC");
++MODULE_LICENSE("GPL");
+diff --git a/sound/soc/s3c24xx/s3c-ac97.h b/sound/soc/s3c24xx/s3c-ac97.h
+new file mode 100644
+index 0000000..2781983
+--- /dev/null
++++ b/sound/soc/s3c24xx/s3c-ac97.h
+@@ -0,0 +1,23 @@
++/* sound/soc/s3c24xx/s3c-ac97.h
++ *
++ * ALSA SoC Audio Layer - S3C AC97 Controller driver
++ * 	Evolved from s3c2443-ac97.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co. Ltd
++ * 	Author: Jaswinder Singh <jassi.brar@samsung.com>
++ * 	Credits: Graeme Gregory, Sean Choi
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __S3C_AC97_H_
++#define __S3C_AC97_H_
++
++#define S3C_AC97_DAI_PCM 0
++#define S3C_AC97_DAI_MIC 1
++
++extern struct snd_soc_dai s3c_ac97_dai[];
++
++#endif /* __S3C_AC97_H_ */
 -- 
 1.6.2.5
