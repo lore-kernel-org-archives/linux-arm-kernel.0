@@ -1,9 +1,10 @@
 From: wellsk40@gmail.com (Kevin Wells)
-Date: Tue, 26 Jan 2010 15:58:22 -0800
+Date: Tue, 26 Jan 2010 16:13:51 -0800
 Subject: [PATCH 00/10] ARM: LPC32XX: New architecture support
-Message-ID: <1264550302.6528.2@usb10132>
+Message-ID: <1264551231.6528.3@usb10132>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 
 This patch series adds support for the LPC32XX processor and includes
