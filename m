@@ -1,24 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 28 Jan 2010 12:00:26 +0000
-Subject: [alsa-devel] [PATCHv2 05/10] ASoC: AC97: SMDK: Add wm9713
-	machine driver
-In-Reply-To: <1264571959-15115-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1264571959-15115-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <20100128120020.GA19270@sirena.org.uk>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 28 Jan 2010 13:13:35 +0100
+Subject: [PATCH/RFC v2 0/3] Human readable platform-specific
+	performance event support
+In-Reply-To: <000101caa011$1ba9ee10$52fdca30$%fujak@samsung.com>
+References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
+	<1264675934.4283.2088.camel@laptop>
+	<000101caa011$1ba9ee10$52fdca30$%fujak@samsung.com>
+Message-ID: <1264680815.4283.2100.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 02:59:19PM +0900, jassisinghbrar at gmail.com wrote:
+On Thu, 2010-01-28 at 12:57 +0100, Tomasz Fujak wrote:
 
-> +	Headphone Playback Switch - On
-> +	$ amixer cset numid=4 1
-> +
+please educate your MUA to wrap lines at ~80.
 
-Actually, one thing that really needs fixing here - these instructions
-refer to the controls by number.  This is extremely fragile in the face
-of any changes in the CODEC driver since the control numbering is worked
-out at runtime and any change in the set of controls exported by the
-device may change the result.  It is much better to refer to the
-controls by name since the names are much less likely to change.  This
-is also helpful for people using other UIs which don't display the
-control names.
+> Apparently I did not comprehend your attitude towards the events'
+> description being exported from the kernel.
+> There's been a lengthy discussion which ended in a conclusion that the
+> platform detection is a complicated task.
+
+If its really that complicated export a pmu identifier someplace.
+
+The fact is, the kernel simply doesn't use this list, we have perf in
+kernel so that resource scheduling and isolation can be done, for that
+we need to know how to program the hardware and we need to know about
+scheduling constraints, we do not need exhaustive lists of possible
+events, let alone descriptive text for them, in the kernel.
