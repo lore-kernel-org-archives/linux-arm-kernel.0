@@ -1,73 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 28 Jan 2010 10:15:32 +0900
-Subject: [PATCH RE-SEND-2] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle inside
-	each ARCH Kconfig
-Message-ID: <1264641332-30800-1-git-send-email-kgene.kim@samsung.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 27 Jan 2010 17:11:38 -0800
+Subject: [PATCH] RFC: make struct platform_driver.id_table const
+In-Reply-To: <f17812d71001260054g57b282c4n90977cc76d521f89@mail.gmail.com>
+References: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100125013421.GL26562@trinity.fluff.org>
+	<4B5CFEBE.2070906@gmail.com>
+	<20100125074242.GA12480@pengutronix.de>
+	<4B5E092B.3070801@gmail.com>
+	<f17812d71001252201n215f2a9y1906fef630726dbe@mail.gmail.com>
+	<20100126083500.GA20792@pengutronix.de>
+	<f17812d71001260054g57b282c4n90977cc76d521f89@mail.gmail.com>
+Message-ID: <20100128011135.GA24068@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ARM_L1_CACHE_SHIFT_6 into arch/arm/Kconfig. Basically,
-ARM L1 cache line size is 32Bytes. Therefore, whenever new ARCH which
-has 64Bytes L1 cache line size is added, have to set ARM_L1_CACHE_SHIFT
-to 6. That is, have to add/modify arch/arm/mm/Kconfig.
-This patch is for handle it in each ARCH such as ARCH_OMAP3, ARCH_S5PC1XX,
-and ARCH_S5PV210 which is in review.
-This patch also adds selecting ARM_L1_CACHE_SHIFT_6 into Kconfig of
-ARCH_OMAP3 and ARCH_S5PC1XX.
+On Tue, Jan 26, 2010 at 04:54:13PM +0800, Eric Miao wrote:
+> 2010/1/26 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Greg,
+> >
+> > On Tue, Jan 26, 2010 at 02:01:15PM +0800, Eric Miao wrote:
+> >> I seems to remember a similar patch sent to GregKH weeks ago and
+> >> should be sitting somewhere but this one looks to be more complete.
+> > Yes, it's
+> > ? ? ? ?gregkh-2.6/gregkh-05-driver-core/driver-core-make-platform_device_id-table-const.patch
+> >
+> > Below you can find the current state with all Acks it has got until now.
+> > (Eric: I considered your mail as Ack, too. ?OK?)
+> 
+> OK.
+> 
+> > As I don't know how to change the log message with an incremental patch
+> > you have to tell me if you prefer this way.
+> 
+> Greg?
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/Kconfig           |    6 ++++++
- arch/arm/mm/Kconfig        |    2 +-
- arch/arm/plat-omap/Kconfig |    1 +
- 3 files changed, 8 insertions(+), 1 deletions(-)
+I took out the chunk that came in the previous patch, and applied it.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a5602ec..13c07a6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -161,6 +161,11 @@ config ARCH_MTD_XIP
- config GENERIC_HARDIRQS_NO__DO_IRQ
- 	def_bool y
- 
-+config ARM_L1_CACHE_SHIFT_6
-+	bool
-+	help
-+	  Setting ARM L1 cache line size to 64 Bytes.
-+
- if OPROFILE
- 
- config OPROFILE_ARMV6
-@@ -646,6 +651,7 @@ config ARCH_S5PC1XX
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select CPU_V7
-+	select ARM_L1_CACHE_SHIFT_6
- 	help
- 	  Samsung S5PC1XX series based systems
- 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 91617f7..8ca9fb7 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -779,5 +779,5 @@ config CACHE_XSC3L2
- 
- config ARM_L1_CACHE_SHIFT
- 	int
--	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
-+	default 6 if ARM_L1_CACHE_SHIFT_6
- 	default 5
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index e2ea04a..2e3eec6 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -22,6 +22,7 @@ config ARCH_OMAP3
- 	bool "TI OMAP3"
- 	select CPU_V7
- 	select COMMON_CLKDEV
-+	select ARM_L1_CACHE_SHIFT_6
- 
- config ARCH_OMAP4
- 	bool "TI OMAP4"
--- 
-1.6.2.5
+thanks,
+
+greg k-h
