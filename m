@@ -1,69 +1,61 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 28 Jan 2010 12:58:40 -0500
-Subject: [PATCH 06/13] ARM: LPC32XX: Core architecture files
-In-Reply-To: <1264643011-17390-7-git-send-email-wellsk40@gmail.com>
-References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
-	<1264643011-17390-7-git-send-email-wellsk40@gmail.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E9602@mi8nycmail19.Mi8.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jan 2010 18:05:31 +0000
+Subject: [PATCH 3/3] ARM: Select CPU_32v6K for CPU_V7 only if
+	ARCH_OMAP2 isnot selected
+In-Reply-To: <20100128174741.GN23505@atomide.com>
+References: <20100126193748.15134.4837.stgit@baageli.muru.com>
+	<1264676451.7064.40.camel@pc1117.cambridge.arm.com>
+	<20100128174741.GN23505@atomide.com>
+Message-ID: <1264701931.7064.98.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 27, 2010 6:43 PM, wellsk40 wrote:
-> From: Kevin Wells <wellsk40@gmail.com>
+On Thu, 2010-01-28 at 17:47 +0000, Tony Lindgren wrote:
+> * Catalin Marinas <catalin.marinas@arm.com> [100128 02:58]:
+> > On Tue, 2010-01-26 at 19:37 +0000, Tony Lindgren wrote:
+> > > Otherwise the kernel built with both CPU_V6 and CPU_V7 will not
+> > > boot on omap2.
+> > >
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > ---
+> > >  arch/arm/mm/Kconfig |    4 ++--
+> > >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> > > index baf6384..4c2e90d 100644
+> > > --- a/arch/arm/mm/Kconfig
+> > > +++ b/arch/arm/mm/Kconfig
+> > > @@ -399,7 +399,7 @@ config CPU_V6
+> > >  config CPU_32v6K
+> > >         bool "Support ARM V6K processor extensions" if !SMP
+> > >         depends on CPU_V6
+> > > -       default y if SMP && !ARCH_MX3
+> > > +       default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
+> > >         help
+> > >           Say Y here if your ARMv6 processor supports the 'K' extension.
+> > >           This enables the kernel to use some instructions not present
+> > > @@ -410,7 +410,7 @@ config CPU_32v6K
+> > >  # ARMv7
+> > >  config CPU_V7
+> > >         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+> > > -       select CPU_32v6K
+> > > +       select CPU_32v6K if !ARCH_OMAP2
+> >
+> > I suspect that would be an issue for all ARMv6 platforms without the MP
+> > extensions (v6K). Could we do something like:
+> >
+> >       select CPU_32v6K if SMP || !CPU_V6
 > 
-> GPIO support functions for gpiolib, irq setup and handling, serial
-> port support, and high resolution timer support used in the LPC32XX
-> architecture.
-> 
-> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
-> ---
+> Hmm, but then we can't compile in SMP for single core systems and
+> keep it bootable on single core v6?
 
-[snip]
+Not with the current kernel since it hardcodes the shareability bit in
+the page tables and the LDREX/STREX operations don't work as expected on
+uniprocessor hardware.
 
-> +static struct gpio_regs gpio_grp_regs[] = {
-> +	{
-> +		.inp_state	= (void __iomem *) GPIO_P0_INP_STATE(GPIOBASE),
-> +		.outp_set	= (void __iomem *) GPIO_P0_OUTP_SET(GPIOBASE),
-> +		.outp_clr	= (void __iomem *) GPIO_P0_OUTP_CLR(GPIOBASE),
-> +		.dir_set	= (void __iomem *) GPIO_P0_DIR_SET(GPIOBASE),
-> +		.dir_clr	= (void __iomem *) GPIO_P0_DIR_CLR(GPIOBASE),
-> +	},
-> +	{
-> +		.inp_state	= (void __iomem *) GPIO_P1_INP_STATE(GPIOBASE),
-> +		.outp_set	= (void __iomem *) GPIO_P1_OUTP_SET(GPIOBASE),
-> +		.outp_clr	= (void __iomem *) GPIO_P1_OUTP_CLR(GPIOBASE),
-> +		.dir_set	= (void __iomem *) GPIO_P1_DIR_SET(GPIOBASE),
-> +		.dir_clr	= (void __iomem *) GPIO_P1_DIR_CLR(GPIOBASE),
-> +	},
-> +	{
-> +		.inp_state	= (void __iomem *) GPIO_P2_INP_STATE(GPIOBASE),
-> +		.outp_set	= (void __iomem *) GPIO_P2_OUTP_SET(GPIOBASE),
-> +		.outp_clr	= (void __iomem *) GPIO_P2_OUTP_CLR(GPIOBASE),
-> +		.dir_set	= (void __iomem *) GPIO_P2_DIR_SET(GPIOBASE),
-> +		.dir_clr	= (void __iomem *) GPIO_P2_DIR_CLR(GPIOBASE),
-> +	},
-> +	{
-> +		.inp_state	= (void __iomem *) GPIO_P3_INP_STATE(GPIOBASE),
-> +		.outp_set	= (void __iomem *) GPIO_P3_OUTP_SET(GPIOBASE),
-> +		.outp_clr	= (void __iomem *) GPIO_P3_OUTP_CLR(GPIOBASE),
-> +		.dir_set	= (void __iomem *) GPIO_P2_DIR_SET(GPIOBASE),
-> +		.dir_clr	= (void __iomem *) GPIO_P2_DIR_CLR(GPIOBASE),
-> +	},
-> +};
+I agree that it would be nice to be able to have an SMP kernel booting
+on both UP and MP but there are some #ifdef CONFIG_SMP in the kernel
+which would need to be sorted out.
 
-All this casting is pretty ugly.
-
-It appears these GPIO_P* macros are only used here.  Can the macros
-be modified to create the (void __iomem *) directly?
-
-BTW, you might need to add __force in order to keep sparse happy.
-
-Also, a general comment on the global names in 
-arch/arm/mach-lpc32xx/include/mach/platform.h.
-
-You might consider adding something like LPC32XX_ to the front of
-all the defines. Names like GPIO_BASE or UART3_BASE could very well
-conflict with some other piece of code in the future.
-
-Regards,
-Hartley
+-- 
+Catalin
