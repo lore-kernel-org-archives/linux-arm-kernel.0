@@ -1,47 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 28 Jan 2010 10:29:22 +0100
-Subject: [PATCHv2] ARM: S3C64XX: SPI: Make platform device compilation
-	selectable
-In-Reply-To: <1b68c6791001280112h5054a260rc5b37d3adc7c5576@mail.gmail.com>
-References: <1264666489-24789-1-git-send-email-jassisinghbrar@gmail.com>
-	<20100128090239.GD13756@pengutronix.de>
-	<1b68c6791001280112h5054a260rc5b37d3adc7c5576@mail.gmail.com>
-Message-ID: <20100128092922.GE13756@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Jan 2010 09:32:33 +0000
+Subject: Problems with device compilation by subsystem config
+In-Reply-To: <20100128070518.GS10014@trinity.fluff.org>
+References: <20100128070518.GS10014@trinity.fluff.org>
+Message-ID: <20100128093233.GA7339@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 06:12:30PM +0900, jassi brar wrote:
-> 2010/1/28 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Thu, Jan 28, 2010 at 05:14:49PM +0900, jassisinghbrar at gmail.com wrote:
-> >> From: Jassi Brar <jassi.brar@samsung.com>
-> >>
-> >> The SPI controller platform devices should be compiled in
-> >> independent of the driver support, otherwise we might end
-> >> up with dev-spi built as kernel module.
-> >> Change this to make every machine select if it has some SPI
-> >> device and wants to build device definitions.
-> > Is it correct that S3C64XX_DEV_SPI for now is always unselected and so
-> > dev-spi.o is never compiled? ?Assuming there are already machines using
-> > it the corresponding symbols should select S3C64XX_DEV_SPI, don't they?
-> >
-> > If that's wrong the last sentence in your commit log is confusing.
-> Hello,
-> No machine currently uses s3c64xx-spi, so it's ok.
-> In future a s3c64xx based machine has to select S3C64XX_DEV_SPI
->  if it has some device attached to the SPI bus.
-OK, then maybe change the commit log to:
+On Thu, Jan 28, 2010 at 07:05:18AM +0000, Ben Dooks wrote:
 
-	The SPI controller platform devices should be compiled in
-	independent of the driver support, otherwise we might end up
-	with dev-spi built as kernel module.
+> My first response is that this forces the user to rebuild the kernel
+> every time they decide to change the subsytems included, which if just
+> building things as modules isn't nice. However this wasn't a strong enough
+> objection at the time to reject the patches.
 
-	So now every machine that has some SPI device should select
-	S3C64XX_DEV_SPI.  Currently there is no such machine in mainline
-	yet.
+> People might say that building everything is a waste of kernel space, but
+> we cluttering mach-xxx.c with #ifdefs is also not pleasant, and if we have
+> as currently for many of the other devices CONFIG to build the devices
+> selected by the machine then we are reasonably efficient.
 
-Best regards
-Uwe
+I tend to agree that the space savings being pointless on a system like
+S3C64xx - on S3C24xx RAM is likely to be much more precious but if
+the processor is something like the S3C64xx the resource used by the
+device definitions is unlikely to be meaningful.  I only included the
+conditional build for the audio device because the existing code for I2C,
+SDHCI and so on was doing the same.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+> To fix thsi I propose changing the SPI and Audio support to have their
+> own 'config S3C_DEV_xxx' entries which are selected by the boards that
+> use them (this removes the need for #ifdef in the board file) and these
+> entries should not be dependant on the subsytem defines.
+
+To be honest I'd be inclined to just unconditionally include them.  I
+suspect if they're genuinely unused the linker ought to be able to
+discard them anyway.
