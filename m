@@ -1,40 +1,72 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 27 Jan 2010 17:43:45 -0800
-Subject: [PATCH 3/5] gic: Add set_type callback
-In-Reply-To: <20100127231832.GF29665@n2100.arm.linux.org.uk>
-References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
-	<1264620749-24527-4-git-send-email-adharmap@codeaurora.org>
-	<20100127231832.GF29665@n2100.arm.linux.org.uk>
-Message-ID: <4B60EBD1.9020005@codeaurora.org>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Thu, 28 Jan 2010 03:41:52 +0000
+Subject: [PATCHv2 06/10] ARM: SMDK64XX: Enable AC97 device
+In-Reply-To: <1264571969-15145-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1264571969-15145-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <20100128034152.GA14154@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Jan 27, 2010 at 11:32:27AM -0800, adharmap at codeaurora.org wrote:
->> +	if (flow_type & (IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING)) {
->> +		reg_value |= (2<<bit_index);
->> +		writel(reg_value, gic_dist_base(irq) + GIC_DIST_CONFIG
->> +							+ register_index);
->> +		__set_irq_handler_unlocked(irq, handle_edge_irq);
->> +	}
->> +
->> +	if (flow_type & (IRQ_TYPE_LEVEL_HIGH|IRQ_TYPE_LEVEL_LOW)) {
+On Wed, Jan 27, 2010 at 02:59:29PM +0900, jassisinghbrar at gmail.com wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
 > 
-> This is actually where things start to get rather sticky - because
-> there may well be on-chip inverters between the GIC and external
-> peripherals.
-Actually the comment in gic_dist_init mentions about configuring SPI's 
-as level low when the GIC only supports level high. That suggests 
-presence of an inverter.
+> Add AC97 controller to platform devices and initialize the AC97 gpios.
+
+I'd much rather see platform devices always added unless there is a really
+good reason not to. People can build things as modules and this means you
+end up having to rebuild the core kernel as well as the module if you want
+to change.
+ 
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  arch/arm/mach-s3c6410/mach-smdk6410.c |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
 > 
-> Since the GIC can only sense one edge or one level depending on the
-> hardware setup, it seems wrong to allow the configuration of both
-> high and low levels, and both edges.
-Agree, but this change at least lets us configure them as edge/level 
-triggered.
+> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+> index eba345f..259ebbb 100644
+> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+> @@ -55,6 +55,7 @@
+>  #include <plat/gpio-cfg.h>
+>  
+>  #include <plat/s3c6410.h>
+> +#include <plat/audio.h>
+>  #include <plat/clock.h>
+>  #include <plat/devs.h>
+>  #include <plat/cpu.h>
+> @@ -253,7 +254,9 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+>  	&smdk6410_b_pwr_5v,
+>  #endif
+>  	&smdk6410_lcd_powerdev,
+> -
+> +#ifdef CONFIG_SND_SOC_SMDK_WM9713
+> +	&s3c64xx_device_ac97,
+> +#endif
+>  	&smdk6410_smsc911x,
+>  };
+>  
+> @@ -475,6 +478,10 @@ static void __init smdk6410_machine_init(void)
+>  	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+>  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+>  
+> +#ifdef CONFIG_SND_SOC_SMDK_WM9713
+> +	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
+> +#endif
+> +
+>  	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
+>  }
+>  
+> -- 
+> 1.6.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-One solution (a rather easy one) is we simply reject LEVEL_LOW and 
-EDGE_FALLING and think as if the inverters belong to the peripherals 
-rather than the GIC.
+-- 
+-- 
+Ben
 
-Please suggest alternative implementation ideas.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
