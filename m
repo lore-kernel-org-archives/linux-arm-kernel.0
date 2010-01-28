@@ -1,22 +1,41 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Wed, 27 Jan 2010 17:43:18 -0800
-Subject: LPC32XX architecture files (updated)
-Message-ID: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+Date: Wed, 27 Jan 2010 17:43:20 -0800
+Subject: [PATCH 02/13] pnx4008_wdt: Added Kconfig support for the LPC32XX
+In-Reply-To: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+Message-ID: <1264643011-17390-3-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Kevin Wells <wellsk40@gmail.com>
 
-The initial LCP32xx arch files are in these patches. Changes from
-yesterdays posting:
+The existing PNX4008 support for the WDT was re-used. The option to
+select the PNX4008 driver in the kernel config is now also based on
+the ARCH_LCP32XX config flag.
 
-gpiolib.c updated from user review comments, thanks!
+Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+---
+ drivers/watchdog/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Files all send via git send-email now, thanks for pointing me in
-the right direction and sorry about the wraps. (if gmail wasn't
-available, I'd be stuck!)
-
-These have been checked with checkpatch.
-
-thanks,
-Kevin Wells
-NXP Semiconductors
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 050ee14..3019415 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -200,11 +200,11 @@ config OMAP_WATCHDOG
+ 	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430 watchdog timer.
+ 
+ config PNX4008_WATCHDOG
+-	tristate "PNX4008 Watchdog"
+-	depends on ARCH_PNX4008
++	tristate "PNX4008/LPC32XX Watchdog"
++	depends on ARCH_PNX4008 || ARCH_LPC32XX
+ 	help
+ 	  Say Y here if to include support for the watchdog timer
+-	  in the PNX4008 processor.
++	  in the PNX4008 or LPC32XX processors.
+ 	  This driver can be built as a module by choosing M. The module
+ 	  will be called pnx4008_wdt.
+ 
+-- 
+1.6.6
