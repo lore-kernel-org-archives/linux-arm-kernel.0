@@ -1,19 +1,49 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 28 Jan 2010 11:52:14 +0100
-Subject: [PATCH/RFC v2 0/3] Human readable platform-specific
-	performance event support
-In-Reply-To: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
-References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
-Message-ID: <1264675934.4283.2088.camel@laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jan 2010 11:00:50 +0000
+Subject: [PATCH 3/3] ARM: Select CPU_32v6K for CPU_V7 only if
+	ARCH_OMAP2 isnot selected
+In-Reply-To: <20100126193748.15134.4837.stgit@baageli.muru.com>
+References: <20100126193748.15134.4837.stgit@baageli.muru.com>
+Message-ID: <1264676451.7064.40.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-01-28 at 10:34 +0100, Tomasz Fujak wrote:
-> Human readable description support for performance events v2. With perf support included.
-> Changes from v1:
->  - applied on top of latest perf_event/ARM (5899/1 - 5903/1)
->  - moved to debugfs, now based on seq_file
->  - reads one line at a time, memory overallocation fixed [perf]
+On Tue, 2010-01-26 at 19:37 +0000, Tony Lindgren wrote:
+> Otherwise the kernel built with both CPU_V6 and CPU_V7 will not
+> boot on omap2.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mm/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index baf6384..4c2e90d 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -399,7 +399,7 @@ config CPU_V6
+>  config CPU_32v6K
+>         bool "Support ARM V6K processor extensions" if !SMP
+>         depends on CPU_V6
+> -       default y if SMP && !ARCH_MX3
+> +       default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
+>         help
+>           Say Y here if your ARMv6 processor supports the 'K' extension.
+>           This enables the kernel to use some instructions not present
+> @@ -410,7 +410,7 @@ config CPU_32v6K
+>  # ARMv7
+>  config CPU_V7
+>         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+> -       select CPU_32v6K
+> +       select CPU_32v6K if !ARCH_OMAP2
 
-You can keep sending these patches, but I'll keep ignoring them
-eventually adding you to the /dev/null redirect.
+I suspect that would be an issue for all ARMv6 platforms without the MP
+extensions (v6K). Could we do something like:
+
+	select CPU_32v6K if SMP || !CPU_V6
+
+As for the CPU_32v6K config entry, do any of ARCH_MX3 or ARCH_OMAP2
+support SMP? We could remove them.
+
+-- 
+Catalin
