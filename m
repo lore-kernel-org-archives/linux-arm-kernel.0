@@ -1,186 +1,317 @@
 From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Thu, 28 Jan 2010 10:34:21 +0100
-Subject: [PATCH/RFC v2 1/3] perfevents: Added performance event structure
-	definition,
-	export event description in the debugfs "perf_events_platform" file
+Date: Thu, 28 Jan 2010 10:34:23 +0100
+Subject: [PATCH/RFC v2 3/3] perf: Extended events (platform-specific) support
+	in perf
 In-Reply-To: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
 References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
-Message-ID: <1264671263-21412-2-git-send-email-t.fujak@samsung.com>
+Message-ID: <1264671263-21412-4-git-send-email-t.fujak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Tomasz Fujak <t.fujak@samsung.com>
 Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
 Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 
 ---
- include/linux/perf_event.h |   19 +++++++++
- kernel/perf_event.c        |   92 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 111 insertions(+), 0 deletions(-)
+ tools/perf/util/parse-events.c |  217 ++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 206 insertions(+), 11 deletions(-)
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index c66b34f..b50e2b8 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -458,6 +458,12 @@ enum perf_callchain_context {
+diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
+index e5bc0fb..37a9b25 100644
+--- a/tools/perf/util/parse-events.c
++++ b/tools/perf/util/parse-events.c
+@@ -9,6 +9,9 @@
+ #include "header.h"
+ #include "debugfs.h"
  
- #define PERF_MAX_STACK_DEPTH		255
++#define			PLATFORM_EVENT_FILE_NAME\
++				"perf_events_platform"
++
+ int				nr_counters;
  
-+#define PERF_EVENT_RAW_BIT			(1ULL << 63)
-+#define PERF_EVENT_RAW_TO_CONFIG(_val)	((_val) | PERF_EVENT_RAW_BIT)
-+#define PERF_EVENT_CONFIG_TO_RAW(_val)	((_val) & ~PERF_EVENT_RAW_BIT)
-+#define PERF_EVENT_IS_RAW(_val)		((_val) & PERF_EVENT_RAW_BIT)
-+
-+
- struct perf_callchain_entry {
- 	__u64				nr;
- 	__u64				ip[PERF_MAX_STACK_DEPTH];
-@@ -554,6 +560,19 @@ struct perf_mmap_data {
- 	void				*data_pages[0];
- };
+ struct perf_event_attr		attrs[MAX_COUNTERS];
+@@ -60,6 +63,10 @@ static struct event_symbol event_symbols[] = {
+ #define PERF_EVENT_TYPE(config)	__PERF_EVENT_FIELD(config, TYPE)
+ #define PERF_EVENT_ID(config)		__PERF_EVENT_FIELD(config, EVENT)
  
-+struct perf_event_description {
-+	struct list_head	list;
++static struct event_symbol	*platform_event_symbols;
++static unsigned int		platform_event_count;
++static int			platform_events_initialized;
 +
-+	/* type : 1, subsystem [0..7], id [56..63]*/
-+	__u64				config;
-+	__u64				min_value;	/* min. wakeup period */
-+	__u64				max_value;	/* max. wakeup period */
-+	__u32				flags;		/* ??? */
-+	__u32				reserved[3];
-+	char				*name;
-+	char				*description;
-+};
-+
- struct perf_pending_entry {
- 	struct perf_pending_entry *next;
- 	void (*func)(struct perf_pending_entry *);
-diff --git a/kernel/perf_event.c b/kernel/perf_event.c
-index 603c0d8..dc68f0b 100644
---- a/kernel/perf_event.c
-+++ b/kernel/perf_event.c
-@@ -31,6 +31,9 @@
- #include <linux/ftrace_event.h>
- #include <linux/hw_breakpoint.h>
- 
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
-+
- #include <asm/irq_regs.h>
- 
- /*
-@@ -99,6 +102,10 @@ void __weak hw_perf_enable(void)		{ barrier(); }
- void __weak hw_perf_event_setup(int cpu)	{ barrier(); }
- void __weak hw_perf_event_setup_online(int cpu)	{ barrier(); }
- 
-+static LIST_HEAD(perf_event_empty);
-+
-+const struct list_head __weak *perf_events_platform;
-+
- int __weak
- hw_perf_group_sched_in(struct perf_event *group_leader,
- 	       struct perf_cpu_context *cpuctx,
-@@ -5333,6 +5340,83 @@ perf_set_overcommit(struct sysdev_class *class, const char *buf, size_t count)
- 	return count;
+ static const char *hw_event_names[] = {
+ 	"cycles",
+ 	"instructions",
+@@ -241,6 +248,150 @@ static const char *tracepoint_id_to_name(u64 config)
+ 	return buf;
  }
  
-+static void *platevent_seq_start(struct seq_file *s, loff_t *pos)
++/* o for valid line, 1 for invalid */
++/* each line format should be "0x%llx\t%s\t%lld-%lld\t%s\n" */
++static int parse_platevent_line(char *line, struct event_symbol *symbol)
 +{
-+	struct list_head *spos = NULL;
++	char *name = NULL;
++	char *description, *ptr, *end;
++	int eaten;
++	unsigned long long discard;
 +
-+	if (perf_events_platform) {
-+		loff_t count = *pos;
-+		struct list_head *curr;
++	if (1 !=  sscanf(line + 2, "%llx", &symbol->config))
++		return 1;
 +
-+		list_for_each(curr, perf_events_platform)
-+			if (!count--)
-+				break;
++	/* skip 0x%llx\t */
++	ptr = strchr(line + 2, '\t') + 1;
++	if (!ptr)
++		return 1;
 +
-+		if (curr != perf_events_platform) {
-+			s->private = perf_events_platform;
-+			spos = curr;
-+		}
++	end = strchr(ptr, '\t');
++	if (!end)
++		return 1;
++
++	name = strndup(ptr, end - ptr);
++	ptr = end + 1;
++
++	if (2 != sscanf(ptr, "%lld-%lld\t%n", &discard, &discard, &eaten)) {
++		free(name);
++		return 1;
 +	}
 +
-+	return spos;
-+}
 +
-+static void *platevent_seq_next(struct seq_file *s, void *v, loff_t *pos)
-+{
-+	struct list_head *curr = (struct list_head *)v;
-+	struct list_head *head = (struct list_head *)s->private;
++	description = strdup(ptr + eaten);
++	description[strlen(description) - 1] = 0;
 +
-+	if (list_is_last(curr, head))
-+		return NULL;
-+
-+	++(*pos);
-+	return curr->next;
-+}
-+
-+static void platevent_seq_stop(struct seq_file *s, void *v)
-+{
-+	kfree(v);
-+}
-+
-+static int platevent_seq_show(struct seq_file *s, void *v)
-+{
-+	struct list_head *curr = (struct list_head *)v;
-+
-+	if (curr) {
-+		struct perf_event_description *entry = list_entry(curr,
-+					struct perf_event_description, list);
-+
-+		if (PERF_EVENT_IS_RAW(entry->config))
-+			seq_printf(s, "0x%llx\t%s\t%lld-%lld\t%s\n",
-+			PERF_EVENT_CONFIG_TO_RAW(entry->config),
-+			entry->name, entry->min_value,
-+			entry->max_value, entry->description);
-+	}
++	if (name && description) {
++		symbol->symbol = name;
++		symbol->alias = "";
++		/* description gets lost here */
++	} else
++		free(name);
++	free(description);
 +
 +	return 0;
 +}
 +
-+static const struct seq_operations platevent_seq_ops = {
-+	.start = platevent_seq_start,
-+	.next  = platevent_seq_next,
-+	.stop  = platevent_seq_stop,
-+	.show  = platevent_seq_show
-+};
-+
-+static int platevent_open(struct inode *inode, struct file *file)
++#define LINE_SIZE_MAX 256
++/* 0 - event ok, < 0 - unrecoverable error, > 0 - eof */
++static int extract_platevent_item(FILE *file, struct event_symbol *symbol)
 +{
-+	return seq_open(file, &platevent_seq_ops);
-+};
++	int result = -1;
 +
-+static const struct file_operations platevent_file_ops = {
-+	.owner   = THIS_MODULE,
-+	.open    = platevent_open,
-+	.read    = seq_read,
-+	.llseek  = seq_lseek,
-+	.release = seq_release
-+};
++	do {
++		char line[LINE_SIZE_MAX];
 +
++		if (!fgets(line, LINE_SIZE_MAX, file)) {
++			if (feof(file))
++				return 1;
++			 if (ferror(file))
++				return -1;
++			continue;
++		}
++		result = parse_platevent_line(line, symbol);
++	} while (0 < result);
 +
- static SYSDEV_CLASS_ATTR(
- 				reserve_percpu,
- 				0644,
-@@ -5358,8 +5442,16 @@ static struct attribute_group perfclass_attr_group = {
- 	.name			= "perf_events",
- };
- 
++	return result;
++}
 +
- static int __init perf_event_sysfs_init(void)
++#define PATH_LEN_MAX 256
++static int load_platform_events(const char *platevent_entry)
++{
++	FILE *file;
++	int count = 0;
++	int capacity = 16;
++	int result;
++	char platevent_file_path[PATH_LEN_MAX];
++
++	struct event_symbol *symbols = NULL;
++
++	/* if the path is of excessive length, skip it */
++	if (debugfs_make_path(platevent_entry, platevent_file_path,
++		ARRAY_SIZE(platevent_file_path)))
++		return -1;
++
++	file = fopen(platevent_file_path, "r");
++	if (!file) {
++		fprintf(stderr, "can't open platform event file '%s'\n",
++			platevent_file_path);
++		return -1;
++	}
++
++	symbols = (struct event_symbol *)
++				calloc(sizeof(struct event_symbol), capacity);
++	if (!symbols) {
++		fclose(file);
++		return -1;
++	}
++
++	do {
++		result = extract_platevent_item(file, &symbols[count]);
++		if (!result)
++			++count;
++
++		if (capacity == count) {
++			struct event_symbol *tmp =
++				(struct event_symbol *)realloc(symbols,
++				sizeof(struct event_symbol) *
++				(capacity <<= 1));
++
++			if (!tmp) {
++				result = -1;
++				break;
++			}
++			symbols = tmp;
++		}
++	} while (!result);
++	/* <0 - error */
++
++	fclose(file);
++
++	if ((result < 0) || (0 == count)) {
++		/* ditching the collection for there was a parse error */
++		free(symbols);
++		count = 0;
++	} else {
++		/* trim the collection storage */
++		if (count != capacity)
++			platform_event_symbols = realloc(symbols,
++				sizeof(struct event_symbol) * count);
++		else
++			platform_event_symbols = symbols;
++		platform_event_count = count;
++	}
++	return count;
++}
++
++static struct event_symbol *platevent_find_config(u64 config)
++{
++	unsigned int i;
++	for (i = 0; i < platform_event_count; ++i)
++		if (platform_event_symbols[i].config == config)
++			return &platform_event_symbols[i];
++
++	return NULL;
++}
++
+ static int is_cache_op_valid(u8 cache_type, u8 cache_op)
  {
-+	struct dentry *dentry;
+ 	if (hw_cache_stat[cache_type] & COP(cache_op))
+@@ -283,10 +434,16 @@ const char *__event_name(int type, u64 config)
+ 	}
+ 
+ 	switch (type) {
+-	case PERF_TYPE_HARDWARE:
++	case PERF_TYPE_HARDWARE: {
++		const struct event_symbol *event;
 +
-+	dentry = debugfs_create_file("perf_events_platform", 0444, NULL,
-+			NULL, &platevent_file_ops);
-+	if (!dentry)
-+		printk(KERN_WARNING "Cannot create debugfs entry 'perf_events_platform'\n");
-+
- 	return sysfs_create_group(&cpu_sysdev_class.kset.kobj,
- 				  &perfclass_attr_group);
+ 		if (config < PERF_COUNT_HW_MAX)
+ 			return hw_event_names[config];
++		event = platevent_find_config(config);
++		if (event)
++			return event->symbol;
+ 		return "unknown-hardware";
++	}
+ 
+ 	case PERF_TYPE_HW_CACHE: {
+ 		u8 cache_type, cache_op, cache_result;
+@@ -606,33 +763,34 @@ parse_breakpoint_event(const char **strp, struct perf_event_attr *attr)
+ 	return EVT_HANDLED;
  }
+ 
+-static int check_events(const char *str, unsigned int i)
++static int check_event(const char *str, const struct event_symbol *event)
+ {
+ 	int n;
+ 
+-	n = strlen(event_symbols[i].symbol);
+-	if (!strncmp(str, event_symbols[i].symbol, n))
++	n = strlen(event->symbol);
++	if (!strncmp(str, event->symbol, n))
+ 		return n;
+ 
+-	n = strlen(event_symbols[i].alias);
++	n = strlen(event->alias);
+ 	if (n)
+-		if (!strncmp(str, event_symbols[i].alias, n))
++		if (!strncmp(str, event->alias, n))
+ 			return n;
+ 	return 0;
+ }
+ 
+ static enum event_result
+-parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
++do_parse_symbolic_event(const char **strp, struct perf_event_attr *attr,
++			const struct event_symbol *symbols, unsigned int count)
+ {
+ 	const char *str = *strp;
+ 	unsigned int i;
+ 	int n;
+ 
+-	for (i = 0; i < ARRAY_SIZE(event_symbols); i++) {
+-		n = check_events(str, i);
++	for (i = 0; i < count; ++i) {
++		n = check_event(str, &symbols[i]);
+ 		if (n > 0) {
+-			attr->type = event_symbols[i].type;
+-			attr->config = event_symbols[i].config;
++			attr->type = symbols[i].type;
++			attr->config = symbols[i].config;
+ 			*strp = str + n;
+ 			return EVT_HANDLED;
+ 		}
+@@ -641,6 +799,27 @@ parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
+ }
+ 
+ static enum event_result
++parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
++{
++	return do_parse_symbolic_event(strp, attr,
++			event_symbols, ARRAY_SIZE(event_symbols));
++}
++
++static enum event_result
++parse_platform_event(const char **strp, struct perf_event_attr *attr)
++{
++	if (!platform_events_initialized)
++		platform_events_initialized =
++			load_platform_events(PLATFORM_EVENT_FILE_NAME);
++
++	if (platform_events_initialized < 0)
++		return EVT_FAILED;
++
++	return do_parse_symbolic_event(strp, attr, platform_event_symbols,
++				platform_event_count);
++}
++
++static enum event_result
+ parse_raw_event(const char **strp, struct perf_event_attr *attr)
+ {
+ 	const char *str = *strp;
+@@ -739,6 +918,10 @@ parse_event_symbols(const char **str, struct perf_event_attr *attr)
+ 	if (ret != EVT_FAILED)
+ 		goto modifier;
+ 
++	ret = parse_platform_event(str, attr);
++	if (ret != EVT_FAILED)
++		goto modifier;
++
+ 	ret = parse_breakpoint_event(str, attr);
+ 	if (ret != EVT_FAILED)
+ 		goto modifier;
+@@ -924,6 +1107,18 @@ void print_events(void)
+ 		}
+ 	}
+ 
++    if (!platform_events_initialized)
++		platform_events_initialized =
++			load_platform_events(PLATFORM_EVENT_FILE_NAME);
++
++    if (0 < platform_events_initialized) {
++		for (i = 0; i < platform_event_count; ++i)
++			printf("  %-42s [%s]\n",
++				platform_event_symbols[i].symbol,
++				"Hardware platform-specific event");
++	}
++
++
+ 	printf("\n");
+ 	printf("  %-42s [raw hardware event descriptor]\n",
+ 		"rNNN");
 -- 
 1.5.4.3
