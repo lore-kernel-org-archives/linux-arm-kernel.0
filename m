@@ -1,50 +1,28 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 28 Jan 2010 09:13:23 +0900
-Subject: [PATCH 1/2 RE-SEND] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
-	inside each ARCH Kconfig
-Message-ID: <1264637603-14967-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 28 Jan 2010 09:13:29 +0900
+Subject: [PATCH 2/2] ARM: S5PC1XX: Add ARM_L1_CACHE_SHIFT_6 in ARCH_S5PC1XX
+Message-ID: <1264637609-15001-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ARM_L1_CACHE_SHIFT_6 into arch/arm/Kconfig. Basically,
-ARM L1 cache line size is 32Bytes. Therefore, whenever new ARCH which
-has 64Bytes L1 cache line size is added, have to set ARM_L1_CACHE_SHIFT
-to 6. That is, have to add/modify arch/arm/mm/Kconfig.
-This patch is for handle it in each ARCH such as ARCH_S5PC1XX, and
-ARCH_S5PV210 which is in review.
+This patch add ARM_L1_CACHE_SHIFT_6 in ARCH_S5PC1XX.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/Kconfig    |    5 +++++
- arch/arm/mm/Kconfig |    2 +-
- 2 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/Kconfig    |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a5602ec..c7e98ed 100644
+index c7e98ed..4e7d72e 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -161,6 +161,11 @@ config ARCH_MTD_XIP
- config GENERIC_HARDIRQS_NO__DO_IRQ
- 	def_bool y
+@@ -651,6 +651,7 @@ config ARCH_S5PC1XX
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select CPU_V7
++	select ARM_L1_CACHE_SHIFT_6
+ 	help
+ 	  Samsung S5PC1XX series based systems
  
-+config ARM_L1_CACHE_SHIFT_6
-+	bool
-+	help
-+	  Setting ARM L1 cache line size to 64 Bytes.
-+
- if OPROFILE
- 
- config OPROFILE_ARMV6
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 91617f7..ad0b8d3 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -779,5 +779,5 @@ config CACHE_XSC3L2
- 
- config ARM_L1_CACHE_SHIFT
- 	int
--	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
-+	default 6 if ARCH_OMAP3 || ARM_L1_CACHE_SHIFT_6
- 	default 5
 -- 
 1.6.2.5
