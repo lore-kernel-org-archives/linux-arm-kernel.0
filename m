@@ -1,41 +1,22 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 27 Jan 2010 17:11:38 -0800
-Subject: [PATCH] RFC: make struct platform_driver.id_table const
-In-Reply-To: <f17812d71001260054g57b282c4n90977cc76d521f89@mail.gmail.com>
-References: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100125013421.GL26562@trinity.fluff.org>
-	<4B5CFEBE.2070906@gmail.com>
-	<20100125074242.GA12480@pengutronix.de>
-	<4B5E092B.3070801@gmail.com>
-	<f17812d71001252201n215f2a9y1906fef630726dbe@mail.gmail.com>
-	<20100126083500.GA20792@pengutronix.de>
-	<f17812d71001260054g57b282c4n90977cc76d521f89@mail.gmail.com>
-Message-ID: <20100128011135.GA24068@kroah.com>
+From: wellsk40@gmail.com (wellsk40 at gmail.com)
+Date: Wed, 27 Jan 2010 17:43:18 -0800
+Subject: LPC32XX architecture files (updated)
+Message-ID: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 04:54:13PM +0800, Eric Miao wrote:
-> 2010/1/26 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Greg,
-> >
-> > On Tue, Jan 26, 2010 at 02:01:15PM +0800, Eric Miao wrote:
-> >> I seems to remember a similar patch sent to GregKH weeks ago and
-> >> should be sitting somewhere but this one looks to be more complete.
-> > Yes, it's
-> > ? ? ? ?gregkh-2.6/gregkh-05-driver-core/driver-core-make-platform_device_id-table-const.patch
-> >
-> > Below you can find the current state with all Acks it has got until now.
-> > (Eric: I considered your mail as Ack, too. ?OK?)
-> 
-> OK.
-> 
-> > As I don't know how to change the log message with an incremental patch
-> > you have to tell me if you prefer this way.
-> 
-> Greg?
 
-I took out the chunk that came in the previous patch, and applied it.
+The initial LCP32xx arch files are in these patches. Changes from
+yesterdays posting:
+
+gpiolib.c updated from user review comments, thanks!
+
+Files all send via git send-email now, thanks for pointing me in
+the right direction and sorry about the wraps. (if gmail wasn't
+available, I'd be stuck!)
+
+These have been checked with checkpatch.
 
 thanks,
-
-greg k-h
+Kevin Wells
+NXP Semiconductors
