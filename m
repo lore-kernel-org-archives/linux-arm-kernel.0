@@ -1,66 +1,47 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 28 Jan 2010 11:26:06 +0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000801ca9f7a$338d5f90$9aa81eb0$@deacon@arm.com>
-References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
-	<201001261847.44774.jpihet@mvista.com>
-	<201001271840.47714.jpihet@mvista.com>
-	<000801ca9f7a$338d5f90$9aa81eb0$@deacon@arm.com>
-Message-ID: <20100128112606.GC4175@wear.picochip.com>
+From: t.fujak@samsung.com (Tomasz Fujak)
+Date: Thu, 28 Jan 2010 12:57:47 +0100
+Subject: [PATCH/RFC v2 0/3] Human readable platform-specific performance
+	event support
+In-Reply-To: <1264675934.4283.2088.camel@laptop>
+References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
+	<1264675934.4283.2088.camel@laptop>
+Message-ID: <000101caa011$1ba9ee10$52fdca30$%fujak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 05:57:32PM -0000, Will Deacon wrote:
-> Hi Jean,
+> -----Original Message-----
+> From: Peter Zijlstra [mailto:peterz at infradead.org]
+> Sent: Thursday, January 28, 2010 11:52 AM
+> To: Tomasz Fujak
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> acme at redhat.com; jamie.iles at picochip.com; will.deacon at arm.com;
+> jpihet at mvista.com; mingo at elte.hu; p.osciak at samsung.com;
+> m.szyprowski at samsung.com; kyungmin.park at samsung.com;
+> m.nazarewicz at samsung.com
+> Subject: Re: [PATCH/RFC v2 0/3] Human readable platform-specific
+> performance event support
 > 
-> Jean Pihet wrote:
+> On Thu, 2010-01-28 at 10:34 +0100, Tomasz Fujak wrote:
+> > Human readable description support for performance events v2. With
+> perf support included.
+> > Changes from v1:
+> >  - applied on top of latest perf_event/ARM (5899/1 - 5903/1)
+> >  - moved to debugfs, now based on seq_file
+> >  - reads one line at a time, memory overallocation fixed [perf]
 > 
-> > > However, if the IRQs are
-> > > defined, but for some reason we fail to request them, then the
-> > > armpmu_reserve_hardware function will fail.
-> > That is the expected behaviour, isn't it?
-> > Why is the PMU request failing? That is worth investigating. I never had that
-> > problem on the Cortex-A8. Is it caused because of the multicore?
-> 
-> Don't worry, requesting the IRQs did not fail. I was simply speculating about
-> the behaviour if it *does* fail. Then armpmu_reserve_hardware will return an
-> error, which will prevent the event being added. Instead, we could print a
-> warning, but continue without IRQs in the same manner as though they had not
-> been defined in pmu.c.
-This was my mistake and I don't think we should continue - we'd _probably_ be
-ok for sampling counters, but for the counting counters we could hit problems
-if the counters weren't being scheduled in and out. For example if someone did
-'perf stat -a -e cycles -- sleep 1m' then the cycle counter would not need to
-be scheduled out, the counter could wrap a few times and we wouldn't know
-because we didn't get an interrupt.
+> You can keep sending these patches, but I'll keep ignoring them
+> eventually adding you to the /dev/null redirect.
 
-I'd suggest the following patch to fix it.
+Apparently I did not comprehend your attitude towards the events' description being exported from the kernel.
+There's been a lengthy discussion which ended in a conclusion that the platform detection is a complicated task.
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 36a23cc..7b1022b 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -320,6 +320,7 @@ armpmu_reserve_hardware(void)
- 
- 	if (pmu_irqs->num_irqs < 1) {
- 		pr_err("no irqs for PMUs defined\n");
-+		return -ENODEV;
- 	}
- 
- 	for (i = 0; i < pmu_irqs->num_irqs; ++i) {
+The solution finally accepted covers just a subset of platforms. I guess the detection scheme may be updated and possibly changed as new cores/implementers come into sight.
+That I think provides additional reasoning to keep the event list where it's defined (in the kernel).
+The rest of the suggestions (perf implementation, debugfs instead of sysfs) I've included into the posted patches.
 
-> > > Actually, the return
-> > > value appears to be uninitialised if you don't have any IRQs defined.
-> > If the PMU request fails the IRQ should not be requested, so I think it is ok.
-> > Is that correct?
-> 
-> What I mean is, if pmu_irqs->num_irqs < 1, then we return err without ever
-> setting it. In fact, we might even end up freeing IRQs which we haven't
-> requested which could cause all sorts of problems.
-Good spot! I'm suprised gcc didn't pick this one up. The patch above should
-prvent this.
+Therefore I cannot really understand why you're threatening to ignore my further efforts; especially since the arguments me and my teammate Michal brought I find reasonable.
 
-Russell, shall I supersede the old patch in the patch system and roll in the
-patch above?
+So finally, if the proposed patches are too intrusive, can you imagine other mechanism in the kernel that would let the userspace unambiguously retrieve a list of supported events?
+Maybe an entry in the sysfs that indicates supported event list version (relevant to the implementer, cupid and other black magic that is involved into the platform detection)?
 
-Jamie
+Right now what can be done is to try follow the kernel implementation of the detection scheme in the applications, which I can't say I'm a fan of.
