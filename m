@@ -1,22 +1,74 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Thu, 28 Jan 2010 20:58:45 +0100
-Subject: LPC32XX architecture files (updated)
-In-Reply-To: <20100128190644.GA7765@pengutronix.de>
-References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
-	<20100128190644.GA7765@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F805C8A0A7FB@eu1rdcrdc1wx030.exi.nxp.com>
+From: dan@debian.org (Daniel Jacobowitz)
+Date: Thu, 28 Jan 2010 15:21:24 -0500
+Subject: 32-bit Thumb-2 breakpoints
+In-Reply-To: <20100112142523.GA28804@caradoc.them.org>
+References: <20100111215816.GA1068@caradoc.them.org>
+	<1263292498.29654.26.camel@pc1117.cambridge.arm.com>
+	<20100112142523.GA28804@caradoc.them.org>
+Message-ID: <20100128202124.GA29606@caradoc.them.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
-> 
-> as I read it, the order of the patches could be improved. For example,
-> patches
-> 1-3 check for ARCH_LPC32XX which is only introduced in Patch 4 (which then
-> includes the Kconfig from the subdir which again is introduced in #5).
-> This makes bisecting troublesome.
-> 
+On Tue, Jan 12, 2010 at 09:25:23AM -0500, Daniel Jacobowitz wrote:
+> I'll plan on 0xf7f0 0xa000.
 
-I see what you mean with git bisect. Once I get some of the other review
-comments installed, I'll release a (hopeful) final round of patches with
-a better organized patch order...
+Like so.  Shall I send this to the patch system?
+
+From: Daniel Jacobowitz <dan@codesourcery.com>
+
+Recognize 0xf7f0 0xa000 as a 32-bit breakpoint instruction for
+Thumb-2.
+
+Signed-off-by: Daniel Jacobowitz <dan@codesourcery.com>
+
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index a2ea385..bd56673 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -499,10 +499,41 @@ static struct undef_hook thumb_break_hook = {
+ 	.fn		= break_trap,
+ };
+ 
++static int thumb2_break_trap(struct pt_regs *regs, unsigned int instr)
++{
++	unsigned int instr2;
++	void __user *pc;
++
++	/* Check the second half of the instruction.  */
++	pc = (void __user *)(instruction_pointer(regs) + 2);
++
++	if (processor_mode(regs) == SVC_MODE) {
++		instr2 = *(u16 *) pc;
++	} else {
++		get_user(instr2, (u16 __user *)pc);
++	}
++
++	if (instr2 == 0xa000) {
++		ptrace_break(current, regs);
++		return 0;
++	} else {
++		return 1;
++	}
++}
++
++static struct undef_hook thumb2_break_hook = {
++	.instr_mask	= 0xffff,
++	.instr_val	= 0xf7f0,
++	.cpsr_mask	= PSR_T_BIT,
++	.cpsr_val	= PSR_T_BIT,
++	.fn		= thumb2_break_trap,
++};
++
+ static int __init ptrace_break_init(void)
+ {
+ 	register_undef_hook(&arm_break_hook);
+ 	register_undef_hook(&thumb_break_hook);
++	register_undef_hook(&thumb2_break_hook);
+ 	return 0;
+ }
+ 
+
+
+-- 
+Daniel Jacobowitz
+CodeSourcery
