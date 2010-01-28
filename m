@@ -1,58 +1,44 @@
-From: 914059751@qq.com (rocky)
-Date: Fri, 22 Jan 2010 09:11:29 +0800
-Subject: =?gb2312?B?tPC4tDogUXVlcnkgYWJvdXQgbG9vcHNfcGVyX2ppZmZ5?=
-In-Reply-To: <tencent_2543180B1828B0D317DCD9FC@qq.com>
-References: <tencent_2543180B1828B0D317DCD9FC@qq.com>
-Message-ID: <6134FC3AD99C4CA8A47F7E3D5E71C470@dufan>
+From: lbassel@quicinc.com (Larry Bassel)
+Date: Thu, 28 Jan 2010 15:04:49 -0800
+Subject: [RFC 05/18] arm: msm: implement ioremap_strongly_ordered
+In-Reply-To: <20100111233720.GK7925@n2100.arm.linux.org.uk>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-6-git-send-email-dwalker@codeaurora.org>
+	<20100111233720.GK7925@n2100.arm.linux.org.uk>
+Message-ID: <20100128230449.GU10547@labbmf-linux.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Green hand apology for the unintended CC, I should make this query personal.
+On Mon, Jan 11, 2010 at 03:37:20PM -0800, Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 02:47:24PM -0800, Daniel Walker wrote:
+> > From: Larry Bassel <lbassel@quicinc.com>
+> > 
+> > Both the clean and invalidate functionality needed
+> > for the video encoder and 7x27 barrier code
+> > need to have a strongly ordered mapping set up
+> > so that one may perform a write to strongly ordered
+> > memory. The generic ARM code does not provide this.
+> > 
+> > The generic ARM code does provide MT_DEVICE, which starts
+> > as strongly ordered, but the code later turns the buffered flag
+> > on for ARMv6 in order to make the device shared. This is not
+> > suitable for my purpose, so this patch adds code for a
+> > MT_DEVICE_STRONGLY_ORDERED mapping type.
+> 
+> This doesn't really describe what "my purpose" is; the patch description
+> is too vague to ascertain why this is required.
 
- 
+Hopefully this is a better description of the patch:
 
-  _____  
+Some Qualcomm SOCs (such as the MSM7x27) require a write to
+strongly ordered memory in order to fully flush the AXI bus.
+Although the generic ARM code provides MT_DEVICE, which starts
+as strongly ordered, it later turns on the buffered flag to
+make this memory shared.
 
-???: linux-arm-kernel-bounces at lists.infradead.org
-[mailto:linux-arm-kernel-bounces at lists.infradead.org] ?? ???
-????: 2010?1?19? 21:38
-???: Alessandro Rubini
-??: linux-arm-kernel
-??: Re: Query about loops_per_jiffy
+Add an additional mapping type MT_DEVICE_STRONGLY_ORDERED which
+will stay in strongly ordered mode and allow proper
+implementation of cache and invalidate operations on these
+devices.
 
- 
-
-Are you  Alessandro Rubini of LINUX DEVICE DRIVER?
-
------------------- Original ------------------
-
-From:  "Alessandro Rubini"<rubini-list@gnudd.com>;
-
-Date:  Tue, Jan 19, 2010 04:21 PM
-
-To:  "914059751"<914059751@qq.com>; 
-
-Cc:  "linux-arm-kernel"<linux-arm-kernel@lists.infradead.org>; 
-
-Subject:  Re: Query about loops_per_jiffy
-
- 
-
-> (loops_per_jiffy * HZ)/1000,000   will give a BogoMips value.
-
-No, it will give a BogoLips (loops per second). A loop is two instructions,
-in ./arch/arm/lib/delay.S (function __delay) called by init/calibrate.c ..
-To have bogomips you need to multiply by two.
-
-> then why calibrate_delay do it like the following:
->     printk(KERN_CONT "%lu.%02lu BogoMIPS (lpj=%lu)\n",
->             loops_per_jiffy/(500000/HZ),
->             (loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
-
-It's correct, using normal integer aritmetics care.
-
-/alessandro
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/fc3ec93b/attachment.htm>
+Larry
