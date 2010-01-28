@@ -1,36 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jan 2010 00:15:23 +0000
-Subject: defining ZRELADDR as PHYS_OFFSET + TEXT_OFFSET
-In-Reply-To: <20100127101228.GA17421@pengutronix.de>
-References: <20100127101228.GA17421@pengutronix.de>
-Message-ID: <20100128001523.GA608@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 28 Jan 2010 09:13:23 +0900
+Subject: [PATCH 1/2 RE-SEND] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
+	inside each ARCH Kconfig
+Message-ID: <1264637603-14967-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 11:12:28AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> currently all platforms need to define zreladdr-y in
-> arch/arm/mach-$mach/Makefile.boot and PHYS_OFFSET (in
-> arch/arm/mach-$mach/include/mach/memory.h).
-> 
-> Constraints for these are:
-> 
->  TEXTADDR = PAGE_OFFSET + TEXT_OFFSET
->  __virt_to_phys(virt) = virt - PAGE_OFFSET + PHYS_OFFSET (at least for
-> 	"small" virtual addresses)
->  ZRELADDR = __virt_to_phys(TEXTADDR)
-> 
-> (The equallity for __virt_to_phys only holds "normaly" according to
-> http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html.
-> In practice it holds for addresses of the first bank of RAM which is
-> enough for the purposes of this mail.)
-> 
-> So we can deduce ZRELADDR = PHYS_OFFSET + TEXT_OFFSET.
-> 
-> Is there something I missed or is it possible to get rid of zreladdr-y
-> in .../Makefile.boot and define it according to the equation above?
+This patch adds ARM_L1_CACHE_SHIFT_6 into arch/arm/Kconfig. Basically,
+ARM L1 cache line size is 32Bytes. Therefore, whenever new ARCH which
+has 64Bytes L1 cache line size is added, have to set ARM_L1_CACHE_SHIFT
+to 6. That is, have to add/modify arch/arm/mm/Kconfig.
+This patch is for handle it in each ARCH such as ARCH_S5PC1XX, and
+ARCH_S5PV210 which is in review.
 
-You'd need to find some way to get PHYS_OFFSET out of the C code
-into the makefile.  With all sorts of stuff going on in various
-platforms memory.h files, that doesn't look simple.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/Kconfig    |    5 +++++
+ arch/arm/mm/Kconfig |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a5602ec..c7e98ed 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -161,6 +161,11 @@ config ARCH_MTD_XIP
+ config GENERIC_HARDIRQS_NO__DO_IRQ
+ 	def_bool y
+ 
++config ARM_L1_CACHE_SHIFT_6
++	bool
++	help
++	  Setting ARM L1 cache line size to 64 Bytes.
++
+ if OPROFILE
+ 
+ config OPROFILE_ARMV6
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 91617f7..ad0b8d3 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -779,5 +779,5 @@ config CACHE_XSC3L2
+ 
+ config ARM_L1_CACHE_SHIFT
+ 	int
+-	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
++	default 6 if ARCH_OMAP3 || ARM_L1_CACHE_SHIFT_6
+ 	default 5
+-- 
+1.6.2.5
