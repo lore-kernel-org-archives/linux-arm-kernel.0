@@ -1,31 +1,35 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Jan 2010 21:41:12 +0900
-Subject: [PATCH 04/06] sh: Build drivers/sh for SuperH Mobile ARM
+Date: Thu, 28 Jan 2010 21:41:21 +0900
+Subject: [PATCH 05/06] sh: Let INTC set IRQF_VALID on ARM platforms
 In-Reply-To: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
 References: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
-Message-ID: <20100128124112.8982.731.sendpatchset@rxone.opensource.se>
+Message-ID: <20100128124121.8982.71803.sendpatchset@rxone.opensource.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Build drivers/sh in the case for SuperH Mobile ARM.
-Shared code for the interrupt controller (INTC) and
-the gpio/pinmux (PFC) is located there.
+Reuse the SuperH INTC code on ARM by using set_irq_flags()
+to set IRQF_VALID on ARM platforms. Reworking the shared ARM
+interrupt code and removing IRQF_VALID is another option.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- drivers/Makefile |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/sh/intc.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
---- 0001/drivers/Makefile
-+++ work/drivers/Makefile	2010-01-19 15:39:21.000000000 +0900
-@@ -99,6 +99,7 @@ obj-$(CONFIG_SGI_SN)		+= sn/
- obj-y				+= firmware/
- obj-$(CONFIG_CRYPTO)		+= crypto/
- obj-$(CONFIG_SUPERH)		+= sh/
-+obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
- obj-$(CONFIG_GENERIC_TIME)	+= clocksource/
- obj-$(CONFIG_DMA_ENGINE)	+= dma/
- obj-$(CONFIG_DCA)		+= dca/
+--- 0001/drivers/sh/intc.c
++++ work/drivers/sh/intc.c	2010-01-21 19:53:15.000000000 +0900
+@@ -658,6 +658,11 @@ static void __init intc_register_irq(str
+ 
+ 	if (desc->ack_regs)
+ 		ack_handle[irq] = intc_ack_data(desc, d, enum_id);
++
++	/* Set IRQF_VALID to enable IRQ on ARM systems */
++#ifdef CONFIG_ARCH_SHMOBILE
++	set_irq_flags(irq, IRQF_VALID);
++#endif
+ }
+ 
+ static unsigned int __init save_reg(struct intc_desc_int *d,
