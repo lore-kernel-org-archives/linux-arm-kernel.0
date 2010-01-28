@@ -1,19 +1,17 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2010 17:03:49 +0000
-Subject: Uncompressing broken with commit e7db7b4270
-Message-ID: <1264698229.7064.93.camel@pc1117.cambridge.arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 28 Jan 2010 22:37:28 +0530
+Subject: [PATCH 08/13] ARM: LPC32XX: clock tree support
+In-Reply-To: <1264643011-17390-9-git-send-email-wellsk40@gmail.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-9-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100128170728.GA14674@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 27, 2010 at 05:43:26PM -0800, wellsk40 at gmail.com wrote:
+> +static struct clk_lookup lookups[] __initdata = {
 
-For whatever reason, with commit e7db7b4270 (arm: add support for
-LZO-compressed kernels) if the kernel Image goes beyond a certain size
-it fails to uncompress. Reverting this commit solves the problem.
-Removing some random kernel features also solves the uncompressing as
-the kernel image gets smaller.
+This shouldn't be __initdata, since it'll be needed when loading modules
+which use clk_get().
 
-Any idea?
-
--- 
-Catalin
+Rabin
