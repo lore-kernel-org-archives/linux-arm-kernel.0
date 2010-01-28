@@ -1,72 +1,22 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Thu, 28 Jan 2010 03:41:52 +0000
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Thu, 28 Jan 2010 13:08:09 +0900
 Subject: [PATCHv2 06/10] ARM: SMDK64XX: Enable AC97 device
-In-Reply-To: <1264571969-15145-1-git-send-email-jassisinghbrar@gmail.com>
+In-Reply-To: <20100128034152.GA14154@trinity.fluff.org>
 References: <1264571969-15145-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <20100128034152.GA14154@trinity.fluff.org>
+	<20100128034152.GA14154@trinity.fluff.org>
+Message-ID: <1b68c6791001272008k7341d360oeb0e84b181e74b0c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 02:59:29PM +0900, jassisinghbrar at gmail.com wrote:
-> From: Jassi Brar <jassi.brar@samsung.com>
-> 
-> Add AC97 controller to platform devices and initialize the AC97 gpios.
-
-I'd much rather see platform devices always added unless there is a really
-good reason not to. People can build things as modules and this means you
-end up having to rebuild the core kernel as well as the module if you want
-to change.
- 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
->  arch/arm/mach-s3c6410/mach-smdk6410.c |    9 ++++++++-
->  1 files changed, 8 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> index eba345f..259ebbb 100644
-> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> @@ -55,6 +55,7 @@
->  #include <plat/gpio-cfg.h>
->  
->  #include <plat/s3c6410.h>
-> +#include <plat/audio.h>
->  #include <plat/clock.h>
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
-> @@ -253,7 +254,9 @@ static struct platform_device *smdk6410_devices[] __initdata = {
->  	&smdk6410_b_pwr_5v,
->  #endif
->  	&smdk6410_lcd_powerdev,
-> -
-> +#ifdef CONFIG_SND_SOC_SMDK_WM9713
-> +	&s3c64xx_device_ac97,
-> +#endif
->  	&smdk6410_smsc911x,
->  };
->  
-> @@ -475,6 +478,10 @@ static void __init smdk6410_machine_init(void)
->  	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
->  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
->  
-> +#ifdef CONFIG_SND_SOC_SMDK_WM9713
-> +	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
-> +#endif
-> +
->  	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
->  }
->  
-> -- 
-> 1.6.2.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Thu, Jan 28, 2010 at 12:41 PM, Ben Dooks <ben@trinity.fluff.org> wrote:
+> On Wed, Jan 27, 2010 at 02:59:29PM +0900, jassisinghbrar at gmail.com wrote:
+>> From: Jassi Brar <jassi.brar@samsung.com>
+>>
+>> Add AC97 controller to platform devices and initialize the AC97 gpios.
+>
+> I'd much rather see platform devices always added unless there is a really
+> good reason not to. People can build things as modules and this means you
+> end up having to rebuild the core kernel as well as the module if you want
+> to change.
+Yes, sounds good to me. I will revise this patch accordingly.
+Thanks
