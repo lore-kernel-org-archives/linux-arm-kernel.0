@@ -1,69 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 28 Jan 2010 08:41:01 +0100
-Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
-In-Reply-To: <20100127154818.de91e255.akpm@linux-foundation.org>
-References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100127154818.de91e255.akpm@linux-foundation.org>
-Message-ID: <20100128074101.GA13756@pengutronix.de>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 28 Jan 2010 08:05:26 +0000
+Subject: [PATCH] ARM: S3C64XX: SPI: Make platform device build selectable
+In-Reply-To: <1264663530-30027-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1264663530-30027-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <20100128080525.GT10014@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Jan 27, 2010 at 03:48:18PM -0800, Andrew Morton wrote:
-> On Mon, 25 Jan 2010 16:37:34 +0100
-> Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
+On Thu, Jan 28, 2010 at 04:25:30PM +0900, jassisinghbrar at gmail.com wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
 > 
-> > The probe function passes a pointer to a struct fb_info to
-> > platform_set_drvdata, so don't interpret the return value of
-> > platform_get_drvdata as a pointer to struct imxfb_info.
-> > 
-> > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > Acked-by: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  drivers/video/imxfb.c |    6 ++++--
-> >  1 files changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> > index 66358fa..b4b6dec 100644
-> > --- a/drivers/video/imxfb.c
-> > +++ b/drivers/video/imxfb.c
-> > @@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
-> >   */
-> >  static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
-> >  {
-> > -	struct imxfb_info *fbi = platform_get_drvdata(dev);
-> > +	struct fb_info *info = platform_get_drvdata(dev);
-> > +	struct imxfb_info *fbi = info->par;
-> >  
-> >  	pr_debug("%s\n", __func__);
-> >  
-> > @@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
-> >  
-> >  static int imxfb_resume(struct platform_device *dev)
-> >  {
-> > -	struct imxfb_info *fbi = platform_get_drvdata(dev);
-> > +	struct fb_info *info = platform_get_drvdata(dev);
-> > +	struct imxfb_info *fbi = info->par;
-> >  
-> >  	pr_debug("%s\n", __func__);
-> >  
+> The SPI controller platform devices should be compiled in independent of 
+> the driver support, otherwise we might end up with dev-spi built as kernel
+> module.
+> Change this to make every machine select if it has some SPI device and wants
+> to build in SPI platform device definitions.
 > 
-> What were the runtime effects of this bug?
-For me it was that in the original imxfb_info *fbi backlight_power was
-NULL but in imxfb_suspend it was 4 resulting in an oops as imxfb_suspend
-calls imxfb_disable_controller(fbi) which in turn has
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  arch/arm/plat-s3c64xx/Makefile |    2 +-
+>  arch/arm/plat-samsung/Kconfig  |    5 +++++
+>  2 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
+> index 80255a5..9838550 100644
+> --- a/arch/arm/plat-s3c64xx/Makefile
+> +++ b/arch/arm/plat-s3c64xx/Makefile
+> @@ -47,4 +47,4 @@ obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
+>  obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
+>  obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+>  obj-$(CONFIG_SND_S3C24XX_SOC) += dev-audio.o
+> -obj-$(CONFIG_SPI_S3C64XX) += dev-spi.o
+> +obj-$(CONFIG_S3C_DEV_SPI) += dev-spi.o
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 1c2fe91..2220187 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -132,6 +132,11 @@ config S3C_DEV_NAND
+>  	help
+>  	  Compile in platform device definition for NAND controller
+>  
+> +config S3C_DEV_SPI
 
-	if (fbi->backlight_power)
-		fbi->backlight_power(0);
+I'd prefer to see this as either S3C64XX_DEV_SPI or S3C_DEV_HSSPI to
+differentiate it from the older S3C24XX SPI blocks.
 
-.
-
-Best regards
-Uwe
+> +	bool
+> +	help
+> +	  Compile in platform device definition for SPI controller
+> +
+>  comment "Power management"
+>  
+>  config SAMSUNG_PM_DEBUG
+> -- 
+> 1.6.2.5
+> 
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
