@@ -1,24 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 28 Jan 2010 21:30:53 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.33-rc4
-Message-ID: <f17812d71001280530x1186b7k4b94b3cbedde53ba@mail.gmail.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 28 Jan 2010 14:52:05 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v4)
+In-Reply-To: <1264685461.7064.65.camel@pc1117.cambridge.arm.com>
+References: <20100114130700.27721.63614.stgit@e101986-lin>
+	<1264685461.7064.65.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100128145205.GB24679@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7284ce6c9f6153d1777df5f310c959724d1bd446:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc4
+Catalin Marinas wrote:
+> On Thu, 2010-01-14 at 13:07 +0000, Leif Lindholm wrote:
+> > The SWP instruction was deprecated in the ARMv6 architecture, superseded
+> > by the LDREX/STREX family of instructions for
+> > load-linked/store-conditional operations. The ARMv7 multiprocessing
+> > extensions mandate that SWP/SWPB instructions are treated as undefined
+> > from reset, with the ability to enable them through the System Control
+> > Register SW bit.
+> > 
+> > This patch adds the alternative solution to emulate the SWP and SWPB
+> > instructions using LDREX/STREX sequences, and log statistics to
+> > /proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
+> > modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
+> > user RO.
+> 
+> Just a thought - could we not add another kuser helper in the vectors
+> page that does this? Your exception trapping code would set regs->ARM_lr
+> to the next instruction following SWP and regs->ARM_pc to the helper. 
 
-are available in the git repository at:
+That would corrupt LR seen by userspace, wouldn't it?
+Userspace assumes SWP/SWPB do not change LR.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
-
-Eric Miao (3):
-      [ARM] pxa/corgi: fix incorrect default GPIO for UDC Vbus
-      [ARM] pxa: fix the incorrect naming of AC97 reset pin config for pxa26x
-      [ARM] pxa: fix irq suspend/resume for pxa25x
-
- arch/arm/mach-pxa/corgi.c                   |    1 +
- arch/arm/mach-pxa/include/mach/mfp-pxa25x.h |    6 ++++--
- arch/arm/mach-pxa/irq.c                     |   14 ++++++++++----
- 3 files changed, 15 insertions(+), 6 deletions(-)
+-- Jamie
