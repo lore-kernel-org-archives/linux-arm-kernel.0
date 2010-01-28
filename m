@@ -1,83 +1,62 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 28 Jan 2010 14:59:30 -0800
-Subject: [RFC PATCH 05/12] arm: mm: retry on QSD icache parity errors
-Message-ID: <1264719577-5436-6-git-send-email-dwalker@codeaurora.org>
+Date: Thu, 28 Jan 2010 14:59:32 -0800
+Subject: [RFC PATCH 07/12] arm: mm: support error reporting in L1/L2 caches on
+	QSD
+Message-ID: <1264719577-5436-8-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Muckle <smuckle@quicinc.com>
 
-Parity errors in the icache on QSD can be worked around either by
-retrying the access, or invalidating the icache. The whole icache
-must be invalidated since the data abort is imprecise (the faulting
-address is not known).
+The Scorpion processor supports reporting L2 errors, L1 icache parity
+errors, and L1 dcache parity errors as imprecise external aborts. If
+this option is not enabled these errors will go unreported and data
+corruption will occur.
 
 Signed-off-by: Steve Muckle <smuckle@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mm/fault.c |   36 +++++++++++++++++++++++++++++++++++-
- 1 files changed, 35 insertions(+), 1 deletions(-)
+ arch/arm/mm/Kconfig   |    8 ++++++++
+ arch/arm/mm/proc-v7.S |    8 ++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 10e0680..bea3e75 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -2,6 +2,7 @@
-  *  linux/arch/arm/mm/fault.c
-  *
-  *  Copyright (C) 1995  Linus Torvalds
-+ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-  *  Modifications for ARM processor (c) 1995-2004 Russell King
-  *
-  * This program is free software; you can redistribute it and/or modify
-@@ -442,6 +443,39 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	return 1;
- }
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index baf6384..8ae3fce 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -687,6 +687,14 @@ config CPU_DCACHE_SIZE
+ 	  If your SoC is configured to have a different size, define the value
+ 	  here with proper conditions.
  
-+static int
-+do_imprecise_ext(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-+{
-+#ifdef CONFIG_ARCH_MSM_SCORPION
-+	unsigned int regval;
-+	static unsigned char flush_toggle;
++config CPU_CACHE_ERR_REPORT
++	bool "Report errors in the L1 and L2 caches"
++	depends on ARCH_MSM_SCORPION
++	default y
++	help
++	  Say Y here to have errors in the L1 and L2 caches reported as
++	  imprecise data aborts.
 +
-+	asm("mrc p15, 0, %0, c5, c1, 0\n" /* read adfsr for fault status */
-+	    : "=r" (regval));
-+	if (regval == 0x2) {
-+		/* Fault was caused by icache parity error. Alternate
-+		 * simply retrying the access and flushing the icache. */
-+		flush_toggle ^= 1;
-+		if (flush_toggle)
-+			asm("mcr p15, 0, %0, c7, c5, 0\n"
-+			    :
-+			    : "r" (regval)); /* input value is ignored */
-+		/* Clear fault in EFSR. */
-+		asm("mcr p15, 7, %0, c15, c0, 1\n"
-+		    :
-+		    : "r" (regval));
-+		/* Clear fault in ADFSR. */
-+		regval = 0;
-+		asm("mcr p15, 0, %0, c5, c1, 0\n"
-+		    :
-+		    : "r" (regval));
-+		return 0;
-+	}
+ config CPU_DCACHE_WRITETHROUGH
+ 	bool "Force write through D-cache"
+ 	depends on (CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3ca5d29..299c8cb 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -246,6 +246,14 @@ __v7_setup:
+ #ifdef CONFIG_ARCH_MSM_SCORPION
+ 	mov     r0, #0x77
+ 	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
++
++	mrc     p15, 0, r0, c1, c0, 1           @ read ACTLR
++#ifdef CONFIG_CPU_CACHE_ERR_REPORT
++	orr     r0, r0, #0x37                   @ turn on L1/L2 error reporting
++#else
++	bic     r0, r0, #0x37
 +#endif
-+
-+	return 1;
-+}
-+
- static struct fsr_info {
- 	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
- 	int	sig;
-@@ -479,7 +513,7 @@ static struct fsr_info {
- 	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
- 	{ do_bad,		SIGBUS,  0,		"lock abort"			   }, /* xscale */
- 	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
--	{ do_bad,		SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
-+	{ do_imprecise_ext,	SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
- 	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
- 	{ do_bad,		SIGBUS,  0,		"dcache parity error"		   }, /* xscale */
- 	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
++	mcr     p15, 0, r0, c1, c0, 1           @ write ACTLR
+ #endif
+ 	/*
+ 	 * Memory region attributes with SCTLR.TRE=1
 -- 
 1.6.3.3
