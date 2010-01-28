@@ -1,47 +1,32 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2010 13:19:07 +0000
-Subject: [PATCH 1/5] gic: prevent gic from crossing NR_IRQ
-In-Reply-To: <20100127224309.GD29665@n2100.arm.linux.org.uk>
-References: <20100127224309.GD29665@n2100.arm.linux.org.uk>
-Message-ID: <1264684747.7064.61.camel@pc1117.cambridge.arm.com>
+Date: Thu, 28 Jan 2010 13:31:01 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v4)
+In-Reply-To: <20100114130700.27721.63614.stgit@e101986-lin>
+References: <20100114130700.27721.63614.stgit@e101986-lin>
+Message-ID: <1264685461.7064.65.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-01-27 at 22:43 +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 27, 2010 at 11:32:25AM -0800, adharmap at codeaurora.org wrote:
-> > From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
-> >
-> > The gic code tries to initialize interrupts beyond NR_IRQ. Prevent
-> > code from doing that.
+On Thu, 2010-01-14 at 13:07 +0000, Leif Lindholm wrote:
+> The SWP instruction was deprecated in the ARMv6 architecture, superseded
+> by the LDREX/STREX family of instructions for
+> load-linked/store-conditional operations. The ARMv7 multiprocessing
+> extensions mandate that SWP/SWPB instructions are treated as undefined
+> from reset, with the ability to enable them through the System Control
+> Register SW bit.
 > 
-> NAK.  This is completely the wrong approach.
-> 
->         /*
->          * Find out how many interrupts are supported.
->          */
->         max_irq = readl(base + GIC_DIST_CTR) & 0x1f;
->         max_irq = (max_irq + 1) * 32;
-> 
->         /*
->          * The GIC only supports up to 1020 interrupt sources.
->          * Limit this to either the architected maximum, or the
->          * platform maximum.
->          */
->         if (max_irq > max(1020, NR_IRQS))
->                 max_irq = max(1020, NR_IRQS);
-> ...
->         for (i = irq_start; i < gic_data[gic_nr].irq_offset + max_irq; i++) {
-> 
-> This function is broken if irq_start != 0, and needs fixing - max_irq
-> needs to be limited to the _minimum_ of 1020 or NR_IRQS - irq_start.
+> This patch adds the alternative solution to emulate the SWP and SWPB
+> instructions using LDREX/STREX sequences, and log statistics to
+> /proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
+> modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
+> user RO.
 
-Actually I think in this case max_irq should be left to whatever the
-hardware reads (but not more than 1020) since further down in this
-function we configure the IRQs for the GIC and we also want to disable
-those beyond NR_IRQS.
+Just a thought - could we not add another kuser helper in the vectors
+page that does this? Your exception trapping code would set regs->ARM_lr
+to the next instruction following SWP and regs->ARM_pc to the helper. 
 
-The "for" loop for set_irq_chip() should go to the minimum of max_irqs
-and NR_IRQS.
+This way you don't have to worry about handling another exception from
+inside the kernel or modifying set_pte_ext.
 
 -- 
 Catalin
