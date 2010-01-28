@@ -1,31 +1,30 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 28 Jan 2010 14:31:49 +0900
-Subject: [PATCHv2 06/10] ARM: SMDK64XX: Enable AC97 device
-In-Reply-To: <1b68c6791001272008k7341d360oeb0e84b181e74b0c@mail.gmail.com>
-References: <1264571969-15145-1-git-send-email-jassisinghbrar@gmail.com>
-	<20100128034152.GA14154@trinity.fluff.org>
-	<1b68c6791001272008k7341d360oeb0e84b181e74b0c@mail.gmail.com>
-Message-ID: <1b68c6791001272131u388f1980l48a1a587070f0189@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 28 Jan 2010 07:11:22 +0100
+Subject: spitz (arm pda): time no longer ok after resume
+In-Reply-To: <20100127180010.GA22660@n2100.arm.linux.org.uk>
+References: <20100127171308.GA24875@ucw.cz>
+	<20100127180010.GA22660@n2100.arm.linux.org.uk>
+Message-ID: <20100128061121.GA15937@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 1:08 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
-> On Thu, Jan 28, 2010 at 12:41 PM, Ben Dooks <ben@trinity.fluff.org> wrote:
->> On Wed, Jan 27, 2010 at 02:59:29PM +0900, jassisinghbrar at gmail.com wrote:
->>> From: Jassi Brar <jassi.brar@samsung.com>
->>>
->>> Add AC97 controller to platform devices and initialize the AC97 gpios.
->>
->> I'd much rather see platform devices always added unless there is a really
->> good reason not to. People can build things as modules and this means you
->> end up having to rebuild the core kernel as well as the module if you want
->> to change.
-> Yes, sounds good to me. I will revise this patch accordingly.
-> Thanks
+On Wed 2010-01-27 18:00:10, Russell King - ARM Linux wrote:
+> On Wed, Jan 27, 2010 at 06:13:08PM +0100, Pavel Machek wrote:
+> > It seems that spitz has problems with time after resume; time while it
+> > was sleeping is not accounted. This seems to be regression in
+> > 2.6.33-rc5.
+> 
+> No rtc configured/loaded?
 
-s3c64xx_device_ac97 device is exported from dev-audio.c
-which is compiled only if CONFIG_SND_S3C24XX_SOC is defined.
-So, If we unconditionally add the platform device, it will give error in case
-the user didn't select Samsung ASoC option.
-So, I guess i should make it conditional on CONFIG_SND_S3C24XX_SOC
-rather than CONFIG_SND_SOC_SMDK_WM9713
+I did make oldconfig and it worked before... strange.
+
+.config:
+CONFIG_RTC_LIB=y
+# CONFIG_RTC_CLASS is not set
+
+It looks you are right, pxa-rtc.o was not there. Sorry.
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
