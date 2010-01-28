@@ -1,36 +1,48 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 28 Jan 2010 00:26:07 +0000
-Subject: [PATCH 2/2] ARM: S5PC1XX: Add ARM_L1_CACHE_SHIFT_6 in ARCH_S5PC1XX
-In-Reply-To: <1264637609-15001-1-git-send-email-kgene.kim@samsung.com>
-References: <1264637609-15001-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100128002607.GN10014@trinity.fluff.org>
+Date: Thu, 28 Jan 2010 00:39:14 +0000
+Subject: [PATCH 0/5] Arm Gic Changes
+In-Reply-To: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
+References: <1264620749-24527-1-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20100128003914.GM9153@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 09:13:29AM +0900, Kukjin Kim wrote:
-> This patch add ARM_L1_CACHE_SHIFT_6 in ARCH_S5PC1XX.
+On Wed, Jan 27, 2010 at 11:32:24AM -0800, adharmap at codeaurora.org wrote:
+> From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/Kconfig    |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> Few fixes and improvements to arch/arm/common/gic.c file.
+
+both ARM and GIC in the title should be all in capitals, they are
+abbreviations of something longer.
+
+I think it would be nicer to make GIC in all the patch titles all capital
+instead of all lower case.
+ 
+> Abhijeet Dharmapurikar (5):
+>   gic: prevent gic from crossing NR_IRQ
+>   gic: add callback for mask_ack
+>   gic: Add set_type callback
+>   gic: dont disable INT in ack callback
+>   gic: initialize interrupts as per argument
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c7e98ed..4e7d72e 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -651,6 +651,7 @@ config ARCH_S5PC1XX
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select CPU_V7
-> +	select ARM_L1_CACHE_SHIFT_6
->  	help
->  	  Samsung S5PC1XX series based systems
+>  arch/arm/common/gic.c                    |  114 ++++++++++++++++++++++++-----
+>  arch/arm/include/asm/hardware/gic.h      |    3 +-
+>  arch/arm/mach-omap2/board-4430sdp.c      |    3 +-
+>  arch/arm/mach-realview/realview_eb.c     |   10 ++-
+>  arch/arm/mach-realview/realview_pb1176.c |    7 ++-
+>  arch/arm/mach-realview/realview_pb11mp.c |    7 ++-
+>  arch/arm/mach-realview/realview_pba8.c   |    4 +-
+>  arch/arm/mach-realview/realview_pbx.c    |    5 +-
+>  arch/arm/mach-ux500/cpu-u8500.c          |    2 +-
+>  9 files changed, 122 insertions(+), 33 deletions(-)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-You'll need to merge this with the previous patch, otherwise you have
-a functionaltiy breakage in between that patch and this. Kconfig will
-override the .config and thus re-write the cache-shift configuration
-
+-- 
 -- 
 Ben
 
