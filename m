@@ -1,26 +1,25 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 28 Jan 2010 17:13:01 +0900
-Subject: [PATCH] ARM: S3C64XX: SPI: Make platform device build selectable
-In-Reply-To: <20100128080525.GT10014@trinity.fluff.org>
-References: <1264663530-30027-1-git-send-email-jassisinghbrar@gmail.com>
-	<20100128080525.GT10014@trinity.fluff.org>
-Message-ID: <1b68c6791001280013t2688b6b4pe22f97ed9144bee9@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 28 Jan 2010 00:19:57 -0800
+Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
+In-Reply-To: <20100128074101.GA13756@pengutronix.de>
+References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100127154818.de91e255.akpm@linux-foundation.org>
+	<20100128074101.GA13756@pengutronix.de>
+Message-ID: <20100128001957.408936b2.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 5:05 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Thu, Jan 28, 2010 at 04:25:30PM +0900, jassisinghbrar at gmail.com wrote:
->> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
->> index 1c2fe91..2220187 100644
->> --- a/arch/arm/plat-samsung/Kconfig
->> +++ b/arch/arm/plat-samsung/Kconfig
->> @@ -132,6 +132,11 @@ config S3C_DEV_NAND
->> ? ? ? help
->> ? ? ? ? Compile in platform device definition for NAND controller
->>
->> +config S3C_DEV_SPI
->
-> I'd prefer to see this as either S3C64XX_DEV_SPI or S3C_DEV_HSSPI to
-> differentiate it from the older S3C24XX SPI blocks.
-I prefer S3C64XX_DEV_SPI.
-will resend. thanks.
+On Thu, 28 Jan 2010 08:41:01 +0100 Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+
+> > What were the runtime effects of this bug?
+> For me it was that in the original imxfb_info *fbi backlight_power was
+> NULL but in imxfb_suspend it was 4 resulting in an oops as imxfb_suspend
+> calls imxfb_disable_controller(fbi) which in turn has
+> 
+> 	if (fbi->backlight_power)
+> 		fbi->backlight_power(0);
+
+OK, thanks, that was important info.
+
+I rescheduled the patch for 2.6.33 and marked it for 2.6.32.x backporting.
