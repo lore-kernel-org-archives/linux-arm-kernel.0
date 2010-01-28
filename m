@@ -1,119 +1,88 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 28 Jan 2010 14:59:29 -0800
-Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and resume
-	functions
-Message-ID: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+Date: Thu, 28 Jan 2010 14:59:37 -0800
+Subject: [RFC PATCH 12/12] arm: mm: qsd8x50: Fix incorrect permission faults
+Message-ID: <1264719577-5436-13-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Willie Ruan <wruan@quicinc.com>
+From: Dave Estes <cestes@quicinc.com>
 
-The application processor in Qualcomm's MSM chips can be powered off
-(also called power collapse) during suspend and idle time. L2 cache power
-will be collapsed too on current chips. To handle this scenario, we need
-to add a function (l2x0_suspend here) to flush L2 cache before the power
-loss and another function (l2x0_resume) to restore the cache settings
-after the power is restored.
+Handle incorrectly reported permission faults for qsd8650.  On
+permission faults, retry MVA to PA conversion.  If retry detects
+translation fault.  Report as translation fault.
 
-To minimize performance impact these two functions should be called as
-close as possible to the point where power is collapsed and restored.
-Since it is possible that the power could not be turned off, e.g. due to
-a pending interrupt, the parameter 'collapsed' should be used for the
-l2x0_resume function to indicate the actual power collapse state.
-
-Signed-off-by: Willie Ruan <wruan@quicinc.com>
+Cc: Jamie Lokier <jamie@shareable.org>
+Signed-off-by: Dave Estes <cestes@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
- arch/arm/mm/cache-l2x0.c                   |   46 ++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig     |    2 ++
+ arch/arm/mm/abort-ev7.S |   38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index cdb9022..a86b948 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -55,4 +55,7 @@
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
- #endif
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 155c7a3..0288749 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -572,6 +572,8 @@ config CPU_TLB_V6
+ config CPU_TLB_V7
+ 	bool
  
-+extern void l2x0_suspend(void);
-+extern void l2x0_resume(int collapsed);
-+
- #endif
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index cb8fc65..c746878 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -2,6 +2,7 @@
-  * arch/arm/mm/cache-l2x0.c - L210/L220 cache controller support
-  *
-  * Copyright (C) 2007 ARM Limited
-+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -26,6 +27,7 @@
- #define CACHE_LINE_SIZE		32
++config VERIFY_PERMISSION_FAULT
++	bool
+ endif
  
- static void __iomem *l2x0_base;
-+static uint32_t aux_ctrl_save;
- static DEFINE_SPINLOCK(l2x0_lock);
- 
- static inline void cache_wait(void __iomem *reg, unsigned long mask)
-@@ -54,6 +56,13 @@ static inline void l2x0_inv_all(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static inline void l2x0_flush_all(void)
-+{
-+	/* clean and invalidate all ways */
-+	sync_writel(0xff, L2X0_CLEAN_INV_WAY, 0xff);
-+	cache_sync();
-+}
-+
- static void l2x0_inv_range(unsigned long start, unsigned long end)
- {
- 	void __iomem *base = l2x0_base;
-@@ -176,3 +185,40 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
- 
- 	printk(KERN_INFO "L2X0 cache controller enabled\n");
- }
-+
-+/*
-+ * l2x0_suspend - Suspend L2 cache
+ config CPU_HAS_ASID
+diff --git a/arch/arm/mm/abort-ev7.S b/arch/arm/mm/abort-ev7.S
+index 2e6dc04..0151c03 100644
+--- a/arch/arm/mm/abort-ev7.S
++++ b/arch/arm/mm/abort-ev7.S
+@@ -1,3 +1,20 @@
++/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 + *
-+ * Call this function when L2 cache power will be collapsed (power-off):
-+ * 	1) during suspend;
-+ *	2) during idle.
-+ */
-+void l2x0_suspend(void)
-+{
-+	/* Save aux control register value */
-+	aux_ctrl_save = readl(l2x0_base + L2X0_AUX_CTRL);
-+	/* Flush all cache */
-+	l2x0_flush_all();
-+	/* Disable the cache */
-+	writel(0, l2x0_base + L2X0_CTRL);
-+}
-+
-+/*
-+ * l2x0_resume - Resume L2 cache
-+ * @collapsed:  1 -- power was collapsed
-+ *              0 -- power was not collapsed
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
 + *
-+ * Call this function with the 'collapsed' paramater to tell
-+ * whether the power was really collapsed. Cache is still valid
-+ * if there was no power loss, thus performance is maintained
-+ * because of no need to invalidate the cache.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
 + */
-+void l2x0_resume(int collapsed)
-+{
-+	if (collapsed)
-+		/* Restore aux control register value */
-+		writel(aux_ctrl_save, l2x0_base + L2X0_AUX_CTRL);
 +
-+	/* Enable the cache */
-+	writel(1, l2x0_base + L2X0_CTRL);
-+}
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ /*
+@@ -29,5 +46,26 @@ ENTRY(v7_early_abort)
+ 	 * V6 code adjusts the returned DFSR.
+ 	 * New designs should not need to patch up faults.
+ 	 */
++
++#if defined(CONFIG_VERIFY_PERMISSION_FAULT)
++	/*
++	 * Detect erroneous permission failures and fix
++	 */
++	ldr	r3, =0x40d			@ On permission fault
++	and	r3, r1, r3
++	cmp	r3, #0x0d
++	movne	pc, lr
++
++	mcr	p15, 0, r0, c7, c8, 0   	@ Retranslate FAR
++	isb
++	mrc	p15, 0, r2, c7, c4, 0   	@ Read the PAR
++	and	r3, r2, #0x7b   		@ On translation fault
++	cmp	r3, #0x0b
++	movne	pc, lr
++	bic	r1, r1, #0xf			@ Fix up FSR FS[5:0]
++	and	r2, r2, #0x7e
++	orr	r1, r1, r2, LSR #1
++#endif
++
+ 	mov	pc, lr
+ ENDPROC(v7_early_abort)
 -- 
 1.6.3.3
