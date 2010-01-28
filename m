@@ -1,317 +1,37 @@
-From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Thu, 28 Jan 2010 10:34:23 +0100
-Subject: [PATCH/RFC v2 3/3] perf: Extended events (platform-specific) support
-	in perf
-In-Reply-To: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
-References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
-Message-ID: <1264671263-21412-4-git-send-email-t.fujak@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jan 2010 10:18:09 +0000
+Subject: [PATCH] ARM: Correct the FPSCR bits setting when raising exceptions
+Message-ID: <20100128101809.7752.76832.stgit@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tomasz Fujak <t.fujak@samsung.com>
-Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+Commit c98929c07a removed the clearing of the FPSCR[31:28] bits from the
+vfp_raise_exceptions() function and the new bits are or'ed with the old
+FPSCR bits leading to unexpected results (the original commit was
+referring to the cumulative bits - FPSCR[4:0]).
 
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Tom Hameenanttila <tmhameen@marvell.com>
 ---
- tools/perf/util/parse-events.c |  217 ++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 206 insertions(+), 11 deletions(-)
+ arch/arm/vfp/vfpmodule.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index e5bc0fb..37a9b25 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -9,6 +9,9 @@
- #include "header.h"
- #include "debugfs.h"
- 
-+#define			PLATFORM_EVENT_FILE_NAME\
-+				"perf_events_platform"
-+
- int				nr_counters;
- 
- struct perf_event_attr		attrs[MAX_COUNTERS];
-@@ -60,6 +63,10 @@ static struct event_symbol event_symbols[] = {
- #define PERF_EVENT_TYPE(config)	__PERF_EVENT_FIELD(config, TYPE)
- #define PERF_EVENT_ID(config)		__PERF_EVENT_FIELD(config, EVENT)
- 
-+static struct event_symbol	*platform_event_symbols;
-+static unsigned int		platform_event_count;
-+static int			platform_events_initialized;
-+
- static const char *hw_event_names[] = {
- 	"cycles",
- 	"instructions",
-@@ -241,6 +248,150 @@ static const char *tracepoint_id_to_name(u64 config)
- 	return buf;
- }
- 
-+/* o for valid line, 1 for invalid */
-+/* each line format should be "0x%llx\t%s\t%lld-%lld\t%s\n" */
-+static int parse_platevent_line(char *line, struct event_symbol *symbol)
-+{
-+	char *name = NULL;
-+	char *description, *ptr, *end;
-+	int eaten;
-+	unsigned long long discard;
-+
-+	if (1 !=  sscanf(line + 2, "%llx", &symbol->config))
-+		return 1;
-+
-+	/* skip 0x%llx\t */
-+	ptr = strchr(line + 2, '\t') + 1;
-+	if (!ptr)
-+		return 1;
-+
-+	end = strchr(ptr, '\t');
-+	if (!end)
-+		return 1;
-+
-+	name = strndup(ptr, end - ptr);
-+	ptr = end + 1;
-+
-+	if (2 != sscanf(ptr, "%lld-%lld\t%n", &discard, &discard, &eaten)) {
-+		free(name);
-+		return 1;
-+	}
-+
-+
-+	description = strdup(ptr + eaten);
-+	description[strlen(description) - 1] = 0;
-+
-+	if (name && description) {
-+		symbol->symbol = name;
-+		symbol->alias = "";
-+		/* description gets lost here */
-+	} else
-+		free(name);
-+	free(description);
-+
-+	return 0;
-+}
-+
-+#define LINE_SIZE_MAX 256
-+/* 0 - event ok, < 0 - unrecoverable error, > 0 - eof */
-+static int extract_platevent_item(FILE *file, struct event_symbol *symbol)
-+{
-+	int result = -1;
-+
-+	do {
-+		char line[LINE_SIZE_MAX];
-+
-+		if (!fgets(line, LINE_SIZE_MAX, file)) {
-+			if (feof(file))
-+				return 1;
-+			 if (ferror(file))
-+				return -1;
-+			continue;
-+		}
-+		result = parse_platevent_line(line, symbol);
-+	} while (0 < result);
-+
-+	return result;
-+}
-+
-+#define PATH_LEN_MAX 256
-+static int load_platform_events(const char *platevent_entry)
-+{
-+	FILE *file;
-+	int count = 0;
-+	int capacity = 16;
-+	int result;
-+	char platevent_file_path[PATH_LEN_MAX];
-+
-+	struct event_symbol *symbols = NULL;
-+
-+	/* if the path is of excessive length, skip it */
-+	if (debugfs_make_path(platevent_entry, platevent_file_path,
-+		ARRAY_SIZE(platevent_file_path)))
-+		return -1;
-+
-+	file = fopen(platevent_file_path, "r");
-+	if (!file) {
-+		fprintf(stderr, "can't open platform event file '%s'\n",
-+			platevent_file_path);
-+		return -1;
-+	}
-+
-+	symbols = (struct event_symbol *)
-+				calloc(sizeof(struct event_symbol), capacity);
-+	if (!symbols) {
-+		fclose(file);
-+		return -1;
-+	}
-+
-+	do {
-+		result = extract_platevent_item(file, &symbols[count]);
-+		if (!result)
-+			++count;
-+
-+		if (capacity == count) {
-+			struct event_symbol *tmp =
-+				(struct event_symbol *)realloc(symbols,
-+				sizeof(struct event_symbol) *
-+				(capacity <<= 1));
-+
-+			if (!tmp) {
-+				result = -1;
-+				break;
-+			}
-+			symbols = tmp;
-+		}
-+	} while (!result);
-+	/* <0 - error */
-+
-+	fclose(file);
-+
-+	if ((result < 0) || (0 == count)) {
-+		/* ditching the collection for there was a parse error */
-+		free(symbols);
-+		count = 0;
-+	} else {
-+		/* trim the collection storage */
-+		if (count != capacity)
-+			platform_event_symbols = realloc(symbols,
-+				sizeof(struct event_symbol) * count);
-+		else
-+			platform_event_symbols = symbols;
-+		platform_event_count = count;
-+	}
-+	return count;
-+}
-+
-+static struct event_symbol *platevent_find_config(u64 config)
-+{
-+	unsigned int i;
-+	for (i = 0; i < platform_event_count; ++i)
-+		if (platform_event_symbols[i].config == config)
-+			return &platform_event_symbols[i];
-+
-+	return NULL;
-+}
-+
- static int is_cache_op_valid(u8 cache_type, u8 cache_op)
- {
- 	if (hw_cache_stat[cache_type] & COP(cache_op))
-@@ -283,10 +434,16 @@ const char *__event_name(int type, u64 config)
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index f60a540..a63c4be 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -197,10 +197,13 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
  	}
  
- 	switch (type) {
--	case PERF_TYPE_HARDWARE:
-+	case PERF_TYPE_HARDWARE: {
-+		const struct event_symbol *event;
+ 	/*
+-	 * Update the FPSCR with the additional exception flags.
++	 * If any of the status flags are set, update the FPSCR.
+ 	 * Comparison instructions always return at least one of
+ 	 * these flags set.
+ 	 */
++	if (exceptions & (FPSCR_N|FPSCR_Z|FPSCR_C|FPSCR_V))
++		fpscr &= ~(FPSCR_N|FPSCR_Z|FPSCR_C|FPSCR_V);
 +
- 		if (config < PERF_COUNT_HW_MAX)
- 			return hw_event_names[config];
-+		event = platevent_find_config(config);
-+		if (event)
-+			return event->symbol;
- 		return "unknown-hardware";
-+	}
+ 	fpscr |= exceptions;
  
- 	case PERF_TYPE_HW_CACHE: {
- 		u8 cache_type, cache_op, cache_result;
-@@ -606,33 +763,34 @@ parse_breakpoint_event(const char **strp, struct perf_event_attr *attr)
- 	return EVT_HANDLED;
- }
- 
--static int check_events(const char *str, unsigned int i)
-+static int check_event(const char *str, const struct event_symbol *event)
- {
- 	int n;
- 
--	n = strlen(event_symbols[i].symbol);
--	if (!strncmp(str, event_symbols[i].symbol, n))
-+	n = strlen(event->symbol);
-+	if (!strncmp(str, event->symbol, n))
- 		return n;
- 
--	n = strlen(event_symbols[i].alias);
-+	n = strlen(event->alias);
- 	if (n)
--		if (!strncmp(str, event_symbols[i].alias, n))
-+		if (!strncmp(str, event->alias, n))
- 			return n;
- 	return 0;
- }
- 
- static enum event_result
--parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
-+do_parse_symbolic_event(const char **strp, struct perf_event_attr *attr,
-+			const struct event_symbol *symbols, unsigned int count)
- {
- 	const char *str = *strp;
- 	unsigned int i;
- 	int n;
- 
--	for (i = 0; i < ARRAY_SIZE(event_symbols); i++) {
--		n = check_events(str, i);
-+	for (i = 0; i < count; ++i) {
-+		n = check_event(str, &symbols[i]);
- 		if (n > 0) {
--			attr->type = event_symbols[i].type;
--			attr->config = event_symbols[i].config;
-+			attr->type = symbols[i].type;
-+			attr->config = symbols[i].config;
- 			*strp = str + n;
- 			return EVT_HANDLED;
- 		}
-@@ -641,6 +799,27 @@ parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
- }
- 
- static enum event_result
-+parse_symbolic_event(const char **strp, struct perf_event_attr *attr)
-+{
-+	return do_parse_symbolic_event(strp, attr,
-+			event_symbols, ARRAY_SIZE(event_symbols));
-+}
-+
-+static enum event_result
-+parse_platform_event(const char **strp, struct perf_event_attr *attr)
-+{
-+	if (!platform_events_initialized)
-+		platform_events_initialized =
-+			load_platform_events(PLATFORM_EVENT_FILE_NAME);
-+
-+	if (platform_events_initialized < 0)
-+		return EVT_FAILED;
-+
-+	return do_parse_symbolic_event(strp, attr, platform_event_symbols,
-+				platform_event_count);
-+}
-+
-+static enum event_result
- parse_raw_event(const char **strp, struct perf_event_attr *attr)
- {
- 	const char *str = *strp;
-@@ -739,6 +918,10 @@ parse_event_symbols(const char **str, struct perf_event_attr *attr)
- 	if (ret != EVT_FAILED)
- 		goto modifier;
- 
-+	ret = parse_platform_event(str, attr);
-+	if (ret != EVT_FAILED)
-+		goto modifier;
-+
- 	ret = parse_breakpoint_event(str, attr);
- 	if (ret != EVT_FAILED)
- 		goto modifier;
-@@ -924,6 +1107,18 @@ void print_events(void)
- 		}
- 	}
- 
-+    if (!platform_events_initialized)
-+		platform_events_initialized =
-+			load_platform_events(PLATFORM_EVENT_FILE_NAME);
-+
-+    if (0 < platform_events_initialized) {
-+		for (i = 0; i < platform_event_count; ++i)
-+			printf("  %-42s [%s]\n",
-+				platform_event_symbols[i].symbol,
-+				"Hardware platform-specific event");
-+	}
-+
-+
- 	printf("\n");
- 	printf("  %-42s [raw hardware event descriptor]\n",
- 		"rNNN");
--- 
-1.5.4.3
+ 	fmxr(FPSCR, fpscr);
