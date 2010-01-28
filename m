@@ -1,88 +1,83 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 28 Jan 2010 14:59:37 -0800
-Subject: [RFC PATCH 12/12] arm: mm: qsd8x50: Fix incorrect permission faults
-Message-ID: <1264719577-5436-13-git-send-email-dwalker@codeaurora.org>
+Date: Thu, 28 Jan 2010 14:59:30 -0800
+Subject: [RFC PATCH 05/12] arm: mm: retry on QSD icache parity errors
+Message-ID: <1264719577-5436-6-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Estes <cestes@quicinc.com>
+From: Steve Muckle <smuckle@quicinc.com>
 
-Handle incorrectly reported permission faults for qsd8650.  On
-permission faults, retry MVA to PA conversion.  If retry detects
-translation fault.  Report as translation fault.
+Parity errors in the icache on QSD can be worked around either by
+retrying the access, or invalidating the icache. The whole icache
+must be invalidated since the data abort is imprecise (the faulting
+address is not known).
 
-Cc: Jamie Lokier <jamie@shareable.org>
-Signed-off-by: Dave Estes <cestes@quicinc.com>
+Signed-off-by: Steve Muckle <smuckle@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mm/Kconfig     |    2 ++
- arch/arm/mm/abort-ev7.S |   38 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+), 0 deletions(-)
+ arch/arm/mm/fault.c |   36 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 155c7a3..0288749 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -572,6 +572,8 @@ config CPU_TLB_V6
- config CPU_TLB_V7
- 	bool
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 10e0680..bea3e75 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -2,6 +2,7 @@
+  *  linux/arch/arm/mm/fault.c
+  *
+  *  Copyright (C) 1995  Linus Torvalds
++ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *  Modifications for ARM processor (c) 1995-2004 Russell King
+  *
+  * This program is free software; you can redistribute it and/or modify
+@@ -442,6 +443,39 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	return 1;
+ }
  
-+config VERIFY_PERMISSION_FAULT
-+	bool
- endif
- 
- config CPU_HAS_ASID
-diff --git a/arch/arm/mm/abort-ev7.S b/arch/arm/mm/abort-ev7.S
-index 2e6dc04..0151c03 100644
---- a/arch/arm/mm/abort-ev7.S
-+++ b/arch/arm/mm/abort-ev7.S
-@@ -1,3 +1,20 @@
-+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ */
++static int
++do_imprecise_ext(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
++{
++#ifdef CONFIG_ARCH_MSM_SCORPION
++	unsigned int regval;
++	static unsigned char flush_toggle;
 +
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- /*
-@@ -29,5 +46,26 @@ ENTRY(v7_early_abort)
- 	 * V6 code adjusts the returned DFSR.
- 	 * New designs should not need to patch up faults.
- 	 */
-+
-+#if defined(CONFIG_VERIFY_PERMISSION_FAULT)
-+	/*
-+	 * Detect erroneous permission failures and fix
-+	 */
-+	ldr	r3, =0x40d			@ On permission fault
-+	and	r3, r1, r3
-+	cmp	r3, #0x0d
-+	movne	pc, lr
-+
-+	mcr	p15, 0, r0, c7, c8, 0   	@ Retranslate FAR
-+	isb
-+	mrc	p15, 0, r2, c7, c4, 0   	@ Read the PAR
-+	and	r3, r2, #0x7b   		@ On translation fault
-+	cmp	r3, #0x0b
-+	movne	pc, lr
-+	bic	r1, r1, #0xf			@ Fix up FSR FS[5:0]
-+	and	r2, r2, #0x7e
-+	orr	r1, r1, r2, LSR #1
++	asm("mrc p15, 0, %0, c5, c1, 0\n" /* read adfsr for fault status */
++	    : "=r" (regval));
++	if (regval == 0x2) {
++		/* Fault was caused by icache parity error. Alternate
++		 * simply retrying the access and flushing the icache. */
++		flush_toggle ^= 1;
++		if (flush_toggle)
++			asm("mcr p15, 0, %0, c7, c5, 0\n"
++			    :
++			    : "r" (regval)); /* input value is ignored */
++		/* Clear fault in EFSR. */
++		asm("mcr p15, 7, %0, c15, c0, 1\n"
++		    :
++		    : "r" (regval));
++		/* Clear fault in ADFSR. */
++		regval = 0;
++		asm("mcr p15, 0, %0, c5, c1, 0\n"
++		    :
++		    : "r" (regval));
++		return 0;
++	}
 +#endif
 +
- 	mov	pc, lr
- ENDPROC(v7_early_abort)
++	return 1;
++}
++
+ static struct fsr_info {
+ 	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+ 	int	sig;
+@@ -479,7 +513,7 @@ static struct fsr_info {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
+ 	{ do_bad,		SIGBUS,  0,		"lock abort"			   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
+-	{ do_bad,		SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
++	{ do_imprecise_ext,	SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
+ 	{ do_bad,		SIGBUS,  0,		"dcache parity error"		   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
 -- 
 1.6.3.3
