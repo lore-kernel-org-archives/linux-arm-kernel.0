@@ -1,62 +1,56 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 28 Jan 2010 14:59:32 -0800
-Subject: [RFC PATCH 07/12] arm: mm: support error reporting in L1/L2 caches on
-	QSD
-Message-ID: <1264719577-5436-8-git-send-email-dwalker@codeaurora.org>
+Date: Thu, 28 Jan 2010 14:59:31 -0800
+Subject: [RFC PATCH 06/12] arm: msm: set L2CR1 to enable prefetch and burst on
+	Scorpion.
+Message-ID: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@quicinc.com>
+From: Larry Bassel <lbassel@quicinc.com>
 
-The Scorpion processor supports reporting L2 errors, L1 icache parity
-errors, and L1 dcache parity errors as imprecise external aborts. If
-this option is not enabled these errors will go unreported and data
-corruption will occur.
+This change improves the following LMBench benchmarks
+by over 15%:
 
-Signed-off-by: Steve Muckle <smuckle@quicinc.com>
+System Call Latency
+Signal Handling Latency
+Fault Latency
+Inter-process Communication Latency
+Inter-process Communication Bandwidth
+Random Number Generation Latency
+
+Acked-by: Steve Muckle <smuckle@quicinc.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Shilimkar, Santosh <santosh.shilimkar@ti.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Bohan, Michael <mbohan@quicinc.com>
+Signed-off-by: Larry Bassel <lbassel@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mm/Kconfig   |    8 ++++++++
- arch/arm/mm/proc-v7.S |    8 ++++++++
- 2 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/mm/proc-v7.S |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index baf6384..8ae3fce 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -687,6 +687,14 @@ config CPU_DCACHE_SIZE
- 	  If your SoC is configured to have a different size, define the value
- 	  here with proper conditions.
- 
-+config CPU_CACHE_ERR_REPORT
-+	bool "Report errors in the L1 and L2 caches"
-+	depends on ARCH_MSM_SCORPION
-+	default y
-+	help
-+	  Say Y here to have errors in the L1 and L2 caches reported as
-+	  imprecise data aborts.
-+
- config CPU_DCACHE_WRITETHROUGH
- 	bool "Force write through D-cache"
- 	depends on (CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE
 diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3ca5d29..299c8cb 100644
+index 7aaf88a..3ca5d29 100644
 --- a/arch/arm/mm/proc-v7.S
 +++ b/arch/arm/mm/proc-v7.S
-@@ -246,6 +246,14 @@ __v7_setup:
- #ifdef CONFIG_ARCH_MSM_SCORPION
- 	mov     r0, #0x77
- 	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
-+
-+	mrc     p15, 0, r0, c1, c0, 1           @ read ACTLR
-+#ifdef CONFIG_CPU_CACHE_ERR_REPORT
-+	orr     r0, r0, #0x37                   @ turn on L1/L2 error reporting
-+#else
-+	bic     r0, r0, #0x37
+@@ -2,6 +2,7 @@
+  *  linux/arch/arm/mm/proc-v7.S
+  *
+  *  Copyright (C) 2001 Deep Blue Solutions Ltd.
++ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -242,6 +243,10 @@ __v7_setup:
+ 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
+ 	mov	r10, #0x1f			@ domains 0, 1 = manager
+ 	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
++#ifdef CONFIG_ARCH_MSM_SCORPION
++	mov     r0, #0x77
++	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
 +#endif
-+	mcr     p15, 0, r0, c1, c0, 1           @ write ACTLR
- #endif
  	/*
  	 * Memory region attributes with SCTLR.TRE=1
+ 	 *
 -- 
 1.6.3.3
