@@ -1,37 +1,19 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2010 10:18:09 +0000
-Subject: [PATCH] ARM: Correct the FPSCR bits setting when raising exceptions
-Message-ID: <20100128101809.7752.76832.stgit@pc1117.cambridge.arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 28 Jan 2010 11:52:14 +0100
+Subject: [PATCH/RFC v2 0/3] Human readable platform-specific
+	performance event support
+In-Reply-To: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
+References: <1264671263-21412-1-git-send-email-t.fujak@samsung.com>
+Message-ID: <1264675934.4283.2088.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c98929c07a removed the clearing of the FPSCR[31:28] bits from the
-vfp_raise_exceptions() function and the new bits are or'ed with the old
-FPSCR bits leading to unexpected results (the original commit was
-referring to the cumulative bits - FPSCR[4:0]).
+On Thu, 2010-01-28 at 10:34 +0100, Tomasz Fujak wrote:
+> Human readable description support for performance events v2. With perf support included.
+> Changes from v1:
+>  - applied on top of latest perf_event/ARM (5899/1 - 5903/1)
+>  - moved to debugfs, now based on seq_file
+>  - reads one line at a time, memory overallocation fixed [perf]
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Tom Hameenanttila <tmhameen@marvell.com>
----
- arch/arm/vfp/vfpmodule.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index f60a540..a63c4be 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -197,10 +197,13 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
- 	}
- 
- 	/*
--	 * Update the FPSCR with the additional exception flags.
-+	 * If any of the status flags are set, update the FPSCR.
- 	 * Comparison instructions always return at least one of
- 	 * these flags set.
- 	 */
-+	if (exceptions & (FPSCR_N|FPSCR_Z|FPSCR_C|FPSCR_V))
-+		fpscr &= ~(FPSCR_N|FPSCR_Z|FPSCR_C|FPSCR_V);
-+
- 	fpscr |= exceptions;
- 
- 	fmxr(FPSCR, fpscr);
+You can keep sending these patches, but I'll keep ignoring them
+eventually adding you to the /dev/null redirect.
