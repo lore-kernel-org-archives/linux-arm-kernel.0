@@ -1,49 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2010 11:00:50 +0000
-Subject: [PATCH 3/3] ARM: Select CPU_32v6K for CPU_V7 only if
-	ARCH_OMAP2 isnot selected
-In-Reply-To: <20100126193748.15134.4837.stgit@baageli.muru.com>
-References: <20100126193748.15134.4837.stgit@baageli.muru.com>
-Message-ID: <1264676451.7064.40.camel@pc1117.cambridge.arm.com>
+From: l.fu@pengutronix.de (Luotao Fu)
+Date: Thu, 28 Jan 2010 12:16:57 +0100
+Subject: LPC32XX architecture files (updated)
+In-Reply-To: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+Message-ID: <4B617229.4090903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-26 at 19:37 +0000, Tony Lindgren wrote:
-> Otherwise the kernel built with both CPU_V6 and CPU_V7 will not
-> boot on omap2.
+Hi,
+
+wellsk40 at gmail.com wrote:
+> The initial LCP32xx arch files are in these patches. Changes from
+> yesterdays posting:
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mm/Kconfig |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> gpiolib.c updated from user review comments, thanks!
 > 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index baf6384..4c2e90d 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -399,7 +399,7 @@ config CPU_V6
->  config CPU_32v6K
->         bool "Support ARM V6K processor extensions" if !SMP
->         depends on CPU_V6
-> -       default y if SMP && !ARCH_MX3
-> +       default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
->         help
->           Say Y here if your ARMv6 processor supports the 'K' extension.
->           This enables the kernel to use some instructions not present
-> @@ -410,7 +410,7 @@ config CPU_32v6K
->  # ARMv7
->  config CPU_V7
->         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-> -       select CPU_32v6K
-> +       select CPU_32v6K if !ARCH_OMAP2
+> Files all send via git send-email now, thanks for pointing me in
+> the right direction and sorry about the wraps. (if gmail wasn't
+> available, I'd be stuck!)
+> 
+> These have been checked with checkpatch.
+> 
+> thanks,
+> Kevin Wells
+> NXP Semiconductors
+> 
+thx for the patches. I applied them together with the nxp patches by RMK on the
+linus master tree. (since it otherwise won't compile, as you've mentioned
+earlier). It compiles so far. For convenience I put this onto our public git server
 
-I suspect that would be an issue for all ARMv6 platforms without the MP
-extensions (v6K). Could we do something like:
+git://git.pengutronix.de/git/lfu/linux-lfu lpc32xx_wells
 
-	select CPU_32v6K if SMP || !CPU_V6
-
-As for the CPU_32v6K config entry, do any of ARCH_MX3 or ARCH_OMAP2
-support SMP? We could remove them.
-
+cheers
+Luotao Fu
 -- 
-Catalin
+Pengutronix e.K.                           | Dipl.-Ing. Luotao Fu        |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
