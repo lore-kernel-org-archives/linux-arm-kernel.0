@@ -1,60 +1,29 @@
-From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
-Date: Thu, 28 Jan 2010 17:14:49 +0900
-Subject: [PATCHv2] ARM: S3C64XX: SPI: Make platform device compilation
-	selectable
-Message-ID: <1264666489-24789-1-git-send-email-jassisinghbrar@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 28 Jan 2010 08:23:07 +0000
+Subject: RFC: change device building for s3c24xx/s3c64xx/s5p series
+Message-ID: <20100128082307.GU10014@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jassi.brar@samsung.com>
+After thinking a bit about the current build for the Samsung architectures
+I decided to try the patch included below to change from using Kconfig
+to define what is needed to use a build instead.
 
-The SPI controller platform devices should be compiled in
-independent of the driver support, otherwise we might end
-up with dev-spi built as kernel module.
-Change this to make every machine select if it has some SPI
-device and wants to build device definitions.
+This is one of the soultions I was thinking about, but does not currently
+remove the need for the default setup code for each device... that may be
+sorted by a different solution that I will try and sort out a set of
+patches for if i feel it will be useful.
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/plat-s3c64xx/Makefile |    4 +++-
- arch/arm/plat-samsung/Kconfig  |    6 ++++++
- 2 files changed, 9 insertions(+), 1 deletions(-)
+If we use the lib target we will end up always building the necessary
+device files and then leave it up to the linker to actually pick the ones
+that the included board needs. As a note, a small increase in the build
+time to ensure that these are created should not be a problem.
 
-diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
-index 80255a5..e60bde3 100644
---- a/arch/arm/plat-s3c64xx/Makefile
-+++ b/arch/arm/plat-s3c64xx/Makefile
-@@ -40,6 +40,9 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
- 
- obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
- 
-+# SPI support
-+obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
-+
- # Device setup
- 
- obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
-@@ -47,4 +50,3 @@ obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
- obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
- obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
- obj-$(CONFIG_SND_S3C24XX_SOC) += dev-audio.o
--obj-$(CONFIG_SPI_S3C64XX) += dev-spi.o
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 1c2fe91..72da646 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -132,6 +132,12 @@ config S3C_DEV_NAND
- 	help
- 	  Compile in platform device definition for NAND controller
- 
-+config S3C64XX_DEV_SPI
-+	bool
-+	help
-+	  Compile in platform device definitions for S3C64XX's type
-+	  SPI controllers.
-+
- comment "Power management"
- 
- config SAMSUNG_PM_DEBUG
--- 
-1.6.2.5
+Currently we haven't tried the same attempt with the setup code as that
+will end up forcing the necessary device definitions into the kernel
+unless it is changed to the board calling the necessary default
+functions. This would move them out of the SoC setup code, but mean
+that all boards would need to be altered. It would also mean that each
+board would need to know which SoC it is using.
+
+Any views on the subject would be useful.
