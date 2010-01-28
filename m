@@ -1,50 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 27 Jan 2010 15:48:18 -0800
-Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
-In-Reply-To: <1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100127154818.de91e255.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jan 2010 00:15:23 +0000
+Subject: defining ZRELADDR as PHYS_OFFSET + TEXT_OFFSET
+In-Reply-To: <20100127101228.GA17421@pengutronix.de>
+References: <20100127101228.GA17421@pengutronix.de>
+Message-ID: <20100128001523.GA608@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jan 2010 16:37:34 +0100
-Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
-
-> The probe function passes a pointer to a struct fb_info to
-> platform_set_drvdata, so don't interpret the return value of
-> platform_get_drvdata as a pointer to struct imxfb_info.
+On Wed, Jan 27, 2010 at 11:12:28AM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/video/imxfb.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+> currently all platforms need to define zreladdr-y in
+> arch/arm/mach-$mach/Makefile.boot and PHYS_OFFSET (in
+> arch/arm/mach-$mach/include/mach/memory.h).
 > 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 66358fa..b4b6dec 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
->   */
->  static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
->  {
-> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
-> +	struct fb_info *info = platform_get_drvdata(dev);
-> +	struct imxfb_info *fbi = info->par;
->  
->  	pr_debug("%s\n", __func__);
->  
-> @@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
->  
->  static int imxfb_resume(struct platform_device *dev)
->  {
-> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
-> +	struct fb_info *info = platform_get_drvdata(dev);
-> +	struct imxfb_info *fbi = info->par;
->  
->  	pr_debug("%s\n", __func__);
->  
+> Constraints for these are:
+> 
+>  TEXTADDR = PAGE_OFFSET + TEXT_OFFSET
+>  __virt_to_phys(virt) = virt - PAGE_OFFSET + PHYS_OFFSET (at least for
+> 	"small" virtual addresses)
+>  ZRELADDR = __virt_to_phys(TEXTADDR)
+> 
+> (The equallity for __virt_to_phys only holds "normaly" according to
+> http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html.
+> In practice it holds for addresses of the first bank of RAM which is
+> enough for the purposes of this mail.)
+> 
+> So we can deduce ZRELADDR = PHYS_OFFSET + TEXT_OFFSET.
+> 
+> Is there something I missed or is it possible to get rid of zreladdr-y
+> in .../Makefile.boot and define it according to the equation above?
 
-What were the runtime effects of this bug?
+You'd need to find some way to get PHYS_OFFSET out of the C code
+into the makefile.  With all sorts of stuff going on in various
+platforms memory.h files, that doesn't look simple.
