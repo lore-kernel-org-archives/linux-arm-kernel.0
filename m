@@ -1,17 +1,30 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 28 Jan 2010 22:37:28 +0530
-Subject: [PATCH 08/13] ARM: LPC32XX: clock tree support
-In-Reply-To: <1264643011-17390-9-git-send-email-wellsk40@gmail.com>
-References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
-	<1264643011-17390-9-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100128170728.GA14674@debian>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Thu, 28 Jan 2010 11:15:49 -0600
+Subject: disable_irq() causes hang on AT91RM9200 targets?
+In-Reply-To: <4B61C2C7.2000405@billgatliff.com>
+References: <4B61C2C7.2000405@billgatliff.com>
+Message-ID: <4B61C645.4030104@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 05:43:26PM -0800, wellsk40 at gmail.com wrote:
-> +static struct clk_lookup lookups[] __initdata = {
+Bill Gatliff wrote:
+> Guys:
+>
+>
+> Has anyone noticed that with 2.6.33-rc5 (at least) on AT91RM9200,
+> disable_irq() seems to cause a lockup when the interrupt number is a
+> GPIO line?  I'm calling disable_irq() from an interrupt handler on the
+> same GPIO line.
+>
+> I just saw this happen, and it seems to be repeatable.  Just wondering
+> if this is a known issue before I start digging into it...
+>   
 
-This shouldn't be __initdata, since it'll be needed when loading modules
-which use clk_get().
+Heh, disable_irq_nosync().  D'oh!  :)
 
-Rabin
+
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
