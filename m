@@ -1,40 +1,43 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Jan 2010 21:40:49 +0900
-Subject: [PATCH 02/06] ARM: Add sh7377 and G4EVM support
+Date: Thu, 28 Jan 2010 21:41:01 +0900
+Subject: [PATCH 03/06] ARM: Add sh7372 and AP4EVB support
 In-Reply-To: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
 References: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
-Message-ID: <20100128124049.8982.28633.sendpatchset@rxone.opensource.se>
+Message-ID: <20100128124101.8982.71955.sendpatchset@rxone.opensource.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
 This patch adds base support for the SuperH Mobile ARM processor
-sh7377 together with G4EVM board support. Only timer, serial
+sh7372 together with AP4EVB board support. Only timer, serial
 console and NOR flash are supported at this point. Patches for
 the interrupt controller, pinmux support, clock framework and
 runtime pm will be submitted as feature patches on top of this.
 
+The mach-type entry has been submitted but is included here for now.
+
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Applies on top of linux-next 20100119 and the sh7367 patch.
+ Applies on top of linux-next 20100119 and the sh7367+sh7377 patches.
 
  arch/arm/mach-shmobile/Kconfig               |   14 +
  arch/arm/mach-shmobile/Makefile              |    2 
- arch/arm/mach-shmobile/board-g4evm.c         |  127 ++++++++++++
+ arch/arm/mach-shmobile/board-ap4evb.c        |  127 +++++++++++++
  arch/arm/mach-shmobile/include/mach/common.h |    4 
- arch/arm/mach-shmobile/setup-sh7377.c        |  260 ++++++++++++++++++++++++++
- 5 files changed, 407 insertions(+)
+ arch/arm/mach-shmobile/setup-sh7372.c        |  241 ++++++++++++++++++++++++++
+ arch/arm/tools/mach-types                    |    1 
+ 6 files changed, 389 insertions(+)
 
---- 0002/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2010-01-21 19:50:20.000000000 +0900
-@@ -10,12 +10,24 @@ config ARCH_SH7367
+--- 0003/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2010-01-21 19:51:03.000000000 +0900
+@@ -18,6 +18,14 @@ config ARCH_SH7377
  	select GENERIC_TIME
  	select GENERIC_CLOCKEVENTS
  
-+config ARCH_SH7377
-+	bool "SH-Mobile SH7377 (G4)"
++config ARCH_SH7372
++	bool "SH-Mobile SH7372 (AP4)"
 +	select CPU_V7
 +	select HAVE_CLK
 +	select COMMON_CLKDEV
@@ -44,48 +47,50 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
  comment "SH-Mobile Board Type"
  
  config MACH_G3EVM
- 	bool "G3EVM board"
- 	depends on ARCH_SH7367
+@@ -28,6 +36,10 @@ config MACH_G4EVM
+ 	bool "G4EVM board"
+ 	depends on ARCH_SH7377
  
-+config MACH_G4EVM
-+	bool "G4EVM board"
-+	depends on ARCH_SH7377
++config MACH_AP4EVB
++	bool "AP4EVB board"
++	depends on ARCH_SH7372
 +
  comment "SH-Mobile System Configuration"
  
  menu "Memory configuration"
-@@ -23,6 +35,7 @@ menu "Memory configuration"
- config MEMORY_START
+@@ -36,6 +48,7 @@ config MEMORY_START
  	hex "Physical memory start address"
  	default "0x50000000" if MACH_G3EVM
-+	default "0x40000000" if MACH_G4EVM
+ 	default "0x40000000" if MACH_G4EVM
++	default "0x40000000" if MACH_AP4EVB
  	default "0x00000000"
  	---help---
  	  Tweak this only when porting to a new machine which does not
-@@ -32,6 +45,7 @@ config MEMORY_START
- config MEMORY_SIZE
+@@ -46,6 +59,7 @@ config MEMORY_SIZE
  	hex "Physical memory size"
  	default "0x08000000" if MACH_G3EVM
-+	default "0x08000000" if MACH_G4EVM
+ 	default "0x08000000" if MACH_G4EVM
++	default "0x10000000" if MACH_AP4EVB
  	default "0x04000000"
  	help
  	  This sets the default memory size assumed by your kernel. It can
---- 0002/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2010-01-21 19:50:20.000000000 +0900
-@@ -7,6 +7,8 @@ obj-y				:= timer.o
- 
+--- 0003/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2010-01-21 19:51:03.000000000 +0900
+@@ -8,7 +8,9 @@ obj-y				:= timer.o
  # CPU objects
  obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o
-+obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7367.o
+ obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7367.o
++obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7367.o
  
  # Board objects
  obj-$(CONFIG_MACH_G3EVM)	+= board-g3evm.o
-+obj-$(CONFIG_MACH_G4EVM)	+= board-g4evm.o
+ obj-$(CONFIG_MACH_G4EVM)	+= board-g4evm.o
++obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
 --- /dev/null
-+++ work/arch/arm/mach-shmobile/board-g4evm.c	2010-01-21 19:50:21.000000000 +0900
++++ work/arch/arm/mach-shmobile/board-ap4evb.c	2010-01-21 19:51:04.000000000 +0900
 @@ -0,0 +1,127 @@
 +/*
-+ * G4EVM board support
++ * AP4EVB board support
 + *
 + * Copyright (C) 2010  Magnus Damm
 + * Copyright (C) 2008  Yoshihiro Shimoda
@@ -171,11 +176,11 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +};
 +
 +
-+static struct platform_device *g4evm_devices[] __initdata = {
++static struct platform_device *ap4evb_devices[] __initdata = {
 +	&nor_flash_device,
 +};
 +
-+static struct map_desc g4evm_io_desc[] __initdata = {
++static struct map_desc ap4evb_io_desc[] __initdata = {
 +	/* create a 1:1 entity map for 0xe6xxxxxx
 +	 * used by CPGA, INTC and PFC.
 +	 */
@@ -187,46 +192,46 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	},
 +};
 +
-+static void __init g4evm_map_io(void)
++static void __init ap4evb_map_io(void)
 +{
-+	iotable_init(g4evm_io_desc, ARRAY_SIZE(g4evm_io_desc));
++	iotable_init(ap4evb_io_desc, ARRAY_SIZE(ap4evb_io_desc));
 +
 +	/* setup early devices and clocks here as well */
-+	sh7377_add_early_devices();
++	sh7372_add_early_devices();
 +	sh7367_clock_init(); /* use g3 clocks for now */
 +}
 +
-+static void __init g4evm_init(void)
++static void __init ap4evb_init(void)
 +{
-+	sh7377_add_standard_devices();
++	sh7372_add_standard_devices();
 +
-+	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
++	platform_add_devices(ap4evb_devices, ARRAY_SIZE(ap4evb_devices));
 +}
 +
-+MACHINE_START(G4EVM, "g4evm")
++MACHINE_START(AP4EVB, "ap4evb")
 +	.phys_io	= 0xe6000000,
 +	.io_pg_offst	= ((0xe6000000) >> 18) & 0xfffc,
-+	.map_io		= g4evm_map_io,
-+	.init_irq	= sh7377_init_irq,
-+	.init_machine	= g4evm_init,
++	.map_io		= ap4evb_map_io,
++	.init_irq	= sh7372_init_irq,
++	.init_machine	= ap4evb_init,
 +	.timer		= &shmobile_timer,
 +MACHINE_END
---- 0002/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-01-21 19:50:20.000000000 +0900
-@@ -8,4 +8,8 @@ extern void sh7367_add_early_devices(voi
- extern void sh7367_add_standard_devices(void);
- extern void sh7367_clock_init(void);
+--- 0003/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-01-21 19:51:03.000000000 +0900
+@@ -12,4 +12,8 @@ extern void sh7377_init_irq(void);
+ extern void sh7377_add_early_devices(void);
+ extern void sh7377_add_standard_devices(void);
  
-+extern void sh7377_init_irq(void);
-+extern void sh7377_add_early_devices(void);
-+extern void sh7377_add_standard_devices(void);
++extern void sh7372_init_irq(void);
++extern void sh7372_add_early_devices(void);
++extern void sh7372_add_standard_devices(void);
 +
  #endif /* __ARCH_MACH_COMMON_H */
 --- /dev/null
-+++ work/arch/arm/mach-shmobile/setup-sh7377.c	2010-01-21 19:50:21.000000000 +0900
-@@ -0,0 +1,260 @@
++++ work/arch/arm/mach-shmobile/setup-sh7372.c	2010-01-21 19:51:04.000000000 +0900
+@@ -0,0 +1,241 @@
 +/*
-+ * sh7377 processor support
++ * sh7372 processor support
 + *
 + * Copyright (C) 2010  Magnus Damm
 + * Copyright (C) 2008  Yoshihiro Shimoda
@@ -350,10 +355,10 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +};
 +
 +static struct plat_sci_port scif6_platform_data = {
-+	.mapbase	= 0xe6cc0000,
++	.mapbase	= 0xe6c30000,
 +	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
 +	.type		= PORT_SCIF,
-+	.irqs           = { 196, 196, 196, 196 },
++	.irqs           = { 91, 91, 91, 91 },
 +};
 +
 +static struct platform_device scif6_device = {
@@ -361,21 +366,6 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	.id		= 6,
 +	.dev		= {
 +		.platform_data	= &scif6_platform_data,
-+	},
-+};
-+
-+static struct plat_sci_port scif7_platform_data = {
-+	.mapbase	= 0xe6c30000,
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
-+	.type		= PORT_SCIF,
-+	.irqs           = { 91, 91, 91, 91 },
-+};
-+
-+static struct platform_device scif7_device = {
-+	.name		= "sh-sci",
-+	.id		= 7,
-+	.dev		= {
-+		.platform_data	= &scif7_platform_data,
 +	},
 +};
 +
@@ -411,7 +401,7 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	.num_resources	= ARRAY_SIZE(cmt10_resources),
 +};
 +
-+static struct platform_device *sh7377_early_devices[] __initdata = {
++static struct platform_device *sh7372_early_devices[] __initdata = {
 +	&scif0_device,
 +	&scif1_device,
 +	&scif2_device,
@@ -419,26 +409,25 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	&scif4_device,
 +	&scif5_device,
 +	&scif6_device,
-+	&scif7_device,
 +	&cmt10_device,
 +};
 +
-+void __init sh7377_add_standard_devices(void)
++void __init sh7372_add_standard_devices(void)
 +{
-+	platform_add_devices(sh7377_early_devices,
-+			    ARRAY_SIZE(sh7377_early_devices));
++	platform_add_devices(sh7372_early_devices,
++			    ARRAY_SIZE(sh7372_early_devices));
 +}
 +
 +#define SMSTPCR3 0xe615013c
 +#define SMSTPCR3_CMT1 (1 << 29)
 +
-+void __init sh7377_add_early_devices(void)
++void __init sh7372_add_early_devices(void)
 +{
 +	/* enable clock to CMT1 */
 +	__raw_writel(__raw_readl(SMSTPCR3) & ~SMSTPCR3_CMT1, SMSTPCR3);
 +
-+	early_platform_add_devices(sh7377_early_devices,
-+				   ARRAY_SIZE(sh7377_early_devices));
++	early_platform_add_devices(sh7372_early_devices,
++				   ARRAY_SIZE(sh7372_early_devices));
 +}
 +
 +enum {
@@ -446,7 +435,7 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +
 +	/* interrupt sources INTCA */
 +
-+	SCIFA0, SCIFA1, SCIFA2, SCIFA3, SCIFA4, SCIFA5, SCIFB, SCIFA6,
++	SCIFA0, SCIFA1, SCIFA2, SCIFA3, SCIFA4, SCIFA5, SCIFB,
 +	CMT10,
 +};
 +
@@ -455,7 +444,7 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	INTC_VECT(SCIFA0, 0xc00), INTC_VECT(SCIFA1, 0xc20),
 +	INTC_VECT(SCIFA2, 0xc40), INTC_VECT(SCIFA3, 0xc60),
 +	INTC_VECT(SCIFA4, 0xd20), INTC_VECT(SCIFA5, 0xd40),
-+	INTC_VECT(SCIFB, 0xd60), INTC_VECT(SCIFA6, 0x1a80),
++	INTC_VECT(SCIFB, 0xd60),
 +};
 +
 +static struct intc_mask_reg mask_registers[] = {
@@ -465,8 +454,6 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	  { SCIFB, SCIFA5, SCIFA4, 0, 0, 0, 0, 0 } },
 +	{ 0xe69400a4, 0xe69400e4, 8, /* IMR9A / IMCR9A */
 +	  { 0, 0, 0, CMT10, 0, 0, 0, 0 } },
-+	{ 0xe695009c, 0xe69500dc, 8, /* IMR7A3 / IMCR7A3 */
-+	  { 0, 0, 0, 0, SCIFA6, 0, 0, 0 } },
 +};
 +
 +static struct intc_prio_reg prio_registers[] = {
@@ -475,13 +462,19 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +					      SCIFA2, SCIFA3 } },
 +	{ 0xe6940020, 0, 16, 4, /* IPRIA */ { 0, SCIFA4, 0, 0 } },
 +	{ 0xe6940034, 0, 16, 4, /* IPRNA */ { SCIFB, SCIFA5, 0, 0 } },
-+	{ 0xe695003c, 0, 16, 4, /* IPRPA3 */ { SCIFA6, 0, 0, 0 } },
 +};
 +
-+static DECLARE_INTC_DESC(intc_desc, "sh7377", vectors, NULL, mask_registers,
++static DECLARE_INTC_DESC(intc_desc, "sh7372", vectors, NULL, mask_registers,
 +			 prio_registers, NULL);
 +
-+void __init sh7377_init_irq(void)
++void __init sh7372_init_irq(void)
 +{
 +	register_intc_controller(&intc_desc);
 +}
+--- 0001/arch/arm/tools/mach-types
++++ work/arch/arm/tools/mach-types	2010-01-21 19:51:03.000000000 +0900
+@@ -2578,3 +2578,4 @@ glacier			MACH_GLACIER		GLACIER			2592
+ phrazer_bulldog		MACH_PHRAZER_BULLDOG	PHRAZER_BULLDOG		2593
+ omap3_bulldog		MACH_OMAP3_BULLDOG	OMAP3_BULLDOG		2594
+ pca101			MACH_PCA101		PCA101			2595
++ap4evb			MACH_AP4EVB		AP4EVB			2630
