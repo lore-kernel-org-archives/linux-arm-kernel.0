@@ -1,79 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jan 2010 09:52:04 -0800
-Subject: [PATCH 1/3] OMAP4: Add L2 Cache support
-In-Reply-To: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100129175204.GE23505@atomide.com>
+From: wruan@quicinc.com (Ruan, Willie)
+Date: Fri, 29 Jan 2010 09:54:28 -0800
+Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and
+	resume functions
+In-Reply-To: <20100129064920.GB1529@ucw.cz>
+References: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+	<20100129064920.GB1529@ucw.cz>
+Message-ID: <179C5F34D68DF54C8898E904FC5BAF8C79E15B77C3@NALASEXMB09.na.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [100129 03:44]:
-> This patch adds L2 Cache support for OMAP4. External L2 cache
-> is used in OMPA4
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/board-4430sdp.c        |   33 ++++++++++++++++++++++++++++
->  arch/arm/mm/Kconfig                        |    2 +-
->  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
->  3 files changed, 35 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 0c6be6b..194d633 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -28,6 +28,7 @@
->  #include <plat/control.h>
->  #include <plat/timer-gp.h>
->  #include <asm/hardware/gic.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  
->  static struct platform_device sdp4430_lcd_device = {
->  	.name		= "sdp4430_lcd",
-> @@ -49,6 +50,38 @@ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
->  static struct omap_board_config_kernel sdp4430_config[] __initdata = {
->  	{ OMAP_TAG_LCD,		&sdp4430_lcd_config },
->  };
-> +#ifdef CONFIG_CACHE_L2X0
-> +static int __init omap_l2_cache_init(void)
-> +{
-> +	void __iomem *l2cache_base;
+> From: Pavel Machek [mailto:pavel at ucw.cz] 
+> Sent: Thursday, January 28, 2010 10:49 PM
+>
+> So this fixes suspend/resume?
 
-Since this is an initcall, you need to return here early to avoid
-running on other omaps:
+Yes
 
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
-
-> +
-> +	/* Static mapping, never released */
-> +	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
-> +	BUG_ON(!l2cache_base);
-> +
-> +	/* Enable L2 Cache using secure api
-> +	 * r0 contains the value to be modified and "r12" contains
-> +	 * the monitor API number. This API uses few CPU registers
-> +	 * internally and hence they need be backed up including
-> +	 * link register "lr".
-> +	 */
-> +	__asm__ __volatile__(
-> +		"stmfd r13!, {r0-r12, r14}\n"
-> +		"mov r0, #1\n"
-> +		"ldr r12, =0x102\n"
-> +		"dsb\n"
-> +		"smc\n"
-> +		"ldmfd r13!, {r0-r12, r14}");
-> +
-> +	/* 32KB way size, 16-way associativity,
-> +	* parity disabled
-> +	*/
-> +	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
-> +
-> +	return 0;
-> +}
-> +early_initcall(omap_l2_cache_init);
-> +#endif
-
-Regards,
-
-Tony
+~Willie
