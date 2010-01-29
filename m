@@ -1,35 +1,33 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 29 Jan 2010 17:00:30 +0530
-Subject: [PATCH 0/3] OMAP4: Enable L2 cache
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C09C67F9@dbde02.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 29 Jan 2010 17:03:08 +0530
+Subject: [PATCH] OMAP4: Clean the secondary_data from L2
+In-Reply-To: <1264764789-16025-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1264764789-16025-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1264764789-16025-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+The boot_secondary() needs to call outer_clean_range() because the
+L2 cache is already enabled in the kernel boot with
+early_initcall
 
-Here is the rebased series against 2.6.33-rc5 which adds L2 cache support 
-on OMAP4430. I have dropped the l2 errata patch from earlier post [1] in
-this series since it will go through Russell's patch system. The link
-for patches is [2]
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/omap-smp.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-The following changes since commit 92dcffb916d309aa01778bf8963a6932e4014d07:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc5
-
-Santosh Shilimkar (3):
-      OMAP4: Add L2 Cache support
-      OMAP4: Clean the secondary_data from L2
-      OMAP4: Enable L2 Cache
-
- arch/arm/configs/omap_4430sdp_defconfig    |    2 +
- arch/arm/mach-omap2/board-4430sdp.c        |   33 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap-smp.c             |    2 +
- arch/arm/mm/Kconfig                        |    2 +-
- arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
- 5 files changed, 39 insertions(+), 1 deletions(-)
-
-Regards,
-Santosh
-
-[1]	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg20553.html
-[2]	http://www.spinics.net/lists/arm-kernel/msg81122.html
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 38153e5..2d0733a 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -73,6 +73,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * the AuxCoreBoot1 register is updated with cpu state
+ 	 * A barrier is added to ensure that write buffer is drained
+ 	 */
++	flush_cache_all();
++	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
+ 	omap_modify_auxcoreboot0(0x200, 0x0);
+ 	flush_cache_all();
+ 	smp_wmb();
+-- 
+1.6.0.4
