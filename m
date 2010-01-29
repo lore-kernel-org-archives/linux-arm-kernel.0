@@ -1,27 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2010 15:16:16 +0000
-Subject: Uncompressing broken with commit e7db7b4270
-In-Reply-To: <20100129150345.GA5876@laptop>
-References: <1264698229.7064.93.camel@pc1117.cambridge.arm.com>
-	<20100129144601.GA27577@pengutronix.de>
-	<20100129150345.GA5876@laptop>
-Message-ID: <20100129151616.GA17299@n2100.arm.linux.org.uk>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Fri, 29 Jan 2010 15:17:59 -0000
+Subject: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
+In-Reply-To: <20100129145425.GC27577@pengutronix.de>
+References: <20100129145425.GC27577@pengutronix.de>
+Message-ID: <000101caa0f6$3dfadc50$b9f094f0$@lindholm@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2010 at 04:04:15PM +0100, Albin Tonnerre wrote:
-> If so, the decompressor would exit with an error message stating that it can't
-> allocate enough memory, so I doubt this is the cause.
-> 
-> However, I have to admit I have no clue as to why Catalin is experiencing this.
-> Maybe you could check if your kernel is compiled with CONFIG_ALIGNMENT_TRAP, and
-> try setting it if it's unset, just to make sure it does not try to read
-> something unaligned?
+> -----Original Message-----
+> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> Sent: 29 January 2010 14:54
 
-Alignment faults can't be handled in the decompressor; we have no
-reliable way to setup the machine vectors at such an early stage to
-trap any exceptions.
+> > But as Catalin says, this makes no functional difference, even though
+> > it might look "more impressive" :)
+>
+> With a bigger number of loops_per_seconds the maximal period that can
+> be delayed for is shorter and the granularity is better, no?
 
-> Anyway... Russell, would you have any hint?
+I concur that this aspect of my comment was technically incorrect - but if
+your code was depending on either of those, surely that would be a problem
+in itself?
 
-Absolutely none.
+The minimum time would be questionable anyway, as loops_per_second is an
+average, and the branch predictor is fairly likely to miss on the first time
+through the loop unless your code uses a lot of delays.
+ 
+/
+	Leif
