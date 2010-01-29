@@ -1,97 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jan 2010 09:56:16 -0800
-Subject: [PATCH 1/3 v2] OMAP4: Add L2 Cache support
-In-Reply-To: <1264771839-1121-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1264771839-1121-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100129175616.GF23505@atomide.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 29 Jan 2010 09:59:29 -0800
+Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and
+	resume functions
+In-Reply-To: <179C5F34D68DF54C8898E904FC5BAF8C79E15B77C4@NALASEXMB09.na.qualcomm.com>
+References: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+	<1264763312.4242.47.camel@pc1117.cambridge.arm.com>
+	<179C5F34D68DF54C8898E904FC5BAF8C79E15B77C4@NALASEXMB09.na.qualcomm.com>
+Message-ID: <1264787969.1818.6.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Sorry, replied to the older version. Same comment here again.
-
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [100129 05:28]:
-> This patch adds L2 Cache support for OMAP4. External L2 cache
-> is used in OMPA4
+On Fri, 2010-01-29 at 09:55 -0800, Ruan, Willie wrote:
+> > From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+> > Sent: Friday, January 29, 2010 3:09 AM
+> >
+> > Do we need any for of locking around this code (as we do for
+> > l2x0_inv_all) or races are not possible during suspend?
 > 
-> v2 version incorporates Catalin's commnet on the register
-> save/restore list
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/mach-omap2/board-4430sdp.c        |   45 ++++++++++++++++++++++++++++
->  arch/arm/mm/Kconfig                        |    2 +-
->  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
->  3 files changed, 47 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 0c6be6b..a828c77 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -28,6 +28,7 @@
->  #include <plat/control.h>
->  #include <plat/timer-gp.h>
->  #include <asm/hardware/gic.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  
->  static struct platform_device sdp4430_lcd_device = {
->  	.name		= "sdp4430_lcd",
-> @@ -49,6 +50,50 @@ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
->  static struct omap_board_config_kernel sdp4430_config[] __initdata = {
->  	{ OMAP_TAG_LCD,		&sdp4430_lcd_config },
->  };
-> +#ifdef CONFIG_CACHE_L2X0
-> +static noinline void omap_l2x_control(unsigned long val)
-> +{
-> +	register unsigned long r0 asm("r0") = val;
-> +
-> +	/* This API modifies Pl310 Control Register.
-> +	 * r0 contains the value to be modified and "r12" contains
-> +	 * the monitor API number. It uses few CPU registers
-> +	 * internally and hence they need be backed up including
-> +	 * link register "lr".
-> +	 * Explicitly save r11 and r12 since  the compiler generated
-> +	 * code won't save it.
-> +	 */
-> +	__asm__ __volatile__(
-> +		__asmeq("%0", "r0")
-> +		"stmfd r13!, {r11,r12}\n"
-> +		"ldr r12, =0x102\n"
-> +		"dsb\n"
-> +		"smc\n"
-> +		"ldmfd r13!, {r11,r12}\n"
-> +		: : "r" (r0)
-> +		: "r4", "r5", "r10", "lr");
-> +}
-> +
-> +static int __init omap_l2_cache_init(void)
-> +{
-> +	void __iomem *l2cache_base;
+> Local interrupts have been disabled in suspend_ops->enter and
+> in arch_idle. Thus, no other locking is necessary.
 
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
+What if there are multiple cpu's calling cache_sync() at the same time?
+Disable interrupt wouldn't prevent it ..
 
-
-> +
-> +	/* Static mapping, never released */
-> +	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
-> +	BUG_ON(!l2cache_base);
-> +
-> +	/* Enable L2 Cache controller */
-> +	omap_l2x_control(0x1);
-> +
-> +	/* 32KB way size, 16-way associativity,
-> +	* parity disabled
-> +	*/
-> +	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
-> +
-> +	return 0;
-> +}
-> +early_initcall(omap_l2_cache_init);
-> +#endif
-
-Because it's an initcall.
-
-Tony
+Daniel
