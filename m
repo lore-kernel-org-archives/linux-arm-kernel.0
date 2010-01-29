@@ -1,36 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 29 Jan 2010 15:54:26 +0100
-Subject: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
-Message-ID: <20100129145425.GC27577@pengutronix.de>
+From: chetannanda@gmail.com (Chetan Nanda)
+Date: Fri, 29 Jan 2010 22:18:55 +0530
+Subject: not able to understand 'icedcc_putc'
+Message-ID: <7f245da81001290848n5630c6b6q68f19369fd0ad5aa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Fri, Jan 29, 2010 at 12:17:18PM -0000, Leif Lindholm wrote:
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > kernel-bounces at lists.infradead.org] On Behalf Of Dirk Behme
-> > Sent: 27 January 2010 16:45
-> 
-> > On a 400MHz ARM11 MPCore system (NEC NaviEngine based) with kernel
-> > 2.6.32 we found that BogoMIPS/loops per jiffies ~doubles (see below
-> > [1]) by adding a nop to __delay():
-> 
-> The reason for this is that the ARM11 MPCore doesn't fold branch
-> instructions for busy-wait-style loops. Inserting the nop (or any other
-> non-branch instruction) removes the branch instruction from the
-> execution stream.
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0360f/ch06s02s04.html
-> 
-> But as Catalin says, this makes no functional difference, even though it
-> might look "more impressive" :)
-With a bigger number of loops_per_seconds the maximal period that can be
-delayed for is shorter and the granularity is better, no?
+I am newbie to ARM core. This might be a very silly question, but I am not
+able to understand how 'icedcc_putc' function prints a character on console
+(UART).
 
-Best regards
-Uwe
+############3
+static void icedcc_putc(int ch)
+{
+    int status, i = 0x4000000;
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+    do {
+        if (--i < 0)
+            return;
+
+        asm volatile ("mrc p14, 0, %0, c0, c0, 0" : "=r" (status));
+    } while (status & 2);
+
+    asm("mcr p14, 0, %0, c1, c0, 0" : : "r" (ch));
+}
+#############
+
+Thanks for your help
+
+~cnanda
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100129/22e360fb/attachment-0001.htm>
