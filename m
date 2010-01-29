@@ -1,221 +1,916 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 29 Jan 2010 20:59:39 +0900
-Subject: [PATCH v4 3/8 RE-SEND] ARM: S5PV210: Add IRQ support
-Message-ID: <1264766379-5764-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 29 Jan 2010 20:59:59 +0900
+Subject: [PATCH v4 7/8 RE-SEND] ARM: S5PV210: Add S5PV210 configuration file
+Message-ID: <1264766399-5863-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IRQ support for S5PV210. This patch adds interrupt
-register definitions, IRQ definitions for various interrupt sources
-and new VIC base for VIC2 and VIC3 in plat-s5p common irq code.
+This patch adds S5PV210 default configuration file.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/irqs.h     |  146 +++++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/regs-irq.h |   19 +++
- arch/arm/plat-s5p/include/plat/irqs.h         |    4 +
- 3 files changed, 169 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/include/mach/irqs.h
- create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-irq.h
+ arch/arm/configs/s5pv210_defconfig |  893 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 893 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/s5pv210_defconfig
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
 new file mode 100644
-index 0000000..62c5175
+index 0000000..ea0b01d
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -0,0 +1,146 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/irqs.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - IRQ definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/arch/arm/configs/s5pv210_defconfig
+@@ -0,0 +1,893 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.33-rc4
++# Fri Jan 29 20:45:48 2010
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_GPIO=y
++CONFIG_NO_IOPORT=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_ARM_L1_CACHE_SHIFT_6=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
 +
-+#ifndef __ASM_ARCH_IRQS_H
-+#define __ASM_ARCH_IRQS_H __FILE__
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_LOCK_KERNEL=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_LOCALVERSION=""
++CONFIG_LOCALVERSION_AUTO=y
++CONFIG_HAVE_KERNEL_GZIP=y
++CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_KERNEL_GZIP=y
++# CONFIG_KERNEL_BZIP2 is not set
++# CONFIG_KERNEL_LZMA is not set
++# CONFIG_KERNEL_LZO is not set
++CONFIG_SWAP=y
++# CONFIG_SYSVIPC is not set
++# CONFIG_BSD_PROCESS_ACCT is not set
 +
-+#include <plat/irqs.h>
++#
++# RCU Subsystem
++#
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
++# CONFIG_TREE_RCU_TRACE is not set
++# CONFIG_IKCONFIG is not set
++CONFIG_LOG_BUF_SHIFT=17
++# CONFIG_GROUP_SCHED is not set
++# CONFIG_CGROUPS is not set
++CONFIG_SYSFS_DEPRECATED=y
++CONFIG_SYSFS_DEPRECATED_V2=y
++# CONFIG_RELAY is not set
++CONFIG_NAMESPACES=y
++# CONFIG_UTS_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE=""
++CONFIG_RD_GZIP=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++# CONFIG_EMBEDDED is not set
++CONFIG_UID16=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS=y
++CONFIG_KALLSYMS_ALL=y
++# CONFIG_KALLSYMS_EXTRA_PASS is not set
++CONFIG_HOTPLUG=y
++CONFIG_PRINTK=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++CONFIG_SHMEM=y
++CONFIG_AIO=y
 +
-+/* VIC0: System, DMA, Timer */
++#
++# Kernel Performance Events And Counters
++#
++CONFIG_VM_EVENT_COUNTERS=y
++CONFIG_SLUB_DEBUG=y
++CONFIG_COMPAT_BRK=y
++# CONFIG_SLAB is not set
++CONFIG_SLUB=y
++# CONFIG_SLOB is not set
++# CONFIG_PROFILING is not set
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_CLK=y
 +
-+#define IRQ_EINT0		S5P_IRQ_VIC0(0)
-+#define IRQ_EINT1		S5P_IRQ_VIC0(1)
-+#define IRQ_EINT2		S5P_IRQ_VIC0(2)
-+#define IRQ_EINT3		S5P_IRQ_VIC0(3)
-+#define IRQ_EINT4		S5P_IRQ_VIC0(4)
-+#define IRQ_EINT5		S5P_IRQ_VIC0(5)
-+#define IRQ_EINT6		S5P_IRQ_VIC0(6)
-+#define IRQ_EINT7		S5P_IRQ_VIC0(7)
-+#define IRQ_EINT8		S5P_IRQ_VIC0(8)
-+#define IRQ_EINT9		S5P_IRQ_VIC0(9)
-+#define IRQ_EINT10		S5P_IRQ_VIC0(10)
-+#define IRQ_EINT11		S5P_IRQ_VIC0(11)
-+#define IRQ_EINT12		S5P_IRQ_VIC0(12)
-+#define IRQ_EINT13		S5P_IRQ_VIC0(13)
-+#define IRQ_EINT14		S5P_IRQ_VIC0(14)
-+#define IRQ_EINT15		S5P_IRQ_VIC0(15)
-+#define IRQ_EINT16_31		S5P_IRQ_VIC0(16)
-+#define IRQ_BATF		S5P_IRQ_VIC0(17)
-+#define IRQ_MDMA		S5P_IRQ_VIC0(18)
-+#define IRQ_PDMA0		S5P_IRQ_VIC0(19)
-+#define IRQ_PDMA1		S5P_IRQ_VIC0(20)
-+#define IRQ_TIMER0_VIC		S5P_IRQ_VIC0(21)
-+#define IRQ_TIMER1_VIC		S5P_IRQ_VIC0(22)
-+#define IRQ_TIMER2_VIC		S5P_IRQ_VIC0(23)
-+#define IRQ_TIMER3_VIC		S5P_IRQ_VIC0(24)
-+#define IRQ_TIMER4_VIC		S5P_IRQ_VIC0(25)
-+#define IRQ_SYSTIMER		S5P_IRQ_VIC0(26)
-+#define IRQ_WDT			S5P_IRQ_VIC0(27)
-+#define IRQ_RTC_ALARM		S5P_IRQ_VIC0(28)
-+#define IRQ_RTC_TIC		S5P_IRQ_VIC0(29)
-+#define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
-+#define IRQ_FIMC3		S5P_IRQ_VIC0(31)
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_SLOW_WORK is not set
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_SLABINFO=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
++# CONFIG_MODVERSIONS is not set
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
 +
-+/* VIC1: ARM, Power, Memory, Connectivity, Storage */
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_DEADLINE=y
++CONFIG_IOSCHED_CFQ=y
++# CONFIG_DEFAULT_DEADLINE is not set
++CONFIG_DEFAULT_CFQ=y
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="cfq"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_SPIN_UNLOCK is not set
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_READ_UNLOCK is not set
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_WRITE_UNLOCK is not set
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
++# CONFIG_FREEZER is not set
 +
-+#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-+#define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
-+#define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
-+#define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-+#define IRQ_CORTEX4		S5P_IRQ_VIC1(4)
-+#define IRQ_IEMAPC		S5P_IRQ_VIC1(5)
-+#define IRQ_IEMIEC		S5P_IRQ_VIC1(6)
-+#define IRQ_ONENAND		S5P_IRQ_VIC1(7)
-+#define IRQ_NFC			S5P_IRQ_VIC1(8)
-+#define IRQ_CFC			S5P_IRQ_VIC1(9)
-+#define IRQ_UART0		S5P_IRQ_VIC1(10)
-+#define IRQ_UART1		S5P_IRQ_VIC1(11)
-+#define IRQ_UART2		S5P_IRQ_VIC1(12)
-+#define IRQ_UART3		S5P_IRQ_VIC1(13)
-+#define IRQ_IIC			S5P_IRQ_VIC1(14)
-+#define IRQ_SPI0		S5P_IRQ_VIC1(15)
-+#define IRQ_SPI1		S5P_IRQ_VIC1(16)
-+#define IRQ_SPI2		S5P_IRQ_VIC1(17)
-+#define IRQ_IRDA		S5P_IRQ_VIC1(18)
-+#define IRQ_CAN0		S5P_IRQ_VIC1(19)
-+#define IRQ_CAN1		S5P_IRQ_VIC1(20)
-+#define IRQ_HSIRX		S5P_IRQ_VIC1(21)
-+#define IRQ_HSITX		S5P_IRQ_VIC1(22)
-+#define IRQ_UHOST		S5P_IRQ_VIC1(23)
-+#define IRQ_OTG			S5P_IRQ_VIC1(24)
-+#define IRQ_MSM			S5P_IRQ_VIC1(25)
-+#define IRQ_HSMMC0		S5P_IRQ_VIC1(26)
-+#define IRQ_HSMMC1		S5P_IRQ_VIC1(27)
-+#define IRQ_HSMMC2		S5P_IRQ_VIC1(28)
-+#define IRQ_MIPICSI		S5P_IRQ_VIC1(29)
-+#define IRQ_MIPIDSI		S5P_IRQ_VIC1(30)
-+#define IRQ_ONENAND_AUDI	S5P_IRQ_VIC1(31)
++#
++# System Type
++#
++CONFIG_MMU=y
++# CONFIG_ARCH_AAEC2000 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_ARCH_VERSATILE is not set
++# CONFIG_ARCH_AT91 is not set
++# CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_NOMADIK is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP23XX is not set
++# CONFIG_ARCH_IXP2000 is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
++# CONFIG_ARCH_KIRKWOOD is not set
++# CONFIG_ARCH_LOKI is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++# CONFIG_ARCH_W90X900 is not set
++# CONFIG_ARCH_PNX4008 is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_MSM is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C2410 is not set
++# CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5P6440 is not set
++# CONFIG_ARCH_S5PC1XX is not set
++CONFIG_ARCH_S5PV210=y
++# CONFIG_ARCH_SHARK is not set
++# CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP is not set
++# CONFIG_ARCH_BCMRING is not set
++# CONFIG_ARCH_U8500 is not set
++CONFIG_PLAT_SAMSUNG=y
++CONFIG_SAMSUNG_CLKSRC=y
++CONFIG_SAMSUNG_IRQ_VIC_TIMER=y
++CONFIG_SAMSUNG_IRQ_UART=y
++CONFIG_SAMSUNG_GPIOLIB_4BIT=y
++CONFIG_S3C_GPIO_CFG_S3C24XX=y
++CONFIG_S3C_GPIO_CFG_S3C64XX=y
++CONFIG_S3C_GPIO_PULL_UPDOWN=y
++CONFIG_SAMSUNG_GPIO_EXTRA=0
++# CONFIG_S3C_ADC is not set
 +
-+/* VIC2: Multimedia, Audio, Security */
++#
++# Power management
++#
++CONFIG_PLAT_S3C=y
 +
-+#define IRQ_LCD0		S5P_IRQ_VIC2(0)
-+#define IRQ_LCD1		S5P_IRQ_VIC2(1)
-+#define IRQ_LCD2		S5P_IRQ_VIC2(2)
-+#define IRQ_LCD3		S5P_IRQ_VIC2(3)
-+#define IRQ_ROTATOR		S5P_IRQ_VIC2(4)
-+#define IRQ_FIMC0		S5P_IRQ_VIC2(5)
-+#define IRQ_FIMC1		S5P_IRQ_VIC2(6)
-+#define IRQ_FIMC2		S5P_IRQ_VIC2(7)
-+#define IRQ_JPEG		S5P_IRQ_VIC2(8)
-+#define IRQ_2D			S5P_IRQ_VIC2(9)
-+#define IRQ_3D			S5P_IRQ_VIC2(10)
-+#define IRQ_MIXER		S5P_IRQ_VIC2(11)
-+#define IRQ_HDMI		S5P_IRQ_VIC2(12)
-+#define IRQ_IIC1		S5P_IRQ_VIC2(13)
-+#define IRQ_MFC			S5P_IRQ_VIC2(14)
-+#define IRQ_TVENC		S5P_IRQ_VIC2(15)
-+#define IRQ_I2S0		S5P_IRQ_VIC2(16)
-+#define IRQ_I2S1		S5P_IRQ_VIC2(17)
-+#define IRQ_I2S2		S5P_IRQ_VIC2(18)
-+#define IRQ_AC97		S5P_IRQ_VIC2(19)
-+#define IRQ_PCM0		S5P_IRQ_VIC2(20)
-+#define IRQ_PCM1		S5P_IRQ_VIC2(21)
-+#define IRQ_SPDIF		S5P_IRQ_VIC2(22)
-+#define IRQ_ADC			S5P_IRQ_VIC2(23)
-+#define IRQ_PENDN		S5P_IRQ_VIC2(24)
-+#define IRQ_TC			IRQ_PENDN
-+#define IRQ_KEYPAD		S5P_IRQ_VIC2(25)
-+#define IRQ_CG			S5P_IRQ_VIC2(26)
-+#define IRQ_SEC			S5P_IRQ_VIC2(27)
-+#define IRQ_SECRX		S5P_IRQ_VIC2(28)
-+#define IRQ_SECTX		S5P_IRQ_VIC2(29)
-+#define IRQ_SDMIRQ		S5P_IRQ_VIC2(30)
-+#define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
++#
++# Boot options
++#
++# CONFIG_S3C_BOOT_ERROR_RESET is not set
++CONFIG_S3C_BOOT_UART_FORCE_FIFO=y
++CONFIG_S3C_LOWLEVEL_UART_PORT=1
++CONFIG_S3C_GPIO_SPACE=0
++CONFIG_S3C_GPIO_TRACK=y
++CONFIG_PLAT_S5P=y
++CONFIG_CPU_S5PV210=y
++CONFIG_MACH_SMDKV210=y
++# CONFIG_MACH_SMDKC110 is not set
 +
-+/* VIC3: Etc */
++#
++# Processor Type
++#
++CONFIG_CPU_32v6K=y
++CONFIG_CPU_V7=y
++CONFIG_CPU_32v7=y
++CONFIG_CPU_ABRT_EV7=y
++CONFIG_CPU_PABRT_V7=y
++CONFIG_CPU_CACHE_V7=y
++CONFIG_CPU_CACHE_VIPT=y
++CONFIG_CPU_COPY_V6=y
++CONFIG_CPU_TLB_V7=y
++CONFIG_CPU_HAS_ASID=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
 +
-+#define IRQ_IPC			S5P_IRQ_VIC3(0)
-+#define IRQ_HOSTIF		S5P_IRQ_VIC3(1)
-+#define IRQ_MMC3		S5P_IRQ_VIC3(2)
-+#define IRQ_CEC			S5P_IRQ_VIC3(3)
-+#define IRQ_TSI			S5P_IRQ_VIC3(4)
-+#define IRQ_MDNIE0		S5P_IRQ_VIC3(5)
-+#define IRQ_MDNIE1		S5P_IRQ_VIC3(6)
-+#define IRQ_MDNIE2		S5P_IRQ_VIC3(7)
-+#define IRQ_MDNIE3		S5P_IRQ_VIC3(8)
-+#define IRQ_VIC_END		S5P_IRQ_VIC3(31)
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++# CONFIG_ARM_THUMBEE is not set
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_BPREDICT_DISABLE is not set
++CONFIG_HAS_TLS_REG=y
++CONFIG_ARM_L1_CACHE_SHIFT=6
++# CONFIG_ARM_ERRATA_430973 is not set
++# CONFIG_ARM_ERRATA_458693 is not set
++# CONFIG_ARM_ERRATA_460075 is not set
++CONFIG_ARM_VIC=y
++CONFIG_ARM_VIC_NR=2
 +
-+#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
++#
++# Bus support
++#
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
 +
-+#define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
-+#define IRQ_EINT(x)		S5P_EINT(x)
++#
++# Kernel Features
++#
++# CONFIG_VMSPLIT_3G is not set
++CONFIG_VMSPLIT_2G=y
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0x80000000
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
++CONFIG_PREEMPT=y
++CONFIG_HZ=200
++# CONFIG_THUMB2_KERNEL is not set
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++CONFIG_ARCH_SPARSEMEM_ENABLE=y
++CONFIG_ARCH_SPARSEMEM_DEFAULT=y
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++# CONFIG_FLATMEM_MANUAL is not set
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++CONFIG_SPARSEMEM_MANUAL=y
++CONFIG_SPARSEMEM=y
++CONFIG_HAVE_MEMORY_PRESENT=y
++CONFIG_SPARSEMEM_EXTREME=y
++CONFIG_SPLIT_PTLOCK_CPUS=999999
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
 +
-+/* Set the default NR_IRQS */
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0
++CONFIG_ZBOOT_ROM_BSS=0
++CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
 +
-+#define NR_IRQS 		(IRQ_EINT(31) + 1)
++#
++# CPU Power Management
++#
++# CONFIG_CPU_IDLE is not set
 +
-+#endif /* ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-irq.h b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-new file mode 100644
-index 0000000..5c3b104
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-@@ -0,0 +1,19 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - IRQ register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++#
++# Floating point emulation
++#
 +
-+#ifndef __ASM_ARCH_REGS_IRQ_H
-+#define __ASM_ARCH_REGS_IRQ_H __FILE__
++#
++# At least one emulation must be selected
++#
++# CONFIG_FPE_NWFPE is not set
++# CONFIG_FPE_FASTFPE is not set
++CONFIG_VFP=y
++CONFIG_VFPv3=y
++CONFIG_NEON=y
 +
-+#include <asm/hardware/vic.h>
-+#include <mach/map.h>
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
 +
-+#endif /* __ASM_ARCH_REGS_IRQ_H */
-diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-s5p/include/plat/irqs.h
-index 101038d..e172a33 100644
---- a/arch/arm/plat-s5p/include/plat/irqs.h
-+++ b/arch/arm/plat-s5p/include/plat/irqs.h
-@@ -28,6 +28,8 @@
- 
- #define S5P_VIC0_BASE		S5P_IRQ(0)
- #define S5P_VIC1_BASE		S5P_IRQ(32)
-+#define S5P_VIC2_BASE		S5P_IRQ(64)
-+#define S5P_VIC3_BASE		S5P_IRQ(96)
- 
- #define VIC_BASE(x)		(S5P_VIC0_BASE + ((x)*32))
- 
-@@ -73,6 +75,8 @@
- 
- #define S5P_IRQ_VIC0(x)		(S5P_VIC0_BASE + (x))
- #define S5P_IRQ_VIC1(x)		(S5P_VIC1_BASE + (x))
-+#define S5P_IRQ_VIC2(x)		(S5P_VIC2_BASE + (x))
-+#define S5P_IRQ_VIC3(x)		(S5P_VIC3_BASE + (x))
- 
- #define S5P_TIMER_IRQ(x)	S5P_IRQ(11 + (x))
- 
++#
++# Power management options
++#
++# CONFIG_PM is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++# CONFIG_NET is not set
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
++CONFIG_STANDALONE=y
++CONFIG_PREVENT_FIRMWARE_BUILD=y
++CONFIG_FW_LOADER=y
++CONFIG_FIRMWARE_IN_KERNEL=y
++CONFIG_EXTRA_FIRMWARE=""
++# CONFIG_DEBUG_DRIVER is not set
++# CONFIG_DEBUG_DEVRES is not set
++# CONFIG_SYS_HYPERVISOR is not set
++# CONFIG_MTD is not set
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_COW_COMMON is not set
++CONFIG_BLK_DEV_LOOP=y
++# CONFIG_BLK_DEV_CRYPTOLOOP is not set
++
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=8192
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MG_DISK is not set
++# CONFIG_MISC_DEVICES is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_TGT is not set
++# CONFIG_SCSI_NETLINK is not set
++CONFIG_SCSI_PROC_FS=y
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++CONFIG_CHR_DEV_SG=y
++# CONFIG_CHR_DEV_SCH is not set
++# CONFIG_SCSI_MULTI_LUN is not set
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++CONFIG_SCSI_WAIT_SCAN=m
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_FC_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_LIBFC is not set
++# CONFIG_LIBFCOE is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++# CONFIG_PHONE is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
++
++#
++# Userland interfaces
++#
++CONFIG_INPUT_MOUSEDEV=y
++CONFIG_INPUT_MOUSEDEV_PSAUX=y
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
++# CONFIG_INPUT_JOYDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++# CONFIG_TOUCHSCREEN_AD7879 is not set
++# CONFIG_TOUCHSCREEN_DYNAPRO is not set
++# CONFIG_TOUCHSCREEN_FUJITSU is not set
++# CONFIG_TOUCHSCREEN_GUNZE is not set
++# CONFIG_TOUCHSCREEN_ELO is not set
++# CONFIG_TOUCHSCREEN_WACOM_W8001 is not set
++# CONFIG_TOUCHSCREEN_MTOUCH is not set
++# CONFIG_TOUCHSCREEN_INEXIO is not set
++# CONFIG_TOUCHSCREEN_MK712 is not set
++# CONFIG_TOUCHSCREEN_PENMOUNT is not set
++# CONFIG_TOUCHSCREEN_TOUCHRIGHT is not set
++# CONFIG_TOUCHSCREEN_TOUCHWIN is not set
++# CONFIG_TOUCHSCREEN_TOUCHIT213 is not set
++# CONFIG_TOUCHSCREEN_W90X900 is not set
++# CONFIG_INPUT_MISC is not set
++
++#
++# Hardware I/O ports
++#
++CONFIG_SERIO=y
++CONFIG_SERIO_SERPORT=y
++# CONFIG_SERIO_RAW is not set
++# CONFIG_SERIO_ALTERA_PS2 is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
++
++#
++# Serial drivers
++#
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_CONSOLE is not set
++CONFIG_SERIAL_8250_NR_UARTS=4
++CONFIG_SERIAL_8250_RUNTIME_UARTS=4
++# CONFIG_SERIAL_8250_EXTENDED is not set
++
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_UARTS=4
++# CONFIG_SERIAL_SAMSUNG_DEBUG is not set
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
++CONFIG_SERIAL_S5PV210=y
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_UNIX98_PTYS=y
++# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=256
++# CONFIG_IPMI_HANDLER is not set
++CONFIG_HW_RANDOM=y
++# CONFIG_HW_RANDOM_TIMERIOMEM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_I2C is not set
++# CONFIG_SPI is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
++CONFIG_ARCH_REQUIRE_GPIOLIB=y
++CONFIG_GPIOLIB=y
++# CONFIG_DEBUG_GPIO is not set
++# CONFIG_GPIO_SYSFS is not set
++
++#
++# Memory mapped GPIO expanders:
++#
++
++#
++# I2C GPIO expanders:
++#
++
++#
++# PCI GPIO expanders:
++#
++
++#
++# SPI GPIO expanders:
++#
++
++#
++# AC97 GPIO expanders:
++#
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++
++#
++# Display device support
++#
++# CONFIG_DISPLAY_SUPPORT is not set
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_MMC is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_RTC_LIB=y
++# CONFIG_RTC_CLASS is not set
++# CONFIG_DMADEVICES is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++
++#
++# TI VLYNQ
++#
++# CONFIG_STAGING is not set
++
++#
++# File systems
++#
++CONFIG_EXT2_FS=y
++# CONFIG_EXT2_FS_XATTR is not set
++# CONFIG_EXT2_FS_XIP is not set
++# CONFIG_EXT3_FS is not set
++# CONFIG_EXT4_FS is not set
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++CONFIG_FS_POSIX_ACL=y
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
++CONFIG_DNOTIFY=y
++CONFIG_INOTIFY=y
++CONFIG_INOTIFY_USER=y
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS_FS is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_FUSE_FS is not set
++CONFIG_GENERIC_ACL=y
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++CONFIG_CRAMFS=y
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BLOCK=y
++# CONFIG_ROMFS_BACKED_BY_MTD is not set
++# CONFIG_ROMFS_BACKED_BY_BOTH is not set
++CONFIG_ROMFS_ON_BLOCK=y
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++
++#
++# Partition Types
++#
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_ACORN_PARTITION is not set
++# CONFIG_OSF_PARTITION is not set
++# CONFIG_AMIGA_PARTITION is not set
++# CONFIG_ATARI_PARTITION is not set
++# CONFIG_MAC_PARTITION is not set
++CONFIG_MSDOS_PARTITION=y
++CONFIG_BSD_DISKLABEL=y
++# CONFIG_MINIX_SUBPARTITION is not set
++CONFIG_SOLARIS_X86_PARTITION=y
++# CONFIG_UNIXWARE_DISKLABEL is not set
++# CONFIG_LDM_PARTITION is not set
++# CONFIG_SGI_PARTITION is not set
++# CONFIG_ULTRIX_PARTITION is not set
++# CONFIG_SUN_PARTITION is not set
++# CONFIG_KARMA_PARTITION is not set
++# CONFIG_EFI_PARTITION is not set
++# CONFIG_SYSV68_PARTITION is not set
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-1"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++# CONFIG_NLS_CODEPAGE_850 is not set
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++# CONFIG_NLS_ISO8859_15 is not set
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_UTF8 is not set
++
++#
++# Kernel hacking
++#
++# CONFIG_PRINTK_TIME is not set
++CONFIG_ENABLE_WARN_DEPRECATED=y
++CONFIG_ENABLE_MUST_CHECK=y
++CONFIG_FRAME_WARN=1024
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_UNUSED_SYMBOLS is not set
++# CONFIG_DEBUG_FS is not set
++# CONFIG_HEADERS_CHECK is not set
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_DEBUG_SHIRQ is not set
++CONFIG_DETECT_SOFTLOCKUP=y
++# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
++CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
++CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
++CONFIG_SCHED_DEBUG=y
++# CONFIG_SCHEDSTATS is not set
++# CONFIG_TIMER_STATS is not set
++# CONFIG_DEBUG_OBJECTS is not set
++# CONFIG_SLUB_DEBUG_ON is not set
++# CONFIG_SLUB_STATS is not set
++# CONFIG_DEBUG_KMEMLEAK is not set
++# CONFIG_DEBUG_PREEMPT is not set
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_PI_LIST=y
++# CONFIG_RT_MUTEX_TESTER is not set
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_PROVE_LOCKING is not set
++# CONFIG_LOCK_STAT is not set
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
++# CONFIG_DEBUG_KOBJECT is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_DEBUG_VM is not set
++# CONFIG_DEBUG_WRITECOUNT is not set
++CONFIG_DEBUG_MEMORY_INIT=y
++# CONFIG_DEBUG_LIST is not set
++# CONFIG_DEBUG_SG is not set
++# CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_DEBUG_CREDENTIALS is not set
++# CONFIG_BOOT_PRINTK_DELAY is not set
++# CONFIG_RCU_TORTURE_TEST is not set
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_BACKTRACE_SELF_TEST is not set
++# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
++# CONFIG_FAULT_INJECTION is not set
++# CONFIG_LATENCYTOP is not set
++CONFIG_SYSCTL_SYSCALL_CHECK=y
++# CONFIG_PAGE_POISONING is not set
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_TRACING_SUPPORT=y
++CONFIG_FTRACE=y
++# CONFIG_FUNCTION_TRACER is not set
++# CONFIG_SCHED_TRACER is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_BOOT_TRACER is not set
++CONFIG_BRANCH_PROFILE_NONE=y
++# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
++# CONFIG_PROFILE_ALL_BRANCHES is not set
++# CONFIG_STACK_TRACER is not set
++# CONFIG_KMEMTRACE is not set
++# CONFIG_WORKQUEUE_TRACER is not set
++# CONFIG_BLK_DEV_IO_TRACE is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_KGDB is not set
++CONFIG_ARM_UNWIND=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++# CONFIG_DEBUG_STACK_USAGE is not set
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_DEBUG_ICEDCC is not set
++# CONFIG_OC_ETM is not set
++CONFIG_DEBUG_S3C_UART=1
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
++# CONFIG_CRYPTO is not set
++# CONFIG_BINARY_PRINTF is not set
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_FIND_LAST_BIT=y
++CONFIG_CRC_CCITT=y
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_LZO_DECOMPRESS=y
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_BZIP2=y
++CONFIG_DECOMPRESS_LZMA=y
++CONFIG_DECOMPRESS_LZO=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_DMA=y
 -- 
 1.6.2.5
