@@ -1,22 +1,24 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Jan 2010 07:48:45 +0100
-Subject: [RFC PATCH 01/12] arm: msm: allow ARCH_MSM to have v7 cpus
-In-Reply-To: <1264719577-5436-2-git-send-email-dwalker@codeaurora.org>
-References: <1264719577-5436-2-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100129064845.GA1529@ucw.cz>
+Date: Fri, 29 Jan 2010 07:49:21 +0100
+Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and
+	resume functions
+In-Reply-To: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+References: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100129064920.GB1529@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2010-01-28 14:59:26, Daniel Walker wrote:
-> ARCH_MSM supports armv7 cpus, so we're pushed the CPU_V6/CPU_V7 selection
-> down into the arch/arm/mach-msm/Kconfig.
+On Thu 2010-01-28 14:59:29, Daniel Walker wrote:
+> From: Willie Ruan <wruan@quicinc.com>
 > 
-> Also update the description to be a bit more accurate.
-> 
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> The application processor in Qualcomm's MSM chips can be powered off
+> (also called power collapse) during suspend and idle time. L2 cache power
+> will be collapsed too on current chips. To handle this scenario, we need
+> to add a function (l2x0_suspend here) to flush L2 cache before the power
+> loss and another function (l2x0_resume) to restore the cache settings
+> after the power is restored.
 
-ack (fwiw).
-								Pavel
+So this fixes suspend/resume? Ack...
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
