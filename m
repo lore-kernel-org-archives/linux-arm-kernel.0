@@ -1,67 +1,47 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 29 Jan 2010 09:02:15 +0000
-Subject: [PATCH] ARM: SAMSUNG: Move DMA support to plat-samsung
-In-Reply-To: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
-References: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264755741-16184-5-git-send-email-ben-linux@fluff.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 29 Jan 2010 10:45:00 +0100
+Subject: [PATCH 0/3] RTC driver for i.MX25
+In-Reply-To: <cover.1264596212.git.baruch@tkos.co.il>
+References: <cover.1264596212.git.baruch@tkos.co.il>
+Message-ID: <20100129094500.GN19551@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the core of the DMA support to plat-samsung for everyone to use.
+On Wed, Jan 27, 2010 at 03:00:46PM +0200, Baruch Siach wrote:
+> These patches add support for the RTC of the i.MX25 chip, which is based on the 
+> DryIce block. The driver is based on code from the Freescale i.MX BSP.
+> 
+> Also included platform code for i.MX25 chip, and the i.MX25 PDK board.
+> 
+> These patches have been tested on the i.MX25 PDK board.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/plat-s3c/Makefile                         |    4 ----
- arch/arm/plat-samsung/Makefile                     |    4 ++++
- arch/arm/{plat-s3c => plat-samsung}/dma.c          |    0
- .../{plat-s3c => plat-samsung}/include/plat/dma.h  |    2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
- rename arch/arm/{plat-s3c => plat-samsung}/dma.c (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/dma.h (98%)
+I added 2/3 and 3/3 to mxc-master. The rtc guys should take care of the
+rest.
 
-diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
-index 197b9bd..2a3c4a4 100644
---- a/arch/arm/plat-s3c/Makefile
-+++ b/arch/arm/plat-s3c/Makefile
-@@ -13,7 +13,3 @@ obj-				:=
- 
- obj-y				+= init.o
- obj-y				+= time.o
--
--# DMA support
--
--obj-$(CONFIG_S3C_DMA)		+= dma.o
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 629fd9f..facc7e3 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -39,6 +39,10 @@ obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
- obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
- obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
- 
-+# DMA support
-+
-+obj-$(CONFIG_S3C_DMA)		+= dma.o
-+
- # PM support
- 
- obj-$(CONFIG_PM)		+= pm.o
-diff --git a/arch/arm/plat-s3c/dma.c b/arch/arm/plat-samsung/dma.c
-similarity index 100%
-rename from arch/arm/plat-s3c/dma.c
-rename to arch/arm/plat-samsung/dma.c
-diff --git a/arch/arm/plat-s3c/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-similarity index 98%
-rename from arch/arm/plat-s3c/include/plat/dma.h
-rename to arch/arm/plat-samsung/include/plat/dma.h
-index e429d10..7584d75 100644
---- a/arch/arm/plat-s3c/include/plat/dma.h
-+++ b/arch/arm/plat-samsung/include/plat/dma.h
-@@ -1,4 +1,4 @@
--/* arch/arm/plat-s3c/include/plat/dma.h
-+/* arch/arm/plat-samsung/include/plat/dma.h
-  *
-  * Copyright (C) 2003-2006 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
+Sascha
+
+
+> 
+> Baruch Siach (3):
+>   rtc: driver for the DryIce block found in i.MX25 chips
+>   mx25: add support for the DryIce rtc
+>   mx25pdk: platform code for the DryIce RTC module
+> 
+>  arch/arm/mach-mx25/clock.c            |    2 +
+>  arch/arm/mach-mx25/devices.c          |   19 ++
+>  arch/arm/mach-mx25/devices.h          |    1 +
+>  arch/arm/mach-mx25/mx25pdk.c          |    1 +
+>  arch/arm/plat-mxc/include/mach/mx25.h |    2 +
+>  drivers/rtc/Kconfig                   |   10 +
+>  drivers/rtc/Makefile                  |    1 +
+>  drivers/rtc/rtc-imxdi.c               |  559 +++++++++++++++++++++++++++++++++
+>  8 files changed, 595 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/rtc/rtc-imxdi.c
+> 
+> 
+
 -- 
-1.6.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
