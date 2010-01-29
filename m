@@ -1,33 +1,30 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 29 Jan 2010 09:02:18 +0000
-Subject: [PATCH] ARM: S3C24XX: Move audio-simtec.h to plat-s3c24xx
+Date: Fri, 29 Jan 2010 09:02:19 +0000
+Subject: [PATCH] ARM: SAMSUNG: Select NO_IOPORT for plat-samsung
 In-Reply-To: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
 References: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264755741-16184-8-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264755741-16184-9-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continue the clearout of plat-s3c by moving audio-simtec.h to plat-s3c24xx
-as there are no current implementations outside of this platform.
+All these platforms select NO_IOPORT, so move it to plat-samsung Kconfig
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- .../include/plat/audio-simtec.h                    |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
- rename arch/arm/{plat-s3c => plat-s3c24xx}/include/plat/audio-simtec.h (95%)
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-s3c/include/plat/audio-simtec.h b/arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
-similarity index 95%
-rename from arch/arm/plat-s3c/include/plat/audio-simtec.h
-rename to arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
-index 53a9365..de5e88f 100644
---- a/arch/arm/plat-s3c/include/plat/audio-simtec.h
-+++ b/arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
-@@ -1,4 +1,4 @@
--/* arch/arm/plat-s3c/include/plat/audio-simtec.h
-+/* arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
-  *
-  * Copyright 2008 Simtec Electronics
-  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 93bd893..d552c65 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -7,6 +7,7 @@
+ config PLAT_SAMSUNG
+ 	bool
+ 	depends on ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX || ARCH_S5PC1XX
++	select NO_IOPORT
+ 	default y
+ 	help
+ 	  Base platform code for all Samsung SoC based systems
 -- 
 1.6.0.4
