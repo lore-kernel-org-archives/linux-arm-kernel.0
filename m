@@ -1,37 +1,52 @@
 From: adharmap@codeaurora.org (adharmap at codeaurora.org)
-Date: Thu, 28 Jan 2010 23:06:00 -0800
-Subject: [PATCH v2 0/4] GIC Changes
-Message-ID: <1264748764-5319-1-git-send-email-adharmap@codeaurora.org>
+Date: Thu, 28 Jan 2010 23:06:01 -0800
+Subject: [PATCH v2 1/4] GIC: Disable unused interrupts
+In-Reply-To: <1264748764-5319-1-git-send-email-adharmap@codeaurora.org>
+References: <1264748764-5319-1-git-send-email-adharmap@codeaurora.org>
+Message-ID: <1264748764-5319-2-git-send-email-adharmap@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
 
-Few fixes and improvements to arch/arm/common/gic.c file. 
+Disable all interrupts of a gic in distributor initialization function.
+This way interrupts beyond NR_IRQS stay disabled.
 
-Changes in v2
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@quicinc.com>
+---
+ arch/arm/common/gic.c |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-Russell indicated that there could be an on chip inteverter on some interrupt
-lines and hence there is no way to enforce correct edge rising/falling or level
-high/low configuration. The change to introduce set_type callback is dropped.
-
-Also the change to configure SPI's and PPI's as level/edge  depending on the
-flow_type argument passed in gic_dist_init is dropped. 
-
-As per Catalin's suggestion all the interrupts reported by gic are
-disabled. This way we initialize and disable all the unused interrupts.
-The iterator,i in the gic_dist_init is still prevented from exceeding NR_IRQS.
-
-As per Ben Dook's suggestion 'gic:...' is changed to 'GIC:...' in title.
-
-Thanks for all your inputs. Please let me know if further changes are
-required.
-
-Abhijeet Dharmapurikar (4):
-  GIC: Disable unused interrupts
-  GIC: Prevent gic from crossing NR_IRQS
-  GIC: Add callback for mask_ack
-  GIC: Dont disable INT in ack callback
-
- arch/arm/common/gic.c |   56 +++++++++++++++++++++++++++++++++---------------
- 1 files changed, 38 insertions(+), 18 deletions(-)
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 337741f..cd92ce0 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -175,6 +175,11 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ 	set_irq_chained_handler(irq, gic_handle_cascade_irq);
+ }
+ 
++/*
++ * In case of multiple cascaded GICs, order calls to gic_dist_init with
++ * ascending irq_start
++ */
++
+ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 			  unsigned int irq_start)
+ {
+@@ -200,11 +205,10 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+ 
+ 	/*
+ 	 * The GIC only supports up to 1020 interrupt sources.
+-	 * Limit this to either the architected maximum, or the
+-	 * platform maximum.
++	 * Limit this to either the architected maximum
+ 	 */
+-	if (max_irq > max(1020, NR_IRQS))
+-		max_irq = max(1020, NR_IRQS);
++	if (max_irq > 1020)
++		max_irq = 1020;
+ 
+ 	/*
+ 	 * Set all global interrupts to be level triggered, active low.
+-- 
+1.5.6.3
