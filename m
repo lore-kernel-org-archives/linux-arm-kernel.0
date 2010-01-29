@@ -1,29 +1,25 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Fri, 29 Jan 2010 10:08:04 +0900
-Subject: [alsa-devel] [PATCHv2 05/10] ASoC: AC97: SMDK: Add wm9713 machine
-	driver
-In-Reply-To: <20100128120020.GA19270@sirena.org.uk>
-References: <1264571959-15115-1-git-send-email-jassisinghbrar@gmail.com>
-	<20100128120020.GA19270@sirena.org.uk>
-Message-ID: <1b68c6791001281708ve324caaoa52581e3ebce09bd@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 28 Jan 2010 17:14:26 -0800
+Subject: [RFC PATCH 06/12] arm: msm: set L2CR1 to enable prefetch and
+	burst on Scorpion.
+In-Reply-To: <alpine.LFD.2.00.1001282003050.1681@xanadu.home>
+References: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+	<alpine.LFD.2.00.1001282003050.1681@xanadu.home>
+Message-ID: <1264727666.14915.48.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 9:00 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Jan 27, 2010 at 02:59:19PM +0900, jassisinghbrar at gmail.com wrote:
->
->> + ? ? Headphone Playback Switch - On
->> + ? ? $ amixer cset numid=4 1
->> +
->
-> Actually, one thing that really needs fixing here - these instructions
-> refer to the controls by number. ?This is extremely fragile in the face
-> of any changes in the CODEC driver since the control numbering is worked
-> out at runtime and any change in the set of controls exported by the
-> device may change the result. ?It is much better to refer to the
-> controls by name since the names are much less likely to change. ?This
-> is also helpful for people using other UIs which don't display the
-> control names.
-I will submit a patch for it, though I used exact control names and their
-values before every command.
+On Thu, 2010-01-28 at 20:06 -0500, Nicolas Pitre wrote:
+
+> Do you really think the addition of only 4 lines in a file that contains 
+> 348 lines justifies the addition of such copyright notice?  What would 
+> the kernel source looks like if everyone adding/modifying 4 lines in 
+> every random files did the same?
+> 
+> Just a thought.
+> 
+
+I don't disagree with you. It's actually a legal policy .. I can ask
+some questions regard it tho ..
+
+Daniel
