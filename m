@@ -1,37 +1,35 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 29 Jan 2010 20:26:34 +0900
-Subject: [PATCH 01/06] ARM: SuperH Mobile ARM, sh7367 and G3EVM support
-In-Reply-To: <20100128220835.GA23471@n2100.arm.linux.org.uk>
-References: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
-	<20100128124038.8982.82995.sendpatchset@rxone.opensource.se>
-	<20100128220835.GA23471@n2100.arm.linux.org.uk>
-Message-ID: <aec7e5c31001290326q76036a49p44fe5a5b31f5cd53@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 29 Jan 2010 17:00:30 +0530
+Subject: [PATCH 0/3] OMAP4: Enable L2 cache
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C09C67F9@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2010 at 7:08 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> The entries in this choice menu are sorted by option text - please
-> place your new option appropriately to avoid conflicts.
+Tony,
 
-Ok, will make sure it gets sorted properly.
+Here is the rebased series against 2.6.33-rc5 which adds L2 cache support 
+on OMAP4430. I have dropped the l2 errata patch from earlier post [1] in
+this series since it will go through Russell's patch system. The link
+for patches is [2]
 
->> +static struct sh_timer_config cmt10_platform_data = {
->> + ? ? .name = "CMT10",
->> + ? ? .channel_offset = 0x10,
->> + ? ? .timer_bit = 0,
->> + ? ? .clk = "r_clk",
->
-> I guess you can't do a lot about this because of arch/sh, but over in ARM
-> land, we use clkdev to get the clock primerily by the device name rather
-> than a string passed around; this is how the clk API is meant to be used.
+The following changes since commit 92dcffb916d309aa01778bf8963a6932e4014d07:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc5
 
-At this early stage there is not so much to do. When I get around to
-implement the clock framework and runtime pm for SuperH Mobile ARM
-then I'll have a close look at clkdev.
+Santosh Shilimkar (3):
+      OMAP4: Add L2 Cache support
+      OMAP4: Clean the secondary_data from L2
+      OMAP4: Enable L2 Cache
 
-I'll update and resend these patches next week.
+ arch/arm/configs/omap_4430sdp_defconfig    |    2 +
+ arch/arm/mach-omap2/board-4430sdp.c        |   33 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap-smp.c             |    2 +
+ arch/arm/mm/Kconfig                        |    2 +-
+ arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
+ 5 files changed, 39 insertions(+), 1 deletions(-)
 
-Thanks!
+Regards,
+Santosh
 
-/ magnus
+[1]	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg20553.html
+[2]	http://www.spinics.net/lists/arm-kernel/msg81122.html
