@@ -1,21 +1,79 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 29 Jan 2010 12:27:21 -0500
-Subject: [patch v2 2/2] at91_udc.c use spinlocks instead of local_irq_xxx
-In-Reply-To: <20100129162155.824407360@gmail.com>>
-References: <20100129162029.998540038@gmail.com>>
-	<20100129162155.824407360@gmail.com>>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E96FA@mi8nycmail19.Mi8.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jan 2010 09:52:04 -0800
+Subject: [PATCH 1/3] OMAP4: Add L2 Cache support
+In-Reply-To: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20100129175204.GE23505@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 29, 2010 9:21 AM, Harro Haan wrote:
->
-> The locking code of this driver is reworked for preempt-rt.
->
-> Signed-off-by: Harro Haan <hrhaan@gmail.com>
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [100129 03:44]:
+> This patch adds L2 Cache support for OMAP4. External L2 cache
+> is used in OMPA4
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  drivers/usb/gadget/at91_udc.c |  139 ++++++++++++++++++++++++++++--------------
->  drivers/usb/gadget/at91_udc.h |    1 
->  2 files changed, 94 insertions(+), 46 deletions(-)
+>  arch/arm/mach-omap2/board-4430sdp.c        |   33 ++++++++++++++++++++++++++++
+>  arch/arm/mm/Kconfig                        |    2 +-
+>  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
+>  3 files changed, 35 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 0c6be6b..194d633 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -28,6 +28,7 @@
+>  #include <plat/control.h>
+>  #include <plat/timer-gp.h>
+>  #include <asm/hardware/gic.h>
+> +#include <asm/hardware/cache-l2x0.h>
+>  
+>  static struct platform_device sdp4430_lcd_device = {
+>  	.name		= "sdp4430_lcd",
+> @@ -49,6 +50,38 @@ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
+>  static struct omap_board_config_kernel sdp4430_config[] __initdata = {
+>  	{ OMAP_TAG_LCD,		&sdp4430_lcd_config },
+>  };
+> +#ifdef CONFIG_CACHE_L2X0
+> +static int __init omap_l2_cache_init(void)
+> +{
+> +	void __iomem *l2cache_base;
 
-Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Since this is an initcall, you need to return here early to avoid
+running on other omaps:
+
+	if (!cpu_is_omap44xx())
+		return -ENODEV;
+
+> +
+> +	/* Static mapping, never released */
+> +	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+> +	BUG_ON(!l2cache_base);
+> +
+> +	/* Enable L2 Cache using secure api
+> +	 * r0 contains the value to be modified and "r12" contains
+> +	 * the monitor API number. This API uses few CPU registers
+> +	 * internally and hence they need be backed up including
+> +	 * link register "lr".
+> +	 */
+> +	__asm__ __volatile__(
+> +		"stmfd r13!, {r0-r12, r14}\n"
+> +		"mov r0, #1\n"
+> +		"ldr r12, =0x102\n"
+> +		"dsb\n"
+> +		"smc\n"
+> +		"ldmfd r13!, {r0-r12, r14}");
+> +
+> +	/* 32KB way size, 16-way associativity,
+> +	* parity disabled
+> +	*/
+> +	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
+> +
+> +	return 0;
+> +}
+> +early_initcall(omap_l2_cache_init);
+> +#endif
+
+Regards,
+
+Tony
