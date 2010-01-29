@@ -1,22 +1,21 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Fri, 29 Jan 2010 18:04:19 +0100
-Subject: [patch v2 1/2] at91_udc.c read_fifo timing issue
-In-Reply-To: <20100129162155.709756286@gmail.com>
-References: <20100129162029.998540038@gmail.com>
-	<20100129162155.709756286@gmail.com>
-Message-ID: <3efb10971001290904p74b1919aif8ff013f050123a9@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 29 Jan 2010 12:27:21 -0500
+Subject: [patch v2 2/2] at91_udc.c use spinlocks instead of local_irq_xxx
+In-Reply-To: <20100129162155.824407360@gmail.com>>
+References: <20100129162029.998540038@gmail.com>>
+	<20100129162155.824407360@gmail.com>>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E96FA@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harro,
-
-2010/1/29 Harro Haan <hrhaan@gmail.com>:
-> This solves the read_fifo timing issue for example seen with CDC Ethernet.
-> See the comments below for more info.
+On Friday, January 29, 2010 9:21 AM, Harro Haan wrote:
+>
+> The locking code of this driver is reworked for preempt-rt.
 >
 > Signed-off-by: Harro Haan <hrhaan@gmail.com>
 > ---
-> ?drivers/usb/gadget/at91_udc.c | ? 46 ++++++++++++++++++++++++++++++++++++++----
-> ?1 file changed, 42 insertions(+), 4 deletions(-)
->
-Acked-by: Remy Bohmer <linux@bohmer.net>
+>  drivers/usb/gadget/at91_udc.c |  139 ++++++++++++++++++++++++++++--------------
+>  drivers/usb/gadget/at91_udc.h |    1 
+>  2 files changed, 94 insertions(+), 46 deletions(-)
+
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
