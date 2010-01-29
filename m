@@ -1,45 +1,68 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 29 Jan 2010 00:29:11 +0000
-Subject: disable_irq() causes hang on AT91RM9200 targets?
-In-Reply-To: <4B61C2C7.2000405@billgatliff.com>
-References: <4B61C2C7.2000405@billgatliff.com>
-Message-ID: <20100129002911.GN9153@trinity.fluff.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 28 Jan 2010 20:06:37 -0500 (EST)
+Subject: [RFC PATCH 06/12] arm: msm: set L2CR1 to enable prefetch and burst
+	on Scorpion.
+In-Reply-To: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+References: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1001282003050.1681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2010 at 11:00:55AM -0600, Bill Gatliff wrote:
-> Guys:
-> 
-> 
-> Has anyone noticed that with 2.6.33-rc5 (at least) on AT91RM9200,
-> disable_irq() seems to cause a lockup when the interrupt number is a
-> GPIO line?  I'm calling disable_irq() from an interrupt handler on the
-> same GPIO line.
-> 
-> I just saw this happen, and it seems to be repeatable.  Just wondering
-> if this is a known issue before I start digging into it...
+On Thu, 28 Jan 2010, Daniel Walker wrote:
 
-disable_irq_nosync(), disable_irq() has for a while waited for the IRQ
-to clear before exiting. Now, guess what happens if you wait for the IRQ
-to clear in the IRQ handler that is currently executing.
- 
+> From: Larry Bassel <lbassel@quicinc.com>
 > 
-> b.g.
+> This change improves the following LMBench benchmarks
+> by over 15%:
 > 
+> System Call Latency
+> Signal Handling Latency
+> Fault Latency
+> Inter-process Communication Latency
+> Inter-process Communication Bandwidth
+> Random Number Generation Latency
+> 
+> Acked-by: Steve Muckle <smuckle@quicinc.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Shilimkar, Santosh <santosh.shilimkar@ti.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Bohan, Michael <mbohan@quicinc.com>
+> Signed-off-by: Larry Bassel <lbassel@quicinc.com>
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> ---
+>  arch/arm/mm/proc-v7.S |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 7aaf88a..3ca5d29 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -2,6 +2,7 @@
+>   *  linux/arch/arm/mm/proc-v7.S
+>   *
+>   *  Copyright (C) 2001 Deep Blue Solutions Ltd.
+> + *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+
+Do you really think the addition of only 4 lines in a file that contains 
+348 lines justifies the addition of such copyright notice?  What would 
+the kernel source looks like if everyone adding/modifying 4 lines in 
+every random files did the same?
+
+Just a thought.
+
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -242,6 +243,10 @@ __v7_setup:
+>  	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
+>  	mov	r10, #0x1f			@ domains 0, 1 = manager
+>  	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
+> +#ifdef CONFIG_ARCH_MSM_SCORPION
+> +	mov     r0, #0x77
+> +	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
+> +#endif
+>  	/*
+>  	 * Memory region attributes with SCTLR.TRE=1
+>  	 *
 > -- 
-> Bill Gatliff
-> bgat at billgatliff.com
+> 1.6.3.3
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
