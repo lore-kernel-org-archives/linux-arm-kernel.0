@@ -1,7 +1,7 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 29 Jan 2010 15:43:52 -0700
-Subject: [PATCH] mach-kirkwood/common.c: remove unnecessary (void *) casts
-Message-ID: <201001291543.52272.hartleys@visionengravers.com>
+Date: Fri, 29 Jan 2010 15:56:58 -0700
+Subject: [PATCH] mach-orion5x/common.c: remove unnecessary (void *) casts
+Message-ID: <201001291556.59176.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,43 +14,25 @@ Cc: Nicolas Pitre <nico@marvell.com>
 
 ---
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 242dd07..f759ca2 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -656,7 +656,7 @@ static struct platform_device kirkwood_xor00_channel = {
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index f87fa12..8dc2c76 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -488,7 +488,7 @@ static struct platform_device orion5x_xor0_channel = {
  	.dev		= {
- 		.dma_mask		= &kirkwood_xor_dmamask,
+ 		.dma_mask		= &orion5x_xor_dmamask,
  		.coherent_dma_mask	= DMA_BIT_MASK(64),
--		.platform_data		= (void *)&kirkwood_xor00_data,
-+		.platform_data		= &kirkwood_xor00_data,
+-		.platform_data		= (void *)&orion5x_xor0_data,
++		.platform_data		= &orion5x_xor0_data,
  	},
  };
  
-@@ -682,7 +682,7 @@ static struct platform_device kirkwood_xor01_channel = {
+@@ -514,7 +514,7 @@ static struct platform_device orion5x_xor1_channel = {
  	.dev		= {
- 		.dma_mask		= &kirkwood_xor_dmamask,
+ 		.dma_mask		= &orion5x_xor_dmamask,
  		.coherent_dma_mask	= DMA_BIT_MASK(64),
--		.platform_data		= (void *)&kirkwood_xor01_data,
-+		.platform_data		= &kirkwood_xor01_data,
- 	},
- };
- 
-@@ -755,7 +755,7 @@ static struct platform_device kirkwood_xor10_channel = {
- 	.dev		= {
- 		.dma_mask		= &kirkwood_xor_dmamask,
- 		.coherent_dma_mask	= DMA_BIT_MASK(64),
--		.platform_data		= (void *)&kirkwood_xor10_data,
-+		.platform_data		= &kirkwood_xor10_data,
- 	},
- };
- 
-@@ -781,7 +781,7 @@ static struct platform_device kirkwood_xor11_channel = {
- 	.dev		= {
- 		.dma_mask		= &kirkwood_xor_dmamask,
- 		.coherent_dma_mask	= DMA_BIT_MASK(64),
--		.platform_data		= (void *)&kirkwood_xor11_data,
-+		.platform_data		= &kirkwood_xor11_data,
+-		.platform_data		= (void *)&orion5x_xor1_data,
++		.platform_data		= &orion5x_xor1_data,
  	},
  };
  
