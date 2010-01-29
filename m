@@ -1,179 +1,200 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 29 Jan 2010 09:02:21 +0000
-Subject: [PATCH] ARM: S3C: Remove old plat-s3c directory and unused contents
+Date: Fri, 29 Jan 2010 09:02:12 +0000
+Subject: [PATCH] ARM: SAMSUNG: Move common headers from plat-s3c to
+	plat-samsung
 In-Reply-To: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
 References: <1264755741-16184-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264755741-16184-11-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264755741-16184-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the plat-s3c directory, as it isn't being used anymore and then
-remove it from the ARM build.
+Move common headers from plat-s3c's include/plat directory into plat-samsung.
+
+No need to fix any files, these are still included via <plat/>
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/Kconfig                         |    1 -
- arch/arm/Makefile                        |    8 ++++----
- arch/arm/plat-s3c/Kconfig                |   11 -----------
- arch/arm/plat-s3c/Makefile               |   13 -------------
- arch/arm/plat-s3c/include/mach/io.h      |   18 ------------------
- arch/arm/plat-s3c/include/mach/timex.h   |   26 --------------------------
- arch/arm/plat-s3c/include/mach/vmalloc.h |   20 --------------------
- 7 files changed, 4 insertions(+), 93 deletions(-)
- delete mode 100644 arch/arm/plat-s3c/Kconfig
- delete mode 100644 arch/arm/plat-s3c/Makefile
- delete mode 100644 arch/arm/plat-s3c/include/mach/io.h
- delete mode 100644 arch/arm/plat-s3c/include/mach/timex.h
- delete mode 100644 arch/arm/plat-s3c/include/mach/vmalloc.h
+ .../include/plat/audio.h                           |    2 +-
+ .../include/plat/cpu-freq.h                        |    2 +-
+ .../{plat-s3c => plat-samsung}/include/plat/cpu.h  |    2 +-
+ .../include/plat/debug-macro.S                     |    2 +-
+ .../{plat-s3c => plat-samsung}/include/plat/devs.h |    2 +-
+ .../{plat-s3c => plat-samsung}/include/plat/fb.h   |    2 +-
+ .../{plat-s3c => plat-samsung}/include/plat/pm.h   |    2 +-
+ .../include/plat/regs-fb-v4.h                      |    2 +-
+ .../include/plat/regs-fb.h                         |    2 +-
+ .../include/plat/regs-serial.h                     |    2 +-
+ .../include/plat/uncompress.h                      |    2 +-
+ .../include/plat/usb-control.h                     |    2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/audio.h (91%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/cpu-freq.h (98%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/cpu.h (97%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/debug-macro.S (96%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/devs.h (98%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/fb.h (98%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/pm.h (99%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-fb-v4.h (99%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-fb.h (99%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/regs-serial.h (99%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/uncompress.h (98%)
+ rename arch/arm/{plat-s3c => plat-samsung}/include/plat/usb-control.h (95%)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3bc5169..20844fc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -785,7 +785,6 @@ source "arch/arm/mach-dove/Kconfig"
- source "arch/arm/plat-samsung/Kconfig"
- source "arch/arm/plat-s3c24xx/Kconfig"
- source "arch/arm/plat-s3c64xx/Kconfig"
--source "arch/arm/plat-s3c/Kconfig"
- source "arch/arm/plat-s5p/Kconfig"
- source "arch/arm/plat-s5pc1xx/Kconfig"
- 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index bbcd512..774f66a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -182,10 +182,10 @@ plat-$(CONFIG_PLAT_IOP)		:= iop
- plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
- plat-$(CONFIG_PLAT_ORION)	:= orion
- plat-$(CONFIG_PLAT_PXA)		:= pxa
--plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx s3c samsung
--plat-$(CONFIG_PLAT_S3C64XX)	:= s3c64xx s3c samsung
--plat-$(CONFIG_PLAT_S5PC1XX)	:= s5pc1xx s3c samsung
--plat-$(CONFIG_PLAT_S5P)		:= s5p samsung s3c
-+plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
-+plat-$(CONFIG_PLAT_S3C64XX)	:= s3c64xx samsung
-+plat-$(CONFIG_PLAT_S5PC1XX)	:= s5pc1xx samsung
-+plat-$(CONFIG_PLAT_S5P)		:= s5p samsung
- plat-$(CONFIG_ARCH_STMP3XXX)	:= stmp3xxx
- 
- ifeq ($(CONFIG_ARCH_EBSA110),y)
-diff --git a/arch/arm/plat-s3c/Kconfig b/arch/arm/plat-s3c/Kconfig
-deleted file mode 100644
-index 6108ba9..0000000
---- a/arch/arm/plat-s3c/Kconfig
-+++ /dev/null
-@@ -1,11 +0,0 @@
--# Copyright 2007 Simtec Electronics
--#
--# Licensed under GPLv2
--
--config PLAT_S3C
--	bool
--	depends on ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX
--	default y
--	select NO_IOPORT
--	help
--	  Base platform code for any Samsung S3C device
-diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
-deleted file mode 100644
-index 867c9cf..0000000
---- a/arch/arm/plat-s3c/Makefile
-+++ /dev/null
-@@ -1,13 +0,0 @@
--# arch/arm/plat-s3c/Makefile
--#
--# Copyright 2008 Simtec Electronics
--#
--# Licensed under GPLv2
--
--obj-y				:=
--obj-m				:=
--obj-n				:= dummy.o
--obj-				:=
--
--# Core support for all Samsung SoCs
--
-diff --git a/arch/arm/plat-s3c/include/mach/io.h b/arch/arm/plat-s3c/include/mach/io.h
-deleted file mode 100644
-index f6a5363..0000000
---- a/arch/arm/plat-s3c/include/mach/io.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/* arch/arm/plat-s3c/include/mach/io.h
-- *
-- * Copyright 2008 Simtec Electronics
-- *	Ben Dooks <ben-linux@fluff.org>
-- *
-- * Default IO routines for plat-s3c based systems, such as S3C24A0
-- */
--
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
--
--/* No current ISA/PCI bus support. */
--#define __io(a)		__typesafe_io(a)
--#define __mem_pci(a)	(a)
--
--#define IO_SPACE_LIMIT (0xFFFFFFFF)
--
--#endif
-diff --git a/arch/arm/plat-s3c/include/mach/timex.h b/arch/arm/plat-s3c/include/mach/timex.h
-deleted file mode 100644
-index 2a425ed..0000000
---- a/arch/arm/plat-s3c/include/mach/timex.h
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/timex.h
-- *
-- * Copyright (c) 2003-2005 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2410 - time parameters
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_TIMEX_H
--#define __ASM_ARCH_TIMEX_H
--
--/* CLOCK_TICK_RATE needs to be evaluatable by the cpp, so making it
-- * a variable is useless. It seems as long as we make our timers an
-- * exact multiple of HZ, any value that makes a 1->1 correspondence
-- * for the time conversion functions to/from jiffies is acceptable.
--*/
--
--
--#define CLOCK_TICK_RATE 12000000
--
--
--#endif /* __ASM_ARCH_TIMEX_H */
-diff --git a/arch/arm/plat-s3c/include/mach/vmalloc.h b/arch/arm/plat-s3c/include/mach/vmalloc.h
-deleted file mode 100644
-index bfd2ca6..0000000
---- a/arch/arm/plat-s3c/include/mach/vmalloc.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/* arch/arm/plat-s3c/include/mach/vmalloc.h
-- *
-- * from arch/arm/mach-iop3xx/include/mach/vmalloc.h
-- *
-- * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
-- *		      http://www.simtec.co.uk/products/SWLINUX/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * S3C2410 vmalloc definition
--*/
--
--#ifndef __ASM_ARCH_VMALLOC_H
--#define __ASM_ARCH_VMALLOC_H
--
--#define VMALLOC_END	  (0xE0000000)
--
--#endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/plat-s3c/include/plat/audio.h b/arch/arm/plat-samsung/include/plat/audio.h
+similarity index 91%
+rename from arch/arm/plat-s3c/include/plat/audio.h
+rename to arch/arm/plat-samsung/include/plat/audio.h
+index f22d23b..da561da 100644
+--- a/arch/arm/plat-s3c/include/plat/audio.h
++++ b/arch/arm/plat-samsung/include/plat/audio.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/audio.h
++/* arch/arm/plat-samsung/include/plat/audio.h
+  *
+  * Copyright (c) 2009 Samsung Electronics Co. Ltd
+  * Author: Jaswinder Singh <jassi.brar@samsung.com>
+diff --git a/arch/arm/plat-s3c/include/plat/cpu-freq.h b/arch/arm/plat-samsung/include/plat/cpu-freq.h
+similarity index 98%
+rename from arch/arm/plat-s3c/include/plat/cpu-freq.h
+rename to arch/arm/plat-samsung/include/plat/cpu-freq.h
+index 94eb06a..80c4a80 100644
+--- a/arch/arm/plat-s3c/include/plat/cpu-freq.h
++++ b/arch/arm/plat-samsung/include/plat/cpu-freq.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/cpu-freq.h
++/* arch/arm/plat-samsung/include/plat/cpu-freq.h
+  *
+  * Copyright (c) 2006-2007 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+similarity index 97%
+rename from arch/arm/plat-s3c/include/plat/cpu.h
+rename to arch/arm/plat-samsung/include/plat/cpu.h
+index 676db94..d316b4a 100644
+--- a/arch/arm/plat-s3c/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s3c/include/plat/cpu.h
++/* linux/arch/arm/plat-samsung/include/plat/cpu.h
+  *
+  * Copyright (c) 2004-2005 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c/include/plat/debug-macro.S b/arch/arm/plat-samsung/include/plat/debug-macro.S
+similarity index 96%
+rename from arch/arm/plat-s3c/include/plat/debug-macro.S
+rename to arch/arm/plat-samsung/include/plat/debug-macro.S
+index 3634d4e..43ed0ec 100644
+--- a/arch/arm/plat-s3c/include/plat/debug-macro.S
++++ b/arch/arm/plat-samsung/include/plat/debug-macro.S
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c/debug-macro.S
++/* arch/arm/plat-samsung/include/plat/debug-macro.S
+  *
+  * Copyright 2005, 2007 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+similarity index 98%
+rename from arch/arm/plat-s3c/include/plat/devs.h
+rename to arch/arm/plat-samsung/include/plat/devs.h
+index c6f9b73..0597ffa 100644
+--- a/arch/arm/plat-s3c/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c24xx/devs.h
++/* arch/arm/plat-samsung/include/plat/devs.h
+  *
+  * Copyright (c) 2004 Simtec Electronics
+  * Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+similarity index 98%
+rename from arch/arm/plat-s3c/include/plat/fb.h
+rename to arch/arm/plat-samsung/include/plat/fb.h
+index f8db879..ffc01a7 100644
+--- a/arch/arm/plat-s3c/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s3c/include/plat/fb.h
++/* arch/arm/plat-samsung/include/plat/fb.h
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+diff --git a/arch/arm/plat-s3c/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+similarity index 99%
+rename from arch/arm/plat-s3c/include/plat/pm.h
+rename to arch/arm/plat-samsung/include/plat/pm.h
+index 2543bd2..245836d 100644
+--- a/arch/arm/plat-s3c/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c24xx/pm.h
++/* arch/arm/plat-samsung/include/plat/pm.h
+  *
+  * Copyright (c) 2004 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c/include/plat/regs-fb-v4.h b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+similarity index 99%
+rename from arch/arm/plat-s3c/include/plat/regs-fb-v4.h
+rename to arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+index a60ed0d..0f43599 100644
+--- a/arch/arm/plat-s3c/include/plat/regs-fb-v4.h
++++ b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/regs-fb-v4.h
++/* arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+diff --git a/arch/arm/plat-s3c/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
+similarity index 99%
+rename from arch/arm/plat-s3c/include/plat/regs-fb.h
+rename to arch/arm/plat-samsung/include/plat/regs-fb.h
+index e9ee599..0ef806e 100644
+--- a/arch/arm/plat-s3c/include/plat/regs-fb.h
++++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/regs-fb.h
++/* arch/arm/plat-samsung/include/plat/regs-fb.h
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+diff --git a/arch/arm/plat-s3c/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
+similarity index 99%
+rename from arch/arm/plat-s3c/include/plat/regs-serial.h
+rename to arch/arm/plat-samsung/include/plat/regs-serial.h
+index 60d6604..a6eba84 100644
+--- a/arch/arm/plat-s3c/include/plat/regs-serial.h
++++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-serial.h
++/* arch/arm/plat-samsung/include/plat/regs-serial.h
+  *
+  *  From linux/include/asm-arm/hardware/serial_s3c2410.h
+  *
+diff --git a/arch/arm/plat-s3c/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+similarity index 98%
+rename from arch/arm/plat-s3c/include/plat/uncompress.h
+rename to arch/arm/plat-samsung/include/plat/uncompress.h
+index dc66a47..e87ce8f 100644
+--- a/arch/arm/plat-s3c/include/plat/uncompress.h
++++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c/uncompress.h
++/* arch/arm/plat-samsung/include/plat/uncompress.h
+  *
+  * Copyright 2003, 2007 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c/include/plat/usb-control.h b/arch/arm/plat-samsung/include/plat/usb-control.h
+similarity index 95%
+rename from arch/arm/plat-s3c/include/plat/usb-control.h
+rename to arch/arm/plat-samsung/include/plat/usb-control.h
+index a6a57bf..7fa1fbe 100644
+--- a/arch/arm/plat-s3c/include/plat/usb-control.h
++++ b/arch/arm/plat-samsung/include/plat/usb-control.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/usb-control.h
++/* arch/arm/plat-samsung/include/plat/usb-control.h
+  *
+  * Copyright (c) 2004 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
 -- 
 1.6.0.4
