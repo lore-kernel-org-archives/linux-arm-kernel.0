@@ -1,510 +1,793 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 29 Jan 2010 11:06:18 +0900
-Subject: [PATCH v2 2/7] ARM: S5P6442: Add clock support for S5P6442
-Message-ID: <1264730778-15995-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 29 Jan 2010 11:06:14 +0900
+Subject: [PATCH v2 1/7] ARM: S5P6442: Add Samsung S5P6442 CPU support
+Message-ID: <1264730774-15959-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock support for S5P6442. This patch adds the clock
-register definitions and the various system clocks in S5P6442.
+This patch adds support for Samsung S5P6442 CPU. This patch also adds
+an entry for S5P6442 cpu in plat-s5p cpu table.
 
 Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5p6442/Makefile                  |    2 +-
- arch/arm/mach-s5p6442/clock.c                   |  247 +++++++++++++++++++++++
- arch/arm/mach-s5p6442/include/mach/pwm-clock.h  |   62 ++++++
- arch/arm/mach-s5p6442/include/mach/regs-clock.h |  103 ++++++++++
- arch/arm/mach-s5p6442/include/mach/tick.h       |   24 +++
- 5 files changed, 437 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-s5p6442/clock.c
- create mode 100644 arch/arm/mach-s5p6442/include/mach/pwm-clock.h
- create mode 100644 arch/arm/mach-s5p6442/include/mach/regs-clock.h
- create mode 100644 arch/arm/mach-s5p6442/include/mach/tick.h
+ arch/arm/mach-s5p6442/Kconfig                    |   24 ++++
+ arch/arm/mach-s5p6442/Makefile                   |   18 ++++
+ arch/arm/mach-s5p6442/Makefile.boot              |    2 +
+ arch/arm/mach-s5p6442/cpu.c                      |  121 +++++++++++++++++++++
+ arch/arm/mach-s5p6442/include/mach/debug-macro.S |   36 +++++++
+ arch/arm/mach-s5p6442/include/mach/entry-macro.S |   48 +++++++++
+ arch/arm/mach-s5p6442/include/mach/gpio.h        |  123 ++++++++++++++++++++++
+ arch/arm/mach-s5p6442/include/mach/hardware.h    |   18 +++
+ arch/arm/mach-s5p6442/include/mach/map.h         |   59 ++++++++++
+ arch/arm/mach-s5p6442/include/mach/memory.h      |   19 ++++
+ arch/arm/mach-s5p6442/include/mach/system.h      |   26 +++++
+ arch/arm/mach-s5p6442/include/mach/uncompress.h  |   24 ++++
+ arch/arm/mach-s5p6442/init.c                     |   44 ++++++++
+ arch/arm/plat-s3c/include/plat/debug-macro.S     |   12 ++
+ arch/arm/plat-s5p/cpu.c                          |   10 ++
+ arch/arm/plat-s5p/include/plat/map-s5p.h         |    1 +
+ arch/arm/plat-s5p/include/plat/s5p6442.h         |   33 ++++++
+ 17 files changed, 618 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5p6442/Kconfig
+ create mode 100644 arch/arm/mach-s5p6442/Makefile
+ create mode 100644 arch/arm/mach-s5p6442/Makefile.boot
+ create mode 100644 arch/arm/mach-s5p6442/cpu.c
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/map.h
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/memory.h
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/system.h
+ create mode 100644 arch/arm/mach-s5p6442/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-s5p6442/init.c
+ create mode 100644 arch/arm/plat-s5p/include/plat/s5p6442.h
 
-diff --git a/arch/arm/mach-s5p6442/Makefile b/arch/arm/mach-s5p6442/Makefile
-index 0a45d01..f1b3e75 100644
---- a/arch/arm/mach-s5p6442/Makefile
-+++ b/arch/arm/mach-s5p6442/Makefile
-@@ -12,7 +12,7 @@ obj-				:=
- 
- # Core support for S5P6442 system
- 
--obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o
-+obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o clock.o
- 
- # machine support
- 
-diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
+diff --git a/arch/arm/mach-s5p6442/Kconfig b/arch/arm/mach-s5p6442/Kconfig
 new file mode 100644
-index 0000000..e8ba43e
+index 0000000..cc9fc4f
 --- /dev/null
-+++ b/arch/arm/mach-s5p6442/clock.c
-@@ -0,0 +1,248 @@
-+/* linux/arch/arm/mach-s5p6442/clock.c
++++ b/arch/arm/mach-s5p6442/Kconfig
+@@ -0,0 +1,24 @@
++# arch/arm/mach-s5p6442/Kconfig
++#
++# Copyright (c) 2010 Samsung Electronics Co., Ltd.
++#		http://www.samsung.com/
++#
++# Licensed under GPLv2
++
++# Configuration options for the S5P6442
++
++if ARCH_S5P6442
++
++config CPU_S5P6442
++	bool
++	select PLAT_S5P
++	help
++	  Enable S5P6442 CPU support
++
++config MACH_SMDK6442
++	bool "SMDK6442"
++	select CPU_S5P6442
++	help
++	  Machine support for Samsung SMDK6442
++
++endif
+diff --git a/arch/arm/mach-s5p6442/Makefile b/arch/arm/mach-s5p6442/Makefile
+new file mode 100644
+index 0000000..0a45d01
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/Makefile
+@@ -0,0 +1,18 @@
++# arch/arm/mach-s5p6442/Makefile
++#
++# Copyright (c) 2010 Samsung Electronics Co., Ltd.
++# 		http://www.samsung.com/
++#
++# Licensed under GPLv2
++
++obj-y				:=
++obj-m				:=
++obj-n				:=
++obj-				:=
++
++# Core support for S5P6442 system
++
++obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o
++
++# machine support
++
+diff --git a/arch/arm/mach-s5p6442/Makefile.boot b/arch/arm/mach-s5p6442/Makefile.boot
+new file mode 100644
+index 0000000..ff90aa1
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/Makefile.boot
+@@ -0,0 +1,2 @@
++   zreladdr-y	:= 0x20008000
++params_phys-y	:= 0x20000100
+diff --git a/arch/arm/mach-s5p6442/cpu.c b/arch/arm/mach-s5p6442/cpu.c
+new file mode 100644
+index 0000000..bc2524d
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/cpu.c
+@@ -0,0 +1,121 @@
++/* linux/arch/arm/mach-s5p6442/cpu.c
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
-+ *
-+ * S5P6442 - Clock support
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#include <linux/init.h>
-+#include <linux/module.h>
 +#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
 +#include <linux/list.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
++#include <linux/timer.h>
++#include <linux/init.h>
 +#include <linux/clk.h>
-+#include <linux/sysdev.h>
 +#include <linux/io.h>
++#include <linux/sysdev.h>
++#include <linux/serial_core.h>
++#include <linux/platform_device.h>
 +
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/irq.h>
++
++#include <asm/proc-fns.h>
++
++#include <mach/hardware.h>
 +#include <mach/map.h>
++#include <asm/irq.h>
 +
-+#include <plat/cpu-freq.h>
++#include <plat/regs-serial.h>
 +#include <mach/regs-clock.h>
-+#include <plat/clock.h>
++
 +#include <plat/cpu.h>
-+#include <plat/pll.h>
-+#include <plat/s5p-clock.h>
-+#include <plat/clock-clksrc.h>
++#include <plat/devs.h>
++#include <plat/clock.h>
 +#include <plat/s5p6442.h>
 +
-+static struct clk clk_pd1 = {
-+	.name		= "pclkd1",
-+	.id		= -1,
-+	.ops		= &clk_ops_def_setrate,
-+};
++/* Initial IO mappings */
 +
-+static struct clksrc_clk clk_mout_apll = {
-+	.clk	= {
-+		.name		= "mout_apll",
-+		.id		= -1,
-+	},
-+	.sources	= &clk_src_apll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 0, .size = 1 },
-+};
-+
-+static struct clksrc_clk clk_mout_epll = {
-+	.clk	= {
-+		.name		= "mout_epll",
-+		.id		= -1,
-+	},
-+	.sources	= &clk_src_epll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1 },
-+};
-+
-+static struct clksrc_clk clk_mout_mpll = {
-+	.clk = {
-+		.name		= "mout_mpll",
-+		.id		= -1,
-+	},
-+	.sources	= &clk_src_mpll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 4, .size = 1 },
-+};
-+
-+int s5p6442_clk_ip3_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
-+}
-+
-+/* Clock initialisation code */
-+static struct clksrc_clk *init_parents[] = {
-+	&clk_mout_apll,
-+	&clk_mout_epll,
-+	&clk_mout_mpll,
-+};
-+
-+#define GET_DIV(clk, field) ((((clk) & field##_MASK) >> field##_SHIFT) + 1)
-+
-+void __init_or_cpufreq s5p6442_setup_clocks(void)
-+{
-+	struct clk *xtal_clk;
-+	unsigned long xtal;
-+	unsigned long fclk;
-+	unsigned long a2m;
-+	unsigned long epll;
-+	unsigned long apll;
-+	unsigned long mpll;
-+	unsigned int ptr;
-+	unsigned long hclkd0 = 0;
-+	unsigned long hclkd1 = 0;
-+	unsigned long pclkd0 = 0;
-+	unsigned long pclkd1 = 0;
-+	u32 clkdiv0;
-+	u32 clkdiv3;
-+	u32 mux_stat0;
-+	u32 mux_stat1;
-+
-+	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-+
-+	clkdiv0 = __raw_readl(S5P_CLK_DIV0);
-+	printk(KERN_DEBUG "%s: clkdiv0 = %08x\n", __func__, clkdiv0);
-+
-+	clkdiv3 = __raw_readl(S5P_CLK_DIV3);
-+	printk(KERN_DEBUG "%s: clkdiv3 = %08x\n", __func__, clkdiv3);
-+
-+	xtal_clk = clk_get(NULL, "xtal");
-+	BUG_ON(IS_ERR(xtal_clk));
-+
-+	xtal = clk_get_rate(xtal_clk);
-+	clk_put(xtal_clk);
-+
-+	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-+
-+	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-+	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
-+	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-+
-+	printk(KERN_INFO "S5P64XX: PLL settings, A=%ld.%ldMHz, M=%ld.%ldMHz," \
-+							" E=%ld.%ldMHz\n",
-+			   print_mhz(apll), print_mhz(mpll), print_mhz(epll));
-+
-+	fclk = apll / GET_DIV(clkdiv0, S5P_CLKDIV0_APLL);
-+
-+	mux_stat1 = __raw_readl(S5P_CLK_MUX_STAT1);
-+	mux_stat0 = __raw_readl(S5P_CLK_MUX_STAT0);
-+
-+	switch ((mux_stat1 & S5P_CLK_MUX_STAT1_D0SYNC_MASK) >> \
-+					S5P_CLK_MUX_STAT1_D0SYNC_SHIFT) {
-+	case 0x1:	/* Asynchronous mode */
-+		switch ((mux_stat0 & S5P_CLK_MUX_STAT0_MUXD0_MASK) \
-+					>> S5P_CLK_MUX_STAT0_MUXD0_SHIFT) {
-+		case 0x1:	/* MPLL source */
-+			hclkd0 = mpll / GET_DIV(clkdiv0, S5P_CLKDIV0_D0CLK);
-+			pclkd0 = hclkd0 / GET_DIV(clkdiv0, S5P_CLKDIV0_P0CLK);
-+			break;
-+		case 0x2:	/* A2M source */
-+			a2m = apll / GET_DIV(clkdiv0, S5P_CLKDIV0_A2M);
-+			hclkd0 = a2m / GET_DIV(clkdiv0, S5P_CLKDIV0_D0CLK);
-+			pclkd0 = hclkd0 / GET_DIV(clkdiv0, S5P_CLKDIV0_P0CLK);
-+			break;
-+		default:
-+			break;
-+
-+		}
-+
-+		switch ((mux_stat0 & S5P_CLK_MUX_STAT0_MUXD1_MASK) >> \
-+						S5P_CLK_MUX_STAT0_MUXD1_SHIFT) {
-+		case 0x1:	/* MPLL source */
-+			hclkd1 = mpll / GET_DIV(clkdiv0, S5P_CLKDIV0_D1CLK);
-+			pclkd1 = hclkd0 / GET_DIV(clkdiv0, S5P_CLKDIV0_P1CLK);
-+			break;
-+		case 0x2:	/* A2M source */
-+			a2m = apll / GET_DIV(clkdiv0, S5P_CLKDIV0_A2M);
-+			hclkd1 = a2m / GET_DIV(clkdiv0, S5P_CLKDIV0_D1CLK);
-+			pclkd1 = hclkd0 / GET_DIV(clkdiv0, S5P_CLKDIV0_P1CLK);
-+			break;
-+		default:
-+			break;
-+		}
-+		break;
-+
-+	case 0x2:	/* Synchronous mode */
-+		hclkd0 = fclk / GET_DIV(clkdiv0, S5P_CLKDIV0_D0CLK);
-+		pclkd0 = hclkd0 / GET_DIV(clkdiv0, S5P_CLKDIV0_P0CLK);
-+		hclkd1 = fclk / GET_DIV(clkdiv0, S5P_CLKDIV0_D1CLK);
-+		pclkd1 = hclkd1 / GET_DIV(clkdiv0, S5P_CLKDIV0_P1CLK);
-+		break;
-+	default:
-+		printk(KERN_ERR "failed to get sync/async mode status register\n");
-+		break;
-+	}
-+
-+	printk(KERN_INFO "S5P64XX: HCLKD0=%ld.%ldMHz, HCLKD1=%ld.%ldMHz," \
-+				" PCLKD0=%ld.%ldMHz, PCLKD1=%ld.%ldMHz\n",
-+			       print_mhz(hclkd0), print_mhz(hclkd1),
-+			       print_mhz(pclkd0), print_mhz(pclkd1));
-+
-+	clk_fout_mpll.rate = mpll;
-+	clk_fout_epll.rate = epll;
-+	clk_fout_apll.rate = apll;
-+
-+	clk_f.rate = fclk;
-+	clk_pd1.rate = pclkd1;
-+
-+	/* For backward compatibility */
-+	clk_h.rate = hclkd1;
-+	clk_p.rate = pclkd1;
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
-+		s3c_set_clksrc(init_parents[ptr], true);
-+}
-+
-+static struct clk init_clocks[] = {
++static struct map_desc s5p6442_iodesc[] __initdata = {
 +	{
-+		.name		= "systimer",
-+		.id		= -1,
-+		.parent		= &clk_pd1,
-+		.enable		= s5p6442_clk_ip3_ctrl,
-+		.ctrlbit	= (1<<16),
++		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
++		.pfn		= __phys_to_pfn(S5P6442_PA_SYSTIMER),
++		.length		= SZ_16K,
++		.type		= MT_DEVICE,
 +	}, {
-+		.name		= "uart",
-+		.id		= 0,
-+		.parent		= &clk_pd1,
-+		.enable		= s5p6442_clk_ip3_ctrl,
-+		.ctrlbit	= (1<<17),
-+	}, {
-+		.name		= "uart",
-+		.id		= 1,
-+		.parent		= &clk_pd1,
-+		.enable		= s5p6442_clk_ip3_ctrl,
-+		.ctrlbit	= (1<<18),
-+	}, {
-+		.name		= "uart",
-+		.id		= 2,
-+		.parent		= &clk_pd1,
-+		.enable		= s5p6442_clk_ip3_ctrl,
-+		.ctrlbit	= (1<<19),
-+	}, {
-+		.name		= "timers",
-+		.id		= -1,
-+		.parent		= &clk_pd1,
-+		.enable		= s5p6442_clk_ip3_ctrl,
-+		.ctrlbit	= (1<<23),
-+	},
++		.virtual	= (unsigned long)VA_VIC2,
++		.pfn		= __phys_to_pfn(S5P6442_PA_VIC2),
++		.length		= SZ_16K,
++		.type		= MT_DEVICE,
++	}
 +};
 +
-+static struct clk *clks[] __initdata = {
-+	&clk_ext,
-+	&clk_epll,
-+	&clk_pd1,
-+	&clk_mout_epll.clk,
-+	&clk_mout_mpll.clk,
-+};
-+
-+void __init s5p6442_register_clocks(void)
++static void s5p6442_idle(void)
 +{
-+	int ret;
++	if (!need_resched())
++		cpu_do_idle();
 +
-+	ret = s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-+	if (ret > 0)
-+		printk(KERN_ERR "Failed to register %u clocks\n", ret);
-+
-+	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-+
-+	s3c_pwmclk_init();
++	local_irq_enable();
 +}
-diff --git a/arch/arm/mach-s5p6442/include/mach/pwm-clock.h b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
-new file mode 100644
-index 0000000..081247e
---- /dev/null
-+++ b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
-@@ -0,0 +1,69 @@
-+/* linux/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
++
++/* s5p6442_map_io
 + *
-+ * Copyright 2008 Simtec Electronics
-+ *      Ben Dooks <ben@simtec.co.uk>
-+ *      http://armlinux.simtec.co.uk/
-+ *
-+ * Copyright 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Based on arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
-+ *
-+ * S5P6442 - pwm clock and timer support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * register the standard cpu IO areas
 +*/
 +
-+#ifndef __ASM_ARCH_PWMCLK_H
-+#define __ASM_ARCH_PWMCLK_H __FILE__
-+
-+/**
-+ * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
-+ * @cfg: The timer TCFG1 register bits shifted down to 0.
-+ *
-+ * Return true if the given configuration from TCFG1 is a TCLK instead
-+ * any of the TDIV clocks.
-+ */
-+static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
++void __init s5p6442_map_io(void)
 +{
-+	return tcfg == S3C2410_TCFG1_MUX_TCLK;
++	iotable_init(s5p6442_iodesc, ARRAY_SIZE(s5p6442_iodesc));
 +}
 +
-+/**
-+ * tcfg_to_divisor() - convert tcfg1 setting to a divisor
-+ * @tcfg1: The tcfg1 setting, shifted down.
-+ *
-+ * Get the divisor value for the given tcfg1 setting. We assume the
-+ * caller has already checked to see if this is not a TCLK source.
-+ */
-+static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
++void __init s5p6442_init_clocks(int xtal)
 +{
-+	return 1 << (1 + tcfg1);
++	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
++
++	s3c24xx_register_baseclocks(xtal);
++	s5p_register_clocks(xtal);
++	s5p6442_register_clocks();
++	s5p6442_setup_clocks();
 +}
 +
-+/**
-+ * pwm_tdiv_has_div1() - does the tdiv setting have a /1
-+ *
-+ * Return true if we have a /1 in the tdiv setting.
-+ */
-+static inline unsigned int pwm_tdiv_has_div1(void)
++void __init s5p6442_init_irq(void)
 +{
-+	return 0;
++	/* S5P6442 supports 3 VIC */
++	u32 vic[3];
++
++	/* VIC0, VIC1, and VIC2: some interrupt reserved */
++	vic[0] = 0x7fefffff;
++	vic[1] = 0X7f389c81;
++	vic[2] = 0X1bbbcfff;
++
++	s5p_init_irq(vic, ARRAY_SIZE(vic));
 +}
 +
-+/**
-+ * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
-+ * @div: The divisor to calculate the bit information for.
-+ *
-+ * Turn a divisor into the necessary bit field for TCFG1.
-+ */
-+static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
++static struct sysdev_class s5p6442_sysclass = {
++	.name	= "s5p6442-core",
++};
++
++static struct sys_device s5p6442_sysdev = {
++	.cls	= &s5p6442_sysclass,
++};
++
++static int __init s5p6442_core_init(void)
 +{
-+	return ilog2(div) - 1;
++	return sysdev_class_register(&s5p6442_sysclass);
 +}
 +
-+#define S3C_TCFG1_MUX_TCLK S3C2410_TCFG1_MUX_TCLK
++core_initcall(s5p6442_core_init);
 +
-+#endif /* __ASM_ARCH_PWMCLK_H */
-diff --git a/arch/arm/mach-s5p6442/include/mach/regs-clock.h b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
++int __init s5p6442_init(void)
++{
++	printk(KERN_INFO "S5P6442: Initializing architecture\n");
++
++	/* set idle function */
++	pm_idle = s5p6442_idle;
++
++	return sysdev_register(&s5p6442_sysdev);
++}
+diff --git a/arch/arm/mach-s5p6442/include/mach/debug-macro.S b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
 new file mode 100644
-index 0000000..ec4911a
+index 0000000..593a21a
 --- /dev/null
-+++ b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
-@@ -0,0 +1,103 @@
-+/* linux/arch/arm/mach-s5p6442/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
+@@ -0,0 +1,36 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/debug-macro.S
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
 + *
-+ * S5P6442 - Clock register definitions
++ * Based on arch/arm/mach-s3c6400/include/mach/debug-macro.S
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#ifndef __ASM_ARCH_REGS_CLOCK_H
-+#define __ASM_ARCH_REGS_CLOCK_H __FILE__
++/* pull in the relevant register and map files. */
 +
 +#include <mach/map.h>
++#include <plat/regs-serial.h>
 +
-+#define S5P_CLKREG(x)		(S3C_VA_SYS + (x))
++	.macro addruart, rx
++		mrc	p15, 0, \rx, c1, c0
++		tst	\rx, #1
++		ldreq	\rx, = S3C_PA_UART
++		ldrne	\rx, = S3C_VA_UART
++#if CONFIG_DEBUG_S3C_UART != 0
++		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
++#endif
++	.endm
 +
-+#define S5P_APLL_LOCK		S5P_CLKREG(0x00)
-+#define S5P_MPLL_LOCK		S5P_CLKREG(0x08)
-+#define S5P_EPLL_LOCK		S5P_CLKREG(0x10)
-+#define S5P_VPLL_LOCK		S5P_CLKREG(0x20)
++#define fifo_full fifo_full_s5pv210
++#define fifo_level fifo_level_s5pv210
 +
-+#define S5P_APLL_CON		S5P_CLKREG(0x100)
-+#define S5P_MPLL_CON		S5P_CLKREG(0x108)
-+#define S5P_EPLL_CON		S5P_CLKREG(0x110)
-+#define S5P_VPLL_CON		S5P_CLKREG(0x120)
++/* include the reset of the code which will do the work, we're only
++ * compiling for a single cpu processor type so the default of s3c2440
++ * will be fine with us.
++ */
 +
-+#define S5P_CLK_SRC0		S5P_CLKREG(0x200)
-+#define S5P_CLK_SRC1		S5P_CLKREG(0x204)
-+#define S5P_CLK_SRC2		S5P_CLKREG(0x208)
-+#define S5P_CLK_SRC3		S5P_CLKREG(0x20C)
-+#define S5P_CLK_SRC4		S5P_CLKREG(0x210)
-+#define S5P_CLK_SRC5		S5P_CLKREG(0x214)
-+#define S5P_CLK_SRC6		S5P_CLKREG(0x218)
-+
-+#define S5P_CLK_SRC_MASK0	S5P_CLKREG(0x280)
-+#define S5P_CLK_SRC_MASK1	S5P_CLKREG(0x284)
-+
-+#define S5P_CLK_DIV0		S5P_CLKREG(0x300)
-+#define S5P_CLK_DIV1		S5P_CLKREG(0x304)
-+#define S5P_CLK_DIV2		S5P_CLKREG(0x308)
-+#define S5P_CLK_DIV3		S5P_CLKREG(0x30C)
-+#define S5P_CLK_DIV4		S5P_CLKREG(0x310)
-+#define S5P_CLK_DIV5		S5P_CLKREG(0x314)
-+#define S5P_CLK_DIV6		S5P_CLKREG(0x318)
-+
-+#define S5P_CLKGATE_IP3		S5P_CLKREG(0x46C)
-+
-+/* CLK_OUT */
-+#define S5P_CLK_OUT_SHIFT	(12)
-+#define S5P_CLK_OUT_MASK	(0x1F << S5P_CLK_OUT_SHIFT)
-+#define S5P_CLK_OUT		S5P_CLKREG(0x500)
-+
-+#define S5P_CLK_DIV_STAT0	S5P_CLKREG(0x1000)
-+#define S5P_CLK_DIV_STAT1	S5P_CLKREG(0x1004)
-+
-+#define S5P_CLK_MUX_STAT0	S5P_CLKREG(0x1100)
-+#define S5P_CLK_MUX_STAT1	S5P_CLKREG(0x1104)
-+
-+#define S5P_MDNIE_SEL		S5P_CLKREG(0x7008)
-+
-+/* Register Bit definition */
-+#define S5P_EPLL_EN     		(1<<31)
-+#define S5P_EPLL_MASK   		0xffffffff
-+#define S5P_EPLLVAL(_m, _p, _s)   	((_m) << 16 | ((_p) << 8) | ((_s)))
-+
-+/* CLKDIV0 */
-+#define S5P_CLKDIV0_APLL_SHIFT		(0)
-+#define S5P_CLKDIV0_APLL_MASK		(0x7 << S5P_CLKDIV0_APLL_SHIFT)
-+#define S5P_CLKDIV0_A2M_SHIFT		(4)
-+#define S5P_CLKDIV0_A2M_MASK		(0x7 << S5P_CLKDIV0_A2M_SHIFT)
-+#define S5P_CLKDIV0_D0CLK_SHIFT		(16)
-+#define S5P_CLKDIV0_D0CLK_MASK		(0xF << S5P_CLKDIV0_D0CLK_SHIFT)
-+#define S5P_CLKDIV0_P0CLK_SHIFT		(20)
-+#define S5P_CLKDIV0_P0CLK_MASK		(0x7 << S5P_CLKDIV0_P0CLK_SHIFT)
-+#define S5P_CLKDIV0_D1CLK_SHIFT		(24)
-+#define S5P_CLKDIV0_D1CLK_MASK		(0xF << S5P_CLKDIV0_D1CLK_SHIFT)
-+#define S5P_CLKDIV0_P1CLK_SHIFT		(28)
-+#define S5P_CLKDIV0_P1CLK_MASK		(0x7 << S5P_CLKDIV0_P1CLK_SHIFT)
-+
-+/* Clock MUX status Registers */
-+#define S5P_CLK_MUX_STAT0_APLL_SHIFT	(0)
-+#define S5P_CLK_MUX_STAT0_APLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_APLL_SHIFT)
-+#define S5P_CLK_MUX_STAT0_MPLL_SHIFT	(4)
-+#define S5P_CLK_MUX_STAT0_MPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_MPLL_SHIFT)
-+#define S5P_CLK_MUX_STAT0_EPLL_SHIFT	(8)
-+#define S5P_CLK_MUX_STAT0_EPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_EPLL_SHIFT)
-+#define S5P_CLK_MUX_STAT0_VPLL_SHIFT	(12)
-+#define S5P_CLK_MUX_STAT0_VPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_VPLL_SHIFT)
-+#define S5P_CLK_MUX_STAT0_MUXARM_SHIFT	(16)
-+#define S5P_CLK_MUX_STAT0_MUXARM_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXARM_SHIFT)
-+#define S5P_CLK_MUX_STAT0_MUXD0_SHIFT	(20)
-+#define S5P_CLK_MUX_STAT0_MUXD0_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXD0_SHIFT)
-+#define S5P_CLK_MUX_STAT0_MUXD1_SHIFT	(24)
-+#define S5P_CLK_MUX_STAT0_MUXD1_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXD1_SHIFT)
-+#define S5P_CLK_MUX_STAT1_D1SYNC_SHIFT	(24)
-+#define S5P_CLK_MUX_STAT1_D1SYNC_MASK	(0x7 << S5P_CLK_MUX_STAT1_D1SYNC_SHIFT)
-+#define S5P_CLK_MUX_STAT1_D0SYNC_SHIFT	(28)
-+#define S5P_CLK_MUX_STAT1_D0SYNC_MASK	(0x7 << S5P_CLK_MUX_STAT1_D0SYNC_SHIFT)
-+
-+#endif /* __ASM_ARCH_REGS_CLOCK_H */
-diff --git a/arch/arm/mach-s5p6442/include/mach/tick.h b/arch/arm/mach-s5p6442/include/mach/tick.h
++#include <plat/debug-macro.S>
+diff --git a/arch/arm/mach-s5p6442/include/mach/entry-macro.S b/arch/arm/mach-s5p6442/include/mach/entry-macro.S
 new file mode 100644
-index 0000000..2763c08
+index 0000000..6d574ed
 --- /dev/null
-+++ b/arch/arm/mach-s5p6442/include/mach/tick.h
-@@ -0,0 +1,26 @@
-+/* linux/arch/arm/mach-s5p6442/include/mach/tick.h
++++ b/arch/arm/mach-s5p6442/include/mach/entry-macro.S
+@@ -0,0 +1,48 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/entry-macro.S
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
 + *
-+ * Based on arch/arm/mach-s3c6400/include/mach/tick.h
-+ *
-+ * S5P6442 - Timer tick support definitions
++ * Low-level IRQ helper macros for the Samsung S5P6442
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#ifndef __ASM_ARCH_TICK_H
-+#define __ASM_ARCH_TICK_H __FILE__
++#include <asm/hardware/vic.h>
++#include <mach/map.h>
++#include <plat/irqs.h>
 +
-+static inline u32 s3c24xx_ostimer_pending(void)
++	.macro	disable_fiq
++	.endm
++
++	.macro	get_irqnr_preamble, base, tmp
++	ldr	\base, =VA_VIC0
++	.endm
++
++	.macro	arch_ret_to_user, tmp1, tmp2
++	.endm
++
++	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
++
++	@ check the vic0
++	mov	\irqnr, # S5P_IRQ_OFFSET + 31
++	ldr	\irqstat, [ \base, # VIC_IRQ_STATUS ]
++	teq	\irqstat, #0
++
++	@ otherwise try vic1
++	addeq	\tmp, \base, #(VA_VIC1 - VA_VIC0)
++	addeq	\irqnr, \irqnr, #32
++	ldreq	\irqstat, [ \tmp, # VIC_IRQ_STATUS ]
++	teqeq	\irqstat, #0
++
++	@ otherwise try vic2
++	addeq	\tmp, \base, #(VA_VIC2 - VA_VIC0)
++	addeq	\irqnr, \irqnr, #32
++	ldreq	\irqstat, [ \tmp, # VIC_IRQ_STATUS ]
++	teqeq	\irqstat, #0
++
++	clzne	\irqstat, \irqstat
++	subne	\irqnr, \irqnr, \irqstat
++	.endm
+diff --git a/arch/arm/mach-s5p6442/include/mach/gpio.h b/arch/arm/mach-s5p6442/include/mach/gpio.h
+new file mode 100644
+index 0000000..b8715df
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/gpio.h
+@@ -0,0 +1,123 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/gpio.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - GPIO lib support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_GPIO_H
++#define __ASM_ARCH_GPIO_H __FILE__
++
++#define gpio_get_value	__gpio_get_value
++#define gpio_set_value	__gpio_set_value
++#define gpio_cansleep	__gpio_cansleep
++#define gpio_to_irq	__gpio_to_irq
++
++/* GPIO bank sizes */
++#define S5P6442_GPIO_A0_NR	(8)
++#define S5P6442_GPIO_A1_NR	(2)
++#define S5P6442_GPIO_B_NR	(4)
++#define S5P6442_GPIO_C0_NR	(5)
++#define S5P6442_GPIO_C1_NR	(5)
++#define S5P6442_GPIO_D0_NR	(2)
++#define S5P6442_GPIO_D1_NR	(6)
++#define S5P6442_GPIO_E0_NR	(8)
++#define S5P6442_GPIO_E1_NR	(5)
++#define S5P6442_GPIO_F0_NR	(8)
++#define S5P6442_GPIO_F1_NR	(8)
++#define S5P6442_GPIO_F2_NR	(8)
++#define S5P6442_GPIO_F3_NR	(6)
++#define S5P6442_GPIO_G0_NR	(7)
++#define S5P6442_GPIO_G1_NR	(7)
++#define S5P6442_GPIO_G2_NR	(7)
++#define S5P6442_GPIO_H0_NR	(8)
++#define S5P6442_GPIO_H1_NR	(8)
++#define S5P6442_GPIO_H2_NR	(8)
++#define S5P6442_GPIO_H3_NR	(8)
++#define S5P6442_GPIO_J0_NR	(8)
++#define S5P6442_GPIO_J1_NR	(6)
++#define S5P6442_GPIO_J2_NR	(8)
++#define S5P6442_GPIO_J3_NR	(8)
++#define S5P6442_GPIO_J4_NR	(5)
++
++/* GPIO bank numbers */
++
++/* CONFIG_S3C_GPIO_SPACE allows the user to select extra
++ * space for debugging purposes so that any accidental
++ * change from one gpio bank to another can be caught.
++*/
++
++#define S5P6442_GPIO_NEXT(__gpio) \
++	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
++
++enum s5p_gpio_number {
++	S5P6442_GPIO_A0_START	= 0,
++	S5P6442_GPIO_A1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_A0),
++	S5P6442_GPIO_B_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_A1),
++	S5P6442_GPIO_C0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_B),
++	S5P6442_GPIO_C1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_C0),
++	S5P6442_GPIO_D0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_C1),
++	S5P6442_GPIO_D1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_D0),
++	S5P6442_GPIO_E0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_D1),
++	S5P6442_GPIO_E1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_E0),
++	S5P6442_GPIO_F0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_E1),
++	S5P6442_GPIO_F1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_F0),
++	S5P6442_GPIO_F2_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_F1),
++	S5P6442_GPIO_F3_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_F2),
++	S5P6442_GPIO_G0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_F3),
++	S5P6442_GPIO_G1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_G0),
++	S5P6442_GPIO_G2_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_G1),
++	S5P6442_GPIO_H0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_G2),
++	S5P6442_GPIO_H1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_H0),
++	S5P6442_GPIO_H2_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_H1),
++	S5P6442_GPIO_H3_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_H2),
++	S5P6442_GPIO_J0_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_H3),
++	S5P6442_GPIO_J1_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_J0),
++	S5P6442_GPIO_J2_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_J1),
++	S5P6442_GPIO_J3_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_J2),
++	S5P6442_GPIO_J4_START	= S5P6442_GPIO_NEXT(S5P6442_GPIO_J3),
++};
++
++/* S5P6442 GPIO number definitions. */
++#define S5P6442_GPA0(_nr)	(S5P6442_GPIO_A0_START + (_nr))
++#define S5P6442_GPA1(_nr)	(S5P6442_GPIO_A1_START + (_nr))
++#define S5P6442_GPB(_nr)	(S5P6442_GPIO_B_START + (_nr))
++#define S5P6442_GPC0(_nr)	(S5P6442_GPIO_C0_START + (_nr))
++#define S5P6442_GPC1(_nr)	(S5P6442_GPIO_C1_START + (_nr))
++#define S5P6442_GPD0(_nr)	(S5P6442_GPIO_D0_START + (_nr))
++#define S5P6442_GPD1(_nr)	(S5P6442_GPIO_D1_START + (_nr))
++#define S5P6442_GPE0(_nr)	(S5P6442_GPIO_E0_START + (_nr))
++#define S5P6442_GPE1(_nr)	(S5P6442_GPIO_E1_START + (_nr))
++#define S5P6442_GPF0(_nr)	(S5P6442_GPIO_F0_START + (_nr))
++#define S5P6442_GPF1(_nr)	(S5P6442_GPIO_F1_START + (_nr))
++#define S5P6442_GPF2(_nr)	(S5P6442_GPIO_F2_START + (_nr))
++#define S5P6442_GPF3(_nr)	(S5P6442_GPIO_F3_START + (_nr))
++#define S5P6442_GPG0(_nr)	(S5P6442_GPIO_G0_START + (_nr))
++#define S5P6442_GPG1(_nr)	(S5P6442_GPIO_G1_START + (_nr))
++#define S5P6442_GPG2(_nr)	(S5P6442_GPIO_G2_START + (_nr))
++#define S5P6442_GPH0(_nr)	(S5P6442_GPIO_H0_START + (_nr))
++#define S5P6442_GPH1(_nr)	(S5P6442_GPIO_H1_START + (_nr))
++#define S5P6442_GPH2(_nr)	(S5P6442_GPIO_H2_START + (_nr))
++#define S5P6442_GPH3(_nr)	(S5P6442_GPIO_H3_START + (_nr))
++#define S5P6442_GPJ0(_nr)	(S5P6442_GPIO_J0_START + (_nr))
++#define S5P6442_GPJ1(_nr)	(S5P6442_GPIO_J1_START + (_nr))
++#define S5P6442_GPJ2(_nr)	(S5P6442_GPIO_J2_START + (_nr))
++#define S5P6442_GPJ3(_nr)	(S5P6442_GPIO_J3_START + (_nr))
++#define S5P6442_GPJ4(_nr)	(S5P6442_GPIO_J4_START + (_nr))
++
++/* the end of the S5P6442 specific gpios */
++#define S5P6442_GPIO_END	(S5P6442_GPJ4(S5P6442_GPIO_J4_NR) + 1)
++#define S3C_GPIO_END		S5P6442_GPIO_END
++
++/* define the number of gpios we need to the one after the GPJ4() range */
++#define ARCH_NR_GPIOS		(S5P6442_GPJ4(S5P6442_GPIO_J4_NR) +	\
++				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
++
++#include <asm-generic/gpio.h>
++
++#endif /* __ASM_ARCH_GPIO_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/hardware.h b/arch/arm/mach-s5p6442/include/mach/hardware.h
+new file mode 100644
+index 0000000..8cd7b67
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/hardware.h
+@@ -0,0 +1,18 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/hardware.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - Hardware support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_HARDWARE_H
++#define __ASM_ARCH_HARDWARE_H __FILE__
++
++/* currently nothing here, placeholder */
++
++#endif /* __ASM_ARCH_HARDWARE_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/map.h b/arch/arm/mach-s5p6442/include/mach/map.h
+new file mode 100644
+index 0000000..07d22e9
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/map.h
+@@ -0,0 +1,58 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/map.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - Memory map definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_MAP_H
++#define __ASM_ARCH_MAP_H __FILE__
++
++#include <plat/map-base.h>
++#include <plat/map-s5p.h>
++
++#define S5P6442_PA_CHIPID	(0xE0000000)
++#define S5P_PA_CHIPID		S5P6442_PA_CHIPID
++
++#define S5P6442_PA_SYSCON	(0xE0100000)
++#define S5P_PA_SYSCON		S5P6442_PA_SYSCON
++
++#define S5P6442_PA_GPIO		(0xE0200000)
++#define S5P_PA_GPIO		S5P6442_PA_GPIO
++
++#define S5P6442_PA_VIC0		(0xE4000000)
++#define S5P_PA_VIC0		S5P6442_PA_VIC0
++
++#define S5P6442_PA_VIC1		(0xE4100000)
++#define S5P_PA_VIC1		S5P6442_PA_VIC1
++
++#define S5P6442_PA_VIC2		(0xE4200000)
++#define S5P_PA_VIC2		S5P6442_PA_VIC2
++
++#define S5P6442_PA_TIMER	(0xEA000000)
++#define S5P_PA_TIMER		S5P6442_PA_TIMER
++
++#define S5P6442_PA_SYSTIMER   	(0xEA100000)
++
++#define S5P6442_PA_UART		(0xEC000000)
++
++#define S5P_PA_UART0		(S5P6442_PA_UART + 0x0)
++#define S5P_PA_UART1		(S5P6442_PA_UART + 0x400)
++#define S5P_PA_UART2		(S5P6442_PA_UART + 0x800)
++#define S5P_SZ_UART		SZ_256
++
++#define S5P6442_PA_IIC0		(0xEC100000)
++
++#define S5P6442_PA_SDRAM	(0x20000000)
++#define S5P_PA_SDRAM		S5P6442_PA_SDRAM
++
++/* compatibiltiy defines. */
++#define S3C_PA_UART		S5P6442_PA_UART
++#define S3C_PA_IIC		S5P6442_PA_IIC0
++
++#endif /* __ASM_ARCH_MAP_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/memory.h b/arch/arm/mach-s5p6442/include/mach/memory.h
+new file mode 100644
+index 0000000..9ddd877
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/memory.h
+@@ -0,0 +1,19 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/memory.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - Memory definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_MEMORY_H
++#define __ASM_ARCH_MEMORY_H
++
++#define PHYS_OFFSET		UL(0x20000000)
++#define CONSISTENT_DMA_SIZE	SZ_8M
++
++#endif /* __ASM_ARCH_MEMORY_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/system.h b/arch/arm/mach-s5p6442/include/mach/system.h
+new file mode 100644
+index 0000000..8bcd8ed
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/system.h
+@@ -0,0 +1,26 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/system.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - system support header
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_SYSTEM_H
++#define __ASM_ARCH_SYSTEM_H __FILE__
++
++static void arch_idle(void)
 +{
-+	u32 pend = __raw_readl(VA_VIC0 + VIC_RAW_STATUS);
-+	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
++	/* nothing here yet */
 +}
 +
-+#define TICK_MAX	(0xffffffff)
++static void arch_reset(char mode, const char *cmd)
++{
++	/* nothing here yet */
++}
 +
-+#endif /* __ASM_ARCH_TICK_H */
++#endif /* __ASM_ARCH_SYSTEM_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/uncompress.h b/arch/arm/mach-s5p6442/include/mach/uncompress.h
+new file mode 100644
+index 0000000..5ac7cbe
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/include/mach/uncompress.h
+@@ -0,0 +1,24 @@
++/* linux/arch/arm/mach-s5p6442/include/mach/uncompress.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6442 - uncompress code
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_UNCOMPRESS_H
++#define __ASM_ARCH_UNCOMPRESS_H
++
++#include <mach/map.h>
++#include <plat/uncompress.h>
++
++static void arch_detect_cpu(void)
++{
++	/* we do not need to do any cpu detection here at the moment. */
++}
++
++#endif /* __ASM_ARCH_UNCOMPRESS_H */
+diff --git a/arch/arm/mach-s5p6442/init.c b/arch/arm/mach-s5p6442/init.c
+new file mode 100644
+index 0000000..1874bdb
+--- /dev/null
++++ b/arch/arm/mach-s5p6442/init.c
+@@ -0,0 +1,44 @@
++/* linux/arch/arm/mach-s5p6442/s5p6442-init.c
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++
++#include <plat/cpu.h>
++#include <plat/devs.h>
++#include <plat/s5p6442.h>
++#include <plat/regs-serial.h>
++
++static struct s3c24xx_uart_clksrc s5p6442_serial_clocks[] = {
++	[0] = {
++		.name		= "pclk",
++		.divisor	= 1,
++		.min_baud	= 0,
++		.max_baud	= 0,
++	},
++};
++
++/* uart registration process */
++void __init s5p6442_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++{
++	struct s3c2410_uartcfg *tcfg = cfg;
++	u32 ucnt;
++
++	for (ucnt = 0; ucnt < no; ucnt++, tcfg++) {
++		if (!tcfg->clocks) {
++			tcfg->clocks = s5p6442_serial_clocks;
++			tcfg->clocks_size = ARRAY_SIZE(s5p6442_serial_clocks);
++		}
++	}
++
++	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
++}
+diff --git a/arch/arm/plat-s3c/include/plat/debug-macro.S b/arch/arm/plat-s3c/include/plat/debug-macro.S
+index 3634d4e..cbde9f1 100644
+--- a/arch/arm/plat-s3c/include/plat/debug-macro.S
++++ b/arch/arm/plat-s3c/include/plat/debug-macro.S
+@@ -11,6 +11,18 @@
+ 
+ #include <plat/regs-serial.h>
+ 
++/* The S5PV210/S5PC110 and S5P6442 implementations are as belows. */
++
++	.macro fifo_level_s5pv210 rd, rx
++		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		and	\rd, \rd, #S5PV210_UFSTAT_TXMASK
++	.endm
++
++	.macro  fifo_full_s5pv210 rd, rx
++		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		tst	\rd, #S5PV210_UFSTAT_TXFULL
++	.endm
++
+ /* The S3C2440 implementations are used by default as they are the
+  * most widely re-used */
+ 
+diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
+index ee9c6b3..e699924 100644
+--- a/arch/arm/plat-s5p/cpu.c
++++ b/arch/arm/plat-s5p/cpu.c
+@@ -18,10 +18,12 @@
+ #include <mach/regs-clock.h>
+ #include <plat/cpu.h>
+ #include <plat/s5p6440.h>
++#include <plat/s5p6442.h>
+ 
+ /* table of supported CPUs */
+ 
+ static const char name_s5p6440[] = "S5P6440";
++static const char name_s5p6442[] = "S5P6442";
+ 
+ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+@@ -32,6 +34,14 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.init_uarts	= s5p6440_init_uarts,
+ 		.init		= s5p6440_init,
+ 		.name		= name_s5p6440,
++	}, {
++		.idcode		= 0x36442000,
++		.idmask		= 0xffffff00,
++		.map_io		= s5p6442_map_io,
++		.init_clocks	= s5p6442_init_clocks,
++		.init_uarts	= s5p6442_init_uarts,
++		.init		= s5p6442_init,
++		.name		= name_s5p6442,
+ 	},
+ };
+ 
+diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
+index 51d9cb5..cc60604 100644
+--- a/arch/arm/plat-s5p/include/plat/map-s5p.h
++++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
+@@ -28,5 +28,6 @@
+ #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+ #define VA_VIC0			VA_VIC(0)
+ #define VA_VIC1			VA_VIC(1)
++#define VA_VIC2			VA_VIC(2)
+ 
+ #endif /* __ASM_PLAT_MAP_S5P_H */
+diff --git a/arch/arm/plat-s5p/include/plat/s5p6442.h b/arch/arm/plat-s5p/include/plat/s5p6442.h
+new file mode 100644
+index 0000000..1f49ef7
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/s5p6442.h
+@@ -0,0 +1,33 @@
++/* arch/arm/plat-s5p/include/plat/s5p6442.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * Header file for s5p6442 cpu support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/* Common init code for S5P6442 related SoCs */
++
++extern void s5p6442_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++extern void s5p6442_register_clocks(void);
++extern void s5p6442_setup_clocks(void);
++
++#ifdef CONFIG_CPU_S5P6442
++
++extern  int s5p6442_init(void);
++extern void s5p6442_init_irq(void);
++extern void s5p6442_map_io(void);
++extern void s5p6442_init_clocks(int xtal);
++
++#define s5p6442_init_uarts s5p6442_common_init_uarts
++
++#else
++#define s5p6442_init_clocks NULL
++#define s5p6442_init_uarts NULL
++#define s5p6442_map_io NULL
++#define s5p6442_init NULL
++#endif
 -- 
 1.6.2.5
