@@ -1,83 +1,53 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 29 Jan 2010 20:59:44 +0900
-Subject: [PATCH v4 4/8 RE-SEND] ARM: S5PV210: Update Kconfig and Makefiles
-Message-ID: <1264766384-5797-1-git-send-email-kgene.kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Jan 2010 12:16:05 +0000
+Subject: [PATCH 1/3] OMAP4: Add L2 Cache support
+In-Reply-To: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1264767365.4242.54.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updates arch/arm Kconfig and Makefile for building the S5PV210 support.
-Also modifies the plat-s5p Kconfig file to include the support for plat-s5p
-for S5PV210.
+On Fri, 2010-01-29 at 11:46 +0000, Santosh Shilimkar wrote:
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -28,6 +28,7 @@
+>  #include <plat/control.h>
+>  #include <plat/timer-gp.h>
+>  #include <asm/hardware/gic.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> 
+>  static struct platform_device sdp4430_lcd_device = {
+>         .name           = "sdp4430_lcd",
+> @@ -49,6 +50,38 @@ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
+>  static struct omap_board_config_kernel sdp4430_config[] __initdata = {
+>         { OMAP_TAG_LCD,         &sdp4430_lcd_config },
+>  };
+> +#ifdef CONFIG_CACHE_L2X0
+> +static int __init omap_l2_cache_init(void)
+> +{
+> +       void __iomem *l2cache_base;
+> +
+> +       /* Static mapping, never released */
+> +       l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+> +       BUG_ON(!l2cache_base);
+> +
+> +       /* Enable L2 Cache using secure api
+> +        * r0 contains the value to be modified and "r12" contains
+> +        * the monitor API number. This API uses few CPU registers
+> +        * internally and hence they need be backed up including
+> +        * link register "lr".
+> +        */
+> +       __asm__ __volatile__(
+> +               "stmfd r13!, {r0-r12, r14}\n"
+> +               "mov r0, #1\n"
+> +               "ldr r12, =0x102\n"
+> +               "dsb\n"
+> +               "smc\n"
+> +               "ldmfd r13!, {r0-r12, r14}");
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/Kconfig          |   13 ++++++++++++-
- arch/arm/Makefile         |    1 +
- arch/arm/plat-s5p/Kconfig |    2 +-
- 3 files changed, 14 insertions(+), 2 deletions(-)
+Same comments as on the cache-l2x0.c changes - can you not let the
+compiler choose what to saved by declaring the clobbered register in the
+asm directive?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d51bb45..195c5b8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -655,6 +655,15 @@ config ARCH_S5PC1XX
- 	help
- 	  Samsung S5PC1XX series based systems
- 
-+config ARCH_S5PV210
-+	bool "Samsung S5PV210/S5PC110"
-+	select CPU_V7
-+	select GENERIC_GPIO
-+	select HAVE_CLK
-+	select ARM_L1_CACHE_SHIFT_6
-+	help
-+	  Samsung S5PV210/S5PC110 series based systems
-+
- config ARCH_SHARK
- 	bool "Shark"
- 	select CPU_SA110
-@@ -817,6 +826,8 @@ if ARCH_S5PC1XX
- source "arch/arm/mach-s5pc100/Kconfig"
- endif
- 
-+source "arch/arm/mach-s5pv210/Kconfig"
-+
- source "arch/arm/mach-lh7a40x/Kconfig"
- 
- source "arch/arm/mach-h720x/Kconfig"
-@@ -1091,7 +1102,7 @@ source kernel/Kconfig.preempt
- config HZ
- 	int
- 	default 128 if ARCH_L7200
--	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440
-+	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || ARCH_S5PV210
- 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
- 	default AT91_TIMER_HZ if ARCH_AT91
- 	default 100
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index bbcd512..c968bde 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -163,6 +163,7 @@ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
- machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
- machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
- machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
-+machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
- machine-$(CONFIG_ARCH_SA1100)		:= sa1100
- machine-$(CONFIG_ARCH_SHARK)		:= shark
- machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index fca6dad..225ab11 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -7,7 +7,7 @@
- 
- config PLAT_S5P
- 	bool
--	depends on ARCH_S5P6440
-+	depends on (ARCH_S5P6440 || ARCH_S5PV210)
- 	default y
- 	select PLAT_S3C
- 	select ARM_VIC
 -- 
-1.6.2.5
+Catalin
