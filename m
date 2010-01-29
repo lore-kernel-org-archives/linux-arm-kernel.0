@@ -1,21 +1,32 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Jan 2010 07:44:23 +0100
-Subject: [RFC PATCH 08/12] arm: mm: enable L2X0 to use L2 cache on MSM7X27
-In-Reply-To: <1264719577-5436-9-git-send-email-dwalker@codeaurora.org>
-References: <1264719577-5436-9-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100129064423.GA1347@ucw.cz>
+Date: Fri, 29 Jan 2010 07:45:01 +0100
+Subject: [RFC PATCH 06/12] arm: msm: set L2CR1 to enable prefetch and
+	burst on Scorpion.
+In-Reply-To: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+References: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100129064501.GB1347@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2010-01-28 14:59:33, Daniel Walker wrote:
-> From: Willie Ruan <wruan@quicinc.com>
+Hi!
+
+> From: Larry Bassel <lbassel@quicinc.com>
 > 
-> Acked-by: Steve Muckle <smuckle@quicinc.com>
-> Signed-off-by: Willie Ruan <wruan@quicinc.com>
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> This change improves the following LMBench benchmarks
+> by over 15%:
 
-ack.
+But what does this change do?
 
+> @@ -242,6 +243,10 @@ __v7_setup:
+>  	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
+>  	mov	r10, #0x1f			@ domains 0, 1 = manager
+>  	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
+> +#ifdef CONFIG_ARCH_MSM_SCORPION
+> +	mov     r0, #0x77
+> +	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
+> +#endif
+
+...probably should be explained here...
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
