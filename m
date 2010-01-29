@@ -1,73 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2010 14:30:02 +0000
-Subject: [PATCH 1/3] OMAP4: Add L2 Cache support
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C09C688C@dbde02.ent.ti.com>
-References: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
-	<1264767365.4242.54.camel@pc1117.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C09C688C@dbde02.ent.ti.com>
-Message-ID: <20100129143002.GD16712@n2100.arm.linux.org.uk>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 29 Jan 2010 06:33:54 -0800
+Subject: [RFC PATCH 06/12] arm: msm: set L2CR1 to enable prefetch and
+	burst on Scorpion.
+In-Reply-To: <1264762740.4242.40.camel@pc1117.cambridge.arm.com>
+References: <1264719577-5436-7-git-send-email-dwalker@codeaurora.org>
+	<1264762740.4242.40.camel@pc1117.cambridge.arm.com>
+Message-ID: <1264775634.5109.42.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2010 at 05:56:55PM +0530, Shilimkar, Santosh wrote:
-> Thanks for quick comment.
-> > -----Original Message-----
-> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > Sent: Friday, January 29, 2010 5:46 PM
-> > To: Shilimkar, Santosh
-> > Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org; rmk at arm.linux.org.uk; linux-
-> > omap at vger.kernel.org
-> > Subject: Re: [PATCH 1/3] OMAP4: Add L2 Cache support
-> > 
-> > On Fri, 2010-01-29 at 11:46 +0000, Santosh Shilimkar wrote:
-> > > +#ifdef CONFIG_CACHE_L2X0
-> > > +static int __init omap_l2_cache_init(void)
-> > > +{
-> > > +       void __iomem *l2cache_base;
-> > > +
-> > > +       /* Static mapping, never released */
-> > > +       l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
-> > > +       BUG_ON(!l2cache_base);
-> > > +
-> > > +       /* Enable L2 Cache using secure api
-> > > +        * r0 contains the value to be modified and "r12" contains
-> > > +        * the monitor API number. This API uses few CPU registers
-> > > +        * internally and hence they need be backed up including
-> > > +        * link register "lr".
-> > > +        */
-> > > +       __asm__ __volatile__(
-> > > +               "stmfd r13!, {r0-r12, r14}\n"
-> > > +               "mov r0, #1\n"
-> > > +               "ldr r12, =0x102\n"
-> > > +               "dsb\n"
-> > > +               "smc\n"
-> > > +               "ldmfd r13!, {r0-r12, r14}");
-> > 
-> > Same comments as on the cache-l2x0.c changes - can you not let the
-> > compiler choose what to saved by declaring the clobbered register in the
-> > asm directive?
->
-> Since this code was used only ones in init, I haven't converted it to
-> function. With clobber list as well as you know adding r12 to clobber
-> list, compiler don't generate the save code and r11 can't be added to
-> clobber list.
+On Fri, 2010-01-29 at 10:59 +0000, Catalin Marinas wrote:
+> On Thu, 2010-01-28 at 22:59 +0000, Daniel Walker wrote:
+> > @@ -242,6 +243,10 @@ __v7_setup:
+> >         mcr     p15, 0, r4, c2, c0, 1           @ load TTB1
+> >         mov     r10, #0x1f                      @ domains 0, 1 = manager
+> >         mcr     p15, 0, r10, c3, c0, 0          @ load domain access register
+> > +#ifdef CONFIG_ARCH_MSM_SCORPION
+> > +       mov     r0, #0x77
+> > +       mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
+> > +#endif
+> 
+> I thought we want to move these out of the kernel into the boot loader
+> (or boot monitor or bios or whatever it's called).
 
-Well, we seem to have two places with the same code structure.  Let's
-pull them together into a common function, such as:
+I left it in cause it still felt like an open question the last time I
+submitted it ..
 
-void omap_smc1(u32 fn, u32 arg)
-{
-	register u32 r12 asm("r12") = fn;
-	register u32 r0 asm("r0") = arg;
-	asm volatile(
-		"str r11, [sp], #-4\n"
-		"dsb\n"
-		"smc\n"
-		"ldr r11, [sp, #4]!"
-		: "+r" (r0), "+r" (r12)
-		:
-		: "r0-r10", "lr", "cc");
-}
-EXPORT_SYMBOL(omap_smc1);
+Honestly, I feel like we should keep as much control in Linux as
+possible.. Having it in Linux is just one place for it to get screwed
+up, vs. having it in many different boot loaders.
 
-The code there probably may not be Thumb-2 compatible.
+Daniel
