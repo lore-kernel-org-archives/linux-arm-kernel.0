@@ -1,41 +1,58 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Jan 2010 10:38:59 +0000
+Date: Fri, 29 Jan 2010 10:42:56 +0000
 Subject: [PATCH 3/3] ARM: Select CPU_32v6K for CPU_V7 only if
 	ARCH_OMAP2 isnot selected
-In-Reply-To: <20100128183303.GA30029@shareable.org>
-References: <20100128183303.GA30029@shareable.org>
-Message-ID: <1264761539.4242.25.camel@pc1117.cambridge.arm.com>
+In-Reply-To: <20100128174741.GN23505@atomide.com>
+References: <20100126193748.15134.4837.stgit@baageli.muru.com>
+	<1264676451.7064.40.camel@pc1117.cambridge.arm.com>
+	<20100128174741.GN23505@atomide.com>
+Message-ID: <1264761776.4242.30.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-01-28 at 18:33 +0000, Jamie Lokier wrote:
-> Catalin Marinas wrote:
-> > > Hmm, but then we can't compile in SMP for single core systems and
-> > > keep it bootable on single core v6?
+On Thu, 2010-01-28 at 17:47 +0000, Tony Lindgren wrote:
+> * Catalin Marinas <catalin.marinas@arm.com> [100128 02:58]:
+> > On Tue, 2010-01-26 at 19:37 +0000, Tony Lindgren wrote:
+> > > Otherwise the kernel built with both CPU_V6 and CPU_V7 will not
+> > > boot on omap2.
+> > >
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > ---
+> > >  arch/arm/mm/Kconfig |    4 ++--
+> > >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> > > index baf6384..4c2e90d 100644
+> > > --- a/arch/arm/mm/Kconfig
+> > > +++ b/arch/arm/mm/Kconfig
+> > > @@ -399,7 +399,7 @@ config CPU_V6
+> > >  config CPU_32v6K
+> > >         bool "Support ARM V6K processor extensions" if !SMP
+> > >         depends on CPU_V6
+> > > -       default y if SMP && !ARCH_MX3
+> > > +       default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
+> > >         help
+> > >           Say Y here if your ARMv6 processor supports the 'K' extension.
+> > >           This enables the kernel to use some instructions not present
+> > > @@ -410,7 +410,7 @@ config CPU_32v6K
+> > >  # ARMv7
+> > >  config CPU_V7
+> > >         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+> > > -       select CPU_32v6K
+> > > +       select CPU_32v6K if !ARCH_OMAP2
 > >
-> > Not with the current kernel since it hardcodes the shareability bit in
-> > the page tables and the LDREX/STREX operations don't work as expected on
-> > uniprocessor hardware.
+> > I suspect that would be an issue for all ARMv6 platforms without the MP
+> > extensions (v6K). Could we do something like:
+> >
+> >       select CPU_32v6K if SMP || !CPU_V6
 > 
-> My understanding of LDREX/STREX is that it's allowed to be quite
-> different on uniprocessors (and CPU-local activity on SMP), but if
-> it's used properly it still works ok.
-> 
-> Can you say a bit more about assumptions made by the kernel using
-> LDREX/STREX that fail on uniprocessor hardware?
-> 
-> Is it just the shareability bit in page tables having the wrong value?
+> Hmm, but then we can't compile in SMP for single core systems and
+> keep it bootable on single core v6?
 
-The kernel doesn't make any assumptions. It's the CPU that behaved
-differently when the page was marked as shareable in a UP system. I
-tried in the past and it looked like STREX was expecting some kind of
-global exclusive monitor and it was always failing.
-
-Anyway, it is possible that I don't recall correctly and it may have
-been just an ARM11MPCore but with the SMP/nAMP mode disabled but the
-STREX had already implemented with other expectations.
-
-It's worth giving it a try though.
+Assuming that there is no issue with LDREX/STREX and the page
+shareability attribute (or that we sort it out), there is also the TLS
+register. The HAS_TLS_REG option gets enabled if SMP but I think that's
+a v6K extension.
 
 -- 
 Catalin
