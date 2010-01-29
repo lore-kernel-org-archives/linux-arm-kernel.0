@@ -1,21 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2010 10:29:55 +0000
-Subject: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
-	inside each ARCH Kconfig
-In-Reply-To: <1264747415-6711-1-git-send-email-kgene.kim@samsung.com>
-References: <1264747415-6711-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100129102955.GA8919@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Jan 2010 10:38:59 +0000
+Subject: [PATCH 3/3] ARM: Select CPU_32v6K for CPU_V7 only if
+	ARCH_OMAP2 isnot selected
+In-Reply-To: <20100128183303.GA30029@shareable.org>
+References: <20100128183303.GA30029@shareable.org>
+Message-ID: <1264761539.4242.25.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2010 at 03:43:35PM +0900, Kukjin Kim wrote:
-> Add ARM_L1_CACHE_SHIFT_6 to arch/arm/Kconfig to allow CPUs with
-> L1 cache lines which are 64bytes to indicate this without having to
-> alter the arch/arm/mm/Kconfig entry each time.
+On Thu, 2010-01-28 at 18:33 +0000, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > > Hmm, but then we can't compile in SMP for single core systems and
+> > > keep it bootable on single core v6?
+> >
+> > Not with the current kernel since it hardcodes the shareability bit in
+> > the page tables and the LDREX/STREX operations don't work as expected on
+> > uniprocessor hardware.
 > 
-> Update the mm Kconfig so that ARM_L1_CACHE_SHIFT default value
-> uses this and change OMAP3 and S5PC1XX to select ARM_L1_CACHE_SHIFT_6.
+> My understanding of LDREX/STREX is that it's allowed to be quite
+> different on uniprocessors (and CPU-local activity on SMP), but if
+> it's used properly it still works ok.
+> 
+> Can you say a bit more about assumptions made by the kernel using
+> LDREX/STREX that fail on uniprocessor hardware?
+> 
+> Is it just the shareability bit in page tables having the wrong value?
 
-This looks fine, thanks.
+The kernel doesn't make any assumptions. It's the CPU that behaved
+differently when the page was marked as shareable in a UP system. I
+tried in the past and it looked like STREX was expecting some kind of
+global exclusive monitor and it was always failing.
 
-Who's going to handle this patch?
+Anyway, it is possible that I don't recall correctly and it may have
+been just an ARM11MPCore but with the SMP/nAMP mode disabled but the
+STREX had already implemented with other expectations.
+
+It's worth giving it a try though.
+
+-- 
+Catalin
