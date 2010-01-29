@@ -1,54 +1,37 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 29 Jan 2010 10:38:06 +0530
-Subject: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
-In-Reply-To: <1264683782.7064.54.camel@pc1117.cambridge.arm.com>
-References: <4B606D92.9020005@googlemail.com>
-	<1264683782.7064.54.camel@pc1117.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C09C6448@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 29 Jan 2010 15:34:16 +0900
+Subject: [PATCH v2 0/7] ARM: S5P6442: Add support for Samsung's S5P6442	SoC
+In-Reply-To: <9c9fda241001282002i41634063n4a78236568dfe24c@mail.gmail.com>
+References: <000301caa08a$9f6a3830$de3ea890$%kim@samsung.com>
+	<9c9fda241001282002i41634063n4a78236568dfe24c@mail.gmail.com>
+Message-ID: <001601caa0ad$16959a90$43c0cfb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Thursday, January 28, 2010 6:33 PM
-> To: Dirk Behme
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
+Kyungmin Park wrote:
+> Hi,
 > 
-> On Wed, 2010-01-27 at 16:45 +0000, Dirk Behme wrote:
-> > On a 400MHz ARM11 MPCore system (NEC NaviEngine based) with kernel
-> > 2.6.32 we found that BogoMIPS/loops per jiffies ~doubles (see below
-> > [1]) by adding a nop to __delay():
-> >
-> > --- a/arch/arm/lib/delay.S
-> > +++ b/arch/arm/lib/delay.S
-> > @@ -41,6 +41,9 @@ ENTRY(__const_udelay)    @ 0 <= r0 <= 0x
-> >   @ Delay routine
-> >   ENTRY(__delay)
-> > +#if defined(CONFIG_CPU_V6) && defined(CONFIG_SMP)
-> > +        nop
-> > +#endif
-> >           subs    r0, r0, #1
-> >   #if 0
-> >           movls    pc, lr
-> >
-> > Any ideas what might happen here?
-> 
-> Branch (mis-)prediction? Alignment?
-> 
-> It doesn't really matter, bogomips should not be used as some form of
-> performance checking.
-> 
-> BTW, local timers give a more accurate estimate of the CPU frequency
-> (they are counting at half this frequency).
+> Are there other reason to crate the new s5p6442? Is any problem to use
+s5p6440?
 
-Last time I was experimenting with this, the data I got from for A9 was " the
-loop prediction" makes this faster on the hw support fast loop mode .
-It is a feature of the C-A9 pipeline that enables it to spot short loops like 
-"BHI      {pc}-4 ; 0x100  **" nd just issue store them in the pipiline queue
-to be dispatched from there rather than being fetched from the Icache all 
-the time.
+Hello, Mr. Park
 
-Regards,
-Santosh
+> As you said it's packages SoCs. based on s5p6440? isn't it?
+No. S5P6442 is not package SoC based on S5P6440.
+It is both ARM11, of course, the name is similar.
+But others differs.
+
+> Thank you,
+> Kyungmin Park
+> 
+> On Fri, Jan 29, 2010 at 11:27 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
