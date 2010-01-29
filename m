@@ -1,45 +1,62 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 29 Jan 2010 04:14:19 +0000
-Subject: [PATCH] ARM: S3C64XX: Make audio device code built unconditionally
+Date: Fri, 29 Jan 2010 04:14:15 +0000
+Subject: [PATCH] ARM: S3C64XX: SPI: Make platform device compilation selectable
 In-Reply-To: <1264738459-1972-1-git-send-email-ben-linux@fluff.org>
 References: <1264738459-1972-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264738459-1972-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264738459-1972-3-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Making the code depend on CONFIG_SND_S3C24XX_SOC means that if the ASoC
-code is build modularily, the boards will fail to link due to the device
-code also being built as a module.
+From: Jassi Brar <jassi.brar@samsung.com>
 
-As per Mark Brown's suggestions, just compile this always as it is expected
-many machines will have audio.
+The SPI controller platform devices should be compiled in
+independent of the driver support, otherwise we might end
+up with dev-spi built as kernel module.
+Change this to make every machine select if it has some SPI
+device and wants to build device definitions.
 
-Also move the obj-y line out of the device setup area into a new area just
-for devices.
-
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c64xx/Makefile |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c64xx/Makefile |    4 +++-
+ arch/arm/plat-samsung/Kconfig  |    6 ++++++
+ 2 files changed, 9 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
-index e60bde3..33a73f3 100644
+index 80255a5..e60bde3 100644
 --- a/arch/arm/plat-s3c64xx/Makefile
 +++ b/arch/arm/plat-s3c64xx/Makefile
-@@ -43,10 +43,13 @@ obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
- # SPI support
- obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
+@@ -40,6 +40,9 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
  
-+# Device support
-+obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+ 
++# SPI support
++obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
 +
  # Device setup
  
  obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
- obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
+@@ -47,4 +50,3 @@ obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
  obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
  obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
--obj-$(CONFIG_SND_S3C24XX_SOC) += dev-audio.o
+ obj-$(CONFIG_SND_S3C24XX_SOC) += dev-audio.o
+-obj-$(CONFIG_SPI_S3C64XX) += dev-spi.o
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 1c2fe91..72da646 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -132,6 +132,12 @@ config S3C_DEV_NAND
+ 	help
+ 	  Compile in platform device definition for NAND controller
+ 
++config S3C64XX_DEV_SPI
++	bool
++	help
++	  Compile in platform device definitions for S3C64XX's type
++	  SPI controllers.
 +
+ comment "Power management"
+ 
+ config SAMSUNG_PM_DEBUG
 -- 
 1.6.0.4
