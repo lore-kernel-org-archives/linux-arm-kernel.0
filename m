@@ -1,44 +1,36 @@
-From: lbassel@quicinc.com (Larry Bassel)
-Date: Thu, 28 Jan 2010 15:04:49 -0800
-Subject: [RFC 05/18] arm: msm: implement ioremap_strongly_ordered
-In-Reply-To: <20100111233720.GK7925@n2100.arm.linux.org.uk>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-6-git-send-email-dwalker@codeaurora.org>
-	<20100111233720.GK7925@n2100.arm.linux.org.uk>
-Message-ID: <20100128230449.GU10547@labbmf-linux.quicinc.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 29 Jan 2010 15:54:26 +0100
+Subject: ARM11 MPCore: Adding nop to __delay() doubles the BogoMIPS/lpj
+Message-ID: <20100129145425.GC27577@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 03:37:20PM -0800, Russell King - ARM Linux wrote:
-> On Mon, Jan 11, 2010 at 02:47:24PM -0800, Daniel Walker wrote:
-> > From: Larry Bassel <lbassel@quicinc.com>
-> > 
-> > Both the clean and invalidate functionality needed
-> > for the video encoder and 7x27 barrier code
-> > need to have a strongly ordered mapping set up
-> > so that one may perform a write to strongly ordered
-> > memory. The generic ARM code does not provide this.
-> > 
-> > The generic ARM code does provide MT_DEVICE, which starts
-> > as strongly ordered, but the code later turns the buffered flag
-> > on for ARMv6 in order to make the device shared. This is not
-> > suitable for my purpose, so this patch adds code for a
-> > MT_DEVICE_STRONGLY_ORDERED mapping type.
+Hello,
+
+On Fri, Jan 29, 2010 at 12:17:18PM -0000, Leif Lindholm wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > kernel-bounces at lists.infradead.org] On Behalf Of Dirk Behme
+> > Sent: 27 January 2010 16:45
 > 
-> This doesn't really describe what "my purpose" is; the patch description
-> is too vague to ascertain why this is required.
+> > On a 400MHz ARM11 MPCore system (NEC NaviEngine based) with kernel
+> > 2.6.32 we found that BogoMIPS/loops per jiffies ~doubles (see below
+> > [1]) by adding a nop to __delay():
+> 
+> The reason for this is that the ARM11 MPCore doesn't fold branch
+> instructions for busy-wait-style loops. Inserting the nop (or any other
+> non-branch instruction) removes the branch instruction from the
+> execution stream.
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0360f/ch06s02s04.html
+> 
+> But as Catalin says, this makes no functional difference, even though it
+> might look "more impressive" :)
+With a bigger number of loops_per_seconds the maximal period that can be
+delayed for is shorter and the granularity is better, no?
 
-Hopefully this is a better description of the patch:
+Best regards
+Uwe
 
-Some Qualcomm SOCs (such as the MSM7x27) require a write to
-strongly ordered memory in order to fully flush the AXI bus.
-Although the generic ARM code provides MT_DEVICE, which starts
-as strongly ordered, it later turns on the buffered flag to
-make this memory shared.
-
-Add an additional mapping type MT_DEVICE_STRONGLY_ORDERED which
-will stay in strongly ordered mode and allow proper
-implementation of cache and invalidate operations on these
-devices.
-
-Larry
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
