@@ -1,25 +1,64 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Jan 2010 07:49:21 +0100
-Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and
-	resume functions
-In-Reply-To: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
-References: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100129064920.GB1529@ucw.cz>
+Date: Fri, 29 Jan 2010 07:50:06 +0100
+Subject: [RFC PATCH 05/12] arm: mm: retry on QSD icache parity errors
+In-Reply-To: <1264719577-5436-6-git-send-email-dwalker@codeaurora.org>
+References: <1264719577-5436-6-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100129065006.GC1529@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2010-01-28 14:59:29, Daniel Walker wrote:
-> From: Willie Ruan <wruan@quicinc.com>
+Hi!
+
+> Parity errors in the icache on QSD can be worked around either by
+> retrying the access, or invalidating the icache. The whole icache
+> must be invalidated since the data abort is imprecise (the faulting
+> address is not known).
 > 
-> The application processor in Qualcomm's MSM chips can be powered off
-> (also called power collapse) during suspend and idle time. L2 cache power
-> will be collapsed too on current chips. To handle this scenario, we need
-> to add a function (l2x0_suspend here) to flush L2 cache before the power
-> loss and another function (l2x0_resume) to restore the cache settings
-> after the power is restored.
+> Signed-off-by: Steve Muckle <smuckle@quicinc.com>
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 
-So this fixes suspend/resume? Ack...
 
+> @@ -442,6 +443,39 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	return 1;
+>  }
+>  
+> +static int
+> +do_imprecise_ext(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> +{
+> +#ifdef CONFIG_ARCH_MSM_SCORPION
+> +	unsigned int regval;
+> +	static unsigned char flush_toggle;
+> +
+> +	asm("mrc p15, 0, %0, c5, c1, 0\n" /* read adfsr for fault status */
+> +	    : "=r" (regval));
+> +	if (regval == 0x2) {
+> +		/* Fault was caused by icache parity error. Alternate
+> +		 * simply retrying the access and flushing the icache. */
+> +		flush_toggle ^= 1;
+> +		if (flush_toggle)
+> +			asm("mcr p15, 0, %0, c7, c5, 0\n"
+> +			    :
+> +			    : "r" (regval)); /* input value is ignored */
+> +		/* Clear fault in EFSR. */
+> +		asm("mcr p15, 7, %0, c15, c0, 1\n"
+> +		    :
+> +		    : "r" (regval));
+> +		/* Clear fault in ADFSR. */
+> +		regval = 0;
+> +		asm("mcr p15, 0, %0, c5, c1, 0\n"
+> +		    :
+> +		    : "r" (regval));
+> +		return 0;
+> +	}
+> +#endif
+
+Tell the user or at least keep the count, so cache going bad can be
+recognized?
+
+Also you probably need asm volatile, and probably do not need those
+\n-s.
+
+									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
