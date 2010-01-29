@@ -1,20 +1,54 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 29 Jan 2010 23:18:26 +0100
-Subject: [PATCH v5] input: MXC: add mxc-keypad driver to support the
-	Keypad Port present in the mxc application processors family.
-In-Reply-To: <20100129215015.GA26720@core.coreip.homeip.net>
-References: <1264799926.2975.3.camel@realization>
-	<20100129215015.GA26720@core.coreip.homeip.net>
-Message-ID: <1264803506.2975.25.camel@realization>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 29 Jan 2010 15:30:53 -0700
+Subject: [PATCH] mach-dove/common.c: remove unnecessary (void *) casts
+Message-ID: <201001291530.53460.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One question.. out of the patch
-I am working at home, and for me the clock say 23:12
-I am working on this because I am fresh graduated and I am continuing
-a University project adding row on my resume ;) and I am proud to work
-on linux kernel.
-I suppose you respond me now for work.. true?
+The (void *) cast is not needed when setting dev.platform_data to the
+address of the data. Remove the casts.
 
-I wonder, where are your keyboards pressed? :)
-Where do you live?
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+---
+
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 806972a..5da2cf4 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -605,7 +605,7 @@ static struct platform_device dove_xor00_channel = {
+ 	.dev		= {
+ 		.dma_mask		= &dove_xor0_dmamask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= (void *)&dove_xor00_data,
++		.platform_data		= &dove_xor00_data,
+ 	},
+ };
+ 
+@@ -631,7 +631,7 @@ static struct platform_device dove_xor01_channel = {
+ 	.dev		= {
+ 		.dma_mask		= &dove_xor0_dmamask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= (void *)&dove_xor01_data,
++		.platform_data		= &dove_xor01_data,
+ 	},
+ };
+ 
+@@ -704,7 +704,7 @@ static struct platform_device dove_xor10_channel = {
+ 	.dev		= {
+ 		.dma_mask		= &dove_xor1_dmamask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= (void *)&dove_xor10_data,
++		.platform_data		= &dove_xor10_data,
+ 	},
+ };
+ 
+@@ -730,7 +730,7 @@ static struct platform_device dove_xor11_channel = {
+ 	.dev		= {
+ 		.dma_mask		= &dove_xor1_dmamask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= (void *)&dove_xor11_data,
++		.platform_data		= &dove_xor11_data,
+ 	},
+ };
+ 
