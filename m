@@ -1,26 +1,38 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 29 Jan 2010 20:56:45 +0100
-Subject: [PATCH 3/4] rtc: enable rtc in max8925
-In-Reply-To: <771cded01001250355p71099663j385d25fc63a5d63d@mail.gmail.com>
-References: <771cded01001250309x33f85bbah4db8b526f6706309@mail.gmail.com>
-	<20100125122231.3d4ddc02@linux.lan.towertech.it>
-	<771cded01001250355p71099663j385d25fc63a5d63d@mail.gmail.com>
-Message-ID: <20100129195644.GC23130@sortiz.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 29 Jan 2010 12:01:03 -0800
+Subject: [RFC PATCH 04/12] arm: mm: cache-l2x0: add l2x0 suspend and
+	resume functions
+In-Reply-To: <20100129194344.GB19882@n2100.arm.linux.org.uk>
+References: <1264719577-5436-5-git-send-email-dwalker@codeaurora.org>
+	<1264763312.4242.47.camel@pc1117.cambridge.arm.com>
+	<179C5F34D68DF54C8898E904FC5BAF8C79E15B77C4@NALASEXMB09.na.qualcomm.com>
+	<1264787969.1818.6.camel@c-dwalke-linux.qualcomm.com>
+	<179C5F34D68DF54C8898E904FC5BAF8C79E15B77CD@NALASEXMB09.na.qualcomm.com>
+	<1264789772.1818.8.camel@c-dwalke-linux.qualcomm.com>
+	<20100129190355.GA19882@n2100.arm.linux.org.uk>
+	<1264792338.1818.28.camel@c-dwalke-linux.qualcomm.com>
+	<20100129194344.GB19882@n2100.arm.linux.org.uk>
+Message-ID: <1264795263.1818.38.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On Fri, 2010-01-29 at 19:43 +0000, Russell King - ARM Linux wrote:
 
-On Mon, Jan 25, 2010 at 06:55:50AM -0500, Haojian Zhuang wrote:
-> +struct max8925_rtc_info {
-> +	struct rtc_device	*rtc_dev;
-> +	struct max8925_chip	*chip;
-> +	struct i2c_client	*i2c;
-I dont think you need this pointer here, right ?
+> Umm, I think whatever you're looking at is outdated by at least one
+> month.  What you're trying to tell me is in -next hasn't been there
+> for at least an entire month:
+> 
+> http://git.kernel.org/gitweb.cgi?p=linux/kernel/git/sfr/linux-next.git;a=blob;f=arch/arm/mm/cache-l2x0.c;h=cb8fc6573b1b2c9dedbeeec0f9a87c491a78ba85;hb=HEAD
+> 
+> This is the same as what was merged into Linus' tree for 2.6.33-rc1
+> on 17 Dec, and was in -next well before that date.
+> 
+> If your tree has sync_writel() then it's out of date.
 
-Cheers,
-Samuel.
+I was quoting code from next cause I was porting this patch to next (due
+to your prior comments). The version of next that I have doesn't have
+sync_writel() (it's next as of yesterday) ..
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+I'm updating the locking in this patches also.
+
+Daniel
