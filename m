@@ -1,88 +1,96 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 30 Jan 2010 23:24:57 +0530
-Subject: [PATCH 0/9] Initial multi-omap support for omap4
-In-Reply-To: <20100130162441.GQ23505@atomide.com>
-References: <20100130020036.10590.78028.stgit@baageli.muru.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EC6@dbde02.ent.ti.com>
-	<20100130162441.GQ23505@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EF8@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 30 Jan 2010 22:02:31 +0100
+Subject: change boot requirements [Was: make PHYS_OFFSET determined at
+	run time (unfinished)]
+In-Reply-To: <4B5DF1C9.6090102@bluewatersys.com>
+References: <20100119083803.GA17904@pengutronix.de>
+	<20100122115831.GA8377@pengutronix.de>
+	<20100125173201.GA14834@pengutronix.de>
+	<4B5DF1C9.6090102@bluewatersys.com>
+Message-ID: <20100130210231.GC16345@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Saturday, January 30, 2010 9:55 PM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 0/9] Initial multi-omap support for omap4
-> 
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100130 04:49]:
-> > > > Hi all,
-> > > >
-> > > > These patches allow compiling in also omap4 into the multi-omap
-> > > > configuration. As I don't yet have omap4, I've only boot tested
-> > > > these on omap2 and omap3.
-> > > >
-> > > > Somebody with an omap4 board please boot test these with the
-> > > > omap3_defconfig and see what happens.. You might want to enable
-> > > > DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
-> > > Looks like this series have some dependent series because it doesn't
-> > > apply on mainline.
-> > >
-> > > So I tested this directly on linux-omap "multi-omap4" branch. It boots sufficiently
-> > > but doesn't proceed after "brd_init". Didn't get much time to debug so attached log
-> >
-> > Stand alone omap_4430sdp_defconfig also didn't fully boot on the linux-omap "multi-omap4".
-> > The log below shows that the serial platform data isn't configured correctly.
-> >
-> > <6>io scheduler deadline registered
-> > <6>io scheduler cfq registered (default)
-> > <6>Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-> > <6>serial8250.0: ttyS0 at MMIO 0x4806a000 (irq = 104) is a ST16654
-> > <6>serial8250.1: ttyS0 at MMIO 0x4806a000 (irq = 105) is a ST16654
-> >
-> > Below patch to fix the boot for omap_4430sdp_defconfig. Small typo really.
-> >
-> > diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/inclu
-> > index 67ffa08..83dce4c 100644
-> > --- a/arch/arm/plat-omap/include/plat/serial.h
-> > +++ b/arch/arm/plat-omap/include/plat/serial.h
-> > @@ -33,7 +33,7 @@
-> >
-> >  /* OMAP4 serial ports */
-> >  #define OMAP4_UART1_BASE       OMAP2_UART1_BASE
-> > -#define OMAP4_UART2_BASE       OMAP2_UART1_BASE
-> > +#define OMAP4_UART2_BASE       OMAP2_UART2_BASE
-> >  #define OMAP4_UART3_BASE       0x48020000
-> >  #define OMAP4_UART4_BASE       0x4806e000
-> 
-> Heh OK :) Sounds like at this point it makes sense to merge
-> that into the original patch redo omap-for-linus partially.
-> 
-> Can I also add your Acked-by for these patches then?
-Yes please.
-> > For multi-omap build, for now I need to disable
-> > [*] Reset unused clocks during boot
-> 
-> Sounds like omap4 has some clocks left on from the bootloader
-> that it should clk_get and clk_enable during init. That should
-> be easy to track if you boot with "debug" in your cmdline and
-> take a look at the list of unused clocks that are shut down
-> with late_initcall.
-I know it hangs when it tries to cut down UART3 ( console) clock.
-The clock support got just recently merged and drivers are not 
-yet migrated so, need to still depend on bootloader. The work 
-is ongoing and soon the patches will be pushed. Few drivers
-are planned to be handled in hwmod way so we were holding these
-patches. 
-> > With this OMAP4430 boots with omap3_defconfig :)
-> 
-> Cool, thanks, good to hear!
-> 
-> Now the only omap2/3/4 that's not booting with omap3_defconfig
-> is 2430 because of the different clock offsets compare dot 2420.
-> That should get fixed eventually though.
-> 
-> Regards,
-> 
-> Tony
+Hello,
+
+On Tue, Jan 26, 2010 at 08:32:25AM +1300, Ryan Mallon wrote:
+> Uwe Kleine-K?nig wrote:
+> > On Fri, Jan 22, 2010 at 12:58:31PM +0100, Uwe Kleine-K?nig wrote:
+> >> just a short status report:  The code seems to work OK if PHYS_OFFSET is
+> >> determined correctly.
+> >>
+> >> The problem is when it does not.  Currently I place arch/arm/boot/Image
+> >> at 0xa1008000[1] with PHYS_OFFSET being 0xa0000000.  Then
+> >> arch/arm/boot/head.S guesses PHYS_OFFSET to be 0xa1000000 resulting
+> >> __va(bank->start) of my only bank to be 0xbf000000.  And so this bank is
+> >> discarded by sanity_check_meminfo as 0xbf000000 overlaps the vmalloc
+> >> region.
+> >>
+> >> So how to proceed?  These possiblities come to (my) mind:
+> >>
+> >>  - parse the atag list to better guess phys_offset
+> >>    (both zImage and Image would need to do that)
+> >>  - require that zImage and Image are placed such that the guess is done
+> >>    right (which is stupid for zImage as then the decompressor needs to
+> >>    move the decompressed image)
+> >>  - require the bootloader to pass phys_offset (r3?)
+> >>  - make the ram mapping non-linear
+> >>  - don't discard the whole bank, only the addresses overlaping the
+> >>    vmalloc region
+> >>
+> >> Anything else?  Preferences?  Thoughts?
+> > I'd like to go forward here and if I don't hear anything here I'll start
+> > requiring that the bootloader sets r3=PHYS_OFFSET as this seems the most
+> > robust solution to me.
+It works now for me.  
+
+zImage expects to get PHYS_OFFSET passed in r3.  It doesn't hurt at all
+if the value is wrong if RUNTIME_PHYS_OFFSET is off.  If it's on it is
+used if the value is 128MiB-aligned.  If not sp & 0xf8000000 is used.
+This should work for most machines.
+
+There is no machine support included yet, but adding it for your machine
+should be easy.  Just select RUNTIME_PHYS_OFFSET and remove the
+definition of PHYS_OFFSET from <mach/memory.h>.
+
+The whole series is available via git, see below, and I will send the
+patches not yet send in reply to this mail.
+
+Best regards
+Uwe
+
+The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+  Linus Torvalds (1):
+        Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+
+Uwe Kleine-K?nig (9):
+      zImage: fix comments for cache_on, cache_off and cache_clean_flush
+      zImage: some comments for __armv3_mpu_cache_on
+      zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+      zImage: annotate debug functions about corrupted registers
+      zImage: don't define unused symbol initrd_phys
+      arm: deprecate support for old way to pass kernel parameters
+      zImage: don't hard code the stack size twice
+      uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+      Allow PHYS_OFFSET to be runtime determined
+
+ Documentation/arm/Booting         |    1 +
+ arch/arm/Kconfig                  |    9 ++++
+ arch/arm/boot/Makefile            |    6 ++-
+ arch/arm/boot/compressed/Makefile |   10 ++---
+ arch/arm/boot/compressed/head.S   |   76 +++++++++++++++++++++++++++++++++----
+ arch/arm/include/asm/memory.h     |    5 ++
+ arch/arm/kernel/Makefile          |    4 +-
+ arch/arm/kernel/compat.c          |    7 ---
+ arch/arm/kernel/compat.h          |    2 -
+ arch/arm/kernel/head.S            |   31 +++++++++++----
+ arch/arm/kernel/setup.c           |   21 ++++++++++-
+ 11 files changed, 138 insertions(+), 34 deletions(-)
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
