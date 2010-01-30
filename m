@@ -1,82 +1,52 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 29 Jan 2010 19:37:31 -0500
-Subject: [PATCH]NUC900 LCD Controller Driver
-In-Reply-To: <20100129162755.b591a2fb.akpm@linux-foundation.org>
-References: <ae11f36b1001110005k410620datb5444ffa795b27f3@mail.gmail.com>
-	<20100129162755.b591a2fb.akpm@linux-foundation.org>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E976F@mi8nycmail19.Mi8.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Jan 2010 18:01:19 -0800
+Subject: [PATCH 0/9] Initial multi-omap support for omap4
+Message-ID: <20100130020036.10590.78028.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 29, 2010 5:28 PM, Andrew Morton wrote:
->
-> On Mon, 11 Jan 2010 17:05:44 +0900
-> Wang Qiang <rurality.linux@gmail.com> wrote:
->
->> hi, Dear Wan
->> 
->> There is the patch of LCD controller driver for nuc900s.
->> The Linux LOGO is just fine and the FB-Test application was ok, too.
->> 
->> best regards
->> wangqiang
->> 
->>
->> ...
->>
->> @@ -380,6 +381,48 @@ struct platform_device nuc900_device_kpi = {
->>  	.resource	= nuc900_kpi_resource,
->>  };
->> 
->> +#ifdef CONFIG_FB_NUC900
->> +
->> +static struct resource nuc900_lcd_resource[] = {
->> +	[0] = {
->> +		.start = W90X900_PA_LCD,
->> +		.end   = W90X900_PA_LCD + W90X900_SZ_LCD - 1,
->> +		.flags = IORESOURCE_MEM,
->> +	},
->> +	[1] = {
->> +		.start = IRQ_LCD,
->> +		.end   = IRQ_LCD,
->> +		.flags = IORESOURCE_IRQ,
->> +	}
->> +};
->> +
->> +static u64 nuc900_device_lcd_dmamask = 0xffffffffUL;
->
-> I suspect this should have type `dma_addr_t', but `struct device' uses
-> open-coded u64 too.  Odd.
->
-> It makes no sense to initialise a u64 with an unsigned long value -
-> it's wrong on a 32-bit machine.
->
-> this:
->
->	static u64 nuc900_device_lcd_dmamask = -1;
->
-> will work.
->
->> +struct platform_device nuc900_device_lcd = {
->> +	.name             = "nuc900-lcd",
->> +	.id               = -1,
->> +	.num_resources    = ARRAY_SIZE(nuc900_lcd_resource),
->> +	.resource         = nuc900_lcd_resource,
->> +	.dev              = {
->> +		.dma_mask               = &nuc900_device_lcd_dmamask,
->> +		.coherent_dma_mask      = 0xffffffffUL
->
-> And this gets initialised to 0x00000000ffffffff also.  Using -1 will fix.
->
+Hi all,
 
-Wouldn't this also work?
+These patches allow compiling in also omap4 into the multi-omap
+configuration. As I don't yet have omap4, I've only boot tested
+these on omap2 and omap3.
 
-	.dev			= {
-		.dma_mask			= &nuc900_device_lcd.dev.coherent_dma_mask,
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-
-Then you could just get rid of nuc900_device_lcd_dmamask.
+Somebody with an omap4 board please boot test these with the
+omap3_defconfig and see what happens.. You might want to enable
+DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
 
 Regards,
-Hartley
+
+Tony
+
+---
+
+Tony Lindgren (9):
+      omap: Move multi-omap ifdeffery into it's own header file
+      omap2/3/4: Clean up defines for entry-macro.S
+      omap4: Use get_irqnr_preamble
+      omap2/3/4: Clean up entry-macro.s for adding support for omap4 multiboot
+      omap2/3/4: Allow booting omap4 with multi-omap configuration
+      omap3/4: Fix compile for multi-omap for clkops_noncore_dpll_ops
+      omap: Fix gpio.c for multi-omap for omap4
+      omap2/3/4: Fix mach-omap2/serial.c for multiboot
+      omap2/3/4: Add omap4 into omap3_defconfnig
+
+
+ arch/arm/configs/omap3_defconfig               |    6 +
+ arch/arm/mach-omap2/clock34xx.c                |    2 
+ arch/arm/mach-omap2/clock34xx.h                |    2 
+ arch/arm/mach-omap2/clock34xx_data.c           |    6 -
+ arch/arm/mach-omap2/clock44xx.c                |    2 
+ arch/arm/mach-omap2/clock44xx.h                |    2 
+ arch/arm/mach-omap2/clock44xx_data.c           |   12 +
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   81 +++++++--
+ arch/arm/mach-omap2/serial.c                   |   18 +-
+ arch/arm/plat-omap/gpio.c                      |  217 ++++++++++++++----------
+ arch/arm/plat-omap/include/plat/cpu.h          |   70 --------
+ arch/arm/plat-omap/include/plat/multi.h        |   94 ++++++++++
+ 12 files changed, 316 insertions(+), 196 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/multi.h
+
+-- 
+Signature
