@@ -1,206 +1,64 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jan 2010 18:01:23 -0800
-Subject: [PATCH 1/9] omap: Move multi-omap ifdeffery into it's own header file
+Date: Fri, 29 Jan 2010 18:01:27 -0800
+Subject: [PATCH 2/9] omap2/3/4: Clean up defines for entry-macro.S
 In-Reply-To: <20100130020036.10590.78028.stgit@baageli.muru.com>
 References: <20100130020036.10590.78028.stgit@baageli.muru.com>
-Message-ID: <20100130020123.10590.29024.stgit@baageli.muru.com>
+Message-ID: <20100130020127.10590.67010.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This way we can include it easily as needed also for .S files.
+Define the irq base the same way as for omap2 and omap3,
+and start using get_irqnr_preamble.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/include/plat/cpu.h   |   70 -----------------------
- arch/arm/plat-omap/include/plat/multi.h |   94 +++++++++++++++++++++++++++++++
- 2 files changed, 95 insertions(+), 69 deletions(-)
- create mode 100644 arch/arm/plat-omap/include/plat/multi.h
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 995466d..b80151c 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -31,6 +31,7 @@
- #define __ASM_ARCH_OMAP_CPU_H
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index 4fd6b1b..3e63aaa 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -19,6 +19,12 @@
+ #include <plat/omap34xx.h>
+ #include <plat/omap44xx.h>
  
- #include <linux/bitops.h>
-+#include <plat/multi.h>
++#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
++#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
++#define OMAP4_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
++#define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
++#define	ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
++
+ 		.macro	disable_fiq
+ 		.endm
  
- /*
-  * Omap device type i.e. EMU/HS/TST/GP/BAD
-@@ -76,75 +77,6 @@ unsigned int omap_rev(void);
- #define GET_OMAP_REVISION()	((omap_rev() >> 8) & 0xff)
+@@ -27,11 +33,6 @@
  
- /*
-- * Test if multicore OMAP support is needed
-- */
--#undef MULTI_OMAP1
--#undef MULTI_OMAP2
--#undef OMAP_NAME
+ #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 
+-#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
+-#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
+-#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* Active interrupt offset */
+-#define	ACTIVEIRQ_MASK		0x7f		/* Active interrupt bits */
 -
--#ifdef CONFIG_ARCH_OMAP730
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP1
--#  define MULTI_OMAP1
--# else
--#  define OMAP_NAME omap730
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP850
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP1
--#  define MULTI_OMAP1
--# else
--#  define OMAP_NAME omap850
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP15XX
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP1
--#  define MULTI_OMAP1
--# else
--#  define OMAP_NAME omap1510
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP16XX
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP1
--#  define MULTI_OMAP1
--# else
--#  define OMAP_NAME omap16xx
--# endif
--#endif
--#if (defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
--# if (defined(OMAP_NAME) || defined(MULTI_OMAP1))
--#  error "OMAP1 and OMAP2 can't be selected at the same time"
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP2420
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP2
--#  define MULTI_OMAP2
--# else
--#  define OMAP_NAME omap2420
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP2430
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP2
--#  define MULTI_OMAP2
--# else
--#  define OMAP_NAME omap2430
--# endif
--#endif
--#ifdef CONFIG_ARCH_OMAP3430
--# ifdef OMAP_NAME
--#  undef  MULTI_OMAP2
--#  define MULTI_OMAP2
--# else
--#  define OMAP_NAME omap3430
--# endif
--#endif
+ 		.pushsection .data
+ omap_irq_base:	.word	0
+ 		.popsection
+@@ -90,8 +91,6 @@ omap_irq_base:	.word	0
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+ 
+-#define OMAP44XX_VA_GIC_CPU_BASE	OMAP2_L4_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
 -
--/*
-  * Macros to group OMAP into cpu classes.
-  * These can be used in most places.
-  * cpu_is_omap7xx():	True for OMAP730, OMAP850
-diff --git a/arch/arm/plat-omap/include/plat/multi.h b/arch/arm/plat-omap/include/plat/multi.h
-new file mode 100644
-index 0000000..f235d32
---- /dev/null
-+++ b/arch/arm/plat-omap/include/plat/multi.h
-@@ -0,0 +1,94 @@
-+/*
-+ * Support for compiling in multiple OMAP processors
-+ *
-+ * Copyright (C) 2010 Nokia Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ *
-+ */
-+
-+#ifndef __PLAT_OMAP_MULTI_H
-+#define __PLAT_OMAP_MULTI_H
-+
-+/*
-+ * Test if multicore OMAP support is needed
-+ */
-+#undef MULTI_OMAP1
-+#undef MULTI_OMAP2
-+#undef OMAP_NAME
-+
-+#ifdef CONFIG_ARCH_OMAP730
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP1
-+#  define MULTI_OMAP1
-+# else
-+#  define OMAP_NAME omap730
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP850
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP1
-+#  define MULTI_OMAP1
-+# else
-+#  define OMAP_NAME omap850
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP15XX
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP1
-+#  define MULTI_OMAP1
-+# else
-+#  define OMAP_NAME omap1510
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP16XX
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP1
-+#  define MULTI_OMAP1
-+# else
-+#  define OMAP_NAME omap16xx
-+# endif
-+#endif
-+#if (defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
-+# if (defined(OMAP_NAME) || defined(MULTI_OMAP1))
-+#  error "OMAP1 and OMAP2 can't be selected at the same time"
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP2420
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP2
-+#  define MULTI_OMAP2
-+# else
-+#  define OMAP_NAME omap2420
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP2430
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP2
-+#  define MULTI_OMAP2
-+# else
-+#  define OMAP_NAME omap2430
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_OMAP3430
-+# ifdef OMAP_NAME
-+#  undef  MULTI_OMAP2
-+#  define MULTI_OMAP2
-+# else
-+#  define OMAP_NAME omap3430
-+# endif
-+#endif
-+
-+#endif	/* __PLAT_OMAP_MULTI_H */
+ 		.macro  get_irqnr_preamble, base, tmp
+ 		.endm
+ 
+@@ -115,7 +114,7 @@ omap_irq_base:	.word	0
+ 		 * valid range for an IRQ (30-1020 inclusive).
+ 		 */
+ 		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		ldr     \base, =OMAP44XX_VA_GIC_CPU_BASE
++		ldr     \base, =OMAP4_IRQ_BASE
+ 		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+ 
+ 		ldr     \tmp, =1021
