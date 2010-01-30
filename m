@@ -1,75 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 30 Jan 2010 08:24:41 -0800
-Subject: [PATCH 0/9] Initial multi-omap support for omap4
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EC6@dbde02.ent.ti.com>
-References: <20100130020036.10590.78028.stgit@baageli.muru.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EC6@dbde02.ent.ti.com>
-Message-ID: <20100130162441.GQ23505@atomide.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Sat, 30 Jan 2010 18:01:48 +0100
+Subject: [PATCH] ARM: SAMSUNG: Add support for 12bit ADC
+Message-ID: <b2e8f9f71001300901v2969c41bx7be6c052ad424a00@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100130 04:49]:
-> > > Hi all,
-> > >
-> > > These patches allow compiling in also omap4 into the multi-omap
-> > > configuration. As I don't yet have omap4, I've only boot tested
-> > > these on omap2 and omap3.
-> > >
-> > > Somebody with an omap4 board please boot test these with the
-> > > omap3_defconfig and see what happens.. You might want to enable
-> > > DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
-> > Looks like this series have some dependent series because it doesn't
-> > apply on mainline.
-> > 
-> > So I tested this directly on linux-omap "multi-omap4" branch. It boots sufficiently
-> > but doesn't proceed after "brd_init". Didn't get much time to debug so attached log
-> 
-> Stand alone omap_4430sdp_defconfig also didn't fully boot on the linux-omap "multi-omap4".
-> The log below shows that the serial platform data isn't configured correctly. 
-> 
-> <6>io scheduler deadline registered
-> <6>io scheduler cfq registered (default)
-> <6>Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-> <6>serial8250.0: ttyS0 at MMIO 0x4806a000 (irq = 104) is a ST16654
-> <6>serial8250.1: ttyS0 at MMIO 0x4806a000 (irq = 105) is a ST16654
-> 
-> Below patch to fix the boot for omap_4430sdp_defconfig. Small typo really.
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/inclu
-> index 67ffa08..83dce4c 100644
-> --- a/arch/arm/plat-omap/include/plat/serial.h
-> +++ b/arch/arm/plat-omap/include/plat/serial.h
-> @@ -33,7 +33,7 @@
-> 
->  /* OMAP4 serial ports */
->  #define OMAP4_UART1_BASE       OMAP2_UART1_BASE
-> -#define OMAP4_UART2_BASE       OMAP2_UART1_BASE
-> +#define OMAP4_UART2_BASE       OMAP2_UART2_BASE
->  #define OMAP4_UART3_BASE       0x48020000
->  #define OMAP4_UART4_BASE       0x4806e000
+The S3C64XX SoC series support 12bit ADC data, enable this and
+mask the data accordingly.
 
-Heh OK :) Sounds like at this point it makes sense to merge
-that into the original patch redo omap-for-linus partially.
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ arch/arm/plat-samsung/adc.c                   |   24 +++++++++++++++++++-----
+ arch/arm/plat-samsung/include/plat/regs-adc.h |    1 +
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-Can I also add your Acked-by for these patches then?
- 
-> For multi-omap build, for now I need to disable 
-> [*] Reset unused clocks during boot
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index c7659b7..81caf21 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -262,6 +262,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ {
+ 	struct adc_device *adc = pw;
+ 	struct s3c_adc_client *client = adc->cur;
++	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
+ 	unsigned long flags;
+ 	unsigned data0, data1;
 
-Sounds like omap4 has some clocks left on from the bootloader
-that it should clk_get and clk_enable during init. That should
-be easy to track if you boot with "debug" in your cmdline and
-take a look at the list of unused clocks that are shut down
-with late_initcall.
- 
-> With this OMAP4430 boots with omap3_defconfig :)
+@@ -276,9 +277,17 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
 
-Cool, thanks, good to hear!
+ 	client->nr_samples--;
 
-Now the only omap2/3/4 that's not booting with omap3_defconfig
-is 2430 because of the different clock offsets compare dot 2420.
-That should get fixed eventually though.
++	if (cpu == TYPE_S3C64XX) {
++		/* S3C64XX ADC resolution is 12-bit */
++		data0 &= 0xfff;
++		data1 &= 0xfff;
++	} else {
++		data0 &= 0x3ff;
++		data1 &= 0x3ff;
++	}
++
+ 	if (client->convert_cb)
+-		(client->convert_cb)(client, data0 & 0x3ff, data1 & 0x3ff,
+-				     &client->nr_samples);
++		(client->convert_cb)(client, data0, data1, &client->nr_samples);
 
-Regards,
+ 	if (client->nr_samples > 0) {
+ 		/* fire another conversion for this */
+@@ -295,7 +304,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 	}
 
-Tony
+ exit:
+-	if (platform_get_device_id(adc->pdev)->driver_data == TYPE_S3C64XX) {
++	if (cpu == TYPE_S3C64XX) {
+ 		/* Clear ADC interrupt */
+ 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
+ 	}
+@@ -308,6 +317,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	struct adc_device *adc;
+ 	struct resource *regs;
+ 	int ret;
++	unsigned tmp;
+
+ 	adc = kzalloc(sizeof(struct adc_device), GFP_KERNEL);
+ 	if (adc == NULL) {
+@@ -354,8 +364,12 @@ static int s3c_adc_probe(struct platform_device *pdev)
+
+ 	clk_enable(adc->clk);
+
+-	writel(adc->prescale | S3C2410_ADCCON_PRSCEN,
+-	       adc->regs + S3C2410_ADCCON);
++	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
++	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
++		/* Enable 12-bit ADC resolution */
++		tmp |= S3C64XX_ADCCON_RESSEL;
++	}
++	writel(tmp, adc->regs + S3C2410_ADCCON);
+
+ 	dev_info(dev, "attached adc driver\n");
+
+diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h
+b/arch/arm/plat-samsung/include/plat/regs-adc.h
+index f43c8da..7554c4f 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-adc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
+@@ -25,6 +25,7 @@
+
+
+ /* ADCCON Register Bits */
++#define S3C64XX_ADCCON_RESSEL		(1<<16)
+ #define S3C2410_ADCCON_ECFLG		(1<<15)
+ #define S3C2410_ADCCON_PRSCEN		(1<<14)
+ #define S3C2410_ADCCON_PRSCVL(x)	(((x)&0xFF)<<6)
+-- 
+1.6.6.1
