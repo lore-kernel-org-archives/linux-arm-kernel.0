@@ -1,42 +1,25 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 30 Jan 2010 16:39:26 +0530
-Subject: [PATCH 0/9] Initial multi-omap support for omap4
-In-Reply-To: <20100130020036.10590.78028.stgit@baageli.muru.com>
-References: <20100130020036.10590.78028.stgit@baageli.muru.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EB3@dbde02.ent.ti.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Sat, 30 Jan 2010 12:27:21 +0100
+Subject: [PATCH v5] input: MXC: add mxc-keypad driver to support the
+	Keypad Port present in the mxc application processors family.
+In-Reply-To: <20100129213727.GB21364@pengutronix.de>
+References: <1264799926.2975.3.camel@realization>
+	<20100129213727.GB21364@pengutronix.de>
+Message-ID: <1264850841.2587.0.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony
-> Lindgren
-> Sent: Saturday, January 30, 2010 7:31 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Subject: [PATCH 0/9] Initial multi-omap support for omap4
-> 
-> Hi all,
-> 
-> These patches allow compiling in also omap4 into the multi-omap
-> configuration. As I don't yet have omap4, I've only boot tested
-> these on omap2 and omap3.
-> 
-> Somebody with an omap4 board please boot test these with the
-> omap3_defconfig and see what happens.. You might want to enable
-> DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
-Looks like this series have some dependent series because it doesn't
-apply on mainline.
+On ven, 2010-01-29 at 22:37 +0100, Uwe Kleine-K?nig wrote:
+> > [...]
+> > +MODULE_LICENSE("GPL v2");
+> There is no space expected in the string passed to MODULE_LICENSE. 
 
-So I tested this directly on linux-omap "multi-omap4" branch. It boots sufficiently
-but doesn't proceed after "brd_init". Didn't get much time to debug so attached log
+in include/linux/module.h:
 
-Regards,
-Santosh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap3_defconfig.log
-Type: application/octet-stream
-Size: 10866 bytes
-Desc: omap3_defconfig.log
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100130/4a7373c7/attachment-0001.obj>
+/*
+ * The following license idents are currently accepted as indicating free
+ * software modules
+ *
+ *	"GPL"				[GNU Public License v2 or later]
+ *	"GPL v2"			[GNU Public License v2]
+...
