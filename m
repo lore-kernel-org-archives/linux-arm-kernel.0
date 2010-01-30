@@ -1,65 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Jan 2010 18:01:43 -0800
-Subject: [PATCH 9/9] omap2/3/4: Add omap4 into omap3_defconfnig
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 30 Jan 2010 16:39:26 +0530
+Subject: [PATCH 0/9] Initial multi-omap support for omap4
 In-Reply-To: <20100130020036.10590.78028.stgit@baageli.muru.com>
 References: <20100130020036.10590.78028.stgit@baageli.muru.com>
-Message-ID: <20100130020142.10590.89073.stgit@baageli.muru.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EB3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap4 into omap3_defconfig. Note that this does not
-yet boot on omap4, but boots on omap2 and omap3.
+Tony,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony
+> Lindgren
+> Sent: Saturday, January 30, 2010 7:31 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Subject: [PATCH 0/9] Initial multi-omap support for omap4
+> 
+> Hi all,
+> 
+> These patches allow compiling in also omap4 into the multi-omap
+> configuration. As I don't yet have omap4, I've only boot tested
+> these on omap2 and omap3.
+> 
+> Somebody with an omap4 board please boot test these with the
+> omap3_defconfig and see what happens.. You might want to enable
+> DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
+Looks like this series have some dependent series because it doesn't
+apply on mainline.
 
-Also note that CONFIG_SMP does not currently work on
-uniprocessor ARMs.
+So I tested this directly on linux-omap "multi-omap4" branch. It boots sufficiently
+but doesn't proceed after "brd_init". Didn't get much time to debug so attached log
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap3_defconfig |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
-index 2bc80d7..714835e 100644
---- a/arch/arm/configs/omap3_defconfig
-+++ b/arch/arm/configs/omap3_defconfig
-@@ -239,7 +239,7 @@ CONFIG_ARCH_OMAP_OTG=y
- CONFIG_ARCH_OMAP2PLUS=y
- CONFIG_ARCH_OMAP2=y
- CONFIG_ARCH_OMAP3=y
--# CONFIG_ARCH_OMAP4 is not set
-+CONFIG_ARCH_OMAP4=y
- 
- #
- # OMAP Feature Selections
-@@ -295,6 +295,7 @@ CONFIG_MACH_OMAP_ZOOM3=y
- CONFIG_MACH_CM_T35=y
- CONFIG_MACH_IGEP0020=y
- CONFIG_MACH_OMAP_3630SDP=y
-+CONFIG_MACH_OMAP_4430SDP=y
- # CONFIG_OMAP3_EMU is not set
- # CONFIG_OMAP3_SDRC_AC_TIMING is not set
- 
-@@ -334,6 +335,7 @@ CONFIG_ARM_L1_CACHE_SHIFT=6
- # CONFIG_ARM_ERRATA_430973 is not set
- # CONFIG_ARM_ERRATA_458693 is not set
- # CONFIG_ARM_ERRATA_460075 is not set
-+CONFIG_ARM_GIC=y
- CONFIG_COMMON_CLKDEV=y
- 
- #
-@@ -350,6 +352,7 @@ CONFIG_TICK_ONESHOT=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+# CONFIG_SMP is not set
- CONFIG_VMSPLIT_3G=y
- # CONFIG_VMSPLIT_2G is not set
- # CONFIG_VMSPLIT_1G is not set
-@@ -361,6 +364,7 @@ CONFIG_HZ=128
- # CONFIG_THUMB2_KERNEL is not set
- CONFIG_AEABI=y
- CONFIG_OABI_COMPAT=y
-+CONFIG_ARCH_HAS_HOLES_MEMORYMODEL=y
- # CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
- # CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
- # CONFIG_HIGHMEM is not set
+Regards,
+Santosh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: omap3_defconfig.log
+Type: application/octet-stream
+Size: 10866 bytes
+Desc: omap3_defconfig.log
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100130/4a7373c7/attachment-0001.obj>
