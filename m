@@ -1,50 +1,113 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Sun, 31 Jan 2010 14:42:31 +0100
-Subject: [PATCH v6] input: IMX: add imx-keypad driver to support the
-	Keypad Port present in the imx application processors family.
-In-Reply-To: <20100131090802.GD12320@core.coreip.homeip.net>
-References: <1264852407.2587.4.camel@realization>
-	<20100131090802.GD12320@core.coreip.homeip.net>
-Message-ID: <1264945351.2433.10.camel@realization>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Sun, 31 Jan 2010 07:58:12 -0800
+Subject: [PATCH] staging/dream: add missing include files/fix compilation
+In-Reply-To: <20100131092829.GJ2238@elf.ucw.cz>
+References: <20091225205917.GA25761@elf.ucw.cz>
+	<20100115002419.GA25643@kroah.com> <20100119054516.GB22153@elf.ucw.cz>
+	<1263914079.1951.43.camel@m0nster> <20100131084421.GG2238@elf.ucw.cz>
+	<20100131092829.GJ2238@elf.ucw.cz>
+Message-ID: <1264953492.2059.5.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On dom, 2010-01-31 at 01:08 -0800, Dmitry Torokhov wrote:
-> Hi Alberto,
+On Sun, 2010-01-31 at 10:28 +0100, Pavel Machek wrote:
+> Hi!
 > 
-> On Sat, Jan 30, 2010 at 12:53:27PM +0100, Alberto Panizzo wrote:
+> > > > > > This adds missing include files, so it should now compile. ifdef
+> > > > > > guards were added to Kconfig, so it should not cause problems on
+> > > > > > non-arch-msm machines.
+> > > > > > 
+> > > > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > > > 
+> > > > > Odd, this doesn't apply to the linux-next tree, some of the files are
+> > > > > already there.
+> > > > 
+> > > > Strange, it seems it is almost all already in. Well, good :-).
+> > > > 
+> > > > But there's small problem. linux-next now contains dwalker's tree, and
+> > > > I could not get it to compile, even with staging disabled. I'll need
+> > > > to look into that.
+> > > 
+> > > I worked on it a little, but I won't have time to really start cleaning
+> > > up that tree till next week, or this weekend.
+> > > 
+> > > I pushed a new tree for next that should compile for dream with the
+> > > attached config. I also included the patch that I added to get it to
+> > > compile (you'll need the machine types too which I didn't include).
 > > 
-> > Changes in v6:
-> > -MXC to IMX pattern change (apart of Kconfig dependencies)
-> > -Comment style fixes
-> > -Greater check delay in debouncing process (10). 
-> > -Improve the usage of keypad->exit_flag: now it is false only
-> between open and 
-> >  close functions. And if we handle an interrupt out there, leave all
-> interrupts
-> >  masked, and wait for another open to re enable they.
-> > -Remove unnecessary "free events" mechanism (tested with evtest).
+> > Thanks! I checked out linux-next version, and it seems to include
 > > 
+> > > commit cdf6c137865357112aa31666b65b938ab29fa736
+> > >     msm: compile fixes for dream.
+> > 
+> > this patch. It still fails with:
+> > 
+> > arch/arm/mach-msm/rpc_hsusb.c: In function 'msm_chg_rpc_connect':
+> > arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> > function 'machine_is_msm7201a_surf'
+> > arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> > function 'machine_is_msm7x27_surf'
+> > arch/arm/mach-msm/rpc_hsusb.c:157: error: implicit declaration of
+> > function 'machine_is_qsd8x50_surf'
+> > make[1]: *** [arch/arm/mach-msm/rpc_hsusb.o] Error 1
+> > make: *** [arch/arm/mach-msm] Error 2
+> > 
+> > (and similar error further down). This fixes it, but you probably want
+> > to add machine_is_* to your git. (Aha, is that what you meant by
+> > "machine types"?
+> > 
+> > With this patch it compiles.
 > 
-> I took the liberty of making some changes to the driver, could you
-> please give the patch below a try and if I did not mess it up I will
-> fold it into your v6 version and apply to next.
+> Ok, it compiles, but I do not see it booting. You config has:
 > 
-> Thank you.
+> CONFIG_MSM_DEBUG_UART=3
+> # CONFIG_MSM_DEBUG_UART_NONE is not set
+> # CONFIG_MSM_DEBUG_UART1 is not set
+> # CONFIG_MSM_DEBUG_UART2 is not set
+> CONFIG_MSM_DEBUG_UART3=y
+> ...
+> CONFIG_DEBUG_LL=y
+> CONFIG_EARLY_PRINTK=y
 > 
-> -- 
-> Dmitry 
+> set, so I'd expect it to say something on the serial line... (right?
+> Or do I still need to patch printk.c to get that?). And I see nothing
+> :-(.
+> 
+> I'm using
+> 
+> ./fastboot -c "console=ttyMSM2 root=/dev/mmcblk0p1 rootdelay=5 fbcon=rotate:1" boot /data/l/linux-dwalker/arch/arm/boot/zImage
+> 
+> ...with different kernel, it works (as in "I get most of the boot on
+> serial line; it will not actually mount root").
 
-For me it is ok. Your patch looks good and I tested your changes and all
-goes well. I have to work on my English and other changes make the 
-source code more readable.
-Dmitry, put also your Signed-off line in v6 patch after merge if you
-feel to wont this. (I've already thought to ask you this before this
-patch fix) You help me a lot on building this version and an Acked-by
-maybe is not fair about your work.
+Have you seen this error?
 
-Thank You Dmirty :)
+  GEN     /local/mnt/workspace/c_dwalke/git-trees/dream-test/Makefile
+scripts/kconfig/conf -s arch/arm/Kconfig
+  GEN     /local/mnt/workspace/c_dwalke/git-trees/dream-test/Makefile
+  CHK     include/linux/version.h
+  CHK     include/generated/utsrelease.h
+  Using /local/mnt/workspace/c_dwalke/git-trees/linux-2.6 as source for kernel
+make[2]: `include/generated/mach-types.h' is up to date.
+  CALL    /local/mnt/workspace/c_dwalke/git-trees/linux-2.6/scripts/checksyscalls.sh
+  CHK     include/generated/compile.h
+  GZIP    kernel/config_data.gz
+  IKCFG   kernel/config_data.h
+  CC      kernel/configs.o
+  LD      kernel/built-in.o
+  CC      drivers/video/msm/msm_fb.o
+  CC      drivers/video/cfbcopyarea.o
+/home/dwalker/linux-2.6/drivers/video/msm/msm_fb.c:24: fatal error: linux/msm_mdp.h: No such file or directory
+compilation terminated.
+make[4]: *** [drivers/video/msm/msm_fb.o] Error 1
+make[3]: *** [drivers/video/msm] Error 2
+make[3]: *** Waiting for unfinished jobs....
+make[2]: *** [drivers/video] Error 2
+make[1]: *** [drivers] Error 2
+make: *** [sub-make] Error 2
 
+Even with the framebuffer off I still don't get any serial output on a
+plain 2.6.33-rc6 .. I'm using a config that you sent me when you first
+tested my -next tree .
 
--- 
-Alberto!
+Daniel
