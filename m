@@ -1,7 +1,7 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 31 Jan 2010 11:46:18 +0200
+Date: Sun, 31 Jan 2010 11:50:21 +0200
 Subject: [PATCH] [ARM] pxa: match camera clock by struct device
-Message-ID: <1264931178-29177-1-git-send-email-mike@compulab.co.il>
+Message-ID: <1264931421-29635-1-git-send-email-mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
