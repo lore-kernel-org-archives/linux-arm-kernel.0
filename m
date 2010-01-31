@@ -1,277 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sat, 30 Jan 2010 22:07:40 +0100
-Subject: [PATCH 3/3] Allow PHYS_OFFSET to be runtime determined
-In-Reply-To: <20100130210231.GC16345@pengutronix.de>
-References: <20100130210231.GC16345@pengutronix.de>
-Message-ID: <1264885660-7755-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: mogambo.kztrj@gmail.com (Mogambo Park)
+Date: Sun, 31 Jan 2010 09:03:16 +0900
+Subject: Static mappings at boottime
+In-Reply-To: <20100130153921.GA17904@n2100.arm.linux.org.uk>
+References: <2703439e1001300647q1149a357v3b3e9da6bd8c91cf@mail.gmail.com>
+	<20100130145549.GA17097@n2100.arm.linux.org.uk>
+	<2703439e1001300713k5782d098h6420f19565437c9f@mail.gmail.com>
+	<20100130153921.GA17904@n2100.arm.linux.org.uk>
+Message-ID: <2703439e1001301603r435cad59ub37430f4aeef888d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bases on work done earlier by Lennert Buytenhek and Mark A. Greer.
-Compared to their approach zreladdr isn't guessed based on the pc
-register but the bootloader is expected to pass PHYS_OFFSET in r3.  If
-that value doesn't look right (e.g. isn't aligned) it is guessed based
-on the value of sp.  This should work for CONFIG_ZBOOT_ROM, too.
+On Sun, Jan 31, 2010 at 12:39 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 31, 2010 at 12:13:42AM +0900, Khushhua Mogambo wrote:
+>> On Sat, Jan 30, 2010 at 11:55 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Sat, Jan 30, 2010 at 11:47:36PM +0900, Khushhua Mogambo wrote:
+>> >> And pass already mapped Virtual addr(and not phys addr) to device drivers
+>> >> ?via IORESOURCE_MEM.
+>> >
+>> > But you can't do this. ?Resources take physical addresses, not virtual
+>> > addresses.
+>> ?but phys addr and virt addr is both u32 numbers
+>> ?how can kernel detect i passes virt and not phys address?
+>
+> No, virtual addresses are _pointers_, not integers.
+OK I will the pass only phys addr.
 
-To use it for your machine removing the definition of PHYS_OFFSET from
-<mach/memory.h> and selecting CONFIG_RUNTIME_PHYS_OFFSET should be
-enough.
-
-Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-Cc: Steve Chen <schen@mvista.com>
-Cc: Mark A. Greer <mgreer@mvista.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- Documentation/arm/Booting         |    1 +
- arch/arm/Kconfig                  |    3 ++
- arch/arm/boot/compressed/Makefile |    1 +
- arch/arm/boot/compressed/head.S   |   50 +++++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/memory.h     |    5 +++
- arch/arm/kernel/head.S            |   31 +++++++++++++++++------
- arch/arm/kernel/setup.c           |   10 ++++++-
- 7 files changed, 92 insertions(+), 9 deletions(-)
-
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 7685029..ec228a4 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -126,6 +126,7 @@ In either case, the following conditions must be met:
-   r0 = 0,
-   r1 = machine type number discovered in (3) above.
-   r2 = physical address of tagged list in system RAM.
-+  r3 = PHYS_OFFSET
- 
- - CPU mode
-   All forms of interrupts must be disabled (IRQs and FIQs)
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3064e0c..ac5f59e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1254,6 +1254,9 @@ config UACCESS_WITH_MEMCPY
- 	  However, if the CPU data cache is using a write-allocate mode,
- 	  this option is unlikely to provide any performance gain.
- 
-+config RUNTIME_PHYS_OFFSET
-+	bool
-+
- config DEPRECATED_PARAM_STRUCT
- 	bool "Provide old way to pass kernel parameters"
- 	help
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 470adae..a651330 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -4,6 +4,7 @@
- # create a compressed vmlinuz image from the original vmlinux
- #
- 
-+AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
- HEAD	= head.o
- OBJS	= misc.o
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 0938d02..6441e85 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -120,6 +120,16 @@ wait:		mrc	p14, 0, pc, c0, c1, 0
- #endif
- 		.endm
- 
-+		.macro	debug_passed_physoffset
-+#ifdef DEBUG
-+		bleq	1f
-+		kputc	#'!'
-+		kphex	r9, 8
-+		kputc	#'\n'
-+1:
-+#endif
-+		.endm
-+
- 		.section ".start", #alloc, #execinstr
- /*
-  * sort out different calling conventions
-@@ -137,6 +147,7 @@ start:
- 		.word	_edata			@ zImage end address
- 1:		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
-+		mov	r9, r3			@ save phys_offset
- 
- #ifndef __ARM_ARCH_2__
- 		/*
-@@ -233,6 +244,44 @@ not_relocated:	mov	r0, #0
- 		cmp	r2, r3
- 		blo	1b
- 
-+#ifdef CONFIG_RUNTIME_PHYS_OFFSET
-+		/*
-+		 * assert physoffset passed by bootloader is properly
-+		 * 2MiB-aligned, ...
-+		 */
-+		ldr	r10, =0x001fffff
-+
-+		tst	r9, r10
-+		debug_passed_physoffset
-+		tst	r9, r10
-+
-+		/*
-+		 * ... if not guess it based on sp.
-+		 * sp & 0xf8000000 should work for most machines.  The needed
-+		 * preconditions are:
-+		 * - physoffset is aligned to a 128MiB boundary
-+		 *   (As of Jan 2010 all but s3c2400, u300 and at91 have it.
-+		 *   For the latter it depends on configuration.)
-+		 * - sp < physoffset + 128MiB (which is definitely true if you
-+		 *   only have 128MiB of RAM or less)
-+		 */
-+		andne	r9, sp, #0xf8000000
-+
-+#ifdef DEBUG
-+		kputc	#'P'
-+		kphex	r9, 8
-+		kputc	#'\n'
-+#endif
-+
-+		add	r4, r9, #TEXT_OFFSET
-+#else /* ifdef CONFIG_RUNTIME_PHYS_OFFSET */
-+		/* warn on r4(ZRELADDR) != r9 + TEXT_OFFSET */
-+		add	r10, r9, #TEXT_OFFSET
-+		cmp	r10, r4
-+		debug_passed_physoffset
-+
-+#endif /* ifdef CONFIG_RUNTIME_PHYS_OFFSET / else */
-+
- 		/*
- 		 * The C runtime environment should now be setup
- 		 * sufficiently.  Turn the cache on, set up some
-@@ -571,6 +620,7 @@ call_kernel:	bl	cache_clean_flush
- 		mov	r0, #0			@ must be zero
- 		mov	r1, r7			@ restore architecture number
- 		mov	r2, r8			@ restore atags pointer
-+		sub	r3, r4, #TEXT_OFFSET	@ physoffset
- 		mov	pc, r4			@ call kernel
- 
- /*
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 5421d82..a7390f9 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -24,6 +24,11 @@
-  */
- #define UL(x) _AC(x, UL)
- 
-+#if defined(CONFIG_RUNTIME_PHYS_OFFSET) && !defined(__ASSEMBLY__)
-+extern unsigned long phys_offset;
-+#define PHYS_OFFSET	phys_offset
-+#endif
-+
- #ifdef CONFIG_MMU
- 
- /*
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index eb62bf9..b173bb6 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -22,12 +22,14 @@
- #include <asm/thread_info.h>
- #include <asm/system.h>
- 
-+#if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
- #if (PHYS_OFFSET & 0x001fffff)
- #error "PHYS_OFFSET must be at an even 2MiB boundary!"
- #endif
-+#define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
-+#endif
- 
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
--#define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
- 
- 
- /*
-@@ -44,8 +46,8 @@
- 	.globl	swapper_pg_dir
- 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
- 
--	.macro	pgtbl, rd
--	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
-+	.macro	pgtbl, rd, phys_offset
-+	add	\rd, \phys_offset, #(TEXT_OFFSET - 0x4000)
- 	.endm
- 
- #ifdef CONFIG_XIP_KERNEL
-@@ -215,9 +217,25 @@ ENDPROC(__turn_mmu_on)
-  * Returns:
-  *  r0, r3, r6, r7 corrupted
-  *  r4 = physical page table address
-+ *  r5 = physical start address of (the first bank of) RAM (PHYS_OFFSET)
-  */
- __create_page_tables:
--	pgtbl	r4				@ page table address
-+#if defined(CONFIG_RUNTIME_PHYS_OFFSET)
-+	@ stext is at PHYS_OFFSET + TEXT_OFFSET.  As PHYS_OFFSET has to be
-+	@ 2MiB-aligned and assuming that TEXT_OFFSET < 2MiB
-+	@ stext & 0xffe00000 yields PHYS_OFFSET
-+	adr	r5, stext
-+	ldr	r4, =0xffe00000
-+	and	r5, r5, r4
-+
-+	@ save phys_offset
-+	ldr	r4, =(phys_offset - PAGE_OFFSET)
-+	str	r5, [r4, r5]
-+#else
-+	ldr	r5, =PHYS_OFFSET
-+#endif
-+
-+	pgtbl	r4, r5				@ r4 = page table address
- 
- 	/*
- 	 * Clear the 16K level 1 swapper page table
-@@ -282,10 +300,7 @@ __create_page_tables:
- 	 * Then map first 1MB of ram in case it contains our boot params.
- 	 */
- 	add	r0, r4, #PAGE_OFFSET >> 18
--	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
--	.if	(PHYS_OFFSET & 0x00f00000)
--	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
--	.endif
-+	orr	r6, r7, r5
- 	str	r6, [r0]
- 
- #ifdef CONFIG_DEBUG_LL
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3c38d4f..7f63135 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -68,6 +68,12 @@ __setup("fpe=", fpe_setup);
- extern void paging_init(struct machine_desc *desc);
- extern void reboot_setup(char *str);
- 
-+#if defined(CONFIG_RUNTIME_PHYS_OFFSET)
-+/* assign a value to prevent phys_offset from ending in up bss */
-+unsigned long phys_offset = 0xdeadbeef;
-+EXPORT_SYMBOL(phys_offset);
-+#endif
-+
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
- unsigned int __machine_arch_type;
-@@ -682,7 +688,7 @@ static struct init_tags {
- 	{ tag_size(tag_core), ATAG_CORE },
- 	{ 1, PAGE_SIZE, 0xff },
- 	{ tag_size(tag_mem32), ATAG_MEM },
--	{ MEM_SIZE, PHYS_OFFSET },
-+	{ MEM_SIZE, },
- 	{ 0, ATAG_NONE }
- };
- 
-@@ -723,6 +729,8 @@ void __init setup_arch(char **cmdline_p)
- 		tags = phys_to_virt(__atags_pointer);
- 	else if (mdesc->boot_params)
- 		tags = phys_to_virt(mdesc->boot_params);
-+	else
-+		init_tags.mem.start = PHYS_OFFSET;
- 
- #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- 	/*
--- 
-1.6.6
+>>
+>> >> i thinks that way i can do most use of virtual address space for ioremap
+>> >> and I can set VMALLOC size to maximum possible. also drivers doesnt have
+>> >> to worry about mapping(and no addr space is mapped twice in two code pieces)
+>> >>
+>> >> is it considered good kernel porting practice? can we face any problem
+>> >> after some times?
+>> >
+>> > Definitely not.
+>> sorry i asks two opposite qeustions same time.
+>> i am hopeful "Definitely not" is reply of second question ^^
+>
+> It was in reply to the first question.
+i understands, I will use all staticaly mapped devices space and implement
+__arch_ioremap type funcs to give virt addr to drivers.
+thanks a lots.
