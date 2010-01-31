@@ -1,37 +1,36 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 31 Jan 2010 13:03:33 +0200
-Subject: [PATCH] [ARM] pxa: match camera clock by struct device
-In-Reply-To: <1264930332-28775-1-git-send-email-mike@compulab.co.il>
-References: <1264930332-28775-1-git-send-email-mike@compulab.co.il>
-Message-ID: <4B656385.7080905@compulab.co.il>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Sun, 31 Jan 2010 05:31:30 -0800
+Subject: [PATCH] staging/dream: add missing include files/fix compilation
+In-Reply-To: <20100131084421.GG2238@elf.ucw.cz>
+References: <20091225205917.GA25761@elf.ucw.cz>
+	<20100115002419.GA25643@kroah.com> <20100119054516.GB22153@elf.ucw.cz>
+	<1263914079.1951.43.camel@m0nster> <20100131084421.GG2238@elf.ucw.cz>
+Message-ID: <1264944690.2059.2.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I had some problems with git-send-email, so the patch was sent several
-times..
-Sorry for the noise....
+On Sun, 2010-01-31 at 09:44 +0100, Pavel Machek wrote:
 
-Mike Rapoport wrote:
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
->  arch/arm/mach-pxa/pxa3xx.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> arch/arm/mach-msm/rpc_hsusb.c: In function 'msm_chg_rpc_connect':
+> arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> function 'machine_is_msm7201a_surf'
+> arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> function 'machine_is_msm7x27_surf'
+> arch/arm/mach-msm/rpc_hsusb.c:157: error: implicit declaration of
+> function 'machine_is_qsd8x50_surf'
+> make[1]: *** [arch/arm/mach-msm/rpc_hsusb.o] Error 1
+> make: *** [arch/arm/mach-msm] Error 2
 > 
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index fcb0721..9d338a7 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -257,7 +257,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
->  	/* Power I2C clock is always on */
->  	INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
->  	INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
-> -	INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
-> +	INIT_CLKREG(&clk_pxa3xx_camera, "pxa27x-camera.0", NULL),
->  	INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
->  	INIT_CLKREG(&clk_pxa3xx_ffuart, "pxa2xx-uart.0", NULL),
->  	INIT_CLKREG(&clk_pxa3xx_btuart, "pxa2xx-uart.1", NULL),
+> (and similar error further down). This fixes it, but you probably want
+> to add machine_is_* to your git. (Aha, is that what you meant by
+> "machine types"?
 
+Yeah, those machines aren't registered so the inlines don't get
+generated .. 
 
--- 
-Sincerely yours,
-Mike.
+> With this patch it compiles.
+
+I need to actually register those machine types, So I can't remove them.
+They are valid boards.
+
+Daniel
