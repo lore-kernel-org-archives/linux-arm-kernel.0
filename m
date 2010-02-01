@@ -1,233 +1,281 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Mon, 1 Feb 2010 10:20:57 +0100
-Subject: [PATCH] rtc: driver for the DryIce block found in i.MX25 chips
-In-Reply-To: <f0c75e5d2252a4abc5c2ef480d173a4039c44a5c.1265009145.git.baruch@tkos.co.il>
-References: <20100129111055.12837fc1@linux.lan.towertech.it>
-	<f0c75e5d2252a4abc5c2ef480d173a4039c44a5c.1265009145.git.baruch@tkos.co.il>
-Message-ID: <20100201102057.4937155f@linux.lan.towertech.it>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 1 Feb 2010 11:28:43 +0100
+Subject: [PATCH 2/2] ftrace: re-enable dynamic ftrace for ARM
+In-Reply-To: <1264959196-5175-2-git-send-email-rabin@rab.in>
+References: <1264959196-5175-1-git-send-email-rabin@rab.in>
+	<1264959196-5175-2-git-send-email-rabin@rab.in>
+Message-ID: <20100201102843.GA31714@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  1 Feb 2010 09:36:51 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
+Hi Rabin,
 
-> Address the comments of Alessandro Zummo:
+On Sun, Jan 31, 2010 at 11:03:16PM +0530, Rabin Vincent wrote:
+> This adds mcount recording and updates dynamic ftrace for ARM to work
+> with the new ftrace dyamic tracing implementation.
 > 
-> 	* remove the .ioctl implementation
-
- you did not add the ops for alarm irq handling... ?
-
- more below.
-
-> +static int dryice_rtc_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct imxdi_dev *imxdi = NULL;
-
- = NULL is not necessary
-
-> +	int rc = 0;
-
- idem for = 0
-
-> +	imxdi = kzalloc(sizeof(*imxdi), GFP_KERNEL);
-> +	if (!imxdi)
-> +		return -ENOMEM;
+> With dynamic tracing, mcount() is implemented as a nop.  Callsites are
+> patched on startup with nops, and dynamically patched to call to the
+> ftrace_caller() routine as needed.
+> 
+> One oddity of the ARM implementation is that we need to handle two kinds
+> of mcounts.  Newer GCC versions renamed the mcount routine (to
+> __gnu_mcount_nc) and changed the semantics (lr is pushed on the stack
+> before the call).  We detect which one is used at run-time.
+> 
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Abhishek Sagar <sagar.abhishek@gmail.com>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/Kconfig               |    2 +
+>  arch/arm/include/asm/ftrace.h  |   14 +++++
+>  arch/arm/kernel/entry-common.S |   25 ++++++---
+>  arch/arm/kernel/ftrace.c       |  122 ++++++++++++++++++++++++++--------------
+>  scripts/recordmcount.pl        |    2 +
+>  5 files changed, 115 insertions(+), 50 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4c33ca8..dc92691 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -17,6 +17,8 @@ config ARM
+>  	select HAVE_KPROBES if (!XIP_KERNEL)
+>  	select HAVE_KRETPROBES if (HAVE_KPROBES)
+>  	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+> +	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> +	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL && !THUMB2_KERNEL)
+>  	select HAVE_GENERIC_DMA_COHERENT
+>  	select HAVE_KERNEL_GZIP
+>  	select HAVE_KERNEL_LZO
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index 103f7ee..12f445d 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -8,6 +8,20 @@
+>  #ifndef __ASSEMBLY__
+>  extern void mcount(void);
+>  extern void __gnu_mcount_nc(void);
 > +
-> +	imxdi->pdev = pdev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-
- you forgot to release imxdi here. I still suggest to
- use devm.
-
-> +
-> +	if (!request_mem_region(res->start, resource_size(res),
-> +				pdev->name)) {
-> +		rc = -EBUSY;
-> +		goto err_free_mem;
-> +	}
-> +	imxdi->ioaddr = ioremap(res->start, resource_size(res));
-> +	if (imxdi->ioaddr == NULL) {
-> +		rc = -ENOMEM;
-> +		goto err_release_region;
-> +	}
-> +
-> +	if ((imxdi->irq = platform_get_irq(pdev, 0)) < 0) {
-> +		rc = imxdi->irq;
-> +		goto err;
-> +	}
-
- no if inline with the assignment please, it's not readable.
-
-> +	init_waitqueue_head(&imxdi->write_wait);
-> +
-> +	INIT_WORK(&imxdi->work, dryice_work);
-> +
-> +	mutex_init(&imxdi->write_mutex);
-> +
-> +	imxdi->clk = clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(imxdi->clk)) {
-> +		rc = PTR_ERR(imxdi->clk);
-> +		goto err;
-> +	}
-> +	clk_enable(imxdi->clk);
-> +
-> +	/*
-> +	 * Initialize dryice hardware
-> +	 */
-> +
-> +	/* put dryice into valid state */
-> +	if (__raw_readl(imxdi->ioaddr+DSR) & DSR_NVF)
-> +		rc = di_write_wait(imxdi, DSR_NVF | DSR_SVF, DSR);
-> +	if (rc)
-> +		goto err;
-> +
-> +	/* mask all interrupts */
-> +	__raw_writel(0, imxdi->ioaddr+DIER);
-> +
-> +	if (request_irq(imxdi->irq, dryice_norm_irq, IRQF_SHARED,
-> +				pdev->name, imxdi) < 0) {
-> +		dev_warn(&pdev->dev, "interrupt not available.\n");
-> +		imxdi->irq = -1;
-> +		goto err;
-> +	}
-
- ditto for the if. what's the value of rc here?
-
-> +	/* initialize alarm */
-> +	rc = di_write_wait(imxdi, DCAMR_UNSET, DCAMR);
-> +	if (rc == 0)
-> +		rc = di_write_wait(imxdi, 0, DCALR);
-> +	if (rc)
-> +		goto err;
-> +
-> +	/* clear alarm flag */
-> +	if (__raw_readl(imxdi->ioaddr+DSR) & DSR_CAF)
-> +		rc = di_write_wait(imxdi, DSR_CAF, DSR);
-> +	if (rc)
-> +		goto err;
-> +
-> +	/* the timer won't count if it has never been written to */
-> +	if (__raw_readl(imxdi->ioaddr+DTCMR) == 0)
-> +		rc = di_write_wait(imxdi, 0, DTCMR);
-> +	if (rc)
-> +		goto err;
-> +
-> +	/* start keeping time */
-> +	if (!(__raw_readl(imxdi->ioaddr+DCR) & DCR_TCE))
-> +		rc = di_write_wait(imxdi,
-> +				__raw_readl(imxdi->ioaddr+DCR) | DCR_TCE, DCR);
-> +	if (rc)
-> +		goto err;
-
- spaces are welcomed around the +
-
-> +	imxdi->rtc = rtc_device_register(pdev->name, &pdev->dev,
-> +				  &dryice_rtc_ops, THIS_MODULE);
-> +	if (IS_ERR(imxdi->rtc)) {
-> +		rc = PTR_ERR(imxdi->rtc);
-> +		goto err;
-> +	}
-> +	platform_set_drvdata(pdev, imxdi);
-> +
-> +	return 0;
-> +err:
-> +	if (imxdi->rtc && !IS_ERR(imxdi->rtc))
-> +		rtc_device_unregister(imxdi->rtc);
-> +
-> +	if (imxdi->irq >= 0)
-> +		free_irq(imxdi->irq, imxdi);
-> +
-> +	if (imxdi->clk && !IS_ERR(imxdi->clk)) {
-> +		clk_disable(imxdi->clk);
-> +		clk_put(imxdi->clk);
-> +	}
-> +
-> +	if (imxdi->ioaddr)
-> +		iounmap(imxdi->ioaddr);
-> +
-> +err_release_region:
-> +	release_mem_region(res->start, resource_size(res));
-> +
-> +err_free_mem:
-> +	kfree(imxdi);
-> +
-> +	return rc;
-> +}
-> +
-> +static int __exit dryice_rtc_remove(struct platform_device *pdev)
-
- no __devexit? 
-
-> +{
-> +	struct imxdi_dev *imxdi = platform_get_drvdata(pdev);
-> +	struct resource *mem;
-> +
-> +	flush_scheduled_work();
-> +
-> +	/* mask alarm interrupt */
-> +	di_int_disable(imxdi, DIER_CAIE);
-> +
-> +	if (imxdi->irq >= 0)
-> +		free_irq(imxdi->irq, imxdi);
-> +
-> +	rtc_device_unregister(imxdi->rtc);
-> +
-> +	clk_disable(imxdi->clk);
-> +	clk_put(imxdi->clk);
-> +
-> +	iounmap(imxdi->ioaddr);
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	release_mem_region(mem->start, resource_size(mem));
-> +
-> +	kfree(imxdi);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver dryice_rtc_driver = {
-> +	.driver = {
-> +		   .name = "imxdi_rtc",
-> +		   .owner = THIS_MODULE,
-> +		   },
-> +	.probe = dryice_rtc_probe,
-> +	.remove = __exit_p(dryice_rtc_remove),
- 
- __devexit_p ?
-
+> +#ifdef CONFIG_DYNAMIC_FTRACE
+> +struct dyn_arch_ftrace {
+> +	bool	gnu_mcount;
 > +};
 > +
-> +static int __init dryice_rtc_init(void)
+> +static inline unsigned long ftrace_call_adjust(unsigned long addr)
 > +{
-> +	return platform_driver_register(&dryice_rtc_driver);
+> +	return addr;
 > +}
 > +
-> +static void __exit dryice_rtc_exit(void)
+> +extern void ftrace_caller_gnu(void);
+> +#endif
+> +
+>  #endif
+>  
+>  #endif
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 2c1db77..2a7ab14 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -93,16 +93,25 @@ ENDPROC(ret_from_fork)
+>  
+>  #ifdef CONFIG_FUNCTION_TRACER
+>  #ifdef CONFIG_DYNAMIC_FTRACE
+> +ENTRY(__gnu_mcount_nc)
+> +	mov	ip, lr
+> +	ldm	sp!, {lr}
+> +	mov	pc, ip
+> +
+>  ENTRY(mcount)
+> -	stmdb sp!, {r0-r3, lr}
+> -	mov r0, lr
+> -	sub r0, r0, #MCOUNT_INSN_SIZE
+> +	stmdb	sp!, {lr}
+> +	ldr	lr, [fp, #-4]
+> +	ldmia	sp!, {pc}
+>  
+> -	.globl mcount_call
+> -mcount_call:
+> -	bl ftrace_stub
+> -	ldr lr, [fp, #-4]			@ restore lr
+> -	ldmia sp!, {r0-r3, pc}
+> +ENTRY(ftrace_caller_gnu)
+> +	add	sp, sp,	#4
+> +
+> +	/*
+> +	 * We take advantage of the fact that we build with frame pointers and
+> +	 * -mapcs-frame to combine the ftrace_caller implementations for the
+> +	 * two mcounts with just the above adjustment.  This will need to be
+> +	 * revisited if Thumb-2 support is added.
+> +	 */
+>  
+>  ENTRY(ftrace_caller)
+>  	stmdb sp!, {r0-r3, lr}
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index c638427..1d5d268 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -7,11 +7,12 @@
+>   *
+>   * Defines low-level handling of mcount calls when the kernel
+>   * is compiled with the -pg flag. When using dynamic ftrace, the
+> - * mcount call-sites get patched lazily with NOP till they are
+> - * enabled. All code mutation routines here take effect atomically.
+> + * mcount call-sites get patched with NOP till they are enabled.
+> + * All code mutation routines here take effect atomically.
+>   */
+>  
+>  #include <linux/ftrace.h>
+> +#include <linux/uaccess.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/ftrace.h>
+> @@ -20,17 +21,26 @@
+>  #define BL_OPCODE      0xeb000000
+>  #define BL_OFFSET_MASK 0x00ffffff
+>  
+> -static unsigned long bl_insn;
+> -static const unsigned long NOP = 0xe1a00000; /* mov r0, r0 */
+> +#define	NOP		0xe1a00000	/* mov r0, r0 */
+> +#define	GNU_NOP		0xe8bd4000	/* pop {lr} */
+>  
+> -unsigned char *ftrace_nop_replace(void)
+> +#define GNU_MCOUNT_ADDR	((unsigned long) __gnu_mcount_nc)
+> +#define GNU_FTRACE_ADDR ((unsigned long) ftrace_caller_gnu)
+> +
+> +static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
 > +{
-> +	platform_driver_unregister(&dryice_rtc_driver);
+> +	return rec->arch.gnu_mcount ? GNU_NOP : NOP;
 > +}
 > +
-> +module_init(dryice_rtc_init);
-> +module_exit(dryice_rtc_exit);
+> +static unsigned long ftrace_caller_addr(struct dyn_ftrace *rec)
+>  {
+> -	return (char *)&NOP;
+> +	return rec->arch.gnu_mcount ? GNU_FTRACE_ADDR : FTRACE_ADDR;
+>  }
+>  
+>  /* construct a branch (BL) instruction to addr */
+> -unsigned char *ftrace_call_replace(unsigned long pc, unsigned long addr)
+> +static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
+>  {
+> +	unsigned long bl_insn;
+>  	long offset;
+>  
+>  	offset = (long)addr - (long)(pc + PC_OFFSET);
+> @@ -39,65 +49,93 @@ unsigned char *ftrace_call_replace(unsigned long pc, unsigned long addr)
+>  		 * doesn't generate branches outside of kernel text.
+>  		 */
+>  		WARN_ON_ONCE(1);
+> -		return NULL;
+> +		return 0;
+>  	}
+>  	offset = (offset >> 2) & BL_OFFSET_MASK;
+>  	bl_insn = BL_OPCODE | offset;
+> -	return (unsigned char *)&bl_insn;
+> +	return bl_insn;
+>  }
+>  
+> -int ftrace_modify_code(unsigned long pc, unsigned char *old_code,
+> -		       unsigned char *new_code)
+> +static int ftrace_modify_code(unsigned long pc, unsigned long old,
+> +			      unsigned long new)
+>  {
+> -	unsigned long err = 0, replaced = 0, old, new;
+> +	unsigned long replaced;
+>  
+> -	old = *(unsigned long *)old_code;
+> -	new = *(unsigned long *)new_code;
+> +	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
+> +		return -EFAULT;
+>  
+> -	__asm__ __volatile__ (
+> -		"1:  ldr    %1, [%2]  \n"
+> -		"    cmp    %1, %4    \n"
+> -		"2:  streq  %3, [%2]  \n"
+> -		"    cmpne  %1, %3    \n"
+> -		"    movne  %0, #2    \n"
+> -		"3:\n"
+> +	if (replaced != old)
+> +		return -EINVAL;
+>  
+> -		".section .fixup, \"ax\"\n"
+> -		"4:  mov  %0, #1  \n"
+> -		"    b    3b      \n"
+> -		".previous\n"
+> +	if (probe_kernel_write((void *)pc, &new, MCOUNT_INSN_SIZE))
+> +		return -EPERM;
+>  
+> -		".section __ex_table, \"a\"\n"
+> -		"    .long 1b, 4b \n"
+> -		"    .long 2b, 4b \n"
+> -		".previous\n"
+> +	flush_icache_range(pc, pc + MCOUNT_INSN_SIZE);
+>  
+> -		: "=r"(err), "=r"(replaced)
+> -		: "r"(pc), "r"(new), "r"(old), "0"(err), "1"(replaced)
+> -		: "memory");
+> -
+> -	if (!err && (replaced == old))
+> -		flush_icache_range(pc, pc + MCOUNT_INSN_SIZE);
+> -
+> -	return err;
+> +	return 0;
+>  }
+>  
+>  int ftrace_update_ftrace_func(ftrace_func_t func)
+>  {
+> -	int ret;
+>  	unsigned long pc, old;
+> -	unsigned char *new;
+> +	unsigned long new;
+>  
+>  	pc = (unsigned long)&ftrace_call;
+>  	memcpy(&old, &ftrace_call, MCOUNT_INSN_SIZE);
+>  	new = ftrace_call_replace(pc, (unsigned long)func);
+> -	ret = ftrace_modify_code(pc, (unsigned char *)&old, new);
 > +
-> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
-> +MODULE_AUTHOR("Baruch Siach <baruch@tkos.co.il>");
-> +MODULE_DESCRIPTION("IMX DryIce Realtime Clock Driver (RTC)");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.6.5
-> 
+> +	return ftrace_modify_code(pc, old, new);
+> +}
+> +
+> +int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+> +{
+> +	unsigned long new, old;
+> +	unsigned long ip = rec->ip;
+> +
+> +	old = ftrace_nop_replace(rec);
+> +	new = ftrace_call_replace(ip, ftrace_caller_addr(rec));
+> +
+> +	return ftrace_modify_code(rec->ip, old, new);
+> +}
+> +
+> +static int ftrace_detect_make_nop(struct module *mod,
+> +				  struct dyn_ftrace *rec, unsigned long addr)
+> +{
+> +	unsigned long ip = rec->ip;
+> +	unsigned long call;
+> +	int ret;
+> +
+> +	call = ftrace_call_replace(ip, GNU_MCOUNT_ADDR);
+> +	ret = ftrace_modify_code(ip, call, GNU_NOP);
+> +	if (!ret)
+> +		rec->arch.gnu_mcount = true;
+> +	else if (ret == -EINVAL) {
+> +		call = ftrace_call_replace(ip, addr);
+> +		ret = ftrace_modify_code(ip, call, NOP);
+> +	}
+> +
+>  	return ret;
+>  }
+Wouldn't it be nice to patch out the instruction pushing lr to the
+stack (in the gnu case)?  Should work, shouldn't it.
 
+Thanks for looking into that.
+
+Best regards
+Uwe
 
 -- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
