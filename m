@@ -1,25 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Feb 2010 19:09:06 +0000
-Subject: [PATCH] Modify PL031 for Nomadik and U8500
-In-Reply-To: <1265032400-28558-1-git-send-email-linus.walleij@stericsson.com>
-References: <1265032400-28558-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100201190906.GA4667@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 2 Feb 2010 04:42:00 +0800
+Subject: [PATCH - v5] support for Embedian MXM-8x10
+In-Reply-To: <201001221010.45174.epeer@tmtservices.co.za>
+References: <201001221010.45174.epeer@tmtservices.co.za>
+Message-ID: <f17812d71002011242i53f4c2faoe47b3d6988cefaa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2010 at 02:53:19PM +0100, Linus Walleij wrote:
-> Note: I cannot find any in-kernel users of this driver, no
-> platforms have it in their defconfig. But for mach-nomadik and
-> mach-u8500 we will certainly use this driver. Patches to make use
-> of it will follow.
+> +static struct spi_board_info mcp251x_board_info[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .modalias ? ? ? ?= "mcp251x",
+> + ? ? ? ? ? ? ? .max_speed_hz ? ?= 65E5,
 
-Versatile/Realview platforms have this; I don't know why it was never
-added to their defconfigs, but it's something I regularly build.
+This looks weird to me, should be an integer here right?
 
->  static struct amba_id pl031_ids[] __initdata = {
->  	{
->  		.id = 0x00041031,
-> -		.mask = 0x000fffff,
-> +		.mask = 0x00ffffff,
-
-Why is this increasing the mask?
+> + ? ? ? ? ? ? ? .bus_num ? ? ? ? = 3,
+> + ? ? ? ? ? ? ? .chip_select ? ? = 0,
+> + ? ? ? ? ? ? ? .platform_data ? = &mcp251x_info,
+> + ? ? ? ? ? ? ? .controller_data = &mcp251x_chip_info1,
+> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ? = gpio_to_irq(ICONTROL_MCP251x_nIRQ1)
+> + ? ? ? },
