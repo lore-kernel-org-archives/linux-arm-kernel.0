@@ -1,60 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 1 Feb 2010 16:47:02 +0100
-Subject: Pull request
-Message-ID: <20100201154702.GW19551@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 1 Feb 2010 16:56:25 +0100
+Subject: my imx changes for 2.6.34
+Message-ID: <20100201155625.GA22413@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello,
 
-Please pull the following MXC related patches for -rc.
+I have made a few more patches based on Sascha's mxc-master branch for
+2.6.34.
 
-Sascha
+As usual I'll send them as reply to this mail and they are available via
+git.  Diffstat and shortlog are below.
 
+Best regards
+Uwe
 
-The following changes since commit 004b35063296b6772fa72404a35b498f1e71e87e:
-  Linus Torvalds (1):
-        Merge branch 'drm-linus' of git://git.kernel.org/.../airlied/drm-2.6
+The following changes since commit 1eaa4f2762899d2f3c54ba7a4fee564e255ad0a5:
+  Baruch Siach (1):
+        mx25pdk: platform code for the DryIce RTC module
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+  git://git.pengutronix.de/git/ukl/linux-2.6.git imx/master
 
-Baruch Siach (4):
-      mx25: remove unused mx25_clocks_init() argument
-      mx25: properly initialize clocks
-      mx25: fix time accounting
-      mx25: make the FEC AHB clk secondary of the IPG
+Uwe Kleine-K?nig (8):
+      mx1: prefix SOC specific defines with MX1_ and deprecate old names
+      mx25: deprecate UART1_BASE_ADDR and UART2_BASE_ADDR
+      imx: BUG in clk_disable if the clock isn't enabled
+      mxc91231: use MXC91231_IO_ADDRESS instead of MXC91231_AIPS1_IO_ADDRESS
+      mxc91231: redefine MXC91231_IO_ADDRESS using IMX_IO_ADDRESS
+      imx2x: convert serial.c to use soc-prefixed constants
+      imx: define per SOC ..._PHYS_OFFSET and use these in favour of PHYS_OFFSET
+      imx/mx25: rename files defining a machine to mach-$mach.c
 
-Mark Brown (4):
-      mx31ads: Allow enable/disable of switchable supplies
-      mx31ads: Provide a name for EXPIO interrupt chip
-      mx31ads: Provide an IRQ range to the WM835x on the 1133-EV1 module
-      MXC: Add AUDMUXv2 register decode to debugfs
-
-Sascha Hauer (2):
-      i.MX25: Allow secondary clocks in DEFINE_CLOCK
-      i.MX25: implement secondary clocks for uarts and fec
-
-Uwe Kleine-K?nig (1):
-      mx35: add a missing comma in a pad definition
-
-Vladimir Zapolskiy (1):
-      ARM: MX3: Fixed typo in declared enum type name.
-
- arch/arm/mach-mx25/clock.c                      |   58 ++++++----
- arch/arm/mach-mx25/mx25pdk.c                    |    2 +-
- arch/arm/mach-mx3/mx31ads.c                     |    4 +
- arch/arm/plat-mxc/audmux-v2.c                   |  137 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/board-mx31lite.h |    2 +-
- arch/arm/plat-mxc/include/mach/common.h         |    2 +-
- arch/arm/plat-mxc/include/mach/iomux-mx35.h     |    2 +-
- arch/arm/plat-mxc/include/mach/irqs.h           |    5 +
- 8 files changed, 187 insertions(+), 25 deletions(-)
-
+ arch/arm/mach-mx1/Makefile                       |    1 +
+ arch/arm/mach-mx1/mach-mx1ads.c                  |    4 +-
+ arch/arm/mach-mx2/Makefile                       |    1 -
+ arch/arm/mach-mx2/mach-cpuimx27.c                |    2 +-
+ arch/arm/mach-mx2/mach-imx27lite.c               |    2 +-
+ arch/arm/mach-mx2/mach-mx21ads.c                 |    2 +-
+ arch/arm/mach-mx2/mach-mx27_3ds.c                |    2 +-
+ arch/arm/mach-mx2/mach-mx27ads.c                 |    2 +-
+ arch/arm/mach-mx2/mach-mxt_td60.c                |    2 +-
+ arch/arm/mach-mx2/mach-pca100.c                  |    2 +-
+ arch/arm/mach-mx2/mach-pcm038.c                  |    2 +-
+ arch/arm/mach-mx2/serial.c                       |   48 ++--
+ arch/arm/mach-mx25/Makefile                      |    2 +-
+ arch/arm/mach-mx25/{mx25pdk.c => mach-mx25pdk.c} |    2 +-
+ arch/arm/mach-mx3/mach-armadillo5x0.c            |    2 +-
+ arch/arm/mach-mx3/mach-kzm_arm11_01.c            |    2 +-
+ arch/arm/mach-mx3/mach-mx31_3ds.c                |    2 +-
+ arch/arm/mach-mx3/mach-mx31ads.c                 |    2 +-
+ arch/arm/mach-mx3/mach-mx31lilly.c               |    2 +-
+ arch/arm/mach-mx3/mach-mx31lite.c                |    2 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c             |    2 +-
+ arch/arm/mach-mx3/mach-mx35pdk.c                 |    2 +-
+ arch/arm/mach-mx3/mach-pcm037.c                  |    2 +-
+ arch/arm/mach-mx3/mach-pcm043.c                  |    2 +-
+ arch/arm/mach-mx3/mach-qong.c                    |    2 +-
+ arch/arm/mach-mxc91231/magx-zn5.c                |    2 +-
+ arch/arm/plat-mxc/clock.c                        |    1 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S     |    2 +-
+ arch/arm/plat-mxc/include/mach/memory.h          |   36 ++-
+ arch/arm/plat-mxc/include/mach/mx1.h             |  387 +++++++++++++++-------
+ arch/arm/plat-mxc/include/mach/mx25.h            |    9 +-
+ arch/arm/plat-mxc/include/mach/mxc91231.h        |   58 +---
+ 32 files changed, 349 insertions(+), 242 deletions(-)
+ rename arch/arm/mach-mx25/{mx25pdk.c => mach-mx25pdk.c} (98%)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
