@@ -1,40 +1,90 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 2 Feb 2010 01:50:38 +0800
-Subject: [PATCH] [ARM] pxa: match camera clock by struct device
-In-Reply-To: <1264931178-29177-1-git-send-email-mike@compulab.co.il>
-References: <1264931178-29177-1-git-send-email-mike@compulab.co.il>
-Message-ID: <f17812d71002010950v2bff262j43700d2be04da3e3@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Feb 2010 11:11:41 -0800
+Subject: [PATCH 0/9] Initial multi-omap support for omap4
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EF8@dbde02.ent.ti.com>
+References: <20100130020036.10590.78028.stgit@baageli.muru.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EC6@dbde02.ent.ti.com>
+	<20100130162441.GQ23505@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C0A68EF8@dbde02.ent.ti.com>
+Message-ID: <20100201191140.GA22747@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2010 at 5:46 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
-> ?arch/arm/mach-pxa/pxa3xx.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index fcb0721..9d338a7 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -257,7 +257,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
-> ? ? ? ?/* Power I2C clock is always on */
-> ? ? ? ?INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
-> - ? ? ? INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
-> + ? ? ? INIT_CLKREG(&clk_pxa3xx_camera, "pxa27x-camera.0", NULL),
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100130 09:52]:
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Saturday, January 30, 2010 9:55 PM
+> > To: Shilimkar, Santosh
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> > Subject: Re: [PATCH 0/9] Initial multi-omap support for omap4
+> > 
+> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100130 04:49]:
+> > > > > Hi all,
+> > > > >
+> > > > > These patches allow compiling in also omap4 into the multi-omap
+> > > > > configuration. As I don't yet have omap4, I've only boot tested
+> > > > > these on omap2 and omap3.
+> > > > >
+> > > > > Somebody with an omap4 board please boot test these with the
+> > > > > omap3_defconfig and see what happens.. You might want to enable
+> > > > > DEBUG_LL and EARLY_PRINTK with earlyprintk on the cmdline too.
+> > > > Looks like this series have some dependent series because it doesn't
+> > > > apply on mainline.
+> > > >
+> > > > So I tested this directly on linux-omap "multi-omap4" branch. It boots sufficiently
+> > > > but doesn't proceed after "brd_init". Didn't get much time to debug so attached log
+> > >
+> > > Stand alone omap_4430sdp_defconfig also didn't fully boot on the linux-omap "multi-omap4".
+> > > The log below shows that the serial platform data isn't configured correctly.
+> > >
+> > > <6>io scheduler deadline registered
+> > > <6>io scheduler cfq registered (default)
+> > > <6>Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+> > > <6>serial8250.0: ttyS0 at MMIO 0x4806a000 (irq = 104) is a ST16654
+> > > <6>serial8250.1: ttyS0 at MMIO 0x4806a000 (irq = 105) is a ST16654
+> > >
+> > > Below patch to fix the boot for omap_4430sdp_defconfig. Small typo really.
+> > >
+> > > diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/inclu
+> > > index 67ffa08..83dce4c 100644
+> > > --- a/arch/arm/plat-omap/include/plat/serial.h
+> > > +++ b/arch/arm/plat-omap/include/plat/serial.h
+> > > @@ -33,7 +33,7 @@
+> > >
+> > >  /* OMAP4 serial ports */
+> > >  #define OMAP4_UART1_BASE       OMAP2_UART1_BASE
+> > > -#define OMAP4_UART2_BASE       OMAP2_UART1_BASE
+> > > +#define OMAP4_UART2_BASE       OMAP2_UART2_BASE
+> > >  #define OMAP4_UART3_BASE       0x48020000
+> > >  #define OMAP4_UART4_BASE       0x4806e000
 
-Interesting, but not keeping an eye on pxa27x camera driver for a while,
-does that support pxa3xx as well? I seem to remember the DMA logic
-is a bit different, making it quite difficult to support both in a
-single driver.
+I've refreshed the second patch in the earlier multi-omap series
+with your fix above.
+ 
+> > Heh OK :) Sounds like at this point it makes sense to merge
+> > that into the original patch redo omap-for-linus partially.
+> > 
+> > Can I also add your Acked-by for these patches then?
+> Yes please.
 
-And the hardware in pxa320 differs from the one in pxa310 as well.
+OK, added your Acked-by to all the omap4 patches. Also fixed
+three checkpatch.pl warnings about long lines for the gpio patch.
 
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ffuart, "pxa2xx-uart.0", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_btuart, "pxa2xx-uart.1", NULL),
-> --
-> 1.6.4.4
->
->
+> > > For multi-omap build, for now I need to disable
+> > > [*] Reset unused clocks during boot
+> > 
+> > Sounds like omap4 has some clocks left on from the bootloader
+> > that it should clk_get and clk_enable during init. That should
+> > be easy to track if you boot with "debug" in your cmdline and
+> > take a look at the list of unused clocks that are shut down
+> > with late_initcall.
+> I know it hangs when it tries to cut down UART3 ( console) clock.
+> The clock support got just recently merged and drivers are not 
+> yet migrated so, need to still depend on bootloader. The work 
+> is ongoing and soon the patches will be pushed. Few drivers
+> are planned to be handled in hwmod way so we were holding these
+> patches. 
+
+OK
+
+Tony
