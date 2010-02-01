@@ -1,48 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 1 Feb 2010 13:14:56 +0100
-Subject: About kernel decompressors (fwd)
-Message-ID: <20100201121454.GA20387@atrey.karlin.mff.cuni.cz>
+From: andy@warmcat.com (Andy Green)
+Date: Mon, 01 Feb 2010 13:28:54 +0100
+Subject: [PATCH] imx-serial-excessive-status-clearing-on-break.patch
+Message-ID: <20100201122853.21848.90945.stgit@otae.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Andy Green <andy.green@txtr.com>
 
-I guess Andrea wanted me  to forward this....
+cc: Sasha Hauer <kernel@pengutronix.de>
 
------ Forwarded message from Andrea Adami <andrea.adami@gmail.com> -----
-Date: Mon, 1 Feb 2010 13:08:44 +0100
-From: Andrea Adami <andrea.adami@gmail.com>
-To: pavel at ucw.cz
-Subject: About kernel decompressors
+We noticed that we were only able to communicate once with a GSM module
+per session, if we powered down the module then the serial driver was
+broken until reset, no traffic or /proc/interrupts activity could be
+seen any more.
 
-Pavel,
+Volker noticed it was provoked by a long "break" seen on the wire when
+the RX was not driven during powerdown, we discovered we could kill the
+serial driver just by forcing RX low extenally for a little while.
 
-I'd like to add a couple of observations in the "Uncompressing broken
-with commit e7db7b4270" thread.
-Unfortunately I wasn't subscribed and I can't properly reply to the thread...
+I saw that the processing for BREAK in the driver gets too excited and
+clears down all set bits in USR2, including that a character is pending.
+This stops all further characters getting processed.
 
-This is for kernels 2.6.33-rc5 and -rc6 on Sharp corgi (Zaurus
-SL-C860, pxa255, 64M RAM)
+The attached one-liner makes the serial driver immortal against BREAK.
 
-1) after that commit neither gzip, nor lzo can decompress from NAND
-2) I tested the LZMA patch and this also won't help the boot from nand
-3) kernel size is uninfluent: I tested 930KiB-lzma kernels and 1240KiB
-gzip-kernels.
-4) I tried to set stack size to 8192, still no boot
+Signed-off-by: Andy Green <andy.green@txtr.com>
+Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
+---
 
-5) all the 3 above kernels boot just fine from kexec (I launch them
-with linux-kexecboot-2.6.26)
+ drivers/serial/imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
->From nand, the boot stops immediately after
-**** JUMP to LINUX! ****
-
-
-Cheers
-
-Andrea
-
------ End forwarded message -----
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+index 18130f1..c5b546a 100644
+--- a/drivers/serial/imx.c
++++ b/drivers/serial/imx.c
+@@ -440,7 +440,7 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
+ 
+ 		temp = readl(sport->port.membase + USR2);
+ 		if (temp & USR2_BRCD) {
+-			writel(temp | USR2_BRCD, sport->port.membase + USR2);
++			writel(USR2_BRCD, sport->port.membase + USR2);
+ 			if (uart_handle_break(&sport->port))
+ 				continue;
+ 		}
