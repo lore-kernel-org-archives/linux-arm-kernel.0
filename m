@@ -1,73 +1,233 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 1 Feb 2010 09:49:07 +0100
-Subject: defining ZRELADDR as PHYS_OFFSET + TEXT_OFFSET
-In-Reply-To: <20100201012425.GD2582@mvista.com>
-References: <20100127101228.GA17421@pengutronix.de>
-	<20100128001523.GA608@n2100.arm.linux.org.uk>
-	<20100201012425.GD2582@mvista.com>
-Message-ID: <20100201084906.GA5983@pengutronix.de>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Mon, 1 Feb 2010 10:20:57 +0100
+Subject: [PATCH] rtc: driver for the DryIce block found in i.MX25 chips
+In-Reply-To: <f0c75e5d2252a4abc5c2ef480d173a4039c44a5c.1265009145.git.baruch@tkos.co.il>
+References: <20100129111055.12837fc1@linux.lan.towertech.it>
+	<f0c75e5d2252a4abc5c2ef480d173a4039c44a5c.1265009145.git.baruch@tkos.co.il>
+Message-ID: <20100201102057.4937155f@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo George,
+On Mon,  1 Feb 2010 09:36:51 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-On Sun, Jan 31, 2010 at 08:24:25PM -0500, George G. Davis wrote:
-> On Thu, Jan 28, 2010 at 12:15:23AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Jan 27, 2010 at 11:12:28AM +0100, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > currently all platforms need to define zreladdr-y in
-> > > arch/arm/mach-$mach/Makefile.boot and PHYS_OFFSET (in
-> > > arch/arm/mach-$mach/include/mach/memory.h).
-> > > 
-> > > Constraints for these are:
-> > > 
-> > >  TEXTADDR = PAGE_OFFSET + TEXT_OFFSET
-> > >  __virt_to_phys(virt) = virt - PAGE_OFFSET + PHYS_OFFSET (at least for
-> > > 	"small" virtual addresses)
-> > >  ZRELADDR = __virt_to_phys(TEXTADDR)
-> > > 
-> > > (The equallity for __virt_to_phys only holds "normaly" according to
-> > > http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html.
-> > > In practice it holds for addresses of the first bank of RAM which is
-> > > enough for the purposes of this mail.)
-> > > 
-> > > So we can deduce ZRELADDR = PHYS_OFFSET + TEXT_OFFSET.
-> > > 
-> > > Is there something I missed or is it possible to get rid of zreladdr-y
-> > > in .../Makefile.boot and define it according to the equation above?
-> > 
-> > You'd need to find some way to get PHYS_OFFSET out of the C code
-> > into the makefile.  With all sorts of stuff going on in various
-> > platforms memory.h files, that doesn't look simple.
+> Address the comments of Alessandro Zummo:
 > 
-> How about this?:
-> 
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index 4a590f4..b79050e 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -21,7 +21,7 @@ endif
->  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
->  #   PARAMS_PHYS must be within 4MB of ZRELADDR
->  #   INITRD_PHYS must be in RAM
-> -ZRELADDR    := $(zreladdr-y)
-> +ZRELADDR    := $(shell printf "0x%08x" $$[`echo PHYS_OFFSET + $(TEXT_OFFSET)  | $(CPP) $(CPP_FLAGS) -D__ASSEMBLY__ -xc -include arch/arm/include/asm/memory.h - | tail -n 1`])
->  PARAMS_PHYS := $(params_phys-y)
->  INITRD_PHYS := $(initrd_phys-y)
-hui!  Is this really robust?
+> 	* remove the .ioctl implementation
 
-> Since params_phys-y is (always?) constant relative to zreladdr-y, it can
-> also be calculated in a similar fashion, e.g.
-> 
-> PARAMS_PHYS := $(shell printf "0x%08x" $$[$(ZRELADDR) - 0x7f00])
-This isn't necessarily true I think.  And I'd prefer getting rid of
-PARAMS_PHYS.  This is only used for bootp and maybe if the bootloader
-doesn't pass r2 properly.
+ you did not add the ops for alarm irq handling... ?
 
-Best regards
-Uwe
+ more below.
+
+> +static int dryice_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct imxdi_dev *imxdi = NULL;
+
+ = NULL is not necessary
+
+> +	int rc = 0;
+
+ idem for = 0
+
+> +	imxdi = kzalloc(sizeof(*imxdi), GFP_KERNEL);
+> +	if (!imxdi)
+> +		return -ENOMEM;
+> +
+> +	imxdi->pdev = pdev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -ENODEV;
+
+ you forgot to release imxdi here. I still suggest to
+ use devm.
+
+> +
+> +	if (!request_mem_region(res->start, resource_size(res),
+> +				pdev->name)) {
+> +		rc = -EBUSY;
+> +		goto err_free_mem;
+> +	}
+> +	imxdi->ioaddr = ioremap(res->start, resource_size(res));
+> +	if (imxdi->ioaddr == NULL) {
+> +		rc = -ENOMEM;
+> +		goto err_release_region;
+> +	}
+> +
+> +	if ((imxdi->irq = platform_get_irq(pdev, 0)) < 0) {
+> +		rc = imxdi->irq;
+> +		goto err;
+> +	}
+
+ no if inline with the assignment please, it's not readable.
+
+> +	init_waitqueue_head(&imxdi->write_wait);
+> +
+> +	INIT_WORK(&imxdi->work, dryice_work);
+> +
+> +	mutex_init(&imxdi->write_mutex);
+> +
+> +	imxdi->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(imxdi->clk)) {
+> +		rc = PTR_ERR(imxdi->clk);
+> +		goto err;
+> +	}
+> +	clk_enable(imxdi->clk);
+> +
+> +	/*
+> +	 * Initialize dryice hardware
+> +	 */
+> +
+> +	/* put dryice into valid state */
+> +	if (__raw_readl(imxdi->ioaddr+DSR) & DSR_NVF)
+> +		rc = di_write_wait(imxdi, DSR_NVF | DSR_SVF, DSR);
+> +	if (rc)
+> +		goto err;
+> +
+> +	/* mask all interrupts */
+> +	__raw_writel(0, imxdi->ioaddr+DIER);
+> +
+> +	if (request_irq(imxdi->irq, dryice_norm_irq, IRQF_SHARED,
+> +				pdev->name, imxdi) < 0) {
+> +		dev_warn(&pdev->dev, "interrupt not available.\n");
+> +		imxdi->irq = -1;
+> +		goto err;
+> +	}
+
+ ditto for the if. what's the value of rc here?
+
+> +	/* initialize alarm */
+> +	rc = di_write_wait(imxdi, DCAMR_UNSET, DCAMR);
+> +	if (rc == 0)
+> +		rc = di_write_wait(imxdi, 0, DCALR);
+> +	if (rc)
+> +		goto err;
+> +
+> +	/* clear alarm flag */
+> +	if (__raw_readl(imxdi->ioaddr+DSR) & DSR_CAF)
+> +		rc = di_write_wait(imxdi, DSR_CAF, DSR);
+> +	if (rc)
+> +		goto err;
+> +
+> +	/* the timer won't count if it has never been written to */
+> +	if (__raw_readl(imxdi->ioaddr+DTCMR) == 0)
+> +		rc = di_write_wait(imxdi, 0, DTCMR);
+> +	if (rc)
+> +		goto err;
+> +
+> +	/* start keeping time */
+> +	if (!(__raw_readl(imxdi->ioaddr+DCR) & DCR_TCE))
+> +		rc = di_write_wait(imxdi,
+> +				__raw_readl(imxdi->ioaddr+DCR) | DCR_TCE, DCR);
+> +	if (rc)
+> +		goto err;
+
+ spaces are welcomed around the +
+
+> +	imxdi->rtc = rtc_device_register(pdev->name, &pdev->dev,
+> +				  &dryice_rtc_ops, THIS_MODULE);
+> +	if (IS_ERR(imxdi->rtc)) {
+> +		rc = PTR_ERR(imxdi->rtc);
+> +		goto err;
+> +	}
+> +	platform_set_drvdata(pdev, imxdi);
+> +
+> +	return 0;
+> +err:
+> +	if (imxdi->rtc && !IS_ERR(imxdi->rtc))
+> +		rtc_device_unregister(imxdi->rtc);
+> +
+> +	if (imxdi->irq >= 0)
+> +		free_irq(imxdi->irq, imxdi);
+> +
+> +	if (imxdi->clk && !IS_ERR(imxdi->clk)) {
+> +		clk_disable(imxdi->clk);
+> +		clk_put(imxdi->clk);
+> +	}
+> +
+> +	if (imxdi->ioaddr)
+> +		iounmap(imxdi->ioaddr);
+> +
+> +err_release_region:
+> +	release_mem_region(res->start, resource_size(res));
+> +
+> +err_free_mem:
+> +	kfree(imxdi);
+> +
+> +	return rc;
+> +}
+> +
+> +static int __exit dryice_rtc_remove(struct platform_device *pdev)
+
+ no __devexit? 
+
+> +{
+> +	struct imxdi_dev *imxdi = platform_get_drvdata(pdev);
+> +	struct resource *mem;
+> +
+> +	flush_scheduled_work();
+> +
+> +	/* mask alarm interrupt */
+> +	di_int_disable(imxdi, DIER_CAIE);
+> +
+> +	if (imxdi->irq >= 0)
+> +		free_irq(imxdi->irq, imxdi);
+> +
+> +	rtc_device_unregister(imxdi->rtc);
+> +
+> +	clk_disable(imxdi->clk);
+> +	clk_put(imxdi->clk);
+> +
+> +	iounmap(imxdi->ioaddr);
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	release_mem_region(mem->start, resource_size(mem));
+> +
+> +	kfree(imxdi);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver dryice_rtc_driver = {
+> +	.driver = {
+> +		   .name = "imxdi_rtc",
+> +		   .owner = THIS_MODULE,
+> +		   },
+> +	.probe = dryice_rtc_probe,
+> +	.remove = __exit_p(dryice_rtc_remove),
+ 
+ __devexit_p ?
+
+> +};
+> +
+> +static int __init dryice_rtc_init(void)
+> +{
+> +	return platform_driver_register(&dryice_rtc_driver);
+> +}
+> +
+> +static void __exit dryice_rtc_exit(void)
+> +{
+> +	platform_driver_unregister(&dryice_rtc_driver);
+> +}
+> +
+> +module_init(dryice_rtc_init);
+> +module_exit(dryice_rtc_exit);
+> +
+> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+> +MODULE_AUTHOR("Baruch Siach <baruch@tkos.co.il>");
+> +MODULE_DESCRIPTION("IMX DryIce Realtime Clock Driver (RTC)");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.6.5
+> 
+
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
