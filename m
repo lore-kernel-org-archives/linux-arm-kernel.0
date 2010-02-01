@@ -1,22 +1,31 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 1 Feb 2010 17:19:21 +0100
-Subject: [PATCH 01/06] ARM: SuperH Mobile ARM, sh7367 and G3EVM support
-In-Reply-To: <20100201142605.GB13428@linux-sh.org>
-References: <20100128124028.8982.16123.sendpatchset@rxone.opensource.se>
-	<20100128124038.8982.82995.sendpatchset@rxone.opensource.se>
-	<20100201141057.GB1340@ucw.cz> <20100201142605.GB13428@linux-sh.org>
-Message-ID: <63386a3d1002010819r63aae9edn2f5bc7e7f08a5fdf@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 1 Feb 2010 22:23:19 +0530
+Subject: [PATCH 2/2] ftrace: re-enable dynamic ftrace for ARM
+In-Reply-To: <20100201102843.GA31714@pengutronix.de>
+References: <1264959196-5175-1-git-send-email-rabin@rab.in>
+	<1264959196-5175-2-git-send-email-rabin@rab.in>
+	<20100201102843.GA31714@pengutronix.de>
+Message-ID: <20100201165318.GA1846@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/2/1 Paul Mundt <lethal@linux-sh.org>:
+On Mon, Feb 01, 2010 at 11:28:43AM +0100, Uwe Kleine-K?nig wrote:
+> On Sun, Jan 31, 2010 at 11:03:16PM +0530, Rabin Vincent wrote:
+> > This adds mcount recording and updates dynamic ftrace for ARM to work
+> > with the new ftrace dyamic tracing implementation.
+[...]
+> Wouldn't it be nice to patch out the instruction pushing lr to the
+> stack (in the gnu case)?  Should work, shouldn't it.
 
-> SH-Mobile (G series, in this case) is a line of SH/ARM multi-cores. They
-> contain both SH and ARM MPUs and are built up almost entirely on SH IP
-> blocks.
+It would and it should, but the main reasons I didn't do that were:
 
-Jaysis, that's one odd bird. There must be some upside to designing
-things like this, is there some paper or conference presentation on the idea
-behind this thing somewhere out there? I just get very curious!
+  - Thumb-2 support needs the LR to be in place, since even -mapcs-frame
+    does not seem to give us an APCS frame there.   The LR would also
+    be needed if GCC gains the ability to build without frame pointers
+    with -pg.
 
-Linus Walleij
+  - I'm not sure we would gain much performance by patching it out, and
+    I'd really like to avoid patching more than what is really necessary
+    and to keep the code as similar as possible to the other arches.
+
+Rabin
