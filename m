@@ -1,87 +1,40 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 2 Feb 2010 01:32:58 +0800
-Subject: [PATCH 4/4] mmp2: append board irq events
-In-Reply-To: <771cded01001250304m6885189ejd1cc1ce3b339e7d2@mail.gmail.com>
-References: <771cded01001250304m6885189ejd1cc1ce3b339e7d2@mail.gmail.com>
-Message-ID: <f17812d71002010932m6c2c1467s16cec746e439718d@mail.gmail.com>
+Date: Tue, 2 Feb 2010 01:50:38 +0800
+Subject: [PATCH] [ARM] pxa: match camera clock by struct device
+In-Reply-To: <1264931178-29177-1-git-send-email-mike@compulab.co.il>
+References: <1264931178-29177-1-git-send-email-mike@compulab.co.il>
+Message-ID: <f17812d71002010950v2bff262j43700d2be04da3e3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 7:04 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 9e4af800fe09dbcd6423843ad617e20821885b2a Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Mon, 25 Jan 2010 05:22:09 -0500
-> Subject: [PATCH] mmp2: append board irq events
+On Sun, Jan 31, 2010 at 5:46 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+> ?arch/arm/mach-pxa/pxa3xx.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index fcb0721..9d338a7 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -257,7 +257,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
+> ? ? ? ?/* Power I2C clock is always on */
+> ? ? ? ?INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
+> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
+> - ? ? ? INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
+> + ? ? ? INIT_CLKREG(&clk_pxa3xx_camera, "pxa27x-camera.0", NULL),
 
-I'd prefer this to be separated into two as follows, the board IRQ
-stuff, I'd like to keep it simple and aligned with the mach-pxa/ is
-doing so to ease the future movement to dynamic IRQ maybe.
+Interesting, but not keeping an eye on pxa27x camera driver for a while,
+does that support pxa3xx as well? I seem to remember the DMA logic
+is a bit different, making it quite difficult to support both in a
+single driver.
 
-commit e039ba833de953cb32d1b80063aa425fdc6a3ca0
-Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-Date:   Thu Jan 28 12:27:36 2010 +0800
+And the hardware in pxa320 differs from the one in pxa310 as well.
 
-    [ARM] mmp2: add missing ICU register definitions
-
-    Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-
-diff --git a/arch/arm/mach-mmp/include/mach/regs-icu.h
-b/arch/arm/mach-mmp/include/mach/regs-icu.h
-index 02b8bf8..f882d91 100644
---- a/arch/arm/mach-mmp/include/mach/regs-icu.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-icu.h
-@@ -40,6 +40,11 @@
- #define ICU_INT_ROUTE_PJ4_IRQ		(1 << 5)
- #define ICU_INT_ROUTE_PJ4_FIQ		(1 << 6)
-
-+#define MMP2_ICU_PJ4_IRQ_STATUS0	ICU_REG(0x138)
-+#define MMP2_ICU_PJ4_IRQ_STATUS1	ICU_REG(0x13c)
-+#define MMP2_ICU_PJ4_FIQ_STATUS0	ICU_REG(0x140)
-+#define MMP2_ICU_PJ4_FIQ_STATUS1	ICU_REG(0x144)
-+
- #define MMP2_ICU_INT4_STATUS		ICU_REG(0x150)
- #define MMP2_ICU_INT5_STATUS		ICU_REG(0x154)
- #define MMP2_ICU_INT17_STATUS		ICU_REG(0x158)
-@@ -56,4 +61,11 @@
- #define MMP2_ICU_PJ4_IRQ_SEL		ICU_REG(0x104)
- #define MMP2_ICU_PJ4_FIQ_SEL		ICU_REG(0x108)
-
-+#define MMP2_ICU_INVERT			ICU_REG(0x164)
-+
-+#define MMP2_ICU_INV_PMIC		(1 << 0)
-+#define MMP2_ICU_INV_PERF		(1 << 1)
-+#define MMP2_ICU_INV_COMMTX		(1 << 2)
-+#define MMP2_ICU_INV_COMMRX		(1 << 3)
-+
- #endif /* __ASM_MACH_ICU_H */
-
-And
-
-commit 807e69408bdf82190e4e551a9580d911ea7452dd
-Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-Date:   Thu Jan 28 12:34:59 2010 +0800
-
-    [ARM] mmp2: add support for board IRQs
-
-    Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-
-diff --git a/arch/arm/mach-mmp/include/mach/irqs.h
-b/arch/arm/mach-mmp/include/mach/irqs.h
-index f907cc9..0270119 100644
---- a/arch/arm/mach-mmp/include/mach/irqs.h
-+++ b/arch/arm/mach-mmp/include/mach/irqs.h
-@@ -222,6 +222,10 @@
- #define IRQ_GPIO_NUM			192
- #define IRQ_GPIO(x)			(IRQ_GPIO_START + (x))
-
--#define NR_IRQS		(IRQ_GPIO_START + IRQ_GPIO_NUM)
-+/* Board IRQ - 64 by default, increase if not enough */
-+#define IRQ_BOARD_START			(IRQ_GPIO_START + IRQ_GPIO_NUM)
-+#define IRQ_BOARD_END			(IRQ_BOARD_START + 64)
-+
-+#define NR_IRQS				(IRQ_BOARD_END)
-
- #endif /* __ASM_MACH_IRQS_H */
+> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
+> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ffuart, "pxa2xx-uart.0", NULL),
+> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_btuart, "pxa2xx-uart.1", NULL),
+> --
+> 1.6.4.4
+>
+>
