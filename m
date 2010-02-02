@@ -1,232 +1,79 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Tue, 2 Feb 2010 14:44:12 +0100 (CET)
-Subject: [PATCH 21/25] imx: only define deprecated symbols
- conditionally
-In-Reply-To: <1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100108161551.GA19007@pengutronix.de>
-	<1262967452-24353-9-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-10-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-12-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-13-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-14-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-15-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-16-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-17-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-18-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LNX.2.00.1002021444050.15395@pobox.suse.cz>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 2 Feb 2010 09:22:58 -0500
+Subject: [PATCH 1/4] mfd: update i2c driver for max8925
+In-Reply-To: <20100129195405.GB23130@sortiz.org>
+References: <771cded01001250307o7e340a0dsf7e02762dad8c953@mail.gmail.com>
+	<20100129195405.GB23130@sortiz.org>
+Message-ID: <771cded01002020622v7fa47689je2a5b1c11e2bb0c7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jan 2010, Uwe Kleine-K?nig wrote:
+On Fri, Jan 29, 2010 at 2:54 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> Hi Haojian,
+>
+> This has to be rewritten, but first let me try to understand something: You
+> need the max9825 core to have pointers to the other i2c devices because of how
+> it handles IRQs right ? In your max9825 irq handler you need to be able to
+> access the rtc and the adc devices, right ? And then on yourrtc and power
+> drivers, you actually only access the max8925 core i2c registers ?
+> I would appreciate if most of your answers to those questions could morph into
+> code comments to this probe routine.
+>
+> Then, about the code design: Having your probe routine relying on those static
+> variable is not ok. If I undersand you correctly, what you trying to achieve
+> here is not calling max8925_device_init() before you actually have the core,
+> the i2c and the adc pointer setup ?
+> If that's so, why not simply use i2c_new_dummy() instead of having to handle
+> recursive calls of your probe routine ?
+>
 
-> Define deprecated symbols in an #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS ...
-> 
-> All files that still depend on the old definitions get
-> -DIMX_NEEDS_DEPRECATED_SYMBOLS passed to the compiler.
-> 
-> When all remaining users are fixed this allows including the soc
-> specific headers unconditionally.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Eric Benard <eric@eukrea.com>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Alan Carvalho de Assis <acassis@gmail.com>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Cc: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> Cc: Ilya Yanok <yanok@emcraft.com>
-> Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
-> Cc: Jiri Kosina <jkosina@suse.cz>
-> Cc: Magnus Lilja <lilja.magnus@gmail.com>
+I wants to initialize max8925 after all three components probed. In
+core driver, irq handling needs to access all three components. In
+power supply driver, both adc and generic components are accessed.
+It's the reason that using three i2c clients in one driver.
 
-What is the status of this patch please? Doesn't seem to be inluded in
-linux-next as of today.
+Yes, the code is not very clear. Now I use i2c_new_dummy() now. Now I
+attache new patches now.
 
-> ---
->  arch/arm/mach-mx2/Makefile            |    3 +++
->  arch/arm/mach-mx3/Makefile            |    4 ++++
->  arch/arm/plat-mxc/Makefile            |    4 ++++
->  arch/arm/plat-mxc/include/mach/mx21.h |    2 ++
->  arch/arm/plat-mxc/include/mach/mx27.h |    2 ++
->  arch/arm/plat-mxc/include/mach/mx2x.h |    2 ++
->  arch/arm/plat-mxc/include/mach/mx31.h |    2 ++
->  arch/arm/plat-mxc/include/mach/mx35.h |    2 ++
->  arch/arm/plat-mxc/include/mach/mx3x.h |    2 ++
->  9 files changed, 23 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-> index 3710893..a9c94e3 100644
-> --- a/arch/arm/mach-mx2/Makefile
-> +++ b/arch/arm/mach-mx2/Makefile
-> @@ -5,6 +5,9 @@
->  # Object file lists.
->  
->  obj-y	:=  generic.o devices.o serial.o
-> +CFLAGS_generic.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> +CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> +CFLAGS_serial.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
->  
->  obj-$(CONFIG_MACH_MX21) += clock_imx21.o
->  
-> diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-> index 670fbb5..62b6093 100644
-> --- a/arch/arm/mach-mx3/Makefile
-> +++ b/arch/arm/mach-mx3/Makefile
-> @@ -5,6 +5,9 @@
->  # Object file lists.
->  
->  obj-y				:= mm.o devices.o cpu.o
-> +CFLAGS_mm.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> +CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> +CFLAGS_cpu.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
->  obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
->  obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
->  obj-$(CONFIG_MACH_MX31ADS)	+= mach-mx31ads.o
-> @@ -13,6 +16,7 @@ obj-$(CONFIG_MACH_MX31LITE)	+= mach-mx31lite.o mx31lite-db.o
->  obj-$(CONFIG_MACH_PCM037)	+= mach-pcm037.o
->  obj-$(CONFIG_MACH_PCM037_EET)	+= mach-pcm037_eet.o
->  obj-$(CONFIG_MACH_MX31_3DS)	+= mach-mx31_3ds.o
-> +CFLAGS_mach-mx31_3ds.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
->  obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
->  				   mx31moboard-marxbot.o
->  obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index 996cbac..7322bca 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -7,9 +7,13 @@ obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
->  
->  obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
->  obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
-> +CFLAGS_iomux-mx1-mx2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> +CFLAGS_dma-mx1-mx2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
->  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
->  obj-$(CONFIG_MXC_PWM)  += pwm.o
->  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
->  obj-$(CONFIG_MXC_ULPI) += ulpi.o
->  obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
-> +CFLAGS_audmux-v1.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
->  obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
-> +CFLAGS_audmux-v2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-> diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-> index 5b9f062..5e2f16e 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx21.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx21.h
-> @@ -184,6 +184,7 @@
->  #define MX21_DMA_REQ_CSI_STAT	30
->  #define MX21_DMA_REQ_CSI_RX	31
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define SDRAM_BASE_ADDR MX21_SDRAM_BASE_ADDR
->  #define CSD1_BASE_ADDR MX21_CSD1_BASE_ADDR
-> @@ -216,5 +217,6 @@
->  #define DMA_REQ_FIRI_RX MX21_DMA_REQ_FIRI_RX
->  #define DMA_REQ_BMI_TX MX21_DMA_REQ_BMI_TX
->  #define DMA_REQ_BMI_RX MX21_DMA_REQ_BMI_RX
-> +#endif
->  
->  #endif /* __ASM_ARCH_MXC_MX21_H__ */
-> diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-> index cd292ff..62746c0 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx27.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx27.h
-> @@ -230,6 +230,7 @@
->  extern int mx27_revision(void);
->  #endif
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define MSHC_BASE_ADDR MX27_MSHC_BASE_ADDR
->  #define GPT5_BASE_ADDR MX27_GPT5_BASE_ADDR
-> @@ -297,5 +298,6 @@ extern int mx27_revision(void);
->  #define DMA_REQ_UART6_RX MX27_DMA_REQ_UART6_RX
->  #define DMA_REQ_SDHC3 MX27_DMA_REQ_SDHC3
->  #define DMA_REQ_NFC MX27_DMA_REQ_NFC
-> +#endif
->  
->  #endif /* __ASM_ARCH_MXC_MX27_H__ */
-> diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
-> index f2eaf14..396470e 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx2x.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx2x.h
-> @@ -176,6 +176,7 @@
->  #define MX2x_DMA_REQ_CSI_STAT	30
->  #define MX2x_DMA_REQ_CSI_RX	31
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
->  #define AIPI_BASE_ADDR_VIRT MX2x_AIPI_BASE_ADDR_VIRT
-> @@ -287,5 +288,6 @@
->  #define DMA_REQ_UART1_TX MX2x_DMA_REQ_UART1_TX
->  #define DMA_REQ_CSI_STAT MX2x_DMA_REQ_CSI_STAT
->  #define DMA_REQ_CSI_RX MX2x_DMA_REQ_CSI_RX
-> +#endif
->  
->  #endif /* __ASM_ARCH_MXC_MX2x_H__ */
-> diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-> index 0c005af..53da4c5 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx31.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx31.h
-> @@ -193,6 +193,7 @@
->  #define MX31_SYSTEM_REV_MIN		MX31_CHIP_REV_1_0
->  #define MX31_SYSTEM_REV_NUM		3
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define ATA_BASE_ADDR MX31_ATA_BASE_ADDR
->  #define UART4_BASE_ADDR MX31_UART4_BASE_ADDR
-> @@ -223,3 +224,4 @@
->  #define MXC_INT_UART5 MX31_INT_UART5
->  #define MXC_INT_CCM MX31_INT_CCM
->  #define MXC_INT_PCMCIA MX31_INT_PCMCIA
-> +#endif
-> diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-> index 0e453b3..ff2d2f0 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx35.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx35.h
-> @@ -187,6 +187,7 @@
->  #define MX35_SYSTEM_REV_MIN		MX35_CHIP_REV_1_0
->  #define MX35_SYSTEM_REV_NUM		3
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define MXC_FEC_BASE_ADDR MX35_FEC_BASE_ADDR
->  #define MXC_INT_OWIRE MX35_INT_OWIRE
-> @@ -202,3 +203,4 @@
->  #define MXC_INT_MLB MX35_INT_MLB
->  #define MXC_INT_SPDIF MX35_INT_SPDIF
->  #define MXC_INT_FEC MX35_INT_FEC
-> +#endif
-> diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-> index be69272..5ae0b00 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx3x.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-> @@ -269,6 +269,7 @@ static inline int mx31_revision(void)
->  }
->  #endif
->  
-> +#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
->  /* these should go away */
->  #define L2CC_BASE_ADDR MX3x_L2CC_BASE_ADDR
->  #define L2CC_SIZE MX3x_L2CC_SIZE
-> @@ -401,5 +402,6 @@ static inline int mx31_revision(void)
->  #define CHIP_REV_3_2 MX3x_CHIP_REV_3_2
->  #define SYSTEM_REV_MIN MX3x_SYSTEM_REV_MIN
->  #define SYSTEM_REV_NUM MX3x_SYSTEM_REV_NUM
-> +#endif
->  
->  #endif /*  __ASM_ARCH_MXC_MX31_H__ */
-> -- 
-> 1.6.5.2
-> 
+Updates are in below.
+1. use i2c_new_dummy() to replace i2c_new_probed_device().
+2. add onkey driver
+3. remove unused i2c pointer in rtc driver
 
--- 
-Jiri Kosina
-SUSE Labs, Novell Inc.
+Thanks
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mfd-update-i2c-driver-for-max8925.patch
+Type: text/x-patch
+Size: 3590 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/ef1c8d48/attachment-0005.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-mfd-update-irq-handler-in-max8925.patch
+Type: text/x-patch
+Size: 29175 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/ef1c8d48/attachment-0006.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-rtc-enable-rtc-in-max8925.patch
+Type: text/x-patch
+Size: 10219 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/ef1c8d48/attachment-0007.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0004-power-enable-power-supply-of-max8925.patch
+Type: text/x-patch
+Size: 16348 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/ef1c8d48/attachment-0008.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0005-input-enable-onkey-driver-of-max8925.patch
+Type: text/x-patch
+Size: 5956 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/ef1c8d48/attachment-0009.bin>
