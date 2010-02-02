@@ -1,45 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  2 Feb 2010 16:22:24 +0000
-Subject: [RFC PATCH 0/4] ARM: add support for hw-breakpoints
-Message-ID: <1265127748-4587-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  2 Feb 2010 16:22:28 +0000
+Subject: [RFC PATCH 4/4] ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
+In-Reply-To: <1265127748-4587-4-git-send-email-will.deacon@arm.com>
+References: <1265127748-4587-1-git-send-email-will.deacon@arm.com>
+	<1265127748-4587-2-git-send-email-will.deacon@arm.com>
+	<1265127748-4587-3-git-send-email-will.deacon@arm.com>
+	<1265127748-4587-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1265127748-4587-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARM cores provide hardware resources for setting breakpoints
-and watchpoints from software when in monitor debug mode. When these
-are triggered, a debug exception is taken [in the form of a prefetch
-or data abort] and a trap can be raised to notify the user that the
-event has occurred.
+If we're targetting a v6 or v7 core and have at least software perf events
+available, then automatically add support for hardware breakpoints.
 
-This patch adds an ARM [v6+] backend to the recent HW-Breakpoint framework
-in the Kernel. The ptrace interface is extended to support the new features
-and has been tested successfully with GDB on 11MPCore and Cortex-A9 platforms.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig         |    1 +
+ arch/arm/kernel/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-All comments welcome, particularly those related to:
-	- The ptrace interface, where I tried to avoid defining a new struct
-	- The debug register accessors, which are rather ugly
-	- Discovering the faulting data address when a watchpoint fires
-
-Patch taken against 2.6.33-rc6 with perf [ARM 5900/1] and atomic64 [ARM 5889/1]
-support.
-
-
-Will Deacon (4):
-  ARM: hw-breakpoint: add mechanism for hooking into prefetch aborts
-  ARM: hw-breakpoint: add ARM backend for the hw-breakpoint framework
-  ARM: hw-breakpoint: add new ptrace requests for hw-breakpoint
-    interaction
-  ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
-
- arch/arm/Kconfig                     |    1 +
- arch/arm/include/asm/hw_breakpoint.h |  113 ++++++
- arch/arm/include/asm/processor.h     |    4 +
- arch/arm/include/asm/ptrace.h        |    2 +
- arch/arm/include/asm/system.h        |    3 +
- arch/arm/kernel/Makefile             |    1 +
- arch/arm/kernel/hw_breakpoint.c      |  672 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ptrace.c             |  158 ++++++++
- arch/arm/mm/fault.c                  |   11 +
- 9 files changed, 965 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/hw_breakpoint.h
- create mode 100644 arch/arm/kernel/hw_breakpoint.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 195722a..361f546 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -23,6 +23,7 @@ config ARM
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+ 	select GENERIC_ATOMIC64 if (!CPU_32v6K)
++	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index c76e6d2..a06c8cc 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -38,6 +38,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+-- 
+1.6.5.7
