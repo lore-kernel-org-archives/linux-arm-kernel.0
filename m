@@ -1,61 +1,48 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 2 Feb 2010 19:28:27 +0000
-Subject: [PATCH 4/5] arm: enable support for software perf events
-In-Reply-To: <20100202190704.GC29701@n2100.arm.linux.org.uk>
-References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
-	<1263471256-3739-2-git-send-email-jamie.iles@picochip.com>
-	<1263471256-3739-3-git-send-email-jamie.iles@picochip.com>
-	<1263471256-3739-4-git-send-email-jamie.iles@picochip.com>
-	<1263471256-3739-5-git-send-email-jamie.iles@picochip.com>
-	<20100202174000.GB29701@n2100.arm.linux.org.uk>
-	<20100202184831.GH4305@wear.picochip.com>
-	<20100202190704.GC29701@n2100.arm.linux.org.uk>
-Message-ID: <20100202192827.GM4305@wear.picochip.com>
+From: matthias@kaehlcke.net (Matthias Kaehlcke)
+Date: Tue, 2 Feb 2010 20:22:17 +0100
+Subject: [PATCH] ARM: Fix warnings in corgi/spitz_defconfig
+Message-ID: <20100202192217.GT8053@darwin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2010 at 07:07:04PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 02, 2010 at 06:48:31PM +0000, Jamie Iles wrote:
-> > On Tue, Feb 02, 2010 at 05:40:00PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Jan 14, 2010 at 12:14:15PM +0000, Jamie Iles wrote:
-> > > > The perf events subsystem allows counting of both hardware and
-> > > > software events. This patch implements the bare minimum for software
-> > > > performance events.
-> > > > 
-> > > > Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
-> > > > Cc: Peter Zijlstra <peterz@infradead.org>
-> > > > Cc: Ingo Molnar <mingo@elte.hu>
-> > > > ---
-> > > >  arch/arm/Kconfig                  |    2 ++
-> > > >  arch/arm/include/asm/perf_event.h |   31 +++++++++++++++++++++++++++++++
-> > > >  arch/arm/mm/fault.c               |    7 +++++++
-> > > >  3 files changed, 40 insertions(+), 0 deletions(-)
-> > > >  create mode 100644 arch/arm/include/asm/perf_event.h
-> > > > 
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 293a879..72646b2 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -21,6 +21,8 @@ config ARM
-> > > >  	select HAVE_KERNEL_GZIP
-> > > >  	select HAVE_KERNEL_LZO
-> > > >  	select GENERIC_ATOMIC64
-> > > 
-> > > This conflicts - this select is only if !CPU_32v6K in my kernel.
-> > > 
-> > > What's the implication?  Does this perf stuff require these atomic64
-> > > stuff (in which case, those symbols should only be selected if
-> > > GENERIC_ATOMIC64 is also selected.)
-> > > 
-> > > Please sort this out.
-> > As Will mentioned, the correct case should be 'GENERIC_ATOMIC64 if
-> > (!CPU_32v6K)' due to my patches being off a tree without the native
-> > atomic64's. I can rebase onto next if that's easier.
-> 
-> Much prefer having them rebased onto 7558b1f, which is in -next if you
-> can manage that.
-Done - I've rebased the complete series.
+corgi/spitz_defconfig select CONFIG_THRUSTMASTER_FF and
+CONFIG_ZEROPLUS_FF as modules, but these are (now?) of boolean type,
+in consequence Kconfig raises a warning. Further these settings
+depend on CONFIG_HID_THRUSTMASTER / CONFIG_HID_ZEROPLUS, which aren't
+selected by the defconfig. Therefore the selection is incorrect at all
+and we remove it.
 
-Thanks,
+Signed-off-by: Matthias Kaehlcke <matthias@kaehlcke.net>
+---
+ arch/arm/configs/corgi_defconfig |    2 --
+ arch/arm/configs/spitz_defconfig |    2 --
+ 2 files changed, 0 insertions(+), 4 deletions(-)
 
-Jamie
+diff --git a/arch/arm/configs/corgi_defconfig b/arch/arm/configs/corgi_defconfig
+index 5e4069f..dbfb437 100644
+--- a/arch/arm/configs/corgi_defconfig
++++ b/arch/arm/configs/corgi_defconfig
+@@ -1320,8 +1320,6 @@ CONFIG_HID_PETALYNX=m
+ CONFIG_HID_SAMSUNG=m
+ CONFIG_HID_SONY=m
+ CONFIG_HID_SUNPLUS=m
+-CONFIG_THRUSTMASTER_FF=m
+-CONFIG_ZEROPLUS_FF=m
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB_ARCH_HAS_HCD=y
+ # CONFIG_USB_ARCH_HAS_OHCI is not set
+diff --git a/arch/arm/configs/spitz_defconfig b/arch/arm/configs/spitz_defconfig
+index 7d89489..dc2bff7 100644
+--- a/arch/arm/configs/spitz_defconfig
++++ b/arch/arm/configs/spitz_defconfig
+@@ -1239,8 +1239,6 @@ CONFIG_HID_PETALYNX=m
+ CONFIG_HID_SAMSUNG=m
+ CONFIG_HID_SONY=m
+ CONFIG_HID_SUNPLUS=m
+-CONFIG_THRUSTMASTER_FF=m
+-CONFIG_ZEROPLUS_FF=m
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB_ARCH_HAS_HCD=y
+ CONFIG_USB_ARCH_HAS_OHCI=y
+-- 
+1.6.5
