@@ -1,40 +1,24 @@
-From: rurality.linux@gmail.com (Qiang Wang)
-Date: Tue, 2 Feb 2010 14:28:39 +0900
-Subject: [PATCH]NUC900 add gpio virtual memory map
-Message-ID: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
+From: epeer@tmtservices.co.za (Edwin Peer)
+Date: Tue, 2 Feb 2010 08:14:08 +0200
+Subject: [PATCH - v5] support for Embedian MXM-8x10
+In-Reply-To: <f17812d71002011242i53f4c2faoe47b3d6988cefaa@mail.gmail.com>
+References: <201001221010.45174.epeer@tmtservices.co.za>
+	<f17812d71002011242i53f4c2faoe47b3d6988cefaa@mail.gmail.com>
+Message-ID: <201002020814.08656.epeer@tmtservices.co.za>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Dear Wan
+On Monday 01 February 2010 22:42:00 Eric Miao wrote:
 
-   This patch adds the gpio registers virtual memory map.
-   Without it, the gpio access will cause the "Data Abort" due to no
-virtual memory assign to it.
+> > +static struct spi_board_info mcp251x_board_info[] = {
+> > +       {
+> > +               .modalias        = "mcp251x",
+> > +               .max_speed_hz    = 65E5,
+> 
+> This looks weird to me, should be an integer here right?
 
-Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
-Cc: Wang Zongshun <mcuos.com@gmail.com>
----
- arch/arm/mach-w90x900/cpu.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Correct. That's 65 x 10^5, or equivalently 6.5 x 10^6. Would you prefer the 
+patch to have it in decimal?
 
-diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-index 20dc0c9..7a79de0 100644
---- a/arch/arm/mach-w90x900/cpu.c
-+++ b/arch/arm/mach-w90x900/cpu.c
-@@ -45,6 +45,7 @@ static struct map_desc nuc900_iodesc[] __initdata = {
- 	IODESC_ENT(UART),
- 	IODESC_ENT(TIMER),
- 	IODESC_ENT(EBI),
-+	IODESC_ENT(GPIO),
- };
-
- /* Initial clock declarations. */
--- 
-1.6.4
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: nuc900-add-gpio-virtual-memory-map.patch
-Type: application/octet-stream
-Size: 558 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100202/f8fb9fd0/attachment.obj>
+Regards,
+Edwin Peer
