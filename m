@@ -1,190 +1,180 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Tue,  2 Feb 2010 15:59:19 -0800
-Subject: [PATCH 07/16] ARM: LPC32XX: Added LPC32XX identifier to UART register
-	field macros
+Date: Tue,  2 Feb 2010 15:59:21 -0800
+Subject: [PATCH 09/16] ARM: LPC32XX: LPC32XX macro name changes and local
+	macro use
 In-Reply-To: <LPC32XX architecture files (updated)>
 References: <LPC32XX architecture files (updated)>
-Message-ID: <1265155168-28909-8-git-send-email-wellsk40@gmail.com>
+Message-ID: <1265155168-28909-10-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-The UART macros and associated code have been updated with the
-LPC32XX identifier.
+Added the LPC32XX prefix to local macro names. Added several
+new local macros for register offsets.
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/include/mach/platform.h |   56 ++++++++++++------------
- arch/arm/mach-lpc32xx/serial.c                |   37 +++++++++-------
- 2 files changed, 49 insertions(+), 44 deletions(-)
+ arch/arm/mach-lpc32xx/suspend.S |   83 ++++++++++++++++++++-------------------
+ 1 files changed, 43 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
-index 1ee148c..9de37ee 100644
---- a/arch/arm/mach-lpc32xx/include/mach/platform.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
-@@ -642,48 +642,48 @@
-  * Standard UART register offsets
-  *
-  */
--#define UART_DLL_FIFO(x)		((x) + 0x00)
--#define UART_DLM_IER(x)			((x) + 0x04)
--#define UART_IIR_FCR(x)			((x) + 0x08)
--#define UART_LCR_(x)			((x) + 0x0C)
--#define UART_MODEM_CTRL(x)		((x) + 0x10)
--#define UART_LSR_(x)			((x) + 0x14)
--#define UART_MODEM_STATUS(x)		((x) + 0x18)
--#define UART_RXLEV(x)			((x) + 0x1C)
-+#define LPC32XX_UART_DLL_FIFO(x)		((x) + 0x00)
-+#define LPC32XX_UART_DLM_IER(x)			((x) + 0x04)
-+#define LPC32XX_UART_IIR_FCR(x)			((x) + 0x08)
-+#define LPC32XX_UART_LCR_(x)			((x) + 0x0C)
-+#define LPC32XX_UART_MODEM_CTRL(x)		((x) + 0x10)
-+#define LPC32XX_UART_LSR_(x)			((x) + 0x14)
-+#define LPC32XX_UART_MODEM_STATUS(x)		((x) + 0x18)
-+#define LPC32XX_UART_RXLEV(x)			((x) + 0x1C)
+diff --git a/arch/arm/mach-lpc32xx/suspend.S b/arch/arm/mach-lpc32xx/suspend.S
+index 1d35b34..eea6ddc 100644
+--- a/arch/arm/mach-lpc32xx/suspend.S
++++ b/arch/arm/mach-lpc32xx/suspend.S
+@@ -26,19 +26,22 @@
+ #include <mach/hardware.h>
  
- /*
-  *
-  * UART control structure offsets
-  *
-  */
--#define UARTCTL_CTRL(x)			((x) + 0x00)
--#define UARTCTL_CLKMODE(x)		((x) + 0x04)
--#define UARTCTL_CLOOP(x)		((x) + 0x08)
-+#define LPC32XX_UARTCTL_CTRL(x)			((x) + 0x00)
-+#define LPC32XX_UARTCTL_CLKMODE(x)		((x) + 0x04)
-+#define LPC32XX_UARTCTL_CLOOP(x)		((x) + 0x08)
+ /* Using named register defines makes the code easier to follow */
+-#define WORK1_REG		r0
+-#define WORK2_REG		r1
+-#define SAVED_HCLK_DIV_REG	r2
+-#define SAVED_HCLK_PLL_REG	r3
+-#define SAVED_DRAM_CLKCTRL_REG	r4
+-#define SAVED_PWR_CTRL_REG	r5
+-#define CLKPWRBASE_REG		r6
+-#define EMCBASE_REG		r7
+-
+-#define EMC_STATUS_OFFS		0x04
+-#define EMC_STATUS_BUSY		0x1
+-#define EMC_STATUS_SELF_RFSH	0x4
+-
++#define WORK1_REG			r0
++#define WORK2_REG			r1
++#define SAVED_HCLK_DIV_REG		r2
++#define SAVED_HCLK_PLL_REG		r3
++#define SAVED_DRAM_CLKCTRL_REG		r4
++#define SAVED_PWR_CTRL_REG		r5
++#define CLKPWRBASE_REG			r6
++#define EMCBASE_REG			r7
++
++#define LPC32XX_EMC_STATUS_OFFS		0x04
++#define LPC32XX_EMC_STATUS_BUSY		0x1
++#define LPC32XX_EMC_STATUS_SELF_RFSH	0x4
++
++#define LPC32XX_CLKPWR_PWR_CTRL_OFFS	0x44
++#define LPC32XX_CLKPWR_HCLK_DIV_OFFS	0x40
++#define LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS 0x58
+ 	.text
  
- /*
-  * ctrl register definitions
-  */
--#define UART_U3_MD_CTRL_EN		_BIT(11)
--#define UART_IRRX6_INV_EN		_BIT(10)
--#define UART_HDPX_EN			_BIT(9)
--#define UART_UART6_IRDAMOD_BYPASS	_BIT(5)
--#define RT_IRTX6_INV_EN			_BIT(4)
--#define RT_IRTX6_INV_MIR_EN		_BIT(3)
--#define RT_RX_IRPULSE_3_16_115K		_BIT(2)
--#define RT_TX_IRPULSE_3_16_115K		_BIT(1)
--#define UART_U5_ROUTE_TO_USB		_BIT(0)
-+#define LPC32XX_UART_U3_MD_CTRL_EN		_BIT(11)
-+#define LPC32XX_UART_IRRX6_INV_EN		_BIT(10)
-+#define LPC32XX_UART_HDPX_EN			_BIT(9)
-+#define LPC32XX_UART_UART6_IRDAMOD_BYPASS	_BIT(5)
-+#define LPC32XX_RT_IRTX6_INV_EN			_BIT(4)
-+#define LPC32XX_RT_IRTX6_INV_MIR_EN		_BIT(3)
-+#define LPC32XX_RT_RX_IRPULSE_3_16_115K		_BIT(2)
-+#define LPC32XX_RT_TX_IRPULSE_3_16_115K		_BIT(1)
-+#define LPC32XX_UART_U5_ROUTE_TO_USB		_BIT(0)
+ ENTRY(lpc32xx_sys_suspend)
+@@ -52,57 +55,57 @@ ENTRY(lpc32xx_sys_suspend)
+ 	ldr	EMCBASE_REG, [WORK1_REG, #4]
  
- /*
-  * clkmode register definitions
-  */
--#define UART_ENABLED_CLOCKS(n)		(((n) >> 16) & 0x7F)
--#define UART_ENABLED_CLOCK(n, u)	(((n) >> (16 + (u))) & 0x1)
--#define UART_ENABLED_CLKS_ANY		_BIT(14)
--#define UART_CLKMODE_OFF		0x0
--#define UART_CLKMODE_ON			0x1
--#define UART_CLKMODE_AUTO		0x2
--#define UART_CLKMODE_MASK(u)		(0x3 << ((((u) - 3) * 2) + 4))
--#define UART_CLKMODE_LOAD(m, u)		((m) << ((((u) - 3) * 2) + 4))
-+#define LPC32XX_UART_ENABLED_CLOCKS(n)		(((n) >> 16) & 0x7F)
-+#define LPC32XX_UART_ENABLED_CLOCK(n, u)	(((n) >> (16 + (u))) & 0x1)
-+#define LPC32XX_UART_ENABLED_CLKS_ANY		_BIT(14)
-+#define LPC32XX_UART_CLKMODE_OFF		0x0
-+#define LPC32XX_UART_CLKMODE_ON			0x1
-+#define LPC32XX_UART_CLKMODE_AUTO		0x2
-+#define LPC32XX_UART_CLKMODE_MASK(u)		(0x3 << ((((u) - 3) * 2) + 4))
-+#define LPC32XX_UART_CLKMODE_LOAD(m, u)		((m) << ((((u) - 3) * 2) + 4))
+ 	ldr	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_PWR_CTRL(0)]
++		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 	orr	WORK1_REG, SAVED_PWR_CTRL_REG, #LPC32XX_CLKPWR_SDRAM_SELF_RFSH
  
- /*
-  *
-diff --git a/arch/arm/mach-lpc32xx/serial.c b/arch/arm/mach-lpc32xx/serial.c
-index def5003..3a0acfd 100644
---- a/arch/arm/mach-lpc32xx/serial.c
-+++ b/arch/arm/mach-lpc32xx/serial.c
-@@ -97,28 +97,32 @@ static struct uartinit uartinit_data[] __initdata = {
- #ifdef CONFIG_ARCH_LPC32XX_UART5_ENABLE
- 	{
- 		.uart_ck_name = "uart5_ck",
--		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 5),
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 5),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL(CLKPWR_IOBASE),
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART3_ENABLE
- 	{
- 		.uart_ck_name = "uart3_ck",
--		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 3),
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 3),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL(CLKPWR_IOBASE),
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART4_ENABLE
- 	{
- 		.uart_ck_name = "uart4_ck",
--		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 4),
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 4),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL(CLKPWR_IOBASE),
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART6_ENABLE
- 	{
- 		.uart_ck_name = "uart6_ck",
--		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 6),
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 6),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL(CLKPWR_IOBASE),
- 	},
- #endif
-@@ -169,31 +173,32 @@ void __init lpc32xx_serial_init(void)
- 	}
+ 	@ Wait for SDRAM busy status to go busy and then idle
+ 	@ This guarantees a small windows where DRAM isn't busy
+ 1:
+-	ldr	WORK2_REG, [EMCBASE_REG, #EMC_STATUS_OFFS]
+-	and	WORK2_REG, WORK2_REG, #EMC_STATUS_BUSY
+-	cmp	WORK2_REG, #EMC_STATUS_BUSY
++	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
++	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
++	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
+ 	bne	1b @ Branch while idle
+ 2:
+-	ldr	WORK2_REG, [EMCBASE_REG, #EMC_STATUS_OFFS]
+-	and	WORK2_REG, WORK2_REG, #EMC_STATUS_BUSY
+-	cmp	WORK2_REG, #EMC_STATUS_BUSY
++	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
++	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
++	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
+ 	beq	2b @ Branch until idle
  
- 	/* This needs to be done after all UART clocks are setup */
--	writel(clkmodes, UARTCTL_CLKMODE(io_p2v(LPC32XX_UART_CTRL_BASE)));
-+	writel(clkmodes,
-+		LPC32XX_UARTCTL_CLKMODE(io_p2v(LPC32XX_UART_CTRL_BASE)));
- 	for (i = 0; i < ARRAY_SIZE(uartinit_data) - 1; i++) {
- 		/* Force a flush of the RX FIFOs to work around a HW bug */
- 		puart = serial_std_platform_data[i].membase;
--		writel(0xC1, UART_IIR_FCR(puart));
--		writel(0x00, UART_DLL_FIFO(puart));
-+		writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
-+		writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
- 		clkmodes = 64;
- 		while (clkmodes--)
--			tmp = readl(UART_DLL_FIFO(puart));
--		writel(0, UART_IIR_FCR(puart));
-+			tmp = readl(LPC32XX_UART_DLL_FIFO(puart));
-+		writel(0, LPC32XX_UART_IIR_FCR(puart));
- 	}
+ 	@ Setup self-refresh with support for manual exit of
+ 	@ self-refresh mode
+-	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
++	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 	orr	WORK2_REG, WORK1_REG, #LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
+-	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
+-	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
++	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
++	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
  
- 	/* IrDA pulsing support on UART6. This only enables the IrDA mux */
--	tmp = readl(UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
-+	tmp = readl(LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
- #ifdef CONFIG_ARCH_LPC32XX_UART6_IRDAMODE
--	tmp &= ~UART_UART6_IRDAMOD_BYPASS;
-+	tmp &= ~LPC32XX_UART_UART6_IRDAMOD_BYPASS;
- #else
--	tmp |= UART_UART6_IRDAMOD_BYPASS;
-+	tmp |= LPC32XX_UART_UART6_IRDAMOD_BYPASS;
- #endif
--	writel(tmp, UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
-+	writel(tmp, LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ 	@ Wait for self-refresh acknowledge, clocks to the DRAM device
+ 	@ will automatically stop on start of self-refresh
+ 3:
+-	ldr	WORK2_REG, [EMCBASE_REG, #EMC_STATUS_OFFS]
+-	and	WORK2_REG, WORK2_REG, #EMC_STATUS_SELF_RFSH
+-	cmp	WORK2_REG, #EMC_STATUS_SELF_RFSH
++	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
++	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
++	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
+ 	bne	3b @ Branch until self-refresh mode starts
  
- 	/* Disable UART5->USB transparent mode or USB won't work */
--	tmp = readl(UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
--	tmp &= ~UART_U5_ROUTE_TO_USB;
--	writel(tmp, UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
-+	tmp = readl(LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
-+	tmp &= ~LPC32XX_UART_U5_ROUTE_TO_USB;
-+	writel(tmp, LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ 	@ Enter direct-run mode from run mode
+ 	bic	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_SELECT_RUN_MODE
+-	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
++	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
  
- 	platform_add_devices(lpc32xx_serial_devs,
- 		ARRAY_SIZE(lpc32xx_serial_devs));
+ 	@ Safe disable of DRAM clock in EMC block, prevents DDR sync
+ 	@ issues on restart
+ 	ldr	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_HCLK_DIV(0)]
++		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
+ 	and	WORK2_REG, SAVED_HCLK_DIV_REG, #0xFFFFFE7F
+-	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLK_DIV(0)]
++	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLK_DIV_OFFS]
+ 
+ 	@ Save HCLK PLL state and disable HCLK PLL
+ 	ldr	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_HCLKPLL_CTRL(0)]
++		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
+ 	bic	WORK2_REG, SAVED_HCLK_PLL_REG, #LPC32XX_CLKPWR_HCLKPLL_POWER_UP
+-	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL(0)]
++	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
+ 
+ 	@ Enter stop mode until an enabled event occurs
+ 	orr	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_STOP_MODE_CTRL
+-	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
++	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 	nop
+ 	nop
+ 	nop
+@@ -118,32 +121,32 @@ ENTRY(lpc32xx_sys_suspend)
+ 
+ 	@ Restore original HCLK PLL value and wait for PLL lock
+ 	str	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_HCLKPLL_CTRL(0)]
++		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
+ 4:
+-	ldr	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL(0)]
++	ldr	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
+ 	and	WORK2_REG, WORK2_REG, #LPC32XX_CLKPWR_HCLKPLL_PLL_STS
+ 	bne	4b
+ 
+ 	@ Re-enter run mode with self-refresh flag cleared, but no DRAM
+ 	@ update yet. DRAM is still in self-refresh
+ 	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_PWR_CTRL(0)]
++		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 
+ 	@ Restore original DRAM clock mode to restore DRAM clocks
+ 	str	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_HCLK_DIV(0)]
++		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
+ 
+ 	@ Clear self-refresh mode
+ 	orr	WORK1_REG, SAVED_PWR_CTRL_REG,\
+ 		#LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
+-	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL(0)]
++	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
+-		#LPC32XX_CLKPWR_PWR_CTRL(0)]
++		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
+ 
+ 	@ Wait for EMC to clear self-refresh mode
+ 5:
+-	ldr	WORK2_REG, [EMCBASE_REG, #EMC_STATUS_OFFS]
+-	and	WORK2_REG, WORK2_REG, #EMC_STATUS_SELF_RFSH
++	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
++	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
+ 	bne	5b @ Branch until self-refresh has exited
+ 
+ 	@ restore regs and return
 -- 
 1.6.6
