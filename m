@@ -1,363 +1,190 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Tue,  2 Feb 2010 15:59:20 -0800
-Subject: [PATCH 08/16] ARM: LPC32XX: Added LPC32XX identifier to GPIO register
+Date: Tue,  2 Feb 2010 15:59:19 -0800
+Subject: [PATCH 07/16] ARM: LPC32XX: Added LPC32XX identifier to UART register
 	field macros
 In-Reply-To: <LPC32XX architecture files (updated)>
 References: <LPC32XX architecture files (updated)>
-Message-ID: <1265155168-28909-9-git-send-email-wellsk40@gmail.com>
+Message-ID: <1265155168-28909-8-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-The GPIO macros and associated code have been updated with the
+The UART macros and associated code have been updated with the
 LPC32XX identifier.
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/gpiolib.c               |   96 +++++++++++++++----------
- arch/arm/mach-lpc32xx/include/mach/gpio.h     |   26 ++++----
- arch/arm/mach-lpc32xx/include/mach/platform.h |   78 ++++++++++----------
- arch/arm/mach-lpc32xx/phy3250.c               |    8 +-
- 4 files changed, 114 insertions(+), 94 deletions(-)
+ arch/arm/mach-lpc32xx/include/mach/platform.h |   56 ++++++++++++------------
+ arch/arm/mach-lpc32xx/serial.c                |   37 +++++++++-------
+ 2 files changed, 49 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/gpiolib.c b/arch/arm/mach-lpc32xx/gpiolib.c
-index 803c48f..beed7eb 100644
---- a/arch/arm/mach-lpc32xx/gpiolib.c
-+++ b/arch/arm/mach-lpc32xx/gpiolib.c
-@@ -42,12 +42,12 @@ struct gpio_regs {
- /*
-  * GPIO names
-  */
--static char *gpio_p0_names[GPIO_P0_MAX] = {
-+static char *gpio_p0_names[LPC32XX_GPIO_P0_MAX] = {
- 	"p0.0", "p0.1", "p0.2", "p0.3",
- 	"p0.4", "p0.5", "p0.6", "p0.7"
- };
- 
--static char *gpio_p1_names[GPIO_P1_MAX] = {
-+static char *gpio_p1_names[LPC32XX_GPIO_P1_MAX] = {
- 	"p1.0", "p1.1", "p1.2", "p1.3",
- 	"p1.4", "p1.5", "p1.6", "p1.7",
- 	"p1.8", "p1.9", "p1.10", "p1.11",
-@@ -56,19 +56,19 @@ static char *gpio_p1_names[GPIO_P1_MAX] = {
- 	"p1.20", "p1.21", "p1.22", "p1.23",
- };
- 
--static char *gpio_p2_names[GPIO_P2_MAX] = {
-+static char *gpio_p2_names[LPC32XX_GPIO_P2_MAX] = {
- 	"p2.0", "p2.1", "p2.2", "p2.3",
- 	"p2.4", "p2.5", "p2.6", "p2.7",
- 	"p2.8", "p2.9", "p2.10", "p2.11",
- 	"p2.12"
- };
- 
--static char *gpio_p3_names[GPIO_P3_MAX] = {
-+static char *gpio_p3_names[LPC32XX_GPIO_P3_MAX] = {
- 	"gpi000", "gpio01", "gpio02", "gpio03",
- 	"gpio04", "gpio05"
- };
- 
--static char *gpi_p3_names[GPI_P3_MAX] = {
-+static char *gpi_p3_names[LPC32XX_GPI_P3_MAX] = {
- 	"gpi00", "gpi01", "gpi02", "gpi03",
- 	"gpi04", "gpi05", "gpi06", "gpi07",
- 	"gpi08", "gpi09", "na",    "na",
-@@ -78,7 +78,7 @@ static char *gpi_p3_names[GPI_P3_MAX] = {
- 	"gpi24", "gpi25", "gpi26", "gpi27"
- };
- 
--static char *gpo_p3_names[GPO_P3_MAX] = {
-+static char *gpo_p3_names[LPC32XX_GPO_P3_MAX] = {
- 	"gpo00", "gpo01", "gpo02", "gpo03",
- 	"gpo04", "gpo05", "gpo06", "gpo07",
- 	"gpo08", "gpo09", "gpo10", "gpo11",
-@@ -89,32 +89,52 @@ static char *gpo_p3_names[GPO_P3_MAX] = {
- 
- static struct gpio_regs gpio_grp_regs[] = {
- 	{
--		.inp_state	= (void __iomem *) GPIO_P0_INP_STATE(GPIOBASE),
--		.outp_set	= (void __iomem *) GPIO_P0_OUTP_SET(GPIOBASE),
--		.outp_clr	= (void __iomem *) GPIO_P0_OUTP_CLR(GPIOBASE),
--		.dir_set	= (void __iomem *) GPIO_P0_DIR_SET(GPIOBASE),
--		.dir_clr	= (void __iomem *) GPIO_P0_DIR_CLR(GPIOBASE),
-+		.inp_state	=
-+			(void __iomem *) LPC32XX_GPIO_P0_INP_STATE(GPIOBASE),
-+		.outp_set	=
-+			(void __iomem *) LPC32XX_GPIO_P0_OUTP_SET(GPIOBASE),
-+		.outp_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P0_OUTP_CLR(GPIOBASE),
-+		.dir_set	=
-+			(void __iomem *) LPC32XX_GPIO_P0_DIR_SET(GPIOBASE),
-+		.dir_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P0_DIR_CLR(GPIOBASE),
- 	},
- 	{
--		.inp_state	= (void __iomem *) GPIO_P1_INP_STATE(GPIOBASE),
--		.outp_set	= (void __iomem *) GPIO_P1_OUTP_SET(GPIOBASE),
--		.outp_clr	= (void __iomem *) GPIO_P1_OUTP_CLR(GPIOBASE),
--		.dir_set	= (void __iomem *) GPIO_P1_DIR_SET(GPIOBASE),
--		.dir_clr	= (void __iomem *) GPIO_P1_DIR_CLR(GPIOBASE),
-+		.inp_state	=
-+			(void __iomem *) LPC32XX_GPIO_P1_INP_STATE(GPIOBASE),
-+		.outp_set	=
-+			(void __iomem *) LPC32XX_GPIO_P1_OUTP_SET(GPIOBASE),
-+		.outp_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P1_OUTP_CLR(GPIOBASE),
-+		.dir_set	=
-+			(void __iomem *) LPC32XX_GPIO_P1_DIR_SET(GPIOBASE),
-+		.dir_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P1_DIR_CLR(GPIOBASE),
- 	},
- 	{
--		.inp_state	= (void __iomem *) GPIO_P2_INP_STATE(GPIOBASE),
--		.outp_set	= (void __iomem *) GPIO_P2_OUTP_SET(GPIOBASE),
--		.outp_clr	= (void __iomem *) GPIO_P2_OUTP_CLR(GPIOBASE),
--		.dir_set	= (void __iomem *) GPIO_P2_DIR_SET(GPIOBASE),
--		.dir_clr	= (void __iomem *) GPIO_P2_DIR_CLR(GPIOBASE),
-+		.inp_state	=
-+			(void __iomem *) LPC32XX_GPIO_P2_INP_STATE(GPIOBASE),
-+		.outp_set	=
-+			(void __iomem *) LPC32XX_GPIO_P2_OUTP_SET(GPIOBASE),
-+		.outp_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P2_OUTP_CLR(GPIOBASE),
-+		.dir_set	=
-+			(void __iomem *) LPC32XX_GPIO_P2_DIR_SET(GPIOBASE),
-+		.dir_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P2_DIR_CLR(GPIOBASE),
- 	},
- 	{
--		.inp_state	= (void __iomem *) GPIO_P3_INP_STATE(GPIOBASE),
--		.outp_set	= (void __iomem *) GPIO_P3_OUTP_SET(GPIOBASE),
--		.outp_clr	= (void __iomem *) GPIO_P3_OUTP_CLR(GPIOBASE),
--		.dir_set	= (void __iomem *) GPIO_P2_DIR_SET(GPIOBASE),
--		.dir_clr	= (void __iomem *) GPIO_P2_DIR_CLR(GPIOBASE),
-+		.inp_state	=
-+			(void __iomem *) LPC32XX_GPIO_P3_INP_STATE(GPIOBASE),
-+		.outp_set	=
-+			(void __iomem *) LPC32XX_GPIO_P3_OUTP_SET(GPIOBASE),
-+		.outp_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P3_OUTP_CLR(GPIOBASE),
-+		.dir_set	=
-+			(void __iomem *) LPC32XX_GPIO_P2_DIR_SET(GPIOBASE),
-+		.dir_clr	=
-+			(void __iomem *) LPC32XX_GPIO_P2_DIR_CLR(GPIOBASE),
- 	},
- };
- 
-@@ -329,8 +349,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPIO_P0_GRP,
--			.ngpio			= GPIO_P0_MAX,
-+			.base			= LPC32XX_GPIO_P0_GRP,
-+			.ngpio			= LPC32XX_GPIO_P0_MAX,
- 			.names			= gpio_p0_names,
- 			.can_sleep		= 0,
- 		},
-@@ -344,8 +364,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPIO_P1_GRP,
--			.ngpio			= GPIO_P1_MAX,
-+			.base			= LPC32XX_GPIO_P1_GRP,
-+			.ngpio			= LPC32XX_GPIO_P1_MAX,
- 			.names			= gpio_p1_names,
- 			.can_sleep		= 0,
- 		},
-@@ -359,8 +379,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_output	= lpc32xx_gpio_dir_output_p012,
- 			.set			= lpc32xx_gpio_set_value_p012,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPIO_P2_GRP,
--			.ngpio			= GPIO_P2_MAX,
-+			.base			= LPC32XX_GPIO_P2_GRP,
-+			.ngpio			= LPC32XX_GPIO_P2_MAX,
- 			.names			= gpio_p2_names,
- 			.can_sleep		= 0,
- 		},
-@@ -374,8 +394,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_output	= lpc32xx_gpio_dir_output_p3,
- 			.set			= lpc32xx_gpio_set_value_p3,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPIO_P3_GRP,
--			.ngpio			= GPIO_P3_MAX,
-+			.base			= LPC32XX_GPIO_P3_GRP,
-+			.ngpio			= LPC32XX_GPIO_P3_MAX,
- 			.names			= gpio_p3_names,
- 			.can_sleep		= 0,
- 		},
-@@ -387,8 +407,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_input	= lpc32xx_gpio_dir_in_always,
- 			.get			= lpc32xx_gpi_get_value,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPI_P3_GRP,
--			.ngpio			= GPI_P3_MAX,
-+			.base			= LPC32XX_GPI_P3_GRP,
-+			.ngpio			= LPC32XX_GPI_P3_MAX,
- 			.names			= gpi_p3_names,
- 			.can_sleep		= 0,
- 		},
-@@ -400,8 +420,8 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
- 			.direction_output	= lpc32xx_gpio_dir_out_always,
- 			.set			= lpc32xx_gpo_set_value,
- 			.request		= lpc32xx_gpio_request,
--			.base			= GPO_P3_GRP,
--			.ngpio			= GPO_P3_MAX,
-+			.base			= LPC32XX_GPO_P3_GRP,
-+			.ngpio			= LPC32XX_GPO_P3_MAX,
- 			.names			= gpo_p3_names,
- 			.can_sleep		= 0,
- 		},
-diff --git a/arch/arm/mach-lpc32xx/include/mach/gpio.h b/arch/arm/mach-lpc32xx/include/mach/gpio.h
-index 8df2198..e95b113 100644
---- a/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -34,23 +34,23 @@
-  * GPIO pins: 8xP0 group, 24xP1 group, 13xP2 group, 6xP3 group
-  */
- 
--#define GPIO_P0_MAX 8
--#define GPIO_P1_MAX 24
--#define GPIO_P2_MAX 13
--#define GPIO_P3_MAX 6
--#define GPI_P3_MAX 28
--#define GPO_P3_MAX 24
-+#define LPC32XX_GPIO_P0_MAX 8
-+#define LPC32XX_GPIO_P1_MAX 24
-+#define LPC32XX_GPIO_P2_MAX 13
-+#define LPC32XX_GPIO_P3_MAX 6
-+#define LPC32XX_GPI_P3_MAX 28
-+#define LPC32XX_GPO_P3_MAX 24
- 
--#define GPIO_P0_GRP 0
--#define GPIO_P1_GRP (GPIO_P0_GRP + GPIO_P0_MAX)
--#define GPIO_P2_GRP (GPIO_P1_GRP + GPIO_P1_MAX)
--#define GPIO_P3_GRP (GPIO_P2_GRP + GPIO_P2_MAX)
--#define GPI_P3_GRP (GPIO_P3_GRP + GPIO_P3_MAX)
--#define GPO_P3_GRP (GPI_P3_GRP + GPI_P3_MAX)
-+#define LPC32XX_GPIO_P0_GRP 0
-+#define LPC32XX_GPIO_P1_GRP (LPC32XX_GPIO_P0_GRP + LPC32XX_GPIO_P0_MAX)
-+#define LPC32XX_GPIO_P2_GRP (LPC32XX_GPIO_P1_GRP + LPC32XX_GPIO_P1_MAX)
-+#define LPC32XX_GPIO_P3_GRP (LPC32XX_GPIO_P2_GRP + LPC32XX_GPIO_P2_MAX)
-+#define LPC32XX_GPI_P3_GRP (LPC32XX_GPIO_P3_GRP + LPC32XX_GPIO_P3_MAX)
-+#define LPC32XX_GPO_P3_GRP (LPC32XX_GPI_P3_GRP + LPC32XX_GPI_P3_MAX)
- 
- /*
-  * A specific GPIO can be selected with this macro
-- * ie, GPIO_05 can be selected with LPC32XX_GPIO(GPIO_P3_GRP, 5)
-+ * ie, GPIO_05 can be selected with LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
-  * See the LPC32x0 User's guide for GPIO group numbers
-  */
- #define LPC32XX_GPIO(x, y) ((x) + (y))
 diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
-index 9de37ee..adc932b 100644
+index 1ee148c..9de37ee 100644
 --- a/arch/arm/mach-lpc32xx/include/mach/platform.h
 +++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
-@@ -690,44 +690,44 @@
-  * GPIO Module Register offsets
+@@ -642,48 +642,48 @@
+  * Standard UART register offsets
   *
   */
--#define GPIO_P3_INP_STATE(x)		((x) + 0x000)
--#define GPIO_P3_OUTP_SET(x)		((x) + 0x004)
--#define GPIO_P3_OUTP_CLR(x)		((x) + 0x008)
--#define GPIO_P3_OUTP_STATE(x)		((x) + 0x00C)
--#define GPIO_P2_DIR_SET(x)		((x) + 0x010)
--#define GPIO_P2_DIR_CLR(x)		((x) + 0x014)
--#define GPIO_P2_DIR_STATE(x)		((x) + 0x018)
--#define GPIO_P2_INP_STATE(x)		((x) + 0x01C)
--#define GPIO_P2_OUTP_SET(x)		((x) + 0x020)
--#define GPIO_P2_OUTP_CLR(x)		((x) + 0x024)
--#define GPIO_P2_MUX_SET(x)		((x) + 0x028)
--#define GPIO_P2_MUX_CLR(x)		((x) + 0x02C)
--#define GPIO_P2_MUX_STATE(x)		((x) + 0x030)
--#define GPIO_P0_INP_STATE(x)		((x) + 0x040)
--#define GPIO_P0_OUTP_SET(x)		((x) + 0x044)
--#define GPIO_P0_OUTP_CLR(x)		((x) + 0x048)
--#define GPIO_P0_OUTP_STATE(x)		((x) + 0x04C)
--#define GPIO_P0_DIR_SET(x)		((x) + 0x050)
--#define GPIO_P0_DIR_CLR(x)		((x) + 0x054)
--#define GPIO_P0_DIR_STATE(x)		((x) + 0x058)
--#define GPIO_P1_INP_STATE(x)		((x) + 0x060)
--#define GPIO_P1_OUTP_SET(x)		((x) + 0x064)
--#define GPIO_P1_OUTP_CLR(x)		((x) + 0x068)
--#define GPIO_P1_OUTP_STATE(x)		((x) + 0x06C)
--#define GPIO_P1_DIR_SET(x)		((x) + 0x070)
--#define GPIO_P1_DIR_CLR(x)		((x) + 0x074)
--#define GPIO_P1_DIR_STATE(x)		((x) + 0x078)
--#define GPIO_P_MUX_SET(x)		((x) + 0x100)
--#define GPIO_P_MUX_CLR(x)		((x) + 0x104)
--#define GPIO_P_MUX_STATE(x)		((x) + 0x108)
--#define GPIO_P3_MUX_SET(x)		((x) + 0x110)
--#define GPIO_P3_MUX_CLR(x)		((x) + 0x114)
--#define GPIO_P3_MUX_STATE(x)		((x) + 0x118)
--#define GPIO_P0_MUX_SET(x)		((x) + 0x120)
--#define GPIO_P0_MUX_CLR(x)		((x) + 0x124)
--#define GPIO_P0_MUX_STATE(x)		((x) + 0x128)
--#define GPIO_P1_MUX_SET(x)		((x) + 0x130)
--#define GPIO_P1_MUX_CLR(x)		((x) + 0x134)
--#define GPIO_P1_MUX_STATE(x)		((x) + 0x138)
-+#define LPC32XX_GPIO_P3_INP_STATE(x)		((x) + 0x000)
-+#define LPC32XX_GPIO_P3_OUTP_SET(x)		((x) + 0x004)
-+#define LPC32XX_GPIO_P3_OUTP_CLR(x)		((x) + 0x008)
-+#define LPC32XX_GPIO_P3_OUTP_STATE(x)		((x) + 0x00C)
-+#define LPC32XX_GPIO_P2_DIR_SET(x)		((x) + 0x010)
-+#define LPC32XX_GPIO_P2_DIR_CLR(x)		((x) + 0x014)
-+#define LPC32XX_GPIO_P2_DIR_STATE(x)		((x) + 0x018)
-+#define LPC32XX_GPIO_P2_INP_STATE(x)		((x) + 0x01C)
-+#define LPC32XX_GPIO_P2_OUTP_SET(x)		((x) + 0x020)
-+#define LPC32XX_GPIO_P2_OUTP_CLR(x)		((x) + 0x024)
-+#define LPC32XX_GPIO_P2_MUX_SET(x)		((x) + 0x028)
-+#define LPC32XX_GPIO_P2_MUX_CLR(x)		((x) + 0x02C)
-+#define LPC32XX_GPIO_P2_MUX_STATE(x)		((x) + 0x030)
-+#define LPC32XX_GPIO_P0_INP_STATE(x)		((x) + 0x040)
-+#define LPC32XX_GPIO_P0_OUTP_SET(x)		((x) + 0x044)
-+#define LPC32XX_GPIO_P0_OUTP_CLR(x)		((x) + 0x048)
-+#define LPC32XX_GPIO_P0_OUTP_STATE(x)		((x) + 0x04C)
-+#define LPC32XX_GPIO_P0_DIR_SET(x)		((x) + 0x050)
-+#define LPC32XX_GPIO_P0_DIR_CLR(x)		((x) + 0x054)
-+#define LPC32XX_GPIO_P0_DIR_STATE(x)		((x) + 0x058)
-+#define LPC32XX_GPIO_P1_INP_STATE(x)		((x) + 0x060)
-+#define LPC32XX_GPIO_P1_OUTP_SET(x)		((x) + 0x064)
-+#define LPC32XX_GPIO_P1_OUTP_CLR(x)		((x) + 0x068)
-+#define LPC32XX_GPIO_P1_OUTP_STATE(x)		((x) + 0x06C)
-+#define LPC32XX_GPIO_P1_DIR_SET(x)		((x) + 0x070)
-+#define LPC32XX_GPIO_P1_DIR_CLR(x)		((x) + 0x074)
-+#define LPC32XX_GPIO_P1_DIR_STATE(x)		((x) + 0x078)
-+#define LPC32XX_GPIO_P_MUX_SET(x)		((x) + 0x100)
-+#define LPC32XX_GPIO_P_MUX_CLR(x)		((x) + 0x104)
-+#define LPC32XX_GPIO_P_MUX_STATE(x)		((x) + 0x108)
-+#define LPC32XX_GPIO_P3_MUX_SET(x)		((x) + 0x110)
-+#define LPC32XX_GPIO_P3_MUX_CLR(x)		((x) + 0x114)
-+#define LPC32XX_GPIO_P3_MUX_STATE(x)		((x) + 0x118)
-+#define LPC32XX_GPIO_P0_MUX_SET(x)		((x) + 0x120)
-+#define LPC32XX_GPIO_P0_MUX_CLR(x)		((x) + 0x124)
-+#define LPC32XX_GPIO_P0_MUX_STATE(x)		((x) + 0x128)
-+#define LPC32XX_GPIO_P1_MUX_SET(x)		((x) + 0x130)
-+#define LPC32XX_GPIO_P1_MUX_CLR(x)		((x) + 0x134)
-+#define LPC32XX_GPIO_P1_MUX_STATE(x)		((x) + 0x138)
+-#define UART_DLL_FIFO(x)		((x) + 0x00)
+-#define UART_DLM_IER(x)			((x) + 0x04)
+-#define UART_IIR_FCR(x)			((x) + 0x08)
+-#define UART_LCR_(x)			((x) + 0x0C)
+-#define UART_MODEM_CTRL(x)		((x) + 0x10)
+-#define UART_LSR_(x)			((x) + 0x14)
+-#define UART_MODEM_STATUS(x)		((x) + 0x18)
+-#define UART_RXLEV(x)			((x) + 0x1C)
++#define LPC32XX_UART_DLL_FIFO(x)		((x) + 0x00)
++#define LPC32XX_UART_DLM_IER(x)			((x) + 0x04)
++#define LPC32XX_UART_IIR_FCR(x)			((x) + 0x08)
++#define LPC32XX_UART_LCR_(x)			((x) + 0x0C)
++#define LPC32XX_UART_MODEM_CTRL(x)		((x) + 0x10)
++#define LPC32XX_UART_LSR_(x)			((x) + 0x14)
++#define LPC32XX_UART_MODEM_STATUS(x)		((x) + 0x18)
++#define LPC32XX_UART_RXLEV(x)			((x) + 0x1C)
  
- #endif
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 0612994..80958b9 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -48,10 +48,10 @@
  /*
-  * Mapped GPIOLIB GPIOs
+  *
+  * UART control structure offsets
+  *
   */
--#define SPI0_CS_GPIO	LPC32XX_GPIO(GPIO_P3_GRP, 5)
--#define LCD_POWER_GPIO	LPC32XX_GPIO(GPO_P3_GRP, 0)
--#define BKL_POWER_GPIO	LPC32XX_GPIO(GPO_P3_GRP, 4)
--#define LED_GPIO	LPC32XX_GPIO(GPO_P3_GRP, 1)
-+#define SPI0_CS_GPIO	LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
-+#define LCD_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
-+#define BKL_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
-+#define LED_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 1)
+-#define UARTCTL_CTRL(x)			((x) + 0x00)
+-#define UARTCTL_CLKMODE(x)		((x) + 0x04)
+-#define UARTCTL_CLOOP(x)		((x) + 0x08)
++#define LPC32XX_UARTCTL_CTRL(x)			((x) + 0x00)
++#define LPC32XX_UARTCTL_CLKMODE(x)		((x) + 0x04)
++#define LPC32XX_UARTCTL_CLOOP(x)		((x) + 0x08)
  
  /*
-  * AMBA LCD controller
+  * ctrl register definitions
+  */
+-#define UART_U3_MD_CTRL_EN		_BIT(11)
+-#define UART_IRRX6_INV_EN		_BIT(10)
+-#define UART_HDPX_EN			_BIT(9)
+-#define UART_UART6_IRDAMOD_BYPASS	_BIT(5)
+-#define RT_IRTX6_INV_EN			_BIT(4)
+-#define RT_IRTX6_INV_MIR_EN		_BIT(3)
+-#define RT_RX_IRPULSE_3_16_115K		_BIT(2)
+-#define RT_TX_IRPULSE_3_16_115K		_BIT(1)
+-#define UART_U5_ROUTE_TO_USB		_BIT(0)
++#define LPC32XX_UART_U3_MD_CTRL_EN		_BIT(11)
++#define LPC32XX_UART_IRRX6_INV_EN		_BIT(10)
++#define LPC32XX_UART_HDPX_EN			_BIT(9)
++#define LPC32XX_UART_UART6_IRDAMOD_BYPASS	_BIT(5)
++#define LPC32XX_RT_IRTX6_INV_EN			_BIT(4)
++#define LPC32XX_RT_IRTX6_INV_MIR_EN		_BIT(3)
++#define LPC32XX_RT_RX_IRPULSE_3_16_115K		_BIT(2)
++#define LPC32XX_RT_TX_IRPULSE_3_16_115K		_BIT(1)
++#define LPC32XX_UART_U5_ROUTE_TO_USB		_BIT(0)
+ 
+ /*
+  * clkmode register definitions
+  */
+-#define UART_ENABLED_CLOCKS(n)		(((n) >> 16) & 0x7F)
+-#define UART_ENABLED_CLOCK(n, u)	(((n) >> (16 + (u))) & 0x1)
+-#define UART_ENABLED_CLKS_ANY		_BIT(14)
+-#define UART_CLKMODE_OFF		0x0
+-#define UART_CLKMODE_ON			0x1
+-#define UART_CLKMODE_AUTO		0x2
+-#define UART_CLKMODE_MASK(u)		(0x3 << ((((u) - 3) * 2) + 4))
+-#define UART_CLKMODE_LOAD(m, u)		((m) << ((((u) - 3) * 2) + 4))
++#define LPC32XX_UART_ENABLED_CLOCKS(n)		(((n) >> 16) & 0x7F)
++#define LPC32XX_UART_ENABLED_CLOCK(n, u)	(((n) >> (16 + (u))) & 0x1)
++#define LPC32XX_UART_ENABLED_CLKS_ANY		_BIT(14)
++#define LPC32XX_UART_CLKMODE_OFF		0x0
++#define LPC32XX_UART_CLKMODE_ON			0x1
++#define LPC32XX_UART_CLKMODE_AUTO		0x2
++#define LPC32XX_UART_CLKMODE_MASK(u)		(0x3 << ((((u) - 3) * 2) + 4))
++#define LPC32XX_UART_CLKMODE_LOAD(m, u)		((m) << ((((u) - 3) * 2) + 4))
+ 
+ /*
+  *
+diff --git a/arch/arm/mach-lpc32xx/serial.c b/arch/arm/mach-lpc32xx/serial.c
+index def5003..3a0acfd 100644
+--- a/arch/arm/mach-lpc32xx/serial.c
++++ b/arch/arm/mach-lpc32xx/serial.c
+@@ -97,28 +97,32 @@ static struct uartinit uartinit_data[] __initdata = {
+ #ifdef CONFIG_ARCH_LPC32XX_UART5_ENABLE
+ 	{
+ 		.uart_ck_name = "uart5_ck",
+-		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 5),
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 5),
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL(CLKPWR_IOBASE),
+ 	},
+ #endif
+ #ifdef CONFIG_ARCH_LPC32XX_UART3_ENABLE
+ 	{
+ 		.uart_ck_name = "uart3_ck",
+-		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 3),
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 3),
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL(CLKPWR_IOBASE),
+ 	},
+ #endif
+ #ifdef CONFIG_ARCH_LPC32XX_UART4_ENABLE
+ 	{
+ 		.uart_ck_name = "uart4_ck",
+-		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 4),
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 4),
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL(CLKPWR_IOBASE),
+ 	},
+ #endif
+ #ifdef CONFIG_ARCH_LPC32XX_UART6_ENABLE
+ 	{
+ 		.uart_ck_name = "uart6_ck",
+-		.ck_mode_mask = UART_CLKMODE_LOAD(UART_CLKMODE_ON, 6),
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 6),
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL(CLKPWR_IOBASE),
+ 	},
+ #endif
+@@ -169,31 +173,32 @@ void __init lpc32xx_serial_init(void)
+ 	}
+ 
+ 	/* This needs to be done after all UART clocks are setup */
+-	writel(clkmodes, UARTCTL_CLKMODE(io_p2v(LPC32XX_UART_CTRL_BASE)));
++	writel(clkmodes,
++		LPC32XX_UARTCTL_CLKMODE(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ 	for (i = 0; i < ARRAY_SIZE(uartinit_data) - 1; i++) {
+ 		/* Force a flush of the RX FIFOs to work around a HW bug */
+ 		puart = serial_std_platform_data[i].membase;
+-		writel(0xC1, UART_IIR_FCR(puart));
+-		writel(0x00, UART_DLL_FIFO(puart));
++		writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
++		writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
+ 		clkmodes = 64;
+ 		while (clkmodes--)
+-			tmp = readl(UART_DLL_FIFO(puart));
+-		writel(0, UART_IIR_FCR(puart));
++			tmp = readl(LPC32XX_UART_DLL_FIFO(puart));
++		writel(0, LPC32XX_UART_IIR_FCR(puart));
+ 	}
+ 
+ 	/* IrDA pulsing support on UART6. This only enables the IrDA mux */
+-	tmp = readl(UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
++	tmp = readl(LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ #ifdef CONFIG_ARCH_LPC32XX_UART6_IRDAMODE
+-	tmp &= ~UART_UART6_IRDAMOD_BYPASS;
++	tmp &= ~LPC32XX_UART_UART6_IRDAMOD_BYPASS;
+ #else
+-	tmp |= UART_UART6_IRDAMOD_BYPASS;
++	tmp |= LPC32XX_UART_UART6_IRDAMOD_BYPASS;
+ #endif
+-	writel(tmp, UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
++	writel(tmp, LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ 
+ 	/* Disable UART5->USB transparent mode or USB won't work */
+-	tmp = readl(UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+-	tmp &= ~UART_U5_ROUTE_TO_USB;
+-	writel(tmp, UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
++	tmp = readl(LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
++	tmp &= ~LPC32XX_UART_U5_ROUTE_TO_USB;
++	writel(tmp, LPC32XX_UARTCTL_CTRL(io_p2v(LPC32XX_UART_CTRL_BASE)));
+ 
+ 	platform_add_devices(lpc32xx_serial_devs,
+ 		ARRAY_SIZE(lpc32xx_serial_devs));
 -- 
 1.6.6
