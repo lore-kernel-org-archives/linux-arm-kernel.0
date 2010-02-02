@@ -1,41 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 2 Feb 2010 12:19:34 +0530
-Subject: [PATCH 1/3] OMAP4: Add L2 Cache support
-In-Reply-To: <20100129143002.GD16712@n2100.arm.linux.org.uk>
-References: <1264765589-18353-1-git-send-email-santosh.shilimkar@ti.com>
-	<1264767365.4242.54.camel@pc1117.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C09C688C@dbde02.ent.ti.com>
-	<20100129143002.GD16712@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0A69934@dbde02.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 2 Feb 2010 09:54:02 +0200
+Subject: [PATCH 3/8] imx: BUG in clk_disable if the clock isn't enabled
+In-Reply-To: <1265040095-31656-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100201155625.GA22413@pengutronix.de>
+	<1265040095-31656-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100202075401.GA13952@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Since this code was used only ones in init, I haven't converted it to
-> > function. With clobber list as well as you know adding r12 to clobber
-> > list, compiler don't generate the save code and r11 can't be added to
-> > clobber list.
-> 
-> Well, we seem to have two places with the same code structure.  Let's
-> pull them together into a common function, such as:
-> 
-> void omap_smc1(u32 fn, u32 arg)
-> {
-> 	register u32 r12 asm("r12") = fn;
-> 	register u32 r0 asm("r0") = arg;
-> 	asm volatile(
-> 		"str r11, [sp], #-4\n"
-> 		"dsb\n"
-> 		"smc\n"
-> 		"ldr r11, [sp, #4]!"
-> 		: "+r" (r0), "+r" (r12)
-> 		:
-> 		: "r0-r10", "lr", "cc");
-> }
-> EXPORT_SYMBOL(omap_smc1);
-> 
-> The code there probably may not be Thumb-2 compatible.
-I will re-arrange the series and sent combined the errata + l2 support
-with above change since dependency.
+Hi Uwe,
 
-Regards,
-Santosh
+On Mon, Feb 01, 2010 at 05:01:30PM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/plat-mxc/clock.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> index 9e8fbd5..de99681 100644
+> --- a/arch/arm/plat-mxc/clock.c
+> +++ b/arch/arm/plat-mxc/clock.c
+> @@ -56,6 +56,7 @@ static void __clk_disable(struct clk *clk)
+>  	__clk_disable(clk->parent);
+>  	__clk_disable(clk->secondary);
+>  
+> +	BUG_ON(!clk->usecount);
+>  	if (!(--clk->usecount) && clk->disable)
+>  		clk->disable(clk);
+
+Is this necessary? Shouldn't WARN_ON be used instead?
+
+Citing include/asm-generic/bug.h: "Don't use BUG() or BUG_ON() unless there's 
+really no way out..."
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
