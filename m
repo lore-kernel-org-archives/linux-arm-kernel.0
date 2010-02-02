@@ -1,5 +1,5 @@
 From: jkosina@suse.cz (Jiri Kosina)
-Date: Tue, 2 Feb 2010 14:43:22 +0100 (CET)
+Date: Tue, 2 Feb 2010 14:44:12 +0100 (CET)
 Subject: [PATCH 21/25] imx: only define deprecated symbols
  conditionally
 In-Reply-To: <1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -17,7 +17,7 @@ References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LNX.2.00.1002021443020.15395@pobox.suse.cz>
+Message-ID: <alpine.LNX.2.00.1002021444050.15395@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -43,6 +43,10 @@ On Fri, 8 Jan 2010, Uwe Kleine-K?nig wrote:
 > Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
 > Cc: Jiri Kosina <jkosina@suse.cz>
 > Cc: Magnus Lilja <lilja.magnus@gmail.com>
+
+What is the status of this patch please? Doesn't seem to be inluded in
+linux-next as of today.
+
 > ---
 >  arch/arm/mach-mx2/Makefile            |    3 +++
 >  arch/arm/mach-mx3/Makefile            |    4 ++++
@@ -54,10 +58,7 @@ On Fri, 8 Jan 2010, Uwe Kleine-K?nig wrote:
 >  arch/arm/plat-mxc/include/mach/mx35.h |    2 ++
 >  arch/arm/plat-mxc/include/mach/mx3x.h |    2 ++
 >  9 files changed, 23 insertions(+), 0 deletions(-)
-
-What is the status of this patch please? Doesn't seem to be inluded in 
-linux-next as of today.
-
+> 
 > diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
 > index 3710893..a9c94e3 100644
 > --- a/arch/arm/mach-mx2/Makefile
