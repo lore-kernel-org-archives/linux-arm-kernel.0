@@ -1,727 +1,938 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 2 Feb 2010 10:31:03 +0000
-Subject: [PATCH v3 2/7] ARM: S5P6442: Add clock support for S5P6442
-In-Reply-To: <1265106049-660-1-git-send-email-kgene.kim@samsung.com>
-References: <1265106049-660-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100202103103.GQ9153@trinity.fluff.org>
+From: epeer@tmtservices.co.za (Edwin Peer)
+Date: Tue, 2 Feb 2010 14:18:34 +0200
+Subject: [PATCH - v6] support for Embedian MXM-8x10
+Message-ID: <201002021418.34815.epeer@tmtservices.co.za>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2010 at 07:20:49PM +0900, Kukjin Kim wrote:
-> This patch adds clock support for S5P6442. This patch adds the clock
-> register definitions and the various system clocks in S5P6442.
-> 
-> Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
-> Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s5p6442/Makefile                  |    2 +-
->  arch/arm/mach-s5p6442/clock.c                   |  444 +++++++++++++++++++++++
->  arch/arm/mach-s5p6442/include/mach/pwm-clock.h  |   69 ++++
->  arch/arm/mach-s5p6442/include/mach/regs-clock.h |  103 ++++++
->  arch/arm/mach-s5p6442/include/mach/tick.h       |   26 ++
->  5 files changed, 643 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-s5p6442/Makefile
->  create mode 100644 arch/arm/mach-s5p6442/clock.c
->  create mode 100644 arch/arm/mach-s5p6442/include/mach/pwm-clock.h
->  create mode 100644 arch/arm/mach-s5p6442/include/mach/regs-clock.h
->  create mode 100644 arch/arm/mach-s5p6442/include/mach/tick.h
-> 
-> diff --git a/arch/arm/mach-s5p6442/Makefile b/arch/arm/mach-s5p6442/Makefile
-> index 0a45d01..f1b3e75 100644
-> --- a/arch/arm/mach-s5p6442/Makefile
-> +++ b/arch/arm/mach-s5p6442/Makefile
-> @@ -12,7 +12,7 @@ obj-				:=
->  
->  # Core support for S5P6442 system
->  
-> -obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o
-> +obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o clock.o
->  
->  # machine support
->  
-> diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
-> new file mode 100644
-> index 0000000..3ea9092
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p6442/clock.c
-> @@ -0,0 +1,444 @@
-> +/* linux/arch/arm/mach-s5p6442/clock.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * S5P6442 - Clock support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/list.h>
-> +#include <linux/errno.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/io.h>
-> +
-> +#include <mach/map.h>
-> +
-> +#include <plat/cpu-freq.h>
-> +#include <mach/regs-clock.h>
-> +#include <plat/clock.h>
-> +#include <plat/cpu.h>
-> +#include <plat/pll.h>
-> +#include <plat/s5p-clock.h>
-> +#include <plat/clock-clksrc.h>
-> +#include <plat/s5p6442.h>
-> +
-> +static struct clksrc_clk clk_mout_apll = {
-> +	.clk	= {
-> +		.name		= "mout_apll",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_apll,
-> +	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 0, .size = 1 },
-> +};
-> +
-> +static struct clksrc_clk clk_mout_mpll = {
-> +	.clk = {
-> +		.name		= "mout_mpll",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_mpll,
-> +	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 4, .size = 1 },
-> +};
-> +
-> +static struct clksrc_clk clk_mout_epll = {
-> +	.clk	= {
-> +		.name		= "mout_epll",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_epll,
-> +	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1 },
-> +};
-> +
-> +/* Possible clock sources for ARM Mux */
-> +static struct clk *clk_src_arm_list[] = {
-> +	[1] = &clk_mout_apll.clk,
-> +	[2] = &clk_mout_mpll.clk,
-> +};
-> +
-> +static struct clksrc_sources clk_src_arm = {
-> +	.sources	= clk_src_arm_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_arm_list),
-> +};
-> +
-> +static struct clksrc_clk clk_mout_arm = {
-> +	.clk	= {
-> +		.name		= "mout_arm",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_arm,
-> +	.reg_src	= { .reg = S5P_CLK_MUX_STAT0, .shift = 16, .size = 3 },
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_a2m_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_A2M_MASK;
-> +	ratio >>= S5P_CLKDIV0_A2M_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
+Hi Eric,
 
-you could re-use the clksrc-clock for this. directly if you don't
-mind have the ability to set the rate too. Otherwise we can export
-an opts with just a get-rate call on them.
+Thanks again for your review. Much appreciated.
 
-> +static struct clk clk_dout_a2m = {
-> +	.name		= "dout_a2m",
-> +	.id		= -1,
-> +	.parent		= &clk_mout_apll.clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_a2m_get_rate,
-> +	},
-> +};
-> +
-> +/* Possible clock sources for D0 Mux */
-> +static struct clk *clk_src_d0_list[] = {
-> +	[1] = &clk_mout_mpll.clk,
-> +	[2] = &clk_dout_a2m,
-> +};
-> +
-> +static struct clksrc_sources clk_src_d0 = {
-> +	.sources	= clk_src_d0_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_d0_list),
-> +};
-> +
-> +static struct clksrc_clk clk_mout_d0 = {
-> +	.clk = {
-> +		.name		= "mout_d0",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_d0,
-> +	.reg_src	= { .reg = S5P_CLK_MUX_STAT0, .shift = 20, .size = 3 },
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_apll_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_APLL_MASK;
-> +	ratio >>= S5P_CLKDIV0_APLL_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
-> +
-> +static struct clk clk_dout_apll = {
-> +	.name		= "dout_apll",
-> +	.id		= -1,
-> +	.parent		= &clk_mout_arm.clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_apll_get_rate,
-> +	},
-> +};
-> +
-> +/* Possible clock sources for D0SYNC Mux */
-> +static struct clk *clk_src_d0sync_list[] = {
-> +	[1] = &clk_mout_d0.clk,
-> +	[2] = &clk_dout_apll,
-> +};
-> +
-> +static struct clksrc_sources clk_src_d0sync = {
-> +	.sources	= clk_src_d0sync_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_d0sync_list),
-> +};
-> +
-> +static struct clksrc_clk clk_mout_d0sync = {
-> +	.clk	= {
-> +		.name		= "mout_d0sync",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_d0sync,
-> +	.reg_src	= { .reg = S5P_CLK_MUX_STAT1, .shift = 28, .size = 3 },
-> +};
-> +
-> +/* Possible clock sources for D1 Mux */
-> +static struct clk *clk_src_d1_list[] = {
-> +	[1] = &clk_mout_mpll.clk,
-> +	[2] = &clk_dout_a2m,
-> +};
-> +
-> +static struct clksrc_sources clk_src_d1 = {
-> +	.sources	= clk_src_d1_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_d1_list),
-> +};
-> +
-> +static struct clksrc_clk clk_mout_d1 = {
-> +	.clk	= {
-> +		.name		= "mout_d1",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_d1,
-> +	.reg_src	= { .reg = S5P_CLK_MUX_STAT0, .shift = 24, .size = 3 },
-> +};
-> +
-> +/* Possible clock sources for D1SYNC Mux */
-> +static struct clk *clk_src_d1sync_list[] = {
-> +	[1] = &clk_mout_d1.clk,
-> +	[2] = &clk_dout_apll,
-> +};
-> +
-> +static struct clksrc_sources clk_src_d1sync = {
-> +	.sources	= clk_src_d1sync_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_d1sync_list),
-> +};
-> +
-> +static struct clksrc_clk clk_mout_d1sync = {
-> +	.clk	= {
-> +		.name		= "mout_d1sync",
-> +		.id		= -1,
-> +	},
-> +	.sources	= &clk_src_d1sync,
-> +	.reg_src	= { .reg = S5P_CLK_MUX_STAT1, .shift = 24, .size = 3 },
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_d1clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_D1CLK_MASK;
-> +	ratio >>= S5P_CLKDIV0_D1CLK_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
-> +
-> +static struct clk clk_dout_d1clk = {
-> +	.name		= "dout_d1clk",
-> +	.id		= -1,
-> +	.parent		= &clk_mout_d1sync.clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_d1clk_get_rate,
-> +	},
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_d0clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_D0CLK_MASK;
-> +	ratio >>= S5P_CLKDIV0_D0CLK_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
-> +
-> +static struct clk clk_dout_d0clk = {
-> +	.name		= "dout_d0clk",
-> +	.id		= -1,
-> +	.parent		= &clk_mout_d0sync.clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_d0clk_get_rate,
-> +	},
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_p0clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_P0CLK_MASK;
-> +	ratio >>= S5P_CLKDIV0_P0CLK_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
-> +
-> +static struct clk clk_dout_p0clk = {
-> +	.name		= "dout_p0clk",
-> +	.id		= -1,
-> +	.parent		= &clk_dout_d0clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_p0clk_get_rate,
-> +	},
-> +};
-> +
-> +static unsigned long s5p6442_clk_dout_p1clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate = clk_get_rate(clk->parent);
-> +	unsigned int ratio;
-> +
-> +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLKDIV0_P1CLK_MASK;
-> +	ratio >>= S5P_CLKDIV0_P1CLK_SHIFT;
-> +
-> +	return rate / (ratio + 1);
-> +}
-> +
-> +static struct clk clk_dout_p1clk = {
-> +	.name		= "dout_p1clk",
-> +	.id		= -1,
-> +	.parent		= &clk_dout_d1clk,
-> +	.ops		= &(struct clk_ops) {
-> +		.get_rate	= s5p6442_clk_dout_p1clk_get_rate,
-> +	},
-> +};
-> +
-> +int s5p6442_clk_ip3_ctrl(struct clk *clk, int enable)
-> +{
-> +	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
-> +}
-> +
-> +/* Clock initialisation code */
-> +static struct clksrc_clk *init_parents[] = {
-> +	&clk_mout_apll,
-> +	&clk_mout_mpll,
-> +	&clk_mout_epll,
-> +	&clk_mout_arm,
-> +	&clk_mout_d0,
-> +	&clk_mout_d0sync,
-> +	&clk_mout_d1,
-> +	&clk_mout_d1sync,
-> +};
-> +
-> +void __init_or_cpufreq s5p6442_setup_clocks(void)
-> +{
-> +	struct clk *xtal_clk;
-> +	struct clk *arm_clk;
-> +	struct clk *hclkd0_clk;
-> +	struct clk *hclkd1_clk;
-> +	struct clk *pclkd0_clk;
-> +	struct clk *pclkd1_clk;
-> +
-> +	unsigned long xtal;
-> +	unsigned long arm;
-> +	unsigned long hclkd0 = 0;
-> +	unsigned long hclkd1 = 0;
-> +	unsigned long pclkd0 = 0;
-> +	unsigned long pclkd1 = 0;
-> +
-> +	unsigned long apll;
-> +	unsigned long mpll;
-> +	unsigned long epll;
-> +	unsigned int ptr;
-> +
-> +	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-> +
-> +	xtal_clk = clk_get(NULL, "xtal");
-> +	BUG_ON(IS_ERR(xtal_clk));
-> +
-> +	xtal = clk_get_rate(xtal_clk);
-> +	clk_put(xtal_clk);
-> +
-> +	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-> +
-> +	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-> +	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
-> +	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-> +
-> +	printk(KERN_INFO "S5P6440: PLL settings, A=%ld, M=%ld, E=%ld",
-> +			apll, mpll, epll);
-> +
-> +	clk_fout_apll.rate = apll;
-> +	clk_fout_mpll.rate = mpll;
-> +	clk_fout_epll.rate = epll;
-> +
-> +	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
-> +		s3c_set_clksrc(init_parents[ptr], true);
-> +
-> +	arm_clk = clk_get(NULL, "dout_apll");
-> +	BUG_ON(IS_ERR(arm_clk));
-> +
-> +	arm = clk_get_rate(arm_clk);
-> +	clk_put(arm_clk);
-> +
-> +	hclkd0_clk = clk_get(NULL, "dout_d0clk");
-> +	BUG_ON(IS_ERR(hclkd0_clk));
-> +
-> +	hclkd0 = clk_get_rate(hclkd0_clk);
-> +	clk_put(hclkd0_clk);
-> +
-> +	pclkd0_clk = clk_get(NULL, "dout_p0clk");
-> +	BUG_ON(IS_ERR(pclkd0_clk));
-> +
-> +	pclkd0 = clk_get_rate(pclkd0_clk);
-> +	clk_put(pclkd0_clk);
-> +
-> +	hclkd1_clk = clk_get(NULL, "dout_d1clk");
-> +	BUG_ON(IS_ERR(hclkd1_clk));
-> +
-> +	hclkd1 = clk_get_rate(hclkd1_clk);
-> +	clk_put(hclkd1_clk);
-> +
-> +	pclkd1_clk = clk_get(NULL, "dout_p1clk");
-> +	BUG_ON(IS_ERR(pclkd1_clk));
-> +
-> +	pclkd1 = clk_get_rate(pclkd1_clk);
-> +	clk_put(pclkd1_clk);
-> +
-> +	printk(KERN_INFO "S5P6442: HCLKD0=%ld, HCLKD1=%ld, PCLKD0=%ld, PCLKD1=%ld\n",
-> +			hclkd0, hclkd1, pclkd0, pclkd1);
-> +
-> +	/* For backward compatibility */
-> +	clk_f.rate = arm;
-> +	clk_h.rate = hclkd1;
-> +	clk_p.rate = pclkd1;
-> +
-> +	clk_dout_p1clk.rate = clk_p.rate;
-> +}
-> +
-> +static struct clk init_clocks[] = {
-> +	{
-> +		.name		= "systimer",
-> +		.id		= -1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<16),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 0,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<17),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<18),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 2,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<19),
-> +	}, {
-> +		.name		= "timers",
-> +		.id		= -1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<23),
-> +	},
-> +};
-> +
-> +static struct clk *clks[] __initdata = {
-> +	&clk_ext,
-> +	&clk_epll,
-> +	&clk_mout_apll.clk,
-> +	&clk_mout_mpll.clk,
-> +	&clk_mout_epll.clk,
-> +	&clk_mout_arm.clk,
-> +	&clk_mout_d0.clk,
-> +	&clk_mout_d0sync.clk,
-> +	&clk_mout_d1.clk,
-> +	&clk_mout_d1sync.clk,
-> +	&clk_dout_apll,
-> +	&clk_dout_a2m,
-> +	&clk_dout_d0clk,
-> +	&clk_dout_p0clk,
-> +	&clk_dout_d1clk,
-> +	&clk_dout_p1clk,
-> +};
-> +
-> +void __init s5p6442_register_clocks(void)
-> +{
-> +	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-> +
-> +	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> +
-> +	s3c_pwmclk_init();
-> +}
-> diff --git a/arch/arm/mach-s5p6442/include/mach/pwm-clock.h b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
-> new file mode 100644
-> index 0000000..15e8525
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
-> @@ -0,0 +1,69 @@
-> +/* linux/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
-> + *
-> + * Copyright 2008 Simtec Electronics
-> + *      Ben Dooks <ben@simtec.co.uk>
-> + *      http://armlinux.simtec.co.uk/
-> + *
-> + * Copyright 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * Based on arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
-> + *
-> + * S5P6442 - pwm clock and timer support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_PWMCLK_H
-> +#define __ASM_ARCH_PWMCLK_H __FILE__
-> +
-> +/**
-> + * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
-> + * @cfg: The timer TCFG1 register bits shifted down to 0.
-> + *
-> + * Return true if the given configuration from TCFG1 is a TCLK instead
-> + * any of the TDIV clocks.
-> + */
-> +static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
-> +{
-> +	return tcfg == S3C2410_TCFG1_MUX_TCLK;
-> +}
-> +
-> +/**
-> + * tcfg_to_divisor() - convert tcfg1 setting to a divisor
-> + * @tcfg1: The tcfg1 setting, shifted down.
-> + *
-> + * Get the divisor value for the given tcfg1 setting. We assume the
-> + * caller has already checked to see if this is not a TCLK source.
-> + */
-> +static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
-> +{
-> +	return 1 << (1 + tcfg1);
-> +}
-> +
-> +/**
-> + * pwm_tdiv_has_div1() - does the tdiv setting have a /1
-> + *
-> + * Return true if we have a /1 in the tdiv setting.
-> + */
-> +static inline unsigned int pwm_tdiv_has_div1(void)
-> +{
-> +	return 0;
-> +}
-> +
-> +/**
-> + * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
-> + * @div: The divisor to calculate the bit information for.
-> + *
-> + * Turn a divisor into the necessary bit field for TCFG1.
-> + */
-> +static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
-> +{
-> +	return ilog2(div) - 1;
-> +}
-> +
-> +#define S3C_TCFG1_MUX_TCLK S3C2410_TCFG1_MUX_TCLK
-> +
-> +#endif /* __ASM_ARCH_PWMCLK_H */
-> diff --git a/arch/arm/mach-s5p6442/include/mach/regs-clock.h b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
-> new file mode 100644
-> index 0000000..d8360b5
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
-> @@ -0,0 +1,103 @@
-> +/* linux/arch/arm/mach-s5p6442/include/mach/regs-clock.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * S5P6442 - Clock register definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_REGS_CLOCK_H
-> +#define __ASM_ARCH_REGS_CLOCK_H __FILE__
-> +
-> +#include <mach/map.h>
-> +
-> +#define S5P_CLKREG(x)		(S3C_VA_SYS + (x))
-> +
-> +#define S5P_APLL_LOCK		S5P_CLKREG(0x00)
-> +#define S5P_MPLL_LOCK		S5P_CLKREG(0x08)
-> +#define S5P_EPLL_LOCK		S5P_CLKREG(0x10)
-> +#define S5P_VPLL_LOCK		S5P_CLKREG(0x20)
-> +
-> +#define S5P_APLL_CON		S5P_CLKREG(0x100)
-> +#define S5P_MPLL_CON		S5P_CLKREG(0x108)
-> +#define S5P_EPLL_CON		S5P_CLKREG(0x110)
-> +#define S5P_VPLL_CON		S5P_CLKREG(0x120)
-> +
-> +#define S5P_CLK_SRC0		S5P_CLKREG(0x200)
-> +#define S5P_CLK_SRC1		S5P_CLKREG(0x204)
-> +#define S5P_CLK_SRC2		S5P_CLKREG(0x208)
-> +#define S5P_CLK_SRC3		S5P_CLKREG(0x20C)
-> +#define S5P_CLK_SRC4		S5P_CLKREG(0x210)
-> +#define S5P_CLK_SRC5		S5P_CLKREG(0x214)
-> +#define S5P_CLK_SRC6		S5P_CLKREG(0x218)
-> +
-> +#define S5P_CLK_SRC_MASK0	S5P_CLKREG(0x280)
-> +#define S5P_CLK_SRC_MASK1	S5P_CLKREG(0x284)
-> +
-> +#define S5P_CLK_DIV0		S5P_CLKREG(0x300)
-> +#define S5P_CLK_DIV1		S5P_CLKREG(0x304)
-> +#define S5P_CLK_DIV2		S5P_CLKREG(0x308)
-> +#define S5P_CLK_DIV3		S5P_CLKREG(0x30C)
-> +#define S5P_CLK_DIV4		S5P_CLKREG(0x310)
-> +#define S5P_CLK_DIV5		S5P_CLKREG(0x314)
-> +#define S5P_CLK_DIV6		S5P_CLKREG(0x318)
-> +
-> +#define S5P_CLKGATE_IP3		S5P_CLKREG(0x46C)
-> +
-> +/* CLK_OUT */
-> +#define S5P_CLK_OUT_SHIFT	(12)
-> +#define S5P_CLK_OUT_MASK	(0x1F << S5P_CLK_OUT_SHIFT)
-> +#define S5P_CLK_OUT		S5P_CLKREG(0x500)
-> +
-> +#define S5P_CLK_DIV_STAT0	S5P_CLKREG(0x1000)
-> +#define S5P_CLK_DIV_STAT1	S5P_CLKREG(0x1004)
-> +
-> +#define S5P_CLK_MUX_STAT0	S5P_CLKREG(0x1100)
-> +#define S5P_CLK_MUX_STAT1	S5P_CLKREG(0x1104)
-> +
-> +#define S5P_MDNIE_SEL		S5P_CLKREG(0x7008)
-> +
-> +/* Register Bit definition */
-> +#define S5P_EPLL_EN     		(1<<31)
-> +#define S5P_EPLL_MASK   		0xffffffff
-> +#define S5P_EPLLVAL(_m, _p, _s)   	((_m) << 16 | ((_p) << 8) | ((_s)))
-> +
-> +/* CLKDIV0 */
-> +#define S5P_CLKDIV0_APLL_SHIFT		(0)
-> +#define S5P_CLKDIV0_APLL_MASK		(0x7 << S5P_CLKDIV0_APLL_SHIFT)
-> +#define S5P_CLKDIV0_A2M_SHIFT		(4)
-> +#define S5P_CLKDIV0_A2M_MASK		(0x7 << S5P_CLKDIV0_A2M_SHIFT)
-> +#define S5P_CLKDIV0_D0CLK_SHIFT		(16)
-> +#define S5P_CLKDIV0_D0CLK_MASK		(0xF << S5P_CLKDIV0_D0CLK_SHIFT)
-> +#define S5P_CLKDIV0_P0CLK_SHIFT		(20)
-> +#define S5P_CLKDIV0_P0CLK_MASK		(0x7 << S5P_CLKDIV0_P0CLK_SHIFT)
-> +#define S5P_CLKDIV0_D1CLK_SHIFT		(24)
-> +#define S5P_CLKDIV0_D1CLK_MASK		(0xF << S5P_CLKDIV0_D1CLK_SHIFT)
-> +#define S5P_CLKDIV0_P1CLK_SHIFT		(28)
-> +#define S5P_CLKDIV0_P1CLK_MASK		(0x7 << S5P_CLKDIV0_P1CLK_SHIFT)
-> +
-> +/* Clock MUX status Registers */
-> +#define S5P_CLK_MUX_STAT0_APLL_SHIFT	(0)
-> +#define S5P_CLK_MUX_STAT0_APLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_APLL_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_MPLL_SHIFT	(4)
-> +#define S5P_CLK_MUX_STAT0_MPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_MPLL_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_EPLL_SHIFT	(8)
-> +#define S5P_CLK_MUX_STAT0_EPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_EPLL_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_VPLL_SHIFT	(12)
-> +#define S5P_CLK_MUX_STAT0_VPLL_MASK	(0x7 << S5P_CLK_MUX_STAT0_VPLL_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_MUXARM_SHIFT	(16)
-> +#define S5P_CLK_MUX_STAT0_MUXARM_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXARM_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_MUXD0_SHIFT	(20)
-> +#define S5P_CLK_MUX_STAT0_MUXD0_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXD0_SHIFT)
-> +#define S5P_CLK_MUX_STAT0_MUXD1_SHIFT	(24)
-> +#define S5P_CLK_MUX_STAT0_MUXD1_MASK	(0x7 << S5P_CLK_MUX_STAT0_MUXD1_SHIFT)
-> +#define S5P_CLK_MUX_STAT1_D1SYNC_SHIFT	(24)
-> +#define S5P_CLK_MUX_STAT1_D1SYNC_MASK	(0x7 << S5P_CLK_MUX_STAT1_D1SYNC_SHIFT)
-> +#define S5P_CLK_MUX_STAT1_D0SYNC_SHIFT	(28)
-> +#define S5P_CLK_MUX_STAT1_D0SYNC_MASK	(0x7 << S5P_CLK_MUX_STAT1_D0SYNC_SHIFT)
-> +
-> +#endif /* __ASM_ARCH_REGS_CLOCK_H */
-> diff --git a/arch/arm/mach-s5p6442/include/mach/tick.h b/arch/arm/mach-s5p6442/include/mach/tick.h
-> new file mode 100644
-> index 0000000..e1d4cab
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p6442/include/mach/tick.h
-> @@ -0,0 +1,26 @@
-> +/* linux/arch/arm/mach-s5p6442/include/mach/tick.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * Based on arch/arm/mach-s3c6400/include/mach/tick.h
-> + *
-> + * S5P6442 - Timer tick support definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_TICK_H
-> +#define __ASM_ARCH_TICK_H __FILE__
-> +
-> +static inline u32 s3c24xx_ostimer_pending(void)
-> +{
-> +	u32 pend = __raw_readl(VA_VIC0 + VIC_RAW_STATUS);
-> +	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
-> +}
-> +
-> +#define TICK_MAX	(0xffffffff)
-> +
-> +#endif /* __ASM_ARCH_TICK_H */
-> -- 
-> 1.6.2.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This version uses int instead of float values for max_speed_hz in mcp251x_board_info.
 
--- 
--- 
-Ben
+Patch is now against 2.6.33-rc6 (not that it made any difference from -rc4).
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Regards,
+Edwin Peer
+
+Signed-off-by: Edwin Peer <epeer@tmtservices.co.za>
+---
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/Kconfig linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/Kconfig
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/Kconfig	2010-02-02 11:20:15.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/Kconfig	2010-02-02 11:17:26.000000000 +0200
+@@ -115,6 +115,11 @@ config MACH_CM_X300
+ 	select CPU_PXA310
+ 	select HAVE_PWM
+ 
++config MACH_CAPC7117
++	bool "Embedian CAPC-7117 evaluation kit based on the MXM-8x10 CoM"
++	select CPU_PXA320
++	select PXA3xx
++
+ config ARCH_GUMSTIX
+ 	bool "Gumstix XScale 255 boards"
+ 	select PXA25x
+@@ -492,6 +497,11 @@ config MACH_TOSA
+ 	select PXA25x
+ 	select PXA_HAVE_BOARD_IRQS
+ 
++config MACH_ICONTROL
++	bool "TMT iControl/SafeTCam based on the MXM-8x10 CoM"
++	select CPU_PXA320
++	select PXA3xx
++
+ config ARCH_PXA_ESERIES
+ 	bool "PXA based Toshiba e-series PDAs"
+ 	select PXA25x
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/Makefile linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/Makefile
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/Makefile	2010-02-02 11:20:15.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/Makefile	2010-02-02 11:17:26.000000000 +0200
+@@ -48,6 +48,7 @@ obj-$(CONFIG_MACH_ARMCORE)	+= cm-x2xx-pc
+ endif
+ obj-$(CONFIG_MACH_EM_X270)	+= em-x270.o
+ obj-$(CONFIG_MACH_CM_X300)      += cm-x300.o
++obj-$(CONFIG_MACH_CAPC7117)     += capc7117.o mxm8x10.o
+ obj-$(CONFIG_ARCH_GUMSTIX)	+= gumstix.o
+ obj-$(CONFIG_GUMSTIX_AM200EPD)	+= am200epd.o
+ obj-$(CONFIG_GUMSTIX_AM300EPD)	+= am300epd.o
+@@ -82,6 +83,7 @@ obj-$(CONFIG_PXA_SHARP_Cxx00)	+= spitz.o
+ obj-$(CONFIG_CORGI_SSP_DEPRECATED)	+= corgi_ssp.o corgi_lcd.o
+ obj-$(CONFIG_MACH_POODLE)	+= poodle.o
+ obj-$(CONFIG_MACH_TOSA)		+= tosa.o
++obj-$(CONFIG_MACH_ICONTROL)     += icontrol.o mxm8x10.o
+ obj-$(CONFIG_ARCH_PXA_ESERIES)	+= eseries.o
+ obj-$(CONFIG_MACH_E330)		+= e330.o
+ obj-$(CONFIG_MACH_E350)		+= e350.o
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/capc7117.c linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/capc7117.c
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/capc7117.c	1970-01-01 02:00:00.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/capc7117.c	2010-02-02 11:17:26.000000000 +0200
+@@ -0,0 +1,158 @@
++/*
++ * linux/arch/arm/mach-pxa/capc7117.c
++ *
++ * Support for the Embedian CAPC-7117 Evaluation Kit
++ * based on the Embedian MXM-8x10 Computer on Module
++ *
++ * Copyright (C) 2009 Embedian Inc.
++ * Copyright (C) 2009 TMT Services & Supplies (Pty) Ltd.
++ *
++ * 2007-09-04: eric miao <eric.y.miao@gmail.com>
++ *             rewrite to align with latest kernel
++ *
++ * 2010-01-09: Edwin Peer <epeer@tmtservices.co.za>
++ *             Hennie van der Merwe <hvdmerwe@tmtservices.co.za>
++ *             rework for upstream merge
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/irq.h>
++#include <linux/platform_device.h>
++#include <linux/ata_platform.h>
++#include <linux/serial_8250.h>
++#include <linux/gpio.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/pxa320.h>
++#include <mach/mxm8x10.h>
++
++#include "generic.h"
++
++/* IDE (PATA) Support */
++static struct pata_platform_info pata_platform_data = {
++	.ioport_shift = 1
++};
++
++static struct resource capc7117_ide_resources[] = {
++	[0] = {
++	       .start = 0x11000020,
++	       .end = 0x1100003f,
++	       .flags = IORESOURCE_MEM
++	},
++	[1] = {
++	       .start = 0x1100001c,
++	       .end = 0x1100001c,
++	       .flags = IORESOURCE_MEM
++	},
++	[2] = {
++	       .start = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO76)),
++	       .end = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO76)),
++	       .flags = IORESOURCE_IRQ | IRQF_TRIGGER_RISING
++	}
++};
++
++static struct platform_device capc7117_ide_device = {
++	.name = "pata_platform",
++	.num_resources = ARRAY_SIZE(capc7117_ide_resources),
++	.resource = capc7117_ide_resources,
++	.dev = {
++		.platform_data = &pata_platform_data,
++		.coherent_dma_mask = ~0		/* grumble */
++	}
++};
++
++static void __init capc7117_ide_init(void)
++{
++	platform_device_register(&capc7117_ide_device);
++}
++
++/* TI16C752 UART support */
++#define	TI16C752_FLAGS		(UPF_BOOT_AUTOCONF | \
++					UPF_IOREMAP | \
++					UPF_BUGGY_UART | \
++					UPF_SKIP_TEST)
++#define	TI16C752_UARTCLK	(22118400)
++static struct plat_serial8250_port ti16c752_platform_data[] = {
++	[0] = {
++	       .mapbase = 0x14000000,
++	       .irq = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO78)),
++	       .irqflags = IRQF_TRIGGER_RISING,
++	       .flags = TI16C752_FLAGS,
++	       .iotype = UPIO_MEM,
++	       .regshift = 1,
++	       .uartclk = TI16C752_UARTCLK
++	},
++	[1] = {
++	       .mapbase = 0x14000040,
++	       .irq = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO79)),
++	       .irqflags = IRQF_TRIGGER_RISING,
++	       .flags = TI16C752_FLAGS,
++	       .iotype = UPIO_MEM,
++	       .regshift = 1,
++	       .uartclk = TI16C752_UARTCLK
++	},
++	[2] = {
++	       .mapbase = 0x14000080,
++	       .irq = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO80)),
++	       .irqflags = IRQF_TRIGGER_RISING,
++	       .flags = TI16C752_FLAGS,
++	       .iotype = UPIO_MEM,
++	       .regshift = 1,
++	       .uartclk = TI16C752_UARTCLK
++	},
++	[3] = {
++	       .mapbase = 0x140000c0,
++	       .irq = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO81)),
++	       .irqflags = IRQF_TRIGGER_RISING,
++	       .flags = TI16C752_FLAGS,
++	       .iotype = UPIO_MEM,
++	       .regshift = 1,
++	       .uartclk = TI16C752_UARTCLK
++	},
++	[4] = {
++	       /* end of array */
++	}
++};
++
++static struct platform_device ti16c752_device = {
++	.name = "serial8250",
++	.id = PLAT8250_DEV_PLATFORM,
++	.dev = {
++		.platform_data = ti16c752_platform_data
++	}
++};
++
++static void __init capc7117_uarts_init(void)
++{
++	platform_device_register(&ti16c752_device);
++}
++
++static void __init capc7117_init(void)
++{
++	/* Init CoM */
++	mxm_8x10_barebones_init();
++
++	/* Init evaluation board peripherals */
++	mxm_8x10_ac97_init();
++	mxm_8x10_usb_host_init();
++	mxm_8x10_mmc_init();
++
++	capc7117_uarts_init();
++	capc7117_ide_init();
++}
++
++MACHINE_START(CAPC7117,
++	      "Embedian CAPC-7117 evaluation kit based on the MXM-8x10 CoM")
++	.phys_io = 0x40000000,
++	.boot_params = 0xa0000100,
++	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
++	.map_io = pxa_map_io,
++	.init_irq = pxa3xx_init_irq,
++	.timer = &pxa_timer,
++	.init_machine = capc7117_init
++MACHINE_END
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/icontrol.c linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/icontrol.c
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/icontrol.c	1970-01-01 02:00:00.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/icontrol.c	2010-02-02 11:18:37.000000000 +0200
+@@ -0,0 +1,202 @@
++/*
++ * linux/arch/arm/mach-pxa/icontrol.c
++ *
++ * Support for the iControl and SafeTcam platforms from TMT Services
++ * using the Embedian MXM-8x10 Computer on Module
++ *
++ * Copyright (C) 2009 TMT Services & Supplies (Pty) Ltd.
++ *
++ * 2010-01-21 Hennie van der Merve <hvdmerwe@tmtservies.co.za>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/irq.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/pxa320.h>
++#include <mach/mxm8x10.h>
++
++#include <linux/spi/spi.h>
++#include <mach/pxa2xx_spi.h>
++#include <linux/can/platform/mcp251x.h>
++
++#include "generic.h"
++
++#define ICONTROL_MCP251x_nCS1	(15)
++#define ICONTROL_MCP251x_nCS2	(16)
++#define ICONTROL_MCP251x_nCS3	(17)
++#define ICONTROL_MCP251x_nCS4	(24)
++
++#define ICONTROL_MCP251x_nIRQ1	(74)
++#define ICONTROL_MCP251x_nIRQ2	(75)
++#define ICONTROL_MCP251x_nIRQ3	(76)
++#define ICONTROL_MCP251x_nIRQ4	(77)
++
++static struct pxa2xx_spi_chip mcp251x_chip_info1 = {
++	.tx_threshold   = 8,
++	.rx_threshold   = 128,
++	.dma_burst_size = 8,
++	.timeout        = 235,
++	.gpio_cs        = ICONTROL_MCP251x_nCS1
++};
++
++static struct pxa2xx_spi_chip mcp251x_chip_info2 = {
++	.tx_threshold   = 8,
++	.rx_threshold   = 128,
++	.dma_burst_size = 8,
++	.timeout        = 235,
++	.gpio_cs        = ICONTROL_MCP251x_nCS2
++};
++
++static struct pxa2xx_spi_chip mcp251x_chip_info3 = {
++	.tx_threshold   = 8,
++	.rx_threshold   = 128,
++	.dma_burst_size = 8,
++	.timeout        = 235,
++	.gpio_cs        = ICONTROL_MCP251x_nCS3
++};
++
++static struct pxa2xx_spi_chip mcp251x_chip_info4 = {
++	.tx_threshold   = 8,
++	.rx_threshold   = 128,
++	.dma_burst_size = 8,
++	.timeout        = 235,
++	.gpio_cs        = ICONTROL_MCP251x_nCS4
++};
++
++static struct mcp251x_platform_data mcp251x_info = {
++	.oscillator_frequency = 16E6,
++	.model                = CAN_MCP251X_MCP2515,
++	.board_specific_setup = NULL,
++	.power_enable         = NULL,
++	.transceiver_enable   = NULL
++};
++
++static struct spi_board_info mcp251x_board_info[] = {
++	{
++		.modalias        = "mcp251x",
++		.max_speed_hz    = 6500000,
++		.bus_num         = 3,
++		.chip_select     = 0,
++		.platform_data   = &mcp251x_info,
++		.controller_data = &mcp251x_chip_info1,
++		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ1)
++	},
++	{
++		.modalias        = "mcp251x",
++		.max_speed_hz    = 6500000,
++		.bus_num         = 3,
++		.chip_select     = 1,
++		.platform_data   = &mcp251x_info,
++		.controller_data = &mcp251x_chip_info2,
++		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ2)
++	},
++	{
++		.modalias        = "mcp251x",
++		.max_speed_hz    = 6500000,
++		.bus_num         = 4,
++		.chip_select     = 0,
++		.platform_data   = &mcp251x_info,
++		.controller_data = &mcp251x_chip_info3,
++		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ3)
++	},
++	{
++		.modalias        = "mcp251x",
++		.max_speed_hz    = 6500000,
++		.bus_num         = 4,
++		.chip_select     = 1,
++		.platform_data   = &mcp251x_info,
++		.controller_data = &mcp251x_chip_info4,
++		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ4)
++	}
++};
++
++static struct pxa2xx_spi_master pxa_ssp3_spi_master_info = {
++	.clock_enable   = CKEN_SSP3,
++	.num_chipselect = 2,
++	.enable_dma     = 1
++};
++
++static struct pxa2xx_spi_master pxa_ssp4_spi_master_info = {
++	.clock_enable   = CKEN_SSP4,
++	.num_chipselect = 2,
++	.enable_dma     = 1
++};
++
++struct platform_device pxa_spi_ssp3 = {
++	.name          = "pxa2xx-spi",
++	.id            = 3,
++	.dev           = {
++		.platform_data = &pxa_ssp3_spi_master_info,
++	}
++};
++
++struct platform_device pxa_spi_ssp4 = {
++	.name          = "pxa2xx-spi",
++	.id            = 4,
++	.dev           = {
++		.platform_data = &pxa_ssp4_spi_master_info,
++	}
++};
++
++static struct platform_device *icontrol_spi_devices[] __initdata = {
++	&pxa_spi_ssp3,
++	&pxa_spi_ssp4,
++};
++
++static mfp_cfg_t mfp_can_cfg[] __initdata = {
++	/* CAN CS lines */
++	GPIO15_GPIO,
++	GPIO16_GPIO,
++	GPIO17_GPIO,
++	GPIO24_GPIO,
++
++	/* SPI (SSP3) lines */
++	GPIO89_SSP3_SCLK,
++	GPIO91_SSP3_TXD,
++	GPIO92_SSP3_RXD,
++
++	/* SPI (SSP4) lines */
++	GPIO93_SSP4_SCLK,
++	GPIO95_SSP4_TXD,
++	GPIO96_SSP4_RXD,
++
++	/* CAN nIRQ lines */
++	GPIO74_GPIO | MFP_LPM_EDGE_RISE,
++	GPIO75_GPIO | MFP_LPM_EDGE_RISE,
++	GPIO76_GPIO | MFP_LPM_EDGE_RISE,
++	GPIO77_GPIO | MFP_LPM_EDGE_RISE
++};
++
++static void __init icontrol_can_init(void)
++{
++	pxa3xx_mfp_config(ARRAY_AND_SIZE(mfp_can_cfg));
++	platform_add_devices(ARRAY_AND_SIZE(icontrol_spi_devices));
++	spi_register_board_info(ARRAY_AND_SIZE(mcp251x_board_info));
++}
++
++static void __init icontrol_init(void)
++{
++	mxm_8x10_barebones_init();
++	mxm_8x10_usb_host_init();
++	mxm_8x10_mmc_init();
++
++	icontrol_can_init();
++}
++
++MACHINE_START(ICONTROL, "iControl/SafeTcam boards using Embedian MXM-8x10 CoM")
++	.phys_io	= 0x40000000,
++	.boot_params	= 0xa0000100,
++	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
++	.map_io		= pxa_map_io,
++	.init_irq	= pxa3xx_init_irq,
++	.timer		= &pxa_timer,
++	.init_machine	= icontrol_init
++MACHINE_END
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/include/mach/mxm8x10.h linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/include/mach/mxm8x10.h
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/include/mach/mxm8x10.h	1970-01-01 02:00:00.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/include/mach/mxm8x10.h	2010-02-02 11:17:26.000000000 +0200
+@@ -0,0 +1,22 @@
++#ifndef __MACH_MXM_8X10_H
++#define __MACH_MXM_8X10_H
++
++#define MXM_8X10_ETH_PHYS	0x13000000
++
++#define NAND_MMIO_START         0x43100000
++#define NAND_MMIO_END           0x43100080
++
++#define EXT_GPIO(x)     (128 + (x))
++
++#if defined(CONFIG_MMC)
++extern void mxm_8x10_mmc_init(void);
++#else
++static inline void mxm_8x10_mmc_init(void) {}
++#endif
++
++extern void mxm_8x10_usb_host_init(void);
++extern void mxm_8x10_ac97_init(void);
++
++extern void mxm_8x10_barebones_init(void);
++
++#endif /* __MACH_MXM_8X10_H */
+diff -Nurp linux-2.6.33-rc6/arch/arm/mach-pxa/mxm8x10.c linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/mxm8x10.c
+--- linux-2.6.33-rc6/arch/arm/mach-pxa/mxm8x10.c	1970-01-01 02:00:00.000000000 +0200
++++ linux-embedian-2.6.33-rc6/arch/arm/mach-pxa/mxm8x10.c	2010-02-02 11:17:26.000000000 +0200
+@@ -0,0 +1,474 @@
++/*
++ * linux/arch/arm/mach-pxa/mxm8x10.c
++ *
++ * Support for the Embedian MXM-8x10 Computer on Module
++ *
++ * Copyright (C) 2006 Marvell International Ltd.
++ * Copyright (C) 2009 Embedian Inc.
++ * Copyright (C) 2009 TMT Services & Supplies (Pty) Ltd.
++ *
++ * 2007-09-04: eric miao <eric.y.miao@gmail.com>
++ *             rewrite to align with latest kernel
++ *
++ * 2010-01-09: Edwin Peer <epeer@tmtservices.co.za>
++ * 	       Hennie van der Merwe <hvdmerwe@tmtservices.co.za>
++ *             rework for upstream merge
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/serial_8250.h>
++#include <linux/dm9000.h>
++#include <linux/gpio.h>
++
++#include <plat/i2c.h>
++#include <plat/pxa3xx_nand.h>
++
++#include <mach/pxafb.h>
++#include <mach/mmc.h>
++#include <mach/ohci.h>
++#include <mach/pxa320.h>
++
++#include <mach/mxm8x10.h>
++
++#include "devices.h"
++#include "generic.h"
++
++/* GPIO pin definition
++
++External device stuff   - Leave unconfigured for now...
++---------------------
++GPIO0   -   DREQ    (External DMA Request)
++GPIO3   -   nGCS2   (External Chip Select) Where is nGCS0; nGCS1; nGCS4; nGCS5 ?
++GPIO4   -   nGCS3
++GPIO15  -   EXT_GPIO1
++GPIO16  -   EXT_GPIO2
++GPIO17  -   EXT_GPIO3
++GPIO24  -   EXT_GPIO4
++GPIO25  -   EXT_GPIO5
++GPIO26  -   EXT_GPIO6
++GPIO27  -   EXT_GPIO7
++GPIO28  -   EXT_GPIO8
++GPIO29  -   EXT_GPIO9
++GPIO30  -   EXT_GPIO10
++GPIO31  -   EXT_GPIO11
++GPIO57  -   EXT_GPIO12
++GPIO74  -   EXT_IRQ1
++GPIO75  -   EXT_IRQ2
++GPIO76  -   EXT_IRQ3
++GPIO77  -   EXT_IRQ4
++GPIO78  -   EXT_IRQ5
++GPIO79  -   EXT_IRQ6
++GPIO80  -   EXT_IRQ7
++GPIO81  -   EXT_IRQ8
++GPIO87  -   VCCIO_PWREN (External Device PWREN)
++
++Dallas 1-Wire   - Leave unconfigured for now...
++-------------
++GPIO0_2 -   DS - 1Wire
++
++Ethernet
++--------
++GPIO1   -   DM9000 PWR
++GPIO9   -   DM9K_nIRQ
++GPIO36  -   DM9K_RESET
++
++Keypad  - Leave unconfigured by for now...
++------
++GPIO1_2 -   KP_DKIN0
++GPIO5_2 -   KP_MKOUT7
++GPIO82  -   KP_DKIN1
++GPIO85  -   KP_DKIN2
++GPIO86  -   KP_DKIN3
++GPIO113 -   KP_MKIN0
++GPIO114 -   KP_MKIN1
++GPIO115 -   KP_MKIN2
++GPIO116 -   KP_MKIN3
++GPIO117 -   KP_MKIN4
++GPIO118 -   KP_MKIN5
++GPIO119 -   KP_MKIN6
++GPIO120 -   KP_MKIN7
++GPIO121 -   KP_MKOUT0
++GPIO122 -   KP_MKOUT1
++GPIO122 -   KP_MKOUT2
++GPIO123 -   KP_MKOUT3
++GPIO124 -   KP_MKOUT4
++GPIO125 -   KP_MKOUT5
++GPIO127 -   KP_MKOUT6
++
++Data Bus    - Leave unconfigured for now...
++--------
++GPIO2   -   nWait (Data Bus)
++
++USB Device
++----------
++GPIO4_2 -   USBD_PULLUP
++GPIO10  -   UTM_CLK (USB Device UTM Clk)
++GPIO49  -   USB 2.0 Device UTM_DATA0
++GPIO50  -   USB 2.0 Device UTM_DATA1
++GPIO51  -   USB 2.0 Device UTM_DATA2
++GPIO52  -   USB 2.0 Device UTM_DATA3
++GPIO53  -   USB 2.0 Device UTM_DATA4
++GPIO54  -   USB 2.0 Device UTM_DATA5
++GPIO55  -   USB 2.0 Device UTM_DATA6
++GPIO56  -   USB 2.0 Device UTM_DATA7
++GPIO58  -   UTM_RXVALID (USB 2.0 Device)
++GPIO59  -   UTM_RXACTIVE (USB 2.0 Device)
++GPIO60  -   UTM_RXERROR
++GPIO61  -   UTM_OPMODE0
++GPIO62  -   UTM_OPMODE1
++GPIO71  -   USBD_INT    (USB Device?)
++GPIO73  -   UTM_TXREADY (USB 2.0 Device)
++GPIO83  -   UTM_TXVALID (USB 2.0 Device)
++GPIO98  -   UTM_RESET   (USB 2.0 device)
++GPIO99  -   UTM_XCVR_SELECT
++GPIO100 -   UTM_TERM_SELECT
++GPIO101 -   UTM_SUSPENDM_X
++GPIO102 -   UTM_LINESTATE0
++GPIO103 -   UTM_LINESTATE1
++
++Card-Bus Interface  - Leave unconfigured for now...
++------------------
++GPIO5   -   nPIOR (I/O space output enable)
++GPIO6   -   nPIOW (I/O space write enable)
++GPIO7   -   nIOS16 (Input from I/O space telling size of data bus)
++GPIO8   -   nPWAIT (Input for inserting wait states)
++
++LCD
++---
++GPIO6_2     -   LDD0
++GPIO7_2     -   LDD1
++GPIO8_2     -   LDD2
++GPIO9_2     -   LDD3
++GPIO11_2    -   LDD5
++GPIO12_2    -   LDD6
++GPIO13_2    -   LDD7
++GPIO14_2    -   VSYNC
++GPIO15_2    -   HSYNC
++GPIO16_2    -   VCLK
++GPIO17_2    -   HCLK
++GPIO18_2    -   VDEN
++GPIO63      -   LDD8    (CPU LCD)
++GPIO64      -   LDD9    (CPU LCD)
++GPIO65      -   LDD10   (CPU LCD)
++GPIO66      -   LDD11   (CPU LCD)
++GPIO67      -   LDD12   (CPU LCD)
++GPIO68      -   LDD13   (CPU LCD)
++GPIO69      -   LDD14   (CPU LCD)
++GPIO70      -   LDD15   (CPU LCD)
++GPIO88      -   VCCLCD_PWREN (LCD Panel PWREN)
++GPIO97      -   BACKLIGHT_EN
++GPIO104     -   LCD_PWREN
++
++PWM   - Leave unconfigured for now...
++---
++GPIO11  -   PWM0
++GPIO12  -   PWM1
++GPIO13  -   PWM2
++GPIO14  -   PWM3
++
++SD-CARD
++-------
++GPIO18  -   SDDATA0
++GPIO19  -   SDDATA1
++GPIO20  -   SDDATA2
++GPIO21  -   SDDATA3
++GPIO22  -   SDCLK
++GPIO23  -   SDCMD
++GPIO72  -   SD_WP
++GPIO84  -   SD_nIRQ_CD  (SD-Card)
++
++I2C
++---
++GPIO32  -   I2CSCL
++GPIO33  -   I2CSDA
++
++AC97
++----
++GPIO35  -   AC97_SDATA_IN
++GPIO37  -   AC97_SDATA_OUT
++GPIO38  -   AC97_SYNC
++GPIO39  -   AC97_BITCLK
++GPIO40  -   AC97_nRESET
++
++UART1
++-----
++GPIO41  -   UART_RXD1
++GPIO42  -   UART_TXD1
++GPIO43  -   UART_CTS1
++GPIO44  -   UART_DCD1
++GPIO45  -   UART_DSR1
++GPIO46  -   UART_nRI1
++GPIO47  -   UART_DTR1
++GPIO48  -   UART_RTS1
++
++UART2
++-----
++GPIO109 -   RTS2
++GPIO110 -   RXD2
++GPIO111 -   TXD2
++GPIO112 -   nCTS2
++
++UART3
++-----
++GPIO105 -   nCTS3
++GPIO106 -   nRTS3
++GPIO107 -   TXD3
++GPIO108 -   RXD3
++
++SSP3    - Leave unconfigured for now...
++----
++GPIO89  -   SSP3_CLK
++GPIO90  -   SSP3_SFRM
++GPIO91  -   SSP3_TXD
++GPIO92  -   SSP3_RXD
++
++SSP4
++GPIO93  -   SSP4_CLK
++GPIO94  -   SSP4_SFRM
++GPIO95  -   SSP4_TXD
++GPIO96  -   SSP4_RXD
++*/
++
++static mfp_cfg_t mfp_cfg[] __initdata = {
++	/* USB */
++	GPIO10_UTM_CLK,
++	GPIO49_U2D_PHYDATA_0,
++	GPIO50_U2D_PHYDATA_1,
++	GPIO51_U2D_PHYDATA_2,
++	GPIO52_U2D_PHYDATA_3,
++	GPIO53_U2D_PHYDATA_4,
++	GPIO54_U2D_PHYDATA_5,
++	GPIO55_U2D_PHYDATA_6,
++	GPIO56_U2D_PHYDATA_7,
++	GPIO58_UTM_RXVALID,
++	GPIO59_UTM_RXACTIVE,
++	GPIO60_U2D_RXERROR,
++	GPIO61_U2D_OPMODE0,
++	GPIO62_U2D_OPMODE1,
++	GPIO71_GPIO, /* USBD_INT */
++	GPIO73_UTM_TXREADY,
++	GPIO83_U2D_TXVALID,
++	GPIO98_U2D_RESET,
++	GPIO99_U2D_XCVR_SEL,
++	GPIO100_U2D_TERM_SEL,
++	GPIO101_U2D_SUSPEND,
++	GPIO102_UTM_LINESTATE_0,
++	GPIO103_UTM_LINESTATE_1,
++	GPIO4_2_GPIO | MFP_PULL_HIGH, /* UTM_PULLUP */
++
++	/* DM9000 */
++	GPIO1_GPIO,
++	GPIO9_GPIO,
++	GPIO36_GPIO,
++
++	/* AC97 */
++	GPIO35_AC97_SDATA_IN_0,
++	GPIO37_AC97_SDATA_OUT,
++	GPIO38_AC97_SYNC,
++	GPIO39_AC97_BITCLK,
++	GPIO40_AC97_nACRESET,
++
++	/* UARTS */
++	GPIO41_UART1_RXD,
++	GPIO42_UART1_TXD,
++	GPIO43_UART1_CTS,
++	GPIO44_UART1_DCD,
++	GPIO45_UART1_DSR,
++	GPIO46_UART1_RI,
++	GPIO47_UART1_DTR,
++	GPIO48_UART1_RTS,
++
++	GPIO109_UART2_RTS,
++	GPIO110_UART2_RXD,
++	GPIO111_UART2_TXD,
++	GPIO112_UART2_CTS,
++
++	GPIO105_UART3_CTS,
++	GPIO106_UART3_RTS,
++	GPIO107_UART3_TXD,
++	GPIO108_UART3_RXD,
++
++	GPIO78_GPIO,
++	GPIO79_GPIO,
++	GPIO80_GPIO,
++	GPIO81_GPIO,
++
++	/* I2C */
++	GPIO32_I2C_SCL,
++	GPIO33_I2C_SDA,
++
++	/* MMC */
++	GPIO18_MMC1_DAT0,
++	GPIO19_MMC1_DAT1,
++	GPIO20_MMC1_DAT2,
++	GPIO21_MMC1_DAT3,
++	GPIO22_MMC1_CLK,
++	GPIO23_MMC1_CMD,
++	GPIO72_GPIO,
++	GPIO84_GPIO,
++
++	/* IRQ */
++	GPIO74_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ1 */
++	GPIO75_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ2 */
++	GPIO76_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ3 */
++	GPIO77_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ4 */
++	GPIO78_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ5 */
++	GPIO79_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ6 */
++	GPIO80_GPIO | MFP_LPM_EDGE_RISE, /* EXT_IRQ7 */
++	GPIO81_GPIO | MFP_LPM_EDGE_RISE  /* EXT_IRQ8 */
++};
++
++/* MMC/MCI Support */
++#if defined(CONFIG_MMC)
++static struct pxamci_platform_data mxm_8x10_mci_platform_data = {
++	.detect_delay = 20,
++	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
++	.gpio_card_detect = EXT_GPIO(72),
++	.gpio_card_ro = EXT_GPIO(84),
++	.gpio_power = -1
++};
++
++void __init mxm_8x10_mmc_init(void)
++{
++	pxa_set_mci_info(&mxm_8x10_mci_platform_data);
++}
++#endif
++
++/* USB Open Host Controler Interface */
++static struct pxaohci_platform_data mxm_8x10_ohci_platform_data = {
++	.port_mode = PMM_NPS_MODE,
++	.flags = ENABLE_PORT_ALL
++};
++
++void __init mxm_8x10_usb_host_init(void)
++{
++	pxa_set_ohci_info(&mxm_8x10_ohci_platform_data);
++}
++
++/* AC97 Sound Support */
++static struct platform_device mxm_8x10_ac97_device = {
++	.name = "pxa2xx-ac97"
++};
++
++void __init mxm_8x10_ac97_init(void)
++{
++	platform_device_register(&mxm_8x10_ac97_device);
++}
++
++/* NAND flash Support */
++#if defined(CONFIG_MTD_NAND_PXA3xx) || defined(CONFIG_MTD_NAND_PXA3xx_MODULE)
++#define NAND_BLOCK_SIZE SZ_128K
++#define NB(x)           (NAND_BLOCK_SIZE * (x))
++static struct mtd_partition mxm_8x10_nand_partitions[] = {
++	[0] = {
++	       .name = "boot",
++	       .size = NB(0x002),
++	       .offset = NB(0x000),
++	       .mask_flags = MTD_WRITEABLE
++	},
++	[1] = {
++	       .name = "kernel",
++	       .size = NB(0x010),
++	       .offset = NB(0x002),
++	       .mask_flags = MTD_WRITEABLE
++	},
++	[2] = {
++	       .name = "root",
++	       .size = NB(0x36c),
++	       .offset = NB(0x012)
++	},
++	[3] = {
++	       .name = "bbt",
++	       .size = NB(0x082),
++	       .offset = NB(0x37e),
++	       .mask_flags = MTD_WRITEABLE
++	}
++};
++
++static struct pxa3xx_nand_platform_data mxm_8x10_nand_info = {
++	.enable_arbiter = 1,
++	.keep_config = 1,
++	.parts = mxm_8x10_nand_partitions,
++	.nr_parts = ARRAY_SIZE(mxm_8x10_nand_partitions)
++};
++
++static void __init mxm_8x10_nand_init(void)
++{
++	pxa3xx_set_nand_info(&mxm_8x10_nand_info);
++}
++#else
++static inline void mxm_8x10_nand_init(void) {}
++#endif /* CONFIG_MTD_NAND_PXA3xx || CONFIG_MTD_NAND_PXA3xx_MODULE */
++
++/* Ethernet support: Davicom DM9000 */
++static struct resource dm9k_resources[] = {
++	[0] = {
++	       .start = MXM_8X10_ETH_PHYS + 0x300,
++	       .end = MXM_8X10_ETH_PHYS + 0x300,
++	       .flags = IORESOURCE_MEM
++	},
++	[1] = {
++	       .start = MXM_8X10_ETH_PHYS + 0x308,
++	       .end = MXM_8X10_ETH_PHYS + 0x308,
++	       .flags = IORESOURCE_MEM
++	},
++	[2] = {
++	       .start = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO9)),
++	       .end = gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO9)),
++	       .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE
++	}
++};
++
++static struct dm9000_plat_data dm9k_plat_data = {
++	.flags = DM9000_PLATF_16BITONLY
++};
++
++static struct platform_device dm9k_device = {
++	.name = "dm9000",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(dm9k_resources),
++	.resource = dm9k_resources,
++	.dev = {
++		.platform_data = &dm9k_plat_data
++	}
++};
++
++static void __init mxm_8x10_ethernet_init(void)
++{
++	platform_device_register(&dm9k_device);
++}
++
++/* PXA UARTs */
++static void __init mxm_8x10_uarts_init(void)
++{
++	pxa_set_ffuart_info(NULL);
++	pxa_set_btuart_info(NULL);
++	pxa_set_stuart_info(NULL);
++}
++
++/* I2C and Real Time Clock */
++static struct i2c_board_info __initdata mxm_8x10_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("ds1337", 0x68)
++	}
++};
++
++static void __init mxm_8x10_i2c_init(void)
++{
++	i2c_register_board_info(0, mxm_8x10_i2c_devices,
++				ARRAY_SIZE(mxm_8x10_i2c_devices));
++	pxa_set_i2c_info(NULL);
++}
++
++void __init mxm_8x10_barebones_init(void)
++{
++	pxa3xx_mfp_config(ARRAY_AND_SIZE(mfp_cfg));
++
++	mxm_8x10_uarts_init();
++	mxm_8x10_nand_init();
++	mxm_8x10_i2c_init();
++	mxm_8x10_ethernet_init();
++}
