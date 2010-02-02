@@ -1,56 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 2 Feb 2010 15:33:01 +0100
-Subject: [PATCH 21/25] imx: only define deprecated symbols conditionally
-In-Reply-To: <alpine.LNX.2.00.1002021444050.15395@pobox.suse.cz>
-References: <1262967452-24353-13-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-14-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-15-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-16-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-17-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-18-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LNX.2.00.1002021444050.15395@pobox.suse.cz>
-Message-ID: <20100202143301.GA20090@pengutronix.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 2 Feb 2010 16:15:55 +0100
+Subject: [PATCH 1/4] mfd: update i2c driver for max8925
+In-Reply-To: <771cded01002020622v7fa47689je2a5b1c11e2bb0c7@mail.gmail.com>
+References: <771cded01001250307o7e340a0dsf7e02762dad8c953@mail.gmail.com>
+	<20100129195405.GB23130@sortiz.org>
+	<771cded01002020622v7fa47689je2a5b1c11e2bb0c7@mail.gmail.com>
+Message-ID: <20100202151554.GC28139@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiri,
+Hi Haojian,
 
-> > Define deprecated symbols in an #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS ...
-> > 
-> > All files that still depend on the old definitions get
-> > -DIMX_NEEDS_DEPRECATED_SYMBOLS passed to the compiler.
-> > 
-> > When all remaining users are fixed this allows including the soc
-> > specific headers unconditionally.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Eric Benard <eric@eukrea.com>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Alan Carvalho de Assis <acassis@gmail.com>
-> > Cc: Daniel Mack <daniel@caiaq.de>
-> > Cc: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> > Cc: Ilya Yanok <yanok@emcraft.com>
-> > Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
-> > Cc: Jiri Kosina <jkosina@suse.cz>
-> > Cc: Magnus Lilja <lilja.magnus@gmail.com>
+On Tue, Feb 02, 2010 at 09:22:58AM -0500, Haojian Zhuang wrote:
+> On Fri, Jan 29, 2010 at 2:54 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> I wants to initialize max8925 after all three components probed. In
+> core driver, irq handling needs to access all three components. In
+> power supply driver, both adc and generic components are accessed.
+> It's the reason that using three i2c clients in one driver.
+Ok, that's what I understood. Adding appropriate comments to the code to
+describe this would be really helpful.
+
+ 
+> Yes, the code is not very clear. Now I use i2c_new_dummy() now. Now I
+> attache new patches now.
 > 
-> What is the status of this patch please? Doesn't seem to be inluded in
-> linux-next as of today.
-Currently they sit in mxc-master[1] and wait for the merge window to
-open.
+> Updates are in below.
+> 1. use i2c_new_dummy() to replace i2c_new_probed_device().
+> 2. add onkey driver
+> 3. remove unused i2c pointer in rtc driver
+Very good, I just have one last comment:
 
-Sascha, what do you think about adding your tree to next?
 
-Best regards
-Uwe
+> @@ -142,27 +138,28 @@ static int __devinit max8925_probe(struct i2c_client *client,
+>  				   const struct i2c_device_id *id)
+>  {
+>  	struct max8925_platform_data *pdata = client->dev.platform_data;
+> -	struct max8925_chip *chip;
+> +	static struct max8925_chip *chip;
+That no longer needs to be static.
+The rest of the code looks fine to me. Once you remove that static
+definition, and you add some comments explaining why you need those 3 i2c
+pointers, I'll merge it.
 
-[1] git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master
+Thanks for your work.
+
+Cheers,
+Samuel.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Intel Open Source Technology Centre
+http://oss.intel.com/
