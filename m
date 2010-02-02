@@ -1,29 +1,45 @@
-From: roel.kluin@gmail.com (roel kluin)
-Date: Tue, 2 Feb 2010 16:44:20 +0100
-Subject: [PATCH v3 2/7 RE-SEND] ARM: S5P6442: Add clock support for
-	S5P6442
-In-Reply-To: <25e057c01002020741l157f57e3s431716adcf038a83@mail.gmail.com>
-References: <1265116976-10140-1-git-send-email-kgene.kim@samsung.com>
-	<25e057c01002020741l157f57e3s431716adcf038a83@mail.gmail.com>
-Message-ID: <25e057c01002020744h11e0dc8dv1217705e9c776a1a@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  2 Feb 2010 16:22:24 +0000
+Subject: [RFC PATCH 0/4] ARM: add support for hw-breakpoints
+Message-ID: <1265127748-4587-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2010 at 4:41 PM, roel kluin <roel.kluin@gmail.com> wrote:
->> This patch adds clock support for S5P6442. This patch adds the clock
->> register definitions and the various system clocks in S5P6442.
->
->> +static struct clksrc_clk clk_mout_epll = {
->> + ? ? ? .clk ? ?= {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mout_epll",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->> + ? ? ? },
->> + ? ? ? .sources ? ? ? ?= &clk_src_epll,
->> + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1 },
->> +};
->
-> This appears not to be used, is this implemented in another patch?
+Modern ARM cores provide hardware resources for setting breakpoints
+and watchpoints from software when in monitor debug mode. When these
+are triggered, a debug exception is taken [in the form of a prefetch
+or data abort] and a trap can be raised to notify the user that the
+event has occurred.
 
-It is, please ignore.
+This patch adds an ARM [v6+] backend to the recent HW-Breakpoint framework
+in the Kernel. The ptrace interface is extended to support the new features
+and has been tested successfully with GDB on 11MPCore and Cortex-A9 platforms.
 
-Roel
+All comments welcome, particularly those related to:
+	- The ptrace interface, where I tried to avoid defining a new struct
+	- The debug register accessors, which are rather ugly
+	- Discovering the faulting data address when a watchpoint fires
+
+Patch taken against 2.6.33-rc6 with perf [ARM 5900/1] and atomic64 [ARM 5889/1]
+support.
+
+
+Will Deacon (4):
+  ARM: hw-breakpoint: add mechanism for hooking into prefetch aborts
+  ARM: hw-breakpoint: add ARM backend for the hw-breakpoint framework
+  ARM: hw-breakpoint: add new ptrace requests for hw-breakpoint
+    interaction
+  ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
+
+ arch/arm/Kconfig                     |    1 +
+ arch/arm/include/asm/hw_breakpoint.h |  113 ++++++
+ arch/arm/include/asm/processor.h     |    4 +
+ arch/arm/include/asm/ptrace.h        |    2 +
+ arch/arm/include/asm/system.h        |    3 +
+ arch/arm/kernel/Makefile             |    1 +
+ arch/arm/kernel/hw_breakpoint.c      |  672 ++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/ptrace.c             |  158 ++++++++
+ arch/arm/mm/fault.c                  |   11 +
+ 9 files changed, 965 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/hw_breakpoint.h
+ create mode 100644 arch/arm/kernel/hw_breakpoint.c
