@@ -1,28 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2010 14:40:22 +0000
+Date: Wed, 3 Feb 2010 14:43:20 +0000
 Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100203135914.GF4277@wear.picochip.com>
+In-Reply-To: <20100203134822.GA27441@caradoc.them.org>
 References: <20100203005038.GA16356@caradoc.them.org>
 	<1265197942.1970.34.camel@pc1117.cambridge.arm.com>
 	<20100203132824.GA27048@n2100.arm.linux.org.uk>
-	<20100203135914.GF4277@wear.picochip.com>
-Message-ID: <20100203144022.GG22275@n2100.arm.linux.org.uk>
+	<20100203134822.GA27441@caradoc.them.org>
+Message-ID: <20100203144320.GH22275@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 01:59:14PM +0000, Jamie Iles wrote:
-> Well it looks like the hardware breakpoint layer is on top of the perf_events
-> subsystem and the breakpoint becomes a perf event. In this case the breakpoint
-> should be scheduled in and out by perf on context switches if targetting a
-> specific PID or could be left in the whole time if desired.
+On Wed, Feb 03, 2010 at 08:48:22AM -0500, Daniel Jacobowitz wrote:
+> On Wed, Feb 03, 2010 at 01:28:24PM +0000, Russell King - ARM Linux wrote:
+> > Software breakpoints are a pain in the backside if you have threaded
+> > programs, because when you insert a breakpoint into one thread, it's
+> > active in all threads - you can't insert a breakpoint into only one
+> > thread.
+> > 
+> > If we have the ability to set hardware breakpoints, I'd like to see
+> > that used in preference to software breakpoints, and only resort to
+> > software breakpoints if there's no other alternative.
+> 
+> GDB has quite good support for this platform-independent problem,
+> not to mention that it's sometimes a feature.  I don't think it's a
+> problem.  The latest addition is displaced stepping support,
+> available for ARM, which is used to bypass software breakpoints
+> hit by an uninteresting thread without having to stop the rest
+> of the program.
 
-Unfortunately, we're drifting from the original topic...
+You should be aware that there has been a move to rid the kernel of
+software-based breakpointing implementations through 'utrace' which
+I've been more or less ignoring because of that (because it means
+that we lose the ability to set any breakpoints.)
 
-This starts worrying me more.  Is execution stopped (as in actually
-stopped, not just switched away from leaving the thread runnable) in
-the target thread when one of these 'perf' breakpoints is hit?  If
-not, it's completely unsuitable for debuggers to use, and raises the
-question of why it's being interfaced with the ptrace code.
-
-Yes, x86 seems to use this method, but it doesn't send signals in the
-counter overflow function, so things must be working differently there.
+Just to be clear, I'm not objecting to your patch (which I think is
+fine) - I'm just trying to make sure that the same ground isn't being
+covered in multiple ways by different people.
