@@ -1,78 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 3 Feb 2010 17:50:25 +0100
-Subject: [PATCH 11/13] ARM: LPC32XX: printascii() output and irq
-	support functions
-In-Reply-To: <1264643011-17390-12-git-send-email-wellsk40@gmail.com>
-References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
-	<1264643011-17390-12-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100203165025.GM11354@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Feb 2010 08:57:55 -0800
+Subject: [PATCH 1/9] omap: define _toggle_gpio_edge_triggering only for
+	OMAP1
+In-Reply-To: <20100203081313.GB11354@pengutronix.de>
+References: <20100203022318.26347.34734.stgit@baageli.muru.com>
+	<20100203022555.26347.62876.stgit@baageli.muru.com>
+	<20100203081313.GB11354@pengutronix.de>
+Message-ID: <20100203165754.GA22747@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [100203 00:10]:
+> Hi Tony,
+> 
+> On Tue, Feb 02, 2010 at 06:25:55PM -0800, Tony Lindgren wrote:
+> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > 
+> > The only usage of _toggle_gpio_edge_triggering is in an
+> > CONFIG_ARCH_OMAP1 is defined, too.
+> This sentence is broken, isn't it?  I guess git commit played tricks on
+> me here and removed a line, something like:
+> 
+> 	#ifdef CONFIG_ARCH_OMAP1 block, so only provide it if
+> 
+> Can you add it back?  I'd recommend doing the line break before the "an"
+> in the first line instead of behind it.
 
-> +	.macro	disable_fiq
-> +	.endm
-> +
-> +	.macro  get_irqnr_preamble, base, tmp
-> +	.endm
-> +
-> +	.macro  arch_ret_to_user, tmp1, tmp2
-> +	.endm
-> +
-> +/*
-> + * Return IRQ number in irqnr. Also return processor Z flag status in CPSR
-> + * as set if an interrupt is pending.
-> + */
-> +	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-> +	/* Get MIC status first */
-> +	ldr	\base, =IO_ADDRESS(MIC_BASE)
-> +	ldr	\irqstat, [\base, #INTC_STAT]
-> +	and	\irqstat, \irqstat, #0xFFFFFFFC
-> +	mov	\tmp, #0
-> +
-> +	/* Drop through to SIC1 or SIC2 if MIC is not pending */
-> +	cmp	\irqstat, #0
-> +	bne	1000f
-> +
-> +	/* SIC1 interrupts start at offset 32 */
-> +	ldr	\base, =IO_ADDRESS(SIC1_BASE)
-> +	ldr	\irqstat, [\base, #INTC_STAT]
-> +	mov	\tmp, #32
-> +
-> +	/* Drop through to SIC2 if SIC1 is not pending */
-> +	cmp	\irqstat, #0
-> +	bne	1000f
-> +
-> +	/* SIC2 interrupts start at offset 64 */
-> +	ldr	\base, =IO_ADDRESS(SIC2_BASE)
-> +	ldr	\irqstat, [\base, #INTC_STAT]
-> +	mov	\tmp, #64
-> +
-> +	/* Safety check only, exit if no status on MIC, SIC1, SIC2 */
-> +	cmp	\irqstat, #0
-> +	beq	1001f
-> +
-> +1000:
-> +	/* Returns an pending interrupt between 0 and 95 */
-> +	clz	\irqnr, \irqstat
-> +	rsb	\irqnr, \irqnr, #31
-> +	add	\irqnr, \irqnr, \tmp
-> +
-> +1001:
-> +	teq	\irqstat, #0
-> +	.endm
-> +
-> +	.macro	irq_prio_table
-> +	.endm
+Sure, updated patch below. The description makes more sense now :)
 
-You could make this easier by only handling MIC(?) interrupts and make
-SIC1 and SIC2 use a chained handler.  Then you can use
-get_irqnr_preamble for microoptimisation.
+BTW, looks like with "git show --pretty=email" the From: field gets
+messed up in the patch below. Author name shows OK in git though.
 
-Best regards
-Uwe
+I wonder if that's a git bug for --pretty=email? Using version
+1.6.6.1 it seems.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Tony
