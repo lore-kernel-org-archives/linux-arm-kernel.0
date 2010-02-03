@@ -1,36 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2010 16:35:22 +0000
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100203153501.GA1944@caradoc.them.org>
-References: <20100203005038.GA16356@caradoc.them.org>
-	<1265197942.1970.34.camel@pc1117.cambridge.arm.com>
-	<20100203132824.GA27048@n2100.arm.linux.org.uk>
-	<4B699010.6010203@parrot.com>
-	<20100203151931.GA1159@caradoc.them.org>
-	<20100203153025.GA29749@n2100.arm.linux.org.uk>
-	<20100203153501.GA1944@caradoc.them.org>
-Message-ID: <20100203163522.GA29306@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 3 Feb 2010 09:35:12 -0700
+Subject: [PATCHv2 04/11] mxc: changes to common plat-mxc code to add
+	support for i.MX5
+In-Reply-To: <ec63e5978fd5ac5d308ede5916e648ba925818eb.1265173480.git.amit.kucheria@canonical.com>
+References: <cover.1265173246.git.amit.kucheria@verdurent.com>
+	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+	<9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
+	<cover.1265173480.git.amit.kucheria@canonical.com>
+	<ccc89dd7a6035abf5a78680404a2b30b9e025353.1265173480.git.amit.kucheria@canonical.com>
+	<ec63e5978fd5ac5d308ede5916e648ba925818eb.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <fa686aa41002030835t7046ed3bk33deed2c2f631263@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 10:35:01AM -0500, Daniel Jacobowitz wrote:
-> On Wed, Feb 03, 2010 at 03:30:25PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 03, 2010 at 10:19:31AM -0500, Daniel Jacobowitz wrote:
-> > > On a related note, it would be Very Helpful(TM) if someone would
-> > > implement read-only access to the helper page via ptrace!  Not as
-> > > helpful as a visible vDSO with symbol names would be, but it would
-> > > still make things a lot easier.
-> > 
-> > Apart from the TLS value which can be obtained by PTRACE_GET_THREAD_AREA,
-> > the contents of the page is constant across all processes on all CPUs.
-> 
-> Yes, I'm aware of that - but having it unreadable means special cases
-> all through GDB, gdbserver, and anything else that wants to read
-> memory.
+On Tue, Feb 2, 2010 at 10:16 PM, Amit Kucheria
+<amit.kucheria@canonical.com> wrote:
+> Changes separted to help in the review process
 
-Well, we could siphon off the PEEK calls, and special case them at
-the arch layer - it'll basically be the same hack as what you're
-suggesting, only in the kernel instead.
+<soapbox>Commit log needs to talk about what the patch is, not how it
+has changed.  Please state what the patch does and why.  It is also
+helpful to have testing information.  The goal is to make it easy for
+both patch reviewers on the mailing list *and* people looking at the
+commit in git after it is merged.  This commit message doesn't provide
+the reader with any helpful information.
 
-So really the question is whether we want a hack for this in the
-kernel or in userspace.
+Patch version/review information like your comment above typically
+goes below the '---' line.</soapbox>
+
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
