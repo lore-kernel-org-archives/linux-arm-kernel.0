@@ -1,113 +1,46 @@
 From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue,  2 Feb 2010 21:16:24 -0800
-Subject: [PATCHv2 02/11] mxc timer: refactor timer code to use timer versions
-In-Reply-To: <0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+Date: Tue,  2 Feb 2010 21:16:25 -0800
+Subject: [PATCHv2 03/11] mxc: Fix Drive Strength Field in the IOMUX controller
+In-Reply-To: <9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
 References: <cover.1265173246.git.amit.kucheria@verdurent.com>
 	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
-Message-ID: <9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
+	<9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <ccc89dd7a6035abf5a78680404a2b30b9e025353.1265173480.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+i.MX51 defines 4 values:
 
-Refactor the timer code into version 1 and version 2.
+00: Low Drive Strength
+01: Medium Drive Strength
+10: High Drive Strength
+11: Max Drive Strength
 
-Essentially there are 2 versions of the timer hardware. Version 1 is found on
-MX1/MXL and MX21. Version 2 is found on MX25, MX27, MX31, MX35, MX37, MX51,
-and future parts.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
 Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
 ---
- arch/arm/plat-mxc/time.c |   19 +++++++++++--------
- 1 files changed, 11 insertions(+), 8 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-v3.h |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-index 844567e..7d6499e 100644
---- a/arch/arm/plat-mxc/time.c
-+++ b/arch/arm/plat-mxc/time.c
-@@ -57,6 +57,9 @@
- #define MX3_TCN			0x24
- #define MX3_TCMP		0x10
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+index 1deda01..f2f73d3 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+@@ -81,11 +81,13 @@ struct pad_desc {
  
-+#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx27())
-+#define timer_is_v2()	(cpu_is_mx3() || cpu_is_mx25())
-+
- static struct clock_event_device clockevent_mxc;
- static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+ #define PAD_CTL_ODE			(1 << 3)
  
-@@ -66,7 +69,7 @@ static inline void gpt_irq_disable(void)
- {
- 	unsigned int tmp;
+-#define PAD_CTL_DSE_STANDARD		(0 << 1)
+-#define PAD_CTL_DSE_HIGH		(1 << 1)
+-#define PAD_CTL_DSE_MAX			(2 << 1)
++#define PAD_CTL_DSE_LOW			(0 << 1)
++#define PAD_CTL_DSE_MED			(1 << 1)
++#define PAD_CTL_DSE_HIGH		(2 << 1)
++#define PAD_CTL_DSE_MAX			(3 << 1)
  
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		__raw_writel(0, timer_base + MX3_IR);
- 	else {
- 		tmp = __raw_readl(timer_base + MXC_TCTL);
-@@ -76,7 +79,7 @@ static inline void gpt_irq_disable(void)
+ #define PAD_CTL_SRE_FAST		(1 << 0)
++#define PAD_CTL_SRE_SLOW		(0 << 0)
  
- static inline void gpt_irq_enable(void)
- {
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		__raw_writel(1<<0, timer_base + MX3_IR);
- 	else {
- 		__raw_writel(__raw_readl(timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
-@@ -90,7 +93,7 @@ static void gpt_irq_acknowledge(void)
- 		__raw_writel(0, timer_base + MX1_2_TSTAT);
- 	if (cpu_is_mx2())
- 		__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP, timer_base + MX1_2_TSTAT);
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		__raw_writel(MX3_TSTAT_OF1, timer_base + MX3_TSTAT);
- }
- 
-@@ -117,7 +120,7 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
- 
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		clocksource_mxc.read = mx3_get_cycles;
- 
- 	clocksource_mxc.mult = clocksource_hz2mult(c,
-@@ -180,7 +183,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 
- 	if (mode != clockevent_mode) {
- 		/* Set event time into far-far future */
--		if (cpu_is_mx3() || cpu_is_mx25())
-+		if (timer_is_v2())
- 			__raw_writel(__raw_readl(timer_base + MX3_TCN) - 3,
- 					timer_base + MX3_TCMP);
- 		else
-@@ -233,7 +236,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
- 	struct clock_event_device *evt = &clockevent_mxc;
- 	uint32_t tstat;
- 
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		tstat = __raw_readl(timer_base + MX3_TSTAT);
- 	else
- 		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
-@@ -264,7 +267,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
- 
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		clockevent_mxc.set_next_event = mx3_set_next_event;
- 
- 	clockevent_mxc.mult = div_sc(c, NSEC_PER_SEC,
-@@ -296,7 +299,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
- 	__raw_writel(0, timer_base + MXC_TCTL);
- 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
- 
--	if (cpu_is_mx3() || cpu_is_mx25())
-+	if (timer_is_v2())
- 		tctl_val = MX3_TCTL_CLK_IPG | MX3_TCTL_FRR | MX3_TCTL_WAITEN | MXC_TCTL_TEN;
- 	else
- 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+ /*
+  * setups a single pad in the iomuxer
 -- 
 1.6.3.3
