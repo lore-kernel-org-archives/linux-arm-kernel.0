@@ -1,29 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 3 Feb 2010 21:56:09 +0100
-Subject: [PATCH] MX1/MX2: -EINVAL overwritten in second iteration in
-	mxc_gpio_setup_multiple_pins()
-In-Reply-To: <4B69CC24.3050503@gmail.com>
-References: <4B69CC24.3050503@gmail.com>
-Message-ID: <20100203205609.GG20113@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Feb 2010 21:34:59 +0000
+Subject: [PATCH 12/13] ARM: LPC32XX: architecture header files
+In-Reply-To: <083DF309106F364B939360100EC290F805C8B787A9@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-13-git-send-email-wellsk40@gmail.com>
+	<20100203170737.GN11354@pengutronix.de>
+	<083DF309106F364B939360100EC290F805C8B787A9@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20100203213459.GB29306@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 08:19:00PM +0100, Roel Kluin wrote:
-> Due to the `ret = gpio_request()' below in the loop, the initial -EINVAL value
-> of ret is overwritten. 
+On Wed, Feb 03, 2010 at 08:20:01PM +0100, Kevin Wells wrote:
+> > 
+> > > +#define VMALLOC_END	(PAGE_OFFSET + 0x10000000)
+> > grepping shows that defining VMALLOC_END based on PAGE_OFFSET is usual,
+> > but I wonder why you don't just
 > 
-> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> The maximum addressable DRAM sizing is 256MB when fully populated. It seemed
+> the right size. 0xF0000000 works too though, I have no problems changing it.
 
-> ---
-> Not 100% sure this is needed, please review. One more question: is it ok
-> to return 0 when count is 0 (and nothing is done)?
-I'd say yes.  If you want nothing from me, I can say I gave you all you
-wanted without doing anything.
+Well, what you have is:
 
-Thanks
-Uwe
+VMALLOC_END
+	...
+VMALLOC_START
+	8MB hole
+high_memory
+	Direct mapped RAM
+PAGE_OFFSET
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+So, if your maximal DRAM size is 256MB, then if you install that amount
+(ignoring things like highmem support, which you should have disabled)
+high_memory = PAGE_OFFSET + 256MB, or PAGE_OFFSET + 0x10000000.
+
+That makes VMALLOC_START = PAGE_OFFSET + 0x10800000, which will be
+above VMALLOC_END !
+
+What actually happens is that the kernel (by default) enforces a 128MB
+VMALLOC area, which, given your VMALLOC_END value will give you a
+maximum of 120MB of SDRAM - if you check your boot log, you probably
+have some message like:
+
+"Truncating RAM at ..."
