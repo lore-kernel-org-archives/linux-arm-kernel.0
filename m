@@ -1,71 +1,46 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 3 Feb 2010 07:09:57 -0800
-Subject: [PATCHv2 01/11] arm: mxc: TrustZone interrupt controller (TZIC)
-	for i.MX5 family
-In-Reply-To: <20100203132404.GC5252@k2>
-References: <cover.1265173480.git.amit.kucheria@canonical.com>
-	<cover.1265173246.git.amit.kucheria@verdurent.com>
+Date: Wed, 3 Feb 2010 07:16:53 -0800
+Subject: [PATCHv2 04/11] mxc: changes to common plat-mxc code to add
+	support for i.MX5
+In-Reply-To: <20100203133840.GD5252@k2>
+References: <cover.1265173246.git.amit.kucheria@verdurent.com>
 	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
-	<f17812d71002022223jdc0ac5cp5b94928fb45695d6@mail.gmail.com>
-	<20100203132404.GC5252@k2>
-Message-ID: <f17812d71002030709i6ecbc374g30e2b1343455b650@mail.gmail.com>
+	<9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
+	<cover.1265173480.git.amit.kucheria@canonical.com>
+	<ccc89dd7a6035abf5a78680404a2b30b9e025353.1265173480.git.amit.kucheria@canonical.com>
+	<ec63e5978fd5ac5d308ede5916e648ba925818eb.1265173480.git.amit.kucheria@canonical.com>
+	<f17812d71002022243s7b68dab0ycc19238535384d4f@mail.gmail.com>
+	<20100203094959.GN6130@pengutronix.de> <20100203133840.GD5252@k2>
+Message-ID: <f17812d71002030716y7e6eb65ei78d3ef78ecf03ad4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 3, 2010 at 5:24 AM, Amit Kucheria
+On Wed, Feb 3, 2010 at 5:38 AM, Amit Kucheria
 <amit.kucheria@canonical.com> wrote:
-> On 10 Feb 02, Eric Miao wrote:
->> Hi Amit,
->>
->> Just some nit-picking review comments, see below:
->>
->> On Tue, Feb 2, 2010 at 9:16 PM, Amit Kucheria
->> <amit.kucheria@canonical.com> wrote:
->> > Freescale i.MX51 processor uses a new interrupt controller. Add
->> > driver for TrustZone Interrupt Controller
+> On 10 Feb 03, Sascha Hauer wrote:
+>> On Tue, Feb 02, 2010 at 10:43:33PM -0800, Eric Miao wrote:
 >> >
->> > Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
->> > ---
->> > ?arch/arm/plat-mxc/Kconfig ?| ? ?8 ++
->> > ?arch/arm/plat-mxc/Makefile | ? ?3 +
->> > ?arch/arm/plat-mxc/tzic.c ? | ?182 ++++++++++++++++++++++++++++++++++++++++++++
->> > ?3 files changed, 193 insertions(+), 0 deletions(-)
->> > ?create mode 100644 arch/arm/plat-mxc/tzic.c
+>> > Mmm.... this should be something that we really need to get rid of, it just
+>> > makes a single kernel for both TZIC and AVIC together impossible, if that's
+>> > so designed by HW, I'm thinking about keeping this into plat-mxc/ is a good
+>> > way to go ...
 >> >
->> > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
->> > index 8b0a1ee..59558c4 100644
->> > --- a/arch/arm/plat-mxc/Kconfig
->> > +++ b/arch/arm/plat-mxc/Kconfig
->> > @@ -62,6 +62,14 @@ config MXC_IRQ_PRIOR
->> > ? ? ? ? ?requirements for timing.
->> > ? ? ? ? ?Say N here, unless you have a specialized requirement.
+>> > Sascha, you have any better idea? Provided the other file debug-macro.S in
+>> > the same directory already seems to break the support for multiple arches?
 >> >
->> > +config MXC_TZIC
->> > + ? ? ? bool "Enable TrustZone Interrupt Controller"
->> > + ? ? ? depends on ARCH_MX51
 >>
->> This is the first patch of the base port, yet I cannot find any reference to
->> this ARCH_MX51, did you miss something?
+>> I have the following patch which I'm not sure I like better. It can
+>> support both irq controller types and does not add overhead if only one
+>> of them is compiled in. It might need some refactoring to fit into Amits
+>> patch stack.
 >
-> ARCH_MX51 is only introduced in the later patches that add the core i.MX5
-> code. Since TZIC is not inherently dependent on i.MX5 (it's merely the first
-> processor to use it), I thought of splitting it out as a separate patch.
+> Is co-existence of TZIC and AVIC a blocker to merging i.MX5 code? I've
+> already made changes so that i.MX5 doesn't explode if AVIC is compiled in.
 >
-> Does this break the sanctity of one self-contained change?
->
-
-This breaks git-bisect, we may want a buildable kernel every commit if possible.
-
->> > + ? ? ? help
->> > + ? ? ? ? This will be automatically selected for all processors
->> > + ? ? ? ? containing this interrupt controller.
->> > + ? ? ? ? Say N here only if you are really sure.
->> > +
-
-...
-
->
-> Thanks for the review.
+> Admittedly the assembly is a bit hard to rid, but we can fix in another set
+> of patches geared towards unification of an i.MX kernel. IMHO, making these
+> changes along with introducing a new SoC will make things a bit hard to
+> follow/merge.
 >
 
-No problem, dude.
+I personally don't feel that's a hard requirement, as long as it can be fixed.
