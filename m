@@ -1,39 +1,22 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Wed, 03 Feb 2010 20:19:00 +0100
-Subject: [PATCH] MX1/MX2: -EINVAL overwritten in second iteration in
-	mxc_gpio_setup_multiple_pins()
-Message-ID: <4B69CC24.3050503@gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Wed, 3 Feb 2010 20:20:01 +0100
+Subject: [PATCH 12/13] ARM: LPC32XX: architecture header files
+In-Reply-To: <20100203170737.GN11354@pengutronix.de>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-13-git-send-email-wellsk40@gmail.com>
+	<20100203170737.GN11354@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F805C8B787A9@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the `ret = gpio_request()' below in the loop, the initial -EINVAL value
-of ret is overwritten. 
+> 
+> > +#define VMALLOC_END	(PAGE_OFFSET + 0x10000000)
+> grepping shows that defining VMALLOC_END based on PAGE_OFFSET is usual,
+> but I wonder why you don't just
 
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
----
-Not 100% sure this is needed, please review. One more question: is it ok
-to return 0 when count is 0 (and nothing is done)?
+The maximum addressable DRAM sizing is 256MB when fully populated. It seemed
+the right size. 0xF0000000 works too though, I have no problems changing it.
 
-diff --git a/arch/arm/plat-mxc/iomux-mx1-mx2.c b/arch/arm/plat-mxc/iomux-mx1-mx2.c
-index a37163c..25023ac 100644
---- a/arch/arm/plat-mxc/iomux-mx1-mx2.c
-+++ b/arch/arm/plat-mxc/iomux-mx1-mx2.c
-@@ -116,14 +116,16 @@ int mxc_gpio_setup_multiple_pins(const int *pin_list, unsigned count,
- 	int i;
- 	unsigned gpio;
- 	unsigned mode;
--	int ret = -EINVAL;
-+	int ret;
- 
- 	for (i = 0; i < count; i++) {
- 		gpio = *p & (GPIO_PIN_MASK | GPIO_PORT_MASK);
- 		mode = *p & ~(GPIO_PIN_MASK | GPIO_PORT_MASK);
- 
--		if (gpio >= (GPIO_PORT_MAX + 1) * 32)
-+		if (gpio >= (GPIO_PORT_MAX + 1) * 32) {
-+			ret = -EINVAL;
- 			goto setup_error;
-+		}
- 
- 		ret = gpio_request(gpio, label);
- 		if (ret)
+> 
+> 	#define VMALLOC_END 0xF0000000
+> 
