@@ -1,37 +1,78 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 3 Feb 2010 09:46:24 -0700
-Subject: [PATCHv2 08/11] fec: fix uninitialized rx buffer usage
-In-Reply-To: <e46b06510f7eb6ca51ea8b96335b2d32ec8bf6f8.1265173480.git.amit.kucheria@canonical.com>
-References: <cover.1265173246.git.amit.kucheria@verdurent.com>
-	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
-	<9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
-	<ccc89dd7a6035abf5a78680404a2b30b9e025353.1265173480.git.amit.kucheria@canonical.com>
-	<ec63e5978fd5ac5d308ede5916e648ba925818eb.1265173480.git.amit.kucheria@canonical.com>
-	<f10f79e7313ecdeeb59ab881795baedf2430c636.1265173480.git.amit.kucheria@canonical.com>
-	<240f12ca87d7666f31263aabc620a9ec197cd8ff.1265173480.git.amit.kucheria@canonical.com>
-	<cover.1265173480.git.amit.kucheria@canonical.com>
-	<752ae69adb57d4f73fa011ba380cea1b927b9c8b.1265173480.git.amit.kucheria@canonical.com>
-	<e46b06510f7eb6ca51ea8b96335b2d32ec8bf6f8.1265173480.git.amit.kucheria@canonical.com>
-Message-ID: <fa686aa41002030846v5044d585w7f4291f89c4b7ad@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 3 Feb 2010 17:50:25 +0100
+Subject: [PATCH 11/13] ARM: LPC32XX: printascii() output and irq
+	support functions
+In-Reply-To: <1264643011-17390-12-git-send-email-wellsk40@gmail.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-12-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100203165025.GM11354@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2010 at 10:16 PM, Amit Kucheria
-<amit.kucheria@canonical.com> wrote:
-> From: Rob Herring <r.herring@freescale.com>
->
-> The fec driver was enabling receive buffer descriptor without allocating
-> the buffers. Make sure the buffer descriptors are initialized to not
-> start receiving packets.
->
-> Open also calls fec_restart after the rx buffers are allocated. With the code
-> in fec_restart, it zeroes out the buffer descriptors that have just been
-> setup.
+Hi Kevin,
 
-fec related patches 8 & 9 look okay to me.
+> +	.macro	disable_fiq
+> +	.endm
+> +
+> +	.macro  get_irqnr_preamble, base, tmp
+> +	.endm
+> +
+> +	.macro  arch_ret_to_user, tmp1, tmp2
+> +	.endm
+> +
+> +/*
+> + * Return IRQ number in irqnr. Also return processor Z flag status in CPSR
+> + * as set if an interrupt is pending.
+> + */
+> +	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> +	/* Get MIC status first */
+> +	ldr	\base, =IO_ADDRESS(MIC_BASE)
+> +	ldr	\irqstat, [\base, #INTC_STAT]
+> +	and	\irqstat, \irqstat, #0xFFFFFFFC
+> +	mov	\tmp, #0
+> +
+> +	/* Drop through to SIC1 or SIC2 if MIC is not pending */
+> +	cmp	\irqstat, #0
+> +	bne	1000f
+> +
+> +	/* SIC1 interrupts start at offset 32 */
+> +	ldr	\base, =IO_ADDRESS(SIC1_BASE)
+> +	ldr	\irqstat, [\base, #INTC_STAT]
+> +	mov	\tmp, #32
+> +
+> +	/* Drop through to SIC2 if SIC1 is not pending */
+> +	cmp	\irqstat, #0
+> +	bne	1000f
+> +
+> +	/* SIC2 interrupts start at offset 64 */
+> +	ldr	\base, =IO_ADDRESS(SIC2_BASE)
+> +	ldr	\irqstat, [\base, #INTC_STAT]
+> +	mov	\tmp, #64
+> +
+> +	/* Safety check only, exit if no status on MIC, SIC1, SIC2 */
+> +	cmp	\irqstat, #0
+> +	beq	1001f
+> +
+> +1000:
+> +	/* Returns an pending interrupt between 0 and 95 */
+> +	clz	\irqnr, \irqstat
+> +	rsb	\irqnr, \irqnr, #31
+> +	add	\irqnr, \irqnr, \tmp
+> +
+> +1001:
+> +	teq	\irqstat, #0
+> +	.endm
+> +
+> +	.macro	irq_prio_table
+> +	.endm
 
-g.
+You could make this easier by only handling MIC(?) interrupts and make
+SIC1 and SIC2 use a chained handler.  Then you can use
+get_irqnr_preamble for microoptimisation.
+
+Best regards
+Uwe
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
