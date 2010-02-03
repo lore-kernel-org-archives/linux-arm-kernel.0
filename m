@@ -1,44 +1,42 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 3 Feb 2010 10:48:23 -0700
-Subject: [spi-devel-general] PATCH [1/1] SPI: AMBA_PL022: Limit TX FIFO
-	fills based on current RX FIFO used
-In-Reply-To: <63386a3d1001220456p484efc7fm811ae2240698cbdf@mail.gmail.com>
-References: <083DF309106F364B939360100EC290F805C4BF1E97@eu1rdcrdc1wx030.exi.nxp.com>
-	<63386a3d1001220456p484efc7fm811ae2240698cbdf@mail.gmail.com>
-Message-ID: <fa686aa41002030948g6359ef3o4c3a7b265490b93f@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 3 Feb 2010 17:52:20 +0000
+Subject: [PATCH v3 2/7 RE-SEND] ARM: S5P6442: Add clock support for S5P6442
+In-Reply-To: <25e057c01002020741l157f57e3s431716adcf038a83@mail.gmail.com>
+References: <1265116976-10140-1-git-send-email-kgene.kim@samsung.com>
+	<25e057c01002020741l157f57e3s431716adcf038a83@mail.gmail.com>
+Message-ID: <20100203175220.GA13267@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2010 at 5:56 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/1/20 Kevin Wells <kevin.wells@nxp.com>:
->
->> Added logic to cap TX FIFO fill size based on current free RX
->> FIFO entries instead of TX status flags. This is to prevent
->> an issue with RX FIFO overflows
->
-> Excellent patch and works like a charm on the U300. My loopback code
-> would generate
-> spurious overfill errors before and now it *never* fails so you hit
-> exactly the right spot.
-> I remember being intrigued by this when I worked on the driver and now
-> it is finally
-> nailed.
->
-> As some sort of maintainer of this file I have signed it off and put
-> it into Russells
-> patch tracker for inclusion, OK? See;
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5893/1
+On Tue, Feb 02, 2010 at 04:41:24PM +0100, roel kluin wrote:
+> > This patch adds clock support for S5P6442. This patch adds the clock
+> > register definitions and the various system clocks in S5P6442.
+> 
+> > +static struct clksrc_clk clk_mout_epll = {
+> > + ? ? ? .clk ? ?= {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mout_epll",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> > + ? ? ? },
+> > + ? ? ? .sources ? ? ? ?= &clk_src_epll,
+> > + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1 },
+> > +};
+> 
+> This appears not to be used, is this implemented in another patch?
 
-I'm actively maintaining SPI now.  In general, I'd prefer SPI patches
-to go through the SPI tree, unless there are commit ordering issues
-with arch code.  I'm tracking SPI patches with patchwork:
+Not sure, although I'm not going to argue about it if it isn't.
 
-http://patchwork.kernel.org/project/spi-devel-general/list/
-
-Thanks,
-g.
+This new version is better than trying to deal with the switch() statements
+which initialised the base hclk values.
+ 
+> Roel
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
