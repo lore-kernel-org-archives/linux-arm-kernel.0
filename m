@@ -1,35 +1,63 @@
-From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Tue,  2 Feb 2010 15:59:28 -0800
-Subject: [PATCH 16/16] ARM: LPC32XX: Fix sparse errors on LCD code
-In-Reply-To: <LPC32XX architecture files (updated)>
-References: <LPC32XX architecture files (updated)>
-Message-ID: <1265155168-28909-17-git-send-email-wellsk40@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 2 Feb 2010 16:14:40 -0800
+Subject: [PATCH 1/1] mmp2: add handling on PMIC IRQ
+In-Reply-To: <771cded01001262208p2da963dbhf51a245606741bfc@mail.gmail.com>
+References: <771cded01001262208p2da963dbhf51a245606741bfc@mail.gmail.com>
+Message-ID: <f17812d71002021614n4d9838dh1e2ad6e6be2843c5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wells <wellsk40@gmail.com>
+On Tue, Jan 26, 2010 at 10:08 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 43f04d3f0ab95721b5fd6b9590990ffa1b1eef1d Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 27 Jan 2010 08:49:12 -0500
+> Subject: [PATCH] mmp2: add handling on PMIC IRQ
+>
+> Since PMIC INT pin is a special pin of CPU, the status of PMIC INT pin needs
+> to be cleared after PMIC IRQ occured. Now append the clear operation in
+> irq chip handler.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/irq-mmp2.c | ? ?7 +++++++
+> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
+> index 41b29f6..761abe3 100644
+> --- a/arch/arm/mach-mmp/irq-mmp2.c
+> +++ b/arch/arm/mach-mmp/irq-mmp2.c
+> @@ -62,7 +62,9 @@ static void _name_##_unmask_irq(unsigned int irq) ? ? ? ? ? ? ? ? ? ? \
+> ?static void _name_##_irq_demux(unsigned int irq, struct irq_desc *desc) ? ? ? ?\
+> ?{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?unsigned long status, mask, n; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? unsigned long mfpr_pmic, data; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?mask = __raw_readl(prefix##_MASK); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? mfpr_pmic = APB_VIRT_BASE + 0x1e000 + 0x2c4; ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?while (1) { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?status = __raw_readl(prefix##_STATUS) & ~mask; ? ? ? ? ?\
+> ? ? ? ? ? ? ? ?if (status == 0) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> @@ -70,6 +72,11 @@ static void _name_##_irq_demux(unsigned int irq,
+> struct irq_desc *desc) ?\
+> ? ? ? ? ? ? ? ?n = find_first_bit(&status, BITS_PER_LONG); ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?while (n < BITS_PER_LONG) { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?generic_handle_irq(irq_base + n); ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? if ((irq_base + n) == IRQ_MMP2_PMIC) { ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? data = __raw_readl(mfpr_pmic); ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(data | (1 << 6), mfpr_pmic); \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(data, mfpr_pmic); ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?n = find_next_bit(&status, BITS_PER_LONG, n+1); \
+> ? ? ? ? ? ? ? ?} ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ?} ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
 
-Added __force and corrected line length to fix sparse errors
-and meet coding requirements.
+I don't think this is probably the right way to go. There could be two
+improvements:
 
-Signed-off-by: Kevin Wells <wellsk40@gmail.com>
----
- arch/arm/mach-lpc32xx/phy3250.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+1. move mfpr register manipulation into a dedicated function, e.g.
+    mmp2_clear_pmic_int() within mmp2.c
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 846bc33..c7a6d9f 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -88,7 +88,8 @@ static int lpc32xx_clcd_setup(struct clcd_fb *fb)
- 	fb->fb.screen_base = (char __iomem *) NULL;
- #ifdef CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD
- 	if (PANEL_SIZE <= CONFIG_ARCH_LPC32XX_IRAM_SIZE) {
--		fb->fb.screen_base = (char __iomem *) io_p2v(LPC32XX_IRAM_BASE);
-+		fb->fb.screen_base = (__force char __iomem *)
-+			io_p2v(LPC32XX_IRAM_BASE);
- 		fb->fb.fix.smem_start = (dma_addr_t) LPC32XX_IRAM_BASE;
- 	}
- #endif
--- 
-1.6.6
+2. invent a pmic_mask_ack_irq() to replace the default one at
+   run-time, so to save the time that every 2nd level interrupt
+   handling has to go through the if (.... == IRQ_MMP2_PMIC) thing,
+   provided it does look like an ack operation to me.
