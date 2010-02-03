@@ -1,211 +1,346 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 3 Feb 2010 15:40:59 -0500
-Subject: [PATCH] input: support onkey in 88pm860x
-Message-ID: <mailman.187.1265202278.2170.linux-arm-kernel@lists.infradead.org>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Wed, 3 Feb 2010 05:24:04 -0800
+Subject: [PATCHv2 01/11] arm: mxc: TrustZone interrupt controller
+	(TZIC) for i.MX5 family
+In-Reply-To: <f17812d71002022223jdc0ac5cp5b94928fb45695d6@mail.gmail.com>
+References: <cover.1265173480.git.amit.kucheria@canonical.com>
+	<cover.1265173246.git.amit.kucheria@verdurent.com>
+	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+	<f17812d71002022223jdc0ac5cp5b94928fb45695d6@mail.gmail.com>
+Message-ID: <20100203132404.GC5252@k2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/input/misc/88pm860x_onkey.c |  154 +++++++++++++++++++++++++++++++++++
- drivers/input/misc/Kconfig          |   10 +++
- drivers/input/misc/Makefile         |    1 +
- 3 files changed, 165 insertions(+), 0 deletions(-)
- create mode 100644 drivers/input/misc/88pm860x_onkey.c
+On 10 Feb 02, Eric Miao wrote:
+> Hi Amit,
+> 
+> Just some nit-picking review comments, see below:
+> 
+> On Tue, Feb 2, 2010 at 9:16 PM, Amit Kucheria
+> <amit.kucheria@canonical.com> wrote:
+> > Freescale i.MX51 processor uses a new interrupt controller. Add
+> > driver for TrustZone Interrupt Controller
+> >
+> > Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> > ---
+> > ?arch/arm/plat-mxc/Kconfig ?| ? ?8 ++
+> > ?arch/arm/plat-mxc/Makefile | ? ?3 +
+> > ?arch/arm/plat-mxc/tzic.c ? | ?182 ++++++++++++++++++++++++++++++++++++++++++++
+> > ?3 files changed, 193 insertions(+), 0 deletions(-)
+> > ?create mode 100644 arch/arm/plat-mxc/tzic.c
+> >
+> > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> > index 8b0a1ee..59558c4 100644
+> > --- a/arch/arm/plat-mxc/Kconfig
+> > +++ b/arch/arm/plat-mxc/Kconfig
+> > @@ -62,6 +62,14 @@ config MXC_IRQ_PRIOR
+> > ? ? ? ? ?requirements for timing.
+> > ? ? ? ? ?Say N here, unless you have a specialized requirement.
+> >
+> > +config MXC_TZIC
+> > + ? ? ? bool "Enable TrustZone Interrupt Controller"
+> > + ? ? ? depends on ARCH_MX51
+> 
+> This is the first patch of the base port, yet I cannot find any reference to
+> this ARCH_MX51, did you miss something?
 
-diff --git a/drivers/input/misc/88pm860x_onkey.c
-b/drivers/input/misc/88pm860x_onkey.c
-new file mode 100644
-index 0000000..a846e67
---- /dev/null
-+++ b/drivers/input/misc/88pm860x_onkey.c
-@@ -0,0 +1,154 @@
-+/*
-+ * 88pm860x_onkey.c - Marvell 88PM860x ONKEY driver
-+ *
-+ * Copyright (C) 2009-2010 Marvell International Ltd.
-+ *      Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/i2c.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/mfd/88pm860x.h>
-+
-+#define PM8607_WAKEUP		0x0b
-+
-+#define LONG_ONKEY_EN		(1 << 1)
-+#define ONKEY_STATUS		(1 << 0)
-+
-+struct pm860x_onkey_info {
-+	struct input_dev	*idev;
-+	struct pm860x_chip	*chip;
-+	struct i2c_client	*i2c;
-+	struct device		*dev;
-+	int			irq;
-+};
-+
-+/* 88PM860x gives us an interrupt when ONKEY is held */
-+static irqreturn_t pm860x_onkey_handler(int irq, void *data)
-+{
-+	struct pm860x_onkey_info *info = data;
-+	int ret;
-+
-+	ret = pm860x_reg_read(info->i2c, PM8607_STATUS_2);
-+	ret &= ONKEY_STATUS;
-+	input_report_key(info->idev, KEY_POWER, ret);
-+	input_sync(info->idev);
-+
-+	/* Enable 8-second long onkey detection */
-+	pm860x_set_bits(info->i2c, PM8607_WAKEUP, 3, LONG_ONKEY_EN);
-+	return IRQ_HANDLED;
-+}
-+
-+static int __devinit pm860x_onkey_probe(struct platform_device *pdev)
-+{
-+	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
-+	struct pm860x_onkey_info *info;
-+	int irq, ret;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ resource!\n");
-+		return -EINVAL;
-+	}
-+
-+	info = kzalloc(sizeof(struct pm860x_onkey_info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+	info->chip = chip;
-+	info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
-+	info->dev = &pdev->dev;
-+	info->irq = irq + chip->irq_base;
-+
-+	ret = request_threaded_irq(info->irq, NULL, pm860x_onkey_handler,
-+				   IRQF_ONESHOT, "onkey", info);
-+	if (ret < 0) {
-+		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
-+			info->irq, ret);
-+		goto out;
-+	}
-+
-+	info->idev = input_allocate_device();
-+	if (!info->idev) {
-+		dev_err(chip->dev, "Failed to allocate input dev\n");
-+		ret = -ENOMEM;
-+		goto out_input;
-+	}
-+
-+	info->idev->name = "88pm860x_on";
-+	info->idev->phys = "88pm860x_on/input0";
-+	info->idev->id.bustype = BUS_I2C;
-+	info->idev->dev.parent = &pdev->dev;
-+	info->irq = irq;
-+	info->idev->evbit[0] = BIT_MASK(EV_KEY);
-+	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-+
-+	ret = input_register_device(info->idev);
-+	if (ret) {
-+		dev_err(chip->dev, "Can't register input device: %d\n", ret);
-+		goto out_reg;
-+	}
-+	platform_set_drvdata(pdev, info);
-+
-+	return 0;
-+
-+out_reg:
-+	input_free_device(info->idev);
-+out_input:
-+	free_irq(info->irq, info);
-+out:
-+	kfree(info);
-+	return ret;
-+}
-+
-+static int __devexit pm860x_onkey_remove(struct platform_device *pdev)
-+{
-+	struct pm860x_onkey_info *info = platform_get_drvdata(pdev);
-+
-+	if (info) {
-+		free_irq(info->irq, info);
-+		input_unregister_device(info->idev);
-+		kfree(info);
-+	}
-+	return 0;
-+}
-+
-+static struct platform_driver pm860x_onkey_driver = {
-+	.driver		= {
-+		.name	= "88pm860x-onkey",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= pm860x_onkey_probe,
-+	.remove		= __devexit_p(pm860x_onkey_remove),
-+};
-+
-+static int __init pm860x_onkey_init(void)
-+{
-+	return platform_driver_register(&pm860x_onkey_driver);
-+}
-+module_init(pm860x_onkey_init);
-+
-+static void __exit pm860x_onkey_exit(void)
-+{
-+	platform_driver_unregister(&pm860x_onkey_driver);
-+}
-+module_exit(pm860x_onkey_exit);
-+
-+MODULE_DESCRIPTION("Marvell 88PM860x ONKEY driver");
-+MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 32f9e02..3cd878f 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -12,6 +12,16 @@ menuconfig INPUT_MISC
+ARCH_MX51 is only introduced in the later patches that add the core i.MX5
+code. Since TZIC is not inherently dependent on i.MX5 (it's merely the first
+processor to use it), I thought of splitting it out as a separate patch.
 
- if INPUT_MISC
+Does this break the sanctity of one self-contained change?
 
-+config INPUT_88PM860X_ONKEY
-+	tristate "88PM860x ONKEY support"
-+	depends on MFD_88PM860X
-+	help
-+	  Support the ONKEY of Marvell 88PM860x PMICs as an input device
-+	  reporting power button status.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called 88pm860x_onkey.
-+
- config INPUT_PCSPKR
- 	tristate "PC Speaker support"
- 	depends on PCSPKR_PLATFORM
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index d903dab..6d6130f 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -4,6 +4,7 @@
+> > + ? ? ? help
+> > + ? ? ? ? This will be automatically selected for all processors
+> > + ? ? ? ? containing this interrupt controller.
+> > + ? ? ? ? Say N here only if you are really sure.
+> > +
+> > ?config MXC_PWM
+> > ? ? ? ?tristate "Enable PWM driver"
+> > ? ? ? ?depends on ARCH_MXC
+> > diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> > index 996cbac..0202ad9 100644
+> > --- a/arch/arm/plat-mxc/Makefile
+> > +++ b/arch/arm/plat-mxc/Makefile
+> > @@ -5,6 +5,9 @@
+> > ?# Common support
+> > ?obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
+> >
+> > +# MX51 uses the TZIC interrupt controller, older platforms use AVIC (irq.o)
+> > +obj-$(CONFIG_MXC_TZIC) += tzic.o
+> > +
+> > ?obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
+> > ?obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+> > ?obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+> > diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> > new file mode 100644
+> > index 0000000..00cb0ad
+> > --- /dev/null
+> > +++ b/arch/arm/plat-mxc/tzic.c
+> > @@ -0,0 +1,182 @@
+> > +/*
+> > + * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/moduleparam.h>
+> > +#include <linux/init.h>
+> > +#include <linux/device.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <asm/mach/irq.h>
+> > +
+> > +#include <mach/hardware.h>
+> > +
+> > +/*
+> > + *****************************************
+> > + * TZIC Registers ? ? ? ? ? ? ? ? ? ? ? ?*
+> > + *****************************************
+> > + */
+> > +
+> > +#define TZIC_INTCNTL ? ? ? ? ? ?0x0000 /* Control register */
+> > +#define TZIC_INTTYPE ? ? ? ? ? ?0x0004 /* Controller Type register */
+> > +#define TZIC_IMPID ? ? ? ? ? ? ?0x0008 /* Distributor Implementer Identification */
+> > +#define TZIC_PRIOMASK ? ? ? ? ? 0x000C /* Priority Mask Reg */
+> > +#define TZIC_SYNCCTRL ? ? ? ? ? 0x0010 /* Synchronizer Control register */
+> > +#define TZIC_DSMINT ? ? ? ? ? ? 0x0014 /* DSM interrupt Holdoffregister */
+> > +#define TZIC_INTSEC0 ? ? ? ? ? ?0x0080 /* Interrupt Security register 0 */
+> > +#define TZIC_ENSET0 ? ? ? ? ? ? 0x0100 /* Enable Set Register 0 */
+> > +#define TZIC_ENCLEAR0 ? ? ? ? ? 0x0180 /* Enable Clear Register 0 */
+> > +#define TZIC_SRCSET0 ? ? ? ? ? ?0x0200 /* Source Set Register 0 */
+> > +#define TZIC_SRCCLAR0 ? ? ? ? ? 0x0280 /* Source Clear Register 0 */
+> > +#define TZIC_PRIORITY0 ? ? ? ? ?0x0400 /* Priority Register 0 */
+> > +#define TZIC_PND0 ? ? ? ? ? ? ? 0x0D00 /* Pending Register 0 */
+> > +#define TZIC_HIPND0 ? ? ? ? ? ? 0x0D80 /* High Priority Pending Register */
+> > +#define TZIC_WAKEUP0 ? ? ? ? ? ?0x0E00 /* Wakeup Config Register */
+> > +#define TZIC_SWINT ? ? ? ? ? ? ?0x0F00 /* Software Interrupt Rigger Register */
+> > +#define TZIC_ID0 ? ? ? ? ? ? ? ?0x0FD0 /* Indentification Register 0 */
+> > +
+> > +void __iomem *tzic_base;
+> 
+> This can just be made to 'static' if it's not used elsewhere, and I'm
+> wondering if it's neater to define them as:
+> 
+> #define TZIC_INTCNTL		(tzic_base + 0x0000)
+> 
+> so to make the code below short and handy.
 
- # Each configuration option enables a list of files.
+tzic_base is actually used in entry-macro.S in patch 0004. I've tried to follow
+AVIC's way of doing things.
 
-+obj-$(CONFIG_INPUT_88PM860X_ONKEY)	+= 88pm860x_onkey.o
- obj-$(CONFIG_INPUT_APANEL)		+= apanel.o
- obj-$(CONFIG_INPUT_ATI_REMOTE)		+= ati_remote.o
- obj-$(CONFIG_INPUT_ATI_REMOTE2)		+= ati_remote2.o
+> > +
+> > +/*
+> > + * Disable interrupt number "irq" in the TZIC
+> 
+> I don't think this follows kernel API doc exactly, you may want to have a
+> look into Documentation/kernel-doc-nano-HOWTO.txt.
+
+OK.
+
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number
+> > + */
+> > +static void tzic_mask_irq(unsigned int irq)
+> > +{
+> > + ? ? ? int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > + ? ? ? __raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0 + (index << 2));
+> 
+> I'll normally define TZIC_ENCLEAR0 then as:
+> 
+> #define TZIC_ENCLEAR(i)		(0x0180 + ((i) << 2))
+> 
+> so the above can be written as:
+> 
+> 	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR(index));
+> 
+> or by including tzic_base into TZIC_*, simply as:
+> 
+> 	__raw_writel(1 << off, TZIC_ENCLEAR(index));
+
+OK.
+
+> > +}
+> > +
+> > +/*
+> > + * Enable interrupt number "irq" in the TZIC
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number
+> > + */
+> > +static void tzic_unmask_irq(unsigned int irq)
+> > +{
+> > + ? ? ? int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > + ? ? ? __raw_writel(1 << off, tzic_base + TZIC_ENSET0 + (index << 2));
+> > +}
+> > +
+> > +static unsigned int wakeup_intr[4];
+> > +
+> > +/*
+> > + * Set interrupt number "irq" in the TZIC as a wake-up source.
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number
+> > + * @param ?enable ? ? ? enable as wake-up if equal to non-zero
+> > + * ? ? ? ? ? ? ? ? ? ? disble as wake-up if equal to zero
+> > + *
+> > + * @return ? ? ? This function returns 0 on success.
+> > + */
+> > +static int tzic_set_wake_irq(unsigned int irq, unsigned int enable)
+> > +{
+> > + ? ? ? unsigned int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > +
+> > + ? ? ? if (index > 3)
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? if (enable)
+> > + ? ? ? ? ? ? ? wakeup_intr[index] |= (1 << off);
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? wakeup_intr[index] &= ~(1 << off);
+> > +
+> > + ? ? ? return 0;
+> > +}
+> > +
+> > +static struct irq_chip mxc_tzic_chip = {
+> > + ? ? ? .name = "MXC_TZIC",
+> > + ? ? ? .ack = tzic_mask_irq,
+> > + ? ? ? .mask = tzic_mask_irq,
+> > + ? ? ? .unmask = tzic_unmask_irq,
+> > + ? ? ? .set_wake = tzic_set_wake_irq,
+> > +};
+> > +
+> > +/*
+> > + * This function initializes the TZIC hardware and disables all the
+> > + * interrupts. It registers the interrupt enable and disable functions
+> > + * to the kernel for each interrupt source.
+> > + */
+> > +void __init tzic_init_irq(void __iomem *irqbase)
+> > +{
+> > + ? ? ? int i;
+> > +
+> > + ? ? ? tzic_base = irqbase;
+> > + ? ? ? /* put the TZIC into the reset value with
+> > + ? ? ? ?* all interrupts disabled
+> > + ? ? ? ?*/
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_INTCNTL);
+> 
+> Mixing the use of 'i' as both a signed counter and register value might
+> not be a good idea, provided it's not guaranteed from theory that 'i' as
+> an integer could not be sufficient to hold the value returned from
+> __raw_readl()
+
+Fair enough.
+
+> > +
+> > + ? ? ? __raw_writel(0x80010001, tzic_base + TZIC_INTCNTL);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_INTCNTL);
+> > + ? ? ? __raw_writel(0x1f, tzic_base + TZIC_PRIOMASK);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_PRIOMASK);
+> > + ? ? ? __raw_writel(0x02, tzic_base + TZIC_SYNCCTRL);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_SYNCCTRL);
+> 
+> Are these read-back really necessary? We can start without them and add them
+> later if they do cause issues.
+
+Can anybody from Freescale comment whether the read-back is necessary?
+
+I'll remove it for now to see what happens in my testing.
+
+> > +
+> > + ? ? ? for (i = 0; i < 4; i++)
+> > + ? ? ? ? ? ? ? __raw_writel(0xFFFFFFFF, tzic_base + TZIC_INTSEC0 + i * 4);
+> > +
+> > + ? ? ? /* disable all interrupts */
+> > + ? ? ? for (i = 0; i < 4; i++)
+> > + ? ? ? ? ? ? ? __raw_writel(0xFFFFFFFF, tzic_base + TZIC_ENCLEAR0 + i * 4);
+> > +
+> > + ? ? ? /* all IRQ no FIQ Warning :: No selection */
+> > +
+> > + ? ? ? for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
+> > + ? ? ? ? ? ? ? set_irq_chip(i, &mxc_tzic_chip);
+> > + ? ? ? ? ? ? ? set_irq_handler(i, handle_level_irq);
+> > + ? ? ? ? ? ? ? set_irq_flags(i, IRQF_VALID);
+> > + ? ? ? }
+> > +
+> > + ? ? ? printk(KERN_INFO "TrustZone Interrupt Controller (TZIC) initialized\n");
+> 
+> You may want to use pr_info() for short.
+
+OK
+
+> > +}
+> > +
+> > +/*
+> > + * enable wakeup interrupt
+> > + *
+> > + * @param is_idle ? ? ? ? ? ? ?1 if called in idle loop (ENSET register);
+> > + * ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0 to be used when called from low power entry
+> > + * @return ? ? ? ? ? ? ? ? ? ? 0 if successful; non-zero otherwise
+> > + *
+> > + */
+> > +int tzic_enable_wake(int is_idle)
+> > +{
+> > + ? ? ? unsigned int i, v;
+> > +
+> > + ? ? ? __raw_writel(1, tzic_base + TZIC_DSMINT);
+> > + ? ? ? if (unlikely(__raw_readl(tzic_base + TZIC_DSMINT) == 0))
+> > + ? ? ? ? ? ? ? return -EAGAIN;
+> 
+> Looks like an unnecessary read-back provided the silicon is sane enough.
+
+Again, Dinh/Rob can you comment?
+
+> > +
+> > + ? ? ? if (likely(is_idle)) {
+> > + ? ? ? ? ? ? ? for (i = 0; i < 4; i++) {
+> > + ? ? ? ? ? ? ? ? ? ? ? v = __raw_readl(tzic_base + TZIC_ENSET0 + i * 4);
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
+> > + ? ? ? ? ? ? ? }
+> > + ? ? ? } else {
+> > + ? ? ? ? ? ? ? for (i = 0; i < 4; i++) {
+> > + ? ? ? ? ? ? ? ? ? ? ? v = wakeup_intr[i];
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
+> > + ? ? ? ? ? ? ? }
+> > + ? ? ? }
+> 
+> Or could be simplified to:
+> 
+> 	for (i = 0; i < 4; i++) {
+> 		v = is_idle ? __raw_readl(TZIC_ENSET(i)) : wakeup_intr[i];
+> 		__raw_writel(v, TZIC_WAKEUP(i));
+> 	}
+
+OK
+
+> but just nit-picking comments, so it's up to you.
+> 
+> > + ? ? ? return 0;
+> > +}
+> 
+> Mmmm.... this being called elsewhere, I'm thinking about making this a
+> sys_device and having this called within sysdev_class.suspend() to make
+> this file rather self-contained.
+
+That is the idea once the base port is upstream.
+
+Thanks for the review.
+
+/Amit
 -- 
-1.5.6.5
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
