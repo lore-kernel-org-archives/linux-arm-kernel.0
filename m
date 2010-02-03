@@ -1,46 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Feb 2010 09:25:57 -0800
-Subject: [PATCH 1/9] omap: define _toggle_gpio_edge_triggering only for
-	OMAP1
-In-Reply-To: <20100203171026.GO11354@pengutronix.de>
-References: <20100203022318.26347.34734.stgit@baageli.muru.com>
-	<20100203022555.26347.62876.stgit@baageli.muru.com>
-	<20100203081313.GB11354@pengutronix.de>
-	<20100203165754.GA22747@atomide.com>
-	<20100203171026.GO11354@pengutronix.de>
-Message-ID: <20100203172557.GE22747@atomide.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 3 Feb 2010 09:36:28 -0800
+Subject: [PATCH 5/5] input: support onkey in 88pm860x
+In-Reply-To: <771cded01002030504ye3416c8nafe21be405237ace@mail.gmail.com>
+References: <771cded01002030504ye3416c8nafe21be405237ace@mail.gmail.com>
+Message-ID: <20100203173628.GB30600@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [100203 09:07]:
-> Hello Tony,
-> 
-> On Wed, Feb 03, 2010 at 08:57:55AM -0800, Tony Lindgren wrote:
-> > BTW, looks like with "git show --pretty=email" the From: field gets
-> > messed up in the patch below. Author name shows OK in git though.
-> > 
-> > I wonder if that's a git bug for --pretty=email? Using version
-> > 1.6.6.1 it seems.
-> That's not a bug, but a feature.  This is normal rfcforgotthenumber mail
-> header quoting.  (2822?)
+Hi Haojian,
 
-Oh right, the email headers need to be ASCII still. Was not aware of
-how umlauts should be encoded into the name though. It seems that
-all my fellow Finns have erased the umlauts from their email addresses,
-at least in my aliases file.
+On Wed, Feb 03, 2010 at 08:04:30AM -0500, Haojian Zhuang wrote:
 
-Tony
+Looks most;y good with the exceptin of the following:
 
-> 
-> > 
-> > Tony
-> 
-> > From 9198bcd39f558dd56823f1c9983e2252fc99a501 Mon Sep 17 00:00:00 2001
-> > From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
-> 
-> Thanks
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+> +
+> +	info = kzalloc(sizeof(struct pm860x_onkey_info), GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +	info->chip = chip;
+> +	info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
+> +	info->dev = &pdev->dev;
+> +	info->irq = irq + chip->irq_base;
+> +
+> +	ret = request_threaded_irq(info->irq, NULL, pm860x_onkey_handler,
+> +				   IRQF_ONESHOT, "onkey", info);
+> +	if (ret < 0) {
+> +		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
+> +			info->irq, ret);
+> +		goto out;
+> +	}
+> +
+> +	info->idev = input_allocate_device();
+
+You can't enable IRQ first and allocate the device later. If IRQ comes
+here it will go "BOOM".
+
+> +	if (!info->idev) {
+> +		dev_err(chip->dev, "Failed to allocate input dev\n");
+> +		ret = -ENOMEM;
+> +		goto out_input;
+> +	}
+> +
+> +	info->idev->name = "88pm860x_on";
+> +	info->idev->phys = "88pm860x_on/input0";
+> +	info->idev->id.bustype = BUS_I2C;
+> +	info->idev->dev.parent = &pdev->dev;
+> +	info->irq = irq;
+> +	info->idev->evbit[0] = BIT_MASK(EV_KEY);
+> +	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
+> +
+> +	ret = input_register_device(info->idev);
+> +	if (ret) {
+> +		dev_err(chip->dev, "Can't register input device: %d\n", ret);
+> +		goto out_reg;
+> +	}
+> +	platform_set_drvdata(pdev, info);
+> +
+> +	return 0;
+> +
+> +out_reg:
+> +	input_free_device(info->idev);
+> +out_input:
+> +	free_irq(info->irq, info);
+
+So this needs to be in reverse order as well.
+
+> +out:
+> +	kfree(info);
+> +	return ret;
+> +}
+> +
+> +static int __devexit pm860x_onkey_remove(struct platform_device *pdev)
+> +{
+> +	struct pm860x_onkey_info *info = platform_get_drvdata(pdev);
+> +
+> +	if (info) {
+
+"info" will never be NULL, your probe routine makes sure of it. Also it
+is considered a good manners to set drvdata back to NULL after
+unbinding.
+
+> +		free_irq(info->irq, info);
+> +		input_unregister_device(info->idev);
+> +		kfree(info);
+> +	}
+> +	return 0;
+> +}
+> +
+
+Thanks.
+
+-- 
+Dmitry
