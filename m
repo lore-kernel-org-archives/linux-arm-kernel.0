@@ -1,30 +1,18 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Wed, 3 Feb 2010 20:25:10 +0100
-Subject: [PATCH 01/16] ARM: LPC32XX: clock lookups array should not be
-	tagged __initdata
-In-Reply-To: <20100203100803.GA22275@n2100.arm.linux.org.uk>
-References: <1265155168-28909-2-git-send-email-wellsk40@gmail.com>
-	<20100203100803.GA22275@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F805C8B787AC@eu1rdcrdc1wx030.exi.nxp.com>
+From: jeff@garzik.org (Jeff Garzik)
+Date: Wed, 03 Feb 2010 14:58:07 -0500
+Subject: [git patches] new hardware support for atang tree
+In-Reply-To: <201002031940.20129.bzolnier@gmail.com>
+References: <201002031940.20129.bzolnier@gmail.com>
+Message-ID: <4B69D54F.4040705@garzik.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> On Tue, Feb 02, 2010 at 03:59:13PM -0800, wellsk40 at gmail.com wrote:
-> > From: Kevin Wells <wellsk40@gmail.com>
-> >
-> > struct clk looksup[] should not be tagged with the __initdata
-> > attribute so system functions after bootup can use the clkdev
-> > support.
-> 
-> Can you roll this into your previous patch set please?
+On 02/03/2010 01:40 PM, Bartlomiej Zolnierkiewicz wrote:
+>
+> Since I haven't seen any progress on mainstreaming of s3c-ide and
+> pata_altera_cf patches in the recent months I decided to merge them
 
-Hi Russell,
+pata_altera_cf still needs to be updated to v3, taking into account 
+Alan's feedback.  A ping in Nov 2009 resulted in no response.
 
-I'll fix the many more comments from the reviews and put up another
-(hopefully last) set of patches that are sparse and bisect safe and
-hopefully review safe. I would like to get these in patch tracker if
-all goes good.
-
-thanks,
-Kevin
+	Jeff
