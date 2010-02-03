@@ -1,52 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Feb 2010 10:20:31 +0000
-Subject: [PATCH 13/16] ARM: LPC32XX: Various fixes with readl/writel types
-In-Reply-To: <1265155168-28909-14-git-send-email-wellsk40@gmail.com>
-References: <1265155168-28909-14-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100203102031.GE22275@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 3 Feb 2010 11:31:02 +0100
+Subject: [PATCH 04/13] ARM: LPC32XX arch support in Kconfig and Makefile
+In-Reply-To: <1264643011-17390-5-git-send-email-wellsk40@gmail.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-5-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100203103102.GE11354@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2010 at 03:59:25PM -0800, wellsk40 at gmail.com wrote:
->  	if (fb->fb.screen_base == NULL) {
-> -		fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
-> -			PANEL_SIZE, &dma, GFP_KERNEL);
-> +		fb->fb.screen_base = (__force char __iomem *)
-> +			dma_alloc_writecombine(&fb->dev->dev, PANEL_SIZE,
-> +			&dma, GFP_KERNEL);
+Hi Kevin,
 
-There are times when putting up with sparse complaints is the right thing
-to do, and this is one situation where that is true.
+On Wed, Jan 27, 2010 at 05:43:22PM -0800, wellsk40 at gmail.com wrote:
+> From: Kevin Wells <wellsk40@gmail.com>
+> 
+> Added support and default config flags in Kconfig for the LCP32XX
+> arch. Updated the Makefile to include the mach-lpc32xx dir when
+> the ARCH_LCP32XX arch is selected.
+> 
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+> ---
+>  arch/arm/Kconfig  |   16 ++++++++++++++++
+>  arch/arm/Makefile |    1 +
+This patch isn't self-contained.  This might hurt bisectability.
+IMHO all intermediate states should be compilable.
 
->  		fb->fb.fix.smem_start = dma;
->  	}
+>  2 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4c33ca8..cc2dbf9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -550,6 +550,20 @@ config ARCH_W90X900
+>  	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
+>  		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
 >  
-> @@ -130,7 +131,7 @@ static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
->  #endif
->  
->  	return dma_mmap_writecombine(&fb->dev->dev, vma,
-> -				     fb->fb.screen_base,
-> +				     (__force void *) fb->fb.screen_base,
+> +config ARCH_LPC32XX
+> +	bool "NXP LPC32XX"
+> +	select CPU_ARM926T
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select GENERIC_GPIO
+no need to select GENERIC_GPIO if you have ARCH_REQUIRE_GPIOLIB
 
-Same here.
+Best regards
+Uwe
 
->  				     fb->fb.fix.smem_start,
->  				     fb->fb.fix.smem_len);
->  }
-> @@ -140,11 +141,12 @@ static void lpc32xx_clcd_remove(struct clcd_fb *fb)
->  #ifdef CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD
->  	if (PANEL_SIZE > CONFIG_ARCH_LPC32XX_IRAM_SIZE)
->  		dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
-> -			fb->fb.screen_base, fb->fb.fix.smem_start);
-> +			(__force void *) fb->fb.screen_base,
-> +			fb->fb.fix.smem_start);
-
-and here.
-
->  
->  #else
->  	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
-> -		fb->fb.screen_base, fb->fb.fix.smem_start);
-> +		(__force void *) fb->fb.screen_base, fb->fb.fix.smem_start);
-
-and here.
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
