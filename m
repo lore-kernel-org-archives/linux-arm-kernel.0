@@ -1,109 +1,172 @@
 From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue,  2 Feb 2010 21:16:28 -0800
-Subject: [PATCHv2 06/11] mxc: enable support for Freescale i.MX5 series of
-	processors
-In-Reply-To: <f10f79e7313ecdeeb59ab881795baedf2430c636.1265173480.git.amit.kucheria@canonical.com>
+Date: Tue,  2 Feb 2010 21:16:29 -0800
+Subject: [PATCHv2 07/11] mxc: Add support for the Babbage board
+In-Reply-To: <240f12ca87d7666f31263aabc620a9ec197cd8ff.1265173480.git.amit.kucheria@canonical.com>
 References: <cover.1265173246.git.amit.kucheria@verdurent.com>
 	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
 	<9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
 	<ccc89dd7a6035abf5a78680404a2b30b9e025353.1265173480.git.amit.kucheria@canonical.com>
 	<ec63e5978fd5ac5d308ede5916e648ba925818eb.1265173480.git.amit.kucheria@canonical.com>
 	<f10f79e7313ecdeeb59ab881795baedf2430c636.1265173480.git.amit.kucheria@canonical.com>
-Message-ID: <240f12ca87d7666f31263aabc620a9ec197cd8ff.1265173480.git.amit.kucheria@canonical.com>
+	<240f12ca87d7666f31263aabc620a9ec197cd8ff.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <752ae69adb57d4f73fa011ba380cea1b927b9c8b.1265173480.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kconfig and Makefiles to enable Freescale i.MX51 processor. Separated to help
-ease the review process.
+Babbage is a reference board from Freescale for their i.MX51 SoC.
+
+Boot tested on a Babbage2.5 board
 
 Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
 ---
- arch/arm/Makefile               |    1 +
- arch/arm/mach-mx5/Kconfig       |   11 +++++++++++
- arch/arm/mach-mx5/Makefile      |    7 +++++++
- arch/arm/mach-mx5/Makefile.boot |    3 +++
- arch/arm/plat-mxc/Kconfig       |    8 ++++++++
- 5 files changed, 30 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx5/Kconfig
- create mode 100644 arch/arm/mach-mx5/Makefile
- create mode 100644 arch/arm/mach-mx5/Makefile.boot
+ arch/arm/mach-mx5/Kconfig               |    6 ++
+ arch/arm/mach-mx5/Makefile              |    2 +
+ arch/arm/mach-mx5/board-mx51_babbage.c  |   99 +++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ 4 files changed, 108 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/board-mx51_babbage.c
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 9e75825..52232d2 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -146,6 +146,7 @@ machine-$(CONFIG_ARCH_MX1)		:= mx1
- machine-$(CONFIG_ARCH_MX2)		:= mx2
- machine-$(CONFIG_ARCH_MX25)		:= mx25
- machine-$(CONFIG_ARCH_MX3)		:= mx3
-+machine-$(CONFIG_ARCH_MX5)		:= mx5
- machine-$(CONFIG_ARCH_MXC91231)		:= mxc91231
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
 diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-new file mode 100644
-index 0000000..ccd96fd
---- /dev/null
+index ccd96fd..80a749c 100644
+--- a/arch/arm/mach-mx5/Kconfig
 +++ b/arch/arm/mach-mx5/Kconfig
-@@ -0,0 +1,11 @@
-+if ARCH_MX5
-+
-+config ARCH_MX51
-+	bool
-+	default y
-+	select MXC_TZIC
-+	select ARCH_MXC_IOMUX_V3
-+
-+comment "MX5 platforms:"
-+
-+endif
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-new file mode 100644
-index 0000000..d74ce4f
---- /dev/null
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -0,0 +1,7 @@
-+#
-+# Makefile for the linux kernel.
-+#
-+
-+# Object file lists.
-+obj-y   := cpu.o mm.o clock.o devices.o
-+
-diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
-new file mode 100644
-index 0000000..9939a19
---- /dev/null
-+++ b/arch/arm/mach-mx5/Makefile.boot
-@@ -0,0 +1,3 @@
-+   zreladdr-y	:= 0x90008000
-+params_phys-y	:= 0x90000100
-+initrd_phys-y	:= 0x90800000
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 59558c4..cea51a0 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -41,6 +41,13 @@ config ARCH_MXC91231
- 	help
- 	  This enables support for systems based on the Freescale MXC91231 family
+@@ -8,4 +8,10 @@ config ARCH_MX51
  
-+config ARCH_MX5
-+	bool "MX5-based"
-+	select CPU_V7
-+	select COMMON_CLKDEV
+ comment "MX5 platforms:"
+ 
++config MACH_MX51_BABBAGE
++	bool "Support MX51 BABBAGE platforms"
 +	help
-+	  This enables support for systems based on the Freescale i.MX51 family
++	  Include support for MX51 Babbage platform. This includes specific
++	  configurations for the board and its peripherals.
 +
- endchoice
+ endif
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index d74ce4f..e4cf91f 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -5,3 +5,5 @@
+ # Object file lists.
+ obj-y   := cpu.o mm.o clock.o devices.o
  
- source "arch/arm/mach-mx1/Kconfig"
-@@ -48,6 +55,7 @@ source "arch/arm/mach-mx2/Kconfig"
- source "arch/arm/mach-mx3/Kconfig"
- source "arch/arm/mach-mx25/Kconfig"
- source "arch/arm/mach-mxc91231/Kconfig"
-+source "arch/arm/mach-mx5/Kconfig"
- 
- endmenu
- 
++obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
++
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+new file mode 100644
+index 0000000..6cd0e14
+--- /dev/null
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -0,0 +1,99 @@
++/*
++ * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/init.h>
++#include <linux/platform_device.h>
++
++#include <mach/common.h>
++#include <mach/hardware.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx51.h>
++
++#include <asm/irq.h>
++#include <asm/setup.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++
++#include "crm_regs.h"
++#include "devices.h"
++
++static struct platform_device *devices[] __initdata = {
++	&mxc_fec_device,
++};
++
++static struct pad_desc mx51babbage_pads[] = {
++	/* UART1 */
++	MX51_BABBAGE_PAD_UART1_RXD__UART1_RXD,
++	MX51_BABBAGE_PAD_UART1_TXD__UART1_TXD,
++	MX51_BABBAGE_PAD_UART1_RTS__UART1_RTS,
++	MX51_BABBAGE_PAD_UART1_CTS__UART1_CTS,
++
++	/* UART2 */
++	MX51_BABBAGE_PAD_UART2_RXD__UART2_RXD,
++	MX51_BABBAGE_PAD_UART2_TXD__UART2_TXD,
++
++	/* UART3 */
++	MX51_BABBAGE_PAD_EIM_D25__UART3_RXD,
++	MX51_BABBAGE_PAD_EIM_D26__UART3_TXD,
++	MX51_BABBAGE_PAD_EIM_D27__UART3_RTS,
++	MX51_BABBAGE_PAD_EIM_D24__UART3_CTS,
++};
++
++/* Serial ports */
++#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static inline void mxc_init_imx_uart(void)
++{
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++	mxc_register_device(&mxc_uart_device1, &uart_pdata);
++	mxc_register_device(&mxc_uart_device2, &uart_pdata);
++}
++#else /* !SERIAL_IMX */
++static inline void mxc_init_imx_uart(void)
++{
++}
++#endif /* SERIAL_IMX */
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
++					ARRAY_SIZE(mx51babbage_pads));
++	mxc_init_imx_uart();
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++}
++
++static void __init mx51_babbage_timer_init(void)
++{
++	mx51_clocks_init(32768, 24000000, 22579200, 24576000);
++}
++
++static struct sys_timer mxc_timer = {
++	.init	= mx51_babbage_timer_init,
++};
++
++MACHINE_START(MX51_BABBAGE, "Freescale MX51 Babbage Board")
++	/* Maintainer: Amit Kucheria <amit.kucheria@canonical.com> */
++	.phys_io = MX51_AIPS1_BASE_ADDR,
++	.io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params = PHYS_OFFSET + 0x100,
++	.map_io = mx51_map_io,
++	.init_irq = mx51_init_irq,
++	.init_machine = mxc_board_init,
++	.timer = &mxc_timer,
++MACHINE_END
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 0a25576..33d4496 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -21,6 +21,7 @@ extern void mx27_map_io(void);
+ extern void mx31_map_io(void);
+ extern void mx35_map_io(void);
+ extern void mx51_map_io(void);
++extern void mx51_babbage_io_init(void);
+ extern void mxc91231_map_io(void);
+ extern void mxc_init_irq(void __iomem *);
+ extern void tzic_init_irq(void __iomem *);
 -- 
 1.6.3.3
