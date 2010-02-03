@@ -1,61 +1,37 @@
-From: maurochehab@gmail.com (Mauro Carvalho Chehab)
-Date: Wed, 03 Feb 2010 06:44:28 -0200
-Subject: [PATCH/RFC v2.1 0/2] Mem-to-mem device framework
-In-Reply-To: <19F8576C6E063C45BE387C64729E7394044A277BB2@dbde02.ent.ti.com>
-References: <1261574255-23386-1-git-send-email-p.osciak@samsung.com>
-	<200912231605.44181.hverkuil@xs4all.nl>
-	<000001ca87cc$f599dca0$e0cd95e0$%osciak@samsung.com>
-	<19F8576C6E063C45BE387C64729E7394044A277BB2@dbde02.ent.ti.com>
-Message-ID: <4B69376C.1010407@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Feb 2010 09:24:53 +0000
+Subject: [PATCHv2 05/11] mxc: Core support for i.MX5 series of
+	processors from Freescale
+In-Reply-To: <f10f79e7313ecdeeb59ab881795baedf2430c636.1265173480.git.amit.kucheria@canonical.com>
+References: <cover.1265173480.git.amit.kucheria@canonical.com>
+	<f10f79e7313ecdeeb59ab881795baedf2430c636.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <20100203092453.GA21921@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hiremath, Vaibhav wrote:
->> -----Original Message-----
->> From: Pawel Osciak [mailto:p.osciak at samsung.com]
->> Sent: Monday, December 28, 2009 8:19 PM
->> To: 'Hans Verkuil'
->> Cc: linux-media at vger.kernel.org; linux-samsung-soc at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org; Marek Szyprowski;
->> kyungmin.park at samsung.com; Hiremath, Vaibhav; Karicheri,
->> Muralidharan; 'Guru Raj'; 'Xiaolin Zhang'; 'Magnus Damm'; 'Sakari
->> Ailus'
->> Subject: RE: [PATCH/RFC v2.1 0/2] Mem-to-mem device framework
->>
->> Hello Hans,
->>
->>
->> On Wednesday 23 December 2009 16:06:18 Hans Verkuil wrote:
->>> Thank you for working on this! It's much appreciated. Now I've
->> noticed that
->>> patches regarding memory-to-memory and memory pool tend to get
->> very few comments.
->>> I suspect that the main reason is that these are SoC-specific
->> features that do
->>> not occur in consumer-type products. So most v4l developers do not
->> have the
->>> interest and motivation (and time!) to look into this.
->> Thank you very much for your response. We were a bit surprised with
->> the lack of
->> responses as there seemed to be a good number of people interested
->> in this area.
->>
->> I'm hoping that everybody interested would take a look at the test
->> device posted
->> along with the patches. It's virtual, no specific hardware required,
->> but it
->> demonstrates the concepts behind the framework, including
->> transactions.
->>
-> [Hiremath, Vaibhav] I was on vacation and resumed today itself, I will go through these patch series this weekend and will get back to you.
-> 
-> I just had cursory look and I would say it should be really good starting point for us to support mem-to-mem devices.\
+On Tue, Feb 02, 2010 at 09:16:27PM -0800, Amit Kucheria wrote:
+> +static int _clk_pll_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	u32 reg;
+> +	void __iomem *pllbase;
+> +
+> +	long mfi, pdf, mfn, mfd = 999999;
+> +	s64 temp64;
+> +	unsigned long quad_parent_rate;
+> +	unsigned long pll_hfsm, dp_ctl;
+> +	unsigned long parent_rate;
+> +
+> +	parent_rate = clk_get_rate(clk->parent);
+> +
+> +	pllbase = _get_pll_base(clk);
+> +
+> +	quad_parent_rate = 4 * parent_rate;
+> +	pdf = mfi = -1;
+> +	while (++pdf < 16 && mfi < 5)
+> +		mfi = rate * (pdf+1) / quad_parent_rate;
+> +	if (mfi > 15)
+> +		return -1;
 
-Hmm... it seems to me that those patches are still under discussion/analysis.
-I'll mark them as RFC at the Patchwork.
-
-Please let me know after you, SoC guys, go into a consensus about it. Then,
-please submit me the final version.
-
-Cheers,
-Mauro
+Why not "return -EPERM" since what you're actually saying here by
+returning -1 is "Permission Denied"?  If you didn't mean "Permission
+Denied", then don't use return -1.
