@@ -1,244 +1,113 @@
 From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue,  2 Feb 2010 21:16:23 -0800
-Subject: [PATCHv2 01/11] arm: mxc: TrustZone interrupt controller (TZIC) for
-	i.MX5 family
-In-Reply-To: <cover.1265173246.git.amit.kucheria@verdurent.com>
+Date: Tue,  2 Feb 2010 21:16:24 -0800
+Subject: [PATCHv2 02/11] mxc timer: refactor timer code to use timer versions
+In-Reply-To: <0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
 References: <cover.1265173246.git.amit.kucheria@verdurent.com>
-Message-ID: <0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <9fa7a3c70c46a1f776c6520051481cff6525ef02.1265173480.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale i.MX51 processor uses a new interrupt controller. Add
-driver for TrustZone Interrupt Controller
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
+Refactor the timer code into version 1 and version 2.
+
+Essentially there are 2 versions of the timer hardware. Version 1 is found on
+MX1/MXL and MX21. Version 2 is found on MX25, MX27, MX31, MX35, MX37, MX51,
+and future parts.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
 Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
 ---
- arch/arm/plat-mxc/Kconfig  |    8 ++
- arch/arm/plat-mxc/Makefile |    3 +
- arch/arm/plat-mxc/tzic.c   |  182 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 193 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/tzic.c
+ arch/arm/plat-mxc/time.c |   19 +++++++++++--------
+ 1 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 8b0a1ee..59558c4 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -62,6 +62,14 @@ config MXC_IRQ_PRIOR
- 	  requirements for timing.
- 	  Say N here, unless you have a specialized requirement.
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 844567e..7d6499e 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -57,6 +57,9 @@
+ #define MX3_TCN			0x24
+ #define MX3_TCMP		0x10
  
-+config MXC_TZIC
-+	bool "Enable TrustZone Interrupt Controller"
-+	depends on ARCH_MX51
-+	help
-+	  This will be automatically selected for all processors
-+	  containing this interrupt controller.
-+	  Say N here only if you are really sure.
++#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx27())
++#define timer_is_v2()	(cpu_is_mx3() || cpu_is_mx25())
 +
- config MXC_PWM
- 	tristate "Enable PWM driver"
- 	depends on ARCH_MXC
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 996cbac..0202ad9 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -5,6 +5,9 @@
- # Common support
- obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
+ static struct clock_event_device clockevent_mxc;
+ static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
  
-+# MX51 uses the TZIC interrupt controller, older platforms use AVIC (irq.o)
-+obj-$(CONFIG_MXC_TZIC) += tzic.o
-+
- obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
- obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-new file mode 100644
-index 0000000..00cb0ad
---- /dev/null
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -0,0 +1,182 @@
-+/*
-+ * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+
-+#include <asm/mach/irq.h>
-+
-+#include <mach/hardware.h>
-+
-+/*
-+ *****************************************
-+ * TZIC Registers                        *
-+ *****************************************
-+ */
-+
-+#define TZIC_INTCNTL            0x0000	/* Control register */
-+#define TZIC_INTTYPE            0x0004	/* Controller Type register */
-+#define TZIC_IMPID              0x0008	/* Distributor Implementer Identification */
-+#define TZIC_PRIOMASK           0x000C	/* Priority Mask Reg */
-+#define TZIC_SYNCCTRL           0x0010	/* Synchronizer Control register */
-+#define TZIC_DSMINT             0x0014	/* DSM interrupt Holdoffregister */
-+#define TZIC_INTSEC0            0x0080	/* Interrupt Security register 0 */
-+#define TZIC_ENSET0             0x0100	/* Enable Set Register 0 */
-+#define TZIC_ENCLEAR0           0x0180	/* Enable Clear Register 0 */
-+#define TZIC_SRCSET0            0x0200	/* Source Set Register 0 */
-+#define TZIC_SRCCLAR0           0x0280	/* Source Clear Register 0 */
-+#define TZIC_PRIORITY0          0x0400	/* Priority Register 0 */
-+#define TZIC_PND0               0x0D00	/* Pending Register 0 */
-+#define TZIC_HIPND0             0x0D80	/* High Priority Pending Register */
-+#define TZIC_WAKEUP0            0x0E00	/* Wakeup Config Register */
-+#define TZIC_SWINT              0x0F00	/* Software Interrupt Rigger Register */
-+#define TZIC_ID0                0x0FD0	/* Indentification Register 0 */
-+
-+void __iomem *tzic_base;
-+
-+/*
-+ * Disable interrupt number "irq" in the TZIC
-+ *
-+ * @param  irq          interrupt source number
-+ */
-+static void tzic_mask_irq(unsigned int irq)
-+{
-+	int index, off;
-+
-+	index = irq >> 5;
-+	off = irq & 0x1F;
-+	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0 + (index << 2));
-+}
-+
-+/*
-+ * Enable interrupt number "irq" in the TZIC
-+ *
-+ * @param  irq          interrupt source number
-+ */
-+static void tzic_unmask_irq(unsigned int irq)
-+{
-+	int index, off;
-+
-+	index = irq >> 5;
-+	off = irq & 0x1F;
-+	__raw_writel(1 << off, tzic_base + TZIC_ENSET0 + (index << 2));
-+}
-+
-+static unsigned int wakeup_intr[4];
-+
-+/*
-+ * Set interrupt number "irq" in the TZIC as a wake-up source.
-+ *
-+ * @param  irq          interrupt source number
-+ * @param  enable       enable as wake-up if equal to non-zero
-+ * 			disble as wake-up if equal to zero
-+ *
-+ * @return       This function returns 0 on success.
-+ */
-+static int tzic_set_wake_irq(unsigned int irq, unsigned int enable)
-+{
-+	unsigned int index, off;
-+
-+	index = irq >> 5;
-+	off = irq & 0x1F;
-+
-+	if (index > 3)
-+		return -EINVAL;
-+
-+	if (enable)
-+		wakeup_intr[index] |= (1 << off);
-+	else
-+		wakeup_intr[index] &= ~(1 << off);
-+
-+	return 0;
-+}
-+
-+static struct irq_chip mxc_tzic_chip = {
-+	.name = "MXC_TZIC",
-+	.ack = tzic_mask_irq,
-+	.mask = tzic_mask_irq,
-+	.unmask = tzic_unmask_irq,
-+	.set_wake = tzic_set_wake_irq,
-+};
-+
-+/*
-+ * This function initializes the TZIC hardware and disables all the
-+ * interrupts. It registers the interrupt enable and disable functions
-+ * to the kernel for each interrupt source.
-+ */
-+void __init tzic_init_irq(void __iomem *irqbase)
-+{
-+	int i;
-+
-+	tzic_base = irqbase;
-+	/* put the TZIC into the reset value with
-+	 * all interrupts disabled
-+	 */
-+	i = __raw_readl(tzic_base + TZIC_INTCNTL);
-+
-+	__raw_writel(0x80010001, tzic_base + TZIC_INTCNTL);
-+	i = __raw_readl(tzic_base + TZIC_INTCNTL);
-+	__raw_writel(0x1f, tzic_base + TZIC_PRIOMASK);
-+	i = __raw_readl(tzic_base + TZIC_PRIOMASK);
-+	__raw_writel(0x02, tzic_base + TZIC_SYNCCTRL);
-+	i = __raw_readl(tzic_base + TZIC_SYNCCTRL);
-+
-+	for (i = 0; i < 4; i++)
-+		__raw_writel(0xFFFFFFFF, tzic_base + TZIC_INTSEC0 + i * 4);
-+
-+	/* disable all interrupts */
-+	for (i = 0; i < 4; i++)
-+		__raw_writel(0xFFFFFFFF, tzic_base + TZIC_ENCLEAR0 + i * 4);
-+
-+	/* all IRQ no FIQ Warning :: No selection */
-+
-+	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
-+		set_irq_chip(i, &mxc_tzic_chip);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+
-+	printk(KERN_INFO "TrustZone Interrupt Controller (TZIC) initialized\n");
-+}
-+
-+/*
-+ * enable wakeup interrupt
-+ *
-+ * @param is_idle		1 if called in idle loop (ENSET register);
-+ *				0 to be used when called from low power entry
-+ * @return			0 if successful; non-zero otherwise
-+ *
-+ */
-+int tzic_enable_wake(int is_idle)
-+{
-+	unsigned int i, v;
-+
-+	__raw_writel(1, tzic_base + TZIC_DSMINT);
-+	if (unlikely(__raw_readl(tzic_base + TZIC_DSMINT) == 0))
-+		return -EAGAIN;
-+
-+	if (likely(is_idle)) {
-+		for (i = 0; i < 4; i++) {
-+			v = __raw_readl(tzic_base + TZIC_ENSET0 + i * 4);
-+			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
-+		}
-+	} else {
-+		for (i = 0; i < 4; i++) {
-+			v = wakeup_intr[i];
-+			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
-+		}
-+	}
-+	return 0;
-+}
+@@ -66,7 +69,7 @@ static inline void gpt_irq_disable(void)
+ {
+ 	unsigned int tmp;
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		__raw_writel(0, timer_base + MX3_IR);
+ 	else {
+ 		tmp = __raw_readl(timer_base + MXC_TCTL);
+@@ -76,7 +79,7 @@ static inline void gpt_irq_disable(void)
+ 
+ static inline void gpt_irq_enable(void)
+ {
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		__raw_writel(1<<0, timer_base + MX3_IR);
+ 	else {
+ 		__raw_writel(__raw_readl(timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
+@@ -90,7 +93,7 @@ static void gpt_irq_acknowledge(void)
+ 		__raw_writel(0, timer_base + MX1_2_TSTAT);
+ 	if (cpu_is_mx2())
+ 		__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP, timer_base + MX1_2_TSTAT);
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		__raw_writel(MX3_TSTAT_OF1, timer_base + MX3_TSTAT);
+ }
+ 
+@@ -117,7 +120,7 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		clocksource_mxc.read = mx3_get_cycles;
+ 
+ 	clocksource_mxc.mult = clocksource_hz2mult(c,
+@@ -180,7 +183,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 
+ 	if (mode != clockevent_mode) {
+ 		/* Set event time into far-far future */
+-		if (cpu_is_mx3() || cpu_is_mx25())
++		if (timer_is_v2())
+ 			__raw_writel(__raw_readl(timer_base + MX3_TCN) - 3,
+ 					timer_base + MX3_TCMP);
+ 		else
+@@ -233,7 +236,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
+ 	struct clock_event_device *evt = &clockevent_mxc;
+ 	uint32_t tstat;
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		tstat = __raw_readl(timer_base + MX3_TSTAT);
+ 	else
+ 		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
+@@ -264,7 +267,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		clockevent_mxc.set_next_event = mx3_set_next_event;
+ 
+ 	clockevent_mxc.mult = div_sc(c, NSEC_PER_SEC,
+@@ -296,7 +299,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ 	__raw_writel(0, timer_base + MXC_TCTL);
+ 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		tctl_val = MX3_TCTL_CLK_IPG | MX3_TCTL_FRR | MX3_TCTL_WAITEN | MXC_TCTL_TEN;
+ 	else
+ 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
 -- 
 1.6.3.3
