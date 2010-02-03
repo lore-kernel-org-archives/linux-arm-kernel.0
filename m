@@ -1,59 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 02 Feb 2010 18:25:55 -0800
-Subject: [PATCH 1/9] omap: define _toggle_gpio_edge_triggering only for OMAP1
+Date: Tue, 02 Feb 2010 18:25:59 -0800
+Subject: [PATCH 2/9] omap: Remove old unused defines for OMAP_32KSYNCT_BASE
 In-Reply-To: <20100203022318.26347.34734.stgit@baageli.muru.com>
 References: <20100203022318.26347.34734.stgit@baageli.muru.com>
-Message-ID: <20100203022555.26347.62876.stgit@baageli.muru.com>
+Message-ID: <20100203022559.26347.77654.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Remove old unused defines for OMAP_32KSYNCT_BASE
 
-The only usage of _toggle_gpio_edge_triggering is in an
-CONFIG_ARCH_OMAP1 is defined, too.
-
-This fixes a compiler warning:
-
-	arch/arm/plat-omap/gpio.c:758: warning: '_toggle_gpio_edge_triggering' defined but not used
-
-when compiling for ARCH_OMAP2, ARCH_OMAP3 or ARCH_OMAP4.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/gpio.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/omap_device.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index d17620c..d2422c7 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -750,6 +750,7 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
- }
- #endif
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 1e5648d..2ed7201 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -89,16 +89,6 @@
+ #define USE_WAKEUP_LAT			0
+ #define IGNORE_WAKEUP_LAT		1
  
-+#ifdef CONFIG_ARCH_OMAP1
- /*
-  * This only applies to chips that can't do both rising and falling edge
-  * detection at once.  For all other chips, this function is a noop.
-@@ -760,11 +761,9 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
- 	u32 l = 0;
- 
- 	switch (bank->method) {
--#ifdef CONFIG_ARCH_OMAP1
- 	case METHOD_MPUIO:
- 		reg += OMAP_MPUIO_GPIO_INT_EDGE;
- 		break;
+-/* XXX this should be moved into a separate file */
+-#if defined(CONFIG_ARCH_OMAP2420)
+-# define OMAP_32KSYNCT_BASE		0x48004000
+-#elif defined(CONFIG_ARCH_OMAP2430)
+-# define OMAP_32KSYNCT_BASE		0x49020000
+-#elif defined(CONFIG_ARCH_OMAP3430)
+-# define OMAP_32KSYNCT_BASE		0x48320000
+-#else
+-# error Unknown OMAP device
 -#endif
- #ifdef CONFIG_ARCH_OMAP15XX
- 	case METHOD_GPIO_1510:
- 		reg += OMAP1510_GPIO_INT_CONTROL;
-@@ -787,6 +786,7 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
  
- 	__raw_writel(l, reg);
- }
-+#endif
+ /* Private functions */
  
- static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- {
