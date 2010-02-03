@@ -1,36 +1,46 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Wed, 3 Feb 2010 16:02:40 +0100
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100203132824.GA27048@n2100.arm.linux.org.uk>
-References: <20100203005038.GA16356@caradoc.them.org>	<1265197942.1970.34.camel@pc1117.cambridge.arm.com>
-	<20100203132824.GA27048@n2100.arm.linux.org.uk>
-Message-ID: <4B699010.6010203@parrot.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Feb 2010 15:02:36 +0000
+Subject: [PATCH 05/13] ARM: LPC32XX: arch Kconfig, plat Kconfig, and
+	makefiles
+In-Reply-To: <20100203135741.GA20113@pengutronix.de>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-6-git-send-email-wellsk40@gmail.com>
+	<20100203105152.GF11354@pengutronix.de>
+	<20100203112645.GF22275@n2100.arm.linux.org.uk>
+	<20100203135741.GA20113@pengutronix.de>
+Message-ID: <20100203150236.GK22275@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux a ?crit :
-> On Wed, Feb 03, 2010 at 11:52:22AM +0000, Catalin Marinas wrote:
->> On Wed, 2010-02-03 at 00:50 +0000, Daniel Jacobowitz wrote:
->>> On Tue, Feb 02, 2010 at 10:43:22PM +0000, Russell King - ARM Linux
->>> wrote:
->>>> Umm, today there were patches posted using hardware support for
->>>> breakpoints / watchpoints.  I've not read through those patches
->>>> yet, but in light of hardware support, do we really need this patch
->>>> anymore?
->>> Yes, it's unrelated.  Hardware breakpoints are a constrained resource,
->>> but we can insert unlimited software breakpoints (and often need to
->>> exceed the hardware breakpoint limit).
->> I agree, we still need support for software breakpoints.
->>
->> The main benefit of hardware debugging support is for watchpoints.
+On Wed, Feb 03, 2010 at 02:57:41PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Russell,
 > 
-> Software breakpoints are a pain in the backside if you have threaded
-> programs, because when you insert a breakpoint into one thread, it's
-> active in all threads - you can't insert a breakpoint into only one
-> thread.
-> 
-An annoying things about software breakpoints is that gdb doesn't
-understand arm kernel helper (for atomic operation/tls). And when it try
-to set breakpoint here it fails...
+> On Wed, Feb 03, 2010 at 11:26:46AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 03, 2010 at 11:51:52AM +0100, Uwe Kleine-K?nig wrote:
+> > > > diff --git a/arch/arm/mach-lpc32xx/Makefile.boot b/arch/arm/mach-lpc32xx/Makefile.boot
+> > > > new file mode 100644
+> > > > index 0000000..b796b41
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-lpc32xx/Makefile.boot
+> > > > @@ -0,0 +1,4 @@
+> > > > +   zreladdr-y	:= 0x80008000
+> > > > +params_phys-y	:= 0x80000100
+> > > I hope your bootloader passes the atag list via r2.  If so there is no
+> > > need to define params_phys-y.
+> > 
+> > Wrong - that's your expectation that nothing uses this, rather than
+> > reality.  While the decompressor doesn't use it, it's required for
+> > the 'bootp' add-on, which allows an initrd/initramfs image and kernel
+> > to be combined together, and the initrd/ramfs to be split away from
+> > the kernel - without encountering the PC24 relocation error problem.
+> Obviously you're right.  Is bootp still used?
 
-Matthieu
+I've no idea - it's there for two reasons:
+
+1. proof of concept for wrapping a zImage
+2. to allow kernel+initrd to be loaded on systems which can only do
+   bootp+tftp of a single file.
+
+I know that my mini EBSA110 bootp loader (which is around 4K total) can
+only accept an initrd this way, and I suspect there's some uclinux type
+platforms which have similar restrictions.
