@@ -1,33 +1,30 @@
 From: dan@debian.org (Daniel Jacobowitz)
-Date: Wed, 3 Feb 2010 12:44:26 -0500
+Date: Wed, 3 Feb 2010 12:45:32 -0500
 Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100203172301.GD19037@shareable.org>
-References: <20100111215816.GA1068@caradoc.them.org>
-	<20100111223503.GD7925@n2100.arm.linux.org.uk>
-	<20100111225436.GA7408@caradoc.them.org>
-	<20100111231027.GA30714@shareable.org>
-	<20100111231702.GA9485@caradoc.them.org>
-	<20100203172301.GD19037@shareable.org>
-Message-ID: <20100203174426.GA10898@caradoc.them.org>
+In-Reply-To: <20100203163522.GA29306@n2100.arm.linux.org.uk>
+References: <20100203005038.GA16356@caradoc.them.org>
+	<1265197942.1970.34.camel@pc1117.cambridge.arm.com>
+	<20100203132824.GA27048@n2100.arm.linux.org.uk>
+	<4B699010.6010203@parrot.com>
+	<20100203151931.GA1159@caradoc.them.org>
+	<20100203153025.GA29749@n2100.arm.linux.org.uk>
+	<20100203153501.GA1944@caradoc.them.org>
+	<20100203163522.GA29306@n2100.arm.linux.org.uk>
+Message-ID: <20100203174532.GB10898@caradoc.them.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 05:23:01PM +0000, Jamie Lokier wrote:
-> Daniel Jacobowitz wrote:
-> > Thankfully, both branches into IT blocks and branches
-> > leaving IT blocks not at the last instruction are forbidden.
+On Wed, Feb 03, 2010 at 04:35:22PM +0000, Russell King - ARM Linux wrote:
+> Well, we could siphon off the PEEK calls, and special case them at
+> the arch layer - it'll basically be the same hack as what you're
+> suggesting, only in the kernel instead.
 > 
-> Forbidden as in throws a fault, or forbidden as in "can we use this to
-> break out of GDB single-stepping to give third-parties a hard time
-> tracing my secret code"?
+> So really the question is whether we want a hack for this in the
+> kernel or in userspace.
 
-Forbidden as in "the architecture documentation says it has
-unpredictable behavior".
-
-That's generally where I draw the line at trying to handle bad code.
-In practice, I will make a wild guess that current processors fault
-branches during an IT block and don't do anything fancy for branches
-into an IT block, or else it messes up in some hard-to-reproduce way.
+Agreed.  In my opinion, this is a useful thing to have in the kernel,
+in order to keep the existing PTRACE_PEEKTEXT API more consistent
+between architectures.  Arguments in the other direction?
 
 -- 
 Daniel Jacobowitz
