@@ -1,34 +1,34 @@
-From: dan@debian.org (Daniel Jacobowitz)
-Date: Wed, 3 Feb 2010 10:35:01 -0500
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 03 Feb 2010 10:35:38 -0500 (EST)
 Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100203153025.GA29749@n2100.arm.linux.org.uk>
+In-Reply-To: <20100203151931.GA1159@caradoc.them.org>
 References: <20100203005038.GA16356@caradoc.them.org>
 	<1265197942.1970.34.camel@pc1117.cambridge.arm.com>
 	<20100203132824.GA27048@n2100.arm.linux.org.uk>
 	<4B699010.6010203@parrot.com>
 	<20100203151931.GA1159@caradoc.them.org>
-	<20100203153025.GA29749@n2100.arm.linux.org.uk>
-Message-ID: <20100203153501.GA1944@caradoc.them.org>
+Message-ID: <alpine.LFD.2.00.1002031033060.1681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 03:30:25PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 03, 2010 at 10:19:31AM -0500, Daniel Jacobowitz wrote:
-> > On a related note, it would be Very Helpful(TM) if someone would
-> > implement read-only access to the helper page via ptrace!  Not as
-> > helpful as a visible vDSO with symbol names would be, but it would
-> > still make things a lot easier.
+On Wed, 3 Feb 2010, Daniel Jacobowitz wrote:
+
+> On Wed, Feb 03, 2010 at 04:02:40PM +0100, Matthieu CASTET wrote:
+> > An annoying things about software breakpoints is that gdb doesn't
+> > understand arm kernel helper (for atomic operation/tls). And when it try
+> > to set breakpoint here it fails...
 > 
-> Apart from the TLS value which can be obtained by PTRACE_GET_THREAD_AREA,
-> the contents of the page is constant across all processes on all CPUs.
+> This is fixed in current GDB; it knows how to step out of the helper
+> page automatically.  If you're still seeing a problem with GDB 7.0,
+> could you file a bug?
+> 
+> On a related note, it would be Very Helpful(TM) if someone would
+> implement read-only access to the helper page via ptrace!  Not as
+> helpful as a visible vDSO with symbol names would be, but it would
+> still make things a lot easier.
 
-Yes, I'm aware of that - but having it unreadable means special cases
-all through GDB, gdbserver, and anything else that wants to read
-memory.
+Why?  Can't you just access it directly straight from gdb's own address 
+space?  This page is the same for all tasks on the system.
 
-If you really think it's the right choice, I can see about hacking
-gdb/gdbserver up for this.
 
--- 
-Daniel Jacobowitz
-CodeSourcery
+Nicolas
