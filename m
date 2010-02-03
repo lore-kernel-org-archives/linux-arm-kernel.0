@@ -1,222 +1,325 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 3 Feb 2010 17:59:00 +0000
-Subject: [PATCH v3 2/7 RE-SEND] ARM: S5P6442: Add clock support for S5P6442
-In-Reply-To: <1265116976-10140-1-git-send-email-kgene.kim@samsung.com>
-References: <1265116976-10140-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100203175900.GB13267@trinity.fluff.org>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Wed, 3 Feb 2010 19:01:38 +0100
+Subject: [PATCH 05/13] ARM: LPC32XX: arch Kconfig, plat Kconfig, and
+	makefiles
+In-Reply-To: <20100203105152.GF11354@pengutronix.de>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-6-git-send-email-wellsk40@gmail.com>
+	<20100203105152.GF11354@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F805C8B78779@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2010 at 10:22:56PM +0900, Kukjin Kim wrote:
-> This patch adds clock support for S5P6442. This patch adds the clock
-> register definitions and the various system clocks in S5P6442.
+> lpc32xx/Kconfig
+> > new file mode 100644
+> > index 0000000..a277885
+> > --- /dev/null
+> > +++ b/arch/arm/mach-lpc32xx/Kconfig
+> > @@ -0,0 +1,158 @@
+> > +if ARCH_LPC32XX
+> > +
+> > +menu "LPC32XX chip options"
+> > +
+> > +config ARCH_LPC32XX_IRAM_SIZE
+> > +	int
+> > +	default 131072 if ARCH_LPC32XX_20
+> > +	default 262144 if ARCH_LPC32XX_30 || ARCH_LPC32XX_40 ||
+> ARCH_LPC32XX_50
+> > +
+> > +choice
+> > +    prompt "Select 32x0 device variation"
+> > +    default ARCH_LPC32XX_50
+> > +
+> > +	config ARCH_LPC32XX_20
+> > +		bool "LPC3220"
+> > +		help
+> > +		 128K IRAM, no ethernet or LCD
+> > +
+> > +	config ARCH_LPC32XX_30
+> > +		bool "LPC3230"
+> > +		help
+> > +		 256K IRAM and LCD, no ethernet
+> > +
+> > +	config ARCH_LPC32XX_40
+> > +		bool "LPC3240"
+> > +		help
+> > +		 256K IRAM and ethernet, no LCD
+> > +
+> > +	config ARCH_LPC32XX_50
+> > +		bool "LPC3250"
+> > +		help
+> > +		 256K IRAM and ethernet and LCD
+> > +
+> > +endchoice
+> It's sad this is a choice and only a single "device variation" is
+> selectable.  Maybe you can autodetect these?
+
+Hi Uwe, thank your for your comments and thorough review.
+Most systems can simply disable support for unused options by disabling
+the driver. I can reduce this.
+
 > 
-> Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
-> Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > +menu "Serial port configuration"
+> > +
+> > +menu "Individual UART enable selections"
+> > +
+> > +config ARCH_LPC32XX_HSUART1_ENABLE
+> > +	bool "Enable high speed UART1"
+> > +	help
+> > +	 Also enable LPC32xx high speed serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_HSUART2_ENABLE
+> > +	bool "Enable high speed UART2"
+> > +	help
+> > +	 Also enable LPC32xx high speed serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_UART3_ENABLE
+> > +	bool "Enable standard UART3"
+> > +	help
+> > +	 Also enable 8250 serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_UART4_ENABLE
+> > +	bool "Enable standard UART4"
+> > +	help
+> > +	 Also enable 8250 serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_UART5_ENABLE
+> > +	bool "Enable standard UART5"
+> > +	default y
+> > +	help
+> > +	 Also enable 8250 serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_UART6_ENABLE
+> > +	bool "Enable standard UART6"
+> > +	help
+> > +	 Also enable 8250 serial support in drivers/serial
+> > +
+> > +config ARCH_LPC32XX_HSUART7_ENABLE
+> > +	bool "Enable high speed UART7"
+> > +	help
+> > +	 Also enable LPC32xx high speed serial support in drivers/serial
+> > +
+> > +endmenu
+> IMHO "enable" is a bit misleading here.  Depending on the selection here
+> the devices are defined or not.
 
+I'm not sure what what you mean here. I'll look at the wording and try to
+fix.
 
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/list.h>
-> +#include <linux/errno.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/io.h>
+> > +choice
+> > +	prompt "Kernel uncompress status output UART selection"
+> > +	default ARCH_LPC32XX_UNCOMP_U5
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_HSU1
+> > +		bool "High speed UART 1"
+> > +		help
+> > +		 Kernel uncompress output is on high speed UART 1
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_HSU2
+> > +		bool "High speed UART 2"
+> > +		help
+> > +		 Kernel uncompress output is on high speed UART 2
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_U3
+> > +		bool "Standard UART 3"
+> > +		help
+> > +		 Kernel uncompress output is on standard UART 3
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_U4
+> > +		bool "Standard UART 4"
+> > +		help
+> > +		 Kernel uncompress output is on standard UART 4
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_U5
+> > +		bool "Standard UART 5"
+> > +		help
+> > +		 Kernel uncompress output is on standard UART 5
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_U6
+> > +		bool "Standard UART 6"
+> > +		help
+> > +		 Kernel uncompress output is on standard UART 6
+> > +
+> > +	config ARCH_LPC32XX_UNCOMP_HSU7
+> > +		bool "High speed UART 7"
+> > +		help
+> > +		 Kernel uncompress output is on high speed UART 7
+> > +
+> > +endchoice
+> Can you autodetect this?
 
-interested to see if these two files are needed in the include, I don't
-think we've actually got an IO functions or use of sysdev atm.
+This is the uncompress output prior to kernel startup. There are
+7 UARTs on the device and different board manufacturers don't
+always use the same UART. For the currently supported boards
+(PHY3250, EA3250, and FDI3250 mach ids), this was the only way
+I could get the UART selection into the config without changing
+code. I suppose it's possible to put specific board checks in
+the uncompress macros, but it would require changes to that file
+for new boards. This seemed the best way to go.
 
-> +#include <mach/map.h>
-> +
-> +#include <plat/cpu-freq.h>
-> +#include <mach/regs-clock.h>
-> +#include <plat/clock.h>
-> +#include <plat/cpu.h>
-> +#include <plat/pll.h>
-> +#include <plat/s5p-clock.h>
-> +#include <plat/clock-clksrc.h>
-> +#include <plat/s5p6442.h>
-> +
-> +static struct clk clk_dout_p0clk = {
-> +	.name		= "dout_p0clk",
-> +	.id		= -1,
-> +	.parent		= &clk_dout_d0clk,
-> +};
-> +
-> +static struct clk clk_dout_p1clk = {
-> +	.name		= "dout_p1clk",
-> +	.id		= -1,
-> +	.parent		= &clk_dout_d1clk,
-> +};
+> 
+> > +choice
+> > +	prompt "debug output (printascii) UART selection"
+> > +	default ARCH_LPC32XX_DEBUGO_U5
+> > +
+> > +	config ARCH_LPC32XX_DEBUGO_U3
+> > +		bool "Standard UART 3"
+> > +		help
+> > +		 printascii messages are output on standard UART 3
+> > +
+> > +	config ARCH_LPC32XX_DEBUGO_U4
+> > +		bool "Standard UART 4"
+> > +		help
+> > +		 printascii messages are output on standard UART 4
+> > +
+> > +	config ARCH_LPC32XX_DEBUGO_U5
+> > +		bool "Standard UART 5"
+> > +		help
+> > +		 printascii messages are output on standard UART 5
+> > +
+> > +	config ARCH_LPC32XX_DEBUGO_U6
+> > +		bool "Standard UART 6"
+> > +		help
+> > +		 printascii messages are output on standard UART 6
+> > +
+> > +endchoice
+> IMHO this isn't something that needs configuration via Kconfig.  It's
+> enough to have this via #defines in debug-macro.S.
 
-do we really need these clocks in the way? either #define them if the
-naming is really important. if they get implemented later then we can
-deal with that then.
+See comment about uncompress output above. Some developers prefer
+printascii messages on a specific UART output (seperated from main
+serial or console output). This handles that.
 
-> +void __init_or_cpufreq s5p6442_setup_clocks(void)
-> +{
-> +	struct clk *xtal_clk;
-> +	struct clk *arm_clk;
-> +	struct clk *hclkd0_clk;
-> +	struct clk *hclkd1_clk;
-> +	struct clk *pclkd0_clk;
-> +	struct clk *pclkd1_clk;
-> +
-> +	unsigned long xtal;
-> +	unsigned long arm;
-> +	unsigned long hclkd0 = 0;
-> +	unsigned long hclkd1 = 0;
-> +	unsigned long pclkd0 = 0;
-> +	unsigned long pclkd1 = 0;
-> +
-> +	unsigned long apll;
-> +	unsigned long mpll;
-> +	unsigned long epll;
-> +	unsigned int ptr;
-> +
-> +	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-> +
-> +	xtal_clk = clk_get(NULL, "xtal");
-> +	BUG_ON(IS_ERR(xtal_clk));
-> +
-> +	xtal = clk_get_rate(xtal_clk);
-> +	clk_put(xtal_clk);
+> 
+> > +endmenu
+> > +
+> > +endmenu
+> > +
+> > +source "arch/arm/mach-lpc32xx/Kconfig.plat"
+> > +
+> > +endif
+> > +
+> > diff --git a/arch/arm/mach-lpc32xx/Kconfig.plat b/arch/arm/mach-
+> lpc32xx/Kconfig.plat
+> > new file mode 100644
+> > index 0000000..a67d1ad
+> > --- /dev/null
+> > +++ b/arch/arm/mach-lpc32xx/Kconfig.plat
+> > @@ -0,0 +1,98 @@
+> > +menu "LPC32XX platform choices"
+> > +
+> > +choice
+> > +    prompt "Choose your board"
+> > +    default MACH_PHY3250
+> > +    help
+> > +        This menu selects the LPC3250 board to support for this build
+> > +
+> > +    config MACH_PHY3250
+> > +        bool "Phytec 3250 development board"
+> > +	help
+> > +	    Support for the Phytec 3250 development board
+> > +
+> > +endchoice
+> Again, support more than one mach per kernel?
 
-tbh, either make a function to do the clk_get,BUG,clk_put or simply
-use the clock structures we have in the file.
+There are a minimum of 3 supported machs for this arch. To keep thing
+simple, I wanted to release initially with just 1 mach. What is a good
+approach for this? Should I break up the arch and plat areas into different
+subdirectories under arch/arm similar to other platforms and remove
+Kconfig.plat?
 
-> +	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-> +
-> +	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-> +	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
-> +	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-> +
-> +	printk(KERN_INFO "S5P6440: PLL settings, A=%ld, M=%ld, E=%ld",
-> +			apll, mpll, epll);
-> +
-> +	clk_fout_apll.rate = apll;
-> +	clk_fout_mpll.rate = mpll;
-> +	clk_fout_epll.rate = epll;
-> +
-> +	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
-> +		s3c_set_clksrc(init_parents[ptr], true);
-> +
-> +	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
-> +		s3c_set_clksrc(&clksrcs[ptr], true);
-> +
-> +	arm_clk = clk_get(NULL, "dout_apll");
-> +	BUG_ON(IS_ERR(arm_clk));
-> +
-> +	arm = clk_get_rate(arm_clk);
-> +	clk_put(arm_clk);
-> +
-> +	hclkd0_clk = clk_get(NULL, "dout_d0clk");
-> +	BUG_ON(IS_ERR(hclkd0_clk));
-> +
-> +	hclkd0 = clk_get_rate(hclkd0_clk);
-> +	clk_put(hclkd0_clk);
-> +
-> +	pclkd0_clk = clk_get(NULL, "dout_p0clk");
-> +	BUG_ON(IS_ERR(pclkd0_clk));
-> +
-> +	pclkd0 = clk_get_rate(pclkd0_clk);
-> +	clk_put(pclkd0_clk);
-> +
-> +	hclkd1_clk = clk_get(NULL, "dout_d1clk");
-> +	BUG_ON(IS_ERR(hclkd1_clk));
-> +
-> +	hclkd1 = clk_get_rate(hclkd1_clk);
-> +	clk_put(hclkd1_clk);
-> +
-> +	pclkd1_clk = clk_get(NULL, "dout_p1clk");
-> +	BUG_ON(IS_ERR(pclkd1_clk));
-> +
-> +	pclkd1 = clk_get_rate(pclkd1_clk);
-> +	clk_put(pclkd1_clk);
+> 
+> > +choice
+> > +	prompt "Phytec LCD module revisions"
+> > +	depends on MACH_PHY3250
+> > +	default PHY3250_QVGA_PANEL_1307_1
+> > +	help
+> > +	  Select one of the supported LCD panel revisions
+> > +
+> > +config PHY3250_QVGA_PANEL_1307_0
+> > +	bool "1307.0 QVGA panel (portrait mode RGB565)"
+> > +	help
+> > +	  Use LCD module version 1307.0
+> > +
+> > +config PHY3250_QVGA_PANEL_1307_1
+> > +	bool "1307.1 QVGA panel (portrait mode RGB565)"
+> > +	help
+> > +	  Use LCD module version 1307.1
+> > +
+> > +endchoice
+> autodetect?  kernel-parameter?
+> 
+> > +choice
+> > +	prompt "Phytec CPU module revisions"
+> > +	depends on MACH_PHY3250
+> > +	default PHY3250_CPU_MODULE_1304_1
+> > +	help
+> > +	  Select one of the supported CPU module revisions
+> > +
+> > +config PHY3250_CPU_MODULE_1304_0
+> > +	bool "1304.0 CPU module"
+> > +	help
+> > +	  Use CPU module version 1304.0
+> > +
+> > +config PHY3250_CPU_MODULE_1304_1
+> > +	bool "1304.1 CPU module"
+> > +	help
+> > +	  Use CPU module version 1304.1
+> > +
+> > +endchoice
+> ditto, autodetect?  kernel-parameter?
+> 
+> > +choice
+> > +	prompt "Phytec Carrier board revisions"
+> > +	depends on MACH_PHY3250
+> > +	default PHY3250_CARRIER_1305_3
+> > +	help
+> > +	  Select one of the supported carrier board revisions
+> > +
+> > +config PHY3250_CARRIER_1305_01
+> > +	bool "1305.0 or 1305.1 carrier board"
+> > +	help
+> > +	  Use carrier board version 1305.0 or 1305.1
+> > +
+> > +config PHY3250_CARRIER_1305_2
+> > +	bool "1305.2 carrier board"
+> > +	help
+> > +	  Use carrier board version 1305.2
+> > +
+> > +config PHY3250_CARRIER_1305_3
+> > +	bool "1305.3 carrier board"
+> > +	help
+> > +	  Use carrier board version 1305.3
+> > +
+> > +endchoice
+> ditto
 
-see above comment.
+I can make these 3 kernel parameters, but not all of them are
+autodetectable. Is this approach wrong?
 
-> +	printk(KERN_INFO "S5P6442: HCLKD0=%ld, HCLKD1=%ld, PCLKD0=%ld, PCLKD1=%ld\n",
-> +			hclkd0, hclkd1, pclkd0, pclkd1);
-> +
-> +	/* For backward compatibility */
-> +	clk_f.rate = arm;
-> +	clk_h.rate = hclkd1;
-> +	clk_p.rate = pclkd1;
-> +
-> +	clk_dout_p1clk.rate = clk_p.rate;
-> +}
-> +
-> +static struct clk init_clocks[] = {
-> +	{
-> +		.name		= "systimer",
-> +		.id		= -1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<16),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 0,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<17),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<18),
-> +	}, {
-> +		.name		= "uart",
-> +		.id		= 2,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<19),
-> +	}, {
-> +		.name		= "timers",
-> +		.id		= -1,
-> +		.parent		= &clk_dout_p1clk,
-> +		.enable		= s5p6442_clk_ip3_ctrl,
-> +		.ctrlbit	= (1<<23),
-> +	},
-> +};
-> +
-> +static struct clk *clks[] __initdata = {
-> +	&clk_ext,
-> +	&clk_epll,
-> +	&clk_mout_apll.clk,
-> +	&clk_mout_mpll.clk,
-> +	&clk_mout_epll.clk,
-> +	&clk_mout_arm.clk,
-> +	&clk_mout_d0.clk,
-> +	&clk_mout_d0sync.clk,
-> +	&clk_mout_d1.clk,
-> +	&clk_mout_d1sync.clk,
-> +	&clk_dout_apll,
-> +	&clk_dout_a2m,
-> +	&clk_dout_d0clk,
-> +	&clk_dout_p0clk,
-> +	&clk_dout_d1clk,
-> +	&clk_dout_p1clk,
-> +};
-> +
-> +void __init s5p6442_register_clocks(void)
-> +{
-> +	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-> +
-> +	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
-> +	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> +
-> +	s3c_pwmclk_init();
-> +}
+> 
+> > +choice
+> > +	prompt "Internal IRAM use"
+> > +	default MACH_LPC32XX_IRAM_RESERVED
+> > +	depends on MACH_PHY3250
+> > +
+> > +config MACH_LPC32XX_IRAM_RESERVED
+> > +	bool "IRAM is not used (reserved)"
+> > +	help
+> > +	  IRAM is not used for video or networking and can be used for
+> > +	  other purposes or drivers
+> > +
+> > +config MACH_LPC32XX_IRAM_FOR_CLCD
+> > +	bool "Use IRAM as a video frame buffer"
+> > +	help
+> > +	  IRAM will be used for the LCD frame buffer. If the required
+> buffer
+> > +	  size is larger than the size of IRAM, then SDRAM will be used
+> > +	  instead.
+> > +
+> > +endchoice
+> A request API would be nice here!?
 
-Did you clean the unused definitions out of the clock register file too?
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+I'm not sure what you mean here by a request API?. The IRAM also can
+be used for network buffer storage (the option was purposely removed
+for initial release). Can you please post an example?
