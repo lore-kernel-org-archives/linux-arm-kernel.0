@@ -1,25 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Feb 2010 20:05:04 +0000
-Subject: [RFC PATCH 1/3] [ARM] allow NR_IRQS to be larger than 256
-In-Reply-To: <4B6B2030.3040306@xenomai.org>
-References: <f17812d71002041109u3d7ea08ej201708fa462e087d@mail.gmail.com>
-	<4B6B2030.3040306@xenomai.org>
-Message-ID: <20100204200504.GG27344@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 4 Feb 2010 21:29:21 +0100
+Subject: [PATCH] Add USB support for i.MX27/35 and Phytec i.MX boards
+In-Reply-To: <20100204183426.GA30488@jasper.tkos.co.il>
+References: <1265295825-8705-1-git-send-email-s.hauer@pengutronix.de>
+	<20100204183426.GA30488@jasper.tkos.co.il>
+Message-ID: <20100204202921.GW6130@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2010 at 08:29:52PM +0100, Gilles Chanteperdrix wrote:
-> Eric Miao wrote:
-> > -#if NR_IRQS > 256
-> > +#if NR_IRQS > 512
-> > +#define HARDIRQ_BITS	10
-> > +#elif NR_IRQS > 256
-> >  #define HARDIRQ_BITS	9
-> >  #else
-> >  #define HARDIRQ_BITS	8
+On Thu, Feb 04, 2010 at 08:34:26PM +0200, Baruch Siach wrote:
+> Hi Sascha,
 > 
-> Would not it be possible to use
+> On Thu, Feb 04, 2010 at 04:03:37PM +0100, Sascha Hauer wrote:
 > 
-> #define HARDIRQ_BITS order_base_2(NR_IRQS)
+> [snip]
+> 
+> >  arch/arm/mach-mx2/Kconfig                 |    2 +
+> >  arch/arm/mach-mx2/mach-pca100.c           |  103 ++++
+> >  arch/arm/mach-mx2/mach-pcm038.c           |   22 +
+> >  arch/arm/mach-mx3/Kconfig                 |    2 +
+> >  arch/arm/mach-mx3/mach-pcm037.c           |  137 ++++--
+> >  arch/arm/mach-mx3/mach-pcm043.c           |   53 ++
+> >  arch/arm/mach-mx3/pcm037.c                |  795 +++++++++++++++++++++++++++++
+> >  arch/arm/mach-mx3/pcm043.c                |  367 +++++++++++++
+> >  arch/arm/plat-mxc/ehci.c                  |  118 ++++-
+> >  arch/arm/plat-mxc/include/mach/mxc_ehci.h |    4 +
+> >  drivers/usb/gadget/fsl_mx3_udc.c          |   31 +-
+> >  11 files changed, 1570 insertions(+), 64 deletions(-)
+> >  create mode 100644 arch/arm/mach-mx3/pcm037.c
+> >  create mode 100644 arch/arm/mach-mx3/pcm043.c
+> 
+> Is the addition of these two files intended?
 
-HARDIRQ_BITS must be a preprocessor constant.
+No. Some git accident... Fixed.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
