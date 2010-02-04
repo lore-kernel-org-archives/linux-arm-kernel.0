@@ -1,51 +1,74 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Thu, 4 Feb 2010 10:42:22 +0100
-Subject: [PATCH 1/2] Modify PL031 for Nomadik and U8500 v2
-In-Reply-To: <1265273123-22421-1-git-send-email-linus.walleij@stericsson.com>
-References: <1265273123-22421-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100204104222.1e7ae094@linux.lan.towertech.it>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 4 Feb 2010 10:51:47 +0100
+Subject: change boot requirements [Was: make PHYS_OFFSET determined at
+	run time (unfinished)]
+In-Reply-To: <20100130210231.GC16345@pengutronix.de>
+References: <20100119083803.GA17904@pengutronix.de>
+	<20100122115831.GA8377@pengutronix.de>
+	<20100125173201.GA14834@pengutronix.de>
+	<4B5DF1C9.6090102@bluewatersys.com>
+	<20100130210231.GC16345@pengutronix.de>
+Message-ID: <20100204095147.GA6562@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  4 Feb 2010 09:45:23 +0100
-Linus Walleij <linus.walleij@stericsson.com> wrote:
+Hello Russell,
 
-> This extends the existing PrimeCell PL031 driver with support for
-> the ST Microelectronics and ST-Ericsson derivatives, in a first
-> and second version as used on the Nomadik and U8500 platforms.
-> It also rids the old ioctl() alarm on/off functions in favor of
-> the new .alarm_irq_enable field of the RTC class ops.
+> The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+>   Linus Torvalds (1):
+>         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
 
- Acked-by: Alessandro Zummo <a.zummo@towertech.it>
+Can you please pull this branch for the .34 merge window?  Since the
+last post one new patch was added to that branch.  I'll send it in reply
+to this mail.
 
+Current shortlog and diffstat are below.
 
-> If you Ack this Alessandro, is it OK that I put it in through
-> Russells patch tracker and ARM tree?
- 
- Ok. Be sure to have it tested on both versions
- of the rtc.
+Thanks
+Uwe
 
-  Please also correct white lines between a function call
- and the related if:
+The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+  Linus Torvalds (1):
+        Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
 
+are available in the git repository at:
 
-> +	ret = pl031_stv2_tm_to_time(dev, tm, &time, &bcd_year);
-----> +
-> +	if (ret == 0) {
-> +		writel(bcd_year, ldata->base + RTC_YLR);
-> +		writel(time, ldata->base + RTC_LR);
-> +	}
+  git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
 
- I've seen a couple of those.
+Uwe Kleine-K?nig (10):
+      zImage: fix comments for cache_on, cache_off and cache_clean_flush
+      zImage: some comments for __armv3_mpu_cache_on
+      zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+      zImage: annotate debug functions about corrupted registers
+      zImage: don't define unused symbol initrd_phys
+      arm: deprecate support for old way to pass kernel parameters
+      zImage: don't hard code the stack size twice
+      uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+      Allow PHYS_OFFSET to be runtime determined
+      arm: remove bit-rotten STANDALONE_DEBUG for decompressor
 
+ Documentation/arm/Booting               |    1 +
+ arch/arm/Kconfig                        |    9 ++++
+ arch/arm/boot/Makefile                  |    6 ++-
+ arch/arm/boot/compressed/Makefile       |   10 ++---
+ arch/arm/boot/compressed/Makefile.debug |   23 ---------
+ arch/arm/boot/compressed/head.S         |   76 +++++++++++++++++++++++++++---
+ arch/arm/boot/compressed/misc.c         |   27 -----------
+ arch/arm/include/asm/memory.h           |    5 ++
+ arch/arm/kernel/Makefile                |    4 +-
+ arch/arm/kernel/compat.c                |    7 ---
+ arch/arm/kernel/compat.h                |    2 -
+ arch/arm/kernel/head.S                  |   31 +++++++++---
+ arch/arm/kernel/setup.c                 |   21 ++++++++-
+ 13 files changed, 138 insertions(+), 84 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/Makefile.debug
 
+Best regards
+Uwe
 -- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
