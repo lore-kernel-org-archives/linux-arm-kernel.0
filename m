@@ -1,53 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Feb 2010 14:07:16 -0800
-Subject: [GIT PULL] omap fixes for 2.6.33-rc6
-Message-ID: <20100204220716.GU22747@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 4 Feb 2010 23:46:46 +0100
+Subject: 32-bit Thumb-2 breakpoints
+In-Reply-To: <20100203174426.GA10898@caradoc.them.org>
+References: <20100111215816.GA1068@caradoc.them.org>
+	<20100111223503.GD7925@n2100.arm.linux.org.uk>
+	<20100111225436.GA7408@caradoc.them.org>
+	<20100111231027.GA30714@shareable.org>
+	<20100111231702.GA9485@caradoc.them.org>
+	<20100203172301.GD19037@shareable.org>
+	<20100203174426.GA10898@caradoc.them.org>
+Message-ID: <20100204224646.GC1436@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed 2010-02-03 12:44:26, Daniel Jacobowitz wrote:
+> On Wed, Feb 03, 2010 at 05:23:01PM +0000, Jamie Lokier wrote:
+> > Daniel Jacobowitz wrote:
+> > > Thankfully, both branches into IT blocks and branches
+> > > leaving IT blocks not at the last instruction are forbidden.
+> > 
+> > Forbidden as in throws a fault, or forbidden as in "can we use this to
+> > break out of GDB single-stepping to give third-parties a hard time
+> > tracing my secret code"?
+> 
+> Forbidden as in "the architecture documentation says it has
+> unpredictable behavior".
+> 
+> That's generally where I draw the line at trying to handle bad code.
+> In practice, I will make a wild guess that current processors fault
+> branches during an IT block and don't do anything fancy for branches
+> into an IT block, or else it messes up in some hard-to-reproduce way.
 
-Please pull omap fixes from:
+So it seems the second kind of forbidden :-(.
+									Pavel
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Regards,
-
-Tony
-The following changes since commit abe94c756c08d50566c09a65b9c7fe72f83071c5:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc6
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Kevin Hilman (2):
-      OMAP2/3: IRQ: ensure valid base address
-      OMAP2/3: GPMC: ensure valid clock pointer
-
-Marek Skuczynski (1):
-      omap: Fix access to already released memory in clk_debugfs_register_one()
-
-Sriram (1):
-      ARCH OMAP : enable ARCH_HAS_HOLES_MEMORYMODEL for OMAP
-
-Tony Lindgren (4):
-      omap: Remove old unused defines for OMAP_32KSYNCT_BASE
-      omap: Fix 3630 mux errors
-      omap: Fix arch/arm/mach-omap2/mux.c: Off by one error
-      omap: Disable serial port autoidle by default
-
-Uwe Kleine-K?nig (1):
-      omap: define _toggle_gpio_edge_triggering only for OMAP1
-
- arch/arm/Kconfig                 |    1 +
- arch/arm/mach-omap2/gpmc.c       |    5 +++-
- arch/arm/mach-omap2/irq.c        |    4 ++-
- arch/arm/mach-omap2/mux.c        |   10 +++++++-
- arch/arm/mach-omap2/mux34xx.c    |   47 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/serial.c     |   11 +++++++-
- arch/arm/plat-omap/clock.c       |    4 +-
- arch/arm/plat-omap/gpio.c        |    4 +-
- arch/arm/plat-omap/omap_device.c |   10 --------
- 9 files changed, 77 insertions(+), 19 deletions(-)
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
