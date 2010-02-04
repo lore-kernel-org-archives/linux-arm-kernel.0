@@ -1,97 +1,20 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Wed, 3 Feb 2010 17:29:16 -0800
-Subject: [PATCH 08/25] imx/mx1: rename files defining a machine to
-	mach-$mach.c
-In-Reply-To: <1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100108161551.GA19007@pengutronix.de>
-	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-7-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100204012916.GC5274@k2>
+From: e.robertson.svg@gmail.com (E Robertson)
+Date: Wed, 3 Feb 2010 21:17:29 -0600
+Subject: copy_to_user limits inquiry
+Message-ID: <3972542e1002031917y5929adb8k9f1043ef3dcd0d1c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jan 08, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-> Cc: Darius Augulis <augulis.darius@gmail.com>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> ---
->  arch/arm/mach-mx1/Makefile                      |    4 ++--
->  arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c}   |    2 +-
->  arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} |    2 +-
->  3 files changed, 4 insertions(+), 4 deletions(-)
->  rename arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c} (98%)
->  rename arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} (98%)
-
-Rethinking about this (based on a similar request for my i.MX5 submission), I
-think renaming the boards to mach-* is a bad idea.
-
-Other SoCs (davinci, omap, msm, nomadik, etc.) use the board-* convention. We
-already use mach-* for the SoC directory names under arch/arm/. Naming the
-boards with mach-* will just cause more confusion.
-
-Regards,
-Amit
-
-
-> diff --git a/arch/arm/mach-mx1/Makefile b/arch/arm/mach-mx1/Makefile
-> index b72f536..297d172 100644
-> --- a/arch/arm/mach-mx1/Makefile
-> +++ b/arch/arm/mach-mx1/Makefile
-> @@ -10,5 +10,5 @@ obj-y			+= generic.o clock.o devices.o
->  obj-$(CONFIG_MX1_VIDEO)	+= ksym_mx1.o mx1_camera_fiq.o
->  
->  # Specific board support
-> -obj-$(CONFIG_ARCH_MX1ADS) += mx1ads.o
-> -obj-$(CONFIG_MACH_SCB9328) += scb9328.o
-> +obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
-> +obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
-> diff --git a/arch/arm/mach-mx1/mx1ads.c b/arch/arm/mach-mx1/mach-mx1ads.c
-> similarity index 98%
-> rename from arch/arm/mach-mx1/mx1ads.c
-> rename to arch/arm/mach-mx1/mach-mx1ads.c
-> index 30f04e5..a39433a 100644
-> --- a/arch/arm/mach-mx1/mx1ads.c
-> +++ b/arch/arm/mach-mx1/mach-mx1ads.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * arch/arm/mach-imx/mx1ads.c
-> + * arch/arm/mach-imx/mach-mx1ads.c
->   *
->   * Initially based on:
->   *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
-> diff --git a/arch/arm/mach-mx1/scb9328.c b/arch/arm/mach-mx1/mach-scb9328.c
-> similarity index 98%
-> rename from arch/arm/mach-mx1/scb9328.c
-> rename to arch/arm/mach-mx1/mach-scb9328.c
-> index 325d98d..b9530d7 100644
-> --- a/arch/arm/mach-mx1/scb9328.c
-> +++ b/arch/arm/mach-mx1/mach-scb9328.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * linux/arch/arm/mach-mx1/scb9328.c
-> + * linux/arch/arm/mach-mx1/mach-scb9328.c
->   *
->   * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
->   * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
-> -- 
-> 1.6.5.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--------------------------------------------------------------------------
-Amit Kucheria,				 Kernel Developer, Verdurent
--------------------------------------------------------------------------
+Hi,
+I allocate two 16 page buffers (64K) for a DMA transfer. These were
+allocated using dma_alloc_coherent and I had not problems with this
+until I start approaching the buffer limit.
+The buffer transfers to userspace (copy_to_user) worked flawlessly
+(well it has for months anyway) until my transfer sizes got pretty
+close to the last two 4096 pages and it's fairly consistent.
+Since this happens on two different 2.6 kernel versions and the DMA
+data transfer driver is the same, it seems the problem lies somewhere
+during the transfer from kernel to user.
+Are their any size restrictions on using the copy_to_user? Perhaps
+page restrictions?
+Thanks.
