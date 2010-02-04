@@ -1,213 +1,200 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Thu, 4 Feb 2010 23:38:30 +0200
-Subject: [RFC PATCH v2 2/2] ARM: VFP: preserve the HW context when calling
-	signal handlers
-In-Reply-To: <b8a1d37c5f981cdd2e83c9fd98198832324cd57c.1265315249.git.imre.deak@nokia.com>
-References: <b8a1d37c5f981cdd2e83c9fd98198832324cd57c.1265315249.git.imre.deak@nokia.com>
-Message-ID: <b8a1d37c5f981cdd2e83c9fd98198832324cd57e.1265315249.git.imre.deak@nokia.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 05 Feb 2010 10:52:33 +1300
+Subject: [PATCH] ep93xx: Add support for Snapper CL15 module
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190902152BFB@mi8nycmail19.Mi8.com>
+References: <4B6B34D3.1010704@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190902152BFB@mi8nycmail19.Mi8.com>
+Message-ID: <4B6B41A1.9040403@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signal handlers can use floating point, so prevent them to corrupt
-the main thread's VFP context. So far there were two signal stack
-frame formats defined based on the VFP implementation, but the user
-struct used for ptrace covers all posibilities, so use it for the
-signal stack too. This patch extends the user struct and leaves
-its magic number the same, in the hope that user space code does
-not depend on its size and can parse the original regs w/o
-problems.
+H Hartley Sweeten wrote:
+> On Thursday, February 04, 2010 1:58 PM, Ryan Mallon wrote:
+>> Add support for the Bluewater Systems Snapper CL15 single board computer
+>> module.
+>>
+>> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+>> Cc: Hartley Sweeten <hartleys@visionengravers.com>
+>>
+>> ---
+>>
+>> diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+>> index 9167c3d..71eabca 100644
+>> --- a/arch/arm/mach-ep93xx/Kconfig
+>> +++ b/arch/arm/mach-ep93xx/Kconfig
+>> @@ -168,6 +168,13 @@ config MACH_TS72XX
+>>  	  Say 'Y' here if you want your kernel to support the
+>>  	  Technologic Systems TS-72xx board.
+>>  
+>> +config MACH_SNAPPER_CL15
+>> +	bool "Support Bluewater Systems Snapper CL15 Module"
+>> +	depends on EP93XX_SDCE0_PHYS_OFFSET
+>> +	help
+>> +	  Say 'Y' here if you want your kernel to support the Bluewater
+>> +	  Systems Snapper CL15 Module.
+>> +
+> 
+> Your will need to base this patch on Russell's -devel tree.  The Sim.One
+> board is now in that.
 
-Support to save / restore the exception registers was added by
-Will Deacon.
+My understanding is that this sort of thing will merge cleanly since the
+patches are otherwise unrelated. I think I only need to rebase on the
+-devel tree if I have direct dependencies, or expect conflicts there.
+Russell?
 
-Signed-off-by: Imre Deak <imre.deak@nokia.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Also, please move this so that they stay alphabetized:
+> 
+> config MACH_SIM_ONE
+> ...
+> +config MACH_SNAPPER_CL15
+> +...
+> config MACH_TS72XX
+> ...
 
----
- arch/arm/include/asm/ucontext.h |   19 +++-----
- arch/arm/include/asm/user.h     |    3 +
- arch/arm/kernel/signal.c        |   91 +++++++++++++++++++++++++++++++++++++--
- 3 files changed, 97 insertions(+), 16 deletions(-)
+Will fix.
 
-diff --git a/arch/arm/include/asm/ucontext.h b/arch/arm/include/asm/ucontext.h
-index bf65e9f..1c3236b 100644
---- a/arch/arm/include/asm/ucontext.h
-+++ b/arch/arm/include/asm/ucontext.h
-@@ -59,23 +59,18 @@ struct iwmmxt_sigframe {
- #endif /* CONFIG_IWMMXT */
- 
- #ifdef CONFIG_VFP
--#if __LINUX_ARM_ARCH__ < 6
--/* For ARM pre-v6, we use fstmiax and fldmiax.  This adds one extra
-- * word after the registers, and a word of padding@the end for
-- * alignment.  */
- #define VFP_MAGIC		0x56465001
--#define VFP_STORAGE_SIZE	152
--#else
--#define VFP_MAGIC		0x56465002
--#define VFP_STORAGE_SIZE	144
--#endif
- 
- struct vfp_sigframe
- {
- 	unsigned long		magic;
- 	unsigned long		size;
--	union vfp_state		storage;
--};
-+	struct user_vfp		ufp;
-+} __attribute__((__aligned__(8)));
-+
-+/* 8 byte for magic and size, 272 byte for ufp */
-+#define VFP_STORAGE_SIZE	sizeof(struct vfp_sigframe)
-+
- #endif /* CONFIG_VFP */
- 
- /*
-@@ -91,7 +86,7 @@ struct aux_sigframe {
- #ifdef CONFIG_IWMMXT
- 	struct iwmmxt_sigframe	iwmmxt;
- #endif
--#if 0 && defined CONFIG_VFP /* Not yet saved.  */
-+#ifdef CONFIG_VFP
- 	struct vfp_sigframe	vfp;
- #endif
- 	/* Something that isn't a valid magic number for any coprocessor.  */
-diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
-index df95e05..ea7e44d 100644
---- a/arch/arm/include/asm/user.h
-+++ b/arch/arm/include/asm/user.h
-@@ -88,6 +88,9 @@ struct user{
- struct user_vfp {
- 	unsigned long long fpregs[32];
- 	unsigned long fpscr;
-+	unsigned long fpexc;
-+	unsigned long fpinst;
-+	unsigned long fpinst2;
- };
- 
- #endif /* _ARM_USER_H */
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index e7714f3..6a36851 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -18,6 +18,7 @@
- #include <asm/cacheflush.h>
- #include <asm/ucontext.h>
- #include <asm/unistd.h>
-+#include <asm/vfp.h>
- 
- #include "ptrace.h"
- #include "signal.h"
-@@ -175,6 +176,88 @@ static int restore_iwmmxt_context(struct iwmmxt_sigframe *frame)
- 
- #endif
- 
-+#ifdef CONFIG_VFP
-+
-+static int preserve_vfp_context(struct vfp_sigframe __user *frame)
-+{
-+	struct thread_info *thread = current_thread_info();
-+	struct vfp_hard_struct *h = &thread->vfpstate.hard;
-+	const unsigned long magic = VFP_MAGIC;
-+	const unsigned long size = VFP_STORAGE_SIZE;
-+	int err = 0;
-+
-+	vfp_sync_state(thread);
-+	__put_user_error(magic, &frame->magic, err);
-+	__put_user_error(size, &frame->size, err);
-+
-+	/*
-+	 * Copy the floating point registers. There can be unused
-+	 * registers see asm/hwcap.h for details.
-+	 */
-+	err |= __copy_to_user(&frame->ufp.fpregs, &h->fpregs,
-+			      sizeof(h->fpregs));
-+	/*
-+	 * Copy the status and control register.
-+	 */
-+	__put_user_error(h->fpscr, &frame->ufp.fpscr, err);
-+
-+	/*
-+	 * Copy the exception registers.
-+	 */
-+	__put_user_error(h->fpexc, &frame->ufp.fpexc, err);
-+	__put_user_error(h->fpinst, &frame->ufp.fpinst, err);
-+	__put_user_error(h->fpinst2, &frame->ufp.fpinst2, err);
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+static int restore_vfp_context(struct vfp_sigframe __user *frame)
-+{
-+	struct thread_info *thread = current_thread_info();
-+	struct vfp_hard_struct *h = &thread->vfpstate.hard;
-+	unsigned long magic;
-+	unsigned long size;
-+	unsigned long fpexc;
-+	int err = 0;
-+
-+	vfp_sync_state(thread);
-+	__get_user_error(magic, &frame->magic, err);
-+	__get_user_error(size, &frame->size, err);
-+
-+	if (err)
-+		return -EFAULT;
-+	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
-+		return -EINVAL;
-+
-+	/*
-+	 * Copy the floating point registers. There can be unused
-+	 * registers see asm/hwcap.h for details.
-+	 */
-+	err |= __copy_from_user(&h->fpregs, &frame->ufp.fpregs,
-+				sizeof(h->fpregs));
-+	/*
-+	 * Copy the status and control register.
-+	 */
-+	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
-+
-+	/*
-+	 * Sanitise and restore the exception registers.
-+	 */
-+	__get_user_error(fpexc, &frame->ufp.fpexc, err);
-+	/* Ensure the VFP is enabled. */
-+	fpexc |= FPEXC_EN;
-+	/* Ensure FPINST2 is invalid and the exception flag is cleared. */
-+	fpexc &= ~(FPEXC_EX | FPEXC_FP2V);
-+	h->fpexc = fpexc;
-+
-+	__get_user_error(h->fpinst, &frame->ufp.fpinst, err);
-+	__get_user_error(h->fpinst2, &frame->ufp.fpinst2, err);
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+#endif
-+
- /*
-  * Do a signal return; undo the signal stack.  These are aligned to 64-bit.
-  */
-@@ -233,8 +316,8 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
- 		err |= restore_iwmmxt_context(&aux->iwmmxt);
- #endif
- #ifdef CONFIG_VFP
--//	if (err == 0)
--//		err |= vfp_restore_state(&sf->aux.vfp);
-+	if (err == 0)
-+		err |= restore_vfp_context(&aux->vfp);
- #endif
- 
- 	return err;
-@@ -348,8 +431,8 @@ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
- 		err |= preserve_iwmmxt_context(&aux->iwmmxt);
- #endif
- #ifdef CONFIG_VFP
--//	if (err == 0)
--//		err |= vfp_save_state(&sf->aux.vfp);
-+	if (err == 0)
-+		err |= preserve_vfp_context(&aux->vfp);
- #endif
- 	__put_user_error(0, &aux->end_magic, err);
- 
+>> +
+>> +#include <linux/platform_device.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+> 
+> #include <linux/io.h>
+> 
+> Should be here since you are using __raw_{read/write}w
+
+Okay.
+
+>> +#include <linux/gpio.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/i2c-gpio.h>
+>> +#include <linux/fb.h>
+>> +
+>> +#include <linux/mtd/partitions.h>
+>> +#include <linux/mtd/nand.h>
+>> +
+>> +#include <mach/hardware.h>
+>> +#include <mach/fb.h>
+>> +
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +
+>> +#define SNAPPERCL15_NAND_BASE	(EP93XX_CS7_PHYS_BASE + 0x01000000)
+> 
+> Maybe use SZ_16M?  Your call.
+
+Sure.
+
+>> +
+>> +#define SNAPPERCL15_NAND_CTRL	(1 << 6)
+>> +#define SNAPPERCL15_NAND_WPN	(1 << 8)
+>> +#define SNAPPERCL15_NAND_ALE	(1 << 9)
+>> +#define SNAPPERCL15_NAND_CLE	(1 << 10)
+>> +#define SNAPPERCL15_NAND_CEN	(1 << 11)
+>> +#define SNAPPERCL15_NAND_RDY	(1 << 14)
+>> +
+>> +#define NAND_CTRL_ADDR(chip)						\
+>> +	((void __iomem *)((unsigned long)chip->IO_ADDR_W + 0x40))
+> 
+> The cast is probably not needed. IO_ADDR_W is already a void __iomem * and
+> adding to it should not require the cast.
+
+I'll have a look and see if I can simplify this and remove the casts. I
+think I based it on one of the other platform NAND implementations that
+had something similar.
+
+>> +
+>> +static unsigned long nand_state;
+>> +
+>> +static void snappercl15_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+>> +				      unsigned int ctrl)
+>> +{
+>> +	struct nand_chip *chip = mtd->priv;
+>> +	static int first = 1;
+>> +	unsigned set;
+>> +
+>> +	if (first) {
+>> +		nand_state = SNAPPERCL15_NAND_CEN | SNAPPERCL15_NAND_WPN;
+>> +		__raw_writew(nand_state, NAND_CTRL_ADDR(chip));
+>> +		first = 0;
+>> +	}
+>> +
+>> +	if (ctrl & NAND_CTRL_CHANGE) {
+>> +		set = SNAPPERCL15_NAND_CEN;
+>> +
+>> +		if (ctrl & NAND_NCE)
+>> +			set &= ~SNAPPERCL15_NAND_CEN;
+>> +		if (ctrl & NAND_CLE)
+>> +			set |= SNAPPERCL15_NAND_CLE;
+>> +		if (ctrl & NAND_ALE)
+>> +			set |= SNAPPERCL15_NAND_ALE;
+>> +
+>> +		nand_state &= ~(SNAPPERCL15_NAND_CEN |
+>> +				SNAPPERCL15_NAND_CLE |
+>> +				SNAPPERCL15_NAND_ALE);
+>> +		nand_state |= set;
+>> +		__raw_writew(nand_state, NAND_CTRL_ADDR(chip));
+>> +	}
+>> +
+>> +	if (cmd != NAND_CMD_NONE)
+>> +		__raw_writew((cmd & 0xff) | nand_state, chip->IO_ADDR_W);
+>> +}
+>> +
+> 
+> Interesting... Is your nand connected thru a fpga or something?
+
+No, just a series of buffers. The Snapper CL15 has placement options for
+either a NAND part or (for legacy reasons) an xD card connector. The
+driver will work with either. For xD cards, hotplugging the cards is not
+supported. However, all new Snapper CL15's are manufactured with NAND
+fitted.
+
+>> +
+>> +static void snappercl15_nand_set_parts(uint64_t size,
+>> +				       struct platform_nand_chip *chip)
+>> +{
+>> +	pr_info("Snapper CL15: %llu bytes NAND\n", size);
+> 
+> You only have one pr_<level> right now but you might consider defining a
+> pr_fmt to prefix the "Snapper CL15: ".  Then you don't have to worry about
+> adding it to any pr_<level> output later.  Just put this before the #include's:
+> 
+> #define pr_fmt(fmt) "Snapper CL15: " fmt
+> 
+> Your could also use the following but the prefix will be "snappercl15: "
+> 
+> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+Probably not worth it since I don't expect to be adding a lot of printks
+to this file. I can probably remove this one even, since the MTD core
+displays informtation about the NAND part and the partition layout.
+
+>> +
+>> +static struct i2c_board_info __initdata snappercl15_i2c_data[] = {
+>> +	{
+>> +		/* Audio codec */
+>> +		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+>> +	},
+>> +};
+> 
+> Are you going to add the audio support later?
+
+Hopefully. I have some partially working code to support the audio using
+the SoC audio interface. I think there is no harm in having this here
+now though, and it saves having to patch it in later.
+
+> 
+> Looks good other than that.
+
+Thanks, will post an updated patch later today.
+
+~Ryan
+
 -- 
-1.6.6
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
