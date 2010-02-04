@@ -1,318 +1,365 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 4 Feb 2010 12:05:28 -0500
-Subject: [PATCH] vic: make irq_chip access typesafe
-In-Reply-To: <A6D19A13FE030A409EC4362C172E091F0E6ED876@eseldmw101.eemea.ericsson.se>
-References: <201002021601.43072.hartleys@visionengravers.com>
-	<A6D19A13FE030A409EC4362C172E091F0E6ED876@eseldmw101.eemea.ericsson.se>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902152B8B@mi8nycmail19.Mi8.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Thu, 4 Feb 2010 10:09:07 -0700
+Subject: [PATCHv2 01/11] arm: mxc: TrustZone interrupt controller (TZIC)
+	for i.MX5 family
+In-Reply-To: <20100203132404.GC5252@k2>
+References: <cover.1265173480.git.amit.kucheria@canonical.com>
+	<cover.1265173246.git.amit.kucheria@verdurent.com>
+	<0511204199ab83aed2340e70a4639500c0528dab.1265173480.git.amit.kucheria@canonical.com>
+	<f17812d71002022223jdc0ac5cp5b94928fb45695d6@mail.gmail.com>
+	<20100203132404.GC5252@k2>
+Message-ID: <86A0E76937111F4C92FABEC0A209885104426182@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ARM] vic: make irq_chip access typesafe
+ 
 
-Currently the base address of the vic is stored as the irq_chip
-data. Unfortunately the base address is a void __iomem * but
-the irq_chip data is a void *. This ends up producing sparse
-warnings about different address spaces.
+-----Original Message-----
+From: Amit Kucheria [mailto:amit.kucheria at canonical.com] 
+Sent: Wednesday, February 03, 2010 7:24 AM
+To: Eric Miao
+Cc: List Linux Kernel; linux at arm.linux.org.uk; Nguyen Dinh-R00091; s.hauer at pengutronix.de; grant.likely at secretlab.ca; Herring Robert-RA7055; linux-arm-kernel at lists.infradead.org; daniel at caiaq.de; bryan.wu at canonical.com; valentin.longchamp at epfl.ch
+Subject: Re: [PATCHv2 01/11] arm: mxc: TrustZone interrupt controller (TZIC) for i.MX5 family
 
-Since there is already a private struct for the vic pm device
-that saves the void __iomem *base address we can reuse this
-data and remove all the warnings by storing this struct as the
-irq_chip data.
+On 10 Feb 02, Eric Miao wrote:
+> Hi Amit,
+> 
+> Just some nit-picking review comments, see below:
+> 
+> On Tue, Feb 2, 2010 at 9:16 PM, Amit Kucheria 
+> <amit.kucheria@canonical.com> wrote:
+> > Freescale i.MX51 processor uses a new interrupt controller. Add 
+> > driver for TrustZone Interrupt Controller
+> >
+> > Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> > ---
+> > ?arch/arm/plat-mxc/Kconfig ?| ? ?8 ++
+> > ?arch/arm/plat-mxc/Makefile | ? ?3 +
+> > ?arch/arm/plat-mxc/tzic.c ? | ?182 
+> > ++++++++++++++++++++++++++++++++++++++++++++
+> > ?3 files changed, 193 insertions(+), 0 deletions(-)
+> > ?create mode 100644 arch/arm/plat-mxc/tzic.c
+> >
+> > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig 
+> > index 8b0a1ee..59558c4 100644
+> > --- a/arch/arm/plat-mxc/Kconfig
+> > +++ b/arch/arm/plat-mxc/Kconfig
+> > @@ -62,6 +62,14 @@ config MXC_IRQ_PRIOR
+> > ? ? ? ? ?requirements for timing.
+> > ? ? ? ? ?Say N here, unless you have a specialized requirement.
+> >
+> > +config MXC_TZIC
+> > + ? ? ? bool "Enable TrustZone Interrupt Controller"
+> > + ? ? ? depends on ARCH_MX51
+> 
+> This is the first patch of the base port, yet I cannot find any 
+> reference to this ARCH_MX51, did you miss something?
 
-The normal arm vic as well as the modified st vic need to call
-vic_pm_register regardless of the CONFIG_PM setting in order
-to save the necessary data. Since the AMBA_VENDOR_ST case
-does not currently call vic_pm_register:
-1) use a break after calling vic_init_st instead of returning.
-2) move the normal arm vic code in vic_init to a new __init 
-function (vic_init_arm) and call it in the switch.
-3) after the switch all vic types call vic_pm_register.
+ARCH_MX51 is only introduced in the later patches that add the core i.MX5 code. Since TZIC is not inherently dependent on i.MX5 (it's merely the first processor to use it), I thought of splitting it out as a separate patch.
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Tested-by: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Andrea Gallo <andrea.gallo@stericsson.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Does this break the sanctity of one self-contained change?
 
----
+> > + ? ? ? help
+> > + ? ? ? ? This will be automatically selected for all processors
+> > + ? ? ? ? containing this interrupt controller.
+> > + ? ? ? ? Say N here only if you are really sure.
+> > +
+> > ?config MXC_PWM
+> > ? ? ? ?tristate "Enable PWM driver"
+> > ? ? ? ?depends on ARCH_MXC
+> > diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile 
+> > index 996cbac..0202ad9 100644
+> > --- a/arch/arm/plat-mxc/Makefile
+> > +++ b/arch/arm/plat-mxc/Makefile
+> > @@ -5,6 +5,9 @@
+> > ?# Common support
+> > ?obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
+> >
+> > +# MX51 uses the TZIC interrupt controller, older platforms use AVIC 
+> > +(irq.o)
+> > +obj-$(CONFIG_MXC_TZIC) += tzic.o
+> > +
+> > ?obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
+> > ?obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+> > ?obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o diff --git 
+> > a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c new file mode 
+> > 100644 index 0000000..00cb0ad
+> > --- /dev/null
+> > +++ b/arch/arm/plat-mxc/tzic.c
+> > @@ -0,0 +1,182 @@
+> > +/*
+> > + * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + *
+> > + * The code contained herein is licensed under the GNU General 
+> > +Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/moduleparam.h>
+> > +#include <linux/init.h>
+> > +#include <linux/device.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <asm/mach/irq.h>
+> > +
+> > +#include <mach/hardware.h>
+> > +
+> > +/*
+> > + *****************************************
+> > + * TZIC Registers ? ? ? ? ? ? ? ? ? ? ? ?*
+> > + *****************************************
+> > + */
+> > +
+> > +#define TZIC_INTCNTL ? ? ? ? ? ?0x0000 /* Control register */ 
+> > +#define TZIC_INTTYPE ? ? ? ? ? ?0x0004 /* Controller Type register 
+> > +*/ #define TZIC_IMPID ? ? ? ? ? ? ?0x0008 /* Distributor 
+> > +Implementer Identification */ #define TZIC_PRIOMASK ? ? ? ? ? 
+> > +0x000C /* Priority Mask Reg */ #define TZIC_SYNCCTRL ? ? ? ? ? 
+> > +0x0010 /* Synchronizer Control register */ #define TZIC_DSMINT ? ? ? ? ? ? 
+> > +0x0014 /* DSM interrupt Holdoffregister */ #define TZIC_INTSEC0 ? ? ? ? ? ?
+> > +0x0080 /* Interrupt Security register 0 */ #define TZIC_ENSET0 ? ? ? ? ? ? 
+> > +0x0100 /* Enable Set Register 0 */ #define TZIC_ENCLEAR0 ? ? ? ? ? 
+> > +0x0180 /* Enable Clear Register 0 */ #define TZIC_SRCSET0 ? ? ? ? ? ?
+> > +0x0200 /* Source Set Register 0 */ #define TZIC_SRCCLAR0 ? ? ? ? ? 
+> > +0x0280 /* Source Clear Register 0 */ #define TZIC_PRIORITY0 ? ? ? ? ?
+> > +0x0400 /* Priority Register 0 */ #define TZIC_PND0 ? ? ? ? ? ? ? 
+> > +0x0D00 /* Pending Register 0 */ #define TZIC_HIPND0 ? ? ? ? ? ? 
+> > +0x0D80 /* High Priority Pending Register */ #define TZIC_WAKEUP0 ? ? ? ? ? ?
+> > +0x0E00 /* Wakeup Config Register */ #define TZIC_SWINT ? ? ? ? ? ? ?
+> > +0x0F00 /* Software Interrupt Rigger Register */ #define TZIC_ID0 ? ? ? ? ? ? ? ?
+> > +0x0FD0 /* Indentification Register 0 */
+> > +
+> > +void __iomem *tzic_base;
+> 
+> This can just be made to 'static' if it's not used elsewhere, and I'm 
+> wondering if it's neater to define them as:
+> 
+> #define TZIC_INTCNTL		(tzic_base + 0x0000)
+> 
+> so to make the code below short and handy.
 
-V2 - add missing variable declaration in vic_init_arm (Linus Walleij)
+tzic_base is actually used in entry-macro.S in patch 0004. I've tried to follow AVIC's way of doing things.
 
-diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-index 1cf999a..6031e44 100644
---- a/arch/arm/common/vic.c
-+++ b/arch/arm/common/vic.c
-@@ -29,7 +29,6 @@
- #include <asm/mach/irq.h>
- #include <asm/hardware/vic.h>
- 
--#if defined(CONFIG_PM)
- /**
-  * struct vic_device - VIC PM device
-  * @sysdev: The system device which is registered.
-@@ -41,6 +40,8 @@
-  * @int_enable: Save for VIC_INT_ENABLE.
-  * @soft_int: Save for VIC_INT_SOFT.
-  * @protect: Save for VIC_PROTECT.
-+ *
-+ * irq_chip also uses this to get the base address of the VIC
-  */
- struct vic_device {
- 	struct sys_device sysdev;
-@@ -49,10 +50,12 @@ struct vic_device {
- 	int		irq;
- 	u32		resume_sources;
- 	u32		resume_irqs;
-+#if defined(CONFIG_PM)
- 	u32		int_select;
- 	u32		int_enable;
- 	u32		soft_int;
- 	u32		protect;
-+#endif /* CONFIG_PM */
- };
- 
- /* we cannot allocate memory when VICs are initially registered */
-@@ -60,12 +63,6 @@ static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
- 
- static int vic_id;
- 
--static inline struct vic_device *to_vic(struct sys_device *sys)
--{
--	return container_of(sys, struct vic_device, sysdev);
--}
--#endif /* CONFIG_PM */
--
- /**
-  * vic_init2 - common initialisation code
-  * @base: Base of the VIC.
-@@ -86,6 +83,11 @@ static void vic_init2(void __iomem *base)
- }
- 
- #if defined(CONFIG_PM)
-+static inline struct vic_device *to_vic(struct sys_device *sys)
-+{
-+	return container_of(sys, struct vic_device, sysdev);
-+}
-+
- static int vic_class_resume(struct sys_device *dev)
- {
- 	struct vic_device *vic = to_vic(dev);
-@@ -176,6 +178,8 @@ static int __init vic_pm_init(void)
- }
- late_initcall(vic_pm_init);
- 
-+#endif /* CONFIG_PM */
-+
- /**
-  * vic_pm_register - Register a VIC for later power management control
-  * @base: The base address of the VIC.
-@@ -185,6 +189,9 @@ late_initcall(vic_pm_init);
-  * Register the VIC with the system device tree so that it can be notified
-  * of suspend and resume requests and ensure that the correct actions are
-  * taken to re-instate the settings on resume.
-+ *
-+ * This is called even with CONFIG_PM disabled since the irq_chip uses the
-+ * vic_device structure to hold the base address for the VIC.
-  */
- static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 resume_sources)
- {
-@@ -200,64 +207,46 @@ static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 res
- 		vic_id++;
- 	}
- }
--#else
--static inline void vic_pm_register(void __iomem *base, unsigned int irq, u32 arg1) { }
--#endif /* CONFIG_PM */
- 
- static void vic_ack_irq(unsigned int irq)
- {
--	void __iomem *base = get_irq_chip_data(irq);
--	irq &= 31;
--	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
-+	struct vic_device *vic = get_irq_chip_data(irq);
-+	u32 mask = 1 << (irq & 31);
-+
-+	writel(mask, vic->base + VIC_INT_ENABLE_CLEAR);
- 	/* moreover, clear the soft-triggered, in case it was the reason */
--	writel(1 << irq, base + VIC_INT_SOFT_CLEAR);
-+	writel(mask, vic->base + VIC_INT_SOFT_CLEAR);
- }
- 
- static void vic_mask_irq(unsigned int irq)
- {
--	void __iomem *base = get_irq_chip_data(irq);
--	irq &= 31;
--	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
--}
-+	struct vic_device *vic = get_irq_chip_data(irq);
-+	u32 mask = 1 << (irq & 31);
- 
--static void vic_unmask_irq(unsigned int irq)
--{
--	void __iomem *base = get_irq_chip_data(irq);
--	irq &= 31;
--	writel(1 << irq, base + VIC_INT_ENABLE);
-+	writel(mask, vic->base + VIC_INT_ENABLE_CLEAR);
- }
- 
--#if defined(CONFIG_PM)
--static struct vic_device *vic_from_irq(unsigned int irq)
-+static void vic_unmask_irq(unsigned int irq)
- {
--        struct vic_device *v = vic_devices;
--	unsigned int base_irq = irq & ~31;
--	int id;
--
--	for (id = 0; id < vic_id; id++, v++) {
--		if (v->irq == base_irq)
--			return v;
--	}
-+	struct vic_device *vic = get_irq_chip_data(irq);
-+	u32 mask = 1 << (irq & 31);
- 
--	return NULL;
-+	writel(mask, vic->base + VIC_INT_ENABLE);
- }
- 
-+#if defined(CONFIG_PM)
- static int vic_set_wake(unsigned int irq, unsigned int on)
- {
--	struct vic_device *v = vic_from_irq(irq);
--	unsigned int off = irq & 31;
--	u32 bit = 1 << off;
--
--	if (!v)
--		return -EINVAL;
-+	struct vic_device *vic = get_irq_chip_data(irq);
-+	u32 mask = 1 << (irq & 31);
- 
--	if (!(bit & v->resume_sources))
-+	if (!(mask & vic->resume_sources))
- 		return -EINVAL;
- 
- 	if (on)
--		v->resume_irqs |= bit;
-+		vic->resume_irqs |= mask;
- 	else
--		v->resume_irqs &= ~bit;
-+		vic->resume_irqs &= ~mask;
- 
- 	return 0;
- }
-@@ -266,11 +255,11 @@ static int vic_set_wake(unsigned int irq, unsigned int on)
- #endif /* CONFIG_PM */
- 
- static struct irq_chip vic_chip = {
--	.name	= "VIC",
--	.ack	= vic_ack_irq,
--	.mask	= vic_mask_irq,
--	.unmask	= vic_unmask_irq,
--	.set_wake = vic_set_wake,
-+	.name		= "VIC",
-+	.ack		= vic_ack_irq,
-+	.mask		= vic_mask_irq,
-+	.unmask		= vic_unmask_irq,
-+	.set_wake	= vic_set_wake,
- };
- 
- /*
-@@ -323,46 +312,17 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 			unsigned int irq = irq_start + i;
- 
- 			set_irq_chip(irq, &vic_chip);
--			set_irq_chip_data(irq, base);
-+			set_irq_chip_data(irq, &vic_devices[vic_id]);
- 			set_irq_handler(irq, handle_level_irq);
- 			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 		}
- 	}
- }
- 
--/**
-- * vic_init - initialise a vectored interrupt controller
-- * @base: iomem base address
-- * @irq_start: starting interrupt number, must be muliple of 32
-- * @vic_sources: bitmask of interrupt sources to allow
-- * @resume_sources: bitmask of interrupt sources to allow for resume
-- */
--void __init vic_init(void __iomem *base, unsigned int irq_start,
--		     u32 vic_sources, u32 resume_sources)
-+static void __init vic_init_arm(void __iomem *base, unsigned int irq_start,
-+				u32 vic_sources)
- {
- 	unsigned int i;
--	u32 cellid = 0;
--	enum amba_vendor vendor;
--
--	/* Identify which VIC cell this one is, by reading the ID */
--	for (i = 0; i < 4; i++) {
--		u32 addr = ((u32)base & PAGE_MASK) + 0xfe0 + (i * 4);
--		cellid |= (readl(addr) & 0xff) << (8 * i);
--	}
--	vendor = (cellid >> 12) & 0xff;
--	printk(KERN_INFO "VIC @%p: id 0x%08x, vendor 0x%02x\n",
--	       base, cellid, vendor);
--
--	switch(vendor) {
--	case AMBA_VENDOR_ST:
--		vic_init_st(base, irq_start, vic_sources);
--		return;
--	default:
--		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
--		/* fall through */
--	case AMBA_VENDOR_ARM:
--		break;
--	}
- 
- 	/* Disable all interrupts initially. */
- 
-@@ -391,11 +351,47 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
- 			unsigned int irq = irq_start + i;
- 
- 			set_irq_chip(irq, &vic_chip);
--			set_irq_chip_data(irq, base);
-+			set_irq_chip_data(irq, &vic_devices[vic_id]);
- 			set_irq_handler(irq, handle_level_irq);
- 			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 		}
- 	}
-+}
-+
-+/**
-+ * vic_init - initialise a vectored interrupt controller
-+ * @base: iomem base address
-+ * @irq_start: starting interrupt number, must be muliple of 32
-+ * @vic_sources: bitmask of interrupt sources to allow
-+ * @resume_sources: bitmask of interrupt sources to allow for resume
-+ */
-+void __init vic_init(void __iomem *base, unsigned int irq_start,
-+		     u32 vic_sources, u32 resume_sources)
-+{
-+	unsigned int i;
-+	u32 cellid = 0;
-+	enum amba_vendor vendor;
-+
-+	/* Identify which VIC cell this one is, by reading the ID */
-+	for (i = 0; i < 4; i++) {
-+		u32 addr = ((u32)base & PAGE_MASK) + 0xfe0 + (i * 4);
-+		cellid |= (readl(addr) & 0xff) << (8 * i);
-+	}
-+	vendor = (cellid >> 12) & 0xff;
-+	printk(KERN_INFO "VIC @%p: id 0x%08x, vendor 0x%02x\n",
-+	       base, cellid, vendor);
-+
-+	switch(vendor) {
-+	case AMBA_VENDOR_ST:
-+		vic_init_st(base, irq_start, vic_sources);
-+		break;
-+	default:
-+		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
-+		/* fall through */
-+	case AMBA_VENDOR_ARM:
-+		vic_init_arm(base, irq_start, vic_sources);
-+		break;
-+	}
- 
- 	vic_pm_register(base, irq_start, resume_sources);
- }
+> > +
+> > +/*
+> > + * Disable interrupt number "irq" in the TZIC
+> 
+> I don't think this follows kernel API doc exactly, you may want to 
+> have a look into Documentation/kernel-doc-nano-HOWTO.txt.
+
+OK.
+
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number  */ static void 
+> > +tzic_mask_irq(unsigned int irq) {
+> > + ? ? ? int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > + ? ? ? __raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0 + (index << 
+> > + 2));
+> 
+> I'll normally define TZIC_ENCLEAR0 then as:
+> 
+> #define TZIC_ENCLEAR(i)		(0x0180 + ((i) << 2))
+> 
+> so the above can be written as:
+> 
+> 	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR(index));
+> 
+> or by including tzic_base into TZIC_*, simply as:
+> 
+> 	__raw_writel(1 << off, TZIC_ENCLEAR(index));
+
+OK.
+
+> > +}
+> > +
+> > +/*
+> > + * Enable interrupt number "irq" in the TZIC
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number  */ static void 
+> > +tzic_unmask_irq(unsigned int irq) {
+> > + ? ? ? int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > + ? ? ? __raw_writel(1 << off, tzic_base + TZIC_ENSET0 + (index << 
+> > +2)); }
+> > +
+> > +static unsigned int wakeup_intr[4];
+> > +
+> > +/*
+> > + * Set interrupt number "irq" in the TZIC as a wake-up source.
+> > + *
+> > + * @param ?irq ? ? ? ? ?interrupt source number
+> > + * @param ?enable ? ? ? enable as wake-up if equal to non-zero
+> > + * ? ? ? ? ? ? ? ? ? ? disble as wake-up if equal to zero
+> > + *
+> > + * @return ? ? ? This function returns 0 on success.
+> > + */
+> > +static int tzic_set_wake_irq(unsigned int irq, unsigned int enable) 
+> > +{
+> > + ? ? ? unsigned int index, off;
+> > +
+> > + ? ? ? index = irq >> 5;
+> > + ? ? ? off = irq & 0x1F;
+> > +
+> > + ? ? ? if (index > 3)
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? if (enable)
+> > + ? ? ? ? ? ? ? wakeup_intr[index] |= (1 << off);
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? wakeup_intr[index] &= ~(1 << off);
+> > +
+> > + ? ? ? return 0;
+> > +}
+> > +
+> > +static struct irq_chip mxc_tzic_chip = {
+> > + ? ? ? .name = "MXC_TZIC",
+> > + ? ? ? .ack = tzic_mask_irq,
+> > + ? ? ? .mask = tzic_mask_irq,
+> > + ? ? ? .unmask = tzic_unmask_irq,
+> > + ? ? ? .set_wake = tzic_set_wake_irq, };
+> > +
+> > +/*
+> > + * This function initializes the TZIC hardware and disables all the
+> > + * interrupts. It registers the interrupt enable and disable 
+> > +functions
+> > + * to the kernel for each interrupt source.
+> > + */
+> > +void __init tzic_init_irq(void __iomem *irqbase) {
+> > + ? ? ? int i;
+> > +
+> > + ? ? ? tzic_base = irqbase;
+> > + ? ? ? /* put the TZIC into the reset value with
+> > + ? ? ? ?* all interrupts disabled
+> > + ? ? ? ?*/
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_INTCNTL);
+> 
+> Mixing the use of 'i' as both a signed counter and register value 
+> might not be a good idea, provided it's not guaranteed from theory 
+> that 'i' as an integer could not be sufficient to hold the value 
+> returned from
+> __raw_readl()
+
+Fair enough.
+
+> > +
+> > + ? ? ? __raw_writel(0x80010001, tzic_base + TZIC_INTCNTL);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_INTCNTL);
+> > + ? ? ? __raw_writel(0x1f, tzic_base + TZIC_PRIOMASK);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_PRIOMASK);
+> > + ? ? ? __raw_writel(0x02, tzic_base + TZIC_SYNCCTRL);
+> > + ? ? ? i = __raw_readl(tzic_base + TZIC_SYNCCTRL);
+> 
+> Are these read-back really necessary? We can start without them and 
+> add them later if they do cause issues.
+
+Can anybody from Freescale comment whether the read-back is necessary?
+
+I'll remove it for now to see what happens in my testing.
+
+[Dinh] - This piece of code was taken from our silicon validation code where it was check the values of the read-backs. The read-backs can be removed.
+
+> > +
+> > + ? ? ? for (i = 0; i < 4; i++)
+> > + ? ? ? ? ? ? ? __raw_writel(0xFFFFFFFF, tzic_base + TZIC_INTSEC0 + 
+> > + i * 4);
+> > +
+> > + ? ? ? /* disable all interrupts */
+> > + ? ? ? for (i = 0; i < 4; i++)
+> > + ? ? ? ? ? ? ? __raw_writel(0xFFFFFFFF, tzic_base + TZIC_ENCLEAR0 + 
+> > + i * 4);
+> > +
+> > + ? ? ? /* all IRQ no FIQ Warning :: No selection */
+> > +
+> > + ? ? ? for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
+> > + ? ? ? ? ? ? ? set_irq_chip(i, &mxc_tzic_chip);
+> > + ? ? ? ? ? ? ? set_irq_handler(i, handle_level_irq);
+> > + ? ? ? ? ? ? ? set_irq_flags(i, IRQF_VALID);
+> > + ? ? ? }
+> > +
+> > + ? ? ? printk(KERN_INFO "TrustZone Interrupt Controller (TZIC) 
+> > + initialized\n");
+> 
+> You may want to use pr_info() for short.
+
+OK
+
+> > +}
+> > +
+> > +/*
+> > + * enable wakeup interrupt
+> > + *
+> > + * @param is_idle ? ? ? ? ? ? ?1 if called in idle loop (ENSET 
+> > +register);
+> > + * ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0 to be used when called from low 
+> > +power entry
+> > + * @return ? ? ? ? ? ? ? ? ? ? 0 if successful; non-zero otherwise
+> > + *
+> > + */
+> > +int tzic_enable_wake(int is_idle)
+> > +{
+> > + ? ? ? unsigned int i, v;
+> > +
+> > + ? ? ? __raw_writel(1, tzic_base + TZIC_DSMINT);
+> > + ? ? ? if (unlikely(__raw_readl(tzic_base + TZIC_DSMINT) == 0))
+> > + ? ? ? ? ? ? ? return -EAGAIN;
+> 
+> Looks like an unnecessary read-back provided the silicon is sane enough.
+
+Again, Dinh/Rob can you comment?
+
+[Dinh] - Can be removed.
+
+> > +
+> > + ? ? ? if (likely(is_idle)) {
+> > + ? ? ? ? ? ? ? for (i = 0; i < 4; i++) {
+> > + ? ? ? ? ? ? ? ? ? ? ? v = __raw_readl(tzic_base + TZIC_ENSET0 + i 
+> > + * 4);
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(v, tzic_base + TZIC_WAKEUP0 + i 
+> > + * 4);
+> > + ? ? ? ? ? ? ? }
+> > + ? ? ? } else {
+> > + ? ? ? ? ? ? ? for (i = 0; i < 4; i++) {
+> > + ? ? ? ? ? ? ? ? ? ? ? v = wakeup_intr[i];
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(v, tzic_base + TZIC_WAKEUP0 + i 
+> > + * 4);
+> > + ? ? ? ? ? ? ? }
+> > + ? ? ? }
+> 
+> Or could be simplified to:
+> 
+> 	for (i = 0; i < 4; i++) {
+> 		v = is_idle ? __raw_readl(TZIC_ENSET(i)) : wakeup_intr[i];
+> 		__raw_writel(v, TZIC_WAKEUP(i));
+> 	}
+
+OK
+
+> but just nit-picking comments, so it's up to you.
+> 
+> > + ? ? ? return 0;
+> > +}
+> 
+> Mmmm.... this being called elsewhere, I'm thinking about making this a 
+> sys_device and having this called within sysdev_class.suspend() to 
+> make this file rather self-contained.
+
+That is the idea once the base port is upstream.
+
+Thanks for the review.
+
+/Amit
+--
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
