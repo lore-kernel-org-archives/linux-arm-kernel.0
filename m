@@ -1,105 +1,65 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 4 Feb 2010 16:25:40 +0800
-Subject: [PATCH 1/1] fix i2c_msg.len not aligning with i2c_master_send
-In-Reply-To: <20100204073759.GC13267@trinity.fluff.org>
-References: <309424b61002032204y37307236q94ab3a502b0526e0@mail.gmail.com>
-	<20100204073759.GC13267@trinity.fluff.org>
-Message-ID: <309424b61002040025n22c2b05wbaab46ca4da946f2@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 4 Feb 2010 09:45:13 +0100
+Subject: [PATCH 08/25] imx/mx1: rename files defining a machine to
+	mach-$mach.c
+In-Reply-To: <20100204012916.GC5274@k2>
+References: <20100108161551.GA19007@pengutronix.de>
+	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100204012916.GC5274@k2>
+Message-ID: <20100204084513.GB5380@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ben
+Hello Amit,
 
-Thanks for your suggestion.
-
-On Thu, Feb 4, 2010 at 3:37 PM, Ben Dooks <ben-linux@fluff.org> wrote:
->
-> On Thu, Feb 04, 2010 at 02:04:03PM +0800, zhangfei gao wrote:
-> > Hi, Jean
-> >
-> >
-> > We found type of i2c_msg.len is __u16, while parameter count in
-> > i2c_master_send is int.
-> > The mismatch will truncate count from int to u16.
-> > For example we downloading firmware which is more than 64K (64K+8) via i2c,
-> > i2c would transfer u16 (8 bytes) in fact.
->
-> I would be wary of changing the i2c_msg structure as this is exported to
-> userspace.
->
->
-> I think a better fix would be to test the count parameter to i2c_master_send
-> and return something like EMSGSIZE to inform the user it is too long.
->
-> If you really want i2c transfers of 64K and above, then you might have to
-> add a new struct i2c_msg and update all the callsites to use it. Either that
-> or chain a set of msgs together and pass them to the i2c controller in one
-> go.
->
-> Please discuss on the i2c list.
->
-
-1. Both i2c_master_send and i2c_msg are exported in include/linux/i2c.h.
-2. Both i2c_master_send and i2c_master_recv supposed to support int
-count, is it suitable to return error when count is bigger than 64K?
-3. It may impact a lot if adding new structure :)
-
-include/linux/i2c.h
-extern int i2c_master_send(struct i2c_client *client, const char *buf,
-                           int count);
-extern int i2c_master_recv(struct i2c_client *client, char *buf, int count);
-
-Thansk
-Zhangfei
-
-> > >From 69ec7599bf0fa28441281be1df76a2f573bb9127 Mon Sep 17 00:00:00 2001
-> > From: Zhangfei Gao <zgao6@marvell.com>
-> > Date: Fri, 5 Feb 2010 05:12:19 +0800
-> > Subject: [PATCH] i2c: i2c_msg.len modify to __u32 type
-> >
-> > ? ? int i2c_master_send(struct i2c_client *client,const char *buf ,int
-> > count)
-> > ? ? {
-> > ? ? ? ? ~
-> > ? ? ? ? msg.len = count;
-> > ? ? ? ? ~
-> > ? ? }
-> > ? ? Parameter count would truncate from int to __u16
-> >
-> > Signed-off-by: Zhangfei Gao <zgao6@marvell.com>
+On Wed, Feb 03, 2010 at 05:29:16PM -0800, Amit Kucheria wrote:
+> On 10 Jan 08, Uwe Kleine-K?nig wrote:
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+> > Cc: Darius Augulis <augulis.darius@gmail.com>
+> > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 > > ---
-> > ?include/linux/i2c.h | ? ?2 +-
-> > ?1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> > index 57d41b0..4769ce9 100644
-> > --- a/include/linux/i2c.h
-> > +++ b/include/linux/i2c.h
-> > @@ -491,7 +491,7 @@ struct i2c_msg {
-> > ?#define I2C_M_IGNORE_NAK ? ?0x1000 ? ?/* if I2C_FUNC_PROTOCOL_MANGLING */
-> > ?#define I2C_M_NO_RD_ACK ? ? ? ?0x0800 ? ?/* if I2C_FUNC_PROTOCOL_MANGLING
-> > */
-> > ?#define I2C_M_RECV_LEN ? ? ? ?0x0400 ? ?/* length will be first received
-> > byte */
-> > - ? ?__u16 len; ? ? ? ?/* msg length ? ? ? ? ? ? ? ?*/
-> > + ? ?__u32 len; ? ? ? ?/* msg length ? ? ? ? ? ? ? ?*/
-> > ? ? ?__u8 *buf; ? ? ? ?/* pointer to msg data ? ? ? ? ? ?*/
-> > ?};
-> >
-> > --
-> > 1.6.0.4
->
->
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
+> >  arch/arm/mach-mx1/Makefile                      |    4 ++--
+> >  arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c}   |    2 +-
+> >  arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} |    2 +-
+> >  3 files changed, 4 insertions(+), 4 deletions(-)
+> >  rename arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c} (98%)
+> >  rename arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} (98%)
+> 
+> Rethinking about this (based on a similar request for my i.MX5 submission), I
+> think renaming the boards to mach-* is a bad idea.
+> 
+> Other SoCs (davinci, omap, msm, nomadik, etc.) use the board-* convention. We
+> already use mach-* for the SoC directory names under arch/arm/. Naming the
+> boards with mach-* will just cause more confusion.
+Hmmm
+
+I still prefer mach-* as the corresponding Kconfig variables are named
+MACH_* and there is no unified meaning of "board".  For (I think) most
+people here board describes the whole machine.  For some (e.g. me) a
+board might only be a PCB where you have to plug in a module that comes
+with the SoC.
+(http://www.digi.com/products/model.jsp?lid=EN&pgid=37&pfid=19&mtid=2070&amtid=2070&pm=Y)
+
+It think machine is precise for all of us.
+
+And note the selecting Kconfig symbol for arch/arm/mach-omap is
+ARCH_OMAP.  Ditto we have ARCH_DAVINCI, ARCH_MSM and ARCH_NOMADIK.
+So we could rename these to arch-omap etc.  But then this conflicts with
+the toplevel arch directory!?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
