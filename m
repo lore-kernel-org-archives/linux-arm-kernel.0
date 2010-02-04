@@ -1,40 +1,45 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 4 Feb 2010 10:59:56 +0100
-Subject: [PATCH 01/16] ARM: LPC32XX: clock lookups array should not be
-	tagged __initdata
-In-Reply-To: <083DF309106F364B939360100EC290F805C8B787AC@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1265155168-28909-2-git-send-email-wellsk40@gmail.com>
-	<20100203100803.GA22275@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F805C8B787AC@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100204095956.GB6562@pengutronix.de>
+Date: Thu, 4 Feb 2010 11:05:36 +0100
+Subject: [PATCH 11/16] ARM: LPC32XX: Converted interrupt registers to
+	void __iomem *
+In-Reply-To: <1265155168-28909-12-git-send-email-wellsk40@gmail.com>
+References: <1265155168-28909-12-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100204100536.GC6562@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Kevin,
+Hello Kevin,
 
-On Wed, Feb 03, 2010 at 08:25:10PM +0100, Kevin Wells wrote:
-> > 
-> > On Tue, Feb 02, 2010 at 03:59:13PM -0800, wellsk40 at gmail.com wrote:
-> > > From: Kevin Wells <wellsk40@gmail.com>
-> > >
-> > > struct clk looksup[] should not be tagged with the __initdata
-> > > attribute so system functions after bootup can use the clkdev
-> > > support.
-s/looksup/lookups/
-
-> > 
-> > Can you roll this into your previous patch set please?
+On Tue, Feb 02, 2010 at 03:59:23PM -0800, wellsk40 at gmail.com wrote:
+> From: Kevin Wells <wellsk40@gmail.com>
 > 
-> Hi Russell,
+> Added register access macros (similar to other register accesses).
+> Updated irq handler to use new access macros.
 > 
-> I'll fix the many more comments from the reviews and put up another
-> (hopefully last) set of patches that are sparse and bisect safe and
-> hopefully review safe. I would like to get these in patch tracker if
-> all goes good.
-Can you please make sure to have all mails in one thread?  That would
-make it easier for me to find them all.
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+> ---
+>  arch/arm/mach-lpc32xx/include/mach/entry-macro.S |    6 +-
+>  arch/arm/mach-lpc32xx/include/mach/platform.h    |   12 ++--
+>  arch/arm/mach-lpc32xx/irq.c                      |   66 +++++++++++-----------
+>  3 files changed, 42 insertions(+), 42 deletions(-)
+> 
+> diff --git a/arch/arm/mach-lpc32xx/include/mach/entry-macro.S b/arch/arm/mach-lpc32xx/include/mach/entry-macro.S
+> index 25f2adc..9626bac 100644
+> --- a/arch/arm/mach-lpc32xx/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-lpc32xx/include/mach/entry-macro.S
+> @@ -39,7 +39,7 @@
+>  	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+>  	/* Get MIC status first */
+>  	ldr	\base, =IO_ADDRESS(LPC32XX_MIC_BASE)
+> -	ldr	\irqstat, [\base, #LPC32XX_INTC_STAT]
+> +	ldr	\irqstat, [\base, #8]
+I consider this a step back.  What about
 
-Thanks
+	ldr	\irqstat, [\base, #(LPC32XX_INTC_STAT - LPC32XX_MIC_BASE)]
+
+?
+
+Best regards
 Uwe
 
 -- 
