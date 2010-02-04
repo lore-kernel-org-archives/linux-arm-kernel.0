@@ -1,42 +1,31 @@
-From: manuel.stahl@iis.fraunhofer.de (Manuel Stahl)
-Date: Thu, 04 Feb 2010 09:57:51 +0100
-Subject: atmel-mci / at91_mci
-Message-ID: <4B6A8C0F.7080907@iis.fraunhofer.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 4 Feb 2010 10:09:13 +0100
+Subject: [PATCH] vic: make irq_chip access typesafe
+In-Reply-To: <201002021601.43072.hartleys@visionengravers.com>
+References: <201002021601.43072.hartleys@visionengravers.com>
+Message-ID: <A6D19A13FE030A409EC4362C172E091F0E6ED876@eseldmw101.eemea.ericsson.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+When I apply this patch to the latest linux-next
+I get the following compile error:
 
-I have a question regarding the atmel-mci/at91_mci driver merge. 
-Actually I have an at91rm9200 device which get's an CRC error while 
-inializing an SD-card. I guess it's because of an at91rm9200 errata:
+  CC      arch/arm/common/vic.o
+/local/scratch/elinwal/linux-next/arch/arm/common/vic.c: In function
+'vic_init_arm':
+/local/scratch/elinwal/linux-next/arch/arm/common/vic.c:338: error: 'i'
+undeclared (first use in this function)
+/local/scratch/elinwal/linux-next/arch/arm/common/vic.c:338: error:
+(Each undeclared identifier is reported only once
+/local/scratch/elinwal/linux-next/arch/arm/common/vic.c:338: error: for
+each function it appears in.)
+make[3]: *** [arch/arm/common/vic.o] Error 1
+make[2]: *** [arch/arm/common] Error 2
 
-- Data Endianess inversion from the MCI to MMC or SD Card
+However if I just add an int i; at the beginning of the offending
+function U300 boots and runs like a charm, so given that you
+fix this it's
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
 
-The at91_mci driver did some byte swapping in 'at91_mci_sg_to_dma' function.
-Where would I implement this in the atmel-mci driver?
-
-Attached is the kernel log when I insert a card.
-
-Regards,
--- 
-
-Dipl.-Inf. Manuel Stahl
-Fraunhofer-Institut f?r Integrierte Schaltungen IIS
-- Leistungsoptimierte Systeme -
-Nordostpark 93                Telefon  +49 (0)911/58061-6419
-90411 N?rnberg                Fax      +49 (0)911/58061-6398
-http://www.iis.fraunhofer.de  manuel.stahl at iis.fraunhofer.de
-
-
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: atmel-mci.log
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100204/7dd51cd3/attachment-0001.el>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 6148 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100204/7dd51cd3/attachment-0001.p7s>
+Yours,
+Linus Walleij
