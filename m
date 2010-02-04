@@ -1,41 +1,76 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Thu, 4 Feb 2010 14:14:51 +0100
-Subject: [PATCH 1/1] fix i2c_msg.len not aligning with i2c_master_send
-In-Reply-To: <f17812d71002040447y4b6f889o1137ae6149559994@mail.gmail.com>
-References: <309424b61002032204y37307236q94ab3a502b0526e0@mail.gmail.com>
-	<20100204103530.65429c04@hyperion.delvare>
-	<309424b61002040438i2fae055dt2d3ef528eae99b48@mail.gmail.com>
-	<f17812d71002040447y4b6f889o1137ae6149559994@mail.gmail.com>
-Message-ID: <20100204141451.3e0f865e@hyperion.delvare>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 04 Feb 2010 13:15:30 +0000
+Subject: [RFC PATCH] ARM: Change the mandatory barriers implementation
+In-Reply-To: <4B6A131B.1070005@codeaurora.org>
+References: <4B6A131B.1070005@codeaurora.org>
+Message-ID: <1265289330.28746.58.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Feb 2010 04:47:41 -0800, Eric Miao wrote:
-> > How about return error in i2c_master_send & i2c_master_recv when count
-> > is bigger than 64K, as suggested by Ben.
+On Thu, 2010-02-04 at 00:21 +0000, Abhijeet Dharmapurikar wrote:
+> > The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+> > systems for things like ordering Normal Non-cacheable memory accesses
+> > with DMA transfer (via Device memory writes). The current implementation
+> > uses dmb() for mb() and friends but this is not sufficient. The DMB only
+> > ensures the ordering of accesses with regards to a single observer
+> > accessing the same memory. If a DMA transfer is started by a write to
+> > Device memory, the data to be transfered may not reach the main memory
+> > (even if mapped as Normal Non-cacheable) before the device receives the
+> > notification to begin the transfer. The only barrier that would help in
+> > this situation is DSB which would completely drain the write buffers.
 > 
-> I think that's more preferable. Making the count parameter as u16,
-> though is going to generate a warning, yet that's usually ignored
-> by careless programmer, screaming out when this happens might
-> be more useful sometimes.
+> On ARMv7, DMB guarantees that all accesses prior to DMB are observed by
+> an observer if that observer sees any accesses _after_ the DMB. In this
+> case, since DMA engine observes a write to itself( It is being written
+> to and hence must observe the write) it should also see the writes to
+> the buffers. A dmb() after the writes to buffer and before write to DMA
+> engine should suffice.
 
-Developers ignoring warnings get the pain the deserve.
+I asked our processor architect for a clarification on the wording of
+the DMB definition but the "all accesses" part most likely refer to
+accesses to the same peripheral or memory block (but not together).
+Intuitively, you can have a hardware configuration as below:
 
-A check on "count" would come at the price of a small performance hit
-for every caller, even though in 99% of the cases the check isn't
-needed.
+     CPU   Device
+      |     | |
+      +-----+ |      (1)
+      |       |
+    Buffer    |
+      |       |
+      +---+---+      (2)
+          |
+         RAM
 
-That being said I don't care too much and will take whatever patch is
-sent to me.
+The peripheral register write and memory write go on different paths. A
+DMB may ensure the ordering at level (1) but there could be delays
+before a write reaches the RAM and the peripheral would get the DMA
+start notification before that. Only DSB would ensure the draining of
+the buffer.
 
-It would be a good idea to add a note about this limit in
-Documentation/i2c/writing-clients and/or include/linux/i2c.h.
+> Moreover an mb() could be in places where accesses to ARM's Device type
+> memory need ordering and are 1kb apart. Such usages of mb() would result
+> in a dsb() and could cause performance problems.
 
-> > The device I used could receive 32K one time instead, the firmware
-> > download only takes place on-demand in fact.
-> > However, it took some time to debug, since no error info come out.
-> > Add error msg may notify users, though transfering more than 64K data
-> > one time is rarely happen.
+Note that accesses to Device memory are ordered relative to each-other
+without any barrier. If you have weakly ordered I/O (not the ARM case),
+there's mmiowb() for this.
+
+If you need ordering between accesses to Normal memory and Device
+memory, a DSB is needed, hence the definition of mb() to be a DSB (some
+processors like Cortex-A8 implement DMB so that it drains the write
+buffer but this is not always the case on other implementations).
+
+Of course, there are situations when you only need ordering of Normal
+memory accesses without any peripheral access and a DMB would be fine in
+this situation. But so far Linux uses mb() for both situations, hence
+I'm taking the less optimal approach for Normal-Normal ordering.
+
+> Since you mention the write buffers this probably applies only to ARMv6.
+> Correct me here, I think that dmb on ARMv6 should suffice too.
+
+I can't guarantee. It depends on the processor implementation
+(ARM11MPCore may have a different behaviour). Linux on ARM should pretty
+much be architecturally generic.
 
 -- 
-Jean Delvare
+Catalin
