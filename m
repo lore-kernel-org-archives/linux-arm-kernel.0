@@ -1,239 +1,97 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 04 Feb 2010 10:02:20 +0900
-Subject: [PATCH v3 2/7 RE-SEND] ARM: S5P6442: Add clock support for S5P6442
-In-Reply-To: <20100203175900.GB13267@trinity.fluff.org>
-References: <1265116976-10140-1-git-send-email-kgene.kim@samsung.com>
-	<20100203175900.GB13267@trinity.fluff.org>
-Message-ID: <007501caa535$b71be9b0$2553bd10$%kim@samsung.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Wed, 3 Feb 2010 17:29:16 -0800
+Subject: [PATCH 08/25] imx/mx1: rename files defining a machine to
+	mach-$mach.c
+In-Reply-To: <1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100108161551.GA19007@pengutronix.de>
+	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100204012916.GC5274@k2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> On Tue, Feb 02, 2010 at 10:22:56PM +0900, Kukjin Kim wrote:
-> > This patch adds clock support for S5P6442. This patch adds the clock
-> > register definitions and the various system clocks in S5P6442.
-> >
-> > Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
-> > Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+On 10 Jan 08, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+> Cc: Darius Augulis <augulis.darius@gmail.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> ---
+>  arch/arm/mach-mx1/Makefile                      |    4 ++--
+>  arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c}   |    2 +-
+>  arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} |    2 +-
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+>  rename arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c} (98%)
+>  rename arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} (98%)
+
+Rethinking about this (based on a similar request for my i.MX5 submission), I
+think renaming the boards to mach-* is a bad idea.
+
+Other SoCs (davinci, omap, msm, nomadik, etc.) use the board-* convention. We
+already use mach-* for the SoC directory names under arch/arm/. Naming the
+boards with mach-* will just cause more confusion.
+
+Regards,
+Amit
+
+
+> diff --git a/arch/arm/mach-mx1/Makefile b/arch/arm/mach-mx1/Makefile
+> index b72f536..297d172 100644
+> --- a/arch/arm/mach-mx1/Makefile
+> +++ b/arch/arm/mach-mx1/Makefile
+> @@ -10,5 +10,5 @@ obj-y			+= generic.o clock.o devices.o
+>  obj-$(CONFIG_MX1_VIDEO)	+= ksym_mx1.o mx1_camera_fiq.o
+>  
+>  # Specific board support
+> -obj-$(CONFIG_ARCH_MX1ADS) += mx1ads.o
+> -obj-$(CONFIG_MACH_SCB9328) += scb9328.o
+> +obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
+> +obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
+> diff --git a/arch/arm/mach-mx1/mx1ads.c b/arch/arm/mach-mx1/mach-mx1ads.c
+> similarity index 98%
+> rename from arch/arm/mach-mx1/mx1ads.c
+> rename to arch/arm/mach-mx1/mach-mx1ads.c
+> index 30f04e5..a39433a 100644
+> --- a/arch/arm/mach-mx1/mx1ads.c
+> +++ b/arch/arm/mach-mx1/mach-mx1ads.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * arch/arm/mach-imx/mx1ads.c
+> + * arch/arm/mach-imx/mach-mx1ads.c
+>   *
+>   * Initially based on:
+>   *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
+> diff --git a/arch/arm/mach-mx1/scb9328.c b/arch/arm/mach-mx1/mach-scb9328.c
+> similarity index 98%
+> rename from arch/arm/mach-mx1/scb9328.c
+> rename to arch/arm/mach-mx1/mach-scb9328.c
+> index 325d98d..b9530d7 100644
+> --- a/arch/arm/mach-mx1/scb9328.c
+> +++ b/arch/arm/mach-mx1/mach-scb9328.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * linux/arch/arm/mach-mx1/scb9328.c
+> + * linux/arch/arm/mach-mx1/mach-scb9328.c
+>   *
+>   * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
+>   * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+> -- 
+> 1.6.5.2
 > 
 > 
-> > +#include <linux/init.h>
-> > +#include <linux/module.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/list.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/err.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/sysdev.h>
-> > +#include <linux/io.h>
-> 
-> interested to see if these two files are needed in the include, I don't
-> think we've actually got an IO functions or use of sysdev atm.
-Hmm...I think, we need IO functions for read SFR.
-And I will remove sysdev.h as your comments.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> > +#include <mach/map.h>
-> > +
-> > +#include <plat/cpu-freq.h>
-> > +#include <mach/regs-clock.h>
-> > +#include <plat/clock.h>
-> > +#include <plat/cpu.h>
-> > +#include <plat/pll.h>
-> > +#include <plat/s5p-clock.h>
-> > +#include <plat/clock-clksrc.h>
-> > +#include <plat/s5p6442.h>
-> > +
-> > +static struct clk clk_dout_p0clk = {
-> > +	.name		= "dout_p0clk",
-> > +	.id		= -1,
-> > +	.parent		= &clk_dout_d0clk,
-> > +};
-> > +
-> > +static struct clk clk_dout_p1clk = {
-> > +	.name		= "dout_p1clk",
-> > +	.id		= -1,
-> > +	.parent		= &clk_dout_d1clk,
-> > +};
-> 
-> do we really need these clocks in the way? either #define them if the
-> naming is really important. if they get implemented later then we can
-> deal with that then.
-Ok, you're right.
-I will change it.
-
-> > +void __init_or_cpufreq s5p6442_setup_clocks(void)
-> > +{
-> > +	struct clk *xtal_clk;
-> > +	struct clk *arm_clk;
-> > +	struct clk *hclkd0_clk;
-> > +	struct clk *hclkd1_clk;
-> > +	struct clk *pclkd0_clk;
-> > +	struct clk *pclkd1_clk;
-> > +
-> > +	unsigned long xtal;
-> > +	unsigned long arm;
-> > +	unsigned long hclkd0 = 0;
-> > +	unsigned long hclkd1 = 0;
-> > +	unsigned long pclkd0 = 0;
-> > +	unsigned long pclkd1 = 0;
-> > +
-> > +	unsigned long apll;
-> > +	unsigned long mpll;
-> > +	unsigned long epll;
-> > +	unsigned int ptr;
-> > +
-> > +	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-> > +
-> > +	xtal_clk = clk_get(NULL, "xtal");
-> > +	BUG_ON(IS_ERR(xtal_clk));
-> > +
-> > +	xtal = clk_get_rate(xtal_clk);
-> > +	clk_put(xtal_clk);
-> 
-> tbh, either make a function to do the clk_get,BUG,clk_put or simply
-> use the clock structures we have in the file.
-Ok, I'll change it.
-
-> > +	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-> > +
-> > +	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-> > +	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
-> > +	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-> > +
-> > +	printk(KERN_INFO "S5P6440: PLL settings, A=%ld, M=%ld, E=%ld",
-> > +			apll, mpll, epll);
-> > +
-> > +	clk_fout_apll.rate = apll;
-> > +	clk_fout_mpll.rate = mpll;
-> > +	clk_fout_epll.rate = epll;
-> > +
-> > +	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
-> > +		s3c_set_clksrc(init_parents[ptr], true);
-> > +
-> > +	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
-> > +		s3c_set_clksrc(&clksrcs[ptr], true);
-> > +
-> > +	arm_clk = clk_get(NULL, "dout_apll");
-> > +	BUG_ON(IS_ERR(arm_clk));
-> > +
-> > +	arm = clk_get_rate(arm_clk);
-> > +	clk_put(arm_clk);
-> > +
-> > +	hclkd0_clk = clk_get(NULL, "dout_d0clk");
-> > +	BUG_ON(IS_ERR(hclkd0_clk));
-> > +
-> > +	hclkd0 = clk_get_rate(hclkd0_clk);
-> > +	clk_put(hclkd0_clk);
-> > +
-> > +	pclkd0_clk = clk_get(NULL, "dout_p0clk");
-> > +	BUG_ON(IS_ERR(pclkd0_clk));
-> > +
-> > +	pclkd0 = clk_get_rate(pclkd0_clk);
-> > +	clk_put(pclkd0_clk);
-> > +
-> > +	hclkd1_clk = clk_get(NULL, "dout_d1clk");
-> > +	BUG_ON(IS_ERR(hclkd1_clk));
-> > +
-> > +	hclkd1 = clk_get_rate(hclkd1_clk);
-> > +	clk_put(hclkd1_clk);
-> > +
-> > +	pclkd1_clk = clk_get(NULL, "dout_p1clk");
-> > +	BUG_ON(IS_ERR(pclkd1_clk));
-> > +
-> > +	pclkd1 = clk_get_rate(pclkd1_clk);
-> > +	clk_put(pclkd1_clk);
-> 
-> see above comment.
-Ok, I will change, but in the pclkd0 and pclkd1 case, I used clk_get,
-clk_get_rate and clk_put.
-Because I'm not sure how to get the clk structure name from clksrcs.
-
-> > +	printk(KERN_INFO "S5P6442: HCLKD0=%ld, HCLKD1=%ld, PCLKD0=%ld,
-> PCLKD1=%ld\n",
-> > +			hclkd0, hclkd1, pclkd0, pclkd1);
-> > +
-> > +	/* For backward compatibility */
-> > +	clk_f.rate = arm;
-> > +	clk_h.rate = hclkd1;
-> > +	clk_p.rate = pclkd1;
-> > +
-> > +	clk_dout_p1clk.rate = clk_p.rate;
-> > +}
-> > +
-> > +static struct clk init_clocks[] = {
-> > +	{
-> > +		.name		= "systimer",
-> > +		.id		= -1,
-> > +		.parent		= &clk_dout_p1clk,
-> > +		.enable		= s5p6442_clk_ip3_ctrl,
-> > +		.ctrlbit	= (1<<16),
-> > +	}, {
-> > +		.name		= "uart",
-> > +		.id		= 0,
-> > +		.parent		= &clk_dout_p1clk,
-> > +		.enable		= s5p6442_clk_ip3_ctrl,
-> > +		.ctrlbit	= (1<<17),
-> > +	}, {
-> > +		.name		= "uart",
-> > +		.id		= 1,
-> > +		.parent		= &clk_dout_p1clk,
-> > +		.enable		= s5p6442_clk_ip3_ctrl,
-> > +		.ctrlbit	= (1<<18),
-> > +	}, {
-> > +		.name		= "uart",
-> > +		.id		= 2,
-> > +		.parent		= &clk_dout_p1clk,
-> > +		.enable		= s5p6442_clk_ip3_ctrl,
-> > +		.ctrlbit	= (1<<19),
-> > +	}, {
-> > +		.name		= "timers",
-> > +		.id		= -1,
-> > +		.parent		= &clk_dout_p1clk,
-> > +		.enable		= s5p6442_clk_ip3_ctrl,
-> > +		.ctrlbit	= (1<<23),
-> > +	},
-> > +};
-> > +
-> > +static struct clk *clks[] __initdata = {
-> > +	&clk_ext,
-> > +	&clk_epll,
-> > +	&clk_mout_apll.clk,
-> > +	&clk_mout_mpll.clk,
-> > +	&clk_mout_epll.clk,
-> > +	&clk_mout_arm.clk,
-> > +	&clk_mout_d0.clk,
-> > +	&clk_mout_d0sync.clk,
-> > +	&clk_mout_d1.clk,
-> > +	&clk_mout_d1sync.clk,
-> > +	&clk_dout_apll,
-> > +	&clk_dout_a2m,
-> > +	&clk_dout_d0clk,
-> > +	&clk_dout_p0clk,
-> > +	&clk_dout_d1clk,
-> > +	&clk_dout_p1clk,
-> > +};
-> > +
-> > +void __init s5p6442_register_clocks(void)
-> > +{
-> > +	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-> > +
-> > +	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
-> > +	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> > +
-> > +	s3c_pwmclk_init();
-> > +}
-> 
-> Did you clean the unused definitions out of the clock register file too?
-Ok, I'll change it.
-
-Actually, I sent updated patch just now.
-One more time, please review it.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
+-- 
+-------------------------------------------------------------------------
+Amit Kucheria,				 Kernel Developer, Verdurent
+-------------------------------------------------------------------------
