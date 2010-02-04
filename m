@@ -1,200 +1,53 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 05 Feb 2010 10:52:33 +1300
-Subject: [PATCH] ep93xx: Add support for Snapper CL15 module
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190902152BFB@mi8nycmail19.Mi8.com>
-References: <4B6B34D3.1010704@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190902152BFB@mi8nycmail19.Mi8.com>
-Message-ID: <4B6B41A1.9040403@bluewatersys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Feb 2010 14:07:16 -0800
+Subject: [GIT PULL] omap fixes for 2.6.33-rc6
+Message-ID: <20100204220716.GU22747@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> On Thursday, February 04, 2010 1:58 PM, Ryan Mallon wrote:
->> Add support for the Bluewater Systems Snapper CL15 single board computer
->> module.
->>
->> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
->> Cc: Hartley Sweeten <hartleys@visionengravers.com>
->>
->> ---
->>
->> diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
->> index 9167c3d..71eabca 100644
->> --- a/arch/arm/mach-ep93xx/Kconfig
->> +++ b/arch/arm/mach-ep93xx/Kconfig
->> @@ -168,6 +168,13 @@ config MACH_TS72XX
->>  	  Say 'Y' here if you want your kernel to support the
->>  	  Technologic Systems TS-72xx board.
->>  
->> +config MACH_SNAPPER_CL15
->> +	bool "Support Bluewater Systems Snapper CL15 Module"
->> +	depends on EP93XX_SDCE0_PHYS_OFFSET
->> +	help
->> +	  Say 'Y' here if you want your kernel to support the Bluewater
->> +	  Systems Snapper CL15 Module.
->> +
-> 
-> Your will need to base this patch on Russell's -devel tree.  The Sim.One
-> board is now in that.
+Hi Linus,
 
-My understanding is that this sort of thing will merge cleanly since the
-patches are otherwise unrelated. I think I only need to rebase on the
--devel tree if I have direct dependencies, or expect conflicts there.
-Russell?
+Please pull omap fixes from:
 
-> 
-> Also, please move this so that they stay alphabetized:
-> 
-> config MACH_SIM_ONE
-> ...
-> +config MACH_SNAPPER_CL15
-> +...
-> config MACH_TS72XX
-> ...
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-Will fix.
+Regards,
 
->> +
->> +#include <linux/platform_device.h>
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
-> 
-> #include <linux/io.h>
-> 
-> Should be here since you are using __raw_{read/write}w
+Tony
+The following changes since commit abe94c756c08d50566c09a65b9c7fe72f83071c5:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc6
 
-Okay.
+are available in the git repository at:
 
->> +#include <linux/gpio.h>
->> +#include <linux/i2c.h>
->> +#include <linux/i2c-gpio.h>
->> +#include <linux/fb.h>
->> +
->> +#include <linux/mtd/partitions.h>
->> +#include <linux/mtd/nand.h>
->> +
->> +#include <mach/hardware.h>
->> +#include <mach/fb.h>
->> +
->> +#include <asm/mach-types.h>
->> +#include <asm/mach/arch.h>
->> +
->> +#define SNAPPERCL15_NAND_BASE	(EP93XX_CS7_PHYS_BASE + 0x01000000)
-> 
-> Maybe use SZ_16M?  Your call.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-Sure.
+Kevin Hilman (2):
+      OMAP2/3: IRQ: ensure valid base address
+      OMAP2/3: GPMC: ensure valid clock pointer
 
->> +
->> +#define SNAPPERCL15_NAND_CTRL	(1 << 6)
->> +#define SNAPPERCL15_NAND_WPN	(1 << 8)
->> +#define SNAPPERCL15_NAND_ALE	(1 << 9)
->> +#define SNAPPERCL15_NAND_CLE	(1 << 10)
->> +#define SNAPPERCL15_NAND_CEN	(1 << 11)
->> +#define SNAPPERCL15_NAND_RDY	(1 << 14)
->> +
->> +#define NAND_CTRL_ADDR(chip)						\
->> +	((void __iomem *)((unsigned long)chip->IO_ADDR_W + 0x40))
-> 
-> The cast is probably not needed. IO_ADDR_W is already a void __iomem * and
-> adding to it should not require the cast.
+Marek Skuczynski (1):
+      omap: Fix access to already released memory in clk_debugfs_register_one()
 
-I'll have a look and see if I can simplify this and remove the casts. I
-think I based it on one of the other platform NAND implementations that
-had something similar.
+Sriram (1):
+      ARCH OMAP : enable ARCH_HAS_HOLES_MEMORYMODEL for OMAP
 
->> +
->> +static unsigned long nand_state;
->> +
->> +static void snappercl15_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
->> +				      unsigned int ctrl)
->> +{
->> +	struct nand_chip *chip = mtd->priv;
->> +	static int first = 1;
->> +	unsigned set;
->> +
->> +	if (first) {
->> +		nand_state = SNAPPERCL15_NAND_CEN | SNAPPERCL15_NAND_WPN;
->> +		__raw_writew(nand_state, NAND_CTRL_ADDR(chip));
->> +		first = 0;
->> +	}
->> +
->> +	if (ctrl & NAND_CTRL_CHANGE) {
->> +		set = SNAPPERCL15_NAND_CEN;
->> +
->> +		if (ctrl & NAND_NCE)
->> +			set &= ~SNAPPERCL15_NAND_CEN;
->> +		if (ctrl & NAND_CLE)
->> +			set |= SNAPPERCL15_NAND_CLE;
->> +		if (ctrl & NAND_ALE)
->> +			set |= SNAPPERCL15_NAND_ALE;
->> +
->> +		nand_state &= ~(SNAPPERCL15_NAND_CEN |
->> +				SNAPPERCL15_NAND_CLE |
->> +				SNAPPERCL15_NAND_ALE);
->> +		nand_state |= set;
->> +		__raw_writew(nand_state, NAND_CTRL_ADDR(chip));
->> +	}
->> +
->> +	if (cmd != NAND_CMD_NONE)
->> +		__raw_writew((cmd & 0xff) | nand_state, chip->IO_ADDR_W);
->> +}
->> +
-> 
-> Interesting... Is your nand connected thru a fpga or something?
+Tony Lindgren (4):
+      omap: Remove old unused defines for OMAP_32KSYNCT_BASE
+      omap: Fix 3630 mux errors
+      omap: Fix arch/arm/mach-omap2/mux.c: Off by one error
+      omap: Disable serial port autoidle by default
 
-No, just a series of buffers. The Snapper CL15 has placement options for
-either a NAND part or (for legacy reasons) an xD card connector. The
-driver will work with either. For xD cards, hotplugging the cards is not
-supported. However, all new Snapper CL15's are manufactured with NAND
-fitted.
+Uwe Kleine-K?nig (1):
+      omap: define _toggle_gpio_edge_triggering only for OMAP1
 
->> +
->> +static void snappercl15_nand_set_parts(uint64_t size,
->> +				       struct platform_nand_chip *chip)
->> +{
->> +	pr_info("Snapper CL15: %llu bytes NAND\n", size);
-> 
-> You only have one pr_<level> right now but you might consider defining a
-> pr_fmt to prefix the "Snapper CL15: ".  Then you don't have to worry about
-> adding it to any pr_<level> output later.  Just put this before the #include's:
-> 
-> #define pr_fmt(fmt) "Snapper CL15: " fmt
-> 
-> Your could also use the following but the prefix will be "snappercl15: "
-> 
-> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
-Probably not worth it since I don't expect to be adding a lot of printks
-to this file. I can probably remove this one even, since the MTD core
-displays informtation about the NAND part and the partition layout.
-
->> +
->> +static struct i2c_board_info __initdata snappercl15_i2c_data[] = {
->> +	{
->> +		/* Audio codec */
->> +		I2C_BOARD_INFO("tlv320aic23", 0x1a),
->> +	},
->> +};
-> 
-> Are you going to add the audio support later?
-
-Hopefully. I have some partially working code to support the audio using
-the SoC audio interface. I think there is no harm in having this here
-now though, and it saves having to patch it in later.
-
-> 
-> Looks good other than that.
-
-Thanks, will post an updated patch later today.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+ arch/arm/Kconfig                 |    1 +
+ arch/arm/mach-omap2/gpmc.c       |    5 +++-
+ arch/arm/mach-omap2/irq.c        |    4 ++-
+ arch/arm/mach-omap2/mux.c        |   10 +++++++-
+ arch/arm/mach-omap2/mux34xx.c    |   47 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/serial.c     |   11 +++++++-
+ arch/arm/plat-omap/clock.c       |    4 +-
+ arch/arm/plat-omap/gpio.c        |    4 +-
+ arch/arm/plat-omap/omap_device.c |   10 --------
+ 9 files changed, 77 insertions(+), 19 deletions(-)
