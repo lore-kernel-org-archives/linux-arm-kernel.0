@@ -1,135 +1,105 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 4 Feb 2010 09:17:45 +0100
-Subject: [PATCH 06/13] ARM: LPC32XX: Core architecture files
-In-Reply-To: <083DF309106F364B939360100EC290F805C8B787EB@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
-	<1264643011-17390-7-git-send-email-wellsk40@gmail.com>
-	<20100203155558.GH11354@pengutronix.de>
-	<083DF309106F364B939360100EC290F805C8B78790@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100203204056.GD20113@pengutronix.de>
-	<083DF309106F364B939360100EC290F805C8B787EB@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100204081744.GA5380@pengutronix.de>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 4 Feb 2010 16:25:40 +0800
+Subject: [PATCH 1/1] fix i2c_msg.len not aligning with i2c_master_send
+In-Reply-To: <20100204073759.GC13267@trinity.fluff.org>
+References: <309424b61002032204y37307236q94ab3a502b0526e0@mail.gmail.com>
+	<20100204073759.GC13267@trinity.fluff.org>
+Message-ID: <309424b61002040025n22c2b05wbaab46ca4da946f2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi, Ben
 
-On Wed, Feb 03, 2010 at 10:58:55PM +0100, Kevin Wells wrote:
-> > > > > +   case IRQ_TYPE_EDGE_FALLING:
-> > > > > +           /* Falling edge sensitive */
-> > > > > +           reg = readl(ctrl + INTC_POLAR);
-> > > > > +           reg &= ~mask;
-> > > > > +           writel(reg, (ctrl + INTC_POLAR));
-> > > > > +           reg = readl(ctrl + INTC_ACT_TYPE);
-> > > > > +           reg |= mask;
-> > > > > +           writel(reg, (ctrl + INTC_ACT_TYPE));
-> > > > > +           set_irq_handler(irq, handle_edge_irq);
-> > > > > +           break;
-> > > > did you test that you really need handle_edge_irq?  Sane irq
-> > controllers
-> > > > can (and should) use handle_level_irq for both level and edge
-> > sensitive
-> > > > irqs.  You only need handle_edge_irq if your controller doesn't
-> > remember
-> > > > edge transitions while the irq is masked.
-> > >
-> > > This is supported and intended. It's important for slow moving external
-> > > GPIO events where you can't clear the active level state or pulse
-> > > duration (ie, switches).
-> > I didn't understand your answer here.  What is supported and intended?
-> > This has something to do with your controller, not with slow external
-> > things.
-> > 
-> 
-> The controller supports level and edge sensitive modes. There are cases
-> when using external events that you want an edge based interrupt. For
-> example, an event connected to a monetary switch will stay asserted
-> (level-wise) as long as the switch is closed. The interrupt controller
-> latches the event and can clear the latch, but the latch would never
-> clear if the interrupt was level sensitive. In cases like this, you just
-> want to handle the edges. This has been tested.
-Oh yes.  Of course.  I'll retry to make my point more explicit using some
-code.
+Thanks for your suggestion.
 
-Did you verify the following is broken? :
+On Thu, Feb 4, 2010 at 3:37 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+>
+> On Thu, Feb 04, 2010 at 02:04:03PM +0800, zhangfei gao wrote:
+> > Hi, Jean
+> >
+> >
+> > We found type of i2c_msg.len is __u16, while parameter count in
+> > i2c_master_send is int.
+> > The mismatch will truncate count from int to u16.
+> > For example we downloading firmware which is more than 64K (64K+8) via i2c,
+> > i2c would transfer u16 (8 bytes) in fact.
+>
+> I would be wary of changing the i2c_msg structure as this is exported to
+> userspace.
+>
+>
+> I think a better fix would be to test the count parameter to i2c_master_send
+> and return something like EMSGSIZE to inform the user it is too long.
+>
+> If you really want i2c transfers of 64K and above, then you might have to
+> add a new struct i2c_msg and update all the callsites to use it. Either that
+> or chain a set of msgs together and pass them to the i2c controller in one
+> go.
+>
+> Please discuss on the i2c list.
+>
 
-	static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
-	{
-		unsigned int reg, ctrl, mask;
+1. Both i2c_master_send and i2c_msg are exported in include/linux/i2c.h.
+2. Both i2c_master_send and i2c_master_recv supposed to support int
+count, is it suitable to return error when count is bigger than 64K?
+3. It may impact a lot if adding new structure :)
 
-		get_controller(irq, &ctrl, &mask);
+include/linux/i2c.h
+extern int i2c_master_send(struct i2c_client *client, const char *buf,
+                           int count);
+extern int i2c_master_recv(struct i2c_client *client, char *buf, int count);
 
-		switch (type) {
-		case IRQ_TYPE_EDGE_RISING:
-			/* Rising edge sensitive */
-			__set_irq_type(ctrl, mask, mask, mask);
-			/*
-			 * don't set irq_handler to handle_edge_irq here
-		         * as handle_level_irq can handle edge sensitive
-		         * irqs just fine.  Of course the controller
-		         * needs to be setup for edge irqs to get any
-		         * difference to IRQ_TYPE_LEVEL_HIGH.
-			 * See
-			 * http://mid.gmane.org/20091007102836.GA27860 at flint.arm.linux.org.uk
-			 * for some details
-			 */
-			break;
+Thansk
+Zhangfei
 
-		case IRQ_TYPE_EDGE_FALLING:
-			/* Falling edge sensitive */
-			__set_irq_type(ctrl, mask, 0, mask);
-			/* don't set irq_handler to handle_edge_irq here */
-			break;
-
-		case IRQ_TYPE_LEVEL_LOW:
-			/* Low level sensitive */
-			__set_irq_type(ctrl, mask, 0, 0);
-			...
-
-	}
-
-	...
-
-	void __init lpc32xx_init_irq(void)
-	{
-		...
-		for (i = 0; i < NR_IRQS; i++) {
-			set_irq_flags(i, IRQF_VALID);
-			set_irq_chip(i, &lpc32xx_irq_chip);
-			/*
-			 * use handle_level_irq for edge and level
- 			 * triggered irqs
-			 */
-			set_irq_handler(irq, handle_level_irq);
-		}
-		...
-	}
-	
-
-> > > > Does this work without NO_HZ?  I though you need to setup a periodic
-> > > > mode with CONFIG_HZ irqs per second first?
-> > >
-> > > This is handled in the clockevents handler. It will setup the driver
-> > > for the next event in the set_next_event callback. I believe the
-> > > current CONFIG_HZ rate is set to 100.
-> > Hmmm:
-> > 
-> > 	~/gsrc/linux-2.6/arch/arm/mach-lpc32xx$ grep HZ *
-> > 	~/gsrc/linux-2.6/arch/arm/mach-lpc32xx$
-> > 
-> 
-> CONFIG_HZ is defined in the phy3250_defconfig file in arch/arms/configs.
-> It's actually used in the clock events driver and passes the next tick delta
-> to the timer driver callback. The timer driver itself doesn't know the tick
-> rate or even the value of HZ - it's in the higher layers. Note this timer
-> driver also works fine with NO_HZ. Sorry about the confusion on this.
-Probably it's really just me who is confused, but I wondered if this
-works *without* NO_HZ as I thought the timer init function is supposed
-to set up a HZ tick.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+> > >From 69ec7599bf0fa28441281be1df76a2f573bb9127 Mon Sep 17 00:00:00 2001
+> > From: Zhangfei Gao <zgao6@marvell.com>
+> > Date: Fri, 5 Feb 2010 05:12:19 +0800
+> > Subject: [PATCH] i2c: i2c_msg.len modify to __u32 type
+> >
+> > ? ? int i2c_master_send(struct i2c_client *client,const char *buf ,int
+> > count)
+> > ? ? {
+> > ? ? ? ? ~
+> > ? ? ? ? msg.len = count;
+> > ? ? ? ? ~
+> > ? ? }
+> > ? ? Parameter count would truncate from int to __u16
+> >
+> > Signed-off-by: Zhangfei Gao <zgao6@marvell.com>
+> > ---
+> > ?include/linux/i2c.h | ? ?2 +-
+> > ?1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> > index 57d41b0..4769ce9 100644
+> > --- a/include/linux/i2c.h
+> > +++ b/include/linux/i2c.h
+> > @@ -491,7 +491,7 @@ struct i2c_msg {
+> > ?#define I2C_M_IGNORE_NAK ? ?0x1000 ? ?/* if I2C_FUNC_PROTOCOL_MANGLING */
+> > ?#define I2C_M_NO_RD_ACK ? ? ? ?0x0800 ? ?/* if I2C_FUNC_PROTOCOL_MANGLING
+> > */
+> > ?#define I2C_M_RECV_LEN ? ? ? ?0x0400 ? ?/* length will be first received
+> > byte */
+> > - ? ?__u16 len; ? ? ? ?/* msg length ? ? ? ? ? ? ? ?*/
+> > + ? ?__u32 len; ? ? ? ?/* msg length ? ? ? ? ? ? ? ?*/
+> > ? ? ?__u8 *buf; ? ? ? ?/* pointer to msg data ? ? ? ? ? ?*/
+> > ?};
+> >
+> > --
+> > 1.6.0.4
+>
+>
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> --
+> --
+> Ben
+>
+> Q: ? ? ?What's a light-year?
+> A: ? ? ?One-third less calories than a regular year.
+>
