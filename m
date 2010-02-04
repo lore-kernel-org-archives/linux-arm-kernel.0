@@ -1,36 +1,123 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 4 Feb 2010 19:52:52 +0530
-Subject: [PATCH 0/5] cache-l2x0 and omap4 l2 support
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0B425F9@dbde02.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu,  4 Feb 2010 19:55:44 +0530
+Subject: [PATCH 2/5] OMAP4: Add L2 Cache support
+In-Reply-To: <1265293547-18960-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1265293547-18960-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1265293547-18960-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell / Tony,
+This patch adds L2 Cache support for OMAP4. External L2 cache
+is used in OMPA4
 
-Here is the series which combines earlier two series because of dependency and 
-rebased against 2.6.33-rc2. This series also implements Russell's suggested
-combined monitor API. Tested on OMAP4430 SDP 
+v2 version incorporates Catalin's commnet on the register
+save/restore list
 
-
-The following changes since commit abe94c756c08d50566c09a65b9c7fe72f83071c5:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc6
-
-Santosh Shilimkar (5):
-      ARM: L2 : Add maintainace by line helper functions
-      OMAP4: Add L2 Cache support
-      OMAP4: Clean the secondary_data from L2
-      ARM: L2 : Errata 588369: Clean & Invalidate do not invalidate clean lines
-      OMAP4: Enable L2 Cache
-
- arch/arm/Kconfig                           |   13 +++++
- arch/arm/configs/omap_4430sdp_defconfig    |    3 +
- arch/arm/mach-omap2/board-4430sdp.c        |   53 +++++++++++++++++++++
- arch/arm/mach-omap2/omap-smp.c             |    2 +
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-omap2/board-4430sdp.c        |   53 ++++++++++++++++++++++++++++
  arch/arm/mm/Kconfig                        |    2 +-
- arch/arm/mm/cache-l2x0.c                   |   71 ++++++++++++++++++++++++----
  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
- 7 files changed, 134 insertions(+), 11 deletions(-)
+ 3 files changed, 55 insertions(+), 1 deletions(-)
 
-Regards,
-Santosh
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 0c6be6b..6571cde 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -28,6 +28,7 @@
+ #include <plat/control.h>
+ #include <plat/timer-gp.h>
+ #include <asm/hardware/gic.h>
++#include <asm/hardware/cache-l2x0.h>
+ 
+ static struct platform_device sdp4430_lcd_device = {
+ 	.name		= "sdp4430_lcd",
+@@ -49,6 +50,58 @@ static struct omap_lcd_config sdp4430_lcd_config __initdata = {
+ static struct omap_board_config_kernel sdp4430_config[] __initdata = {
+ 	{ OMAP_TAG_LCD,		&sdp4430_lcd_config },
+ };
++#ifdef CONFIG_CACHE_L2X0
++void noinline omap_smc1(u32 fn, u32 arg)
++{
++	register u32 r12 asm("r12") = fn;
++	register u32 r0 asm("r0") = arg;
++
++	/* This is common routine cache secure monitor API used to
++	 * modify the PL310 secure registers.
++	 * r0 contains the value to be modified and "r12" contains
++	 * the monitor API number. It uses few CPU registers
++	 * internally and hence they need be backed up including
++	 * link register "lr".
++	 * Explicitly save r11 and r12 the compiler generated code
++	 * won't save it.
++	 */
++	asm volatile(
++		"stmfd r13!, {r11,r12}\n"
++		"dsb\n"
++		"smc\n"
++		"ldmfd r13!, {r11,r12}\n"
++		: "+r" (r0), "+r" (r12)
++		:
++		: "r4", "r5", "r10", "lr", "cc");
++}
++EXPORT_SYMBOL(omap_smc1);
++
++static int __init omap_l2_cache_init(void)
++{
++	void __iomem *l2cache_base;
++
++	/* To avoid code running on other OMAPs in
++	 * multi-omap builds
++	 */
++	if (!cpu_is_omap44xx())
++		return -ENODEV;
++
++	/* Static mapping, never released */
++	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
++	BUG_ON(!l2cache_base);
++
++	/* Enable PL310 L2 Cache controller */
++	omap_smc1(0x102, 0x1);
++
++	/* 32KB way size, 16-way associativity,
++	* parity disabled
++	*/
++	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
++
++	return 0;
++}
++early_initcall(omap_l2_cache_init);
++#endif
+ 
+ static void __init gic_init_irq(void)
+ {
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index baf6384..696e83e 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -754,7 +754,7 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
+ config CACHE_L2X0
+ 	bool "Enable the L2x0 outer cache controller"
+ 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+-		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || ARCH_NOMADIK
++		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || ARCH_NOMADIK || ARCH_OMAP4
+ 	default y
+ 	select OUTER_CACHE
+ 	help
+diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
+index ef870de..c7d628e 100644
+--- a/arch/arm/plat-omap/include/plat/omap44xx.h
++++ b/arch/arm/plat-omap/include/plat/omap44xx.h
+@@ -40,6 +40,7 @@
+ #define OMAP44XX_GIC_CPU_BASE		0x48240100
+ #define OMAP44XX_SCU_BASE		0x48240000
+ #define OMAP44XX_LOCAL_TWD_BASE		0x48240600
++#define OMAP44XX_L2CACHE_BASE		0x48242000
+ #define OMAP44XX_WKUPGEN_BASE		0x48281000
+ 
+ #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
+-- 
+1.6.0.4
