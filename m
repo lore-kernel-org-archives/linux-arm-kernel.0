@@ -1,78 +1,93 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 4 Feb 2010 07:37:59 +0000
-Subject: [PATCH 1/1] fix i2c_msg.len not aligning with i2c_master_send
-In-Reply-To: <309424b61002032204y37307236q94ab3a502b0526e0@mail.gmail.com>
-References: <309424b61002032204y37307236q94ab3a502b0526e0@mail.gmail.com>
-Message-ID: <20100204073759.GC13267@trinity.fluff.org>
+Date: Thu, 4 Feb 2010 08:16:54 +0000
+Subject: [git patches] new hardware support for atang tree
+In-Reply-To: <201002031940.20129.bzolnier@gmail.com>
+References: <201002031940.20129.bzolnier@gmail.com>
+Message-ID: <20100204081654.GD13267@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2010 at 02:04:03PM +0800, zhangfei gao wrote:
-> Hi, Jean
+On Wed, Feb 03, 2010 at 07:40:20PM +0100, Bartlomiej Zolnierkiewicz wrote:
 > 
-> 
-> We found type of i2c_msg.len is __u16, while parameter count in
-> i2c_master_send is int.
-> The mismatch will truncate count from int to u16.
-> For example we downloading firmware which is more than 64K (64K+8) via i2c,
-> i2c would transfer u16 (8 bytes) in fact.
+> Since I haven't seen any progress on mainstreaming of s3c-ide and
+> pata_altera_cf patches in the recent months I decided to merge them
+> into staging section of my tree in order to help in keeping them
+> in-sync with ongoing changes..
 
-I would be wary of changing the i2c_msg structure as this is exported to
-userspace.
+Please be aware the plat-s3c64xx and plat-s3c is currently in the process
+of being removed, the s3c64xx is an development dead-end and thus we know
+exactly what has to be supported, plat-s3c is getting so empty i've shoved
+the stuff either up into plat-s3c24xx or down into plat-samsung.
 
-I think a better fix would be to test the count parameter to i2c_master_send
-and return something like EMSGSIZE to inform the user it is too long.
+Quite a lot of this change is currently in RMK's trees, the rest is just
+being finalised for submission next week.
 
-If you really want i2c transfers of 64K and above, then you might have to
-add a new struct i2c_msg and update all the callsites to use it. Either that
-or chain a set of msgs together and pass them to the i2c controller in one
-go.
-
-Please discuss on the i2c list.
+I might be interested in taking the platform definitions into my tree
+as the registers should be usable either for libata or ide.
  
-> >From 69ec7599bf0fa28441281be1df76a2f573bb9127 Mon Sep 17 00:00:00 2001
-> From: Zhangfei Gao <zgao6@marvell.com>
-> Date: Fri, 5 Feb 2010 05:12:19 +0800
-> Subject: [PATCH] i2c: i2c_msg.len modify to __u32 type
+> DISCLAIMER: the fact of getting patches merged into atang tree means
+> that from now on they will be getting updates for changes happening
+> in atang tree and it should not be treated as an indication regarding
+> decisions taken by 'upstream' kernel trees
 > 
->     int i2c_master_send(struct i2c_client *client,const char *buf ,int
-> count)
->     {
->         ~
->         msg.len = count;
->         ~
->     }
->     Parameter count would truncate from int to __u16
 > 
-> Signed-off-by: Zhangfei Gao <zgao6@marvell.com>
-> ---
->  include/linux/i2c.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> The following changes since commit 18c77417cbb9c595935d5ccb2e55309f0fb75a06:
+>   Bartlomiej Zolnierkiewicz (1):
+>         ide: remove hwif_chipset_t type
 > 
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 57d41b0..4769ce9 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -491,7 +491,7 @@ struct i2c_msg {
->  #define I2C_M_IGNORE_NAK    0x1000    /* if I2C_FUNC_PROTOCOL_MANGLING */
->  #define I2C_M_NO_RD_ACK        0x0800    /* if I2C_FUNC_PROTOCOL_MANGLING
-> */
->  #define I2C_M_RECV_LEN        0x0400    /* length will be first received
-> byte */
-> -    __u16 len;        /* msg length                */
-> +    __u32 len;        /* msg length                */
->      __u8 *buf;        /* pointer to msg data            */
->  };
+> are available in the git repository at:
 > 
-> -- 
-> 1.6.0.4
-
-
+>   git://git.kernel.org/pub/scm/linux/kernel/git/bart/misc.git atang-v4.4
+> 
+> Thomas Abraham (8):
+>       S3C64XX: Add physical address definition for Compact Flash controller.
+>       S3C64XX: Add MEM_SYS_CFG register definition.
+>       S3C64XX: Add IDE controller register definitions.
+>       S3C64XX: Add clock source definition for IDE controller.
+>       S3C64XX: Add platform data and driver resources for IDE controller driver.
+>       S3C6410: Add platform data for S3C IDE controller driver
+>       S3C64XX: Include IDE device code in compilation.
+>       drivers/staging: Add Samsung S3C IDE controller driver
+> 
+> Thomas Chou (1):
+>       drivers/staging: New PATA driver for Altera CompactFlash.
+> 
+>  arch/arm/mach-s3c6400/include/mach/map.h        |    4 +
+>  arch/arm/mach-s3c6410/mach-smdk6410.c           |   14 +-
+>  arch/arm/plat-s3c/include/plat/devs.h           |    1 +
+>  arch/arm/plat-s3c/include/plat/ide.h            |   36 +
+>  arch/arm/plat-s3c/include/plat/regs-ide.h       |   56 ++
+>  arch/arm/plat-s3c64xx/Makefile                  |    1 +
+>  arch/arm/plat-s3c64xx/clock.c                   |    6 +
+>  arch/arm/plat-s3c64xx/dev-ide.c                 |   88 +++
+>  arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    3 +
+>  drivers/staging/Kconfig                         |    4 +
+>  drivers/staging/Makefile                        |    2 +
+>  drivers/staging/pata_altera_cf/Kconfig          |   11 +
+>  drivers/staging/pata_altera_cf/Makefile         |    1 +
+>  drivers/staging/pata_altera_cf/TODO             |    5 +
+>  drivers/staging/pata_altera_cf/pata_altera_cf.c |  582 ++++++++++++++++
+>  drivers/staging/s3c-ide/Kconfig                 |    8 +
+>  drivers/staging/s3c-ide/Makefile                |    1 +
+>  drivers/staging/s3c-ide/TODO                    |    6 +
+>  drivers/staging/s3c-ide/s3c-ide.c               |  822 +++++++++++++++++++++++
+>  19 files changed, 1650 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-s3c/include/plat/ide.h
+>  create mode 100644 arch/arm/plat-s3c/include/plat/regs-ide.h
+>  create mode 100644 arch/arm/plat-s3c64xx/dev-ide.c
+>  create mode 100644 drivers/staging/pata_altera_cf/Kconfig
+>  create mode 100644 drivers/staging/pata_altera_cf/Makefile
+>  create mode 100644 drivers/staging/pata_altera_cf/TODO
+>  create mode 100644 drivers/staging/pata_altera_cf/pata_altera_cf.c
+>  create mode 100644 drivers/staging/s3c-ide/Kconfig
+>  create mode 100644 drivers/staging/s3c-ide/Makefile
+>  create mode 100644 drivers/staging/s3c-ide/TODO
+>  create mode 100644 drivers/staging/s3c-ide/s3c-ide.c
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
 
 -- 
 -- 
