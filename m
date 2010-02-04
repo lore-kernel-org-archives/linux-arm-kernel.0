@@ -1,38 +1,20 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 4 Feb 2010 20:34:26 +0200
-Subject: [PATCH] Add USB support for i.MX27/35 and Phytec i.MX boards
-In-Reply-To: <1265295825-8705-1-git-send-email-s.hauer@pengutronix.de>
-References: <1265295825-8705-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20100204183426.GA30488@jasper.tkos.co.il>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 4 Feb 2010 10:45:04 -0800
+Subject: [PATCH] ARM: Correct the FPSCR bits setting when raising
+	exceptions
+In-Reply-To: <20100128101809.7752.76832.stgit@pc1117.cambridge.arm.com>
+References: <20100128101809.7752.76832.stgit@pc1117.cambridge.arm.com>
+Message-ID: <f17812d71002041045h5f6cbbe8vdf40dad11a693a5e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Thu, Jan 28, 2010 at 2:18 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Commit c98929c07a removed the clearing of the FPSCR[31:28] bits from the
+> vfp_raise_exceptions() function and the new bits are or'ed with the old
+> FPSCR bits leading to unexpected results (the original commit was
+> referring to the cumulative bits - FPSCR[4:0]).
+>
 
-On Thu, Feb 04, 2010 at 04:03:37PM +0100, Sascha Hauer wrote:
-
-[snip]
-
->  arch/arm/mach-mx2/Kconfig                 |    2 +
->  arch/arm/mach-mx2/mach-pca100.c           |  103 ++++
->  arch/arm/mach-mx2/mach-pcm038.c           |   22 +
->  arch/arm/mach-mx3/Kconfig                 |    2 +
->  arch/arm/mach-mx3/mach-pcm037.c           |  137 ++++--
->  arch/arm/mach-mx3/mach-pcm043.c           |   53 ++
->  arch/arm/mach-mx3/pcm037.c                |  795 +++++++++++++++++++++++++++++
->  arch/arm/mach-mx3/pcm043.c                |  367 +++++++++++++
->  arch/arm/plat-mxc/ehci.c                  |  118 ++++-
->  arch/arm/plat-mxc/include/mach/mxc_ehci.h |    4 +
->  drivers/usb/gadget/fsl_mx3_udc.c          |   31 +-
->  11 files changed, 1570 insertions(+), 64 deletions(-)
->  create mode 100644 arch/arm/mach-mx3/pcm037.c
->  create mode 100644 arch/arm/mach-mx3/pcm043.c
-
-Is the addition of these two files intended?
-
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+What's the status of this patch? Looks like a sane fix to me and apparently
+it seems Marvell cores are confused without this already.
