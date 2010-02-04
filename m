@@ -1,23 +1,23 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 3 Feb 2010 23:15:46 +0100
-Subject: [spi-devel-general] PATCH [1/1] SPI: AMBA_PL022: Limit TX FIFO
-	fills based on current RX FIFO used
-In-Reply-To: <fa686aa41002030948g6359ef3o4c3a7b265490b93f@mail.gmail.com>
-References: <083DF309106F364B939360100EC290F805C4BF1E97@eu1rdcrdc1wx030.exi.nxp.com>
-	<63386a3d1001220456p484efc7fm811ae2240698cbdf@mail.gmail.com>
-	<fa686aa41002030948g6359ef3o4c3a7b265490b93f@mail.gmail.com>
-Message-ID: <63386a3d1002031415i4a407b44rfc6ace9ae5ab1c4f@mail.gmail.com>
+From: davidb@quicinc.com (David Brown)
+Date: Wed, 3 Feb 2010 16:09:49 -0800
+Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
+In-Reply-To: <20100119171033.GA1323@shareable.org>
+References: <20100111231143.GF7925@n2100.arm.linux.org.uk>
+	<20100119171033.GA1323@shareable.org>
+Message-ID: <20100204000949.GA22186@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/2/3 Grant Likely <grant.likely@secretlab.ca>:
+On Tue, Jan 19, 2010 at 09:10:33AM -0800, Jamie Lokier wrote:
 
-> I'm actively maintaining SPI now. ?In general, I'd prefer SPI patches
-> to go through the SPI tree, unless there are commit ordering issues
-> with arch code.
+> --- /dev/null
+> +++ b/Documentation/arm/msm/emulate_domain_manager.txt
+> @@ -0,0 +1,282 @@
+> +[... longish license header, like new BSD but different...
 
-Sorry, will queue them in your tree next time, and thanks for picking
-up SPI.
+All of the license blurbs that made it under the documentation
+directory were put there erroneously, and will be removed
+entirely in future patches.  That license wasn't intended for
+kernel documentation.
 
-Yours,
-Linus Walleij
+David
