@@ -1,128 +1,109 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  4 Feb 2010 16:03:45 +0100
-Subject: [PATCH 8/8] i.MX27 pca100: Add USB support
-In-Reply-To: <1265295825-8705-8-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  4 Feb 2010 16:03:41 +0100
+Subject: [PATCH 4/8] i.MX35: Add USB control register access support
+In-Reply-To: <1265295825-8705-4-git-send-email-s.hauer@pengutronix.de>
 References: <1265295825-8705-1-git-send-email-s.hauer@pengutronix.de>
 	<1265295825-8705-2-git-send-email-s.hauer@pengutronix.de>
 	<1265295825-8705-3-git-send-email-s.hauer@pengutronix.de>
 	<1265295825-8705-4-git-send-email-s.hauer@pengutronix.de>
-	<1265295825-8705-5-git-send-email-s.hauer@pengutronix.de>
-	<1265295825-8705-6-git-send-email-s.hauer@pengutronix.de>
-	<1265295825-8705-7-git-send-email-s.hauer@pengutronix.de>
-	<1265295825-8705-8-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1265295825-8705-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1265295825-8705-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-mx3/Kconfig       |    1 +
- arch/arm/mach-mx3/mach-pcm043.c |   53 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/ehci.c                  |   55 +++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |    4 ++
+ 2 files changed, 59 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 2232b7b..3872af1 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -87,6 +87,7 @@ config MACH_QONG
- config MACH_PCM043
- 	bool "Support Phytec pcm043 (i.MX35) platforms"
- 	select ARCH_MX35
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for Phytec pcm043 platform. This includes
- 	  specific configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index 25942b8..a9741c2 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -28,6 +28,9 @@
- #include <linux/interrupt.h>
- #include <linux/i2c.h>
- #include <linux/i2c/at24.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/fsl_devices.h>
+diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
+index 816a9cc..94b0036 100644
+--- a/arch/arm/plat-mxc/ehci.c
++++ b/arch/arm/plat-mxc/ehci.c
+@@ -38,6 +38,18 @@
+ #define MX31_H1_PM_BIT		(1 << 8)
+ #define MX31_H1_DT_BIT		(1 << 4)
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -44,6 +47,8 @@
- #include <mach/ipu.h>
- #include <mach/mx3fb.h>
- #include <mach/mxc_nand.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
- 
- #include "devices.h"
- 
-@@ -205,6 +210,9 @@ static struct pad_desc pcm043_pads[] = {
- 	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
- 	/* gpio */
- 	MX35_PAD_ATA_CS0__GPIO2_6,
-+	/* USB host */
-+	MX35_PAD_I2C2_CLK__USB_TOP_USBH2_PWR,
-+	MX35_PAD_I2C2_DAT__USB_TOP_USBH2_OC,
- };
- 
- static struct mxc_nand_platform_data pcm037_nand_board_info = {
-@@ -212,6 +220,37 @@ static struct mxc_nand_platform_data pcm037_nand_board_info = {
- 	.hw_ecc = 1,
- };
- 
-+static struct mxc_usbh_platform_data otg_pdata = {
-+	.portsc	= MXC_EHCI_MODE_UTMI,
-+	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
-+};
++#define MX35_OTG_SIC_SHIFT	29
++#define MX35_OTG_SIC_MASK	(0x3 << MX35_OTG_SIC_SHIFT)
++#define MX35_OTG_PM_BIT		(1 << 24)
 +
-+static struct mxc_usbh_platform_data usbh1_pdata = {
-+	.portsc	= MXC_EHCI_MODE_SERIAL,
-+	.flags	= MXC_EHCI_INTERFACE_SINGLE_UNI | MXC_EHCI_INTERNAL_PHY |
-+		  MXC_EHCI_IPPUE_DOWN,
-+};
++#define MX35_H1_SIC_SHIFT	21
++#define MX35_H1_SIC_MASK	(0x3 << MX35_H1_SIC_SHIFT)
++#define MX35_H1_PM_BIT		(1 << 8)
++#define MX35_OTG_IPPUE_UP_BIT	(1 << 7)
++#define MX35_OTG_IPPUE_DOWN_BIT	(1 << 6)
++#define MX35_H1_TLL_BIT		(1 << 5)
++#define MX35_OTG_USBTE_BIT	(1 << 4)
 +
-+static struct fsl_usb2_platform_data otg_device_pdata = {
-+	.operating_mode = FSL_USB2_DR_DEVICE,
-+	.phy_mode       = FSL_USB2_PHY_UTMI,
-+};
+ int mxc_set_usbcontrol(int port, unsigned int flags)
+ {
+ 	unsigned int v;
+@@ -85,6 +97,49 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
+ 				     USBCTRL_OTGBASE_OFFSET));
+ 		return 0;
+ 	}
 +
-+static int otg_mode_host;
++	if (cpu_is_mx35()) {
++		v = readl(MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
++				     USBCTRL_OTGBASE_OFFSET));
 +
-+static int __init pcm043_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to device\n");
-+	return 0;
-+}
-+__setup("otg_mode=", pcm043_otg_mode);
++		switch (port) {
++		case 0:	/* OTG port */
++			v &= ~(MX35_OTG_SIC_MASK | MX35_OTG_PM_BIT);
++			v |= (flags & MXC_EHCI_INTERFACE_MASK)
++					<< MX35_OTG_SIC_SHIFT;
++			if (!(flags & MXC_EHCI_POWER_PINS_ENABLED))
++				v |= MX35_OTG_PM_BIT;
 +
- /*
-  * Board specific initialization.
-  */
-@@ -235,6 +274,20 @@ static void __init mxc_board_init(void)
- 
- 	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
- 	mxc_register_device(&mx3_fb, &mx3fb_pdata);
++			break;
++		case 1: /* H1 port */
++			v &= ~(MX35_H1_SIC_MASK | MX35_H1_PM_BIT | MX35_H1_TLL_BIT |
++				MX35_OTG_USBTE_BIT | MXC_EHCI_IPPUE_DOWN | MXC_EHCI_IPPUE_UP);
++			v |= (flags & MXC_EHCI_INTERFACE_MASK)
++						<< MX35_H1_SIC_SHIFT;
++			if (!(flags & MXC_EHCI_POWER_PINS_ENABLED))
++				v |= MX35_H1_PM_BIT;
 +
-+#if defined(CONFIG_USB_ULPI)
-+	if (otg_mode_host) {
-+		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++			if (!(flags & MXC_EHCI_TTL_ENABLED))
++				v |= MX35_H1_TLL_BIT;
 +
-+		mxc_register_device(&mxc_otg_host, &otg_pdata);
++			if (flags & MXC_EHCI_INTERNAL_PHY)
++				v |= MX35_OTG_USBTE_BIT;
++
++			if (flags & MXC_EHCI_IPPUE_DOWN)
++				v |= MX35_OTG_IPPUE_DOWN_BIT;
++
++			if (flags & MXC_EHCI_IPPUE_UP)
++				v |= MX35_OTG_IPPUE_UP_BIT;
++
++			break;
++		default:
++			return -EINVAL;
++		}
++
++		writel(v, MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
++				     USBCTRL_OTGBASE_OFFSET));
++		return 0;
 +	}
-+
-+	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
-+#endif
-+	if (!otg_mode_host)
-+		mxc_register_device(&mxc_otg_udc_device, &otg_device_pdata);
-+
- }
+ #endif /* CONFIG_ARCH_MX3 */
+ #ifdef CONFIG_MACH_MX27
+ 	if (cpu_is_mx27()) {
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index 8f79623..4b9b836 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -22,6 +22,10 @@
+ #define MXC_EHCI_POWER_PINS_ENABLED	(1 << 5)
+ #define MXC_EHCI_TTL_ENABLED		(1 << 6)
  
- static void __init pcm043_timer_init(void)
++#define MXC_EHCI_INTERNAL_PHY		(1 << 7)
++#define MXC_EHCI_IPPUE_DOWN		(1 << 8)
++#define MXC_EHCI_IPPUE_UP		(1 << 9)
++
+ struct mxc_usbh_platform_data {
+ 	int (*init)(struct platform_device *pdev);
+ 	int (*exit)(struct platform_device *pdev);
 -- 
 1.6.6
