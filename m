@@ -1,29 +1,51 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 4 Feb 2010 11:36:40 +0200
-Subject: [PATCH] RFC: mx27: Add soc_camera support
-In-Reply-To: <37367b3a0912150607v713edc32y3578fa2a0c8c61db@mail.gmail.com>
-References: <1260885686-8478-1-git-send-email-acassis@gmail.com>
-	<37367b3a0912150607v713edc32y3578fa2a0c8c61db@mail.gmail.com>
-Message-ID: <20100204093640.GA7357@jasper.tkos.co.il>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Thu, 4 Feb 2010 10:42:22 +0100
+Subject: [PATCH 1/2] Modify PL031 for Nomadik and U8500 v2
+In-Reply-To: <1265273123-22421-1-git-send-email-linus.walleij@stericsson.com>
+References: <1265273123-22421-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100204104222.1e7ae094@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Thu,  4 Feb 2010 09:45:23 +0100
+Linus Walleij <linus.walleij@stericsson.com> wrote:
 
-On Tue, Dec 15, 2009 at 12:07:43PM -0200, Alan Carvalho de Assis wrote:
-> Please note: I just get it compiling and loaded correctly on the
-> mainline kernel.
+> This extends the existing PrimeCell PL031 driver with support for
+> the ST Microelectronics and ST-Ericsson derivatives, in a first
+> and second version as used on the Nomadik and U8500 platforms.
+> It also rids the old ioctl() alarm on/off functions in favor of
+> the new .alarm_irq_enable field of the RTC class ops.
 > 
-> If you have a board powered by i.MX27 and with a camera supported by
-> soc_camera driver, I will be glad case you can do a try.
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 
-I'm now in the process of making this driver work on i.MX25. The CSI hardware 
-of the i.MX25 is very similar to the i.MX27 one. If you have any updates for 
-this driver please let me know.
+ Acked-by: Alessandro Zummo <a.zummo@towertech.it>
 
-baruch
+
+> If you Ack this Alessandro, is it OK that I put it in through
+> Russells patch tracker and ARM tree?
+ 
+ Ok. Be sure to have it tested on both versions
+ of the rtc.
+
+  Please also correct white lines between a function call
+ and the related if:
+
+
+> +	ret = pl031_stv2_tm_to_time(dev, tm, &time, &bcd_year);
+----> +
+> +	if (ret == 0) {
+> +		writel(bcd_year, ldata->base + RTC_YLR);
+> +		writel(time, ldata->base + RTC_LR);
+> +	}
+
+ I've seen a couple of those.
+
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
