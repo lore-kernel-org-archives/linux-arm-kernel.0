@@ -1,110 +1,213 @@
 From: imre.deak@nokia.com (Imre Deak)
-Date: Thu, 4 Feb 2010 23:38:02 +0200
-Subject: [RFC PATCH v2 1/2] ARM: VFP: add support to sync the VFP state of
-	the current thread
+Date: Thu, 4 Feb 2010 23:38:30 +0200
+Subject: [RFC PATCH v2 2/2] ARM: VFP: preserve the HW context when calling
+	signal handlers
 In-Reply-To: <b8a1d37c5f981cdd2e83c9fd98198832324cd57c.1265315249.git.imre.deak@nokia.com>
 References: <b8a1d37c5f981cdd2e83c9fd98198832324cd57c.1265315249.git.imre.deak@nokia.com>
-Message-ID: <b8a1d37c5f981cdd2e83c9fd98198832324cd57d.1265315249.git.imre.deak@nokia.com>
+Message-ID: <b8a1d37c5f981cdd2e83c9fd98198832324cd57e.1265315249.git.imre.deak@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far vfp_sync_state worked only for threads other than the current
-one. This worked for tracing other threads, but not for PTRACE_TRACEME.
-Syncing for the current thread will also be needed by an upcoming patch
-adding support for VFP context save / restore around signal handlers.
+Signal handlers can use floating point, so prevent them to corrupt
+the main thread's VFP context. So far there were two signal stack
+frame formats defined based on the VFP implementation, but the user
+struct used for ptrace covers all posibilities, so use it for the
+signal stack too. This patch extends the user struct and leaves
+its magic number the same, in the hope that user space code does
+not depend on its size and can parse the original regs w/o
+problems.
 
-For SMP we need get_cpu now, since we have to protect the FPEXC
-register, other than this things remained the same for threads other
-than the current.
+Support to save / restore the exception registers was added by
+Will Deacon.
 
 Signed-off-by: Imre Deak <imre.deak@nokia.com>
----
- arch/arm/vfp/vfpmodule.c |   46 +++++++++++++++++++++++++++++++---------------
- 1 files changed, 31 insertions(+), 15 deletions(-)
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index f60a540..d0b6e98 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -426,12 +426,19 @@ static inline void vfp_pm_init(void) { }
- #endif /* CONFIG_PM */
+---
+ arch/arm/include/asm/ucontext.h |   19 +++-----
+ arch/arm/include/asm/user.h     |    3 +
+ arch/arm/kernel/signal.c        |   91 +++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 97 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/include/asm/ucontext.h b/arch/arm/include/asm/ucontext.h
+index bf65e9f..1c3236b 100644
+--- a/arch/arm/include/asm/ucontext.h
++++ b/arch/arm/include/asm/ucontext.h
+@@ -59,23 +59,18 @@ struct iwmmxt_sigframe {
+ #endif /* CONFIG_IWMMXT */
  
- /*
-- * Synchronise the hardware VFP state of a thread other than current with the
-- * saved one. This function is used by the ptrace mechanism.
-+ * Synchronise the hardware VFP state of a thread with the saved one.
-+ * This function is used by the ptrace mechanism and the signal handler path.
-  */
--#ifdef CONFIG_SMP
- void vfp_sync_state(struct thread_info *thread)
- {
-+	unsigned int cpu = get_cpu();
-+	u32 fpexc = fmrx(FPEXC);
-+	int vfp_enabled;
-+	int self;
-+
-+	vfp_enabled = fpexc & FPEXC_EN;
-+	self = thread == current_thread_info();
-+#ifdef CONFIG_SMP
- 	/*
- 	 * On SMP systems, the VFP state is automatically saved at every
- 	 * context switch. We mark the thread VFP state as belonging to a
-@@ -439,18 +446,22 @@ void vfp_sync_state(struct thread_info *thread)
- 	 * needed.
- 	 */
- 	thread->vfpstate.hard.cpu = NR_CPUS;
--}
+ #ifdef CONFIG_VFP
+-#if __LINUX_ARM_ARCH__ < 6
+-/* For ARM pre-v6, we use fstmiax and fldmiax.  This adds one extra
+- * word after the registers, and a word of padding@the end for
+- * alignment.  */
+ #define VFP_MAGIC		0x56465001
+-#define VFP_STORAGE_SIZE	152
 -#else
--void vfp_sync_state(struct thread_info *thread)
--{
--	unsigned int cpu = get_cpu();
--	u32 fpexc = fmrx(FPEXC);
--
- 	/*
--	 * If VFP is enabled, the previous state was already saved and
--	 * last_VFP_context updated.
-+	 * Only the current thread's saved VFP context can be out-of-date.
-+	 * For others there is nothing else to do, since we already ensured
-+	 * force loading above.
- 	 */
--	if (fpexc & FPEXC_EN)
-+	if (!self)
-+		goto out;
-+#endif
-+	/*
-+	 * If the VFP is enabled only the current thread's saved VFP
-+	 * context can get out-of-date. For other threads the context
-+	 * was updated when the current thread started to use the VFP.
-+	 * This also means that the context will be reloaded next time
-+	 * the thread uses the VFP, so no need to enforce it.
-+	 */
-+	if (vfp_enabled && !self)
- 		goto out;
- 
- 	if (!last_VFP_context[cpu])
-@@ -459,8 +470,14 @@ void vfp_sync_state(struct thread_info *thread)
- 	/*
- 	 * Save the last VFP state on this CPU.
- 	 */
--	fmxr(FPEXC, fpexc | FPEXC_EN);
-+	if (!vfp_enabled)
-+		fmxr(FPEXC, fpexc | FPEXC_EN);
- 	vfp_save_state(last_VFP_context[cpu], fpexc);
-+	/*
-+	 * Disable VFP in case it was enabled so that the force reload
-+	 * can happen.
-+	 */
-+	fpexc &= ~FPEXC_EN;
- 	fmxr(FPEXC, fpexc);
- 
- 	/*
-@@ -472,7 +489,6 @@ void vfp_sync_state(struct thread_info *thread)
- out:
- 	put_cpu();
- }
+-#define VFP_MAGIC		0x56465002
+-#define VFP_STORAGE_SIZE	144
 -#endif
  
- #include <linux/smp.h>
+ struct vfp_sigframe
+ {
+ 	unsigned long		magic;
+ 	unsigned long		size;
+-	union vfp_state		storage;
+-};
++	struct user_vfp		ufp;
++} __attribute__((__aligned__(8)));
++
++/* 8 byte for magic and size, 272 byte for ufp */
++#define VFP_STORAGE_SIZE	sizeof(struct vfp_sigframe)
++
+ #endif /* CONFIG_VFP */
+ 
+ /*
+@@ -91,7 +86,7 @@ struct aux_sigframe {
+ #ifdef CONFIG_IWMMXT
+ 	struct iwmmxt_sigframe	iwmmxt;
+ #endif
+-#if 0 && defined CONFIG_VFP /* Not yet saved.  */
++#ifdef CONFIG_VFP
+ 	struct vfp_sigframe	vfp;
+ #endif
+ 	/* Something that isn't a valid magic number for any coprocessor.  */
+diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+index df95e05..ea7e44d 100644
+--- a/arch/arm/include/asm/user.h
++++ b/arch/arm/include/asm/user.h
+@@ -88,6 +88,9 @@ struct user{
+ struct user_vfp {
+ 	unsigned long long fpregs[32];
+ 	unsigned long fpscr;
++	unsigned long fpexc;
++	unsigned long fpinst;
++	unsigned long fpinst2;
+ };
+ 
+ #endif /* _ARM_USER_H */
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index e7714f3..6a36851 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -18,6 +18,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/ucontext.h>
+ #include <asm/unistd.h>
++#include <asm/vfp.h>
+ 
+ #include "ptrace.h"
+ #include "signal.h"
+@@ -175,6 +176,88 @@ static int restore_iwmmxt_context(struct iwmmxt_sigframe *frame)
+ 
+ #endif
+ 
++#ifdef CONFIG_VFP
++
++static int preserve_vfp_context(struct vfp_sigframe __user *frame)
++{
++	struct thread_info *thread = current_thread_info();
++	struct vfp_hard_struct *h = &thread->vfpstate.hard;
++	const unsigned long magic = VFP_MAGIC;
++	const unsigned long size = VFP_STORAGE_SIZE;
++	int err = 0;
++
++	vfp_sync_state(thread);
++	__put_user_error(magic, &frame->magic, err);
++	__put_user_error(size, &frame->size, err);
++
++	/*
++	 * Copy the floating point registers. There can be unused
++	 * registers see asm/hwcap.h for details.
++	 */
++	err |= __copy_to_user(&frame->ufp.fpregs, &h->fpregs,
++			      sizeof(h->fpregs));
++	/*
++	 * Copy the status and control register.
++	 */
++	__put_user_error(h->fpscr, &frame->ufp.fpscr, err);
++
++	/*
++	 * Copy the exception registers.
++	 */
++	__put_user_error(h->fpexc, &frame->ufp.fpexc, err);
++	__put_user_error(h->fpinst, &frame->ufp.fpinst, err);
++	__put_user_error(h->fpinst2, &frame->ufp.fpinst2, err);
++
++	return err ? -EFAULT : 0;
++}
++
++static int restore_vfp_context(struct vfp_sigframe __user *frame)
++{
++	struct thread_info *thread = current_thread_info();
++	struct vfp_hard_struct *h = &thread->vfpstate.hard;
++	unsigned long magic;
++	unsigned long size;
++	unsigned long fpexc;
++	int err = 0;
++
++	vfp_sync_state(thread);
++	__get_user_error(magic, &frame->magic, err);
++	__get_user_error(size, &frame->size, err);
++
++	if (err)
++		return -EFAULT;
++	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
++		return -EINVAL;
++
++	/*
++	 * Copy the floating point registers. There can be unused
++	 * registers see asm/hwcap.h for details.
++	 */
++	err |= __copy_from_user(&h->fpregs, &frame->ufp.fpregs,
++				sizeof(h->fpregs));
++	/*
++	 * Copy the status and control register.
++	 */
++	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
++
++	/*
++	 * Sanitise and restore the exception registers.
++	 */
++	__get_user_error(fpexc, &frame->ufp.fpexc, err);
++	/* Ensure the VFP is enabled. */
++	fpexc |= FPEXC_EN;
++	/* Ensure FPINST2 is invalid and the exception flag is cleared. */
++	fpexc &= ~(FPEXC_EX | FPEXC_FP2V);
++	h->fpexc = fpexc;
++
++	__get_user_error(h->fpinst, &frame->ufp.fpinst, err);
++	__get_user_error(h->fpinst2, &frame->ufp.fpinst2, err);
++
++	return err ? -EFAULT : 0;
++}
++
++#endif
++
+ /*
+  * Do a signal return; undo the signal stack.  These are aligned to 64-bit.
+  */
+@@ -233,8 +316,8 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+ 		err |= restore_iwmmxt_context(&aux->iwmmxt);
+ #endif
+ #ifdef CONFIG_VFP
+-//	if (err == 0)
+-//		err |= vfp_restore_state(&sf->aux.vfp);
++	if (err == 0)
++		err |= restore_vfp_context(&aux->vfp);
+ #endif
+ 
+ 	return err;
+@@ -348,8 +431,8 @@ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+ 		err |= preserve_iwmmxt_context(&aux->iwmmxt);
+ #endif
+ #ifdef CONFIG_VFP
+-//	if (err == 0)
+-//		err |= vfp_save_state(&sf->aux.vfp);
++	if (err == 0)
++		err |= preserve_vfp_context(&aux->vfp);
+ #endif
+ 	__put_user_error(0, &aux->end_magic, err);
  
 -- 
 1.6.6
