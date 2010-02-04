@@ -1,97 +1,135 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 4 Feb 2010 08:16:54 +0000
-Subject: [git patches] new hardware support for atang tree
-In-Reply-To: <201002031940.20129.bzolnier@gmail.com>
-References: <201002031940.20129.bzolnier@gmail.com>
-Message-ID: <20100204081654.GD13267@trinity.fluff.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 4 Feb 2010 09:17:45 +0100
+Subject: [PATCH 06/13] ARM: LPC32XX: Core architecture files
+In-Reply-To: <083DF309106F364B939360100EC290F805C8B787EB@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-7-git-send-email-wellsk40@gmail.com>
+	<20100203155558.GH11354@pengutronix.de>
+	<083DF309106F364B939360100EC290F805C8B78790@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100203204056.GD20113@pengutronix.de>
+	<083DF309106F364B939360100EC290F805C8B787EB@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20100204081744.GA5380@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 07:40:20PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Since I haven't seen any progress on mainstreaming of s3c-ide and
-> pata_altera_cf patches in the recent months I decided to merge them
-> into staging section of my tree in order to help in keeping them
-> in-sync with ongoing changes..
+Hello,
 
-Please be aware the plat-s3c64xx and plat-s3c is currently in the process
-of being removed, the s3c64xx is an development dead-end and thus we know
-exactly what has to be supported, plat-s3c is getting so empty i've shoved
-the stuff either up into plat-s3c24xx or down into plat-samsung.
+On Wed, Feb 03, 2010 at 10:58:55PM +0100, Kevin Wells wrote:
+> > > > > +   case IRQ_TYPE_EDGE_FALLING:
+> > > > > +           /* Falling edge sensitive */
+> > > > > +           reg = readl(ctrl + INTC_POLAR);
+> > > > > +           reg &= ~mask;
+> > > > > +           writel(reg, (ctrl + INTC_POLAR));
+> > > > > +           reg = readl(ctrl + INTC_ACT_TYPE);
+> > > > > +           reg |= mask;
+> > > > > +           writel(reg, (ctrl + INTC_ACT_TYPE));
+> > > > > +           set_irq_handler(irq, handle_edge_irq);
+> > > > > +           break;
+> > > > did you test that you really need handle_edge_irq?  Sane irq
+> > controllers
+> > > > can (and should) use handle_level_irq for both level and edge
+> > sensitive
+> > > > irqs.  You only need handle_edge_irq if your controller doesn't
+> > remember
+> > > > edge transitions while the irq is masked.
+> > >
+> > > This is supported and intended. It's important for slow moving external
+> > > GPIO events where you can't clear the active level state or pulse
+> > > duration (ie, switches).
+> > I didn't understand your answer here.  What is supported and intended?
+> > This has something to do with your controller, not with slow external
+> > things.
+> > 
+> 
+> The controller supports level and edge sensitive modes. There are cases
+> when using external events that you want an edge based interrupt. For
+> example, an event connected to a monetary switch will stay asserted
+> (level-wise) as long as the switch is closed. The interrupt controller
+> latches the event and can clear the latch, but the latch would never
+> clear if the interrupt was level sensitive. In cases like this, you just
+> want to handle the edges. This has been tested.
+Oh yes.  Of course.  I'll retry to make my point more explicit using some
+code.
 
-Quite a lot of this change is currently in RMK's trees, the rest is just
-being finalised for submission next week.
+Did you verify the following is broken? :
 
-I might be interested in taking the platform definitions into my tree
-as the registers should be usable either for libata or ide.
- 
-> DISCLAIMER: the fact of getting patches merged into atang tree means
-> that from now on they will be getting updates for changes happening
-> in atang tree and it should not be treated as an indication regarding
-> decisions taken by 'upstream' kernel trees
+	static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
+	{
+		unsigned int reg, ctrl, mask;
+
+		get_controller(irq, &ctrl, &mask);
+
+		switch (type) {
+		case IRQ_TYPE_EDGE_RISING:
+			/* Rising edge sensitive */
+			__set_irq_type(ctrl, mask, mask, mask);
+			/*
+			 * don't set irq_handler to handle_edge_irq here
+		         * as handle_level_irq can handle edge sensitive
+		         * irqs just fine.  Of course the controller
+		         * needs to be setup for edge irqs to get any
+		         * difference to IRQ_TYPE_LEVEL_HIGH.
+			 * See
+			 * http://mid.gmane.org/20091007102836.GA27860 at flint.arm.linux.org.uk
+			 * for some details
+			 */
+			break;
+
+		case IRQ_TYPE_EDGE_FALLING:
+			/* Falling edge sensitive */
+			__set_irq_type(ctrl, mask, 0, mask);
+			/* don't set irq_handler to handle_edge_irq here */
+			break;
+
+		case IRQ_TYPE_LEVEL_LOW:
+			/* Low level sensitive */
+			__set_irq_type(ctrl, mask, 0, 0);
+			...
+
+	}
+
+	...
+
+	void __init lpc32xx_init_irq(void)
+	{
+		...
+		for (i = 0; i < NR_IRQS; i++) {
+			set_irq_flags(i, IRQF_VALID);
+			set_irq_chip(i, &lpc32xx_irq_chip);
+			/*
+			 * use handle_level_irq for edge and level
+ 			 * triggered irqs
+			 */
+			set_irq_handler(irq, handle_level_irq);
+		}
+		...
+	}
+	
+
+> > > > Does this work without NO_HZ?  I though you need to setup a periodic
+> > > > mode with CONFIG_HZ irqs per second first?
+> > >
+> > > This is handled in the clockevents handler. It will setup the driver
+> > > for the next event in the set_next_event callback. I believe the
+> > > current CONFIG_HZ rate is set to 100.
+> > Hmmm:
+> > 
+> > 	~/gsrc/linux-2.6/arch/arm/mach-lpc32xx$ grep HZ *
+> > 	~/gsrc/linux-2.6/arch/arm/mach-lpc32xx$
+> > 
 > 
-> 
-> The following changes since commit 18c77417cbb9c595935d5ccb2e55309f0fb75a06:
->   Bartlomiej Zolnierkiewicz (1):
->         ide: remove hwif_chipset_t type
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bart/misc.git atang-v4.4
-> 
-> Thomas Abraham (8):
->       S3C64XX: Add physical address definition for Compact Flash controller.
->       S3C64XX: Add MEM_SYS_CFG register definition.
->       S3C64XX: Add IDE controller register definitions.
->       S3C64XX: Add clock source definition for IDE controller.
->       S3C64XX: Add platform data and driver resources for IDE controller driver.
->       S3C6410: Add platform data for S3C IDE controller driver
->       S3C64XX: Include IDE device code in compilation.
->       drivers/staging: Add Samsung S3C IDE controller driver
-> 
-> Thomas Chou (1):
->       drivers/staging: New PATA driver for Altera CompactFlash.
-> 
->  arch/arm/mach-s3c6400/include/mach/map.h        |    4 +
->  arch/arm/mach-s3c6410/mach-smdk6410.c           |   14 +-
->  arch/arm/plat-s3c/include/plat/devs.h           |    1 +
->  arch/arm/plat-s3c/include/plat/ide.h            |   36 +
->  arch/arm/plat-s3c/include/plat/regs-ide.h       |   56 ++
->  arch/arm/plat-s3c64xx/Makefile                  |    1 +
->  arch/arm/plat-s3c64xx/clock.c                   |    6 +
->  arch/arm/plat-s3c64xx/dev-ide.c                 |   88 +++
->  arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    3 +
->  drivers/staging/Kconfig                         |    4 +
->  drivers/staging/Makefile                        |    2 +
->  drivers/staging/pata_altera_cf/Kconfig          |   11 +
->  drivers/staging/pata_altera_cf/Makefile         |    1 +
->  drivers/staging/pata_altera_cf/TODO             |    5 +
->  drivers/staging/pata_altera_cf/pata_altera_cf.c |  582 ++++++++++++++++
->  drivers/staging/s3c-ide/Kconfig                 |    8 +
->  drivers/staging/s3c-ide/Makefile                |    1 +
->  drivers/staging/s3c-ide/TODO                    |    6 +
->  drivers/staging/s3c-ide/s3c-ide.c               |  822 +++++++++++++++++++++++
->  19 files changed, 1650 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/plat-s3c/include/plat/ide.h
->  create mode 100644 arch/arm/plat-s3c/include/plat/regs-ide.h
->  create mode 100644 arch/arm/plat-s3c64xx/dev-ide.c
->  create mode 100644 drivers/staging/pata_altera_cf/Kconfig
->  create mode 100644 drivers/staging/pata_altera_cf/Makefile
->  create mode 100644 drivers/staging/pata_altera_cf/TODO
->  create mode 100644 drivers/staging/pata_altera_cf/pata_altera_cf.c
->  create mode 100644 drivers/staging/s3c-ide/Kconfig
->  create mode 100644 drivers/staging/s3c-ide/Makefile
->  create mode 100644 drivers/staging/s3c-ide/TODO
->  create mode 100644 drivers/staging/s3c-ide/s3c-ide.c
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> CONFIG_HZ is defined in the phy3250_defconfig file in arch/arms/configs.
+> It's actually used in the clock events driver and passes the next tick delta
+> to the timer driver callback. The timer driver itself doesn't know the tick
+> rate or even the value of HZ - it's in the higher layers. Note this timer
+> driver also works fine with NO_HZ. Sorry about the confusion on this.
+Probably it's really just me who is confused, but I wondered if this
+works *without* NO_HZ as I thought the timer init function is supposed
+to set up a HZ tick.
+
+Best regards
+Uwe
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
