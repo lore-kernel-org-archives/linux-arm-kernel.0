@@ -1,79 +1,92 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 5 Feb 2010 09:38:43 -0800
-Subject: [PATCH 08/25] imx/mx1: rename files defining a machine to
-	mach-$mach.c
-In-Reply-To: <20100204084513.GB5380@pengutronix.de>
-References: <1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-7-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100204012916.GC5274@k2> <20100204084513.GB5380@pengutronix.de>
-Message-ID: <20100205173843.GA4791@k2>
+From: amckay@iders.ca (Andrew)
+Date: Fri, 05 Feb 2010 10:49:58 -0600
+Subject: Compiler for Atmel AT91SAMG20
+Message-ID: <4B6C4C36.9030800@iders.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Feb 04, Uwe Kleine-K?nig wrote:
-> Hello Amit,
-> 
-> On Wed, Feb 03, 2010 at 05:29:16PM -0800, Amit Kucheria wrote:
-> > On 10 Jan 08, Uwe Kleine-K?nig wrote:
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-> > > Cc: Darius Augulis <augulis.darius@gmail.com>
-> > > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> > > ---
-> > >  arch/arm/mach-mx1/Makefile                      |    4 ++--
-> > >  arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c}   |    2 +-
-> > >  arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} |    2 +-
-> > >  3 files changed, 4 insertions(+), 4 deletions(-)
-> > >  rename arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c} (98%)
-> > >  rename arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} (98%)
-> > 
-> > Rethinking about this (based on a similar request for my i.MX5 submission), I
-> > think renaming the boards to mach-* is a bad idea.
-> > 
-> > Other SoCs (davinci, omap, msm, nomadik, etc.) use the board-* convention. We
-> > already use mach-* for the SoC directory names under arch/arm/. Naming the
-> > boards with mach-* will just cause more confusion.
-> Hmmm
-> 
-> I still prefer mach-* as the corresponding Kconfig variables are named
-> MACH_* and there is no unified meaning of "board".  For (I think) most
-> people here board describes the whole machine.  For some (e.g. me) a
-> board might only be a PCB where you have to plug in a module that comes
-> with the SoC.
-> (http://www.digi.com/products/model.jsp?lid=EN&pgid=37&pfid=19&mtid=2070&amtid=2070&pm=Y)
-> 
-> It think machine is precise for all of us.
+Hello,
 
-Perhaps. But I still think of arch/arm/mach-* as the SoC platform and
-arch/arm/mach-*/board-* as the various boards.
+I'm having an issue with the compiler that I'm using for building a 
+Kernel for my Atmel AT91SAM9G20 processor.  I had a problem with 
+iptables.  When I run the command it reports an error of "getsockopt 
+failed strangely: Invalid argument".  I traced the problem to Kernel 
+space and it not being happy with the size of the struct passed to 
+kernel space.  In this case userspace thinks that the ipt_get_revision 
+struct is 32 bytes, and the Kernel thinks it is 30 bytes. 
 
-arch/arm/mach-*/mach-* is confusing every way you look at it. I'd rather
-leave it alone than change the names to mach-*.
+ From net/ipv4/netfilter/ip_tables.c:
 
-(Shrug) Just my thoughts.
+static int
+do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
+{
+        int ret;
 
-> And note the selecting Kconfig symbol for arch/arm/mach-omap is
-> ARCH_OMAP.  Ditto we have ARCH_DAVINCI, ARCH_MSM and ARCH_NOMADIK.
-> So we could rename these to arch-omap etc.  But then this conflicts with
-> the toplevel arch directory!?
+        if (!capable(CAP_NET_ADMIN))
+                return -EPERM;
 
-I wouldn't got that far.
+        switch (cmd) {
+        case IPT_SO_GET_INFO:
+                ret = get_info(sock_net(sk), user, len, 0);
+                break;
 
-> Best regards
-> Uwe
+        case IPT_SO_GET_ENTRIES:
+                ret = get_entries(sock_net(sk), user, len);
+                break;
 
-Cheers,
-Amit
+        case IPT_SO_GET_REVISION_MATCH:
+        case IPT_SO_GET_REVISION_TARGET: {
+                struct ipt_get_revision rev;
+                int target;
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+                if (*len != sizeof(rev)) {
+                        printk("%d != %d\n", *len, sizeof(rev));
+                        printk("ipt_get_revision is different sizes\n");
+                        ret = -EINVAL;
+                        break;
+                }
+                if (copy_from_user(&rev, user, sizeof(rev)) != 0) {
+                        ret = -EFAULT;
+                        break;
+                }
+
+                if (cmd == IPT_SO_GET_REVISION_TARGET)
+                        target = 1;
+                else
+                        target = 0;
+
+                try_then_request_module(xt_find_revision(AF_INET, rev.name,
+                                                         rev.revision,
+                                                         target, &ret),
+                                        "ipt_%s", rev.name);
+                break;
+        }
+
+        default:
+                duprintf("do_ipt_get_ctl: unknown request %i\n", cmd);
+                ret = -EINVAL;
+        }
+
+        return ret;
+}
+
+
+The compiler I'm using for the Kernel (Code Sourcery's GNU 
+cross-toolchain arm-2008q3-66-arm-none-eabi) is set to pack structs by 
+default, and the compilers that I use for userspace applications do not 
+pack structs.
+
+I would prefer to have the compiler I use for the Kernel to not pack 
+structs as all of our other toolchains don't do this.  Can anyone 
+recommend another compiler for building Kernels for the AT91SAM9G20 
+processor?  Or is there a way to tell the compiler to not pack structs 
+when building the Kernel?  I tried adding -fpack-struct=4 to the 
+KBUILD_CFLAGS but it didn't seem to make a difference on how bit the 
+Kernel thinks the struct is.
+
+My other option is to compile a glibc library for the Code Sourcery 
+toolchain so I can build userspace applications with pack structs, but I 
+would prefer not to do this.
+
+Andrew McKay
+Iders Inc.
