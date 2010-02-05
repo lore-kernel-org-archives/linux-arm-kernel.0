@@ -1,38 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 4 Feb 2010 16:45:41 -0800
-Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
-Message-ID: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 5 Feb 2010 05:26:55 +0100
+Subject: [PXA320] How to find  I/O registers, base address of ASIX
+	ethernet chip?
+In-Reply-To: <19621265275300@webmail108.yandex.ru>
+References: <19621265275300@webmail108.yandex.ru>
+Message-ID: <20100205042655.GR28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 31cec413e534520111716802833675f53ac99b0b
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Thu Feb 4 16:41:28 2010 -0800
+On Thu, Feb 04, 2010 at 12:21:40PM +0300, Dennis Semakin wrote:
+> Configuration:
+> Computer module is Toradex Colibri PXA320.
+> Board is Colibri Evaluation Board.
+> 
+> Obviously, to access the I/O register of network card, we need to map them into memory, using the ioremap() function.
+> To do this driver (ax88796.c) use platform_get_resource() function to get the physical address of the I/O registers from the board definition (arch/arm/mach-pxa/colibri-pxa320.c). This function returns a pointer to a struct resource, which contains two interesting fields : start and end (both are physical address).
+> Then call ioremap function to remap the memory area returned by platform_get_resource.
+> Right?
+> 
+> Ok. When I start kernel on my board, kernel loading stops on network initialization during call to the address resource.start.
+> So, what could I do if the address (field start in resource structure) is not valid?
+> Can I find it? (I mean address) Maybe I should ask something: where are ethernet chip I/O registers mapped in the memory?
 
-    input: schedule corgi_ssp and corgi_ts to be removed
+The addresses passed to the driver is the I/O area of the chip select
+signal used for the Ethernet chip. This setting should be alright, as it
+worked well for me.
 
-    Cc: Richard Purdie <rpurdie@rpsys.net>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+If your kernel hangs when accessing this area, you most probably haven't
+set up your static bus correctly. The bootloader is in charge of doing
+this, and the correct value for CSADRCFG2 is 0x0032C809.
 
-diff --git a/Documentation/feature-removal-schedule.txt
-b/Documentation/feature-removal-schedule.txt
-index 5860583..e16529e 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -554,3 +554,15 @@ Why:	We now have a generic GPIO based matrix
-keyboard driver that
- 	and so are difficult to maintain.
- Who:	Eric Miao <eric.y.miao@gmail.com>
+Also see http://openpxa.sourceforge.net/ for patches to U-Boot and more
+information about replacing the native bootloader the modules ships
+with.
 
-+----------------------------
-+
-+What:	corgi_ssp and corgi_ts driver
-+When:	2.6.35
-+Files:	arch/arm/mach-pxa/corgi_ssp.c, drivers/input/touchscreen/corgi_ts.c
-+Why:	The corgi touchscreen is now deprecated in favour of the generic
-+	ads7846.c driver. The noise reduction technique used in corgi_ts.c
-+	that to wait til vsync before ADC sampling is also inte grated into
-+	ads7846 driver now. Provided that the original driver is no generic
-+	and difficult to maintain, will be removed later.
-+Who:	Eric Miao <eric.y.miao@gmail.com>
-+
+Daniel
