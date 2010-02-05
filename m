@@ -1,172 +1,95 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 05 Feb 2010 20:14:49 +0900
-Subject: [PATCH 01/06] ARM: SuperH Mobile ARM, sh7367 and G3EVM support V2
+Date: Fri, 05 Feb 2010 20:14:58 +0900
+Subject: [PATCH 02/06] ARM: Add sh7377 and G4EVM support V2
 In-Reply-To: <20100205111440.17065.33296.sendpatchset@rxone.opensource.se>
 References: <20100205111440.17065.33296.sendpatchset@rxone.opensource.se>
-Message-ID: <20100205111449.17065.11983.sendpatchset@rxone.opensource.se>
+Message-ID: <20100205111458.17065.4898.sendpatchset@rxone.opensource.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-This patch is V2 of the SuperH Mobile ARM base support together
-with sh7367 CPU and G3EVM board support. Only timer, serial
-console and NOR flash are supported at this point. Patches for
-the interrupt controller, pinmux support, clock framework and
+This patch is V2 of base support for the SuperH Mobile ARM
+processor sh7372 together with AP4EVB board support. Only timer,
+serial console and NOR flash are supported at this point. Support
+for the interrupt controller, pinmux support, clock framework and
 runtime pm will be submitted as feature patches on top of this.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
  Changes since V1:
- - sorted entries arch/arm/Kconfig
+ - dropped mach-type entry
  - dropped ioremap flag in sh-sci platform data
 
- arch/arm/Kconfig                                  |    7 
- arch/arm/Makefile                                 |    1 
- arch/arm/mach-shmobile/Kconfig                    |   53 ++++
- arch/arm/mach-shmobile/Makefile                   |   12 +
- arch/arm/mach-shmobile/Makefile.boot              |    9 
- arch/arm/mach-shmobile/board-g3evm.c              |  127 +++++++++++
- arch/arm/mach-shmobile/clock-sh7367.c             |   89 +++++++
- arch/arm/mach-shmobile/include/mach/clkdev.h      |    7 
- arch/arm/mach-shmobile/include/mach/common.h      |   11 
- arch/arm/mach-shmobile/include/mach/dma.h         |    1 
- arch/arm/mach-shmobile/include/mach/entry-macro.S |   39 +++
- arch/arm/mach-shmobile/include/mach/gpio.h        |    1 
- arch/arm/mach-shmobile/include/mach/hardware.h    |    7 
- arch/arm/mach-shmobile/include/mach/io.h          |    9 
- arch/arm/mach-shmobile/include/mach/irqs.h        |   10 
- arch/arm/mach-shmobile/include/mach/memory.h      |    7 
- arch/arm/mach-shmobile/include/mach/system.h      |   14 +
- arch/arm/mach-shmobile/include/mach/timex.h       |    6 
- arch/arm/mach-shmobile/include/mach/uncompress.h  |   21 +
- arch/arm/mach-shmobile/include/mach/vmalloc.h     |    6 
- arch/arm/mach-shmobile/setup-sh7367.c             |  241 +++++++++++++++++++++
- arch/arm/mach-shmobile/timer.c                    |   46 ++++
- 22 files changed, 724 insertions(+)
+ arch/arm/mach-shmobile/Kconfig               |   14 +
+ arch/arm/mach-shmobile/Makefile              |    2 
+ arch/arm/mach-shmobile/board-ap4evb.c        |  127 +++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    4 
+ arch/arm/mach-shmobile/setup-sh7372.c        |  241 ++++++++++++++++++++++++++
+ 5 files changed, 388 insertions(+)
 
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2010-02-05 13:59:05.000000000 +0900
-@@ -608,6 +608,11 @@ config ARCH_MSM
- 	  stack and controls some vital subsystems
- 	  (clock and power control, etc).
+--- 0003/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2010-02-05 14:04:20.000000000 +0900
+@@ -18,6 +18,14 @@ config ARCH_SH7377
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
  
-+config ARCH_SHMOBILE
-+	bool "Renesas SH-Mobile"
-+	help
-+	  Support for Renesas's SH-Mobile ARM platforms
-+
- config ARCH_RPC
- 	bool "RiscPC"
- 	select ARCH_ACORN
-@@ -857,6 +862,8 @@ endif
- 
- source "arch/arm/mach-s5p6440/Kconfig"
- 
-+source "arch/arm/mach-shmobile/Kconfig"
-+
- source "arch/arm/plat-stmp3xxx/Kconfig"
- 
- if ARCH_S5PC1XX
---- 0001/arch/arm/Makefile
-+++ work/arch/arm/Makefile	2010-02-05 13:52:58.000000000 +0900
-@@ -166,6 +166,7 @@ machine-$(CONFIG_ARCH_S5P6440)		:= s5p64
- machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
- machine-$(CONFIG_ARCH_SA1100)		:= sa1100
- machine-$(CONFIG_ARCH_SHARK)		:= shark
-+machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
- machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
- machine-$(CONFIG_ARCH_STMP37XX)		:= stmp37xx
- machine-$(CONFIG_ARCH_U300)		:= u300
---- /dev/null
-+++ work/arch/arm/mach-shmobile/Kconfig	2010-02-05 13:53:00.000000000 +0900
-@@ -0,0 +1,53 @@
-+if ARCH_SHMOBILE
-+
-+comment "SH-Mobile System Type"
-+
-+config ARCH_SH7367
-+	bool "SH-Mobile SH7367 (G3)"
-+	select CPU_V6
++config ARCH_SH7372
++	bool "SH-Mobile SH7372 (AP4)"
++	select CPU_V7
 +	select HAVE_CLK
 +	select COMMON_CLKDEV
 +	select GENERIC_TIME
 +	select GENERIC_CLOCKEVENTS
 +
-+comment "SH-Mobile Board Type"
+ comment "SH-Mobile Board Type"
+ 
+ config MACH_G3EVM
+@@ -28,6 +36,10 @@ config MACH_G4EVM
+ 	bool "G4EVM board"
+ 	depends on ARCH_SH7377
+ 
++config MACH_AP4EVB
++	bool "AP4EVB board"
++	depends on ARCH_SH7372
 +
-+config MACH_G3EVM
-+	bool "G3EVM board"
-+	depends on ARCH_SH7367
-+
-+comment "SH-Mobile System Configuration"
-+
-+menu "Memory configuration"
-+
-+config MEMORY_START
-+	hex "Physical memory start address"
-+	default "0x50000000" if MACH_G3EVM
-+	default "0x00000000"
-+	---help---
-+	  Tweak this only when porting to a new machine which does not
-+	  already have a defconfig. Changing it from the known correct
-+	  value on any of the known systems will only lead to disaster.
-+
-+config MEMORY_SIZE
-+	hex "Physical memory size"
-+	default "0x08000000" if MACH_G3EVM
-+	default "0x04000000"
-+	help
-+	  This sets the default memory size assumed by your kernel. It can
-+	  be overridden as normal by the 'mem=' argument on the kernel command
-+	  line.
-+
-+endmenu
-+
-+menu "Timer and clock configuration"
-+
-+config SH_TIMER_CMT
-+	bool "CMT timer driver"
-+	default y
-+	help
-+	  This enables build of the CMT timer driver.
-+
-+endmenu
-+
-+endif
+ comment "SH-Mobile System Configuration"
+ 
+ menu "Memory configuration"
+@@ -36,6 +48,7 @@ config MEMORY_START
+ 	hex "Physical memory start address"
+ 	default "0x50000000" if MACH_G3EVM
+ 	default "0x40000000" if MACH_G4EVM
++	default "0x40000000" if MACH_AP4EVB
+ 	default "0x00000000"
+ 	---help---
+ 	  Tweak this only when porting to a new machine which does not
+@@ -46,6 +59,7 @@ config MEMORY_SIZE
+ 	hex "Physical memory size"
+ 	default "0x08000000" if MACH_G3EVM
+ 	default "0x08000000" if MACH_G4EVM
++	default "0x10000000" if MACH_AP4EVB
+ 	default "0x04000000"
+ 	help
+ 	  This sets the default memory size assumed by your kernel. It can
+--- 0003/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2010-02-05 14:04:20.000000000 +0900
+@@ -8,7 +8,9 @@ obj-y				:= timer.o
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o
+ obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7367.o
++obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7367.o
+ 
+ # Board objects
+ obj-$(CONFIG_MACH_G3EVM)	+= board-g3evm.o
+ obj-$(CONFIG_MACH_G4EVM)	+= board-g4evm.o
++obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
 --- /dev/null
-+++ work/arch/arm/mach-shmobile/Makefile	2010-02-05 13:53:00.000000000 +0900
-@@ -0,0 +1,12 @@
-+#
-+# Makefile for the linux kernel.
-+#
-+
-+# Common objects
-+obj-y				:= timer.o
-+
-+# CPU objects
-+obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o
-+
-+# Board objects
-+obj-$(CONFIG_MACH_G3EVM)	+= board-g3evm.o
---- /dev/null
-+++ work/arch/arm/mach-shmobile/Makefile.boot	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,9 @@
-+__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
-+		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-+
-+   zreladdr-y   := $(__ZRELADDR)
-+
-+# Unsupported legacy stuff
-+#
-+#params_phys-y (Instead: Pass atags pointer in r2)
-+#initrd_phys-y (Instead: Use compiled-in initramfs)
---- /dev/null
-+++ work/arch/arm/mach-shmobile/board-g3evm.c	2010-02-05 13:52:59.000000000 +0900
++++ work/arch/arm/mach-shmobile/board-ap4evb.c	2010-02-05 14:04:20.000000000 +0900
 @@ -0,0 +1,127 @@
 +/*
-+ * G3EVM board support
++ * AP4EVB board support
 + *
 + * Copyright (C) 2010  Magnus Damm
 + * Copyright (C) 2008  Yoshihiro Shimoda
@@ -252,11 +175,11 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +};
 +
 +
-+static struct platform_device *g3evm_devices[] __initdata = {
++static struct platform_device *ap4evb_devices[] __initdata = {
 +	&nor_flash_device,
 +};
 +
-+static struct map_desc g3evm_io_desc[] __initdata = {
++static struct map_desc ap4evb_io_desc[] __initdata = {
 +	/* create a 1:1 entity map for 0xe6xxxxxx
 +	 * used by CPGA, INTC and PFC.
 +	 */
@@ -268,305 +191,46 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	},
 +};
 +
-+static void __init g3evm_map_io(void)
++static void __init ap4evb_map_io(void)
 +{
-+	iotable_init(g3evm_io_desc, ARRAY_SIZE(g3evm_io_desc));
++	iotable_init(ap4evb_io_desc, ARRAY_SIZE(ap4evb_io_desc));
 +
 +	/* setup early devices and clocks here as well */
-+	sh7367_add_early_devices();
-+	sh7367_clock_init();
++	sh7372_add_early_devices();
++	sh7367_clock_init(); /* use g3 clocks for now */
 +}
 +
-+static void __init g3evm_init(void)
++static void __init ap4evb_init(void)
 +{
-+	sh7367_add_standard_devices();
++	sh7372_add_standard_devices();
 +
-+	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
++	platform_add_devices(ap4evb_devices, ARRAY_SIZE(ap4evb_devices));
 +}
 +
-+MACHINE_START(G3EVM, "g3evm")
++MACHINE_START(AP4EVB, "ap4evb")
 +	.phys_io	= 0xe6000000,
 +	.io_pg_offst	= ((0xe6000000) >> 18) & 0xfffc,
-+	.map_io		= g3evm_map_io,
-+	.init_irq	= sh7367_init_irq,
-+	.init_machine	= g3evm_init,
++	.map_io		= ap4evb_map_io,
++	.init_irq	= sh7372_init_irq,
++	.init_machine	= ap4evb_init,
 +	.timer		= &shmobile_timer,
 +MACHINE_END
+--- 0003/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-02-05 14:04:20.000000000 +0900
+@@ -12,4 +12,8 @@ extern void sh7377_init_irq(void);
+ extern void sh7377_add_early_devices(void);
+ extern void sh7377_add_standard_devices(void);
+ 
++extern void sh7372_init_irq(void);
++extern void sh7372_add_early_devices(void);
++extern void sh7372_add_standard_devices(void);
++
+ #endif /* __ARCH_MACH_COMMON_H */
 --- /dev/null
-+++ work/arch/arm/mach-shmobile/clock-sh7367.c	2010-02-05 13:53:00.000000000 +0900
-@@ -0,0 +1,89 @@
-+/*
-+ * Preliminary clock framework support for sh7367
-+ *
-+ * Copyright (C) 2010  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/clk.h>
-+
-+struct clk {
-+	const char *name;
-+	unsigned long rate;
-+};
-+
-+#include <asm/clkdev.h>
-+
-+int __clk_get(struct clk *clk)
-+{
-+	return 1;
-+}
-+EXPORT_SYMBOL(__clk_get);
-+
-+void __clk_put(struct clk *clk)
-+{
-+}
-+EXPORT_SYMBOL(__clk_put);
-+
-+
-+int clk_enable(struct clk *clk)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_enable);
-+
-+void clk_disable(struct clk *clk)
-+{
-+}
-+EXPORT_SYMBOL(clk_disable);
-+
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	return clk ? clk->rate : 0;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
-+/* a static peripheral clock for now - enough to get sh-sci working */
-+static struct clk peripheral_clk = {
-+	.name	    = "peripheral_clk",
-+	.rate	    = 48000000,
-+};
-+
-+/* a static rclk for now - enough to get sh_cmt working */
-+static struct clk r_clk = {
-+	.name	    = "r_clk",
-+	.rate	    = 32768,
-+};
-+
-+static struct clk_lookup lookups[] = {
-+	{
-+		.clk = &peripheral_clk,
-+	}, {
-+		.clk = &r_clk,
-+	}
-+};
-+
-+void __init sh7367_clock_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
-+		lookups[i].con_id = lookups[i].clk->name;
-+		clkdev_add(&lookups[i]);
-+	}
-+}
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/clkdev.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_MACH_CLKDEV_H
-+#define __ASM_MACH_CLKDEV_H
-+
-+int __clk_get(struct clk *clk);
-+void __clk_put(struct clk *clk);
-+
-+#endif /* __ASM_MACH_CLKDEV_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,11 @@
-+#ifndef __ARCH_MACH_COMMON_H
-+#define __ARCH_MACH_COMMON_H
-+
-+extern struct sys_timer shmobile_timer;
-+
-+extern void sh7367_init_irq(void);
-+extern void sh7367_add_early_devices(void);
-+extern void sh7367_add_standard_devices(void);
-+extern void sh7367_clock_init(void);
-+
-+#endif /* __ARCH_MACH_COMMON_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/dma.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1 @@
-+/* empty */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/entry-macro.S	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2008 Renesas Solutions Corp.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+
-+	.macro  disable_fiq
-+	.endm
-+
-+	.macro  get_irqnr_preamble, base, tmp
-+	.endm
-+
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
-+
-+	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	ldr     \base, =INTFLGA
-+	ldr     \irqnr, [\base]
-+	cmp	\irqnr, #0
-+	beq	1000f
-+	/* intevt to irq number */
-+	lsr	\irqnr, \irqnr, #0x5
-+	subs	\irqnr, \irqnr, #16
-+
-+1000:
-+	.endm
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/gpio.h	2010-02-05 13:53:00.000000000 +0900
-@@ -0,0 +1 @@
-+/* empty */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/hardware.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_MACH_HARDWARE_H
-+#define __ASM_MACH_HARDWARE_H
-+
-+/* INTFLGA register - used by low level interrupt code in entry-macro.S */
-+#define INTFLGA			0xe6980018
-+
-+#endif /* __ASM_MACH_HARDWARE_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/io.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,9 @@
-+#ifndef __ASM_MACH_IO_H
-+#define __ASM_MACH_IO_H
-+
-+#define IO_SPACE_LIMIT		0xffffffff
-+
-+#define __io(a)			((void __iomem *)(a))
-+#define __mem_pci(a)		(a)
-+
-+#endif /* __ASM_MACH_IO_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/irqs.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,10 @@
-+#ifndef __ASM_MACH_IRQS_H
-+#define __ASM_MACH_IRQS_H
-+
-+#define NR_IRQS         512
-+#define NR_IRQS_LEGACY  8
-+
-+#define evt2irq(evt)		(((evt) >> 5) - 16)
-+#define irq2evt(irq)		(((irq) + 16) << 5)
-+
-+#endif /* __ASM_MACH_IRQS_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/memory.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_MACH_MEMORY_H
-+#define __ASM_MACH_MEMORY_H
-+
-+#define PHYS_OFFSET	UL(CONFIG_MEMORY_START)
-+#define MEM_SIZE	UL(CONFIG_MEMORY_SIZE)
-+
-+#endif /* __ASM_MACH_MEMORY_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/system.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,14 @@
-+#ifndef __ASM_ARCH_SYSTEM_H
-+#define __ASM_ARCH_SYSTEM_H
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+static inline void arch_reset(char mode, const char *cmd)
-+{
-+	cpu_reset(0);
-+}
-+
-+#endif
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/timex.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,6 @@
-+#ifndef __ASM_MACH_TIMEX_H
-+#define __ASM_MACH_TIMEX_H
-+
-+#define CLOCK_TICK_RATE		1193180 /* unused i8253 PIT value */
-+
-+#endif /* __ASM_MACH_TIMEX_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/uncompress.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,21 @@
-+#ifndef __ASM_MACH_UNCOMPRESS_H
-+#define __ASM_MACH_UNCOMPRESS_H
-+
-+/*
-+ * This does not append a newline
-+ */
-+static void putc(int c)
-+{
-+}
-+
-+static inline void flush(void)
-+{
-+}
-+
-+static void arch_decomp_setup(void)
-+{
-+}
-+
-+#define arch_decomp_wdog()
-+
-+#endif /* __ASM_MACH_UNCOMPRESS_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/vmalloc.h	2010-02-05 13:52:59.000000000 +0900
-@@ -0,0 +1,6 @@
-+#ifndef __ASM_MACH_VMALLOC_H
-+#define __ASM_MACH_VMALLOC_H
-+
-+#define VMALLOC_END       (PAGE_OFFSET + 0x24000000)
-+
-+#endif /* __ASM_MACH_VMALLOC_H */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/setup-sh7367.c	2010-02-05 14:00:16.000000000 +0900
++++ work/arch/arm/mach-shmobile/setup-sh7372.c	2010-02-05 14:04:30.000000000 +0900
 @@ -0,0 +1,241 @@
 +/*
-+ * sh7367 processor support
++ * sh7372 processor support
 + *
 + * Copyright (C) 2010  Magnus Damm
 + * Copyright (C) 2008  Yoshihiro Shimoda
@@ -736,7 +400,7 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	.num_resources	= ARRAY_SIZE(cmt10_resources),
 +};
 +
-+static struct platform_device *sh7367_early_devices[] __initdata = {
++static struct platform_device *sh7372_early_devices[] __initdata = {
 +	&scif0_device,
 +	&scif1_device,
 +	&scif2_device,
@@ -747,22 +411,22 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	&cmt10_device,
 +};
 +
-+void __init sh7367_add_standard_devices(void)
++void __init sh7372_add_standard_devices(void)
 +{
-+	platform_add_devices(sh7367_early_devices,
-+			     ARRAY_SIZE(sh7367_early_devices));
++	platform_add_devices(sh7372_early_devices,
++			    ARRAY_SIZE(sh7372_early_devices));
 +}
 +
-+#define SYMSTPCR2 0xe6158048
-+#define SYMSTPCR2_CMT1 (1 << 29)
++#define SMSTPCR3 0xe615013c
++#define SMSTPCR3_CMT1 (1 << 29)
 +
-+void __init sh7367_add_early_devices(void)
++void __init sh7372_add_early_devices(void)
 +{
 +	/* enable clock to CMT1 */
-+	__raw_writel(__raw_readl(SYMSTPCR2) & ~SYMSTPCR2_CMT1, SYMSTPCR2);
++	__raw_writel(__raw_readl(SMSTPCR3) & ~SMSTPCR3_CMT1, SMSTPCR3);
 +
-+	early_platform_add_devices(sh7367_early_devices,
-+				   ARRAY_SIZE(sh7367_early_devices));
++	early_platform_add_devices(sh7372_early_devices,
++				   ARRAY_SIZE(sh7372_early_devices));
 +}
 +
 +enum {
@@ -799,59 +463,10 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +	{ 0xe6940034, 0, 16, 4, /* IPRNA */ { SCIFB, SCIFA5, 0, 0 } },
 +};
 +
-+static DECLARE_INTC_DESC(intc_desc, "sh7367", vectors, NULL, mask_registers,
++static DECLARE_INTC_DESC(intc_desc, "sh7372", vectors, NULL, mask_registers,
 +			 prio_registers, NULL);
 +
-+void __init sh7367_init_irq(void)
++void __init sh7372_init_irq(void)
 +{
 +	register_intc_controller(&intc_desc);
 +}
---- /dev/null
-+++ work/arch/arm/mach-shmobile/timer.c	2010-02-05 13:53:00.000000000 +0900
-@@ -0,0 +1,46 @@
-+/*
-+ * SH-Mobile Timer
-+ *
-+ * Copyright (C) 2010  Magnus Damm
-+ * Copyright (C) 2002 - 2009  Paul Mundt
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ *
-+ */
-+#include <linux/platform_device.h>
-+#include <asm/mach/time.h>
-+
-+static void __init shmobile_late_time_init(void)
-+{
-+	/*
-+	 * Make sure all compiled-in early timers register themselves.
-+	 *
-+	 * Run probe() for two "earlytimer" devices, these will be the
-+	 * clockevents and clocksource devices respectively. In the event
-+	 * that only a clockevents device is available, we -ENODEV on the
-+	 * clocksource and the jiffies clocksource is used transparently
-+	 * instead. No error handling is necessary here.
-+	 */
-+	early_platform_driver_register_all("earlytimer");
-+	early_platform_driver_probe("earlytimer", 2, 0);
-+}
-+
-+static void __init shmobile_timer_init(void)
-+{
-+	late_time_init = shmobile_late_time_init;
-+}
-+
-+struct sys_timer shmobile_timer = {
-+	.init		= shmobile_timer_init,
-+};
