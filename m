@@ -1,67 +1,26 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 05 Feb 2010 13:35:52 +0300
-Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
-In-Reply-To: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-References: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-Message-ID: <4B6BF488.3070107@ru.mvista.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 05 Feb 2010 10:46:24 +0000
+Subject: [PATCH] ARM: Correct the FPSCR bits setting when raising
+	exceptions
+In-Reply-To: <f17812d71002041045h5f6cbbe8vdf40dad11a693a5e@mail.gmail.com>
+References: <f17812d71002041045h5f6cbbe8vdf40dad11a693a5e@mail.gmail.com>
+Message-ID: <1265366784.7692.37.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2010-02-04 at 18:45 +0000, Eric Miao wrote:
+> On Thu, Jan 28, 2010 at 2:18 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > Commit c98929c07a removed the clearing of the FPSCR[31:28] bits from the
+> > vfp_raise_exceptions() function and the new bits are or'ed with the old
+> > FPSCR bits leading to unexpected results (the original commit was
+> > referring to the cumulative bits - FPSCR[4:0]).
+> >
+> 
+> What's the status of this patch? Looks like a sane fix to me and apparently
+> it seems Marvell cores are confused without this already.
 
-Eric Miao wrote:
+It was accepted by Russell and queued for mainline (patch 5909/1).
 
-> commit 31cec413e534520111716802833675f53ac99b0b
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Thu Feb 4 16:41:28 2010 -0800
->
->     input: schedule corgi_ssp and corgi_ts to be removed
->
->     Cc: Richard Purdie <rpurdie@rpsys.net>
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->   
-
-   Some grammar nitpicking...
-
-> diff --git a/Documentation/feature-removal-schedule.txt
-> b/Documentation/feature-removal-schedule.txt
-> index 5860583..e16529e 100644
-> --- a/Documentation/feature-removal-schedule.txt
-> +++ b/Documentation/feature-removal-schedule.txt
-> @@ -554,3 +554,15 @@ Why:	We now have a generic GPIO based matrix
-> keyboard driver that
->  	and so are difficult to maintain.
->  Who:	Eric Miao <eric.y.miao@gmail.com>
->
-> +----------------------------
-> +
-> +What:	corgi_ssp and corgi_ts driver
-> +When:	2.6.35
-> +Files:	arch/arm/mach-pxa/corgi_ssp.c, drivers/input/touchscreen/corgi_ts.c
-> +Why:	The corgi touchscreen is now deprecated in favour of the generic
-> +	ads7846.c driver. The noise reduction technique used in corgi_ts.c
-> +	that to wait til vsync before ADC sampling is also
-
-   that's?
-
-
->  inte grated into
->   
-
-    integrated.
-
-> +	ads7846 driver now. Provided that the original driver is no generic
->   
-
-   not generic
-
-> +	and difficult to maintain, will be removed later.
->   
-
-   it will.
-
-> +Who:	Eric Miao <eric.y.miao@gmail.com>
-> +
->   
-
-WBR, Sergei
+-- 
+Catalin
