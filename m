@@ -1,37 +1,54 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 4 Feb 2010 16:41:28 -0800
-Subject: [PATCH 13/13] input: schedule corgi_ssp and corgi_ts to be removed
-Message-ID: <mailman.196.1265367892.2170.linux-arm-kernel@lists.infradead.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 05 Feb 2010 11:04:33 +0000
+Subject: [RFC PATCH] ARM: Change the mandatory barriers implementation
+In-Reply-To: <1265289330.28746.58.camel@pc1117.cambridge.arm.com>
+References: <4B6A131B.1070005@codeaurora.org>
+	<1265289330.28746.58.camel@pc1117.cambridge.arm.com>
+Message-ID: <1265367873.7692.52.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- Documentation/feature-removal-schedule.txt |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+On Thu, 2010-02-04 at 13:15 +0000, Catalin Marinas wrote:
+> On Thu, 2010-02-04 at 00:21 +0000, Abhijeet Dharmapurikar wrote:
+> > > The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+> > > systems for things like ordering Normal Non-cacheable memory accesses
+> > > with DMA transfer (via Device memory writes). The current implementation
+> > > uses dmb() for mb() and friends but this is not sufficient. The DMB only
+> > > ensures the ordering of accesses with regards to a single observer
+> > > accessing the same memory. If a DMA transfer is started by a write to
+> > > Device memory, the data to be transfered may not reach the main memory
+> > > (even if mapped as Normal Non-cacheable) before the device receives the
+> > > notification to begin the transfer. The only barrier that would help in
+> > > this situation is DSB which would completely drain the write buffers.
+> >
+> > On ARMv7, DMB guarantees that all accesses prior to DMB are observed by
+> > an observer if that observer sees any accesses _after_ the DMB. In this
+> > case, since DMA engine observes a write to itself( It is being written
+> > to and hence must observe the write) it should also see the writes to
+> > the buffers. A dmb() after the writes to buffer and before write to DMA
+> > engine should suffice.
+> 
+> I asked our processor architect for a clarification on the wording of
+> the DMB definition but the "all accesses" part most likely refer to
+> accesses to the same peripheral or memory block (but not together).
 
-diff --git a/Documentation/feature-removal-schedule.txt
-b/Documentation/feature-removal-schedule.txt
-index 5860583..e16529e 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -554,3 +554,15 @@ Why:	We now have a generic GPIO based matrix
-keyboard driver that
- 	and so are difficult to maintain.
- Who:	Eric Miao <eric.y.miao@gmail.com>
+I got some clarification and there is nothing wrong with the definition
+of the DMB. The catch here is that "observe" (as per the ARM ARM) is
+defined only for master accesses. The DMA engine in this case above does
+not "observe" the write to itself as this is a slave access to one of
+its memory-mapped ports.
 
-+----------------------------
-+
-+What:	corgi_ssp and corgi_ts driver
-+When:	2.6.35
-+Files:	arch/arm/mach-pxa/corgi_ssp.c, drivers/input/touchscreen/corgi_ts.c
-+Why:	The corgi touchscreen is now deprecated in favour of the generic
-+	ads7846.c driver. The noise reduction technique used in corgi_ts.c
-+	that's to wait til vsync before ADC sampling is also integrated into
-+	ads7846 driver now. Provided that the original driver is not generic
-+	and difficult to maintain, it will be removed later.
-+Who:	Eric Miao <eric.y.miao@gmail.com>
-+
---=20
-1.6.3.3
+So, the code below:
+
+	STR	[Normal non-cacheable]
+	DMB
+	STR	[Device]
+
+puts the first store in Group A (according to the DMB definition) and
+the second store in Group B but since the DMA device does not "observe"
+Group B in this case, there is no requirement for the ordering between
+the observability of the store to normal memory and the observability of
+the side-effects of the store to the DMA device.
+
+-- 
+Catalin
