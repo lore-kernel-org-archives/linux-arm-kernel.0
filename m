@@ -1,79 +1,107 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 5 Feb 2010 16:40:30 +0100
-Subject: [PATCH 1/5] mfd: clean code in max8925
-In-Reply-To: <771cded01002030501n698321ddw797aa29372afa744@mail.gmail.com>
-References: <771cded01002030501n698321ddw797aa29372afa744@mail.gmail.com>
-Message-ID: <20100205154029.GC3448@sortiz.org>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri,  5 Feb 2010 08:26:09 -0800
+Subject: [PATCHv3 0/7] Initial Freescale i.MX51 SoC support
+Message-ID: <cover.1265385421.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 03, 2010 at 08:01:55AM -0500, Haojian Zhuang wrote:
-> From eb0e868d65ec3b5ec01dad8d55899c906159dbf1 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 3 Feb 2010 15:37:23 -0500
-> Subject: [PATCH] mfd: clean code in max8925
-Patch applied, thanks. In the future, please add some more verbose changelogs.
+(Using Magnus Damm's template for introducing a new arch)
 
-Cheers,
-Samuel.
+This series of patches adds basic support for i.MX5 family to the kernel. This
+is just the bare minimum that brings up the board - sets up the clocks, IO
+with a serial port and timers.
 
- 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
->  include/linux/mfd/max8925.h |   17 -----------------
->  1 files changed, 0 insertions(+), 17 deletions(-)
-> 
-> diff --git a/include/linux/mfd/max8925.h b/include/linux/mfd/max8925.h
-> index 18c1844..5259dfe 100644
-> --- a/include/linux/mfd/max8925.h
-> +++ b/include/linux/mfd/max8925.h
-> @@ -158,11 +158,6 @@ enum {
->  #define TSC_IRQ_MASK			(0x03)
->  #define RTC_IRQ_MASK			(0x0c)
-> 
-> -#define MAX8925_GPM_NUM_IRQ		(40)
-> -#define MAX8925_ADC_NUM_IRQ		(8)
-> -#define MAX8925_NUM_IRQ			(MAX8925_GPM_NUM_IRQ	\
-> -					+ MAX8925_ADC_NUM_IRQ)
-> -
->  #define MAX8925_MAX_REGULATOR		(23)
-> 
->  #define MAX8925_NAME_SIZE		(32)
-> @@ -200,17 +195,11 @@ enum {
->  	MAX8925_NR_IRQS,
->  };
-> 
-> -struct max8925_irq {
-> -	irq_handler_t		handler;
-> -	void			*data;
-> -};
-> -
->  struct max8925_chip {
->  	struct device		*dev;
->  	struct i2c_client	*i2c;
->  	struct i2c_client	*adc;
->  	struct i2c_client	*rtc;
-> -	struct max8925_irq	irqs[MAX8925_NUM_IRQ];
->  	struct mutex		io_lock;
->  	struct mutex		irq_lock;
-> 
-> @@ -257,12 +246,6 @@ extern int max8925_bulk_write(struct i2c_client
-> *, int, int, unsigned char *);
->  extern int max8925_set_bits(struct i2c_client *, int, unsigned char,
->  			unsigned char);
-> 
-> -extern int max8925_request_irq(struct max8925_chip *, int,
-> -			irq_handler_t, void *);
-> -extern int max8925_free_irq(struct max8925_chip *, int);
-> -extern int max8925_mask_irq(struct max8925_chip *, int);
-> -extern int max8925_unmask_irq(struct max8925_chip *, int);
-> -
->  extern int max8925_device_init(struct max8925_chip *,
->  				struct max8925_platform_data *);
->  extern void max8925_device_exit(struct max8925_chip *);
-> -- 
-> 1.5.6.5
+Features:
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+  * Console: Serial console using pre-existing drivers/serial/imx.c
+  * Timer: Timer provided through arch/arm/plat-mxc/time.c
+  * Interrupts: New interrupt controller through arch/arm/plat-mxc/tzic.c
+  * Clocks: Minimal Clock framework to allow board boot up
+  * Defconfigs: mx51_defconfig provided
+
+Tested on a i.MX51-based Babbage 2.5 board.
+
+Git:
+
+repo: git://kernel.ubuntu.com/amitk/mx51-upstream.git mx51-baseport
+gitweb:
+http://kernel.ubuntu.com/git?p=amitk/mx51-upstream.git;a=shortlog;h=refs/heads/mx51-baseport
+
+Story:
+
+This is a result of dropping a lot of functionality from the existing
+Freescale codebase that is shipping as part of the Ubuntu ARM enablement. A
+lot of the code was refactored to use facilities that were already available
+upstream in arch/arm/plat-mxc/. The hope is to get this base port into
+mainline and then start working on mainlining the drivers.
+
+Changelog:
+
+V1: Initial submission of base port
+
+V2: - Split core code enabling i.MX51 and the babbage board
+    - Refactor timer code to use version 1 or 2 of timer (patch by Sascha)
+    - Fixes from review of V1
+
+V3: - Fixes from review of V2
+    - Merge the Driver Strength patch into the Core i.MX5 support
+    - Moved the fec patches out of this series into its own
+    - Merge the Kconfig/Makefiles into Babbage board support
+
+Regards,
+Amit
+
+Amit Kucheria (6):
+  mxc: TrustZone interrupt controller (TZIC) for Freescale i.MX5 family
+  mxc: changes to common plat-mxc code to add support for i.MX5
+  mxc: Core support for Freescale i.MX5 series
+  mxc: Add support for the Babbage board (i.MX5)
+  mxc: Add mx51_defconfig
+  mxc: MAINTAINERS: Add maintainer for mach-mx5
+
+Sascha Hauer (1):
+  mxc: refactor timer code to use timer versions
+
+ MAINTAINERS                                  |    6 +
+ arch/arm/Makefile                            |    1 +
+ arch/arm/configs/mx51_defconfig              | 1286 ++++++++++++++++++++++++++
+ arch/arm/mach-mx5/Kconfig                    |   17 +
+ arch/arm/mach-mx5/Makefile                   |    9 +
+ arch/arm/mach-mx5/Makefile.boot              |    3 +
+ arch/arm/mach-mx5/board-mx51_babbage.c       |   98 ++
+ arch/arm/mach-mx5/clock-mx51.c               |  825 +++++++++++++++++
+ arch/arm/mach-mx5/cpu.c                      |   47 +
+ arch/arm/mach-mx5/crm_regs.h                 |  583 ++++++++++++
+ arch/arm/mach-mx5/devices.c                  |   96 ++
+ arch/arm/mach-mx5/devices.h                  |    4 +
+ arch/arm/mach-mx5/mm.c                       |   89 ++
+ arch/arm/plat-mxc/Kconfig                    |   16 +
+ arch/arm/plat-mxc/Makefile                   |    3 +
+ arch/arm/plat-mxc/include/mach/common.h      |    5 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    9 +
+ arch/arm/plat-mxc/include/mach/entry-macro.S |   34 +-
+ arch/arm/plat-mxc/include/mach/hardware.h    |    4 +
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h  |  326 +++++++
+ arch/arm/plat-mxc/include/mach/iomux-v3.h    |    8 +-
+ arch/arm/plat-mxc/include/mach/irqs.h        |    9 +-
+ arch/arm/plat-mxc/include/mach/memory.h      |    3 +
+ arch/arm/plat-mxc/include/mach/mx51.h        |  454 +++++++++
+ arch/arm/plat-mxc/include/mach/mxc.h         |   13 +
+ arch/arm/plat-mxc/include/mach/timex.h       |    2 +
+ arch/arm/plat-mxc/time.c                     |   41 +-
+ arch/arm/plat-mxc/tzic.c                     |  172 ++++
+ 28 files changed, 4143 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/configs/mx51_defconfig
+ create mode 100644 arch/arm/mach-mx5/Kconfig
+ create mode 100644 arch/arm/mach-mx5/Makefile
+ create mode 100644 arch/arm/mach-mx5/Makefile.boot
+ create mode 100644 arch/arm/mach-mx5/board-mx51_babbage.c
+ create mode 100644 arch/arm/mach-mx5/clock-mx51.c
+ create mode 100644 arch/arm/mach-mx5/cpu.c
+ create mode 100644 arch/arm/mach-mx5/crm_regs.h
+ create mode 100644 arch/arm/mach-mx5/devices.c
+ create mode 100644 arch/arm/mach-mx5/devices.h
+ create mode 100644 arch/arm/mach-mx5/mm.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx51.h
+ create mode 100644 arch/arm/plat-mxc/include/mach/mx51.h
+ create mode 100644 arch/arm/plat-mxc/tzic.c
