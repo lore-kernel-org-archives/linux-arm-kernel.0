@@ -1,45 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Feb 2010 08:53:38 +0100
-Subject: [PXA320] How to find  I/O registers, base address of ASIX
-	ethernet chip?
+From: insane79@yandex.ru (Dennis Semakin)
+Date: Fri, 05 Feb 2010 11:02:10 +0300
+Subject: [PXA320] How to find I/O registers,
+	base address of ASIX ethernet chip?
 In-Reply-To: <20100205042655.GR28972@buzzloop.caiaq.de>
 References: <19621265275300@webmail108.yandex.ru>
 	<20100205042655.GR28972@buzzloop.caiaq.de>
-Message-ID: <20100205075338.GB31903@pengutronix.de>
+Message-ID: <33291265356930@webmail116.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hello
 
-On Fri, Feb 05, 2010 at 05:26:55AM +0100, Daniel Mack wrote:
-> On Thu, Feb 04, 2010 at 12:21:40PM +0300, Dennis Semakin wrote:
-> > Configuration:
-> > Computer module is Toradex Colibri PXA320.
-> > Board is Colibri Evaluation Board.
-> > 
-> > Obviously, to access the I/O register of network card, we need to map them into memory, using the ioremap() function.
-> > To do this driver (ax88796.c) use platform_get_resource() function to get the physical address of the I/O registers from the board definition (arch/arm/mach-pxa/colibri-pxa320.c). This function returns a pointer to a struct resource, which contains two interesting fields : start and end (both are physical address).
-> > Then call ioremap function to remap the memory area returned by platform_get_resource.
-> > Right?
-> > 
-> > Ok. When I start kernel on my board, kernel loading stops on network initialization during call to the address resource.start.
-> > So, what could I do if the address (field start in resource structure) is not valid?
-> > Can I find it? (I mean address) Maybe I should ask something: where are ethernet chip I/O registers mapped in the memory?
-> 
-> The addresses passed to the driver is the I/O area of the chip select
-> signal used for the Ethernet chip. This setting should be alright, as it
-> worked well for me.
-> 
-> If your kernel hangs when accessing this area, you most probably haven't
-> set up your static bus correctly. The bootloader is in charge of doing
-> this, and the correct value for CSADRCFG2 is 0x0032C809.
-I would prefer if Linux didn't rely on the boot loader for that.  It's
-not expensive or difficult to set this register in machine setup code,
-is it?
+I use u-boot.
 
+>  
+>  The addresses passed to the driver is the I/O area of the chip select
+>  signal used for the Ethernet chip. This setting should be alright, as it
+>  worked well for me.
+>  
+>  If your kernel hangs when accessing this area, you most probably haven't
+>  set up your static bus correctly. The bootloader is in charge of doing
+>  this, and the correct value for CSADRCFG2 is 0x0032C809.
+>  
+>  Also see http://openpxa.sourceforge.net/ for patches to U-Boot and more
+>  information about replacing the native bootloader the modules ships
+>  with.
+>  
+>  Daniel
+>  
+
+In U-BOOT:
+
+MSC1 (address 0x4a00000c) - 0x0779
+$ md.w 0x4a00000c
+4a00000c: 0779 0000 0000 0000 0000 0000 0000 0000 y...............
+4a00001c: 0008 0000 0000 0000 0000 0000 0000 0000 ................
+4a00002c: 0000 0000 0000 0000 0000 0000 0000 0000 ................
+4a00003c: 0000 0000 0000 0000 0000 0000 0000 0000 ................
+
+CSADRCFG2 (address 0x4a000088) - 0032c809
+$ md.l 0x4a000088
+4a000088: 0032c809 00020000 00020000 00000000 ..2.............
+4a000098: 00000000 00000000 00000000 00000000 ................
+4a0000a8: 00000000 00000000 00000000 00000000 ................
+4a0000b8: 00000000 00000000 00000000 00000000 ................
+4a0000c8: 00000000 00000000 00000000 00000000 ................
+
+As I think everythig is right and corresponds to a code
+
+int board_init (void)
+{
+/* arch number for linux kernel */
+gd->bd->bi_arch_number = MACH_TYPE_COLIBRI320;
+
+/* adress of boot parameters */
+gd->bd->bi_boot_params = 0x80000100;
+
+/* configuration for ethernet chip */
+CKENB |= CKENB_7_GPIO;
+GPIO3 = 0x00001c01;
+MSC1 = 0x779;
+CSADRCFG2 = 0x0032C809;
+
+return 0;
+}
+
+
+Thanks
 Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Dennis Semakin 
