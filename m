@@ -1,32 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 5 Feb 2010 07:48:09 +0100
-Subject: [PATCHv2 11/11] mxc: Add imx51_defconfig
-In-Reply-To: <23d720d71fcb0d088fa1829fccaa4823090e1346.1265173480.git.amit.kucheria@canonical.com>
-References: <cover.1265173480.git.amit.kucheria@canonical.com>
-	<23d720d71fcb0d088fa1829fccaa4823090e1346.1265173480.git.amit.kucheria@canonical.com>
-Message-ID: <20100205064809.GZ6130@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 5 Feb 2010 08:51:41 +0100
+Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
+In-Reply-To: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
+References: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
+Message-ID: <20100205075141.GA31903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+Hi Eric,
 
-On Tue, Feb 02, 2010 at 09:16:33PM -0800, Amit Kucheria wrote:
-> This config is used to test the base support for i.MX51 processors on the
-> Babbage board
+> diff --git a/Documentation/feature-removal-schedule.txt
+> b/Documentation/feature-removal-schedule.txt
+> index 5860583..e16529e 100644
+> --- a/Documentation/feature-removal-schedule.txt
+> +++ b/Documentation/feature-removal-schedule.txt
+> @@ -554,3 +554,15 @@ Why:	We now have a generic GPIO based matrix
+> keyboard driver that
+>  	and so are difficult to maintain.
+>  Who:	Eric Miao <eric.y.miao@gmail.com>
 > 
-> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
-> ---
->  arch/arm/configs/imx51_defconfig | 1286 ++++++++++++++++++++++++++++++++++++++
->  1 files changed, 1286 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/configs/imx51_defconfig
+> +----------------------------
+> +
+> +What:	corgi_ssp and corgi_ts driver
+> +When:	2.6.35
+> +Files:	arch/arm/mach-pxa/corgi_ssp.c, drivers/input/touchscreen/corgi_ts.c
+> +Why:	The corgi touchscreen is now deprecated in favour of the generic
+> +	ads7846.c driver. The noise reduction technique used in corgi_ts.c
+> +	that to wait til vsync before ADC sampling is also inte grated into
+> +	ads7846 driver now. Provided that the original driver is no generic
+s/no /not / or s/is no/isn't/
 
-Can you rename this to mx51_defconfig? All other i.MX defconfigs begin
-with mx.
+Best regards
+Uwe
 
-Sascha
+> +	and difficult to maintain, will be removed later.
+> +Who:	Eric Miao <eric.y.miao@gmail.com>
+> +
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
