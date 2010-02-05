@@ -1,41 +1,44 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Feb 2010 08:51:41 +0100
-Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
-In-Reply-To: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-References: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-Message-ID: <20100205075141.GA31903@pengutronix.de>
+Date: Fri, 5 Feb 2010 08:53:38 +0100
+Subject: [PXA320] How to find  I/O registers, base address of ASIX
+	ethernet chip?
+In-Reply-To: <20100205042655.GR28972@buzzloop.caiaq.de>
+References: <19621265275300@webmail108.yandex.ru>
+	<20100205042655.GR28972@buzzloop.caiaq.de>
+Message-ID: <20100205075338.GB31903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Daniel,
 
-> diff --git a/Documentation/feature-removal-schedule.txt
-> b/Documentation/feature-removal-schedule.txt
-> index 5860583..e16529e 100644
-> --- a/Documentation/feature-removal-schedule.txt
-> +++ b/Documentation/feature-removal-schedule.txt
-> @@ -554,3 +554,15 @@ Why:	We now have a generic GPIO based matrix
-> keyboard driver that
->  	and so are difficult to maintain.
->  Who:	Eric Miao <eric.y.miao@gmail.com>
+On Fri, Feb 05, 2010 at 05:26:55AM +0100, Daniel Mack wrote:
+> On Thu, Feb 04, 2010 at 12:21:40PM +0300, Dennis Semakin wrote:
+> > Configuration:
+> > Computer module is Toradex Colibri PXA320.
+> > Board is Colibri Evaluation Board.
+> > 
+> > Obviously, to access the I/O register of network card, we need to map them into memory, using the ioremap() function.
+> > To do this driver (ax88796.c) use platform_get_resource() function to get the physical address of the I/O registers from the board definition (arch/arm/mach-pxa/colibri-pxa320.c). This function returns a pointer to a struct resource, which contains two interesting fields : start and end (both are physical address).
+> > Then call ioremap function to remap the memory area returned by platform_get_resource.
+> > Right?
+> > 
+> > Ok. When I start kernel on my board, kernel loading stops on network initialization during call to the address resource.start.
+> > So, what could I do if the address (field start in resource structure) is not valid?
+> > Can I find it? (I mean address) Maybe I should ask something: where are ethernet chip I/O registers mapped in the memory?
 > 
-> +----------------------------
-> +
-> +What:	corgi_ssp and corgi_ts driver
-> +When:	2.6.35
-> +Files:	arch/arm/mach-pxa/corgi_ssp.c, drivers/input/touchscreen/corgi_ts.c
-> +Why:	The corgi touchscreen is now deprecated in favour of the generic
-> +	ads7846.c driver. The noise reduction technique used in corgi_ts.c
-> +	that to wait til vsync before ADC sampling is also inte grated into
-> +	ads7846 driver now. Provided that the original driver is no generic
-s/no /not / or s/is no/isn't/
+> The addresses passed to the driver is the I/O area of the chip select
+> signal used for the Ethernet chip. This setting should be alright, as it
+> worked well for me.
+> 
+> If your kernel hangs when accessing this area, you most probably haven't
+> set up your static bus correctly. The bootloader is in charge of doing
+> this, and the correct value for CSADRCFG2 is 0x0032C809.
+I would prefer if Linux didn't rely on the boot loader for that.  It's
+not expensive or difficult to set this register in machine setup code,
+is it?
 
 Best regards
 Uwe
-
-> +	and difficult to maintain, will be removed later.
-> +Who:	Eric Miao <eric.y.miao@gmail.com>
-> +
 
 -- 
 Pengutronix e.K.                              | Uwe Kleine-K?nig            |
