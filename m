@@ -1,35 +1,20 @@
-From: GKing@nvidia.com (Gary King)
-Date: Fri, 5 Feb 2010 10:13:03 -0800
-Subject: race between kmap shootdown and cache maintenance
-Message-ID: <A0A1E7539300DF49AA383E614C7827BC048DB1096B@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Feb 2010 19:45:28 +0000
+Subject: [PATCH 08/13] ARM: LPC32XX: clock tree support
+In-Reply-To: <083DF309106F364B939360100EC290F805C8BF7E5A@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1264643011-17390-1-git-send-email-wellsk40@gmail.com>
+	<1264643011-17390-9-git-send-email-wellsk40@gmail.com>
+	<20100203163259.GJ11354@pengutronix.de>
+	<083DF309106F364B939360100EC290F805C8B78796@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100203202047.GC20113@pengutronix.de>
+	<083DF309106F364B939360100EC290F805C8BF7E5A@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20100205194528.GA31511@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have seen some instability with highmem enabled on Tegra 2 systems (Cortex A9 SMP), where ocassionally the kernel will panic with unservicable page faults from flush_dcache_page, at an address half-way through a kmapped page.
+On Fri, Feb 05, 2010 at 05:48:36PM +0100, Kevin Wells wrote:
+> This approach always returned a non-0 clock rate for the clock, regardless
+> of whether the clock was enabled or not. Does the clk_get_rate() function
+> need to return a rate of 0 if the clock is disabled?
 
-I think this patch addresses the root cause: the cache maintenance code doesn't increase the reference count of the kmap, so another thread may kunmap the last reference and zap the corresponding PTE.
-
-- Gary
-
-Gary King
-gking at nvidia.com
-
-
-
-
------------------------------------------------------------------------------------
-This email message is for the sole use of the intended recipient(s) and may contain
-confidential information.  Any unauthorized review, use, disclosure or distribution
-is prohibited.  If you are not the intended recipient, please contact the sender by
-reply email and destroy all copies of the original message.
------------------------------------------------------------------------------------
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100205/2785f794/attachment-0001.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001--ARM-highmem-fix-race-between-cache-flush-and-kmap.patch
-Type: application/octet-stream
-Size: 2027 bytes
-Desc: 0001--ARM-highmem-fix-race-between-cache-flush-and-kmap.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100205/2785f794/attachment-0001.obj>
+No - there's no requirement for that to be the case.
