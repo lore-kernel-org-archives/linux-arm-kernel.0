@@ -1,36 +1,32 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 5 Feb 2010 00:38:01 -0500
-Subject: [PATCH] ARM: Fix ARM11 MPCore OProfile breakage due to ARM patch 5901/2
-Message-ID: <mailman.194.1265349378.2170.linux-arm-kernel@lists.infradead.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 5 Feb 2010 07:48:09 +0100
+Subject: [PATCHv2 11/11] mxc: Add imx51_defconfig
+In-Reply-To: <23d720d71fcb0d088fa1829fccaa4823090e1346.1265173480.git.amit.kucheria@canonical.com>
+References: <cover.1265173480.git.amit.kucheria@canonical.com>
+	<23d720d71fcb0d088fa1829fccaa4823090e1346.1265173480.git.amit.kucheria@canonical.com>
+Message-ID: <20100205064809.GZ6130@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent "fe6c67f ARM: 5901/2: arm/oprofile: reserve the PMU when
-starting" commit broke OProfile support on ARM11 MPCore targets by
-adding a misplaced "} else {" clause in function em_start() which
-results in a call to release_pmu() even though the PMU is in use
-which in turn results in an oops while using OProfile.  Removing
-the stray else clause fixes the problem.
+Hi Amit,
 
-Signed-off-by: George G. Davis <gdavis@mvista.com>
----
- arch/arm/oprofile/op_model_mpcore.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+On Tue, Feb 02, 2010 at 09:16:33PM -0800, Amit Kucheria wrote:
+> This config is used to test the base support for i.MX51 processors on the
+> Babbage board
+> 
+> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> ---
+>  arch/arm/configs/imx51_defconfig | 1286 ++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 1286 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/configs/imx51_defconfig
 
-diff --git a/arch/arm/oprofile/op_model_mpcore.c b/arch/arm/oprofile/op_model_mpcore.c
-index f73ce87..0d4f099 100644
---- a/arch/arm/oprofile/op_model_mpcore.c
-+++ b/arch/arm/oprofile/op_model_mpcore.c
-@@ -246,7 +246,6 @@ static int em_start(void)
- 		if (ret) {
- 			arm11_release_interrupts(pmu_irqs->irqs,
- 						 pmu_irqs->num_irqs);
--		} else {
- 			release_pmu(pmu_irqs);
- 			pmu_irqs = NULL;
- 		}
+Can you rename this to mx51_defconfig? All other i.MX defconfigs begin
+with mx.
 
+Sascha
 
---
-Regards,
-George
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
