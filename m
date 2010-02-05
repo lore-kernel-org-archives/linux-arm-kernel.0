@@ -1,21 +1,79 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Fri, 05 Feb 2010 18:27:53 +0100
-Subject: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
-In-Reply-To: <ef6149ed5e1d228262c3d98421a836400095c1b7.1265385421.git.amit.kucheria@canonical.com>
-References: <cover.1265385421.git.amit.kucheria@canonical.com>	<367110fafb57f7340bbffec9b394ed2fa6e89da5.1265385421.git.amit.kucheria@canonical.com>	<553d86cf968ba78a26b67098c2e1849407a51ba1.1265385421.git.amit.kucheria@canonical.com>	<bf84de08e5c511325fb94a742f5d6efabece06b6.1265385421.git.amit.kucheria@canonical.com>	<7739120baf6088e426f3f8bab174f6c6a6df3601.1265385421.git.amit.kucheria@canonical.com>
-	<ef6149ed5e1d228262c3d98421a836400095c1b7.1265385421.git.amit.kucheria@canonical.com>
-Message-ID: <4B6C5519.2070506@gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri, 5 Feb 2010 09:38:43 -0800
+Subject: [PATCH 08/25] imx/mx1: rename files defining a machine to
+	mach-$mach.c
+In-Reply-To: <20100204084513.GB5380@pengutronix.de>
+References: <1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100204012916.GC5274@k2> <20100204084513.GB5380@pengutronix.de>
+Message-ID: <20100205173843.GA4791@k2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Kucheria skrev:
-> Babbage is a reference board from Freescale for their i.MX51 SoC.
+On 10 Feb 04, Uwe Kleine-K?nig wrote:
+> Hello Amit,
 > 
-> Add board definition, Kconfig and Makefiles to enable Freescale i.MX51
-> processor and Babbage board.
+> On Wed, Feb 03, 2010 at 05:29:16PM -0800, Amit Kucheria wrote:
+> > On 10 Jan 08, Uwe Kleine-K?nig wrote:
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+> > > Cc: Darius Augulis <augulis.darius@gmail.com>
+> > > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> > > ---
+> > >  arch/arm/mach-mx1/Makefile                      |    4 ++--
+> > >  arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c}   |    2 +-
+> > >  arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} |    2 +-
+> > >  3 files changed, 4 insertions(+), 4 deletions(-)
+> > >  rename arch/arm/mach-mx1/{mx1ads.c => mach-mx1ads.c} (98%)
+> > >  rename arch/arm/mach-mx1/{scb9328.c => mach-scb9328.c} (98%)
+> > 
+> > Rethinking about this (based on a similar request for my i.MX5 submission), I
+> > think renaming the boards to mach-* is a bad idea.
+> > 
+> > Other SoCs (davinci, omap, msm, nomadik, etc.) use the board-* convention. We
+> > already use mach-* for the SoC directory names under arch/arm/. Naming the
+> > boards with mach-* will just cause more confusion.
+> Hmmm
 > 
-> Boot tested on a Babbage2.5 board
+> I still prefer mach-* as the corresponding Kconfig variables are named
+> MACH_* and there is no unified meaning of "board".  For (I think) most
+> people here board describes the whole machine.  For some (e.g. me) a
+> board might only be a PCB where you have to plug in a module that comes
+> with the SoC.
+> (http://www.digi.com/products/model.jsp?lid=EN&pgid=37&pfid=19&mtid=2070&amtid=2070&pm=Y)
+> 
+> It think machine is precise for all of us.
 
-In u-boot this board, and the files, are called mx51evk instead of Babbage. It would be nice if the same name is used in both, but no big issue.
+Perhaps. But I still think of arch/arm/mach-* as the SoC platform and
+arch/arm/mach-*/board-* as the various boards.
 
-Regards, Magnus
+arch/arm/mach-*/mach-* is confusing every way you look at it. I'd rather
+leave it alone than change the names to mach-*.
+
+(Shrug) Just my thoughts.
+
+> And note the selecting Kconfig symbol for arch/arm/mach-omap is
+> ARCH_OMAP.  Ditto we have ARCH_DAVINCI, ARCH_MSM and ARCH_NOMADIK.
+> So we could rename these to arch-omap etc.  But then this conflicts with
+> the toplevel arch directory!?
+
+I wouldn't got that far.
+
+> Best regards
+> Uwe
+
+Cheers,
+Amit
+
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
