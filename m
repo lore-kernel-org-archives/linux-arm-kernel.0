@@ -1,86 +1,100 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 5 Feb 2010 08:14:14 +0000
-Subject: [RFC PATCH 3/3] [ARM] Allow boards to specify the exact number
-	of IRQs needed
-In-Reply-To: <f17812d71002041112x6f8308b5q6bc37f6608a3efc9@mail.gmail.com>
-References: <f17812d71002041112x6f8308b5q6bc37f6608a3efc9@mail.gmail.com>
-Message-ID: <20100205081413.GF13267@trinity.fluff.org>
+From: gdavis@mvista.com (George G. Davis)
+Date: Fri, 5 Feb 2010 03:26:52 -0500
+Subject: defining ZRELADDR as PHYS_OFFSET + TEXT_OFFSET
+In-Reply-To: <20100201084906.GA5983@pengutronix.de>
+References: <20100127101228.GA17421@pengutronix.de>
+	<20100128001523.GA608@n2100.arm.linux.org.uk>
+	<20100201012425.GD2582@mvista.com>
+	<20100201084906.GA5983@pengutronix.de>
+Message-ID: <20100205082652.GE21979@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 04, 2010 at 11:12:37AM -0800, Eric Miao wrote:
-> commit 988a6a2bd322d83eba42c05cb6cb77a74cba056b
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Thu Feb 4 11:06:35 2010 -0800
-> 
->     [ARM] Allow boards to specify the exact number of IRQs needed
-> 
->     This will only take effect if SPARSE_IRQ is enabled, any board that
->     depends on this _only_ has to explicitly select SPARSE_IRQ.
-> 
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+Hi,
 
-Is this going to cause errors when the core support tries to register
-irq chips over the number that the board itself supports?
- 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index a1ea728..825ee34 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -19,6 +19,7 @@
+On Mon, Feb 01, 2010 at 09:49:07AM +0100, Uwe Kleine-K?nig wrote:
+> Hallo George,
 > 
->  #ifndef __ASSEMBLY__
->  struct irqaction;
-> +extern int arch_nr_irqs;
->  extern void migrate_irqs(void);
-> 
->  extern void asm_do_IRQ(unsigned int, struct pt_regs *);
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index c59842d..a9128b4 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -20,6 +20,7 @@ struct machine_desc {
->  	 * by assembler code in head.S, head-common.S
->  	 */
->  	unsigned int		nr;		/* architecture number	*/
-> +	unsigned int		num_irqs;	/* number of IRQs */
->  	unsigned int		phys_io;	/* start of physical io	*/
->  	unsigned int		io_pg_offst;	/* byte offset for io
->  						 * page tabe entry	*/
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index e62f39b..e23d248 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -168,7 +168,7 @@ void __init init_IRQ(void)
->  #ifdef CONFIG_SPARSE_IRQ
->  int __init arch_probe_nr_irqs(void)
->  {
-> -	nr_irqs = NR_IRQS;
-> +	nr_irqs = arch_nr_irqs ? arch_nr_irqs : NR_IRQS;
->  	return 0;
->  }
->  #endif
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index c6c57b6..803ed95 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -755,6 +755,7 @@ void __init setup_arch(char **cmdline_p)
->  	/*
->  	 * Set up various architecture-specific pointers
->  	 */
-> +	arch_nr_irqs = mdesc->num_irqs;
->  	init_arch_irq = mdesc->init_irq;
->  	system_timer = mdesc->timer;
->  	init_machine = mdesc->init_machine;
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On Sun, Jan 31, 2010 at 08:24:25PM -0500, George G. Davis wrote:
+> > On Thu, Jan 28, 2010 at 12:15:23AM +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Jan 27, 2010 at 11:12:28AM +0100, Uwe Kleine-K?nig wrote:
+> > > > Hello,
+> > > > 
+> > > > currently all platforms need to define zreladdr-y in
+> > > > arch/arm/mach-$mach/Makefile.boot and PHYS_OFFSET (in
+> > > > arch/arm/mach-$mach/include/mach/memory.h).
+> > > > 
+> > > > Constraints for these are:
+> > > > 
+> > > >  TEXTADDR = PAGE_OFFSET + TEXT_OFFSET
+> > > >  __virt_to_phys(virt) = virt - PAGE_OFFSET + PHYS_OFFSET (at least for
+> > > > 	"small" virtual addresses)
+> > > >  ZRELADDR = __virt_to_phys(TEXTADDR)
+> > > > 
+> > > > (The equallity for __virt_to_phys only holds "normaly" according to
+> > > > http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html.
+> > > > In practice it holds for addresses of the first bank of RAM which is
+> > > > enough for the purposes of this mail.)
+> > > > 
+> > > > So we can deduce ZRELADDR = PHYS_OFFSET + TEXT_OFFSET.
+> > > > 
+> > > > Is there something I missed or is it possible to get rid of zreladdr-y
+> > > > in .../Makefile.boot and define it according to the equation above?
+> > > 
+> > > You'd need to find some way to get PHYS_OFFSET out of the C code
+> > > into the makefile.  With all sorts of stuff going on in various
+> > > platforms memory.h files, that doesn't look simple.
+> > 
+> > How about this?:
+> > 
+> > diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> > index 4a590f4..b79050e 100644
+> > --- a/arch/arm/boot/Makefile
+> > +++ b/arch/arm/boot/Makefile
+> > @@ -21,7 +21,7 @@ endif
+> >  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+> >  #   PARAMS_PHYS must be within 4MB of ZRELADDR
+> >  #   INITRD_PHYS must be in RAM
+> > -ZRELADDR    := $(zreladdr-y)
+> > +ZRELADDR    := $(shell printf "0x%08x" $$[`echo PHYS_OFFSET + $(TEXT_OFFSET)  | $(CPP) $(CPP_FLAGS) -D__ASSEMBLY__ -xc -include arch/arm/include/asm/memory.h - | tail -n 1`])
+> >  PARAMS_PHYS := $(params_phys-y)
+> >  INITRD_PHYS := $(initrd_phys-y)
+> hui!  Is this really robust?
 
--- 
--- 
-Ben
+Apologies for the delay, busy...
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+It can be but it is admittedly rather tricky to get the syntax right.  I've
+no idea how the above worked the first time I tried but it didn't upon
+further inspection.  I came up with this variation on the theme:
+
+ZRELADDR     = $(shell $(CONFIG_SHELL) -c 'printf "0x%08x" $$[`echo PHYS_OFFSET + $(TEXT_OFFSET) | $(CPP) $(cpp_flags) -D__ASSEMBLY__ -xc -imacros asm/memory.h - 2>/dev/null | tail -1`]')
+
+
+This version seems to work for a number of zImage test builds I did.
+Alas, it is rather tricky to get the syntax right for all uses, e.g. I
+think uImage is still broken.
+
+> 
+> > Since params_phys-y is (always?) constant relative to zreladdr-y, it can
+> > also be calculated in a similar fashion, e.g.
+> > 
+> > PARAMS_PHYS := $(shell printf "0x%08x" $$[$(ZRELADDR) - 0x7f00])
+> This isn't necessarily true I think.  And I'd prefer getting rid of
+> PARAMS_PHYS.  This is only used for bootp and maybe if the bootloader
+> doesn't pass r2 properly.
+
+If the bootloader is passing params pointer, then sure, disregard.
+
+Thanks!
+
+--
+Regards,
+George
+
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                    | http://www.pengutronix.de/  |
