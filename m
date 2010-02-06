@@ -1,49 +1,27 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Sat, 6 Feb 2010 09:42:00 +0100 (CET)
-Subject: [PATCH 1/11] arch/arm/plat-pxa: Correct NULL test
-Message-ID: <Pine.LNX.4.64.1002060941410.8092@ask.diku.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Feb 2010 09:25:44 +0000
+Subject: [RFC PATCH v2 2/2] ARM: VFP: preserve the HW context when
+	calling signal handlers
+In-Reply-To: <b8a1d37c5f981cdd2e83c9fd98198832324cd57e.1265315249.git.imre.deak@nokia.com>
+References: <b8a1d37c5f981cdd2e83c9fd98198832324cd57c.1265315249.git.imre.deak@nokia.com>
+	<b8a1d37c5f981cdd2e83c9fd98198832324cd57e.1265315249.git.imre.deak@nokia.com>
+Message-ID: <20100206092544.GB1923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Thu, Feb 04, 2010 at 11:38:30PM +0200, Imre Deak wrote:
+> diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+> index df95e05..ea7e44d 100644
+> --- a/arch/arm/include/asm/user.h
+> +++ b/arch/arm/include/asm/user.h
+> @@ -88,6 +88,9 @@ struct user{
+>  struct user_vfp {
+>  	unsigned long long fpregs[32];
+>  	unsigned long fpscr;
+> +	unsigned long fpexc;
+> +	unsigned long fpinst;
+> +	unsigned long fpinst2;
 
-Test the value that was just allocated rather than the previously tested one.
-
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
-
-// <smpl>
-@r@
-expression *x;
-expression e;
-identifier l;
-@@
-
-if (x == NULL || ...) {
-    ... when forall
-    return ...; }
-... when != goto l;
-    when != x = e
-    when != &x
-*x == NULL
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- arch/arm/plat-pxa/dma.c             |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
-index 2975798..bcfda50 100644
---- a/arch/arm/plat-pxa/dma.c
-+++ b/arch/arm/plat-pxa/dma.c
-@@ -244,7 +244,7 @@ static void pxa_dma_init_debugfs(void)
- 
- 	dbgfs_chan = kmalloc(sizeof(*dbgfs_state) * num_dma_channels,
- 			     GFP_KERNEL);
--	if (!dbgfs_state)
-+	if (!dbgfs_chan)
- 		goto err_alloc;
- 
- 	chandir = debugfs_create_dir("channels", dbgfs_root);
+Absolutely no way is this anywhere near suitable.  This is a _userspace_
+_visible_ API change, breaking anyone using the ptrace API by overwriting
+additional memory which they will not be expecting.
