@@ -1,51 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Feb 2010 11:28:03 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100208105209.GA31671@atrey.karlin.mff.cuni.cz>
-References: <20100208065519.GE1290@ucw.cz>
-	<1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-	<20100208105209.GA31671@atrey.karlin.mff.cuni.cz>
-Message-ID: <1265628483.4020.63.camel@pc1117.cambridge.arm.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 08 Feb 2010 13:30:42 +0200
+Subject: smsc911x suspend/resume
+In-Reply-To: <20100208101123.GW28972@buzzloop.caiaq.de>
+References: <4B6FDC83.9090205@compulab.co.il>
+	<20100208101123.GW28972@buzzloop.caiaq.de>
+Message-ID: <4B6FF5E2.6060304@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-02-08 at 10:52 +0000, Pavel Machek wrote:
-> > On Mon, 2010-02-08 at 06:55 +0000, Pavel Machek wrote:
-> > > > > So, let's put this in the HCD drivers and be done with it.
-> > > >
-> > > > The patch below is what fixes the I-D cache incoherency issues on ARM. I
-> > > > don't particularly like the solution but it seems to be the only one
-> > > > available.
-> > >
-> > > Really? It looks like arm should just flush the caches when mapping
-> > > executable page to the userspace.... you can't expect all the drivers
-> > > to be modified like that...
-> >
-> > We could of course flush the caches every time we get a page fault but
-> > that's far from optimal, especially since DMA-capable drivers to do
-> > not
+Daniel Mack wrote:
+> On Mon, Feb 08, 2010 at 11:42:27AM +0200, Mike Rapoport wrote:
+>> I'm trying to make suspend/resume work on OMAP3-based system and I'm
+>> encountering issues with resume of SMSC 9220 chip.
+>> After resume the interface is unusable unless I do 'ifconfig eth0 down'
+>> and 'ifconfig eth0 up'.
+>> I would expect that 'ping <some host>' would work right after resume
+>> without need to bring the interface down and up, but probably I miss
+>> something.
+>> Any help would be appreciated.
 > 
-> Maybe far for optimal, but it is something that should be done,
-> _first_. Correctness is more important than performance, and you can't
-> expect all drivers to behave like you want them.
+> What happens to your supply voltages when going to suspend? When I
+> implemented the code for the smsc driver, I could only test scenarios
+> where AVDD remains stable during suspend. So the driver might need some
+> tweaks if that assumption is not true in your case. The SMSC datasheet
+> is quite comprehensive about this topic IIRC.
 
-I wouldn't call heavy cache flushing "correctness". We could as well
-disable the caches so that it is fully coherent.
+By AVDD you mean VDD33A?
+Anyway, I have all the supplies except VDDVARIO shut down...
+And the datasheet is indeed comprehensively describes chip power states
+but I haven't found there anything about supplies required to stay on
+during suspend...
 
-The arch code follows an API defined in cachetlb.txt but the PIO drivers
-don't (some do, like mmci.c). It may be inconvenient to call
-flush_dcache_page() in the driver, hence I started a discussion on
-linux-arch on a PIO mapping API that x86 or other fully coherent
-architectures can leave it as no-ops.
 
-> Then you can add optimalizations not to do the flushes on drivers you
-> audited and where you care...
+> Also have a look at the Raumfeld device patches which use exactly this
+> chip and which can suspend and resume just fine. You'll need to check
+> out Eric's devel branch for that.
+> 
+> Daniel
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Sorry but that's not really feasible (unless I don't fully understand
-what you mean) - if we do the cache flushing on the fault handling path
-in the arch code, there is no way for the arch code to know what driver
-is doing, unless we make this conditionally compiled with something like
-CONFIG_ARCH_NEEDS_HEAVY_FLUSHING.
 
 -- 
-Catalin
+Sincerely yours,
+Mike.
