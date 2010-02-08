@@ -1,82 +1,77 @@
-From: andi@lisas.de (Andreas Mohr)
-Date: Mon, 8 Feb 2010 08:33:34 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100208065519.GE1290@ucw.cz>
-References: <20100129185434.GH19501@one-eyed-alien.net>
-	<1265045354.25750.52.camel@pc1117.cambridge.arm.com>
-	<20100208065519.GE1290@ucw.cz>
-Message-ID: <20100208073334.GB7171@rhlx01.hs-esslingen.de>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 8 Feb 2010 08:36:13 +0100
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+Message-ID: <20100208073612.GV28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 08, 2010 at 03:02:14PM +0800, Jebediah Huang wrote:
+> On Mon, Feb 8, 2010 at 2:02 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > On Mon, Feb 8, 2010 at 1:44 PM, Jebediah Huang <jebediah.huang@gmail.com> wrote:
+> >> static struct i2c_board_info i2c_board_info[] =
+> >> {
+> >> ? ? ? ?{
+> >> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = "max7319",
+> >> ? ? ? ? ? ? ? ?.addr ? ? ? ? ? = 0x6C,
+> >> ? ? ? ? ? ? ? ?.irq ? ? ? ? ? ?= IRQ_GPIO(105),
+> >
+> > This doesn't look correct, if max7319 is ever able to interrupt the host
+> > CPU, this should be something other than SDA.
+> 
+> Thank you. I remove irq now. It is not used.
 
-On Mon, Feb 08, 2010 at 07:55:19AM +0100, Pavel Machek wrote:
-> Plus it does unneccessary flushes on x86, etc...
+If you didn't wire an IRQ from the max7319 to your CPU, you can't easily
+use it as an input device. I2C is a polled bus, all transactions are
+always initiated from the CPU side. So you would need to 'ask' the chip
+constantly for its current state, which is not good.
 
-Noticed that as well, there should be an arch-obeying helper for this.
+The INT line should be connected to some GPIO on your PXA so the chip
+can actively let the PXA know when any input line stated changed.
+Everything else makes very little sense.
 
+> I test hardware is ok. I test with this:
+>  {
+>         int fd, t;
+>         int i;
+>         char buf[512];
+>         fd = open("/dev/i2c-0", O_RDWR);
+>         printf("fd=%d\n",fd);
+>         t = ioctl(fd, I2C_SLAVE, 0x6c);
+>         printf("t=%d\n",t);
+>         memset(buf,0,512);
+>         t = read(fd,buf,512);
+>         printf("t=%d\n",t);
+>         for(i=0;i<t;i++) {
+>         printf("0x%x,",buf[i]);
+>         }
+>         printf("\n");
+>         exit(0);
+> }
+> 
+> output if max732x enabled is:
+> # ./i2ctest
+> [  184.070025] i2c: error: exhausted retries
+> fd=3
+> t=-1
+> [  184.074256] i2c: msg_num: 0 msg_idx: -2000 msg_ptr: 0
+> [  184.080428] i2c: ICR: 000007e0 ISR: 00000002
+> [  184.080444] i2c: log: [00000006:00000000] [00000006:00000000]
+> [00000006:00000000] [00000006:00000000] [00000006:00000000]
+> [00000006:00000000] [00000006:00
+> 000000] [00000006:00000000] [00000006:00000000] [00000006:00000000]
+> [00000006:00000000] [00000007:00000000] [00000447:000007e0]
+> t=-1
 
-On my MIPSEL, I had urb->transfer_buffer NULL ptr crashes
-(I think that was expected in case of a certain DMA setup, Alan said).
+How do you enable/disable the chip? As Eric said, the error above
+indicates an eletrical issue with the bus. 
 
-However, even with NULL check added I still had:
+> disable max732x is:
+> # ./i2ctest no button pressed
 
-hub 2-1.1:1.0: state 7 ports 7 chg 0000 evt 0010
-Unhandled kernel unaligned access[#1]:
-Cpu 0
-$ 0   : 00000000 fffffffd 803b0000 00010000
-$ 4   : 08002042 8143bfe0 0043bfe0 0000000d
-$ 8   : 00000001 3b9aca00 c4653600 00000000
-$12   : 00000049 3b9aca00 81dbc868 00000000
-$16   : a1e00000 803b0000 8037f840 81dfaa80
-$20   : 00000000 81dd5080 80000000 00000000
-$24   : 00000000 80015a64
-$28   : 8033a000 8033bc10 a1dd83cc 801da5e4
-Hi    : 00000000
-Lo    : 00000000
-epc   : 800171e8 __flush_dcache_page+0x38/0x120
-    Not tainted
-ra    : 801da5e4 ehci_urb_done+0x180/0x1e4
-Status: 10009002    KERNEL EXL
-Cause : 00800010
-BadVA : 08002056
-PrId  : 00029029 (Broadcom BCM3302)
-Modules linked in:
-Process swapper (pid: 0, threadinfo=8033a000, task=8033c000, tls=00000000)
-Stack : 00000000 00000000 81e04980 801c80ac a1dd9060 a1dd8394 ffffff6a ffffff6a
-        81dfaa80 a1dd83cc a1dd8380 801db3a4 803a6a28 80068e9c 000003f8 00003fc0
-        a1dd81cc 801dea58 00000001 00000000 a1dd9360 81dd5080 a1dd8380 10009001
-        a1dd83cc 81dd5158 00000000 80318d44 81dd5158 00000001 00010031 801de8f4
-        81dd5158 8033bce0 803a76a0 803a0000 8033d860 8004f924 00000219 00000043
-        ...
-Call Trace:
-[<800171e8>] __flush_dcache_page+0x38/0x120
-[<801da5e4>] ehci_urb_done+0x180/0x1e4
-[<801db3a4>] qh_completions+0x484/0x554
-[<801de8f4>] ehci_work+0x1ec/0xb68
-[<801e2598>] ehci_irq+0x360/0x3a4
-[<801c7cf8>] usb_hcd_irq+0x64/0x15c
-[<80066d58>] handle_IRQ_event+0x90/0x280
-[<80068e80>] handle_percpu_irq+0x48/0x9c
-[<8000e228>] plat_irq_dispatch+0x15c/0x178
-[<80001444>] ret_from_irq+0x0/0x4
-[<80001680>] r4k_wait+0x20/0x40
-[<8000fe34>] cpu_idle+0x30/0x60
-[<80354a34>] start_kernel+0x338/0x350
+What are you testing without the chip?
 
-
-Code: 00000000  10800029  3c02803b <8c820014> 14400026  3c02803b  8c83001c  2482001c  14620021
-Disabling lock debugging due to kernel taint
-Kernel panic - not syncing: Fatal exception in interrupt
-
-
-
-Seems like BadVA : 08002056 really isn't as aligned (offset 0x6) as it should be.
-
-I've given up on this now BTW, I'll wait until the dust has settled (i.e. some nice improvements
-have found their way to the kernel) and retry in some months with a much newer kernel version
-(currently patched-up 2.6.31.9) whether something remains to be fixed.
-I'll work on more productive things such as submitting some waiting patches.
-
-Andreas Mohr
+Daniel
