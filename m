@@ -1,53 +1,48 @@
-From: Steve.Glendinning@smsc.com (Steve.Glendinning at smsc.com)
-Date: Mon, 8 Feb 2010 11:46:39 +0000
-Subject: smsc911x suspend/resume
-In-Reply-To: <4B6FF5E2.6060304@compulab.co.il>
-Message-ID: <OFE2B2FE18.A8D1D506-ON802576C4.003FCA39-802576C4.0040B683@smsc.com>
+From: insane79@yandex.ru (Dennis Semakin)
+Date: Mon, 08 Feb 2010 15:16:12 +0300
+Subject: [PXA320] How to find I/O registers,
+	base address of ASIX ethernet chip?
+In-Reply-To: <20100208101524.GX28972@buzzloop.caiaq.de>
+References: <19621265275300@webmail108.yandex.ru>
+	<20100205042655.GR28972@buzzloop.caiaq.de>
+	<33291265356930@webmail116.yandex.ru>
+	<20100207051343.GL9007@buzzloop.caiaq.de>
+	<33061265619560@webmail103.yandex.ru>
+	<20100208091348.GC15255@pengutronix.de>
+	<18311265621886@webmail106.yandex.ru>
+	<20100208101524.GX28972@buzzloop.caiaq.de>
+Message-ID: <32661265631372@webmail120.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Dear Daniel
+Thank you very much for code. It works fine.
+If you will be in Moscow, I'll buy you a pints of beer :)
 
-> >> I'm trying to make suspend/resume work on OMAP3-based system and I'm
-> >> encountering issues with resume of SMSC 9220 chip.
-> >> After resume the interface is unusable unless I do 'ifconfig eth0 
-down'
-> >> and 'ifconfig eth0 up'.
-> >> I would expect that 'ping <some host>' would work right after resume
-> >> without need to bring the interface down and up, but probably I miss
-> >> something.
-> >> Any help would be appreciated.
-> > 
-> > What happens to your supply voltages when going to suspend? When I
-> > implemented the code for the smsc driver, I could only test scenarios
-> > where AVDD remains stable during suspend. So the driver might need 
-some
-> > tweaks if that assumption is not true in your case. The SMSC datasheet
-> > is quite comprehensive about this topic IIRC.
-> 
-> By AVDD you mean VDD33A?
-> Anyway, I have all the supplies except VDDVARIO shut down...
-> And the datasheet is indeed comprehensively describes chip power states
-> but I haven't found there anything about supplies required to stay on
-> during suspend...
+It is necessary to ask only: why in u-boot git-repository I didn't see this code?
 
-I don't have the code in front of me (I'm travelling today) but IIRC
-the driver doesn't place the LAN9220 in a specific power saving state,
-so as far as the LAN9220 is concerned it's not actually suspended.
+08.02.10, 11:15, "Daniel Mack" <daniel@caiaq.de>:
 
-It's hard to do this in a "generic" way: some people expect their link
-to stay up during suspend, some want suspend to completely power down
-the ethernet chip, and some want to use one of several WoL modes. 
+> On Mon, Feb 08, 2010 at 12:38:06PM +0300, Dennis Semakin wrote:
+>  > 08.02.10, 10:13, "Uwe Kleine-K?nig" :
+>  > >  This sounds like a missing clock.  Ah, and Daniel already asked that,
+>  > >  too: "Did you switch on the clock for the static bus?"
+>  > >  
+>  > 
+>  > Well... I yet do not know how to do this...
+>  
+>  Try adding this sniplet to your lowlevel_init function in U-Boot:
+>  
+>          /* enable clocks for NAND and static memory */
+>          ldr             r0, =CKENA
+>          ldr             r1, [r0]
+>          orr             r1, r1, #(CKENA_4_NAND | CKENA_9_SMC)
+>          str             r1, [r0]
+>          ldr             r1, [r0]
+>  
+>  Daniel
+>  
 
-David: What's the "done thing" here for similar non-pci drivers?
-Obviously "doesn't work after suspend" isn't the intended behaviour, so
-there's definitely room for improvement!
-
-> > Also have a look at the Raumfeld device patches which use exactly this
-> > chip and which can suspend and resume just fine. You'll need to check
-> > out Eric's devel branch for that.
-
-Daniel: I haven't seen this, do you have a location for the git tree?
-
-Thanks,
-Steve
+Thanks
+Best regards
+Dennis Semakin
