@@ -1,49 +1,56 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 08 Feb 2010 13:30:42 +0200
-Subject: smsc911x suspend/resume
-In-Reply-To: <20100208101123.GW28972@buzzloop.caiaq.de>
-References: <4B6FDC83.9090205@compulab.co.il>
-	<20100208101123.GW28972@buzzloop.caiaq.de>
-Message-ID: <4B6FF5E2.6060304@compulab.co.il>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 8 Feb 2010 12:33:06 +0100
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+Message-ID: <20100208113306.GN9007@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack wrote:
-> On Mon, Feb 08, 2010 at 11:42:27AM +0200, Mike Rapoport wrote:
->> I'm trying to make suspend/resume work on OMAP3-based system and I'm
->> encountering issues with resume of SMSC 9220 chip.
->> After resume the interface is unusable unless I do 'ifconfig eth0 down'
->> and 'ifconfig eth0 up'.
->> I would expect that 'ping <some host>' would work right after resume
->> without need to bring the interface down and up, but probably I miss
->> something.
->> Any help would be appreciated.
+On Mon, Feb 08, 2010 at 07:08:06PM +0800, Jebediah Huang wrote:
+> Is it correct that max732x driver will take i2c configuration from my
+> setup info and make each max7319 input signel into a gpio?
 > 
-> What happens to your supply voltages when going to suspend? When I
-> implemented the code for the smsc driver, I could only test scenarios
-> where AVDD remains stable during suspend. So the driver might need some
-> tweaks if that assumption is not true in your case. The SMSC datasheet
-> is quite comprehensive about this topic IIRC.
-
-By AVDD you mean VDD33A?
-Anyway, I have all the supplies except VDDVARIO shut down...
-And the datasheet is indeed comprehensively describes chip power states
-but I haven't found there anything about supplies required to stay on
-during suspend...
-
-
-> Also have a look at the Raumfeld device patches which use exactly this
-> chip and which can suspend and resume just fine. You'll need to check
-> out Eric's devel branch for that.
+> Hardware work correctly because without max732x driver, above i2c-dev
+> code can read max7319 input signel. Configuration is correct.
 > 
-> Daniel
+> gpio_base is starting where max732x driver will add new gpio number
+> for max7319 signel.
+
+Yes, that should be right. After the driver is probed successfully, you
+should be able to access the GPIOs with generic functions as described
+in include/linux/gpio.h. Can you try if that works?
+
+And if you can, you should really hook up an I2C analyzer to your bus
+and see what is happening electrically and which messages pass the bus.
+
+> static struct max732x_platform_data max7319_data[] = {
+>        [0] = {
+>                .gpio_base      =  NR_BUILTIN_GPIO,
+>        },
+> };
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> static struct i2c_board_info i2c_board_info[] =
+> {
+>        {
+>                .type           = "max7319",
+>                .addr           = 0x6C,
+>                .irq            = IRQ_GPIO(125), <= this is my irq pin
+> for max7319 INT_N
 
+I just saw that there is indeed no support for irq line handling in this
+driver. In order to use these lines as input for something like the
+gpio_keys driver, support for that should be added. I never used this
+driver and can't say whether it is under active development.
 
--- 
-Sincerely yours,
-Mike.
+> Is my understanding wrong?
+
+One thing you should also know is that once the kernel driver is active,
+it blocks the address it is configured to, so you can't access the same
+address via the userspace API. That might be confusing if you're not
+aware of that.
+
+Daniel
