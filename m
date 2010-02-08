@@ -1,5 +1,5 @@
 From: insane79@yandex.ru (Dennis Semakin)
-Date: Mon, 08 Feb 2010 15:16:12 +0300
+Date: Mon, 08 Feb 2010 15:16:22 +0300
 Subject: [PXA320] How to find I/O registers,
 	base address of ASIX ethernet chip?
 In-Reply-To: <20100208101524.GX28972@buzzloop.caiaq.de>
@@ -11,7 +11,7 @@ References: <19621265275300@webmail108.yandex.ru>
 	<20100208091348.GC15255@pengutronix.de>
 	<18311265621886@webmail106.yandex.ru>
 	<20100208101524.GX28972@buzzloop.caiaq.de>
-Message-ID: <32661265631372@webmail120.yandex.ru>
+Message-ID: <32851265631382@webmail120.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
