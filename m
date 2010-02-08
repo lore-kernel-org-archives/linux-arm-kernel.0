@@ -1,32 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Feb 2010 10:19:44 +0000
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Feb 2010 11:52:10 +0100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100208073334.GB7171@rhlx01.hs-esslingen.de>
-References: <20100208073334.GB7171@rhlx01.hs-esslingen.de>
-Message-ID: <1265624384.4020.25.camel@pc1117.cambridge.arm.com>
+In-Reply-To: <1265622676.4020.19.camel@pc1117.cambridge.arm.com>
+References: <20100208065519.GE1290@ucw.cz>
+	<1265622676.4020.19.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100208105209.GA31671@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-02-08 at 07:33 +0000, Andreas Mohr wrote:
-> On Mon, Feb 08, 2010 at 07:55:19AM +0100, Pavel Machek wrote:
-> > Plus it does unneccessary flushes on x86, etc...
+> Hi,
 > 
-> Noticed that as well, there should be an arch-obeying helper for this.
+> On Mon, 2010-02-08 at 06:55 +0000, Pavel Machek wrote:
+> > > > So, let's put this in the HCD drivers and be done with it.
+> > >
+> > > The patch below is what fixes the I-D cache incoherency issues on ARM. I
+> > > don't particularly like the solution but it seems to be the only one
+> > > available.
+> > 
+> > Really? It looks like arm should just flush the caches when mapping
+> > executable page to the userspace.... you can't expect all the drivers
+> > to be modified like that...
 > 
-> 
-> On my MIPSEL, I had urb->transfer_buffer NULL ptr crashes
-> (I think that was expected in case of a certain DMA setup, Alan said).
-> 
-> However, even with NULL check added I still had:
-> 
-> hub 2-1.1:1.0: state 7 ports 7 chg 0000 evt 0010
-> Unhandled kernel unaligned access[#1]:
+> We could of course flush the caches every time we get a page fault but
+> that's far from optimal, especially since DMA-capable drivers to do
+> not
 
-Just to avoid confusion - that's a similar patch applied to a different
-driver. The ISP1760 HCD driver works fine with my patch (transfer_buffer
-never seems to be NULL with latest mainline). I can't comment on the
-ehci-q.c driver (it looks like it has some support for DMA while my
-patch only applies to PIO drivers where transfer_buffer should be set).
+Maybe far for optimal, but it is something that should be done,
+_first_. Correctness is more important than performance, and you can't
+expect all drivers to behave like you want them.
+
+Then you can add optimalizations not to do the flushes on drivers you
+audited and where you care...
 
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
