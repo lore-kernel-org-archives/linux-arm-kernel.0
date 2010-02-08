@@ -1,39 +1,49 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 8 Feb 2010 07:30:34 -0700
-Subject: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
-In-Reply-To: <229789.92421.qm@web51008.mail.re2.yahoo.com>
-References: <ef6149ed5e1d228262c3d98421a836400095c1b7.1265385421.git.amit.kucheria@canonical.com>
-	<229789.92421.qm@web51008.mail.re2.yahoo.com>
-Message-ID: <86A0E76937111F4C92FABEC0A20988510442655D@az33exm21>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 08 Feb 2010 16:42:25 +0200
+Subject: smsc911x suspend/resume
+In-Reply-To: <20100208114638.GO9007@buzzloop.caiaq.de>
+References: <4B6FDC83.9090205@compulab.co.il>
+	<20100208101123.GW28972@buzzloop.caiaq.de>
+	<4B6FF5E2.6060304@compulab.co.il>
+	<20100208114638.GO9007@buzzloop.caiaq.de>
+Message-ID: <4B7022D1.5030408@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Daniel Mack wrote:
+> On Mon, Feb 08, 2010 at 01:30:42PM +0200, Mike Rapoport wrote:
+>> Daniel Mack wrote:
+>>> What happens to your supply voltages when going to suspend? When I
+>>> implemented the code for the smsc driver, I could only test scenarios
+>>> where AVDD remains stable during suspend. So the driver might need some
+>>> tweaks if that assumption is not true in your case. The SMSC datasheet
+>>> is quite comprehensive about this topic IIRC.
+>> By AVDD you mean VDD33A?
+> 
+> Yes.
+> 
+>> Anyway, I have all the supplies except VDDVARIO shut down...
+>> And the datasheet is indeed comprehensively describes chip power states
+>> but I haven't found there anything about supplies required to stay on
+>> during suspend...
+> 
+> In fact the datasheet doesn't really state that, and the chip seems
+> to expect the power domains to remain switched on during suspend, and
+> all power switching is done internally. Also the table in "7.4 Power
+> Consumption (Device and System Components)" describes it like that.
+> 
+> So it all comes down to the question of how low-power you need to be,
+> and whether you need wake-on-lan or not. What's currently implemented is
+> D1, but adding support for D2 should be easy.
 
-the 2 parameters are what we(FSL) use for the correct settings for the mx51 babbage board.
+I did some brute force save/restore of smsc9220 registers and it seems
+to wake up now.
+The question now is how to make it in a "generic" way ...
+Thanks for the help anyway :)
 
-Dinh 
-
------Original Message-----
-From: Fabio Estevam [mailto:fabioestevam at yahoo.com] 
-Sent: Sunday, February 07, 2010 1:11 PM
-To: amit.kucheria at verdurent.com; Amit Kucheria
-Cc: linux at arm.linux.org.uk; Nguyen Dinh-R00091; s.hauer at pengutronix.de; grant.likely at secretlab.ca; Herring Robert-RA7055; linux-arm-kernel at lists.infradead.org; daniel at caiaq.de; bryan.wu at canonical.com; eric.miao at canonical.com; valentin.longchamp at epfl.ch
-Subject: Re: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
-
-Hi Amit,
-
-...
-
---- On Fri, 2/5/10, Amit Kucheria <amit.kucheria@canonical.com> wrote:
-> +static void __init mx51_babbage_timer_init(void) {
-> +??? mx51_clocks_init(32768, 24000000, 22579200, 24576000); }
-
-Would you care to comment about the values of the last two parameters of this function?
-
-Regards,
-
-Fabio Estevam
+> Daniel
 
 
-      
+-- 
+Sincerely yours,
+Mike.
