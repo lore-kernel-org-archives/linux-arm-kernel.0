@@ -1,24 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 8 Feb 2010 19:06:25 +0100
-Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
-In-Reply-To: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-References: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
-Message-ID: <20100208180625.GB1469@ucw.cz>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Mon, 08 Feb 2010 11:17:34 -0800
+Subject: [RFC PATCH] ARM: Change the mandatory barriers implementation
+In-Reply-To: <1265367873.7692.52.camel@pc1117.cambridge.arm.com>
+References: <4B6A131B.1070005@codeaurora.org>	
+	<1265289330.28746.58.camel@pc1117.cambridge.arm.com>
+	<1265367873.7692.52.camel@pc1117.cambridge.arm.com>
+Message-ID: <4B70634E.4040008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2010-02-04 16:45:41, Eric Miao wrote:
-> commit 31cec413e534520111716802833675f53ac99b0b
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Thu Feb 4 16:41:28 2010 -0800
+Catalin Marinas wrote:
+> On Thu, 2010-02-04 at 13:15 +0000, Catalin Marinas wrote:
+>> On Thu, 2010-02-04 at 00:21 +0000, Abhijeet Dharmapurikar wrote:
+>>>> The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+>>>> systems for things like ordering Normal Non-cacheable memory accesses
+>>>> with DMA transfer (via Device memory writes). The current implementation
+>>>> uses dmb() for mb() and friends but this is not sufficient. The DMB only
+>>>> ensures the ordering of accesses with regards to a single observer
+>>>> accessing the same memory. If a DMA transfer is started by a write to
+>>>> Device memory, the data to be transfered may not reach the main memory
+>>>> (even if mapped as Normal Non-cacheable) before the device receives the
+>>>> notification to begin the transfer. The only barrier that would help in
+>>>> this situation is DSB which would completely drain the write buffers.
+>>> On ARMv7, DMB guarantees that all accesses prior to DMB are observed by
+>>> an observer if that observer sees any accesses _after_ the DMB. In this
+>>> case, since DMA engine observes a write to itself( It is being written
+>>> to and hence must observe the write) it should also see the writes to
+>>> the buffers. A dmb() after the writes to buffer and before write to DMA
+>>> engine should suffice.
+>> I asked our processor architect for a clarification on the wording of
+>> the DMB definition but the "all accesses" part most likely refer to
+>> accesses to the same peripheral or memory block (but not together).
 > 
->     input: schedule corgi_ssp and corgi_ts to be removed
+> I got some clarification and there is nothing wrong with the definition
+> of the DMB. The catch here is that "observe" (as per the ARM ARM) is
+> defined only for master accesses. The DMA engine in this case above does
+> not "observe" the write to itself as this is a slave access to one of
+> its memory-mapped ports.
 > 
->     Cc: Richard Purdie <rpurdie@rpsys.net>
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> So, the code below:
+> 
+> 	STR	[Normal non-cacheable]
+> 	DMB
+> 	STR	[Device]
+> 
+> puts the first store in Group A (according to the DMB definition) and
+> the second store in Group B but since the DMA device does not "observe"
+> Group B in this case, there is no requirement for the ordering between
+> the observability of the store to normal memory and the observability of
+> the side-effects of the store to the DMA device.
 
-ACK.
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I agree now. DSB would be the right thing to do. Moreover the option to 
+have a barrier.h for each platform gives them a chance to fine tune 
+these barriers further.
