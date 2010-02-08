@@ -1,30 +1,34 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Feb 2010 11:11:23 +0100
-Subject: smsc911x suspend/resume
-In-Reply-To: <4B6FDC83.9090205@compulab.co.il>
-References: <4B6FDC83.9090205@compulab.co.il>
-Message-ID: <20100208101123.GW28972@buzzloop.caiaq.de>
+Date: Mon, 8 Feb 2010 11:15:24 +0100
+Subject: [PXA320] How to find I/O registers, base address
+	of ASIX ethernet chip?
+In-Reply-To: <18311265621886@webmail106.yandex.ru>
+References: <19621265275300@webmail108.yandex.ru>
+	<20100205042655.GR28972@buzzloop.caiaq.de>
+	<33291265356930@webmail116.yandex.ru>
+	<20100207051343.GL9007@buzzloop.caiaq.de>
+	<33061265619560@webmail103.yandex.ru>
+	<20100208091348.GC15255@pengutronix.de>
+	<18311265621886@webmail106.yandex.ru>
+Message-ID: <20100208101524.GX28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 11:42:27AM +0200, Mike Rapoport wrote:
-> I'm trying to make suspend/resume work on OMAP3-based system and I'm
-> encountering issues with resume of SMSC 9220 chip.
-> After resume the interface is unusable unless I do 'ifconfig eth0 down'
-> and 'ifconfig eth0 up'.
-> I would expect that 'ping <some host>' would work right after resume
-> without need to bring the interface down and up, but probably I miss
-> something.
-> Any help would be appreciated.
+On Mon, Feb 08, 2010 at 12:38:06PM +0300, Dennis Semakin wrote:
+> 08.02.10, 10:13, "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>:
+> >  This sounds like a missing clock.  Ah, and Daniel already asked that,
+> >  too: "Did you switch on the clock for the static bus?"
+> >  
+> 
+> Well... I yet do not know how to do this...
 
-What happens to your supply voltages when going to suspend? When I
-implemented the code for the smsc driver, I could only test scenarios
-where AVDD remains stable during suspend. So the driver might need some
-tweaks if that assumption is not true in your case. The SMSC datasheet
-is quite comprehensive about this topic IIRC.
+Try adding this sniplet to your lowlevel_init function in U-Boot:
 
-Also have a look at the Raumfeld device patches which use exactly this
-chip and which can suspend and resume just fine. You'll need to check
-out Eric's devel branch for that.
+        /* enable clocks for NAND and static memory */
+        ldr             r0, =CKENA
+        ldr             r1, [r0]
+        orr             r1, r1, #(CKENA_4_NAND | CKENA_9_SMC)
+        str             r1, [r0]
+        ldr             r1, [r0]
 
 Daniel
