@@ -1,34 +1,32 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Feb 2010 11:15:24 +0100
-Subject: [PXA320] How to find I/O registers, base address
-	of ASIX ethernet chip?
-In-Reply-To: <18311265621886@webmail106.yandex.ru>
-References: <19621265275300@webmail108.yandex.ru>
-	<20100205042655.GR28972@buzzloop.caiaq.de>
-	<33291265356930@webmail116.yandex.ru>
-	<20100207051343.GL9007@buzzloop.caiaq.de>
-	<33061265619560@webmail103.yandex.ru>
-	<20100208091348.GC15255@pengutronix.de>
-	<18311265621886@webmail106.yandex.ru>
-Message-ID: <20100208101524.GX28972@buzzloop.caiaq.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Feb 2010 10:19:44 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100208073334.GB7171@rhlx01.hs-esslingen.de>
+References: <20100208073334.GB7171@rhlx01.hs-esslingen.de>
+Message-ID: <1265624384.4020.25.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 12:38:06PM +0300, Dennis Semakin wrote:
-> 08.02.10, 10:13, "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>:
-> >  This sounds like a missing clock.  Ah, and Daniel already asked that,
-> >  too: "Did you switch on the clock for the static bus?"
-> >  
+On Mon, 2010-02-08 at 07:33 +0000, Andreas Mohr wrote:
+> On Mon, Feb 08, 2010 at 07:55:19AM +0100, Pavel Machek wrote:
+> > Plus it does unneccessary flushes on x86, etc...
 > 
-> Well... I yet do not know how to do this...
+> Noticed that as well, there should be an arch-obeying helper for this.
+> 
+> 
+> On my MIPSEL, I had urb->transfer_buffer NULL ptr crashes
+> (I think that was expected in case of a certain DMA setup, Alan said).
+> 
+> However, even with NULL check added I still had:
+> 
+> hub 2-1.1:1.0: state 7 ports 7 chg 0000 evt 0010
+> Unhandled kernel unaligned access[#1]:
 
-Try adding this sniplet to your lowlevel_init function in U-Boot:
+Just to avoid confusion - that's a similar patch applied to a different
+driver. The ISP1760 HCD driver works fine with my patch (transfer_buffer
+never seems to be NULL with latest mainline). I can't comment on the
+ehci-q.c driver (it looks like it has some support for DMA while my
+patch only applies to PIO drivers where transfer_buffer should be set).
 
-        /* enable clocks for NAND and static memory */
-        ldr             r0, =CKENA
-        ldr             r1, [r0]
-        orr             r1, r1, #(CKENA_4_NAND | CKENA_9_SMC)
-        str             r1, [r0]
-        ldr             r1, [r0]
-
-Daniel
+-- 
+Catalin
