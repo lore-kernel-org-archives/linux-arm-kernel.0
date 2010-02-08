@@ -1,38 +1,44 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Feb 2010 12:46:38 +0100
+Date: Mon, 8 Feb 2010 12:53:16 +0100
 Subject: smsc911x suspend/resume
-In-Reply-To: <4B6FF5E2.6060304@compulab.co.il>
-References: <4B6FDC83.9090205@compulab.co.il>
-	<20100208101123.GW28972@buzzloop.caiaq.de>
-	<4B6FF5E2.6060304@compulab.co.il>
-Message-ID: <20100208114638.GO9007@buzzloop.caiaq.de>
+In-Reply-To: <OFE2B2FE18.A8D1D506-ON802576C4.003FCA39-802576C4.0040B683@smsc.com>
+References: <4B6FF5E2.6060304@compulab.co.il>
+	<OFE2B2FE18.A8D1D506-ON802576C4.003FCA39-802576C4.0040B683@smsc.com>
+Message-ID: <20100208115316.GA28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 01:30:42PM +0200, Mike Rapoport wrote:
-> Daniel Mack wrote:
-> > What happens to your supply voltages when going to suspend? When I
-> > implemented the code for the smsc driver, I could only test scenarios
-> > where AVDD remains stable during suspend. So the driver might need some
-> > tweaks if that assumption is not true in your case. The SMSC datasheet
-> > is quite comprehensive about this topic IIRC.
+On Mon, Feb 08, 2010 at 11:46:39AM +0000, Steve.Glendinning at smsc.com wrote:
+> > Anyway, I have all the supplies except VDDVARIO shut down...
+> > And the datasheet is indeed comprehensively describes chip power states
+> > but I haven't found there anything about supplies required to stay on
+> > during suspend...
 > 
-> By AVDD you mean VDD33A?
+> I don't have the code in front of me (I'm travelling today) but IIRC
+> the driver doesn't place the LAN9220 in a specific power saving state,
+> so as far as the LAN9220 is concerned it's not actually suspended.
 
-Yes.
+It does, I added that awhile back in b6907b0c7. But as I say, this is
+currently hard-coded to D1, and if support for D2 is desired, we would
+need to make that a platform data option.
 
-> Anyway, I have all the supplies except VDDVARIO shut down...
-> And the datasheet is indeed comprehensively describes chip power states
-> but I haven't found there anything about supplies required to stay on
-> during suspend...
+> It's hard to do this in a "generic" way: some people expect their link
+> to stay up during suspend, some want suspend to completely power down
+> the ethernet chip, and some want to use one of several WoL modes. 
+> 
+> David: What's the "done thing" here for similar non-pci drivers?
+> Obviously "doesn't work after suspend" isn't the intended behaviour, so
+> there's definitely room for improvement!
+> 
+> > > Also have a look at the Raumfeld device patches which use exactly this
+> > > chip and which can suspend and resume just fine. You'll need to check
+> > > out Eric's devel branch for that.
+> 
+> Daniel: I haven't seen this, do you have a location for the git tree?
 
-In fact the datasheet doesn't really state that, and the chip seems
-to expect the power domains to remain switched on during suspend, and
-all power switching is done internally. Also the table in "7.4 Power
-Consumption (Device and System Components)" describes it like that.
+git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
 
-So it all comes down to the question of how low-power you need to be,
-and whether you need wake-on-lan or not. What's currently implemented is
-D1, but adding support for D2 should be easy.
+See the 'devel' branch. But there's actually nothing exciting in there,
+it's just a simple platform support.
 
 Daniel
