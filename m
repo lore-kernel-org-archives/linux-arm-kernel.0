@@ -1,56 +1,38 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Feb 2010 12:33:06 +0100
-Subject: Using PXA arm board with MAX7319 GPIO expander input
-In-Reply-To: <bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
-References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
-	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
-	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
-	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
-Message-ID: <20100208113306.GN9007@buzzloop.caiaq.de>
+Date: Mon, 8 Feb 2010 12:46:38 +0100
+Subject: smsc911x suspend/resume
+In-Reply-To: <4B6FF5E2.6060304@compulab.co.il>
+References: <4B6FDC83.9090205@compulab.co.il>
+	<20100208101123.GW28972@buzzloop.caiaq.de>
+	<4B6FF5E2.6060304@compulab.co.il>
+Message-ID: <20100208114638.GO9007@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 07:08:06PM +0800, Jebediah Huang wrote:
-> Is it correct that max732x driver will take i2c configuration from my
-> setup info and make each max7319 input signel into a gpio?
+On Mon, Feb 08, 2010 at 01:30:42PM +0200, Mike Rapoport wrote:
+> Daniel Mack wrote:
+> > What happens to your supply voltages when going to suspend? When I
+> > implemented the code for the smsc driver, I could only test scenarios
+> > where AVDD remains stable during suspend. So the driver might need some
+> > tweaks if that assumption is not true in your case. The SMSC datasheet
+> > is quite comprehensive about this topic IIRC.
 > 
-> Hardware work correctly because without max732x driver, above i2c-dev
-> code can read max7319 input signel. Configuration is correct.
-> 
-> gpio_base is starting where max732x driver will add new gpio number
-> for max7319 signel.
+> By AVDD you mean VDD33A?
 
-Yes, that should be right. After the driver is probed successfully, you
-should be able to access the GPIOs with generic functions as described
-in include/linux/gpio.h. Can you try if that works?
+Yes.
 
-And if you can, you should really hook up an I2C analyzer to your bus
-and see what is happening electrically and which messages pass the bus.
+> Anyway, I have all the supplies except VDDVARIO shut down...
+> And the datasheet is indeed comprehensively describes chip power states
+> but I haven't found there anything about supplies required to stay on
+> during suspend...
 
-> static struct max732x_platform_data max7319_data[] = {
->        [0] = {
->                .gpio_base      =  NR_BUILTIN_GPIO,
->        },
-> };
-> 
-> static struct i2c_board_info i2c_board_info[] =
-> {
->        {
->                .type           = "max7319",
->                .addr           = 0x6C,
->                .irq            = IRQ_GPIO(125), <= this is my irq pin
-> for max7319 INT_N
+In fact the datasheet doesn't really state that, and the chip seems
+to expect the power domains to remain switched on during suspend, and
+all power switching is done internally. Also the table in "7.4 Power
+Consumption (Device and System Components)" describes it like that.
 
-I just saw that there is indeed no support for irq line handling in this
-driver. In order to use these lines as input for something like the
-gpio_keys driver, support for that should be added. I never used this
-driver and can't say whether it is under active development.
-
-> Is my understanding wrong?
-
-One thing you should also know is that once the kernel driver is active,
-it blocks the address it is configured to, so you can't access the same
-address via the userspace API. That might be confusing if you're not
-aware of that.
+So it all comes down to the question of how low-power you need to be,
+and whether you need wake-on-lan or not. What's currently implemented is
+D1, but adding support for D2 should be easy.
 
 Daniel
