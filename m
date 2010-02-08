@@ -1,19 +1,27 @@
-From: Steve.Glendinning@smsc.com (Steve.Glendinning at smsc.com)
-Date: Mon, 8 Feb 2010 12:27:50 +0000
-Subject: smsc911x suspend/resume
-In-Reply-To: <20100208115316.GA28972@buzzloop.caiaq.de>
-Message-ID: <OFF34C9E86.0CCFA0E8-ON802576C4.0041FE48-802576C4.00447BBD@smsc.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Mon, 8 Feb 2010 12:32:38 -0000 (GMT)
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <20100208113306.GN9007@buzzloop.caiaq.de>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+	<20100208113306.GN9007@buzzloop.caiaq.de>
+Message-ID: <6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I don't have the code in front of me (I'm travelling today) but IIRC
-> > the driver doesn't place the LAN9220 in a specific power saving state,
-> > so as far as the LAN9220 is concerned it's not actually suspended.
-> 
-> It does, I added that awhile back in b6907b0c7. But as I say, this is
-> currently hard-coded to D1, and if support for D2 is desired, we would
-> need to make that a platform data option.
+> I just saw that there is indeed no support for irq line handling in this
+> driver. In order to use these lines as input for something like the
+> gpio_keys driver, support for that should be added. I never used this
+> driver and can't say whether it is under active development.
 
-You're right, and I should remember as I reviewed it!
+It should be rather easy to introduce something similar to what I did for
+the pca953x driver (http://patchwork.kernel.org/patch/77418/)
 
-Steve
+MAX732x seems a lot saner than PCA953x, as it has at least a hardware
+interrupt mask...
+
+        M.
+-- 
+And if you don't know where you're going, any road will take you there...
