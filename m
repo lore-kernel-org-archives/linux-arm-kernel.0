@@ -1,37 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 8 Feb 2010 11:52:10 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-References: <20100208065519.GE1290@ucw.cz>
-	<1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100208105209.GA31671@atrey.karlin.mff.cuni.cz>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 08 Feb 2010 19:53:13 +0900
+Subject: [PATCH] ARM: mach-shmobile: optimize get_irqnr_preamble/and_base
+	macros
+Message-ID: <20100208105313.5976.54002.sendpatchset@rxone.opensource.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
-> 
-> On Mon, 2010-02-08 at 06:55 +0000, Pavel Machek wrote:
-> > > > So, let's put this in the HCD drivers and be done with it.
-> > >
-> > > The patch below is what fixes the I-D cache incoherency issues on ARM. I
-> > > don't particularly like the solution but it seems to be the only one
-> > > available.
-> > 
-> > Really? It looks like arm should just flush the caches when mapping
-> > executable page to the userspace.... you can't expect all the drivers
-> > to be modified like that...
-> 
-> We could of course flush the caches every time we get a page fault but
-> that's far from optimal, especially since DMA-capable drivers to do
-> not
+From: Magnus Damm <damm@opensource.se>
 
-Maybe far for optimal, but it is something that should be done,
-_first_. Correctness is more important than performance, and you can't
-expect all drivers to behave like you want them.
+Optimize the SH-Mobile interrupt assembly macros to avoid
+reloading the INTFLGA register address in case of multiple
+pending interrupts. Kindly pointed out by Russell King.
 
-Then you can add optimalizations not to do the flushes on drivers you
-audited and where you care...
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- 0002/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ work/arch/arm/mach-shmobile/include/mach/entry-macro.S	2010-02-08 14:47:31.000000000 +0900
+@@ -21,13 +21,13 @@
+ 	.endm
+ 
+ 	.macro  get_irqnr_preamble, base, tmp
++	ldr     \base, =INTFLGA
+ 	.endm
+ 
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+ 
+ 	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	ldr     \base, =INTFLGA
+ 	ldr     \irqnr, [\base]
+ 	cmp	\irqnr, #0
+ 	beq	1000f
