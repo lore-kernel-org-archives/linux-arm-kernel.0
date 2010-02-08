@@ -1,22 +1,30 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 08 Feb 2010 11:03:14 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-References: <20100208065519.GE1290@ucw.cz>
-	<1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-Message-ID: <4B6FE162.6000004@warmcat.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 8 Feb 2010 11:11:23 +0100
+Subject: smsc911x suspend/resume
+In-Reply-To: <4B6FDC83.9090205@compulab.co.il>
+References: <4B6FDC83.9090205@compulab.co.il>
+Message-ID: <20100208101123.GW28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/10 10:51, Somebody in the thread at some point said:
+On Mon, Feb 08, 2010 at 11:42:27AM +0200, Mike Rapoport wrote:
+> I'm trying to make suspend/resume work on OMAP3-based system and I'm
+> encountering issues with resume of SMSC 9220 chip.
+> After resume the interface is unusable unless I do 'ifconfig eth0 down'
+> and 'ifconfig eth0 up'.
+> I would expect that 'ping <some host>' would work right after resume
+> without need to bring the interface down and up, but probably I miss
+> something.
+> Any help would be appreciated.
 
-> We could of course flush the caches every time we get a page fault but
-> that's far from optimal, especially since DMA-capable drivers to do not
-> pollute the D-cache and don't need this extra flushing. Note that the
-> recent ARM processors have PIPT caches but separate for I and D and it's
-> the PIO drivers that pollute the D-cache.
+What happens to your supply voltages when going to suspend? When I
+implemented the code for the smsc driver, I could only test scenarios
+where AVDD remains stable during suspend. So the driver might need some
+tweaks if that assumption is not true in your case. The SMSC datasheet
+is quite comprehensive about this topic IIRC.
 
-Just noting that AFAIK iMX31 USB and MMC drivers both are PIO at the 
-moment, for lack of any platform DMA support of its unusual DMA engine.
+Also have a look at the Raumfeld device patches which use exactly this
+chip and which can suspend and resume just fine. You'll need to check
+out Eric's devel branch for that.
 
--Andy
+Daniel
