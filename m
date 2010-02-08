@@ -1,51 +1,54 @@
-From: fg@emlix.com (Fabian Godehardt)
-Date: Mon, 8 Feb 2010 14:13:19 +0100
-Subject: atmel-mci / at91_mci
-In-Reply-To: <4B6A8C0F.7080907@iis.fraunhofer.de>
-References: <4B6A8C0F.7080907@iis.fraunhofer.de>
-Message-ID: <201002081413.19984.fg@emlix.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Mon, 8 Feb 2010 18:55:22 +0530
+Subject: [PATCH] ux500: fix DEBUG_LL/earlyprintk
+Message-ID: <1265635522-25842-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a static mapping for the UART and correct its virtual address in
+debug-macro.S, to make DEBUG_LL/earlyprintk work.
 
-Am Donnerstag 04 Februar 2010 09:57:51 schrieb Manuel Stahl:
-> Hi all,
-> 
-> I have a question regarding the atmel-mci/at91_mci driver merge.
-> Actually I have an at91rm9200 device which get's an CRC error while
-> inializing an SD-card. I guess it's because of an at91rm9200 errata:
-> 
-> - Data Endianess inversion from the MCI to MMC or SD Card
-> 
-> The at91_mci driver did some byte swapping in 'at91_mci_sg_to_dma'
->  function. Where would I implement this in the atmel-mci driver?
-> 
-> Attached is the kernel log when I insert a card.
+Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/mach-ux500/cpu-u8500.c                |    1 +
+ arch/arm/mach-ux500/include/mach/debug-macro.S |    9 +++++----
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-Some time ago i had a 9200 with 2.6.20 where i had similar problems (AFAIR).
-
-My workaround was to reduce the frequency on card initialization (somewhere on 
-probe() ):
-
-	mmc->f_min = 325000;
-
-and deactivating 4WIRE mode.
-
-Maybe this also helps in your case.
-
-
-Mit freundlichen Gr??en/With kind regards
-
-Fabian Godehardt
-
+diff --git a/arch/arm/mach-ux500/cpu-u8500.c b/arch/arm/mach-ux500/cpu-u8500.c
+index 5f05e58..397bc1f 100644
+--- a/arch/arm/mach-ux500/cpu-u8500.c
++++ b/arch/arm/mach-ux500/cpu-u8500.c
+@@ -33,6 +33,7 @@ static struct platform_device *platform_devs[] __initdata = {
+ 
+ /* minimum static i/o mapping required to boot U8500 platforms */
+ static struct map_desc u8500_io_desc[] __initdata = {
++	__IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GIC_CPU_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GIC_DIST_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
+diff --git a/arch/arm/mach-ux500/include/mach/debug-macro.S b/arch/arm/mach-ux500/include/mach/debug-macro.S
+index 8f21b6a..8de225e 100644
+--- a/arch/arm/mach-ux500/include/mach/debug-macro.S
++++ b/arch/arm/mach-ux500/include/mach/debug-macro.S
+@@ -8,12 +8,13 @@
+  * published by the Free Software Foundation.
+  *
+  */
++#include <mach/hardware.h>
++
+ 	.macro	addruart,rx
+ 	mrc	p15, 0, \rx, c1, c0
+-	tst	\rx, #1			@MMU enabled?
+-	moveq	\rx, #0x80000000	@MMU off, Physical address
+-	movne	\rx, #0xF0000000	@MMU on, Virtual address
+-	orr	\rx, \rx, #0x7000
++	tst	\rx, #1					@ MMU enabled?
++	ldreq	\rx, =U8500_UART2_BASE			@ no, physical address
++	ldrne	\rx, =IO_ADDRESS(U8500_UART2_BASE)	@ yes, virtual address
+ 	.endm
+ 
+ #include <asm/hardware/debug-pl01x.S>
 -- 
-Besuchen Sie uns auf der Embedded World 2010 in N?rnberg!
--> Halle 11, Stand 222
-
-Dipl.-Ing. (FH) Fabian Godehardt, emlix GmbH, http://www.emlix.com
-Fon +49 551 30664-0, Fax -11, Bahnhofsallee 1b, 37081 G?ttingen, Germany
-Sitz der Gesellschaft: G?ttingen, Amtsgericht G?ttingen HR B 3160
-Gesch?ftsf?hrer: Dr. Uwe Kracke, Ust-IdNr.: DE 205 198 055
-
-emlix - your embedded linux partner
+1.6.5.3
