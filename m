@@ -1,29 +1,29 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Feb 2010 13:49:46 +0100
-Subject: [PXA320] How to find I/O registers, base
-	address of ASIX ethernet chip?
-In-Reply-To: <32661265631372@webmail120.yandex.ru>
-References: <19621265275300@webmail108.yandex.ru>
-	<20100205042655.GR28972@buzzloop.caiaq.de>
-	<33291265356930@webmail116.yandex.ru>
-	<20100207051343.GL9007@buzzloop.caiaq.de>
-	<33061265619560@webmail103.yandex.ru>
-	<20100208091348.GC15255@pengutronix.de>
-	<18311265621886@webmail106.yandex.ru>
-	<20100208101524.GX28972@buzzloop.caiaq.de>
-	<32661265631372@webmail120.yandex.ru>
-Message-ID: <20100208124946.GB28972@buzzloop.caiaq.de>
+Date: Mon, 8 Feb 2010 14:04:48 +0100
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+	<20100208113306.GN9007@buzzloop.caiaq.de>
+	<6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
+Message-ID: <20100208130448.GD28972@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 03:16:12PM +0300, Dennis Semakin wrote:
-> It is necessary to ask only: why in u-boot git-repository I didn't see this code?
+On Mon, Feb 08, 2010 at 12:32:38PM -0000, Marc Zyngier wrote:
+> > I just saw that there is indeed no support for irq line handling in this
+> > driver. In order to use these lines as input for something like the
+> > gpio_keys driver, support for that should be added. I never used this
+> > driver and can't say whether it is under active development.
+> 
+> It should be rather easy to introduce something similar to what I did for
+> the pca953x driver (http://patchwork.kernel.org/patch/77418/)
+> 
+> MAX732x seems a lot saner than PCA953x, as it has at least a hardware
+> interrupt mask...
 
-It did see this code, but it wasn't taken for upstream, for reasons I
-cannot remember.
+Is anyone with access to such hardware able to implement this?
 
-You should have a look at the openpxa patches provided by Marek and see
-if they work for you. If they don't, help fixing them.
-
-Best regards,
 Daniel
