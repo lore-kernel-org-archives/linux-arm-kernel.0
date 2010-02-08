@@ -1,62 +1,44 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 8 Feb 2010 01:45:31 -0500
-Subject: [PATCH 3/5] mfd: use genirq in 88pm860x
-In-Reply-To: <20100205153938.GB3448@sortiz.org>
-References: <771cded01002030503w15f5394fwd226a26e4deadc6d@mail.gmail.com>
-	<20100205153938.GB3448@sortiz.org>
-Message-ID: <771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Feb 2010 07:55:19 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1265045354.25750.52.camel@pc1117.cambridge.arm.com>
+References: <20100129185434.GH19501@one-eyed-alien.net>
+	<1265045354.25750.52.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100208065519.GE1290@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 5, 2010 at 10:39 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> Hi Haojian,
->
-> On Wed, Feb 03, 2010 at 08:03:13AM -0500, Haojian Zhuang wrote:
->> From 1c49d1bf59a1ec2c59dc093899e6b2d0991bd676 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Wed, 3 Feb 2010 15:39:28 -0500
->> Subject: [PATCH] mfd: use genirq in 88pm860x
-> The patch looks fine to me but:
->
-> - Please add some more verbose changelog
-> - It doesnt build on x86, you need to apply this:
->
-> diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
-> index 0b1eba0..6a14d2b 100644
-> --- a/drivers/mfd/88pm860x-core.c
-> +++ b/drivers/mfd/88pm860x-core.c
-> @@ -544,7 +544,11 @@ static int __devinit device_irq_init(struct pm860x_chip
-> *ch
-> ? ? ? ? ? ? ? ?set_irq_chip_and_handler(__irq, &pm860x_irq_chip,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? handle_edge_irq);
-> ? ? ? ? ? ? ? ?set_irq_nested_thread(__irq, 1);
-> +#ifdef CONFIG_ARM
-> ? ? ? ? ? ? ? ?set_irq_flags(__irq, IRQF_VALID);
-> +#else
-> + ? ? ? ? ? ? ? set_irq_noprobe(__irq);
-> +#endif
-> ? ? ? ?}
->
-> ? ? ? ?ret = request_threaded_irq(chip->core_irq, NULL, pm860x_irq, flags,
->
-> - After applying this patch, 88pm860x-ts.c fails to build. You need to merge
-> patches 3 and 4 into one single patch to prevent build failure.
->
-> Cheers,
-> Samuel.
->
+Hi!
 
-Great thanks. Now the patch is updated. The modification is in below.
-1. Merge patch of IRQ handling and touchscreen driver.
-2. Add CONFIG_ARM in 88pm860x driver.
-3. Add more comments in changelog.
+> > So, let's put this in the HCD drivers and be done with it.
+> 
+> The patch below is what fixes the I-D cache incoherency issues on ARM. I
+> don't particularly like the solution but it seems to be the only one
+> available.
 
-Best Regards
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mfd-use-genirq-in-88pm860x.patch
-Type: text/x-patch
-Size: 18895 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100208/fd51edee/attachment-0001.bin>
+Really? It looks like arm should just flush the caches when mapping
+executable page to the userspace.... you can't expect all the drivers
+to be modified like that...
+
+Plus it does unneccessary flushes on x86, etc...
+
+> @@ -904,6 +906,14 @@ __acquires(priv->lock)
+>  			status = 0;
+>  	}
+>  
+> +	if (usb_pipein(urb->pipe) && usb_pipetype(urb->pipe) == PIPE_BULK) {
+> +		void *ptr;
+> +		for (ptr = urb->transfer_buffer;
+> +		     ptr < urb->transfer_buffer + urb->transfer_buffer_length;
+> +		     ptr += PAGE_SIZE)
+> +			flush_dcache_page(virt_to_page(ptr));
+> +	}
+> +
+>  	/* complete() can reenter this HCD */
+>  	usb_hcd_unlink_urb_from_ep(priv_to_hcd(priv), urb);
+>  	spin_unlock(&priv->lock);
+> 
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
