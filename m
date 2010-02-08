@@ -1,40 +1,62 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 8 Feb 2010 14:06:59 +0800
-Subject: [PXA320] How to find I/O registers, base address of ASIX ethernet
-	chip?
-In-Reply-To: <20100207051122.GK9007@buzzloop.caiaq.de>
-References: <19621265275300@webmail108.yandex.ru>
-	<20100205042655.GR28972@buzzloop.caiaq.de>
-	<20100205075338.GB31903@pengutronix.de>
-	<20100207051122.GK9007@buzzloop.caiaq.de>
-Message-ID: <f17812d71002072206g13d04ef6jab12c26e54909082@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 8 Feb 2010 01:45:31 -0500
+Subject: [PATCH 3/5] mfd: use genirq in 88pm860x
+In-Reply-To: <20100205153938.GB3448@sortiz.org>
+References: <771cded01002030503w15f5394fwd226a26e4deadc6d@mail.gmail.com>
+	<20100205153938.GB3448@sortiz.org>
+Message-ID: <771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/2/7 Daniel Mack <daniel@caiaq.de>:
-> On Fri, Feb 05, 2010 at 08:53:38AM +0100, Uwe Kleine-K?nig wrote:
->> On Fri, Feb 05, 2010 at 05:26:55AM +0100, Daniel Mack wrote:
->> > The addresses passed to the driver is the I/O area of the chip select
->> > signal used for the Ethernet chip. This setting should be alright, as it
->> > worked well for me.
->> >
->> > If your kernel hangs when accessing this area, you most probably haven't
->> > set up your static bus correctly. The bootloader is in charge of doing
->> > this, and the correct value for CSADRCFG2 is 0x0032C809.
->> I would prefer if Linux didn't rely on the boot loader for that. ?It's
->> not expensive or difficult to set this register in machine setup code,
->> is it?
->>
+On Fri, Feb 5, 2010 at 10:39 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> Hi Haojian,
 >
-> The boarsds I've been working on need to set this register from the
-> bootloader anyway they use Ethernet for TFTP downloads. But you're
-> right, in general, there should be a way to set such registers from
-> kernel space as well. Eric, any such plans?
+> On Wed, Feb 03, 2010 at 08:03:13AM -0500, Haojian Zhuang wrote:
+>> From 1c49d1bf59a1ec2c59dc093899e6b2d0991bd676 Mon Sep 17 00:00:00 2001
+>> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Date: Wed, 3 Feb 2010 15:39:28 -0500
+>> Subject: [PATCH] mfd: use genirq in 88pm860x
+> The patch looks fine to me but:
+>
+> - Please add some more verbose changelog
+> - It doesnt build on x86, you need to apply this:
+>
+> diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+> index 0b1eba0..6a14d2b 100644
+> --- a/drivers/mfd/88pm860x-core.c
+> +++ b/drivers/mfd/88pm860x-core.c
+> @@ -544,7 +544,11 @@ static int __devinit device_irq_init(struct pm860x_chip
+> *ch
+> ? ? ? ? ? ? ? ?set_irq_chip_and_handler(__irq, &pm860x_irq_chip,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? handle_edge_irq);
+> ? ? ? ? ? ? ? ?set_irq_nested_thread(__irq, 1);
+> +#ifdef CONFIG_ARM
+> ? ? ? ? ? ? ? ?set_irq_flags(__irq, IRQF_VALID);
+> +#else
+> + ? ? ? ? ? ? ? set_irq_noprobe(__irq);
+> +#endif
+> ? ? ? ?}
+>
+> ? ? ? ?ret = request_threaded_irq(chip->core_irq, NULL, pm860x_irq, flags,
+>
+> - After applying this patch, 88pm860x-ts.c fails to build. You need to merge
+> patches 3 and 4 into one single patch to prevent build failure.
+>
+> Cheers,
+> Samuel.
 >
 
-I think so, the setting of CSADRCFGx and others is really something
-like SMEMC initialization, provided we have a smemc.c, we might be
-able to have something generic there.
+Great thanks. Now the patch is updated. The modification is in below.
+1. Merge patch of IRQ handling and touchscreen driver.
+2. Add CONFIG_ARM in 88pm860x driver.
+3. Add more comments in changelog.
 
-> Daniel
->
+Best Regards
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mfd-use-genirq-in-88pm860x.patch
+Type: text/x-patch
+Size: 18895 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100208/fd51edee/attachment-0001.bin>
