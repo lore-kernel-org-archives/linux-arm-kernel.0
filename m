@@ -1,48 +1,19 @@
-From: insane79@yandex.ru (Dennis Semakin)
-Date: Mon, 08 Feb 2010 15:16:22 +0300
-Subject: [PXA320] How to find I/O registers,
-	base address of ASIX ethernet chip?
-In-Reply-To: <20100208101524.GX28972@buzzloop.caiaq.de>
-References: <19621265275300@webmail108.yandex.ru>
-	<20100205042655.GR28972@buzzloop.caiaq.de>
-	<33291265356930@webmail116.yandex.ru>
-	<20100207051343.GL9007@buzzloop.caiaq.de>
-	<33061265619560@webmail103.yandex.ru>
-	<20100208091348.GC15255@pengutronix.de>
-	<18311265621886@webmail106.yandex.ru>
-	<20100208101524.GX28972@buzzloop.caiaq.de>
-Message-ID: <32851265631382@webmail120.yandex.ru>
+From: Steve.Glendinning@smsc.com (Steve.Glendinning at smsc.com)
+Date: Mon, 8 Feb 2010 12:27:50 +0000
+Subject: smsc911x suspend/resume
+In-Reply-To: <20100208115316.GA28972@buzzloop.caiaq.de>
+Message-ID: <OFF34C9E86.0CCFA0E8-ON802576C4.0041FE48-802576C4.00447BBD@smsc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel
-Thank you very much for code. It works fine.
-If you will be in Moscow, I'll buy you a pints of beer :)
+> > I don't have the code in front of me (I'm travelling today) but IIRC
+> > the driver doesn't place the LAN9220 in a specific power saving state,
+> > so as far as the LAN9220 is concerned it's not actually suspended.
+> 
+> It does, I added that awhile back in b6907b0c7. But as I say, this is
+> currently hard-coded to D1, and if support for D2 is desired, we would
+> need to make that a platform data option.
 
-It is necessary to ask only: why in u-boot git-repository I didn't see this code?
+You're right, and I should remember as I reviewed it!
 
-08.02.10, 11:15, "Daniel Mack" <daniel@caiaq.de>:
-
-> On Mon, Feb 08, 2010 at 12:38:06PM +0300, Dennis Semakin wrote:
->  > 08.02.10, 10:13, "Uwe Kleine-K?nig" :
->  > >  This sounds like a missing clock.  Ah, and Daniel already asked that,
->  > >  too: "Did you switch on the clock for the static bus?"
->  > >  
->  > 
->  > Well... I yet do not know how to do this...
->  
->  Try adding this sniplet to your lowlevel_init function in U-Boot:
->  
->          /* enable clocks for NAND and static memory */
->          ldr             r0, =CKENA
->          ldr             r1, [r0]
->          orr             r1, r1, #(CKENA_4_NAND | CKENA_9_SMC)
->          str             r1, [r0]
->          ldr             r1, [r0]
->  
->  Daniel
->  
-
-Thanks
-Best regards
-Dennis Semakin
+Steve
