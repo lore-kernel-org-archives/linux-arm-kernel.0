@@ -1,73 +1,74 @@
 From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 9 Feb 2010 20:17:58 +0100
-Subject: [PATCH 01/14] ARM: LPC32XX: Initial architecture header files
-In-Reply-To: <20100209093129.GA2284@pengutronix.de>
+Date: Tue, 9 Feb 2010 20:18:02 +0100
+Subject: [PATCH 03/14] ARM: LPC32XX: Clock driver
+In-Reply-To: <20100209103918.GD2284@pengutronix.de>
 References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-2-git-send-email-wellsk40@gmail.com>
-	<20100209093129.GA2284@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F805C8C7550B@eu1rdcrdc1wx030.exi.nxp.com>
+	<1265674295-23996-4-git-send-email-wellsk40@gmail.com>
+	<20100209103918.GD2284@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F805C8C7550C@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks again Uwe for your time spent reviewing this and your
-helpful comments!
-
-> > diff --git a/arch/arm/mach-lpc32xx/include/mach/board.h b/arch/arm/mach-
-> lpc32xx/include/mach/board.h
-> > new file mode 100644
-> > index 0000000..30424bc
-> > --- /dev/null
-> > +++ b/arch/arm/mach-lpc32xx/include/mach/board.h
-> > @@ -0,0 +1,23 @@
+> > +
 > > +/*
-> > + * arch/arm/mach-lpc32xx/include/mach/board.h
-> > + *
-> > + * Author: Kevin Wells <kevin.wells@nxp.com>
-> > + *
-> > + * Copyright (C) 2010 NXP Semiconductors
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
+> > + * Post divider values for PLLs based on selected register value
 > > + */
-> > +
-> > +
-> nitpick: there is an empty line too much.
-> 
-> > +#ifndef __ASM_ARCH_BOARD_H
-> > +#define __ASM_ARCH_BOARD_H
-> > +
-> > +#endif
-> Do you really need this file?
+> > +const u32 pll_postdivs[4] = {1, 2, 4, 8};
+> make this static, too?
 > 
 
-This file is a place holder. most of the other drivers for this
-platform are already complete and a few add structures to this
-file that are shared via platform data. I can remove it, but
-would have to replace it later so I prefer to keep it now.
+This object is used in 2 files/functions for PLL rate computation and
+PLL rate generation and is externally defined in common.h. I should
+be able to move the other function that references this into clock.c,
+it's a clock function too, and make things a little more simpler.
 
-> > diff --git a/arch/arm/mach-lpc32xx/include/mach/clkdev.h
-> b/arch/arm/mach-lpc32xx/include/mach/clkdev.h
-> > new file mode 100644
-> > index 0000000..9bf0637
-> > --- /dev/null
-> > +++ b/arch/arm/mach-lpc32xx/include/mach/clkdev.h
-> > @@ -0,0 +1,25 @@
-> > +/*
-> > + * arch/arm/mach-lpc32xx/include/mach/clkdev.h
-> > + *
-> > + * Author: Kevin Wells <kevin.wells@nxp.com>
-> hmmm, I wonder why you use your nxp address here, but gmail in the
-> S-o-b.
+> > +static void local_clk_disable(struct clk *clk)
+> > +{
+> > +	/* Don't attempt to disable clock if it has no users */
+> WARN_ON(clk->usecount <= 0)?
+> 
+> > +	if (clk->usecount > 0) {
+> > +		clk->usecount--;
+> > +
+> > +		/* Only disable clock when it has no more users */
+> > +		if ((clk->usecount == 0) && (clk->enable))
+> > +			clk->enable(clk, 0);
+> > +
+> > +		/* Check parent clocks, they may need to be disabled too */
+> > +		if (clk->parent)
+> > +			local_clk_disable(clk->parent);
+> > +	}
+> > +}
+> > +
+> > +static int local_clk_enable(struct clk *clk)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	if (clk->usecount == 0) {
+> > +		/* Enable parent clocks first */
+> > +		if (clk->parent)
+> > +			ret = local_clk_enable(clk->parent);
+> > +
+> > +		/* Enable clock on first use */
+> > +		if ((ret == 0) && (clk->enable)) {
+> > +			ret = clk->enable(clk, 1);
+> > +			clk->usecount++;
+> > +		}
+> > +
+> > +		/* Back out use counters if enable fails */
+> > +		if (ret < 0)
+> > +			local_clk_disable(clk);
+> if enable failed there is no need to disable, is it?
+> 
+> And I think the reference counting is broken.
+> 
+> After
+> 
+> 	clk_enable(aclk);
+> 	clk_enable(aclk);
+> 	clk_disable(aclk);
+> 
+> aclk is disabled because usecount isn't increased if it is already >0!?
 > 
 
-Corporate email + corporate IT + outlook = lots of problems with mailing lists
-I'll change that address in git too.
-
-Kevin
+Yes, this does seem broken. I will review and fix.
