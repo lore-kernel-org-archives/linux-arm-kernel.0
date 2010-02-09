@@ -1,108 +1,151 @@
 From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue,  9 Feb 2010 18:59:48 +0200
-Subject: [PATCHv3 0/7] Initial Freescale i.MX51 SoC support
-Message-ID: <cover.1265733173.git.amit.kucheria@canonical.com>
+Date: Tue,  9 Feb 2010 18:59:50 +0200
+Subject: [PATCHv3 2/7] mxc: refactor timer code to use timer versions
+In-Reply-To: <a003708ad4ee9384226251431c7953a24079ff80.1265733173.git.amit.kucheria@canonical.com>
+References: <cover.1265733173.git.amit.kucheria@canonical.com>
+	<a003708ad4ee9384226251431c7953a24079ff80.1265733173.git.amit.kucheria@canonical.com>
+Message-ID: <0f3332c4fabb2227b1bc15dc7542017d08f10a09.1265733173.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(patchset rebased on top of Sascha's tree and trivial fixes made)
-git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Will you consider merging it now?
+Refactor the timer code into version 1 and version 2.
 
-Regards,
-Amit
+Essentially there are 2 versions of the timer hardware on Freescale MXC
+hardware. Version 1 is found on MX1/MXL, MX21 and MX27. Version 2 is found on
+MX25, MX31, MX35, MX37, MX51, and future parts.
 
-This series of patches adds basic support for i.MX5 family to the kernel. This
-is just the bare minimum that brings up the board - sets up the clocks, IO
-with a serial port and timers.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+---
+ arch/arm/plat-mxc/time.c |   41 ++++++++++++++++++++++++++---------------
+ 1 files changed, 26 insertions(+), 15 deletions(-)
 
-Features:
-
-  * Console: Serial console using pre-existing drivers/serial/imx.c
-  * Timer: Timer provided through arch/arm/plat-mxc/time.c
-  * Interrupts: New interrupt controller through arch/arm/plat-mxc/tzic.c
-  * Clocks: Minimal Clock framework to allow board boot up
-  * Defconfigs: mx51_defconfig provided
-
-Tested on a i.MX51-based Babbage 2.5 board.
-
-Git:
-
-repo: git://kernel.ubuntu.com/amitk/mx51-upstream.git mx51-baseport
-
-Story:
-
-This is a result of dropping a lot of functionality from the existing
-Freescale codebase that is shipping as part of the Ubuntu ARM enablement. A
-lot of the code was refactored to use facilities that were already available
-upstream in arch/arm/plat-mxc/. The hope is to get this base port into
-mainline and then start working on mainlining the drivers.
-
-Changelog:
-
-V1: Initial submission of base port
-
-V2: - Split core code enabling i.MX51 and the babbage board
-    - Refactor timer code to use version 1 or 2 of timer (patch by Sascha)
-    - Fixes from review of V1
-
-V3: - Fixes from review of V2
-    - Merge the Driver Strength patch into the Core i.MX5 support
-    - Moved the fec patches out of this series into its own
-    - Merge the Kconfig/Makefiles into Babbage board support
-
-Amit Kucheria (6):
-  mxc: TrustZone interrupt controller (TZIC) for Freescale i.MX5 family
-  mxc: changes to common plat-mxc code to add support for i.MX5
-  mxc: Core support for Freescale i.MX5 series
-  mxc: Add support for the Babbage board (i.MX5)
-  mxc: Add mx51_defconfig
-  mxc: MAINTAINERS: Add maintainer for mach-mx5
-
-Sascha Hauer (1):
-  mxc: refactor timer code to use timer versions
-
- MAINTAINERS                                  |    6 +
- arch/arm/Makefile                            |    1 +
- arch/arm/configs/mx51_defconfig              | 1286 ++++++++++++++++++++++++++
- arch/arm/mach-mx5/Kconfig                    |   18 +
- arch/arm/mach-mx5/Makefile                   |    9 +
- arch/arm/mach-mx5/Makefile.boot              |    3 +
- arch/arm/mach-mx5/board-mx51_babbage.c       |   98 ++
- arch/arm/mach-mx5/clock-mx51.c               |  825 +++++++++++++++++
- arch/arm/mach-mx5/cpu.c                      |   47 +
- arch/arm/mach-mx5/crm_regs.h                 |  583 ++++++++++++
- arch/arm/mach-mx5/devices.c                  |   96 ++
- arch/arm/mach-mx5/devices.h                  |    4 +
- arch/arm/mach-mx5/mm.c                       |   89 ++
- arch/arm/plat-mxc/Kconfig                    |   16 +
- arch/arm/plat-mxc/Makefile                   |    3 +
- arch/arm/plat-mxc/include/mach/common.h      |    5 +
- arch/arm/plat-mxc/include/mach/debug-macro.S |    9 +
- arch/arm/plat-mxc/include/mach/entry-macro.S |   34 +-
- arch/arm/plat-mxc/include/mach/hardware.h    |    4 +
- arch/arm/plat-mxc/include/mach/iomux-mx51.h  |  326 +++++++
- arch/arm/plat-mxc/include/mach/iomux-v3.h    |    8 +-
- arch/arm/plat-mxc/include/mach/irqs.h        |    9 +-
- arch/arm/plat-mxc/include/mach/memory.h      |    3 +
- arch/arm/plat-mxc/include/mach/mx51.h        |  454 +++++++++
- arch/arm/plat-mxc/include/mach/mxc.h         |   13 +
- arch/arm/plat-mxc/include/mach/timex.h       |    2 +
- arch/arm/plat-mxc/time.c                     |   41 +-
- arch/arm/plat-mxc/tzic.c                     |  172 ++++
- 28 files changed, 4144 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/configs/mx51_defconfig
- create mode 100644 arch/arm/mach-mx5/Kconfig
- create mode 100644 arch/arm/mach-mx5/Makefile
- create mode 100644 arch/arm/mach-mx5/Makefile.boot
- create mode 100644 arch/arm/mach-mx5/board-mx51_babbage.c
- create mode 100644 arch/arm/mach-mx5/clock-mx51.c
- create mode 100644 arch/arm/mach-mx5/cpu.c
- create mode 100644 arch/arm/mach-mx5/crm_regs.h
- create mode 100644 arch/arm/mach-mx5/devices.c
- create mode 100644 arch/arm/mach-mx5/devices.h
- create mode 100644 arch/arm/mach-mx5/mm.c
- create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx51.h
- create mode 100644 arch/arm/plat-mxc/include/mach/mx51.h
- create mode 100644 arch/arm/plat-mxc/tzic.c
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 844567e..c1ce51a 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -30,9 +30,15 @@
+ #include <asm/mach/time.h>
+ #include <mach/common.h>
+ 
++/*
++ * There are 2 versions of the timer hardware on Freescale MXC hardware.
++ * Version 1: MX1/MXL, MX21, MX27.
++ * Version 2: MX25, MX31, MX35, MX37, MX51
++ */
++
+ /* defines common for all i.MX */
+ #define MXC_TCTL		0x00
+-#define MXC_TCTL_TEN		(1 << 0)
++#define MXC_TCTL_TEN		(1 << 0) /* Enable module */
+ #define MXC_TPRER		0x04
+ 
+ /* MX1, MX21, MX27 */
+@@ -47,8 +53,8 @@
+ #define MX2_TSTAT_CAPT		(1 << 1)
+ #define MX2_TSTAT_COMP		(1 << 0)
+ 
+-/* MX31, MX35, MX25, MXC91231 */
+-#define MX3_TCTL_WAITEN		(1 << 3)
++/* MX31, MX35, MX25, MXC91231, MX5 */
++#define MX3_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
+ #define MX3_TCTL_CLK_IPG	(1 << 6)
+ #define MX3_TCTL_FRR		(1 << 9)
+ #define MX3_IR			0x0c
+@@ -57,6 +63,9 @@
+ #define MX3_TCN			0x24
+ #define MX3_TCMP		0x10
+ 
++#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
++#define timer_is_v2()	(!timer_is_v1())
++
+ static struct clock_event_device clockevent_mxc;
+ static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+ 
+@@ -66,7 +75,7 @@ static inline void gpt_irq_disable(void)
+ {
+ 	unsigned int tmp;
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		__raw_writel(0, timer_base + MX3_IR);
+ 	else {
+ 		tmp = __raw_readl(timer_base + MXC_TCTL);
+@@ -76,7 +85,7 @@ static inline void gpt_irq_disable(void)
+ 
+ static inline void gpt_irq_enable(void)
+ {
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		__raw_writel(1<<0, timer_base + MX3_IR);
+ 	else {
+ 		__raw_writel(__raw_readl(timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
+@@ -86,11 +95,13 @@ static inline void gpt_irq_enable(void)
+ 
+ static void gpt_irq_acknowledge(void)
+ {
+-	if (cpu_is_mx1())
+-		__raw_writel(0, timer_base + MX1_2_TSTAT);
+-	if (cpu_is_mx2())
+-		__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP, timer_base + MX1_2_TSTAT);
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v1()) {
++		if (cpu_is_mx1())
++			__raw_writel(0, timer_base + MX1_2_TSTAT);
++		else
++			__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP,
++				timer_base + MX1_2_TSTAT);
++	} else if (timer_is_v2())
+ 		__raw_writel(MX3_TSTAT_OF1, timer_base + MX3_TSTAT);
+ }
+ 
+@@ -117,7 +128,7 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		clocksource_mxc.read = mx3_get_cycles;
+ 
+ 	clocksource_mxc.mult = clocksource_hz2mult(c,
+@@ -180,7 +191,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 
+ 	if (mode != clockevent_mode) {
+ 		/* Set event time into far-far future */
+-		if (cpu_is_mx3() || cpu_is_mx25())
++		if (timer_is_v2())
+ 			__raw_writel(__raw_readl(timer_base + MX3_TCN) - 3,
+ 					timer_base + MX3_TCMP);
+ 		else
+@@ -233,7 +244,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
+ 	struct clock_event_device *evt = &clockevent_mxc;
+ 	uint32_t tstat;
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		tstat = __raw_readl(timer_base + MX3_TSTAT);
+ 	else
+ 		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
+@@ -264,7 +275,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		clockevent_mxc.set_next_event = mx3_set_next_event;
+ 
+ 	clockevent_mxc.mult = div_sc(c, NSEC_PER_SEC,
+@@ -296,7 +307,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ 	__raw_writel(0, timer_base + MXC_TCTL);
+ 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+ 
+-	if (cpu_is_mx3() || cpu_is_mx25())
++	if (timer_is_v2())
+ 		tctl_val = MX3_TCTL_CLK_IPG | MX3_TCTL_FRR | MX3_TCTL_WAITEN | MXC_TCTL_TEN;
+ 	else
+ 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+-- 
+1.6.3.3
