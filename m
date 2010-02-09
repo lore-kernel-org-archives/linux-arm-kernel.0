@@ -1,13 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 08 Feb 2010 22:35:34 -0500 (EST)
+From: GKing@nvidia.com (Gary King)
+Date: Mon, 8 Feb 2010 20:00:53 -0800
 Subject: race between kmap shootdown and cache maintenance
-In-Reply-To: <A0A1E7539300DF49AA383E614C7827BC048DB10979@HQMAIL01.nvidia.com>
+In-Reply-To: <alpine.LFD.2.00.1002082229480.1681@xanadu.home>
 References: <A0A1E7539300DF49AA383E614C7827BC048DB1096B@HQMAIL01.nvidia.com>
 	<20100207153045.GA30457@n2100.arm.linux.org.uk>
 	<A0A1E7539300DF49AA383E614C7827BC048DB10979@HQMAIL01.nvidia.com>
-Message-ID: <alpine.LFD.2.00.1002082229480.1681@xanadu.home>
+	<alpine.LFD.2.00.1002082229480.1681@xanadu.home>
+Message-ID: <A0A1E7539300DF49AA383E614C7827BC048DB10984@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The patch is not a no-op; without this patch I was seeing panics in v7_flush_kern_dcache about 1 time in 3 boots, with it the crash has not reproduced in hundreds of boots.
+
+However, from re-reading the highmem code, I think my original description of the cause of the crash was slightly mistaken:
+
+Kmap zero-flushing is lazy (it happens on the subsequent call to kmap), and the page_address is not set to NULL until the lazy-flush happens. In this case, if page_address is called immediately following a kunmap call which resulted in the pin count dropping to 1, a valid address will be returned.
+
+On SMP or PREEMPT kernels, kmap may be called in one context during cache maintenance on one of these pages in a different context, resulting in flush_all_zero_pkmaps invalidating the PTE (and TLB) of the pages that is actively undergoing maintenance.
+
+- Gary
+
+-----Original Message-----
+From: Nicolas Pitre [mailto:nico at fluxnic.net] 
+Sent: Monday, February 08, 2010 7:36 PM
+To: Gary King
+Cc: 'Russell King - ARM Linux'; 'linux-arm-kernel at lists.infradead.org'
+Subject: RE: race between kmap shootdown and cache maintenance
 
 On Mon, 8 Feb 2010, Gary King wrote:
 
@@ -39,3 +57,9 @@ So unless proven otherwise I think this patch is useless.
 
 
 Nicolas
+-----------------------------------------------------------------------------------
+This email message is for the sole use of the intended recipient(s) and may contain
+confidential information.  Any unauthorized review, use, disclosure or distribution
+is prohibited.  If you are not the intended recipient, please contact the sender by
+reply email and destroy all copies of the original message.
+-----------------------------------------------------------------------------------
