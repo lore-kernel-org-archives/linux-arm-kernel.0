@@ -1,26 +1,65 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Tue, 9 Feb 2010 20:00:56 +0530
-Subject: [PATCH] amba-pl011: support hardware flow control
-In-Reply-To: <20100208135124.GA26608@n2100.arm.linux.org.uk>
-References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
-	<20100208135124.GA26608@n2100.arm.linux.org.uk>
-Message-ID: <20100209143055.GA6015@bnru01.bnr.st.com>
+From: manuel.stahl@iis.fraunhofer.de (Manuel Stahl)
+Date: Tue, 09 Feb 2010 16:49:50 +0100
+Subject: atmel-mci / at91_mci
+In-Reply-To: <201002081413.19984.fg@emlix.com>
+References: <4B6A8C0F.7080907@iis.fraunhofer.de>
+	<201002081413.19984.fg@emlix.com>
+Message-ID: <4B71841E.7030108@iis.fraunhofer.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 02:51:24PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Feb 08, 2010 at 07:11:50PM +0530, Rabin Vincent wrote:
-> > Enable/disable hardware flow control as requested by the termios.
-> 
-> From what I remember, I didn't implement this because there were
-> corner cases to be dealt with.  I don't remember what they were
-> off hand though.
+Am 08.02.2010 14:13, schrieb Fabian Godehardt:
+> Hi,
+>
+> Am Donnerstag 04 Februar 2010 09:57:51 schrieb Manuel Stahl:
+>> Hi all,
+>>
+>> I have a question regarding the atmel-mci/at91_mci driver merge.
+>> Actually I have an at91rm9200 device which get's an CRC error while
+>> inializing an SD-card. I guess it's because of an at91rm9200 errata:
+>>
+>> - Data Endianess inversion from the MCI to MMC or SD Card
+>>
+>> The at91_mci driver did some byte swapping in 'at91_mci_sg_to_dma'
+>>   function. Where would I implement this in the atmel-mci driver?
+>>
+>> Attached is the kernel log when I insert a card.
+>
+> Some time ago i had a 9200 with 2.6.20 where i had similar problems (AFAIR).
+>
+> My workaround was to reduce the frequency on card initialization (somewhere on
+> probe() ):
+>
+> 	mmc->f_min = 325000;
+>
+> and deactivating 4WIRE mode.
+>
+> Maybe this also helps in your case.
 
-We haven't seen any problems with it thus far.  Nothing obvious strikes
-me on rechecking the pl011 spec; it would be helpful if you could
-elaborate.
+Unfortunately this is not the problem. The SD-card works fine with the 
+old at91_mci driver, but not with the newer atmel-mci. The problem is 
+that I need both slots at the same time, so at91_mci is no option for me.
 
-Either way, this patch should be safe to apply since existing users of
-the driver shouldn't be affected.
+In the second slot there is a WLAN card which gets timeouts after 
+successful firmware load with at91_mci but does not work with atmel-mci.
 
-Rabin
+I have exactly the same setup with an AVR32 processor, there both 
+devices work. With the atmel-mci driver obiously.
+
+Regards,
+-- 
+Dipl.-Inf. Manuel Stahl
+Fraunhofer-Institut f?r Integrierte Schaltungen IIS
+- Leistungsoptimierte Systeme -
+Nordostpark 93                Telefon  +49 (0)911/58061-6419
+90411 N?rnberg                Fax      +49 (0)911/58061-6398
+http://www.iis.fraunhofer.de  manuel.stahl at iis.fraunhofer.de
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 6148 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100209/389bfd88/attachment-0001.p7s>
