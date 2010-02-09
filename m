@@ -1,40 +1,51 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue, 9 Feb 2010 18:06:31 +0200
-Subject: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
-In-Reply-To: <4B6C5519.2070506@gmail.com>
-References: <cover.1265385421.git.amit.kucheria@canonical.com>
-	<367110fafb57f7340bbffec9b394ed2fa6e89da5.1265385421.git.amit.kucheria@canonical.com>
-	<553d86cf968ba78a26b67098c2e1849407a51ba1.1265385421.git.amit.kucheria@canonical.com>
-	<bf84de08e5c511325fb94a742f5d6efabece06b6.1265385421.git.amit.kucheria@canonical.com>
-	<7739120baf6088e426f3f8bab174f6c6a6df3601.1265385421.git.amit.kucheria@canonical.com>
-	<ef6149ed5e1d228262c3d98421a836400095c1b7.1265385421.git.amit.kucheria@canonical.com>
-	<4B6C5519.2070506@gmail.com>
-Message-ID: <20100209160631.GI3390@matterhorn.verdurent.com>
+From: csammy@gmail.com (Sammy Chan)
+Date: Wed, 10 Feb 2010 00:26:18 +0800
+Subject: Kernel stuck at at91_change_speed
+Message-ID: <1bbf47391002090826hdb97241la4b6449556cfe7ad@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Feb 05, Magnus Lilja wrote:
-> Amit Kucheria skrev:
-> > Babbage is a reference board from Freescale for their i.MX51 SoC.
-> > 
-> > Add board definition, Kconfig and Makefiles to enable Freescale i.MX51
-> > processor and Babbage board.
-> > 
-> > Boot tested on a Babbage2.5 board
-> 
-> In u-boot this board, and the files, are called mx51evk instead of Babbage. It would be nice if the same name is used in both, but no big issue.
-> 
-> Regards, Magnus
+Hi,
 
-I started to do a patch to move it to EVK but then realised that
-arch/arm/tools/mach-types has it as mx51_babbage. So this would cause more
-confusion.
+This is my first post. I've an interesting finding to share with you.
+I'm using an old kernel 2.4.21-rmk1 on AT91RM9200. Recently, I found
+that the kernel would hang at times when calling open("/dev/ttySX") in
+order to initialize an RS232 port, IRDA port or other serial device.
+In fact, it got stuck at an infinite while loop here:
 
-I'll just add a comment in the Kconfig help.
+[drivers/at91/serial/at91_serial.c, at91_change_speed()]
+
+......
+    /* first, disable interrupts and drain transmitter */
+    local_irq_save(flags);
+    imr = UART_GET_IMR(uart);   /* get interrupt mask */
+    UART_PUT_IDR(uart, -1);     /* disable all interrupts */
+    local_irq_restore(flags);
+
+    while (!(UART_GET_CSR(uart) & AT91C_US_TXEMPTY)) { barrier(); }
+......
+    UART_PUT_BRGR(uart, quot);
+
+------------------------------------------
+It didn't stand to reason that a byte sent to the shift register could
+never trasmitted. After painstaking investigation, I found that
+US_BRGR (clock divisor) was 0 when the loop was being executed, which
+means the clock was disabled. The reason there was data to be
+transmitted during the open call was that by default the ttyS device
+has the ECHO c_lflag on and there was some initial noise generated
+from the serial devices, causing the noise received to be transmitted
+soon after the transmitted was enabled during. If the noise happened
+to arrive just before the loop was executed, the kernel would be
+trapped. That explains the randomness. If US_BRGR was set to some
+non-zero value, the problem would disappear. It seems even in the
+latest kernel, the while loop still precedes setting the US_BRGR. I
+wonder if this is a potential kernel bug, or if it's just my
+responsibility to ensure that there is no noise or ECHO turned off as
+default for non-terminal devices?
 
 Regards,
-Amit
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Sammy
+
+----------------
+Sammy Chan
+csammy at gmail.com
