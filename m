@@ -1,75 +1,50 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 08 Feb 2010 23:40:28 -0500 (EST)
-Subject: race between kmap shootdown and cache maintenance
-In-Reply-To: <A0A1E7539300DF49AA383E614C7827BC048DB10984@HQMAIL01.nvidia.com>
-References: <A0A1E7539300DF49AA383E614C7827BC048DB1096B@HQMAIL01.nvidia.com>
-	<20100207153045.GA30457@n2100.arm.linux.org.uk>
-	<A0A1E7539300DF49AA383E614C7827BC048DB10979@HQMAIL01.nvidia.com>
-	<alpine.LFD.2.00.1002082229480.1681@xanadu.home>
-	<A0A1E7539300DF49AA383E614C7827BC048DB10984@HQMAIL01.nvidia.com>
-Message-ID: <alpine.LFD.2.00.1002082310420.1681@xanadu.home>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 9 Feb 2010 07:39:03 +0000
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <f17812d71002081705q7723c388re8582d1186802340@mail.gmail.com>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+	<20100208113306.GN9007@buzzloop.caiaq.de>
+	<6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
+	<f17812d71002081705q7723c388re8582d1186802340@mail.gmail.com>
+Message-ID: <20100209073903.4d8a00e4@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Feb 2010, Gary King wrote:
+On Tue, 9 Feb 2010 09:05:22 +0800
+Eric Miao <eric.y.miao@gmail.com> wrote:
 
-> The patch is not a no-op; without this patch I was seeing panics in 
-> v7_flush_kern_dcache about 1 time in 3 boots, with it the crash has 
-> not reproduced in hundreds of boots.
-
-I would still like to understand why.  Without a good explanation this 
-might simply be covering another bug.
-
-> However, from re-reading the highmem code, I think my original 
-> description of the cause of the crash was slightly mistaken:
+> On Mon, Feb 8, 2010 at 8:32 PM, Marc Zyngier <maz@misterjones.org> wrote:
+> >> I just saw that there is indeed no support for irq line handling in this
+> >> driver. In order to use these lines as input for something like the
+> >> gpio_keys driver, support for that should be added. I never used this
+> >> driver and can't say whether it is under active development.
+> >
+> > It should be rather easy to introduce something similar to what I did for
+> > the pca953x driver (http://patchwork.kernel.org/patch/77418/)
+> >
+> > MAX732x seems a lot saner than PCA953x, as it has at least a hardware
+> > interrupt mask...
 > 
-> Kmap zero-flushing is lazy (it happens on the subsequent call to 
-> kmap), and the page_address is not set to NULL until the lazy-flush 
-> happens. In this case, if page_address is called immediately following 
-> a kunmap call which resulted in the pin count dropping to 1, a valid 
-> address will be returned.
+> Well, I'd say max732x is a chip of heavy simplification, input/output direction
+> of each pin is normally hardcoded, depending on the chip model used, there
+> seems no such interrupt mask registers for SW use really.
 
-But that's where things seem wrong.  There should no be any caller of 
-flush_dcache_page() passing a page with no "owner".
+I'm currently staring at the max7319 datasheet, and it really looks
+like there is such a register:
 
-Can you try this patch and see if it actually triggers, and if so what 
-the call backtrace is?
+"All input ports are continuously monitored for state changes
+(transition detection). Transitions are latched, allowing detection of
+transient changes. Any combination of inputs can be selected using the
+interrupt mask to assert the INT output. When the MAX7319 is
+subsequently accessed through the serial interface, any pending
+interrupt is cleared."
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 6f3a4b7..7afdb4b 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -125,6 +125,8 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
- 	 * coherent with the kernels mapping.
- 	 */
- #ifdef CONFIG_HIGHMEM
-+	extern int kmap_high_pinned(struct page *);
-+	BUG_ON(addr && PageHighMem(page) && !kmap_high_pinned(page));
- 	/*
- 	 * kmap_atomic() doesn't set the page virtual address, and
- 	 * kunmap_atomic() takes care of cache flushing already.
-diff --git a/mm/highmem.c b/mm/highmem.c
-index 9c1e627..f50d83e 100644
---- a/mm/highmem.c
-+++ b/mm/highmem.c
-@@ -238,6 +238,18 @@ void *kmap_high_get(struct page *page)
- 	unlock_kmap_any(flags);
- 	return (void*) vaddr;
- }
-+
-+int kmap_high_pinned(struct page *page)
-+{
-+	unsigned long vaddr, flags;
-+	int res;
-+
-+	lock_kmap_any(flags);
-+	vaddr = (unsigned long)page_address(page);
-+	res = (vaddr && pkmap_count[PKMAP_NR(vaddr)] >= 2);
-+	unlock_kmap_any(flags);
-+	return res;
-+}
- #endif
- 
- /**
+So it would seems (although I agree with you that max732x as a GPIO
+expander is grossly simplified) that the feature is at least advertised.
 
-Nicolas
+	M.
+-- 
+I'm the slime oozin' out from your TV set...
