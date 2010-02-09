@@ -1,26 +1,31 @@
-From: tiendas.mixtas-bounces@charanga.es (tiendas.mixtas-bounces at charanga.es)
-Date: Tue, 09 Feb 2010 11:21:39 +0100
-Subject: =?iso-8859-1?q?El_mensaje_enviado_a_Tiendas=2Emixtas_espera_la_a?=
-	=?iso-8859-1?q?probacion_del_moderador?=
-Message-ID: <mailman.14024.1265710899.1069.tiendas.mixtas@charanga.es>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 9 Feb 2010 10:22:58 -0000 (GMT)
+Subject: Using PXA arm board with MAX7319 GPIO expander input
+In-Reply-To: <f17812d71002090019n1facdbfw54f87da726333fa3@mail.gmail.com>
+References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
+	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
+	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
+	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
+	<20100208113306.GN9007@buzzloop.caiaq.de>
+	<6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
+	<f17812d71002081705q7723c388re8582d1186802340@mail.gmail.com>
+	<20100209073903.4d8a00e4@taxman.wild-wind.fr.eu.org>
+	<f17812d71002090019n1facdbfw54f87da726333fa3@mail.gmail.com>
+Message-ID: <1a3edf73aeae353342a4a082b4803bd9.squirrel@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El mensaje que ha enviado a la lista 'Tiendas.mixtas' y que versa
-sobre:
 
-    Returned mail: see transcript for details
+On Tue, February 9, 2010 08:19, Eric Miao wrote:
+> That sounds like a good news. I'm seeing your previous implementation
+> of interrupt support on pca953x as a good one, so probably would be
+> good to follow that, and not sure Jebediah Huang can have this tested :-)
 
-Ha sido retenido en espera de que el moderador de la lista lo revise y
-apruebe.
+It will probably take a while before I have access to my PXA boards again
+(currently moving), but unless someone beats me to it, I'll probably give
+it a go in a few weeks. Provided that I can source the hardware, of
+course... :-)
 
-Ha sido retenido por:
-
-    Mensaje dirigido a una lista privada procedente de una direcci?n
-que no pertenece a la lista
-
-O se mandar? el mensaje a la lista o se le enviar? una notificaci?n
-con la decisi?n del moderador. Si desea cancelar este env?o, puede
-hacerlo a trav?s de la siguiente URL:
-
-    http://correo1.charanga.es/mailman/confirm/tiendas.mixtas/65a07343b54c9d0f17d92b9d07e49e2e779263c1
+        M.
+-- 
+And if you don't know where you're going, any road will take you there...
