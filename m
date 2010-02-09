@@ -1,20 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Feb 2010 09:59:34 +0000
-Subject: [PATCH 01/14] ARM: LPC32XX: Initial architecture header files
-In-Reply-To: <20100209093129.GA2284@pengutronix.de>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-2-git-send-email-wellsk40@gmail.com>
-	<20100209093129.GA2284@pengutronix.de>
-Message-ID: <20100209095934.GA11534@n2100.arm.linux.org.uk>
+From: tiendas.mixtas-bounces@charanga.es (tiendas.mixtas-bounces at charanga.es)
+Date: Tue, 09 Feb 2010 11:21:39 +0100
+Subject: =?iso-8859-1?q?El_mensaje_enviado_a_Tiendas=2Emixtas_espera_la_a?=
+	=?iso-8859-1?q?probacion_del_moderador?=
+Message-ID: <mailman.14024.1265710899.1069.tiendas.mixtas@charanga.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2010 at 10:31:29AM +0100, Uwe Kleine-K?nig wrote:
-> > +#define io_p2v(x)	((void __iomem *) (unsigned long) IO_ADDRESS(x))
-> Is this cast to unsigned long needed?  AFAIK IO_ADDRESS(x) has
-> type unsigned for x in { 0x0 ... 0xffffffff } (provided that int uses a
-> 32 bit 2s-complement representation).  If unsigned long is really
-> needed, maybe put it into the IO_ADDRESS macro?
+El mensaje que ha enviado a la lista 'Tiendas.mixtas' y que versa
+sobre:
 
-int -> void __iomem * = sparse warning
-unsigned long -> void __iomem * = no sparse warning
+    Returned mail: see transcript for details
+
+Ha sido retenido en espera de que el moderador de la lista lo revise y
+apruebe.
+
+Ha sido retenido por:
+
+    Mensaje dirigido a una lista privada procedente de una direcci?n
+que no pertenece a la lista
+
+O se mandar? el mensaje a la lista o se le enviar? una notificaci?n
+con la decisi?n del moderador. Si desea cancelar este env?o, puede
+hacerlo a trav?s de la siguiente URL:
+
+    http://correo1.charanga.es/mailman/confirm/tiendas.mixtas/65a07343b54c9d0f17d92b9d07e49e2e779263c1
