@@ -1,37 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Feb 2010 17:58:57 +0000
-Subject: [PATCH 01/14] ARM: LPC32XX: Initial architecture header files
-In-Reply-To: <20100209165223.GA11113@pengutronix.de>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-2-git-send-email-wellsk40@gmail.com>
-	<20100209093129.GA2284@pengutronix.de>
-	<20100209095934.GA11534@n2100.arm.linux.org.uk>
-	<20100209165223.GA11113@pengutronix.de>
-Message-ID: <20100209175857.GA20924@n2100.arm.linux.org.uk>
+Date: Tue, 9 Feb 2010 18:01:09 +0000
+Subject: [PATCH] amba-pl011: support hardware flow control
+In-Reply-To: <20100209143055.GA6015@bnru01.bnr.st.com>
+References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
+	<20100208135124.GA26608@n2100.arm.linux.org.uk>
+	<20100209143055.GA6015@bnru01.bnr.st.com>
+Message-ID: <20100209180109.GB20924@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2010 at 05:52:23PM +0100, Uwe Kleine-K?nig wrote:
-> [Added linux-sparse at vger.kernel.org to Cc:]
-> 
-> On Tue, Feb 09, 2010 at 09:59:34AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 09, 2010 at 10:31:29AM +0100, Uwe Kleine-K?nig wrote:
-> > > > +#define io_p2v(x)	((void __iomem *) (unsigned long) IO_ADDRESS(x))
-> > > Is this cast to unsigned long needed?  AFAIK IO_ADDRESS(x) has
-> > > type unsigned for x in { 0x0 ... 0xffffffff } (provided that int uses a
-> > > 32 bit 2s-complement representation).  If unsigned long is really
-> > > needed, maybe put it into the IO_ADDRESS macro?
+On Tue, Feb 09, 2010 at 08:00:56PM +0530, Rabin VINCENT wrote:
+> On Mon, Feb 08, 2010 at 02:51:24PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Feb 08, 2010 at 07:11:50PM +0530, Rabin Vincent wrote:
+> > > Enable/disable hardware flow control as requested by the termios.
 > > 
-> > int -> void __iomem * = sparse warning
-> > unsigned long -> void __iomem * = no sparse warning
-> Ah, OK, I see.  But IMHO it's a poor reason to add the cast.  Either
-> the cast is necessary/recommended or sparse is wrong.  In the first case
-> the reasoning shouldn't have to do with sparse, in the latter sparse
-> should be fixed.
+> > From what I remember, I didn't implement this because there were
+> > corner cases to be dealt with.  I don't remember what they were
+> > off hand though.
+> 
+> We haven't seen any problems with it thus far.  Nothing obvious strikes
+> me on rechecking the pl011 spec; it would be helpful if you could
+> elaborate.
 
-The point is that on 64-bit architectures, a pointer may be representable
-by an unsigned long, but not an int.
+Can't elaborate at the moment without re-reading the specs.
 
-> Is this intended?  What is the preferred way to define iomem pointers?
+> Either way, this patch should be safe to apply since existing users of
+> the driver shouldn't be affected.
 
-Define a numerical address with a UL suffix is the simplest way.
+Err, that really doesn't follow.  There are existing users, and existing
+users will have CRTSCTS set by default.  Therefore, existing users are
+going from having hardware flow control on the UART disabled to having
+it enabled.
+
+That's not "shouldn't be affected", that's a "this patch does change
+the hardware behaviour for these users".
