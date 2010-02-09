@@ -1,41 +1,42 @@
-From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Mon,  8 Feb 2010 16:11:35 -0800
-Subject: [PATCH 14/14] WATCHDOG: Add support for the LPC32XX arch
-In-Reply-To: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1265674295-23996-15-git-send-email-wellsk40@gmail.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 8 Feb 2010 16:46:29 -0800 (PST)
+Subject: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
+In-Reply-To: <229789.92421.qm@web51008.mail.re2.yahoo.com>
+Message-ID: <784058.93145.qm@web51001.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wells <wellsk40@gmail.com>
 
-Allow the pnx4408 watchdog  driver to be reused with the
-LPC32xx arch. Changed menu title to include the LCP32XX
-device.
 
-Signed-off-by: Kevin Wells <wellsk40@gmail.com>
----
- drivers/watchdog/Kconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+--- On Sun, 2/7/10, Fabio Estevam <fabioestevam@yahoo.com> wrote:
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 050ee14..3019415 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -200,11 +200,11 @@ config OMAP_WATCHDOG
- 	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430 watchdog timer.
- 
- config PNX4008_WATCHDOG
--	tristate "PNX4008 Watchdog"
--	depends on ARCH_PNX4008
-+	tristate "PNX4008/LPC32XX Watchdog"
-+	depends on ARCH_PNX4008 || ARCH_LPC32XX
- 	help
- 	  Say Y here if to include support for the watchdog timer
--	  in the PNX4008 processor.
-+	  in the PNX4008 or LPC32XX processors.
- 	  This driver can be built as a module by choosing M. The module
- 	  will be called pnx4008_wdt.
- 
--- 
-1.6.6
+> From: Fabio Estevam <fabioestevam@yahoo.com>
+> Subject: Re: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
+> To: amit.kucheria at verdurent.com, "Amit Kucheria" <amit.kucheria@canonical.com>
+> Cc: linux at arm.linux.org.uk, Dinh.Nguyen at freescale.com, s.hauer at pengutronix.de, grant.likely at secretlab.ca, r.herring at freescale.com, valentin.longchamp at epfl.ch, daniel at caiaq.de, bryan.wu at canonical.com, eric.miao at canonical.com, linux-arm-kernel at lists.infradead.org
+> Date: Sunday, February 7, 2010, 5:10 PM
+> Hi Amit,
+> 
+> ...
+> 
+> --- On Fri, 2/5/10, Amit Kucheria <amit.kucheria@canonical.com>
+> wrote:
+> > +static void __init mx51_babbage_timer_init(void)
+> > +{
+> > +??? mx51_clocks_init(32768, 24000000, 22579200,
+> 24576000);
+> > +}
+> 
+> Would you care to comment about the values of the last two
+> parameters of this function?
+
+I can see all oscillator values on MX51EVK schematics, except the last one (24.576 MHz). Where did you get this value from?
+
+Regards,
+
+Fabio Estevam
+
+
+
+
+      
