@@ -1,32 +1,33 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 9 Feb 2010 11:39:18 +0100
-Subject: [PATCH 03/14] ARM: LPC32XX: Clock driver
-In-Reply-To: <1265674295-23996-4-git-send-email-wellsk40@gmail.com>
+Date: Tue, 9 Feb 2010 11:58:17 +0100
+Subject: [PATCH 04/14] ARM: LPC32XX: GPIO, timer, and IRQ drivers
+In-Reply-To: <1265674295-23996-5-git-send-email-wellsk40@gmail.com>
 References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-4-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100209103918.GD2284@pengutronix.de>
+	<1265674295-23996-5-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100209105817.GE2284@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 04:11:24PM -0800, wellsk40 at gmail.com wrote:
+On Mon, Feb 08, 2010 at 04:11:25PM -0800, wellsk40 at gmail.com wrote:
 > From: Kevin Wells <wellsk40@gmail.com>
 > 
-> Clock driver for the LPC32XX architecture
+> Common drivers for the LPC32XX used on all platforms
 > 
 > Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 > ---
->  arch/arm/mach-lpc32xx/clock.c | 1078 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-lpc32xx/clock.h |   37 ++
->  2 files changed, 1115 insertions(+), 0 deletions(-)
+>  arch/arm/mach-lpc32xx/gpiolib.c |  458 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-lpc32xx/irq.c     |  438 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-lpc32xx/timer.c   |  182 ++++++++++++++++
+>  3 files changed, 1078 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+> diff --git a/arch/arm/mach-lpc32xx/gpiolib.c b/arch/arm/mach-lpc32xx/gpiolib.c
 > new file mode 100644
-> index 0000000..4f0b882
+> index 0000000..202cd82
 > --- /dev/null
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -0,0 +1,1078 @@
+> +++ b/arch/arm/mach-lpc32xx/gpiolib.c
+> @@ -0,0 +1,458 @@
 > +/*
-> + * arch/arm/mach-lpc32xx/clock.c
+> + * arch/arm/mach-lpc32xx/gpiolib.c
 > + *
 > + * Author: Kevin Wells <kevin.wells@nxp.com>
 > + *
@@ -41,1109 +42,468 @@ On Mon, Feb 08, 2010 at 04:11:24PM -0800, wellsk40 at gmail.com wrote:
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 > + * GNU General Public License for more details.
-> + */
-> +
-> +/*
-> + * LPC32xx clock mamagement driver overview
-s/mamagement/management/
-
-> + *
-> + * The LPC32XX contains a number of high level system clocks that can be
-> + * generated from different sources. These system clocks are used to
-> + * generate the CPU and bus rates and the individual peripheral clocks in
-> + * the system. When Linux is started by the boot loader, the system
-> + * clocks are already running. Stopping a system clock during normal
-> + * Linux operation should never be attempted, as peripherals that require
-> + * those clocks will quit working (ie, DRAM).
-> + *
-> + * The LPC32xx high level clock tree looks as follows. Clocks marked with
-> + * an asterisk are always on and cannot be disabled. Clocks marked with
-> + * an ampersand can only be disabled in CPU suspend mode. Clocks marked
-> + * with a carot are always on if it is the selected clock for the SYSCLK
-s/carot/caret/
-
-> + * source. The clock that isn't used for SYSCLK can be enabled and
-> + * disabled normally.
-> + *                               32KHz oscillator*
-> + *                               /      |      \
-> + *                             RTC*   PLL397^ TOUCH
-> + *                                     /
-> + *               Main oscillator^     /
-> + *                   |        \      /
-> + *                   |         SYSCLK&
-> + *                   |            \
-> + *                   |             \
-> + *                USB_PLL       HCLK_PLL&
-> + *                   |           |    |
-> + *            USB host/device  PCLK&  |
-> + *                               |    |
-> + *                             Peripherals
-> + *
-> + * The CPU and chip bus rates are derived from the HCLK PLL, which can
-> + * generate various clock rates up to 266MHz and beyond. The internal bus
-> + * rates (PCLK and HCLK) are generated from dividers based on the HCLK
-> + * PLL rate. HCLK can be a ratio of 1:1, 1:2, or 1:4 or HCLK PLL rate,
-> + * while PCLK can be 1:1 to 1:32 of HCLK PLL rate. Most peripherals high
-> + * level clocks are based on either HCLK or PCLK, but have their own
-> + * dividers as part of the IP itself. Because of this, the system clock
-> + * rates should not be changed.
-> + *
-> + * The HCLK PLL is clocked from SYSCLK, which can be derived from the
-> + * main oscillator or PLL397. PLL397 generates a rate that is 397 times
-> + * the 32KHz oscillator rate. The main oscillator runs at the selected
-> + * oscillator/crystal rate on the mosc_in pin of the LPC32xx. This rate
-> + * is normally 13MHz, but depends on the selection of external crystals
-> + * or oscillators. If USB operation is required, the main oscillator must
-> + * be used in the system.
-> + *
-> + * Switching SYSCLK between sources during normal Linux operation is not
-> + * supported. SYSCLK is preset in the bootloader. Because of the
-> + * complexities of clock management during clock frequency changes,
-> + * there are some limitations to the clock driver explained below:
-> + * - The PLL397 and main oscillator can be enabled and disabled by the
-> + *   clk_enable() and clk_disable() functions unless SYSCLK is based
-> + *   on that clock. This allows the other oscillator that isn't driving
-> + *   the HCLK PLL to be used as another system clock that can be routed
-> + *   to an external pin.
-> + * - The muxed SYSCLK input and HCLK_PLL rate cannot be changed with
-> + *   this driver.
-> + * - HCLK and PCLK rates cannot be changed as part of this driver.
-> + * - Most peripherals have their own dividers are part of the peripheral
-> + *   block. Changing SYSCLK, HCLK PLL, HCLK, or PCLK sources or rates
-> + *   will also impact the individual peripheral rates.
 > + */
 > +
 > +#include <linux/kernel.h>
-> +#include <linux/list.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
 > +#include <linux/errno.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/amba/bus.h>
-> +#include <linux/amba/clcd.h>
+> +#include <linux/gpio.h>
 > +
 > +#include <mach/hardware.h>
-> +#include <asm/clkdev.h>
-> +#include <mach/clkdev.h>
 > +#include <mach/platform.h>
-> +#include "clock.h"
 > +#include "common.h"
 > +
-> +static struct clk clk_armpll;
-> +static struct clk clk_usbpll;
-> +static struct mutex clkm_lock;
-static DEFINE_MUTEX(clkm_lock);
-
-then you don't need to mutex_init below.
-
+> +#define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
+> +#define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
+> +#define LPC32XX_GPIO_P3_OUTP_CLR		_GPREG(0x008)
+> +#define LPC32XX_GPIO_P3_OUTP_STATE		_GPREG(0x00C)
+> +#define LPC32XX_GPIO_P2_DIR_SET			_GPREG(0x010)
+> +#define LPC32XX_GPIO_P2_DIR_CLR			_GPREG(0x014)
+> +#define LPC32XX_GPIO_P2_DIR_STATE		_GPREG(0x018)
+> +#define LPC32XX_GPIO_P2_INP_STATE		_GPREG(0x01C)
+> +#define LPC32XX_GPIO_P2_OUTP_SET		_GPREG(0x020)
+> +#define LPC32XX_GPIO_P2_OUTP_CLR		_GPREG(0x024)
+> +#define LPC32XX_GPIO_P2_MUX_SET			_GPREG(0x028)
+> +#define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
+> +#define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
+> +#define LPC32XX_GPIO_P0_INP_STATE		_GPREG(0x040)
+> +#define LPC32XX_GPIO_P0_OUTP_SET		_GPREG(0x044)
+> +#define LPC32XX_GPIO_P0_OUTP_CLR		_GPREG(0x048)
+> +#define LPC32XX_GPIO_P0_OUTP_STATE		_GPREG(0x04C)
+> +#define LPC32XX_GPIO_P0_DIR_SET			_GPREG(0x050)
+> +#define LPC32XX_GPIO_P0_DIR_CLR			_GPREG(0x054)
+> +#define LPC32XX_GPIO_P0_DIR_STATE		_GPREG(0x058)
+> +#define LPC32XX_GPIO_P1_INP_STATE		_GPREG(0x060)
+> +#define LPC32XX_GPIO_P1_OUTP_SET		_GPREG(0x064)
+> +#define LPC32XX_GPIO_P1_OUTP_CLR		_GPREG(0x068)
+> +#define LPC32XX_GPIO_P1_OUTP_STATE		_GPREG(0x06C)
+> +#define LPC32XX_GPIO_P1_DIR_SET			_GPREG(0x070)
+> +#define LPC32XX_GPIO_P1_DIR_CLR			_GPREG(0x074)
+> +#define LPC32XX_GPIO_P1_DIR_STATE		_GPREG(0x078)
 > +
-> +/*
-> + * Post divider values for PLLs based on selected register value
-> + */
-> +const u32 pll_postdivs[4] = {1, 2, 4, 8};
-make this static, too?
-
+> +#define GPIO012_PIN_TO_BIT(x)			(1 << (x))
+> +#define GPIO3_PIN_TO_BIT(x)			(1 << ((x) + 25))
+> +#define GPO3_PIN_TO_BIT(x)			(1 << (x))
+> +#define GPIO012_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
+> +#define GPIO3_PIN_IN_SEL(x, y)			(((x) >> (10 + (y))) & 1)
+> +#define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
+> +#define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
 > +
-> +static u32 local_return_parent_rate(struct clk *clk)
-> +{
-> +	/*
-> +	 * If a clock has a rate of 0, then it inherits it's parent
-> +	 * clock rate
-> +	 */
-> +	if (clk->rate == 0)
-> +		return local_return_parent_rate(clk->parent);
-> +
-> +	return clk->rate;
-> +}
-> +
-> +/* 32KHz clock has a fixed rate and is not stoppable */
-> +static struct clk osc_32KHz = {
-> +	.rate		= LPC32XX_CLOCK_OSC_FREQ,
-> +	.get_rate	= &local_return_parent_rate,
-The address operator -----^ isn't needed and commonly omitted.
-
-> +};
-> +
-> +static int local_pll397_enable(struct clk *clk, int enable)
-> +{
-> +	u32 reg;
-> +	unsigned long timeout = 1 + msecs_to_jiffies(10);
-> +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_PLL397_CTRL);
-> +
-> +	if (enable == 0) 	{
-> +		reg |= LPC32XX_CLKPWR_SYSCTRL_PLL397_DIS;
-> +		__raw_writel(reg, LPC32XX_CLKPWR_PLL397_CTRL);
-> +		clk->rate = 0;
-I think you don't need to zero rate here.  get_rate isn't guaranteed to
-return the right value if the clock is off, but you don't need to
-"destroy" the right value on purpose.
-
-> +	} else {
-> +		/* Enable PLL397 */
-> +		reg &= ~LPC32XX_CLKPWR_SYSCTRL_PLL397_DIS;
-> +		__raw_writel(reg, LPC32XX_CLKPWR_PLL397_CTRL);
-> +		clk->rate = LPC32XX_CLOCK_OSC_FREQ * 397;
-> +
-> +		/* Wait for PLL397 lock */
-> +		while (((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
-> +			LPC32XX_CLKPWR_SYSCTRL_PLL397_STS) == 0) &&
-> +			(timeout > jiffies))
-> +			cpu_relax();
-> +
-> +		if ((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
-> +			LPC32XX_CLKPWR_SYSCTRL_PLL397_STS) == 0)
-> +			return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int local_oscmain_enable(struct clk *clk, int enable)
-> +{
-> +	u32 reg;
-> +	unsigned long timeout = 1 + msecs_to_jiffies(10);
-> +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL);
-> +
-> +	if (enable == 0) {
-> +		reg |= LPC32XX_CLKPWR_MOSC_DISABLE;
-> +		__raw_writel(reg, LPC32XX_CLKPWR_MAIN_OSC_CTRL);
-> +		clk->rate = 0;
-> +	} else {
-> +		/* Enable main oscillator */
-> +		reg &= ~LPC32XX_CLKPWR_MOSC_DISABLE;
-> +		__raw_writel(reg, LPC32XX_CLKPWR_MAIN_OSC_CTRL);
-> +		clk->rate = LPC32XX_MAIN_OSC_FREQ;
-> +
-> +		/* Wait for main oscillator to start */
-> +		while (((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
-> +			LPC32XX_CLKPWR_MOSC_DISABLE) != 0) &&
-> +			(timeout > jiffies))
-> +			cpu_relax();
-> +
-> +		if ((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
-> +			LPC32XX_CLKPWR_MOSC_DISABLE) != 0)
-> +			return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk osc_pll397 = {
-> +	.parent		= &osc_32KHz,
-> +	.enable		= &local_pll397_enable,
-> +	.rate		= LPC32XX_CLOCK_OSC_FREQ * 397,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk osc_main = {
-> +	.enable		= &local_oscmain_enable,
-> +	.rate		= LPC32XX_MAIN_OSC_FREQ,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_sys;
-> +
-> +/*
-> + * Setup the HCLK PLL with a PLL structure
-> + */
-> +static u32 local_clk_pll_setup(struct clk_pll_setup *PllSetup)
-> +{
-> +	u32 tv, tmp = 0;
-> +
-> +	if (PllSetup->analog_on != 0)
-> +		tmp |= LPC32XX_CLKPWR_HCLKPLL_POWER_UP;
-> +	if (PllSetup->cco_bypass_b15 != 0)
-> +		tmp |= LPC32XX_CLKPWR_HCLKPLL_CCO_BYPASS;
-> +	if (PllSetup->direct_output_b14 != 0)
-> +		tmp |= LPC32XX_CLKPWR_HCLKPLL_POSTDIV_BYPASS;
-> +	if (PllSetup->fdbk_div_ctrl_b13 != 0)
-> +		tmp |= LPC32XX_CLKPWR_HCLKPLL_FDBK_SEL_FCLK;
-> +
-> +	switch (PllSetup->pll_p) {
-> +	case 1:
-> +		tv = 0;
-> +		break;
-> +
-> +	case 2:
-> +		tv = 1;
-> +		break;
-> +
-> +	case 4:
-> +		tv = 2;
-> +		break;
-> +
-> +	case 8:
-> +		tv = 3;
-> +		break;
-> +
-> +	default:
-> +		return 0;
-> +	}
-I don't know the hardware details here, but maybe using ffs and
-is_power_of_2 is more efficient?
-
-> +	tmp |= LPC32XX_CLKPWR_HCLKPLL_POSTDIV_2POW(tv);
-> +	tmp |= LPC32XX_CLKPWR_HCLKPLL_PREDIV_PLUS1(PllSetup->pll_n - 1);
-> +	tmp |= LPC32XX_CLKPWR_HCLKPLL_PLLM(PllSetup->pll_m - 1);
-> +
-> +	return tmp;
-> +}
-> +
-> +/*
-> + * Update the ARM core PLL frequency rate variable from the actual PLL setting
-> + */
-> +static void local_update_armpll_rate(void)
-> +{
-> +	u32 clkin, pllreg;
-> +
-> +	clkin = clk_armpll.parent->rate;
-> +	pllreg = __raw_readl(LPC32XX_CLKPWR_HCLKPLL_CTRL) & 0x1FFFF;
-> +
-> +	clk_armpll.rate = clk_get_pllrate_from_reg(clkin, pllreg);
-> +}
-> +
-> +/*
-> + * Find a PLL configuration for the selected input frequency
-> + */
-> +static u32 local_clk_find_pll_cfg(u32 pllin_freq, u32 target_freq,
-> +	struct clk_pll_setup *pllsetup)
-> +{
-> +	u32 ifreq, freqtol, m, n, p, fclkout;
-> +
-> +	/* Determine frequency tolerance limits */
-> +	freqtol = target_freq / 250;
-> +	ifreq = pllin_freq;
-> +
-> +	/* Is direct bypass mode possible? */
-> +	if (abs(pllin_freq - target_freq) <= freqtol) {
-> +		pllsetup->analog_on = 0;
-> +		pllsetup->cco_bypass_b15 = 1;
-> +		pllsetup->direct_output_b14 = 1;
-> +		pllsetup->fdbk_div_ctrl_b13 = 1;
-> +		pllsetup->pll_p = pll_postdivs[0];
-> +		pllsetup->pll_n = 1;
-> +		pllsetup->pll_m = 1;
-> +		return clk_check_pll_setup(ifreq, pllsetup);
-> +	} else if (target_freq <= ifreq) {
-> +		pllsetup->analog_on = 0;
-> +		pllsetup->cco_bypass_b15 = 1;
-> +		pllsetup->direct_output_b14 = 0;
-> +		pllsetup->fdbk_div_ctrl_b13 = 1;
-> +		pllsetup->pll_n = 1;
-> +		pllsetup->pll_m = 1;
-> +		for (p = 0; p <= 3; p++) {
-> +			pllsetup->pll_p = pll_postdivs[p];
-> +			fclkout = clk_check_pll_setup(ifreq, pllsetup);
-> +			if (abs(target_freq - fclkout) <= freqtol)
-> +				return fclkout;
-> +		}
-> +	}
-> +
-> +	/* Is direct mode possible? */
-> +	pllsetup->analog_on = 1;
-> +	pllsetup->cco_bypass_b15 = 0;
-> +	pllsetup->direct_output_b14 = 1;
-> +	pllsetup->fdbk_div_ctrl_b13 = 0;
-> +	pllsetup->pll_p = pll_postdivs[0];
-> +	for (m = 1; m <= 256; m++) {
-> +		for (n = 1; n <= 4; n++) {
-> +			/* Compute output frequency for this value */
-> +			pllsetup->pll_n = n;
-> +			pllsetup->pll_m = m;
-> +			fclkout = clk_check_pll_setup(ifreq,
-> +				pllsetup);
-> +			if (abs(target_freq - fclkout) <=
-> +				freqtol)
-> +				return fclkout;
-> +		}
-> +	}
-> +
-> +	/* Is integer mode possible? */
-> +	pllsetup->analog_on = 1;
-> +	pllsetup->cco_bypass_b15 = 0;
-> +	pllsetup->direct_output_b14 = 0;
-> +	pllsetup->fdbk_div_ctrl_b13 = 1;
-> +	for (m = 1; m <= 256; m++) {
-> +		for (n = 1; n <= 4; n++) {
-> +			for (p = 0; p < 4; p++) {
-> +				/* Compute output frequency */
-> +				pllsetup->pll_p = pll_postdivs[p];
-> +				pllsetup->pll_n = n;
-> +				pllsetup->pll_m = m;
-> +				fclkout = clk_check_pll_setup(
-> +					ifreq, pllsetup);
-> +				if (abs(target_freq - fclkout) <= freqtol)
-> +					return fclkout;
-> +			}
-> +		}
-> +	}
-> +
-> +	/* Try non-integer mode */
-> +	pllsetup->analog_on = 1;
-> +	pllsetup->cco_bypass_b15 = 0;
-> +	pllsetup->direct_output_b14 = 0;
-> +	pllsetup->fdbk_div_ctrl_b13 = 0;
-> +	for (m = 1; m <= 256; m++) {
-> +		for (n = 1; n <= 4; n++) {
-> +			for (p = 0; p < 4; p++) {
-> +				/* Compute output frequency */
-> +				pllsetup->pll_p = pll_postdivs[p];
-> +				pllsetup->pll_n = n;
-> +				pllsetup->pll_m = m;
-> +				fclkout = clk_check_pll_setup(
-> +					ifreq, pllsetup);
-> +				if (abs(target_freq - fclkout) <= freqtol)
-> +					return fclkout;
-> +			}
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk clk_armpll = {
-> +	.parent		= &clk_sys,
-> +	.get_rate	= &local_return_parent_rate,
+> +struct gpio_regs {
+> +	void __iomem *inp_state;
+> +	void __iomem *outp_set;
+> +	void __iomem *outp_clr;
+> +	void __iomem *dir_set;
+> +	void __iomem *dir_clr;
 > +};
 > +
 > +/*
-> + * Update the USB PLL frequency rate variable from the actual PLL setting
+> + * GPIO names
 > + */
-> +static void local_update_usbpll_rate(void)
+> +static const char *gpio_p0_names[LPC32XX_GPIO_P0_MAX] = {
+> +	"p0.0", "p0.1", "p0.2", "p0.3",
+> +	"p0.4", "p0.5", "p0.6", "p0.7"
+> +};
+> +
+> +static const char *gpio_p1_names[LPC32XX_GPIO_P1_MAX] = {
+> +	"p1.0", "p1.1", "p1.2", "p1.3",
+> +	"p1.4", "p1.5", "p1.6", "p1.7",
+> +	"p1.8", "p1.9", "p1.10", "p1.11",
+> +	"p1.12", "p1.13", "p1.14", "p1.15",
+> +	"p1.16", "p1.17", "p1.18", "p1.19",
+> +	"p1.20", "p1.21", "p1.22", "p1.23",
+> +};
+> +
+> +static const char *gpio_p2_names[LPC32XX_GPIO_P2_MAX] = {
+> +	"p2.0", "p2.1", "p2.2", "p2.3",
+> +	"p2.4", "p2.5", "p2.6", "p2.7",
+> +	"p2.8", "p2.9", "p2.10", "p2.11",
+> +	"p2.12"
+> +};
+> +
+> +static const char *gpio_p3_names[LPC32XX_GPIO_P3_MAX] = {
+> +	"gpi000", "gpio01", "gpio02", "gpio03",
+> +	"gpio04", "gpio05"
+> +};
+> +
+> +static const char *gpi_p3_names[LPC32XX_GPI_P3_MAX] = {
+> +	"gpi00", "gpi01", "gpi02", "gpi03",
+> +	"gpi04", "gpi05", "gpi06", "gpi07",
+> +	"gpi08", "gpi09",  NULL,    NULL,
+> +	 NULL,    NULL,    NULL,   "gpi15",
+> +	"gpi16", "gpi17", "gpi18", "gpi19",
+> +	"gpi20", "gpi21", "gpi22", "gpi23",
+> +	"gpi24", "gpi25", "gpi26", "gpi27"
+> +};
+> +
+> +static const char *gpo_p3_names[LPC32XX_GPO_P3_MAX] = {
+> +	"gpo00", "gpo01", "gpo02", "gpo03",
+> +	"gpo04", "gpo05", "gpo06", "gpo07",
+> +	"gpo08", "gpo09", "gpo10", "gpo11",
+> +	"gpo12", "gpo13", "gpo14", "gpo15",
+> +	"gpo16", "gpo17", "gpo18", "gpo19",
+> +	"gpo20", "gpo21", "gpo22", "gpo23"
+> +};
+> +
+> +static struct gpio_regs gpio_grp_regs_p0 = {
+> +	.inp_state	= LPC32XX_GPIO_P0_INP_STATE,
+> +	.outp_set	= LPC32XX_GPIO_P0_OUTP_SET,
+> +	.outp_clr	= LPC32XX_GPIO_P0_OUTP_CLR,
+> +	.dir_set	= LPC32XX_GPIO_P0_DIR_SET,
+> +	.dir_clr	= LPC32XX_GPIO_P0_DIR_CLR,
+> +};
+> +
+> +static struct gpio_regs gpio_grp_regs_p1 = {
+> +	.inp_state	= LPC32XX_GPIO_P1_INP_STATE,
+> +	.outp_set	= LPC32XX_GPIO_P1_OUTP_SET,
+> +	.outp_clr	= LPC32XX_GPIO_P1_OUTP_CLR,
+> +	.dir_set	= LPC32XX_GPIO_P1_DIR_SET,
+> +	.dir_clr	= LPC32XX_GPIO_P1_DIR_CLR,
+> +};
+> +
+> +static struct gpio_regs gpio_grp_regs_p2 = {
+> +	.inp_state	= LPC32XX_GPIO_P2_INP_STATE,
+> +	.outp_set	= LPC32XX_GPIO_P2_OUTP_SET,
+> +	.outp_clr	= LPC32XX_GPIO_P2_OUTP_CLR,
+> +	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
+> +	.dir_clr	= LPC32XX_GPIO_P2_DIR_CLR,
+> +};
+> +
+> +static struct gpio_regs gpio_grp_regs_p3 = {
+> +	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
+> +	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
+> +	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
+> +	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
+> +	.dir_clr	= LPC32XX_GPIO_P2_DIR_CLR,
+> +};
+> +
+> +struct lpc32xx_gpio_chip {
+> +	struct gpio_chip	chip;
+> +	struct gpio_regs	*gpio_grp;
+> +};
+> +
+> +static inline struct lpc32xx_gpio_chip *to_lpc32xx_gpio(
+> +	struct gpio_chip *gpc)
 > +{
-> +	u32 clkin, pllreg;
+> +	return container_of(gpc, struct lpc32xx_gpio_chip, chip);
+> +}
 > +
-> +	clkin = clk_usbpll.get_rate(&clk_usbpll);
-> +	pllreg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL) & 0x1FFFF;
-> +
-> +	if ((pllreg & LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP) == 0)
-> +		clk_usbpll.rate = 0;
+> +static void __set_gpio_dir_p012(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin, int input)
+> +{
+> +	if (input)
+> +		__raw_writel(GPIO012_PIN_TO_BIT(pin),
+> +			group->gpio_grp->dir_clr);
 > +	else
-> +		clk_usbpll.rate = clk_get_pllrate_from_reg(clkin,
-> +			pllreg);
+> +		__raw_writel(GPIO012_PIN_TO_BIT(pin),
+> +			group->gpio_grp->dir_set);
 > +}
 > +
-> +/*
-> + * Setup the USB PLL with a PLL structure
-> + */
-> +static u32 local_clk_usbpll_setup(struct clk_pll_setup *pHCLKPllSetup)
+> +static void __set_gpio_dir_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin, int input)
 > +{
-> +	u32 reg, tmp = local_clk_pll_setup(pHCLKPllSetup);
+> +	u32 u;
 > +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL) & ~0x1FFFF;
-> +	reg |= tmp;
-> +	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+> +	/* P3 GPIO pins are offset in the register to pin mapping */
+> +	u =  GPIO3_PIN_TO_BIT(pin);
+here ------^ is a superflous space.
+
 > +
-> +	return clk_check_pll_setup(clk_usbpll.parent->rate,
-> +		pHCLKPllSetup);
+> +	if (input)
+> +		__raw_writel(u, group->gpio_grp->dir_clr);
+> +	else
+> +		__raw_writel(u, group->gpio_grp->dir_set);
 > +}
 > +
-> +static int local_usbpll_enable(struct clk *clk, int enable)
+> +static void __set_gpio_level_p012(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin, int high)
 > +{
-> +	u32 reg;
-> +	int ret = -ENODEV;
-> +	unsigned long timeout = 1 + msecs_to_jiffies(10);
-> +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
-> +
-> +	if (enable == 0) {
-> +		reg &= ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN1 |
-> +			LPC32XX_CLKPWR_USBCTRL_CLK_EN2);
-> +		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-> +	} else if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP) {
-> +		reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
-> +		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-> +
-> +		/* Wait for PLL lock */
-> +		while ((timeout > jiffies) & (ret == -ENODEV)) {
-> +			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
-> +			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
-> +				ret = 0;
-> +		}
-> +
-> +		if (ret == 0) {
-> +			reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
-> +			__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-> +		}
-> +	}
-> +
-> +	return ret;
+> +	if (high)
+> +		__raw_writel(GPIO012_PIN_TO_BIT(pin),
+> +			group->gpio_grp->outp_set);
+> +	else
+> +		__raw_writel(GPIO012_PIN_TO_BIT(pin),
+> +			group->gpio_grp->outp_clr);
 > +}
 > +
-> +static int local_usbpll_set_rate(struct clk *clk, u32 rate)
+> +static void __set_gpio_level_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin, int high)
 > +{
-> +	u32 clkin, reg, usbdiv;
-> +	struct clk_pll_setup pllsetup;
+> +	u32 u;
+> +
+> +	/* P3 GPIO pins are offset in the register to pin mapping */
+> +	u = GPIO3_PIN_TO_BIT(pin);
+
+	u32 u = ...
+?
+
+> +
+> +	if (high)
+> +		__raw_writel(u, group->gpio_grp->outp_set);
+> +	else
+> +		__raw_writel(u, group->gpio_grp->outp_clr);
+> +}
+> +
+> +static void __set_gpo_level_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin, int high)
+> +{
+> +	if (high)
+> +		__raw_writel(GPO3_PIN_TO_BIT(pin), group->gpio_grp->outp_set);
+> +	else
+> +		__raw_writel(GPO3_PIN_TO_BIT(pin), group->gpio_grp->outp_clr);
+> +}
+> +
+> +static int __get_gpio_state_p012(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin)
+> +{
+> +	return GPIO012_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state),
+> +		pin);
+> +}
+> +
+> +static int __get_gpio_state_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin)
+> +{
+> +	int state;
+> +
+> +	state = __raw_readl(group->gpio_grp->inp_state);
 > +
 > +	/*
-> +	 * Unlike other clocks, this clock has a KHz input rate, so bump
-> +	 * it up to work with the PLL function
+> +	 * P3 GPIO pin input mapping is not contiguous, GPIOP3-0..4 is mapped
+> +	 * to bits 10..14, while GPIOP3-5 is mapped to bit 24.
 > +	 */
-> +	rate = rate * 1000;
-> +
-> +	local_usbpll_enable(clk, 0);
-> +
-> +	if (rate == 0)
-> +		return 0;
-> +
-> +	clkin = clk->parent->rate;
-> +	usbdiv = __raw_readl(LPC32XX_CLKPWR_USBCLK_PDIV) + 1;
-> +	clkin = clkin / usbdiv;
-> +
-> +	/* Try to find a good rate setup */
-> +	if (local_clk_find_pll_cfg(clkin, rate, &pllsetup) == 0)
-> +		return -EINVAL;
-> +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
-> +	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
-> +	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-> +
-> +	pllsetup.analog_on = 1;
-> +	local_clk_usbpll_setup(&pllsetup);
-> +
-> +	clk->rate = clk_check_pll_setup(clkin, &pllsetup);
-> +
-> +	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
-> +	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
-> +	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk clk_usbpll = {
-> +	.parent		= &osc_main,
-> +	.set_rate	= &local_usbpll_set_rate,
-> +	.enable		= &local_usbpll_enable,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static u32 clk_get_hclk_div(void)
-> +{
-> +	static const u32 hclkdivs[4] = {1, 2, 4, 4};
-> +	return hclkdivs[LPC32XX_CLKPWR_HCLKDIV_DIV_2POW(
-> +		__raw_readl(LPC32XX_CLKPWR_HCLK_DIV))];
-> +}
-> +
-> +static struct clk clk_hclk = {
-> +	.parent		= &clk_armpll,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_pclk = {
-> +	.parent		= &clk_armpll,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static int local_onoff_enable(struct clk *clk, int enable)
-> +{
-> +	u32 tmp;
-> +
-> +	tmp = __raw_readl(clk->enable_reg);
-> +
-> +	if (enable == 0)
-> +		tmp &= ~clk->enable_mask;
+> +	if (pin == 5)
+> +		state = GPIO3_PIN5_IN_SEL(state);
 > +	else
-> +		tmp |= clk->enable_mask;
+> +		state = GPIO3_PIN_IN_SEL(state, pin);
+I would hide that in GPIO3_PIN_IN_SEL, e.g.
+
+
+	#define GPIO3_PIN_IN_SHIFT(pin)		(pin == 5 ? 24 : 10 + (pin))
+	#define GPIO3_PIN_IN_SEL(state, pin)	(((state) >> GPIO3_PIN_IN_SHIFT(pin)) & 1)
+
 > +
-> +	__raw_writel(tmp, clk->enable_reg);
+> +	return state;
+> +}
+> +
+> +static int __get_gpi_state_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin)
+> +{
+> +	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
+> +}
+> +
+> +/*
+> + * GENERIC_GPIO primitives.
+> + */
+> +static int lpc32xx_gpio_dir_input_p012(struct gpio_chip *chip,
+> +	unsigned pin)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	__set_gpio_dir_p012(group, pin, 1);
 > +
 > +	return 0;
 > +}
 > +
-> +/* Peripheral clock sources */
-> +static struct clk clk_timer0 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
-> +	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_TIMER0_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_timer1 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
-> +	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_TIMER1_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_timer2 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
-> +	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_TIMER2_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_timer3 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
-> +	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_wdt = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_TIMER_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_vfp9 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_DEBUG_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_VFP_CLOCK_ENABLE_BIT,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +static struct clk clk_dma = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_DMA_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_DMACLKCTRL_CLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_uart3 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_UART_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_UARTCLKCTRL_UART3_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_uart4 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_UART_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_UARTCLKCTRL_UART4_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_uart5 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_UART_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_UARTCLKCTRL_UART5_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_uart6 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_UART_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_UARTCLKCTRL_UART6_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_i2c0 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_I2C_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_I2CCLK_I2C1CLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_i2c1 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_I2C_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_I2CCLK_I2C2CLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_i2c2 = {
-> +	.parent		= &clk_pclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= io_p2v(LPC32XX_USB_BASE + 0xFF4),
-> +	.enable_mask	= 0x4,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_ssp0 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_SSP_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_ssp1 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_SSP_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_SSPCTRL_SSPCLK1_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_kscan = {
-> +	.parent		= &osc_32KHz,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_KEY_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_KEYCLKCTRL_CLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_nand = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_NAND_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_NANDCLK_SLCCLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_i2s0 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_I2S_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_I2SCTRL_I2SCLK0_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_i2s1 = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_I2S_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_I2SCTRL_I2SCLK1_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_net = {
-> +	.parent		= &clk_hclk,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_MACCLK_CTRL,
-> +	.enable_mask	= (LPC32XX_CLKPWR_MACCTRL_DMACLK_EN |
-> +		LPC32XX_CLKPWR_MACCTRL_MMIOCLK_EN |
-> +		LPC32XX_CLKPWR_MACCTRL_HRCCLK_EN),
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_rtc = {
-> +	.parent		= &osc_32KHz,
-> +	.rate		= 1, /* 1 Hz */
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static struct clk clk_usbd = {
-> +	.parent		= &clk_usbpll,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_USB_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_USBCTRL_HCLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static int tsc_onoff_enable(struct clk *clk, int enable)
+> +static int lpc32xx_gpio_dir_input_p3(struct gpio_chip *chip,
+> +	unsigned pin)
 > +{
-> +	u32 tmp;
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
 > +
-> +	/* Make sure 32KHz clock is the selected clock */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
-> +	tmp &= ~LPC32XX_CLKPWR_ADCCTRL1_PCLK_SEL;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
-> +
-> +	if (enable == 0)
-> +		__raw_writel(0, clk->enable_reg);
-> +	else
-> +		__raw_writel(clk->enable_mask, clk->enable_reg);
+> +	__set_gpio_dir_p3(group, pin, 1);
 > +
 > +	return 0;
 > +}
 > +
-> +static struct clk clk_tsc = {
-> +	.parent		= &osc_32KHz,
-> +	.enable		= &tsc_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_ADC_CLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_ADC32CLKCTRL_CLK_EN,
-> +	.get_rate	= &local_return_parent_rate,
-> +};
-> +
-> +static int mmc_onoff_enable(struct clk *clk, int enable)
+> +static int lpc32xx_gpio_dir_in_always(struct gpio_chip *chip,
+> +	unsigned pin)
 > +{
-> +	u32 tmp;
+> +	return 0;
+> +}
 > +
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
-> +		~(LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
-> +		LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(15));
+> +static int lpc32xx_gpio_get_value_p012(struct gpio_chip *chip, unsigned pin)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
 > +
-> +	/* If rate is 0, disable clock */
-> +	if (enable != 0)
-> +		tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
-> +			LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(1);
+> +	return __get_gpio_state_p012(group, pin);
+> +}
 > +
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
+> +static int lpc32xx_gpio_get_value_p3(struct gpio_chip *chip, unsigned pin)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	return __get_gpio_state_p3(group, pin);
+> +}
+> +
+> +static int lpc32xx_gpi_get_value(struct gpio_chip *chip, unsigned pin)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	return __get_gpi_state_p3(group, pin);
+> +}
+> +
+> +static int lpc32xx_gpio_dir_output_p012(struct gpio_chip *chip, unsigned pin,
+> +	int value)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	__set_gpio_dir_p012(group, pin, 0);
 > +
 > +	return 0;
 > +}
 > +
-> +static u32 mmc_get_rate(struct clk *clk)
+> +static int lpc32xx_gpio_dir_output_p3(struct gpio_chip *chip, unsigned pin,
+> +	int value)
 > +{
-> +	u32 div, tmp, rate;
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
 > +
-> +	div = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
-> +	tmp = div & LPC32XX_CLKPWR_MSCARD_SDCARD_EN;
+> +	__set_gpio_dir_p3(group, pin, 0);
 > +
-> +	if (!tmp)
+> +	return 0;
+> +}
+> +
+> +static int lpc32xx_gpio_dir_out_always(struct gpio_chip *chip, unsigned pin,
+> +	int value)
+> +{
+> +	return 0;
+> +}
+> +
+> +static void lpc32xx_gpio_set_value_p012(struct gpio_chip *chip, unsigned pin,
+> +	int value)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	__set_gpio_level_p012(group, pin, value);
+> +}
+> +
+> +static void lpc32xx_gpio_set_value_p3(struct gpio_chip *chip, unsigned pin,
+> +	int value)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	__set_gpio_level_p3(group, pin, value);
+> +}
+> +
+> +static void lpc32xx_gpo_set_value(struct gpio_chip *chip, unsigned pin,
+> +	int value)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	__set_gpo_level_p3(group, pin, value);
+> +}
+> +
+> +static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
+> +{
+> +	if (pin < chip->ngpio)
 > +		return 0;
 > +
-> +	/* Get the parent clock rate */
-> +	rate = clk->parent->get_rate(clk->parent);
-> +
-> +	/* Get the LCD controller clock divider value */
-> +	div = div & 0xF;
-> +
-> +	if (!div)
-> +		return 0;
-> +
-> +	tmp = rate / div;
-> +
-> +	return tmp;
-> +}
-> +
-> +static int mmc_set_rate(struct clk *clk, u32 rate)
-> +{
-> +	if (rate == 0)
-> +		mmc_onoff_enable(clk, 0);
-> +	else
-> +		mmc_onoff_enable(clk, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk clk_mmc = {
-> +	.parent		= &clk_armpll,
-> +	.set_rate	= &mmc_set_rate,
-> +	.get_rate	= &mmc_get_rate,
-> +	.enable		= &mmc_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_MS_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
-> +};
-> +
-> +static u32 clcd_get_rate(struct clk *clk)
-> +{
-> +	u32 tmp, div, rate;
-> +
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
-> +		LPC32XX_CLKPWR_LCDCTRL_CLK_EN;
-> +
-> +	if (!tmp)
-> +		return 0;
-> +
-> +	rate = clk->parent->get_rate(clk->parent);
-> +	tmp = __raw_readl(io_p2v(LPC32XX_LCD_BASE + CLCD_TIM2));
-> +
-> +	/* Only supports internal clocking */
-> +	if (tmp & TIM2_BCD)
-> +		return rate;
-> +
-> +	div = (tmp & 0x1F) | ((tmp & 0xF8) >> 22);
-> +	tmp = rate / (2 + div);
-> +
-> +	return tmp;
-> +}
-> +
-> +static int clcd_set_rate(struct clk *clk, u32 rate)
-> +{
-> +	u32 tmp, prate, div;
-> +
-> +	tmp = __raw_readl(io_p2v(LPC32XX_LCD_BASE + CLCD_TIM2));
-> +	prate = clk->parent->get_rate(clk->parent);
-> +
-> +	if (rate == prate) {
-> +		tmp |= TIM2_BCD;
-> +		local_onoff_enable(clk, 1);
-> +	} else {
-> +		/* Find closest divider */
-> +		div = prate / rate;
-> +		if (div == 1)
-> +			div = 0;
-> +		else
-> +			div -= 2;
-> +
-> +		tmp &= ~(0xF800001F);
-> +		tmp &= ~TIM2_BCD;
-> +		tmp |= (div & 0x1F);
-> +		tmp |= (((div >> 5) & 0x1F) << 27);
-> +		__raw_writel(tmp, io_p2v(LPC32XX_LCD_BASE + CLCD_TIM2));
-> +		local_onoff_enable(clk, 1);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk clk_lcd = {
-> +	.parent		= &clk_hclk,
-> +	.set_rate	= &clcd_set_rate,
-> +	.get_rate	= &clcd_get_rate,
-> +	.enable		= &local_onoff_enable,
-> +	.enable_reg	= LPC32XX_CLKPWR_LCDCLK_CTRL,
-> +	.enable_mask	= LPC32XX_CLKPWR_LCDCTRL_CLK_EN,
-> +};
-> +
-> +static inline void clk_lock(void)
-> +{
-> +	mutex_lock(&clkm_lock);
-> +}
-> +
-> +static inline void clk_unlock(void)
-> +{
-> +	mutex_unlock(&clkm_lock);
-> +}
-> +
-> +static void local_clk_disable(struct clk *clk)
-> +{
-> +	/* Don't attempt to disable clock if it has no users */
-WARN_ON(clk->usecount <= 0)?
-
-> +	if (clk->usecount > 0) {
-> +		clk->usecount--;
-> +
-> +		/* Only disable clock when it has no more users */
-> +		if ((clk->usecount == 0) && (clk->enable))
-> +			clk->enable(clk, 0);
-> +
-> +		/* Check parent clocks, they may need to be disabled too */
-> +		if (clk->parent)
-> +			local_clk_disable(clk->parent);
-> +	}
-> +}
-> +
-> +static int local_clk_enable(struct clk *clk)
-> +{
-> +	int ret = 0;
-> +
-> +	if (clk->usecount == 0) {
-> +		/* Enable parent clocks first */
-> +		if (clk->parent)
-> +			ret = local_clk_enable(clk->parent);
-> +
-> +		/* Enable clock on first use */
-> +		if ((ret == 0) && (clk->enable)) {
-> +			ret = clk->enable(clk, 1);
-> +			clk->usecount++;
-> +		}
-> +
-> +		/* Back out use counters if enable fails */
-> +		if (ret < 0)
-> +			local_clk_disable(clk);
-if enable failed there is no need to disable, is it?
-
-And I think the reference counting is broken.
-
-After
-
-	clk_enable(aclk);
-	clk_enable(aclk);
-	clk_disable(aclk);
-
-aclk is disabled because usecount isn't increased if it is already >0!?
-
-
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/*
-> + * clk_enable - inform the system when the clock source should be running.
-> + */
-> +int clk_enable(struct clk *clk)
-> +{
-> +	int ret;
-> +
-> +	clk_lock();
-> +	ret = local_clk_enable(clk);
-> +	clk_unlock();
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(clk_enable);
-> +
-> +/*
-> + * clk_disable - inform the system when the clock source is no longer required
-> + */
-> +void clk_disable(struct clk *clk)
-> +{
-> +	clk_lock();
-> +	local_clk_disable(clk);
-> +	clk_unlock();
-> +}
-> +EXPORT_SYMBOL(clk_disable);
-> +
-> +/*
-> + * clk_get_rate - obtain the current clock rate (in Hz) for a clock source
-> + */
-> +unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long rate;
-> +
-> +	clk_lock();
-> +	rate = (clk->get_rate)(clk);
-> +	clk_unlock();
-> +
-> +	return rate;
-> +}
-> +EXPORT_SYMBOL(clk_get_rate);
-> +
-> +/*
-> + * clk_set_rate - set the clock rate for a clock source
-> + */
-> +int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	int ret = -EINVAL;
-> +
-> +	/*
-> +	 * Most system clocks can only be enabled or disabled, with
-> +	 * the actual rate set as part of the peripheral dividers
-> +	 * instead of high level clock control
-> +	 */
-> +	if (clk->set_rate) {
-> +		clk_lock();
-> +		ret = (clk->set_rate)(clk, rate);
-> +		clk_unlock();
-> +	}
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(clk_set_rate);
-> +
-> +/*
-> + * clk_round_rate - adjust a rate to the exact rate a clock can provide
-> + */
-> +long clk_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	int ret;
-> +
-> +	/* Use set_rate to try to adjust the rate if it supports it */
-> +	ret = clk_set_rate(clk, rate);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return clk->rate;
-> +}
-> +EXPORT_SYMBOL(clk_round_rate);
-> +
-> +/*
-> + * clk_set_parent - set the parent clock source for this clock
-> + */
-> +int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	/* Clock re-parenting is not supported */
 > +	return -EINVAL;
 > +}
-> +EXPORT_SYMBOL(clk_set_parent);
 > +
-> +/*
-> + * clk_get_parent - get the parent clock source for this clock
-> + */
-> +struct clk *clk_get_parent(struct clk *clk)
-> +{
-> +	return clk->parent;
-> +}
-> +EXPORT_SYMBOL(clk_get_parent);
-> +
-> +#define _REGISTER_CLOCK(d, n, c) \
-> +	{ \
-> +		.dev_id = (d), \
-> +		.con_id = (n), \
-> +		.clk = &(c), \
+> +static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
+> +	{
+> +		.chip = {
+> +			.label			= "gpio_p0",
+> +			.direction_input	= lpc32xx_gpio_dir_input_p012,
+> +			.get			= lpc32xx_gpio_get_value_p012,
+> +			.direction_output	= lpc32xx_gpio_dir_output_p012,
+> +			.set			= lpc32xx_gpio_set_value_p012,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPIO_P0_GRP,
+> +			.ngpio			= LPC32XX_GPIO_P0_MAX,
+> +			.names			= gpio_p0_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p0,
 > +	},
-> +
-> +static struct clk_lookup lookups[] = {
-> +	_REGISTER_CLOCK(NULL, "osc_32KHz", osc_32KHz)
-> +	_REGISTER_CLOCK(NULL, "osc_pll397", osc_pll397)
-> +	_REGISTER_CLOCK(NULL, "osc_main", osc_main)
-> +	_REGISTER_CLOCK(NULL, "sys_ck", clk_sys)
-> +	_REGISTER_CLOCK(NULL, "arm_pll_ck", clk_armpll)
-> +	_REGISTER_CLOCK(NULL, "ck_pll5", clk_usbpll)
-> +	_REGISTER_CLOCK(NULL, "hclk_ck", clk_hclk)
-> +	_REGISTER_CLOCK(NULL, "pclk_ck", clk_pclk)
-> +	_REGISTER_CLOCK(NULL, "timer0_ck", clk_timer0)
-> +	_REGISTER_CLOCK(NULL, "timer1_ck", clk_timer1)
-> +	_REGISTER_CLOCK(NULL, "timer2_ck", clk_timer2)
-> +	_REGISTER_CLOCK(NULL, "timer3_ck", clk_timer3)
-> +	_REGISTER_CLOCK(NULL, "vfp9_ck", clk_vfp9)
-> +	_REGISTER_CLOCK(NULL, "clk_dmac", clk_dma)
-> +	_REGISTER_CLOCK("pnx4008-watchdog", NULL, clk_wdt)
-> +	_REGISTER_CLOCK(NULL, "uart3_ck", clk_uart3)
-> +	_REGISTER_CLOCK(NULL, "uart4_ck", clk_uart4)
-> +	_REGISTER_CLOCK(NULL, "uart5_ck", clk_uart5)
-> +	_REGISTER_CLOCK(NULL, "uart6_ck", clk_uart6)
-> +	_REGISTER_CLOCK("pnx-i2c.0", NULL, clk_i2c0)
-> +	_REGISTER_CLOCK("pnx-i2c.1", NULL, clk_i2c1)
-> +	_REGISTER_CLOCK("pnx-i2c.2", NULL, clk_i2c2)
-> +	_REGISTER_CLOCK("dev:ssp0", NULL, clk_ssp0)
-> +	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
-> +	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
-> +	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
-> +	_REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
-> +	_REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
-> +	_REGISTER_CLOCK("lpc32xx-ts", NULL, clk_tsc)
-> +	_REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
-> +	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
-> +	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
-> +	_REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
-> +	_REGISTER_CLOCK("lpc32xx_rtc", NULL, clk_rtc)
+> +	{
+> +		.chip = {
+> +			.label			= "gpio_p1",
+> +			.direction_input	= lpc32xx_gpio_dir_input_p012,
+> +			.get			= lpc32xx_gpio_get_value_p012,
+> +			.direction_output	= lpc32xx_gpio_dir_output_p012,
+> +			.set			= lpc32xx_gpio_set_value_p012,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPIO_P1_GRP,
+> +			.ngpio			= LPC32XX_GPIO_P1_MAX,
+> +			.names			= gpio_p1_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p1,
+> +	},
+> +	{
+> +		.chip = {
+> +			.label			= "gpio_p2",
+> +			.direction_input	= lpc32xx_gpio_dir_input_p012,
+> +			.get			= lpc32xx_gpio_get_value_p012,
+> +			.direction_output	= lpc32xx_gpio_dir_output_p012,
+> +			.set			= lpc32xx_gpio_set_value_p012,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPIO_P2_GRP,
+> +			.ngpio			= LPC32XX_GPIO_P2_MAX,
+> +			.names			= gpio_p2_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p2,
+> +	},
+> +	{
+> +		.chip = {
+> +			.label			= "gpio_p3",
+> +			.direction_input	= lpc32xx_gpio_dir_input_p3,
+> +			.get			= lpc32xx_gpio_get_value_p3,
+> +			.direction_output	= lpc32xx_gpio_dir_output_p3,
+> +			.set			= lpc32xx_gpio_set_value_p3,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPIO_P3_GRP,
+> +			.ngpio			= LPC32XX_GPIO_P3_MAX,
+> +			.names			= gpio_p3_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p3,
+> +	},
+> +	{
+> +		.chip = {
+> +			.label			= "gpi_p3",
+> +			.direction_input	= lpc32xx_gpio_dir_in_always,
+> +			.get			= lpc32xx_gpi_get_value,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPI_P3_GRP,
+> +			.ngpio			= LPC32XX_GPI_P3_MAX,
+> +			.names			= gpi_p3_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p3,
+> +	},
+> +	{
+> +		.chip = {
+> +			.label			= "gpo_p3",
+> +			.direction_output	= lpc32xx_gpio_dir_out_always,
+> +			.set			= lpc32xx_gpo_set_value,
+> +			.request		= lpc32xx_gpio_request,
+> +			.base			= LPC32XX_GPO_P3_GRP,
+> +			.ngpio			= LPC32XX_GPO_P3_MAX,
+> +			.names			= gpo_p3_names,
+> +			.can_sleep		= 0,
+> +		},
+> +		.gpio_grp = &gpio_grp_regs_p3,
+> +	},
 > +};
 > +
-> +static int __init clk_init(void)
+> +void __init lpc32xx_gpio_init(void)
 > +{
 > +	int i;
 > +
-> +	mutex_init(&clkm_lock);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(lookups); i++)
-> +		clkdev_add(&lookups[i]);
-> +
-> +	/*
-> +	 * Setup muxed SYSCLK for HCLK PLL base -this selects the
-> +	 * parent clock used for the ARM PLL and is used to derive
-> +	 * the many system clock rates in the device.
-> +	 */
-> +	if (clk_is_sysclk_mainosc() != 0)
-> +		clk_sys.parent = &osc_main;
-> +	else
-> +		clk_sys.parent = &osc_pll397;
-> +
-> +	clk_sys.rate = clk_sys.parent->rate;
-> +
-> +	/* Compute the current ARM PLL and USB PLL frequencies */
-> +	local_update_armpll_rate();
-> +	local_update_usbpll_rate();
-> +
-> +	/* Compute HCLK and PCLK bus rates */
-> +	clk_hclk.rate = clk_hclk.parent->rate / clk_get_hclk_div();
-> +	clk_pclk.rate = clk_pclk.parent->rate / clk_get_pclk_div();
-> +
-> +	/*
-> +	 * Enable system clocks - this step is somewhat formal, as the
-> +	 * clocks are already running, but it does get the clock data
-> +	 * inline with the actual system state. Never disable these
-> +	 * clocks as they will only stop if the system is going to sleep.
-> +	 * In that case, the chip/system power management functions will
-> +	 * handle clock gating.
-> +	 */
-> +	clk_enable(&clk_hclk);
-> +	clk_enable(&clk_pclk);
-> +
-> +	/*
-> +	 * Timers 0 and 1 were enabled and are being used by the high
-> +	 * resolution tick function prior to this driver being initialized.
-> +	 * Tag them now as used.
-> +	 */
-> +	clk_enable(&clk_timer0);
-> +	clk_enable(&clk_timer1);
-> +
-> +	return 0;
+> +	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+> +		gpiochip_add(&lpc32xx_gpiochip[i].chip);
 > +}
-> +core_initcall(clk_init);
-> +
-> diff --git a/arch/arm/mach-lpc32xx/clock.h b/arch/arm/mach-lpc32xx/clock.h
+> diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
 > new file mode 100644
-> index 0000000..97789b9
+> index 0000000..18c3caf
 > --- /dev/null
-> +++ b/arch/arm/mach-lpc32xx/clock.h
-> @@ -0,0 +1,37 @@
+> +++ b/arch/arm/mach-lpc32xx/irq.c
+> @@ -0,0 +1,438 @@
 > +/*
-> + * arch/arm/mach-lpc32xx/clock.h
+> + * arch/arm/mach-lpc32xx/irq.c
 > + *
 > + * Author: Kevin Wells <kevin.wells@nxp.com>
 > + *
@@ -1160,29 +520,627 @@ aclk is disabled because usecount isn't increased if it is already >0!?
 > + * GNU General Public License for more details.
 > + */
 > +
-> +#ifndef __LPC32XX_CLOCK_H
-> +#define __LPC32XX_CLOCK_H
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
 > +
-> +struct clk {
-> +	struct list_head node;
-> +	struct clk *parent;
-> +	u32 rate;
-> +	s8 usecount;
-why is usecount a signed value?  You don't save anything here with using
-an 8bit quantity because of padding.  So you can use u32 with no cost.
-
+> +#include <mach/irqs.h>
+> +#include <mach/hardware.h>
+> +#include <mach/platform.h>
+> +#include "common.h"
 > +
-> +	int (*set_rate) (struct clk *, u32);
-> +	int (*enable) (struct clk *clk, int);
-> +	u32 (*get_rate) (struct clk *clk);
+> +/*
+> + * Default value representing the Activation polarity of all internal
+> + * interrupt sources
+> + */
+> +#define MIC_APR_DEFAULT		0x3FF0EFE0
+> +#define SIC1_APR_DEFAULT	0xFBD27186
+> +#define SIC2_APR_DEFAULT	0x801810C0
 > +
-> +	/* Register address and bit mask for simple clocks */
-> +	void __iomem *enable_reg;
-> +	u32 enable_mask;
+> +/*
+> + * Default value representing the Activation Type of all internal
+> + * interrupt sources. All are level sensitive.
+> + */
+> +#define MIC_ATR_DEFAULT		0x00000000
+> +#define SIC1_ATR_DEFAULT	0x00026000
+> +#define SIC2_ATR_DEFAULT	0x00000000
+> +
+> +struct lpc32xx_event_group_regs {
+> +	void __iomem *enab_reg;
+> +	void __iomem *edge_reg;
+> +	void __iomem *maskstat_reg;
+> +	void __iomem *rawstat_reg;
 > +};
 > +
-> +#endif
+> +static const struct lpc32xx_event_group_regs lpc32xx_event_int_regs = {
+> +	.enab_reg = LPC32XX_CLKPWR_INT_ER,
+> +	.edge_reg = LPC32XX_CLKPWR_INT_AP,
+> +	.maskstat_reg = LPC32XX_CLKPWR_INT_SR,
+> +	.rawstat_reg = LPC32XX_CLKPWR_INT_RS,
+> +};
+> +
+> +static const struct lpc32xx_event_group_regs lpc32xx_event_pin_regs = {
+> +	.enab_reg = LPC32XX_CLKPWR_PIN_ER,
+> +	.edge_reg = LPC32XX_CLKPWR_PIN_AP,
+> +	.maskstat_reg = LPC32XX_CLKPWR_PIN_SR,
+> +	.rawstat_reg = LPC32XX_CLKPWR_PIN_RS,
+> +};
+> +
+> +struct lpc32xx_event_info {
+> +	const struct lpc32xx_event_group_regs *event_group;
+> +	u32 mask;
+> +};
+> +
+> +/*
+> + * Maps an IRQ number to and event mask and register
+> + */
+> +static const struct lpc32xx_event_info lpc32xx_events[NR_IRQS] = {
+> +	[IRQ_LPC32XX_GPI_08] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_08_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_09] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_09_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_19] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_19_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_07] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_07_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_00] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_00_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_01] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_01_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_02] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_02_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_03] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_03_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_04] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_04_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_05] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_05_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPI_06] = {
+> +		.event_group = &lpc32xx_event_pin_regs,
+> +		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_06_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_00] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_00_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_01] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_01_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_02] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_02_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_03] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_03_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_04] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_04_BIT,
+> +	},
+> +	[IRQ_LPC32XX_GPIO_05] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_05_BIT,
+> +	},
+> +	[IRQ_LPC32XX_KEY] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_KEY_BIT,
+> +	},
+> +	[IRQ_LPC32XX_USB_OTG_ATX] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_USBATXINT_BIT,
+> +	},
+> +	[IRQ_LPC32XX_USB_HOST] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_USB_BIT,
+> +	},
+> +	[IRQ_LPC32XX_RTC] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_RTC_BIT,
+> +	},
+> +	[IRQ_LPC32XX_MSTIMER] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_MSTIMER_BIT,
+> +	},
+> +	[IRQ_LPC32XX_TS_AUX] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_TS_AUX_BIT,
+> +	},
+> +	[IRQ_LPC32XX_TS_P] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_TS_P_BIT,
+> +	},
+> +	[IRQ_LPC32XX_TS_IRQ] = {
+> +		.event_group = &lpc32xx_event_int_regs,
+> +		.mask = LPC32XX_CLKPWR_INTSRC_ADC_BIT,
+> +	},
+> +};
+> +
+> +static void get_controller(unsigned int irq, unsigned int *base,
+> +	unsigned int *irqbit)
+> +{
+> +	if (irq < 32) {
+> +		*base = LPC32XX_MIC_BASE;
+> +		*irqbit = 1 << irq;
+> +	} else if (irq < 64) {
+> +		*base = LPC32XX_SIC1_BASE;
+> +		*irqbit = 1 << (irq - 32);
+> +	} else {
+> +		*base = LPC32XX_SIC2_BASE;
+> +		*irqbit = 1 << (irq - 64);
+> +	}
+> +}
+> +
+> +static void lpc32xx_mask_irq(unsigned int irq)
+> +{
+> +	unsigned int reg, ctrl, mask;
+> +
+> +	get_controller(irq, &ctrl, &mask);
+> +
+> +	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) & ~mask;
+> +	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+> +}
+> +
+> +static void lpc32xx_unmask_irq(unsigned int irq)
+> +{
+> +	unsigned int reg, ctrl, mask;
+> +
+> +	get_controller(irq, &ctrl, &mask);
+> +
+> +	reg = __raw_readl(LPC32XX_INTC_MASK(ctrl)) | mask;
+> +	__raw_writel(reg, LPC32XX_INTC_MASK(ctrl));
+> +}
+> +
+> +static void lpc32xx_ack_irq(unsigned int irq)
+> +{
+> +	unsigned int ctrl, mask;
+> +
+> +	get_controller(irq, &ctrl, &mask);
+> +
+> +	__raw_writel(mask, LPC32XX_INTC_RAW_STAT(ctrl));
+> +
+> +	/* Also need to clear pending wake event */
+> +	if (lpc32xx_events[irq].mask != 0)
+> +		__raw_writel(lpc32xx_events[irq].mask,
+> +			lpc32xx_events[irq].event_group->rawstat_reg);
+> +}
+> +
+> +static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
+> +	int use_edge)
+> +{
+> +	unsigned int reg, ctrl, mask;
+> +
+> +	get_controller(irq, &ctrl, &mask);
+> +
+> +	/* Activation level, high or low */
+> +	reg = __raw_readl(LPC32XX_INTC_POLAR(ctrl));
+> +	if (use_high_level)
+> +		reg |= mask;
+> +	else
+> +		reg &= ~mask;
+> +	__raw_writel(reg, LPC32XX_INTC_POLAR(ctrl));
+> +
+> +	/* Activation type, edge or level */
+> +	reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
+> +	if (use_edge) {
+> +		reg |= mask;
+> +		set_irq_handler(irq, handle_edge_irq);
+> +	} else {
+> +		reg &= ~mask;
+> +		set_irq_handler(irq, handle_level_irq);
+> +	}
+> +
+> +	/* Use same polarity for the wake events */
+> +	if (lpc32xx_events[irq].mask != 0) {
+> +		reg = __raw_readl(lpc32xx_events[irq].event_group->edge_reg);
+> +
+> +		if (use_high_level)
+> +			reg |= lpc32xx_events[irq].mask;
+> +		else
+> +			reg &= ~lpc32xx_events[irq].mask;
+> +
+> +		__raw_writel(reg, lpc32xx_events[irq].event_group->edge_reg);
+> +	}
+> +}
+> +
+> +static int lpc32xx_set_irq_type(unsigned int irq, unsigned int type)
+> +{
+> +	switch (type) {
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		/* Rising edge sensitive */
+> +		__lpc32xx_set_irq_type(irq, 1, 1);
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		/* Falling edge sensitive */
+> +		__lpc32xx_set_irq_type(irq, 0, 1);
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_LOW:
+> +		/* Low level sensitive */
+> +		__lpc32xx_set_irq_type(irq, 0, 0);
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_HIGH:
+> +		/* High level sensitive */
+> +		__lpc32xx_set_irq_type(irq, 1, 0);
+> +		break;
+> +
+> +	/* Other modes are not supported */
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Ok to use the level handler for all types */
+> +	set_irq_handler(irq, handle_level_irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int lpc32xx_irq_wake(unsigned int irqno, unsigned int state)
+> +{
+> +	unsigned long eventreg;
+> +
+> +	if (lpc32xx_events[irqno].mask != 0) {
+> +		eventreg = __raw_readl(lpc32xx_events[irqno].
+> +			event_group->enab_reg);
+> +
+> +		if (state)
+> +			eventreg |= lpc32xx_events[irqno].mask;
+> +		else
+> +			eventreg &= ~lpc32xx_events[irqno].mask;
+> +
+> +		__raw_writel(eventreg,
+> +			lpc32xx_events[irqno].event_group->enab_reg);
+> +
+> +		return 0;
+> +	}
+> +
+> +	/* Clear event */
+> +	__raw_writel(lpc32xx_events[irqno].mask,
+> +		lpc32xx_events[irqno].event_group->rawstat_reg);
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static void __init lpc32xx_set_default_mappings(unsigned int apr,
+> +	unsigned int atr, unsigned int offset)
+> +{
+> +	unsigned int i;
+> +
+> +	/* Set activation levels for each interrupt */
+> +	i = 0;
+> +	while (i < 32) {
+> +		__lpc32xx_set_irq_type(offset + i, ((apr >> i) & 0x1),
+> +			((atr >> i) & 0x1));
+> +		i++;
+> +	}
+> +}
+> +
+> +static struct irq_chip lpc32xx_irq_chip = {
+> +	.ack = lpc32xx_ack_irq,
+> +	.mask = lpc32xx_mask_irq,
+> +	.unmask = lpc32xx_unmask_irq,
+> +	.set_type = lpc32xx_set_irq_type,
+> +	.set_wake = lpc32xx_irq_wake
+> +};
+> +
+> +#define SIC1_IRQ(x) ((x) + 32)
+> +#define SIC2_IRQ(x) ((x) + 64)
+> +
+> +static void lpc32xx_sic1_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	unsigned long ints = __raw_readl(LPC32XX_INTC_STAT(LPC32XX_SIC1_BASE));
+> +
+> +	while (ints != 0) {
+> +		int irqno = fls(ints) - 1;
+> +
+> +		ints &= ~(1 << irqno);
+> +
+> +		handle_level_irq(SIC1_IRQ(irqno), desc);
+> +	}
+> +}
+> +
+> +static void lpc32xx_sic2_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	unsigned long ints = __raw_readl(LPC32XX_INTC_STAT(LPC32XX_SIC2_BASE));
+> +
+> +	while (ints != 0) {
+> +		int irqno = fls(ints) - 1;
+> +
+> +		ints &= ~(1 << irqno);
+> +
+> +		handle_level_irq(SIC2_IRQ(irqno), desc);
+This is wrong!  You call handle_level_irq(SIC2_IRQ(irqno)) with the
+descriptor of IRQ_LPC32XX_SUB2IRQ.
 
+Better use
+
+	generic_handle_irq(SIC2_IRQ(irqno));
+
+and don't hardcode handle_level_irq here.
+
+> +	}
+> +}
+> +
+> +void __init lpc32xx_init_irq(void)
+> +{
+> +	unsigned int i;
+> +
+> +	/* Setup MIC */
+> +	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_MIC_BASE));
+> +	__raw_writel(MIC_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_MIC_BASE));
+> +	__raw_writel(MIC_ATR_DEFAULT, LPC32XX_INTC_ACT_TYPE(LPC32XX_MIC_BASE));
+> +
+> +	/* Setup SIC1 */
+> +	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
+> +	__raw_writel(MIC_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_SIC1_BASE));
+> +	__raw_writel(MIC_ATR_DEFAULT, LPC32XX_INTC_ACT_TYPE(LPC32XX_SIC1_BASE));
+> +
+> +	/* Setup SIC2 */
+> +	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+> +	__raw_writel(MIC_APR_DEFAULT, LPC32XX_INTC_POLAR(LPC32XX_SIC2_BASE));
+> +	__raw_writel(MIC_ATR_DEFAULT, LPC32XX_INTC_ACT_TYPE(LPC32XX_SIC2_BASE));
+> +
+> +	/* Configure supported IRQ's */
+> +	for (i = 0; i < NR_IRQS; i++) {
+> +		set_irq_chip(i, &lpc32xx_irq_chip);
+> +		set_irq_handler(i, handle_level_irq);
+> +		set_irq_flags(i, IRQF_VALID);
+> +	}
+> +
+> +	/* Set default mappings */
+> +	lpc32xx_set_default_mappings(MIC_APR_DEFAULT, MIC_ATR_DEFAULT, 0);
+> +	lpc32xx_set_default_mappings(SIC1_APR_DEFAULT, SIC1_ATR_DEFAULT, 32);
+> +	lpc32xx_set_default_mappings(SIC2_APR_DEFAULT, SIC2_ATR_DEFAULT, 64);
+> +
+> +	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
+> +	set_irq_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
+> +	set_irq_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+> +
+> +	/* mask all interrupts except SUBIRQ */
+> +	__raw_writel((1 << IRQ_LPC32XX_SUB1IRQ) | (1 << IRQ_LPC32XX_SUB2IRQ),
+> +		LPC32XX_INTC_MASK(LPC32XX_MIC_BASE));
+> +	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
+> +	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+set_irq_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler) calls
+lpc32xx_irq_chip->enable(IRQ_LPC32XX_SUB2IRQ), so first masking all irqs
+and only then calling set_irq_chained_handler should do the right thing.
+
+> +
+> +	/* Initially disable all wake events */
+> +	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
+> +	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
+> +	__raw_writel(0, LPC32XX_CLKPWR_PIN_ER);
+> +
+> +	/*
+> +	 * Default wake activation polarities, all pin sources are low edge
+> +	 * triggered
+> +	 */
+> +	__raw_writel(LPC32XX_CLKPWR_INTSRC_TS_P_BIT |
+> +		LPC32XX_CLKPWR_INTSRC_MSTIMER_BIT |
+> +		LPC32XX_CLKPWR_INTSRC_RTC_BIT,
+> +		LPC32XX_CLKPWR_INT_AP);
+> +	__raw_writel(0, LPC32XX_CLKPWR_PIN_AP);
+> +
+> +	/* Clear latched wake event states */
+> +	__raw_writel(__raw_readl(LPC32XX_CLKPWR_PIN_RS),
+> +		LPC32XX_CLKPWR_PIN_RS);
+> +	__raw_writel(__raw_readl(LPC32XX_CLKPWR_INT_RS),
+> +		LPC32XX_CLKPWR_INT_RS);
+> +}
+> diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
+> new file mode 100644
+> index 0000000..630dd4a
+> --- /dev/null
+> +++ b/arch/arm/mach-lpc32xx/timer.c
+> @@ -0,0 +1,182 @@
+> +/*
+> + * arch/arm/mach-lpc32xx/timer.c
+> + *
+> + * Author: Kevin Wells <kevin.wells@nxp.com>
+> + *
+> + * Copyright (C) 2009 - 2010 NXP Semiconductors
+> + * Copyright (C) 2009 Fontys University of Applied Sciences, Eindhoven
+> + *                    Ed Schouten <e.schouten@fontys.nl>
+> + *                    Laurens Timmermans <l.timmermans@fontys.nl>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/time.h>
+> +#include <linux/err.h>
+> +#include <linux/clockchips.h>
+> +
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/platform.h>
+> +#include "common.h"
+> +
+> +static cycle_t lpc32xx_clksrc_read(struct clocksource *cs)
+> +{
+> +	return (cycle_t)__raw_readl(LCP32XX_TIMER_TC(LPC32XX_TIMER1_BASE));
+> +}
+> +
+> +static struct clocksource lpc32xx_clksrc = {
+> +	.name	= "lpc32xx_clksrc",
+> +	.shift	= 24,
+> +	.rating	= 300,
+> +	.read	= lpc32xx_clksrc_read,
+> +	.mask	= CLOCKSOURCE_MASK(32),
+> +	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+> +static int lpc32xx_clkevt_next_event(unsigned long delta,
+> +    struct clock_event_device *dev)
+> +{
+> +	__raw_writel(LCP32XX_TIMER_CNTR_TCR_RESET,
+> +		LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
+> +	__raw_writel(delta, LCP32XX_TIMER_PR(LPC32XX_TIMER0_BASE));
+> +	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
+> +		LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
+> +
+> +	return 0;
+> +}
+> +
+> +static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
+> +    struct clock_event_device *dev)
+> +{
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		WARN_ON(1);
+> +		break;
+> +
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +	case CLOCK_EVT_MODE_SHUTDOWN:
+> +		/*
+> +		 * Disable the timer. When using oneshot, we must also
+> +		 * disable the timer to wait for the first call to
+> +		 * set_next_event().
+> +		 */
+> +		__raw_writel(0, LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
+> +		break;
+> +
+> +	case CLOCK_EVT_MODE_UNUSED:
+> +	case CLOCK_EVT_MODE_RESUME:
+> +		break;
+> +	}
+> +}
+> +
+> +static struct clock_event_device lpc32xx_clkevt = {
+> +	.name		= "lpc32xx_clkevt",
+> +	.features	= CLOCK_EVT_FEAT_ONESHOT,
+> +	.shift		= 32,
+> +	.rating		= 300,
+> +	.set_next_event	= lpc32xx_clkevt_next_event,
+> +	.set_mode	= lpc32xx_clkevt_mode,
+> +};
+> +
+> +static irqreturn_t lpc32xx_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = &lpc32xx_clkevt;
+> +
+> +	/* Clear match */
+> +	__raw_writel(LCP32XX_TIMER_CNTR_MTCH_BIT(0),
+> +		LCP32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction lpc32xx_timer_irq = {
+> +	.name		= "LPC32XX Timer Tick",
+> +	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= lpc32xx_timer_interrupt,
+> +};
+> +
+> +/*
+> + * The clock management driver isn't initialized at this point, so the
+> + * clocks need to be enabled here manually and then tagged as used in
+> + * the clock driver initialization
+> + */
+> +static void __init lpc32xx_timer_init(void)
+> +{
+> +	u32 clkrate, pllreg;
+> +
+> +	/* Enable timer clock */
+> +	__raw_writel(LPC32XX_CLKPWR_TMRPWMCLK_TIMER0_EN |
+> +		LPC32XX_CLKPWR_TMRPWMCLK_TIMER1_EN,
+> +		LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1);
+> +
+> +	/*
+> +	 * The clock driver isn't initialized at this point. So determine if
+> +	 * the SYSCLK is driven from the PLL397 or main oscillator and then use
+> +	 * it to compute the PLL frequency and the PCLK divider to get the base
+> +	 * timer rates. This rate is needed to compute the tick rate.
+> +	 */
+> +	if (clk_is_sysclk_mainosc() != 0)
+> +		clkrate = LPC32XX_MAIN_OSC_FREQ;
+> +	else
+> +		clkrate = 397 * LPC32XX_CLOCK_OSC_FREQ;
+> +
+> +	/* Get ARM HCLKPLL register and convert it into a frequency */
+> +	pllreg = __raw_readl(LPC32XX_CLKPWR_HCLKPLL_CTRL) & 0x1FFFF;
+> +	clkrate = clk_get_pllrate_from_reg(clkrate, pllreg);
+> +
+> +	/* Get PCLK divider and divide ARM PLL clock by it to get timer rate */
+> +	clkrate = clkrate / clk_get_pclk_div();
+> +
+> +	/* Initial timer setup */
+> +	__raw_writel(0, LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
+> +	__raw_writel(LCP32XX_TIMER_CNTR_MTCH_BIT(0),
+> +		LCP32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
+> +	__raw_writel(1, LCP32XX_TIMER_MR0(LPC32XX_TIMER0_BASE));
+> +	__raw_writel(LCP32XX_TIMER_CNTR_MCR_MTCH(0) |
+> +		LCP32XX_TIMER_CNTR_MCR_STOP(0) |
+> +		LCP32XX_TIMER_CNTR_MCR_RESET(0),
+> +		LCP32XX_TIMER_MCR(LPC32XX_TIMER0_BASE));
+> +
+> +	/* Setup tick interrupt */
+> +	setup_irq(IRQ_LPC32XX_TIMER0, &lpc32xx_timer_irq);
+> +
+> +	/* Setup the clockevent structure. */
+> +	lpc32xx_clkevt.mult = div_sc(clkrate, NSEC_PER_SEC,
+> +		lpc32xx_clkevt.shift);
+> +	lpc32xx_clkevt.max_delta_ns = clockevent_delta2ns(-1,
+> +		&lpc32xx_clkevt);
+> +	lpc32xx_clkevt.min_delta_ns = clockevent_delta2ns(1,
+> +		&lpc32xx_clkevt) + 1;
+> +	lpc32xx_clkevt.cpumask = cpumask_of(0);
+> +	clockevents_register_device(&lpc32xx_clkevt);
+> +
+> +	/* Use timer1 as clock source. */
+> +	__raw_writel(LCP32XX_TIMER_CNTR_TCR_RESET,
+> +		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
+> +	__raw_writel(0, LCP32XX_TIMER_PR(LPC32XX_TIMER1_BASE));
+> +	__raw_writel(0, LCP32XX_TIMER_MCR(LPC32XX_TIMER1_BASE));
+> +	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
+> +		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
+> +	lpc32xx_clksrc.mult = clocksource_hz2mult(clkrate,
+> +		lpc32xx_clksrc.shift);
+> +	clocksource_register(&lpc32xx_clksrc);
+> +}
+> +
+> +struct sys_timer lpc32xx_timer = {
+> +	.init		= &lpc32xx_timer_init,
+> +};
+> +
 Best regards
 Uwe
 
