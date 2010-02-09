@@ -1,36 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Feb 2010 18:01:09 +0000
-Subject: [PATCH] amba-pl011: support hardware flow control
-In-Reply-To: <20100209143055.GA6015@bnru01.bnr.st.com>
-References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
-	<20100208135124.GA26608@n2100.arm.linux.org.uk>
-	<20100209143055.GA6015@bnru01.bnr.st.com>
-Message-ID: <20100209180109.GB20924@n2100.arm.linux.org.uk>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 9 Feb 2010 20:17:58 +0100
+Subject: [PATCH 01/14] ARM: LPC32XX: Initial architecture header files
+In-Reply-To: <20100209093129.GA2284@pengutronix.de>
+References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
+	<1265674295-23996-2-git-send-email-wellsk40@gmail.com>
+	<20100209093129.GA2284@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F805C8C7550B@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2010 at 08:00:56PM +0530, Rabin VINCENT wrote:
-> On Mon, Feb 08, 2010 at 02:51:24PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Feb 08, 2010 at 07:11:50PM +0530, Rabin Vincent wrote:
-> > > Enable/disable hardware flow control as requested by the termios.
-> > 
-> > From what I remember, I didn't implement this because there were
-> > corner cases to be dealt with.  I don't remember what they were
-> > off hand though.
+Thanks again Uwe for your time spent reviewing this and your
+helpful comments!
+
+> > diff --git a/arch/arm/mach-lpc32xx/include/mach/board.h b/arch/arm/mach-
+> lpc32xx/include/mach/board.h
+> > new file mode 100644
+> > index 0000000..30424bc
+> > --- /dev/null
+> > +++ b/arch/arm/mach-lpc32xx/include/mach/board.h
+> > @@ -0,0 +1,23 @@
+> > +/*
+> > + * arch/arm/mach-lpc32xx/include/mach/board.h
+> > + *
+> > + * Author: Kevin Wells <kevin.wells@nxp.com>
+> > + *
+> > + * Copyright (C) 2010 NXP Semiconductors
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +
+> nitpick: there is an empty line too much.
 > 
-> We haven't seen any problems with it thus far.  Nothing obvious strikes
-> me on rechecking the pl011 spec; it would be helpful if you could
-> elaborate.
+> > +#ifndef __ASM_ARCH_BOARD_H
+> > +#define __ASM_ARCH_BOARD_H
+> > +
+> > +#endif
+> Do you really need this file?
+> 
 
-Can't elaborate at the moment without re-reading the specs.
+This file is a place holder. most of the other drivers for this
+platform are already complete and a few add structures to this
+file that are shared via platform data. I can remove it, but
+would have to replace it later so I prefer to keep it now.
 
-> Either way, this patch should be safe to apply since existing users of
-> the driver shouldn't be affected.
+> > diff --git a/arch/arm/mach-lpc32xx/include/mach/clkdev.h
+> b/arch/arm/mach-lpc32xx/include/mach/clkdev.h
+> > new file mode 100644
+> > index 0000000..9bf0637
+> > --- /dev/null
+> > +++ b/arch/arm/mach-lpc32xx/include/mach/clkdev.h
+> > @@ -0,0 +1,25 @@
+> > +/*
+> > + * arch/arm/mach-lpc32xx/include/mach/clkdev.h
+> > + *
+> > + * Author: Kevin Wells <kevin.wells@nxp.com>
+> hmmm, I wonder why you use your nxp address here, but gmail in the
+> S-o-b.
+> 
 
-Err, that really doesn't follow.  There are existing users, and existing
-users will have CRTSCTS set by default.  Therefore, existing users are
-going from having hardware flow control on the UART disabled to having
-it enabled.
+Corporate email + corporate IT + outlook = lots of problems with mailing lists
+I'll change that address in git too.
 
-That's not "shouldn't be affected", that's a "this patch does change
-the hardware behaviour for these users".
+Kevin
