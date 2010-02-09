@@ -1,65 +1,40 @@
-From: manuel.stahl@iis.fraunhofer.de (Manuel Stahl)
-Date: Tue, 09 Feb 2010 16:49:50 +0100
-Subject: atmel-mci / at91_mci
-In-Reply-To: <201002081413.19984.fg@emlix.com>
-References: <4B6A8C0F.7080907@iis.fraunhofer.de>
-	<201002081413.19984.fg@emlix.com>
-Message-ID: <4B71841E.7030108@iis.fraunhofer.de>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Tue, 9 Feb 2010 18:06:31 +0200
+Subject: [PATCHv3 5/7] mxc: Add support for the Babbage board (i.MX5)
+In-Reply-To: <4B6C5519.2070506@gmail.com>
+References: <cover.1265385421.git.amit.kucheria@canonical.com>
+	<367110fafb57f7340bbffec9b394ed2fa6e89da5.1265385421.git.amit.kucheria@canonical.com>
+	<553d86cf968ba78a26b67098c2e1849407a51ba1.1265385421.git.amit.kucheria@canonical.com>
+	<bf84de08e5c511325fb94a742f5d6efabece06b6.1265385421.git.amit.kucheria@canonical.com>
+	<7739120baf6088e426f3f8bab174f6c6a6df3601.1265385421.git.amit.kucheria@canonical.com>
+	<ef6149ed5e1d228262c3d98421a836400095c1b7.1265385421.git.amit.kucheria@canonical.com>
+	<4B6C5519.2070506@gmail.com>
+Message-ID: <20100209160631.GI3390@matterhorn.verdurent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.02.2010 14:13, schrieb Fabian Godehardt:
-> Hi,
->
-> Am Donnerstag 04 Februar 2010 09:57:51 schrieb Manuel Stahl:
->> Hi all,
->>
->> I have a question regarding the atmel-mci/at91_mci driver merge.
->> Actually I have an at91rm9200 device which get's an CRC error while
->> inializing an SD-card. I guess it's because of an at91rm9200 errata:
->>
->> - Data Endianess inversion from the MCI to MMC or SD Card
->>
->> The at91_mci driver did some byte swapping in 'at91_mci_sg_to_dma'
->>   function. Where would I implement this in the atmel-mci driver?
->>
->> Attached is the kernel log when I insert a card.
->
-> Some time ago i had a 9200 with 2.6.20 where i had similar problems (AFAIR).
->
-> My workaround was to reduce the frequency on card initialization (somewhere on
-> probe() ):
->
-> 	mmc->f_min = 325000;
->
-> and deactivating 4WIRE mode.
->
-> Maybe this also helps in your case.
+On 10 Feb 05, Magnus Lilja wrote:
+> Amit Kucheria skrev:
+> > Babbage is a reference board from Freescale for their i.MX51 SoC.
+> > 
+> > Add board definition, Kconfig and Makefiles to enable Freescale i.MX51
+> > processor and Babbage board.
+> > 
+> > Boot tested on a Babbage2.5 board
+> 
+> In u-boot this board, and the files, are called mx51evk instead of Babbage. It would be nice if the same name is used in both, but no big issue.
+> 
+> Regards, Magnus
 
-Unfortunately this is not the problem. The SD-card works fine with the 
-old at91_mci driver, but not with the newer atmel-mci. The problem is 
-that I need both slots at the same time, so at91_mci is no option for me.
+I started to do a patch to move it to EVK but then realised that
+arch/arm/tools/mach-types has it as mx51_babbage. So this would cause more
+confusion.
 
-In the second slot there is a WLAN card which gets timeouts after 
-successful firmware load with at91_mci but does not work with atmel-mci.
-
-I have exactly the same setup with an AVR32 processor, there both 
-devices work. With the atmel-mci driver obiously.
+I'll just add a comment in the Kconfig help.
 
 Regards,
+Amit
 -- 
-Dipl.-Inf. Manuel Stahl
-Fraunhofer-Institut f?r Integrierte Schaltungen IIS
-- Leistungsoptimierte Systeme -
-Nordostpark 93                Telefon  +49 (0)911/58061-6419
-90411 N?rnberg                Fax      +49 (0)911/58061-6398
-http://www.iis.fraunhofer.de  manuel.stahl at iis.fraunhofer.de
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 6148 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100209/389bfd88/attachment-0001.p7s>
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
