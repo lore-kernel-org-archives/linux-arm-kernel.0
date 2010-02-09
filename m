@@ -1,53 +1,34 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Feb 2010 16:19:18 +0800
-Subject: Using PXA arm board with MAX7319 GPIO expander input
-In-Reply-To: <20100209073903.4d8a00e4@taxman.wild-wind.fr.eu.org>
-References: <bf0eec9a1002072144n461e5894m8993bfd4e8f49e9b@mail.gmail.com>
-	<f17812d71002072202x2fb620c3hf4c3bbf6dc78aa78@mail.gmail.com>
-	<bf0eec9a1002072302w1e81cc6bkd994c3efaab4d51d@mail.gmail.com>
-	<bf0eec9a1002080308v77c9c026j302767e41cd660f2@mail.gmail.com>
-	<20100208113306.GN9007@buzzloop.caiaq.de>
-	<6a1db73cb6c89001764393acd766f2ba.squirrel@www.loen.fr>
-	<f17812d71002081705q7723c388re8582d1186802340@mail.gmail.com>
-	<20100209073903.4d8a00e4@taxman.wild-wind.fr.eu.org>
-Message-ID: <f17812d71002090019n1facdbfw54f87da726333fa3@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 9 Feb 2010 01:09:19 -0800
+Subject: [PATCH] input: schedule corgi_ssp and corgi_ts to be removed
+In-Reply-To: <f17812d71002081715w485b33bbx3f67afb86c6d8ee1@mail.gmail.com>
+References: <f17812d71002041645n15e502a3sccc76fc3f2e75c76@mail.gmail.com>
+	<20100208180625.GB1469@ucw.cz>
+	<f17812d71002081715w485b33bbx3f67afb86c6d8ee1@mail.gmail.com>
+Message-ID: <20100209090918.GA12642@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 9, 2010 at 3:39 PM, Marc Zyngier <maz@misterjones.org> wrote:
-> On Tue, 9 Feb 2010 09:05:22 +0800
-> Eric Miao <eric.y.miao@gmail.com> wrote:
->
->> On Mon, Feb 8, 2010 at 8:32 PM, Marc Zyngier <maz@misterjones.org> wrote:
->> >> I just saw that there is indeed no support for irq line handling in this
->> >> driver. In order to use these lines as input for something like the
->> >> gpio_keys driver, support for that should be added. I never used this
->> >> driver and can't say whether it is under active development.
->> >
->> > It should be rather easy to introduce something similar to what I did for
->> > the pca953x driver (http://patchwork.kernel.org/patch/77418/)
->> >
->> > MAX732x seems a lot saner than PCA953x, as it has at least a hardware
->> > interrupt mask...
->>
->> Well, I'd say max732x is a chip of heavy simplification, input/output direction
->> of each pin is normally hardcoded, depending on the chip model used, there
->> seems no such interrupt mask registers for SW use really.
->
-> I'm currently staring at the max7319 datasheet, and it really looks
-> like there is such a register:
->
-> "All input ports are continuously monitored for state changes
-> (transition detection). Transitions are latched, allowing detection of
-> transient changes. Any combination of inputs can be selected using the
-> interrupt mask to assert the INT output. When the MAX7319 is
-> subsequently accessed through the serial interface, any pending
-> interrupt is cleared."
->
-> So it would seems (although I agree with you that max732x as a GPIO
-> expander is grossly simplified) that the feature is at least advertised.
->
+On Tue, Feb 09, 2010 at 09:15:38AM +0800, Eric Miao wrote:
+> On Tue, Feb 9, 2010 at 2:06 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Thu 2010-02-04 16:45:41, Eric Miao wrote:
+> >> commit 31cec413e534520111716802833675f53ac99b0b
+> >> Author: Eric Miao <eric.y.miao@gmail.com>
+> >> Date: ? Thu Feb 4 16:41:28 2010 -0800
+> >>
+> >> ? ? input: schedule corgi_ssp and corgi_ts to be removed
+> >>
+> >> ? ? Cc: Richard Purdie <rpurdie@rpsys.net>
+> >> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> >
+> > ACK.
+> >
+> 
+> Thanks, guys.
+> 
+> Dmitry, I'm hoping these two patches will go through your tree please?
 
-That sounds like a good news. I'm seeing your previous implementation
-of interrupt support on pca953x as a good one, so probably would be
-good to follow that, and not sure Jebediah Huang can have this tested :-)
+I have it in next, do you want it in .33 instead?
+
+-- 
+Dmitry
