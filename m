@@ -1,70 +1,53 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 10 Feb 2010 12:50:05 +0800
-Subject: [Linux-arm-nuc900] Re: [PATCH]NUC900 clk enable problem fix
-In-Reply-To: <71413c851002091833q4f3c88a0u9d36426b5155949c@mail.gmail.com>
-References: <71413c851001220404v14c0ae9bq43c926179ef7c599@mail.gmail.com>
-	<71413c851002091833q4f3c88a0u9d36426b5155949c@mail.gmail.com>
-Message-ID: <e68bb3471002092050p5325445ep278822a5b351ecd0@mail.gmail.com>
+Date: Wed, 10 Feb 2010 12:53:38 +0800
+Subject: [Linux-arm-nuc900] Re: [PATCH]NUC900 add gpio virtual memory map
+In-Reply-To: <71413c851002091831x101b67a7t9e38e94bbbc95db1@mail.gmail.com>
+References: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
+	<71413c851002091831x101b67a7t9e38e94bbbc95db1@mail.gmail.com>
+Message-ID: <e68bb3471002092053u7cb5d0aai129538fb32cb4880@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked.
-
-? 2010?2?10? ??10:33?Qiang Wang <rurality.linux@gmail.com> ???
-> hi, Mr Russell
+? 2010?2?10? ??10:31?Qiang Wang <rurality.linux@gmail.com> ???
+> hello, Mr Russell
 >
 > please check and ack this patch.
 >
 > thank you very much.
 >
 
+Hi guy, don't have anxiety,you have to await me to check this issue.
+
 > best regards
-> Wang Qiang
+> wangqiang
 >
-> 2010/1/22 Qiang Wang <rurality.linux@gmail.com>:
->> hello, Wan
+> 2010/2/2 Qiang Wang <rurality.linux@gmail.com>:
+>> hi, Dear Wan
 >>
->> ?There is the patch of nuc900 clk enable problem of timers.
->> ?I tested it ?in 950 env-board, and shell can come correctly.
->>
->>
+>> ? This patch adds the gpio registers virtual memory map.
+>> ? Without it, the gpio access will cause the "Data Abort" due to no
+>> virtual memory assign to it.
 >>
 >> Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
->>
+>> Cc: Wang Zongshun <mcuos.com@gmail.com>
 >> ---
->> ?arch/arm/mach-w90x900/cpu.c | ? 10 ++++++++++
->> ?1 files changed, 10 insertions(+), 0 deletions(-)
+>> ?arch/arm/mach-w90x900/cpu.c | ? ?1 +
+>> ?1 files changed, 1 insertions(+), 0 deletions(-)
 >>
 >> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
->> index 20dc0c9..dd8e1fd 100644
+>> index 20dc0c9..7a79de0 100644
 >> --- a/arch/arm/mach-w90x900/cpu.c
 >> +++ b/arch/arm/mach-w90x900/cpu.c
->> @@ -68,6 +68,11 @@ static DEFINE_CLK(gdma, 27);
->> ?static DEFINE_CLK(adc, 28);
->> ?static DEFINE_CLK(usi, 29);
->> ?static DEFINE_CLK(ext, 0);
->> +static DEFINE_CLK(timer0, 19);
->> +static DEFINE_CLK(timer1, 20);
->> +static DEFINE_CLK(timer2, 21);
->> +static DEFINE_CLK(timer3, 22);
->> +static DEFINE_CLK(timer4, 23);
->>
->> ?static struct clk_lookup nuc900_clkregs[] = {
->> ? ? ? ?DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
->> @@ -90,6 +95,11 @@ static struct clk_lookup nuc900_clkregs[] = {
->> ? ? ? ?DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
->> ? ? ? ?DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
->> ? ? ? ?DEF_CLKLOOK(&clk_ext, NULL, "ext"),
->> + ? ? ? DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
->> + ? ? ? DEF_CLKLOOK(&clk_timer1, NULL, "timer1"),
->> + ? ? ? DEF_CLKLOOK(&clk_timer2, NULL, "timer2"),
->> + ? ? ? DEF_CLKLOOK(&clk_timer3, NULL, "timer3"),
->> + ? ? ? DEF_CLKLOOK(&clk_timer4, NULL, "timer4"),
+>> @@ -45,6 +45,7 @@ static struct map_desc nuc900_iodesc[] __initdata = {
+>> ? ? ? ?IODESC_ENT(UART),
+>> ? ? ? ?IODESC_ENT(TIMER),
+>> ? ? ? ?IODESC_ENT(EBI),
+>> + ? ? ? IODESC_ENT(GPIO),
 >> ?};
 >>
->> ?/* Initial serial platform data */
+>> ?/* Initial clock declarations. */
 >> --
->> 1.6.6
+>> 1.6.4
 >>
 >
 > --
