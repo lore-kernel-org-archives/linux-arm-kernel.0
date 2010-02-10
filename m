@@ -1,110 +1,137 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 10 Feb 2010 17:32:38 +0100 (CET)
-Subject: [PATCH v2] async-tx: fix buffer sumbission error handling in
-	ipu_idma.c
-In-Reply-To: <e9c3a7c21002100754k7737b79cvb13a2b39ad16cc44@mail.gmail.com>
-References: <Pine.LNX.4.64.1002101643390.4495@axis700.grange>
-	<e9c3a7c21002100754k7737b79cvb13a2b39ad16cc44@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1002101659580.4495@axis700.grange>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Feb 2010 09:22:21 -0800
+Subject: [PATCH] OMAP: hsmmc: fix memory leak
+In-Reply-To: <alpine.DEB.2.00.1002101419540.20129@ak-desktop>
+References: <1265632385-27448-1-git-send-email-aaro.koskinen@nokia.com>
+	<20100209231732.GM21755@atomide.com>
+	<alpine.DEB.2.00.1002101419540.20129@ak-desktop>
+Message-ID: <20100210172220.GT21755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If submitting new buffer failed, a wrong descriptor gets completed and it
-doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
-these bugs and make ipu_update_channel_buffer() void, because it never fails.
+Hi
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
+Added LAKML to Cc for a quick review there too.
 
-v1 -> v2: When fixing Oopses remember to not introduce compiler warnings;)
-
-On Wed, 10 Feb 2010, Dan Williams wrote:
-
-> On Wed, Feb 10, 2010 at 8:44 AM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> > If submitting new buffer failed, a wrong descriptor gets completed and it
-> > doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
-> > these bugs and make ipu_update_channel_buffer() void, because it never fails.
-> >
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+* Aaro Koskinen <aaro.koskinen@nokia.com> [100210 04:25]:
+> Hi,
 > 
-> Looks like 2.6.33 material.  Shall I tag it for -stable as well?
+> On Wed, 10 Feb 2010, Tony Lindgren wrote:
+> >* Aaro Koskinen <aaro.koskinen@nokia.com> [100208 04:29]:
+> >>The platform data allocated with kmalloc() will become unreachable once
+> >>the init is complete, so it should be freed. The problem was discovered
+> >>by kmemleak.
+> >
+> >Looks like this is safe to do as platform_device_add_data does kmemdup
+> >on the data.
+> >
+> >BTW, if you want to create a version for 2.6.33, we should still have
+> >enough time to queue it as a fix. It's a very limited size leak though,
+> >but still a leak.
+> 
+> The version for 2.6.33 is below (also attached).
 
-This is more of a theoretical Oops possibility. You have to really try 
-hard to get it - if at all possible. At least I've never seen one and 
-never heard anyone seeing it. So, strictly speaking, I don't think this 
-bug can hurt anyone, but, if Sascha has nothing against this patch, you 
-can push it to stable too.
+Thanks, added to omap-fixes for 2.6.33.
 
- drivers/dma/ipu/ipu_idmac.c |   25 +++++++------------------
- 1 files changed, 7 insertions(+), 18 deletions(-)
+Regards,
 
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index 9a5bc1a..e80bae1 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -761,12 +761,10 @@ static void ipu_select_buffer(enum ipu_channel channel, int buffer_n)
-  * @buffer_n:	buffer number to update.
-  *		0 or 1 are the only valid values.
-  * @phyaddr:	buffer physical address.
-- * @return:	Returns 0 on success or negative error code on failure. This
-- *              function will fail if the buffer is set to ready.
-  */
- /* Called under spin_lock(_irqsave)(&ichan->lock) */
--static int ipu_update_channel_buffer(struct idmac_channel *ichan,
--				     int buffer_n, dma_addr_t phyaddr)
-+static void ipu_update_channel_buffer(struct idmac_channel *ichan,
-+				      int buffer_n, dma_addr_t phyaddr)
- {
- 	enum ipu_channel channel = ichan->dma_chan.chan_id;
- 	uint32_t reg;
-@@ -806,8 +804,6 @@ static int ipu_update_channel_buffer(struct idmac_channel *ichan,
- 	}
- 
- 	spin_unlock_irqrestore(&ipu_data.lock, flags);
--
--	return 0;
- }
- 
- /* Called under spin_lock_irqsave(&ichan->lock) */
-@@ -816,7 +812,6 @@ static int ipu_submit_buffer(struct idmac_channel *ichan,
- {
- 	unsigned int chan_id = ichan->dma_chan.chan_id;
- 	struct device *dev = &ichan->dma_chan.dev->device;
--	int ret;
- 
- 	if (async_tx_test_ack(&desc->txd))
- 		return -EINTR;
-@@ -827,14 +822,7 @@ static int ipu_submit_buffer(struct idmac_channel *ichan,
- 	 * could make it conditional on status >= IPU_CHANNEL_ENABLED, but
- 	 * doing it again shouldn't hurt either.
- 	 */
--	ret = ipu_update_channel_buffer(ichan, buf_idx,
--					sg_dma_address(sg));
--
--	if (ret < 0) {
--		dev_err(dev, "Updating sg %p on channel 0x%x buffer %d failed!\n",
--			sg, chan_id, buf_idx);
--		return ret;
--	}
-+	ipu_update_channel_buffer(ichan, buf_idx, sg_dma_address(sg));
- 
- 	ipu_select_buffer(chan_id, buf_idx);
- 	dev_dbg(dev, "Updated sg %p on channel 0x%x buffer %d\n",
-@@ -1379,10 +1367,11 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
- 
- 	if (likely(sgnew) &&
- 	    ipu_submit_buffer(ichan, descnew, sgnew, ichan->active_buffer) < 0) {
--		callback = desc->txd.callback;
--		callback_param = desc->txd.callback_param;
-+		callback = descnew->txd.callback;
-+		callback_param = descnew->txd.callback_param;
- 		spin_unlock(&ichan->lock);
--		callback(callback_param);
-+		if (callback)
-+			callback(callback_param);
- 		spin_lock(&ichan->lock);
- 	}
- 
--- 
-1.6.2.4
+Tony
+
+> 
+> From: Aaro Koskinen <aaro.koskinen@nokia.com>
+> Date: Thu, 4 Feb 2010 13:06:59 +0200
+> Subject: [PATCH] OMAP: hsmmc: fix memory leak
+> 
+> The platform data allocated with kmalloc() will become unreachable once
+> the init is complete, so it should be freed. The problem was discovered
+> by kmemleak.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/mach-omap2/mmc-twl4030.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mmc-twl4030.c b/arch/arm/mach-omap2/mmc-twl4030.c
+> index 0c3c72d..8afe9dd 100644
+> --- a/arch/arm/mach-omap2/mmc-twl4030.c
+> +++ b/arch/arm/mach-omap2/mmc-twl4030.c
+> @@ -408,6 +408,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  {
+>  	struct twl4030_hsmmc_info *c;
+>  	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
+> +	int i;
+> 
+>  	if (cpu_is_omap2430()) {
+>  		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
+> @@ -434,7 +435,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  		mmc = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
+>  		if (!mmc) {
+>  			pr_err("Cannot allocate memory for mmc device!\n");
+> -			return;
+> +			goto done;
+>  		}
+> 
+>  		if (c->name)
+> @@ -532,6 +533,10 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  			continue;
+>  		c->dev = mmc->dev;
+>  	}
+> +
+> +done:
+> +	for (i = 0; i < nr_hsmmc; i++)
+> +		kfree(hsmmc_data[i]);
+>  }
+> 
+>  #endif
+> -- 
+> 1.5.6.5
+
+> From 6d15f48ecc177bde18033af2884eb2c5ce53bfd7 Mon Sep 17 00:00:00 2001
+> From: Aaro Koskinen <aaro.koskinen@nokia.com>
+> Date: Thu, 4 Feb 2010 13:06:59 +0200
+> Subject: [PATCH] OMAP: hsmmc: fix memory leak
+> 
+> The platform data allocated with kmalloc() will become unreachable once
+> the init is complete, so it should be freed. The problem was discovered
+> by kmemleak.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/mach-omap2/mmc-twl4030.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mmc-twl4030.c b/arch/arm/mach-omap2/mmc-twl4030.c
+> index 0c3c72d..8afe9dd 100644
+> --- a/arch/arm/mach-omap2/mmc-twl4030.c
+> +++ b/arch/arm/mach-omap2/mmc-twl4030.c
+> @@ -408,6 +408,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  {
+>  	struct twl4030_hsmmc_info *c;
+>  	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
+> +	int i;
+>  
+>  	if (cpu_is_omap2430()) {
+>  		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
+> @@ -434,7 +435,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  		mmc = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
+>  		if (!mmc) {
+>  			pr_err("Cannot allocate memory for mmc device!\n");
+> -			return;
+> +			goto done;
+>  		}
+>  
+>  		if (c->name)
+> @@ -532,6 +533,10 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
+>  			continue;
+>  		c->dev = mmc->dev;
+>  	}
+> +
+> +done:
+> +	for (i = 0; i < nr_hsmmc; i++)
+> +		kfree(hsmmc_data[i]);
+>  }
+>  
+>  #endif
+> -- 
+> 1.5.6.5
+> 
