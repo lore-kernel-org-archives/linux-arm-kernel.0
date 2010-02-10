@@ -1,137 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2010 09:22:21 -0800
-Subject: [PATCH] OMAP: hsmmc: fix memory leak
-In-Reply-To: <alpine.DEB.2.00.1002101419540.20129@ak-desktop>
-References: <1265632385-27448-1-git-send-email-aaro.koskinen@nokia.com>
-	<20100209231732.GM21755@atomide.com>
-	<alpine.DEB.2.00.1002101419540.20129@ak-desktop>
-Message-ID: <20100210172220.GT21755@atomide.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 10 Feb 2010 10:47:45 -0700
+Subject: [PATCH v2] async-tx: fix buffer sumbission error handling in
+	ipu_idma.c
+In-Reply-To: <Pine.LNX.4.64.1002101659580.4495@axis700.grange>
+References: <Pine.LNX.4.64.1002101643390.4495@axis700.grange>
+	<e9c3a7c21002100754k7737b79cvb13a2b39ad16cc44@mail.gmail.com>
+	<Pine.LNX.4.64.1002101659580.4495@axis700.grange>
+Message-ID: <e9c3a7c21002100947y1cf32043u4ec9d2a5c4e494f8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-Added LAKML to Cc for a quick review there too.
-
-* Aaro Koskinen <aaro.koskinen@nokia.com> [100210 04:25]:
-> Hi,
-> 
-> On Wed, 10 Feb 2010, Tony Lindgren wrote:
-> >* Aaro Koskinen <aaro.koskinen@nokia.com> [100208 04:29]:
-> >>The platform data allocated with kmalloc() will become unreachable once
-> >>the init is complete, so it should be freed. The problem was discovered
-> >>by kmemleak.
-> >
-> >Looks like this is safe to do as platform_device_add_data does kmemdup
-> >on the data.
-> >
-> >BTW, if you want to create a version for 2.6.33, we should still have
-> >enough time to queue it as a fix. It's a very limited size leak though,
-> >but still a leak.
-> 
-> The version for 2.6.33 is below (also attached).
-
-Thanks, added to omap-fixes for 2.6.33.
-
-Regards,
-
-Tony
-
-> 
-> From: Aaro Koskinen <aaro.koskinen@nokia.com>
-> Date: Thu, 4 Feb 2010 13:06:59 +0200
-> Subject: [PATCH] OMAP: hsmmc: fix memory leak
-> 
-> The platform data allocated with kmalloc() will become unreachable once
-> the init is complete, so it should be freed. The problem was discovered
-> by kmemleak.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+On Wed, Feb 10, 2010 at 9:32 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> If submitting new buffer failed, a wrong descriptor gets completed and it
+> doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
+> these bugs and make ipu_update_channel_buffer() void, because it never fails.
+>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > ---
->  arch/arm/mach-omap2/mmc-twl4030.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/mmc-twl4030.c b/arch/arm/mach-omap2/mmc-twl4030.c
-> index 0c3c72d..8afe9dd 100644
-> --- a/arch/arm/mach-omap2/mmc-twl4030.c
-> +++ b/arch/arm/mach-omap2/mmc-twl4030.c
-> @@ -408,6 +408,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  {
->  	struct twl4030_hsmmc_info *c;
->  	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
-> +	int i;
-> 
->  	if (cpu_is_omap2430()) {
->  		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
-> @@ -434,7 +435,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  		mmc = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
->  		if (!mmc) {
->  			pr_err("Cannot allocate memory for mmc device!\n");
-> -			return;
-> +			goto done;
->  		}
-> 
->  		if (c->name)
-> @@ -532,6 +533,10 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  			continue;
->  		c->dev = mmc->dev;
->  	}
-> +
-> +done:
-> +	for (i = 0; i < nr_hsmmc; i++)
-> +		kfree(hsmmc_data[i]);
->  }
-> 
->  #endif
-> -- 
-> 1.5.6.5
+>
+> v1 -> v2: When fixing Oopses remember to not introduce compiler warnings;)
+>
+> On Wed, 10 Feb 2010, Dan Williams wrote:
+>
+>> On Wed, Feb 10, 2010 at 8:44 AM, Guennadi Liakhovetski
+>> <g.liakhovetski@gmx.de> wrote:
+>> > If submitting new buffer failed, a wrong descriptor gets completed and it
+>> > doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
+>> > these bugs and make ipu_update_channel_buffer() void, because it never fails.
+>> >
+>> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>>
+>> Looks like 2.6.33 material. ?Shall I tag it for -stable as well?
+>
+> This is more of a theoretical Oops possibility. You have to really try
+> hard to get it - if at all possible. At least I've never seen one and
+> never heard anyone seeing it. So, strictly speaking, I don't think this
+> bug can hurt anyone, but, if Sascha has nothing against this patch, you
+> can push it to stable too.
 
-> From 6d15f48ecc177bde18033af2884eb2c5ce53bfd7 Mon Sep 17 00:00:00 2001
-> From: Aaro Koskinen <aaro.koskinen@nokia.com>
-> Date: Thu, 4 Feb 2010 13:06:59 +0200
-> Subject: [PATCH] OMAP: hsmmc: fix memory leak
-> 
-> The platform data allocated with kmalloc() will become unreachable once
-> the init is complete, so it should be freed. The problem was discovered
-> by kmemleak.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
->  arch/arm/mach-omap2/mmc-twl4030.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/mmc-twl4030.c b/arch/arm/mach-omap2/mmc-twl4030.c
-> index 0c3c72d..8afe9dd 100644
-> --- a/arch/arm/mach-omap2/mmc-twl4030.c
-> +++ b/arch/arm/mach-omap2/mmc-twl4030.c
-> @@ -408,6 +408,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  {
->  	struct twl4030_hsmmc_info *c;
->  	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
-> +	int i;
->  
->  	if (cpu_is_omap2430()) {
->  		control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
-> @@ -434,7 +435,7 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  		mmc = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
->  		if (!mmc) {
->  			pr_err("Cannot allocate memory for mmc device!\n");
-> -			return;
-> +			goto done;
->  		}
->  
->  		if (c->name)
-> @@ -532,6 +533,10 @@ void __init twl4030_mmc_init(struct twl4030_hsmmc_info *controllers)
->  			continue;
->  		c->dev = mmc->dev;
->  	}
-> +
-> +done:
-> +	for (i = 0; i < nr_hsmmc; i++)
-> +		kfree(hsmmc_data[i]);
->  }
->  
->  #endif
-> -- 
-> 1.5.6.5
-> 
+Given the time proximity to 2.6.33-final I'll push it without the
+stable tag.  If we later decide it is needed there it's just a matter
+of sending Greg a note.
+
+Thanks,
+Dan
