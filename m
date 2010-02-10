@@ -1,43 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 10 Feb 2010 20:29:13 +0000
-Subject: [PATCH] ARM: SMDK6410: Fix modular build of AC97 audio driver
-Message-ID: <1265833753-22360-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 10 Feb 2010 13:37:18 -0700
+Subject: [PATCH v2] async-tx: fix buffer sumbission error handling in
+	ipu_idma.c
+In-Reply-To: <Pine.LNX.4.64.1002102111170.4495@axis700.grange>
+References: <Pine.LNX.4.64.1002101643390.4495@axis700.grange>
+	<e9c3a7c21002100754k7737b79cvb13a2b39ad16cc44@mail.gmail.com>
+	<Pine.LNX.4.64.1002101659580.4495@axis700.grange>
+	<e9c3a7c21002100947y1cf32043u4ec9d2a5c4e494f8@mail.gmail.com>
+	<20100210180427.GD15883@pengutronix.de>
+	<Pine.LNX.4.64.1002102111170.4495@axis700.grange>
+Message-ID: <e9c3a7c21002101237p60a76cbey4cebe0299171cbf0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the AC97 audio driver is built modular a _MODULE is appended to
-the symbol defined for the config option. Rather than write a lengthy
-check against multiple symbols just unconditionally register the AC97
-controller device - much simpler and hardly a massive resource hit.
+2010/2/10 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> On Wed, 10 Feb 2010, Uwe Kleine-K?nig wrote:
+>
+>> Hello Guennadi,
+>>
+>> s/sumbission/submission/ in the Subject
+>
+> Right, thanks Uwe. Dan, can you fix this when committing or shall I make
+> v3?
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c6410/mach-smdk6410.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+I applied it with this fix.
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index 259ebbb..f2c70ec 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -254,9 +254,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&smdk6410_b_pwr_5v,
- #endif
- 	&smdk6410_lcd_powerdev,
--#ifdef CONFIG_SND_SOC_SMDK_WM9713
- 	&s3c64xx_device_ac97,
--#endif
- 	&smdk6410_smsc911x,
- };
- 
-@@ -478,9 +476,7 @@ static void __init smdk6410_machine_init(void)
- 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
--#ifdef CONFIG_SND_SOC_SMDK_WM9713
- 	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
--#endif
- 
- 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
- }
--- 
-1.6.6.1
+--
+Dan
