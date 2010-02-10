@@ -1,126 +1,120 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 10 Feb 2010 09:25:19 +0200
-Subject: [PATCH 2/3] mx25: add platform support for imxfb
+Date: Wed, 10 Feb 2010 09:25:20 +0200
+Subject: [PATCH 3/3] mx25pdk: add LCD support
 In-Reply-To: <cover.1265786237.git.baruch@tkos.co.il>
 References: <cover.1265786237.git.baruch@tkos.co.il>
-Message-ID: <63f40f35fe8cdea681d8341af36a4c539086f7ef.1265786237.git.baruch@tkos.co.il>
+Message-ID: <d46f11162815bb8e4bb85d49870f600df2a8aee1.1265786237.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-mx25/clock.c            |   12 ++++++++++++
- arch/arm/mach-mx25/devices.c          |   23 +++++++++++++++++++++++
- arch/arm/mach-mx25/devices.h          |    1 +
- arch/arm/plat-mxc/include/mach/mx25.h |    2 ++
- 4 files changed, 38 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx25/mx25pdk.c                |   55 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h |    2 +
+ 2 files changed, 57 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index 744b52a..56bf958 100644
---- a/arch/arm/mach-mx25/clock.c
-+++ b/arch/arm/mach-mx25/clock.c
-@@ -124,6 +124,11 @@ static unsigned long get_rate_gpt(struct clk *clk)
- 	return get_rate_per(5);
- }
+diff --git a/arch/arm/mach-mx25/mx25pdk.c b/arch/arm/mach-mx25/mx25pdk.c
+index f4e8b98..6d9dd33 100644
+--- a/arch/arm/mach-mx25/mx25pdk.c
++++ b/arch/arm/mach-mx25/mx25pdk.c
+@@ -35,6 +35,7 @@
+ #include <mach/imx-uart.h>
+ #include <mach/mx25.h>
+ #include <mach/mxc_nand.h>
++#include <mach/imxfb.h>
+ #include "devices.h"
+ #include <mach/iomux.h>
  
-+static unsigned long get_rate_lcdc(struct clk *clk)
-+{
-+	return get_rate_per(7);
-+}
+@@ -54,6 +55,31 @@ static struct pad_desc mx25pdk_pads[] = {
+ 	MX25_PAD_FEC_TX_CLK__FEC_TX_CLK,
+ 	MX25_PAD_A17__GPIO_2_3, /* FEC_EN, GPIO 35 */
+ 	MX25_PAD_D12__GPIO_4_8, /* FEC_RESET_B, GPIO 104 */
 +
- static unsigned long get_rate_otg(struct clk *clk)
++	/* LCD */
++	MX25_PAD_LD0__LD0,
++	MX25_PAD_LD1__LD1,
++	MX25_PAD_LD2__LD2,
++	MX25_PAD_LD3__LD3,
++	MX25_PAD_LD4__LD4,
++	MX25_PAD_LD5__LD5,
++	MX25_PAD_LD6__LD6,
++	MX25_PAD_LD7__LD7,
++	MX25_PAD_LD8__LD8,
++	MX25_PAD_LD9__LD9,
++	MX25_PAD_LD10__LD10,
++	MX25_PAD_LD11__LD11,
++	MX25_PAD_LD12__LD12,
++	MX25_PAD_LD13__LD13,
++	MX25_PAD_LD14__LD14,
++	MX25_PAD_LD15__LD15,
++	MX25_PAD_GPIO_E__LD16,
++	MX25_PAD_GPIO_F__LD17,
++	MX25_PAD_HSYNC__HSYNC,
++	MX25_PAD_VSYNC__VSYNC,
++	MX25_PAD_LSCLK__LSCLK,
++	MX25_PAD_OE_ACD__OE_ACD,
++	MX25_PAD_CONTRAST__CONTRAST,
+ };
+ 
+ static struct fec_platform_data mx25_fec_pdata = {
+@@ -83,6 +109,34 @@ static struct mxc_nand_platform_data mx25pdk_nand_board_info = {
+ 	.flash_bbt	= 1,
+ };
+ 
++static struct imx_fb_videomode mx25pdk_modes[] = {
++	{
++		.mode	= {
++			.name		= "CRT-VGA",
++			.refresh	= 60,
++			.xres		= 640,
++			.yres		= 480,
++			.pixclock	= 39683,
++			.left_margin	= 45,
++			.right_margin	= 114,
++			.upper_margin	= 33,
++			.lower_margin	= 11,
++			.hsync_len	= 1,
++			.vsync_len	= 1,
++		},
++		.bpp	= 16,
++		.pcr	= 0xFA208B80,
++	},
++};
++
++static struct imx_fb_platform_data mx25pdk_fb_pdata = {
++	.mode		= mx25pdk_modes,
++	.num_modes	= ARRAY_SIZE(mx25pdk_modes),
++	.pwmr		= 0x00A903FF,
++	.lscr1		= 0x00120300,
++	.dmacr		= 0x00020010,
++};
++
+ static void __init mx25pdk_init(void)
  {
- 	return 48000000; /* FIXME */
-@@ -167,6 +172,8 @@ DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(cspi3_clk,  0, CCM_CGCR1,  7, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(fec_ahb_clk, 0, CCM_CGCR0, 23, NULL,	 NULL, NULL);
-+DEFINE_CLOCK(lcdc_ahb_clk, 0, CCM_CGCR0, 24, NULL,	 NULL, NULL);
-+DEFINE_CLOCK(lcdc_per_clk, 0, CCM_CGCR0,  7, NULL,	 NULL, &lcdc_ahb_clk);
- DEFINE_CLOCK(uart1_clk,  0, CCM_CGCR2, 14, get_rate_uart, NULL, &uart_per_clk);
- DEFINE_CLOCK(uart2_clk,  0, CCM_CGCR2, 15, get_rate_uart, NULL, &uart_per_clk);
- DEFINE_CLOCK(uart3_clk,  0, CCM_CGCR2, 16, get_rate_uart, NULL, &uart_per_clk);
-@@ -183,6 +190,7 @@ DEFINE_CLOCK(tsc_clk,	 0, CCM_CGCR2, 13, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(i2c_clk,	 0, CCM_CGCR0,  6, get_rate_i2c, NULL, NULL);
- DEFINE_CLOCK(fec_clk,	 0, CCM_CGCR1, 15, get_rate_ipg, NULL, &fec_ahb_clk);
- DEFINE_CLOCK(dryice_clk, 0, CCM_CGCR1,  8, get_rate_ipg, NULL, NULL);
-+DEFINE_CLOCK(lcdc_clk,	 0, CCM_CGCR1, 29, get_rate_lcdc, NULL, &lcdc_per_clk);
+ 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
+@@ -92,6 +146,7 @@ static void __init mx25pdk_init(void)
+ 	mxc_register_device(&mxc_usbh2, NULL);
+ 	mxc_register_device(&mxc_nand_device, &mx25pdk_nand_board_info);
+ 	mxc_register_device(&mx25_rtc_device, NULL);
++	mxc_register_device(&mx25_fb_device, &mx25pdk_fb_pdata);
  
- #define _REGISTER_CLOCK(d, n, c)	\
- 	{				\
-@@ -216,6 +224,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c_clk)
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
-+	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
- };
+ 	mx25pdk_fec_reset();
+ 	mxc_register_device(&mx25_fec_device, &mx25_fec_pdata);
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx25.h b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
+index 9af494f..5418d52 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx25.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
+@@ -462,9 +462,11 @@
+ #define MX25_PAD_GPIO_C__CAN2_TX	IOMUX_PAD(0x3f8, 0x1fc, 0x16, 0, 0, PAD_CTL_PUS_22K_UP)
  
- int __init mx25_clocks_init(void)
-@@ -233,6 +242,9 @@ int __init mx25_clocks_init(void)
- 	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
- 	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
+ #define MX25_PAD_GPIO_D__GPIO_D		IOMUX_PAD(0x3fc, 0x200, 0x10, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_GPIO_E__LD16		IOMUX_PAD(0x400, 0x204, 0x02, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_GPIO_D__CAN2_RX	IOMUX_PAD(0x3fc, 0x200, 0x16, 0x484, 1, PAD_CTL_PUS_22K_UP)
  
-+	/* Clock source for lcdc is upll */
-+	__raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7), CRM_BASE + 0x64);
-+
- 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
+ #define MX25_PAD_GPIO_E__GPIO_E		IOMUX_PAD(0x400, 0x204, 0x10, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_GPIO_F__LD17		IOMUX_PAD(0x404, 0x208, 0x02, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_GPIO_E__AUD7_TXD	IOMUX_PAD(0x400, 0x204, 0x14, 0, 0, NO_PAD_CTRL)
  
- 	return 0;
-diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index b0b75fc..3f4b8a0 100644
---- a/arch/arm/mach-mx25/devices.c
-+++ b/arch/arm/mach-mx25/devices.c
-@@ -477,3 +477,26 @@ struct platform_device mx25_rtc_device = {
- 	.num_resources	= ARRAY_SIZE(mx25_rtc_resources),
- 	.resource	= mx25_rtc_resources,
- };
-+
-+static struct resource mx25_fb_resources[] = {
-+	{
-+		.start	= MX25_LCDC_BASE_ADDR,
-+		.end	= MX25_LCDC_BASE_ADDR + 0xfff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= MX25_INT_LCDC,
-+		.end	= MX25_INT_LCDC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device mx25_fb_device = {
-+	.name		= "imx-fb",
-+	.id		= 0,
-+	.resource	= mx25_fb_resources,
-+	.num_resources	= ARRAY_SIZE(mx25_fb_resources),
-+	.dev		= {
-+		.coherent_dma_mask = 0xFFFFFFFF,
-+	},
-+};
-diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
-index 37e6a08..39560e1 100644
---- a/arch/arm/mach-mx25/devices.h
-+++ b/arch/arm/mach-mx25/devices.h
-@@ -20,3 +20,4 @@ extern struct platform_device mxc_i2c_device2;
- extern struct platform_device mx25_fec_device;
- extern struct platform_device mxc_nand_device;
- extern struct platform_device mx25_rtc_device;
-+extern struct platform_device mx25_fb_device;
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 215c4d8..f29798d 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -44,9 +44,11 @@
- #define MX25_FEC_BASE_ADDR		0x50038000
- #define MX25_NFC_BASE_ADDR		0xbb000000
- #define MX25_DRYICE_BASE_ADDR		0x53ffc000
-+#define MX25_LCDC_BASE_ADDR		0x53fbc000
- 
- #define MX25_INT_DRYICE	25
- #define MX25_INT_FEC	57
- #define MX25_INT_NANDFC	33
-+#define MX25_INT_LCDC	39
- 
- #endif /* __MACH_MX25_H__ */
+ #define MX25_PAD_GPIO_F__GPIO_F		IOMUX_PAD(0x404, 0x208, 0x10, 0, 0, NO_PAD_CTRL)
 -- 
 1.6.6.1
