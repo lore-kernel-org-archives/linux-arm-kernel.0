@@ -1,44 +1,93 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 10 Feb 2010 10:33:31 +0200
-Subject: [PATCH 2/3] mx25: add platform support for imxfb
-In-Reply-To: <20100210075315.GB10185@pengutronix.de>
-References: <cover.1265786237.git.baruch@tkos.co.il>
-	<63f40f35fe8cdea681d8341af36a4c539086f7ef.1265786237.git.baruch@tkos.co.il>
-	<20100210075315.GB10185@pengutronix.de>
-Message-ID: <20100210083331.GB29489@jasper.tkos.co.il>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Wed, 10 Feb 2010 09:38:38 -0000 (GMT)
+Subject: [PATCH] Eurotech Zeus : Making USB port 2 work
+In-Reply-To: <20100210120555.1b648467@ironhide>
+References: <20100210120555.1b648467@ironhide>
+Message-ID: <37cba69b59077aff2450e9b89c9d0d20.squirrel@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
 
-On Wed, Feb 10, 2010 at 08:53:15AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Feb 10, 2010 at 09:25:19AM +0200, Baruch Siach wrote:
-> > @@ -233,6 +242,9 @@ int __init mx25_clocks_init(void)
-> >  	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
-> >  	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
-> >  
-> > +	/* Clock source for lcdc is upll */
-> > +	__raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7), CRM_BASE + 0x64);
-> > +
-> 0x64?  Please define a register name for that constant.
+On Wed, February 10, 2010 06:35, Amit Walambe wrote:
 
-I just followed the precedence set in the get_rate_per() routine above.  
-Defining a register name is obviously better.
+Hi Amit,
 
-> Ditto for 7.
+> The attached patch adds support for the second USB port of
+> Arcom/Eurotech Zeus SBC. Currently only port 1 works. The patch sets the
+> power enabling GPIO for port 2 and corrects the port initialisation
+> flags.
 
-See arch/arm/mach-mx3/clock.c:mx31_clocks_init() and 
-arch/arm/mach-mx3/clock-imx35.c:mx35_clocks_init(). This is probably a matter 
-for a separate cleanup patch.
+Thanks for having a look at this. Comments below:
 
-> Note I didn't look in the hardware manual, but I wonder if that should
-> better go in the enable routine for lcdc?
+> Index: linux-2.6.33-rc6/arch/arm/mach-pxa/zeus.c
+> ===================================================================
+> --- linux-2.6.33-rc6.orig/arch/arm/mach-pxa/zeus.c	2010-02-10 11:37:47.456069467 +0530
+> +++ linux-2.6.33-rc6/arch/arm/mach-pxa/zeus.c	2010-02-10 11:40:30.443073251 +0530
+> @@ -482,7 +482,6 @@
+>  {
+>  	int err;
+>
+> -	/* Switch on port 2. */
+>  	if ((err = gpio_request(ZEUS_USB2_PWREN_GPIO, "USB2_PWREN"))) {
+>  		dev_err(dev, "Can't request USB2_PWREN\n");
+>  		return err;
+> @@ -494,6 +493,9 @@
+>  		return err;
+>  	}
+>
+> +	/* Switch on port 2. */
+> +	gpio_set_value(ZEUS_USB2_PWREN_GPIO, 1);
+> +
 
-OK. I'll do it there.
+ZEUS_USB2_PWREN_GPIO is already set to one a few lines above (see call to
+gpio_direction_output).
 
-baruch
+>  	/* Port 2 is shared between host and client interface. */
+>  	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
+>
+> @@ -503,13 +505,16 @@
+>  static void zeus_ohci_exit(struct device *dev)
+>  {
+>  	/* Power-off port 2 */
+> +	gpio_set_value(ZEUS_USB2_PWREN_GPIO, 0);
+>  	gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 0);
 
+Same here.
+
+>  	gpio_free(ZEUS_USB2_PWREN_GPIO);
+>  }
+>
+>  static struct pxaohci_platform_data zeus_ohci_platform_data = {
+>  	.port_mode	= PMM_NPS_MODE,
+> -	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
+> +	/* Clear Power Control Polarity Low and set Power Sense
+> +	 * Polarity Low. Supply power to USB ports. */
+> +	.flags		= ENABLE_PORT_ALL | ~(POWER_CONTROL_LOW) | POWER_SENSE_LOW,
+
+I suppose that is actually what makes it work, though the change is rather suspect.
+You're basically setting *all* bits to 1, except for POWER_CONTROL_LOW, and I don't
+think that's the expected behaviour. Could you try the following instead:
+
+         .flags        = ENABLE_PORT_ALL | POWER_SENSE_LOW,
+
+Additionally, you can try adding NO_OC_PROTECTION or OC_MODE_PERPORT if the above doesn't
+work. This is a bit of a shot in the dark, as I'm currently far away from my Zeus board
+and can't directly test it.
+
+>  	.init		= zeus_ohci_init,
+>  	.exit		= zeus_ohci_exit,
+>  };
+> @@ -837,7 +842,7 @@
+>  	PCFR = PCFR_OPDE | PCFR_DC_EN | PCFR_FS | PCFR_FP;
+>  }
+>
+> -MACHINE_START(ARCOM_ZEUS, "Arcom ZEUS")
+> +MACHINE_START(ARCOM_ZEUS, "Arcom/Eurotech ZEUS")
+
+Please sent this as a separate patch, including a Signed-off-by: line.
+
+Thanks,
+
+        M.
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+And if you don't know where you're going, any road will take you there...
