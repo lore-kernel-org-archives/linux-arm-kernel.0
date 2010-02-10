@@ -1,78 +1,77 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 2 Feb 2010 09:02:18 +0530
-Subject: [PATCH] amba-pl011: support hardware flow control
-Message-ID: <mailman.201.1265809553.2170.linux-arm-kernel@lists.infradead.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 10 Feb 2010 16:44:40 +0100 (CET)
+Subject: [PATCH] async-tx: fix buffer sumbission error handling in ipu_idma.c
+Message-ID: <Pine.LNX.4.64.1002101643390.4495@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable/disable automatic hardware flow control as requested by the
-termios.  The controller does not allow us to control the RTS line when
-auto-RTS is enabled, so we enable auto-RTS only if the kernel has not
-disabled RTS.
+If submitting new buffer failed, a wrong descriptor gets completed and it
+doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
+these bugs and make ipu_update_channel_buffer() void, because it never fails.
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- drivers/serial/amba-pl011.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+ drivers/dma/ipu/ipu_idmac.c |   24 +++++++-----------------
+ 1 files changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
-index ef7adc8..ce6c353 100644
---- a/drivers/serial/amba-pl011.c
-+++ b/drivers/serial/amba-pl011.c
-@@ -71,6 +71,7 @@ struct uart_amba_port {
- 	unsigned int		im;	/* interrupt mask */
- 	unsigned int		old_status;
- 	unsigned int		ifls;	/* vendor-specific */
-+	bool			autorts;
- };
- 
- /* There is by now at least one vendor with differing details, so handle it */
-@@ -308,6 +309,11 @@ static void pl011_set_mctrl(struct uart_port *port, unsigned int mctrl)
- 	TIOCMBIT(TIOCM_OUT1, UART011_CR_OUT1);
- 	TIOCMBIT(TIOCM_OUT2, UART011_CR_OUT2);
- 	TIOCMBIT(TIOCM_LOOP, UART011_CR_LBE);
-+
-+	if (uap->autorts) {
-+		/* We need to disable auto-RTS if we want to turn RTS off */
-+		TIOCMBIT(TIOCM_RTS, UART011_CR_RTSEN);
-+	}
- #undef TIOCMBIT
- 
- 	writew(cr, uap->port.membase + UART011_CR);
-@@ -437,6 +443,7 @@ static void pl011_shutdown(struct uart_port *port)
- 	/*
- 	 * disable the port
- 	 */
-+	uap->autorts = false;
- 	writew(UART01x_CR_UARTEN | UART011_CR_TXE, uap->port.membase + UART011_CR);
- 
- 	/*
-@@ -456,6 +463,7 @@ static void
- pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 		     struct ktermios *old)
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index 9a5bc1a..fbc5d25 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -761,12 +761,10 @@ static void ipu_select_buffer(enum ipu_channel channel, int buffer_n)
+  * @buffer_n:	buffer number to update.
+  *		0 or 1 are the only valid values.
+  * @phyaddr:	buffer physical address.
+- * @return:	Returns 0 on success or negative error code on failure. This
+- *              function will fail if the buffer is set to ready.
+  */
+ /* Called under spin_lock(_irqsave)(&ichan->lock) */
+-static int ipu_update_channel_buffer(struct idmac_channel *ichan,
+-				     int buffer_n, dma_addr_t phyaddr)
++static void ipu_update_channel_buffer(struct idmac_channel *ichan,
++				      int buffer_n, dma_addr_t phyaddr)
  {
-+	struct uart_amba_port *uap = (struct uart_amba_port *)port;
- 	unsigned int lcr_h, old_cr;
- 	unsigned long flags;
- 	unsigned int baud, quot;
-@@ -532,6 +540,17 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 	old_cr = readw(port->membase + UART011_CR);
- 	writew(0, port->membase + UART011_CR);
+ 	enum ipu_channel channel = ichan->dma_chan.chan_id;
+ 	uint32_t reg;
+@@ -806,8 +804,6 @@ static int ipu_update_channel_buffer(struct idmac_channel *ichan,
+ 	}
  
-+	if (termios->c_cflag & CRTSCTS) {
-+		if (old_cr & UART011_CR_RTS)
-+			old_cr |= UART011_CR_RTSEN;
-+
-+		old_cr |= UART011_CR_CTSEN;
-+		uap->autorts = true;
-+	} else {
-+		old_cr &= ~(UART011_CR_CTSEN | UART011_CR_RTSEN);
-+		uap->autorts = false;
-+	}
-+
- 	/* Set baud rate */
- 	writew(quot & 0x3f, port->membase + UART011_FBRD);
- 	writew(quot >> 6, port->membase + UART011_IBRD);
+ 	spin_unlock_irqrestore(&ipu_data.lock, flags);
+-
+-	return 0;
+ }
+ 
+ /* Called under spin_lock_irqsave(&ichan->lock) */
+@@ -827,14 +823,7 @@ static int ipu_submit_buffer(struct idmac_channel *ichan,
+ 	 * could make it conditional on status >= IPU_CHANNEL_ENABLED, but
+ 	 * doing it again shouldn't hurt either.
+ 	 */
+-	ret = ipu_update_channel_buffer(ichan, buf_idx,
+-					sg_dma_address(sg));
+-
+-	if (ret < 0) {
+-		dev_err(dev, "Updating sg %p on channel 0x%x buffer %d failed!\n",
+-			sg, chan_id, buf_idx);
+-		return ret;
+-	}
++	ipu_update_channel_buffer(ichan, buf_idx, sg_dma_address(sg));
+ 
+ 	ipu_select_buffer(chan_id, buf_idx);
+ 	dev_dbg(dev, "Updated sg %p on channel 0x%x buffer %d\n",
+@@ -1379,10 +1368,11 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
+ 
+ 	if (likely(sgnew) &&
+ 	    ipu_submit_buffer(ichan, descnew, sgnew, ichan->active_buffer) < 0) {
+-		callback = desc->txd.callback;
+-		callback_param = desc->txd.callback_param;
++		callback = descnew->txd.callback;
++		callback_param = descnew->txd.callback_param;
+ 		spin_unlock(&ichan->lock);
+-		callback(callback_param);
++		if (callback)
++			callback(callback_param);
+ 		spin_lock(&ichan->lock);
+ 	}
+ 
 -- 
-1.6.5.3
+1.6.2.4
