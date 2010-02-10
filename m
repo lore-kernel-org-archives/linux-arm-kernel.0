@@ -1,29 +1,34 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 10 Feb 2010 21:22:02 +0800
-Subject: [PATCH 2/2] ASoC: Remove legacy PXA SSP API usage
-In-Reply-To: <20100210131748.GB27173@sirena.org.uk>
-References: <f17812d71002100421v6e8e36c5n7e3786b55311b76a@mail.gmail.com>
-	<20100210131748.GB27173@sirena.org.uk>
-Message-ID: <f17812d71002100522t3ca7fe92l59bd73df61934703@mail.gmail.com>
+From: rabin.vincent@stericsson.com (Rabin VINCENT)
+Date: Wed, 10 Feb 2010 19:15:21 +0530
+Subject: [PATCH] amba-pl011: support hardware flow control
+In-Reply-To: <20100210011637.GA8683@shareable.org>
+References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
+	<20100208135124.GA26608@n2100.arm.linux.org.uk>
+	<20100209143055.GA6015@bnru01.bnr.st.com>
+	<20100209221449.GA23083@n2100.arm.linux.org.uk>
+	<20100210011637.GA8683@shareable.org>
+Message-ID: <20100210134515.GA2844@bnru01.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2010 at 9:17 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Feb 10, 2010 at 08:21:30PM +0800, Eric Miao wrote:
->> commit c7b67965c24aae11b7ea36522b27b63057ed81e5
->> Author: Eric Miao <eric.y.miao@gmail.com>
->> Date: ? Tue Feb 9 19:46:01 2010 +0800
->>
->> ? ? ASoC: Remove legacy SSP API usage
->>
->> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-> Makes sense to merge this via the ARM tree due to the overlap with
-> moving the header to plat/
->
+On Wed, Feb 10, 2010 at 02:16:37AM +0100, Jamie Lokier wrote:
+> Russell King - ARM Linux wrote:
+> > This means that when the kernel's buffers fill up, the kernel calls
+> > down to the serial core layer to throttle the input.  This then
+> > calls into the set_mctrl function to de-assert RTS.  However, because
+> > the hardware ignores the requested software state, the RTS signal
+> > is not de-asserted, and the remote end continues sending data.
+> > 
+> > So, enabling hardware auto-RTS is bad news - you will lose data if
+> > the application stops reading data.
+> 
+[..]
+> The ideal combination may be a bit of both:
+> 
+>     1. When kernel deasserts RTS, do that and disable hardware-RTS
+>        so it really is deasserted.
+> 
+>     2. When kernel asserts RTS with mctrl, enable hardware-RTS
+>        so what's output depends on the receive FIFO state.
 
-Thanks man, that's what I was thinking of, and really appreciate your
-quick Ack on this.
+I've implemented this in the updated patch below.
