@@ -1,54 +1,55 @@
-From: abhijitpagare@ti.com (Abhijit Pagare)
-Date: Wed, 10 Feb 2010 13:42:03 +0530
-Subject: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding dependency
-	related update.
-Message-ID: <1265789523-6413-1-git-send-email-abhijitpagare@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 10 Feb 2010 10:15:13 +0200
+Subject: [PATCH 1/3] imxfb: add support for i.MX25
+In-Reply-To: <20100210075007.GA10185@pengutronix.de>
+References: <cover.1265786237.git.baruch@tkos.co.il>
+	<0bea69783cf8f6b04c64fed75f10c3dd3c567fb4.1265786237.git.baruch@tkos.co.il>
+	<20100210075007.GA10185@pengutronix.de>
+Message-ID: <20100210081512.GA29489@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A check is added for avoiding the sleep/wakeup dependency updates
-for OMAP4 as the structures for the dependencies are currently absent.
+Hi Uwe,
 
-Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
-Re-submitting
+On Wed, Feb 10, 2010 at 08:50:07AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Feb 10, 2010 at 09:25:18AM +0200, Baruch Siach wrote:
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  drivers/video/Kconfig |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> > index 5a5c303..7ff9acc 100644
+> > --- a/drivers/video/Kconfig
+> > +++ b/drivers/video/Kconfig
+> > @@ -402,7 +402,7 @@ config FB_SA1100
+> >  
+> >  config FB_IMX
+> >  	tristate "Motorola i.MX LCD support"
+> > -	depends on FB && (ARCH_MX1 || ARCH_MX2)
+> > +	depends on FB && (ARCH_MX1 || ARCH_MX2 || ARCH_MX25)
+> Can we make this
+> 
+> 	depends on FB && HAVE_FB_IMX
+> 
+> and let the archs select HAVE_FB_IMX?
 
-Compiled and Boot Tested on OMAP4430 simulator, ES1 Chip & OMAP3430 SDP.
-And also Compiled for OMAP2430 and OMAP2420
+I just wanted to do the minimal working change. Do you want me to send a patch 
+updating each ARCH's Kconfig?
 
-This patch has a dependency on the earlier set of OMAP4 clock-domain patches.
+> And is "FB" really necessary?  The snipplet above is in an
+> 
+> 	menuconfig FB
+> 		...
+> 	endmenu
+> 
+> block.  (And there are many other items depending explicitly on FB.)
 
- arch/arm/mach-omap2/clockdomain.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+I don't know. As above, I'd rather do the minimal change.
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 8c9e78c..6ec25ee 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -507,8 +507,9 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
- 	pr_debug("clockdomain: enabling automatic idle transitions for %s\n",
- 		 clkdm->name);
- 
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_add_autodeps(clkdm);
-+	if (!cpu_is_omap44xx())
-+		if (atomic_read(&clkdm->usecount) > 0)
-+			_clkdm_add_autodeps(clkdm);
- 
- 	_omap2_clkdm_set_hwsup(clkdm, 1);
- 
-@@ -540,8 +541,9 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
- 
- 	_omap2_clkdm_set_hwsup(clkdm, 0);
- 
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_del_autodeps(clkdm);
-+	if (!cpu_is_omap44xx())
-+		if (atomic_read(&clkdm->usecount) > 0)
-+			_clkdm_del_autodeps(clkdm);
- }
- 
- 
+baruch
+
 -- 
-1.5.4.7
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
