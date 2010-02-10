@@ -1,47 +1,26 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Feb 2010 11:16:32 +0100
-Subject: [PATCHv3 0/7] Initial Freescale i.MX51 SoC support
-In-Reply-To: <cover.1265733173.git.amit.kucheria@canonical.com>
-References: <cover.1265733173.git.amit.kucheria@canonical.com>
-Message-ID: <20100210101632.GM17643@pengutronix.de>
+Date: Wed, 10 Feb 2010 11:17:45 +0100
+Subject: MXC: mx31moboard patches for next merge window
+In-Reply-To: <1265735616-476-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1265735616-476-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20100210101745.GN17643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+On Tue, Feb 09, 2010 at 06:13:33PM +0100, Valentin Longchamp wrote:
+> 
+> Here are a few patches for the mxc branch related to the mx31moboard.
+> The first two patches are just minimal changes and the third one adds support for
+> a new baseboard used on some of our robots.
+> 
+> The patches were generated for the mxc-master branch.
+> 
+> All the comments are welcome.
 
-On Tue, Feb 09, 2010 at 06:59:48PM +0200, Amit Kucheria wrote:
-> (patchset rebased on top of Sascha's tree and trivial fixes made)
-> git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master
-> 
-> Will you consider merging it now?
-> 
-> Regards,
-> Amit
-> 
-> This series of patches adds basic support for i.MX5 family to the kernel. This
-> is just the bare minimum that brings up the board - sets up the clocks, IO
-> with a serial port and timers.
-> 
-> Features:
-> 
->   * Console: Serial console using pre-existing drivers/serial/imx.c
->   * Timer: Timer provided through arch/arm/plat-mxc/time.c
->   * Interrupts: New interrupt controller through arch/arm/plat-mxc/tzic.c
->   * Clocks: Minimal Clock framework to allow board boot up
->   * Defconfigs: mx51_defconfig provided
-> 
-> Tested on a i.MX51-based Babbage 2.5 board.
-> 
-> Git:
-> 
-> repo: git://kernel.ubuntu.com/amitk/mx51-upstream.git mx51-baseport
-
-ok, merged for -next. BTW the correct branch is mx51-baseport-sascha.
-This shouldn't happen with the proper use of git request-pull.
-
-Thanks for your work!
+Ok, added to mxc-master.
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
