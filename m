@@ -1,47 +1,23 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 10 Feb 2010 10:47:45 -0700
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 10 Feb 2010 19:04:27 +0100
 Subject: [PATCH v2] async-tx: fix buffer sumbission error handling in
 	ipu_idma.c
-In-Reply-To: <Pine.LNX.4.64.1002101659580.4495@axis700.grange>
+In-Reply-To: <e9c3a7c21002100947y1cf32043u4ec9d2a5c4e494f8@mail.gmail.com>
 References: <Pine.LNX.4.64.1002101643390.4495@axis700.grange>
 	<e9c3a7c21002100754k7737b79cvb13a2b39ad16cc44@mail.gmail.com>
 	<Pine.LNX.4.64.1002101659580.4495@axis700.grange>
-Message-ID: <e9c3a7c21002100947y1cf32043u4ec9d2a5c4e494f8@mail.gmail.com>
+	<e9c3a7c21002100947y1cf32043u4ec9d2a5c4e494f8@mail.gmail.com>
+Message-ID: <20100210180427.GD15883@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2010 at 9:32 AM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> If submitting new buffer failed, a wrong descriptor gets completed and it
-> doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
-> these bugs and make ipu_update_channel_buffer() void, because it never fails.
->
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->
-> v1 -> v2: When fixing Oopses remember to not introduce compiler warnings;)
->
-> On Wed, 10 Feb 2010, Dan Williams wrote:
->
->> On Wed, Feb 10, 2010 at 8:44 AM, Guennadi Liakhovetski
->> <g.liakhovetski@gmx.de> wrote:
->> > If submitting new buffer failed, a wrong descriptor gets completed and it
->> > doesn't check, if a callback is at all defined, which can lead to an Oops. Fix
->> > these bugs and make ipu_update_channel_buffer() void, because it never fails.
->> >
->> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->>
->> Looks like 2.6.33 material. ?Shall I tag it for -stable as well?
->
-> This is more of a theoretical Oops possibility. You have to really try
-> hard to get it - if at all possible. At least I've never seen one and
-> never heard anyone seeing it. So, strictly speaking, I don't think this
-> bug can hurt anyone, but, if Sascha has nothing against this patch, you
-> can push it to stable too.
+Hello Guennadi,
 
-Given the time proximity to 2.6.33-final I'll push it without the
-stable tag.  If we later decide it is needed there it's just a matter
-of sending Greg a note.
+s/sumbission/submission/ in the Subject
 
-Thanks,
-Dan
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
