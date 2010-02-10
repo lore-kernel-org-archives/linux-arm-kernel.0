@@ -1,29 +1,25 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 10 Feb 2010 09:25:18 +0200
-Subject: [PATCH 1/3] imxfb: add support for i.MX25
-In-Reply-To: <cover.1265786237.git.baruch@tkos.co.il>
-References: <cover.1265786237.git.baruch@tkos.co.il>
-Message-ID: <0bea69783cf8f6b04c64fed75f10c3dd3c567fb4.1265786237.git.baruch@tkos.co.il>
+Date: Wed, 10 Feb 2010 09:25:17 +0200
+Subject: [PATCH 0/3] mx25: framebuffer support
+Message-ID: <cover.1265786237.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/video/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This set of patches adds support for the i.MX25 LCD controller block using the 
+imxfb driver. Platform code for the i.MX25 PDK board is also added.
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 5a5c303..7ff9acc 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -402,7 +402,7 @@ config FB_SA1100
- 
- config FB_IMX
- 	tristate "Motorola i.MX LCD support"
--	depends on FB && (ARCH_MX1 || ARCH_MX2)
-+	depends on FB && (ARCH_MX1 || ARCH_MX2 || ARCH_MX25)
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
--- 
-1.6.6.1
+Tested on the i.MX25 PDK.
+
+Baruch Siach (3):
+  imxfb: add support for i.MX25
+  mx25: add platform support for imxfb
+  mx25pdk: add LCD support
+
+ arch/arm/mach-mx25/clock.c                  |   12 ++++++
+ arch/arm/mach-mx25/devices.c                |   23 +++++++++++
+ arch/arm/mach-mx25/devices.h                |    1 +
+ arch/arm/mach-mx25/mx25pdk.c                |   55 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h |    2 +
+ arch/arm/plat-mxc/include/mach/mx25.h       |    2 +
+ drivers/video/Kconfig                       |    2 +-
+ 7 files changed, 96 insertions(+), 1 deletions(-)
