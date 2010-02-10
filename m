@@ -1,41 +1,46 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 10 Feb 2010 01:16:37 +0000
-Subject: [PATCH] amba-pl011: support hardware flow control
-In-Reply-To: <20100209221449.GA23083@n2100.arm.linux.org.uk>
-References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
-	<20100208135124.GA26608@n2100.arm.linux.org.uk>
-	<20100209143055.GA6015@bnru01.bnr.st.com>
-	<20100209221449.GA23083@n2100.arm.linux.org.uk>
-Message-ID: <20100210011637.GA8683@shareable.org>
+From: rurality.linux@gmail.com (Qiang Wang)
+Date: Wed, 10 Feb 2010 11:31:12 +0900
+Subject: [PATCH]NUC900 add gpio virtual memory map
+In-Reply-To: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
+References: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
+Message-ID: <71413c851002091831x101b67a7t9e38e94bbbc95db1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> This means that when the kernel's buffers fill up, the kernel calls
-> down to the serial core layer to throttle the input.  This then
-> calls into the set_mctrl function to de-assert RTS.  However, because
-> the hardware ignores the requested software state, the RTS signal
-> is not de-asserted, and the remote end continues sending data.
-> 
-> So, enabling hardware auto-RTS is bad news - you will lose data if
-> the application stops reading data.
+hello, Mr Russell
 
-Surely the driver can just stop reading from the UART when the
-kernel's buffers are full and hardware-RTS is enabled.  Then the
-hardware will deassert RTS itself.
+please check and ack this patch.
 
-The problem with relying on the kernel to deassert RTS is that it's
-too slow when something disables interrupts for a few ms, and you get
-lost data that way instead.
+thank you very much.
 
-The ideal combination may be a bit of both:
+best regards
+wangqiang
 
-    1. When kernel deasserts RTS, do that and disable hardware-RTS
-       so it really is deasserted.
-
-    2. When kernel asserts RTS with mctrl, enable hardware-RTS
-       so what's output depends on the receive FIFO state.
-
-That should solve both types of overrun.
-
--- Jamie
+2010/2/2 Qiang Wang <rurality.linux@gmail.com>:
+> hi, Dear Wan
+>
+> ? This patch adds the gpio registers virtual memory map.
+> ? Without it, the gpio access will cause the "Data Abort" due to no
+> virtual memory assign to it.
+>
+> Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
+> Cc: Wang Zongshun <mcuos.com@gmail.com>
+> ---
+> ?arch/arm/mach-w90x900/cpu.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+> index 20dc0c9..7a79de0 100644
+> --- a/arch/arm/mach-w90x900/cpu.c
+> +++ b/arch/arm/mach-w90x900/cpu.c
+> @@ -45,6 +45,7 @@ static struct map_desc nuc900_iodesc[] __initdata = {
+> ? ? ? ?IODESC_ENT(UART),
+> ? ? ? ?IODESC_ENT(TIMER),
+> ? ? ? ?IODESC_ENT(EBI),
+> + ? ? ? IODESC_ENT(GPIO),
+> ?};
+>
+> ?/* Initial clock declarations. */
+> --
+> 1.6.4
+>
