@@ -1,26 +1,67 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Thu, 11 Feb 2010 12:12:43 +0100
-Subject: [PATCH][KS8695] Mark network interface as running on ifconfig up
-Message-ID: <4B73E62B.3030305@visionsystems.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 11 Feb 2010 13:41:56 +0100
+Subject: [PATCH 3/5] mfd: use genirq in 88pm860x
+In-Reply-To: <771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
+References: <771cded01002030503w15f5394fwd226a26e4deadc6d@mail.gmail.com>
+	<20100205153938.GB3448@sortiz.org>
+	<771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
+Message-ID: <20100211124155.GD3136@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[KS8695] Mark network interface as running on ifconfig up
+Hi Haojian,
 
-Without netif_carrier_on() network interface will not transmit any packets
-after ifconfig down and subsequent ifconfig up.
+On Mon, Feb 08, 2010 at 01:45:31AM -0500, Haojian Zhuang wrote:
+> On Fri, Feb 5, 2010 at 10:39 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> > Hi Haojian,
+> >
+> > On Wed, Feb 03, 2010 at 08:03:13AM -0500, Haojian Zhuang wrote:
+> >> From 1c49d1bf59a1ec2c59dc093899e6b2d0991bd676 Mon Sep 17 00:00:00 2001
+> >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >> Date: Wed, 3 Feb 2010 15:39:28 -0500
+> >> Subject: [PATCH] mfd: use genirq in 88pm860x
+> > The patch looks fine to me but:
+> >
+> > - Please add some more verbose changelog
+> > - It doesnt build on x86, you need to apply this:
+> >
+> > diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+> > index 0b1eba0..6a14d2b 100644
+> > --- a/drivers/mfd/88pm860x-core.c
+> > +++ b/drivers/mfd/88pm860x-core.c
+> > @@ -544,7 +544,11 @@ static int __devinit device_irq_init(struct pm860x_chip
+> > *ch
+> > ? ? ? ? ? ? ? ?set_irq_chip_and_handler(__irq, &pm860x_irq_chip,
+> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? handle_edge_irq);
+> > ? ? ? ? ? ? ? ?set_irq_nested_thread(__irq, 1);
+> > +#ifdef CONFIG_ARM
+> > ? ? ? ? ? ? ? ?set_irq_flags(__irq, IRQF_VALID);
+> > +#else
+> > + ? ? ? ? ? ? ? set_irq_noprobe(__irq);
+> > +#endif
+> > ? ? ? ?}
+> >
+> > ? ? ? ?ret = request_threaded_irq(chip->core_irq, NULL, pm860x_irq, flags,
+> >
+> > - After applying this patch, 88pm860x-ts.c fails to build. You need to merge
+> > patches 3 and 4 into one single patch to prevent build failure.
+> >
+> > Cheers,
+> > Samuel.
+> >
+> 
+> Great thanks. Now the patch is updated. The modification is in below.
+> 1. Merge patch of IRQ handling and touchscreen driver.
+> 2. Add CONFIG_ARM in 88pm860x driver.
+> 3. Add more comments in changelog.
+> 
+> Best Regards
+> Haojian
+Thanks, patch applied.
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+Cheers,
+Samuel.
 
-Index: linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
-===================================================================
---- linux-2.6.33-rc7.orig/drivers/net/arm/ks8695net.c
-+++ linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
-@@ -1371,6 +1371,7 @@ ks8695_open(struct net_device *ndev)
- 
- 	napi_enable(&ksp->napi);
- 	netif_start_queue(ndev);
-+	netif_carrier_on(ndev);
- 
- 	return 0;
- }
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
