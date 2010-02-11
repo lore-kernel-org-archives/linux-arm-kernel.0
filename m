@@ -1,169 +1,139 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Thu, 11 Feb 2010 11:13:19 -0800
-Subject: [RFC 0/2] fix dma_map_sg not to do barriers for each buffer
-In-Reply-To: <20100211105638.GB9480@n2100.arm.linux.org.uk>
-References: <20100210212156.GB30854@n2100.arm.linux.org.uk>
-	<1265885102.3389.34.camel@pc1117.cambridge.arm.com>
-	<20100211105638.GB9480@n2100.arm.linux.org.uk>
-Message-ID: <4B7456CF.6030805@codeaurora.org>
+From: amckay@iders.ca (Andrew)
+Date: Thu, 11 Feb 2010 14:40:29 -0600
+Subject: Compiler for Atmel AT91SAMG20
+In-Reply-To: <20100205180014.GA19538@caradoc.them.org>
+References: <4B6C4C36.9030800@iders.ca>
+	<20100205180014.GA19538@caradoc.them.org>
+Message-ID: <4B746B3D.5070708@iders.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Thu, Feb 11, 2010 at 10:45:01AM +0000, Catalin Marinas wrote:
->> Alternatively we could use the dsb() macro. I don't think we need more
->> than this and we would not (well, not easily) compile ARMv5 and ARMv6 in
->> the same kernel.
-> 
-> That doesn't work - ARMv3 and some ARMv4 don't have a 'drain write
-> buffer' instruction but others do - executing that instruction on
-> older CPUs which don't have a write buffer causes an illegal
-> instruction fault.
-> 
->> The ___dma_single_cpu_to_dev() covers both inner and outer caches but I
->> haven't seen it touched by this patch (nor the other you posted). When
->> you clean the L1 cache, you need to make sure that there is a barrier
->> (DSB) so that it completes before cleaning the L2, otherwise you clean
->> the L2 but data keeps coming from L1.
->>
->> For the *_sg functions, you either use barrier between L1 and L2 for
->> each page or you do the for_each_sg() loop twice, once for L1 and
->> another for L2.
-> 
-> Okay, that's a fundamental problem with this approach.  Spanner in the
-> works kind of thing.  I think that's a problem for Abhijeet's patch
-> as well - since the same comment appears to apply there too.
+Thanks for the reply.  I have switched to the arm-none-linux-gnueabi 
+tools to compile my kernel and userspace applications.  It fixes one 
+getsockopt call.  But now I have another similar issue with another 
+getsockopt call.  In iptables libiptc.c
 
-The problem applies to my patch as well, however my board has a unified 
-cache and I didn't think about ordering operations on the outer caches.
+        /* Initialize current state */
+        h->sockfd = sockfd;
+        h->info = info;
 
-> Sounds like it needs a totally different approach then.
-how about the following ?
+        h->entries->size = h->info.size;
+
+        tmp = sizeof(STRUCT_GET_ENTRIES) + h->info.size;
+
+        if (getsockopt(h->sockfd, TC_IPPROTO, SO_GET_ENTRIES, h->entries,
+                       &tmp) < 0){
+                printf("getsockopt failed\n");
+                goto error;
+        }
+
+I added some trace code to the kernel:
+
+static int
+get_entries(struct net *net, struct ipt_get_entries __user *uptr, int *len)
+{
+        int ret;
+        struct ipt_get_entries get;
+        struct xt_table *t;
+
+        if (*len < sizeof(get)) {
+                duprintf("get_entries: %u < %zu\n", *len, sizeof(get));
+                printk("%s:%d get_entries: %u < %zu\n", __FILE__, 
+__LINE__, *len, sizeof(get));
+                return -EINVAL;
+        }
+        if (copy_from_user(&get, uptr, sizeof(get)) != 0)
+                return -EFAULT;
+        if (*len != sizeof(struct ipt_get_entries) + get.size) {
+                duprintf("get_entries: %u != %zu\n",
+                         *len, sizeof(get) + get.size);
+                printk("%s:%d get_entries: %u != %zu\n",
+                         __FILE__, __LINE__, *len, sizeof(get) + get.size);
+                return -EINVAL;
+        }
+.
+.
+.
+
+The error printed out is:
+net/ipv4/netfilter/ip_tables.c:1178 get_entries: 660 != 656
+
+I've done some digging on google and found that there is mention of this 
+error with a 32-bit version of iptables running on a 64-bit kernel.  
+However since this is running on an ARM board both the kernel and 
+userspace applications are 32-bit.  There is a kernel option called 
+CONFIG_COMPAT which is used to add 32-bit support in a 64-bit kernel.  
+However this option is only available if the architecture of the kernel 
+is IA64.
+
+I haven't found a mention of a final solution to this problem in my 
+searches yet.
+
+I did a bit more digging and found that the struct ipt_get_entries is 
+different sizes in kernel space and in user space.  In kernel space it 
+is being reported as 36 bytes, in userspace the struct is being reported 
+as 40 bytes.
+
+net/ipv4/netfilter/ip_tables.c:1180 sizeof(struct ipt_get_entries): 36
+sizeof(STRUCT_GET_ENTRIES): 40
+
+It looking@the struct it should be 36 bytes large if it is unpadded.  
+So it appears that iptables is padding that struct.  I wonder if the 
+fact that I'm cross compiling this application on a 64-bit machine is 
+confusing the configuration process, and making it tell the compiler to 
+align the struct on 8 byte boundaries.  I have compared the definition 
+of the struct in the kernel headers and the headers in my toolchain.  
+They appear to be the same.
+
+Kernel:
+/* The argument to IPT_SO_GET_ENTRIES. */
+struct ipt_get_entries
+{
+        /* Which table: user fills this in. */
+        char name[IPT_TABLE_MAXNAMELEN];
+
+        /* User fills this in: total entry size. */
+        unsigned int size;
+
+        /* The entries. */
+        struct ipt_entry entrytable[0];
+};
+
+Toolchain:/* The argument to IPT_SO_GET_ENTRIES. */
+struct ipt_get_entries
+{
+        /* Which table: user fills this in. */
+        char name[IPT_TABLE_MAXNAMELEN];
+
+        /* User fills this in: total entry size. */
+        unsigned int size;
+
+        /* The entries. */
+        struct ipt_entry entrytable[0];
+};
+
+Does anyone know how to go about fixing this problem?
+
+Thanks
+Andrew McKay
+Iders Inc.
 
 
- From ea746d981f6f7291fd0f8b3f51bdd3747ca976c5 Mon Sep 17 00:00:00 2001
-From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-Date: Thu, 11 Feb 2010 10:29:19 -0800
-Subject: [PATCH] dma: define map/unmap functions for outer cache
-
-Define map and unmap functions for outer cache and execute barriers
-at appropriate places within them. For architectures without outer caches
-these functions are nil.
-
-Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
----
-  arch/arm/include/asm/cacheflush.h |   39 
-+++++++++++++++++++++++++++++++++++++
-  arch/arm/mm/dma-mapping.c         |   17 +--------------
-  2 files changed, 41 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/cacheflush.h 
-b/arch/arm/include/asm/cacheflush.h
-index 8148a00..3474a54 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -11,6 +11,7 @@
-  #define _ASMARM_CACHEFLUSH_H
-
-  #include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-
-  #include <asm/glue.h>
-  #include <asm/shmparam.h>
-@@ -300,6 +301,38 @@ static inline void outer_flush_range(unsigned long 
-start, unsigned long end)
-  		outer_cache.flush_range(start, end);
-  }
-
-+static inline void dmac_outer_map_area(const void *kaddr, size_t size,
-+	enum dma_data_direction dir)
-+{
-+	unsigned long paddr;
-+
-+	/* complete all the prior L1 operations */
-+	dma_barrier();
-+	paddr = __pa(kaddr);
-+	if (dir == DMA_FROM_DEVICE) {
-+		outer_inv_range(paddr, paddr + size);
-+	} else {
-+		outer_clean_range(paddr, paddr + size);
-+	}
-+	/* FIXME: non-speculating: flush on bidirectional mappings? */
-+}
-+
-+static inline void dmac_outer_unmap_area(const void *kaddr, size_t size,
-+	enum dma_data_direction dir)
-+{
-+
-+	/* FIXME: non-speculating: not required */
-+	/* don't bother invalidating if DMA to device */
-+	if (dir != DMA_TO_DEVICE) {
-+		unsigned long paddr = __pa(kaddr);
-+		outer_inv_range(paddr, paddr + size);
-+	}
-+
-+	/* complete all the outer cache operations operations */
-+	dma_barrier();
-+}
-+
-+
-  #else
-
-  static inline void outer_inv_range(unsigned long start, unsigned long end)
-@@ -308,6 +341,12 @@ static inline void outer_clean_range(unsigned long 
-start, unsigned long end)
-  { }
-  static inline void outer_flush_range(unsigned long start, unsigned 
-long end)
-  { }
-+static inline void dmac_outer_map_area(const void *kaddr, size_t size,
-+	enum dma_data_direction dir)
-+{ }
-+static inline void dmac_outer_unmap_area(const void *kaddr, size_t size,
-+	enum dma_data_direction dir)
-+{ }
-
-  #endif
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 64daef2..6fff111 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -407,19 +407,11 @@ EXPORT_SYMBOL(dma_free_coherent);
-  void ___dma_single_cpu_to_dev(const void *kaddr, size_t size,
-  	enum dma_data_direction dir)
-  {
--	unsigned long paddr;
--
-  	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
-
-  	dmac_map_area(kaddr, size, dir);
-
--	paddr = __pa(kaddr);
--	if (dir == DMA_FROM_DEVICE) {
--		outer_inv_range(paddr, paddr + size);
--	} else {
--		outer_clean_range(paddr, paddr + size);
--	}
--	/* FIXME: non-speculating: flush on bidirectional mappings? */
-+	dmac_outer_map_area(kaddr, size, dir);
-  }
-  EXPORT_SYMBOL(___dma_single_cpu_to_dev);
-
-@@ -428,12 +420,7 @@ void ___dma_single_dev_to_cpu(const void *kaddr, 
-size_t size,
-  {
-  	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
-
--	/* FIXME: non-speculating: not required */
--	/* don't bother invalidating if DMA to device */
--	if (dir != DMA_TO_DEVICE) {
--		unsigned long paddr = __pa(kaddr);
--		outer_inv_range(paddr, paddr + size);
--	}
-+	dmac_outer_unmap_area(kaddr, size, dir);
-
-  	dmac_unmap_area(kaddr, size, dir);
-  }
--- 
-1.5.6.3
+Daniel Jacobowitz wrote:
+> On Fri, Feb 05, 2010 at 10:49:58AM -0600, Andrew wrote:
+>   
+>> The compiler I'm using for the Kernel (Code Sourcery's GNU
+>> cross-toolchain arm-2008q3-66-arm-none-eabi) is set to pack structs
+>> by default, and the compilers that I use for userspace applications
+>> do not pack structs.
+>>     
+>
+> That's the wrong compiler.  Use the arm-none-linux-gnueabi tools to
+> build the Linux kernel.
+>
+> The EABI tools should have the same ABI as the Linux tools though, so
+> I don't know what you mean by not packing structs.  Make sure both
+> your kernel and userspace compilers are using the EABI!  Or, if you
+> are not using an EABI userspace, disable CONFIG_AEABI.
+>
+>   
