@@ -1,247 +1,112 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2010 19:35:33 -0800
-Subject: [PATCH 02/17] MTD: remove no longer used OMAP flash map
+Date: Wed, 10 Feb 2010 19:35:39 -0800
+Subject: [PATCH 03/17] omap iommu: cleanup iommu page address mask and
+	definitions
 In-Reply-To: <20100211033310.1624.80025.stgit@baageli.muru.com>
 References: <20100211033310.1624.80025.stgit@baageli.muru.com>
-Message-ID: <20100211033533.1624.629.stgit@baageli.muru.com>
+Message-ID: <20100211033539.1624.87169.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ladislav Michl <ladis@linux-mips.org>
+From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-All OMAP boards are now using physmap-flash.
+This is just a cleanup, but adds a few macros here, which can be used
+in the proceeding patches.
 
-Cc: linux-mtd at lists.infradead.org
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/mtd/maps/Kconfig    |    9 --
- drivers/mtd/maps/Makefile   |    1 
- drivers/mtd/maps/omap_nor.c |  188 -------------------------------------------
- 3 files changed, 0 insertions(+), 198 deletions(-)
+ arch/arm/plat-omap/iopgtable.h |   50 +++++++++++++++++++++++++++++++---------
+ 1 files changed, 39 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
-index 2de0cc8..9605cb8 100644
---- a/drivers/mtd/maps/Kconfig
-+++ b/drivers/mtd/maps/Kconfig
-@@ -428,15 +428,6 @@ config MTD_H720X
- 	  This enables access to the flash chips on the Hynix evaluation boards.
- 	  If you have such a board, say 'Y'.
+diff --git a/arch/arm/plat-omap/iopgtable.h b/arch/arm/plat-omap/iopgtable.h
+index 37dac43..ab23b6a 100644
+--- a/arch/arm/plat-omap/iopgtable.h
++++ b/arch/arm/plat-omap/iopgtable.h
+@@ -1,7 +1,7 @@
+ /*
+  * omap iommu: pagetable definitions
+  *
+- * Copyright (C) 2008-2009 Nokia Corporation
++ * Copyright (C) 2008-2010 Nokia Corporation
+  *
+  * Written by Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+  *
+@@ -13,26 +13,52 @@
+ #ifndef __PLAT_OMAP_IOMMU_H
+ #define __PLAT_OMAP_IOMMU_H
  
--config MTD_OMAP_NOR
--	tristate "TI OMAP board mappings"
--	depends on MTD_CFI && ARCH_OMAP
--	help
--	  This enables access to the NOR flash chips on TI OMAP-based
--	  boards defining flash platform devices and flash platform data.
--	  These boards include the Innovator, H2, H3, OSK, Perseus2, and
--	  more.  If you have such a board, say 'Y'.
--
- # This needs CFI or JEDEC, depending on the cards found.
- config MTD_PCI
- 	tristate "PCI MTD driver"
-diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-index ce31521..faa9fef 100644
---- a/drivers/mtd/maps/Makefile
-+++ b/drivers/mtd/maps/Makefile
-@@ -55,7 +55,6 @@ obj-$(CONFIG_MTD_IXP2000)	+= ixp2000.o
- obj-$(CONFIG_MTD_WRSBC8260)	+= wr_sbc82xx_flash.o
- obj-$(CONFIG_MTD_DMV182)	+= dmv182.o
- obj-$(CONFIG_MTD_PLATRAM)	+= plat-ram.o
--obj-$(CONFIG_MTD_OMAP_NOR)	+= omap_nor.o
- obj-$(CONFIG_MTD_INTEL_VR_NOR)	+= intel_vr_nor.o
- obj-$(CONFIG_MTD_BFIN_ASYNC)	+= bfin-async-flash.o
- obj-$(CONFIG_MTD_RBTX4939)	+= rbtx4939-flash.o
-diff --git a/drivers/mtd/maps/omap_nor.c b/drivers/mtd/maps/omap_nor.c
-index ead0b2f..e69de29 100644
---- a/drivers/mtd/maps/omap_nor.c
-+++ b/drivers/mtd/maps/omap_nor.c
-@@ -1,188 +0,0 @@
--/*
-- * Flash memory support for various TI OMAP boards
-- *
-- * Copyright (C) 2001-2002 MontaVista Software Inc.
-- * Copyright (C) 2003-2004 Texas Instruments
-- * Copyright (C) 2004 Nokia Corporation
-- *
-- *	Assembled using driver code copyright the companies above
-- *	and written by David Brownell, Jian Zhang <jzhang@ti.com>,
-- * 	Tony Lindgren <tony@atomide.com> and others.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License as published by the
-- * Free Software Foundation; either version 2 of the License, or (at your
-- * option) any later version.
-- *
-- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
-- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
-- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
-- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- *
-- * You should have received a copy of the  GNU General Public License along
-- * with this program; if not, write  to the Free Software Foundation, Inc.,
-- * 675 Mass Ave, Cambridge, MA 02139, USA.
-- */
--
--#include <linux/platform_device.h>
--#include <linux/module.h>
--#include <linux/types.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/ioport.h>
--#include <linux/slab.h>
--
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/map.h>
--#include <linux/mtd/partitions.h>
--
--#include <asm/io.h>
--#include <mach/hardware.h>
--#include <asm/mach/flash.h>
--#include <plat/tc.h>
--
--#ifdef CONFIG_MTD_PARTITIONS
--static const char *part_probes[] = { /* "RedBoot", */ "cmdlinepart", NULL };
--#endif
--
--struct omapflash_info {
--	struct mtd_partition	*parts;
--	struct mtd_info		*mtd;
--	struct map_info		map;
--};
--
--static void omap_set_vpp(struct map_info *map, int enable)
--{
--	static int	count;
--	u32 l;
--
--	if (cpu_class_is_omap1()) {
--		if (enable) {
--			if (count++ == 0) {
--				l = omap_readl(EMIFS_CONFIG);
--				l |= OMAP_EMIFS_CONFIG_WP;
--				omap_writel(l, EMIFS_CONFIG);
--			}
--		} else {
--			if (count && (--count == 0)) {
--				l = omap_readl(EMIFS_CONFIG);
--				l &= ~OMAP_EMIFS_CONFIG_WP;
--				omap_writel(l, EMIFS_CONFIG);
--			}
--		}
--	}
--}
--
--static int __init omapflash_probe(struct platform_device *pdev)
--{
--	int err;
--	struct omapflash_info *info;
--	struct flash_platform_data *pdata = pdev->dev.platform_data;
--	struct resource *res = pdev->resource;
--	unsigned long size = res->end - res->start + 1;
--
--	info = kzalloc(sizeof(struct omapflash_info), GFP_KERNEL);
--	if (!info)
--		return -ENOMEM;
--
--	if (!request_mem_region(res->start, size, "flash")) {
--		err = -EBUSY;
--		goto out_free_info;
--	}
--
--	info->map.virt		= ioremap(res->start, size);
--	if (!info->map.virt) {
--		err = -ENOMEM;
--		goto out_release_mem_region;
--	}
--	info->map.name		= dev_name(&pdev->dev);
--	info->map.phys		= res->start;
--	info->map.size		= size;
--	info->map.bankwidth	= pdata->width;
--	info->map.set_vpp	= omap_set_vpp;
--
--	simple_map_init(&info->map);
--	info->mtd = do_map_probe(pdata->map_name, &info->map);
--	if (!info->mtd) {
--		err = -EIO;
--		goto out_iounmap;
--	}
--	info->mtd->owner = THIS_MODULE;
--
--	info->mtd->dev.parent = &pdev->dev;
--
--#ifdef CONFIG_MTD_PARTITIONS
--	err = parse_mtd_partitions(info->mtd, part_probes, &info->parts, 0);
--	if (err > 0)
--		add_mtd_partitions(info->mtd, info->parts, err);
--	else if (err <= 0 && pdata->parts)
--		add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
--	else
--#endif
--		add_mtd_device(info->mtd);
--
--	platform_set_drvdata(pdev, info);
--
--	return 0;
--
--out_iounmap:
--	iounmap(info->map.virt);
--out_release_mem_region:
--	release_mem_region(res->start, size);
--out_free_info:
--	kfree(info);
--
--	return err;
--}
--
--static int __exit omapflash_remove(struct platform_device *pdev)
--{
--	struct omapflash_info *info = platform_get_drvdata(pdev);
--
--	platform_set_drvdata(pdev, NULL);
--
--	if (info) {
--		if (info->parts) {
--			del_mtd_partitions(info->mtd);
--			kfree(info->parts);
--		} else
--			del_mtd_device(info->mtd);
--		map_destroy(info->mtd);
--		release_mem_region(info->map.phys, info->map.size);
--		iounmap((void __iomem *) info->map.virt);
--		kfree(info);
--	}
--
--	return 0;
--}
--
--static struct platform_driver omapflash_driver = {
--	.remove	= __exit_p(omapflash_remove),
--	.driver = {
--		.name	= "omapflash",
--		.owner	= THIS_MODULE,
--	},
--};
--
--static int __init omapflash_init(void)
--{
--	return platform_driver_probe(&omapflash_driver, omapflash_probe);
--}
--
--static void __exit omapflash_exit(void)
--{
--	platform_driver_unregister(&omapflash_driver);
--}
--
--module_init(omapflash_init);
--module_exit(omapflash_exit);
--
--MODULE_LICENSE("GPL");
--MODULE_DESCRIPTION("MTD NOR map driver for TI OMAP boards");
--MODULE_ALIAS("platform:omapflash");
++/*
++ * "L2 table" address mask and size definitions.
++ */
+ #define IOPGD_SHIFT		20
+-#define IOPGD_SIZE		(1 << IOPGD_SHIFT)
++#define IOPGD_SIZE		(1UL << IOPGD_SHIFT)
+ #define IOPGD_MASK		(~(IOPGD_SIZE - 1))
+-#define IOSECTION_MASK		IOPGD_MASK
+-#define PTRS_PER_IOPGD		(1 << (32 - IOPGD_SHIFT))
+-#define IOPGD_TABLE_SIZE	(PTRS_PER_IOPGD * sizeof(u32))
+ 
+-#define IOSUPER_SIZE		(IOPGD_SIZE << 4)
++/*
++ * "section" address mask and size definitions.
++ */
++#define IOSECTION_SHIFT		20
++#define IOSECTION_SIZE		(1UL << IOSECTION_SHIFT)
++#define IOSECTION_MASK		(~(IOSECTION_SIZE - 1))
++
++/*
++ * "supersection" address mask and size definitions.
++ */
++#define IOSUPER_SHIFT		24
++#define IOSUPER_SIZE		(1UL << IOSUPER_SHIFT)
+ #define IOSUPER_MASK		(~(IOSUPER_SIZE - 1))
+ 
++#define PTRS_PER_IOPGD		(1UL << (32 - IOPGD_SHIFT))
++#define IOPGD_TABLE_SIZE	(PTRS_PER_IOPGD * sizeof(u32))
++
++/*
++ * "small page" address mask and size definitions.
++ */
+ #define IOPTE_SHIFT		12
+-#define IOPTE_SIZE		(1 << IOPTE_SHIFT)
++#define IOPTE_SIZE		(1UL << IOPTE_SHIFT)
+ #define IOPTE_MASK		(~(IOPTE_SIZE - 1))
+-#define IOPAGE_MASK		IOPTE_MASK
+-#define PTRS_PER_IOPTE		(1 << (IOPGD_SHIFT - IOPTE_SHIFT))
+-#define IOPTE_TABLE_SIZE	(PTRS_PER_IOPTE * sizeof(u32))
+ 
+-#define IOLARGE_SIZE		(IOPTE_SIZE << 4)
++/*
++ * "large page" address mask and size definitions.
++ */
++#define IOLARGE_SHIFT		16
++#define IOLARGE_SIZE		(1UL << IOLARGE_SHIFT)
+ #define IOLARGE_MASK		(~(IOLARGE_SIZE - 1))
+ 
++#define PTRS_PER_IOPTE		(1UL << (IOPGD_SHIFT - IOPTE_SHIFT))
++#define IOPTE_TABLE_SIZE	(PTRS_PER_IOPTE * sizeof(u32))
++
++#define IOPAGE_MASK		IOPTE_MASK
++
++/*
++ * some descriptor attributes.
++ */
+ #define IOPGD_TABLE		(1 << 0)
+ #define IOPGD_SECTION		(2 << 0)
+ #define IOPGD_SUPER		(1 << 18 | 2 << 0)
+@@ -40,12 +66,14 @@
+ #define IOPTE_SMALL		(2 << 0)
+ #define IOPTE_LARGE		(1 << 0)
+ 
++/* to find an entry in a page-table-directory */
+ #define iopgd_index(da)		(((da) >> IOPGD_SHIFT) & (PTRS_PER_IOPGD - 1))
+ #define iopgd_offset(obj, da)	((obj)->iopgd + iopgd_index(da))
+ 
+ #define iopte_paddr(iopgd)	(*iopgd & ~((1 << 10) - 1))
+ #define iopte_vaddr(iopgd)	((u32 *)phys_to_virt(iopte_paddr(iopgd)))
+ 
++/* to find an entry in the second-level page table. */
+ #define iopte_index(da)		(((da) >> IOPTE_SHIFT) & (PTRS_PER_IOPTE - 1))
+ #define iopte_offset(iopgd, da)	(iopte_vaddr(iopgd) + iopte_index(da))
+ 
