@@ -1,48 +1,60 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 11 Feb 2010 08:37:39 +0200
-Subject: [PATCH] imxfb: add support for i.MX25
-In-Reply-To: <20100210162942.GA15883@pengutronix.de>
-References: <20100210162942.GA15883@pengutronix.de>
-Message-ID: <855e977f1f610de9d409602da41ed3e191e7e613.1265869827.git.baruch@tkos.co.il>
+From: amit.walambe@eurotech.com (Amit Walambe)
+Date: Thu, 11 Feb 2010 12:33:44 +0530
+Subject: [PATCH] Eurotech Zeus : Making USB port 2 work
+In-Reply-To: <37cba69b59077aff2450e9b89c9d0d20.squirrel@www.loen.fr>
+References: <20100210120555.1b648467@ironhide>
+	<37cba69b59077aff2450e9b89c9d0d20.squirrel@www.loen.fr>
+Message-ID: <20100211123344.28014152@ironhide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-mxc/Kconfig |    1 +
- drivers/video/Kconfig     |    5 ++++-
- 2 files changed, 5 insertions(+), 1 deletions(-)
+Hi!
+Thanks for your comments Marc.
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 8b0a1ee..2a049df 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -24,6 +24,7 @@ config ARCH_MX25
- 	bool "MX25-based"
- 	select CPU_ARM926T
- 	select COMMON_CLKDEV
-+	select HAVE_FB_IMX
- 	help
- 	  This enables support for systems based on the Freescale i.MX25 family
- 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 5a5c303..83d40ed 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -400,9 +400,12 @@ config FB_SA1100
- 	  If you plan to use the LCD display with your SA-1100 system, say
- 	  Y here.
- 
-+config HAVE_FB_IMX
-+	bool
-+
- config FB_IMX
- 	tristate "Motorola i.MX LCD support"
--	depends on FB && (ARCH_MX1 || ARCH_MX2)
-+	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
--- 
-1.6.6.1
+On Wed, 10 Feb 2010 09:38:38 -0000 (GMT)
+"Marc Zyngier" <maz@misterjones.org> wrote:
+> >  static struct pxaohci_platform_data zeus_ohci_platform_data = {
+> >  	.port_mode	= PMM_NPS_MODE,
+> > -	.flags		= ENABLE_PORT_ALL |
+> > POWER_CONTROL_LOW | POWER_SENSE_LOW,
+> > +	/* Clear Power Control Polarity Low and set Power Sense
+> > +	 * Polarity Low. Supply power to USB ports. */
+> > +	.flags		= ENABLE_PORT_ALL |
+> > ~(POWER_CONTROL_LOW) | POWER_SENSE_LOW,
+> 
+> I suppose that is actually what makes it work, though the change is
+> rather suspect. You're basically setting *all* bits to 1
+My bad. Attaching a modified patch. I have tested it on a Zeus and it
+works ok.
+
+> > -MACHINE_START(ARCOM_ZEUS, "Arcom ZEUS")
+> > +MACHINE_START(ARCOM_ZEUS, "Arcom/Eurotech ZEUS")
+> 
+> Please sent this as a separate patch, including a Signed-off-by: line.
+Please see attached.
+
+> Thanks,
+> 
+>         M.
+
+Thanks and regards,
+- Amit
+
+______________________________________________________________________
+This email has been scanned by the MessageLabs Email Security System.
+For more information please visit http://www.messagelabs.com/email 
+______________________________________________________________________
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arcom-to-eurotech.patch
+Type: text/x-patch
+Size: 667 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100211/e0396c8d/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: eurotech_zeus_usb_port2.patch
+Type: text/x-patch
+Size: 829 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100211/e0396c8d/attachment-0001.bin>
