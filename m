@@ -1,66 +1,53 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Feb 2010 19:36:03 -0800
-Subject: [PATCH 10/17] omap1: mailbox: kill compile warning
+Date: Wed, 10 Feb 2010 19:36:07 -0800
+Subject: [PATCH 12/17] omap2/3/4: gpmc: kill compile warning
 In-Reply-To: <20100211033310.1624.80025.stgit@baageli.muru.com>
 References: <20100211033310.1624.80025.stgit@baageli.muru.com>
-Message-ID: <20100211033603.1624.89553.stgit@baageli.muru.com>
+Message-ID: <20100211033607.1624.87200.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <felipe.balbi@nokia.com>
 
-use ioremap and remove unused variable to get rid
-of compile warnings.
+Get rid of the following warnings:
+
+arch/arm/mach-omap2/gpmc.c:550:30: warning: non-ANSI
+function declaration of function 'omap3_gpmc_save_context'
+
+arch/arm/mach-omap2/gpmc.c:581:33: warning: non-ANSI
+function declaration of function 'omap3_gpmc_restore_context'
 
 Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/devices.c |    2 +-
- arch/arm/mach-omap1/mailbox.c |    9 +++++++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index a2d07aa..379100c 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -73,7 +73,7 @@ static inline void omap_init_rtc(void) {}
- #  define INT_DSP_MAILBOX1	INT_1610_DSP_MAILBOX1
- #endif
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 7027cdc..5bc3ca0 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -552,9 +552,10 @@ void __init gpmc_init(void)
+ #ifdef CONFIG_ARCH_OMAP3
+ static struct omap3_gpmc_regs gpmc_context;
  
--#define OMAP1_MBOX_BASE		OMAP1_IO_ADDRESS(OMAP16XX_MAILBOX_BASE)
-+#define OMAP1_MBOX_BASE		OMAP16XX_MAILBOX_BASE
- 
- static struct resource mbox_resources[] = {
- 	{
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index caf889a..4f5b3da 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -146,7 +146,6 @@ EXPORT_SYMBOL(mbox_dsp_info);
- static int __devinit omap1_mbox_probe(struct platform_device *pdev)
+-void omap3_gpmc_save_context()
++void omap3_gpmc_save_context(void)
  {
- 	struct resource *res;
--	int ret = 0;
- 
- 	if (pdev->num_resources != 2) {
- 		dev_err(&pdev->dev, "invalid number of resources: %d\n",
-@@ -160,12 +159,18 @@ static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "invalid mem resource\n");
- 		return -ENODEV;
- 	}
--	mbox_base = res->start;
+ 	int i;
 +
-+	mbox_base = ioremap(res->start, resource_size(res));
-+	if (!mbox_base) {
-+		dev_err(&pdev->dev, "ioremap failed\n");
-+		return -ENODEV;
-+	}
- 
- 	/* DSP IRQ */
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (unlikely(!res)) {
- 		dev_err(&pdev->dev, "invalid irq resource\n");
-+		iounmap(mbox_base);
- 		return -ENODEV;
+ 	gpmc_context.sysconfig = gpmc_read_reg(GPMC_SYSCONFIG);
+ 	gpmc_context.irqenable = gpmc_read_reg(GPMC_IRQENABLE);
+ 	gpmc_context.timeout_ctrl = gpmc_read_reg(GPMC_TIMEOUT_CONTROL);
+@@ -583,9 +584,10 @@ void omap3_gpmc_save_context()
  	}
- 	mbox_dsp_info.irq = res->start;
+ }
+ 
+-void omap3_gpmc_restore_context()
++void omap3_gpmc_restore_context(void)
+ {
+ 	int i;
++
+ 	gpmc_write_reg(GPMC_SYSCONFIG, gpmc_context.sysconfig);
+ 	gpmc_write_reg(GPMC_IRQENABLE, gpmc_context.irqenable);
+ 	gpmc_write_reg(GPMC_TIMEOUT_CONTROL, gpmc_context.timeout_ctrl);
