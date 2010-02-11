@@ -1,46 +1,96 @@
-From: rdunlap@xenotime.net (Randy Dunlap)
-Date: Wed, 10 Feb 2010 16:41:38 -0800
-Subject: [RFC 0/2] fix dma_map_sg not to do barriers for each buffer
-In-Reply-To: <20100211093835I.fujita.tomonori@lab.ntt.co.jp>
-References: <1265834250-29170-1-git-send-email-adharmap@codeaurora.org>	<4B7324D3.1000509@xenotime.net>
-	<20100211093835I.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <4B735242.8000101@xenotime.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Feb 2010 19:35:25 -0800
+Subject: [PATCH 00/17] omap updates for 2.6.34 merge window, part 1
+Message-ID: <20100211033310.1624.80025.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/10 16:39, FUJITA Tomonori wrote:
-> On Wed, 10 Feb 2010 13:27:47 -0800
-> Randy Dunlap <rdunlap@xenotime.net> wrote:
-> 
->> On 02/10/10 12:37, adharmap at codeaurora.org wrote:
->>> From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
->>>
->>> Please refer to the post here
->>> http://lkml.org/lkml/2010/1/4/347
->>>
->>> These changes are to introduce barrierless dma_map_area and dma_unmap_area and
->>> use them to map the buffers in the scatterlist. For the last buffer, call
->>> the normal dma_map_area(aka with barriers) effectively executing the barrier
->>> at the end of the operation.
->>>
->>> Note that the barrierless operations are implemented for few arm
->>> architectures only and I would implement for others once these are okayed by the
->>> community.
->>
->> So when you add these interfaces for other architectures, you will also
->> update Documentation/DMA-API.txt,  right??
-> 
-> Seems that you misunderstand him.
-> 
-> He is talking about other "arm" architectures. His patchset improves
-> arm's internal implementation (dma_map_area and dma_unmap_area are not
-> the DMA API; not exported for driver writers). He meant that the
-> patchset doesn't cover all arm architectures.
-> 
-> This is about arm's implementation details and not related with other
-> non arm architectures. So no need to update Documentation/DMA-API.txt.
+Hi all,
 
-OK, in that case I did misunderstand.  Thanks for the info.
+Over the next few days I'll be posting total of 66 omap patches
+for review. Here's part 1.
+
+Regards,
+
+Tony
+
+
+---
+
+Felipe Balbi (4):
+      omap1: mailbox: kill compile warning
+      omap2/3/4: mailbox: kill compile warning in mailbox.c
+      omap2/3/4: gpmc: kill compile warning
+      omap2/3/4: gpmc: avoid section definitions on headers
+
+Hiroshi DOYU (3):
+      omap iommu: cleanup iommu page address mask and definitions
+      omap: iommu: fix incorrect address for supersection 1st entry
+      omap iommu: fix incorrect address for largepage 1st entry
+
+Janusz Krzysztofik (4):
+      omap: McBSP: Use macros for all register read/write operations
+      omap: McBSP: Modify macros/functions API for easy cache access
+      omap: McBSP: Introduce caching in register write operations
+      omap: McBSP: Use cache when modifying individual register bits
+
+Ladislav Michl (2):
+      omap: convert boards to use physmap-flash
+      MTD: remove no longer used OMAP flash map
+
+Vimal Singh (3):
+      omap2/3/4: Introducing 'gpmc-nand.c' for GPMC specific NAND init
+      omap3: SDP: Introducing 'board-sdp-flash.c' for flash init
+      omap3: Add support for flash on 3430SDP board
+
+vikram pandita (1):
+      omap2/3/4: serial: fix coding style indentaion
+
+
+ arch/arm/mach-omap1/Makefile                 |    2 
+ arch/arm/mach-omap1/board-fsample.c          |    9 -
+ arch/arm/mach-omap1/board-h2.c               |    9 -
+ arch/arm/mach-omap1/board-h3.c               |    9 -
+ arch/arm/mach-omap1/board-innovator.c        |    9 -
+ arch/arm/mach-omap1/board-osk.c              |    9 -
+ arch/arm/mach-omap1/board-palmte.c           |    9 -
+ arch/arm/mach-omap1/board-palmtt.c           |    9 -
+ arch/arm/mach-omap1/board-palmz71.c          |   10 -
+ arch/arm/mach-omap1/board-perseus2.c         |    9 -
+ arch/arm/mach-omap1/board-sx1.c              |   11 -
+ arch/arm/mach-omap1/board-voiceblue.c        |    9 -
+ arch/arm/mach-omap1/devices.c                |    2 
+ arch/arm/mach-omap1/flash.c                  |   33 ++
+ arch/arm/mach-omap1/mailbox.c                |    9 -
+ arch/arm/mach-omap1/mcbsp.c                  |   16 +
+ arch/arm/mach-omap2/Makefile                 |    6 
+ arch/arm/mach-omap2/board-2430sdp.c          |    7 
+ arch/arm/mach-omap2/board-3430sdp.c          |  111 ++++++++
+ arch/arm/mach-omap2/board-h4.c               |    7 
+ arch/arm/mach-omap2/board-sdp-flash.c        |  272 +++++++++++++++++++
+ arch/arm/mach-omap2/gpmc-nand.c              |  139 ++++++++++
+ arch/arm/mach-omap2/gpmc.c                   |    6 
+ arch/arm/mach-omap2/include/mach/board-sdp.h |   21 +
+ arch/arm/mach-omap2/mailbox.c                |    2 
+ arch/arm/mach-omap2/mcbsp.c                  |   20 +
+ arch/arm/mach-omap2/serial.c                 |   19 +
+ arch/arm/plat-omap/include/plat/flash.h      |   16 +
+ arch/arm/plat-omap/include/plat/gpmc.h       |    4 
+ arch/arm/plat-omap/include/plat/mcbsp.h      |    3 
+ arch/arm/plat-omap/include/plat/nand.h       |   10 +
+ arch/arm/plat-omap/iommu.c                   |    6 
+ arch/arm/plat-omap/iopgtable.h               |   50 +++-
+ arch/arm/plat-omap/mcbsp.c                   |  366 +++++++++++++-------------
+ drivers/mtd/maps/Kconfig                     |    9 -
+ drivers/mtd/maps/Makefile                    |    1 
+ drivers/mtd/maps/omap_nor.c                  |  188 -------------
+ drivers/mtd/nand/omap2.c                     |   35 --
+ 38 files changed, 962 insertions(+), 500 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/flash.c
+ create mode 100644 arch/arm/mach-omap2/board-sdp-flash.c
+ create mode 100644 arch/arm/mach-omap2/gpmc-nand.c
+ create mode 100644 arch/arm/mach-omap2/include/mach/board-sdp.h
+ create mode 100644 arch/arm/plat-omap/include/plat/flash.h
 
 -- 
-~Randy
+Signature
