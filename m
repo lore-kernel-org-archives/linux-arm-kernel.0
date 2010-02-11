@@ -1,63 +1,32 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 11 Feb 2010 13:41:56 +0100
-Subject: [PATCH 3/5] mfd: use genirq in 88pm860x
-In-Reply-To: <771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
-References: <771cded01002030503w15f5394fwd226a26e4deadc6d@mail.gmail.com>
-	<20100205153938.GB3448@sortiz.org>
-	<771cded01002072245j385cc3b5xc63e99009149650b@mail.gmail.com>
-Message-ID: <20100211124155.GD3136@sortiz.org>
+Date: Thu, 11 Feb 2010 13:42:43 +0100
+Subject: [PATCH 5/5] input: support onkey in 88pm860x
+In-Reply-To: <20100205171108.GA28694@core.coreip.homeip.net>
+References: <771cded01002030504ye3416c8nafe21be405237ace@mail.gmail.com>
+	<20100203173628.GB30600@core.coreip.homeip.net>
+	<771cded01002040308t3fe112e5leb60bc969fbfcfb@mail.gmail.com>
+	<20100205154211.GE3448@sortiz.org>
+	<20100205171108.GA28694@core.coreip.homeip.net>
+Message-ID: <20100211124242.GE3136@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+Hi Dmittry,
 
-On Mon, Feb 08, 2010 at 01:45:31AM -0500, Haojian Zhuang wrote:
-> On Fri, Feb 5, 2010 at 10:39 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> > Hi Haojian,
-> >
-> > On Wed, Feb 03, 2010 at 08:03:13AM -0500, Haojian Zhuang wrote:
-> >> From 1c49d1bf59a1ec2c59dc093899e6b2d0991bd676 Mon Sep 17 00:00:00 2001
-> >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >> Date: Wed, 3 Feb 2010 15:39:28 -0500
-> >> Subject: [PATCH] mfd: use genirq in 88pm860x
-> > The patch looks fine to me but:
-> >
-> > - Please add some more verbose changelog
-> > - It doesnt build on x86, you need to apply this:
-> >
-> > diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
-> > index 0b1eba0..6a14d2b 100644
-> > --- a/drivers/mfd/88pm860x-core.c
-> > +++ b/drivers/mfd/88pm860x-core.c
-> > @@ -544,7 +544,11 @@ static int __devinit device_irq_init(struct pm860x_chip
-> > *ch
-> > ? ? ? ? ? ? ? ?set_irq_chip_and_handler(__irq, &pm860x_irq_chip,
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? handle_edge_irq);
-> > ? ? ? ? ? ? ? ?set_irq_nested_thread(__irq, 1);
-> > +#ifdef CONFIG_ARM
-> > ? ? ? ? ? ? ? ?set_irq_flags(__irq, IRQF_VALID);
-> > +#else
-> > + ? ? ? ? ? ? ? set_irq_noprobe(__irq);
-> > +#endif
-> > ? ? ? ?}
-> >
-> > ? ? ? ?ret = request_threaded_irq(chip->core_irq, NULL, pm860x_irq, flags,
-> >
-> > - After applying this patch, 88pm860x-ts.c fails to build. You need to merge
-> > patches 3 and 4 into one single patch to prevent build failure.
-> >
-> > Cheers,
-> > Samuel.
-> >
+On Fri, Feb 05, 2010 at 09:11:09AM -0800, Dmitry Torokhov wrote:
+> Hi Samuel,
 > 
-> Great thanks. Now the patch is updated. The modification is in below.
-> 1. Merge patch of IRQ handling and touchscreen driver.
-> 2. Add CONFIG_ARM in 88pm860x driver.
-> 3. Add more comments in changelog.
+> On Fri, Feb 05, 2010 at 04:42:12PM +0100, Samuel Ortiz wrote:
+> > On Thu, Feb 04, 2010 at 06:08:42AM -0500, Haojian Zhuang wrote:
+> > > Fix and format the new patch.
+> > Dmitry, are you ok with this new version ?
+> > 
 > 
-> Best Regards
-> Haojian
-Thanks, patch applied.
+> Looks OK. It could be made a bit simpler in error path by requesting IRQ
+> after allocating input device but before registering it (input devices
+> can take events s soon as they ghave been allocated with
+> input_allocate_device) but it is not that important.
+Thanks, I'm taking this patch then.
 
 Cheers,
 Samuel.
