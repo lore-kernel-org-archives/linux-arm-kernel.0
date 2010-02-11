@@ -1,26 +1,36 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Thu, 11 Feb 2010 10:05:58 +0100
-Subject: [PATCH][KS8695] Mark network interface as running on ifconfig up
-Message-ID: <4B73C876.1060906@visionsystems.de>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Thu, 11 Feb 2010 09:32:40 -0000 (GMT)
+Subject: [PATCH] Eurotech Zeus : Making USB port 2 work
+In-Reply-To: <20100211123344.28014152@ironhide>
+References: <20100210120555.1b648467@ironhide>
+	<37cba69b59077aff2450e9b89c9d0d20.squirrel@www.loen.fr>
+	<20100211123344.28014152@ironhide>
+Message-ID: <4b396ba26c3a8b9da558246363208a69.squirrel@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[KS8695] Mark network interface as running on ifconfig up
+On Thu, February 11, 2010 07:03, Amit Walambe wrote:
+> Hi!
+> Thanks for your comments Marc.
+>
+> On Wed, 10 Feb 2010 09:38:38 -0000 (GMT)
+> "Marc Zyngier" <maz@misterjones.org> wrote:
+>> >  static struct pxaohci_platform_data zeus_ohci_platform_data = {
+>> >  	.port_mode	= PMM_NPS_MODE,
+>> > -	.flags		= ENABLE_PORT_ALL |
+>> > POWER_CONTROL_LOW | POWER_SENSE_LOW,
+>> > +	/* Clear Power Control Polarity Low and set Power Sense
+>> > +	 * Polarity Low. Supply power to USB ports. */
+>> > +	.flags		= ENABLE_PORT_ALL |
+>> > ~(POWER_CONTROL_LOW) | POWER_SENSE_LOW,
+>>
+>> I suppose that is actually what makes it work, though the change is
+>> rather suspect. You're basically setting *all* bits to 1
+> My bad. Attaching a modified patch. I have tested it on a Zeus and it
+> works ok.
 
-Without netif_carrier_on() network interface will not transmit any packets
-after ifconfig down and subsequent ifconfig up.
+Thanks. Both patches queued for 2.6.34.
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-
-Index: linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
-===================================================================
---- linux-2.6.33-rc7.orig/drivers/net/arm/ks8695net.c
-+++ linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
-@@ -1371,6 +1371,7 @@ ks8695_open(struct net_device *ndev)
- 
- 	napi_enable(&ksp->napi);
- 	netif_start_queue(ndev);
-+	netif_carrier_on(ndev);
- 
- 	return 0;
- }
+        M.
+-- 
+And if you don't know where you're going, any road will take you there...
