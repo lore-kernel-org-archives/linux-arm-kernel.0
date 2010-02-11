@@ -1,20 +1,26 @@
-From: richardliu@ms1.techarea.org (Richard Liu)
-Date: Thu, 11 Feb 2010 16:27:16 +0800
-Subject: Clean/Invalidate L1/L2 DCache on userspace.
-Message-ID: <4B73BF64.7030603@ms1.techarea.org>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Thu, 11 Feb 2010 10:05:58 +0100
+Subject: [PATCH][KS8695] Mark network interface as running on ifconfig up
+Message-ID: <4B73C876.1060906@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All:
+[KS8695] Mark network interface as running on ifconfig up
 
-     Does any one try to clean/invalidate L2 Dcache for userspace memory?
+Without netif_carrier_on() network interface will not transmit any packets
+after ifconfig down and subsequent ifconfig up.
 
-Program allocated a memory from malloc on userspace.
-Tried to pass userspace memory point to kernel and use function 
-"dma_cache_maint" to flush/invalidate it.
-But it's not work.
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
 
-     sys_cacheflush seems only flush L1 and icache only.
-It doesn't fit my requirement.
-So, I cannot find any solution to clean/invalidate L2 Dcache from user 
-space.
+Index: linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
+===================================================================
+--- linux-2.6.33-rc7.orig/drivers/net/arm/ks8695net.c
++++ linux-2.6.33-rc7/drivers/net/arm/ks8695net.c
+@@ -1371,6 +1371,7 @@ ks8695_open(struct net_device *ndev)
+ 
+ 	napi_enable(&ksp->napi);
+ 	netif_start_queue(ndev);
++	netif_carrier_on(ndev);
+ 
+ 	return 0;
+ }
