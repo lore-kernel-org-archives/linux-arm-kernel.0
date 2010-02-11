@@ -1,36 +1,46 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 11 Feb 2010 13:42:43 +0100
-Subject: [PATCH 5/5] input: support onkey in 88pm860x
-In-Reply-To: <20100205171108.GA28694@core.coreip.homeip.net>
-References: <771cded01002030504ye3416c8nafe21be405237ace@mail.gmail.com>
-	<20100203173628.GB30600@core.coreip.homeip.net>
-	<771cded01002040308t3fe112e5leb60bc969fbfcfb@mail.gmail.com>
-	<20100205154211.GE3448@sortiz.org>
-	<20100205171108.GA28694@core.coreip.homeip.net>
-Message-ID: <20100211124242.GE3136@sortiz.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 11 Feb 2010 16:16:02 +0100
+Subject: [PATCH 2/2] [U300] Add MMCI DMA platform config
+Message-ID: <1265901362-4104-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmittry,
+This adds the platform configuration necessary to
+get DMA on the U300 MMCI block.
 
-On Fri, Feb 05, 2010 at 09:11:09AM -0800, Dmitry Torokhov wrote:
-> Hi Samuel,
-> 
-> On Fri, Feb 05, 2010 at 04:42:12PM +0100, Samuel Ortiz wrote:
-> > On Thu, Feb 04, 2010 at 06:08:42AM -0500, Haojian Zhuang wrote:
-> > > Fix and format the new patch.
-> > Dmitry, are you ok with this new version ?
-> > 
-> 
-> Looks OK. It could be made a bit simpler in error path by requesting IRQ
-> after allocating input device but before registering it (input devices
-> can take events s soon as they ghave been allocated with
-> input_allocate_device) but it is not that important.
-Thanks, I'm taking this patch then.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+---
+ arch/arm/mach-u300/mmc.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-Cheers,
-Samuel.
-
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index 109f5a6..a02d17c 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -19,7 +19,10 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/gpio.h>
++#include <linux/dmaengine.h>
+ #include <linux/amba/mmci.h>
++#include <mach/coh901318.h>
++#include <mach/dma_channels.h>
+ 
+ #include "mmc.h"
+ #include "padmux.h"
+@@ -106,6 +109,12 @@ int __devinit mmc_init(struct amba_device *adev)
+ 	mmci_card->mmc0_plat_data.gpio_cd = -1;
+ 	mmci_card->mmc0_plat_data.capabilities = MMC_CAP_MMC_HIGHSPEED |
+ 		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA;
++#ifdef CONFIG_DMA_ENGINE
++	mmci_card->mmc0_plat_data.dma_filter = coh901318_filter_id;
++	mmci_card->mmc0_plat_data.dma_rx_param =
++		(void *) U300_DMA_MMCSD_RX_TX;
++	/* Don't specify a TX channel, this RX channel is bidirectional */
++#endif
+ 
+ 	mmcsd_device->platform_data = (void *) &mmci_card->mmc0_plat_data;
+ 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.6.3.3
