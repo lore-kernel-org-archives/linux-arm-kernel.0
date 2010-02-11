@@ -1,25 +1,52 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Thu, 11 Feb 2010 22:26:10 +0530
-Subject: [PATCH] amba-pl011: support hardware flow control
-In-Reply-To: <20100210202552.GA30854@n2100.arm.linux.org.uk>
-References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
-	<20100208135124.GA26608@n2100.arm.linux.org.uk>
-	<20100209143055.GA6015@bnru01.bnr.st.com>
-	<20100209221449.GA23083@n2100.arm.linux.org.uk>
-	<20100210011637.GA8683@shareable.org>
-	<20100210134515.GA2844@bnru01.bnr.st.com>
-	<20100210202552.GA30854@n2100.arm.linux.org.uk>
-Message-ID: <20100211165610.GA26986@bnru01.bnr.st.com>
+From: Bas.Vermeulen@novero.com (Bas Vermeulen)
+Date: Thu, 11 Feb 2010 19:02:02 +0100
+Subject: [PATCH] imx serial driver: NULL pointer dereference in
+	serial_imx_probe/remove
+Message-ID: <4B74461A.1050403@novero.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 10, 2010 at 09:25:52PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Feb 10, 2010 at 07:15:21PM +0530, Rabin VINCENT wrote:
-> > I've implemented this in the updated patch below.
-> 
-> I think this is ok.  Has it been tested?
+Check for NULL pointer before dereferencing, as it is possible and legal 
+to pass in NULL for the platform data for a serial port.
 
-Yes.  I was able to reproduce the described problem, and this version of
-the patch fixes it.
+Signed-off-by: Bas Vermeulen <bas.vermeulen@novero.com>
 
-Rabin
+diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+index 60d665a..d00fcf8 100644
+--- a/drivers/serial/imx.c
++++ b/drivers/serial/imx.c
+@@ -1279,7 +1279,7 @@ static int serial_imx_probe(struct platform_device 
+*pdev)
+          sport->use_irda = 1;
+  #endif
+
+-    if (pdata->init) {
++    if (pdata && pdata->init) {
+          ret = pdata->init(pdev);
+          if (ret)
+              goto clkput;
+@@ -1292,7 +1292,7 @@ static int serial_imx_probe(struct platform_device 
+*pdev)
+
+      return 0;
+  deinit:
+-    if (pdata->exit)
++    if (pdata && pdata->exit)
+          pdata->exit(pdev);
+  clkput:
+      clk_put(sport->clk);
+@@ -1321,7 +1321,7 @@ static int serial_imx_remove(struct 
+platform_device *pdev)
+
+      clk_disable(sport->clk);
+
+-    if (pdata->exit)
++    if (pdata && pdata->exit)
+          pdata->exit(pdev);
+
+      iounmap(sport->port.membase);
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: drivers-imx-serial-null-dereference.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100211/5064c9a5/attachment.el>
