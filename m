@@ -1,98 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 10 Feb 2010 17:13:56 -0700 (MST)
-Subject: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding dependency
-	related update.
-In-Reply-To: <1265789523-6413-1-git-send-email-abhijitpagare@ti.com>
-References: <1265789523-6413-1-git-send-email-abhijitpagare@ti.com>
-Message-ID: <alpine.DEB.2.00.1002101711170.28188@utopia.booyaka.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 11 Feb 2010 09:39:17 +0900
+Subject: [RFC 0/2] fix dma_map_sg not to do barriers for each buffer
+In-Reply-To: <4B7324D3.1000509@xenotime.net>
+References: <1265834250-29170-1-git-send-email-adharmap@codeaurora.org>
+	<4B7324D3.1000509@xenotime.net>
+Message-ID: <20100211093835I.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhijit,
+On Wed, 10 Feb 2010 13:27:47 -0800
+Randy Dunlap <rdunlap@xenotime.net> wrote:
 
-On Wed, 10 Feb 2010, Abhijit Pagare wrote:
-
-> A check is added for avoiding the sleep/wakeup dependency updates
-> for OMAP4 as the structures for the dependencies are currently absent.
+> On 02/10/10 12:37, adharmap at codeaurora.org wrote:
+> > From: Abhijeet Dharmapurikar <adharmap@quicinc.com>
+> > 
+> > Please refer to the post here
+> > http://lkml.org/lkml/2010/1/4/347
+> > 
+> > These changes are to introduce barrierless dma_map_area and dma_unmap_area and
+> > use them to map the buffers in the scatterlist. For the last buffer, call
+> > the normal dma_map_area(aka with barriers) effectively executing the barrier
+> > at the end of the operation.
+> > 
+> > Note that the barrierless operations are implemented for few arm
+> > architectures only and I would implement for others once these are okayed by the
+> > community.
 > 
-> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+> So when you add these interfaces for other architectures, you will also
+> update Documentation/DMA-API.txt,  right??
 
-Thanks, I've made the following changes to the patch to try to ensure that 
-this doesn't slip through the cracks, and queued it for 2.6.34.  If you 
-have any comments on the revised patch, please let me know.
+Seems that you misunderstand him.
 
+He is talking about other "arm" architectures. His patchset improves
+arm's internal implementation (dma_map_area and dma_unmap_area are not
+the DMA API; not exported for driver writers). He meant that the
+patchset doesn't cover all arm architectures.
 
-- Paul
-
-From: Abhijit Pagare <abhijitpagare@ti.com>
-Date: Wed, 10 Feb 2010 13:42:03 +0530
-Subject: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding dependency related update.
-
-A check is added for avoiding the sleep/wakeup dependency updates
-for OMAP4 as the structures for the dependencies are currently absent.
-
-Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-[paul at pwsan.com: added warnings, explanatory comment, copyright update]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clockdomain.c |   30 ++++++++++++++++++++++++------
- 1 files changed, 24 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index a38a615..de4278c 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -1,8 +1,8 @@
- /*
-  * OMAP2/3/4 clockdomain framework functions
-  *
-- * Copyright (C) 2008-2009 Texas Instruments, Inc.
-- * Copyright (C) 2008-2009 Nokia Corporation
-+ * Copyright (C) 2008-2010 Texas Instruments, Inc.
-+ * Copyright (C) 2008-2010 Nokia Corporation
-  *
-  * Written by Paul Walmsley and Jouni H?gander
-  * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
-@@ -891,8 +891,17 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
- 	pr_debug("clockdomain: enabling automatic idle transitions for %s\n",
- 		 clkdm->name);
- 
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_add_autodeps(clkdm);
-+	/*
-+	 * XXX This should be removed once TI adds wakeup/sleep
-+	 * dependency code and data for OMAP4.
-+	 */
-+	if (cpu_is_omap44xx()) {
-+		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-+			  "support is not yet implemented\n");
-+	} else {
-+		if (atomic_read(&clkdm->usecount) > 0)
-+			_clkdm_add_autodeps(clkdm);
-+	}
- 
- 	_omap2_clkdm_set_hwsup(clkdm, 1);
- 
-@@ -924,8 +933,17 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
- 
- 	_omap2_clkdm_set_hwsup(clkdm, 0);
- 
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_del_autodeps(clkdm);
-+	/*
-+	 * XXX This should be removed once TI adds wakeup/sleep
-+	 * dependency code and data for OMAP4.
-+	 */
-+	if (cpu_is_omap44xx()) {
-+		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-+			  "support is not yet implemented\n");
-+	} else {
-+		if (atomic_read(&clkdm->usecount) > 0)
-+			_clkdm_del_autodeps(clkdm);
-+	}
- }
- 
- 
--- 
-1.6.6.GIT
+This is about arm's implementation details and not related with other
+non arm architectures. So no need to update Documentation/DMA-API.txt.
