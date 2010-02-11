@@ -1,170 +1,116 @@
-From: vimalsingh@ti.com (Vimal Singh)
-Date: Wed, 10 Feb 2010 18:22:55 -0800
-Subject: [PATCH] omap3: Add support for flash on 3430SDP board
-Message-ID: <mailman.205.1265859950.2170.linux-arm-kernel@lists.infradead.org>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Thu, 11 Feb 2010 10:32:11 +0530
+Subject: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding
+	dependency related update.
+In-Reply-To: <alpine.DEB.2.00.1002101711170.28188@utopia.booyaka.com>
+References: <1265789523-6413-1-git-send-email-abhijitpagare@ti.com>
+	<alpine.DEB.2.00.1002101711170.28188@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0CD3DDD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for flashes on 3430SDP boards. All three
-NAND, NOR and OneNAND are supported. I have tested it on
-3430SDP (ES2 and ES3.1).
+Paul,
 
-This patch can be treated as an example to "how to utilize":
-'gpmc-nand.c' and 'board-sdp-flash.c'.
+>-----Original Message-----
+>From: Paul Walmsley [mailto:paul at pwsan.com]
+>Sent: Thursday, February 11, 2010 5:44 AM
+>To: Pagare, Abhijit
+>Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding
+>dependency related update.
+>
+>Hi Abhijit,
+>
+>On Wed, 10 Feb 2010, Abhijit Pagare wrote:
+>
+>> A check is added for avoiding the sleep/wakeup dependency updates
+>> for OMAP4 as the structures for the dependencies are currently absent.
+>>
+>> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>
+>Thanks, I've made the following changes to the patch to try to ensure that
+>this doesn't slip through the cracks, and queued it for 2.6.34.  If you
+>have any comments on the revised patch, please let me know.
 
-Similar patches can be created for 2430sdp and 3630sdp or any other
-similar board.
+Looks neat. Thanks.
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+-Abhijit
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 0b17dca..af5853f 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -100,7 +100,8 @@ obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
- obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
- 					   mmc-twl4030.o
- obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o \
--					   mmc-twl4030.o
-+					   mmc-twl4030.o \
-+					   board-sdp-flash.o
- obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
- obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
- 					   board-rx51-sdram.o \
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index eda4f64..2e38e5b 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -41,6 +41,8 @@
- #include <plat/control.h>
- #include <plat/gpmc-smc91x.h>
- 
-+#include <mach/board-sdp.h>
-+
- #include "mux.h"
- #include "sdram-qimonda-hyb18m512160af-6.h"
- #include "mmc-twl4030.h"
-@@ -650,6 +652,114 @@ static struct omap_board_mux board_mux[] __initdata = {
- #define board_mux	NULL
- #endif
- 
-+static struct mtd_partition sdp_nor_partitions[] = {
-+	/* bootloader (U-Boot, etc) in first sector */
-+	{
-+		.name		= "Bootloader-NOR",
-+		.offset		= 0,
-+		.size		= SZ_256K,
-+		.mask_flags	= MTD_WRITEABLE, /* force read-only */
-+	},
-+	/* bootloader params in the next sector */
-+	{
-+		.name		= "Params-NOR",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_256K,
-+		.mask_flags	= 0,
-+	},
-+	/* kernel */
-+	{
-+		.name		= "Kernel-NOR",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_2M,
-+		.mask_flags	= 0
-+	},
-+	/* file system */
-+	{
-+		.name		= "Filesystem-NOR",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+		.mask_flags	= 0
-+	}
-+};
-+
-+static struct mtd_partition sdp_onenand_partitions[] = {
-+	{
-+		.name		= "X-Loader-OneNAND",
-+		.offset		= 0,
-+		.size		= 4 * (64 * 2048),
-+		.mask_flags	= MTD_WRITEABLE  /* force read-only */
-+	},
-+	{
-+		.name		= "U-Boot-OneNAND",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= 2 * (64 * 2048),
-+		.mask_flags	= MTD_WRITEABLE  /* force read-only */
-+	},
-+	{
-+		.name		= "U-Boot Environment-OneNAND",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= 1 * (64 * 2048),
-+	},
-+	{
-+		.name		= "Kernel-OneNAND",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= 16 * (64 * 2048),
-+	},
-+	{
-+		.name		= "File System-OneNAND",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static struct mtd_partition sdp_nand_partitions[] = {
-+	/* All the partition sizes are listed in terms of NAND block size */
-+	{
-+		.name		= "X-Loader-NAND",
-+		.offset		= 0,
-+		.size		= 4 * (64 * 2048),
-+		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
-+	},
-+	{
-+		.name		= "U-Boot-NAND",
-+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x80000 */
-+		.size		= 10 * (64 * 2048),
-+		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
-+	},
-+	{
-+		.name		= "Boot Env-NAND",
-+
-+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x1c0000 */
-+		.size		= 6 * (64 * 2048),
-+	},
-+	{
-+		.name		= "Kernel-NAND",
-+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x280000 */
-+		.size		= 40 * (64 * 2048),
-+	},
-+	{
-+		.name		= "File System - NAND",
-+		.size		= MTDPART_SIZ_FULL,
-+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x780000 */
-+	},
-+};
-+
-+static struct flash_partitions sdp_flash_partitions[] = {
-+	{
-+		.parts = sdp_nor_partitions,
-+		.nr_parts = ARRAY_SIZE(sdp_nor_partitions),
-+	},
-+	{
-+		.parts = sdp_onenand_partitions,
-+		.nr_parts = ARRAY_SIZE(sdp_onenand_partitions),
-+	},
-+	{
-+		.parts = sdp_nand_partitions,
-+		.nr_parts = ARRAY_SIZE(sdp_nand_partitions),
-+	},
-+};
-+
- static void __init omap_3430sdp_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-@@ -666,6 +776,7 @@ static void __init omap_3430sdp_init(void)
- 	omap_serial_init();
- 	usb_musb_init();
- 	board_smc91x_init();
-+	sdp_flash_init(sdp_flash_partitions);
- 	sdp3430_display_init();
- 	enable_board_wakeup_source();
- 	usb_ehci_init(&ehci_pdata);
+>
+>
+>- Paul
+>
+>From: Abhijit Pagare <abhijitpagare@ti.com>
+>Date: Wed, 10 Feb 2010 13:42:03 +0530
+>Subject: [PATCH] ARM: OMAP4 clock domain: Add check for avoiding dependency
+>related update.
+>
+>A check is added for avoiding the sleep/wakeup dependency updates
+>for OMAP4 as the structures for the dependencies are currently absent.
+>
+>Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+>[paul at pwsan.com: added warnings, explanatory comment, copyright update]
+>Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>---
+> arch/arm/mach-omap2/clockdomain.c |   30 ++++++++++++++++++++++++------
+> 1 files changed, 24 insertions(+), 6 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-
+>omap2/clockdomain.c
+>index a38a615..de4278c 100644
+>--- a/arch/arm/mach-omap2/clockdomain.c
+>+++ b/arch/arm/mach-omap2/clockdomain.c
+>@@ -1,8 +1,8 @@
+> /*
+>  * OMAP2/3/4 clockdomain framework functions
+>  *
+>- * Copyright (C) 2008-2009 Texas Instruments, Inc.
+>- * Copyright (C) 2008-2009 Nokia Corporation
+>+ * Copyright (C) 2008-2010 Texas Instruments, Inc.
+>+ * Copyright (C) 2008-2010 Nokia Corporation
+>  *
+>  * Written by Paul Walmsley and Jouni H?gander
+>  * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
+>@@ -891,8 +891,17 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
+> 	pr_debug("clockdomain: enabling automatic idle transitions for %s\n",
+> 		 clkdm->name);
+>
+>-	if (atomic_read(&clkdm->usecount) > 0)
+>-		_clkdm_add_autodeps(clkdm);
+>+	/*
+>+	 * XXX This should be removed once TI adds wakeup/sleep
+>+	 * dependency code and data for OMAP4.
+>+	 */
+>+	if (cpu_is_omap44xx()) {
+>+		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
+>+			  "support is not yet implemented\n");
+>+	} else {
+>+		if (atomic_read(&clkdm->usecount) > 0)
+>+			_clkdm_add_autodeps(clkdm);
+>+	}
+>
+> 	_omap2_clkdm_set_hwsup(clkdm, 1);
+>
+>@@ -924,8 +933,17 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
+>
+> 	_omap2_clkdm_set_hwsup(clkdm, 0);
+>
+>-	if (atomic_read(&clkdm->usecount) > 0)
+>-		_clkdm_del_autodeps(clkdm);
+>+	/*
+>+	 * XXX This should be removed once TI adds wakeup/sleep
+>+	 * dependency code and data for OMAP4.
+>+	 */
+>+	if (cpu_is_omap44xx()) {
+>+		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
+>+			  "support is not yet implemented\n");
+>+	} else {
+>+		if (atomic_read(&clkdm->usecount) > 0)
+>+			_clkdm_del_autodeps(clkdm);
+>+	}
+> }
+>
+>
+>--
+>1.6.6.GIT
