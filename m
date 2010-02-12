@@ -1,30 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 12 Feb 2010 10:01:32 +0100
-Subject: [PATCH] amba-pl011: support hardware flow control
-In-Reply-To: <20100210202552.GA30854@n2100.arm.linux.org.uk>
-References: <1265636510-27679-1-git-send-email-rabin.vincent@stericsson.com>
-	<20100208135124.GA26608@n2100.arm.linux.org.uk>
-	<20100209143055.GA6015@bnru01.bnr.st.com>
-	<20100209221449.GA23083@n2100.arm.linux.org.uk>
-	<20100210011637.GA8683@shareable.org>
-	<20100210134515.GA2844@bnru01.bnr.st.com>
-	<20100210202552.GA30854@n2100.arm.linux.org.uk>
-Message-ID: <A6D19A13FE030A409EC4362C172E091F0E81A321@eseldmw101.eemea.ericsson.se>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 12 Feb 2010 10:40:41 +0100
+Subject: at91 preempt oops
+In-Reply-To: <c785bba31002110856m4c1068cr47a476742c2c4562@mail.gmail.com>
+References: <c785bba31002110856m4c1068cr47a476742c2c4562@mail.gmail.com>
+Message-ID: <20100212094041.GB21947@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Russell] 
+Hello,
 
-> On Wed, Feb 10, 2010 at 07:15:21PM +0530, Rabin VINCENT wrote:
-> > I've implemented this in the updated patch below.
-> 
-> I think this is ok.  Has it been tested?
+can you please reproduce with the patch below and then report that to
+the maintainer of the reported function?
 
-I have also regression tested on the U300 (which has a pure,
-unmodified PL011 from ARM) and no obvious problems.
-Busybox stty seem to say that -crtscts is on by default
-so I believe it's in full use now?
+Best regards
+Uwe
 
-I can do further stress tests, just tell me how...
+diff --git a/kernel/timer.c b/kernel/timer.c
+index 15533b7..1dea19c 100644
+--- a/kernel/timer.c
++++ b/kernel/timer.c
+@@ -1027,7 +1027,7 @@ static inline void __run_timers(struct tvec_base *base)
+ 				lock_map_release(&lockdep_map);
+ 
+ 				if (preempt_count != preempt_count()) {
+-					printk(KERN_ERR "huh, entered %p "
++					printk(KERN_ERR "huh, entered %pF "
+ 					       "with preempt_count %08x, exited"
+ 					       " with %08x?\n",
+ 					       fn, preempt_count,
 
-Linus
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
