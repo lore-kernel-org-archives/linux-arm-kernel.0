@@ -1,59 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Feb 2010 11:35:38 +0100
-Subject: [PATCH 1/2] arm/at91: Don't disable irqs in set_next_event and
-	set_mode callbacks
-In-Reply-To: <20100122165238.GB13718@pengutronix.de>
-References: <1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1261056821-28521-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100122160824.GA13718@pengutronix.de>
-	<20100122163658.GA18461@n2100.arm.linux.org.uk>
-	<20100122165238.GB13718@pengutronix.de>
-Message-ID: <20100212103538.GA6590@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 12 Feb 2010 10:38:52 +0000
+Subject: [PATCH 4/5] ARM: S3C2443: GPIO: Correct AC97 pin defines
+In-Reply-To: <1265971133-17610-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1265971133-17610-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1265971133-17610-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+From: Jassi Brar <jassi.brar@samsung.com>
 
-On Fri, Jan 22, 2010 at 05:52:38PM +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Jan 22, 2010 at 04:36:58PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 22, 2010 at 05:08:24PM +0100, Uwe Kleine-K?nig wrote:
-> > > You can pull them from
-> > > 
-> > > 	git://git.pengutronix.de/git/ukl/linux-2.6.git arm/clock-event
-> > 
-> > I really don't like pulling git urls which I don't know what I'm pulling.
-> > Please include at least a diffstat and shortlog of the commits you're
-> > expecting to be sent.
-> > 
-> > Something like the output from git request-pull would be ideal.
-> OK, appended below.  Actually I expected you to make me sending them to
-> the patch system.  But as I prefer when you pull from me, I'm happy to
-> provide you with diffstat and shortlog.
-You didn't pull yet.  Is this still on your list?
+GPIO_E-[5,9] pin functionality was defined incorrectly.
+The patch corrects and adds missing pins.
 
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c2410/include/mach/regs-gpio.h |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-Best regards
-Uwe
-
-> The following changes since commit 066000dd856709b6980123eb39b957fe26993f7b:
->   Ananth N Mavinakayanahalli (1):
->         Revert "x86, apic: Use logical flat on intel with <= 8 logical cpus"
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/clock-event
-> 
-> Uwe Kleine-K?nig (2):
->       arm/at91: Don't disable irqs in set_next_event and set_mode callbacks
->       arm/{pxa,sa1100,nomadik}: Don't disable irqs in set_next_event and set_mode
-> 
->  arch/arm/mach-at91/at91rm9200_time.c  |   20 ++++++--------------
->  arch/arm/mach-at91/at91sam926x_time.c |   11 ++++++-----
->  arch/arm/mach-pxa/time.c              |   10 +---------
->  arch/arm/mach-sa1100/time.c           |    8 +-------
->  arch/arm/plat-nomadik/timer.c         |    9 +--------
->  5 files changed, 15 insertions(+), 43 deletions(-)
-
+diff --git a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
+index ebc85c6..fd672f3 100644
+--- a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
++++ b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
+@@ -406,31 +406,31 @@
+ #define S3C2443_GPE5_SD1_CLK   (0x02 << 10)
+ #define S3C2400_GPE5_EINT5     (0x02 << 10)
+ #define S3C2400_GPE5_TCLK1     (0x03 << 10)
++#define S3C2443_GPE5_AC_BITCLK (0x03 << 10)
+ 
+ #define S3C2410_GPE6_SDCMD     (0x02 << 12)
+ #define S3C2443_GPE6_SD1_CMD   (0x02 << 12)
+-#define S3C2443_GPE6_AC_BITCLK (0x03 << 12)
++#define S3C2443_GPE6_AC_SDI    (0x03 << 12)
+ #define S3C2400_GPE6_EINT6     (0x02 << 12)
+ 
+ #define S3C2410_GPE7_SDDAT0    (0x02 << 14)
+ #define S3C2443_GPE5_SD1_DAT0  (0x02 << 14)
+-#define S3C2443_GPE7_AC_SDI    (0x03 << 14)
++#define S3C2443_GPE7_AC_SDO    (0x03 << 14)
+ #define S3C2400_GPE7_EINT7     (0x02 << 14)
+ 
+ #define S3C2410_GPE8_SDDAT1    (0x02 << 16)
+ #define S3C2443_GPE8_SD1_DAT1  (0x02 << 16)
+-#define S3C2443_GPE8_AC_SDO    (0x03 << 16)
++#define S3C2443_GPE8_AC_SYNC   (0x03 << 16)
+ #define S3C2400_GPE8_nXDACK0   (0x02 << 16)
+ 
+ #define S3C2410_GPE9_SDDAT2    (0x02 << 18)
+ #define S3C2443_GPE9_SD1_DAT2  (0x02 << 18)
+-#define S3C2443_GPE9_AC_SYNC   (0x03 << 18)
++#define S3C2443_GPE9_AC_nRESET (0x03 << 18)
+ #define S3C2400_GPE9_nXDACK1   (0x02 << 18)
+ #define S3C2400_GPE9_nXBACK    (0x03 << 18)
+ 
+ #define S3C2410_GPE10_SDDAT3   (0x02 << 20)
+ #define S3C2443_GPE10_SD1_DAT3 (0x02 << 20)
+-#define S3C2443_GPE10_AC_nRESET (0x03 << 20)
+ #define S3C2400_GPE10_nXDREQ0  (0x02 << 20)
+ 
+ #define S3C2410_GPE11_SPIMISO0 (0x02 << 22)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.6.1
