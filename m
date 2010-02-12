@@ -1,90 +1,35 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Feb 2010 21:06:09 +0100
-Subject: [PATCH 07/14] ARM: LPC32XX: Misc support functions
-In-Reply-To: <1265674295-23996-8-git-send-email-wellsk40@gmail.com>
+Date: Fri, 12 Feb 2010 21:08:14 +0100
+Subject: [PATCH 08/14] ARM: LPC32XX: Phytec 3250 platform support
+In-Reply-To: <1265674295-23996-9-git-send-email-wellsk40@gmail.com>
 References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-8-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100212200609.GA947@pengutronix.de>
+	<1265674295-23996-9-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100212200813.GB947@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-> +/*
-> + * Detects and returns IRAM size for the device variation
-> + */
-> +#define LPC32XX_IRAM_BANK_SIZE (128 * SZ_1K)
-SZ_128K ?
-
-> +static u32 iram_size;
-> +u32 lpc32xx_return_iram_size(void)
-> +{
-> +	if (iram_size == 0) {
-> +		u32 savedval;
-> +		void __iomem *iramptr1, *iramptr2;
-> +
-> +		iramptr1 = io_p2v(LPC32XX_IRAM_BASE);
-> +		iramptr2 = io_p2v(LPC32XX_IRAM_BASE + LPC32XX_IRAM_BANK_SIZE);
-> +		savedval = __raw_readl(iramptr2);
-> +
-> +		__raw_writel(savedval + 1, iramptr2);
-> +
-> +		/*
-> +		 * If IRAM size is 128K, the value at iramptr2 will wrap back
-> +		 * into iramptr1
-> +		 */
-> +		if (__raw_readl(iramptr1) == __raw_readl(iramptr2))
-> +			iram_size = LPC32XX_IRAM_BANK_SIZE;
-> +		else
-> +			iram_size = LPC32XX_IRAM_BANK_SIZE * 2;
-> +
-> +		__raw_writel(savedval, iramptr2);
-> +	}
-> +
-> +	return iram_size;
-> +}
-I didn't understand this.  The size of IRAM is either 128KiB or 256KiB,
-right.  And if it's 128KiB it's mirrored.
-
-So if the content of a 256KiB IRAM happens to be
-
-	00000:  00000001 ....
-	...
-	20000:  00000000 ....
-
-the above code does
-
-	savedval = 8
-	IRAM[20000] = 1
-	iram_size = LPC32XX_IRAM_BANK_SIZE;
-
-IMHO you should do:
-
-	savedval1 = __raw_readl(iramptr1);
-	savedval2 = __raw_readl(iramptr2);
-
-	if (savedval1 == savedval2) {
-		__raw_writel(savedval2 + 1, iramptr2);
-		if (__raw_readl(iramptr1) == savedval2 + 1)
-			iram_size = LPC32XX_IRAM_BANK_SIZE;
-		else
-			iram_size = 2 * LPC32XX_IRAM_BANK_SIZE;
-		__raw_writel(savedval2, iramptr2);
-	} else
-		iram_size = 2 * LPC32XX_IRAM_BANK_SIZE;
-
-> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+On Mon, Feb 08, 2010 at 04:11:29PM -0800, wellsk40 at gmail.com wrote:
+> From: Kevin Wells <wellsk40@gmail.com>
+> 
+> Platform support file for the PHY3250 mach id
+> 
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+> ---
+>  arch/arm/mach-lpc32xx/phy3250.c |  385 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 385 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
 > new file mode 100644
-> index 0000000..8161efe
+> index 0000000..62bdb62
 > --- /dev/null
-> +++ b/arch/arm/mach-lpc32xx/common.h
-> @@ -0,0 +1,75 @@
+> +++ b/arch/arm/mach-lpc32xx/phy3250.c
+> @@ -0,0 +1,385 @@
 > +/*
-> + * arch/arm/mach-lpc32xx/common.h
+> + * arch/arm/mach-lpc32xx/phy3250.c
 > + *
 > + * Author: Kevin Wells <kevin.wells@nxp.com>
 > + *
-> + * Copyright (C) 2009-2010 NXP Semiconductors
+> + * Copyright (C) 2010 NXP Semiconductors
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License as published by
@@ -97,75 +42,375 @@ IMHO you should do:
 > + * GNU General Public License for more details.
 > + */
 > +
-> +#ifndef __LPC32XX_COMMON_H
-> +#define __LPC32XX_COMMON_H
-> +
+> +#include <linux/init.h>
 > +#include <linux/platform_device.h>
+> +#include <linux/sysdev.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/device.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/eeprom.h>
+> +#include <linux/leds.h>
+> +#include <linux/gpio.h>
+> +#include <linux/amba/bus.h>
+> +#include <linux/amba/clcd.h>
+> +#include <linux/amba/pl022.h>
+> +
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/platform.h>
+> +#include <mach/board.h>
+> +#include "common.h"
 > +
 > +/*
-> + * Arch specific platform device structures
+> + * Mapped GPIOLIB GPIOs
 > + */
-> +extern struct platform_device watchdog_device;
-lpc32xx_watchdoc_device?
+> +#define SPI0_CS_GPIO	LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
+> +#define LCD_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
+> +#define BKL_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
+> +#define LED_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 1)
+> +
+> +/*
+> + * AMBA LCD controller
+> + */
+> +static struct clcd_panel conn_lcd_panel = {
+> +	.mode		= {
+> +		.name		= "QVGA portrait",
+> +		.refresh	= 60,
+> +		.xres		= 240,
+> +		.yres		= 320,
+> +		.pixclock	= 191828,
+> +		.left_margin	= 22,
+> +		.right_margin	= 11,
+> +		.upper_margin	= 2,
+> +		.lower_margin	= 1,
+> +		.hsync_len	= 5,
+> +		.vsync_len	= 2,
+> +		.sync		= 0,
+> +		.vmode		= FB_VMODE_NONINTERLACED,
+> +	},
+> +	.width		= -1,
+> +	.height		= -1,
+> +	.tim2		= (TIM2_IVS | TIM2_IHS),
+> +	.cntl		= (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
+> +				CNTL_LCDBPP16_565),
+> +	.bpp		= 16,
+> +};
+> +#define PANEL_SIZE (3 * SZ_64K)
+> +
+> +static int lpc32xx_clcd_setup(struct clcd_fb *fb)
+> +{
+> +	dma_addr_t dma;
+> +
+> +	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
+> +		PANEL_SIZE, &dma, GFP_KERNEL);
+> +	if (!fb->fb.screen_base) {
+> +		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	fb->fb.fix.smem_start = dma;
+> +	fb->fb.fix.smem_len = PANEL_SIZE;
+> +	fb->panel = &conn_lcd_panel;
+> +
+> +	gpio_request(LCD_POWER_GPIO, "LCD power");
+> +	gpio_direction_output(LCD_POWER_GPIO, 1);
+> +	gpio_request(BKL_POWER_GPIO, "LCD backlight power");
+> +	gpio_direction_output(BKL_POWER_GPIO, 1);
+I'd check the return values of the gpio_... functions.
 
-> +extern struct platform_device i2c0_device;
-> +extern struct platform_device i2c1_device;
-> +extern struct platform_device i2c2_device;
-I prefer using functions to add these devices because then it's easier
-to add support for now SoCs that happen to have the watchdog at a
-different address.  Then you can just do:
-
-	static struct resource watchdog_resources[] __initdata = {
-		{
-			.flags = ...;
-		},
-	};
-	int __init lpc32xx_add_watchdog(void)
-	{
-		if (cpu_is_lpc3212()) {
-			watchdog_resources[0].start = LPC3212_WATCHDOG_BASE;
-		} else if (cpu_is_lpc3214()) {
-			watchdog_resources[0].start = LPC3214_WATCHDOG_BASE;
-		} else
-			return -ENODEV;
-
-		watchdog_resources[0].end = watchdog_resources[0].start + SZ_4K;
-
-		....
-
-	}
-
-or something similar.  Another variation is:
-
-	static struct resource watchdog_resources[] __initdata = {
-		...
-	}
-
-	int __init lpc32xx_add_watchdog(sometype baseaddr)
-	{
-		watchdog_resources[0].start = base;
-		...
-	}
-
-and then in a header do:
-
-	#define lpc3212_add_watchdog() lpc32xx_add_watchdog(LPC3212_WATCHDOG_BASE)
-	#define lpc3214_add_watchdog() lpc32xx_add_watchdog(LPC3214_WATCHDOG_BASE)
-
-or provide an inline function.
-
-When providing platform_devices as in your patch you have to do:
-
-	extern struct platform_device lpc3212_watchdog_device;
-	extern struct platform_device lpc3214_watchdog_device;
-
-and at least in a kernel that supports both SoCs one or the other only
-sits in RAM doing nothing.
-
-But YMMV.
-
-Best regards
-Uwe
+> +
+> +	return 0;
+> +}
+> +
+> +static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
+> +{
+> +	return dma_mmap_writecombine(&fb->dev->dev, vma,
+> +		fb->fb.screen_base, fb->fb.fix.smem_start,
+> +		fb->fb.fix.smem_len);
+> +}
+> +
+> +static void lpc32xx_clcd_remove(struct clcd_fb *fb)
+> +{
+> +	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
+> +		fb->fb.screen_base, fb->fb.fix.smem_start);
+> +}
+> +
+> +/*
+> + * On some early LCD modules (1307.0), the backlight logic is inverted.
+> + * For those board variants, swap the disable and enable states for
+> + * BKL_POWER_GPIO.
+> +*/
+> +static void clcd_disable(struct clcd_fb *fb)
+> +{
+> +	gpio_set_value(BKL_POWER_GPIO, 0);
+> +	gpio_set_value(LCD_POWER_GPIO, 0);
+> +}
+> +
+> +static void clcd_enable(struct clcd_fb *fb)
+> +{
+> +	gpio_set_value(BKL_POWER_GPIO, 1);
+> +	gpio_set_value(LCD_POWER_GPIO, 1);
+> +}
+> +
+> +static struct clcd_board lpc32xx_clcd_data = {
+> +	.name		= "Phytec LCD",
+> +	.check		= clcdfb_check,
+> +	.decode		= clcdfb_decode,
+> +	.disable	= clcd_disable,
+> +	.enable		= clcd_enable,
+> +	.setup		= lpc32xx_clcd_setup,
+> +	.mmap		= lpc32xx_clcd_mmap,
+> +	.remove		= lpc32xx_clcd_remove,
+> +};
+> +
+> +static struct amba_device clcd_device = {
+> +	.dev				= {
+> +		.coherent_dma_mask	= ~0,
+> +		.init_name		= "dev:clcd",
+> +		.platform_data		= &lpc32xx_clcd_data,
+> +	},
+> +	.res				= {
+> +		.start			= LPC32XX_LCD_BASE,
+> +		.end			= (LPC32XX_LCD_BASE + SZ_4K - 1),
+> +		.flags			= IORESOURCE_MEM,
+> +	},
+> +	.dma_mask			= ~0,
+> +	.irq				= {IRQ_LPC32XX_LCD, NO_IRQ},
+> +};
+> +
+> +/*
+> + * AMBA SSP (SPI)
+> + */
+> +static void phy3250_spi_cs_set(u32 control)
+> +{
+> +	gpio_set_value(SPI0_CS_GPIO, (int) control);
+> +}
+> +
+> +static struct pl022_config_chip spi0_chip_info = {
+> +	.lbm			= LOOPBACK_DISABLED,
+> +	.com_mode		= INTERRUPT_TRANSFER,
+> +	.iface			= SSP_INTERFACE_MOTOROLA_SPI,
+> +	.hierarchy		= SSP_MASTER,
+> +	.slave_tx_disable	= 0,
+> +	.endian_tx		= SSP_TX_LSB,
+> +	.endian_rx		= SSP_RX_LSB,
+> +	.data_size		= SSP_DATA_BITS_8,
+> +	.rx_lev_trig		= SSP_RX_4_OR_MORE_ELEM,
+> +	.tx_lev_trig		= SSP_TX_4_OR_MORE_EMPTY_LOC,
+> +	.clk_phase		= SSP_CLK_FIRST_EDGE,
+> +	.clk_pol		= SSP_CLK_POL_IDLE_LOW,
+> +	.ctrl_len		= SSP_BITS_8,
+> +	.wait_state		= SSP_MWIRE_WAIT_ZERO,
+> +	.duplex			= SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
+> +	.cs_control		= phy3250_spi_cs_set,
+> +};
+> +
+> +static struct pl022_ssp_controller lpc32xx_ssp0_data = {
+> +	.bus_id			= 0,
+> +	.num_chipselect		= 1,
+> +	.enable_dma		= 0,
+> +};
+> +
+> +static struct amba_device ssp0_device = {
+> +	.dev				= {
+> +		.coherent_dma_mask	= ~0,
+> +		.init_name		= "dev:ssp0",
+> +		.platform_data		= &lpc32xx_ssp0_data,
+> +	},
+> +	.res				= {
+> +		.start			= LPC32XX_SSP0_BASE,
+> +		.end			= (LPC32XX_SSP0_BASE + SZ_4K - 1),
+> +		.flags			= IORESOURCE_MEM,
+> +	},
+> +	.dma_mask			= ~0,
+> +	.irq				= {IRQ_LPC32XX_SSP0, NO_IRQ},
+> +};
+> +
+> +/* AT25 driver registration */
+> +static int __init phy3250_spi_board_register(void)
+> +{
+> +#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
+> +	static struct spi_board_info info[] = {
+> +		{
+> +			.modalias = "spidev",
+> +			.max_speed_hz = 5000000,
+> +			.bus_num = 0,
+> +			.chip_select = 0,
+> +			.controller_data = &spi0_chip_info,
+> +		},
+> +	};
+> +
+> +#else
+> +	static struct spi_eeprom eeprom = {
+> +		.name = "at25256a",
+> +		.byte_len = 0x8000,
+> +		.page_size = 64,
+> +		.flags = EE_ADDR2,
+> +	};
+> +
+> +	static struct spi_board_info info[] = {
+> +		{
+> +			.modalias = "at25",
+> +			.max_speed_hz = 5000000,
+> +			.bus_num = 0,
+> +			.chip_select = 0,
+> +			.platform_data = &eeprom,
+> +			.controller_data = &spi0_chip_info,
+> +		},
+> +	};
+> +#endif
+> +	return spi_register_board_info(info, ARRAY_SIZE(info));
+> +}
+> +arch_initcall(phy3250_spi_board_register);
+> +
+> +static struct i2c_board_info __initdata phy3250_i2c_board_info[] = {
+> +	{
+> +		I2C_BOARD_INFO("pcf8563", 0x51),
+> +	},
+> +};
+> +
+> +static struct gpio_led phy_leds[] = {
+> +	{
+> +		.name			= "led0",
+> +		.gpio			= LED_GPIO,
+> +		.active_low		= 1,
+> +		.default_trigger	= "heartbeat",
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data led_data = {
+> +	.leds = phy_leds,
+> +	.num_leds = ARRAY_SIZE(phy_leds),
+> +};
+> +
+> +static struct platform_device lpc32xx_gpio_led_device = {
+> +	.name			= "leds-gpio",
+> +	.id			= -1,
+> +	.dev.platform_data	= &led_data,
+> +};
+> +
+> +static struct platform_device *phy3250_devs[] __initdata = {
+> +	&i2c0_device,
+> +	&i2c1_device,
+> +	&i2c2_device,
+> +	&watchdog_device,
+> +	&lpc32xx_gpio_led_device,
+> +};
+> +
+> +static struct amba_device *amba_devs[] __initdata = {
+> +	&clcd_device,
+> +	&ssp0_device,
+> +};
+> +
+> +/*
+> + * Board specific functions
+> + */
+> +static void __init phy3250_board_init(void)
+> +{
+> +	u32 tmp;
+> +	int i;
+> +
+> +	lpc32xx_gpio_init();
+> +
+> +	/* Register GPIOs used on this board */
+> +	gpio_request(SPI0_CS_GPIO, "spi0 cs");
+> +	gpio_direction_output(SPI0_CS_GPIO, 1);
+> +
+> +	/* Setup network interface for RMII mode */
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_MACCLK_CTRL);
+> +	tmp &= ~LPC32XX_CLKPWR_MACCTRL_PINS_MSK;
+> +	tmp |= LPC32XX_CLKPWR_MACCTRL_USE_RMII_PINS;
+> +	__raw_writel(tmp, LPC32XX_CLKPWR_MACCLK_CTRL);
+> +
+> +	/* Setup SLC NAND controller muxing */
+> +	__raw_writel(LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
+> +		LPC32XX_CLKPWR_NAND_CLK_CTRL);
+> +
+> +	/* Setup LCD muxing to RGB565 */
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
+> +		~(LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_MSK |
+> +		LPC32XX_CLKPWR_LCDCTRL_PSCALE_MSK);
+> +	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
+> +	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
+> +
+> +	/* Set up I2C pull levels */
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
+> +	tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE |
+> +		LPC32XX_CLKPWR_I2CCLK_I2C2HI_DRIVE;
+> +	__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
+> +
+> +	/* Disable IrDA pulsing support on UART6 */
+> +	tmp = __raw_readl(LPC32XX_UARTCTL_CTRL);
+> +	tmp |= LPC32XX_UART_UART6_IRDAMOD_BYPASS;
+> +	__raw_writel(tmp, LPC32XX_UARTCTL_CTRL);
+> +
+> +	/* Enable DMA for I2S1 channel */
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_I2S_CLK_CTRL);
+> +	tmp = LPC32XX_CLKPWR_I2SCTRL_I2S1_USE_DMA;
+> +	__raw_writel(tmp, LPC32XX_CLKPWR_I2S_CLK_CTRL);
+> +
+> +	lpc32xx_serial_init();
+> +
+> +	/*
+> +	 * AMBA peripheral clocks need to be enabled prior to AMBA device
+> +	 * detection or a data fault will occur, so enable the clocks
+> +	 * here. However, we don't want to enable them if the peripheral
+> +	 * isn't included in the image
+> +	 */
+> +#ifdef CONFIG_FB_ARMCLCD
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
+> +	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
+> +		LPC32XX_CLKPWR_LCDCLK_CTRL);
+> +#endif
+> +#ifdef CONFIG_SPI_PL022
+> +	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
+> +	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
+> +		LPC32XX_CLKPWR_SSP_CLK_CTRL);
+> +#endif
+> +
+> +	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
+> +	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+> +		struct amba_device *d = amba_devs[i];
+> +		amba_device_register(d, &iomem_resource);
+> +	}
+> +
+> +	/* Test clock needed for UDA1380 initial init */
+> +	__raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC |
+> +		LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN,
+> +		LPC32XX_CLKPWR_TEST_CLK_SEL);
+> +
+> +	i2c_register_board_info(0, phy3250_i2c_board_info,
+> +		ARRAY_SIZE(phy3250_i2c_board_info));
+> +}
+> +
+> +static int __init lpc32xx_display_uid(void)
+> +{
+> +	u32 uid[4];
+> +
+> +	lpc32xx_get_uid(uid);
+> +
+> +	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
+> +		uid[3], uid[2], uid[1], uid[0]);
+> +
+> +	return 1;
+> +}
+> +arch_initcall(lpc32xx_display_uid);
+> +
+> +MACHINE_START(PHY3250, "Phytec 3250 board with the LPC3250 Microcontroller")
+> +	/* Maintainer: Kevin Wells, NXP Semiconductors */
+> +	.phys_io	= LPC32XX_UART5_BASE,
+> +	.io_pg_offst	= ((IO_ADDRESS(LPC32XX_UART5_BASE))>>18) & 0xfffc,
+> +	.boot_params	= 0x80000100,
+> +	.map_io		= lpc32xx_map_io,
+> +	.init_irq	= lpc32xx_init_irq,
+> +	.timer		= &lpc32xx_timer,
+> +	.init_machine	= phy3250_board_init,
+> +MACHINE_END
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
