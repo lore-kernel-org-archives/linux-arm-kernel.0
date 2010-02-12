@@ -1,417 +1,167 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Feb 2010 21:08:14 +0100
-Subject: [PATCH 08/14] ARM: LPC32XX: Phytec 3250 platform support
-In-Reply-To: <1265674295-23996-9-git-send-email-wellsk40@gmail.com>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-9-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100212200813.GB947@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 12 Feb 2010 21:52:22 +0100
+Subject: [PATCH 2/2] [U300] Fix the DMA configuration
+Message-ID: <1266007942-29399-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 08, 2010 at 04:11:29PM -0800, wellsk40 at gmail.com wrote:
-> From: Kevin Wells <wellsk40@gmail.com>
-> 
-> Platform support file for the PHY3250 mach id
-> 
-> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
-> ---
->  arch/arm/mach-lpc32xx/phy3250.c |  385 +++++++++++++++++++++++++++++++++++++++
->  1 files changed, 385 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-> new file mode 100644
-> index 0000000..62bdb62
-> --- /dev/null
-> +++ b/arch/arm/mach-lpc32xx/phy3250.c
-> @@ -0,0 +1,385 @@
-> +/*
-> + * arch/arm/mach-lpc32xx/phy3250.c
-> + *
-> + * Author: Kevin Wells <kevin.wells@nxp.com>
-> + *
-> + * Copyright (C) 2010 NXP Semiconductors
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/device.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/spi/eeprom.h>
-> +#include <linux/leds.h>
-> +#include <linux/gpio.h>
-> +#include <linux/amba/bus.h>
-> +#include <linux/amba/clcd.h>
-> +#include <linux/amba/pl022.h>
-> +
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/platform.h>
-> +#include <mach/board.h>
-> +#include "common.h"
-> +
-> +/*
-> + * Mapped GPIOLIB GPIOs
-> + */
-> +#define SPI0_CS_GPIO	LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
-> +#define LCD_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
-> +#define BKL_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
-> +#define LED_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 1)
-> +
-> +/*
-> + * AMBA LCD controller
-> + */
-> +static struct clcd_panel conn_lcd_panel = {
-> +	.mode		= {
-> +		.name		= "QVGA portrait",
-> +		.refresh	= 60,
-> +		.xres		= 240,
-> +		.yres		= 320,
-> +		.pixclock	= 191828,
-> +		.left_margin	= 22,
-> +		.right_margin	= 11,
-> +		.upper_margin	= 2,
-> +		.lower_margin	= 1,
-> +		.hsync_len	= 5,
-> +		.vsync_len	= 2,
-> +		.sync		= 0,
-> +		.vmode		= FB_VMODE_NONINTERLACED,
-> +	},
-> +	.width		= -1,
-> +	.height		= -1,
-> +	.tim2		= (TIM2_IVS | TIM2_IHS),
-> +	.cntl		= (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
-> +				CNTL_LCDBPP16_565),
-> +	.bpp		= 16,
-> +};
-> +#define PANEL_SIZE (3 * SZ_64K)
-> +
-> +static int lpc32xx_clcd_setup(struct clcd_fb *fb)
-> +{
-> +	dma_addr_t dma;
-> +
-> +	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
-> +		PANEL_SIZE, &dma, GFP_KERNEL);
-> +	if (!fb->fb.screen_base) {
-> +		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	fb->fb.fix.smem_start = dma;
-> +	fb->fb.fix.smem_len = PANEL_SIZE;
-> +	fb->panel = &conn_lcd_panel;
-> +
-> +	gpio_request(LCD_POWER_GPIO, "LCD power");
-> +	gpio_direction_output(LCD_POWER_GPIO, 1);
-> +	gpio_request(BKL_POWER_GPIO, "LCD backlight power");
-> +	gpio_direction_output(BKL_POWER_GPIO, 1);
-I'd check the return values of the gpio_... functions.
+This fixes a few bugs in the DMA configuration for the COH 901 318
+DMA engine used in U300. It also removes the directional parameter
+for each channel: separate DMA engine patches (submitted to the
+DMA engine maintainer) switches that mechanism over to using
+dynamic configuration of this, to handle bidirectional DMA
+channels.
 
-> +
-> +	return 0;
-> +}
-> +
-> +static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-> +{
-> +	return dma_mmap_writecombine(&fb->dev->dev, vma,
-> +		fb->fb.screen_base, fb->fb.fix.smem_start,
-> +		fb->fb.fix.smem_len);
-> +}
-> +
-> +static void lpc32xx_clcd_remove(struct clcd_fb *fb)
-> +{
-> +	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
-> +		fb->fb.screen_base, fb->fb.fix.smem_start);
-> +}
-> +
-> +/*
-> + * On some early LCD modules (1307.0), the backlight logic is inverted.
-> + * For those board variants, swap the disable and enable states for
-> + * BKL_POWER_GPIO.
-> +*/
-> +static void clcd_disable(struct clcd_fb *fb)
-> +{
-> +	gpio_set_value(BKL_POWER_GPIO, 0);
-> +	gpio_set_value(LCD_POWER_GPIO, 0);
-> +}
-> +
-> +static void clcd_enable(struct clcd_fb *fb)
-> +{
-> +	gpio_set_value(BKL_POWER_GPIO, 1);
-> +	gpio_set_value(LCD_POWER_GPIO, 1);
-> +}
-> +
-> +static struct clcd_board lpc32xx_clcd_data = {
-> +	.name		= "Phytec LCD",
-> +	.check		= clcdfb_check,
-> +	.decode		= clcdfb_decode,
-> +	.disable	= clcd_disable,
-> +	.enable		= clcd_enable,
-> +	.setup		= lpc32xx_clcd_setup,
-> +	.mmap		= lpc32xx_clcd_mmap,
-> +	.remove		= lpc32xx_clcd_remove,
-> +};
-> +
-> +static struct amba_device clcd_device = {
-> +	.dev				= {
-> +		.coherent_dma_mask	= ~0,
-> +		.init_name		= "dev:clcd",
-> +		.platform_data		= &lpc32xx_clcd_data,
-> +	},
-> +	.res				= {
-> +		.start			= LPC32XX_LCD_BASE,
-> +		.end			= (LPC32XX_LCD_BASE + SZ_4K - 1),
-> +		.flags			= IORESOURCE_MEM,
-> +	},
-> +	.dma_mask			= ~0,
-> +	.irq				= {IRQ_LPC32XX_LCD, NO_IRQ},
-> +};
-> +
-> +/*
-> + * AMBA SSP (SPI)
-> + */
-> +static void phy3250_spi_cs_set(u32 control)
-> +{
-> +	gpio_set_value(SPI0_CS_GPIO, (int) control);
-> +}
-> +
-> +static struct pl022_config_chip spi0_chip_info = {
-> +	.lbm			= LOOPBACK_DISABLED,
-> +	.com_mode		= INTERRUPT_TRANSFER,
-> +	.iface			= SSP_INTERFACE_MOTOROLA_SPI,
-> +	.hierarchy		= SSP_MASTER,
-> +	.slave_tx_disable	= 0,
-> +	.endian_tx		= SSP_TX_LSB,
-> +	.endian_rx		= SSP_RX_LSB,
-> +	.data_size		= SSP_DATA_BITS_8,
-> +	.rx_lev_trig		= SSP_RX_4_OR_MORE_ELEM,
-> +	.tx_lev_trig		= SSP_TX_4_OR_MORE_EMPTY_LOC,
-> +	.clk_phase		= SSP_CLK_FIRST_EDGE,
-> +	.clk_pol		= SSP_CLK_POL_IDLE_LOW,
-> +	.ctrl_len		= SSP_BITS_8,
-> +	.wait_state		= SSP_MWIRE_WAIT_ZERO,
-> +	.duplex			= SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
-> +	.cs_control		= phy3250_spi_cs_set,
-> +};
-> +
-> +static struct pl022_ssp_controller lpc32xx_ssp0_data = {
-> +	.bus_id			= 0,
-> +	.num_chipselect		= 1,
-> +	.enable_dma		= 0,
-> +};
-> +
-> +static struct amba_device ssp0_device = {
-> +	.dev				= {
-> +		.coherent_dma_mask	= ~0,
-> +		.init_name		= "dev:ssp0",
-> +		.platform_data		= &lpc32xx_ssp0_data,
-> +	},
-> +	.res				= {
-> +		.start			= LPC32XX_SSP0_BASE,
-> +		.end			= (LPC32XX_SSP0_BASE + SZ_4K - 1),
-> +		.flags			= IORESOURCE_MEM,
-> +	},
-> +	.dma_mask			= ~0,
-> +	.irq				= {IRQ_LPC32XX_SSP0, NO_IRQ},
-> +};
-> +
-> +/* AT25 driver registration */
-> +static int __init phy3250_spi_board_register(void)
-> +{
-> +#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
-> +	static struct spi_board_info info[] = {
-> +		{
-> +			.modalias = "spidev",
-> +			.max_speed_hz = 5000000,
-> +			.bus_num = 0,
-> +			.chip_select = 0,
-> +			.controller_data = &spi0_chip_info,
-> +		},
-> +	};
-> +
-> +#else
-> +	static struct spi_eeprom eeprom = {
-> +		.name = "at25256a",
-> +		.byte_len = 0x8000,
-> +		.page_size = 64,
-> +		.flags = EE_ADDR2,
-> +	};
-> +
-> +	static struct spi_board_info info[] = {
-> +		{
-> +			.modalias = "at25",
-> +			.max_speed_hz = 5000000,
-> +			.bus_num = 0,
-> +			.chip_select = 0,
-> +			.platform_data = &eeprom,
-> +			.controller_data = &spi0_chip_info,
-> +		},
-> +	};
-> +#endif
-> +	return spi_register_board_info(info, ARRAY_SIZE(info));
-> +}
-> +arch_initcall(phy3250_spi_board_register);
-> +
-> +static struct i2c_board_info __initdata phy3250_i2c_board_info[] = {
-> +	{
-> +		I2C_BOARD_INFO("pcf8563", 0x51),
-> +	},
-> +};
-> +
-> +static struct gpio_led phy_leds[] = {
-> +	{
-> +		.name			= "led0",
-> +		.gpio			= LED_GPIO,
-> +		.active_low		= 1,
-> +		.default_trigger	= "heartbeat",
-> +	},
-> +};
-> +
-> +static struct gpio_led_platform_data led_data = {
-> +	.leds = phy_leds,
-> +	.num_leds = ARRAY_SIZE(phy_leds),
-> +};
-> +
-> +static struct platform_device lpc32xx_gpio_led_device = {
-> +	.name			= "leds-gpio",
-> +	.id			= -1,
-> +	.dev.platform_data	= &led_data,
-> +};
-> +
-> +static struct platform_device *phy3250_devs[] __initdata = {
-> +	&i2c0_device,
-> +	&i2c1_device,
-> +	&i2c2_device,
-> +	&watchdog_device,
-> +	&lpc32xx_gpio_led_device,
-> +};
-> +
-> +static struct amba_device *amba_devs[] __initdata = {
-> +	&clcd_device,
-> +	&ssp0_device,
-> +};
-> +
-> +/*
-> + * Board specific functions
-> + */
-> +static void __init phy3250_board_init(void)
-> +{
-> +	u32 tmp;
-> +	int i;
-> +
-> +	lpc32xx_gpio_init();
-> +
-> +	/* Register GPIOs used on this board */
-> +	gpio_request(SPI0_CS_GPIO, "spi0 cs");
-> +	gpio_direction_output(SPI0_CS_GPIO, 1);
-> +
-> +	/* Setup network interface for RMII mode */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_MACCLK_CTRL);
-> +	tmp &= ~LPC32XX_CLKPWR_MACCTRL_PINS_MSK;
-> +	tmp |= LPC32XX_CLKPWR_MACCTRL_USE_RMII_PINS;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_MACCLK_CTRL);
-> +
-> +	/* Setup SLC NAND controller muxing */
-> +	__raw_writel(LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
-> +		LPC32XX_CLKPWR_NAND_CLK_CTRL);
-> +
-> +	/* Setup LCD muxing to RGB565 */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
-> +		~(LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_MSK |
-> +		LPC32XX_CLKPWR_LCDCTRL_PSCALE_MSK);
-> +	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
-> +
-> +	/* Set up I2C pull levels */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
-> +	tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE |
-> +		LPC32XX_CLKPWR_I2CCLK_I2C2HI_DRIVE;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
-> +
-> +	/* Disable IrDA pulsing support on UART6 */
-> +	tmp = __raw_readl(LPC32XX_UARTCTL_CTRL);
-> +	tmp |= LPC32XX_UART_UART6_IRDAMOD_BYPASS;
-> +	__raw_writel(tmp, LPC32XX_UARTCTL_CTRL);
-> +
-> +	/* Enable DMA for I2S1 channel */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_I2S_CLK_CTRL);
-> +	tmp = LPC32XX_CLKPWR_I2SCTRL_I2S1_USE_DMA;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_I2S_CLK_CTRL);
-> +
-> +	lpc32xx_serial_init();
-> +
-> +	/*
-> +	 * AMBA peripheral clocks need to be enabled prior to AMBA device
-> +	 * detection or a data fault will occur, so enable the clocks
-> +	 * here. However, we don't want to enable them if the peripheral
-> +	 * isn't included in the image
-> +	 */
-> +#ifdef CONFIG_FB_ARMCLCD
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
-> +	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
-> +		LPC32XX_CLKPWR_LCDCLK_CTRL);
-> +#endif
-> +#ifdef CONFIG_SPI_PL022
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
-> +	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
-> +		LPC32XX_CLKPWR_SSP_CLK_CTRL);
-> +#endif
-> +
-> +	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
-> +	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-> +		struct amba_device *d = amba_devs[i];
-> +		amba_device_register(d, &iomem_resource);
-> +	}
-> +
-> +	/* Test clock needed for UDA1380 initial init */
-> +	__raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC |
-> +		LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN,
-> +		LPC32XX_CLKPWR_TEST_CLK_SEL);
-> +
-> +	i2c_register_board_info(0, phy3250_i2c_board_info,
-> +		ARRAY_SIZE(phy3250_i2c_board_info));
-> +}
-> +
-> +static int __init lpc32xx_display_uid(void)
-> +{
-> +	u32 uid[4];
-> +
-> +	lpc32xx_get_uid(uid);
-> +
-> +	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
-> +		uid[3], uid[2], uid[1], uid[0]);
-> +
-> +	return 1;
-> +}
-> +arch_initcall(lpc32xx_display_uid);
-> +
-> +MACHINE_START(PHY3250, "Phytec 3250 board with the LPC3250 Microcontroller")
-> +	/* Maintainer: Kevin Wells, NXP Semiconductors */
-> +	.phys_io	= LPC32XX_UART5_BASE,
-> +	.io_pg_offst	= ((IO_ADDRESS(LPC32XX_UART5_BASE))>>18) & 0xfffc,
-> +	.boot_params	= 0x80000100,
-> +	.map_io		= lpc32xx_map_io,
-> +	.init_irq	= lpc32xx_init_irq,
-> +	.timer		= &lpc32xx_timer,
-> +	.init_machine	= phy3250_board_init,
-> +MACHINE_END
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+---
+ arch/arm/mach-u300/core.c |   22 ++++------------------
+ 1 files changed, 4 insertions(+), 18 deletions(-)
 
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index 6869052..01b5031 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -475,7 +475,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 1 * 0x40 + 0x20,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -528,7 +527,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 2 * 0x40 + 0x20,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -582,7 +580,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 3 * 0x40 + 0x20,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -635,7 +632,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 4 * 0x40 + 0x20,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -706,7 +702,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 1 * 0x40 + 0x220,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -746,7 +741,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 2 * 0x40 + 0x220,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -799,7 +793,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 3 * 0x40 + 0x220,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -852,7 +845,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 4 * 0x40 + 0x220,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -905,7 +897,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 5 * 0x40 + 0x220,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -964,7 +955,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr =  U300_MMCSD_BASE + 0x080,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -974,8 +964,8 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+-				COH901318_CX_CTRL_TCP_DISABLE |
+-				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+ 				COH901318_CX_CTRL_DDMA_LEGACY,
+@@ -986,7 +976,7 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+ 				COH901318_CX_CTRL_TCP_ENABLE |
+-				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+ 				COH901318_CX_CTRL_DDMA_LEGACY,
+@@ -996,7 +986,7 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+-				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TCP_DISABLE |
+ 				COH901318_CX_CTRL_TC_IRQ_ENABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+@@ -1039,7 +1029,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 1,
+ 		.dev_addr = U300_PCM_I2S0_BASE + 0x14,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -1092,7 +1081,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 1,
+ 		.dev_addr = U300_PCM_I2S0_BASE + 0x10,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -1145,7 +1133,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 1,
+ 		.dev_addr =  U300_PCM_I2S1_BASE + 0x14,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+@@ -1198,7 +1185,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 1,
+ 		.dev_addr = U300_PCM_I2S1_BASE + 0x10,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+-				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
