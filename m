@@ -1,167 +1,28 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 12 Feb 2010 21:52:22 +0100
-Subject: [PATCH 2/2] [U300] Fix the DMA configuration
-Message-ID: <1266007942-29399-1-git-send-email-linus.walleij@stericsson.com>
+From: mattias@vmlinux.org (Mattias Walstrom)
+Date: Fri, 12 Feb 2010 23:15:51 +0100
+Subject: i2c-imx: Autoprobe of eeproms
+Message-ID: <4B75D317.7040801@vmlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a few bugs in the DMA configuration for the COH 901 318
-DMA engine used in U300. It also removes the directional parameter
-for each channel: separate DMA engine patches (submitted to the
-DMA engine maintainer) switches that mechanism over to using
-dynamic configuration of this, to handle bidirectional DMA
-channels.
+I have tried to get autoprobe of eeproms to work on a custom freescale
+mx27-board, and i found out that the i2c-imx driver was missing the
+following, is there a reason for this, most other i2c-bus drivers seems
+to have it?
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
----
- arch/arm/mach-u300/core.c |   22 ++++------------------
- 1 files changed, 4 insertions(+), 18 deletions(-)
+--- linux-2.6.32.8.orig/drivers/i2c/busses/i2c-imx.c    2010-02-09
+13:57:19.000000000 +0100
++++ linux-2.6.32.8/drivers/i2c/busses/i2c-imx.c 2010-02-12
+11:30:12.000000000 +0100
+@@ -521,6 +521,7 @@
+        i2c_imx->adapter.algo           = &i2c_imx_algo;
+        i2c_imx->adapter.dev.parent     = &pdev->dev;
+        i2c_imx->adapter.nr             = pdev->id;
++        i2c_imx->adapter.class          = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+        i2c_imx->irq                    = irq;
+        i2c_imx->base                   = base;
+        i2c_imx->res                    = res;
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 6869052..01b5031 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -475,7 +475,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 1 * 0x40 + 0x20,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -528,7 +527,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 2 * 0x40 + 0x20,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -582,7 +580,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 3 * 0x40 + 0x20,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -635,7 +632,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 4 * 0x40 + 0x20,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -706,7 +702,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 1 * 0x40 + 0x220,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -746,7 +741,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 2 * 0x40 + 0x220,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -799,7 +793,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 3 * 0x40 + 0x220,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -852,7 +845,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 4 * 0x40 + 0x220,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -905,7 +897,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr = U300_MSL_BASE + 5 * 0x40 + 0x220,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -964,7 +955,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 0,
- 		.dev_addr =  U300_MMCSD_BASE + 0x080,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -974,8 +964,8 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
- 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
- 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
--				COH901318_CX_CTRL_TCP_DISABLE |
--				COH901318_CX_CTRL_TC_IRQ_DISABLE |
-+				COH901318_CX_CTRL_TCP_ENABLE |
-+				COH901318_CX_CTRL_TC_IRQ_ENABLE |
- 				COH901318_CX_CTRL_HSP_ENABLE |
- 				COH901318_CX_CTRL_HSS_DISABLE |
- 				COH901318_CX_CTRL_DDMA_LEGACY,
-@@ -986,7 +976,7 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
- 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
- 				COH901318_CX_CTRL_TCP_ENABLE |
--				COH901318_CX_CTRL_TC_IRQ_DISABLE |
-+				COH901318_CX_CTRL_TC_IRQ_ENABLE |
- 				COH901318_CX_CTRL_HSP_ENABLE |
- 				COH901318_CX_CTRL_HSS_DISABLE |
- 				COH901318_CX_CTRL_DDMA_LEGACY,
-@@ -996,7 +986,7 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
- 				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
- 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
--				COH901318_CX_CTRL_TCP_ENABLE |
-+				COH901318_CX_CTRL_TCP_DISABLE |
- 				COH901318_CX_CTRL_TC_IRQ_ENABLE |
- 				COH901318_CX_CTRL_HSP_ENABLE |
- 				COH901318_CX_CTRL_HSS_DISABLE |
-@@ -1039,7 +1029,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 1,
- 		.dev_addr = U300_PCM_I2S0_BASE + 0x14,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -1092,7 +1081,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 1,
- 		.dev_addr = U300_PCM_I2S0_BASE + 0x10,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -1145,7 +1133,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 1,
- 		.dev_addr =  U300_PCM_I2S1_BASE + 0x14,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
-@@ -1198,7 +1185,6 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
- 		.priority_high = 1,
- 		.dev_addr = U300_PCM_I2S1_BASE + 0x10,
- 		.param.config = COH901318_CX_CFG_CH_DISABLE |
--				COH901318_CX_CFG_RM_PRIMARY_TO_MEMORY |
- 				COH901318_CX_CFG_LCR_DISABLE |
- 				COH901318_CX_CFG_TC_IRQ_ENABLE |
- 				COH901318_CX_CFG_BE_IRQ_ENABLE,
--- 
-1.6.3.3
+
+Best regards
+Mattias Walstr?m
