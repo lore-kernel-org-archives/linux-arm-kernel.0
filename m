@@ -1,72 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Feb 2010 12:03:50 +0100
-Subject: [PULL REQUEST] runtime physoffset [Was: change boot requirements]
-In-Reply-To: <20100204095147.GA6562@pengutronix.de>
-References: <20100119083803.GA17904@pengutronix.de>
-	<20100122115831.GA8377@pengutronix.de>
-	<20100125173201.GA14834@pengutronix.de>
-	<4B5DF1C9.6090102@bluewatersys.com>
-	<20100130210231.GC16345@pengutronix.de>
-	<20100204095147.GA6562@pengutronix.de>
-Message-ID: <20100212110350.GB18221@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Feb 2010 11:15:58 -0000
+Subject: 11MPCore SCU performance counters in perf
+Message-ID: <000101caabd4$c0e526a0$42af73e0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi Jamie,
 
-On Thu, Feb 04, 2010 at 10:51:47AM +0100, Uwe Kleine-K?nig wrote:
-> > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
-> >   Linus Torvalds (1):
-> >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-> 
-> Can you please pull this branch for the .34 merge window?  Since the
-> last post one new patch was added to that branch.  I'll send it in reply
-> to this mail.
-Do you consider pulling?  If not, can you please say why?
+With the perf stuff now applied by Russell, I've had a go at porting the
+oprofile backend to use perf. It's working well for v6 and v7 PMUs, but to
+maintain full oprofile compatability, I need to add the following new features
+to perf:
 
-Best regards
-Uwe
+1.) Support for xscale1/xscale2 PMUs
+2.) Support for the 11MPCore SCU
 
-> The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
->   Linus Torvalds (1):
->         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-> 
-> Uwe Kleine-K?nig (10):
->       zImage: fix comments for cache_on, cache_off and cache_clean_flush
->       zImage: some comments for __armv3_mpu_cache_on
->       zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
->       zImage: annotate debug functions about corrupted registers
->       zImage: don't define unused symbol initrd_phys
->       arm: deprecate support for old way to pass kernel parameters
->       zImage: don't hard code the stack size twice
->       uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
->       Allow PHYS_OFFSET to be runtime determined
->       arm: remove bit-rotten STANDALONE_DEBUG for decompressor
-> 
->  Documentation/arm/Booting               |    1 +
->  arch/arm/Kconfig                        |    9 ++++
->  arch/arm/boot/Makefile                  |    6 ++-
->  arch/arm/boot/compressed/Makefile       |   10 ++---
->  arch/arm/boot/compressed/Makefile.debug |   23 ---------
->  arch/arm/boot/compressed/head.S         |   76 +++++++++++++++++++++++++++---
->  arch/arm/boot/compressed/misc.c         |   27 -----------
->  arch/arm/include/asm/memory.h           |    5 ++
->  arch/arm/kernel/Makefile                |    4 +-
->  arch/arm/kernel/compat.c                |    7 ---
->  arch/arm/kernel/compat.h                |    2 -
->  arch/arm/kernel/head.S                  |   31 +++++++++---
->  arch/arm/kernel/setup.c                 |   21 ++++++++-
->  13 files changed, 138 insertions(+), 84 deletions(-)
->  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
+I've done (1), but I still need to test it on some hardware. As for (2), I'm not
+sure how to proceed. The oprofile SCU driver [op_model_mpcore.c] appears only to
+support one board [the Realview EB11MP] and uses the board specific macro
+__io_address to get at the SCU. Furthermore, because oprofile expects to
+associate events with a particular core, the SCU counters are divided up between
+the cores. I think this has the potential to make profiling results quite
+misleading because some events [e.g. `A read transfer is sent to the external
+memory.'] are not tied to a core, but oprofile will be forced to choose one to
+report it on.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Looking at the oprofile userspace sources, the SCU events don't appear to be
+supported. The 11MPCore is the only ARM core to expose the SCU performance
+counters in this way and basically, I don't think it's worth supporting in the
+kernel...
+
+...however, we will almost certainly want support for `uncore' counters in the
+future [that is, counters not associated with a particular CPU]. I guess the
+question is: do I hack SCU support into perf and establish a method for
+supporting uncore counters at the same time, or shall I drop the SCU because of
+the reasons above and leave the uncore problem for another day?
+
+Please let me know what you think,
+
+Will
