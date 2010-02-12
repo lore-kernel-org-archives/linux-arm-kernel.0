@@ -1,53 +1,151 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Feb 2010 10:38:49 +0000
-Subject: [PATCH 1/5] ARM: SMDK64XX: Enable AC97 device
-Message-ID: <1265971133-17610-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Fri, 12 Feb 2010 10:38:51 +0000
+Subject: [PATCH 3/5] ARM: S3C64XX: Add AC97 platform resources
+In-Reply-To: <1265971133-17610-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1265971133-17610-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1265971133-17610-3-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Add AC97 controller to platform devices and initialize the AC97 gpios.
+This patch defines the platform device and the resources: IRQ, DMA and MEM,
+needed by the AC97 controller driver.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c6410/mach-smdk6410.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c/include/plat/audio.h |    8 +++
+ arch/arm/plat-s3c/include/plat/devs.h  |    3 +
+ arch/arm/plat-s3c64xx/dev-audio.c      |   78 ++++++++++++++++++++++++++++++++
+ 3 files changed, 89 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index eba345f..259ebbb 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -55,6 +55,7 @@
- #include <plat/gpio-cfg.h>
+diff --git a/arch/arm/plat-s3c/include/plat/audio.h b/arch/arm/plat-s3c/include/plat/audio.h
+index f22d23b..e07c941 100644
+--- a/arch/arm/plat-s3c/include/plat/audio.h
++++ b/arch/arm/plat-s3c/include/plat/audio.h
+@@ -8,6 +8,14 @@
+  * published by the Free Software Foundation.
+  */
  
- #include <plat/s3c6410.h>
-+#include <plat/audio.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-@@ -253,7 +254,9 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&smdk6410_b_pwr_5v,
- #endif
- 	&smdk6410_lcd_powerdev,
--
-+#ifdef CONFIG_SND_SOC_SMDK_WM9713
-+	&s3c64xx_device_ac97,
-+#endif
- 	&smdk6410_smsc911x,
- };
- 
-@@ -475,6 +478,10 @@ static void __init smdk6410_machine_init(void)
- 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
-+#ifdef CONFIG_SND_SOC_SMDK_WM9713
-+	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
-+#endif
++/* The machine init code calls s3c*_ac97_setup_gpio with
++ * one of these defines in order to select appropriate bank
++ * of GPIO for AC97 pins
++ */
++#define S3C64XX_AC97_GPD  0
++#define S3C64XX_AC97_GPE  1
++extern void s3c64xx_ac97_setup_gpio(int);
 +
- 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
- }
+ /**
+  * struct s3c_audio_pdata - common platform data for audio device drivers
+  * @cfg_gpio: Callback function to setup mux'ed pins in I2S/PCM/AC97 mode
+diff --git a/arch/arm/plat-s3c/include/plat/devs.h b/arch/arm/plat-s3c/include/plat/devs.h
+index c6f9b73..65317eb 100644
+--- a/arch/arm/plat-s3c/include/plat/devs.h
++++ b/arch/arm/plat-s3c/include/plat/devs.h
+@@ -35,7 +35,10 @@ extern struct platform_device s3c64xx_device_spi1;
+ extern struct platform_device s3c64xx_device_pcm0;
+ extern struct platform_device s3c64xx_device_pcm1;
  
++extern struct platform_device s3c64xx_device_ac97;
++
+ extern struct platform_device s3c_device_ts;
++
+ extern struct platform_device s3c_device_fb;
+ extern struct platform_device s3c_device_ohci;
+ extern struct platform_device s3c_device_lcd;
+diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
+index f6b7bfb..63088b7 100644
+--- a/arch/arm/plat-s3c64xx/dev-audio.c
++++ b/arch/arm/plat-s3c64xx/dev-audio.c
+@@ -11,6 +11,7 @@
+ #include <linux/kernel.h>
+ #include <linux/string.h>
+ #include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
+ 
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+@@ -254,3 +255,80 @@ struct platform_device s3c64xx_device_pcm1 = {
+ 	},
+ };
+ EXPORT_SYMBOL(s3c64xx_device_pcm1);
++
++/* AC97 Controller platform devices */
++
++static int s3c64xx_ac97_cfg_gpd(struct platform_device *pdev)
++{
++	s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C64XX_GPD0_AC97_BITCLK);
++	s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C64XX_GPD1_AC97_nRESET);
++	s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C64XX_GPD2_AC97_SYNC);
++	s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C64XX_GPD3_AC97_SDI);
++	s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C64XX_GPD4_AC97_SDO);
++
++	return 0;
++}
++
++static int s3c64xx_ac97_cfg_gpe(struct platform_device *pdev)
++{
++	s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C64XX_GPE0_AC97_BITCLK);
++	s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C64XX_GPE1_AC97_nRESET);
++	s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C64XX_GPE2_AC97_SYNC);
++	s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C64XX_GPE3_AC97_SDI);
++	s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C64XX_GPE4_AC97_SDO);
++
++	return 0;
++}
++
++static struct resource s3c64xx_ac97_resource[] = {
++	[0] = {
++		.start = S3C64XX_PA_AC97,
++		.end   = S3C64XX_PA_AC97 + 0x100 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = DMACH_AC97_PCMOUT,
++		.end   = DMACH_AC97_PCMOUT,
++		.flags = IORESOURCE_DMA,
++	},
++	[2] = {
++		.start = DMACH_AC97_PCMIN,
++		.end   = DMACH_AC97_PCMIN,
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = DMACH_AC97_MICIN,
++		.end   = DMACH_AC97_MICIN,
++		.flags = IORESOURCE_DMA,
++	},
++	[4] = {
++		.start = IRQ_AC97,
++		.end   = IRQ_AC97,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c_audio_pdata s3c_ac97_pdata;
++
++static u64 s3c64xx_ac97_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device s3c64xx_device_ac97 = {
++	.name		  = "s3c-ac97",
++	.id		  = -1,
++	.num_resources	  = ARRAY_SIZE(s3c64xx_ac97_resource),
++	.resource	  = s3c64xx_ac97_resource,
++	.dev = {
++		.platform_data = &s3c_ac97_pdata,
++		.dma_mask = &s3c64xx_ac97_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++EXPORT_SYMBOL(s3c64xx_device_ac97);
++
++void __init s3c64xx_ac97_setup_gpio(int num)
++{
++	if (num == S3C64XX_AC97_GPD)
++		s3c_ac97_pdata.cfg_gpio = s3c64xx_ac97_cfg_gpd;
++	else
++		s3c_ac97_pdata.cfg_gpio = s3c64xx_ac97_cfg_gpe;
++}
 -- 
 1.6.6.1
