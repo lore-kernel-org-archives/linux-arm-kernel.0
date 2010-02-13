@@ -1,66 +1,68 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 23 Feb 2010 15:50:38 +0000
-Subject: [PATCH] omap: McBSP: Drop unnecessary status/error bit clearing on reg_cacheretrieved register values
-Message-ID: <mailman.235.1268351985.2170.linux-arm-kernel@lists.infradead.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 14 Feb 2010 01:18:34 +0530
+Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
+Message-ID: <mailman.286.1270059955.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MsBSP register cache will never have any error/status flags set, since
-these flags are never written to the reg_cache. So it is kind of not
-necessary to clear these flags, which are actually always 0.
+Fix the mcount routines to build and run on a kernel built with the
+Thumb-2 instruction set by correcting the following errors using the
+fixes suggested by Catalin Marinas:
 
-In other words, clearing the status/error flags are not necessary, since the
-reg_cache will never got these bits set. We can just write back the
-register content from the cache as it is when clearing an error condition.
+ - Problem: The following assembler errors appear at the "adr r0,
+   ftrace_stub" instruction:
 
-Tested on Amstrad Delta.
+   entry-common.S: Assembler messages:
+   entry-common.S:179: Error: invalid immediate for address calculation (value = 0x00000004)
 
-Reported-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-Acked-by: Jarkko Nikula <jhnikula@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+   Fix: The errors don't occur with a non-global symbol, so use one.
 
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index e47686e..52dfcc8 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -133,8 +133,7 @@ static irqreturn_t omap_mcbsp_tx_irq_handler(int irq, void *dev_id)
- 		dev_err(mcbsp_tx->dev, "TX Frame Sync Error! : 0x%x\n",
- 			irqst_spcr2);
- 		/* Writing zero to XSYNC_ERR clears the IRQ */
--		MCBSP_WRITE(mcbsp_tx, SPCR2,
--			    MCBSP_READ_CACHE(mcbsp_tx, SPCR2) & ~(XSYNC_ERR));
-+		MCBSP_WRITE(mcbsp_tx, SPCR2, MCBSP_READ_CACHE(mcbsp_tx, SPCR2));
- 	} else {
- 		complete(&mcbsp_tx->tx_irq_completion);
- 	}
-@@ -154,8 +153,7 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
- 		dev_err(mcbsp_rx->dev, "RX Frame Sync Error! : 0x%x\n",
- 			irqst_spcr1);
- 		/* Writing zero to RSYNC_ERR clears the IRQ */
--		MCBSP_WRITE(mcbsp_rx, SPCR1,
--			    MCBSP_READ_CACHE(mcbsp_rx, SPCR1) & ~(RSYNC_ERR));
-+		MCBSP_WRITE(mcbsp_rx, SPCR1, MCBSP_READ_CACHE(mcbsp_rx, SPCR1));
- 	} else {
- 		complete(&mcbsp_rx->tx_irq_completion);
- 	}
-@@ -934,8 +932,7 @@ int omap_mcbsp_pollwrite(unsigned int id, u16 buf)
- 	/* if frame sync error - clear the error */
- 	if (MCBSP_READ(mcbsp, SPCR2) & XSYNC_ERR) {
- 		/* clear error */
--		MCBSP_WRITE(mcbsp, SPCR2,
--				MCBSP_READ_CACHE(mcbsp, SPCR2) & (~XSYNC_ERR));
-+		MCBSP_WRITE(mcbsp, SPCR2, MCBSP_READ_CACHE(mcbsp, SPCR2));
- 		/* resend */
- 		return -1;
- 	} else {
-@@ -975,8 +972,7 @@ int omap_mcbsp_pollread(unsigned int id, u16 *buf)
- 	/* if frame sync error - clear the error */
- 	if (MCBSP_READ(mcbsp, SPCR1) & RSYNC_ERR) {
- 		/* clear error */
--		MCBSP_WRITE(mcbsp, SPCR1,
--				MCBSP_READ_CACHE(mcbsp, SPCR1) & (~RSYNC_ERR));
-+		MCBSP_WRITE(mcbsp, SPCR1, MCBSP_READ_CACHE(mcbsp, SPCR1));
- 		/* resend */
- 		return -1;
- 	} else {
+ - Problem: The "mov lr, pc" does not set the lsb when storing the pc in
+   lr.  The called function returns with "bx lr", and the mode changes
+   to ARM.
+
+   Fix: Add a label on the return address and use "adr lr, BSYM(label)".
+
+We don't modify the old mcount because it won't be built when using
+Thumb-2.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/kernel/entry-common.S |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index c7a8c20..f5e75de 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -167,7 +167,7 @@ ENTRY(__gnu_mcount_nc)
+ 	stmdb	sp!, {r0-r3, lr}
+ 	ldr	r0, =ftrace_trace_function
+ 	ldr	r2, [r0]
+-	adr	r0, ftrace_stub
++	adr	r0, .Lftrace_stub
+ 	cmp	r0, r2
+ 	bne	gnu_trace
+ 	ldmia	sp!, {r0-r3, ip, lr}
+@@ -177,8 +177,9 @@ gnu_trace:
+ 	ldr	r1, [sp, #20]			@ lr of instrumented routine
+ 	mov	r0, lr
+ 	sub	r0, r0, #MCOUNT_INSN_SIZE
+-	mov	lr, pc
++	adr	lr, BSYM(1f)
+ 	mov	pc, r2
++1:
+ 	ldmia	sp!, {r0-r3, ip, lr}
+ 	mov	pc, ip
+ ENDPROC(__gnu_mcount_nc)
+@@ -213,6 +214,7 @@ ENDPROC(mcount)
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ 
+ ENTRY(ftrace_stub)
++.Lftrace_stub:
+ 	mov	pc, lr
+ ENDPROC(ftrace_stub)
+ 
+-- 
+1.7.0
