@@ -1,58 +1,57 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 13 Feb 2010 23:27:28 +0000
-Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
-In-Reply-To: <1266090518-31120-7-git-send-email-rabin@rab.in>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-7-git-send-email-rabin@rab.in>
-Message-ID: <4B773560.2060800@arm.com>
+Date: Sat, 13 Feb 2010 23:47:03 +0000
+Subject: [PATCH] Help fix SMP boot issues with L2 cache
+In-Reply-To: <20100212182552.GF18595@n2100.arm.linux.org.uk>
+References: <20100212182552.GF18595@n2100.arm.linux.org.uk>
+Message-ID: <4B7739F7.7060604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rabin Vincent wrote:
-> Fix the mcount routines to build and run on a kernel built with the
-> Thumb-2 instruction set.
+Russell King - ARM Linux wrote:
+>     ARM: Add L2 cache handling to smp boot support
+>     
+>     The page table and secondary data which we're asking the secondary CPU
+>     to make use of has to hit RAM to ensure that the secondary CPU can see
+>     it since it may not be taking part in coherency or cache searches at
+>     this point.
+>     
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/kernel/entry-common.S |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+>  arch/arm/kernel/smp.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 42eb166..cd2a574 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -156,7 +156,8 @@ ENTRY(__gnu_mcount_nc)
->  	stmdb	sp!, {r0-r3, lr}
->  	ldr	r0, =ftrace_trace_function
->  	ldr	r2, [r0]
-> -	adr	r0, ftrace_stub
-> + THUMB(	orr	r2, r2, #1		)
-> +	adr	r0, BSYM(ftrace_stub)
->  	cmp	r0, r2
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 57162af..577543f 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -99,6 +99,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
+>  	*pmd = __pmd((PHYS_OFFSET & PGDIR_MASK) |
+>  		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE);
+>  	flush_pmd_entry(pmd);
+> +	outer_clean_range(__pa(pmd), __pa(pmd + 1));
+>  
+>  	/*
+>  	 * We need to tell the secondary core where to find
+> @@ -106,7 +107,8 @@ int __cpuinit __cpu_up(unsigned int cpu)
+>  	 */
+>  	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
+>  	secondary_data.pgdir = virt_to_phys(pgd);
+> -	wmb();
+> +	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
+> +	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
+>  
+>  	/*
+>  	 * Now bring the CPU into our world.
 
-Does this code not give the correct result if not modified?
+But is the outer_cache initialised at this point? I recall for RealView 
+I had to change the l2x0_init to an early_initcall:
 
->  	bne	gnu_trace
->  	ldmia	sp!, {r0-r3, ip, lr}
-> @@ -166,8 +167,9 @@ gnu_trace:
->  	ldr	r1, [sp, #20]			@ lr of instrumented routine
->  	mov	r0, lr
->  	sub	r0, r0, #MCOUNT_INSN_SIZE
-> -	mov	lr, pc
-> -	mov	pc, r2
-> + ARM(	mov	lr, pc			)
-> + ARM(	mov	pc, r2			)
-> + THUMB(	blx	r2			)
->  	ldmia	sp!, {r0-r3, ip, lr}
->  	mov	pc, ip
->  ENDPROC(__gnu_mcount_nc)
+http://linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=70e1b8d308f635eaeb7dad14fc5c79f082a147ef;hp=f034a4ab31b0663a5b68c65503122bed1eaca349
 
-As above, what does this need modifying? "mov pc, r2" wouldn't change 
-the mode to ARM even if the value in r2 is even. It may need THUMB(nop) 
-after this instruction.
-
-I could of course miss something as I haven't actually tried this code.
+I think I have a patch for 2.6.33, I'll dig it out on Monday. But this 
+was only needed when running the kernel in non-secure mode and the L2 
+was pre-initialised by the secure monitor (it may be the case on some 
+Omap boards).
 
 -- 
 Catalin
