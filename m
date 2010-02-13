@@ -1,53 +1,44 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Sat, 13 Feb 2010 15:54:03 +0100
-Subject: [PATCH] iop-adma: redundant/wrong tests in iop_*_count()?
-Message-ID: <4B76BD0B.2010307@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 14 Feb 2010 01:18:28 +0530
+Subject: [PATCH 00/10] ARM: ftrace: cleanups, Thumb-2, and dynamic ftrace
+Message-ID: <1266090518-31120-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we reach the loop, len is at least 1, we only stay in the loop when
-len is at least MAX_BYTE_COUNT + 1, MAX_BYTE_COUNT is subtracted in each
-iteration. So when we leave the loop, or didn't take it, len is at least 1.
-Testing whether len is non-zero appears redundant.
+This series contains fixes and improvements to the ARM ftrace support.  It adds
+Thumb-2 support and re-implements the dynamic ftrace support.
 
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
----
-Or are the tests off by one? Then we'll need a different patch...
+"ftrace: allow building without frame pointers" and "ftrace: pass KBUILD_CFLAGS
+to record_mcount.pl" are non-ARM-specific ftrace patches which are required to
+support the ARM functionality.
 
-diff --git a/arch/arm/include/asm/hardware/iop3xx-adma.h b/arch/arm/include/asm/hardware/iop3xx-adma.h
-index 1a8c727..9b28f12 100644
---- a/arch/arm/include/asm/hardware/iop3xx-adma.h
-+++ b/arch/arm/include/asm/hardware/iop3xx-adma.h
-@@ -366,8 +366,7 @@ static inline int iop_chan_xor_slot_count(size_t len, int src_cnt,
- 		slot_cnt += *slots_per_op;
- 	}
- 
--	if (len)
--		slot_cnt += *slots_per_op;
-+	slot_cnt += *slots_per_op;
- 
- 	return slot_cnt;
- }
-@@ -389,8 +388,7 @@ static inline int iop_chan_zero_sum_slot_count(size_t len, int src_cnt,
- 		slot_cnt += *slots_per_op;
- 	}
- 
--	if (len)
--		slot_cnt += *slots_per_op;
-+	slot_cnt += *slots_per_op;
- 
- 	return slot_cnt;
- }
-@@ -737,10 +735,8 @@ iop_desc_set_zero_sum_byte_count(struct iop_adma_desc_slot *desc, u32 len)
- 			i += slots_per_op;
- 		} while (len > IOP_ADMA_ZERO_SUM_MAX_BYTE_COUNT);
- 
--		if (len) {
--			iter = iop_hw_desc_slot_idx(hw_desc, i);
--			iter->byte_count = len;
--		}
-+		iter = iop_hw_desc_slot_idx(hw_desc, i);
-+		iter->byte_count = len;
- 	}
- }
- 
+Cleanups / docs:
+
+  ARM: ftrace: clean up mcount assembly indentation
+  ARM: ftrace: document mcount formats
+
+Thumb-2:
+
+  ftrace: allow building without frame pointers
+  ARM: ftrace: allow building without frame pointers
+  ARM: ftrace: add ENDPROC annotations
+  ARM: ftrace: add Thumb-2 support
+
+Dynamic ftrace:
+
+  ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+  ARM: ftrace: fix and update dynamic ftrace
+  ARM: ftrace: add Thumb-2 support to dynamic ftrace
+  ARM: ftrace: enable dynamic ftrace
+
+ Makefile                       |    3 +
+ arch/arm/Kconfig               |    2 +
+ arch/arm/Kconfig.debug         |    5 +
+ arch/arm/include/asm/ftrace.h  |   23 +++++-
+ arch/arm/kernel/armksyms.c     |    2 +
+ arch/arm/kernel/entry-common.S |  167 ++++++++++++++++++++++++-----------
+ arch/arm/kernel/ftrace.c       |  188 +++++++++++++++++++++++++++++----------
+ kernel/trace/Kconfig           |    2 +-
+ scripts/Makefile.build         |    3 +-
+ scripts/recordmcount.pl        |    2 +
+ 10 files changed, 295 insertions(+), 102 deletions(-)
