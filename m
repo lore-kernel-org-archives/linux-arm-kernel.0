@@ -1,33 +1,26 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 14 Feb 2010 01:18:38 +0530
-Subject: [PATCH 10/10] ARM: ftrace: enable dynamic ftrace
-In-Reply-To: <1266090518-31120-1-git-send-email-rabin@rab.in>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-Message-ID: <1266090518-31120-11-git-send-email-rabin@rab.in>
+Date: Sun, 14 Feb 2010 01:24:44 +0530
+Subject: [PATCH 2/2] ftrace: re-enable dynamic ftrace for ARM
+In-Reply-To: <20100201211101.GB26532@pengutronix.de>
+References: <1264959196-5175-1-git-send-email-rabin@rab.in>
+	<1264959196-5175-2-git-send-email-rabin@rab.in>
+	<20100201102843.GA31714@pengutronix.de>
+	<20100201165318.GA1846@debian>
+	<20100201211101.GB26532@pengutronix.de>
+Message-ID: <20100213195444.GA31190@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamic ftrace for ARM has been disabled since 07c4cc1cdaa08f ("ftrace:
-disable dynamic ftrace for all archs that use daemon").  Now that the
-code has been updated, re-enable it.
+On Mon, Feb 01, 2010 at 10:11:02PM +0100, Uwe Kleine-K?nig wrote:
+> That's OK for me.  Then the only thing that would be nice would be some
+> more documentation.  E.g. how looks the function prologue in the two
+> cases, which of these instruction is patched?
+> 
+> This doesn't need to be a stopper for your patch, it's on my long term
+> todo list already to add some documentation to the (non-dynamic) ftrace
+> on arm.  I wouldn't mind to add the documentation myself, but not now.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I've add this documentation (among other things) in the updated patch
+set I've just posted.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c33ca8..eee22bb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -17,6 +17,8 @@ config ARM
- 	select HAVE_KPROBES if (!XIP_KERNEL)
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-+	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-+	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
--- 
-1.6.6
+Rabin
