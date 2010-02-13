@@ -1,23 +1,58 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 13 Feb 2010 22:54:48 +0000
-Subject: [PATCH 05/10] ARM: ftrace: add ENDPROC annotations
-In-Reply-To: <1266090518-31120-6-git-send-email-rabin@rab.in>
+Date: Sat, 13 Feb 2010 23:27:28 +0000
+Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
+In-Reply-To: <1266090518-31120-7-git-send-email-rabin@rab.in>
 References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-6-git-send-email-rabin@rab.in>
-Message-ID: <4B772DB8.7060105@arm.com>
+	<1266090518-31120-7-git-send-email-rabin@rab.in>
+Message-ID: <4B773560.2060800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Rabin Vincent wrote:
-> When building as Thumb-2, the ".type foo, %function" annotation in
-> ENDPROC seems to be required in order for the assembly routines to be
-> recognized as Thumb-2 code.  If the ENDPROC annotations are not present,
-> calls to these routines are generated as BLX instead of BL.
+> Fix the mcount routines to build and run on a kernel built with the
+> Thumb-2 instruction set.
 > 
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/kernel/entry-common.S |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 42eb166..cd2a574 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -156,7 +156,8 @@ ENTRY(__gnu_mcount_nc)
+>  	stmdb	sp!, {r0-r3, lr}
+>  	ldr	r0, =ftrace_trace_function
+>  	ldr	r2, [r0]
+> -	adr	r0, ftrace_stub
+> + THUMB(	orr	r2, r2, #1		)
+> +	adr	r0, BSYM(ftrace_stub)
+>  	cmp	r0, r2
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Does this code not give the correct result if not modified?
+
+>  	bne	gnu_trace
+>  	ldmia	sp!, {r0-r3, ip, lr}
+> @@ -166,8 +167,9 @@ gnu_trace:
+>  	ldr	r1, [sp, #20]			@ lr of instrumented routine
+>  	mov	r0, lr
+>  	sub	r0, r0, #MCOUNT_INSN_SIZE
+> -	mov	lr, pc
+> -	mov	pc, r2
+> + ARM(	mov	lr, pc			)
+> + ARM(	mov	pc, r2			)
+> + THUMB(	blx	r2			)
+>  	ldmia	sp!, {r0-r3, ip, lr}
+>  	mov	pc, ip
+>  ENDPROC(__gnu_mcount_nc)
+
+As above, what does this need modifying? "mov pc, r2" wouldn't change 
+the mode to ARM even if the value in r2 is even. It may need THUMB(nop) 
+after this instruction.
+
+I could of course miss something as I haven't actually tried this code.
 
 -- 
 Catalin
