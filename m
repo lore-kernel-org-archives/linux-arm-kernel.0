@@ -1,54 +1,39 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 14 Feb 2010 21:18:06 +0000
-Subject: i2c-imx: Autoprobe of eeproms
-In-Reply-To: <4B75D317.7040801@vmlinux.org>
-References: <4B75D317.7040801@vmlinux.org>
-Message-ID: <20100214211806.GA30679@trinity.fluff.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 14 Feb 2010 23:53:25 +0200
+Subject: [PATCH] iop: n2100: enable serial interrupt
+Message-ID: <1266184405-21444-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2010 at 11:15:51PM +0100, Mattias Walstrom wrote:
-> I have tried to get autoprobe of eeproms to work on a custom freescale
-> mx27-board, and i found out that the i2c-imx driver was missing the
-> following, is there a reason for this, most other i2c-bus drivers seems
-> to have it?
+Thecus N2100 has a jumper (J3/J4) to select whether the XINT1 interrupt
+line is connected to the second UHCI controller (position J3) or to
+the serial port UART (position J4). Currently, the kernel is hardcoded
+to assume the J3 position, and the serial port is always being used in
+polling mode.
 
-auto-probing of anything on an i2c bus is always going to be trumped
-by actually knowing. The limited address space means often different
-types of peripherals can end up with similar addresses.
+The patch adds the IRQ autodetection flag for the serial port interrupt,
+and also marks it as shared (as the driver for the second UHCI controller
+will request the interrupt in any case). Now, when the jumper is set to
+the J4 position, the serial port will have an interrupt line, resulting
+in less CPU overhead and faster throughput.
 
-It is highly recommended in the ARM world where the board information is
-known from early in the initialisation process that the board registers
-the devices it knows to have available so that the i2c core can atatch
-the relevant drivers.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mach-iop32x/n2100.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I'm not even sure if SPD is the right class to have on this, I think
-Jean Delvare has pronounced on this on the linux-i2c list (iirc, it
-is for probing DRAM DIMMS).
-
-Even if Jean hasn't nixed this, I would still prefer not to apply this.
-
-PS, this should have been cc'd to the linux-i2c list!
- 
-> --- linux-2.6.32.8.orig/drivers/i2c/busses/i2c-imx.c    2010-02-09
-> 13:57:19.000000000 +0100
-> +++ linux-2.6.32.8/drivers/i2c/busses/i2c-imx.c 2010-02-12
-> 11:30:12.000000000 +0100
-> @@ -521,6 +521,7 @@
->         i2c_imx->adapter.algo           = &i2c_imx_algo;
->         i2c_imx->adapter.dev.parent     = &pdev->dev;
->         i2c_imx->adapter.nr             = pdev->id;
-> +        i2c_imx->adapter.class          = I2C_CLASS_HWMON | I2C_CLASS_SPD;
->         i2c_imx->irq                    = irq;
->         i2c_imx->base                   = base;
->         i2c_imx->res                    = res;
-> 
-> 
-> Best regards
-> Mattias Walstr?m
-
+diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
+index d2e4278..001db59 100644
+--- a/arch/arm/mach-iop32x/n2100.c
++++ b/arch/arm/mach-iop32x/n2100.c
+@@ -178,7 +178,7 @@ static struct plat_serial8250_port n2100_serial_port[] = {
+ 		.mapbase	= N2100_UART,
+ 		.membase	= (char *)N2100_UART,
+ 		.irq		= 0,
+-		.flags		= UPF_SKIP_TEST,
++		.flags		= UPF_SKIP_TEST | UPF_AUTO_IRQ | UPF_SHARE_IRQ,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 0,
+ 		.uartclk	= 1843200,
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+1.5.6.5
