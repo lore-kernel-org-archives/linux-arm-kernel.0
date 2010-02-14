@@ -1,47 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 14 Feb 2010 12:08:40 +0100
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 14 Feb 2010 21:23:27 +0530
 Subject: [PATCH 08/10] ARM: ftrace: fix and update dynamic ftrace
-In-Reply-To: <1266090518-31120-9-git-send-email-rabin@rab.in>
+In-Reply-To: <20100214110840.GA21357@pengutronix.de>
 References: <1266090518-31120-1-git-send-email-rabin@rab.in>
 	<1266090518-31120-9-git-send-email-rabin@rab.in>
-Message-ID: <20100214110840.GA21357@pengutronix.de>
+	<20100214110840.GA21357@pengutronix.de>
+Message-ID: <20100214155326.GA2842@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, Feb 14, 2010 at 12:08:40PM +0100, Uwe Kleine-K?nig wrote:
+> > diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> > index 103f7ee..4a56a2e 100644
+> > --- a/arch/arm/include/asm/ftrace.h
+> > +++ b/arch/arm/include/asm/ftrace.h
+> > @@ -2,12 +2,29 @@
+> >  #define _ASM_ARM_FTRACE
+> >  
+> >  #ifdef CONFIG_FUNCTION_TRACER
+> > -#define MCOUNT_ADDR		((long)(mcount))
+> > +#define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
+> hhmm, does this work with both the old and the new mcount function?
 
-On Sun, Feb 14, 2010 at 01:18:36AM +0530, Rabin Vincent wrote:
-> This adds mcount recording and updates dynamic ftrace for ARM to work
-> with the new ftrace dyamic tracing implementation.  It also adds support
-> for the mcount format used by newer ARM compilers.
-> 
-> With dynamic tracing, mcount() is implemented as a nop.  Callsites are
-> patched on startup with nops, and dynamically patched to call to the
-> ftrace_caller() routine as needed.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/include/asm/ftrace.h  |   19 +++++-
->  arch/arm/kernel/entry-common.S |   37 +++++++---
->  arch/arm/kernel/ftrace.c       |  155 +++++++++++++++++++++++++++------------
->  scripts/recordmcount.pl        |    2 +
->  4 files changed, 155 insertions(+), 58 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> index 103f7ee..4a56a2e 100644
-> --- a/arch/arm/include/asm/ftrace.h
-> +++ b/arch/arm/include/asm/ftrace.h
-> @@ -2,12 +2,29 @@
->  #define _ASM_ARM_FTRACE
->  
->  #ifdef CONFIG_FUNCTION_TRACER
-> -#define MCOUNT_ADDR		((long)(mcount))
-> +#define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
-hhmm, does this work with both the old and the new mcount function?
+Yes, MCOUNT_ADDR is not used by the generic ftrace code directly, but is
+instead only passed to our arch specific functions.  We determine the
+right mcount address to use there:
 
-Best regards
-Uwe
+> +#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+[..]
+> +static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
+> +{
+> +	if (!rec->arch.old_mcount)
+> +		return addr;
+> +
+> +	if (addr == MCOUNT_ADDR)
+> +		addr = OLD_MCOUNT_ADDR;
+> +	else if (addr == FTRACE_ADDR)
+> +		addr = OLD_FTRACE_ADDR;
+> +
+> +	return addr;
+> +}
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I changed MCOUNT_ADDR from mcount to __gnu_mcount_nc because we always
+build __gnu_mcount_nc in, but don't build mcount when using Thumb-2.
+
+Rabin
