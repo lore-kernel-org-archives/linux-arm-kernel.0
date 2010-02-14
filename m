@@ -1,41 +1,27 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 14 Feb 2010 17:51:22 +0100
-Subject: [PATCH 05/14] ARM: LPC32XX: System suspend support
-In-Reply-To: <1265674295-23996-6-git-send-email-wellsk40@gmail.com>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-6-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100214165122.GA1365@ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Feb 2010 19:40:46 +0000
+Subject: apply chip ID
+In-Reply-To: <d4d4c7ef1002140814x5c406afaq7f60dc584e389348@mail.gmail.com>
+References: <d4d4c7ef1002140814x5c406afaq7f60dc584e389348@mail.gmail.com>
+Message-ID: <20100214194046.GA11315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Feb 15, 2010 at 12:14:08AM +0800, ?? wrote:
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index 07b976d..629b858 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -2635,3 +2635,4 @@ hw90240			MACH_HW90240		HW90240			2648
+> dm365_leopard		MACH_DM365_LEOPARD	DM365_LEOPARD		2649
+> mityomapl138		MACH_MITYOMAPL138	MITYOMAPL138		2650
+> scat110			MACH_SCAT110		SCAT110			2651
+> +ak780x			MACH_AK780X		AK780X			2557
+> +ak880x			MACH_AK880X		AK880X			2558
 
-> Support for system suspend and resume
-> 
-> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
-> ---
+This file is periodically replaced; as such taking patches for the file is
+senseless.
 
-
-> +	/* Backup a small area of IRAM used for the suspend code */
-> +	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
-> +		lpc32xx_sys_suspend_sz);
-> +	flush_cache_all();
-> +
-> +	/*
-> +	 * Copy code to suspend system into IRAM. The suspend code
-> +	 * needs to run from IRAM as DRAM may no longer be available
-> +	 * when the PLL is stopped.
-> +	 */
-> +	memcpy((void *) TEMP_IRAM_AREA, &lpc32xx_sys_suspend,
-> +		lpc32xx_sys_suspend_sz);
-
-icache flush needed here? or does the above flush suffice? ... I
-believe you do need the flush.
-
-> +	/* Transfer to suspend code in IRAM */
-> +	lpc32xx_suspend_ptr = (void *) TEMP_IRAM_AREA;
-> +	(void) lpc32xx_suspend_ptr();
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Moreover, your two additions refer to a number which is already allocated
+and in use for bcmring_evm_jazz and bcmring_sp - you can not use these
+numbers.
