@@ -1,26 +1,21 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 15 Feb 2010 22:04:04 +0800
-Subject: [PATCH - v7] Support for Embedian MXM-8x10
-In-Reply-To: <201002051831.48357.epeer@tmtservices.co.za>
-References: <201002051831.48357.epeer@tmtservices.co.za>
-Message-ID: <f17812d71002150604x605ff89aja93a8b385dd31489@mail.gmail.com>
+Date: Mon, 15 Feb 2010 22:18:29 +0800
+Subject: [PATCH 1/2 v2] pxa/imote2: Add defconfig for the imote2 platform.
+In-Reply-To: <20100214091921.GB5979@excalibur.local>
+References: <1266094772-2776-1-git-send-email-stefan@datenfreihafen.org>
+	<20100214091921.GB5979@excalibur.local>
+Message-ID: <f17812d71002150618i7b7361eemaa246259e731e3e1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 6, 2010 at 12:31 AM, Edwin Peer <epeer@tmtservices.co.za> wrote:
-> Hi Eric,
+On Sun, Feb 14, 2010 at 5:19 PM, Stefan Schmidt
+<stefan@datenfreihafen.org> wrote:
+> From 92ce6bbee5146a3986360e6a9267b285ece4db67 Mon Sep 17 00:00:00 2001
+> From: Stefan Schmidt <stefan@datenfreihafen.org>
+> Date: Sat, 13 Feb 2010 21:55:52 +0100
+> Subject: [PATCH 1/2] pxa/imote2: Add defconfig for the imote2 platform.
 >
-> I think we are nearly there now.
 >
-> This version of the patch includes an MFP fix for the MMC / SD card.
->
-> Also removed some unused #defines in mxm8x10.h.
->
-> Patch is against 2.6.33-rc6.
->
-> Regards,
-> Edwin Peer
->
-> Signed-off-by: Edwin Peer <epeer@tmtservices.co.za>
+> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
 
-Thanks, looks fine to me, applied to 'devel'.
+Applied to 'devel', thanks.
