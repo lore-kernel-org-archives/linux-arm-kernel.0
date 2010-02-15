@@ -1,20 +1,23 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 15 Feb 2010 11:58:18 +0100
-Subject: [PATCH] imx-serial-excessive-status-clearing-on-break.patch
-In-Reply-To: <20100201122853.21848.90945.stgit@otae.warmcat.com>
-References: <20100201122853.21848.90945.stgit@otae.warmcat.com>
-Message-ID: <4B7928CA.8050408@warmcat.com>
+From: david.vrabel@csr.com (David Vrabel)
+Date: Mon, 15 Feb 2010 11:58:06 +0000
+Subject: [PATCH 3/3] [U300] Set f_max to 24 MHz for MMC
+In-Reply-To: <1266233040-17124-1-git-send-email-linus.walleij@stericsson.com>
+References: <1266233040-17124-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4B7936CE.9020402@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/10 13:28, Somebody in the thread at some point said:
+Linus Walleij wrote:
+> 
+> +	mmci_card->mmc0_plat_data.f_max = 24*1024*1024;
 
-> -			writel(temp | USR2_BRCD, sport->port.membase + USR2);
-> +			writel(USR2_BRCD, sport->port.membase + USR2);
+Is the frequency really 25165824 Hz and not 24000000 Hz?
 
-Hi Sascha -
+David
+-- 
+David Vrabel, Senior Software Engineer, Drivers
+CSR, Churchill House, Cambridge Business Park,  Tel: +44 (0)1223 692562
+Cowley Road, Cambridge, CB4 0WZ                 http://www.csr.com/
 
-What is the disposition of this patch?  It solves a real problem in the 
-imx serial but it is just sitting there for two weeks.
 
--Andy
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
