@@ -1,21 +1,28 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 15 Feb 2010 22:33:03 +0800
-Subject: [PATCH 1/2] PXA3xx: Add support for preconfiguring SMEMC
-In-Reply-To: <201002150155.35786.marek.vasut@gmail.com>
-References: <201002150155.35786.marek.vasut@gmail.com>
-Message-ID: <f17812d71002150633p1699d012ocf15c96dee9f4be0@mail.gmail.com>
+From: heutling@who-ing.de (Sebastian Heutling)
+Date: Mon, 15 Feb 2010 17:16:09 +0100
+Subject: atmel-mci / at91_mci
+In-Reply-To: <4B71841E.7030108@iis.fraunhofer.de>
+References: <4B6A8C0F.7080907@iis.fraunhofer.de>	<201002081413.19984.fg@emlix.com>
+	<4B71841E.7030108@iis.fraunhofer.de>
+Message-ID: <4B797349.4030902@who-ing.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2010 at 8:55 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> This patch adds SMEMC preconfiguration that was proposed in the "[PXA320] How to
-> find ?I/O registers, base address of ASIX ethernet chip?" thread.
+On 02/09/10 16:49, Manuel Stahl wrote:
+> Unfortunately this is not the problem. The SD-card works fine with the
+> old at91_mci driver, but not with the newer atmel-mci. The problem is
+> that I need both slots at the same time, so at91_mci is no option for me.
 >
-> Comments are welcome, as it is it's just a quick thing, but it works. This
-> addition should be harmless.
+> In the second slot there is a WLAN card which gets timeouts after
+> successful firmware load with at91_mci but does not work with atmel-mci.
 >
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->
+> I have exactly the same setup with an AVR32 processor, there both
+> devices work. With the atmel-mci driver obiously.
+>    
 
-I'd expect a more intuitive way to configure the static memory controller,
-actually the configuration is so complex that this task is no easy :)
+Could that be related to the "SLOT_B" bit in the SDCR?
+I had to set it in U-Boot to get the second slot working properly.
+My guess is that on AT91 (we use SAM9G20) every access needs to set or 
+clear that bit depending on which slot is addressed.
+
+Sebastian Heutling
