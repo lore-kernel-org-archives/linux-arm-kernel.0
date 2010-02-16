@@ -1,48 +1,131 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Feb 2010 18:24:43 -0700
-Subject: [PATCH 03/19] OMAP3: clock: use std _MASK suffix for CM_FCLKEN_IVA2
-	defines
+Date: Mon, 15 Feb 2010 18:24:45 -0700
+Subject: [PATCH 05/19] OMAP2/3 PM: Adding powerdomain APIs for reading the
+	next logic and mem state
 In-Reply-To: <20100216011942.1101.14348.stgit@localhost.localdomain>
 References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-Message-ID: <20100216012441.1101.85404.stgit@localhost.localdomain>
+Message-ID: <20100216012444.1101.68067.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@deeprootsystems.com>
+From: Thara Gopinath <thara@ti.com>
 
-Add _MASK suffix to CM_FCLKEN_IVA2 bitfieds to conform with the rest
-of the usage in cm-regbits-34xx.h of using _SHIFT and _MASK suffixes.
+This patch adds APIs pwrdm_read_logic_retst and
+pwrdm_read_mem_retst for reading the next programmed
+logic and memory state a powerdomain is to hit in event
+of the next power domain state being retention.
+These are needed for OSWR support.
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Thara Gopinath <thara@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/cm-regbits-34xx.h |    2 +-
- arch/arm/mach-omap2/pm34xx.c          |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c             |   73 +++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/powerdomain.h |    2 +
+ 2 files changed, 75 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
-index 6923deb..a76e835 100644
---- a/arch/arm/mach-omap2/cm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
-@@ -55,7 +55,7 @@
- /* Bits specific to each register */
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index dc03289..e9eeaa4 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -679,6 +679,29 @@ int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+ }
  
- /* CM_FCLKEN_IVA2 */
--#define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2			(1 << 0)
-+#define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK		(1 << 0)
- #define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_SHIFT		0
+ /**
++ * pwrdm_read_logic_retst - get next powerdomain logic power state
++ * @pwrdm: struct powerdomain * to get next logic power state
++ *
++ * Return the powerdomain pwrdm's logic power state.  Returns -EINVAL
++ * if the powerdomain pointer is null or returns the next logic
++ * power state upon success.
++ */
++int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
++{
++	if (!pwrdm)
++		return -EINVAL;
++
++	/*
++	 * The register bit names below may not correspond to the
++	 * actual names of the bits in each powerdomain's register,
++	 * but the type of value returned is the same for each
++	 * powerdomain.
++	 */
++	return prm_read_mod_bits_shift(pwrdm->prcm_offs, pwrstctrl_reg_offs,
++					OMAP3430_LOGICSTATEST);
++}
++
++/**
+  * pwrdm_read_mem_pwrst - get current memory bank power state
+  * @pwrdm: struct powerdomain * to get current memory bank power state
+  * @bank: memory bank number (0-3)
+@@ -785,6 +808,56 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+ }
  
- /* CM_CLKEN_PLL_IVA2 */
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 5087b15..62e27aa 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -688,7 +688,7 @@ static void __init omap3_iva_idle(void)
- 			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+ /**
++ * pwrdm_read_mem_retst - get next memory bank power state
++ * @pwrdm: struct powerdomain * to get mext memory bank power state
++ * @bank: memory bank number (0-3)
++ *
++ * Return the powerdomain pwrdm's next memory power state for bank
++ * x.  Returns -EINVAL if the powerdomain pointer is null, -EEXIST if
++ * the target memory bank does not exist or is not controllable, or
++ * returns the next memory power state upon success.
++ */
++int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
++{
++	u32 m;
++
++	if (!pwrdm)
++		return -EINVAL;
++
++	if (pwrdm->banks < (bank + 1))
++		return -EEXIST;
++
++	/*
++	 * The register bit names below may not correspond to the
++	 * actual names of the bits in each powerdomain's register,
++	 * but the type of value returned is the same for each
++	 * powerdomain.
++	 */
++	switch (bank) {
++	case 0:
++		m = OMAP_MEM0_RETSTATE_MASK;
++		break;
++	case 1:
++		m = OMAP_MEM1_RETSTATE_MASK;
++		break;
++	case 2:
++		m = OMAP_MEM2_RETSTATE_MASK;
++		break;
++	case 3:
++		m = OMAP_MEM3_RETSTATE_MASK;
++		break;
++	case 4:
++		m = OMAP_MEM4_RETSTATE_MASK;
++	default:
++		WARN_ON(1); /* should never happen */
++		return -EEXIST;
++	}
++
++	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
++					pwrstctrl_reg_offs, m);
++}
++
++/**
+  * pwrdm_clear_all_prev_pwrst - clear previous powerstate register for a pwrdm
+  * @pwrdm: struct powerdomain * to clear
+  *
+diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
+index e15c7e9..6657ff2 100644
+--- a/arch/arm/plat-omap/include/plat/powerdomain.h
++++ b/arch/arm/plat-omap/include/plat/powerdomain.h
+@@ -137,8 +137,10 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
  
- 	/* Enable IVA2 clock */
--	cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2,
-+	cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
- 			 OMAP3430_IVA2_MOD, CM_FCLKEN);
+ int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
+ int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
++int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
+ int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
+ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
++int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
  
- 	/* Set IVA2 boot mode to 'idle' */
+ int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
+ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
