@@ -1,50 +1,40 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 16 Feb 2010 20:15:55 +0530
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002161522.38467.oliver@neukum.org>
-References: <20100208065519.GE1290@ucw.cz>
-	<201002161446.59920.oliver@neukum.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF8038@dbde02.ent.ti.com>
-	<201002161522.38467.oliver@neukum.org>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF8073@dbde02.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 16 Feb 2010 17:14:20 +0200
+Subject: [PATCH 0/3] mx25: framebuffer support
+In-Reply-To: <cover.1265786237.git.baruch@tkos.co.il>
+References: <cover.1265786237.git.baruch@tkos.co.il>
+Message-ID: <20100216151420.GD32332@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oliver Neukum [mailto:oliver at neukum.org]
-> Sent: Tuesday, February 16, 2010 7:53 PM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; Catalin Marinas; Pavel Machek; Greg KH; Matthew Dharm; Sergei Shtylyov;
-> Ming Lei; Sebastian Siewior; linux-usb at vger.kernel.org; linux-kernel; linux-arm-kernel; Mankad,
-> Maulik Ojas
-> Subject: Re: USB mass storage and ARM cache coherency
-> 
-> Am Dienstag, 16. Februar 2010 15:12:45 schrieb Shilimkar, Santosh:
-> > > > > I am afraid for these controllers the controller driver must be responsible
-> > > > > for all DMA and cache issues. Indicating the exact requirements to the
-> > > > > upper layer would be a battle already lost.
-> > > > > so the safe choice is not to set has_dma and the generic layer will leave
-> > > > > the issue to the lower level.
-> > > > This means don't use dma at all which will almost kill the performance.
-> > >
-> > > Why would you be unable to map a buffer in the hcd driver when you know
-> > > that you'll use DMA?
-> > Probably it can be. The USB stack has the dma maintenance code at common
-> > place for all controllers and hence we were just trying to see if there is
-> > way to handle that way.
-> 
-> This is true. If you can find a clean way to describe your requirements
-> to the generic layer, that would be better. The problem is that we must
-> not end up with a dozen flags.
-Agree 
-> Your original patch however kills ehci, ohci and uhci on some architectures.
-Well the patch was making _ONLY_ control transfers use PIO and rest of
-the transfer would still use dma. So not sure how much performance impact would
-be because of that.
-Another issue with that patch is there are few controllers which can't do PIO
-at all and hence the patch would broke those controllers.
+Ping?
 
-So we need a clean way to handle it as you described.
+I'd really like to see this merged in .34.
 
-Regards,
-Santosh
+Thanks,
+baruch
+
+On Wed, Feb 10, 2010 at 09:25:17AM +0200, Baruch Siach wrote:
+> This set of patches adds support for the i.MX25 LCD controller block using the 
+> imxfb driver. Platform code for the i.MX25 PDK board is also added.
+> 
+> Tested on the i.MX25 PDK.
+> 
+> Baruch Siach (3):
+>   imxfb: add support for i.MX25
+>   mx25: add platform support for imxfb
+>   mx25pdk: add LCD support
+> 
+>  arch/arm/mach-mx25/clock.c                  |   12 ++++++
+>  arch/arm/mach-mx25/devices.c                |   23 +++++++++++
+>  arch/arm/mach-mx25/devices.h                |    1 +
+>  arch/arm/mach-mx25/mx25pdk.c                |   55 +++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/iomux-mx25.h |    2 +
+>  arch/arm/plat-mxc/include/mach/mx25.h       |    2 +
+>  drivers/video/Kconfig                       |    2 +-
+>  7 files changed, 96 insertions(+), 1 deletions(-)
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
