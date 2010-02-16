@@ -1,131 +1,42 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Feb 2010 18:24:45 -0700
-Subject: [PATCH 05/19] OMAP2/3 PM: Adding powerdomain APIs for reading the
-	next logic and mem state
+Date: Mon, 15 Feb 2010 18:24:47 -0700
+Subject: [PATCH 06/19] OMAP3 PM: Defining .pwrsts_logic_ret field for core
+	power domain structure
 In-Reply-To: <20100216011942.1101.14348.stgit@localhost.localdomain>
 References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-Message-ID: <20100216012444.1101.68067.stgit@localhost.localdomain>
+Message-ID: <20100216012445.1101.91246.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thara Gopinath <thara@ti.com>
 
-This patch adds APIs pwrdm_read_logic_retst and
-pwrdm_read_mem_retst for reading the next programmed
-logic and memory state a powerdomain is to hit in event
-of the next power domain state being retention.
-These are needed for OSWR support.
+This patch adds the flag .pwrsts_logic_ret info for the core power domain
+in the associated powerdomain structure. This flag specifies the states
+core domain logic can hit in event of the domain entering retention.
 
 Signed-off-by: Thara Gopinath <thara@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c             |   73 +++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/powerdomain.h |    2 +
- 2 files changed, 75 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomains34xx.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index dc03289..e9eeaa4 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -679,6 +679,29 @@ int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
- }
- 
- /**
-+ * pwrdm_read_logic_retst - get next powerdomain logic power state
-+ * @pwrdm: struct powerdomain * to get next logic power state
-+ *
-+ * Return the powerdomain pwrdm's logic power state.  Returns -EINVAL
-+ * if the powerdomain pointer is null or returns the next logic
-+ * power state upon success.
-+ */
-+int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
-+{
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	/*
-+	 * The register bit names below may not correspond to the
-+	 * actual names of the bits in each powerdomain's register,
-+	 * but the type of value returned is the same for each
-+	 * powerdomain.
-+	 */
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, pwrstctrl_reg_offs,
-+					OMAP3430_LOGICSTATEST);
-+}
-+
-+/**
-  * pwrdm_read_mem_pwrst - get current memory bank power state
-  * @pwrdm: struct powerdomain * to get current memory bank power state
-  * @bank: memory bank number (0-3)
-@@ -785,6 +808,56 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- }
- 
- /**
-+ * pwrdm_read_mem_retst - get next memory bank power state
-+ * @pwrdm: struct powerdomain * to get mext memory bank power state
-+ * @bank: memory bank number (0-3)
-+ *
-+ * Return the powerdomain pwrdm's next memory power state for bank
-+ * x.  Returns -EINVAL if the powerdomain pointer is null, -EEXIST if
-+ * the target memory bank does not exist or is not controllable, or
-+ * returns the next memory power state upon success.
-+ */
-+int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
-+{
-+	u32 m;
-+
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	if (pwrdm->banks < (bank + 1))
-+		return -EEXIST;
-+
-+	/*
-+	 * The register bit names below may not correspond to the
-+	 * actual names of the bits in each powerdomain's register,
-+	 * but the type of value returned is the same for each
-+	 * powerdomain.
-+	 */
-+	switch (bank) {
-+	case 0:
-+		m = OMAP_MEM0_RETSTATE_MASK;
-+		break;
-+	case 1:
-+		m = OMAP_MEM1_RETSTATE_MASK;
-+		break;
-+	case 2:
-+		m = OMAP_MEM2_RETSTATE_MASK;
-+		break;
-+	case 3:
-+		m = OMAP_MEM3_RETSTATE_MASK;
-+		break;
-+	case 4:
-+		m = OMAP_MEM4_RETSTATE_MASK;
-+	default:
-+		WARN_ON(1); /* should never happen */
-+		return -EEXIST;
-+	}
-+
-+	return prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+					pwrstctrl_reg_offs, m);
-+}
-+
-+/**
-  * pwrdm_clear_all_prev_pwrst - clear previous powerstate register for a pwrdm
-  * @pwrdm: struct powerdomain * to clear
-  *
-diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
-index e15c7e9..6657ff2 100644
---- a/arch/arm/plat-omap/include/plat/powerdomain.h
-+++ b/arch/arm/plat-omap/include/plat/powerdomain.h
-@@ -137,8 +137,10 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
- 
- int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
- int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
-+int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
- int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
- int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-+int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
- 
- int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
- int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
+diff --git a/arch/arm/mach-omap2/powerdomains34xx.h b/arch/arm/mach-omap2/powerdomains34xx.h
+index 186c013..bd87112 100644
+--- a/arch/arm/mach-omap2/powerdomains34xx.h
++++ b/arch/arm/mach-omap2/powerdomains34xx.h
+@@ -82,6 +82,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
+ 					   CHIP_IS_OMAP3430ES2 |
+ 					   CHIP_IS_OMAP3430ES3_0),
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	  = {
+ 		[0] = PWRSTS_OFF_RET,	 /* MEM1RETSTATE */
+@@ -98,6 +99,7 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+ 	.prcm_offs	  = CORE_MOD,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES3_1),
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.flags		  = PWRDM_HAS_HDWR_SAR, /* for USBTLL only */
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	  = {
