@@ -1,64 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Feb 2010 18:24:41 -0700
-Subject: [PATCH 02/19] OMAP: omap_device: when 'called from invalid state',
-	print state
+Date: Mon, 15 Feb 2010 18:24:43 -0700
+Subject: [PATCH 03/19] OMAP3: clock: use std _MASK suffix for CM_FCLKEN_IVA2
+	defines
 In-Reply-To: <20100216011942.1101.14348.stgit@localhost.localdomain>
 References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-Message-ID: <20100216012437.1101.80544.stgit@localhost.localdomain>
+Message-ID: <20100216012441.1101.85404.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-The omap_device_[enable|idle|shutdown] functions print a warning
-when called from an invalid state.  Print the invalid state in
-the warning messages.  This also uses __func__ to get the function
-name.
-
-Also, move the entire print string onto a single line to facilitate
-grepping or error messages.  Recent discussions on LKML show
-strong preference for grep-able code vs. strict 80 column limit.
+Add _MASK suffix to CM_FCLKEN_IVA2 bitfieds to conform with the rest
+of the usage in cm-regbits-34xx.h of using _SHIFT and _MASK suffixes.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/omap_device.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/cm-regbits-34xx.h |    2 +-
+ arch/arm/mach-omap2/pm34xx.c          |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 40289e0..c739a04 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -466,8 +466,8 @@ int omap_device_enable(struct platform_device *pdev)
- 	od = _find_by_pdev(pdev);
+diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
+index 6923deb..a76e835 100644
+--- a/arch/arm/mach-omap2/cm-regbits-34xx.h
++++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
+@@ -55,7 +55,7 @@
+ /* Bits specific to each register */
  
- 	if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
--		WARN(1, "omap_device: %s.%d: omap_device_enable() called from "
--		     "invalid state\n", od->pdev.name, od->pdev.id);
-+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
-+		     od->pdev.name, od->pdev.id, __func__, od->_state);
- 		return -EINVAL;
- 	}
+ /* CM_FCLKEN_IVA2 */
+-#define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2			(1 << 0)
++#define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK		(1 << 0)
+ #define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_SHIFT		0
  
-@@ -505,8 +505,8 @@ int omap_device_idle(struct platform_device *pdev)
- 	od = _find_by_pdev(pdev);
+ /* CM_CLKEN_PLL_IVA2 */
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 5087b15..62e27aa 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -688,7 +688,7 @@ static void __init omap3_iva_idle(void)
+ 			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
  
- 	if (od->_state != OMAP_DEVICE_STATE_ENABLED) {
--		WARN(1, "omap_device: %s.%d: omap_device_idle() called from "
--		     "invalid state\n", od->pdev.name, od->pdev.id);
-+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
-+		     od->pdev.name, od->pdev.id, __func__, od->_state);
- 		return -EINVAL;
- 	}
+ 	/* Enable IVA2 clock */
+-	cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2,
++	cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
+ 			 OMAP3430_IVA2_MOD, CM_FCLKEN);
  
-@@ -538,8 +538,8 @@ int omap_device_shutdown(struct platform_device *pdev)
- 
- 	if (od->_state != OMAP_DEVICE_STATE_ENABLED &&
- 	    od->_state != OMAP_DEVICE_STATE_IDLE) {
--		WARN(1, "omap_device: %s.%d: omap_device_shutdown() called "
--		     "from invalid state\n", od->pdev.name, od->pdev.id);
-+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
-+		     od->pdev.name, od->pdev.id, __func__, od->_state);
- 		return -EINVAL;
- 	}
- 
+ 	/* Set IVA2 boot mode to 'idle' */
