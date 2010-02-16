@@ -1,35 +1,114 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Feb 2010 18:24:44 -0700
-Subject: [PATCH 04/19] OMAP3: Clock: Added IDLEST definitions for SGX
+Date: Mon, 15 Feb 2010 18:24:48 -0700
+Subject: [PATCH 07/19] OMAP3 PM: Adding counters for power domain logic off
+	and mem off during retention.
 In-Reply-To: <20100216011942.1101.14348.stgit@localhost.localdomain>
 References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-Message-ID: <20100216012443.1101.30955.stgit@localhost.localdomain>
+Message-ID: <20100216012447.1101.72353.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+From: Thara Gopinath <thara@ti.com>
 
-Added definitions for OMAP3430ES2_ST_SGX_SHIFT and OMAP3430ES2_ST_SGX_MASK
-as these were missing.
+This patch adds counters to keep track of whether the powerdomain
+logic or software controllable memory banks are turned off when
+the power domain enters retention. During power domain retention
+if logic gets turned off, the scenario is known as Open Switch Retention.
+Also during retention s/w controllable memory banks of a power
+domain can be chosen to be kept in retention or off.
 
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+This patch adds one counter per powerdomain to track the power domain
+logic state during retention. Number of memory bank state counters
+added depends on the number of software controllable memory banks
+of the powerdomain. To view these counters do
+	cat ../debug/pm_debug/count
+
+Signed-off-by: Thara Gopinath <thara@ti.com>
+[paul at pwsan.com: conditional expressions simplified; counter increment
+ code moved to its own function]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/cm-regbits-34xx.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm-debug.c                |    5 +++++
+ arch/arm/mach-omap2/powerdomain.c             |   25 +++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/powerdomain.h |    2 ++
+ 3 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
-index a76e835..d18da47 100644
---- a/arch/arm/mach-omap2/cm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
-@@ -379,6 +379,10 @@
- #define OMAP3430ES2_CM_FCLKEN_SGX_EN_SGX_SHIFT		1
- #define OMAP3430ES2_CM_FCLKEN_SGX_EN_SGX_MASK		(1 << 1)
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 0ce356f..c18f7f2 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -385,6 +385,11 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
+ 			pwrdm->state_counter[i]);
  
-+/* CM_IDLEST_SGX */
-+#define OMAP3430ES2_ST_SGX_SHIFT			1
-+#define OMAP3430ES2_ST_SGX_MASK				(1 << 1)
++	seq_printf(s, ",RET-LOGIC-OFF:%d", pwrdm->ret_logic_off_counter);
++	for (i = 0; i < pwrdm->banks; i++)
++		seq_printf(s, ",RET-MEMBANK%d-OFF:%d", i + 1,
++				pwrdm->ret_mem_off_counter[i]);
 +
- /* CM_ICLKEN_SGX */
- #define OMAP3430ES2_CM_ICLKEN_SGX_EN_SGX_SHIFT		0
- #define OMAP3430ES2_CM_ICLKEN_SGX_EN_SGX_MASK		(1 << 0)
+ 	seq_printf(s, "\n");
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index e9eeaa4..9a0fb38 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -125,6 +125,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
+ 		pwrdm->state_counter[i] = 0;
+ 
++	pwrdm->ret_logic_off_counter = 0;
++	for (i = 0; i < pwrdm->banks; i++)
++		pwrdm->ret_mem_off_counter[i] = 0;
++
+ 	pwrdm_wait_transition(pwrdm);
+ 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
+ 	pwrdm->state_counter[pwrdm->state] = 1;
+@@ -134,6 +138,25 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	return 0;
+ }
+ 
++static void _update_logic_membank_counters(struct powerdomain *pwrdm)
++{
++	int i;
++	u8 prev_logic_pwrst, prev_mem_pwrst;
++
++	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
++	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
++	    (prev_logic_pwrst == PWRDM_POWER_OFF))
++		pwrdm->ret_logic_off_counter++;
++
++	for (i = 0; i < pwrdm->banks; i++) {
++		prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
++
++		if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
++		    (prev_mem_pwrst == PWRDM_POWER_OFF))
++			pwrdm->ret_mem_off_counter[i]++;
++	}
++}
++
+ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ {
+ 
+@@ -153,6 +176,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 		prev = pwrdm_read_prev_pwrst(pwrdm);
+ 		if (pwrdm->state != prev)
+ 			pwrdm->state_counter[prev]++;
++		if (prev == PWRDM_POWER_RET)
++			_update_logic_membank_counters(pwrdm);
+ 		break;
+ 	default:
+ 		return -EINVAL;
+diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
+index 6657ff2..d82b2c0 100644
+--- a/arch/arm/plat-omap/include/plat/powerdomain.h
++++ b/arch/arm/plat-omap/include/plat/powerdomain.h
+@@ -100,6 +100,8 @@ struct powerdomain {
+ 	struct list_head node;
+ 	int state;
+ 	unsigned state_counter[PWRDM_MAX_PWRSTS];
++	unsigned ret_logic_off_counter;
++	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+ 
+ #ifdef CONFIG_PM_DEBUG
+ 	s64 timer;
