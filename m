@@ -1,41 +1,46 @@
 From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Tue, 16 Feb 2010 22:41:52 +0100
-Subject: [PATCH 1/2] arm/pxa: Enable check_scoop_reg() only if CONFIG_PM is
-	set.
-Message-ID: <1266356512-1269-1-git-send-email-stefan@datenfreihafen.org>
+Date: Tue, 16 Feb 2010 22:42:55 +0100
+Subject: [PATCH 2/2] arm/pxa: Let zeus.c link without CONFIG_PM enabled.
+Message-ID: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function gets only called from scoop_suspend() and scoop_resume() which are
-only built in if we have CONFIG_PM set. Make it the same for check_scoop_reg().
+Add some safety check for CONFIG_PM around zeus_power_off(). Without it linking
+can fail like this:
 
-This fixes the following warning:
-arch/arm/common/scoop.c:143: warning: ?check_scoop_reg? defined but not used
+arch/arm/mach-pxa/built-in.o: In function `zeus_power_off':
+e800.c:(.text+0x2bc8): undefined reference to `pxa27x_cpu_suspend'
 
 Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
----
- arch/arm/common/scoop.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
-index 37bda5f..9012004 100644
---- a/arch/arm/common/scoop.c
-+++ b/arch/arm/common/scoop.c
-@@ -140,6 +140,7 @@ EXPORT_SYMBOL(reset_scoop);
- EXPORT_SYMBOL(read_scoop_reg);
- EXPORT_SYMBOL(write_scoop_reg);
+--
+
+This smells a bit fishy as zeus_power_off() is only mapped to pm_power_off and
+that one seems to come and go to nowhere. Is this any magic I don't get on a
+first glance?
+---
+ arch/arm/mach-pxa/zeus.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index 75f2a37..213279d 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -621,11 +621,15 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
+ 	.udc_command = zeus_udc_command,
+ };
  
 +#ifdef CONFIG_PM
- static void check_scoop_reg(struct scoop_dev *sdev)
+ static void zeus_power_off(void)
  {
- 	unsigned short mcr;
-@@ -149,7 +150,6 @@ static void check_scoop_reg(struct scoop_dev *sdev)
- 		iowrite16(0x0101, sdev->base + SCOOP_MCR);
+ 	local_irq_disable();
+ 	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP);
  }
++#else
++#define zeus_power_off   NULL
++#endif
  
--#ifdef CONFIG_PM
- static int scoop_suspend(struct platform_device *dev, pm_message_t state)
- {
- 	struct scoop_dev *sdev = platform_get_drvdata(dev);
+ #ifdef CONFIG_APM_EMULATION
+ static void zeus_get_power_status(struct apm_power_info *info)
 -- 
 1.6.6.2
