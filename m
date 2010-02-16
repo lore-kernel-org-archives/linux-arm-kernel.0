@@ -1,433 +1,136 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Feb 2010 18:24:55 -0700
-Subject: [PATCH 13/19] OMAP3: hwmod: support to specify the offset position of
-	various SYSCONFIG register bits.
+Date: Mon, 15 Feb 2010 18:24:58 -0700
+Subject: [PATCH 14/19] OMAP: HWMOD: Add support for early device register into
+	omap device layer
 In-Reply-To: <20100216011942.1101.14348.stgit@localhost.localdomain>
 References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-Message-ID: <20100216012454.1101.75905.stgit@localhost.localdomain>
+Message-ID: <20100216012455.1101.2409.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thara Gopinath <thara@ti.com>
 
-In OMAP3 Some modules like Smartreflex do not have the regular sysconfig
-register.Instead clockactivity bits are part of another register at a
-different bit position than the usual bit positions 8 and 9.
-
-In OMAP4, a new scheme is available  due to the new protocol
-between the PRCM and the IPs. Depending of the scheme, the SYSCONFIG
-bitfields position will be different.
-The IP_REVISION register should be at offset 0x00.
-It should contain a SCHEME field. From this we can determine whether
-the IP follows legacy scheme or the new scheme.
-
-31:30 SCHEME  Used to distinguish between old scheme and current.
- Read 0x0:  Legacy protocol.
- Read 0x1:  New PRCM protocol defined for new OMAP4 IPs
-
-For legacy IP
- 13:12 MIDLEMODE
- 11:8  CLOCKACTIVITY
- 6     EMUSOFT
- 5     EMUFREE
- 4:3   SIDLEMODE
- 2     ENAWAKEUP
- 1     SOFTRESET
- 0     AUTOIDLE
-
-For new OMAP4 IP's, the bit position in SYSCONFIG is (for simple target):
- 5:4   STANDBYMODE (Ex MIDLEMODE)
- 3:2   IDLEMODE (Ex SIDLEMODE)
- 1     FREEEMU (Ex EMUFREE)
- 0     SOFTRESET
-
-Unfortunately In OMAP4 also some IPs will not follow any of these
-two schemes. This is the case at least for McASP, SmartReflex
-and some security IPs.
-
-This patch introduces a new field sysc_fields in omap_hwmod_sysconfig which
-can be used by the hwmod structures to specify the offsets for the
-sysconfig register of the IP.Also two static structures
-omap_hwmod_sysc_type1 and omap_hwmod_sysc_type2 are defined
-which can be used directly to populate the sysc_fields if the IP follows
-legacy or new OMAP4 scheme. If the IP follows none of these two schemes
-a new omap_hwmod_sysc_fields structure has to be defined and
-passed as part of omap_hwmod_sysconfig.
+This patch adds support in omap device layer to register devices
+as early platform devices. Certain devices needed during system boot up
+like timers, gpio etc can be registered as early devices. This will
+allow for them to be probed very early on during system boot up.
+This patch adds a parameter is_early_device in omap_device_build.
+Depending on this parameter a call to early_platform_add_devices
+or platform_register_device is made.
 
 Signed-off-by: Thara Gopinath <thara@ti.com>
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/Makefile                 |    3 +
- arch/arm/mach-omap2/omap_hwmod.c             |  100 +++++++++++++++++++++++---
- arch/arm/mach-omap2/omap_hwmod_common_data.c |   44 +++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   73 +++++++++++++++----
- 4 files changed, 191 insertions(+), 29 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_data.c
+ arch/arm/plat-omap/include/plat/omap_device.h |    5 ++--
+ arch/arm/plat-omap/omap_device.c              |   33 ++++++++++++++++++++++---
+ 2 files changed, 32 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 34c2867..10e6c6e 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -5,7 +5,8 @@
- # Common support
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 4677ff7..3694b62 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -90,15 +90,16 @@ struct omap_device *omap_device_build(const char *pdev_name, int pdev_id,
+ 				      struct omap_hwmod *oh, void *pdata,
+ 				      int pdata_len,
+ 				      struct omap_device_pm_latency *pm_lats,
+-				      int pm_lats_cnt);
++				      int pm_lats_cnt, int is_early_device);
  
--omap-2-3-common				= irq.o sdrc.o omap_hwmod.o
-+omap-2-3-common				= irq.o sdrc.o omap_hwmod.o \
-+					  omap_hwmod_common_data.o
- omap-3-4-common				= dpll3xxx.o
- prcm-common				= prcm.o powerdomain.o
- clock-common				= clock.o clock_common_data.o \
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 70912d1..fb11ec1 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -137,12 +137,24 @@ static void _write_sysconfig(u32 v, struct omap_hwmod *oh)
- static int _set_master_standbymode(struct omap_hwmod *oh, u8 standbymode,
- 				   u32 *v)
- {
-+	u32 mstandby_mask;
-+	u8 mstandby_shift;
-+
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE))
- 		return -EINVAL;
+ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 					 struct omap_hwmod **oh, int oh_cnt,
+ 					 void *pdata, int pdata_len,
+ 					 struct omap_device_pm_latency *pm_lats,
+-					 int pm_lats_cnt);
++					 int pm_lats_cnt, int is_early_device);
  
--	*v &= ~SYSC_MIDLEMODE_MASK;
--	*v |= __ffs(standbymode) << SYSC_MIDLEMODE_SHIFT;
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	mstandby_shift = oh->sysconfig->sysc_fields->midle_shift;
-+	mstandby_mask = (0x3 << mstandby_shift);
-+
-+	*v &= ~mstandby_mask;
-+	*v |= __ffs(standbymode) << mstandby_shift;
+ int omap_device_register(struct omap_device *od);
++int omap_early_device_register(struct omap_device *od);
  
- 	return 0;
- }
-@@ -159,12 +171,24 @@ static int _set_master_standbymode(struct omap_hwmod *oh, u8 standbymode,
-  */
- static int _set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode, u32 *v)
- {
-+	u32 sidle_mask;
-+	u8 sidle_shift;
-+
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SIDLEMODE))
- 		return -EINVAL;
- 
--	*v &= ~SYSC_SIDLEMODE_MASK;
--	*v |= __ffs(idlemode) << SYSC_SIDLEMODE_SHIFT;
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	sidle_shift = oh->sysconfig->sysc_fields->sidle_shift;
-+	sidle_mask = (0x3 << sidle_shift);
-+
-+	*v &= ~sidle_mask;
-+	*v |= __ffs(idlemode) << sidle_shift;
- 
- 	return 0;
- }
-@@ -182,12 +206,24 @@ static int _set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode, u32 *v)
-  */
- static int _set_clockactivity(struct omap_hwmod *oh, u8 clockact, u32 *v)
- {
-+	u32 clkact_mask;
-+	u8  clkact_shift;
-+
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY))
- 		return -EINVAL;
- 
--	*v &= ~SYSC_CLOCKACTIVITY_MASK;
--	*v |= clockact << SYSC_CLOCKACTIVITY_SHIFT;
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	clkact_shift = oh->sysconfig->sysc_fields->clkact_shift;
-+	clkact_mask = (0x3 << clkact_shift);
-+
-+	*v &= ~clkact_mask;
-+	*v |= clockact << clkact_shift;
- 
- 	return 0;
- }
-@@ -202,11 +238,21 @@ static int _set_clockactivity(struct omap_hwmod *oh, u8 clockact, u32 *v)
-  */
- static int _set_softreset(struct omap_hwmod *oh, u32 *v)
- {
-+	u32 softrst_mask;
-+
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SOFTRESET))
- 		return -EINVAL;
- 
--	*v |= SYSC_SOFTRESET_MASK;
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	softrst_mask = (0x1 << oh->sysconfig->sysc_fields->srst_shift);
-+
-+	*v |= softrst_mask;
- 
- 	return 0;
- }
-@@ -227,12 +273,24 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
- static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
- 				u32 *v)
- {
-+	u32 autoidle_mask;
-+	u8 autoidle_shift;
-+
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE))
- 		return -EINVAL;
- 
--	*v &= ~SYSC_AUTOIDLE_MASK;
--	*v |= autoidle << SYSC_AUTOIDLE_SHIFT;
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	autoidle_shift = oh->sysconfig->sysc_fields->autoidle_shift;
-+	autoidle_mask = (0x3 << autoidle_shift);
-+
-+	*v &= ~autoidle_mask;
-+	*v |= autoidle << autoidle_shift;
- 
- 	return 0;
- }
-@@ -246,14 +304,22 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
-  */
- static int _enable_wakeup(struct omap_hwmod *oh)
- {
--	u32 v;
-+	u32 v, wakeup_mask;
- 
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	wakeup_mask = (0x1 << oh->sysconfig->sysc_fields->enwkup_shift);
-+
- 	v = oh->_sysc_cache;
--	v |= SYSC_ENAWAKEUP_MASK;
-+	v |= wakeup_mask;
- 	_write_sysconfig(v, oh);
- 
- 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
-@@ -272,14 +338,22 @@ static int _enable_wakeup(struct omap_hwmod *oh)
-  */
- static int _disable_wakeup(struct omap_hwmod *oh)
- {
--	u32 v;
-+	u32 v, wakeup_mask;
- 
- 	if (!oh->sysconfig ||
- 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
-+	if (!oh->sysconfig->sysc_fields) {
-+		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
-+			"sysconfig not provided!\n");
-+		return -EINVAL;
-+	}
-+
-+	wakeup_mask = (0x1 << oh->sysconfig->sysc_fields->enwkup_shift);
-+
- 	v = oh->_sysc_cache;
--	v &= ~SYSC_ENAWAKEUP_MASK;
-+	v &= ~wakeup_mask;
- 	_write_sysconfig(v, oh);
- 
- 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.c b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-new file mode 100644
-index 0000000..2567c6e
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-@@ -0,0 +1,44 @@
-+/*
-+ * omap_hwmod common data structures
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ * Thara Gopinath <thara@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This data/structures are to be used while defining OMAP on-chip module
-+ * data and their integration with other OMAP modules and Linux.
-+ */
-+
-+#include <plat/omap_hwmod.h>
-+
-+/**
-+ * struct omap_hwmod_sysc_type1 - TYPE1 sysconfig scheme.
-+ *
-+ * To be used by hwmod structure to specify the sysconfig offsets
-+ * if the device ip is compliant with the original PRCM protocol
-+ * defined for OMAP2420.
-+ */
-+struct omap_hwmod_sysc_fields omap_hwmod_sysc_type1 = {
-+	.midle_shift	= SYSC_TYPE1_MIDLEMODE_SHIFT,
-+	.clkact_shift	= SYSC_TYPE1_CLOCKACTIVITY_SHIFT,
-+	.sidle_shift	= SYSC_TYPE1_SIDLEMODE_SHIFT,
-+	.enwkup_shift	= SYSC_TYPE1_ENAWAKEUP_SHIFT,
-+	.srst_shift	= SYSC_TYPE1_SOFTRESET_SHIFT,
-+	.autoidle_shift	= SYSC_TYPE1_AUTOIDLE_SHIFT,
-+};
-+
-+/**
-+ * struct omap_hwmod_sysc_type2 - TYPE2 sysconfig scheme.
-+ *
-+ * To be used by hwmod structure to specify the sysconfig offsets if the
-+ * device ip is compliant with the new PRCM protocol defined for new
-+ * OMAP4 IPs.
-+ */
-+struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2 = {
-+	.midle_shift	= SYSC_TYPE2_MIDLEMODE_SHIFT,
-+	.sidle_shift	= SYSC_TYPE2_SIDLEMODE_SHIFT,
-+	.srst_shift	= SYSC_TYPE2_SOFTRESET_SHIFT,
-+};
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 921990e..665420e 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -33,25 +33,42 @@
- #define __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_OMAP_HWMOD_H
- 
- #include <linux/kernel.h>
-+#include <linux/list.h>
- #include <linux/ioport.h>
--
- #include <plat/cpu.h>
- 
- struct omap_device;
- 
--/* OCP SYSCONFIG bit shifts/masks */
--#define SYSC_MIDLEMODE_SHIFT		12
--#define SYSC_MIDLEMODE_MASK		(0x3 << SYSC_MIDLEMODE_SHIFT)
--#define SYSC_CLOCKACTIVITY_SHIFT	8
--#define SYSC_CLOCKACTIVITY_MASK		(0x3 << SYSC_CLOCKACTIVITY_SHIFT)
--#define SYSC_SIDLEMODE_SHIFT		3
--#define SYSC_SIDLEMODE_MASK		(0x3 << SYSC_SIDLEMODE_SHIFT)
--#define SYSC_ENAWAKEUP_SHIFT		2
--#define SYSC_ENAWAKEUP_MASK		(1 << SYSC_ENAWAKEUP_SHIFT)
--#define SYSC_SOFTRESET_SHIFT		1
--#define SYSC_SOFTRESET_MASK		(1 << SYSC_SOFTRESET_SHIFT)
--#define SYSC_AUTOIDLE_SHIFT		0
--#define SYSC_AUTOIDLE_MASK		(1 << SYSC_AUTOIDLE_SHIFT)
-+extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type1;
-+extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
-+
-+/*
-+ * OCP SYSCONFIG bit shifts/masks TYPE1. These are for IPs compliant
-+ * with the original PRCM protocol defined for OMAP2420
-+ */
-+#define SYSC_TYPE1_MIDLEMODE_SHIFT	12
-+#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3 << SYSC_MIDLEMODE_SHIFT)
-+#define SYSC_TYPE1_CLOCKACTIVITY_SHIFT	8
-+#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3 << SYSC_CLOCKACTIVITY_SHIFT)
-+#define SYSC_TYPE1_SIDLEMODE_SHIFT	3
-+#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3 << SYSC_SIDLEMODE_SHIFT)
-+#define SYSC_TYPE1_ENAWAKEUP_SHIFT	2
-+#define SYSC_TYPE1_ENAWAKEUP_MASK	(1 << SYSC_ENAWAKEUP_SHIFT)
-+#define SYSC_TYPE1_SOFTRESET_SHIFT	1
-+#define SYSC_TYPE1_SOFTRESET_MASK	(1 << SYSC_SOFTRESET_SHIFT)
-+#define SYSC_TYPE1_AUTOIDLE_SHIFT	0
-+#define SYSC_TYPE1_AUTOIDLE_MASK	(1 << SYSC_AUTOIDLE_SHIFT)
-+
-+/*
-+ * OCP SYSCONFIG bit shifts/masks TYPE2. These are for IPs compliant
-+ * with the new PRCM protocol defined for new OMAP4 IPs.
-+ */
-+#define SYSC_TYPE2_SOFTRESET_SHIFT	0
-+#define SYSC_TYPE2_SOFTRESET_MASK	(1 << SYSC_TYPE2_SOFTRESET_SHIFT)
-+#define SYSC_TYPE2_SIDLEMODE_SHIFT	2
-+#define SYSC_TYPE2_SIDLEMODE_MASK	(0x3 << SYSC_TYPE2_SIDLEMODE_SHIFT)
-+#define SYSC_TYPE2_MIDLEMODE_SHIFT	4
-+#define SYSC_TYPE2_MIDLEMODE_MASK	(0x3 << SYSC_TYPE2_MIDLEMODE_SHIFT)
- 
- /* OCP SYSSTATUS bit shifts/masks */
- #define SYSS_RESETDONE_SHIFT		0
-@@ -62,7 +79,6 @@ struct omap_device;
- #define HWMOD_IDLEMODE_NO		(1 << 1)
- #define HWMOD_IDLEMODE_SMART		(1 << 2)
- 
--
- /**
-  * struct omap_hwmod_irq_info - MPU IRQs used by the hwmod
-  * @name: name of the IRQ channel (module local name)
-@@ -236,6 +252,24 @@ struct omap_hwmod_ocp_if {
- #define CLOCKACT_TEST_NONE	0x3
- 
- /**
-+ * struct omap_hwmod_sysc_fields - hwmod OCP_SYSCONFIG register field offsets.
-+ * @midle_shift: Offset of the midle bit
-+ * @clkact_shift: Offset of the clockactivity bit
-+ * @sidle_shift: Offset of the sidle bit
-+ * @enwkup_shift: Offset of the enawakeup bit
-+ * @srst_shift: Offset of the softreset bit
-+ * @autoidle_shift: Offset of the autoidle bit.
-+ */
-+struct omap_hwmod_sysc_fields {
-+	u8 midle_shift;
-+	u8 clkact_shift;
-+	u8 sidle_shift;
-+	u8 enwkup_shift;
-+	u8 srst_shift;
-+	u8 autoidle_shift;
-+};
-+
-+/**
-  * struct omap_hwmod_sysconfig - hwmod OCP_SYSCONFIG/OCP_SYSSTATUS data
-  * @rev_offs: IP block revision register offset (from module base addr)
-  * @sysc_offs: OCP_SYSCONFIG register offset (from module base addr)
-@@ -252,6 +286,14 @@ struct omap_hwmod_ocp_if {
-  * been associated with the clocks marked in @clockact.  This field is
-  * only used if HWMOD_SET_DEFAULT_CLOCKACT is set (see below)
+ /* OMAP PM interface */
+ int omap_device_align_pm_lat(struct platform_device *pdev,
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index c739a04..5904358 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -307,6 +307,7 @@ int omap_device_fill_resources(struct omap_device *od, struct resource *res)
+  * @pdata_len: amount of memory pointed to by @pdata
+  * @pm_lats: pointer to a omap_device_pm_latency array for this device
+  * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
++ * @is_early_device: should the device be registered as an early device or not
   *
-+ *
-+ * @sysc_fields: structure containing the offset positions of various bits in
-+ * SYSCONFIG register. This can be populated using omap_hwmod_sysc_type1 or
-+ * omap_hwmod_sysc_type2 defined in omap_hwmod_common_data.c depending on
-+ * whether the device ip is compliant with the original PRCM protocol
-+ * defined for OMAP2420 or the new  PRCM protocol for new OMAP4 IPs.
-+ * If the device follows a differnt scheme for the sysconfig register ,
-+ * then this field has to be populated with the correct offset structure.
-  */
- struct omap_hwmod_sysconfig {
- 	u16 rev_offs;
-@@ -260,6 +302,7 @@ struct omap_hwmod_sysconfig {
- 	u8 idlemodes;
- 	u8 sysc_flags;
- 	u8 clockact;
-+	struct omap_hwmod_sysc_fields *sysc_fields;
- };
+  * Convenience function for building and registering a single
+  * omap_device record, which in turn builds and registers a
+@@ -318,7 +319,7 @@ struct omap_device *omap_device_build(const char *pdev_name, int pdev_id,
+ 				      struct omap_hwmod *oh, void *pdata,
+ 				      int pdata_len,
+ 				      struct omap_device_pm_latency *pm_lats,
+-				      int pm_lats_cnt)
++				      int pm_lats_cnt, int is_early_device)
+ {
+ 	struct omap_hwmod *ohs[] = { oh };
+ 
+@@ -326,7 +327,8 @@ struct omap_device *omap_device_build(const char *pdev_name, int pdev_id,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	return omap_device_build_ss(pdev_name, pdev_id, ohs, 1, pdata,
+-				    pdata_len, pm_lats, pm_lats_cnt);
++				    pdata_len, pm_lats, pm_lats_cnt,
++				    is_early_device);
+ }
  
  /**
+@@ -338,6 +340,7 @@ struct omap_device *omap_device_build(const char *pdev_name, int pdev_id,
+  * @pdata_len: amount of memory pointed to by @pdata
+  * @pm_lats: pointer to a omap_device_pm_latency array for this device
+  * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
++ * @is_early_device: should the device be registered as an early device or not
+  *
+  * Convenience function for building and registering an omap_device
+  * subsystem record.  Subsystem records consist of multiple
+@@ -349,7 +352,7 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 					 struct omap_hwmod **ohs, int oh_cnt,
+ 					 void *pdata, int pdata_len,
+ 					 struct omap_device_pm_latency *pm_lats,
+-					 int pm_lats_cnt)
++					 int pm_lats_cnt, int is_early_device)
+ {
+ 	int ret = -ENOMEM;
+ 	struct omap_device *od;
+@@ -407,7 +410,11 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 
+ 	od->magic = OMAP_DEVICE_MAGIC;
+ 
+-	ret = omap_device_register(od);
++	if (is_early_device)
++		ret = omap_early_device_register(od);
++	else
++		ret = omap_device_register(od);
++
+ 	if (ret)
+ 		goto odbs_exit4;
+ 
+@@ -428,6 +435,24 @@ odbs_exit1:
+ }
+ 
+ /**
++ * omap_early_device_register - register an omap_device as an early platform
++ * device.
++ * @od: struct omap_device * to register
++ *
++ * Register the omap_device structure.  This currently just calls
++ * platform_early_add_device() on the underlying platform_device.
++ * Returns 0 by default.
++ */
++int omap_early_device_register(struct omap_device *od)
++{
++	struct platform_device *devices[1];
++
++	devices[0] = &(od->pdev);
++	early_platform_add_devices(devices, 1);
++	return 0;
++}
++
++/**
+  * omap_device_register - register an omap_device with one omap_hwmod
+  * @od: struct omap_device * to register
+  *
