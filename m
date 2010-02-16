@@ -1,61 +1,19 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Tue, 16 Feb 2010 22:12:55 +0000
-Subject: [PATCH 2/2] arm/pxa: Let zeus.c link without CONFIG_PM enabled.
-In-Reply-To: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
-References: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
-Message-ID: <20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Feb 2010 23:11:52 +0000
+Subject: [PATCH v2 08/13] OMAP3/4 clock: split into per-chip family files
+In-Reply-To: <20100216192301.GQ21755@atomide.com>
+References: <20100211181236.795.56094.stgit@localhost.localdomain>
+	<20100211181706.795.84644.stgit@localhost.localdomain>
+	<alpine.DEB.2.00.1002151755530.28188@utopia.booyaka.com>
+	<20100216192301.GQ21755@atomide.com>
+Message-ID: <20100216231152.GA22618@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Feb 2010 22:42:55 +0100
-Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+On Tue, Feb 16, 2010 at 11:23:01AM -0800, Tony Lindgren wrote:
+> Just to comment on the naming, we should call additional cpu options
+> CONFIG_CPU_OMAP3630 etc instead of CONFIG_ARCH_OMAP to avoid confusion.
 
-> Add some safety check for CONFIG_PM around zeus_power_off(). Without it linking
-> can fail like this:
-> 
-> arch/arm/mach-pxa/built-in.o: In function `zeus_power_off':
-> e800.c:(.text+0x2bc8): undefined reference to `pxa27x_cpu_suspend'
-> 
-> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
-> 
-> --
-> 
-> This smells a bit fishy as zeus_power_off() is only mapped to pm_power_off and
-> that one seems to come and go to nowhere. Is this any magic I don't get on a
-> first glance?
-
-The magic takes place in arch/arm/kernel/process.c.
-
-> ---
->  arch/arm/mach-pxa/zeus.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-> index 75f2a37..213279d 100644
-> --- a/arch/arm/mach-pxa/zeus.c
-> +++ b/arch/arm/mach-pxa/zeus.c
-> @@ -621,11 +621,15 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
->  	.udc_command = zeus_udc_command,
->  };
->  
-> +#ifdef CONFIG_PM
->  static void zeus_power_off(void)
->  {
->  	local_irq_disable();
->  	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP);
->  }
-> +#else
-> +#define zeus_power_off   NULL
-> +#endif
->  
->  #ifdef CONFIG_APM_EMULATION
->  static void zeus_get_power_status(struct apm_power_info *info)
-
-Acked-by: Marc Zyngier <maz@misterjones.org>
-
-Eric, are you willing to take this directly, or do you want me to queue
-it for the next merge window with the rest of the fixes?
-
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+Or CONFIG_SOC_OMAP3630.  OMAP3630 is not a CPU type - it's a description
+of the whole system.  The CPU is just the processor and caches without
+peripherals.
