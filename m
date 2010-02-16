@@ -1,44 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Feb 2010 09:39:46 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002161007.20576.oliver@neukum.org>
-References: <20100208065519.GE1290@ucw.cz>
-	<201002160922.47072.oliver@neukum.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7DBB@dbde02.ent.ti.com>
-	<201002161007.20576.oliver@neukum.org>
-Message-ID: <20100216093946.GA13884@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 16 Feb 2010 14:00:07 +0300
+Subject: [PATCH 12/19] OMAP3 clock: Remove FreqSel for 3630
+In-Reply-To: <20100216012453.1101.96664.stgit@localhost.localdomain>
+References: <20100216011942.1101.14348.stgit@localhost.localdomain>
+	<20100216012453.1101.96664.stgit@localhost.localdomain>
+Message-ID: <4B7A7AB7.90503@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2010 at 10:07:20AM +0100, Oliver Neukum wrote:
-> Am Dienstag, 16. Februar 2010 09:55:55 schrieb Shilimkar, Santosh:
-> > > Would you care to elaborate on the exact nature of the bug you are fixing?
-> > On the OMAP4 (ARM cortex-a9) platform, the enumeration fails because control
-> > transfer buffers are corrupted. On our platform, we use PIO mode for control 
-> > transfers and DMA for bulk transfers.
-> > 
-> > The current stack performs dma cache maintenance even for the PIO transfers
-> > which leads to the corruption issue. The control buffers are handled by CPU 
-> > and they already coherent from CPU point of view.
-> 
-> How does the mapping corrupt buffers? It might impact performance, but why
-> do you see corruption?
+Hello.
 
-On map, buffers are cleaned if they're being used for DMA_TO_DEVICE and
-DMA_BIDIRECTIONAL, or invalidated in the case of DMA_FROM_DEVICE.
+Paul Walmsley wrote:
 
-However, because ARM CPUs can now speculatively prefetch, just leaving it
-at that results in corruption of buffers used for DMA.  So we have to
-invalidate DMA_FROM_DEVICE and DMA_BIDIRECTIONAL buffers on unmap to
-ensure coherency with DMA operations.
+> From: Vishwanath BS <vishwanath.bs@ti.com>
+>
+> DPLL_FREQSEL field in CLKEN_PLL register is no longer valid for
+> OMAP3630. So remove references to that.
+>
+> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/dpll3xxx.c |   11 +++++++----
+>  1 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index 2b559fc..84be81c 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -243,8 +243,11 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
+>  	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
+>  	_omap3_noncore_dpll_bypass(clk);
+>  
+> -	/* Set jitter correction */
+> -	if (!cpu_is_omap44xx()) {
+> +	/*
+> +	 * Set jitter correction. No jitter correction for OMAP4 and 3630
+> +	 * since freqsel is field is no longer present
+>   
 
-If the CPU writes to a DMA_FROM_DEVICE buffer between map and unmap, the
-writes can sit in the cache, and on unmap, they will be discarded.
+   I can't parse that comment. I guess first "is" is not needed. :-)
 
-Cleaning the cache on unmap is not an option; that too can lead to DMA
-buffer corruption in the DMA case.
-
-USB and associated host driver must abide by the DMA API buffer
-ownership rules otherwise the result will be data corruption; either
-that or USB/host driver people need to have a discussion with the
-DMA API authors to remove this sensible "restriction".
+WBR, Sergei
