@@ -1,43 +1,31 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 16 Feb 2010 14:00:07 +0300
-Subject: [PATCH 12/19] OMAP3 clock: Remove FreqSel for 3630
-In-Reply-To: <20100216012453.1101.96664.stgit@localhost.localdomain>
-References: <20100216011942.1101.14348.stgit@localhost.localdomain>
-	<20100216012453.1101.96664.stgit@localhost.localdomain>
-Message-ID: <4B7A7AB7.90503@ru.mvista.com>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Tue, 16 Feb 2010 14:32:57 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100216093946.GA13884@n2100.arm.linux.org.uk>
+References: <20100208065519.GE1290@ucw.cz>
+	<201002161007.20576.oliver@neukum.org>
+	<20100216093946.GA13884@n2100.arm.linux.org.uk>
+Message-ID: <201002161432.57705.oliver@neukum.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Am Dienstag, 16. Februar 2010 10:39:46 schrieb Russell King - ARM Linux:
+> However, because ARM CPUs can now speculatively prefetch, just leaving it
+> at that results in corruption of buffers used for DMA.  So we have to
+> invalidate DMA_FROM_DEVICE and DMA_BIDIRECTIONAL buffers on unmap to
+> ensure coherency with DMA operations.
+> 
+> If the CPU writes to a DMA_FROM_DEVICE buffer between map and unmap, the
+> writes can sit in the cache, and on unmap, they will be discarded.
+> 
+> Cleaning the cache on unmap is not an option; that too can lead to DMA
+> buffer corruption in the DMA case.
 
-Paul Walmsley wrote:
+I am afraid for these controllers the controller driver must be responsible
+for all DMA and cache issues. Indicating the exact requirements to the
+upper layer would be a battle already lost.
+so the safe choice is not to set has_dma and the generic layer will leave
+the issue to the lower level.
 
-> From: Vishwanath BS <vishwanath.bs@ti.com>
->
-> DPLL_FREQSEL field in CLKEN_PLL register is no longer valid for
-> OMAP3630. So remove references to that.
->
-> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/dpll3xxx.c |   11 +++++++----
->  1 files changed, 7 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 2b559fc..84be81c 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -243,8 +243,11 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
->  	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
->  	_omap3_noncore_dpll_bypass(clk);
->  
-> -	/* Set jitter correction */
-> -	if (!cpu_is_omap44xx()) {
-> +	/*
-> +	 * Set jitter correction. No jitter correction for OMAP4 and 3630
-> +	 * since freqsel is field is no longer present
->   
-
-   I can't parse that comment. I guess first "is" is not needed. :-)
-
-WBR, Sergei
+	Regards
+		Oliver
