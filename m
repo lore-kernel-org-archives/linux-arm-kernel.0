@@ -1,46 +1,46 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Tue, 16 Feb 2010 15:31:18 +0000
-Subject: [PATCH] ARM: RealView SD/MMC Card detection and write-protect using
-	GPIOLIB
-Message-ID: <20100216153118.23344.90703.stgit@ARM03585.cambridge.arm.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Tue, 16 Feb 2010 16:38:24 +0100
+Subject: [PATCH 0/3] mx25: framebuffer support
+In-Reply-To: <20100216151420.GD32332@jasper.tkos.co.il>
+References: <cover.1265786237.git.baruch@tkos.co.il>
+	<20100216151420.GD32332@jasper.tkos.co.il>
+Message-ID: <4B7ABBF0.1090102@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The switch to using GPIOLIB broke the sd/mmc card detection on the
-RealView development boards if GPIO_PL061 was not selected.
-This patch selects GPIO_PL061 if GPIOLIB is selected.
-The sense of the return value from mmc_status has also changed
-and is corrected.
+Hi,
 
-Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/Kconfig              |    1 +
- arch/arm/mach-realview/core.c |    2 +-
- 2 files changed, 2 insertions(+), 1 deletions(-)
+Baruch Siach schrieb:
+> Ping?
+> 
+> I'd really like to see this merged in .34.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c33ca8..a3c0baa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -235,6 +235,7 @@ config ARCH_REALVIEW
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select GPIO_PL061 if GPIOLIB
- 	help
- 	  This enables support for ARM Ltd RealView boards.
- 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 27e2338..06bb649 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -253,7 +253,7 @@ static unsigned int realview_mmc_status(struct device *dev)
- 	else
- 		mask = 2;
- 
--	return readl(REALVIEW_SYSMCI) & mask;
-+	return !(readl(REALVIEW_SYSMCI) & mask);
- }
- 
- struct mmci_platform_data realview_mmc0_plat_data = {
+if no one feels responsible for taking this stuff you might want to try 
+sending it to Andrew Morton (CC'ed). Just a general advice I really 
+don't know this framebuffer.
+
+
+Regards,
+
+Florian Tobias Schandinat
+
+> On Wed, Feb 10, 2010 at 09:25:17AM +0200, Baruch Siach wrote:
+>> This set of patches adds support for the i.MX25 LCD controller block using the 
+>> imxfb driver. Platform code for the i.MX25 PDK board is also added.
+>>
+>> Tested on the i.MX25 PDK.
+>>
+>> Baruch Siach (3):
+>>   imxfb: add support for i.MX25
+>>   mx25: add platform support for imxfb
+>>   mx25pdk: add LCD support
+>>
+>>  arch/arm/mach-mx25/clock.c                  |   12 ++++++
+>>  arch/arm/mach-mx25/devices.c                |   23 +++++++++++
+>>  arch/arm/mach-mx25/devices.h                |    1 +
+>>  arch/arm/mach-mx25/mx25pdk.c                |   55 +++++++++++++++++++++++++++
+>>  arch/arm/plat-mxc/include/mach/iomux-mx25.h |    2 +
+>>  arch/arm/plat-mxc/include/mach/mx25.h       |    2 +
+>>  drivers/video/Kconfig                       |    2 +-
+>>  7 files changed, 96 insertions(+), 1 deletions(-)
+> 
