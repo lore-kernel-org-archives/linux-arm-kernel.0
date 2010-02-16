@@ -1,47 +1,44 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 16 Feb 2010 09:15:25 +0000
-Subject: 11MPCore SCU performance counters in perf
-In-Reply-To: <000101caabd4$c0e526a0$42af73e0$@deacon@arm.com>
-References: <000101caabd4$c0e526a0$42af73e0$@deacon@arm.com>
-Message-ID: <20100216091525.GB5475@wear.picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Feb 2010 09:39:46 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <201002161007.20576.oliver@neukum.org>
+References: <20100208065519.GE1290@ucw.cz>
+	<201002160922.47072.oliver@neukum.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7DBB@dbde02.ent.ti.com>
+	<201002161007.20576.oliver@neukum.org>
+Message-ID: <20100216093946.GA13884@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Feb 16, 2010 at 10:07:20AM +0100, Oliver Neukum wrote:
+> Am Dienstag, 16. Februar 2010 09:55:55 schrieb Shilimkar, Santosh:
+> > > Would you care to elaborate on the exact nature of the bug you are fixing?
+> > On the OMAP4 (ARM cortex-a9) platform, the enumeration fails because control
+> > transfer buffers are corrupted. On our platform, we use PIO mode for control 
+> > transfers and DMA for bulk transfers.
+> > 
+> > The current stack performs dma cache maintenance even for the PIO transfers
+> > which leads to the corruption issue. The control buffers are handled by CPU 
+> > and they already coherent from CPU point of view.
+> 
+> How does the mapping corrupt buffers? It might impact performance, but why
+> do you see corruption?
 
-On Fri, Feb 12, 2010 at 11:15:58AM -0000, Will Deacon wrote:
-> Hi Jamie,
-> 
-> With the perf stuff now applied by Russell, I've had a go at porting the
-> oprofile backend to use perf. It's working well for v6 and v7 PMUs, but to
-> maintain full oprofile compatability, I need to add the following new
-> features to perf:
-> 
-> 1.) Support for xscale1/xscale2 PMUs 2.) Support for the 11MPCore SCU
-> 
-> I've done (1), but I still need to test it on some hardware. As for (2), I'm
-> not sure how to proceed. The oprofile SCU driver [op_model_mpcore.c] appears
-> only to support one board [the Realview EB11MP] and uses the board specific
-> macro __io_address to get at the SCU. Furthermore, because oprofile expects
-> to associate events with a particular core, the SCU counters are divided up
-> between the cores. I think this has the potential to make profiling results
-> quite misleading because some events [e.g. `A read transfer is sent to the
-> external memory.'] are not tied to a core, but oprofile will be forced to
-> choose one to report it on.
-> 
-> Looking at the oprofile userspace sources, the SCU events don't appear to be
-> supported. The 11MPCore is the only ARM core to expose the SCU performance
-> counters in this way and basically, I don't think it's worth supporting in
-> the kernel...
-> 
-> ...however, we will almost certainly want support for `uncore' counters in
-> the future [that is, counters not associated with a particular CPU]. I guess
-> the question is: do I hack SCU support into perf and establish a method for
-> supporting uncore counters at the same time, or shall I drop the SCU because
-> of the reasons above and leave the uncore problem for another day?
-Are the events particularly useful? I'd be inclined not to support them unless
-someone really needs them. The caveats that you mention are quite important
-and they really could be quite misleading. If the oprofile userspace doesn't
-support the SCU events then I don't see that we've lost anything...
+On map, buffers are cleaned if they're being used for DMA_TO_DEVICE and
+DMA_BIDIRECTIONAL, or invalidated in the case of DMA_FROM_DEVICE.
 
-Jamie
+However, because ARM CPUs can now speculatively prefetch, just leaving it
+at that results in corruption of buffers used for DMA.  So we have to
+invalidate DMA_FROM_DEVICE and DMA_BIDIRECTIONAL buffers on unmap to
+ensure coherency with DMA operations.
+
+If the CPU writes to a DMA_FROM_DEVICE buffer between map and unmap, the
+writes can sit in the cache, and on unmap, they will be discarded.
+
+Cleaning the cache on unmap is not an option; that too can lead to DMA
+buffer corruption in the DMA case.
+
+USB and associated host driver must abide by the DMA API buffer
+ownership rules otherwise the result will be data corruption; either
+that or USB/host driver people need to have a discussion with the
+DMA API authors to remove this sensible "restriction".
