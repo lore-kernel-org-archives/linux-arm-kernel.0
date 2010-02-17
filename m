@@ -1,30 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Feb 2010 19:03:20 +0000
-Subject: [PATCH 2/2] ARM: SMDK6410: Register IISv4 device
-In-Reply-To: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1266433400-26780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Feb 2010 11:24:24 -0800
+Subject: [PATCH v2] omap: Remove DEBUGFS dependency for mux name checking
+In-Reply-To: <1266427021-10990-1-git-send-email-ranjithl@ti.com>
+References: <1266427021-10990-1-git-send-email-ranjithl@ti.com>
+Message-ID: <20100217192423.GA21755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IISv4 controller is connected to the WM8580 on the board.
+* Ranjith Lohithakshan <ranjithl@ti.com> [100217 09:14]:
+> The check for a valid mux name should be performed regardless of whether
+> DEBUGFS is enabled or not.
+> 
+> This fixes the issue currently seen with boards not booting up
+> if DEBUGFS is not enabled in defconfig.
+> 
+> Signed-off-by: Ranjith Lohithakshan <ranjithl@ti.com>
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c6410/mach-smdk6410.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Thanks, I've updated the description a bit to include the error
+and added the patch into omap-fixes-for-linus.
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index 297f1fa..6176243 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -255,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_ohci,
- 	&s3c_device_usb_hsotg,
-+	&s3c64xx_device_iisv4,
- 
- #ifdef CONFIG_REGULATOR
- 	&smdk6410_b_pwr_5v,
--- 
-1.6.6.1
+Updated patch below.
+
+Regards,
+
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: fix-mux-debufs.patch
+Type: text/x-diff
+Size: 1871 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100217/738ff7aa/attachment.bin>
