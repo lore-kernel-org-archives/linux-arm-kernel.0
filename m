@@ -1,31 +1,35 @@
-From: andy@warmcat.com (Andy Green)
-Date: Wed, 17 Feb 2010 10:57:17 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Feb 2010 09:55:53 +0000
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100217095000.GA17643@pengutronix.de>
+In-Reply-To: <1266397543.16346.264.camel@pasglop>
 References: <20100208065519.GE1290@ucw.cz>
-	<1265622676.4020.19.camel@pc1117.cambridge.arm.com>
-	<4B6FE162.6000004@warmcat.com>
-	<20100217095000.GA17643@pengutronix.de>
-Message-ID: <4B7BBD7D.9090602@warmcat.com>
+	<1265628483.4020.63.camel@pc1117.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
+	<201002160922.47072.oliver@neukum.org>
+	<1266397543.16346.264.camel@pasglop>
+Message-ID: <20100217095553.GA30033@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/10 10:50, Somebody in the thread at some point said:
-> On Mon, Feb 08, 2010 at 11:03:14AM +0100, Andy Green wrote:
->> On 02/08/10 10:51, Somebody in the thread at some point said:
->>
->>> We could of course flush the caches every time we get a page fault but
->>> that's far from optimal, especially since DMA-capable drivers to do not
->>> pollute the D-cache and don't need this extra flushing. Note that the
->>> recent ARM processors have PIPT caches but separate for I and D and it's
->>> the PIO drivers that pollute the D-cache.
->>
->> Just noting that AFAIK iMX31 USB and MMC drivers both are PIO at the
->> moment, for lack of any platform DMA support of its unusual DMA engine.
->
-> The EHCI module has its own DMA engine and has nothing to do with the
-> SDMA engine.
+On Wed, Feb 17, 2010 at 08:05:43PM +1100, Benjamin Herrenschmidt wrote:
+> On Tue, 2010-02-16 at 09:22 +0100, Oliver Neukum wrote:
+> > This seems wrong to me. Buffers for control transfers may be
+> > transfered
+> > by DMA, so the caches must be flushed on architectures whose caches
+> > are not coherent with respect to DMA.
+> > 
+> > Would you care to elaborate on the exact nature of the bug you are
+> > fixing?
+> 
+> I missed part of this thread, so forgive me if I'm a bit off here, but
+> if the problem is indeed I$/D$ cache coherency vs. PIO transfers, then
+> this is a long solved issue on other archs such as ppc (and I _think_
+> sparc).
 
-You're right, my mistake.  iMX31 MMC is PIO due to no SDMA support though.
+Nope.  It's to do with mapping a buffer for DMA, and then doing PIO
+reads/writes to it.
 
--Andy
+With speculative prefetches, you have to deal with cache coherency with
+hardware DMA on DMA unmap.  If you've written to the buffer in violation
+of the DMA API buffer ownership rules, then your writes get thrown away
+resulting in immediate data corruption.
