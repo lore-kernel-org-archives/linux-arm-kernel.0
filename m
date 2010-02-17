@@ -1,30 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Feb 2010 19:17:06 +0100
-Subject: [PATCH 1/2] add mx3 cupid bsp cleanup
-In-Reply-To: <D99582E5322435468A77E74BB0039E7B176E1F3BBA@SRV02.hamburg.garz-fricke.de>
-References: <D99582E5322435468A77E74BB0039E7B176E1F3BBA@SRV02.hamburg.garz-fricke.de>
-Message-ID: <20100217181706.GB3880@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 17 Feb 2010 18:19:30 +0000
+Subject: [PATCH 2/3] ARM: S3C64XX: Add initial support for board specific IRQs
+In-Reply-To: <1266430771-6037-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1266430771-6037-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1266430771-6037-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Follow the scheme used for IRQs. By default 16 GPIOs are allocated
+for board use.
 
-I wouldn't split the patch.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c6400/include/mach/gpio.h |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-On Wed, Feb 17, 2010 at 05:54:53PM +0100, Carsten Behling wrote:
-> Hi,
-> 
-> this is the cleaned up patch for the CUPID BSP.
-> 
-> Carsten
-This isn't a message suitable to go into git.  You can write such things
-after the triple-dash below you S-o-b.
-
-Also please remove "cleanup" from the Subject. 
-> 
-> Signed-off-by: Carsten Behling <carsten.behling@garz-fricke.com>
-> ---
-
+diff --git a/arch/arm/mach-s3c6400/include/mach/gpio.h b/arch/arm/mach-s3c6400/include/mach/gpio.h
+index e8e35e8..0d46e99 100644
+--- a/arch/arm/mach-s3c6400/include/mach/gpio.h
++++ b/arch/arm/mach-s3c6400/include/mach/gpio.h
+@@ -91,6 +91,10 @@ enum s3c_gpio_number {
+ #define S3C_GPIO_END		S3C64XX_GPIO_END
+ 
+ /* define the number of gpios we need to the one after the GPQ() range */
+-#define ARCH_NR_GPIOS	(S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
++#define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
++
++#define BOARD_NR_GPIOS 16
++
++#define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
+ 
+ #include <asm-generic/gpio.h>
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.6.1
