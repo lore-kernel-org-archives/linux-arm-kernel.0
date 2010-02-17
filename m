@@ -1,22 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Feb 2010 16:00:58 +0100
-Subject: [PATCH 1/1] add mx3 cupid bsp with added to uncompress.h and
-	against mxc-master
-In-Reply-To: <D99582E5322435468A77E74BB0039E7B176E1F3BB6@SRV02.hamburg.garz-fricke.de>
-References: <D99582E5322435468A77E74BB0039E7B176E1F3BB6@SRV02.hamburg.garz-fricke.de>
-Message-ID: <20100217150058.GA25773@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Feb 2010 15:27:55 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1266397543.16346.264.camel@pasglop>
+References: <20100208065519.GE1290@ucw.cz>
+	<1265628483.4020.63.camel@pc1117.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
+	<201002160922.47072.oliver@neukum.org>
+	<1266397543.16346.264.camel@pasglop>
+Message-ID: <1266420475.16707.31.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 2010-02-17 at 20:05 +1100, Benjamin Herrenschmidt wrote:
+> On Tue, 2010-02-16 at 09:22 +0100, Oliver Neukum wrote:
+> > This seems wrong to me. Buffers for control transfers may be
+> > transfered
+> > by DMA, so the caches must be flushed on architectures whose caches
+> > are not coherent with respect to DMA.
+> > 
+> > Would you care to elaborate on the exact nature of the bug you are
+> > fixing?
+> 
+> I missed part of this thread, so forgive me if I'm a bit off here, but
+> if the problem is indeed I$/D$ cache coherency vs. PIO transfers, then
+> this is a long solved issue on other archs such as ppc (and I _think_
+> sparc).
 
-On Wed, Feb 17, 2010 at 03:42:01PM +0100, Carsten Behling wrote:
-> I removed the obsolete Macros and added the board to uncompress.h.
-and what about the other things pointed out?
+The thread I started was indeed regarding I/D cache coherency and PIO.
+But it diverged into DMA issues a few days ago (should have been a new
+thread).
 
-Best regards
-Uwe
+> The way we do it, at least on powerpc which is PIPT, is to keep track on
+> a per-page basis, whether a given page is clean for execution using
+> PG_arch1 bit. This bit is cleared when a new page is popped into the
+> page cache, and we clear it from flush_dcache_page() iirc (you may want
+> to dbl check I don't have the code at hand right now, or rather, I do
+> but I'm to lazy to look right now :-)
+
+We do the same on ARM. The problem with most (all) HCD drivers that do
+PIO is that they copy the data to the transfer buffer but there is no
+call in this driver to flush_dcache_page(). The upper mass storage or
+filesystem layers don't call this function either, so there isn't
+anything that would set the PG_arch1 bit.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
