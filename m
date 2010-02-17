@@ -1,119 +1,62 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 17 Feb 2010 18:13:15 +0100
-Subject: [PATCH 1/2] add mx3 cupid bsp cleanup
-In-Reply-To: <D99582E5322435468A77E74BB0039E7B176E1F3BBA@SRV02.hamburg.garz-fricke.de>
-References: <D99582E5322435468A77E74BB0039E7B176E1F3BBA@SRV02.hamburg.garz-fricke.de>
-Message-ID: <20100217171315.GK9007@buzzloop.caiaq.de>
+From: tim_th@posti.tyyppi.org (Timo TH)
+Date: Wed, 17 Feb 2010 19:16:54 +0200
+Subject: AT91SAM9263 USB Serial hang?
+In-Reply-To: <fc09324d1002102340o4444c8abve6d1d6bb5289d461@mail.gmail.com>
+References: <fc09324d1002102340o4444c8abve6d1d6bb5289d461@mail.gmail.com>
+Message-ID: <fc09324d1002170916l6ce9c6c4i58f41d2b9db6818f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2010 at 05:54:53PM +0100, Carsten Behling wrote:
+FYI: This was caused by microcom's and pppd's inability to TIOCMSET
+the RTS flags the way ftdi_sio wants it.
 
-[...]
-
-> diff --git a/arch/arm/plat-mxc/include/mach/board-guf_cupid.h b/arch/arm/plat-mxc/include/mach/board-guf_cupid.h
-> new file mode 100644
-> index 0000000..e10733b
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/board-guf_cupid.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright 2010 Garz & Fricke GmbH All Rights Reserved.
-> + *
-> + * Author: Carsten Behling <carsten.behling@garz-fricke.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor Boston, MA 02110-1301 USA
-> + */
-> +
-> +#ifndef __MACH_BOARD_GUF_CUPID_H__
-> +#define __MACH_BOARD_GUF_CUPID_H__
-> +
-> +#endif /* __MACH_BOARD_GUF_CUPID_H__ */
-
-Unless you plan to fill that file with live at some later point, you
-should remove it.
-
-> Signed-off-by: Carsten Behling <carsten.behling@garz-fricke.com>
-> ---
->  arch/arm/mach-mx3/Kconfig                        |    7 ++++++
->  arch/arm/mach-mx3/Makefile                       |    1 +
->  arch/arm/plat-mxc/include/mach/board-guf_cupid.h |   24 ++++++++++++++++++++++
->  3 files changed, 32 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/board-guf_cupid.h
-
-And what's that second patch about?
-
-Daniel
-
-
-> 
-> diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-> index 3872af1..a7e40d7 100644
-> --- a/arch/arm/mach-mx3/Kconfig
-> +++ b/arch/arm/mach-mx3/Kconfig
-> @@ -114,4 +114,11 @@ config MACH_KZM_ARM11_01
->           Include support for KZM-ARM11-01. This includes specific
->           configurations for the board and its peripherals.
-> 
-> +config MACH_GUF_CUPID
-> +       bool "Support Garz & Fricke Cupid platform"
-> +       select ARCH_MX35
-> +       help
-> +         Include support for Cupid platform. This includes specific
-> +         configurations for the board and its peripherals.
-> +
->  endif
-> diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-> index 5d650fd..7f9ca81 100644
-> --- a/arch/arm/mach-mx3/Makefile
-> +++ b/arch/arm/mach-mx3/Makefile
-> @@ -24,3 +24,4 @@ obj-$(CONFIG_MACH_PCM043)     += mach-pcm043.o
->  obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
->  obj-$(CONFIG_MACH_MX35_3DS)    += mach-mx35pdk.o
->  obj-$(CONFIG_MACH_KZM_ARM11_01)        += mach-kzm_arm11_01.o
-> +obj-$(CONFIG_MACH_GUF_CUPID)   += mach-guf_cupid.o
-> diff --git a/arch/arm/plat-mxc/include/mach/board-guf_cupid.h b/arch/arm/plat-mxc/include/mach/board-guf_cupid.h
-> new file mode 100644
-> index 0000000..e10733b
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/board-guf_cupid.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright 2010 Garz & Fricke GmbH All Rights Reserved.
-> + *
-> + * Author: Carsten Behling <carsten.behling@garz-fricke.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor Boston, MA 02110-1301 USA
-> + */
-> +
-> +#ifndef __MACH_BOARD_GUF_CUPID_H__
-> +#define __MACH_BOARD_GUF_CUPID_H__
-> +
-> +#endif /* __MACH_BOARD_GUF_CUPID_H__ */
-> --
-> 1.6.0.2
-> 
+On 11 February 2010 09:40, Timo TH <tim_th@posti.tyyppi.org> wrote:
+> Anyone seen this kind of a problem?
+>
+> Environment : ARM9 SAM9263ek, gprs modem on usb, (pppd 2.4.4)
+>
+> With Linux 2.6.27.34 everything worked OK. (with at91-patches)
+> Upgraded to Linux 2.6.31.6 and now everything works upto point where
+> data connection should be made.
+> Something wrong with handling of DTR or DCD or what?
+>
+>
+>
+> # modprobe ftdi_sio
+> usbcore: registered new interface driver usbserial
+> USB Serial support registered for generic
+> usbcore: registered new interface driver usbserial_generic
+> USB Serial support registered for FTDI USB Serial Device
+> ftdi_sio 1-2.2:1.0: usb_probe_interface
+> ftdi_sio 1-2.2:1.0: usb_probe_interface - got id
+> ftdi_sio 1-2.2:1.0: FTDI USB Serial Device converter detected
+> usb 1-2.2: Detected FT2232C
+> usb 1-2.2: Number of endpoints 2
+> usb 1-2.2: Endpoint 1 MaxPacketSize 64
+> usb 1-2.2: Endpoint 2 MaxPacketSize 64
+> usb 1-2.2: Setting MaxPacketSize 64
+> usb 1-2.2: FTDI USB Serial Device converter now attached to ttyUSB0
+> ftdi_sio: v1.5.0:USB FTDI Serial Converters Driver
+>
+> # microcom /dev/ttyUSB0
+> AT
+> OK
+> AT+CPIN=0000
+> OK
+> AT+CREG?
+> +CREG: 0,1
+> ATD*98#
+> //// No reply of any kind
+>
+> With 2.6.27.34, everything above is same (except ftdi_sio is 1.4.3)
+> and there ATD gets reply
+> CONNECT
+>
+> Strange detail, If instead of microcom doing
+> # cat < /dev/ttyUSB0 in one terminal, and just echo in the AT commands
+> in another terminal, then the cat displays CONNECT
+>
+> But this is no help for my goal, since I'm trying to use pppd and it
+> only gets timeout to its ATD command.
+>
+>
