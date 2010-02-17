@@ -1,5 +1,5 @@
 From: Catalin.Marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Feb 2010 15:39:45 -0000
+Date: Wed, 17 Feb 2010 15:40:06 -0000
 Subject: USB mass storage and ARM cache coherency
 In-Reply-To: <1266397543.16346.264.camel@pasglop>
 References: <20100208065519.GE1290@ucw.cz>
@@ -7,7 +7,7 @@ References: <20100208065519.GE1290@ucw.cz>
 	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
 	<201002160922.47072.oliver@neukum.org>
 	<1266397543.16346.264.camel@pasglop>
-Message-ID: <39E9E98DF632C2469FF2FC07853B70C6058006B5@ZIPPY.Emea.Arm.com>
+Message-ID: <39E9E98DF632C2469FF2FC07853B70C6058006B6@ZIPPY.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
