@@ -1,52 +1,126 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 17 Feb 2010 12:33:23 +0200
-Subject: [PATCH 1/3] imxfb: add support for i.MX25
+Date: Wed, 17 Feb 2010 12:33:24 +0200
+Subject: [PATCH 2/3] mx25: add platform support for imxfb
 In-Reply-To: <20100217094359.GY17643@pengutronix.de>
 References: <20100217094359.GY17643@pengutronix.de>
-Message-ID: <4462289450ddcd8b075afc1445bacb78615c38eb.1266402631.git.baruch@tkos.co.il>
+Message-ID: <b12ebbc018327b298d8bcd8a9fb50bcedddba3ff.1266402631.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit also introduces the HAVE_FB_IMX config that is to be selected from
-the MX25 platform config. Once this commit gets merged, the two other i.MX
-archs, ARCH_MX1 and ARCH_MX2, should follow this one.
-
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/Kconfig |    1 +
- drivers/video/Kconfig     |    5 ++++-
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx25/clock.c            |   12 ++++++++++++
+ arch/arm/mach-mx25/devices.c          |   23 +++++++++++++++++++++++
+ arch/arm/mach-mx25/devices.h          |    1 +
+ arch/arm/plat-mxc/include/mach/mx25.h |    2 ++
+ 4 files changed, 38 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 8b0a1ee..2a049df 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -24,6 +24,7 @@ config ARCH_MX25
- 	bool "MX25-based"
- 	select CPU_ARM926T
- 	select COMMON_CLKDEV
-+	select HAVE_FB_IMX
- 	help
- 	  This enables support for systems based on the Freescale i.MX25 family
+diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
+index 744b52a..56bf958 100644
+--- a/arch/arm/mach-mx25/clock.c
++++ b/arch/arm/mach-mx25/clock.c
+@@ -124,6 +124,11 @@ static unsigned long get_rate_gpt(struct clk *clk)
+ 	return get_rate_per(5);
+ }
  
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 5a5c303..83d40ed 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -400,9 +400,12 @@ config FB_SA1100
- 	  If you plan to use the LCD display with your SA-1100 system, say
- 	  Y here.
- 
-+config HAVE_FB_IMX
-+	bool
++static unsigned long get_rate_lcdc(struct clk *clk)
++{
++	return get_rate_per(7);
++}
 +
- config FB_IMX
- 	tristate "Motorola i.MX LCD support"
--	depends on FB && (ARCH_MX1 || ARCH_MX2)
-+	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
+ static unsigned long get_rate_otg(struct clk *clk)
+ {
+ 	return 48000000; /* FIXME */
+@@ -167,6 +172,8 @@ DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
+ DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
+ DEFINE_CLOCK(cspi3_clk,  0, CCM_CGCR1,  7, get_rate_ipg, NULL, NULL);
+ DEFINE_CLOCK(fec_ahb_clk, 0, CCM_CGCR0, 23, NULL,	 NULL, NULL);
++DEFINE_CLOCK(lcdc_ahb_clk, 0, CCM_CGCR0, 24, NULL,	 NULL, NULL);
++DEFINE_CLOCK(lcdc_per_clk, 0, CCM_CGCR0,  7, NULL,	 NULL, &lcdc_ahb_clk);
+ DEFINE_CLOCK(uart1_clk,  0, CCM_CGCR2, 14, get_rate_uart, NULL, &uart_per_clk);
+ DEFINE_CLOCK(uart2_clk,  0, CCM_CGCR2, 15, get_rate_uart, NULL, &uart_per_clk);
+ DEFINE_CLOCK(uart3_clk,  0, CCM_CGCR2, 16, get_rate_uart, NULL, &uart_per_clk);
+@@ -183,6 +190,7 @@ DEFINE_CLOCK(tsc_clk,	 0, CCM_CGCR2, 13, get_rate_ipg, NULL, NULL);
+ DEFINE_CLOCK(i2c_clk,	 0, CCM_CGCR0,  6, get_rate_i2c, NULL, NULL);
+ DEFINE_CLOCK(fec_clk,	 0, CCM_CGCR1, 15, get_rate_ipg, NULL, &fec_ahb_clk);
+ DEFINE_CLOCK(dryice_clk, 0, CCM_CGCR1,  8, get_rate_ipg, NULL, NULL);
++DEFINE_CLOCK(lcdc_clk,	 0, CCM_CGCR1, 29, get_rate_lcdc, NULL, &lcdc_per_clk);
+ 
+ #define _REGISTER_CLOCK(d, n, c)	\
+ 	{				\
+@@ -216,6 +224,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c_clk)
+ 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+ 	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
++	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
+ };
+ 
+ int __init mx25_clocks_init(void)
+@@ -233,6 +242,9 @@ int __init mx25_clocks_init(void)
+ 	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
+ 	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
+ 
++	/* Clock source for lcdc is upll */
++	__raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7), CRM_BASE + 0x64);
++
+ 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index b0b75fc..3f4b8a0 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -477,3 +477,26 @@ struct platform_device mx25_rtc_device = {
+ 	.num_resources	= ARRAY_SIZE(mx25_rtc_resources),
+ 	.resource	= mx25_rtc_resources,
+ };
++
++static struct resource mx25_fb_resources[] = {
++	{
++		.start	= MX25_LCDC_BASE_ADDR,
++		.end	= MX25_LCDC_BASE_ADDR + 0xfff,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= MX25_INT_LCDC,
++		.end	= MX25_INT_LCDC,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mx25_fb_device = {
++	.name		= "imx-fb",
++	.id		= 0,
++	.resource	= mx25_fb_resources,
++	.num_resources	= ARRAY_SIZE(mx25_fb_resources),
++	.dev		= {
++		.coherent_dma_mask = 0xFFFFFFFF,
++	},
++};
+diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
+index 37e6a08..39560e1 100644
+--- a/arch/arm/mach-mx25/devices.h
++++ b/arch/arm/mach-mx25/devices.h
+@@ -20,3 +20,4 @@ extern struct platform_device mxc_i2c_device2;
+ extern struct platform_device mx25_fec_device;
+ extern struct platform_device mxc_nand_device;
+ extern struct platform_device mx25_rtc_device;
++extern struct platform_device mx25_fb_device;
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index 215c4d8..f29798d 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -44,9 +44,11 @@
+ #define MX25_FEC_BASE_ADDR		0x50038000
+ #define MX25_NFC_BASE_ADDR		0xbb000000
+ #define MX25_DRYICE_BASE_ADDR		0x53ffc000
++#define MX25_LCDC_BASE_ADDR		0x53fbc000
+ 
+ #define MX25_INT_DRYICE	25
+ #define MX25_INT_FEC	57
+ #define MX25_INT_NANDFC	33
++#define MX25_INT_LCDC	39
+ 
+ #endif /* __MACH_MX25_H__ */
 -- 
 1.6.6.1
