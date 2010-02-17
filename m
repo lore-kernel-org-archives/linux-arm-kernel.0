@@ -1,5 +1,5 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Feb 2010 15:27:55 +0000
+From: Catalin.Marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Feb 2010 15:27:56 -0000
 Subject: USB mass storage and ARM cache coherency
 In-Reply-To: <1266397543.16346.264.camel@pasglop>
 References: <20100208065519.GE1290@ucw.cz>
@@ -7,7 +7,7 @@ References: <20100208065519.GE1290@ucw.cz>
 	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
 	<201002160922.47072.oliver@neukum.org>
 	<1266397543.16346.264.camel@pasglop>
-Message-ID: <1266420475.16707.31.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <39E9E98DF632C2469FF2FC07853B70C6058006B4@ZIPPY.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,10 +17,10 @@ On Wed, 2010-02-17 at 20:05 +1100, Benjamin Herrenschmidt wrote:
 > > transfered
 > > by DMA, so the caches must be flushed on architectures whose caches
 > > are not coherent with respect to DMA.
-> > 
+> >=20
 > > Would you care to elaborate on the exact nature of the bug you are
 > > fixing?
-> 
+>=20
 > I missed part of this thread, so forgive me if I'm a bit off here, but
 > if the problem is indeed I$/D$ cache coherency vs. PIO transfers, then
 > this is a long solved issue on other archs such as ppc (and I _think_
@@ -43,5 +43,7 @@ call in this driver to flush_dcache_page(). The upper mass storage or
 filesystem layers don't call this function either, so there isn't
 anything that would set the PG_arch1 bit.
 
--- 
+--=20
 Catalin
+-- 
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
