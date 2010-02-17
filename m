@@ -1,83 +1,40 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 17 Feb 2010 14:25:08 +0530
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 17 Feb 2010 20:05:43 +1100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002161522.38467.oliver@neukum.org>
+In-Reply-To: <201002160922.47072.oliver@neukum.org>
 References: <20100208065519.GE1290@ucw.cz>
-	<201002161446.59920.oliver@neukum.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF8038@dbde02.ent.ti.com>
-	<201002161522.38467.oliver@neukum.org>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
+	<1265628483.4020.63.camel@pc1117.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
+	<201002160922.47072.oliver@neukum.org>
+Message-ID: <1266397543.16346.264.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oliver Neukum [mailto:oliver at neukum.org]
-> Sent: Tuesday, February 16, 2010 7:53 PM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; Catalin Marinas; Pavel Machek; Greg KH; Matthew Dharm; Sergei Shtylyov;
-> Ming Lei; Sebastian Siewior; linux-usb at vger.kernel.org; linux-kernel; linux-arm-kernel; Mankad,
-> Maulik Ojas
-> Subject: Re: USB mass storage and ARM cache coherency
+On Tue, 2010-02-16 at 09:22 +0100, Oliver Neukum wrote:
+> This seems wrong to me. Buffers for control transfers may be
+> transfered
+> by DMA, so the caches must be flushed on architectures whose caches
+> are not coherent with respect to DMA.
 > 
-> Am Dienstag, 16. Februar 2010 15:12:45 schrieb Shilimkar, Santosh:
-> > > > > I am afraid for these controllers the controller driver must be responsible
-> > > > > for all DMA and cache issues. Indicating the exact requirements to the
-> > > > > upper layer would be a battle already lost.
-> > > > > so the safe choice is not to set has_dma and the generic layer will leave
-> > > > > the issue to the lower level.
-> > > > This means don't use dma at all which will almost kill the performance.
-> > >
-> > > Why would you be unable to map a buffer in the hcd driver when you know
-> > > that you'll use DMA?
-> > Probably it can be. The USB stack has the dma maintenance code at common
-> > place for all controllers and hence we were just trying to see if there is
-> > way to handle that way.
-> 
-> This is true. If you can find a clean way to describe your requirements
-> to the generic layer, that would be better. The problem is that we must
-> not end up with a dozen flags.
-> 
-> Your original patch however kills ehci, ohci and uhci on some architectures.
+> Would you care to elaborate on the exact nature of the bug you are
+> fixing?
 
-How about below approach? Controller driver can set 
-"uses_pio_for_control" if it can't do dma for control transfer.
+I missed part of this thread, so forgive me if I'm a bit off here, but
+if the problem is indeed I$/D$ cache coherency vs. PIO transfers, then
+this is a long solved issue on other archs such as ppc (and I _think_
+sparc).
 
-diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-index 80995ef..e3eae02 100644
---- a/drivers/usb/core/hcd.c
-+++ b/drivers/usb/core/hcd.c
-@@ -1276,7 +1276,7 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
+The way we do it, at least on powerpc which is PIPT, is to keep track on
+a per-page basis, whether a given page is clean for execution using
+PG_arch1 bit. This bit is cleared when a new page is popped into the
+page cache, and we clear it from flush_dcache_page() iirc (you may want
+to dbl check I don't have the code at hand right now, or rather, I do
+but I'm to lazy to look right now :-)
+
+Any page with that not set is mapped into userspace with execute
+permission disabled. We do the flush and set PG_arch1 on the first exec
+fault to that page.
+
+Cheers,
+Ben.
  
- 	if (usb_endpoint_xfer_control(&urb->ep->desc)
- 	    && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
--		if (hcd->self.uses_dma) {
-+		if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control) {
- 			urb->setup_dma = dma_map_single(
- 					hcd->self.controller,
- 					urb->setup_packet,
-@@ -1335,7 +1335,7 @@ static void unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
- 
- 	if (usb_endpoint_xfer_control(&urb->ep->desc)
- 	    && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
--		if (hcd->self.uses_dma)
-+		if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control)
- 			dma_unmap_single(hcd->self.controller, urb->setup_dma,
- 					sizeof(struct usb_ctrlrequest),
- 					DMA_TO_DEVICE);
-diff --git a/include/linux/usb.h b/include/linux/usb.h
-index d7ace1b..ba5b0a2 100644
---- a/include/linux/usb.h
-+++ b/include/linux/usb.h
-@@ -329,6 +329,9 @@ struct usb_bus {
- 	int busnum;			/* Bus number (in order of reg) */
- 	const char *bus_name;		/* stable id (PCI slot_name etc) */
- 	u8 uses_dma;			/* Does the host controller use DMA? */
-+	u8 uses_pio_for_control;	/* Does the host controller use PIO
-+					 * for control tansfers? 
-+					 */
- 	u8 otg_port;			/* 0, or number of OTG/HNP port */
- 	unsigned is_b_host:1;		/* true during some HNP roleswitches */
- 	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
-
-Regards,
-Santosh
