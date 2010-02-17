@@ -1,34 +1,31 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 17 Feb 2010 12:02:56 -0800 (PST)
-Subject: [PATCH] mx51_babbage: Fix ckih2 parameter in mx51_clocks_init function
-Message-ID: <88241.12409.qm@web51008.mail.re2.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Feb 2010 20:26:17 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <Pine.LNX.4.44L0.1002171201190.1913-100000@iolanthe.rowland.org>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
+	<Pine.LNX.4.44L0.1002171201190.1913-100000@iolanthe.rowland.org>
+Message-ID: <20100217202617.GB30033@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to be applied into Sascha's mxc-master branch.
+On Wed, Feb 17, 2010 at 12:02:21PM -0500, Alan Stern wrote:
+> Why do you skip mapping the setup packet but not the data packet?
 
-Fix ckih2 parameter in mx51_clocks_init funtion. CKIH2 pin is left unconnected on Babbage.
+This is something of a FAQ in this thread.  Here are the responses to
+similar questions yesterday:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+"Gadiyar, Anand" <gadiyar@ti.com> said:
+> Not really. For instance, in the case of the DMA engine in the MUSB
+> controller in OMAP3, we can only use DMA with endpoints other than
+> EP0, and EP0 is what is used for control transfers.
+>
+> It's not PIO for all the endpoints or DMA for all of them.
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index d5ccb5f..ee67a71 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -79,7 +79,7 @@ static void __init mxc_board_init(void)
- 
- static void __init mx51_babbage_timer_init(void)
- {
--	mx51_clocks_init(32768, 24000000, 22579200, 24576000);
-+	mx51_clocks_init(32768, 24000000, 22579200, 0);
- }
- 
- static struct sys_timer mxc_timer = {
--- 
-1.6.0.4
-
-
-      
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> said:
+> On the OMAP4 (ARM cortex-a9) platform, the enumeration fails because control
+> transfer buffers are corrupted. On our platform, we use PIO mode for control
+> transfers and DMA for bulk transfers.
+>
+> The current stack performs dma cache maintenance even for the PIO transfers
+> which leads to the corruption issue. The control buffers are handled by CPU
+> and they already coherent from CPU point of view.
