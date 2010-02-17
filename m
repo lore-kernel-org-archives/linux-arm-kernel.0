@@ -1,40 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Feb 2010 19:03:19 +0000
-Subject: [PATCH 1/2] ARM: S3C64XX: Declare IISv4 PCLK for S3C6410
-Message-ID: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 17 Feb 2010 19:03:20 +0000
+Subject: [PATCH 2/2] ARM: SMDK6410: Register IISv4 device
+In-Reply-To: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1266433400-26780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi <jassi.brar@samsung.com>
+The IISv4 controller is connected to the WM8580 on the board.
 
-[Updated the device ID to -1 since there's only one IISv4 device but the
-S3C clock API tries to match based on the ID of the requesting device
-(and not the name) -- broonie.]
-
-Signed-Off-by: Jassi <jassi.brar@samsung.com>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/plat-s3c64xx/clock.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c6410/mach-smdk6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-s3c64xx/clock.c b/arch/arm/plat-s3c64xx/clock.c
-index 2989c3a..1ba30cb 100644
---- a/arch/arm/plat-s3c64xx/clock.c
-+++ b/arch/arm/plat-s3c64xx/clock.c
-@@ -129,6 +129,14 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s3c64xx_pclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_PCLK_IIS1,
- 	}, {
-+#ifdef CONFIG_CPU_S3C6410
-+		.name		= "iis",
-+		.id		= -1,  /* There's only one IISv4 port */
-+		.parent		= &clk_p,
-+		.enable		= s3c64xx_pclk_ctrl,
-+		.ctrlbit	= S3C6410_CLKCON_PCLK_IIS2,
-+	}, {
-+#endif
- 		.name		= "spi",
- 		.id		= 0,
- 		.parent		= &clk_p,
+diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+index 297f1fa..6176243 100644
+--- a/arch/arm/mach-s3c6410/mach-smdk6410.c
++++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+@@ -255,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_ohci,
+ 	&s3c_device_usb_hsotg,
++	&s3c64xx_device_iisv4,
+ 
+ #ifdef CONFIG_REGULATOR
+ 	&smdk6410_b_pwr_5v,
 -- 
 1.6.6.1
