@@ -1,33 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2010 11:24:24 -0800
-Subject: [PATCH v2] omap: Remove DEBUGFS dependency for mux name checking
-In-Reply-To: <1266427021-10990-1-git-send-email-ranjithl@ti.com>
-References: <1266427021-10990-1-git-send-email-ranjithl@ti.com>
-Message-ID: <20100217192423.GA21755@atomide.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Wed, 17 Feb 2010 12:02:56 -0800 (PST)
+Subject: [PATCH] mx51_babbage: Fix ckih2 parameter in mx51_clocks_init function
+Message-ID: <88241.12409.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ranjith Lohithakshan <ranjithl@ti.com> [100217 09:14]:
-> The check for a valid mux name should be performed regardless of whether
-> DEBUGFS is enabled or not.
-> 
-> This fixes the issue currently seen with boards not booting up
-> if DEBUGFS is not enabled in defconfig.
-> 
-> Signed-off-by: Ranjith Lohithakshan <ranjithl@ti.com>
+This patch is to be applied into Sascha's mxc-master branch.
 
-Thanks, I've updated the description a bit to include the error
-and added the patch into omap-fixes-for-linus.
+Fix ckih2 parameter in mx51_clocks_init funtion. CKIH2 pin is left unconnected on Babbage.
 
-Updated patch below.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index d5ccb5f..ee67a71 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -79,7 +79,7 @@ static void __init mxc_board_init(void)
+ 
+ static void __init mx51_babbage_timer_init(void)
+ {
+-	mx51_clocks_init(32768, 24000000, 22579200, 24576000);
++	mx51_clocks_init(32768, 24000000, 22579200, 0);
+ }
+ 
+ static struct sys_timer mxc_timer = {
+-- 
+1.6.0.4
 
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: fix-mux-debufs.patch
-Type: text/x-diff
-Size: 1871 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100217/738ff7aa/attachment.bin>
+
+      
