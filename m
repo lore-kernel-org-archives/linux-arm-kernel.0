@@ -1,41 +1,40 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 17 Feb 2010 19:26:00 +0100
-Subject: PL-330 DMA driver
-In-Reply-To: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-Message-ID: <63386a3d1002171026h51f34d4buc9ba0293ea08c004@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 17 Feb 2010 19:03:19 +0000
+Subject: [PATCH 1/2] ARM: S3C64XX: Declare IISv4 PCLK for S3C6410
+Message-ID: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/2/17 jassi brar <jassisinghbrar@gmail.com>:
+From: Jassi <jassi.brar@samsung.com>
 
-> Could maintainers please suggest what is the best place for the PL330
-> controller driver?
+[Updated the device ID to -1 since there's only one IISv4 device but the
+S3C clock API tries to match based on the ID of the requesting device
+(and not the name) -- broonie.]
 
-drivers/dma/amba-pl033.c would be my bet.
+Signed-Off-by: Jassi <jassi.brar@samsung.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-s3c64xx/clock.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-I have patches to support MMCI (PL180/PL181) using the generic DMA
-engine pending, I will attempt to submit patches for spi/amba-pl022.c and
-serial/amba-pl011.c when I get the time.
-
-In drivers/dma/coh901318.c we found that implementing a generic
-DMA engine over some random custom DMA controller is actually
-quite straight forward. If you're making it custom I think seriously
-you're doing something wrong.
-
-The key to making the DMA controller wholly abstract is to configure
-the driver with platform data containing information on how to
-set up/tear down/refill/etc any DMA channel on the system, so
-the DMA engine knows all about all channels, and the driver
-using it just knows that it's requesting some rx or tx channel with
-some platform filter (all from platform data).
-
-This way replacing the DMA enginge, as in resynthesize your SoC
-with some totally different DMA controller, and the driver using it
-still works.
-
-There may be DMA controllers so esoteric that they cannot be
-handled by DMA engine, what do I know, I haven't seen one
-yet.
-
-Linus Walleij
+diff --git a/arch/arm/plat-s3c64xx/clock.c b/arch/arm/plat-s3c64xx/clock.c
+index 2989c3a..1ba30cb 100644
+--- a/arch/arm/plat-s3c64xx/clock.c
++++ b/arch/arm/plat-s3c64xx/clock.c
+@@ -129,6 +129,14 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s3c64xx_pclk_ctrl,
+ 		.ctrlbit	= S3C_CLKCON_PCLK_IIS1,
+ 	}, {
++#ifdef CONFIG_CPU_S3C6410
++		.name		= "iis",
++		.id		= -1,  /* There's only one IISv4 port */
++		.parent		= &clk_p,
++		.enable		= s3c64xx_pclk_ctrl,
++		.ctrlbit	= S3C6410_CLKCON_PCLK_IIS2,
++	}, {
++#endif
+ 		.name		= "spi",
+ 		.id		= 0,
+ 		.parent		= &clk_p,
+-- 
+1.6.6.1
