@@ -1,40 +1,38 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 17 Feb 2010 20:05:43 +1100
+From: oliver@neukum.org (Oliver Neukum)
+Date: Wed, 17 Feb 2010 10:10:57 +0100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002160922.47072.oliver@neukum.org>
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
 References: <20100208065519.GE1290@ucw.cz>
-	<1265628483.4020.63.camel@pc1117.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
-	<201002160922.47072.oliver@neukum.org>
-Message-ID: <1266397543.16346.264.camel@pasglop>
+	<201002161522.38467.oliver@neukum.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
+Message-ID: <201002171010.57464.oliver@neukum.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-02-16 at 09:22 +0100, Oliver Neukum wrote:
-> This seems wrong to me. Buffers for control transfers may be
-> transfered
-> by DMA, so the caches must be flushed on architectures whose caches
-> are not coherent with respect to DMA.
+Am Mittwoch, 17. Februar 2010 09:55:08 schrieb Shilimkar, Santosh:
+> > Your original patch however kills ehci, ohci and uhci on some architectures.
 > 
-> Would you care to elaborate on the exact nature of the bug you are
-> fixing?
+> How about below approach? Controller driver can set 
+> "uses_pio_for_control" if it can't do dma for control transfer.
+> 
+> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+> index 80995ef..e3eae02 100644
+> --- a/drivers/usb/core/hcd.c
+> +++ b/drivers/usb/core/hcd.c
+> @@ -1276,7 +1276,7 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
+>  
+>         if (usb_endpoint_xfer_control(&urb->ep->desc)
+>             && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
+> -               if (hcd->self.uses_dma) {
+> +               if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control) {
 
-I missed part of this thread, so forgive me if I'm a bit off here, but
-if the problem is indeed I$/D$ cache coherency vs. PIO transfers, then
-this is a long solved issue on other archs such as ppc (and I _think_
-sparc).
+It is not elegant to describe exceptions. It would be better, if you split up
+the flag into two flags, called uses_dma_for_ordinary_transfers and
+uses_dma_for control_transfers. Doing so also makes sure you look at
+all hcd drivers ;-)
 
-The way we do it, at least on powerpc which is PIPT, is to keep track on
-a per-page basis, whether a given page is clean for execution using
-PG_arch1 bit. This bit is cleared when a new page is popped into the
-page cache, and we clear it from flush_dcache_page() iirc (you may want
-to dbl check I don't have the code at hand right now, or rather, I do
-but I'm to lazy to look right now :-)
+And the tests become straightforward. And please add a detailed comment
+to explain why this differentiation is needed on ARM.
 
-Any page with that not set is mapped into userspace with execute
-permission disabled. We do the flush and set PG_arch1 on the first exec
-fault to that page.
-
-Cheers,
-Ben.
- 
+	Regards
+		Oliver
