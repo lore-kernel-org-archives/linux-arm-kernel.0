@@ -1,23 +1,38 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 17 Feb 2010 13:32:02 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 17 Feb 2010 14:10:29 +0100
 Subject: [PATCH 1/1] add mx3 cupid bsp
 In-Reply-To: <D99582E5322435468A77E74BB0039E7B176E1F3BB3@SRV02.hamburg.garz-fricke.de>
 References: <D99582E5322435468A77E74BB0039E7B176E1F3BB3@SRV02.hamburg.garz-fricke.de>
-Message-ID: <20100217123202.GG9007@buzzloop.caiaq.de>
+Message-ID: <20100217131029.GA1553@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-just some minor things below.
+Hello,
 
 On Wed, Feb 17, 2010 at 11:54:29AM +0100, Carsten Behling wrote:
+> Signed-off-by: Carsten Behling <behlin_c@gmx.de>
+> ---
+>  arch/arm/mach-mx3/Kconfig                    |    7 +
+>  arch/arm/mach-mx3/Makefile                   |    1 +
+>  arch/arm/mach-mx3/cupid.c                    |  186 ++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/board-cupid.h |   27 ++++
+>  4 files changed, 221 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx3/cupid.c
+>  create mode 100644 arch/arm/plat-mxc/include/mach/board-cupid.h
+> 
+> diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+> index 2829441..f2700a0 100644
+> --- a/arch/arm/mach-mx3/Kconfig
+> +++ b/arch/arm/mach-mx3/Kconfig
+> @@ -112,4 +112,11 @@ config MACH_KZM_ARM11_01
+>           Include support for KZM-ARM11-01. This includes specific
+>           configurations for the board and its peripherals.
+> 
 > +config MACH_GUF_CUPID
 > +       bool "Support Garz & Fricke Cupid platform"
 > +       select ARCH_MX35
 > +       default n
-
-'n' is the default default, no need to specify it.
+default n is the default, you can skip stating this explicitly.
 
 > +       help
 > +         Include support for Cupid platform. This includes specific
@@ -37,11 +52,16 @@ On Wed, Feb 17, 2010 at 11:54:29AM +0100, Carsten Behling wrote:
 > index 0000000..b7e0044
 > --- /dev/null
 > +++ b/arch/arm/mach-mx3/cupid.c
+can you please call that mach-guf_cpuid.c?  (There are patches in
+mxc-master that do the same for the other machs).
+
 > @@ -0,0 +1,186 @@
 > +/*
 > + * Copyright 2009 Garz & Fricke GmbH All Rights Reserved.
 > + *
 > + * Author: Carsten Behling carsten.behling at garz-fricke.com>
+missing '<'
+
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License as published by
@@ -56,6 +76,8 @@ On Wed, Feb 17, 2010 at 11:54:29AM +0100, Carsten Behling wrote:
 > + * You should have received a copy of the GNU General Public License
 > + * along with this program; if not, write to the Free Software
 > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+This is an old address of the FSF.
+
 > + */
 > +
 > +#include <linux/types.h>
@@ -78,9 +100,8 @@ On Wed, Feb 17, 2010 at 11:54:29AM +0100, Carsten Behling wrote:
 > +#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
 > +#include <mach/i2c.h>
 > +#endif
-
-No need for the #ifs here - you can and should include this
-unconditionally.
+If including mach/i2c.h even without CONFIG_I2C_IMX doesn't hurt, just
+include it unconditionally.
 
 > +#include <mach/iomux-mx35.h>
 > +#include <mach/ipu.h>
@@ -233,6 +254,7 @@ unconditionally.
 > index 0000000..4a3d7a8
 > --- /dev/null
 > +++ b/arch/arm/plat-mxc/include/mach/board-cupid.h
+board-guf_cupid.h please
 > @@ -0,0 +1,27 @@
 > +/*
 > + *  Copyright (C) 2009 Carsten Behling, Garz & Fricke GmbH
@@ -251,21 +273,25 @@ unconditionally.
 > + * along with this program; if not, write to the Free Software
 > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 > + */
+ditto, old address
+
 > +
 > +#ifndef __ASM_ARCH_MXC_BOARD_CUPID_H__
 > +#define __ASM_ARCH_MXC_BOARD_CUPID_H__
-> +
+__MACH_BOARD_GUF_CUPID_H__ please
+
 > +/* mandatory for CONFIG_LL_DEBUG */
 > +
 > +#define MXC_LL_UART_PADDR      UART1_BASE_ADDR
 > +#define MXC_LL_UART_VADDR      AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
+> +
+> +#endif /* __ASM_ARCH_MXC_BOARD_CUPID_H__ */
+Can you please base you patch on top of mxc-master?  You shouldn't use
+UART1_BASE_ADDR or AIPS1_IO_ADDRESS any more.
 
-These macros are not needed anymore, you can remove them - and with it,
-the whole file.
+Best regards
+Uwe
 
-You should, however, add your platform to
-arch/arm/plat-mxc/include/mach/uncompress.h to enable the uncompressing
-output.
-
-
-Daniel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
