@@ -1,52 +1,36 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 17 Feb 2010 14:47:28 +0530
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 17 Feb 2010 20:40:09 +1100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002171010.57464.oliver@neukum.org>
+In-Reply-To: <201002171015.52875.oliver@neukum.org>
 References: <20100208065519.GE1290@ucw.cz>
-	<201002161522.38467.oliver@neukum.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
-	<201002171010.57464.oliver@neukum.org>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84FF@dbde02.ent.ti.com>
+	<201002160922.47072.oliver@neukum.org>
+	<1266397543.16346.264.camel@pasglop>
+	<201002171015.52875.oliver@neukum.org>
+Message-ID: <1266399609.16346.271.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oliver Neukum [mailto:oliver at neukum.org]
-> Sent: Wednesday, February 17, 2010 2:41 PM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; Catalin Marinas; Pavel Machek; Greg KH; Matthew Dharm; Sergei Shtylyov;
-> Ming Lei; Sebastian Siewior; linux-usb at vger.kernel.org; linux-kernel; linux-arm-kernel; Mankad,
-> Maulik Ojas; Gadiyar, Anand
-> Subject: Re: USB mass storage and ARM cache coherency
+On Wed, 2010-02-17 at 10:15 +0100, Oliver Neukum wrote:
+> We should have changed the subject line.
 > 
-> Am Mittwoch, 17. Februar 2010 09:55:08 schrieb Shilimkar, Santosh:
-> > > Your original patch however kills ehci, ohci and uhci on some architectures.
-> >
-> > How about below approach? Controller driver can set
-> > "uses_pio_for_control" if it can't do dma for control transfer.
-> >
-> > diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> > index 80995ef..e3eae02 100644
-> > --- a/drivers/usb/core/hcd.c
-> > +++ b/drivers/usb/core/hcd.c
-> > @@ -1276,7 +1276,7 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
-> >
-> >         if (usb_endpoint_xfer_control(&urb->ep->desc)
-> >             && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
-> > -               if (hcd->self.uses_dma) {
-> > +               if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control) {
-> 
-> It is not elegant to describe exceptions. It would be better, if you split up
-> the flag into two flags, called uses_dma_for_ordinary_transfers and
-> uses_dma_for control_transfers. Doing so also makes sure you look at
-> all hcd drivers ;-)
-> 
-Good point. Negative checks are any way not elegant
-> And the tests become straightforward. And please add a detailed comment
-> to explain why this differentiation is needed on ARM.
-OK. I shall create a patch with description about the problem.
+> There's a second problem. It turns out that on ARM
+> mapping for DMA must not be done if PIO will be used. Some HCDs
+> use PIO for some transfers but DMA for others. The generic layer
+> must learn about this. 
 
-Thanks for feedback!!
+Ah, that makes a lot of sense and the same problem would happen on
+any non-DMA coherent architecture, including some embedded ppc's.
 
-Regards,
-Santosh
+I can see why the dma unmap would invalidate the dcache and blow
+away the PIO.
+
+What bugs me here is that the dma_map_* operation should always
+be done at the lowest level, ie, the actual HCD driver, and thus
+it should be up to the HCD to decide whether to dma_map or not
+depending on whether it's going to do DMA or not. I haven't
+scrutinized USB lately but if that isn't the case and the dma_map_*
+operations are done behind your back by the USB core then that needs to
+be changed in a way or another, or hooked at least.
+
+Cheers,
+Ben.
