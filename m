@@ -1,62 +1,26 @@
-From: tim_th@posti.tyyppi.org (Timo TH)
-Date: Wed, 17 Feb 2010 19:16:54 +0200
-Subject: AT91SAM9263 USB Serial hang?
-In-Reply-To: <fc09324d1002102340o4444c8abve6d1d6bb5289d461@mail.gmail.com>
-References: <fc09324d1002102340o4444c8abve6d1d6bb5289d461@mail.gmail.com>
-Message-ID: <fc09324d1002170916l6ce9c6c4i58f41d2b9db6818f@mail.gmail.com>
+From: jose.goncalves@inov.pt (=?ISO-8859-1?Q?Jos=E9_Miguel_Gon=E7alves?=)
+Date: Wed, 17 Feb 2010 18:09:35 +0000
+Subject: [PATCH] spi_s3c24xx: Fix for SPI on S3C2412
+Message-ID: <4B7C30DF.90805@inov.pt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FYI: This was caused by microcom's and pppd's inability to TIOCMSET
-the RTS flags the way ftdi_sio wants it.
+Hi,
 
-On 11 February 2010 09:40, Timo TH <tim_th@posti.tyyppi.org> wrote:
-> Anyone seen this kind of a problem?
->
-> Environment : ARM9 SAM9263ek, gprs modem on usb, (pppd 2.4.4)
->
-> With Linux 2.6.27.34 everything worked OK. (with at91-patches)
-> Upgraded to Linux 2.6.31.6 and now everything works upto point where
-> data connection should be made.
-> Something wrong with handling of DTR or DCD or what?
->
->
->
-> # modprobe ftdi_sio
-> usbcore: registered new interface driver usbserial
-> USB Serial support registered for generic
-> usbcore: registered new interface driver usbserial_generic
-> USB Serial support registered for FTDI USB Serial Device
-> ftdi_sio 1-2.2:1.0: usb_probe_interface
-> ftdi_sio 1-2.2:1.0: usb_probe_interface - got id
-> ftdi_sio 1-2.2:1.0: FTDI USB Serial Device converter detected
-> usb 1-2.2: Detected FT2232C
-> usb 1-2.2: Number of endpoints 2
-> usb 1-2.2: Endpoint 1 MaxPacketSize 64
-> usb 1-2.2: Endpoint 2 MaxPacketSize 64
-> usb 1-2.2: Setting MaxPacketSize 64
-> usb 1-2.2: FTDI USB Serial Device converter now attached to ttyUSB0
-> ftdi_sio: v1.5.0:USB FTDI Serial Converters Driver
->
-> # microcom /dev/ttyUSB0
-> AT
-> OK
-> AT+CPIN=0000
-> OK
-> AT+CREG?
-> +CREG: 0,1
-> ATD*98#
-> //// No reply of any kind
->
-> With 2.6.27.34, everything above is same (except ftdi_sio is 1.4.3)
-> and there ATD gets reply
-> CONNECT
->
-> Strange detail, If instead of microcom doing
-> # cat < /dev/ttyUSB0 in one terminal, and just echo in the AT commands
-> in another terminal, then the cat displays CONNECT
->
-> But this is no help for my goal, since I'm trying to use pppd and it
-> only gets timeout to its ATD command.
->
->
+Testing some SPI temperature sensors and ADCs with a S3C4212 host I have 
+found that I could not read the correct data.  I've probed the SPI 
+signals with a scope and everything seemed OK.
+I dig into the driver sources and on the S3C2412 datasheet to find that 
+this device can not use the same S3C2410 driver's code because of the 
+added FIFOs, even if not used. The following patch is needed to make the 
+driver to work on the S3C2412 chip (and probably on the S3C2413).
+
+Regards,
+Jos? Miguel Gon?alves
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: linux-2.6.git-spi_s3c2412.patch
+Type: text/x-patch
+Size: 2286 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100217/dd567841/attachment.bin>
