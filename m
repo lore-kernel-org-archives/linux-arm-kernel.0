@@ -1,35 +1,36 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 17 Feb 2010 16:07:52 +0900
-Subject: PL-330 DMA driver
-In-Reply-To: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-Message-ID: <4B7B95C8.5070400@samsung.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Wed, 17 Feb 2010 08:23:32 +0100
+Subject: [PATCH 2/2] arm/pxa: Let zeus.c link without CONFIG_PM enabled.
+In-Reply-To: <20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
+References: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
+	<20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
+Message-ID: <20100217072332.GA3593@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/17/2010 2:50 PM, jassi brar wrote:
-> Hello,
-> 
->   Many Samsung SoCs have PL-330 as the DMA controller and the driver
-> is missing in the mainline.
-> 
-> A few months ago, Joonyoung Shim of Samsung, attempted the driver for PL-330
-> based on the DMA API(drivers/dma/), but the patches weren't accepted.
-> Perhaps the driver should go into arch/arm/common/ ? Or inconspicuously
-> into arch/arm/plat-s3cxxxx/ ?
-> 
+Hello.
 
-First we need a decision about we use which dma api. I think it's better 
-we use the DMA API, but i agree about using s3c dma api for
-compatibility of the existing s3c dma api too.
+On Tue, 2010-02-16 at 22:12, Marc Zyngier wrote:
+> On Tue, 16 Feb 2010 22:42:55 +0100
+> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+> 
+> > Add some safety check for CONFIG_PM around zeus_power_off(). Without it linking
+> > can fail like this:
+> > 
+> > arch/arm/mach-pxa/built-in.o: In function `zeus_power_off':
+> > e800.c:(.text+0x2bc8): undefined reference to `pxa27x_cpu_suspend'
+> > 
+> > Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
+> > 
+> > --
+> > 
+> > This smells a bit fishy as zeus_power_off() is only mapped to pm_power_off and
+> > that one seems to come and go to nowhere. Is this any magic I don't get on a
+> > first glance?
+> 
+> The magic takes place in arch/arm/kernel/process.c.
 
-> Could maintainers please suggest what is the best place for the PL330
-> controller driver?
-> 
-> Regards
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Ah, thanks a lot. Something learned today. :)
+
+regards
+Stefan Schmidt
