@@ -1,36 +1,83 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Wed, 17 Feb 2010 08:23:32 +0100
-Subject: [PATCH 2/2] arm/pxa: Let zeus.c link without CONFIG_PM enabled.
-In-Reply-To: <20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
-References: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
-	<20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
-Message-ID: <20100217072332.GA3593@excalibur.local>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 17 Feb 2010 14:25:08 +0530
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <201002161522.38467.oliver@neukum.org>
+References: <20100208065519.GE1290@ucw.cz>
+	<201002161446.59920.oliver@neukum.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF8038@dbde02.ent.ti.com>
+	<201002161522.38467.oliver@neukum.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On Tue, 2010-02-16 at 22:12, Marc Zyngier wrote:
-> On Tue, 16 Feb 2010 22:42:55 +0100
-> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+> -----Original Message-----
+> From: Oliver Neukum [mailto:oliver at neukum.org]
+> Sent: Tuesday, February 16, 2010 7:53 PM
+> To: Shilimkar, Santosh
+> Cc: Russell King - ARM Linux; Catalin Marinas; Pavel Machek; Greg KH; Matthew Dharm; Sergei Shtylyov;
+> Ming Lei; Sebastian Siewior; linux-usb at vger.kernel.org; linux-kernel; linux-arm-kernel; Mankad,
+> Maulik Ojas
+> Subject: Re: USB mass storage and ARM cache coherency
 > 
-> > Add some safety check for CONFIG_PM around zeus_power_off(). Without it linking
-> > can fail like this:
-> > 
-> > arch/arm/mach-pxa/built-in.o: In function `zeus_power_off':
-> > e800.c:(.text+0x2bc8): undefined reference to `pxa27x_cpu_suspend'
-> > 
-> > Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
-> > 
-> > --
-> > 
-> > This smells a bit fishy as zeus_power_off() is only mapped to pm_power_off and
-> > that one seems to come and go to nowhere. Is this any magic I don't get on a
-> > first glance?
+> Am Dienstag, 16. Februar 2010 15:12:45 schrieb Shilimkar, Santosh:
+> > > > > I am afraid for these controllers the controller driver must be responsible
+> > > > > for all DMA and cache issues. Indicating the exact requirements to the
+> > > > > upper layer would be a battle already lost.
+> > > > > so the safe choice is not to set has_dma and the generic layer will leave
+> > > > > the issue to the lower level.
+> > > > This means don't use dma at all which will almost kill the performance.
+> > >
+> > > Why would you be unable to map a buffer in the hcd driver when you know
+> > > that you'll use DMA?
+> > Probably it can be. The USB stack has the dma maintenance code at common
+> > place for all controllers and hence we were just trying to see if there is
+> > way to handle that way.
 > 
-> The magic takes place in arch/arm/kernel/process.c.
+> This is true. If you can find a clean way to describe your requirements
+> to the generic layer, that would be better. The problem is that we must
+> not end up with a dozen flags.
+> 
+> Your original patch however kills ehci, ohci and uhci on some architectures.
 
-Ah, thanks a lot. Something learned today. :)
+How about below approach? Controller driver can set 
+"uses_pio_for_control" if it can't do dma for control transfer.
 
-regards
-Stefan Schmidt
+diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+index 80995ef..e3eae02 100644
+--- a/drivers/usb/core/hcd.c
++++ b/drivers/usb/core/hcd.c
+@@ -1276,7 +1276,7 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
+ 
+ 	if (usb_endpoint_xfer_control(&urb->ep->desc)
+ 	    && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
+-		if (hcd->self.uses_dma) {
++		if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control) {
+ 			urb->setup_dma = dma_map_single(
+ 					hcd->self.controller,
+ 					urb->setup_packet,
+@@ -1335,7 +1335,7 @@ static void unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
+ 
+ 	if (usb_endpoint_xfer_control(&urb->ep->desc)
+ 	    && !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP)) {
+-		if (hcd->self.uses_dma)
++		if (hcd->self.uses_dma && !hcd->self.uses_pio_for_control)
+ 			dma_unmap_single(hcd->self.controller, urb->setup_dma,
+ 					sizeof(struct usb_ctrlrequest),
+ 					DMA_TO_DEVICE);
+diff --git a/include/linux/usb.h b/include/linux/usb.h
+index d7ace1b..ba5b0a2 100644
+--- a/include/linux/usb.h
++++ b/include/linux/usb.h
+@@ -329,6 +329,9 @@ struct usb_bus {
+ 	int busnum;			/* Bus number (in order of reg) */
+ 	const char *bus_name;		/* stable id (PCI slot_name etc) */
+ 	u8 uses_dma;			/* Does the host controller use DMA? */
++	u8 uses_pio_for_control;	/* Does the host controller use PIO
++					 * for control tansfers? 
++					 */
+ 	u8 otg_port;			/* 0, or number of OTG/HNP port */
+ 	unsigned is_b_host:1;		/* true during some HNP roleswitches */
+ 	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
+
+Regards,
+Santosh
