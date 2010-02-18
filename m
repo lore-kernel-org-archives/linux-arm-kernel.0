@@ -1,59 +1,47 @@
-From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 8 Feb 2010 13:35:40 -0600
-Subject: [PATCH] Mailbox: disable mailbox interrupt when request queue
-Message-ID: <mailman.220.1266477028.2170.linux-arm-kernel@lists.infradead.org>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Thu, 18 Feb 2010 12:44:21 +0530
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <201002180756.14100.oliver@neukum.org>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
+	<Pine.LNX.4.44L0.1002171201190.1913-100000@iolanthe.rowland.org>
+	<5A47E75E594F054BAF48C5E4FC4B92AB03216236D6@dbde02.ent.ti.com>
+	<201002180756.14100.oliver@neukum.org>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB03215B106B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when blk_get_request fails to get the request it is returning
-without read the message from the mailbox fifo, then when it
-leaves the isr and interruption is trigger again and again and
-the workqueue which get elements from the request queue is never
-executed and the kernel is stuck and shows a softlockup message.
-Now the mailbox interrupt is disabled when request queue is full
-and enabled when it pop a elememt form the request queue.
+Oliver Neukum wrote:
+> Am Mittwoch, 17. Februar 2010 21:30:24 schrieb Gadiyar, Anand:
+> > > Why do you skip mapping the setup packet but not the data packet?
+> > > 
+> > 
+> > I think that's oversight. For this controller, we need to skip mapping
+> > all buffers used to do transfers on EP0, which is all control transfers.
+> 
+> One thing more. Do you have an issue with EP 0 only or all control
+> endpoints? EP 0 must be control, but devices are within spec if they
+> have multiple control endpoints provided EP 0 is control.
 
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
----
- arch/arm/plat-omap/mailbox.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+Sorry for the confusion. The issue is not with EP 0 of devices
+connected to the controller; the problem is with EP 0 on the host
+controller itself.
 
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 8ecb837..8d86b0b 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -30,6 +30,7 @@
-=20
- static struct omap_mbox *mboxes;
- static DEFINE_RWLOCK(mboxes_lock);
-+static bool rq_full;
-=20
- static int mbox_configured;
- static DEFINE_MUTEX(mbox_configured_lock);
-@@ -139,6 +140,10 @@ static void mbox_rx_work(struct work_struct *work)
- 	while (1) {
- 		spin_lock_irqsave(q->queue_lock, flags);
- 		rq =3D blk_fetch_request(q);
-+		if (rq_full) {
-+			omap_mbox_enable_irq(mbox, IRQ_RX);
-+			rq_full =3D false;
-+		}
- 		spin_unlock_irqrestore(q->queue_lock, flags);
- 		if (!rq)
- 			break;
-@@ -176,8 +181,11 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox=
-)
-=20
- 	while (!mbox_fifo_empty(mbox)) {
- 		rq =3D blk_get_request(q, WRITE, GFP_ATOMIC);
--		if (unlikely(!rq))
-+		if (unlikely(!rq)) {
-+			omap_mbox_disable_irq(mbox, IRQ_RX);
-+			rq_full =3D true;
- 			goto nomem;
-+		}
-=20
- 		msg =3D mbox_fifo_read(mbox);
-=20
---=20
-1.6.0.4
+The controller in question is the MUSB OTG controller present in
+OMAPs, Davinci chips, and some Blackfins. The MUSB HCD driver is
+written such that it carries out all control transfers on EP 0 of
+the controller. All bulk transfers are carried out on other hardware
+endpoints.
+
+(This is the same "hardware endpoint" that is used in when the MUSB
+is used in gadget mode.)
+
+
+I'm not really sure why EP0 was chosen for control transfers, or
+if there is a restriction that we *need* to use it. Let me study
+the docs some more.
+
+The problem is that with the driver code as written today, we use
+EP 0 for all control transfers, and the DMA engine cannot do DMA
+to this endpoint's FIFO.
+
+- Anand
