@@ -1,37 +1,41 @@
-From: bzolnier@gmail.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 18 Feb 2010 15:47:40 +0100
-Subject: [PATCH] Documentation: remove obsolete arm/Sharp-LH/LPD7A400 file
-Message-ID: <201002181547.41043.bzolnier@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 18 Feb 2010 17:00:09 +0200
+Subject: [PATCH] Add resources description for s3c24xx ts driver
+In-Reply-To: <201002181601.20625.anarsoul@gmail.com>
+References: <201002181601.20625.anarsoul@gmail.com>
+Message-ID: <201002181700.15340.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+? ????????? ?? 18 ??????? 2010 16:01:14 ????? Vasily Khoruzhick ???????:
+> Following patch adds resource description for s3c24xx ts driver.
+> Without this patch driver fails to initialize with "no resource for
+> interrupt" message.
+> 
+> Anyway, even with this patch driver stops reporting events after few
+> presses, I'll investigate on it later.
+> 
+> Btw, does this driver work at least for anyone?
+> 
+> Regards
+> Vasily
 
-It has been obsoleted by Documentation/arm/Sharp-LH/LPD7A40X
-and can be safely removed.
+Ok, found problem: driver reports touches even if stylus is not down. Here's 
+patch in attachment.
 
-Inspired-by: Jonathan Corbet <corbet@lwn.net>
-Signed-off-by: Bartlomiej Zolnierkiewicz <bzolnier@gmail.com>
----
- Documentation/arm/Sharp-LH/LPD7A400 |   15 ---------------
- 1 file changed, 15 deletions(-)
-
-Index: b/Documentation/arm/Sharp-LH/LPD7A400
-===================================================================
---- a/Documentation/arm/Sharp-LH/LPD7A400
-+++ /dev/null
-@@ -1,15 +0,0 @@
--README on Implementing Linux for the Logic PD LPD7A400-10
--=========================================================
--
--- CPLD memory mapping
--
--  The board designers chose to use high address lines for controlling
--  access to the CPLD registers.  It turns out to be a big waste
--  because we're using an MMU and must map IO space into virtual
--  memory.  The result is that we have to make a mapping for every
--  register.
--
--- Serial Console
--
--  It may be OK not to use the serial console option if the user passes
--  the console device name to the kernel.  This deserves some exploration.
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-s3c24xx_ts-report-touch-only-when-stylus-is-down.patch
+Type: text/x-patch
+Size: 1581 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100218/bfa92d42/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100218/bfa92d42/attachment.sig>
