@@ -1,42 +1,77 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 18 Feb 2010 10:14:47 +0900
-Subject: PL-330 DMA driver
-In-Reply-To: <63386a3d1002171353v36f7b5c8tdab15b1593581e02@mail.gmail.com>
-References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-	<63386a3d1002171026h51f34d4buc9ba0293ea08c004@mail.gmail.com>
-	<20100217203114.GC30033@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.1002172220080.4623@axis700.grange>
-	<63386a3d1002171353v36f7b5c8tdab15b1593581e02@mail.gmail.com>
-Message-ID: <1b68c6791002171714u59a7d0fak7cd531de96eb0025@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Feb 2010 17:17:20 -0800
+Subject: [PATCH 00/23] omap updates for 2.6.34, part 3
+Message-ID: <20100218011311.30736.20436.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 6:53 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/2/17 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
->
->> Of course, there's also a problem of reusing peripheral drivers with
->> different DMA controllers...
->
-> That's what I'm facing with MMCI and a host of other peripherals.
->
-> We have to either:
->
-> (1) Use something, i.e the DMA engine slave
->
-> (2) Fork the driver entirely to some ste-mmci.c and delete all generic
-> ?code. (Repeat for each vendor using a primecell!)
->
-> (3) Sprinkle mmci.c with #ifdef ARCH_U300 for our DMA engine.
-> ?Or, not so bad, atleast sprinkle the smallish part I have now
-> ?broken out in mmci.c that deals with DMA transfers.
->
-> I think the current patch does (1) and it actually works, then if
-> it gets burdensome to others, using a generic DMA engine can
-> be a special case of (3) since that works for us so we're on the right
-> path in two cases and (2) doesn't look good to me.
->
-> Yours,
-> Linus Walleij
+Hi all,
 
-CCing the S3C maintainer (Ben Dooks)  to share his opinion.
+Sorry, was meaning to post these last week alread..
+
+Here are the omap board-*.c file changes for review.
+
+Regards,
+
+Tony
+
+---
+
+Enric Balletbo i Serra (8):
+      omap3: Add platform data for the twl4030_codec MFD on IGEP v2
+      omap3: Fix typo on IGEP v2 board
+      omap3: Add platform init code for EHCI driver on IGEP v2
+      omap3: Enable DSS2 for IGEP v2 board
+      omap3: Add support for flash on IGEP v2 board
+      ARM: OMAP3: SDRC: add timing data for Numonyx M65KxxxxAM
+      omap3: Use timing data for omap2_init_common_hw on IGEP v2
+      omap3: Update defconfig for IGEP v2 to allow new drivers andfeatures
+
+Grazvydas Ignotas (3):
+      OMAP: pandora: add DSS2 support and related regulators
+      omap3: pandora: update regulator setup
+      omap3: pandora: update defconfig
+
+Jonas Zetterberg (2):
+      IGEPv2: Added WIFI support
+      IGEPv2: Use Red Led1 as Heartbeat if configured
+
+Sanjeev Premi (4):
+      omap3evm: Add mux settings for keypad
+      omap3evm: Fixes after moving to matrix_keypad
+      omap3evm: Configure GPIO175 for touchscreen PEN_IRQ
+      OMAP3EVM: PM: Update defconfig
+
+Thomas Weber (2):
+      Add minimal support for DevKit8000
+      Add devkit8000_defconfig
+
+Vaibhav Hiremath (3):
+      AM3517: Enable basic I2C Support
+      AM3517: Enable RTC driver support for AM3517EVM
+      AM3517: Enable I2C-GPIO Expander driver support for AM3517EVM
+
+vikram pandita (1):
+      omap: zoom3: enable ehci support
+
+
+ arch/arm/configs/devkit8000_defconfig          | 1889 ++++++++++++++++++++++++
+ arch/arm/configs/igep0020_defconfig            |  525 ++++---
+ arch/arm/configs/omap3_evm_defconfig           |    6 
+ arch/arm/configs/omap3_pandora_defconfig       |  678 +++++++--
+ arch/arm/mach-omap2/Kconfig                    |    6 
+ arch/arm/mach-omap2/Makefile                   |    2 
+ arch/arm/mach-omap2/board-am3517evm.c          |   86 +
+ arch/arm/mach-omap2/board-devkit8000.c         |  691 +++++++++
+ arch/arm/mach-omap2/board-igep0020.c           |  269 +++
+ arch/arm/mach-omap2/board-omap3evm.c           |   33 
+ arch/arm/mach-omap2/board-omap3pandora.c       |  180 ++
+ arch/arm/mach-omap2/board-zoom3.c              |   14 
+ arch/arm/mach-omap2/sdram-numonyx-m65kxxxxam.h |   51 +
+ 13 files changed, 4020 insertions(+), 410 deletions(-)
+ create mode 100644 arch/arm/configs/devkit8000_defconfig
+ create mode 100644 arch/arm/mach-omap2/board-devkit8000.c
+ create mode 100644 arch/arm/mach-omap2/sdram-numonyx-m65kxxxxam.h
+
+-- 
+Signature
