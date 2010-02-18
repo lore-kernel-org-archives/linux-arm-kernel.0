@@ -1,33 +1,54 @@
-From: hli@broadcom.com (Henry Li)
-Date: Wed, 17 Feb 2010 16:33:00 -0800
-Subject: Alignment Requirement for MT_MEMORY type
-Message-ID: <B125D8217ABC4B43826503DE00A2D44910F4639A8D@SJEXCHCCR01.corp.ad.broadcom.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Wed, 17 Feb 2010 16:45:54 -0800
+Subject: Kernel panic due to page migration accessing memory holes
+Message-ID: <4B7C8DC2.3060004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-Can someone tell me why there is a requirement for the virtual and physical
-addresses and size using MT_MEMORY memtype (where prot_l1=0) to be aligned
-to section boundary (1MB) in linux-2.6.32/arch/arm/mm/mmu.c/create_mapping
-during IO table init?
+I have encountered a kernel panic on the ARM/msm platform in the mm 
+migration code on 2.6.29.  My memory configuration has two discontiguous 
+banks per our ATAG definition.   These banks end up on addresses that 
+are 1 MB aligned.  I am using FLATMEM (not SPARSEMEM), but my 
+understanding is that SPARSEMEM should not be necessary to support this 
+configuration.  Please correct me if I'm wrong.
 
+The crash occurs in mm/page_alloc.c:move_freepages() when being passed a 
+start_page that corresponds to the last several megabytes of our first 
+memory bank.  The code in move_freepages_block() aligns the passed in 
+page number to pageblock_nr_pages, which corresponds to 4 MB.  It then 
+passes that aligned pfn as the beginning of a 4 MB range to 
+move_freepages().  The problem is that since our bank's end address is 
+not 4 MB aligned, the range passed to move_freepages() exceeds the end 
+of our memory bank.  The code later blows up when trying to access 
+uninitialized page structures.
 
-Following is the relevent code snippet:
+As a temporary fix, I added some code to move_freepages_block() that 
+inspects whether the range exceeds our first memory bank -- returning 0 
+if it does.  This is not a clean solution, since it requires exporting 
+the ARM specific meminfo structure to extract the bank information.
 
-addr = md->virtual & PAGE_MASK;
-phys = (unsigned long)__pfn_to_phys(md->pfn);
-length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+I see an option exists called CONFIG_HOLES_IN_ZONE, which has control 
+over the definition of pfn_valid_within() used in move_freepages().  
+This option seems relevant to the problem.  The ia64 architecture has a 
+special version of pfn_valid() called ia64_pfn_valid() that is used in 
+conjunction with this option.  It appears to inspect the page 
+structure's state in a safe way that does not cause a crash, and can 
+presumably be used to determine whether the page structure is 
+initialized properly.  The ARM version of pfn_valid() used in the 
+FLATMEM scenario does not appear to be memory hole aware, and will 
+blindly return true in this case.
 
-if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
-	printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
-	       "be mapped using pages, ignoring.\n",
-	       __pfn_to_phys(md->pfn), addr);
-	return;
-}
+I have looked on linux-next, and at least the functions mentioned above 
+have not changed.
 
+I was curious if there is a stated requirement where memory banks must 
+end on 4 MB aligned addresses.  Although I found this problem on ARM, it 
+appears upon inspection that the problem could occur on other 
+architectures as well, given the memory map assumptions stated above.  
+I'm hoping that some mm experts might understand the problem in greater 
+detail.
 
 Thanks,
-
-- Henry
+Michael
