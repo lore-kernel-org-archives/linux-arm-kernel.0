@@ -1,30 +1,48 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 18 Feb 2010 21:01:46 +0900
-Subject: PL-330 DMA driver
-In-Reply-To: <e9c3a7c21002172224y7a80d913r5b78c1e41a91565f@mail.gmail.com>
-References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
-	<e9c3a7c21002172224y7a80d913r5b78c1e41a91565f@mail.gmail.com>
-Message-ID: <4B7D2C2A.8030802@samsung.com>
+From: bornet.romain@gmail.com (Romain Bornet)
+Date: Thu, 18 Feb 2010 13:06:23 +0100
+Subject: NDCBx registers in PXA3XX MTD driver
+Message-ID: <62fd715d1002180406y1181bbe9y83ba3cd0277989c4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/18/2010 3:24 PM, Dan Williams wrote:
-> On Tue, Feb 16, 2010 at 10:50 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
->> Hello,
->>
->> ?any Samsung SoCs have PL-330 as the DMA controller and the driver
->> is missing in the mainline.
->>
->> A few months ago, Joonyoung Shim of Samsung, attempted the driver for PL-330
->> based on the DMA API(drivers/dma/), but the patches weren't accepted.
-> 
-> Looking back at the archives seems I missed this patch.  So it was not
-> rejected just overlooked.  Do we want to move forward on that patch as
-> it stands, or go a different direction?  If it is resubmitted I will
-> get it in the queue for 2.6.34.
-> 
+Hi folks,
 
-You can find the prior patch of pl330 from the below url.
-http://patchwork.kernel.org/patch/47847/
+I'm rather new in the ARM / Linux world and currently working on a
+PXA168-based board.
 
-If needs, i can resubmit patch based from async_tx repo after some test.
+I'm trying to understand the implementation of the pxa3xx_nand.c
+driver and came across 3 lines of code I cannot understand.
+
+The 3 lines in question are the one where the NDCB0/1/2 registers are
+written in write_cmd()
+---
+nand_writel(info, NDCB0, info->ndcb0);
+nand_writel(info, NDCB0, info->ndcb1);
+nand_writel(info, NDCB0, info->ndcb2);
+---
+
+see here for context...
+http://lxr.linux.no/#linux+v2.6.32/drivers/mtd/nand/pxa3xx_nand.c#L459
+
+Why are all 3 values (ndcb0, ndcb1, ndcb2) written to the same
+register NDCB0 whereas the PXA3xx and PXA168 have different offsets
+(0x48, 0x4C and 0x50) for these 3 registers as documented in
+PXA3xx_DM_Vol_II in chapter "3.8.10 NAND Controller Command Buffers
+(NDCBx)" (available from Marvell @
+http://www.marvell.com/products/processors/applications/pxa_3xx/PXA3xx_Developers_Manual.zip
+)
+
+I first thought about a possible hardware Errata but couldn't find any
+hint in this direction.
+
+I would have expected
+
+nand_writel(info, NDCB0, info->ndcb0);
+nand_writel(info, NDCB1, info->ndcb1);
+nand_writel(info, NDCB2, info->ndcb2);
+
+
+Any clue on this?
+
+Thanks for your help !
+    Romain
