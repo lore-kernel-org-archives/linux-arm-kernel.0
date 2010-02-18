@@ -1,200 +1,100 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Thu, 18 Feb 2010 10:04:32 +0000
-Subject: Kernel panic due to page migration accessing memory holes
-In-Reply-To: <20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
-References: <4B7C8DC2.3060004@codeaurora.org>
-	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>
-	<4B7CF8C0.4050105@codeaurora.org>
-	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <20100218100432.GA32626@csn.ul.ie>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 18 Feb 2010 11:15:38 +0100
+Subject: pull request for .34
+Message-ID: <20100218101538.GA8659@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 06:36:04PM +0900, KAMEZAWA Hiroyuki wrote:
-> On Thu, 18 Feb 2010 00:22:24 -0800
-> Michael Bohan <mbohan@codeaurora.org> wrote:
-> 
-> > On 2/17/2010 5:03 PM, KAMEZAWA Hiroyuki wrote:
-> > > On Wed, 17 Feb 2010 16:45:54 -0800
-> > > Michael Bohan<mbohan@codeaurora.org>  wrote:
-> > >> As a temporary fix, I added some code to move_freepages_block() that
-> > >> inspects whether the range exceeds our first memory bank -- returning 0
-> > >> if it does.  This is not a clean solution, since it requires exporting
-> > >> the ARM specific meminfo structure to extract the bank information.
-> > >>
-> > >>      
-> > > Hmm, my first impression is...
-> > >
-> > > - Using FLATMEM, memmap is created for the number of pages and memmap should
-> > >    not have aligned size.
-> > > - Using SPARSEMEM, memmap is created for aligned number of pages.
-> > >
-> > > Then, the range [zone->start_pfn ... zone->start_pfn + zone->spanned_pages]
-> > > should be checked always.
-> > >
-> > >
-> > >   803 static int move_freepages_block(struct zone *zone, struct page *page,
-> > >   804                                 int migratetype)
-> > >   805 {
-> > >   816         if (start_pfn<  zone->zone_start_pfn)
-> > >   817                 start_page = page;
-> > >   818         if (end_pfn>= zone->zone_start_pfn + zone->spanned_pages)
-> > >   819                 return 0;
-> > >   820
-> > >   821         return move_freepages(zone, start_page, end_page, migratetype);
-> > >   822 }
-> > >
-> > > "(end_pfn>= zone->zone_start_pfn + zone->spanned_pages)" is checked.
-> > > What zone->spanned_pages is set ? The zone's range is
-> > > [zone->start_pfn ... zone->start_pfn+zone->spanned_pages], so this
-> > > area should have initialized memmap. I wonder zone->spanned_pages is too big.
-> > >    
-> > 
-> > In the block of code above running on my target, the zone_start_pfn is 
-> > is 0x200 and the spanned_pages is 0x44100.  This is consistent with the 
-> > values shown from the zoneinfo file below.  It is also consistent with 
-> > my memory map:
-> > 
-> > bank0:
-> >      start: 0x00200000
-> >      size:  0x07B00000
-> > 
-> > bank1:
-> >      start: 0x40000000
-> >      size:  0x04300000
-> > 
-> > Thus, spanned_pages here is the highest address reached minus the start 
-> > address of the lowest bank (eg. 0x40000000 + 0x04300000 - 0x00200000).
-> > 
-> > Both of these banks exist in the same zone.  This means that the check 
-> > in move_freepages_block() will never be satisfied for cases that overlap 
-> > with the prohibited pfns, since the zone spans invalid pfns.  Should 
-> > each bank be associated with its own zone?
-> > 
-> 
-> Hmm. okay then..(CCing Mel.)
-> 
->  [Fact]
->  - There are 2 banks of memory and a memory hole on your machine.
->    As
->          0x00200000 - 0x07D00000
->          0x40000000 - 0x43000000
-> 
->  - Each bancks are in the same zone.
->  - You use FLATMEM.
->  - You see panic in move_freepages().
->  - Your host's MAX_ORDER=11....buddy allocator's alignment is 0x400000
->    Then, it seems 1st bank is not algined.
+Hello Russell,
 
-It's not and assumptions are made about it being aligned.
+I collected the raw_spinlock conversion patches by Thomas[1] and put them
+together with my patches in my repository.
 
->  - You see panic in move_freepages().
->  - When you added special range check for bank0 in move_freepages(), no panic.
->    So, it seems the kernel see somehing bad at accessing memmap for a memory 
->    hole between bank0 and bank1.
-> 
-> 
-> When you use FLATMEM, memmap/migrate-type-bitmap should be allocated for
-> the whole range of [start_pfn....max_pfn) regardless of memory holes. 
-> Then, I think you have memmap even for a memory hole [0x07D00000...0x40000000)
-> 
+All the patches have been posted on this list without anyone having
+objections.
 
-It would have at the start but then ....
+I have a patch stack that makes imx21 and imx27 use runtime physoffset,
+but I'm not sure yet if I can complete bringing it into shape for the
+merge window.
 
+Best regards
+Uwe
 
-> Then, the question is why move_freepages() panic at accessing *unused* memmaps
-> for memory hole. All memmap(struct page) are initialized in 
->   memmap_init()
-> 	-> memmap_init_zone()
-> 		-> ....
->   Here, all page structs are initialized (page->flags, page->lru are initialized.)
-> 
+[1] I only fixed one subject not to contain a patch name
 
-ARM frees unused portions of memmap to save memory. It's why memmap_valid_within()
-exists when CONFIG_ARCH_HAS_HOLES_MEMORYMODEL although previously only
-reading /proc/pagetypeinfo cared.
+The following changes since commit b0483e78e5c4c9871fc5541875b3bc006846d46b:
+  Linus Torvalds (1):
+        Merge git://git.kernel.org/.../gregkh/tty-2.6
 
-In that case, the FLATMEM memory map had unexpected holes which "never"
-happens and that was the workaround. The problem here is that there are
-unaligned zones but no pfn_valid() implementation that can identify
-them as you'd have with SPARSEMEM. My expectation is that you are using
-the pfn_valid() implementation from asm-generic
+are available in the git repository at:
 
-#define pfn_valid(pfn)          ((pfn) < max_mapnr)
+  git://git.pengutronix.de/git/ukl/linux-2.6.git for-rmk
 
-which is insufficient in your case.
+Thomas Gleixner (12):
+      arm: Convert dma_spin_lock to raw_spinlock
+      arm: Convert stop_lock to raw_spinlock
+      arm: convert die_lock and undef_lock to raw_spinlocks
+      arm: Convert l2x0_lock to raw_spinlock
+      arm: Convert cpu_asid_lock to raw_spinlock
+      arm: Convert xscale minicache_lock to raw_spinlock
+      arm: Convert v4 minicache_lock to raw_spinlock
+      arm: Convert v6_lock to raw_spinlock
+      arm: Convert footbridge gpio and led locks to raw_spinlock
+      arm: Convert integrator cm_lock and v3_lock to raw_spinlock
+      arm: Convert ixp4xx pci_lock to raw_spinlock
+      arm: Convert shark leds_lock to raw_spinlock
 
-> Then, looking back into move_freepages().
->  ==
->  778         for (page = start_page; page <= end_page;) {
->  779                 /* Make sure we are not inadvertently changing nodes */
->  780                 VM_BUG_ON(page_to_nid(page) != zone_to_nid(zone));
->  781 
->  782                 if (!pfn_valid_within(page_to_pfn(page))) {
->  783                         page++;
->  784                         continue;
->  785                 }
->  786 
->  787                 if (!PageBuddy(page)) {
->  788                         page++;
->  789                         continue;
->  790                 }
->  791 
->  792                 order = page_order(page);
->  793                 list_del(&page->lru);
->  794                 list_add(&page->lru,
->  795                         &zone->free_area[order].free_list[migratetype]);
->  796                 page += 1 << order;
->  797                 pages_moved += 1 << order;
->  798         }
->  ==
-> Assume an access to page struct itself doesn't cause panic.
-> Touching page struct's member of page->lru at el to cause panic,
-> So, PageBuddy should be set.
-> 
-> Then, there are 2 chances.
->   1. page_to_nid(page) != zone_to_nid(zone).
->   2. PageBuddy() is set by mistake.
->      (PG_reserved page never be set PG_buddy.)
-> 
-> For both, something corrupted in unused memmap area.
-> There are 2 possibility.
->  (1) memmap for memory hole was not initialized correctly.
->  (2) something wrong currupt memmap. (by overwrite.)
-> 
-> I doubt (2) rather than (1).
-> 
+Uwe Kleine-K?nig (13):
+      arm/zImage: fix comments for cache_on, cache_off and cache_clean_flush
+      arm/zImage: some comments for __armv3_mpu_cache_on
+      arm/zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+      arm/zImage: annotate debug functions about corrupted registers
+      arm/zImage: don't define unused symbol initrd_phys
+      arm: deprecate support for old way to pass kernel parameters
+      arm/zImage: don't hard code the stack size twice
+      arm/uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+      arm: Allow PHYS_OFFSET to be runtime determined
+      arm: remove bit-rotten STANDALONE_DEBUG for decompressor
+      arm/ixp2000: fix type of ixp2000_timer_interrupt
+      Merge branch 'arm/booting' into for-rmk
+      Merge branch 'arm/raw_spinlock' into for-rmk
 
-I think it's more likely the at the memmap he is accessing has been
-freed and is effectively random data.
-
-> One of difficulty here is that your kernel is 2.6.29. Can't you try 2.6.32 and
-> reproduce trouble ? Or could you check page flags for memory holes ?
-> For holes, nid should be zero and PG_buddy shouldn't be set and PG_reserved
-> should be set...
-> 
-> And checking memmap initialization of memory holes in memmap_init_zone() 
-> may be good start point for debug, I guess.
-> 
-> Off topic:
-> BTW, memory hole seems huge for your size of memory....using SPARSEMEM
-> is a choice.
-> 
-
-SPARSEMEM would give you an implementation of pfn_valid() that you could
-use here. The choices that spring to mind are;
-
-1. reduce MAX_ORDER so they are aligned (easiest)
-2. use SPARSEMEM (easy, but not necessary what you want to do, might
-	waste memory unless you drop MAX_ORDER as well)
-3. implement a pfn_valid() that can handle the holes and set
-	CONFIG_HOLES_IN_ZONE so it's called in move_freepages() to
-	deal with the holes (should pass this by someone more familiar
-	with ARM than I)
-4. Call memmap_valid_within in move_freepages (very very ugly, not
-	suitable for upstream merging)
-
+ Documentation/arm/Booting                        |    1 +
+ arch/arm/Kconfig                                 |    9 +++
+ arch/arm/boot/Makefile                           |    6 ++-
+ arch/arm/boot/compressed/Makefile                |   10 +--
+ arch/arm/boot/compressed/Makefile.debug          |   23 -------
+ arch/arm/boot/compressed/head.S                  |   76 +++++++++++++++++++--
+ arch/arm/boot/compressed/misc.c                  |   27 --------
+ arch/arm/include/asm/dma.h                       |    6 +-
+ arch/arm/include/asm/memory.h                    |    5 ++
+ arch/arm/kernel/Makefile                         |    4 +-
+ arch/arm/kernel/compat.c                         |    7 --
+ arch/arm/kernel/compat.h                         |    2 -
+ arch/arm/kernel/dma.c                            |    2 +-
+ arch/arm/kernel/head.S                           |   31 +++++++--
+ arch/arm/kernel/setup.c                          |   21 ++++++-
+ arch/arm/kernel/smp.c                            |    6 +-
+ arch/arm/kernel/traps.c                          |   20 +++---
+ arch/arm/mach-footbridge/include/mach/hardware.h |    2 +-
+ arch/arm/mach-footbridge/netwinder-hw.c          |   14 ++--
+ arch/arm/mach-footbridge/netwinder-leds.c        |   10 ++--
+ arch/arm/mach-integrator/core.c                  |    6 +-
+ arch/arm/mach-integrator/pci_v3.c                |   14 ++--
+ arch/arm/mach-ixp2000/core.c                     |    2 +-
+ arch/arm/mach-ixp4xx/common-pci.c                |   22 +++---
+ arch/arm/mach-shark/leds.c                       |    6 +-
+ arch/arm/mm/cache-l2x0.c                         |   30 ++++----
+ arch/arm/mm/context.c                            |    6 +-
+ arch/arm/mm/copypage-v4mc.c                      |    6 +-
+ arch/arm/mm/copypage-v6.c                        |   10 ++--
+ arch/arm/mm/copypage-xscale.c                    |    6 +-
+ drivers/char/ds1620.c                            |    8 +-
+ drivers/char/nwflash.c                           |    4 +-
+ drivers/mtd/maps/dc21285.c                       |    4 +-
+ sound/oss/waveartist.c                           |    4 +-
+ 34 files changed, 232 insertions(+), 178 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/Makefile.debug
 -- 
-Mel Gorman
-Part-time Phd Student                          Linux Technology Center
-University of Limerick                         IBM Dublin Software Lab
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
