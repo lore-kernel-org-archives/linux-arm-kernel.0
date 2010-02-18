@@ -1,12 +1,18 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 18 Feb 2010 14:23:00 +0530
-Subject: [PATCH 0/9] omap4 updates for 2.6.34
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C417F61A@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Feb 2010 08:53:36 +0000
+Subject: Kernel panic due to page migration accessing memory holes
+In-Reply-To: <4B7C8DC2.3060004@codeaurora.org>
+References: <4B7C8DC2.3060004@codeaurora.org>
+Message-ID: <20100218085336.GB848@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series have few omap4 updates and is based on Tony's 
-'omap-for-linus' branch. This series patches are part of the
-below series posted on linux-omap for review earlier this week.
+On Wed, Feb 17, 2010 at 04:45:54PM -0800, Michael Bohan wrote:
+> I have encountered a kernel panic on the ARM/msm platform in the mm  
+> migration code on 2.6.29.  My memory configuration has two discontiguous  
+> banks per our ATAG definition.   These banks end up on addresses that  
+> are 1 MB aligned.  I am using FLATMEM (not SPARSEMEM), but my  
+> understanding is that SPARSEMEM should not be necessary to support this  
+> configuration.  Please correct me if I'm wrong.
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg23939.html
+Make sure you have ARCH_HAS_HOLES_MEMORYMODEL enabled.
