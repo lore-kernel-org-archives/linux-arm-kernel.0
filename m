@@ -1,25 +1,24 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 18 Feb 2010 14:46:15 +0800
-Subject: [PATCH 2/2] arm/pxa: Let zeus.c link without CONFIG_PM enabled.
-In-Reply-To: <20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
-References: <1266356575-1364-1-git-send-email-stefan@datenfreihafen.org>
-	<20100216221255.0f905df3@taxman.wild-wind.fr.eu.org>
-Message-ID: <f17812d71002172246s4d90fd96x51dde9dd3ec8dcc9@mail.gmail.com>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Thu, 18 Feb 2010 07:56:14 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB03216236D6@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02C3CF84D1@dbde02.ent.ti.com>
+	<Pine.LNX.4.44L0.1002171201190.1913-100000@iolanthe.rowland.org>
+	<5A47E75E594F054BAF48C5E4FC4B92AB03216236D6@dbde02.ent.ti.com>
+Message-ID: <201002180756.14100.oliver@neukum.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Acked-by: Marc Zyngier <maz@misterjones.org>
->
-> Eric, are you willing to take this directly, or do you want me to queue
-> it for the next merge window with the rest of the fixes?
->
+Am Mittwoch, 17. Februar 2010 21:30:24 schrieb Gadiyar, Anand:
+> > Why do you skip mapping the setup packet but not the data packet?
+> > 
+> 
+> I think that's oversight. For this controller, we need to skip mapping
+> all buffers used to do transfers on EP0, which is all control transfers.
 
-With your Ack, I've applied this to 'devel'. The zeus can still be
-built with CONFIG_PM enabled, so I tend to include this for the
-next merge window instead of going into the -rc phase.
+One thing more. Do you have an issue with EP 0 only or all control
+endpoints? EP 0 must be control, but devices are within spec if they
+have multiple control endpoints provided EP 0 is control.
 
-And note this doesn't look like a final fix to this issue, so you
-may want to work a bit on it some time later.
-
-Please submit the rest of the fixes as we are close to the merge
-window. And thanks.
+	Regards
+		Oliver
