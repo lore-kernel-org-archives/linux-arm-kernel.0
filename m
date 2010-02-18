@@ -1,54 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2010 17:32:50 -0800
-Subject: [PATCH 23/23] OMAP3EVM: PM: Update defconfig
-In-Reply-To: <20100218013012.32075.43788.stgit@baageli.muru.com>
-References: <20100218013012.32075.43788.stgit@baageli.muru.com>
-Message-ID: <20100218013250.32075.51003.stgit@baageli.muru.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 18 Feb 2010 14:53:42 +1300
+Subject: [PATCH] ep93xx: include correct irq.h in core.c
+In-Reply-To: <201001141353.23018.hartleys@visionengravers.com>
+References: <201001141353.23018.hartleys@visionengravers.com>
+Message-ID: <4B7C9DA6.1090100@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sanjeev Premi <premi@ti.com>
+H Hartley Sweeten wrote:
+> ep93xx: include correct irq.h in core.c
+> 
+> Currently <asm/mach/irq.h> is included by core.c. This header
+> includes <linux/irq.h> and defines a number of internal functions.
+> These internal functions are not needed by this file. Change the
+> include so that we just get what is needed.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-This patch updates the omap3_evm_defconfig to
-select these options:
-  * CONFIG_PM_DEBUG
-  * CONFIG_DEBUG_FS
-  * CONFIG_OMAP_SMARTREFLEX
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap3_evm_defconfig |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+~Ryan
 
-diff --git a/arch/arm/configs/omap3_evm_defconfig b/arch/arm/configs/omap3_evm_defconfig
-index 86cc4be..e2ad859 100644
---- a/arch/arm/configs/omap3_evm_defconfig
-+++ b/arch/arm/configs/omap3_evm_defconfig
-@@ -187,6 +187,8 @@ CONFIG_ARCH_OMAP3=y
- #
- # OMAP Feature Selections
- #
-+CONFIG_OMAP_SMARTREFLEX=y
-+# CONFIG_OMAP_SMARTREFLEX_TESTING is not set
- # CONFIG_OMAP_DEBUG_POWERDOMAIN is not set
- # CONFIG_OMAP_DEBUG_CLOCKDOMAIN is not set
- CONFIG_OMAP_RESET_CLOCKS=y
-@@ -333,7 +335,7 @@ CONFIG_BINFMT_MISC=y
- # Power management options
- #
- CONFIG_PM=y
--# CONFIG_PM_DEBUG is not set
-+CONFIG_PM_DEBUG=y
- CONFIG_PM_SLEEP=y
- CONFIG_SUSPEND=y
- CONFIG_SUSPEND_FREEZER=y
-@@ -1339,7 +1341,7 @@ CONFIG_ENABLE_MUST_CHECK=y
- CONFIG_FRAME_WARN=1024
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_UNUSED_SYMBOLS is not set
--# CONFIG_DEBUG_FS is not set
-+CONFIG_DEBUG_FS=y
- # CONFIG_HEADERS_CHECK is not set
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_SHIRQ is not set
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
