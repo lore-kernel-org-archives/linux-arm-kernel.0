@@ -1,65 +1,32 @@
-From: bornet.romain@gmail.com (Romain Bornet)
-Date: Thu, 18 Feb 2010 14:11:48 +0100
-Subject: NDCBx registers in PXA3XX MTD driver
-In-Reply-To: <f17812d71002180439p1585ea08l37b6d55327c53364@mail.gmail.com>
-References: <62fd715d1002180406y1181bbe9y83ba3cd0277989c4@mail.gmail.com>
-	<f17812d71002180439p1585ea08l37b6d55327c53364@mail.gmail.com>
-Message-ID: <62fd715d1002180511n34c7ace8o6bb58fd413fd8335@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 18 Feb 2010 16:01:14 +0200
+Subject: [PATCH] Add resources description for s3c24xx ts driver
+Message-ID: <201002181601.20625.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric
+Following patch adds resource description for s3c24xx ts driver.
+Without this patch driver fails to initialize with "no resource for interrupt" 
+message.
 
-In fact I didn't pay attention to the note at the beginning of the
-chapter and to the fact that NDCB1 and 2 are specified read-only!
+Anyway, even with this patch driver stops reporting events after few presses, 
+I'll investigate on it later.
 
-Thanks for the clarification and the quick reply!
+Btw, does this driver work at least for anyone?
 
-Have a nice day.
-    Romain
-
-On Thu, Feb 18, 2010 at 1:39 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Feb 18, 2010 at 8:06 PM, Romain Bornet <bornet.romain@gmail.com> wrote:
->> Hi folks,
->>
->> I'm rather new in the ARM / Linux world and currently working on a
->> PXA168-based board.
->>
->> I'm trying to understand the implementation of the pxa3xx_nand.c
->> driver and came across 3 lines of code I cannot understand.
->>
->> The 3 lines in question are the one where the NDCB0/1/2 registers are
->> written in write_cmd()
->> ---
->> nand_writel(info, NDCB0, info->ndcb0);
->> nand_writel(info, NDCB0, info->ndcb1);
->> nand_writel(info, NDCB0, info->ndcb2);
->> ---
->>
->> see here for context...
->> http://lxr.linux.no/#linux+v2.6.32/drivers/mtd/nand/pxa3xx_nand.c#L459
->>
->> Why are all 3 values (ndcb0, ndcb1, ndcb2) written to the same
->> register NDCB0 whereas the PXA3xx and PXA168 have different offsets
->> (0x48, 0x4C and 0x50) for these 3 registers as documented in
->> PXA3xx_DM_Vol_II in chapter "3.8.10 NAND Controller Command Buffers
->> (NDCBx)" (available from Marvell @
->> http://www.marvell.com/products/processors/applications/pxa_3xx/PXA3xx_Developers_Manual.zip
->> )
->>
->> I first thought about a possible hardware Errata but couldn't find any
->> hint in this direction.
->>
->> I would have expected
->>
->> nand_writel(info, NDCB0, info->ndcb0);
->> nand_writel(info, NDCB1, info->ndcb1);
->> nand_writel(info, NDCB2, info->ndcb2);
->>
->
-> If you read the documentation a little bit more carefully, you'll know why.
->
-> Basically, the write is to NDCB0 _only_ and in turn writing to 0, 1, 2
-> respectively, reading of NDCB1 and NDCB2 is however, doable, which
-> will show you what you've written.
->
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Add-resources-description-for-s3c24xx-ts-driver.patch
+Type: text/x-patch
+Size: 1230 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100218/8d0b0ec3/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100218/8d0b0ec3/attachment.sig>
