@@ -1,15 +1,16 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2010 17:17:20 -0800
-Subject: [PATCH 00/23] omap updates for 2.6.34, part 3
-Message-ID: <20100218011311.30736.20436.stgit@baageli.muru.com>
+Date: Wed, 17 Feb 2010 17:31:44 -0800
+Subject: [PATCH 00/23] Series short description
+Message-ID: <20100218013012.32075.43788.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-Sorry, was meaning to post these last week alread..
+Looks like stg mail choked on a bad email addres, here's a retry.
 
-Here are the omap board-*.c file changes for review.
+These patches are against what I have sitting in omap-for-linus
+branch in the linux-omap tree.
 
 Regards,
 
