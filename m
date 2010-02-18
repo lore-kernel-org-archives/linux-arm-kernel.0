@@ -1,43 +1,44 @@
 From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Thu, 18 Feb 2010 23:11:33 +0200
-Subject: [PATCH 1/2] Gemini: wrong registers used to set reg_level in
-	gpio_set_irq_type()
+Date: Thu, 18 Feb 2010 23:11:40 +0200
+Subject: [PATCH 2/2] MAINTAINERS: fix my e-mail and status for Gemini and FA526
 In-Reply-To: <20100218211126.5646.39087.stgit@localhost.localdomain>
 References: <20100218211126.5646.39087.stgit@localhost.localdomain>
-Message-ID: <20100218211133.5646.49891.stgit@localhost.localdomain>
+Message-ID: <20100218211140.5646.94979.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roel Kluin <roel.kluin@gmail.com>
-
-It appears the wrong GPIO registers were used
-
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
 ---
 
- arch/arm/mach-gemini/gpio.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ MAINTAINERS |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
-index e726385..fe3bd5a 100644
---- a/arch/arm/mach-gemini/gpio.c
-+++ b/arch/arm/mach-gemini/gpio.c
-@@ -86,7 +86,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
- 	unsigned int reg_both, reg_level, reg_type;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 412eff6..44c669d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -616,10 +616,10 @@ M:	Richard Purdie <rpurdie@rpsys.net>
+ S:	Maintained
  
- 	reg_type = __raw_readl(base + GPIO_INT_TYPE);
--	reg_level = __raw_readl(base + GPIO_INT_BOTH_EDGE);
-+	reg_level = __raw_readl(base + GPIO_INT_LEVEL);
- 	reg_both = __raw_readl(base + GPIO_INT_BOTH_EDGE);
+ ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
+-M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
++M:	Paulius Zaleckas <paulius.zaleckas@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://gitorious.org/linux-gemini/mainline.git
+-S:	Maintained
++S:	Odd Fixes
+ F:	arch/arm/mach-gemini/
  
- 	switch (type) {
-@@ -117,7 +117,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
- 	}
+ ARM/EBSA110 MACHINE SUPPORT
+@@ -641,9 +641,9 @@ T:	topgit git://git.openezx.org/openezx.git
+ F:	arch/arm/mach-pxa/ezx.c
  
- 	__raw_writel(reg_type, base + GPIO_INT_TYPE);
--	__raw_writel(reg_level, base + GPIO_INT_BOTH_EDGE);
-+	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
- 	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
+ ARM/FARADAY FA526 PORT
+-M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
++M:	Paulius Zaleckas <paulius.zaleckas@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
++S:	Odd Fixes
+ F:	arch/arm/mm/*-fa*
  
- 	gpio_ack_irq(irq);
+ ARM/FOOTBRIDGE ARCHITECTURE
