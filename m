@@ -1,32 +1,37 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 18 Feb 2010 15:18:14 +1300
-Subject: [PATCH] ep93xx: move timer defines into core.c and document
-In-Reply-To: <201001121811.28763.hartleys@visionengravers.com>
-References: <201001121811.28763.hartleys@visionengravers.com>
-Message-ID: <4B7CA366.50801@bluewatersys.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 17 Feb 2010 23:18:26 -0500 (EST)
+Subject: race between kmap shootdown and cache maintenance
+In-Reply-To: <d6200be21002171800m7f03f94blbb17d68bce4a9302@mail.gmail.com>
+References: <A0A1E7539300DF49AA383E614C7827BC048DB1096B@HQMAIL01.nvidia.com>
+	<20100207153045.GA30457@n2100.arm.linux.org.uk>
+	<A0A1E7539300DF49AA383E614C7827BC048DB10979@HQMAIL01.nvidia.com>
+	<alpine.LFD.2.00.1002082229480.1681@xanadu.home>
+	<A0A1E7539300DF49AA383E614C7827BC048DB10984@HQMAIL01.nvidia.com>
+	<alpine.LFD.2.00.1002082310420.1681@xanadu.home>
+	<A0A1E7539300DF49AA383E614C7827BC048DB10A1D@HQMAIL01.nvidia.com>
+	<d6200be21002171800m7f03f94blbb17d68bce4a9302@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1002172316240.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> ep93xx: move timer defines into core.c and document
-> 
-> The timer defines are only used in core.c. Move them so
-> they will not be globaly exposed.
-> 
-> While here, add additional defines to document the magic
-> numbers used in the registers. Also, add some comments
-> for clarification.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersus.com>
+On Wed, 17 Feb 2010, Arve Hj?nnev?g wrote:
 
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+> On Fri, Feb 12, 2010 at 5:08 PM, Gary King <GKing@nvidia.com> wrote:
+> > I finally got a chance to test this; it looks like this condition may be common: many (all?) of the various page cache-like things seem to just hand pages to flush_dcache_page blindly, and expect flush_dcache_page to determine whether or not maintenance is required.
+> >
+> > With your patch, I immediately hit the BUG() when the init process is started; the backtrace is attached as unpinned_maint.log.
+> 
+> I see the same crash on Nexus One with this patch applied to a
+> 2.6.33-rc8 kernel.
+> 
+> If I change the BUG_ON to WARN_ON, the system boot further, but the
+> warning triggers the bug.
+> 
+> If I also apply the fix from this thread the system boots again, and I
+> see several calls that do not have the kmap-high pinned.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+OK.  After further considerations, I think the original patch is 
+legitimate.
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+
+Nicolas
