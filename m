@@ -1,24 +1,42 @@
 From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 18 Feb 2010 10:07:53 +0900
-Subject: [PATCH 2/2] ARM: SMDK6410: Register IISv4 device
-In-Reply-To: <1266433400-26780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1266433400-26780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1b68c6791002171707r71bfee5ev5bea8daa7537a975@mail.gmail.com>
+Date: Thu, 18 Feb 2010 10:14:47 +0900
+Subject: PL-330 DMA driver
+In-Reply-To: <63386a3d1002171353v36f7b5c8tdab15b1593581e02@mail.gmail.com>
+References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
+	<63386a3d1002171026h51f34d4buc9ba0293ea08c004@mail.gmail.com>
+	<20100217203114.GC30033@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.1002172220080.4623@axis700.grange>
+	<63386a3d1002171353v36f7b5c8tdab15b1593581e02@mail.gmail.com>
+Message-ID: <1b68c6791002171714u59a7d0fak7cd531de96eb0025@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 4:03 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> index 297f1fa..6176243 100644
-> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> @@ -255,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
-> ? ? ? ?&s3c_device_fb,
-> ? ? ? ?&s3c_device_ohci,
-> ? ? ? ?&s3c_device_usb_hsotg,
-> + ? ? ? &s3c64xx_device_iisv4,
-Since, we now compile dev-audio.c unconditionally, I think this should be ok.
+On Thu, Feb 18, 2010 at 6:53 AM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/2/17 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+>
+>> Of course, there's also a problem of reusing peripheral drivers with
+>> different DMA controllers...
+>
+> That's what I'm facing with MMCI and a host of other peripherals.
+>
+> We have to either:
+>
+> (1) Use something, i.e the DMA engine slave
+>
+> (2) Fork the driver entirely to some ste-mmci.c and delete all generic
+> ?code. (Repeat for each vendor using a primecell!)
+>
+> (3) Sprinkle mmci.c with #ifdef ARCH_U300 for our DMA engine.
+> ?Or, not so bad, atleast sprinkle the smallish part I have now
+> ?broken out in mmci.c that deals with DMA transfers.
+>
+> I think the current patch does (1) and it actually works, then if
+> it gets burdensome to others, using a generic DMA engine can
+> be a special case of (3) since that works for us so we're on the right
+> path in two cases and (2) doesn't look good to me.
+>
+> Yours,
+> Linus Walleij
 
-Acked-by: Jassi Brar <jassi.brar@samsung.com>
+CCing the S3C maintainer (Ben Dooks)  to share his opinion.
