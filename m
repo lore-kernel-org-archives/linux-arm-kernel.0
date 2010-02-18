@@ -1,32 +1,29 @@
 From: maz@misterjones.org (Marc Zyngier)
-Date: Thu, 18 Feb 2010 20:29:24 +0000
-Subject: [PATCH 2/5] Correct the USB host initialisation flags of
-	Arcom/Eurotech Zeus SBC.
-Message-ID: <20100218202924.6d2633d8@taxman.wild-wind.fr.eu.org>
+Date: Thu, 18 Feb 2010 20:30:31 +0000
+Subject: [PATCH 3/5] Add Eurotech as the manufacturer of the Zeus board
+Message-ID: <20100218203031.4d45ef39@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Amit Walambe <amit.walambe@eurotech.com>
 Signed-off-by: Marc Zyngier <maz@misterjones.org>
 ---
- arch/arm/mach-pxa/zeus.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/zeus.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 75f2a37..4034b98 100644
+index 4034b98..c252ea3 100644
 --- a/arch/arm/mach-pxa/zeus.c
 +++ b/arch/arm/mach-pxa/zeus.c
-@@ -509,7 +509,9 @@ static void zeus_ohci_exit(struct device *dev)
+@@ -839,7 +839,7 @@ static void __init zeus_map_io(void)
+ 	PCFR = PCFR_OPDE | PCFR_DC_EN | PCFR_FS | PCFR_FP;
+ }
  
- static struct pxaohci_platform_data zeus_ohci_platform_data = {
- 	.port_mode	= PMM_NPS_MODE,
--	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
-+	/* Clear Power Control Polarity Low and set Power Sense
-+	 * Polarity Low. Supply power to USB ports. */
-+	.flags		= ENABLE_PORT_ALL | POWER_SENSE_LOW,
- 	.init		= zeus_ohci_init,
- 	.exit		= zeus_ohci_exit,
- };
+-MACHINE_START(ARCOM_ZEUS, "Arcom ZEUS")
++MACHINE_START(ARCOM_ZEUS, "Arcom/Eurotech ZEUS")
+ 	/* Maintainer: Marc Zyngier <maz@misterjones.org> */
+ 	.phys_io	= 0x40000000,
+ 	.io_pg_offst	= ((io_p2v(0x40000000) >> 18) & 0xfffc),
 -- 
 1.7.0
 
