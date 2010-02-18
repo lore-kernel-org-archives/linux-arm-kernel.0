@@ -1,41 +1,22 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 18 Feb 2010 14:29:09 +0530
-Subject: [PATCH 4/9] omap: sdma: Limit the secure reserve channel fix for omap3
-In-Reply-To: <1266483554-15044-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
-	<1266483554-15044-2-git-send-email-santosh.shilimkar@ti.com>
-	<1266483554-15044-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1266483554-15044-4-git-send-email-santosh.shilimkar@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 18 Feb 2010 09:32:39 +0000
+Subject: [PATCH 2/2] ARM: SMDK6410: Register IISv4 device
+In-Reply-To: <1b68c6791002171707r71bfee5ev5bea8daa7537a975@mail.gmail.com>
+References: <1266433400-26780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1266433400-26780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1b68c6791002171707r71bfee5ev5bea8daa7537a975@mail.gmail.com>
+Message-ID: <20100218093239.GA3315@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 'ba50ea7e' reserves DMA channels 0 and 1 on high
-security devices, in order to avoid collision between kernel
-dma transfers and ROM code dma transfers.
+On Thu, Feb 18, 2010 at 10:07:53AM +0900, jassi brar wrote:
+> On Thu, Feb 18, 2010 at 4:03 AM, Mark Brown
 
-This fix is applicable only for OMAP3 so add an appropriate
-check.
+> > + ? ? ? &s3c64xx_device_iisv4,
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
-CC: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/plat-omap/dma.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> Since, we now compile dev-audio.c unconditionally, I think this should be ok.
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index 5ec96db..049165c 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2149,7 +2149,8 @@ static int __init omap_init_dma(void)
- 			DMA_SYSCONFIG_AUTOIDLE);
- 		dma_write(v , OCP_SYSCONFIG);
- 		/* reserve dma channels 0 and 1 in high security devices */
--		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-+		if (cpu_is_omap34xx() &&
-+			(omap_type() != OMAP2_DEVICE_TYPE_GP)) {
- 			printk(KERN_INFO "Reserving DMA channels 0 and 1 for "
- 					"HS ROM code\n");
- 			dma_chan[0].dev_id = 0;
--- 
-1.6.0.4
+> Acked-by: Jassi Brar <jassi.brar@samsung.com>
+
+This is actually a revised version of the patch, rather than the
+original (I've been carrying it for over a release now...).
