@@ -1,63 +1,43 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 18 Feb 2010 09:31:32 +1100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100217204404.GD30033@n2100.arm.linux.org.uk>
-References: <20100208065519.GE1290@ucw.cz>
-	<1265628483.4020.63.camel@pc1117.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C3CF7D50@dbde02.ent.ti.com>
-	<201002160922.47072.oliver@neukum.org>
-	<1266397543.16346.264.camel@pasglop>
-	<1266420475.16707.31.camel@e102109-lin.cambridge.arm.com>
-	<1266439020.16346.285.camel@pasglop>
-	<20100217204404.GD30033@n2100.arm.linux.org.uk>
-Message-ID: <1266445892.16346.306.camel@pasglop>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 17 Feb 2010 18:02:23 -0600
+Subject: [PATCH 0/7] OMAP PM updates for 2.6.34
+Message-ID: <1266451350-4480-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-02-17 at 20:44 +0000, Russell King - ARM Linux wrote:
-> No, because that'd probably bugger up the Sparc64 method of delaying
-> flush_dcache_page.
-> 
-> This method works as follows:
-> 
-> - a page cache page is allocated - this has PG_arch_1 clear.
-> 
-> - IO happens on it and it's placed into the page cache.  PG_arch_1 is
->   still clear.
-> 
-> - someone calls read()/write() which accesses the page.  The generic
->   file IO layers call flush_dcache_page() in response to
-> read()/write()
->   fs calls.  flush_dcache_page() spots that the page is not yet mapped
->   into userspace, and sets PG_arch_1 to mark the fact that the kernel
->   mapping is dirty.
-> 
-> - when someone maps the page, we check PG_arch_1 in update_mmu_cache.
->   If PG_arch_1 is set, we flush the kernel mapping.
-> 
-> Clearly, if we go around having drivers clearing PG_arch_1, this is
-> going to break horribly. 
+Here's a small series of PM updates destined for 2.6.34.
 
-Ok, you do things very differently than us on ppc then. We clear
-PG_arch_1 in flush_dcache_page(), and we set it when the page has been
-cache cleaned for execution.
+This branch is also available as 'pm-2.6.34' in my tree and is based
+on Tony's omap-for-linus branch. This will be it for PM patches for
+2.6.34 as the rest of the PM branch is under more significant rework.
 
-We assume that anybody that dirties a page in the kernel will call
-flush_dcache_page() which removes our PG_arch_1 bit thus marking the
-page "dirty".
+Yes, this is a bit late, but hopefully better late than never for
+these relatively minor changes.  Thes changes mainly affect CPUidle
+and off-mode support, neither of which are currently enbled in
+mainline default defconfigs.
 
-Note that from experience, doing the check & flushes in
-update_mmu_cache() is racy on SMP. At least for I$/D$, we have the case
-where processor one does set_pte followed by update_mmu_cache(). The
-later isn't done yet but processor 2 sees the PTE now and starts using
-it, cache hasn't been fully flushed yet. You may avoid that race in some
-ways, but on ppc, I've stopped using that.
+Kalle Jokiniemi (2):
+  OMAP3: cpuidle: Add valid field into C-state parameter passing
+  OMAP3: RX-51: Pass cpu idle parameters
 
-I now do things directly in set_pte_at(). In fact, that's why I want
-your patch to change update_mmu_cache() to take a PTE pointer :-) Since
-my set_pte_at() can now remove the _PAGE_EXEC bit, I need
-update_mmu_cache() to re-read the PTE before it updates the hash table
-or TLB.
+Kevin Hilman (2):
+  OMAP3: cpuidle: configure latencies/thresholds from board file
+  OMAP3: RX-51: support sleep indicator LEDs
 
-Cheers,
-Ben.
+Rajendra Nayak (1):
+  OMAP3: PM: add scratchpad locking function
+
+Sanjeev Premi (1):
+  OMAP3: cpuidle: Update statistics for correct state
+
+Tero Kristo (1):
+  OMAP3: PM: Added support for L2 aux ctrl register save and restore
+
+ arch/arm/mach-omap2/board-3430sdp.c |   20 +++
+ arch/arm/mach-omap2/board-rx51.c    |   44 +++++++
+ arch/arm/mach-omap2/cpuidle34xx.c   |  226 +++++++++++++++++++++++++++++------
+ arch/arm/mach-omap2/pm.h            |   20 +++
+ arch/arm/mach-omap2/pm34xx.c        |    4 +
+ arch/arm/mach-omap2/sleep34xx.S     |   59 +++++++++-
+ arch/arm/plat-omap/Kconfig          |   17 +++
+ 7 files changed, 352 insertions(+), 38 deletions(-)
