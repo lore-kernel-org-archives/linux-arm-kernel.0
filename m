@@ -1,83 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Feb 2010 17:32:33 -0800
-Subject: [PATCH 17/23] IGEPv2: Use Red Led1 as Heartbeat if configured
+Date: Wed, 17 Feb 2010 17:32:36 -0800
+Subject: [PATCH 18/23] AM3517: Enable basic I2C Support
 In-Reply-To: <20100218013012.32075.43788.stgit@baageli.muru.com>
 References: <20100218013012.32075.43788.stgit@baageli.muru.com>
-Message-ID: <20100218013233.32075.60849.stgit@baageli.muru.com>
+Message-ID: <20100218013235.32075.79075.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Zetterberg <jozz@jozz.se>
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-If not configured it will be exported as normal GPIO led.
+Add basic I2C board Hook-up support, where all the 3 I2C instances
+are getting registered.
 
-Signed-off-by: Jonas Zetterberg <jozz@jozz.se>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-igep0020.c |   30 ++++++++++++++++++++++++++++--
- 1 files changed, 28 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-am3517evm.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 4a5d663..748f418 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -16,6 +16,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/leds.h>
- #include <linux/interrupt.h>
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index ad323b4..af99faf 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -38,6 +38,15 @@
+ #define LCD_PANEL_BKLIGHT_PWR	182
+ #define LCD_PANEL_PWM		181
  
- #include <linux/regulator/machine.h>
-@@ -354,9 +355,34 @@ static void __init igep2_display_init(void)
- 	    gpio_direction_output(IGEP2_GPIO_DVI_PUP, 1))
- 		pr_err("IGEP v2: Could not obtain gpio GPIO_DVI_PUP\n");
- }
-+#ifdef CONFIG_LEDS_TRIGGERS
-+static struct gpio_led gpio_leds[] = {
-+	{
-+		.name = "GPIO_LED1_RED",
-+		.default_trigger = "heartbeat",
-+		.gpio = IGEP2_GPIO_LED1_RED,
-+	},
-+};
++static int __init am3517_evm_i2c_init(void)
++{
++	omap_register_i2c_bus(1, 400, NULL, 0);
++	omap_register_i2c_bus(2, 400, NULL, 0);
++	omap_register_i2c_bus(3, 400, NULL, 0);
 +
-+static struct gpio_led_platform_data gpio_leds_info = {
-+	.leds           = gpio_leds,
-+	.num_leds       = ARRAY_SIZE(gpio_leds),
-+};
++	return 0;
++}
 +
-+static struct platform_device leds_gpio = {
-+	 .name   = "leds-gpio",
-+	 .id     = -1,
-+	 .dev    = {
-+		 .platform_data  =  &gpio_leds_info,
-+	},
-+};
-+#endif
+ static int lcd_enabled;
+ static int dvi_enabled;
  
- static struct platform_device *igep2_devices[] __initdata = {
- 	&igep2_dss_device,
-+#ifdef CONFIG_LEDS_TRIGGERS
-+	&leds_gpio,
-+#endif
- };
+@@ -216,6 +225,8 @@ static struct omap_board_mux board_mux[] __initdata = {
  
- static void __init igep2_init_irq(void)
-@@ -456,14 +482,14 @@ static void __init igep2_init(void)
- 		gpio_set_value(IGEP2_GPIO_LED0_GREEN, 0);
- 	} else
- 		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED0_GREEN\n");
--
-+#ifndef CONFIG_LEDS_TRIGGERS
- 	if ((gpio_request(IGEP2_GPIO_LED1_RED, "GPIO_LED1_RED") == 0) &&
- 	    (gpio_direction_output(IGEP2_GPIO_LED1_RED, 1) == 0)) {
- 		gpio_export(IGEP2_GPIO_LED1_RED, 0);
- 		gpio_set_value(IGEP2_GPIO_LED1_RED, 0);
- 	} else
- 		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED1_RED\n");
--
-+#endif
- 	/* GPIO W-LAN + Bluetooth combo module */
- 	if ((gpio_request(IGEP2_GPIO_WIFI_NPD, "GPIO_WIFI_NPD") == 0) &&
- 	    (gpio_direction_output(IGEP2_GPIO_WIFI_NPD, 1) == 0)) {
+ static void __init am3517_evm_init(void)
+ {
++	am3517_evm_i2c_init();
++
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	platform_add_devices(am3517_evm_devices,
+ 				ARRAY_SIZE(am3517_evm_devices));
