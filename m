@@ -1,21 +1,32 @@
-From: hli@broadcom.com (Henry Li)
-Date: Thu, 18 Feb 2010 10:08:36 -0800
-Subject: Alignment Requirement for MT_MEMORY type
-In-Reply-To: <20100218085125.GA848@n2100.arm.linux.org.uk>
-References: <B125D8217ABC4B43826503DE00A2D44910F4639A8D@SJEXCHCCR01.corp.ad.broadcom.com>
-	<20100218085125.GA848@n2100.arm.linux.org.uk>
-Message-ID: <B125D8217ABC4B43826503DE00A2D44910F4639C3F@SJEXCHCCR01.corp.ad.broadcom.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Thu, 18 Feb 2010 20:23:47 +0000
+Subject: [PATCH 0/5] Zeus fixes for 2.6.34
+Message-ID: <20100218202347.1a902b3e@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Eric,
 
-On Wed, Feb 17, 2010 at 04:33:00PM -0800, Henry Li wrote:
-> Can someone tell me why there is a requirement for the virtual and 
-> physical addresses and size using MT_MEMORY memtype (where prot_l1=0) 
-> to be aligned to section boundary (1MB) in 
-> linux-2.6.32/arch/arm/mm/mmu.c/create_mapping
-> during IO table init?
+Here's the current state of my tree for the Zeus board.
+Please consider queuing these patches for 2.6.34.
 
-Because today SDRAM is always a whole number of MB, so its pointless defining it in terms of 4K pages.  MT_MEMORY is not for general purpose use, but only for setting up the initial kernel SDRAM mapping.
+Thanks,
 
->> I see. The platform I am working with has 160kB of SRAM that I need to map as cacheable and shareable but its physical address is not 1MB aligned.  Is there suitable memtype that I could use to map this?
+	M.
+
+Amit Walambe (2):
+  Correct the USB host initialisation flags of Arcom/Eurotech Zeus SBC.
+  Add Eurotech as the manufacturer of the Zeus board
+
+Marc Zyngier (3):
+  pxa/zeus: Allow usage of 8250-compatible UART in uncompress
+  watchdog: add support for onboard max6369 to Arcom Zeus
+  pxa/zeus: Add support for mcp2515 CAN bus
+
+ arch/arm/mach-pxa/include/mach/uncompress.h |   20 +++++--
+ arch/arm/mach-pxa/include/mach/zeus.h       |    3 +-
+ arch/arm/mach-pxa/zeus.c                    |   81 ++++++++++++++++++++++-----
+ 3 files changed, 84 insertions(+), 20 deletions(-)
+
+-- 
+I'm the slime oozin' out from your TV set...
