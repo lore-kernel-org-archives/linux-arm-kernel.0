@@ -1,70 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 20 Feb 2010 08:38:54 +0900
-Subject: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
-	inside each ARCH Kconfig
-In-Reply-To: <20100219231721.GG21755@atomide.com>
-References: <1264747415-6711-1-git-send-email-kgene.kim@samsung.com>
-	<20100129102955.GA8919@n2100.arm.linux.org.uk>
-	<20100129204845.GM23505@atomide.com>
-	<00a201cab1b7$6ff6feb0$4fe4fc10$%kim@samsung.com>
-	<20100219231721.GG21755@atomide.com>
-Message-ID: <00a301cab1bc$b57126a0$205373e0$%kim@samsung.com>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Fri, 19 Feb 2010 17:37:40 -0600
+Subject: [PATCH 03/11] arm: omap: musb: ioremap only what's ours
+In-Reply-To: <20100219233019.10559.71005.stgit@baageli.muru.com>
+References: <20100219232648.10559.380.stgit@baageli.muru.com>
+	<20100219233019.10559.71005.stgit@baageli.muru.com>
+Message-ID: <A24693684029E5489D1D202277BE89445369164A@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
+Hi,
+
 > -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-[mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Tony Lindgren
-> Sent: Saturday, February 20, 2010 8:17 AM
-> To: Kukjin Kim
-> Cc: linux-omap at vger.kernel.org; 'Russell King - ARM Linux'; linux-arm-
-> kernel at lists.infradead.org; ben-linux at fluff.org
-> Subject: Re: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for
-> handle inside each ARCH Kconfig
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> Sent: Friday, February 19, 2010 5:30 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Felipe Balbi; linux-omap at vger.kernel.org; linux-usb at vger.kernel.org
+> Subject: [PATCH 03/11] arm: omap: musb: ioremap only what's ours
 > 
-> * Kukjin Kim <kgene.kim@samsung.com> [100219 14:56]:
-> >
-> > Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100129 02:27]:
-> > > > On Fri, Jan 29, 2010 at 03:43:35PM +0900, Kukjin Kim wrote:
-> > > > > Add ARM_L1_CACHE_SHIFT_6 to arch/arm/Kconfig to allow CPUs with
-> > > > > L1 cache lines which are 64bytes to indicate this without having to
-> > > > > alter the arch/arm/mm/Kconfig entry each time.
-> > > > >
-> > > > > Update the mm Kconfig so that ARM_L1_CACHE_SHIFT default value
-> > > > > uses this and change OMAP3 and S5PC1XX to select
-> > > ARM_L1_CACHE_SHIFT_6.
-> > > >
-> > > > This looks fine, thanks.
-> > > >
-> > > > Who's going to handle this patch?
-> > >
-> > > I recommend RMK handle this.
-> > >
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > >
-> >
-> > Hi Tony and Russell,
-> >
-> > I wonder this patch who does/did handle.
-> > Please let me know.
+> From: Felipe Balbi <felipe.balbi@nokia.com>
 > 
-> Please send your patch to Russell's patch tracking system if you have
-> not yet done so and then Russell will pick it up from there:
+> omap3430 TRM says the OTG address space is 4k, not 8k.
+> 
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/usb-musb.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-
+> musb.c
+> index a80441d..ba71f76 100644
+> --- a/arch/arm/mach-omap2/usb-musb.c
+> +++ b/arch/arm/mach-omap2/usb-musb.c
+> @@ -152,7 +152,7 @@ void __init usb_musb_init(void)
+>  		musb_resources[0].start = OMAP243X_HS_BASE;
+>  	else
+>  		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
+> -	musb_resources[0].end = musb_resources[0].start + SZ_8K - 1;
+> +	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
 
-Hi Tony,
+I'm just curious...
 
-Thanks for your reply.
-I'm sending my patch to Russell's patch tracking system.
+Is this valid also if cpu_is_243x() ?
 
-May I add 'Acked-by: Tony Lindgren <tony@atomide.com>' in my patch?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
+Regards,
+Sergio
+> 
+>  	/*
+>  	 * REVISIT: This line can be removed once all the platforms using
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
