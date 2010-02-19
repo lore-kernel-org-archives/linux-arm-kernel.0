@@ -1,48 +1,87 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Fri, 19 Feb 2010 01:42:30 +0100
-Subject: [PATCH 03/14] ARM: LPC32XX: Clock driver
-In-Reply-To: <20100209103918.GD2284@pengutronix.de>
-References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
-	<1265674295-23996-4-git-send-email-wellsk40@gmail.com>
-	<20100209103918.GD2284@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F805CCD42BF8@eu1rdcrdc1wx030.exi.nxp.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Feb 2010 16:27:48 -0800
+Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
+Message-ID: <20100219002748.GB21755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +
-> > +static inline void clk_unlock(void)
-> > +{
-> > +	mutex_unlock(&clkm_lock);
-> > +}
-> > +
-> > +static void local_clk_disable(struct clk *clk)
-> > +{
-> > +	/* Don't attempt to disable clock if it has no users */
-> WARN_ON(clk->usecount <= 0)?
+Hi all,
 
-Is the expectation that the driver will always enable a clock
-prior to disabling it and balance each disable with a previous
-enable? I'm seeing a specific case of disable first, some
-register accesses, and then clock enable on the amba clcd
-driver (the warning fires on the first disable before enable).
+Here's one more patch for booting CPU_V6 and CPU_V7 omaps
+with the same kernel binary. This is needed to boot to
+user space, earlier I was just checking for "Mounted root".
 
-[<c002b098>] (clk_disable+0x0/0x34) from [<c014555c>] (clcdfb_disable+0xa8/0xb0)
- r5:00000000 r4:c3c10400
-[<c01454b4>] (clcdfb_disable+0x0/0xb0) from [<c014570c>] (clcdfb_set_par+0x50/0xe8)
- r6:00000028 r5:c3c10400 r4:c3c10400
-[<c01456bc>] (clcdfb_set_par+0x0/0xe8) from [<c0140884>] (fbcon_init+0x2f4/0x42c)
+Now I'm wondering if some of these should be done as
 
-> 
-> > +	if (clk->usecount > 0) {
-> > +		clk->usecount--;
-> > +
-> > +		/* Only disable clock when it has no more users */
-> > +		if ((clk->usecount == 0) && (clk->enable))
-> > +			clk->enable(clk, 0);
-> > +
-> > +		/* Check parent clocks, they may need to be disabled too */
-> > +		if (clk->parent)
-> > +			local_clk_disable(clk->parent);
-> > +	}
-> > +}
-> > +
+default y if CPU_V7 && !CPU_32v6K
+
+or 
+
+default y if CPU_V7 && !CPU_V6
+
+instead to make them more generic? This is, after the
+earlier patch selecting CPU_32v6K if !ARCH_OMAP2.
+
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 18 Feb 2010 13:22:58 -0800
+Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
+
+To mount root, we need to disable VFPv3, HAS_TLS_REG, and
+set ARM_L1_CACHE_SHIFT=5.
+
+Otherwise we'll get something like this for CPUv3:
+
+Freeing init memory: 184K
+Internal error: Oops - undefined instruction: 0 [#1]
+last sysfs file:
+Modules linked in:
+CPU: 0    Not tainted  (2.6.33-rc8-07824-gf2e1d91-dirty #36)
+PC is at no_old_VFP_process+0x8/0x3c
+LR is at __und_usr_unknown+0x0/0x14
+...
+
+Or the system just hangs if HAS_TLS_REG is set.
+
+The ARM_L1_CACHE_SHIFT most likely will cause issues
+too if not set to 5.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 554cb9c..89dba0b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1498,7 +1498,7 @@ config VFP
+ config VFPv3
+ 	bool
+ 	depends on VFP
+-	default y if CPU_V7
++	default y if CPU_V7 && !ARCH_OMAP2
+ 
+ config NEON
+ 	bool "Advanced SIMD (NEON) Extension support"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 4c2e90d..800f0ce 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -718,7 +718,7 @@ config TLS_REG_EMUL
+ config HAS_TLS_REG
+ 	bool
+ 	depends on !TLS_REG_EMUL
+-	default y if SMP || CPU_32v7
++	default y if (SMP || CPU_32v7) && !ARCH_OMAP2
+ 	help
+ 	  This selects support for the CP15 thread register.
+ 	  It is defined to be available on some ARMv6 processors (including
+@@ -779,5 +779,5 @@ config CACHE_XSC3L2
+ 
+ config ARM_L1_CACHE_SHIFT
+ 	int
+-	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
++	default 6 if (ARCH_OMAP3 || ARCH_S5PC1XX) && !ARCH_OMAP2
+ 	default 5
