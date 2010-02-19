@@ -1,108 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Feb 2010 15:30:38 -0800
-Subject: [PATCH 11/11] omap: musb: Add USB support to 4430 SDP board file
-In-Reply-To: <20100219232648.10559.380.stgit@baageli.muru.com>
-References: <20100219232648.10559.380.stgit@baageli.muru.com>
-Message-ID: <20100219233038.10559.52038.stgit@baageli.muru.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 20 Feb 2010 08:38:54 +0900
+Subject: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
+	inside each ARCH Kconfig
+In-Reply-To: <20100219231721.GG21755@atomide.com>
+References: <1264747415-6711-1-git-send-email-kgene.kim@samsung.com>
+	<20100129102955.GA8919@n2100.arm.linux.org.uk>
+	<20100129204845.GM23505@atomide.com>
+	<00a201cab1b7$6ff6feb0$4fe4fc10$%kim@samsung.com>
+	<20100219231721.GG21755@atomide.com>
+Message-ID: <00a301cab1bc$b57126a0$205373e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maulik Mankad <x0082077@ti.com>
+Tony Lindgren wrote:
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Tony Lindgren
+> Sent: Saturday, February 20, 2010 8:17 AM
+> To: Kukjin Kim
+> Cc: linux-omap at vger.kernel.org; 'Russell King - ARM Linux'; linux-arm-
+> kernel at lists.infradead.org; ben-linux at fluff.org
+> Subject: Re: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for
+> handle inside each ARCH Kconfig
+> 
+> * Kukjin Kim <kgene.kim@samsung.com> [100219 14:56]:
+> >
+> > Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100129 02:27]:
+> > > > On Fri, Jan 29, 2010 at 03:43:35PM +0900, Kukjin Kim wrote:
+> > > > > Add ARM_L1_CACHE_SHIFT_6 to arch/arm/Kconfig to allow CPUs with
+> > > > > L1 cache lines which are 64bytes to indicate this without having to
+> > > > > alter the arch/arm/mm/Kconfig entry each time.
+> > > > >
+> > > > > Update the mm Kconfig so that ARM_L1_CACHE_SHIFT default value
+> > > > > uses this and change OMAP3 and S5PC1XX to select
+> > > ARM_L1_CACHE_SHIFT_6.
+> > > >
+> > > > This looks fine, thanks.
+> > > >
+> > > > Who's going to handle this patch?
+> > >
+> > > I recommend RMK handle this.
+> > >
+> > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > >
+> >
+> > Hi Tony and Russell,
+> >
+> > I wonder this patch who does/did handle.
+> > Please let me know.
+> 
+> Please send your patch to Russell's patch tracking system if you have
+> not yet done so and then Russell will pick it up from there:
 
-This patch adds support for Mentor USB to 4430 SDP board
-file.
+Hi Tony,
 
-It also defines the base address for HS USB OTG controller
-in OMAP4.
+Thanks for your reply.
+I'm sending my patch to Russell's patch tracking system.
 
-Also updates platform specfic structure with base address
-and IRQ details.
+May I add 'Acked-by: Tony Lindgren <tony@atomide.com>' in my patch?
 
-Signed-off-by: Maulik Mankad <x0082077@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Felipe Balbi <felipe.balbi@nokia.com>
-Cc: David Brownell <david-b@pacbell.net>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-4430sdp.c        |   10 ++++++++++
- arch/arm/mach-omap2/usb-musb.c             |    9 +++++++--
- arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
- 3 files changed, 18 insertions(+), 2 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 793ce8f..86b240e 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -17,6 +17,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/usb/otg.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -27,6 +28,7 @@
- #include <plat/common.h>
- #include <plat/control.h>
- #include <plat/timer-gp.h>
-+#include <plat/usb.h>
- #include <asm/hardware/gic.h>
- 
- static struct platform_device sdp4430_lcd_device = {
-@@ -73,11 +75,19 @@ static void __init omap_4430sdp_init_irq(void)
- 	omap_gpio_init();
- }
- 
-+static struct omap_musb_board_data musb_board_data = {
-+	.interface_type		= MUSB_INTERFACE_UTMI,
-+	.mode			= MUSB_PERIPHERAL,
-+	.power			= 100,
-+};
- 
- static void __init omap_4430sdp_init(void)
- {
- 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
- 	omap_serial_init();
-+	/* OMAP4 SDP uses internal transceiver so register nop transceiver */
-+	usb_nop_xceiv_register();
-+	usb_musb_init(&musb_board_data);
- }
- 
- static void __init omap_4430sdp_map_io(void)
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 85feb60..53a9638 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -87,10 +87,15 @@ static struct platform_device musb_device = {
- 
- void __init usb_musb_init(struct omap_musb_board_data *board_data)
- {
--	if (cpu_is_omap243x())
-+	if (cpu_is_omap243x()) {
- 		musb_resources[0].start = OMAP243X_HS_BASE;
--	else
-+	} else if (cpu_is_omap34xx()) {
- 		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
-+	} else if (cpu_is_omap44xx()) {
-+		musb_resources[0].start = OMAP44XX_HSUSB_OTG_BASE;
-+		musb_resources[1].start = INT_44XX_HS_USB_MC;
-+		musb_resources[2].start = INT_44XX_HS_USB_DMA;
-+	}
- 	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
- 
- 	/*
-diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-index 2068b39..8fc15d3 100644
---- a/arch/arm/plat-omap/include/plat/omap44xx.h
-+++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-@@ -45,6 +45,7 @@
- #define OMAP44XX_MCPDM_L3_BASE		0x49032000
- 
- #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
-+#define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
- 
- #endif /* __ASM_ARCH_OMAP44XX_H */
- 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
