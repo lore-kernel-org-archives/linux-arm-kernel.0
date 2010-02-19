@@ -1,41 +1,60 @@
-From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Fri, 19 Feb 2010 15:26:09 -0800
-Subject: [PATCH 13/13] WATCHDOG: Add support for the LPC32XX arch
-In-Reply-To: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1266621969-28847-14-git-send-email-wellsk40@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Feb 2010 15:29:59 -0800
+Subject: [PATCH 00/11] omap updates for 2.6.34, part 4
+Message-ID: <20100219232648.10559.380.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wells <wellsk40@gmail.com>
+Hi all,
 
-Allow the pnx4408 watchdog  driver to be reused with the
-LPC32xx arch. Changed menu title to include the LCP32XX
-device.
+Here are few USB platform init patches that have been already
+posted to linux-usb and linux-omap and have been sitting in for-next.
 
-Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+Posting them one more time to make sure people on linux-arm-kernel
+have seen these too.
+
+Regards,
+
+Tony
+
 ---
- drivers/watchdog/Kconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 713b1ce..b882e09 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -205,11 +205,11 @@ config OMAP_WATCHDOG
- 	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430 watchdog timer.
- 
- config PNX4008_WATCHDOG
--	tristate "PNX4008 Watchdog"
--	depends on ARCH_PNX4008
-+	tristate "PNX4008/LPC32XX Watchdog"
-+	depends on ARCH_PNX4008 || ARCH_LPC32XX
- 	help
- 	  Say Y here if to include support for the watchdog timer
--	  in the PNX4008 processor.
-+	  in the PNX4008 or LPC32XX processors.
- 	  This driver can be built as a module by choosing M. The module
- 	  will be called pnx4008_wdt.
- 
+Felipe Balbi (7):
+      arm: omap: musb: ioremap only what's ours
+      omap: musb: remove unused data
+      arm: omap: musb: we can use clk framework
+      omap: musb: remove unused soft_con field
+      omap: musb: remove unused dma data
+      omap: musb: remove unnecessary return
+      omap: musb: get rid of dyn_fifo
+
+Maulik Mankad (4):
+      USB: Add empty functions in otg.h
+      omap: musb: Remove #ifdef from board-omap3evm.c
+      omap: musb: Pass board specific data from board file
+      omap: musb: Add USB support to 4430 SDP board file
+
+
+ arch/arm/mach-omap2/board-2430sdp.c          |    8 ++-
+ arch/arm/mach-omap2/board-3430sdp.c          |    8 ++-
+ arch/arm/mach-omap2/board-4430sdp.c          |   10 +++
+ arch/arm/mach-omap2/board-cm-t35.c           |    8 ++-
+ arch/arm/mach-omap2/board-devkit8000.c       |    8 ++-
+ arch/arm/mach-omap2/board-igep0020.c         |    8 ++-
+ arch/arm/mach-omap2/board-ldp.c              |    8 ++-
+ arch/arm/mach-omap2/board-omap3beagle.c      |    8 ++-
+ arch/arm/mach-omap2/board-omap3evm.c         |   12 +++-
+ arch/arm/mach-omap2/board-omap3pandora.c     |    8 ++-
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    8 ++-
+ arch/arm/mach-omap2/board-overo.c            |    8 ++-
+ arch/arm/mach-omap2/board-rx51.c             |    8 ++-
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    8 ++-
+ arch/arm/mach-omap2/usb-musb.c               |   83 ++++----------------------
+ arch/arm/plat-omap/include/plat/omap44xx.h   |    1 
+ arch/arm/plat-omap/include/plat/usb.h        |   11 +++
+ include/linux/usb/musb.h                     |    3 +
+ include/linux/usb/otg.h                      |   10 +++
+ 19 files changed, 141 insertions(+), 85 deletions(-)
+
 -- 
-1.6.6
+Signature
