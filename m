@@ -1,62 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Feb 2010 17:36:51 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1266599755.32546.38.camel@e102109-lin.cambridge.arm.com>
-References: <1266445892.16346.306.camel@pasglop>
-	<1266599755.32546.38.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1266601011.32546.48.camel@e102109-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Feb 2010 10:03:32 -0800
+Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
+In-Reply-To: <20100219083556.GB19649@n2100.arm.linux.org.uk>
+References: <20100219002748.GB21755@atomide.com>
+	<20100219083556.GB19649@n2100.arm.linux.org.uk>
+Message-ID: <20100219180331.GC21755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-02-19 at 17:15 +0000, Catalin Marinas wrote:
-> On Wed, 2010-02-17 at 22:31 +0000, Benjamin Herrenschmidt wrote:
-> > On Wed, 2010-02-17 at 20:44 +0000, Russell King - ARM Linux wrote:
-> > > No, because that'd probably bugger up the Sparc64 method of delaying
-> > > flush_dcache_page.
-> > >
-> > > This method works as follows:
-> > >
-> > > - a page cache page is allocated - this has PG_arch_1 clear.
-> > >
-> > > - IO happens on it and it's placed into the page cache.  PG_arch_1 is
-> > >   still clear.
-> > >
-> > > - someone calls read()/write() which accesses the page.  The generic
-> > >   file IO layers call flush_dcache_page() in response to
-> > > read()/write()
-> > >   fs calls.  flush_dcache_page() spots that the page is not yet mapped
-> > >   into userspace, and sets PG_arch_1 to mark the fact that the kernel
-> > >   mapping is dirty.
-> > >
-> > > - when someone maps the page, we check PG_arch_1 in update_mmu_cache.
-> > >   If PG_arch_1 is set, we flush the kernel mapping.
-> > >
-> > > Clearly, if we go around having drivers clearing PG_arch_1, this is
-> > > going to break horribly.
-> >
-> > Ok, you do things very differently than us on ppc then. We clear
-> > PG_arch_1 in flush_dcache_page(), and we set it when the page has been
-> > cache cleaned for execution.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100219 00:33]:
+> On Thu, Feb 18, 2010 at 04:27:48PM -0800, Tony Lindgren wrote:
+> > @@ -779,5 +779,5 @@ config CACHE_XSC3L2
+> >  
+> >  config ARM_L1_CACHE_SHIFT
+> >  	int
+> > -	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
+> > +	default 6 if (ARCH_OMAP3 || ARCH_S5PC1XX) && !ARCH_OMAP2
+> >  	default 5
 > 
-> For this perspective it's not that different, just that we use the
-> negated PG_arch_1.
+> This one is definitely wrong.  Setting the L1 cache line size larger
+> than it actually is should be safe; setting it smaller is definitely
+> unsafe.
 
-I got your point now (after reading the replies on linux-arch :)).
+OK dropped that part, updated patch below. Maybe the VFPv3
+code can be fixed to boot on earlier hardware too.
 
-So PPC assumes that if PG_arch_1 is clear (the default), the page wasn't
-cleaned. If there is no call to flush_dcache_page() but the page gets
-mapped to user space, update_mmu_cache() (or set_pte_at()) would simply
-assume that the page was dirtied, flush the caches and set this bit.
+So I guess ARM_L1_CACHE_SHIFT should be only used for alignment, and
+not for for cache operations?
 
-We could easily do this on ARM as well and assume that the page is dirty
-if !PG_arch_1. But it only partially solves the problem (only for
-faulted-in pages).
+If so, then what have in arch/arm/plat-omap/iommu.c seems buggy:
 
-If a page is already mapped in user space, flush_dcache_page() on ARM
-does the flushing rather than deferring it to update_mmu_cache(). The
-PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
-that the HCD could transfer data into a page cache page already mapped
-in user space? My understanding is that the scenario above is possible.
+static void flush_iopgd_range(u32 *first, u32 *last)
+{
+	/* FIXME: L2 cache should be taken care of if it exists */
+	do {
+		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
+		    : : "r" (first));
+		first += L1_CACHE_BYTES / sizeof(*first);
+	} while (first <= last);
+}
 
--- 
-Catalin
+It seems that this code should use the real cache line size instead to
+avoid every other line not to flush if ARM_L1_CACHE_SHIFT is set larger
+than it is.
+
+Regards,
+
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: v6-v7-mount-root-v2.patch
+Type: text/x-diff
+Size: 1374 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100219/fb979dbd/attachment.bin>
