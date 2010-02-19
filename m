@@ -1,76 +1,57 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Feb 2010 01:17:55 -0800
-Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
-In-Reply-To: <1266510750-9846-3-git-send-email-anarsoul@gmail.com>
-References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
-	<1266510750-9846-3-git-send-email-anarsoul@gmail.com>
-Message-ID: <20100219091755.GB2856@core.coreip.homeip.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 19 Feb 2010 10:21:54 +0100
+Subject: [PATCH 03/14] ARM: LPC32XX: Clock driver
+In-Reply-To: <083DF309106F364B939360100EC290F805CCD42BF8@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1265674295-23996-1-git-send-email-wellsk40@gmail.com>
+	<1265674295-23996-4-git-send-email-wellsk40@gmail.com>
+	<20100209103918.GD2284@pengutronix.de>
+	<083DF309106F364B939360100EC290F805CCD42BF8@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20100219092154.GA13068@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vasily,
+Hello Kevin,
 
-On Thu, Feb 18, 2010 at 06:32:28PM +0200, Vasily Khoruzhick wrote:
-> By default, driver reports touches when it gots (1 << ts.shift)
-> samples, even if stylus is up. This behavior looks wrong to me.
-> Patch makes driver to report touches only when stylus is down.
+On Fri, Feb 19, 2010 at 01:42:30AM +0100, Kevin Wells wrote:
+> > > +
+> > > +static inline void clk_unlock(void)
+> > > +{
+> > > +	mutex_unlock(&clkm_lock);
+> > > +}
+> > > +
+> > > +static void local_clk_disable(struct clk *clk)
+> > > +{
+> > > +	/* Don't attempt to disable clock if it has no users */
+> > WARN_ON(clk->usecount <= 0)?
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/input/touchscreen/s3c2410_ts.c |   22 +++++++++++-----------
->  1 files changed, 11 insertions(+), 11 deletions(-)
+> Is the expectation that the driver will always enable a clock
+> prior to disabling it and balance each disable with a previous
+> enable?
+Quoting include/linux/clk.h:
+
+	 * Implementation detail: if the clock source is shared between
+	 * multiple drivers, clk_enable() calls must be balanced by the
+	 * same number of clk_disable() calls for the clock source to be
+	 * disabled.
+	 */
+
+This doesn't answer your complete question, but yes, a driver that
+havn't enabled a clk must not disable it.
+
+>         I'm seeing a specific case of disable first, some
+> register accesses, and then clock enable on the amba clcd
+> driver (the warning fires on the first disable before enable).
 > 
-> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-> index 6386b44..e2fe2ed 100644
-> --- a/drivers/input/touchscreen/s3c2410_ts.c
-> +++ b/drivers/input/touchscreen/s3c2410_ts.c
-> @@ -128,25 +128,25 @@ static void touch_timer_fire(unsigned long data)
->  
->  	down = get_down(data0, data1);
->  
-> -	if (ts.count == (1 << ts.shift)) {
-> -		ts.xp >>= ts.shift;
-> -		ts.yp >>= ts.shift;
-> +	if (down) {
-> +		if (ts.count == (1 << ts.shift)) {
-> +			ts.xp >>= ts.shift;
-> +			ts.yp >>= ts.shift;
->  
-> -		dev_dbg(ts.dev, "%s: X=%lu, Y=%lu, count=%d\n",
-> -			__func__, ts.xp, ts.yp, ts.count);
-> +			dev_dbg(ts.dev, "%s: X=%lu, Y=%lu, count=%d\n",
-> +				__func__, ts.xp, ts.yp, ts.count);
->  
-> -		input_report_abs(ts.input, ABS_X, ts.xp);
-> -		input_report_abs(ts.input, ABS_Y, ts.yp);
-> +			input_report_abs(ts.input, ABS_X, ts.xp);
-> +			input_report_abs(ts.input, ABS_Y, ts.yp);
->  
-> -		input_report_key(ts.input, BTN_TOUCH, 1);
-> -		input_sync(ts.input);
-> +			input_report_key(ts.input, BTN_TOUCH, 1);
-> +			input_sync(ts.input);
->  
-> +		}
->  		ts.xp = 0;
->  		ts.yp = 0;
->  		ts.count = 0;
+> [<c002b098>] (clk_disable+0x0/0x34) from [<c014555c>] (clcdfb_disable+0xa8/0xb0)
+>  r5:00000000 r4:c3c10400
+> [<c01454b4>] (clcdfb_disable+0x0/0xb0) from [<c014570c>] (clcdfb_set_par+0x50/0xe8)
+>  r6:00000028 r5:c3c10400 r4:c3c10400
+> [<c01456bc>] (clcdfb_set_par+0x0/0xe8) from [<c0140884>] (fbcon_init+0x2f4/0x42c)
+So yes, this is a bug.
 
-I do not think this is right. Here you reset sampling data regardless
-of whether you got the right number of samples or not. You should repeat
-s3c_adc_start only if you got (1 << ts.shift) samples. But I think I see
-why touchpad may stop reporintg sometimes - if timer fires before you
-get the needed number of samples nothing will happen as timer is not
-gettign rearmed.
-
-> -	}
->  
-> -	if (down) {
->  		s3c_adc_start(ts.client, 0, 1 << ts.shift);
->  	} else {
->  		ts.count = 0;
-
-I also think this branch is missing ts.xp = ts.yp = 0;
+Best regards
+Uwe
 
 -- 
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
