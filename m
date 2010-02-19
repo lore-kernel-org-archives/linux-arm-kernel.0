@@ -1,87 +1,45 @@
-From: john.holland@cellent-fs.de (John Holland)
-Date: Fri, 19 Feb 2010 23:11:04 +0100
-Subject: [PATCH] 3/3 kirkwood/sheeva: correlate MPP to SD CD and SD WP
-In-Reply-To: <alpine.LFD.2.00.1002191618310.1946@xanadu.home>
-References: <1266612938.8172.76.camel@oklahoma>
-	<alpine.LFD.2.00.1002191618310.1946@xanadu.home>
-Message-ID: <1266617464.8172.139.camel@oklahoma>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 20 Feb 2010 08:01:10 +0900
+Subject: [PATCH RE-SEND-3] ARM: MM: Add ARM_L1_CACHE_SHIFT_6 for handle
+	inside each ARCH Kconfig
+In-Reply-To: <20100129204845.GM23505@atomide.com>
+References: <1264747415-6711-1-git-send-email-kgene.kim@samsung.com>
+	<20100129102955.GA8919@n2100.arm.linux.org.uk>
+	<20100129204845.GM23505@atomide.com>
+Message-ID: <00a201cab1b7$6ff6feb0$4fe4fc10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Accept SD CD and SD WP in accordance to
-http://plugcomputer.org/data/docs/Sheeva-PowerPlug-V1.3-GTI-090906.pdf
-on MPP 47 and 44 respectively on the eSATA SheevaPlug
 
-Signed-off-by: John Holland <john.holland@cellent-fs.de>
+Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100129 02:27]:
+> > On Fri, Jan 29, 2010 at 03:43:35PM +0900, Kukjin Kim wrote:
+> > > Add ARM_L1_CACHE_SHIFT_6 to arch/arm/Kconfig to allow CPUs with
+> > > L1 cache lines which are 64bytes to indicate this without having to
+> > > alter the arch/arm/mm/Kconfig entry each time.
+> > >
+> > > Update the mm Kconfig so that ARM_L1_CACHE_SHIFT default value
+> > > uses this and change OMAP3 and S5PC1XX to select
+> ARM_L1_CACHE_SHIFT_6.
+> >
+> > This looks fine, thanks.
+> >
+> > Who's going to handle this patch?
+> 
+> I recommend RMK handle this.
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+
+Hi Tony and Russell,
+
+I wonder this patch who does/did handle.
+Please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
 --
-diff -Naur linux-2.6-2.6.32/arch/arm/mach-kirkwood/sheevaplug-setup.c linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/sheevaplug-setup.c
---- linux-2.6-2.6.32/arch/arm/mach-kirkwood/sheevaplug-setup.c	2010-02-19 19:15:49.643951762 +0100
-+++ linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/sheevaplug-setup.c	2010-02-19 19:18:13.249598152 +0100
-@@ -51,6 +51,11 @@
- 	/* unfortunately the CD signal has not been connected */
- };
- 
-+static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
-+	.gpio_write_protect = 44, /* MPP44 used as SD write protect */
-+	.gpio_card_detect = 47,	  /* MPP47 used as SD card detect */
-+};
-+
- static struct gpio_led sheevaplug_led_pins[] = {
- 	{
- 		.name			= "plug:green:health",
-@@ -79,13 +84,26 @@
- 	0
- };
- 
-+static unsigned int sheeva_esata_mpp_config[] __initdata = {
-+	MPP29_GPIO,	/* USB Power Enable */
-+	MPP44_GPIO,	/* SD Write Protect */
-+	MPP47_GPIO,	/* SD Card Detect */
-+	MPP49_GPIO,	/* LED Green */
-+	0
-+};
-+
- static void __init sheevaplug_init(void)
- {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
- 	kirkwood_init();
--	kirkwood_mpp_conf(sheevaplug_mpp_config);
-+
-+	/* setup gpio pin select */
-+	if (machine_is_sheeva_esata())
-+		kirkwood_mpp_conf(sheeva_esata_mpp_config);
-+	else
-+		kirkwood_mpp_conf(sheevaplug_mpp_config);
- 
- 	kirkwood_uart0_init();
- 	kirkwood_nand_init(ARRAY_AND_SIZE(sheevaplug_nand_parts), 25);
-@@ -101,7 +119,11 @@
- 	if (machine_is_sheeva_esata())
- 		kirkwood_sata_init(&sheeva_esata_sata_data);
- 
--	kirkwood_sdio_init(&sheevaplug_mvsdio_data);
-+ 	/* enable sd wp and sd cd on plugs with esata */
-+ 	if (machine_is_sheeva_esata())
-+ 		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
-+ 	else
-+ 		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
- 
- 	platform_device_register(&sheevaplug_leds);
- }
-
-Although this has not yet been thoroughly tested, it has no noticeable
-adverse effects.
-
--- 
-John Holland
-
-___________________________________________
-
-Cellent Finance Solutions AG
-
-Firmensitz: Calwer Stra?e 33, 70173 Stuttgart
-Registergericht: Amtsgericht Stuttgart, HRB 720743
-Vorstand: Thomas Wild
-Vorsitzender des Aufsichtsrats: Rudolf Zipf
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
