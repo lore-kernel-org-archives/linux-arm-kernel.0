@@ -1,135 +1,95 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Fri, 19 Feb 2010 11:00:03 +0900
-Subject: Kernel panic due to page migration accessing memory holes
-In-Reply-To: <4B7DEDB0.8030802@codeaurora.org>
-References: <4B7C8DC2.3060004@codeaurora.org>
-	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>
-	<4B7CF8C0.4050105@codeaurora.org>
-	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
-	<20100218100432.GA32626@csn.ul.ie>
-	<4B7DEDB0.8030802@codeaurora.org>
-Message-ID: <20100219110003.dfe58df8.kamezawa.hiroyu@jp.fujitsu.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 19 Feb 2010 10:39:04 +0800
+Subject: [Linux-arm-nuc900] Re: [PATCH]NUC900 add gpio virtual memory map
+In-Reply-To: <e68bb3471002092053u7cb5d0aai129538fb32cb4880@mail.gmail.com>
+References: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
+	<71413c851002091831x101b67a7t9e38e94bbbc95db1@mail.gmail.com>
+	<e68bb3471002092053u7cb5d0aai129538fb32cb4880@mail.gmail.com>
+Message-ID: <e68bb3471002181839p499d56fey355a8b6e82f63238@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2010 17:47:28 -0800
-Michael Bohan <mbohan@codeaurora.org> wrote:
+Okay for this patch, and all patches submitted by you have sent to
+Russell's Patch system?
 
-> On 2/18/2010 2:04 AM, Mel Gorman wrote:
-> > On Thu, Feb 18, 2010 at 06:36:04PM +0900, KAMEZAWA Hiroyuki wrote:
-> >    
-> >>   [Fact]
-> >>   - There are 2 banks of memory and a memory hole on your machine.
-> >>     As
-> >>           0x00200000 - 0x07D00000
-> >>           0x40000000 - 0x43000000
-> >>
-> >>   - Each bancks are in the same zone.
-> >>   - You use FLATMEM.
-> >>   - You see panic in move_freepages().
-> >>   - Your host's MAX_ORDER=11....buddy allocator's alignment is 0x400000
-> >>     Then, it seems 1st bank is not algined.
-> >>      
-> > It's not and assumptions are made about it being aligned.
-> >    
-> 
-> Would it be prudent to have the ARM mm init code detect unaligned, 
-> discontiguous banks and print a warning message if 
-> CONFIG_ARCH_HAS_HOLES_MEMORYMODEL is not configured?  Should we take it 
-> a step further and even BUG()?
-> 
-> > ARM frees unused portions of memmap to save memory. It's why memmap_valid_within()
-> > exists when CONFIG_ARCH_HAS_HOLES_MEMORYMODEL although previously only
-> > reading /proc/pagetypeinfo cared.
-> >
-> > In that case, the FLATMEM memory map had unexpected holes which "never"
-> > happens and that was the workaround. The problem here is that there are
-> > unaligned zones but no pfn_valid() implementation that can identify
-> > them as you'd have with SPARSEMEM. My expectation is that you are using
-> > the pfn_valid() implementation from asm-generic
-> >
-> > #define pfn_valid(pfn)          ((pfn)<  max_mapnr)
-> >
-> > which is insufficient in your case.
-> >    
-> 
-> I am actually using the pfn_valid implementation FLATMEM in 
-> arch/arm/include/asm/memory.h.  This one is very similar to the 
-> asm-generic, and has no knowledge of the holes.
-> 
-That means, in FLATMEM, memmaps are allocated for [start....max_pfn].
-pfn_valid() isn't for "there is memor" but for "there is memmap".
-
-
-
-> > I think it's more likely the at the memmap he is accessing has been
-> > freed and is effectively random data.
-> >
-> >    
-> 
-> I also think this is the case.
-> 
-Then, plz check free_bootmem() at el doen't free pages in a memory hole.
-
-
-> > SPARSEMEM would give you an implementation of pfn_valid() that you could
-> > use here. The choices that spring to mind are;
-> >
-> > 1. reduce MAX_ORDER so they are aligned (easiest)
-> >    
-> 
-> Is it safe to assume that reducing MAX_ORDER will hurt performance?
-> 
-> > 2. use SPARSEMEM (easy, but not necessary what you want to do, might
-> > 	waste memory unless you drop MAX_ORDER as well)
-> >    
-> 
-> We intend to use SPARSEMEM, but we'd also like to maintain FLATMEM 
-> compatibility for some configurations.  My guess is that there are other 
-> ARM users that may want this support as well.
-> 
-> > 3. implement a pfn_valid() that can handle the holes and set
-> > 	CONFIG_HOLES_IN_ZONE so it's called in move_freepages() to
-> > 	deal with the holes (should pass this by someone more familiar
-> > 	with ARM than I)
-> >    
-> 
-> This option seems the best to me.  We should be able to implement an ARM 
-> specific pfn_valid() that walks the ARM meminfo struct to ensure the pfn 
-> is not within a hole.
-> 
-> My only concern with this is a comment in __rmqueue_fallback() after 
-> calling move_freepages_block()  that states "Claim the whole block if 
-> over half of it is free".  Suppose only 1 MB is beyond the bank limit.  
-> That means that over half of the pages of the 4 MB block will be 
-> reported by move_freepages() as free -- but 1 MB of those pages are 
-> invalid.  Won't this cause problems if these pages are assumed to be 
-> part of an active block?
-> 
-memmap for memory holes should be marked as PG_reserved and never be freed
-by free_bootmem(). Then, memmap for memory holes will not be in buddy allocator.
-
-Again, pfn_valid() just show "there is memmap", not for "there is a valid page"
+2010/2/10 Wan ZongShun <mcuos.com@gmail.com>:
+> ? 2010?2?10? ??10:31?Qiang Wang <rurality.linux@gmail.com> ???
+>> hello, Mr Russell
+>>
+>> please check and ack this patch.
+>>
+>> thank you very much.
+>>
+>
+> Hi guy, don't have anxiety,you have to await me to check this issue.
+>
+>> best regards
+>> wangqiang
+>>
+>> 2010/2/2 Qiang Wang <rurality.linux@gmail.com>:
+>>> hi, Dear Wan
+>>>
+>>> ? This patch adds the gpio registers virtual memory map.
+>>> ? Without it, the gpio access will cause the "Data Abort" due to no
+>>> virtual memory assign to it.
+>>>
+>>> Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
+>>> Cc: Wang Zongshun <mcuos.com@gmail.com>
+>>> ---
+>>> ?arch/arm/mach-w90x900/cpu.c | ? ?1 +
+>>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+>>> index 20dc0c9..7a79de0 100644
+>>> --- a/arch/arm/mach-w90x900/cpu.c
+>>> +++ b/arch/arm/mach-w90x900/cpu.c
+>>> @@ -45,6 +45,7 @@ static struct map_desc nuc900_iodesc[] __initdata = {
+>>> ? ? ? ?IODESC_ENT(UART),
+>>> ? ? ? ?IODESC_ENT(TIMER),
+>>> ? ? ? ?IODESC_ENT(EBI),
+>>> + ? ? ? IODESC_ENT(GPIO),
+>>> ?};
+>>>
+>>> ?/* Initial clock declarations. */
+>>> --
+>>> 1.6.4
+>>>
+>>
+>> --
+>> ????"NUC900 Linux BSP????".
+>> NUC900 Linux????????????
+>> NUC900 at googlegroups.com
+>> ?????????
+>> NUC900+unsubscribe at googlegroups.com
+>> ??????????
+>> https://groups.google.com/group/NUC900?hl=zh-CN
+>>
+>
+>
+>
+> --
+> *linux-arm-kernel mailing list
+> mail addr:linux-arm-kernel at lists.infradead.org
+> you can subscribe by:
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> * linux-arm-NUC900 mailing list
+> mail addr:NUC900 at googlegroups.com
+> main web: https://groups.google.com/group/NUC900
+> you can subscribe it by sending me mail:
+> mcuos.com at gmail.com
+>
 
 
-> It seems like we should have an additional check in 
-> move_freepages_block() with pfn_valid_within() to check the last page in 
-> the block (eg. end_pfn) before calling move_freepages_block().  If the 
-> last page is not valid, then we shouldn't we return 0 as in the zone 
-> span check?  This will also skip the extra burden of checking each 
-> individual page, when we already know the proposed range is invalid.
-> 
-You don't need that. please check why PG_reserved for your memory holes
-are not set.
 
-> Assuming we did return 0 in this case, would that sub-block of pages 
-> ever be usable for anything else, or would it be effectively wasted?  If 
-> this memory were wasted, then adjusting MAX_ORDER would have an 
-> advantage in this sense -- ignoring any performance implications.
-> 
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Even you do that, you have to fix "someone corrupts memory" or "someone
-free PG_reserved memory" issue, anyway.
-
-Thanks,
--Kame
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
