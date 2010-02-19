@@ -1,34 +1,36 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Feb 2010 09:52:11 +0100
-Subject: [PATCH] ARM: fix documentation of the PrimeCell bus
-Message-ID: <1266569531-31618-1-git-send-email-linus.walleij@stericsson.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 19 Feb 2010 01:05:07 -0800
+Subject: [PATCH 4/4] s3c24xx_ts: re-enable IRQ on resume
+In-Reply-To: <1266510750-9846-5-git-send-email-anarsoul@gmail.com>
+References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
+	<1266510750-9846-5-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100219090506.GA2856@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus@foobar.localdomain>
+On Thu, Feb 18, 2010 at 06:32:30PM +0200, Vasily Khoruzhick wrote:
+> IRQ should be enabled on resume, otherwise driver doesn't
+> report events.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/input/touchscreen/s3c2410_ts.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+> index e2fe2ed..6738c26 100644
+> --- a/drivers/input/touchscreen/s3c2410_ts.c
+> +++ b/drivers/input/touchscreen/s3c2410_ts.c
+> @@ -401,6 +401,7 @@ static int s3c2410ts_resume(struct device *dev)
+>  	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
+>  
+>  	clk_enable(ts.clock);
+> +	enable_irq(ts.irq_tc);
+>  
+>  	/* Initialise registers */
+>  	if ((info->delay & 0xffff) > 0)
 
-This fixes the filepath encoded in <linux/amba/bus.h> and adds
-some documentation as to what this bus really means.
+Applied to my 'next' branch, thank you Vasily.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- include/linux/amba/bus.h |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index ab94335..6816be6 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -1,5 +1,9 @@
- /*
-- *  linux/include/asm-arm/hardware/amba.h
-+ *  linux/include/amba/bus.h
-+ *
-+ *  This device type deals with ARM PrimeCells and anything else that
-+ *  presents a proper CID (0xB105F00D) at the end of the I/O register
-+ *  region or that is derived from a PrimeCell.
-  *
-  *  Copyright (C) 2003 Deep Blue Solutions Ltd, All Rights Reserved.
-  *
 -- 
-1.6.6
+Dmitry
