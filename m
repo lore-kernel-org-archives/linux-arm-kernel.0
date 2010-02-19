@@ -1,46 +1,57 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Feb 2010 01:05:52 +0100
-Subject: [PATCH 5/7] ARM: U300: add MMCI DMA platform config
-Message-ID: <1266537952-13099-1-git-send-email-linus.walleij@stericsson.com>
+Date: Fri, 19 Feb 2010 01:05:00 +0100
+Subject: [PATCH 0/7] PrimeCell DMA Device
+Message-ID: <1266537900-11710-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the platform configuration necessary to
-get DMA on the U300 MMCI block.
+This is a revised set of patches mainly adding DMA
+engine support to the so-called "amba" bus which is
+actually the PrimeCell bus. It also deals with
+setting the maximum clocking frequency from the
+platform data.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
----
- arch/arm/mach-u300/mmc.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+For DMA: the idea is to structure the data passed
+from the PrimeCell to the DMA engine framework to
+get some control over it, atleast we will have an
+established place where such stuff should go, and
+that is struct amba_dma_channel_config.
 
-diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-index c1cb977..8f6d8af 100644
---- a/arch/arm/mach-u300/mmc.c
-+++ b/arch/arm/mach-u300/mmc.c
-@@ -19,7 +19,10 @@
- #include <linux/regulator/consumer.h>
- #include <linux/regulator/machine.h>
- #include <linux/gpio.h>
-+#include <linux/dmaengine.h>
- #include <linux/amba/mmci.h>
-+#include <mach/coh901318.h>
-+#include <mach/dma_channels.h>
- 
- #include "mmc.h"
- #include "padmux.h"
-@@ -107,6 +110,12 @@ int __devinit mmc_init(struct amba_device *adev)
- 	mmci_card->mmc0_plat_data.gpio_cd = -1;
- 	mmci_card->mmc0_plat_data.capabilities = MMC_CAP_MMC_HIGHSPEED |
- 		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA;
-+#ifdef CONFIG_DMA_ENGINE
-+	mmci_card->mmc0_plat_data.dma_filter = coh901318_filter_id;
-+	mmci_card->mmc0_plat_data.dma_rx_param =
-+		(void *) U300_DMA_MMCSD_RX_TX;
-+	/* Don't specify a TX channel, this RX channel is bidirectional */
-+#endif
- 
- 	mmcsd_device->platform_data = (void *) &mmci_card->mmc0_plat_data;
- 
--- 
-1.6.6
+The patches goes from trivial groundwork to
+controversial so that the chain can be cut anywhere.
+It's cleanup patches for amba and MMCI first.
+
+Patch 1 - Removes the custom DBG macro and a printk()
+  in mmci.c in favor of dev_dbg()/dev_err()
+  [Rebase of earlier patch]
+
+Patch 2 - Introduce the f_max attribute in the MMCI
+  platform data struct and add kerneldoc to the
+  platform data in <linux/amba/mmci.h>.
+  [Rebase of earlier patch]
+
+Patch 3 - Set the U300 f_max attribute to 24 MHz
+  [Rebase of earlier patch]
+
+Patch 4 - Add the PrimeCell DMA device superset
+  extension in <linux/amba/dma.h> and (basically a
+  struct and the dma_set_ambaconfig() call) and
+  implement this all the way in the MMCI driver as
+  an example.
+
+Patch 5 - Amend the U300 platform config with
+  DMA specifics.
+
+Patch 6 - Patch sent earliner to Dan Williams
+  that updates the linux-next COH 901 318 driver
+  to support memcpy and slaves properly.
+
+Patch 7 - Patch on top of the patch already sent
+  to Dan Williams, adding the PrimeCell API
+  to COH 901 318 so that U300 compiles properly.
+
+The entire set has been regression compiled against
+the RealView, Versatile and Integrator defconfigs.
+
+Yours,
+Linus Walleij
