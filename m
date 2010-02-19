@@ -1,47 +1,82 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 19 Feb 2010 16:34:22 -0500 (EST)
-Subject: RFC patch set - kirkwood/sheeva - enable eSATA port
-In-Reply-To: <1266612938.8172.76.camel@oklahoma>
+From: john.holland@cellent-fs.de (John Holland)
+Date: Fri, 19 Feb 2010 23:10:58 +0100
+Subject: [PATCH] 1/3 kirkwood/sheeva: basic board support
+In-Reply-To: <alpine.LFD.2.00.1002191618310.1946@xanadu.home>
 References: <1266612938.8172.76.camel@oklahoma>
-Message-ID: <alpine.LFD.2.00.1002191618310.1946@xanadu.home>
+	<alpine.LFD.2.00.1002191618310.1946@xanadu.home>
+Message-ID: <1266617458.8172.137.camel@oklahoma>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Feb 2010, John Holland wrote:
+Allow basic eSATA SheevaPlug board configuration and build.
 
-> Hi there,
-> 
-> included are two patches. The first enables Kconfig and basic board
-> support for the eSATA version of the SheevaPlug found at
-> http://www.newit.co.uk/store/index.php?main_page=index&cPath=3. No, I
-> have no affiliation. The second enables the SATA interfaces on the SoC
-> to allow eSATA visibility.
-> 
-> I'm opening a discussion to help us decide if the first patch is
-> necessary. Please keep in mind, I also have a third non-disclosed patch
-> that enables SD WP/CD on the same hardware: I have seen that the SoC MPP
-> is also connected to the SD card interface.
+Signed-off-by: John Holland <john.holland@cellent-fs.de>
+--
+diff -Naur linux-2.6-2.6.32/arch/arm/mach-kirkwood/Kconfig linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/Kconfig
+--- linux-2.6-2.6.32/arch/arm/mach-kirkwood/Kconfig	2009-12-03 04:51:21.000000000 +0100
++++ linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/Kconfig	2010-02-19 18:49:14.099872716 +0100
+@@ -32,6 +32,12 @@
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell SheevaPlug Reference Board.
+ 
++config MACH_ESATA_SHEEVAPLUG
++	bool "Marvell eSATA SheevaPlug Reference Board"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell eSATA SheevaPlug Reference Board.
++
+ config MACH_TS219
+ 	bool "QNAP TS-119 and TS-219 Turbo NAS"
+ 	help
+diff -Naur linux-2.6-2.6.32/arch/arm/mach-kirkwood/Makefile linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/Makefile
+--- linux-2.6-2.6.32/arch/arm/mach-kirkwood/Makefile	2009-12-03 04:51:21.000000000 +0100
++++ linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/Makefile	2010-02-19 18:49:14.099872716 +0100
+@@ -5,6 +5,7 @@
+ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
++obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o
+ obj-$(CONFIG_MACH_OPENRD_BASE)		+= openrd_base-setup.o
+ 
+diff -Naur linux-2.6-2.6.32/arch/arm/mach-kirkwood/sheevaplug-setup.c linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/sheevaplug-setup.c
+--- linux-2.6-2.6.32/arch/arm/mach-kirkwood/sheevaplug-setup.c	2009-12-03 04:51:21.000000000 +0100
++++ linux-2.6-2.6.32.new/arch/arm/mach-kirkwood/sheevaplug-setup.c	2010-02-19 18:49:47.403810163 +0100
+@@ -96,6 +96,7 @@
+ 	platform_device_register(&sheevaplug_leds);
+ }
+ 
++#ifdef CONFIG_MACH_SHEEVAPLUG
+ MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
+ 	/* Maintainer: shadi Ammouri <shadi@marvell.com> */
+ 	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
+@@ -106,3 +107,16 @@
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
+ MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_ESATA_SHEEVAPLUG
++MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= sheevaplug_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
 
-Please make those 3 separate patches.  And yes I think you need the 
-first patch as well.  Some code will be optimized away at compile time 
-if one of the configs is not selected.
 
-> Please pardon my git ignorance, but I couldn't find any guidelines
-> forcing me to use it here.
+-- 
+John Holland
 
-You're not forced to use Git.  However I'd prefer if you could post 
-those patches separately, one per message, with some explanation blurb 
-for each patch and a SOB tag.  See Documentation/SubmittingPatches 
-for all the details (apply what makes sense).
+___________________________________________
 
-> During my excursions with the new hardware, it was pointed out that the
-> Sheeva u-boot 3.4.19 does not properly initialize the SoC SATA ports
-> disallowing further usage; indifferent to the above patches. The "net"
-> http://plugcomputer.org/plugforum/index.php?topic=927.0 told me to use
-> u-boot 3.4.19 intended for the openrd hardware, and it worked.
+Cellent Finance Solutions AG
 
-That would be good if someone made the necessary patch to add the proper 
-initialization to the kernel eventually.
-
-
-Nicolas
+Firmensitz: Calwer Stra?e 33, 70173 Stuttgart
+Registergericht: Amtsgericht Stuttgart, HRB 720743
+Vorstand: Thomas Wild
+Vorsitzender des Aufsichtsrats: Rudolf Zipf
