@@ -1,57 +1,84 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Feb 2010 01:05:00 +0100
-Subject: [PATCH 0/7] PrimeCell DMA Device
-Message-ID: <1266537900-11710-1-git-send-email-linus.walleij@stericsson.com>
+Date: Fri, 19 Feb 2010 01:05:21 +0100
+Subject: [PATCH 2/7] ARM: MMCI: pass max frequency from platform
+Message-ID: <1266537921-12289-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a revised set of patches mainly adding DMA
-engine support to the so-called "amba" bus which is
-actually the PrimeCell bus. It also deals with
-setting the maximum clocking frequency from the
-platform data.
+This introduce the field f_max into the mmci_platform_data,
+making it possible to pass in a desired block clocking frequency
+from a board configuration. This is often more desirable than
+using a module parameter. We keep the module parameter as a
+fallback as well as the default frequency specified for this
+parameter if a parameter is not provided.
 
-For DMA: the idea is to structure the data passed
-from the PrimeCell to the DMA engine framework to
-get some control over it, atleast we will have an
-established place where such stuff should go, and
-that is struct amba_dma_channel_config.
+This also adds some kerneldoc style documentation to the
+platform data struct in mmci.h.
 
-The patches goes from trivial groundwork to
-controversial so that the chain can be cut anywhere.
-It's cleanup patches for amba and MMCI first.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c   |   13 ++++++++++++-
+ include/linux/amba/mmci.h |   23 ++++++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 2 deletions(-)
 
-Patch 1 - Removes the custom DBG macro and a printk()
-  in mmci.c in favor of dev_dbg()/dev_err()
-  [Rebase of earlier patch]
-
-Patch 2 - Introduce the f_max attribute in the MMCI
-  platform data struct and add kerneldoc to the
-  platform data in <linux/amba/mmci.h>.
-  [Rebase of earlier patch]
-
-Patch 3 - Set the U300 f_max attribute to 24 MHz
-  [Rebase of earlier patch]
-
-Patch 4 - Add the PrimeCell DMA device superset
-  extension in <linux/amba/dma.h> and (basically a
-  struct and the dma_set_ambaconfig() call) and
-  implement this all the way in the MMCI driver as
-  an example.
-
-Patch 5 - Amend the U300 platform config with
-  DMA specifics.
-
-Patch 6 - Patch sent earliner to Dan Williams
-  that updates the linux-next COH 901 318 driver
-  to support memcpy and slaves properly.
-
-Patch 7 - Patch on top of the patch already sent
-  to Dan Williams, adding the PrimeCell API
-  to COH 901 318 so that U300 compiles properly.
-
-The entire set has been regression compiled against
-the RealView, Versatile and Integrator defconfigs.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 84c103a..1252cd6 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -629,7 +629,18 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	mmc->ops = &mmci_ops;
+ 	mmc->f_min = (host->mclk + 511) / 512;
+-	mmc->f_max = min(host->mclk, fmax);
++	/*
++	 * If the platform data supplies a maximum operating
++	 * frequency, this takes precedence. Else, we fall back
++	 * to using the module parameter, which has a (low)
++	 * default value in case it is not specified. Either
++	 * value must not exceed the clock rate into the block,
++	 * of course.
++	 */
++	if (plat->f_max)
++		mmc->f_max = min(host->mclk, plat->f_max);
++	else
++		mmc->f_max = min(host->mclk, fmax);
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
+ #ifdef CONFIG_REGULATOR
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 6b42417..7e466fe 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -6,8 +6,29 @@
+ 
+ #include <linux/mmc/host.h>
+ 
++/**
++ * struct mmci_platform_data - platform configuration for the MMCI
++ * (also known as PL180) block.
++ * @f_max: the maximum operational frequency for this host in this
++ * platform configuration. When this is specified it takes precedence
++ * over the module parameter for the same frequency.
++ * @ocr_mask: available voltages on the 4 pins from the block, this
++ * is ignored if a regulator is used, see the MMC_VDD_* masks in
++ * mmc/host.h
++ * @translate_vdd: a callback function to translate a MMC_VDD_*
++ * mask into a value to be binary or:ed and written into the
++ * MMCIPWR register of the block
++ * @status: if no GPIO read function was given to the block in
++ * gpio_wp (below) this function will be called to determine
++ * whether a card is present in the MMC slot or not
++ * @gpio_wp: read this GPIO pin to see if the card is write protected
++ * @gpio_cd: read this GPIO pin to detect card insertion
++ * @capabilities: the capabilities of the block as implemented in
++ * this platform, signify anything MMC_CAP_* from mmc/host.h
++ */
+ struct mmci_platform_data {
+-	unsigned int ocr_mask;			/* available voltages */
++	unsigned int f_max;
++	unsigned int ocr_mask;
+ 	u32 (*translate_vdd)(struct device *, unsigned int);
+ 	unsigned int (*status)(struct device *);
+ 	int	gpio_wp;
+-- 
+1.6.6
