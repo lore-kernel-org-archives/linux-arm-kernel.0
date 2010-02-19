@@ -1,61 +1,129 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Fri, 19 Feb 2010 15:10:12 +0900
-Subject: Kernel panic due to page migration accessing memory holes
-In-Reply-To: <4B7E2635.8010700@codeaurora.org>
-References: <4B7C8DC2.3060004@codeaurora.org>
-	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>
-	<4B7CF8C0.4050105@codeaurora.org>
-	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
-	<20100218100432.GA32626@csn.ul.ie>
-	<4B7DEDB0.8030802@codeaurora.org>
-	<20100219110003.dfe58df8.kamezawa.hiroyu@jp.fujitsu.com>
-	<4B7E2635.8010700@codeaurora.org>
-Message-ID: <20100219151012.d430b7ea.kamezawa.hiroyu@jp.fujitsu.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 19 Feb 2010 14:17:52 +0800
+Subject: [PATCH 1/5] pxa/zeus: Allow usage of 8250-compatible UART in
+	uncompress
+In-Reply-To: <20100218202612.6d6385e6@taxman.wild-wind.fr.eu.org>
+References: <20100218202612.6d6385e6@taxman.wild-wind.fr.eu.org>
+Message-ID: <f17812d71002182217n439da3c0n8b8dcee4e8318008@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Feb 2010 21:48:37 -0800
-Michael Bohan <mbohan@codeaurora.org> wrote:
+On Fri, Feb 19, 2010 at 4:26 AM, Marc Zyngier <maz@misterjones.org> wrote:
+> Zeus console port is wired to a 8250-compatible device
+> (pxa UARTs are reserved to other uses). This patch
+> allows such a configuration in the uncompress sequence.
+>
+> It has been regression-tested on a Viper using FFUART.
+>
+> Signed-off-by: Marc Zyngier <maz@misterjones.org>
 
-> On 2/18/2010 6:00 PM, KAMEZAWA Hiroyuki wrote:
-> > memmap for memory holes should be marked as PG_reserved and never be freed
-> > by free_bootmem(). Then, memmap for memory holes will not be in buddy allocator.
-> >
-> > Again, pfn_valid() just show "there is memmap", not for "there is a valid page"
-> >    
-> 
-> ARM seems to have been freeing the memmap holes for a long time.
-Ouch.
+Hi Marc,
 
-> I'm pretty sure there would be a lot of pushback if we tried to change 
-> that.  For example, in my memory map running FLATMEM, I would be 
-> consuming an extra ~7 MB of memory if these structures were not freed.
-> 
-> As a compromise, perhaps we could free everything except the first 
-> 'pageblock_nr_pages' in a hole?  This would guarantee that 
-> move_freepages() doesn't deference any memory that doesn't belong to the 
-> memmap -- but still only waste a relatively small amount of memory.  For 
-> a 4 MB page block, it should only consume an extra 32 KB per hole in the 
-> memory map.
-> 
-No. You have to implement pfn_valid() to return correct value as
-"pfn_valid() returnes true if there is memmap." even if you do that.
-Otherwise, many things will go bad.
+I would like to modify the patch a little bit as follows (and into two),
+please let me know if you are OK (better to go with your Ack):
 
-You have 2 or 3 ways.
+    [ARM] pxa: refactor uncompress.h for non-PXA uarts
 
-1. re-implement pfn_valid() which returns correct value.
-   maybe not difficult. but please take care of defining CONFIG_HOLES_IN_....
-   etc.
+    The original patch came from Marc Zyngier where support of 8250-compatible
+    UART is required to show the uncompress information. Modified a little bit
+    here, including changes below:
 
-2. use DISCONTIGMEM and treat each bank and NUMA node.
-   There will be no waste for memmap. But other complication of CONFIG_NUMA.
-   
-3. use SPARSEMEM.
-   You have even 2 choisce here. 
-   a - Set your MAX_ORDER and SECTION_SIZE to be proper value.
-   b - waste some amount of memory for memmap on the edge of section.
-       (and don't free memmap for the edge.)
-      
-Thanks,
--Kame
+    1. #include <mach/regs-uart.h> is actually not necessary
+    2. introduced uart_{read,write}() for different base and shift
+    3. introduced uart_is_enabled() and assumed enabled always for
+       non-PXA uarts
+
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h
+b/arch/arm/mach-pxa/include/mach/uncompress.h
+index 237734b..4888a21 100644
+--- a/arch/arm/mach-pxa/include/mach/uncompress.h
++++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+@@ -10,20 +10,41 @@
+  */
+
+ #include <linux/serial_reg.h>
+-#include <mach/regs-uart.h>
+ #include <asm/mach-types.h>
+
+-#define __REG(x)       ((volatile unsigned long *)x)
++#define FFUART_BASE	(0x40100000)
++#define BTUART_BASE	(0x40200000)
++#define STUART_BASE	(0x40700000)
+
+-static volatile unsigned long *UART = FFUART;
++static unsigned long uart_base = FFUART_BASE;
++static unsigned int uart_shift = 2;
++static unsigned int uart_is_pxa = 1;
++
++static inline unsigned char uart_read(int offset)
++{
++	return *(volatile unsigned char *)(uart_base + (offset << uart_shift));
++}
++
++static inline void uart_write(unsigned char val, int offset)
++{
++	*(volatile unsigned char *)(uart_base + (offset << uart_shift)) = val;
++}
++
++static inline int uart_is_enabled(void)
++{
++	/* assume enabled by default for non-PXA uarts */
++	return uart_is_pxa ? uart_read(UART_IER) & UART_IER_UUE : 1;
++}
+
+ static inline void putc(char c)
+ {
+-	if (!(UART[UART_IER] & IER_UUE))
++	if (!uart_is_enabled())
+ 		return;
+-	while (!(UART[UART_LSR] & LSR_TDRQ))
++
++	while (!(uart_read(UART_LSR) & UART_LSR_THRE))
+ 		barrier();
+-	UART[UART_TX] = c;
++
++	uart_write(c, UART_TX);
+ }
+
+ /*
+@@ -38,7 +59,7 @@ static inline void arch_decomp_setup(void)
+ 	if (machine_is_littleton() || machine_is_intelmote2()
+ 	    || machine_is_csb726() || machine_is_stargate2()
+ 	    || machine_is_cm_x300() || machine_is_balloon3())
+-		UART = STUART;
++		uart_base = STUART_BASE;
+ }
+
+ /*
+
+
+And
+
+    [ARM] pxa/zeus: allow usage of 8250-compatible UART in uncompress
+
+    Zeus console port is wired to a 8250-compatible device (pxa UARTs are
+    reserved to other uses). This patch allows such a configuration in the
+    uncompress sequence.
+
+    Signed-off-by: Marc Zyngier <maz@misterjones.org>
+
+diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h
+b/arch/arm/mach-pxa/include/mach/uncompress.h
+index 4888a21..5ef91d9 100644
+--- a/arch/arm/mach-pxa/include/mach/uncompress.h
++++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+@@ -60,6 +60,12 @@ static inline void arch_decomp_setup(void)
+ 	    || machine_is_csb726() || machine_is_stargate2()
+ 	    || machine_is_cm_x300() || machine_is_balloon3())
+ 		uart_base = STUART_BASE;
++
++	if (machine_is_arcom_zeus()) {
++		uart_base = 0x10000000;	/* nCS4 */
++		uart_shift = 1;
++		uart_is_pxa = 0;
++	}
+ }
+
+ /*
