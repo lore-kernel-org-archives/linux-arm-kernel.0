@@ -1,111 +1,151 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 19 Feb 2010 20:27:43 +0800
-Subject: [PATCH] pxamci: close a serious race
-In-Reply-To: <4B7CC814.5080402@gmail.com>
-References: <f383264b0906151408u7b7087b8u815b337836a4b2c6@mail.gmail.com>
-	<4A373E72.4030104@gmail.com> <4A37A343.9000106@sdgsystems.com>
-	<4A37A622.5050507@gmail.com>
-	<6f7de2b00906161221l684f3cb2ra3831f2a4eec50e3@mail.gmail.com>
-	<4A4DA584.7080402@gmail.com> <4B7CC814.5080402@gmail.com>
-Message-ID: <f17812d71002190427r4f8a57b4va250f44961910ef1@mail.gmail.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Fri, 19 Feb 2010 13:48:33 +0000
+Subject: Kernel panic due to page migration accessing memory holes
+In-Reply-To: <4B7DEDB0.8030802@codeaurora.org>
+References: <4B7C8DC2.3060004@codeaurora.org>
+	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>
+	<4B7CF8C0.4050105@codeaurora.org>
+	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
+	<20100218100432.GA32626@csn.ul.ie>
+	<4B7DEDB0.8030802@codeaurora.org>
+Message-ID: <20100219134833.GE30258@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 12:54 PM, Vernon Sauder <vernoninhand@gmail.com> wrote:
-> Eric Miao wrote, On 07/03/2009 02:30 AM:
->> Matt Reimer wrote:
->>> On Tue, Jun 16, 2009 at 7:03 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+On Thu, Feb 18, 2010 at 05:47:28PM -0800, Michael Bohan wrote:
+> On 2/18/2010 2:04 AM, Mel Gorman wrote:
+>> On Thu, Feb 18, 2010 at 06:36:04PM +0900, KAMEZAWA Hiroyuki wrote:
+>>    
+>>>   [Fact]
+>>>   - There are 2 banks of memory and a memory hole on your machine.
+>>>     As
+>>>           0x00200000 - 0x07D00000
+>>>           0x40000000 - 0x43000000
 >>>
->>>> Aric D. Blumer wrote:
->>>>> Eric Miao wrote:
->>>>>
->>>>>>> Matt Reimer wrote:
->>>>>>>
->>>>>>>>> Close a race condition that could result in the last 32 bytes not
->>>>>>>>> being transferred:
->>>>>>>>>
->>>>>>>>> . . .
->>>>>>> Mmm... sounds reasonable (though I didn't observe this on PXA320 yet).
->>>>>>>
->>>>>>>>> Fix this by not calling pxamci_data_done() until the DMA channel
->>>> stops.
->>>>>>> The patch - however - I'm not sure if DATA_TRAN_DONE happens only for
->>>>>>> READ (sounds like a WRITE will also trigger DATA_TRAN_DONE?)
->>>>>>>
->>>>> You are correct; it does happen for writes too. ?Looks like we need to
->>>>> take that into account somehow, because we're probably introducing a
->>>>> race with writes now: ?The DMA finishes and turns off the SD clock
->>>>> possibly before the transaction occurs across the SD bus. ?It's not
->>>>> clear to me from the documentation if the MMC controller will finish
->>>>> the transaction before turning off the clock. ?Either way, the code
->>>>> should be cleaner to guarantee that it doesn't.
->>>>>
->>>> A quick solution would be waiting for DMA to stop in pxamci_data_done()
->>>> if it's a read - though not clean enough as using STOPIRQEN.
->>>>
->>>>
->>> How about the attached patch? I've been running a test reading and writing a
->>> 79M file for over an hour without a failure. I'll let it run a while and
->>> report back if there are any problems.
->>>
->>> Matt
->>>
+>>>   - Each bancks are in the same zone.
+>>>   - You use FLATMEM.
+>>>   - You see panic in move_freepages().
+>>>   - Your host's MAX_ORDER=11....buddy allocator's alignment is 0x400000
+>>>     Then, it seems 1st bank is not algined.
+>>>      
+>> It's not and assumptions are made about it being aligned.
+>>    
+>
+> Would it be prudent to have the ARM mm init code detect unaligned,  
+> discontiguous banks and print a warning message if  
+> CONFIG_ARCH_HAS_HOLES_MEMORYMODEL is not configured?  Should we take it  
+> a step further and even BUG()?
+>
+
+I guess it wouldn't hurt. I wouldn't get too side-tracked though as it's
+not the most important issue here.
+
+>> ARM frees unused portions of memmap to save memory. It's why memmap_valid_within()
+>> exists when CONFIG_ARCH_HAS_HOLES_MEMORYMODEL although previously only
+>> reading /proc/pagetypeinfo cared.
 >>
->> Hi Matt,
+>> In that case, the FLATMEM memory map had unexpected holes which "never"
+>> happens and that was the workaround. The problem here is that there are
+>> unaligned zones but no pfn_valid() implementation that can identify
+>> them as you'd have with SPARSEMEM. My expectation is that you are using
+>> the pfn_valid() implementation from asm-generic
 >>
->> Sorry for the long long latency. This patch doesn't apply to the latest
->> tree however - could you take a look and make this refreshed?
+>> #define pfn_valid(pfn)          ((pfn)<  max_mapnr)
 >>
->> Thanks
->> - eric
+>> which is insufficient in your case.
+>>    
+>
+> I am actually using the pfn_valid implementation FLATMEM in  
+> arch/arm/include/asm/memory.h.  This one is very similar to the  
+> asm-generic, and has no knowledge of the holes.
+>
+
+Same problem applies so.
+
+>> I think it's more likely the at the memmap he is accessing has been
+>> freed and is effectively random data.
 >>
+>>    
 >
-> I am sorry to bring this back up again but it looks like this patch died
-> without a resolution that made it into mainline. I am working on an
-> issue with a PXA 270 that looks identical to this. However, this patch
-> still does not apply cleanly and causes other problems.
+> I also think this is the case.
 >
-> I have a platform where I can cause this issue within minutes. For some
-> reason, running an web server serving pages off a read-only SD mount and
-> serving a large file across a Bluetooth network connection brings out
-> the worst of this bug.
+>> SPARSEMEM would give you an implementation of pfn_valid() that you could
+>> use here. The choices that spring to mind are;
+>>
+>> 1. reduce MAX_ORDER so they are aligned (easiest)
+>>    
 >
-> The first problem with this patch is calling data_done from dma_irq
-> breaks the synchronization. If the DMA interrupt comes before the
-> END_CMD_RES interrupt (which is normally does for me), then data_done is
-> called before cmd_done. This either causes cmd_done to not disable the
-> DATA_DONE interrupt (when called from pxamci_irq but after request_done
-> sets cmd == NULL) or a WARN_ON if start_cmd is called from data_done to
-> start processing another command.
->
-> The second problem is that the slab corruption patch which I submitted
-> [1] causes short messages to fail. If the algorithm assumes that all
-> messages are DMA, then things fall down when using PIO. I would like to
-> reconcile these two patches and see if we can get these issues fixed and
-> upstream.
->
-> For an immediate fix, the simplest thing is to add a busy-wait inside
-> data_done to wait for the DMA to stop [2]. From my testing, this wait
-> takes ~3 usec at the most.
+> Is it safe to assume that reducing MAX_ORDER will hurt performance?
 >
 
-Went through all the threads in [1], I'm still a little bit concerned about
-the root cause of this problem. My understanding atm (correct me pls)
-is:
+No, it does not necessarily reduce performance. In some circumstances it
+might even help although I wouldn't chase after it.
 
-1. Errata 59, we need to fill the DMA at least 32-byte in 4-bit mode and
-8-byte in 1-bit mode for read operation
+Downside one is that some hash tables might be getting hurt if you have a
+very large amount of memory (look for "hash table entries:" in dmesg after
+booting to see what order is being used).
 
-2. That your observed issue which can be worked around by using PIO
-instead of DMA for short messages
+Downside two is that if some drivers require large contiguous memory
+early in boot, they might be hurt by MAX_ORDER being lower. If you
+require CONFIG_HUGETLB_PAGE, it might not be possible to reduce
+MAX_ORDER depending on the size of the huge page.
 
-3. The DMA done interrupt comes before END_CMD_RES
+>> 2. use SPARSEMEM (easy, but not necessary what you want to do, might
+>> 	waste memory unless you drop MAX_ORDER as well)
+>>    
+>
+> We intend to use SPARSEMEM, but we'd also like to maintain FLATMEM  
+> compatibility for some configurations.  My guess is that there are other  
+> ARM users that may want this support as well.
+>
+>> 3. implement a pfn_valid() that can handle the holes and set
+>> 	CONFIG_HOLES_IN_ZONE so it's called in move_freepages() to
+>> 	deal with the holes (should pass this by someone more familiar
+>> 	with ARM than I)
+>>    
+>
+> This option seems the best to me.  We should be able to implement an ARM  
+> specific pfn_valid() that walks the ARM meminfo struct to ensure the pfn  
+> is not within a hole.
+>
 
-For 3), I don't quite think it's a problem, data_done() is normally not
-done in DMA done interrupt unless error occurs, normally the DMA
-done interrupt handler just swaps the write buffer, data_done() is
-performed in DATA_TRANS_DONE then.
+Be sure to check your performance before and after. pfn_valid_within()
+is used in a fair few places and you are likely enabling it.
 
-For 2), I'm still thinking if there is an explanation.
+> My only concern with this is a comment in __rmqueue_fallback() after  
+> calling move_freepages_block()  that states "Claim the whole block if  
+> over half of it is free".  Suppose only 1 MB is beyond the bank limit.   
+> That means that over half of the pages of the 4 MB block will be  
+> reported by move_freepages() as free -- but 1 MB of those pages are  
+> invalid.  Won't this cause problems if these pages are assumed to be  
+> part of an active block?
+>
 
-For 1), we definitely need a workaround patch.
+The only operation taking place there is updating a bitmap so I doubt
+you'll hit snags there.
+
+> It seems like we should have an additional check in  
+> move_freepages_block() with pfn_valid_within() to check the last page in  
+> the block (eg. end_pfn) before calling move_freepages_block().  If the  
+> last page is not valid, then we shouldn't we return 0 as in the zone  
+> span check? This will also skip the extra burden of checking each  
+> individual page, when we already know the proposed range is invalid.
+>
+
+You don't know where the holes are going to be so it is paranod rather
+than making assumptions about where architectures put holes.
+
+> Assuming we did return 0 in this case, would that sub-block of pages  
+> ever be usable for anything else, or would it be effectively wasted? 
+
+They're still usable.
+
+> If  
+> this memory were wasted, then adjusting MAX_ORDER would have an  
+> advantage in this sense -- ignoring any performance implications.
+>
+
+-- 
+Mel Gorman
+Part-time Phd Student                          Linux Technology Center
+University of Limerick                         IBM Dublin Software Lab
