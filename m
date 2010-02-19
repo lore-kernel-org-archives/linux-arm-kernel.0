@@ -1,116 +1,31 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 19 Feb 2010 10:55:30 +0530
-Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
-In-Reply-To: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C417FA42@dbde02.ent.ti.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Thu, 18 Feb 2010 21:48:37 -0800
+Subject: Kernel panic due to page migration accessing memory holes
+In-Reply-To: <20100219110003.dfe58df8.kamezawa.hiroyu@jp.fujitsu.com>
+References: <4B7C8DC2.3060004@codeaurora.org>	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>	<4B7CF8C0.4050105@codeaurora.org>	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>	<20100218100432.GA32626@csn.ul.ie>	<4B7DEDB0.8030802@codeaurora.org>
+	<20100219110003.dfe58df8.kamezawa.hiroyu@jp.fujitsu.com>
+Message-ID: <4B7E2635.8010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bye the way just to add bit more clarity, this patch addresses TX
-hardware restriction in the new UART IP used on omap3630 and omap4430.
-First part of the fix for RX is already in mainline,
-Commit: "ce13d4716a276f4331d78ba28a5093a63822ab95"
+On 2/18/2010 6:00 PM, KAMEZAWA Hiroyuki wrote:
+> memmap for memory holes should be marked as PG_reserved and never be freed
+> by free_bootmem(). Then, memmap for memory holes will not be in buddy allocator.
+>
+> Again, pfn_valid() just show "there is memmap", not for "there is a valid page"
+>    
 
-More details on this thread are here.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg19447.html
+ARM seems to have been freeing the memmap holes for a long time.  I'm 
+pretty sure there would be a lot of pushback if we tried to change 
+that.  For example, in my memory map running FLATMEM, I would be 
+consuming an extra ~7 MB of memory if these structures were not freed.
 
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Thursday, February 18, 2010 2:29 PM
-> To: tony at atomide.com
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh; Woodruff,
-> Richard; Ghorai, Sukumar
-> Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
-> 
-> This patch is addition to the already merged commit on non-empty
-> uart fifo read abort. "ce13d4716a276f4331d78ba28a5093a63822ab95"
-> 
-> OMAP3630 and OMAP4430 UART IP blocks have a restriction on TX FIFO
-> too. If you try to write to the tx fifo when it is full, the system aborts.
-> 
-> This can be easily reproducible by not suppressing interconnect errors or
-> long duration testing where continuous prints over console from multiple
-> threads. This patch is addressing the issue by ensuring that write is
-> not issued while fifo is full. A timeout is added to avoid any hang
-> on fifo-full for 10 mS which is unlikely case.
-> 
-> Patch is validated on OMAP3630 and OMAP4 SDP.
-> 
-> V2 version removed the additional 1 uS on every TX as per
-> Tony's suggestion
-> 
-> Signed-off-by: Woodruff Richard <r-woodruff2@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Ghorai Sukumar <s-ghorai@ti.com>
-> ---
->  arch/arm/mach-omap2/serial.c |   31 ++++++++++++++++++++++++++++---
->  1 files changed, 28 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index 5f3035e..b79bc89 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -23,6 +23,7 @@
->  #include <linux/serial_reg.h>
->  #include <linux/clk.h>
->  #include <linux/io.h>
-> +#include <linux/delay.h>
-> 
->  #include <plat/common.h>
->  #include <plat/board.h>
-> @@ -160,6 +161,13 @@ static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
->  	return (unsigned int)__raw_readb(up->membase + offset);
->  }
-> 
-> +static inline void __serial_write_reg(struct uart_port *up, int offset,
-> +		int value)
-> +{
-> +	offset <<= up->regshift;
-> +	__raw_writeb(value, up->membase + offset);
-> +}
-> +
->  static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
->  				    int value)
->  {
-> @@ -620,6 +628,20 @@ static unsigned int serial_in_override(struct uart_port *up, int offset)
->  	return __serial_read_reg(up, offset);
->  }
-> 
-> +static void serial_out_override(struct uart_port *up, int offset, int value)
-> +{
-> +	unsigned int status, tmout = 10000;
-> +
-> +	status = __serial_read_reg(up, UART_LSR);
-> +	while (!(status & UART_LSR_THRE)) {
-> +		/* Wait up to 10ms for the character(s) to be sent. */
-> +		if (--tmout == 0)
-> +			break;
-> +		udelay(1);
-> +		status = __serial_read_reg(up, UART_LSR);
-> +	}
-> +	__serial_write_reg(up, offset, value);
-> +}
->  void __init omap_serial_early_init(void)
->  {
->  	int i;
-> @@ -721,11 +743,14 @@ void __init omap_serial_init_port(int port)
->  	 * omap3xxx: Never read empty UART fifo on UARTs
->  	 * with IP rev >=0x52
->  	 */
-> -	if (cpu_is_omap44xx())
-> +	if (cpu_is_omap44xx()) {
->  		uart->p->serial_in = serial_in_override;
-> -	else if ((serial_read_reg(uart->p, UART_OMAP_MVER) & 0xFF)
-> -			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV)
-> +		uart->p->serial_out = serial_out_override;
-> +	} else if ((serial_read_reg(uart->p, UART_OMAP_MVER) & 0xFF)
-> +			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV) {
->  		uart->p->serial_in = serial_in_override;
-> +		uart->p->serial_out = serial_out_override;
-> +	}
->  }
-> 
->  /**
-> --
-> 1.6.0.4
+As a compromise, perhaps we could free everything except the first 
+'pageblock_nr_pages' in a hole?  This would guarantee that 
+move_freepages() doesn't deference any memory that doesn't belong to the 
+memmap -- but still only waste a relatively small amount of memory.  For 
+a 4 MB page block, it should only consume an extra 32 KB per hole in the 
+memory map.
+
+Thanks,
+Michael
