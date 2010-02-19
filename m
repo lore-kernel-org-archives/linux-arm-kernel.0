@@ -1,329 +1,217 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Fri, 19 Feb 2010 15:26:01 -0800
-Subject: [PATCH 05/13] ARM: LPC32XX: System suspend support
+Date: Fri, 19 Feb 2010 15:26:02 -0800
+Subject: [PATCH 06/13] ARM: LPC32XX: Serial support code
 In-Reply-To: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
 References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1266621969-28847-6-git-send-email-wellsk40@gmail.com>
+Message-ID: <1266621969-28847-7-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-Support for system suspend and resume
+Serial port setup support code
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/pm.c      |  145 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/suspend.S |  151 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 296 insertions(+), 0 deletions(-)
+ arch/arm/mach-lpc32xx/serial.c |  191 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 191 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
+diff --git a/arch/arm/mach-lpc32xx/serial.c b/arch/arm/mach-lpc32xx/serial.c
 new file mode 100644
-index 0000000..d792e2e
+index 0000000..680a79b
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/pm.c
-@@ -0,0 +1,145 @@
++++ b/arch/arm/mach-lpc32xx/serial.c
+@@ -0,0 +1,191 @@
 +/*
-+ * arch/arm/mach-lpc32xx/pm.c
++ * arch/arm/mach-lpc32xx/serial.c
 + *
-+ * Original authors: Vitaly Wool, Dmitry Chigirev <source@mvista.com>
-+ * Modified by Kevin Wells <kevin.wells@nxp.com>
++ * Author: Kevin Wells <kevin.wells@nxp.com>
 + *
-+ * 2005 (c) MontaVista Software, Inc. This file is licensed under
-+ * the terms of the GNU General Public License version 2. This program
-+ * is licensed "as is" without any warranty of any kind, whether express
-+ * or implied.
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+/*
-+ * LPC32XX CPU and system power management
-+ *
-+ * The LCP32XX has three CPU modes for controlling system power: run,
-+ * direct-run, and halt modes. When switching between halt and run modes,
-+ * the CPU transistions through direct-run mode. For Linux, direct-run
-+ * mode is not used in normal operation. Halt mode is used when the
-+ * system is fully suspended.
-+ *
-+ * Run mode:
-+ * The ARM CPU clock (HCLK_PLL), HCLK bus clock, and PCLK bus clocks are
-+ * derived from the HCLK PLL. The HCLK and PCLK bus rates are divided from
-+ * the HCLK_PLL rate. Linux runs in this mode.
-+ *
-+ * Direct-run mode:
-+ * The ARM CPU clock, HCLK bus clock, and PCLK bus clocks are driven from
-+ * SYSCLK. SYSCLK is usually around 13MHz, but may vary based on SYSCLK
-+ * source or the frequency of the main oscillator. In this mode, the
-+ * HCLK_PLL can be safely enabled, changed, or disabled.
-+ *
-+ * Halt mode:
-+ * SYSCLK is gated off and the CPU and system clocks are halted.
-+ * Peripherals based on the 32KHz oscillator clock (ie, RTC, touch,
-+ * key scanner, etc.) still operate if enabled. In this state, an enabled
-+ * system event (ie, GPIO state change, RTC match, key press, etc.) will
-+ * wake the system up back into direct-run mode.
-+ *
-+ * DRAM refresh
-+ * DRAM clocking and refresh are slightly different for systems with DDR
-+ * DRAM or regular SDRAM devices. If SDRAM is used in the system, the
-+ * SDRAM will still be accessible in direct-run mode. In DDR based systems,
-+ * a transistion to direct-run mode will stop all DDR accesses (no clocks).
-+ * Because of this, the code to switch power modes and the code to enter
-+ * and exit DRAM self-refresh modes must not be executed in DRAM. A small
-+ * section of IRAM is used instead for this.
-+ *
-+ * Suspend is handled with the following logic:
-+ *  Backup a small area of IRAM used for the suspend code
-+ *  Copy suspend code to IRAM
-+ *  Transfer control to code in IRAM
-+ *  Places DRAMs in self-refresh mode
-+ *  Enter direct-run mode
-+ *  Save state of HCLK_PLL PLL
-+ *  Disable HCLK_PLL PLL
-+ *  Enter halt mode - CPU and buses will stop
-+ *  System enters direct-run mode when an enabled event occurs
-+ *  HCLK PLL state is restored
-+ *  Run mode is entered
-+ *  DRAMS are placed back into normal mode
-+ *  Code execution returns from IRAM
-+ *  IRAM code are used for suspend is restored
-+ *  Suspend mode is exited
-+ */
-+
-+#include <linux/suspend.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
++#include <linux/serial_reg.h>
++#include <linux/serial_8250.h>
++#include <linux/clk.h>
 +#include <linux/io.h>
 +
-+#include <asm/cacheflush.h>
-+
 +#include <mach/hardware.h>
 +#include <mach/platform.h>
++#include <mach/io.h>
 +#include "common.h"
-+#include "clock.h"
 +
-+#define TEMP_IRAM_AREA  IO_ADDRESS(LPC32XX_IRAM_BASE)
++#define LPC32XX_SUART_FIFO_SIZE	64
 +
-+/*
-+ * Both STANDBY and MEM suspend states are handled the same with no
-+ * loss of CPU or memory state
-+ */
-+static int lpc32xx_pm_enter(suspend_state_t state)
-+{
-+	int (*lpc32xx_suspend_ptr) (void);
-+	void *iram_swap_area;
-+
-+	/* Allocate some space for temporary IRAM storage */
-+	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
-+	if (!iram_swap_area) {
-+		printk(KERN_ERR
-+		       "PM Suspend: cannot allocate memory to save portion "
-+			"of SRAM\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* Backup a small area of IRAM used for the suspend code */
-+	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
-+		lpc32xx_sys_suspend_sz);
-+
-+	/*
-+	 * Copy code to suspend system into IRAM. The suspend code
-+	 * needs to run from IRAM as DRAM may no longer be available
-+	 * when the PLL is stopped.
-+	 */
-+	memcpy((void *) TEMP_IRAM_AREA, &lpc32xx_sys_suspend,
-+		lpc32xx_sys_suspend_sz);
-+	flush_icache_range((unsigned long)TEMP_IRAM_AREA,
-+		(unsigned long)(TEMP_IRAM_AREA) + lpc32xx_sys_suspend_sz);
-+
-+	/* Transfer to suspend code in IRAM */
-+	lpc32xx_suspend_ptr = (void *) TEMP_IRAM_AREA;
-+	flush_cache_all();
-+	(void) lpc32xx_suspend_ptr();
-+
-+	/* Restore original IRAM contents */
-+	memcpy((void *) TEMP_IRAM_AREA, iram_swap_area,
-+		lpc32xx_sys_suspend_sz);
-+
-+	kfree(iram_swap_area);
-+
-+	return 0;
-+}
-+
-+static struct platform_suspend_ops lpc32xx_pm_ops = {
-+	.valid	= suspend_valid_only_mem,
-+	.enter	= lpc32xx_pm_enter,
++/* Standard 8250/16550 compatible serial ports */
++static struct plat_serial8250_port serial_std_platform_data[] = {
++#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
++	{
++		.membase        = io_p2v(LPC32XX_UART5_BASE),
++		.mapbase        = LPC32XX_UART5_BASE,
++		.irq		= IRQ_LPC32XX_UART_IIR5,
++		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
++	{
++		.membase	= io_p2v(LPC32XX_UART3_BASE),
++		.mapbase        = LPC32XX_UART3_BASE,
++		.irq		= IRQ_LPC32XX_UART_IIR3,
++		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
++	{
++		.membase	= io_p2v(LPC32XX_UART4_BASE),
++		.mapbase        = LPC32XX_UART4_BASE,
++		.irq		= IRQ_LPC32XX_UART_IIR4,
++		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
++	{
++		.membase	= io_p2v(LPC32XX_UART6_BASE),
++		.mapbase        = LPC32XX_UART6_BASE,
++		.irq		= IRQ_LPC32XX_UART_IIR6,
++		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
++		.regshift	= 2,
++		.iotype		= UPIO_MEM32,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
++					UPF_SKIP_TEST,
++	},
++#endif
++	{ },
 +};
 +
-+#define EMC_DYN_MEM_CTRL_OFS 0x20
-+#define EMC_SRMMC           (1 << 3)
-+#define EMC_CTRL_REG io_p2v(LPC32XX_EMC_BASE + EMC_DYN_MEM_CTRL_OFS)
-+static int __init lpc32xx_pm_init(void)
++struct uartinit {
++	char *uart_ck_name;
++	u32 ck_mode_mask;
++	void __iomem *pdiv_clk_reg;
++};
++
++static struct uartinit uartinit_data[] __initdata = {
++#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
++	{
++		.uart_ck_name = "uart5_ck",
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 5),
++		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
++	{
++		.uart_ck_name = "uart3_ck",
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 3),
++		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
++	{
++		.uart_ck_name = "uart4_ck",
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 4),
++		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL,
++	},
++#endif
++#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
++	{
++		.uart_ck_name = "uart6_ck",
++		.ck_mode_mask =
++			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 6),
++		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL,
++	},
++#endif
++};
++
++static struct platform_device serial_std_platform_device = {
++	.name			= "serial8250",
++	.id			= 0,
++	.dev			= {
++		.platform_data	= serial_std_platform_data,
++	},
++};
++
++static struct platform_device *lpc32xx_serial_devs[] __initdata = {
++	&serial_std_platform_device,
++};
++
++void __init lpc32xx_serial_init(void)
 +{
-+	/*
-+	 * Setup SDRAM self-refresh clock to automatically disable o
-+	 * start of self-refresh. This only needs to be done once.
-+	 */
-+	__raw_writel(__raw_readl(EMC_CTRL_REG) | EMC_SRMMC, EMC_CTRL_REG);
++	u32 tmp, clkmodes = 0;
++	struct clk *clk;
++	unsigned int puart;
++	int i, j;
 +
-+	suspend_set_ops(&lpc32xx_pm_ops);
++	/* UART clocks are off, let clock driver manage them */
++	__raw_writel(0, LPC32XX_CLKPWR_UART_CLK_CTRL);
 +
-+	return 0;
++	for (i = 0; i < ARRAY_SIZE(uartinit_data); i++) {
++		clk = clk_get(NULL, uartinit_data[i].uart_ck_name);
++		if (!IS_ERR(clk)) {
++			clk_enable(clk);
++			serial_std_platform_data[i].uartclk =
++				clk_get_rate(clk);
++		}
++
++		/* Fall back on main osc rate if clock rate return fails */
++		if (serial_std_platform_data[i].uartclk == 0)
++			serial_std_platform_data[i].uartclk =
++				LPC32XX_MAIN_OSC_FREQ;
++
++		/* Setup UART clock modes for all UARTs, disable autoclock */
++		clkmodes |= uartinit_data[i].ck_mode_mask;
++
++		/* pre-UART clock divider set to 1 */
++		__raw_writel(0x0101, uartinit_data[i].pdiv_clk_reg);
++	}
++
++	/* This needs to be done after all UART clocks are setup */
++	__raw_writel(clkmodes, LPC32XX_UARTCTL_CLKMODE);
++	for (i = 0; i < ARRAY_SIZE(uartinit_data) - 1; i++) {
++		/* Force a flush of the RX FIFOs to work around a HW bug */
++		puart = serial_std_platform_data[i].mapbase;
++		__raw_writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
++		__raw_writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
++		j = LPC32XX_SUART_FIFO_SIZE;
++		while (j--)
++			tmp = __raw_readl(LPC32XX_UART_DLL_FIFO(puart));
++		__raw_writel(0, LPC32XX_UART_IIR_FCR(puart));
++	}
++
++	/* Disable UART5->USB transparent mode or USB won't work */
++	tmp = __raw_readl(LPC32XX_UARTCTL_CTRL);
++	tmp &= ~LPC32XX_UART_U5_ROUTE_TO_USB;
++	__raw_writel(tmp, LPC32XX_UARTCTL_CTRL);
++
++	platform_add_devices(lpc32xx_serial_devs,
++		ARRAY_SIZE(lpc32xx_serial_devs));
 +}
-+arch_initcall(lpc32xx_pm_init);
-diff --git a/arch/arm/mach-lpc32xx/suspend.S b/arch/arm/mach-lpc32xx/suspend.S
-new file mode 100644
-index 0000000..374f9f0
---- /dev/null
-+++ b/arch/arm/mach-lpc32xx/suspend.S
-@@ -0,0 +1,151 @@
-+/*
-+ * arch/arm/mach-lpc32xx/suspend.S
-+ *
-+ * Original authors: Dmitry Chigirev, Vitaly Wool <source@mvista.com>
-+ * Modified by Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * 2005 (c) MontaVista Software, Inc. This file is licensed under
-+ * the terms of the GNU General Public License version 2. This program
-+ * is licensed "as is" without any warranty of any kind, whether express
-+ * or implied.
-+ */
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/platform.h>
-+#include <mach/hardware.h>
-+
-+/* Using named register defines makes the code easier to follow */
-+#define WORK1_REG			r0
-+#define WORK2_REG			r1
-+#define SAVED_HCLK_DIV_REG		r2
-+#define SAVED_HCLK_PLL_REG		r3
-+#define SAVED_DRAM_CLKCTRL_REG		r4
-+#define SAVED_PWR_CTRL_REG		r5
-+#define CLKPWRBASE_REG			r6
-+#define EMCBASE_REG			r7
-+
-+#define LPC32XX_EMC_STATUS_OFFS		0x04
-+#define LPC32XX_EMC_STATUS_BUSY		0x1
-+#define LPC32XX_EMC_STATUS_SELF_RFSH	0x4
-+
-+#define LPC32XX_CLKPWR_PWR_CTRL_OFFS	0x44
-+#define LPC32XX_CLKPWR_HCLK_DIV_OFFS	0x40
-+#define LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS 0x58
-+
-+#define CLKPWR_PCLK_DIV_MASK		0xFFFFFE7F
-+
-+	.text
-+
-+ENTRY(lpc32xx_sys_suspend)
-+	@ Save a copy of the used registers in IRAM, r0 is corrupted
-+	adr	r0, tmp_stack_end
-+	stmfd	r0!, {r3 - r7, sp, lr}
-+
-+	@ Load a few common register addresses
-+	adr	WORK1_REG, reg_bases
-+	ldr	CLKPWRBASE_REG, [WORK1_REG, #0]
-+	ldr	EMCBASE_REG, [WORK1_REG, #4]
-+
-+	ldr	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	orr	WORK1_REG, SAVED_PWR_CTRL_REG, #LPC32XX_CLKPWR_SDRAM_SELF_RFSH
-+
-+	@ Wait for SDRAM busy status to go busy and then idle
-+	@ This guarantees a small windows where DRAM isn't busy
-+1:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	bne	1b @ Branch while idle
-+2:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	beq	2b @ Branch until idle
-+
-+	@ Setup self-refresh with support for manual exit of
-+	@ self-refresh mode
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	orr	WORK2_REG, WORK1_REG, #LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+
-+	@ Wait for self-refresh acknowledge, clocks to the DRAM device
-+	@ will automatically stop on start of self-refresh
-+3:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	bne	3b @ Branch until self-refresh mode starts
-+
-+	@ Enter direct-run mode from run mode
-+	bic	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_SELECT_RUN_MODE
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+
-+	@ Safe disable of DRAM clock in EMC block, prevents DDR sync
-+	@ issues on restart
-+	ldr	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
-+	and	WORK2_REG, SAVED_HCLK_DIV_REG, #CLKPWR_PCLK_DIV_MASK
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLK_DIV_OFFS]
-+
-+	@ Save HCLK PLL state and disable HCLK PLL
-+	ldr	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+	bic	WORK2_REG, SAVED_HCLK_PLL_REG, #LPC32XX_CLKPWR_HCLKPLL_POWER_UP
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+
-+	@ Enter stop mode until an enabled event occurs
-+	orr	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_STOP_MODE_CTRL
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	.rept 9
-+	nop
-+	.endr
-+
-+	@ Clear stop status
-+	bic	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_STOP_MODE_CTRL
-+
-+	@ Restore original HCLK PLL value and wait for PLL lock
-+	str	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+4:
-+	ldr	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_CLKPWR_HCLKPLL_PLL_STS
-+	bne	4b
-+
-+	@ Re-enter run mode with self-refresh flag cleared, but no DRAM
-+	@ update yet. DRAM is still in self-refresh
-+	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+
-+	@ Restore original DRAM clock mode to restore DRAM clocks
-+	str	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
-+
-+	@ Clear self-refresh mode
-+	orr	WORK1_REG, SAVED_PWR_CTRL_REG,\
-+		#LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+
-+	@ Wait for EMC to clear self-refresh mode
-+5:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	bne	5b @ Branch until self-refresh has exited
-+
-+	@ restore regs and return
-+	adr	r0, tmp_stack
-+	ldmfd	r0!, {r3 - r7, sp, pc}
-+
-+reg_bases:
-+	.long	IO_ADDRESS(LPC32XX_CLK_PM_BASE)
-+	.long	IO_ADDRESS(LPC32XX_EMC_BASE)
-+
-+tmp_stack:
-+	.long	0, 0, 0, 0, 0, 0, 0
-+tmp_stack_end:
-+
-+ENTRY(lpc32xx_sys_suspend_sz)
-+	.word	. - lpc32xx_sys_suspend
 -- 
 1.6.6
