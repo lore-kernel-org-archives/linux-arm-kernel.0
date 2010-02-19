@@ -1,21 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Feb 2010 08:35:56 +0000
-Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
-In-Reply-To: <20100219002748.GB21755@atomide.com>
-References: <20100219002748.GB21755@atomide.com>
-Message-ID: <20100219083556.GB19649@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 19 Feb 2010 09:44:03 +0100
+Subject: Alignment Requirement for MT_MEMORY type
+In-Reply-To: <B125D8217ABC4B43826503DE00A2D44910F4639C3F@SJEXCHCCR01.corp.ad.broadcom.com>
+References: <B125D8217ABC4B43826503DE00A2D44910F4639A8D@SJEXCHCCR01.corp.ad.broadcom.com>
+	<20100218085125.GA848@n2100.arm.linux.org.uk>
+	<B125D8217ABC4B43826503DE00A2D44910F4639C3F@SJEXCHCCR01.corp.ad.broadcom.com>
+Message-ID: <63386a3d1002190044t6157e1d7ua70f188e3b8a5b93@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 04:27:48PM -0800, Tony Lindgren wrote:
-> @@ -779,5 +779,5 @@ config CACHE_XSC3L2
->  
->  config ARM_L1_CACHE_SHIFT
->  	int
-> -	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
-> +	default 6 if (ARCH_OMAP3 || ARCH_S5PC1XX) && !ARCH_OMAP2
->  	default 5
+2010/2/18 Henry Li <hli@broadcom.com>:
+> On Wed, Feb 17, 2010 at 04:33:00PM -0800, Henry Li wrote:
+>>> Can someone tell me why there is a requirement for the virtual and
+>>> physical addresses and size using MT_MEMORY memtype (where prot_l1=0)
+>>> to be aligned to section boundary (1MB) in
+>>> linux-2.6.32/arch/arm/mm/mmu.c/create_mapping
+>>> during IO table init?
 
-This one is definitely wrong.  Setting the L1 cache line size larger
-than it actually is should be safe; setting it smaller is definitely
-unsafe.
+>> Because today SDRAM is always a whole number of MB, so its pointless
+>> defining it in terms of 4K pages. ?MT_MEMORY is not for general purpose
+>> use, but only for setting up the initial kernel SDRAM mapping.
+
+> I see. The platform I am working with has 160kB of SRAM that I need
+> to map as cacheable and shareable but its physical address is not 1MB
+> aligned. ?Is there suitable memtype that I could use to map this?
+
+I don't know just what you're trying to do, but is this some kind of
+fast on-chip RAM, that's not in a separate capsule?
+
+In that case you might want to examine the solution used for
+the OMAP on-chip SRAM at:
+arch/arm/plat-omap/sram.c
+Or the solution we chose for the TCM memory close to the L1
+caches in ARM systems:
+arch/arm/kernel/tcm.c
+
+Yours,
+Linus Walleij
