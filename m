@@ -1,87 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Feb 2010 16:27:48 -0800
-Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
-Message-ID: <20100219002748.GB21755@atomide.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Thu, 18 Feb 2010 17:47:28 -0800
+Subject: Kernel panic due to page migration accessing memory holes
+In-Reply-To: <20100218100432.GA32626@csn.ul.ie>
+References: <4B7C8DC2.3060004@codeaurora.org>
+	<20100218100324.5e9e8f8c.kamezawa.hiroyu@jp.fujitsu.com>
+	<4B7CF8C0.4050105@codeaurora.org>
+	<20100218183604.95ee8c77.kamezawa.hiroyu@jp.fujitsu.com>
+	<20100218100432.GA32626@csn.ul.ie>
+Message-ID: <4B7DEDB0.8030802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 2/18/2010 2:04 AM, Mel Gorman wrote:
+> On Thu, Feb 18, 2010 at 06:36:04PM +0900, KAMEZAWA Hiroyuki wrote:
+>    
+>>   [Fact]
+>>   - There are 2 banks of memory and a memory hole on your machine.
+>>     As
+>>           0x00200000 - 0x07D00000
+>>           0x40000000 - 0x43000000
+>>
+>>   - Each bancks are in the same zone.
+>>   - You use FLATMEM.
+>>   - You see panic in move_freepages().
+>>   - Your host's MAX_ORDER=11....buddy allocator's alignment is 0x400000
+>>     Then, it seems 1st bank is not algined.
+>>      
+> It's not and assumptions are made about it being aligned.
+>    
 
-Here's one more patch for booting CPU_V6 and CPU_V7 omaps
-with the same kernel binary. This is needed to boot to
-user space, earlier I was just checking for "Mounted root".
+Would it be prudent to have the ARM mm init code detect unaligned, 
+discontiguous banks and print a warning message if 
+CONFIG_ARCH_HAS_HOLES_MEMORYMODEL is not configured?  Should we take it 
+a step further and even BUG()?
 
-Now I'm wondering if some of these should be done as
+> ARM frees unused portions of memmap to save memory. It's why memmap_valid_within()
+> exists when CONFIG_ARCH_HAS_HOLES_MEMORYMODEL although previously only
+> reading /proc/pagetypeinfo cared.
+>
+> In that case, the FLATMEM memory map had unexpected holes which "never"
+> happens and that was the workaround. The problem here is that there are
+> unaligned zones but no pfn_valid() implementation that can identify
+> them as you'd have with SPARSEMEM. My expectation is that you are using
+> the pfn_valid() implementation from asm-generic
+>
+> #define pfn_valid(pfn)          ((pfn)<  max_mapnr)
+>
+> which is insufficient in your case.
+>    
 
-default y if CPU_V7 && !CPU_32v6K
+I am actually using the pfn_valid implementation FLATMEM in 
+arch/arm/include/asm/memory.h.  This one is very similar to the 
+asm-generic, and has no knowledge of the holes.
 
-or 
+> I think it's more likely the at the memmap he is accessing has been
+> freed and is effectively random data.
+>
+>    
 
-default y if CPU_V7 && !CPU_V6
+I also think this is the case.
 
-instead to make them more generic? This is, after the
-earlier patch selecting CPU_32v6K if !ARCH_OMAP2.
+> SPARSEMEM would give you an implementation of pfn_valid() that you could
+> use here. The choices that spring to mind are;
+>
+> 1. reduce MAX_ORDER so they are aligned (easiest)
+>    
 
-Regards,
+Is it safe to assume that reducing MAX_ORDER will hurt performance?
 
-Tony
+> 2. use SPARSEMEM (easy, but not necessary what you want to do, might
+> 	waste memory unless you drop MAX_ORDER as well)
+>    
 
+We intend to use SPARSEMEM, but we'd also like to maintain FLATMEM 
+compatibility for some configurations.  My guess is that there are other 
+ARM users that may want this support as well.
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 18 Feb 2010 13:22:58 -0800
-Subject: [PATCH] arm: Allow mounting root on omaps with CPU_V6 and CPU_V7
+> 3. implement a pfn_valid() that can handle the holes and set
+> 	CONFIG_HOLES_IN_ZONE so it's called in move_freepages() to
+> 	deal with the holes (should pass this by someone more familiar
+> 	with ARM than I)
+>    
 
-To mount root, we need to disable VFPv3, HAS_TLS_REG, and
-set ARM_L1_CACHE_SHIFT=5.
+This option seems the best to me.  We should be able to implement an ARM 
+specific pfn_valid() that walks the ARM meminfo struct to ensure the pfn 
+is not within a hole.
 
-Otherwise we'll get something like this for CPUv3:
+My only concern with this is a comment in __rmqueue_fallback() after 
+calling move_freepages_block()  that states "Claim the whole block if 
+over half of it is free".  Suppose only 1 MB is beyond the bank limit.  
+That means that over half of the pages of the 4 MB block will be 
+reported by move_freepages() as free -- but 1 MB of those pages are 
+invalid.  Won't this cause problems if these pages are assumed to be 
+part of an active block?
 
-Freeing init memory: 184K
-Internal error: Oops - undefined instruction: 0 [#1]
-last sysfs file:
-Modules linked in:
-CPU: 0    Not tainted  (2.6.33-rc8-07824-gf2e1d91-dirty #36)
-PC is at no_old_VFP_process+0x8/0x3c
-LR is at __und_usr_unknown+0x0/0x14
-...
+It seems like we should have an additional check in 
+move_freepages_block() with pfn_valid_within() to check the last page in 
+the block (eg. end_pfn) before calling move_freepages_block().  If the 
+last page is not valid, then we shouldn't we return 0 as in the zone 
+span check?  This will also skip the extra burden of checking each 
+individual page, when we already know the proposed range is invalid.
 
-Or the system just hangs if HAS_TLS_REG is set.
+Assuming we did return 0 in this case, would that sub-block of pages 
+ever be usable for anything else, or would it be effectively wasted?  If 
+this memory were wasted, then adjusting MAX_ORDER would have an 
+advantage in this sense -- ignoring any performance implications.
 
-The ARM_L1_CACHE_SHIFT most likely will cause issues
-too if not set to 5.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 554cb9c..89dba0b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1498,7 +1498,7 @@ config VFP
- config VFPv3
- 	bool
- 	depends on VFP
--	default y if CPU_V7
-+	default y if CPU_V7 && !ARCH_OMAP2
- 
- config NEON
- 	bool "Advanced SIMD (NEON) Extension support"
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 4c2e90d..800f0ce 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -718,7 +718,7 @@ config TLS_REG_EMUL
- config HAS_TLS_REG
- 	bool
- 	depends on !TLS_REG_EMUL
--	default y if SMP || CPU_32v7
-+	default y if (SMP || CPU_32v7) && !ARCH_OMAP2
- 	help
- 	  This selects support for the CP15 thread register.
- 	  It is defined to be available on some ARMv6 processors (including
-@@ -779,5 +779,5 @@ config CACHE_XSC3L2
- 
- config ARM_L1_CACHE_SHIFT
- 	int
--	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
-+	default 6 if (ARCH_OMAP3 || ARCH_S5PC1XX) && !ARCH_OMAP2
- 	default 5
+Thanks,
+Michael
