@@ -1,114 +1,56 @@
-From: rurality.linux@gmail.com (Qiang Wang)
-Date: Fri, 19 Feb 2010 11:42:20 +0900
-Subject: [Linux-arm-nuc900] Re: [PATCH]NUC900 add gpio virtual memory map
-In-Reply-To: <e68bb3471002181839p499d56fey355a8b6e82f63238@mail.gmail.com>
-References: <71413c851002012128l26bbf64fvfffabcae194f076e@mail.gmail.com>
-	<71413c851002091831x101b67a7t9e38e94bbbc95db1@mail.gmail.com>
-	<e68bb3471002092053u7cb5d0aai129538fb32cb4880@mail.gmail.com>
-	<e68bb3471002181839p499d56fey355a8b6e82f63238@mail.gmail.com>
-Message-ID: <71413c851002181842r39ce0d86mc9c1dc1ea80e59c@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 19 Feb 2010 10:40:28 +0530
+Subject: [PATCH 7/9] omap4: Add auto-generated irq and dma headers
+In-Reply-To: <alpine.DEB.2.00.1002181014470.24812@utopia.booyaka.com>
+References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-2-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-3-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-4-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-5-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-6-git-send-email-santosh.shilimkar@ti.com>
+	<1266483554-15044-7-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1002181014470.24812@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C417FA18@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Dear Wan
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, February 18, 2010 10:53 PM
+> To: Shilimkar, Santosh
+> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Cousson,
+> Benoit
+> Subject: Re: [PATCH 7/9] omap4: Add auto-generated irq and dma headers
+> 
+> Hello Santosh,
+> 
+> thanks for sending these in.  One minor comment:
+> 
+> On Thu, 18 Feb 2010, Santosh Shilimkar wrote:
+> 
+> > These files are generated along with the HWMOD and will eventually be
+> > in the existing header files as soon as all drivers will be migrate to
+> > omap_hwmod / omap_device.
+> >
+> > The dma-44xx.h file should be in 'arch/arm/mach-omap2/include/mach/',
+> > but this would need dma.h header also present in the mach directory to
+> > make local include possible, like what is done for irq.h. Then the
+> > script is needed to modify the drivers to include 'mach/dma.h' instead
+> > of 'plat/dma.h'. This would be a bigger change and hence left out for now
+> 
+> I think I originally wrote the DMA generator script, so please add a Nokia
+> copyright and put my name in there also.  After that point, it has my ack.
+>
+Updated patch attached with Paul's contributions added to the dma-44xx.h file.
 
-happy new year
+Regards,
+Santosh
 
-? 2010?2?19? ??11:39?Wan ZongShun <mcuos.com@gmail.com> ???
-> Okay for this patch, and all patches submitted by you have sent to
-> Russell's Patch system?
-
-Not yet. Because I do not know the how to.
-And would you like tell me the method?
-
-> 2010/2/10 Wan ZongShun <mcuos.com@gmail.com>:
->> ? 2010?2?10? ??10:31?Qiang Wang <rurality.linux@gmail.com> ???
->>> hello, Mr Russell
->>>
->>> please check and ack this patch.
->>>
->>> thank you very much.
->>>
->>
->> Hi guy, don't have anxiety,you have to await me to check this issue.
->>
->>> best regards
->>> wangqiang
->>>
->>> 2010/2/2 Qiang Wang <rurality.linux@gmail.com>:
->>>> hi, Dear Wan
->>>>
->>>> ? This patch adds the gpio registers virtual memory map.
->>>> ? Without it, the gpio access will cause the "Data Abort" due to no
->>>> virtual memory assign to it.
->>>>
->>>> Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
->>>> Cc: Wang Zongshun <mcuos.com@gmail.com>
->>>> ---
->>>> ?arch/arm/mach-w90x900/cpu.c | ? ?1 +
->>>> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
->>>> index 20dc0c9..7a79de0 100644
->>>> --- a/arch/arm/mach-w90x900/cpu.c
->>>> +++ b/arch/arm/mach-w90x900/cpu.c
->>>> @@ -45,6 +45,7 @@ static struct map_desc nuc900_iodesc[] __initdata = {
->>>> ? ? ? ?IODESC_ENT(UART),
->>>> ? ? ? ?IODESC_ENT(TIMER),
->>>> ? ? ? ?IODESC_ENT(EBI),
->>>> + ? ? ? IODESC_ENT(GPIO),
->>>> ?};
->>>>
->>>> ?/* Initial clock declarations. */
->>>> --
->>>> 1.6.4
->>>>
->>>
->>> --
->>> ????"NUC900 Linux BSP????".
->>> NUC900 Linux????????????
->>> NUC900 at googlegroups.com
->>> ?????????
->>> NUC900+unsubscribe at googlegroups.com
->>> ??????????
->>> https://groups.google.com/group/NUC900?hl=zh-CN
->>>
->>
->>
->>
->> --
->> *linux-arm-kernel mailing list
->> mail addr:linux-arm-kernel at lists.infradead.org
->> you can subscribe by:
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> * linux-arm-NUC900 mailing list
->> mail addr:NUC900 at googlegroups.com
->> main web: https://groups.google.com/group/NUC900
->> you can subscribe it by sending me mail:
->> mcuos.com at gmail.com
->>
->
->
->
-> --
-> *linux-arm-kernel mailing list
-> mail addr:linux-arm-kernel at lists.infradead.org
-> you can subscribe by:
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> * linux-arm-NUC900 mailing list
-> mail addr:NUC900 at googlegroups.com
-> main web: https://groups.google.com/group/NUC900
-> you can subscribe it by sending me mail:
-> mcuos.com at gmail.com
->
-> --
-> ????"NUC900 Linux BSP????".
-> NUC900 Linux????????????
-> NUC900 at googlegroups.com
-> ?????????
-> NUC900+unsubscribe at googlegroups.com
-> ??????????
-> https://groups.google.com/group/NUC900?hl=zh-CN
->
+ 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0007-omap4-Add-auto-generated-irq-and-dma-headers.patch
+Type: application/octet-stream
+Size: 15351 bytes
+Desc: 0007-omap4-Add-auto-generated-irq-and-dma-headers.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100219/a5350f83/attachment.obj>
