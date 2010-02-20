@@ -1,29 +1,63 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Sat, 20 Feb 2010 17:41:00 +0100
-Subject: [PATCH  0/3] MXC PCMCIA Support
-In-Reply-To: <20100220155150.GA3591@n2100.arm.linux.org.uk>
-References: <20100220153200.19692.70098.stgit@srv002.fuzzey.net>
-	<20100220155150.GA3591@n2100.arm.linux.org.uk>
-Message-ID: <4B80109C.5080005@gmail.com>
+From: wellsk40@gmail.com (Kevin Wells)
+Date: Sat, 20 Feb 2010 11:17:17 -0800
+Subject: [PATCH 01/13] ARM: LPC32XX: Initial architecture header files
+In-Reply-To: <a08234131002201112x66a595c4j235bf1a31aef4f92@mail.gmail.com>
+References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
+	<1266621969-28847-2-git-send-email-wellsk40@gmail.com>
+	<20100220161248.GA31424@pengutronix.de>
+	<a08234131002201112x66a595c4j235bf1a31aef4f92@mail.gmail.com>
+Message-ID: <a08234131002201117t5bbd350ybaf14613cef0c54f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> I do wonder whether, as you have windows, you should be using the soc
-> support - the soc support is based interfacing hardware which does not
-> have windows into the generic infrastructure which assumes the presence
-> of windows.
->   
-Hi Russell,
-Yes I understand what you mean.
+2010/2/20 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> Hey Kevin,
+>
+> > +/*
+> > + * Note!
+> > + * Muxed GP pins need to be setup to the GP state in the board level
+> > + * code prior to using this driver.
+> This is done by the imx machines, too, and I wonder if it's worth to try
+> to get rid of that or at least let the gpio_direction_... functions fail
+> if the pin isn't muxed as gpio. ?Thoughts?
+>
+HI Uwe,
 
-I asked on -pcmcia about the approach back in June 2009:
-http://marc.info/?l=linux-pcmcia&m=124805223926065&w=2
-but didn't get a reply :(
+In the current function of the driver, the assumption is that if an out pin
+is used, it has already been muxed correctly, so requesting an output
+for a pin not muxed as a GPI/O will work fine and even setting it's pin
+level will work, but the level won't appear on the external pin. If
+something decides to switch the mux after that state is programmed,
+then the currently programmed output level will show up on that pin.
 
-OTOH soc_common provides some other useful stuff like polling thread,
-common interrupt handler core, common debug etc.
+For state muxing, I would prefer to not have the GPIO driver change an
+existing mux state to make a GPIO work. I don't return an error now
+when a output state is used and is not muxed for an output state. But
+its painless to add this.
 
-Cheers,
+GPI pins and GPIO pins configured as inputs always work regardless
+of the muxed pin state and would never need to have a fail check, its
+basically a raw pin state read.
 
-Martin
+> I didn't check the alternative functionalities for the gpios on lpc32xx,
+> but what happens if any gpio is requested and the direction configured?
+> Does it interfer with system functions? ?(E.g. if a pin is used in a
+> dedicated say i2c function, does it make the i2c driver non-functional
+> if I do gpio_direction_output(i2cpin, 1)?)
+>
+
+Setting a GPIO direction or output state will not effect a peripheral pin
+(on this part) when muxed for the peripheral. (ie, setting a GPIO to output
+and switching it to low when its shared with a UART pin and the mux is
+setup for UART).
+
+thanks,
+Kevin
+
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
