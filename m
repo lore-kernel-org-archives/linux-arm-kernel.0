@@ -1,26 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 20 Feb 2010 15:51:50 +0000
-Subject: [PATCH  0/3] MXC PCMCIA Support
-In-Reply-To: <20100220153200.19692.70098.stgit@srv002.fuzzey.net>
-References: <20100220153200.19692.70098.stgit@srv002.fuzzey.net>
-Message-ID: <20100220155150.GA3591@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 20 Feb 2010 17:12:48 +0100
+Subject: [PATCH 01/13] ARM: LPC32XX: Initial architecture header files
+In-Reply-To: <1266621969-28847-2-git-send-email-wellsk40@gmail.com>
+References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
+	<1266621969-28847-2-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100220161248.GA31424@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2010 at 04:32:01PM +0100, Martin Fuzzey wrote:
-> This patch series adds support for the MXC PCMCIA / CF controller.
-> 
-> It has been tested on MX21 (with CF card + ide-cs as well as a
-> broadcom based wificard using b43 driver)
-> 
-> It has been compile only tested for MX27, MX31 as I don't have
-> this hardware but the code is based on Freescale's MX31.
-> 
-> Changes since RFC:
->    * Split arch specifc changes from driver
->    * Update to 2.6.33-rc8 [soc-common is now a standalone module]
+Hey Kevin,
 
-I do wonder whether, as you have windows, you should be using the soc
-support - the soc support is based interfacing hardware which does not
-have windows into the generic infrastructure which assumes the presence
-of windows.
+> +/*
+> + * Note!
+> + * Muxed GP pins need to be setup to the GP state in the board level
+> + * code prior to using this driver.
+This is done by the imx machines, too, and I wonder if it's worth to try
+to get rid of that or at least let the gpio_direction_... functions fail
+if the pin isn't muxed as gpio.  Thoughts?
+
+I didn't check the alternative functionalities for the gpios on lpc32xx,
+but what happens if any gpio is requested and the direction configured?
+Does it interfer with system functions?  (E.g. if a pin is used in a
+dedicated say i2c function, does it make the i2c driver non-functional
+if I do gpio_direction_output(i2cpin, 1)?)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
