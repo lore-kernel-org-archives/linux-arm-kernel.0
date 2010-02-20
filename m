@@ -1,31 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Feb 2010 12:31:35 +0000
-Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <1266927716.3123.57.camel@e102109-lin.cambridge.arm.com>
-References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
-	<20100223111036.GA10501@n2100.arm.linux.org.uk>
-	<1266927716.3123.57.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100223123135.GD10501@n2100.arm.linux.org.uk>
+From: wellsk40@gmail.com (Kevin Wells)
+Date: Sat, 20 Feb 2010 11:14:21 -0800
+Subject: [PATCH 01/13] ARM: LPC32XX: Initial architecture header files
+In-Reply-To: <a08234131002201112x66a595c4j235bf1a31aef4f92@mail.gmail.com>
+References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
+	<1266621969-28847-2-git-send-email-wellsk40@gmail.com>
+	<20100220161248.GA31424@pengutronix.de>
+	<a08234131002201112x66a595c4j235bf1a31aef4f92@mail.gmail.com>
+Message-ID: <a08234131002201114j75674a2ep5e301aacc09dc064@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2010 at 12:21:56PM +0000, Catalin Marinas wrote:
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 058e7e9..0db8b06 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -138,10 +138,12 @@ extern unsigned int user_debug;
->  #define dmb() __asm__ __volatile__ ("" : : : "memory")
->  #endif
->  
-> -#if __LINUX_ARM_ARCH__ >= 7 || defined(CONFIG_SMP)
-> -#define mb()		dmb()
-> +#ifdef CONFIG_ARCH_HAS_BARRIERS
-> +#include <mach/barriers.h>
-> +#elif __LINUX_ARM_ARCH__ >= 5
-> +#define mb()		dsb()
->  #define rmb()		dmb()
-> -#define wmb()		dmb()
-> +#define wmb()		dsb()
+2010/2/20 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Why do we need these to be anything more than compiler barriers on PXA?
+Hey Kevin,
+>
+> > +/*
+> > + * Note!
+> > + * Muxed GP pins need to be setup to the GP state in the board level
+> > + * code prior to using this driver.
+> This is done by the imx machines, too, and I wonder if it's worth to try
+> to get rid of that or at least let the gpio_direction_... functions fail
+> if the pin isn't muxed as gpio.  Thoughts?
+>
+> HI Uwe,
+
+In the current function of the driver, the assumption is that if an out pin
+is used, it has already been muxed correctly, so requesting an output
+for a pin not muxed as a GPI/O will work fine and even setting it's pin
+level will work, but the level won't appear on the external pin. If
+something decides to switch the mux after that state is programmed,
+then the currently programmed output level will show up on that pin.
+
+For state muxing, I would prefer to not have the GPIO driver change an
+existing mux state to make a GPIO work. I don't return an error now
+when a output state is used and is not muxed for an output state. But
+its painless to add this.
+
+GPI pins and GPIO pins configured as inputs always work regardless
+of the muxed pin state and would never need to have a fail check, its
+basically a raw pin state read.
+
+ I didn't check the alternative functionalities for the gpios on lpc32xx,
+> but what happens if any gpio is requested and the direction configured?
+> Does it interfer with system functions?  (E.g. if a pin is used in a
+> dedicated say i2c function, does it make the i2c driver non-functional
+> if I do gpio_direction_output(i2cpin, 1)?)
+>
+>
+Setting a GPIO direction or output state will not effect a peripheral pin
+(on this part) when muxed for the peripheral. (ie, setting a GPIO to output
+and switching it to low when its shared with a UART pin and the mux is
+setup for UART).
+
+thanks,
+Kevin
+
+Best regards
+Uwe
+
+--
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100220/24c3bd02/attachment-0001.htm>
