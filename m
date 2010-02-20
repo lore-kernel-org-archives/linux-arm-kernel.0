@@ -1,25 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 20 Feb 2010 16:34:52 +0000
-Subject: [PATCH 06/13] ARM: LPC32XX: Serial support code
-In-Reply-To: <1266621969-28847-7-git-send-email-wellsk40@gmail.com>
-References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-	<1266621969-28847-7-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100220163452.GB12409@n2100.arm.linux.org.uk>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Sat, 20 Feb 2010 17:41:00 +0100
+Subject: [PATCH  0/3] MXC PCMCIA Support
+In-Reply-To: <20100220155150.GA3591@n2100.arm.linux.org.uk>
+References: <20100220153200.19692.70098.stgit@srv002.fuzzey.net>
+	<20100220155150.GA3591@n2100.arm.linux.org.uk>
+Message-ID: <4B80109C.5080005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2010 at 03:26:02PM -0800, wellsk40 at gmail.com wrote:
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/serial.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/serial_reg.h>
-> +#include <linux/serial_8250.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/platform.h>
-> +#include <mach/io.h>
+Russell King - ARM Linux wrote:
+> I do wonder whether, as you have windows, you should be using the soc
+> support - the soc support is based interfacing hardware which does not
+> have windows into the generic infrastructure which assumes the presence
+> of windows.
+>   
+Hi Russell,
+Yes I understand what you mean.
 
-mach/io.h is not required.
+I asked on -pcmcia about the approach back in June 2009:
+http://marc.info/?l=linux-pcmcia&m=124805223926065&w=2
+but didn't get a reply :(
+
+OTOH soc_common provides some other useful stuff like polling thread,
+common interrupt handler core, common debug etc.
+
+Cheers,
+
+Martin
