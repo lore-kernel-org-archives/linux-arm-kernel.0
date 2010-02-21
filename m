@@ -1,28 +1,22 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 22 Feb 2010 00:58:48 +0200
-Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
-In-Reply-To: <20100221225125.GA18604@core.coreip.homeip.net>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Sun, 21 Feb 2010 23:12:10 +0000
+Subject: [PATCH 1/4] Add resources description for s3c24xx ts driver
+In-Reply-To: <1266510750-9846-2-git-send-email-anarsoul@gmail.com>
 References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
-	<201002212344.39633.anarsoul@gmail.com>
-	<20100221225125.GA18604@core.coreip.homeip.net>
-Message-ID: <201002220058.52583.anarsoul@gmail.com>
+	<1266510750-9846-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100221231210.GB30679@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 22 ??????? 2010 00:51:25 ????? Dmitry Torokhov ???????:
-> We do put it in WAIT4INT mode rigtht there though so it looks like we
-> just need to move that call (well the original doing WAIT4INT | INT_UP)
-> before we check for pen state.
+On Thu, Feb 18, 2010 at 06:32:27PM +0200, Vasily Khoruzhick wrote:
+> Without resources description driver fails during initialization.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-And we need to disable WAIT4INT mode in s3c24xx_ts_schedule_read (actually 
-according to spec we need to disable it right after we got interrupt).
+ok, added to next-s3c24xx-ts
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100222/23ce84ed/attachment.sig>
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
