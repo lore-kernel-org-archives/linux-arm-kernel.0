@@ -1,28 +1,23 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 21 Feb 2010 14:51:25 -0800
-Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
-In-Reply-To: <201002212344.39633.anarsoul@gmail.com>
-References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
-	<201002211210.12306.anarsoul@gmail.com>
-	<2accc2ff1002210627i25a76293x398b2806a6dbb200@mail.gmail.com>
-	<201002212344.39633.anarsoul@gmail.com>
-Message-ID: <20100221225125.GA18604@core.coreip.homeip.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 21 Feb 2010 22:57:47 +0000
+Subject: [PATCH] Documentation: remove obsolete arm/Sharp-LH/LPD7A400 file
+In-Reply-To: <201002181547.41043.bzolnier@gmail.com>
+References: <201002181547.41043.bzolnier@gmail.com>
+Message-ID: <20100221225747.GA5856@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 21, 2010 at 11:44:34PM +0200, Vasily Khoruzhick wrote:
-> ? ????????? ?? 21 ??????? 2010 16:27:13 ????? Nelson Castillo ???????:
-> > I remember I got bit by this also when I scheduled more conversions
-> > without a timer; pen-up event would not get noticed. I didn't check
-> > the specs to see if there was a way to configure the HW to do
-> > otherwise.
+On Thu, Feb 18, 2010 at 03:47:40PM +0100, Bartlomiej Zolnierkiewicz wrote:
 > 
-> UPDOWN bits in ADCDAT0 and ADCDAT1 are valid only in WAIT4INT mode, it's wrong 
-> to check them in select callback because ADC is not in WAIT4INT mode.
+> It has been obsoleted by Documentation/arm/Sharp-LH/LPD7A40X
+> and can be safely removed.
 
-We do put it in WAIT4INT mode rigtht there though so it looks like we
-just need to move that call (well the original doing WAIT4INT | INT_UP)
-before we check for pen state.
+Is anyone actually using any of the Sharp LH code?  Should the entire
+lot be removed from the kernel?
 
--- 
-Dmitry
+AFAIK it's completely unmaintained and hasn't received any meaningful
+updates for almost four years now, apart from random untested fixes to
+make it cope with changes which have impacted it.
+
+If no one's actually using it, it's nothing more than a maintainence
+burden.
