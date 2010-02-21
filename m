@@ -1,23 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Feb 2010 22:57:47 +0000
-Subject: [PATCH] Documentation: remove obsolete arm/Sharp-LH/LPD7A400 file
-In-Reply-To: <201002181547.41043.bzolnier@gmail.com>
-References: <201002181547.41043.bzolnier@gmail.com>
-Message-ID: <20100221225747.GA5856@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 22 Feb 2010 00:58:48 +0200
+Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
+In-Reply-To: <20100221225125.GA18604@core.coreip.homeip.net>
+References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
+	<201002212344.39633.anarsoul@gmail.com>
+	<20100221225125.GA18604@core.coreip.homeip.net>
+Message-ID: <201002220058.52583.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2010 at 03:47:40PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> 
-> It has been obsoleted by Documentation/arm/Sharp-LH/LPD7A40X
-> and can be safely removed.
+? ????????? ?? 22 ??????? 2010 00:51:25 ????? Dmitry Torokhov ???????:
+> We do put it in WAIT4INT mode rigtht there though so it looks like we
+> just need to move that call (well the original doing WAIT4INT | INT_UP)
+> before we check for pen state.
 
-Is anyone actually using any of the Sharp LH code?  Should the entire
-lot be removed from the kernel?
+And we need to disable WAIT4INT mode in s3c24xx_ts_schedule_read (actually 
+according to spec we need to disable it right after we got interrupt).
 
-AFAIK it's completely unmaintained and hasn't received any meaningful
-updates for almost four years now, apart from random untested fixes to
-make it cope with changes which have impacted it.
-
-If no one's actually using it, it's nothing more than a maintainence
-burden.
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100222/23ce84ed/attachment.sig>
