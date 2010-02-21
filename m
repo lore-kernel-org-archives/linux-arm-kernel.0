@@ -1,32 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Feb 2010 21:07:40 +0000
-Subject: [PATCH 3/7] ARM: U300: set f_max to 24 MHz for MMCI
-In-Reply-To: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-References: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100221210740.GA3528@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 21 Feb 2010 23:44:34 +0200
+Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
+In-Reply-To: <2accc2ff1002210627i25a76293x398b2806a6dbb200@mail.gmail.com>
+References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
+	<201002211210.12306.anarsoul@gmail.com>
+	<2accc2ff1002210627i25a76293x398b2806a6dbb200@mail.gmail.com>
+Message-ID: <201002212344.39633.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2010 at 01:05:31AM +0100, Linus Walleij wrote:
-> This employs the frequency setting mechanism introduced to the
-> MMCI to specify that this system can actually be clocked at 24 MHz.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
->  arch/arm/mach-u300/mmc.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-> index 109f5a6..c1cb977 100644
-> --- a/arch/arm/mach-u300/mmc.c
-> +++ b/arch/arm/mach-u300/mmc.c
-> @@ -101,6 +101,7 @@ int __devinit mmc_init(struct amba_device *adev)
->  	 * we have a regulator we can control instead.
->  	 */
->  	/* Nominally 2.85V on our platform */
-> +	mmci_card->mmc0_plat_data.f_max = 24000000;
+? ????????? ?? 21 ??????? 2010 16:27:13 ????? Nelson Castillo ???????:
+> I remember I got bit by this also when I scheduled more conversions
+> without a timer; pen-up event would not get noticed. I didn't check
+> the specs to see if there was a way to configure the HW to do
+> otherwise.
 
-I bet setting this without DMA support leads to overruns/underruns on
-the interface.  That's why MMCI has a low default - to ensure that PIO
-mode can keep up with the data transfers; the low maximum isn't because
-of something to do with ARM platforms.
+UPDOWN bits in ADCDAT0 and ADCDAT1 are valid only in WAIT4INT mode, it's wrong 
+to check them in select callback because ADC is not in WAIT4INT mode.
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100221/fb2d0a61/attachment.sig>
