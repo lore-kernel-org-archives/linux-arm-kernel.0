@@ -1,85 +1,67 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 21 Feb 2010 23:14:03 -0800
-Subject: [PATCH 2/4] s3c24xx_ts: report touch only when stylus is down
-In-Reply-To: <201002220058.52583.anarsoul@gmail.com>
-References: <1266510750-9846-1-git-send-email-anarsoul@gmail.com>
-	<201002212344.39633.anarsoul@gmail.com>
-	<20100221225125.GA18604@core.coreip.homeip.net>
-	<201002220058.52583.anarsoul@gmail.com>
-Message-ID: <20100222071403.GD2095@core.coreip.homeip.net>
+From: biswa.nayak@wipro.com (biswa.nayak at wipro.com)
+Date: Mon, 22 Feb 2010 14:06:17 +0530
+Subject: Interrupt registering for PIO problem in ATMEL chips
+Message-ID: <17E4CABDDEE0BC4A9F40814378DEC0CB21EB65@BLR-EC-MBX03.wipro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2010 at 12:58:48AM +0200, Vasily Khoruzhick wrote:
-> ? ????????? ?? 22 ??????? 2010 00:51:25 ????? Dmitry Torokhov ???????:
-> > We do put it in WAIT4INT mode rigtht there though so it looks like we
-> > just need to move that call (well the original doing WAIT4INT | INT_UP)
-> > before we check for pen state.
-> 
-> And we need to disable WAIT4INT mode in s3c24xx_ts_schedule_read (actually 
-> according to spec we need to disable it right after we got interrupt).
-> 
+Hello List,
+I have a strange issue with dealing with interrupts in a ATMEL chip as
+described below. 
 
-So is the below sufficient to make it work? Even if it works aI think we
-need to add socke locking around scheduling reads from irq and
-callback...
+As per the documentations, the peripherals of my board (custom one based
+on AT91SAM9260) are connected to the Advanced Interrupt Controller (AIC)
+of the ATMEL chip via the Parallel I/O (PIO) chips. 
+Also, PIOs can not distinguish between inputs and interrupts, as they
+treat everything as inputs. 
 
--- 
-Dmitry
+Now, my problem is I am writing this keypad driver, which is connected
+to PIOA. 
+I am able to read the key press event if I keep reading the PIO lines in
+a loop. 
 
+Now, I need to read the key press events in an interrupt handler (but
+obvious) How exactly can I install an interrupt handler? 
 
-Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+The PIOA is connected to pin 2 of AIC, but then I can not install the
+handler for pin2, It fails saying error -22 ( resource not available).
+I also don't know, what I can do even if I get to install the handler
+for PIO. 
 
----
+Can someone guide me in this? Or atleast point to me some driver codes
+which handles such situations. 
 
- drivers/input/touchscreen/s3c2410_ts.c |   22 ++++++++++++++++++----
- 1 files changed, 18 insertions(+), 4 deletions(-)
+I would really appreciate some help on this, as I have hit a roadblock
+here. 
+Please, let me know if you need more info on this.
 
+Thanks
+Biswa
 
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-index 60f18c2..b389648 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -152,9 +152,12 @@ static void s3c24xx_ts_schedule_read(void)
-  */
- static irqreturn_t s3c24xx_ts_stylus_irq(int irq, void *dev_id)
- {
--	if (s3c24xx_ts_check_pen_down())
-+	if (s3c24xx_ts_check_pen_down()) {
-+		/* Reset WAIT4INT state */
-+		writel(0, ts.io + S3C2410_ADCTSC);
-+
- 		s3c24xx_ts_schedule_read();
--	else
-+	} else
- 		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
+Branch of Wipro Limited,
+Place of Commercial Register of the Branch: Kiel
+Commercial Registration Number of the branch : HRB 7178 KI
+VAT registration number - German Tax No:19/294/30609
+Company name as Registered in Commercial Register : Wipro Limited (India) Zweigniederlassung Deutschland
+Legal form of the Company : Domestic Branch of the Foreign Limited liability Company. 
+Company seat: Registered office at Doddakannelli, Sarjapur Road, Bangalore, India : 560 035.
+Tel : 91-80-28440011, Fax : 91-80-28440051, website: www.wipro.com
+Managing Director : Mr Azim H Premji
+
  
- 	return IRQ_HANDLED;
-@@ -211,14 +214,25 @@ static void s3c24xx_ts_select(struct s3c_adc_client *client, unsigned select)
- 		/*
- 		 * Conversion is complete, we have desired number of samples.
- 		 */
-+
-+		/*
-+		 * We need to be in WAIT4INT mode to successfully check for
-+		 * pen state.
-+		 */
-+		writel(WAIT4INT | INT_UP, ts.io + S3C2410_ADCTSC);
-+
- 		pen_is_down = s3c24xx_ts_check_pen_down();
- 
- 		s3c24xx_ts_report_state(pen_is_down);
- 
--		if (pen_is_down)
-+		if (pen_is_down) {
-+			/* Reset WAIT4INT state */
-+			writel(0, ts.io + S3C2410_ADCTSC);
-+
- 			s3c24xx_ts_schedule_read();
--		else
-+		} else {
- 			writel(WAIT4INT | INT_DOWN, ts.io + S3C2410_ADCTSC);
-+		}
- 	}
- }
- 
+
+Zweigniederlassung der Wipro Limited
+Registergericht: Kiel
+Handelsregisternummer: HRB 7178 KI
+Steuernummer: 19/294/30609
+Firma laut Handelsregistereintrag: Wipro Limited (India) Zweigniederlassung Deutschland
+Rechtsform der Gesellschaft: inl?ndische Zweigniederlassung einer Aktiengesellschaft ausl?ndischen Rechts
+Sitz der Gesellschaft: Doddakannelli, Sarjapur Road, Bangalore, Indien 560 035
+Tel. +91 80 28440011, Fax: +91 80 28440051, website: www.wipro.com
+Vorstandsvorsitzender: Azim H Premji
+
+The information contained in this electronic message and any attachments to this message are intended for the exclusive use of the addressee(s) and may contain proprietary, confidential or privileged information. If you are not the intended recipient, you should not disseminate, distribute or copy this e-mail. Please notify the sender immediately and destroy all copies of this message and any attachments. </p>
+
+WARNING: Computer viruses can be transmitted via email. The recipient should check this email and any attachments for the presence of viruses. The company accepts no liability for any damage caused by any virus transmitted by this email. 
+
+www.wipro.com
