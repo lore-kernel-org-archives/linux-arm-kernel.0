@@ -1,51 +1,77 @@
-From: manuel.stahl@iis.fraunhofer.de (Manuel Stahl)
-Date: Mon, 22 Feb 2010 10:56:47 +0100
-Subject: atmel-mci / at91_mci
-In-Reply-To: <4B797349.4030902@who-ing.de>
-References: <4B6A8C0F.7080907@iis.fraunhofer.de>	<201002081413.19984.fg@emlix.com>
-	<4B71841E.7030108@iis.fraunhofer.de> <4B797349.4030902@who-ing.de>
-Message-ID: <4B8254DF.8090602@iis.fraunhofer.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Feb 2010 11:58:09 +0100
+Subject: pull request for .34
+In-Reply-To: <20100218110135.GB8659@pengutronix.de>
+References: <20100218101538.GA8659@pengutronix.de>
+	<20100218102757.GA20243@n2100.arm.linux.org.uk>
+	<20100218110135.GB8659@pengutronix.de>
+Message-ID: <20100222105809.GA14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.02.2010 17:16, schrieb Sebastian Heutling:
-> On 02/09/10 16:49, Manuel Stahl wrote:
->> Unfortunately this is not the problem. The SD-card works fine with the
->> old at91_mci driver, but not with the newer atmel-mci. The problem is
->> that I need both slots at the same time, so at91_mci is no option for me.
->>
->> In the second slot there is a WLAN card which gets timeouts after
->> successful firmware load with at91_mci but does not work with atmel-mci.
->>
->> I have exactly the same setup with an AVR32 processor, there both
->> devices work. With the atmel-mci driver obiously.
->
-> Could that be related to the "SLOT_B" bit in the SDCR?
-> I had to set it in U-Boot to get the second slot working properly.
-> My guess is that on AT91 (we use SAM9G20) every access needs to set or
-> clear that bit depending on which slot is addressed.
+Hello Russell,
 
-No there was a bug in the atmel_mci driver for 2.6.27 related to SDCR. 
-With at91_mci you can only use one slot at a time, which is configured 
-in the board setup code. The at91_mci driver communicates with the right 
-slot, it can even download the firmware. Until then all SDIO traffic is 
-OK, after the download there are timeouts. Maybe the restart of the 
-device with the new firmware is not working properly.
+On Thu, Feb 18, 2010 at 12:01:35PM +0100, Uwe Kleine-K?nig wrote:
+> > What also isn't helpful is bundling it up with
+> [...]
+> >                                                the load address change
+> > stuff which I'm not pulling for .34.
+> That's the first objection I hear (or read) about that.  I'm not sure
+> what is meant by "load address change stuff", I assume it's the runtime
+> physoffset.  I look forward to more concrete feed-back.
+should I repost?
 
-Regards,
+I hope I didn't upset you in any way, if so it wasn't intended and I ask
+you to please point out the problem that I can sort that out.
+Otherwise I just assume it's lack of time. 
+
+> >       arm/zImage: fix comments for cache_on, cache_off and cache_clean_flush
+> >       arm/zImage: some comments for __armv3_mpu_cache_on
+> >       arm/zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+> >       arm/zImage: annotate debug functions about corrupted registers
+> >       arm/zImage: don't define unused symbol initrd_phys
+> >       arm: deprecate support for old way to pass kernel parameters
+> >       arm/zImage: don't hard code the stack size twice
+> >       arm/uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+> >       arm: Allow PHYS_OFFSET to be runtime determined
+> >       arm: remove bit-rotten STANDALONE_DEBUG for decompressor
+> >       arm/ixp2000: fix type of ixp2000_timer_interrupt
+> Is it OK for you to take all but the two concering RUNTIME_PHYSOFFSET?
+As I havn't got a reply up to now, I just retry without those:
+
+The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+  Linus Torvalds (1):
+        Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+
+Uwe Kleine-K?nig (8):
+      arm/zImage: fix comments for cache_on, cache_off and cache_clean_flush
+      arm/zImage: some comments for __armv3_mpu_cache_on
+      arm/zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+      arm/zImage: annotate debug functions about corrupted registers
+      arm/zImage: don't define unused symbol initrd_phys
+      arm: deprecate support for old way to pass kernel parameters
+      arm/zImage: don't hard code the stack size twice
+      arm: remove bit-rotten STANDALONE_DEBUG for decompressor
+
+ arch/arm/Kconfig                        |    6 ++++++
+ arch/arm/boot/compressed/Makefile       |    9 +++------
+ arch/arm/boot/compressed/Makefile.debug |   23 -----------------------
+ arch/arm/boot/compressed/head.S         |   26 ++++++++++++++++++--------
+ arch/arm/boot/compressed/misc.c         |   27 ---------------------------
+ arch/arm/kernel/Makefile                |    4 +++-
+ arch/arm/kernel/compat.c                |    7 -------
+ arch/arm/kernel/compat.h                |    2 --
+ arch/arm/kernel/setup.c                 |   11 +++++++++++
+ 9 files changed, 41 insertions(+), 74 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/Makefile.debug
+
+Thanks
+Uwe
+
 -- 
-Dipl.-Inf. Manuel Stahl
-Fraunhofer-Institut f?r Integrierte Schaltungen IIS
-- Leistungsoptimierte Systeme -
-Nordostpark 93                Telefon  +49 (0)911/58061-6419
-90411 N?rnberg                Fax      +49 (0)911/58061-6398
-http://www.iis.fraunhofer.de  manuel.stahl at iis.fraunhofer.de
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 6148 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100222/1a8980b6/attachment.p7s>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
