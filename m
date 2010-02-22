@@ -1,31 +1,22 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 22 Feb 2010 23:36:24 +0530
-Subject: [PATCH 02/10] ARM: ftrace: document mcount formats
-In-Reply-To: <20100213203748.GC16528@pengutronix.de>
+Date: Mon, 22 Feb 2010 23:46:57 +0530
+Subject: [PATCH 00/10] ARM: ftrace: cleanups, Thumb-2, and dynamic ftrace
+In-Reply-To: <1266090518-31120-1-git-send-email-rabin@rab.in>
 References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-3-git-send-email-rabin@rab.in>
-	<20100213203748.GC16528@pengutronix.de>
-Message-ID: <20100222180624.GA4061@debian>
+Message-ID: <20100222181657.GA4102@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2010 at 09:37:48PM +0100, Uwe Kleine-K?nig wrote:
-> On Sun, Feb 14, 2010 at 01:18:30AM +0530, Rabin Vincent wrote:
-> > + * With both the mcount types, we need to restore the original lr before
-> > + * returning.  In the __gnu_mcount_nc, version we're allowed to clobber ip.
-> > + * No other registers should be clobbered.
-> > + */
-> Very nice.
-> 
-> Maybe make the last two sentences:
-> 
-> In the __gnu_mcount_nc case the ip register is clobbered which is OK as
-> the calling convention for ARM allow clobbering this value for
-> subroutines and it doesn't contain parameters.
+Hi Steven / Frederic / Ingo,
 
-Won't quoting calling conventions here be misleading?  The mcounts don't
-following normal convention for the other bits (we can't clobber even
-the registers that are normally caller-saved, we need to restore lr,
-etc.)
+On Sun, Feb 14, 2010 at 01:18:28AM +0530, Rabin Vincent wrote:
+> This series contains fixes and improvements to the ARM ftrace support.  It adds
+> Thumb-2 support and re-implements the dynamic ftrace support.
+> 
+> "ftrace: allow building without frame pointers" and "ftrace: pass KBUILD_CFLAGS
+> to record_mcount.pl" are non-ARM-specific ftrace patches which are required to
+> support the ARM functionality.
+
+Ping.  Any comments on this?
 
 Rabin
