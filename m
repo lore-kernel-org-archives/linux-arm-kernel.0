@@ -1,106 +1,31 @@
-From: niam.niam@gmail.com (niam)
-Date: Mon, 22 Feb 2010 19:40:43 +0200
-Subject: [PATCH] jffs2: fix memory leak if the sector was successfully
-	erased
-In-Reply-To: <4B82BEC5.2040306@gandalf.sssup.it>
-References: <a9e22dff1002220826p63209a33n27e84ea10e191a19@mail.gmail.com>
-	<20100222163543.GL28972@buzzloop.caiaq.de>
-	<4B82BEC5.2040306@gandalf.sssup.it>
-Message-ID: <a9e22dff1002220940v529faaa3j92ee0fdf7edf8d38@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 22 Feb 2010 23:36:24 +0530
+Subject: [PATCH 02/10] ARM: ftrace: document mcount formats
+In-Reply-To: <20100213203748.GC16528@pengutronix.de>
+References: <1266090518-31120-1-git-send-email-rabin@rab.in>
+	<1266090518-31120-3-git-send-email-rabin@rab.in>
+	<20100213203748.GC16528@pengutronix.de>
+Message-ID: <20100222180624.GA4061@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, indeed, you are right!
+On Sat, Feb 13, 2010 at 09:37:48PM +0100, Uwe Kleine-K?nig wrote:
+> On Sun, Feb 14, 2010 at 01:18:30AM +0530, Rabin Vincent wrote:
+> > + * With both the mcount types, we need to restore the original lr before
+> > + * returning.  In the __gnu_mcount_nc, version we're allowed to clobber ip.
+> > + * No other registers should be clobbered.
+> > + */
+> Very nice.
+> 
+> Maybe make the last two sentences:
+> 
+> In the __gnu_mcount_nc case the ip register is clobbered which is OK as
+> the calling convention for ARM allow clobbering this value for
+> subroutines and it doesn't contain parameters.
 
-Thank you Michael!
+Won't quoting calling conventions here be misleading?  The mcounts don't
+following normal convention for the other bits (we can't clobber even
+the registers that are normally caller-saved, we need to restore lr,
+etc.)
 
-Thank you to everybody and I'm sorry for doing that much noise here.
-
-Next time I will try to send more correct patches.
-
-However freeing memory in the callback is not obvious. Isn't better to
-do this out of it?
-
--- Dima
-
-On Mon, Feb 22, 2010 at 7:28 PM, Michael Trimarchi
-<trimarchi@gandalf.sssup.it> wrote:
-> Hi,
->
-> Daniel Mack wrote:
->>
->> On Mon, Feb 22, 2010 at 06:26:22PM +0200, Ni at m wrote:
->>
->>>
->>> Memory allocated for erase instruction is not freed if the sector was
->>> successfully erased.
->>>
->>> Signed-off-by: Dmytro Milinevskyy <niam.niam@gmail.com>
->>>
->>
->> Can you forward that to the right people please? Call
->> scripts/get_maintainer.pl to get a list of maintainers.
->>
->> Daniel
->>
->>
->>
->>
->>>
->>> ---
->>> ?fs/jffs2/erase.c | ? ?4 +++-
->>> ?1 files changed, 3 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/fs/jffs2/erase.c b/fs/jffs2/erase.c
->>> index b47679b..c0a5604 100644
->>> --- a/fs/jffs2/erase.c
->>> +++ b/fs/jffs2/erase.c
->>> @@ -74,8 +74,10 @@ static void jffs2_erase_block(struct jffs2_sb_info *c,
->>> ? ? ? ?((struct erase_priv_struct *)instr->priv)->c = c;
->>>
->>> ? ? ? ?ret = c->mtd->erase(c->mtd, instr);
->>> - ? ? ? if (!ret)
->>> + ? ? ? if (!ret) {
->>> + ? ? ? ?kfree(instr);
->>> ? ? ? ? ? ? ? ?return;
->>> + ? ?}
->>>
->>> ? ? ? ?bad_offset = instr->fail_addr;
->>> ? ? ? ?kfree(instr);
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->>
->
-> static void jffs2_erase_callback(struct erase_info *instr)
-> {
-> ? ? ? struct erase_priv_struct *priv = (void *)instr->priv;
->
-> ? ? ? if(instr->state != MTD_ERASE_DONE) {
-> printk(KERN_WARNING "Erase at 0x%08x finished, but state != MTD_ERASE_DONE.
-> State is 0x%x instead.\n", instr->addr, instr->state);
-> ? ? ? ? ? ? ? jffs2_erase_failed(priv->c, priv->jeb, instr->fail_addr);
-> ? ? ? } else {
-> ? ? ? ? ? ? ? jffs2_erase_succeeded(priv->c, priv->jeb);
-> ? ? ? }
-> ? ? ? kfree(instr);
-> }
->
-> instr->callback = jffs2_erase_callback;
->
-> Maybe the free is here ?:)
->
-> Michael
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->
->
+Rabin
