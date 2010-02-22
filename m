@@ -1,37 +1,56 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Feb 2010 21:42:57 +0100
-Subject: [PATCH 3/7] ARM: U300: set f_max to 24 MHz for MMCI
-In-Reply-To: <20100221210740.GA3528@n2100.arm.linux.org.uk>
-References: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-	<20100221210740.GA3528@n2100.arm.linux.org.uk>
-Message-ID: <A6D19A13FE030A409EC4362C172E091F0E9355A2@eseldmw101.eemea.ericsson.se>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Feb 2010 13:37:22 -0800
+Subject: [PATCH 00/11] omap updates for 2.6.34, part 4
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C417FF19@dbde02.ent.ti.com>
+References: <20100219232648.10559.380.stgit@baageli.muru.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C417FF19@dbde02.ent.ti.com>
+Message-ID: <20100222213722.GU18786@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Russell]
-> On Fri, Feb 19, 2010 at 01:05:31AM +0100, Linus Walleij wrote:
-> > @@ -101,6 +101,7 @@ int __devinit mmc_init(struct amba_device *adev)
-> >  	 * we have a regulator we can control instead.
-> >  	 */
-> >  	/* Nominally 2.85V on our platform */
-> > +	mmci_card->mmc0_plat_data.f_max = 24000000;
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100220 00:27]:
+> Tony, 
 > 
-> I bet setting this without DMA support leads to overruns/underruns on
-> the interface.
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony
+> > Lindgren
+> > Sent: Saturday, February 20, 2010 5:00 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-omap at vger.kernel.org
+> > Subject: [PATCH 00/11] omap updates for 2.6.34, part 4
+> > 
+> > Hi all,
+> > 
+> > Here are few USB platform init patches that have been already
+> > posted to linux-usb and linux-omap and have been sitting in for-next.
+> > 
+> > Posting them one more time to make sure people on linux-arm-kernel
+> > have seen these too.
+> > 
+> > Regards,
+> > 
+> > Tony
+> > 
+> > ---
+> > 
+> > Felipe Balbi (7):
+> >       arm: omap: musb: ioremap only what's ours
+> >       omap: musb: remove unused data
+> >       arm: omap: musb: we can use clk framework
+> >       omap: musb: remove unused soft_con field
+> >       omap: musb: remove unused dma data
+> >       omap: musb: remove unnecessary return
+> >       omap: musb: get rid of dyn_fifo
+> > 
+> > Maulik Mankad (4):
+> >       USB: Add empty functions in otg.h
+> >       omap: musb: Remove #ifdef from board-omap3evm.c
+> >       omap: musb: Pass board specific data from board file
+> >       omap: musb: Add USB support to 4430 SDP board file
+> >
+> We need attached patch to keep multi-omap build booting on omap4
+> on top of this series.
 
-Actually no, not on the U300. On the RealView etc, yes.
+Thanks, I'll add it.
 
-Because we have this (see mmci_set_clkreg()):
-
-if (host->hw_designer == AMBA_VENDOR_ST)
-	clk |= MCI_FCEN; /* Bug fix in ST IP block */
-
-This enables HW flow control on the block, and holds back
-reads/writes so it doesn't over/underruns.
-
-We experienced the problem years ago, and reported to
-ST Microelectronics, who fixed it in the next hardware
-revision. All present U300 platforms have this fixed.
-But the clk framework restricts it to 18.9 MHz.
-
-Linus Walleij
+Tony
