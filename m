@@ -1,74 +1,90 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Mon, 22 Feb 2010 19:41:42 +0100
-Subject: [PATCH 02/10] ARM: ftrace: document mcount formats
-In-Reply-To: <1266090518-31120-3-git-send-email-rabin@rab.in>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-3-git-send-email-rabin@rab.in>
-Message-ID: <20100222184138.GI5055@nowhere>
+From: carsten.behling@garz-fricke.com (Carsten Behling)
+Date: Mon, 22 Feb 2010 19:37:56 +0100
+Subject: [PATCH 1/1] MX35: Add CUPID i2c1 rtc and at24 support.
+Message-ID: <D99582E5322435468A77E74BB0039E7B176E1F3BC8@SRV02.hamburg.garz-fricke.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 14, 2010 at 01:18:30AM +0530, Rabin Vincent wrote:
-> Add a comment describing the mcount variants and how the callsites look
-> like.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+Signed-off-by: Carsten Behling <carsten.behling@garz-fricke.com>
+---
+ This patch adds i2-1 devices at24 eeprom and rtc to the Garz & Fricke CUPID bsp.
+ This patch depends on the basic CUPID bsp patch.
 
+ arch/arm/mach-mx3/mach-guf_cupid.c |   34 +++++++++++++++++++++++++++++++++-
+ 1 files changed, 33 insertions(+), 1 deletions(-)
 
-Cool, this was really missing I think.
+diff --git a/arch/arm/mach-mx3/mach-guf_cupid.c b/arch/arm/mach-mx3/mach-guf_cupid.c
+index e8300f8..417b911 100644
+--- a/arch/arm/mach-mx3/mach-guf_cupid.c
++++ b/arch/arm/mach-mx3/mach-guf_cupid.c
+@@ -25,7 +25,8 @@
+ #include <linux/memory.h>
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
+-
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -33,6 +34,7 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/imx-uart.h>
++#include <mach/i2c.h>
+ #include <mach/iomux-mx35.h>
+ #include <mach/ipu.h>
+ #include <mach/mx3fb.h>
+@@ -76,6 +78,27 @@ static struct imxuart_platform_data cupid_uart_pdata = {
+        .flags = IMXUART_HAVE_RTSCTS,
+ };
 
++#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
++static struct imxi2c_platform_data cupid_i2c_1_pdata = {
++       .bitrate = 50000,
++};
++
++static struct at24_platform_data cupid_eeprom_pdata = {
++       .byte_len = 4096,
++       .page_size = 32,
++       .flags = AT24_FLAG_ADDR16,
++};
++
++static struct i2c_board_info cupid_i2c_devices[] = {
++       {
++               I2C_BOARD_INFO("at24", 0x50), /* E0=0, E1=0, E2=0 */
++               .platform_data = &cupid_eeprom_pdata,
++       }, {
++               I2C_BOARD_INFO("pcf8563", 0x51),
++       }
++};
++#endif
++
+ static struct platform_device *devices[] __initdata = {
+        &mxc_fec_device,
+ };
+@@ -110,6 +133,9 @@ static struct pad_desc cupid_pads[] = {
+        MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
+        MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
+        MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
++       /* I2C1 */
++       MX35_PAD_I2C1_CLK__I2C1_SCL,
++       MX35_PAD_I2C1_DAT__I2C1_SDA,
+        /* Display */
+        MX35_PAD_LD0__IPU_DISPB_DAT_0,
+        MX35_PAD_LD1__IPU_DISPB_DAT_1,
+@@ -156,6 +182,12 @@ static void __init cupid_board_init(void)
+        mxc_register_device(&mxc_nand_device, &cupid_nand_pdata);
+        mxc_register_device(&mx3_ipu, &cupid_ipu_pdata);
+        mxc_register_device(&mx3_fb, &cupid_mx3fb_pdata);
++#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
++       i2c_register_board_info(0, cupid_i2c_devices,
++                       ARRAY_SIZE(cupid_i2c_devices));
++
++       mxc_register_device(&mxc_i2c_device0, &cupid_i2c_1_pdata);
++#endif
+ }
 
-Acked-by: Frederic Weisbecker <fweisbec@gmail.com>
-
-
-
-> ---
->  arch/arm/kernel/entry-common.S |   32 ++++++++++++++++++++++++++++++++
->  1 files changed, 32 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 0b042bd..d412d7c 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -92,6 +92,38 @@ ENDPROC(ret_from_fork)
->  #define CALL(x) .long x
->  
->  #ifdef CONFIG_FUNCTION_TRACER
-> +/*
-> + * When compiling with -pg, gcc inserts a call to the mcount routine at the
-> + * start of every function.  In mcount, apart from the function's address (in
-> + * lr), we need to get hold of the function's caller's address.
-> + *
-> + * Older GCCs (pre-4.4) inserted a call to a routine called mcount like this:
-> + *
-> + *	bl	mcount
-> + *
-> + * These versions have the limitation that in order for the mcount routine to
-> + * be able to determine the function's caller's address, an APCS-style frame
-> + * pointer (which is set up with something like the code below) is required.
-> + *
-> + *	mov     ip, sp
-> + *	push    {fp, ip, lr, pc}
-> + *	sub     fp, ip, #4
-> + *
-> + * With EABI, these frame pointers are not available unless -mapcs-frame is
-> + * specified, and if building as Thumb-2, not even then.
-> + *
-> + * Newer GCCs (4.4+) solve this problem by introducing a new version of mcount,
-> + * with call sites like:
-> + *
-> + *	push	{lr}
-> + *	bl	__gnu_mcount_nc
-> + *
-> + * With these compilers, frame pointers are not necessary.
-> + *
-> + * With both the mcount types, we need to restore the original lr before
-> + * returning.  In the __gnu_mcount_nc, version we're allowed to clobber ip.
-> + * No other registers should be clobbered.
-> + */
->  #ifdef CONFIG_DYNAMIC_FTRACE
->  ENTRY(mcount)
->  	stmdb	sp!, {r0-r3, lr}
-> -- 
-> 1.6.6
-> 
+ static void __init cupid_timer_init(void)
+--
+1.6.0.2
