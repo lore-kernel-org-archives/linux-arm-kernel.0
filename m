@@ -1,90 +1,119 @@
-From: carsten.behling@garz-fricke.com (Carsten Behling)
-Date: Mon, 22 Feb 2010 19:37:56 +0100
-Subject: [PATCH 1/1] MX35: Add CUPID i2c1 rtc and at24 support.
-Message-ID: <D99582E5322435468A77E74BB0039E7B176E1F3BC8@SRV02.hamburg.garz-fricke.de>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Mon, 22 Feb 2010 20:05:18 +0100
+Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
+In-Reply-To: <1266090518-31120-5-git-send-email-rabin@rab.in>
+References: <1266090518-31120-1-git-send-email-rabin@rab.in>
+	<1266090518-31120-5-git-send-email-rabin@rab.in>
+Message-ID: <20100222190516.GJ5055@nowhere>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Carsten Behling <carsten.behling@garz-fricke.com>
----
- This patch adds i2-1 devices at24 eeprom and rtc to the Garz & Fricke CUPID bsp.
- This patch depends on the basic CUPID bsp patch.
+On Sun, Feb 14, 2010 at 01:18:32AM +0530, Rabin Vincent wrote:
+> With a new enough GCC, ARM function tracing can be supported without the
+> need for frame pointers.  This is essential for Thumb-2 support, since
+> frame pointers aren't available then.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/Kconfig.debug         |    5 +++++
+>  arch/arm/kernel/armksyms.c     |    2 ++
+>  arch/arm/kernel/entry-common.S |    7 +++++++
+>  kernel/trace/Kconfig           |    2 +-
+>  4 files changed, 15 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 5cb9326..5501253 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -27,6 +27,11 @@ config ARM_UNWIND
+>  	  the performance is not affected. Currently, this feature
+>  	  only works with EABI compilers. If unsure say Y.
+>  
+> +config OLD_MCOUNT
+> +	bool
+> +	depends on FUNCTION_TRACER && FRAME_POINTER
+> +	default y
+> +
 
- arch/arm/mach-mx3/mach-guf_cupid.c |   34 +++++++++++++++++++++++++++++++++-
- 1 files changed, 33 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-guf_cupid.c b/arch/arm/mach-mx3/mach-guf_cupid.c
-index e8300f8..417b911 100644
---- a/arch/arm/mach-mx3/mach-guf_cupid.c
-+++ b/arch/arm/mach-mx3/mach-guf_cupid.c
-@@ -25,7 +25,8 @@
- #include <linux/memory.h>
- #include <linux/interrupt.h>
- #include <linux/delay.h>
--
-+#include <linux/i2c.h>
-+#include <linux/i2c/at24.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-@@ -33,6 +34,7 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/imx-uart.h>
-+#include <mach/i2c.h>
- #include <mach/iomux-mx35.h>
- #include <mach/ipu.h>
- #include <mach/mx3fb.h>
-@@ -76,6 +78,27 @@ static struct imxuart_platform_data cupid_uart_pdata = {
-        .flags = IMXUART_HAVE_RTSCTS,
- };
 
-+#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
-+static struct imxi2c_platform_data cupid_i2c_1_pdata = {
-+       .bitrate = 50000,
-+};
-+
-+static struct at24_platform_data cupid_eeprom_pdata = {
-+       .byte_len = 4096,
-+       .page_size = 32,
-+       .flags = AT24_FLAG_ADDR16,
-+};
-+
-+static struct i2c_board_info cupid_i2c_devices[] = {
-+       {
-+               I2C_BOARD_INFO("at24", 0x50), /* E0=0, E1=0, E2=0 */
-+               .platform_data = &cupid_eeprom_pdata,
-+       }, {
-+               I2C_BOARD_INFO("pcf8563", 0x51),
-+       }
-+};
-+#endif
-+
- static struct platform_device *devices[] __initdata = {
-        &mxc_fec_device,
- };
-@@ -110,6 +133,9 @@ static struct pad_desc cupid_pads[] = {
-        MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
-        MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
-        MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
-+       /* I2C1 */
-+       MX35_PAD_I2C1_CLK__I2C1_SCL,
-+       MX35_PAD_I2C1_DAT__I2C1_SDA,
-        /* Display */
-        MX35_PAD_LD0__IPU_DISPB_DAT_0,
-        MX35_PAD_LD1__IPU_DISPB_DAT_1,
-@@ -156,6 +182,12 @@ static void __init cupid_board_init(void)
-        mxc_register_device(&mxc_nand_device, &cupid_nand_pdata);
-        mxc_register_device(&mx3_ipu, &cupid_ipu_pdata);
-        mxc_register_device(&mx3_fb, &cupid_mx3fb_pdata);
-+#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
-+       i2c_register_board_info(0, cupid_i2c_devices,
-+                       ARRAY_SIZE(cupid_i2c_devices));
-+
-+       mxc_register_device(&mxc_i2c_device0, &cupid_i2c_1_pdata);
-+#endif
- }
+Btw, you described that mcount is used in some gcc versions and
+__gnu_mcount_nc in newers.
+Shouldn't we have a gcc version dependency here? (not sure we can
+do this from Kconfig though).
 
- static void __init cupid_timer_init(void)
---
-1.6.0.2
+
+
+>  config DEBUG_USER
+>  	bool "Verbose user fault messages"
+>  	help
+> diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+> index 8214bfe..e5e1e53 100644
+> --- a/arch/arm/kernel/armksyms.c
+> +++ b/arch/arm/kernel/armksyms.c
+> @@ -165,6 +165,8 @@ EXPORT_SYMBOL(_find_next_bit_be);
+>  #endif
+>  
+>  #ifdef CONFIG_FUNCTION_TRACER
+> +#ifdef CONFIG_OLD_MCOUNT
+>  EXPORT_SYMBOL(mcount);
+> +#endif
+>  EXPORT_SYMBOL(__gnu_mcount_nc);
+>  #endif
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index d412d7c..c98e3a3 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -169,6 +169,12 @@ gnu_trace:
+>  	ldmia	sp!, {r0-r3, ip, lr}
+>  	mov	pc, ip
+>  
+> +#ifdef CONFIG_OLD_MCOUNT
+> +/*
+> + * This is under an ifdef in order to force link-time errors for people trying
+> + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
+> + * mcount.
+> + */
+>  ENTRY(mcount)
+>  	stmdb	sp!, {r0-r3, lr}
+>  	ldr	r0, =ftrace_trace_function
+> @@ -187,6 +193,7 @@ trace:
+>  	mov	pc, r2
+>  	ldr	lr, [fp, #-4]			@ restore lr
+>  	ldmia	sp!, {r0-r3, pc}
+> +#endif
+>  
+>  #endif /* CONFIG_DYNAMIC_FTRACE */
+>  
+> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+> index 6c22d8a..7468ffe 100644
+> --- a/kernel/trace/Kconfig
+> +++ b/kernel/trace/Kconfig
+> @@ -126,7 +126,7 @@ if FTRACE
+>  config FUNCTION_TRACER
+>  	bool "Kernel Function Tracer"
+>  	depends on HAVE_FUNCTION_TRACER
+> -	select FRAME_POINTER
+> +	select FRAME_POINTER if (!ARM_UNWIND)
+
+
+So, if I understand well. If people have ARM_UNWIND but
+FUNCTION_TRACER, it might crash at link time in case
+they don't have a recent enough gcc version to
+support the new -pg style?
+
+That doesn't look good.
+
+Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
+only if (old gcc && frame pointers) || new gcc
+
+And then, we need config OLD_MCOUNT:
+	 old gcc && FUNCTION_TRACER
+
+and config NEW_MCOUNT:
+	new gcc && FUNCTION_TRACER
+
+so that we can selectively build mcount or __gnu_mcount_nc.
+
+Hmm, I fear we can't check gcc version from Kconfig, as I'm
+grepping on Kconfig files...
