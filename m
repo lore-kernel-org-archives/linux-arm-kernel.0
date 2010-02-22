@@ -1,119 +1,43 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Mon, 22 Feb 2010 20:05:18 +0100
-Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
-In-Reply-To: <1266090518-31120-5-git-send-email-rabin@rab.in>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Feb 2010 20:20:09 +0100
+Subject: [PATCH 02/10] ARM: ftrace: document mcount formats
+In-Reply-To: <20100222180624.GA4061@debian>
 References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-5-git-send-email-rabin@rab.in>
-Message-ID: <20100222190516.GJ5055@nowhere>
+	<1266090518-31120-3-git-send-email-rabin@rab.in>
+	<20100213203748.GC16528@pengutronix.de>
+	<20100222180624.GA4061@debian>
+Message-ID: <20100222192009.GA13527@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 14, 2010 at 01:18:32AM +0530, Rabin Vincent wrote:
-> With a new enough GCC, ARM function tracing can be supported without the
-> need for frame pointers.  This is essential for Thumb-2 support, since
-> frame pointers aren't available then.
+On Mon, Feb 22, 2010 at 11:36:24PM +0530, Rabin Vincent wrote:
+> On Sat, Feb 13, 2010 at 09:37:48PM +0100, Uwe Kleine-K?nig wrote:
+> > On Sun, Feb 14, 2010 at 01:18:30AM +0530, Rabin Vincent wrote:
+> > > + * With both the mcount types, we need to restore the original lr before
+> > > + * returning.  In the __gnu_mcount_nc, version we're allowed to clobber ip.
+> > > + * No other registers should be clobbered.
+> > > + */
+> > Very nice.
+> > 
+> > Maybe make the last two sentences:
+> > 
+> > In the __gnu_mcount_nc case the ip register is clobbered which is OK as
+> > the calling convention for ARM allow clobbering this value for
+> > subroutines and it doesn't contain parameters.
 > 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/Kconfig.debug         |    5 +++++
->  arch/arm/kernel/armksyms.c     |    2 ++
->  arch/arm/kernel/entry-common.S |    7 +++++++
->  kernel/trace/Kconfig           |    2 +-
->  4 files changed, 15 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 5cb9326..5501253 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -27,6 +27,11 @@ config ARM_UNWIND
->  	  the performance is not affected. Currently, this feature
->  	  only works with EABI compilers. If unsure say Y.
->  
-> +config OLD_MCOUNT
-> +	bool
-> +	depends on FUNCTION_TRACER && FRAME_POINTER
-> +	default y
-> +
+> Won't quoting calling conventions here be misleading?  The mcounts don't
+> following normal convention for the other bits (we can't clobber even
+> the registers that are normally caller-saved, we need to restore lr,
+> etc.)
+actually mcount is a function in the middle of a function call.  So it
+must be transparent for both the caller and the callee.  As the called
+function needs to know the return address, mcount must not clobber it.
+And as ip is don't care and can be clobbered mcount can use it as it
+likes.
 
+Best regards
+Uwe
 
-
-Btw, you described that mcount is used in some gcc versions and
-__gnu_mcount_nc in newers.
-Shouldn't we have a gcc version dependency here? (not sure we can
-do this from Kconfig though).
-
-
-
->  config DEBUG_USER
->  	bool "Verbose user fault messages"
->  	help
-> diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-> index 8214bfe..e5e1e53 100644
-> --- a/arch/arm/kernel/armksyms.c
-> +++ b/arch/arm/kernel/armksyms.c
-> @@ -165,6 +165,8 @@ EXPORT_SYMBOL(_find_next_bit_be);
->  #endif
->  
->  #ifdef CONFIG_FUNCTION_TRACER
-> +#ifdef CONFIG_OLD_MCOUNT
->  EXPORT_SYMBOL(mcount);
-> +#endif
->  EXPORT_SYMBOL(__gnu_mcount_nc);
->  #endif
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index d412d7c..c98e3a3 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -169,6 +169,12 @@ gnu_trace:
->  	ldmia	sp!, {r0-r3, ip, lr}
->  	mov	pc, ip
->  
-> +#ifdef CONFIG_OLD_MCOUNT
-> +/*
-> + * This is under an ifdef in order to force link-time errors for people trying
-> + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
-> + * mcount.
-> + */
->  ENTRY(mcount)
->  	stmdb	sp!, {r0-r3, lr}
->  	ldr	r0, =ftrace_trace_function
-> @@ -187,6 +193,7 @@ trace:
->  	mov	pc, r2
->  	ldr	lr, [fp, #-4]			@ restore lr
->  	ldmia	sp!, {r0-r3, pc}
-> +#endif
->  
->  #endif /* CONFIG_DYNAMIC_FTRACE */
->  
-> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> index 6c22d8a..7468ffe 100644
-> --- a/kernel/trace/Kconfig
-> +++ b/kernel/trace/Kconfig
-> @@ -126,7 +126,7 @@ if FTRACE
->  config FUNCTION_TRACER
->  	bool "Kernel Function Tracer"
->  	depends on HAVE_FUNCTION_TRACER
-> -	select FRAME_POINTER
-> +	select FRAME_POINTER if (!ARM_UNWIND)
-
-
-So, if I understand well. If people have ARM_UNWIND but
-FUNCTION_TRACER, it might crash at link time in case
-they don't have a recent enough gcc version to
-support the new -pg style?
-
-That doesn't look good.
-
-Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
-only if (old gcc && frame pointers) || new gcc
-
-And then, we need config OLD_MCOUNT:
-	 old gcc && FUNCTION_TRACER
-
-and config NEW_MCOUNT:
-	new gcc && FUNCTION_TRACER
-
-so that we can selectively build mcount or __gnu_mcount_nc.
-
-Hmm, I fear we can't check gcc version from Kconfig, as I'm
-grepping on Kconfig files...
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
