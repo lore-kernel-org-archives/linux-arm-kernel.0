@@ -1,43 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Feb 2010 20:20:09 +0100
-Subject: [PATCH 02/10] ARM: ftrace: document mcount formats
-In-Reply-To: <20100222180624.GA4061@debian>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-3-git-send-email-rabin@rab.in>
-	<20100213203748.GC16528@pengutronix.de>
-	<20100222180624.GA4061@debian>
-Message-ID: <20100222192009.GA13527@pengutronix.de>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 22 Feb 2010 22:26:59 +0200
+Subject: Interrupt registering for PIO problem in ATMEL chips
+In-Reply-To: <17E4CABDDEE0BC4A9F40814378DEC0CB21EB65@BLR-EC-MBX03.wipro.com>
+References: <17E4CABDDEE0BC4A9F40814378DEC0CB21EB65@BLR-EC-MBX03.wipro.com>
+Message-ID: <cd73a99e1002221226i5d47e60cs4b99cb911000cd52@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2010 at 11:36:24PM +0530, Rabin Vincent wrote:
-> On Sat, Feb 13, 2010 at 09:37:48PM +0100, Uwe Kleine-K?nig wrote:
-> > On Sun, Feb 14, 2010 at 01:18:30AM +0530, Rabin Vincent wrote:
-> > > + * With both the mcount types, we need to restore the original lr before
-> > > + * returning.  In the __gnu_mcount_nc, version we're allowed to clobber ip.
-> > > + * No other registers should be clobbered.
-> > > + */
-> > Very nice.
-> > 
-> > Maybe make the last two sentences:
-> > 
-> > In the __gnu_mcount_nc case the ip register is clobbered which is OK as
-> > the calling convention for ARM allow clobbering this value for
-> > subroutines and it doesn't contain parameters.
-> 
-> Won't quoting calling conventions here be misleading?  The mcounts don't
-> following normal convention for the other bits (we can't clobber even
-> the registers that are normally caller-saved, we need to restore lr,
-> etc.)
-actually mcount is a function in the middle of a function call.  So it
-must be transparent for both the caller and the callee.  As the called
-function needs to know the return address, mcount must not clobber it.
-And as ip is don't care and can be clobbered mcount can use it as it
-likes.
+hi,
 
-Best regards
-Uwe
+> Also, PIOs can not distinguish between inputs and interrupts, as they
+> treat everything as inputs.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Not quite.  Interrupts in GPIO input pins are optional.
+
+
+> Now, my problem is I am writing this keypad driver, which is connected
+> to PIOA.
+
+There are existing GPIO-driven keypad drivers - have a look in
+drivers/input/keyboard/.
+
+
+> The PIOA is connected to pin 2 of AIC, but then I can not install the
+> handler for pin2, It fails saying error -22 ( resource not available).
+> I also don't know, what I can do even if I get to install the handler
+> for PIO.
+
+You request the interrupt only for the specific GPIO pin(s) you're
+using.  You don't request all PIOA interrupts.
+ie, do the following:
+   request_irq(AT91_PIN_PA2, ...)
+
+
+Regards,
+  Andrew Victor
