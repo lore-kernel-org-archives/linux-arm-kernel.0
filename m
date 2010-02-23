@@ -1,38 +1,35 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 23 Feb 2010 13:37:44 -0500
-Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
-In-Reply-To: <20100223182338.GC5836@debian>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-8-git-send-email-rabin@rab.in>
-	<1266931846.19540.9.camel@frodo>  <20100223182338.GC5836@debian>
-Message-ID: <1266950264.24271.6116.camel@gandalf.stny.rr.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 23 Feb 2010 10:36:08 -0800
+Subject: [RFC PATCH 05/12] arm: mm: retry on QSD icache parity errors
+In-Reply-To: <1264763482.4242.50.camel@pc1117.cambridge.arm.com>
+References: <1264719577-5436-6-git-send-email-dwalker@codeaurora.org>
+	<1264763482.4242.50.camel@pc1117.cambridge.arm.com>
+Message-ID: <1266950168.24069.1.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-02-23 at 23:53 +0530, Rabin Vincent wrote:
-
-> > > diff --git a/scripts/Makefile.build b/scripts/Makefile.build
-> > > index 0b94d2f..2535c11 100644
-> > > --- a/scripts/Makefile.build
-> > > +++ b/scripts/Makefile.build
-> > > @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
-> > >  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
-> > >  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
-> > >  	"$(if $(CONFIG_64BIT),64,32)" \
-> > > -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
-> > > +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
-> > > +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
-> > 
-> > Doesn't this need to be with the change of recordmcount.pl too?
-> > Otherwise applying this patch alone will break it. We need every step of
-> > the patches to work otherwise we risk breaking a kernel bisect.
+On Fri, 2010-01-29 at 11:11 +0000, Catalin Marinas wrote:
+> On Thu, 2010-01-28 at 22:59 +0000, Daniel Walker wrote:
+> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> > index 10e0680..bea3e75 100644
+> > --- a/arch/arm/mm/fault.c
+> > +++ b/arch/arm/mm/fault.c
+> [...]
+> >  static struct fsr_info {
+> >         int     (*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+> >         int     sig;
+> > @@ -479,7 +513,7 @@ static struct fsr_info {
+> >         { do_bad,               SIGBUS,  0,             "unknown 19"                       },
+> >         { do_bad,               SIGBUS,  0,             "lock abort"                       }, /* xscale */
+> >         { do_bad,               SIGBUS,  0,             "unknown 21"                       },
+> > -       { do_bad,               SIGBUS,  BUS_OBJERR,    "imprecise external abort"         }, /* xscale */
+> > +       { do_imprecise_ext,     SIGBUS,  BUS_OBJERR,    "imprecise external abort"         }, /* xscale */
 > 
-> Dynamic ftrace for ARM is only enabled in the last patch of the series,
-> so this woudn't be breaking it.  No modification should be required for
-> record_mcount.pl for other archs because this doesn't add/remove any
-> parameters.
+> Can you not use hook_fault_code() and move the do_imprecise_ext() to a
+> platform-specific file (under arch/arm/mach-* maybe)?
+> 
 
-OK, it looked to me that "KBUILD_CFLAGS" was a separate parameter. I
-miscounted my quotes. ;-)
+How do you mean? I'm not sure how we would move this into
+arch/arm/mach- ..
 
--- Steve
+Daniel
