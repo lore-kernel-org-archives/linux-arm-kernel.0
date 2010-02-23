@@ -1,7 +1,7 @@
 From: viresh.linux@gmail.com (viresh kumar)
-Date: Tue, 23 Feb 2010 12:00:33 +0530
+Date: Tue, 23 Feb 2010 12:06:45 +0530
 Subject: QUERY: Inclusion of header files in kernel header files.
-Message-ID: <22dbbef21002222230x780c1ffatca5541453f6043ab@mail.gmail.com>
+Message-ID: <22dbbef21002222236j2eaaf36cjd3720e2573d25a70@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,4 +35,4 @@ ST Microelectronics
 India.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100223/a3ce48a3/attachment.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100223/8f5cac70/attachment.htm>
