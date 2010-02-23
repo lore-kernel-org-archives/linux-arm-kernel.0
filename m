@@ -1,65 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Feb 2010 15:12:46 +0000
-Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <20100223123040.GC10501@n2100.arm.linux.org.uk>
-References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
-	<20100223111036.GA10501@n2100.arm.linux.org.uk>
-	<1266927403.3123.56.camel@e102109-lin.cambridge.arm.com>
-	<20100223123040.GC10501@n2100.arm.linux.org.uk>
-Message-ID: <1266937966.3123.121.camel@e102109-lin.cambridge.arm.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Tue, 23 Feb 2010 20:50:55 +0530
+Subject: [PATCH 10/11] omap: musb: get rid of dyn_fifo
+In-Reply-To: <f3642e6b1002230709r4dcd09bv9c495875bbd873c7@mail.gmail.com>
+References: <20100219232648.10559.380.stgit@baageli.muru.com>
+	<20100219233036.10559.29778.stgit@baageli.muru.com>
+	<4B83EC7C.6020406@corscience.de>
+	<f3642e6b1002230709r4dcd09bv9c495875bbd873c7@mail.gmail.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0321A20527@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-02-23 at 12:30 +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2010 at 12:16:43PM +0000, Catalin Marinas wrote:
-> > On Tue, 2010-02-23 at 11:10 +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Feb 23, 2010 at 11:01:05AM +0000, Catalin Marinas wrote:
-> > > > -#define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > > > -#define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > > > -#define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > > > +#define mb()		dsb()
-> > > > +#define rmb()		dmb()
-> > > > +#define wmb()		dsb()
-> > > 
-> > > What is the reason for getting rid of the arch_is_coherent() bit here
-> > > and imposing non-compiler barriers on everything?  
-> > 
-> > The original code defines the mandatory barriers only if
-> > __LINUX_ARCH_ARM__ >= 7 || CONFIG_SMP.
+> > I think this patch breaks musb_hdrc.
+> >
+> > In musb_core_init is musb->config->dyn_fifo checked but is never set.
+> >
+> > So I get the following dmesg output:
+> >
+> > musb_hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split,
+> > HB-ISO Rx, HB-ISO Tx, SoftConn)
+> > musb_hdrc: MHDRC RTL version 1.400
+> > musb_core_init 1405: reconfigure software for Dynamic FIFOs
+> > musb_hdrc musb_hdrc: musb_init_controller failed with status -19
+> >
+> > Thomas
 > 
-> No.  Please read the code.
+> I think I have the same problem.
+> There are other problems right now (I'm trying several different branch/defconfig
+> combinations) so I can't be 100% sure.
 > 
-> The original code defines mandatory barriers in the following cases:
-> - ARMv7+
-> - SMP
-> - Any architecture which sets arch_is_coherent() (for coherent DMA) -
->   which at the moment is only Xscale 3 on IXP23xx platforms.
-> 
-> So, we end up with mandatory barriers for: ARMv7+, ARMv6 SMP, XScale 3.
-> We end up with mb() and friends being compiler barriers on everything
-> else.
 
-The scenario I have in mind is when using mb() in relation with DMA
-coherent mappings. We only use Normal Uncached for this case on ARMv7.
-Earlier architectures, including ARMv6 SMP, we use strongly ordered
-which would be fine without any barrier.
+Ajay reported earlier today [1] that there is a dependency patch [2]
+that needs to be taken in. Looks like it was missed when the MUSB
+patchset was added to linux-omap for extra testing.
 
-Since mb() isn't meant for SMP use, does it still make sense to have it
-defined in the ARMv6 SMP case? Would people not use the smp_* variants?
+- Anand
 
-Or is mb() meant to cover all the cases that smp_mb() would cover on
-SMP?
-
-> So, all you need to do is to leave the #else clause as-is, and change:
-> 
-> #if __LINUX_ARM_ARCH__ >= 7 || defined(CONFIG_SMP)
-> 
-> to be
-> 
-> #if __LINUX_ARM_ARCH__ >= 6
-
-Yes, sounds fine. Just need to check whether the minimum version should
-be 6 or 7 (see above).
-
--- 
-Catalin
+[1] http://marc.info/?l=linux-omap&m=126691578831301&w=2
+[2] http://marc.info/?l=linux-omap&m=126088393130177&w=2
