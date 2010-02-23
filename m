@@ -1,109 +1,51 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 23 Feb 2010 08:18:33 -0500
-Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
-In-Reply-To: <20100222190516.GJ5055@nowhere>
+Date: Tue, 23 Feb 2010 08:30:46 -0500
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <1266090518-31120-8-git-send-email-rabin@rab.in>
 References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-5-git-send-email-rabin@rab.in>
-	<20100222190516.GJ5055@nowhere>
-Message-ID: <1266931113.19540.5.camel@frodo>
+	<1266090518-31120-8-git-send-email-rabin@rab.in>
+Message-ID: <1266931846.19540.9.camel@frodo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-02-22 at 20:05 +0100, Frederic Weisbecker wrote:
+On Sun, 2010-02-14 at 01:18 +0530, Rabin Vincent wrote:
+> On ARM, we have two ABIs, and the ABI used is controlled via a config
+> option.  Object files built with one ABI can't be merged with object
+> files built with the other ABI.  So, record_mcount.pl needs to use the
+> same compiler flags as the kernel when generating the object file with
+> the mcount locations.  Ensure this by passing CFLAGS to the script.
+
+I'm fine with this for now, but I'm wondering if we should pass the
+autoconf.h to the script and parse that instead. This would give us all
+set config options that we can look at.
+
+But I need to go back and start looking at converting recordmcount.pl to
+recordmcount.c again.
 
 > 
-> Btw, you described that mcount is used in some gcc versions and
-> __gnu_mcount_nc in newers.
-> Shouldn't we have a gcc version dependency here? (not sure we can
-> do this from Kconfig though).
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  scripts/Makefile.build |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
 > 
+> diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+> index 0b94d2f..2535c11 100644
+> --- a/scripts/Makefile.build
+> +++ b/scripts/Makefile.build
+> @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
+>  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+>  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
+>  	"$(if $(CONFIG_64BIT),64,32)" \
+> -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+> +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
+> +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
 
-Maybe we can add something to recordmcount.pl?
-
-> 
-> 
-> >  config DEBUG_USER
-> >  	bool "Verbose user fault messages"
-> >  	help
-> > diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-> > index 8214bfe..e5e1e53 100644
-> > --- a/arch/arm/kernel/armksyms.c
-> > +++ b/arch/arm/kernel/armksyms.c
-> > @@ -165,6 +165,8 @@ EXPORT_SYMBOL(_find_next_bit_be);
-> >  #endif
-> >  
-> >  #ifdef CONFIG_FUNCTION_TRACER
-> > +#ifdef CONFIG_OLD_MCOUNT
-> >  EXPORT_SYMBOL(mcount);
-> > +#endif
-> >  EXPORT_SYMBOL(__gnu_mcount_nc);
-> >  #endif
-> > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> > index d412d7c..c98e3a3 100644
-> > --- a/arch/arm/kernel/entry-common.S
-> > +++ b/arch/arm/kernel/entry-common.S
-> > @@ -169,6 +169,12 @@ gnu_trace:
-> >  	ldmia	sp!, {r0-r3, ip, lr}
-> >  	mov	pc, ip
-> >  
-> > +#ifdef CONFIG_OLD_MCOUNT
-> > +/*
-> > + * This is under an ifdef in order to force link-time errors for people trying
-> > + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
-> > + * mcount.
-> > + */
-> >  ENTRY(mcount)
-> >  	stmdb	sp!, {r0-r3, lr}
-> >  	ldr	r0, =ftrace_trace_function
-> > @@ -187,6 +193,7 @@ trace:
-> >  	mov	pc, r2
-> >  	ldr	lr, [fp, #-4]			@ restore lr
-> >  	ldmia	sp!, {r0-r3, pc}
-> > +#endif
-> >  
-> >  #endif /* CONFIG_DYNAMIC_FTRACE */
-> >  
-> > diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> > index 6c22d8a..7468ffe 100644
-> > --- a/kernel/trace/Kconfig
-> > +++ b/kernel/trace/Kconfig
-> > @@ -126,7 +126,7 @@ if FTRACE
-> >  config FUNCTION_TRACER
-> >  	bool "Kernel Function Tracer"
-> >  	depends on HAVE_FUNCTION_TRACER
-> > -	select FRAME_POINTER
-> > +	select FRAME_POINTER if (!ARM_UNWIND)
-> 
-> 
-> So, if I understand well. If people have ARM_UNWIND but
-> FUNCTION_TRACER, it might crash at link time in case
-> they don't have a recent enough gcc version to
-> support the new -pg style?
-> 
-> That doesn't look good.
-> 
-> Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
-> only if (old gcc && frame pointers) || new gcc
-> 
-> And then, we need config OLD_MCOUNT:
-> 	 old gcc && FUNCTION_TRACER
-> 
-> and config NEW_MCOUNT:
-> 	new gcc && FUNCTION_TRACER
-> 
-> so that we can selectively build mcount or __gnu_mcount_nc.
-> 
-> Hmm, I fear we can't check gcc version from Kconfig, as I'm
-> grepping on Kconfig files...
-
-
-I would not check gcc version through KCONFIG, but you can have the gcc
-version checked and define another macro in a header somewhere, like
-asm/ftrace.h. Then we could do something different while it is
-compiling.
-
-Disclaimer:
-I have to go back and read the entire thread, to know what exactly is
-going on ;-)
+Doesn't this need to be with the change of recordmcount.pl too?
+Otherwise applying this patch alone will break it. We need every step of
+the patches to work otherwise we risk breaking a kernel bisect.
 
 -- Steve
+
+>  	"$(if $(part-of-module),1,0)" "$(@)";
+>  endif
+>  
