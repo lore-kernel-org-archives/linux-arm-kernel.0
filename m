@@ -1,85 +1,66 @@
-From: b.hutchman@gmail.com (Brian Hutchinson)
-Date: Fri, 26 Feb 2010 16:41:35 -0500
-Subject: External initramfs again ... keep getting "overlaps in-use memory
-	region" - [SOLVED!]
-Message-ID: <3d1967ab1002261341v642a83d8m1fed3a3fdaa28066@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 23 Feb 2010 15:50:38 +0000
+Subject: [PATCH] omap: McBSP: Drop unnecessary status/error bit clearing on reg_cacheretrieved register values
+Message-ID: <mailman.235.1268351985.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 7:17 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Feb 25, 2010 at 07:11:54PM -0500, Brian Hutchinson wrote:
->> Do I have to re-arrange that 16M hole I mentioned and make it the
->> first 16M and the rest all contig in the fixup?
->
-> What I described was not quite right - was 4 bits out.
->
-> For this layout:
->
-> ?0x00000000 - DDR Bank 0
-> ?0x04000000 - DDR Bank 1
-> ?0x08000000 - DDR Bank 2
-> ?0x0c000000 - DDR Bank 3
->
-> MAX_PHYSMEM_BITS would be 28 and SECTION_SIZE_BITS 26.
->
-> But if you actually have this:
->
-> ?The way the code is called it looks like it sets up 16M region
-> ?(0x0-0x01ffffff), then skips 16M (0x02000000-0x07ffffff) (I don't know
-> ?why ... yet) then the last three 32M regions are contiguous (see
-> ?kernel messages below).
->
-> You could set SECTION_SIZE_BITS to 27 since your memory appears to be
-> grouped in two sections - 0x0 - 0x01ffffff, and then 0x08000000 -
-> 0x0dffffff.
+The MsBSP register cache will never have any error/status flags set, since
+these flags are never written to the reg_cache. So it is kind of not
+necessary to clear these flags, which are actually always 0.
 
-Russell is the man!  I thank the Lord for Russell!
+In other words, clearing the status/error flags are not necessary, since the
+reg_cache will never got these bits set. We can just write back the
+register content from the cache as it is when clearing an error condition.
 
-Error in my earlier post ... the 16M hole I described as
-(0x02000000-0x07ffffff) was a typo, it should have been
-(0x02000000-0x03ffffff) ... thought I should point that out to avoid
-confusion.
+Tested on Amstrad Delta.
 
-Summary of solution Russell schooled me on for others to enjoy ....
+Reported-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-I had no idea that the memory model was my problem ... especially
-because my initramfs cpio (12M+ gzipped, around 34M uncompressed)
-image worked when linked with the kernel but would give me the
-problems described earlier in this thread when I tried to load the
-cpio external using the initrd= method.
-
-I modified my Kconfig to allow the sparsemem model to be selected ...
-for my arch in Kconfig I had to add:
-select ARCH_SPARSEMEM_ENABLE
-
-With this change the sparsemem selection showed up in make menuconfig.
-
-In my memory.h file I placed these two lines which are the magic to
-getting sparsemem to work:
-
-#define MAX_PHYSMEM_BITS 28
-#define SECTION_SIZE_BITS 26
-
-Didn't have to make any other changes!  Pretty painless!  Rebuilt the
-kernel after making the above changes.
-
-Tested by tftp'ing my initramfs cpio.gz image to 0x4000000.  Took note
-of the bytes transferred so I would know the size to use with the
-initrd command.
-
-Modified my initrd line to be initrd=0x4000000,<size of bytes
-transferred in tftp mentioned above>
-Did a bootm (u-boot) of the kernel and ..... success!
-
-This is also the solution to the other thread I started:
-http://lists.arm.linux.org.uk/lurker/message/20100222.220721.f03c1e3a.en.html
-
-See some of these sources for info in the sparsemem memory model:
-http://lkml.indiana.edu/hypermail/linux/kernel/0505.0/0771.html
-http://kerneltrap.org/node/14009
-
-
-Regards,
-
-Brian
+diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+index e47686e..52dfcc8 100644
+--- a/arch/arm/plat-omap/mcbsp.c
++++ b/arch/arm/plat-omap/mcbsp.c
+@@ -133,8 +133,7 @@ static irqreturn_t omap_mcbsp_tx_irq_handler(int irq, void *dev_id)
+ 		dev_err(mcbsp_tx->dev, "TX Frame Sync Error! : 0x%x\n",
+ 			irqst_spcr2);
+ 		/* Writing zero to XSYNC_ERR clears the IRQ */
+-		MCBSP_WRITE(mcbsp_tx, SPCR2,
+-			    MCBSP_READ_CACHE(mcbsp_tx, SPCR2) & ~(XSYNC_ERR));
++		MCBSP_WRITE(mcbsp_tx, SPCR2, MCBSP_READ_CACHE(mcbsp_tx, SPCR2));
+ 	} else {
+ 		complete(&mcbsp_tx->tx_irq_completion);
+ 	}
+@@ -154,8 +153,7 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
+ 		dev_err(mcbsp_rx->dev, "RX Frame Sync Error! : 0x%x\n",
+ 			irqst_spcr1);
+ 		/* Writing zero to RSYNC_ERR clears the IRQ */
+-		MCBSP_WRITE(mcbsp_rx, SPCR1,
+-			    MCBSP_READ_CACHE(mcbsp_rx, SPCR1) & ~(RSYNC_ERR));
++		MCBSP_WRITE(mcbsp_rx, SPCR1, MCBSP_READ_CACHE(mcbsp_rx, SPCR1));
+ 	} else {
+ 		complete(&mcbsp_rx->tx_irq_completion);
+ 	}
+@@ -934,8 +932,7 @@ int omap_mcbsp_pollwrite(unsigned int id, u16 buf)
+ 	/* if frame sync error - clear the error */
+ 	if (MCBSP_READ(mcbsp, SPCR2) & XSYNC_ERR) {
+ 		/* clear error */
+-		MCBSP_WRITE(mcbsp, SPCR2,
+-				MCBSP_READ_CACHE(mcbsp, SPCR2) & (~XSYNC_ERR));
++		MCBSP_WRITE(mcbsp, SPCR2, MCBSP_READ_CACHE(mcbsp, SPCR2));
+ 		/* resend */
+ 		return -1;
+ 	} else {
+@@ -975,8 +972,7 @@ int omap_mcbsp_pollread(unsigned int id, u16 *buf)
+ 	/* if frame sync error - clear the error */
+ 	if (MCBSP_READ(mcbsp, SPCR1) & RSYNC_ERR) {
+ 		/* clear error */
+-		MCBSP_WRITE(mcbsp, SPCR1,
+-				MCBSP_READ_CACHE(mcbsp, SPCR1) & (~RSYNC_ERR));
++		MCBSP_WRITE(mcbsp, SPCR1, MCBSP_READ_CACHE(mcbsp, SPCR1));
+ 		/* resend */
+ 		return -1;
+ 	} else {
