@@ -1,66 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Feb 2010 11:01:27 +0000
-Subject: [PATCH 4/4] ARM: Add RealView-specific barrier implementation
-Message-ID: <20100223110127.11048.98497.stgit@e102109-lin.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 23 Feb 2010 11:05:11 +0000
+Subject: [PATCH] mx31ads: Configure SSI5 pins in IOMUX for PMIC module audio
+	support
+Message-ID: <1266923111-16575-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines ARCH_HAS_BARRIERS for the RealView boards if
-CACHE_L2X0 is enabled and adds the mach/barriers.h file. The mb() and
-wmb() barriers perform an L2 cache sync in addition to the DSB.
+SSI5 on the CPU is connected to the PMIC module to provide audio support
+so unconditionally configure the relevant pins on the CPU to route out
+the signals.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/Kconfig                               |    1 +
- arch/arm/mach-realview/include/mach/barriers.h |   30 ++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
+ arch/arm/mach-mx3/mach-mx31ads.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c33ca8..bc3deba 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -235,6 +235,7 @@ config ARCH_REALVIEW
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_HAS_BARRIERS if CACHE_L2X0
- 	help
- 	  This enables support for ARM Ltd RealView boards.
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index e5423f8..e402e0d 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -490,6 +490,19 @@ static void mxc_init_i2c(void)
+ }
+ #endif
  
-diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
-new file mode 100644
-index 0000000..cc11517
---- /dev/null
-+++ b/arch/arm/mach-realview/include/mach/barriers.h
-@@ -0,0 +1,30 @@
-+/*
-+ * arch/arm/mach-realview/include/mach/barriers.h
-+ *
-+ * Copyright (C) 2010 ARM Ltd.
-+ * Written by Catalin Marinas <catalin.marinas@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
++static unsigned int ssi_pins[] = {
++	MX31_PIN_SFS5__SFS5,
++	MX31_PIN_SCK5__SCK5,
++	MX31_PIN_SRXD5__SRXD5,
++	MX31_PIN_STXD5__STXD5,
++};
 +
-+#ifndef __MACH_BARRIERS_H
-+#define __MACH_BARRIERS_H
++static void mxc_init_audio(void)
++{
++	mxc_register_device(&imx_ssi_device0, NULL);
++	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
++}
 +
-+#include <asm/outercache.h>
-+
-+#define rmb()		dmb()
-+#define wmb()		do { dsb(); outer_sync(); } while (0)
-+#define mb()		wmb()
-+
-+#endif	/* __MACH_BARRIERS_H */
+ /*!
+  * This structure defines static mappings for the i.MX31ADS board.
+  */
+@@ -525,6 +538,7 @@ static void __init mxc_board_init(void)
+ 	mxc_init_extuart();
+ 	mxc_init_imx_uart();
+ 	mxc_init_i2c();
++	mxc_init_audio();
+ }
+ 
+ static void __init mx31ads_timer_init(void)
+-- 
+1.7.0
