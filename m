@@ -1,117 +1,49 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Tue, 23 Feb 2010 18:11:16 +0100
-Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
-In-Reply-To: <1266931113.19540.5.camel@frodo>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-5-git-send-email-rabin@rab.in>
-	<20100222190516.GJ5055@nowhere> <1266931113.19540.5.camel@frodo>
-Message-ID: <20100223171112.GC5357@nowhere>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Feb 2010 17:33:34 +0000
+Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
+In-Reply-To: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
+References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100223173334.GA13519@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2010 at 08:18:33AM -0500, Steven Rostedt wrote:
-> On Mon, 2010-02-22 at 20:05 +0100, Frederic Weisbecker wrote:
-> 
-> > 
-> > Btw, you described that mcount is used in some gcc versions and
-> > __gnu_mcount_nc in newers.
-> > Shouldn't we have a gcc version dependency here? (not sure we can
-> > do this from Kconfig though).
-> > 
-> 
-> Maybe we can add something to recordmcount.pl?
+On Tue, Feb 23, 2010 at 11:01:05AM +0000, Catalin Marinas wrote:
+> The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+> systems for things like ordering Normal Non-cacheable memory accesses
+> with DMA transfer (via Device memory writes). The current implementation
+> uses dmb() for mb() and friends but this is not sufficient. The DMB only
+> ensures the ordering of accesses with regards to a single observer
+> accessing the same memory.
 
+Erm, I also don't think your statement here is right.  DMB is defined in
+the ARM ARM to be by default a full-system, read/write memory barrier.
+It has this property:
 
+  If the required shareability is Full system then the operation applies
+  to all observers within the system.
+...
+  Any observer with the same required shareability domain as Pe observes
+  all members of Group A before it observes any member of Group B to the
+  extent that those group members are required to be observed, as
+  determined by the shareability and cacheability of the memory locations
+  accessed by the group members.  Where members of Group A and Group B
+  access the same memory-mapped peripheral, all members of Group A will
+  be visible at the memory-mapped peripheral before any members of Group
+  B are visible at that peripheral.
 
-May be yeah, with an explicit message that describes the issue.
+This most definitely is not "single observer" - it's all observers within
+the same "shareability domain".  That may encompass all CPUs and not
+devices and DMA agents.
 
+I'd go further - in the case of:
 
- 
-> > 
-> > 
-> > >  config DEBUG_USER
-> > >  	bool "Verbose user fault messages"
-> > >  	help
-> > > diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-> > > index 8214bfe..e5e1e53 100644
-> > > --- a/arch/arm/kernel/armksyms.c
-> > > +++ b/arch/arm/kernel/armksyms.c
-> > > @@ -165,6 +165,8 @@ EXPORT_SYMBOL(_find_next_bit_be);
-> > >  #endif
-> > >  
-> > >  #ifdef CONFIG_FUNCTION_TRACER
-> > > +#ifdef CONFIG_OLD_MCOUNT
-> > >  EXPORT_SYMBOL(mcount);
-> > > +#endif
-> > >  EXPORT_SYMBOL(__gnu_mcount_nc);
-> > >  #endif
-> > > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> > > index d412d7c..c98e3a3 100644
-> > > --- a/arch/arm/kernel/entry-common.S
-> > > +++ b/arch/arm/kernel/entry-common.S
-> > > @@ -169,6 +169,12 @@ gnu_trace:
-> > >  	ldmia	sp!, {r0-r3, ip, lr}
-> > >  	mov	pc, ip
-> > >  
-> > > +#ifdef CONFIG_OLD_MCOUNT
-> > > +/*
-> > > + * This is under an ifdef in order to force link-time errors for people trying
-> > > + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
-> > > + * mcount.
-> > > + */
-> > >  ENTRY(mcount)
-> > >  	stmdb	sp!, {r0-r3, lr}
-> > >  	ldr	r0, =ftrace_trace_function
-> > > @@ -187,6 +193,7 @@ trace:
-> > >  	mov	pc, r2
-> > >  	ldr	lr, [fp, #-4]			@ restore lr
-> > >  	ldmia	sp!, {r0-r3, pc}
-> > > +#endif
-> > >  
-> > >  #endif /* CONFIG_DYNAMIC_FTRACE */
-> > >  
-> > > diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> > > index 6c22d8a..7468ffe 100644
-> > > --- a/kernel/trace/Kconfig
-> > > +++ b/kernel/trace/Kconfig
-> > > @@ -126,7 +126,7 @@ if FTRACE
-> > >  config FUNCTION_TRACER
-> > >  	bool "Kernel Function Tracer"
-> > >  	depends on HAVE_FUNCTION_TRACER
-> > > -	select FRAME_POINTER
-> > > +	select FRAME_POINTER if (!ARM_UNWIND)
-> > 
-> > 
-> > So, if I understand well. If people have ARM_UNWIND but
-> > FUNCTION_TRACER, it might crash at link time in case
-> > they don't have a recent enough gcc version to
-> > support the new -pg style?
-> > 
-> > That doesn't look good.
-> > 
-> > Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
-> > only if (old gcc && frame pointers) || new gcc
-> > 
-> > And then, we need config OLD_MCOUNT:
-> > 	 old gcc && FUNCTION_TRACER
-> > 
-> > and config NEW_MCOUNT:
-> > 	new gcc && FUNCTION_TRACER
-> > 
-> > so that we can selectively build mcount or __gnu_mcount_nc.
-> > 
-> > Hmm, I fear we can't check gcc version from Kconfig, as I'm
-> > grepping on Kconfig files...
-> 
-> 
-> I would not check gcc version through KCONFIG, but you can have the gcc
-> version checked and define another macro in a header somewhere, like
-> asm/ftrace.h. Then we could do something different while it is
-> compiling.
+	write to non-cacheable memory
+	dmb();
+	write to peripheral
 
+then, because the dmb() is a full system dmb, all observers within the
+system should see the write to non-cacheable memory before the write to
+peripheral.
 
-Yeah. I understand now why we can't do that on Kconfig time, HOSTCC
-can be different than CC.
-
-The most important thing is to have a message that describes the issue
-if the compiler-config combination is impossible.
+Either that or the ARM ARM is unclear/wrong about what "all observers"
+means.
