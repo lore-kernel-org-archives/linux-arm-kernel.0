@@ -1,71 +1,145 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Feb 2010 16:02:35 +0000
-Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <20100223152402.GF10501@n2100.arm.linux.org.uk>
-References: <20100223152402.GF10501@n2100.arm.linux.org.uk>
-Message-ID: <1266940955.3123.133.camel@e102109-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 23 Feb 2010 21:47:27 +0530
+Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
+In-Reply-To: <20100222213932.GW18786@atomide.com>
+References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C417FA42@dbde02.ent.ti.com>
+	<20100222213932.GW18786@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E15AA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-02-23 at 15:24 +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2010 at 03:12:46PM +0000, Catalin Marinas wrote:
-> > The scenario I have in mind is when using mb() in relation with DMA
-> > coherent mappings. We only use Normal Uncached for this case on ARMv7.
-> > Earlier architectures, including ARMv6 SMP, we use strongly ordered
-> > which would be fine without any barrier.
+Tony,
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Tuesday, February 23, 2010 3:10 AM
+> To: Shilimkar, Santosh
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Woodruff, Richard; Ghorai,
+> Sukumar
+> Subject: Re: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
+> 
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100218 21:22]:
+> > Bye the way just to add bit more clarity, this patch addresses TX
+> > hardware restriction in the new UART IP used on omap3630 and omap4430.
+> > First part of the fix for RX is already in mainline,
+> > Commit: "ce13d4716a276f4331d78ba28a5093a63822ab95"
 > >
-> > Since mb() isn't meant for SMP use, does it still make sense to have it
-> > defined in the ARMv6 SMP case? Would people not use the smp_* variants?
+> > More details on this thread are here.
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg19447.html
 > 
-> Part of the reason for that is that smp_mb() are, afaik, supposed to be
-> as strong as mb() in the SMP case, or reduce to compiler barriers in the
-> UP case.
-
-I looked again at Documentation/memory-barriers.txt and I haven't seen
-anything that would suggest the above. The only reference to these types
-of barriers together seems to be:
-
-        Note that SMP memory barriers _must_ be used to control the
-        ordering of references to shared memory on SMP systems [...].
-        
-        Mandatory barriers should not be used to control SMP effects,
-        since mandatory barriers unnecessarily impose overhead on UP
-        systems. They may, however, be used to control MMIO effects on
-        accesses through relaxed memory I/O windows.
-
-They don't seem to imply that one is stronger than the other, only that
-they are meant for different scenarios.
-
-> I'm not entirely convinced by the part of your patch which changes the
-> SMP barriers yet.  For instance, some drivers contain:
+> Thanks, I've updated the comments for this patch with the link above
+> and added the whole series into omap for-next.
 > 
->                 /* We need for force the visibility of tp->intr_mask
->                  * for other CPUs, as we can loose an MSI interrupt
->                  * and potentially wait for a retransmit timeout if we don't.
->                  * The posted write to IntrMask is safe, as it will
->                  * eventually make it to the chip and we won't loose anything
->                  * until it does.
->                  */
->                 tp->intr_mask = 0xffff;
->                 smp_wmb();
->                 RTL_W16(IntrMask, tp->intr_event);
+Please drop this patch since it has introduces regression on interrupt latency
+while traces are enabled. Since 8250 driver calls serial_out() function is with
+interrupt disabled ( spin_lock_irqsave), the interrupt latency at times is 
+as high as in few milliseconds because of error case.
+
+I shall work towards this issue but for now we should drop this since the side effect
+of this change is known
+
 > 
-> The second write is a write to hardware, and thus would be to a device
-> region.  The first is a write to a memory structure.
-> 
-> It seems to me given your description in the patch, that having smp_wmb()
-> be a dmb(), rather than a wmb() would be insufficient here.
+> > > -----Original Message-----
+> > > From: Shilimkar, Santosh
+> > > Sent: Thursday, February 18, 2010 2:29 PM
+> > > To: tony at atomide.com
+> > > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Shilimkar, Santosh;
+> Woodruff,
+> > > Richard; Ghorai, Sukumar
+> > > Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
+> > >
+> > > This patch is addition to the already merged commit on non-empty
+> > > uart fifo read abort. "ce13d4716a276f4331d78ba28a5093a63822ab95"
+> > >
+> > > OMAP3630 and OMAP4430 UART IP blocks have a restriction on TX FIFO
+> > > too. If you try to write to the tx fifo when it is full, the system aborts.
+> > >
+> > > This can be easily reproducible by not suppressing interconnect errors or
+> > > long duration testing where continuous prints over console from multiple
+> > > threads. This patch is addressing the issue by ensuring that write is
+> > > not issued while fifo is full. A timeout is added to avoid any hang
+> > > on fifo-full for 10 mS which is unlikely case.
+> > >
+> > > Patch is validated on OMAP3630 and OMAP4 SDP.
+> > >
+> > > V2 version removed the additional 1 uS on every TX as per
+> > > Tony's suggestion
+> > >
+> > > Signed-off-by: Woodruff Richard <r-woodruff2@ti.com>
+> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > CC: Ghorai Sukumar <s-ghorai@ti.com>
+> > > ---
+> > >  arch/arm/mach-omap2/serial.c |   31 ++++++++++++++++++++++++++++---
+> > >  1 files changed, 28 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> > > index 5f3035e..b79bc89 100644
+> > > --- a/arch/arm/mach-omap2/serial.c
+> > > +++ b/arch/arm/mach-omap2/serial.c
+> > > @@ -23,6 +23,7 @@
+> > >  #include <linux/serial_reg.h>
+> > >  #include <linux/clk.h>
+> > >  #include <linux/io.h>
+> > > +#include <linux/delay.h>
+> > >
+> > >  #include <plat/common.h>
+> > >  #include <plat/board.h>
+> > > @@ -160,6 +161,13 @@ static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
+> > >  	return (unsigned int)__raw_readb(up->membase + offset);
+> > >  }
+> > >
+> > > +static inline void __serial_write_reg(struct uart_port *up, int offset,
+> > > +		int value)
+> > > +{
+> > > +	offset <<= up->regshift;
+> > > +	__raw_writeb(value, up->membase + offset);
+> > > +}
+> > > +
+> > >  static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
+> > >  				    int value)
+> > >  {
+> > > @@ -620,6 +628,20 @@ static unsigned int serial_in_override(struct uart_port *up, int offset)
+> > >  	return __serial_read_reg(up, offset);
+> > >  }
+> > >
+> > > +static void serial_out_override(struct uart_port *up, int offset, int value)
+> > > +{
+> > > +	unsigned int status, tmout = 10000;
+> > > +
+> > > +	status = __serial_read_reg(up, UART_LSR);
+> > > +	while (!(status & UART_LSR_THRE)) {
+> > > +		/* Wait up to 10ms for the character(s) to be sent. */
+> > > +		if (--tmout == 0)
+> > > +			break;
+> > > +		udelay(1);
+> > > +		status = __serial_read_reg(up, UART_LSR);
+> > > +	}
+> > > +	__serial_write_reg(up, offset, value);
+> > > +}
+> > >  void __init omap_serial_early_init(void)
+> > >  {
+> > >  	int i;
+> > > @@ -721,11 +743,14 @@ void __init omap_serial_init_port(int port)
+> > >  	 * omap3xxx: Never read empty UART fifo on UARTs
+> > >  	 * with IP rev >=0x52
+> > >  	 */
+> > > -	if (cpu_is_omap44xx())
+> > > +	if (cpu_is_omap44xx()) {
+> > >  		uart->p->serial_in = serial_in_override;
+> > > -	else if ((serial_read_reg(uart->p, UART_OMAP_MVER) & 0xFF)
+> > > -			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV)
+> > > +		uart->p->serial_out = serial_out_override;
+> > > +	} else if ((serial_read_reg(uart->p, UART_OMAP_MVER) & 0xFF)
+> > > +			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV) {
+> > >  		uart->p->serial_in = serial_in_override;
+> > > +		uart->p->serial_out = serial_out_override;
+> > > +	}
+> > >  }
+> > >
+> > >  /**
+> > > --
+> > > 1.6.0.4
+> >
 
-Yes, a DMB is insufficient here (see the Mailbox example in the Barrier
-Litmus document from Richard G). That's actually the case with the GIC
-currently - CPU0 writes some data, barrier and then IPI to CPU1. If only
-DMB is used, the IPI may arrive at CPU1 before the data written by CPU0
-reaches the memory.
-
-My proposal for this would be to place an explicit DSB at the beginning
-of gic_raise_irq(). Otherwise, we can change smp_wmb() to be a DSB but
-we may have some performance penalty for other cases where ordering with
-Device accesses is not required.
-
--- 
-Catalin
+Regards,
+Santosh
