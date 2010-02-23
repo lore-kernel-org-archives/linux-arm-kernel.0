@@ -1,53 +1,76 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 23 Feb 2010 17:04:09 -0500 (EST)
-Subject: =?ISO-8859-15?Q?Re=3A_=5BPATCH=5D=A0MPP_routines_and_definitions_for_MV78XX0_arch?=
-In-Reply-To: <4B83DA46.4030309@kolios.dk>
-References: <4B83DA46.4030309@kolios.dk>
-Message-ID: <alpine.LFD.2.00.1002231655250.1946@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Feb 2010 15:12:25 -0800
+Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E1174@dbde02.ent.ti.com>
+References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C417FA42@dbde02.ent.ti.com>
+	<20100222213932.GW18786@atomide.com>
+	<20100222230712.GB18786@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C42E1174@dbde02.ent.ti.com>
+Message-ID: <20100223231225.GL28173@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Feb 2010, Sebastien Requiem wrote:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100222 23:16]:
+> Tony,
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Tuesday, February 23, 2010 4:37 AM
+> > To: Shilimkar, Santosh
+> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Woodruff, Richard; Ghorai,
+> > Sukumar
+> > Subject: Re: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
+> > 
+> > * Tony Lindgren <tony@atomide.com> [100222 13:35]:
+> > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100218 21:22]:
+> > > > Bye the way just to add bit more clarity, this patch addresses TX
+> > > > hardware restriction in the new UART IP used on omap3630 and omap4430.
+> > > > First part of the fix for RX is already in mainline,
+> > > > Commit: "ce13d4716a276f4331d78ba28a5093a63822ab95"
+> > > >
+> > > > More details on this thread are here.
+> > > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg19447.html
+> > >
+> > > Thanks, I've updated the comments for this patch with the link above
+> > > and added the whole series into omap for-next.
+> > 
+> > Except patches 8 and 9 as they break compile for mach-omap1
+> > and need to be updated.
+> >
+> Patch 8 is alright and doesn't break omap1. Patch 7 and patch 9 needs update to fix
+> the mach-omap1 build issue by moving irqs-44xx.h header file to plat-omap directory.
+> Attached are updated 7 and 9.
+> Build tested for omap1 (omap_generic_1710_defconfig and omap_h2_1610_defconfig) and boot
+> tested with omap3_defconfig on omap4430sdp board.
 
-> Hi everyone,
-> 
-> 
-> I have recently created the routines to configure the MPP
-> lines on specific plateform for the architecture MV78XX0.
-> 
-> 
-> Patch description :
-> ============
-> This patch is composed of two new files :
-> - mpp.c which is mainly inspired by the same
-> file as in mach-kirkwood
-> - mpp.h that is written from the documentation provided
-> by Marvell
-> 
-> http://www.marvell.com/products/processors/embedded/discovery_innovation/HW_MV78100_OpenSource.pdf
-> 
-> moreover, due to some implementation problem, I have
-> defined some MPPX_UNUSED that offer the posibility
-> to developers to SET MPP to some unused value
-> (such as Buffalo WXL)
-> 
-> Note: This patch doesn't support MV78200 yet (only 78100 MPP lines have been
-> written)
-> =============
-> 
-> 
-> I would very much appreciate if you could review the patch
-> and give feedback/comments.
+Next time, one patch per email please. And updates as replies
+to the original patches, or else the whole series. And patches
+as inline attachments.
 
-You should put the Signed-off-by tag along with your patch description, 
-not after the patch.
+Otherwise it's hard to keep track of the patches and comment
+them.
 
-The coding style requires hard tabs for code indentation, and those 
-must be 8 space width.  More details in Documentation/CodingStyle.
+I've updated your patch 9/9 with the following as in omap for-next
+I was getting:
 
-You forgot to include the change to Makefile for the new file.
+arch/arm/mach-omap2/usb-musb.c:97: Building for omap_3430sdp_defconfigred (first use in this function)                                                              Building for omap_3630sdp_defconfigch-omap2/usb-musb.c:97: error: (Each undeclared identifier is reported only once
+arch/arm/mach-omap2/usb-musb.c:97: error: for each function it appears in.)
+arch/arm/mach-omap2/usb-musb.c:98: error: 'INT_44XX_HS_USB_DMA' undeclared (first use in this function)
 
-I've fixed those up and committed the patch to the orion git tree.
+Regards,
 
+Tony
 
-Nicolas
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -94,8 +94,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
+ 		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
+ 	} else if (cpu_is_omap44xx()) {
+ 		musb_resources[0].start = OMAP44XX_HSUSB_OTG_BASE;
+-		musb_resources[1].start = INT_44XX_HS_USB_MC;
+-		musb_resources[2].start = INT_44XX_HS_USB_DMA;
++		musb_resources[1].start = OMAP44XX_IRQ_HS_USB_MC_N;
++		musb_resources[2].start = OMAP44XX_IRQ_HS_USB_DMA_N;
+ 	}
+ 	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
+ 
