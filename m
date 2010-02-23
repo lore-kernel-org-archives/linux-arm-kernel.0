@@ -1,122 +1,75 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 23 Feb 2010 23:28:07 +0530
-Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
-In-Reply-To: <20100223171112.GC5357@nowhere>
-References: <1266090518-31120-1-git-send-email-rabin@rab.in>
-	<1266090518-31120-5-git-send-email-rabin@rab.in>
-	<20100222190516.GJ5055@nowhere> <1266931113.19540.5.camel@frodo>
-	<20100223171112.GC5357@nowhere>
-Message-ID: <20100223175807.GB5836@debian>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Feb 2010 17:58:35 +0000
+Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
+In-Reply-To: <20100223173334.GA13519@n2100.arm.linux.org.uk>
+References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
+	<20100223173334.GA13519@n2100.arm.linux.org.uk>
+Message-ID: <1266947915.3123.150.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2010 at 06:11:16PM +0100, Frederic Weisbecker wrote:
-> On Tue, Feb 23, 2010 at 08:18:33AM -0500, Steven Rostedt wrote:
-> > On Mon, 2010-02-22 at 20:05 +0100, Frederic Weisbecker wrote:
-> > > 
-> > > Btw, you described that mcount is used in some gcc versions and
-> > > __gnu_mcount_nc in newers.
-> > > Shouldn't we have a gcc version dependency here? (not sure we can
-> > > do this from Kconfig though).
-> > > 
-> > Maybe we can add something to recordmcount.pl?
+On Tue, 2010-02-23 at 17:33 +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 23, 2010 at 11:01:05AM +0000, Catalin Marinas wrote:
+> > The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+> > systems for things like ordering Normal Non-cacheable memory accesses
+> > with DMA transfer (via Device memory writes). The current implementation
+> > uses dmb() for mb() and friends but this is not sufficient. The DMB only
+> > ensures the ordering of accesses with regards to a single observer
+> > accessing the same memory.
 > 
-> May be yeah, with an explicit message that describes the issue.
-
-Adding something to recordmcount.pl to detect this would be
-insufficient, because this affects non-dynamic ftrace too.
-
-> > > > +++ b/arch/arm/kernel/entry-common.S
-> > > > @@ -169,6 +169,12 @@ gnu_trace:
-> > > >  	ldmia	sp!, {r0-r3, ip, lr}
-> > > >  	mov	pc, ip
-> > > >  
-> > > > +#ifdef CONFIG_OLD_MCOUNT
-> > > > +/*
-> > > > + * This is under an ifdef in order to force link-time errors for people trying
-> > > > + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
-> > > > + * mcount.
-> > > > + */
-> > > >  ENTRY(mcount)
-> > > >  	stmdb	sp!, {r0-r3, lr}
-> > > >  	ldr	r0, =ftrace_trace_function
-> > > > @@ -187,6 +193,7 @@ trace:
-> > > >  	mov	pc, r2
-> > > >  	ldr	lr, [fp, #-4]			@ restore lr
-> > > >  	ldmia	sp!, {r0-r3, pc}
-> > > > +#endif
-> > > >  
-> > > >  #endif /* CONFIG_DYNAMIC_FTRACE */
-> > > >  
-> > > > diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> > > > index 6c22d8a..7468ffe 100644
-> > > > --- a/kernel/trace/Kconfig
-> > > > +++ b/kernel/trace/Kconfig
-> > > > @@ -126,7 +126,7 @@ if FTRACE
-> > > >  config FUNCTION_TRACER
-> > > >  	bool "Kernel Function Tracer"
-> > > >  	depends on HAVE_FUNCTION_TRACER
-> > > > -	select FRAME_POINTER
-> > > > +	select FRAME_POINTER if (!ARM_UNWIND)
-> > > 
-> > > 
-> > > So, if I understand well. If people have ARM_UNWIND but
-> > > FUNCTION_TRACER, it might crash at link time in case
-> > > they don't have a recent enough gcc version to
-> > > support the new -pg style?
-
-They'd probably get an "undefined reference to mcount" message.  I
-forced the link time error because otherwise they'll have runtime
-problems.
-
-> > > 
-> > > That doesn't look good.
-> > > 
-> > > Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
-> > > only if (old gcc && frame pointers) || new gcc
-> > > 
-> > > And then, we need config OLD_MCOUNT:
-> > > 	 old gcc && FUNCTION_TRACER
-> > > 
-> > > and config NEW_MCOUNT:
-> > > 	new gcc && FUNCTION_TRACER
-> > > 
-> > > so that we can selectively build mcount or __gnu_mcount_nc.
-
-There's more to this.  When we build with FRAME_POINTER, we need to
-always build in both version of mcount.  This is to allow modules to be
-built with different versions of the compiler (one which uses the old
-mcount and one with the new mcount).
-
-> > > 
-> > > Hmm, I fear we can't check gcc version from Kconfig, as I'm
-> > > grepping on Kconfig files...
-> > 
-> > 
-> > I would not check gcc version through KCONFIG, but you can have the gcc
-> > version checked and define another macro in a header somewhere, like
-> > asm/ftrace.h. Then we could do something different while it is
-> > compiling.
+> Erm, I also don't think your statement here is right.  DMB is defined in
+> the ARM ARM to be by default a full-system, read/write memory barrier.
+> It has this property:
 > 
-> Yeah. I understand now why we can't do that on Kconfig time, HOSTCC
-> can be different than CC.
+>   If the required shareability is Full system then the operation applies
+>   to all observers within the system.
+> ...
+>   Any observer with the same required shareability domain as Pe observes
+>   all members of Group A before it observes any member of Group B to the
+>   extent that those group members are required to be observed, as
+>   determined by the shareability and cacheability of the memory locations
+>   accessed by the group members.  Where members of Group A and Group B
+>   access the same memory-mapped peripheral, all members of Group A will
+>   be visible at the memory-mapped peripheral before any members of Group
+>   B are visible at that peripheral.
 > 
-> The most important thing is to have a message that describes the issue
-> if the compiler-config combination is impossible.
+> This most definitely is not "single observer" - it's all observers within
+> the same "shareability domain".  That may encompass all CPUs and not
+> devices and DMA agents.
 
-The easiest option to have a more obvious message than a linker error
-would be to add something like this in entry-common.S:
+Yes, that's correct but see below (the issue is the definition of
+"observability").
 
-  #if (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)) \
-	&& !defined(OLD_MCOUNT)
-  #warning Ftrace on GCC < 4.4 requires frame pointers
-  #endif
+> I'd go further - in the case of:
+> 
+>         write to non-cacheable memory
+>         dmb();
+>         write to peripheral
+> 
+> then, because the dmb() is a full system dmb, all observers within the
+> system should see the write to non-cacheable memory before the write to
+> peripheral.
+> 
+> Either that or the ARM ARM is unclear/wrong about what "all observers"
+> means.
 
-Messages like this are also present in other places in ARM (for example
-arch/arm/kernel/unwind.c), so this wouldn't be this first.
+The ARM ARM wasn't clear to me either but the answer I got from Richard
+G on this issue is that the "write to peripheral" above doesn't count as
+"observed" since the "observability" definition only applies to master
+accesses. In the above case, the CPU writes to a slave port of the
+peripheral and the DMB has no effect on when such event would be
+observed (if the device is mapped as strongly ordered, there are some
+stricter requirements). You could ask RG directly, he would probably be
+happy to clarify this for you.
 
-Note that the above message would help in all cases except the one where
-someone builds the kernel with !fp and GCC 4.4+, and then builds a
-module with an older GCC.  That would still be only a linker error.
+Linux doesn't have a barrier defined to flush the write buffer, even
+though the Documentation/DMA-API.txt mention that the user of coherent
+DMA mappings may need to do this. Since many drivers use wmb/mb for this
+situation, I find this barrier as the best place to put a DSB.
 
-Rabin
+IMHO, mb() has at least the smp_mb() semantics and it can be safely used
+in the IPI case you mentioned instead of the smp_* one (when implemented
+as DSB).
+
+-- 
+Catalin
