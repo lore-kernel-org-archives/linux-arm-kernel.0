@@ -1,31 +1,45 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Mon, 22 Feb 2010 18:33:26 -0800 (PST)
-Subject: [PATCH 1/1] MX35: Add CUPID i2c1 rtc and at24 support.
-In-Reply-To: <D99582E5322435468A77E74BB0039E7B176E1F3BC8@SRV02.hamburg.garz-fricke.de>
-Message-ID: <310600.62483.qm@web51006.mail.re2.yahoo.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Feb 2010 21:50:52 -0700
+Subject: [PATCH 06/11] OMAP clockdomain: if no autodeps exist,
+	don't try to add or remove them
+In-Reply-To: <20100223044915.18888.83242.stgit@localhost.localdomain>
+References: <20100223044915.18888.83242.stgit@localhost.localdomain>
+Message-ID: <20100223045050.18888.84634.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+_clkdm_add_autodeps() and _clkdm_del_autodeps() will attempt to dereference
+a NULL pointer if no autodeps were supplied to clkdm_init().
 
---- On Mon, 2/22/10, Carsten Behling <carsten.behling@garz-fricke.com> wrote:
+Based on a patch from Roel Kluin <roel.kluin@gmail.com> - thanks Roel.
 
-> From: Carsten Behling <carsten.behling@garz-fricke.com>
-> Subject: [PATCH 1/1] MX35: Add CUPID i2c1 rtc and at24 support.
-> To: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-> Cc: "daniel at caiaq.de" <daniel@caiaq.de>, "kernel at pengutronix.de" <kernel@pengutronix.de>, "u.kleine-koenig at pengutronix.de" <u.kleine-koenig@pengutronix.de>
-> Date: Monday, February 22, 2010, 4:37 PM
-> Signed-off-by: Carsten Behling <carsten.behling@garz-fricke.com>
-> ---
->  This patch adds i2-1 devices at24 eeprom and rtc to the
-> Garz & Fricke CUPID bsp.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Roel Kluin <roel.kluin@gmail.com>
+---
+ arch/arm/mach-omap2/clockdomain.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-I didn't see RTC support being added on your patch as per your description.
-
-Regards,
-
-Fabio Estevam
-
-
-
-
-      
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index de4278c..b26d30a 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -173,6 +173,9 @@ static void _clkdm_add_autodeps(struct clockdomain *clkdm)
+ {
+ 	struct clkdm_autodep *autodep;
+ 
++	if (!autodeps)
++		return;
++
+ 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
+ 		if (IS_ERR(autodep->clkdm.ptr))
+ 			continue;
+@@ -201,6 +204,9 @@ static void _clkdm_del_autodeps(struct clockdomain *clkdm)
+ {
+ 	struct clkdm_autodep *autodep;
+ 
++	if (!autodeps)
++		return;
++
+ 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
+ 		if (IS_ERR(autodep->clkdm.ptr))
+ 			continue;
