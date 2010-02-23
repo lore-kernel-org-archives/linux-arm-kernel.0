@@ -1,31 +1,24 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 23 Feb 2010 09:02:39 +0100
-Subject: [PATCH 01/13] ARM: LPC32XX: Initial architecture header files
-In-Reply-To: <083DF309106F364B939360100EC290F805CCDFB589@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-	<1266621969-28847-2-git-send-email-wellsk40@gmail.com>
-	<20100220161248.GA31424@pengutronix.de>
-	<a08234131002201112x66a595c4j235bf1a31aef4f92@mail.gmail.com>
-	<a08234131002201117t5bbd350ybaf14613cef0c54f@mail.gmail.com>
-	<083DF309106F364B939360100EC290F805CCDFB589@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100223080239.GA6596@pengutronix.de>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Tue, 23 Feb 2010 15:42:58 +0530
+Subject: [PATCH 0/4] ux500: u8500 v1 revision, clock gating
+Message-ID: <1266919983-32759-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+These apply on top of the clkdev_add_table patch and the ux500 patches in
+next/rmk-devel.
 
-On Mon, Feb 22, 2010 at 10:41:01PM +0100, Kevin Wells wrote:
-> I'm going to add the pin mux check to a future patch release.
-> It's a nice feature and may save some GPIO pin issues down
-> the road, but respectfully, I want to focus on getting the
-> release out without adding more changes & features at the
-> moment. I'll add this capbility in with a new pinmux driver
-> in the future.
-OK for me.
+Rabin Vincent (4):
+  ux500: fix CLKRST addresses
+  ux500: move system timer to cpu file
+  ux500: add support for u8500 v1 revision
+  ux500: support clock gating
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ arch/arm/mach-ux500/board-mop500.c          |   20 +-
+ arch/arm/mach-ux500/clock.c                 |  491 +++++++++++++++++++++++++--
+ arch/arm/mach-ux500/clock.h                 |  125 +++++++
+ arch/arm/mach-ux500/cpu-u8500.c             |   44 +++-
+ arch/arm/mach-ux500/include/mach/hardware.h |   37 ++-
+ arch/arm/mach-ux500/include/mach/setup.h    |    3 +
+ 6 files changed, 657 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/clock.h
