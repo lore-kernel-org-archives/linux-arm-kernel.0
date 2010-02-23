@@ -1,888 +1,1169 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Feb 2010 21:50:50 -0700
-Subject: [PATCH 05/11] OMAP hwmod: add hwmod class support
+Date: Mon, 22 Feb 2010 21:50:56 -0700
+Subject: [PATCH 09/11] OMAP4: clock: Rename leaf clock nodes to end with a
+	_ick or _fck
 In-Reply-To: <20100223044915.18888.83242.stgit@localhost.localdomain>
 References: <20100223044915.18888.83242.stgit@localhost.localdomain>
-Message-ID: <20100223045048.18888.52038.stgit@localhost.localdomain>
+Message-ID: <20100223045055.18888.46077.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for categorizing and iterating over hardware IP blocks by
-the "class" of the IP block.  The class is the type of the IP block:
-e.g., "timer", "timer1ms", etc.  Move the OCP_SYSCONFIG/SYSSTATUS data
-from the struct omap_hwmod into the struct omap_hwmod_class, since
-it's expected to stay consistent for each class.  While here, fix some
-comments.
+From: Rajendra Nayak <rnayak@ti.com>
 
-The hwmod_class structures in this patch were designed and proposed by
-Beno?t Cousson <b-cousson@ti.com> and were refined in a discussion
-between Thara Gopinath <thara@ti.com>, Kevin Hilman
-<khilman@deeprootsystems.com>, and myself.
+All leaf clock nodes are renamed for OMAP4 to have a clk name which
+end with a _ick or a _fck. This is done so that the naming convention
+is same as that followed on older OMAPs.
 
-This patch uses WARN() lines that are longer than 80 characters, as
-Kevin noted a broader lkml consensus to increase greppability by
-keeping the messages all on one line.
-
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
-Cc: Thara Gopinath <thara@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/Makefile                 |    7 -
- arch/arm/mach-omap2/omap_hwmod.c             |  222 ++++++++++++++++----------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    6 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    7 +
- arch/arm/mach-omap2/omap_hwmod_common_data.c |   24 +++
- arch/arm/mach-omap2/omap_hwmod_common_data.h |   24 +++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   37 +++-
- 8 files changed, 234 insertions(+), 99 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_data.h
+ arch/arm/mach-omap2/clock44xx_data.c |  561 ++++++++++++++++++----------------
+ 1 files changed, 297 insertions(+), 264 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 4aa621d..162294e 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -5,15 +5,16 @@
- # Common support
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
- 
--omap-2-3-common				= irq.o sdrc.o omap_hwmod.o \
-+omap-2-3-common				= irq.o sdrc.o
-+hwmod-common				= omap_hwmod.o \
- 					  omap_hwmod_common_data.o
- prcm-common				= prcm.o powerdomain.o
- clock-common				= clock.o clock_common_data.o \
- 					  clockdomain.o clkt_dpll.o \
- 					  clkt_clksel.o
- 
--obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common)
--obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(prcm-common)
-+obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(hwmod-common)
-+obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(prcm-common) $(hwmod-common)
- obj-$(CONFIG_ARCH_OMAP4) += $(prcm-common)
- 
- obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 501660a..c664947 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -84,17 +84,16 @@ static u8 inited;
-  */
- static int _update_sysc_cache(struct omap_hwmod *oh)
- {
--	if (!oh->sysconfig) {
--		WARN(!oh->sysconfig, "omap_hwmod: %s: cannot read "
--		     "OCP_SYSCONFIG: not defined on hwmod\n", oh->name);
-+	if (!oh->class->sysc) {
-+		WARN(1, "omap_hwmod: %s: cannot read OCP_SYSCONFIG: not defined on hwmod's class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
- 	/* XXX ensure module interface clock is up */
- 
--	oh->_sysc_cache = omap_hwmod_readl(oh, oh->sysconfig->sysc_offs);
-+	oh->_sysc_cache = omap_hwmod_readl(oh, oh->class->sysc->sysc_offs);
- 
--	if (!(oh->sysconfig->sysc_flags & SYSC_NO_CACHE))
-+	if (!(oh->class->sysc->sysc_flags & SYSC_NO_CACHE))
- 		oh->_int_flags |= _HWMOD_SYSCONFIG_LOADED;
- 
- 	return 0;
-@@ -105,14 +104,13 @@ static int _update_sysc_cache(struct omap_hwmod *oh)
-  * @v: OCP_SYSCONFIG value to write
-  * @oh: struct omap_hwmod *
-  *
-- * Write @v into the module OCP_SYSCONFIG register, if it has one.  No
-- * return value.
-+ * Write @v into the module class' OCP_SYSCONFIG register, if it has
-+ * one.  No return value.
-  */
- static void _write_sysconfig(u32 v, struct omap_hwmod *oh)
- {
--	if (!oh->sysconfig) {
--		WARN(!oh->sysconfig, "omap_hwmod: %s: cannot write "
--		     "OCP_SYSCONFIG: not defined on hwmod\n", oh->name);
-+	if (!oh->class->sysc) {
-+		WARN(1, "omap_hwmod: %s: cannot write OCP_SYSCONFIG: not defined on hwmod's class\n", oh->name);
- 		return;
- 	}
- 
-@@ -120,7 +118,7 @@ static void _write_sysconfig(u32 v, struct omap_hwmod *oh)
- 
- 	if (oh->_sysc_cache != v) {
- 		oh->_sysc_cache = v;
--		omap_hwmod_writel(v, oh, oh->sysconfig->sysc_offs);
-+		omap_hwmod_writel(v, oh, oh->class->sysc->sysc_offs);
- 	}
- }
- 
-@@ -140,17 +138,16 @@ static int _set_master_standbymode(struct omap_hwmod *oh, u8 standbymode,
- 	u32 mstandby_mask;
- 	u8 mstandby_shift;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_MIDLEMODE))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	mstandby_shift = oh->sysconfig->sysc_fields->midle_shift;
-+	mstandby_shift = oh->class->sysc->sysc_fields->midle_shift;
- 	mstandby_mask = (0x3 << mstandby_shift);
- 
- 	*v &= ~mstandby_mask;
-@@ -174,17 +171,16 @@ static int _set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode, u32 *v)
- 	u32 sidle_mask;
- 	u8 sidle_shift;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SIDLEMODE))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SIDLEMODE))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	sidle_shift = oh->sysconfig->sysc_fields->sidle_shift;
-+	sidle_shift = oh->class->sysc->sysc_fields->sidle_shift;
- 	sidle_mask = (0x3 << sidle_shift);
- 
- 	*v &= ~sidle_mask;
-@@ -209,17 +205,16 @@ static int _set_clockactivity(struct omap_hwmod *oh, u8 clockact, u32 *v)
- 	u32 clkact_mask;
- 	u8  clkact_shift;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_CLOCKACTIVITY))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	clkact_shift = oh->sysconfig->sysc_fields->clkact_shift;
-+	clkact_shift = oh->class->sysc->sysc_fields->clkact_shift;
- 	clkact_mask = (0x3 << clkact_shift);
- 
- 	*v &= ~clkact_mask;
-@@ -240,17 +235,16 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
- {
- 	u32 softrst_mask;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SOFTRESET))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	softrst_mask = (0x1 << oh->sysconfig->sysc_fields->srst_shift);
-+	softrst_mask = (0x1 << oh->class->sysc->sysc_fields->srst_shift);
- 
- 	*v |= softrst_mask;
- 
-@@ -276,17 +270,16 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
- 	u32 autoidle_mask;
- 	u8 autoidle_shift;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_AUTOIDLE))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	autoidle_shift = oh->sysconfig->sysc_fields->autoidle_shift;
-+	autoidle_shift = oh->class->sysc->sysc_fields->autoidle_shift;
- 	autoidle_mask = (0x3 << autoidle_shift);
- 
- 	*v &= ~autoidle_mask;
-@@ -306,17 +299,16 @@ static int _enable_wakeup(struct omap_hwmod *oh)
- {
- 	u32 v, wakeup_mask;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	wakeup_mask = (0x1 << oh->sysconfig->sysc_fields->enwkup_shift);
-+	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
- 
- 	v = oh->_sysc_cache;
- 	v |= wakeup_mask;
-@@ -340,17 +332,16 @@ static int _disable_wakeup(struct omap_hwmod *oh)
- {
- 	u32 v, wakeup_mask;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
--	if (!oh->sysconfig->sysc_fields) {
--		WARN(!oh->sysconfig->sysc_fields, "offset struct for "
--			"sysconfig not provided!\n");
-+	if (!oh->class->sysc->sysc_fields) {
-+		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	wakeup_mask = (0x1 << oh->sysconfig->sysc_fields->enwkup_shift);
-+	wakeup_mask = (0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
- 
- 	v = oh->_sysc_cache;
- 	v &= ~wakeup_mask;
-@@ -638,27 +629,28 @@ static void __iomem *_find_mpu_rt_base(struct omap_hwmod *oh, u8 index)
-  */
- static void _sysc_enable(struct omap_hwmod *oh)
- {
--	u8 idlemode;
-+	u8 idlemode, sf;
- 	u32 v;
- 
--	if (!oh->sysconfig)
-+	if (!oh->class->sysc)
- 		return;
- 
- 	v = oh->_sysc_cache;
-+	sf = oh->class->sysc->sysc_flags;
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_SIDLEMODE) {
-+	if (sf & SYSC_HAS_SIDLEMODE) {
- 		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
- 			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
- 		_set_slave_idlemode(oh, idlemode, &v);
- 	}
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE) {
-+	if (sf & SYSC_HAS_MIDLEMODE) {
- 		idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
- 			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
- 		_set_master_standbymode(oh, idlemode, &v);
- 	}
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE) {
-+	if (sf & SYSC_HAS_AUTOIDLE) {
- 		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
- 			0 : 1;
- 		_set_module_autoidle(oh, idlemode, &v);
-@@ -671,9 +663,9 @@ static void _sysc_enable(struct omap_hwmod *oh)
- 	 * calling into this code.  But this must wait until the
- 	 * clock structures are tagged with omap_hwmod entries
- 	 */
--	if (oh->flags & HWMOD_SET_DEFAULT_CLOCKACT &&
--	    oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY)
--		_set_clockactivity(oh, oh->sysconfig->clockact, &v);
-+	if ((oh->flags & HWMOD_SET_DEFAULT_CLOCKACT) &&
-+	    (sf & SYSC_HAS_CLOCKACTIVITY))
-+		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
- 
- 	_write_sysconfig(v, oh);
- }
-@@ -689,21 +681,22 @@ static void _sysc_enable(struct omap_hwmod *oh)
-  */
- static void _sysc_idle(struct omap_hwmod *oh)
- {
--	u8 idlemode;
-+	u8 idlemode, sf;
- 	u32 v;
- 
--	if (!oh->sysconfig)
-+	if (!oh->class->sysc)
- 		return;
- 
- 	v = oh->_sysc_cache;
-+	sf = oh->class->sysc->sysc_flags;
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_SIDLEMODE) {
-+	if (sf & SYSC_HAS_SIDLEMODE) {
- 		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
- 			HWMOD_IDLEMODE_FORCE : HWMOD_IDLEMODE_SMART;
- 		_set_slave_idlemode(oh, idlemode, &v);
- 	}
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE) {
-+	if (sf & SYSC_HAS_MIDLEMODE) {
- 		idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
- 			HWMOD_IDLEMODE_FORCE : HWMOD_IDLEMODE_SMART;
- 		_set_master_standbymode(oh, idlemode, &v);
-@@ -722,19 +715,21 @@ static void _sysc_idle(struct omap_hwmod *oh)
- static void _sysc_shutdown(struct omap_hwmod *oh)
- {
- 	u32 v;
-+	u8 sf;
- 
--	if (!oh->sysconfig)
-+	if (!oh->class->sysc)
- 		return;
- 
- 	v = oh->_sysc_cache;
-+	sf = oh->class->sysc->sysc_flags;
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_SIDLEMODE)
-+	if (sf & SYSC_HAS_SIDLEMODE)
- 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_FORCE, &v);
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE)
-+	if (sf & SYSC_HAS_MIDLEMODE)
- 		_set_master_standbymode(oh, HWMOD_IDLEMODE_FORCE, &v);
- 
--	if (oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE)
-+	if (sf & SYSC_HAS_AUTOIDLE)
- 		_set_module_autoidle(oh, 1, &v);
- 
- 	_write_sysconfig(v, oh);
-@@ -851,9 +846,9 @@ static int _reset(struct omap_hwmod *oh)
- 	u32 r, v;
- 	int c = 0;
- 
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SOFTRESET) ||
--	    (oh->sysconfig->sysc_flags & SYSS_MISSING))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET) ||
-+	    (oh->class->sysc->sysc_flags & SYSS_MISSING))
- 		return -EINVAL;
- 
- 	/* clocks must be on for this operation */
-@@ -871,7 +866,7 @@ static int _reset(struct omap_hwmod *oh)
- 		return r;
- 	_write_sysconfig(v, oh);
- 
--	omap_test_timeout((omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
-+	omap_test_timeout((omap_hwmod_readl(oh, oh->class->sysc->syss_offs) &
- 			   SYSS_RESETDONE_MASK),
- 			  MAX_MODULE_RESET_WAIT, c);
- 
-@@ -917,7 +912,7 @@ static int _enable(struct omap_hwmod *oh)
- 	_add_initiator_dep(oh, mpu_oh);
- 	_enable_clocks(oh);
- 
--	if (oh->sysconfig) {
-+	if (oh->class->sysc) {
- 		if (!(oh->_int_flags & _HWMOD_SYSCONFIG_LOADED))
- 			_update_sysc_cache(oh);
- 		_sysc_enable(oh);
-@@ -948,7 +943,7 @@ static int _idle(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
- 
--	if (oh->sysconfig)
-+	if (oh->class->sysc)
- 		_sysc_idle(oh);
- 	_del_initiator_dep(oh, mpu_oh);
- 	_disable_clocks(oh);
-@@ -978,7 +973,7 @@ static int _shutdown(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
- 
--	if (oh->sysconfig)
-+	if (oh->class->sysc)
- 		_sysc_shutdown(oh);
- 	_del_initiator_dep(oh, mpu_oh);
- 	/* XXX what about the other system initiators here? DMA, tesla, d2d */
-@@ -1038,7 +1033,7 @@ static int _setup(struct omap_hwmod *oh)
- 		 * _enable() function should be split to avoid the
- 		 * rewrite of the OCP_SYSCONFIG register.
- 		 */
--		if (oh->sysconfig) {
-+		if (oh->class->sysc) {
- 			_update_sysc_cache(oh);
- 			_sysc_enable(oh);
- 		}
-@@ -1085,9 +1080,12 @@ int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
-  * omap_hwmod_register - register a struct omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-- * Registers the omap_hwmod @oh.  Returns -EEXIST if an omap_hwmod already
-- * has been registered by the same name; -EINVAL if the omap_hwmod is in the
-- * wrong state, or 0 on success.
-+ * Registers the omap_hwmod @oh.  Returns -EEXIST if an omap_hwmod
-+ * already has been registered by the same name; -EINVAL if the
-+ * omap_hwmod is in the wrong state, if @oh is NULL, if the
-+ * omap_hwmod's class field is NULL; if the omap_hwmod is missing a
-+ * name, or if the omap_hwmod's class is missing a name; or 0 upon
-+ * success.
-  *
-  * XXX The data should be copied into bootmem, so the original data
-  * should be marked __initdata and freed after init.  This would allow
-@@ -1099,7 +1097,8 @@ int omap_hwmod_register(struct omap_hwmod *oh)
- {
- 	int ret, ms_id;
- 
--	if (!oh || (oh->_state != _HWMOD_STATE_UNKNOWN))
-+	if (!oh || !oh->name || !oh->class || !oh->class->name ||
-+	    (oh->_state != _HWMOD_STATE_UNKNOWN))
- 		return -EINVAL;
- 
- 	mutex_lock(&omap_hwmod_mutex);
-@@ -1372,7 +1371,7 @@ void omap_hwmod_ocp_barrier(struct omap_hwmod *oh)
- {
- 	BUG_ON(!oh);
- 
--	if (!oh->sysconfig || !oh->sysconfig->sysc_flags) {
-+	if (!oh->class->sysc || !oh->class->sysc->sysc_flags) {
- 		WARN(1, "omap_device: %s: OCP barrier impossible due to "
- 		      "device configuration\n", oh->name);
- 		return;
-@@ -1382,7 +1381,7 @@ void omap_hwmod_ocp_barrier(struct omap_hwmod *oh)
- 	 * Forces posted writes to complete on the OCP thread handling
- 	 * register writes
- 	 */
--	omap_hwmod_readl(oh, oh->sysconfig->sysc_offs);
-+	omap_hwmod_readl(oh, oh->class->sysc->sysc_offs);
- }
- 
- /**
-@@ -1575,8 +1574,8 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
-  */
- int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- {
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
- 	mutex_lock(&omap_hwmod_mutex);
-@@ -1600,8 +1599,8 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
-  */
- int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- {
--	if (!oh->sysconfig ||
--	    !(oh->sysconfig->sysc_flags & SYSC_HAS_ENAWAKEUP))
-+	if (!oh->class->sysc ||
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
- 		return -EINVAL;
- 
- 	mutex_lock(&omap_hwmod_mutex);
-@@ -1610,3 +1609,52 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+/**
-+ * omap_hwmod_for_each_by_class - call @fn for each hwmod of class @classname
-+ * @classname: struct omap_hwmod_class name to search for
-+ * @fn: callback function pointer to call for each hwmod in class @classname
-+ * @user: arbitrary context data to pass to the callback function
-+ *
-+ * For each omap_hwmod of class @classname, call @fn.  Takes
-+ * omap_hwmod_mutex to prevent the hwmod list from changing during the
-+ * iteration.  If the callback function returns something other than
-+ * zero, the iterator is terminated, and the callback function's return
-+ * value is passed back to the caller.  Returns 0 upon success, -EINVAL
-+ * if @classname or @fn are NULL, or passes back the error code from @fn.
-+ */
-+int omap_hwmod_for_each_by_class(const char *classname,
-+				 int (*fn)(struct omap_hwmod *oh,
-+					   void *user),
-+				 void *user)
-+{
-+	struct omap_hwmod *temp_oh;
-+	int ret = 0;
-+
-+	if (!classname || !fn)
-+		return -EINVAL;
-+
-+	pr_debug("omap_hwmod: %s: looking for modules of class %s\n",
-+		 __func__, classname);
-+
-+	mutex_lock(&omap_hwmod_mutex);
-+
-+	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
-+		if (!strcmp(temp_oh->class->name, classname)) {
-+			pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
-+				 __func__, temp_oh->name);
-+			ret = (*fn)(temp_oh, user);
-+			if (ret)
-+				break;
-+		}
-+	}
-+
-+	mutex_unlock(&omap_hwmod_mutex);
-+
-+	if (ret)
-+		pr_debug("omap_hwmod: %s: iterator terminated early: %d\n",
-+			 __func__, ret);
-+
-+	return ret;
-+}
-+
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a1c5839..eb7ee24 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -16,6 +16,8 @@
- #include <plat/cpu.h>
- #include <plat/dma.h>
- 
-+#include "omap_hwmod_common_data.h"
-+
- #include "prm-regbits-24xx.h"
- 
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 6deca1e..c0825cf 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -1,8 +1,8 @@
  /*
-@@ -58,6 +60,7 @@ static struct omap_hwmod_ocp_if *omap2420_l3_masters[] = {
- /* L3 */
- static struct omap_hwmod omap2420_l3_hwmod = {
- 	.name		= "l3_hwmod",
-+	.class		= &l3_hwmod_class,
- 	.masters	= omap2420_l3_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2420_l3_masters),
- 	.slaves		= omap2420_l3_slaves,
-@@ -87,6 +90,7 @@ static struct omap_hwmod_ocp_if *omap2420_l4_core_masters[] = {
- /* L4 CORE */
- static struct omap_hwmod omap2420_l4_core_hwmod = {
- 	.name		= "l4_core_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap2420_l4_core_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2420_l4_core_masters),
- 	.slaves		= omap2420_l4_core_slaves,
-@@ -106,6 +110,7 @@ static struct omap_hwmod_ocp_if *omap2420_l4_wkup_masters[] = {
- /* L4 WKUP */
- static struct omap_hwmod omap2420_l4_wkup_hwmod = {
- 	.name		= "l4_wkup_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap2420_l4_wkup_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2420_l4_wkup_masters),
- 	.slaves		= omap2420_l4_wkup_slaves,
-@@ -121,6 +126,7 @@ static struct omap_hwmod_ocp_if *omap2420_mpu_masters[] = {
- /* MPU */
- static struct omap_hwmod omap2420_mpu_hwmod = {
- 	.name		= "mpu_hwmod",
-+	.class		= &mpu_hwmod_class,
- 	.main_clk	= "mpu_ck",
- 	.masters	= omap2420_mpu_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2420_mpu_masters),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index ed2de79..241bd82 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -16,6 +16,8 @@
- #include <plat/cpu.h>
- #include <plat/dma.h>
- 
-+#include "omap_hwmod_common_data.h"
-+
- #include "prm-regbits-24xx.h"
- 
- /*
-@@ -58,6 +60,7 @@ static struct omap_hwmod_ocp_if *omap2430_l3_masters[] = {
- /* L3 */
- static struct omap_hwmod omap2430_l3_hwmod = {
- 	.name		= "l3_hwmod",
-+	.class		= &l3_hwmod_class,
- 	.masters	= omap2430_l3_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2430_l3_masters),
- 	.slaves		= omap2430_l3_slaves,
-@@ -89,6 +92,7 @@ static struct omap_hwmod_ocp_if *omap2430_l4_core_masters[] = {
- /* L4 CORE */
- static struct omap_hwmod omap2430_l4_core_hwmod = {
- 	.name		= "l4_core_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap2430_l4_core_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2430_l4_core_masters),
- 	.slaves		= omap2430_l4_core_slaves,
-@@ -108,6 +112,7 @@ static struct omap_hwmod_ocp_if *omap2430_l4_wkup_masters[] = {
- /* L4 WKUP */
- static struct omap_hwmod omap2430_l4_wkup_hwmod = {
- 	.name		= "l4_wkup_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap2430_l4_wkup_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2430_l4_wkup_masters),
- 	.slaves		= omap2430_l4_wkup_slaves,
-@@ -123,6 +128,7 @@ static struct omap_hwmod_ocp_if *omap2430_mpu_masters[] = {
- /* MPU */
- static struct omap_hwmod omap2430_mpu_hwmod = {
- 	.name		= "mpu_hwmod",
-+	.class		= &mpu_hwmod_class,
- 	.main_clk	= "mpu_ck",
- 	.masters	= omap2430_mpu_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap2430_mpu_masters),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 8d4b686..ed60840 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -18,6 +18,8 @@
- #include <plat/cpu.h>
- #include <plat/dma.h>
- 
-+#include "omap_hwmod_common_data.h"
-+
- #include "prm-regbits-34xx.h"
- 
- /*
-@@ -69,6 +71,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l3_masters[] = {
- /* L3 */
- static struct omap_hwmod omap3xxx_l3_hwmod = {
- 	.name		= "l3_hwmod",
-+	.class		= &l3_hwmod_class,
- 	.masters	= omap3xxx_l3_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l3_masters),
- 	.slaves		= omap3xxx_l3_slaves,
-@@ -98,6 +101,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_core_masters[] = {
- /* L4 CORE */
- static struct omap_hwmod omap3xxx_l4_core_hwmod = {
- 	.name		= "l4_core_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap3xxx_l4_core_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_core_masters),
- 	.slaves		= omap3xxx_l4_core_slaves,
-@@ -117,6 +121,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_per_masters[] = {
- /* L4 PER */
- static struct omap_hwmod omap3xxx_l4_per_hwmod = {
- 	.name		= "l4_per_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap3xxx_l4_per_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_per_masters),
- 	.slaves		= omap3xxx_l4_per_slaves,
-@@ -136,6 +141,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_wkup_masters[] = {
- /* L4 WKUP */
- static struct omap_hwmod omap3xxx_l4_wkup_hwmod = {
- 	.name		= "l4_wkup_hwmod",
-+	.class		= &l4_hwmod_class,
- 	.masters	= omap3xxx_l4_wkup_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_wkup_masters),
- 	.slaves		= omap3xxx_l4_wkup_slaves,
-@@ -151,6 +157,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_mpu_masters[] = {
- /* MPU */
- static struct omap_hwmod omap3xxx_mpu_hwmod = {
- 	.name		= "mpu_hwmod",
-+	.class		= &mpu_hwmod_class,
- 	.main_clk	= "arm_fck",
- 	.masters	= omap3xxx_mpu_masters,
- 	.masters_cnt	= ARRAY_SIZE(omap3xxx_mpu_masters),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.c b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-index 2567c6e..1e80b91 100644
---- a/arch/arm/mach-omap2/omap_hwmod_common_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-@@ -3,6 +3,10 @@
+  * OMAP4 Clock data
   *
-  * Copyright (C) 2010 Texas Instruments, Inc.
-  * Thara Gopinath <thara@ti.com>
-+ * Beno?t Cousson
-+ *
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Paul Walmsley
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- * Copyright (C) 2009 Nokia Corporation
++ * Copyright (C) 2009-2010 Texas Instruments, Inc.
++ * Copyright (C) 2009-2010 Nokia Corporation
   *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -14,6 +18,8 @@
+  * Paul Walmsley (paul at pwsan.com)
+  * Rajendra Nayak (rnayak at ti.com)
+@@ -1254,8 +1254,8 @@ static struct clk syc_clk_div_ck = {
  
- #include <plat/omap_hwmod.h>
+ /* Leaf clocks controlled by modules */
  
-+#include "omap_hwmod_common_data.h"
-+
- /**
-  * struct omap_hwmod_sysc_type1 - TYPE1 sysconfig scheme.
-  *
-@@ -42,3 +48,21 @@ struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2 = {
- 	.sidle_shift	= SYSC_TYPE2_SIDLEMODE_SHIFT,
- 	.srst_shift	= SYSC_TYPE2_SOFTRESET_SHIFT,
- };
-+
-+
-+/*
-+ * omap_hwmod class data
-+ */
-+
-+struct omap_hwmod_class l3_hwmod_class = {
-+	.name = "l3"
-+};
-+
-+struct omap_hwmod_class l4_hwmod_class = {
-+	.name = "l4"
-+};
-+
-+struct omap_hwmod_class mpu_hwmod_class = {
-+	.name = "mpu"
-+};
-+
-diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.h b/arch/arm/mach-omap2/omap_hwmod_common_data.h
-new file mode 100644
-index 0000000..3645a28
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap_hwmod_common_data.h
-@@ -0,0 +1,24 @@
-+/*
-+ * omap_hwmod_common_data.h - OMAP hwmod common macros and declarations
-+ *
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Paul Walmsley
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ * Beno?t Cousson
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __ARCH_ARM_MACH_OMAP2_OMAP_HWMOD_COMMON_DATA_H
-+#define __ARCH_ARM_MACH_OMAP2_OMAP_HWMOD_COMMON_DATA_H
-+
-+#include <plat/omap_hwmod.h>
-+
-+/* OMAP hwmod classes - forward declarations */
-+extern struct omap_hwmod_class l3_hwmod_class;
-+extern struct omap_hwmod_class l4_hwmod_class;
-+extern struct omap_hwmod_class mpu_hwmod_class;
-+
-+#endif
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index d2241fc..440b416 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -4,7 +4,7 @@
-  * Copyright (C) 2009 Nokia Corporation
-  * Paul Walmsley
-  *
-- * Created in collaboration with (alphabetical order): Benoit Cousson,
-+ * Created in collaboration with (alphabetical order): Beno?t Cousson,
-  * Kevin Hilman, Tony Lindgren, Rajendra Nayak, Vikram Pandita, Sakari
-  * Poussa, Anand Sawant, Santosh Shilimkar, Richard Woodruff
-  *
-@@ -254,7 +254,7 @@ struct omap_hwmod_ocp_if {
-  * @sidle_shift: Offset of the sidle bit
-  * @enwkup_shift: Offset of the enawakeup bit
-  * @srst_shift: Offset of the softreset bit
-- * @autoidle_shift: Offset of the autoidle bit.
-+ * @autoidle_shift: Offset of the autoidle bit
-  */
- struct omap_hwmod_sysc_fields {
- 	u8 midle_shift;
-@@ -266,7 +266,7 @@ struct omap_hwmod_sysc_fields {
+-static struct clk aes1_ck = {
+-	.name		= "aes1_ck",
++static struct clk aes1_fck = {
++	.name		= "aes1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_AES1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1264,8 +1264,8 @@ static struct clk aes1_ck = {
+ 	.recalc		= &followparent_recalc,
  };
  
- /**
-- * struct omap_hwmod_sysconfig - hwmod OCP_SYSCONFIG/OCP_SYSSTATUS data
-+ * struct omap_hwmod_class_sysconfig - hwmod class OCP_SYS* data
-  * @rev_offs: IP block revision register offset (from module base addr)
-  * @sysc_offs: OCP_SYSCONFIG register offset (from module base addr)
-  * @syss_offs: OCP_SYSSTATUS register offset (from module base addr)
-@@ -282,16 +282,15 @@ struct omap_hwmod_sysc_fields {
-  * been associated with the clocks marked in @clockact.  This field is
-  * only used if HWMOD_SET_DEFAULT_CLOCKACT is set (see below)
-  *
-- *
-  * @sysc_fields: structure containing the offset positions of various bits in
-  * SYSCONFIG register. This can be populated using omap_hwmod_sysc_type1 or
-  * omap_hwmod_sysc_type2 defined in omap_hwmod_common_data.c depending on
-  * whether the device ip is compliant with the original PRCM protocol
-- * defined for OMAP2420 or the new  PRCM protocol for new OMAP4 IPs.
-- * If the device follows a differnt scheme for the sysconfig register ,
-+ * defined for OMAP2420 or the new PRCM protocol for new OMAP4 IPs.
-+ * If the device follows a different scheme for the sysconfig register ,
-  * then this field has to be populated with the correct offset structure.
-  */
--struct omap_hwmod_sysconfig {
-+struct omap_hwmod_class_sysconfig {
- 	u16 rev_offs;
- 	u16 sysc_offs;
- 	u16 syss_offs;
-@@ -391,8 +390,24 @@ struct omap_hwmod_omap4_prcm {
- #define _HWMOD_STATE_DISABLED			6
+-static struct clk aes2_ck = {
+-	.name		= "aes2_ck",
++static struct clk aes2_fck = {
++	.name		= "aes2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_AES2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1274,8 +1274,8 @@ static struct clk aes2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
  
- /**
-+ * struct omap_hwmod_class - the type of an IP block
-+ * @name: name of the hwmod_class
-+ * @sysc: device SYSCONFIG/SYSSTATUS register data
-+ * @rev: revision of the IP class
-+ *
-+ * Represent the class of a OMAP hardware "modules" (e.g. timer,
-+ * smartreflex, gpio, uart...)
+-static struct clk aess_ck = {
+-	.name		= "aess_ck",
++static struct clk aess_fck = {
++	.name		= "aess_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM1_ABE_AESS_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1284,8 +1284,8 @@ static struct clk aess_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk cust_efuse_ck = {
+-	.name		= "cust_efuse_ck",
++static struct clk cust_efuse_fck = {
++	.name		= "cust_efuse_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_CEFUSE_CEFUSE_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1294,8 +1294,8 @@ static struct clk cust_efuse_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk des3des_ck = {
+-	.name		= "des3des_ck",
++static struct clk des3des_fck = {
++	.name		= "des3des_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_DES3DES_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1329,9 +1329,9 @@ static const struct clksel func_dmic_abe_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged func_dmic_abe_gfclk into dmic_ck */
+-static struct clk dmic_ck = {
+-	.name		= "dmic_ck",
++/* Merged func_dmic_abe_gfclk into dmic */
++static struct clk dmic_fck = {
++	.name		= "dmic_fck",
+ 	.parent		= &dmic_sync_mux_ck,
+ 	.clksel		= func_dmic_abe_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1344,8 +1344,8 @@ static struct clk dmic_ck = {
+ 	.clkdm_name	= "abe_clkdm",
+ };
+ 
+-static struct clk dss_ck = {
+-	.name		= "dss_ck",
++static struct clk dss_fck = {
++	.name		= "dss_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1354,8 +1354,8 @@ static struct clk dss_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk ducati_ck = {
+-	.name		= "ducati_ck",
++static struct clk ducati_ick = {
++	.name		= "ducati_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_DUCATI_DUCATI_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1364,8 +1364,8 @@ static struct clk ducati_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk emif1_ck = {
+-	.name		= "emif1_ck",
++static struct clk emif1_ick = {
++	.name		= "emif1_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_MEMIF_EMIF_1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1374,8 +1374,8 @@ static struct clk emif1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk emif2_ck = {
+-	.name		= "emif2_ck",
++static struct clk emif2_ick = {
++	.name		= "emif2_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_MEMIF_EMIF_2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1389,9 +1389,9 @@ static const struct clksel fdif_fclk_div[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged fdif_fclk into fdif_ck */
+-static struct clk fdif_ck = {
+-	.name		= "fdif_ck",
++/* Merged fdif_fclk into fdif */
++static struct clk fdif_fck = {
++	.name		= "fdif_fck",
+ 	.parent		= &dpll_per_m4_ck,
+ 	.clksel		= fdif_fclk_div,
+ 	.clksel_reg	= OMAP4430_CM_CAM_FDIF_CLKCTRL,
+@@ -1428,9 +1428,9 @@ static const struct clksel sgx_clk_mux_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged sgx_clk_mux into gfx_ck */
+-static struct clk gfx_ck = {
+-	.name		= "gfx_ck",
++/* Merged sgx_clk_mux into gfx */
++static struct clk gfx_fck = {
++	.name		= "gfx_fck",
+ 	.parent		= &dpll_core_m7_ck,
+ 	.clksel		= sgx_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1443,8 +1443,8 @@ static struct clk gfx_ck = {
+ 	.clkdm_name	= "l3_gfx_clkdm",
+ };
+ 
+-static struct clk gpio1_ck = {
+-	.name		= "gpio1_ck",
++static struct clk gpio1_ick = {
++	.name		= "gpio1_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_WKUP_GPIO1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1453,8 +1453,8 @@ static struct clk gpio1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpio2_ck = {
+-	.name		= "gpio2_ck",
++static struct clk gpio2_ick = {
++	.name		= "gpio2_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_GPIO2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1463,8 +1463,8 @@ static struct clk gpio2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpio3_ck = {
+-	.name		= "gpio3_ck",
++static struct clk gpio3_ick = {
++	.name		= "gpio3_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_GPIO3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1473,8 +1473,8 @@ static struct clk gpio3_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpio4_ck = {
+-	.name		= "gpio4_ck",
++static struct clk gpio4_ick = {
++	.name		= "gpio4_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_GPIO4_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1483,8 +1483,8 @@ static struct clk gpio4_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpio5_ck = {
+-	.name		= "gpio5_ck",
++static struct clk gpio5_ick = {
++	.name		= "gpio5_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_GPIO5_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1493,8 +1493,8 @@ static struct clk gpio5_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpio6_ck = {
+-	.name		= "gpio6_ck",
++static struct clk gpio6_ick = {
++	.name		= "gpio6_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_GPIO6_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1503,8 +1503,8 @@ static struct clk gpio6_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk gpmc_ck = {
+-	.name		= "gpmc_ck",
++static struct clk gpmc_ick = {
++	.name		= "gpmc_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3_2_GPMC_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1519,9 +1519,12 @@ static const struct clksel dmt1_clk_mux_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged dmt1_clk_mux into gptimer1_ck */
+-static struct clk gptimer1_ck = {
+-	.name		= "gptimer1_ck",
++/*
++ * Merged dmt1_clk_mux into gptimer1
++ * gptimer1 renamed temporarily into gpt1 to match OMAP3 convention
 + */
-+struct omap_hwmod_class {
-+	const char				*name;
-+	struct omap_hwmod_class_sysconfig	*sysc;
-+	u32					rev;
-+};
-+
-+/**
-  * struct omap_hwmod - integration data for OMAP hardware "modules" (IP blocks)
-  * @name: name of the hwmod
-+ * @class: struct omap_hwmod_class * to the class of this hwmod
-  * @od: struct omap_device currently associated with this hwmod (internal use)
-  * @mpu_irqs: ptr to an array of MPU IRQs (see also mpu_irqs_cnt)
-  * @sdma_chs: ptr to an array of SDMA channel IDs (see also sdma_chs_cnt)
-@@ -402,7 +417,6 @@ struct omap_hwmod_omap4_prcm {
-  * @opt_clks: other device clocks that drivers can request (0..*)
-  * @masters: ptr to array of OCP ifs that this hwmod can initiate on
-  * @slaves: ptr to array of OCP ifs that this hwmod can respond on
-- * @sysconfig: device SYSCONFIG/SYSSTATUS register data
-  * @dev_attr: arbitrary device attributes that can be passed to the driver
-  * @_sysc_cache: internal-use hwmod flags
-  * @_rt_va: cached register target start address (internal use)
-@@ -431,6 +445,7 @@ struct omap_hwmod_omap4_prcm {
-  */
- struct omap_hwmod {
- 	const char			*name;
-+	struct omap_hwmod_class		*class;
- 	struct omap_device		*od;
- 	struct omap_hwmod_irq_info	*mpu_irqs;
- 	struct omap_hwmod_dma_info	*sdma_chs;
-@@ -443,7 +458,6 @@ struct omap_hwmod {
- 	struct omap_hwmod_opt_clk	*opt_clks;
- 	struct omap_hwmod_ocp_if	**masters; /* connect to *_IA */
- 	struct omap_hwmod_ocp_if	**slaves;  /* connect to *_TA */
--	struct omap_hwmod_sysconfig	*sysconfig;
- 	void				*dev_attr;
- 	u32				_sysc_cache;
- 	void __iomem			*_rt_va;
-@@ -504,6 +518,11 @@ int omap_hwmod_set_clockact_none(struct omap_hwmod *oh);
- int omap_hwmod_enable_wakeup(struct omap_hwmod *oh);
- int omap_hwmod_disable_wakeup(struct omap_hwmod *oh);
++static struct clk gpt1_fck = {
++	.name		= "gpt1_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1534,9 +1537,12 @@ static struct clk gptimer1_ck = {
+ 	.clkdm_name	= "l4_wkup_clkdm",
+ };
  
-+int omap_hwmod_for_each_by_class(const char *classname,
-+				 int (*fn)(struct omap_hwmod *oh,
-+					   void *user),
-+				 void *user);
-+
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+-/* Merged cm2_dm10_mux into gptimer10_ck */
+-static struct clk gptimer10_ck = {
+-	.name		= "gptimer10_ck",
++/*
++ * Merged cm2_dm10_mux into gptimer10
++ * gptimer10 renamed temporarily into gpt10 to match OMAP3 convention
++ */
++static struct clk gpt10_fck = {
++	.name		= "gpt10_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1549,9 +1555,12 @@ static struct clk gptimer10_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-/* Merged cm2_dm11_mux into gptimer11_ck */
+-static struct clk gptimer11_ck = {
+-	.name		= "gptimer11_ck",
++/*
++ * Merged cm2_dm11_mux into gptimer11
++ * gptimer11 renamed temporarily into gpt11 to match OMAP3 convention
++ */
++static struct clk gpt11_fck = {
++	.name		= "gpt11_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1564,9 +1573,12 @@ static struct clk gptimer11_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-/* Merged cm2_dm2_mux into gptimer2_ck */
+-static struct clk gptimer2_ck = {
+-	.name		= "gptimer2_ck",
++/*
++ * Merged cm2_dm2_mux into gptimer2
++ * gptimer2 renamed temporarily into gpt2 to match OMAP3 convention
++ */
++static struct clk gpt2_fck = {
++	.name		= "gpt2_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1579,9 +1591,12 @@ static struct clk gptimer2_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-/* Merged cm2_dm3_mux into gptimer3_ck */
+-static struct clk gptimer3_ck = {
+-	.name		= "gptimer3_ck",
++/*
++ * Merged cm2_dm3_mux into gptimer3
++ * gptimer3 renamed temporarily into gpt3 to match OMAP3 convention
++ */
++static struct clk gpt3_fck = {
++	.name		= "gpt3_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1594,9 +1609,12 @@ static struct clk gptimer3_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-/* Merged cm2_dm4_mux into gptimer4_ck */
+-static struct clk gptimer4_ck = {
+-	.name		= "gptimer4_ck",
++/*
++ * Merged cm2_dm4_mux into gptimer4
++ * gptimer4 renamed temporarily into gpt4 to match OMAP3 convention
++ */
++static struct clk gpt4_fck = {
++	.name		= "gpt4_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1615,9 +1633,12 @@ static const struct clksel timer5_sync_mux_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged timer5_sync_mux into gptimer5_ck */
+-static struct clk gptimer5_ck = {
+-	.name		= "gptimer5_ck",
++/*
++ * Merged timer5_sync_mux into gptimer5
++ * gptimer5 renamed temporarily into gpt5 to match OMAP3 convention
++ */
++static struct clk gpt5_fck = {
++	.name		= "gpt5_fck",
+ 	.parent		= &syc_clk_div_ck,
+ 	.clksel		= timer5_sync_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1630,9 +1651,12 @@ static struct clk gptimer5_ck = {
+ 	.clkdm_name	= "abe_clkdm",
+ };
+ 
+-/* Merged timer6_sync_mux into gptimer6_ck */
+-static struct clk gptimer6_ck = {
+-	.name		= "gptimer6_ck",
++/*
++ * Merged timer6_sync_mux into gptimer6
++ * gptimer6 renamed temporarily into gpt6 to match OMAP3 convention
++ */
++static struct clk gpt6_fck = {
++	.name		= "gpt6_fck",
+ 	.parent		= &syc_clk_div_ck,
+ 	.clksel		= timer5_sync_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1645,9 +1669,12 @@ static struct clk gptimer6_ck = {
+ 	.clkdm_name	= "abe_clkdm",
+ };
+ 
+-/* Merged timer7_sync_mux into gptimer7_ck */
+-static struct clk gptimer7_ck = {
+-	.name		= "gptimer7_ck",
++/*
++ * Merged timer7_sync_mux into gptimer7
++ * gptimer7 renamed temporarily into gpt7 to match OMAP3 convention
++ */
++static struct clk gpt7_fck = {
++	.name		= "gpt7_fck",
+ 	.parent		= &syc_clk_div_ck,
+ 	.clksel		= timer5_sync_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1660,9 +1687,12 @@ static struct clk gptimer7_ck = {
+ 	.clkdm_name	= "abe_clkdm",
+ };
+ 
+-/* Merged timer8_sync_mux into gptimer8_ck */
+-static struct clk gptimer8_ck = {
+-	.name		= "gptimer8_ck",
++/*
++ * Merged timer8_sync_mux into gptimer8
++ * gptimer8 renamed temporarily into gpt8 to match OMAP3 convention
++ */
++static struct clk gpt8_fck = {
++	.name		= "gpt8_fck",
+ 	.parent		= &syc_clk_div_ck,
+ 	.clksel		= timer5_sync_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1675,9 +1705,12 @@ static struct clk gptimer8_ck = {
+ 	.clkdm_name	= "abe_clkdm",
+ };
+ 
+-/* Merged cm2_dm9_mux into gptimer9_ck */
+-static struct clk gptimer9_ck = {
+-	.name		= "gptimer9_ck",
++/*
++ * Merged cm2_dm9_mux into gptimer9
++ * gptimer9 renamed temporarily into gpt9 to match OMAP3 convention
++ */
++static struct clk gpt9_fck = {
++	.name		= "gpt9_fck",
+ 	.parent		= &sys_clkin_ck,
+ 	.clksel		= dmt1_clk_mux_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1690,8 +1723,8 @@ static struct clk gptimer9_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-static struct clk hdq1w_ck = {
+-	.name		= "hdq1w_ck",
++static struct clk hdq1w_fck = {
++	.name		= "hdq1w_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_HDQ1W_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1700,9 +1733,9 @@ static struct clk hdq1w_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-/* Merged hsi_fclk into hsi_ck */
+-static struct clk hsi_ck = {
+-	.name		= "hsi_ck",
++/* Merged hsi_fclk into hsi */
++static struct clk hsi_ick = {
++	.name		= "hsi_ick",
+ 	.parent		= &dpll_per_m2x2_ck,
+ 	.clksel		= per_sgx_fclk_div,
+ 	.clksel_reg	= OMAP4430_CM_L3INIT_HSI_CLKCTRL,
+@@ -1716,8 +1749,8 @@ static struct clk hsi_ck = {
+ 	.clkdm_name	= "l3_init_clkdm",
+ };
+ 
+-static struct clk i2c1_ck = {
+-	.name		= "i2c1_ck",
++static struct clk i2c1_fck = {
++	.name		= "i2c1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_I2C1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1726,8 +1759,8 @@ static struct clk i2c1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk i2c2_ck = {
+-	.name		= "i2c2_ck",
++static struct clk i2c2_fck = {
++	.name		= "i2c2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_I2C2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1736,8 +1769,8 @@ static struct clk i2c2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk i2c3_ck = {
+-	.name		= "i2c3_ck",
++static struct clk i2c3_fck = {
++	.name		= "i2c3_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_I2C3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1746,8 +1779,8 @@ static struct clk i2c3_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk i2c4_ck = {
+-	.name		= "i2c4_ck",
++static struct clk i2c4_fck = {
++	.name		= "i2c4_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_I2C4_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1756,8 +1789,8 @@ static struct clk i2c4_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk iss_ck = {
+-	.name		= "iss_ck",
++static struct clk iss_fck = {
++	.name		= "iss_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_CAM_ISS_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1766,8 +1799,8 @@ static struct clk iss_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk ivahd_ck = {
+-	.name		= "ivahd_ck",
++static struct clk ivahd_ick = {
++	.name		= "ivahd_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_IVAHD_IVAHD_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1776,8 +1809,8 @@ static struct clk ivahd_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk keyboard_ck = {
+-	.name		= "keyboard_ck",
++static struct clk keyboard_fck = {
++	.name		= "keyboard_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_WKUP_KEYBOARD_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1786,8 +1819,8 @@ static struct clk keyboard_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk l3_instr_interconnect_ck = {
+-	.name		= "l3_instr_interconnect_ck",
++static struct clk l3_instr_interconnect_ick = {
++	.name		= "l3_instr_interconnect_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INSTR_L3_INSTR_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1796,8 +1829,8 @@ static struct clk l3_instr_interconnect_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk l3_interconnect_3_ck = {
+-	.name		= "l3_interconnect_3_ck",
++static struct clk l3_interconnect_3_ick = {
++	.name		= "l3_interconnect_3_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INSTR_L3_3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -1824,9 +1857,9 @@ static const struct clksel func_mcasp_abe_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged func_mcasp_abe_gfclk into mcasp_ck */
+-static struct clk mcasp_ck = {
+-	.name		= "mcasp_ck",
++/* Merged func_mcasp_abe_gfclk into mcasp */
++static struct clk mcasp_fck = {
++	.name		= "mcasp_fck",
+ 	.parent		= &mcasp_sync_mux_ck,
+ 	.clksel		= func_mcasp_abe_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1857,9 +1890,9 @@ static const struct clksel func_mcbsp1_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged func_mcbsp1_gfclk into mcbsp1_ck */
+-static struct clk mcbsp1_ck = {
+-	.name		= "mcbsp1_ck",
++/* Merged func_mcbsp1_gfclk into mcbsp1 */
++static struct clk mcbsp1_fck = {
++	.name		= "mcbsp1_fck",
+ 	.parent		= &mcbsp1_sync_mux_ck,
+ 	.clksel		= func_mcbsp1_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1890,9 +1923,9 @@ static const struct clksel func_mcbsp2_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged func_mcbsp2_gfclk into mcbsp2_ck */
+-static struct clk mcbsp2_ck = {
+-	.name		= "mcbsp2_ck",
++/* Merged func_mcbsp2_gfclk into mcbsp2 */
++static struct clk mcbsp2_fck = {
++	.name		= "mcbsp2_fck",
+ 	.parent		= &mcbsp2_sync_mux_ck,
+ 	.clksel		= func_mcbsp2_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1923,9 +1956,9 @@ static const struct clksel func_mcbsp3_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged func_mcbsp3_gfclk into mcbsp3_ck */
+-static struct clk mcbsp3_ck = {
+-	.name		= "mcbsp3_ck",
++/* Merged func_mcbsp3_gfclk into mcbsp3 */
++static struct clk mcbsp3_fck = {
++	.name		= "mcbsp3_fck",
+ 	.parent		= &mcbsp3_sync_mux_ck,
+ 	.clksel		= func_mcbsp3_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1955,9 +1988,9 @@ static const struct clksel per_mcbsp4_gfclk_sel[] = {
+ 	{ .parent = NULL },
+ };
+ 
+-/* Merged per_mcbsp4_gfclk into mcbsp4_ck */
+-static struct clk mcbsp4_ck = {
+-	.name		= "mcbsp4_ck",
++/* Merged per_mcbsp4_gfclk into mcbsp4 */
++static struct clk mcbsp4_fck = {
++	.name		= "mcbsp4_fck",
+ 	.parent		= &mcbsp4_sync_mux_ck,
+ 	.clksel		= per_mcbsp4_gfclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -1970,8 +2003,8 @@ static struct clk mcbsp4_ck = {
+ 	.clkdm_name	= "l4_per_clkdm",
+ };
+ 
+-static struct clk mcspi1_ck = {
+-	.name		= "mcspi1_ck",
++static struct clk mcspi1_fck = {
++	.name		= "mcspi1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1980,8 +2013,8 @@ static struct clk mcspi1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk mcspi2_ck = {
+-	.name		= "mcspi2_ck",
++static struct clk mcspi2_fck = {
++	.name		= "mcspi2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -1990,8 +2023,8 @@ static struct clk mcspi2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk mcspi3_ck = {
+-	.name		= "mcspi3_ck",
++static struct clk mcspi3_fck = {
++	.name		= "mcspi3_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2000,8 +2033,8 @@ static struct clk mcspi3_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk mcspi4_ck = {
+-	.name		= "mcspi4_ck",
++static struct clk mcspi4_fck = {
++	.name		= "mcspi4_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2010,9 +2043,9 @@ static struct clk mcspi4_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-/* Merged hsmmc1_fclk into mmc1_ck */
+-static struct clk mmc1_ck = {
+-	.name		= "mmc1_ck",
++/* Merged hsmmc1_fclk into mmc1 */
++static struct clk mmc1_fck = {
++	.name		= "mmc1_fck",
+ 	.parent		= &func_64m_fclk,
+ 	.clksel		= hsmmc6_fclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -2025,9 +2058,9 @@ static struct clk mmc1_ck = {
+ 	.clkdm_name	= "l3_init_clkdm",
+ };
+ 
+-/* Merged hsmmc2_fclk into mmc2_ck */
+-static struct clk mmc2_ck = {
+-	.name		= "mmc2_ck",
++/* Merged hsmmc2_fclk into mmc2 */
++static struct clk mmc2_fck = {
++	.name		= "mmc2_fck",
+ 	.parent		= &func_64m_fclk,
+ 	.clksel		= hsmmc6_fclk_sel,
+ 	.init		= &omap2_init_clksel_parent,
+@@ -2040,8 +2073,8 @@ static struct clk mmc2_ck = {
+ 	.clkdm_name	= "l3_init_clkdm",
+ };
+ 
+-static struct clk mmc3_ck = {
+-	.name		= "mmc3_ck",
++static struct clk mmc3_fck = {
++	.name		= "mmc3_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MMCSD3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2050,8 +2083,8 @@ static struct clk mmc3_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk mmc4_ck = {
+-	.name		= "mmc4_ck",
++static struct clk mmc4_fck = {
++	.name		= "mmc4_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MMCSD4_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2060,8 +2093,8 @@ static struct clk mmc4_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk mmc5_ck = {
+-	.name		= "mmc5_ck",
++static struct clk mmc5_fck = {
++	.name		= "mmc5_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_MMCSD5_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2070,8 +2103,8 @@ static struct clk mmc5_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk ocp_wp1_ck = {
+-	.name		= "ocp_wp1_ck",
++static struct clk ocp_wp1_ick = {
++	.name		= "ocp_wp1_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INSTR_OCP_WP1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2080,8 +2113,8 @@ static struct clk ocp_wp1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk pdm_ck = {
+-	.name		= "pdm_ck",
++static struct clk pdm_fck = {
++	.name		= "pdm_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM1_ABE_PDM_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2090,8 +2123,8 @@ static struct clk pdm_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk pkaeip29_ck = {
+-	.name		= "pkaeip29_ck",
++static struct clk pkaeip29_fck = {
++	.name		= "pkaeip29_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_PKAEIP29_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2100,8 +2133,8 @@ static struct clk pkaeip29_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk rng_ck = {
+-	.name		= "rng_ck",
++static struct clk rng_ick = {
++	.name		= "rng_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_RNG_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2110,8 +2143,8 @@ static struct clk rng_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk sha2md51_ck = {
+-	.name		= "sha2md51_ck",
++static struct clk sha2md51_fck = {
++	.name		= "sha2md51_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4SEC_SHA2MD51_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2120,8 +2153,8 @@ static struct clk sha2md51_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk sl2_ck = {
+-	.name		= "sl2_ck",
++static struct clk sl2_ick = {
++	.name		= "sl2_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_IVAHD_SL2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2130,8 +2163,8 @@ static struct clk sl2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk slimbus1_ck = {
+-	.name		= "slimbus1_ck",
++static struct clk slimbus1_fck = {
++	.name		= "slimbus1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM1_ABE_SLIMBUS_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2140,8 +2173,8 @@ static struct clk slimbus1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk slimbus2_ck = {
+-	.name		= "slimbus2_ck",
++static struct clk slimbus2_fck = {
++	.name		= "slimbus2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_SLIMBUS2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2150,8 +2183,8 @@ static struct clk slimbus2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk sr_core_ck = {
+-	.name		= "sr_core_ck",
++static struct clk sr_core_fck = {
++	.name		= "sr_core_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2160,8 +2193,8 @@ static struct clk sr_core_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk sr_iva_ck = {
+-	.name		= "sr_iva_ck",
++static struct clk sr_iva_fck = {
++	.name		= "sr_iva_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2170,8 +2203,8 @@ static struct clk sr_iva_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk sr_mpu_ck = {
+-	.name		= "sr_mpu_ck",
++static struct clk sr_mpu_fck = {
++	.name		= "sr_mpu_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2180,8 +2213,8 @@ static struct clk sr_mpu_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk tesla_ck = {
+-	.name		= "tesla_ck",
++static struct clk tesla_ick = {
++	.name		= "tesla_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_TESLA_TESLA_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2190,8 +2223,8 @@ static struct clk tesla_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk uart1_ck = {
+-	.name		= "uart1_ck",
++static struct clk uart1_fck = {
++	.name		= "uart1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_UART1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2200,8 +2233,8 @@ static struct clk uart1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk uart2_ck = {
+-	.name		= "uart2_ck",
++static struct clk uart2_fck = {
++	.name		= "uart2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_UART2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2210,8 +2243,8 @@ static struct clk uart2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk uart3_ck = {
+-	.name		= "uart3_ck",
++static struct clk uart3_fck = {
++	.name		= "uart3_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_UART3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2220,8 +2253,8 @@ static struct clk uart3_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk uart4_ck = {
+-	.name		= "uart4_ck",
++static struct clk uart4_fck = {
++	.name		= "uart4_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L4PER_UART4_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2230,8 +2263,8 @@ static struct clk uart4_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk unipro1_ck = {
+-	.name		= "unipro1_ck",
++static struct clk unipro1_fck = {
++	.name		= "unipro1_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_UNIPRO1_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2240,8 +2273,8 @@ static struct clk unipro1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usb_host_ck = {
+-	.name		= "usb_host_ck",
++static struct clk usb_host_fck = {
++	.name		= "usb_host_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2250,8 +2283,8 @@ static struct clk usb_host_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usb_host_fs_ck = {
+-	.name		= "usb_host_fs_ck",
++static struct clk usb_host_fs_fck = {
++	.name		= "usb_host_fs_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_USB_HOST_FS_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2260,8 +2293,8 @@ static struct clk usb_host_fs_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usb_otg_ck = {
+-	.name		= "usb_otg_ck",
++static struct clk usb_otg_ick = {
++	.name		= "usb_otg_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_USB_OTG_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2270,8 +2303,8 @@ static struct clk usb_otg_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usb_tll_ck = {
+-	.name		= "usb_tll_ck",
++static struct clk usb_tll_ick = {
++	.name		= "usb_tll_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_USB_TLL_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2280,8 +2313,8 @@ static struct clk usb_tll_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usbphyocp2scp_ck = {
+-	.name		= "usbphyocp2scp_ck",
++static struct clk usbphyocp2scp_ick = {
++	.name		= "usbphyocp2scp_ick",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+@@ -2290,8 +2323,8 @@ static struct clk usbphyocp2scp_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk usim_ck = {
+-	.name		= "usim_ck",
++static struct clk usim_fck = {
++	.name		= "usim_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_WKUP_USIM_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2300,8 +2333,8 @@ static struct clk usim_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk wdt2_ck = {
+-	.name		= "wdt2_ck",
++static struct clk wdt2_fck = {
++	.name		= "wdt2_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM_WKUP_WDT2_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2310,8 +2343,8 @@ static struct clk wdt2_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+-static struct clk wdt3_ck = {
+-	.name		= "wdt3_ck",
++static struct clk wdt3_fck = {
++	.name		= "wdt3_fck",
+ 	.ops		= &clkops_omap2_dflt,
+ 	.enable_reg	= OMAP4430_CM1_ABE_WDT3_CLKCTRL,
+ 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+@@ -2519,93 +2552,93 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK(NULL,	"pmd_stm_clock_mux_ck",		&pmd_stm_clock_mux_ck,	CK_443X),
+ 	CLK(NULL,	"pmd_trace_clk_mux_ck",		&pmd_trace_clk_mux_ck,	CK_443X),
+ 	CLK(NULL,	"syc_clk_div_ck",		&syc_clk_div_ck,	CK_443X),
+-	CLK(NULL,	"aes1_ck",			&aes1_ck,	CK_443X),
+-	CLK(NULL,	"aes2_ck",			&aes2_ck,	CK_443X),
+-	CLK(NULL,	"aess_ck",			&aess_ck,	CK_443X),
+-	CLK(NULL,	"cust_efuse_ck",		&cust_efuse_ck,	CK_443X),
+-	CLK(NULL,	"des3des_ck",			&des3des_ck,	CK_443X),
++	CLK(NULL,	"aes1_fck",			&aes1_fck,	CK_443X),
++	CLK(NULL,	"aes2_fck",			&aes2_fck,	CK_443X),
++	CLK(NULL,	"aess_fck",			&aess_fck,	CK_443X),
++	CLK(NULL,	"cust_efuse_fck",		&cust_efuse_fck,	CK_443X),
++	CLK(NULL,	"des3des_fck",			&des3des_fck,	CK_443X),
+ 	CLK(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck,	CK_443X),
+-	CLK(NULL,	"dmic_ck",			&dmic_ck,	CK_443X),
+-	CLK(NULL,	"dss_ck",			&dss_ck,	CK_443X),
+-	CLK(NULL,	"ducati_ck",			&ducati_ck,	CK_443X),
+-	CLK(NULL,	"emif1_ck",			&emif1_ck,	CK_443X),
+-	CLK(NULL,	"emif2_ck",			&emif2_ck,	CK_443X),
+-	CLK(NULL,	"fdif_ck",			&fdif_ck,	CK_443X),
++	CLK(NULL,	"dmic_fck",			&dmic_fck,	CK_443X),
++	CLK(NULL,	"dss_fck",			&dss_fck,	CK_443X),
++	CLK(NULL,	"ducati_ick",			&ducati_ick,	CK_443X),
++	CLK(NULL,	"emif1_ick",			&emif1_ick,	CK_443X),
++	CLK(NULL,	"emif2_ick",			&emif2_ick,	CK_443X),
++	CLK(NULL,	"fdif_fck",			&fdif_fck,	CK_443X),
+ 	CLK(NULL,	"per_sgx_fclk",			&per_sgx_fclk,	CK_443X),
+-	CLK(NULL,	"gfx_ck",			&gfx_ck,	CK_443X),
+-	CLK(NULL,	"gpio1_ck",			&gpio1_ck,	CK_443X),
+-	CLK(NULL,	"gpio2_ck",			&gpio2_ck,	CK_443X),
+-	CLK(NULL,	"gpio3_ck",			&gpio3_ck,	CK_443X),
+-	CLK(NULL,	"gpio4_ck",			&gpio4_ck,	CK_443X),
+-	CLK(NULL,	"gpio5_ck",			&gpio5_ck,	CK_443X),
+-	CLK(NULL,	"gpio6_ck",			&gpio6_ck,	CK_443X),
+-	CLK(NULL,	"gpmc_ck",			&gpmc_ck,	CK_443X),
+-	CLK(NULL,	"gptimer1_ck",			&gptimer1_ck,	CK_443X),
+-	CLK(NULL,	"gptimer10_ck",			&gptimer10_ck,	CK_443X),
+-	CLK(NULL,	"gptimer11_ck",			&gptimer11_ck,	CK_443X),
+-	CLK(NULL,	"gptimer2_ck",			&gptimer2_ck,	CK_443X),
+-	CLK(NULL,	"gptimer3_ck",			&gptimer3_ck,	CK_443X),
+-	CLK(NULL,	"gptimer4_ck",			&gptimer4_ck,	CK_443X),
+-	CLK(NULL,	"gptimer5_ck",			&gptimer5_ck,	CK_443X),
+-	CLK(NULL,	"gptimer6_ck",			&gptimer6_ck,	CK_443X),
+-	CLK(NULL,	"gptimer7_ck",			&gptimer7_ck,	CK_443X),
+-	CLK(NULL,	"gptimer8_ck",			&gptimer8_ck,	CK_443X),
+-	CLK(NULL,	"gptimer9_ck",			&gptimer9_ck,	CK_443X),
+-	CLK("omap2_hdq.0",	"ick",				&hdq1w_ck,	CK_443X),
+-	CLK(NULL,	"hsi_ck",			&hsi_ck,	CK_443X),
+-	CLK("i2c_omap.1",	"ick",				&i2c1_ck,	CK_443X),
+-	CLK("i2c_omap.2",	"ick",				&i2c2_ck,	CK_443X),
+-	CLK("i2c_omap.3",	"ick",				&i2c3_ck,	CK_443X),
+-	CLK("i2c_omap.4",	"ick",				&i2c4_ck,	CK_443X),
+-	CLK(NULL,	"iss_ck",			&iss_ck,	CK_443X),
+-	CLK(NULL,	"ivahd_ck",			&ivahd_ck,	CK_443X),
+-	CLK(NULL,	"keyboard_ck",			&keyboard_ck,	CK_443X),
+-	CLK(NULL,	"l3_instr_interconnect_ck",	&l3_instr_interconnect_ck,	CK_443X),
+-	CLK(NULL,	"l3_interconnect_3_ck",		&l3_interconnect_3_ck,	CK_443X),
++	CLK(NULL,	"gfx_fck",			&gfx_fck,	CK_443X),
++	CLK(NULL,	"gpio1_ick",			&gpio1_ick,	CK_443X),
++	CLK(NULL,	"gpio2_ick",			&gpio2_ick,	CK_443X),
++	CLK(NULL,	"gpio3_ick",			&gpio3_ick,	CK_443X),
++	CLK(NULL,	"gpio4_ick",			&gpio4_ick,	CK_443X),
++	CLK(NULL,	"gpio5_ick",			&gpio5_ick,	CK_443X),
++	CLK(NULL,	"gpio6_ick",			&gpio6_ick,	CK_443X),
++	CLK(NULL,	"gpmc_ick",			&gpmc_ick,	CK_443X),
++	CLK(NULL,	"gpt1_fck",			&gpt1_fck,	CK_443X),
++	CLK(NULL,	"gpt10_fck",			&gpt10_fck,	CK_443X),
++	CLK(NULL,	"gpt11_fck",			&gpt11_fck,	CK_443X),
++	CLK(NULL,	"gpt2_fck",			&gpt2_fck,	CK_443X),
++	CLK(NULL,	"gpt3_fck",			&gpt3_fck,	CK_443X),
++	CLK(NULL,	"gpt4_fck",			&gpt4_fck,	CK_443X),
++	CLK(NULL,	"gpt5_fck",			&gpt5_fck,	CK_443X),
++	CLK(NULL,	"gpt6_fck",			&gpt6_fck,	CK_443X),
++	CLK(NULL,	"gpt7_fck",			&gpt7_fck,	CK_443X),
++	CLK(NULL,	"gpt8_fck",			&gpt8_fck,	CK_443X),
++	CLK(NULL,	"gpt9_fck",			&gpt9_fck,	CK_443X),
++	CLK("omap2_hdq.0",	"fck",				&hdq1w_fck,	CK_443X),
++	CLK(NULL,	"hsi_ick",			&hsi_ick,	CK_443X),
++	CLK("i2c_omap.1",	"fck",				&i2c1_fck,	CK_443X),
++	CLK("i2c_omap.2",	"fck",				&i2c2_fck,	CK_443X),
++	CLK("i2c_omap.3",	"fck",				&i2c3_fck,	CK_443X),
++	CLK("i2c_omap.4",	"fck",				&i2c4_fck,	CK_443X),
++	CLK(NULL,	"iss_fck",			&iss_fck,	CK_443X),
++	CLK(NULL,	"ivahd_ick",			&ivahd_ick,	CK_443X),
++	CLK(NULL,	"keyboard_fck",			&keyboard_fck,	CK_443X),
++	CLK(NULL,	"l3_instr_interconnect_ick",	&l3_instr_interconnect_ick,	CK_443X),
++	CLK(NULL,	"l3_interconnect_3_ick",	&l3_interconnect_3_ick,	CK_443X),
+ 	CLK(NULL,	"mcasp_sync_mux_ck",		&mcasp_sync_mux_ck,	CK_443X),
+-	CLK(NULL,	"mcasp_ck",			&mcasp_ck,	CK_443X),
++	CLK(NULL,	"mcasp_fck",			&mcasp_fck,	CK_443X),
+ 	CLK(NULL,	"mcbsp1_sync_mux_ck",		&mcbsp1_sync_mux_ck,	CK_443X),
+-	CLK("omap-mcbsp.1",	"fck",				&mcbsp1_ck,	CK_443X),
++	CLK("omap-mcbsp.1",	"fck",				&mcbsp1_fck,	CK_443X),
+ 	CLK(NULL,	"mcbsp2_sync_mux_ck",		&mcbsp2_sync_mux_ck,	CK_443X),
+-	CLK("omap-mcbsp.2",	"fck",				&mcbsp2_ck,	CK_443X),
++	CLK("omap-mcbsp.2",	"fck",				&mcbsp2_fck,	CK_443X),
+ 	CLK(NULL,	"mcbsp3_sync_mux_ck",		&mcbsp3_sync_mux_ck,	CK_443X),
+-	CLK("omap-mcbsp.3",	"fck",				&mcbsp3_ck,	CK_443X),
++	CLK("omap-mcbsp.3",	"fck",				&mcbsp3_fck,	CK_443X),
+ 	CLK(NULL,	"mcbsp4_sync_mux_ck",		&mcbsp4_sync_mux_ck,	CK_443X),
+-	CLK("omap-mcbsp.4",	"fck",				&mcbsp4_ck,	CK_443X),
+-	CLK("omap2_mcspi.1",	"fck",				&mcspi1_ck,	CK_443X),
+-	CLK("omap2_mcspi.2",	"fck",				&mcspi2_ck,	CK_443X),
+-	CLK("omap2_mcspi.3",	"fck",				&mcspi3_ck,	CK_443X),
+-	CLK("omap2_mcspi.4",	"fck",				&mcspi4_ck,	CK_443X),
+-	CLK("mmci-omap-hs.0",	"fck",				&mmc1_ck,	CK_443X),
+-	CLK("mmci-omap-hs.1",	"fck",				&mmc2_ck,	CK_443X),
+-	CLK("mmci-omap-hs.2",	"fck",				&mmc3_ck,	CK_443X),
+-	CLK("mmci-omap-hs.3",	"fck",				&mmc4_ck,	CK_443X),
+-	CLK("mmci-omap-hs.4",	"fck",				&mmc5_ck,	CK_443X),
+-	CLK(NULL,	"ocp_wp1_ck",			&ocp_wp1_ck,	CK_443X),
+-	CLK(NULL,	"pdm_ck",			&pdm_ck,	CK_443X),
+-	CLK(NULL,	"pkaeip29_ck",			&pkaeip29_ck,	CK_443X),
+-	CLK("omap_rng",	"ick",				&rng_ck,	CK_443X),
+-	CLK(NULL,	"sha2md51_ck",			&sha2md51_ck,	CK_443X),
+-	CLK(NULL,	"sl2_ck",			&sl2_ck,	CK_443X),
+-	CLK(NULL,	"slimbus1_ck",			&slimbus1_ck,	CK_443X),
+-	CLK(NULL,	"slimbus2_ck",			&slimbus2_ck,	CK_443X),
+-	CLK(NULL,	"sr_core_ck",			&sr_core_ck,	CK_443X),
+-	CLK(NULL,	"sr_iva_ck",			&sr_iva_ck,	CK_443X),
+-	CLK(NULL,	"sr_mpu_ck",			&sr_mpu_ck,	CK_443X),
+-	CLK(NULL,	"tesla_ck",			&tesla_ck,	CK_443X),
+-	CLK(NULL,	"uart1_ck",			&uart1_ck,	CK_443X),
+-	CLK(NULL,	"uart2_ck",			&uart2_ck,	CK_443X),
+-	CLK(NULL,	"uart3_ck",			&uart3_ck,	CK_443X),
+-	CLK(NULL,	"uart4_ck",			&uart4_ck,	CK_443X),
+-	CLK(NULL,	"unipro1_ck",			&unipro1_ck,	CK_443X),
+-	CLK(NULL,	"usb_host_ck",			&usb_host_ck,	CK_443X),
+-	CLK(NULL,	"usb_host_fs_ck",		&usb_host_fs_ck,	CK_443X),
+-	CLK("musb_hdrc",	"ick",				&usb_otg_ck,	CK_443X),
+-	CLK(NULL,	"usb_tll_ck",			&usb_tll_ck,	CK_443X),
+-	CLK(NULL,	"usbphyocp2scp_ck",		&usbphyocp2scp_ck,	CK_443X),
+-	CLK(NULL,	"usim_ck",			&usim_ck,	CK_443X),
+-	CLK("omap_wdt",	"fck",				&wdt2_ck,	CK_443X),
+-	CLK(NULL,	"wdt3_ck",			&wdt3_ck,	CK_443X),
++	CLK("omap-mcbsp.4",	"fck",				&mcbsp4_fck,	CK_443X),
++	CLK("omap2_mcspi.1",	"fck",				&mcspi1_fck,	CK_443X),
++	CLK("omap2_mcspi.2",	"fck",				&mcspi2_fck,	CK_443X),
++	CLK("omap2_mcspi.3",	"fck",				&mcspi3_fck,	CK_443X),
++	CLK("omap2_mcspi.4",	"fck",				&mcspi4_fck,	CK_443X),
++	CLK("mmci-omap-hs.0",	"fck",				&mmc1_fck,	CK_443X),
++	CLK("mmci-omap-hs.1",	"fck",				&mmc2_fck,	CK_443X),
++	CLK("mmci-omap-hs.2",	"fck",				&mmc3_fck,	CK_443X),
++	CLK("mmci-omap-hs.3",	"fck",				&mmc4_fck,	CK_443X),
++	CLK("mmci-omap-hs.4",	"fck",				&mmc5_fck,	CK_443X),
++	CLK(NULL,	"ocp_wp1_ick",			&ocp_wp1_ick,	CK_443X),
++	CLK(NULL,	"pdm_fck",			&pdm_fck,	CK_443X),
++	CLK(NULL,	"pkaeip29_fck",			&pkaeip29_fck,	CK_443X),
++	CLK("omap_rng",	"ick",				&rng_ick,	CK_443X),
++	CLK(NULL,	"sha2md51_fck",			&sha2md51_fck,	CK_443X),
++	CLK(NULL,	"sl2_ick",			&sl2_ick,	CK_443X),
++	CLK(NULL,	"slimbus1_fck",			&slimbus1_fck,	CK_443X),
++	CLK(NULL,	"slimbus2_fck",			&slimbus2_fck,	CK_443X),
++	CLK(NULL,	"sr_core_fck",			&sr_core_fck,	CK_443X),
++	CLK(NULL,	"sr_iva_fck",			&sr_iva_fck,	CK_443X),
++	CLK(NULL,	"sr_mpu_fck",			&sr_mpu_fck,	CK_443X),
++	CLK(NULL,	"tesla_ick",			&tesla_ick,	CK_443X),
++	CLK(NULL,	"uart1_fck",			&uart1_fck,	CK_443X),
++	CLK(NULL,	"uart2_fck",			&uart2_fck,	CK_443X),
++	CLK(NULL,	"uart3_fck",			&uart3_fck,	CK_443X),
++	CLK(NULL,	"uart4_fck",			&uart4_fck,	CK_443X),
++	CLK(NULL,	"unipro1_fck",			&unipro1_fck,	CK_443X),
++	CLK(NULL,	"usb_host_fck",			&usb_host_fck,	CK_443X),
++	CLK(NULL,	"usb_host_fs_fck",		&usb_host_fs_fck,	CK_443X),
++	CLK("musb_hdrc",	"ick",				&usb_otg_ick,	CK_443X),
++	CLK(NULL,	"usb_tll_ick",			&usb_tll_ick,	CK_443X),
++	CLK(NULL,	"usbphyocp2scp_ick",		&usbphyocp2scp_ick,	CK_443X),
++	CLK(NULL,	"usim_fck",			&usim_fck,	CK_443X),
++	CLK("omap_wdt",	"fck",				&wdt2_fck,	CK_443X),
++	CLK(NULL,	"wdt3_fck",			&wdt3_fck,	CK_443X),
+ 	CLK(NULL,	"otg_60m_gfclk_ck",		&otg_60m_gfclk_ck,	CK_443X),
+ 	CLK(NULL,	"stm_clk_div_ck",		&stm_clk_div_ck,	CK_443X),
+ 	CLK(NULL,	"trace_clk_div_ck",		&trace_clk_div_ck,	CK_443X),
