@@ -1,38 +1,109 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Tue, 23 Feb 2010 12:06:45 +0530
-Subject: QUERY: Inclusion of header files in kernel header files.
-Message-ID: <22dbbef21002222236j2eaaf36cjd3720e2573d25a70@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 23 Feb 2010 08:18:33 -0500
+Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
+In-Reply-To: <20100222190516.GJ5055@nowhere>
+References: <1266090518-31120-1-git-send-email-rabin@rab.in>
+	<1266090518-31120-5-git-send-email-rabin@rab.in>
+	<20100222190516.GJ5055@nowhere>
+Message-ID: <1266931113.19540.5.camel@frodo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 2010-02-22 at 20:05 +0100, Frederic Weisbecker wrote:
 
-I have been through many kernel header files and have found that kernel
-header
-files at many places don't include other header files which they have
-dependency upon.
+> 
+> Btw, you described that mcount is used in some gcc versions and
+> __gnu_mcount_nc in newers.
+> Shouldn't we have a gcc version dependency here? (not sure we can
+> do this from Kconfig though).
+> 
 
-For example:
-<linux/amba/bus.h> uses struct device and struct resource and it doesn't
-include <linux/device.h> and <linux/resource.h> header files.
+Maybe we can add something to recordmcount.pl?
 
-Now, whenever i try to include bus.h, i have to include device.h and
-resource.h.
+> 
+> 
+> >  config DEBUG_USER
+> >  	bool "Verbose user fault messages"
+> >  	help
+> > diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+> > index 8214bfe..e5e1e53 100644
+> > --- a/arch/arm/kernel/armksyms.c
+> > +++ b/arch/arm/kernel/armksyms.c
+> > @@ -165,6 +165,8 @@ EXPORT_SYMBOL(_find_next_bit_be);
+> >  #endif
+> >  
+> >  #ifdef CONFIG_FUNCTION_TRACER
+> > +#ifdef CONFIG_OLD_MCOUNT
+> >  EXPORT_SYMBOL(mcount);
+> > +#endif
+> >  EXPORT_SYMBOL(__gnu_mcount_nc);
+> >  #endif
+> > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> > index d412d7c..c98e3a3 100644
+> > --- a/arch/arm/kernel/entry-common.S
+> > +++ b/arch/arm/kernel/entry-common.S
+> > @@ -169,6 +169,12 @@ gnu_trace:
+> >  	ldmia	sp!, {r0-r3, ip, lr}
+> >  	mov	pc, ip
+> >  
+> > +#ifdef CONFIG_OLD_MCOUNT
+> > +/*
+> > + * This is under an ifdef in order to force link-time errors for people trying
+> > + * to build with !FRAME_POINTER with a GCC which doesn't use the new-style
+> > + * mcount.
+> > + */
+> >  ENTRY(mcount)
+> >  	stmdb	sp!, {r0-r3, lr}
+> >  	ldr	r0, =ftrace_trace_function
+> > @@ -187,6 +193,7 @@ trace:
+> >  	mov	pc, r2
+> >  	ldr	lr, [fp, #-4]			@ restore lr
+> >  	ldmia	sp!, {r0-r3, pc}
+> > +#endif
+> >  
+> >  #endif /* CONFIG_DYNAMIC_FTRACE */
+> >  
+> > diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+> > index 6c22d8a..7468ffe 100644
+> > --- a/kernel/trace/Kconfig
+> > +++ b/kernel/trace/Kconfig
+> > @@ -126,7 +126,7 @@ if FTRACE
+> >  config FUNCTION_TRACER
+> >  	bool "Kernel Function Tracer"
+> >  	depends on HAVE_FUNCTION_TRACER
+> > -	select FRAME_POINTER
+> > +	select FRAME_POINTER if (!ARM_UNWIND)
+> 
+> 
+> So, if I understand well. If people have ARM_UNWIND but
+> FUNCTION_TRACER, it might crash at link time in case
+> they don't have a recent enough gcc version to
+> support the new -pg style?
+> 
+> That doesn't look good.
+> 
+> Ideally, we need HAVE_FUNCTION_TRACER to be enabled in arm
+> only if (old gcc && frame pointers) || new gcc
+> 
+> And then, we need config OLD_MCOUNT:
+> 	 old gcc && FUNCTION_TRACER
+> 
+> and config NEW_MCOUNT:
+> 	new gcc && FUNCTION_TRACER
+> 
+> so that we can selectively build mcount or __gnu_mcount_nc.
+> 
+> Hmm, I fear we can't check gcc version from Kconfig, as I'm
+> grepping on Kconfig files...
 
-Is this correct approach?
 
-Again, if i include device.h and resource.h, they must be included before
-bus.h.
-Now this will disturb the alphabetical ordering of including header files
-sometimes. (not in this example)
+I would not check gcc version through KCONFIG, but you can have the gcc
+version checked and define another macro in a header somewhere, like
+asm/ftrace.h. Then we could do something different while it is
+compiling.
 
-Any idea behind this philosophy.
+Disclaimer:
+I have to go back and read the entire thread, to know what exactly is
+going on ;-)
 
-
-regards,
-viresh kumar
-ST Microelectronics
-India.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100223/8f5cac70/attachment.htm>
+-- Steve
