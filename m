@@ -1,115 +1,29 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 23 Feb 2010 17:05:31 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Feb 2010 11:41:16 +0000
 Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E13E7@dbde02.ent.ti.com>
 References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E13E7@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C42E13E7@dbde02.ent.ti.com>
+Message-ID: <20100223114116.GB10501@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
-Thanks for these patches.
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Tuesday, February 23, 2010 4:31 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Tony Lindgren; Larry Bassel; Daniel Walker; Russell King
-> Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-> 
-> The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
-> systems for things like ordering Normal Non-cacheable memory accesses
-> with DMA transfer (via Device memory writes). The current implementation
-> uses dmb() for mb() and friends but this is not sufficient. The DMB only
-> ensures the ordering of accesses with regards to a single observer
-> accessing the same memory. If a DMA transfer is started by a write to
-> Device memory, the data to be transfered may not reach the main memory
-> (even if mapped as Normal Non-cacheable) before the device receives the
-> notification to begin the transfer. The only barrier that would help in
-> this situation is DSB which would completely drain the write buffers.
-> 
-> The patch also adds support for platform-defined barriers that can be
-> defined in mach/barriers.h. This is required by at least two platforms -
-> MSM and RealView (possible OMAP as well). On RealView with an outer
-> cache (PL310 for example) stores to Normal Non-cacheable memory are
-> buffered by the outer cache but the DSB doesn't go as far as this. A
-> separate L2x0 sync command is required (a store to Strongly Ordered
-> memory would do as well, similar to the MSM requirements and maybe
-> faster).
-> 
-> Note that the SMP barriers are not affected as they only deal with
-> ordering in Normal memory. There is however a situation with the use of
-> IPIs. A DMB is not enough to ensure that a write to Normal memory is
-> strictly ordered with respect to the IPI generation (and interrupt
-> handling). A solution is for the users of smp_call_function() to use a
-> mandatory barrier.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Daniel Walker <dwalker@codeaurora.org>
-> Cc: Larry Bassel <lbassel@quicinc.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/include/asm/system.h |   18 ++++++++----------
->  arch/arm/mm/Kconfig           |    6 ++++++
->  2 files changed, 14 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 058e7e9..477861d 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -138,14 +138,12 @@ extern unsigned int user_debug;
->  #define dmb() __asm__ __volatile__ ("" : : : "memory")
->  #endif
-> 
-> -#if __LINUX_ARM_ARCH__ >= 7 || defined(CONFIG_SMP)
-> -#define mb()		dmb()
-> -#define rmb()		dmb()
-> -#define wmb()		dmb()
-> +#ifdef CONFIG_ARCH_HAS_BARRIERS
-> +#include <mach/barriers.h>
->  #else
-> -#define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> -#define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> -#define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> +#define mb()		dsb()
-> +#define rmb()		dmb()
-> +#define wmb()		dsb()
->  #endif
-> 
->  #ifndef CONFIG_SMP
-> @@ -153,9 +151,9 @@ extern unsigned int user_debug;
->  #define smp_rmb()	barrier()
->  #define smp_wmb()	barrier()
->  #else
-> -#define smp_mb()	mb()
-> -#define smp_rmb()	rmb()
-> -#define smp_wmb()	wmb()
-> +#define smp_mb()	dmb()
-> +#define smp_rmb()	dmb()
-> +#define smp_wmb()	dmb()
->  #endif
-> 
->  #define read_barrier_depends()		do { } while(0)
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index f62beb7..f67f2c4 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -802,3 +802,9 @@ config ARM_L1_CACHE_SHIFT
->  	int
->  	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
->  	default 5
-> +
-> +config ARCH_HAS_BARRIERS
-> +	bool
-> +	help
-> +	  This option allows the use of custom mandatory barriers
-> +	  included via the mach/barriers.h file.
-> 
-OMAP3 and family would be ok with this much needed mandatory barriers
-but for OMAP4, we need platform specified barriers as you mentioned. Will
-have a look at this series and do some testing on OMAP4. Will send
-a follow up patch then.
+On Tue, Feb 23, 2010 at 05:05:31PM +0530, Shilimkar, Santosh wrote:
+> OMAP3 and family would be ok with this much needed mandatory barriers
+> but for OMAP4, we need platform specified barriers as you mentioned. Will
+> have a look at this series and do some testing on OMAP4. Will send
+> a follow up patch then.
 
-Regards,
-Santosh
+Wait for v2 - it introduces barriers onto the older CPUs which do not
+need it, and therefore is definitely not right.
+
+Eg, ARMv4 CPUs don't need the drain-write-buffer instruction for mb()
+and wmb() - we have no relaxed behaviours on those CPUs, so this is
+pointless.  As I also pointed out, it breaks ARMv3 because the drain-
+write-buffer instruction there is an undefined instruction.
+
+Plus, non-coherent Xscale has the same requirements as ARMv4, so getting
+rid of the arch_is_coherent() stuff was completely wrong.
+
+Basically, the patch is not suitable as it currently stands, and is in
+need of rework.
