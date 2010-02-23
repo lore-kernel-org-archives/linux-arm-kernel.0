@@ -1,16 +1,35 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Tue, 23 Feb 2010 15:52:51 +0530
-Subject: [PATCH 4/4] ux500: support clock gating
-In-Reply-To: <1266919983-32759-5-git-send-email-rabin.vincent@stericsson.com>
-References: <1266919983-32759-1-git-send-email-rabin.vincent@stericsson.com>
-	<1266919983-32759-5-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <20100223102251.GA3216@bnru01.bnr.st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Feb 2010 11:00:59 +0000
+Subject: [PATCH 0/4] ARM mandatory barriers
+Message-ID: <20100223105806.11048.16585.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2010 at 11:13:02AM +0100, Rabin VINCENT wrote:
-> Implment clock gating support for the u8500 clocks.
+Hi,
 
-Oops.  I'll fix this typo together with any comments from review.
+This is a follow up to a previous patch I posted on the implementation
+of the mandatory barriers on ARM. The third patch adds support for the
+L2x0 cache sync operation and the last patch implements the
+RealView-specific mandatory barriers.
 
-Rabin
+
+Catalin Marinas (4):
+      ARM: Change the mandatory barriers implementation
+      ARM: Move the outer_cache definitions into a separate file
+      ARM: Add outer_cache_fns sync function and support for L2x0
+      ARM: Add RealView-specific barrier implementation
+
+
+ arch/arm/Kconfig                               |    1 
+ arch/arm/include/asm/cacheflush.h              |   38 -------------
+ arch/arm/include/asm/outercache.h              |   69 ++++++++++++++++++++++++
+ arch/arm/include/asm/system.h                  |   18 +++---
+ arch/arm/mach-realview/include/mach/barriers.h |   30 ++++++++++
+ arch/arm/mm/Kconfig                            |    6 ++
+ arch/arm/mm/cache-l2x0.c                       |    1 
+ 7 files changed, 116 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/include/asm/outercache.h
+ create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
+
+-- 
+Catalin
