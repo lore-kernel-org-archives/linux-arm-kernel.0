@@ -1,34 +1,30 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 23 Feb 2010 22:28:43 +0100
-Subject: [PATCH 03/13] ARM: LPC32XX: Clock driver
-In-Reply-To: <20100220163313.GA12409@n2100.arm.linux.org.uk>
-References: <1266621969-28847-1-git-send-email-wellsk40@gmail.com>
-	<1266621969-28847-4-git-send-email-wellsk40@gmail.com>
-	<20100220163313.GA12409@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F805CCE964FB@eu1rdcrdc1wx030.exi.nxp.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 23 Feb 2010 22:36:40 +0100
+Subject: sleeping clk_[enable,disable]?
+In-Reply-To: <20100223200329.GC6325@debian>
+References: <63386a3d1002230632v4c98c79dg4512684f76008a7d@mail.gmail.com>
+	<20100223200329.GC6325@debian>
+Message-ID: <63386a3d1002231336n160d9419if6c339d57ab1512@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+2010/2/23 Rabin Vincent <rabin@rab.in>:
 
-Thanks much for your response on this.
+> On Tue, Feb 23, 2010 at 03:32:19PM +0100, Linus Walleij wrote:
 
-Does it make sense to repost the complete patchset or just the diffs
-of the changed files? (clock.h and clock.c).
+>> * Throw in udelay():s after the clk_[enable,disable] calls, with some values
+>> ? that are unfortunately then spread out in the drivers instead of in the
+>> ? clk implementation.
+>
+> Or you could place the udelay()s inside the clk_* calls themselves. ?See
+> mach-pxa/clock.c or plat-stmp3xxx/clock.c.
 
-> 
-> There's no requirement to return a rate of zero if the clock is not
-> enabled.
-> In fact, it's something that should be avoided because it prevents
-> querying
-> the rate you'll get before enabling the clock (which might affect whether
-> you decide to enable it.)
-> 
+Hm, yeah pxa has a the maximum defined delay 5 us, and stmp3xx has
+a maximum of 10 us both probably acceptable delays in a fastpath. So your
+system latency requirements control the limit here and in that case ...
+perhaps one would better just switch all interrupt handlers where a
+clk_enable/disable occurs to threaded anyway just to be on the safe
+side. (Just thinking aloud a bit...)
 
-Alright, this reduces some checks. I've also made changes to set_rate
-functions to allow clock rate changes without the clock being enabled
-or changing the current clock enable state.
-
-thanks,
-Kevin
- 
+Yours,
+Linus Walleij
