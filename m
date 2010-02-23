@@ -1,9 +1,9 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 23 Feb 2010 17:15:18 -0500 (EST)
-Subject: [PATCH] Support for Buffalo WXL (Terastation Duo)
-In-Reply-To: <4B83DD5C.2080607@kolios.dk>
-References: <4B83DD5C.2080607@kolios.dk>
-Message-ID: <alpine.LFD.2.00.1002231704230.1946@xanadu.home>
+Date: Tue, 23 Feb 2010 17:04:09 -0500 (EST)
+Subject: =?ISO-8859-15?Q?Re=3A_=5BPATCH=5D=A0MPP_routines_and_definitions_for_MV78XX0_arch?=
+In-Reply-To: <4B83DA46.4030309@kolios.dk>
+References: <4B83DA46.4030309@kolios.dk>
+Message-ID: <alpine.LFD.2.00.1002231655250.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,38 +12,42 @@ On Tue, 23 Feb 2010, Sebastien Requiem wrote:
 > Hi everyone,
 > 
 > 
-> 
-> I have created a patch to support a new Sub architecture.
-> 
-> 
-> Description of patch:
-> 
-> * Modification of Kconfig to add the Option
-> * 1 new file : buffalo-wxl-setup.c
-> This file is inspired from the db-78xx0-setup.c already present.
-> The following is done:
->  - Configure MPP Lines for the plateform (see my patch for MPP)
-> This is taken from the stock kernel provided by buffalotech (the vendor)
->  - GigaBit Ethernet
->  - Sata
->  - Uart are initiallized in a different way than on the dev board as we have
-> one core only.
->  - USB
+> I have recently created the routines to configure the MPP
+> lines on specific plateform for the architecture MV78XX0.
 > 
 > 
-> The kernel has been running for some days now on my plateform.
+> Patch description :
+> ============
+> This patch is composed of two new files :
+> - mpp.c which is mainly inspired by the same
+> file as in mach-kirkwood
+> - mpp.h that is written from the documentation provided
+> by Marvell
 > 
-> I would appreciate if you had time to review my patch and give me any 
-> comments/feedback regarding my work.
+> http://www.marvell.com/products/processors/embedded/discovery_innovation/HW_MV78100_OpenSource.pdf
+> 
+> moreover, due to some implementation problem, I have
+> defined some MPPX_UNUSED that offer the posibility
+> to developers to SET MPP to some unused value
+> (such as Buffalo WXL)
+> 
+> Note: This patch doesn't support MV78200 yet (only 78100 MPP lines have been
+> written)
+> =============
+> 
+> 
+> I would very much appreciate if you could review the patch
+> and give feedback/comments.
 
-All previous comments also apply to this patch.
+You should put the Signed-off-by tag along with your patch description, 
+not after the patch.
 
-Furthermore you used the config symbol MACH_BUFFALO_WXL while the 
-machine record expects MACH_TERASTATION_WXL.  And in wxl_pci_init() you 
-used machine_is_db78x00_bp() instead of machine_is_terastation_wxl() 
-which is actively wrong.
+The coding style requires hard tabs for code indentation, and those 
+must be 8 space width.  More details in Documentation/CodingStyle.
 
-I've fixed up those and pushed the result too.
+You forgot to include the change to Makefile for the new file.
+
+I've fixed those up and committed the patch to the orion git tree.
 
 
 Nicolas
