@@ -1,30 +1,49 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 23 Feb 2010 22:36:40 +0100
-Subject: sleeping clk_[enable,disable]?
-In-Reply-To: <20100223200329.GC6325@debian>
-References: <63386a3d1002230632v4c98c79dg4512684f76008a7d@mail.gmail.com>
-	<20100223200329.GC6325@debian>
-Message-ID: <63386a3d1002231336n160d9419if6c339d57ab1512@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 23 Feb 2010 17:15:18 -0500 (EST)
+Subject: [PATCH] Support for Buffalo WXL (Terastation Duo)
+In-Reply-To: <4B83DD5C.2080607@kolios.dk>
+References: <4B83DD5C.2080607@kolios.dk>
+Message-ID: <alpine.LFD.2.00.1002231704230.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/2/23 Rabin Vincent <rabin@rab.in>:
+On Tue, 23 Feb 2010, Sebastien Requiem wrote:
 
-> On Tue, Feb 23, 2010 at 03:32:19PM +0100, Linus Walleij wrote:
+> Hi everyone,
+> 
+> 
+> 
+> I have created a patch to support a new Sub architecture.
+> 
+> 
+> Description of patch:
+> 
+> * Modification of Kconfig to add the Option
+> * 1 new file : buffalo-wxl-setup.c
+> This file is inspired from the db-78xx0-setup.c already present.
+> The following is done:
+>  - Configure MPP Lines for the plateform (see my patch for MPP)
+> This is taken from the stock kernel provided by buffalotech (the vendor)
+>  - GigaBit Ethernet
+>  - Sata
+>  - Uart are initiallized in a different way than on the dev board as we have
+> one core only.
+>  - USB
+> 
+> 
+> The kernel has been running for some days now on my plateform.
+> 
+> I would appreciate if you had time to review my patch and give me any 
+> comments/feedback regarding my work.
 
->> * Throw in udelay():s after the clk_[enable,disable] calls, with some values
->> ? that are unfortunately then spread out in the drivers instead of in the
->> ? clk implementation.
->
-> Or you could place the udelay()s inside the clk_* calls themselves. ?See
-> mach-pxa/clock.c or plat-stmp3xxx/clock.c.
+All previous comments also apply to this patch.
 
-Hm, yeah pxa has a the maximum defined delay 5 us, and stmp3xx has
-a maximum of 10 us both probably acceptable delays in a fastpath. So your
-system latency requirements control the limit here and in that case ...
-perhaps one would better just switch all interrupt handlers where a
-clk_enable/disable occurs to threaded anyway just to be on the safe
-side. (Just thinking aloud a bit...)
+Furthermore you used the config symbol MACH_BUFFALO_WXL while the 
+machine record expects MACH_TERASTATION_WXL.  And in wxl_pci_init() you 
+used machine_is_db78x00_bp() instead of machine_is_terastation_wxl() 
+which is actively wrong.
 
-Yours,
-Linus Walleij
+I've fixed up those and pushed the result too.
+
+
+Nicolas
