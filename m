@@ -1,35 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Feb 2010 12:16:43 +0000
-Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <20100223111036.GA10501@n2100.arm.linux.org.uk>
-References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
-	<20100223111036.GA10501@n2100.arm.linux.org.uk>
-Message-ID: <1266927403.3123.56.camel@e102109-lin.cambridge.arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 23 Feb 2010 12:45:13 +0100
+Subject: [PATCH] ARM: U300: fix inverted clk round rate
+Message-ID: <1266925513-28402-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-02-23 at 11:10 +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2010 at 11:01:05AM +0000, Catalin Marinas wrote:
-> > -#define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > -#define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > -#define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-> > +#define mb()		dsb()
-> > +#define rmb()		dmb()
-> > +#define wmb()		dsb()
-> 
-> What is the reason for getting rid of the arch_is_coherent() bit here
-> and imposing non-compiler barriers on everything?  
+The clk_round_rate() functions in the U300 clocking will always
+select the lowest clocking frequency due to inverted rounding
+comparisons. Fix this.
 
-The original code defines the mandatory barriers only if
-__LINUX_ARCH_ARM__ >= 7 || CONFIG_SMP. However we still need them for
-earlier architectures (v6). We can change the #if here to test for
-earlier architectures as well and only do the arch_is_coherent() check
-for some early implementations that don't have barriers.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-u300/clock.c |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-> This also breaks ARMv3 since you now issue a mcr for the write buffer
-> on architectures which have no write buffer.
-
-Is this the case for another #ifdef? I can add it.
-
+diff --git a/arch/arm/mach-u300/clock.c b/arch/arm/mach-u300/clock.c
+index c174ed1..5af71d5 100644
+--- a/arch/arm/mach-u300/clock.c
++++ b/arch/arm/mach-u300/clock.c
+@@ -610,34 +610,34 @@ EXPORT_SYMBOL(clk_get_rate);
+ 
+ static unsigned long clk_round_rate_mclk(struct clk *clk, unsigned long rate)
+ {
+-	if (rate >= 18900000)
++	if (rate <= 18900000)
+ 		return 18900000;
+-	if (rate >= 20800000)
++	if (rate <= 20800000)
+ 		return 20800000;
+-	if (rate >= 23100000)
++	if (rate <= 23100000)
+ 		return 23100000;
+-	if (rate >= 26000000)
++	if (rate <= 26000000)
+ 		return 26000000;
+-	if (rate >= 29700000)
++	if (rate <= 29700000)
+ 		return 29700000;
+-	if (rate >= 34700000)
++	if (rate <= 34700000)
+ 		return 34700000;
+-	if (rate >= 41600000)
++	if (rate <= 41600000)
+ 		return 41600000;
+-	if (rate >= 52000000)
++	if (rate <= 52000000)
+ 		return 52000000;
+ 	return -EINVAL;
+ }
+ 
+ static unsigned long clk_round_rate_cpuclk(struct clk *clk, unsigned long rate)
+ {
+-	if (rate >= 13000000)
++	if (rate <= 13000000)
+ 		return 13000000;
+-	if (rate >= 52000000)
++	if (rate <= 52000000)
+ 		return 52000000;
+-	if (rate >= 104000000)
++	if (rate <= 104000000)
+ 		return 104000000;
+-	if (rate >= 208000000)
++	if (rate <= 208000000)
+ 		return 208000000;
+ 	return -EINVAL;
+ }
 -- 
-Catalin
+1.6.3.3
