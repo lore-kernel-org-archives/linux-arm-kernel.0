@@ -1,56 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Feb 2010 18:03:42 +0000
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Feb 2010 18:04:04 +0000
 Subject: [PATCH 1/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <1266940955.3123.133.camel@e102109-lin.cambridge.arm.com>
-References: <20100223152402.GF10501@n2100.arm.linux.org.uk>
-	<1266940955.3123.133.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100223180342.GA26434@n2100.arm.linux.org.uk>
+In-Reply-To: <1266947915.3123.150.camel@e102109-lin.cambridge.arm.com>
+References: <20100223110105.11048.8143.stgit@e102109-lin.cambridge.arm.com>
+	<20100223173334.GA13519@n2100.arm.linux.org.uk>
+	<1266947915.3123.150.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1266948244.3123.152.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2010 at 04:02:35PM +0000, Catalin Marinas wrote:
-> > I'm not entirely convinced by the part of your patch which changes the
-> > SMP barriers yet.  For instance, some drivers contain:
-> > 
-> >                 /* We need for force the visibility of tp->intr_mask
-> >                  * for other CPUs, as we can loose an MSI interrupt
-> >                  * and potentially wait for a retransmit timeout if we don't.
-> >                  * The posted write to IntrMask is safe, as it will
-> >                  * eventually make it to the chip and we won't loose anything
-> >                  * until it does.
-> >                  */
-> >                 tp->intr_mask = 0xffff;
-> >                 smp_wmb();
-> >                 RTL_W16(IntrMask, tp->intr_event);
-> > 
-> > The second write is a write to hardware, and thus would be to a device
-> > region.  The first is a write to a memory structure.
-> > 
-> > It seems to me given your description in the patch, that having smp_wmb()
-> > be a dmb(), rather than a wmb() would be insufficient here.
+On Tue, 2010-02-23 at 17:58 +0000, Catalin Marinas wrote:
+> On Tue, 2010-02-23 at 17:33 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Feb 23, 2010 at 11:01:05AM +0000, Catalin Marinas wrote:
+> > > The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
+> > > systems for things like ordering Normal Non-cacheable memory accesses
+> > > with DMA transfer (via Device memory writes). The current implementation
+> > > uses dmb() for mb() and friends but this is not sufficient. The DMB only
+> > > ensures the ordering of accesses with regards to a single observer
+> > > accessing the same memory.
+> >
+> > Erm, I also don't think your statement here is right.  DMB is defined in
+> > the ARM ARM to be by default a full-system, read/write memory barrier.
+> > It has this property:
+> >
+> >   If the required shareability is Full system then the operation applies
+> >   to all observers within the system.
+> > ...
+> >   Any observer with the same required shareability domain as Pe observes
+> >   all members of Group A before it observes any member of Group B to the
+> >   extent that those group members are required to be observed, as
+> >   determined by the shareability and cacheability of the memory locations
+> >   accessed by the group members.  Where members of Group A and Group B
+> >   access the same memory-mapped peripheral, all members of Group A will
+> >   be visible at the memory-mapped peripheral before any members of Group
+> >   B are visible at that peripheral.
+> >
+> > This most definitely is not "single observer" - it's all observers within
+> > the same "shareability domain".  That may encompass all CPUs and not
+> > devices and DMA agents.
 > 
-> My proposal for this would be to place an explicit DSB at the beginning
-> of gic_raise_irq(). Otherwise, we can change smp_wmb() to be a DSB but
-> we may have some performance penalty for other cases where ordering with
-> Device accesses is not required.
+> Yes, that's correct but see below (the issue is the definition of
+> "observability").
 
-That doesn't solve the above case; this isn't GIC code, it's driver code.
+I meant that the definitions in the ARM ARM encompass all CPUs,
+devices/DMA agents (but only when acting as masters).
 
-Given what you've said, it would appear that smp_wmb() needs to be a
-wmb() in the SMP case, to ensure that the write to intr_mask is
-visible to other CPUs before the interrupt mask write hits the
-peripheral.
-
-So, that leads us back to the:
-
-#ifndef CONFIG_SMP
-#define smp_mb()        barrier()
-#define smp_rmb()       barrier()
-#define smp_wmb()       barrier()
-#else
-#define smp_mb()        mb()
-#define smp_rmb()       rmb()
-#define smp_wmb()       wmb()
-#endif
-
-which we have at the moment.
+-- 
+Catalin
