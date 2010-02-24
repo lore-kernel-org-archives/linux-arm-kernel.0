@@ -1,41 +1,25 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 24 Feb 2010 13:21:12 -0700 (MST)
-Subject: [GIT PULL] Second set of OMAP clock/hwmod patches for 2.6.34
-In-Reply-To: <alpine.DEB.2.00.1002241207020.2701@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1002241116000.2701@utopia.booyaka.com>
-	<20100224190211.GS28173@atomide.com>
-	<alpine.DEB.2.00.1002241207020.2701@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1002241320120.2701@utopia.booyaka.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 25 Feb 2010 08:12:34 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <201002240816.10178.oliver@neukum.org>
+References: <1266445892.16346.306.camel@pasglop>
+	<201002192153.22159.oliver@neukum.org>
+	<1266979689.23523.1669.camel@pasglop>
+	<201002240816.10178.oliver@neukum.org>
+Message-ID: <1267045954.23523.1692.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Feb 2010, Paul Walmsley wrote:
+On Wed, 2010-02-24 at 08:16 +0100, Oliver Neukum wrote:
+> I don't know. The issue seems quite complex. It would seem better to
+> centralize it as far as practical. Do you have a wrapper drivers could
+> call?
 
-> On Wed, 24 Feb 2010, Tony Lindgren wrote:
-> 
-> > * Paul Walmsley <paul@pwsan.com> [100224 10:15]:
-> > > 
-> > > Hi Tony,
-> > > 
-> > > The following changes since commit 0482e3c6f704d25b6a4e3c940caeeacece4e6d74:
-> > >   Tony Lindgren (1):
-> > >         Merge branch 'omap-fixes-for-linus' into omap-for-linus
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.pwsan.com/linux-2.6 for_2.6.34_b
-> > 
-> > Hmm this does not seem to merge without conflicts to omap-for-linus,
-> > maybe take a look if you can merge/rebase it?
-> > 
-> > I'd assume rebasing or merging your branch with
-> > 80c20d543d142ee54ec85259b77aaf0b83c32db5 will do the trick.
-> 
-> Looks like 4751227df948582e82f19df30efa662ab71fa980 is the problem.
+flush_dcache_page() ? :-)
 
-Cool, it turned out to be not too bad to rebase.  for_2.6.34_b branch is 
-updated.  I'll retest here and resend a pull request after the tests are 
-complete.
+Now, the subsystem might be the one to know whether something is mapped
+into userspace or not (v4l in our case) in which case a wrapper could be
+created.
 
-
-- Paul
+Cheers,
+Ben.
