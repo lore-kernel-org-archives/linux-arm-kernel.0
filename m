@@ -1,44 +1,35 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 24 Feb 2010 18:50:16 +0100
-Subject: [PATCH] ARM: pxa/raumfeld: set GPIO drive bits for LED pins
-Message-ID: <1267033816-5331-1-git-send-email-daniel@caiaq.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Feb 2010 12:57:28 -0500 (EST)
+Subject: Git pull request: more Kirkwood/MV78xx0 stuff
+Message-ID: <alpine.LFD.2.00.1002241251260.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set GPIO bits to pull the pins connected to LEDs for lower power mode.
-We want all LEDs off when devices are in suspend.
+Russell, please pull:
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-pxa/raumfeld.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+	git://git.marvell.com/orion for-rmk
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 06717d7..3184bdc 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -231,6 +231,10 @@ static mfp_cfg_t raumfeld_connector_pin_config[] __initdata = {
- 	GPIO26_SSP2_FRM,
- 	GPIO27_SSP2_TXD,
- 	GPIO29_SSP2_EXTCLK,
-+
-+	/* LEDs */
-+	GPIO35_GPIO | MFP_LPM_PULL_LOW,
-+	GPIO36_GPIO | MFP_LPM_DRIVE_HIGH,
- };
- 
- static mfp_cfg_t raumfeld_speaker_pin_config[] __initdata = {
-@@ -277,6 +281,10 @@ static mfp_cfg_t raumfeld_speaker_pin_config[] __initdata = {
- 	GPIO87_SSP1_TXD,
- 	GPIO88_SSP1_RXD,
- 	GPIO90_SSP1_SYSCLK,
-+
-+	/* LEDs */
-+	GPIO35_GPIO | MFP_LPM_PULL_LOW,
-+	GPIO36_GPIO | MFP_LPM_DRIVE_HIGH,
- };
- 
- /*
--- 
-1.6.6.2
+This adds support for the eSATA SheevaPlug and the Terastation Duo.
+
+John Holland (3):
+      [ARM] eSATA SheevaPlug basic board support
+      [ARM] eSATA SheevaPlug: configure SoC SATA interface
+      [ARM] eSATA SheevaPlug: correlate MPP to SD CD and SD WP
+
+Sebastien Requiem (2):
+      [ARM]?MV78XX0: MPP routines and definitions
+      [ARM] MV78xx0: Support for Buffalo WXL (Terastation Duo)
+
+ arch/arm/configs/mv78xx0_defconfig        |    1 +
+ arch/arm/mach-kirkwood/Kconfig            |    6 +
+ arch/arm/mach-kirkwood/Makefile           |    1 +
+ arch/arm/mach-kirkwood/sheevaplug-setup.c |   50 +++-
+ arch/arm/mach-mv78xx0/Kconfig             |    6 +
+ arch/arm/mach-mv78xx0/Makefile            |    3 +-
+ arch/arm/mach-mv78xx0/buffalo-wxl-setup.c |  155 ++++++++++
+ arch/arm/mach-mv78xx0/mpp.c               |   96 +++++++
+ arch/arm/mach-mv78xx0/mpp.h               |  347 +++++++++++++++++++++++
+ 9 files changed, 662 insertions(+), 3 deletions(-)
+
+
+Nicolas
