@@ -1,23 +1,83 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 24 Feb 2010 11:19:28 -0500 (EST)
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1266979632.23523.1668.camel@pasglop>
-Message-ID: <Pine.LNX.4.44L0.1002241100190.2436-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Feb 2010 16:29:28 +0000
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <4B8543B2.4030004@marcansoft.com>
+References: <1266933437-4876-1-git-send-email-hector@marcansoft.com>
+	<20100224084259.GA8068@pengutronix.de>
+	<4B84F0F6.40902@marcansoft.com>
+	<20100224110353.GA15105@n2100.arm.linux.org.uk>
+	<4B8543B2.4030004@marcansoft.com>
+Message-ID: <20100224162928.GA3888@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Feb 2010, Benjamin Herrenschmidt wrote:
-
-> > The PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
-> > that the HCD could transfer data into a page cache page already mapped
-> > in user space? My understanding is that the scenario above is possible.
+On Wed, Feb 24, 2010 at 04:20:18PM +0100, Hector Martin wrote:
+> Russell King - ARM Linux wrote:
+> > It does work with the previous version of the decompressor.
 > 
-> It is but I'm not confident the responsibility for doing that cleanup
-> is at the HCD level. That would impact a lot of HCD activities that
-> don't need such flushing since the use of the page is purely in-kernel.
+> Sure, at this point in time. The broken code is still the loader, not
+> the new decompressor. If a GCC update had been the culprit, it wouldn't
+> be GCC's fault. The fact remains that the behavior is undefined and
+> (with current GCC versions) requires carefully crafting the resulting C
+> code in order to get reasonable behavior. I don't think you can
+> reasonably require that a generic descompressor be maintained by others
+> with care for compatibility with this hack; someone would have to police
+> changes for potential issues, and you still have a decent chance of
+> getting breakage if GCC decides to change its behavior some day. I'd say
+> fixing the loader to not require this undefined behavior is a
+> considerably better long-term solution.
 
-That's right.  The HCD merely puts data wherever it's told to.  It 
-doesn't know whether the destination is in the page cache, in 
-userspace, or anywhere else.  The same is true for usb-storage.
+For starters, do you actually understand how this stuff works, or are
+you just viewing the "-Dstatic=" as a hack you don't like?
 
-Alan Stern
+Let's examine what's going on.  If you build a file with -fpic, then
+you're asking the compiler to generate position independent code - eg
+for shared libraries.
+
+How this is achieved depends on the architecture.  On ARM, it is achieved
+as follows:
+
+1. references to global data are indirected via the GOT since they can
+   be placed anywhere - in the executable or in another shared library.
+   This is well defined and the user environment relies upon this
+   behaviour.
+
+2. references to local 'static' data are private to the shared library,
+   and are addressed relative to the position of the GOT using the
+   address of the GOT and an offset from the GOT written into the code.
+   This is well defined and the user environment relies upon this
+   behaviour.
+
+3. function references to local 'static' functions are made using
+   standard branch instructions since these are already pc relative
+
+4. function references to global functions are via the PLT.
+
+Now, with the kernel decompressor, we don't care about (3) or (4) -
+indeed, all functions could be static.
+
+However, we do care about (1) vs (2).  For read-only static data, (2)
+is entirely acceptable - static read-only data can be placed in the
+.rodata section and move with the text segment.
+
+However, for writable local data, even if we tell the linker to locate
+the data segment in RAM, the relative offset between the data and text
+is fixed at built time.  What this means is that if you try and relocate
+the image, any read-write data using (2) will most probably end up
+outside RAM.
+
+In order to be able to relocate the data independently of the text
+segment, we need the read-write data to be built with global visibility,
+thereby causing (1) to be used.
+
+We could investigate whether there's a better solution to "-Dstatic="
+to ensure that we end up with (1) for all read/write data.
+
+So, to sum up, contrary to your belief, the behaviour we're invoking
+from the toolchain is not some spurious toolchain behaviour, but
+well-defined behaviour which, if it changes, results in userspace
+breakage.
+
+What is the hack is defining 'static' as a way to get rid of all
+local data, thereby avoiding writable data being addressed relative
+to the GOT.
