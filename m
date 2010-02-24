@@ -1,32 +1,21 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 24 Feb 2010 16:50:38 -0500 (EST)
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267046036.23523.1693.camel@pasglop>
-Message-ID: <Pine.LNX.4.44L0.1002241641370.1253-100000@iolanthe.rowland.org>
+From: hector@marcansoft.com (Hector Martin)
+Date: Wed, 24 Feb 2010 23:09:13 +0100
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <20100224153028.GA28805@pengutronix.de>
+References: <1266933437-4876-1-git-send-email-hector@marcansoft.com>	<20100224084259.GA8068@pengutronix.de>	<4B84F0F6.40902@marcansoft.com>	<20100224110353.GA15105@n2100.arm.linux.org.uk>	<4B8543B2.4030004@marcansoft.com>
+	<20100224153028.GA28805@pengutronix.de>
+Message-ID: <4B85A389.6080701@marcansoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Feb 2010, Benjamin Herrenschmidt wrote:
+Uwe Kleine-K?nig wrote:
+> Independant of the outcome of this discussion I suggest reverting the
+> switch to the new decompressor for .33.  Hectors patch definitely isn't
+> .33 material and broken or not the old decompressor was more reliable.
 
-> I'm surprised that usb-storage has an issue here. It shouldn't afaik,
-> since it's just a SCSI driver (or not anymore ?)
+That's reasonable, as far as .33 goes. Obviously I'm not expecting my
+patch to make it to this release.
 
-It still is.  There's also the ub driver, which is a non-SCSI block 
-device driver for some of the same devices handled by usb-storage.
-
-> and the BIO or
-> filesystems handle things there no ? I haven't seen a single call to
-> flush_dcache_page() in any of drivers/scsi, drivers/ata or drivers/ide
-> when I looked...
-
-There is no real issue; it's just that the problem was first noted in 
-connection with usb-storage reading in executable pages, so Catalin's 
-initial post was oriented toward modifying usb-storage.
-
-The main issue here is that the same host controller will use PIO
-sometimes and DMA sometimes, depending on the details of the transfer.  
-The USB core didn't expect this and consequently we violated the rules
-for DMA mapping.  The question is: If the core is fixed so that the
-rules aren't violated, will everything work correctly?
-
-Alan Stern
+-- 
+Hector Martin (hector at marcansoft.com)
+Public Key: http://www.marcansoft.com/marcan.asc
