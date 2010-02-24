@@ -1,76 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Feb 2010 15:12:25 -0800
-Subject: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E1174@dbde02.ent.ti.com>
-References: <1266483554-15044-1-git-send-email-santosh.shilimkar@ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C417FA42@dbde02.ent.ti.com>
-	<20100222213932.GW18786@atomide.com>
-	<20100222230712.GB18786@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C42E1174@dbde02.ent.ti.com>
-Message-ID: <20100223231225.GL28173@atomide.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 24 Feb 2010 00:44:22 +0000
+Subject: PL-330 DMA driver
+In-Reply-To: <20100218103203.GB20243@n2100.arm.linux.org.uk>
+References: <1b68c6791002162150wb8fbae8ya1e5b3c0a56b7fad@mail.gmail.com>
+	<e9c3a7c21002172224y7a80d913r5b78c1e41a91565f@mail.gmail.com>
+	<20100218103203.GB20243@n2100.arm.linux.org.uk>
+Message-ID: <20100224004422.GD30679@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100222 23:16]:
-> Tony,
-> > -----Original Message-----
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> > Sent: Tuesday, February 23, 2010 4:37 AM
-> > To: Shilimkar, Santosh
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Woodruff, Richard; Ghorai,
-> > Sukumar
-> > Subject: Re: [PATCH 1/9] omap3/4: uart: fix full-fifo write abort
-> > 
-> > * Tony Lindgren <tony@atomide.com> [100222 13:35]:
-> > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100218 21:22]:
-> > > > Bye the way just to add bit more clarity, this patch addresses TX
-> > > > hardware restriction in the new UART IP used on omap3630 and omap4430.
-> > > > First part of the fix for RX is already in mainline,
-> > > > Commit: "ce13d4716a276f4331d78ba28a5093a63822ab95"
-> > > >
-> > > > More details on this thread are here.
-> > > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg19447.html
+On Thu, Feb 18, 2010 at 10:32:03AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 17, 2010 at 11:24:28PM -0700, Dan Williams wrote:
+> > On Tue, Feb 16, 2010 at 10:50 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
+> > > Hello,
 > > >
-> > > Thanks, I've updated the comments for this patch with the link above
-> > > and added the whole series into omap for-next.
+> > > ?Many Samsung SoCs have PL-330 as the DMA controller and the driver
+> > > is missing in the mainline.
+> > >
+> > > A few months ago, Joonyoung Shim of Samsung, attempted the driver for PL-330
+> > > based on the DMA API(drivers/dma/), but the patches weren't accepted.
 > > 
-> > Except patches 8 and 9 as they break compile for mach-omap1
-> > and need to be updated.
-> >
-> Patch 8 is alright and doesn't break omap1. Patch 7 and patch 9 needs update to fix
-> the mach-omap1 build issue by moving irqs-44xx.h header file to plat-omap directory.
-> Attached are updated 7 and 9.
-> Build tested for omap1 (omap_generic_1710_defconfig and omap_h2_1610_defconfig) and boot
-> tested with omap3_defconfig on omap4430sdp board.
+> > Looking back at the archives seems I missed this patch.  So it was not
+> > rejected just overlooked.  Do we want to move forward on that patch as
+> > it stands, or go a different direction?  If it is resubmitted I will
+> > get it in the queue for 2.6.34.
+> 
+> If it's a generic ARM primecell, it's likely it will be used elsewhere as
+> well (primecells are gaining popularity at the moment.)  Having it not
+> be specific to S3C would be a big advantage, unless of course everyone
+> specifically wants to have divergent copies of the same code.
 
-Next time, one patch per email please. And updates as replies
-to the original patches, or else the whole series. And patches
-as inline attachments.
+Which is great, until you find out that the S3C PL080 isn't a vanilla
+PL080, and has extra registers.
 
-Otherwise it's hard to keep track of the patches and comment
-them.
+I'm in favour of some form of generic DMA API, but we're going to have
+to sort out whether it is dmaengine, dmaengine with some updates or
+something entirely new.
 
-I've updated your patch 9/9 with the following as in omap for-next
-I was getting:
+The current dmaengine API doesn't have any support for circular buffer
+mangement, and from what I remeber of reading stuff last time, adding
+to the queue from a buffer done callback is a no-no.
 
-arch/arm/mach-omap2/usb-musb.c:97: Building for omap_3430sdp_defconfigred (first use in this function)                                                              Building for omap_3630sdp_defconfigch-omap2/usb-musb.c:97: error: (Each undeclared identifier is reported only once
-arch/arm/mach-omap2/usb-musb.c:97: error: for each function it appears in.)
-arch/arm/mach-omap2/usb-musb.c:98: error: 'INT_44XX_HS_USB_DMA' undeclared (first use in this function)
+-- 
+Ben
 
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -94,8 +94,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
- 		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
- 	} else if (cpu_is_omap44xx()) {
- 		musb_resources[0].start = OMAP44XX_HSUSB_OTG_BASE;
--		musb_resources[1].start = INT_44XX_HS_USB_MC;
--		musb_resources[2].start = INT_44XX_HS_USB_DMA;
-+		musb_resources[1].start = OMAP44XX_IRQ_HS_USB_MC_N;
-+		musb_resources[2].start = OMAP44XX_IRQ_HS_USB_DMA_N;
- 	}
- 	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
- 
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
