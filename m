@@ -1,32 +1,58 @@
-From: prashantsmailcenter@gmail.com (Prashant Bhole)
-Date: Wed, 24 Feb 2010 15:08:38 +0530
-Subject: large page support for IOP331
-In-Reply-To: <20100224091111.GA7598@n2100.arm.linux.org.uk>
-References: <9ff69a5d1002240100r708381ceha1ca29f2bd6f18b@mail.gmail.com>
-	<20100224091111.GA7598@n2100.arm.linux.org.uk>
-Message-ID: <9ff69a5d1002240138r6f7089c0o670f856a4ab3536f@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Feb 2010 10:45:40 +0100
+Subject: [PATCH] mx25: move ARCH_MXC_IOMUX_V3 to the ARCH level
+In-Reply-To: <3152e0f2d1d239c4363b1c624cb2fe208edb99e3.1267003785.git.baruch@tkos.co.il>
+References: <3152e0f2d1d239c4363b1c624cb2fe208edb99e3.1267003785.git.baruch@tkos.co.il>
+Message-ID: <20100224094540.GB25271@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 2:41 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 24, 2010 at 02:30:30PM +0530, Prashant Bhole wrote:
->> Is there any support of large page for arm architecture?
->
-> The short answer is no.
->
-> The long answer is that to have 16K pages, it causes bigger problems
-> with the 2nd level page tables, which from the hardware perspective
-> are only 256 per L1 entry, but are required to be in unique pages.
->
+On Wed, Feb 24, 2010 at 11:31:31AM +0200, Baruch Siach wrote:
+> ARCH_MXC_IOMUX_V3 is not specific to the i.MX25 PDK platform. Thus,
+> ARCH_MXC_IOMUX_V3 should be selected by ARCH_MX25.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-But we have 64 bit memory subsystem for IOP331 and
-IOP331 developer's manual:
+Ok, applied.
 
-http://download.intel.com/design/iio/manuals/27394202.pdf
+Sascha
 
-Page number 452, Table 218 says that we can have 8K and 16K
-pages. Please correct me if I am wrong
+> ---
+>  arch/arm/mach-mx25/Kconfig |    1 -
+>  arch/arm/plat-mxc/Kconfig  |    1 +
+>  2 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
+> index cc28f56..54d2173 100644
+> --- a/arch/arm/mach-mx25/Kconfig
+> +++ b/arch/arm/mach-mx25/Kconfig
+> @@ -3,7 +3,6 @@ if ARCH_MX25
+>  comment "MX25 platforms:"
+>  
+>  config MACH_MX25_3DS
+> -	select ARCH_MXC_IOMUX_V3
+>  	bool "Support MX25PDK (3DS) Platform"
+>  
+>  endif
+> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> index 2a049df..31a1f40 100644
+> --- a/arch/arm/plat-mxc/Kconfig
+> +++ b/arch/arm/plat-mxc/Kconfig
+> @@ -24,6 +24,7 @@ config ARCH_MX25
+>  	bool "MX25-based"
+>  	select CPU_ARM926T
+>  	select COMMON_CLKDEV
+> +	select ARCH_MXC_IOMUX_V3
+>  	select HAVE_FB_IMX
+>  	help
+>  	  This enables support for systems based on the Freescale i.MX25 family
+> -- 
+> 1.6.6.1
+> 
+> 
 
 -- 
-~p~r~a~s~h~a~n~t~
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
