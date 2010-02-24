@@ -1,42 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2010 12:50:02 +0000
-Subject: [PATCH 3/7] ARM: U300: set f_max to 24 MHz for MMCI
-In-Reply-To: <A6D19A13FE030A409EC4362C172E091F0E9355A2@eseldmw101.eemea.ericsson.se>
-References: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-	<20100221210740.GA3528@n2100.arm.linux.org.uk>
-	<A6D19A13FE030A409EC4362C172E091F0E9355A2@eseldmw101.eemea.ericsson.se>
-Message-ID: <20100224125002.GA19641@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Feb 2010 13:59:53 +0100
+Subject: QUERY: Inclusion of header files in kernel header files.
+In-Reply-To: <22dbbef21002232020k76d0f737tf24c8cba29679a21@mail.gmail.com>
+References: <22dbbef21002222230x780c1ffatca5541453f6043ab@mail.gmail.com>
+	<f17812d71002231852l1e47add7pc17764c67d26ae2b@mail.gmail.com>
+	<22dbbef21002232020k76d0f737tf24c8cba29679a21@mail.gmail.com>
+Message-ID: <201002241359.55543.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2010 at 09:42:57PM +0100, Linus Walleij wrote:
-> Actually no, not on the U300. On the RealView etc, yes.
+Hi Viresh,
+
+On Wednesday 24 February 2010 05:20:59 viresh kumar wrote:
+> > My understanding is that if you are going to include every dependency
+> > into the header files, they are going to explode very soon. E.g. like
+> > bus.h, as long as you declared something like:
+> > 
+> > struct device;
+> > struct resource;
 > 
-> Because we have this (see mmci_set_clkreg()):
-> 
-> if (host->hw_designer == AMBA_VENDOR_ST)
-> 	clk |= MCI_FCEN; /* Bug fix in ST IP block */
-> 
-> This enables HW flow control on the block, and holds back
-> reads/writes so it doesn't over/underruns.
+> If these two structure prototypes are already present in latest kernel
+> then its okay.
+> Actually i have seen 2.6.32 and these prototypes are not present
+> there, so we may need to add header file or add prototypes of these
+> structures.
 
-Pierre used to argue that stopping the clock to the card was a bad
-thing, which is probably based on his experience dealing with SD/SDIO
-cards - so really the overrun/underrun problem is not a bug with the
-hardware.
+As a rule of thumb, header files should use forward-declaration of structures 
+whenever possible. Including other header files to pull in structure 
+definitions is only required when embedding a structure into another (as the 
+compiler needs to known the embedded structure size) and when inline functions 
+or macros dereference pointers to the structure (although in the case of 
+macros there's not strict requirement).
 
-I had a MMC card completely destroyed by the PXA MCI hardware (to the
-point that it lost its identification), and never worked out why - I
-do seem to remember that the spec does not permit the stopping of the
-card clock with a command in progress.  Since that time I vowed to
-stay clear of the MMC/SD/SDIO crap again - in my view the whole design
-is far too fragile and implementations on both sides are too buggy for
-safe and reliable use.
+Exceptions to this rule are of course permitted.
 
-I'm not sure at the moment where we go with these DMA patches - I was
-working on AACI to add DMA support there, until the ALSA developers
-totally and utterly crapped my work there by making changes to the
-driver behind my back - I've not got the motivation to undo all the
-shite they changed to get things back into a reasonable shape yet.
+-- 
+Regards,
 
-So I'm just going to sit on the AMBA DMA stuff for the time being.
+Laurent Pinchart
