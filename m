@@ -1,44 +1,34 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Wed, 24 Feb 2010 13:06:05 -0600
-Subject: AC97 audio broken on SAM9263EK?
-Message-ID: <4B85789D.6000704@billgatliff.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 24 Feb 2010 12:07:39 -0700 (MST)
+Subject: [GIT PULL] Second set of OMAP clock/hwmod patches for 2.6.34
+In-Reply-To: <20100224190211.GS28173@atomide.com>
+References: <alpine.DEB.2.00.1002241116000.2701@utopia.booyaka.com>
+	<20100224190211.GS28173@atomide.com>
+Message-ID: <alpine.DEB.2.00.1002241207020.2701@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys:
+On Wed, 24 Feb 2010, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [100224 10:15]:
+> > 
+> > Hi Tony,
+> > 
+> > The following changes since commit 0482e3c6f704d25b6a4e3c940caeeacece4e6d74:
+> >   Tony Lindgren (1):
+> >         Merge branch 'omap-fixes-for-linus' into omap-for-linus
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pwsan.com/linux-2.6 for_2.6.34_b
+> 
+> Hmm this does not seem to merge without conflicts to omap-for-linus,
+> maybe take a look if you can merge/rebase it?
+> 
+> I'd assume rebasing or merging your branch with
+> 80c20d543d142ee54ec85259b77aaf0b83c32db5 will do the trick.
+
+Looks like 4751227df948582e82f19df30efa662ab71fa980 is the problem.
 
 
-It looks like AC97 support for the SAM9263EK isn't in the current
-mainline kernel.  Or am I just missing something?
-
-More specifically, it looks like the "atmel_ac97c" driver found in
-sound/atmel/ac97c.c is what I need, based on my look at
-at91_add_device_ac97().  But I see this in sound/atmel/Kconfig:
-
-    config SND_ATMEL_AC97C
-            tristate "Atmel AC97 Controller (AC97C) driver"
-            select SND_PCM
-            select SND_AC97_CODEC
-            depends on DW_DMAC && AVR32
-
-And I see this in sound/atmel/Makefile:
-
-    snd-atmel-abdac-objs            := abdac.o
-    snd-atmel-ac97c-objs            := ac97c.o
-
-    obj-$(CONFIG_SND_ATMEL_ABDAC)   += snd-atmel-abdac.o
-    obj-$(CONFIG_SND_ATMEL_AC97C)   += snd-atmel-ac97c.o
-
-In other words, the driver isn't built unless I'm on an AVR32 platform
-and I have a DesignWare DMAC.  Neither of those describe the AT91SAM9263EK.
-
-Has anyone tested AC97 audio on the SAM9263EK lately?  Has it ever worked?
-
-
-Thanks!
-
--- 
-Bill Gatliff
-Embedded systems training and consulting
-http://billgatliff.com
-bgat at billgatliff.com
+- Paul
