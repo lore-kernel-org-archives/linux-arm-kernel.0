@@ -1,20 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Feb 2010 11:37:23 +0000
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 24 Feb 2010 13:51:09 +0200
 Subject: New s3c2442 machine
-In-Reply-To: <201002241319.01567.anarsoul@gmail.com>
+In-Reply-To: <20100224113722.GD9018@sirena.org.uk>
 References: <201002241319.01567.anarsoul@gmail.com>
-Message-ID: <20100224113722.GD9018@sirena.org.uk>
+	<20100224113722.GD9018@sirena.org.uk>
+Message-ID: <201002241351.25377.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 01:18:53PM +0200, Vasily Khoruzhick wrote:
-> Hi, I'm going to submit patch series to add support for s3c2442-based iPAQ 
-> rx1950 machine (once again :)). Which kernel tree should I use as base? Ben's 
-> next-samsung branch from git.fluff.org or Linus' master branch from 
-> git.kernel.org?
+? ????????? ?? 24 ??????? 2010 13:37:23 ????? Mark Brown ???????:
+> In general (not particularly just for this) you're better off working
+> with -next for things other than bug fixes since that's where any new
+> code will be applied - except for during the merge window Linus' tree
+> is always in the process of stabailisation with new development going
+> on in -next.
 
-In general (not particularly just for this) you're better off working
-with -next for things other than bug fixes since that's where any new
-code will be applied - except for during the merge window Linus' tree
-is always in the process of stabailisation with new development going
-on in -next.
+Ok, thanks for response!
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100224/178ef49a/attachment-0001.sig>
