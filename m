@@ -1,131 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Feb 2010 16:40:53 +0900
-Subject: [PATCH v5 6/8] ARM: S5PV210: Add SMDKC110 board support file
-Message-ID: <1266997253-6550-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 24 Feb 2010 16:40:44 +0900
+Subject: [PATCH v5 4/8] ARM: S5PV210: Update Kconfig and Makefiles
+Message-ID: <1266997244-6484-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SMDKC110 board support file.
+Updates arch/arm Kconfig and Makefile for building the S5PV210 support.
+Also modifies the plat-s5p Kconfig file to include the support for plat-s5p
+for S5PV210.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/Makefile        |    1 +
- arch/arm/mach-s5pv210/mach-smdkc110.c |   98 +++++++++++++++++++++++++++++++++
- 2 files changed, 99 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/mach-smdkc110.c
+ arch/arm/Kconfig          |   13 ++++++++++++-
+ arch/arm/Makefile         |    1 +
+ arch/arm/plat-s5p/Kconfig |    2 +-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 3ecb607..8ebf51c 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -17,3 +17,4 @@ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
- # machine support
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ac5f74b..9adc7e5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -672,6 +672,15 @@ config ARCH_S5PC1XX
+ 	help
+ 	  Samsung S5PC1XX series based systems
  
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
-+obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-new file mode 100644
-index 0000000..ab4869d
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -0,0 +1,98 @@
-+/* linux/arch/arm/mach-s5pv210/mach-smdkc110.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++config ARCH_S5PV210
++	bool "Samsung S5PV210/S5PC110"
++	select CPU_V7
++	select GENERIC_GPIO
++	select HAVE_CLK
++	select ARM_L1_CACHE_SHIFT_6
++	help
++	  Samsung S5PV210/S5PC110 series based systems
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
+ config ARCH_SHARK
+ 	bool "Shark"
+ 	select CPU_SA110
+@@ -832,6 +841,8 @@ if ARCH_S5PC1XX
+ source "arch/arm/mach-s5pc100/Kconfig"
+ endif
+ 
++source "arch/arm/mach-s5pv210/Kconfig"
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/map.h>
-+#include <mach/regs-clock.h>
-+
-+#include <plat/regs-serial.h>
-+#include <plat/s5pv210.h>
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
-+
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				 S5PV210_UFCON_TXTRIG4 |	\
-+				 S5PV210_UFCON_RXTRIG4)
-+
-+static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
-+	[0] = {
-+		.hwport		= 0,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[1] = {
-+		.hwport		= 1,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[2] = {
-+		.hwport		= 2,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[3] = {
-+		.hwport		= 3,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+};
-+
-+static struct platform_device *smdkc110_devices[] __initdata = {
-+};
-+
-+static void __init smdkc110_map_io(void)
-+{
-+	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-+	s3c24xx_init_clocks(24000000);
-+	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
-+}
-+
-+static void __init smdkc110_machine_init(void)
-+{
-+	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
-+}
-+
-+MACHINE_START(SMDKC110, "SMDKC110")
-+	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.init_irq	= s5pv210_init_irq,
-+	.map_io		= smdkc110_map_io,
-+	.init_machine	= smdkc110_machine_init,
-+	.timer		= &s3c24xx_timer,
-+MACHINE_END
+ source "arch/arm/mach-lh7a40x/Kconfig"
+ 
+ source "arch/arm/mach-h720x/Kconfig"
+@@ -1106,7 +1117,7 @@ source kernel/Kconfig.preempt
+ config HZ
+ 	int
+ 	default 128 if ARCH_L7200
+-	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || ARCH_S5P6442
++	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PV210
+ 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+ 	default 100
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index fc8cc4b..2703222 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -164,6 +164,7 @@ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+ machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
+ machine-$(CONFIG_ARCH_S5P6442)		:= s5p6442
+ machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
++machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index 7cf7f5e..d400a6a 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -7,7 +7,7 @@
+ 
+ config PLAT_S5P
+ 	bool
+-	depends on (ARCH_S5P6440 || ARCH_S5P6442)
++	depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PV210)
+ 	default y
+ 	select ARM_VIC
+ 	select NO_IOPORT
 -- 
 1.6.2.5
