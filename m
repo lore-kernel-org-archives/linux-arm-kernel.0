@@ -1,32 +1,72 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Wed, 24 Feb 2010 08:16:09 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1266979689.23523.1669.camel@pasglop>
-References: <1266445892.16346.306.camel@pasglop>
-	<201002192153.22159.oliver@neukum.org>
-	<1266979689.23523.1669.camel@pasglop>
-Message-ID: <201002240816.10178.oliver@neukum.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 24 Feb 2010 16:48:47 +0900
+Subject: [PATCH v5 0/8] ARM: S5PV210: Add support for Samsung's S5PV210
+Message-ID: <013501cab525$cfb76300$6f262900$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. Februar 2010 03:48:09 schrieb Benjamin Herrenschmidt:
-> On Fri, 2010-02-19 at 21:53 +0100, Oliver Neukum wrote:
-> > Am Freitag, 19. Februar 2010 18:36:51 schrieb Catalin Marinas:
-> > > If a page is already mapped in user space, flush_dcache_page() on ARM
-> > > does the flushing rather than deferring it to update_mmu_cache(). The
-> > > PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
-> > > that the HCD could transfer data into a page cache page already mapped
-> > > in user space? My understanding is that the scenario above is possible.
-> > 
-> > Yes, video drivers do that. 
-> 
-> In which case it would be up to the video driver to call
-> flush_dcache_page() (though if it's v4l you are talking about, maybe it
-> might make sense to push it into the v4l layer itself).
 
-I don't know. The issue seems quite complex. It would seem better to
-centralize it as far as practical. Do you have a wrapper drivers could
-call?
+This patch set adds support for Samsung's S5PV210 CPU. The S5PV210 integrates
+a ARM Cortex A8 microprocessor with several other peripherals to support
+features such as multimedia, storage, graphics and gaming. The S5PV210 can be
+used in products such as Netbooks and Mobile devices.
 
-	Regards
-		Oliver
+This patch set consists of the following patches.
+
+[PATCH v5 1/8] ARM: S5PV210: Add Samsung S5PV210 CPU support
+[PATCH v5 2/8] ARM: S5PV210: Add clock support for S5PV210
+[PATCH v5 3/8] ARM: S5PV210: Add IRQ support	
+[PATCH v5 4/8] ARM: S5PV210: Update Kconfig and Makefiles
+[PATCH v5 5/8] ARM: S5PV210: Add SMDKV210 board support file
+[PATCH v5 6/8] ARM: S5PV210: Add SMDKC110 board support file
+[PATCH v5 7/8] ARM: S5PV210: Add S5PV210 configuration file
+[PATCH v5 8/8] ARM: S5PV210: Add S5PC110 configuration file
+
+
+Changes since v4 :
+
+1. Re-made patch set based on Ben's latest next-samsung
+2. Added <mach/*.h> files missing from v4 patches
+3. Removed arch/arm/mm/Kconfig patch about ARM_L1_CACHE_SHIFT
+  (Submitted to Russell's patch tracking system about that)
+
+
+Changes since v3 :
+
+1. Removed unnecessary CONFIG_CPU_S5PV210_INIT, CONFIG_CPU_S5PV210_CLOCK, and
+CONFIG_S5PC110_XXX_TYPE.
+2. Renamed mach-s5pv210/s5pv210-init.c and s5pv210-clock.c to just
+mach-s5pv210/init.c and clock.c
+3. Common macros are used such as S3C_PA_XXX and S3C_VA_XXX
+4. Renamed S5P_VA_VICx definitions as VA_VICx
+5. Removed unnecessary definitions in the header files like map.h
+6. Added v210 specific debug macros.
+7. Added VIC2 and VIC3 definitions.
+8. Applied Marek's suggestion about ARM_L1_CACHE_SHIFT value changing to 6
+9. Separated serial support patch which can be applied to S5PV210/S5PC110,
+and S5P6442.
+10. Fixed Makefiles as per Ben's suggestion.
+
+
+Changes since v2 :
+
+1. Use SPARSEMEM as Russell suggested.
+2. Fixed code as per comments from Ben in linux-samsung-soc mailing list.
+
+
+Changes since v1 :
+
+1. Removed mach/s5pv210/include/mach/gpio-core.h file.
+2. Removed unused clock gate defines.
+3. Removed machine fixup code from smdkv210 and smdkc110 board support.
+4. Merged Kconfig and Makefiles with other source code patches.
+5. Replaced multiple definition of UART info with macro.
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
