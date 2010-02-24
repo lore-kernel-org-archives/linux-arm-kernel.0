@@ -1,162 +1,435 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 24 Feb 2010 11:18:15 -0700 (MST)
-Subject: [GIT PULL] Second set of OMAP clock/hwmod patches for 2.6.34
-Message-ID: <alpine.DEB.2.00.1002241116000.2701@utopia.booyaka.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Wed, 24 Feb 2010 20:59:29 +0200
+Subject: Fwd: [PATCH] Bugfixing and improvement of the AT91 MCI driver
+In-Reply-To: <201002241453.56191.wolfgang.mues@auerswald.de>
+References: <201002241453.56191.wolfgang.mues@auerswald.de>
+Message-ID: <cd73a99e1002241059o3cc6c58es8e9910c55d4ac896@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi Wolfgang,
 
-Hi Tony,
+Thanks for the patch.
 
-The following changes since commit 0482e3c6f704d25b6a4e3c940caeeacece4e6d74:
-  Tony Lindgren (1):
-        Merge branch 'omap-fixes-for-linus' into omap-for-linus
+There has been quite a bit of work done recently to update the
+atmel_mci driver to support both the AVR32 and AT91 platforms.
+(Most of the discussion regarding this has happened on the
+arm-linux-kernel mailing-list)
 
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 for_2.6.34_b
-
-Abhijit Pagare (1):
-      ARM: OMAP4 clock domain: Add check for avoiding dependency related update.
-
-Kevin Hilman (4):
-      OMAP: omap_device: add omap_device_is_valid()
-      OMAP: omap_device: when 'called from invalid state', print state
-      OMAP3: clock: use std _MASK suffix for CM_FCLKEN_IVA2 defines
-      OMAP2/3: PRCM: fix misc. compiler warnings
-
-Mike Turquette (1):
-      OMAP3630: Clock: Workaround for DPLL HS divider limitation
-
-Paul Walmsley (20):
-      OMAP2/3/4 clock: fix DPLL multiplier value errors; also copyrights, includes, documentation
-      OMAP4 clock: drop the CLOCK_IN_OMAP4430 clock flag
-      OMAP2xxx clock: GFX functional clock rates are not independently changeable
-      OMAP2xxx clock: drop DELAYED_APP flag from non-clksel clocks
-      OMAP2 clock: drop CONFIG_PARTICIPANT clock flag
-      OMAP clock: compress clock flags down to a u8
-      OMAP clock: drop .id field; ensure each clock has a unique name
-      OMAP3/4 clock: split into per-chip family files
-      OMAP2 clock: split OMAP2420, OMAP2430 clock data into their own files
-      OMAP2430 clock: make func_96m_ck parent-selectable
-      OMAP2 clock: drop DELAYED_APP clock flag
-      OMAP clock: drop RATE_FIXED clock flag
-      OMAP4 clock: drop the ALWAYS_ENABLED clock flag
-      OMAP clock: add omap_clk_get_by_name() for use by OMAP hwmod core code
-      OMAP hwmod: convert hwmod to use hardware clock names rather than clkdev dev+con
-      OMAP hwmod: convert header files with static allocations into C files
-      OMAP hwmod: add hwmod class support
-      OMAP clockdomain: if no autodeps exist, don't try to add or remove them
-      OMAP2/3 clock: combine OMAP2 & 3 boot-time MPU rate change code
-      OMAP2+ clock: revise omap2_clk_{disable,enable}()
-
-Rajendra Nayak (1):
-      OMAP4: clock: Rename leaf clock nodes to end with a _ick or _fck
-
-Ranjith Lohithakshan (2):
-      OMAP2/3 clock: Extend find_idlest() to pass back idle state value
-      AM35xx: Add clock support for new modules on AM35xx
-
-Richard Woodruff (1):
-      OMAP3 clock: introduce DPLL4 Jtype
-
-Sanjeev Premi (1):
-      OMAP3 clock: Check return values for clk_get()
-
-Santosh Shilimkar (2):
-      OMAP4: clock: Add dummy clock nodes for interface clocks
-      OMAP4: clock: Remove clock hacks from timer-gp.c
-
-Tero Kristo (1):
-      OMAP3: Clock: Added IDLEST definitions for SGX
-
-Thara Gopinath (5):
-      OMAP2/3 PM: Adding powerdomain APIs for reading the next logic and mem state
-      OMAP3 PM: Defining .pwrsts_logic_ret field for core power domain structure
-      OMAP3 PM: Adding counters for power domain logic off and mem off during retention.
-      OMAP3: hwmod: support to specify the offset position of various SYSCONFIG register bits.
-      OMAP: HWMOD: Add support for early device register into omap device layer
-
-Vimarsh Zutshi (1):
-      OMAP3: clock: add capability to change rate of dpll4_m5_ck_3630
-
-Vishwanath BS (3):
-      OMAP3 clock: Remove FreqSel for 3630
-      OMAP3 clock: Introduce 3630 DPLL4 HSDivider changes
-      OMAP3 clock: add support for 192Mhz DPLL4M2 output
-
- arch/arm/configs/omap_4430sdp_defconfig            |    7 +-
- arch/arm/mach-omap1/clock.c                        |   19 +-
- arch/arm/mach-omap1/clock_data.c                   |   41 +-
- arch/arm/mach-omap2/Makefile                       |   47 +-
- arch/arm/mach-omap2/clkt2xxx_apll.c                |    6 +-
- arch/arm/mach-omap2/clkt34xx_dpll3m2.c             |    1 +
- arch/arm/mach-omap2/clkt_clksel.c                  |    8 -
- arch/arm/mach-omap2/clkt_dpll.c                    |    2 +-
- arch/arm/mach-omap2/clock.c                        |  293 ++++++---
- arch/arm/mach-omap2/clock.h                        |   14 +-
- .../{clock2xxx_data.c => clock2420_data.c}         |  697 ++++---------------
- arch/arm/mach-omap2/clock2430.c                    |   59 ++
- .../{clock2xxx_data.c => clock2430_data.c}         |  637 +++++-------------
- arch/arm/mach-omap2/clock2xxx.c                    |   67 +--
- arch/arm/mach-omap2/clock2xxx.h                    |   26 +-
- arch/arm/mach-omap2/clock34xx.c                    |  123 +---
- arch/arm/mach-omap2/clock34xx.h                    |   20 +-
- arch/arm/mach-omap2/clock3517.c                    |  124 ++++
- arch/arm/mach-omap2/clock3517.h                    |   14 +
- arch/arm/mach-omap2/clock36xx.c                    |   72 ++
- arch/arm/mach-omap2/clock36xx.h                    |   13 +
- arch/arm/mach-omap2/clock3xxx.c                    |  104 +++
- arch/arm/mach-omap2/clock3xxx.h                    |   21 +
- .../{clock34xx_data.c => clock3xxx_data.c}         |  502 +++++++++++---
- arch/arm/mach-omap2/clock44xx.c                    |   19 -
- arch/arm/mach-omap2/clock44xx.h                    |   13 +-
- arch/arm/mach-omap2/clock44xx_data.c               |  724 +++++++++-----------
- arch/arm/mach-omap2/clockdomain.c                  |   46 +-
- arch/arm/mach-omap2/cm-regbits-34xx.h              |   28 +-
- arch/arm/mach-omap2/cm.h                           |    3 +
- arch/arm/mach-omap2/dpll3xxx.c                     |   82 ++-
- arch/arm/mach-omap2/id.c                           |    3 +
- arch/arm/mach-omap2/io.c                           |   29 +-
- arch/arm/mach-omap2/omap_hwmod.c                   |  288 ++++++---
- .../{omap_hwmod_2420.h => omap_hwmod_2420_data.c}  |   38 +-
- .../{omap_hwmod_2430.h => omap_hwmod_2430_data.c}  |   38 +-
- arch/arm/mach-omap2/omap_hwmod_34xx.h              |  168 -----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  181 +++++
- arch/arm/mach-omap2/omap_hwmod_common_data.c       |   68 ++
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   24 +
- arch/arm/mach-omap2/pm-debug.c                     |    5 +
- arch/arm/mach-omap2/pm34xx.c                       |    2 +-
- arch/arm/mach-omap2/powerdomain.c                  |   98 +++
- arch/arm/mach-omap2/powerdomains34xx.h             |    2 +
- arch/arm/mach-omap2/prcm.c                         |   18 +-
- arch/arm/mach-omap2/timer-gp.c                     |    5 -
- arch/arm/plat-omap/clock.c                         |   39 +-
- arch/arm/plat-omap/include/plat/clock.h            |   91 ++-
- arch/arm/plat-omap/include/plat/cpu.h              |    2 +
- arch/arm/plat-omap/include/plat/omap_device.h      |    7 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h       |  136 +++-
- arch/arm/plat-omap/include/plat/powerdomain.h      |    4 +
- arch/arm/plat-omap/include/plat/prcm.h             |    3 +-
- arch/arm/plat-omap/omap_device.c                   |   61 ++-
- 54 files changed, 2857 insertions(+), 2285 deletions(-)
- copy arch/arm/mach-omap2/{clock2xxx_data.c => clock2420_data.c} (72%)
- create mode 100644 arch/arm/mach-omap2/clock2430.c
- rename arch/arm/mach-omap2/{clock2xxx_data.c => clock2430_data.c} (75%)
- create mode 100644 arch/arm/mach-omap2/clock3517.c
- create mode 100644 arch/arm/mach-omap2/clock3517.h
- create mode 100644 arch/arm/mach-omap2/clock36xx.c
- create mode 100644 arch/arm/mach-omap2/clock36xx.h
- create mode 100644 arch/arm/mach-omap2/clock3xxx.c
- create mode 100644 arch/arm/mach-omap2/clock3xxx.h
- rename arch/arm/mach-omap2/{clock34xx_data.c => clock3xxx_data.c} (88%)
- delete mode 100644 arch/arm/mach-omap2/clock44xx.c
- rename arch/arm/mach-omap2/{omap_hwmod_2420.h => omap_hwmod_2420_data.c} (82%)
- rename arch/arm/mach-omap2/{omap_hwmod_2430.h => omap_hwmod_2430_data.c} (83%)
- delete mode 100644 arch/arm/mach-omap2/omap_hwmod_34xx.h
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_data.h
+Nicolas Ferre maintains the at91_mci driver.
 
 
-- Paul
+Regards,
+  Andrew Victor
+
+
+---------- Forwarded message ----------
+From: Wolfgang M?es <wolfgang.mues@auerswald.de>
+Date: 2010/2/24
+Subject: [PATCH] Bugfixing and improvement of the AT91 MCI driver
+To: Andrew Victor <linux@maxim.org.za>
+Cc: linux-kernel at vger.kernel.org
+
+
+Andrew,
+
+as we are working on a project regarding AT91SAM9260 and using the
+MCI interface for SD/SDHC data transfer, we are forced to make a
+series of bugfixes and improvements to the AT91 MCI driver:
+
+- Fix a buf in the dmabuf pointer calculation.
+- Use a fixed DMA buffer instead of allocating a DMA buffer
+?each time a data transfer is requested.
+- Fix address error in kunmap_atomic().
+- Use the dma buffer also for reads, because we found
+?that double buffering PDC was NOT working, and we need
+?a solution which allows bigger stream sizes.
+- Use dmac_flush_range() because flush_dcache_page()
+?was not OK if more than one page is transferred.
+- Extend card timeout to 2s because some cards need it.
+- Extend card detect time to 500ms (usefull if the user
+?is inserting the card gentle into the slot).
+- Fill in the mmc->max_ variables to allow the IO elevator
+?to do the job. Without these variables filled in,
+?each IO transfer is limited to 4096 bytes, which is limiting
+?transfer speed and - most important - is triggering
+?ACCELLERATED WEAR-OUT of the flash sectors of the card
+?(because the card has to do a lot of partial sector
+? erases).
+
+We have tested this driver which a lot of SD and SDHC cards
+and we think the driver is ready for production use now.
+
+For reads, we get about 90% of the expected maximum calculated
+speed (from the clock frequency). For writes, we get about 50%.
+
+As we are using a slightly older kernel, I have ported this
+patch to latest 2.6.33 by hand. So please take care to compile
+and look for compile-time errors. I've done my very best.
+
+Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
+
+---
+
+diff -ur linux-2.6.33-rc8-original/drivers/mmc/host/at91_mci.c
+linux-2.6.33-rc8-at91/drivers/mmc/host/at91_mci.c
+--- linux-2.6.33-rc8-original/drivers/mmc/host/at91_mci.c
+2010-02-12 20:07:45.000000000 +0100
++++ linux-2.6.33-rc8-at91/drivers/mmc/host/at91_mci.c ? 2010-02-24
+14:21:46.838590913 +0100
+@@ -88,6 +88,10 @@
+?#define at91_mci_read(host, reg) ? ? ? __raw_readl((host)->baseaddr + (reg))
+?#define at91_mci_write(host, reg, val) __raw_writel((val),
+(host)->baseaddr + (reg))
+
++#define MCI_BLKSIZE ? ? ? ? ? ?512
++#define MCI_MAXBLKSIZE ? ? ? ? ? ? ? ? 4095
++#define MCI_BLKATONCE ? ? ? ? ?256
++#define MCI_BUFSIZE ? ? ? ? ? ?(MCI_BLKSIZE * MCI_BLKATONCE)
+
+?/*
+?* Low level type for this driver
+@@ -227,11 +231,13 @@
+? ? ? ? ? ? ? ? ? ? ? ?for (index = 0; index < (amount / 4); index++)
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*dmabuf++ = swab32(sgbuffer[index]);
+? ? ? ? ? ? ? ?} else {
+- ? ? ? ? ? ? ? ? ? ? ? memcpy(dmabuf, sgbuffer, amount);
+- ? ? ? ? ? ? ? ? ? ? ? dmabuf += amount;
++ ? ? ? ? ? ? ? ? ? ? ? char *tmpv = (char *)dmabuf;
++ ? ? ? ? ? ? ? ? ? ? ? memcpy(tmpv, sgbuffer, amount);
++ ? ? ? ? ? ? ? ? ? ? ? tmpv += amount;
++ ? ? ? ? ? ? ? ? ? ? ? dmabuf = (unsigned *)tmpv;
+? ? ? ? ? ? ? ?}
+
+- ? ? ? ? ? ? ? kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
++ ? ? ? ? ? ? ? kunmap_atomic(((void*)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
+
+? ? ? ? ? ? ? ?if (size == 0)
+? ? ? ? ? ? ? ? ? ? ? ?break;
+@@ -245,80 +251,14 @@
+?}
+
+?/*
+- * Prepare a dma read
+- */
+-static void at91_mci_pre_dma_read(struct at91mci_host *host)
+-{
+- ? ? ? int i;
+- ? ? ? struct scatterlist *sg;
+- ? ? ? struct mmc_command *cmd;
+- ? ? ? struct mmc_data *data;
+-
+- ? ? ? pr_debug("pre dma read\n");
+-
+- ? ? ? cmd = host->cmd;
+- ? ? ? if (!cmd) {
+- ? ? ? ? ? ? ? pr_debug("no command\n");
+- ? ? ? ? ? ? ? return;
+- ? ? ? }
+-
+- ? ? ? data = cmd->data;
+- ? ? ? if (!data) {
+- ? ? ? ? ? ? ? pr_debug("no data\n");
+- ? ? ? ? ? ? ? return;
+- ? ? ? }
+-
+- ? ? ? for (i = 0; i < 2; i++) {
+- ? ? ? ? ? ? ? /* nothing left to transfer */
+- ? ? ? ? ? ? ? if (host->transfer_index >= data->sg_len) {
+- ? ? ? ? ? ? ? ? ? ? ? pr_debug("Nothing left to transfer (index =
+%d)\n", host->transfer_index);
+- ? ? ? ? ? ? ? ? ? ? ? break;
+- ? ? ? ? ? ? ? }
+-
+- ? ? ? ? ? ? ? /* Check to see if this needs filling */
+- ? ? ? ? ? ? ? if (i == 0) {
+- ? ? ? ? ? ? ? ? ? ? ? if (at91_mci_read(host, ATMEL_PDC_RCR) != 0) {
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_debug("Transfer active in current\n");
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? continue;
+- ? ? ? ? ? ? ? ? ? ? ? }
+- ? ? ? ? ? ? ? }
+- ? ? ? ? ? ? ? else {
+- ? ? ? ? ? ? ? ? ? ? ? if (at91_mci_read(host, ATMEL_PDC_RNCR) != 0) {
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_debug("Transfer active in next\n");
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? continue;
+- ? ? ? ? ? ? ? ? ? ? ? }
+- ? ? ? ? ? ? ? }
+-
+- ? ? ? ? ? ? ? /* Setup the next transfer */
+- ? ? ? ? ? ? ? pr_debug("Using transfer index %d\n", host->transfer_index);
+-
+- ? ? ? ? ? ? ? sg = &data->sg[host->transfer_index++];
+- ? ? ? ? ? ? ? pr_debug("sg = %p\n", sg);
+-
+- ? ? ? ? ? ? ? sg->dma_address = dma_map_page(NULL, sg_page(sg),
+sg->offset, sg->length, DMA_FROM_DEVICE);
+-
+- ? ? ? ? ? ? ? pr_debug("dma address = %08X, length = %d\n",
+sg->dma_address, sg->length);
+-
+- ? ? ? ? ? ? ? if (i == 0) {
+- ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RPR, sg->dma_address);
+- ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RCR,
+(data->blksz & 0x3) ? sg->length : sg->length / 4);
+- ? ? ? ? ? ? ? }
+- ? ? ? ? ? ? ? else {
+- ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RNPR, sg->dma_address);
+- ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RNCR,
+(data->blksz & 0x3) ? sg->length : sg->length / 4);
+- ? ? ? ? ? ? ? }
+- ? ? ? }
+-
+- ? ? ? pr_debug("pre dma read done\n");
+-}
+-
+-/*
+?* Handle after a dma read
+?*/
+?static void at91_mci_post_dma_read(struct at91mci_host *host)
+?{
+? ? ? ?struct mmc_command *cmd;
+? ? ? ?struct mmc_data *data;
++ ? ? ? unsigned int len, i, size;
++ ? ? ? unsigned *dmabuf = host->buffer;
+
+? ? ? ?pr_debug("post dma read\n");
+
+@@ -334,42 +274,40 @@
+? ? ? ? ? ? ? ?return;
+? ? ? ?}
+
+- ? ? ? while (host->in_use_index < host->transfer_index) {
+- ? ? ? ? ? ? ? struct scatterlist *sg;
+-
+- ? ? ? ? ? ? ? pr_debug("finishing index %d\n", host->in_use_index);
+-
+- ? ? ? ? ? ? ? sg = &data->sg[host->in_use_index++];
++ ? ? ? size = data->blksz * data->blocks;
++ ? ? ? len = data->sg_len;
++
++ ? ? ? at91_mci_write(host, AT91_MCI_IDR, AT91_MCI_ENDRX);
++ ? ? ? at91_mci_write(host, AT91_MCI_IER, AT91_MCI_RXBUFF);
+
+- ? ? ? ? ? ? ? pr_debug("Unmapping page %08X\n", sg->dma_address);
++ ? ? ? for (i = 0; i < len; i++) {
++ ? ? ? ? ? ? ? struct scatterlist *sg;
++ ? ? ? ? ? ? ? int amount;
++ ? ? ? ? ? ? ? unsigned int *sgbuffer;
+
+- ? ? ? ? ? ? ? dma_unmap_page(NULL, sg->dma_address, sg->length,
+DMA_FROM_DEVICE);
++ ? ? ? ? ? ? ? sg = &data->sg[i];
+
++ ? ? ? ? ? ? ? sgbuffer = kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) +
+sg->offset;
++ ? ? ? ? ? ? ? amount = min(size, sg->length);
++ ? ? ? ? ? ? ? size -= amount;
++
+? ? ? ? ? ? ? ?if (cpu_is_at91rm9200()) { ? ? ?/* AT91RM9200 errata */
+- ? ? ? ? ? ? ? ? ? ? ? unsigned int *buffer;
+- ? ? ? ? ? ? ? ? ? ? ? int index;
+-
+- ? ? ? ? ? ? ? ? ? ? ? /* Swap the contents of the buffer */
+- ? ? ? ? ? ? ? ? ? ? ? buffer = kmap_atomic(sg_page(sg),
+KM_BIO_SRC_IRQ) + sg->offset;
+- ? ? ? ? ? ? ? ? ? ? ? pr_debug("buffer = %p, length = %d\n", buffer,
+sg->length);
+-
+- ? ? ? ? ? ? ? ? ? ? ? for (index = 0; index < (sg->length / 4); index++)
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? buffer[index] = swab32(buffer[index]);
+
+- ? ? ? ? ? ? ? ? ? ? ? kunmap_atomic(buffer, KM_BIO_SRC_IRQ);
++ ? ? ? ? ? ? ? ? ? ? ? int index;
++ ? ? ? ? ? ? ? ? ? ? ? for (index = 0; index < (amount / 4); index++)
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sgbuffer[index] = swab32(*dmabuf++);
++ ? ? ? ? ? ? ? } else {
++ ? ? ? ? ? ? ? ? ? ? ? char *tmpv = (char *)dmabuf;
++ ? ? ? ? ? ? ? ? ? ? ? memcpy(sgbuffer, tmpv, amount);
++ ? ? ? ? ? ? ? ? ? ? ? tmpv += amount;
++ ? ? ? ? ? ? ? ? ? ? ? dmabuf = (unsigned *)tmpv;
+? ? ? ? ? ? ? ?}
+
+- ? ? ? ? ? ? ? flush_dcache_page(sg_page(sg));
+-
+- ? ? ? ? ? ? ? data->bytes_xfered += sg->length;
+- ? ? ? }
+-
+- ? ? ? /* Is there another transfer to trigger? */
+- ? ? ? if (host->transfer_index < data->sg_len)
+- ? ? ? ? ? ? ? at91_mci_pre_dma_read(host);
+- ? ? ? else {
+- ? ? ? ? ? ? ? at91_mci_write(host, AT91_MCI_IDR, AT91_MCI_ENDRX);
+- ? ? ? ? ? ? ? at91_mci_write(host, AT91_MCI_IER, AT91_MCI_RXBUFF);
++ ? ? ? ? ? ? ? kunmap_atomic(((void*)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
++ ? ? ? ? ? ? ? dmac_flush_range ((void*)sgbuffer, ((void*)sgbuffer)+amount);
++ ? ? ? ? ? ? ? data->bytes_xfered += amount;
++ ? ? ? ? ? ? ? if (size == 0)
++ ? ? ? ? ? ? ? ? ? ? ? break;
+? ? ? ?}
+
+? ? ? ?pr_debug("post dma read done\n");
+@@ -602,10 +540,14 @@
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/*
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? * Handle a read
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? */
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->buffer = NULL;
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?host->total_length = 0;
+
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? at91_mci_pre_dma_read(host);
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RPR,
+host->physical_address);
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RCR,
+(data->blksz & 0x3) ?
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (blocks * block_length) :
+(blocks * block_length) / 4);
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RNPR, 0);
++ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? at91_mci_write(host, ATMEL_PDC_RNCR, 0);
++
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ier = AT91_MCI_ENDRX /* | AT91_MCI_RXBUFF */;
+? ? ? ? ? ? ? ? ? ? ? ?}
+? ? ? ? ? ? ? ? ? ? ? ?else {
+@@ -621,20 +563,8 @@
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (host->total_length < 12)
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?host->total_length = 12;
+
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->buffer =
+kmalloc(host->total_length, GFP_KERNEL);
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (!host->buffer) {
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_debug("Can't alloc tx buffer\n");
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cmd->error = -ENOMEM;
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_request_done(host->mmc,
+host->request);
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return;
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+-
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?at91_mci_sg_to_dma(host, data);
+
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->physical_address = dma_map_single(NULL,
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->buffer,
+host->total_length,
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_TO_DEVICE);
+-
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pr_debug("Transmitting %d bytes\n",
+host->total_length);
+
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?at91_mci_write(host, ATMEL_PDC_TPR,
+host->physical_address);
+@@ -701,14 +631,6 @@
+? ? ? ?cmd->resp[2] = at91_mci_read(host, AT91_MCI_RSPR(2));
+? ? ? ?cmd->resp[3] = at91_mci_read(host, AT91_MCI_RSPR(3));
+
+- ? ? ? if (host->buffer) {
+- ? ? ? ? ? ? ? dma_unmap_single(NULL,
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->physical_address, host->total_length,
+- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_TO_DEVICE);
+- ? ? ? ? ? ? ? kfree(host->buffer);
+- ? ? ? ? ? ? ? host->buffer = NULL;
+- ? ? ? }
+-
+? ? ? ?pr_debug("Status = %08X/%08x [%08X %08X %08X %08X]\n",
+? ? ? ? ? ? ? ? status, at91_mci_read(host, AT91_MCI_SR),
+? ? ? ? ? ? ? ? cmd->resp[0], cmd->resp[1], cmd->resp[2], cmd->resp[3]);
+@@ -754,7 +676,8 @@
+? ? ? ?host->request = mrq;
+? ? ? ?host->flags = 0;
+
+- ? ? ? mod_timer(&host->timer, jiffies + ?HZ);
++ ? ? ? /* more than 1s timeout seen with takeMS sdhc cards */
++ ? ? ? mod_timer(&host->timer, jiffies + ?2 * HZ);
+
+? ? ? ?at91_mci_process_next(host);
+?}
+@@ -942,7 +865,8 @@
+? ? ? ? ? ? ? ? ? ? ? ?pr_debug("****** Resetting SD-card bus width ******\n");
+? ? ? ? ? ? ? ? ? ? ? ?at91_mci_write(host, AT91_MCI_SDCR,
+at91_mci_read(host, AT91_MCI_SDCR) & ~AT91_MCI_SDCBUS);
+? ? ? ? ? ? ? ?}
+- ? ? ? ? ? ? ? mmc_detect_change(host->mmc, msecs_to_jiffies(100));
++ ? ? ? ? ? ? ? /* 0.5s is needed here because of early switch firing. */
++ ? ? ? ? ? ? ? mmc_detect_change(host->mmc, msecs_to_jiffies(500));
+? ? ? ?}
+? ? ? ?return IRQ_HANDLED;
+?}
+@@ -1008,12 +932,15 @@
+? ? ? ?mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+? ? ? ?mmc->caps = MMC_CAP_SDIO_IRQ;
+
+- ? ? ? mmc->max_blk_size = 4095;
+- ? ? ? mmc->max_blk_count = mmc->max_req_size;
++ ? ? ? mmc->max_blk_size ?= MCI_MAXBLKSIZE;
++ ? ? ? mmc->max_blk_count = MCI_BLKATONCE;
++ ? ? ? mmc->max_phys_segs = MCI_BLKATONCE;
++ ? ? ? mmc->max_hw_segs ? = MCI_BLKATONCE;
++ ? ? ? mmc->max_req_size ?= MCI_BUFSIZE;
++ ? ? ? mmc->max_seg_size ?= MCI_BUFSIZE;
+
+? ? ? ?host = mmc_priv(mmc);
+? ? ? ?host->mmc = mmc;
+- ? ? ? host->buffer = NULL;
+? ? ? ?host->bus_mode = 0;
+? ? ? ?host->board = pdev->dev.platform_data;
+? ? ? ?if (host->board->wire4) {
+@@ -1024,6 +951,13 @@
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?" - using 1 wire\n");
+? ? ? ?}
+
++ ? ? ? host->buffer = dma_alloc_coherent(&pdev->dev, MCI_BUFSIZE,
+&host->physical_address, GFP_KERNEL);
++ ? ? ? if (!host->buffer){
++ ? ? ? ? ? ? ? ret = -ENOMEM;
++ ? ? ? ? ? ? ? dev_err(&pdev->dev, "Can't allocate transmit buffer\n");
++ ? ? ? ? ? ? ? goto fail5;
++ ? ? ? }
++
+? ? ? ?/*
+? ? ? ? * Reserve GPIOs ... board init code makes sure these pins are set
+? ? ? ? * up as GPIOs with the right direction (input, except for vcc)
+@@ -1032,7 +966,7 @@
+? ? ? ? ? ? ? ?ret = gpio_request(host->board->det_pin, "mmc_detect");
+? ? ? ? ? ? ? ?if (ret < 0) {
+? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&pdev->dev, "couldn't claim card detect pin\n");
+- ? ? ? ? ? ? ? ? ? ? ? goto fail5;
++ ? ? ? ? ? ? ? ? ? ? ? goto fail4b;
+? ? ? ? ? ? ? ?}
+? ? ? ?}
+? ? ? ?if (host->board->wp_pin) {
+@@ -1132,6 +1066,9 @@
+?fail4:
+? ? ? ?if (host->board->det_pin)
+? ? ? ? ? ? ? ?gpio_free(host->board->det_pin);
++fail4b:
++ ? ? ? if (host->buffer)
++ ? ? ? ? ? ? ? dma_free_coherent (&pdev->dev, MCI_BUFSIZE,
+host->buffer, host->physical_address);
+?fail5:
+? ? ? ?mmc_free_host(mmc);
+?fail6:
+@@ -1154,6 +1091,9 @@
+
+? ? ? ?host = mmc_priv(mmc);
+
++ ? ? ? if (host->buffer)
++ ? ? ? ? ? ? ? dma_free_coherent (&pdev->dev, MCI_BUFSIZE,
+host->buffer, host->physical_address);
++
+? ? ? ?if (host->board->det_pin) {
+? ? ? ? ? ? ? ?if (device_can_wakeup(&pdev->dev))
+? ? ? ? ? ? ? ? ? ? ? ?free_irq(gpio_to_irq(host->board->det_pin), host);
+
+---
+best regards
+
+i. A. Wolfgang M?es
+--
+Auerswald Gesellschaft f?r Datensysteme mbH
+Hardware Development
+Telefon: +49 (0)5306 9219 562
+Telefax: +49 (0)5306 9219 94
+E-Mail: Wolfgang.Mues at Auerswald.de
+Web: http://www.auerswald.de
+
+--------------------------------------------------------------
+Auerswald Gesellschaft f?r Datensysteme mbH
+Vor den Grash?fen 1, 38162 Cremlingen
+Registriert beim AG Braunschweig HRB 7499
+Gesch?ftsf?hrer: Dipl-Ing. Gerhard Auerswald
