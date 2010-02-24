@@ -1,28 +1,53 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 24 Feb 2010 13:48:09 +1100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201002192153.22159.oliver@neukum.org>
-References: <1266445892.16346.306.camel@pasglop>
-	<1266599755.32546.38.camel@e102109-lin.cambridge.arm.com>
-	<1266601011.32546.48.camel@e102109-lin.cambridge.arm.com>
-	<201002192153.22159.oliver@neukum.org>
-Message-ID: <1266979689.23523.1669.camel@pasglop>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 24 Feb 2010 10:52:47 +0800
+Subject: QUERY: Inclusion of header files in kernel header files.
+In-Reply-To: <22dbbef21002222230x780c1ffatca5541453f6043ab@mail.gmail.com>
+References: <22dbbef21002222230x780c1ffatca5541453f6043ab@mail.gmail.com>
+Message-ID: <f17812d71002231852l1e47add7pc17764c67d26ae2b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-02-19 at 21:53 +0100, Oliver Neukum wrote:
-> Am Freitag, 19. Februar 2010 18:36:51 schrieb Catalin Marinas:
-> > If a page is already mapped in user space, flush_dcache_page() on ARM
-> > does the flushing rather than deferring it to update_mmu_cache(). The
-> > PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
-> > that the HCD could transfer data into a page cache page already mapped
-> > in user space? My understanding is that the scenario above is possible.
-> 
-> Yes, video drivers do that. 
+On Tue, Feb 23, 2010 at 2:30 PM, viresh kumar <viresh.linux@gmail.com> wrote:
+> Hello,
+> I have been through many kernel header files and have found that kernel
+> header
+> files at many places don't include other header files which they have
+> dependency upon.
+> For example:
+> <linux/amba/bus.h> uses struct device and struct resource and it doesn't
+> include <linux/device.h> and <linux/resource.h> header files.
+> Now, whenever i try to include bus.h, i have to include device.h and
+> resource.h.
+> Is this correct approach?
+> Again, if i include device.h and resource.h, they must be included before
+> bus.h.
+> Now this will disturb the alphabetical ordering of including header files
+> sometimes. (not in this example)
+> Any idea behind this philosophy.
+>
 
-In which case it would be up to the video driver to call
-flush_dcache_page() (though if it's v4l you are talking about, maybe it
-might make sense to push it into the v4l layer itself).
+My understanding is that if you are going to include every dependency
+into the header files, they are going to explode very soon. E.g. like bus.h,
+as long as you declared something like:
 
-Cheers,
-Ben.
+struct device;
+struct resource;
+
+....
+
+The compiler will be happy to know the structures are actually defined
+elsewhere when processing the header file itself (as long as there is
+no direct de-reference of the field members of these structures). And
+thus in .c file you are going to decide all the dependent header files
+by your own.
+
+> regards,
+> viresh kumar
+> ST Microelectronics
+> India.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
