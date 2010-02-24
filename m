@@ -1,18 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2010 11:03:53 +0000
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <4B84F0F6.40902@marcansoft.com>
-References: <1266933437-4876-1-git-send-email-hector@marcansoft.com>
-	<20100224084259.GA8068@pengutronix.de>
-	<4B84F0F6.40902@marcansoft.com>
-Message-ID: <20100224110353.GA15105@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 24 Feb 2010 13:18:53 +0200
+Subject: New s3c2442 machine
+Message-ID: <201002241319.01567.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 10:27:18AM +0100, Hector Martin wrote:
-> But it doesn't work, and breaks legitimate code.
+Hi, I'm going to submit patch series to add support for s3c2442-based iPAQ 
+rx1950 machine (once again :)). Which kernel tree should I use as base? Ben's 
+next-samsung branch from git.fluff.org or Linus' master branch from 
+git.kernel.org?
 
-It does work with the previous version of the decompressor.
-
-I noticed that you did not reply to my previous email on this subject,
-are you intentionally ignoring my responses?
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100224/15b619b9/attachment.sig>
