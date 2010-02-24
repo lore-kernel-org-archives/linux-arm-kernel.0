@@ -1,48 +1,73 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 24 Feb 2010 22:25:37 +0100
-Subject: [PATCH 3/7] ARM: U300: set f_max to 24 MHz for MMCI
-In-Reply-To: <20100224125002.GA19641@n2100.arm.linux.org.uk>
-References: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-	<20100221210740.GA3528@n2100.arm.linux.org.uk>
-	<A6D19A13FE030A409EC4362C172E091F0E9355A2@eseldmw101.eemea.ericsson.se>
-	<20100224125002.GA19641@n2100.arm.linux.org.uk>
-Message-ID: <A6D19A13FE030A409EC4362C172E091F0E964212@eseldmw101.eemea.ericsson.se>
+Date: Wed, 24 Feb 2010 22:49:49 +0100
+Subject: [PATCH] ARM: MMCI: support 8bit mode on the ST Micro version
+Message-ID: <1267048189-16386-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK I have now investigated this MMCI HW flow control mentioned
-earlier (Dan, this may be outside your interests, sorry in that
-case):
+This adds support for an 8bit wide bus to the card (data lines
+MCIDAT0 through 7 exist) on the ST Micro version and alters the
+U300 platform to support this.
 
-> > if (host->hw_designer == AMBA_VENDOR_ST)
-> > 	clk |= MCI_FCEN; /* Bug fix in ST IP block */
-> > 
-> > This enables HW flow control on the block, and holds back
-> > reads/writes so it doesn't over/underruns.
->
-> Pierre used to argue that stopping the clock to the card was a bad
-> thing, which is probably based on his experience dealing with SD/SDIO
-> cards - so really the overrun/underrun problem is not a bug with the
-> hardware.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+----
+This thing comes in on top of the DMA and all, no hurries to get
+this in really so it's pending conclusion of the DMA debate
+and will be rewritten if need be.
+---
+ arch/arm/mach-u300/mmc.c |    2 +-
+ drivers/mmc/host/mmci.c  |   10 +++++++++-
+ drivers/mmc/host/mmci.h  |    4 +++-
+ 3 files changed, 13 insertions(+), 3 deletions(-)
 
-Yep this is achieved by gating the clocks to the card indeed.
-It will gate all clocks to the card, not just one, so MCIFBCLK
-(i.e. the feedback clock from the card), MCICLKOUT (output to
-the feedback loop) and MCICLK (main card clock) are all gated.
-
-This has been in widespread use on the U300 platform under another
-OS however, and no big problems have been reported. I believe this
-is because we only have this platform fitted with uSD-cards in
-practice, and those are late to the MMC/SD-show and may thus be
-tolerant to this behaviour, something that may not apply to the
-MMC cards of old times.
-
-Another place where we use PL180 is with eMMC:s and here we
-know the exact card in use, and we know that it will tolerate
-this behaviour.
-
-So for us this frequency and HW gating seems to be acceptable
-in practice though in theory we could solder in an MMC card holder
-to the PL180.
-
-Linus Walleij
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index 8f6d8af..e40bfec 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -109,7 +109,7 @@ int __devinit mmc_init(struct amba_device *adev)
+ 	mmci_card->mmc0_plat_data.gpio_wp = -1;
+ 	mmci_card->mmc0_plat_data.gpio_cd = -1;
+ 	mmci_card->mmc0_plat_data.capabilities = MMC_CAP_MMC_HIGHSPEED |
+-		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA;
++		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+ #ifdef CONFIG_DMA_ENGINE
+ 	mmci_card->mmc0_plat_data.dma_filter = coh901318_filter_id;
+ 	mmci_card->mmc0_plat_data.dma_rx_param =
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index a95c72a..3804151 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -65,7 +65,15 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 	}
+ 
+ 	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
+-		clk |= MCI_WIDE_BUS;
++		clk |= MCI_4BIT_BUS;
++
++	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8) {
++		if (host->hw_designer == AMBA_VENDOR_ST)
++			clk |= MCI_8BIT_BUS;
++		else
++			dev_err(mmc_dev(host->mmc),
++				"8bit bus mode requested but not available\n");
++	}
+ 
+ 	writel(clk, host->base + MMCICLOCK);
+ }
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 13557e9..9b09d15 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -25,7 +25,9 @@
+ #define MCI_CLK_ENABLE		(1 << 8)
+ #define MCI_CLK_PWRSAVE		(1 << 9)
+ #define MCI_CLK_BYPASS		(1 << 10)
+-#define MCI_WIDE_BUS		(1 << 11)
++#define MCI_4BIT_BUS		(1 << 11)
++/* The ST Micro version has an 8bit mode as well */
++#define MCI_8BIT_BUS		(1 << 12)
+ /* HW flow control on the ST Micro version */
+ #define MCI_FCEN		(1 << 13)
+ 
+-- 
+1.6.3.3
