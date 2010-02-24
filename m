@@ -1,46 +1,118 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 24 Feb 2010 11:08:31 +0100
-Subject: [PATCH 36/39] arm/mx25: don't include iomux.h which is for iomux-v1
-	machines
+Date: Wed, 24 Feb 2010 11:07:59 +0100
+Subject: [PATCH 04/39] arm/mx2: use cpp magic to create imx-mmc devices
 In-Reply-To: <20100224100649.GA6456@pengutronix.de>
 References: <20100224100649.GA6456@pengutronix.de>
-Message-ID: <1267006114-31743-36-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1267006114-31743-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This makes the source shorter and easier to verify.  While at it switch
+to use the SoC-prefixed constants.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx25/mach-mx25pdk.c      |    2 +-
- arch/arm/plat-mxc/include/mach/iomux.h |    4 ----
- 2 files changed, 1 insertions(+), 5 deletions(-)
+ arch/arm/mach-mx2/devices.c |   87 +++++++++++++++---------------------------
+ 1 files changed, 31 insertions(+), 56 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/mach-mx25pdk.c b/arch/arm/mach-mx25/mach-mx25pdk.c
-index 10be38e..cb85e2e 100644
---- a/arch/arm/mach-mx25/mach-mx25pdk.c
-+++ b/arch/arm/mach-mx25/mach-mx25pdk.c
-@@ -36,7 +36,7 @@
- #include <mach/mx25.h>
- #include <mach/mxc_nand.h>
- #include "devices.h"
--#include <mach/iomux.h>
-+#include <mach/iomux-mx25.h>
- 
- static struct imxuart_platform_data uart_pdata = {
- 	.flags = IMXUART_HAVE_RTSCTS,
-diff --git a/arch/arm/plat-mxc/include/mach/iomux.h b/arch/arm/plat-mxc/include/mach/iomux.h
-index e15d28a..8b2467f 100644
---- a/arch/arm/plat-mxc/include/mach/iomux.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux.h
-@@ -109,10 +109,6 @@
- #include <mach/iomux-mx27.h>
- #endif
- #endif
--#ifdef CONFIG_ARCH_MX25
--#include <mach/iomux-mx25.h>
--#endif
+diff --git a/arch/arm/mach-mx2/devices.c b/arch/arm/mach-mx2/devices.c
+index b32dfa0..71fd2c5 100644
+--- a/arch/arm/mach-mx2/devices.c
++++ b/arch/arm/mach-mx2/devices.c
+@@ -261,63 +261,38 @@ struct platform_device mxc_pwm_device = {
+ /*
+  * Resource definition for the MXC SDHC
+  */
+-static struct resource mxc_sdhc1_resources[] = {
+-	{
+-		.start = SDHC1_BASE_ADDR,
+-		.end   = SDHC1_BASE_ADDR + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MXC_INT_SDHC1,
+-		.end   = MXC_INT_SDHC1,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start  = DMA_REQ_SDHC1,
+-		.end    = DMA_REQ_SDHC1,
+-		.flags  = IORESOURCE_DMA,
+-	},
+-};
 -
+-static u64 mxc_sdhc1_dmamask = 0xffffffffUL;
+-
+-struct platform_device mxc_sdhc_device0 = {
+-       .name           = "mxc-mmc",
+-       .id             = 0,
+-       .dev            = {
+-               .dma_mask = &mxc_sdhc1_dmamask,
+-               .coherent_dma_mask = 0xffffffff,
+-       },
+-       .num_resources  = ARRAY_SIZE(mxc_sdhc1_resources),
+-       .resource       = mxc_sdhc1_resources,
+-};
+-
+-static struct resource mxc_sdhc2_resources[] = {
+-	{
+-		.start = SDHC2_BASE_ADDR,
+-		.end   = SDHC2_BASE_ADDR + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MXC_INT_SDHC2,
+-		.end   = MXC_INT_SDHC2,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start  = DMA_REQ_SDHC2,
+-		.end    = DMA_REQ_SDHC2,
+-		.flags  = IORESOURCE_DMA,
+-	},
+-};
++#define DEFINE_MXC_MMC_DEVICE(n, baseaddr, irq, dmareq)			\
++	static struct resource mxc_sdhc_resources ## n[] = {		\
++		{							\
++			.start = baseaddr,				\
++			.end = baseaddr + SZ_4K - 1,			\
++			.flags = IORESOURCE_MEM,			\
++		}, {							\
++			.start = irq,					\
++			.end = irq,					\
++			.flags = IORESOURCE_IRQ,			\
++		}, {							\
++			.start = dmareq,				\
++			.end = dmareq,					\
++			.flags = IORESOURCE_DMA,			\
++		},							\
++	};								\
++									\
++	static u64 mxc_sdhc ## n ## _dmamask = 0xffffffffUL;		\
++									\
++	struct platform_device mxc_sdhc_device ## n = {			\
++		.name = "mxc-mmc",					\
++		.id = n,						\
++		.dev = {						\
++			.dma_mask = &mxc_sdhc ## n ## _dmamask,		\
++			.coherent_dma_mask = 0xffffffff,		\
++		},							\
++		.num_resources = ARRAY_SIZE(mxc_sdhc_resources ## n),	\
++		.resource = mxc_sdhc_resources ## n,		\
++	}
  
- /* decode irq number to use with IMR(x), ISR(x) and friends */
- #define IRQ_TO_REG(irq) ((irq - MXC_INTERNAL_IRQS) >> 5)
+-static u64 mxc_sdhc2_dmamask = 0xffffffffUL;
+-
+-struct platform_device mxc_sdhc_device1 = {
+-       .name           = "mxc-mmc",
+-       .id             = 1,
+-       .dev            = {
+-               .dma_mask = &mxc_sdhc2_dmamask,
+-               .coherent_dma_mask = 0xffffffff,
+-       },
+-       .num_resources  = ARRAY_SIZE(mxc_sdhc2_resources),
+-       .resource       = mxc_sdhc2_resources,
+-};
++DEFINE_MXC_MMC_DEVICE(0, MX2x_SDHC1_BASE_ADDR, MX2x_INT_SDHC1, MX2x_DMA_REQ_SDHC1);
++DEFINE_MXC_MMC_DEVICE(1, MX2x_SDHC2_BASE_ADDR, MX2x_INT_SDHC2, MX2x_DMA_REQ_SDHC2);
+ 
+ #ifdef CONFIG_MACH_MX27
+ static struct resource otg_resources[] = {
 -- 
 1.6.6.2
