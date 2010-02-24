@@ -1,49 +1,43 @@
 From: hector@marcansoft.com (Hector Martin)
-Date: Wed, 24 Feb 2010 10:27:18 +0100
+Date: Wed, 24 Feb 2010 10:28:03 +0100
 Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <20100224084259.GA8068@pengutronix.de>
-References: <1266933437-4876-1-git-send-email-hector@marcansoft.com>
-	<20100224084259.GA8068@pengutronix.de>
-Message-ID: <4B84F0F6.40902@marcansoft.com>
+In-Reply-To: <20100224085126.GC8068@pengutronix.de>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
+	<20100224085126.GC8068@pengutronix.de>
+Message-ID: <4B84F123.10309@marcansoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Uwe Kleine-K?nig wrote:
-> Hello
-> 
-> [expanded Cc:]
-> 
-> On Tue, Feb 23, 2010 at 02:57:17PM +0100, hector at marcansoft.com wrote:
->> From: Hector Martin <hector@marcansoft.com>
->>
->> The -Dstatic= stuff in the Makefile is a hack and subtly breaks the
->> current inflate implementation, because the fixed inflate tables are
->> included into a function and removing static places them in the stack,
-> Maybe this is the problem that people see after e7db7b4270?  Is this the
-> final hint that we should revert that one?
+> This is a big regression as this introduces two new copies.  And as
+> CONFIG_ZBOOT_ROM isn't primary about saving RAM at the early boot stages
+> but for fast booting this is not acceptable.
 
-Quite likely it is this same issue. The switch to the other inflate
-implementation is probably what introduced the breakage. However,
-e7db7b4270 itself is perfectly fine. The problem has been lurking all
-along in the -Dstatic= thing, and that would've caused issues with
-several perfectly valid C constructs in the kernel lib/inflate stuff.
+I'm not seeing any significant performance decrease due to these
+optimized copies, compared to the time spent actually uncompressing the
+kernel. In fact, it's quite possible that this will speed things up on
+some implementations (particularly simpler/older/slower ones), as doing
+a block-based copy from ROM to RAM followed by a RAM->RAM inflate can
+very well be faster than uncompressing straight from ROM, if the ROM bus
+is slower. Inflate causes many small accesses.
 
-I can also 'fix' the issue with a two-line patch to the new deflate
-code, but that's not a proper solution, just an ugly workaround. I don't
-think restricting the inflate code to a weird subset of C due to ARM
-peculiarities is a good idea.
+If this can be shown to be a real performance issue, it can be fixed by:
+1) not copying the actual payload to RAM, instead passing the ROM
+address to the decompressor (you still need a gaping hole in RAM since
+you can't relocate the other sections up to fill the hole, but you avoid
+the copy)
+2) keeping track of the true uncompressed kernel size (not just some 4x
+expansion guess), so the loader can be placed directly afterwards,
+leaving space for the kernel and avoiding the final relocation.
 
-This can also break with GCC updates - the current code depends on
-unspecified behavior of the compiler. Essentially, the split relocation
-is something that is not allowed nor expected by the compiler, and
--Dstatic= is a crude hack to attempt to modify code so it doesn't
-trigger the cases where the hack breaks down. But it doesn't work, and
-breaks legitimate code. Even worse, the bugs it introduces can be subtle
-heisenbugs, as was the case here - I spent two afternoons tracking it
-down through the bowels of inflate and comparing the output vs. an x86
-build. In a worst-case scenario, the bug could've caused corrupted
-kernel output (not just a flat-out hang or crash while uncompressing),
-which would've been so much fun to debug (*cough*).
+I'll be happy to make these changes if it really makes a difference, but
+I'm not convinced right now.
+
+It's worth noting that while debugging this I found a bug in the inflate
+stuff that causes inflate to be *much* slower for certain targets,
+including some ARM ones (yet nobody appears to have complained). I'll be
+submitting a fix for this to LKML, as it affects the generic deflate
+implementation.
 
 -- 
 Hector Martin (hector at marcansoft.com)
