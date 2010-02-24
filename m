@@ -1,27 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2010 22:34:18 +0000
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-Message-ID: <20100224223418.GB25587@n2100.arm.linux.org.uk>
+Date: Wed, 24 Feb 2010 22:41:59 +0000
+Subject: [PATCH] ARM: MMCI: support 8bit mode on the ST Micro version
+In-Reply-To: <1267048189-16386-1-git-send-email-linus.walleij@stericsson.com>
+References: <1267048189-16386-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100224224158.GA7095@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 03:23:37AM +0100, Hector Martin wrote:
-> Instead, clean up the stub loader and unify it. The loader is now
-> exactly the same regardless of whether you've enabled CONFIG_ZBOOT_ROM
-> or not, and runs from RAM in PIC mode. CONFIG_ZBOOT_ROM simply enables
-> an extra section of stub code that lets the zImage boot from ROM by
-> copying itself to RAM first.
+On Wed, Feb 24, 2010 at 10:49:49PM +0100, Linus Walleij wrote:
+> +	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8) {
+> +		if (host->hw_designer == AMBA_VENDOR_ST)
+> +			clk |= MCI_8BIT_BUS;
+> +		else
+> +			dev_err(mmc_dev(host->mmc),
+> +				"8bit bus mode requested but not available\n");
+> +	}
 
-Unacceptable.
+Hmm.  I don't think this is necessary - just arrange for the 8-bit
+capability flag to be cleared for non-ST devices.
 
-The point of putting the decompressor in ROM is to save the time spent
-copying it to RAM first.  Boot loaders are already perfectly capable
-of copying the image into RAM and calling it there.
-
-Getting the decompressor to do that step first just moves the copy from
-the boot loader into the decompressor.  It doesn't eliminate it, which
-is what ROM-based decompression is all about.
-
-Basically, this patch makes the feature entirely pointless.
+It might be a good idea to call this register bit 'MCI_ST_8BIT_BUS'
+so that people don't mistake it as something present on all
+implementations.
