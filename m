@@ -1,97 +1,32 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 24 Feb 2010 10:35:30 +0530
-Subject: [PATCH 00/11] OMAP clock/hwmod: final set of 2.6.34 patches
-In-Reply-To: <20100223044915.18888.83242.stgit@localhost.localdomain>
-References: <20100223044915.18888.83242.stgit@localhost.localdomain>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C42E1715@dbde02.ent.ti.com>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Wed, 24 Feb 2010 08:16:09 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1266979689.23523.1669.camel@pasglop>
+References: <1266445892.16346.306.camel@pasglop>
+	<201002192153.22159.oliver@neukum.org>
+	<1266979689.23523.1669.camel@pasglop>
+Message-ID: <201002240816.10178.oliver@neukum.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul
-> Walmsley
-> Sent: Tuesday, February 23, 2010 10:20 AM
-> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 00/11] OMAP clock/hwmod: final set of 2.6.34 patches
+Am Mittwoch, 24. Februar 2010 03:48:09 schrieb Benjamin Herrenschmidt:
+> On Fri, 2010-02-19 at 21:53 +0100, Oliver Neukum wrote:
+> > Am Freitag, 19. Februar 2010 18:36:51 schrieb Catalin Marinas:
+> > > If a page is already mapped in user space, flush_dcache_page() on ARM
+> > > does the flushing rather than deferring it to update_mmu_cache(). The
+> > > PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
+> > > that the HCD could transfer data into a page cache page already mapped
+> > > in user space? My understanding is that the scenario above is possible.
+> > 
+> > Yes, video drivers do that. 
 > 
-> Hello,
-> 
-> Here are a few more OMAP clock and hwmod patches intended for 2.6.34,
-> posted in case anyone has any review comments.
-> 
-> These patches have been boot-tested on OSK5912, N800, 2430SDP,
-> Overo; and compile-tested on 4430SDP.
-> 
-I have boot tested this series and earlier two series on OMAP4430 SDP.
-They boot fine.
-> 
-> ---
-> 
-> size:
->    text	   data	    bss	    dec	    hex	filename
-> 2882000	 127872	  88872	3098744	 2f4878	vmlinux.osk5912.orig
-> 2882016	 127872	  88872	3098760	 2f4888	vmlinux.osk5912.patched
-> 2324953	 121440	  63728	2510121	 264d29	vmlinux.n8x0.orig
-> 2325885	 121536	  63728	2511149	 26512d	vmlinux.n8x0.patched
-> 3422044	 176928	 146928	3745900	 39286c	vmlinux.2430sdp.orig
-> 3423048	 177024	 146928	3747000	 392cb8	vmlinux.2430sdp.patched
-> 6060161	1797424	5800396	13657981 d0677d	vmlinux.omap3.orig
-> 6061113	1797488	5800396	13658997 d06b75	vmlinux.omap3.patched
-> 2049131	 168736	  65412	2283279	 22d70f	vmlinux.4430sdp.orig
-> 2050167	 169632	  65412	2285211	 22de9b	vmlinux.4430sdp.patched
-> 
-> Paul Walmsley (7):
->       OMAP clock: add omap_clk_get_by_name() for use by OMAP hwmod core code
->       OMAP hwmod: convert hwmod to use hardware clock names rather than clkdev dev+con
->       OMAP hwmod: convert header files with static allocations into C files
->       OMAP hwmod: add hwmod class support
->       OMAP clockdomain: if no autodeps exist, don't try to add or remove them
->       OMAP2/3 clock: combine OMAP2 & 3 boot-time MPU rate change code
->       OMAP2+ clock: revise omap2_clk_{disable,enable}()
-> 
-> Rajendra Nayak (1):
->       OMAP4: clock: Rename leaf clock nodes to end with a _ick or _fck
-> 
-> Santosh Shilimkar (2):
->       OMAP4: clock: Add dummy clock nodes for interface clocks
->       OMAP4: clock: Remove clock hacks from timer-gp.c
-> 
-> Vimarsh Zutshi (1):
->       From 5c87e27fd557a56aca72cd10529c3bdcb0c8a517 Mon Sep 17 00:00:00 2001
-> 
-> 
->  arch/arm/configs/omap_4430sdp_defconfig      |    7
->  arch/arm/mach-omap1/clock.c                  |   14 -
->  arch/arm/mach-omap1/clock_data.c             |    6
->  arch/arm/mach-omap2/Makefile                 |   12 -
->  arch/arm/mach-omap2/clock.c                  |  220 ++++++++--
->  arch/arm/mach-omap2/clock.h                  |    5
->  arch/arm/mach-omap2/clock2xxx.c              |   34 -
->  arch/arm/mach-omap2/clock3xxx.c              |   59 ---
->  arch/arm/mach-omap2/clock3xxx_data.c         |    2
->  arch/arm/mach-omap2/clock44xx_data.c         |  596 ++++++++++++++------------
->  arch/arm/mach-omap2/clockdomain.c            |   16 +
->  arch/arm/mach-omap2/io.c                     |   21 -
->  arch/arm/mach-omap2/omap_hwmod.c             |  244 ++++++-----
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c   |   38 +-
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c   |   38 +-
->  arch/arm/mach-omap2/omap_hwmod_34xx.h        |  168 -------
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |  181 ++++++++
->  arch/arm/mach-omap2/omap_hwmod_common_data.c |   24 +
->  arch/arm/mach-omap2/omap_hwmod_common_data.h |   24 +
->  arch/arm/mach-omap2/timer-gp.c               |    5
->  arch/arm/plat-omap/clock.c                   |   37 ++
->  arch/arm/plat-omap/include/plat/clock.h      |    3
->  arch/arm/plat-omap/include/plat/omap_hwmod.h |   71 ++-
->  23 files changed, 1073 insertions(+), 752 deletions(-)
->  rename arch/arm/mach-omap2/{omap_hwmod_2420.h => omap_hwmod_2420_data.c} (82%)
->  rename arch/arm/mach-omap2/{omap_hwmod_2430.h => omap_hwmod_2430_data.c} (83%)
->  delete mode 100644 arch/arm/mach-omap2/omap_hwmod_34xx.h
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_data.h
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> In which case it would be up to the video driver to call
+> flush_dcache_page() (though if it's v4l you are talking about, maybe it
+> might make sense to push it into the v4l layer itself).
+
+I don't know. The issue seems quite complex. It would seem better to
+centralize it as far as practical. Do you have a wrapper drivers could
+call?
+
+	Regards
+		Oliver
