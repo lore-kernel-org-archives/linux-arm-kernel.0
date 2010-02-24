@@ -1,23 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2010 14:40:54 +0000
-Subject: [PATCH 3/7] ARM: U300: set f_max to 24 MHz for MMCI
-In-Reply-To: <A6D19A13FE030A409EC4362C172E091F0E963F15@eseldmw101.eemea.ericsson.se>
-References: <1266537931-12560-1-git-send-email-linus.walleij@stericsson.com>
-	<20100221210740.GA3528@n2100.arm.linux.org.uk>
-	<A6D19A13FE030A409EC4362C172E091F0E9355A2@eseldmw101.eemea.ericsson.se>
-	<20100224125002.GA19641@n2100.arm.linux.org.uk>
-	<A6D19A13FE030A409EC4362C172E091F0E963F15@eseldmw101.eemea.ericsson.se>
-Message-ID: <20100224144054.GA21680@n2100.arm.linux.org.uk>
+From: hector@marcansoft.com (Hector Martin)
+Date: Wed, 24 Feb 2010 16:20:18 +0100
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <20100224110353.GA15105@n2100.arm.linux.org.uk>
+References: <1266933437-4876-1-git-send-email-hector@marcansoft.com>	<20100224084259.GA8068@pengutronix.de>	<4B84F0F6.40902@marcansoft.com>
+	<20100224110353.GA15105@n2100.arm.linux.org.uk>
+Message-ID: <4B8543B2.4030004@marcansoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 03:35:46PM +0100, Linus Walleij wrote:
-> If a generic PrimeCell DMA doesn't work out, we will have to fork
-> the driver instead, since we cannot even use it with the U8500
-> without DMA support, perhaps this is just as good anyway since
-> we wouldn't be disturbing RealView etc with our patches. But
-> it'll lead to some code duplication.
+Russell King - ARM Linux wrote:
+> It does work with the previous version of the decompressor.
 
-Versatile and Realview both have DMA infrastructure based around the
-PL080 and a routing selector for the DMA signals.  However, no one
-has yet come up with a suitable way to deal with this yet...
+Sure, at this point in time. The broken code is still the loader, not
+the new decompressor. If a GCC update had been the culprit, it wouldn't
+be GCC's fault. The fact remains that the behavior is undefined and
+(with current GCC versions) requires carefully crafting the resulting C
+code in order to get reasonable behavior. I don't think you can
+reasonably require that a generic descompressor be maintained by others
+with care for compatibility with this hack; someone would have to police
+changes for potential issues, and you still have a decent chance of
+getting breakage if GCC decides to change its behavior some day. I'd say
+fixing the loader to not require this undefined behavior is a
+considerably better long-term solution.
+
+> I noticed that you did not reply to my previous email on this subject,
+> are you intentionally ignoring my responses?
+
+You had a valid point which I hadn't considered (running ROM images from
+RAM), so I figured I'd give addressing that a shot before going into
+discussion mode.
+
+-- 
+Hector Martin (hector at marcansoft.com)
+Public Key: http://www.marcansoft.com/marcan.asc
