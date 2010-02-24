@@ -1,21 +1,17 @@
-From: prashantsmailcenter@gmail.com (Prashant Bhole)
-Date: Wed, 24 Feb 2010 14:30:30 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Feb 2010 09:11:11 +0000
 Subject: large page support for IOP331
-Message-ID: <9ff69a5d1002240100r708381ceha1ca29f2bd6f18b@mail.gmail.com>
+In-Reply-To: <9ff69a5d1002240100r708381ceha1ca29f2bd6f18b@mail.gmail.com>
+References: <9ff69a5d1002240100r708381ceha1ca29f2bd6f18b@mail.gmail.com>
+Message-ID: <20100224091111.GA7598@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-I am using kernel 2.6.24 for a custom hardware with IOP331 processor.
+On Wed, Feb 24, 2010 at 02:30:30PM +0530, Prashant Bhole wrote:
+> Is there any support of large page for arm architecture?
 
-Is there any support of large page for arm architecture?
+The short answer is no.
 
-I tried to change the page size by changing PAGE_SHIFT to make page
- size 8K/16K. But kernel didn't boot.
-Am I missing something?
-
-
-Thanks,
-
--- 
-~p~r~a~s~h~a~n~t~
+The long answer is that to have 16K pages, it causes bigger problems
+with the 2nd level page tables, which from the hardware perspective
+are only 256 per L1 entry, but are required to be in unique pages.
