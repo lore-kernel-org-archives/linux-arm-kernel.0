@@ -1,341 +1,269 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 24 Feb 2010 11:08:25 +0100
-Subject: [PATCH 30/39] arm/imx/iomux-mx1: unify style and comment cleanup
+Date: Wed, 24 Feb 2010 11:08:24 +0100
+Subject: [PATCH 29/39] arm/imx/iomux-v1: make base address a runtime choice
 In-Reply-To: <20100224100649.GA6456@pengutronix.de>
 References: <20100224100649.GA6456@pengutronix.de>
-Message-ID: <1267006114-31743-30-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1267006114-31743-29-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- use __MACH_IOMUX_MX1_H__ as header protector analogous to
-  <mach/mx...h>
-- use tabs for indention
+While at it move register modification to static inlines and
+so make the relevant code more readable.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx1.h |  309 ++++++++++++++--------------
- 1 files changed, 150 insertions(+), 159 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux.h |    1 -
+ arch/arm/plat-mxc/iomux-v1.c           |  193 +++++++++++++++++++++-----------
+ 2 files changed, 127 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx1.h b/arch/arm/plat-mxc/include/mach/iomux-mx1.h
-index bf23305..d29a7b3 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx1.h
-@@ -1,166 +1,157 @@
+diff --git a/arch/arm/plat-mxc/include/mach/iomux.h b/arch/arm/plat-mxc/include/mach/iomux.h
+index 011cfcd..e15d28a 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux.h
++++ b/arch/arm/plat-mxc/include/mach/iomux.h
+@@ -24,7 +24,6 @@
+ *  GPIO Module and I/O Multiplexer
+ *  x = 0..3 for reg_A, reg_B, reg_C, reg_D
+ */
+-#define VA_GPIO_BASE	IO_ADDRESS(GPIO_BASE_ADDR)
+ #define MXC_DDIR(x)    (0x00 + ((x) << 8))
+ #define MXC_OCR1(x)    (0x04 + ((x) << 8))
+ #define MXC_OCR2(x)    (0x08 + ((x) << 8))
+diff --git a/arch/arm/plat-mxc/iomux-v1.c b/arch/arm/plat-mxc/iomux-v1.c
+index 0b74568..aeaf295 100644
+--- a/arch/arm/plat-mxc/iomux-v1.c
++++ b/arch/arm/plat-mxc/iomux-v1.c
+@@ -1,9 +1,8 @@
  /*
--* Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
--*
--* This program is free software; you can redistribute it and/or
--* modify it under the terms of the GNU General Public License
--* as published by the Free Software Foundation; either version 2
--* of the License, or (at your option) any later version.
--* This program is distributed in the hope that it will be useful,
--* but WITHOUT ANY WARRANTY; without even the implied warranty of
--* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--* GNU General Public License for more details.
--*
--* You should have received a copy of the GNU General Public License
--* along with this program; if not, write to the Free Software
--* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
--* MA 02110-1301, USA.
--*/
--
--#ifndef _MXC_IOMUX_MX1_H
--#define _MXC_IOMUX_MX1_H
-+ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+#ifndef __MACH_IOMUX_MX1_H__
-+#define __MACH_IOMUX_MX1_H__
+  * arch/arm/plat-mxc/iomux-v1.c
+  *
+- * author: Sascha Hauer
+- * Created: april 20th, 2004
+- * Copyright: Synertronixx GmbH
++ * Copyright (C) 2004 Sascha Hauer, Synertronixx GmbH
++ * Copyright (C) 2009 Uwe Kleine-Koenig, Pengutronix
+  *
+  * Common code for i.MX1, i.MX21 and i.MX27
+  *
+@@ -18,9 +17,8 @@
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
++ * along with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+  */
  
- #ifndef GPIO_PORTA
- #error Please include mach/iomux.h
- #endif
+ #include <linux/errno.h>
+@@ -34,78 +32,119 @@
+ #include <asm/mach/map.h>
+ #include <mach/iomux.h>
  
--/* FIXME: This list is not completed. The correct directions are
--* missing on some (many) pins
--*/
--
--
--/* Primary GPIO pin functions */
-+#define PA0_AIN_SPI2_CLK	(GPIO_PORTA | GPIO_AIN | GPIO_OUT | 0)
-+#define PA0_AF_ETMTRACESYNC	(GPIO_PORTA | GPIO_AF | 0)
-+#define PA1_AOUT_SPI2_RXD	(GPIO_PORTA | GPIO_AOUT | GPIO_IN | 1)
-+#define PA1_PF_TIN		(GPIO_PORTA | GPIO_PF | 1)
-+#define PA2_PF_PWM0		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 2)
-+#define PA3_PF_CSI_MCLK		(GPIO_PORTA | GPIO_PF | 3)
-+#define PA4_PF_CSI_D0		(GPIO_PORTA | GPIO_PF | 4)
-+#define PA5_PF_CSI_D1		(GPIO_PORTA | GPIO_PF | 5)
-+#define PA6_PF_CSI_D2		(GPIO_PORTA | GPIO_PF | 6)
-+#define PA7_PF_CSI_D3		(GPIO_PORTA | GPIO_PF | 7)
-+#define PA8_PF_CSI_D4		(GPIO_PORTA | GPIO_PF | 8)
-+#define PA9_PF_CSI_D5		(GPIO_PORTA | GPIO_PF | 9)
-+#define PA10_PF_CSI_D6		(GPIO_PORTA | GPIO_PF | 10)
-+#define PA11_PF_CSI_D7		(GPIO_PORTA | GPIO_PF | 11)
-+#define PA12_PF_CSI_VSYNC	(GPIO_PORTA | GPIO_PF | 12)
-+#define PA13_PF_CSI_HSYNC	(GPIO_PORTA | GPIO_PF | 13)
-+#define PA14_PF_CSI_PIXCLK	(GPIO_PORTA | GPIO_PF | 14)
-+#define PA15_PF_I2C_SDA		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 15)
-+#define PA16_PF_I2C_SCL		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 16)
-+#define PA17_AF_ETMTRACEPKT4	(GPIO_PORTA | GPIO_AF | 17)
-+#define PA17_AIN_SPI2_SS	(GPIO_PORTA | GPIO_AIN | GPIO_OUT | 17)
-+#define PA18_AF_ETMTRACEPKT5	(GPIO_PORTA | GPIO_AF | 18)
-+#define PA19_AF_ETMTRACEPKT6	(GPIO_PORTA | GPIO_AF | 19)
-+#define PA20_AF_ETMTRACEPKT7	(GPIO_PORTA | GPIO_AF | 20)
-+#define PA21_PF_A0		(GPIO_PORTA | GPIO_PF | 21)
-+#define PA22_PF_CS4		(GPIO_PORTA | GPIO_PF | 22)
-+#define PA23_PF_CS5		(GPIO_PORTA | GPIO_PF | 23)
-+#define PA24_PF_A16		(GPIO_PORTA | GPIO_PF | 24)
-+#define PA24_AF_ETMTRACEPKT0	(GPIO_PORTA | GPIO_AF | 24)
-+#define PA25_PF_A17		(GPIO_PORTA | GPIO_PF | 25)
-+#define PA25_AF_ETMTRACEPKT1	(GPIO_PORTA | GPIO_AF | 25)
-+#define PA26_PF_A18		(GPIO_PORTA | GPIO_PF | 26)
-+#define PA26_AF_ETMTRACEPKT2	(GPIO_PORTA | GPIO_AF | 26)
-+#define PA27_PF_A19		(GPIO_PORTA | GPIO_PF | 27)
-+#define PA27_AF_ETMTRACEPKT3	(GPIO_PORTA | GPIO_AF | 27)
-+#define PA28_PF_A20		(GPIO_PORTA | GPIO_PF | 28)
-+#define PA28_AF_ETMPIPESTAT0	(GPIO_PORTA | GPIO_AF | 28)
-+#define PA29_PF_A21		(GPIO_PORTA | GPIO_PF | 29)
-+#define PA29_AF_ETMPIPESTAT1	(GPIO_PORTA | GPIO_AF | 29)
-+#define PA30_PF_A22		(GPIO_PORTA | GPIO_PF | 30)
-+#define PA30_AF_ETMPIPESTAT2	(GPIO_PORTA | GPIO_AF | 30)
-+#define PA31_PF_A23		(GPIO_PORTA | GPIO_PF | 31)
-+#define PA31_AF_ETMTRACECLK	(GPIO_PORTA | GPIO_AF | 31)
-+#define PB8_PF_SD_DAT0		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 8)
-+#define PB8_AF_MS_PIO		(GPIO_PORTB | GPIO_AF | 8)
-+#define PB9_PF_SD_DAT1		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 9)
-+#define PB9_AF_MS_PI1		(GPIO_PORTB | GPIO_AF | 9)
-+#define PB10_PF_SD_DAT2		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 10)
-+#define PB10_AF_MS_SCLKI	(GPIO_PORTB | GPIO_AF | 10)
-+#define PB11_PF_SD_DAT3		(GPIO_PORTB | GPIO_PF | 11)
-+#define PB11_AF_MS_SDIO		(GPIO_PORTB | GPIO_AF | 11)
-+#define PB12_PF_SD_CLK		(GPIO_PORTB | GPIO_PF | 12)
-+#define PB12_AF_MS_SCLK0	(GPIO_PORTB | GPIO_AF | 12)
-+#define PB13_PF_SD_CMD		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 13)
-+#define PB13_AF_MS_BS		(GPIO_PORTB | GPIO_AF | 13)
-+#define PB14_AF_SSI_RXFS	(GPIO_PORTB | GPIO_AF | 14)
-+#define PB15_AF_SSI_RXCLK	(GPIO_PORTB | GPIO_AF | 15)
-+#define PB16_AF_SSI_RXDAT	(GPIO_PORTB | GPIO_AF | GPIO_IN | 16)
-+#define PB17_AF_SSI_TXDAT	(GPIO_PORTB | GPIO_AF | GPIO_OUT | 17)
-+#define PB18_AF_SSI_TXFS	(GPIO_PORTB | GPIO_AF | 18)
-+#define PB19_AF_SSI_TXCLK	(GPIO_PORTB | GPIO_AF | 19)
-+#define PB20_PF_USBD_AFE	(GPIO_PORTB | GPIO_PF | 20)
-+#define PB21_PF_USBD_OE		(GPIO_PORTB | GPIO_PF | 21)
-+#define PB22_PF_USBD_RCV	(GPIO_PORTB | GPIO_PF | 22)
-+#define PB23_PF_USBD_SUSPND	(GPIO_PORTB | GPIO_PF | 23)
-+#define PB24_PF_USBD_VP		(GPIO_PORTB | GPIO_PF | 24)
-+#define PB25_PF_USBD_VM		(GPIO_PORTB | GPIO_PF | 25)
-+#define PB26_PF_USBD_VPO	(GPIO_PORTB | GPIO_PF | 26)
-+#define PB27_PF_USBD_VMO	(GPIO_PORTB | GPIO_PF | 27)
-+#define PB28_PF_UART2_CTS	(GPIO_PORTB | GPIO_PF | GPIO_OUT | 28)
-+#define PB29_PF_UART2_RTS	(GPIO_PORTB | GPIO_PF | GPIO_IN | 29)
-+#define PB30_PF_UART2_TXD	(GPIO_PORTB | GPIO_PF | GPIO_OUT | 30)
-+#define PB31_PF_UART2_RXD	(GPIO_PORTB | GPIO_PF | GPIO_IN | 31)
-+#define PC3_PF_SSI_RXFS		(GPIO_PORTC | GPIO_PF | 3)
-+#define PC4_PF_SSI_RXCLK	(GPIO_PORTC | GPIO_PF | 4)
-+#define PC5_PF_SSI_RXDAT	(GPIO_PORTC | GPIO_PF | GPIO_IN | 5)
-+#define PC6_PF_SSI_TXDAT	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 6)
-+#define PC7_PF_SSI_TXFS		(GPIO_PORTC | GPIO_PF | 7)
-+#define PC8_PF_SSI_TXCLK	(GPIO_PORTC | GPIO_PF | 8)
-+#define PC9_PF_UART1_CTS	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 9)
-+#define PC10_PF_UART1_RTS	(GPIO_PORTC | GPIO_PF | GPIO_IN | 10)
-+#define PC11_PF_UART1_TXD	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 11)
-+#define PC12_PF_UART1_RXD	(GPIO_PORTC | GPIO_PF | GPIO_IN | 12)
-+#define PC13_PF_SPI1_SPI_RDY	(GPIO_PORTC | GPIO_PF | 13)
-+#define PC14_PF_SPI1_SCLK	(GPIO_PORTC | GPIO_PF | 14)
-+#define PC15_PF_SPI1_SS		(GPIO_PORTC | GPIO_PF | 15)
-+#define PC16_PF_SPI1_MISO	(GPIO_PORTC | GPIO_PF | 16)
-+#define PC17_PF_SPI1_MOSI	(GPIO_PORTC | GPIO_PF | 17)
-+#define PC24_BIN_UART3_RI	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 24)
-+#define PC25_BIN_UART3_DSR	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 25)
-+#define PC26_AOUT_UART3_DTR	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 26)
-+#define PC27_BIN_UART3_DCD	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 27)
-+#define PC28_BIN_UART3_CTS	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 28)
-+#define PC29_AOUT_UART3_RTS	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 29)
-+#define PC30_BIN_UART3_TX	(GPIO_PORTC | GPIO_BIN | 30)
-+#define PC31_AOUT_UART3_RX	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 31)
-+#define PD6_PF_LSCLK		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 6)
-+#define PD7_PF_REV		(GPIO_PORTD | GPIO_PF | 7)
-+#define PD7_AF_UART2_DTR	(GPIO_PORTD | GPIO_AF | GPIO_IN | 7)
-+#define PD7_AIN_SPI2_SCLK	(GPIO_PORTD | GPIO_AIN | 7)
-+#define PD8_PF_CLS		(GPIO_PORTD | GPIO_PF | 8)
-+#define PD8_AF_UART2_DCD	(GPIO_PORTD | GPIO_AF | GPIO_OUT | 8)
-+#define PD8_AIN_SPI2_SS		(GPIO_PORTD | GPIO_AIN | 8)
-+#define PD9_PF_PS		(GPIO_PORTD | GPIO_PF | 9)
-+#define PD9_AF_UART2_RI		(GPIO_PORTD | GPIO_AF | GPIO_OUT | 9)
-+#define PD9_AOUT_SPI2_RXD	(GPIO_PORTD | GPIO_AOUT | GPIO_IN | 9)
-+#define PD10_PF_SPL_SPR		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 10)
-+#define PD10_AF_UART2_DSR	(GPIO_PORTD | GPIO_AF | GPIO_OUT | 10)
-+#define PD10_AIN_SPI2_TXD	(GPIO_PORTD | GPIO_AIN | GPIO_OUT | 10)
-+#define PD11_PF_CONTRAST	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 11)
-+#define PD12_PF_ACD_OE		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 12)
-+#define PD13_PF_LP_HSYNC	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 13)
-+#define PD14_PF_FLM_VSYNC	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 14)
-+#define PD15_PF_LD0		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 15)
-+#define PD16_PF_LD1		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 16)
-+#define PD17_PF_LD2		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 17)
-+#define PD18_PF_LD3		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 18)
-+#define PD19_PF_LD4		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 19)
-+#define PD20_PF_LD5		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 20)
-+#define PD21_PF_LD6		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 21)
-+#define PD22_PF_LD7		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 22)
-+#define PD23_PF_LD8		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 23)
-+#define PD24_PF_LD9		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 24)
-+#define PD25_PF_LD10		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 25)
-+#define PD26_PF_LD11		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 26)
-+#define PD27_PF_LD12		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 27)
-+#define PD28_PF_LD13		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 28)
-+#define PD29_PF_LD14		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 29)
-+#define PD30_PF_LD15		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 30)
-+#define PD31_PF_TMR2OUT		(GPIO_PORTD | GPIO_PF | 31)
-+#define PD31_BIN_SPI2_TXD	(GPIO_PORTD | GPIO_BIN | 31)
++static void __iomem *imx_iomuxv1_baseaddr;
++
++static inline unsigned long imx_iomuxv1_readl(unsigned offset)
++{
++	return __raw_readl(imx_iomuxv1_baseaddr + offset);
++}
++
++static inline void imx_iomuxv1_writel(unsigned long val, unsigned offset)
++{
++	__raw_writel(val, imx_iomuxv1_baseaddr + offset);
++}
++
++static inline void imx_iomuxv1_rmwl(unsigned offset,
++		unsigned long mask, unsigned long value)
++{
++	unsigned long reg = imx_iomuxv1_readl(offset);
++
++	reg &= ~mask;
++	reg |= value;
++
++	imx_iomuxv1_writel(reg, offset);
++}
++
++static inline void imx_iomuxv1_set_puen(
++		unsigned int port, unsigned int pin, int on)
++{
++	unsigned long mask = 1 << pin;
++
++	imx_iomuxv1_rmwl(MXC_PUEN(port), mask, on ? mask : 0);
++}
++
++static inline void imx_iomuxv1_set_ddir(
++		unsigned int port, unsigned int pin, int out)
++{
++	unsigned long mask = 1 << pin;
++
++	imx_iomuxv1_rmwl(MXC_DDIR(port), mask, out ? mask : 0);
++}
++
++static inline void imx_iomuxv1_set_gpr(
++		unsigned int port, unsigned int pin, int af)
++{
++	unsigned long mask = 1 << pin;
++
++	imx_iomuxv1_rmwl(MXC_GPR(port), mask, af ? mask : 0);
++}
++
++static inline void imx_iomuxv1_set_gius(
++		unsigned int port, unsigned int pin, int inuse)
++{
++	unsigned long mask = 1 << pin;
++
++	imx_iomuxv1_rmwl(MXC_GIUS(port), mask, inuse ? mask : 0);
++}
++
++static inline void imx_iomuxv1_set_ocr(
++		unsigned int port, unsigned int pin, unsigned int ocr)
++{
++	unsigned long shift = (pin & 0xf) << 1;
++	unsigned long mask = 3 << shift;
++	unsigned long value = ocr << shift;
++	unsigned long offset = pin < 16 ? MXC_OCR1(port) : MXC_OCR2(port);
++
++	imx_iomuxv1_rmwl(offset, mask, value);
++}
++
++static inline void imx_iomuxv1_set_iconfa(
++		unsigned int port, unsigned int pin, unsigned int aout)
++{
++	unsigned long shift = (pin & 0xf) << 1;
++	unsigned long mask = 3 << shift;
++	unsigned long value = aout << shift;
++	unsigned long offset = pin < 16 ? MXC_ICONFA1(port) : MXC_ICONFA2(port);
++
++	imx_iomuxv1_rmwl(offset, mask, value);
++}
++
++static inline void imx_iomuxv1_set_iconfb(
++		unsigned int port, unsigned int pin, unsigned int bout)
++{
++	unsigned long shift = (pin & 0xf) << 1;
++	unsigned long mask = 3 << shift;
++	unsigned long value = bout << shift;
++	unsigned long offset = pin < 16 ? MXC_ICONFB1(port) : MXC_ICONFB2(port);
++
++	imx_iomuxv1_rmwl(offset, mask, value);
++}
++
+ void mxc_gpio_mode(int gpio_mode)
+ {
+ 	unsigned int pin = gpio_mode & GPIO_PIN_MASK;
+ 	unsigned int port = (gpio_mode & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
+ 	unsigned int ocr = (gpio_mode & GPIO_OCR_MASK) >> GPIO_OCR_SHIFT;
+-	unsigned int tmp;
++	unsigned int aout = (gpio_mode >> GPIO_AOUT_SHIFT) & 3;
++	unsigned int bout = (gpio_mode >> GPIO_BOUT_SHIFT) & 3;
  
--#define PA0_AIN_SPI2_CLK        (GPIO_PORTA | GPIO_AIN | GPIO_OUT | 0)
--#define PA0_AF_ETMTRACESYNC     (GPIO_PORTA | GPIO_AF | 0)
--#define PA1_AOUT_SPI2_RXD       (GPIO_PORTA | GPIO_AOUT | GPIO_IN | 1)
--#define PA1_PF_TIN              (GPIO_PORTA | GPIO_PF | 1)
--#define PA2_PF_PWM0             (GPIO_PORTA | GPIO_PF | GPIO_OUT | 2)
--#define PA3_PF_CSI_MCLK         (GPIO_PORTA | GPIO_PF | 3)
--#define PA4_PF_CSI_D0           (GPIO_PORTA | GPIO_PF | 4)
--#define PA5_PF_CSI_D1           (GPIO_PORTA | GPIO_PF | 5)
--#define PA6_PF_CSI_D2           (GPIO_PORTA | GPIO_PF | 6)
--#define PA7_PF_CSI_D3           (GPIO_PORTA | GPIO_PF | 7)
--#define PA8_PF_CSI_D4           (GPIO_PORTA | GPIO_PF | 8)
--#define PA9_PF_CSI_D5           (GPIO_PORTA | GPIO_PF | 9)
--#define PA10_PF_CSI_D6          (GPIO_PORTA | GPIO_PF | 10)
--#define PA11_PF_CSI_D7          (GPIO_PORTA | GPIO_PF | 11)
--#define PA12_PF_CSI_VSYNC       (GPIO_PORTA | GPIO_PF | 12)
--#define PA13_PF_CSI_HSYNC       (GPIO_PORTA | GPIO_PF | 13)
--#define PA14_PF_CSI_PIXCLK      (GPIO_PORTA | GPIO_PF | 14)
--#define PA15_PF_I2C_SDA         (GPIO_PORTA | GPIO_PF | GPIO_OUT | 15)
--#define PA16_PF_I2C_SCL         (GPIO_PORTA | GPIO_PF | GPIO_OUT | 16)
--#define PA17_AF_ETMTRACEPKT4    (GPIO_PORTA | GPIO_AF | 17)
--#define PA17_AIN_SPI2_SS        (GPIO_PORTA | GPIO_AIN | GPIO_OUT | 17)
--#define PA18_AF_ETMTRACEPKT5    (GPIO_PORTA | GPIO_AF | 18)
--#define PA19_AF_ETMTRACEPKT6    (GPIO_PORTA | GPIO_AF | 19)
--#define PA20_AF_ETMTRACEPKT7    (GPIO_PORTA | GPIO_AF | 20)
--#define PA21_PF_A0              (GPIO_PORTA | GPIO_PF | 21)
--#define PA22_PF_CS4             (GPIO_PORTA | GPIO_PF | 22)
--#define PA23_PF_CS5             (GPIO_PORTA | GPIO_PF | 23)
--#define PA24_PF_A16             (GPIO_PORTA | GPIO_PF | 24)
--#define PA24_AF_ETMTRACEPKT0    (GPIO_PORTA | GPIO_AF | 24)
--#define PA25_PF_A17             (GPIO_PORTA | GPIO_PF | 25)
--#define PA25_AF_ETMTRACEPKT1    (GPIO_PORTA | GPIO_AF | 25)
--#define PA26_PF_A18             (GPIO_PORTA | GPIO_PF | 26)
--#define PA26_AF_ETMTRACEPKT2    (GPIO_PORTA | GPIO_AF | 26)
--#define PA27_PF_A19             (GPIO_PORTA | GPIO_PF | 27)
--#define PA27_AF_ETMTRACEPKT3    (GPIO_PORTA | GPIO_AF | 27)
--#define PA28_PF_A20             (GPIO_PORTA | GPIO_PF | 28)
--#define PA28_AF_ETMPIPESTAT0    (GPIO_PORTA | GPIO_AF | 28)
--#define PA29_PF_A21             (GPIO_PORTA | GPIO_PF | 29)
--#define PA29_AF_ETMPIPESTAT1    (GPIO_PORTA | GPIO_AF | 29)
--#define PA30_PF_A22             (GPIO_PORTA | GPIO_PF | 30)
--#define PA30_AF_ETMPIPESTAT2    (GPIO_PORTA | GPIO_AF | 30)
--#define PA31_PF_A23             (GPIO_PORTA | GPIO_PF | 31)
--#define PA31_AF_ETMTRACECLK     (GPIO_PORTA | GPIO_AF | 31)
--#define PB8_PF_SD_DAT0          (GPIO_PORTB | GPIO_PF | GPIO_PUEN | 8)
--#define PB8_AF_MS_PIO           (GPIO_PORTB | GPIO_AF | 8)
--#define PB9_PF_SD_DAT1          (GPIO_PORTB | GPIO_PF | GPIO_PUEN | 9)
--#define PB9_AF_MS_PI1           (GPIO_PORTB | GPIO_AF | 9)
--#define PB10_PF_SD_DAT2         (GPIO_PORTB | GPIO_PF | GPIO_PUEN | 10)
--#define PB10_AF_MS_SCLKI        (GPIO_PORTB | GPIO_AF | 10)
--#define PB11_PF_SD_DAT3         (GPIO_PORTB | GPIO_PF | 11)
--#define PB11_AF_MS_SDIO         (GPIO_PORTB | GPIO_AF | 11)
--#define PB12_PF_SD_CLK          (GPIO_PORTB | GPIO_PF | 12)
--#define PB12_AF_MS_SCLK0        (GPIO_PORTB | GPIO_AF | 12)
--#define PB13_PF_SD_CMD          (GPIO_PORTB | GPIO_PF | GPIO_PUEN | 13)
--#define PB13_AF_MS_BS           (GPIO_PORTB | GPIO_AF | 13)
--#define PB14_AF_SSI_RXFS        (GPIO_PORTB | GPIO_AF | 14)
--#define PB15_AF_SSI_RXCLK       (GPIO_PORTB | GPIO_AF | 15)
--#define PB16_AF_SSI_RXDAT       (GPIO_PORTB | GPIO_AF | GPIO_IN | 16)
--#define PB17_AF_SSI_TXDAT       (GPIO_PORTB | GPIO_AF | GPIO_OUT | 17)
--#define PB18_AF_SSI_TXFS        (GPIO_PORTB | GPIO_AF | 18)
--#define PB19_AF_SSI_TXCLK       (GPIO_PORTB | GPIO_AF | 19)
--#define PB20_PF_USBD_AFE        (GPIO_PORTB | GPIO_PF | 20)
--#define PB21_PF_USBD_OE         (GPIO_PORTB | GPIO_PF | 21)
--#define PB22_PF_USBD_RCV        (GPIO_PORTB | GPIO_PF | 22)
--#define PB23_PF_USBD_SUSPND     (GPIO_PORTB | GPIO_PF | 23)
--#define PB24_PF_USBD_VP         (GPIO_PORTB | GPIO_PF | 24)
--#define PB25_PF_USBD_VM         (GPIO_PORTB | GPIO_PF | 25)
--#define PB26_PF_USBD_VPO        (GPIO_PORTB | GPIO_PF | 26)
--#define PB27_PF_USBD_VMO        (GPIO_PORTB | GPIO_PF | 27)
--#define PB28_PF_UART2_CTS       (GPIO_PORTB | GPIO_PF | GPIO_OUT | 28)
--#define PB29_PF_UART2_RTS       (GPIO_PORTB | GPIO_PF | GPIO_IN | 29)
--#define PB30_PF_UART2_TXD       (GPIO_PORTB | GPIO_PF | GPIO_OUT | 30)
--#define PB31_PF_UART2_RXD       (GPIO_PORTB | GPIO_PF | GPIO_IN | 31)
--#define PC3_PF_SSI_RXFS         (GPIO_PORTC | GPIO_PF | 3)
--#define PC4_PF_SSI_RXCLK        (GPIO_PORTC | GPIO_PF | 4)
--#define PC5_PF_SSI_RXDAT        (GPIO_PORTC | GPIO_PF | GPIO_IN | 5)
--#define PC6_PF_SSI_TXDAT        (GPIO_PORTC | GPIO_PF | GPIO_OUT | 6)
--#define PC7_PF_SSI_TXFS         (GPIO_PORTC | GPIO_PF | 7)
--#define PC8_PF_SSI_TXCLK        (GPIO_PORTC | GPIO_PF | 8)
--#define PC9_PF_UART1_CTS        (GPIO_PORTC | GPIO_PF | GPIO_OUT | 9)
--#define PC10_PF_UART1_RTS       (GPIO_PORTC | GPIO_PF | GPIO_IN | 10)
--#define PC11_PF_UART1_TXD       (GPIO_PORTC | GPIO_PF | GPIO_OUT | 11)
--#define PC12_PF_UART1_RXD       (GPIO_PORTC | GPIO_PF | GPIO_IN | 12)
--#define PC13_PF_SPI1_SPI_RDY    (GPIO_PORTC | GPIO_PF | 13)
--#define PC14_PF_SPI1_SCLK       (GPIO_PORTC | GPIO_PF | 14)
--#define PC15_PF_SPI1_SS         (GPIO_PORTC | GPIO_PF | 15)
--#define PC16_PF_SPI1_MISO       (GPIO_PORTC | GPIO_PF | 16)
--#define PC17_PF_SPI1_MOSI       (GPIO_PORTC | GPIO_PF | 17)
--#define PC24_BIN_UART3_RI       (GPIO_PORTC | GPIO_BIN | GPIO_OUT | 24)
--#define PC25_BIN_UART3_DSR      (GPIO_PORTC | GPIO_BIN | GPIO_OUT | 25)
--#define PC26_AOUT_UART3_DTR     (GPIO_PORTC | GPIO_AOUT | GPIO_IN | 26)
--#define PC27_BIN_UART3_DCD      (GPIO_PORTC | GPIO_BIN | GPIO_OUT | 27)
--#define PC28_BIN_UART3_CTS      (GPIO_PORTC | GPIO_BIN | GPIO_OUT | 28)
--#define PC29_AOUT_UART3_RTS     (GPIO_PORTC | GPIO_AOUT | GPIO_IN | 29)
--#define PC30_BIN_UART3_TX       (GPIO_PORTC | GPIO_BIN | 30)
--#define PC31_AOUT_UART3_RX      (GPIO_PORTC | GPIO_AOUT | GPIO_IN | 31)
--#define PD6_PF_LSCLK            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 6)
--#define PD7_PF_REV              (GPIO_PORTD | GPIO_PF | 7)
--#define PD7_AF_UART2_DTR        (GPIO_PORTD | GPIO_AF | GPIO_IN | 7)
--#define PD7_AIN_SPI2_SCLK       (GPIO_PORTD | GPIO_AIN | 7)
--#define PD8_PF_CLS              (GPIO_PORTD | GPIO_PF | 8)
--#define PD8_AF_UART2_DCD        (GPIO_PORTD | GPIO_AF | GPIO_OUT | 8)
--#define PD8_AIN_SPI2_SS         (GPIO_PORTD | GPIO_AIN | 8)
--#define PD9_PF_PS               (GPIO_PORTD | GPIO_PF | 9)
--#define PD9_AF_UART2_RI         (GPIO_PORTD | GPIO_AF | GPIO_OUT | 9)
--#define PD9_AOUT_SPI2_RXD       (GPIO_PORTD | GPIO_AOUT | GPIO_IN | 9)
--#define PD10_PF_SPL_SPR         (GPIO_PORTD | GPIO_PF | GPIO_OUT | 10)
--#define PD10_AF_UART2_DSR       (GPIO_PORTD | GPIO_AF | GPIO_OUT | 10)
--#define PD10_AIN_SPI2_TXD       (GPIO_PORTD | GPIO_AIN | GPIO_OUT | 10)
--#define PD11_PF_CONTRAST        (GPIO_PORTD | GPIO_PF | GPIO_OUT | 11)
--#define PD12_PF_ACD_OE          (GPIO_PORTD | GPIO_PF | GPIO_OUT | 12)
--#define PD13_PF_LP_HSYNC        (GPIO_PORTD | GPIO_PF | GPIO_OUT | 13)
--#define PD14_PF_FLM_VSYNC       (GPIO_PORTD | GPIO_PF | GPIO_OUT | 14)
--#define PD15_PF_LD0             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 15)
--#define PD16_PF_LD1             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 16)
--#define PD17_PF_LD2             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 17)
--#define PD18_PF_LD3             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 18)
--#define PD19_PF_LD4             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 19)
--#define PD20_PF_LD5             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 20)
--#define PD21_PF_LD6             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 21)
--#define PD22_PF_LD7             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 22)
--#define PD23_PF_LD8             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 23)
--#define PD24_PF_LD9             (GPIO_PORTD | GPIO_PF | GPIO_OUT | 24)
--#define PD25_PF_LD10            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 25)
--#define PD26_PF_LD11            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 26)
--#define PD27_PF_LD12            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 27)
--#define PD28_PF_LD13            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 28)
--#define PD29_PF_LD14            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 29)
--#define PD30_PF_LD15            (GPIO_PORTD | GPIO_PF | GPIO_OUT | 30)
--#define PD31_PF_TMR2OUT         (GPIO_PORTD | GPIO_PF | 31)
--#define PD31_BIN_SPI2_TXD       (GPIO_PORTD | GPIO_BIN | 31)
+ 	/* Pullup enable */
+-	tmp = __raw_readl(VA_GPIO_BASE + MXC_PUEN(port));
+-	if (gpio_mode & GPIO_PUEN)
+-		tmp |= (1 << pin);
+-	else
+-		tmp &= ~(1 << pin);
+-	__raw_writel(tmp, VA_GPIO_BASE + MXC_PUEN(port));
++	imx_iomuxv1_set_puen(port, pin, gpio_mode & GPIO_PUEN);
+ 
+ 	/* Data direction */
+-	tmp = __raw_readl(VA_GPIO_BASE + MXC_DDIR(port));
+-	if (gpio_mode & GPIO_OUT)
+-		tmp |= 1 << pin;
+-	else
+-		tmp &= ~(1 << pin);
+-	__raw_writel(tmp, VA_GPIO_BASE + MXC_DDIR(port));
++	imx_iomuxv1_set_ddir(port, pin, gpio_mode & GPIO_OUT);
+ 
+ 	/* Primary / alternate function */
+-	tmp = __raw_readl(VA_GPIO_BASE + MXC_GPR(port));
+-	if (gpio_mode & GPIO_AF)
+-		tmp |= (1 << pin);
+-	else
+-		tmp &= ~(1 << pin);
+-	__raw_writel(tmp, VA_GPIO_BASE + MXC_GPR(port));
++	imx_iomuxv1_set_gpr(port, pin, gpio_mode & GPIO_AF);
+ 
+ 	/* use as gpio? */
+-	tmp = __raw_readl(VA_GPIO_BASE + MXC_GIUS(port));
+-	if (gpio_mode & (GPIO_PF | GPIO_AF))
+-		tmp &= ~(1 << pin);
+-	else
+-		tmp |= (1 << pin);
+-	__raw_writel(tmp, VA_GPIO_BASE + MXC_GIUS(port));
 -
+-	if (pin < 16) {
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_OCR1(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= (ocr << (pin * 2));
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_OCR1(port));
 -
--#endif
-+#endif /* ifndef __MACH_IOMUX_MX1_H__ */
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_ICONFA1(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= ((gpio_mode >> GPIO_AOUT_SHIFT) & 3) << (pin * 2);
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_ICONFA1(port));
+-
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_ICONFB1(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= ((gpio_mode >> GPIO_BOUT_SHIFT) & 3) << (pin * 2);
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_ICONFB1(port));
+-	} else {
+-		pin -= 16;
+-
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_OCR2(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= (ocr << (pin * 2));
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_OCR2(port));
+-
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_ICONFA2(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= ((gpio_mode >> GPIO_AOUT_SHIFT) & 3) << (pin * 2);
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_ICONFA2(port));
+-
+-		tmp = __raw_readl(VA_GPIO_BASE + MXC_ICONFB2(port));
+-		tmp &= ~(3 << (pin * 2));
+-		tmp |= ((gpio_mode >> GPIO_BOUT_SHIFT) & 3) << (pin * 2);
+-		__raw_writel(tmp, VA_GPIO_BASE + MXC_ICONFB2(port));
+-	}
++	imx_iomuxv1_set_gius(port, pin, !(gpio_mode & (GPIO_PF | GPIO_AF)));
++
++	imx_iomuxv1_set_ocr(port, pin, ocr);
++
++	imx_iomuxv1_set_iconfa(port, pin, aout);
++
++	imx_iomuxv1_set_iconfb(port, pin, bout);
+ }
+ EXPORT_SYMBOL(mxc_gpio_mode);
+ 
+@@ -151,6 +190,28 @@ void mxc_gpio_release_multiple_pins(const int *pin_list, int count)
+ 		gpio_free(gpio);
+ 		p++;
+ 	}
+-
+ }
+ EXPORT_SYMBOL(mxc_gpio_release_multiple_pins);
++
++static int imx_iomuxv1_init(void)
++{
++#ifdef CONFIG_ARCH_MX1
++	if (cpu_is_mx1())
++		imx_iomuxv1_baseaddr = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR);
++	else
++#endif
++#ifdef CONFIG_MACH_MX21
++	if (cpu_is_mx21())
++		imx_iomuxv1_baseaddr = MX21_IO_ADDRESS(MX21_GPIO_BASE_ADDR);
++	else
++#endif
++#ifdef CONFIG_MACH_MX27
++	if (cpu_is_mx27())
++		imx_iomuxv1_baseaddr = MX27_IO_ADDRESS(MX27_GPIO_BASE_ADDR);
++	else
++#endif
++		return -ENODEV;
++
++	return 0;
++}
++pure_initcall(imx_iomuxv1_init);
 -- 
 1.6.6.2
