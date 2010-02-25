@@ -1,75 +1,34 @@
-From: swirl@gmx.li (Thomas Weber)
-Date: Thu, 25 Feb 2010 10:36:13 +0100
-Subject: No subject
-Message-ID: <1267090573-17708-1-git-send-email-swirl@gmx.li>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Feb 2010 10:35:55 +0100
+Subject: [PATCH] MXC: mach_armadillo5x0: Add USB Host support.
+In-Reply-To: <1267090289.2722.4.camel@realization>
+References: <1267054032.3870.47.camel@realization>
+	<20100225080259.GA13295@pengutronix.de>
+	<1267090289.2722.4.camel@realization>
+Message-ID: <20100225093555.GA10399@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: [PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
+Hi Alberto,
 
-The omap_serial_early_init prints the following errors:
+> > I think you need to protect all hunks by
+> > #ifdef CONFIG_USB_ULPI
+> > 
+> > For the pin-setup it's not important, but you must not call
+> > otg_ulpi_create if USB_ULPI isn't configured.
+> > 
+> > Best regards
+> > Uwe
+> > 
+> 
+> Ok, I'd seen this protection in pcm037 but I thought that on
+> my board USB will be always enabled.
+This breaks make randconfig, so either (a) add the #ifdefs or (b) select
+USB_ULPI.  IMHO (a) is preferable.
 
-Could not get uart4_ick
-Could not get uart4_fck
+Best regards
+Uwe
 
-because all the uarts available in omap_uart[] will be initialized.
-Only omap4430 and omap3630 have 4 uarts at the moment.
-This patch reduces the number of uarts when cpu is not omap4430 or
-omap3630.
-
-Signed-off-by: Thomas Weber <weber@corscience.de>
----
- arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index b79bc89..da77930 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
- }
- void __init omap_serial_early_init(void)
- {
--	int i;
-+	int i, nr_ports;
- 	char name[16];
- 
-+	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
-+		nr_ports = 3;
-+	else
-+		nr_ports = ARRAY_SIZE(omap_uart);
-+
- 	/*
- 	 * Make sure the serial ports are muxed on at this point.
- 	 * You have to mux them off in device drivers later on
- 	 * if not needed.
- 	 */
- 
--	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
-+	for (i = 0; i < nr_ports; i++) {
- 		struct omap_uart_state *uart = &omap_uart[i];
- 		struct platform_device *pdev = &uart->pdev;
- 		struct device *dev = &pdev->dev;
-@@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
- 			continue;
- 		}
- 
--		sprintf(name, "uart%d_ick", i+1);
-+		sprintf(name, "uart%d_ick", i + 1);
- 		uart->ick = clk_get(NULL, name);
- 		if (IS_ERR(uart->ick)) {
--			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
- 			uart->ick = NULL;
- 		}
- 
- 		sprintf(name, "uart%d_fck", i+1);
- 		uart->fck = clk_get(NULL, name);
- 		if (IS_ERR(uart->fck)) {
--			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
- 			uart->fck = NULL;
- 		}
- 
 -- 
-1.6.4.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
