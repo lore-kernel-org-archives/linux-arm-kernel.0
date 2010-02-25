@@ -1,11 +1,8 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Feb 2010 15:29:07 -0500 (EST)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Feb 2010 20:30:52 +0000
 Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <4B86D5D8.2010905@marcansoft.com>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-	<20100224223418.GB25587@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
-	<20100224234215.GA21985@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.LFD.2.00.1002251428410.1946@xanadu.home>
+References: <20100224234215.GA21985@n2100.arm.linux.org.uk>
 	<4B85BCE0.7000903@marcansoft.com>
 	<20100225000114.GB21985@n2100.arm.linux.org.uk>
 	<4B85C4A4.4060005@marcansoft.com>
@@ -15,52 +12,80 @@ References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
 	<alpine.LFD.2.00.1002251332190.1946@xanadu.home>
 	<4B86CDC8.4080107@marcansoft.com>
 	<alpine.LFD.2.00.1002251428410.1946@xanadu.home>
-	<4B86D5D8.2010905@marcansoft.com>
-Message-ID: <alpine.LFD.2.00.1002251507000.1946@xanadu.home>
+Message-ID: <20100225203052.GE3101@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Feb 2010, Hector Martin wrote:
+On Thu, Feb 25, 2010 at 02:40:43PM -0500, Nicolas Pitre wrote:
+> On Thu, 25 Feb 2010, Hector Martin wrote:
+> > And I'm still not convinced that compiler behavior is defined such 
+> > that this cannot break in the future.
+> 
+> Seems to me that we're relying on compiler conventions that have been 
+> around for decades already.  What do you expect to break?
 
-> Compilers are getting smarter, and code relying on old assumptions that
-> may no longer be true (because compilers optimize better or do things
-> differently) is precisely that which is most liable to break. The only
-> way you can properly guarantee things will work is by sticking to actual
-> standards and doing what the compiler expects you to do. Moving around
-> text/rodata without moving around bss/(maybe data) isn't something
-> allowed by the compiler. Sure, you can hack around it like we're doing
-> here, but you're relying on your hacks correctly preventing the compiler
-> from doing something valid yet which breaks your assumptions.
+Sigh.  It's well defined behaviour - it's part of the ELF ABI.  There's
+nothing undefined or spurious about it, and it's not going away any time
+soon.
 
-Sure.  And so far we've used a naive hack with -Dstatic.  Russell's 
-patch is now removing the hack and making sure the restrictions we count 
-on are respected wrt .data section.  If we need to ensure no static .bss 
-variable are used we might just add this in the Makefile:
+For example, my C library has this:
 
-	[ "$(nm compressed/vmlinux | grep " b ")" != "" ]
+00ca5d60 B __environ
 
-> Well, if you're into speed anyway, caring about the actual kernel size
-> is desirable because it avoids a totally useless copy when the zImage is
-> loaded into RAM somewhere near the end of where the kernel would be. The
-> guesstimate in the code will think it'll overlap and move things around
-> unnecessarily. Worse, if the kernel ends up being highly compressible
-> for whatever reason, it could overflow the 4x guesstimate and make the
-> whole compressed loader fail again if it happens to be around there.
+as part of it's BSS segment.  If I do:
 
-Those are valid points, and rather orthogonal to the ROMable 
-decompressor issue.  Better not to mix them together.
+#include <stdio.h>
+char **__environ;
+int main() {
+        printf("&__environ = %p\n", &__environ);
+        printf("__environ = %p\n", __environ);
+        printf("__environ[0] = %s\n", __environ[0]);
+        return 0;
+}
 
-And I vaguely remember trying to do just that a couple years ago: 
-getting hold of the decompressed kernel size and feeding that into the 
-decompressor code.  I somehow didn't come up with a satisfactory 
-solution and never revisited it since.
+I get:
 
-> But this discussion is rather pointless because at this stage I highly
-> doubt Russell is going to change his mind.
+080496a0 B __environ
 
-If you produce a patch for the above, and it is clean and portable, then 
-I suspect he would just merge it.  Only at that point we could 
-reconsider the ROMable decompressor issue.
+as part of the program.  So, as soon as I run this program, there exists
+two '__environ' variables - one in the program and one in the C library.
 
+Let's see what happens when I run the program:
 
-Nicolas
+&__environ = 0x80496a0
+__environ = 0xbfa01c1c
+__environ[0] = HOSTNAME=rmk-PC
+
+That's definitely the one in the application program.  How can the program,
+which clearly has this variable as part of its BSS segment independent of
+the C library, and which never initializes this BSS variable, end up with
+data in there?
+
+It's well defined behaviour brought about by global data and the GOT,
+where the shared library is pointed to the version in the user program
+rather than its own BSS - independent of the rest of the shared library's
+text, data, and bss segments.  When the shared library reads or writes
+'__environ', it does it via the GOT which is redirected _at run time_ to
+point at the application binary copy by the dynamic linker.
+
+And now try changing that 'char **__environ' to be extern, and see what
+effect that has:
+
+080496e0 B __environ@@GLIBC_2.0
+
+Yes, still part of the application binary (this time versioned with the
+C library version), and the C library still finds that instead of its
+own copy.
+
+But, build an application binary which doesn't reference __environ, and
+the version in the C library's BSS segment will be used instead.
+
+This is not undefined compiler behaviour.  This is well defined behaviour,
+and it's precisely this behaviour that we're using.  We're directing the
+*global* data references to some other part of memory independent of the
+rest of the decompressor image.
+
+So, rather than wasting my time with this crap, can we please move on?
+
+I guess I could've pulled several people's trees during the time it's
+taken to write this email which shouldn't have been necessary.
