@@ -1,104 +1,81 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 26 Feb 2010 00:23:30 +0530
-Subject: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in
-	early_init
-In-Reply-To: <20100225184355.GF28173@atomide.com>
-References: <1267090819-17796-1-git-send-email-swirl@gmx.li>
-	<20100225184355.GF28173@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C43BF5EC@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Feb 2010 18:56:09 +0000
+Subject: [PATCH 0/6] ARM: oprofile: use perf-events framework as backend
+Message-ID: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There are currently two hardware performance monitoring subsystems in the
+kernel for ARM: OProfile and perf-events. This creates the following problems:
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Friday, February 26, 2010 12:14 AM
-> To: Thomas Weber; Aguirre, Sergio
-> Cc: linux-omap at vger.kernel.org; Russell King; Kevin Hilman; Shilimkar, Santosh; Pandita, Vikram;
-> Syed, Rafiuddin; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Thomas Weber
-> Subject: Re: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
-> 
-> * Thomas Weber <swirl@gmx.li> [100225 01:36]:
-> >
-> > The omap_serial_early_init prints the following errors:
-> >
-> > Could not get uart4_ick
-> > Could not get uart4_fck
-> >
-> > because all the uarts available in omap_uart[] will be initialized.
-> > Only omap4430 and omap3630 have 4 uarts at the moment.
-> > This patch reduces the number of uarts when cpu is not omap4430 or
-> > omap3630.
-> 
-> ..and I only patched omap_serial_init and forgot about
-> the omap_serial_early_init..
-> 
-> Looks good to me, Sergio, care to test and Ack this? Also, sounds
-> like we still need to patch omap4 for uart4 for the clocks.
-> 
-Clocks will be take care automatically by "nr_ports" for omap4 too
-with this patch. Below clock changes are just cosmetic ones, isn't it ?
+1.) Duplicate PMU accessor code. Inevitable code drift may lead to bugs in one
+framework that are fixed in the other.
 
-Am I missing something?
+2.) Locking issues. OProfile doesn't reprogram hardware counters between
+profiling runs if the events to be monitored have not been changed. This means
+that other profiling frameworks cannot use the counters if OProfile is in use.
 
-> Regards,
-> 
-> Tony
-> 
-> > Signed-off-by: Thomas Weber <weber@corscience.de>
-> > ---
-> >  arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
-> >  1 files changed, 10 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> > index b79bc89..da77930 100644
-> > --- a/arch/arm/mach-omap2/serial.c
-> > +++ b/arch/arm/mach-omap2/serial.c
-> > @@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
-> >  }
-> >  void __init omap_serial_early_init(void)
-> >  {
-> > -	int i;
-> > +	int i, nr_ports;
-> >  	char name[16];
-> >
-> > +	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
-> > +		nr_ports = 3;
-> > +	else
-> > +		nr_ports = ARRAY_SIZE(omap_uart);
-> > +
-> >  	/*
-> >  	 * Make sure the serial ports are muxed on at this point.
-> >  	 * You have to mux them off in device drivers later on
-> >  	 * if not needed.
-> >  	 */
-> >
-> > -	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
-> > +	for (i = 0; i < nr_ports; i++) {
-> >  		struct omap_uart_state *uart = &omap_uart[i];
-> >  		struct platform_device *pdev = &uart->pdev;
-> >  		struct device *dev = &pdev->dev;
-> > @@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
-> >  			continue;
-> >  		}
-> >
-> > -		sprintf(name, "uart%d_ick", i+1);
-> > +		sprintf(name, "uart%d_ick", i + 1);
-> >  		uart->ick = clk_get(NULL, name);
-> >  		if (IS_ERR(uart->ick)) {
-> > -			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
-> > +			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
-> >  			uart->ick = NULL;
-> >  		}
-> >
-> >  		sprintf(name, "uart%d_fck", i+1);
-> >  		uart->fck = clk_get(NULL, name);
-> >  		if (IS_ERR(uart->fck)) {
-> > -			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
-> > +			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
-> >  			uart->fck = NULL;
-> >  		}
-> >
-> > --
-> > 1.6.4.4
-> >
+3.) Due to differences in the two frameworks, it may not be possible to
+compare the results obtained by OProfile with those obtained by perf.
+
+This patch series removes the OProfile PMU driver code and replaces it with
+calls to perf, therefore resolving the issues mentioned above. To preserve
+compatibility with existing OProfile tools, drivers for XScale v1 and v2 PMUs
+are added to the perf backend.
+
+The only userspace-visible change is the lack of SCU counter support for
+11MPCore. This is currently unsupported by OProfile userspace tools anyway and
+therefore shouldn't cause any problems.
+
+Tested on dual-core A9MP [Realview PBX], quad-core 11MPCore [Realview PB11MP]
+and XScale PXA270 [Gumstix Verdex XL6P].
+
+Patch taken against 2.6.33 + perf-events patches in Russell's branch:
+
+ARM: 5890/1: Fix incorrect Realview board IRQs for L220 and PMU
+ARM: 5899/2: arm: provide a mechanism to reserve performance counters
+ARM: 5901/2: arm/oprofile: reserve the PMU when starting
+ARM: 5900/2: arm: enable support for software perf events
+ARM: 5902/4: arm/perfevents: implement perf event support for ARMv6
+ARM: 5903/1: arm/perfevents: add support for ARMv7
+
+
+Will Deacon (6):
+  ARM: perf-events: add Realview PMU IRQs to pmu.c
+  ARM: perf-events: use numeric ID to identify PMU
+  ARM: perf-events: add support for xscale PMUs
+  perf-events: export enable/disable event symbols to kernel modules
+  ARM: oprofile: use perf-events framework as backend
+  ARM: oprofile: remove old files and update KConfig
+
+ arch/arm/Kconfig                        |   26 +-
+ arch/arm/include/asm/perf_event.h       |   12 +
+ arch/arm/kernel/perf_event.c            |  862 ++++++++++++++++++++++++++++++-
+ arch/arm/kernel/pmu.c                   |   14 +
+ arch/arm/oprofile/Makefile              |    7 +-
+ arch/arm/oprofile/backtrace.c           |   83 ---
+ arch/arm/oprofile/common.c              |  356 +++++++++++--
+ arch/arm/oprofile/op_arm_model.h        |   35 --
+ arch/arm/oprofile/op_counter.h          |   27 -
+ arch/arm/oprofile/op_model_arm11_core.c |  162 ------
+ arch/arm/oprofile/op_model_arm11_core.h |   45 --
+ arch/arm/oprofile/op_model_mpcore.c     |  306 -----------
+ arch/arm/oprofile/op_model_mpcore.h     |   61 ---
+ arch/arm/oprofile/op_model_v6.c         |   78 ---
+ arch/arm/oprofile/op_model_v7.c         |  415 ---------------
+ arch/arm/oprofile/op_model_v7.h         |  103 ----
+ arch/arm/oprofile/op_model_xscale.c     |  444 ----------------
+ include/linux/perf_event.h              |    1 +
+ kernel/perf_event.c                     |    8 +
+ 19 files changed, 1192 insertions(+), 1853 deletions(-)
+ delete mode 100644 arch/arm/oprofile/backtrace.c
+ delete mode 100644 arch/arm/oprofile/op_arm_model.h
+ delete mode 100644 arch/arm/oprofile/op_counter.h
+ delete mode 100644 arch/arm/oprofile/op_model_arm11_core.c
+ delete mode 100644 arch/arm/oprofile/op_model_arm11_core.h
+ delete mode 100644 arch/arm/oprofile/op_model_mpcore.c
+ delete mode 100644 arch/arm/oprofile/op_model_mpcore.h
+ delete mode 100644 arch/arm/oprofile/op_model_v6.c
+ delete mode 100644 arch/arm/oprofile/op_model_v7.c
+ delete mode 100644 arch/arm/oprofile/op_model_v7.h
+ delete mode 100644 arch/arm/oprofile/op_model_xscale.c
