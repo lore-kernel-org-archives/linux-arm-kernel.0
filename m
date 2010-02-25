@@ -1,75 +1,74 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 25 Feb 2010 10:35:12 +0100
-Subject: [PATCH] Bugfixing and improvement of the AT91 MCI driver
-In-Reply-To: <201002250859.49804.wolfgang.mues@auerswald.de>
-References: <201002250859.49804.wolfgang.mues@auerswald.de>
-Message-ID: <4B864450.7090805@atmel.com>
+From: swirl@gmx.li (Thomas Weber)
+Date: Thu, 25 Feb 2010 10:40:19 +0100
+Subject: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
+Message-ID: <1267090819-17796-1-git-send-email-swirl@gmx.li>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/02/2010 08:59, Wolfgang M?es :
-> Nicolas,
 
-Hi Wolfgang,
+The omap_serial_early_init prints the following errors:
 
-Thanks a lot for your hard work on this driver and your patch.
+Could not get uart4_ick
+Could not get uart4_fck
 
-> as we are working on a project regarding AT91SAM9260 and using the 
-> MCI interface for SD/SDHC data transfer, we are forced to make a
-> series of bugfixes and improvements to the AT91 MCI driver:
-> 
-> - Fix a buf in the dmabuf pointer calculation.
-> - Use a fixed DMA buffer instead of allocating a DMA buffer
->   each time a data transfer is requested.
-> - Fix address error in kunmap_atomic().
-> - Use the dma buffer also for reads, because we found
->   that double buffering PDC was NOT working, and we need
->   a solution which allows bigger stream sizes.
-> - Use dmac_flush_range() because flush_dcache_page()
->   was not OK if more than one page is transferred.
-> - Extend card timeout to 2s because some cards need it.
-> - Extend card detect time to 500ms (usefull if the user
->   is inserting the card gentle into the slot).
-> - Fill in the mmc->max_ variables to allow the IO elevator
->   to do the job. Without these variables filled in,
->   each IO transfer is limited to 4096 bytes, which is limiting
->   transfer speed and - most important - is triggering
->   ACCELLERATED WEAR-OUT of the flash sectors of the card
->   (because the card has to do a lot of partial sector
->    erases).
+because all the uarts available in omap_uart[] will be initialized.
+Only omap4430 and omap3630 have 4 uarts at the moment.
+This patch reduces the number of uarts when cpu is not omap4430 or
+omap3630.
 
-A big amount of updates, indeed !
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-> We have tested this driver which a lot of SD and SDHC cards
-> and we think the driver is ready for production use now.
-> 
-> For reads, we get about 90% of the expected maximum calculated
-> speed (from the clock frequency). For writes, we get about 50%.
-
-
-This is a precious feedback. Thanks.
-
-> As we are using a slightly older kernel, I have ported this
-> patch to latest 2.6.33 by hand. So please take care to compile
-> and look for compile-time errors. I've done my very best.
-> 
-> Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
-
-The problem is that we should change this big patch into a patch series
-for integrating one enhancement at a time...
-
-As you say that you are working on an old kernel release, I guess that
-you may not have time to rework this patch and split it into a patch series?
-
-In short, I see at least four patches:
-- pointer calculation fixes
-- timeouts and detect time
-- use of dma buffer for read
-- mmc->max_ variables update
-
-So, tell me, and I will see how we can move forward together with those
-very interesting enhancements...
-
-Best regards,
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index b79bc89..da77930 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
+ }
+ void __init omap_serial_early_init(void)
+ {
+-	int i;
++	int i, nr_ports;
+ 	char name[16];
+ 
++	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
++		nr_ports = 3;
++	else
++		nr_ports = ARRAY_SIZE(omap_uart);
++
+ 	/*
+ 	 * Make sure the serial ports are muxed on at this point.
+ 	 * You have to mux them off in device drivers later on
+ 	 * if not needed.
+ 	 */
+ 
+-	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
++	for (i = 0; i < nr_ports; i++) {
+ 		struct omap_uart_state *uart = &omap_uart[i];
+ 		struct platform_device *pdev = &uart->pdev;
+ 		struct device *dev = &pdev->dev;
+@@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
+ 			continue;
+ 		}
+ 
+-		sprintf(name, "uart%d_ick", i+1);
++		sprintf(name, "uart%d_ick", i + 1);
+ 		uart->ick = clk_get(NULL, name);
+ 		if (IS_ERR(uart->ick)) {
+-			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
++			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
+ 			uart->ick = NULL;
+ 		}
+ 
+ 		sprintf(name, "uart%d_fck", i+1);
+ 		uart->fck = clk_get(NULL, name);
+ 		if (IS_ERR(uart->fck)) {
+-			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
++			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
+ 			uart->fck = NULL;
+ 		}
+ 
 -- 
-Nicolas Ferre
+1.6.4.4
