@@ -1,27 +1,34 @@
-From: aric@sdgsystems.com (Aric D. Blumer)
-Date: Thu, 25 Feb 2010 10:20:17 -0500
-Subject: Soft Lockup Debugging
-Message-ID: <4B869531.3030708@sdgsystems.com>
+From: b.hutchman@gmail.com (Brian Hutchinson)
+Date: Thu, 25 Feb 2010 10:51:36 -0500
+Subject: External initramfs again ... keep getting "overlaps in-use memory
+	region"
+Message-ID: <3d1967ab1002250751t1ef512fehf69e3beb7f3f318e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was wondering if someone could give me some pointers on how to debug
-the soft lockup shown in the attachment.
+Still trying to get my external initramfs working.
 
-System:  Kernel 2.6.29.6, PXA320, AR6002 wifi using the SDIO stack.
+In u-boot, I've tried to tftp my initramfs_data.cpio.gz file to areas
+the Kernel uses and area it doesn't know about.
 
-The lockup only occurs when the CPU_FREQ governor is set to powersave
-(reducing CPU frequency from 806 MHz to 104 MHz) and the wifi interface
-is sending traffic.  I suspect that the main schedule() function is
-getting stuck on the runqueue spinlock.  If that's the case, how do I
-figure out who is holding the lock?  If that's not the case, can anyone
-enlighten me on what exactly is hanging from this trace?
+I've unwound things enough to know that the ATAG_MEM's that describe
+memory are not passed from u-boot to the kernel (2.6.28).  The kernel
+I have is using the "fixup" method to setup 4 banks of DDR (32M each).
+ The first bank actually leaves a 16M hole and I've tried to tftp the
+cpio.gz there too.
 
-Thanks.
+When I use memory that is setup by the kernel fixup, I get the
+"overlaps in-use memory region" and when I try to use the 16M region
+that isn't included in the fixup I get the "extends beyond physical
+memory - disabling initrd" message.
 
+I'm supplying the initrd=<location I tftp cpio.gz to>,<size of
+cpio.gz> on the command line.
 
+Do I also need to supply ramdisk_size= and root=/dev/ram0?  Everything
+I've read about initramfs says I don't need these or the
+CONFIG_BLK_DEV_RAM setting.
 
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: soft_lockup.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100225/28cc81e3/attachment-0001.txt>
+Thanks!
+
+Brian
