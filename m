@@ -1,46 +1,30 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Feb 2010 16:25:21 -0500 (EST)
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <20100225210500.GI3101@n2100.arm.linux.org.uk>
-References: <20100225000114.GB21985@n2100.arm.linux.org.uk>
-	<4B85C4A4.4060005@marcansoft.com>
-	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
-	<20100225093859.GA19870@n2100.arm.linux.org.uk>
-	<4B864B4C.9020805@marcansoft.com>
-	<alpine.LFD.2.00.1002251332190.1946@xanadu.home>
-	<4B86CDC8.4080107@marcansoft.com>
-	<alpine.LFD.2.00.1002251428410.1946@xanadu.home>
-	<4B86D5D8.2010905@marcansoft.com>
-	<alpine.LFD.2.00.1002251507000.1946@xanadu.home>
-	<20100225210500.GI3101@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1002251611100.1946@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Feb 2010 21:29:15 +0000
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <20100225205113.GF3101@n2100.arm.linux.org.uk>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+Message-ID: <20100225212915.GA24043@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Feb 2010, Russell King - ARM Linux wrote:
-
-> On Thu, Feb 25, 2010 at 03:29:07PM -0500, Nicolas Pitre wrote:
-> > On Thu, 25 Feb 2010, Hector Martin wrote:
-> > > But this discussion is rather pointless because at this stage I highly
-> > > doubt Russell is going to change his mind.
-> > 
-> > If you produce a patch for the above, and it is clean and portable, then 
-> > I suspect he would just merge it.  Only at that point we could 
-> > reconsider the ROMable decompressor issue.
+On Thu, Feb 25, 2010 at 08:51:13PM +0000, Russell King - ARM Linux wrote:
+> Err, you've rebased your tree since I last pulled it, and this now results
+> in the following, and a load of duplicated commits between the two trees.
 > 
-> Hector's arguments have been based around denying various well defined
-> features of the ELF shared library support, and it would be wreckless
-> of me to accept changes based upon denials.
+> This is not nice, please don't rebase stuff which I've already pulled.
+> 
+> I'm going to think about what to do about this; I can't trivially drop
+> your previous work from my tree.
 
-I think we've pretty much settled this now.
+What happened to this commit?
 
-It is however true that the decompressor code doesn't have the 
-decompressed kernel size and that a 4x expansion is assumed which is not 
-optimal.  This alone, without mixing it up with other issues, should be 
-sufficient for considering an eventual patch from Hector if his fix is 
-well done.  That's what I was referring to above, and I think the 
-ROMable decompressor structure change can be postponed until real issues 
-with it actually arise.
+[ARM] pxa/ttc_dkb: remove duplicate macro definition
 
+which follows:
 
-Nicolas
+[ARM] pxa/raumfeld: add defconfig
+[ARM] pxa/raumfeld: add platform support
+
+in your previous pull request?  I can find these two in your latest with
+different commit IDs, but not the pxa/ttc_dkb patch.
