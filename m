@@ -1,37 +1,96 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Feb 2010 21:43:18 +0000
-Subject: Soft Lockup Debugging
-In-Reply-To: <4B869531.3030708@sdgsystems.com>
-References: <4B869531.3030708@sdgsystems.com>
-Message-ID: <20100225214318.GB24043@n2100.arm.linux.org.uk>
+Date: Thu, 25 Feb 2010 21:56:09 +0000
+Subject: External initramfs again ... keep getting "overlaps in-use
+	memory region"
+In-Reply-To: <3d1967ab1002251323o630c3b33mb49e39270c1e2917@mail.gmail.com>
+References: <3d1967ab1002250751t1ef512fehf69e3beb7f3f318e@mail.gmail.com>
+	<3d1967ab1002250814q27ed0798l7e250f80c0db3fdb@mail.gmail.com>
+	<20100225190913.GC3101@n2100.arm.linux.org.uk>
+	<3d1967ab1002251323o630c3b33mb49e39270c1e2917@mail.gmail.com>
+Message-ID: <20100225215609.GC24043@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 10:20:17AM -0500, Aric D. Blumer wrote:
-> [  450.102093] Exception stack(0xcfd79b70 to 0xcfd79bb8)
-> [  450.107170] 9b60:                                     00000029 cf80aac0 c043b7f4 40000013 
-> [  450.115604] 9b80: cf80aac0 00000029 00000029 c040d730 cfd78000 c0440900 0000000a cfd79bd4 
-> [  450.124064] 9ba0: cfd79bd8 cfd79bb8 c007cc8c c007b1ac 40000013 ffffffff                   
-> [  450.132506]  r6:04000000 r5:cfd79ba4 r4:ffffffff
-> [  450.137222] [<c007b180>] (handle_IRQ_event+0x0/0x84) from [<c007cc8c>] (handle_level_irq+0x78/0xf0)
-> [  450.146419]  r7:c040d730 r6:cfd79cb0 r5:00000029 r4:c0416648
-> [  450.152195] [<c007cc14>] (handle_level_irq+0x0/0xf0) from [<c0030060>] (__exception_text_start+0x60/0x74)
-> [  450.161910]  r5:c0447f20 r4:00000029
-> [  450.165559] [<c0030000>] (__exception_text_start+0x0/0x74) from [<c0030a70>] (__irq_svc+0x30/0xc0)
-> [  450.174667] Exception stack(0xcfd79c10 to 0xcfd79c58)
-> [  450.179745] 9c00:                                     00000014 cf8bce00 c043b7a0 40000013 
-> [  450.188188] 9c20: cf8bce00 00000014 00000014 c040d730 cfd78000 c0440900 0000000a cfd79c74 
-> [  450.196649] 9c40: cfd79c78 cfd79c58 c007cc8c c007b1ac 40000013 ffffffff                   
-> [  450.205105]  r6:00000200 r5:cfd79c44 r4:ffffffff
-> [  450.209815] [<c007b180>] (handle_IRQ_event+0x0/0x84) from [<c007cc8c>] (handle_level_irq+0x78/0xf0)
-> [  450.219011]  r7:c040d730 r6:cfd79d60 r5:00000014 r4:c041615c
-> [  450.224797] [<c007cc14>] (handle_level_irq+0x0/0xf0) from [<c0030060>] (__exception_text_start+0x60/0x74)
-> [  450.234512]  r5:c0447f20 r4:00000014
-> [  450.238159] [<c0030000>] (__exception_text_start+0x0/0x74) from [<c0030a70>] (__irq_svc+0x30/0xc0)
+On Thu, Feb 25, 2010 at 04:23:57PM -0500, Brian Hutchinson wrote:
+> > Give us all the information:
+> >
+> > - where exactly your memory is located and how large
+> 
+> ARM926EJS with 128M of DDR ... 4 banks of 32M, physical map configured as:
+> 
+> 0x00000000 - DDR Bank 0
+> 0x04000000 - DDR Bank 1
+> 0x08000000 - DDR Bank 2
+> 0x0c000000 - DDR Bank 3
 
-Looks to me like a stuck IRQ problem - but no idea which IRQ.  You'll
-need to disassemble handle_IRQ_event to find out which register the
-interrupt number ends up in when PC=0xc007b1ac, and then read it
-from the exception stack.  The register order there is:
+Ok.
 
-	r0-r12, sp (r13), lr (r14), pc (r15), cpsr, -1
+> > - where you've tried putting your initrd image, and how large this is
+> 
+> The arch fixup is calling a function that does the following to setup
+> memory ... passing "size" = 32M and "start"=start address of each DDR
+> bank (given above).  The first 32M region is split funny though:
+> 
+>     meminfo->bank[meminfo->nr_banks].start = PAGE_ALIGN(start);
+>     meminfo->bank[meminfo->nr_banks].size = size & PAGE_MASK;
+>     meminfo->bank[meminfo->nr_banks].node = PHYS_TO_NID(start);
+>     meminfo->nr_banks++;
+> 
+> The way the code is called it looks like it sets up 16M region
+> (0x0-0x01ffffff), then skips 16M (0x02000000-0x07ffffff) (I don't know
+> why ... yet) then the last three 32M regions are contiguous (see
+> kernel messages below).
+
+Given what you've said above, this seems to be in disagreement with
+the physical layout.  If there are aliases of the DDR between these
+banks, this is going to lead to very strange behaviour or even oopses
+from the kernel.
+
+> #1. For the case where I tftp my initramfs_data.cpio.gz to RAM at
+> address 0x02000000 (the hole I mentioned above), I get the following
+> kernel messages when I boot with command line of
+> initrd=0x2000000,0xc8bdb6 (cpio.gz is around 13M compressed and
+> uncompressed the cpio is 34M.  It is outside physical memory so this
+> makes sense.
+
+Yes - there's various reasons why we expect the initrd to be real valid
+memory which has been declared to the kernel, most notably that it is
+freed back into the kernel's free page pool.
+
+> #2.  For the case where I tftp my initramfs_data.cpio.gz to RAM at
+> address 0x04000000 (start of second 32M DDR region), I get the
+> following kernel messages when I boot with command line of
+> initrd=0x4000000,0xc8bdb6 (Same cpio image as used above) ... cpio.gz
+> is around 13M compressed and uncompressed the cpio is 34M:
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux..........................................................................................................
+> done, booting the kernel.
+> Linux version 2.6.28-picochip-3.2.0 (hutch at hutch-laptop) (gcc version
+> 4.2.2) #10 PREEMPT Thu Feb 25 09:22:49 EST 2010
+> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> CPU: VIVT data cache, VIVT instruction cache
+> Machine: pc7205-2 1.0. Rev B BOM
+> Memory policy: ECC disabled, Data cache writeback
+> INITRD: 0x04000000+0x00c8bdb6 overlaps in-use memory region - disabling initrd
+
+Right - I see you're using discontigmem.  Don't.  Really, it's not
+worth the overhead and additional expenses - plus you're running into
+one of the problems with it right here.
+
+Each node of discontigmem has its own free page data, and this gets
+placed at the start of each node, with the exception of node 0 (since
+that contains the kernel.)
+
+This means your initrd is being overwritten by the free page data for
+the second node.
+
+If you use sparsemem, then everything ends up in 'node 0' because there
+is no other node - and the free page data gets all lumped together.
+
+I highly recommend sparsemem - the run-time overheads are lower than
+discontigmem.  Discontigmem is designed for NUMA architectures, where
+there is a non-uniform cost to allocating memory from non-local nodes.
+Sparsemem is designed for non-contiguous memory where the cost is
+equal.
