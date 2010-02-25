@@ -1,57 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Feb 2010 15:03:08 -0800
-Subject: [PATCH 2/6] Zoom3: Defconfig update
+Date: Thu, 25 Feb 2010 15:03:11 -0800
+Subject: [PATCH 3/6] AM35x: Add missing GPIO mux config for EHCI port
 In-Reply-To: <20100225230116.26233.65157.stgit@baageli.muru.com>
 References: <20100225230116.26233.65157.stgit@baageli.muru.com>
-Message-ID: <20100225230308.26233.67705.stgit@baageli.muru.com>
+Message-ID: <20100225230311.26233.97139.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: manjugk manjugk <manjugk@ti.com>
+From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 
-Some of the features are not enabled by default in zoom3 defconfig.
+Adding GPIO mux config used for PHY reset of EHCI port on base board.
+We get below failure message without this patch,
 
-This patch enables:
- - MMC Resume
- - TWL4030 RTC driver
- - Debug File system
+"hub 1-0:1.0: unable to enumerate USB device on port 1"
 
-Build and boot tested on Zoom3 board.
-
-Signed-off-by: Manjunatha GK <manjugk@ti.com>
+Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/omap_zoom3_defconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/board-am3517evm.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/omap_zoom3_defconfig b/arch/arm/configs/omap_zoom3_defconfig
-index a3e3c82..ff8ac3d 100644
---- a/arch/arm/configs/omap_zoom3_defconfig
-+++ b/arch/arm/configs/omap_zoom3_defconfig
-@@ -1136,7 +1136,7 @@ CONFIG_TWL4030_USB=y
- # CONFIG_NOP_USB_XCEIV is not set
- CONFIG_MMC=y
- # CONFIG_MMC_DEBUG is not set
--# CONFIG_MMC_UNSAFE_RESUME is not set
-+CONFIG_MMC_UNSAFE_RESUME=y
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index e6b8967..aee0a02 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -301,6 +301,9 @@ static void __init am3517_evm_init(void)
+ 				ARRAY_SIZE(am3517_evm_devices));
  
- #
- # MMC/SD/SDIO Card Drivers
-@@ -1186,7 +1186,7 @@ CONFIG_RTC_INTF_DEV=y
- # CONFIG_RTC_DRV_PCF8563 is not set
- # CONFIG_RTC_DRV_PCF8583 is not set
- # CONFIG_RTC_DRV_M41T80 is not set
--# CONFIG_RTC_DRV_TWL4030 is not set
-+CONFIG_RTC_DRV_TWL4030=y
- # CONFIG_RTC_DRV_S35390A is not set
- # CONFIG_RTC_DRV_FM3130 is not set
- # CONFIG_RTC_DRV_RX8581 is not set
-@@ -1416,7 +1416,7 @@ CONFIG_FRAME_WARN=1024
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_STRIP_ASM_SYMS is not set
- # CONFIG_UNUSED_SYMBOLS is not set
--# CONFIG_DEBUG_FS is not set
-+CONFIG_DEBUG_FS=y
- # CONFIG_HEADERS_CHECK is not set
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_SHIRQ is not set
+ 	omap_serial_init();
++
++	/* Configure GPIO for EHCI port */
++	omap_mux_init_gpio(57, OMAP_PIN_OUTPUT);
+ 	usb_ehci_init(&ehci_pdata);
+ 	/* DSS */
+ 	am3517_evm_display_init();
