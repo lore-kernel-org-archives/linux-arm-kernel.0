@@ -1,35 +1,41 @@
-From: saaguirre@ti.com (Sergio Aguirre)
-Date: Thu, 25 Feb 2010 09:55:45 -0600
-Subject: [PATCH] arm: Fix .gitignore for boot/compressed folder
-Message-ID: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 25 Feb 2010 16:03:44 +0000
+Subject: QUERY: How to call board specific initialization function
+	before map_io or timer_init
+In-Reply-To: <22dbbef21002250507s12664df5q36e50a8f9e0bc3b9@mail.gmail.com>
+References: <22dbbef21002250507s12664df5q36e50a8f9e0bc3b9@mail.gmail.com>
+Message-ID: <20100225160344.GG30679@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should complements changes done in:
+On Thu, Feb 25, 2010 at 06:37:37PM +0530, viresh kumar wrote:
+> Hello,
+> 
+> I need to call my board specific initialization routine before
+> timer_init or map_io is called.
+> I tried to see that in earlier architectures and found most of
+> architecture call machine
+> specific init function from map_io or init_irq or init_machine.
+> 
+> Situation: I need to register my clock framework with
+> arch/arm/common/clkdev framework
+> before actually initializing timer. So i can't do this in
+> "init_machine" as timer_init is called
+> before that.
 
-  commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
-  Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
-  Date:   Fri Jan 8 14:42:43 2010 -0800
+One method would be to use an init call from <linux/init.h> which is
+called before these are done (you'll have to work out which one is
+suitable for yourself).
 
-      arm: add support for LZO-compressed kernels
+Either that or ensure that your boards always call a specific
+routine in their init sequence to ensure clocks are registered before
+the timer needs them.
 
-It missed to do the respective changes in '.gitignore' file.
+If I remeber correctly, map_io() is actually called before the timers
+are initialised, so you could add your clocks there.
 
-Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
----
- arch/arm/boot/compressed/.gitignore |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index ab204db..bb984af 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -1,3 +1,5 @@
- font.c
--piggy.gz
-+piggy.gzip
-+piggy.lzo
-+lib1funcs.S
- vmlinux.lds
 -- 
-1.6.3.3
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
