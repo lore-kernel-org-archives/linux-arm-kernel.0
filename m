@@ -1,45 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Feb 2010 08:23:36 +0000
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <4B85C4A4.4060005@marcansoft.com>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-	<20100224223418.GB25587@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
-	<20100224234215.GA21985@n2100.arm.linux.org.uk>
-	<4B85BCE0.7000903@marcansoft.com>
-	<20100225000114.GB21985@n2100.arm.linux.org.uk>
-	<4B85C4A4.4060005@marcansoft.com>
-Message-ID: <20100225082336.GA30605@n2100.arm.linux.org.uk>
+From: alberto.panizzo@gmail.com (Alberto Panizzo)
+Date: Thu, 25 Feb 2010 10:31:29 +0100
+Subject: [PATCH] MXC: mach_armadillo5x0: Add USB Host support.
+In-Reply-To: <20100225080259.GA13295@pengutronix.de>
+References: <1267054032.3870.47.camel@realization>
+	<20100225080259.GA13295@pengutronix.de>
+Message-ID: <1267090289.2722.4.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 01:30:28AM +0100, Hector Martin wrote:
-> Russell King - ARM Linux wrote:
-> > On Thu, Feb 25, 2010 at 12:57:20AM +0100, Hector Martin wrote:
-> >> Russell King - ARM Linux wrote:
-> >>> On Wed, Feb 24, 2010 at 06:34:49PM -0500, Nicolas Pitre wrote:
-> >>>> What about simply not compiling the decompressor with -fPIC when using 
-> >>>> ZBOOT_ROM=y?  That would certainly solve the problem with the only 
-> >>>> restriction that such kernel images won't be bootable from RAM which is 
-> >>>> probably an acceptable compromize.
-> >>> Unfortunately, that doesn't solve the stack-bashing with ZBOOT_ROM=n.
-> >> Yes it does, that's exactly what my first version of the patch did. Once
-> >> you get rid of the partial relocation used for ROM builds (with split
-> >> text/bss) you don't need -Dstatic=, and once you get rid of that you
-> >> solve the stack-bashing. The ROM build becomes a bog standard
-> >> non-relocatable ROM image (with the usual LMA/VMA linker script stuff to
-> >> copy initialized data to RAM), and the RAM build becomes a bog standard
-> >> relocatable image (a single contiguous blob including
-> >> text/rodata/data/bss) that doesn't suffer from any issues when you move
-> >> it around.
-> > 
-> > Did you bother to read my previous reply explaining that this is not
-> > a hack for the toolchain?  It sounds to me like you didn't.
+Hi Uwe,
+
+On gio, 2010-02-25 at 09:02 +0100, Uwe Kleine-K?nig wrote:
+> Hi Alberto,
 > 
-> Are you new to C? It looks like you are seriously still claiming that
-> -Dstatic= is A-OK under all circumstances. It very obviously isn't.
+> On Thu, Feb 25, 2010 at 12:27:12AM +0100, Alberto Panizzo wrote:
+> > This add USB Host capability. The Armadillo 500 board is supplied
+> > with two USB Host connectors driven by the USB OTG and USB Host 2
+> > ports, through two NXP isp 1504 transceivers.
+> > 
+> > Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> > ---
+> > 
+> > Sascha, if there aren't problems, can you add this for 2.6.34?
+> > 
+..
 
-Clearly you didn't (a) read my mail and (b) understand it.
+> >  #include "crm_regs.h"
+> > @@ -103,6 +108,118 @@ static int armadillo5x0_pins[] = {
+> >  	/* I2C2 */
+> >  	MX31_PIN_CSPI2_MOSI__SCL,
+> >  	MX31_PIN_CSPI2_MISO__SDA,
+> > +	/* OTG */
+> > +	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
+> > +	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
+> > +	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
+> > +	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
+> > +	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
+> > +	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
+> > +	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
+> > +	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
+> > +	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
+> > +	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+> > +	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
+> > +	MX31_PIN_USBOTG_STP__USBOTG_STP,
+> > +	/* USB host 2 */
+> > +	IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC),
+> > ...
+> I think you need to protect all hunks by
+> #ifdef CONFIG_USB_ULPI
+> 
+> For the pin-setup it's not important, but you must not call
+> otg_ulpi_create if USB_ULPI isn't configured.
+> 
+> Best regards
+> Uwe
+> 
 
-And if you're going to be that insulting, I see no point discussing
-this further with you.
+Ok, I'd seen this protection in pcm037 but I thought that on
+my board USB will be always enabled.
+
+Sascha, please throw this patch, The From: mail is wrong, sorry..
+
+Alberto!
