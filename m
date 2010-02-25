@@ -1,198 +1,78 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Thu, 25 Feb 2010 10:41:44 +0100
-Subject: [PATCH v2] MXC: mach_armadillo5x0: Add USB Host support.
-Message-ID: <1267090904.2722.8.camel@realization>
+From: hector@marcansoft.com (Hector Martin)
+Date: Thu, 25 Feb 2010 10:51:56 +0100
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>	<20100224223418.GB25587@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>	<20100224234215.GA21985@n2100.arm.linux.org.uk>	<4B85BCE0.7000903@marcansoft.com>	<20100225000114.GB21985@n2100.arm.linux.org.uk>	<4B85C4A4.4060005@marcansoft.com>
+	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+Message-ID: <4B86483C.6000108@marcansoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add USB Host capability. The Armadillo 500 board is supplied
-with two USB Host connectors driven by the USB OTG and USB Host 2
-ports, through two NXP isp 1504 transceivers.
+Nicolas Pitre wrote:
+> On Thu, 25 Feb 2010, Hector Martin wrote:
+> 
+>> Russell King - ARM Linux wrote:
+>>> On Thu, Feb 25, 2010 at 12:57:20AM +0100, Hector Martin wrote:
+>>>> Russell King - ARM Linux wrote:
+>>>>> On Wed, Feb 24, 2010 at 06:34:49PM -0500, Nicolas Pitre wrote:
+>>>>>> What about simply not compiling the decompressor with -fPIC when using 
+>>>>>> ZBOOT_ROM=y?  That would certainly solve the problem with the only 
+>>>>>> restriction that such kernel images won't be bootable from RAM which is 
+>>>>>> probably an acceptable compromize.
+>>>>> Unfortunately, that doesn't solve the stack-bashing with ZBOOT_ROM=n.
+>>>> Yes it does, that's exactly what my first version of the patch did. Once
+>>>> you get rid of the partial relocation used for ROM builds (with split
+>>>> text/bss) you don't need -Dstatic=, and once you get rid of that you
+>>>> solve the stack-bashing. The ROM build becomes a bog standard
+>>>> non-relocatable ROM image (with the usual LMA/VMA linker script stuff to
+>>>> copy initialized data to RAM), and the RAM build becomes a bog standard
+>>>> relocatable image (a single contiguous blob including
+>>>> text/rodata/data/bss) that doesn't suffer from any issues when you move
+>>>> it around.
+>>> Did you bother to read my previous reply explaining that this is not
+>>> a hack for the toolchain?  It sounds to me like you didn't.
+>> Long story short, -Dstatic= isn't accomplishing what you want, because
+>> it's crude and doesn't handle all cases properly. If you want to keep
+>> the current model, you have to be willing to manually watch changes to
+>> the decompressor implementations so they do not violate your assumptions
+>> (i.e. never use static inside functions and rely on it, at least),
+>> because -Dstatic= will break valid C code. Under _all_ circumstances, no
+>> matter what your other compiler flags are or how you link and load
+>> stuff, -Dstatic= is guaranteed to break some valid C code, and that's
+>> what's happening here.
+> 
+> Obviously.  But that's the core of the argument: we made sure that the 
+> previous implementation didn't use any static within functions.  Why do 
+> you need to do that?  This is usually a bad idea anyway as this makes 
+> the function non reentrant.
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
+Static inside functions doesn't imply being non-reentrant (any more than
+using global variables does). In this case the data arrays are also
+const so it doesn't matter. But even if they weren't it wouldn't imply
+non-reentrancy. For example, you could have the function generate the
+tables on the fly on the first call, and add a spinlock if you want it
+to be reentrant (in fact, I'm pretty sure the tables could optionally be
+generated on the fly in the original zlib version, though that part was
+removed for the kernel).
 
-This patch is based on top of Pengutronix mxc-master branch.
-Please, if possible add this for 2.6.34.
-Thanks.
+> 
+> Two possibilities that I can see:
+> 
+> Put this in a common header file for the decompressor code:
+> 
+> /* ARM wants to redefine this sometimes */
+> #ifndef static_func
+> #define static_func
+> #endif
+> 
+> Then declare your functions with static_func, and ARM can use 
+> -Dstatic_func.
+> 
+> Or, we give up the ability to load in RAM a ROMable zImage.
 
-Alberto!
+I can also fix the second version of the patch to get rid of the two
+extra copies of the kernel.
 
- arch/arm/mach-mx3/Kconfig             |    1 +
- arch/arm/mach-mx3/mach-armadillo5x0.c |  128 +++++++++++++++++++++++++++++++++
- 2 files changed, 129 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 3872af1..96069a4 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -95,6 +95,7 @@ config MACH_PCM043
- config MACH_ARMADILLO5X0
- 	bool "Support Atmark Armadillo-500 Development Base Board"
- 	select ARCH_MX31
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for Atmark Armadillo-500 platform. This includes
- 	  specific configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
-index 3d72b0b..b3cec1b 100644
---- a/arch/arm/mach-mx3/mach-armadillo5x0.c
-+++ b/arch/arm/mach-mx3/mach-armadillo5x0.c
-@@ -36,6 +36,9 @@
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <linux/i2c.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/delay.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -52,6 +55,8 @@
- #include <mach/ipu.h>
- #include <mach/mx3fb.h>
- #include <mach/mxc_nand.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
- 
- #include "devices.h"
- #include "crm_regs.h"
-@@ -103,6 +108,118 @@ static int armadillo5x0_pins[] = {
- 	/* I2C2 */
- 	MX31_PIN_CSPI2_MOSI__SCL,
- 	MX31_PIN_CSPI2_MISO__SDA,
-+	/* OTG */
-+	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
-+	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
-+	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
-+	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
-+	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
-+	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
-+	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
-+	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
-+	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
-+	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
-+	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
-+	MX31_PIN_USBOTG_STP__USBOTG_STP,
-+	/* USB host 2 */
-+	IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_NXT, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_STP, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DATA0, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DATA1, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_STXD3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SRXD3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SCK3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SFS3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_STXD6, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SRXD6, IOMUX_CONFIG_FUNC),
-+};
-+
-+/* USB */
-+#define OTG_RESET IOMUX_TO_GPIO(MX31_PIN_STXD4)
-+#define USBH2_RESET IOMUX_TO_GPIO(MX31_PIN_SCK6)
-+#define USBH2_CS IOMUX_TO_GPIO(MX31_PIN_GPIO1_3)
-+
-+#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
-+			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+
-+static int usbotg_init(struct platform_device *pdev)
-+{
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
-+
-+	/* Chip already enabled by hardware */
-+	/* OTG phy reset*/
-+	gpio_request(OTG_RESET, "USB-OTG-RESET");
-+
-+	if (gpio_direction_output(OTG_RESET, 1/*HIGH*/)) {
-+		pr_warning("Failed to reset usbotg phy \n");
-+		return -1;
-+	}
-+	gpio_set_value(OTG_RESET, 0/*LOW*/);
-+	mdelay(5);
-+	gpio_set_value(OTG_RESET, 1/*HIGH*/);
-+
-+	return 0;
-+}
-+
-+static int usbh2_init(struct platform_device *pdev)
-+{
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
-+
-+
-+	/* Enable the chip */
-+	gpio_request(USBH2_CS, "USB-H2-CS");
-+	gpio_direction_output(USBH2_CS, 0/*Enabled*/);
-+
-+	/* H2 phy reset*/
-+	gpio_request(USBH2_RESET, "USB-H2-RESET");
-+
-+	if (gpio_direction_output(USBH2_RESET, 1/*HIGH*/)) {
-+		pr_warning("Failed to reset usbh2 phy \n");
-+		return -1;
-+	}
-+	gpio_set_value(USBH2_RESET, 0/*LOW*/);
-+	mdelay(5);
-+	gpio_set_value(USBH2_RESET, 1/*HIGH*/);
-+
-+	return 0;
-+}
-+
-+static struct mxc_usbh_platform_data usbotg_pdata = {
-+	.init	= usbotg_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_DIFF_UNI,
-+};
-+
-+static struct mxc_usbh_platform_data usbh2_pdata = {
-+	.init	= usbh2_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_DIFF_UNI,
- };
- 
- /* RTC over I2C*/
-@@ -393,6 +510,17 @@ static void __init armadillo5x0_init(void)
- 	if (armadillo5x0_i2c_rtc.irq == 0)
- 		pr_warning("armadillo5x0_init: failed to get RTC IRQ\n");
- 	i2c_register_board_info(1, &armadillo5x0_i2c_rtc, 1);
-+
-+	/* USB */
-+#if defined(CONFIG_USB_ULPI)
-+	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+
-+	mxc_register_device(&mxc_otg_host, &usbotg_pdata);
-+	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-+#endif
- }
- 
- static void __init armadillo5x0_timer_init(void)
 -- 
-1.6.3.3
+Hector Martin (hector at marcansoft.com)
+Public Key: http://www.marcansoft.com/marcan.asc
