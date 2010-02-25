@@ -1,42 +1,37 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Fri, 26 Feb 2010 09:59:26 +0530
-Subject: QUERY: How to call board specific initialization function before
-	map_io or timer_init
-In-Reply-To: <20100225160344.GG30679@trinity.fluff.org>
-References: <22dbbef21002250507s12664df5q36e50a8f9e0bc3b9@mail.gmail.com>
-	<20100225160344.GG30679@trinity.fluff.org>
-Message-ID: <22dbbef21002252029k54236940wf51e599a169e360e@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 25 Feb 2010 12:36:25 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267045954.23523.1692.camel@pasglop>
+References: <1266445892.16346.306.camel@pasglop>
+	<201002192153.22159.oliver@neukum.org>
+	<1266979689.23523.1669.camel@pasglop>
+	<201002240816.10178.oliver@neukum.org>
+	<1267045954.23523.1692.camel@pasglop>
+Message-ID: <1267101385.2902.8.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Situation: I need to register my clock framework with
->> arch/arm/common/clkdev framework
->> before actually initializing timer. So i can't do this in
->> "init_machine" as timer_init is called
->> before that.
->
-> One method would be to use an init call from <linux/init.h> which is
-> called before these are done (you'll have to work out which one is
-> suitable for yourself).
->
+On Thu, 2010-02-25 at 08:12 +1100, Benjamin Herrenschmidt wrote:
+> On Wed, 2010-02-24 at 08:16 +0100, Oliver Neukum wrote:
+> > I don't know. The issue seems quite complex. It would seem better to
+> > centralize it as far as practical. Do you have a wrapper drivers could
+> > call?
+> 
+> flush_dcache_page() ? :-)
 
-I tried few of them but timer_init or map_io are getting called before my
-routine is called.
+Actually, that can be wrong depending on the implementation.  The
+problem is incoherency of the kernel page (dirty) with respect to user
+space aliases (clean).  What has to happen on parisc is that the kernel
+alias needs flushing.  We can guarantee the userspace aliases to be
+clean (and not moved in).  We wouldn't want to incur the expense of
+flushing the user space pages as well.
 
-> Either that or ensure that your boards always call a specific
-> routine in their init sequence to ensure clocks are registered before
-> the timer needs them.
->
-> If I remeber correctly, map_io() is actually called before the timers
-> are initialised, so you could add your clocks there.
+> Now, the subsystem might be the one to know whether something is mapped
+> into userspace or not (v4l in our case) in which case a wrapper could be
+> created.
 
-I can add my init routine to map_io's implementation, but i think
-map_io is not supposed to be implemented that way. map_io should
-be called to statically map devices memory. It is not for hardware
-specific initializations.
+Right, so it's the responsibility of the API used by the subsystem.
+Thus Caitlin's pio_kmap seems the right one ... I don't understand what
+the additional problems are.
 
-Is my understanding correct?
-
-
-regards,
-viresh kumar
+James
