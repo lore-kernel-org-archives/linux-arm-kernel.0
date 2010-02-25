@@ -1,34 +1,35 @@
-From: b.hutchman@gmail.com (Brian Hutchinson)
-Date: Thu, 25 Feb 2010 10:51:36 -0500
-Subject: External initramfs again ... keep getting "overlaps in-use memory
-	region"
-Message-ID: <3d1967ab1002250751t1ef512fehf69e3beb7f3f318e@mail.gmail.com>
+From: saaguirre@ti.com (Sergio Aguirre)
+Date: Thu, 25 Feb 2010 09:55:45 -0600
+Subject: [PATCH] arm: Fix .gitignore for boot/compressed folder
+Message-ID: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Still trying to get my external initramfs working.
+This should complements changes done in:
 
-In u-boot, I've tried to tftp my initramfs_data.cpio.gz file to areas
-the Kernel uses and area it doesn't know about.
+  commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
+  Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+  Date:   Fri Jan 8 14:42:43 2010 -0800
 
-I've unwound things enough to know that the ATAG_MEM's that describe
-memory are not passed from u-boot to the kernel (2.6.28).  The kernel
-I have is using the "fixup" method to setup 4 banks of DDR (32M each).
- The first bank actually leaves a 16M hole and I've tried to tftp the
-cpio.gz there too.
+      arm: add support for LZO-compressed kernels
 
-When I use memory that is setup by the kernel fixup, I get the
-"overlaps in-use memory region" and when I try to use the 16M region
-that isn't included in the fixup I get the "extends beyond physical
-memory - disabling initrd" message.
+It missed to do the respective changes in '.gitignore' file.
 
-I'm supplying the initrd=<location I tftp cpio.gz to>,<size of
-cpio.gz> on the command line.
+Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
+---
+ arch/arm/boot/compressed/.gitignore |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-Do I also need to supply ramdisk_size= and root=/dev/ram0?  Everything
-I've read about initramfs says I don't need these or the
-CONFIG_BLK_DEV_RAM setting.
-
-Thanks!
-
-Brian
+diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+index ab204db..bb984af 100644
+--- a/arch/arm/boot/compressed/.gitignore
++++ b/arch/arm/boot/compressed/.gitignore
+@@ -1,3 +1,5 @@
+ font.c
+-piggy.gz
++piggy.gzip
++piggy.lzo
++lib1funcs.S
+ vmlinux.lds
+-- 
+1.6.3.3
