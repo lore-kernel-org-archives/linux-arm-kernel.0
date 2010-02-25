@@ -1,56 +1,42 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Thu, 25 Feb 2010 11:09:42 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B85789D.6000704@billgatliff.com>
-References: <4B85789D.6000704@billgatliff.com>
-Message-ID: <4B864C66.6060209@atmel.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Thu, 25 Feb 2010 11:31:17 +0100
+Subject: [PATCH v2] MXC: mach_armadillo5x0: Add USB Host support.
+In-Reply-To: <20100225100912.GB10399@pengutronix.de>
+References: <1267090904.2722.8.camel@realization>
+	<20100225100912.GB10399@pengutronix.de>
+Message-ID: <1267093877.2722.26.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+On gio, 2010-02-25 at 11:09 +0100, Uwe Kleine-K?nig wrote:
+> > +static struct mxc_usbh_platform_data usbotg_pdata = {
+> > +     .init   = usbotg_init,
+> > +     .portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+> > +     .flags  = MXC_EHCI_POWER_PINS_ENABLED |
+> MXC_EHCI_INTERFACE_DIFF_UNI,
+> > +};
+> > +
+> > +static struct mxc_usbh_platform_data usbh2_pdata = {
+> > +     .init   = usbh2_init,
+> > +     .portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+> > +     .flags  = MXC_EHCI_POWER_PINS_ENABLED |
+> MXC_EHCI_INTERFACE_DIFF_UNI,
+> >  };
+> I didn't test, but I assume gcc issues a warning about usbotg_pdata
+> and
+> usbh2_pdata not being used if CONFIG_USB_ULPI!=y.
+> 
+> 
 
-I have been working on the sam9263 AC97 driver. I have sent a patch to 
-the alsa mailing list but it has not being integrated yet (as far as I 
-know...)(http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025119.html).
+yes, it behave the same as pcm037 do...
+(another rule added to my pocket: No warnings at all for any combination
+of configs!)
+Let we teach how a machine code have to be developed! :)
+Stay tuned for version 3
 
-I have tested it and it worked, but I have recently made some changes so 
-the atmel ac97.c driver could support full duplex mode.
 
-So I will submit a new patch by the end of the day/week, and I will copy 
-it to you if you are interested.
+-- 
+Alberto!
 
-Regards,
-Sedji Gaaouaou
-Le 2/24/2010 8:06 PM, Bill Gatliff a ?crit :
-> Guys:
->
->
-> It looks like AC97 support for the SAM9263EK isn't in the current
-> mainline kernel.  Or am I just missing something?
->
-> More specifically, it looks like the "atmel_ac97c" driver found in
-> sound/atmel/ac97c.c is what I need, based on my look at
-> at91_add_device_ac97().  But I see this in sound/atmel/Kconfig:
->
->      config SND_ATMEL_AC97C
->              tristate "Atmel AC97 Controller (AC97C) driver"
->              select SND_PCM
->              select SND_AC97_CODEC
->              depends on DW_DMAC&&  AVR32
->
-> And I see this in sound/atmel/Makefile:
->
->      snd-atmel-abdac-objs            := abdac.o
->      snd-atmel-ac97c-objs            := ac97c.o
->
->      obj-$(CONFIG_SND_ATMEL_ABDAC)   += snd-atmel-abdac.o
->      obj-$(CONFIG_SND_ATMEL_AC97C)   += snd-atmel-ac97c.o
->
-> In other words, the driver isn't built unless I'm on an AVR32 platform
-> and I have a DesignWare DMAC.  Neither of those describe the AT91SAM9263EK.
->
-> Has anyone tested AC97 audio on the SAM9263EK lately?  Has it ever worked?
->
->
-> Thanks!
->
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
