@@ -1,36 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Feb 2010 15:03:11 -0800
-Subject: [PATCH 3/6] AM35x: Add missing GPIO mux config for EHCI port
+Date: Thu, 25 Feb 2010 15:03:13 -0800
+Subject: [PATCH 4/6] AM35x: Enable OMAP_MUX in defconfig
 In-Reply-To: <20100225230116.26233.65157.stgit@baageli.muru.com>
 References: <20100225230116.26233.65157.stgit@baageli.muru.com>
-Message-ID: <20100225230311.26233.97139.stgit@baageli.muru.com>
+Message-ID: <20100225230313.26233.8965.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 
-Adding GPIO mux config used for PHY reset of EHCI port on base board.
-We get below failure message without this patch,
-
-"hub 1-0:1.0: unable to enumerate USB device on port 1"
+Enabling OMAP_MUX in defconfig as it is required for EHCI to work.
 
 Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-am3517evm.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/configs/am3517_evm_defconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index e6b8967..aee0a02 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -301,6 +301,9 @@ static void __init am3517_evm_init(void)
- 				ARRAY_SIZE(am3517_evm_devices));
- 
- 	omap_serial_init();
-+
-+	/* Configure GPIO for EHCI port */
-+	omap_mux_init_gpio(57, OMAP_PIN_OUTPUT);
- 	usb_ehci_init(&ehci_pdata);
- 	/* DSS */
- 	am3517_evm_display_init();
+diff --git a/arch/arm/configs/am3517_evm_defconfig b/arch/arm/configs/am3517_evm_defconfig
+index abe9966..edae1c2 100644
+--- a/arch/arm/configs/am3517_evm_defconfig
++++ b/arch/arm/configs/am3517_evm_defconfig
+@@ -201,7 +201,7 @@ CONFIG_ARCH_OMAP3=y
+ # CONFIG_OMAP_DEBUG_POWERDOMAIN is not set
+ # CONFIG_OMAP_DEBUG_CLOCKDOMAIN is not set
+ CONFIG_OMAP_RESET_CLOCKS=y
+-# CONFIG_OMAP_MUX is not set
++CONFIG_OMAP_MUX=y
+ # CONFIG_OMAP_MCBSP is not set
+ # CONFIG_OMAP_MBOX_FWK is not set
+ # CONFIG_OMAP_MPU_TIMER is not set
