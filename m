@@ -1,39 +1,62 @@
-From: hector@marcansoft.com (Hector Martin)
-Date: Thu, 25 Feb 2010 20:21:44 +0100
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 25 Feb 2010 14:24:01 -0500 (EST)
 Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <alpine.LFD.2.00.1002251332190.1946@xanadu.home>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>	<20100224223418.GB25587@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>	<20100224234215.GA21985@n2100.arm.linux.org.uk>	<4B85BCE0.7000903@marcansoft.com>	<20100225000114.GB21985@n2100.arm.linux.org.uk>	<4B85C4A4.4060005@marcansoft.com>	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>	<20100225093859.GA19870@n2100.arm.linux.org.uk>	<4B864B4C.9020805@marcansoft.com>
-	<alpine.LFD.2.00.1002251332190.1946@xanadu.home>
-Message-ID: <4B86CDC8.4080107@marcansoft.com>
+In-Reply-To: <20100225122429.GA3101@n2100.arm.linux.org.uk>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
+	<20100224223418.GB25587@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
+	<20100224234215.GA21985@n2100.arm.linux.org.uk>
+	<4B85BCE0.7000903@marcansoft.com>
+	<20100225000114.GB21985@n2100.arm.linux.org.uk>
+	<4B85C4A4.4060005@marcansoft.com>
+	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+	<20100225093859.GA19870@n2100.arm.linux.org.uk>
+	<20100225122429.GA3101@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1002251420160.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Thu, 25 Feb 2010, Hector Martin wrote:
+On Thu, 25 Feb 2010, Russell King - ARM Linux wrote:
+
+> And here's the patch - not run tested yet, but compile-tested for
+> gzip and LZO in both ROM=y and ROM=n modes.
 > 
->> If you can programmatically ensure that the decompressors do not use
->> anything but GOT entries to access data, that's certainly a better
->> solution than what we have now (I don't mean actually "fixing" them as
->> in -Dstatic=, just something that makes the build fail if this is not
->> the case so someone else can go and make the required changes). Maybe
->> building the object and then grepping the relocations for offenders, or
->> something like that.
+>     ARM: Eliminate decompressor -Dstatic= PIC hack
 > 
-> Russell made a patch which simply ends up discarding .data section.
+>     We used to build decompressors with -Dstatic= to avoid any local data
+>     being generated.  The problem is that local data generates GOTOFF
+>     relocations, which means we can't relocate the data relative to the
+>     text segment.
+> 
+>     Global data, on the other hand, goes through the GOT, and can be
+>     relocated anywhere.
+> 
+>     Unfortunately, with the new decompressors, this presents a problem
+>     since they declare static data within functions, and this leads to
+>     stack overflow.
+> 
+>     Fix this by separating out the decompressor code into a separate file,
+>     and removing 'static' from BSS data in misc.c.
+> 
+>     Also, discard the .data section - this means that should we end up
+>     with read/write initialized data, the decompressor will fail to link
+>     and the problem will be obvious.
+> 
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-You still have the issue of the .bss section. Though I must admit this
-would be rare, a decompressor using the .bss section would still cause
-silent breakage. And I'm still not convinced that compiler behavior is
-defined such that this cannot break in the future.
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
 
-> You are still copying the actual decompressor code which is less optimal 
-> than what we already have.  The current solution, as I explained 
-> already, involves _zero_ copying.
+However...
 
-The overhead of copying the decompressor is negligible. We're talking
-somewhere along the lines of 0.1% of the time spent inside the
-decompressor, worst case.
+> @@ -14,6 +14,7 @@ SECTIONS
+>    /DISCARD/ : {
+>      *(.ARM.exidx*)
+>      *(.ARM.extab*)
+> +    *(.data)
+>    }
 
--- 
-Hector Martin (hector at marcansoft.com)
-Public Key: http://www.marcansoft.com/marcan.asc
+I'd put a comment there, otherwise lots of people will go WTF when 
+coming across this.
+
+
+Nicolas
