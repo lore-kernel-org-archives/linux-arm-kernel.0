@@ -1,74 +1,39 @@
-From: swirl@gmx.li (Thomas Weber)
-Date: Thu, 25 Feb 2010 10:40:19 +0100
-Subject: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
-Message-ID: <1267090819-17796-1-git-send-email-swirl@gmx.li>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Feb 2010 09:38:59 +0000
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
+	<20100224223418.GB25587@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
+	<20100224234215.GA21985@n2100.arm.linux.org.uk>
+	<4B85BCE0.7000903@marcansoft.com>
+	<20100225000114.GB21985@n2100.arm.linux.org.uk>
+	<4B85C4A4.4060005@marcansoft.com>
+	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+Message-ID: <20100225093859.GA19870@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 24, 2010 at 11:28:45PM -0500, Nicolas Pitre wrote:
+> Obviously.  But that's the core of the argument: we made sure that the 
+> previous implementation didn't use any static within functions.  Why do 
+> you need to do that?  This is usually a bad idea anyway as this makes 
+> the function non reentrant.
 
-The omap_serial_early_init prints the following errors:
+Indeed - but having static data within a function doesn't make it non-
+reentrant - having static data modified by the function can make it
+non-reentrant.
 
-Could not get uart4_ick
-Could not get uart4_fck
+I wonder if we can get around this problem a slightly different way -
+instead of building the decompressor into misc.c, build it as a separate
+PIC object without the -Dstatic= stuff, and verify that it contains no
+read-write data.
 
-because all the uarts available in omap_uart[] will be initialized.
-Only omap4430 and omap3630 have 4 uarts at the moment.
-This patch reduces the number of uarts when cpu is not omap4430 or
-omap3630.
+Since these decompressors are designed to be used within the multi-threaded
+environment of the kernel, they shouldn't have any read-write data within
+them (or if they do, they'd better use some locking - which would make
+them unusable for decompressors.)
 
-Signed-off-by: Thomas Weber <weber@corscience.de>
----
- arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index b79bc89..da77930 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
- }
- void __init omap_serial_early_init(void)
- {
--	int i;
-+	int i, nr_ports;
- 	char name[16];
- 
-+	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
-+		nr_ports = 3;
-+	else
-+		nr_ports = ARRAY_SIZE(omap_uart);
-+
- 	/*
- 	 * Make sure the serial ports are muxed on at this point.
- 	 * You have to mux them off in device drivers later on
- 	 * if not needed.
- 	 */
- 
--	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
-+	for (i = 0; i < nr_ports; i++) {
- 		struct omap_uart_state *uart = &omap_uart[i];
- 		struct platform_device *pdev = &uart->pdev;
- 		struct device *dev = &pdev->dev;
-@@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
- 			continue;
- 		}
- 
--		sprintf(name, "uart%d_ick", i+1);
-+		sprintf(name, "uart%d_ick", i + 1);
- 		uart->ick = clk_get(NULL, name);
- 		if (IS_ERR(uart->ick)) {
--			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
- 			uart->ick = NULL;
- 		}
- 
- 		sprintf(name, "uart%d_fck", i+1);
- 		uart->fck = clk_get(NULL, name);
- 		if (IS_ERR(uart->fck)) {
--			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
- 			uart->fck = NULL;
- 		}
- 
--- 
-1.6.4.4
+Then we can tailor our misc.c not to use static data (which is the real
+problem - not the functions being static), and the -Dstatic= hack will
+go away.
