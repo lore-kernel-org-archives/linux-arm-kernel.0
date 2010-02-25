@@ -1,7 +1,7 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Feb 2010 13:30:56 -0500 (EST)
+Date: Thu, 25 Feb 2010 13:35:32 -0500 (EST)
 Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <4B86483C.6000108@marcansoft.com>
+In-Reply-To: <4B864B4C.9020805@marcansoft.com>
 References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
 	<20100224223418.GB25587@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
@@ -10,31 +10,37 @@ References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
 	<20100225000114.GB21985@n2100.arm.linux.org.uk>
 	<4B85C4A4.4060005@marcansoft.com>
 	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
-	<4B86483C.6000108@marcansoft.com>
-Message-ID: <alpine.LFD.2.00.1002251322060.1946@xanadu.home>
+	<20100225093859.GA19870@n2100.arm.linux.org.uk>
+	<4B864B4C.9020805@marcansoft.com>
+Message-ID: <alpine.LFD.2.00.1002251332190.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Feb 2010, Hector Martin wrote:
 
-> Nicolas Pitre wrote:
-> > Obviously.  But that's the core of the argument: we made sure that the 
-> > previous implementation didn't use any static within functions.  Why do 
-> > you need to do that?  This is usually a bad idea anyway as this makes 
-> > the function non reentrant.
-> 
-> Static inside functions doesn't imply being non-reentrant (any more than
-> using global variables does).
+> If you can programmatically ensure that the decompressors do not use
+> anything but GOT entries to access data, that's certainly a better
+> solution than what we have now (I don't mean actually "fixing" them as
+> in -Dstatic=, just something that makes the build fail if this is not
+> the case so someone else can go and make the required changes). Maybe
+> building the object and then grepping the relocations for offenders, or
+> something like that.
 
-Usually it does, unless as you mention those are used read-only.
-I think we don't have to teach each other how a C compiler works, right?
+Russell made a patch which simply ends up discarding .data section.
 
-But just to make sure we're on the same page: if you need a global 
-variable, or a static variable within a function, it is preferable if 
-they're truly read-only by marking them const.  This has the advantage 
-of not having to bother with .data relocation in RAM when booting a 
-kernel directly from ROM as they get allocated to the .rodata section 
-which is included in .text by default by the linker.
+> However, considering my second patch can be adapted to avoid the two
+> extra copies, I still think that's a cleaner solution. All I have to do
+> is move things around in the linker script so the piggy is at the end of
+> the zImage, avoid copying that the first time around (and instead pass
+> the old pointer to ROM to the decompressor), and introduce the real
+> decompressed uncompressed kernel size to the mix so I can relocate the
+> decompressor to ZRELADDR+kernel_size (and fix the relocation check code
+> so it uses the real size, not some 4x guess), which would avoid the
+> second copy.
+
+You are still copying the actual decompressor code which is less optimal 
+than what we already have.  The current solution, as I explained 
+already, involves _zero_ copying.
 
 
 Nicolas
