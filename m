@@ -1,31 +1,61 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Thu, 25 Feb 2010 04:48:17 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267045954.23523.1692.camel@pasglop>
-References: <1266445892.16346.306.camel@pasglop>
-	<201002240816.10178.oliver@neukum.org>
-	<1267045954.23523.1692.camel@pasglop>
-Message-ID: <201002250448.17866.oliver@neukum.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Feb 2010 23:06:55 -0500 (EST)
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <4B85BCE0.7000903@marcansoft.com>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
+	<20100224223418.GB25587@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
+	<20100224234215.GA21985@n2100.arm.linux.org.uk>
+	<4B85BCE0.7000903@marcansoft.com>
+Message-ID: <alpine.LFD.2.00.1002242232190.1946@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. Februar 2010 22:12:34 schrieb Benjamin Herrenschmidt:
-> On Wed, 2010-02-24 at 08:16 +0100, Oliver Neukum wrote:
-> > I don't know. The issue seems quite complex. It would seem better to
-> > centralize it as far as practical. Do you have a wrapper drivers could
-> > call?
+On Thu, 25 Feb 2010, Hector Martin wrote:
+
+> Russell King - ARM Linux wrote:
+> > On Wed, Feb 24, 2010 at 06:34:49PM -0500, Nicolas Pitre wrote:
+> >> What about simply not compiling the decompressor with -fPIC when using 
+> >> ZBOOT_ROM=y?  That would certainly solve the problem with the only 
+> >> restriction that such kernel images won't be bootable from RAM which is 
+> >> probably an acceptable compromize.
+> > 
+> > Unfortunately, that doesn't solve the stack-bashing with ZBOOT_ROM=n.
 > 
-> flush_dcache_page() ? :-)
+> Yes it does, that's exactly what my first version of the patch did. Once
+> you get rid of the partial relocation used for ROM builds (with split
+> text/bss) you don't need -Dstatic=, and once you get rid of that you
+> solve the stack-bashing. The ROM build becomes a bog standard
+> non-relocatable ROM image (with the usual LMA/VMA linker script stuff to
+> copy initialized data to RAM), and the RAM build becomes a bog standard
+> relocatable image (a single contiguous blob including
+> text/rodata/data/bss) that doesn't suffer from any issues when you move
+> it around.
 
-Will this do anything on arches that don't need it?
-Secondly, can we have a wrapper that you can pass a pointer and an
-offset?
- 
-> Now, the subsystem might be the one to know whether something is mapped
-> into userspace or not (v4l in our case) in which case a wrapper could be
-> created.
+OK...  Well, just to put things in perspective: the CONFIG_ZBOOT_ROM 
+was invented by myself almost 12 years ago.  No split LMA/VMA was needed 
+because the code didn't use any writable global variable.  The idea is 
+to have the boot loader branch directly to the decompressor stored in 
+flash (those were the days when NOR flash was more popular than NAND) 
+and then the decompressor simply get the deflated data directly from ROM 
+and stores the inflated kernel directly in RAM at its final address.  No 
+copy what so ever was involved, and with the CPU I and D caches enabled 
+and burst mode properly configured in the flash you get the fastest boot 
+possible.  At least until I added support to do eXecute-In-Place from 
+flash with the kernel that is (yes, I'm guilty for that as well).  So 
+that has to continue working otherwise it is a regression.
 
-If possible, I'd like to centralize this. Drivers are likely to get this wrong.
+Then, Russell added the ability for the decompressor to be PIC.  And he 
+even managed for a ZBOOT_ROM kernel to just work if you decided to load 
+it in RAM and execute it from there.  But for that to work the -Dstatic 
+hack was needed.  Admitedly, this hack and the ability to run a 
+ZBOOT_ROM kernel from anywhere in RAM is nice but not strictly needed.  
+But no one could argue that this didn't work.  Claiming that this is an 
+abuse of the compiler is beside the point: it has worked for years and 
+now _you_ are the one who wants to change the rules, not the GCC people.
 
-	Regards
-		Oliver
+Now I apparently missed something in the thread... What is this stack 
+bashing about?  Admitedly I didn't look at any of the patches (yet).
+
+
+Nicolas
