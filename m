@@ -1,74 +1,50 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Feb 2010 14:40:43 -0500 (EST)
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <4B86CDC8.4080107@marcansoft.com>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-	<20100224223418.GB25587@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
-	<20100224234215.GA21985@n2100.arm.linux.org.uk>
-	<4B85BCE0.7000903@marcansoft.com>
-	<20100225000114.GB21985@n2100.arm.linux.org.uk>
-	<4B85C4A4.4060005@marcansoft.com>
-	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
-	<20100225093859.GA19870@n2100.arm.linux.org.uk>
-	<4B864B4C.9020805@marcansoft.com>
-	<alpine.LFD.2.00.1002251332190.1946@xanadu.home>
-	<4B86CDC8.4080107@marcansoft.com>
-Message-ID: <alpine.LFD.2.00.1002251428410.1946@xanadu.home>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 25 Feb 2010 20:41:25 +0100
+Subject: [PATCH] staging/dream: add missing include files/fix compilation
+In-Reply-To: <1267126586.5439.56.camel@c-dwalke-linux.qualcomm.com>
+References: <20091225205917.GA25761@elf.ucw.cz>
+	<20100115002419.GA25643@kroah.com>
+	<20100119054516.GB22153@elf.ucw.cz>
+	<1263914079.1951.43.camel@m0nster>
+	<20100131084421.GG2238@elf.ucw.cz>
+	<20100131092829.GJ2238@elf.ucw.cz>
+	<1264953492.2059.5.camel@m0nster>
+	<20100225193027.GA7391@elf.ucw.cz>
+	<1267126586.5439.56.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100225194125.GA7645@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Feb 2010, Hector Martin wrote:
+Hi!
 
-> Nicolas Pitre wrote:
-> > On Thu, 25 Feb 2010, Hector Martin wrote:
+> > > /home/dwalker/linux-2.6/drivers/video/msm/msm_fb.c:24: fatal error: linux/msm_mdp.h: No such file or directory
+> > > compilation terminated.
+> > > make[4]: *** [drivers/video/msm/msm_fb.o] Error 1
+> > > make[3]: *** [drivers/video/msm] Error 2
+> > > make[3]: *** Waiting for unfinished jobs....
+> > > make[2]: *** [drivers/video] Error 2
+> > > make[1]: *** [drivers] Error 2
+> > > make: *** [sub-make] Error 2
 > > 
-> >> If you can programmatically ensure that the decompressors do not use
-> >> anything but GOT entries to access data, that's certainly a better
-> >> solution than what we have now (I don't mean actually "fixing" them as
-> >> in -Dstatic=, just something that makes the build fail if this is not
-> >> the case so someone else can go and make the required changes). Maybe
-> >> building the object and then grepping the relocations for offenders, or
-> >> something like that.
+> > Yes, framebuffer has problems.
 > > 
-> > Russell made a patch which simply ends up discarding .data section.
+> > > Even with the framebuffer off I still don't get any serial output on a
+> > > plain 2.6.33-rc6 .. I'm using a config that you sent me when you first
+> > > tested my -next tree .
+> > 
+> > 2.6.33 boots here, with attached config. I'll try -next next.
 > 
-> You still have the issue of the .bss section. Though I must admit this
-> would be rare, a decompressor using the .bss section would still cause
-> silent breakage.
+> My -next tree hasn't changed much since you last looked at it .. I
+> wouldn't bother testing it. I might take some small fixes from that tree
+> to merge, but what's there is still too much of a mess to merge.
 
-What breakage?  We do use the .bss right now.  But .bss can be fixed to 
-some absolute address in RAM with no further handling besides clearing 
+Ok, so your -next tree will not be merged for 2.6.34?
 
-I found the following at the top of arch/arm/boot/compressed/misc.c:
+> I just pushed another tree called "working-mmc" which still needs some
+> clean up but should have working mmc if you want to test that.
 
- * Nicolas Pitre <nico@visuaide.com>  1999/04/14 :
- *  For this code to run directly from Flash, all constant variables must
- *  be marked with 'const' and all other variables initialized at run-time
- *  only.  This way all non constant variables will end up in the bss segment,
- *  which should point to addresses in RAM and cleared to 0 on start.
- *  This allows for a much quicker boot time.
-
-> And I'm still not convinced that compiler behavior is defined such 
-> that this cannot break in the future.
-
-Seems to me that we're relying on compiler conventions that have been 
-around for decades already.  What do you expect to break?
-
-> > You are still copying the actual decompressor code which is less optimal 
-> > than what we already have.  The current solution, as I explained 
-> > already, involves _zero_ copying.
-> 
-> The overhead of copying the decompressor is negligible. We're talking
-> somewhere along the lines of 0.1% of the time spent inside the
-> decompressor, worst case.
-
-Possible.  And granted this whole scheme was elaborated in 1999 when 
-CPUs were much slower and the kernel much smaller relative to the 
-decompressor, etc.  But again that "just works" already, without the 
-copy overhead, and the code needed to make the copy (I know it's only 4 
-asm instructions), and the complexity needed to care about the actual 
-decompressed kernel size, etc. etc.
-
-
-Nicolas
+Do you have git url? Yes, I'd like to play.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
