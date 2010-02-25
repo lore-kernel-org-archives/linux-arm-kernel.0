@@ -1,57 +1,89 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 25 Feb 2010 11:48:18 -0800
-Subject: [PATCH] staging/dream: add missing include files/fix compilation
-In-Reply-To: <20100225194125.GA7645@elf.ucw.cz>
-References: <20091225205917.GA25761@elf.ucw.cz>
-	<20100115002419.GA25643@kroah.com> <20100119054516.GB22153@elf.ucw.cz>
-	<1263914079.1951.43.camel@m0nster> <20100131084421.GG2238@elf.ucw.cz>
-	<20100131092829.GJ2238@elf.ucw.cz> <1264953492.2059.5.camel@m0nster>
-	<20100225193027.GA7391@elf.ucw.cz>
-	<1267126586.5439.56.camel@c-dwalke-linux.qualcomm.com>
-	<20100225194125.GA7645@elf.ucw.cz>
-Message-ID: <1267127298.5439.62.camel@c-dwalke-linux.qualcomm.com>
+From: hector@marcansoft.com (Hector Martin)
+Date: Thu, 25 Feb 2010 20:56:08 +0100
+Subject: [PATCH] Clean up ARM compressed loader
+In-Reply-To: <alpine.LFD.2.00.1002251428410.1946@xanadu.home>
+References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
+	<20100224223418.GB25587@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
+	<20100224234215.GA21985@n2100.arm.linux.org.uk>
+	<4B85BCE0.7000903@marcansoft.com>
+	<20100225000114.GB21985@n2100.arm.linux.org.uk>
+	<4B85C4A4.4060005@marcansoft.com>
+	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
+	<20100225093859.GA19870@n2100.arm.linux.org.uk>
+	<4B864B4C.9020805@marcansoft.com>
+	<alpine.LFD.2.00.1002251332190.1946@xanadu.home>
+	<4B86CDC8.4080107@marcansoft.com>
+	<alpine.LFD.2.00.1002251428410.1946@xanadu.home>
+Message-ID: <4B86D5D8.2010905@marcansoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-02-25 at 20:41 +0100, Pavel Machek wrote:
-> Hi!
+Nicolas Pitre wrote:
+> On Thu, 25 Feb 2010, Hector Martin wrote:
+>> Nicolas Pitre wrote:
+>>> Russell made a patch which simply ends up discarding .data section.
+>> You still have the issue of the .bss section. Though I must admit this
+>> would be rare, a decompressor using the .bss section would still cause
+>> silent breakage.
 > 
-> > > > /home/dwalker/linux-2.6/drivers/video/msm/msm_fb.c:24: fatal error: linux/msm_mdp.h: No such file or directory
-> > > > compilation terminated.
-> > > > make[4]: *** [drivers/video/msm/msm_fb.o] Error 1
-> > > > make[3]: *** [drivers/video/msm] Error 2
-> > > > make[3]: *** Waiting for unfinished jobs....
-> > > > make[2]: *** [drivers/video] Error 2
-> > > > make[1]: *** [drivers] Error 2
-> > > > make: *** [sub-make] Error 2
-> > > 
-> > > Yes, framebuffer has problems.
-> > > 
-> > > > Even with the framebuffer off I still don't get any serial output on a
-> > > > plain 2.6.33-rc6 .. I'm using a config that you sent me when you first
-> > > > tested my -next tree .
-> > > 
-> > > 2.6.33 boots here, with attached config. I'll try -next next.
-> > 
-> > My -next tree hasn't changed much since you last looked at it .. I
-> > wouldn't bother testing it. I might take some small fixes from that tree
-> > to merge, but what's there is still too much of a mess to merge.
+> What breakage?  We do use the .bss right now.  But .bss can be fixed to 
+> some absolute address in RAM with no further handling besides clearing
+
+static data in BSS can end up addressed with a GOT-relative offset (even
+if you put it at "some absolute address" - this is still PIC code). That
+ will fail once you move around the text/rodata/GOT blob when running
+the ROM code from RAM, since it'll push the BSS section somewhere else
+(potentially not RAM). So you still need to ensure that all BSS data is
+globally visible.
+
+> I found the following at the top of arch/arm/boot/compressed/misc.c:
 > 
-> Ok, so your -next tree will not be merged for 2.6.34?
+>  * Nicolas Pitre <nico@visuaide.com>  1999/04/14 :
+>  *  For this code to run directly from Flash, all constant variables must
+>  *  be marked with 'const' and all other variables initialized at run-time
+>  *  only.  This way all non constant variables will end up in the bss segment,
+>  *  which should point to addresses in RAM and cleared to 0 on start.
+>  *  This allows for a much quicker boot time.
 
-No it won't be. I was still planning to merge some more stripped down
-board file for other targets, along with some other minor stuff.. 
+This is a different issue, the part where so far the code hasn't been
+copying data. This is unrelated to the issue that -Dstatic= tries to
+solve, which has to do with the way data can be located relative to the GOT.
 
-> > I just pushed another tree called "working-mmc" which still needs some
-> > clean up but should have working mmc if you want to test that.
+>> And I'm still not convinced that compiler behavior is defined such 
+>> that this cannot break in the future.
 > 
-> Do you have git url? Yes, I'd like to play.
+> Seems to me that we're relying on compiler conventions that have been 
+> around for decades already.  What do you expect to break?
 
+Compilers are getting smarter, and code relying on old assumptions that
+may no longer be true (because compilers optimize better or do things
+differently) is precisely that which is most liable to break. The only
+way you can properly guarantee things will work is by sticking to actual
+standards and doing what the compiler expects you to do. Moving around
+text/rodata without moving around bss/(maybe data) isn't something
+allowed by the compiler. Sure, you can hack around it like we're doing
+here, but you're relying on your hacks correctly preventing the compiler
+from doing something valid yet which breaks your assumptions.
 
-git://codeaurora.org/quic/kernel/dwalker/linux-msm.git working-mmc
+> Possible.  And granted this whole scheme was elaborated in 1999 when 
+> CPUs were much slower and the kernel much smaller relative to the 
+> decompressor, etc.  But again that "just works" already, without the 
+> copy overhead, and the code needed to make the copy (I know it's only 4 
+> asm instructions), and the complexity needed to care about the actual 
+> decompressed kernel size, etc. etc.
 
-or 
+Well, if you're into speed anyway, caring about the actual kernel size
+is desirable because it avoids a totally useless copy when the zImage is
+loaded into RAM somewhere near the end of where the kernel would be. The
+guesstimate in the code will think it'll overlap and move things around
+unnecessarily. Worse, if the kernel ends up being highly compressible
+for whatever reason, it could overflow the 4x guesstimate and make the
+whole compressed loader fail again if it happens to be around there.
 
-https://www.codeaurora.org/gitweb/quic/kernel/?p=dwalker/linux-msm.git;a=shortlog;h=refs/heads/working-mmc
+But this discussion is rather pointless because at this stage I highly
+doubt Russell is going to change his mind.
 
-Daniel
+-- 
+Hector Martin (hector at marcansoft.com)
+Public Key: http://www.marcansoft.com/marcan.asc
