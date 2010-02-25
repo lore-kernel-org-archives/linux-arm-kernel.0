@@ -1,75 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Feb 2010 18:56:13 +0000
-Subject: [PATCH 4/6] perf-events: export enable/disable event symbols to
-	kernel modules
-In-Reply-To: <1267124175-21721-4-git-send-email-will.deacon@arm.com>
-References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-2-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-3-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-4-git-send-email-will.deacon@arm.com>
-Message-ID: <1267124175-21721-5-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 25 Feb 2010 10:57:34 -0800
+Subject: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in
+	early_init
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C43BF5EC@dbde02.ent.ti.com>
+References: <1267090819-17796-1-git-send-email-swirl@gmx.li>
+	<20100225184355.GF28173@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C43BF5EC@dbde02.ent.ti.com>
+Message-ID: <20100225185734.GI28173@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf_event_enable and perf_event_disable functions are used to
-control the activation of perf-events for a given context or CPU.
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100225 10:51]:
+> 
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Friday, February 26, 2010 12:14 AM
+> > To: Thomas Weber; Aguirre, Sergio
+> > Cc: linux-omap at vger.kernel.org; Russell King; Kevin Hilman; Shilimkar, Santosh; Pandita, Vikram;
+> > Syed, Rafiuddin; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Thomas Weber
+> > Subject: Re: [RESEND][PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
+> > 
+> > * Thomas Weber <swirl@gmx.li> [100225 01:36]:
+> > >
+> > > The omap_serial_early_init prints the following errors:
+> > >
+> > > Could not get uart4_ick
+> > > Could not get uart4_fck
+> > >
+> > > because all the uarts available in omap_uart[] will be initialized.
+> > > Only omap4430 and omap3630 have 4 uarts at the moment.
+> > > This patch reduces the number of uarts when cpu is not omap4430 or
+> > > omap3630.
+> > 
+> > ..and I only patched omap_serial_init and forgot about
+> > the omap_serial_early_init..
+> > 
+> > Looks good to me, Sergio, care to test and Ack this? Also, sounds
+> > like we still need to patch omap4 for uart4 for the clocks.
+> > 
+> Clocks will be take care automatically by "nr_ports" for omap4 too
+> with this patch. Below clock changes are just cosmetic ones, isn't it ?
+> 
+> Am I missing something?
 
-This patch exports these symbols so that they can be used by kernel
-modules. Without these symbols, an event must be destroyed and recreated
-to disable or enable it respectively. The maximum number of perf-events
-is also made available to modules via the perf_get_max_events function.
+Yes sorry, I'm referring to "[RFC][PATCH 0/3] OMAP3630: UART4 startup"
+series to fix the uart4 issues for 3630, not omap4.
 
-Cc: Ingo Molnar <mingo@elte.hu>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/linux/perf_event.h |    1 +
- kernel/perf_event.c        |    8 ++++++++
- 2 files changed, 9 insertions(+), 0 deletions(-)
+Regards,
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index a177698..c28a0ee 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -741,6 +741,7 @@ struct perf_output_handle {
-  * Set by architecture code:
-  */
- extern int perf_max_events;
-+extern int perf_get_max_events(void);
- 
- extern const struct pmu *hw_perf_event_init(struct perf_event *event);
- 
-diff --git a/kernel/perf_event.c b/kernel/perf_event.c
-index 2ae7409..0157033 100644
---- a/kernel/perf_event.c
-+++ b/kernel/perf_event.c
-@@ -39,6 +39,12 @@
- static DEFINE_PER_CPU(struct perf_cpu_context, perf_cpu_context);
- 
- int perf_max_events __read_mostly = 1;
-+int perf_get_max_events(void)
-+{
-+	return perf_max_events;
-+}
-+EXPORT_SYMBOL_GPL(perf_get_max_events);
-+
- static int perf_reserved_percpu __read_mostly;
- static int perf_overcommit __read_mostly = 1;
- 
-@@ -604,6 +610,7 @@ void perf_event_disable(struct perf_event *event)
- 
- 	raw_spin_unlock_irq(&ctx->lock);
- }
-+EXPORT_SYMBOL_GPL(perf_event_disable);
- 
- static int
- event_sched_in(struct perf_event *event,
-@@ -1028,6 +1035,7 @@ void perf_event_enable(struct perf_event *event)
-  out:
- 	raw_spin_unlock_irq(&ctx->lock);
- }
-+EXPORT_SYMBOL_GPL(perf_event_enable);
- 
- static int perf_event_refresh(struct perf_event *event, int refresh)
- {
--- 
-1.6.3.3
+Tony
