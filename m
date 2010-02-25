@@ -1,47 +1,32 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Thu, 25 Feb 2010 17:49:45 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B867108.2050806@billgatliff.com>
-References: <4B85789D.6000704@billgatliff.com> <4B864C66.6060209@atmel.com>
-	<4B867108.2050806@billgatliff.com>
-Message-ID: <4B86AA29.8010806@atmel.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Thu, 25 Feb 2010 18:42:38 +0100
+Subject: [PATCH] ARM: SAMSUNG: Fix s3c hsotg driver compilation
+Message-ID: <b2e8f9f71002250942y7f61f12tcf3d6770b467985d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+File regs-sys.h was moved from plat to mach.
 
-Here is the patch for the ac97 support on AT91:
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ drivers/usb/gadget/s3c-hsotg.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025629.html
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index fec9c09..eda6a91 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -27,10 +27,10 @@
+ #include <linux/usb/gadget.h>
 
-Here is the patch for the full duplex support:
+ #include <mach/map.h>
++#include <mach/regs-sys.h>
 
-http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025628.html
+ #include <plat/regs-usb-hsotg-phy.h>
+ #include <plat/regs-usb-hsotg.h>
+-#include <plat/regs-sys.h>
+ #include <plat/udc-hs.h>
 
-Best Regards,
-Sedji Gaouaou
-
-Le 2/25/2010 1:46 PM, Bill Gatliff a ?crit :
-> Sedji Gaouaou wrote:
->> Hi Bill,
->>
->> I have been working on the sam9263 AC97 driver. I have sent a patch to
->> the alsa mailing list but it has not being integrated yet (as far as I
->> know...)(http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025119.html).
->>
->>
->> I have tested it and it worked, but I have recently made some changes
->> so the atmel ac97.c driver could support full duplex mode.
->>
->> So I will submit a new patch by the end of the day/week, and I will
->> copy it to you if you are interested.
->
-> Please do!  I'll also take a look at your submitted driver, and see how
-> it works for me.
->
->
-> Thanks!
->
->
-> b.g.
->
+ #define DMA_ADDR_INVALID (~((dma_addr_t)0))
+-- 
+1.7.0
