@@ -1,40 +1,28 @@
 From: wolfgang.mues@auerswald.de (Wolfgang =?iso-8859-15?q?M=FCes?=)
-Date: Thu, 25 Feb 2010 15:29:20 +0100
-Subject: [PATCH5/5] at91_mci: enable large data blocks
-Message-ID: <201002251529.20622.wolfgang.mues@auerswald.de>
+Date: Thu, 25 Feb 2010 15:32:27 +0100
+Subject: [PATCH] Bugfixing and improvement of the AT91 MCI driver
+In-Reply-To: <4B864450.7090805@atmel.com>
+References: <4B864450.7090805@atmel.com>
+Message-ID: <201002251532.27844.wolfgang.mues@auerswald.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Nicolas,
 
-this is the last part of my fixes and improvements for the at91_mci driver.
+Am Donnerstag, 25. Februar 2010 schrieb Nicolas Ferre:
+> Thanks a lot for your hard work on this driver and your patch.
+Thank YOU for the development of the driver. It's a lot easier if 
+there IS a driver if you start a project.
 
-This patch is setting some max_ variables for the IO elevator, so the elevator
-will put requests for large data blocks to the driver. This is critical for
-a) speed 
-and
-b) wear leveling of the flash chip controller.
+> The problem is that we should change this big patch into a patch series
+> for integrating one enhancement at a time...
+Oh, yes, I should have known this..
 
-I would ship no product which is treating the SD card with millions of single
-4 KByte write command due to the short life cycle of the SD cards.
+> As you say that you are working on an old kernel release, I guess that
+> you may not have time to rework this patch and split it into a patch
+> series?
+Hrmmmpf. I've done it now.
 
-Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
-
----
-diff -ur linux-2.6.33-rc8-readbuf/drivers/mmc/host/at91_mci.c linux-2.6.33-rc8-max/drivers/mmc/host/at91_mci.c
---- linux-2.6.33-rc8-readbuf/drivers/mmc/host/at91_mci.c	2010-02-25 14:42:05.803239154 +0100
-+++ linux-2.6.33-rc8-max/drivers/mmc/host/at91_mci.c	2010-02-25 14:48:35.143738415 +0100
-@@ -934,6 +934,9 @@
- 	mmc->max_blk_size  = MCI_MAXBLKSIZE; 
- 	mmc->max_blk_count = MCI_BLKATONCE;
- 	mmc->max_req_size  = MCI_BUFSIZE;
-+	mmc->max_phys_segs = MCI_BLKATONCE;
-+	mmc->max_hw_segs   = MCI_BLKATONCE;
-+	mmc->max_seg_size  = MCI_BUFSIZE; 
- 
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
----
 best regards
  
 i. A. Wolfgang M?es
