@@ -1,50 +1,39 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Thu, 25 Feb 2010 12:12:13 +0100
-Subject: [PATCH] mx31pdk: Add NAND support
-In-Reply-To: <48285.22454.qm@web51005.mail.re2.yahoo.com>
-References: <48285.22454.qm@web51005.mail.re2.yahoo.com>
-Message-ID: <1267096333.2722.44.camel@realization>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Feb 2010 12:12:18 +0000
+Subject: [PATCH] ARM: perf-events: request PMU interrupts with IRQF_NOBALANCING
+Message-ID: <1267099938-5555-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+If IRQ balancing is used on a multicore ARM system, PMU interrupt
+lines may be relocated onto CPUs other than the one causing the
+counter overflow. This can result in misattribution of events to
+the wrong core and, in the case that the CPU handling the interrupt
+has not experience counter overflow, the interrupt can be disabled
+because the handler returns IRQ_NONE.
 
-On mer, 2010-02-24 at 16:58 -0800, Fabio Estevam wrote:
-> Add NAND support to MX31PDK board.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mx3/mach-mx31_3ds.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> index b88c18a..2d78754 100644
-> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> @@ -34,6 +34,7 @@
->  #include <mach/board-mx31pdk.h>
->  #include <mach/imx-uart.h>
->  #include <mach/iomux-mx3.h>
-> +#include <mach/mxc_nand.h>
->  #include "devices.h"
->  
->  /*!
-> @@ -80,6 +81,11 @@ static struct resource smsc911x_resources[] = {
->  	},
->  };
->  
-> +static struct mxc_nand_platform_data mx31pdk_nand_board_info = {
-> +	.width = 1,
-> +	.hw_ecc = 1,
-> +};
-> +
+This patch adds the IRQF_NOBALANCING flag to the request_irq call
+in perf_events.c.
 
-Are you sure that this works? Don't you see a lot of Bad blocks reports
-in boot messages?
+Cc: Jamie Iles <jamie.iles@picochip.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index c54ceb3..b44d159 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -332,7 +332,8 @@ armpmu_reserve_hardware(void)
+ 
+ 	for (i = 0; i < pmu_irqs->num_irqs; ++i) {
+ 		err = request_irq(pmu_irqs->irqs[i], armpmu->handle_irq,
+-				  IRQF_DISABLED, "armpmu", NULL);
++				  IRQF_DISABLED | IRQF_NOBALANCING,
++				  "armpmu", NULL);
+ 		if (err) {
+ 			pr_warning("unable to request IRQ%d for ARM "
+ 				   "perf counters\n", pmu_irqs->irqs[i]);
 -- 
-Alberto!
-
-        Be Persistent!
-                - Greg Kroah-Hartman (FOSDEM 2010)
+1.6.3.3
