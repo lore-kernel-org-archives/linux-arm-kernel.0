@@ -1,32 +1,73 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Feb 2010 15:03:13 -0800
-Subject: [PATCH 4/6] AM35x: Enable OMAP_MUX in defconfig
+Date: Thu, 25 Feb 2010 15:03:16 -0800
+Subject: [PATCH 5/6] AM3517 EVM: Enable I2C support
 In-Reply-To: <20100225230116.26233.65157.stgit@baageli.muru.com>
 References: <20100225230116.26233.65157.stgit@baageli.muru.com>
-Message-ID: <20100225230313.26233.8965.stgit@baageli.muru.com>
+Message-ID: <20100225230315.26233.31309.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+From: Sriram <srk@ti.com>
 
-Enabling OMAP_MUX in defconfig as it is required for EHCI to work.
+There are multiple devices connected to I2C bus on AM3517EVM
+(for instance audio codec, IO expander etc). Enable I2C support
+in the default kernel configuration for AM3517 EVM.
 
-Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+Signed-off-by: Sriramakrishnan <srk@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/am3517_evm_defconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/configs/am3517_evm_defconfig |   41 ++++++++++++++++++++++++++++++++-
+ 1 files changed, 40 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/configs/am3517_evm_defconfig b/arch/arm/configs/am3517_evm_defconfig
-index abe9966..edae1c2 100644
+index edae1c2..66a10b5 100644
 --- a/arch/arm/configs/am3517_evm_defconfig
 +++ b/arch/arm/configs/am3517_evm_defconfig
-@@ -201,7 +201,7 @@ CONFIG_ARCH_OMAP3=y
- # CONFIG_OMAP_DEBUG_POWERDOMAIN is not set
- # CONFIG_OMAP_DEBUG_CLOCKDOMAIN is not set
- CONFIG_OMAP_RESET_CLOCKS=y
--# CONFIG_OMAP_MUX is not set
-+CONFIG_OMAP_MUX=y
- # CONFIG_OMAP_MCBSP is not set
- # CONFIG_OMAP_MBOX_FWK is not set
- # CONFIG_OMAP_MPU_TIMER is not set
+@@ -590,7 +590,46 @@ CONFIG_HW_RANDOM=y
+ # CONFIG_R3964 is not set
+ # CONFIG_RAW_DRIVER is not set
+ # CONFIG_TCG_TPM is not set
+-# CONFIG_I2C is not set
++CONFIG_I2C=y
++CONFIG_I2C_BOARDINFO=y
++CONFIG_I2C_COMPAT=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_HELPER_AUTO=y
++
++#
++# I2C Hardware Bus support
++#
++
++#
++# I2C system bus drivers (mostly embedded / system-on-chip)
++#
++# CONFIG_I2C_DESIGNWARE is not set
++# CONFIG_I2C_GPIO is not set
++# CONFIG_I2C_OCORES is not set
++CONFIG_I2C_OMAP=y
++# CONFIG_I2C_SIMTEC is not set
++
++#
++# External I2C/SMBus adapter drivers
++#
++# CONFIG_I2C_PARPORT_LIGHT is not set
++# CONFIG_I2C_TAOS_EVM is not set
++# CONFIG_I2C_TINY_USB is not set
++
++#
++# Other I2C/SMBus bus drivers
++#
++# CONFIG_I2C_PCA_PLATFORM is not set
++# CONFIG_I2C_STUB is not set
++
++#
++# Miscellaneous I2C Chip support
++#
++# CONFIG_SENSORS_TSL2550 is not set
++# CONFIG_I2C_DEBUG_CORE is not set
++# CONFIG_I2C_DEBUG_ALGO is not set
++# CONFIG_I2C_DEBUG_BUS is not set
++# CONFIG_I2C_DEBUG_CHIP is not set
+ # CONFIG_SPI is not set
+ 
+ #
