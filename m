@@ -1,307 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Feb 2010 12:24:29 +0000
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <20100225093859.GA19870@n2100.arm.linux.org.uk>
-References: <1266978217-7023-1-git-send-email-hector@marcansoft.com>
-	<20100224223418.GB25587@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002241824520.1946@xanadu.home>
-	<20100224234215.GA21985@n2100.arm.linux.org.uk>
-	<4B85BCE0.7000903@marcansoft.com>
-	<20100225000114.GB21985@n2100.arm.linux.org.uk>
-	<4B85C4A4.4060005@marcansoft.com>
-	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
-	<20100225093859.GA19870@n2100.arm.linux.org.uk>
-Message-ID: <20100225122429.GA3101@n2100.arm.linux.org.uk>
+From: Foster_Brian@emc.com (Foster_Brian at emc.com)
+Date: Thu, 25 Feb 2010 07:34:34 -0500
+Subject: ARM 2.6.30.9 OOPS question -- stack limit?
+Message-ID: <D27CA15508148C428A25104ADEFAAC81057281E1@CORPUSMX50C.corp.emc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 09:38:59AM +0000, Russell King - ARM Linux wrote:
-> Then we can tailor our misc.c not to use static data (which is the real
-> problem - not the functions being static), and the -Dstatic= hack will
-> go away.
+Hi,
 
-And here's the patch - not run tested yet, but compile-tested for
-gzip and LZO in both ROM=y and ROM=n modes.
+I'm running 2.6.30.9 on a Marvell 88f6281 (sheevaplug) based system and
+one of our stress tests occasionally produces the kernel OOPS shown
+below. It is always preceded by a futex_wait WARN_ON(), so I've included
+that as well.
 
-    ARM: Eliminate decompressor -Dstatic= PIC hack
+In short, I'm curious about the state of the stack as shown in the OOPS.
+I'm suspicious that excessively large stacks in this app could be
+causing a problem, but the OOPS is not clear enough to me to indicate
+whether that is the case here (a HUGE stack dump is printed between the
+Stack: and Code: lines). From looking at random kernel oops messages via
+google, I usually see that the stack limit is above sp at the time of
+the crash. In this case, sp blows the stack limit away. Is that the
+issue here, or am I misinterpreting what the "stack limit" actually
+means? Any insight that could help translate this particular error would
+be helpful. Thanks in advance.
 
-    We used to build decompressors with -Dstatic= to avoid any local data
-    being generated.  The problem is that local data generates GOTOFF
-    relocations, which means we can't relocate the data relative to the
-    text segment.
+Brian
 
-    Global data, on the other hand, goes through the GOT, and can be
-    relocated anywhere.
-
-    Unfortunately, with the new decompressors, this presents a problem
-    since they declare static data within functions, and this leads to
-    stack overflow.
-
-    Fix this by separating out the decompressor code into a separate file,
-    and removing 'static' from BSS data in misc.c.
-
-    Also, discard the .data section - this means that should we end up
-    with read/write initialized data, the decompressor will fail to link
-    and the problem will be obvious.
-
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
- arch/arm/boot/compressed/Makefile       |    6 +--
- arch/arm/boot/compressed/decompress.c   |   45 +++++++++++++
- arch/arm/boot/compressed/misc.c         |  109 +++---------------------------
- arch/arm/boot/compressed/vmlinux.lds.in |    2 +-
- 4 files changed, 58 insertions(+), 104 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 2d4d88b..97c89e7 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -5,7 +5,7 @@
- #
- 
- HEAD	= head.o
--OBJS	= misc.o
-+OBJS	= misc.o decompress.o
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
- 
- #
-@@ -106,10 +106,6 @@ lib1funcs = $(obj)/lib1funcs.o
- $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
- 	$(call cmd,shipped)
- 
--# Don't allow any static data in misc.o, which
--# would otherwise mess up our GOT table
--CFLAGS_misc.o := -Dstatic=
--
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
- 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
- 	$(call if_changed,ld)
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-new file mode 100644
-index 0000000..0da382f
---- /dev/null
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -0,0 +1,45 @@
-+#define _LINUX_STRING_H_
-+
-+#include <linux/compiler.h>	/* for inline */
-+#include <linux/types.h>	/* for size_t */
-+#include <linux/stddef.h>	/* for NULL */
-+#include <linux/linkage.h>
-+#include <asm/string.h>
-+
-+extern unsigned long free_mem_ptr;
-+extern unsigned long free_mem_end_ptr;
-+extern void error(char *);
-+
-+#define STATIC static
-+
-+#define ARCH_HAS_DECOMP_WDOG
-+
-+/* Diagnostic functions */
-+#ifdef DEBUG
-+#  define Assert(cond,msg) {if(!(cond)) error(msg);}
-+#  define Trace(x) fprintf x
-+#  define Tracev(x) {if (verbose) fprintf x ;}
-+#  define Tracevv(x) {if (verbose>1) fprintf x ;}
-+#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
-+#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
-+#else
-+#  define Assert(cond,msg)
-+#  define Trace(x)
-+#  define Tracev(x)
-+#  define Tracevv(x)
-+#  define Tracec(c,x)
-+#  define Tracecv(c,x)
-+#endif
-+
-+#ifdef CONFIG_KERNEL_GZIP
-+#include "../../../../lib/decompress_inflate.c"
-+#endif
-+
-+#ifdef CONFIG_KERNEL_LZO
-+#include "../../../../lib/decompress_unlzo.c"
-+#endif
-+
-+void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
-+{
-+	decompress(input, len, NULL, NULL, output, NULL, error);
-+}
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 7e0fe4d..4c663fb 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -23,8 +23,8 @@ unsigned int __machine_arch_type;
- #include <linux/compiler.h>	/* for inline */
- #include <linux/types.h>	/* for size_t */
- #include <linux/stddef.h>	/* for NULL */
--#include <asm/string.h>
- #include <linux/linkage.h>
-+#include <asm/string.h>
- 
- #include <asm/unaligned.h>
- 
-@@ -106,57 +106,7 @@ static void putstr(const char *ptr)
- 
- #endif
- 
--#define __ptr_t void *
--
--#define memzero(s,n) __memzero(s,n)
--
--/*
-- * Optimised C version of memzero for the ARM.
-- */
--void __memzero (__ptr_t s, size_t n)
--{
--	union { void *vp; unsigned long *ulp; unsigned char *ucp; } u;
--	int i;
--
--	u.vp = s;
--
--	for (i = n >> 5; i > 0; i--) {
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--	}
--
--	if (n & 1 << 4) {
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--	}
--
--	if (n & 1 << 3) {
--		*u.ulp++ = 0;
--		*u.ulp++ = 0;
--	}
--
--	if (n & 1 << 2)
--		*u.ulp++ = 0;
--
--	if (n & 1 << 1) {
--		*u.ucp++ = 0;
--		*u.ucp++ = 0;
--	}
--
--	if (n & 1)
--		*u.ucp++ = 0;
--}
--
--static inline __ptr_t memcpy(__ptr_t __dest, __const __ptr_t __src,
--			    size_t __n)
-+void *memcpy(void *__dest, __const void *__src, size_t __n)
- {
- 	int i = 0;
- 	unsigned char *d = (unsigned char *)__dest, *s = (unsigned char *)__src;
-@@ -193,59 +143,20 @@ static inline __ptr_t memcpy(__ptr_t __dest, __const __ptr_t __src,
- /*
-  * gzip delarations
-  */
--#define STATIC static
--
--/* Diagnostic functions */
--#ifdef DEBUG
--#  define Assert(cond,msg) {if(!(cond)) error(msg);}
--#  define Trace(x) fprintf x
--#  define Tracev(x) {if (verbose) fprintf x ;}
--#  define Tracevv(x) {if (verbose>1) fprintf x ;}
--#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
--#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
--#else
--#  define Assert(cond,msg)
--#  define Trace(x)
--#  define Tracev(x)
--#  define Tracevv(x)
--#  define Tracec(c,x)
--#  define Tracecv(c,x)
--#endif
--
--static void error(char *m);
--
- extern char input_data[];
- extern char input_data_end[];
- 
--static unsigned char *output_data;
--static unsigned long output_ptr;
--
--static void error(char *m);
-+unsigned char *output_data;
-+unsigned long output_ptr;
- 
--static void putstr(const char *);
--
--static unsigned long free_mem_ptr;
--static unsigned long free_mem_end_ptr;
--
--#ifdef STANDALONE_DEBUG
--#define NO_INFLATE_MALLOC
--#endif
--
--#define ARCH_HAS_DECOMP_WDOG
--
--#ifdef CONFIG_KERNEL_GZIP
--#include "../../../../lib/decompress_inflate.c"
--#endif
--
--#ifdef CONFIG_KERNEL_LZO
--#include "../../../../lib/decompress_unlzo.c"
--#endif
-+unsigned long free_mem_ptr;
-+unsigned long free_mem_end_ptr;
- 
- #ifndef arch_error
- #define arch_error(x)
- #endif
- 
--static void error(char *x)
-+void error(char *x)
- {
- 	arch_error(x);
- 
-@@ -261,6 +172,8 @@ asmlinkage void __div0(void)
- 	error("Attempting division by 0!");
- }
- 
-+extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
-+
- #ifndef STANDALONE_DEBUG
- 
- unsigned long
-@@ -281,8 +194,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 	output_ptr = get_unaligned_le32(tmp);
- 
- 	putstr("Uncompressing Linux...");
--	decompress(input_data, input_data_end - input_data,
--			NULL, NULL, output_data, NULL, error);
-+	do_decompress(input_data, input_data_end - input_data,
-+			output_data, error);
- 	putstr(" done, booting the kernel.\n");
- 	return output_ptr;
- }
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
-index a5924b9..d00b544 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.in
-+++ b/arch/arm/boot/compressed/vmlinux.lds.in
-@@ -14,6 +14,7 @@ SECTIONS
-   /DISCARD/ : {
-     *(.ARM.exidx*)
-     *(.ARM.extab*)
-+    *(.data)
-   }
- 
-   . = TEXT_START;
-@@ -40,7 +41,6 @@ SECTIONS
-   .got			: { *(.got) }
-   _got_end = .;
-   .got.plt		: { *(.got.plt) }
--  .data			: { *(.data) }
-   _edata = .;
- 
-   . = BSS_START;
+------------[ cut here ]------------
+WARNING: at kernel/futex.c:1003 futex_wait+0x3fc/0x504() Modules linked
+in: sr_mod cdrom usblp usbhid rt3090sta(P) msdos udf crc_itu_t isofs
+ufsd(P) [<c002c834>] (unwind_backtrace+0x0/0xdc) from [<c0038228>]
+(warn_slowpath_common+0x4c/0x80) [<c0038228>]
+(warn_slowpath_common+0x4c/0x80) from [<c005b650>]
+(futex_wait+0x3fc/0x504) [<c005b650>] (futex_wait+0x3fc/0x504) from
+[<c005cd4c>] (do_futex+0xac/0x9e8) [<c005cd4c>] (do_futex+0xac/0x9e8)
+from [<c005d7ac>] (sys_futex+0x124/0x138) [<c005d7ac>]
+(sys_futex+0x124/0x138) from [<c00279a0>] (ret_fast_syscall+0x0/0x2c)
+---[ end trace 9837fa0402e69254 ]--- Unable to handle kernel paging
+request at virtual address 000b9a34 pgd = cb2e8000 [000b9a34]
+*pgd=0f021031, *pte=055de34f, *ppte=055deaae Internal error: Oops: 81f
+[#1] PREEMPT Modules linked in: sr_mod cdrom usblp usbhid rt3090sta(P)
+msdos udf crc_itu_t isofs ufsd(P)
+CPU: 0    Tainted: P        W   (2.6.30.9 #1)
+PC is at 0x40a95d60
+LR is at 0x40a95d5c
+pc : [<40a95d60>]    lr : [<40a95d5c>]    psr: 80000010
+sp : bec6a388  ip : 40aa216c  fp : 40aa21b0
+r10: 40aa2000  r9 : 000001b4  r8 : 000b9a34
+r7 : 000b9a34  r6 : bec6a5c8  r5 : 00000000  r4 : 00000000
+r3 : 00000000  r2 : 00000002  r1 : 00000081  r0 : 00000000
+Flags: Nzcv  IRQs on  FIQs on  Mode USER_32  ISA ARM  Segment user
+Control: 0005397f  Table: 0b2e8000  DAC: 00000015 Process appweb (pid:
+26569, stack limit = 0xcb206268)
+Stack: (0xbec6a388 to 0xcb208000)
+...
+Code: c59f32e4 c79a0003 cbfffdf4 e3a02002 (e5882000) Kernel panic - not
+syncing: Fatal exception in interrupt [<c002c834>]
+(unwind_backtrace+0x0/0xdc) <4>ttyS0: 1 input overrun(s) from
+[<c02e493c>] (panic+0x48/0x12c) [<c02e493c>] (panic+0x48/0x12c) from
+[<c002b0f0>] (die+0x160/0x18c) [<c002b0f0>] (die+0x160/0x18c) from
+[<c002d95c>] (__do_kernel_fault+0x68/0x80) [<c002d95c>]
+(__do_kernel_fault+0x68/0x80) from [<c02e9140>]
+(do_page_fault+0x290/0x2b4) [<c02e9140>] (do_page_fault+0x290/0x2b4)
+from [<c002724c>] (do_DataAbort+0x30/0x90) [<c002724c>]
+(do_DataAbort+0x30/0x90) from [<c02e769c>] (ret_from_exception+0x0/0x10)
+Exception stack(0xcb207fb0 to 0xcb207ff8)
+7fa0:                                     00000000 00000081 00000002
+00000000 
+7fc0: 00000000 00000000 bec6a5c8 000b9a34 000b9a34 000001b4 40aa2000
+40aa21b0 
+7fe0: 40aa216c bec6a388 40a95d5c 40a95d60 80000010 ffffffff           
