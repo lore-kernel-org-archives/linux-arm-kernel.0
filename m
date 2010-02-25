@@ -1,65 +1,75 @@
-From: alberto.panizzo@gmail.com (Alberto Panizzo)
-Date: Thu, 25 Feb 2010 10:31:29 +0100
-Subject: [PATCH] MXC: mach_armadillo5x0: Add USB Host support.
-In-Reply-To: <20100225080259.GA13295@pengutronix.de>
-References: <1267054032.3870.47.camel@realization>
-	<20100225080259.GA13295@pengutronix.de>
-Message-ID: <1267090289.2722.4.camel@realization>
+From: swirl@gmx.li (Thomas Weber)
+Date: Thu, 25 Feb 2010 10:36:13 +0100
+Subject: No subject
+Message-ID: <1267090573-17708-1-git-send-email-swirl@gmx.li>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Subject: [PATCH/RFC] OMAP2: serial.c: Fix number of uarts in early_init
 
-On gio, 2010-02-25 at 09:02 +0100, Uwe Kleine-K?nig wrote:
-> Hi Alberto,
-> 
-> On Thu, Feb 25, 2010 at 12:27:12AM +0100, Alberto Panizzo wrote:
-> > This add USB Host capability. The Armadillo 500 board is supplied
-> > with two USB Host connectors driven by the USB OTG and USB Host 2
-> > ports, through two NXP isp 1504 transceivers.
-> > 
-> > Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> > ---
-> > 
-> > Sascha, if there aren't problems, can you add this for 2.6.34?
-> > 
-..
+The omap_serial_early_init prints the following errors:
 
-> >  #include "crm_regs.h"
-> > @@ -103,6 +108,118 @@ static int armadillo5x0_pins[] = {
-> >  	/* I2C2 */
-> >  	MX31_PIN_CSPI2_MOSI__SCL,
-> >  	MX31_PIN_CSPI2_MISO__SDA,
-> > +	/* OTG */
-> > +	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
-> > +	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
-> > +	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
-> > +	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
-> > +	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
-> > +	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
-> > +	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
-> > +	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
-> > +	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
-> > +	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
-> > +	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
-> > +	MX31_PIN_USBOTG_STP__USBOTG_STP,
-> > +	/* USB host 2 */
-> > +	IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC),
-> > +	IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC),
-> > ...
-> I think you need to protect all hunks by
-> #ifdef CONFIG_USB_ULPI
-> 
-> For the pin-setup it's not important, but you must not call
-> otg_ulpi_create if USB_ULPI isn't configured.
-> 
-> Best regards
-> Uwe
-> 
+Could not get uart4_ick
+Could not get uart4_fck
 
-Ok, I'd seen this protection in pcm037 but I thought that on
-my board USB will be always enabled.
+because all the uarts available in omap_uart[] will be initialized.
+Only omap4430 and omap3630 have 4 uarts at the moment.
+This patch reduces the number of uarts when cpu is not omap4430 or
+omap3630.
 
-Sascha, please throw this patch, The From: mail is wrong, sorry..
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-Alberto!
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index b79bc89..da77930 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
+ }
+ void __init omap_serial_early_init(void)
+ {
+-	int i;
++	int i, nr_ports;
+ 	char name[16];
+ 
++	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
++		nr_ports = 3;
++	else
++		nr_ports = ARRAY_SIZE(omap_uart);
++
+ 	/*
+ 	 * Make sure the serial ports are muxed on at this point.
+ 	 * You have to mux them off in device drivers later on
+ 	 * if not needed.
+ 	 */
+ 
+-	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
++	for (i = 0; i < nr_ports; i++) {
+ 		struct omap_uart_state *uart = &omap_uart[i];
+ 		struct platform_device *pdev = &uart->pdev;
+ 		struct device *dev = &pdev->dev;
+@@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
+ 			continue;
+ 		}
+ 
+-		sprintf(name, "uart%d_ick", i+1);
++		sprintf(name, "uart%d_ick", i + 1);
+ 		uart->ick = clk_get(NULL, name);
+ 		if (IS_ERR(uart->ick)) {
+-			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
++			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
+ 			uart->ick = NULL;
+ 		}
+ 
+ 		sprintf(name, "uart%d_fck", i+1);
+ 		uart->fck = clk_get(NULL, name);
+ 		if (IS_ERR(uart->fck)) {
+-			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
++			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
+ 			uart->fck = NULL;
+ 		}
+ 
+-- 
+1.6.4.4
