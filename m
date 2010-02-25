@@ -1,46 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Feb 2010 14:31:12 -0800
-Subject: [GIT PULL] Second set of OMAP clock/hwmod patches for 2.6.34
-In-Reply-To: <alpine.DEB.2.00.1002241320120.2701@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1002241116000.2701@utopia.booyaka.com>
-	<20100224190211.GS28173@atomide.com>
-	<alpine.DEB.2.00.1002241207020.2701@utopia.booyaka.com>
-	<alpine.DEB.2.00.1002241320120.2701@utopia.booyaka.com>
-Message-ID: <20100225223111.GO28173@atomide.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Thu, 25 Feb 2010 23:33:20 +0100
+Subject: [PATCH] mx31pdk: Add NAND support
+In-Reply-To: <933005.90402.qm@web51001.mail.re2.yahoo.com>
+References: <933005.90402.qm@web51001.mail.re2.yahoo.com>
+Message-ID: <1267137200.2810.10.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [100224 12:18]:
-> On Wed, 24 Feb 2010, Paul Walmsley wrote:
+On gio, 2010-02-25 at 14:22 -0800, Fabio Estevam wrote:
+> --- On Thu, 2/25/10, Fabio Estevam <fabioestevam@yahoo.com> wrote:
 > 
-> > On Wed, 24 Feb 2010, Tony Lindgren wrote:
-> > 
-> > > * Paul Walmsley <paul@pwsan.com> [100224 10:15]:
-> > > > 
-> > > > Hi Tony,
-> > > > 
-> > > > The following changes since commit 0482e3c6f704d25b6a4e3c940caeeacece4e6d74:
-> > > >   Tony Lindgren (1):
-> > > >         Merge branch 'omap-fixes-for-linus' into omap-for-linus
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > >   git://git.pwsan.com/linux-2.6 for_2.6.34_b
-> > > 
-> > > Hmm this does not seem to merge without conflicts to omap-for-linus,
-> > > maybe take a look if you can merge/rebase it?
-> > > 
-> > > I'd assume rebasing or merging your branch with
-> > > 80c20d543d142ee54ec85259b77aaf0b83c32db5 will do the trick.
-> > 
-> > Looks like 4751227df948582e82f19df30efa662ab71fa980 is the problem.
+> ...
 > 
-> Cool, it turned out to be not too bad to rebase.  for_2.6.34_b branch is 
-> updated.  I'll retest here and resend a pull request after the tests are 
-> complete.
+> > > 
+> > > Are you sure that this works? Don't you see a lot of
+> > Bad
+> > > blocks reports
+> > > in boot messages?
+> > 
+> > I followed the same approach used on other i.MX boards.
+> > This is what I see:
+> > ...
+> > NAND device: Manufacturer ID: 0xec, Chip ID: 0xaa (Samsung
+> > NAND 256MiB 1,8V 8-bit)         
+> > Scanning device for bad blocks       
+> > Bad eraseblock 42 at 0x000000540000     
+> > Bad eraseblock 125 at 0x000000fa0000     
+> > Bad eraseblock 887 at 0x000006ee0000     
+> > Bad eraseblock 1750 at 0x00000dac0000     
+> > Bad eraseblock 2046 at 0x00000ffc0000     
+> > Bad eraseblock 2047 at 0x00000ffe0000     
+> >                
+> 
+> Just looked at what Redboot reported:
+> 
+> ++Searching for BBT table in the flash ...                                      
+> .                                                                               
+> Found version 1 Bbt0 at block 2047 (0xffe0000)                                  
+> Block 42 is bad                                                                 
+> Block 125 is bad                                                                
+> Block 887 is bad                                                                
+> Block 1750 is bad                                                               
+> Total bad blocks: 4   
+> 
+> So the only mismatch is 2046 eraseblock.
+> 
+> Regards,
+> 
+> Fabio Estevam
+> 
 
-OK that's merged now. I think we're pretty much done for this
-merge window. I'll take a look at few more board-*.c patches
-though.
+What kernel are you running? In particular, what version
+of mxc_nand.c are you building?
+Recently the mxc_nand.c has been updated to support newer i.MX SoC
+and the problem come after this update. (add NFC_NAND V2 support)
 
-Tony
+-- 
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
