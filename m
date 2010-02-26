@@ -1,37 +1,46 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 26 Feb 2010 09:23:15 +0100
-Subject: [PATCH 4/6] perf-events: export enable/disable event symbols to
-	kernel modules
-In-Reply-To: <1267124175-21721-5-git-send-email-will.deacon@arm.com>
-References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-2-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-3-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-4-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20100226082315.GC15885@elte.hu>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 26 Feb 2010 17:05:01 +0800
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <20100225212915.GA24043@n2100.arm.linux.org.uk>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+Message-ID: <f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 26, 2010 at 5:29 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 25, 2010 at 08:51:13PM +0000, Russell King - ARM Linux wrote:
+>> Err, you've rebased your tree since I last pulled it, and this now results
+>> in the following, and a load of duplicated commits between the two trees.
+>>
+>> This is not nice, please don't rebase stuff which I've already pulled.
+>>
+>> I'm going to think about what to do about this; I can't trivially drop
+>> your previous work from my tree.
+>
+> What happened to this commit?
+>
+> [ARM] pxa/ttc_dkb: remove duplicate macro definition
+>
 
-* Will Deacon <will.deacon@arm.com> wrote:
+Hi Russell,
 
-> The perf_event_enable and perf_event_disable functions are used to
-> control the activation of perf-events for a given context or CPU.
-> 
-> This patch exports these symbols so that they can be used by kernel
-> modules. Without these symbols, an event must be destroyed and recreated
-> to disable or enable it respectively. The maximum number of perf-events
-> is also made available to modules via the perf_get_max_events function.
-> 
-> Cc: Ingo Molnar <mingo@elte.hu>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  include/linux/perf_event.h |    1 +
->  kernel/perf_event.c        |    8 ++++++++
->  2 files changed, 9 insertions(+), 0 deletions(-)
+This one actually has been merged into 'fix' and been there in -rc8
+already. Now we have to live with this duplicate commit, it's my fault.
 
-Hm, what modules would like to use them, and in what fashion?
+> which follows:
+>
+> [ARM] pxa/raumfeld: add defconfig
+> [ARM] pxa/raumfeld: add platform support
+>
+> in your previous pull request? ?I can find these two in your latest with
+> different commit IDs, but not the pxa/ttc_dkb patch.
+>
 
-Thanks,
+I've sorted this out by merging your devel branch back, and rebased
+the remaining patches on top of it. Please try re-pull. A rough test
+here at my side shows a clean merge so far.
 
-	Ingo
+Thanks
