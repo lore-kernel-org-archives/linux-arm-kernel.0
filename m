@@ -1,85 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Feb 2010 11:17:02 -0000
-Subject: [PATCH 2/6] ARM: perf-events: use numeric ID to identify PMU
-In-Reply-To: <201002261010.03017.jpihet@mvista.com>
-References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-2-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-3-git-send-email-will.deacon@arm.com>
-	<201002261010.03017.jpihet@mvista.com>
-Message-ID: <000701cab6d5$38d828a0$aa8879e0$@deacon@arm.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Fri, 26 Feb 2010 13:24:29 +0200
+Subject: [RESEND PATCH] ARM: oprofile: convert from sysdev to platform device
+Message-ID: <1267183469-4371-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+oprofile does not work with PM, because sysdev_suspend() is done with
+interrupts disabled and oprofile needs a mutex. Implementing oprofile
+as a platform device solves this problem.
 
-> > +/* ARM perf PMU IDs for use by internal perf clients. */
-> > +#define ARM_PERF_PMU_ID_XSCALE1	0
-> > +#define ARM_PERF_PMU_ID_XSCALE2	(ARM_PERF_PMU_ID_XSCALE1 + 1)
-> > +#define ARM_PERF_PMU_ID_V6	(ARM_PERF_PMU_ID_XSCALE2 + 1)
-> > +#define ARM_PERF_PMU_ID_V6MP	(ARM_PERF_PMU_ID_V6 + 1)
-> > +#define ARM_PERF_PMU_ID_CA8	(ARM_PERF_PMU_ID_V6MP + 1)
-> > +#define ARM_PERF_PMU_ID_CA9	(ARM_PERF_PMU_ID_CA8 + 1)
-> > +#define ARM_NUM_PMU_IDS		(ARM_PERF_PMU_ID_CA9 + 1)
-> I think we need a better representation of the IDs and names. This is error
-> prone in case of modification, e.g. adding an ID.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+---
+ arch/arm/oprofile/common.c |   44 ++++++++++++++++++++++++++++----------------
+ 1 files changed, 28 insertions(+), 16 deletions(-)
 
-OK - how about something like this?:
-
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index 925b9a4..7584aa4 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -29,13 +29,15 @@ set_perf_event_pending(void)
- #define PERF_EVENT_INDEX_OFFSET 1
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 3fcd752..af0ffda 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -11,7 +11,8 @@
+ #include <linux/oprofile.h>
+ #include <linux/errno.h>
+ #include <linux/slab.h>
+-#include <linux/sysdev.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
+ #include <linux/mutex.h>
  
- /* ARM perf PMU IDs for use by internal perf clients. */
--#define ARM_PERF_PMU_ID_XSCALE1        0
--#define ARM_PERF_PMU_ID_XSCALE2        (ARM_PERF_PMU_ID_XSCALE1 + 1)
--#define ARM_PERF_PMU_ID_V6     (ARM_PERF_PMU_ID_XSCALE2 + 1)
--#define ARM_PERF_PMU_ID_V6MP   (ARM_PERF_PMU_ID_V6 + 1)
--#define ARM_PERF_PMU_ID_CA8    (ARM_PERF_PMU_ID_V6MP + 1)
--#define ARM_PERF_PMU_ID_CA9    (ARM_PERF_PMU_ID_CA8 + 1)
--#define ARM_NUM_PMU_IDS                (ARM_PERF_PMU_ID_CA9 + 1)
-+static enum arm_perf_pmu_ids {
-+       ARM_PERF_PMU_ID_XSCALE1 = 0,
-+       ARM_PERF_PMU_ID_XSCALE2,
-+       ARM_PERF_PMU_ID_V6,
-+       ARM_PERF_PMU_ID_V6MP,
-+       ARM_PERF_PMU_ID_CA8,
-+       ARM_PERF_PMU_ID_CA9,
-+       ARM_NUM_PMU_IDS,
-+};
+ #include "op_counter.h"
+@@ -77,7 +78,7 @@ static void op_arm_stop(void)
+ }
  
- extern int
- armpmu_get_pmu_id(void);
-
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 98c62ff..513ee60 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -69,13 +69,13 @@ struct cpu_hw_events {
- DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
+ #ifdef CONFIG_PM
+-static int op_arm_suspend(struct sys_device *dev, pm_message_t state)
++static int op_arm_suspend(struct platform_device *dev, pm_message_t state)
+ {
+ 	mutex_lock(&op_arm_mutex);
+ 	if (op_arm_enabled)
+@@ -86,7 +87,7 @@ static int op_arm_suspend(struct sys_device *dev, pm_message_t state)
+ 	return 0;
+ }
  
- /* PMU names. */
--static const char *arm_pmu_names[ARM_NUM_PMU_IDS] = {
--       "xscale1",
--       "xscale2",
--       "v6",
--       "v6mpcore",
--       "ARMv7 Cortex-A8",
--       "ARMv7 Cortex-A9",
-+static const char *arm_pmu_names[] = {
-+       [ARM_PERF_PMU_ID_XSCALE1] = "xscale1",
-+       [ARM_PERF_PMU_ID_XSCALE2] = "xscale2",
-+       [ARM_PERF_PMU_ID_V6]      = "v6",
-+       [ARM_PERF_PMU_ID_V6MP]    = "v6mpcore",
-+       [ARM_PERF_PMU_ID_CA8]     = "ARMv7 Cortex-A8",
-+       [ARM_PERF_PMU_ID_CA9]     = "ARMv7 Cortex-A9",
+-static int op_arm_resume(struct sys_device *dev)
++static int op_arm_resume(struct platform_device *dev)
+ {
+ 	mutex_lock(&op_arm_mutex);
+ 	if (op_arm_enabled && op_arm_model->start())
+@@ -95,34 +96,41 @@ static int op_arm_resume(struct sys_device *dev)
+ 	return 0;
+ }
+ 
+-static struct sysdev_class oprofile_sysclass = {
+-	.name		= "oprofile",
++static struct platform_driver oprofile_driver = {
++	.driver         = {
++		.name   = "arm-oprofile",
++	},
+ 	.resume		= op_arm_resume,
+ 	.suspend	= op_arm_suspend,
  };
  
- struct arm_pmu {
-
-
-Cheers,
-
-Will
+-static struct sys_device device_oprofile = {
+-	.id		= 0,
+-	.cls		= &oprofile_sysclass,
+-};
++static struct platform_device *oprofile_pdev;
+ 
+ static int __init init_driverfs(void)
+ {
+ 	int ret;
+ 
+-	if (!(ret = sysdev_class_register(&oprofile_sysclass)))
+-		ret = sysdev_register(&device_oprofile);
++	ret = platform_driver_register(&oprofile_driver);
++	if (ret)
++		return ret;
++
++	oprofile_pdev =
++		platform_device_register_simple("arm-oprofile", 0, NULL, 0);
++	if (IS_ERR(oprofile_pdev)) {
++		ret = PTR_ERR(oprofile_pdev);
++		platform_driver_unregister(&oprofile_driver);
++	}
+ 
+ 	return ret;
+ }
+ 
+ static void  exit_driverfs(void)
+ {
+-	sysdev_unregister(&device_oprofile);
+-	sysdev_class_unregister(&oprofile_sysclass);
++	platform_device_unregister(oprofile_pdev);
++	platform_driver_unregister(&oprofile_driver);
+ }
+ #else
+-#define init_driverfs()	do { } while (0)
++static int __init init_driverfs(void) { return 0; }
+ #define exit_driverfs() do { } while (0)
+ #endif /* CONFIG_PM */
+ 
+@@ -159,8 +167,12 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+ 		if (!counter_config)
+ 			return -ENOMEM;
+ 
++		ret = init_driverfs();
++		if (ret) {
++			kfree(counter_config);
++			return ret;
++		}
+ 		op_arm_model = spec;
+-		init_driverfs();
+ 		ops->create_files = op_arm_create_files;
+ 		ops->setup = op_arm_setup;
+ 		ops->shutdown = op_arm_stop;
+@@ -178,6 +190,6 @@ void oprofile_arch_exit(void)
+ 	if (op_arm_model) {
+ 		exit_driverfs();
+ 		op_arm_model = NULL;
++		kfree(counter_config);
+ 	}
+-	kfree(counter_config);
+ }
+-- 
+1.5.6.5
