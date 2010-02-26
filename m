@@ -1,51 +1,23 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Thu, 25 Feb 2010 14:22:39 -0800 (PST)
-Subject: [PATCH] mx31pdk: Add NAND support
-Message-ID: <933005.90402.qm@web51001.mail.re2.yahoo.com>
+From: 914059751@qq.com (rocky)
+Date: Fri, 26 Feb 2010 15:05:56 +0800
+Subject: Query about arm Dcache/Icache ?
+Message-ID: <12E2D0F704624646AF3EE27EFBBD5321@dufan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all:-)
 
---- On Thu, 2/25/10, Fabio Estevam <fabioestevam@yahoo.com> wrote:
+      From ARM920T, cache is split into Icache and Dcache.
 
-...
+Question: How does hardware know which part of binary program in memory
+should loaded into Icache/Dcache?
 
-> > 
-> > Are you sure that this works? Don't you see a lot of
-> Bad
-> > blocks reports
-> > in boot messages?
-> 
-> I followed the same approach used on other i.MX boards.
-> This is what I see:
-> ...
-> NAND device: Manufacturer ID: 0xec, Chip ID: 0xaa (Samsung
-> NAND 256MiB 1,8V 8-bit)? ? ? ? ?
-> Scanning device for bad blocks? ? ? ?
-> Bad eraseblock 42 at 0x000000540000? ? ?
-> Bad eraseblock 125 at 0x000000fa0000? ? ?
-> Bad eraseblock 887 at 0x000006ee0000? ? ?
-> Bad eraseblock 1750 at 0x00000dac0000? ? ?
-> Bad eraseblock 2046 at 0x00000ffc0000? ? ?
-> Bad eraseblock 2047 at 0x00000ffe0000? ? ?
-> ? ? ? ? ? ? ? ?
+ 
 
-Just looked at what Redboot reported:
+Rocky
 
-++Searching for BBT table in the flash ...                                      
-.                                                                               
-Found version 1 Bbt0 at block 2047 (0xffe0000)                                  
-Block 42 is bad                                                                 
-Block 125 is bad                                                                
-Block 887 is bad                                                                
-Block 1750 is bad                                                               
-Total bad blocks: 4   
+ 
 
-So the only mismatch is 2046 eraseblock.
-
-Regards,
-
-Fabio Estevam
-
-
-      
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100226/6293e70d/attachment-0001.htm>
