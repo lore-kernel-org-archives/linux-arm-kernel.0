@@ -1,51 +1,55 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 26 Feb 2010 16:09:24 +0000
-Subject: [PULL] Pull request for for-rmk/samsung5
-In-Reply-To: <20100225205301.GG3101@n2100.arm.linux.org.uk>
-References: <20100225000919.GA28433@fluff.org.uk>
-	<20100225205301.GG3101@n2100.arm.linux.org.uk>
-Message-ID: <20100226160924.GB24864@trinity.fluff.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Feb 2010 16:25:21 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1266979632.23523.1668.camel@pasglop>
+References: <1266979632.23523.1668.camel@pasglop>
+Message-ID: <1267201521.14703.50.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 08:53:01PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 25, 2010 at 12:09:19AM +0000, Ben Dooks wrote:
-> > Sorry for the late request, but haven't been very well. Quite a bit of
-> > this update has been on list for a while, but only just been merged
-> > together into one tree.
-> > 
-> > This is the last of the Samsung updates that need to go via RMK, they
-> > are mostly plat-s3c/plat-s3c64xx and machine squashed and the new
-> > S5P6442 and S5PV210 code.
-> > 
-> > Included are some updates for the current code to avoid build or runtime
-> > problems with other updates such as via the ASoC tree.
-> > 
-> > I will be doing a seperate set of updates direct to Linus once these are
-> > merged to fix and outstanding problems, any updates such as S3C2443 clock
-> > rewrite and anything else not directly relying on arch/arm modifications.
-> > 
-> > There will also be a set of documentation updates to deal with the current
-> > shifts and outline anything else that needs to be done.
-> > 
-> > Anything urgent, please cc: me directly.
-> > 
-> > The following changes since commit ab5d97db1c6ced3e95c00d097931471707032b1f:
-> >   Ben Dooks (1):
-> >         ARM: SAMSUNG: Fix bad use of __initdata for s3c_register_clocks()
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.fluff.org/bjdooks/linux.git for-rmk/samsung5
+On Wed, 2010-02-24 at 02:47 +0000, Benjamin Herrenschmidt wrote:
+> On Fri, 2010-02-19 at 17:36 +0000, Catalin Marinas wrote:
+> >
+> > If a page is already mapped in user space, flush_dcache_page() on ARM
+> > does the flushing rather than deferring it to update_mmu_cache().
 > 
-> This gives me conflicts in arch/arm/Makefile and arch/arm/Kconfig.  I'll
-> need to investigate, which I'll do over the weekend.
+> This is for D-cache aliases on VIVT right ? Or are you still talking
+> about I/D coherency on PIPT ARMs ? Because the later should not matter
+> for already mapped userspace pages in the sense that if user space
+> explicitely read() onto a page, it's up to userspace to cache clean that
+> page before executing from it in my book :-)
 
-Very probably, this is based of the for-rmk/samsung3 branch which has
-very likely diverged from your branch. Thanks for looking at it.
+I was still thinking about PIPT I/D coherency. The read() case you
+mention is pretty clear, no need or the kernel to ensure coherency
+(especially since writing is done via copy_to_user rather than to the
+page cache page).
+
+For mmap'ed pages (and present in the page cache), is it guaranteed that
+the HCD driver won't write to it once it has been mapped into user
+space? If that's the case, it may solve the problem by just reversing
+the meaning of PG_arch_1 on ARM and assume that a newly allocated page
+has dirty D-cache by default.
+
+> > The PIO HCD drivers, however, don't call flush_dcache_page(). Is it possible
+> > that the HCD could transfer data into a page cache page already mapped
+> > in user space? My understanding is that the scenario above is possible.
+> 
+> It is but I'm not confident the responsibility for doing that cleanup
+> is at the HCD level. That would impact a lot of HCD activities that
+> don't need such flushing since the use of the page is purely in-kernel.
+> 
+> Though I suppose that could be optimized out in most case using the page
+> use count.
+> 
+> But I still wonder whether it should be pushed down to the actual
+> interface drivers, that's always been the case I believe. In fact, in
+> the case of block ops, it's generally done at the BIO or even file
+> system layer right ?
+
+The filesystem layer does it only if it needs to touch the data written
+by the block device (e.g. cramfs, jffs). Some block devices call
+flush_dcache_page (like mmci.c) while some others don't (and those that
+use DMA actually don't since the DMA API handles the flushing).
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Catalin
