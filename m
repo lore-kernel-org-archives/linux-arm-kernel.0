@@ -1,241 +1,50 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 26 Feb 2010 18:36:32 +0100
-Subject: [PATCH v4] MXC: mach_armadillo5x0: Add USB Host support.
-Message-ID: <1267205792.2778.101.camel@realization>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Feb 2010 19:59:45 +0000
+Subject: [PULL] Pull request for for-rmk/samsung5
+In-Reply-To: <20100226160924.GB24864@trinity.fluff.org>
+References: <20100225000919.GA28433@fluff.org.uk>
+	<20100225205301.GG3101@n2100.arm.linux.org.uk>
+	<20100226160924.GB24864@trinity.fluff.org>
+Message-ID: <20100226195944.GA23933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add USB Host capability. The Armadillo 500 board is supplied
-with two USB Host connectors driven by the USB OTG and USB Host 2
-ports, through two NXP isp 1504 transceivers.
+On Fri, Feb 26, 2010 at 04:09:24PM +0000, Ben Dooks wrote:
+> On Thu, Feb 25, 2010 at 08:53:01PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Feb 25, 2010 at 12:09:19AM +0000, Ben Dooks wrote:
+> > > Sorry for the late request, but haven't been very well. Quite a bit of
+> > > this update has been on list for a while, but only just been merged
+> > > together into one tree.
+> > > 
+> > > This is the last of the Samsung updates that need to go via RMK, they
+> > > are mostly plat-s3c/plat-s3c64xx and machine squashed and the new
+> > > S5P6442 and S5PV210 code.
+> > > 
+> > > Included are some updates for the current code to avoid build or runtime
+> > > problems with other updates such as via the ASoC tree.
+> > > 
+> > > I will be doing a seperate set of updates direct to Linus once these are
+> > > merged to fix and outstanding problems, any updates such as S3C2443 clock
+> > > rewrite and anything else not directly relying on arch/arm modifications.
+> > > 
+> > > There will also be a set of documentation updates to deal with the current
+> > > shifts and outline anything else that needs to be done.
+> > > 
+> > > Anything urgent, please cc: me directly.
+> > > 
+> > > The following changes since commit ab5d97db1c6ced3e95c00d097931471707032b1f:
+> > >   Ben Dooks (1):
+> > >         ARM: SAMSUNG: Fix bad use of __initdata for s3c_register_clocks()
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.fluff.org/bjdooks/linux.git for-rmk/samsung5
+> > 
+> > This gives me conflicts in arch/arm/Makefile and arch/arm/Kconfig.  I'll
+> > need to investigate, which I'll do over the weekend.
+> 
+> Very probably, this is based of the for-rmk/samsung3 branch which has
+> very likely diverged from your branch. Thanks for looking at it.
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
-
-This patch is based on top of Pengutronix mxc-master branch.
-Please, if possible add this for 2.6.34.
-Thanks.
-
-changes since v3:
--Correct the error handling as addressed by Russell.
-
-Alberto!
-
- arch/arm/mach-mx3/Kconfig             |    1 +
- arch/arm/mach-mx3/mach-armadillo5x0.c |  166 +++++++++++++++++++++++++++++++++
- 2 files changed, 167 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 3872af1..96069a4 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -95,6 +95,7 @@ config MACH_PCM043
- config MACH_ARMADILLO5X0
- 	bool "Support Atmark Armadillo-500 Development Base Board"
- 	select ARCH_MX31
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for Atmark Armadillo-500 platform. This includes
- 	  specific configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
-index 3d72b0b..5f72ec9 100644
---- a/arch/arm/mach-mx3/mach-armadillo5x0.c
-+++ b/arch/arm/mach-mx3/mach-armadillo5x0.c
-@@ -36,6 +36,9 @@
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <linux/i2c.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/delay.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -52,6 +55,8 @@
- #include <mach/ipu.h>
- #include <mach/mx3fb.h>
- #include <mach/mxc_nand.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
- 
- #include "devices.h"
- #include "crm_regs.h"
-@@ -103,8 +108,158 @@ static int armadillo5x0_pins[] = {
- 	/* I2C2 */
- 	MX31_PIN_CSPI2_MOSI__SCL,
- 	MX31_PIN_CSPI2_MISO__SDA,
-+	/* OTG */
-+	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
-+	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
-+	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
-+	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
-+	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
-+	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
-+	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
-+	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
-+	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
-+	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
-+	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
-+	MX31_PIN_USBOTG_STP__USBOTG_STP,
-+	/* USB host 2 */
-+	IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_NXT, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_STP, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DATA0, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_USBH2_DATA1, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_STXD3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SRXD3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SCK3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SFS3, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_STXD6, IOMUX_CONFIG_FUNC),
-+	IOMUX_MODE(MX31_PIN_SRXD6, IOMUX_CONFIG_FUNC),
- };
- 
-+/* USB */
-+#if defined(CONFIG_USB_ULPI)
-+
-+#define OTG_RESET IOMUX_TO_GPIO(MX31_PIN_STXD4)
-+#define USBH2_RESET IOMUX_TO_GPIO(MX31_PIN_SCK6)
-+#define USBH2_CS IOMUX_TO_GPIO(MX31_PIN_GPIO1_3)
-+
-+#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
-+			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+
-+static int usbotg_init(struct platform_device *pdev)
-+{
-+	int err;
-+
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
-+
-+	/* Chip already enabled by hardware */
-+	/* OTG phy reset*/
-+	err = gpio_request(OTG_RESET, "USB-OTG-RESET");
-+	if (err) {
-+		pr_err("Failed to request the usb otg reset gpio\n");
-+		return err;
-+	}
-+
-+	err = gpio_direction_output(OTG_RESET, 1/*HIGH*/);
-+	if (err) {
-+		pr_err("Failed to reset the usb otg phy\n");
-+		goto otg_free_reset;
-+	}
-+
-+	gpio_set_value(OTG_RESET, 0/*LOW*/);
-+	mdelay(5);
-+	gpio_set_value(OTG_RESET, 1/*HIGH*/);
-+
-+	return 0;
-+
-+otg_free_reset:
-+	gpio_free(OTG_RESET);
-+	return err;
-+}
-+
-+static int usbh2_init(struct platform_device *pdev)
-+{
-+	int err;
-+
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
-+
-+
-+	/* Enable the chip */
-+	err = gpio_request(USBH2_CS, "USB-H2-CS");
-+	if (err) {
-+		pr_err("Failed to request the usb host 2 CS gpio\n");
-+		return err;
-+	}
-+
-+	err = gpio_direction_output(USBH2_CS, 0/*Enabled*/);
-+	if (err) {
-+		pr_err("Failed to drive the usb host 2 CS gpio\n");
-+		goto h2_free_cs;
-+	}
-+
-+	/* H2 phy reset*/
-+	err = gpio_request(USBH2_RESET, "USB-H2-RESET");
-+	if (err) {
-+		pr_err("Failed to request the usb host 2 reset gpio\n");
-+		goto h2_free_cs;
-+	}
-+
-+	err = gpio_direction_output(USBH2_RESET, 1/*HIGH*/);
-+	if (err) {
-+		pr_err("Failed to reset the usb host 2 phy\n");
-+		goto h2_free_reset;
-+	}
-+
-+	gpio_set_value(USBH2_RESET, 0/*LOW*/);
-+	mdelay(5);
-+	gpio_set_value(USBH2_RESET, 1/*HIGH*/);
-+
-+	return 0;
-+
-+h2_free_reset:
-+	gpio_free(USBH2_RESET);
-+h2_free_cs:
-+	gpio_free(USBH2_CS);
-+	return err;
-+}
-+
-+static struct mxc_usbh_platform_data usbotg_pdata = {
-+	.init	= usbotg_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_DIFF_UNI,
-+};
-+
-+static struct mxc_usbh_platform_data usbh2_pdata = {
-+	.init	= usbh2_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_DIFF_UNI,
-+};
-+#endif /* CONFIG_USB_ULPI */
-+
- /* RTC over I2C*/
- #define ARMADILLO5X0_RTC_GPIO	IOMUX_TO_GPIO(MX31_PIN_SRXD4)
- 
-@@ -393,6 +548,17 @@ static void __init armadillo5x0_init(void)
- 	if (armadillo5x0_i2c_rtc.irq == 0)
- 		pr_warning("armadillo5x0_init: failed to get RTC IRQ\n");
- 	i2c_register_board_info(1, &armadillo5x0_i2c_rtc, 1);
-+
-+	/* USB */
-+#if defined(CONFIG_USB_ULPI)
-+	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+
-+	mxc_register_device(&mxc_otg_host, &usbotg_pdata);
-+	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-+#endif
- }
- 
- static void __init armadillo5x0_timer_init(void)
--- 
-1.6.3.3
+When you say that, are you saying that the contents of the samsung3
+branch which I pulled aren't relevant anymore?
