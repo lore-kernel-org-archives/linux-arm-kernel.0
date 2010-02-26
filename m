@@ -1,50 +1,32 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Fri, 26 Feb 2010 10:56:36 +0100
-Subject: [PATCH] mx31pdk: Add NAND support
-In-Reply-To: <210155.75899.qm@web51001.mail.re2.yahoo.com>
-References: <210155.75899.qm@web51001.mail.re2.yahoo.com>
-Message-ID: <201002261056.37618.jbe@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Feb 2010 10:01:14 -0000
+Subject: [PATCH 5/6] ARM: oprofile: use perf-events framework as backend
+In-Reply-To: <201002261028.07691.jpihet@mvista.com>
+References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
+	<1267124175-21721-5-git-send-email-will.deacon@arm.com>
+	<1267124175-21721-6-git-send-email-will.deacon@arm.com>
+	<201002261028.07691.jpihet@mvista.com>
+Message-ID: <000501cab6ca$a1ca7710$e55f6530$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam wrote:
-> > Are you sure that this works? Don't you see a lot of Bad
-> > blocks reports
-> > in boot messages?
->
-> I followed the same approach used on other i.MX boards. This is what I see:
-> ...
-> NAND device: Manufacturer ID: 0xec, Chip ID: 0xaa (Samsung NAND 256MiB 1,8V
-> 8-bit) Scanning device for bad blocks
-> Bad eraseblock 42 at 0x000000540000
-> Bad eraseblock 125 at 0x000000fa0000
-> Bad eraseblock 887 at 0x000006ee0000
-> Bad eraseblock 1750 at 0x00000dac0000
-> Bad eraseblock 2046 at 0x00000ffc0000
-> Bad eraseblock 2047 at 0x00000ffe0000
-> Registering mxc_nand as whole device
->
-> If I define it as:
->
-> static struct mxc_nand_platform_data mx31pdk_nand_board_info = {
-> 	.width = 1,
-> 	.hw_ecc = 1,
-> 	.flash_bbt =1,
-> };
+Hi Jean,
 
-Your bootloader also use a Bad Block Table? Then also your kernel should use 
-it. If hardware ECC is in use, its always a good idea to collect the bad 
-blocks into a BBT. Most of the time you can't control at which offset in the 
-OOB data the NAND controller will store the ECC sum. There is the risk it 
-will destroy manufacturer's bad block markers. So, its better to collect 
-these marked bad blocks into a BBT the first time you use the NAND device. 
-After that _only_ the BBT should be used to handle bad blocks (in the boot 
-loader and the kernel).
+Thanks for the feedback.
 
-jbe
+> How is the underlaying HW reserved? In Oprofile we used to have a call to
+> reserve_pmu.
 
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+Since this patch uses the perf API, perf will take care of reserving the hardware
+for us [well, it reserves it for the perf framework]. The events created by
+OProfile are pinned to each CPU, so provided the perf calls don't fail, we know
+that we have access to the PMU. If the calls do fail, we report failure back to
+the generic OProfile framework.
+ 
+> Otherwise I am OK with the concept of cleaning the profiling tools. Very good!
+
+Thanks. Not only does it clean the code - it adds A9MP support to OProfile for free!
+
+Cheers,
+
+Will
