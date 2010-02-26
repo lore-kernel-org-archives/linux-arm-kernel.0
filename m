@@ -1,106 +1,53 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Fri, 26 Feb 2010 12:48:03 +0100
-Subject: [PATCH] mx31pdk: Add NAND support
-In-Reply-To: <1267180433.2778.56.camel@realization>
-References: <210155.75899.qm@web51001.mail.re2.yahoo.com>
-	<201002261056.37618.jbe@pengutronix.de>
-	<1267180433.2778.56.camel@realization>
-Message-ID: <201002261248.03214.jbe@pengutronix.de>
+From: aric@sdgsystems.com (Aric D. Blumer)
+Date: Fri, 26 Feb 2010 08:12:09 -0500
+Subject: Soft Lockup Debugging
+In-Reply-To: <20100225214318.GB24043@n2100.arm.linux.org.uk>
+References: <4B869531.3030708@sdgsystems.com>
+	<20100225214318.GB24043@n2100.arm.linux.org.uk>
+Message-ID: <4B87C8A9.6030606@sdgsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alberto,
-
-Alberto Panizzo wrote:
-> On ven, 2010-02-26 at 10:56 +0100, Juergen Beisert wrote:
-> > Fabio Estevam wrote:
-> > > > Are you sure that this works? Don't you see a lot of Bad
-> > > > blocks reports
-> > > > in boot messages?
-> > >
-> > > I followed the same approach used on other i.MX boards. This is what I
-> > > see: ...
-> > > NAND device: Manufacturer ID: 0xec, Chip ID: 0xaa (Samsung NAND 256MiB
-> > > 1,8V 8-bit) Scanning device for bad blocks
-> > > Bad eraseblock 42 at 0x000000540000
-> > > Bad eraseblock 125 at 0x000000fa0000
-> > > Bad eraseblock 887 at 0x000006ee0000
-> > > Bad eraseblock 1750 at 0x00000dac0000
-> > > Bad eraseblock 2046 at 0x00000ffc0000
-> > > Bad eraseblock 2047 at 0x00000ffe0000
-> > > Registering mxc_nand as whole device
-> > >
-> > > If I define it as:
-> > >
-> > > static struct mxc_nand_platform_data mx31pdk_nand_board_info = {
-> > > 	.width = 1,
-> > > 	.hw_ecc = 1,
-> > > 	.flash_bbt =1,
-> > > };
-> >
-> > Your bootloader also use a Bad Block Table? Then also your kernel should
-> > use it. If hardware ECC is in use, its always a good idea to collect the
-> > bad blocks into a BBT. Most of the time you can't control at which offset
-> > in the OOB data the NAND controller will store the ECC sum. There is the
-> > risk it will destroy manufacturer's bad block markers. So, its better to
-> > collect these marked bad blocks into a BBT the first time you use the
-> > NAND device. After that _only_ the BBT should be used to handle bad
-> > blocks (in the boot loader and the kernel).
+On 02/25/2010 04:43 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 25, 2010 at 10:20:17AM -0500, Aric D. Blumer wrote:
+>   
+>> [  450.102093] Exception stack(0xcfd79b70 to 0xcfd79bb8)
+>> [  450.107170] 9b60:                                     00000029 cf80aac0 c043b7f4 40000013 
+>> [  450.115604] 9b80: cf80aac0 00000029 00000029 c040d730 cfd78000 c0440900 0000000a cfd79bd4 
+>> [  450.124064] 9ba0: cfd79bd8 cfd79bb8 c007cc8c c007b1ac 40000013 ffffffff                   
+>> [  450.132506]  r6:04000000 r5:cfd79ba4 r4:ffffffff
+>> [  450.137222] [<c007b180>] (handle_IRQ_event+0x0/0x84) from [<c007cc8c>] (handle_level_irq+0x78/0xf0)
+>> [  450.146419]  r7:c040d730 r6:cfd79cb0 r5:00000029 r4:c0416648
+>> [  450.152195] [<c007cc14>] (handle_level_irq+0x0/0xf0) from [<c0030060>] (__exception_text_start+0x60/0x74)
+>> [  450.161910]  r5:c0447f20 r4:00000029
+>> [  450.165559] [<c0030000>] (__exception_text_start+0x0/0x74) from [<c0030a70>] (__irq_svc+0x30/0xc0)
+>> [  450.174667] Exception stack(0xcfd79c10 to 0xcfd79c58)
+>> [  450.179745] 9c00:                                     00000014 cf8bce00 c043b7a0 40000013 
+>> [  450.188188] 9c20: cf8bce00 00000014 00000014 c040d730 cfd78000 c0440900 0000000a cfd79c74 
+>> [  450.196649] 9c40: cfd79c78 cfd79c58 c007cc8c c007b1ac 40000013 ffffffff                   
+>> [  450.205105]  r6:00000200 r5:cfd79c44 r4:ffffffff
+>> [  450.209815] [<c007b180>] (handle_IRQ_event+0x0/0x84) from [<c007cc8c>] (handle_level_irq+0x78/0xf0)
+>> [  450.219011]  r7:c040d730 r6:cfd79d60 r5:00000014 r4:c041615c
+>> [  450.224797] [<c007cc14>] (handle_level_irq+0x0/0xf0) from [<c0030060>] (__exception_text_start+0x60/0x74)
+>> [  450.234512]  r5:c0447f20 r4:00000014
+>> [  450.238159] [<c0030000>] (__exception_text_start+0x0/0x74) from [<c0030a70>] (__irq_svc+0x30/0xc0)
+>>     
+> Looks to me like a stuck IRQ problem - but no idea which IRQ.  You'll
+> need to disassemble handle_IRQ_event to find out which register the
+> interrupt number ends up in when PC=0xc007b1ac, and then read it
+> from the exception stack.  The register order there is:
 >
-> Thank you Juergen to participate on this thread.
-> Ok, so with this board shall be enabled the flash_bbt checking because
-> the bootloader uses it. But how do you explain that on Mine board the
-> kernel recognize it correctly and in Fabio's board the kernel prompt
-> disagree with the bootloader one? It is a kind of bootloader issue?
+> 	r0-r12, sp (r13), lr (r14), pc (r15), cpsr, -1
+>   
 
-Here on my i.MX35 based system the bootloader reports:
+I see.  So when interpreting soft lockup backtraces, the most important
+context is probably the one that the soft lockup detection code
+interrupts, and in this case it is the IRQ handlers.  Makes perfect
+sense in hindsight.
 
-NAND device: Manufacturer ID: 0x20, Chip ID: 0xac (ST Micro NAND 512MiB 1,8V 8-bit)
-Bad block table found at page 262080, version 0x01
-Bad block table found at page 262016, version 0x01
-nand_read_bbt: Bad block at 0x01d00000
-nand_read_bbt: Bad block at 0x10020000
-nand_read_bbt: Bad block at 0x10040000
-nand_read_bbt: Bad block at 0x10060000
-nand_read_bbt: Bad block at 0x10080000
-nand_read_bbt: Bad block at 0x100a0000
-nand_read_bbt: Bad block at 0x100e0000
-nand_read_bbt: Bad block at 0x10120000
-nand_read_bbt: Bad block at 0x10160000
-nand_read_bbt: Bad block at 0x101a0000
-nand_read_bbt: Bad block at 0x101c0000
-nand_read_bbt: Bad block at 0x10200000
-nand_read_bbt: Bad block at 0x10240000
+You were right.  The issue is a stuck IRQ in the pxamci.c code.  I've
+got a fix, but it's relevant to this discussion:
 
-And the starting kernel reports:
+http://lists.arm.linux.org.uk/lurker/message/20090615.210855.a3f32cf1.en.html
 
-[...]
-NAND device: Manufacturer ID: 0x20, Chip ID: 0xac (ST Micro NAND 512MiB 1,8V 8-bit)
-Bad block table found at page 262080, version 0x01
-Bad block table found at page 262016, version 0x01
-nand_read_bbt: Bad block at 0x000001d00000
-nand_read_bbt: Bad block at 0x000010020000
-nand_read_bbt: Bad block at 0x000010040000
-nand_read_bbt: Bad block at 0x000010060000
-nand_read_bbt: Bad block at 0x000010080000
-nand_read_bbt: Bad block at 0x0000100a0000
-nand_read_bbt: Bad block at 0x0000100e0000
-nand_read_bbt: Bad block at 0x000010120000
-nand_read_bbt: Bad block at 0x000010160000
-nand_read_bbt: Bad block at 0x0000101a0000
-nand_read_bbt: Bad block at 0x0000101c0000
-nand_read_bbt: Bad block at 0x000010200000
-nand_read_bbt: Bad block at 0x000010240000
-[...]
-
-Both are configured to use a BBT and will handle the bad blocks in the same
-manner.
-
-Regards,
-Juergen
-
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+Thanks for the help!
