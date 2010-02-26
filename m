@@ -1,37 +1,42 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 26 Feb 2010 10:50:11 +0800
-Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <20100225212915.GA24043@n2100.arm.linux.org.uk>
-References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
-	<20100225205113.GF3101@n2100.arm.linux.org.uk>
-	<20100225212915.GA24043@n2100.arm.linux.org.uk>
-Message-ID: <f17812d71002251850p2d69665cr508e69f9be0e7578@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Fri, 26 Feb 2010 09:59:26 +0530
+Subject: QUERY: How to call board specific initialization function before
+	map_io or timer_init
+In-Reply-To: <20100225160344.GG30679@trinity.fluff.org>
+References: <22dbbef21002250507s12664df5q36e50a8f9e0bc3b9@mail.gmail.com>
+	<20100225160344.GG30679@trinity.fluff.org>
+Message-ID: <22dbbef21002252029k54236940wf51e599a169e360e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2010 at 5:29 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Feb 25, 2010 at 08:51:13PM +0000, Russell King - ARM Linux wrote:
->> Err, you've rebased your tree since I last pulled it, and this now results
->> in the following, and a load of duplicated commits between the two trees.
->>
->> This is not nice, please don't rebase stuff which I've already pulled.
->>
->> I'm going to think about what to do about this; I can't trivially drop
->> your previous work from my tree.
+>> Situation: I need to register my clock framework with
+>> arch/arm/common/clkdev framework
+>> before actually initializing timer. So i can't do this in
+>> "init_machine" as timer_init is called
+>> before that.
 >
-> What happened to this commit?
->
-> [ARM] pxa/ttc_dkb: remove duplicate macro definition
->
-> which follows:
->
-> [ARM] pxa/raumfeld: add defconfig
-> [ARM] pxa/raumfeld: add platform support
->
-> in your previous pull request? ?I can find these two in your latest with
-> different commit IDs, but not the pxa/ttc_dkb patch.
+> One method would be to use an init call from <linux/init.h> which is
+> called before these are done (you'll have to work out which one is
+> suitable for yourself).
 >
 
-Ouch, I'll get this sorted out and send the pull request again. Sorry it
-took you time to find the mess out ;-)
+I tried few of them but timer_init or map_io are getting called before my
+routine is called.
+
+> Either that or ensure that your boards always call a specific
+> routine in their init sequence to ensure clocks are registered before
+> the timer needs them.
+>
+> If I remeber correctly, map_io() is actually called before the timers
+> are initialised, so you could add your clocks there.
+
+I can add my init routine to map_io's implementation, but i think
+map_io is not supposed to be implemented that way. map_io should
+be called to statically map devices memory. It is not for hardware
+specific initializations.
+
+Is my understanding correct?
+
+
+regards,
+viresh kumar
