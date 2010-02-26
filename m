@@ -1,38 +1,37 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 26 Feb 2010 02:12:07 +0100
-Subject: [PATCH resend] s3cmci: Initialize default platform data no_wprotect
-	and no_detect with 1
-Message-ID: <1267146728-8369-1-git-send-email-lars@metafoo.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 26 Feb 2010 10:50:11 +0800
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <20100225212915.GA24043@n2100.arm.linux.org.uk>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+Message-ID: <f17812d71002251850p2d69665cr508e69f9be0e7578@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no platform_data was givin to the device it's going to use it's default
-platform data struct which has all fields initialized to zero.
-As a result the driver is going to try to request gpio0 both as write protect
-and card detect pin. Which of course will fail and makes the driver unusable
+On Fri, Feb 26, 2010 at 5:29 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 25, 2010 at 08:51:13PM +0000, Russell King - ARM Linux wrote:
+>> Err, you've rebased your tree since I last pulled it, and this now results
+>> in the following, and a load of duplicated commits between the two trees.
+>>
+>> This is not nice, please don't rebase stuff which I've already pulled.
+>>
+>> I'm going to think about what to do about this; I can't trivially drop
+>> your previous work from my tree.
+>
+> What happened to this commit?
+>
+> [ARM] pxa/ttc_dkb: remove duplicate macro definition
+>
+> which follows:
+>
+> [ARM] pxa/raumfeld: add defconfig
+> [ARM] pxa/raumfeld: add platform support
+>
+> in your previous pull request? ?I can find these two in your latest with
+> different commit IDs, but not the pxa/ttc_dkb patch.
+>
 
-Previously to the introduction of no_wprotect and no_detect the behavior was
-to assume that if no platform data was given there is no write protect or card
-detect pin.
-This patch restores that behavior.
-
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
----
- drivers/mmc/host/s3cmci.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index d96e1ab..b9c96cc 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1360,6 +1360,8 @@ static struct mmc_host_ops s3cmci_ops = {
- static struct s3c24xx_mci_pdata s3cmci_def_pdata = {
- 	/* This is currently here to avoid a number of if (host->pdata)
- 	 * checks. Any zero fields to ensure reasonable defaults are picked. */
-+	 .no_wprotect = 1,
-+	 .no_detect = 1,
- };
- 
- #ifdef CONFIG_CPU_FREQ
--- 
-1.5.6.5
+Ouch, I'll get this sorted out and send the pull request again. Sorry it
+took you time to find the mess out ;-)
