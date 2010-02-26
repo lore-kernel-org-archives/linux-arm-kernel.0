@@ -1,30 +1,30 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Fri, 26 Feb 2010 15:53:43 -0800
-Subject: [PATCH 06/13] RM: LPC32XX: Serial support code
+Date: Fri, 26 Feb 2010 15:53:45 -0800
+Subject: [PATCH 08/13] ARM: LPC32XX: Phytec 3250 platform support
 In-Reply-To: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
 References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1267228430-27193-7-git-send-email-wellsk40@gmail.com>
+Message-ID: <1267228430-27193-9-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-Serial port setup support code
+Platform support file for the PHY3250 mach id
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/serial.c |  190 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 190 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-lpc32xx/serial.c
+ arch/arm/mach-lpc32xx/phy3250.c |  397 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 397 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-lpc32xx/phy3250.c
 
-diff --git a/arch/arm/mach-lpc32xx/serial.c b/arch/arm/mach-lpc32xx/serial.c
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
 new file mode 100644
-index 0000000..429cfdb
+index 0000000..bc9a42d
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/serial.c
-@@ -0,0 +1,190 @@
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -0,0 +1,397 @@
 +/*
-+ * arch/arm/mach-lpc32xx/serial.c
++ * arch/arm/mach-lpc32xx/phy3250.c
 + *
 + * Author: Kevin Wells <kevin.wells@nxp.com>
 + *
@@ -41,177 +41,384 @@ index 0000000..429cfdb
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/serial.h>
-+#include <linux/serial_core.h>
-+#include <linux/serial_reg.h>
-+#include <linux/serial_8250.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/sysdev.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/dma-mapping.h>
++#include <linux/device.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/eeprom.h>
++#include <linux/leds.h>
++#include <linux/gpio.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/clcd.h>
++#include <linux/amba/pl022.h>
++
++#include <asm/setup.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
 +#include <mach/hardware.h>
 +#include <mach/platform.h>
 +#include "common.h"
 +
-+#define LPC32XX_SUART_FIFO_SIZE	64
++/*
++ * Mapped GPIOLIB GPIOs
++ */
++#define SPI0_CS_GPIO	LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
++#define LCD_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
++#define BKL_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
++#define LED_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 1)
 +
-+/* Standard 8250/16550 compatible serial ports */
-+static struct plat_serial8250_port serial_std_platform_data[] = {
-+#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
-+	{
-+		.membase        = io_p2v(LPC32XX_UART5_BASE),
-+		.mapbase        = LPC32XX_UART5_BASE,
-+		.irq		= IRQ_LPC32XX_UART_IIR5,
-+		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
-+		.regshift	= 2,
-+		.iotype		= UPIO_MEM32,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
-+					UPF_SKIP_TEST,
++/*
++ * AMBA LCD controller
++ */
++static struct clcd_panel conn_lcd_panel = {
++	.mode		= {
++		.name		= "QVGA portrait",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 191828,
++		.left_margin	= 22,
++		.right_margin	= 11,
++		.upper_margin	= 2,
++		.lower_margin	= 1,
++		.hsync_len	= 5,
++		.vsync_len	= 2,
++		.sync		= 0,
++		.vmode		= FB_VMODE_NONINTERLACED,
 +	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
-+	{
-+		.membase	= io_p2v(LPC32XX_UART3_BASE),
-+		.mapbase        = LPC32XX_UART3_BASE,
-+		.irq		= IRQ_LPC32XX_UART_IIR3,
-+		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
-+		.regshift	= 2,
-+		.iotype		= UPIO_MEM32,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
-+					UPF_SKIP_TEST,
-+	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
-+	{
-+		.membase	= io_p2v(LPC32XX_UART4_BASE),
-+		.mapbase        = LPC32XX_UART4_BASE,
-+		.irq		= IRQ_LPC32XX_UART_IIR4,
-+		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
-+		.regshift	= 2,
-+		.iotype		= UPIO_MEM32,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
-+					UPF_SKIP_TEST,
-+	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
-+	{
-+		.membase	= io_p2v(LPC32XX_UART6_BASE),
-+		.mapbase        = LPC32XX_UART6_BASE,
-+		.irq		= IRQ_LPC32XX_UART_IIR6,
-+		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
-+		.regshift	= 2,
-+		.iotype		= UPIO_MEM32,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
-+					UPF_SKIP_TEST,
-+	},
-+#endif
-+	{ },
++	.width		= -1,
++	.height		= -1,
++	.tim2		= (TIM2_IVS | TIM2_IHS),
++	.cntl		= (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
++				CNTL_LCDBPP16_565),
++	.bpp		= 16,
 +};
++#define PANEL_SIZE (3 * SZ_64K)
 +
-+struct uartinit {
-+	char *uart_ck_name;
-+	u32 ck_mode_mask;
-+	void __iomem *pdiv_clk_reg;
-+};
-+
-+static struct uartinit uartinit_data[] __initdata = {
-+#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
-+	{
-+		.uart_ck_name = "uart5_ck",
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 5),
-+		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL,
-+	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
-+	{
-+		.uart_ck_name = "uart3_ck",
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 3),
-+		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL,
-+	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
-+	{
-+		.uart_ck_name = "uart4_ck",
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 4),
-+		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL,
-+	},
-+#endif
-+#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
-+	{
-+		.uart_ck_name = "uart6_ck",
-+		.ck_mode_mask =
-+			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 6),
-+		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL,
-+	},
-+#endif
-+};
-+
-+static struct platform_device serial_std_platform_device = {
-+	.name			= "serial8250",
-+	.id			= 0,
-+	.dev			= {
-+		.platform_data	= serial_std_platform_data,
-+	},
-+};
-+
-+static struct platform_device *lpc32xx_serial_devs[] __initdata = {
-+	&serial_std_platform_device,
-+};
-+
-+void __init lpc32xx_serial_init(void)
++static int lpc32xx_clcd_setup(struct clcd_fb *fb)
 +{
-+	u32 tmp, clkmodes = 0;
-+	struct clk *clk;
-+	unsigned int puart;
-+	int i, j;
++	dma_addr_t dma;
 +
-+	/* UART clocks are off, let clock driver manage them */
-+	__raw_writel(0, LPC32XX_CLKPWR_UART_CLK_CTRL);
-+
-+	for (i = 0; i < ARRAY_SIZE(uartinit_data); i++) {
-+		clk = clk_get(NULL, uartinit_data[i].uart_ck_name);
-+		if (!IS_ERR(clk)) {
-+			clk_enable(clk);
-+			serial_std_platform_data[i].uartclk =
-+				clk_get_rate(clk);
-+		}
-+
-+		/* Fall back on main osc rate if clock rate return fails */
-+		if (serial_std_platform_data[i].uartclk == 0)
-+			serial_std_platform_data[i].uartclk =
-+				LPC32XX_MAIN_OSC_FREQ;
-+
-+		/* Setup UART clock modes for all UARTs, disable autoclock */
-+		clkmodes |= uartinit_data[i].ck_mode_mask;
-+
-+		/* pre-UART clock divider set to 1 */
-+		__raw_writel(0x0101, uartinit_data[i].pdiv_clk_reg);
++	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
++		PANEL_SIZE, &dma, GFP_KERNEL);
++	if (!fb->fb.screen_base) {
++		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
++		return -ENOMEM;
 +	}
 +
-+	/* This needs to be done after all UART clocks are setup */
-+	__raw_writel(clkmodes, LPC32XX_UARTCTL_CLKMODE);
-+	for (i = 0; i < ARRAY_SIZE(uartinit_data) - 1; i++) {
-+		/* Force a flush of the RX FIFOs to work around a HW bug */
-+		puart = serial_std_platform_data[i].mapbase;
-+		__raw_writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
-+		__raw_writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
-+		j = LPC32XX_SUART_FIFO_SIZE;
-+		while (j--)
-+			tmp = __raw_readl(LPC32XX_UART_DLL_FIFO(puart));
-+		__raw_writel(0, LPC32XX_UART_IIR_FCR(puart));
-+	}
++	fb->fb.fix.smem_start = dma;
++	fb->fb.fix.smem_len = PANEL_SIZE;
++	fb->panel = &conn_lcd_panel;
 +
-+	/* Disable UART5->USB transparent mode or USB won't work */
++	if (gpio_request(LCD_POWER_GPIO, "LCD power"))
++		printk(KERN_ERR "Error requesting gpio %u",
++			LCD_POWER_GPIO);
++	else if (gpio_direction_output(LCD_POWER_GPIO, 1))
++		printk(KERN_ERR "Error setting gpio %u to output",
++			LCD_POWER_GPIO);
++
++	if (gpio_request(BKL_POWER_GPIO, "LCD backlight power"))
++		printk(KERN_ERR "Error requesting gpio %u",
++			BKL_POWER_GPIO);
++	else if (gpio_direction_output(BKL_POWER_GPIO, 1))
++		printk(KERN_ERR "Error setting gpio %u to output",
++			BKL_POWER_GPIO);
++
++	return 0;
++}
++
++static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
++{
++	return dma_mmap_writecombine(&fb->dev->dev, vma,
++		fb->fb.screen_base, fb->fb.fix.smem_start,
++		fb->fb.fix.smem_len);
++}
++
++static void lpc32xx_clcd_remove(struct clcd_fb *fb)
++{
++	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
++		fb->fb.screen_base, fb->fb.fix.smem_start);
++}
++
++/*
++ * On some early LCD modules (1307.0), the backlight logic is inverted.
++ * For those board variants, swap the disable and enable states for
++ * BKL_POWER_GPIO.
++*/
++static void clcd_disable(struct clcd_fb *fb)
++{
++	gpio_set_value(BKL_POWER_GPIO, 0);
++	gpio_set_value(LCD_POWER_GPIO, 0);
++}
++
++static void clcd_enable(struct clcd_fb *fb)
++{
++	gpio_set_value(BKL_POWER_GPIO, 1);
++	gpio_set_value(LCD_POWER_GPIO, 1);
++}
++
++static struct clcd_board lpc32xx_clcd_data = {
++	.name		= "Phytec LCD",
++	.check		= clcdfb_check,
++	.decode		= clcdfb_decode,
++	.disable	= clcd_disable,
++	.enable		= clcd_enable,
++	.setup		= lpc32xx_clcd_setup,
++	.mmap		= lpc32xx_clcd_mmap,
++	.remove		= lpc32xx_clcd_remove,
++};
++
++static struct amba_device lpc32xx_clcd_device = {
++	.dev				= {
++		.coherent_dma_mask	= ~0,
++		.init_name		= "dev:clcd",
++		.platform_data		= &lpc32xx_clcd_data,
++	},
++	.res				= {
++		.start			= LPC32XX_LCD_BASE,
++		.end			= (LPC32XX_LCD_BASE + SZ_4K - 1),
++		.flags			= IORESOURCE_MEM,
++	},
++	.dma_mask			= ~0,
++	.irq				= {IRQ_LPC32XX_LCD, NO_IRQ},
++};
++
++/*
++ * AMBA SSP (SPI)
++ */
++static void phy3250_spi_cs_set(u32 control)
++{
++	gpio_set_value(SPI0_CS_GPIO, (int) control);
++}
++
++static struct pl022_config_chip spi0_chip_info = {
++	.lbm			= LOOPBACK_DISABLED,
++	.com_mode		= INTERRUPT_TRANSFER,
++	.iface			= SSP_INTERFACE_MOTOROLA_SPI,
++	.hierarchy		= SSP_MASTER,
++	.slave_tx_disable	= 0,
++	.endian_tx		= SSP_TX_LSB,
++	.endian_rx		= SSP_RX_LSB,
++	.data_size		= SSP_DATA_BITS_8,
++	.rx_lev_trig		= SSP_RX_4_OR_MORE_ELEM,
++	.tx_lev_trig		= SSP_TX_4_OR_MORE_EMPTY_LOC,
++	.clk_phase		= SSP_CLK_FIRST_EDGE,
++	.clk_pol		= SSP_CLK_POL_IDLE_LOW,
++	.ctrl_len		= SSP_BITS_8,
++	.wait_state		= SSP_MWIRE_WAIT_ZERO,
++	.duplex			= SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
++	.cs_control		= phy3250_spi_cs_set,
++};
++
++static struct pl022_ssp_controller lpc32xx_ssp0_data = {
++	.bus_id			= 0,
++	.num_chipselect		= 1,
++	.enable_dma		= 0,
++};
++
++static struct amba_device lpc32xx_ssp0_device = {
++	.dev				= {
++		.coherent_dma_mask	= ~0,
++		.init_name		= "dev:ssp0",
++		.platform_data		= &lpc32xx_ssp0_data,
++	},
++	.res				= {
++		.start			= LPC32XX_SSP0_BASE,
++		.end			= (LPC32XX_SSP0_BASE + SZ_4K - 1),
++		.flags			= IORESOURCE_MEM,
++	},
++	.dma_mask			= ~0,
++	.irq				= {IRQ_LPC32XX_SSP0, NO_IRQ},
++};
++
++/* AT25 driver registration */
++static int __init phy3250_spi_board_register(void)
++{
++#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
++	static struct spi_board_info info[] = {
++		{
++			.modalias = "spidev",
++			.max_speed_hz = 5000000,
++			.bus_num = 0,
++			.chip_select = 0,
++			.controller_data = &spi0_chip_info,
++		},
++	};
++
++#else
++	static struct spi_eeprom eeprom = {
++		.name = "at25256a",
++		.byte_len = 0x8000,
++		.page_size = 64,
++		.flags = EE_ADDR2,
++	};
++
++	static struct spi_board_info info[] = {
++		{
++			.modalias = "at25",
++			.max_speed_hz = 5000000,
++			.bus_num = 0,
++			.chip_select = 0,
++			.platform_data = &eeprom,
++			.controller_data = &spi0_chip_info,
++		},
++	};
++#endif
++	return spi_register_board_info(info, ARRAY_SIZE(info));
++}
++arch_initcall(phy3250_spi_board_register);
++
++static struct i2c_board_info __initdata phy3250_i2c_board_info[] = {
++	{
++		I2C_BOARD_INFO("pcf8563", 0x51),
++	},
++};
++
++static struct gpio_led phy_leds[] = {
++	{
++		.name			= "led0",
++		.gpio			= LED_GPIO,
++		.active_low		= 1,
++		.default_trigger	= "heartbeat",
++	},
++};
++
++static struct gpio_led_platform_data led_data = {
++	.leds = phy_leds,
++	.num_leds = ARRAY_SIZE(phy_leds),
++};
++
++static struct platform_device lpc32xx_gpio_led_device = {
++	.name			= "leds-gpio",
++	.id			= -1,
++	.dev.platform_data	= &led_data,
++};
++
++static struct platform_device *phy3250_devs[] __initdata = {
++	&lpc32xx_i2c0_device,
++	&lpc32xx_i2c1_device,
++	&lpc32xx_i2c2_device,
++	&lpc32xx_watchdog_device,
++	&lpc32xx_gpio_led_device,
++};
++
++static struct amba_device *amba_devs[] __initdata = {
++	&lpc32xx_clcd_device,
++	&lpc32xx_ssp0_device,
++};
++
++/*
++ * Board specific functions
++ */
++static void __init phy3250_board_init(void)
++{
++	u32 tmp;
++	int i;
++
++	lpc32xx_gpio_init();
++
++	/* Register GPIOs used on this board */
++	if (gpio_request(SPI0_CS_GPIO, "spi0 cs"))
++		printk(KERN_ERR "Error requesting gpio %u",
++			SPI0_CS_GPIO);
++	else if (gpio_direction_output(SPI0_CS_GPIO, 1))
++		printk(KERN_ERR "Error setting gpio %u to output",
++			SPI0_CS_GPIO);
++
++	/* Setup network interface for RMII mode */
++	tmp = __raw_readl(LPC32XX_CLKPWR_MACCLK_CTRL);
++	tmp &= ~LPC32XX_CLKPWR_MACCTRL_PINS_MSK;
++	tmp |= LPC32XX_CLKPWR_MACCTRL_USE_RMII_PINS;
++	__raw_writel(tmp, LPC32XX_CLKPWR_MACCLK_CTRL);
++
++	/* Setup SLC NAND controller muxing */
++	__raw_writel(LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
++		LPC32XX_CLKPWR_NAND_CLK_CTRL);
++
++	/* Setup LCD muxing to RGB565 */
++	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
++		~(LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_MSK |
++		LPC32XX_CLKPWR_LCDCTRL_PSCALE_MSK);
++	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
++	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
++
++	/* Set up I2C pull levels */
++	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
++	tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE |
++		LPC32XX_CLKPWR_I2CCLK_I2C2HI_DRIVE;
++	__raw_writel(tmp, LPC32XX_CLKPWR_I2C_CLK_CTRL);
++
++	/* Disable IrDA pulsing support on UART6 */
 +	tmp = __raw_readl(LPC32XX_UARTCTL_CTRL);
-+	tmp &= ~LPC32XX_UART_U5_ROUTE_TO_USB;
++	tmp |= LPC32XX_UART_UART6_IRDAMOD_BYPASS;
 +	__raw_writel(tmp, LPC32XX_UARTCTL_CTRL);
 +
-+	platform_add_devices(lpc32xx_serial_devs,
-+		ARRAY_SIZE(lpc32xx_serial_devs));
++	/* Enable DMA for I2S1 channel */
++	tmp = __raw_readl(LPC32XX_CLKPWR_I2S_CLK_CTRL);
++	tmp = LPC32XX_CLKPWR_I2SCTRL_I2S1_USE_DMA;
++	__raw_writel(tmp, LPC32XX_CLKPWR_I2S_CLK_CTRL);
++
++	lpc32xx_serial_init();
++
++	/*
++	 * AMBA peripheral clocks need to be enabled prior to AMBA device
++	 * detection or a data fault will occur, so enable the clocks
++	 * here. However, we don't want to enable them if the peripheral
++	 * isn't included in the image
++	 */
++#ifdef CONFIG_FB_ARMCLCD
++	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
++	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
++		LPC32XX_CLKPWR_LCDCLK_CTRL);
++#endif
++#ifdef CONFIG_SPI_PL022
++	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
++	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
++		LPC32XX_CLKPWR_SSP_CLK_CTRL);
++#endif
++
++	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
++	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
++		struct amba_device *d = amba_devs[i];
++		amba_device_register(d, &iomem_resource);
++	}
++
++	/* Test clock needed for UDA1380 initial init */
++	__raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC |
++		LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN,
++		LPC32XX_CLKPWR_TEST_CLK_SEL);
++
++	i2c_register_board_info(0, phy3250_i2c_board_info,
++		ARRAY_SIZE(phy3250_i2c_board_info));
 +}
++
++static int __init lpc32xx_display_uid(void)
++{
++	u32 uid[4];
++
++	lpc32xx_get_uid(uid);
++
++	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
++		uid[3], uid[2], uid[1], uid[0]);
++
++	return 1;
++}
++arch_initcall(lpc32xx_display_uid);
++
++MACHINE_START(PHY3250, "Phytec 3250 board with the LPC3250 Microcontroller")
++	/* Maintainer: Kevin Wells, NXP Semiconductors */
++	.phys_io	= LPC32XX_UART5_BASE,
++	.io_pg_offst	= ((IO_ADDRESS(LPC32XX_UART5_BASE))>>18) & 0xfffc,
++	.boot_params	= 0x80000100,
++	.map_io		= lpc32xx_map_io,
++	.init_irq	= lpc32xx_init_irq,
++	.timer		= &lpc32xx_timer,
++	.init_machine	= phy3250_board_init,
++MACHINE_END
 -- 
 1.6.6
