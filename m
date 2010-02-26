@@ -1,23 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Feb 2010 23:55:18 +0000
-Subject: [PATCH] Clean up ARM compressed loader
-In-Reply-To: <20100225234845.GH24043@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1002241824520.1946@xanadu.home>
-	<20100224234215.GA21985@n2100.arm.linux.org.uk>
-	<4B85BCE0.7000903@marcansoft.com>
-	<20100225000114.GB21985@n2100.arm.linux.org.uk>
-	<4B85C4A4.4060005@marcansoft.com>
-	<alpine.LFD.2.00.1002242309030.1946@xanadu.home>
-	<20100225093859.GA19870@n2100.arm.linux.org.uk>
-	<20100225122429.GA3101@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002251420160.1946@xanadu.home>
-	<20100225234845.GH24043@n2100.arm.linux.org.uk>
-Message-ID: <20100225235518.GI24043@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 26 Feb 2010 11:22:50 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <201002250448.17866.oliver@neukum.org>
+References: <1266445892.16346.306.camel@pasglop>
+	<201002240816.10178.oliver@neukum.org>
+	<1267045954.23523.1692.camel@pasglop>
+	<201002250448.17866.oliver@neukum.org>
+Message-ID: <1267143770.23523.1763.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2010 at 11:48:45PM +0000, Russell King - ARM Linux wrote:
-> -		.word	_got_start		@ r6
-> +		.word	_end			@ r6
+On Thu, 2010-02-25 at 04:48 +0100, Oliver Neukum wrote:
+> Am Mittwoch, 24. Februar 2010 22:12:34 schrieb Benjamin Herrenschmidt:
+> > On Wed, 2010-02-24 at 08:16 +0100, Oliver Neukum wrote:
+> > > I don't know. The issue seems quite complex. It would seem better to
+> > > centralize it as far as practical. Do you have a wrapper drivers could
+> > > call?
+> > 
+> > flush_dcache_page() ? :-)
+> 
+> Will this do anything on arches that don't need it?
 
-Grr, that should be _etext.
+No, it's going to be an empty inline:
+
+arch/x86/include/asm/cacheflush.h:static inline void flush_dcache_page(struct page *page) { }
+
+> Secondly, can we have a wrapper that you can pass a pointer and an
+> offset?
+
+I'm sure you can make one :-) Use virt_to_page() though that will not
+work for vmap/vmalloc space of course.
+ 
+> > Now, the subsystem might be the one to know whether something is mapped
+> > into userspace or not (v4l in our case) in which case a wrapper could be
+> > created.
+> 
+> If possible, I'd like to centralize this. Drivers are likely to get this wrong.
+
+Right. In the case of v4l, it's probably something that should go into
+the subsystem. IE. That's how it works for block too, it's done at the
+BIO and/or filesystem layer (though individual filesystems do have their
+hand in the pudding). 
+
+Cheers,
+Ben.
+
+> 	Regards
+> 		Oliver
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
