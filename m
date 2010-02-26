@@ -1,50 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Feb 2010 09:53:27 -0000
-Subject: [PATCH 4/6] perf-events: export enable/disable event symbols to
-	kernel modules
-In-Reply-To: <20100226082315.GC15885@elte.hu>
-References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-2-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-3-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-4-git-send-email-will.deacon@arm.com>
-	<1267124175-21721-5-git-send-email-will.deacon@arm.com>
-	<20100226082315.GC15885@elte.hu>
-Message-ID: <000401cab6c9$8b9acc20$a2d06460$@deacon@arm.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Fri, 26 Feb 2010 10:56:36 +0100
+Subject: [PATCH] mx31pdk: Add NAND support
+In-Reply-To: <210155.75899.qm@web51001.mail.re2.yahoo.com>
+References: <210155.75899.qm@web51001.mail.re2.yahoo.com>
+Message-ID: <201002261056.37618.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
+Fabio Estevam wrote:
+> > Are you sure that this works? Don't you see a lot of Bad
+> > blocks reports
+> > in boot messages?
+>
+> I followed the same approach used on other i.MX boards. This is what I see:
+> ...
+> NAND device: Manufacturer ID: 0xec, Chip ID: 0xaa (Samsung NAND 256MiB 1,8V
+> 8-bit) Scanning device for bad blocks
+> Bad eraseblock 42 at 0x000000540000
+> Bad eraseblock 125 at 0x000000fa0000
+> Bad eraseblock 887 at 0x000006ee0000
+> Bad eraseblock 1750 at 0x00000dac0000
+> Bad eraseblock 2046 at 0x00000ffc0000
+> Bad eraseblock 2047 at 0x00000ffe0000
+> Registering mxc_nand as whole device
+>
+> If I define it as:
+>
+> static struct mxc_nand_platform_data mx31pdk_nand_board_info = {
+> 	.width = 1,
+> 	.hw_ecc = 1,
+> 	.flash_bbt =1,
+> };
 
-Thanks for the quick response.
+Your bootloader also use a Bad Block Table? Then also your kernel should use 
+it. If hardware ECC is in use, its always a good idea to collect the bad 
+blocks into a BBT. Most of the time you can't control at which offset in the 
+OOB data the NAND controller will store the ECC sum. There is the risk it 
+will destroy manufacturer's bad block markers. So, its better to collect 
+these marked bad blocks into a BBT the first time you use the NAND device. 
+After that _only_ the BBT should be used to handle bad blocks (in the boot 
+loader and the kernel).
 
-> * Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > The perf_event_enable and perf_event_disable functions are used to
-> > control the activation of perf-events for a given context or CPU.
-> >
-> > This patch exports these symbols so that they can be used by kernel
-> > modules. Without these symbols, an event must be destroyed and recreated
-> > to disable or enable it respectively. The maximum number of perf-events
-> > is also made available to modules via the perf_get_max_events function.
-> >
-> 
-> Hm, what modules would like to use them, and in what fashion?
-> 
+jbe
 
-The module I had in mind was OProfile [currently just the ARM port, but
-perhaps other architectures may decide to do this too]. The patch I posted
-here:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/010479.html
-
-removes the PMU control code from OProfile and replaces it with calls to perf.
-This means that when OProfile starts or stops a profiling session, the
-corresponding events are enabled or disabled respectively.
-
-If you want to compile OProfile as a module, then the enable/disable functions
-will need to be exported. I suppose the other solution is to prevent OProfile
-from being compiled as a module.
-
-Thanks,
-
-Will
+-- 
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
