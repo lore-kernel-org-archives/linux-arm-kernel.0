@@ -1,36 +1,41 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Fri, 26 Feb 2010 15:53:49 -0800
-Subject: [PATCH 12/13] i2c: Add support for the LPC32XX arch
+Date: Fri, 26 Feb 2010 15:53:50 -0800
+Subject: [PATCH 13/13] WATCHDOG: Add support for the LPC32XX arch
 In-Reply-To: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
 References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1267228430-27193-13-git-send-email-wellsk40@gmail.com>
+Message-ID: <1267228430-27193-14-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-Allow the i2c-pnx driver to be reused with the LPC32xx arch.
-Changed menu title to include NXP devices
+Allow the PNX4008 watchdog driver to be reused with the
+LPC32xx arch. Changed menu title to include the LCP32XX
+device.
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- drivers/i2c/busses/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/watchdog/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index d914ef8..16ab972 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -474,8 +474,8 @@ config I2C_PASEMI
- 	  Supports the PA Semi PWRficient on-chip SMBus interfaces.
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 713b1ce..b882e09 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -205,11 +205,11 @@ config OMAP_WATCHDOG
+ 	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430 watchdog timer.
  
- config I2C_PNX
--	tristate "I2C bus support for Philips PNX targets"
+ config PNX4008_WATCHDOG
+-	tristate "PNX4008 Watchdog"
 -	depends on ARCH_PNX4008
-+	tristate "I2C bus support for Philips/NXP devices"
++	tristate "PNX4008/LPC32XX Watchdog"
 +	depends on ARCH_PNX4008 || ARCH_LPC32XX
  	help
- 	  This driver supports the Philips IP3204 I2C IP block master and/or
- 	  slave controller
+ 	  Say Y here if to include support for the watchdog timer
+-	  in the PNX4008 processor.
++	  in the PNX4008 or LPC32XX processors.
+ 	  This driver can be built as a module by choosing M. The module
+ 	  will be called pnx4008_wdt.
+ 
 -- 
 1.6.6
