@@ -1,47 +1,22 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Fri, 26 Feb 2010 10:31:26 +0100
-Subject: [PATCH] ARM: perf-events: fix v7 event selection mask
-In-Reply-To: <1267121911-18667-1-git-send-email-will.deacon@arm.com>
-References: <1267121911-18667-1-git-send-email-will.deacon@arm.com>
-Message-ID: <201002261031.26285.jpihet@mvista.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 26 Feb 2010 10:36:21 +0100
+Subject: [PATCH] mx31pdk: Add NAND support
+In-Reply-To: <505892.36787.qm@web51002.mail.re2.yahoo.com>
+References: <1267095523.2722.40.camel@realization>
+	<505892.36787.qm@web51002.mail.re2.yahoo.com>
+Message-ID: <20100226093621.GB3088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Hello,
 
-On Thursday 25 February 2010 19:18:31 Will Deacon wrote:
-> The event selection mask for ARMv7 cores [ARMV7_EVTSEL_MASK]
-> is incorrectly set to 0x7f. This means that the top bit of an
-> event ID is ignored, so counting branch misses (id=0x10) and
-> ISBs (id=0x90) give the same results.
-Good catch! It is a left over from the Cortex-A8 only code. Cortex-A9 
-introduces more events.
+> MACH name is MX35_3DS and board name is mach-mx35pdk.c
+Oh, I must have missed that when massrenaming the machine files.
+(commit 321ed164).  Sorry :-)
 
-Signed-off-by: Jean Pihet <jpihet@mvista.com>
+Best regards
+Uwe
 
-Thanks,
-Jean
-
->
-> This patch sets the event selection mask to the correct value
-> of 0xff.
->
-> Cc: Jean Pihet <jpihet@mvista.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/perf_event.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index b44d159..c45a155 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -1625,7 +1625,7 @@ enum armv7_counters {
->  /*
->   * EVTSEL: Event selection reg
->   */
-> -#define	ARMV7_EVTSEL_MASK	0x7f		/* Mask for writable bits */
-> +#define	ARMV7_EVTSEL_MASK	0xff		/* Mask for writable bits */
->
->  /*
->   * SELECT: Counter selection reg
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
