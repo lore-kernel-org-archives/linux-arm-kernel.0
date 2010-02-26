@@ -1,331 +1,380 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Fri, 26 Feb 2010 15:53:42 -0800
-Subject: [PATCH 05/13] ARM: LPC32XX: System suspend support
+Date: Fri, 26 Feb 2010 15:53:44 -0800
+Subject: [PATCH 07/13] ARM: LPC32XX: Misc support functions
 In-Reply-To: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
 References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1267228430-27193-6-git-send-email-wellsk40@gmail.com>
+Message-ID: <1267228430-27193-8-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-Support for system suspend and resume
+Misc support functions and prototypes used in the LPC32XX arch
+and platforms
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/pm.c      |  145 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/suspend.S |  151 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 296 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-lpc32xx/pm.c
- create mode 100644 arch/arm/mach-lpc32xx/suspend.S
+ arch/arm/mach-lpc32xx/common.c |  271 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-lpc32xx/common.h |   73 +++++++++++
+ 2 files changed, 344 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-lpc32xx/common.c
+ create mode 100644 arch/arm/mach-lpc32xx/common.h
 
-diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
+diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
 new file mode 100644
-index 0000000..d792e2e
+index 0000000..ee24dc2
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/pm.c
-@@ -0,0 +1,145 @@
++++ b/arch/arm/mach-lpc32xx/common.c
+@@ -0,0 +1,271 @@
 +/*
-+ * arch/arm/mach-lpc32xx/pm.c
++ * arch/arm/mach-lpc32xx/common.c
 + *
-+ * Original authors: Vitaly Wool, Dmitry Chigirev <source@mvista.com>
-+ * Modified by Kevin Wells <kevin.wells@nxp.com>
++ * Author: Kevin Wells <kevin.wells@nxp.com>
 + *
-+ * 2005 (c) MontaVista Software, Inc. This file is licensed under
-+ * the terms of the GNU General Public License version 2. This program
-+ * is licensed "as is" without any warranty of any kind, whether express
-+ * or implied.
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+/*
-+ * LPC32XX CPU and system power management
-+ *
-+ * The LCP32XX has three CPU modes for controlling system power: run,
-+ * direct-run, and halt modes. When switching between halt and run modes,
-+ * the CPU transistions through direct-run mode. For Linux, direct-run
-+ * mode is not used in normal operation. Halt mode is used when the
-+ * system is fully suspended.
-+ *
-+ * Run mode:
-+ * The ARM CPU clock (HCLK_PLL), HCLK bus clock, and PCLK bus clocks are
-+ * derived from the HCLK PLL. The HCLK and PCLK bus rates are divided from
-+ * the HCLK_PLL rate. Linux runs in this mode.
-+ *
-+ * Direct-run mode:
-+ * The ARM CPU clock, HCLK bus clock, and PCLK bus clocks are driven from
-+ * SYSCLK. SYSCLK is usually around 13MHz, but may vary based on SYSCLK
-+ * source or the frequency of the main oscillator. In this mode, the
-+ * HCLK_PLL can be safely enabled, changed, or disabled.
-+ *
-+ * Halt mode:
-+ * SYSCLK is gated off and the CPU and system clocks are halted.
-+ * Peripherals based on the 32KHz oscillator clock (ie, RTC, touch,
-+ * key scanner, etc.) still operate if enabled. In this state, an enabled
-+ * system event (ie, GPIO state change, RTC match, key press, etc.) will
-+ * wake the system up back into direct-run mode.
-+ *
-+ * DRAM refresh
-+ * DRAM clocking and refresh are slightly different for systems with DDR
-+ * DRAM or regular SDRAM devices. If SDRAM is used in the system, the
-+ * SDRAM will still be accessible in direct-run mode. In DDR based systems,
-+ * a transistion to direct-run mode will stop all DDR accesses (no clocks).
-+ * Because of this, the code to switch power modes and the code to enter
-+ * and exit DRAM self-refresh modes must not be executed in DRAM. A small
-+ * section of IRAM is used instead for this.
-+ *
-+ * Suspend is handled with the following logic:
-+ *  Backup a small area of IRAM used for the suspend code
-+ *  Copy suspend code to IRAM
-+ *  Transfer control to code in IRAM
-+ *  Places DRAMs in self-refresh mode
-+ *  Enter direct-run mode
-+ *  Save state of HCLK_PLL PLL
-+ *  Disable HCLK_PLL PLL
-+ *  Enter halt mode - CPU and buses will stop
-+ *  System enters direct-run mode when an enabled event occurs
-+ *  HCLK PLL state is restored
-+ *  Run mode is entered
-+ *  DRAMS are placed back into normal mode
-+ *  Code execution returns from IRAM
-+ *  IRAM code are used for suspend is restored
-+ *  Suspend mode is exited
-+ */
-+
-+#include <linux/suspend.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/i2c-pnx.h>
 +#include <linux/io.h>
 +
-+#include <asm/cacheflush.h>
++#include <asm/mach/map.h>
 +
++#include <mach/i2c.h>
 +#include <mach/hardware.h>
 +#include <mach/platform.h>
 +#include "common.h"
-+#include "clock.h"
-+
-+#define TEMP_IRAM_AREA  IO_ADDRESS(LPC32XX_IRAM_BASE)
 +
 +/*
-+ * Both STANDBY and MEM suspend states are handled the same with no
-+ * loss of CPU or memory state
++ * Watchdog timer
 + */
-+static int lpc32xx_pm_enter(suspend_state_t state)
-+{
-+	int (*lpc32xx_suspend_ptr) (void);
-+	void *iram_swap_area;
-+
-+	/* Allocate some space for temporary IRAM storage */
-+	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
-+	if (!iram_swap_area) {
-+		printk(KERN_ERR
-+		       "PM Suspend: cannot allocate memory to save portion "
-+			"of SRAM\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* Backup a small area of IRAM used for the suspend code */
-+	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
-+		lpc32xx_sys_suspend_sz);
-+
-+	/*
-+	 * Copy code to suspend system into IRAM. The suspend code
-+	 * needs to run from IRAM as DRAM may no longer be available
-+	 * when the PLL is stopped.
-+	 */
-+	memcpy((void *) TEMP_IRAM_AREA, &lpc32xx_sys_suspend,
-+		lpc32xx_sys_suspend_sz);
-+	flush_icache_range((unsigned long)TEMP_IRAM_AREA,
-+		(unsigned long)(TEMP_IRAM_AREA) + lpc32xx_sys_suspend_sz);
-+
-+	/* Transfer to suspend code in IRAM */
-+	lpc32xx_suspend_ptr = (void *) TEMP_IRAM_AREA;
-+	flush_cache_all();
-+	(void) lpc32xx_suspend_ptr();
-+
-+	/* Restore original IRAM contents */
-+	memcpy((void *) TEMP_IRAM_AREA, iram_swap_area,
-+		lpc32xx_sys_suspend_sz);
-+
-+	kfree(iram_swap_area);
-+
-+	return 0;
-+}
-+
-+static struct platform_suspend_ops lpc32xx_pm_ops = {
-+	.valid	= suspend_valid_only_mem,
-+	.enter	= lpc32xx_pm_enter,
++static struct resource watchdog_resources[] = {
++	[0] = {
++		.start = LPC32XX_WDTIM_BASE,
++		.end = LPC32XX_WDTIM_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
 +};
 +
-+#define EMC_DYN_MEM_CTRL_OFS 0x20
-+#define EMC_SRMMC           (1 << 3)
-+#define EMC_CTRL_REG io_p2v(LPC32XX_EMC_BASE + EMC_DYN_MEM_CTRL_OFS)
-+static int __init lpc32xx_pm_init(void)
-+{
-+	/*
-+	 * Setup SDRAM self-refresh clock to automatically disable o
-+	 * start of self-refresh. This only needs to be done once.
-+	 */
-+	__raw_writel(__raw_readl(EMC_CTRL_REG) | EMC_SRMMC, EMC_CTRL_REG);
++struct platform_device lpc32xx_watchdog_device = {
++	.name = "pnx4008-watchdog",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(watchdog_resources),
++	.resource = watchdog_resources,
++};
 +
-+	suspend_set_ops(&lpc32xx_pm_ops);
++/*
++ * I2C busses
++ */
++static struct i2c_pnx_data i2c0_data = {
++	.name = I2C_CHIP_NAME "1",
++	.base = LPC32XX_I2C1_BASE,
++	.irq = IRQ_LPC32XX_I2C_1,
++};
++
++static struct i2c_pnx_data i2c1_data = {
++	.name = I2C_CHIP_NAME "2",
++	.base = LPC32XX_I2C2_BASE,
++	.irq = IRQ_LPC32XX_I2C_2,
++};
++
++static struct i2c_pnx_data i2c2_data = {
++	.name = "USB-I2C",
++	.base = LPC32XX_OTG_I2C_BASE,
++	.irq = IRQ_LPC32XX_USB_I2C,
++};
++
++struct platform_device lpc32xx_i2c0_device = {
++	.name = "pnx-i2c",
++	.id = 0,
++	.dev = {
++		.platform_data = &i2c0_data,
++	},
++};
++
++struct platform_device lpc32xx_i2c1_device = {
++	.name = "pnx-i2c",
++	.id = 1,
++	.dev = {
++		.platform_data = &i2c1_data,
++	},
++};
++
++struct platform_device lpc32xx_i2c2_device = {
++	.name = "pnx-i2c",
++	.id = 2,
++	.dev = {
++		.platform_data = &i2c2_data,
++	},
++};
++
++/*
++ * Returns the unique ID for the device
++ */
++void lpc32xx_get_uid(u32 devid[4])
++{
++	int i;
++
++	for (i = 0; i < 4; i++)
++		devid[i] = __raw_readl(LPC32XX_CLKPWR_DEVID(i << 2));
++}
++
++/*
++ * Returns SYSCLK source
++ * 0 = PLL397, 1 = main oscillator
++ */
++int clk_is_sysclk_mainosc(void)
++{
++	if ((__raw_readl(LPC32XX_CLKPWR_SYSCLK_CTRL) &
++		LPC32XX_CLKPWR_SYSCTRL_SYSCLKMUX) == 0)
++		return 1;
 +
 +	return 0;
 +}
-+arch_initcall(lpc32xx_pm_init);
-diff --git a/arch/arm/mach-lpc32xx/suspend.S b/arch/arm/mach-lpc32xx/suspend.S
-new file mode 100644
-index 0000000..374f9f0
---- /dev/null
-+++ b/arch/arm/mach-lpc32xx/suspend.S
-@@ -0,0 +1,151 @@
++
 +/*
-+ * arch/arm/mach-lpc32xx/suspend.S
-+ *
-+ * Original authors: Dmitry Chigirev, Vitaly Wool <source@mvista.com>
-+ * Modified by Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * 2005 (c) MontaVista Software, Inc. This file is licensed under
-+ * the terms of the GNU General Public License version 2. This program
-+ * is licensed "as is" without any warranty of any kind, whether express
-+ * or implied.
++ * System reset via the watchdog timer
 + */
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/platform.h>
-+#include <mach/hardware.h>
++void lpc32xx_watchdog_reset(void)
++{
++	/* Make sure WDT clocks are enabled */
++	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
++		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
 +
-+/* Using named register defines makes the code easier to follow */
-+#define WORK1_REG			r0
-+#define WORK2_REG			r1
-+#define SAVED_HCLK_DIV_REG		r2
-+#define SAVED_HCLK_PLL_REG		r3
-+#define SAVED_DRAM_CLKCTRL_REG		r4
-+#define SAVED_PWR_CTRL_REG		r5
-+#define CLKPWRBASE_REG			r6
-+#define EMCBASE_REG			r7
++	/* Instant assert of RESETOUT_N with pulse length 1mS */
++	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
++	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
++}
 +
-+#define LPC32XX_EMC_STATUS_OFFS		0x04
-+#define LPC32XX_EMC_STATUS_BUSY		0x1
-+#define LPC32XX_EMC_STATUS_SELF_RFSH	0x4
++/*
++ * Detects and returns IRAM size for the device variation
++ */
++#define LPC32XX_IRAM_BANK_SIZE SZ_128K
++static u32 iram_size;
++u32 lpc32xx_return_iram_size(void)
++{
++	if (iram_size == 0) {
++		u32 savedval1, savedval2;
++		void __iomem *iramptr1, *iramptr2;
 +
-+#define LPC32XX_CLKPWR_PWR_CTRL_OFFS	0x44
-+#define LPC32XX_CLKPWR_HCLK_DIV_OFFS	0x40
-+#define LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS 0x58
++		iramptr1 = io_p2v(LPC32XX_IRAM_BASE);
++		iramptr2 = io_p2v(LPC32XX_IRAM_BASE + LPC32XX_IRAM_BANK_SIZE);
++		savedval1 = __raw_readl(iramptr1);
++		savedval2 = __raw_readl(iramptr2);
 +
-+#define CLKPWR_PCLK_DIV_MASK		0xFFFFFE7F
++		if (savedval1 == savedval2) {
++			__raw_writel(savedval2 + 1, iramptr2);
++			if (__raw_readl(iramptr1) == savedval2 + 1)
++				iram_size = LPC32XX_IRAM_BANK_SIZE;
++			else
++				iram_size = LPC32XX_IRAM_BANK_SIZE * 2;
++			__raw_writel(savedval2, iramptr2);
++		} else
++			iram_size = LPC32XX_IRAM_BANK_SIZE * 2;
++	}
 +
-+	.text
++	return iram_size;
++}
 +
-+ENTRY(lpc32xx_sys_suspend)
-+	@ Save a copy of the used registers in IRAM, r0 is corrupted
-+	adr	r0, tmp_stack_end
-+	stmfd	r0!, {r3 - r7, sp, lr}
++/*
++ * Computes PLL rate from PLL register and input clock
++ */
++u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup)
++{
++	u32 ilfreq, p, m, n, fcco, fref, cfreq;
++	int mode;
 +
-+	@ Load a few common register addresses
-+	adr	WORK1_REG, reg_bases
-+	ldr	CLKPWRBASE_REG, [WORK1_REG, #0]
-+	ldr	EMCBASE_REG, [WORK1_REG, #4]
++	/*
++	 * PLL requirements
++	 * ifreq must be >= 1MHz and <= 20MHz
++	 * FCCO must be >= 156MHz and <= 320MHz
++	 * FREF must be >= 1MHz and <= 27MHz
++	 * Assume the passed input data is not valid
++	 */
 +
-+	ldr	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	orr	WORK1_REG, SAVED_PWR_CTRL_REG, #LPC32XX_CLKPWR_SDRAM_SELF_RFSH
++	ilfreq = ifreq;
++	m = pllsetup->pll_m;
++	n = pllsetup->pll_n;
++	p = pllsetup->pll_p;
 +
-+	@ Wait for SDRAM busy status to go busy and then idle
-+	@ This guarantees a small windows where DRAM isn't busy
-+1:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	bne	1b @ Branch while idle
-+2:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_BUSY
-+	beq	2b @ Branch until idle
++	mode = (pllsetup->cco_bypass_b15 << 2) |
++		(pllsetup->direct_output_b14 << 1) |
++	pllsetup->fdbk_div_ctrl_b13;
 +
-+	@ Setup self-refresh with support for manual exit of
-+	@ self-refresh mode
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	orr	WORK2_REG, WORK1_REG, #LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
++	switch (mode) {
++	case 0x0: /* Non-integer mode */
++		cfreq = (m * ilfreq) / (2 * p * n);
++		fcco = (m * ilfreq) / n;
++		fref = ilfreq / n;
++		break;
 +
-+	@ Wait for self-refresh acknowledge, clocks to the DRAM device
-+	@ will automatically stop on start of self-refresh
-+3:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	cmp	WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	bne	3b @ Branch until self-refresh mode starts
++	case 0x1: /* integer mode */
++		cfreq = (m * ilfreq) / n;
++		fcco = (m * ilfreq) / (n * 2 * p);
++		fref = ilfreq / n;
++		break;
 +
-+	@ Enter direct-run mode from run mode
-+	bic	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_SELECT_RUN_MODE
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
++	case 0x2:
++	case 0x3: /* Direct mode */
++		cfreq = (m * ilfreq) / n;
++		fcco = cfreq;
++		fref = ilfreq / n;
++		break;
 +
-+	@ Safe disable of DRAM clock in EMC block, prevents DDR sync
-+	@ issues on restart
-+	ldr	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
-+	and	WORK2_REG, SAVED_HCLK_DIV_REG, #CLKPWR_PCLK_DIV_MASK
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLK_DIV_OFFS]
++	case 0x4:
++	case 0x5: /* Bypass mode */
++		cfreq = ilfreq / (2 * p);
++		fcco = 156000000;
++		fref = 1000000;
++		break;
 +
-+	@ Save HCLK PLL state and disable HCLK PLL
-+	ldr	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+	bic	WORK2_REG, SAVED_HCLK_PLL_REG, #LPC32XX_CLKPWR_HCLKPLL_POWER_UP
-+	str	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
++	case 0x6:
++	case 0x7: /* Direct bypass mode */
++	default:
++		cfreq = ilfreq;
++		fcco = 156000000;
++		fref = 1000000;
++		break;
++	}
 +
-+	@ Enter stop mode until an enabled event occurs
-+	orr	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_STOP_MODE_CTRL
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	.rept 9
-+	nop
-+	.endr
++	if (fcco < 156000000 || fcco > 320000000)
++		cfreq = 0;
 +
-+	@ Clear stop status
-+	bic	WORK1_REG, WORK1_REG, #LPC32XX_CLKPWR_STOP_MODE_CTRL
++	if (fref < 1000000 || fref > 27000000)
++		cfreq = 0;
 +
-+	@ Restore original HCLK PLL value and wait for PLL lock
-+	str	SAVED_HCLK_PLL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+4:
-+	ldr	WORK2_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_HCLKPLL_CTRL_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_CLKPWR_HCLKPLL_PLL_STS
-+	bne	4b
++	return (u32) cfreq;
++}
 +
-+	@ Re-enter run mode with self-refresh flag cleared, but no DRAM
-+	@ update yet. DRAM is still in self-refresh
-+	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
++u32 clk_get_pclk_div(void)
++{
++	return 1 + ((__raw_readl(LPC32XX_CLKPWR_HCLK_DIV) >> 2) & 0x1F);
++}
 +
-+	@ Restore original DRAM clock mode to restore DRAM clocks
-+	str	SAVED_HCLK_DIV_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_HCLK_DIV_OFFS]
++static struct map_desc lpc32xx_io_desc[] __initdata = {
++	{
++		.virtual	= IO_ADDRESS(LPC32XX_AHB0_START),
++		.pfn		= __phys_to_pfn(LPC32XX_AHB0_START),
++		.length		= LPC32XX_AHB0_SIZE,
++		.type		= MT_DEVICE
++	},
++	{
++		.virtual	= IO_ADDRESS(LPC32XX_AHB1_START),
++		.pfn		= __phys_to_pfn(LPC32XX_AHB1_START),
++		.length		= LPC32XX_AHB1_SIZE,
++		.type		= MT_DEVICE
++	},
++	{
++		.virtual	= IO_ADDRESS(LPC32XX_FABAPB_START),
++		.pfn		= __phys_to_pfn(LPC32XX_FABAPB_START),
++		.length		= LPC32XX_FABAPB_SIZE,
++		.type		= MT_DEVICE
++	},
++	{
++		.virtual	= IO_ADDRESS(LPC32XX_IRAM_BASE),
++		.pfn		= __phys_to_pfn(LPC32XX_IRAM_BASE),
++		.length		= (LPC32XX_IRAM_BANK_SIZE * 2),
++		.type		= MT_DEVICE
++	},
++};
 +
-+	@ Clear self-refresh mode
-+	orr	WORK1_REG, SAVED_PWR_CTRL_REG,\
-+		#LPC32XX_CLKPWR_UPD_SDRAM_SELF_RFSH
-+	str	WORK1_REG, [CLKPWRBASE_REG, #LPC32XX_CLKPWR_PWR_CTRL_OFFS]
-+	str	SAVED_PWR_CTRL_REG, [CLKPWRBASE_REG,\
-+		#LPC32XX_CLKPWR_PWR_CTRL_OFFS]
++void __init lpc32xx_map_io(void)
++{
++	iotable_init(lpc32xx_io_desc, ARRAY_SIZE(lpc32xx_io_desc));
++}
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+new file mode 100644
+index 0000000..f82211f
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -0,0 +1,73 @@
++/*
++ * arch/arm/mach-lpc32xx/common.h
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2009-2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+	@ Wait for EMC to clear self-refresh mode
-+5:
-+	ldr	WORK2_REG, [EMCBASE_REG, #LPC32XX_EMC_STATUS_OFFS]
-+	and	WORK2_REG, WORK2_REG, #LPC32XX_EMC_STATUS_SELF_RFSH
-+	bne	5b @ Branch until self-refresh has exited
++#ifndef __LPC32XX_COMMON_H
++#define __LPC32XX_COMMON_H
 +
-+	@ restore regs and return
-+	adr	r0, tmp_stack
-+	ldmfd	r0!, {r3 - r7, sp, pc}
++#include <linux/platform_device.h>
 +
-+reg_bases:
-+	.long	IO_ADDRESS(LPC32XX_CLK_PM_BASE)
-+	.long	IO_ADDRESS(LPC32XX_EMC_BASE)
++/*
++ * Arch specific platform device structures
++ */
++extern struct platform_device lpc32xx_watchdog_device;
++extern struct platform_device lpc32xx_i2c0_device;
++extern struct platform_device lpc32xx_i2c1_device;
++extern struct platform_device lpc32xx_i2c2_device;
 +
-+tmp_stack:
-+	.long	0, 0, 0, 0, 0, 0, 0
-+tmp_stack_end:
++/*
++ * Other arch specific structures and functions
++ */
++extern struct sys_timer lpc32xx_timer;
++extern void __init lpc32xx_init_irq(void);
++extern void __init lpc32xx_map_io(void);
++extern void __init lpc32xx_serial_init(void);
++extern void __init lpc32xx_gpio_init(void);
 +
-+ENTRY(lpc32xx_sys_suspend_sz)
-+	.word	. - lpc32xx_sys_suspend
++/*
++ * Structure used for setting up and querying the PLLS
++ */
++struct clk_pll_setup {
++	int analog_on;
++	int cco_bypass_b15;
++	int direct_output_b14;
++	int fdbk_div_ctrl_b13;
++	int pll_p;
++	int pll_n;
++	u32 pll_m;
++};
++
++extern int clk_is_sysclk_mainosc(void);
++extern u32 clk_check_pll_setup(u32 ifreq, struct clk_pll_setup *pllsetup);
++extern u32 clk_get_pllrate_from_reg(u32 inputclk, u32 regval);
++extern u32 clk_get_pclk_div(void);
++
++/*
++ * Returns the LPC32xx unique 128-bit chip ID
++ */
++extern void lpc32xx_get_uid(u32 devid[4]);
++
++extern void lpc32xx_watchdog_reset(void);
++extern u32 lpc32xx_return_iram_size(void);
++
++/*
++ * Pointers used for sizing and copying suspend function data
++ */
++extern int lpc32xx_sys_suspend(void);
++extern int lpc32xx_sys_suspend_sz;
++
++#endif
 -- 
 1.6.6
