@@ -1,32 +1,25 @@
-From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 27 Feb 2010 17:51:38 +0100
-Subject: [PATCH 57/66] arch/arm/plat-omap/include/plat/blizzard.h: Checkpatch
-	cleanup
-In-Reply-To: <1267289508-31031-1-git-send-email-andrea.gelmini@gelma.net>
-References: <1267289508-31031-1-git-send-email-andrea.gelmini@gelma.net>
-Message-ID: <1267289508-31031-58-git-send-email-andrea.gelmini@gelma.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 27 Feb 2010 21:33:45 +0100
+Subject: arch/arm broken in next
+Message-ID: <20100227203345.GA5760@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/plat-omap/include/plat/blizzard.h:9: ERROR: spaces prohibited around that ':' (ctx:WxW)
+Hello,
 
-Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
----
- arch/arm/plat-omap/include/plat/blizzard.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+since
 
-diff --git a/arch/arm/plat-omap/include/plat/blizzard.h b/arch/arm/plat-omap/include/plat/blizzard.h
-index 8d160f1..56e7f2e 100644
---- a/arch/arm/plat-omap/include/plat/blizzard.h
-+++ b/arch/arm/plat-omap/include/plat/blizzard.h
-@@ -6,7 +6,7 @@ struct blizzard_platform_data {
- 	void		(*power_down)(struct device *dev);
- 	unsigned long	(*get_clock_rate)(struct device *dev);
- 
--	unsigned	te_connected : 1;
-+	unsigned	te_connected:1;
- };
- 
- #endif
+	40464e5 (Merge remote branch 'samsung/next-samsung')
+
+next is broken for arch/arm.  Our autobuilders fail with:
+
+	arch/arm/Kconfig:920: file 'arch/arm/mach-lh7a40x/Kconfig' is already sourced from 'arch/arm/Kconfig'
+
+Both parents of 40464e5 only include the above file once.
+
+Best regards
+Uwe
+
 -- 
-1.7.0.90.g251a4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
