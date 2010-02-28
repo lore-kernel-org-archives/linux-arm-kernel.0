@@ -1,39 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sun, 28 Feb 2010 10:12:39 +1100
-Subject: arch/arm broken in next
-In-Reply-To: <20100227203345.GA5760@pengutronix.de>
-References: <20100227203345.GA5760@pengutronix.de>
-Message-ID: <20100228101239.63de9eb6.sfr@canb.auug.org.au>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 28 Feb 2010 11:14:32 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+References: <1266979632.23523.1668.camel@pasglop>
+	<1267201521.14703.50.camel@e102109-lin.cambridge.arm.com>
+	<20100226210030.GC23933@n2100.arm.linux.org.uk>
+Message-ID: <1267316072.23523.1842.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Fri, 2010-02-26 at 21:00 +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 26, 2010 at 04:25:21PM +0000, Catalin Marinas wrote:
+> > For mmap'ed pages (and present in the page cache), is it guaranteed that
+> > the HCD driver won't write to it once it has been mapped into user
+> > space? If that's the case, it may solve the problem by just reversing
+> > the meaning of PG_arch_1 on ARM and assume that a newly allocated page
+> > has dirty D-cache by default.
+> 
+> I guess we could also set PG_arch_1 in the DMA API as well, to avoid the
+> unnecessary D cache flushing when clean pages get mapped into userspace.
 
-On Sat, 27 Feb 2010 21:33:45 +0100 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
->
-> since
-> 
-> 	40464e5 (Merge remote branch 'samsung/next-samsung')
-> 
-> next is broken for arch/arm.  Our autobuilders fail with:
-> 
-> 	arch/arm/Kconfig:920: file 'arch/arm/mach-lh7a40x/Kconfig' is already sourced from 'arch/arm/Kconfig'
-> 
-> Both parents of 40464e5 only include the above file once.
+That's an interesting thought for us too. When doing I$/D$ coherency, we
+have to fist flush the D$ and then invalidate the I$. If we could keep
+track of D$ and I$ separately, we could avoid the first step in many
+cases, including the DMA API trick you mentioned.
 
-Yeah, sorry about that.  This is one of those rare cases where the
-automatic git merge got it wrong.  I will make sure it doesn't happen for
-the next release.  The correct resolution should not include the second
-inclusion.
+I wonder if it's time to get a PG_arch_2 :-)
 
--- 
 Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100228/285a05ae/attachment.sig>
+Ben.
