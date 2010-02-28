@@ -1,62 +1,62 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 28 Feb 2010 16:14:19 +0000
-Subject: [PULL] Pull request for for-rmk/samsung5
-In-Reply-To: <20100226195944.GA23933@n2100.arm.linux.org.uk>
-References: <20100225000919.GA28433@fluff.org.uk>
-	<20100225205301.GG3101@n2100.arm.linux.org.uk>
-	<20100226160924.GB24864@trinity.fluff.org>
-	<20100226195944.GA23933@n2100.arm.linux.org.uk>
-Message-ID: <20100228161419.GI30679@trinity.fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 28 Feb 2010 16:14:49 +0000
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
+Message-ID: <20100228161449.GD16745@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2010 at 07:59:45PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 26, 2010 at 04:09:24PM +0000, Ben Dooks wrote:
-> > On Thu, Feb 25, 2010 at 08:53:01PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Feb 25, 2010 at 12:09:19AM +0000, Ben Dooks wrote:
-> > > > Sorry for the late request, but haven't been very well. Quite a bit of
-> > > > this update has been on list for a while, but only just been merged
-> > > > together into one tree.
-> > > > 
-> > > > This is the last of the Samsung updates that need to go via RMK, they
-> > > > are mostly plat-s3c/plat-s3c64xx and machine squashed and the new
-> > > > S5P6442 and S5PV210 code.
-> > > > 
-> > > > Included are some updates for the current code to avoid build or runtime
-> > > > problems with other updates such as via the ASoC tree.
-> > > > 
-> > > > I will be doing a seperate set of updates direct to Linus once these are
-> > > > merged to fix and outstanding problems, any updates such as S3C2443 clock
-> > > > rewrite and anything else not directly relying on arch/arm modifications.
-> > > > 
-> > > > There will also be a set of documentation updates to deal with the current
-> > > > shifts and outline anything else that needs to be done.
-> > > > 
-> > > > Anything urgent, please cc: me directly.
-> > > > 
-> > > > The following changes since commit ab5d97db1c6ced3e95c00d097931471707032b1f:
-> > > >   Ben Dooks (1):
-> > > >         ARM: SAMSUNG: Fix bad use of __initdata for s3c_register_clocks()
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > >   git://git.fluff.org/bjdooks/linux.git for-rmk/samsung5
-> > > 
-> > > This gives me conflicts in arch/arm/Makefile and arch/arm/Kconfig.  I'll
-> > > need to investigate, which I'll do over the weekend.
-> > 
-> > Very probably, this is based of the for-rmk/samsung3 branch which has
-> > very likely diverged from your branch. Thanks for looking at it.
+On Fri, Feb 26, 2010 at 05:05:01PM +0800, Eric Miao wrote:
+> Hi Russell,
 > 
-> When you say that, are you saying that the contents of the samsung3
-> branch which I pulled aren't relevant anymore?
+> This one actually has been merged into 'fix' and been there in -rc8
+> already. Now we have to live with this duplicate commit, it's my fault.
+> 
+> > which follows:
+> >
+> > [ARM] pxa/raumfeld: add defconfig
+> > [ARM] pxa/raumfeld: add platform support
+> >
+> > in your previous pull request? ?I can find these two in your latest with
+> > different commit IDs, but not the pxa/ttc_dkb patch.
+> >
+> 
+> I've sorted this out by merging your devel branch back, and rebased
+> the remaining patches on top of it. Please try re-pull. A rough test
+> here at my side shows a clean merge so far.
 
-No, the samsung3 is the last pulled one, and the samsung4 and then
-samsung5 are direct descendants of samsung3 and have not had any
-changes fed back from your dev tree.
+That isn't a fix - merging my devel branch just causes more problems
+because it regularly gets rebuilt.
 
--- 
-Ben
+The 'devel' branch contains individual patches, and is regularly re-
+generated from individual sub-branches.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+The 'devel-stable' branch (internal) contains work pulled from other
+people, and the 'stable' bit means that I once pulled, I don't wind
+the tree back at any point.  This gets merged into 'devel' as the last
+merge.
+
+Your original set of commits were merged into 'devel-stable' and has
+had other trees merged on top of those.
+
+You've destroyed your original commits, so this calls into question my
+entire 'devel-stable' branch.
+
+I've still not decided what to do about this.  I'll ask Linus to merge
+most of the 'devel' stuff without 'devel-stable' merged into mainline
+to move stuff forward - this means _no_ _one's_ git work will be merged
+through my tree, at least initially.
+
+However, I'm putting 'devel-stable' on hold; I'll let the other ARM git
+maintainers discuss this and work out what they're going to do about
+this mess.  One solution is to destroy the 'devel-stable' branch in
+its entirety, and get everyone to resend all their pull requests.
+That's *not* nice.
+
+I also won't be pulling any more git trees until this issue is resolved -
+it would be stupid to pull more git trees on top of 'devel-stable' at
+this point.
