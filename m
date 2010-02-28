@@ -1,29 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Feb 2010 15:57:54 +0000
-Subject: [PATCH 3/3] MAINTAINERS: add i2c tree for embedded platforms
-In-Reply-To: <1267009306-17227-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100224110044.GB15181@pengutronix.de>
-	<1267009306-17227-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100228155754.GC16745@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Sun, 28 Feb 2010 16:12:16 +0000
+Subject: [PATCH] CLKDEV: remove extra clk_find iterations
+In-Reply-To: <4B88D956.1090003@st.com>
+References: <4B88D956.1090003@st.com>
+Message-ID: <20100228161216.GH30679@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2010 at 12:01:46PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Jean Delvare <khali@linux-fr.org>
-> ---
->  MAINTAINERS |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2533fc4..a3c936c 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2626,6 +2626,7 @@ M:	"Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
->  L:	linux-i2c at vger.kernel.org
->  W:	http://i2c.wiki.kernel.org/
->  T:	quilt kernel.org/pub/linux/kernel/people/jdelvare/linux-2.6/jdelvare-i2c/
-> +T:	git git://git.fluff.org/bjdooks/linux.git
+On Sat, Feb 27, 2010 at 02:05:34PM +0530, Viresh KUMAR wrote:
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-This is wrong.  This is the same tree which I pull ARM stuff from, so it
-needs qualifying with a branch name.
+hmm, looks like your mailer has reformatted this message
+
+and two, please add a useful description, what is going on here?
+
+> ---
+>  arch/arm/common/clkdev.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> =======================================
+> 
+> diff --git a/arch/arm/common/clkdev.c b/arch/arm/common/clkdev.c
+> index aae5bc0..736dfba 100644
+> 
+> --- a/arch/arm/common/clkdev.c
+> 
+> +++ b/arch/arm/common/clkdev.c
+> 
+> @@ -55,7 +55,10 @@
+> 
+> static?struct?clk?*clk_find(const?char?*dev_id,?const?char?*con_id)
+> ? ? if?(match?==?0)
+> ? ? ? continue;
+> +? ? if?(match?==?3)
+> +? ? ? return?p->clk;
+> +
+> ? ? if?(match?>?best)?{
+> ? ? ? clk?=?p->clk;
+> ? ? ? best?=?match;
+> 
+> -- 1.6.0.2
+> 
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
