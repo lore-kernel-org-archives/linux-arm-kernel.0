@@ -1,25 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Feb 2010 14:20:46 +0000
-Subject: [RFC PATCH v2 4/9] add generic dmabounce support
-In-Reply-To: <1267366082-15248-5-git-send-email-albert_herranz@yahoo.es>
-References: <1267366082-15248-1-git-send-email-albert_herranz@yahoo.es>
-	<1267366082-15248-5-git-send-email-albert_herranz@yahoo.es>
-Message-ID: <20100228142046.GA16745@n2100.arm.linux.org.uk>
+Date: Sun, 28 Feb 2010 15:55:02 +0000
+Subject: [PATCH 2/3] i2c/pxa: only define 'blue_murder'-function if
+	DEBUG is #defined
+In-Reply-To: <1267009306-17227-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100228155502.GB16745@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 28, 2010 at 03:07:57PM +0100, Albert Herranz wrote:
-> This patch makes part of the ARM dmabounce code available to other
-> architectures as a generic API.
+On Wed, Feb 24, 2010 at 12:01:45PM +0100, Uwe Kleine-K?nig wrote:
+> From: Wolfram Sang <w.sang@pengutronix.de>
+> 
+> This talkative function is also called on timeouts. As timeouts can
+> happen on regular writes to EEPROMs (no error case), this creates false
+> positives.  Giving lots of details is interesting only for developers
+> anyhow, so just use the function if DEBUG is #defined.
 
-There is already a generic dma bounce implementation - it's called
-swiotlb - lib/swiotlb.c.  We should eventually switch the ARM
-dmabounce stuff over to that instead of keeping dmabounce around.
+Are you sure this is safe?  If you time out the write before it completes,
+how do you know if the write was successful?
 
-The only problem I forsee is that on ARM, we have devices which can
-only address the least significant N bits of RAM, but there may be
-an offset on the base address of RAM on the bus which isn't included
-in these N bits.
-
-Even more fun is where we have a DMA controller which can address
-N bits of RAM, except for bit M which must be zero... (where N > M).
+I don't think this is "no error code" nor "false positive".  If the timeout
+is too short for your EEPROMs, then the timeout needs to be increased.
