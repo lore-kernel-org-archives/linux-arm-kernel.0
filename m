@@ -1,74 +1,51 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 28 Feb 2010 11:29:53 +1100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100226220351.GE23933@n2100.arm.linux.org.uk>
-References: <1266445892.16346.306.camel@pasglop>
-	<1266599755.32546.38.camel@e102109-lin.cambridge.arm.com>
-	<1266979170.23523.1660.camel@pasglop>
-	<1267202674.14703.70.camel@e102109-lin.cambridge.arm.com>
-	<1267220980.23523.1820.camel@pasglop>
-	<20100226220351.GE23933@n2100.arm.linux.org.uk>
-Message-ID: <1267316993.23523.1857.camel@pasglop>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Sat, 27 Feb 2010 21:23:39 -0600
+Subject: AC97 audio broken on SAM9263EK?
+In-Reply-To: <4B86AA29.8010806@atmel.com>
+References: <4B85789D.6000704@billgatliff.com> <4B864C66.6060209@atmel.com>
+	<4B867108.2050806@billgatliff.com> <4B86AA29.8010806@atmel.com>
+Message-ID: <4B89E1BB.6090504@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-02-26 at 22:03 +0000, Russell King - ARM Linux wrote:
-> On Sat, Feb 27, 2010 at 08:49:40AM +1100, Benjamin Herrenschmidt wrote:
-> > It will deadlock if you use normal IRQs. I don't see a good way around
-> > that other than using a higher-level type of IRQs. I though ARM has
-> > something like that (FIQs ?). Can you use those guys for IPIs ?
-> 
-> If the hardware did support using FIQs for IPIs, this would not be
-> desirable because then it takes it away from the SoC folk to do what
-> they will with it.
-> 
-> In the past, it's been used as a fast CPU-driven "DMA" interface -
-> some SoCs have been wired up in such a way that's the only use
-> available for the FIQ.
+Sedji Gaouaou wrote:
+> Hi Bill,
+>
+> Here is the patch for the ac97 support on AT91:
+>
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025629.html
+>
+>
+> Here is the patch for the full duplex support:
+>
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025628.html
+>
 
-This is an issue indeed.
+Hmm.  I applied both patches to 2.6.33-rc5.  There were two local
+variables "err" and "ptcr" that weren't defined, which I corrected.  And
+then there was this:
 
-> The other problem we'd encounter using FIQs for IPIs is that some IPIs
-> need to take locks - and in order to make that safe, we'd either need
-> another class of locks which disable IRQs and FIQs together, or we'd
-> need to disable FIQs everywhere we disable IRQs - at which point FIQs
-> become utterly pointless.
+ CC      sound/atmel/ac97c.o
+sound/atmel/ac97c.c: In function ?atmel_ac97c_capture_trigger?:
+sound/atmel/ac97c.c:545: warning: unused variable ?casr?
+sound/atmel/ac97c.c: In function ?atmel_ac97c_pcm_new?:
+sound/atmel/ac97c.c:743: error: ?at91_ac97_pcm_defs? undeclared (first
+use in this function)
+sound/atmel/ac97c.c:743: error: (Each undeclared identifier is reported
+only once
+sound/atmel/ac97c.c:743: error: for each function it appears in.)
+sound/atmel/ac97c.c:743: warning: type defaults to ?int? in declaration
+of ?type name?
+sound/atmel/ac97c.c:743: warning: type defaults to ?int? in declaration
+of ?type name?
+sound/atmel/ac97c.c:743: error: negative width in bit-field ?<anonymous>?
+make[2]: *** [sound/atmel/ac97c.o] Error 1
 
-That's solvable easily :-) I mentioned having potentially to deal with a
-similar problem with people using PowerPC 440 for SMP (doesn't broadcast
-cache ops either). 440 has critical interrupts, which are akin to FIQs.
 
-The trick here is that you don't use -only- critical interrupts for
-IPIs. You use normal interrupts for all the current IPI types. You -add-
-a fast one using critical interrupts specifically for cache ops, with a
-very fast asm only path.
+b.g.
 
-This works for us because masking interrupts doesn't mask critical
-interrupts (it's a separate mask bit in our MSR). If that isn't the case
-with FIQs then the whole idea is moot.
-
-> (There only differences between FIQ and IRQ are:
->  - on simultaneous raising of both, the FIQ will be called before the IRQ.
->  - each has its own (single) vector.
->  - invocation of FIQ masks IRQ.
-> 
-> What I'm saying is that what gives FIQ an advantage for SoC people is
-> that it's bare bones light weight and therefore extremely fast - as soon
-> as you load it up with additional complexity, it becomes less useful.)
-
-I understand.
-
-Then Catalin idea of tricking the cache with load and stores would work
-for the D$ side of thing. The I$ side of thing probably still needs IPIs
-though, and you might need to use non-blocking async SMP call function
-for that if you're going to do it from set_pte_at() instead of
-update_mmu_cache() since the later is racy. In any case, it's a lot less
-of a deadlock nest than the D$ side which needs to be dealt with in the
-DMA ops, called below layers of driver and subsystem locks.
-
-Note: Somebody at ARM needs to be severely beaten up for coming up with
-that SMP scheme without broadcast cache ops and not also mandating some
-kind FIQ IPI scheme that isn't masked with normal interrupts :-)
-
-Cheers,
-Ben.
+-- 
+Bill Gatliff
+Embedded systems training and consulting
+http://billgatliff.com
+bgat at billgatliff.com
