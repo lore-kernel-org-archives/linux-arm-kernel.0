@@ -1,41 +1,45 @@
-From: albert_herranz@yahoo.es (Albert Herranz)
-Date: Sun, 28 Feb 2010 17:37:06 +0100
-Subject: [RFC PATCH v2 4/9] add generic dmabounce support
-In-Reply-To: <20100228142046.GA16745@n2100.arm.linux.org.uk>
-References: <1267366082-15248-1-git-send-email-albert_herranz@yahoo.es>
-	<1267366082-15248-5-git-send-email-albert_herranz@yahoo.es>
-	<20100228142046.GA16745@n2100.arm.linux.org.uk>
-Message-ID: <4B8A9BB2.3080202@yahoo.es>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 28 Feb 2010 20:17:06 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267316647.23523.1852.camel@pasglop>
+References: <1266979632.23523.1668.camel@pasglop>
+	<1267201521.14703.50.camel@e102109-lin.cambridge.arm.com>
+	<1267220429.23523.1811.camel@pasglop>
+	<20100226214908.GD23933@n2100.arm.linux.org.uk>
+	<1267316647.23523.1852.camel@pasglop>
+Message-ID: <20100228191706.GB4853@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Sun, Feb 28, 2010 at 03:07:57PM +0100, Albert Herranz wrote:
->> This patch makes part of the ARM dmabounce code available to other
->> architectures as a generic API.
+> There's two potential problems with the approach, and maybe more that I
+> have missed though. One is the case of a networked filesystem where the
+> executable pages are modified remotely. However, I would expect such a
+> program to invalidate the PTE mappings before making the change visible,
+> so we -do- get a chance to re-flush provided something clears PG_arch_1.
 > 
-> There is already a generic dma bounce implementation - it's called
-> swiotlb - lib/swiotlb.c.  We should eventually switch the ARM
-> dmabounce stuff over to that instead of keeping dmabounce around.
+> Then, there's In the case of a multithread app, where one thread does
+> the cache flush and another thread then executes, the earlier ARMs
+> without broadcast ops have a potential problem there. In fact, some
+> variant of PowerPC 440 have the same problem and some people are
+> (ab)using those for SMP setups I'm being told.
 > 
-> The only problem I forsee is that on ARM, we have devices which can
-> only address the least significant N bits of RAM, but there may be
-> an offset on the base address of RAM on the bus which isn't included
-> in these N bits.
+> For that case, I see two options. One is a big hammer but would make
+> existing code work to "most" extent: Don't allow a page to be both
+> writable and executable. Ping-pong the page permission lazily and flush
+> when transitioning from write to exec.
 > 
-> Even more fun is where we have a DMA controller which can address
-> N bits of RAM, except for bit M which must be zero... (where N > M).
+> That means using a spare bit for Linux _PAGE_RW separate from your real
+> RW bit I suppose, since you have HW loaded PTEs (on 440 it's easier
+> since we SW load, we can do the fixup there, though it has a perf impact
+> obviously).
 > 
+> Another option would be to make some syscall mandatory to "sync" caches
+> which could then do IPIs or whatever else is needed. But that would
+> require changing existing userspace code.
 
-In the Wii we have several limitations:
-- it is a NOT_COHERENT_CACHE platform
-- write accesses to coherent memory from the main processor must be done always in 32-bit chunks
-- some devices can only reliably perform DMA to/from a specific region of memory (the second block of RAM, 64MB at 0x10000000, called MEM2)
-
-So if swiotlb is the way to go I can try to adapt it to take into account these cases:
-- it should allocate the io_tlb_start and io_tlb_overflow_buffer areas from MEM2 (add allocation/freeing hooks for these areas?)
-- it should copy data from coherent memory in 32-bit chunks (add copy to/from coherent hooks?)
-- it should decide to bounce buffers sitting in MEM1 (add a dma_needs_bounce() hook?)
-
-Thanks,
-Albert
+Or you could do first option by default, and add mmap flag that says
+that application is responsible for cross-cpu cache flushes...?
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
