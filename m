@@ -1,29 +1,24 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  1 Mar 2010 12:12:16 +0100
-Subject: [PATCH] MAINTAINERS: add i2c tree for embedded platforms
-In-Reply-To: <20100301113840.4d6b4e7d@hyperion.delvare>
-References: <20100301113840.4d6b4e7d@hyperion.delvare>
-Message-ID: <1267441936-4432-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Mon, 1 Mar 2010 16:55:10 +0530
+Subject: [PATCH 00/03] sDMA driver descriptor autoloading feature [version 5]
+	and omap hsmmc driver adaptations
+Message-ID: <618f0c911003010325t337bb0f4o67e2cb3b2484d767@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Jean Delvare <khali@linux-fr.org>
----
- MAINTAINERS |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+This patch series is introduction of new sDMA feature: descriptor
+autoloading (v5)
+       and its adoption by omap hsmmc driver.
+Previous thread (v4 of sDMA patch, without hsmmc adoptions) is here:
+http://patchwork.kernel.org/patch/66690/
+Current version(s) based on for-next branch, 7b97f3ed. Tested on omap4430 sdp.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f520dd0..a01745b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2658,6 +2658,7 @@ M:	"Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
- L:	linux-i2c at vger.kernel.org
- W:	http://i2c.wiki.kernel.org/
- T:	quilt kernel.org/pub/linux/kernel/people/jdelvare/linux-2.6/jdelvare-i2c/
-+T:	git git://git.fluff.org/bjdooks/linux.git next-i2c
- S:	Maintained
- F:	Documentation/i2c/
- F:	drivers/i2c/
--- 
-1.7.0
+Venkatraman S (3):
+     MMC:  prevent race between dma  and hsmmc callback
+     sDMA: descriptor autoloading feature [version 5]
+     MMC: omap hsmmc adaptation of descriptor autoloading feature
+
+ arch/arm/plat-omap/dma.c              |  269 ++++++++++++++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/dma.h |  170 +++++++++++++++++++++
+ drivers/mmc/host/omap_hsmmc.c         |  162 ++++++++++++++++----
+ 3 files changed, 571 insertions(+), 30 deletions(-)
