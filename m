@@ -1,56 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 01 Mar 2010 15:44:58 +0300
-Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
-	callback
-In-Reply-To: <618f0c911003010325q201fbcedr776da21c709ac421@mail.gmail.com>
-References: <618f0c911003010325q201fbcedr776da21c709ac421@mail.gmail.com>
-Message-ID: <4B8BB6CA.7000104@ru.mvista.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 1 Mar 2010 21:23:37 +0800
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <alpine.LFD.2.00.1002281928200.10679@xanadu.home>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
+	<20100228161449.GD16745@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002281928200.10679@xanadu.home>
+Message-ID: <f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-Venkatraman S wrote:
-
-> It is observed that sometimes the MMC Transfer Complete (TC) is not
-> received when DMA completion callback is processed (or takes too long
-> to process)
-> This patch moves the releasing of DMA channel from dma callback to the
-> mmc transfer complete handler.
-> This is observed consistently when descriptor loading is used (see the
-> rest of the series)
+On Mon, Mar 1, 2010 at 8:42 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Sun, 28 Feb 2010, Russell King - ARM Linux wrote:
 >
-> Signed-off-by: Venkatraman S <svenkatr@ti.com>
-> ---
->  drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++--------
->  1 files changed, 11 insertions(+), 8 deletions(-)
+>> You've destroyed your original commits, so this calls into question my
+>> entire 'devel-stable' branch.
+>>
+>> I've still not decided what to do about this. ?I'll ask Linus to merge
+>> most of the 'devel' stuff without 'devel-stable' merged into mainline
+>> to move stuff forward - this means _no_ _one's_ git work will be merged
+>> through my tree, at least initially.
+>>
+>> However, I'm putting 'devel-stable' on hold; I'll let the other ARM git
+>> maintainers discuss this and work out what they're going to do about
+>> this mess. ?One solution is to destroy the 'devel-stable' branch in
+>> its entirety, and get everyone to resend all their pull requests.
+>> That's *not* nice.
 >
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 83f0aff..06337f6 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1046,8 +1046,18 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+> What about simply ignoring Eric's latest pull request and have your
+> 'devel-stable' be merged by Linus as is? ?Surely the earlier branch you
+> merged from Eric wasn't that bad anyway, and Eric can certainly provide
+> new commits on top later on to fix possible issues with that in order to
+> bring his stuff to the same state as what he just asked you to pull.
 >
->  	if (end_cmd || ((status & CC) && host->cmd))
->  		omap_hsmmc_cmd_done(host, host->cmd);
-> -	if ((end_trans || (status & TC)) && host->mrq)
-> +	if ((end_trans || (status & TC)) && host->mrq) {
->  		omap_hsmmc_xfer_done(host, data);
-> +		if (host->dma_ch != -1) {
-> +			omap_free_dma(host->dma_ch);
-> +			host->dma_ch = -1;
-> +		/*
-> +		 * Callback: run in interrupt context.
-> +		 * mutex_unlock will throw a kernel warning if used.
-> +		 */
->   
 
-   The comment should be aligned with the rest of the code.
+Russell,
 
-> +			up(&host->sem);
-> +		}
-> +	}
->
->  	spin_unlock(&host->irq_lock);
+Regarding the problem of my rebased three commits that were already
+merged into your tree, I'm seeing three ways out:
 
-WBR, Sergei
+1. merge back your devel branch (tried and as you suggested is not a
+very clean way)
+
+2. merge linus v2.6.33-rc? and get the other commits rebased
+
+3. rebase all the other commits against your devel branch or (devel-stable)
+
+Just lemme know which is the best approach.
+
+BTW, it would be very helpful to us if we are able to understand the
+difference and how you maintain 'devel' and 'devel-stable' branch?
+
+- eric
