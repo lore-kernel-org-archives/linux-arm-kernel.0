@@ -1,37 +1,25 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 28 Feb 2010 19:42:25 -0500 (EST)
-Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <20100228161449.GD16745@n2100.arm.linux.org.uk>
-References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
-	<20100225205113.GF3101@n2100.arm.linux.org.uk>
-	<20100225212915.GA24043@n2100.arm.linux.org.uk>
-	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
-	<20100228161449.GD16745@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1002281928200.10679@xanadu.home>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Sun, 28 Feb 2010 20:58:14 -0700
+Subject: [PATCH] iop-adma: redundant/wrong tests in iop_*_count()?
+In-Reply-To: <4B76BD0B.2010307@gmail.com>
+References: <4B76BD0B.2010307@gmail.com>
+Message-ID: <e9c3a7c21002281958u4ee6fb94p55b7c5069dd08be5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Feb 2010, Russell King - ARM Linux wrote:
+On Sat, Feb 13, 2010 at 7:54 AM, Roel Kluin <roel.kluin@gmail.com> wrote:
+> When we reach the loop, len is at least 1, we only stay in the loop when
+> len is at least MAX_BYTE_COUNT + 1, MAX_BYTE_COUNT is subtracted in each
+> iteration. So when we leave the loop, or didn't take it, len is at least 1.
+> Testing whether len is non-zero appears redundant.
+>
+> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+> ---
+> Or are the tests off by one? Then we'll need a different patch...
 
-> You've destroyed your original commits, so this calls into question my
-> entire 'devel-stable' branch.
-> 
-> I've still not decided what to do about this.  I'll ask Linus to merge
-> most of the 'devel' stuff without 'devel-stable' merged into mainline
-> to move stuff forward - this means _no_ _one's_ git work will be merged
-> through my tree, at least initially.
-> 
-> However, I'm putting 'devel-stable' on hold; I'll let the other ARM git
-> maintainers discuss this and work out what they're going to do about
-> this mess.  One solution is to destroy the 'devel-stable' branch in
-> its entirety, and get everyone to resend all their pull requests.
-> That's *not* nice.
+No, not off by one, just redundant.
 
-What about simply ignoring Eric's latest pull request and have your 
-'devel-stable' be merged by Linus as is?  Surely the earlier branch you 
-merged from Eric wasn't that bad anyway, and Eric can certainly provide 
-new commits on top later on to fix possible issues with that in order to 
-bring his stuff to the same state as what he just asked you to pull.
+Applied, thanks.
 
-
-Nicolas
+--
+Dan
