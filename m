@@ -1,38 +1,75 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon,  1 Mar 2010 19:57:59 +0000
-Subject: [PATCH 2.6.34] ASoC: Fix S3C64xx IIS driver for Samsung header reorg
-Message-ID: <1267473479-443-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: albert_herranz@yahoo.es (Albert Herranz)
+Date: Mon, 01 Mar 2010 21:11:30 +0100
+Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
+	driver flag
+In-Reply-To: <Pine.LNX.4.44L0.1003011356040.1341-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1003011356040.1341-100000@iolanthe.rowland.org>
+Message-ID: <4B8C1F72.3080902@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reorgs of the Samsung headers have moved the GPIO bank definitions
-from plat/ to mach/ - the IIS driver needs to be updated to take care
-of this.
+Alan Stern wrote:
+> If urb->num_sgs > 0 then urb has been s-g mapped.  Although we don't
+> currently check for it, quite a few URBs have transfer_buffer_length ==
+> 0 (a number of control requests are like this, for example) so they
+> don't need a mapping either.
+> 
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
+Ok, I'll use urb->num_sgs > 0 to check for s-g mapped requests.
 
-Ideally this could also go in via the same path as the ARM/Samsung changes
-which do the moves.  If those get merged without this fix then it may as
-well go via ASoC.
+>> The final logic would be something like:
+>> - map if URB_NO_TRANSFER_DMA_MAP is cleared
+>> - otherwise (URB_TRANSFER_NO_DMA_MAP is set so) map if
+>> HCD_NO_COHERENT_MEM is set _and_ it's not a scatter/gather request
+>> (as that should have been mapped already by usb_buffer_map_sg())
+>>
+>> Am I on the right path?
+> 
+> More or less.  I would do it somewhat differently:
+> 
+> 	If URB_NO_TRANSFER_DMA_MAP is set then no map is needed.
+> 	Otherwise if num_sgs > 0 then no map is needed.
+> 	Otherwise if HCD_NO_COHERENT_MEM is set then use
+> 		hcd_alloc_coherent().
+> 	Otherwise if transfer_buffer_length > 0 then use
+> 		dma_map_single().
+> 
 
- sound/soc/s3c24xx/s3c64xx-i2s.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I think that logic is not quite right.
+Remember that the final goal is to avoid allocating USB buffers from coherent memory (because the USB drivers access USB buffers without access restrictions but the platform I'm working on can't write to coherent memory unless it is done in 32-bit chunks).
+And we want to avoid bouncing at the USB layer too (that's what v1 did).
 
-diff --git a/sound/soc/s3c24xx/s3c64xx-i2s.c b/sound/soc/s3c24xx/s3c64xx-i2s.c
-index 93ed3aa..a72c251 100644
---- a/sound/soc/s3c24xx/s3c64xx-i2s.c
-+++ b/sound/soc/s3c24xx/s3c64xx-i2s.c
-@@ -22,8 +22,8 @@
- #include <sound/soc.h>
- 
- #include <plat/regs-s3c2412-iis.h>
--#include <plat/gpio-bank-d.h>
--#include <plat/gpio-bank-e.h>
-+#include <mach/gpio-bank-d.h>
-+#include <mach/gpio-bank-e.h>
- #include <plat/gpio-cfg.h>
- 
- #include <mach/map.h>
--- 
-1.7.0
+The strategy so far is:
+- we have modified the USB buffer allocation routines hcd_buffer_alloc()/hcd_buffer_free() to always return normal kernel memory when HCD_NO_COHERENT_MEM is set on the host controller.
+- during map_urb_for_dma()/unmap_urb_for_dma() we need to make sure that those USB buffers are sync'ed, even if we are told USB_NO_{SETUP,TRANSFER}_DMA_MAP
+
+So the logic would be:
+
+ 	If URB_NO_TRANSFER_DMA_MAP is _cleared_ then do the mapping
+	- this case covers normal kernel memory used as a buffer and not already DMA mapped by a USB driver
+
+ 	Otherwise if HCD_NO_COHERENT_MEM is set _and_ num_sgs == 0 _and_ transfer_buffer_length > 0 then do the mapping too
+	- this case covers USB buffers allocated via usb_buffer_alloc() and marked URB_NO_TRANSFER_DMA_MAP by a USB driver, which are allocated from normal kernel memory when HCD_NO_COHERENT_MEM is set (we avoid bouncing buffers here too, at least if they sit already within MEM2 in the Wii, but anyway that's part of the platform DMA mapping code)
+
+	s-g urbs do not need a mapping as they have already been mapped, marked URB_NO_TRANSFER_DMA_MAP and have num_sgs > 0
+	
+> Similar logic is needed for the setup buffer mapping, but you can 
+> assume that control URBs never use scatter-gather so there's no need to 
+> check num_sgs (and there's no need to check the transfer length, since 
+> setup packets are always 8 bytes long).
+> 
+> In fact, I think URB_NO_SETUP_DMA_MAP doesn't really offer any
+> worthwhile advantages.  (About the only place where multiple control
+> requests are used in rapid succession is during firmware transfers, and
+> those aren't time-constrained.)  It is currently used in a few
+> drivers, but we ought to be able to remove it without too much effort.  
+> That might make a good project.
+> 
+
+I'll leave that projects to others or, in any case, address it later :)
+
+> Alan Stern
+> 
+
+Thanks,
+Albert
