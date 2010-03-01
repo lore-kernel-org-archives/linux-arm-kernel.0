@@ -1,75 +1,48 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 1 Mar 2010 15:45:10 -0500 (EST)
-Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
-	driver flag
-In-Reply-To: <4B8C1F72.3080902@yahoo.es>
-Message-ID: <Pine.LNX.4.44L0.1003011528240.1341-100000@iolanthe.rowland.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 01 Mar 2010 13:15:18 -0800
+Subject: [PATCH] staging/dream: add missing include files/fix compilation
+In-Reply-To: <20100301211057.GA3004@elf.ucw.cz>
+References: <1263914079.1951.43.camel@m0nster>
+	<20100131084421.GG2238@elf.ucw.cz> <20100131092829.GJ2238@elf.ucw.cz>
+	<1264953492.2059.5.camel@m0nster> <20100225193027.GA7391@elf.ucw.cz>
+	<1267126586.5439.56.camel@c-dwalke-linux.qualcomm.com>
+	<20100225194125.GA7645@elf.ucw.cz>
+	<1267127298.5439.62.camel@c-dwalke-linux.qualcomm.com>
+	<20100226213107.GA29615@elf.ucw.cz>
+	<1267469856.29769.9.camel@c-dwalke-linux.qualcomm.com>
+	<20100301211057.GA3004@elf.ucw.cz>
+Message-ID: <1267478118.29769.16.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Mar 2010, Albert Herranz wrote:
+On Mon, 2010-03-01 at 22:10 +0100, Pavel Machek wrote:
 
-> >> Am I on the right path?
-> > 
-> > More or less.  I would do it somewhat differently:
-> > 
-> > 	If URB_NO_TRANSFER_DMA_MAP is set then no map is needed.
-> > 	Otherwise if num_sgs > 0 then no map is needed.
-> > 	Otherwise if HCD_NO_COHERENT_MEM is set then use
-> > 		hcd_alloc_coherent().
-> > 	Otherwise if transfer_buffer_length > 0 then use
-> > 		dma_map_single().
-> > 
+> How do I get that one? I tried killing the repository and redoing git
+> pull, followed up by 
+
+You should just be able to do "git remotes update" , then checkout the
+branch again.
+
+> git checkout refs/remotes/origin/working-mmc
 > 
-> I think that logic is not quite right.
-> Remember that the final goal is to avoid allocating USB buffers from coherent memory (because the USB drivers access USB buffers without access restrictions but the platform I'm working on can't write to coherent memory unless it is done in 32-bit chunks).
-
-Actually the final goal is to make the mapping/unmapping algorithms 
-clear and correct.  One of the subgoals involves avoiding coherent USB 
-buffers, but there are others as well (if you look back the through the 
-linux-usb mailing list for the last few weeks you'll see a discussion 
-about a controller which has to use PIO for control transfers but can 
-use DMA for other types).
-
-> And we want to avoid bouncing at the USB layer too (that's what v1 did).
+> only to get (git log): [I think I was there before].
 > 
-> The strategy so far is:
-> - we have modified the USB buffer allocation routines hcd_buffer_alloc()/hcd_buffer_free() to always return normal kernel memory when HCD_NO_COHERENT_MEM is set on the host controller.
-> - during map_urb_for_dma()/unmap_urb_for_dma() we need to make sure that those USB buffers are sync'ed, even if we are told USB_NO_{SETUP,TRANSFER}_DMA_MAP
+> commit 2b0bcf161e83fc7d45476f3330f06b656a1f03d4
+> Author: Daniel Walker <dwalker@codeaurora.org>
+> Date:   Mon Feb 22 12:29:17 2010 -0800
 > 
-> So the logic would be:
+>     DMA fixes (get MMC working).
 > 
->  	If URB_NO_TRANSFER_DMA_MAP is _cleared_ then do the mapping
-
-No, that's wrong because it ignores the HCD_LOCAL_MEM flag.
-
-> 	- this case covers normal kernel memory used as a buffer and not already DMA mapped by a USB driver
+> commit 5fc33446739aa7a0826d98a00cc50a712c6d60eb
+> Author: San Mehat <san@google.com>
+> Date:   Wed Feb 3 12:59:29 2010 -0800
 > 
->  	Otherwise if HCD_NO_COHERENT_MEM is set _and_ num_sgs == 0 _and_ transfer_buffer_length > 0 then do the mapping too
-> 	- this case covers USB buffers allocated via usb_buffer_alloc() and marked URB_NO_TRANSFER_DMA_MAP by a USB driver, which are allocated from normal kernel memory when HCD_NO_COHERENT_MEM is set (we avoid bouncing buffers here too, at least if they sit already within MEM2 in the Wii, but anyway that's part of the platform DMA mapping code)
-> 
-> 	s-g urbs do not need a mapping as they have already been mapped, marked URB_NO_TRANSFER_DMA_MAP and have num_sgs > 0
+>     drivers: mmc: msm_sdcc: Add EMBEDDED_SDIO support
+>     
+>     Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
 
-Actually the test for transfer_buffer_length == 0 should be done first, 
-since obviously no mapping is needed if there's no data.  (And in fact 
-the current code does do this; I was wrong earlier when I said it 
-doesn't.)
+I actually dropped a patch between the two above, otherwise the history
+is very similar. I think you have the right one, are you still getting
+the compile errors?
 
-So let's make things a little easier by first testing the conditions 
-under which no mapping is needed:
-
-	If transfer_buffer_length is 0 then do nothing.
-	Otherwise if num_sgs > 0 then do nothing.
-	Otherwise if URB_NO_TRANSFER_DMA_MAP and transfer_dma
-		are both set (this avoids your HCD_NO_COHERENT_MEM
-		case) then do nothing.
-
-The remaining cases all need mapping and/or bounce buffers:
-
-	Otherwise if HCD_LOCAL_MEM is set then call hcd_alloc_coherent.
-	Otherwise call dma_map_single.
-
-Finally, the unmapping tests can be simplified greatly if the kind of
-mapping is recorded in the URB flags.
-
-Alan Stern
+Daniel
