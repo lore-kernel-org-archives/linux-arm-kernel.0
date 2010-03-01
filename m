@@ -1,53 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Mar 2010 17:07:22 +0000
-Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <alpine.LFD.2.00.1003010856200.3616@localhost.localdomain>
-References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
-	<20100225205113.GF3101@n2100.arm.linux.org.uk>
-	<20100225212915.GA24043@n2100.arm.linux.org.uk>
-	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
-	<20100228161449.GD16745@n2100.arm.linux.org.uk>
-	<20100301093927.GC29952@pengutronix.de>
-	<20100301094820.GA10863@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003010827330.3616@localhost.localdomain>
-	<alpine.LFD.2.00.1003010856200.3616@localhost.localdomain>
-Message-ID: <20100301170722.GB3002@n2100.arm.linux.org.uk>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Mon, 1 Mar 2010 18:57:10 +0100
+Subject: [PATCH 04/13] ARM: LPC32XX: GPIO, timer, and IRQ drivers
+In-Reply-To: <20100227204243.GB5760@pengutronix.de>
+References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
+	<1267228430-27193-5-git-send-email-wellsk40@gmail.com>
+	<20100227204243.GB5760@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F805CCF92938@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 01, 2010 at 08:58:12AM -0800, Linus Torvalds wrote:
-> On Mon, 1 Mar 2010, Linus Torvalds wrote:
-> > 
-> > rmk: I think it's ok if you end up having to rebase something this time in 
-> > order to fix up a mistake that has already happened - no rule should be 
-> > _so_ set in stone that it can't be violated when bad things happen.
+Hi Uwe,
+
+> > +
+> > +	/* Activation type, edge or level */
+> > +	reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
+> > +	if (use_edge) {
+> > +		reg |= mask;
+> > +		set_irq_handler(irq, handle_edge_irq);
+> > +	} else {
+> > +		reg &= ~mask;
+> > +		set_irq_handler(irq, handle_level_irq);
+> > +	}
+> So you really need handle_edge_irq?  If so you should report this to
+> your hardware department and ask for a better irq logic next time.
 > 
-> Btw, since I have a pending pull from you already, let me know if I should 
-> pull it or not. I was just about to pull it, and then I started wondering 
-> whether the pax patches are involved, so I kept off.
 
-That pull request contains just local commits, so it's safe to be pulled
-in respect of this issue.  The only concern raised on it is from Geert
-Uytterhoeven over a bit of missing documentation - basically:
+Thanks for your time in helping to improve this port. I'm really
+embarrassed to say I missed this. The complete correct changes are below
+with the level based handler used for all sources.
+This is fixed it in my baseline. Thanks for catching this.
 
- 5) void update_mmu_cache(struct vm_area_struct *vma,
--                        unsigned long address, pte_t pte)
-+                        unsigned long address, pte_t *ptep)
+@@ -242,13 +242,11 @@ static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
+ 
+        /* Activation type, edge or level */
+        reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
+-       if (use_edge) {
++       if (use_edge)
+                reg |= mask;
+-               set_irq_handler(irq, handle_edge_irq);
+-       } else {
++       else
+                reg &= ~mask;
+-               set_irq_handler(irq, handle_level_irq);
+-       }
++       __raw_writel(reg, LPC32XX_INTC_ACT_TYPE(ctrl));
+ 
+        /* Use same polarity for the wake events */
+        if (lpc32xx_events[irq].mask != 0) {
 
-        At the end of every page fault, this routine is invoked to
-        tell the architecture specific code that a translation
--       described by "pte" now exists at virtual address "address"
--       for address space "vma->vm_mm", in the software page tables.
-+       now exists at virtual address "address" for address space
-+       "vma->vm_mm", in the software page tables.
+Kevin
 
-the complaint is that 'ptep' is not documented.  "ptep is a pointer to
-the pte" wouldn't (at least to me) provide any additional information
-to the reader.
-
-> But if you're just going to ask the pxa people to fix things up (which is 
-> my preference), just send me an email saying "go ahead and pull". I'm 
-> checking, just in case.
-
-I hope that the PXA situation does get straightened out soon, at which
-point this will be part of a pull request next week.
+> 
+> Best regards
+> Uwe
+> 
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
