@@ -1,35 +1,42 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon,  1 Mar 2010 18:51:42 +0000
-Subject: [PATCH 2.6.34] USB: Fix s3c-hsotg build following Samsung platform
-	header moves
-Message-ID: <1267469502-19560-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Mon,  1 Mar 2010 18:52:22 +0000
+Subject: [PATCH 2.6.34] ARM: SAMSUNG: Fix build after "ARM: Eliminate
+	decompressor -Dstatic= PIC hack"
+Message-ID: <1267469542-19633-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a reference to regs-sys.h got missed in the reorganisation of
-the Samsung platform headers targetted for 2.6.34.
+Commit 5de813b6 (ARM: Eliminate decompressor -Dstatic= PIC hack) among
+other things changed the declared type of the error() function to an
+extern, conflicting with the forward declartion in the Samsung
+plat/uncompress.h which appears to have been relying on the static
+being defined away, causing build failures since error() ends up with
+a GOT relocation but the linker script discards all GOT relocated
+data and functions:
+
+arch/arm/boot/compressed/decompress.o: In function `gunzip':
+/home/broonie/git/linux-2.6/arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:68: undefined reference to `error'
+
+and so on. Fix this with minimal invasiveness by fixing the
+plat/uncompress.h declaration.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
-
-This should probably go via the Samsung/ARM tree along with the reorgs that
-introduce the change.
-
- drivers/usb/gadget/s3c-hsotg.c |    2 +-
+ arch/arm/plat-samsung/include/plat/uncompress.h |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 7e5bf59..f742c8e 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -30,7 +30,7 @@
+diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+index e87ce8f..e41e6d2 100644
+--- a/arch/arm/plat-samsung/include/plat/uncompress.h
++++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+@@ -140,7 +140,7 @@ static void arch_decomp_error(const char *x)
+ #define arch_error arch_decomp_error
+ #endif
  
- #include <plat/regs-usb-hsotg-phy.h>
- #include <plat/regs-usb-hsotg.h>
--#include <plat/regs-sys.h>
-+#include <mach/regs-sys.h>
- #include <plat/udc-hs.h>
+-static void error(char *err);
++extern void error(char *err);
  
- #define DMA_ADDR_INVALID (~((dma_addr_t)0))
+ #ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
+ static inline void arch_enable_uart_fifo(void)
 -- 
 1.7.0
