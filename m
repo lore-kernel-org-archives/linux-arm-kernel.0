@@ -1,86 +1,58 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 1 Mar 2010 09:49:48 -0500 (EST)
-Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
-	driver flag
-In-Reply-To: <1267366082-15248-9-git-send-email-albert_herranz@yahoo.es>
-Message-ID: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Mar 2010 15:16:30 +0000
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
+	<20100228161449.GD16745@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1002281928200.10679@xanadu.home>
+	<f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
+Message-ID: <20100301151630.GA3002@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Feb 2010, Albert Herranz wrote:
-
-> The HCD_NO_COHERENT_MEM USB host controller driver flag can be enabled
-> to instruct the USB stack to avoid allocating coherent memory for USB
-> buffers.
+On Mon, Mar 01, 2010 at 09:23:37PM +0800, Eric Miao wrote:
+> Russell,
 > 
-> This flag is useful to overcome some esoteric memory access restrictions
-> found in some platforms.
-> For example, the Nintendo Wii video game console is a NOT_COHERENT_CACHE
-> platform that is unable to safely perform non-32 bit uncached writes
-> to RAM because the byte enables are not connected to the bus.
-> Thus, in that platform, "coherent" DMA buffers cannot be directly used
-> by the kernel code unless it guarantees that all write accesses
-> to said buffers are done in 32 bit chunks (which is not the case in the
-> USB subsystem).
+> Regarding the problem of my rebased three commits that were already
+> merged into your tree, I'm seeing three ways out:
 > 
-> To avoid this unwanted behaviour HCD_NO_COHERENT_MEM can be enabled at
-> the HCD controller, causing USB buffer allocations to be satisfied from
-> normal kernel memory. In this case, the USB stack will make sure that
-> the buffers get properly mapped/unmapped for DMA transfers using the DMA
-> streaming mapping API.
+> 1. merge back your devel branch (tried and as you suggested is not a
+> very clean way)
 > 
-> Note that other parts of the USB stack may also use coherent memory,
-> like for example the hardware descriptors used in the EHCI controllers.
-> This needs to be checked and addressed separately. In the EHCI example,
-> hardware descriptors are accessed in 32-bit (or 64-bit) chunks, causing
-> no problems in the described scenario.
+> 2. merge linus v2.6.33-rc? and get the other commits rebased
+> 
+> 3. rebase all the other commits against your devel branch or (devel-stable)
+> 
+> Just lemme know which is the best approach.
+> 
+> BTW, it would be very helpful to us if we are able to understand the
+> difference and how you maintain 'devel' and 'devel-stable' branch?
 
-> --- a/drivers/usb/core/hcd.c
-> +++ b/drivers/usb/core/hcd.c
-> @@ -1260,6 +1260,34 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
->  	*dma_handle = 0;
->  }
->  
-> +static int urb_needs_setup_dma_map(struct usb_hcd *hcd, struct urb *urb)
-> +{
-> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
-> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
-> +		urb->setup_dma == ~(dma_addr_t)0);
-> +}
-> +
-> +static int urb_needs_setup_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
-> +{
-> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
-> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
-> +		urb->setup_dma && urb->setup_dma != ~(dma_addr_t)0);
-> +}
-> +
-> +static int urb_needs_transfer_dma_map(struct usb_hcd *hcd, struct urb *urb)
-> +{
-> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
-> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
-> +		urb->transfer_dma == ~(dma_addr_t)0);
-> +}
-> +
-> +static int urb_needs_transfer_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
-> +{
-> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
-> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
-> +		urb->transfer_dma && urb->transfer_dma != ~(dma_addr_t)0);
-> +}
-> +
+The devel branch is unstable - it's a combination of topic branches,
+and these topic branches are regularly re-merged to produce a single
+head for Stephen Rothwell to pull into -next.  The other reason for
+publishing it is to give Nicolas (and others) something to look at so
+they know what's going on in my tree.
 
-These functions would be a lot easier to understand if they were 
-expanded into multiple test and return statements, rather than 
-squeezing all the Boolean manipulations into single expressions.  (Not 
-to mention the fact that other developement is going to make them even 
-more complicated than they are now...)
+It also occasionally receives truely unstable patches for testing
+purposes, which very well could be dropped - eg, if they cause build
+errors.  (Remember - I have no practical way to test patches which
+affect many ARM platforms, except by getting linux-next to pick them
+up.)
 
-Also, I can't help thinking that the corresponding *_map() and 
-*_unmap() routines are so similar, it ought to be possible to combine 
-them.  The only difference is a check for a NULL DMA address, and it's 
-not clear to me why it is present.  It's also not clear why the test 
-for a DMA address of all ones is present.  Maybe they both can be 
-removed.
+What this means is that the commit IDs of the merges and occasionally
+patches will change, and as such, basing anything on top of it is a
+recipe for disaster.
 
-Alan Stern
+In theory, the devel-stable branch receives merges of external trees,
+occasionally receives local merges from stable topic branches, but is
+never rebased and no commits are ever undone on it.
+
+So, basing patches on top of devel-stable should be safe.
+
+If you can arrange for your tree to be rebased upon devel-stable, that
+should solve the problem, and avoid any need to mess around with what's
+already committed there.
