@@ -1,25 +1,41 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Sun, 28 Feb 2010 20:58:14 -0700
-Subject: [PATCH] iop-adma: redundant/wrong tests in iop_*_count()?
-In-Reply-To: <4B76BD0B.2010307@gmail.com>
-References: <4B76BD0B.2010307@gmail.com>
-Message-ID: <e9c3a7c21002281958u4ee6fb94p55b7c5069dd08be5@mail.gmail.com>
+Date: Sun, 28 Feb 2010 21:36:33 -0700
+Subject: [PATCH 6/7] fix COH 901 318 memcpy and slave issues
+In-Reply-To: <1266537963-13368-1-git-send-email-linus.walleij@stericsson.com>
+References: <1266537963-13368-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <e9c3a7c21002282036w4f627bbdibcdadb9b493ef19@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2010 at 7:54 AM, Roel Kluin <roel.kluin@gmail.com> wrote:
-> When we reach the loop, len is at least 1, we only stay in the loop when
-> len is at least MAX_BYTE_COUNT + 1, MAX_BYTE_COUNT is subtracted in each
-> iteration. So when we leave the loop, or didn't take it, len is at least 1.
-> Testing whether len is non-zero appears redundant.
+On Thu, Feb 18, 2010 at 5:06 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> This patch fixes several issues with the COH 901 318 DMA engine:
 >
-> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
-> ---
-> Or are the tests off by one? Then we'll need a different patch...
+> - A questionable mechanism for counting the number of interrupts
+> ?was removed. There is never more than one interrupt fired for
+> ?a transaction in this hardware.
+> - A debug print was broken to the point that it caused a bug
+> ?when swithed on.
+> - Dynamically configure the slave controller for mem->dev
+> ?or dev->mem transfers, this was previously hard-coded in
+> ?the channel configurations, but we have a channel which
+> ?is actually bidirectionals (MMC/SD) so this doesn't work
+> ?out!
+> - Refactored a bit to get a clearer program flow especially in
+> ?the dma_tasklet() and also remove some duplicated code, minor
+> ?nitwits, spelling etc.
+> - Also removed the redundant BUG_ON() located by Julia Lawall
+> ?using coccinelle.
+>
 
-No, not off by one, just redundant.
+Sorry for the delay.  This looks ok to me as far as I can tell, but it
+makes me a bit nervous to make all the unrelated changes in one
+commit.  For bisection purposes I think it would be better to split
+the pure cleanups from the fixes, agree?
 
-Applied, thanks.
+I may proceed with the initial dmaengine pull request as early as
+tomorrow, but I think this is something that we can justify later in
+the merge window or even shortly after -rc1.
 
 --
 Dan
