@@ -1,58 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Mar 2010 15:16:30 +0000
-Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
-References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
-	<20100225205113.GF3101@n2100.arm.linux.org.uk>
-	<20100225212915.GA24043@n2100.arm.linux.org.uk>
-	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
-	<20100228161449.GD16745@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002281928200.10679@xanadu.home>
-	<f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
-Message-ID: <20100301151630.GA3002@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon,  1 Mar 2010 18:44:23 +0100
+Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
+In-Reply-To: <20100226201934.GG8417@bicker>
+References: <20100226201934.GG8417@bicker>
+Message-ID: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 01, 2010 at 09:23:37PM +0800, Eric Miao wrote:
-> Russell,
-> 
-> Regarding the problem of my rebased three commits that were already
-> merged into your tree, I'm seeing three ways out:
-> 
-> 1. merge back your devel branch (tried and as you suggested is not a
-> very clean way)
-> 
-> 2. merge linus v2.6.33-rc? and get the other commits rebased
-> 
-> 3. rebase all the other commits against your devel branch or (devel-stable)
-> 
-> Just lemme know which is the best approach.
-> 
-> BTW, it would be very helpful to us if we are able to understand the
-> difference and how you maintain 'devel' and 'devel-stable' branch?
+From: Wolfgang Muees <wolfgang.mues@auerswald.de>
 
-The devel branch is unstable - it's a combination of topic branches,
-and these topic branches are regularly re-merged to produce a single
-head for Stephen Rothwell to pull into -next.  The other reason for
-publishing it is to give Nicolas (and others) something to look at so
-they know what's going on in my tree.
+Fixes two pointer errors, one which leads to memory overwrites if used with
+large chunks of data.
 
-It also occasionally receives truely unstable patches for testing
-purposes, which very well could be dropped - eg, if they cause build
-errors.  (Remember - I have no practical way to test patches which
-affect many ARM platforms, except by getting linux-next to pick them
-up.)
+Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/host/at91_mci.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-What this means is that the commit IDs of the merges and occasionally
-patches will change, and as such, basing anything on top of it is a
-recipe for disaster.
-
-In theory, the devel-stable branch receives merges of external trees,
-occasionally receives local merges from stable topic branches, but is
-never rebased and no commits are ever undone on it.
-
-So, basing patches on top of devel-stable should be safe.
-
-If you can arrange for your tree to be rebased upon devel-stable, that
-should solve the problem, and avoid any need to mess around with what's
-already committed there.
+diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+index 63924e0..6835104 100644
+--- a/drivers/mmc/host/at91_mci.c
++++ b/drivers/mmc/host/at91_mci.c
+@@ -227,11 +227,13 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
+ 			for (index = 0; index < (amount / 4); index++)
+ 				*dmabuf++ = swab32(sgbuffer[index]);
+ 		} else {
+-			memcpy(dmabuf, sgbuffer, amount);
+-			dmabuf += amount;
++			char *tmpv = (char *)dmabuf;
++			memcpy(tmpv, sgbuffer, amount);
++			tmpv += amount;
++			dmabuf = (unsigned *)tmpv;
+ 		}
+ 
+-		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
++		kunmap_atomic(((void *)sgbuffer) - sg->offset, KM_BIO_SRC_IRQ);
+ 
+ 		if (size == 0)
+ 			break;
+-- 
+1.5.6.5
