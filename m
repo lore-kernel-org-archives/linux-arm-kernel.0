@@ -1,36 +1,33 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Mon, 1 Mar 2010 16:42:20 -0000 (GMT)
-Subject: Current status of interrupt handling capability of pca953x
-	gpio  driver.
-In-Reply-To: <eedb5541003010818r3a917a42rc973a4a74076a27@mail.gmail.com>
-References: <eedb5541003010818r3a917a42rc973a4a74076a27@mail.gmail.com>
-Message-ID: <3131fcab4adc999286a99435352e1deb.squirrel@www.loen.fr>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 1 Mar 2010 08:58:12 -0800 (PST)
+Subject: [GIT PULL] pxa: patches for next merge window
+In-Reply-To: <alpine.LFD.2.00.1003010827330.3616@localhost.localdomain>
+References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
+	<20100225205113.GF3101@n2100.arm.linux.org.uk>
+	<20100225212915.GA24043@n2100.arm.linux.org.uk>
+	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
+	<20100228161449.GD16745@n2100.arm.linux.org.uk>
+	<20100301093927.GC29952@pengutronix.de>
+	<20100301094820.GA10863@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003010827330.3616@localhost.localdomain>
+Message-ID: <alpine.LFD.2.00.1003010856200.3616@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Mon, March 1, 2010 16:18, javier Martin wrote:
-> Hi,
-> I saw a recent mail from Marc Zyngier on December about adding interrupt
-> handling capability to pca953x gpio driver. (
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/006651.html
-> )
-> There has not been any activity since then (or at least I couldn't find
-> anything). What is the status regarding to mainline of these features?
->
-> Have changes proposed by Marc Zyngier accepted? If not, what points have to
-> be improved?
 
-The patch is currently at it's 4th iteration (posted in February on LKML
-http://lkml.org/lkml/2010/2/5/282) and sitting in Andrew Morton's mm tree.
-It also has been successfully used on Blackfin boards.
+On Mon, 1 Mar 2010, Linus Torvalds wrote:
+> 
+> rmk: I think it's ok if you end up having to rebase something this time in 
+> order to fix up a mistake that has already happened - no rule should be 
+> _so_ set in stone that it can't be violated when bad things happen.
 
-When it comes to mainline merging, I really have no clue. The patch received very
-little public comment (I only received a few private emails from people using it).
+Btw, since I have a pending pull from you already, let me know if I should 
+pull it or not. I was just about to pull it, and then I started wondering 
+whether the pax patches are involved, so I kept off.
 
-So if someone higher up in the food chain wants to carry that patch in his tree
-and push it upstream, I can give it a respin.
+But if you're just going to ask the pxa people to fix things up (which is 
+my preference), just send me an email saying "go ahead and pull". I'm 
+checking, just in case.
 
-        M.
--- 
-And if you don't know where you're going, any road will take you there...
+		Linus
