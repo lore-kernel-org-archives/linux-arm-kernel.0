@@ -1,80 +1,35 @@
-From: albert_herranz@yahoo.es (Albert Herranz)
-Date: Mon, 01 Mar 2010 19:38:19 +0100
-Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
-	driver flag
-In-Reply-To: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
-Message-ID: <4B8C099B.30504@yahoo.es>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon,  1 Mar 2010 18:51:42 +0000
+Subject: [PATCH 2.6.34] USB: Fix s3c-hsotg build following Samsung platform
+	header moves
+Message-ID: <1267469502-19560-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Stern wrote:
->> --- a/drivers/usb/core/hcd.c
->> +++ b/drivers/usb/core/hcd.c
->> @@ -1260,6 +1260,34 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
->>  	*dma_handle = 0;
->>  }
->>  
->> +static int urb_needs_setup_dma_map(struct usb_hcd *hcd, struct urb *urb)
->> +{
->> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
->> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
->> +		urb->setup_dma == ~(dma_addr_t)0);
->> +}
->> +
->> +static int urb_needs_setup_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
->> +{
->> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
->> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
->> +		urb->setup_dma && urb->setup_dma != ~(dma_addr_t)0);
->> +}
->> +
->> +static int urb_needs_transfer_dma_map(struct usb_hcd *hcd, struct urb *urb)
->> +{
->> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
->> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
->> +		urb->transfer_dma == ~(dma_addr_t)0);
->> +}
->> +
->> +static int urb_needs_transfer_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
->> +{
->> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
->> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
->> +		urb->transfer_dma && urb->transfer_dma != ~(dma_addr_t)0);
->> +}
->> +
-> 
-> These functions would be a lot easier to understand if they were 
-> expanded into multiple test and return statements, rather than 
-> squeezing all the Boolean manipulations into single expressions.  (Not 
-> to mention the fact that other developement is going to make them even 
-> more complicated than they are now...)
-> 
+Fix a reference to regs-sys.h got missed in the reorganisation of
+the Samsung platform headers targetted for 2.6.34.
 
-Yes, agreed. I'll enhance that, thanks.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
 
-> Also, I can't help thinking that the corresponding *_map() and 
-> *_unmap() routines are so similar, it ought to be possible to combine 
-> them.  The only difference is a check for a NULL DMA address, and it's 
-> not clear to me why it is present.  It's also not clear why the test 
-> for a DMA address of all ones is present.  Maybe they both can be 
-> removed.
-> 
+This should probably go via the Samsung/ARM tree along with the reorgs that
+introduce the change.
 
-I think too that I can simplify that logic.
-I added those checks in a defensive way seeking robustness while I familiarize with the USB stack innards. So far, those cases are just avoiding mappings when urb_needs_transfer_dma_map()/urb_needs_transfer_dma_unmap() are called with urb->transfer_buffer == 0 and urb->transfer_dma == 0.
+ drivers/usb/gadget/s3c-hsotg.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I guess that those cases are related to scatterlist-based urb requests.
-What should be the correct way to check if a urb has already been scatter/gather-mapped?
-
-The final logic would be something like:
-- map if URB_NO_TRANSFER_DMA_MAP is cleared
-- otherwise (URB_TRANSFER_NO_DMA_MAP is set so) map if HCD_NO_COHERENT_MEM is set _and_ it's not a scatter/gather request (as that should have been mapped already by usb_buffer_map_sg())
-
-Am I on the right path?
-
-> Alan Stern
-> 
-
-Thanks,
-Albert
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index 7e5bf59..f742c8e 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -30,7 +30,7 @@
+ 
+ #include <plat/regs-usb-hsotg-phy.h>
+ #include <plat/regs-usb-hsotg.h>
+-#include <plat/regs-sys.h>
++#include <mach/regs-sys.h>
+ #include <plat/udc-hs.h>
+ 
+ #define DMA_ADDR_INVALID (~((dma_addr_t)0))
+-- 
+1.7.0
