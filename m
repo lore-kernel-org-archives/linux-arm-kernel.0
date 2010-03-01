@@ -1,56 +1,86 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 1 Mar 2010 21:23:37 +0800
-Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <alpine.LFD.2.00.1002281928200.10679@xanadu.home>
-References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
-	<20100225205113.GF3101@n2100.arm.linux.org.uk>
-	<20100225212915.GA24043@n2100.arm.linux.org.uk>
-	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
-	<20100228161449.GD16745@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1002281928200.10679@xanadu.home>
-Message-ID: <f17812d71003010523r6aa7cfd0va28b994dfadedeac@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 1 Mar 2010 09:49:48 -0500 (EST)
+Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
+	driver flag
+In-Reply-To: <1267366082-15248-9-git-send-email-albert_herranz@yahoo.es>
+Message-ID: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 1, 2010 at 8:42 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Sun, 28 Feb 2010, Russell King - ARM Linux wrote:
->
->> You've destroyed your original commits, so this calls into question my
->> entire 'devel-stable' branch.
->>
->> I've still not decided what to do about this. ?I'll ask Linus to merge
->> most of the 'devel' stuff without 'devel-stable' merged into mainline
->> to move stuff forward - this means _no_ _one's_ git work will be merged
->> through my tree, at least initially.
->>
->> However, I'm putting 'devel-stable' on hold; I'll let the other ARM git
->> maintainers discuss this and work out what they're going to do about
->> this mess. ?One solution is to destroy the 'devel-stable' branch in
->> its entirety, and get everyone to resend all their pull requests.
->> That's *not* nice.
->
-> What about simply ignoring Eric's latest pull request and have your
-> 'devel-stable' be merged by Linus as is? ?Surely the earlier branch you
-> merged from Eric wasn't that bad anyway, and Eric can certainly provide
-> new commits on top later on to fix possible issues with that in order to
-> bring his stuff to the same state as what he just asked you to pull.
->
+On Sun, 28 Feb 2010, Albert Herranz wrote:
 
-Russell,
+> The HCD_NO_COHERENT_MEM USB host controller driver flag can be enabled
+> to instruct the USB stack to avoid allocating coherent memory for USB
+> buffers.
+> 
+> This flag is useful to overcome some esoteric memory access restrictions
+> found in some platforms.
+> For example, the Nintendo Wii video game console is a NOT_COHERENT_CACHE
+> platform that is unable to safely perform non-32 bit uncached writes
+> to RAM because the byte enables are not connected to the bus.
+> Thus, in that platform, "coherent" DMA buffers cannot be directly used
+> by the kernel code unless it guarantees that all write accesses
+> to said buffers are done in 32 bit chunks (which is not the case in the
+> USB subsystem).
+> 
+> To avoid this unwanted behaviour HCD_NO_COHERENT_MEM can be enabled at
+> the HCD controller, causing USB buffer allocations to be satisfied from
+> normal kernel memory. In this case, the USB stack will make sure that
+> the buffers get properly mapped/unmapped for DMA transfers using the DMA
+> streaming mapping API.
+> 
+> Note that other parts of the USB stack may also use coherent memory,
+> like for example the hardware descriptors used in the EHCI controllers.
+> This needs to be checked and addressed separately. In the EHCI example,
+> hardware descriptors are accessed in 32-bit (or 64-bit) chunks, causing
+> no problems in the described scenario.
 
-Regarding the problem of my rebased three commits that were already
-merged into your tree, I'm seeing three ways out:
+> --- a/drivers/usb/core/hcd.c
+> +++ b/drivers/usb/core/hcd.c
+> @@ -1260,6 +1260,34 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
+>  	*dma_handle = 0;
+>  }
+>  
+> +static int urb_needs_setup_dma_map(struct usb_hcd *hcd, struct urb *urb)
+> +{
+> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
+> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+> +		urb->setup_dma == ~(dma_addr_t)0);
+> +}
+> +
+> +static int urb_needs_setup_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
+> +{
+> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
+> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+> +		urb->setup_dma && urb->setup_dma != ~(dma_addr_t)0);
+> +}
+> +
+> +static int urb_needs_transfer_dma_map(struct usb_hcd *hcd, struct urb *urb)
+> +{
+> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
+> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+> +		urb->transfer_dma == ~(dma_addr_t)0);
+> +}
+> +
+> +static int urb_needs_transfer_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
+> +{
+> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
+> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+> +		urb->transfer_dma && urb->transfer_dma != ~(dma_addr_t)0);
+> +}
+> +
 
-1. merge back your devel branch (tried and as you suggested is not a
-very clean way)
+These functions would be a lot easier to understand if they were 
+expanded into multiple test and return statements, rather than 
+squeezing all the Boolean manipulations into single expressions.  (Not 
+to mention the fact that other developement is going to make them even 
+more complicated than they are now...)
 
-2. merge linus v2.6.33-rc? and get the other commits rebased
+Also, I can't help thinking that the corresponding *_map() and 
+*_unmap() routines are so similar, it ought to be possible to combine 
+them.  The only difference is a check for a NULL DMA address, and it's 
+not clear to me why it is present.  It's also not clear why the test 
+for a DMA address of all ones is present.  Maybe they both can be 
+removed.
 
-3. rebase all the other commits against your devel branch or (devel-stable)
-
-Just lemme know which is the best approach.
-
-BTW, it would be very helpful to us if we are able to understand the
-difference and how you maintain 'devel' and 'devel-stable' branch?
-
-- eric
+Alan Stern
