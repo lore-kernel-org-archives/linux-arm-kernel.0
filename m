@@ -1,59 +1,80 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Mon, 1 Mar 2010 18:57:10 +0100
-Subject: [PATCH 04/13] ARM: LPC32XX: GPIO, timer, and IRQ drivers
-In-Reply-To: <20100227204243.GB5760@pengutronix.de>
-References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
-	<1267228430-27193-5-git-send-email-wellsk40@gmail.com>
-	<20100227204243.GB5760@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F805CCF92938@eu1rdcrdc1wx030.exi.nxp.com>
+From: albert_herranz@yahoo.es (Albert Herranz)
+Date: Mon, 01 Mar 2010 19:38:19 +0100
+Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
+	driver flag
+In-Reply-To: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1003010943480.1645-100000@iolanthe.rowland.org>
+Message-ID: <4B8C099B.30504@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-> > +
-> > +	/* Activation type, edge or level */
-> > +	reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
-> > +	if (use_edge) {
-> > +		reg |= mask;
-> > +		set_irq_handler(irq, handle_edge_irq);
-> > +	} else {
-> > +		reg &= ~mask;
-> > +		set_irq_handler(irq, handle_level_irq);
-> > +	}
-> So you really need handle_edge_irq?  If so you should report this to
-> your hardware department and ask for a better irq logic next time.
+Alan Stern wrote:
+>> --- a/drivers/usb/core/hcd.c
+>> +++ b/drivers/usb/core/hcd.c
+>> @@ -1260,6 +1260,34 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
+>>  	*dma_handle = 0;
+>>  }
+>>  
+>> +static int urb_needs_setup_dma_map(struct usb_hcd *hcd, struct urb *urb)
+>> +{
+>> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
+>> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+>> +		urb->setup_dma == ~(dma_addr_t)0);
+>> +}
+>> +
+>> +static int urb_needs_setup_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
+>> +{
+>> +	return !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP) ||
+>> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+>> +		urb->setup_dma && urb->setup_dma != ~(dma_addr_t)0);
+>> +}
+>> +
+>> +static int urb_needs_transfer_dma_map(struct usb_hcd *hcd, struct urb *urb)
+>> +{
+>> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
+>> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+>> +		urb->transfer_dma == ~(dma_addr_t)0);
+>> +}
+>> +
+>> +static int urb_needs_transfer_dma_unmap(struct usb_hcd *hcd, struct urb *urb)
+>> +{
+>> +	return !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP) ||
+>> +	       ((hcd->driver->flags & HCD_NO_COHERENT_MEM) &&
+>> +		urb->transfer_dma && urb->transfer_dma != ~(dma_addr_t)0);
+>> +}
+>> +
+> 
+> These functions would be a lot easier to understand if they were 
+> expanded into multiple test and return statements, rather than 
+> squeezing all the Boolean manipulations into single expressions.  (Not 
+> to mention the fact that other developement is going to make them even 
+> more complicated than they are now...)
 > 
 
-Thanks for your time in helping to improve this port. I'm really
-embarrassed to say I missed this. The complete correct changes are below
-with the level based handler used for all sources.
-This is fixed it in my baseline. Thanks for catching this.
+Yes, agreed. I'll enhance that, thanks.
 
-@@ -242,13 +242,11 @@ static void __lpc32xx_set_irq_type(unsigned int irq, int use_high_level,
- 
-        /* Activation type, edge or level */
-        reg = __raw_readl(LPC32XX_INTC_ACT_TYPE(ctrl));
--       if (use_edge) {
-+       if (use_edge)
-                reg |= mask;
--               set_irq_handler(irq, handle_edge_irq);
--       } else {
-+       else
-                reg &= ~mask;
--               set_irq_handler(irq, handle_level_irq);
--       }
-+       __raw_writel(reg, LPC32XX_INTC_ACT_TYPE(ctrl));
- 
-        /* Use same polarity for the wake events */
-        if (lpc32xx_events[irq].mask != 0) {
-
-Kevin
-
+> Also, I can't help thinking that the corresponding *_map() and 
+> *_unmap() routines are so similar, it ought to be possible to combine 
+> them.  The only difference is a check for a NULL DMA address, and it's 
+> not clear to me why it is present.  It's also not clear why the test 
+> for a DMA address of all ones is present.  Maybe they both can be 
+> removed.
 > 
-> Best regards
-> Uwe
+
+I think too that I can simplify that logic.
+I added those checks in a defensive way seeking robustness while I familiarize with the USB stack innards. So far, those cases are just avoiding mappings when urb_needs_transfer_dma_map()/urb_needs_transfer_dma_unmap() are called with urb->transfer_buffer == 0 and urb->transfer_dma == 0.
+
+I guess that those cases are related to scatterlist-based urb requests.
+What should be the correct way to check if a urb has already been scatter/gather-mapped?
+
+The final logic would be something like:
+- map if URB_NO_TRANSFER_DMA_MAP is cleared
+- otherwise (URB_TRANSFER_NO_DMA_MAP is set so) map if HCD_NO_COHERENT_MEM is set _and_ it's not a scatter/gather request (as that should have been mapped already by usb_buffer_map_sg())
+
+Am I on the right path?
+
+> Alan Stern
 > 
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+Thanks,
+Albert
