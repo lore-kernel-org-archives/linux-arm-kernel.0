@@ -1,69 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Mar 2010 09:48:21 +0000
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 1 Mar 2010 19:11:40 +0900
 Subject: [GIT PULL] pxa: patches for next merge window
-In-Reply-To: <20100301093927.GC29952@pengutronix.de>
+In-Reply-To: <20100301094820.GA10863@n2100.arm.linux.org.uk>
 References: <f17812d71002241849m6b37f601h7eef1a723b2d0335@mail.gmail.com>
 	<20100225205113.GF3101@n2100.arm.linux.org.uk>
 	<20100225212915.GA24043@n2100.arm.linux.org.uk>
 	<f17812d71002260105q54c26198jc9b61851c35ae8ef@mail.gmail.com>
 	<20100228161449.GD16745@n2100.arm.linux.org.uk>
 	<20100301093927.GC29952@pengutronix.de>
-Message-ID: <20100301094820.GA10863@n2100.arm.linux.org.uk>
+	<20100301094820.GA10863@n2100.arm.linux.org.uk>
+Message-ID: <20100301101140.GA12088@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 01, 2010 at 10:39:27AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-
-(in reply to Eric)
-
-> > The 'devel' branch contains individual patches, and is regularly re-
-> > generated from individual sub-branches.
+On Mon, Mar 01, 2010 at 09:48:21AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 01, 2010 at 10:39:27AM +0100, Uwe Kleine-K?nig wrote:
+> > In my eyes there are three different possibilities for the future:
 > > 
-> > The 'devel-stable' branch (internal) contains work pulled from other
-> > people, and the 'stable' bit means that I once pulled, I don't wind
-> > the tree back at any point.  This gets merged into 'devel' as the last
-> > merge.
+> >  a) every tree requested for pulling has to keep constant.
+> >  b) rmk treats the submaintainer trees as his topic branches that are
+> >     regularly merged into devel.
+> >  c) Linus pulls directly from submaintainers.
 > > 
-> > Your original set of commits were merged into 'devel-stable' and has
-> > had other trees merged on top of those.
+> > I think c) isn't nice (and AFAIK Linus would request a)).
 > > 
-> > You've destroyed your original commits, so this calls into question my
-> > entire 'devel-stable' branch.
-> > 
-> > I've still not decided what to do about this.  I'll ask Linus to merge
-> > most of the 'devel' stuff without 'devel-stable' merged into mainline
-> > to move stuff forward - this means _no_ _one's_ git work will be merged
-> > through my tree, at least initially.
-> > 
-> > However, I'm putting 'devel-stable' on hold; I'll let the other ARM git
-> > maintainers discuss this and work out what they're going to do about
-> > this mess.  One solution is to destroy the 'devel-stable' branch in
-> > its entirety, and get everyone to resend all their pull requests.
-> > That's *not* nice.
-> > 
-> > I also won't be pulling any more git trees until this issue is resolved -
-> > it would be stupid to pull more git trees on top of 'devel-stable' at
-> > this point.
->
-> In my eyes there are three different possibilities for the future:
+> > I'd prefer a).  And if a submaintainer "doesn't behave" next time either
+> > both trees are pulled making the arm tree as ugly as are the others
+> > sometimes or the second pull request is declined if Russell notes it
+> > early enough (maybe supported by some script work).
 > 
->  a) every tree requested for pulling has to keep constant.
->  b) rmk treats the submaintainer trees as his topic branches that are
->     regularly merged into devel.
->  c) Linus pulls directly from submaintainers.
+> I've added Linus to this, so he's aware of what's going on, since if
+> I do merge Eric's latest tree, Linus will see duplicate commits from
+> me and I don't wish to have one of Linus' responses to that. ;)
 > 
-> I think c) isn't nice (and AFAIK Linus would request a)).
-> 
-> I'd prefer a).  And if a submaintainer "doesn't behave" next time either
-> both trees are pulled making the arm tree as ugly as are the others
-> sometimes or the second pull request is declined if Russell notes it
-> early enough (maybe supported by some script work).
+> The general rule is that once you've asked someone to pull your tree,
+> that's it, the commits are cast in stone.  It doesn't matter who you
+> ask to pull your tree.
 
-I've added Linus to this, so he's aware of what's going on, since if
-I do merge Eric's latest tree, Linus will see duplicate commits from
-me and I don't wish to have one of Linus' responses to that. ;)
+Out of the non-PXA merge requests, the only conflicts seem to be on
+Kconfig/Makefile bits as usual, being fairly insular beyond that. While
+these are fairly easy to sort out, it's a bit impolite to jump to c) as
+long as other changes in the same area are already present in the ARM
+tree. I intentionally did not send my pull request to Linus initially
+because I didn't want to create extra work for others merging out of
+order and triggering conflicts on the same files. (Although in -next at
+the moment I believe it's only 3 trees that are in conflict with regards
+to arch/arm/{Kconfig,Makefile}).
 
-The general rule is that once you've asked someone to pull your tree,
-that's it, the commits are cast in stone.  It doesn't matter who you
-ask to pull your tree.
+c) works so long as there is no overlap between trees and people
+generally behave responsibly. Some of the ARM trees already do this
+today, where areas of overlap are handled through the ARM tree while
+isolated changes are often just pulled directly. As long as people can
+determine when to use which strategy then this model works fairly well.
+Some merge conflicts will occur regardless, though.
+
+Having said that, many of the ARM architecture git trees are pulled in to
+-next directly with merge resolution handled there, some of which will be
+merged in to the main ARM tree and others which will not. Anything
+showing up in -next should have already been reviewed and aimed at
+heading in to Linus's tree directly, so having an extra layer where
+everything has to be integrated before being sent out just seems like
+extra work. Someone is going to have to do the merge resolution
+regardless, the issue is just trying to make sure that the more serious
+ones are resolved in the ARM tree.
+
+One way around this would be to have people pull before doing a merge
+request, but that also means that you're then sending out a merge request
+for something that hasn't seen the testing that the original one did, and
+may suddenly have bugs introduced by upstream changes. This isn't an
+ideal solution either.
