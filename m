@@ -1,56 +1,66 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Mon, 01 Mar 2010 11:34:49 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B89E1BB.6090504@billgatliff.com>
-References: <4B85789D.6000704@billgatliff.com> <4B864C66.6060209@atmel.com>
-	<4B867108.2050806@billgatliff.com> <4B86AA29.8010806@atmel.com>
-	<4B89E1BB.6090504@billgatliff.com>
-Message-ID: <4B8B9849.5040203@atmel.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 1 Mar 2010 11:38:40 +0100
+Subject: [PATCH 3/3] MAINTAINERS: add i2c tree for embedded platforms
+In-Reply-To: <20100301090714.GB29952@pengutronix.de>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100228155754.GC16745@n2100.arm.linux.org.uk>
+	<20100301090714.GB29952@pengutronix.de>
+Message-ID: <20100301113840.4d6b4e7d@hyperion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 1 Mar 2010 10:07:14 +0100, Uwe Kleine-K?nig wrote:
+> On Sun, Feb 28, 2010 at 03:57:54PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 24, 2010 at 12:01:46PM +0100, Uwe Kleine-K?nig wrote:
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > Acked-by: Jean Delvare <khali@linux-fr.org>
+> > > ---
+> > >  MAINTAINERS |    1 +
+> > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > index 2533fc4..a3c936c 100644
+> > > --- a/MAINTAINERS
+> > > +++ b/MAINTAINERS
+> > > @@ -2626,6 +2626,7 @@ M:	"Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
+> > >  L:	linux-i2c at vger.kernel.org
+> > >  W:	http://i2c.wiki.kernel.org/
+> > >  T:	quilt kernel.org/pub/linux/kernel/people/jdelvare/linux-2.6/jdelvare-i2c/
+> > > +T:	git git://git.fluff.org/bjdooks/linux.git
+> > 
+> > This is wrong.  This is the same tree which I pull ARM stuff from, so it
+> > needs qualifying with a branch name.
+> $(git ls-remote git://git.fluff.org/bjdooks/linux.git) suggests two
+> candidates:
+> 
+> 	for-linus/i2c
+> 	next-i2c
+> 
+> And I think for now this is only parsed by humans and everbody should be
+> able to notice that e.g. "next-s3c" doesn't contain i2c patches in the
+> presence of the two above branches.
+> 
+> So unless there is a syntax to specify more than one branch I suggest to
+> keep it as is.  Or should we only list next-i2c?  Ben, what do you
+> think?
 
-Sorry my mistake, could you please try this one:
-http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html
+I presume that for-linus/i2c is a temporary subset of next-i2c for
+Linus' consumption. So we can ignore for-linus/i2c and only list
+next-i2c.
 
-Regards,
-Sedji
+> (Maybe we can just make it:
+> 
+> 	T: git git://git.fluff.org/bjdooks/linux.git for-linus/i2c
+> 	T: git git://git.fluff.org/bjdooks/linux.git next-i2c
+> 
+> but this is a bit too much IMHO.  (Who volunteers to list all branches
+> of tip in MAINTAINERS? ;-))
+> 
+> Best regards
+> Uwe
+> 
 
-Le 2/28/2010 4:23 AM, Bill Gatliff a ?crit :
-> Sedji Gaouaou wrote:
->> Hi Bill,
->>
->> Here is the patch for the ac97 support on AT91:
->>
->> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025629.html
->>
->>
->> Here is the patch for the full duplex support:
->>
->> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025628.html
->>
->
-> Hmm.  I applied both patches to 2.6.33-rc5.  There were two local
-> variables "err" and "ptcr" that weren't defined, which I corrected.  And
-> then there was this:
->
->   CC      sound/atmel/ac97c.o
-> sound/atmel/ac97c.c: In function ?atmel_ac97c_capture_trigger?:
-> sound/atmel/ac97c.c:545: warning: unused variable ?casr?
-> sound/atmel/ac97c.c: In function ?atmel_ac97c_pcm_new?:
-> sound/atmel/ac97c.c:743: error: ?at91_ac97_pcm_defs? undeclared (first
-> use in this function)
-> sound/atmel/ac97c.c:743: error: (Each undeclared identifier is reported
-> only once
-> sound/atmel/ac97c.c:743: error: for each function it appears in.)
-> sound/atmel/ac97c.c:743: warning: type defaults to ?int? in declaration
-> of ?type name?
-> sound/atmel/ac97c.c:743: warning: type defaults to ?int? in declaration
-> of ?type name?
-> sound/atmel/ac97c.c:743: error: negative width in bit-field ?<anonymous>?
-> make[2]: *** [sound/atmel/ac97c.o] Error 1
->
->
-> b.g.
->
+
+-- 
+Jean Delvare
