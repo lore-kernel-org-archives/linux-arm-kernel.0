@@ -1,32 +1,53 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue,  2 Mar 2010 16:35:54 +0530
-Subject: [PATCH] CLKDEV: return from clk_find as soon as we get maching clk
-Message-ID: <1267527954-20270-1-git-send-email-viresh.kumar@st.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Tue, 2 Mar 2010 21:11:33 +0900
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267333263.2762.11.camel@mulgrave.site>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+Message-ID: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_find function looks for clock with matching dev_id and con_id.
-We should return from clk_find as soon as we get a clock with matching dev_id
-and con_id. This can be done by comparing variable "match" with 3.
+On Sun, 28 Feb 2010 10:31:03 +0530
+James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/common/clkdev.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+> On Sun, 2010-02-28 at 11:14 +1100, Benjamin Herrenschmidt wrote:
+> > On Fri, 2010-02-26 at 21:00 +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Feb 26, 2010 at 04:25:21PM +0000, Catalin Marinas wrote:
+> > > > For mmap'ed pages (and present in the page cache), is it guaranteed that
+> > > > the HCD driver won't write to it once it has been mapped into user
+> > > > space? If that's the case, it may solve the problem by just reversing
+> > > > the meaning of PG_arch_1 on ARM and assume that a newly allocated page
+> > > > has dirty D-cache by default.
+> > > 
+> > > I guess we could also set PG_arch_1 in the DMA API as well, to avoid the
+> > > unnecessary D cache flushing when clean pages get mapped into userspace.
+> > 
+> > That's an interesting thought for us too. When doing I$/D$ coherency, we
+> > have to fist flush the D$ and then invalidate the I$. If we could keep
+> > track of D$ and I$ separately, we could avoid the first step in many
+> > cases, including the DMA API trick you mentioned.
+> > 
+> > I wonder if it's time to get a PG_arch_2 :-)
+> 
+> Sorry to be a bit late to the party (on holiday), but I/D coherency is
+> supposed to be taken care of using flush_cache_page in the memory
+> mapping routines.
 
-diff --git a/arch/arm/common/clkdev.c b/arch/arm/common/clkdev.c
-index aae5bc0..736dfba 100644
---- a/arch/arm/common/clkdev.c
-+++ b/arch/arm/common/clkdev.c
-@@ -55,6 +55,9 @@ static struct clk *clk_find(const char *dev_id, const char *con_id)
- 		if (match == 0)
- 			continue;
- 
-+		if (match == 3)
-+			return p->clk;
-+
- 		if (match > best) {
- 			clk = p->clk;
- 			best = match;
--- 
-1.6.0.2
+powerpc does that? To be exact, powerpc doesn't need
+flush_cache_page() and handles I/D coherency in the pte modification
+code. powerpc uses PG_arch_1 to avoid unnecessarily handling I/D
+coherency. Seems that IA64 does the same trick with PG_arch_1.
+
+
+> But the point of all of this is that I cache invalidation doesn't appear
+> anywhere in the I/O path ... so  if we're getting I/D incoherency,
+> there's some problem in the mm code (or there's a missing arch
+> assumption ... like I cache gets moved in more aggressively than we
+> expect).  Parisc is very sensitive to I/D incoherency, so we'd notice if
+> there were a serious generic problem here.
+
+I'm not sure that there are some problems in the mm or common code. Is
+this ARM's implementation issue? (Of course, the usb stack and the
+driver's misuse of the DMA API needs to be fixed too).
