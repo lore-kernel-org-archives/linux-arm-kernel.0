@@ -1,22 +1,21 @@
-From: jhautbois@gmail.com (Jean-Michel Hautbois)
-Date: Tue, 2 Mar 2010 10:07:49 +0100
-Subject: [kGDB]Cannot compile KGDB on ARM SMP
-Message-ID: <8cad0aa1003020107g3aae0875n1da8c442d9909f96@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 2 Mar 2010 10:50:10 +0100
+Subject: [PATCH 0/4] ARM mandatory barriers
+In-Reply-To: <20100223105806.11048.16585.stgit@e102109-lin.cambridge.arm.com>
+References: <20100223105806.11048.16585.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <63386a3d1003020150o6a7bf041mf9c32fb989430063@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there !
+2010/2/23 Catalin Marinas <catalin.marinas@arm.com>:
 
-I am  curently trying to compile kgdb on an ARM SMP core.
-I have the following error :
-kernel/kgdb.c:1481: undefined reference to `kgdb_roundup_cpus'
+> This is a follow up to a previous patch I posted on the implementation
+> of the mandatory barriers on ARM. The third patch adds support for the
+> L2x0 cache sync operation and the last patch implements the
+> RealView-specific mandatory barriers.
 
-When I am looking at the function 'kgdb_roundup_cpus', it is defined
-for x86, mips, blackfin, powerpc, but not for ARM.
-Is there any specific reason for that ?
-I can't see why...
+Catalin what is the status of these patches? I don't find them in the
+patch tracker, are they being reworked? (Sorry if I missed some of the
+discussion here...)
 
-Thanks in advance for your help !
-
-Best Regards,
-JM
+Linus Walleij
