@@ -1,41 +1,21 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Mar 2010 10:50:23 -0500 (EST)
-Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
-	driver flag
-In-Reply-To: <4B8C45DF.50607@yahoo.es>
-Message-ID: <Pine.LNX.4.44L0.1003021034190.1730-100000@iolanthe.rowland.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Mar 2010 15:54:19 -0000
+Subject: [PATCH 5/6] ARM: oprofile: use perf-events framework as backend
+In-Reply-To: <201002261125.04448.jpihet@mvista.com>
+References: <1267124175-21721-1-git-send-email-will.deacon@arm.com>
+	<201002261028.07691.jpihet@mvista.com>
+	<000501cab6ca$a1ca7710$e55f6530$@deacon@arm.com>
+	<201002261125.04448.jpihet@mvista.com>
+Message-ID: <001401caba20$9ec4ae10$dc4e0a30$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Mar 2010, Albert Herranz wrote:
+Hi Jean,
 
-> > 	If transfer_buffer_length is 0 then do nothing.
-> > 	Otherwise if num_sgs > 0 then do nothing.
-> > 	Otherwise if URB_NO_TRANSFER_DMA_MAP and transfer_dma
-> > 		are both set (this avoids your HCD_NO_COHERENT_MEM
-> > 		case) then do nothing.
-> > 
-> 
-> I see. This case would include the PIO case too (for which dma_handle
-> is set to all 1s).
+> I am OK to co-maintain this code if you do not mind.
 
-The test above should be transfer_dma != ~0, not transfer_dma != 0,
-since ~0 means the DMA address isn't set.  In fact I forgot to 
-include the PIO case; it should be handled by changing the remaining 
-tests as follows:
+Sure - the more the merrier. I'll post an updated version of the patch [using
+an enum instead of #defined PMU IDs] once I've heard back from Ingo about the
+symbols I'm exporting from the generic perf events code.
 
-	Otherwise if hcd->self.uses_dma is set then
-		If this URB doesn't require PIO then call dma_map_single
-	Otherwise if HCD_LOCAL_MEM is set then call hcd_alloc_coherent
-	Otherwise do nothing (PIO case).
-
-Currently "this URB doesn't require PIO" is always true, but in the 
-future it won't be.
-
-> So this assumes that transfer_dma should be set initially to 0 when
-> allocating USB buffers for HCD_NO_COHERENT_MEM.
-
-No, it should be set to ~0, the same as when buffers are allocated for 
-a PIO-based controller.
-
-Alan Stern
+Will
