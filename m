@@ -1,179 +1,89 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 2 Mar 2010 21:54:43 +0000
-Subject: [PATCH] This patch adds support for GPIO bank J present on
-	S3C244X CPUs. It
-In-Reply-To: <1267545937-20557-1-git-send-email-chripell@fsfe.org>
-References: <1267545937-20557-1-git-send-email-chripell@fsfe.org>
-Message-ID: <20100302215443.GJ30679@trinity.fluff.org>
+From: swetland@google.com (Brian Swetland)
+Date: Tue, 2 Mar 2010 14:56:33 -0800
+Subject: board/device file names, and machine names
+In-Reply-To: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 02, 2010 at 05:05:37PM +0100, Christian Pellegrin wrote:
-> 
-> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
-> ---
->  arch/arm/mach-s3c2410/include/mach/gpio-core.h |    5 +++++
->  arch/arm/mach-s3c2410/include/mach/gpio-nrs.h  |    4 ++++
->  arch/arm/mach-s3c2410/include/mach/gpio.h      |    8 ++++++++
->  arch/arm/plat-s3c/pm-gpio.c                    |    5 +++--
->  arch/arm/plat-s3c24xx/gpiolib.c                |   16 +++++++++++++++-
->  5 files changed, 35 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-core.h b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-> index f8b879a..de9697c 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-> @@ -24,8 +24,13 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
->  {
->  	struct s3c_gpio_chip *chip;
->  
-> +#ifdef CONFIG_CPU_S3C244X
-> +	if (pin > S3C2410_GPJ(15))
-> +		return NULL;
-> +#else
->  	if (pin > S3C2410_GPG(10))
->  		return NULL;
-> +#endif
->  
->  	chip = &s3c24xx_gpios[pin/32];
->  	return (S3C2410_GPIO_OFFSET(pin) < chip->chip.ngpio) ? chip : NULL;
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> index 2edbb9c..f1f32e2 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> @@ -24,6 +24,7 @@
->  #define S3C2410_GPIO_BANKF   (32*5)
->  #define S3C2410_GPIO_BANKG   (32*6)
->  #define S3C2410_GPIO_BANKH   (32*7)
-> +#define S3C2410_GPIO_BANKJ   (32*8)
->  
->  /* GPIO bank sizes */
->  #define S3C2410_GPIO_A_NR	(32)
-> @@ -34,6 +35,7 @@
->  #define S3C2410_GPIO_F_NR	(32)
->  #define S3C2410_GPIO_G_NR	(32)
->  #define S3C2410_GPIO_H_NR	(32)
-> +#define S3C2410_GPIO_J_NR	(32)
->  
->  #if CONFIG_S3C_GPIO_SPACE != 0
->  #error CONFIG_S3C_GPIO_SPACE cannot be zero at the moment
-> @@ -53,6 +55,7 @@ enum s3c_gpio_number {
->  	S3C2410_GPIO_F_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_E),
->  	S3C2410_GPIO_G_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_F),
->  	S3C2410_GPIO_H_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_G),
-> +	S3C2410_GPIO_J_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_H),
->  };
->  
->  #endif /* __ASSEMBLY__ */
-> @@ -67,6 +70,7 @@ enum s3c_gpio_number {
->  #define S3C2410_GPF(_nr)	(S3C2410_GPIO_F_START + (_nr))
->  #define S3C2410_GPG(_nr)	(S3C2410_GPIO_G_START + (_nr))
->  #define S3C2410_GPH(_nr)	(S3C2410_GPIO_H_START + (_nr))
-> +#define S3C2410_GPJ(_nr)	(S3C2410_GPIO_J_START + (_nr))
->  
->  /* compatibility until drivers can be modified */
->  
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-s3c2410/include/mach/gpio.h
-> index 15f0b3e..1528fc7 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
-> @@ -20,10 +20,18 @@
->   * devices that need GPIO.
->   */
->  
-> +#ifdef CONFIG_CPU_S3C244X
-> +#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
-> +#else
->  #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
-> +#endif
+On Tue, Mar 2, 2010 at 1:29 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
 >
->  #include <asm-generic/gpio.h>
->  #include <mach/gpio-nrs.h>
->  #include <mach/gpio-fns.h>
->  
-> +#ifdef CONFIG_CPU_S3C244X
-> +#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
-> +#else
->  #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
-> +#endif
-> diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-s3c/pm-gpio.c
-> index cfd326a..8ef2c9d 100644
-> --- a/arch/arm/plat-s3c/pm-gpio.c
-> +++ b/arch/arm/plat-s3c/pm-gpio.c
-> @@ -20,6 +20,7 @@
->  #include <linux/gpio.h>
->  
->  #include <mach/gpio-core.h>
-> +#include <mach/regs-gpioj.h>
->  #include <plat/pm.h>
->  
->  /* PM GPIO helpers */
-> @@ -343,7 +344,7 @@ void s3c_pm_save_gpios(void)
->  			  ourchip->pm_save[2],
->  			  ourchip->pm_save[3]);
->  
-> -		gpio_nr += ourchip->chip.ngpio;
-> +		gpio_nr += ourchip->chip.ngpio - 1;
+> Hi,
+>
+> I was wondering if you (or the list) had any suggestions for proper
+> names to use in these two cases. Under mach-msm we have tons of devices
+> that could be added, and it can sometimes be hard to isolate a sane
+> name ..
+>
+> I'll use the Nexus One device as an example .. HTC originally called
+> this device the HTC Passion prior to release.. Google named the same
+> device "mahimahi" prior to release .. Then finally it was released as
+> Nexus One .
+>
+> So one device has at least three names (more I'm sure),
+>
+> ? ? ? ?Passion
+> ? ? ? ?Mahimahi
+> ? ? ? ?Nexus One
+>
+> Google has most of the code support under board files with the name
+> mahimahi.
+>
+> To me it makes a lot more sense to use a mass marketed name like "Nexus
+> One" .. Few people know what an HTC Passion is, and extremely few know
+> what "mahimahi" is.
 
-This seems to be a seperate fix to the original change.
+We would, of course, prefer to keep the board named mahimahi for all
+the reasons that have been mentioned in various previous discussions
+around trout, etc:
+1. This was the name used during development for the platform.
+2. This is the name the bootloader uses and the production bootloader
+passes module parameters, etc under this name
+3. This is the name the production userspace build for these phones
+uses to identify the specific hardware and locate some features.
+4. The Kconfig description provides a reasonable place to put more
+expansive description of the various enduser visible product names.
+5. My understanding has always been that MACH_* identifies a
+particular board which may be instantiated in a number of products
+6. I'm still unconvinced that a machine name like "mahimahi" is any
+more or less confusing than any other common machine name for an ARM
+board, which tend to be codenames, strange alphanumeric designators,
+or combinations of the two.
 
->  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
->  	}
->  }
-> @@ -374,7 +375,7 @@ void s3c_pm_restore_gpios(void)
->  
->  		s3c_pm_resume_gpio(ourchip);
->  
-> -		gpio_nr += ourchip->chip.ngpio;
-> +		gpio_nr += ourchip->chip.ngpio - 1;
->  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
->  	}
->  }
+This seems like an unforunate issue to bikeshed about, and by
+insisting on renaming the board names, more hurdles are put up between
+the (often competing, at least for our time) goals of "going to
+mainline" and "maintaining an up to date tree that works on production
+hardware without regression".
 
-and again.
+Thanks,
 
-> diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-> index 6d7a961..815b2b1 100644
-> --- a/arch/arm/plat-s3c24xx/gpiolib.c
-> +++ b/arch/arm/plat-s3c24xx/gpiolib.c
-> @@ -26,6 +26,7 @@
->  #include <plat/pm.h>
->  
->  #include <mach/regs-gpio.h>
-> +#include <mach/regs-gpioj.h>
->  
->  static int s3c24xx_gpiolib_banka_input(struct gpio_chip *chip, unsigned offset)
->  {
-> @@ -151,7 +152,8 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
->  			.ngpio			= 16,
->  			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
->  		},
-> -	}, {
-> +	},
-> +	[7] = {
->  		.base	= S3C2410_GPHCON,
->  		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
->  		.chip	= {
-> @@ -161,6 +163,18 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
->  			.ngpio			= 11,
->  		},
->  	},
-> +#ifdef CONFIG_CPU_S3C244X
-> +	[8] = {
-> +		.base	= S3C2440_GPJCON,
-> +		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
-> +		.chip	= {
-> +			.base			= S3C2410_GPJ(0),
-> +			.owner			= THIS_MODULE,
-> +			.label			= "GPIOJ",
-> +			.ngpio			= 13,
-> +		},
-> +	},
-> +#endif
->  };
+Brian
 
--- 
-Ben
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+>
+> Here is a link to mach-msm from Google's tree so you can see the naming
+> they use,
+>
+> http://android.git.kernel.org/?p=kernel/msm.git;a=tree;f=arch/arm/mach-msm;h=f67bef98c885df15781d3122e3325f6164884118;hb=refs/heads/android-msm-2.6.29-nexusone
+>
+> Another example of this is,
+>
+> arch/arm/mach-msm/board-trout.c
+>
+> which in mainline we renamed to,
+>
+> arch/arm/mach-msm/board-dream.c
+>
+> Dream is actually a released name, so it seems to make more sense.
+> However, there are many other names we could have used.
+>
+> machine_is_xx names have a similar kind of problem .. However, it's lot
+> easier to mainline a machine_is_xxx name ..
+>
+> Any comments welcome, since this stuff is disputed and up in the air.
+> I'm sure many other projects have faced similar problems also.
+>
+> Daniel
+>
