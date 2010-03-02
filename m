@@ -1,53 +1,41 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Tue, 2 Mar 2010 21:11:33 +0900
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267333263.2762.11.camel@mulgrave.site>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-Message-ID: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 2 Mar 2010 10:50:23 -0500 (EST)
+Subject: [RFC PATCH v2 8/9] USB: add HCD_NO_COHERENT_MEM host controller
+	driver flag
+In-Reply-To: <4B8C45DF.50607@yahoo.es>
+Message-ID: <Pine.LNX.4.44L0.1003021034190.1730-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Feb 2010 10:31:03 +0530
-James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
+On Mon, 1 Mar 2010, Albert Herranz wrote:
 
-> On Sun, 2010-02-28 at 11:14 +1100, Benjamin Herrenschmidt wrote:
-> > On Fri, 2010-02-26 at 21:00 +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Feb 26, 2010 at 04:25:21PM +0000, Catalin Marinas wrote:
-> > > > For mmap'ed pages (and present in the page cache), is it guaranteed that
-> > > > the HCD driver won't write to it once it has been mapped into user
-> > > > space? If that's the case, it may solve the problem by just reversing
-> > > > the meaning of PG_arch_1 on ARM and assume that a newly allocated page
-> > > > has dirty D-cache by default.
-> > > 
-> > > I guess we could also set PG_arch_1 in the DMA API as well, to avoid the
-> > > unnecessary D cache flushing when clean pages get mapped into userspace.
+> > 	If transfer_buffer_length is 0 then do nothing.
+> > 	Otherwise if num_sgs > 0 then do nothing.
+> > 	Otherwise if URB_NO_TRANSFER_DMA_MAP and transfer_dma
+> > 		are both set (this avoids your HCD_NO_COHERENT_MEM
+> > 		case) then do nothing.
 > > 
-> > That's an interesting thought for us too. When doing I$/D$ coherency, we
-> > have to fist flush the D$ and then invalidate the I$. If we could keep
-> > track of D$ and I$ separately, we could avoid the first step in many
-> > cases, including the DMA API trick you mentioned.
-> > 
-> > I wonder if it's time to get a PG_arch_2 :-)
 > 
-> Sorry to be a bit late to the party (on holiday), but I/D coherency is
-> supposed to be taken care of using flush_cache_page in the memory
-> mapping routines.
+> I see. This case would include the PIO case too (for which dma_handle
+> is set to all 1s).
 
-powerpc does that? To be exact, powerpc doesn't need
-flush_cache_page() and handles I/D coherency in the pte modification
-code. powerpc uses PG_arch_1 to avoid unnecessarily handling I/D
-coherency. Seems that IA64 does the same trick with PG_arch_1.
+The test above should be transfer_dma != ~0, not transfer_dma != 0,
+since ~0 means the DMA address isn't set.  In fact I forgot to 
+include the PIO case; it should be handled by changing the remaining 
+tests as follows:
 
+	Otherwise if hcd->self.uses_dma is set then
+		If this URB doesn't require PIO then call dma_map_single
+	Otherwise if HCD_LOCAL_MEM is set then call hcd_alloc_coherent
+	Otherwise do nothing (PIO case).
 
-> But the point of all of this is that I cache invalidation doesn't appear
-> anywhere in the I/O path ... so  if we're getting I/D incoherency,
-> there's some problem in the mm code (or there's a missing arch
-> assumption ... like I cache gets moved in more aggressively than we
-> expect).  Parisc is very sensitive to I/D incoherency, so we'd notice if
-> there were a serious generic problem here.
+Currently "this URB doesn't require PIO" is always true, but in the 
+future it won't be.
 
-I'm not sure that there are some problems in the mm or common code. Is
-this ARM's implementation issue? (Of course, the usb stack and the
-driver's misuse of the DMA API needs to be fixed too).
+> So this assumes that transfer_dma should be set initially to 0 when
+> allocating USB buffers for HCD_NO_COHERENT_MEM.
+
+No, it should be set to ~0, the same as when buffers are allocated for 
+a PIO-based controller.
+
+Alan Stern
