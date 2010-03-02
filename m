@@ -1,64 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 02 Mar 2010 17:05:27 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 2 Mar 2010 18:19:20 +0100
+Subject: LPC32XX architecture files (updated v5)
+In-Reply-To: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
+References: <1267228430-27193-1-git-send-email-wellsk40@gmail.com>
+Message-ID: <083DF309106F364B939360100EC290F805CCF9315D@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-03-02 at 21:11 +0900, FUJITA Tomonori wrote:
-> On Sun, 28 Feb 2010 10:31:03 +0530
-> James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
-> > But the point of all of this is that I cache invalidation doesn't appear
-> > anywhere in the I/O path ... so  if we're getting I/D incoherency,
-> > there's some problem in the mm code (or there's a missing arch
-> > assumption ... like I cache gets moved in more aggressively than we
-> > expect).  Parisc is very sensitive to I/D incoherency, so we'd notice if
-> > there were a serious generic problem here.
+
+Hi Russell,
+
+Can I submit these patches to the patch tracker? Or is there
+another way to get them accepted? I'm sure we'll continue
+finding small issues here and there over time, but we are
+committed to maintaining and improving them in the long run.
+(And I would like to start getting the other drivers outside
+of the ARM area going).
+
+thanks,
+Kevin
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of wellsk40 at gmail.com
+> Sent: Friday, February 26, 2010 3:54 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Subject: LPC32XX architecture files (updated v5)
 > 
-> I'm not sure that there are some problems in the mm or common code. Is
-> this ARM's implementation issue? (Of course, the usb stack and the
-> driver's misuse of the DMA API needs to be fixed too).
-
-Just to summarise - on ARM (PIPT / non-aliasing VIPT) there is I-cache
-invalidation for user pages in update_mmu_cache() (it could actually be
-in set_pte_at on SMP to avoid a race but that's for another thread). The
-D-cache is flushed by this function only if the PG_arch_1 bit is set.
-This bit is set in the ARM case by flush_dcache_page(), following the
-advice in Documentation/cachetlb.txt.
-
-With some drivers (those doing PIO) or subsystems (SCSI mass storage
-over USB HCD), there is no call to flush_dcache_page() for page cache
-pages, hence the ARM implementation of update_mmu_cache() doesn't flush
-the D-cache (and only invalidating the I-cache doesn't help).
-
-The viable solutions so far:
-
-     1. Implement a PIO mapping API similar to the DMA API which takes
-        care of the D-cache flushing. This means that PIO drivers would
-        need to be modified to use an API like pio_kmap()/pio_kunmap()
-        before writing to a page cache page.
-     2. Invert the meaning of PG_arch_1 to denote a clean page. This
-        means that by default newly allocated page cache pages are
-        considered dirty and even if there isn't a call to
-        flush_dcache_page(), update_mmu_cache() would flush the D-cache.
-        This is the PowerPC approach.
-
-Option 2 above looks pretty appealing to me since it can be done in the
-ARM code exclusively. I've done some tests and it indeed solves the
-cache coherency with a rootfs on a USB stick. As Russell suggested, it
-can be optimised to mark a page as clean when the DMA API is involved to
-avoid duplicate flushing.
-
-It was also suggested to add a PG_arch_2 flag which would keep track of
-the I-cache status as well.
-
-I can post a proposal to modify the cachetlb.txt document to reflect the
-issues we currently have on ARM.
-
--- 
-Catalin
+> 
+> Thanks for reviewing. This is the 5th patchset. Updates
+> are listed below..
+> 
+> Greatly simplified debug-macro.S (similar to other drivers
+> 	that use debug-8250.S)
+> Clock driver changes - type fixes to some functions, clock
+> 	tree enabled from top down and disabled from bottom
+> 	up, fixed round clock support, AMBA driver fixes for
+> 	get_clk_rate, AMBA fix to allow a clock rate to be
+> 	set without the clock needing to be enabled, other
+> 	review changes
+> 
+> thanks,
+> Kevin Wells
+> NXP Semiconductors
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
