@@ -1,52 +1,41 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 03 Mar 2010 10:29:54 +1100
+Date: Wed, 03 Mar 2010 10:33:54 +1100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+In-Reply-To: <1267552072.15401.83.camel@e102109-lin.cambridge.arm.com>
 References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
 	<1267316072.23523.1842.camel@pasglop>
 	<1267333263.2762.11.camel@mulgrave.site>
 	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
 	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1267572594.2173.25.camel@pasglop>
+	<1267552072.15401.83.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1267572834.2173.28.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-03-02 at 17:05 +0000, Catalin Marinas wrote:
-
-> The viable solutions so far:
+On Tue, 2010-03-02 at 17:47 +0000, Catalin Marinas wrote:
 > 
->      1. Implement a PIO mapping API similar to the DMA API which takes
->         care of the D-cache flushing. This means that PIO drivers would
->         need to be modified to use an API like pio_kmap()/pio_kunmap()
->         before writing to a page cache page.
->      2. Invert the meaning of PG_arch_1 to denote a clean page. This
->         means that by default newly allocated page cache pages are
->         considered dirty and even if there isn't a call to
->         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
->         This is the PowerPC approach.
+> Actually, option 2 still has an issue - does not easily work on SMP
+> systems where cache maintenance operations aren't broadcast in hardware.
+> In this case (ARM11MPCore), flush_dcache_page() is implemented
+> non-lazily so that the flushing happens on the same processor that
+> dirtied the cache. But since with some drivers there is no call to this
+> function, it wouldn't make any difference.
 
-I don't see the point of a "PIO" API. I would thus vote for 2 :-) Note
-that flushing the D-cache isn't enough, you also need to invalidate the
-I-cache as we discussed earlier, though you mostly get away if you don't
-by luck.
+Also, option 1 would not solve the icache issue which has the same
+problem related to IPIs. You -really- need to spank some HW folks
+here :-)
 
-There's also a question as to whether clearing PG_arch_1 is
-flush_dcache_page() is really necessary or not.
+> A solution is to do something like read-for-ownership before flushing
+> the D-cache in update_mmu_cache() (or set_pte_at()). 
 
-> Option 2 above looks pretty appealing to me since it can be done in the
-> ARM code exclusively. I've done some tests and it indeed solves the
-> cache coherency with a rootfs on a USB stick. As Russell suggested, it
-> can be optimised to mark a page as clean when the DMA API is involved to
-> avoid duplicate flushing.
+You might also want to experiment with not clearing PG_arch_1 in
+flush_dcache_page(). I'm not 100% convinced it is necessary and that may
+reduce the amount of flushing needed.
 
-That wouldn't solve the need for invalidating the I-cache... Unless we
-use another bit.
-
-> It was also suggested to add a PG_arch_2 flag which would keep track of
-> the I-cache status as well.
-> 
-> I can post a proposal to modify the cachetlb.txt document to reflect the
-> issues we currently have on ARM.
+Another thing is, on powerpc, we only do the cleaning when we try to
+execute from the pages. IE. We basically "filter out" exec permission
+when pages are not clean. At least on processors that support per-page
+exec permission. You may want to consider something like that as well.
 
 Cheers,
 Ben.
