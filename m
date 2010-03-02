@@ -1,68 +1,52 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 02 Mar 2010 15:29:05 -0800
-Subject: board/device file names, and machine names
-In-Reply-To: <a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
-	<a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-Message-ID: <1267572545.8759.121.camel@c-dwalke-linux.qualcomm.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 03 Mar 2010 10:29:54 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1267572594.2173.25.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-03-02 at 14:56 -0800, Brian Swetland wrote:
+On Tue, 2010-03-02 at 17:05 +0000, Catalin Marinas wrote:
 
+> The viable solutions so far:
 > 
-> We would, of course, prefer to keep the board named mahimahi for all
-> the reasons that have been mentioned in various previous discussions
-> around trout, etc:
-> 1. This was the name used during development for the platform.
+>      1. Implement a PIO mapping API similar to the DMA API which takes
+>         care of the D-cache flushing. This means that PIO drivers would
+>         need to be modified to use an API like pio_kmap()/pio_kunmap()
+>         before writing to a page cache page.
+>      2. Invert the meaning of PG_arch_1 to denote a clean page. This
+>         means that by default newly allocated page cache pages are
+>         considered dirty and even if there isn't a call to
+>         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
+>         This is the PowerPC approach.
 
-Yeah, but HTC used a totally different name .. So why is your any more
-important than their name?
+I don't see the point of a "PIO" API. I would thus vote for 2 :-) Note
+that flushing the D-cache isn't enough, you also need to invalidate the
+I-cache as we discussed earlier, though you mostly get away if you don't
+by luck.
 
-Neither name has been used in mass marketing.
+There's also a question as to whether clearing PG_arch_1 is
+flush_dcache_page() is really necessary or not.
 
-> 2. This is the name the bootloader uses and the production bootloader
-> passes module parameters, etc under this name
+> Option 2 above looks pretty appealing to me since it can be done in the
+> ARM code exclusively. I've done some tests and it indeed solves the
+> cache coherency with a rootfs on a USB stick. As Russell suggested, it
+> can be optimised to mark a page as clean when the DMA API is involved to
+> avoid duplicate flushing.
 
-Isn't this something Android specific tho? (you could reflash the
-bootloader too can't you?)
+That wouldn't solve the need for invalidating the I-cache... Unless we
+use another bit.
 
-> 3. This is the name the production userspace build for these phones
-> uses to identify the specific hardware and locate some features.
+> It was also suggested to add a PG_arch_2 flag which would keep track of
+> the I-cache status as well.
+> 
+> I can post a proposal to modify the cachetlb.txt document to reflect the
+> issues we currently have on ARM.
 
-How is this connected with the kernel? These devices can be reflashed
-can't they?
-
-> 4. The Kconfig description provides a reasonable place to put more
-> expansive description of the various enduser visible product names.
-
-Your not looking at it from the developers point of view .. Your
-assuming your team does coding, and everyone else just uses the code .. 
-Which I don't think is what's going to happen.
-
-> 5. My understanding has always been that MACH_* identifies a
-> particular board which may be instantiated in a number of products
-> 6. I'm still unconvinced that a machine name like "mahimahi" is any
-> more or less confusing than any other common machine name for an ARM
-> board, which tend to be codenames, strange alphanumeric designators,
-> or combinations of the two.
-
-It's like I said above, no one knows what mahimahi is. Eveyone knows
-what nexus one is.
-
-> This seems like an unforunate issue to bikeshed about, and by
-> insisting on renaming the board names, more hurdles are put up between
-> the (often competing, at least for our time) goals of "going to
-> mainline" and "maintaining an up to date tree that works on production
-> hardware without regression".
-
-This is really a classic kind of issue .. If you work with us (i.e. the
-community) , then your code goes into the kernel. If you ignore us, then
-your code usually doesn't go in ..
-
-I want your code to go in, but I also want you to work with us.
-
-I'm not insisting anything right now, I'm just getting a wider audience
-to review the issue.
-
-Daniel
+Cheers,
+Ben.
