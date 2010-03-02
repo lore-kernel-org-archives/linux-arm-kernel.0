@@ -1,28 +1,58 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 02 Mar 2010 10:50:00 +0530
-Subject: [PATCH] CLKDEV: remove extra clk_find iterations
-In-Reply-To: <20100228161216.GH30679@trinity.fluff.org>
-References: <4B88D956.1090003@st.com>
-	<20100228161216.GH30679@trinity.fluff.org>
-Message-ID: <4B8CA000.2060205@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 2 Mar 2010 09:25:37 +0100
+Subject: [PATCH 2.6.34] ARM: SAMSUNG: Fix build after "ARM: Eliminate
+	decompressor -Dstatic= PIC hack"
+In-Reply-To: <1267469542-19633-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1267469542-19633-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20100302082537.GA17629@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+On Mon, Mar 01, 2010 at 06:52:22PM +0000, Mark Brown wrote:
+> Commit 5de813b6 (ARM: Eliminate decompressor -Dstatic= PIC hack) among
+> other things changed the declared type of the error() function to an
+> extern, conflicting with the forward declartion in the Samsung
+declaration --------------------------------^
 
-On 2/28/2010 9:42 PM, Ben Dooks wrote:
-> On Sat, Feb 27, 2010 at 02:05:34PM +0530, Viresh KUMAR wrote:
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> plat/uncompress.h which appears to have been relying on the static
+> being defined away, causing build failures since error() ends up with
+> a GOT relocation but the linker script discards all GOT relocated
+> data and functions:
 > 
-> hmm, looks like your mailer has reformatted this message
+> arch/arm/boot/compressed/decompress.o: In function `gunzip':
+> /home/broonie/git/linux-2.6/arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:68: undefined reference to `error'
+> 
+> and so on. Fix this with minimal invasiveness by fixing the
+> plat/uncompress.h declaration.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/uncompress.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+> index e87ce8f..e41e6d2 100644
+> --- a/arch/arm/plat-samsung/include/plat/uncompress.h
+> +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+> @@ -140,7 +140,7 @@ static void arch_decomp_error(const char *x)
+>  #define arch_error arch_decomp_error
+>  #endif
+>  
+> -static void error(char *err);
+> +extern void error(char *err);
+>  
+>  #ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
+>  static inline void arch_enable_uart_fifo(void)
+> -- 
+> 1.7.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
-I will send correct patch again.
-
-> and two, please add a useful description, what is going on here?
-> 
-
-will add more description this time.
-
-
-viresh.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
