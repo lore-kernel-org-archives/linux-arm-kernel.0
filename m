@@ -1,38 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 3 Mar 2010 11:33:42 +0100
-Subject: [PATCH v2] CLKDEV: return from clk_find as soon as we get
-	maching clk
-In-Reply-To: <1267598907-7095-1-git-send-email-viresh.kumar@st.com>
-References: <1267598907-7095-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <20100303103342.GA7952@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 03 Mar 2010 10:40:17 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267572594.2173.25.camel@pasglop>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<1267572594.2173.25.camel@pasglop>
+Message-ID: <1267612817.15589.55.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Mar 03, 2010 at 12:18:27PM +0530, Viresh KUMAR wrote:
-> clk_find function looks for clock with matching dev_id and con_id.
-> We should return from clk_find as soon as we get a clock with matching dev_id
-> and con_id. This can be done by comparing variable "match" with 3.
+On Tue, 2010-03-02 at 23:29 +0000, Benjamin Herrenschmidt wrote:
+> On Tue, 2010-03-02 at 17:05 +0000, Catalin Marinas wrote:
 > 
-> v2:
-> 	- remove if (match == 0), check.
-> 	- move match==3 in if (match > best) condition
-can you take the changes since v1 out of the changelog.  They usually go
-...
+> > The viable solutions so far:
+> >
+> >      1. Implement a PIO mapping API similar to the DMA API which takes
+> >         care of the D-cache flushing. This means that PIO drivers would
+> >         need to be modified to use an API like pio_kmap()/pio_kunmap()
+> >         before writing to a page cache page.
+> >      2. Invert the meaning of PG_arch_1 to denote a clean page. This
+> >         means that by default newly allocated page cache pages are
+> >         considered dirty and even if there isn't a call to
+> >         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
+> >         This is the PowerPC approach.
+[...]
+> > Option 2 above looks pretty appealing to me since it can be done in the
+> > ARM code exclusively. I've done some tests and it indeed solves the
+> > cache coherency with a rootfs on a USB stick. As Russell suggested, it
+> > can be optimised to mark a page as clean when the DMA API is involved to
+> > avoid duplicate flushing.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
-... here.
+> That wouldn't solve the need for invalidating the I-cache... Unless we
+> use another bit.
 
-Does this mean you understood Russell's hint?
-
-Did you test the differences your patch results in for the generated
-code?
-
-Best regards
-Uwe
+Indeed. We currently always invalidate the I-cache when the page is
+mapped. With PG_arch_2, we could optimise this but I'm not sure it is
+worth since I think we only get an update_mmu_cache() call for a page
+(unless it is unmapped and re-mapped again).
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
