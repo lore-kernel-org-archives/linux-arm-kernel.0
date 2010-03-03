@@ -1,82 +1,54 @@
-From: al@alarsen.net (Anders Larsen)
-Date: Wed, 3 Mar 2010 22:33:41 +0100
-Subject: [PATCH 2/2] AT91 slow-clock resume: don't restore the PLL settings
-	when the PLL was off
-Message-ID: <20100303213341.GA654@alarsen.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 3 Mar 2010 22:54:38 +0100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100303215437.GF2579@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Langer <julien.langer@gmail.com>
+Hi!
 
-AT91: Don't try to restore the PLL settings on resume when the PLLs were turned
-off before suspending.
+> > I'm not sure that there are some problems in the mm or common code. Is
+> > this ARM's implementation issue? (Of course, the usb stack and the
+> > driver's misuse of the DMA API needs to be fixed too).
+> 
+> Just to summarise - on ARM (PIPT / non-aliasing VIPT) there is I-cache
+> invalidation for user pages in update_mmu_cache() (it could actually be
+> in set_pte_at on SMP to avoid a race but that's for another thread). The
+> D-cache is flushed by this function only if the PG_arch_1 bit is set.
+> This bit is set in the ARM case by flush_dcache_page(), following the
+> advice in Documentation/cachetlb.txt.
+> 
+> With some drivers (those doing PIO) or subsystems (SCSI mass storage
+> over USB HCD), there is no call to flush_dcache_page() for page cache
+> pages, hence the ARM implementation of update_mmu_cache() doesn't flush
+> the D-cache (and only invalidating the I-cache doesn't help).
+> 
+> The viable solutions so far:
+> 
+>      1. Implement a PIO mapping API similar to the DMA API which takes
+>         care of the D-cache flushing. This means that PIO drivers would
+>         need to be modified to use an API like pio_kmap()/pio_kunmap()
+>         before writing to a page cache page.
+>      2. Invert the meaning of PG_arch_1 to denote a clean page. This
+>         means that by default newly allocated page cache pages are
+>         considered dirty and even if there isn't a call to
+>         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
+>         This is the PowerPC approach.
 
-We run into this problem with the PLLB on the at91: ohci-at91 disables the PLLB
-when going to suspend. The slowclock code however tries to do the same: It
-saves the PLLB register value and when restoring the value during resume it
-waits for the PLLB to lock again. However the PLL will never lock and the loop
-would run into its timeout because the slowclock code just stored and restored
-an empty register.
-Fix the problem by only restoring PLLA/PLLB when the registers were != 0.
+What about option
 
-Signed-off-by: Julien Langer <julien.langer@gmail.com>
-Signed-off-by: Anders Larsen <al@alarsen.net>
-Cc: Andrew Victor <avictor.za@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/mach-at91/pm_slowclock.S |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+3. Forget about PG_arch_1 and always do the flush?
 
-Index: b/arch/arm/mach-at91/pm_slowclock.S
-===================================================================
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -171,17 +171,25 @@ ENTRY(at91_slow_clock)
- 	ldr	r3, [r1, #(AT91_CKGR_PLLAR - AT91_PMC)]
- 	str	r3, .saved_pllar
- 
-+	cmp r3, #0
-+	beq 3f
-+
- 	mov	r3, #AT91_PMC_PLLCOUNT
- 	orr	r3, r3, #(1 << 29)		/* bit 29 always set */
- 	str	r3, [r1, #(AT91_CKGR_PLLAR - AT91_PMC)]
- 
-+3:
- 	/* Save PLLB setting and disable it */
- 	ldr	r3, [r1, #(AT91_CKGR_PLLBR - AT91_PMC)]
- 	str	r3, .saved_pllbr
- 
-+	cmp r3, #0
-+	beq 4f
-+
- 	mov	r3, #AT91_PMC_PLLCOUNT
- 	str	r3, [r1, #(AT91_CKGR_PLLBR - AT91_PMC)]
- 
-+4:
- 	/* Turn off the main oscillator */
- 	ldr	r3, [r1, #(AT91_CKGR_MOR - AT91_PMC)]
- 	bic	r3, r3, #AT91_PMC_MOSCEN
-@@ -199,16 +207,22 @@ ENTRY(at91_slow_clock)
- 
- 	/* Restore PLLB setting */
- 	ldr	r3, .saved_pllbr
-+	cmp r3, #0
-+	beq 5f
- 	str	r3, [r1, #(AT91_CKGR_PLLBR - AT91_PMC)]
- 
- 	wait_pllblock
- 
-+5:
- 	/* Restore PLLA setting */
- 	ldr	r3, .saved_pllar
-+	cmp r3, #0
-+	beq 6f
- 	str	r3, [r1, #(AT91_CKGR_PLLAR - AT91_PMC)]
- 
- 	wait_pllalock
- 
-+6:
- #ifdef SLOWDOWN_MASTER_CLOCK
- 	/*
- 	 * First set PRES if it was not 0,
+How big is the performance impact? Note that current code does not
+even *work* so working, 10% slower code will be an improvement.
+
+								Pavel
+
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
