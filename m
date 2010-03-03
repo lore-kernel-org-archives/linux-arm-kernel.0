@@ -1,68 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 03 Mar 2010 12:16:59 +0000
-Subject: [PATCH v3 4/4] ARM: Add RealView-specific barrier implementation
-In-Reply-To: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
-References: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100303121659.22029.7659.stgit@e102109-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed,  3 Mar 2010 15:17:35 +0100
+Subject: [PATCH] mmc: at91_mci: correct kunmap_atomic()
+In-Reply-To: <20100302133434.761df661.akpm@linux-foundation.org>
+References: <20100302133434.761df661.akpm@linux-foundation.org>
+Message-ID: <1267625855-32695-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines ARCH_HAS_BARRIERS for the RealView boards if
-CACHE_L2X0 is enabled and adds the mach/barriers.h file. The mb() and
-wmb() barriers perform an L2 cache sync in addition to the DSB.
+kunmap_atomic() accepts a pointer to any location in the page so we do not need
+the subtraction and cast.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/Kconfig                               |    1 +
- arch/arm/mach-realview/include/mach/barriers.h |   30 ++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
+Andrew,
+I created a new patch that you can stack at the top of the previous
+patch series. I guess that you cannot fold it in other patches as the
+kunmap_atomic() correction impacts two different patches.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 184a6bd..d2b1f3f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -235,6 +235,7 @@ config ARCH_REALVIEW
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_HAS_BARRIERS if CACHE_L2X0
- 	help
- 	  This enables support for ARM Ltd RealView boards.
+Thanks.
+
+ drivers/mmc/host/at91_mci.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+index 55507da..91dc60c 100644
+--- a/drivers/mmc/host/at91_mci.c
++++ b/drivers/mmc/host/at91_mci.c
+@@ -248,7 +248,7 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
+ 			dmabuf = (unsigned *)tmpv;
+ 		}
  
-diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
-new file mode 100644
-index 0000000..cc11517
---- /dev/null
-+++ b/arch/arm/mach-realview/include/mach/barriers.h
-@@ -0,0 +1,30 @@
-+/*
-+ * arch/arm/mach-realview/include/mach/barriers.h
-+ *
-+ * Copyright (C) 2010 ARM Ltd.
-+ * Written by Catalin Marinas <catalin.marinas@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#ifndef __MACH_BARRIERS_H
-+#define __MACH_BARRIERS_H
-+
-+#include <asm/outercache.h>
-+
-+#define rmb()		dmb()
-+#define wmb()		do { dsb(); outer_sync(); } while (0)
-+#define mb()		wmb()
-+
-+#endif	/* __MACH_BARRIERS_H */
+-		kunmap_atomic(((void *)sgbuffer) - sg->offset, KM_BIO_SRC_IRQ);
++		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
+ 
+ 		if (size == 0)
+ 			break;
+@@ -313,7 +313,7 @@ static void at91_mci_post_dma_read(struct at91mci_host *host)
+ 			dmabuf = (unsigned *)tmpv;
+ 		}
+ 
+-		kunmap_atomic(((void *)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
++		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
+ 		dmac_flush_range((void *)sgbuffer, ((void *)sgbuffer) + amount);
+ 		data->bytes_xfered += amount;
+ 		if (size == 0)
+-- 
+1.5.6.5
