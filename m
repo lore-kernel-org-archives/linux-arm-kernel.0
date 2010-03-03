@@ -1,47 +1,62 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed,  3 Mar 2010 10:37:35 +0530
-Subject: [PATCH 05/11] ST SPEAr: Added clock framework for SPEAr platform and
-	machines
-In-Reply-To: <1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+Date: Wed,  3 Mar 2010 10:37:32 +0530
+Subject: [PATCH 02/11] ST SPEAr: Added basic header files for SPEAr3xx machine
+	family
+In-Reply-To: <1267592861-26911-2-git-send-email-viresh.kumar@st.com>
 References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
-Message-ID: <1267592861-26911-6-git-send-email-viresh.kumar@st.com>
+Message-ID: <1267592861-26911-3-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock framework for SPEAr is based upon clkdev framework for ARM
-
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/clock.c               |  525 +++++++++++++++++++++
- arch/arm/mach-spear3xx/include/mach/clkdev.h |   19 +
- arch/arm/mach-spear6xx/clock.c               |  656 ++++++++++++++++++++++++++
- arch/arm/mach-spear6xx/include/mach/clkdev.h |   19 +
- arch/arm/plat-spear/clock.c                  |  433 +++++++++++++++++
- arch/arm/plat-spear/include/plat/clkdev.h    |   20 +
- arch/arm/plat-spear/include/plat/clock.h     |  130 +++++
- 7 files changed, 1802 insertions(+), 0 deletions(-)
- create mode 100755 arch/arm/mach-spear3xx/clock.c
- create mode 100644 arch/arm/mach-spear3xx/include/mach/clkdev.h
- create mode 100755 arch/arm/mach-spear6xx/clock.c
- create mode 100644 arch/arm/mach-spear6xx/include/mach/clkdev.h
- create mode 100755 arch/arm/plat-spear/clock.c
- create mode 100644 arch/arm/plat-spear/include/plat/clkdev.h
- create mode 100755 arch/arm/plat-spear/include/plat/clock.h
+ arch/arm/mach-spear3xx/include/mach/debug-macro.S |   38 +++++
+ arch/arm/mach-spear3xx/include/mach/dma.h         |   18 +++
+ arch/arm/mach-spear3xx/include/mach/entry-macro.S |   46 ++++++
+ arch/arm/mach-spear3xx/include/mach/generic.h     |   39 +++++
+ arch/arm/mach-spear3xx/include/mach/hardware.h    |   20 +++
+ arch/arm/mach-spear3xx/include/mach/io.h          |   22 +++
+ arch/arm/mach-spear3xx/include/mach/irqs.h        |   57 +++++++
+ arch/arm/mach-spear3xx/include/mach/memory.h      |   20 +++
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h   |  163 +++++++++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/spear.h       |  136 +++++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/spear300.h    |   64 ++++++++
+ arch/arm/mach-spear3xx/include/mach/spear310.h    |   43 ++++++
+ arch/arm/mach-spear3xx/include/mach/spear320.h    |   69 +++++++++
+ arch/arm/mach-spear3xx/include/mach/system.h      |   41 +++++
+ arch/arm/mach-spear3xx/include/mach/timex.h       |   19 +++
+ arch/arm/mach-spear3xx/include/mach/uncompress.h  |   43 ++++++
+ arch/arm/mach-spear3xx/include/mach/vmalloc.h     |   22 +++
+ 17 files changed, 860 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/dma.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/generic.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/io.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/memory.h
+ create mode 100755 arch/arm/mach-spear3xx/include/mach/misc_regs.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/spear.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/spear300.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/spear310.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/spear320.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/system.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/timex.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/vmalloc.h
 
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-new file mode 100755
-index 0000000..005fecc
+diff --git a/arch/arm/mach-spear3xx/include/mach/debug-macro.S b/arch/arm/mach-spear3xx/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..2f6c5bd
 --- /dev/null
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -0,0 +1,525 @@
++++ b/arch/arm/mach-spear3xx/include/mach/debug-macro.S
+@@ -0,0 +1,38 @@
 +/*
-+ * arch/arm/mach-spear3xx/clock.c
++ * arch/arm/mach-spear3xx/include/mach/debug-macro.S
 + *
-+ * SPEAr3xx machines clock framework source file
++ * Debugging macro include header spear3xx machine family
 + *
 + * Copyright (C) 2009 ST Microelectronics
 + * Viresh Kumar<viresh.kumar@st.com>
@@ -51,1679 +66,162 @@ index 0000000..005fecc
 + * warranty of any kind, whether express or implied.
 + */
 +
++#include <linux/amba/serial.h>
++#include <mach/spear.h>
++
++		.macro	addruart, rx
++		mrc	p15, 0, \rx, c1, c0
++		tst	\rx, #1					@ MMU enabled?
++		moveq	\rx, =SPEAR3XX_ICM1_UART_BASE		@ Physical base
++		movne	\rx, =VA_SPEAR3XX_ICM1_UART_BASE	@ Virtual base
++		.endm
++
++		.macro	senduart, rd, rx
++		strb	\rd, [\rx, #UART01x_DR]			@ ASC_TX_BUFFER
++		.endm
++
++		.macro	waituart, rd, rx
++1001:		ldr	\rd, [\rx, #UART01x_FR]			@ FLAG REGISTER
++		tst	\rd, #UART01x_FR_TXFF			@ TX_FULL
++		bne	1001b
++		.endm
++
++		.macro	busyuart, rd, rx
++1002:		ldr	\rd, [\rx, #UART01x_FR]			@ FLAG REGISTER
++		tst	\rd, #UART011_FR_TXFE			@ TX_EMPTY
++		beq	1002b
++		.endm
+diff --git a/arch/arm/mach-spear3xx/include/mach/dma.h b/arch/arm/mach-spear3xx/include/mach/dma.h
+new file mode 100644
+index 0000000..9b93bc6
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/dma.h
+@@ -0,0 +1,18 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/dma.h
++ *
++ * Generic DMA support for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ASM_ARCH_DMA_H
++#define __ASM_ARCH_DMA_H
++
++#endif /* __ASM_ARCH_DMA_H */
++
+diff --git a/arch/arm/mach-spear3xx/include/mach/entry-macro.S b/arch/arm/mach-spear3xx/include/mach/entry-macro.S
+new file mode 100644
+index 0000000..947625d
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/entry-macro.S
+@@ -0,0 +1,46 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/entry-macro.S
++ *
++ * Low-level IRQ helper macros for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <mach/hardware.h>
++#include <mach/spear.h>
++#include <asm/hardware/vic.h>
++
++		.macro	disable_fiq
++		.endm
++
++		.macro	get_irqnr_preamble, base, tmp
++		.endm
++
++		.macro	arch_ret_to_user, tmp1, tmp2
++		.endm
++
++		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
++		ldr	\base, =VA_SPEAR3XX_ML1_VIC_BASE
++		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get status
++		teq	\irqstat, #0
++		beq	1001f				@ this will set/reset
++							@ zero register
++		/*
++		 * Following code will find bit position of least significang
++		 * bit set in irqstat, using following equation
++		 * least significant bit set in n = (n & ~(n-1))
++		 */
++		sub	\tmp, \irqstat, #1		@ tmp = irqstat - 1
++		mvn	\tmp, \tmp			@ tmp = ~tmp
++		and	\irqstat, \irqstat, \tmp	@ irqstat &= tmp
++		/* Now, irqstat is = bit no. of 1st bit set in vic irq status */
++		clz	\tmp, \irqstat			@ tmp = leading zeros
++		rsb	\irqnr, \tmp, #0x1F		@ irqnr = 32 - tmp - 1
++
++1001:		/* EQ will be set if no irqs pending */
++		.endm
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+new file mode 100644
+index 0000000..a659e60
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -0,0 +1,39 @@
++/*
++ * arch/arm/mach-spear3xx/generic.h
++ *
++ * SPEAr3XX machine family generic header file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ASM_ARCH_GENERIC_H
++#define __ASM_ARCH_GENERIC_H
++
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
 +#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <mach/misc_regs.h>
-+#include <plat/clock.h>
-+
-+/* root clks */
-+/* 32 KHz oscillator clock */
-+static struct clk osc_32k_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.rate = 32 * KHZ,
-+};
-+
-+static struct clk_lookup osc_32k_cl = {
-+	.con_id = "osc_32k_clk",
-+	.clk = &osc_32k_clk,
-+};
-+
-+/* 24 MHz oscillator clock */
-+static struct clk osc_24m_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.rate = 24 * MHZ,
-+};
-+
-+static struct clk_lookup osc_24m_cl = {
-+	.con_id = "osc_24m_clk",
-+	.clk = &osc_24m_clk,
-+};
-+
-+/* clock derived from 32 KHz osc clk */
-+/* rtc clock */
-+static struct clk rtc_clk = {
-+	.pclk = &osc_32k_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = RTC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup rtc_cl = {
-+	.dev_id = "rtc",
-+	.clk = &rtc_clk,
-+};
-+
-+/* clock derived from 24 MHz osc clk */
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+};
-+
-+/* PLL1 clock */
-+static struct clk pll1_clk = {
-+	.pclk = &osc_24m_clk,
-+	.en_reg = PLL1_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.recalc = &pll1_clk_recalc,
-+	.private_data = &pll1_config,
-+};
-+
-+static struct clk_lookup pll1_cl = {
-+	.con_id = "pll1_clk",
-+	.clk = &pll1_clk,
-+};
-+
-+/* PLL3 48 MHz clock */
-+static struct clk pll3_48m_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &osc_24m_clk,
-+	.rate = 48 * MHZ,
-+};
-+
-+static struct clk_lookup pll3_48m_cl = {
-+	.con_id = "pll3_48m_clk",
-+	.clk = &pll3_48m_clk,
-+};
-+
-+/* watch dog timer clock */
-+static struct clk wdt_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &osc_24m_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup wdt_cl = {
-+	.dev_id = "wdt",
-+	.clk = &wdt_clk,
-+};
-+
-+/* clock derived from pll1 clk */
-+/* cpu clock */
-+static struct clk cpu_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &pll1_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup cpu_cl = {
-+	.con_id = "cpu_clk",
-+	.clk = &cpu_clk,
-+};
-+
-+/* ahb configuration structure */
-+static struct bus_clk_config ahb_config = {
-+	.reg = CORE_CLK_CFG,
-+	.mask = PLL_HCLK_RATIO_MASK,
-+	.shift = PLL_HCLK_RATIO_SHIFT,
-+};
-+
-+/* ahb clock */
-+static struct clk ahb_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &pll1_clk,
-+	.recalc = &bus_clk_recalc,
-+	.private_data = &ahb_config,
-+};
-+
-+static struct clk_lookup ahb_cl = {
-+	.con_id = "ahb_clk",
-+	.clk = &ahb_clk,
-+};
-+
-+/* uart configurations */
-+static struct aux_clk_config uart_config = {
-+	.synth_reg = UART_CLK_SYNT,
-+};
-+
-+/* uart parents */
-+static struct pclk_info uart_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* uart parent select structure */
-+static struct pclk_sel uart_pclk_sel = {
-+	.pclk_info = uart_pclk_info,
-+	.pclk_count = ARRAY_SIZE(uart_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = UART_CLK_MASK,
-+};
-+
-+/* uart clock */
-+static struct clk uart_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = UART_CLK_ENB,
-+	.pclk_sel = &uart_pclk_sel,
-+	.pclk_sel_shift = UART_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &uart_config,
-+};
-+
-+static struct clk_lookup uart_cl = {
-+	.dev_id = "uart",
-+	.clk = &uart_clk,
-+};
-+
-+/* firda configurations */
-+static struct aux_clk_config firda_config = {
-+	.synth_reg = FIRDA_CLK_SYNT,
-+};
-+
-+/* firda parents */
-+static struct pclk_info firda_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* firda parent select structure */
-+static struct pclk_sel firda_pclk_sel = {
-+	.pclk_info = firda_pclk_info,
-+	.pclk_count = ARRAY_SIZE(firda_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = FIRDA_CLK_MASK,
-+};
-+
-+/* firda clock */
-+static struct clk firda_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = FIRDA_CLK_ENB,
-+	.pclk_sel = &firda_pclk_sel,
-+	.pclk_sel_shift = FIRDA_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &firda_config,
-+};
-+
-+static struct clk_lookup firda_cl = {
-+	.dev_id = "firda",
-+	.clk = &firda_clk,
-+};
-+
-+/* gpt parents */
-+static struct pclk_info gpt_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* gpt parent select structure */
-+static struct pclk_sel gpt_pclk_sel = {
-+	.pclk_info = gpt_pclk_info,
-+	.pclk_count = ARRAY_SIZE(gpt_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = GPT_CLK_MASK,
-+};
-+
-+/* gpt0 configurations */
-+static struct aux_clk_config gpt0_config = {
-+	.synth_reg = PRSC1_CLK_CFG,
-+};
-+
-+/* gpt0 timer clock */
-+static struct clk gpt0_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT0_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt0_config,
-+};
-+
-+static struct clk_lookup gpt0_cl = {
-+	.dev_id = "gpt0",
-+	.clk = &gpt0_clk,
-+};
-+
-+/* gpt1 configurations */
-+static struct aux_clk_config gpt1_config = {
-+	.synth_reg = PRSC2_CLK_CFG,
-+};
-+
-+/* gpt1 timer clock */
-+static struct clk gpt1_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPT1_CLK_ENB,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT1_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt1_config,
-+};
-+
-+static struct clk_lookup gpt1_cl = {
-+	.dev_id = "gpt1",
-+	.clk = &gpt1_clk,
-+};
-+
-+/* gpt2 configurations */
-+static struct aux_clk_config gpt2_config = {
-+	.synth_reg = PRSC3_CLK_CFG,
-+};
-+
-+/* gpt2 timer clock */
-+static struct clk gpt2_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPT2_CLK_ENB,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT2_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt2_config,
-+};
-+
-+static struct clk_lookup gpt2_cl = {
-+	.dev_id = "gpt2",
-+	.clk = &gpt2_clk,
-+};
-+
-+/* clock derived from pll3 clk */
-+/* usbh clock */
-+static struct clk usbh_clk = {
-+	.pclk = &pll3_48m_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = USBH_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup usbh_cl = {
-+	.dev_id = "usbh",
-+	.clk = &usbh_clk,
-+};
-+
-+/* usbd clock */
-+static struct clk usbd_clk = {
-+	.pclk = &pll3_48m_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = USBD_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup usbd_cl = {
-+	.dev_id = "usbd",
-+	.clk = &usbd_clk,
-+};
-+
-+/* clcd clock */
-+static struct clk clcd_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &pll3_48m_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup clcd_cl = {
-+	.dev_id = "clcd",
-+	.clk = &clcd_clk,
-+};
-+
-+/* clock derived from ahb clk */
-+/* apb configuration structure */
-+static struct bus_clk_config apb_config = {
-+	.reg = CORE_CLK_CFG,
-+	.mask = HCLK_PCLK_RATIO_MASK,
-+	.shift = HCLK_PCLK_RATIO_SHIFT,
-+};
-+
-+/* apb clock */
-+static struct clk apb_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ahb_clk,
-+	.recalc = &bus_clk_recalc,
-+	.private_data = &apb_config,
-+};
-+
-+static struct clk_lookup apb_cl = {
-+	.con_id = "apb_clk",
-+	.clk = &apb_clk,
-+};
-+
-+/* i2c clock */
-+static struct clk i2c_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = I2C_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup i2c_cl = {
-+	.dev_id = "i2c",
-+	.clk = &i2c_clk,
-+};
-+
-+/* dma clock */
-+static struct clk dma_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = DMA_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup dma_cl = {
-+	.dev_id = "dma",
-+	.clk = &dma_clk,
-+};
-+
-+/* jpeg clock */
-+static struct clk jpeg_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = JPEG_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup jpeg_cl = {
-+	.dev_id = "jpeg",
-+	.clk = &jpeg_clk,
-+};
-+
-+/* gmac clock */
-+static struct clk gmac_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GMAC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gmac_cl = {
-+	.dev_id = "gmac",
-+	.clk = &gmac_clk,
-+};
-+
-+/* smi clock */
-+static struct clk smi_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SMI_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup smi_cl = {
-+	.dev_id = "smi",
-+	.clk = &smi_clk,
-+};
-+
-+/* c3 clock */
-+static struct clk c3_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = C3_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup c3_cl = {
-+	.dev_id = "c3",
-+	.clk = &c3_clk,
-+};
-+
-+/* clock derived from apb clk */
-+/* adc clock */
-+static struct clk adc_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = ADC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup adc_cl = {
-+	.dev_id = "adc",
-+	.clk = &adc_clk,
-+};
-+
-+/* ssp clock */
-+static struct clk ssp_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SSP_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup ssp_cl = {
-+	.dev_id = "ssp",
-+	.clk = &ssp_clk,
-+};
-+
-+/* gpio clock */
-+static struct clk gpio_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPIO_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gpio_cl = {
-+	.dev_id = "gpio",
-+	.clk = &gpio_clk,
-+};
-+
-+/* array of all spear 3xx clock lookups */
-+static struct clk_lookup *spear_clk_lookups[] = {
-+	/* root clks */
-+	&osc_32k_cl,
-+	&osc_24m_cl,
-+
-+	/* clock derived from 32 KHz osc clk */
-+	&rtc_cl,
-+
-+	/* clock derived from 24 MHz osc clk */
-+	&pll1_cl,
-+	&pll3_48m_cl,
-+	&wdt_cl,
-+
-+	/* clock derived from pll1 clk */
-+	&cpu_cl,
-+	&ahb_cl,
-+	&uart_cl,
-+	&firda_cl,
-+	&gpt0_cl,
-+	&gpt1_cl,
-+	&gpt2_cl,
-+
-+	/* clock derived from pll3 clk */
-+	&usbh_cl,
-+	&usbd_cl,
-+	&clcd_cl,
-+
-+	/* clock derived from ahb clk */
-+	&apb_cl,
-+	&i2c_cl,
-+	&dma_cl,
-+	&jpeg_cl,
-+	&gmac_cl,
-+	&smi_cl,
-+	&c3_cl,
-+
-+	/* clock derived from apb clk */
-+	&adc_cl,
-+	&ssp_cl,
-+	&gpio_cl,
-+};
-+
-+void __init clk_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
-+		clk_register(spear_clk_lookups[i]);
-+
-+	recalc_root_clocks();
-+}
-diff --git a/arch/arm/mach-spear3xx/include/mach/clkdev.h b/arch/arm/mach-spear3xx/include/mach/clkdev.h
++#include <linux/platform_device.h>
++#include <linux/amba/bus.h>
++
++/* Add spear3xx family device structure declarations here */
++extern struct amba_device uart_device;
++extern struct sys_timer spear_sys_timer;
++
++/* Add spear300 machine device structure declarations here */
++
++/* Add spear3xx family function declarations here */
++void __init spear3xx_map_io(void);
++void __init spear3xx_init_irq(void);
++void __init spear3xx_init(void);
++void __init spear300_init(void);
++void __init spear310_init(void);
++void __init spear320_init(void);
++void __init spear_gpt_init(void);
++void __init clk_init(void);
++
++#endif /* __ASM_ARCH_GENERIC_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/hardware.h b/arch/arm/mach-spear3xx/include/mach/hardware.h
 new file mode 100644
-index 0000000..04b168b
+index 0000000..e92267a
 --- /dev/null
-+++ b/arch/arm/mach-spear3xx/include/mach/clkdev.h
-@@ -0,0 +1,19 @@
-+/*
-+ * arch/arm/mach-spear3xx/include/mach/clkdev.h
-+ *
-+ * Clock Dev framework definitions for SPEAr3xx machine family
-+ *
-+ * Copyright (C) 2009 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __ASM_MACH_CLKDEV_H
-+#define __ASM_MACH_CLKDEV_H
-+
-+#include <plat/clkdev.h>
-+
-+#endif /* __ASM_MACH_CLKDEV_H */
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-new file mode 100755
-index 0000000..c33b847
---- /dev/null
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -0,0 +1,656 @@
-+/*
-+ * arch/arm/mach-spear6xx/clock.c
-+ *
-+ * SPEAr6xx machines clock framework source file
-+ *
-+ * Copyright (C) 2009 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <mach/misc_regs.h>
-+#include <plat/clock.h>
-+
-+/* root clks */
-+/* 32 KHz oscillator clock */
-+static struct clk osc_32k_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.rate = 32 * KHZ,
-+};
-+
-+static struct clk_lookup osc_32k_cl = {
-+	.con_id = "osc_32k_clk",
-+	.clk = &osc_32k_clk,
-+};
-+
-+/* 30 MHz oscillator clock */
-+static struct clk osc_30m_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.rate = 30 * MHZ,
-+};
-+
-+static struct clk_lookup osc_30m_cl = {
-+	.con_id = "osc_30m_clk",
-+	.clk = &osc_30m_clk,
-+};
-+
-+/* clock derived from 32 KHz osc clk */
-+/* rtc clock */
-+static struct clk rtc_clk = {
-+	.pclk = &osc_32k_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = RTC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup rtc_cl = {
-+	.dev_id = "rtc",
-+	.clk = &rtc_clk,
-+};
-+
-+/* clock derived from 30 MHz osc clk */
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+};
-+
-+/* PLL1 clock */
-+static struct clk pll1_clk = {
-+	.pclk = &osc_30m_clk,
-+	.en_reg = PLL1_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.recalc = &pll1_clk_recalc,
-+	.private_data = &pll1_config,
-+};
-+
-+static struct clk_lookup pll1_cl = {
-+	.con_id = "pll1_clk",
-+	.clk = &pll1_clk,
-+};
-+
-+/* PLL3 48 MHz clock */
-+static struct clk pll3_48m_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &osc_30m_clk,
-+	.rate = 48 * MHZ,
-+};
-+
-+static struct clk_lookup pll3_48m_cl = {
-+	.con_id = "pll3_48m_clk",
-+	.clk = &pll3_48m_clk,
-+};
-+
-+/* watch dog timer clock */
-+static struct clk wdt_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &osc_30m_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup wdt_cl = {
-+	.dev_id = "wdt",
-+	.clk = &wdt_clk,
-+};
-+
-+/* clock derived from pll1 clk */
-+/* cpu clock */
-+static struct clk cpu_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &pll1_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup cpu_cl = {
-+	.con_id = "cpu_clk",
-+	.clk = &cpu_clk,
-+};
-+
-+/* ahb configuration structure */
-+static struct bus_clk_config ahb_config = {
-+	.reg = CORE_CLK_CFG,
-+	.mask = PLL_HCLK_RATIO_MASK,
-+	.shift = PLL_HCLK_RATIO_SHIFT,
-+};
-+
-+/* ahb clock */
-+static struct clk ahb_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &pll1_clk,
-+	.recalc = &bus_clk_recalc,
-+	.private_data = &ahb_config,
-+};
-+
-+static struct clk_lookup ahb_cl = {
-+	.con_id = "ahb_clk",
-+	.clk = &ahb_clk,
-+};
-+
-+/* uart parents */
-+static struct pclk_info uart_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* uart parent select structure */
-+static struct pclk_sel uart_pclk_sel = {
-+	.pclk_info = uart_pclk_info,
-+	.pclk_count = ARRAY_SIZE(uart_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = UART_CLK_MASK,
-+};
-+
-+/* uart configurations */
-+static struct aux_clk_config uart_config = {
-+	.synth_reg = UART_CLK_SYNT,
-+};
-+
-+/* uart0 clock */
-+static struct clk uart0_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = UART0_CLK_ENB,
-+	.pclk_sel = &uart_pclk_sel,
-+	.pclk_sel_shift = UART_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &uart_config,
-+};
-+
-+static struct clk_lookup uart0_cl = {
-+	.dev_id = "uart0",
-+	.clk = &uart0_clk,
-+};
-+
-+/* uart1 clock */
-+static struct clk uart1_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = UART1_CLK_ENB,
-+	.pclk_sel = &uart_pclk_sel,
-+	.pclk_sel_shift = UART_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &uart_config,
-+};
-+
-+static struct clk_lookup uart1_cl = {
-+	.dev_id = "uart1",
-+	.clk = &uart1_clk,
-+};
-+
-+/* firda configurations */
-+static struct aux_clk_config firda_config = {
-+	.synth_reg = FIRDA_CLK_SYNT,
-+};
-+
-+/* firda parents */
-+static struct pclk_info firda_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* firda parent select structure */
-+static struct pclk_sel firda_pclk_sel = {
-+	.pclk_info = firda_pclk_info,
-+	.pclk_count = ARRAY_SIZE(firda_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = FIRDA_CLK_MASK,
-+};
-+
-+/* firda clock */
-+static struct clk firda_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = FIRDA_CLK_ENB,
-+	.pclk_sel = &firda_pclk_sel,
-+	.pclk_sel_shift = FIRDA_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &firda_config,
-+};
-+
-+static struct clk_lookup firda_cl = {
-+	.dev_id = "firda",
-+	.clk = &firda_clk,
-+};
-+
-+/* clcd configurations */
-+static struct aux_clk_config clcd_config = {
-+	.synth_reg = CLCD_CLK_SYNT,
-+};
-+
-+/* clcd parents */
-+static struct pclk_info clcd_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* clcd parent select structure */
-+static struct pclk_sel clcd_pclk_sel = {
-+	.pclk_info = clcd_pclk_info,
-+	.pclk_count = ARRAY_SIZE(clcd_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = CLCD_CLK_MASK,
-+};
-+
-+/* clcd clock */
-+static struct clk clcd_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = CLCD_CLK_ENB,
-+	.pclk_sel = &clcd_pclk_sel,
-+	.pclk_sel_shift = CLCD_CLK_SHIFT,
-+	.recalc = &aux_clk_recalc,
-+	.private_data = &clcd_config,
-+};
-+
-+static struct clk_lookup clcd_cl = {
-+	.dev_id = "clcd",
-+	.clk = &clcd_clk,
-+};
-+
-+/* gpt parents */
-+static struct pclk_info gpt_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_mask = AUX_CLK_PLL1_MASK,
-+		.scalable = 1,
-+	}, {
-+		.pclk = &pll3_48m_clk,
-+		.pclk_mask = AUX_CLK_PLL3_MASK,
-+		.scalable = 0,
-+	},
-+};
-+
-+/* gpt parent select structure */
-+static struct pclk_sel gpt_pclk_sel = {
-+	.pclk_info = gpt_pclk_info,
-+	.pclk_count = ARRAY_SIZE(gpt_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = GPT_CLK_MASK,
-+};
-+
-+/* gpt0_1 configurations */
-+static struct aux_clk_config gpt0_1_config = {
-+	.synth_reg = PRSC1_CLK_CFG,
-+};
-+
-+/* gpt0 ARM1 subsystem timer clock */
-+static struct clk gpt0_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT0_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt0_1_config,
-+};
-+
-+static struct clk_lookup gpt0_cl = {
-+	.dev_id = "gpt0",
-+	.clk = &gpt0_clk,
-+};
-+
-+/* gpt1 timer clock */
-+static struct clk gpt1_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT1_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt0_1_config,
-+};
-+
-+static struct clk_lookup gpt1_cl = {
-+	.dev_id = "gpt1",
-+	.clk = &gpt1_clk,
-+};
-+
-+/* gpt2 configurations */
-+static struct aux_clk_config gpt2_config = {
-+	.synth_reg = PRSC2_CLK_CFG,
-+};
-+
-+/* gpt2 timer clock */
-+static struct clk gpt2_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPT2_CLK_ENB,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT2_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt2_config,
-+};
-+
-+static struct clk_lookup gpt2_cl = {
-+	.dev_id = "gpt2",
-+	.clk = &gpt2_clk,
-+};
-+
-+/* gpt3 configurations */
-+static struct aux_clk_config gpt3_config = {
-+	.synth_reg = PRSC3_CLK_CFG,
-+};
-+
-+/* gpt3 timer clock */
-+static struct clk gpt3_clk = {
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPT3_CLK_ENB,
-+	.pclk_sel = &gpt_pclk_sel,
-+	.pclk_sel_shift = GPT3_CLK_SHIFT,
-+	.recalc = &gpt_clk_recalc,
-+	.private_data = &gpt3_config,
-+};
-+
-+static struct clk_lookup gpt3_cl = {
-+	.dev_id = "gpt3",
-+	.clk = &gpt3_clk,
-+};
-+
-+/* clock derived from pll3 clk */
-+/* usbh0 clock */
-+static struct clk usbh0_clk = {
-+	.pclk = &pll3_48m_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = USBH0_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup usbh0_cl = {
-+	.dev_id = "usbh0",
-+	.clk = &usbh0_clk,
-+};
-+
-+/* usbh1 clock */
-+static struct clk usbh1_clk = {
-+	.pclk = &pll3_48m_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = USBH1_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup usbh1_cl = {
-+	.dev_id = "usbh1",
-+	.clk = &usbh1_clk,
-+};
-+
-+/* usbd clock */
-+static struct clk usbd_clk = {
-+	.pclk = &pll3_48m_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = USBD_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup usbd_cl = {
-+	.dev_id = "usbd",
-+	.clk = &usbd_clk,
-+};
-+
-+/* clock derived from ahb clk */
-+/* apb configuration structure */
-+static struct bus_clk_config apb_config = {
-+	.reg = CORE_CLK_CFG,
-+	.mask = HCLK_PCLK_RATIO_MASK,
-+	.shift = HCLK_PCLK_RATIO_SHIFT,
-+};
-+
-+/* apb clock */
-+static struct clk apb_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ahb_clk,
-+	.recalc = &bus_clk_recalc,
-+	.private_data = &apb_config,
-+};
-+
-+static struct clk_lookup apb_cl = {
-+	.con_id = "apb_clk",
-+	.clk = &apb_clk,
-+};
-+
-+/* i2c clock */
-+static struct clk i2c_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = I2C_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup i2c_cl = {
-+	.dev_id = "i2c",
-+	.clk = &i2c_clk,
-+};
-+
-+/* dma clock */
-+static struct clk dma_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = DMA_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup dma_cl = {
-+	.dev_id = "dma",
-+	.clk = &dma_clk,
-+};
-+
-+/* jpeg clock */
-+static struct clk jpeg_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = JPEG_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup jpeg_cl = {
-+	.dev_id = "jpeg",
-+	.clk = &jpeg_clk,
-+};
-+
-+/* gmac clock */
-+static struct clk gmac_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GMAC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gmac_cl = {
-+	.dev_id = "gmac",
-+	.clk = &gmac_clk,
-+};
-+
-+/* smi clock */
-+static struct clk smi_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SMI_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup smi_cl = {
-+	.dev_id = "smi",
-+	.clk = &smi_clk,
-+};
-+
-+/* fsmc clock */
-+static struct clk fsmc_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = FSMC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup fsmc_cl = {
-+	.dev_id = "fsmc",
-+	.clk = &fsmc_clk,
-+};
-+
-+/* clock derived from apb clk */
-+/* adc clock */
-+static struct clk adc_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = ADC_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup adc_cl = {
-+	.dev_id = "adc",
-+	.clk = &adc_clk,
-+};
-+
-+/* ssp0 clock */
-+static struct clk ssp0_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SSP0_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup ssp0_cl = {
-+	.dev_id = "ssp0",
-+	.clk = &ssp0_clk,
-+};
-+
-+/* ssp1 clock */
-+static struct clk ssp1_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SSP1_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup ssp1_cl = {
-+	.dev_id = "ssp1",
-+	.clk = &ssp1_clk,
-+};
-+
-+/* ssp2 clock */
-+static struct clk ssp2_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = SSP2_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup ssp2_cl = {
-+	.dev_id = "ssp2",
-+	.clk = &ssp2_clk,
-+};
-+
-+/* gpio0 ARM subsystem clock */
-+static struct clk gpio0_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &apb_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gpio0_cl = {
-+	.dev_id = "gpio0",
-+	.clk = &gpio0_clk,
-+};
-+
-+/* gpio1 clock */
-+static struct clk gpio1_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPIO1_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gpio1_cl = {
-+	.dev_id = "gpio1",
-+	.clk = &gpio1_clk,
-+};
-+
-+/* gpio2 clock */
-+static struct clk gpio2_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = PERIP1_CLK_ENB,
-+	.en_reg_bit = GPIO2_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk_lookup gpio2_cl = {
-+	.dev_id = "gpio2",
-+	.clk = &gpio2_clk,
-+};
-+
-+/* array of all spear 6xx clock lookups */
-+static struct clk_lookup *spear_clk_lookups[] = {
-+	/* root clks */
-+	&osc_32k_cl,
-+	&osc_30m_cl,
-+
-+	/* clock derived from 32 KHz osc clk */
-+	&rtc_cl,
-+
-+	/* clock derived from 30 MHz osc clk */
-+	&pll1_cl,
-+	&pll3_48m_cl,
-+	&wdt_cl,
-+
-+	/* clock derived from pll1 clk */
-+	&cpu_cl,
-+	&ahb_cl,
-+	&uart0_cl,
-+	&uart1_cl,
-+	&firda_cl,
-+	&clcd_cl,
-+	&gpt0_cl,
-+	&gpt1_cl,
-+	&gpt2_cl,
-+	&gpt3_cl,
-+
-+	/* clock derived from pll3 clk */
-+	&usbh0_cl,
-+	&usbh1_cl,
-+	&usbd_cl,
-+
-+	/* clock derived from ahb clk */
-+	&apb_cl,
-+	&i2c_cl,
-+	&dma_cl,
-+	&jpeg_cl,
-+	&gmac_cl,
-+	&smi_cl,
-+	&fsmc_cl,
-+
-+	/* clock derived from apb clk */
-+	&adc_cl,
-+	&ssp0_cl,
-+	&ssp1_cl,
-+	&ssp2_cl,
-+	&gpio0_cl,
-+	&gpio1_cl,
-+	&gpio2_cl,
-+};
-+
-+void __init clk_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
-+		clk_register(spear_clk_lookups[i]);
-+
-+	recalc_root_clocks();
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-spear6xx/include/mach/clkdev.h b/arch/arm/mach-spear6xx/include/mach/clkdev.h
-new file mode 100644
-index 0000000..2fb7dbc
---- /dev/null
-+++ b/arch/arm/mach-spear6xx/include/mach/clkdev.h
-@@ -0,0 +1,19 @@
-+/*
-+ * arch/arm/mach-spear6xx/include/mach/clkdev.h
-+ *
-+ * Clock Dev framework definitions for SPEAr6xx machine family
-+ *
-+ * Copyright (C) 2009 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __ASM_MACH_CLKDEV_H
-+#define __ASM_MACH_CLKDEV_H
-+
-+#include <plat/clkdev.h>
-+
-+#endif /* __ASM_MACH_CLKDEV_H */
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-new file mode 100755
-index 0000000..bdcae0c
---- /dev/null
-+++ b/arch/arm/plat-spear/clock.c
-@@ -0,0 +1,433 @@
-+/*
-+ * arch/arm/plat-spear/clock.c
-+ *
-+ * Clock framework for SPEAr platform
-+ *
-+ * Copyright (C) 2009 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/bug.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
-+#include <mach/misc_regs.h>
-+#include <plat/clock.h>
-+
-+static DEFINE_SPINLOCK(clocks_lock);
-+static LIST_HEAD(root_clks);
-+
-+static void propagate_rate(struct list_head *);
-+
-+static int generic_clk_enable(struct clk *clk)
-+{
-+	unsigned int val;
-+
-+	if (!clk->en_reg)
-+		return -EFAULT;
-+
-+	val = readl(clk->en_reg);
-+	if (unlikely(clk->flags & RESET_TO_ENABLE))
-+		val &= ~(1 << clk->en_reg_bit);
-+	else
-+		val |= 1 << clk->en_reg_bit;
-+
-+	writel(val, clk->en_reg);
-+
-+	return 0;
-+}
-+
-+static void generic_clk_disable(struct clk *clk)
-+{
-+	unsigned int val;
-+
-+	if (!clk->en_reg)
-+		return;
-+
-+	val = readl(clk->en_reg);
-+	if (unlikely(clk->flags & RESET_TO_ENABLE))
-+		val |= 1 << clk->en_reg_bit;
-+	else
-+		val &= ~(1 << clk->en_reg_bit);
-+
-+	writel(val, clk->en_reg);
-+}
-+
-+/* generic clk ops */
-+static struct clkops generic_clkops = {
-+	.enable = generic_clk_enable,
-+	.disable = generic_clk_disable,
-+};
-+
-+/*
-+ * clk_enable - inform the system when the clock source should be running.
-+ * @clk: clock source
-+ *
-+ * If the clock can not be enabled/disabled, this should return success.
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_enable(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (!clk || IS_ERR(clk))
-+		return -EFAULT;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	if (clk->usage_count++ == 0) {
-+		if (clk->ops && clk->ops->enable)
-+			ret = clk->ops->enable(clk);
-+	}
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_enable);
-+
-+/*
-+ * clk_disable - inform the system when the clock source is no longer required.
-+ * @clk: clock source
-+ *
-+ * Inform the system that a clock source is no longer required by
-+ * a driver and may be shut down.
-+ *
-+ * Implementation detail: if the clock source is shared between
-+ * multiple drivers, clk_enable() calls must be balanced by the
-+ * same number of clk_disable() calls for the clock source to be
-+ * disabled.
-+ */
-+void clk_disable(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	if (!clk || IS_ERR(clk))
-+		return;
-+
-+	WARN_ON(clk->usage_count == 0);
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	if (--clk->usage_count == 0) {
-+		if (clk->ops && clk->ops->disable)
-+			clk->ops->disable(clk);
-+	}
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+EXPORT_SYMBOL(clk_disable);
-+
-+/**
-+ * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-+ *		 This is only valid once the clock source has been enabled.
-+ * @clk: clock source
-+ */
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	unsigned long flags, rate;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	rate = clk->rate;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+	return rate;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
-+/**
-+ * clk_set_parent - set the parent clock source for this clock
-+ * @clk: clock source
-+ * @parent: parent clock source
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	int i, found = 0, val = 0;
-+	unsigned long flags;
-+
-+	if (!clk || IS_ERR(clk) || !parent || IS_ERR(parent))
-+		return -EFAULT;
-+	if (clk->usage_count == 0)
-+		return -EBUSY;
-+	if (!clk->pclk_sel)
-+		return -EPERM;
-+	if (clk->pclk == parent)
-+		return 0;
-+
-+	for (i = 0; i < clk->pclk_sel->pclk_count; i++) {
-+		if (clk->pclk_sel->pclk_info[i].pclk == parent) {
-+			found = 1;
-+			break;
-+		}
-+	}
-+
-+	if (!found)
-+		return -EPERM;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	/* reflect parent change in hardware */
-+	val = readl(clk->pclk_sel->pclk_sel_reg);
-+	val &= ~(clk->pclk_sel->pclk_sel_mask << clk->pclk_sel_shift);
-+	val |= clk->pclk_sel->pclk_info[i].pclk_mask << clk->pclk_sel_shift;
-+	writel(val, clk->pclk_sel->pclk_sel_reg);
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+	/* reflect parent change in software */
-+	clk->recalc(clk);
-+	propagate_rate(&clk->children);
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_set_parent);
-+
-+/* registers clock in platform clock framework */
-+void clk_register(struct clk_lookup *cl)
-+{
-+	struct clk *clk = cl->clk;
-+	unsigned long flags;
-+
-+	if (!clk || IS_ERR(clk))
-+		return;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+
-+	INIT_LIST_HEAD(&clk->children);
-+	if (clk->flags & ALWAYS_ENABLED)
-+		clk->ops = NULL;
-+	else if (!clk->ops)
-+		clk->ops = &generic_clkops;
-+
-+	/* root clock don't have any parents */
-+	if (!clk->pclk && !clk->pclk_sel) {
-+		list_add(&clk->sibling, &root_clks);
-+		/* add clocks with only one parent to parent's children list */
-+	} else if (clk->pclk && !clk->pclk_sel) {
-+		list_add(&clk->sibling, &clk->pclk->children);
-+	} else {
-+		/* add clocks with > 1 parent to 1st parent's children list */
-+		list_add(&clk->sibling,
-+			 &clk->pclk_sel->pclk_info[0].pclk->children);
-+	}
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+	/* add clock to arm clockdev framework */
-+	clkdev_add(cl);
-+}
-+
-+/**
-+ * propagate_rate - recalculate and propagate all clocks in list head
-+ *
-+ * Recalculates all root clocks in list head, which if the clock's .recalc is
-+ * set correctly, should also propagate their rates.
-+ */
-+static void propagate_rate(struct list_head *lhead)
-+{
-+	struct clk *clkp, *_temp;
-+
-+	list_for_each_entry_safe(clkp, _temp, lhead, sibling) {
-+		if (clkp->recalc)
-+			clkp->recalc(clkp);
-+		propagate_rate(&clkp->children);
-+	}
-+}
-+
-+/* returns current programmed clocks clock info structure */
-+static struct pclk_info *pclk_info_get(struct clk *clk)
-+{
-+	unsigned int mask, i;
-+	unsigned long flags;
-+	struct pclk_info *info;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	mask = (readl(clk->pclk_sel->pclk_sel_reg) >> clk->pclk_sel_shift)
-+			& clk->pclk_sel->pclk_sel_mask;
-+
-+	for (i = 0; i < clk->pclk_sel->pclk_count; i++) {
-+		if (clk->pclk_sel->pclk_info[i].pclk_mask == mask)
-+			info = &clk->pclk_sel->pclk_info[i];
-+	}
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+	return info;
-+}
-+
-+/*
-+ * Set pclk as cclk's parent and add clock sibling node to current parents
-+ * children list
-+ */
-+static void change_parent(struct clk *cclk, struct clk *pclk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	list_del(&cclk->sibling);
-+	list_add(&cclk->sibling, &pclk->children);
-+
-+	cclk->pclk = pclk;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/*
-+ * calculates current programmed rate of pll1
-+ *
-+ * In normal mode
-+ * rate = (2 * M[15:8] * Fin)/(N * 2^P)
-+ *
-+ * In Dithered mode
-+ * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
-+ */
-+void pll1_clk_recalc(struct clk *clk)
-+{
-+	struct pll_clk_config *config = clk->private_data;
-+	unsigned int num = 2, den = 0, val, mode = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	mode = (readl(config->mode_reg) >> PLL_MODE_SHIFT) &
-+		PLL_MODE_MASK;
-+
-+	val = readl(config->cfg_reg);
-+	/* calculate denominator */
-+	den = (val >> PLL_DIV_P_SHIFT) & PLL_DIV_P_MASK;
-+	den = 1 << den;
-+	den *= (val >> PLL_DIV_N_SHIFT) & PLL_DIV_N_MASK;
-+
-+	/* calculate numerator & denominator */
-+	if (!mode) {
-+		/* Normal mode */
-+		num *= (val >> PLL_NORM_FDBK_M_SHIFT) & PLL_NORM_FDBK_M_MASK;
-+	} else {
-+		/* Dithered mode */
-+		num *= (val >> PLL_DITH_FDBK_M_SHIFT) & PLL_DITH_FDBK_M_MASK;
-+		den *= 256;
-+	}
-+
-+	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/* calculates current programmed rate of ahb or apb bus */
-+void bus_clk_recalc(struct clk *clk)
-+{
-+	struct bus_clk_config *config = clk->private_data;
-+	unsigned int div;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	div = ((readl(config->reg) >> config->shift) & config->mask) + 1;
-+	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/*
-+ * calculates current programmed rate of auxiliary synthesizers
-+ * used by: UART, FIRDA
-+ *
-+ * Fout from synthesizer can be given from two equations:
-+ * Fout1 = (Fin * X/Y)/2
-+ * Fout2 = Fin * X/Y
-+ *
-+ * Selection of eqn 1 or 2 is programmed in register
-+ */
-+void aux_clk_recalc(struct clk *clk)
-+{
-+	struct aux_clk_config *config = clk->private_data;
-+	struct pclk_info *pclk_info = NULL;
-+	unsigned int num = 1, den = 1, val, eqn;
-+	unsigned long flags;
-+
-+	/* get current programmed parent */
-+	pclk_info = pclk_info_get(clk);
-+	if (!pclk_info) {
-+		spin_lock_irqsave(&clocks_lock, flags);
-+		clk->pclk = NULL;
-+		clk->rate = 0;
-+		spin_unlock_irqrestore(&clocks_lock, flags);
-+		return;
-+	}
-+
-+	change_parent(clk, pclk_info->pclk);
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	if (pclk_info->scalable) {
-+		val = readl(config->synth_reg);
-+
-+		eqn = (val >> AUX_EQ_SEL_SHIFT) & AUX_EQ_SEL_MASK;
-+		if (eqn == AUX_EQ1_SEL)
-+			den *= 2;
-+
-+		/* calculate numerator */
-+		num = (val >> AUX_XSCALE_SHIFT) & AUX_XSCALE_MASK;
-+
-+		/* calculate denominator */
-+		den *= (val >> AUX_YSCALE_SHIFT) & AUX_YSCALE_MASK;
-+		val = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	} else
-+		val = clk->pclk->rate;
-+
-+	clk->rate = val;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/*
-+ * calculates current programmed rate of gpt synthesizers
-+ * Fout from synthesizer can be given from below equations:
-+ * Fout= Fin/((2 ^ (N+1)) * (M+1))
-+ */
-+void gpt_clk_recalc(struct clk *clk)
-+{
-+	struct aux_clk_config *config = clk->private_data;
-+	struct pclk_info *pclk_info = NULL;
-+	unsigned int div = 1, val;
-+	unsigned long flags;
-+
-+	pclk_info = pclk_info_get(clk);
-+	if (!pclk_info) {
-+		spin_lock_irqsave(&clocks_lock, flags);
-+		clk->pclk = NULL;
-+		clk->rate = 0;
-+		spin_unlock_irqrestore(&clocks_lock, flags);
-+		return;
-+	}
-+
-+	change_parent(clk, pclk_info->pclk);
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	if (pclk_info->scalable) {
-+		val = readl(config->synth_reg);
-+		div += (val >> GPT_MSCALE_SHIFT) & GPT_MSCALE_MASK;
-+		div *= 1 << (((val >> GPT_NSCALE_SHIFT) & GPT_NSCALE_MASK) + 1);
-+	}
-+
-+	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/*
-+ * Used for clocks that always have same value as the parent clock divided by a
-+ * fixed divisor
-+ */
-+void follow_parent(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	clk->rate = clk->pclk->rate;
-+	spin_unlock_irqrestore(&clocks_lock, flags);
-+}
-+
-+/**
-+ * recalc_root_clocks - recalculate and propagate all root clocks
-+ *
-+ * Recalculates all root clocks (clocks with no parent), which if the
-+ * clock's .recalc is set correctly, should also propagate their rates.
-+ */
-+void recalc_root_clocks(void)
-+{
-+	propagate_rate(&root_clks);
-+}
-diff --git a/arch/arm/plat-spear/include/plat/clkdev.h b/arch/arm/plat-spear/include/plat/clkdev.h
-new file mode 100644
-index 0000000..9b1cd54
---- /dev/null
-+++ b/arch/arm/plat-spear/include/plat/clkdev.h
++++ b/arch/arm/mach-spear3xx/include/mach/hardware.h
 @@ -0,0 +1,20 @@
 +/*
-+ * arch/arm/plat-spear/include/plat/clkdev.h
++ * arch/arm/mach-spear3xx/include/mach/hardware.h
 + *
-+ * Clock Dev framework definitions for SPEAr platform
++ * Hardware definitions for SPEAr3xx machine family
 + *
 + * Copyright (C) 2009 ST Microelectronics
 + * Viresh Kumar<viresh.kumar@st.com>
@@ -1733,23 +231,23 @@ index 0000000..9b1cd54
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __ASM_PLAT_CLKDEV_H
-+#define __ASM_PLAT_CLKDEV_H
++#ifndef __ASM_MACH_HARDWARE_H
++#define __ASM_MACH_HARDWARE_H
 +
-+#define __clk_get(clk) ({ 1; })
-+#define __clk_put(clk) do { } while (0)
++/* Vitual to physical translation of statically mapped space */
++#define IO_ADDRESS(x)		(x | 0xF0000000)
 +
-+#endif /* __ASM_PLAT_CLKDEV_H */
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-new file mode 100755
-index 0000000..c220274
++#endif /* __ASM_MACH_HARDWARE_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/io.h b/arch/arm/mach-spear3xx/include/mach/io.h
+new file mode 100644
+index 0000000..235df7a
 --- /dev/null
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -0,0 +1,130 @@
++++ b/arch/arm/mach-spear3xx/include/mach/io.h
+@@ -0,0 +1,22 @@
 +/*
-+ * arch/arm/plat-spear/include/plat/clock.h
++ * arch/arm/mach-spear3xx/include/mach/io.h
 + *
-+ * Clock framework definitions for SPEAr platform
++ * IO definitions for SPEAr3xx machine family
 + *
 + * Copyright (C) 2009 ST Microelectronics
 + * Viresh Kumar<viresh.kumar@st.com>
@@ -1759,122 +257,757 @@ index 0000000..c220274
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __ASM_PLAT_CLOCK_H
-+#define __ASM_PLAT_CLOCK_H
++#ifndef __ASM_MACH_IO_H
++#define __ASM_MACH_IO_H
 +
-+#include <linux/list.h>
-+#include <asm/clkdev.h>
-+#include <linux/types.h>
++#define IO_SPACE_LIMIT		0xFFFFFFFF
 +
-+/* clk values */
-+#define KHZ			(1000)
-+#define MHZ			(1000000)
++#define __io(a)			__typesafe_io(a)
++#define __mem_pci(a)		(a)
 +
-+/* clk structure flags */
-+#define	ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
-+#define	RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
-+
-+/**
-+ * struct clkops - clock operations
-+ * @enable: pointer to clock enable function
-+ * @disable: pointer to clock disable function
++#endif /* __ASM_MACH_IO_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
+new file mode 100644
+index 0000000..7e451e8
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
+@@ -0,0 +1,57 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/irqs.h
++ *
++ * IRQ helper macros for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+struct clkops {
-+	int (*enable) (struct clk *);
-+	void (*disable) (struct clk *);
-+};
 +
-+/**
-+ * struct pclk_info - parents info
-+ * @pclk: pointer to parent clk
-+ * @pclk_mask: value to be written for selecting this parent
-+ * @scalable: Is parent scalable (1 - YES, 0 - NO)
++#ifndef __ASM_MACH_IRQS_H
++#define __ASM_MACH_IRQS_H
++
++/* IRQ definitions */
++#define IRQ_HW_ACCEL_MOD_0			0
++#define IRQ_INTRCOMM_RAS_ARM			1
++#define IRQ_CPU_GPT1_1				2
++#define IRQ_CPU_GPT1_2				3
++#define IRQ_BASIC_GPT1_1			4
++#define IRQ_BASIC_GPT1_2			5
++#define IRQ_BASIC_GPT2_1			6
++#define IRQ_BASIC_GPT2_2			7
++#define IRQ_BASIC_DMA				8
++#define IRQ_BASIC_SMI				9
++#define IRQ_BASIC_RTC				10
++#define IRQ_BASIC_GPIO				11
++#define IRQ_BASIC_WDT				12
++#define IRQ_DDR_CONTROLLER			13
++#define IRQ_SYS_ERROR				14
++#define IRQ_WAKEUP_RCV				15
++#define IRQ_JPEG				16
++#define IRQ_IRDA				17
++#define IRQ_ADC					18
++#define IRQ_UART				19
++#define IRQ_SSP					20
++#define IRQ_I2C					21
++#define IRQ_MAC_1				22
++#define IRQ_MAC_2				23
++#define IRQ_USB_DEV				24
++#define IRQ_USB_H_OHCI_0			25
++#define IRQ_USB_H_EHCI_0			26
++#define IRQ_USB_H_EHCI_1			IRQ_USB_H_EHCI_0
++#define IRQ_USB_H_OHCI_1			27
++#define IRQ_GEN_RAS_1				28
++#define IRQ_GEN_RAS_2				29
++#define IRQ_GEN_RAS_3				30
++#define IRQ_HW_ACCEL_MOD_1			31
++#define IRQ_VIC_END				32
++
++#define SPEAR_GPIO_INT_BASE	IRQ_VIC_END
++#define VIRTUAL_IRQS		0
++#define NR_IRQS 		(IRQ_VIC_END + VIRTUAL_IRQS)
++
++#endif /* __ASM_MACH_IRQS_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/memory.h b/arch/arm/mach-spear3xx/include/mach/memory.h
+new file mode 100644
+index 0000000..1090287
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/memory.h
+@@ -0,0 +1,20 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/memory.h
++ *
++ * Memory map for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+struct pclk_info {
-+	struct clk *pclk;
-+	u8 pclk_mask;
-+	u8 scalable;
-+};
 +
-+/**
-+ * struct pclk_sel - parents selection configuration
-+ * @pclk_info: pointer to array of parent clock info
-+ * @pclk_count: number of parents
-+ * @pclk_sel_reg: register for selecting a parent
-+ * @pclk_sel_mask: mask for selecting parent (can be used to clear bits also)
++#ifndef __ASM_MACH_MEMORY_H
++#define __ASM_MACH_MEMORY_H
++
++/* Physical DRAM offset */
++#define PHYS_OFFSET		UL(0x00000000)
++
++#endif /* __ASM_MACH_MEMORY_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/misc_regs.h b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+new file mode 100755
+index 0000000..d83dae9
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+@@ -0,0 +1,163 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/misc_regs.h
++ *
++ * Miscellaneous registers definitions for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+struct pclk_sel {
-+	struct pclk_info *pclk_info;
-+	u8 pclk_count;
-+	unsigned int *pclk_sel_reg;
-+	unsigned int pclk_sel_mask;
-+};
 +
-+/**
-+ * struct clk - clock structure
-+ * @usage_count: num of users who enabled this clock
-+ * @flags: flags for clock properties
-+ * @rate: programmed clock rate in Hz
-+ * @en_reg: clk enable/disable reg
-+ * @en_reg_bit: clk enable/disable bit
-+ * @ops: clk enable/disable ops - generic_clkops selected if NULL
-+ * @recalc: pointer to clock rate recalculate function
-+ * @pclk: current parent clk
-+ * @pclk_sel: pointer to parent selection structure
-+ * @pclk_sel_shift: register shift for selecting parent of this clock
-+ * @children: list for childrens or this clock
-+ * @sibling: node for list of clocks having same parents
-+ * @private_data: clock specific private data
++#ifndef __ASM_MACH_MISC_REGS_H
++#define __ASM_MACH_MISC_REGS_H
++
++#include <mach/spear.h>
++
++#define MISC_BASE		VA_SPEAR3XX_ICM3_MISC_REG_BASE
++
++#define SOC_CFG_CTR		((unsigned int *)(MISC_BASE + 0x000))
++#define DIAG_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x004))
++#define PLL1_CTR 		((unsigned int *)(MISC_BASE + 0x008))
++#define PLL1_FRQ 		((unsigned int *)(MISC_BASE + 0x00C))
++#define PLL1_MOD 		((unsigned int *)(MISC_BASE + 0x010))
++#define PLL2_CTR 		((unsigned int *)(MISC_BASE + 0x014))
++/* PLL_CTR register masks */
++#define PLL_ENABLE		2
++#define PLL_MODE_SHIFT		4
++#define PLL_MODE_MASK		0x3
++#define PLL_MODE_NORMAL		0
++#define PLL_MODE_FRACTION	1
++#define PLL_MODE_DITH_DSB	2
++#define PLL_MODE_DITH_SSB	3
++
++#define PLL2_FRQ 		((unsigned int *)(MISC_BASE + 0x018))
++/* PLL FRQ register masks */
++#define PLL_DIV_N_SHIFT		0
++#define PLL_DIV_N_MASK		0xFF
++#define PLL_DIV_P_SHIFT		8
++#define PLL_DIV_P_MASK		0x7
++#define PLL_NORM_FDBK_M_SHIFT	24
++#define PLL_NORM_FDBK_M_MASK	0xFF
++#define PLL_DITH_FDBK_M_SHIFT	16
++#define PLL_DITH_FDBK_M_MASK	0xFFFF
++
++#define PLL2_MOD 		((unsigned int *)(MISC_BASE + 0x01C))
++#define PLL_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x020))
++#define CORE_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x024))
++/* CORE CLK CFG register masks */
++#define PLL_HCLK_RATIO_SHIFT	10
++#define PLL_HCLK_RATIO_MASK	0x3
++#define HCLK_PCLK_RATIO_SHIFT	8
++#define HCLK_PCLK_RATIO_MASK	0x3
++
++#define PERIP_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x028))
++/* PERIP_CLK_CFG register masks */
++#define UART_CLK_SHIFT		4
++#define UART_CLK_MASK		0x1
++#define FIRDA_CLK_SHIFT		5
++#define FIRDA_CLK_MASK		0x3
++#define GPT0_CLK_SHIFT		8
++#define GPT1_CLK_SHIFT		11
++#define GPT2_CLK_SHIFT		12
++#define GPT_CLK_MASK		0x1
++#define AUX_CLK_PLL3_MASK	0
++#define AUX_CLK_PLL1_MASK	1
++
++#define PERIP1_CLK_ENB 		((unsigned int *)(MISC_BASE + 0x02C))
++/* PERIP1_CLK_ENB register masks */
++#define UART_CLK_ENB		3
++#define SSP_CLK_ENB		5
++#define I2C_CLK_ENB		7
++#define JPEG_CLK_ENB		8
++#define FIRDA_CLK_ENB		10
++#define GPT1_CLK_ENB		11
++#define GPT2_CLK_ENB		12
++#define ADC_CLK_ENB		15
++#define RTC_CLK_ENB		17
++#define GPIO_CLK_ENB		18
++#define DMA_CLK_ENB		19
++#define SMI_CLK_ENB		21
++#define GMAC_CLK_ENB		23
++#define USBD_CLK_ENB		24
++#define USBH_CLK_ENB		25
++#define C3_CLK_ENB		31
++
++#define SOC_CORE_ID		((unsigned int *)(MISC_BASE + 0x030))
++#define RAS_CLK_ENB 		((unsigned int *)(MISC_BASE + 0x034))
++#define PERIP1_SOF_RST 		((unsigned int *)(MISC_BASE + 0x038))
++/* PERIP1_SOF_RST register masks */
++#define JPEG_SOF_RST		8
++
++#define SOC_USER_ID 		((unsigned int *)(MISC_BASE + 0x03C))
++#define RAS_SOF_RST 		((unsigned int *)(MISC_BASE + 0x040))
++#define PRSC1_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x044))
++#define PRSC2_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x048))
++#define PRSC3_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x04C))
++/* gpt synthesizer register masks */
++#define GPT_MSCALE_SHIFT	0
++#define GPT_MSCALE_MASK		0xFFF
++#define GPT_NSCALE_SHIFT	12
++#define GPT_NSCALE_MASK		0xF
++
++#define AMEM_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x050))
++#define EXPI_CLK_CFG 		((unsigned int *)(MISC_BASE + 0x054))
++#define CLCD_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x05C))
++#define FIRDA_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x060))
++#define UART_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x064))
++#define GMAC_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x068))
++#define RAS1_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x06C))
++#define RAS2_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x070))
++#define RAS3_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x074))
++#define RAS4_CLK_SYNT 		((unsigned int *)(MISC_BASE + 0x078))
++/* aux clk synthesiser register masks for irda to ras4 */
++#define AUX_EQ_SEL_SHIFT	30
++#define AUX_EQ_SEL_MASK		1
++#define AUX_EQ1_SEL		0
++#define AUX_EQ2_SEL		1
++#define AUX_XSCALE_SHIFT	16
++#define AUX_XSCALE_MASK		0xFFF
++#define AUX_YSCALE_SHIFT	0
++#define AUX_YSCALE_MASK		0xFFF
++
++#define ICM1_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x07C))
++#define ICM2_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x080))
++#define ICM3_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x084))
++#define ICM4_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x088))
++#define ICM5_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x08C))
++#define ICM6_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x090))
++#define ICM7_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x094))
++#define ICM8_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x098))
++#define ICM9_ARB_CFG 		((unsigned int *)(MISC_BASE + 0x09C))
++#define DMA_CHN_CFG 		((unsigned int *)(MISC_BASE + 0x0A0))
++#define USB2_PHY_CFG 		((unsigned int *)(MISC_BASE + 0x0A4))
++#define GMAC_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x0A8))
++#define EXPI_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x0AC))
++#define PRC1_LOCK_CTR 		((unsigned int *)(MISC_BASE + 0x0C0))
++#define PRC2_LOCK_CTR 		((unsigned int *)(MISC_BASE + 0x0C4))
++#define PRC3_LOCK_CTR 		((unsigned int *)(MISC_BASE + 0x0C8))
++#define PRC4_LOCK_CTR 		((unsigned int *)(MISC_BASE + 0x0CC))
++#define PRC1_IRQ_CTR 		((unsigned int *)(MISC_BASE + 0x0D0))
++#define PRC2_IRQ_CTR 		((unsigned int *)(MISC_BASE + 0x0D4))
++#define PRC3_IRQ_CTR 		((unsigned int *)(MISC_BASE + 0x0D8))
++#define PRC4_IRQ_CTR 		((unsigned int *)(MISC_BASE + 0x0DC))
++#define PWRDOWN_CFG_CTR 	((unsigned int *)(MISC_BASE + 0x0E0))
++#define COMPSSTL_1V8_CFG 	((unsigned int *)(MISC_BASE + 0x0E4))
++#define COMPSSTL_2V5_CFG 	((unsigned int *)(MISC_BASE + 0x0E8))
++#define COMPCOR_3V3_CFG 	((unsigned int *)(MISC_BASE + 0x0EC))
++#define SSTLPAD_CFG_CTR 	((unsigned int *)(MISC_BASE + 0x0F0))
++#define BIST1_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x0F4))
++#define BIST2_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x0F8))
++#define BIST3_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x0FC))
++#define BIST4_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x100))
++#define BIST5_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x104))
++#define BIST1_STS_RES 		((unsigned int *)(MISC_BASE + 0x108))
++#define BIST2_STS_RES 		((unsigned int *)(MISC_BASE + 0x10C))
++#define BIST3_STS_RES 		((unsigned int *)(MISC_BASE + 0x110))
++#define BIST4_STS_RES 		((unsigned int *)(MISC_BASE + 0x114))
++#define BIST5_STS_RES 		((unsigned int *)(MISC_BASE + 0x118))
++#define SYSERR_CFG_CTR 		((unsigned int *)(MISC_BASE + 0x11C))
++
++#endif /* __ASM_MACH_MISC_REGS_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear.h b/arch/arm/mach-spear3xx/include/mach/spear.h
+new file mode 100644
+index 0000000..ade272a
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/spear.h
+@@ -0,0 +1,136 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/spear.h
++ *
++ * SPEAr3xx Machine family specific definition
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+struct clk {
-+	unsigned int usage_count;
-+	unsigned int flags;
-+	unsigned long rate;
-+	unsigned int *en_reg;
-+	u8 en_reg_bit;
-+	const struct clkops *ops;
-+	void (*recalc) (struct clk *);
 +
-+	struct clk *pclk;
-+	struct pclk_sel *pclk_sel;
-+	unsigned int pclk_sel_shift;
++#ifndef __ASM_MACH_SPEAR3XX_H
++#define __ASM_MACH_SPEAR3XX_H
 +
-+	struct list_head children;
-+	struct list_head sibling;
-+	void *private_data;
-+};
++#include <mach/hardware.h>
++#include <mach/spear300.h>
++#include <mach/spear310.h>
++#include <mach/spear320.h>
 +
-+/* pll configuration structure */
-+struct pll_clk_config {
-+	unsigned int *mode_reg;
-+	unsigned int *cfg_reg;
-+};
++#define SPEAR3XX_ICM9_BASE		0xC0000000
++#define SPEAR3XX_ICM9_SIZE		0x10000000
 +
-+/* ahb and apb bus configuration structure */
-+struct bus_clk_config {
-+	unsigned int *reg;
-+	unsigned int mask;
-+	unsigned int shift;
-+};
++/* ICM1 - Low speed connection */
++#define SPEAR3XX_ICM1_2_BASE		0xD0000000
++#define SPEAR3XX_ICM1_2_SIZE		0x10000000
++
++#define SPEAR3XX_ICM1_UART_BASE		0xD0000000
++#define VA_SPEAR3XX_ICM1_UART_BASE	IO_ADDRESS(SPEAR3XX_ICM1_UART_BASE)
++#define SPEAR3XX_ICM1_UART_SIZE		0x00080000
++
++#define SPEAR3XX_ICM1_ADC_BASE 		0xD0080000
++#define SPEAR3XX_ICM1_ADC_SIZE 		0x00080000
++
++#define SPEAR3XX_ICM1_SSP_BASE		0xD0100000
++#define SPEAR3XX_ICM1_SSP_SIZE		0x00080000
++
++#define SPEAR3XX_ICM1_I2C_BASE 		0xD0180000
++#define SPEAR3XX_ICM1_I2C_SIZE 		0x00080000
++
++#define SPEAR3XX_ICM1_JPEG_BASE 	0xD0800000
++#define SPEAR3XX_ICM1_JPEG_SIZE		0x00800000
++
++#define SPEAR3XX_ICM1_IRDA_BASE		0xD1000000
++#define SPEAR3XX_ICM1_IRDA_SIZE		0x00080000
++
++#define SPEAR3XX_ICM1_SRAM_BASE		0xD2800000
++#define SPEAR3XX_ICM1_SRAM_SIZE		0x05800000
++
++/* ICM2 - Application Subsystem */
++#define SPEAR3XX_ICM2_HWACCEL0_BASE 	0xD8800000
++#define SPEAR3XX_ICM2_HWACCEL0_SIZE 	0x00800000
++
++#define SPEAR3XX_ICM2_HWACCEL1_BASE 	0xD9000000
++#define SPEAR3XX_ICM2_HWACCEL1_SIZE 	0x00800000
++
++/* ICM4 - High Speed Connection */
++#define SPEAR3XX_ICM4_BASE		0xE0000000
++#define SPEAR3XX_ICM4_SIZE		0x08000000
++
++#define SPEAR3XX_ICM4_MII_BASE		0xE0800000
++#define SPEAR3XX_ICM4_MII_SIZE		0x00800000
++
++#define SPEAR3XX_ICM4_USBD_FIFO_BASE	0xE1000000
++#define SPEAR3XX_ICM4_USBD_FIFO_SIZE	0x00100000
++
++#define SPEAR3XX_ICM4_USBD_CSR_BASE 	0xE1100000
++#define SPEAR3XX_ICM4_USBD_CSR_SIZE 	0x00100000
++
++#define SPEAR3XX_ICM4_USBD_PLDT_BASE	0xE1200000
++#define SPEAR3XX_ICM4_USBD_PLDT_SIZE	0x00100000
++
++#define SPEAR3XX_ICM4_USB_EHCI0_1_BASE	0xE1800000
++#define SPEAR3XX_ICM4_USB_EHCI0_1_SIZE	0x00100000
++
++#define SPEAR3XX_ICM4_USB_OHCI0_BASE	0xE1900000
++#define SPEAR3XX_ICM4_USB_OHCI0_SIZE	0x00100000
++
++#define SPEAR3XX_ICM4_USB_OHCI1_BASE	0xE2100000
++#define SPEAR3XX_ICM4_USB_OHCI1_SIZE	0x00100000
++
++#define SPEAR3XX_ICM4_USB_ARB_BASE	0xE2800000
++#define SPEAR3XX_ICM4_USB_ARB_SIZE	0x00010000
++
++/* ML1 - Multi Layer CPU Subsystem */
++#define SPEAR3XX_ICM3_ML1_2_BASE	0xF0000000
++#define SPEAR3XX_ICM3_ML1_2_SIZE	0x0F000000
++
++#define SPEAR3XX_ML1_SDRAM_BASE		0x00000000
++#define SPEAR3XX_ML1_SDRAM_SIZE		0x40000000
++
++#define SPEAR3XX_ML1_TMR_BASE		0xF0000000
++#define SPEAR3XX_ML1_TMR_SIZE 		0x00100000
++
++#define SPEAR3XX_ML1_VIC_BASE		0xF1100000
++#define VA_SPEAR3XX_ML1_VIC_BASE	IO_ADDRESS(SPEAR3XX_ML1_VIC_BASE)
++#define SPEAR3XX_ML1_VIC_SIZE		0x00100000
++
++/* ICM3 - Basic Subsystem */
++#define SPEAR3XX_ICM3_SMEM_BASE		0xF8000000
++#define SPEAR3XX_ICM3_SMEM_SIZE		0x04000000
++
++#define SPEAR3XX_ICM3_SMI_CTRL_BASE	0xFC000000
++#define SPEAR3XX_ICM3_SMI_CTRL_SIZE	0x00200000
++
++#define SPEAR3XX_ICM3_DMA_BASE		0xFC400000
++#define SPEAR3XX_ICM3_DMA_SIZE		0x00200000
++
++#define SPEAR3XX_ICM3_SDRAM_CTRL_BASE	0xFC600000
++#define SPEAR3XX_ICM3_SDRAM_CTRL_SIZE	0x00200000
++
++#define SPEAR3XX_ICM3_TMR0_BASE 	0xFC800000
++#define SPEAR3XX_ICM3_TMR0_SIZE 	0x00080000
++
++#define SPEAR3XX_ICM3_WDT_BASE		0xFC880000
++#define SPEAR3XX_ICM3_WDT_SIZE		0x00080000
++
++#define SPEAR3XX_ICM3_RTC_BASE		0xFC900000
++#define SPEAR3XX_ICM3_RTC_SIZE		0x00080000
++
++#define SPEAR3XX_ICM3_GPIO_BASE		0xFC980000
++#define SPEAR3XX_ICM3_GPIO_SIZE		0x00080000
++
++#define SPEAR3XX_ICM3_SYS_CTRL_BASE	0xFCA00000
++#define VA_SPEAR3XX_ICM3_SYS_CTRL_BASE	IO_ADDRESS(SPEAR3XX_ICM3_SYS_CTRL_BASE)
++#define SPEAR3XX_ICM3_SYS_CTRL_SIZE	0x00080000
++
++#define SPEAR3XX_ICM3_MISC_REG_BASE 	0xFCA80000
++#define VA_SPEAR3XX_ICM3_MISC_REG_BASE	IO_ADDRESS(SPEAR3XX_ICM3_MISC_REG_BASE)
++#define SPEAR3XX_ICM3_MISC_REG_SIZE 	0x00080000
++
++#define SPEAR3XX_ICM3_TMR1_BASE 	0xFCB00000
++#define SPEAR3XX_ICM3_TMR1_SIZE 	0x00080000
++
++#endif /* __ASM_MACH_SPEAR3XX_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear300.h b/arch/arm/mach-spear3xx/include/mach/spear300.h
+new file mode 100644
+index 0000000..0cd95be
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/spear300.h
+@@ -0,0 +1,64 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/spear300.h
++ *
++ * SPEAr300 Machine specific definition
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifdef	CONFIG_MACH_SPEAR300
++
++#ifndef __ASM_MACH_SPEAR300_H
++#define __ASM_MACH_SPEAR300_H
++
++/* Base address of various IPs */
++#define SPEAR300_TELECOM_BASE		0x50000000
++#define SPEAR300_TELECOM_SIZE		0x10000000
++
++#define SPEAR300_CLCD_BASE		0x60000000
++#define SPEAR300_CLCD_SIZE		0x10000000
++
++#define SPEAR300_SDIO_BASE		0x70000000
++#define SPEAR300_SDIO_SIZE		0x10000000
++
++#define SPEAR300_NAND_0_BASE		0x80000000
++#define SPEAR300_NAND_0_SIZE		0x04000000
++
++#define SPEAR300_NAND_1_BASE		0x84000000
++#define SPEAR300_NAND_1_SIZE		0x04000000
++
++#define SPEAR300_NAND_2_BASE		0x88000000
++#define SPEAR300_NAND_2_SIZE		0x04000000
++
++#define SPEAR300_NAND_3_BASE		0x8c000000
++#define SPEAR300_NAND_3_SIZE		0x04000000
++
++#define SPEAR300_NOR_0_BASE		0x90000000
++#define SPEAR300_NOR_0_SIZE		0x01000000
++
++#define SPEAR300_NOR_1_BASE		0x91000000
++#define SPEAR300_NOR_1_SIZE		0x01000000
++
++#define SPEAR300_NOR_2_BASE		0x92000000
++#define SPEAR300_NOR_2_SIZE		0x01000000
++
++#define SPEAR300_NOR_3_BASE		0x93000000
++#define SPEAR300_NOR_3_SIZE		0x01000000
++
++#define SPEAR300_FSMC_BASE		0x94000000
++#define SPEAR300_FSMC_SIZE		0x05000000
++
++#define SPEAR300_KEYBOARD_BASE 		0xA0000000
++#define SPEAR300_KEYBOARD_SIZE 		0x09000000
++
++#define SPEAR300_GPIO_BASE		0xA9000000
++#define SPEAR300_GPIO_SIZE		0x07000000
++
++#endif /* __ASM_MACH_SPEAR300_H */
++
++#endif /* CONFIG_MACH_SPEAR300 */
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear310.h b/arch/arm/mach-spear3xx/include/mach/spear310.h
+new file mode 100644
+index 0000000..5c79131
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/spear310.h
+@@ -0,0 +1,43 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/spear310.h
++ *
++ * SPEAr310 Machine specific definition
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifdef	CONFIG_MACH_SPEAR310
++
++#ifndef __ASM_MACH_SPEAR310_H
++#define __ASM_MACH_SPEAR310_H
++
++#define SPEAR310_NAND_BASE		0x40000000
++#define SPEAR310_NAND_SIZE		0x04000000
++
++#define SPEAR310_FSMC_BASE		0x44000000
++#define SPEAR310_FSMC_SIZE		0x01000000
++
++#define SPEAR310_UART0_BASE		0xB2000000
++#define SPEAR310_UART1_BASE		0xB2080000
++#define SPEAR310_UART2_BASE		0xB2100000
++#define SPEAR310_UART3_BASE		0xB2180000
++#define SPEAR310_UART4_BASE		0xB2200000
++#define SPEAR310_UART_SIZE		0x00080000
++
++#define SPEAR310_HDLC_BASE		0xB2800000
++#define SPEAR310_HDLC_SIZE		0x00800000
++
++#define SPEAR310_RS485_0_BASE		0xB3000000
++#define SPEAR310_RS485_0_SIZE		0x00800000
++
++#define SPEAR310_RS485_1_BASE		0xB3800000
++#define SPEAR310_RS485_1_SIZE		0x00800000
++
++#endif /* __ASM_MACH_SPEAR310_H */
++
++#endif /* CONFIG_MACH_SPEAR310 */
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
+new file mode 100644
+index 0000000..ab6a85a
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
+@@ -0,0 +1,69 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/spear320.h
++ *
++ * SPEAr320 Machine specific definition
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifdef	CONFIG_MACH_SPEAR320
++
++#ifndef __ASM_MACH_SPEAR320_H
++#define __ASM_MACH_SPEAR320_H
++
++#define SPEAR320_EMI_CTRL_BASE		0x40000000
++#define SPEAR320_EMI_CTRL_SIZE		0x08000000
++
++#define SPEAR320_FSMC_BASE		0x4C000000
++#define SPEAR320_FSMC_SIZE		0x01000000
++
++#define SPEAR320_I2S_BASE		0x60000000
++#define SPEAR320_I2S_SIZE		0x10000000
++
++#define SPEAR320_SDIO_BASE		0x70000000
++#define SPEAR320_SDIO_SIZE		0x10000000
++
++#define SPEAR320_CLCD_BASE		0x90000000
++#define SPEAR320_CLCD_SIZE		0x10000000
++
++#define SPEAR320_PAR_PORT_BASE		0xA0000000
++#define SPEAR320_PAR_PORT_SIZE		0x01000000
++
++#define SPEAR320_CAN0_BASE		0xA1000000
++#define SPEAR320_CAN0_SIZE		0x01000000
++
++#define SPEAR320_CAN1_BASE		0xA2000000
++#define SPEAR320_CAN1_SIZE		0x01000000
++
++#define SPEAR320_UART0_BASE		0xA3000000
++#define SPEAR320_UART0_SIZE		0x01000000
++
++#define SPEAR320_UART1_BASE		0xA4000000
++#define SPEAR320_UART1_SIZE		0x01000000
++
++#define SPEAR320_SSP0_BASE		0xA5000000
++#define SPEAR320_SSP0_SIZE		0x01000000
++
++#define SPEAR320_SSP1_BASE		0xA6000000
++#define SPEAR320_SSP1_SIZE		0x01000000
++
++#define SPEAR320_I2C_BASE		0xA7000000
++#define SPEAR320_I2C_SIZE		0x01000000
++
++#define SPEAR320_PWM_BASE		0xA8000000
++#define SPEAR320_PWM_SIZE		0x01000000
++
++#define SPEAR320_SMII0_BASE		0xAA000000
++#define SPEAR320_SMII0_SIZE		0x01000000
++
++#define SPEAR320_SMII1_BASE		0xAB000000
++#define SPEAR320_SMII1_SIZE		0x01000000
++
++#endif /* __ASM_MACH_SPEAR320_H */
++
++#endif /* CONFIG_MACH_SPEAR320 */
+diff --git a/arch/arm/mach-spear3xx/include/mach/system.h b/arch/arm/mach-spear3xx/include/mach/system.h
+new file mode 100644
+index 0000000..b7bc53f
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/system.h
+@@ -0,0 +1,41 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/system.h
++ *
++ * SPEAr3xx Machine family specific architecture functions
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ASM_MACH_SYSTEM_H
++#define __ASM_MACH_SYSTEM_H
++
++#include <linux/io.h>
++#include <linux/sysctl_sp810.h>
++#include <mach/spear.h>
++
++static inline void arch_idle(void)
++{
++	/*
++	 * This should do all the clock switching
++	 * and wait for interrupt tricks
++	 */
++	cpu_do_idle();
++}
++
++static inline void arch_reset(char mode, const char *cmd)
++{
++	if (mode == 's') {
++		/* software reset, Jump into ROM at address 0 */
++		cpu_reset(0);
++	} else {
++		/* hardware reset, Use on-chip reset capability */
++		sysctl_soft_reset(SPEAR3XX_ICM3_SYS_CTRL_BASE);
++	}
++}
++
++#endif /* __ASM_MACH_SYSTEM_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/timex.h b/arch/arm/mach-spear3xx/include/mach/timex.h
+new file mode 100644
+index 0000000..29708db
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/timex.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/timex.h
++ *
++ * SPEAr3XX machine family specific timex definitions
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __ASM_MACH_TIMEX_H
++#define __ASM_MACH_TIMEX_H
++
++#define CLOCK_TICK_RATE			48000000
++
++#endif /* __ASM_MACH_TIMEX_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/uncompress.h b/arch/arm/mach-spear3xx/include/mach/uncompress.h
+new file mode 100644
+index 0000000..08ec3b1
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/uncompress.h
+@@ -0,0 +1,43 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/uncompress.h
++ *
++ * Serial port stubs for kernel decompress status messages
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/amba/serial.h>
++#include <mach/spear.h>
++
++#ifndef __ASM_MACH_UNCOMPRESS_H
++#define __ASM_MACH_UNCOMPRESS_H
++/*
++ * This does not append a newline
++ */
++static inline void putc(int c)
++{
++	void __iomem *base = (void __iomem *)SPEAR3XX_ICM1_UART_BASE;
++
++	while (readl(base + UART01x_FR) & UART01x_FR_TXFF)
++		barrier();
++
++	writel(c, base + UART01x_DR);
++}
++
++static inline void flush(void)
++{
++}
 +
 +/*
-+ * Aux clk configuration structure: applicable to GPT, UART and FIRDA
++ * nothing to do
 + */
-+struct aux_clk_config {
-+	unsigned int *synth_reg;
-+};
++#define arch_decomp_setup()
++#define arch_decomp_wdog()
 +
-+/* platform specific clock functions */
-+void clk_register(struct clk_lookup *cl);
-+void recalc_root_clocks(void);
++#endif /* __ASM_MACH_UNCOMPRESS_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/vmalloc.h b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
+new file mode 100644
+index 0000000..4f236f3
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
+@@ -0,0 +1,22 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/vmalloc.h
++ *
++ * Defining Vmalloc area for SPEAr3xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+/* clock recalc functions */
-+void follow_parent(struct clk *clk);
-+void pll1_clk_recalc(struct clk *clk);
-+void bus_clk_recalc(struct clk *clk);
-+void gpt_clk_recalc(struct clk *clk);
-+void aux_clk_recalc(struct clk *clk);
++#ifndef __ASM_MACH_VMALLOC_H
++#define __ASM_MACH_VMALLOC_H
 +
-+#endif /* __ASM_PLAT_CLOCK_H */
++#include <mach/memory.h>
++
++#define VMALLOC_SIZE		(0x30000000)
++#define VMALLOC_END		(PAGE_OFFSET + VMALLOC_SIZE)
++
++#endif /* __ASM_MACH_VMALLOC_H */
 -- 
 1.6.0.2
