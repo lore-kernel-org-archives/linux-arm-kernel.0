@@ -1,46 +1,31 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 02 Mar 2010 16:39:20 -0800
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Tue, 2 Mar 2010 16:47:29 -0800
 Subject: board/device file names, and machine names
-In-Reply-To: <20100302235137.GC29715@n2100.arm.linux.org.uk>
-References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
-	<20100302235137.GC29715@n2100.arm.linux.org.uk>
-Message-ID: <1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+In-Reply-To: <1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>	<20100302235137.GC29715@n2100.arm.linux.org.uk>
+	<1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4B8DB1A1.2060305@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-03-02 at 23:51 +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 02, 2010 at 01:29:58PM -0800, Daniel Walker wrote:
-> > So one device has at least three names (more I'm sure),
-> > 
-> > 	Passion
-> > 	Mahimahi
-> > 	Nexus One
-> > 
-> > Google has most of the code support under board files with the name
-> > mahimahi.
+On 03/02/2010 04:39 PM, Daniel Walker wrote:
+> I'm ok with doing renames once all the code is merged .. That's always
+> been one of the options with the Google code. 
 > 
-> I see no reason why the internal names can't be used in the code; just
-> make the configuration option texts user-friendly so that the common
-> names for the devices are used.
+> However, we need some future direction .. If we do a rename later on
+> with the older code, then we ideally want new code to be submitted with
+> appropriate names..
 
-The internal names are usually available before the device also.
-However, in the case above there are multiple internal names. I
-personally think the naming matter, or making the tree more readable and
-cleaner .. What do you think, does the file naming even matter?
+I'm not sure I understand.  Are you suggesting that
+code for new boards developed for Android phones be submitted
+under the eventual product names?  That's really not possible
+if you want the code submitted before the product ships, because
+the marketing department often finalizes a product name late
+in the development cycle.
+ -- Tim
 
-> A comment at the top of the file may also help.
-> 
-> As far as filenames go, let's keep them the same for now; we can rename
-> the filenames later once stuff is merged - while git can sort out
-> subsequent _merges_ with files renamed, but what it can't do is apply
-> patches on top of renamed files.  That's just something to be aware of
-> when chosing when to rename.
-
-I'm ok with doing renames once all the code is merged .. That's always
-been one of the options with the Google code. 
-
-However, we need some future direction .. If we do a rename later on
-with the older code, then we ideally want new code to be submitted with
-appropriate names..
-
-Daniel
+=============================
+Tim Bird
+Architecture Group Chair, CE Linux Forum
+Senior Staff Engineer, Sony Corporation of America
+=============================
