@@ -1,32 +1,51 @@
 From: bgat@billgatliff.com (Bill Gatliff)
-Date: Tue, 02 Mar 2010 21:36:23 -0600
+Date: Tue, 02 Mar 2010 21:42:06 -0600
 Subject: board/device file names, and machine names
-In-Reply-To: <a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
-	<a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-Message-ID: <4B8DD937.40301@billgatliff.com>
+In-Reply-To: <1267572545.8759.121.camel@c-dwalke-linux.qualcomm.com>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>	<a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
+	<1267572545.8759.121.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4B8DDA8E.6000206@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brian Swetland wrote:
-> We would, of course, prefer to keep the board named mahimahi for all
-> the reasons that have been mentioned in various previous discussions
-> around trout, etc:
+
+> Yeah, but HTC used a totally different name .. So why is your any more
+> important than their name?
 >   
 
-Ooh, division in the camp.  :)
+Well..... 'Cause they got there first.  :)
 
-Actually, I'd like to change my previous answer.  In the interest of
-getting code into kernel.org more quickly, I for one could live with
-"mahimahi"--- so long as a comment in board-mahimahi.c provided the
-"also-known-as" names.  Same for board-halibut.c, etc.
 
-The point is to document the mapping between the various names
-_somewhere_ within the kernel code itself.  Given that, LXR et. al can
-help sort things out.  I'd prefer the mapping be done with filenames,
-but mapping in comments is just about as good--- and probably more
-flexible if a "mahimahi clone" ever appears: no need for another
-filename, just add to the "also known as" comment.
+> Isn't this something Android specific tho? (you could reflash the
+> bootloader too can't you?)
+>   
+
+Half the appeal of getting the Google/Qualcomm kernels into kernel.org,
+at least for me, is being able to see the Very Same Code that's running
+on my Nexus One phone.  If I have to reflash something to be able to use
+the kernel.org kernels--- especially if the reflashing is just to
+implement a name change--- then I lose the confidence that I'm looking
+at the same thing that my phone is running.
+
+> Your not looking at it from the developers point of view .. Your
+> assuming your team does coding, and everyone else just uses the code .. 
+> Which I don't think is what's going to happen.
+>   
+
+As a developer, I really don't care what the files are named, unless
+those file names are the sole documentation available for the platform. 
+As long as the various names for the hardware are documented
+_somewhere_, then you've provided the information that I'm seeking.  In
+that case, you could call the files board-q1.c, board-q2.c, and so on
+and I'd be just as happy.
+
+> It's like I said above, no one knows what mahimahi is. Eveyone knows
+> what nexus one is.
+>   
+
+But we don't really care about either specifically--- we just need to
+know that they both refer to the same thing.
+
 
 
 b.g.
