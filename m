@@ -1,5 +1,5 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Wed, 03 Mar 2010 23:44:22 +0100
+Date: Wed, 03 Mar 2010 23:47:10 +0100
 Subject: +
 	mx3fb-introduce-waveform-configuration-for-pixel-clock-signal.patch
 	added to -mm tree
@@ -8,7 +8,7 @@ References: <201003022230.o22MUGIs000990@imap1.linux-foundation.org>
 	<1267571785.2670.10.camel@realization>
 	<Pine.LNX.4.64.1003030951360.6770@axis700.grange>
 	<1267626205.2776.67.camel@realization>
-Message-ID: <1267656262.2722.1.camel@realization>
+Message-ID: <1267656430.29404.0.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
