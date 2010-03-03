@@ -1,45 +1,46 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 2 Mar 2010 16:04:01 -0800
-Subject: Current status of interrupt handling capability of pca953x
-	gpio  driver.
-In-Reply-To: <3131fcab4adc999286a99435352e1deb.squirrel@www.loen.fr>
-References: <eedb5541003010818r3a917a42rc973a4a74076a27@mail.gmail.com>
-	<3131fcab4adc999286a99435352e1deb.squirrel@www.loen.fr>
-Message-ID: <20100302160401.bc8b73df.akpm@linux-foundation.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 02 Mar 2010 16:39:20 -0800
+Subject: board/device file names, and machine names
+In-Reply-To: <20100302235137.GC29715@n2100.arm.linux.org.uk>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
+	<20100302235137.GC29715@n2100.arm.linux.org.uk>
+Message-ID: <1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Mar 2010 16:42:20 -0000 (GMT)
-"Marc Zyngier" <maz@misterjones.org> wrote:
+On Tue, 2010-03-02 at 23:51 +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 02, 2010 at 01:29:58PM -0800, Daniel Walker wrote:
+> > So one device has at least three names (more I'm sure),
+> > 
+> > 	Passion
+> > 	Mahimahi
+> > 	Nexus One
+> > 
+> > Google has most of the code support under board files with the name
+> > mahimahi.
+> 
+> I see no reason why the internal names can't be used in the code; just
+> make the configuration option texts user-friendly so that the common
+> names for the devices are used.
 
-> 
-> On Mon, March 1, 2010 16:18, javier Martin wrote:
-> > Hi,
-> > I saw a recent mail from Marc Zyngier on December about adding interrupt
-> > handling capability to pca953x gpio driver. (
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/006651.html
-> > )
-> > There has not been any activity since then (or at least I couldn't find
-> > anything). What is the status regarding to mainline of these features?
-> >
-> > Have changes proposed by Marc Zyngier accepted? If not, what points have to
-> > be improved?
-> 
-> The patch is currently at it's 4th iteration (posted in February on LKML
-> http://lkml.org/lkml/2010/2/5/282) and sitting in Andrew Morton's mm tree.
-> It also has been successfully used on Blackfin boards.
-> 
-> When it comes to mainline merging, I really have no clue. The patch received very
-> little public comment (I only received a few private emails from people using it).
-> 
-> So if someone higher up in the food chain wants to carry that patch in his tree
-> and push it upstream, I can give it a respin.
-> 
+The internal names are usually available before the device also.
+However, in the case above there are multiple internal names. I
+personally think the naming matter, or making the tree more readable and
+cleaner .. What do you think, does the file naming even matter?
 
-I was planning on merging
+> A comment at the top of the file may also help.
+> 
+> As far as filenames go, let's keep them the same for now; we can rename
+> the filenames later once stuff is merged - while git can sort out
+> subsequent _merges_ with files renamed, but what it can't do is apply
+> patches on top of renamed files.  That's just something to be aware of
+> when chosing when to rename.
 
-gpio-pca953xc-add-interrupt-handling-capability.patch
-gpio-pca953xc-add-interrupt-handling-capability-fix.patch
-gpio-pca953xc-add-interrupt-handling-capability-v4.patch
+I'm ok with doing renames once all the code is merged .. That's always
+been one of the options with the Google code. 
 
-into 2.6.34 unless someone stops me.
+However, we need some future direction .. If we do a rename later on
+with the older code, then we ideally want new code to be submitted with
+appropriate names..
+
+Daniel
