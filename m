@@ -1,41 +1,151 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 03 Mar 2010 12:16:37 +0000
-Subject: [PATCH v3 0/4] ARM mandatory barriers
-Message-ID: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
+Date: Wed, 03 Mar 2010 12:16:48 +0000
+Subject: [PATCH v3 2/4] ARM: Move the outer_cache definitions into a
+	separate file
+In-Reply-To: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
+References: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100303121648.22029.57562.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To avoid #include collisions with subsequent patches in the series, this
+patch moves the outer_cache definitions to a separate asm/outercache.h
+file.
 
-This is version 3 of this set of patches. The *mb() barriers semantics
-are now correctly implemented WRT arch_is_coherent(). For the ARMv7 and
-CONFIG_SMP cases, the mb() and wmb() become a DSB. Platform code can
-override them by defining CONFIG_ARCH_HAS_BARRIERS and implementing the
-mach/barriers.h file.
-
-The smp_*mb() barriers are implemented as DMB since they are not
-required to have any effect outside of Normal Cacheable memory.
-
-Thanks.
-
-
-Catalin Marinas (4):
-      ARM: Change the mandatory barriers implementation
-      ARM: Move the outer_cache definitions into a separate file
-      ARM: Add outer_cache_fns sync function and support for L2x0
-      ARM: Add RealView-specific barrier implementation
-
-
- arch/arm/Kconfig                               |    1 
- arch/arm/include/asm/cacheflush.h              |   38 -------------
- arch/arm/include/asm/outercache.h              |   69 ++++++++++++++++++++++++
- arch/arm/include/asm/system.h                  |   14 +++--
- arch/arm/mach-realview/include/mach/barriers.h |   30 ++++++++++
- arch/arm/mm/Kconfig                            |    6 ++
- arch/arm/mm/cache-l2x0.c                       |   10 +++
- 7 files changed, 125 insertions(+), 43 deletions(-)
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/cacheflush.h |   38 +----------------------
+ arch/arm/include/asm/outercache.h |   61 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+), 37 deletions(-)
  create mode 100644 arch/arm/include/asm/outercache.h
- create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
 
--- 
-Catalin
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 8113bb5..ed7d289 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -15,6 +15,7 @@
+ #include <asm/glue.h>
+ #include <asm/shmparam.h>
+ #include <asm/cachetype.h>
++#include <asm/outercache.h>
+ 
+ #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
+ 
+@@ -233,12 +234,6 @@ struct cpu_cache_fns {
+ 	void (*dma_flush_range)(const void *, const void *);
+ };
+ 
+-struct outer_cache_fns {
+-	void (*inv_range)(unsigned long, unsigned long);
+-	void (*clean_range)(unsigned long, unsigned long);
+-	void (*flush_range)(unsigned long, unsigned long);
+-};
+-
+ /*
+  * Select the calling method
+  */
+@@ -295,37 +290,6 @@ extern void dmac_flush_range(const void *, const void *);
+ 
+ #endif
+ 
+-#ifdef CONFIG_OUTER_CACHE
+-
+-extern struct outer_cache_fns outer_cache;
+-
+-static inline void outer_inv_range(unsigned long start, unsigned long end)
+-{
+-	if (outer_cache.inv_range)
+-		outer_cache.inv_range(start, end);
+-}
+-static inline void outer_clean_range(unsigned long start, unsigned long end)
+-{
+-	if (outer_cache.clean_range)
+-		outer_cache.clean_range(start, end);
+-}
+-static inline void outer_flush_range(unsigned long start, unsigned long end)
+-{
+-	if (outer_cache.flush_range)
+-		outer_cache.flush_range(start, end);
+-}
+-
+-#else
+-
+-static inline void outer_inv_range(unsigned long start, unsigned long end)
+-{ }
+-static inline void outer_clean_range(unsigned long start, unsigned long end)
+-{ }
+-static inline void outer_flush_range(unsigned long start, unsigned long end)
+-{ }
+-
+-#endif
+-
+ /*
+  * Copy user data from/to a page which is mapped into a different
+  * processes address space.  Really, we want to allow our "user
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+new file mode 100644
+index 0000000..c8571cb
+--- /dev/null
++++ b/arch/arm/include/asm/outercache.h
+@@ -0,0 +1,61 @@
++/*
++ * arch/arm/include/asm/outercache.h
++ *
++ * Copyright (C) 2010 ARM Ltd.
++ * Written by Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef __ASM_OUTERCACHE_H
++#define __ASM_OUTERCACHE_H
++
++struct outer_cache_fns {
++	void (*inv_range)(unsigned long, unsigned long);
++	void (*clean_range)(unsigned long, unsigned long);
++	void (*flush_range)(unsigned long, unsigned long);
++};
++
++#ifdef CONFIG_OUTER_CACHE
++
++extern struct outer_cache_fns outer_cache;
++
++static inline void outer_inv_range(unsigned long start, unsigned long end)
++{
++	if (outer_cache.inv_range)
++		outer_cache.inv_range(start, end);
++}
++static inline void outer_clean_range(unsigned long start, unsigned long end)
++{
++	if (outer_cache.clean_range)
++		outer_cache.clean_range(start, end);
++}
++static inline void outer_flush_range(unsigned long start, unsigned long end)
++{
++	if (outer_cache.flush_range)
++		outer_cache.flush_range(start, end);
++}
++
++#else
++
++static inline void outer_inv_range(unsigned long start, unsigned long end)
++{ }
++static inline void outer_clean_range(unsigned long start, unsigned long end)
++{ }
++static inline void outer_flush_range(unsigned long start, unsigned long end)
++{ }
++
++#endif
++
++#endif	/* __ASM_OUTERCACHE_H */
