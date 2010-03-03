@@ -1,45 +1,41 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 03 Mar 2010 17:31:23 +0530
-Subject: [PATCH v2] CLKDEV: return from clk_find as soon as we get	maching
-	clk
-In-Reply-To: <20100303103342.GA7952@pengutronix.de>
-References: <1267598907-7095-1-git-send-email-viresh.kumar@st.com>
-	<20100303103342.GA7952@pengutronix.de>
-Message-ID: <4B8E4F93.6030200@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 03 Mar 2010 12:16:37 +0000
+Subject: [PATCH v3 0/4] ARM mandatory barriers
+Message-ID: <20100303121307.22029.26151.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On 3/3/2010 4:03 PM, Uwe Kleine-K?nig wrote:
-> On Wed, Mar 03, 2010 at 12:18:27PM +0530, Viresh KUMAR wrote:
->> clk_find function looks for clock with matching dev_id and con_id.
->> We should return from clk_find as soon as we get a clock with matching dev_id
->> and con_id. This can be done by comparing variable "match" with 3.
->>
->> v2:
->> 	- remove if (match == 0), check.
->> 	- move match==3 in if (match > best) condition
-> can you take the changes since v1 out of the changelog.  They usually go
-> ...
+This is version 3 of this set of patches. The *mb() barriers semantics
+are now correctly implemented WRT arch_is_coherent(). For the ARMv7 and
+CONFIG_SMP cases, the mb() and wmb() become a DSB. Platform code can
+override them by defining CONFIG_ARCH_HAS_BARRIERS and implementing the
+mach/barriers.h file.
 
-OK.
+The smp_*mb() barriers are implemented as DMB since they are not
+required to have any effect outside of Normal Cacheable memory.
 
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
-> Does this mean you understood Russell's hint?
+Thanks.
 
-Truly speaking i didn't get it completely, but i think Russsell is 
-referring to multiple return points from a function.
 
-Russell, Am I getting it correctly ?
+Catalin Marinas (4):
+      ARM: Change the mandatory barriers implementation
+      ARM: Move the outer_cache definitions into a separate file
+      ARM: Add outer_cache_fns sync function and support for L2x0
+      ARM: Add RealView-specific barrier implementation
 
-> Did you test the differences your patch results in for the generated
-> code?
 
-I think they are essentially same, we now just have a single return point
-in the new patch.
+ arch/arm/Kconfig                               |    1 
+ arch/arm/include/asm/cacheflush.h              |   38 -------------
+ arch/arm/include/asm/outercache.h              |   69 ++++++++++++++++++++++++
+ arch/arm/include/asm/system.h                  |   14 +++--
+ arch/arm/mach-realview/include/mach/barriers.h |   30 ++++++++++
+ arch/arm/mm/Kconfig                            |    6 ++
+ arch/arm/mm/cache-l2x0.c                       |   10 +++
+ 7 files changed, 125 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm/include/asm/outercache.h
+ create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
 
-regards,
-viresh
+-- 
+Catalin
