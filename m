@@ -1,37 +1,41 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Wed, 3 Mar 2010 12:47:11 +0900
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267572594.2173.25.camel@pasglop>
-References: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<1267572594.2173.25.camel@pasglop>
-Message-ID: <20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Tue, 02 Mar 2010 21:52:48 -0600
+Subject: board/device file names, and machine names
+In-Reply-To: <1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>	<20100302235137.GC29715@n2100.arm.linux.org.uk>
+	<1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4B8DDD10.4060601@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 03 Mar 2010 10:29:54 +1100
-Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+Daniel Walker wrote:
+>
+> I'm ok with doing renames once all the code is merged .. That's always
+> been one of the options with the Google code. 
+>   
 
-> On Tue, 2010-03-02 at 17:05 +0000, Catalin Marinas wrote:
-> 
-> > The viable solutions so far:
-> > 
-> >      1. Implement a PIO mapping API similar to the DMA API which takes
-> >         care of the D-cache flushing. This means that PIO drivers would
-> >         need to be modified to use an API like pio_kmap()/pio_kunmap()
-> >         before writing to a page cache page.
-> >      2. Invert the meaning of PG_arch_1 to denote a clean page. This
-> >         means that by default newly allocated page cache pages are
-> >         considered dirty and even if there isn't a call to
-> >         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
-> >         This is the PowerPC approach.
-> 
-> I don't see the point of a "PIO" API. I would thus vote for 2 :-) Note
+No.  Please, no.
 
-Yeah, as powerpc and ia64 do, arm can flush D cache and invalidate I
-cache when inserting a executable page to pte, IIUC. No need for the
-new API for I/D consistency.
+The ideal outcome is that the kernel.org code becomes the canonical
+source code for the platform, i.e. the difference between kernel.org and
+Google/Qualcomm-internal code is nil.  You might not ever get there, but
+you pretty much close off that opportunity entirely when you start
+renaming stuff.
 
-The ways to improve the approach (introducing PG_arch_2 or marking a
-page clean on dma_unmap_* with DMA_FROM_DEVICE like ia64 does) is up
-to architectures.
+> However, we need some future direction .. If we do a rename later on
+> with the older code, then we ideally want new code to be submitted with
+> appropriate names..
+>   
+
+... which requires work from all interested parties: Qualcomm, Google,
+and the community.  Far less likely to happen than, say, we all learn
+that "mahimahi == Nexus One" because we read it in a comment somewhere.
+
+
+b.g.
+
+-- 
+Bill Gatliff
+Embedded systems training and consulting
+http://billgatliff.com
+bgat at billgatliff.com
