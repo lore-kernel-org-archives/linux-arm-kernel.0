@@ -1,83 +1,23 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed,  3 Mar 2010 10:37:31 +0530
-Subject: [PATCH 01/11] ST SPEAr: Added ARM PrimeXsys System Controller SP810
-	header file
-In-Reply-To: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 03 Mar 2010 16:10:32 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
+References: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<1267572594.2173.25.camel@pasglop>
+	<20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <1267593032.16696.1.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- include/linux/sysctl_sp810.h |   59 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 include/linux/sysctl_sp810.h
+On Wed, 2010-03-03 at 12:47 +0900, FUJITA Tomonori wrote:
+> The ways to improve the approach (introducing PG_arch_2 or marking a
+> page clean on dma_unmap_* with DMA_FROM_DEVICE like ia64 does) is up
+> to architectures. 
 
-diff --git a/include/linux/sysctl_sp810.h b/include/linux/sysctl_sp810.h
-new file mode 100644
-index 0000000..9b841b9
---- /dev/null
-+++ b/include/linux/sysctl_sp810.h
-@@ -0,0 +1,59 @@
-+/*
-+ * linux/sysctl_sp810.h
-+ *
-+ * ARM PrimeXsys System Controller SP810 header file
-+ *
-+ * Copyright (C) 2009 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef SYSCTL_SP810_H
-+#define SYSCTL_SP810_H
-+
-+#include <linux/io.h>
-+
-+/* sysctl registers offset */
-+#define SCCTRL			0x000
-+#define SCSYSSTAT		0x004
-+#define SCIMCTRL		0x008
-+#define SCIMSTAT		0x00C
-+#define SCXTALCTRL		0x010
-+#define SCPLLCTRL		0x014
-+#define SCPLLFCTRL		0x018
-+#define SCPERCTRL0		0x01C
-+#define SCPERCTRL1		0x020
-+#define SCPEREN			0x024
-+#define SCPERDIS		0x028
-+#define SCPERCLKEN		0x02C
-+#define SCPERSTAT		0x030
-+#define SCSYSID0		0xEE0
-+#define SCSYSID1		0xEE4
-+#define SCSYSID2		0xEE8
-+#define SCSYSID3		0xEEC
-+#define SCITCR			0xF00
-+#define SCITIR0			0xF04
-+#define SCITIR1			0xF08
-+#define SCITOR			0xF0C
-+#define SCCNTCTRL		0xF10
-+#define SCCNTDATA		0xF14
-+#define SCCNTSTEP		0xF18
-+#define SCPERIPHID0		0xFE0
-+#define SCPERIPHID1		0xFE4
-+#define SCPERIPHID2		0xFE8
-+#define SCPERIPHID3		0xFEC
-+#define SCPCELLID0		0xFF0
-+#define SCPCELLID1		0xFF4
-+#define SCPCELLID2		0xFF8
-+#define SCPCELLID3		0xFFC
-+
-+static inline void sysctl_soft_reset(void __iomem *base)
-+{
-+	/* writing any value to SCSYSSTAT reg will reset system */
-+	writel(0, base + SCSYSSTAT);
-+}
-+
-+#endif	/* SYSCTL_SP810_H */
--- 
-1.6.0.2
+How does the above work ? IE, the dma unmap will flush the D side but
+not the I side ... or is the ia64 flush primitive magic enough to do
+both ?
+
+Cheers,
+Ben.
