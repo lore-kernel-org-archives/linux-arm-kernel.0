@@ -1,8 +1,7 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed,  3 Mar 2010 10:37:41 +0530
-Subject: [PATCH 11/11] ST SPEAr: Updated Maintainers and added
-	Documentation/arm/SPEAr
-In-Reply-To: <1267592861-26911-11-git-send-email-viresh.kumar@st.com>
+Date: Wed,  3 Mar 2010 10:37:38 +0530
+Subject: [PATCH 08/11] ST SPEAr: Added source files for SPEAr6xx machine family
+In-Reply-To: <1267592861-26911-8-git-send-email-viresh.kumar@st.com>
 References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
@@ -11,123 +10,341 @@ References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-9-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-10-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-11-git-send-email-viresh.kumar@st.com>
-Message-ID: <1267592861-26911-12-git-send-email-viresh.kumar@st.com>
+Message-ID: <1267592861-26911-9-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- Documentation/arm/SPEAr/overview.txt |   60 ++++++++++++++++++++++++++++++++++
- MAINTAINERS                          |   27 +++++++++++++++
- 2 files changed, 87 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/arm/SPEAr/overview.txt
+ arch/arm/mach-spear6xx/Kconfig        |   20 +++++
+ arch/arm/mach-spear6xx/Kconfig600     |   17 ++++
+ arch/arm/mach-spear6xx/Makefile       |   12 +++
+ arch/arm/mach-spear6xx/Makefile.boot  |    3 +
+ arch/arm/mach-spear6xx/spear600.c     |   23 +++++
+ arch/arm/mach-spear6xx/spear600_evb.c |   48 +++++++++++
+ arch/arm/mach-spear6xx/spear6xx.c     |  149 +++++++++++++++++++++++++++++++++
+ 7 files changed, 272 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear6xx/Kconfig
+ create mode 100644 arch/arm/mach-spear6xx/Kconfig600
+ create mode 100644 arch/arm/mach-spear6xx/Makefile
+ create mode 100644 arch/arm/mach-spear6xx/Makefile.boot
+ create mode 100644 arch/arm/mach-spear6xx/spear600.c
+ create mode 100644 arch/arm/mach-spear6xx/spear600_evb.c
+ create mode 100644 arch/arm/mach-spear6xx/spear6xx.c
 
-diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
+diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
 new file mode 100644
-index 0000000..253a35c
+index 0000000..bddba03
 --- /dev/null
-+++ b/Documentation/arm/SPEAr/overview.txt
-@@ -0,0 +1,60 @@
-+			SPEAr ARM Linux Overview
-+			==========================
++++ b/arch/arm/mach-spear6xx/Kconfig
+@@ -0,0 +1,20 @@
++#
++# SPEAr6XX Machine configuration file
++#
 +
-+Introduction
-+------------
++if ARCH_SPEAR6XX
 +
-+  SPEAr (Structured Processor Enhanced Architecture).
-+  weblink : http://www.st.com/spear
++choice
++	prompt "SPEAr6XX Family"
++	default MACH_SPEAR600
 +
-+  The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
-+  supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
-+  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
-+  series is in progress.
++config MACH_SPEAR600
++	bool "SPEAr600"
++	help
++	  Supports ST SPEAr600 Machine
++endchoice
 +
-+  Hierarchy in SPEAr is as follows:
++# Adding SPEAr6XX machine specific configuration files
++source "arch/arm/mach-spear6xx/Kconfig600"
 +
-+  SPEAr (Platform)
-+	- SPEAr3XX (3XX SOC series, based on ARM9)
-+		- SPEAr300 (SOC)
-+			- SPEAr300_EVB (Evaluation Board)
-+		- SPEAr310 (SOC)
-+			- SPEAr310_EVB (Evaluation Board)
-+		- SPEAr320 (SOC)
-+			- SPEAr320_EVB (Evaluation Board)
-+	- SPEAr6XX (6XX SOC series, based on ARM9)
-+		- SPEAr600 (SOC)
-+			- SPEAr600_EVB (Evaluation Board)
-+	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
-+		- SPEAr1300 (SOC)
++endif #ARCH_SPEAR6XX
+diff --git a/arch/arm/mach-spear6xx/Kconfig600 b/arch/arm/mach-spear6xx/Kconfig600
+new file mode 100644
+index 0000000..9e19f65
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/Kconfig600
+@@ -0,0 +1,17 @@
++#
++# SPEAr600 machine configuration file
++#
 +
-+  Configuration
-+  -------------
++if MACH_SPEAR600
 +
-+  A generic configuration is provided for each machine, and can be used as the
-+  default by
-+	make spear600_defconfig
-+	make spear300_defconfig
-+	make spear310_defconfig
-+	make spear320_defconfig
++choice
++	prompt "SPEAr600 Boards"
++	default BOARD_SPEAR600_EVB
 +
-+  Layout
-+  ------
++config	BOARD_SPEAR600_EVB
++	bool "SPEAr600 Evaluation Board"
++	help
++	  Supports ST SPEAr600 Evaluation Board
++endchoice
 +
-+  The common files for multiple machine families (SPEAr3XX, SPEAr6XX and
-+  SPEAr13XX) are located in the platform code contained in arch/arm/plat-spear
-+  with headers in plat/.
++endif	#MACH_SPEAR600
+diff --git a/arch/arm/mach-spear6xx/Makefile b/arch/arm/mach-spear6xx/Makefile
+new file mode 100644
+index 0000000..cc1a4d8
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/Makefile
+@@ -0,0 +1,12 @@
++#
++# Makefile for SPEAr6XX machine series
++#
 +
-+  Each machine series have a directory with name arch/arm/mach-spear followed by
-+  series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
++# common files
++obj-y	+= clock.o spear6xx.o
 +
-+  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
-+  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
-+  specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
-+  mach-spear* also contains board specific files for each machine type.
++# spear600 specific files
++obj-$(CONFIG_MACH_SPEAR600) += spear600.o
 +
++# spear600 boards files
++obj-$(CONFIG_BOARD_SPEAR600_EVB) += spear600_evb.o
+diff --git a/arch/arm/mach-spear6xx/Makefile.boot b/arch/arm/mach-spear6xx/Makefile.boot
+new file mode 100644
+index 0000000..7a1f3c0
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/Makefile.boot
+@@ -0,0 +1,3 @@
++zreladdr-y	:= 0x00008000
++params_phys-y	:= 0x00000100
++initrd_phys-y	:= 0x00800000
+diff --git a/arch/arm/mach-spear6xx/spear600.c b/arch/arm/mach-spear6xx/spear600.c
+new file mode 100644
+index 0000000..2a08ee9
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear600.c
+@@ -0,0 +1,23 @@
++/*
++ * arch/arm/mach-spear6xx/spear600.c
++ *
++ * SPEAr600 machine source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+  Document Author
-+  ---------------
++#include <mach/generic.h>
++#include <mach/spear.h>
 +
-+  Viresh Kumar, (c) 2010 ST Microelectronics
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2533fc4..8f11d92 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5078,6 +5078,33 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc-next-2.6.git
- S:	Maintained
- F:	arch/sparc/
- 
-+SPEAR PLATFORM SUPPORT
-+M:	Viresh Kumar <viresh.kumar@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/plat-spear/
++/* Add spear600 specific devices here */
 +
-+SPEAR3XX MACHINE SUPPORT
-+M:	Viresh Kumar <viresh.kumar@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/mach-spear3xx/
++void __init spear600_init(void)
++{
++	/* call spear6xx family common init function */
++	spear6xx_init();
++}
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+new file mode 100644
+index 0000000..0ee2ce6
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -0,0 +1,48 @@
++/*
++ * arch/arm/mach-spear6xx/spear600_evb.c
++ *
++ * SPEAr600 evaluation board source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+SPEAR6XX MACHINE SUPPORT
-+M:	Rajeev Kumar <rajeev-dlh.kumar@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/mach-spear6xx/
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++#include <mach/generic.h>
++#include <mach/spear.h>
 +
-+SPEAR CLOCK FRAMEWORK SUPPORT
-+M:	Viresh Kumar <viresh.kumar@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/mach-spear*/clock.c
-+F:	arch/arm/mach-spear*/include/mach/clkdev.h
-+F:	arch/arm/plat-spear/clock.c
-+F:	arch/arm/plat-spear/include/plat/clock.h and clkdev.h
++static struct amba_device *amba_devs[] __initdata = {
++	&uart_device[0],
++	&uart_device[1],
++};
 +
- SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
- M:	Roger Wolff <R.E.Wolff@BitWizard.nl>
- S:	Supported
++static struct platform_device *plat_devs[] __initdata = {
++};
++
++static void __init spear600_evb_init(void)
++{
++	unsigned int i;
++
++	/* call spear600 machine init function */
++	spear600_init();
++
++	/* Add Platform Devices */
++	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
++
++	/* Add Amba Devices */
++	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
++		amba_device_register(amba_devs[i], &iomem_resource);
++}
++
++MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
++	.boot_params	=	0x00000100,
++	.map_io		=	spear6xx_map_io,
++	.init_irq	=	spear6xx_init_irq,
++	.timer		=	&spear_sys_timer,
++	.init_machine	=	spear600_evb_init,
++MACHINE_END
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+new file mode 100644
+index 0000000..dafa067
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -0,0 +1,149 @@
++/*
++ * arch/arm/mach-spear6xx/spear6xx.c
++ *
++ * SPEAr6XX machines common source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/types.h>
++#include <linux/ptrace.h>
++#include <linux/io.h>
++#include <asm/hardware/vic.h>
++#include <asm/irq.h>
++#include <asm/mach/arch.h>
++#include <mach/irqs.h>
++#include <mach/generic.h>
++#include <mach/spear.h>
++#include <plat/gpt.h>
++
++/* Add spear6xx machines common devices here */
++/* uart device registeration */
++struct amba_device uart_device[] = {
++	{
++		.dev = {
++			.init_name = "uart0",
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_UART0_BASE,
++			.end = SPEAR6XX_ICM1_UART0_BASE +
++				SPEAR6XX_ICM1_UART0_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_UART_0, NO_IRQ},
++		.periphid = 0x00041011,
++	},
++	{
++		.dev = {
++			.init_name = "uart1",
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_UART1_BASE,
++			.end = SPEAR6XX_ICM1_UART1_BASE +
++				SPEAR6XX_ICM1_UART1_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_UART_1, NO_IRQ},
++		.periphid = 0x00041011,
++	}
++};
++
++/* Following enumerates all GPTs available in the system */
++struct spear_timer spear6xx_timers[] = {
++	{
++		.id = 1,
++		.phys_base = SPEAR6XX_CPU_TMR_BASE,
++		.irq = IRQ_CPU_GPT1_1
++	}, {
++		.id = 2,
++		.phys_base = (SPEAR6XX_CPU_TMR_BASE + 0x80),
++		.irq = IRQ_CPU_GPT1_2
++	}, {
++		.id = 3,
++		.phys_base = (SPEAR6XX_ICM3_TMR_BASE),
++		.irq = IRQ_BASIC_GPT1_1
++	}, {
++		.id = 4,
++		.phys_base = (SPEAR6XX_ICM3_TMR_BASE + 0x80),
++		.irq = IRQ_BASIC_GPT1_2
++
++	}, {
++		.id = 5,
++		.phys_base = SPEAR6XX_ICM2_TMR0_BASE,
++		.irq = IRQ_APPL_GPT1_1
++	}, {
++		.id = 6,
++		.phys_base = (SPEAR6XX_ICM2_TMR0_BASE + 0x80),
++		.irq = IRQ_APPL_GPT1_2
++	}, {
++		.id = 7,
++		.phys_base = SPEAR6XX_ICM2_TMR1_BASE,
++		.irq = IRQ_APPL_GPT2_1
++	}, {
++		.id = 8,
++		.phys_base = (SPEAR6XX_ICM2_TMR1_BASE + 0x80),
++		.irq = IRQ_APPL_GPT2_2
++	},
++};
++
++void __init spear_gpt_init(void)
++{
++	spear_timer_init(spear6xx_timers, ARRAY_SIZE(spear6xx_timers));
++}
++
++/* This will add devices, and do machine specific tasks */
++void __init spear6xx_init(void)
++{
++	/* nothing to do for now */
++}
++
++/* This will initialize vic */
++void __init spear6xx_init_irq(void)
++{
++	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_PRI_BASE, 0, ~0, 0);
++	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0, 0);
++}
++
++/* Following will create static virtual/physical mappings */
++static struct map_desc spear6xx_io_desc[] __initdata = {
++	{
++		.virtual	= VA_SPEAR6XX_ICM1_UART0_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM1_UART0_BASE),
++		.length		= SPEAR6XX_ICM1_UART0_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_CPU_VIC_PRI_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_PRI_BASE),
++		.length		= SPEAR6XX_CPU_VIC_PRI_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_CPU_VIC_SEC_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_SEC_BASE),
++		.length		= SPEAR6XX_CPU_VIC_SEC_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_ICM3_SYS_CTRL_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SYS_CTRL_BASE),
++		.length		= SPEAR6XX_ICM3_MISC_REG_BASE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_ICM3_MISC_REG_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
++		.length		= SPEAR6XX_ICM3_MISC_REG_SIZE,
++		.type		= MT_DEVICE
++	},
++};
++
++/* This will create static memory mapping for selected devices */
++void __init spear6xx_map_io(void)
++{
++	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
++
++	/* This will initialize clock framework */
++	clk_init();
++}
 -- 
 1.6.0.2
