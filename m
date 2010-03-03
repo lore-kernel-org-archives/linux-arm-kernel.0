@@ -1,48 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed,  3 Mar 2010 15:17:35 +0100
-Subject: [PATCH] mmc: at91_mci: correct kunmap_atomic()
-In-Reply-To: <20100302133434.761df661.akpm@linux-foundation.org>
-References: <20100302133434.761df661.akpm@linux-foundation.org>
-Message-ID: <1267625855-32695-1-git-send-email-nicolas.ferre@atmel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 3 Mar 2010 15:24:38 +0100
+Subject: board/device file names, and machine names
+In-Reply-To: <20100303101957.GA9848@n2100.arm.linux.org.uk>
+References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
+	<20100302235137.GC29715@n2100.arm.linux.org.uk>
+	<1267576760.8759.164.camel@c-dwalke-linux.qualcomm.com>
+	<20100303084244.GD29715@n2100.arm.linux.org.uk>
+	<20100303091728.GA31740@atrey.karlin.mff.cuni.cz>
+	<20100303094757.GB22482@n2100.arm.linux.org.uk>
+	<20100303100022.GA7175@atrey.karlin.mff.cuni.cz>
+	<20100303100847.GA30607@n2100.arm.linux.org.uk>
+	<20100303101759.GA10499@atrey.karlin.mff.cuni.cz>
+	<20100303101957.GA9848@n2100.arm.linux.org.uk>
+Message-ID: <20100303142437.GA1740@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kunmap_atomic() accepts a pointer to any location in the page so we do not need
-the subtraction and cast.
+On Wed 2010-03-03 10:19:57, Russell King - ARM Linux wrote:
+> On Wed, Mar 03, 2010 at 11:18:00AM +0100, Pavel Machek wrote:
+> > 
+> > Hi!
+> > 
+> > > > > > > Given the amount of discussion there's already been, I'm going to come
+> > > > > > > down hard on this issue to kill the discussion.
+> > 
+> > > > So... dwalker is maintainer of arch-msm, and does not like the
+> > > > codenames. Then you come, and just because are maintainer of arm,
+> > > > override the decision, without even notifying l-k?
+> > > 
+> > > So you don't think that Daniel, who was *explicitly* asking for my
+> > > suggestions and opinions, is entitled to a clear and straight
+> > > answer?
+> > 
+> > When someone asks for your suggestions, you can "go down hard on this
+> > issue"?
+> 
+> It's clear that all you want to have is an argument.  This ends here.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Andrew,
-I created a new patch that you can stack at the top of the previous
-patch series. I guess that you cannot fold it in other patches as the
-kunmap_atomic() correction impacts two different patches.
-
-Thanks.
-
- drivers/mmc/host/at91_mci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-index 55507da..91dc60c 100644
---- a/drivers/mmc/host/at91_mci.c
-+++ b/drivers/mmc/host/at91_mci.c
-@@ -248,7 +248,7 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
- 			dmabuf = (unsigned *)tmpv;
- 		}
- 
--		kunmap_atomic(((void *)sgbuffer) - sg->offset, KM_BIO_SRC_IRQ);
-+		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
- 
- 		if (size == 0)
- 			break;
-@@ -313,7 +313,7 @@ static void at91_mci_post_dma_read(struct at91mci_host *host)
- 			dmabuf = (unsigned *)tmpv;
- 		}
- 
--		kunmap_atomic(((void *)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
-+		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
- 		dmac_flush_range((void *)sgbuffer, ((void *)sgbuffer) + amount);
- 		data->bytes_xfered += amount;
- 		if (size == 0)
+It's clear that all I want is reasonable arm maintainer.
+									Pavel
 -- 
-1.5.6.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
