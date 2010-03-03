@@ -1,57 +1,37 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Tue, 02 Mar 2010 21:42:06 -0600
-Subject: board/device file names, and machine names
-In-Reply-To: <1267572545.8759.121.camel@c-dwalke-linux.qualcomm.com>
-References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>	<a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-	<1267572545.8759.121.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4B8DDA8E.6000206@billgatliff.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Wed, 3 Mar 2010 12:47:11 +0900
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267572594.2173.25.camel@pasglop>
+References: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<1267572594.2173.25.camel@pasglop>
+Message-ID: <20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 03 Mar 2010 10:29:54 +1100
+Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
 
-> Yeah, but HTC used a totally different name .. So why is your any more
-> important than their name?
->   
+> On Tue, 2010-03-02 at 17:05 +0000, Catalin Marinas wrote:
+> 
+> > The viable solutions so far:
+> > 
+> >      1. Implement a PIO mapping API similar to the DMA API which takes
+> >         care of the D-cache flushing. This means that PIO drivers would
+> >         need to be modified to use an API like pio_kmap()/pio_kunmap()
+> >         before writing to a page cache page.
+> >      2. Invert the meaning of PG_arch_1 to denote a clean page. This
+> >         means that by default newly allocated page cache pages are
+> >         considered dirty and even if there isn't a call to
+> >         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
+> >         This is the PowerPC approach.
+> 
+> I don't see the point of a "PIO" API. I would thus vote for 2 :-) Note
 
-Well..... 'Cause they got there first.  :)
+Yeah, as powerpc and ia64 do, arm can flush D cache and invalidate I
+cache when inserting a executable page to pte, IIUC. No need for the
+new API for I/D consistency.
 
-
-> Isn't this something Android specific tho? (you could reflash the
-> bootloader too can't you?)
->   
-
-Half the appeal of getting the Google/Qualcomm kernels into kernel.org,
-at least for me, is being able to see the Very Same Code that's running
-on my Nexus One phone.  If I have to reflash something to be able to use
-the kernel.org kernels--- especially if the reflashing is just to
-implement a name change--- then I lose the confidence that I'm looking
-at the same thing that my phone is running.
-
-> Your not looking at it from the developers point of view .. Your
-> assuming your team does coding, and everyone else just uses the code .. 
-> Which I don't think is what's going to happen.
->   
-
-As a developer, I really don't care what the files are named, unless
-those file names are the sole documentation available for the platform. 
-As long as the various names for the hardware are documented
-_somewhere_, then you've provided the information that I'm seeking.  In
-that case, you could call the files board-q1.c, board-q2.c, and so on
-and I'd be just as happy.
-
-> It's like I said above, no one knows what mahimahi is. Eveyone knows
-> what nexus one is.
->   
-
-But we don't really care about either specifically--- we just need to
-know that they both refer to the same thing.
-
-
-
-b.g.
-
--- 
-Bill Gatliff
-Embedded systems training and consulting
-http://billgatliff.com
-bgat at billgatliff.com
+The ways to improve the approach (introducing PG_arch_2 or marking a
+page clean on dma_unmap_* with DMA_FROM_DEVICE like ia64 does) is up
+to architectures.
