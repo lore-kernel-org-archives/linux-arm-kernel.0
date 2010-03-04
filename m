@@ -1,37 +1,34 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 04 Mar 2010 13:00:19 +1100
+From: wolfgang@iksw-muees.de (Wolfgang =?iso-8859-1?q?M=FCes?=)
+Date: Thu, 4 Mar 2010 07:54:57 +0100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267594809.4383.27.camel@mulgrave.site>
-References: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+In-Reply-To: <20100303215437.GF2579@ucw.cz>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
 	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<1267572594.2173.25.camel@pasglop>
-	<20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
-	<1267593032.16696.1.camel@pasglop>
-	<1267594809.4383.27.camel@mulgrave.site>
-Message-ID: <1267668019.22204.20.camel@pasglop>
+	<20100303215437.GF2579@ucw.cz>
+Message-ID: <201003040754.57800.wolfgang@iksw-muees.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-03 at 11:10 +0530, James Bottomley wrote:
-> On Wed, 2010-03-03 at 16:10 +1100, Benjamin Herrenschmidt wrote:
-> > On Wed, 2010-03-03 at 12:47 +0900, FUJITA Tomonori wrote:
-> > > The ways to improve the approach (introducing PG_arch_2 or marking a
-> > > page clean on dma_unmap_* with DMA_FROM_DEVICE like ia64 does) is up
-> > > to architectures. 
-> > 
-> > How does the above work ? IE, the dma unmap will flush the D side but
-> > not the I side ... or is the ia64 flush primitive magic enough to do
-> > both ?
-> 
-> The point is that in a well regulated system, the I cache shouldn't need
-> extra flushing in the kernel.  We should only be faulting in R-X pages.
-> If we're operating on RWX pages (i.e. self modifying code), it's the job
-> of userspace to keep I/D coherency.
-> 
-> So the only case the kernel needs to worry about is the R-X fault case
-> for executable text code.
+Hi,
 
-Still, you do need to flush I when a page cache page is recycled.
+Pavel Machek wrote:
 
-Cheers,
-Ben.
+> 3. Forget about PG_arch_1 and always do the flush?
+> 
+> How big is the performance impact? Note that current code does not
+> even *work* so working, 10% slower code will be an improvement.
+
+... and this is what *I* don't understand in this discussion. Obviously a 
+flush() in PIO drivers is a clean and quick solution to the problem. And how 
+much execution time will it cost - given the fact that if there is NO flush, 
+the flush operation will not be avoided, only delayed (up to the time the data 
+cache is doing the flush himself). If the data cache is doing the flush BEFORE 
+the data is used in userspace (this includes the most common case of reading 
+large files from the device), there will be no performance impact.
+
+Just my 2 cents.
+
+regards
+Wolfgang
+-- 
+Wahre Worte sind nicht sch?n - Sch?ne Worte sind nicht wahr. (Laotse)
