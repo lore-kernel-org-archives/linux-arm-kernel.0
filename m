@@ -1,52 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 04 Mar 2010 18:07:29 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100304154103.GA9384@linux-sh.org>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267712512.31654.176.camel@mulgrave.site>
-	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
-	<20100304154103.GA9384@linux-sh.org>
-Message-ID: <1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Mar 2010 18:28:43 -0000
+Subject: [kGDB]Cannot compile KGDB on ARM SMP
+In-Reply-To: <1267724191.6526.501.camel@e102109-lin.cambridge.arm.com>
+References: <8cad0aa1003020107g3aae0875n1da8c442d9909f96@mail.gmail.com>	
+	<4B8EF272.1090007@windriver.com>	
+	<001e01cabbc0$109a67f0$31cf37d0$@deacon@arm.com>
+	<1267724191.6526.501.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <001f01cabbc8$85680300$90380900$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-04 at 15:41 +0000, Paul Mundt wrote:
-> On Thu, Mar 04, 2010 at 03:29:38PM +0000, Catalin Marinas wrote:
-> > On Thu, 2010-03-04 at 14:21 +0000, James Bottomley wrote:
-> > > The thing which was discovered in this thread is basically that ARM is
-> > > handling deferred flushing (for D/I coherency) in a slightly different
-> > > way from everyone else ...
+Hi Catalin,
+
+> On Thu, 2010-03-04 at 17:28 +0000, Will Deacon wrote:
+> > I took a quick look at the code in kernel/kgdb.c and adding the following
+> > memory barrier appears to resolve the issue:
 > >
-> > Doing a grep for PG_dcache_dirty defined in terms of PG_arch_1 reveals
-> > that MIPS, Parisc, Score, SH and SPARC do similar things to ARM. PowerPC
-> > and IA-64 use PG_arch_1 as a clean rather than dirty bit.
+> > diff --git a/kernel/kgdb.c b/kernel/kgdb.c
+> > index 761fdd2..1308381 100644
+> > --- a/kernel/kgdb.c
+> > +++ b/kernel/kgdb.c
+> > @@ -1537,6 +1537,7 @@ acquirelock:
+> >                  * Wait till all the CPUs have quit
+> >                  * from the debugger.
+> >                  */
+> > +               smp_wmb();
+> >                 for_each_online_cpu(i) {
+> >                         while (atomic_read(&cpu_in_kgdb[i]))
+> >                                 cpu_relax();
 > 
-> SH used to use it as a PG_mapped which was roughly similar to the
-> PG_dcache_clean approach, at which point things like flushing for the PIO
-> case in the HCD wasn't necessary. It did result in rather aggressive over
-> flushing though, which is one of the reasons we elected to switch to
-> PG_dcache_dirty.
+> Shouldn't this be smp_rmb()?
 
-Are you more in favour if a PIO kmap API than inverting the meaning of
-PG_arch_1? 
+Actually, I think that we need an smp_mb() because there is
+another variable involved (passive_cpu_wait[i]) as well as
+cpu_in_kgdb[i], both of which are being read from and written
+to.
 
-I'm not familiar with SH but for PIO devices the flushing shouldn't be
-more aggressive. For the DMA devices, Russell suggested that we mark the
-page as clean (set PG_dcache_clean) in the DMA API to avoid the default
-flushing.
+I think deadlock occurs because the store buffers don't drain
+on the 11MPCore, so the CPUs happily cpu_relax() while polling
+on variables that they will never see change. Perhaps cpu_relax()
+should be defined to be something stronger than a compiler memory
+barrier for ARM?
 
-> Note that the PG_dcache_dirty semantics are also outlined in
-> Documentation/cachetlb.txt for PG_arch_1 usage, so it's hardly esoteric.
-
-Yes, but the flush_dcache_page() semantics outlined in the same file
-aren't followed by all the PIO drivers in the kernel.
-
--- 
-Catalin
+Will
