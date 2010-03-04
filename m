@@ -1,38 +1,35 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Wed, 03 Mar 2010 17:36:18 -0600
-Subject: [kGDB]Cannot compile KGDB on ARM SMP
-In-Reply-To: <8cad0aa1003020107g3aae0875n1da8c442d9909f96@mail.gmail.com>
-References: <8cad0aa1003020107g3aae0875n1da8c442d9909f96@mail.gmail.com>
-Message-ID: <4B8EF272.1090007@windriver.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 4 Mar 2010 02:08:39 +0100
+Subject: [PATCH/RFC] arm: Enable backtrace printing on oops when PC
+	iscorrupted
+In-Reply-To: <20100218170750.GF20243@n2100.arm.linux.org.uk>
+References: <1264065809-7893-1-git-send-email-laurent.pinchart@ideasonboard.com>
+	<1264527661.13482.74.camel@pc1117.cambridge.arm.com>
+	<20100218170750.GF20243@n2100.arm.linux.org.uk>
+Message-ID: <201003040208.41421.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
+On Thursday 18 February 2010 18:07:50 Russell King - ARM Linux wrote:
+> On Tue, Jan 26, 2010 at 05:41:01PM +0000, Catalin Marinas wrote:
+> > On Thu, 2010-01-21 at 09:23 +0000, Laurent Pinchart wrote:
+> > > If PC points outside kernel text, start printing the backtrace at LR
+> > > instead.
+> > > 
+> > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Has this been queued by someone?  If not, please send it to the patch
+> system.
 
-Jean-Michel Hautbois wrote:
-> Hi there !
->
-> I am  curently trying to compile kgdb on an ARM SMP core.
-> I have the following error :
-> kernel/kgdb.c:1481: undefined reference to `kgdb_roundup_cpus'
->
-> When I am looking at the function 'kgdb_roundup_cpus', it is defined
-> for x86, mips, blackfin, powerpc, but not for ARM.
-> Is there any specific reason for that ?
-> I can't see why...
->
->   
+As your mail was sent to Catalin I assumed he would take care of that. If the 
+patch should still be sent to the patch system, could you tell me how to 
+proceed ?
 
-No one has yet to submit a patch which implements the proper way to
-interrupt the slave CPUs and get them to call the kgdb_nmicallback(), as
-well as to run the kgdb test suite on the SMP device.
+-- 
+Regards,
 
-I do not have any SMP ARM hw to test this, or I probably would have
-implemented myself.
-
-If you come up with any patches you can submit them here and please cc
-kgdb-bugreport at lists.sourceforge.net.  If you have questions about the
-kgdb test suite I am sure we can find some answers.
-
-Thanks,
-Jason.
+Laurent Pinchart
