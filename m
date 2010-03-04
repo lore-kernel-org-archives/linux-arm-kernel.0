@@ -1,91 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Mar 2010 17:28:11 -0000
-Subject: [kGDB]Cannot compile KGDB on ARM SMP
-In-Reply-To: <4B8EF272.1090007@windriver.com>
-References: <8cad0aa1003020107g3aae0875n1da8c442d9909f96@mail.gmail.com>
-	<4B8EF272.1090007@windriver.com>
-Message-ID: <001e01cabbc0$109a67f0$31cf37d0$@deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 04 Mar 2010 17:34:28 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100304163023.GC13417@n2100.arm.linux.org.uk>
+References: <1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+	<20100304163023.GC13417@n2100.arm.linux.org.uk>
+Message-ID: <1267724068.6526.499.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 2010-03-04 at 16:30 +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 05, 2010 at 12:41:03AM +0900, Paul Mundt wrote:
+> > On Thu, Mar 04, 2010 at 03:29:38PM +0000, Catalin Marinas wrote:
+> > > On Thu, 2010-03-04 at 14:21 +0000, James Bottomley wrote:
+> > > > The thing which was discovered in this thread is basically that ARM is
+> > > > handling deferred flushing (for D/I coherency) in a slightly different
+> > > > way from everyone else ...
+> > >
+> > > Doing a grep for PG_dcache_dirty defined in terms of PG_arch_1 reveals
+> > > that MIPS, Parisc, Score, SH and SPARC do similar things to ARM. PowerPC
+> > > and IA-64 use PG_arch_1 as a clean rather than dirty bit.
+> > 
+> > SH used to use it as a PG_mapped which was roughly similar to the
+> > PG_dcache_clean approach, at which point things like flushing for the PIO
+> > case in the HCD wasn't necessary. It did result in rather aggressive over
+> > flushing though, which is one of the reasons we elected to switch to
+> > PG_dcache_dirty.
+> >
+> > Note that the PG_dcache_dirty semantics are also outlined in
+> > Documentation/cachetlb.txt for PG_arch_1 usage, so it's hardly esoteric.
+> 
+> Indeed; the ARM approach was basically taken from Sparc64.
+[...]
+> The general critera (from memory) seems to be:
+> - a virtual indexed aliasing cache (whether it be VIVT or VIPT aliasing)
+> - write allocate caches show the problem better than read allocate only
+> - using a block device for the filesystem
+> - mmap'ing a page and immediately accessing the last few cache lines in
+>   that page
 
-> No one has yet to submit a patch which implements the proper way to
-> interrupt the slave CPUs and get them to call the kgdb_nmicallback(), as
-> well as to run the kgdb test suite on the SMP device.
+It actually triggers easily with a non-aliasing VIPT cache (can't even
+start /sbin/init). The main condition is for the caches to be in
+write-allocate mode (and the processor to support this, i.e. Cortex-A9).
 
-I've done the obvious thing with this patch:
+A simple test is to use an ext2/3 filesystem (cramfs, jffs2 etc.
+wouldn't do since they call flush_dcache_page) on a compact flash card
+using the pata_platform driver (and without commit 2d68b7fe55d9e19).
 
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index ba8ccfe..a5b846b 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -9,6 +9,7 @@
-  * Authors:  George Davis <davis_g@mvista.com>
-  *           Deepak Saxena <dsaxena@plexity.net>
-  */
-+#include <linux/irq.h>
- #include <linux/kgdb.h>
- #include <asm/traps.h>
- 
-@@ -158,6 +159,18 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
-        .fn                     = kgdb_compiled_brk_fn
- };
- 
-+static void kgdb_call_nmi_hook(void *ignored)
-+{
-+       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-+}
-+
-+void kgdb_roundup_cpus(unsigned long flags)
-+{
-+       local_irq_enable();
-+       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
-+       local_irq_disable();
-+}
-+
- /**
-  *     kgdb_arch_init - Perform any architecture specific initalization.
-  *
+Other forms of triggering this is to use something like slram + ext2/3.
 
-This is all well and good and solves the compilation issue. However, in an
-SMP environment [quad-core ARM 11MPCore] the testsuite very quickly deadlocks:
-
-rv-pb11mpcore:~# echo kgdbts=V1 > /sys/module/kgdbts/parameters/kgdbts
-[   62.787343] kgdb: Registered I/O driver kgdbts.
-[   62.801176] kgdbts:RUN plant and detach test
-[   62.814748] kgdbts:RUN sw breakpoint test
-[   62.828126] kgdbts:RUN bad memory access test
-[   62.841687] kgdbts:RUN singlestep test 1000 iterations
-[   62.859816] kgdbts:RUN singlestep [0/1000]
-[   63.132699] kgdbts:RUN singlestep [100/1000]
-[   63.406217] kgdbts:RUN singlestep [200/1000]
-[   63.679694] kgdbts:RUN singlestep [300/1000]
-
-<machine completely unresponsive>
-
-I took a quick look at the code in kernel/kgdb.c and adding the following
-memory barrier appears to resolve the issue:
-
-diff --git a/kernel/kgdb.c b/kernel/kgdb.c
-index 761fdd2..1308381 100644
---- a/kernel/kgdb.c
-+++ b/kernel/kgdb.c
-@@ -1537,6 +1537,7 @@ acquirelock:
-                 * Wait till all the CPUs have quit
-                 * from the debugger.
-                 */
-+               smp_wmb();
-                for_each_online_cpu(i) {
-                        while (atomic_read(&cpu_in_kgdb[i]))
-                                cpu_relax();
-
-There may be more that are missing, but I'm not familiar enough with KGDB
-internals to know what's going on.
-
-I can submit this as a patch if you'd like, but I'd value some feedback
-first. Adding random memory barriers isn't a great solution!
-
-Cheers,
-
-Will
+-- 
+Catalin
