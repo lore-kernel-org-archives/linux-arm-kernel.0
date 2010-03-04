@@ -1,142 +1,210 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] ARM: Integrator: convert to use register definitions
-References: <git-1267729916-f8760b0e06e1c909bb1153b5cb0434e214c90dbb@rmk-PC>
-Message-ID: <git-1267729916-c5a2fd4062e2ee2088f38ac4e60a5669c1c8ac56@rmk-PC>
+Subject: [PATCH] ARM: Make Integrator/Versatile/Reaview VCO code similar
+References: <git-1267729916-2297f112a4e3ab4a5241c68977bf2e1b96438c54@rmk-PC>
+Message-ID: <git-1267729916-7f33674fea37cfdc2c024a267d2d2758cc64085c@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Rather than using converted base address plus offset, use the register
-address itself now that IO_ADDRESS() can cope with these.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/core.c          |   12 ++++++------
- arch/arm/mach-integrator/cpu.c           |    8 ++++----
- arch/arm/mach-integrator/integrator_ap.c |    2 +-
- arch/arm/mach-integrator/integrator_cp.c |   10 +++++-----
- arch/arm/mach-integrator/pci_v3.c        |    6 +++---
- 5 files changed, 19 insertions(+), 19 deletions(-)
+ arch/arm/mach-integrator/impd1.c               |   16 ++++------------
+ arch/arm/mach-integrator/include/mach/clkdev.h |    3 ++-
+ arch/arm/mach-integrator/integrator_cp.c       |    9 +++++----
+ arch/arm/mach-realview/core.c                  |   16 ++++++++--------
+ arch/arm/mach-realview/include/mach/clkdev.h   |    2 +-
+ arch/arm/mach-versatile/core.c                 |   10 +++++-----
+ arch/arm/mach-versatile/include/mach/clkdev.h  |    2 +-
+ 7 files changed, 26 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index d02f0e3..ac2b0c5 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -166,8 +166,8 @@ arch_initcall(integrator_init);
-  *  UART0  7    6
-  *  UART1  5    4
-  */
--#define SC_CTRLC	(IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_CTRLC_OFFSET)
--#define SC_CTRLS	(IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_CTRLS_OFFSET)
-+#define SC_CTRLC	IO_ADDRESS(INTEGRATOR_SC_CTRLC)
-+#define SC_CTRLS	IO_ADDRESS(INTEGRATOR_SC_CTRLS)
- 
- static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *base, unsigned int mctrl)
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 3e21102..2f9de62 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -55,20 +55,10 @@ static const struct icst_params impd1_vco_params = {
+ static void impd1_setvco(struct clk *clk, struct icst_vco vco)
  {
-@@ -199,7 +199,7 @@ static struct amba_pl010_data integrator_uart_data = {
- 	.set_mctrl = integrator_uart_set_mctrl,
+ 	struct impd1_module *impd1 = clk->data;
+-	int vconr = clk - impd1->vcos;
+-	u32 val;
+-
+-	val = vco.v | (vco.r << 9) | (vco.s << 16);
++	u32 val = vco.v | (vco.r << 9) | (vco.s << 16);
+ 
+ 	writel(0xa05f, impd1->base + IMPD1_LOCK);
+-	switch (vconr) {
+-	case 0:
+-		writel(val, impd1->base + IMPD1_OSC1);
+-		break;
+-	case 1:
+-		writel(val, impd1->base + IMPD1_OSC2);
+-		break;
+-	}
++	writel(val, clk->vcoreg);
+ 	writel(0, impd1->base + IMPD1_LOCK);
+ 
+ #ifdef DEBUG
+@@ -381,6 +371,8 @@ static int impd1_probe(struct lm_device *dev)
+ 		impd1->vcos[i].data = impd1,
+ 		impd1->vcos[i].setvco = impd1_setvco;
+ 	}
++	impd1->vcos[0].vcoreg = impd1->base + IMPD1_OSC1;
++	impd1->vcos[1].vcoreg = impd1->base + IMPD1_OSC2;
+ 
+ 	impd1->clks[0] = clkdev_alloc(&impd1->vcos[0], NULL, "lm%x:01000",
+ 					dev->id);
+diff --git a/arch/arm/mach-integrator/include/mach/clkdev.h b/arch/arm/mach-integrator/include/mach/clkdev.h
+index 89ea938..ed67e8e 100644
+--- a/arch/arm/mach-integrator/include/mach/clkdev.h
++++ b/arch/arm/mach-integrator/include/mach/clkdev.h
+@@ -8,8 +8,9 @@ struct clk {
+ 	unsigned long		rate;
+ 	struct module		*owner;
+ 	const struct icst_params *params;
+-	void			*data;
++	void __iomem		*vcoreg;
+ 	void			(*setvco)(struct clk *, struct icst_vco vco);
++	void			*data;
  };
  
--#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET
-+#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_CTRL)
- 
- static DEFINE_SPINLOCK(cm_lock);
- 
-@@ -224,9 +224,9 @@ EXPORT_SYMBOL(cm_control);
- /*
-  * Where is the timer (VA)?
-  */
--#define TIMER0_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000000)
--#define TIMER1_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000100)
--#define TIMER2_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000200)
-+#define TIMER0_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER0_BASE)
-+#define TIMER1_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER1_BASE)
-+#define TIMER2_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER2_BASE)
- 
- /*
-  * How long is the timer interval?
-diff --git a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
-index b761879..7f1b73b 100644
---- a/arch/arm/mach-integrator/cpu.c
-+++ b/arch/arm/mach-integrator/cpu.c
-@@ -26,10 +26,10 @@
- 
- static struct cpufreq_driver integrator_driver;
- 
--#define CM_ID  	(IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_ID_OFFSET)
--#define CM_OSC	(IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_OSC_OFFSET)
--#define CM_STAT (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_STAT_OFFSET)
--#define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
-+#define CM_ID  	IO_ADDRESS(INTEGRATOR_HDR_ID)
-+#define CM_OSC	IO_ADDRESS(INTEGRATOR_HDR_OSC)
-+#define CM_STAT IO_ADDRESS(INTEGRATOR_HDR_STAT)
-+#define CM_LOCK IO_ADDRESS(INTEGRATOR_HDR_LOCK)
- 
- static const struct icst525_params lclk_params = {
- 	.ref		= 24000,
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 45bba04..c89b231 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -56,7 +56,7 @@
- #define VA_IC_BASE	IO_ADDRESS(INTEGRATOR_IC_BASE) 
- #define VA_SC_BASE	IO_ADDRESS(INTEGRATOR_SC_BASE)
- #define VA_EBI_BASE	IO_ADDRESS(INTEGRATOR_EBI_BASE)
--#define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_IC_OFFSET
-+#define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_IC)
- 
- /*
-  * Logical      Physical
+ static inline int __clk_get(struct clk *clk)
 diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 333c297..c0161df 100644
+index 5a5a8c1..5908580 100644
 --- a/arch/arm/mach-integrator/integrator_cp.c
 +++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -47,7 +47,7 @@
- 
- #define INTCP_PA_CLCD_BASE		0xc0000000
- 
--#define INTCP_VA_CIC_BASE		IO_ADDRESS(INTEGRATOR_HDR_BASE) + 0x40
-+#define INTCP_VA_CIC_BASE		IO_ADDRESS(INTEGRATOR_HDR_BASE + 0x40)
- #define INTCP_VA_PIC_BASE		IO_ADDRESS(INTEGRATOR_IC_BASE)
- #define INTCP_VA_SIC_BASE		IO_ADDRESS(INTEGRATOR_CP_SIC_BASE)
- 
-@@ -265,8 +265,8 @@ static void __init intcp_init_irq(void)
+@@ -266,8 +266,8 @@ static void __init intcp_init_irq(void)
  /*
   * Clock handling
   */
--#define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
--#define CM_AUXOSC (IO_ADDRESS(INTEGRATOR_HDR_BASE)+0x1c)
-+#define CM_LOCK IO_ADDRESS(INTEGRATOR_HDR_LOCK)
-+#define CM_AUXOSC IO_ADDRESS(INTEGRATOR_HDR_BASE + 0x1c)
+-#define CM_LOCK IO_ADDRESS(INTEGRATOR_HDR_LOCK)
+-#define CM_AUXOSC IO_ADDRESS(INTEGRATOR_HDR_BASE + 0x1c)
++#define CM_LOCK		(__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
++#define CM_AUXOSC	(__io_address(INTEGRATOR_HDR_BASE)+0x1c)
  
- static const struct icst525_params cp_auxvco_params = {
- 	.ref		= 24000,
-@@ -393,8 +393,8 @@ static struct platform_device *intcp_devs[] __initdata = {
-  */
- static unsigned int mmc_status(struct device *dev)
+ static const struct icst_params cp_auxvco_params = {
+ 	.ref		= 24000000,
+@@ -285,16 +285,17 @@ static void cp_auxvco_set(struct clk *clk, struct icst_vco vco)
  {
--	unsigned int status = readl(IO_ADDRESS(0xca000000) + 4);
--	writel(8, IO_ADDRESS(INTEGRATOR_CP_CTL_BASE) + 8);
-+	unsigned int status = readl(IO_ADDRESS(0xca000000 + 4));
-+	writel(8, IO_ADDRESS(INTEGRATOR_CP_CTL_BASE + 8));
+ 	u32 val;
  
- 	return status & 8;
+-	val = readl(CM_AUXOSC) & ~0x7ffff;
++	val = readl(clk->vcoreg) & ~0x7ffff;
+ 	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+ 
+ 	writel(0xa05f, CM_LOCK);
+-	writel(val, CM_AUXOSC);
++	writel(val, clk->vcoreg);
+ 	writel(0, CM_LOCK);
  }
-diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index e87fe9f..e549162 100644
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -391,9 +391,9 @@ static int __init pci_v3_setup_resources(struct resource **resource)
-  * means I can't get additional information on the reason for the pm2fb
-  * problems.  I suppose I'll just have to mind-meld with the machine. ;)
-  */
--#define SC_PCI     (IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_PCIENABLE_OFFSET)
--#define SC_LBFADDR (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x20)
--#define SC_LBFCODE (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x24)
-+#define SC_PCI     IO_ADDRESS(INTEGRATOR_SC_PCIENABLE)
-+#define SC_LBFADDR IO_ADDRESS(INTEGRATOR_SC_BASE + 0x20)
-+#define SC_LBFCODE IO_ADDRESS(INTEGRATOR_SC_BASE + 0x24)
  
- static int
- v3_pci_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ static struct clk cp_auxclk = {
+ 	.params	= &cp_auxvco_params,
++	.vcoreg	= CM_AUXOSC,
+ 	.setvco = cp_auxvco_set,
+ };
+ 
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index f97f001..043b93b 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -271,19 +271,13 @@ static const struct icst_params realview_oscvco_params = {
+ static void realview_oscvco_set(struct clk *clk, struct icst_vco vco)
+ {
+ 	void __iomem *sys_lock = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_LOCK_OFFSET;
+-	void __iomem *sys_osc;
+ 	u32 val;
+ 
+-	if (machine_is_realview_pb1176())
+-		sys_osc = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC0_OFFSET;
+-	else
+-		sys_osc = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC4_OFFSET;
+-
+-	val = readl(sys_osc) & ~0x7ffff;
++	val = readl(clk->vcoreg) & ~0x7ffff;
+ 	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+ 
+ 	writel(0xa05f, sys_lock);
+-	writel(val, sys_osc);
++	writel(val, clk->vcoreg);
+ 	writel(0, sys_lock);
+ }
+ 
+@@ -332,7 +326,13 @@ static struct clk_lookup lookups[] = {
+ 
+ static int __init clk_init(void)
+ {
++	if (machine_is_realview_pb1176())
++		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC0_OFFSET;
++	else
++		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC4_OFFSET;
++
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
++
+ 	return 0;
+ }
+ arch_initcall(clk_init);
+diff --git a/arch/arm/mach-realview/include/mach/clkdev.h b/arch/arm/mach-realview/include/mach/clkdev.h
+index fefe467..baea03c 100644
+--- a/arch/arm/mach-realview/include/mach/clkdev.h
++++ b/arch/arm/mach-realview/include/mach/clkdev.h
+@@ -6,7 +6,7 @@
+ struct clk {
+ 	unsigned long		rate;
+ 	const struct icst_params *params;
+-	u32			oscoff;
++	void __iomem		*vcoreg;
+ 	void			(*setvco)(struct clk *, struct icst_vco vco);
+ };
+ 
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 490fc75..957bbde 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -370,21 +370,19 @@ static const struct icst_params versatile_oscvco_params = {
+ 
+ static void versatile_oscvco_set(struct clk *clk, struct icst_vco vco)
+ {
+-	void __iomem *sys = __io_address(VERSATILE_SYS_BASE);
+-	void __iomem *sys_lock = sys + VERSATILE_SYS_LOCK_OFFSET;
++	void __iomem *sys_lock = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_LOCK_OFFSET;
+ 	u32 val;
+ 
+-	val = readl(sys + clk->oscoff) & ~0x7ffff;
++	val = readl(clk->vcoreg) & ~0x7ffff;
+ 	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+ 
+ 	writel(0xa05f, sys_lock);
+-	writel(val, sys + clk->oscoff);
++	writel(val, clk->vcoreg);
+ 	writel(0, sys_lock);
+ }
+ 
+ static struct clk osc4_clk = {
+ 	.params	= &versatile_oscvco_params,
+-	.oscoff	= VERSATILE_SYS_OSCCLCD_OFFSET,
+ 	.setvco	= versatile_oscvco_set,
+ };
+ 
+@@ -831,6 +829,8 @@ void __init versatile_init(void)
+ {
+ 	int i;
+ 
++	osc4_clk.vcoreg	= __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSCCLCD_OFFSET;
++
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+ 	platform_device_register(&versatile_flash_device);
+diff --git a/arch/arm/mach-versatile/include/mach/clkdev.h b/arch/arm/mach-versatile/include/mach/clkdev.h
+index fefe467..baea03c 100644
+--- a/arch/arm/mach-versatile/include/mach/clkdev.h
++++ b/arch/arm/mach-versatile/include/mach/clkdev.h
+@@ -6,7 +6,7 @@
+ struct clk {
+ 	unsigned long		rate;
+ 	const struct icst_params *params;
+-	u32			oscoff;
++	void __iomem		*vcoreg;
+ 	void			(*setvco)(struct clk *, struct icst_vco vco);
+ };
+ 
