@@ -1,7 +1,7 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 05 Mar 2010 08:28:34 +1100
+Date: Fri, 05 Mar 2010 08:34:40 +1100
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267712512.31654.176.camel@mulgrave.site>
+In-Reply-To: <20100304154103.GA9384@linux-sh.org>
 References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
 	<1267316072.23523.1842.camel@pasglop>
 	<1267333263.2762.11.camel@mulgrave.site>
@@ -11,50 +11,42 @@ References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
 	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
 	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
 	<1267712512.31654.176.camel@mulgrave.site>
-Message-ID: <1267738114.22204.70.camel@pasglop>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+Message-ID: <1267738480.22204.74.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-04 at 19:51 +0530, James Bottomley wrote:
-> 
-> Technically, he is.  In the old days, most VI architectures were high
-> end enough not to require PIO transfers.  The only exception was an
-> IDE driver used by sparc, which lead to the arch specific ide in/out
-> string instructions, in which sparc actually did all the necessary
-> flushing.
-
-Actually, Catalin's problem is with newer PIPT ARM :-)
-
-> So no other drivers than old IDE grew up with cache flushing in the
-> PIO case (and almost no high end VI hardware had an IDE interface, so
-> they rarely got implemented in the arch layer).  However, recently,
-> with the transition from old IDE to libata and the prevalence of ARM
-> with more commodity hardware, the deficiency is becoming exposed.
-> Even the PA8000 workstations now come with an IDE CD, which means
-> we're starting to have problems with them as well.
-
-I don't think there's a core or driver problem in this specific case. As
-we discussed earlier, I believe the problem is that ARM considers a
-fresh page out of the page cache as "clean" instead of "dirty", and
-inverting that like we do on powerpc will fix their problem too.
-
-> > Seems like ARM has requirement other architectures do not, that is
-> > a) not documented anywhere
-> > b) causes problems
+On Fri, 2010-03-05 at 00:41 +0900, Paul Mundt wrote:
+> On Thu, Mar 04, 2010 at 03:29:38PM +0000, Catalin Marinas wrote:
+> > On Thu, 2010-03-04 at 14:21 +0000, James Bottomley wrote:
+> > > The thing which was discovered in this thread is basically that ARM is
+> > > handling deferred flushing (for D/I coherency) in a slightly different
+> > > way from everyone else ... 
 > > 
-> > You could argue that performance improvement (how big is it,
-> anyway?)
-> > is worth it, but this should be agreed to by wider community...
+> > Doing a grep for PG_dcache_dirty defined in terms of PG_arch_1 reveals
+> > that MIPS, Parisc, Score, SH and SPARC do similar things to ARM. PowerPC
+> > and IA-64 use PG_arch_1 as a clean rather than dirty bit.
+> > 
+> SH used to use it as a PG_mapped which was roughly similar to the
+> PG_dcache_clean approach, at which point things like flushing for the PIO
+> case in the HCD wasn't necessary. It did result in rather aggressive over
+> flushing though, which is one of the reasons we elected to switch to
+> PG_dcache_dirty.
 > 
-> Performance is always worth it provided we don't sacrifice
-> correctness.
-> The thing which was discovered in this thread is basically that ARM is
-> handling deferred flushing (for D/I coherency) in a slightly different
-> way from everyone else ... once that's fixed, ARM will likely not have
-> the D/I problem, but we'll still have the libata (and other PIO
-> systems) D flushing issue. 
+> Note that the PG_dcache_dirty semantics are also outlined in
+> Documentation/cachetlb.txt for PG_arch_1 usage, so it's hardly esoteric.
 
-You mean older VIVT ARM will grow a new issue there ?
+Doing this way though is a lot more fragile... since page cache pages
+are no longer dirty by default, you need to ensure that any driver
+writing to one without DMA sets PG_arch_1, and as we've seen, this is
+generally not the case (it's almost never the case actually).
+
+Also, in the DMA case, you may not need to flush D$, but you -still-
+need to invalidate I$, and unless you then get another bit for tracking
+it, you end up doing a lot of over-invalidating of I$ no ?
+
+Or am I missing a critical piece of the puzzle ?
 
 Cheers,
 Ben.
