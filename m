@@ -1,127 +1,212 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] ARM: ICST: move minimum VCO frequency to icst_params
-References: <git-1267729916-ff35c828640614581186e8105b4b08a1881d8137@rmk-PC>
-Message-ID: <git-1267729916-d6819e2672c1b28c5b4e50c4f22e1895b85881aa@rmk-PC>
+Subject: [PATCH] ARM: Realview/Versatile/Integrator: remove unused
+	definitions from platform.h
+References: <git-1267729916-e504d2d965ff812d89c7c484276e35e001195fae@rmk-PC>
+Message-ID: <git-1267729916-b3f4ccc3dfd1e01b45888a740b2b5638b82e0638@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/icst307.c                |    2 +-
- arch/arm/common/icst525.c                |    2 +-
- arch/arm/include/asm/hardware/icst.h     |    1 +
- arch/arm/mach-integrator/cpu.c           |    2 ++
- arch/arm/mach-integrator/impd1.c         |    1 +
- arch/arm/mach-integrator/integrator_cp.c |    1 +
- arch/arm/mach-realview/core.c            |    1 +
- arch/arm/mach-versatile/core.c           |    1 +
- 8 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-integrator/include/mach/platform.h |   42 +--------------------
+ arch/arm/mach-realview/include/mach/platform.h   |   20 ----------
+ arch/arm/mach-versatile/include/mach/platform.h  |   26 +------------
+ 3 files changed, 4 insertions(+), 84 deletions(-)
 
-diff --git a/arch/arm/common/icst307.c b/arch/arm/common/icst307.c
-index 66c69e5..312485f 100644
---- a/arch/arm/common/icst307.c
-+++ b/arch/arm/common/icst307.c
-@@ -53,7 +53,7 @@ icst307_hz_to_vco(const struct icst_params *p, unsigned long freq)
- 		/*
- 		 * f must be between 6MHz and 200MHz (3.3 or 5V)
- 		 */
--		if (f > ICST307_VCO_MIN && f <= p->vco_max)
-+		if (f > p->vco_min && f <= p->vco_max)
- 			break;
- 	} while (i < ARRAY_SIZE(idx2s));
+diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
+index e00a262..f934227 100644
+--- a/arch/arm/mach-integrator/include/mach/platform.h
++++ b/arch/arm/mach-integrator/include/mach/platform.h
+@@ -23,9 +23,6 @@
+  *
+  *   Integrator address map
+  *
+- * 	NOTE: This is a multi-hosted header file for use with uHAL and
+- * 	      supported debuggers.
+- *
+  * ***********************************************************************/
  
-diff --git a/arch/arm/common/icst525.c b/arch/arm/common/icst525.c
-index c1d22b7..da58965 100644
---- a/arch/arm/common/icst525.c
-+++ b/arch/arm/common/icst525.c
-@@ -51,7 +51,7 @@ icst525_hz_to_vco(const struct icst_params *p, unsigned long freq)
- 		 * f must be between 10MHz and
- 		 *  320MHz (5V) or 200MHz (3V)
- 		 */
--		if (f > ICST525_VCO_MIN && f <= p->vco_max)
-+		if (f > p->vco_min && f <= p->vco_max)
- 			break;
- 	} while (i < ARRAY_SIZE(idx2s));
+ #ifndef __address_h
+@@ -328,20 +325,6 @@
+  */
+ #define PHYS_PCI_V3_BASE                0x62000000
  
-diff --git a/arch/arm/include/asm/hardware/icst.h b/arch/arm/include/asm/hardware/icst.h
-index 65b1edd..6707c6a 100644
---- a/arch/arm/include/asm/hardware/icst.h
-+++ b/arch/arm/include/asm/hardware/icst.h
-@@ -17,6 +17,7 @@
- struct icst_params {
- 	unsigned long	ref;
- 	unsigned long	vco_max;	/* inclusive */
-+	unsigned long	vco_min;	/* exclusive */
- 	unsigned short	vd_min;		/* inclusive */
- 	unsigned short	vd_max;		/* inclusive */
- 	unsigned char	rd_min;		/* inclusive */
-diff --git a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
-index 3ebb785..569306b 100644
---- a/arch/arm/mach-integrator/cpu.c
-+++ b/arch/arm/mach-integrator/cpu.c
-@@ -34,6 +34,7 @@ static struct cpufreq_driver integrator_driver;
- static const struct icst_params lclk_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST525_VCO_MAX_5V,
-+	.vco_min	= ICST525_VCO_MIN,
- 	.vd_min		= 8,
- 	.vd_max		= 132,
- 	.rd_min		= 24,
-@@ -43,6 +44,7 @@ static const struct icst_params lclk_params = {
- static const struct icst_params cclk_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST525_VCO_MAX_5V,
-+	.vco_min	= ICST525_VCO_MIN,
- 	.vd_min		= 12,
- 	.vd_max		= 160,
- 	.rd_min		= 24,
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index ecce3eb..036cfb4 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -43,6 +43,7 @@ struct impd1_module {
- static const struct icst_params impd1_vco_params = {
- 	.ref		= 24000000,	/* 24 MHz */
- 	.vco_max	= ICST525_VCO_MAX_3V,
-+	.vco_min	= ICST525_VCO_MIN,
- 	.vd_min		= 12,
- 	.vd_max		= 519,
- 	.rd_min		= 3,
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 335af99..34c120a 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -271,6 +271,7 @@ static void __init intcp_init_irq(void)
- static const struct icst_params cp_auxvco_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST525_VCO_MAX_5V,
-+	.vco_min	= ICST525_VCO_MIN,
- 	.vd_min 	= 8,
- 	.vd_max 	= 263,
- 	.rd_min 	= 3,
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 02d4837..3ac4413 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -276,6 +276,7 @@ struct mmci_platform_data realview_mmc1_plat_data = {
- static const struct icst_params realview_oscvco_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST307_VCO_MAX,
-+	.vco_min	= ICST307_VCO_MIN,
- 	.vd_min		= 4 + 8,
- 	.vd_max		= 511 + 8,
- 	.rd_min		= 1 + 2,
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index ff5d24f..c4bf680 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -382,6 +382,7 @@ static struct mmci_platform_data mmc0_plat_data = {
- static const struct icst_params versatile_oscvco_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST307_VCO_MAX,
-+	.vco_min	= ICST307_VCO_MIN,
- 	.vd_min		= 4 + 8,
- 	.vd_max		= 511 + 8,
- 	.rd_min		= 1 + 2,
+-#define PCI_DRAMSIZE                    INTEGRATOR_SSRAM_SIZE
+-
+-/* 'export' these to UHAL */
+-#define UHAL_PCI_IO                     PCI_IO_BASE
+-#define UHAL_PCI_MEM                    PCI_MEM_BASE
+-#define UHAL_PCI_ALLOC_IO_BASE          0x00004000
+-#define UHAL_PCI_ALLOC_MEM_BASE         PCI_MEM_BASE
+-#define UHAL_PCI_MAX_SLOT               20
+-
+-/* ========================================================================
+- *  Start of uHAL definitions
+- * ========================================================================
+- */
+-
+ /* ------------------------------------------------------------------------
+  *  Integrator Interrupt Controllers
+  * ------------------------------------------------------------------------
+@@ -389,7 +372,7 @@
+  */
+ 
+ /* ------------------------------------------------------------------------
+- *  LED's - The header LED is not accessible via the uHAL API
++ *  LED's
+  * ------------------------------------------------------------------------
+  *
+  */
+@@ -402,34 +385,18 @@
+ #define LED_BANK                        INTEGRATOR_DBG_LEDS
+ 
+ /*
+- *  Memory definitions - run uHAL out of SSRAM.
+- *
+- */
+-#define uHAL_MEMORY_SIZE                INTEGRATOR_SSRAM_SIZE
+-
+-/*
+- *  Clean base - dummy
+- *
+- */
+-#define CLEAN_BASE                      INTEGRATOR_BOOT_ROM_HI
+-
+-/*
+  *  Timer definitions
+  *
+  *  Only use timer 1 & 2
+  *  (both run at 24MHz and will need the clock divider set to 16).
+  *
+- *  Timer 0 runs at bus frequency and therefore could vary and currently
+- *  uHAL can't handle that.
+- *
++ *  Timer 0 runs at bus frequency
+  */
+ 
+ #define INTEGRATOR_TIMER0_BASE          INTEGRATOR_CT_BASE
+ #define INTEGRATOR_TIMER1_BASE          (INTEGRATOR_CT_BASE + 0x100)
+ #define INTEGRATOR_TIMER2_BASE          (INTEGRATOR_CT_BASE + 0x200)
+ 
+-#define MAX_TIMER                       2
+-#define MAX_PERIOD                      699050
+ #define TICKS_PER_uSEC                  24
+ 
+ /*
+@@ -437,14 +404,9 @@
+  *
+  */
+ #define mSEC_1                          1000
+-#define mSEC_5                          (mSEC_1 * 5)
+ #define mSEC_10                         (mSEC_1 * 10)
+-#define mSEC_25                         (mSEC_1 * 25)
+-#define SEC_1                           (mSEC_1 * 1000)
+ 
+ #define INTEGRATOR_CSR_BASE             0x10000000
+ #define INTEGRATOR_CSR_SIZE             0x10000000
+ 
+ #endif
+-
+-/* 	END */
+diff --git a/arch/arm/mach-realview/include/mach/platform.h b/arch/arm/mach-realview/include/mach/platform.h
+index 86c0c44..1b77a27 100644
+--- a/arch/arm/mach-realview/include/mach/platform.h
++++ b/arch/arm/mach-realview/include/mach/platform.h
+@@ -231,12 +231,6 @@
+ #define REALVIEW_INTREG_OFFSET		0x8	/* Interrupt control */
+ #define REALVIEW_DECODE_OFFSET		0xC	/* Fitted logic modules */
+ 
+-/* 
+- *  Clean base - dummy
+- * 
+- */
+-#define CLEAN_BASE                      REALVIEW_BOOT_ROM_HI
+-
+ /*
+  * System controller bit assignment
+  */
+@@ -249,20 +243,6 @@
+ #define REALVIEW_TIMER4_EnSel	21
+ 
+ 
+-#define MAX_TIMER                       2
+-#define MAX_PERIOD                      699050
+-#define TICKS_PER_uSEC                  1
+-
+-/* 
+- *  These are useconds NOT ticks.  
+- * 
+- */
+-#define mSEC_1                          1000
+-#define mSEC_5                          (mSEC_1 * 5)
+-#define mSEC_10                         (mSEC_1 * 10)
+-#define mSEC_25                         (mSEC_1 * 25)
+-#define SEC_1                           (mSEC_1 * 1000)
+-
+ #define REALVIEW_CSR_BASE             0x10000000
+ #define REALVIEW_CSR_SIZE             0x10000000
+ 
+diff --git a/arch/arm/mach-versatile/include/mach/platform.h b/arch/arm/mach-versatile/include/mach/platform.h
+index 8320739..ec08740 100644
+--- a/arch/arm/mach-versatile/include/mach/platform.h
++++ b/arch/arm/mach-versatile/include/mach/platform.h
+@@ -205,7 +205,7 @@
+ #define VERSATILE_CLCD_BASE            0x10120000	/* CLCD */
+ #define VERSATILE_DMAC_BASE            0x10130000	/* DMA controller */
+ #define VERSATILE_VIC_BASE             0x10140000	/* Vectored interrupt controller */
+-#define VERSATILE_PERIPH_BASE          0x10150000    /* off-chip peripherals alias from */
++#define VERSATILE_PERIPH_BASE          0x10150000	/* off-chip peripherals alias from */
+                                                 /* 0x10000000 - 0x100FFFFF */
+ #define VERSATILE_AHBM_BASE            0x101D0000	/* AHB monitor */
+ #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
+@@ -213,7 +213,7 @@
+ #define VERSATILE_TIMER0_1_BASE        0x101E2000	/* Timer 0 and 1 */
+ #define VERSATILE_TIMER2_3_BASE        0x101E3000	/* Timer 2 and 3 */
+ #define VERSATILE_GPIO0_BASE           0x101E4000	/* GPIO port 0 */
+-#define VERSATILE_GPIO1_BASE           0x101E5000    /* GPIO port 1 */
++#define VERSATILE_GPIO1_BASE           0x101E5000	/* GPIO port 1 */
+ #define VERSATILE_GPIO2_BASE           0x101E6000	/* GPIO port 2 */
+ #define VERSATILE_GPIO3_BASE           0x101E7000	/* GPIO port 3 */
+ #define VERSATILE_RTC_BASE             0x101E8000	/* Real Time Clock */
+@@ -379,12 +379,6 @@
+ #define SIC_INT_PCI3                    30
+ 
+ 
+-/* 
+- *  Clean base - dummy
+- * 
+- */
+-#define CLEAN_BASE                      VERSATILE_BOOT_ROM_HI
+-
+ /*
+  * System controller bit assignment
+  */
+@@ -397,20 +391,6 @@
+ #define VERSATILE_TIMER4_EnSel	21
+ 
+ 
+-#define MAX_TIMER                       2
+-#define MAX_PERIOD                      699050
+-#define TICKS_PER_uSEC                  1
+-
+-/* 
+- *  These are useconds NOT ticks.  
+- * 
+- */
+-#define mSEC_1                          1000
+-#define mSEC_5                          (mSEC_1 * 5)
+-#define mSEC_10                         (mSEC_1 * 10)
+-#define mSEC_25                         (mSEC_1 * 25)
+-#define SEC_1                           (mSEC_1 * 1000)
+-
+ #define VERSATILE_CSR_BASE             0x10000000
+ #define VERSATILE_CSR_SIZE             0x10000000
+ 
+@@ -432,5 +412,3 @@
+ #endif
+ 
+ #endif
+-
+-/* 	END */
