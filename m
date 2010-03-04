@@ -1,163 +1,73 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] Video: ARM CLCD: Better fix for swapped IENB and CNTL
-	registers
-References: <git-1267729916-c739d2307661c806c29c44bdccb224eca19d528b@rmk-PC>
-Message-ID: <git-1267729916-3195353d18eb39c9368cfbdb490be952ba8ea4af@rmk-PC>
+Subject: [PATCH] ARM: Integrator: convert Integrator/CP to use SP804 timer
+	support
+References: <git-1267729916-6ca45be431733d3c1460cbc8245eb2efe0150fdd@rmk-PC>
+Message-ID: <git-1267729916-d812bfe0155031706019561409a54500168b6caf@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On PL111, as found on Realview and other platforms, these registers are
-always arranged as CNTL then IENB.  On PL110, these registers are IENB
-then CNTL, except on Versatile platforms.
-
-Re-arrange the handling of these register swaps so that PL111 always
-gets it right without resorting to ifdefs, leaving the only case needing
-special handling being PL110 on Versatile.
-
-Fill out amba/clcd.h with the PL110/PL111 register definition
-differences in case someone tries to use the PL110 specific definitions
-on PL111.
+The Integrator/CP board has SP804-compatible timer modules, so use
+the SP804-compatible code from Versatile and Realview.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/video/amba-clcd.c |   31 ++++++++++++++++++++++++-------
- include/linux/amba/clcd.h |   33 +++++++++++++++++----------------
- 2 files changed, 41 insertions(+), 23 deletions(-)
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/integrator_cp.c |   14 ++++++++++++--
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
-index a21efcd..afe21e6 100644
---- a/drivers/video/amba-clcd.c
-+++ b/drivers/video/amba-clcd.c
-@@ -65,16 +65,16 @@ static void clcdfb_disable(struct clcd_fb *fb)
- 	if (fb->board->disable)
- 		fb->board->disable(fb);
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index df97d16..27db275 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -11,6 +11,7 @@ config ARCH_INTEGRATOR_AP
+ config ARCH_INTEGRATOR_CP
+ 	bool "Support Integrator/CP platform"
+ 	select ARCH_CINTEGRATOR
++	select ARM_TIMER_SP804
+ 	help
+ 	  Include support for the ARM(R) Integrator CP platform.
  
--	val = readl(fb->regs + CLCD_CNTL);
-+	val = readl(fb->regs + fb->off_cntl);
- 	if (val & CNTL_LCDPWR) {
- 		val &= ~CNTL_LCDPWR;
--		writel(val, fb->regs + CLCD_CNTL);
-+		writel(val, fb->regs + fb->off_cntl);
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index a9ab8fd..a7575c4 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -29,6 +29,7 @@
+ #include <asm/irq.h>
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
++#include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/icst.h>
  
- 		clcdfb_sleep(20);
+ #include <mach/cm.h>
+@@ -40,6 +41,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
++#include <plat/timer-sp.h>
++
+ #include "common.h"
+ 
+ #define INTCP_PA_FLASH_BASE		0x24000000
+@@ -569,11 +572,18 @@ static void __init intcp_init(void)
  	}
- 	if (val & CNTL_LCDEN) {
- 		val &= ~CNTL_LCDEN;
--		writel(val, fb->regs + CLCD_CNTL);
-+		writel(val, fb->regs + fb->off_cntl);
- 	}
+ }
  
- 	/*
-@@ -94,7 +94,7 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
- 	 * Bring up by first enabling..
- 	 */
- 	cntl |= CNTL_LCDEN;
--	writel(cntl, fb->regs + CLCD_CNTL);
-+	writel(cntl, fb->regs + fb->off_cntl);
+-#define TIMER_CTRL_IE	(1 << 5)			/* Interrupt Enable */
++#define TIMER0_VA_BASE __io_address(INTEGRATOR_TIMER0_BASE)
++#define TIMER1_VA_BASE __io_address(INTEGRATOR_TIMER1_BASE)
++#define TIMER2_VA_BASE __io_address(INTEGRATOR_TIMER2_BASE)
  
- 	clcdfb_sleep(20);
- 
-@@ -102,7 +102,7 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
- 	 * and now apply power.
- 	 */
- 	cntl |= CNTL_LCDPWR;
--	writel(cntl, fb->regs + CLCD_CNTL);
-+	writel(cntl, fb->regs + fb->off_cntl);
- 
- 	/*
- 	 * finally, enable the interface.
-@@ -233,7 +233,7 @@ static int clcdfb_set_par(struct fb_info *info)
- 		readl(fb->regs + CLCD_TIM0), readl(fb->regs + CLCD_TIM1),
- 		readl(fb->regs + CLCD_TIM2), readl(fb->regs + CLCD_TIM3),
- 		readl(fb->regs + CLCD_UBAS), readl(fb->regs + CLCD_LBAS),
--		readl(fb->regs + CLCD_IENB), readl(fb->regs + CLCD_CNTL));
-+		readl(fb->regs + fb->off_ienb), readl(fb->regs + fb->off_cntl));
- #endif
- 
- 	return 0;
-@@ -345,6 +345,23 @@ static int clcdfb_register(struct clcd_fb *fb)
+ static void __init intcp_timer_init(void)
  {
- 	int ret;
- 
-+	/*
-+	 * ARM PL111 always has IENB at 0x1c; it's only PL110
-+	 * which is reversed on some platforms.
-+	 */
-+	if (amba_manf(fb->dev) == 0x41 && amba_part(fb->dev) == 0x111) {
-+		fb->off_ienb = CLCD_PL111_IENB;
-+		fb->off_cntl = CLCD_PL111_CNTL;
-+	} else {
-+#ifdef CONFIG_ARCH_VERSATILE
-+		fb->off_ienb = CLCD_PL111_IENB;
-+		fb->off_cntl = CLCD_PL111_CNTL;
-+#else
-+		fb->off_ienb = CLCD_PL110_IENB;
-+		fb->off_cntl = CLCD_PL110_CNTL;
-+#endif
-+	}
+-	integrator_time_init(1000, TIMER_CTRL_IE);
++	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
++	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
++	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
 +
- 	fb->clk = clk_get(&fb->dev->dev, NULL);
- 	if (IS_ERR(fb->clk)) {
- 		ret = PTR_ERR(fb->clk);
-@@ -416,7 +433,7 @@ static int clcdfb_register(struct clcd_fb *fb)
- 	/*
- 	 * Ensure interrupts are disabled.
- 	 */
--	writel(0, fb->regs + CLCD_IENB);
-+	writel(0, fb->regs + fb->off_ienb);
++	sp804_clocksource_init(TIMER2_VA_BASE);
++	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1);
+ }
  
- 	fb_set_var(&fb->fb, &fb->fb.var);
- 
-diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
-index 29c0448..ca16c38 100644
---- a/include/linux/amba/clcd.h
-+++ b/include/linux/amba/clcd.h
-@@ -21,22 +21,21 @@
- #define CLCD_UBAS 		0x00000010
- #define CLCD_LBAS 		0x00000014
- 
--#if !defined(CONFIG_ARCH_VERSATILE) && !defined(CONFIG_ARCH_REALVIEW)
--#define CLCD_IENB 		0x00000018
--#define CLCD_CNTL 		0x0000001c
--#else
--/*
-- * Someone rearranged these two registers on the Versatile
-- * platform...
-- */
--#define CLCD_IENB 		0x0000001c
--#define CLCD_CNTL 		0x00000018
--#endif
--
--#define CLCD_STAT 		0x00000020
--#define CLCD_INTR 		0x00000024
--#define CLCD_UCUR 		0x00000028
--#define CLCD_LCUR 		0x0000002C
-+#define CLCD_PL110_IENB		0x00000018
-+#define CLCD_PL110_CNTL		0x0000001c
-+#define CLCD_PL110_STAT		0x00000020
-+#define CLCD_PL110_INTR 	0x00000024
-+#define CLCD_PL110_UCUR		0x00000028
-+#define CLCD_PL110_LCUR		0x0000002C
-+
-+#define CLCD_PL111_CNTL		0x00000018
-+#define CLCD_PL111_IENB		0x0000001c
-+#define CLCD_PL111_RIS		0x00000020
-+#define CLCD_PL111_MIS		0x00000024
-+#define CLCD_PL111_ICR		0x00000028
-+#define CLCD_PL111_UCUR		0x0000002c
-+#define CLCD_PL111_LCUR		0x00000030
-+
- #define CLCD_PALL 		0x00000200
- #define CLCD_PALETTE		0x00000200
- 
-@@ -147,6 +146,8 @@ struct clcd_fb {
- 	struct clcd_board	*board;
- 	void			*board_data;
- 	void __iomem		*regs;
-+	u16			off_ienb;
-+	u16			off_cntl;
- 	u32			clcd_cntl;
- 	u32			cmap[16];
- };
+ static struct sys_timer cp_timer = {
