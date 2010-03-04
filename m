@@ -1,36 +1,83 @@
-From: tytso@google.com (Theodore Tso)
-Date: Wed, 3 Mar 2010 14:08:31 -0500
-Subject: board/device file names, and machine names
-In-Reply-To: <a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-References: <1267565398.8759.77.camel@c-dwalke-linux.qualcomm.com>
-	<a55d774e1003021456id57a19eud4ca5752ba91d72d@mail.gmail.com>
-Message-ID: <5fca72811003031108n6d4799cbmf9254ab5d9df69d8@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 04 Mar 2010 19:51:52 +0530
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+Message-ID: <1267712512.31654.176.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 2, 2010 at 5:56 PM, Brian Swetland <swetland@google.com> wrote:
+On Thu, 2010-03-04 at 14:51 +0100, Pavel Machek wrote:
+> > On Wed, 2010-03-03 at 21:54 +0000, Pavel Machek wrote:
+> > > > With some drivers (those doing PIO) or subsystems (SCSI mass storage
+> > > > over USB HCD), there is no call to flush_dcache_page() for page cache
+> > > > pages, hence the ARM implementation of update_mmu_cache() doesn't flush
+> > > > the D-cache (and only invalidating the I-cache doesn't help).
+> > > >
+> > > > The viable solutions so far:
+> > > >
+> > > >      1. Implement a PIO mapping API similar to the DMA API which takes
+> > > >         care of the D-cache flushing. This means that PIO drivers would
+> > > >         need to be modified to use an API like pio_kmap()/pio_kunmap()
+> > > >         before writing to a page cache page.
+> > > >      2. Invert the meaning of PG_arch_1 to denote a clean page. This
+> > > >         means that by default newly allocated page cache pages are
+> > > >         considered dirty and even if there isn't a call to
+> > > >         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
+> > > >         This is the PowerPC approach.
+> > > 
+> > > What about option
+> > > 
+> > > 3. Forget about PG_arch_1 and always do the flush?
+> > > 
+> > > How big is the performance impact? Note that current code does not
+> > > even *work* so working, 10% slower code will be an improvement.
+> > 
+> > The driver fix is as simple as calling a flush_dcache_page() and I've
+> > been carrying such patches in my tree for some time now. The question is
+> > whether we need to do it in the driver or not (would need to update
+> > Documentation/cachetlb.txt as well).
+> > 
+> > The reason I'm not in favour always doing the flush is that we penalise
+> > DMA drivers where there is no need for extra D-cache flushing (already
+> > handled by the DMA API; option 1 above is similar, just that it is meant
+> > for PIO usage). An ARM patch I proposed for inverting the meaning of
+> > PG_arch_1 also marks a page as clean in the dma_map_* functions.
+> 
+> But you are not fixing driver bug, are you?
 
->
->
-> We would, of course, prefer to keep the board named mahimahi for all
-> the reasons that have been mentioned in various previous discussions
-> around trout, etc:
-> 1. This was the name used during development for the platform.
-> 2. This is the name the bootloader uses and the production bootloader
-> passes module parameters, etc under this name
->
+Technically, he is.  In the old days, most VI architectures were high
+end enough not to require PIO transfers.  The only exception was an IDE
+driver used by sparc, which lead to the arch specific ide in/out string
+instructions, in which sparc actually did all the necessary flushing.
 
-This to me is the biggest thing to get right --- if there is deployed
-userspace which is using this name (mahimahi) in the bootloader to boot the
-machine, then changing this means that it adds a barrier to users who want
-to use the standard device userland, but who want to try testing their own
-kernel built from mainline.   Assuming that we eventually solve the rest of
-the issues, it would be a darned shame that just because the upstream
-community wanted to be "helpful" in renaming the device, someone wanting to
-build from upstream sources has a to apply a patch reversing the rename so
-that it will actually *work* on a standard Nexus One....
+So no other drivers than old IDE grew up with cache flushing in the PIO
+case (and almost no high end VI hardware had an IDE interface, so they
+rarely got implemented in the arch layer).  However, recently, with the
+transition from old IDE to libata and the prevalence of ARM with more
+commodity hardware, the deficiency is becoming exposed.  Even the PA8000
+workstations now come with an IDE CD, which means we're starting to have
+problems with them as well.
 
--- Ted
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100303/eab4760b/attachment.htm>
+> Seems like ARM has requirement other architectures do not, that is
+> a) not documented anywhere
+> b) causes problems
+> 
+> You could argue that performance improvement (how big is it, anyway?)
+> is worth it, but this should be agreed to by wider community...
+
+Performance is always worth it provided we don't sacrifice correctness.
+The thing which was discovered in this thread is basically that ARM is
+handling deferred flushing (for D/I coherency) in a slightly different
+way from everyone else ... once that's fixed, ARM will likely not have
+the D/I problem, but we'll still have the libata (and other PIO systems)
+D flushing issue.
+
+James
