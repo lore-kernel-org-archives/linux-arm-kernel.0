@@ -1,20 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Mar 2010 21:36:34 +0000
-Subject: DMA using data buffer vmapped in kernel space
-In-Reply-To: <201003042211.28569.thomas@koeller.dyndns.org>
-References: <201003042211.28569.thomas@koeller.dyndns.org>
-Message-ID: <20100304213634.GH13417@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 05 Mar 2010 08:37:40 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+	<1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1267738660.22204.77.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 04, 2010 at 10:11:08PM +0100, Thomas Koeller wrote:
-> I do not understand the purpose of the failing check. The virt_addr_valid()
-> macro checks whether its argument is below high_memory. But why would the
-> virtual address of a DMA data buffer matter at all? After all, the pages
-> are resident, so I cannot see any problem here. Can anybody explain?
+On Thu, 2010-03-04 at 18:07 +0000, Catalin Marinas wrote:
+> 
+> Are you more in favour if a PIO kmap API than inverting the meaning of
+> PG_arch_1? 
 
-Cache maintainence is done using virtual addresses for L1, and
-physical addresses for L2.  There's the need for virtual addresses
-to be translatable to physical addresses, which is only true for
-the kernel direct mapped region (pages between PAGE_OFFSET and
-high_memory).
+My main worry with this approach is the sheer amount of drivers that
+need fixing. I believe inverting PG_arch_1 is a better solution and I
+somewhat fail to see how we end up doing too much flushing if we have
+per-page execute permission (but maybe SH doesn't ?)
+
+> I'm not familiar with SH but for PIO devices the flushing shouldn't be
+> more aggressive. For the DMA devices, Russell suggested that we mark
+> the
+> page as clean (set PG_dcache_clean) in the DMA API to avoid the
+> default
+> flushing.
+
+I really like that idea, as I said earlier, but I'm worried about the I$
+side of things. IE. What I'm trying to say is that I can't see how to do
+that optimisation without ending up with missing I$ invalidations or
+doing way too many of them, unless we have a separate bit to track I$
+state.
+
+> > Note that the PG_dcache_dirty semantics are also outlined in
+> > Documentation/cachetlb.txt for PG_arch_1 usage, so it's hardly
+> esoteric.
+> 
+> Yes, but the flush_dcache_page() semantics outlined in the same file
+> aren't followed by all the PIO drivers in the kernel.
+> 
+
+Cheers,
+Ben.
