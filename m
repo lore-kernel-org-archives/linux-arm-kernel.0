@@ -1,163 +1,142 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] ARM: Realview/Versatile: separate out common sched_clock()
-References: <git-1267729916-5a852a86ebb11b488b619f8386b6df6332c730de@rmk-PC>
-Message-ID: <git-1267729916-2297f112a4e3ab4a5241c68977bf2e1b96438c54@rmk-PC>
+Subject: [PATCH] ARM: Integrator: convert to use register definitions
+References: <git-1267729916-f8760b0e06e1c909bb1153b5cb0434e214c90dbb@rmk-PC>
+Message-ID: <git-1267729916-c5a2fd4062e2ee2088f38ac4e60a5669c1c8ac56@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Provide a common sched_clock() implementation for Versatile and
-Realview.
+Rather than using converted base address plus offset, use the register
+address itself now that IO_ADDRESS() can cope with these.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-realview/core.c         |   16 ----------
- arch/arm/mach-versatile/core.c        |   22 -------------
- arch/arm/plat-versatile/Makefile      |    2 +
- arch/arm/plat-versatile/sched-clock.c |   53 +++++++++++++++++++++++++++++++++
- 4 files changed, 55 insertions(+), 38 deletions(-)
- create mode 100644 arch/arm/plat-versatile/sched-clock.c
+ arch/arm/mach-integrator/core.c          |   12 ++++++------
+ arch/arm/mach-integrator/cpu.c           |    8 ++++----
+ arch/arm/mach-integrator/integrator_ap.c |    2 +-
+ arch/arm/mach-integrator/integrator_cp.c |   10 +++++-----
+ arch/arm/mach-integrator/pci_v3.c        |    6 +++---
+ 5 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 80b8142..f97f001 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -53,8 +53,6 @@
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index d02f0e3..ac2b0c5 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -166,8 +166,8 @@ arch_initcall(integrator_init);
+  *  UART0  7    6
+  *  UART1  5    4
+  */
+-#define SC_CTRLC	(IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_CTRLC_OFFSET)
+-#define SC_CTRLS	(IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_CTRLS_OFFSET)
++#define SC_CTRLC	IO_ADDRESS(INTEGRATOR_SC_CTRLC)
++#define SC_CTRLS	IO_ADDRESS(INTEGRATOR_SC_CTRLS)
  
- #include "core.h"
+ static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *base, unsigned int mctrl)
+ {
+@@ -199,7 +199,7 @@ static struct amba_pl010_data integrator_uart_data = {
+ 	.set_mctrl = integrator_uart_set_mctrl,
+ };
  
--#define REALVIEW_REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
--
- /* used by entry-macro.S and platsmp.c */
- void __iomem *gic_cpu_base_addr;
+-#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET
++#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_CTRL)
  
-@@ -77,20 +75,6 @@ void __init realview_adjust_zones(int node, unsigned long *size,
+ static DEFINE_SPINLOCK(cm_lock);
+ 
+@@ -224,9 +224,9 @@ EXPORT_SYMBOL(cm_control);
+ /*
+  * Where is the timer (VA)?
+  */
+-#define TIMER0_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000000)
+-#define TIMER1_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000100)
+-#define TIMER2_VA_BASE (IO_ADDRESS(INTEGRATOR_CT_BASE)+0x00000200)
++#define TIMER0_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER0_BASE)
++#define TIMER1_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER1_BASE)
++#define TIMER2_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER2_BASE)
+ 
+ /*
+  * How long is the timer interval?
+diff --git a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
+index b761879..7f1b73b 100644
+--- a/arch/arm/mach-integrator/cpu.c
++++ b/arch/arm/mach-integrator/cpu.c
+@@ -26,10 +26,10 @@
+ 
+ static struct cpufreq_driver integrator_driver;
+ 
+-#define CM_ID  	(IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_ID_OFFSET)
+-#define CM_OSC	(IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_OSC_OFFSET)
+-#define CM_STAT (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_STAT_OFFSET)
+-#define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
++#define CM_ID  	IO_ADDRESS(INTEGRATOR_HDR_ID)
++#define CM_OSC	IO_ADDRESS(INTEGRATOR_HDR_OSC)
++#define CM_STAT IO_ADDRESS(INTEGRATOR_HDR_STAT)
++#define CM_LOCK IO_ADDRESS(INTEGRATOR_HDR_LOCK)
+ 
+ static const struct icst525_params lclk_params = {
+ 	.ref		= 24000,
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 45bba04..c89b231 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -56,7 +56,7 @@
+ #define VA_IC_BASE	IO_ADDRESS(INTEGRATOR_IC_BASE) 
+ #define VA_SC_BASE	IO_ADDRESS(INTEGRATOR_SC_BASE)
+ #define VA_EBI_BASE	IO_ADDRESS(INTEGRATOR_EBI_BASE)
+-#define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_IC_OFFSET
++#define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_IC)
+ 
+ /*
+  * Logical      Physical
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 333c297..c0161df 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -47,7 +47,7 @@
+ 
+ #define INTCP_PA_CLCD_BASE		0xc0000000
+ 
+-#define INTCP_VA_CIC_BASE		IO_ADDRESS(INTEGRATOR_HDR_BASE) + 0x40
++#define INTCP_VA_CIC_BASE		IO_ADDRESS(INTEGRATOR_HDR_BASE + 0x40)
+ #define INTCP_VA_PIC_BASE		IO_ADDRESS(INTEGRATOR_IC_BASE)
+ #define INTCP_VA_SIC_BASE		IO_ADDRESS(INTEGRATOR_CP_SIC_BASE)
+ 
+@@ -265,8 +265,8 @@ static void __init intcp_init_irq(void)
+ /*
+  * Clock handling
+  */
+-#define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
+-#define CM_AUXOSC (IO_ADDRESS(INTEGRATOR_HDR_BASE)+0x1c)
++#define CM_LOCK IO_ADDRESS(INTEGRATOR_HDR_LOCK)
++#define CM_AUXOSC IO_ADDRESS(INTEGRATOR_HDR_BASE + 0x1c)
+ 
+ static const struct icst525_params cp_auxvco_params = {
+ 	.ref		= 24000,
+@@ -393,8 +393,8 @@ static struct platform_device *intcp_devs[] __initdata = {
+  */
+ static unsigned int mmc_status(struct device *dev)
+ {
+-	unsigned int status = readl(IO_ADDRESS(0xca000000) + 4);
+-	writel(8, IO_ADDRESS(INTEGRATOR_CP_CTL_BASE) + 8);
++	unsigned int status = readl(IO_ADDRESS(0xca000000 + 4));
++	writel(8, IO_ADDRESS(INTEGRATOR_CP_CTL_BASE + 8));
+ 
+ 	return status & 8;
  }
- #endif
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index e87fe9f..e549162 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -391,9 +391,9 @@ static int __init pci_v3_setup_resources(struct resource **resource)
+  * means I can't get additional information on the reason for the pm2fb
+  * problems.  I suppose I'll just have to mind-meld with the machine. ;)
+  */
+-#define SC_PCI     (IO_ADDRESS(INTEGRATOR_SC_BASE) + INTEGRATOR_SC_PCIENABLE_OFFSET)
+-#define SC_LBFADDR (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x20)
+-#define SC_LBFCODE (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x24)
++#define SC_PCI     IO_ADDRESS(INTEGRATOR_SC_PCIENABLE)
++#define SC_LBFADDR IO_ADDRESS(INTEGRATOR_SC_BASE + 0x20)
++#define SC_LBFCODE IO_ADDRESS(INTEGRATOR_SC_BASE + 0x24)
  
--/*
-- * This is the RealView sched_clock implementation.  This has
-- * a resolution of 41.7ns, and a maximum value of about 179s.
-- */
--unsigned long long sched_clock(void)
--{
--	unsigned long long v;
--
--	v = (unsigned long long)readl(REALVIEW_REFCOUNTER) * 125;
--	do_div(v, 3);
--
--	return v;
--}
--
- 
- #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
- 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index b68ddd3..490fc75 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -28,7 +28,6 @@
- #include <linux/amba/clcd.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
--#include <linux/cnt32_to_63.h>
- #include <linux/io.h>
- 
- #include <asm/clkdev.h>
-@@ -227,27 +226,6 @@ void __init versatile_map_io(void)
- 	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
- }
- 
--#define VERSATILE_REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
--
--/*
-- * This is the Versatile sched_clock implementation.  This has
-- * a resolution of 41.7ns, and a maximum value of about 35583 days.
-- *
-- * The return value is guaranteed to be monotonic in that range as
-- * long as there is always less than 89 seconds between successive
-- * calls to this function.
-- */
--unsigned long long sched_clock(void)
--{
--	unsigned long long v = cnt32_to_63(readl(VERSATILE_REFCOUNTER));
--
--	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
--	v *= 125<<1;
--	do_div(v, 3<<1);
--
--	return v;
--}
--
- 
- #define VERSATILE_FLASHCTRL    (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_FLASH_OFFSET)
- 
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 334d2f1..9b1a668 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,2 +1,4 @@
- obj-y	:= clock.o
- obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
-+obj-$(CONFIG_ARCH_REALVIEW) += sched-clock.o
-+obj-$(CONFIG_ARCH_VERSATILE) += sched-clock.o
-diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-new file mode 100644
-index 0000000..9768cf7
---- /dev/null
-+++ b/arch/arm/plat-versatile/sched-clock.c
-@@ -0,0 +1,53 @@
-+/*
-+ *  linux/arch/arm/plat-versatile/sched-clock.c
-+ *
-+ *  Copyright (C) 1999 - 2003 ARM Limited
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+#include <linux/cnt32_to_63.h>
-+#include <linux/io.h>
-+#include <asm/div64.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+
-+#ifdef VERSATILE_SYS_BASE
-+#define REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
-+#endif
-+
-+#ifdef REALVIEW_SYS_BASE
-+#define REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
-+#endif
-+
-+/*
-+ * This is the Realview and Versatile sched_clock implementation.  This
-+ * has a resolution of 41.7ns, and a maximum value of about 35583 days.
-+ *
-+ * The return value is guaranteed to be monotonic in that range as
-+ * long as there is always less than 89 seconds between successive
-+ * calls to this function.
-+ */
-+unsigned long long sched_clock(void)
-+{
-+	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
-+
-+	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
-+	v *= 125<<1;
-+	do_div(v, 3<<1);
-+
-+	return v;
-+}
+ static int
+ v3_pci_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
