@@ -1,31 +1,66 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 4 Mar 2010 23:16:29 +0000
-Subject: [PULL] Pull request for for-rmk/samsung5
-In-Reply-To: <20100302234322.GB29715@n2100.arm.linux.org.uk>
-References: <20100225000919.GA28433@fluff.org.uk>
-	<20100302234322.GB29715@n2100.arm.linux.org.uk>
-Message-ID: <20100304231629.GC24864@trinity.fluff.org>
+Date: Thu, 4 Mar 2010 23:20:06 +0000
+Subject: [PATCH] s3c244x: Fix compilation issue due to moved
+	cpufreq-related files
+In-Reply-To: <1267627095-24200-1-git-send-email-anarsoul@gmail.com>
+References: <1267627095-24200-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100304232006.GA31126@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 02, 2010 at 11:43:22PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 25, 2010 at 12:09:19AM +0000, Ben Dooks wrote:
-> >   git://git.fluff.org/bjdooks/linux.git for-rmk/samsung5
+On Wed, Mar 03, 2010 at 04:38:15PM +0200, Vasily Khoruzhick wrote:
+> cpufreq-related files were moved but Makefiles were not modified, and it
+> breaks compilation when CONFIG_S3C2440_CPUFREQ=y.
+
+I've fixed this by moving the files instead of hte makefile. Commit will
+be in next-samsung soon. Thanks for pointing this out.
+
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-s3c2440/Makefile |    4 ----
+>  arch/arm/plat-s3c24xx/Makefile |    4 ++++
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> Conflicts in arch/arm/Kconfig and arch/arm/Makefile - please check
-> the resulting merge carefully.
+> diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
+> index c85ba32..1825516 100644
+> --- a/arch/arm/mach-s3c2440/Makefile
+> +++ b/arch/arm/mach-s3c2440/Makefile
+> @@ -19,10 +19,6 @@ obj-$(CONFIG_S3C2440_DMA)	+= dma.o
+>  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o
+>  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-irq.o
+>  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-clock.o
+> -obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
+> -
+> -obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
+> -obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
+>  
+>  # Machine support
+>  
+> diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
+> index c2237c4..b3a7ac2 100644
+> --- a/arch/arm/plat-s3c24xx/Makefile
+> +++ b/arch/arm/plat-s3c24xx/Makefile
+> @@ -22,6 +22,10 @@ obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
+>  
+>  obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpu-freq.o
+>  obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpu-freq-debugfs.o
+> +obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
+> +
+> +obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
+> +obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
+>  
+>  # Architecture dependant builds
+>  
+> -- 
+> 1.7.0
 > 
-> Unfortunately, no patch available since devel-stable has multiple
-> ancestors.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I've pulled the git tree, and there is one minor problem missed due to
-no default support for in any of the s3c_defconfigs for cpu-freq and
-the s3c6400_defconfig currently fails with missing iisv4 device.
-
-I can build for-rmk/samsung6 from for-rmk/samsung5 with the fixes for
-the audio driver and the cpu-freq in. I'm just awaiting an OK on whether
-to merge the header file fix for the s3c-hsotg driver in with this.
-
+-- 
 -- 
 Ben
 
