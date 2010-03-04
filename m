@@ -1,35 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Mar 2010 21:44:35 +0000
-Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <1267727802.6526.545.camel@e102109-lin.cambridge.arm.com>
-References: <20100302172947.27766.61539.stgit@e102109-lin.cambridge.arm.com>
-	<20100304164416.GD13417@n2100.arm.linux.org.uk>
-	<1267727802.6526.545.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 04 Mar 2010 22:11:51 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267738660.22204.77.camel@pasglop>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+	<1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+	<1267738660.22204.77.camel@pasglop>
+Message-ID: <1267740711.30572.5.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 04, 2010 at 06:36:42PM +0000, Catalin Marinas wrote:
-> ARM: Assume new page cache pages have dirty D-cache
+On Thu, 2010-03-04 at 21:37 +0000, Benjamin Herrenschmidt wrote:
+> On Thu, 2010-03-04 at 18:07 +0000, Catalin Marinas wrote:
+> > I'm not familiar with SH but for PIO devices the flushing shouldn't be
+> > more aggressive. For the DMA devices, Russell suggested that we mark
+> > the page as clean (set PG_dcache_clean) in the DMA API to avoid the
+> > default flushing.
 > 
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> There are places in Linux where writes to newly allocated page cache
-> pages happen without a subsequent call to flush_dcache_page() (several
-> PIO drivers including USB HCD). This patch changes the meaning of
-> PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-> mapped page in update_mmu_cache().
-> 
-> The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-> function to avoid additional cache flushing in update_mmu_cache().
+> I really like that idea, as I said earlier, but I'm worried about the I$
+> side of things. IE. What I'm trying to say is that I can't see how to do
+> that optimisation without ending up with missing I$ invalidations or
+> doing way too many of them, unless we have a separate bit to track I$
+> state.
 
-As I just realised, this is going to subject all pages placed into
-userspace with a D cache flush - even anonymous pages, and those
-which we've been careful to deal with the cache issues already (eg,
-via the COW page copying code.)
+But does this optimisation really matter? I think with careful checking
+in set_pte_at(), you are not going to invalidate the I-cache more than
+necessary. If the original page wasn't pte_present() you would need to
+do the I-cache invalidation. The other cases where set_pte_at() is
+called for LRU (pte_young) or COW (pte_write) we can avoid the extra
+invalidation.
 
-I think all the copypage functions need to set PG_dcache_clean on the
-new pages once their copy has completed.
-
-I wonder if there's any other anonymous page creating functions which
-could do with a similar treatment...
+-- 
+Catalin
