@@ -1,415 +1,189 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] ARM: Integrator: move 16-bit timer support to
-	Integrator/AP
-References: <git-1267729916-d812bfe0155031706019561409a54500168b6caf@rmk-PC>
-Message-ID: <git-1267729916-5a852a86ebb11b488b619f8386b6df6332c730de@rmk-PC>
+Subject: [PATCH] ARM: ICST: icst.*_ps_to_vco() functions are unused,
+	remove them
+References: <git-1267729916-d7b7baa36d825d0372850f49532dd8991b625e57@rmk-PC>
+Message-ID: <git-1267729916-d9e7099903d7e6aeb982cf23eca37d0d92e92484@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Only Integrator/AP has 16-bit timers, so move the support into the
-Integrator/AP specific support files.
+These functions were originally implemented for the CLCD driver before
+we had clk API support.  Since the CLCD driver does not use these
+anymore, we can remove them.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/common.h        |    1 -
- arch/arm/mach-integrator/core.c          |  157 -----------------------------
- arch/arm/mach-integrator/integrator_ap.c |  158 +++++++++++++++++++++++++++++-
- arch/arm/mach-integrator/integrator_cp.c |    2 -
- 4 files changed, 155 insertions(+), 163 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/common.h
+ arch/arm/common/icst307.c               |   64 ------------------------------
+ arch/arm/common/icst525.c               |   65 -------------------------------
+ arch/arm/include/asm/hardware/icst307.h |    1 -
+ arch/arm/include/asm/hardware/icst525.h |    1 -
+ 4 files changed, 0 insertions(+), 131 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
-deleted file mode 100644
-index cdbe710..0000000
---- a/arch/arm/mach-integrator/common.h
-+++ /dev/null
-@@ -1 +0,0 @@
--extern void integrator_time_init(u32, unsigned int);
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index ac2b0c5..b02cfc0 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -19,8 +19,6 @@
- #include <linux/termios.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/serial.h>
--#include <linux/clocksource.h>
--#include <linux/clockchips.h>
- #include <linux/io.h>
- 
- #include <asm/clkdev.h>
-@@ -28,14 +26,11 @@
- #include <mach/hardware.h>
- #include <mach/platform.h>
- #include <asm/irq.h>
--#include <asm/hardware/arm_timer.h>
- #include <mach/cm.h>
- #include <asm/system.h>
- #include <asm/leds.h>
- #include <asm/mach/time.h>
- 
--#include "common.h"
--
- static struct amba_pl010_data integrator_uart_data;
- 
- static struct amba_device rtc_device = {
-@@ -220,155 +215,3 @@ void cm_control(u32 mask, u32 set)
+diff --git a/arch/arm/common/icst307.c b/arch/arm/common/icst307.c
+index 2eebd96..f78f5b5 100644
+--- a/arch/arm/common/icst307.c
++++ b/arch/arm/common/icst307.c
+@@ -95,67 +95,3 @@ icst307_khz_to_vco(const struct icst_params *p, unsigned long freq)
  }
  
- EXPORT_SYMBOL(cm_control);
+ EXPORT_SYMBOL(icst307_khz_to_vco);
 -
--/*
-- * Where is the timer (VA)?
-- */
--#define TIMER0_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER0_BASE)
--#define TIMER1_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER1_BASE)
--#define TIMER2_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER2_BASE)
--
--/*
-- * How long is the timer interval?
-- */
--#define TIMER_INTERVAL	(TICKS_PER_uSEC * mSEC_10)
--#if TIMER_INTERVAL >= 0x100000
--#define TICKS2USECS(x)	(256 * (x) / TICKS_PER_uSEC)
--#elif TIMER_INTERVAL >= 0x10000
--#define TICKS2USECS(x)	(16 * (x) / TICKS_PER_uSEC)
--#else
--#define TICKS2USECS(x)	((x) / TICKS_PER_uSEC)
--#endif
--
--static unsigned long timer_reload;
--
--static void __iomem * const clksrc_base = (void __iomem *)TIMER2_VA_BASE;
--
--static cycle_t timersp_read(struct clocksource *cs)
+-struct icst_vco
+-icst307_ps_to_vco(const struct icst_params *p, unsigned long period)
 -{
--	return ~(readl(clksrc_base + TIMER_VALUE) & 0xffff);
--}
+-	struct icst_vco vco = { .s = 1, .v = p->vd_max, .r = p->rd_max };
+-	unsigned long f, ps;
+-	unsigned int i = 0, rd, best = (unsigned int)-1;
 -
--static struct clocksource clocksource_timersp = {
--	.name		= "timer2",
--	.rating		= 200,
--	.read		= timersp_read,
--	.mask		= CLOCKSOURCE_MASK(16),
--	.shift		= 16,
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
+-	ps = 1000000000UL / p->vco_max;
 -
--static void integrator_clocksource_init(u32 khz)
--{
--	struct clocksource *cs = &clocksource_timersp;
--	void __iomem *base = clksrc_base;
--	u32 ctrl = TIMER_CTRL_ENABLE;
+-	/*
+-	 * First, find the PLL output divisor such
+-	 * that the PLL output is within spec.
+-	 */
+-	do {
+-		f = period / s2div[idx2s[i]];
 -
--	if (khz >= 1500) {
--		khz /= 16;
--		ctrl = TIMER_CTRL_DIV16;
+-		/*
+-		 * f must be between 6MHz and 200MHz (3.3 or 5V)
+-		 */
+-		if (f >= ps && f < 1000000000UL / 6000 + 1)
+-			break;
+-	} while (i < ARRAY_SIZE(idx2s));
+-
+-	if (i >= ARRAY_SIZE(idx2s))
+-		return vco;
+-
+-	vco.s = idx2s[i];
+-
+-	ps = 500000000UL / p->ref;
+-
+-	/*
+-	 * Now find the closest divisor combination
+-	 * which gives a PLL output of 'f'.
+-	 */
+-	for (rd = p->rd_min; rd <= p->rd_max; rd++) {
+-		unsigned long f_in_div, f_pll;
+-		unsigned int vd;
+-		int f_diff;
+-
+-		f_in_div = ps * rd;
+-
+-		vd = (f_in_div + f / 2) / f;
+-		if (vd < p->vd_min || vd > p->vd_max)
+-			continue;
+-
+-		f_pll = (f_in_div + vd / 2) / vd;
+-		f_diff = f_pll - f;
+-		if (f_diff < 0)
+-			f_diff = -f_diff;
+-
+-		if ((unsigned)f_diff < best) {
+-			vco.v = vd - 8;
+-			vco.r = rd - 2;
+-			if (f_diff == 0)
+-				break;
+-			best = f_diff;
+-		}
 -	}
 -
--	writel(ctrl, base + TIMER_CTRL);
--	writel(0xffff, base + TIMER_LOAD);
--
--	cs->mult = clocksource_khz2mult(khz, cs->shift);
--	clocksource_register(cs);
+-	return vco;
 -}
 -
--static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
--
--/*
-- * IRQ handler for the timer
-- */
--static irqreturn_t integrator_timer_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--
--	/* clear the interrupt */
--	writel(1, clkevt_base + TIMER_INTCLR);
--
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
--}
--
--static void clkevt_set_mode(enum clock_event_mode mode, struct clock_event_device *evt)
--{
--	u32 ctrl = readl(clkevt_base + TIMER_CTRL) & ~TIMER_CTRL_ENABLE;
--
--	BUG_ON(mode == CLOCK_EVT_MODE_ONESHOT);
--
--	if (mode == CLOCK_EVT_MODE_PERIODIC) {
--		writel(ctrl, clkevt_base + TIMER_CTRL);
--		writel(timer_reload, clkevt_base + TIMER_LOAD);
--		ctrl |= TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
--	}
--
--	writel(ctrl, clkevt_base + TIMER_CTRL);
--}
--
--static int clkevt_set_next_event(unsigned long next, struct clock_event_device *evt)
--{
--	unsigned long ctrl = readl(clkevt_base + TIMER_CTRL);
--
--	writel(ctrl & ~TIMER_CTRL_ENABLE, clkevt_base + TIMER_CTRL);
--	writel(next, clkevt_base + TIMER_LOAD);
--	writel(ctrl | TIMER_CTRL_ENABLE, clkevt_base + TIMER_CTRL);
--
--	return 0;
--}
--
--static struct clock_event_device integrator_clockevent = {
--	.name		= "timer1",
--	.shift		= 34,
--	.features	= CLOCK_EVT_FEAT_PERIODIC,
--	.set_mode	= clkevt_set_mode,
--	.set_next_event	= clkevt_set_next_event,
--	.rating		= 300,
--	.cpumask	= cpu_all_mask,
--};
--
--static struct irqaction integrator_timer_irq = {
--	.name		= "timer",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= integrator_timer_interrupt,
--	.dev_id		= &integrator_clockevent,
--};
--
--static void integrator_clockevent_init(u32 khz, unsigned int ctrl)
--{
--	struct clock_event_device *evt = &integrator_clockevent;
--
--	if (khz * 1000 > 0x100000 * HZ) {
--		khz /= 256;
--		ctrl |= TIMER_CTRL_DIV256;
--	} else if (khz * 1000 > 0x10000 * HZ) {
--		khz /= 16;
--		ctrl |= TIMER_CTRL_DIV16;
--	}
--
--	timer_reload = khz * 1000 / HZ;
--	writel(ctrl, clkevt_base + TIMER_CTRL);
--
--	evt->irq = IRQ_TIMERINT1;
--	evt->mult = div_sc(khz, NSEC_PER_MSEC, evt->shift);
--	evt->max_delta_ns = clockevent_delta2ns(0xffff, evt);
--	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
--
--	setup_irq(IRQ_TIMERINT1, &integrator_timer_irq);
--	clockevents_register_device(evt);
--}
--
--/*
-- * Set up timer(s).
-- */
--void __init integrator_time_init(u32 khz, unsigned int ctrl)
--{
--	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
--	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
--	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
--
--	integrator_clocksource_init(khz);
--	integrator_clockevent_init(khz, ctrl);
--}
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index c89b231..227cf4d 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -27,10 +27,14 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/kmi.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-+#include <asm/hardware/arm_timer.h>
- #include <asm/irq.h>
- #include <asm/setup.h>
- #include <asm/param.h>		/* HZ */
-@@ -44,8 +48,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--#include "common.h"
--
- /* 
-  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
-  * is the (PA >> 12).
-@@ -335,9 +337,159 @@ static void __init ap_init(void)
- 	}
+-EXPORT_SYMBOL(icst307_ps_to_vco);
+diff --git a/arch/arm/common/icst525.c b/arch/arm/common/icst525.c
+index fd5c2e7..eadf983 100644
+--- a/arch/arm/common/icst525.c
++++ b/arch/arm/common/icst525.c
+@@ -93,68 +93,3 @@ icst525_khz_to_vco(const struct icst_params *p, unsigned long freq)
  }
  
-+/*
-+ * Where is the timer (VA)?
-+ */
-+#define TIMER0_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER0_BASE)
-+#define TIMER1_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER1_BASE)
-+#define TIMER2_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER2_BASE)
-+
-+/*
-+ * How long is the timer interval?
-+ */
-+#define TIMER_INTERVAL	(TICKS_PER_uSEC * mSEC_10)
-+#if TIMER_INTERVAL >= 0x100000
-+#define TICKS2USECS(x)	(256 * (x) / TICKS_PER_uSEC)
-+#elif TIMER_INTERVAL >= 0x10000
-+#define TICKS2USECS(x)	(16 * (x) / TICKS_PER_uSEC)
-+#else
-+#define TICKS2USECS(x)	((x) / TICKS_PER_uSEC)
-+#endif
-+
-+static unsigned long timer_reload;
-+
-+static void __iomem * const clksrc_base = (void __iomem *)TIMER2_VA_BASE;
-+
-+static cycle_t timersp_read(struct clocksource *cs)
-+{
-+	return ~(readl(clksrc_base + TIMER_VALUE) & 0xffff);
-+}
-+
-+static struct clocksource clocksource_timersp = {
-+	.name		= "timer2",
-+	.rating		= 200,
-+	.read		= timersp_read,
-+	.mask		= CLOCKSOURCE_MASK(16),
-+	.shift		= 16,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static void integrator_clocksource_init(u32 khz)
-+{
-+	struct clocksource *cs = &clocksource_timersp;
-+	void __iomem *base = clksrc_base;
-+	u32 ctrl = TIMER_CTRL_ENABLE;
-+
-+	if (khz >= 1500) {
-+		khz /= 16;
-+		ctrl = TIMER_CTRL_DIV16;
-+	}
-+
-+	writel(ctrl, base + TIMER_CTRL);
-+	writel(0xffff, base + TIMER_LOAD);
-+
-+	cs->mult = clocksource_khz2mult(khz, cs->shift);
-+	clocksource_register(cs);
-+}
-+
-+static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
-+
-+/*
-+ * IRQ handler for the timer
-+ */
-+static irqreturn_t integrator_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	/* clear the interrupt */
-+	writel(1, clkevt_base + TIMER_INTCLR);
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void clkevt_set_mode(enum clock_event_mode mode, struct clock_event_device *evt)
-+{
-+	u32 ctrl = readl(clkevt_base + TIMER_CTRL) & ~TIMER_CTRL_ENABLE;
-+
-+	BUG_ON(mode == CLOCK_EVT_MODE_ONESHOT);
-+
-+	if (mode == CLOCK_EVT_MODE_PERIODIC) {
-+		writel(ctrl, clkevt_base + TIMER_CTRL);
-+		writel(timer_reload, clkevt_base + TIMER_LOAD);
-+		ctrl |= TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
-+	}
-+
-+	writel(ctrl, clkevt_base + TIMER_CTRL);
-+}
-+
-+static int clkevt_set_next_event(unsigned long next, struct clock_event_device *evt)
-+{
-+	unsigned long ctrl = readl(clkevt_base + TIMER_CTRL);
-+
-+	writel(ctrl & ~TIMER_CTRL_ENABLE, clkevt_base + TIMER_CTRL);
-+	writel(next, clkevt_base + TIMER_LOAD);
-+	writel(ctrl | TIMER_CTRL_ENABLE, clkevt_base + TIMER_CTRL);
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device integrator_clockevent = {
-+	.name		= "timer1",
-+	.shift		= 34,
-+	.features	= CLOCK_EVT_FEAT_PERIODIC,
-+	.set_mode	= clkevt_set_mode,
-+	.set_next_event	= clkevt_set_next_event,
-+	.rating		= 300,
-+	.cpumask	= cpu_all_mask,
-+};
-+
-+static struct irqaction integrator_timer_irq = {
-+	.name		= "timer",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= integrator_timer_interrupt,
-+	.dev_id		= &integrator_clockevent,
-+};
-+
-+static void integrator_clockevent_init(u32 khz)
-+{
-+	struct clock_event_device *evt = &integrator_clockevent;
-+	unsigned int ctrl = 0;
-+
-+	if (khz * 1000 > 0x100000 * HZ) {
-+		khz /= 256;
-+		ctrl |= TIMER_CTRL_DIV256;
-+	} else if (khz * 1000 > 0x10000 * HZ) {
-+		khz /= 16;
-+		ctrl |= TIMER_CTRL_DIV16;
-+	}
-+
-+	timer_reload = khz * 1000 / HZ;
-+	writel(ctrl, clkevt_base + TIMER_CTRL);
-+
-+	evt->irq = IRQ_TIMERINT1;
-+	evt->mult = div_sc(khz, NSEC_PER_MSEC, evt->shift);
-+	evt->max_delta_ns = clockevent_delta2ns(0xffff, evt);
-+	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
-+
-+	setup_irq(IRQ_TIMERINT1, &integrator_timer_irq);
-+	clockevents_register_device(evt);
-+}
-+
-+/*
-+ * Set up timer(s).
-+ */
- static void __init ap_init_timer(void)
- {
--	integrator_time_init(TICKS_PER_uSEC * 1000, 0);
-+	u32 khz = TICKS_PER_uSEC * 1000;
-+
-+	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
-+	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
-+	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
-+
-+	integrator_clocksource_init(khz);
-+	integrator_clockevent_init(khz);
- }
- 
- static struct sys_timer ap_timer = {
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index a7575c4..5a5a8c1 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -43,8 +43,6 @@
- 
- #include <plat/timer-sp.h>
- 
--#include "common.h"
+ EXPORT_SYMBOL(icst525_khz_to_vco);
 -
- #define INTCP_PA_FLASH_BASE		0x24000000
- #define INTCP_FLASH_SIZE		SZ_32M
+-struct icst_vco
+-icst525_ps_to_vco(const struct icst_params *p, unsigned long period)
+-{
+-	struct icst_vco vco = { .s = 1, .v = p->vd_max, .r = p->rd_max };
+-	unsigned long f, ps;
+-	unsigned int i = 0, rd, best = (unsigned int)-1;
+-
+-	ps = 1000000000UL / p->vco_max;
+-
+-	/*
+-	 * First, find the PLL output divisor such
+-	 * that the PLL output is within spec.
+-	 */
+-	do {
+-		f = period / s2div[idx2s[i]];
+-
+-		/*
+-		 * f must be between 10MHz and
+-		 *  320MHz (5V) or 200MHz (3V)
+-		 */
+-		if (f >= ps && f < 100000)
+-			break;
+-	} while (i < ARRAY_SIZE(idx2s));
+-
+-	if (i >= ARRAY_SIZE(idx2s))
+-		return vco;
+-
+-	vco.s = idx2s[i];
+-
+-	ps = 500000000UL / p->ref;
+-
+-	/*
+-	 * Now find the closest divisor combination
+-	 * which gives a PLL output of 'f'.
+-	 */
+-	for (rd = p->rd_min; rd <= p->rd_max; rd++) {
+-		unsigned long f_in_div, f_pll;
+-		unsigned int vd;
+-		int f_diff;
+-
+-		f_in_div = ps * rd;
+-
+-		vd = (f_in_div + f / 2) / f;
+-		if (vd < p->vd_min || vd > p->vd_max)
+-			continue;
+-
+-		f_pll = (f_in_div + vd / 2) / vd;
+-		f_diff = f_pll - f;
+-		if (f_diff < 0)
+-			f_diff = -f_diff;
+-
+-		if ((unsigned)f_diff < best) {
+-			vco.v = vd - 8;
+-			vco.r = rd - 2;
+-			if (f_diff == 0)
+-				break;
+-			best = f_diff;
+-		}
+-	}
+-
+-	return vco;
+-}
+-
+-EXPORT_SYMBOL(icst525_ps_to_vco);
+diff --git a/arch/arm/include/asm/hardware/icst307.h b/arch/arm/include/asm/hardware/icst307.h
+index 85932e9..8d0820a 100644
+--- a/arch/arm/include/asm/hardware/icst307.h
++++ b/arch/arm/include/asm/hardware/icst307.h
+@@ -20,6 +20,5 @@
  
+ unsigned long icst307_khz(const struct icst_params *p, struct icst_vco vco);
+ struct icst_vco icst307_khz_to_vco(const struct icst_params *p, unsigned long freq);
+-struct icst_vco icst307_ps_to_vco(const struct icst_params *p, unsigned long period);
+ 
+ #endif
+diff --git a/arch/arm/include/asm/hardware/icst525.h b/arch/arm/include/asm/hardware/icst525.h
+index 170deb2..42a274e 100644
+--- a/arch/arm/include/asm/hardware/icst525.h
++++ b/arch/arm/include/asm/hardware/icst525.h
+@@ -18,6 +18,5 @@
+ 
+ unsigned long icst525_khz(const struct icst_params *p, struct icst_vco vco);
+ struct icst_vco icst525_khz_to_vco(const struct icst_params *p, unsigned long freq);
+-struct icst_vco icst525_ps_to_vco(const struct icst_params *p, unsigned long period);
+ 
+ #endif
