@@ -1,38 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 4 Mar 2010 20:42:41 +0100
-Subject: [PATCH] V4L/DVB: mx1-camera: compile fix
-In-Reply-To: <20100304192623.GA14587@pengutronix.de>
-References: <1267721687-19697-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<Pine.LNX.4.64.1003041811160.4825@axis700.grange>
-	<20100304192623.GA14587@pengutronix.de>
-Message-ID: <20100304194241.GG19843@pengutronix.de>
+From: thomas@koeller.dyndns.org (Thomas Koeller)
+Date: Thu, 4 Mar 2010 22:11:08 +0100
+Subject: DMA using data buffer vmapped in kernel space
+Message-ID: <201003042211.28569.thomas@koeller.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 04, 2010 at 08:26:23PM +0100, Uwe Kleine-K?nig wrote:
-> Hi Guennadi,
-> 
-> On Thu, Mar 04, 2010 at 06:13:38PM +0100, Guennadi Liakhovetski wrote:
-> > > +#undef DMA_BASE 
-> > > +#define DMA_BASE MX1_IO_ADDRESS(MX1_DMA_BASE_ADDR)
-> > 
-> > I don't like this. Why the "undef"? Is DMA_BASE already defined? where and 
-> > what is it? If it is - we better use a different name, if not - just 
-> > remove the undef, please.
-> yes, it's not pretty, but I wanted to make a minimal patch.
-> 
-> arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h has:
-> 
-> 	#define DMA_BASE IO_ADDRESS(DMA_BASE_ADDR)
+Hi,
 
-This is only used in the mx1 camera driver, so you can just remove it
-from dma-mx1-mx2.h and use MX1_IO_ADDRESS(MX1_DMA_BASE_ADDR) in the camera
-driver.
+I am writing a driver that loads a firmware blob into its device. The driver
+calls request_firmware() and gets a struct firmware * that contains a
+data buffer pointer in its 'data' member. The buffer is then passed to a
+SPI driver to send it to the device.
 
-Sascha
+The SPI driver uses DMA and, in preparation for that, eventually calls
+dma_cache_maint() (contained in arch/arm/mm/dma-mapping.c). At this
+point, the whole thing goes bad because there is a check:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	BUG_ON(!virt_addr_valid(start) || !virt_addr_valid(start + size - 1));
+
+and the address obtained via request_firmware() fails this check.
+
+The request_firmware() function creates the data buffer by allocating a
+number of single pages in a loop, places them in an array, and finally
+creates a kernel mapping by calling vmap(). The vmap() result is the
+buffer address passed to the DMA.
+
+I do not understand the purpose of the failing check. The virt_addr_valid()
+macro checks whether its argument is below high_memory. But why would the
+virtual address of a DMA data buffer matter at all? After all, the pages
+are resident, so I cannot see any problem here. Can anybody explain?
+
+Thomas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100304/11d54161/attachment.sig>
