@@ -1,38 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Mar 2010 16:44:16 +0000
-Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <20100302172947.27766.61539.stgit@e102109-lin.cambridge.arm.com>
-References: <20100302172947.27766.61539.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100304164416.GD13417@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  4 Mar 2010 17:54:46 +0100
+Subject: [PATCH] V4L/DVB: mx1-camera: compile fix
+Message-ID: <1267721687-19697-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 02, 2010 at 05:34:29PM +0000, Catalin Marinas wrote:
-> There are places in Linux where writes to newly allocated page cache
-> pages happen without a subsequent call to flush_dcache_page() (several
-> PIO drivers including USB HCD). This patch changes the meaning of
-> PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-> mapped page in update_mmu_cache().
-> 
-> The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-> function to avoid additional cache flushing in update_mmu_cache().
-...
->  arch/arm/include/asm/cacheflush.h |    6 +++---
->  arch/arm/mm/copypage-v6.c         |    2 +-
->  arch/arm/mm/dma-mapping.c         |    5 +++++
->  arch/arm/mm/fault-armv.c          |    2 +-
->  arch/arm/mm/flush.c               |    2 +-
->  5 files changed, 11 insertions(+), 6 deletions(-)
+This is a regression of
 
-Could you please send for RFC a fuller patch which covers all places that
-PG_dcache_dirty is used and/or mentioned?
+	7d58289 (mx1: prefix SOC specific defines with MX1_ and deprecate old names)
 
-$ grep PG_dcache_dirty arch/arm -r
-arch/arm/mm/copypage-v6.c:      if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-arch/arm/mm/fault-armv.c: *  1. If PG_dcache_dirty is set for the page, we need to ensure
-arch/arm/mm/fault-armv.c:       if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
-arch/arm/mm/flush.c:            set_bit(PG_dcache_dirty, &page->flags);
-arch/arm/mm/copypage-v4mc.c:    if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-arch/arm/mm/copypage-xscale.c:  if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-arch/arm/include/asm/tlbflush.h: * if PG_dcache_dirty is set for the page, we need to ensure that any
-arch/arm/include/asm/cacheflush.h:#define PG_dcache_dirty PG_arch_1
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+this went unnoticed up to now as mx1_defconfig doesn't include support
+for mx1-camera.
+I have a patch pending to change that though.
+
+Best regards
+Uwe
+
+ drivers/media/video/mx1_camera.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/media/video/mx1_camera.c b/drivers/media/video/mx1_camera.c
+index 2ba14fb..38e5315 100644
+--- a/drivers/media/video/mx1_camera.c
++++ b/drivers/media/video/mx1_camera.c
+@@ -45,6 +45,9 @@
+ #include <mach/hardware.h>
+ #include <mach/mx1_camera.h>
+ 
++#undef DMA_BASE 
++#define DMA_BASE MX1_IO_ADDRESS(MX1_DMA_BASE_ADDR)
++
+ /*
+  * CSI registers
+  */
+@@ -783,7 +786,7 @@ static int __init mx1_camera_probe(struct platform_device *pdev)
+ 			       pcdev);
+ 
+ 	imx_dma_config_channel(pcdev->dma_chan, IMX_DMA_TYPE_FIFO,
+-			       IMX_DMA_MEMSIZE_32, DMA_REQ_CSI_R, 0);
++			       IMX_DMA_MEMSIZE_32, MX1_DMA_REQ_CSI_R, 0);
+ 	/* burst length : 16 words = 64 bytes */
+ 	imx_dma_config_burstlen(pcdev->dma_chan, 0);
+ 
+-- 
+1.7.0
