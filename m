@@ -1,20 +1,28 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Thu, 04 Mar 2010 22:59:38 +0000
-Subject: [PATCH 2.6.34] USB: Fix s3c-hsotg build following Samsung platform
-	header moves
-In-Reply-To: <1267469502-19560-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1267469502-19560-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <4B903B5A.3070204@simtec.co.uk>
+Date: Thu, 04 Mar 2010 23:00:14 +0000
+Subject: [PATCH] ARM: s3c2440: mini2440: remove improper __initdata in
+	struct s3c2410fb_display
+In-Reply-To: <dc447791003011433u48809fb2gf6b3937f2e6eb5d1@mail.gmail.com>
+References: <1267399178-11478-1-git-send-email-walsimou@walsimou.com>
+	<dc447791003011433u48809fb2gf6b3937f2e6eb5d1@mail.gmail.com>
+Message-ID: <4B903B7E.7050500@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> Fix a reference to regs-sys.h got missed in the reorganisation of
-> the Samsung platform headers targetted for 2.6.34.
+M P wrote:
+> On Sun, Feb 28, 2010 at 11:19 PM, Abdoulaye Walsimou Gaye
+> <walsimou@walsimou.com> wrote:
+>> This patch remove improper __initdata in struct s3c2410fb_display for for
+>> mini2440 board.
+>> This __initdata prevents for example directfb to work properly
+>> (see below).
+>>
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> I beleive this patch, and/or something similar is already in the pipe
+> from some time.
 
-anyone mind if this gets merged into my next tree and given to RMK?
+Please wait until Russell merges for-rmk/samsung5 into mainline and
+then send bug reports.
 
 -- 
 Ben Dooks, Design & Software Engineer, Simtec Electronics
