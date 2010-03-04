@@ -1,313 +1,164 @@
 From: linux@arm.linux.org.uk (Russell King)
-Date: Thu, 04 Mar 2010 19:11:57 +0000
-Subject: [PATCH] ARM: Add Versatile Express CA9x4 processor support
-References: <git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
-Message-ID: <git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
+Date: Thu, 04 Mar 2010 19:11:56 +0000
+Subject: [PATCH] ARM: Integrator: fix Integrator/CP definitions,
+	move to platform.h
+References: <git-1267729916-b3f4ccc3dfd1e01b45888a740b2b5638b82e0638@rmk-PC>
+Message-ID: <git-1267729916-f385afa654740947343096c73e2389124fe60f54@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-vexpress/Kconfig                 |    5 +
- arch/arm/mach-vexpress/Makefile                |    1 +
- arch/arm/mach-vexpress/ct-ca9x4.c              |  201 ++++++++++++++++++++++++
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h |   43 +++++
- arch/arm/mm/Kconfig                            |    3 +-
- 5 files changed, 252 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-vexpress/ct-ca9x4.c
- create mode 100644 arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+ arch/arm/mach-integrator/include/mach/platform.h |   14 ++++---
+ arch/arm/mach-integrator/integrator_ap.c         |    4 +-
+ arch/arm/mach-integrator/integrator_cp.c         |   38 ++++++++++-----------
+ 3 files changed, 28 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 751858c..3f19b66 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,4 +1,9 @@
- menu "Versatile Express platform type"
- 	depends on ARCH_VEXPRESS
+diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
+index f934227..5e6ea5c 100644
+--- a/arch/arm/mach-integrator/include/mach/platform.h
++++ b/arch/arm/mach-integrator/include/mach/platform.h
+@@ -287,12 +287,14 @@
+ #define INTEGRATOR_DBG_LEDS             (INTEGRATOR_DBG_BASE + INTEGRATOR_DBG_LEDS_OFFSET)
+ #define INTEGRATOR_DBG_SWITCH           (INTEGRATOR_DBG_BASE + INTEGRATOR_DBG_SWITCH_OFFSET)
  
-+config ARCH_VEXPRESS_CA9X4
-+	bool "Versatile Express Cortex-A9x4 tile"
-+	select CPU_V7
-+	select ARM_GIC
+-
+-#if defined(CONFIG_ARCH_INTEGRATOR_AP)
+-#define INTEGRATOR_GPIO_BASE            0x1B000000	 /*  GPIO */
+-#elif defined(CONFIG_ARCH_INTEGRATOR_CP)
+-#define INTEGRATOR_GPIO_BASE            0xC9000000	 /*  GPIO */
+-#endif
++#define INTEGRATOR_AP_GPIO_BASE		0x1B000000	/* GPIO */
 +
- endmenu
-diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-index b47cf73..3c5e160 100644
---- a/arch/arm/mach-vexpress/Makefile
-+++ b/arch/arm/mach-vexpress/Makefile
-@@ -3,3 +3,4 @@
- #
++#define INTEGRATOR_CP_MMC_BASE		0x1C000000	/* MMC */
++#define INTEGRATOR_CP_AACI_BASE		0x1D000000	/* AACI */
++#define INTEGRATOR_CP_ETH_BASE		0xC8000000	/* Ethernet */
++#define INTEGRATOR_CP_GPIO_BASE		0xC9000000	/* GPIO */
++#define INTEGRATOR_CP_SIC_BASE		0xCA000000	/* SIC */
++#define INTEGRATOR_CP_CTL_BASE		0xCB000000	/* CP system control */
  
- obj-y					:= v2m.o
-+obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-new file mode 100644
-index 0000000..7258398
---- /dev/null
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -0,0 +1,201 @@
-+/*
-+ * Versatile Express Core Tile Cortex A9x4 Support
-+ */
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/clcd.h>
-+
-+#include <asm/clkdev.h>
-+#include <asm/hardware/arm_timer.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/clkdev.h>
-+#include <mach/ct-ca9x4.h>
-+
-+#include <plat/timer-sp.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+
-+#include "core.h"
-+
-+#include <mach/motherboard.h>
-+
-+#define V2M_PA_CS7	0x10000000
-+
-+static struct map_desc ct_ca9x4_io_desc[] __initdata = {
-+	{
-+		.virtual	= __MMIO_P2V(CT_CA9X4_MPIC),
-+		.pfn		= __phys_to_pfn(CT_CA9X4_MPIC),
-+		.length		= SZ_16K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= __MMIO_P2V(CT_CA9X4_SP804_TIMER),
-+		.pfn		= __phys_to_pfn(CT_CA9X4_SP804_TIMER),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= __MMIO_P2V(CT_CA9X4_L2CC),
-+		.pfn		= __phys_to_pfn(CT_CA9X4_L2CC),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+static void __init ct_ca9x4_map_io(void)
-+{
-+	v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
-+}
-+
-+void __iomem *gic_cpu_base_addr;
-+
-+static void __init ct_ca9x4_init_irq(void)
-+{
-+	gic_cpu_base_addr = MMIO_P2V(A9_MPCORE_GIC_CPU);
-+	gic_dist_init(0, MMIO_P2V(A9_MPCORE_GIC_DIST), 29);
-+	gic_cpu_init(0, gic_cpu_base_addr);
-+}
-+
-+#if 0
-+static void ct_ca9x4_timer_init(void)
-+{
-+	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
-+	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
-+
-+	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1));
-+	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0);
-+}
-+
-+static struct sys_timer ct_ca9x4_timer = {
-+	.init	= ct_ca9x4_timer_init,
-+};
-+#endif
-+
-+static struct clcd_panel xvga_panel = {
-+	.mode		= {
-+		.name		= "XVGA",
-+		.refresh	= 60,
-+		.xres		= 1024,
-+		.yres		= 768,
-+		.pixclock	= 15384,
-+		.left_margin	= 168,
-+		.right_margin	= 8,
-+		.upper_margin	= 29,
-+		.lower_margin	= 3,
-+		.hsync_len	= 144,
-+		.vsync_len	= 6,
-+		.sync		= 0,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_BCD | TIM2_IPC,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.bpp		= 16,
-+};
-+
-+static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
-+{
-+	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
-+	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE_DB1, 2);
-+	v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE_DB1 | 1, 63500127);
-+}
-+
-+static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
-+{
-+	unsigned long framesize = 1024 * 768 * 2;
-+	dma_addr_t dma;
-+
-+	fb->panel = &xvga_panel;
-+
-+	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
-+				&dma, GFP_KERNEL);
-+	if (!fb->fb.screen_base) {
-+		printk(KERN_ERR "CLCD: unable to map frame buffer\n");
-+		return -ENOMEM;
-+	}
-+	fb->fb.fix.smem_start = dma;
-+	fb->fb.fix.smem_len = framesize;
-+
-+	return 0;
-+}
-+
-+static int ct_ca9x4_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	return dma_mmap_writecombine(&fb->dev->dev, vma, fb->fb.screen_base,
-+		fb->fb.fix.smem_start, fb->fb.fix.smem_len);
-+}
-+
-+static void ct_ca9x4_clcd_remove(struct clcd_fb *fb)
-+{
-+	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
-+		fb->fb.screen_base, fb->fb.fix.smem_start);
-+}
-+
-+static struct clcd_board ct_ca9x4_clcd_data = {
-+	.name		= "CT-CA9X4",
-+	.check		= clcdfb_check,
-+	.decode		= clcdfb_decode,
-+	.enable		= ct_ca9x4_clcd_enable,
-+	.setup		= ct_ca9x4_clcd_setup,
-+	.mmap		= ct_ca9x4_clcd_mmap,
-+	.remove		= ct_ca9x4_clcd_remove,
-+};
-+
-+static AMBA_DEVICE(clcd, "ct:clcd", CT_CA9X4_CLCDC, &ct_ca9x4_clcd_data);
-+static AMBA_DEVICE(dmc, "ct:dmc", CT_CA9X4_DMC, NULL);
-+static AMBA_DEVICE(smc, "ct:smc", CT_CA9X4_SMC, NULL);
-+static AMBA_DEVICE(gpio, "ct:gpio", CT_CA9X4_GPIO, NULL);
-+
-+static struct amba_device *ct_ca9x4_amba_devs[] __initdata = {
-+	&clcd_device,
-+	&dmc_device,
-+	&smc_device,
-+	&gpio_device,
-+};
-+
-+
-+
-+static struct clk osc1_clk = {
-+	.rate	= 24000000,
-+};
-+
-+static struct clk_lookup lookups[] = {
-+	{	/* CLCD */
-+		.dev_id		= "ct:clcd",
-+		.clk		= &osc1_clk,
-+	},
-+};
-+
-+static void ct_ca9x4_init(void)
-+{
-+	int i;
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	l2x0_init(MMIO_P2V(CT_CA9X4_L2CC), 0x00000000, 0xfe0fffff);
-+#endif
-+
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+
-+	for (i = 0; i < ARRAY_SIZE(ct_ca9x4_amba_devs); i++)
-+		amba_device_register(ct_ca9x4_amba_devs[i], &iomem_resource);
-+}
-+
-+MACHINE_START(VEXPRESS, "ARM-Versatile Express CA9x4")
-+	.phys_io	= V2M_UART0,
-+	.io_pg_offst	= (__MMIO_P2V(V2M_UART0) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x00000100,
-+	.map_io		= ct_ca9x4_map_io,
-+	.init_irq	= ct_ca9x4_init_irq,
-+#if 0
-+	.timer		= &ct_ca9x4_timer,
-+#else
-+	.timer		= &v2m_timer,
-+#endif
-+	.init_machine	= ct_ca9x4_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-new file mode 100644
-index 0000000..10718e6
---- /dev/null
-+++ b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-@@ -0,0 +1,43 @@
-+#ifndef __MACH_CT_CA9X4_H
-+#define __MACH_CT_CA9X4_H
-+
-+/*
-+ * Physical base addresses
-+ */
-+#define CT_CA9X4_CLCDC		(0x10020000)
-+#define CT_CA9X4_AXIRAM		(0x10060000)
-+#define CT_CA9X4_DMC		(0x100e0000)
-+#define CT_CA9X4_SMC		(0x100e1000)
-+#define CT_CA9X4_SCC		(0x100e2000)
-+#define CT_CA9X4_SP804_TIMER	(0x100e4000)
-+#define CT_CA9X4_SP805_WDT	(0x100e5000)
-+#define CT_CA9X4_TZPC		(0x100e6000)
-+#define CT_CA9X4_GPIO		(0x100e8000)
-+#define CT_CA9X4_FASTAXI	(0x100e9000)
-+#define CT_CA9X4_SLOWAXI	(0x100ea000)
-+#define CT_CA9X4_TZASC		(0x100ec000)
-+#define CT_CA9X4_CORESIGHT	(0x10200000)
-+#define CT_CA9X4_MPIC		(0x1e000000)
-+#define CT_CA9X4_SYSTIMER	(0x1e004000)
-+#define CT_CA9X4_SYSWDT		(0x1e007000)
-+#define CT_CA9X4_L2CC		(0x1e00a000)
-+
-+#define CT_CA9X4_TIMER0		(CT_CA9X4_SP804_TIMER + 0x000)
-+#define CT_CA9X4_TIMER1		(CT_CA9X4_SP804_TIMER + 0x020)
-+
-+#define A9_MPCORE_SCU		(CT_CA9X4_MPIC + 0x0000)
-+#define A9_MPCORE_GIC_CPU	(CT_CA9X4_MPIC + 0x0100)
-+#define A9_MPCORE_GIT		(CT_CA9X4_MPIC + 0x0200)
-+#define A9_MPCORE_GIC_DIST	(CT_CA9X4_MPIC + 0x1000)
-+
-+/*
-+ * Interrupts.  Those in {} are for AMBA devices
-+ */
-+#define IRQ_CT_CA9X4_CLCDC	{ 76 }
-+#define IRQ_CT_CA9X4_DMC	{ -1 }
-+#define IRQ_CT_CA9X4_SMC	{ 77, 78 }
-+#define IRQ_CT_CA9X4_TIMER0	80
-+#define IRQ_CT_CA9X4_TIMER1	81
-+#define IRQ_CT_CA9X4_GPIO	{ 82 }
-+
-+#endif
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c4ed9f9..270c8e2 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -754,7 +754,8 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
- config CACHE_L2X0
- 	bool "Enable the L2x0 outer cache controller"
- 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
--		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || ARCH_NOMADIK || ARCH_OMAP4
-+		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || \
-+		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_VEXPRESS_CA9X4
- 	default y
- 	select OUTER_CACHE
- 	help
+ /* ------------------------------------------------------------------------
+  *  KMI keyboard/mouse definitions
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 93da7d4..45bba04 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -118,8 +118,8 @@ static struct map_desc ap_io_desc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= IO_ADDRESS(INTEGRATOR_GPIO_BASE),
+-		.pfn		= __phys_to_pfn(INTEGRATOR_GPIO_BASE),
++		.virtual	= IO_ADDRESS(INTEGRATOR_AP_GPIO_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_AP_GPIO_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 108bc48..333c297 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -42,9 +42,6 @@
+ 
+ #include "common.h"
+ 
+-#define INTCP_PA_MMC_BASE		0x1c000000
+-#define INTCP_PA_AACI_BASE		0x1d000000
+-
+ #define INTCP_PA_FLASH_BASE		0x24000000
+ #define INTCP_FLASH_SIZE		SZ_32M
+ 
+@@ -52,12 +49,11 @@
+ 
+ #define INTCP_VA_CIC_BASE		IO_ADDRESS(INTEGRATOR_HDR_BASE) + 0x40
+ #define INTCP_VA_PIC_BASE		IO_ADDRESS(INTEGRATOR_IC_BASE)
+-#define INTCP_VA_SIC_BASE		IO_ADDRESS(0xca000000)
++#define INTCP_VA_SIC_BASE		IO_ADDRESS(INTEGRATOR_CP_SIC_BASE)
+ 
+-#define INTCP_PA_ETH_BASE		0xc8000000
+ #define INTCP_ETH_SIZE			0x10
+ 
+-#define INTCP_VA_CTRL_BASE		IO_ADDRESS(0xcb000000)
++#define INTCP_VA_CTRL_BASE		IO_ADDRESS(INTEGRATOR_CP_CTL_BASE)
+ #define INTCP_FLASHPROG			0x04
+ #define CINTEGRATOR_FLASHPROG_FLVPPEN	(1 << 0)
+ #define CINTEGRATOR_FLASHPROG_FLWREN	(1 << 1)
+@@ -72,7 +68,9 @@
+  * f1600000	16000000	UART 0
+  * f1700000	17000000	UART 1
+  * f1a00000	1a000000	Debug LEDs
+- * f1b00000	1b000000	GPIO
++ * fc900000	c9000000	GPIO
++ * fca00000	ca000000	SIC
++ * fcb00000	cb000000	CP system control
+  */
+ 
+ static struct map_desc intcp_io_desc[] __initdata = {
+@@ -117,18 +115,18 @@ static struct map_desc intcp_io_desc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= IO_ADDRESS(INTEGRATOR_GPIO_BASE),
+-		.pfn		= __phys_to_pfn(INTEGRATOR_GPIO_BASE),
++		.virtual	= IO_ADDRESS(INTEGRATOR_CP_GPIO_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_CP_GPIO_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= IO_ADDRESS(0xca000000),
+-		.pfn		= __phys_to_pfn(0xca000000),
++		.virtual	= IO_ADDRESS(INTEGRATOR_CP_SIC_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_CP_SIC_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= IO_ADDRESS(0xcb000000),
+-		.pfn		= __phys_to_pfn(0xcb000000),
++		.virtual	= IO_ADDRESS(INTEGRATOR_CP_CTL_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_CP_CTL_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}
+@@ -364,8 +362,8 @@ static struct platform_device intcp_flash_device = {
+ 
+ static struct resource smc91x_resources[] = {
+ 	[0] = {
+-		.start	= INTCP_PA_ETH_BASE,
+-		.end	= INTCP_PA_ETH_BASE + INTCP_ETH_SIZE - 1,
++		.start	= INTEGRATOR_CP_ETH_BASE,
++		.end	= INTEGRATOR_CP_ETH_BASE + INTCP_ETH_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+@@ -396,7 +394,7 @@ static struct platform_device *intcp_devs[] __initdata = {
+ static unsigned int mmc_status(struct device *dev)
+ {
+ 	unsigned int status = readl(IO_ADDRESS(0xca000000) + 4);
+-	writel(8, IO_ADDRESS(0xcb000000) + 8);
++	writel(8, IO_ADDRESS(INTEGRATOR_CP_CTL_BASE) + 8);
+ 
+ 	return status & 8;
+ }
+@@ -414,8 +412,8 @@ static struct amba_device mmc_device = {
+ 		.platform_data = &mmc_data,
+ 	},
+ 	.res		= {
+-		.start	= INTCP_PA_MMC_BASE,
+-		.end	= INTCP_PA_MMC_BASE + SZ_4K - 1,
++		.start	= INTEGRATOR_CP_MMC_BASE,
++		.end	= INTEGRATOR_CP_MMC_BASE + SZ_4K - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	.irq		= { IRQ_CP_MMCIINT0, IRQ_CP_MMCIINT1 },
+@@ -427,8 +425,8 @@ static struct amba_device aaci_device = {
+ 		.init_name = "mb:1d",
+ 	},
+ 	.res		= {
+-		.start	= INTCP_PA_AACI_BASE,
+-		.end	= INTCP_PA_AACI_BASE + SZ_4K - 1,
++		.start	= INTEGRATOR_CP_AACI_BASE,
++		.end	= INTEGRATOR_CP_AACI_BASE + SZ_4K - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	.irq		= { IRQ_CP_AACIINT, NO_IRQ },
