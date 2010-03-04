@@ -1,58 +1,69 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 4 Mar 2010 23:20:06 +0000
-Subject: [PATCH] s3c244x: Fix compilation issue due to moved
-	cpufreq-related files
-In-Reply-To: <1267627095-24200-1-git-send-email-anarsoul@gmail.com>
-References: <1267627095-24200-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <20100304232006.GA31126@trinity.fluff.org>
+Date: Thu, 4 Mar 2010 23:21:15 +0000
+Subject: [PATCH] Fix GPIOs bank H and J not being preserved during suspend
+In-Reply-To: <1267599637-9283-1-git-send-email-chripell@fsfe.org>
+References: <cabda6421003022258j51258c56w99b0e75d2d2b088c@mail.gmail.com>
+	<1267599637-9283-1-git-send-email-chripell@fsfe.org>
+Message-ID: <20100304232115.GB31126@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 03, 2010 at 04:38:15PM +0200, Vasily Khoruzhick wrote:
-> cpufreq-related files were moved but Makefiles were not modified, and it
-> breaks compilation when CONFIG_S3C2440_CPUFREQ=y.
-
-I've fixed this by moving the files instead of hte makefile. Commit will
-be in next-samsung soon. Thanks for pointing this out.
-
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm/mach-s3c2440/Makefile |    4 ----
->  arch/arm/plat-s3c24xx/Makefile |    4 ++++
->  2 files changed, 4 insertions(+), 4 deletions(-)
+On Wed, Mar 03, 2010 at 08:00:37AM +0100, Christian Pellegrin wrote:
+> This patch adds bank H and J GPIOs (present on S3C244X CPUs) to the list
+> of registers that must be saved/resumed during suspend.
 > 
-> diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
-> index c85ba32..1825516 100644
-> --- a/arch/arm/mach-s3c2440/Makefile
-> +++ b/arch/arm/mach-s3c2440/Makefile
-> @@ -19,10 +19,6 @@ obj-$(CONFIG_S3C2440_DMA)	+= dma.o
->  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o
->  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-irq.o
->  obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-clock.o
-> -obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
-> -
-> -obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
-> -obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
+> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
+> ---
+>  arch/arm/mach-s3c2410/include/mach/gpio-core.h |    5 +++++
+>  arch/arm/plat-s3c/pm-gpio.c                    |    4 ++--
+>  2 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-core.h b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> index f8b879a..de9697c 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> @@ -24,8 +24,13 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
+>  {
+>  	struct s3c_gpio_chip *chip;
 >  
->  # Machine support
+> +#ifdef CONFIG_CPU_S3C244X
+> +	if (pin > S3C2410_GPJ(15))
+> +		return NULL;
+> +#else
+
+Hmm, could we use the arch define for number of GPIOs here instead
+of an ifdef?
+
+  	if (pin > S3C2410_GPG(10))
+>  		return NULL;
+> +#endif
 >  
-> diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-> index c2237c4..b3a7ac2 100644
-> --- a/arch/arm/plat-s3c24xx/Makefile
-> +++ b/arch/arm/plat-s3c24xx/Makefile
-> @@ -22,6 +22,10 @@ obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
+>  	chip = &s3c24xx_gpios[pin/32];
+>  	return (S3C2410_GPIO_OFFSET(pin) < chip->chip.ngpio) ? chip : NULL;
+> diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-s3c/pm-gpio.c
+> index cfd326a..b3cc8db 100644
+> --- a/arch/arm/plat-s3c/pm-gpio.c
+> +++ b/arch/arm/plat-s3c/pm-gpio.c
+> @@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+>  			  ourchip->pm_save[2],
+>  			  ourchip->pm_save[3]);
 >  
->  obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpu-freq.o
->  obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpu-freq-debugfs.o
-> +obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
-> +
-> +obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
-> +obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
+> -		gpio_nr += ourchip->chip.ngpio;
+> +		gpio_nr += ourchip->chip.ngpio - 1;
+>  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+>  	}
+>  }
+> @@ -374,7 +374,7 @@ void s3c_pm_restore_gpios(void)
 >  
->  # Architecture dependant builds
+>  		s3c_pm_resume_gpio(ourchip);
 >  
+> -		gpio_nr += ourchip->chip.ngpio;
+> +		gpio_nr += ourchip->chip.ngpio - 1;
+>  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+>  	}
+>  }
 > -- 
-> 1.7.0
+> 1.5.6.5
 > 
 > 
 > _______________________________________________
