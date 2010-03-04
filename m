@@ -1,35 +1,37 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 4 Mar 2010 02:08:39 +0100
-Subject: [PATCH/RFC] arm: Enable backtrace printing on oops when PC
-	iscorrupted
-In-Reply-To: <20100218170750.GF20243@n2100.arm.linux.org.uk>
-References: <1264065809-7893-1-git-send-email-laurent.pinchart@ideasonboard.com>
-	<1264527661.13482.74.camel@pc1117.cambridge.arm.com>
-	<20100218170750.GF20243@n2100.arm.linux.org.uk>
-Message-ID: <201003040208.41421.laurent.pinchart@ideasonboard.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 04 Mar 2010 13:00:19 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267594809.4383.27.camel@mulgrave.site>
+References: <20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<1267572594.2173.25.camel@pasglop>
+	<20100303124624Z.fujita.tomonori@lab.ntt.co.jp>
+	<1267593032.16696.1.camel@pasglop>
+	<1267594809.4383.27.camel@mulgrave.site>
+Message-ID: <1267668019.22204.20.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Thursday 18 February 2010 18:07:50 Russell King - ARM Linux wrote:
-> On Tue, Jan 26, 2010 at 05:41:01PM +0000, Catalin Marinas wrote:
-> > On Thu, 2010-01-21 at 09:23 +0000, Laurent Pinchart wrote:
-> > > If PC points outside kernel text, start printing the backtrace at LR
-> > > instead.
-> > > 
-> > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On Wed, 2010-03-03 at 11:10 +0530, James Bottomley wrote:
+> On Wed, 2010-03-03 at 16:10 +1100, Benjamin Herrenschmidt wrote:
+> > On Wed, 2010-03-03 at 12:47 +0900, FUJITA Tomonori wrote:
+> > > The ways to improve the approach (introducing PG_arch_2 or marking a
+> > > page clean on dma_unmap_* with DMA_FROM_DEVICE like ia64 does) is up
+> > > to architectures. 
 > > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > How does the above work ? IE, the dma unmap will flush the D side but
+> > not the I side ... or is the ia64 flush primitive magic enough to do
+> > both ?
 > 
-> Has this been queued by someone?  If not, please send it to the patch
-> system.
+> The point is that in a well regulated system, the I cache shouldn't need
+> extra flushing in the kernel.  We should only be faulting in R-X pages.
+> If we're operating on RWX pages (i.e. self modifying code), it's the job
+> of userspace to keep I/D coherency.
+> 
+> So the only case the kernel needs to worry about is the R-X fault case
+> for executable text code.
 
-As your mail was sent to Catalin I assumed he would take care of that. If the 
-patch should still be sent to the patch system, could you tell me how to 
-proceed ?
+Still, you do need to flush I when a page cache page is recycled.
 
--- 
-Regards,
-
-Laurent Pinchart
+Cheers,
+Ben.
