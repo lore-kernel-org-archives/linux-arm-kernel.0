@@ -1,73 +1,163 @@
 From: linux@arm.linux.org.uk (Russell King)
 Date: Thu, 04 Mar 2010 19:11:56 +0000
-Subject: [PATCH] ARM: Integrator: convert Integrator/CP to use SP804 timer
-	support
-References: <git-1267729916-6ca45be431733d3c1460cbc8245eb2efe0150fdd@rmk-PC>
-Message-ID: <git-1267729916-d812bfe0155031706019561409a54500168b6caf@rmk-PC>
+Subject: [PATCH] ARM: Realview/Versatile: separate out common sched_clock()
+References: <git-1267729916-5a852a86ebb11b488b619f8386b6df6332c730de@rmk-PC>
+Message-ID: <git-1267729916-2297f112a4e3ab4a5241c68977bf2e1b96438c54@rmk-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The Integrator/CP board has SP804-compatible timer modules, so use
-the SP804-compatible code from Versatile and Realview.
+Provide a common sched_clock() implementation for Versatile and
+Realview.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/Kconfig         |    1 +
- arch/arm/mach-integrator/integrator_cp.c |   14 ++++++++++++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ arch/arm/mach-realview/core.c         |   16 ----------
+ arch/arm/mach-versatile/core.c        |   22 -------------
+ arch/arm/plat-versatile/Makefile      |    2 +
+ arch/arm/plat-versatile/sched-clock.c |   53 +++++++++++++++++++++++++++++++++
+ 4 files changed, 55 insertions(+), 38 deletions(-)
+ create mode 100644 arch/arm/plat-versatile/sched-clock.c
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index df97d16..27db275 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_INTEGRATOR_AP
- config ARCH_INTEGRATOR_CP
- 	bool "Support Integrator/CP platform"
- 	select ARCH_CINTEGRATOR
-+	select ARM_TIMER_SP804
- 	help
- 	  Include support for the ARM(R) Integrator CP platform.
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 80b8142..f97f001 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -53,8 +53,6 @@
  
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index a9ab8fd..a7575c4 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -29,6 +29,7 @@
- #include <asm/irq.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-+#include <asm/hardware/arm_timer.h>
- #include <asm/hardware/icst.h>
+ #include "core.h"
  
- #include <mach/cm.h>
-@@ -40,6 +41,8 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
+-#define REALVIEW_REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
+-
+ /* used by entry-macro.S and platsmp.c */
+ void __iomem *gic_cpu_base_addr;
  
-+#include <plat/timer-sp.h>
-+
- #include "common.h"
+@@ -77,20 +75,6 @@ void __init realview_adjust_zones(int node, unsigned long *size,
+ }
+ #endif
  
- #define INTCP_PA_FLASH_BASE		0x24000000
-@@ -569,11 +572,18 @@ static void __init intcp_init(void)
- 	}
+-/*
+- * This is the RealView sched_clock implementation.  This has
+- * a resolution of 41.7ns, and a maximum value of about 179s.
+- */
+-unsigned long long sched_clock(void)
+-{
+-	unsigned long long v;
+-
+-	v = (unsigned long long)readl(REALVIEW_REFCOUNTER) * 125;
+-	do_div(v, 3);
+-
+-	return v;
+-}
+-
+ 
+ #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
+ 
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index b68ddd3..490fc75 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -28,7 +28,6 @@
+ #include <linux/amba/clcd.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/amba/mmci.h>
+-#include <linux/cnt32_to_63.h>
+ #include <linux/io.h>
+ 
+ #include <asm/clkdev.h>
+@@ -227,27 +226,6 @@ void __init versatile_map_io(void)
+ 	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
  }
  
--#define TIMER_CTRL_IE	(1 << 5)			/* Interrupt Enable */
-+#define TIMER0_VA_BASE __io_address(INTEGRATOR_TIMER0_BASE)
-+#define TIMER1_VA_BASE __io_address(INTEGRATOR_TIMER1_BASE)
-+#define TIMER2_VA_BASE __io_address(INTEGRATOR_TIMER2_BASE)
+-#define VERSATILE_REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
+-
+-/*
+- * This is the Versatile sched_clock implementation.  This has
+- * a resolution of 41.7ns, and a maximum value of about 35583 days.
+- *
+- * The return value is guaranteed to be monotonic in that range as
+- * long as there is always less than 89 seconds between successive
+- * calls to this function.
+- */
+-unsigned long long sched_clock(void)
+-{
+-	unsigned long long v = cnt32_to_63(readl(VERSATILE_REFCOUNTER));
+-
+-	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
+-	v *= 125<<1;
+-	do_div(v, 3<<1);
+-
+-	return v;
+-}
+-
  
- static void __init intcp_timer_init(void)
- {
--	integrator_time_init(1000, TIMER_CTRL_IE);
-+	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
-+	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
-+	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+ #define VERSATILE_FLASHCTRL    (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_FLASH_OFFSET)
+ 
+diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+index 334d2f1..9b1a668 100644
+--- a/arch/arm/plat-versatile/Makefile
++++ b/arch/arm/plat-versatile/Makefile
+@@ -1,2 +1,4 @@
+ obj-y	:= clock.o
+ obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
++obj-$(CONFIG_ARCH_REALVIEW) += sched-clock.o
++obj-$(CONFIG_ARCH_VERSATILE) += sched-clock.o
+diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
+new file mode 100644
+index 0000000..9768cf7
+--- /dev/null
++++ b/arch/arm/plat-versatile/sched-clock.c
+@@ -0,0 +1,53 @@
++/*
++ *  linux/arch/arm/plat-versatile/sched-clock.c
++ *
++ *  Copyright (C) 1999 - 2003 ARM Limited
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++#include <linux/cnt32_to_63.h>
++#include <linux/io.h>
++#include <asm/div64.h>
 +
-+	sp804_clocksource_init(TIMER2_VA_BASE);
-+	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1);
- }
- 
- static struct sys_timer cp_timer = {
++#include <mach/hardware.h>
++#include <mach/platform.h>
++
++#ifdef VERSATILE_SYS_BASE
++#define REFCOUNTER	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
++#endif
++
++#ifdef REALVIEW_SYS_BASE
++#define REFCOUNTER	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_24MHz_OFFSET)
++#endif
++
++/*
++ * This is the Realview and Versatile sched_clock implementation.  This
++ * has a resolution of 41.7ns, and a maximum value of about 35583 days.
++ *
++ * The return value is guaranteed to be monotonic in that range as
++ * long as there is always less than 89 seconds between successive
++ * calls to this function.
++ */
++unsigned long long sched_clock(void)
++{
++	unsigned long long v = cnt32_to_63(readl(REFCOUNTER));
++
++	/* the <<1 gets rid of the cnt_32_to_63 top bit saving on a bic insn */
++	v *= 125<<1;
++	do_div(v, 3<<1);
++
++	return v;
++}
