@@ -1,52 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 04 Mar 2010 13:35:56 +0000
+Date: Thu, 04 Mar 2010 13:47:21 +0000
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100303215437.GF2579@ucw.cz>
+In-Reply-To: <201003040754.57800.wolfgang@iksw-muees.de>
 References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
 	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
 	<20100303215437.GF2579@ucw.cz>
-Message-ID: <1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<201003040754.57800.wolfgang@iksw-muees.de>
+Message-ID: <1267710441.6526.390.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-03 at 21:54 +0000, Pavel Machek wrote:
-> > With some drivers (those doing PIO) or subsystems (SCSI mass storage
-> > over USB HCD), there is no call to flush_dcache_page() for page cache
-> > pages, hence the ARM implementation of update_mmu_cache() doesn't flush
-> > the D-cache (and only invalidating the I-cache doesn't help).
+On Thu, 2010-03-04 at 06:54 +0000, Wolfgang M?es wrote:
+> Pavel Machek wrote:
+> 
+> > 3. Forget about PG_arch_1 and always do the flush?
 > >
-> > The viable solutions so far:
-> >
-> >      1. Implement a PIO mapping API similar to the DMA API which takes
-> >         care of the D-cache flushing. This means that PIO drivers would
-> >         need to be modified to use an API like pio_kmap()/pio_kunmap()
-> >         before writing to a page cache page.
-> >      2. Invert the meaning of PG_arch_1 to denote a clean page. This
-> >         means that by default newly allocated page cache pages are
-> >         considered dirty and even if there isn't a call to
-> >         flush_dcache_page(), update_mmu_cache() would flush the D-cache.
-> >         This is the PowerPC approach.
+> > How big is the performance impact? Note that current code does not
+> > even *work* so working, 10% slower code will be an improvement.
 > 
-> What about option
-> 
-> 3. Forget about PG_arch_1 and always do the flush?
-> 
-> How big is the performance impact? Note that current code does not
-> even *work* so working, 10% slower code will be an improvement.
+> ... and this is what *I* don't understand in this discussion. Obviously a
+> flush() in PIO drivers is a clean and quick solution to the problem. And how
+> much execution time will it cost - given the fact that if there is NO flush,
+> the flush operation will not be avoided, only delayed (up to the time the data
+> cache is doing the flush himself). If the data cache is doing the flush BEFORE
+> the data is used in userspace (this includes the most common case of reading
+> large files from the device), there will be no performance impact.
 
-The driver fix is as simple as calling a flush_dcache_page() and I've
-been carrying such patches in my tree for some time now. The question is
-whether we need to do it in the driver or not (would need to update
-Documentation/cachetlb.txt as well).
+Indeed, I don't care much about whether we do delayed cache flushing or
+not. What I care about is that we need flushing at least once (and
+ideally only once). Most PIO drivers don't call any cache flushing
+function. Upper layers like USB mass storage or VFS don't do it either
+(and probably they shouldn't).
 
-The reason I'm not in favour always doing the flush is that we penalise
-DMA drivers where there is no need for extra D-cache flushing (already
-handled by the DMA API; option 1 above is similar, just that it is meant
-for PIO usage). An ARM patch I proposed for inverting the meaning of
-PG_arch_1 also marks a page as clean in the dma_map_* functions.
+This leaves us with either modifying existing PIO drivers (two patches I
+submitted are already in mainline) or clarifying the flush_dcache_page()
+usage throughout the kernel (and modifying the architecture code
+accordingly). The Documentation/cachetlb.txt states that
+flush_dcache_page() is called any time the kernel writes to a page cache
+page, which is not the case for PIO drivers.
+
+There may be a small advantage with the delayed flushing since not all
+pages read from a device would be mapped in user space but I haven't
+done any benchmarks to see the impact.
 
 -- 
 Catalin
