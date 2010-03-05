@@ -1,48 +1,46 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Fri, 5 Mar 2010 16:35:53 -0000
-Subject: [PATCH] ARM: Add Versatile Express CA9x4 processor support
-In-Reply-To: <git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
-References: <git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
-	<git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
-Message-ID: <000201cabc81$ec481330$c4d83990$@tuckley@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 05 Mar 2010 16:52:40 +0000
+Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
+In-Reply-To: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
+References: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
+Message-ID: <1267807960.2581.5.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Russell King
+On Thu, 2010-03-04 at 21:44 +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 04, 2010 at 06:36:42PM +0000, Catalin Marinas wrote:
+> > ARM: Assume new page cache pages have dirty D-cache
+> >
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > There are places in Linux where writes to newly allocated page cache
+> > pages happen without a subsequent call to flush_dcache_page() (several
+> > PIO drivers including USB HCD). This patch changes the meaning of
+> > PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
+> > mapped page in update_mmu_cache().
+> >
+> > The patch also sets the PG_arch_1 bit in the DMA cache maintenance
+> > function to avoid additional cache flushing in update_mmu_cache().
+> 
+> As I just realised, this is going to subject all pages placed into
+> userspace with a D cache flush - even anonymous pages, and those
+> which we've been careful to deal with the cache issues already (eg,
+> via the COW page copying code.)
+> 
+> I think all the copypage functions need to set PG_dcache_clean on the
+> new pages once their copy has completed.
 
-> + * Versatile Express Core Tile Cortex A9x4 Support
+As Ben said, I think we can set PG_dcache_clean in the
+clear/copy_user_page() functions. My doubt with these functions is the
+highmem cases where kunmap_atomic() only flushes the D-cache in one
+situation, the other just calling kunmap_high() which doesn't seem to do
+anything to the caches.
 
-Versatile Express daughter boards are *not* called "Core Tiles". They are
-both physically and electrically incompatible and so we have specifically
-avoided using the term.
+But for non-aliasing VIPT, do we actually need the D-cache flushing in
+kunmap_atomic() or copy_user_page()? If we default to new page being
+dirty, I think we can remove the cache cleaning from this function and
+leave it for update_mmu_cache (or set_pte_at but that's for a different
+patch).
 
-> +static struct clcd_panel xvga_panel = {
-
-What happened to the support for vga and svga? These are needed when using
-the CLCD controller on the motherboard which doesn't support XVGA due to bus
-bandwidth limitations.
-
-
-> +static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
-> +{
-> +	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
-> +	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE_DB1, 2);
-> +	v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE_DB1 | 1, 63500127);
-> +}
-
-This is not the preferred way to use the SRI (which I'm now told is
-officially called "The Serial Configuration Controller").
-
-There is a documented data structure and set of routines which are used by
-the boot-monitor, self-test, bootloader and my kernel patch set for the
-Versatile Express. We would prefer that it be kept consistent across all
-software that needs to use the SCC.
-
-My versions of these routines also make use of spin_lock() to make them smp
-safe.
-
-Regards,
-
-Colin
+-- 
+Catalin
