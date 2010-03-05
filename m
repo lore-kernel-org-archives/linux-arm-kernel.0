@@ -1,41 +1,45 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 5 Mar 2010 10:28:23 +0900
-Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
-References: <20100302172947.27766.61539.stgit@e102109-lin.cambridge.arm.com>
-	<20100304164416.GD13417@n2100.arm.linux.org.uk>
-	<1267727802.6526.545.camel@e102109-lin.cambridge.arm.com>
-	<20100304214435.GJ13417@n2100.arm.linux.org.uk>
-Message-ID: <20100305012823.GD26618@linux-sh.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 05 Mar 2010 15:31:13 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100304214030.GI13417@n2100.arm.linux.org.uk>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267738114.22204.70.camel@pasglop>
+	<20100304214030.GI13417@n2100.arm.linux.org.uk>
+Message-ID: <1267763473.22204.89.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 04, 2010 at 09:44:35PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 04, 2010 at 06:36:42PM +0000, Catalin Marinas wrote:
-> > ARM: Assume new page cache pages have dirty D-cache
-> > 
-> > From: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > There are places in Linux where writes to newly allocated page cache
-> > pages happen without a subsequent call to flush_dcache_page() (several
-> > PIO drivers including USB HCD). This patch changes the meaning of
-> > PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-> > mapped page in update_mmu_cache().
-> > 
-> > The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-> > function to avoid additional cache flushing in update_mmu_cache().
+On Thu, 2010-03-04 at 21:40 +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 05, 2010 at 08:28:34AM +1100, Benjamin Herrenschmidt wrote:
+> > I don't think there's a core or driver problem in this specific case. As
+> > we discussed earlier, I believe the problem is that ARM considers a
+> > fresh page out of the page cache as "clean" instead of "dirty", and
+> > inverting that like we do on powerpc will fix their problem too.
 > 
-> As I just realised, this is going to subject all pages placed into
-> userspace with a D cache flush - even anonymous pages, and those
-> which we've been careful to deal with the cache issues already (eg,
-> via the COW page copying code.)
-> 
-> I think all the copypage functions need to set PG_dcache_clean on the
-> new pages once their copy has completed.
-> 
-> I wonder if there's any other anonymous page creating functions which
-> could do with a similar treatment...
+> The only concern is that it means we treat anonymous pages as dirty
+> by default.
+>
+> That's quite sub-optimal since we take care (eg) on write faults to
+> copy the page and take care of the cache issues while we do that -
 
-In the anonymous page case, flush_anon_page() is always called prior to
-flush_dcache_page(), so flush_anon_page() could just set PG_dcache_clean
-to work around that. That would handle get_user_pages(), too.
+If you do the cache handling inside your copy_user_highpage() then you
+can just set PG_arch_1 stuff there.
+
+> whether that be remapping the page to be coherent with the user
+> address, or cleaning each cache line as we copy the data.
+> 
+> Of course, the simple solution is to also arrange for PG_arch_1 to be
+> set in this case.
+
+Right.
+
+Cheers,
+Ben.
