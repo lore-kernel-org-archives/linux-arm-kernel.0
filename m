@@ -1,26 +1,29 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 05 Mar 2010 15:46:19 +1100
-Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <20100305012823.GD26618@linux-sh.org>
-References: <20100302172947.27766.61539.stgit@e102109-lin.cambridge.arm.com>
-	<20100304164416.GD13417@n2100.arm.linux.org.uk>
-	<1267727802.6526.545.camel@e102109-lin.cambridge.arm.com>
-	<20100304214435.GJ13417@n2100.arm.linux.org.uk>
-	<20100305012823.GD26618@linux-sh.org>
-Message-ID: <1267764379.22204.103.camel@pasglop>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 5 Mar 2010 09:04:09 +0200
+Subject: [PATCH] s3c244x: Fix compilation issue due to moved
+	cpufreq-related files
+In-Reply-To: <20100304232006.GA31126@trinity.fluff.org>
+References: <1267627095-24200-1-git-send-email-anarsoul@gmail.com>
+	<20100304232006.GA31126@trinity.fluff.org>
+Message-ID: <201003050904.27297.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-03-05 at 10:28 +0900, Paul Mundt wrote:
-> In the anonymous page case, flush_anon_page() is always called prior to
-> flush_dcache_page(), so flush_anon_page() could just set PG_dcache_clean
-> to work around that. That would handle get_user_pages(), too. 
+? ????????? ?? 5 ????? 2010 01:20:06 ????? Ben Dooks ???????:
 
-Well, currently, we clear PG_arch_1 in flush_dcache_page(), at least on
-ppc.
+> I've fixed this by moving the files instead of hte makefile. Commit will
+> be in next-samsung soon. Thanks for pointing this out.
 
-Now, I have a nagging feeling that we might not need to... I'll have to
-give it a closer look when I'm back from this extended week-end :-)
+Sorry, but it seems you forgot about s3c2440-cpufreq.c in commit 8997de30ad 
+(look at my patch again :)). Please move it from plat-s3c244x to arch-s3c2440 
+too.
 
-Cheers,
-Ben.
+Regards,
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100305/79aa97f0/attachment.sig>
