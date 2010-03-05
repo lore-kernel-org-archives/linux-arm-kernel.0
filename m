@@ -1,34 +1,18 @@
-From: Colin.Tuckley@arm.com (Colin Tuckley)
-Date: Fri, 5 Mar 2010 12:12:33 +0000
-Subject: [PATCH] ARM: Add Versatile Express SMP support
-In-Reply-To: <git-1267729916-22c6a14e4a304af9afdfe1ccf493570f862ba05f@rmk-PC>
-References: <git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
-	<git-1267729916-22c6a14e4a304af9afdfe1ccf493570f862ba05f@rmk-PC>
-Message-ID: <F01D8B85CFF58440B2A13965FBA90CA404E3EA536A@GEORGE.Emea.Arm.com>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Fri, 5 Mar 2010 14:25:29 -0000
+Subject: [PATCH] ARM: Add Versatile Express support
+In-Reply-To: <git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
+References: <git-1267729916-9e7380877e37e33ffe507b0299aa4c6e9cac599e@rmk-PC>
+	<git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
+Message-ID: <000101cabc6f$b54b4080$1fe1c180$@tuckley@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Russell King
+For some reason you seem to have renamed the "System Register Interface" to
+"configuration register interface"
 
-
-> +++ b/arch/arm/mach-vexpress/headsmp.S
-
-   <snip>
-
-> + * Realview specific entry point for secondary CPUs.  This provides
-
-
-That "Realview" is incorrect, it could either be removed or replaced with "Versatile Express"
+The SRI sub-system is used for more functions than configuration and all of
+the ARM documentation refers to it as the SRI, so for consistency it needs
+to be called the SRI.
 
 Colin
-
---
-Colin Tuckley - ARM Ltd.
-110 Fulbourn Rd
-Cambridge, CB1 9NJ
-Tel: +44 1223 400536
-
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
