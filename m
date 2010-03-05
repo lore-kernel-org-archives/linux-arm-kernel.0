@@ -1,35 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Mar 2010 21:01:36 +0000
-Subject: [PATCH] make the default alignment trap behavior configurable
-	for user space
-In-Reply-To: <20100305150101.GC23225@pengutronix.de>
-References: <alpine.LFD.2.00.0812092312130.14328@xanadu.home>
-	<200812111015.28688.siarhei.siamashka@nokia.com>
-	<alpine.LFD.2.00.0812110915230.14328@xanadu.home>
-	<20100305150101.GC23225@pengutronix.de>
-Message-ID: <20100305210136.GD4885@n2100.arm.linux.org.uk>
+Date: Fri, 5 Mar 2010 21:12:12 +0000
+Subject: [PATCH] arm: convert /proc/cpu/aligment to seq_file
+In-Reply-To: <20100305144523.GB23225@pengutronix.de>
+References: <20091127063746.GB25983@x200.malnet.ru>
+	<20100305144523.GB23225@pengutronix.de>
+Message-ID: <20100305211212.GE4885@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 05, 2010 at 04:01:01PM +0100, Uwe Kleine-K?nig wrote:
-> I like that patch.  (And I'd choose SIGBUS.)
+On Fri, Mar 05, 2010 at 03:45:23PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Is it still considered?
+> On Fri, Nov 27, 2009 at 09:37:46AM +0300, Alexey Dobriyan wrote:
+> > Signed-off-by: Alexey Dobriyan <adobriyan@gmail.com>
+> 
+> What are the up and down sides of that patch?  I assume there are no
+> changes for the userspace?
 
-Absolutely not.
+We have something like a 100 byte file for /proc/cpu/alignment.  Is
+there really any risk that 8 32-bit numbers printed in decimal plus
+some text will ever overflow the PAGE_SIZE (4096) bytes of space
+allocated to procfs file data?
 
-Alignment faults _remain_ a reality.  I've recently built a new glibc -
-and guess what, it _relies_ upon alignment faults - I'm up to 2321607
-userspace alignment faults.
+Let's assume 100 bytes for the text bits, plus 10 bytes per 32-bit
+number (maximum 32-bit number is 4294967295).  So that's 180 bytes
+maximum in this file.
 
-If you decide to make alignment faults create a SIGBUS, then you kill any
-system booting using some glibc's and with gconv support.
+Are we ever going to see an ARM machine with a page size less than
+256 bytes?
 
-The hard fact is: the correct setting of the alignment fault handler is
-_entirely_ _specific_ to the userspace you are running.  There is no one
-correct setting for it.
+In my opinion, there isn't any danger of overflowing the procfs file
+buffer at all - so the question is whether the complexity of seq_file
+is worth "fixing" a problem which just doesn't exist.
 
-To this end, recent kernels now have a kernel command line option to
-chose the correct alignment fault handling behaviour - which is the right
-thing to do since a multi-platform kernel may require different options
-for their different userspaces.
+The only reason it would be worth it is if we're getting rid of the
+old simple procfs PAGE_SIZE buffer interface.
