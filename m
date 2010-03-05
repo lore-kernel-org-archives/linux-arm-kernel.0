@@ -1,50 +1,28 @@
-From: mkl0301@gmail.com (Lin Mac)
-Date: Sat, 6 Mar 2010 05:14:38 +0800
-Subject: Different definition in div_sc and clocksource_cyc2ns
-Message-ID: <10d816431003051314i3e87a2d2yab344826d14a310a@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Mar 2010 21:16:29 +0000
+Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
+In-Reply-To: <1267807960.2581.5.camel@e102109-lin.cambridge.arm.com>
+References: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
+	<1267807960.2581.5.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100305211629.GF4885@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Fri, Mar 05, 2010 at 04:52:40PM +0000, Catalin Marinas wrote:
+> As Ben said, I think we can set PG_dcache_clean in the
+> clear/copy_user_page() functions. My doubt with these functions is the
+> highmem cases where kunmap_atomic() only flushes the D-cache in one
+> situation, the other just calling kunmap_high() which doesn't seem to do
+> anything to the caches.
 
-While working with the clocksource, I found that the relation of cycle
-and nanosecond of div_sc and clocksource_cyc2ns is different.
+In which case you're totally missing the point with these functions.
+The copy_user_page and clear_user_page functions specifically do tricks
+to ensure that they can avoid additional cache maintainence - or any
+cache maintainence at all.
 
-linux-2.6.33
-div_sc in include/linux/clockchips.h suggests that clock_ticks =
-(nanoseconds * factor) >> shift.
-  98/*
-  99 * Calculate a multiplication factor for scaled math, which is
-used to convert
- 100 * nanoseconds based values to clock ticks:
- 101 *
- 102 * clock_ticks = (nanoseconds * factor) >> shift.
- 103 *
- 104 * div_sc is the rearranged equation to calculate a factor from a
-given clock
- 105 * ticks / nanoseconds ratio:
- 106 *
- 107 * factor = (clock_ticks << shift) / nanoseconds
- 108 */
- 109static inline unsigned long div_sc(unsigned long ticks, unsigned long nsec,
- 110                                   int shift)
- 111{
- 112        uint64_t tmp = ((uint64_t)ticks) << shift;
- 113
- 114        do_div(tmp, nsec);
- 115        return (unsigned long) tmp;
- 116}
+For instance, on aliasing VIPT, they will map the user page in using
+the same colour as the ultimate userspace address, ensuring that any
+cache lines created will be visible to the userspace application.
 
-
-However, clocksource_cyc2ns in include/linux/clocksource.h suggest
-nanoseconds=(cycles*mult)>>shift.
- 268static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
- 269{
- 270        return ((u64) cycles * mult) >> shift;
- 271}
-
-But there are many others using div_sc, I don't think they got issues
-with it. So what am I missing?
-
-Best Regards,
-Mac Lin
+So what kunmap_atomic() does with caches is not really relevant to the
+coherency issue.
