@@ -1,37 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Mar 2010 21:12:12 +0000
-Subject: [PATCH] arm: convert /proc/cpu/aligment to seq_file
-In-Reply-To: <20100305144523.GB23225@pengutronix.de>
-References: <20091127063746.GB25983@x200.malnet.ru>
-	<20100305144523.GB23225@pengutronix.de>
-Message-ID: <20100305211212.GE4885@n2100.arm.linux.org.uk>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Sat, 6 Mar 2010 05:14:38 +0800
+Subject: Different definition in div_sc and clocksource_cyc2ns
+Message-ID: <10d816431003051314i3e87a2d2yab344826d14a310a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 05, 2010 at 03:45:23PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Nov 27, 2009 at 09:37:46AM +0300, Alexey Dobriyan wrote:
-> > Signed-off-by: Alexey Dobriyan <adobriyan@gmail.com>
-> 
-> What are the up and down sides of that patch?  I assume there are no
-> changes for the userspace?
+hi,
 
-We have something like a 100 byte file for /proc/cpu/alignment.  Is
-there really any risk that 8 32-bit numbers printed in decimal plus
-some text will ever overflow the PAGE_SIZE (4096) bytes of space
-allocated to procfs file data?
+While working with the clocksource, I found that the relation of cycle
+and nanosecond of div_sc and clocksource_cyc2ns is different.
 
-Let's assume 100 bytes for the text bits, plus 10 bytes per 32-bit
-number (maximum 32-bit number is 4294967295).  So that's 180 bytes
-maximum in this file.
+linux-2.6.33
+div_sc in include/linux/clockchips.h suggests that clock_ticks =
+(nanoseconds * factor) >> shift.
+  98/*
+  99 * Calculate a multiplication factor for scaled math, which is
+used to convert
+ 100 * nanoseconds based values to clock ticks:
+ 101 *
+ 102 * clock_ticks = (nanoseconds * factor) >> shift.
+ 103 *
+ 104 * div_sc is the rearranged equation to calculate a factor from a
+given clock
+ 105 * ticks / nanoseconds ratio:
+ 106 *
+ 107 * factor = (clock_ticks << shift) / nanoseconds
+ 108 */
+ 109static inline unsigned long div_sc(unsigned long ticks, unsigned long nsec,
+ 110                                   int shift)
+ 111{
+ 112        uint64_t tmp = ((uint64_t)ticks) << shift;
+ 113
+ 114        do_div(tmp, nsec);
+ 115        return (unsigned long) tmp;
+ 116}
 
-Are we ever going to see an ARM machine with a page size less than
-256 bytes?
 
-In my opinion, there isn't any danger of overflowing the procfs file
-buffer at all - so the question is whether the complexity of seq_file
-is worth "fixing" a problem which just doesn't exist.
+However, clocksource_cyc2ns in include/linux/clocksource.h suggest
+nanoseconds=(cycles*mult)>>shift.
+ 268static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
+ 269{
+ 270        return ((u64) cycles * mult) >> shift;
+ 271}
 
-The only reason it would be worth it is if we're getting rid of the
-old simple procfs PAGE_SIZE buffer interface.
+But there are many others using div_sc, I don't think they got issues
+with it. So what am I missing?
+
+Best Regards,
+Mac Lin
