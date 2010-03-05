@@ -1,16 +1,34 @@
-From: albin.tonnerre@gmail.com (Albin Tonnerre)
-Date: Fri, 5 Mar 2010 11:47:07 +0100
-Subject: [PATCH] ARM: Add Versatile Express CA9x4 processor support
-In-Reply-To: <git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
-References: <git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
-	<git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
-Message-ID: <bbb699fe1003050247i4e12a596w6feea9a174c9b746@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri,  5 Mar 2010 10:47:23 +0000
+Subject: [PATCH] ARM: S3C64XX: Reintroduce unconditional build of
+Message-ID: <1267786043-27064-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Ben Dooks' commit cf9814eb (ARM: S3C64XX: Make audio device code built
+unconditionally) made the struct devices for the audio blocks in the
+S3C64xx series processors be built unconditionally but this change seems
+to have gone AWOL in the various Samsung platform moves this release
+cycle, causing link failures with machine drivers that rely on it.
 
-> +config ARCH_VEXPRESS_CA9X4
-> + ? ? ? bool "Versatile Express Cortex-A9x4 tile"
-> + ? ? ? select CPU_V7
-> + ? ? ? select ARM_GIC
+Reintroduce the change.
+
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/Makefile |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index d1d341a..3758e15 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -57,6 +57,6 @@ obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+ 
+ obj-y				+= dev-uart.o
+ obj-y				+= dev-rtc.o
++obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+-obj-$(CONFIG_SND_S3C24XX_SOC)	+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+-- 
+1.7.0
