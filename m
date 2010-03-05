@@ -1,34 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Mar 2010 22:36:34 +0000
-Subject: [PATCH] ARM: Add Versatile Express support
-In-Reply-To: <000101cabc6f$b54b4080$1fe1c180$@tuckley@arm.com>
-References: <git-1267729916-9e7380877e37e33ffe507b0299aa4c6e9cac599e@rmk-PC>
-	<git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
-	<000101cabc6f$b54b4080$1fe1c180$@tuckley@arm.com>
-Message-ID: <20100305223634.GA20095@n2100.arm.linux.org.uk>
+Date: Fri, 5 Mar 2010 22:50:47 +0000
+Subject: [PATCH] ARM: Realview/Versatile/Integrator: separate out
+	common clock code
+In-Reply-To: <000001cabc52$b2514090$16f3c1b0$@tuckley@arm.com>
+References: <git-1267729916-2dbb324ef24e91a11ed84389718874ece7056fd7@rmk-PC>
+	<git-1267729916-5eb24b69c868ed8197842aa7c1576cdd05d9d41e@rmk-PC>
+	<000001cabc52$b2514090$16f3c1b0$@tuckley@arm.com>
+Message-ID: <20100305225047.GB20095@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 05, 2010 at 02:25:29PM -0000, Colin Tuckley wrote:
-> For some reason you seem to have renamed the "System Register Interface" to
-> "configuration register interface"
+On Fri, Mar 05, 2010 at 10:57:49AM -0000, Colin Tuckley wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > kernel-bounces at lists.infradead.org] On Behalf Of Russell King
+> 
+> > +	select PLAT_VERSATILE
+> 
+> This needs to be called something else if it's going to be used for
+> mach-realview and mach-integrator. It's too confusing because of there being
+> a mach-versatile. It needs to be a more generic name, something that isn't a
+> mach. Perhaps "ARMDEV".
 
-No I have not - I'm using the terminology found in the ARM documentation:
+Well, the platform families are officially documented on the ARM 
+documentation site as:
 
-Configuration Data Register, SYS_CFG registers
+"Versatile Express"
+"RealView Versatile baseboards" (eg, of which the Realview EB and
+  Versatile PB926 are members)
+"Integrator baseboards"
 
-The SYS_CFG registers enable communication between the MCC and DCC to
-read and write a variety of system parameters, for example:
- ? oscillators
- ? voltage
- ? current
- ? power.
-...
+So the commonest naming theme is 'Versatile' - except for the old
+Integrator platforms.  
 
-There's many more references to these being 'configuration' registers
-in the user guides for these boards.  I see no sign of it being called
-by any different name.
-
-Maybe the documentation on the ARM website is out of date?  In any case,
-it would seem that I'm using the publically documented names for these
-interfaces.
+I think it's reasonable to describe the common parts between all these
+families as 'Vesatile' rather than making up another name which doesn't
+really connect with any of them.
