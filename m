@@ -1,49 +1,60 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 5 Mar 2010 10:23:38 +0100
-Subject: sharp c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1
-In-Reply-To: <f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
-References: <20100106071026.GD1382@ucw.cz>
-	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
-	<20100107065230.GA1303@ucw.cz>
-	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
-Message-ID: <20100305092338.GA32433@atrey.karlin.mff.cuni.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 05 Mar 2010 09:27:19 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <1267763650.22204.92.camel@pasglop>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+	<1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+	<1267738660.22204.77.camel@pasglop>
+	<1267740711.30572.5.camel@e102109-lin.cambridge.arm.com>
+	<1267763650.22204.92.camel@pasglop>
+Message-ID: <1267781239.17516.4.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> > Sharp-SL code uses strange, complex grouping of gpios for wakeups
-> >> > toggling. Fortunately, it is unneeded in recent kernels (and actually
-> >> > provokes WARN_ONs during resume). Remove it.
-> >> >
-> >> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> >>
-> >> Pavel,
-> >>
-> >> The code to be removed below is used to support pxa27x_keypad
-> >> to be able to resume from sleep. What's the exact reason to remove
-> >> this on spitz?
+On Fri, 2010-03-05 at 04:34 +0000, Benjamin Herrenschmidt wrote:
+> On Thu, 2010-03-04 at 22:11 +0000, Catalin Marinas wrote:
+> > On Thu, 2010-03-04 at 21:37 +0000, Benjamin Herrenschmidt wrote:
+> > > On Thu, 2010-03-04 at 18:07 +0000, Catalin Marinas wrote:
+> > > > I'm not familiar with SH but for PIO devices the flushing shouldn't be
+> > > > more aggressive. For the DMA devices, Russell suggested that we mark
+> > > > the page as clean (set PG_dcache_clean) in the DMA API to avoid the
+> > > > default flushing.
+> > >
+> > > I really like that idea, as I said earlier, but I'm worried about the I$
+> > > side of things. IE. What I'm trying to say is that I can't see how to do
+> > > that optimisation without ending up with missing I$ invalidations or
+> > > doing way too many of them, unless we have a separate bit to track I$
+> > > state.
 > >
-> > Well, otherwise I get this during resume: (2.6.32 regression)
-> >
-> > (and similar for matrix-keypad, but dmitry worked around that
-> > already).
-> >
-> > Problem is that gpio-keys and matrix-keypad want to set_wake for each
-> > gpio individually, hw can do that, but pxa27x.c breaks it.
-> >
-> > I don't get it; what is pxa27x_keypad used on? It looks like
-> > matrix-keypad subset.
+> > But does this optimisation really matter? I think with careful checking
+> > in set_pte_at(), you are not going to invalidate the I-cache more than
+> > necessary. If the original page wasn't pte_present() you would need to
+> > do the I-cache invalidation. The other cases where set_pte_at() is
+> > called for LRU (pte_young) or COW (pte_write) we can avoid the extra
+> > invalidation.
 > 
-> pxa27x has its own specific keypad controller. And since we now
-> use enable_irq_wake, and the keypad controller has only one
-> such IRQ_KEYPAD, will have to setup the keypad GPIO wakeup
-> as a whole.
+> No. Not on PIPT (or non aliasing VIPT).
+> 
+> Take your typical glibc text page. This is a struct page that will be
+> mapped in almost every process in your system. You do not want to do the
+> icache inval every time. Once it's been cleaned once, it's clean for
+> subsequent mappings. Only VIVT needs such multiple invalidates I suppose
+> though in this case you probably do everything differently anyways.
 
-But pxa27x keypad controlled is not used on spitz, right? So why do we
-break spitz by tying GPIO wakeup settings together?
-									Pavel
+Yes, you are right, shared libraries don't need the extra flushing with
+PIPT caches.
+
+Thanks.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Catalin
