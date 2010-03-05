@@ -1,46 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 05 Mar 2010 16:52:40 +0000
-Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
-References: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
-Message-ID: <1267807960.2581.5.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Mar 2010 20:43:07 +0000
+Subject: [PATCH] ARM: Add Versatile Express CA9x4 processor support
+In-Reply-To: <002101cabc5c$81fa5440$85eefcc0$@deacon@arm.com>
+References: <git-1267729916-61c9b6ab773870de77ff9183b8bb055a03b19671@rmk-PC>
+	<git-1267729916-8545dcd13a3ae6450278b076cb024d10d64ee785@rmk-PC>
+	<002101cabc5c$81fa5440$85eefcc0$@deacon@arm.com>
+Message-ID: <20100305204307.GB4885@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-04 at 21:44 +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 04, 2010 at 06:36:42PM +0000, Catalin Marinas wrote:
-> > ARM: Assume new page cache pages have dirty D-cache
-> >
-> > From: Catalin Marinas <catalin.marinas@arm.com>
-> >
-> > There are places in Linux where writes to newly allocated page cache
-> > pages happen without a subsequent call to flush_dcache_page() (several
-> > PIO drivers including USB HCD). This patch changes the meaning of
-> > PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-> > mapped page in update_mmu_cache().
-> >
-> > The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-> > function to avoid additional cache flushing in update_mmu_cache().
-> 
-> As I just realised, this is going to subject all pages placed into
-> userspace with a D cache flush - even anonymous pages, and those
-> which we've been careful to deal with the cache issues already (eg,
-> via the COW page copying code.)
-> 
-> I think all the copypage functions need to set PG_dcache_clean on the
-> new pages once their copy has completed.
+On Fri, Mar 05, 2010 at 12:08:02PM -0000, Will Deacon wrote:
+> The only problem with adding the PMU interrupts here is that
+> they are not visible to kernel/pmu.c, which includes <linux/interrupt.h>.
+> Adding a conditional #include <mach/ct-ca9x4.h> worked, but it's not
+> very nice. Would it be possible to include the tile IRQs in the
+> include/mach/irqs.h?
 
-As Ben said, I think we can set PG_dcache_clean in the
-clear/copy_user_page() functions. My doubt with these functions is the
-highmem cases where kunmap_atomic() only flushes the D-cache in one
-situation, the other just calling kunmap_high() which doesn't seem to do
-anything to the caches.
+Given that this platform can have multiple different tiles fitted, I
+don't think it's correct to publicise the interrupt numbers globally.
 
-But for non-aliasing VIPT, do we actually need the D-cache flushing in
-kunmap_atomic() or copy_user_page()? If we default to new page being
-dirty, I think we can remove the cache cleaning from this function and
-leave it for update_mmu_cache (or set_pte_at but that's for a different
-patch).
+Currently, we have the situation where 99.9% of the tile dependencies
+are entirely separated from the motherboard - the only exception being
+the base of the motherboard IRQ numbers, and the base addresses of
+the motherboard CS regions.
 
--- 
-Catalin
+It would be better if there was some way to allow board support to
+register their individual details with the PMU code.  The fact that
+the PMU interrupts on CA9x4 are 92-95 does not mean that on another
+Versatile Express tile, they will be the same - and in that case if
+you select the interrupts through ifdefs, you're tied to only one
+platform inspite of the rest of the kernel image supporting multiple
+platforms.
