@@ -1,44 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 6 Mar 2010 19:36:49 +0000
+Date: Sat, 6 Mar 2010 19:44:11 +0000
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267872443.8894.1443.camel@mulgrave.site>
-References: <1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267712512.31654.176.camel@mulgrave.site>
-	<20100304142704.GB6622@n2100.arm.linux.org.uk>
-	<1267872443.8894.1443.camel@mulgrave.site>
-Message-ID: <20100306193649.GB13262@n2100.arm.linux.org.uk>
+In-Reply-To: <201003061156.41136.wolfgang@iksw-muees.de>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<201003040754.57800.wolfgang@iksw-muees.de>
+	<20100304093117.GA5282@n2100.arm.linux.org.uk>
+	<201003061156.41136.wolfgang@iksw-muees.de>
+Message-ID: <20100306194411.GC13262@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 06, 2010 at 04:17:23PM +0530, James Bottomley wrote:
-> On a fault in of exec data, we first try to get the page out of the page
-> cache.  If it's not present, we put the faulting process to sleep and
-> fetch it in from storage.  When we do the read, on the PIO path, the
-> kernel alias for the page becomes dirty.  Some time later, we place the
-> page into the user space (updating the pte entry that caused a fault).
-> At this point, we'll call both flush_icache_page() and
-> update_mmu_cache() ... this is where the I/D resolution should be done.
+On Sat, Mar 06, 2010 at 11:56:41AM +0100, Wolfgang M?es wrote:
+> > 3. A page may be read in response to an application issuing a read(2) call.
+> >    - the data is read from the kernel mapping, and isn't mapped into a
+> >      userspace address.
+> > 
+> > So, in case (3), flushing the I and D caches could be completely wasteful
+> But how do you AVOID the writeback of the data cache in (3)?
+> IMHO, the dirty data is in the cache, and the cache will writeback this data 
+> on its own.
 
-No - this is where things get extremely icky.
+You don't avoid the writeback - you avoid explicitly causing the
+writeback _and_ having to wait for it.
 
-The problem at this point occurs on SMP architectures.  As soon as you
-update the PTE entry, it is visible to other threads of the application.
-If you do I-cache handling after updating the PTE, then there is a window
-where another CPU can execute the page:
+If you're writing data into a page (pio) which you then access via that
+same mapping (via read(2)), it is totally pointless to sit in a loop
+asking the cache to write the data back to memory.
 
-CPU0			CPU1
-			speculatively prefetches from page N via kernel
-			mapping, loads garbage into I-cache
-attempts to execute P
-page fault
-page N allocated
-set_pte_at
-			executes P
-			*splat*
-flush I-cache
+The point when you need this data written back to memory is the point
+where you start to create mappings which may alias with the existing
+mapping.  Up until that point, the hardware itself can deal with the
+writebacks when it decides it's a good time to do so.
+
+Also, cache replaacement policies may not decide to immediately re-use
+the cache lines you've just flushed - which means that by forcing them
+to be written back, you're just increasing the overall latency of the
+system.
