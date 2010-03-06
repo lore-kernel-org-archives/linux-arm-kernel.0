@@ -1,76 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat,  6 Mar 2010 14:43:04 +0530
-Subject: [PATCH] ARM: Add omap-specific barrier implementation
-Message-ID: <1267866784-10465-1-git-send-email-santosh.shilimkar@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 06 Mar 2010 10:00:22 +0000
+Subject: [RFC PATCH] ARM: Assume new page cache pages have dirty D-cache
+In-Reply-To: <20100305211629.GF4885@n2100.arm.linux.org.uk>
+References: <20100304214435.GJ13417@n2100.arm.linux.org.uk>
+	<1267807960.2581.5.camel@e102109-lin.cambridge.arm.com>
+	<20100305211629.GF4885@n2100.arm.linux.org.uk>
+Message-ID: <1267869622.4280.5.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines ARCH_HAS_BARRIERS for the OMAP4 platform if
-CACHE_L2X0 is enabled and adds the mach/barriers.h file. The mb() and
-wmb() barriers perform an L2 cache sync in addition to the DSB.
+On Fri, 2010-03-05 at 21:16 +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 05, 2010 at 04:52:40PM +0000, Catalin Marinas wrote:
+> > As Ben said, I think we can set PG_dcache_clean in the
+> > clear/copy_user_page() functions. My doubt with these functions is the
+> > highmem cases where kunmap_atomic() only flushes the D-cache in one
+> > situation, the other just calling kunmap_high() which doesn't seem to do
+> > anything to the caches.
+> 
+> In which case you're totally missing the point with these functions.
+> The copy_user_page and clear_user_page functions specifically do tricks
+> to ensure that they can avoid additional cache maintainence - or any
+> cache maintainence at all.
+> 
+> For instance, on aliasing VIPT, they will map the user page in using
+> the same colour as the ultimate userspace address, ensuring that any
+> cache lines created will be visible to the userspace application.
 
-The patch is based on top of Catalin's below series
-	- [PATCH v3 0/4] ARM mandatory barriers
-	- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/75425
+I was more thinking for the non-aliasing VIPT case where we could defer
+the flushing until update_mmu_cache(). But I'm fine with just setting
+PG_dcache_clean in these functions to avoid checks on non-aliasing vs.
+aliasing VIPT.
 
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/include/mach/barriers.h |   32 +++++++++++++++++++++++++++
- arch/arm/plat-omap/Kconfig                  |    1 +
- 2 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/include/mach/barriers.h
+> So what kunmap_atomic() does with caches is not really relevant to the
+> coherency issue.
 
-diff --git a/arch/arm/mach-omap2/include/mach/barriers.h b/arch/arm/mach-omap2/include/mach/barriers.h
-new file mode 100644
-index 0000000..e29aebf
---- /dev/null
-+++ b/arch/arm/mach-omap2/include/mach/barriers.h
-@@ -0,0 +1,32 @@
-+/*
-+ * omap barriers.h
-+ *
-+ * Copyright (C) 2010 Texas Instruments Ltd.
-+ * Copyright (C) 2010 ARM Ltd.
-+ * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ * based on realview version of Catalin Marinas <catalin.marinas@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#ifndef __MACH_BARRIERS_H
-+#define __MACH_BARRIERS_H
-+
-+#include <asm/outercache.h>
-+
-+#define rmb()		dmb()
-+#define wmb()		do { dsb(); outer_sync(); } while (0)
-+#define mb()		wmb()
-+
-+#endif	/* __MACH_BARRIERS_H */
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 6da796e..4812da4 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -38,6 +38,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARCH_HAS_BARRIERS if CACHE_L2X0
- 
- endchoice
- 
+The relevant part is that if highmem is enabled, copy_user_page() does
+not flush the D-cache, leaving it to kunmap_atomic(). Does this latter
+function flush the D-cache in all the relevant situations?
+
 -- 
-1.6.0.4
+Catalin
