@@ -1,10 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 16:11:19 -0800
-Subject: [PATCH 19b/19] ARM/OMAP: Remove the +x bit from a couple of source
-	files
-In-Reply-To: <20100311234404.4500.82861.stgit@baageli.muru.com>
-References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-Message-ID: <20100312001119.GB2900@atomide.com>
+From: andrew@digital-domain.net (Andrew Clayton)
+Date: Sat, 6 Mar 2010 00:14:46 +0000
+Subject: [PATCH] ARM/OMAP: Remove the +x bit from a couple of source files
+Message-ID: <mailman.236.1268352604.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove the +x bit from a couple of source files
+
+Signed-off-by: Andrew Clayton <andrew@digital-domain.net>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+old mode 100755
+new mode 100644
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+old mode 100755
+new mode 100644
