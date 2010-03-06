@@ -1,185 +1,76 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Fri, 5 Mar 2010 16:36:47 -0800
-Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
-Message-ID: <4B91A39F.8050502@am.sony.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat,  6 Mar 2010 14:43:04 +0530
+Subject: [PATCH] ARM: Add omap-specific barrier implementation
+Message-ID: <1267866784-10465-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry - had wrong lists on original message
+This patch defines ARCH_HAS_BARRIERS for the OMAP4 platform if
+CACHE_L2X0 is enabled and adds the mach/barriers.h file. The mb() and
+wmb() barriers perform an L2 cache sync in addition to the DSB.
 
-Add ftrace function-graph tracer support for ARM.
+The patch is based on top of Catalin's below series
+	- [PATCH v3 0/4] ARM mandatory barriers
+	- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/75425
 
-This includes adding code in mcount to check for
-(and call) a registered function graph trace entry
-routine, and adding code to support a return
-trampoline, to catch the function exit.
-
-IRQENTRY_TEXT was added to vmlinux.lds.S (to eliminate
-a compiler error on kernel/trace/trace_functions_graph.c),
-although no routines were marked as __irq_entry.
-
-Signed-off-by: Tim Bird <tim.bird@am.sony.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/Kconfig               |    1
- arch/arm/kernel/Makefile       |    4 +--
- arch/arm/kernel/entry-common.S |   36 +++++++++++++++++++++++++++++++-
- arch/arm/kernel/ftrace_graph.c |   46 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/vmlinux.lds.S  |    1
- 5 files changed, 85 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/include/mach/barriers.h |   32 +++++++++++++++++++++++++++
+ arch/arm/plat-omap/Kconfig                  |    1 +
+ 2 files changed, 33 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/include/mach/barriers.h
 
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -18,6 +18,7 @@ config ARM
- 	select HAVE_KPROBES if (!XIP_KERNEL)
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-+	select HAVE_FUNCTION_GRAPH_TRACER if (!XIP_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -5,9 +5,8 @@
- CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
- AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
-
--ifdef CONFIG_DYNAMIC_FTRACE
- CFLAGS_REMOVE_ftrace.o = -pg
--endif
-+CFLAGS_REMOVE_ftrace_graph.o = -pg
-
- CFLAGS_REMOVE_return_address.o = -pg
-
-@@ -31,6 +30,7 @@ obj-$(CONFIG_SMP)		+= smp.o
- obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
- obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
- obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
-+obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace_graph.o
- obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
- obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-decode.o
- obj-$(CONFIG_ATAGS_PROC)	+= atags.o
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -98,6 +98,11 @@ ENTRY(mcount)
- 	mov r0, lr
- 	sub r0, r0, #MCOUNT_INSN_SIZE
-
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	@ FIXTHIS - DYNAMIC_FTRACE does not support function graph tracing
-+	@ when the dynamic work is revived, this should be supported as well
-+#endif
-+
- 	.globl mcount_call
- mcount_call:
- 	bl ftrace_stub
-@@ -144,8 +149,16 @@ ENTRY(mcount)
- 	adr r0, ftrace_stub
- 	cmp r0, r2
- 	bne trace
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	ldr r1, =ftrace_graph_return
-+	ldr r2, [r1]
-+	cmp r0, r2		@ if *ftrace_graph_return != ftrace_stub
-+	bne ftrace_graph_caller
-+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-+
- 	ldr lr, [fp, #-4]			@ restore lr
--	ldmia sp!, {r0-r3, pc}
-+	ldmia sp!, {r0-r3, pc}			@ return doing nothing
-
- trace:
- 	ldr r1, [fp, #-4]			@ lr of instrumented routine
-@@ -156,6 +169,27 @@ trace:
- 	ldr lr, [fp, #-4]			@ restore lr
- 	ldmia sp!, {r0-r3, pc}
-
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+ENTRY(ftrace_graph_caller)
-+	sub r0, fp, #4			@ &lr of instrumented routine (&parent)
-+	mov r1, lr			@ instrumented routine (func)
-+	sub r1, r1, #MCOUNT_INSN_SIZE
-+	mov r2, fp			@ frame pointer
-+	bl prepare_ftrace_return
-+	ldr lr, [fp, #-4]		@ restore lr
-+	ldmia sp!, {r0-r3, pc}
-+
-+	.globl return_to_handler
-+return_to_handler:
-+	stmdb sp!, {r0-r3}
-+	mov r0, fp			@ frame pointer
-+	bl ftrace_return_to_handler
-+	mov lr, r0			@ r0 has real ret addr
-+	ldmia sp!, {r0-r3}
-+	mov pc, lr
-+
-+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-+
- #endif /* CONFIG_DYNAMIC_FTRACE */
-
- 	.globl ftrace_stub
+diff --git a/arch/arm/mach-omap2/include/mach/barriers.h b/arch/arm/mach-omap2/include/mach/barriers.h
+new file mode 100644
+index 0000000..e29aebf
 --- /dev/null
-+++ b/arch/arm/kernel/ftrace_graph.c
-@@ -0,0 +1,46 @@
++++ b/arch/arm/mach-omap2/include/mach/barriers.h
+@@ -0,0 +1,32 @@
 +/*
-+ * function graph tracing support.
++ * omap barriers.h
 + *
-+ * Copyright (C) 2009 Tim Bird <tim.bird@am.sony.com>
++ * Copyright (C) 2010 Texas Instruments Ltd.
++ * Copyright (C) 2010 ARM Ltd.
++ * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
++ * based on realview version of Catalin Marinas <catalin.marinas@arm.com>
 + *
-+ * For licencing details, see COPYING.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * Defines routine needed for ARM return trampoline for tracing
-+ * function exits.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 + */
 +
-+#include <linux/ftrace.h>
++#ifndef __MACH_BARRIERS_H
++#define __MACH_BARRIERS_H
 +
-+/*
-+ * Hook the return address and push it in the stack of return addrs
-+ * in current thread info.
-+ */
-+void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
-+			   unsigned long frame_pointer)
-+{
-+	unsigned long old;
++#include <asm/outercache.h>
 +
-+	struct ftrace_graph_ent trace;
-+	unsigned long return_hooker = (unsigned long)
-+				&return_to_handler;
++#define rmb()		dmb()
++#define wmb()		do { dsb(); outer_sync(); } while (0)
++#define mb()		wmb()
 +
-+	if (unlikely(atomic_read(&current->tracing_graph_pause)))
-+		return;
-+
-+	old = *parent;
-+	*parent = return_hooker;
-+
-+	if (ftrace_push_return_trace(old, self_addr, &trace.depth,
-+		    frame_pointer) == -EBUSY) {
-+		*parent = old;
-+		return;
-+	}
-+
-+	trace.func = self_addr;
-+
-+	/* Only trace if the calling function expects to */
-+	if (!ftrace_graph_entry(&trace)) {
-+		current->curr_ret_stack--;
-+		*parent = old;
-+	}
-+}
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -91,6 +91,7 @@ SECTIONS
- 			SCHED_TEXT
- 			LOCK_TEXT
- 			KPROBES_TEXT
-+			IRQENTRY_TEXT
- #ifdef CONFIG_MMU
- 			*(.fixup)
- #endif
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
-Please read the FAQ at  http://www.tux.org/lkml/
++#endif	/* __MACH_BARRIERS_H */
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 6da796e..4812da4 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -38,6 +38,7 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARCH_HAS_BARRIERS if CACHE_L2X0
+ 
+ endchoice
+ 
+-- 
+1.6.0.4
