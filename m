@@ -1,27 +1,23 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Sat, 6 Mar 2010 12:05:17 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <201003061156.41136.wolfgang@iksw-muees.de>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<20100304093117.GA5282@n2100.arm.linux.org.uk>
-	<201003061156.41136.wolfgang@iksw-muees.de>
-Message-ID: <201003061205.17490.oliver@neukum.org>
+From: thomas@koeller.dyndns.org (Thomas Koeller)
+Date: Sat, 6 Mar 2010 14:07:12 +0100
+Subject: DMA using data buffer vmapped in kernel space
+In-Reply-To: <20100304213634.GH13417@n2100.arm.linux.org.uk>
+References: <201003042211.28569.thomas@koeller.dyndns.org>
+	<20100304213634.GH13417@n2100.arm.linux.org.uk>
+Message-ID: <201003061407.12698.thomas@koeller.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 6. M?rz 2010 11:56:41 schrieb Wolfgang M?es:
-> > 1. A page is faulted in for an application, and it is a text page.
-> >    - the data read in to the page needs to be visible to the instruction
-> >      stream, so on Harvard architecture machines, this may require cache
-> >      maintainence on both the D and I caches.
-> Yes. I think that the EXPECTED behaviour of block devices is to give the 
-> result of the read back in memory. So the driver should do the flush of the 
-> data cache.
-> 
-> The invalidation of the I cache should be done by the function which makes 
-> this piece of data executable. (Have I missed something here?)
+Am Donnerstag, 4. M?rz 2010 22:36:34 schrieb Russell King - ARM Linux:
+> Cache maintainence is done using virtual addresses for L1, and
+> physical addresses for L2.  There's the need for virtual addresses
+> to be translatable to physical addresses, which is only true for
+> the kernel direct mapped region (pages between PAGE_OFFSET and
+> high_memory).
 
-What tells you that IO is happening before the page is made executable?
+Isn't the mapping created by vmap() sufficient for the virt/phys
+translation? In which way is this case different from a buffer
+passed in from user space, where the constituent pages are not
+in the directly mapped kernel region either?
 
-	Regards
-		Oliver
+tk
