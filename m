@@ -1,56 +1,50 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Sun, 07 Mar 2010 21:59:16 +0000
-Subject: [PATCH] stargate 2, imote 2: remove spi cs gpio direction to avoid
-	clash with driver
-Message-ID: <4B9421B4.6000200@cam.ac.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Sun, 7 Mar 2010 22:58:59 +0000
+Subject: [PULL] please pull bjdooks' for-rmk/samsung6
+Message-ID: <20100307225859.GA28823@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+this pull fixes the merge problems and bugs found during testing as well
+as fixing the s3c2443 clock code to use the common samsung clock code.
 
-Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
----
+The following changes since commit d608c738bb8fb37e5fbfcdef9c566764f2fea086:
+  Mark Brown (1):
+        ARM: S3C64XX: Add initial support for board specific IRQs
 
- Fix for an issue seen as a failure in gpio allocation within
- pxa2xx_spi.  Not sure when this problem first occured.
- Looks like a bug that has been there a while and for some
- reason has recently gained unfortunate symptoms.
+are available in the git repository at:
 
- Patch is against Linus' tree. 
+  git://git.fluff.org/bjdooks/linux.git for-rmk/samsung6
 
- arch/arm/mach-pxa/imote2.c    |    4 ----
- arch/arm/mach-pxa/stargate2.c |    5 -----
- 2 files changed, 0 insertions(+), 9 deletions(-)
+Ben Dooks (8):
+      ARM: S3C2443: Use common clock gate code
+      ARM: S3C2440: Fix plat-s3c24xx move of s3c2440/s3c2442 support
+      ARM: S3C2443: Change to using plat-samsung clksrc-clk implementation
+      ARM: S3C2443: Further clksrc-clk conversions
+      ARM: S3C2443: Update notes on MPLLREF clock
+      ARM: S3C2443: Remove #if 0 for clk_mpll
+      ARM: S3C2443: Add set_rate and round_rate calls for armdiv clock
+      ARM: Merge next-samsung-s3c2443-clock
 
-diff --git a/arch/arm/mach-pxa/imote2.c b/arch/arm/mach-pxa/imote2.c
-index f7f3ba8..f940de0 100644
---- a/arch/arm/mach-pxa/imote2.c
-+++ b/arch/arm/mach-pxa/imote2.c
-@@ -574,10 +574,6 @@ static void __init imote2_init(void)
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
- 
--	/* SPI chip select directions - all other directions should
--	 * be handled by drivers.*/
--	gpio_direction_output(37, 0);
--
- 	platform_add_devices(imote2_devices, ARRAY_SIZE(imote2_devices));
- 
- 	pxa2xx_set_spi_info(1, &pxa_ssp_master_0_info);
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 0c4ec35..f6931a1 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -779,11 +779,6 @@ static void __init stargate2_init(void)
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
- 
--	/* spi chip selects */
--	gpio_direction_output(37, 0);
--	gpio_direction_output(24, 0);
--	gpio_direction_output(39, 0);
--
- 	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
- 
- 	pxa2xx_set_spi_info(1, &pxa_ssp_master_0_info);
+Mark Brown (3):
+      ASoC: Fix S3C64xx IIS driver for Samsung header reorg
+      ARM: S3C64XX: Reintroduce unconditional build of audio device
+      USB: Fix s3c-hsotg build following Samsung platform header moves
+
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |   32 +-
+ .../s3c2440-pll-12000000.c                         |    2 +-
+ .../s3c2440-pll-16934400.c                         |    2 +-
+ arch/arm/mach-s3c2443/Kconfig                      |    1 +
+ arch/arm/mach-s3c2443/clock.c                      |  817 +++++++-------------
+ arch/arm/mach-s3c64xx/Makefile                     |    2 +-
+ drivers/usb/gadget/s3c-hsotg.c                     |    2 +-
+ sound/soc/s3c24xx/s3c64xx-i2s.c                    |    4 +-
+ 8 files changed, 267 insertions(+), 595 deletions(-)
+ rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c2440-pll-12000000.c (98%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c2440-pll-16934400.c (99%)
+
+
 -- 
-1.6.3.3
+Ben (ben at fluff.org, http://www.fluff.org/)
+
+  'a smiley only costs 4 bytes'
