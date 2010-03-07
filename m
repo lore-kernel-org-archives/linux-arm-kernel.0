@@ -1,9 +1,8 @@
 From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sun, 07 Mar 2010 09:07:17 +0530
+Date: Sun, 07 Mar 2010 11:24:11 +0530
 Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267909429.22204.127.camel@pasglop>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
+In-Reply-To: <20100306193649.GB13262@n2100.arm.linux.org.uk>
+References: <1267316072.23523.1842.camel@pasglop>
 	<1267333263.2762.11.camel@mulgrave.site>
 	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
 	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
@@ -13,13 +12,13 @@ References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
 	<1267712512.31654.176.camel@mulgrave.site>
 	<20100304142704.GB6622@n2100.arm.linux.org.uk>
 	<1267872443.8894.1443.camel@mulgrave.site>
-	<1267909429.22204.127.camel@pasglop>
-Message-ID: <1267933038.2812.12.camel@mulgrave.site>
+	<20100306193649.GB13262@n2100.arm.linux.org.uk>
+Message-ID: <1267941251.2812.20.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-03-07 at 08:03 +1100, Benjamin Herrenschmidt wrote:
-> On Sat, 2010-03-06 at 16:17 +0530, James Bottomley wrote:
+On Sat, 2010-03-06 at 19:36 +0000, Russell King - ARM Linux wrote:
+> On Sat, Mar 06, 2010 at 04:17:23PM +0530, James Bottomley wrote:
 > > On a fault in of exec data, we first try to get the page out of the page
 > > cache.  If it's not present, we put the faulting process to sleep and
 > > fetch it in from storage.  When we do the read, on the PIO path, the
@@ -27,65 +26,43 @@ On Sun, 2010-03-07 at 08:03 +1100, Benjamin Herrenschmidt wrote:
 > > page into the user space (updating the pte entry that caused a fault).
 > > At this point, we'll call both flush_icache_page() and
 > > update_mmu_cache() ... this is where the I/D resolution should be done.
-> > Since it's after any I/O has occurred, it doesn't matter whether the CPU
-> > speculatively moved anything in or not.  As long as you flush the kernel
-> > alias and invalidate the user I and D aliases, we're good to go.  Using
-> > the page arch flags is really only to optimise this process (defer
-> > kernel D alias flushing).
 > 
-> Ok, so while flush_icache_page() looks like something we could use
-> instead of set_pte_at() for the icache flushing, it doesn't answer all
-> the questions. Off the top of my mind:
+> No - this is where things get extremely icky.
 
-OK, so what I was actually trying to get across is the point that we
-don't handle I cache problems in the I/O or page cache code ... we
-handle them in the mm code, so the mm piece of the above was
-deliberately a bit vague.
+OK, but the point I'm trying to make is that the page cache code,
+including the I/O layer, only manages kernel D alias state (either by
+flushing or marking it dirty).  The user space I/D handling is done in
+the mm code (I'm not claiming it's done correctly there, just claiming
+it's done there).
 
-> - I see the calls to flush_icache_page() in mm/memory.c but I don't see
-> them next to all set_pte_at() that insert a valid PTE. For example, we
-> don't flush the icache for anonymous pages. While that might seem like a
-> good idea, we have been under pressure to "fix" that on powerpc to make
-> sure there is no stale icache content from another process leaking into
-> userspace.
-
-I'm not entirely sure what flush_icache_page() is supposed to do.  On
-parisc it flushes the *kernel* icache ... which has got to be wrong.
-According to cachetlb.txt it's an obsolete interface.
-
-> - It needs to be done -before- set_pte_at() but I think the code does it
-> right, only your explanation above makes it unclear :-)
-
-Sorry, like I said, I only sketched the mm piece.  However, at least on
-parisc, there's a technical problem with flushing before we have the
-pte:  On VIPT systems, we need a mapping before the flush will work.  I
-was experimenting with a mechanism whereby we set aside in the kernel an
-aligned region of our congruence size and simply flushed in that region
-with the correct mappings, but we haven't got around to implementing it
-in the kernel yet.
-
-> - It doesn't take the PTE pointer as an argument, so here goes our trick
-> on powerpc of filtering out exec permission rather than flushing when a
-> page is accessed by a read fault
+> The problem at this point occurs on SMP architectures.  As soon as you
+> update the PTE entry, it is visible to other threads of the application.
+> If you do I-cache handling after updating the PTE, then there is a window
+> where another CPU can execute the page:
 > 
-> - We -still- have the problem of tracking whether the icache has been
-> flushed or not yet for a given physical page on archs with PIPT (or non
-> aliasing VIPT) like powerpc. Without that tracking, we flush a lot more
-> than necessary since we'll end up flushing things like glibc text pages
-> for every process they are mapped into which is totally wasteful. Thus
-> the idea of using a new PG bit to separate D$ from I$ tracking still
-> makes sense.
+> CPU0			CPU1
+> 			speculatively prefetches from page N via kernel
+> 			mapping, loads garbage into I-cache
+> attempts to execute P
+> page fault
+> page N allocated
+> set_pte_at
+> 			executes P
+> 			*splat*
+> flush I-cache
 
-So, assuming full congruence of user space, can't you use the VMA as an
-indicator?  i.e. if we have no user space mappings, we have to flush the
-icache ... if we have one or more, the icache has been flushed and
-placing the same page congruently in a different address space benefits
-from that prior flush, so consequently there's no need to flush again?
+OK, so I can believe this.  We see extremely rare segfaults on parisc
+which look to be the result of some I flush race like this.  However, I
+think for a discussion of problems with the arch and mm interfaces, we
+should probably move off the usb list and onto linux-arch.
 
-I also think we've established the relevant facts for the I/O thread
-(that we only need to either flush the kernel D cache or mark it as to
-be flushed later on PIO reads).  We're now into deep technicalities of
-how the mm system operates at the architecture level, so perhaps we
-should move this to linux-arch?
+Our specific problem on parisc is that being VIPT we can't do an I (or
+D) user flush without a mapping.  We have two schemes for fixing this:
+One is to use a PAGE_FLUSH flag for the mapping ... it allows the
+flushes to work but refuses any type of RWX access (can do this because
+we have a software TLB).  The other is to use a flush area within the
+kernel where we flush a page congruent to the userspace address ... I
+haven't got this working yet, and it's a bit wasteful of kernel address
+space because our congruence modulus is 4MB.
 
 James
