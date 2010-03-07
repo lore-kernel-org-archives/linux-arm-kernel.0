@@ -1,41 +1,34 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Sun, 7 Mar 2010 21:24:49 +0530
-Subject: [PATCH 00/11] Adding Support for SPEAr Platform under ARM
-	architecture
-In-Reply-To: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
+From: jic23@cam.ac.uk (J.I. Cameron)
+Date: 07 Mar 2010 17:19:08 +0000
+Subject: Compile problem due to compressor changes,
+	UART referenced in section .txt
+Message-ID: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Dear  All,
 
-On Wed, Mar 3, 2010 at 10:37 AM, Viresh KUMAR <viresh.kumar@st.com> wrote:
-> Following set of patches are for adding ST Microelctronics SPEAr Platform under
-> ARM architecture in Linux.
->
-> Hierarchy in SPEAr is as follows:
-> SPEAr (Platform)
-> ? ? ? ?- SPEAr3XX (3XX SOC series, based on ARM9)
-> ? ? ? ? ? ? ? ?- SPEAr300 (SOC)
-> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr300_EVB (Evaluation Board)
-> ? ? ? ? ? ? ? ?- SPEAr310 (SOC)
-> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr310_EVB (Evaluation Board)
-> ? ? ? ? ? ? ? ?- SPEAr320 (SOC)
-> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr320_EVB (Evaluation Board)
-> ? ? ? ?- SPEAr6XX (6XX SOC series, based on ARM9)
-> ? ? ? ? ? ? ? ?- SPEAr600 (SOC)
-> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr600_EVB (Evaluation Board)
-> ? ? ? ?- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
-> ? ? ? ? ? ? ? ?- SPEAr1300 (SOC)
->
-> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
-> under development phase.
->
+Ran into the following problem on a pxa stargate2 platform (I think it will
+effect a number of others).
 
-Is this patch set fine? Or do i need resubmit it?
+`UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o: 
+defined in discarded section `.data' of arch/arm/boot/compressed/misc.o 
+`UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o: 
+defined in discarded section `.data' of arch/arm/boot/compressed/misc.o
 
+There is a hack in mach-pxa/include/mach/uncompress.h
+that changes the primary uart for some platforms:
 
-regards,
-viresh kumar,
-ST Microelectronics
+static inline void arch_decomp_setup(void)
+{
+	if (machine_is_littleton() || machine_is_intelmote2()
+	    || machine_is_csb726() || machine_is_stargate2()
+	  || machine_is_cm_x300() || machine_is_balloon3())
+	UART = STUART;
+}
+
+Simply changing the initial assignment of UART and commenting this function
+out acts as a work around.  I'm not entirely sure how to fix the problem
+properly.
+
+Jonathan
