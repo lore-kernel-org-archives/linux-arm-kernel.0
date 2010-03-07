@@ -1,59 +1,54 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 07 Mar 2010 08:07:10 +1100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100306193649.GB13262@n2100.arm.linux.org.uk>
-References: <1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267712512.31654.176.camel@mulgrave.site>
-	<20100304142704.GB6622@n2100.arm.linux.org.uk>
-	<1267872443.8894.1443.camel@mulgrave.site>
-	<20100306193649.GB13262@n2100.arm.linux.org.uk>
-Message-ID: <1267909630.22204.129.camel@pasglop>
+From: db.pub.mail@gmail.com (dave b)
+Date: Sun, 7 Mar 2010 12:05:21 +1100
+Subject: weirdness with compiling a 2.6.33 kernel on arm debian
+In-Reply-To: <20100306104131.GV28972@buzzloop.caiaq.de>
+References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
+	<19346.6765.457769.167118@pilspetsen.it.uu.se>
+	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
+	<20100306104131.GV28972@buzzloop.caiaq.de>
+Message-ID: <25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-03-06 at 19:36 +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 06, 2010 at 04:17:23PM +0530, James Bottomley wrote:
-> > On a fault in of exec data, we first try to get the page out of the page
-> > cache.  If it's not present, we put the faulting process to sleep and
-> > fetch it in from storage.  When we do the read, on the PIO path, the
-> > kernel alias for the page becomes dirty.  Some time later, we place the
-> > page into the user space (updating the pte entry that caused a fault).
-> > At this point, we'll call both flush_icache_page() and
-> > update_mmu_cache() ... this is where the I/D resolution should be done.
-> 
-> No - this is where things get extremely icky.
-> 
-> The problem at this point occurs on SMP architectures.  As soon as you
-> update the PTE entry, it is visible to other threads of the application.
-> If you do I-cache handling after updating the PTE, then there is a window
-> where another CPU can execute the page:
+Ok... however how should one test the memory of an arm machine? ...
+memtest is only for x86. *I am referring to the kernel memtest and not
+memtest86.
 
-Right, we actually hit that bug on powerpc, however, James explanation
-is misleading, ie, I think the -code- actually is right and
-flush_icache_page() is called before set_pte_at(). However, see my other
-email, I have other issues with it as it is, but nothing unfixable.
 
-So for now, I keep my flush in set_pte_at() and ptep_set_access_flags(),
-we'll see if I can move that to an improved flush_icache_page(). In
-fact, even set_pte_at() isn't a panacea for me, as I want the fault type
-as well.
-
-Cheers,
-Ben.
-
-> CPU0			CPU1
-> 			speculatively prefetches from page N via kernel
-> 			mapping, loads garbage into I-cache
-> attempts to execute P
-> page fault
-> page N allocated
-> set_pte_at
-> 			executes P
-> 			*splat*
-> flush I-cache
+On 6 March 2010 21:41, Daniel Mack <daniel@caiaq.de> wrote:
+> On Sat, Mar 06, 2010 at 09:24:49PM +1100, dave b wrote:
+>> On 6 March 2010 20:03, Mikael Pettersson <mikpe@it.uu.se> wrote:
+>> > dave b writes:
+>> > ?> Hi have now successfully built a 2.6.33 kernel on a linkstation pro
+>> > ?> v2. This is an arm device. It is currently running debian?? lenny
+>> > ?> armel.
+>> > ?>
+>> > ?>
+>> > ?> I compiled?? (make) zImage, then did a make modules which failed on the
+>> > ?> first two rounds of compiling the modules -
+>> > ?>
+>> > ?> "fs/afs/super.c: In function ???afs_test_super???:
+>> > ?> fs/afs/super.c:278: internal compiler error: Segmentation fault
+>> > ?> Please submit a full bug report,
+>> > ?> with preprocessed source if appropriate.
+>> > ?> See <file:///usr/share/doc/gcc-4.3/README.Bugs> for instructions."
+>> > ?> This was the error encountered on the attempt at compiling the
+>> > ?> modules.
+>> > ?>
+>> > ?> "crypto/gcm.c: In function ???crypto_gcm_setauthsize???:
+>> > ?> crypto/gcm.c:152: internal compiler error: Segmentation fault
+>> > ?> Please submit a full bug report,
+>> > ?> with preprocessed source if appropriate.
+>> > ?> See <file:///usr/share/doc/gcc-4.3/README.Bugs> for instructions.
+>> > ?> make[1]: *** [crypto/gcm.o] Error 1"
+>> > ?> This was the error the on the second attempt at compiling the modules.
+>> > ?>
+>> > ?> The 3rd attempt at building the modules was successful...
+>
+> Whenever I had comparable problems, it was _always_ faulty RAM on my
+> local machine, and I'm very sure you're seeing a similar. _If_ gcc
+> crashes, it will always do that for the same input.
+>
+> Daniel
+>
+>
