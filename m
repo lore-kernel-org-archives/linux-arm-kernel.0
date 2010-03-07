@@ -1,75 +1,56 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 08 Mar 2010 09:13:33 +1300
-Subject: Compile problem due to compressor changes,	UART referenced in
-	section .txt
-In-Reply-To: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
-References: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
-Message-ID: <4B9408ED.4060901@bluewatersys.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Sun, 07 Mar 2010 21:59:16 +0000
+Subject: [PATCH] stargate 2, imote 2: remove spi cs gpio direction to avoid
+	clash with driver
+Message-ID: <4B9421B4.6000200@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-J.I. Cameron wrote:
-> Dear  All,
->
-> Ran into the following problem on a pxa stargate2 platform (I think it
-> will
-> effect a number of others).
->
-> `UART' referenced in section `.text' of
-> arch/arm/boot/compressed/misc.o: defined in discarded section `.data'
-> of arch/arm/boot/compressed/misc.o `UART' referenced in section
-> `.text' of arch/arm/boot/compressed/misc.o: defined in discarded
-> section `.data' of arch/arm/boot/compressed/misc.o
->
-> There is a hack in mach-pxa/include/mach/uncompress.h
-> that changes the primary uart for some platforms:
->
-> static inline void arch_decomp_setup(void)
-> {
->     if (machine_is_littleton() || machine_is_intelmote2()
->         || machine_is_csb726() || machine_is_stargate2()
->       || machine_is_cm_x300() || machine_is_balloon3())
->     UART = STUART;
-> }
->
-> Simply changing the initial assignment of UART and commenting this
-> function
-> out acts as a work around.  I'm not entirely sure how to fix the problem
-> properly.
-Perhaps something like this untested patch:
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
 ---
 
-diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
-index 237734b..efd9c0d 100644
---- a/arch/arm/mach-pxa/include/mach/uncompress.h
-+++ b/arch/arm/mach-pxa/include/mach/uncompress.h
-@@ -15,7 +15,16 @@
+ Fix for an issue seen as a failure in gpio allocation within
+ pxa2xx_spi.  Not sure when this problem first occured.
+ Looks like a bug that has been there a while and for some
+ reason has recently gained unfortunate symptoms.
+
+ Patch is against Linus' tree. 
+
+ arch/arm/mach-pxa/imote2.c    |    4 ----
+ arch/arm/mach-pxa/stargate2.c |    5 -----
+ 2 files changed, 0 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/imote2.c b/arch/arm/mach-pxa/imote2.c
+index f7f3ba8..f940de0 100644
+--- a/arch/arm/mach-pxa/imote2.c
++++ b/arch/arm/mach-pxa/imote2.c
+@@ -574,10 +574,6 @@ static void __init imote2_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
  
- #define __REG(x)       ((volatile unsigned long *)x)
+-	/* SPI chip select directions - all other directions should
+-	 * be handled by drivers.*/
+-	gpio_direction_output(37, 0);
+-
+ 	platform_add_devices(imote2_devices, ARRAY_SIZE(imote2_devices));
  
-+#if defined(CONFIG_MACH_LITTLETON)  ||	\
-+    defined(CONFIG_MACH_INTELMOTE2) ||	\
-+    defined(CONFIG_MACH_CSB726)     ||	\
-+    defined(CONFIG_MACH_STARGATE2)  ||	\
-+    defined(CONFIG_MACH_CM_X300)    ||	\
-+    defined(CONFIG_MACH_BALLOON3)
-+static volatile unsigned long *UART = STUART;
-+#else
- static volatile unsigned long *UART = FFUART;
-+#endif
+ 	pxa2xx_set_spi_info(1, &pxa_ssp_master_0_info);
+diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
+index 0c4ec35..f6931a1 100644
+--- a/arch/arm/mach-pxa/stargate2.c
++++ b/arch/arm/mach-pxa/stargate2.c
+@@ -779,11 +779,6 @@ static void __init stargate2_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
  
- static inline void putc(char c)
- {
-@@ -35,10 +44,6 @@ static inline void flush(void)
+-	/* spi chip selects */
+-	gpio_direction_output(37, 0);
+-	gpio_direction_output(24, 0);
+-	gpio_direction_output(39, 0);
+-
+ 	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
  
- static inline void arch_decomp_setup(void)
- {
--	if (machine_is_littleton() || machine_is_intelmote2()
--	    || machine_is_csb726() || machine_is_stargate2()
--	    || machine_is_cm_x300() || machine_is_balloon3())
--		UART = STUART;
- }
- 
- /*
+ 	pxa2xx_set_spi_info(1, &pxa_ssp_master_0_info);
+-- 
+1.6.3.3
