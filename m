@@ -1,22 +1,41 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Sun, 7 Mar 2010 11:01:39 +0000
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-	<20100306104131.GV28972@buzzloop.caiaq.de>
-	<25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
-Message-ID: <56d259a01003070301r7d5bbb9y56b01fa794c4bcc7@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Sun, 7 Mar 2010 21:24:49 +0530
+Subject: [PATCH 00/11] Adding Support for SPEAr Platform under ARM
+	architecture
+In-Reply-To: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/10, dave b <db.pub.mail@gmail.com> wrote:
-> Ok... however how should one test the memory of an arm machine? ...
->  memtest is only for x86. *I am referring to the kernel memtest and not
->  memtest86.
+Hello Russell,
 
-Well, there's a userspace one: follow the link from
-http://www.arm.linux.org.uk/developer/stresstests.php
+On Wed, Mar 3, 2010 at 10:37 AM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+> Following set of patches are for adding ST Microelctronics SPEAr Platform under
+> ARM architecture in Linux.
+>
+> Hierarchy in SPEAr is as follows:
+> SPEAr (Platform)
+> ? ? ? ?- SPEAr3XX (3XX SOC series, based on ARM9)
+> ? ? ? ? ? ? ? ?- SPEAr300 (SOC)
+> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr300_EVB (Evaluation Board)
+> ? ? ? ? ? ? ? ?- SPEAr310 (SOC)
+> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr310_EVB (Evaluation Board)
+> ? ? ? ? ? ? ? ?- SPEAr320 (SOC)
+> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr320_EVB (Evaluation Board)
+> ? ? ? ?- SPEAr6XX (6XX SOC series, based on ARM9)
+> ? ? ? ? ? ? ? ?- SPEAr600 (SOC)
+> ? ? ? ? ? ? ? ? ? ? ? ?- SPEAr600_EVB (Evaluation Board)
+> ? ? ? ?- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+> ? ? ? ? ? ? ? ?- SPEAr1300 (SOC)
+>
+> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
+> under development phase.
+>
 
-    M
+Is this patch set fine? Or do i need resubmit it?
+
+
+regards,
+viresh kumar,
+ST Microelectronics
