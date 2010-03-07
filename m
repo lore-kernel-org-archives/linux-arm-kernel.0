@@ -1,37 +1,22 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 7 Mar 2010 09:23:44 +0100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <1267716956.6526.491.camel@e102109-lin.cambridge.arm.com>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267716956.6526.491.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100307082344.GB1987@elf.ucw.cz>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Sun, 7 Mar 2010 11:01:39 +0000
+Subject: weirdness with compiling a 2.6.33 kernel on arm debian
+In-Reply-To: <25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
+References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
+	<19346.6765.457769.167118@pilspetsen.it.uu.se>
+	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
+	<20100306104131.GV28972@buzzloop.caiaq.de>
+	<25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
+Message-ID: <56d259a01003070301r7d5bbb9y56b01fa794c4bcc7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 3/7/10, dave b <db.pub.mail@gmail.com> wrote:
+> Ok... however how should one test the memory of an arm machine? ...
+>  memtest is only for x86. *I am referring to the kernel memtest and not
+>  memtest86.
 
-> > Seems like ARM has requirement other architectures do not, that is
-> > a) not documented anywhere
-> > b) causes problems
-> 
-> Well, ARM is pretty similar to other architectures in this respect. And
-> I'm sure other architectures have similar problems, only that they only
-> become visible in some circumstances they may not have encountered (i.e.
-> PIO drivers + filesystem that doesn't call flush_dcache_page like ext*).
-> Some other architectures may do heavier flushing
-> 
-> Of course, a Documentation/arm/cachetlb.txt file would make sense.
+Well, there's a userspace one: follow the link from
+http://www.arm.linux.org.uk/developer/stresstests.php
 
-Actually, short/simple documentation for driver authors would be even
-better. Then you can claim it is bug in driver :-).
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+    M
