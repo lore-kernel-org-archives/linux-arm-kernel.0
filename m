@@ -1,64 +1,33 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 8 Mar 2010 18:22:49 -0500
-Subject: [PATCH] locomo.c: make irq register access typesafe
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
-References: <201001201110.44583.hartleys@visionengravers.com><f17812d71001201813hf93c33wbfc9f50452ec38fa@mail.gmail.com><BD79186B4FD85F4B8E60E381CAEE1909020E8E46@mi8nycmail19.Mi8.com><f17812d71001201841w34abc3b5w49b8c2986897dbe8@mail.gmail.com>
-	<BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909022427BE@mi8nycmail19.Mi8.com>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Tue, 9 Mar 2010 00:25:29 +0100
+Subject: [PATCH] Kirkwood: WPS button keycode mapping
+Message-ID: <201003090025.29849.chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 20, 2010 8:00 PM, H Hartley Sweeten wrote:
-> On Wednesday, January 20, 2010 7:42 PM, Eric Miao wrote:
->> On Thu, Jan 21, 2010 at 10:31 AM, H Hartley Sweeten
->> <hartleys@visionengravers.com> wrote:
->>> On Wednesday, January 20, 2010 7:13 PM, Eric Miao wrote:
->>>> On Thu, Jan 21, 2010 at 2:10 AM, H Hartley Sweeten
->>>> <hartleys@visionengravers.com> wrote:
->>>>> In locomo_setup_irq a void __iomem * is stored by set_irq_chip_data
->>>>> to hold the base address for the irq registers. ?Unfortunately chip_data
->>>>> is a void *. This will cause a number of (different address space) sparse
->>>>> warnings.
->>>>>
->>>>
->>>> That's actually been fixed as a side effect in my previous proposed
->>>> irq cleanup patches. The way is to pass locomo chip as the data
->>>> instead of a raw pointer. Please let me know how you think, the
->>>> specific patch follows:
->>>
->>> There must be some other patches to locomo.c that remove the locomo_key_*,
->>> locomo_gpio_*, locomo_lt_*, and locomo_spi_* related stuff. ?Were all of
->>> them merged into common code? ?Where can I find a reference to the
->>> original patches?
->>>
->>
->> Cannot find the reference atm but they were posted weeks ago.
->
-> Located them at:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/thread.html
->
-> I'll try to take a good look at them tomorrow and give you any feedback
-> I have.
->
->>> Other than that it looks good to me.
->>
->> Thanks.
+Commit "Input: add KEY_WPS_BUTTON definition"
+added a generic keycode for WPS button.
+Let's use it, instead of "F1" mapping.
 
-Eric,
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+(untested, don't have the HW - please keep the CC!)
 
-Did your locomo irq cleanup patches get lost somewhere?  I see three pending
-patches in linux-next but they did not show up in Linus' tree during the
-merge window.
-
-commit da8065ac3ea29d1bfdb5a163be346fbe35066f8d
-[ARM] locomo: avoid unnecessary cascaded keyboard IRQ
-
-commit 00dd8027b913088ff9b656c5aaa6336c303b7f26
-[ARM] locomo: remove unused IRQs and avoid unnecessary cascade
-
-commit ac609d266e4af4ebf586d610bd76e04dddae0c4c
-[ARM] locomo: allow cascaded IRQ base to be specified by platforms
-
-Regards,
-Hartley
+KEY_WPS_BUTTON chance made it into 2.6.34-rc1.
+---
+diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+index 0358f45..5e6f711 100644
+--- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
++++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+@@ -74,9 +74,9 @@ static struct gpio_keys_button mv88f6281gtw_ge_button_pins[] = {
+ 		.desc		= "SWR Button",
+ 		.active_low	= 1,
+ 	}, {
+-		.code		= KEY_F1,
++		.code		= KEY_WPS_BUTTON,
+ 		.gpio		= 46,
+-		.desc		= "WPS Button(F1)",
++		.desc		= "WPS Button",
+ 		.active_low	= 1,
+ 	},
+ };
