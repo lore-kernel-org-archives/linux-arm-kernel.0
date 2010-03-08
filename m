@@ -1,31 +1,36 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 8 Mar 2010 20:46:28 +0100
-Subject: [PATCH 1/2 v3] ARM: SAMSUNG: Move HWMON from plat-s3c24xx to
-	plat-samsung
-In-Reply-To: <b2e8f9f71001261615tf492c27o12a3c358defbe39f@mail.gmail.com>
-References: <b2e8f9f71001260316l56cdfc7bv20944b4e3ba3fdf5@mail.gmail.com>
-	<20100126145008.GB9153@trinity.fluff.org>
-	<b2e8f9f71001261615tf492c27o12a3c358defbe39f@mail.gmail.com>
-Message-ID: <b2e8f9f71003081146rf15d89fx2421561dbe82ff6d@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 8 Mar 2010 14:58:34 -0500
+Subject: [PATCH] ep93xx: register the pwm devices on the ts72xx dev boards
+In-Reply-To: <1268071608-5327-1-git-send-email-mcrapet@gmail.com>
+References: <1268071608-5327-1-git-send-email-mcrapet@gmail.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902242769@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2010 at 01:15, Maurus Cuelenaere <mcuelenaere@gmail.com> wrote:
-> Move HWMON platform definition from plat-s3c24xx to plat-samsung
-> and adjust mach-bast to use the new s3c_hwmon_set_platdata().
->
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+On Monday, March 08, 2010 11:07 AM, Matthieu Crapet wrote:
+> Add the platform init code to register the pwm device that exist
+> on the various ts72xx development boards.
+> 
+> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+
+Looks ok.
+
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
 > ---
-> Changes since v2:
-> remove EXPORT_SYMBOL
-> add kerneldoc for s3c_hwmon_set_platdata
-> attribute original copyright holder
->
-> Changes since v1:
-> select S3C_DEV_HWMON for mach-bast config
->
-
-Any updates on this?
-
---
-Maurus Cuelenaere
+>  arch/arm/mach-ep93xx/ts72xx.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+> index 259f782..1acb7bf 100644
+> --- a/arch/arm/mach-ep93xx/ts72xx.c
+> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+> @@ -176,6 +176,9 @@ static void __init ts72xx_init_machine(void)
+>  	ts72xx_register_flash();
+>  	platform_device_register(&ts72xx_rtc_device);
+>  
+> +	/* PWM1 is DIO_6 on TS-72xx header */
+> +	ep93xx_register_pwm(0, 1);
+> +
+>  	ep93xx_register_eth(&ts72xx_eth_data, 1);
+>  }
