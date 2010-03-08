@@ -1,39 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Mar 2010 10:57:04 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100307082344.GB1987@elf.ucw.cz>
-References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
-	<1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267716956.6526.491.camel@e102109-lin.cambridge.arm.com>
-	<20100307082344.GB1987@elf.ucw.cz>
-Message-ID: <1268045824.14199.37.camel@e102109-lin.cambridge.arm.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon, 08 Mar 2010 11:15:30 +0000
+Subject: [PATCH] pxa: fix for UART reference in section text for a number
+	of platforms.
+Message-ID: <4B94DC52.1040201@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-03-07 at 08:23 +0000, Pavel Machek wrote:
-> > > Seems like ARM has requirement other architectures do not, that is
-> > > a) not documented anywhere
-> > > b) causes problems
-> >
-> > Well, ARM is pretty similar to other architectures in this respect. And
-> > I'm sure other architectures have similar problems, only that they only
-> > become visible in some circumstances they may not have encountered (i.e.
-> > PIO drivers + filesystem that doesn't call flush_dcache_page like ext*).
-> > Some other architectures may do heavier flushing
-> >
-> > Of course, a Documentation/arm/cachetlb.txt file would make sense.
-> 
-> Actually, short/simple documentation for driver authors would be even
-> better. Then you can claim it is bug in driver :-).
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
 
-That would help, but only once we agree whether it's a driver bug or the
-arch code needs changing.
+---
+ Fix exactly as proposed by Russell King.  Thanks!
 
+ arch/arm/mach-pxa/include/mach/uncompress.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
+index 237734b..b009299 100644
+--- a/arch/arm/mach-pxa/include/mach/uncompress.h
++++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+@@ -15,7 +15,7 @@
+ 
+ #define __REG(x)       ((volatile unsigned long *)x)
+ 
+-static volatile unsigned long *UART = FFUART;
++static volatile unsigned long *UART;
+ 
+ static inline void putc(char c)
+ {
+@@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
+ 	    || machine_is_csb726() || machine_is_stargate2()
+ 	    || machine_is_cm_x300() || machine_is_balloon3())
+ 		UART = STUART;
++	else
++		UART = FFUART;
+ }
+ 
+ /*
 -- 
-Catalin
+1.6.4.4
