@@ -1,38 +1,47 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Mon, 08 Mar 2010 12:48:36 +0100
-Subject: bit errors on spitz
-In-Reply-To: <20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
-	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
-	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-Message-ID: <1268048916.6477.9.camel@utx.utx.cz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 8 Mar 2010 19:48:56 +0800
+Subject: [PATCH] pxa: fix for UART reference in section text for a number
+	of platforms.
+In-Reply-To: <4B94DC52.1040201@cam.ac.uk>
+References: <4B94DC52.1040201@cam.ac.uk>
+Message-ID: <f17812d71003080348k7ff5cd77lf5e1262ce1ccf14@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyril Hrubis wrote:
+What's the background?
 
-> Well I've seen empty lines when editing file with vim
-
-And I have seen:
-
-- Unreproducible SIGSEGV of gcc (while Wi-Fi connection over CF card was
-  running).
-- Unreproducible SIGSEGV of opkg (downloading via Wi-Fi connection over
-  CF card).
-- Unreproducible SIGSEGV of rm (called from find command launched via
-  ssh, networking via Wi-Fi connection over CF card).
-  (Hint: Tasks above are HDD-intensive.)
-- Lost blocks while copying from CF to SD.
-- Lost blocks while copying from HDD to SD.
-- Lost blocks while copying from CF to USB flash stick.
-- And I see display noise while CF Wi-Fi card is active.
-
-These problems appear in all kernels, at least since 2.6.26.
-
-There is no note in the syslog.
-
-
-________________________________________________________________________
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+2010/3/8 Jonathan Cameron <jic23@cam.ac.uk>:
+> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+>
+> ---
+> ?Fix exactly as proposed by Russell King. ?Thanks!
+>
+> ?arch/arm/mach-pxa/include/mach/uncompress.h | ? ?4 +++-
+> ?1 files changed, 3 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
+> index 237734b..b009299 100644
+> --- a/arch/arm/mach-pxa/include/mach/uncompress.h
+> +++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+> @@ -15,7 +15,7 @@
+>
+> ?#define __REG(x) ? ? ? ((volatile unsigned long *)x)
+>
+> -static volatile unsigned long *UART = FFUART;
+> +static volatile unsigned long *UART;
+>
+> ?static inline void putc(char c)
+> ?{
+> @@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
+> ? ? ? ? ? ?|| machine_is_csb726() || machine_is_stargate2()
+> ? ? ? ? ? ?|| machine_is_cm_x300() || machine_is_balloon3())
+> ? ? ? ? ? ? ? ?UART = STUART;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? UART = FFUART;
+> ?}
+>
+> ?/*
+> --
+> 1.6.4.4
+>
+>
