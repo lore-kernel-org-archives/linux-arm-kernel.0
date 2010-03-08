@@ -1,33 +1,39 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 8 Mar 2010 11:31:08 +0100
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <20100308095337.GB27502@pengutronix.de>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-	<20100306104131.GV28972@buzzloop.caiaq.de>
-	<25ae2d691003061705l5fc0bca7n4a07f558a0c410cf@mail.gmail.com>
-	<20100308095337.GB27502@pengutronix.de>
-Message-ID: <20100308103108.GF28972@buzzloop.caiaq.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Mar 2010 10:57:04 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100307082344.GB1987@elf.ucw.cz>
+References: <20100226210030.GC23933@n2100.arm.linux.org.uk>
+	<1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267716956.6526.491.camel@e102109-lin.cambridge.arm.com>
+	<20100307082344.GB1987@elf.ucw.cz>
+Message-ID: <1268045824.14199.37.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 08, 2010 at 10:53:37AM +0100, Uwe Kleine-K?nig wrote:
-> On Sun, Mar 07, 2010 at 12:05:21PM +1100, dave b wrote:
-> > Ok... however how should one test the memory of an arm machine? ...
-> > memtest is only for x86. *I am referring to the kernel memtest and not
-> > memtest86.
-> The easiest is:  rerun make and check if it fails at exactly the same
-> place.
+On Sun, 2010-03-07 at 08:23 +0000, Pavel Machek wrote:
+> > > Seems like ARM has requirement other architectures do not, that is
+> > > a) not documented anywhere
+> > > b) causes problems
+> >
+> > Well, ARM is pretty similar to other architectures in this respect. And
+> > I'm sure other architectures have similar problems, only that they only
+> > become visible in some circumstances they may not have encountered (i.e.
+> > PIO drivers + filesystem that doesn't call flush_dcache_page like ext*).
+> > Some other architectures may do heavier flushing
+> >
+> > Of course, a Documentation/arm/cachetlb.txt file would make sense.
+> 
+> Actually, short/simple documentation for driver authors would be even
+> better. Then you can claim it is bug in driver :-).
 
-Hmm, I wonder whether this is in any way related to what Pavel and Cyril
-reported in the 'bit error' thread.
+That would help, but only once we agree whether it's a driver bug or the
+arch code needs changing.
 
-Dave, does your bootloader have any memory test built-in? Do you see the
-same issues with any older kernel?
-
-FWIW, we're currently hunting a strange bug with hanging tasks, which
-only seems to affect systems with Wifi enabled. That might be totally
-unrelated to both of these issues though.
-
-Daniel
+-- 
+Catalin
