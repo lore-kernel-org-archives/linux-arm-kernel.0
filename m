@@ -1,64 +1,74 @@
-From: armando.visconti@st.com (Armando VISCONTI)
-Date: Mon, 08 Mar 2010 14:48:50 +0100
-Subject: [PATCH 00/11] Adding Support for SPEAr Platform under ARM
-	architecture
-In-Reply-To: <22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-	<22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
-Message-ID: <4B950042.1030007@st.com>
+From: 914059751@qq.com (=?gbk?B?uvrR7sr3?=)
+Date: Mon, 8 Mar 2010 22:24:26 +0800
+Subject: Query abut 2410 LCD configuration
+Message-ID: <tencent_2B5575C569651C571622EABD@qq.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+Hi all:)
 
-We really would like to contribute back to the linux community
-with the SPEAr architecture, as we already did for the u-boot loader.
-
-We started just adding the minimum required to boot up the system,
-but we will definetely add all the remaining peripheral in the
-next merging windows.
-
-Can you possibly just spend some times on this patch set and give us
-your feedback? We would really appreciate.
-:-)
+      In arch/arm/mach-s3c2410/include/mach/fb.h, struct s3c2410fb_display defines lcd configurations, 
+      Can figure out where does these values following pixclock come from?
 
 
-Thx very much,
-Armando
+/* LCD description */
+struct s3c2410fb_display {
+	/* LCD type */
+	unsigned type;
+
+	/* Screen size */
+	unsigned short width;
+	unsigned short height;
+
+	/* Screen info */
+	unsigned short xres;
+	unsigned short yres;
+	unsigned short bpp;
+
+	unsigned pixclock;		/* pixclock in picoseconds */
+	unsigned short left_margin;  /* value in pixels (TFT) or HCLKs (STN) */
+	unsigned short right_margin; /* value in pixels (TFT) or HCLKs (STN) */
+	unsigned short hsync_len;    /* value in pixels (TFT) or HCLKs (STN) */
+	unsigned short upper_margin;	/* value in lines (TFT) or 0 (STN) */
+	unsigned short lower_margin;	/* value in lines (TFT) or 0 (STN) */
+	unsigned short vsync_len;	/* value in lines (TFT) or 0 (STN) */
+
+	/* lcd configuration registers */
+	unsigned long	lcdcon5;
+};
 
 
-viresh kumar wrote:
-> Hello Russell,
->
-> On Wed, Mar 3, 2010 at 10:37 AM, Viresh KUMAR <viresh.kumar@st.com> wrote:
->   
->> Following set of patches are for adding ST Microelctronics SPEAr Platform under
->> ARM architecture in Linux.
->>
->> Hierarchy in SPEAr is as follows:
->> SPEAr (Platform)
->>        - SPEAr3XX (3XX SOC series, based on ARM9)
->>                - SPEAr300 (SOC)
->>                        - SPEAr300_EVB (Evaluation Board)
->>                - SPEAr310 (SOC)
->>                        - SPEAr310_EVB (Evaluation Board)
->>                - SPEAr320 (SOC)
->>                        - SPEAr320_EVB (Evaluation Board)
->>        - SPEAr6XX (6XX SOC series, based on ARM9)
->>                - SPEAr600 (SOC)
->>                        - SPEAr600_EVB (Evaluation Board)
->>        - SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
->>                - SPEAr1300 (SOC)
->>
->> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
->> under development phase.
->>
->>     
->
-> Is this patch set fine? Or do i need resubmit it?
->
->
-> regards,
-> viresh kumar,
-> ST Microelectronics
->   
+
+      Take LQ080V3DG01 for example,
+
+-----------------             arch/arm/mach-s3c2410/mach-qt2410.c     ----------------------------
+		/* Configuration for 640x480 SHARP LQ080V3DG01 */
+		.lcdcon5 = S3C2410_LCDCON5_FRM565 |
+			   S3C2410_LCDCON5_INVVLINE |
+			   S3C2410_LCDCON5_INVVFRAME |
+			   S3C2410_LCDCON5_PWREN |
+			   S3C2410_LCDCON5_HWSWP,
+
+		.type		= S3C2410_LCDCON1_TFT,
+		.width		= 640,
+		.height		= 480,
+
+		.pixclock	= 40000, /* HCLK/4 */
+		.xres		= 640,
+		.yres		= 480,
+		.bpp		= 16,
+		.left_margin	= 44,
+		.right_margin	= 116,
+		.hsync_len	= 96,
+		.upper_margin	= 19,
+		.lower_margin	= 11,
+		.vsync_len	= 15,
+	},
+
+pixclock is 40000 in picoseconds , 1/(40000*10^-12) = 25MHz, that correspond with LQ080V3DG01 clock frequency ranges.
+
+wondering where does the rest of values come from?
+any tips/ideas would be appreciated!
+
+thanks
+BR
