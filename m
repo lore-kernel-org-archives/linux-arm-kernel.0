@@ -1,40 +1,32 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Mon, 08 Mar 2010 11:15:30 +0000
-Subject: [PATCH] pxa: fix for UART reference in section text for a number
-	of platforms.
-Message-ID: <4B94DC52.1040201@cam.ac.uk>
+From: chripell@fsfe.org (christian pellegrin)
+Date: Mon, 8 Mar 2010 12:17:17 +0100
+Subject: [PATCH] Fix GPIOs bank H and J not being preserved during suspend
+In-Reply-To: <20100304232115.GB31126@trinity.fluff.org>
+References: <cabda6421003022258j51258c56w99b0e75d2d2b088c@mail.gmail.com>
+	<1267599637-9283-1-git-send-email-chripell@fsfe.org>
+	<20100304232115.GB31126@trinity.fluff.org>
+Message-ID: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+On Fri, Mar 5, 2010 at 12:21 AM, Ben Dooks <ben-linux@fluff.org> wrote:
 
----
- Fix exactly as proposed by Russell King.  Thanks!
+>> +#ifdef CONFIG_CPU_S3C244X
+>> + ? ? if (pin > S3C2410_GPJ(15))
+>> + ? ? ? ? ? ? return NULL;
+>> +#else
+>
+> Hmm, could we use the arch define for number of GPIOs here instead
+> of an ifdef?
+>
 
- arch/arm/mach-pxa/include/mach/uncompress.h |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
-index 237734b..b009299 100644
---- a/arch/arm/mach-pxa/include/mach/uncompress.h
-+++ b/arch/arm/mach-pxa/include/mach/uncompress.h
-@@ -15,7 +15,7 @@
- 
- #define __REG(x)       ((volatile unsigned long *)x)
- 
--static volatile unsigned long *UART = FFUART;
-+static volatile unsigned long *UART;
- 
- static inline void putc(char c)
- {
-@@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
- 	    || machine_is_csb726() || machine_is_stargate2()
- 	    || machine_is_cm_x300() || machine_is_balloon3())
- 		UART = STUART;
-+	else
-+		UART = FFUART;
- }
- 
- /*
+ack, good idea. I'm sending the new patchi in response to this. Tested
+on s3c2440 custom board.
+
 -- 
-1.6.4.4
+Christian Pellegrin, see http://www.evolware.org/chri/
+"Real Programmers don't play tennis, or any other sport which requires
+you to change clothes. Mountain climbing is OK, and Real Programmers
+wear their climbing boots to work in case a mountain should suddenly
+spring up in the middle of the computer room."
