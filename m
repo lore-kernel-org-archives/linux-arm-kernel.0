@@ -1,41 +1,64 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Mon, 8 Mar 2010 14:32:21 +0100
-Subject: bit errors on spitz
-In-Reply-To: <20100308124248.GB12363@n2100.arm.linux.org.uk>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
-	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
-	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-	<1268048916.6477.9.camel@utx.utx.cz>
-	<20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
-	<20100308124248.GB12363@n2100.arm.linux.org.uk>
-Message-ID: <20100308133221.GB14904@atrey.karlin.mff.cuni.cz>
+From: armando.visconti@st.com (Armando VISCONTI)
+Date: Mon, 08 Mar 2010 14:48:50 +0100
+Subject: [PATCH 00/11] Adding Support for SPEAr Platform under ARM
+	architecture
+In-Reply-To: <22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<22dbbef21003070754l6c99f777ycd99cfa892169736@mail.gmail.com>
+Message-ID: <4B950042.1030007@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> Is this display rotated by 90 degrees?
+Dear Russell,
 
-Yes it is.
+We really would like to contribute back to the linux community
+with the SPEAr architecture, as we already did for the u-boot loader.
 
-> If so, they're actually horizontal lines as far as the display scanning
-> is concerned - and that tends to suggest that there's insufficient system
-> bus bandwidth for all the activity taking place, and the LCD controller
-> is being starved of data.
+We started just adding the minimum required to boot up the system,
+but we will definetely add all the remaining peripheral in the
+next merging windows.
 
-Well, when doing 'echo 0 > /sys/class/graphics/fbcon/rotate_all' for 2.6.33
-I've got the same problem but the lines are vertical. However 2.6.24 seems to
-work in non rotated mode.
+Can you possibly just spend some times on this patch set and give us
+your feedback? We would really appreciate.
+:-)
 
-> I've seen similar (described) effects on SA1110 systems in past years
-> with low clock rates.
-> 
-> Some of the reports suggest that this happens with multiple kernel versions
-> and is not something new to the latest kernels.  Please confirm when the
-> problem started.
 
-As far as I can test in rotated mode it happens for kernels from 2.6.24 to
-2.6.33 (I haven't older kernel than 2.6.24 that boots on spitz). 
+Thx very much,
+Armando
 
--- 
-metan
+
+viresh kumar wrote:
+> Hello Russell,
+>
+> On Wed, Mar 3, 2010 at 10:37 AM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>   
+>> Following set of patches are for adding ST Microelctronics SPEAr Platform under
+>> ARM architecture in Linux.
+>>
+>> Hierarchy in SPEAr is as follows:
+>> SPEAr (Platform)
+>>        - SPEAr3XX (3XX SOC series, based on ARM9)
+>>                - SPEAr300 (SOC)
+>>                        - SPEAr300_EVB (Evaluation Board)
+>>                - SPEAr310 (SOC)
+>>                        - SPEAr310_EVB (Evaluation Board)
+>>                - SPEAr320 (SOC)
+>>                        - SPEAr320_EVB (Evaluation Board)
+>>        - SPEAr6XX (6XX SOC series, based on ARM9)
+>>                - SPEAr600 (SOC)
+>>                        - SPEAr600_EVB (Evaluation Board)
+>>        - SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+>>                - SPEAr1300 (SOC)
+>>
+>> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
+>> under development phase.
+>>
+>>     
+>
+> Is this patch set fine? Or do i need resubmit it?
+>
+>
+> regards,
+> viresh kumar,
+> ST Microelectronics
+>   
