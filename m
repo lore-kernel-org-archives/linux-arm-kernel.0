@@ -1,55 +1,38 @@
-From: chripell@fsfe.org (Christian Pellegrin)
-Date: Mon,  8 Mar 2010 12:21:28 +0100
-Subject: [PATCH v2] Fix GPIOs bank H and J not being preserved during suspend
-In-Reply-To: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
-References: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
-Message-ID: <1268047288-11166-1-git-send-email-chripell@fsfe.org>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Mon, 08 Mar 2010 12:48:36 +0100
+Subject: bit errors on spitz
+In-Reply-To: <20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+Message-ID: <1268048916.6477.9.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds bank H and J GPIOs (present on S3C244X CPUs) to the list
-of registers that must be saved/resumed during suspend.
+Cyril Hrubis wrote:
 
-Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
----
- arch/arm/mach-s3c2410/include/mach/gpio-core.h |    2 +-
- arch/arm/plat-s3c/pm-gpio.c                    |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+> Well I've seen empty lines when editing file with vim
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-core.h b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-index f8b879a..7c33ecf 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
-@@ -24,7 +24,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
- {
- 	struct s3c_gpio_chip *chip;
- 
--	if (pin > S3C2410_GPG(10))
-+	if (pin > S3C_GPIO_END)
- 		return NULL;
- 
- 	chip = &s3c24xx_gpios[pin/32];
-diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-s3c/pm-gpio.c
-index cfd326a..b3cc8db 100644
---- a/arch/arm/plat-s3c/pm-gpio.c
-+++ b/arch/arm/plat-s3c/pm-gpio.c
-@@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
- 			  ourchip->pm_save[2],
- 			  ourchip->pm_save[3]);
- 
--		gpio_nr += ourchip->chip.ngpio;
-+		gpio_nr += ourchip->chip.ngpio - 1;
- 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
- 	}
- }
-@@ -374,7 +374,7 @@ void s3c_pm_restore_gpios(void)
- 
- 		s3c_pm_resume_gpio(ourchip);
- 
--		gpio_nr += ourchip->chip.ngpio;
-+		gpio_nr += ourchip->chip.ngpio - 1;
- 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
- 	}
- }
--- 
-1.5.6.5
+And I have seen:
+
+- Unreproducible SIGSEGV of gcc (while Wi-Fi connection over CF card was
+  running).
+- Unreproducible SIGSEGV of opkg (downloading via Wi-Fi connection over
+  CF card).
+- Unreproducible SIGSEGV of rm (called from find command launched via
+  ssh, networking via Wi-Fi connection over CF card).
+  (Hint: Tasks above are HDD-intensive.)
+- Lost blocks while copying from CF to SD.
+- Lost blocks while copying from HDD to SD.
+- Lost blocks while copying from CF to USB flash stick.
+- And I see display noise while CF Wi-Fi card is active.
+
+These problems appear in all kernels, at least since 2.6.26.
+
+There is no note in the syslog.
+
+
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
