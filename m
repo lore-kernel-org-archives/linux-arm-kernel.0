@@ -1,38 +1,98 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 8 Mar 2010 16:16:05 +0000
-Subject: [PATCH v2] Fix GPIOs bank H and J not being preserved during
-	suspend
-In-Reply-To: <cabda6421003080814j2e17b664x1806a418928e09d4@mail.gmail.com>
-References: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
-	<1268047288-11166-1-git-send-email-chripell@fsfe.org>
-	<20100308155522.GE24864@trinity.fluff.org>
-	<cabda6421003080814j2e17b664x1806a418928e09d4@mail.gmail.com>
-Message-ID: <20100308161604.GF24864@trinity.fluff.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Mar 2010 16:25:01 +0000
+Subject: [PATCH 4/6] ARMv7: Use lazy cache flushing if hardware
+	broadcastscache operations
+In-Reply-To: <20091207141339.30429.28247.stgit@pc1117.cambridge.arm.com>
+References: <20091207141339.30429.28247.stgit@pc1117.cambridge.arm.com>
+Message-ID: <1268065501.25012.28.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 08, 2010 at 05:14:05PM +0100, christian pellegrin wrote:
-> On Mon, Mar 8, 2010 at 4:55 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> >
-> > Still not getting why you're changing this from x, to x - 1.
-> >
-> 
-> ok: the reason is that gpio_nr is already incremented by one in the
-> for instruction. So gpio_nr is not pointing to the first pin of a bank
-> after the first iteration. Of course this doesn't matter because we
-> don't have 32 banks of gpio pins and s3c_gpiolib_getchip works even if
-> we point to a pin in the middle of a bank. But if we get a s3c device
-> with more than 32 banks the 33rd will be skipped. Or at least this is
-> the reason why I did this, maybe I'm mistaken.
-> 
-> Anyway this is a minor point, I fixed it when catching why bank H was
-> not preserved (and so my serial console ttyS1 was dead).
+Hi Russell,
 
-Can we have that as a seperate patch with that information in it, to show
-what is being changed. Thanks.
+On Mon, 2009-12-07 at 14:13 +0000, Catalin Marinas wrote:
+> ARMv7 processors like Cortex-A9 broadcast the cache maintenance
+> operations in hardware. The patch adds the CPU ID checks for such
+> feature and allows the flush_dcache_page/update_mmu_cache pair to work
+> in lazy flushing mode similar to the UP case.
+
+It looks like I haven't got a final ok from you on this patch (I had the
+impression that it's in the patch system already but rebased my patches
+and found that it's not in mainline).
+
+Are you ok with it (quoting it below)?
+
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/include/asm/smp_plat.h |    9 +++++++++
+>  arch/arm/mm/fault-armv.c        |    2 --
+>  arch/arm/mm/flush.c             |    9 ++++-----
+>  3 files changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/smp_plat.h
+> b/arch/arm/include/asm/smp_plat.h
+> index 59303e2..e587167 100644
+> --- a/arch/arm/include/asm/smp_plat.h
+> +++ b/arch/arm/include/asm/smp_plat.h
+> @@ -13,4 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
+>         return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+>  }
+> 
+> +#ifndef CONFIG_SMP
+> +#define cache_ops_need_broadcast()     0
+> +#else
+> +static inline int cache_ops_need_broadcast(void)
+> +{
+> +       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+> +}
+> +#endif
+> +
+>  #endif
+> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+> index d0d17b6..bb60117 100644
+> --- a/arch/arm/mm/fault-armv.c
+> +++ b/arch/arm/mm/fault-armv.c
+> @@ -153,10 +153,8 @@ void update_mmu_cache(struct vm_area_struct *vma,
+> unsigned long addr, pte_t pte)
+> 
+>         page = pfn_to_page(pfn);
+>         mapping = page_mapping(page);
+> -#ifndef CONFIG_SMP
+>         if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+>                 __flush_dcache_page(mapping, page);
+> -#endif
+>         if (mapping) {
+>                 if (cache_is_vivt())
+>                         make_coherent(mapping, vma, addr, pfn);
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 7f294f3..2d3325d 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -15,6 +15,7 @@
+>  #include <asm/cachetype.h>
+>  #include <asm/system.h>
+>  #include <asm/tlbflush.h>
+> +#include <asm/smp_plat.h>
+> 
+>  #include "mm.h"
+> 
+> @@ -198,12 +199,10 @@ void flush_dcache_page(struct page *page)
+>  {
+>         struct address_space *mapping = page_mapping(page);
+> 
+> -#ifndef CONFIG_SMP
+> -       if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
+> +       if (!cache_ops_need_broadcast() &&
+> +           !PageHighMem(page) && mapping && !mapping_mapped(mapping))
+>                 set_bit(PG_dcache_dirty, &page->flags);
+> -       else
+> -#endif
+> -       {
+> +       else {
+>                 __flush_dcache_page(mapping, page);
+>                 if (mapping && cache_is_vivt())
+>                         __flush_dcache_aliases(mapping, page);
+
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Catalin
