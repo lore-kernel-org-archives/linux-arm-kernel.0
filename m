@@ -1,35 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Mar 2010 10:14:45 +0000
-Subject: Compile problem due to compressor changes, UART referenced in
-	section .txt
-In-Reply-To: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
-References: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
-Message-ID: <20100308101445.GA12363@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Mar 2010 10:27:58 +0000
+Subject: Cleanup ARM platform support, and add Versatile Express support
+In-Reply-To: <20100305095413.GA3897@n2100.arm.linux.org.uk>
+References: <20100305095413.GA3897@n2100.arm.linux.org.uk>
+Message-ID: <1268044078.14199.28.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 07, 2010 at 05:19:08PM +0000, J.I. Cameron wrote:
-> Dear  All,
->
-> Ran into the following problem on a pxa stargate2 platform (I think it will
-> effect a number of others).
->
-> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
-> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o  
-> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
-> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o
->
-> There is a hack in mach-pxa/include/mach/uncompress.h
-> that changes the primary uart for some platforms:
->
-> static inline void arch_decomp_setup(void)
-> {
-> 	if (machine_is_littleton() || machine_is_intelmote2()
-> 	    || machine_is_csb726() || machine_is_stargate2()
-> 	  || machine_is_cm_x300() || machine_is_balloon3())
-> 	UART = STUART;
+Hi Russell,
 
-	else
-		UART = FFUART;
+On Fri, 2010-03-05 at 09:54 +0000, Russell King - ARM Linux wrote:
+> What follows is a rather large patch set (tested by others and myself)
+> which cleans up the Integrator, Versatile and Realview platform support,
+> and adds support for the ARM Versatile Express platform.
 
-and remove the initializer from UART.
+Rather than sending an e-mail to every individual patch, I'll just
+comment here on the series. I welcome the Integrator/Versatile/RealView
+clean-up and the patches look fine. For these (*except* the Versatile
+Express patches):
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+(you don't actually need to go back and add the ack to the patches).
+
+Regarding the choice of the plat-versatile name for the common directory
+I don't think it's something that should prevent merging (I'm personally
+ok with this but it could be easily changed at a later time).
+
+Regarding the VE patches, since I haven't done the port I cannot
+actually tell whether there is something missing. I'll let Colin comment
+on them.
+
+-- 
+Catalin
