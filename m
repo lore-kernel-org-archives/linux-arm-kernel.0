@@ -1,93 +1,72 @@
-From: gianlucarenzi@eurekelettronica.it (gianluca)
-Date: Mon, 08 Mar 2010 15:32:21 +0100
-Subject: Query abut 2410 LCD configuration
-In-Reply-To: <tencent_2B5575C569651C571622EABD@qq.com>
-References: <tencent_2B5575C569651C571622EABD@qq.com>
-Message-ID: <4B950A75.2020107@eurekelettronica.it>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 8 Mar 2010 15:55:22 +0000
+Subject: [PATCH v2] Fix GPIOs bank H and J not being preserved during
+	suspend
+In-Reply-To: <1268047288-11166-1-git-send-email-chripell@fsfe.org>
+References: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
+	<1268047288-11166-1-git-send-email-chripell@fsfe.org>
+Message-ID: <20100308155522.GE24864@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-??? wrote:
-> Hi all:)
+On Mon, Mar 08, 2010 at 12:21:28PM +0100, Christian Pellegrin wrote:
+> This patch adds bank H and J GPIOs (present on S3C244X CPUs) to the list
+> of registers that must be saved/resumed during suspend.
 > 
->       In arch/arm/mach-s3c2410/include/mach/fb.h, struct s3c2410fb_display defines lcd configurations, 
->       Can figure out where does these values following pixclock come from?
+> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
+> ---
+>  arch/arm/mach-s3c2410/include/mach/gpio-core.h |    2 +-
+>  arch/arm/plat-s3c/pm-gpio.c                    |    4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> 
-> /* LCD description */
-> struct s3c2410fb_display {
-> 	/* LCD type */
-> 	unsigned type;
-> 
-> 	/* Screen size */
-> 	unsigned short width;
-> 	unsigned short height;
-> 
-> 	/* Screen info */
-> 	unsigned short xres;
-> 	unsigned short yres;
-> 	unsigned short bpp;
-> 
-> 	unsigned pixclock;		/* pixclock in picoseconds */
-> 	unsigned short left_margin;  /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short right_margin; /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short hsync_len;    /* value in pixels (TFT) or HCLKs (STN) */
-> 	unsigned short upper_margin;	/* value in lines (TFT) or 0 (STN) */
-> 	unsigned short lower_margin;	/* value in lines (TFT) or 0 (STN) */
-> 	unsigned short vsync_len;	/* value in lines (TFT) or 0 (STN) */
-> 
-> 	/* lcd configuration registers */
-> 	unsigned long	lcdcon5;
-> };
-> 
-> 
-> 
->       Take LQ080V3DG01 for example,
-> 
-> -----------------             arch/arm/mach-s3c2410/mach-qt2410.c     ----------------------------
-> 		/* Configuration for 640x480 SHARP LQ080V3DG01 */
-> 		.lcdcon5 = S3C2410_LCDCON5_FRM565 |
-> 			   S3C2410_LCDCON5_INVVLINE |
-> 			   S3C2410_LCDCON5_INVVFRAME |
-> 			   S3C2410_LCDCON5_PWREN |
-> 			   S3C2410_LCDCON5_HWSWP,
-> 
-> 		.type		= S3C2410_LCDCON1_TFT,
-> 		.width		= 640,
-> 		.height		= 480,
-> 
-> 		.pixclock	= 40000, /* HCLK/4 */
-> 		.xres		= 640,
-> 		.yres		= 480,
-> 		.bpp		= 16,
-> 		.left_margin	= 44,
-> 		.right_margin	= 116,
-> 		.hsync_len	= 96,
-> 		.upper_margin	= 19,
-> 		.lower_margin	= 11,
-> 		.vsync_len	= 15,
-> 	},
-> 
-> pixclock is 40000 in picoseconds , 1/(40000*10^-12) = 25MHz, that correspond with LQ080V3DG01 clock frequency ranges.
-> 
-> wondering where does the rest of values come from?
-> any tips/ideas would be appreciated!
-Maybe the LQ080... datasheet? or other platform driver with the same LCD 
-configuration, or they simply came from tests.
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-core.h b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> index f8b879a..7c33ecf 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+> @@ -24,7 +24,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
+>  {
+>  	struct s3c_gpio_chip *chip;
+>  
+> -	if (pin > S3C2410_GPG(10))
+> +	if (pin > S3C_GPIO_END)
+>  		return NULL;
+>  
+>  	chip = &s3c24xx_gpios[pin/32];
+> diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-s3c/pm-gpio.c
+> index cfd326a..b3cc8db 100644
+> --- a/arch/arm/plat-s3c/pm-gpio.c
+> +++ b/arch/arm/plat-s3c/pm-gpio.c
+> @@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+>  			  ourchip->pm_save[2],
+>  			  ourchip->pm_save[3]);
+>  
+> -		gpio_nr += ourchip->chip.ngpio;
+> +		gpio_nr += ourchip->chip.ngpio - 1;
+>  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+>  	}
+>  }
+> @@ -374,7 +374,7 @@ void s3c_pm_restore_gpios(void)
+>  
+>  		s3c_pm_resume_gpio(ourchip);
+>  
+> -		gpio_nr += ourchip->chip.ngpio;
+> +		gpio_nr += ourchip->chip.ngpio - 1;
+>  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+>  	}
+>  }
 
+Still not getting why you're changing this from x, to x - 1.
 
-Regards,
+> 1.5.6.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-            ,,,
-           (o o)
-======oOO==(_)==OOo======
+-- 
+Ben
 
-Gianluca Renzi
-R&D
-phone: +39.0542.609120
-fax:   +39.0542.609212
-
-       .oooO  Oooo.
-======(   )==(   )=======
-        \ (    ) /
-         \_)  (_/
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
