@@ -1,253 +1,202 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri, 12 Mar 2010 12:30:58 -0500
-Subject: [PATCH] [ARM] pxa: support saarb platform
-Message-ID: <mailman.454.1274095224.2170.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 8 Mar 2010 11:28:43 -0500
+Subject: [PATCH] input: enable onkey driver of max8925
+Message-ID: <mailman.460.1274252292.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support saarb handheld platform. PXA950 is installed on saarb.
-
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/configs/pxa3xx_defconfig |   12 +++-
- arch/arm/mach-pxa/Kconfig         |    5 ++
- arch/arm/mach-pxa/Makefile        |    1 +
- arch/arm/mach-pxa/saarb.c         |  139 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 154 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-pxa/saarb.c
+ drivers/input/misc/Kconfig         |   10 +++
+ drivers/input/misc/Makefile        |    1 +
+ drivers/input/misc/max8925_onkey.c |  145 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 156 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/misc/max8925_onkey.c
 
-diff --git a/arch/arm/configs/pxa3xx_defconfig
-b/arch/arm/configs/pxa3xx_defconfig
-index 82ca6c8..9234469 100644
---- a/arch/arm/configs/pxa3xx_defconfig
-+++ b/arch/arm/configs/pxa3xx_defconfig
-@@ -221,7 +221,9 @@ CONFIG_CPU_PXA935=y
- CONFIG_MACH_ZYLONITE=y
- CONFIG_MACH_LITTLETON=y
- CONFIG_MACH_TAVOREVB=y
-+CONFIG_MACH_TAVOREVB3=y
- CONFIG_MACH_SAAR=y
-+CONFIG_MACH_SAARB=y
- # CONFIG_MACH_ARMCORE is not set
- # CONFIG_MACH_CM_X300 is not set
- # CONFIG_MACH_H4700 is not set
-@@ -646,6 +648,7 @@ CONFIG_MOUSE_PXA930_TRKBALL=y
- # CONFIG_INPUT_JOYSTICK is not set
- # CONFIG_INPUT_TABLET is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_88PM860X=y
- # CONFIG_TOUCHSCREEN_ADS7846 is not set
- # CONFIG_TOUCHSCREEN_AD7877 is not set
- # CONFIG_TOUCHSCREEN_AD7879_I2C is not set
-@@ -819,7 +822,8 @@ CONFIG_SSB_POSSIBLE=y
- #
- # Multifunction device drivers
- #
--# CONFIG_MFD_CORE is not set
-+CONFIG_MFD_CORE=y
-+CONFIG_MFD_88PM860X=y
- # CONFIG_MFD_SM501 is not set
- # CONFIG_MFD_ASIC3 is not set
- # CONFIG_HTC_EGPIO is not set
-@@ -887,6 +891,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_DA903X=y
-+CONFIG_BACKLIGHT_88PM860X=y
+diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+index 23140a3..5505b5c 100644
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -50,6 +50,16 @@ config INPUT_M68K_BEEP
+ 	tristate "M68k Beeper support"
+ 	depends on M68K
 
- #
- # Display device support
-@@ -981,6 +986,7 @@ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
- # CONFIG_REGULATOR_MAX1586 is not set
- CONFIG_REGULATOR_DA903X=y
- # CONFIG_REGULATOR_LP3971 is not set
-+CONFIG_REGULATOR_88PM8607=y
- # CONFIG_UIO is not set
- # CONFIG_STAGING is not set
-
-@@ -999,8 +1005,8 @@ CONFIG_FS_POSIX_ACL=y
- # CONFIG_BTRFS_FS is not set
- CONFIG_FILE_LOCKING=y
- CONFIG_FSNOTIFY=y
--CONFIG_DNOTIFY=y
--# CONFIG_INOTIFY is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_INOTIFY=y
- CONFIG_INOTIFY_USER=y
- # CONFIG_QUOTA is not set
- # CONFIG_AUTOFS_FS is not set
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index e12ada9..2a0e344 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -54,6 +54,11 @@ config MACH_SAAR
- 	select PXA3xx
- 	select CPU_PXA930
-
-+config MACH_SAARB
-+	bool "PXA950 Handheld Platform (aka SAARB)"
-+	select CPU_PXA950
-+	select PXA_HAVE_BOARD_IRQS
++config INPUT_MAX8925_ONKEY
++	tristate "MAX8925 ONKEY support"
++	depends on MFD_MAX8925
++	help
++	  Support the ONKEY of MAX8925 PMICs as an input device
++	  reporting power button status.
 +
- comment "Third Party Dev Platforms (sorted by vendor name)"
-
- config ARCH_PXA_IDP
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 55d3368..3b869ad 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -34,6 +34,7 @@ obj-$(CONFIG_MACH_LITTLETON)	+= littleton.o
- obj-$(CONFIG_MACH_TAVOREVB)	+= tavorevb.o
- obj-$(CONFIG_MACH_TAVOREVB3)	+= tavorevb3.o
- obj-$(CONFIG_MACH_SAAR)		+= saar.o
-+obj-$(CONFIG_MACH_SAARB)	+= saarb.o
-
- # 3rd Party Dev Platforms
- obj-$(CONFIG_ARCH_PXA_IDP)	+= idp.o
-diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
++	  To compile this driver as a module, choose M here: the module
++	  will be called max8925_onkey.
++
+ config INPUT_APANEL
+ 	tristate "Fujitsu Lifebook Application Panel buttons"
+ 	depends on X86 && I2C && LEDS_CLASS
+diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+index 7e95a5d..71e9111 100644
+--- a/drivers/input/misc/Makefile
++++ b/drivers/input/misc/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_HP_SDC_RTC)		+= hp_sdc_rtc.o
+ obj-$(CONFIG_INPUT_IXP4XX_BEEPER)	+= ixp4xx-beeper.o
+ obj-$(CONFIG_INPUT_KEYSPAN_REMOTE)	+= keyspan_remote.o
+ obj-$(CONFIG_INPUT_M68K_BEEP)		+= m68kspkr.o
++obj-$(CONFIG_INPUT_MAX8925_ONKEY)	+= max8925_onkey.o
+ obj-$(CONFIG_INPUT_PCAP)		+= pcap_keys.o
+ obj-$(CONFIG_INPUT_PCF50633_PMU)	+= pcf50633-input.o
+ obj-$(CONFIG_INPUT_PCSPKR)		+= pcspkr.o
+diff --git a/drivers/input/misc/max8925_onkey.c
+b/drivers/input/misc/max8925_onkey.c
 new file mode 100644
-index 0000000..20438a7
+index 0000000..b81d6ac
 --- /dev/null
-+++ b/arch/arm/mach-pxa/saarb.c
-@@ -0,0 +1,139 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/saarb.c
++++ b/drivers/input/misc/max8925_onkey.c
+@@ -0,0 +1,145 @@
++/**
++ * max8925_onkey.c - MAX8925 ONKEY driver
 + *
-+ *  Support for the Marvell PXA950 Handheld Platform (aka SAARB)
++ * Copyright (C) 2009 Marvell International Ltd.
++ *      Haojian Zhuang <haojian.zhuang@marvell.com>
 + *
-+ *  Copyright (C) 2007-2010 Marvell International Ltd.
++ * This file is subject to the terms and conditions of the GNU General
++ * Public License. See the file "COPYING" in the main directory of this
++ * archive for more details.
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
-+#include <linux/init.h>
 +#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
 +#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/mfd/88pm860x.h>
++#include <linux/input.h>
++#include <linux/interrupt.h>
++#include <linux/mfd/max8925.h>
++#include <linux/slab.h>
 +
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
++#define HARDRESET_EN		(1 << 7)
++#define PWREN_EN		(1 << 7)
 +
-+#include <mach/pxa930.h>
-+
-+#include <plat/i2c.h>
-+
-+#include "devices.h"
-+#include "generic.h"
-+
-+/* SAARB MFP configurations */
-+static mfp_cfg_t saarb_mfp_cfg[] __initdata = {
-+	/* UART */
-+	GPIO53_UART1_RXD,
-+	GPIO54_UART1_TXD,
-+
-+	/* I2C */
-+	GPIO73_CI2C_SCL,
-+	GPIO74_CI2C_SDA,
-+
-+	/* PMIC */
-+	PMIC_INT_GPIO83,
++struct max8925_onkey_info {
++	struct input_dev	*idev;
++	struct max8925_chip	*chip;
++	struct i2c_client	*i2c;
++	struct device		*dev;
++	int			irq;
 +};
 +
-+#if defined(CONFIG_I2C_PXA) || defined(CONFIG_I2C_PXA_MODULE)
-+static struct pm860x_touch_pdata saarb_touch = {
-+	.gpadc_prebias	= 1,
-+	.slot_cycle	= 1,
-+	.tsi_prebias	= 6,
-+	.pen_prebias	= 16,
-+	.pen_prechg	= 2,
-+	.res_x		= 300,
-+};
-+
-+static struct pm860x_backlight_pdata saarb_backlight[] = {
-+	{
-+		.id	= PM8606_ID_BACKLIGHT,
-+		.iset	= PM8606_WLED_CURRENT(24),
-+		.flags	= PM8606_BACKLIGHT1,
-+	},
-+	{},
-+};
-+
-+static struct pm860x_led_pdata saarb_led[] = {
-+	{
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_BLUE,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_BLUE,
-+	},
-+};
-+
-+static struct pm860x_platform_data saarb_pm8607_info = {
-+	.touch				= &saarb_touch,
-+	.backlight			= &saarb_backlight[0],
-+	.led				= &saarb_led[0],
-+	.companion_addr			= 0x10,
-+	.irq_mode			= 0,
-+	.irq_base			= IRQ_BOARD_START,
-+
-+	.i2c_port			= GI2C_PORT,
-+};
-+
-+static struct i2c_board_info saarb_i2c_info[] = {
-+	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &saarb_pm8607_info,
-+		.irq		= gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO83)),
-+	},
-+};
-+
-+static void __init saarb_init_i2c(void)
++/* MAX8925 gives us an interrupt when ONKEY is held for 3 seconds. */
++static irqreturn_t max8925_onkey_handler(int irq, void *data)
 +{
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(saarb_i2c_info));
-+}
-+#else
-+static inline void saarb_init_i2c(void) {}
-+#endif
++	struct max8925_onkey_info *info = data;
 +
-+static void __init saarb_init(void)
-+{
-+	/* initialize MFP configurations */
-+	pxa3xx_mfp_config(ARRAY_AND_SIZE(saarb_mfp_cfg));
++	input_report_key(info->idev, KEY_POWER, 1);
++	input_sync(info->idev);
 +
-+	pxa_set_ffuart_info(NULL);
-+
-+	saarb_init_i2c();
++	/* Enable hardreset to halt if system isn't shutdown on time */
++	max8925_set_bits(info->i2c, MAX8925_SYSENSEL,
++			 HARDRESET_EN, HARDRESET_EN);
++	return IRQ_HANDLED;
 +}
 +
-+MACHINE_START(SAARB, "PXA950 Handheld Platform (aka SAARB)")
-+	.phys_io        = 0x40000000,
-+	.boot_params    = 0xa0000100,
-+	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
-+	.map_io         = pxa_map_io,
-+	.init_irq       = pxa3xx_init_irq,
-+	.timer          = &pxa_timer,
-+	.init_machine   = saarb_init,
-+MACHINE_END
++static int __devinit max8925_onkey_probe(struct platform_device *pdev)
++{
++	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
++	struct max8925_onkey_info *info;
++	int irq, ret;
++
++	info = kzalloc(sizeof(struct max8925_onkey_info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++	info->chip = chip;
++	info->i2c = chip->i2c;
++	info->dev = &pdev->dev;
++	irq = chip->irq_base + MAX8925_IRQ_GPM_SW_3SEC;
++
++	ret = request_threaded_irq(irq, NULL, max8925_onkey_handler,
++				   IRQF_ONESHOT, "onkey", info);
++	if (ret < 0) {
++		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
++			irq, ret);
++		goto out;
++	}
++
++	info->idev = input_allocate_device();
++	if (!info->idev) {
++		dev_err(chip->dev, "Failed to allocate input dev\n");
++		ret = -ENOMEM;
++		goto out_input;
++	}
++
++	info->idev->name = "max8925_on";
++	info->idev->phys = "max8925_on/input0";
++	info->idev->id.bustype = BUS_I2C;
++	info->idev->dev.parent = &pdev->dev;
++	info->irq = irq;
++	info->idev->evbit[0] = BIT_MASK(EV_KEY);
++	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
++
++	ret = input_register_device(info->idev);
++	if (ret) {
++		dev_err(chip->dev, "Can't register input device: %d\n", ret);
++		goto out_reg;
++	}
++	platform_set_drvdata(pdev, info);
++
++	return 0;
++
++out_reg:
++	input_free_device(info->idev);
++out_input:
++	free_irq(info->irq, info);
++out:
++	kfree(info);
++	return ret;
++}
++
++static int __devexit max8925_onkey_remove(struct platform_device *pdev)
++{
++	struct max8925_onkey_info *info = platform_get_drvdata(pdev);
++
++	if (info) {
++		free_irq(info->irq, info);
++		input_unregister_device(info->idev);
++		kfree(info);
++	}
++	return 0;
++}
++
++static struct platform_driver max8925_onkey_driver = {
++	.driver		= {
++		.name	= "max8925-onkey",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= max8925_onkey_probe,
++	.remove		= __devexit_p(max8925_onkey_remove),
++};
++
++static int __init max8925_onkey_init(void)
++{
++	return platform_driver_register(&max8925_onkey_driver);
++}
++module_init(max8925_onkey_init);
++
++static void __exit max8925_onkey_exit(void)
++{
++	platform_driver_unregister(&max8925_onkey_driver);
++}
++module_exit(max8925_onkey_exit);
++
++MODULE_DESCRIPTION("Maxim MAX8925 ONKEY driver");
++MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
++MODULE_LICENSE("GPL");
 -- 
 1.5.6.5
