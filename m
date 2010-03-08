@@ -1,54 +1,38 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 08 Mar 2010 08:18:26 +0000
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <771cded01003072228i1a6249f0tc0026794cc512bd2@mail.gmail.com>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-	<20100125135628.GB26613@rakim.wolfsonmicro.main>
-	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
-	<20100126110420.GI15759@rakim.wolfsonmicro.main>
-	<771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
-	<20100126120058.GN15759@rakim.wolfsonmicro.main>
-	<771cded01001260414q4c8df1e0k303772b87bc725eb@mail.gmail.com>
-	<1264522249.3067.79.camel@odin>
-	<771cded01003072228i1a6249f0tc0026794cc512bd2@mail.gmail.com>
-Message-ID: <1268036306.3204.12.camel@odin>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Mon, 8 Mar 2010 09:25:30 +0100
+Subject: bit errors on spitz
+In-Reply-To: <20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+Message-ID: <20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-03-08 at 01:28 -0500, Haojian Zhuang wrote:
-> On Tue, Jan 26, 2010 at 11:10 AM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> > On Tue, 2010-01-26 at 07:14 -0500, Haojian Zhuang wrote:
-> >> On Tue, Jan 26, 2010 at 7:00 AM, Mark Brown
-> >> <broonie@opensource.wolfsonmicro.com> wrote:
-> >> >
-> >>
-> >> update this patch.
-> >>
-> >
-> > Applied.
-> >
-> > Thanks
-> >
-> > Liam
-> >
-> >
+Hi!
+> dmesg would not be useful, it usually hits user programs. Like... mutt
+> suddenly displaying , instead of - in the header. Program failing to
+> start because function printg is not found (it was not exactly
+> printf->printg,  I don't remember exact symbol), ping complaining
+> about discarding corrupted packets, etc.
 > 
-> Hi Liam & Mark,
-> 
-> I just want to confirm whether max8649 is merged into regulator
-> codebase. It seems that I can't find max8649 in regulator git tree.
+> (Or of course, kernel oopsing or not going from suspend at all. But as
+> even user data are being corrupted, oops is not likely to be
+> interesting and system is typically not in state to capture it any more.)
+>
 
-max8649 was merged into regulator and has now been pulled by Linus.
+Well I've seen empty lines when editing file with vim (these that are starting
+with blue tilda) in the middle of file. And sometimes programs segfaults for no
+good reason. Just today I've run "apt-get update" and got:
 
-Where were you looking ?
+symbol lookup error: apt-get: undefined symbol: _ZN16pkgAcquireStatus4StopEv
 
-Thanks
+While the correct symbol seems to be _ZN16pkgAcquireStatus4.
 
-Liam
+When running 'make' in kernel directory and closing the display sometimes
+machine dies and nothing but reset under battery cover helps. I remeber waking
+up in the morning, opening the device and reseting the device. And it seems to
+be provoked much more by active CF wifi card.
 
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+metan
