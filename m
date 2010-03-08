@@ -1,116 +1,64 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 8 Mar 2010 21:07:46 +0100
-Subject: [PATCH 4/7] ARM: S3C64XX: Add touchscreen platform device
-	definition
-In-Reply-To: <20100308195911.GG24864@trinity.fluff.org>
-References: <b2e8f9f71003081038u441531bfsba40c7a11d302ee0@mail.gmail.com>
-	<20100308195911.GG24864@trinity.fluff.org>
-Message-ID: <b2e8f9f71003081207v5a778290j8636f4cc5a66377b@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 8 Mar 2010 18:22:49 -0500
+Subject: [PATCH] locomo.c: make irq register access typesafe
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
+References: <201001201110.44583.hartleys@visionengravers.com><f17812d71001201813hf93c33wbfc9f50452ec38fa@mail.gmail.com><BD79186B4FD85F4B8E60E381CAEE1909020E8E46@mi8nycmail19.Mi8.com><f17812d71001201841w34abc3b5w49b8c2986897dbe8@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909022427BE@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the touchscreen platform device definition for S3C64XX boards.
+On Wednesday, January 20, 2010 8:00 PM, H Hartley Sweeten wrote:
+> On Wednesday, January 20, 2010 7:42 PM, Eric Miao wrote:
+>> On Thu, Jan 21, 2010 at 10:31 AM, H Hartley Sweeten
+>> <hartleys@visionengravers.com> wrote:
+>>> On Wednesday, January 20, 2010 7:13 PM, Eric Miao wrote:
+>>>> On Thu, Jan 21, 2010 at 2:10 AM, H Hartley Sweeten
+>>>> <hartleys@visionengravers.com> wrote:
+>>>>> In locomo_setup_irq a void __iomem * is stored by set_irq_chip_data
+>>>>> to hold the base address for the irq registers. ?Unfortunately chip_data
+>>>>> is a void *. This will cause a number of (different address space) sparse
+>>>>> warnings.
+>>>>>
+>>>>
+>>>> That's actually been fixed as a side effect in my previous proposed
+>>>> irq cleanup patches. The way is to pass locomo chip as the data
+>>>> instead of a raw pointer. Please let me know how you think, the
+>>>> specific patch follows:
+>>>
+>>> There must be some other patches to locomo.c that remove the locomo_key_*,
+>>> locomo_gpio_*, locomo_lt_*, and locomo_spi_* related stuff. ?Were all of
+>>> them merged into common code? ?Where can I find a reference to the
+>>> original patches?
+>>>
+>>
+>> Cannot find the reference atm but they were posted weeks ago.
+>
+> Located them at:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/thread.html
+>
+> I'll try to take a good look at them tomorrow and give you any feedback
+> I have.
+>
+>>> Other than that it looks good to me.
+>>
+>> Thanks.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
-?arch/arm/mach-s3c64xx/Makefile | ? ?1 +
-?arch/arm/mach-s3c64xx/dev-ts.c | ? 61 ++++++++++++++++++++++++++++++++++++++++
-?arch/arm/plat-samsung/Kconfig ?| ? ?6 ++++
-?3 files changed, 68 insertions(+), 0 deletions(-)
-?create mode 100644 arch/arm/mach-s3c64xx/dev-ts.c
+Eric,
 
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index d1d341a..02bc97f 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -60,3 +60,4 @@ obj-y ? ? ? ? ? ? ? ? ? ? ? ? += dev-rtc.o
-?obj-$(CONFIG_S3C_ADC) ? ? ? ? ?+= dev-adc.o
-?obj-$(CONFIG_SND_S3C24XX_SOC) ?+= dev-audio.o
-?obj-$(CONFIG_S3C64XX_DEV_SPI) ?+= dev-spi.o
-+obj-$(CONFIG_S3C64XX_DEV_TS) ?+= dev-ts.o
-diff --git a/arch/arm/mach-s3c64xx/dev-ts.c b/arch/arm/mach-s3c64xx/dev-ts.c
-new file mode 100644
-index 0000000..17cc793
---- /dev/null
-+++ b/arch/arm/mach-s3c64xx/dev-ts.c
-@@ -0,0 +1,61 @@
-+/* linux/arch/arm/mach-s3c64xx/dev-ts.c
-+ *
-+ * Copyright (c) 2008 Simtec Electronics
-+ * ? ? http://armlinux.simtec.co.uk/
-+ * ? ? Ben Dooks <ben@simtec.co.uk>, <ben-linux@fluff.org>
-+ *
-+ * Adapted by Maurus Cuelenaere for s3c64xx
-+ *
-+ * S3C64XX series device definition for touchscreen device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+#include <plat/devs.h>
-+#include <plat/ts.h>
-+
-+static struct resource s3c_ts_resource[] = {
-+ ? ? ? [0] = {
-+ ? ? ? ? ? ? ? .start = S3C64XX_PA_ADC,
-+ ? ? ? ? ? ? ? .end ? = S3C64XX_PA_ADC + SZ_256 - 1,
-+ ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-+ ? ? ? },
-+ ? ? ? [1] = {
-+ ? ? ? ? ? ? ? .start = IRQ_TC,
-+ ? ? ? ? ? ? ? .end ? = IRQ_TC,
-+ ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
-+ ? ? ? },
-+};
-+
-+struct platform_device s3c_device_ts = {
-+ ? ? ? .name ? ? ? ? ? = "s3c64xx-ts",
-+ ? ? ? .id ? ? ? ? ? ? = -1,
-+ ? ? ? .num_resources ?= ARRAY_SIZE(s3c_ts_resource),
-+ ? ? ? .resource ? ? ? = s3c_ts_resource,
-+};
-+
-+void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
-+{
-+ ? ? ? struct s3c2410_ts_mach_info *npd;
-+
-+ ? ? ? if (!pd) {
-+ ? ? ? ? ? ? ? printk(KERN_ERR "%s: no platform data\n", __func__);
-+ ? ? ? ? ? ? ? return;
-+ ? ? ? }
-+
-+ ? ? ? npd = kmemdup(pd, sizeof(struct s3c2410_ts_mach_info), GFP_KERNEL);
-+ ? ? ? if (!npd)
-+ ? ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+
-+ ? ? ? s3c_device_ts.dev.platform_data = npd;
-+}
-+EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index d552c65..5d3ef35 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -191,6 +191,12 @@ config S3C64XX_DEV_SPI
-? ? ? ? ?Compile in platform device definitions for S3C64XX's type
-? ? ? ? ?SPI controllers.
+Did your locomo irq cleanup patches get lost somewhere?  I see three pending
+patches in linux-next but they did not show up in Linus' tree during the
+merge window.
 
-+config S3C64XX_DEV_TS
-+ ? ? ? bool
-+ ? ? ? help
-+ ? ? ? ? ? Common in platform device definitions for S3C64XX touchscreen
-+ ? ? ? ? ? device
-+
-?# DMA
+commit da8065ac3ea29d1bfdb5a163be346fbe35066f8d
+[ARM] locomo: avoid unnecessary cascaded keyboard IRQ
 
-?config S3C_DMA
---
-1.7.0.1
+commit 00dd8027b913088ff9b656c5aaa6336c303b7f26
+[ARM] locomo: remove unused IRQs and avoid unnecessary cascade
+
+commit ac609d266e4af4ebf586d610bd76e04dddae0c4c
+[ARM] locomo: allow cascaded IRQ base to be specified by platforms
+
+Regards,
+Hartley
