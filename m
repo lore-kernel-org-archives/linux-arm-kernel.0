@@ -1,129 +1,97 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 8 Mar 2010 19:38:59 +0100
-Subject: [PATCH 5/7] ARM: S3C64XX: Add s3c64xx support to touchscreen driver
-Message-ID: <b2e8f9f71003081038v5096204dm8bb4bfaeadb3203d@mail.gmail.com>
+Date: Mon, 8 Mar 2010 19:39:02 +0100
+Subject: [PATCH 6/7] ARM: SAMSUNG: Add broken_card_detection field to HSMMC
+	platform data
+Message-ID: <b2e8f9f71003081039w75a32a02m51d8e17ea0e34264@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This ack's the extra interrupt s3c64xx platforms have in the touchscreen driver.
+This is useful when your board uses multiple HSMMC controllers and
+only some of them have broken card detection.
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- drivers/input/touchscreen/Kconfig      |    6 +++---
- drivers/input/touchscreen/s3c2410_ts.c |   26 ++++++++++++++++++++++----
- 2 files changed, 25 insertions(+), 7 deletions(-)
+ arch/arm/plat-samsung/dev-hsmmc.c          |    1 +
+ arch/arm/plat-samsung/dev-hsmmc1.c         |    1 +
+ arch/arm/plat-samsung/dev-hsmmc2.c         |    1 +
+ arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
+ drivers/mmc/host/sdhci-s3c.c               |    3 +++
+ 5 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/input/touchscreen/Kconfig
-b/drivers/input/touchscreen/Kconfig
-index dfafc76..0378b3d 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -146,11 +146,11 @@ config TOUCHSCREEN_FUJITSU
- 	  module will be called fujitsu-ts.
+diff --git a/arch/arm/plat-samsung/dev-hsmmc.c
+b/arch/arm/plat-samsung/dev-hsmmc.c
+index 4c05b39..09c1af9 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc.c
++++ b/arch/arm/plat-samsung/dev-hsmmc.c
+@@ -60,6 +60,7 @@ void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc0_def_platdata;
 
- config TOUCHSCREEN_S3C2410
--	tristate "Samsung S3C2410 touchscreen input driver"
--	depends on ARCH_S3C2410
-+	tristate "Samsung S3C touchscreen input driver"
-+	depends on ARCH_S3C2410 || ARCH_S3C64XX
- 	select S3C24XX_ADC
- 	help
--	  Say Y here if you have the s3c2410 touchscreen.
-+	  Say Y here if you have the s3c touchscreen.
+ 	set->max_width = pd->max_width;
++	set->broken_card_detection = pd->broken_card_detection;
 
- 	  If unsure, say N.
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/dev-hsmmc1.c
+b/arch/arm/plat-samsung/dev-hsmmc1.c
+index e49bc4c..11421a6 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc1.c
++++ b/arch/arm/plat-samsung/dev-hsmmc1.c
+@@ -60,6 +60,7 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc1_def_platdata;
 
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c
-b/drivers/input/touchscreen/s3c2410_ts.c
-index 0cd0ca6..04c990e 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -40,7 +40,9 @@
- #include <plat/regs-adc.h>
- #include <plat/ts.h>
+ 	set->max_width = pd->max_width;
++	set->broken_card_detection = pd->broken_card_detection;
 
-+#ifdef PLAT_S3C24XX
- #include <mach/regs-gpio.h>
-+#endif
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/dev-hsmmc2.c
+b/arch/arm/plat-samsung/dev-hsmmc2.c
+index 824580b..dccc581 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc2.c
++++ b/arch/arm/plat-samsung/dev-hsmmc2.c
+@@ -61,6 +61,7 @@ void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc2_def_platdata;
 
- #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
+ 	set->max_width = pd->max_width;
++	set->broken_card_detection = pd->broken_card_detection;
 
-@@ -88,6 +90,12 @@ struct s3c2410ts {
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h
+b/arch/arm/plat-samsung/include/plat/sdhci.h
+index 7d07cd7..6763af7 100644
+--- a/arch/arm/plat-samsung/include/plat/sdhci.h
++++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+@@ -24,6 +24,7 @@ struct mmc_ios;
+  * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
+  * @max_width: The maximum number of data bits supported.
+  * @host_caps: Standard MMC host capabilities bit field.
++ * @broken_card_detection: Quirk for broken card detection.
+  * @cfg_gpio: Configure the GPIO for a specific card bit-width
+  * @cfg_card: Configure the interface for a specific card and speed. This
+  *            is necessary the controllers and/or GPIO blocks require the
+@@ -37,6 +38,7 @@ struct mmc_ios;
+ struct s3c_sdhci_platdata {
+ 	unsigned int	max_width;
+ 	unsigned int	host_caps;
++	bool		broken_card_detection;
 
- static struct s3c2410ts ts;
+ 	char		**clocks;	/* set of clock sources */
 
-+enum s3c_cpu_type {
-+	TYPE_S3C2410,
-+	TYPE_S3C2440,
-+	TYPE_S3C64XX,
-+};
-+
- /**
-  * s3c2410_ts_connect - configure gpio for s3c2410 systems
-  *
-@@ -97,10 +105,12 @@ static struct s3c2410ts ts;
- */
- static inline void s3c2410_ts_connect(void)
- {
-+#ifdef PLAT_S3C24XX
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
-+#endif
- }
-
- /**
-@@ -169,6 +179,7 @@ static DEFINE_TIMER(touch_timer, touch_timer_fire, 0, 0);
-  */
- static irqreturn_t stylus_irq(int irq, void *dev_id)
- {
-+	struct platform_device *pdev = to_platform_device(ts.dev);
- 	unsigned long data0;
- 	unsigned long data1;
- 	bool down;
-@@ -187,6 +198,12 @@ static irqreturn_t stylus_irq(int irq, void *dev_id)
- 	else
- 		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
-
-+
-+	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
-+		/* Clear pen down/up interrupt */
-+		writel(0x0, ts.io + S3C64XX_ADCCLRINTPNDNUP);
-+	}
-+
- 	return IRQ_HANDLED;
- }
-
-@@ -296,7 +313,7 @@ static int __devinit s3c2410ts_probe(struct
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 50997d2..08cf90a 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -342,6 +342,9 @@ static int __devinit sdhci_s3c_probe(struct
 platform_device *pdev)
- 	}
+ 	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+ 			 SDHCI_QUIRK_32BIT_DMA_SIZE);
 
- 	/* Configure the touchscreen external FETs on the S3C2410 */
--	if (!platform_get_device_id(pdev)->driver_data)
-+	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C2410)
- 		s3c2410_ts_connect();
-
- 	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
-@@ -418,15 +435,16 @@ static struct dev_pm_ops s3c_ts_pmops = {
- #endif
-
- static struct platform_device_id s3cts_driver_ids[] = {
--	{ "s3c2410-ts", 0 },
--	{ "s3c2440-ts", 1 },
-+	{ "s3c2410-ts", TYPE_S3C2410 },
-+	{ "s3c2440-ts", TYPE_S3C2440 },
-+	{ "s3c64xx-ts", TYPE_S3C64XX },
- 	{ }
- };
- MODULE_DEVICE_TABLE(platform, s3cts_driver_ids);
-
- static struct platform_driver s3c_ts_driver = {
- 	.driver         = {
--		.name   = "s3c24xx-ts",
-+		.name   = "s3c-ts",
- 		.owner  = THIS_MODULE,
- #ifdef CONFIG_PM
- 		.pm	= &s3c_ts_pmops,
++	if (pdata->broken_card_detection)
++		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret) {
+ 		dev_err(dev, "sdhci_add_host() failed\n");
 -- 
 1.7.0.1
