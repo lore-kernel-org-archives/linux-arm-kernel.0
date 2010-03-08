@@ -1,60 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Mar 2010 11:17:37 +0000
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100306193649.GB13262@n2100.arm.linux.org.uk>
-References: <1267316072.23523.1842.camel@pasglop>
-	<1267333263.2762.11.camel@mulgrave.site>
-	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
-	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
-	<20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267712512.31654.176.camel@mulgrave.site>
-	<20100304142704.GB6622@n2100.arm.linux.org.uk>
-	<1267872443.8894.1443.camel@mulgrave.site>
-	<20100306193649.GB13262@n2100.arm.linux.org.uk>
-Message-ID: <1268047057.14199.54.camel@e102109-lin.cambridge.arm.com>
+From: chripell@fsfe.org (Christian Pellegrin)
+Date: Mon,  8 Mar 2010 12:21:28 +0100
+Subject: [PATCH v2] Fix GPIOs bank H and J not being preserved during suspend
+In-Reply-To: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
+References: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
+Message-ID: <1268047288-11166-1-git-send-email-chripell@fsfe.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-03-06 at 19:36 +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 06, 2010 at 04:17:23PM +0530, James Bottomley wrote:
-> > On a fault in of exec data, we first try to get the page out of the page
-> > cache.  If it's not present, we put the faulting process to sleep and
-> > fetch it in from storage.  When we do the read, on the PIO path, the
-> > kernel alias for the page becomes dirty.  Some time later, we place the
-> > page into the user space (updating the pte entry that caused a fault).
-> > At this point, we'll call both flush_icache_page() and
-> > update_mmu_cache() ... this is where the I/D resolution should be done.
-> 
-> No - this is where things get extremely icky.
-> 
-> The problem at this point occurs on SMP architectures.  As soon as you
-> update the PTE entry, it is visible to other threads of the application.
-> If you do I-cache handling after updating the PTE, then there is a window
-> where another CPU can execute the page:
-> 
-> CPU0                    CPU1
->                         speculatively prefetches from page N via kernel
->                         mapping, loads garbage into I-cache
-> attempts to execute P
-> page fault
-> page N allocated
-> set_pte_at
->                         executes P
->                         *splat*
-> flush I-cache
+This patch adds bank H and J GPIOs (present on S3C244X CPUs) to the list
+of registers that must be saved/resumed during suspend.
 
-You have two choices - either invalidate the I-cache before the user pte
-becomes visible or set the page as not-executable in set_pte_at() and
-later mark it as executable in update_mmu_cache (via set_pte_ext).
+Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
+---
+ arch/arm/mach-s3c2410/include/mach/gpio-core.h |    2 +-
+ arch/arm/plat-s3c/pm-gpio.c                    |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-We currently invalidate the whole I-cache for historical reasons but we
-could actually only invalidate a single page. Since even on latest ARM
-CPUs, the I-cache is a real VIPT (i.e. can have aliases), we would need
-to invalidate on the user mapping (or create a temporary one). The
-latter approach of clearing the X bit in set_pte_at may actually help
-with this scenario (I haven't done any tests though).
-
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-core.h b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+index f8b879a..7c33ecf 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio-core.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio-core.h
+@@ -24,7 +24,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
+ {
+ 	struct s3c_gpio_chip *chip;
+ 
+-	if (pin > S3C2410_GPG(10))
++	if (pin > S3C_GPIO_END)
+ 		return NULL;
+ 
+ 	chip = &s3c24xx_gpios[pin/32];
+diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-s3c/pm-gpio.c
+index cfd326a..b3cc8db 100644
+--- a/arch/arm/plat-s3c/pm-gpio.c
++++ b/arch/arm/plat-s3c/pm-gpio.c
+@@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+ 			  ourchip->pm_save[2],
+ 			  ourchip->pm_save[3]);
+ 
+-		gpio_nr += ourchip->chip.ngpio;
++		gpio_nr += ourchip->chip.ngpio - 1;
+ 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+ 	}
+ }
+@@ -374,7 +374,7 @@ void s3c_pm_restore_gpios(void)
+ 
+ 		s3c_pm_resume_gpio(ourchip);
+ 
+-		gpio_nr += ourchip->chip.ngpio;
++		gpio_nr += ourchip->chip.ngpio - 1;
+ 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+ 	}
+ }
 -- 
-Catalin
+1.5.6.5
