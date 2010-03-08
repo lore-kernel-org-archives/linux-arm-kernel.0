@@ -1,32 +1,60 @@
-From: chripell@fsfe.org (christian pellegrin)
-Date: Mon, 8 Mar 2010 12:17:17 +0100
-Subject: [PATCH] Fix GPIOs bank H and J not being preserved during suspend
-In-Reply-To: <20100304232115.GB31126@trinity.fluff.org>
-References: <cabda6421003022258j51258c56w99b0e75d2d2b088c@mail.gmail.com>
-	<1267599637-9283-1-git-send-email-chripell@fsfe.org>
-	<20100304232115.GB31126@trinity.fluff.org>
-Message-ID: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 08 Mar 2010 11:17:37 +0000
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100306193649.GB13262@n2100.arm.linux.org.uk>
+References: <1267316072.23523.1842.camel@pasglop>
+	<1267333263.2762.11.camel@mulgrave.site>
+	<20100302211049V.fujita.tomonori@lab.ntt.co.jp>
+	<1267549527.15401.78.camel@e102109-lin.cambridge.arm.com>
+	<20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<20100304142704.GB6622@n2100.arm.linux.org.uk>
+	<1267872443.8894.1443.camel@mulgrave.site>
+	<20100306193649.GB13262@n2100.arm.linux.org.uk>
+Message-ID: <1268047057.14199.54.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 5, 2010 at 12:21 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+On Sat, 2010-03-06 at 19:36 +0000, Russell King - ARM Linux wrote:
+> On Sat, Mar 06, 2010 at 04:17:23PM +0530, James Bottomley wrote:
+> > On a fault in of exec data, we first try to get the page out of the page
+> > cache.  If it's not present, we put the faulting process to sleep and
+> > fetch it in from storage.  When we do the read, on the PIO path, the
+> > kernel alias for the page becomes dirty.  Some time later, we place the
+> > page into the user space (updating the pte entry that caused a fault).
+> > At this point, we'll call both flush_icache_page() and
+> > update_mmu_cache() ... this is where the I/D resolution should be done.
+> 
+> No - this is where things get extremely icky.
+> 
+> The problem at this point occurs on SMP architectures.  As soon as you
+> update the PTE entry, it is visible to other threads of the application.
+> If you do I-cache handling after updating the PTE, then there is a window
+> where another CPU can execute the page:
+> 
+> CPU0                    CPU1
+>                         speculatively prefetches from page N via kernel
+>                         mapping, loads garbage into I-cache
+> attempts to execute P
+> page fault
+> page N allocated
+> set_pte_at
+>                         executes P
+>                         *splat*
+> flush I-cache
 
->> +#ifdef CONFIG_CPU_S3C244X
->> + ? ? if (pin > S3C2410_GPJ(15))
->> + ? ? ? ? ? ? return NULL;
->> +#else
->
-> Hmm, could we use the arch define for number of GPIOs here instead
-> of an ifdef?
->
+You have two choices - either invalidate the I-cache before the user pte
+becomes visible or set the page as not-executable in set_pte_at() and
+later mark it as executable in update_mmu_cache (via set_pte_ext).
 
-
-ack, good idea. I'm sending the new patchi in response to this. Tested
-on s3c2440 custom board.
+We currently invalidate the whole I-cache for historical reasons but we
+could actually only invalidate a single page. Since even on latest ARM
+CPUs, the I-cache is a real VIPT (i.e. can have aliases), we would need
+to invalidate on the user mapping (or create a temporary one). The
+latter approach of clearing the X bit in set_pte_at may actually help
+with this scenario (I haven't done any tests though).
 
 -- 
-Christian Pellegrin, see http://www.evolware.org/chri/
-"Real Programmers don't play tennis, or any other sport which requires
-you to change clothes. Mountain climbing is OK, and Real Programmers
-wear their climbing boots to work in case a mountain should suddenly
-spring up in the middle of the computer room."
+Catalin
