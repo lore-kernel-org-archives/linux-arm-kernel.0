@@ -1,112 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 08 Mar 2010 16:38:03 +0000
-Subject: [PATCH 4/6] ARMv7: Use lazy cache flushing if
-	hardwarebroadcastscache operations
-In-Reply-To: <20100308163125.GA13856@n2100.arm.linux.org.uk>
-References: <20091207141339.30429.28247.stgit@pc1117.cambridge.arm.com>
-	<1268065501.25012.28.camel@e102109-lin.cambridge.arm.com>
-	<20100308163125.GA13856@n2100.arm.linux.org.uk>
-Message-ID: <1268066283.25012.35.camel@e102109-lin.cambridge.arm.com>
+From: arm@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 08 Mar 2010 17:44:19 +0000
+Subject: [PATCH] pxa: fix for UART reference in section text for a number
+	of platforms.
+In-Reply-To: <f17812d71003080410y7d5dad83t28e6855aa4ad5cfc@mail.gmail.com>
+References: <4B94DC52.1040201@cam.ac.uk>	<f17812d71003080348k7ff5cd77lf5e1262ce1ccf14@mail.gmail.com>
+	<f17812d71003080410y7d5dad83t28e6855aa4ad5cfc@mail.gmail.com>
+Message-ID: <4B953773.6050904@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-03-08 at 16:31 +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 08, 2010 at 04:25:01PM +0000, Catalin Marinas wrote:
-> > Hi Russell,
-> >
-> > On Mon, 2009-12-07 at 14:13 +0000, Catalin Marinas wrote:
-> > > ARMv7 processors like Cortex-A9 broadcast the cache maintenance
-> > > operations in hardware. The patch adds the CPU ID checks for such
-> > > feature and allows the flush_dcache_page/update_mmu_cache pair to work
-> > > in lazy flushing mode similar to the UP case.
-> >
-> > It looks like I haven't got a final ok from you on this patch (I had the
-> > impression that it's in the patch system already but rebased my patches
-> > and found that it's not in mainline).
+On 03/08/10 12:10, Eric Miao wrote:
+> On Mon, Mar 8, 2010 at 7:48 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> What's the background?
+>>
 > 
-> It needs to be updated - we have a cache_ops_need_broadcast() in
-> smp_plat.h now for the ptrace issues.
+> OK, I saw the thread. So this is basically going to move the "UART" to
+> bss, which doesn't get discarded. However, my 'devel' branch has been
+> modified a bit to support off chip UART decompressing messages to be
+> displayed, I'm afraid this needs to be updated a bit.
 
-I noticed that when rebasing. Here's the updated patch:
+The same problem will occur with the other two variables changed by
+this function, so how about the following (against your tree, but tested
+against mainline with a couple of patches lifted from your tree). Builds
+fine for imote2, startgate2 and arcom_zeus. Just testing a full build
+of all pxa platforms to see if anything similar is hiding elsewhere.
 
-ARMv7: Use lazy cache flushing if hardware broadcasts cache operations
+[PATCH] pxa: fix for uart_base and friends reference in section.
 
-From: Catalin Marinas <catalin.marinas@arm.com>
-
-ARMv7 processors like Cortex-A9 broadcast the cache maintenance
-operations in hardware. The patch adds the CPU ID checks for such
-feature and allows the flush_dcache_page/update_mmu_cache pair to work
-in lazy flushing mode similar to the UP case.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
 ---
- arch/arm/include/asm/smp_plat.h |    4 ++++
- arch/arm/mm/fault-armv.c        |    2 --
- arch/arm/mm/flush.c             |    9 ++++-----
- 3 files changed, 8 insertions(+), 7 deletions(-)
+ arch/arm/mach-pxa/include/mach/uncompress.h |   18 ++++++++++++------
+ 1 files changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index e621530..963a338 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -13,9 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
- }
+diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
+index 5ef91d9..03914e4 100644
+--- a/arch/arm/mach-pxa/include/mach/uncompress.h
++++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+@@ -16,9 +16,9 @@
+ #define BTUART_BASE	(0x40200000)
+ #define STUART_BASE	(0x40700000)
  
-+#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
-+#define cache_ops_need_broadcast()	0
-+#else
- static inline int cache_ops_need_broadcast(void)
+-static unsigned long uart_base = FFUART_BASE;
+-static unsigned int uart_shift = 2;
+-static unsigned int uart_is_pxa = 1;
++static unsigned long uart_base;
++static unsigned int uart_shift;
++static unsigned int uart_is_pxa;
+ 
+ static inline unsigned char uart_read(int offset)
  {
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+@@ -58,14 +58,20 @@ static inline void arch_decomp_setup(void)
+ {
+ 	if (machine_is_littleton() || machine_is_intelmote2()
+ 	    || machine_is_csb726() || machine_is_stargate2()
+-	    || machine_is_cm_x300() || machine_is_balloon3())
++	    || machine_is_cm_x300() || machine_is_balloon3()) {
+ 		uart_base = STUART_BASE;
+-
+-	if (machine_is_arcom_zeus()) {
++		uart_shift = 2;
++		uart_is_pxa = 1;
++	} else if (machine_is_arcom_zeus()) {
+ 		uart_base = 0x10000000;	/* nCS4 */
+ 		uart_shift = 1;
+ 		uart_is_pxa = 0;
++	} else {
++		uart_base = FFUART_BASE;
++		uart_shift = 2;
++		uart_is_pxa = 1;
+ 	}
  }
-+#endif
  
- #endif
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index c9b97e9..0866ffd 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -169,10 +169,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 		return;
- 
- 	mapping = page_mapping(page);
--#ifndef CONFIG_SMP
- 	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
- 		__flush_dcache_page(mapping, page);
--#endif
- 	if (mapping) {
- 		if (cache_is_vivt())
- 			make_coherent(mapping, vma, addr, ptep, pfn);
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index e34f095..c2cea53 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -16,6 +16,7 @@
- #include <asm/smp_plat.h>
- #include <asm/system.h>
- #include <asm/tlbflush.h>
-+#include <asm/smp_plat.h>
- 
- #include "mm.h"
- 
-@@ -241,12 +242,10 @@ void flush_dcache_page(struct page *page)
- 
- 	mapping = page_mapping(page);
- 
--#ifndef CONFIG_SMP
--	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
-+	if (!cache_ops_need_broadcast() &&
-+	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
- 		set_bit(PG_dcache_dirty, &page->flags);
--	else
--#endif
--	{
-+	else {
- 		__flush_dcache_page(mapping, page);
- 		if (mapping && cache_is_vivt())
- 			__flush_dcache_aliases(mapping, page);
-
-
+ /*
 -- 
-Catalin
+1.6.4.4
