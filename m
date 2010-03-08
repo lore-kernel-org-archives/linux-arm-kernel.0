@@ -1,58 +1,91 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 8 Mar 2010 20:10:18 +0800
-Subject: [PATCH] pxa: fix for UART reference in section text for a number
-	of platforms.
-In-Reply-To: <f17812d71003080348k7ff5cd77lf5e1262ce1ccf14@mail.gmail.com>
-References: <4B94DC52.1040201@cam.ac.uk>
-	<f17812d71003080348k7ff5cd77lf5e1262ce1ccf14@mail.gmail.com>
-Message-ID: <f17812d71003080410y7d5dad83t28e6855aa4ad5cfc@mail.gmail.com>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Mon, 8 Mar 2010 14:15:50 +0200
+Subject: [PULL REQUEST] runtime physoffset [Was: change boot requirements]
+In-Reply-To: <20100212110350.GB18221@pengutronix.de>
+References: <20100119083803.GA17904@pengutronix.de>
+	<20100122115831.GA8377@pengutronix.de>
+	<20100125173201.GA14834@pengutronix.de>
+	<4B5DF1C9.6090102@bluewatersys.com>
+	<20100130210231.GC16345@pengutronix.de>
+	<20100204095147.GA6562@pengutronix.de>
+	<20100212110350.GB18221@pengutronix.de>
+Message-ID: <20100308121550.GC9233@matterhorn.verdurent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 8, 2010 at 7:48 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> What's the background?
->
+On 10 Feb 12, Uwe Kleine-K?nig wrote:
+> Hello Russell,
+> 
+> On Thu, Feb 04, 2010 at 10:51:47AM +0100, Uwe Kleine-K?nig wrote:
+> > > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+> > >   Linus Torvalds (1):
+> > >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> > 
+> > Can you please pull this branch for the .34 merge window?  Since the
+> > last post one new patch was added to that branch.  I'll send it in reply
+> > to this mail.
+> Do you consider pulling?  If not, can you please say why?
+> 
+> Best regards
+> Uwe
 
-OK, I saw the thread. So this is basically going to move the "UART" to
-bss, which doesn't get discarded. However, my 'devel' branch has been
-modified a bit to support off chip UART decompressing messages to be
-displayed, I'm afraid this needs to be updated a bit.
+Bumping up this thread since these patches are necessary to reach our
+eventual goal of a common kernel.
 
-Thanks
+Russell, any feedback on this set?
 
-> 2010/3/8 Jonathan Cameron <jic23@cam.ac.uk>:
->> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
->>
->> ---
->> ?Fix exactly as proposed by Russell King. ?Thanks!
->>
->> ?arch/arm/mach-pxa/include/mach/uncompress.h | ? ?4 +++-
->> ?1 files changed, 3 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
->> index 237734b..b009299 100644
->> --- a/arch/arm/mach-pxa/include/mach/uncompress.h
->> +++ b/arch/arm/mach-pxa/include/mach/uncompress.h
->> @@ -15,7 +15,7 @@
->>
->> ?#define __REG(x) ? ? ? ((volatile unsigned long *)x)
->>
->> -static volatile unsigned long *UART = FFUART;
->> +static volatile unsigned long *UART;
->>
->> ?static inline void putc(char c)
->> ?{
->> @@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
->> ? ? ? ? ? ?|| machine_is_csb726() || machine_is_stargate2()
->> ? ? ? ? ? ?|| machine_is_cm_x300() || machine_is_balloon3())
->> ? ? ? ? ? ? ? ?UART = STUART;
->> + ? ? ? else
->> + ? ? ? ? ? ? ? UART = FFUART;
->> ?}
->>
->> ?/*
->> --
->> 1.6.4.4
->>
->>
->
+/Amit
+
+> > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+> >   Linus Torvalds (1):
+> >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> > 
+> > Uwe Kleine-K?nig (10):
+> >       zImage: fix comments for cache_on, cache_off and cache_clean_flush
+> >       zImage: some comments for __armv3_mpu_cache_on
+> >       zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+> >       zImage: annotate debug functions about corrupted registers
+> >       zImage: don't define unused symbol initrd_phys
+> >       arm: deprecate support for old way to pass kernel parameters
+> >       zImage: don't hard code the stack size twice
+> >       uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+> >       Allow PHYS_OFFSET to be runtime determined
+> >       arm: remove bit-rotten STANDALONE_DEBUG for decompressor
+> > 
+> >  Documentation/arm/Booting               |    1 +
+> >  arch/arm/Kconfig                        |    9 ++++
+> >  arch/arm/boot/Makefile                  |    6 ++-
+> >  arch/arm/boot/compressed/Makefile       |   10 ++---
+> >  arch/arm/boot/compressed/Makefile.debug |   23 ---------
+> >  arch/arm/boot/compressed/head.S         |   76 +++++++++++++++++++++++++++---
+> >  arch/arm/boot/compressed/misc.c         |   27 -----------
+> >  arch/arm/include/asm/memory.h           |    5 ++
+> >  arch/arm/kernel/Makefile                |    4 +-
+> >  arch/arm/kernel/compat.c                |    7 ---
+> >  arch/arm/kernel/compat.h                |    2 -
+> >  arch/arm/kernel/head.S                  |   31 +++++++++---
+> >  arch/arm/kernel/setup.c                 |   21 ++++++++-
+> >  13 files changed, 138 insertions(+), 84 deletions(-)
+> >  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-------------------------------------------------------------------------
+Amit Kucheria,				 Kernel Developer, Verdurent
+-------------------------------------------------------------------------
