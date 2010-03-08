@@ -1,91 +1,23 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Mon, 8 Mar 2010 14:15:50 +0200
-Subject: [PULL REQUEST] runtime physoffset [Was: change boot requirements]
-In-Reply-To: <20100212110350.GB18221@pengutronix.de>
-References: <20100119083803.GA17904@pengutronix.de>
-	<20100122115831.GA8377@pengutronix.de>
-	<20100125173201.GA14834@pengutronix.de>
-	<4B5DF1C9.6090102@bluewatersys.com>
-	<20100130210231.GC16345@pengutronix.de>
-	<20100204095147.GA6562@pengutronix.de>
-	<20100212110350.GB18221@pengutronix.de>
-Message-ID: <20100308121550.GC9233@matterhorn.verdurent.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Mon, 8 Mar 2010 13:16:35 +0100
+Subject: bit errors on spitz
+In-Reply-To: <1268048916.6477.9.camel@utx.utx.cz>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+	<1268048916.6477.9.camel@utx.utx.cz>
+Message-ID: <20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Feb 12, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> On Thu, Feb 04, 2010 at 10:51:47AM +0100, Uwe Kleine-K?nig wrote:
-> > > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
-> > >   Linus Torvalds (1):
-> > >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-> > 
-> > Can you please pull this branch for the .34 merge window?  Since the
-> > last post one new patch was added to that branch.  I'll send it in reply
-> > to this mail.
-> Do you consider pulling?  If not, can you please say why?
-> 
-> Best regards
-> Uwe
+Hi!
+> - And I see display noise while CF Wi-Fi card is active.
 
-Bumping up this thread since these patches are necessary to reach our
-eventual goal of a common kernel.
+Forgotten about this one. See for yourself, notice short black vertical lines
+flashing randomly.
 
-Russell, any feedback on this set?
-
-/Amit
-
-> > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
-> >   Linus Torvalds (1):
-> >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-> > 
-> > Uwe Kleine-K?nig (10):
-> >       zImage: fix comments for cache_on, cache_off and cache_clean_flush
-> >       zImage: some comments for __armv3_mpu_cache_on
-> >       zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
-> >       zImage: annotate debug functions about corrupted registers
-> >       zImage: don't define unused symbol initrd_phys
-> >       arm: deprecate support for old way to pass kernel parameters
-> >       zImage: don't hard code the stack size twice
-> >       uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
-> >       Allow PHYS_OFFSET to be runtime determined
-> >       arm: remove bit-rotten STANDALONE_DEBUG for decompressor
-> > 
-> >  Documentation/arm/Booting               |    1 +
-> >  arch/arm/Kconfig                        |    9 ++++
-> >  arch/arm/boot/Makefile                  |    6 ++-
-> >  arch/arm/boot/compressed/Makefile       |   10 ++---
-> >  arch/arm/boot/compressed/Makefile.debug |   23 ---------
-> >  arch/arm/boot/compressed/head.S         |   76 +++++++++++++++++++++++++++---
-> >  arch/arm/boot/compressed/misc.c         |   27 -----------
-> >  arch/arm/include/asm/memory.h           |    5 ++
-> >  arch/arm/kernel/Makefile                |    4 +-
-> >  arch/arm/kernel/compat.c                |    7 ---
-> >  arch/arm/kernel/compat.h                |    2 -
-> >  arch/arm/kernel/head.S                  |   31 +++++++++---
-> >  arch/arm/kernel/setup.c                 |   21 ++++++++-
-> >  13 files changed, 138 insertions(+), 84 deletions(-)
-> >  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+http://atrey.karlin.mff.cuni.cz/~metan/outgoing/zaurus_sickness.mpg
 
 -- 
--------------------------------------------------------------------------
-Amit Kucheria,				 Kernel Developer, Verdurent
--------------------------------------------------------------------------
+metan
