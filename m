@@ -1,29 +1,28 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Tue, 9 Mar 2010 00:26:35 +0100
-Subject: [PATCH] Orion5x: replace KEY_WLAN with KEY_WPS_BUTTON
-Message-ID: <201003090026.35696.chunkeey@googlemail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Mar 2010 23:46:50 +0000
+Subject: [PATCH] locomo.c: make irq register access typesafe
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909022427BE@mi8nycmail19.Mi8.com>
+References: <201001201110.44583.hartleys@visionengravers.com>
+	<f17812d71001201813hf93c33wbfc9f50452ec38fa@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909020E8E46@mi8nycmail19.Mi8.com>
+	<f17812d71001201841w34abc3b5w49b8c2986897dbe8@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909022427BE@mi8nycmail19.Mi8.com>
+Message-ID: <20100308234649.GA17662@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Input: add KEY_WPS_BUTTON definition" introduced
-a generic keycode for WPS input events. 
+On Mon, Mar 08, 2010 at 06:22:49PM -0500, H Hartley Sweeten wrote:
+> Did your locomo irq cleanup patches get lost somewhere?  I see three pending
+> patches in linux-next but they did not show up in Linus' tree during the
+> merge window.
 
-Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
----
-(untested, don't have the HW - keep the CC.)
+*All* the trees which I merged into mine have not made it into
+mainline - Linus seems to have released -rc1 two days early.
 
-KEY_WLAN is _reversed_ for WLAN rfkill. ;-)
----
-diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-index cb0feca..f9f222e 100644
---- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-+++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-@@ -77,7 +77,7 @@ static struct gpio_keys_button wrt350n_v2_buttons[] = {
- 		.desc		= "Reset Button",
- 		.active_low	= 1,
- 	}, {
--		.code		= KEY_WLAN,
-+		.code		= KEY_WPS_BUTTON,
- 		.gpio		= 2,
- 		.desc		= "WPS Button",
- 		.active_low	= 1,
+I'm currently uncertain what this means - whether all this work
+is going to have to wait for the next merge window.
+
+If it is going to have to wait, there's a lesson in there for
+not sending me headache inducing git tree pull requests *after*
+the merge window has opened.
