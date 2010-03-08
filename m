@@ -1,459 +1,468 @@
-From: doronsa@gmail.com (doron)
-Date: Mon, 8 Mar 2010 10:42:16 +0200
+From: tghk48@motorola.com (TAO HU)
+Date: Mon, 8 Mar 2010 17:14:40 +0800
 Subject: kernel 2.6.22.18 omap qpio
-In-Reply-To: <5f4a33681003072245h37d9c78ekb4f67b23840d20a7@mail.gmail.com>
+In-Reply-To: <003301cabe9b$43d82ed0$cb888c70$@com>
 References: <00c601caba46$73b79a90$5b26cfb0$@com>
 	<5f4a33681003072245h37d9c78ekb4f67b23840d20a7@mail.gmail.com>
-Message-ID: <003301cabe9b$43d82ed0$cb888c70$@com>
+	<003301cabe9b$43d82ed0$cb888c70$@com>
+Message-ID: <5f4a33681003080114t125b9910u3f96c94890c902e4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi tao
-
-Yes the processor is OMAP 35XX
-
-The code off the driver: 
-
- 
-
- 
-
-#include <linux/kernel.h>
-
-#include <linux/module.h>
-
-#include <linux/fs.h>
-
-#include <asm/uaccess.h> 
-
-#include <asm/arch/gpio.h>
-
-//#include <asm/gpio.h>
-
- 
-
-#include <asm/arch/omap34xx.h>
-
-#include <asm/arch/hardware.h>
-
- 
-
-#include <asm/arch/mux.h>
-
-#include <asm/arch/board.h>
-
-#include <asm/arch/common.h>
-
-#include <asm/arch/keypad.h>
-
-#include <asm/arch/dma.h>
-
-#include <asm/arch/gpmc.h>
-
-#include <asm/arch/twl4030-rtc.h>
-
-#include <asm/arch/mcspi.h>
-
-#include <asm/arch/prcm.h>
-
- 
-
- 
-
- 
-
-static int device_open(struct inode *inode, struct file *file)
-
-{
-
-#ifdef DEBUG
-
-  printk(KERN_INFO "device_open(%p)\n", file);
-
-#endif
-
- 
-
-  return 0;
-
-}
-
- 
-
-static int device_release(struct inode *inode, struct file *file)
-
-{
-
-#ifdef DEBUG
-
-  printk(KERN_INFO "device_release(%p,%p)\n", inode, file);
-
-#endif
-
- 
-
-  return 0;
-
-}
-
- 
-
-static int device_ioctl(struct inode *inode, struct file *file, unsigned int
-ioctl_num, unsigned long ioctl_param)
-
-{
-
-  int ret_val = 0;
-
-  int ret = 0;
-
-  struct pin_value *temp_pin, pv;
-
- 
-
-  switch(ioctl_num)
-
-  {
-
-    case IOCTL_CONFIG_PIN_VALUE:
-
- 
-
-      temp_pin = (struct pin_value*)ioctl_param;
-
- 
-
-      //if (omap_cfg_reg(temp_pin->pin))
-
-      if (omap_request_gpio(temp_pin->pin))
-
-      {
-
-            omap_free_gpio(temp_pin->pin);
-
-      }
-
-      else{
-
-           printk(KERN_INFO "gpio not config(%lu )\n", temp_pin->pin);
-
-            ret_val = -1;
-
-            goto ioctl_out;
-
-          }
-
-      break;
-
-    case IOCTL_FREE_PIN_VALUE:
-
- 
-
-            temp_pin = (struct pin_value*)ioctl_param;
-
- 
-
-            omap_free_gpio(temp_pin->pin);
-
-            printk(KERN_INFO "gpio not free(%lu)\n", temp_pin->pin);
-
-            ret_val = -1;
-
-      break;
-
-    case IOCTL_SET_PIN_VALUE:
-
-            temp_pin = (struct pin_value*)ioctl_param;
-
-            //printk(KERN_INFO "try to set gpio pin(%lu ) return %d \n",
-temp_pin->pin,ret);
-
-            omap_request_gpio((int)temp_pin->pin);
-
-            omap_set_gpio_direction((int)temp_pin->pin, 0);
-//input=1//output=0
-
-            if ((int)temp_pin->value)
-
-                  omap_set_gpio_dataout((int)temp_pin->pin,1);
-
-            else
-
-                  omap_set_gpio_dataout((int)temp_pin->pin,0);
-
- 
-
-            printk(KERN_INFO "gpio set(%lu ) to val %d\n",
-temp_pin->pin,temp_pin->value);
-
-            //ret = omap_get_gpio_datain((int)temp_pin->pin);
-
-            //printk(KERN_INFO "gpio get (%lu ) to val %d\n",
-temp_pin->pin,ret);
-
-            omap_free_gpio((int)temp_pin->pin);
-
-            ret_val = -1;
-
- 
-
-            break;
-
-    case IOCTL_GET_PIN_VALUE:
-
-              temp_pin = (struct pin_value*)ioctl_param;
-
-              pv.pin = temp_pin->pin;
-
-            /*
-
-            omap_get_gpio_datain(int gpio)
-
-            Description: This function is responsible for reading pin
-values.
-
-            Parameter: int gpio - GPIO PIN (Pin 0-63)
-
-            */
-
-            //omap_free_gpio((int)temp_pin->pin);
-
-            if (omap_request_gpio(temp_pin->pin)==0)
-
-            {
-
-                  omap_set_gpio_direction(temp_pin->pin, 1);
-//input=1//output=0
-
-                  pv.value = omap_get_gpio_datain(temp_pin->pin);
-
-                  printk(KERN_INFO "gpio get val (%lu ) to val %d\n",
-temp_pin->pin,pv.value);
-
-                  if (copy_to_user(temp_pin, &pv, sizeof(struct pin_value))
-!= 0)
-
-                        {
-
-                        ret_val = -1;
-
-                        goto ioctl_out;
-
-                        }
-
-                        omap_free_gpio((int)temp_pin->pin);
-
-                         //ret_val = pv.value;
-
-                        //copy_to_user(temp_pin, &pv, sizeof(struct
-pin_value));
-
-            }
-
-            else{
-
-                        printk(KERN_INFO "gpio not free(%lu )\n",
-temp_pin->pin);
-
-                  ret_val = -1;
-
-                  goto ioctl_out;
-
-                  }
-
-      break;
-
-    case IOCTL_SET_PIN_INPUT:
-
-      temp_pin = (struct pin_value*)ioctl_param;
-
-      if (omap_request_gpio(temp_pin->pin)==0)
-
-                  omap_set_gpio_direction(temp_pin->pin, temp_pin->value);
-//input=1//output=0
-
-      else{
-
-                  printk(KERN_INFO "gpio not free(%lu )\n", temp_pin->pin);
-
-            ret_val = -1;
-
-            goto ioctl_out;
-
-            }
-
-     break;
-
- 
-
-  }
-
- 
-
-ioctl_out:
-
-  //up(&sw_sem);
-
-  return ret_val;
-
-}
-
- 
-
- 
-
-struct file_operations our_file_ops = {
-
-  .ioctl = device_ioctl,
-
-  .open = device_open,
-
-  .release = device_release,
-
-  .owner = THIS_MODULE,
-
-};
-
- 
-
-int init_module()
-
-{
-
-  int ret_val;
-
- 
-
-  ret_val = register_chrdev(MAJOR_NUM, DEVICE_NAME, &our_file_ops);
-
- 
-
-  if (ret_val < 0)
-
-  {
-
-    printk(KERN_ALERT "device %s failed(%d)\n", DEVICE_NAME, ret_val);
-
-    return ret_val;
-
-  }
-
- 
-
-      sema_init(&sw_sem, 1);
-
-      printk(KERN_INFO "mknod /dev/%s c %d 0\n", DEVICE_NAME, MAJOR_NUM);
-
-/*
-
-      omap_cfg_reg(MUX1_1_GPIO113);
-
-      omap_cfg_reg(MUX1_2_GPIO114);
-
-      omap_cfg_reg(MUX1_3_GPIO115);
-
- 
-
-      ret = omap_request_gpio(MUX1_1_GPIO113);
-
-      if (ret < 0)
-
-            printk(KERN_ERR "SELECT_MUX1_1: can't reserve GPIO:%d !\n",
-MUX1_1_GPIO113);
-
-      ret = omap_request_gpio(MUX1_2_GPIO114);
-
-      if (ret < 0)
-
-            printk(KERN_ERR "SELECT_MUX1_2: can't reserve GPIO:%d !\n",
-MUX1_2_GPIO114);
-
-      ret = omap_request_gpio(MUX1_3_GPIO115);
-
-      if (ret < 0)
-
-            printk(KERN_ERR "SELECT_MUX1_3: can't reserve GPIO:%d !\n",
-MUX1_3_GPIO115);
-
- 
-
-*/
-
- 
-
-  return 0;
-
-}
-
- 
-
-void cleanup_module()
-
-{
-
-  unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
-
-}
-
- 
-
- 
-
-Regard Doron Sandroy
-
- 
-
- 
-
-From: TAO HU [mailto:tghk48 at motorola.com] 
-Sent: Monday, March 08, 2010 8:45 AM
-To: doron
-Subject: Re: kernel 2.6.22.18 omap qpio
-
- 
-
-Are you using OMAP processor?
-Can you post the piece of code so people can help
-
-On Wed, Mar 3, 2010 at 4:25 AM, doron <doronsa@gmail.com> wrote:
-
-Hi all
-
- 
-
-I wrote an driver  to the activation of " GPIO " according to the kernel
-instructions (gpio.txt) and when I request to free the GPIO I receive always
-that the GPIO is reserved .
-
-What the required steps in order to toggle the GPIO MUXED and not MUXED
-
- 
-
-Regards  Doron Sandroy
-
- 
-
- 
-
- 
-
- 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
-
--- 
+I assume the error you referred to is as below.
+
+omap_cfg_reg(MUX1_1_GPIO113);
+... ...
+ret = omap_request_gpio(MUX1_1_GPIO113);
+
+????? if (ret < 0)
+
+??????????? printk(KERN_ERR "SELECT_MUX1_1: can't reserve GPIO:%d
+!\n", MUX1_1_GPIO113);
+
+Pls don't be confused by MUX setting and GPIO operation.
+
+Calling GPIO API (omap_request_gpio() etc.) is independent of MUX
+setting though they have functional dependency.
+It means that the number passed to omap_request_gpio() should be GPIO#
+(113 in this case).
+
+So the correct code should be
+omap_cfg_reg(MUX1_1_GPIO113);
+... ...
+ret = omap_request_gpio(113);
+
+
+
+On Mon, Mar 8, 2010 at 4:42 PM, doron <doronsa@gmail.com> wrote:
+>
+> Hi tao
+>
+> Yes the processor is OMAP 35XX
+>
+> The code off the driver:
+>
+>
+>
+>
+>
+> #include <linux/kernel.h>
+>
+> #include <linux/module.h>
+>
+> #include <linux/fs.h>
+>
+> #include <asm/uaccess.h>
+>
+> #include <asm/arch/gpio.h>
+>
+> //#include <asm/gpio.h>
+>
+>
+>
+> #include <asm/arch/omap34xx.h>
+>
+> #include <asm/arch/hardware.h>
+>
+>
+>
+> #include <asm/arch/mux.h>
+>
+> #include <asm/arch/board.h>
+>
+> #include <asm/arch/common.h>
+>
+> #include <asm/arch/keypad.h>
+>
+> #include <asm/arch/dma.h>
+>
+> #include <asm/arch/gpmc.h>
+>
+> #include <asm/arch/twl4030-rtc.h>
+>
+> #include <asm/arch/mcspi.h>
+>
+> #include <asm/arch/prcm.h>
+>
+>
+>
+>
+>
+>
+>
+> static int device_open(struct inode *inode, struct file *file)
+>
+> {
+>
+> #ifdef DEBUG
+>
+> ? printk(KERN_INFO "device_open(%p)\n", file);
+>
+> #endif
+>
+>
+>
+> ? return 0;
+>
+> }
+>
+>
+>
+> static int device_release(struct inode *inode, struct file *file)
+>
+> {
+>
+> #ifdef DEBUG
+>
+> ? printk(KERN_INFO "device_release(%p,%p)\n", inode, file);
+>
+> #endif
+>
+>
+>
+> ? return 0;
+>
+> }
+>
+>
+>
+> static int device_ioctl(struct inode *inode, struct file *file, unsigned int ioctl_num, unsigned long ioctl_param)
+>
+> {
+>
+> ? int ret_val = 0;
+>
+> ? int ret = 0;
+>
+> ? struct pin_value *temp_pin, pv;
+>
+>
+>
+> ? switch(ioctl_num)
+>
+> ? {
+>
+> ??? case IOCTL_CONFIG_PIN_VALUE:
+>
+>
+>
+> ????? temp_pin = (struct pin_value*)ioctl_param;
+>
+>
+>
+> ????? //if (omap_cfg_reg(temp_pin->pin))
+>
+> ????? if (omap_request_gpio(temp_pin->pin))
+>
+> ????? {
+>
+> ??????????? omap_free_gpio(temp_pin->pin);
+>
+> ????? }
+>
+> ????? else{
+>
+> ????? ???? printk(KERN_INFO "gpio not config(%lu )\n", temp_pin->pin);
+>
+> ??????????? ret_val = -1;
+>
+> ??????????? goto ioctl_out;
+>
+> ????? ??? }
+>
+> ????? break;
+>
+> ??? case IOCTL_FREE_PIN_VALUE:
+>
+>
+>
+> ??????????? temp_pin = (struct pin_value*)ioctl_param;
+>
+>
+>
+> ??????????? omap_free_gpio(temp_pin->pin);
+>
+> ??????????? printk(KERN_INFO "gpio not free(%lu)\n", temp_pin->pin);
+>
+> ??????????? ret_val = -1;
+>
+> ????? break;
+>
+> ??? case IOCTL_SET_PIN_VALUE:
+>
+> ??????????? temp_pin = (struct pin_value*)ioctl_param;
+>
+> ??????????? //printk(KERN_INFO "try to set gpio pin(%lu ) return %d \n", temp_pin->pin,ret);
+>
+> ??????????? omap_request_gpio((int)temp_pin->pin);
+>
+> ??????????? omap_set_gpio_direction((int)temp_pin->pin, 0); //input=1//output=0
+>
+> ??????????? if ((int)temp_pin->value)
+>
+> ????????????????? omap_set_gpio_dataout((int)temp_pin->pin,1);
+>
+> ??????????? else
+>
+> ????????????????? omap_set_gpio_dataout((int)temp_pin->pin,0);
+>
+>
+>
+> ??????????? printk(KERN_INFO "gpio set(%lu ) to val %d\n", temp_pin->pin,temp_pin->value);
+>
+> ??????????? //ret = omap_get_gpio_datain((int)temp_pin->pin);
+>
+> ??????????? //printk(KERN_INFO "gpio get (%lu ) to val %d\n", temp_pin->pin,ret);
+>
+> ??????????? omap_free_gpio((int)temp_pin->pin);
+>
+> ??????????? ret_val = -1;
+>
+>
+>
+> ??????????? break;
+>
+> ??? case IOCTL_GET_PIN_VALUE:
+>
+> ??????????? ? temp_pin = (struct pin_value*)ioctl_param;
+>
+> ??????????? ? pv.pin = temp_pin->pin;
+>
+> ??????????? /*
+>
+> ??????????? omap_get_gpio_datain(int gpio)
+>
+> ??????????? Description: This function is responsible for reading pin values.
+>
+> ??????????? Parameter: int gpio - GPIO PIN (Pin 0-63)
+>
+> ??????????? */
+>
+> ??????????? //omap_free_gpio((int)temp_pin->pin);
+>
+> ??????????? if (omap_request_gpio(temp_pin->pin)==0)
+>
+> ??????????? {
+>
+> ????????????????? omap_set_gpio_direction(temp_pin->pin, 1); //input=1//output=0
+>
+> ????????????????? pv.value = omap_get_gpio_datain(temp_pin->pin);
+>
+> ????????????????? printk(KERN_INFO "gpio get val (%lu ) to val %d\n", temp_pin->pin,pv.value);
+>
+> ????????????????? if (copy_to_user(temp_pin, &pv, sizeof(struct pin_value)) != 0)
+>
+> ??????????????????????? {
+>
+> ??????????????????????? ret_val = -1;
+>
+> ??????????????????????? goto ioctl_out;
+>
+> ??????????????????????? }
+>
+> ??????????????????????? omap_free_gpio((int)temp_pin->pin);
+>
+> ??????????????????????? ?//ret_val = pv.value;
+>
+> ??????????????????????? //copy_to_user(temp_pin, &pv, sizeof(struct pin_value));
+>
+> ??????????? }
+>
+> ??????????? else{
+>
+> ??????????????????????? printk(KERN_INFO "gpio not free(%lu )\n", temp_pin->pin);
+>
+> ????????????????? ret_val = -1;
+>
+> ????????????????? goto ioctl_out;
+>
+> ????????????????? }
+>
+> ????? break;
+>
+> ??? case IOCTL_SET_PIN_INPUT:
+>
+> ????? temp_pin = (struct pin_value*)ioctl_param;
+>
+> ????? if (omap_request_gpio(temp_pin->pin)==0)
+>
+> ????? ??????????? omap_set_gpio_direction(temp_pin->pin, temp_pin->value); //input=1//output=0
+>
+> ????? else{
+>
+> ????????????????? printk(KERN_INFO "gpio not free(%lu )\n", temp_pin->pin);
+>
+> ??????????? ret_val = -1;
+>
+> ??????????? goto ioctl_out;
+>
+> ??????????? }
+>
+> ???? break;
+>
+>
+>
+> ? }
+>
+>
+>
+> ioctl_out:
+>
+> ? //up(&sw_sem);
+>
+> ? return ret_val;
+>
+> }
+>
+>
+>
+>
+>
+> struct file_operations our_file_ops = {
+>
+> ? .ioctl = device_ioctl,
+>
+> ? .open = device_open,
+>
+> ? .release = device_release,
+>
+> ? .owner = THIS_MODULE,
+>
+> };
+>
+>
+>
+> int init_module()
+>
+> {
+>
+> ? int ret_val;
+>
+>
+>
+> ? ret_val = register_chrdev(MAJOR_NUM, DEVICE_NAME, &our_file_ops);
+>
+>
+>
+> ? if (ret_val < 0)
+>
+> ? {
+>
+> ??? printk(KERN_ALERT "device %s failed(%d)\n", DEVICE_NAME, ret_val);
+>
+> ??? return ret_val;
+>
+> ? }
+>
+>
+>
+> ? ??? sema_init(&sw_sem, 1);
+>
+> ? ??? printk(KERN_INFO "mknod /dev/%s c %d 0\n", DEVICE_NAME, MAJOR_NUM);
+>
+> /*
+>
+> ????? omap_cfg_reg(MUX1_1_GPIO113);
+>
+> ????? omap_cfg_reg(MUX1_2_GPIO114);
+>
+> ????? omap_cfg_reg(MUX1_3_GPIO115);
+>
+>
+>
+> ????? ret = omap_request_gpio(MUX1_1_GPIO113);
+>
+> ????? if (ret < 0)
+>
+> ??????????? printk(KERN_ERR "SELECT_MUX1_1: can't reserve GPIO:%d !\n", MUX1_1_GPIO113);
+>
+> ????? ret = omap_request_gpio(MUX1_2_GPIO114);
+>
+> ????? if (ret < 0)
+>
+> ??????????? printk(KERN_ERR "SELECT_MUX1_2: can't reserve GPIO:%d !\n", MUX1_2_GPIO114);
+>
+> ????? ret = omap_request_gpio(MUX1_3_GPIO115);
+>
+> ????? if (ret < 0)
+>
+> ??????????? printk(KERN_ERR "SELECT_MUX1_3: can't reserve GPIO:%d !\n", MUX1_3_GPIO115);
+>
+>
+>
+> */
+>
+>
+>
+> ? return 0;
+>
+> }
+>
+>
+>
+> void cleanup_module()
+>
+> {
+>
+> ? unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
+>
+> }
+>
+>
+>
+>
+>
+> Regard Doron Sandroy
+>
+>
+>
+>
+>
+> From: TAO HU [mailto:tghk48 at motorola.com]
+> Sent: Monday, March 08, 2010 8:45 AM
+> To: doron
+> Subject: Re: kernel 2.6.22.18 omap qpio
+>
+>
+>
+> Are you using OMAP processor?
+> Can you post the piece of code so people can help
+>
+> On Wed, Mar 3, 2010 at 4:25 AM, doron <doronsa@gmail.com> wrote:
+>
+> Hi all
+>
+>
+>
+> I wrote an driver ?to the activation of " GPIO " according to the kernel ?instructions (gpio.txt) and when I request to free the GPIO I receive always that the GPIO is reserved .
+>
+> What the required steps in order to toggle the GPIO MUXED and not MUXED
+>
+>
+>
+> Regards? Doron Sandroy
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> --
+> Best Regards
+> Hu Tao
+>
+
+
+
+--
 Best Regards
 Hu Tao
-
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100308/c56f394c/attachment-0001.htm>
