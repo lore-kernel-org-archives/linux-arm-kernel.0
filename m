@@ -1,36 +1,128 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 8 Mar 2010 14:58:34 -0500
-Subject: [PATCH] ep93xx: register the pwm devices on the ts72xx dev boards
-In-Reply-To: <1268071608-5327-1-git-send-email-mcrapet@gmail.com>
-References: <1268071608-5327-1-git-send-email-mcrapet@gmail.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902242769@mi8nycmail19.Mi8.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 8 Mar 2010 19:59:13 +0000
+Subject: [PATCH 4/7] ARM: S3C64XX: Add touchscreen platform device
+	definition
+In-Reply-To: <b2e8f9f71003081038u441531bfsba40c7a11d302ee0@mail.gmail.com>
+References: <b2e8f9f71003081038u441531bfsba40c7a11d302ee0@mail.gmail.com>
+Message-ID: <20100308195911.GG24864@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 08, 2010 11:07 AM, Matthieu Crapet wrote:
-> Add the platform init code to register the pwm device that exist
-> on the various ts72xx development boards.
-> 
-> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+On Mon, Mar 08, 2010 at 07:38:53PM +0100, Maurus Cuelenaere wrote:
 
-Looks ok.
+please don't send patches with no description.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
+> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 > ---
->  arch/arm/mach-ep93xx/ts72xx.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c64xx/Makefile |    1 +
+>  arch/arm/mach-s3c64xx/dev-ts.c |   61 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/Kconfig  |    6 ++++
+>  3 files changed, 68 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s3c64xx/dev-ts.c
 > 
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-> index 259f782..1acb7bf 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -176,6 +176,9 @@ static void __init ts72xx_init_machine(void)
->  	ts72xx_register_flash();
->  	platform_device_register(&ts72xx_rtc_device);
->  
-> +	/* PWM1 is DIO_6 on TS-72xx header */
-> +	ep93xx_register_pwm(0, 1);
+> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+> index d1d341a..02bc97f 100644
+> --- a/arch/arm/mach-s3c64xx/Makefile
+> +++ b/arch/arm/mach-s3c64xx/Makefile
+> @@ -60,3 +60,4 @@ obj-y				+= dev-rtc.o
+>  obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+>  obj-$(CONFIG_SND_S3C24XX_SOC)	+= dev-audio.o
+>  obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+> +obj-$(CONFIG_S3C64XX_DEV_TS)  += dev-ts.o
+> diff --git a/arch/arm/mach-s3c64xx/dev-ts.c b/arch/arm/mach-s3c64xx/dev-ts.c
+> new file mode 100644
+> index 0000000..17cc793
+> --- /dev/null
+> +++ b/arch/arm/mach-s3c64xx/dev-ts.c
+> @@ -0,0 +1,61 @@
+> +/* linux/arch/arm/mach-s3c64xx/dev-ts.c
+> + *
+> + * Copyright (c) 2008 Simtec Electronics
+> + *	http://armlinux.simtec.co.uk/
+> + *	Ben Dooks <ben@simtec.co.uk>, <ben-linux@fluff.org>
+> + *
+> + * Adapted by Maurus Cuelenaere for s3c64xx
+> + *
+> + * S3C64XX series device definition for touchscreen device
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
->  	ep93xx_register_eth(&ts72xx_eth_data, 1);
->  }
+> +#include <linux/kernel.h>
+> +#include <linux/string.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <mach/irqs.h>
+> +#include <mach/map.h>
+> +
+> +#include <plat/devs.h>
+> +#include <plat/ts.h>
+> +
+> +static struct resource s3c_ts_resource[] = {
+> +	[0] = {
+> +		.start = S3C64XX_PA_ADC,
+> +		.end   = S3C64XX_PA_ADC + SZ_256 - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start = IRQ_TC,
+> +		.end   = IRQ_TC,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device s3c_device_ts = {
+> +	.name		= "s3c64xx-ts",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
+> +	.resource	= s3c_ts_resource,
+> +};
+> +
+> +void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
+> +{
+> +	struct s3c2410_ts_mach_info *npd;
+> +
+> +	if (!pd) {
+> +		printk(KERN_ERR "%s: no platform data\n", __func__);
+> +		return;
+> +	}
+> +
+> +	npd = kmemdup(pd, sizeof(struct s3c2410_ts_mach_info), GFP_KERNEL);
+> +	if (!npd)
+> +		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+> +
+> +	s3c_device_ts.dev.platform_data = npd;
+> +}
+> +EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index d552c65..5d3ef35 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -191,6 +191,12 @@ config S3C64XX_DEV_SPI
+>  	  Compile in platform device definitions for S3C64XX's type
+>  	  SPI controllers.
+> 
+> +config S3C64XX_DEV_TS
+> +	bool
+> +	help
+> +	    Common in platform device definitions for S3C64XX touchscreen
+> +	    device
+> +
+>  # DMA
+> 
+>  config S3C_DMA
+> -- 
+> 1.7.0.1
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
