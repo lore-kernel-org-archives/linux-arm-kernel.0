@@ -1,42 +1,39 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 8 Mar 2010 01:28:39 -0500
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <1264522249.3067.79.camel@odin>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-	<20100125135628.GB26613@rakim.wolfsonmicro.main>
-	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
-	<20100126110420.GI15759@rakim.wolfsonmicro.main>
-	<771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
-	<20100126120058.GN15759@rakim.wolfsonmicro.main>
-	<771cded01001260414q4c8df1e0k303772b87bc725eb@mail.gmail.com>
-	<1264522249.3067.79.camel@odin>
-Message-ID: <771cded01003072228i1a6249f0tc0026794cc512bd2@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Mar 2010 08:28:59 +0100
+Subject: bit errors on spitz
+In-Reply-To: <f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+Message-ID: <20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 11:10 AM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> On Tue, 2010-01-26 at 07:14 -0500, Haojian Zhuang wrote:
->> On Tue, Jan 26, 2010 at 7:00 AM, Mark Brown
->> <broonie@opensource.wolfsonmicro.com> wrote:
->> >
->>
->> update this patch.
->>
->
-> Applied.
->
-> Thanks
->
-> Liam
->
->
+> On Sat, Mar 6, 2010 at 5:27 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> > Hi!
+> >
+> > I'm getting way too many bit errors on spitz, with various
+> > kernels.
+> >
+> > It may be tied to network usage (bluetooth or wifi?). It happens even
+> > on AC power.
+> 
+> Pavel,
+> 
+> What kind of bit errors? I'm not using any network here on my spitz so
+> not sure what exactly was happening. Could you paste the dmesg here
+> so we can help take a look?
 
-Hi Liam & Mark,
+dmesg would not be useful, it usually hits user programs. Like... mutt
+suddenly displaying , instead of - in the header. Program failing to
+start because function printg is not found (it was not exactly
+printf->printg,  I don't remember exact symbol), ping complaining
+about discarding corrupted packets, etc.
 
-I just want to confirm whether max8649 is merged into regulator
-codebase. It seems that I can't find max8649 in regulator git tree.
+(Or of course, kernel oopsing or not going from suspend at all. But as
+even user data are being corrupted, oops is not likely to be
+interesting and system is typically not in state to capture it any more.)
 
-Thanks
-Haojian
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
