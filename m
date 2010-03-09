@@ -1,43 +1,36 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 09 Mar 2010 16:43:04 +0000
-Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
-In-Reply-To: <1268143623-22361-2-git-send-email-saeed@marvell.com>
-References: <1268143623-22361-2-git-send-email-saeed@marvell.com>
-Message-ID: <1268152984.1000.12.camel@e102109-lin.cambridge.arm.com>
+Date: Tue, 09 Mar 2010 16:45:34 +0000
+Subject: [PATCH 2/2] arm: invalidate TLBs when enabling mmu
+In-Reply-To: <1268143623-22361-3-git-send-email-saeed@marvell.com>
+References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
+	<1268143623-22361-2-git-send-email-saeed@marvell.com>
+	<1268143623-22361-3-git-send-email-saeed@marvell.com>
+Message-ID: <1268153134.1000.14.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2010-03-09 at 14:07 +0000, Saeed Bishara wrote:
 > Signed-off-by: Saeed Bishara <saeed@marvell.com>
 > ---
->  arch/arm/mm/proc-v7.S |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+>  arch/arm/boot/compressed/head.S |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 7aaf88a..06cc36c 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -52,6 +52,11 @@ ENTRY(cpu_v7_proc_fin)
->         bic     r0, r0, #0x1000                 @ ...i............
->         bic     r0, r0, #0x0006                 @ .............ca.
->         mcr     p15, 0, r0, c1, c0, 0           @ disable caches
-> +#ifdef CONFIG_OUTER_CACHE
-> +       mrc     p15, 0, r0, c1, c0, 1
-> +       bic     r0, r0, #0x2
-> +       mcr     p15, 0, r0, c1, c0, 1           @ disable L2 cache
-> +#endif
->         ldmfd   sp!, {pc}
->  ENDPROC(cpu_v7_proc_fin)
+> diff --git a/arch/arm/boot/compressed/head.S
+> b/arch/arm/boot/compressed/head.S
+> index 4fddc50..a1ab79f 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -489,6 +489,7 @@ __armv7_mmu_cache_on:
+>                 mcr     p15, 0, r0, c1, c0, 0   @ load control
+> register
+>                 mrc     p15, 0, r0, c1, c0, 0   @ and read it back
+>                 mov     r0, #0
+> +               mcr     p15, 0, r0, c8, c7, 0   @ invalidate I,D TLBs
+>                 mcr     p15, 0, r0, c7, c5, 4   @ ISB
+>                 mov     pc, r12
 
-NACK.
-
-I'm not sure why kexec doesn't work but bit 1 in this register has
-different meanings on Cortex-A8 and A9.
-
-Also, on Cortex-A8, it means L2EN but this refers to the inner L2 rather
-than the outer cache (that's configurable via the L2 Auxiliary Cache
-Control Register but the Linux meaning of outer cache is a separate
-device outside the CPU acting as a cache controller).
+The TLB invalidating is done earlier in the __armv7_mmu_cache_on
+function, why do you need to do it again?
 
 -- 
 Catalin
