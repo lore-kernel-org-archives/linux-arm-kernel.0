@@ -1,14 +1,110 @@
-From: cao.zhong1@gmail.com (Jacky Cao)
-Date: Mon, 8 Mar 2010 18:48:09 +0800
-Subject: QUERY: About xscale data abort exception
-Message-ID: <f8806ca51003080248w1377f618n7a828808532be3db@mail.gmail.com>
+From: 914059751@qq.com (=?gbk?B?uvrR7sr3?=)
+Date: Tue, 9 Mar 2010 08:58:00 +0800
+Subject: Query abut 2410 LCD configuration
+Message-ID: <tencent_4B106ACE28F95B4E19D92218@qq.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone encountered excessive data about caused by cache parity error in
-xScale, especially ixp2400 & ixp2800 ?
+Im wondering these values DOES make any sense ?
+ 
+ 
+------------------ Original ------------------
+From:  "gianluca"<gianlucarenzi@eurekelettronica.it>;
+Date:  Mon, Mar 8, 2010 10:32 PM
+To:  "???"<914059751@qq.com>; 
+Cc:  "linux-arm-kernel"<linux-arm-kernel@lists.infradead.org>; 
+Subject:  Re: Query abut 2410 LCD configuration
 
-The frequency is once a month.
+ 
+ ??? wrote:
+> Hi all:)
+> 
+>       In arch/arm/mach-s3c2410/include/mach/fb.h, struct s3c2410fb_display defines lcd configurations, 
+>       Can figure out where does these values following pixclock come from?
+> 
+> 
+> /* LCD description */
+> struct s3c2410fb_display {
+>     /* LCD type */
+>     unsigned type;
+> 
+>     /* Screen size */
+>     unsigned short width;
+>     unsigned short height;
+> 
+>     /* Screen info */
+>     unsigned short xres;
+>     unsigned short yres;
+>     unsigned short bpp;
+> 
+>     unsigned pixclock;        /* pixclock in picoseconds */
+>     unsigned short left_margin;  /* value in pixels (TFT) or HCLKs (STN) */
+>     unsigned short right_margin; /* value in pixels (TFT) or HCLKs (STN) */
+>     unsigned short hsync_len;    /* value in pixels (TFT) or HCLKs (STN) */
+>     unsigned short upper_margin;    /* value in lines (TFT) or 0 (STN) */
+>     unsigned short lower_margin;    /* value in lines (TFT) or 0 (STN) */
+>     unsigned short vsync_len;    /* value in lines (TFT) or 0 (STN) */
+> 
+>     /* lcd configuration registers */
+>     unsigned long    lcdcon5;
+> };
+> 
+> 
+> 
+>       Take LQ080V3DG01 for example,
+> 
+> -----------------             arch/arm/mach-s3c2410/mach-qt2410.c     ----------------------------
+>         /* Configuration for 640x480 SHARP LQ080V3DG01 */
+>         .lcdcon5 = S3C2410_LCDCON5_FRM565 |
+>                S3C2410_LCDCON5_INVVLINE |
+>                S3C2410_LCDCON5_INVVFRAME |
+>                S3C2410_LCDCON5_PWREN |
+>                S3C2410_LCDCON5_HWSWP,
+> 
+>         .type        = S3C2410_LCDCON1_TFT,
+>         .width        = 640,
+>         .height        = 480,
+> 
+>         .pixclock    = 40000, /* HCLK/4 */
+>         .xres        = 640,
+>         .yres        = 480,
+>         .bpp        = 16,
+>         .left_margin    = 44,
+>         .right_margin    = 116,
+>         .hsync_len    = 96,
+>         .upper_margin    = 19,
+>         .lower_margin    = 11,
+>         .vsync_len    = 15,
+>     },
+> 
+> pixclock is 40000 in picoseconds , 1/(40000*10^-12) = 25MHz, that correspond with LQ080V3DG01 clock frequency ranges.
+> 
+> wondering where does the rest of values come from?
+> any tips/ideas would be appreciated!
+Maybe the LQ080... datasheet? or other platform driver with the same LCD 
+configuration, or they simply came from tests.
+
+
+Regards,
+-- 
+            ,,,
+           (o o)
+======oOO==(_)==OOo======
+
+Gianluca Renzi
+R&D
+phone: +39.0542.609120
+fax:   +39.0542.609212
+
+       .oooO  Oooo.
+======(   )==(   )=======
+        \ (    ) /
+         \_)  (_/
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100308/1464b509/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100309/f110594e/attachment-0001.htm>
