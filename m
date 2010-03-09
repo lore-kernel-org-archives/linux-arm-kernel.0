@@ -1,81 +1,36 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Tue, 09 Mar 2010 09:27:27 +0200
-Subject: Compile problem due to compressor changes, UART referenced in
-	section .txt
-In-Reply-To: <20100308101445.GA12363@n2100.arm.linux.org.uk>
-References: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
-	<20100308101445.GA12363@n2100.arm.linux.org.uk>
-Message-ID: <4B95F85F.5090108@compulab.co.il>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 9 Mar 2010 09:41:14 +0200
+Subject: [PATCH v3] rtc: driver for the DryIce block found in i.MX25 chips
+In-Reply-To: <7859d1571b6d772a9976ca3d53f8ee0e9851bb38.1265099368.git.baruch@tkos.co.il>
+References: <20100202092220.26869dc4@linux.lan.towertech.it>
+	<7859d1571b6d772a9976ca3d53f8ee0e9851bb38.1265099368.git.baruch@tkos.co.il>
+Message-ID: <20100309074114.GA3104@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Sun, Mar 07, 2010 at 05:19:08PM +0000, J.I. Cameron wrote:
->> Dear  All,
->>
->> Ran into the following problem on a pxa stargate2 platform (I think it will
->> effect a number of others).
->>
->> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
->> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o  
->> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
->> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o
->>
->> There is a hack in mach-pxa/include/mach/uncompress.h
->> that changes the primary uart for some platforms:
->>
->> static inline void arch_decomp_setup(void)
->> {
->> 	if (machine_is_littleton() || machine_is_intelmote2()
->> 	    || machine_is_csb726() || machine_is_stargate2()
->> 	  || machine_is_cm_x300() || machine_is_balloon3())
->> 	UART = STUART;
+Hi Alessandro,
+
+On Tue, Feb 02, 2010 at 10:33:03AM +0200, Baruch Siach wrote:
+> This driver is based on code from Freescale which accompanies their i.MX25 PDK
+> board, with some cleanup.
 > 
-> 	else
-> 		UART = FFUART;
-> 
-> and remove the initializer from UART.
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/rtc/Kconfig     |   10 +
+>  drivers/rtc/Makefile    |    1 +
+>  drivers/rtc/rtc-imxdi.c |  520 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 531 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/rtc/rtc-imxdi.c
 
-Something like that:
+Ping?
 
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
-  arch/arm/mach-pxa/include/mach/uncompress.h |    4 +++-
-  1 files changed, 3 insertions(+), 1 deletions(-)
+Since .34-rc1 has already been released, I guess this is not going to get into 
+2.6.34. Are there any remaining issues to resolve in order to merge this 
+upstream?
 
-diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
-index 237734b..b009299 100644
---- a/arch/arm/mach-pxa/include/mach/uncompress.h
-+++ b/arch/arm/mach-pxa/include/mach/uncompress.h
-@@ -15,7 +15,7 @@
-
-  #define __REG(x)       ((volatile unsigned long *)x)
-
--static volatile unsigned long *UART = FFUART;
-+static volatile unsigned long *UART;
-
-  static inline void putc(char c)
-  {
-@@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
-  	    || machine_is_csb726() || machine_is_stargate2()
-  	    || machine_is_cm_x300() || machine_is_balloon3())
-  		UART = STUART;
-+	else
-+		UART = FFUART;
-  }
-
-  /*
--- 
-1.6.4.4
-
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+baruch
 
 -- 
-Sincerely yours,
-Mike.
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
