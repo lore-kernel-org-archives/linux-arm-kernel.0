@@ -1,125 +1,30 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 9 Mar 2010 11:12:03 +0800
-Subject: pxa: Couple of build issues (missing dependencies)
-In-Reply-To: <f17812d71003081905p2967eb6fgd301f3198b421955@mail.gmail.com>
-References: <4B953A83.7020705@cam.ac.uk>
-	<f17812d71003081905p2967eb6fgd301f3198b421955@mail.gmail.com>
-Message-ID: <f17812d71003081912k57459703x37e3babca5dc3977@mail.gmail.com>
+From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
+Date: Tue,  9 Mar 2010 15:10:31 +0900
+Subject: [PATCH 1/4] ARM: S3C6410: Define clk_src2 register
+Message-ID: <1268115034-5998-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct Ian Molton's email address.
+From: Jassi Brar <jassi.brar@samsung.com>
 
-On Tue, Mar 9, 2010 at 11:05 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Tue, Mar 9, 2010 at 1:57 AM, Jonathan Cameron <jic23@cam.ac.uk> wrote:
->> Whilst testing the uncompress patch just sent, I tried a full build
->> of pxa platforms by just enabling them along side my normal couple.
->> This is more or less a vanilla tree as of earlier today (+ a couple
->> of uncompress related patches from Eric's tree). ?I haven't chased
->> these down terribly carefully ?but thought I might as well bring them
->> to the lists attention.
->>
->> Sharpsl_pm calls max1111_read_channel if CONFIG_CORGI_SSP_DEPRECATED
->> is not set. ?There is no dependancy to enforce this being available.
->> (none obvious in the pxa devel tree either).
->>
->
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 38fbd0a..912bdfd 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -454,6 +454,13 @@ config PXA_SHARPSL
-> ?config SHARPSL_PM
-> ? ? ? ?bool
-> ? ? ? ?select APM_EMULATION
-> + ? ? ? select SHARPSL_PM_MAX1111
-> +
-> +config SHARPSL_PM_MAX1111
-> + ? ? ? bool
-> + ? ? ? depends on !CORGI_SSP_DEPRECATED
-> + ? ? ? select HWMON
-> + ? ? ? select SENSORS_MAX1111
->
-> ?config CORGI_SSP_DEPRECATED
-> ? ? ? ?bool
->
->
-> An ugly patch above should address this problem, but a real fix would
-> be to have a sharpsl-battery.c driver.
->
->>
->> FB_W100 is selected by MACH_E740 leading to the following which
->> I would guess indicate some missing dependencies as well.
->> Looks like it doesn't actually drag in frame buffer support as I'd
->> imagine was intended:
->
-> MACH_E740 should not have selected that option, as user has the
-> flexibility to include support of FB_W100 or not. Apparently, the build
-> error is caused by FB_W100 being selected, while FB is made to
-> module.
->
-> I'm yet not sure why MACH_E740 mandates FB_W100, and as Ian is
-> no longer active on this series, I'm going to drop this 'select'.
->
-> As well as for MACH_HIMALAYA. Zbynek CC'ed.
->
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 912bdfd..5b6ee46 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -272,7 +272,6 @@ config MACH_H5000
-> ?config MACH_HIMALAYA
-> ? ? ? ?bool "HTC Himalaya Support"
-> ? ? ? ?select CPU_PXA26x
-> - ? ? ? select FB_W100
->
-> ?config MACH_MAGICIAN
-> ? ? ? ?bool "Enable HTC Magician Support"
-> @@ -554,7 +553,6 @@ config MACH_E740
-> ? ? ? ?bool "Toshiba e740"
-> ? ? ? ?default y
-> ? ? ? ?depends on ARCH_PXA_ESERIES
-> - ? ? ? select FB_W100
-> ? ? ? ?help
-> ? ? ? ? ?Say Y here if you intend to run this kernel on a Toshiba
-> ? ? ? ? ?e740 family PDA.
-> @@ -563,7 +561,6 @@ config MACH_E750
-> ? ? ? ?bool "Toshiba e750"
-> ? ? ? ?default y
-> ? ? ? ?depends on ARCH_PXA_ESERIES
-> - ? ? ? select FB_W100
-> ? ? ? ?help
-> ? ? ? ? ?Say Y here if you intend to run this kernel on a Toshiba
-> ? ? ? ? ?e750 family PDA.
-> @@ -580,7 +577,6 @@ config MACH_E800
-> ? ? ? ?bool "Toshiba e800"
-> ? ? ? ?default y
-> ? ? ? ?depends on ARCH_PXA_ESERIES
-> - ? ? ? select FB_W100
-> ? ? ? ?help
-> ? ? ? ? ?Say Y here if you intend to run this kernel on a Toshiba
-> ? ? ? ? ?e800 family PDA.
->
->
->>
->> drivers/built-in.o: In function `w100fb_remove':
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:794: undefined reference to `unregister_framebuffer'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:799: undefined reference to `fb_dealloc_cmap'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:805: undefined reference to `framebuffer_release'
->> drivers/built-in.o: In function `w100fb_copyarea':
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:385: undefined reference to `cfb_copyarea'
->> drivers/built-in.o: In function `w100fb_fillrect':
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:357: undefined reference to `cfb_fillrect'
->> drivers/built-in.o: In function `w100fb_probe':
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:672: undefined reference to `framebuffer_alloc'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:715: undefined reference to `fb_alloc_cmap'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:751: undefined reference to `register_framebuffer'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:779: undefined reference to `framebuffer_release'
->> /home/jic23/src/kernel/fix.git/drivers/video/w100fb.c:769: undefined reference to `fb_dealloc_cmap'
->> drivers/built-in.o:(.data+0x208): undefined reference to `cfb_imageblit'
->>
->> Thanks,
->>
->> Jonathan
->>
->
+Define S3C6410 specific register - CLK_SRC2
+
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+---
+ arch/arm/mach-s3c64xx/include/mach/regs-clock.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+index 3ef6274..0114eb0 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
++++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+@@ -33,6 +33,7 @@
+ #define S3C_PCLK_GATE		S3C_CLKREG(0x34)
+ #define S3C_SCLK_GATE		S3C_CLKREG(0x38)
+ #define S3C_MEM0_GATE		S3C_CLKREG(0x3C)
++#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
+ 
+ /* CLKDIV0 */
+ #define S3C6400_CLKDIV0_PCLK_MASK	(0xf << 12)
+-- 
+1.6.2.5
