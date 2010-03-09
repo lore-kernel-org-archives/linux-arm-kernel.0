@@ -1,36 +1,34 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 9 Mar 2010 12:34:36 +0200
-Subject: [rtc-linux] Re: [PATCH v3] rtc: driver for the DryIce block
-	found in  i.MX25 chips
-In-Reply-To: <20100309112146.71202332@linux.lan.towertech.it>
-References: <20100202092220.26869dc4@linux.lan.towertech.it>
-	<7859d1571b6d772a9976ca3d53f8ee0e9851bb38.1265099368.git.baruch@tkos.co.il>
-	<20100309074114.GA3104@jasper.tkos.co.il>
-	<20100309112146.71202332@linux.lan.towertech.it>
-Message-ID: <20100309103436.GB25634@jasper.tkos.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 09 Mar 2010 10:52:39 +0000
+Subject: [PATCH] ARM: Improve the L2 cache performance when PL310 is used
+In-Reply-To: <000401cabf73$79a19fa0$6ce4dee0$@tuckley@arm.com>
+References: <20100309101248.7359.60873.stgit@e102109-lin.cambridge.arm.com>
+	<000401cabf73$79a19fa0$6ce4dee0$@tuckley@arm.com>
+Message-ID: <1268131959.3239.11.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro,
-
-On Tue, Mar 09, 2010 at 11:21:46AM +0100, Alessandro Zummo wrote:
-> On Tue, 9 Mar 2010 09:41:14 +0200 Baruch Siach <baruch@tkos.co.il> wrote:
-> > Ping?
-> > 
-> > Since .34-rc1 has already been released, I guess this is not going to get into 
-> > 2.6.34. Are there any remaining issues to resolve in order to merge this 
-> > upstream?
+On Tue, 2010-03-09 at 10:30 +0000, Colin Tuckley wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
 > 
->  I just have to find some time to review it. don't worry, since is a completely
->  new driver it could go upstream at any time.
+> 
+> > With this L2 cache controller, the cache maintenance by PA and sync
+> > operations are atomic and do not require a "wait" loop or spinlocks.
+> > This patch conditionally defines the cache_wait() function and locking
+> > primitives (rather than duplicating the functions or file).
+> > 
+> > Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
+> > automatically enables CACHE_PL310 when CPU_V7 is defined.
+> 
+> That will cause a problem with A8 CPUs which are V7 but which do *not* use a
+> PL310 for the L2 cache.
 
-Thanks. Please note another patch against this one fixing an irq related bug:
+But do they use an L220? Or they don't use anything?
 
-http://groups.google.com/group/rtc-linux/browse_thread/thread/2847baa17905dfc3#
-
-baruch
+Note that CACHE_PL310 depends on CACHE_L2X0, so if you don't have an
+outer cache controller, you don't get CACHE_PL310 enabled.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Catalin
