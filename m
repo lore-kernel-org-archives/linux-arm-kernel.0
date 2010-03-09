@@ -1,21 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Mar 2010 09:04:32 +0000
-Subject: Query about Linux framebuffer implementation
-In-Reply-To: <tencent_5C46336B55A649383B399B3C@qq.com>
-References: <tencent_5C46336B55A649383B399B3C@qq.com>
-Message-ID: <20100309090432.GA5691@n2100.arm.linux.org.uk>
+Date: Tue, 9 Mar 2010 09:14:03 +0000
+Subject: DMA using data buffer vmapped in kernel space
+In-Reply-To: <10d816431003082345j5438d8cdi8ad72c4fa296b684@mail.gmail.com>
+References: <201003042211.28569.thomas@koeller.dyndns.org>
+	<20100304213634.GH13417@n2100.arm.linux.org.uk>
+	<201003061407.12698.thomas@koeller.dyndns.org>
+	<20100306193127.GA13262@n2100.arm.linux.org.uk>
+	<10d816431003082345j5438d8cdi8ad72c4fa296b684@mail.gmail.com>
+Message-ID: <20100309091403.GB5691@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 09, 2010 at 03:58:40PM +0800, ??? wrote:
-> Hi, all
+On Tue, Mar 09, 2010 at 03:45:54PM +0800, Lin Mac wrote:
+> I had encounter a similiar problem and I simply allocated a new
+> buffer, copy the data, then DMA. It seems slow and stupid.
 > 
-> driver/video/fbmem.c implement framebuffer as a char device, in read/write API of this char device file operations, WHY does we need to: 
-> 1st:kmalloc a space
-> 2st:copy data between video memory buffer and kmalloced space above
-> 3rd:copy kmalloced space data to/from user space buffer
+> I'm wondering wether could I translate the vmap virt to phys(don't
+> know how to yet), then use phys_to_virt to get the virt in
+> direct-mapped memory region?
 > 
-> why the hell we just copy data between video memory and user space buffer?
+> Is there other possible ways?
 
-=> framebuffer mailing list (though that seems rather dead), maybe
-lkml instead?
+I think you need to talk to the firmware people... which is unfortunately
+orphaned.
+
+What you could do is prepare a patch to allow the firmware support to
+export a scatterlist via the struct firmware, and then use that with
+dma_map_sg().  Let's hope that the SPI interfaces support scatterlists.
