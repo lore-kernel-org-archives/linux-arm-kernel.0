@@ -1,35 +1,46 @@
-From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
-Date: Tue, 9 Mar 2010 14:37:09 -0300
-Subject: [PATCH] ARM: mach-sa1100: Put nanoEngine support back in the
-	kernel.
-In-Reply-To: <20100309175229.c231f088.kristoffer.ericson@gmail.com>
-References: <1268148843-13135-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<20100309175229.c231f088.kristoffer.ericson@gmail.com>
-Message-ID: <cecb6d8f1003090937t4ec3fe1cw293be3735caa2648@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Mar 2010 17:59:40 -0000
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+In-Reply-To: <20100309164926.GC17251@n2100.arm.linux.org.uk>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>
+	<20100309162202.GB17251@n2100.arm.linux.org.uk>
+	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>
+	<20100309164926.GC17251@n2100.arm.linux.org.uk>
+Message-ID: <001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kristoffer,
+> > Ok. I was going by the comments in Documentation/volatile-considered-harmful.txt
+> > where cpu_relax() is also used as a memory barrier.
+> 
+> I thought you might; I've just submitted a patch for that to akpm, lkml
+> and linux-arch.
 
-On Tue, Mar 9, 2010 at 13:52, Kristoffer Ericson
-<kristoffer.ericson@gmail.com> wrote:
->
-> Without testing it on the actual hardware it applies and looks good, compilation also goes smoothly without any issues.
-> It looks quite alright to me. What are you planning to do with the fixup function?
+Cheers, I'll take a read.
 
-Sorry, this function was the first things I wrote, but the kernel 2.6
-infrastructure made it totally unnecessary and it should have been
-removed. I will do it and send another patch.
+> > In the KGDB case [where this cropped up], if cpu_relax() is left as it is, then
+> > an smp_mb() is required in the architecture independent code. This also seems wrong
+> > because it's only needed for the ARM11MPCore. There may also potentially be other
+> > situations in the Kernel which are prone to deadlock because it is assumed that the
+> > write buffer will always drain.
+> 
+> Why is KGDB being special about this?  Ah yes, it's being brain dead:
 
-> Im just missing the licensing text in the nano...c file for future reference,
+<snip>
 
-Ok, I will add it too.
+> Clearly, kgdb is using atomic_set()/atomic_read() in a way which does not
+> match this documentation - it's certainly missing the barriers as required
+> by the above quoted paragraphs.
+> 
+> Let me repeat: atomic_set() and atomic_read() are NOT atomic.  There's
+> nothing atomic about them.  All they do is provide a pair of accessors
+> to the underlying value in the atomic type.  They are no different to
+> declaring a volatile int and reading/writing it directly.
 
-> after that feel free to add:
-> Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
->
-> Best wishes
-> Kristoffer
+Indeed. I'm not familiar enough with KGDB internals to dive in and look at all the
+potential barrier conflicts, so I'll submit a patch that addresses the one that's
+bitten me so far. Maybe it will motivate somebody else to take a closer look!
 
-Regards,
-Marcelo.
+Cheers,
+
+Will
