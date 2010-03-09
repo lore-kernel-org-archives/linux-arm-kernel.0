@@ -1,54 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  9 Mar 2010 16:01:53 +0000
-Subject: [PATCH] ARM: KGDB: add support for SMP platforms
-Message-ID: <1268150513-3425-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  9 Mar 2010 16:06:08 +0000
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+Message-ID: <1268150768-6597-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support SMP platforms, KGDB requires the architecture backend to
-implement the kgdb_roundup_cpus function.
+The cpu_relax() macro is often used in the body of busy-wait loops to ensure
+that the variable being spun on is re-loaded for each iteration. On the
+ARM11MPCore processor [where loads are prioritised over stores], spinning in
+such a loop will prevent the write buffer from draining. If a write contained
+in the write buffer indirectly affects the variable being spun on, there is a
+potential for deadlock. This deadlock is experienced when executing the KGDB
+testsuite on an SMP ARM11MPCore configuration.
 
-This patch, taken against 2.6.33, implements the function for ARM based on
-the MIPS port.
+This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+forcing a flushing of the write buffer on SMP systems. If the Kernel is not
+compiled for SMP support, this will expand to a barrier() as before.
 
-Cc: Jason Wessel <jason.wessel@windriver.com>
-Cc: Jean-Michel Hautbois <jhautbois@gmail.com>
 Cc: KGDB Mailing List <kgdb-bugreport@lists.sourceforge.net>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/kgdb.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/processor.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index ba8ccfe..a5b846b 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -9,6 +9,7 @@
-  * Authors:  George Davis <davis_g@mvista.com>
-  *           Deepak Saxena <dsaxena@plexity.net>
-  */
-+#include <linux/irq.h>
- #include <linux/kgdb.h>
- #include <asm/traps.h>
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 6a89567..7bed3da 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -91,7 +91,11 @@ extern void release_thread(struct task_struct *);
  
-@@ -158,6 +159,18 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
- 	.fn			= kgdb_compiled_brk_fn
- };
+ unsigned long get_wchan(struct task_struct *p);
  
-+static void kgdb_call_nmi_hook(void *ignored)
-+{
-+       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-+}
-+
-+void kgdb_roundup_cpus(unsigned long flags)
-+{
-+       local_irq_enable();
-+       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
-+       local_irq_disable();
-+}
-+
- /**
-  *	kgdb_arch_init - Perform any architecture specific initalization.
-  *
++#if __LINUX_ARM_ARCH__ == 6
++#define cpu_relax()			smp_mb()
++#else
+ #define cpu_relax()			barrier()
++#endif
+ 
+ /*
+  * Create a new kernel thread
 -- 
 1.6.3.3
