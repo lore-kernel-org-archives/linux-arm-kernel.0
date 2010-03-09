@@ -1,29 +1,29 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Tue,  9 Mar 2010 16:07:03 +0200
-Subject: [PATCH 2/2] arm: invalidate TLBs when enabling mmu
-In-Reply-To: <1268143623-22361-2-git-send-email-saeed@marvell.com>
-References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
-	<1268143623-22361-2-git-send-email-saeed@marvell.com>
-Message-ID: <1268143623-22361-3-git-send-email-saeed@marvell.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Tue, 09 Mar 2010 15:11:38 +0100
+Subject: AC97 audio broken on SAM9263EK?
+In-Reply-To: <4B8B9849.5040203@atmel.com>
+References: <4B85789D.6000704@billgatliff.com>
+	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
+	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
+	<4B8B9849.5040203@atmel.com>
+Message-ID: <4B96571A.3040403@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/boot/compressed/head.S |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 4fddc50..a1ab79f 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -489,6 +489,7 @@ __armv7_mmu_cache_on:
- 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
- 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
- 		mov	r0, #0
-+		mcr	p15, 0, r0, c8, c7, 0	@ invalidate I,D TLBs
- 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
- 		mov	pc, r12
- 
--- 
-1.6.0.4
+I tried your patch, but mpg123 says:
+
+Playing MPEG stream 1 of 1: 05_Tabor_Romance.mp3 ...
+Title:                                   Artist:
+Comment:                                 Album:
+Year:                                    Genre:  Other
+MPEG 1.0 layer III, 128 kbit/s, 44100 Hz stereo
+[audio.c:532] error: Error in writing audio (Input/output error?)!
+[mpg123.c:557] error: Deep trouble! Cannot flush to my output anymore!
+
+I'm using kernel 2.6.33 on the at91sam9g45-ek. For sound I use patches 0039 and 0044 from
+ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz. With these I get proper sound from my head phones.
+
+Regards,
+Yegor
