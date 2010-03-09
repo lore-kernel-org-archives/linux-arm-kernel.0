@@ -1,53 +1,83 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Tue, 09 Mar 2010 16:17:34 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B96571A.3040403@visionsystems.de>
-References: <4B85789D.6000704@billgatliff.com>
-	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
-	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
-	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-Message-ID: <4B96668E.6090805@atmel.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 9 Mar 2010 16:46:43 +0100
+Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
+In-Reply-To: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+Message-ID: <19350.28003.131508.958162@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yegor,
+On Mon, 7 Dec 2009, Russell King - ARM Linux wrote:
+ > While looking into the possible msync() issue (which turned out to be a
+ > non-issue - it's covered by clever code), I found that we're flushing
+ > the same page multiple times.
+ > 
+ > Normally, update_mmu_cache() would not be doing anything on architectures
+ > which don't have a software-loaded TLB.  However, we use this hook for
+ > two things:
+ > 
+ > 1. for our delayed flush_dcache_page().
+ > 2. to fix up multiple shared write-able mappings of the same page.
+ > 
+ > However, as of 8 years ago, I committed this patch (sorry for the
+ > bkbits URL):
+ > 
+ > http://linux.bkbits.net:8080/linux-2.6/?PAGE=patch&REV=3dd7c1f9DypjNd1HyQFAOsA3p7mYig
+ > 
+ > What the majority of that patch is doing is adding the user-mapping
+ > flushing to __flush_dcache_page() - that's fine, and it's explained in
+ > the changeset comments.
+ > 
+ > It also tries to merge the new __flush_dcache_page() code inside
+ > make_coherent() - make_coherent() is sort-of already doing most of what
+ > __flush_dcache_page() does, and for good measure it does a final
+ > flush_cache_page().
+ > 
+ > The unused addition of 'dirty' seems to suggest that this extra
+ > flush_cache_page should have been conditional on that.
+ > 
+ > Moreover, this final flush_cache_page() should not be needed - the whole
+ > "delayed flush_dcache_page" thing only happens when there are no pre-
+ > existing mappings of the page, and so there should be no user mappings
+ > to worry about.
+ > 
+ > Hence, I believe it is safe to get rid of this - but this patch will
+ > need some rigorous testing.  My ARM VersatilePB926 still boots without
+ > this additional patch - but that's not a very good test.  I can't say
+ > much more than that for the time being.
+ > 
+ > Note: for ARMv6 and later, flush_cache_page() is a no-op, so please
+ > don't bother testing this patch there.
+ > 
+ > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+ > ---
+ >  arch/arm/mm/fault-armv.c |    2 --
+ >  1 files changed, 0 insertions(+), 2 deletions(-)
+ > 
+ > diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+ > index 7296022..666a871 100644
+ > --- a/arch/arm/mm/fault-armv.c
+ > +++ b/arch/arm/mm/fault-armv.c
+ > @@ -127,8 +127,6 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma, unsigne
+ >  	flush_dcache_mmap_unlock(mapping);
+ >  	if (aliases)
+ >  		adjust_pte(vma, addr);
+ > -	else
+ > -		flush_cache_page(vma, addr, pfn);
+ >  }
+ >  
+ >  /*
+ > 
+ > _______________________________________________
+ > linux-arm-kernel mailing list
+ > linux-arm-kernel at lists.infradead.org
+ > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Le 3/9/2010 3:11 PM, Yegor Yefremov a ?crit :
->> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html
->
-> I tried your patch, but mpg123 says:
->
-> Playing MPEG stream 1 of 1: 05_Tabor_Romance.mp3 ...
-> Title:                                   Artist:
-> Comment:                                 Album:
-> Year:                                    Genre:  Other
-> MPEG 1.0 layer III, 128 kbit/s, 44100 Hz stereo
-> [audio.c:532] error: Error in writing audio (Input/output error?)!
-> [mpg123.c:557] error: Deep trouble! Cannot flush to my output anymore!
->
-> I'm using kernel 2.6.33 on the at91sam9g45-ek. For sound I use patches 0039 and 0044 from
-> ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz. With these I get proper sound from my head phones.
->
-> Regards,
-> Yegor
->
-I never tried with mpg123. But I just diff the 2 sets of patches, and 
-the only difference I can see is that the one on linux4sam doesn't 
-handle full duplex, whereas the one I posted on the alsa mailing does...
+What's the status of this patch? I see that it's still not included
+in the 2.6.34-rc1 kernel. Did it turn out to be invalid, or was it
+just forgotten?
 
-Yoy can find enclosed both files, may I ask you to test with both?
-If it fails then I guess there is something wrong with the way the full 
-duplex is done(even though I have tested it on my board...)
+As I reported earlier, it sped up an important use case for me by 1%,
+so I've been using it in my ARM kernels for almost 3 months now.
 
-Regards,
-Sedji
-
-
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: ac97c_linux4sam.c
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100309/f3483e6b/attachment-0002.c>
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: ac97c_alsa.c
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100309/f3483e6b/attachment-0003.c>
+/Mikael
