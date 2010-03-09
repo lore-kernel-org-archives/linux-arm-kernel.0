@@ -1,30 +1,33 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 9 Mar 2010 20:15:22 +0100
-Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
-In-Reply-To: <20100309172045.GD17251@n2100.arm.linux.org.uk>
-References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
-	<19350.28003.131508.958162@pilspetsen.it.uu.se>
-	<20100309172045.GD17251@n2100.arm.linux.org.uk>
-Message-ID: <19350.40522.439666.173257@pilspetsen.it.uu.se>
+From: smuckle@codeaurora.org (Steve Muckle)
+Date: Tue, 09 Mar 2010 11:33:12 -0800
+Subject: secondary processor initialization
+Message-ID: <4B96A278.4060300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
- > On Tue, Mar 09, 2010 at 04:46:43PM +0100, Mikael Pettersson wrote:
- > > What's the status of this patch? I see that it's still not included
- > > in the 2.6.34-rc1 kernel. Did it turn out to be invalid, or was it
- > > just forgotten?
- > 
- > I was hoping for some tested-by lines before including it, as I
- > requested on the 18th December.
+Hi,
 
-These report successful tests, but only one (mine) includes a
-proper Tested-by line:
+The Scorpion CPU requires some low level initialization (like cache
+timing registers). Currently we take care of that in the bootloader.
+This seems to fit with what I've heard as a desire to keep CPU
+implementation-specific initialization out of the kernel.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/006473.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/006048.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005663.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005855.html
+We are adding support for a dual core Scorpion target. The second core
+will require some amount of initialization as well. If we take the
+second core out of reset directly into the kernel, we would have to put
+this initialization in the kernel.
 
-Anyway, I'm happy to hear that the patch is still valid, so I'll
-continue to apply it locally until it gets merged upstream.
+Another option is having the secondary CPU(s) execute a portion of the
+bootloader and come in through the main kernel entrypoint. This
+simplifies things but would mean having to put a hook very early in the
+primary boot path, compiled if SMP is configured, which checks the MPIDR
+and reroutes secondary CPUs.
+
+It would also be possible to somehow communicate the secondary CPU
+entrypoint from CPU0 in the kernel to secondary CPUs in the bootloader,
+but that seems uglier than the second option above IMO.
+
+Any thoughts?
+
+thanks,
+Steve
