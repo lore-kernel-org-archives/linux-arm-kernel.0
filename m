@@ -1,83 +1,54 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 9 Mar 2010 16:46:43 +0100
-Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
-In-Reply-To: <20091207221210.GI26821@n2100.arm.linux.org.uk>
-References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
-Message-ID: <19350.28003.131508.958162@pilspetsen.it.uu.se>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  9 Mar 2010 16:01:53 +0000
+Subject: [PATCH] ARM: KGDB: add support for SMP platforms
+Message-ID: <1268150513-3425-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Dec 2009, Russell King - ARM Linux wrote:
- > While looking into the possible msync() issue (which turned out to be a
- > non-issue - it's covered by clever code), I found that we're flushing
- > the same page multiple times.
- > 
- > Normally, update_mmu_cache() would not be doing anything on architectures
- > which don't have a software-loaded TLB.  However, we use this hook for
- > two things:
- > 
- > 1. for our delayed flush_dcache_page().
- > 2. to fix up multiple shared write-able mappings of the same page.
- > 
- > However, as of 8 years ago, I committed this patch (sorry for the
- > bkbits URL):
- > 
- > http://linux.bkbits.net:8080/linux-2.6/?PAGE=patch&REV=3dd7c1f9DypjNd1HyQFAOsA3p7mYig
- > 
- > What the majority of that patch is doing is adding the user-mapping
- > flushing to __flush_dcache_page() - that's fine, and it's explained in
- > the changeset comments.
- > 
- > It also tries to merge the new __flush_dcache_page() code inside
- > make_coherent() - make_coherent() is sort-of already doing most of what
- > __flush_dcache_page() does, and for good measure it does a final
- > flush_cache_page().
- > 
- > The unused addition of 'dirty' seems to suggest that this extra
- > flush_cache_page should have been conditional on that.
- > 
- > Moreover, this final flush_cache_page() should not be needed - the whole
- > "delayed flush_dcache_page" thing only happens when there are no pre-
- > existing mappings of the page, and so there should be no user mappings
- > to worry about.
- > 
- > Hence, I believe it is safe to get rid of this - but this patch will
- > need some rigorous testing.  My ARM VersatilePB926 still boots without
- > this additional patch - but that's not a very good test.  I can't say
- > much more than that for the time being.
- > 
- > Note: for ARMv6 and later, flush_cache_page() is a no-op, so please
- > don't bother testing this patch there.
- > 
- > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
- > ---
- >  arch/arm/mm/fault-armv.c |    2 --
- >  1 files changed, 0 insertions(+), 2 deletions(-)
- > 
- > diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
- > index 7296022..666a871 100644
- > --- a/arch/arm/mm/fault-armv.c
- > +++ b/arch/arm/mm/fault-armv.c
- > @@ -127,8 +127,6 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma, unsigne
- >  	flush_dcache_mmap_unlock(mapping);
- >  	if (aliases)
- >  		adjust_pte(vma, addr);
- > -	else
- > -		flush_cache_page(vma, addr, pfn);
- >  }
- >  
- >  /*
- > 
- > _______________________________________________
- > linux-arm-kernel mailing list
- > linux-arm-kernel at lists.infradead.org
- > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+To support SMP platforms, KGDB requires the architecture backend to
+implement the kgdb_roundup_cpus function.
 
-What's the status of this patch? I see that it's still not included
-in the 2.6.34-rc1 kernel. Did it turn out to be invalid, or was it
-just forgotten?
+This patch, taken against 2.6.33, implements the function for ARM based on
+the MIPS port.
 
-As I reported earlier, it sped up an important use case for me by 1%,
-so I've been using it in my ARM kernels for almost 3 months now.
+Cc: Jason Wessel <jason.wessel@windriver.com>
+Cc: Jean-Michel Hautbois <jhautbois@gmail.com>
+Cc: KGDB Mailing List <kgdb-bugreport@lists.sourceforge.net>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/kgdb.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-/Mikael
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index ba8ccfe..a5b846b 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -9,6 +9,7 @@
+  * Authors:  George Davis <davis_g@mvista.com>
+  *           Deepak Saxena <dsaxena@plexity.net>
+  */
++#include <linux/irq.h>
+ #include <linux/kgdb.h>
+ #include <asm/traps.h>
+ 
+@@ -158,6 +159,18 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
+ 	.fn			= kgdb_compiled_brk_fn
+ };
+ 
++static void kgdb_call_nmi_hook(void *ignored)
++{
++       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
++}
++
++void kgdb_roundup_cpus(unsigned long flags)
++{
++       local_irq_enable();
++       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
++       local_irq_disable();
++}
++
+ /**
+  *	kgdb_arch_init - Perform any architecture specific initalization.
+  *
+-- 
+1.6.3.3
