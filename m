@@ -1,59 +1,81 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 09 Mar 2010 12:35:29 +0530
-Subject: [PATCH 07/11] ST SPEAr: Added source files for SPEAr3xx machine
-	family
-In-Reply-To: <63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
-Message-ID: <4B95F339.5040903@st.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 09 Mar 2010 09:27:27 +0200
+Subject: Compile problem due to compressor changes, UART referenced in
+	section .txt
+In-Reply-To: <20100308101445.GA12363@n2100.arm.linux.org.uk>
+References: <Prayer.1.3.2.1003071719080.2280@hermes-2.csi.cam.ac.uk>
+	<20100308101445.GA12363@n2100.arm.linux.org.uk>
+Message-ID: <4B95F85F.5090108@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Russell King - ARM Linux wrote:
+> On Sun, Mar 07, 2010 at 05:19:08PM +0000, J.I. Cameron wrote:
+>> Dear  All,
+>>
+>> Ran into the following problem on a pxa stargate2 platform (I think it will
+>> effect a number of others).
+>>
+>> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
+>> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o  
+>> `UART' referenced in section `.text' of arch/arm/boot/compressed/misc.o:  
+>> defined in discarded section `.data' of arch/arm/boot/compressed/misc.o
+>>
+>> There is a hack in mach-pxa/include/mach/uncompress.h
+>> that changes the primary uart for some platforms:
+>>
+>> static inline void arch_decomp_setup(void)
+>> {
+>> 	if (machine_is_littleton() || machine_is_intelmote2()
+>> 	    || machine_is_csb726() || machine_is_stargate2()
+>> 	  || machine_is_cm_x300() || machine_is_balloon3())
+>> 	UART = STUART;
+> 
+> 	else
+> 		UART = FFUART;
+> 
+> and remove the initializer from UART.
 
-On 3/9/2010 12:16 PM, Linus Walleij wrote:
-> Hi Viresh,
-> some smallish comments...
-> 
-> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
-> 
->> (skip some stuff that looks OK...)
->> diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
->> new file mode 100644
->> index 0000000..f529d74
->> --- /dev/null
->> +       .res = {
->> +               .start = SPEAR3XX_ICM1_UART_BASE,
->> +               .end = SPEAR3XX_ICM1_UART_BASE + SPEAR3XX_ICM1_UART_SIZE - 1,
->> +               .flags = IORESOURCE_MEM,
->> +               },
->> +       .irq = {IRQ_UART, NO_IRQ},
->> +       .periphid = 0x00041011,
->> +};
-> 
-> You're hardcoding the PrimeCell ID to the ARM version, but I suspect
-> you have an ST derivate with some additional features. If you look in
-> the PL011 driver in drivers/serial/amba-pl011.c you will probably recognize
-> the modified PrimeCell IDs for vendor 0x80 (VENDOR_ST) and I think
-> you might rather need to patch this file with your new periphid and
-> possibly even implement some new extensions (if there are any).
-> 
-> What value is actually in the ID registers of your cell? (Just
-> check in some debugger or simply printk() it...)
-> 
-> Apart from this the patch looks OK to me.
-> 
+Something like that:
 
-Actually PL011 is customized by ST's nomadik platform. And hence above
-is true for nomadik only. We are using ARM's version of PL011 without
-any customization over it and so id for our case is still 0x00041011.
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+  arch/arm/mach-pxa/include/mach/uncompress.h |    4 +++-
+  1 files changed, 3 insertions(+), 1 deletions(-)
 
-regards,
-viresh kumar.
+diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h b/arch/arm/mach-pxa/include/mach/uncompress.h
+index 237734b..b009299 100644
+--- a/arch/arm/mach-pxa/include/mach/uncompress.h
++++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+@@ -15,7 +15,7 @@
+
+  #define __REG(x)       ((volatile unsigned long *)x)
+
+-static volatile unsigned long *UART = FFUART;
++static volatile unsigned long *UART;
+
+  static inline void putc(char c)
+  {
+@@ -39,6 +39,8 @@ static inline void arch_decomp_setup(void)
+  	    || machine_is_csb726() || machine_is_stargate2()
+  	    || machine_is_cm_x300() || machine_is_balloon3())
+  		UART = STUART;
++	else
++		UART = FFUART;
+  }
+
+  /*
+-- 
+1.6.4.4
+
+
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Sincerely yours,
+Mike.
