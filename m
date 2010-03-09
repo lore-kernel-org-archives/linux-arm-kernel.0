@@ -1,38 +1,55 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue,  9 Mar 2010 12:12:05 +0200
-Subject: [PATCH 2/2] mx25: fix build when DEBUG_LL is enabled
-In-Reply-To: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
-References: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
-Message-ID: <3936f84a5e18344d7562af43ca5f76d5e95f6642.1268129163.git.baruch@tkos.co.il>
+Date: Tue,  9 Mar 2010 12:12:04 +0200
+Subject: [PATCH 1/2] mx1: fix build when DEBUG_LL is enabled
+Message-ID: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Greshgorin <alexg@orex-cr.com>
+Commit "mx1: prefix SOC specific defines with MX1_ and deprecate old names"
+redefined the IO_ADDRESS macro in a way that is incompatible with
+debug-macro.S. Reintroduce AVIC_IO_ADDRESS, and use it in debug-macro.S.
 
-Commit "imx25: redefine MX25_IO_ADDRESS using IMX_IO_ADDRESS" removed the
-MX25_AIPS1_IO_ADDRESS macro which is used in debug-macro.S. Reintroduce this
-macro.
-
-Signed-off-by: Alex Greshgorin <alexg@orex-cr.com>
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/plat-mxc/include/mach/mx25.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    2 +-
+ arch/arm/plat-mxc/include/mach/mx1.h         |    5 ++++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 4eb6e33..e2e35db 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -22,6 +22,10 @@
- #define MX25_GPIO3_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xa4000)
- #define MX25_GPIO4_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0x9c000)
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 133d66b..8f82ff4 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -15,7 +15,7 @@
+ #ifdef CONFIG_ARCH_MX1
+ #include <mach/mx1.h>
+ #define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_VADDR	AVIC_IO_ADDRESS(UART1_BASE_ADDR)
+ #endif
  
-+/* define macro needed for debug-macro.S */
-+#define MX25_AIPS1_IO_ADDRESS(x)	\
-+	(((x) - MX25_AIPS1_BASE_ADDR) + MX25_AIPS1_BASE_ADDR_VIRT)
+ #ifdef CONFIG_ARCH_MX25
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index 5eba7e6..37d3560 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -72,6 +72,10 @@
+ #define MX1_AVIC_BASE_ADDR		(0x23000 + MX1_IO_BASE_ADDR)
+ #define MX1_CSI_BASE_ADDR		(0x24000 + MX1_IO_BASE_ADDR)
+ 
++/* define macro needed for entry-macro.S */
++#define AVIC_IO_ADDRESS(x)	((x) - MX1_IO_BASE_ADDR			\
++		+ MX1_IO_BASE_ADDR_VIRT)
 +
- #define MX25_IO_ADDRESS(x) (					\
- 	IMX_IO_ADDRESS(x, MX25_AIPS1) ?:			\
- 	IMX_IO_ADDRESS(x, MX25_AIPS2) ?:			\
+ /* macro to get at IO space when running virtually */
+ #define MX1_IO_ADDRESS(x) (						\
+ 	IMX_IO_ADDRESS(x, MX1_IO))
+@@ -213,7 +217,6 @@
+ #define AVIC_BASE_ADDR MX1_AVIC_BASE_ADDR
+ #define CSI_BASE_ADDR MX1_CSI_BASE_ADDR
+ #define IO_ADDRESS(x) MX1_IO_ADDRESS(x)
+-#define AVIC_IO_ADDRESS(x) IO_ADDRESS(x)
+ #define INT_SOFTINT MX1_INT_SOFTINT
+ #define CSI_INT MX1_CSI_INT
+ #define DSPA_MAC_INT MX1_DSPA_MAC_INT
 -- 
 1.7.0
