@@ -1,30 +1,46 @@
 From: jassisinghbrar@gmail.com (jassisinghbrar at gmail.com)
-Date: Tue,  9 Mar 2010 15:10:31 +0900
-Subject: [PATCH 1/4] ARM: S3C6410: Define clk_src2 register
-Message-ID: <1268115034-5998-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Tue,  9 Mar 2010 15:10:34 +0900
+Subject: [PATCH 4/4] ARM: S3C6410: Declare IISv4 audio-bus clock
+In-Reply-To: <1268115034-5998-3-git-send-email-jassisinghbrar@gmail.com>
+References: <1268115034-5998-1-git-send-email-jassisinghbrar@gmail.com>
+	<1268115034-5998-2-git-send-email-jassisinghbrar@gmail.com>
+	<1268115034-5998-3-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <1268115034-5998-4-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Define S3C6410 specific register - CLK_SRC2
+Declare 'audio-bus' clock for IISv4 controller of S3C6410.
+Even though the name is same as that for IISv3, the id is
+set to -1(just one instance of the controller is available)
+which helps always fetch the correct clock.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s3c64xx/include/mach/regs-clock.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/clock.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-index 3ef6274..0114eb0 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-@@ -33,6 +33,7 @@
- #define S3C_PCLK_GATE		S3C_CLKREG(0x34)
- #define S3C_SCLK_GATE		S3C_CLKREG(0x38)
- #define S3C_MEM0_GATE		S3C_CLKREG(0x3C)
-+#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
- 
- /* CLKDIV0 */
- #define S3C6400_CLKDIV0_PCLK_MASK	(0xf << 12)
+diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+index 6c286d5..da83595 100644
+--- a/arch/arm/mach-s3c64xx/clock.c
++++ b/arch/arm/mach-s3c64xx/clock.c
+@@ -670,6 +670,16 @@ static struct clksrc_clk clksrcs[] = {
+ 		.sources	= &clkset_audio1,
+ 	}, {
+ 		.clk	= {
++			.name		= "audio-bus",
++			.id		= -1,  /* There's only one IISv4 port */
++			.ctrlbit        = S3C6410_CLKCON_SCLK_AUDIO2,
++			.enable		= s3c64xx_sclk_ctrl,
++		},
++		.reg_src	= { .reg = S3C6410_CLK_SRC2, .shift = 0, .size = 3  },
++		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 24, .size = 4  },
++		.sources	= &clkset_audio2,
++	}, {
++		.clk	= {
+ 			.name		= "irda-bus",
+ 			.id		= 0,
+ 			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
 -- 
 1.6.2.5
