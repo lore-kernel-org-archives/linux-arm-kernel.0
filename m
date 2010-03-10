@@ -1,42 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Mar 2010 16:01:10 +0000
-Subject: [RFC PATCH 0/4] ARM: add support for hw-breakpoints [v2]
-Message-ID: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 10 Mar 2010 16:01:11 +0000
+Subject: [RFC PATCH 1/4] ARM: hw-breakpoint: add mechanism for hooking into
+	prefetch aborts
+In-Reply-To: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
+References: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1268236874-7877-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 2 of the RFC originally posted here:
+On ARM processors with hardware breakpoint and watchpoint support,
+triggering these events results in a debug exception. These manifest
+as prefetch and data aborts respectively.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/009084.html
+arch/arm/mm/fault.c already provides hook_fault_code for hooking
+into data aborts dependent on the DFSR. This patch adds a new function,
+hook_ifault_code for hooking into prefetch aborts in the same manner.
 
-Changes from the previous version include:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/system.h |    3 +++
+ arch/arm/mm/fault.c           |   11 +++++++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-- Based on 2.6.33
-- Removal of self-modifying code to access the debug registers
-- Control and value registers now reset during init
-- Removal of .name field from struct arch_hw_breakpoint and associated
-  symbol resolution [following comments made about patches for PPC].
-
-All comments welcome [the last submission didn't attract any!].
-
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-
-Will Deacon (4):
-  ARM: hw-breakpoint: add mechanism for hooking into prefetch aborts
-  ARM: hw-breakpoint: add ARM backend for the hw-breakpoint framework
-  ARM: hw-breakpoint: add new ptrace requests for hw-breakpoint
-    interaction
-  ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
-
- arch/arm/Kconfig                     |    1 +
- arch/arm/include/asm/hw_breakpoint.h |  118 ++++++
- arch/arm/include/asm/processor.h     |    4 +
- arch/arm/include/asm/ptrace.h        |    2 +
- arch/arm/include/asm/system.h        |    3 +
- arch/arm/kernel/Makefile             |    1 +
- arch/arm/kernel/hw_breakpoint.c      |  711 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ptrace.c             |  158 ++++++++
- arch/arm/mm/fault.c                  |   11 +
- 9 files changed, 1009 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/hw_breakpoint.h
- create mode 100644 arch/arm/kernel/hw_breakpoint.c
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 058e7e9..7aa53e3 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -83,6 +83,9 @@ void arm_notify_die(const char *str, struct pt_regs *regs, struct siginfo *info,
+ void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 				       struct pt_regs *),
+ 		     int sig, const char *name);
++void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
++				       struct pt_regs *),
++		     int sig, const char *name);
+ 
+ #define xchg(ptr,x) \
+ 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 9d40c34..9a04584 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -567,6 +567,17 @@ static struct fsr_info ifsr_info[] = {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+ };
+ 
++void __init
++hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++			int sig, const char *name)
++{
++	if (nr >= 0 && nr < ARRAY_SIZE(ifsr_info)) {
++		ifsr_info[nr].fn   = fn;
++		ifsr_info[nr].sig  = sig;
++		ifsr_info[nr].name = name;
++	}
++}
++
+ asmlinkage void __exception
+ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ {
+-- 
+1.6.3.3
