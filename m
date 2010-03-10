@@ -1,23 +1,38 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 10 Mar 2010 12:44:21 +0100
-Subject: [PATCH] Voipac PXA270: Add ethernet support
-In-Reply-To: <201003100544.14268.marek.vasut@gmail.com>
-References: <201003100544.14268.marek.vasut@gmail.com>
-Message-ID: <201003101244.21456.marek.vasut@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Mar 2010 11:47:19 -0000
+Subject: [PATCH 4/6] perf-events: export enable/disable event symbols to
+	kernel modules
+In-Reply-To: <1268218566.8991.1.camel@twins>
+References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>	
+	<1268217690-29712-2-git-send-email-will.deacon@arm.com>	
+	<1268217690-29712-3-git-send-email-will.deacon@arm.com>	
+	<1268217690-29712-4-git-send-email-will.deacon@arm.com>	
+	<1268217690-29712-5-git-send-email-will.deacon@arm.com>
+	<1268218566.8991.1.camel@twins>
+Message-ID: <001201cac047$70b71c60$52255520$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 10. b?ezna 2010 05:44:14 Marek Vasut napsal(a):
-> Hi,
-> this patch adds ethernet support
+Hello Peter,
+
+> On Wed, 2010-03-10 at 10:41 +0000, Will Deacon wrote:
+> > The perf_event_enable and perf_event_disable functions are used to
+> > control the activation of perf-events for a given context or CPU.
+> >
+> > This patch exports these symbols so that they can be used by kernel
+> > modules. Without these symbols, an event must be destroyed and recreated
+> > to disable or enable it respectively. The maximum number of perf-events
+> > is also made available to modules via the perf_get_max_events function.
 > 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-revised patch
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-Voipac-PXA270-Add-ethernet-support.patch
-Type: text/x-patch
-Size: 3139 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100310/bed3d37a/attachment.bin>
+> Where is the module that uses all this?
+
+It's part of the same patchset:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011126.html
+
+The idea is to use perf-events as the backend for OProfile to avoid replicating
+the PMU accessor code.
+
+Cheers,
+
+Will
