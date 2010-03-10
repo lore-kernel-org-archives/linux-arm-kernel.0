@@ -1,29 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Mar 2010 14:58:17 +0000
-Subject: [RFC PATCH 0/2] ARM: pmu: provide a registration mechanism for IRQs
-Message-ID: <1268233099-28965-1-git-send-email-will.deacon@arm.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 10 Mar 2010 16:01:21 +0100
+Subject: [PATCH 4/6] perf-events: export enable/disable event symbols
+	to kernel modules
+In-Reply-To: <1268231442.5279.1.camel@twins>
+References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-3-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-4-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-5-git-send-email-will.deacon@arm.com>
+	<1268218566.8991.1.camel@twins>
+	<001201cac047$70b71c60$52255520$@deacon@arm.com>
+	<1268231442.5279.1.camel@twins>
+Message-ID: <20100310150121.GA1585@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC patch was prompted by a discussion with Russell about the PMU IRQs
-for the new Versatile Express platform:
+On 10.03.10 15:30:42, Peter Zijlstra wrote:
+> On Wed, 2010-03-10 at 11:47 +0000, Will Deacon wrote:
+> > Hello Peter,
+> > 
+> > > On Wed, 2010-03-10 at 10:41 +0000, Will Deacon wrote:
+> > > > The perf_event_enable and perf_event_disable functions are used to
+> > > > control the activation of perf-events for a given context or CPU.
+> > > >
+> > > > This patch exports these symbols so that they can be used by kernel
+> > > > modules. Without these symbols, an event must be destroyed and recreated
+> > > > to disable or enable it respectively. The maximum number of perf-events
+> > > > is also made available to modules via the perf_get_max_events function.
+> > > 
+> > > Where is the module that uses all this?
+> > 
+> > It's part of the same patchset:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011126.html
+> > 
+> > The idea is to use perf-events as the backend for OProfile to avoid replicating
+> > the PMU accessor code.
+> 
+> Ah, very nice. Can something like that be done in general, like an
+> arch-independent oprofile backend using perf, or is there too much
+> arch-specific bits to the oprofile stuff?
+> 
+> I know Robert talked about doing something like this, I just have no
+> clue how arch specific this would be.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/010921.html
+Thanks for cc'ing me. I like this approach. Will take a look at the
+patches.
 
-The set contains two patches, the second of which is intended purely as an
-example to illustrate the usage of the new framework.
+Yes, for implementing oprofile on top of perf we have to touch every
+architecture separately to be backward compatible.
 
-All comments welcome.
+-Robert
 
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Jamie Iles <jamie.iles@picochip.com>
-
-Will Deacon (2):
-  ARM: pmu: register IRQs at runtime
-  ARM: Realview-PBX: register PMU IRQs during board initialisation
-
- arch/arm/include/asm/pmu.h            |   36 ++++++++---
- arch/arm/kernel/perf_event.c          |    6 +-
- arch/arm/kernel/pmu.c                 |  103 ++++++++++++++++++---------------
- arch/arm/mach-realview/realview_pbx.c |   15 +++++
- 4 files changed, 101 insertions(+), 59 deletions(-)
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
+email: robert.richter at amd.com
