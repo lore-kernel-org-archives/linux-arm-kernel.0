@@ -1,61 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Mar 2010 14:34:11 -0800
-Subject: [PATCH 1/6] ARM: perf-events: add Realview PMU IRQs to pmu.c
-In-Reply-To: <20100310222731.GH4585@pc-ran3241>
-References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
-	<20100310215918.GR2900@atomide.com>
-	<20100310222731.GH4585@pc-ran3241>
-Message-ID: <20100310223411.GU2900@atomide.com>
+Date: Wed, 10 Mar 2010 14:41:10 -0800
+Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
+	autoloading feature
+In-Reply-To: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
+References: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
+Message-ID: <20100310224110.GW2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Albin Tonnerre <albin.tonnerre@gmail.com> [100310 14:22]:
-> On Wed, 10 Mar 2010 13:59 -0800, Tony Lindgren wrote :
-> > * Will Deacon <will.deacon@arm.com> [100310 02:46]:
-> > > Add the PMU IRQs for the Realview boards to kernel/pmu.c so that
-> > > they can be used by the perf-events framework.
-> > > 
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm/kernel/pmu.c |   14 ++++++++++++++
-> > >  1 files changed, 14 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> > > index a124312..11a321e 100644
-> > > --- a/arch/arm/kernel/pmu.c
-> > > +++ b/arch/arm/kernel/pmu.c
-> > > @@ -36,6 +36,20 @@ static const int irqs[] = {
-> > >  	IRQ_EB11MP_PMU_CPU1,
-> > >  	IRQ_EB11MP_PMU_CPU2,
-> > >  	IRQ_EB11MP_PMU_CPU3,
-> > > +#elif defined(CONFIG_MACH_REALVIEW_PB1176)
-> > > +	IRQ_DC1176_CORE_PMU,
-> > > +#elif defined(CONFIG_MACH_REALVIEW_PB11MP)
-> > > +	IRQ_TC11MP_PMU_CPU0,
-> > > +	IRQ_TC11MP_PMU_CPU1,
-> > > +	IRQ_TC11MP_PMU_CPU2,
-> > > +	IRQ_TC11MP_PMU_CPU3,
-> > > +#elif defined(CONFIG_MACH_REALVIEW_PBA8)
-> > > +	IRQ_PBA8_PMU,
-> > > +#elif defined(CONFIG_MACH_REALVIEW_PBX)
-> > > +	IRQ_PBX_PMU_CPU0,
-> > > +	IRQ_PBX_PMU_CPU1,
-> > > +	IRQ_PBX_PMU_CPU2,
-> > > +	IRQ_PBX_PMU_CPU3,
-> > >  #elif defined(CONFIG_ARCH_OMAP3)
-> > >  	INT_34XX_BENCH_MPU_EMUL,
-> > >  #elif defined(CONFIG_ARCH_IOP32X)
-> > 
-> > Just a generic comment.. It would be nice to get rid of the
-> > ifdef eliffery here for the interrupt. At least we can now
-> > compile omap2 + 3 + 4 into the same binary, so stuff like
-> > this caused mysterious errors easily.
+* Venkatraman S <svenkatr@ti.com> [100310 06:08]:
+> @@ -1400,14 +1471,23 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host
+> *host, struct mmc_request *req)
+>  					| (req->data->blocks << 16));
+>  	set_data_timeout(host, req->data->timeout_ns, req->data->timeout_clks);
 > 
-> That's the purpose of another patch series Will has submitted as an RFC,
-> see '[RFC PATCH 0/2] ARM: pmu: provide a registration mechanism for IRQs'
+> -	if (host->use_dma) {
+> -		ret = omap_hsmmc_start_dma_transfer(host, req);
+> -		if (ret != 0) {
+> -			dev_dbg(mmc_dev(host->mmc), "MMC start dma failure\n");
+> +	if (host->dma_caps & DMA_TYPE_SDMA) {
+> +		ret = omap_hsmmc_configure_sdma(host, req);
+> +		if (ret)
+>  			return ret;
+> -		}
+> +		host->dma_in_use = DMA_TYPE_SDMA;
+>  	}
+> -	return 0;
+> +	if ((host->dma_caps & DMA_TYPE_SDMA_DLOAD) &&
+> +		host->data->sg_len > 4) {
+> +		ret = omap_hsmmc_configure_sdma_sglist(host, req);
+> +		if (ret)
+> +			return ret;
+> +		host->dma_in_use = DMA_TYPE_SDMA_DLOAD;
+> +
+> +	}
+> +	ret = omap_hsmmc_start_dma_transfer(host);
+> +	return ret;
+> +
+>  }
 
-Oh, great! Sorry I did not notice that & thanks for doing that.
+Does the driver still work in PIO mode?
+
+We need to have the drivers capable to fail over to PIO mode
+as the DMA channels can run out.
 
 Regards,
 
