@@ -1,27 +1,76 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 10 Mar 2010 18:16:35 +0000
-Subject: [PATCH 2.6.34] ARM: SAMSUNG: Fix build after "ARM: Eliminate
-	decompressor -Dstatic= PIC hack"
-In-Reply-To: <20100310180128.GE12345@n2100.arm.linux.org.uk>
-References: <1267469542-19633-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20100310171736.GJ6850@sirena.org.uk>
-	<20100310172503.GB12345@n2100.arm.linux.org.uk>
-	<20100310174228.GA5060@rakim.wolfsonmicro.main>
-	<20100310174650.GD12345@n2100.arm.linux.org.uk>
-	<20100310175611.GA5403@rakim.wolfsonmicro.main>
-	<20100310180128.GE12345@n2100.arm.linux.org.uk>
-Message-ID: <20100310181635.GA17807@rakim.wolfsonmicro.main>
+From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
+Date: Wed, 10 Mar 2010 15:02:36 -0500
+Subject: [PATCH] ARM support single byte cmpxchg and cmpxchg_local on ARMv6
+In-Reply-To: <20100310173503.GC12345@n2100.arm.linux.org.uk>
+References: <20100310162221.GA19201@localhost>
+	<20100310173503.GC12345@n2100.arm.linux.org.uk>
+Message-ID: <20100310200235.GA29827@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 10, 2010 at 06:01:28PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 10, 2010 at 05:56:11PM +0000, Mark Brown wrote:
+* Russell King - ARM Linux (linux at arm.linux.org.uk) wrote:
+> On Wed, Mar 10, 2010 at 06:22:21PM +0200, Imre Deak wrote:
+> > recently you've added support for __cmpxchg for ARMv6+. There the assumption
+> > is that ldrex[bh]/strex[bh] is only supported on platforms with the 32v6K
+> > extension.
+> > 
+> > Currently the __xchg code uses these even without the extension. Should this
+> > be fixed?
+> 
+> From what I remember, the half-word versions definitely aren't supported
+> on anything without V6K extensions.  I think that the byte and word
+> versions are supported on V6 and up though.
+> 
+> That'd make both __cmpxchg and __xchg slightly buggy, in different ways.
+> 
+> What it does mean is that atomic operations on unsigned shorts using
+> ldrex/strex will only be possible on V6K and up.
 
-> > I agree that that's best, I guess I'll try to take a look.  I'd be much
-> > more comfortable doing that in .35 than .34, though.
+Does the following help (addressing the single byte cmpxchg part of the
+problem) ?
 
-> Since this isn't even in for .34 yet, that isn't a concern.
 
-Oh, I think I'm missing something here or we're talking at cross
-purposes.  The generic change is in Linus' tree since ac0f6f92 and I'm
-seeing build failures with -rc1.
+ARM support single byte cmpxchg and cmpxchg_local on ARMv6
+
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+CC: Imre Deak <imre.deak@nokia.com>
+---
+ arch/arm/include/asm/system.h |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+Index: linux-2.6-lttng.git/arch/arm/include/asm/system.h
+===================================================================
+--- linux-2.6-lttng.git.orig/arch/arm/include/asm/system.h	2010-03-10 14:49:59.000000000 -0500
++++ linux-2.6-lttng.git/arch/arm/include/asm/system.h	2010-03-10 14:57:41.000000000 -0500
+@@ -352,7 +352,6 @@
+ 	unsigned long oldval, res;
+ 
+ 	switch (size) {
+-#ifdef CONFIG_CPU_32v6K
+ 	case 1:
+ 		do {
+ 			asm volatile("@ __cmpxchg1\n"
+@@ -365,6 +364,7 @@
+ 				: "memory", "cc");
+ 		} while (res);
+ 		break;
++#ifdef CONFIG_CPU_32v6K
+ 	case 2:
+ 		do {
+ 			asm volatile("@ __cmpxchg1\n"
+@@ -424,7 +424,6 @@
+ 
+ 	switch (size) {
+ #ifndef CONFIG_CPU_32v6K
+-	case 1:
+ 	case 2:
+ 		ret = __cmpxchg_local_generic(ptr, old, new, size);
+ 		break;
+
+
+-- 
+Mathieu Desnoyers
+Operating System Efficiency Consultant
+EfficiOS Inc.
+http://www.efficios.com
