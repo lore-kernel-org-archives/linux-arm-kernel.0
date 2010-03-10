@@ -1,83 +1,126 @@
-From: george@wildturkeyranch.net (George Anzinger)
-Date: Tue, 09 Mar 2010 14:02:41 -0700
-Subject: [Kgdb-bugreport] [PATCH] KGDB: add smp_mb() in synchronisation
-	during exception handler exit
-In-Reply-To: <1268158831-6976-1-git-send-email-will.deacon@arm.com>
-References: <1268158831-6976-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4B96B771.9050903@wildturkeyranch.net>
+From: y@google.com (y at google.com)
+Date: Tue,  9 Mar 2010 16:09:12 -0800
+Subject: [PATCH] omap: resource: Add per-resource mutex for OMAP resource
+	framework
+Message-ID: <1268179753-4063-1-git-send-email-y>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Chunqiu Wang <cqwang@motorola.com>
 
+Current OMAP resource fwk uses a global res_mutex
+for resource_request and resource_release calls
+for all the available resources.It may cause dead
+lock if resource_request/resource_release is called
+recursively.
 
-On 03/09/2010 11:20 AM,  Will Deacon was caught saying:
-> KGDB uses atomic variables and busy-wait loops to co-ordinate between
-> multiple CPUs on an SMP system. When an exception is handled, the primary
-> CPU executes kgdb_handle_exception() whilst the others execute kgdb_wait.
->
-> There comes a point when the waiters are waiting for the primary CPU to finish:
->
-> 	/* Wait till primary CPU is done with debugging */
-> (1)	while (atomic_read(&passive_cpu_wait[cpu]))
-> 		cpu_relax();
->
-> 	/* Do important KGDB stuff */
->
-> 	/* Signal the primary CPU that we are done: */
-> 	atomic_set(&cpu_in_kgdb[cpu], 0);
->
-> In parallel to this, the primary CPU is doing:
->
-> 	for (i = NR_CPUS-1; i>= 0; i--)
-> 		atomic_set(&passive_cpu_wait[i], 0);
-> 	/*
-> 	 * Wait till all the CPUs have quit
-> 	 * from the debugger.
-> 	 */
-> 	for_each_online_cpu(i) {
-> (1)		while (atomic_read(&cpu_in_kgdb[i]))
-> 			cpu_relax();
-> 	}
->
-> There is a potential deadlock situation at point (1) because the previous
-> writes to the passive_cpu_wait variables by the primary CPU may not yet be
-> visible to the other CPUs [for instance, they may be sitting in the local
-> store buffer]. This means that the waiter CPUs will never exit the while loop
-> and therefore never write to the cpu_in_kgdb variables, which the primary CPU
-> is blocked on. Furthermore, because the primary CPU is aggressively performing
-> reads, the store buffer may not necessarily drain so the system will deadlock.
->
-> This deadlock has been experienced on a quad-core ARM11MPCore platform.
->
-> The following patch addresses the issue by adding a memory barrier to the
-> primary CPU before the polling loop, therefore forcing the previous atomic_sets
-> to be visible before waiting for the waiters to finish.
->
-> Cc: KGDB Mailing List<kgdb-bugreport@lists.sourceforge.net>
-> Cc: Catalin Marinas<catalin.marinas@arm.com>
-> Cc: Russell King - ARM Linux<linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Will Deacon<will.deacon@arm.com>
-> ---
->   kernel/kgdb.c |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/kernel/kgdb.c b/kernel/kgdb.c
-> index 761fdd2..ee7694b 100644
-> --- a/kernel/kgdb.c
-> +++ b/kernel/kgdb.c
-> @@ -1537,6 +1537,7 @@ acquirelock:
->   		 * Wait till all the CPUs have quit
->   		 * from the debugger.
->   		 */
-> +		smp_mb();
->   		for_each_online_cpu(i) {
->   			while (atomic_read(&cpu_in_kgdb[i]))
->   				cpu_relax();
->    
-Doesn't this have the same issue if this cpu gets to the while prior to 
-the other cpu doing its write.  I would think the "smp_mb()" should be 
-in the while loop not prior to it.
+For current OMAP3 VDD1/VDD2 resource, the change_level
+implementation is mach-omap2/resource34xx.c/set_opp(),
+when using resource_release to remove vdd1 constraint,
+this function may call resource_release again to release
+Vdd2 constrait if target vdd1 level is less than OPP3.
+in this scenario, the global res_mutex down operation
+will be called again, this will cause the second
+down operation hang there.
 
+To fix the problem, per-resource mutex is added
+to avoid hangup when resource_request/resource_release
+is called recursively.
+
+Signed-off-by: Chunqiu Wang <cqwang@motorola.com>
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ arch/arm/plat-omap/include/plat/resource.h |    2 ++
+ arch/arm/plat-omap/resource.c              |   21 ++++++++++-----------
+ 2 files changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/resource.h b/arch/arm/plat-omap/include/plat/resource.h
+index 9acebcc..b5aff1f 100644
+--- a/arch/arm/plat-omap/include/plat/resource.h
++++ b/arch/arm/plat-omap/include/plat/resource.h
+@@ -54,6 +54,8 @@ struct shared_resource {
+ 	/* Shared resource operations */
+ 	struct shared_resource_ops *ops;
+ 	struct list_head node;
++	/* Protect each resource */
++	struct mutex resource_mutex;
+ };
+ 
+ struct shared_resource_ops {
+diff --git a/arch/arm/plat-omap/resource.c b/arch/arm/plat-omap/resource.c
+index f1cdecf..0a7b79b 100644
+--- a/arch/arm/plat-omap/resource.c
++++ b/arch/arm/plat-omap/resource.c
+@@ -277,6 +277,7 @@ int resource_register(struct shared_resource *resp)
+ 	}
+ 
+ 	INIT_LIST_HEAD(&resp->users_list);
++	mutex_init(&resp->resource_mutex);
+ 
+ 	/* Add the resource to the resource list */
+ 	list_add(&resp->node, &res_list);
+@@ -339,14 +340,13 @@ int resource_request(const char *name, struct device *dev,
+ 	struct  users_list *user;
+ 	int 	found = 0, ret = 0;
+ 
+-	down(&res_mutex);
+-	resp = _resource_lookup(name);
++	resp = resource_lookup(name);
+ 	if (!resp) {
+ 		printk(KERN_ERR "resource_request: Invalid resource name\n");
+-		ret = -EINVAL;
+-		goto res_unlock;
++		return -EINVAL;
+ 	}
+ 
++	mutex_lock(&resp->resource_mutex);
+ 	/* Call the resource specific validate function */
+ 	if (resp->ops->validate_level) {
+ 		ret = resp->ops->validate_level(resp, level);
+@@ -375,7 +375,7 @@ int resource_request(const char *name, struct device *dev,
+ 	user->level = level;
+ 
+ res_unlock:
+-	up(&res_mutex);
++	mutex_unlock(&resp->resource_mutex);
+ 	/*
+ 	 * Recompute and set the current level for the resource.
+ 	 * NOTE: update_resource level moved out of spin_lock, as it may call
+@@ -406,14 +406,13 @@ int resource_release(const char *name, struct device *dev)
+ 	struct users_list *user;
+ 	int found = 0, ret = 0;
+ 
+-	down(&res_mutex);
+-	resp = _resource_lookup(name);
++	resp = resource_lookup(name);
+ 	if (!resp) {
+ 		printk(KERN_ERR "resource_release: Invalid resource name\n");
+-		ret = -EINVAL;
+-		goto res_unlock;
++		return -EINVAL;
+ 	}
+ 
++	mutex_lock(&resp->resource_mutex);
+ 	list_for_each_entry(user, &resp->users_list, node) {
+ 		if (user->dev == dev) {
+ 			found = 1;
+@@ -434,7 +433,7 @@ int resource_release(const char *name, struct device *dev)
+ 	/* Recompute and set the current level for the resource */
+ 	ret = update_resource_level(resp);
+ res_unlock:
+-	up(&res_mutex);
++	mutex_unlock(&resp->resource_mutex);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(resource_release);
+@@ -458,7 +457,7 @@ int resource_get_level(const char *name)
+ 		up(&res_mutex);
+ 		return -EINVAL;
+ 	}
+-	ret = resp->curr_level;
++	ret =  resp->curr_level;
+ 	up(&res_mutex);
+ 	return ret;
+ }
 -- 
-George Anzinger   george at wildturkeyranch.net
+1.6.6.2
