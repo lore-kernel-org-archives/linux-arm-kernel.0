@@ -1,27 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 10 Mar 2010 14:28:32 +0000
-Subject: [PATCH 2/4] mmp: support ssp in pxa168
-In-Reply-To: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
-References: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
-Message-ID: <20100310142832.GB24422@rakim.wolfsonmicro.main>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 10 Mar 2010 15:30:42 +0100
+Subject: [PATCH 4/6] perf-events: export enable/disable event symbols
+	to kernel modules
+In-Reply-To: <001201cac047$70b71c60$52255520$@deacon@arm.com>
+References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-3-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-4-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-5-git-send-email-will.deacon@arm.com>
+	<1268218566.8991.1.camel@twins>
+	<001201cac047$70b71c60$52255520$@deacon@arm.com>
+Message-ID: <1268231442.5279.1.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 10, 2010 at 08:14:42AM -0500, Haojian Zhuang wrote:
-> From 75fe4b02234f6476e72827508f11f1035d7aaf68 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 10 Mar 2010 06:32:43 -0500
-> Subject: [PATCH] [ARM] mmp: support ssp in pxa168
+On Wed, 2010-03-10 at 11:47 +0000, Will Deacon wrote:
+> Hello Peter,
 > 
-> Support ssp in pxa168. The basic function of SSP is same as pxa, but clock
-> source and IRQ is changed.
+> > On Wed, 2010-03-10 at 10:41 +0000, Will Deacon wrote:
+> > > The perf_event_enable and perf_event_disable functions are used to
+> > > control the activation of perf-events for a given context or CPU.
+> > >
+> > > This patch exports these symbols so that they can be used by kernel
+> > > modules. Without these symbols, an event must be destroyed and recreated
+> > > to disable or enable it respectively. The maximum number of perf-events
+> > > is also made available to modules via the perf_get_max_events function.
+> > 
+> > Where is the module that uses all this?
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> It's part of the same patchset:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011126.html
+> 
+> The idea is to use perf-events as the backend for OProfile to avoid replicating
+> the PMU accessor code.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Ah, very nice. Can something like that be done in general, like an
+arch-independent oprofile backend using perf, or is there too much
+arch-specific bits to the oprofile stuff?
 
-That said might it make sense to merge this and the previous patch via
-ASoC since there's new drivers using this following on and Liam's
-multi-codec work is likely to be creating merge issues this development
-cycle?  I can apply the patches on a branch by themselves which can also
-be pulled into the PXA tree if needed.
+I know Robert talked about doing something like this, I just have no
+clue how arch specific this would be.
