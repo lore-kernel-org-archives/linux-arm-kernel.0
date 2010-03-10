@@ -1,34 +1,39 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 10 Mar 2010 10:39:23 +0530
-Subject: [PATCH 01/11] ST SPEAr: Added ARM PrimeXsys System Controller
-	SP810 header file
-In-Reply-To: <63386a3d1003091214s5251674et99903756f3528e66@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 10 Mar 2010 06:15:10 +0100
+Subject: [PATCH 07/11] ST SPEAr: Added source files for SPEAr3xx machine
+	family
+In-Reply-To: <4B95F339.5040903@st.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003091214s5251674et99903756f3528e66@mail.gmail.com>
-Message-ID: <4B972983.7090307@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
+	<4B95F339.5040903@st.com>
+Message-ID: <63386a3d1003092115ia91b7d9l64cc89ebd72d7e22@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+2010/3/9 Viresh KUMAR <viresh.kumar@st.com>:
 
-On 3/10/2010 1:44 AM, Linus Walleij wrote:
-> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
-> 
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
->>  include/linux/sysctl_sp810.h |   59 ++++++++++++++++++++++++++++++++++++++++++
->>  1 files changed, 59 insertions(+), 0 deletions(-)
->>  create mode 100644 include/linux/sysctl_sp810.h
->> (...)
-> 
-> To the rest of the world this is probably a number of register definitions and
-> an obscure inline function, so the entire internal kernel API does not need
-> to know about it.
-> 
-> Move it to arch/arm/include/asm/hardware
+> On 3/9/2010 12:16 PM, Linus Walleij wrote:
+>> Hi Viresh,
+>>> (...)
+>>> + ? ? ? .irq = {IRQ_UART, NO_IRQ},
+>>> + ? ? ? .periphid = 0x00041011,
+>>> +};
+>>
+>> You're hardcoding the PrimeCell ID to the ARM version, (...)
+>
+> Actually PL011 is customized by ST's nomadik platform. And hence above
+> is true for nomadik only. We are using ARM's version of PL011 without
+> any customization over it and so id for our case is still 0x00041011.
 
-OK.
+OK then you can probably just delete the .periphid line, the only thing that
+will do is to override the number found in the ID registers with the same
+number. If this doesn't work you certainly have a modified version anyway.
 
-
-viresh
+Linus
