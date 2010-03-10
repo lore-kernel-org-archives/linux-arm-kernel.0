@@ -1,53 +1,119 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Mar 2010 13:59:18 -0800
-Subject: [PATCH 1/6] ARM: perf-events: add Realview PMU IRQs to pmu.c
-In-Reply-To: <1268217690-29712-2-git-send-email-will.deacon@arm.com>
-References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20100310215918.GR2900@atomide.com>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Wed, 10 Mar 2010 16:06:07 -0600
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>
+	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+Message-ID: <4B9817CF.2050807@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Will Deacon <will.deacon@arm.com> [100310 02:46]:
-> Add the PMU IRQs for the Realview boards to kernel/pmu.c so that
-> they can be used by the perf-events framework.
+Will Deacon wrote:
+
+>> Clearly, kgdb is using atomic_set()/atomic_read() in a way which does not
+>> match this documentation - it's certainly missing the barriers as required
+>> by the above quoted paragraphs.
+>>
+>> Let me repeat: atomic_set() and atomic_read() are NOT atomic.  There's
+>> nothing atomic about them.  All they do is provide a pair of accessors
+>> to the underlying value in the atomic type.  They are no different to
+>> declaring a volatile int and reading/writing it directly.
+
+
+Clearly the docs state this.
+
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/pmu.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
+> Indeed. I'm not familiar enough with KGDB internals to dive in and look at all the
+> potential barrier conflicts, so I'll submit a patch that addresses the one that's
+> bitten me so far. Maybe it will motivate somebody else to take a closer look!
 > 
-> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> index a124312..11a321e 100644
-> --- a/arch/arm/kernel/pmu.c
-> +++ b/arch/arm/kernel/pmu.c
-> @@ -36,6 +36,20 @@ static const int irqs[] = {
->  	IRQ_EB11MP_PMU_CPU1,
->  	IRQ_EB11MP_PMU_CPU2,
->  	IRQ_EB11MP_PMU_CPU3,
-> +#elif defined(CONFIG_MACH_REALVIEW_PB1176)
-> +	IRQ_DC1176_CORE_PMU,
-> +#elif defined(CONFIG_MACH_REALVIEW_PB11MP)
-> +	IRQ_TC11MP_PMU_CPU0,
-> +	IRQ_TC11MP_PMU_CPU1,
-> +	IRQ_TC11MP_PMU_CPU2,
-> +	IRQ_TC11MP_PMU_CPU3,
-> +#elif defined(CONFIG_MACH_REALVIEW_PBA8)
-> +	IRQ_PBA8_PMU,
-> +#elif defined(CONFIG_MACH_REALVIEW_PBX)
-> +	IRQ_PBX_PMU_CPU0,
-> +	IRQ_PBX_PMU_CPU1,
-> +	IRQ_PBX_PMU_CPU2,
-> +	IRQ_PBX_PMU_CPU3,
->  #elif defined(CONFIG_ARCH_OMAP3)
->  	INT_34XX_BENCH_MPU_EMUL,
->  #elif defined(CONFIG_ARCH_IOP32X)
 
-Just a generic comment.. It would be nice to get rid of the
-ifdef eliffery here for the interrupt. At least we can now
-compile omap2 + 3 + 4 into the same binary, so stuff like
-this caused mysterious errors easily.
 
-Regards,
+Do you think you can try the patch below?
 
-Tony
+It seems we might not need to change to using the atomic_add_return(0,...) because using the atomic_inc() and atomic_dec() will end up using the memory barriers.
+
+I would certainly rather fix kgdb vs mucking with the internals of cpu_relax().
+
+
+Jason.
+
+--- a/kernel/kgdb.c
++++ b/kernel/kgdb.c
+@@ -580,14 +580,13 @@ static void kgdb_wait(struct pt_regs *re
+ 	 * Make sure the above info reaches the primary CPU before
+ 	 * our cpu_in_kgdb[] flag setting does:
+ 	 */
+-	smp_wmb();
+-	atomic_set(&cpu_in_kgdb[cpu], 1);
++	atomic_inc(&cpu_in_kgdb[cpu]);
+ 
+ 	/* Disable any cpu specific hw breakpoints */
+ 	kgdb_disable_hw_debug(regs);
+ 
+ 	/* Wait till primary CPU is done with debugging */
+-	while (atomic_read(&passive_cpu_wait[cpu]))
++	while (atomic_add_return(0, &passive_cpu_wait[cpu]))
+ 		cpu_relax();
+ 
+ 	kgdb_info[cpu].debuggerinfo = NULL;
+@@ -598,7 +597,7 @@ static void kgdb_wait(struct pt_regs *re
+ 		arch_kgdb_ops.correct_hw_break();
+ 
+ 	/* Signal the primary CPU that we are done: */
+-	atomic_set(&cpu_in_kgdb[cpu], 0);
++	atomic_dec(&cpu_in_kgdb[cpu]);
+ 	touch_softlockup_watchdog_sync();
+ 	clocksource_touch_watchdog();
+ 	local_irq_restore(flags);
+@@ -1493,7 +1492,7 @@ acquirelock:
+ 	 * spin_lock code is good enough as a barrier so we don't
+ 	 * need one here:
+ 	 */
+-	atomic_set(&cpu_in_kgdb[ks->cpu], 1);
++	atomic_inc(&cpu_in_kgdb[ks->cpu]);
+ 
+ #ifdef CONFIG_SMP
+ 	/* Signal the other CPUs to enter kgdb_wait() */
+@@ -1505,7 +1504,7 @@ acquirelock:
+ 	 * Wait for the other CPUs to be notified and be waiting for us:
+ 	 */
+ 	for_each_online_cpu(i) {
+-		while (!atomic_read(&cpu_in_kgdb[i]))
++		while (!atomic_add_return(0, &cpu_in_kgdb[i]))
+ 			cpu_relax();
+ 	}
+ 
+@@ -1528,7 +1527,7 @@ acquirelock:
+ 
+ 	kgdb_info[ks->cpu].debuggerinfo = NULL;
+ 	kgdb_info[ks->cpu].task = NULL;
+-	atomic_set(&cpu_in_kgdb[ks->cpu], 0);
++	atomic_dec(&cpu_in_kgdb[ks->cpu]);
+ 
+ 	if (!kgdb_single_step) {
+ 		for (i = NR_CPUS-1; i >= 0; i--)
+@@ -1538,7 +1537,7 @@ acquirelock:
+ 		 * from the debugger.
+ 		 */
+ 		for_each_online_cpu(i) {
+-			while (atomic_read(&cpu_in_kgdb[i]))
++			while (atomic_add_return(0, &cpu_in_kgdb[i]))
+ 				cpu_relax();
+ 		}
+ 	}
+@@ -1742,11 +1741,11 @@ EXPORT_SYMBOL_GPL(kgdb_unregister_io_mod
+  */
+ void kgdb_breakpoint(void)
+ {
+-	atomic_set(&kgdb_setting_breakpoint, 1);
++	atomic_inc(&kgdb_setting_breakpoint);
+ 	wmb(); /* Sync point before breakpoint */
+ 	arch_kgdb_breakpoint();
+ 	wmb(); /* Sync point after breakpoint */
+-	atomic_set(&kgdb_setting_breakpoint, 0);
++	atomic_dec(&kgdb_setting_breakpoint);
+ }
+ EXPORT_SYMBOL_GPL(kgdb_breakpoint);
+ 
