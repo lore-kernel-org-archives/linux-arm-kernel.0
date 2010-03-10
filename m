@@ -1,36 +1,46 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 10 Mar 2010 07:07:49 +0100
-Subject: [PATCH 02/11] ST SPEAr: Added basic header files for SPEAr3xx
-	machine family
-In-Reply-To: <4B9735B2.1030108@st.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 10 Mar 2010 11:40:39 +0530
+Subject: [PATCH 07/11] ST SPEAr: Added source files for SPEAr3xx machine
+	family
+In-Reply-To: <63386a3d1003092115ia91b7d9l64cc89ebd72d7e22@mail.gmail.com>
 References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003091242i5e8786e4n1fe0d83b97d51e3b@mail.gmail.com>
-	<4B9735B2.1030108@st.com>
-Message-ID: <63386a3d1003092207yd7a5a6dqf0aeb03ba67e602a@mail.gmail.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
+	<4B95F339.5040903@st.com>
+	<63386a3d1003092115ia91b7d9l64cc89ebd72d7e22@mail.gmail.com>
+Message-ID: <22dbbef21003092210x44e7e535mf418b1ebf2bc8a9c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
-> On 3/10/2010 2:12 AM, Linus Walleij wrote:
+Linus,
 
->> If you want to keep this file anyway, move it from mach-spear3xx/include/mach
->> to just mach-spear3xx and include like this: #include "misc_regs.h" and
->> thus avoid the entire drivers/* tree (etc) from being able to #include
->> <mach/misc_regs.h>
->> because surely any machine-specific special driver using these very
->> machine-specific
->> registers will be in mach-spear3xx/ anyway.
+On Wed, Mar 10, 2010 at 10:45 AM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/3/9 Viresh KUMAR <viresh.kumar@st.com>:
 >
-> Surely, any standard driver will not use them. Actually we have kept clock
-> framework code common to different machines in plat-spear.
-> And here we need to use misc_regs.h, for this reason i kept it in
-> mach/include/mach.
+>> On 3/9/2010 12:16 PM, Linus Walleij wrote:
+>>> Hi Viresh,
+>>>> (...)
+>>>> + ? ? ? .irq = {IRQ_UART, NO_IRQ},
+>>>> + ? ? ? .periphid = 0x00041011,
+>>>> +};
+>>>
+>>> You're hardcoding the PrimeCell ID to the ARM version, (...)
+>>
+>> Actually PL011 is customized by ST's nomadik platform. And hence above
+>> is true for nomadik only. We are using ARM's version of PL011 without
+>> any customization over it and so id for our case is still 0x00041011.
+>
+> OK then you can probably just delete the .periphid line, the only thing that
+> will do is to override the number found in the ID registers with the same
+> number. If this doesn't work you certainly have a modified version anyway.
+>
 
-Okay so the plat-spear code use <mach/misc_regs.h> that is different
-between different machines? Then it's correct of course, sorry for going
-astray, please keep it there then.
+OK.
 
-Yours,
-Linus Walleij
+viresh.
