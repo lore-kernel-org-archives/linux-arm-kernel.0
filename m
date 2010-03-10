@@ -1,48 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Mar 2010 13:53:22 -0800
-Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
-In-Reply-To: <1268143623-22361-2-git-send-email-saeed@marvell.com>
-References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
-	<1268143623-22361-2-git-send-email-saeed@marvell.com>
-Message-ID: <20100310215321.GP2900@atomide.com>
+From: albin.tonnerre@gmail.com (Albin Tonnerre)
+Date: Wed, 10 Mar 2010 23:27:31 +0100
+Subject: [PATCH 1/6] ARM: perf-events: add Realview PMU IRQs to pmu.c
+In-Reply-To: <20100310215918.GR2900@atomide.com>
+References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
+	<20100310215918.GR2900@atomide.com>
+Message-ID: <20100310222731.GH4585@pc-ran3241>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Saeed Bishara <saeed@marvell.com> [100309 06:13]:
-> Signed-off-by: Saeed Bishara <saeed@marvell.com>
-> ---
->  arch/arm/mm/proc-v7.S |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+On Wed, 10 Mar 2010 13:59 -0800, Tony Lindgren wrote :
+> * Will Deacon <will.deacon@arm.com> [100310 02:46]:
+> > Add the PMU IRQs for the Realview boards to kernel/pmu.c so that
+> > they can be used by the perf-events framework.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/kernel/pmu.c |   14 ++++++++++++++
+> >  1 files changed, 14 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+> > index a124312..11a321e 100644
+> > --- a/arch/arm/kernel/pmu.c
+> > +++ b/arch/arm/kernel/pmu.c
+> > @@ -36,6 +36,20 @@ static const int irqs[] = {
+> >  	IRQ_EB11MP_PMU_CPU1,
+> >  	IRQ_EB11MP_PMU_CPU2,
+> >  	IRQ_EB11MP_PMU_CPU3,
+> > +#elif defined(CONFIG_MACH_REALVIEW_PB1176)
+> > +	IRQ_DC1176_CORE_PMU,
+> > +#elif defined(CONFIG_MACH_REALVIEW_PB11MP)
+> > +	IRQ_TC11MP_PMU_CPU0,
+> > +	IRQ_TC11MP_PMU_CPU1,
+> > +	IRQ_TC11MP_PMU_CPU2,
+> > +	IRQ_TC11MP_PMU_CPU3,
+> > +#elif defined(CONFIG_MACH_REALVIEW_PBA8)
+> > +	IRQ_PBA8_PMU,
+> > +#elif defined(CONFIG_MACH_REALVIEW_PBX)
+> > +	IRQ_PBX_PMU_CPU0,
+> > +	IRQ_PBX_PMU_CPU1,
+> > +	IRQ_PBX_PMU_CPU2,
+> > +	IRQ_PBX_PMU_CPU3,
+> >  #elif defined(CONFIG_ARCH_OMAP3)
+> >  	INT_34XX_BENCH_MPU_EMUL,
+> >  #elif defined(CONFIG_ARCH_IOP32X)
 > 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 7aaf88a..06cc36c 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -52,6 +52,11 @@ ENTRY(cpu_v7_proc_fin)
->  	bic	r0, r0, #0x1000			@ ...i............
->  	bic	r0, r0, #0x0006			@ .............ca.
->  	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
-> +#ifdef CONFIG_OUTER_CACHE
-> +	mrc	p15, 0, r0, c1, c0, 1
-> +	bic	r0, r0, #0x2
-> +	mcr	p15, 0, r0, c1, c0, 1		@ disable L2 cache
-> +#endif
->  	ldmfd	sp!, {pc}
->  ENDPROC(cpu_v7_proc_fin)
+> Just a generic comment.. It would be nice to get rid of the
+> ifdef eliffery here for the interrupt. At least we can now
+> compile omap2 + 3 + 4 into the same binary, so stuff like
+> this caused mysterious errors easily.
 
-This one is a bit tricky. I know of three different ways
-to disable the L2 cache depending on the hardware. One of
-them is what you have above. The second is via SMI, and
-then the first one won't work. The third is via external
-secure monitor calls used on some omaps at least. And in
-the third case the first two methods won't work.
+That's the purpose of another patch series Will has submitted as an RFC,
+see '[RFC PATCH 0/2] ARM: pmu: provide a registration mechanism for IRQs'
 
-AFAIK disabling the c bit should also disable the outer
-cache. Anybody know if there's something else to it?
-
-I'm currently thinking we should call outer_clean_range
-before hitting cpu_v6_proc_fin, then disable cache.
-
-Regards,
-
-Tony
+Cheers,
+-- 
+Albin Tonnerre
