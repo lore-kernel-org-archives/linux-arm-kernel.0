@@ -1,67 +1,57 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 10 Mar 2010 09:27:37 -0800
-Subject: [PATCH] omap: resource: Add per-resource mutex for OMAP resource
-	framework
-In-Reply-To: <8bb80c381003091611l7211439ief40c5cf31e782a0@mail.gmail.com>
-	(Mike Chan's message of "Tue\, 9 Mar 2010 16\:11\:52 -0800")
-References: <-1645286213079228429@unknownmsgid>
-	<8bb80c381003091611l7211439ief40c5cf31e782a0@mail.gmail.com>
-Message-ID: <87eijsgk8m.fsf@deeprootsystems.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 10 Mar 2010 11:29:53 -0600
+Subject: [PATCH] locomo.c: i2c spin_unlock_irqrestore bugfix
+Message-ID: <0D753D10438DA54287A00B027084269763683A720E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Chan <mike@android.com> writes:
+The function locomo_m62332_senddata sends a three byte i2c message to
+a M62332 DAC. This entire function is guarded with a spin_lock_irqsave
+at the start of the function and a spin_unlock_irqrestore at the end.
 
-> On Tue, Mar 9, 2010 at 4:09 PM,  <y@google.com> wrote:
->> From: Chunqiu Wang <cqwang@motorola.com>
->>
->> Current OMAP resource fwk uses a global res_mutex
->> for resource_request and resource_release calls
->> for all the available resources.It may cause dead
->> lock if resource_request/resource_release is called
->> recursively.
->>
->> For current OMAP3 VDD1/VDD2 resource, the change_level
->> implementation is mach-omap2/resource34xx.c/set_opp(),
->> when using resource_release to remove vdd1 constraint,
->> this function may call resource_release again to release
->> Vdd2 constrait if target vdd1 level is less than OPP3.
->> in this scenario, the global res_mutex down operation
->> will be called again, this will cause the second
->> down operation hang there.
->>
->> To fix the problem, per-resource mutex is added
->> to avoid hangup when resource_request/resource_release
->> is called recursively.
->>
->> Signed-off-by: Chunqiu Wang <cqwang@motorola.com>
->> Signed-off-by: Mike Chan <mike@android.com>
->> ---
->> ?arch/arm/plat-omap/include/plat/resource.h | ? ?2 ++
->> ?arch/arm/plat-omap/resource.c ? ? ? ? ? ? ?| ? 21 ++++++++++-----------
->> ?2 files changed, 12 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/include/plat/resource.h b/arch/arm/plat-omap/include/plat/resource.h
->> index 9acebcc..b5aff1f 100644
->> --- a/arch/arm/plat-omap/include/plat/resource.h
->> +++ b/arch/arm/plat-omap/include/plat/resource.h
->> @@ -54,6 +54,8 @@ struct shared_resource {
->> ? ? ? ?/* Shared resource operations */
->> ? ? ? ?struct shared_resource_ops *ops;
+As each byte is transferred, the i2c ACK from the DAC is checked.
+Currently, if the ACK is missing the function simply returns without
+the unlock. It also leaves the i2c bus in an invalid state since the
+last byte transferred did not have a "stop" condition and leave the
+bus idle.
 
-[...]
+Fix this by adding an exit path using goto.
 
->
-> Oops, my git client was slightly screwed up, apologies, I meant to
-> send this from mike at android.com, the patch is still good though :)
->
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 
-FYI... SRF is currently only in the PM branch of the OMAP tree, is
-deprecated and is not targeted for mainline.  
+---
 
-I'll merge this there, but please note that there is no new
-development happening for SRF.
-
-Thanks,
-
-Kevin
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 90ae00b..cb070cf 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -707,7 +707,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+ 	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
+-		return;
++		goto out;
+ 	}
+ 
+ 	/* Send Sub address (LSB is channel select) */
+@@ -735,7 +735,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+ 	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
+-		return;
++		goto out;
+ 	}
+ 
+ 	/* Send DAC data */
+@@ -760,9 +760,9 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+ 	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
+-		return;
+ 	}
+ 
++out:
+ 	/* stop */
+ 	r = locomo_readl(mapbase + LOCOMO_DAC);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
