@@ -1,42 +1,42 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Wed, 10 Mar 2010 10:02:36 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B975C9A.3020106@visionsystems.de>
-References: <4B85789D.6000704@billgatliff.com>
-	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
-	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
-	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
-Message-ID: <4B97602C.6070608@atmel.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 10 Mar 2010 10:31:18 +0100
+Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
+	platform
+In-Reply-To: <4B973CF6.4030009@st.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>
+	<4B973CF6.4030009@st.com>
+Message-ID: <63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
+> Linus Walleij:
+>> If this file is only supposed to be used from plat-spear/time.c, move it down
+>> into plat-spear/gpt.h and #include "gpt.h" so noone else will
+>> accidentally use it.
 >
-> I tried both files and the one really working is ac97c_alsa.c. As far as I understand it is combination of both patches for at91 support and full duplex?
+> GPT's on SPEAr can be used from time.c, platform specific drivers and machine
+> specific drivers or any driver wishing to use hardware timer.
+> In first two cases "gpt.h" will work, but in rest of cases we need gpt.h to be
+> in plat-spear/include/plat
 >
-> I've tried the following applications under Debian 5.0:
->
-> mpg123
-> vlc
-> mplayer
-> amarok
->
-> Regards,
-> Yegor
->
+> Is it okay?
 
-ac97c_alsa.c is the result of the 2 patches I have send to the alsa 
-mailing list 
-(http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html 
-and 
-http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025628.html). 
-It indeed adds support for AT91(1/2) and full duplex(2/2).But is is 
-strange that if you only apply only the first patch you encounter errors...
+If you have or have already planned to write such platform, machine
+or subsystem drivers, it's OK, if there are no such users and you cannot
+easily give one, it's overdesigned IMHO. Some realistic examples of such
+drivers will make me change my mind :-)
 
-On my side I have only tested these patches with mplayer and aplay.
-Plus to test the full duplex I have done like this:
-"arecord -d 10 -f cd -t wav test.wav & mplayer my_file.mp3"
+The reason I persist is that I've seen such unutilized timer API:s before and
+no other user than the system timer in sight. I never understood what they
+were to be used for, and I still don't, so help me understand. The kernel
+has many internal timer API:s based on clockevent available already so
+why add yet another, platform-specific one?
 
-Regards,
-Sedji
+Yours,
+Linus Walleij
