@@ -1,120 +1,45 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 10 Mar 2010 12:02:22 +0530
-Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
-	platform
-In-Reply-To: <63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>
-Message-ID: <4B973CF6.4030009@st.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 10 Mar 2010 16:03:24 +0800
+Subject: [PATCH] locomo: replace locomo_{readl/writel} macros with
+	__raw_{readw/writew}
+In-Reply-To: <0D753D10438DA54287A00B027084269763682CE083@AUSP01VMBX24.collaborationhost.net>
+References: <BD79186B4FD85F4B8E60E381CAEE1909022427CF@mi8nycmail19.Mi8.com>
+	<f17812d71003090526r33325407n250c92b1947d9fcf@mail.gmail.com>
+	<0D753D10438DA54287A00B027084269763682CE083@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <f17812d71003100003g7f5c4113ofb7d8bddf505de2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On 3/10/2010 11:10 AM, Linus Walleij wrote:
-> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
-> 
->>  arch/arm/plat-spear/include/plat/gpt.h |  108 ++++++++++++++++++++++++++++++++
-> 
-> If this file is only supposed to be used from plat-spear/time.c, move it down
-> into plat-spear/gpt.h and #include "gpt.h" so noone else will
-> accidentally use it.
-
-GPT's on SPEAr can be used from time.c, platform specific drivers and machine
-specific drivers or any driver wishing to use hardware timer.
-In first two cases "gpt.h" will work, but in rest of cases we need gpt.h to be
-in plat-spear/include/plat
-
-Is it okay?
-
-> 
->> (...)
+On Wed, Mar 10, 2010 at 9:21 AM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> On Tuesday, March 09, 2010 6:26 AM, Eric Miao wrote:
+>> On Tue, Mar 9, 2010 at 8:18 AM, H Hartley Sweeten
+>><hartleys@visionengravers.com> wrote:
+>>> The locomo_readl and locomo_writel macros are misnamed. Both
+>>> use (*(volatile u16 *)(addr)) so they should be a *w variety.
+>>>
+>>> Instead of renaming the macros just replace them tree wide with
+>>> __raw_readw and __raw_writew.
+>>>
+>>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>>>
 >>
->> +#ifndef __ASM_PLAT_GPT_H
->> +#define __ASM_PLAT_GPT_H
-> 
-> This file to macro match i.e. __PLAT_GPT_H again I think...
-> (But see below.)
+>> Hey Hartley,
+>>
+>> Could you please rebase this on top of my 'devel' branch? And note
+>> locomo_{read,write}l() may also be used in sub-device drivers like
+>> keyboard, LEDs and etc.
+>
+> Eric,
+>
+> I "think" I found your devel branch on kernel.org. ?Following is the
+> rebase.
+>
+> I also noticed a bug in locomo_suspend. The address is wrong when writing
+> to the SPI control register. LOCOMO_SPICT is defined as an offset from
+> LOCOMO_SPI, it's not an offset from the locomo base address. I fixed it
+> in this patch but it might be better as a separate patch.
 
-will be changed
-
-> 
->> +
->> +/* register offsets */
->> +#define GPT_CTRL_OFF           0x80 /* Control Register */
->> +#define GPT_INT_OFF            0x84 /* Interrupt Regiset */
->> +#define GPT_LOAD_OFF           0x88 /* Load Register */
->> +#define GPT_COUNT_OFF          0x8C /* Current Count Register */
-> 
-> Some people want you to do all the indentation e.g. between
-> GPT_CTRL_OFF -> 0x80 with TABs only, and I tend to do that
-> to keep everybody happy. (This would go for all .h files with
-> register definitions.
-> 
-
-I have done it the way you said. I don't know what happened to
-formatting, even if i see my original patchset, i see tabs and no
-spaces. I will take care of this in next version of patchset too.
-
->> +
->> + * Following functions are exported by gpt.c which can be used by other
->> + * kernel entities
->> + */
->> +int spear_timer_init(struct spear_timer *, int);
->> +
->> +struct spear_timer *spear_timer_request(void);
->> +struct spear_timer *spear_timer_request_specific(int id);
->> +
->> +int spear_timer_free(struct spear_timer *timer);
->> +int spear_timer_enable(struct spear_timer *timer);
->> +int spear_timer_disable(struct spear_timer *timer);
->> +
->> +int spear_timer_get_irq(struct spear_timer *timer);
->> +
->> +struct clk *spear_timer_get_fclk(struct spear_timer *timer);
->> +
->> +int spear_timer_start(struct spear_timer *timer);
->> +int spear_timer_stop(struct spear_timer *timer);
->> +
->> +int spear_timer_set_source(struct spear_timer *timer, int source);
->> +int spear_timer_set_load(struct spear_timer *timer, int autoreload,
->> +               u16 value);
->> +int spear_timer_set_load_start(struct spear_timer *timer, int autoreload,
->> +               u16 value);
->> +int spear_timer_match_irq(struct spear_timer *timer, int enable);
->> +int spear_timer_set_prescaler(struct spear_timer *timer, int prescaler);
->> +
->> +int spear_timer_read_status(struct spear_timer *timer);
->> +int spear_timer_clear_status(struct spear_timer *timer, u16 value);
->> +
->> +int spear_timer_read_counter(struct spear_timer *timer);
->> +
->> +int spear_timer_active(struct spear_timer *);
-> 
-> Am I right in assuming that this will only ever be used from the plat/timer.c
-> file?
-
-This will be used by any module looking to use hardware timer.
-
-> 
-> I would contemplate moving away the abstraction API altogether and put
-> everything into timer.c, and just hardcode in the timers you're using as
-> clocksource and clock event, and put the register definitions and
-> offsets from base there as well. This will get down the number of files
-> and reduce the forest of files in a nice way.
-> 
-> If you have some other use of timers that you're planning, the API may
-> be justified, please detail the uses you have in mind in that case.
-> 
-> I know writing APIs is great fun, but sometimes it's easier to read the
-> code if you just get rid of them and keep things simple...
-> 
-
-Explained earlier.
-
-
-viresh kumar
+A separate patch is definitely welcome. Thanks.
