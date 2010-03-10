@@ -1,57 +1,42 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Wed, 10 Mar 2010 09:47:22 +0100
+From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
+Date: Wed, 10 Mar 2010 10:02:36 +0100
 Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B96668E.6090805@atmel.com>
+In-Reply-To: <4B975C9A.3020106@visionsystems.de>
 References: <4B85789D.6000704@billgatliff.com>
 	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
 	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
 	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-	<4B96668E.6090805@atmel.com>
-Message-ID: <4B975C9A.3020106@visionsystems.de>
+	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
+Message-ID: <4B97602C.6070608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sedji,
+Hi,
+>
+> I tried both files and the one really working is ac97c_alsa.c. As far as I understand it is combination of both patches for at91 support and full duplex?
+>
+> I've tried the following applications under Debian 5.0:
+>
+> mpg123
+> vlc
+> mplayer
+> amarok
+>
+> Regards,
+> Yegor
+>
 
-Sedji Gaouaou wrote:
-> Le 3/9/2010 3:11 PM, Yegor Yefremov a ?crit :
->>> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html
->>>
->>
->> I tried your patch, but mpg123 says:
->>
->> Playing MPEG stream 1 of 1: 05_Tabor_Romance.mp3 ...
->> Title:                                   Artist:
->> Comment:                                 Album:
->> Year:                                    Genre:  Other
->> MPEG 1.0 layer III, 128 kbit/s, 44100 Hz stereo
->> [audio.c:532] error: Error in writing audio (Input/output error?)!
->> [mpg123.c:557] error: Deep trouble! Cannot flush to my output anymore!
->>
->> I'm using kernel 2.6.33 on the at91sam9g45-ek. For sound I use patches
->> 0039 and 0044 from
->> ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz.
->> With these I get proper sound from my head phones.
->>
->> Regards,
->> Yegor
->>
-> I never tried with mpg123. But I just diff the 2 sets of patches, and
-> the only difference I can see is that the one on linux4sam doesn't
-> handle full duplex, whereas the one I posted on the alsa mailing does...
-> 
-> Yoy can find enclosed both files, may I ask you to test with both?
-> If it fails then I guess there is something wrong with the way the full
-> duplex is done(even though I have tested it on my board...)
+ac97c_alsa.c is the result of the 2 patches I have send to the alsa 
+mailing list 
+(http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html 
+and 
+http://mailman.alsa-project.org/pipermail/alsa-devel/2010-February/025628.html). 
+It indeed adds support for AT91(1/2) and full duplex(2/2).But is is 
+strange that if you only apply only the first patch you encounter errors...
 
-I tried both files and the one really working is ac97c_alsa.c. As far as I understand it is combination of both patches for at91 support and full duplex?
-
-I've tried the following applications under Debian 5.0:
-
-mpg123
-vlc
-mplayer
-amarok
+On my side I have only tested these patches with mplayer and aplay.
+Plus to test the full duplex I have done like this:
+"arecord -d 10 -f cd -t wav test.wav & mplayer my_file.mp3"
 
 Regards,
-Yegor
+Sedji
