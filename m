@@ -1,293 +1,75 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Wed, 10 Mar 2010 19:42:25 +0530
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor autoloading
-	feature
-Message-ID: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 10 Mar 2010 23:16:46 +0900
+Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
+	platform
+In-Reply-To: <4B977067.3050108@st.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>
+	<4B973CF6.4030009@st.com>
+	<63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>
+	<4B977067.3050108@st.com>
+Message-ID: <20100310141645.GB22729@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-See previous post http://patchwork.kernel.org/patch/82909/.
-Rebased to 2.6.34-rc1
+On Wed, Mar 10, 2010 at 03:41:51PM +0530, Viresh KUMAR wrote:
+> On 3/10/2010 3:01 PM, Linus Walleij wrote:
+> > 2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
+> >> Linus Walleij:
+> >>> If this file is only supposed to be used from plat-spear/time.c, move it down
+> >>> into plat-spear/gpt.h and #include "gpt.h" so noone else will
+> >>> accidentally use it.
+> >>
+> >> GPT's on SPEAr can be used from time.c, platform specific drivers and machine
+> >> specific drivers or any driver wishing to use hardware timer.
+> >> In first two cases "gpt.h" will work, but in rest of cases we need gpt.h to be
+> >> in plat-spear/include/plat
+> >>
+> >> Is it okay?
+> > 
+> > If you have or have already planned to write such platform, machine
+> > or subsystem drivers, it's OK, if there are no such users and you cannot
+> > easily give one, it's overdesigned IMHO. Some realistic examples of such
+> > drivers will make me change my mind :-)
+> > 
+> > The reason I persist is that I've seen such unutilized timer API:s before and
+> > no other user than the system timer in sight. I never understood what they
+> > were to be used for, and I still don't, so help me understand. The kernel
+> > has many internal timer API:s based on clockevent available already so
+> > why add yet another, platform-specific one?
+> > 
+> 
+> As you may have seen in spear.h files in mach folders, we have multiple hardware
+> timers in our design (3 in spear3xx, 4 in spear6xx and each timer have two
+> independent channels. That doubles the timers count, so it is 6 and 8).
+> One timer (or two channels) are used by clock event and clock source, but rest of
+> the timers are still available. So we need some way to export this functionality
+> of our hardware. It can be considered simply as a driver for GPT.
+> 
+> What do you say?
+> 
+This is hardly a unique situation for your platform, this is true for
+most platforms. There's no reason why clockevents couldn't just be
+extended and drivers could then just grab unused clockevents and pin them
+accordingly. Most of the infrastructure is already in place for something
+like that, without really having to do anything special.
 
-CC: Adrian Hunter <adrian.hunter@nokia.com>
-CC: Madhusudhan C <madhu.cr@ti.com>
-CC: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Venkatraman S <svenkatr@ti.com>
----
- drivers/mmc/host/omap_hsmmc.c |  143 +++++++++++++++++++++++++++++++++++------
- 1 files changed, 122 insertions(+), 21 deletions(-)
+Having said that, most drivers have pretty lame reasons for trying to get
+at fixed timer channels, and most of the time they can easily get by with
+an hrtimer instead. There's also the issue that you're effectively
+bypassing nohz by having some timer channel off on the side doing who
+knows what. You would need a pretty compelling reason for why you are
+sidestepping all of the existing infrastructure anyways.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index ea2a082..131d889 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -102,6 +102,7 @@
- #define SRD			(1 << 26)
- #define SOFTRESET		(1 << 1)
- #define RESETDONE		(1 << 0)
-+#define DMA_ICR_QUIET		0xD00
+There are still some legitimate users for dedicated timers that we may
+want to have decoupled from sched_clock() (like the trace clock) and so
+on, but when people start rolling their own timer APIs it always sets off
+warning bells, as it's almost always because they want to do something in
+a driver that existing infrastructure already provides for them.
 
- /*
-  * FIXME: Most likely all the data using these _DEVID defines should come
-@@ -118,6 +119,12 @@
- #define OMAP_MMC_MASTER_CLOCK	96000000
- #define DRIVER_NAME		"mmci-omap-hs"
-
-+#define DMA_TYPE_NODMA	0
-+#define DMA_TYPE_SDMA	1
-+#define DMA_TYPE_SDMA_DLOAD 2
-+
-+#define DMA_CTRL_BUF_SIZE	(PAGE_SIZE * 3)
-+
- /* Timeouts for entering power saving states on inactivity, msec */
- #define OMAP_MMC_DISABLED_TIMEOUT	100
- #define OMAP_MMC_SLEEP_TIMEOUT		1000
-@@ -172,7 +179,11 @@ struct omap_hsmmc_host {
- 	u32			bytesleft;
- 	int			suspended;
- 	int			irq;
--	int			use_dma, dma_ch;
-+	int			dma_caps;
-+	int			dma_in_use;
-+	int			dma_ch;
-+	void			*dma_ctrl_buf;
-+	dma_addr_t		dma_ctrl_buf_phy;
- 	int			dma_line_tx, dma_line_rx;
- 	int			slot_id;
- 	int			got_dbclk;
-@@ -768,7 +779,7 @@ omap_hsmmc_start_command(struct omap_hsmmc_host
-*host, struct mmc_command *cmd,
- 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
- 	OMAP_HSMMC_WRITE(host->base, ISE, INT_EN_MASK);
-
--	if (host->use_dma)
-+	if (host->dma_in_use)
- 		OMAP_HSMMC_WRITE(host->base, IE,
- 				 INT_EN_MASK & ~(BRR_ENABLE | BWR_ENABLE));
- 	else
-@@ -803,7 +814,7 @@ omap_hsmmc_start_command(struct omap_hsmmc_host
-*host, struct mmc_command *cmd,
- 			cmdreg &= ~(DDIR);
- 	}
-
--	if (host->use_dma)
-+	if (host->dma_in_use)
- 		cmdreg |= DMA_EN;
-
- 	/*
-@@ -850,7 +861,7 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host,
-struct mmc_data *data)
-
- 	host->data = NULL;
-
--	if (host->use_dma && host->dma_ch != -1)
-+	if (host->dma_in_use && host->dma_ch != -1)
- 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
- 			omap_hsmmc_get_dma_dir(host, data));
-
-@@ -900,7 +911,7 @@ static void omap_hsmmc_dma_cleanup(struct
-omap_hsmmc_host *host, int errno)
- {
- 	host->data->error = errno;
-
--	if (host->use_dma && host->dma_ch != -1) {
-+	if (host->dma_in_use && host->dma_ch != -1) {
- 		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host->dma_len,
- 			omap_hsmmc_get_dma_dir(host, host->data));
- 		omap_free_dma(host->dma_ch);
-@@ -1253,7 +1264,6 @@ static void omap_hsmmc_config_dma_params(struct
-omap_hsmmc_host *host,
- 			omap_hsmmc_get_dma_sync_dev(host, data),
- 			!(data->flags & MMC_DATA_WRITE));
-
--	omap_start_dma(dma_ch);
- }
-
- /*
-@@ -1268,21 +1278,32 @@ static void omap_hsmmc_dma_cb(int lch, u16
-ch_status, void *data)
-
- 	if (host->dma_ch < 0)
- 		return;
--
--	host->dma_sg_idx++;
--	if (host->dma_sg_idx < host->dma_len) {
--		/* Fire up the next transfer. */
--		omap_hsmmc_config_dma_params(host, host->data,
-+	if (host->dma_in_use == DMA_TYPE_SDMA) {
-+		host->dma_sg_idx++;
-+		if (host->dma_sg_idx < host->dma_len) {
-+			/* Fire up the next transfer. */
-+			omap_hsmmc_config_dma_params(host, host->data,
- 					   host->data->sg + host->dma_sg_idx);
--		return;
-+			omap_start_dma(host->dma_ch);
-+			return;
-+		}
- 	}
-
- }
-
-+static int omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host)
-+{
-+	if (host->dma_in_use == DMA_TYPE_SDMA)
-+		omap_start_dma(host->dma_ch);
-+	else if (host->dma_in_use == DMA_TYPE_SDMA_DLOAD)
-+		return omap_start_dma_sglist_transfers(host->dma_ch, -1);
-+
-+	return 0;
-+}
- /*
-- * Routine to configure and start DMA for the MMC card
-+ * Routine to configure DMA for the MMC card
-  */
--static int omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host,
-+static int omap_hsmmc_configure_sdma(struct omap_hsmmc_host *host,
- 					struct mmc_request *req)
- {
- 	int dma_ch = 0, ret = 0, err = 1, i;
-@@ -1339,6 +1360,56 @@ static int omap_hsmmc_start_dma_transfer(struct
-omap_hsmmc_host *host,
- 	return 0;
- }
-
-+static int omap_hsmmc_configure_sdma_sglist(struct omap_hsmmc_host *host,
-+		struct mmc_request *req)
-+{
-+	int i;
-+	struct omap_dma_sglist_node *sglist, *snode;
-+	struct mmc_data *data = req->data;
-+	int blksz;
-+	int dmadir = omap_hsmmc_get_dma_dir(host, data);
-+	struct omap_dma_sglist_type2a_params *t2p;
-+
-+	sglist = (struct omap_dma_sglist_node *) host->dma_ctrl_buf;
-+	snode = sglist;
-+	blksz = host->data->blksz;
-+
-+	if ((host->dma_len * sizeof(*snode)) > DMA_CTRL_BUF_SIZE) {
-+		dev_err(mmc_dev(host->mmc), "not enough sglist memory %d\n",
-+			host->dma_len);
-+		return -ENOMEM;
-+	}
-+	for (i = 0; i < host->dma_len; snode++, i++) {
-+		snode->desc_type = OMAP_DMA_SGLIST_DESCRIPTOR_TYPE2a;
-+		snode->num_of_elem = blksz / 4;
-+		t2p = &snode->sg_node.t2a;
-+
-+		if (dmadir == DMA_FROM_DEVICE) {
-+			t2p->src_addr = host->mapbase + OMAP_HSMMC_DATA;
-+			t2p->dst_addr = sg_dma_address(data->sg + i);
-+		} else {
-+			t2p->dst_addr = host->mapbase + OMAP_HSMMC_DATA;
-+			t2p->src_addr = sg_dma_address(data->sg + i);
-+		}
-+		snode->flags =
-+			OMAP_DMA_LIST_DST_VALID | OMAP_DMA_LIST_SRC_VALID;
-+
-+		t2p->cfn_fn = sg_dma_len(data->sg + i) / host->data->blksz;
-+		t2p->cicr = DMA_ICR_QUIET;
-+
-+		t2p->dst_frame_idx_or_pkt_size = 0;
-+		t2p->src_frame_idx_or_pkt_size = 0;
-+		t2p->dst_elem_idx = 0;
-+		t2p->src_elem_idx = 0;
-+	}
-+	dev_dbg(mmc_dev(host->mmc), "new sglist %x len =%d\n",
-+			host->dma_ctrl_buf_phy, i);
-+	omap_set_dma_sglist_mode(host->dma_ch, sglist,
-+			host->dma_ctrl_buf_phy, i, NULL);
-+	omap_dma_set_sglist_fastmode(host->dma_ch, 1);
-+	return 0;
-+}
-+
- static void set_data_timeout(struct omap_hsmmc_host *host,
- 			     unsigned int timeout_ns,
- 			     unsigned int timeout_clks)
-@@ -1400,14 +1471,23 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host
-*host, struct mmc_request *req)
- 					| (req->data->blocks << 16));
- 	set_data_timeout(host, req->data->timeout_ns, req->data->timeout_clks);
-
--	if (host->use_dma) {
--		ret = omap_hsmmc_start_dma_transfer(host, req);
--		if (ret != 0) {
--			dev_dbg(mmc_dev(host->mmc), "MMC start dma failure\n");
-+	if (host->dma_caps & DMA_TYPE_SDMA) {
-+		ret = omap_hsmmc_configure_sdma(host, req);
-+		if (ret)
- 			return ret;
--		}
-+		host->dma_in_use = DMA_TYPE_SDMA;
- 	}
--	return 0;
-+	if ((host->dma_caps & DMA_TYPE_SDMA_DLOAD) &&
-+		host->data->sg_len > 4) {
-+		ret = omap_hsmmc_configure_sdma_sglist(host, req);
-+		if (ret)
-+			return ret;
-+		host->dma_in_use = DMA_TYPE_SDMA_DLOAD;
-+
-+	}
-+	ret = omap_hsmmc_start_dma_transfer(host);
-+	return ret;
-+
- }
-
- /*
-@@ -1999,7 +2079,9 @@ static int __init omap_hsmmc_probe(struct
-platform_device *pdev)
- 	host->mmc	= mmc;
- 	host->pdata	= pdata;
- 	host->dev	= &pdev->dev;
--	host->use_dma	= 1;
-+	host->dma_caps	= DMA_TYPE_SDMA;
-+	host->dma_in_use	= DMA_TYPE_NODMA;
-+	host->dma_ctrl_buf = NULL;
- 	host->dev->dma_mask = &pdata->dma_mask;
- 	host->dma_ch	= -1;
- 	host->irq	= irq;
-@@ -2081,6 +2163,15 @@ static int __init omap_hsmmc_probe(struct
-platform_device *pdev)
- 							" clk failed\n");
- 	}
-
-+	if (cpu_is_omap44xx() || cpu_is_omap3630()) {
-+		host->dma_ctrl_buf = dma_alloc_coherent(NULL,
-+					DMA_CTRL_BUF_SIZE,
-+					&host->dma_ctrl_buf_phy,
-+					0);
-+		if (host->dma_ctrl_buf != NULL)
-+			host->dma_caps |= DMA_TYPE_SDMA_DLOAD;
-+	}
-+
- 	/* Since we do only SG emulation, we can have as many segs
- 	 * as we want. */
- 	mmc->max_phys_segs = 1024;
-@@ -2207,6 +2298,10 @@ err_reg:
- err_irq_cd_init:
- 	free_irq(host->irq, host);
- err_irq:
-+	if (host->dma_ctrl_buf)
-+		dma_free_coherent(NULL, DMA_CTRL_BUF_SIZE,
-+				host->dma_ctrl_buf,
-+				host->dma_ctrl_buf_phy);
- 	mmc_host_disable(host->mmc);
- 	clk_disable(host->iclk);
- 	clk_put(host->fclk);
-@@ -2234,6 +2329,12 @@ static int omap_hsmmc_remove(struct
-platform_device *pdev)
- 	if (host) {
- 		mmc_host_enable(host->mmc);
- 		mmc_remove_host(host->mmc);
-+
-+		if (host->dma_ctrl_buf != NULL) {
-+			dma_free_coherent(NULL, DMA_CTRL_BUF_SIZE,
-+				host->dma_ctrl_buf,
-+				host->dma_ctrl_buf_phy);
-+		}
- 		if (host->use_reg)
- 			omap_hsmmc_reg_put(host);
- 		if (host->pdata->cleanup)
--- 
-1.6.3.3
+In cases like these, it's better to see what precisely you plan to do
+with these timer channels before getting in to API semantics, though.
