@@ -1,45 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 10 Mar 2010 16:03:24 +0800
-Subject: [PATCH] locomo: replace locomo_{readl/writel} macros with
-	__raw_{readw/writew}
-In-Reply-To: <0D753D10438DA54287A00B027084269763682CE083@AUSP01VMBX24.collaborationhost.net>
-References: <BD79186B4FD85F4B8E60E381CAEE1909022427CF@mi8nycmail19.Mi8.com>
-	<f17812d71003090526r33325407n250c92b1947d9fcf@mail.gmail.com>
-	<0D753D10438DA54287A00B027084269763682CE083@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <f17812d71003100003g7f5c4113ofb7d8bddf505de2@mail.gmail.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Wed, 10 Mar 2010 09:47:22 +0100
+Subject: AC97 audio broken on SAM9263EK?
+In-Reply-To: <4B96668E.6090805@atmel.com>
+References: <4B85789D.6000704@billgatliff.com>
+	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
+	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
+	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
+	<4B96668E.6090805@atmel.com>
+Message-ID: <4B975C9A.3020106@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 10, 2010 at 9:21 AM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> On Tuesday, March 09, 2010 6:26 AM, Eric Miao wrote:
->> On Tue, Mar 9, 2010 at 8:18 AM, H Hartley Sweeten
->><hartleys@visionengravers.com> wrote:
->>> The locomo_readl and locomo_writel macros are misnamed. Both
->>> use (*(volatile u16 *)(addr)) so they should be a *w variety.
->>>
->>> Instead of renaming the macros just replace them tree wide with
->>> __raw_readw and __raw_writew.
->>>
->>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Eric Miao <eric.y.miao@gmail.com>
->>>
->>
->> Hey Hartley,
->>
->> Could you please rebase this on top of my 'devel' branch? And note
->> locomo_{read,write}l() may also be used in sub-device drivers like
->> keyboard, LEDs and etc.
->
-> Eric,
->
-> I "think" I found your devel branch on kernel.org. ?Following is the
-> rebase.
->
-> I also noticed a bug in locomo_suspend. The address is wrong when writing
-> to the SPI control register. LOCOMO_SPICT is defined as an offset from
-> LOCOMO_SPI, it's not an offset from the locomo base address. I fixed it
-> in this patch but it might be better as a separate patch.
+Hi Sedji,
 
-A separate patch is definitely welcome. Thanks.
+Sedji Gaouaou wrote:
+> Le 3/9/2010 3:11 PM, Yegor Yefremov a ?crit :
+>>> http://mailman.alsa-project.org/pipermail/alsa-devel/2010-March/025709.html
+>>>
+>>
+>> I tried your patch, but mpg123 says:
+>>
+>> Playing MPEG stream 1 of 1: 05_Tabor_Romance.mp3 ...
+>> Title:                                   Artist:
+>> Comment:                                 Album:
+>> Year:                                    Genre:  Other
+>> MPEG 1.0 layer III, 128 kbit/s, 44100 Hz stereo
+>> [audio.c:532] error: Error in writing audio (Input/output error?)!
+>> [mpg123.c:557] error: Deep trouble! Cannot flush to my output anymore!
+>>
+>> I'm using kernel 2.6.33 on the at91sam9g45-ek. For sound I use patches
+>> 0039 and 0044 from
+>> ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz.
+>> With these I get proper sound from my head phones.
+>>
+>> Regards,
+>> Yegor
+>>
+> I never tried with mpg123. But I just diff the 2 sets of patches, and
+> the only difference I can see is that the one on linux4sam doesn't
+> handle full duplex, whereas the one I posted on the alsa mailing does...
+> 
+> Yoy can find enclosed both files, may I ask you to test with both?
+> If it fails then I guess there is something wrong with the way the full
+> duplex is done(even though I have tested it on my board...)
+
+I tried both files and the one really working is ac97c_alsa.c. As far as I understand it is combination of both patches for at91 support and full duplex?
+
+I've tried the following applications under Debian 5.0:
+
+mpg123
+vlc
+mplayer
+amarok
+
+Regards,
+Yegor
