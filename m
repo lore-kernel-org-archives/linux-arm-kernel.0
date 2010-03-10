@@ -1,52 +1,49 @@
-From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
-Date: Wed, 10 Mar 2010 16:15:06 -0500
-Subject: [PATCH] ARM support single byte cmpxchg and cmpxchg_local on ARMv6
-In-Reply-To: <20100310203051.GF12345@n2100.arm.linux.org.uk>
-References: <20100310162221.GA19201@localhost>
-	<20100310173503.GC12345@n2100.arm.linux.org.uk>
-	<20100310200235.GA29827@Krystal>
-	<20100310203051.GF12345@n2100.arm.linux.org.uk>
-Message-ID: <20100310211506.GA5721@Krystal>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Mar 2010 13:55:33 -0800
+Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
+In-Reply-To: <1268152984.1000.12.camel@e102109-lin.cambridge.arm.com>
+References: <1268143623-22361-2-git-send-email-saeed@marvell.com>
+	<1268152984.1000.12.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100310215533.GQ2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux (linux at arm.linux.org.uk) wrote:
-> On Wed, Mar 10, 2010 at 03:02:36PM -0500, Mathieu Desnoyers wrote:
-> > * Russell King - ARM Linux (linux at arm.linux.org.uk) wrote:
-> > > On Wed, Mar 10, 2010 at 06:22:21PM +0200, Imre Deak wrote:
-> > > > recently you've added support for __cmpxchg for ARMv6+. There the assumption
-> > > > is that ldrex[bh]/strex[bh] is only supported on platforms with the 32v6K
-> > > > extension.
-> > > > 
-> > > > Currently the __xchg code uses these even without the extension. Should this
-> > > > be fixed?
-> > > 
-> > > From what I remember, the half-word versions definitely aren't supported
-> > > on anything without V6K extensions.  I think that the byte and word
-> > > versions are supported on V6 and up though.
-> > > 
-> > > That'd make both __cmpxchg and __xchg slightly buggy, in different ways.
-> > > 
-> > > What it does mean is that atomic operations on unsigned shorts using
-> > > ldrex/strex will only be possible on V6K and up.
+* Catalin Marinas <catalin.marinas@arm.com> [100309 09:05]:
+> On Tue, 2010-03-09 at 14:07 +0000, Saeed Bishara wrote:
+> > Signed-off-by: Saeed Bishara <saeed@marvell.com>
+> > ---
+> >  arch/arm/mm/proc-v7.S |    5 +++++
+> >  1 files changed, 5 insertions(+), 0 deletions(-)
 > > 
-> > Does the following help (addressing the single byte cmpxchg part of the
-> > problem) ?
+> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > index 7aaf88a..06cc36c 100644
+> > --- a/arch/arm/mm/proc-v7.S
+> > +++ b/arch/arm/mm/proc-v7.S
+> > @@ -52,6 +52,11 @@ ENTRY(cpu_v7_proc_fin)
+> >         bic     r0, r0, #0x1000                 @ ...i............
+> >         bic     r0, r0, #0x0006                 @ .............ca.
+> >         mcr     p15, 0, r0, c1, c0, 0           @ disable caches
+> > +#ifdef CONFIG_OUTER_CACHE
+> > +       mrc     p15, 0, r0, c1, c0, 1
+> > +       bic     r0, r0, #0x2
+> > +       mcr     p15, 0, r0, c1, c0, 1           @ disable L2 cache
+> > +#endif
+> >         ldmfd   sp!, {pc}
+> >  ENDPROC(cpu_v7_proc_fin)
 > 
-> First I'd need to look up what the real conditions are on the ldrex
-> instructions - which I'm not doing at the moment on account of being
-> down with the lurgy this week...
+> NACK.
+> 
+> I'm not sure why kexec doesn't work but bit 1 in this register has
+> different meanings on Cortex-A8 and A9.
+> 
+> Also, on Cortex-A8, it means L2EN but this refers to the inner L2 rather
+> than the outer cache (that's configurable via the L2 Auxiliary Cache
+> Control Register but the Linux meaning of outer cache is a separate
+> device outside the CPU acting as a cache controller).
 
-No problem, the patch can wait.
+Plus there are two other ways to disable the inner L2 and then
+L2EN won't work like I replied earlier.
 
-Take care,
+Regards,
 
-Mathieu
-
-
-
--- 
-Mathieu Desnoyers
-Operating System Efficiency Consultant
-EfficiOS Inc.
-http://www.efficios.com
+Tony
