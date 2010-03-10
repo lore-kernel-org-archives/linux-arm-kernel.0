@@ -1,20 +1,84 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 10 Mar 2010 17:42:24 +0100
-Subject: [PATCH 4/4] Zipit Z2 WM8750 aSoC driver
-Message-ID: <201003101742.24566.marek.vasut@gmail.com>
+From: madhu.cr@ti.com (Madhusudhan)
+Date: Wed, 10 Mar 2010 10:47:29 -0600
+Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
+	callback
+In-Reply-To: <618f0c911003010325q201fbcedr776da21c709ac421@mail.gmail.com>
+References: <618f0c911003010325q201fbcedr776da21c709ac421@mail.gmail.com>
+Message-ID: <006401cac071$5f4c3df0$544ff780@am.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-This patch adds support for sound through the WM8750 codec on Zipit Z2.
-Also, this patch incorporates support for detecting headset jack
-insertion through the jack detection API.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0008-Zipit-Z2-WM8750-aSoC-driver.patch
-Type: text/x-patch
-Size: 12783 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100310/b7b0b86b/attachment.bin>
+
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+> owner at vger.kernel.org] On Behalf Of Venkatraman S
+> Sent: Monday, March 01, 2010 5:26 AM
+> To: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-omap at vger.kernel.org
+> Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
+> callback
+> 
+> It is observed that sometimes the MMC Transfer Complete (TC) is not
+> received when DMA completion callback is processed (or takes too long
+> to process)
+> This patch moves the releasing of DMA channel from dma callback to the
+> mmc transfer complete handler.
+> This is observed consistently when descriptor loading is used (see the
+> rest of the series)
+> 
+> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++--------
+>  1 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 83f0aff..06337f6 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1046,8 +1046,18 @@ static irqreturn_t omap_hsmmc_irq(int irq, void
+> *dev_id)
+> 
+>  	if (end_cmd || ((status & CC) && host->cmd))
+>  		omap_hsmmc_cmd_done(host, host->cmd);
+> -	if ((end_trans || (status & TC)) && host->mrq)
+> +	if ((end_trans || (status & TC)) && host->mrq) {
+>  		omap_hsmmc_xfer_done(host, data);
+> +		if (host->dma_ch != -1) {
+> +			omap_free_dma(host->dma_ch);
+> +			host->dma_ch = -1;
+
+Why is this necessary? The core is notified of xfer complete only when TC is
+received which is good enough.
+
+> +		/*
+> +		 * Callback: run in interrupt context.
+> +		 * mutex_unlock will throw a kernel warning if used.
+> +		 */
+> +			up(&host->sem);
+> +		}
+> +	}
+> 
+>  	spin_unlock(&host->irq_lock);
+> 
+> @@ -1267,13 +1277,6 @@ static void omap_hsmmc_dma_cb(int lch, u16
+> ch_status, void *data)
+>  		return;
+>  	}
+> 
+> -	omap_free_dma(host->dma_ch);
+> -	host->dma_ch = -1;
+> -	/*
+> -	 * DMA Callback: run in interrupt context.
+> -	 * mutex_unlock will throw a kernel warning if used.
+> -	 */
+> -	up(&host->sem);
+>  }
+> 
+>  /*
+> --
+> 1.6.3.3
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
