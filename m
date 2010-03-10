@@ -1,58 +1,29 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 10 Mar 2010 16:01:21 +0100
-Subject: [PATCH 4/6] perf-events: export enable/disable event symbols
-	to kernel modules
-In-Reply-To: <1268231442.5279.1.camel@twins>
-References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-3-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-4-git-send-email-will.deacon@arm.com>
-	<1268217690-29712-5-git-send-email-will.deacon@arm.com>
-	<1268218566.8991.1.camel@twins>
-	<001201cac047$70b71c60$52255520$@deacon@arm.com>
-	<1268231442.5279.1.camel@twins>
-Message-ID: <20100310150121.GA1585@erda.amd.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 10 Mar 2010 16:20:16 +0100
+Subject: [PATCH] Voipac PXA270
+In-Reply-To: <20100310133529.GK28972@buzzloop.caiaq.de>
+References: <201003100247.27059.marek.vasut@gmail.com>
+	<201003101237.26819.marek.vasut@gmail.com>
+	<20100310133529.GK28972@buzzloop.caiaq.de>
+Message-ID: <201003101620.17501.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.03.10 15:30:42, Peter Zijlstra wrote:
-> On Wed, 2010-03-10 at 11:47 +0000, Will Deacon wrote:
-> > Hello Peter,
-> > 
-> > > On Wed, 2010-03-10 at 10:41 +0000, Will Deacon wrote:
-> > > > The perf_event_enable and perf_event_disable functions are used to
-> > > > control the activation of perf-events for a given context or CPU.
-> > > >
-> > > > This patch exports these symbols so that they can be used by kernel
-> > > > modules. Without these symbols, an event must be destroyed and recreated
-> > > > to disable or enable it respectively. The maximum number of perf-events
-> > > > is also made available to modules via the perf_get_max_events function.
-> > > 
-> > > Where is the module that uses all this?
-> > 
-> > It's part of the same patchset:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011126.html
-> > 
-> > The idea is to use perf-events as the backend for OProfile to avoid replicating
-> > the PMU accessor code.
+Dne St 10. b?ezna 2010 14:35:29 Daniel Mack napsal(a):
+> On Wed, Mar 10, 2010 at 12:37:26PM +0100, Marek Vasut wrote:
+> > Dne St 10. b?ezna 2010 07:18:40 Mike Rapoport napsal(a):
+> > > Do these defines really deserve dedicated .h file? Why cannot they live
+> > > in the arch/arm/mach-pxa/vpac270.c?
+> >
+> > I'm not moving this in. I dont want to polute the .c file with stuff that
+> > should obviously go into the header file. Besides there'll be more GPIOs
+> > defined and that'd make the .c file less readable, which I want to avoid.
 > 
-> Ah, very nice. Can something like that be done in general, like an
-> arch-independent oprofile backend using perf, or is there too much
-> arch-specific bits to the oprofile stuff?
+> The question is - are they shared? If they're not and will never be used
+> by anything else then this .c file, I'd also vote for not having an
+> extra header file for them.
 > 
-> I know Robert talked about doing something like this, I just have no
-> clue how arch specific this would be.
-
-Thanks for cc'ing me. I like this approach. Will take a look at the
-patches.
-
-Yes, for implementing oprofile on top of perf we have to touch every
-architecture separately to be backward compatible.
-
--Robert
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
-email: robert.richter at amd.com
+> Daniel
+> 
+Yes, they are used in the PCMCIA driver. And I'd rather avoid having GPIO 
+definitions scattered across multiple files.
