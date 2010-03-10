@@ -1,54 +1,18 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 10 Mar 2010 06:35:43 -0500
-Subject: [PATCH] [ARM] mmp: enable sound in aspenite
-Message-ID: <mailman.231.1268226991.2170.linux-arm-kernel@lists.infradead.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 10 Mar 2010 08:18:31 -0500
+Subject: [PATCH 0/4] enable sound in pxa168
+Message-ID: <771cded01003100518v2992dc7ft16e0478c683d70d8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable sound on aspenite. Hifi mode is supported.
+These patches are used to enable sound in pxa168 SoC. The platform is
+aspenite. Since SSP clock is changed in PXA168, create a new
+pxa168-ssp.c file in sound/soc/pxa directory.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/mach-mmp/aspenite.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+0001--ARM-pxa-move-ssp-into-plat.patch
+0002--ARM-mmp-support-ssp-in-pxa168.patch
+0003-ASoC-enable-ssp-on-aspenite.patch
+0004--ARM-mmp-enable-sound-in-aspenite.patch
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index a2d307e..244655d 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -59,6 +59,13 @@ static unsigned long common_pin_config[] __initdata = {
- 	/* UART1 */
- 	GPIO107_UART1_RXD,
- 	GPIO108_UART1_TXD,
-+
-+	/* SSP1 */
-+	GPIO113_I2S_MCLK,
-+	GPIO114_I2S_FRM,
-+	GPIO115_I2S_BCLK,
-+	GPIO116_I2S_RXD,
-+	GPIO117_I2S_TXD,
- };
-
- static struct smc91x_platdata smc91x_info = {
-@@ -123,12 +130,18 @@ static struct pxa3xx_nand_platform_data
-aspenite_nand_info = {
- 	.nr_parts	= ARRAY_SIZE(aspenite_nand_partitions),
- };
-
-+static struct i2c_board_info aspenite_i2c_info[] __initdata = {
-+	{ I2C_BOARD_INFO("wm8753", 0x1b), },
-+};
-+
- static void __init common_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(common_pin_config));
-
- 	/* on-chip devices */
- 	pxa168_add_uart(1);
-+	pxa168_add_twsi(1, NULL, ARRAY_AND_SIZE(aspenite_i2c_info));
-+	pxa168_add_ssp(1);
- 	pxa168_add_nand(&aspenite_nand_info);
-
- 	/* off-chip devices */
--- 
-1.5.6.5
+Thanks
+Haojian
