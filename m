@@ -1,49 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Mar 2010 14:41:10 -0800
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
-References: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
-Message-ID: <20100310224110.GW2900@atomide.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 10 Mar 2010 23:16:26 +0000
+Subject: __xchg for sizes other than 32bit
+In-Reply-To: <20100310173503.GC12345@n2100.arm.linux.org.uk>
+References: <20100310162221.GA19201@localhost>
+	<20100310173503.GC12345@n2100.arm.linux.org.uk>
+Message-ID: <20100310231626.GB11663@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Venkatraman S <svenkatr@ti.com> [100310 06:08]:
-> @@ -1400,14 +1471,23 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host
-> *host, struct mmc_request *req)
->  					| (req->data->blocks << 16));
->  	set_data_timeout(host, req->data->timeout_ns, req->data->timeout_clks);
+Russell King - ARM Linux wrote:
+> On Wed, Mar 10, 2010 at 06:22:21PM +0200, Imre Deak wrote:
+> > recently you've added support for __cmpxchg for ARMv6+. There the assumption
+> > is that ldrex[bh]/strex[bh] is only supported on platforms with the 32v6K
+> > extension.
+> > 
+> > Currently the __xchg code uses these even without the extension. Should this
+> > be fixed?
 > 
-> -	if (host->use_dma) {
-> -		ret = omap_hsmmc_start_dma_transfer(host, req);
-> -		if (ret != 0) {
-> -			dev_dbg(mmc_dev(host->mmc), "MMC start dma failure\n");
-> +	if (host->dma_caps & DMA_TYPE_SDMA) {
-> +		ret = omap_hsmmc_configure_sdma(host, req);
-> +		if (ret)
->  			return ret;
-> -		}
-> +		host->dma_in_use = DMA_TYPE_SDMA;
->  	}
-> -	return 0;
-> +	if ((host->dma_caps & DMA_TYPE_SDMA_DLOAD) &&
-> +		host->data->sg_len > 4) {
-> +		ret = omap_hsmmc_configure_sdma_sglist(host, req);
-> +		if (ret)
-> +			return ret;
-> +		host->dma_in_use = DMA_TYPE_SDMA_DLOAD;
-> +
-> +	}
-> +	ret = omap_hsmmc_start_dma_transfer(host);
-> +	return ret;
-> +
->  }
+> >From what I remember, the half-word versions definitely aren't supported
+> on anything without V6K extensions.  I think that the byte and word
+> versions are supported on V6 and up though.
+> 
+> That'd make both __cmpxchg and __xchg slightly buggy, in different ways.
+> 
+> What it does mean is that atomic operations on unsigned shorts using
+> ldrex/strex will only be possible on V6K and up.
 
-Does the driver still work in PIO mode?
+It's possible to emulate 16-bit cmpxchg using 32-bit cmpxchg.
 
-We need to have the drivers capable to fail over to PIO mode
-as the DMA channels can run out.
+xchg can't be emulated with wider xchg, but of course it can use wider
+cmpxchg in a loop.
 
-Regards,
+That sort of thing probably should be in asm-generic somewhere.
 
-Tony
+-- Jamie
