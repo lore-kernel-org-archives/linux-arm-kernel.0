@@ -1,29 +1,33 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 10 Mar 2010 16:20:16 +0100
-Subject: [PATCH] Voipac PXA270
-In-Reply-To: <20100310133529.GK28972@buzzloop.caiaq.de>
-References: <201003100247.27059.marek.vasut@gmail.com>
-	<201003101237.26819.marek.vasut@gmail.com>
-	<20100310133529.GK28972@buzzloop.caiaq.de>
-Message-ID: <201003101620.17501.marek.vasut@gmail.com>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Wed, 10 Mar 2010 20:50:57 +0530
+Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
+	callback
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C46F13B4@dbde02.ent.ti.com>
+References: <618f0c911003100611q42e7f23cuc3c8d3f116ca7eb3@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C46F13B4@dbde02.ent.ti.com>
+Message-ID: <618f0c911003100720n78ea2765l287631c85de1fe8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 10. b?ezna 2010 14:35:29 Daniel Mack napsal(a):
-> On Wed, Mar 10, 2010 at 12:37:26PM +0100, Marek Vasut wrote:
-> > Dne St 10. b?ezna 2010 07:18:40 Mike Rapoport napsal(a):
-> > > Do these defines really deserve dedicated .h file? Why cannot they live
-> > > in the arch/arm/mach-pxa/vpac270.c?
-> >
-> > I'm not moving this in. I dont want to polute the .c file with stuff that
-> > should obviously go into the header file. Besides there'll be more GPIOs
-> > defined and that'd make the .c file less readable, which I want to avoid.
-> 
-> The question is - are they shared? If they're not and will never be used
-> by anything else then this .c file, I'd also vote for not having an
-> extra header file for them.
-> 
-> Daniel
-> 
-Yes, they are used in the PCMCIA driver. And I'd rather avoid having GPIO 
-definitions scattered across multiple files.
+Shilimkar, Santosh wrote:
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
+>> Venkatraman S
+>> Sent: Wednesday, March 10, 2010 7:42 PM
+>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-mmc at vger.kernel.org
+>> Cc: Adrian Hunter; Chikkature Rajashekar, Madhusudhan; Tony Lindgren
+>> Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc callback
+>>
+>> See previous post http://patchwork.kernel.org/patch/82907/
+>> Rebased to 2.6.34-rc1 and fixed comment alignment.
+>>
+> Why did you dropped change log in all your patches? You should retain that and
+> just change the patch version in the subject.
+>
+
+My bad. I just edited the merge commit to point to the previous
+threads and posted it.
+Should I post them again ?
+
+Thanks and regards,
+Venkat.
