@@ -1,19 +1,20 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 10 Mar 2010 17:41:48 +0100
-Subject: [PATCH 3/4] Add battery support into Zipit Z2
-Message-ID: <201003101741.48176.marek.vasut@gmail.com>
+Date: Wed, 10 Mar 2010 17:42:24 +0100
+Subject: [PATCH 4/4] Zipit Z2 WM8750 aSoC driver
+Message-ID: <201003101742.24566.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-This patch adds support for the AER915 battery chip into Zipit Z2
-platform file.
+This patch adds support for sound through the WM8750 codec on Zipit Z2.
+Also, this patch incorporates support for detecting headset jack
+insertion through the jack detection API.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0007-Add-battery-support-into-Zipit-Z2.patch
+Name: 0008-Zipit-Z2-WM8750-aSoC-driver.patch
 Type: text/x-patch
-Size: 2473 bytes
+Size: 12783 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100310/14156318/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100310/b7b0b86b/attachment.bin>
