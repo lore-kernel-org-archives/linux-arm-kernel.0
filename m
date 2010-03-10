@@ -1,53 +1,51 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 10 Mar 2010 15:41:51 +0530
-Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
-	platform
-In-Reply-To: <63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>	
-	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>	
-	<4B973CF6.4030009@st.com>
-	<63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>
-Message-ID: <4B977067.3050108@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Mar 2010 10:17:09 -0000
+Subject: [Kgdb-bugreport] [PATCH] KGDB: add smp_mb() in synchronisation
+	during exception handler exit
+In-Reply-To: <4B96B771.9050903@wildturkeyranch.net>
+References: <1268158831-6976-1-git-send-email-will.deacon@arm.com>
+	<4B96B771.9050903@wildturkeyranch.net>
+Message-ID: <001101cac03a$d84d4820$88e7d860$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/10/2010 3:01 PM, Linus Walleij wrote:
-> 2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
->> Linus Walleij:
->>> If this file is only supposed to be used from plat-spear/time.c, move it down
->>> into plat-spear/gpt.h and #include "gpt.h" so noone else will
->>> accidentally use it.
->>
->> GPT's on SPEAr can be used from time.c, platform specific drivers and machine
->> specific drivers or any driver wishing to use hardware timer.
->> In first two cases "gpt.h" will work, but in rest of cases we need gpt.h to be
->> in plat-spear/include/plat
->>
->> Is it okay?
-> 
-> If you have or have already planned to write such platform, machine
-> or subsystem drivers, it's OK, if there are no such users and you cannot
-> easily give one, it's overdesigned IMHO. Some realistic examples of such
-> drivers will make me change my mind :-)
-> 
-> The reason I persist is that I've seen such unutilized timer API:s before and
-> no other user than the system timer in sight. I never understood what they
-> were to be used for, and I still don't, so help me understand. The kernel
-> has many internal timer API:s based on clockevent available already so
-> why add yet another, platform-specific one?
-> 
+Hi George,
 
-As you may have seen in spear.h files in mach folders, we have multiple hardware
-timers in our design (3 in spear3xx, 4 in spear6xx and each timer have two
-independent channels. That doubles the timers count, so it is 6 and 8).
-One timer (or two channels) are used by clock event and clock source, but rest of
-the timers are still available. So we need some way to export this functionality
-of our hardware. It can be considered simply as a driver for GPT.
+> > diff --git a/kernel/kgdb.c b/kernel/kgdb.c
+> > index 761fdd2..ee7694b 100644
+> > --- a/kernel/kgdb.c
+> > +++ b/kernel/kgdb.c
+> > @@ -1537,6 +1537,7 @@ acquirelock:
+> >   		 * Wait till all the CPUs have quit
+> >   		 * from the debugger.
+> >   		 */
+> > +		smp_mb();
+> >   		for_each_online_cpu(i) {
+> >   			while (atomic_read(&cpu_in_kgdb[i]))
+> >   				cpu_relax();
+> >
+> Doesn't this have the same issue if this cpu gets to the while prior to
+> the other cpu doing its write.  I would think the "smp_mb()" should be
+> in the while loop not prior to it.
 
-What do you say?
+I don't think so. The deadlock in question is caused because the aggressive
+reading in the polling loop prevents the write-buffer from being able to drain.
+For a dual-core system the setup can be simplified like this:
 
-viresh.
+Initially: x = 1, y = 1;
+
+CPU1                        CPU0
+====                        ====
+while (y == 1);             y = 0;
+x = 0;                      while (x == 1); /* This loop prevents y from
+                                               leaving the store buffer */
+
+So the patch inserts a memory barrier on CPU0 between the two lines,
+forcing the update to y to become visible before the reads to x occur.
+CPU1 will then trundle along happily and update x. The absence of a further 
+polling loop means that the update to x will become visible to CPU0 at some
+future time.
+
+Cheers,
+
+Will
