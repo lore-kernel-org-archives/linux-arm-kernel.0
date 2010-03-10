@@ -1,32 +1,24 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 10 Mar 2010 20:17:49 +0900
-Subject: [PATCH] ARM: Add support for 10 hardirq bits
-Message-ID: <20100310111749.18521.9002.sendpatchset@t400s>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 10 Mar 2010 11:56:06 +0100
+Subject: [PATCH 4/6] perf-events: export enable/disable event symbols
+	to kernel modules
+In-Reply-To: <1268217690-29712-5-git-send-email-will.deacon@arm.com>
+References: <1268217690-29712-1-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-2-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-3-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-4-git-send-email-will.deacon@arm.com>
+	<1268217690-29712-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1268218566.8991.1.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Wed, 2010-03-10 at 10:41 +0000, Will Deacon wrote:
+> The perf_event_enable and perf_event_disable functions are used to
+> control the activation of perf-events for a given context or CPU.
+> 
+> This patch exports these symbols so that they can be used by kernel
+> modules. Without these symbols, an event must be destroyed and recreated
+> to disable or enable it respectively. The maximum number of perf-events
+> is also made available to modules via the perf_get_max_events function.
 
-This patch adds support for 10 hardirq bits to
-the ARM architecture. Needed by the SH-Mobile
-ARM processor sh7372 that has more than 512 IRQs.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/include/asm/hardirq.h |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
---- 0001/arch/arm/include/asm/hardirq.h
-+++ work/arch/arm/include/asm/hardirq.h	2010-03-09 21:08:10.000000000 +0900
-@@ -12,7 +12,9 @@ typedef struct {
- 
- #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
- 
--#if NR_IRQS > 256
-+#if NR_IRQS > 512
-+#define HARDIRQ_BITS	10
-+#elif NR_IRQS > 256
- #define HARDIRQ_BITS	9
- #else
- #define HARDIRQ_BITS	8
+Where is the module that uses all this?
