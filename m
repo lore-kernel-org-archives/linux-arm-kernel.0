@@ -1,26 +1,47 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Wed, 10 Mar 2010 16:53:42 +0100
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B97BD8C.3030502@visionsystems.de>
-References: <4B85789D.6000704@billgatliff.com>
-	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
-	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
-	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
-	<4B97602C.6070608@atmel.com> <4B97BD8C.3030502@visionsystems.de>
-Message-ID: <4B97C086.2080404@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Mar 2010 16:01:14 +0000
+Subject: [RFC PATCH 4/4] ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
+In-Reply-To: <1268236874-7877-4-git-send-email-will.deacon@arm.com>
+References: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
+	<1268236874-7877-2-git-send-email-will.deacon@arm.com>
+	<1268236874-7877-3-git-send-email-will.deacon@arm.com>
+	<1268236874-7877-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1268236874-7877-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
->
-> When do you think the driver could hit the mainline kernel? Till 2.6.35 open window?
->
-> Best regards,
-> Yegor
->
+If we're targetting a v6 or v7 core and have at least software perf events
+available, then automatically add support for hardware breakpoints.
 
-It has been acked, but I don't know when it will be in the mainline kernel.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig         |    1 +
+ arch/arm/kernel/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-Regards,
-Sedji
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5e723bc..c6cb103 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -23,6 +23,7 @@ config ARM
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+ 	select GENERIC_ATOMIC64 if (!CPU_32v6K)
++	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index c76e6d2..a06c8cc 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -38,6 +38,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+-- 
+1.6.3.3
