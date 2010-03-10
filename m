@@ -1,50 +1,47 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 10 Mar 2010 09:07:02 -0800
-Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
-	callback
-In-Reply-To: <618f0c911003100720n78ea2765l287631c85de1fe8@mail.gmail.com>
-	(Venkatraman S.'s message of "Wed\, 10 Mar 2010 20\:50\:57 +0530")
-References: <618f0c911003100611q42e7f23cuc3c8d3f116ca7eb3@mail.gmail.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C46F13B4@dbde02.ent.ti.com>
-	<618f0c911003100720n78ea2765l287631c85de1fe8@mail.gmail.com>
-Message-ID: <87fx48gl6x.fsf@deeprootsystems.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 10 Mar 2010 11:11:45 -0600
+Subject: [PATCH] locomo.c: spi register offset bugfix
+Message-ID: <0D753D10438DA54287A00B027084269763683A71C0@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Venkatraman S <svenkatr@ti.com> writes:
+The locomo spi registers are all defined in locomo.h as offsets
+from the first spi register LOCOMO_SPI (0x60), which is itself
+an offset from the locomo base address.  To correctly access
+these registers LOCOMO_SPI must always be included in the
+address calculation.
 
-> Shilimkar, Santosh wrote:
->>> -----Original Message-----
->>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
->>> Venkatraman S
->>> Sent: Wednesday, March 10, 2010 7:42 PM
->>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-mmc at vger.kernel.org
->>> Cc: Adrian Hunter; Chikkature Rajashekar, Madhusudhan; Tony Lindgren
->>> Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc callback
->>>
->>> See previous post http://patchwork.kernel.org/patch/82907/
->>> Rebased to 2.6.34-rc1 and fixed comment alignment.
->>>
->> Why did you dropped change log in all your patches? You should retain that and
->> just change the patch version in the subject.
->>
->
-> My bad. I just edited the merge commit to point to the previous
-> threads and posted it.
-> Should I post them again ?
->
+There are two places in locomo.c where this is not done.  The
+first one, in locomo_suspend, actually results in a write to
+LOCOMO_ST instead of LOCOMO_SPICT.  The second is in __locomo_probe
+and results in a write to LOCOMO_MCSX2 instead of LOCOMO_SPIIE.
 
-Yes.  
+Fix these by including LOCOMO_SPI in the calculation.
 
-As Santosh pointed out, keep the changelog. and add any comments about
-how this differs from previous versions after the '---' in the
-changelog.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 
-Keep in mind that the changelog will be stored in the git history and
-should be useful without having to reference previous versions etc.
+---
 
-Anything useful to the reviewers but not important for the changelog
-should go after the '---' since that will be ignored by git when
-applying.
-
-Kevin
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 90ae00b..4f9ccf6 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -290,7 +290,7 @@ static int locomo_suspend(struct platform_device *dev, pm_message_t state)
+ 	save->LCM_GPO     = locomo_readl(lchip->base + LOCOMO_GPO);	/* GPIO */
+ 	locomo_writel(0x00, lchip->base + LOCOMO_GPO);
+ 	save->LCM_SPICT   = locomo_readl(lchip->base + LOCOMO_SPI + LOCOMO_SPICT);	/* SPI */
+-	locomo_writel(0x40, lchip->base + LOCOMO_SPICT);
++	locomo_writel(0x40, lchip->base + LOCOMO_SPI + LOCOMO_SPICT);
+ 	save->LCM_GPE     = locomo_readl(lchip->base + LOCOMO_GPE);	/* GPIO */
+ 	locomo_writel(0x00, lchip->base + LOCOMO_GPE);
+ 	save->LCM_ASD     = locomo_readl(lchip->base + LOCOMO_ASD);	/* ADSTART */
+@@ -418,7 +418,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
+ 	/* Longtime timer */
+ 	locomo_writel(0, lchip->base + LOCOMO_LTINT);
+ 	/* SPI */
+-	locomo_writel(0, lchip->base + LOCOMO_SPIIE);
++	locomo_writel(0, lchip->base + LOCOMO_SPI + LOCOMO_SPIIE);
+ 
+ 	locomo_writel(6 + 8 + 320 + 30 - 10, lchip->base + LOCOMO_ASD);
+ 	r = locomo_readl(lchip->base + LOCOMO_ASD);
