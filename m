@@ -1,46 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Mar 2010 10:41:03 +0000
-Subject: [PATCH 07/11] ST SPEAr: Added source files for SPEAr3xx
-	machine family
-In-Reply-To: <63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
+Date: Thu, 11 Mar 2010 10:45:52 +0000
+Subject: [PATCH 01/11] ST SPEAr: Added ARM PrimeXsys System Controller
+	SP810 header file
+In-Reply-To: <63386a3d1003091214s5251674et99903756f3528e66@mail.gmail.com>
 References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
-Message-ID: <20100311104103.GC16376@n2100.arm.linux.org.uk>
+	<63386a3d1003091214s5251674et99903756f3528e66@mail.gmail.com>
+Message-ID: <20100311104552.GD16376@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 09, 2010 at 07:46:10AM +0100, Linus Walleij wrote:
-> > +struct amba_device uart_device = {
-> > + ? ? ? .dev = {
-> > + ? ? ? ? ? ? ? .init_name = "uart",
-> > + ? ? ? ? ? ? ? },
-> > + ? ? ? .res = {
-> > + ? ? ? ? ? ? ? .start = SPEAR3XX_ICM1_UART_BASE,
-> > + ? ? ? ? ? ? ? .end = SPEAR3XX_ICM1_UART_BASE + SPEAR3XX_ICM1_UART_SIZE - 1,
-> > + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> > + ? ? ? ? ? ? ? },
-> > + ? ? ? .irq = {IRQ_UART, NO_IRQ},
-> > + ? ? ? .periphid = 0x00041011,
-> > +};
+On Tue, Mar 09, 2010 at 09:14:53PM +0100, Linus Walleij wrote:
+> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
 > 
-> You're hardcoding the PrimeCell ID to the ARM version, but I suspect
-> you have an ST derivate with some additional features. If you look in
-> the PL011 driver in drivers/serial/amba-pl011.c you will probably recognize
-> the modified PrimeCell IDs for vendor 0x80 (VENDOR_ST) and I think
-> you might rather need to patch this file with your new periphid and
-> possibly even implement some new extensions (if there are any).
+> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> > ---
+> > ?include/linux/sysctl_sp810.h | ? 59 ++++++++++++++++++++++++++++++++++++++++++
+> > ?1 files changed, 59 insertions(+), 0 deletions(-)
+> > ?create mode 100644 include/linux/sysctl_sp810.h
+> > (...)
 > 
-> What value is actually in the ID registers of your cell? (Just
-> check in some debugger or simply printk() it...)
+> To the rest of the world this is probably a number of register definitions and
+> an obscure inline function, so the entire internal kernel API does not need
+> to know about it.
 
-There is no need to specify the ID when the device provides it - in fact
-the code will override you by reading the ID from the device if it finds
-it.  The only reason to explicitly provide one is for the very early
-Primecell devices which didn't implement the ID scheme - such as PL010.
+It'll also give people heart-attacks because they'll think it adds a new
+set of deprecated binary sysctl() interfaces to the kernel.
+
+Best drop the 'sysctl' part of the name as well.
