@@ -1,52 +1,36 @@
-From: andy@warmcat.com (Andy Green)
-Date: Thu, 11 Mar 2010 13:25:49 +0000
-Subject: bit errors on spitz
-In-Reply-To: <20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-References: <20100305212708.GC21773@elf.ucw.cz>	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
-	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-Message-ID: <4B98EF5D.5000609@warmcat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Mar 2010 13:29:22 -0000
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <4B9817CF.2050807@windriver.com>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>
+	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+	<4B9817CF.2050807@windriver.com>
+Message-ID: <001601cac11e$dce7f850$96b7e8f0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/10 08:25, Somebody in the thread at some point said:
-> Hi!
->> dmesg would not be useful, it usually hits user programs. Like... mutt
->> suddenly displaying , instead of - in the header. Program failing to
->> start because function printg is not found (it was not exactly
->> printf->printg,  I don't remember exact symbol), ping complaining
->> about discarding corrupted packets, etc.
->>
->> (Or of course, kernel oopsing or not going from suspend at all. But as
->> even user data are being corrupted, oops is not likely to be
->> interesting and system is typically not in state to capture it any more.)
->>
->
-> Well I've seen empty lines when editing file with vim (these that are starting
-> with blue tilda) in the middle of file. And sometimes programs segfaults for no
-> good reason. Just today I've run "apt-get update" and got:
->
-> symbol lookup error: apt-get: undefined symbol: _ZN16pkgAcquireStatus4StopEv
->
-> While the correct symbol seems to be _ZN16pkgAcquireStatus4.
->
-> When running 'make' in kernel directory and closing the display sometimes
-> machine dies and nothing but reset under battery cover helps. I remeber waking
-> up in the morning, opening the device and reseting the device. And it seems to
-> be provoked much more by active CF wifi card.
+Hello Jason,
 
-I saw very similar failures for a long time on our iMX31 based device. 
-Eventually I found a Freescale errata where the RAM inside the USB2 
-macrocell started to make single bit errors below 1.38V Vcore; ours was 
-1.4V at that time but dipped on CPU load.
+> Do you think you can try the patch below?
 
-I cranked up the Vcore to 1.6V and that solved it, we also added some 
-ceramic caps to Vcore to help with the dips.
+Sure - I'll give it a go this afternoon.
+ 
+> It seems we might not need to change to using the atomic_add_return(0,...) because using the
+> atomic_inc() and atomic_dec() will end up using the memory barriers.
 
-So it might be worth looking at PMU arrangements for Vcore level / look 
-for dips with a 'scope (despite this isn't an iMX31).
+The fix I posted to the LKML here:
 
-A characteristic of it was it never caused kernel issues, since the 
-kernel didn't come over USB.  It only ever caused troubles on userspace 
-stuff.
+http://lkml.org/lkml/2010/3/9/260
 
--Andy
+fixed the issue for me, but your patch seems more general [although maybe overkill?].
+
+> I would certainly rather fix kgdb vs mucking with the internals of cpu_relax().
+
+I think that's the general consensus. I was worried about changing the general KGDB
+code to fix an ARM specific problem, but it turns out that the problem is an issue of
+semantics.
+
+I'll let you know whether your patch fixes the problems for me.
+
+Will
