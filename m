@@ -1,32 +1,44 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 12 Mar 2010 08:44:31 +1100
-Subject: USB mass storage and ARM cache coherency
-In-Reply-To: <20100310035249.GB17693@linux-sh.org>
-References: <20100303215437.GF2579@ucw.cz>
-	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
-	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
-	<1267712512.31654.176.camel@mulgrave.site>
-	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
-	<20100304154103.GA9384@linux-sh.org>
-	<1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
-	<1267738660.22204.77.camel@pasglop>
-	<20100305011745.GC26618@linux-sh.org>
-	<1267764295.22204.102.camel@pasglop>
-	<20100310035249.GB17693@linux-sh.org>
-Message-ID: <1268343871.22204.709.camel@pasglop>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 11 Mar 2010 16:48:45 -0600
+Subject: Question about memory resources
+Message-ID: <0D753D10438DA54287A00B0270842697636843779C@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-10 at 12:52 +0900, Paul Mundt wrote:
-> Well, it does start to get a bit painful with sparsemem section or
-> NUMA
-> node IDs also digging in to the page flags on 32-bit.. the benefits
-> would
-> have to be pretty compelling to offset the pain. 
+Hello all,
 
-Unless we play a dangerous trick and re-use another flag that isn't
-meaningful for allocated pages... maybe PG_buddy ? Or do I miss
-something about that guy semantics ?
+I have written a backlight driver for the ep93xx.  The backlight
+on this system is controlled by a pwm output with a single control
+register.  This register is located in the memory resource used
+by the ep93xx framebuffer.
 
-Cheers,
-Ben.
+The framebuffer uses the following resource:
+
+static struct resource ep93xx_fb_resource[] = {
+	{
+		.start	= EP93XX_RASTER_PHYS_BASE,
+		.end		= EP93XX_RASTER_PHYS_BASE + 0x800 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+The backlight would use this resource:
+
+static struct resource ep93xx_bl_resource[] = {
+	{
+		.start	= EP93XX_RASTER_PHYS_BASE + 0x20,
+		.end		= EP93XX_RASTER_PHYS_BASE + 0x23,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+Unfortunately this doesn't work because the request_mem_region
+call fails when the second device is probed since the first
+device already did a request_mem_region and it was marked as
+IORESOURCE_BUSY.
+
+Is there any way to handle this other than using the static i/o
+mapping for the backlight register?
+
+Regards,
+Hartley
