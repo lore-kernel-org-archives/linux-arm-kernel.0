@@ -1,43 +1,31 @@
-From: shiraz.hashim@st.com (Shiraz HASHIM)
-Date: Thu, 11 Mar 2010 15:17:44 +0530
-Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
-	platform
-In-Reply-To: <63386a3d1003102243w637a8ce1m838a2dba946add32@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>	
-	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>	
-	<4B973CF6.4030009@st.com>	
-	<63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>	
-	<4B977067.3050108@st.com>
-	<63386a3d1003102243w637a8ce1m838a2dba946add32@mail.gmail.com>
-Message-ID: <4B98BC40.1030306@st.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Thu, 11 Mar 2010 11:01:43 +0100
+Subject: [PATCH 2.6.34-rc1] fix warning in kernel/elfcore.c from ARM's elf.h
+Message-ID: <19352.49031.176324.151185@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+2.6.34-rc1 added kernel/elfcore.c which includes <asm/elf.h>.
+On ARM, this results in:
 
-On 3/11/2010 12:13 PM, Linus Walleij wrote:
-> 2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
-> 
->> One timer (or two channels) are used by clock event and clock source, but rest of
->> the timers are still available. So we need some way to export this functionality
->> of our hardware. It can be considered simply as a driver for GPT.
-> 
-> The timer people have already explained well enough I think, we have some 16
-> timers on U8500, one we use as clocksource, one for clock events and 14 are
-> currently unused. I plan to add them as clock events as soon as there is some
-> practical use for them.
-> I think there is nothing stopping you from modelling some extra clock events
-> for the remaining timers if you absolutely want to, the kernel will
-> just disregard
-> them currently, which is just as good/bad as the way you're exposing the custom
-> API in these patches.
+In file included from include/linux/elf.h:7,
+                 from kernel/elfcore.c:1:
+/tmp/linux-2.6.34-rc1/arch/arm/include/asm/elf.h:101: warning: 'struct task_struct' declared inside parameter list
+/tmp/linux-2.6.34-rc1/arch/arm/include/asm/elf.h:101: warning: its scope is only this definition or declaration, which is probably not what you want
 
-Can we use clockevents directly? I though they are abstracted by the kernel
-framework and using them directly is not advisable/feasible.
+Including <linux/sched.h> seems a bit heavyweight, so this patch just
+adds a tentative declaration of struct task_struct in <asm/elf.h>.
 
-regards
-Shiraz
+Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+---
+diff -rupN linux-2.6.34-rc1/arch/arm/include/asm/elf.h linux-2.6.34-rc1.arm-elf-task_struct/arch/arm/include/asm/elf.h
+--- linux-2.6.34-rc1/arch/arm/include/asm/elf.h	2010-02-25 14:45:00.000000000 +0100
++++ linux-2.6.34-rc1.arm-elf-task_struct/arch/arm/include/asm/elf.h	2010-03-11 10:55:39.000000000 +0100
+@@ -98,6 +98,7 @@ extern int elf_check_arch(const struct e
+ extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
+ #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
+ 
++struct task_struct;
+ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+ #define ELF_CORE_COPY_TASK_REGS dump_task_regs
+ 
