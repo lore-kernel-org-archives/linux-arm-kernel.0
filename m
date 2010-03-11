@@ -1,40 +1,43 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 11 Mar 2010 16:20:35 +0800
-Subject: [PATCH 2/4] mmp: support ssp in pxa168
-In-Reply-To: <20100310142832.GB24422@rakim.wolfsonmicro.main>
-References: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
-	<20100310142832.GB24422@rakim.wolfsonmicro.main>
-Message-ID: <f17812d71003110020g67bb7fd6tfe1381294b6cfe8f@mail.gmail.com>
+From: shiraz.hashim@st.com (Shiraz HASHIM)
+Date: Thu, 11 Mar 2010 15:17:44 +0530
+Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
+	platform
+In-Reply-To: <63386a3d1003102243w637a8ce1m838a2dba946add32@mail.gmail.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>	
+	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>	
+	<4B973CF6.4030009@st.com>	
+	<63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>	
+	<4B977067.3050108@st.com>
+	<63386a3d1003102243w637a8ce1m838a2dba946add32@mail.gmail.com>
+Message-ID: <4B98BC40.1030306@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 10, 2010 at 10:28 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 10, 2010 at 08:14:42AM -0500, Haojian Zhuang wrote:
->> From 75fe4b02234f6476e72827508f11f1035d7aaf68 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Wed, 10 Mar 2010 06:32:43 -0500
->> Subject: [PATCH] [ARM] mmp: support ssp in pxa168
->>
->> Support ssp in pxa168. The basic function of SSP is same as pxa, but clock
->> source and IRQ is changed.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-> That said might it make sense to merge this and the previous patch via
-> ASoC since there's new drivers using this following on and Liam's
-> multi-codec work is likely to be creating merge issues this development
-> cycle? ?I can apply the patches on a branch by themselves which can also
-> be pulled into the PXA tree if needed.
->
+Hello Linus,
 
-I'd expect there to be some merge conflicts I need to solve along with
-my cleaning up of the SSP code. That said, it's better to go via -pxa
-tree and get the multi-codec work solved in linux-next?
+On 3/11/2010 12:13 PM, Linus Walleij wrote:
+> 2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
+> 
+>> One timer (or two channels) are used by clock event and clock source, but rest of
+>> the timers are still available. So we need some way to export this functionality
+>> of our hardware. It can be considered simply as a driver for GPT.
+> 
+> The timer people have already explained well enough I think, we have some 16
+> timers on U8500, one we use as clocksource, one for clock events and 14 are
+> currently unused. I plan to add them as clock events as soon as there is some
+> practical use for them.
+> I think there is nothing stopping you from modelling some extra clock events
+> for the remaining timers if you absolutely want to, the kernel will
+> just disregard
+> them currently, which is just as good/bad as the way you're exposing the custom
+> API in these patches.
 
-Mark, could you please point me the reference to the multi-codec work
-so I can have a rough feeling of the possible merge issues?
+Can we use clockevents directly? I though they are abstracted by the kernel
+framework and using them directly is not advisable/feasible.
 
-- eric
+regards
+Shiraz
