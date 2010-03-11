@@ -1,121 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 10:03:31 -0800
-Subject: [PATCH 3/3] usb: Fix tusb6010 for DMA API
-In-Reply-To: <20100311180023.20537.27516.stgit@baageli.muru.com>
-References: <20100311180023.20537.27516.stgit@baageli.muru.com>
-Message-ID: <20100311180331.20537.65470.stgit@baageli.muru.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Thu, 11 Mar 2010 23:50:49 +0530
+Subject: [PATCH 2/3] usb: Fix USB_SUSPEND dependency for OTG
+In-Reply-To: <20100311180329.20537.95308.stgit@baageli.muru.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC93DC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 18eabe2347ae7a11b3db768695913724166dfb0e introduced
-DMA buffer ownership. Fix tusb6010 accordingly.
+Tony Lindgren wrote:
+> 
+> To use this, PM_RUNTIME must be set as discussed at:
+> 
+> http://thread.gmane.org/gmane.linux.usb.general/27432/focus=4460
+> 
+> Otherwise we'll get errors like:
+> 
+> drivers/usb/core/hcd.c:1892: error: 'pm_wq' undeclared (first use in this function)
+> drivers/usb/core/hcd.c:1892: error: (Each undeclared identifier is reported only once
+> drivers/usb/core/hcd.c:1892: error: for each function it appears in.)
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Also change the order of musb_read_fifo() to happen after
-dma_cache_maint to have the DMA operations completed before
-moving the remaining unaligned bytes with PIO. The DMA
-access and PIO touch different areas of the FIFO, so this
-change only makes the code a bit easier to follow.
+Hi Tony,
 
-Tested on n810 and g_ether with variable size ping test.
-The test seems to fail for some ping sizes, but that seems to
-be a different problem.
+I already posted this patch last month. Still waiting for it
+to get queued.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/usb/musb/tusb6010.c      |   13 +++++++++++++
- drivers/usb/musb/tusb6010_omap.c |   22 ++++++++++++++--------
- 2 files changed, 27 insertions(+), 8 deletions(-)
+<http://marc.info/?l=linux-usb&m=126675883221098&w=2>
 
-diff --git a/drivers/usb/musb/tusb6010.c b/drivers/usb/musb/tusb6010.c
-index ab776a8..60d3938 100644
---- a/drivers/usb/musb/tusb6010.c
-+++ b/drivers/usb/musb/tusb6010.c
-@@ -29,6 +29,19 @@ static void tusb_source_power(struct musb *musb, int is_on);
- #define TUSB_REV_MAJOR(reg_val)		((reg_val >> 4) & 0xf)
- #define TUSB_REV_MINOR(reg_val)		(reg_val & 0xf)
- 
-+#ifdef CONFIG_PM
-+/* REVISIT: These should be only needed if somebody implements off idle */
-+void musb_platform_save_context(struct musb *musb,
-+			struct musb_context_registers *musb_context)
-+{
-+}
-+
-+void musb_platform_restore_context(struct musb *musb,
-+			struct musb_context_registers *musb_context)
-+{
-+}
-+#endif
-+
- /*
-  * Checks the revision. We need to use the DMA register as 3.0 does not
-  * have correct versions for TUSB_PRCM_REV or TUSB_INT_CTRL_REV.
-diff --git a/drivers/usb/musb/tusb6010_omap.c b/drivers/usb/musb/tusb6010_omap.c
-index 1c86809..6f0e943 100644
---- a/drivers/usb/musb/tusb6010_omap.c
-+++ b/drivers/usb/musb/tusb6010_omap.c
-@@ -38,7 +38,7 @@ struct tusb_omap_dma_ch {
- 
- 	struct tusb_omap_dma	*tusb_dma;
- 
--	void __iomem		*dma_addr;
-+	dma_addr_t		dma_addr;
- 
- 	u32			len;
- 	u16			packet_sz;
-@@ -125,6 +125,7 @@ static void tusb_omap_dma_cb(int lch, u16 ch_status, void *data)
- 	struct tusb_omap_dma_ch	*chdat = to_chdat(channel);
- 	struct tusb_omap_dma	*tusb_dma = chdat->tusb_dma;
- 	struct musb		*musb = chdat->musb;
-+	struct device		*dev = musb->controller;
- 	struct musb_hw_ep	*hw_ep = chdat->hw_ep;
- 	void __iomem		*ep_conf = hw_ep->conf;
- 	void __iomem		*mbase = musb->mregs;
-@@ -172,13 +173,15 @@ static void tusb_omap_dma_cb(int lch, u16 ch_status, void *data)
- 		DBG(3, "Using PIO for remaining %lu bytes\n", pio);
- 		buf = phys_to_virt((u32)chdat->dma_addr) + chdat->transfer_len;
- 		if (chdat->tx) {
--			dma_cache_maint(phys_to_virt((u32)chdat->dma_addr),
--					chdat->transfer_len, DMA_TO_DEVICE);
-+			dma_unmap_single(dev, chdat->dma_addr,
-+						chdat->transfer_len,
-+						DMA_TO_DEVICE);
- 			musb_write_fifo(hw_ep, pio, buf);
- 		} else {
-+			dma_unmap_single(dev, chdat->dma_addr,
-+						chdat->transfer_len,
-+						DMA_FROM_DEVICE);
- 			musb_read_fifo(hw_ep, pio, buf);
--			dma_cache_maint(phys_to_virt((u32)chdat->dma_addr),
--					chdat->transfer_len, DMA_FROM_DEVICE);
- 		}
- 		channel->actual_len += pio;
- 	}
-@@ -223,6 +226,7 @@ static int tusb_omap_dma_program(struct dma_channel *channel, u16 packet_sz,
- 	struct tusb_omap_dma_ch		*chdat = to_chdat(channel);
- 	struct tusb_omap_dma		*tusb_dma = chdat->tusb_dma;
- 	struct musb			*musb = chdat->musb;
-+	struct device			*dev = musb->controller;
- 	struct musb_hw_ep		*hw_ep = chdat->hw_ep;
- 	void __iomem			*mbase = musb->mregs;
- 	void __iomem			*ep_conf = hw_ep->conf;
-@@ -298,14 +302,16 @@ static int tusb_omap_dma_program(struct dma_channel *channel, u16 packet_sz,
- 	chdat->packet_sz = packet_sz;
- 	chdat->len = len;
- 	channel->actual_len = 0;
--	chdat->dma_addr = (void __iomem *)dma_addr;
-+	chdat->dma_addr = dma_addr;
- 	channel->status = MUSB_DMA_STATUS_BUSY;
- 
- 	/* Since we're recycling dma areas, we need to clean or invalidate */
- 	if (chdat->tx)
--		dma_cache_maint(phys_to_virt(dma_addr), len, DMA_TO_DEVICE);
-+		dma_map_single(dev, phys_to_virt(dma_addr), len,
-+				DMA_TO_DEVICE);
- 	else
--		dma_cache_maint(phys_to_virt(dma_addr), len, DMA_FROM_DEVICE);
-+		dma_map_single(dev, phys_to_virt(dma_addr), len,
-+				DMA_FROM_DEVICE);
- 
- 	/* Use 16-bit transfer if dma_addr is not 32-bit aligned */
- 	if ((dma_addr & 0x3) == 0) {
+- Anand
+
+
+> ---
+>  drivers/usb/core/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> index 97a819c..7e59444 100644
+> --- a/drivers/usb/core/Kconfig
+> +++ b/drivers/usb/core/Kconfig
+> @@ -109,7 +109,7 @@ config USB_SUSPEND
+>  config USB_OTG
+>  	bool
+>  	depends on USB && EXPERIMENTAL
+> -	select USB_SUSPEND
+> +	depends on USB_SUSPEND
+>  	default n
+>  
+>  
+> 
