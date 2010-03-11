@@ -1,61 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 15:48:37 -0800
-Subject: [PATCH 13/19] omap: mach-omap2/io.c: fix function declarations
+Date: Thu, 11 Mar 2010 15:48:39 -0800
+Subject: [PATCH 14/19] omap3: pandora: add missing i2c3 board_info
 In-Reply-To: <20100311234404.4500.82861.stgit@baageli.muru.com>
 References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-Message-ID: <20100311234837.4500.84957.stgit@baageli.muru.com>
+Message-ID: <20100311234839.4500.21147.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaro Koskinen <Aaro.Koskinen@nokia.com>
+From: Grazvydas Ignotas <notasas@gmail.com>
 
-Get rid of the following warnings:
+This will allow BQ27500 fuel gauge to function.
 
-	warning: non-ANSI function declaration of function [...]
-
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/io.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/board-omap3pandora.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 402e8f0..ae89d55 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -237,7 +237,7 @@ static void __init _omap2_map_common_io(void)
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 51a5315..395d049 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -459,12 +459,20 @@ static struct i2c_board_info __initdata omap3pandora_i2c_boardinfo[] = {
+ 	},
+ };
+ 
++static struct i2c_board_info __initdata omap3pandora_i2c3_boardinfo[] = {
++	{
++		I2C_BOARD_INFO("bq27500", 0x55),
++		.flags = I2C_CLIENT_WAKE,
++	},
++};
++
+ static int __init omap3pandora_i2c_init(void)
+ {
+ 	omap_register_i2c_bus(1, 2600, omap3pandora_i2c_boardinfo,
+ 			ARRAY_SIZE(omap3pandora_i2c_boardinfo));
+ 	/* i2c2 pins are not connected */
+-	omap_register_i2c_bus(3, 100, NULL, 0);
++	omap_register_i2c_bus(3, 100, omap3pandora_i2c3_boardinfo,
++			ARRAY_SIZE(omap3pandora_i2c3_boardinfo));
+ 	return 0;
  }
  
- #ifdef CONFIG_ARCH_OMAP2420
--void __init omap242x_map_common_io()
-+void __init omap242x_map_common_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
-@@ -246,7 +246,7 @@ void __init omap242x_map_common_io()
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2430
--void __init omap243x_map_common_io()
-+void __init omap243x_map_common_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
-@@ -255,7 +255,7 @@ void __init omap243x_map_common_io()
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
--void __init omap34xx_map_common_io()
-+void __init omap34xx_map_common_io(void)
- {
- 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
- 	_omap2_map_common_io();
-@@ -263,7 +263,7 @@ void __init omap34xx_map_common_io()
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--void __init omap44xx_map_common_io()
-+void __init omap44xx_map_common_io(void)
- {
- 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
- 	_omap2_map_common_io();
