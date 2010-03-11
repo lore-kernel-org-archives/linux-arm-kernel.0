@@ -1,174 +1,37 @@
-From: dongdong.deng@windriver.com (DDD)
-Date: Thu, 11 Mar 2010 10:47:34 +0800
-Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
-	for ARM11MPCore
-In-Reply-To: <4B9817CF.2050807@windriver.com>
-References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
-	<4B9817CF.2050807@windriver.com>
-Message-ID: <4B9859C6.1020000@windriver.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 11 Mar 2010 07:43:16 +0100
+Subject: [PATCH 04/11] ST SPEAr: Added basic header files for SPEAr
+	platform
+In-Reply-To: <4B977067.3050108@st.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003092140o67a6c943rdee3a6c905cea7ef@mail.gmail.com>
+	<4B973CF6.4030009@st.com>
+	<63386a3d1003100131v7027e44cu5031c9ee3bf6ec73@mail.gmail.com>
+	<4B977067.3050108@st.com>
+Message-ID: <63386a3d1003102243w637a8ce1m838a2dba946add32@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Wessel wrote:
-> Will Deacon wrote:
-> 
->>> Clearly, kgdb is using atomic_set()/atomic_read() in a way which does not
->>> match this documentation - it's certainly missing the barriers as required
->>> by the above quoted paragraphs.
->>>
->>> Let me repeat: atomic_set() and atomic_read() are NOT atomic.  There's
->>> nothing atomic about them.  All they do is provide a pair of accessors
->>> to the underlying value in the atomic type.  They are no different to
->>> declaring a volatile int and reading/writing it directly.
-> 
-> 
-> Clearly the docs state this.
-> 
->> Indeed. I'm not familiar enough with KGDB internals to dive in and look at all the
->> potential barrier conflicts, so I'll submit a patch that addresses the one that's
->> bitten me so far. Maybe it will motivate somebody else to take a closer look!
->>
-> 
-> 
-> Do you think you can try the patch below?
-> 
-> It seems we might not need to change to using the atomic_add_return(0,...) because using the atomic_inc() and atomic_dec() will end up using the memory barriers.
->
+2010/3/10 Viresh KUMAR <viresh.kumar@st.com>:
 
-Hi Jason,
+> One timer (or two channels) are used by clock event and clock source, but rest of
+> the timers are still available. So we need some way to export this functionality
+> of our hardware. It can be considered simply as a driver for GPT.
 
-Maybe we should initial the atomic_t variable before we using such as 
-atomic_inc/dec() directly.
+The timer people have already explained well enough I think, we have some 16
+timers on U8500, one we use as clocksource, one for clock events and 14 are
+currently unused. I plan to add them as clock events as soon as there is some
+practical use for them.
 
-Dongdong.
+I think there is nothing stopping you from modelling some extra clock events
+for the remaining timers if you absolutely want to, the kernel will
+just disregard
+them currently, which is just as good/bad as the way you're exposing the custom
+API in these patches.
 
-
---- a/kernel/kgdb.c
-+++ b/kernel/kgdb.c
-@@ -227,6 +227,17 @@ kgdb_post_primary_code(struct pt_regs *regs, int 
-e_vector, int err_code)
-         return;
-  }
-
-+static void kgdb_initial_atomic_var()
-+{
-+       int i;
-+       for (i = NR_CPUS-1; i >= 0; i--) {
-+               atomic_set(&passive_cpu_wait[i], 0);
-+               atomic_set(&cpu_in_kgdb[i], 0);
-+       }
-+
-+       atomic_set(&kgdb_setting_breakpoint, 0);
-+}
-+
-  /**
-   *     kgdb_disable_hw_debug - Disable hardware debugging while we in 
-kgdb.
-   *     @regs: Current &struct pt_regs.
-@@ -1619,6 +1630,7 @@ static void kgdb_register_callbacks(void)
-  {
-         if (!kgdb_io_module_registered) {
-                 kgdb_io_module_registered = 1;
-+               kgdb_initial_atomic_var();
-                 kgdb_arch_init();
-  #ifdef CONFIG_MAGIC_SYSRQ
-                 register_sysrq_key('g', &sysrq_gdb_op);
-
-
-
-
-> I would certainly rather fix kgdb vs mucking with the internals of cpu_relax().
-> 
-> 
-> Jason.
-> 
-> --- a/kernel/kgdb.c
-> +++ b/kernel/kgdb.c
-> @@ -580,14 +580,13 @@ static void kgdb_wait(struct pt_regs *re
->  	 * Make sure the above info reaches the primary CPU before
->  	 * our cpu_in_kgdb[] flag setting does:
->  	 */
-> -	smp_wmb();
-> -	atomic_set(&cpu_in_kgdb[cpu], 1);
-> +	atomic_inc(&cpu_in_kgdb[cpu]);
->  
->  	/* Disable any cpu specific hw breakpoints */
->  	kgdb_disable_hw_debug(regs);
->  
->  	/* Wait till primary CPU is done with debugging */
-> -	while (atomic_read(&passive_cpu_wait[cpu]))
-> +	while (atomic_add_return(0, &passive_cpu_wait[cpu]))
->  		cpu_relax();
->  
->  	kgdb_info[cpu].debuggerinfo = NULL;
-> @@ -598,7 +597,7 @@ static void kgdb_wait(struct pt_regs *re
->  		arch_kgdb_ops.correct_hw_break();
->  
->  	/* Signal the primary CPU that we are done: */
-> -	atomic_set(&cpu_in_kgdb[cpu], 0);
-> +	atomic_dec(&cpu_in_kgdb[cpu]);
->  	touch_softlockup_watchdog_sync();
->  	clocksource_touch_watchdog();
->  	local_irq_restore(flags);
-> @@ -1493,7 +1492,7 @@ acquirelock:
->  	 * spin_lock code is good enough as a barrier so we don't
->  	 * need one here:
->  	 */
-> -	atomic_set(&cpu_in_kgdb[ks->cpu], 1);
-> +	atomic_inc(&cpu_in_kgdb[ks->cpu]);
->  
->  #ifdef CONFIG_SMP
->  	/* Signal the other CPUs to enter kgdb_wait() */
-> @@ -1505,7 +1504,7 @@ acquirelock:
->  	 * Wait for the other CPUs to be notified and be waiting for us:
->  	 */
->  	for_each_online_cpu(i) {
-> -		while (!atomic_read(&cpu_in_kgdb[i]))
-> +		while (!atomic_add_return(0, &cpu_in_kgdb[i]))
->  			cpu_relax();
->  	}
->  
-> @@ -1528,7 +1527,7 @@ acquirelock:
->  
->  	kgdb_info[ks->cpu].debuggerinfo = NULL;
->  	kgdb_info[ks->cpu].task = NULL;
-> -	atomic_set(&cpu_in_kgdb[ks->cpu], 0);
-> +	atomic_dec(&cpu_in_kgdb[ks->cpu]);
->  
->  	if (!kgdb_single_step) {
->  		for (i = NR_CPUS-1; i >= 0; i--)
-> @@ -1538,7 +1537,7 @@ acquirelock:
->  		 * from the debugger.
->  		 */
->  		for_each_online_cpu(i) {
-> -			while (atomic_read(&cpu_in_kgdb[i]))
-> +			while (atomic_add_return(0, &cpu_in_kgdb[i]))
->  				cpu_relax();
->  		}
->  	}
-> @@ -1742,11 +1741,11 @@ EXPORT_SYMBOL_GPL(kgdb_unregister_io_mod
->   */
->  void kgdb_breakpoint(void)
->  {
-> -	atomic_set(&kgdb_setting_breakpoint, 1);
-> +	atomic_inc(&kgdb_setting_breakpoint);
->  	wmb(); /* Sync point before breakpoint */
->  	arch_kgdb_breakpoint();
->  	wmb(); /* Sync point after breakpoint */
-> -	atomic_set(&kgdb_setting_breakpoint, 0);
-> +	atomic_dec(&kgdb_setting_breakpoint);
->  }
->  EXPORT_SYMBOL_GPL(kgdb_breakpoint);
->  
-> 
-> ------------------------------------------------------------------------------
-> Download Intel&#174; Parallel Studio Eval
-> Try the new software tools for yourself. Speed compiling, find bugs
-> proactively, and fine-tune applications for parallel performance.
-> See why Intel Parallel Studio got high marks during beta.
-> http://p.sf.net/sfu/intel-sw-dev
-> _______________________________________________
-> Kgdb-bugreport mailing list
-> Kgdb-bugreport at lists.sourceforge.net
-> https://lists.sourceforge.net/lists/listinfo/kgdb-bugreport
-> 
+Yours,
+Linus Walleij
