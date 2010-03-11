@@ -1,76 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 15:48:21 -0800
-Subject: [PATCH 07/19] OMAP2: serial.c: Fix number of uarts in early_init
+Date: Thu, 11 Mar 2010 15:48:24 -0800
+Subject: [PATCH 08/19] omap2/3/4: mailbox: remove compiler warning
 In-Reply-To: <20100311234404.4500.82861.stgit@baageli.muru.com>
 References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-Message-ID: <20100311234821.4500.90023.stgit@baageli.muru.com>
+Message-ID: <20100311234824.4500.50674.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Weber <swirl@gmx.li>
+From: Suman Anna <s-anna@ti.com>
 
-The omap_serial_early_init prints the following errors:
+Remove a compiler warning in device-specific
+mailbox module.
 
-Could not get uart4_ick
-Could not get uart4_fck
-
-because all the uarts available in omap_uart[] will be initialized.
-Only omap4430 and omap3630 have 4 uarts at the moment.
-This patch reduces the number of uarts when cpu is not omap4430 or
-omap3630.
-
-Signed-off-by: Thomas Weber <weber@corscience.de>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/serial.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/mailbox.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index b79bc89..da77930 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -644,16 +644,21 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
- }
- void __init omap_serial_early_init(void)
- {
--	int i;
-+	int i, nr_ports;
- 	char name[16];
- 
-+	if (!(cpu_is_omap3630() || cpu_is_omap4430()))
-+		nr_ports = 3;
-+	else
-+		nr_ports = ARRAY_SIZE(omap_uart);
-+
- 	/*
- 	 * Make sure the serial ports are muxed on at this point.
- 	 * You have to mux them off in device drivers later on
- 	 * if not needed.
- 	 */
- 
--	for (i = 0; i < ARRAY_SIZE(omap_uart); i++) {
-+	for (i = 0; i < nr_ports; i++) {
- 		struct omap_uart_state *uart = &omap_uart[i];
- 		struct platform_device *pdev = &uart->pdev;
- 		struct device *dev = &pdev->dev;
-@@ -669,17 +674,17 @@ void __init omap_serial_early_init(void)
- 			continue;
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 52a981c..318f363 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -430,19 +430,19 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+ 		if (unlikely(!res)) {
+ 			dev_err(&pdev->dev, "invalid irq resource\n");
+ 			ret = -ENODEV;
+-			goto err_iva1;
++			omap_mbox_unregister(&mbox_dsp_info);
++			goto err_dsp;
  		}
+ 		mbox_iva_info.irq = res->start;
+ 		ret = omap_mbox_register(&pdev->dev, &mbox_iva_info);
+-		if (ret)
+-			goto err_iva1;
++		if (ret) {
++			omap_mbox_unregister(&mbox_dsp_info);
++			goto err_dsp;
++		}
+ 	}
+ #endif
+ 	return 0;
  
--		sprintf(name, "uart%d_ick", i+1);
-+		sprintf(name, "uart%d_ick", i + 1);
- 		uart->ick = clk_get(NULL, name);
- 		if (IS_ERR(uart->ick)) {
--			printk(KERN_ERR "Could not get uart%d_ick\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
- 			uart->ick = NULL;
- 		}
- 
- 		sprintf(name, "uart%d_fck", i+1);
- 		uart->fck = clk_get(NULL, name);
- 		if (IS_ERR(uart->fck)) {
--			printk(KERN_ERR "Could not get uart%d_fck\n", i+1);
-+			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
- 			uart->fck = NULL;
- 		}
- 
+-err_iva1:
+-	omap_mbox_unregister(&mbox_dsp_info);
+-
+ err_dsp:
+ 	iounmap(mbox_base);
+ 	return ret;
