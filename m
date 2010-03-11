@@ -1,36 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 10:03:16 -0800
-Subject: [PATCH 0/3] USB compile fixes omaps
-Message-ID: <20100311180023.20537.27516.stgit@baageli.muru.com>
+Date: Thu, 11 Mar 2010 10:03:22 -0800
+Subject: [PATCH 1/3] usb: Fix compile error for omaps for musb_hdrc
+In-Reply-To: <20100311180023.20537.27516.stgit@baageli.muru.com>
+References: <20100311180023.20537.27516.stgit@baageli.muru.com>
+Message-ID: <20100311180322.20537.3614.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe & Greg,
+CONFIG_ARCH_OMAP34XX is now CONFIG_ARCH_OMAP3.
 
-Here are three fixes to make USB compile for omaps.
-Can you please take a look and queue?
+But since drivers/usb/musb/omap2430.c use CONFIG_PM for these
+registers and functions, do the same for the header.
 
-The tusb6010 DMA fix needs a platform init patch that I'll
-send along with other omap fixes.
+Otherwise we get the following for most omap3 defconfigs:
 
-Regards,
+drivers/usb/musb/omap2430.c:261: error: expected identifier or '(' before 'do'
+drivers/usb/musb/omap2430.c:261: error: expected identifier or '(' before 'while'
+drivers/usb/musb/omap2430.c:268: error: expected identifier or '(' before 'do'
+drivers/usb/musb/omap2430.c:268: error: expected identifier or '(' before 'while'
 
-Tony
-
-
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ drivers/usb/musb/musb_core.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Tony Lindgren (3):
-      usb: Fix compile error for omaps for musb_hdrc
-      usb: Fix USB_SUSPEND dependency for OTG
-      usb: Fix tusb6010 for DMA API
-
-
- drivers/usb/core/Kconfig         |    2 +-
- drivers/usb/musb/musb_core.h     |    4 ++--
- drivers/usb/musb/tusb6010.c      |   13 +++++++++++++
- drivers/usb/musb/tusb6010_omap.c |   22 ++++++++++++++--------
- 4 files changed, 30 insertions(+), 11 deletions(-)
-
--- 
-Signature
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index d849fb8..cd9f4a9 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -469,7 +469,7 @@ struct musb_csr_regs {
+ 
+ struct musb_context_registers {
+ 
+-#if defined(CONFIG_ARCH_OMAP34XX) || defined(CONFIG_ARCH_OMAP2430)
++#ifdef CONFIG_PM
+ 	u32 otg_sysconfig, otg_forcestandby;
+ #endif
+ 	u8 power;
+@@ -483,7 +483,7 @@ struct musb_context_registers {
+ 	struct musb_csr_regs index_regs[MUSB_C_NUM_EPS];
+ };
+ 
+-#if defined(CONFIG_ARCH_OMAP34XX) || defined(CONFIG_ARCH_OMAP2430)
++#ifdef CONFIG_PM
+ extern void musb_platform_save_context(struct musb *musb,
+ 		struct musb_context_registers *musb_context);
+ extern void musb_platform_restore_context(struct musb *musb,
