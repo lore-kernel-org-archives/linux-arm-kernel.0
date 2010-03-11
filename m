@@ -1,30 +1,78 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Thu, 11 Mar 2010 16:42:35 +0100
-Subject: bit errors on spitz
-In-Reply-To: <4B98EF5D.5000609@warmcat.com>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
-	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
-	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-	<4B98EF5D.5000609@warmcat.com>
-Message-ID: <1268322155.3990.114.camel@hammer.suse.cz>
+From: madhu.cr@ti.com (Madhusudhan)
+Date: Thu, 11 Mar 2010 10:27:53 -0600
+Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
+	autoloading feature
+In-Reply-To: <618f0c911003110252i36d6fc31wbaef4ad7a17565b1@mail.gmail.com>
+References: <618f0c911003010327s290fcce1ud665b5a16392aea1@mail.gmail.com>
+	<011301cac0b6$542b1190$544ff780@am.dhcp.ti.com>
+	<618f0c911003110252i36d6fc31wbaef4ad7a17565b1@mail.gmail.com>
+Message-ID: <004401cac137$cccbf0c0$544ff780@am.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy Green wrote:
 
-> I saw very similar failures for a long time on our iMX31 based device. 
-> Eventually I found a Freescale errata where the RAM inside the USB2 
-> macrocell started to make single bit errors below 1.38V Vcore; ours was 
-> 1.4V at that time but dipped on CPU load.
 
-Good tip. It seems that nobody ported driver for the voltage control
-chip ISL6271 from 2.4 kernel, and bootloader probably does not set
-correct values.
+> -----Original Message-----
+> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of
+> Venkatraman S
+> Sent: Thursday, March 11, 2010 4:52 AM
+> To: Madhusudhan
+> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
+> autoloading feature
+> 
+> Madhusudhan <madhu.cr@ti.com> wrote:
+> >> -----Original Message-----
+> >> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+> >> owner at vger.kernel.org] On Behalf Of Venkatraman S
+> >> Sent: Monday, March 01, 2010 5:27 AM
+> >> To: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >> linux-omap at vger.kernel.org
+> >> Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
+> >> autoloading feature
+> >>
+> >> Start to use the sDMA descriptor autoloading feature.
+> >> For large datablocks, the MMC driver has to repeatedly setup, program
+> >> and teardown the
+> >> dma channel for each element of the sglist received in
+> omap_hsmmc_request.
+> >>
+> >> By using descriptor autoloading, transfers from / to each element of
+> >> the sglist is pre programmed
+> >> into a linked list. The sDMA driver completes the entire transaction
+> >> and provides a single interrupt.
+> >>
+> >> Due to this, number of dma interrupts for a typical 100MB transfer on
+> the
+> >> MMC is
+> >> reduced from 25000 to about 400 (approximate). Transfer speeds are
+> >> improved by ~5%
+> >> (Though it varies on the size of read / write & improves on huge
+> >> transfers)
+> >>
+> >> Descriptor autoloading is available only in 3630 and 4430 (as of now).
+> >> Hence normal DMA
+> >> mode is also retained.
+> >>
+> >> Tested on omap4430 sdp.
+> >>
+> >> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+> >
+> > I don't see any issues with this patch except the concern I had on the
+> first
+> > patch in the series. Why is that change linked to this series?
+> >
+>   Thanks. The problem was seen only in the context of using descriptor
+> load. Would
+> you prefer that I post it as a separate patch ?
 
-Datasheet:
-http://www.penguin.cz/~utx/zaurus/datasheets/power/Xscale/ISL6271.pdf
+My point is why that change is needed for this feature to work? 
 
--- 
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+When DMA is completed and a callback is received the ch can be freed. Once
+TC is received the core is notified of the same.
+
+Can the first patch be dropped? Or do you see issues?
+
+> Regards,
+> Venkat.
