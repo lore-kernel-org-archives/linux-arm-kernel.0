@@ -1,44 +1,119 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 11 Mar 2010 16:48:45 -0600
-Subject: Question about memory resources
-Message-ID: <0D753D10438DA54287A00B0270842697636843779C@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Mar 2010 15:48:00 -0800
+Subject: [PATCH 00/19] omap-fixes for 2.6.34-rc1
+Message-ID: <20100311234404.4500.82861.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi all,
 
-I have written a backlight driver for the ep93xx.  The backlight
-on this system is controlled by a pwm output with a single control
-register.  This register is located in the memory resource used
-by the ep93xx framebuffer.
+Here's some omap fixes for review.
 
-The framebuffer uses the following resource:
-
-static struct resource ep93xx_fb_resource[] = {
-	{
-		.start	= EP93XX_RASTER_PHYS_BASE,
-		.end		= EP93XX_RASTER_PHYS_BASE + 0x800 - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
-The backlight would use this resource:
-
-static struct resource ep93xx_bl_resource[] = {
-	{
-		.start	= EP93XX_RASTER_PHYS_BASE + 0x20,
-		.end		= EP93XX_RASTER_PHYS_BASE + 0x23,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
-Unfortunately this doesn't work because the request_mem_region
-call fails when the second device is probed since the first
-device already did a request_mem_region and it was marked as
-IORESOURCE_BUSY.
-
-Is there any way to handle this other than using the static i/o
-mapping for the backlight register?
+I also threw in the n8x0 platform init for tusb6010 and
+updated the defconfig as those were needed to fix and test
+the tusb6010 for the DMA API changes as posted earlier.
 
 Regards,
-Hartley
+
+Tony
+
+---
+
+Aaro Koskinen (2):
+      omap: pass the reboot command to the boot loader
+      omap: mach-omap2/io.c: fix function declarations
+
+Andrea Gelmini (1):
+      omap: Checkpatch cleanup for blizzard.h
+
+Andrew Clayton (1):
+      ARM/OMAP: Remove the +x bit from a couple of source files
+
+Enric Balletbo i Serra (1):
+      omap3: Fix support for the LEDs connected to GPIO outputs on IGEP v2board
+
+Felipe Balbi (1):
+      omap2/3/4: ehci: avoid compiler error with touchbook
+
+Francisco Alecrim (1):
+      omap2: add USB initialization for tusb6010
+
+Grazvydas Ignotas (1):
+      omap3: pandora: add missing i2c3 board_info
+
+Janusz Krzysztofik (1):
+      omap: McBSP: Drop unnecessary status/error bit clearing on reg_cacheretrieved register values
+
+Kevin Hilman (2):
+      OMAP2: cpu_is_omap2*: fix compile-time removal of unused code
+      OMAP4: fix temporary hacks that break multi-omap PM
+
+Santosh Shilimkar (1):
+      omap4: Fix build break by moving omap_smc1 into a separate .S
+
+Suman Anna (1):
+      omap2/3/4: mailbox: remove compiler warning
+
+Thomas Weber (1):
+      OMAP2: serial.c: Fix number of uarts in early_init
+
+Tony Lindgren (4):
+      omap3: Fix compile for Touch Book early_param
+      omap2: Update n8x0 defconfig to test multi-omap and DMA api changes
+      omap: Enable PM_RUNTIME in defconfigs to avoid USB compile errors
+      omap: Fix gpio_resume_after_retention
+
+Vaibhav Hiremath (1):
+      omap: Add DSI regulator supply to OMAP3EVM board file
+
+
+ arch/arm/configs/cm_t35_defconfig            |    2 
+ arch/arm/configs/n770_defconfig              |    1 
+ arch/arm/configs/n8x0_defconfig              |  160 +++++++++++++++++++++++---
+ arch/arm/configs/omap3_beagle_defconfig      |    1 
+ arch/arm/configs/omap3_defconfig             |    2 
+ arch/arm/configs/omap3_evm_defconfig         |    1 
+ arch/arm/configs/omap3_touchbook_defconfig   |    2 
+ arch/arm/configs/omap_3430sdp_defconfig      |    1 
+ arch/arm/configs/omap_3630sdp_defconfig      |    2 
+ arch/arm/configs/omap_h2_1610_defconfig      |    1 
+ arch/arm/configs/omap_zoom2_defconfig        |    1 
+ arch/arm/configs/omap_zoom3_defconfig        |    2 
+ arch/arm/configs/rx51_defconfig              |    1 
+ arch/arm/mach-omap2/Makefile                 |    3 
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 
+ arch/arm/mach-omap2/board-3630sdp.c          |    2 
+ arch/arm/mach-omap2/board-4430sdp.c          |   26 ----
+ arch/arm/mach-omap2/board-am3517evm.c        |    2 
+ arch/arm/mach-omap2/board-cm-t35.c           |    2 
+ arch/arm/mach-omap2/board-devkit8000.c       |    2 
+ arch/arm/mach-omap2/board-igep0020.c         |   56 ++++++---
+ arch/arm/mach-omap2/board-n8x0.c             |   98 ++++++++++++++++
+ arch/arm/mach-omap2/board-omap3beagle.c      |    2 
+ arch/arm/mach-omap2/board-omap3evm.c         |   18 ++-
+ arch/arm/mach-omap2/board-omap3pandora.c     |   12 ++
+ arch/arm/mach-omap2/board-omap3touchbook.c   |   12 +-
+ arch/arm/mach-omap2/board-overo.c            |    2 
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    0 
+ arch/arm/mach-omap2/board-zoom3.c            |    2 
+ arch/arm/mach-omap2/clock2420_data.c         |    1 
+ arch/arm/mach-omap2/io.c                     |   21 ++-
+ arch/arm/mach-omap2/mailbox.c                |   12 +-
+ arch/arm/mach-omap2/omap44xx-smc.S           |   32 +++++
+ arch/arm/mach-omap2/prcm.c                   |    4 -
+ arch/arm/mach-omap2/serial.c                 |   15 ++
+ arch/arm/mach-omap2/usb-ehci.c               |    6 -
+ arch/arm/plat-omap/gpio.c                    |   10 +-
+ arch/arm/plat-omap/include/plat/blizzard.h   |    2 
+ arch/arm/plat-omap/include/plat/cpu.h        |    8 +
+ arch/arm/plat-omap/include/plat/prcm.h       |    2 
+ arch/arm/plat-omap/include/plat/system.h     |    6 -
+ arch/arm/plat-omap/include/plat/usb.h        |    2 
+ arch/arm/plat-omap/mcbsp.c                   |   12 +-
+ 43 files changed, 414 insertions(+), 137 deletions(-)
+ mode change 100755 => 100644 arch/arm/mach-omap2/board-3630sdp.c
+ mode change 100755 => 100644 arch/arm/mach-omap2/board-zoom-peripherals.c
+ create mode 100644 arch/arm/mach-omap2/omap44xx-smc.S
+
+-- 
+Signature
