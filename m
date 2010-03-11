@@ -1,36 +1,81 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 10:41:28 -0800
-Subject: [PATCH 2/3] usb: Fix USB_SUSPEND dependency for OTG
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC93DC@dbde02.ent.ti.com>
-References: <20100311180329.20537.95308.stgit@baageli.muru.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0321EC93DC@dbde02.ent.ti.com>
-Message-ID: <20100311184128.GK2900@atomide.com>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Thu, 11 Mar 2010 20:24:27 +0100
+Subject: [PATCH v2] ARM: Add support for LZMA-compressed kernel images
+In-Reply-To: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
+References: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
+Message-ID: <1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Gadiyar, Anand <gadiyar@ti.com> [100311 10:24]:
-> Tony Lindgren wrote:
-> > 
-> > To use this, PM_RUNTIME must be set as discussed at:
-> > 
-> > http://thread.gmane.org/gmane.linux.usb.general/27432/focus=4460
-> > 
-> > Otherwise we'll get errors like:
-> > 
-> > drivers/usb/core/hcd.c:1892: error: 'pm_wq' undeclared (first use in this function)
-> > drivers/usb/core/hcd.c:1892: error: (Each undeclared identifier is reported only once
-> > drivers/usb/core/hcd.c:1892: error: for each function it appears in.)
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Hi Tony,
-> 
-> I already posted this patch last month. Still waiting for it
-> to get queued.
-> 
-> <http://marc.info/?l=linux-usb&m=126675883221098&w=2>
+This patch allows using a kernel image compressed with LZMA on ARM.
+Extracting the image is fairly slow, but it might be useful on machines
+with a very limited amount of storage, as the size benefit is quite
+significant:
+Gzip: Data Size:    1586352 Bytes = 1549.17 kB = 1.51 MB
+LZMA: Data Size:    2135916 Bytes = 2085.86 kB = 2.04 MB
 
-OK thanks, I just found the thread but no patches. So my version
-can then be dropped.
+Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+Tested-by: Martin Michlmayr <tbm@cyrius.com>
+---
+v2: Updated to apply on top of 2.6.34-rc1
 
-Tony
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/boot/compressed/Makefile     |    1 +
+ arch/arm/boot/compressed/decompress.c |    4 ++++
+ arch/arm/boot/compressed/piggy.lzma.S |    6 ++++++
+ 4 files changed, 12 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/piggy.lzma.S
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3b18128..3ebc7c3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -21,6 +21,7 @@ config ARM
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
++	select HAVE_KERNEL_LZMA
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+ 	help
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 97c89e7..53faa90 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -65,6 +65,7 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
+ 
+ suffix_$(CONFIG_KERNEL_GZIP) = gzip
+ suffix_$(CONFIG_KERNEL_LZO)  = lzo
++suffix_$(CONFIG_KERNEL_LZMA) = lzma
+ 
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 0da382f..d554df6 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -39,6 +39,10 @@ extern void error(char *);
+ #include "../../../../lib/decompress_unlzo.c"
+ #endif
+ 
++#ifdef CONFIG_KERNEL_LZMA
++#include "../../../../lib/decompress_unlzma.c"
++#endif
++
+ void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+ 	decompress(input, len, NULL, NULL, output, NULL, error);
+diff --git a/arch/arm/boot/compressed/piggy.lzma.S b/arch/arm/boot/compressed/piggy.lzma.S
+new file mode 100644
+index 0000000..d7e69cf
+--- /dev/null
++++ b/arch/arm/boot/compressed/piggy.lzma.S
+@@ -0,0 +1,6 @@
++	.section .piggydata,#alloc
++	.globl	input_data
++input_data:
++	.incbin	"arch/arm/boot/compressed/piggy.lzma"
++	.globl	input_data_end
++input_data_end:
+-- 
+1.7.0
