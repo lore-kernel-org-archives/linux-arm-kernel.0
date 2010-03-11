@@ -1,34 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Mar 2010 13:33:53 +0000
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-Message-ID: <20100311133353.GC25011@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Mar 2010 13:53:03 -0000
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <4B9859C6.1020000@windriver.com>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+	<4B9817CF.2050807@windriver.com> <4B9859C6.1020000@windriver.com>
+Message-ID: <001701cac122$2bf75a00$83e60e00$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 06, 2010 at 09:24:49PM +1100, dave b wrote:
-> I had already reported it to debian -
-> http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=572653
+> Maybe we should initial the atomic_t variable before we using such as
+> atomic_inc/dec() directly.
 > 
-> I have cc'ed linux-arm-kernel into this email.
+> Dongdong.
+> 
+> 
+> --- a/kernel/kgdb.c
+> +++ b/kernel/kgdb.c
+> @@ -227,6 +227,17 @@ kgdb_post_primary_code(struct pt_regs *regs, int
+> e_vector, int err_code)
+>          return;
+>   }
+> 
+> +static void kgdb_initial_atomic_var()
+> +{
+> +       int i;
+> +       for (i = NR_CPUS-1; i >= 0; i--) {
+> +               atomic_set(&passive_cpu_wait[i], 0);
+> +               atomic_set(&cpu_in_kgdb[i], 0);
+> +       }
+> +
+> +       atomic_set(&kgdb_setting_breakpoint, 0);
+> +}
+> +
 
-I think most of the points have already been convered, but just for
-completeness,
+Given that passive_cpu_wait and cpu_in_kgdb are static, I think those guys
+are alright as-is. kgdb_setting_breakpoint should probably be reset though.
 
-What is the history of the hardware you're running these builds on?
-Has it proven itself on previous kernel versions running much the same
-tests?
-
-Another point to consider: how are you running the compiler - is it
-over NFS from a PC?
-
-The reason I ask is that you can suffer from very weird corruption
-issues - I have a nice illustration of one which takes a copy of 1GB
-worth of data each day, and every once in a while, bytes 8-15 of a
-naturally aligned 16 byte block in the data become corrupted somewhere
-between the network and disk.  The probability of corruption happening
-is around 0.0000001%, but it still happens... and that makes it
-extremely difficult to track down.
+Will
