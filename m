@@ -1,50 +1,40 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Thu, 11 Mar 2010 23:50:49 +0530
-Subject: [PATCH 2/3] usb: Fix USB_SUSPEND dependency for OTG
-In-Reply-To: <20100311180329.20537.95308.stgit@baageli.muru.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC93DC@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Mar 2010 10:39:44 -0800
+Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
+	autoloading feature
+In-Reply-To: <618f0c911003110708s5015f2bftb443b9ea57cb6477@mail.gmail.com>
+References: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
+	<20100310224110.GW2900@atomide.com>
+	<618f0c911003110708s5015f2bftb443b9ea57cb6477@mail.gmail.com>
+Message-ID: <20100311183944.GJ2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
+* Venkatraman S <svenkatr@ti.com> [100311 07:04]:
+> Tony Lindgren wrote:
+> >
+> > Does the driver still work in PIO mode?
+> >
+> > We need to have the drivers capable to fail over to PIO mode
+> > as the DMA channels can run out.
+> >
 > 
-> To use this, PM_RUNTIME must be set as discussed at:
-> 
-> http://thread.gmane.org/gmane.linux.usb.general/27432/focus=4460
-> 
-> Otherwise we'll get errors like:
-> 
-> drivers/usb/core/hcd.c:1892: error: 'pm_wq' undeclared (first use in this function)
-> drivers/usb/core/hcd.c:1892: error: (Each undeclared identifier is reported only once
-> drivers/usb/core/hcd.c:1892: error: for each function it appears in.)
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>    The driver doesn't have an automatic fallback to PIO,
+> even without my patch. A error return from omap_request_dma is
+> propogated all the way back to the transfer request.
+>   The decision to use_dma (the variable) is unaltered.
 
-Hi Tony,
+OK, that might explain some nasty surprises then..
 
-I already posted this patch last month. Still waiting for it
-to get queued.
+With these patches, does the driver still work in PIO mode though?
+ 
+>    Infact, it would be easier to implement a runtime fallback after
+> this patch is
+> merged as I have separated out the capability and runtime selection.
+> (dma_caps and dma_in_use).
 
-<http://marc.info/?l=linux-usb&m=126675883221098&w=2>
+Sounds good to me, thanks for looking into it.
 
-- Anand
+Regards,
 
-
-> ---
->  drivers/usb/core/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> index 97a819c..7e59444 100644
-> --- a/drivers/usb/core/Kconfig
-> +++ b/drivers/usb/core/Kconfig
-> @@ -109,7 +109,7 @@ config USB_SUSPEND
->  config USB_OTG
->  	bool
->  	depends on USB && EXPERIMENTAL
-> -	select USB_SUSPEND
-> +	depends on USB_SUSPEND
->  	default n
->  
->  
-> 
+Tony
