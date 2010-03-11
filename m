@@ -1,56 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 15:48:47 -0800
-Subject: [PATCH 17/19] omap: Add DSI regulator supply to OMAP3EVM board file
-In-Reply-To: <20100311234404.4500.82861.stgit@baageli.muru.com>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Thu, 11 Mar 2010 17:50:35 -0600
+Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
+In-Reply-To: <20100311234834.4500.12726.stgit@baageli.muru.com>
 References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-Message-ID: <20100311234847.4500.24584.stgit@baageli.muru.com>
+	<20100311234834.4500.12726.stgit@baageli.muru.com>
+Message-ID: <A24693684029E5489D1D202277BE894453FB11F8@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+Hi Tony,
 
-With recent changes happened in OMAP2/3 DSS library for regulator interface, it
-is required to define DSI regulator supply, without this DSS (in turn Fbdev)
-fails to get regulator.
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Thursday, March 11, 2010 5:49 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Aguirre, Sergio; linux-omap at vger.kernel.org
+> Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
+> 
+> From: Tony Lindgren <Aguirre>
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Acked-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-omap3evm.c |   16 +++++++++++-----
- 1 files changed, 11 insertions(+), 5 deletions(-)
+Something funky mix happened with the authorship here :)
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 017bb2f..a05de10 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -514,9 +514,15 @@ static struct regulator_init_data omap3_evm_vdac = {
- };
- 
- /* VPLL2 for digital video outputs */
--static struct regulator_consumer_supply omap3_evm_vpll2_supply = {
--	.supply		= "vdvi",
--	.dev		= &omap3_evm_lcd_device.dev,
-+static struct regulator_consumer_supply omap3_evm_vpll2_supplies[] = {
-+	{
-+		.supply		= "vdvi",
-+		.dev		= &omap3_evm_lcd_device.dev,
-+	},
-+	{
-+		.supply		= "vdds_dsi",
-+		.dev		= &omap3_evm_dss_device.dev,
-+	},
- };
- 
- static struct regulator_init_data omap3_evm_vpll2 = {
-@@ -530,8 +536,8 @@ static struct regulator_init_data omap3_evm_vpll2 = {
- 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &omap3_evm_vpll2_supply,
-+	.num_consumer_supplies	= ARRAY_SIZE(omap3_evm_vpll2_supplies),
-+	.consumer_supplies	= omap3_evm_vpll2_supplies,
- };
- 
- static struct twl4030_platform_data omap3evm_twldata = {
+Should be:
+
+From: Sergio Aguirre <saaguirre@ti.com>
+
+Regards,
+Sergio
