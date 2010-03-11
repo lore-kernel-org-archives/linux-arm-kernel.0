@@ -1,34 +1,32 @@
-From: andy@warmcat.com (Andy Green)
-Date: Thu, 11 Mar 2010 21:21:37 +0000
-Subject: bit errors on spitz
-In-Reply-To: <1268322155.3990.114.camel@hammer.suse.cz>
-References: <20100305212708.GC21773@elf.ucw.cz>	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>	<4B98EF5D.5000609@warmcat.com>
-	<1268322155.3990.114.camel@hammer.suse.cz>
-Message-ID: <4B995EE1.1050609@warmcat.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 12 Mar 2010 08:44:31 +1100
+Subject: USB mass storage and ARM cache coherency
+In-Reply-To: <20100310035249.GB17693@linux-sh.org>
+References: <20100303215437.GF2579@ucw.cz>
+	<1267709756.6526.380.camel@e102109-lin.cambridge.arm.com>
+	<20100304135128.GA12191@atrey.karlin.mff.cuni.cz>
+	<1267712512.31654.176.camel@mulgrave.site>
+	<1267716578.6526.483.camel@e102109-lin.cambridge.arm.com>
+	<20100304154103.GA9384@linux-sh.org>
+	<1267726049.6526.543.camel@e102109-lin.cambridge.arm.com>
+	<1267738660.22204.77.camel@pasglop>
+	<20100305011745.GC26618@linux-sh.org>
+	<1267764295.22204.102.camel@pasglop>
+	<20100310035249.GB17693@linux-sh.org>
+Message-ID: <1268343871.22204.709.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/10 15:42, Somebody in the thread at some point said:
-> Andy Green wrote:
->
->> I saw very similar failures for a long time on our iMX31 based device.
->> Eventually I found a Freescale errata where the RAM inside the USB2
->> macrocell started to make single bit errors below 1.38V Vcore; ours was
->> 1.4V at that time but dipped on CPU load.
->
-> Good tip. It seems that nobody ported driver for the voltage control
-> chip ISL6271 from 2.4 kernel, and bootloader probably does not set
-> correct values.
->
-> Datasheet:
-> http://www.penguin.cz/~utx/zaurus/datasheets/power/Xscale/ISL6271.pdf
+On Wed, 2010-03-10 at 12:52 +0900, Paul Mundt wrote:
+> Well, it does start to get a bit painful with sparsemem section or
+> NUMA
+> node IDs also digging in to the page flags on 32-bit.. the benefits
+> would
+> have to be pretty compelling to offset the pain. 
 
-Unless there's more to it in the way the zaurus using it that regulator 
-isn't programmable digitally.
+Unless we play a dangerous trick and re-use another flag that isn't
+meaningful for allocated pages... maybe PG_buddy ? Or do I miss
+something about that guy semantics ?
 
-Reading about your CF Card WLAN related issues they suck down a good 
-amount of power when their radio is up, I would definitely suggest 
-monitoring with a 'scope the various rails (Vcore, RAM and whatever it 
-is the CF Card is powered by) while putting it under load.
-
--Andy
+Cheers,
+Ben.
