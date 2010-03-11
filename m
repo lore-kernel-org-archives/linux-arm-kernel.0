@@ -1,62 +1,30 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Thu, 11 Mar 2010 20:38:02 +0530
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <20100310224110.GW2900@atomide.com>
-References: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
-	<20100310224110.GW2900@atomide.com>
-Message-ID: <618f0c911003110708s5015f2bftb443b9ea57cb6477@mail.gmail.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Thu, 11 Mar 2010 16:42:35 +0100
+Subject: bit errors on spitz
+In-Reply-To: <4B98EF5D.5000609@warmcat.com>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+	<4B98EF5D.5000609@warmcat.com>
+Message-ID: <1268322155.3990.114.camel@hammer.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
-> * Venkatraman S <svenkatr@ti.com> [100310 06:08]:
->> @@ -1400,14 +1471,23 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host
->> *host, struct mmc_request *req)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | (req->data->blocks << 16));
->> ? ? ? set_data_timeout(host, req->data->timeout_ns, req->data->timeout_clks);
->>
->> - ? ? if (host->use_dma) {
->> - ? ? ? ? ? ? ret = omap_hsmmc_start_dma_transfer(host, req);
->> - ? ? ? ? ? ? if (ret != 0) {
->> - ? ? ? ? ? ? ? ? ? ? dev_dbg(mmc_dev(host->mmc), "MMC start dma failure\n");
->> + ? ? if (host->dma_caps & DMA_TYPE_SDMA) {
->> + ? ? ? ? ? ? ret = omap_hsmmc_configure_sdma(host, req);
->> + ? ? ? ? ? ? if (ret)
->> ? ? ? ? ? ? ? ? ? ? ? return ret;
->> - ? ? ? ? ? ? }
->> + ? ? ? ? ? ? host->dma_in_use = DMA_TYPE_SDMA;
->> ? ? ? }
->> - ? ? return 0;
->> + ? ? if ((host->dma_caps & DMA_TYPE_SDMA_DLOAD) &&
->> + ? ? ? ? ? ? host->data->sg_len > 4) {
->> + ? ? ? ? ? ? ret = omap_hsmmc_configure_sdma_sglist(host, req);
->> + ? ? ? ? ? ? if (ret)
->> + ? ? ? ? ? ? ? ? ? ? return ret;
->> + ? ? ? ? ? ? host->dma_in_use = DMA_TYPE_SDMA_DLOAD;
->> +
->> + ? ? }
->> + ? ? ret = omap_hsmmc_start_dma_transfer(host);
->> + ? ? return ret;
->> +
->> ?}
->
-> Does the driver still work in PIO mode?
->
-> We need to have the drivers capable to fail over to PIO mode
-> as the DMA channels can run out.
->
+Andy Green wrote:
 
-   The driver doesn't have an automatic fallback to PIO,
-even without my patch. A error return from omap_request_dma is
-propogated all the way back to the transfer request.
-  The decision to use_dma (the variable) is unaltered.
+> I saw very similar failures for a long time on our iMX31 based device. 
+> Eventually I found a Freescale errata where the RAM inside the USB2 
+> macrocell started to make single bit errors below 1.38V Vcore; ours was 
+> 1.4V at that time but dipped on CPU load.
 
-   Infact, it would be easier to implement a runtime fallback after
-this patch is
-merged as I have separated out the capability and runtime selection.
-(dma_caps and dma_in_use).
+Good tip. It seems that nobody ported driver for the voltage control
+chip ISL6271 from 2.4 kernel, and bootloader probably does not set
+correct values.
 
-Regards,
+Datasheet:
+http://www.penguin.cz/~utx/zaurus/datasheets/power/Xscale/ISL6271.pdf
 
-Venkat.
+-- 
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
