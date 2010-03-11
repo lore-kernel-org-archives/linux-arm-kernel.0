@@ -1,37 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 11 Mar 2010 11:39:41 +0100
-Subject: [PATCH 1/2] mx1: fix build when DEBUG_LL is enabled
-In-Reply-To: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
-References: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
-Message-ID: <20100311103940.GA19320@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Mar 2010 10:41:03 +0000
+Subject: [PATCH 07/11] ST SPEAr: Added source files for SPEAr3xx
+	machine family
+In-Reply-To: <63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-7-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-8-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003082246g2752ccf4ob52d5bb01dfb264c@mail.gmail.com>
+Message-ID: <20100311104103.GC16376@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Mar 09, 2010 at 07:46:10AM +0100, Linus Walleij wrote:
+> > +struct amba_device uart_device = {
+> > + ? ? ? .dev = {
+> > + ? ? ? ? ? ? ? .init_name = "uart",
+> > + ? ? ? ? ? ? ? },
+> > + ? ? ? .res = {
+> > + ? ? ? ? ? ? ? .start = SPEAR3XX_ICM1_UART_BASE,
+> > + ? ? ? ? ? ? ? .end = SPEAR3XX_ICM1_UART_BASE + SPEAR3XX_ICM1_UART_SIZE - 1,
+> > + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> > + ? ? ? ? ? ? ? },
+> > + ? ? ? .irq = {IRQ_UART, NO_IRQ},
+> > + ? ? ? .periphid = 0x00041011,
+> > +};
+> 
+> You're hardcoding the PrimeCell ID to the ARM version, but I suspect
+> you have an ST derivate with some additional features. If you look in
+> the PL011 driver in drivers/serial/amba-pl011.c you will probably recognize
+> the modified PrimeCell IDs for vendor 0x80 (VENDOR_ST) and I think
+> you might rather need to patch this file with your new periphid and
+> possibly even implement some new extensions (if there are any).
+> 
+> What value is actually in the ID registers of your cell? (Just
+> check in some debugger or simply printk() it...)
 
-On Tue, Mar 09, 2010 at 12:12:04PM +0200, Baruch Siach wrote:
-> Commit "mx1: prefix SOC specific defines with MX1_ and deprecate old names"
-> redefined the IO_ADDRESS macro in a way that is incompatible with
-> debug-macro.S. Reintroduce AVIC_IO_ADDRESS, and use it in debug-macro.S.
-This feels wrong.  Can you please instead fix IMX_IO_ADDRESS?
-
-Something like:
-
-	#ifdef __ASSEMBLY__
-	#define IOREG(x) (x)
-	#else
-	#define IOREG(x) ((void __force __iomem *)(x))
-	#endif
-
-	#define IMX_IO_ADDRESS(addr, module) IOREG(\
-	...
-
-could work.  Don't know if the cast to unsigned long works in assembler.
-Maybe it's unneeded?  Don't remember.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+There is no need to specify the ID when the device provides it - in fact
+the code will override you by reading the ID from the device if it finds
+it.  The only reason to explicitly provide one is for the very early
+Primecell devices which didn't implement the ID scheme - such as PL010.
