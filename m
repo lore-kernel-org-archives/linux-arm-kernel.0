@@ -1,336 +1,174 @@
-From: madhu.cr@ti.com (Madhusudhan)
-Date: Wed, 10 Mar 2010 19:01:05 -0600
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <618f0c911003010327s290fcce1ud665b5a16392aea1@mail.gmail.com>
-References: <618f0c911003010327s290fcce1ud665b5a16392aea1@mail.gmail.com>
-Message-ID: <011301cac0b6$542b1190$544ff780@am.dhcp.ti.com>
+From: dongdong.deng@windriver.com (DDD)
+Date: Thu, 11 Mar 2010 10:47:34 +0800
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <4B9817CF.2050807@windriver.com>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+	<4B9817CF.2050807@windriver.com>
+Message-ID: <4B9859C6.1020000@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Jason Wessel wrote:
+> Will Deacon wrote:
+> 
+>>> Clearly, kgdb is using atomic_set()/atomic_read() in a way which does not
+>>> match this documentation - it's certainly missing the barriers as required
+>>> by the above quoted paragraphs.
+>>>
+>>> Let me repeat: atomic_set() and atomic_read() are NOT atomic.  There's
+>>> nothing atomic about them.  All they do is provide a pair of accessors
+>>> to the underlying value in the atomic type.  They are no different to
+>>> declaring a volatile int and reading/writing it directly.
+> 
+> 
+> Clearly the docs state this.
+> 
+>> Indeed. I'm not familiar enough with KGDB internals to dive in and look at all the
+>> potential barrier conflicts, so I'll submit a patch that addresses the one that's
+>> bitten me so far. Maybe it will motivate somebody else to take a closer look!
+>>
+> 
+> 
+> Do you think you can try the patch below?
+> 
+> It seems we might not need to change to using the atomic_add_return(0,...) because using the atomic_inc() and atomic_dec() will end up using the memory barriers.
+>
+
+Hi Jason,
+
+Maybe we should initial the atomic_t variable before we using such as 
+atomic_inc/dec() directly.
+
+Dongdong.
 
 
-> -----Original Message-----
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> owner at vger.kernel.org] On Behalf Of Venkatraman S
-> Sent: Monday, March 01, 2010 5:27 AM
-> To: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-omap at vger.kernel.org
-> Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-> autoloading feature
-> 
-> Start to use the sDMA descriptor autoloading feature.
-> For large datablocks, the MMC driver has to repeatedly setup, program
-> and teardown the
-> dma channel for each element of the sglist received in omap_hsmmc_request.
-> 
-> By using descriptor autoloading, transfers from / to each element of
-> the sglist is pre programmed
-> into a linked list. The sDMA driver completes the entire transaction
-> and provides a single interrupt.
-> 
-> Due to this, number of dma interrupts for a typical 100MB transfer on the
-> MMC is
-> reduced from 25000 to about 400 (approximate). Transfer speeds are
-> improved by ~5%
-> (Though it varies on the size of read / write & improves on huge
-> transfers)
-> 
-> Descriptor autoloading is available only in 3630 and 4430 (as of now).
-> Hence normal DMA
-> mode is also retained.
-> 
-> Tested on omap4430 sdp.
-> 
-> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+--- a/kernel/kgdb.c
++++ b/kernel/kgdb.c
+@@ -227,6 +227,17 @@ kgdb_post_primary_code(struct pt_regs *regs, int 
+e_vector, int err_code)
+         return;
+  }
 
-I don't see any issues with this patch except the concern I had on the first
-patch in the series. Why is that change linked to this series?
++static void kgdb_initial_atomic_var()
++{
++       int i;
++       for (i = NR_CPUS-1; i >= 0; i--) {
++               atomic_set(&passive_cpu_wait[i], 0);
++               atomic_set(&cpu_in_kgdb[i], 0);
++       }
++
++       atomic_set(&kgdb_setting_breakpoint, 0);
++}
++
+  /**
+   *     kgdb_disable_hw_debug - Disable hardware debugging while we in 
+kgdb.
+   *     @regs: Current &struct pt_regs.
+@@ -1619,6 +1630,7 @@ static void kgdb_register_callbacks(void)
+  {
+         if (!kgdb_io_module_registered) {
+                 kgdb_io_module_registered = 1;
++               kgdb_initial_atomic_var();
+                 kgdb_arch_init();
+  #ifdef CONFIG_MAGIC_SYSRQ
+                 register_sysrq_key('g', &sysrq_gdb_op);
 
-> ---
->  drivers/mmc/host/omap_hsmmc.c |  143 +++++++++++++++++++++++++++++++++++-
-> -----
->  1 files changed, 122 insertions(+), 21 deletions(-)
+
+
+
+> I would certainly rather fix kgdb vs mucking with the internals of cpu_relax().
 > 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 06337f6..425129b 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -102,6 +102,7 @@
->  #define SRD			(1 << 26)
->  #define SOFTRESET		(1 << 1)
->  #define RESETDONE		(1 << 0)
-> +#define DMA_ICR_QUIET		0xD00
 > 
->  /*
->   * FIXME: Most likely all the data using these _DEVID defines should come
-> @@ -118,6 +119,12 @@
->  #define OMAP_MMC_MASTER_CLOCK	96000000
->  #define DRIVER_NAME		"mmci-omap-hs"
+> Jason.
 > 
-> +#define DMA_TYPE_NODMA	0
-> +#define DMA_TYPE_SDMA	1
-> +#define DMA_TYPE_SDMA_DLOAD 2
-> +
-> +#define DMA_CTRL_BUF_SIZE	(PAGE_SIZE * 3)
-> +
->  /* Timeouts for entering power saving states on inactivity, msec */
->  #define OMAP_MMC_DISABLED_TIMEOUT	100
->  #define OMAP_MMC_SLEEP_TIMEOUT		1000
-> @@ -172,7 +179,11 @@ struct omap_hsmmc_host {
->  	u32			bytesleft;
->  	int			suspended;
->  	int			irq;
-> -	int			use_dma, dma_ch;
-> +	int			dma_caps;
-> +	int			dma_in_use;
-> +	int			dma_ch;
-> +	void		*dma_ctrl_buf;
-> +	dma_addr_t 	dma_ctrl_buf_phy;
->  	int			dma_line_tx, dma_line_rx;
->  	int			slot_id;
->  	int			got_dbclk;
-> @@ -768,7 +779,7 @@ omap_hsmmc_start_command(struct omap_hsmmc_host
-> *host, struct mmc_command *cmd,
->  	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
->  	OMAP_HSMMC_WRITE(host->base, ISE, INT_EN_MASK);
-> 
-> -	if (host->use_dma)
-> +	if (host->dma_in_use)
->  		OMAP_HSMMC_WRITE(host->base, IE,
->  				 INT_EN_MASK & ~(BRR_ENABLE | BWR_ENABLE));
->  	else
-> @@ -803,7 +814,7 @@ omap_hsmmc_start_command(struct omap_hsmmc_host
-> *host, struct mmc_command *cmd,
->  			cmdreg &= ~(DDIR);
+> --- a/kernel/kgdb.c
+> +++ b/kernel/kgdb.c
+> @@ -580,14 +580,13 @@ static void kgdb_wait(struct pt_regs *re
+>  	 * Make sure the above info reaches the primary CPU before
+>  	 * our cpu_in_kgdb[] flag setting does:
+>  	 */
+> -	smp_wmb();
+> -	atomic_set(&cpu_in_kgdb[cpu], 1);
+> +	atomic_inc(&cpu_in_kgdb[cpu]);
+>  
+>  	/* Disable any cpu specific hw breakpoints */
+>  	kgdb_disable_hw_debug(regs);
+>  
+>  	/* Wait till primary CPU is done with debugging */
+> -	while (atomic_read(&passive_cpu_wait[cpu]))
+> +	while (atomic_add_return(0, &passive_cpu_wait[cpu]))
+>  		cpu_relax();
+>  
+>  	kgdb_info[cpu].debuggerinfo = NULL;
+> @@ -598,7 +597,7 @@ static void kgdb_wait(struct pt_regs *re
+>  		arch_kgdb_ops.correct_hw_break();
+>  
+>  	/* Signal the primary CPU that we are done: */
+> -	atomic_set(&cpu_in_kgdb[cpu], 0);
+> +	atomic_dec(&cpu_in_kgdb[cpu]);
+>  	touch_softlockup_watchdog_sync();
+>  	clocksource_touch_watchdog();
+>  	local_irq_restore(flags);
+> @@ -1493,7 +1492,7 @@ acquirelock:
+>  	 * spin_lock code is good enough as a barrier so we don't
+>  	 * need one here:
+>  	 */
+> -	atomic_set(&cpu_in_kgdb[ks->cpu], 1);
+> +	atomic_inc(&cpu_in_kgdb[ks->cpu]);
+>  
+>  #ifdef CONFIG_SMP
+>  	/* Signal the other CPUs to enter kgdb_wait() */
+> @@ -1505,7 +1504,7 @@ acquirelock:
+>  	 * Wait for the other CPUs to be notified and be waiting for us:
+>  	 */
+>  	for_each_online_cpu(i) {
+> -		while (!atomic_read(&cpu_in_kgdb[i]))
+> +		while (!atomic_add_return(0, &cpu_in_kgdb[i]))
+>  			cpu_relax();
 >  	}
-> 
-> -	if (host->use_dma)
-> +	if (host->dma_in_use)
->  		cmdreg |= DMA_EN;
-> 
->  	/*
-> @@ -850,7 +861,7 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host,
-> struct mmc_data *data)
-> 
->  	host->data = NULL;
-> 
-> -	if (host->use_dma && host->dma_ch != -1)
-> +	if (host->dma_in_use && host->dma_ch != -1)
->  		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
->  			omap_hsmmc_get_dma_dir(host, data));
-> 
-> @@ -900,7 +911,7 @@ static void omap_hsmmc_dma_cleanup(struct
-> omap_hsmmc_host *host, int errno)
->  {
->  	host->data->error = errno;
-> 
-> -	if (host->use_dma && host->dma_ch != -1) {
-> +	if (host->dma_in_use && host->dma_ch != -1) {
->  		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host-
-> >dma_len,
->  			omap_hsmmc_get_dma_dir(host, host->data));
->  		omap_free_dma(host->dma_ch);
-> @@ -1253,7 +1264,6 @@ static void omap_hsmmc_config_dma_params(struct
-> omap_hsmmc_host *host,
->  			omap_hsmmc_get_dma_sync_dev(host, data),
->  			!(data->flags & MMC_DATA_WRITE));
-> 
-> -	omap_start_dma(dma_ch);
->  }
-> 
->  /*
-> @@ -1268,21 +1278,32 @@ static void omap_hsmmc_dma_cb(int lch, u16
-> ch_status, void *data)
-> 
->  	if (host->dma_ch < 0)
->  		return;
-> -
-> -	host->dma_sg_idx++;
-> -	if (host->dma_sg_idx < host->dma_len) {
-> -		/* Fire up the next transfer. */
-> -		omap_hsmmc_config_dma_params(host, host->data,
-> +	if (host->dma_in_use == DMA_TYPE_SDMA) {
-> +		host->dma_sg_idx++;
-> +		if (host->dma_sg_idx < host->dma_len) {
-> +			/* Fire up the next transfer. */
-> +			omap_hsmmc_config_dma_params(host, host->data,
->  					   host->data->sg +
-host->dma_sg_idx);
-> -		return;
-> +			omap_start_dma(host->dma_ch);
-> +			return;
-> +		}
+>  
+> @@ -1528,7 +1527,7 @@ acquirelock:
+>  
+>  	kgdb_info[ks->cpu].debuggerinfo = NULL;
+>  	kgdb_info[ks->cpu].task = NULL;
+> -	atomic_set(&cpu_in_kgdb[ks->cpu], 0);
+> +	atomic_dec(&cpu_in_kgdb[ks->cpu]);
+>  
+>  	if (!kgdb_single_step) {
+>  		for (i = NR_CPUS-1; i >= 0; i--)
+> @@ -1538,7 +1537,7 @@ acquirelock:
+>  		 * from the debugger.
+>  		 */
+>  		for_each_online_cpu(i) {
+> -			while (atomic_read(&cpu_in_kgdb[i]))
+> +			while (atomic_add_return(0, &cpu_in_kgdb[i]))
+>  				cpu_relax();
+>  		}
 >  	}
-> 
->  }
-> 
-> +static int omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host)
-> +{
-> +	if (host->dma_in_use == DMA_TYPE_SDMA)
-> +		omap_start_dma(host->dma_ch);
-> +	else if (host->dma_in_use == DMA_TYPE_SDMA_DLOAD)
-> +		return omap_start_dma_sglist_transfers(host->dma_ch, -1);
-> +
-> +	return 0;
-> +}
->  /*
-> - * Routine to configure and start DMA for the MMC card
-> + * Routine to configure DMA for the MMC card
+> @@ -1742,11 +1741,11 @@ EXPORT_SYMBOL_GPL(kgdb_unregister_io_mod
 >   */
-> -static int omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host,
-> +static int omap_hsmmc_configure_sdma(struct omap_hsmmc_host *host,
->  					struct mmc_request *req)
+>  void kgdb_breakpoint(void)
 >  {
->  	int dma_ch = 0, ret = 0, err = 1, i;
-> @@ -1339,6 +1360,56 @@ static int omap_hsmmc_start_dma_transfer(struct
-> omap_hsmmc_host *host,
->  	return 0;
+> -	atomic_set(&kgdb_setting_breakpoint, 1);
+> +	atomic_inc(&kgdb_setting_breakpoint);
+>  	wmb(); /* Sync point before breakpoint */
+>  	arch_kgdb_breakpoint();
+>  	wmb(); /* Sync point after breakpoint */
+> -	atomic_set(&kgdb_setting_breakpoint, 0);
+> +	atomic_dec(&kgdb_setting_breakpoint);
 >  }
+>  EXPORT_SYMBOL_GPL(kgdb_breakpoint);
+>  
 > 
-> +static int omap_hsmmc_configure_sdma_sglist(struct omap_hsmmc_host *host,
-> +		struct mmc_request *req)
-> +{
-> +	int i;
-> +	struct omap_dma_sglist_node *sglist, *snode;
-> +	struct mmc_data *data = req->data;
-> +	int blksz;
-> +	int dmadir = omap_hsmmc_get_dma_dir(host, data);
-> +	struct omap_dma_sglist_type2a_params *t2p;
-> +
-> +	sglist = (struct omap_dma_sglist_node *) host->dma_ctrl_buf;
-> +	snode = sglist;
-> +	blksz = host->data->blksz;
-> +
-> +	if ((host->dma_len * sizeof(*snode)) > DMA_CTRL_BUF_SIZE) {
-> +		dev_err(mmc_dev(host->mmc), "not enough sglist memory %d\n",
-> +			host->dma_len);
-> +		return -ENOMEM;
-> +	}
-> +	for (i = 0; i < host->dma_len; snode++, i++) {
-> +		snode->desc_type = OMAP_DMA_SGLIST_DESCRIPTOR_TYPE2a;
-> +		snode->num_of_elem = blksz / 4;
-> +		t2p = &snode->sg_node.t2a;
-> +
-> +		if (dmadir == DMA_FROM_DEVICE) {
-> +			t2p->src_addr = host->mapbase + OMAP_HSMMC_DATA;
-> +			t2p->dst_addr = sg_dma_address(data->sg + i);
-> +		} else {
-> +			t2p->dst_addr = host->mapbase + OMAP_HSMMC_DATA;
-> +			t2p->src_addr = sg_dma_address(data->sg + i);
-> +		}
-> +		snode->flags =
-> +			OMAP_DMA_LIST_DST_VALID | OMAP_DMA_LIST_SRC_VALID;
-> +
-> +		t2p->cfn_fn = sg_dma_len(data->sg + i) / host->data->blksz;
-> +		t2p->cicr = DMA_ICR_QUIET;
-> +
-> +		t2p->dst_frame_idx_or_pkt_size = 0;
-> +		t2p->src_frame_idx_or_pkt_size = 0;
-> +		t2p->dst_elem_idx = 0;
-> +		t2p->src_elem_idx = 0;
-> +	}
-> +	dev_dbg(mmc_dev(host->mmc), "new sglist %x len =%d\n",
-> +			host->dma_ctrl_buf_phy, i);
-> +	omap_set_dma_sglist_mode(host->dma_ch, sglist,
-> +			host->dma_ctrl_buf_phy, i, NULL);
-> +	omap_dma_set_sglist_fastmode(host->dma_ch, 1);
-> +	return 0;
-> +}
-> +
->  static void set_data_timeout(struct omap_hsmmc_host *host,
->  			     unsigned int timeout_ns,
->  			     unsigned int timeout_clks)
-> @@ -1400,14 +1471,23 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host
-> *host, struct mmc_request *req)
->  					| (req->data->blocks << 16));
->  	set_data_timeout(host, req->data->timeout_ns, req->data-
-> >timeout_clks);
+> ------------------------------------------------------------------------------
+> Download Intel&#174; Parallel Studio Eval
+> Try the new software tools for yourself. Speed compiling, find bugs
+> proactively, and fine-tune applications for parallel performance.
+> See why Intel Parallel Studio got high marks during beta.
+> http://p.sf.net/sfu/intel-sw-dev
+> _______________________________________________
+> Kgdb-bugreport mailing list
+> Kgdb-bugreport at lists.sourceforge.net
+> https://lists.sourceforge.net/lists/listinfo/kgdb-bugreport
 > 
-> -	if (host->use_dma) {
-> -		ret = omap_hsmmc_start_dma_transfer(host, req);
-> -		if (ret != 0) {
-> -			dev_dbg(mmc_dev(host->mmc), "MMC start dma
-failure\n");
-> +	if (host->dma_caps & DMA_TYPE_SDMA) {
-> +		ret = omap_hsmmc_configure_sdma(host, req);
-> +		if (ret)
->  			return ret;
-> -		}
-> +		host->dma_in_use = DMA_TYPE_SDMA;
->  	}
-> -	return 0;
-> +	if ((host->dma_caps & DMA_TYPE_SDMA_DLOAD) &&
-> +		host->data->sg_len > 4) {
-> +		ret = omap_hsmmc_configure_sdma_sglist(host, req);
-> +		if (ret)
-> +			return ret;
-> +		host->dma_in_use = DMA_TYPE_SDMA_DLOAD;
-> +
-> +	}
-> +	ret = omap_hsmmc_start_dma_transfer(host);
-> +	return ret;
-> +
->  }
-> 
->  /*
-> @@ -1999,7 +2079,9 @@ static int __init omap_hsmmc_probe(struct
-> platform_device *pdev)
->  	host->mmc	= mmc;
->  	host->pdata	= pdata;
->  	host->dev	= &pdev->dev;
-> -	host->use_dma	= 1;
-> +	host->dma_caps	= DMA_TYPE_SDMA;
-> +	host->dma_in_use	= DMA_TYPE_NODMA;
-> +	host->dma_ctrl_buf = NULL;
->  	host->dev->dma_mask = &pdata->dma_mask;
->  	host->dma_ch	= -1;
->  	host->irq	= irq;
-> @@ -2081,6 +2163,15 @@ static int __init omap_hsmmc_probe(struct
-> platform_device *pdev)
->  							" clk failed\n");
->  	}
-> 
-> +	if (cpu_is_omap44xx() || cpu_is_omap3630()) {
-> +		host->dma_ctrl_buf = dma_alloc_coherent(NULL,
-> +					DMA_CTRL_BUF_SIZE,
-> +					&host->dma_ctrl_buf_phy,
-> +					0);
-> +		if (host->dma_ctrl_buf != NULL)
-> +			host->dma_caps |= DMA_TYPE_SDMA_DLOAD;
-> +	}
-> +
->  	/* Since we do only SG emulation, we can have as many segs
->  	 * as we want. */
->  	mmc->max_phys_segs = 1024;
-> @@ -2207,6 +2298,10 @@ err_reg:
->  err_irq_cd_init:
->  	free_irq(host->irq, host);
->  err_irq:
-> +	if (host->dma_ctrl_buf)
-> +		dma_free_coherent(NULL, DMA_CTRL_BUF_SIZE,
-> +				host->dma_ctrl_buf,
-> +				host->dma_ctrl_buf_phy);
->  	mmc_host_disable(host->mmc);
->  	clk_disable(host->iclk);
->  	clk_put(host->fclk);
-> @@ -2234,6 +2329,12 @@ static int omap_hsmmc_remove(struct
-> platform_device *pdev)
->  	if (host) {
->  		mmc_host_enable(host->mmc);
->  		mmc_remove_host(host->mmc);
-> +
-> +		if (host->dma_ctrl_buf != NULL) {
-> +			dma_free_coherent(NULL, DMA_CTRL_BUF_SIZE,
-> +				host->dma_ctrl_buf,
-> +				host->dma_ctrl_buf_phy);
-> +		}
->  		if (host->use_reg)
->  			omap_hsmmc_reg_put(host);
->  		if (host->pdata->cleanup)
-> --
-> 1.6.3.3
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
