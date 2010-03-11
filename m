@@ -1,92 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Mar 2010 15:48:26 -0800
-Subject: [PATCH 09/19] omap: pass the reboot command to the boot loader
+Date: Thu, 11 Mar 2010 15:48:29 -0800
+Subject: [PATCH 10/19] omap: Checkpatch cleanup for blizzard.h
 In-Reply-To: <20100311234404.4500.82861.stgit@baageli.muru.com>
 References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-Message-ID: <20100311234826.4500.402.stgit@baageli.muru.com>
+Message-ID: <20100311234829.4500.8994.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaro Koskinen <Aaro.Koskinen@nokia.com>
+From: Andrea Gelmini <andrea.gelmini@gelma.net>
 
-This patch follows the commit be093beb608edf821b45fe00a8a080fb5c6ed4af
-by Russell King:
+arch/arm/plat-omap/include/plat/blizzard.h:9:
+ERROR: spaces prohibited around that ':' (ctx:WxW)
 
-  OMAP wishes to pass state to the boot loader upon reboot in order
-  to instruct it whether to wait for USB-based reflashing or not.
-  There is already a facility to do this via the reboot() syscall,
-  except we ignore the string passed to machine_restart().
-
-The patch adds the missing parameter to omap1_arch_reset() and
-omap_prcm_arch_reset(), and modifies the latter to pass the reboot
-command parameter to the boot loader instead of reboot mode (which is
-for kernel internal use only and cannot be modified by the userspace).
-
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/prcm.c               |    4 ++--
- arch/arm/plat-omap/include/plat/prcm.h   |    2 +-
- arch/arm/plat-omap/include/plat/system.h |    6 +++---
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/plat-omap/include/plat/blizzard.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 81872aa..9537f6f 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -133,7 +133,7 @@ u32 omap_prcm_get_reset_sources(void)
- EXPORT_SYMBOL(omap_prcm_get_reset_sources);
+diff --git a/arch/arm/plat-omap/include/plat/blizzard.h b/arch/arm/plat-omap/include/plat/blizzard.h
+index 8d160f1..56e7f2e 100644
+--- a/arch/arm/plat-omap/include/plat/blizzard.h
++++ b/arch/arm/plat-omap/include/plat/blizzard.h
+@@ -6,7 +6,7 @@ struct blizzard_platform_data {
+ 	void		(*power_down)(struct device *dev);
+ 	unsigned long	(*get_clock_rate)(struct device *dev);
  
- /* Resets clock rates and reboots the system. Only called from system.h */
--void omap_prcm_arch_reset(char mode)
-+void omap_prcm_arch_reset(char mode, const char *cmd)
- {
- 	s16 prcm_offs = 0;
- 
-@@ -145,7 +145,7 @@ void omap_prcm_arch_reset(char mode)
- 		u32 l;
- 
- 		prcm_offs = OMAP3430_GR_MOD;
--		l = ('B' << 24) | ('M' << 16) | mode;
-+		l = ('B' << 24) | ('M' << 16) | (cmd ? (u8)*cmd : 0);
- 		/* Reserve the first word in scratchpad for communicating
- 		 * with the boot ROM. A pointer to a data structure
- 		 * describing the boot process can be stored there,
-diff --git a/arch/arm/plat-omap/include/plat/prcm.h b/arch/arm/plat-omap/include/plat/prcm.h
-index d6a0e27..9fbd914 100644
---- a/arch/arm/plat-omap/include/plat/prcm.h
-+++ b/arch/arm/plat-omap/include/plat/prcm.h
-@@ -24,7 +24,7 @@
- #define __ASM_ARM_ARCH_OMAP_PRCM_H
- 
- u32 omap_prcm_get_reset_sources(void);
--void omap_prcm_arch_reset(char mode);
-+void omap_prcm_arch_reset(char mode, const char *cmd);
- int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, u8 idlest,
- 			 const char *name);
- 
-diff --git a/arch/arm/plat-omap/include/plat/system.h b/arch/arm/plat-omap/include/plat/system.h
-index c58a4ef..d0a119f 100644
---- a/arch/arm/plat-omap/include/plat/system.h
-+++ b/arch/arm/plat-omap/include/plat/system.h
-@@ -22,7 +22,7 @@ static inline void arch_idle(void)
- 	cpu_do_idle();
- }
- 
--static inline void omap1_arch_reset(char mode)
-+static inline void omap1_arch_reset(char mode, const char *cmd)
- {
- 	/*
- 	 * Workaround for 5912/1611b bug mentioned in sprz209d.pdf p. 28
-@@ -43,9 +43,9 @@ static inline void omap1_arch_reset(char mode)
- static inline void arch_reset(char mode, const char *cmd)
- {
- 	if (!cpu_class_is_omap2())
--		omap1_arch_reset(mode);
-+		omap1_arch_reset(mode, cmd);
- 	else
--		omap_prcm_arch_reset(mode);
-+		omap_prcm_arch_reset(mode, cmd);
- }
+-	unsigned	te_connected : 1;
++	unsigned	te_connected:1;
+ };
  
  #endif
