@@ -1,79 +1,36 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Thu, 11 Mar 2010 23:12:40 +0530
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <004401cac137$cccbf0c0$544ff780@am.dhcp.ti.com>
-References: <618f0c911003010327s290fcce1ud665b5a16392aea1@mail.gmail.com>
-	<011301cac0b6$542b1190$544ff780@am.dhcp.ti.com>
-	<618f0c911003110252i36d6fc31wbaef4ad7a17565b1@mail.gmail.com>
-	<004401cac137$cccbf0c0$544ff780@am.dhcp.ti.com>
-Message-ID: <618f0c911003110942s2f663928ie1203244fbd32da7@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Mar 2010 10:03:16 -0800
+Subject: [PATCH 0/3] USB compile fixes omaps
+Message-ID: <20100311180023.20537.27516.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Madhusudhan <madhu.cr@ti.com> wrote:
->> -----Original Message-----
->> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of
->> Venkatraman S
->> Sent: Thursday, March 11, 2010 4:52 AM
->> To: Madhusudhan
->> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> linux-omap at vger.kernel.org
->> Subject: Re: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
->> autoloading feature
->>
->> Madhusudhan <madhu.cr@ti.com> wrote:
->> >> -----Original Message-----
->> >> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
->> >> owner at vger.kernel.org] On Behalf Of Venkatraman S
->> >> Sent: Monday, March 01, 2010 5:27 AM
->> >> To: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> >> linux-omap at vger.kernel.org
->> >> Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
->> >> autoloading feature
->> >>
->> >> Start to use the sDMA descriptor autoloading feature.
->> >> For large datablocks, the MMC driver has to repeatedly setup, program
->> >> and teardown the
->> >> dma channel for each element of the sglist received in
->> omap_hsmmc_request.
->> >>
->> >> By using descriptor autoloading, transfers from / to each element of
->> >> the sglist is pre programmed
->> >> into a linked list. The sDMA driver completes the entire transaction
->> >> and provides a single interrupt.
->> >>
->> >> Due to this, number of dma interrupts for a typical 100MB transfer on
->> the
->> >> MMC is
->> >> reduced from 25000 to about 400 (approximate). Transfer speeds are
->> >> improved by ~5%
->> >> (Though it varies on the size of read / write & improves on huge
->> >> transfers)
->> >>
->> >> Descriptor autoloading is available only in 3630 and 4430 (as of now).
->> >> Hence normal DMA
->> >> mode is also retained.
->> >>
->> >> Tested on omap4430 sdp.
->> >>
->> >> Signed-off-by: Venkatraman S <svenkatr@ti.com>
->> >
->> > I don't see any issues with this patch except the concern I had on the
->> first
->> > patch in the series. Why is that change linked to this series?
->> >
->> ? Thanks. The problem was seen only in the context of using descriptor
->> load. Would
->> you prefer that I post it as a separate patch ?
->
-> My point is why that change is needed for this feature to work?
->
-> When DMA is completed and a callback is received the ch can be freed. Once
-> TC is received the core is notified of the same.
->
-> Can the first patch be dropped? Or do you see issues?
-Yes there are issues without this patch when the scatterlist is large
-(300+ blocks), where the dma completion interrupt is received but the
-mmc driver hangs waiting for TC. I don't see the issue if I delay the
-execution of omap_free_dma inside the dma callback.
+Hi Felipe & Greg,
+
+Here are three fixes to make USB compile for omaps.
+Can you please take a look and queue?
+
+The tusb6010 DMA fix needs a platform init patch that I'll
+send along with other omap fixes.
+
+Regards,
+
+Tony
+
+
+---
+
+Tony Lindgren (3):
+      usb: Fix compile error for omaps for musb_hdrc
+      usb: Fix USB_SUSPEND dependency for OTG
+      usb: Fix tusb6010 for DMA API
+
+
+ drivers/usb/core/Kconfig         |    2 +-
+ drivers/usb/musb/musb_core.h     |    4 ++--
+ drivers/usb/musb/tusb6010.c      |   13 +++++++++++++
+ drivers/usb/musb/tusb6010_omap.c |   22 ++++++++++++++--------
+ 4 files changed, 30 insertions(+), 11 deletions(-)
+
+-- 
+Signature
