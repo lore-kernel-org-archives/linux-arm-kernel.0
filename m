@@ -1,33 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 12 Mar 2010 11:05:12 +0100
-Subject: Wrong cache flush function used in arch/arm/boot/compressed/head.S?
-Message-ID: <20100312100511.GQ19843@pengutronix.de>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Fri, 12 Mar 2010 16:07:50 +0530
+Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
+In-Reply-To: <A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
+References: <20100311234404.4500.82861.stgit@baageli.muru.com>
+	<20100311234834.4500.12726.stgit@baageli.muru.com>
+	<A24693684029E5489D1D202277BE894453FB11F8@dlee02.ent.ti.com>
+	<20100311235640.GW2900@atomide.com>
+	<A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC96B2@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> I normally send my patches with this alias:
+> 
+> alias gsend='git send-email --smtp-server /usr/bin/msmtp 
+> --from "Sergio Aguirre <saaguirre@ti.com>" 
+> --envelope-sender="Sergio Aguirre <saaguirre@ti.com>"'
+> 
+> and then just do:
+> 
+> gsend --to='linux-omap at vger.kernel.org' 
+> patches/forLO_20100311/0001-mypatch.patch
+> 
+> But somehow the patch ends up (I'm guessing through TI LDAP 
+> server) changing that to "Aguirre, Sergio"...
+> 
+> and also Patchworks seems to continue display my old 
+> fullname: "Aguirre Rodriguez, Sergio Alberto"... I guess it's 
+> in a static data cache somewhere, maybe?
+> 
+> Does anyone know how to overcome this kind of scenario, and 
+> force what --from param says?
 
-Hi,
+I send patches with an explicit "From: Anand Gadiyar <gadiyar@ti.com>"
+line in the content. This seems to work okay.
 
-0e056f20f18d0efa5da920f3cf8532adc56d5779 contains the following hunk:
+Can you check if this works for you?
 
- 		.word	0x00060000		@ ARMv5TEJ
- 		.word	0x000f0000
--		b	__armv4_mmu_cache_on
--		b	__armv4_mmu_cache_off
--		b	__armv5tej_mmu_cache_flush
-+		W(b)	__armv4_mmu_cache_on
-+		W(b)	__armv4_mmu_cache_off
-+		W(b)	__armv4_mmu_cache_flush
-
-Is this intentional? I do not see any problems in my kernel, but I
-use the same code in my bootloader and it doesn't seem to work correctly
-on my arm926 based system.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Anand
