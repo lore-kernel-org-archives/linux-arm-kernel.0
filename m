@@ -1,16 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Mar 2010 11:25:04 +0000
-Subject: Question about memory resources
-In-Reply-To: <0D753D10438DA54287A00B0270842697636843779C@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B0270842697636843779C@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100312112504.GC23739@sirena.org.uk>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Fri, 12 Mar 2010 15:19:02 +0200
+Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC96B2@dbde02.ent.ti.com>
+References: <20100311234404.4500.82861.stgit@baageli.muru.com>
+	<20100311234834.4500.12726.stgit@baageli.muru.com>
+	<A24693684029E5489D1D202277BE894453FB11F8@dlee02.ent.ti.com>
+	<20100311235640.GW2900@atomide.com>
+	<A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0321EC96B2@dbde02.ent.ti.com>
+Message-ID: <20100312131902.GD3802@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 11, 2010 at 04:48:45PM -0600, H Hartley Sweeten wrote:
+On Fri, Mar 12, 2010 at 11:37:50AM +0100, ext Gadiyar, Anand wrote:
+>I send patches with an explicit "From: Anand Gadiyar <gadiyar@ti.com>"
+>line in the content. This seems to work okay.
+>
+>Can you check if this works for you?
 
-> Is there any way to handle this other than using the static i/o
-> mapping for the backlight register?
+$ git config --global sendemail.from "Sergio Aguirre <saaguirre@ti.com>"
+$ git send-email --to linux-omap at vger.kernel.org --from saaguirre at ti.com 0001-mypatch.patch
 
-The standard thing would be a MFD, or a single driver that exports both
-interfaces.
+This will forge git to add the From: Sergio Aguirre <saaguirre@ti.com> 
+when sending the patches
+
+-- 
+balbi
