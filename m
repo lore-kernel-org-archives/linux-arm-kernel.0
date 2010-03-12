@@ -1,45 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Mar 2010 09:18:40 -0800
-Subject: [PATCH 17/19] omap: Add DSI regulator supply to OMAP3EVM board
-	file
-In-Reply-To: <20100312171204.GE2900@atomide.com>
-References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-	<20100311234847.4500.24584.stgit@baageli.muru.com>
-	<19F8576C6E063C45BE387C64729E7394044DD32D7B@dbde02.ent.ti.com>
-	<20100312171204.GE2900@atomide.com>
-Message-ID: <20100312171840.GF2900@atomide.com>
+Date: Fri, 12 Mar 2010 09:21:48 -0800
+Subject: [PATCH 2/6] SPI omap2_mcspi: Add max_clk_div field to mcspi
+	platform config
+In-Reply-To: <1268407307.14445.51.camel@quad>
+References: <1268407307.14445.51.camel@quad>
+Message-ID: <20100312172148.GG2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100312 09:08]:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [100311 20:45]:
-> > [Hiremath, Vaibhav] Tony,
-> > Please use the patch below, I have fixed Mark's comments to use devname instead of dev.
+* Scott Ellis <scott@jumpnowtek.com> [100312 07:20]:
+> The McSPI_CHxCONF.CLKD register field has different limits for the
+> OMAP3 then the OMAP24xx. As per recommendation from the linux-omap
+> list, added a field for max_clk_div to the platform data for use in 
+> omap2_mcspi.c.
 > 
-> Sorry, looks like I missed Mark's comments while reading the
-> thread at:
+> Used in a subsequent patch. 
 > 
-> http://patchwork.kernel.org/patch/84823/
+> Signed-off-by: Scott Ellis <scott@jumpnowtek.com>
 > 
-> I can't get either of your patches to apply. Please just repost your
-> whole patch against the 2.6.34-rc1 with the Acked-by from Tomi.
+>  arch/arm/mach-omap2/devices.c           |   16 ++++++++++++++++
+>  arch/arm/plat-omap/include/plat/mcspi.h |    1 +
+>  2 files changed, 17 insertions(+), 0 deletions(-)
 > 
-> Also, please read the mailing list instructions we have at:
-> 
-> http://www.elinux.org/Netiquette
-> 
-> Basically one patch per mail. In format that can be applied as it is.
-> Patches inlined, not quoted-printable. I don't want to manually re-edit
-> the patches, it's a complete waste of time.
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 23e4d77..d4ad126 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -302,6 +302,11 @@ static inline void omap_init_sti(void) {}
 >  
-> > diff --git a/drivers/mtd/maps/omap_nor.c b/drivers/mtd/maps/omap_nor.c
-> > deleted file mode 100644
-> > index e69de29..0000000
-> 
-> And this part we don't want to apply, it's not related to this patch.
+>  static struct omap2_mcspi_platform_config omap2_mcspi1_config = {
+>  	.num_cs		= 4,
+> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+> +	.max_clk_div	= 0x0c,
+> +#else
+> +	.max_clk_div	= 0x0f,
+> +#endif
+>  };
+>  
 
-Also, since this is not urgent to get things compiling again, I'll
-drop this for now. We can merge it with the next set of fixes.
+Can't do ifdef else like this. It will break multi-omap booting on
+omap2 + 3 + 4. In the platform init just set the values once with
+cpu_is_omapXXXX() instead.
 
 Regards,
 
