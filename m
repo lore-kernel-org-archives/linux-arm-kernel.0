@@ -1,55 +1,61 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 12 Mar 2010 09:46:02 +0100
-Subject: [PATCH 05/11] ST SPEAr: Added clock framework for SPEAr platform
-	and machines
-In-Reply-To: <4B98C371.7050500@st.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003102300q23ea536bje956f8d5c7e333a2@mail.gmail.com>
-	<4B98C371.7050500@st.com>
-Message-ID: <63386a3d1003120046g2f83ace7s150441daa8bd6892@mail.gmail.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Fri, 12 Mar 2010 10:07:04 +0100
+Subject: bit errors on spitz
+In-Reply-To: <4B995EE1.1050609@warmcat.com>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+	<4B98EF5D.5000609@warmcat.com>
+	<1268322155.3990.114.camel@hammer.suse.cz>
+	<4B995EE1.1050609@warmcat.com>
+Message-ID: <1268384824.4963.35.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/11 Shiraz HASHIM <shiraz.hashim@st.com>:
-> On 3/11/2010 12:30 PM, Linus Walleij wrote:
->> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
->> (...)
->>> + ? ? ? if (unlikely(clk->flags & RESET_TO_ENABLE))
->>> + ? ? ? ? ? ? ? val &= ~(1 << clk->en_reg_bit);
->>> + ? ? ? else
->>> + ? ? ? ? ? ? ? val |= 1 << clk->en_reg_bit;
->>> + ? ? ? writel(val, clk->en_reg);
->>
->> I don't understand one bit of this. (...)
->
-> The intention to use RESET_TO_ENABLE flag is to generalize clock
-> enable/disable across platforms.
+Andy Green wrote: 
+> On 03/11/10 15:42, Somebody in the thread at some point said:
+> > Andy Green wrote:
+> >
+> >> I saw very similar failures for a long time on our iMX31 based device.
+> >> Eventually I found a Freescale errata where the RAM inside the USB2
+> >> macrocell started to make single bit errors below 1.38V Vcore; ours was
+> >> 1.4V at that time but dipped on CPU load.
+> >
+> > Good tip. It seems that nobody ported driver for the voltage control
+> > chip ISL6271 from 2.4 kernel, and bootloader probably does not set
+> > correct values.
 
-I misread the entire thing, there was some bad parsing inside my head...
-Sorry about this.
+> Unless there's more to it in the way the zaurus using it that regulator 
+> isn't programmable digitally.
 
->> OMAP uses CPUfreq but that is really about the CPU. As it happens, all
->> their clk:s always change frequency at the same operating points as the
->> CPU. So they can have pre/post calls from CPUfreq in their code, but
->> this will not work with things like PrimeCells where other users of the cell
->> may not have operating points correlated with CPU operating points.
->>
->> (I'm not requesting you to solve this problem, more to be aware of it.)
->
-> I think generally in embedded systems (at least in our case :) ) the CPU clock
-> itself is not completly independent. It is generally tied with some system
-> clock, which has an impact on bus and peripheral clocks. In that sense cpu freq
-> would be a better mean to notify frequency change.
-> In any case, clock framework don't intend to do it. It only need to reflect
-> correct system state. Is this understanding correct?
+OOPS, I made a mistake and linked ISL6721 instead of ISL6271 there.
+Now it is fixed:
+http://www.penguin.cz/~utx/zaurus/datasheets/power/XScale/ISL6271A.pdf
 
-Currently it's like that but I think clk really needs a frequency change
-notification mechanism. I will have to deal with it some day I think :-/
+This one has I2C. It is connected to GPIO 3 (PWR_SCL) and GPIO 4
+(PWR_SDA).
 
-Yours,
-Linus Walleij
+It is visible between the black plastic and the large circular coil:
+http://www.penguin.cz/~utx/zaurus/teardown#pcbt
+
+> Reading about your CF Card WLAN related issues they suck down a good 
+> amount of power when their radio is up, I would definitely suggest 
+> monitoring with a 'scope the various rails (Vcore, RAM and whatever it 
+> is the CF Card is powered by) while putting it under load.
+
+I guess that Zaurus has a good power design and that voltage should be
+constant enough. CF has a dedicated step down (plus 2.8V power detector
+(Why so low, if CF standard requres more?)), HDD has a dedicated step
+up/down. USB has dedicated step up. Companion chips use dedicated 3.3V
+step down. Audio uses dedicated linear regulator. CPU has several
+dedicated step downs, CPU 3.3V uses step-up to 5V and then down to 3.3V
+(which is shared only with IOPORT).
+
+Nearest common point between CF card power and CPU power is the battery.
+
+
+________________________________________________________________________
+
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
