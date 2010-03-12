@@ -1,53 +1,40 @@
-From: gianlucarenzi@eurekelettronica.it (gianluca)
-Date: Fri, 12 Mar 2010 11:38:28 +0100
-Subject: Query abut 2410 LCD configuration
-In-Reply-To: <tencent_4B106ACE28F95B4E19D92218@qq.com>
-References: <tencent_4B106ACE28F95B4E19D92218@qq.com>
-Message-ID: <4B9A19A4.1080607@eurekelettronica.it>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Fri, 12 Mar 2010 11:43:08 +0100
+Subject: bit errors on spitz
+In-Reply-To: <4B9A0A71.7010206@warmcat.com>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
+	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
+	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
+	<4B98EF5D.5000609@warmcat.com>
+	<1268322155.3990.114.camel@hammer.suse.cz>
+	<4B995EE1.1050609@warmcat.com> <1268384824.4963.35.camel@utx.utx.cz>
+	<4B9A0A71.7010206@warmcat.com>
+Message-ID: <1268390588.4963.66.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????? wrote:
-> Im wondering these values DOES make any sense ?
+Andy Green wrote:
 
-Googling around you can find these settings for a board based on s3c2440
-I think you can compare it with yours and noting the differences for 
-you. What is the best configuration you get?
+> In that case is the PXA CF driver PIO?  Then it can be the same load on 
+> Vcore issue in disguise.
 
-/* Configuration for 640x480 SHARP LQ080V3DG01 */
-.lcdcon5 = S3C2410_LCDCON5_FRM565 |
-S3C2410_LCDCON5_INVVLINE |
-S3C2410_LCDCON5_INVVFRAME |
-S3C2410_LCDCON5_PWREN |
-S3C2410_LCDCON5_HWSWP,
+There is a proprietary ASIC chip (Sharp Scoop) that handles CF and HDD
+access (and also several additional GPIOs):
+http://www.penguin.cz/~utx/zaurus/datasheets/ASIC_S1L50752B26B200/412752.PDF
 
-.type        = S3C2410_LCDCON1_TFT,
-.width        = 640,
-.height        = 480,
+The ASIC runs in dual power mode. HVDD is powered from the 3.3V
+dedicated to CF resp. HDD power supply (both may be turned off by the
+kernel), LVDD is shared with CPU 3.3V (it is always on).
 
-.pixclock    = 166667, /* HCLK/4 */
-.xres        = 640,
-.yres        = 480,
-.bpp        = 16,
-.left_margin    = 48,
-.right_margin    = 18,
-.hsync_len    = 4,
-.upper_margin    = 33,
-.lower_margin    = 10,
-.vsync_len    = 4,
+It seems that there are no other chips connected to the VCC_PLL,
+VCC_SRAM and VCC_CORE.
 
-Best luck!
--- 
-            ,,,
-           (o o)
-======oOO==(_)==OOo======
+VCC_DRAM is the same 3.3V ans CPU ans ASIC LVDD and also the same as
+flash power and flash driver CPLD:
+http://www.penguin.cz/~utx/zaurus/datasheets/memory/
 
-Gianluca Renzi
-R&D
-phone: +39.0542.609120
-fax:   +39.0542.609212
 
-       .oooO  Oooo.
-======(   )==(   )=======
-        \ (    ) /
-         \_)  (_/
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
