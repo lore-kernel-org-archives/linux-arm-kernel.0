@@ -1,40 +1,53 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Fri, 12 Mar 2010 16:07:50 +0530
-Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
-In-Reply-To: <A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
-References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-	<20100311234834.4500.12726.stgit@baageli.muru.com>
-	<A24693684029E5489D1D202277BE894453FB11F8@dlee02.ent.ti.com>
-	<20100311235640.GW2900@atomide.com>
-	<A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0321EC96B2@dbde02.ent.ti.com>
+From: gianlucarenzi@eurekelettronica.it (gianluca)
+Date: Fri, 12 Mar 2010 11:38:28 +0100
+Subject: Query abut 2410 LCD configuration
+In-Reply-To: <tencent_4B106ACE28F95B4E19D92218@qq.com>
+References: <tencent_4B106ACE28F95B4E19D92218@qq.com>
+Message-ID: <4B9A19A4.1080607@eurekelettronica.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I normally send my patches with this alias:
-> 
-> alias gsend='git send-email --smtp-server /usr/bin/msmtp 
-> --from "Sergio Aguirre <saaguirre@ti.com>" 
-> --envelope-sender="Sergio Aguirre <saaguirre@ti.com>"'
-> 
-> and then just do:
-> 
-> gsend --to='linux-omap at vger.kernel.org' 
-> patches/forLO_20100311/0001-mypatch.patch
-> 
-> But somehow the patch ends up (I'm guessing through TI LDAP 
-> server) changing that to "Aguirre, Sergio"...
-> 
-> and also Patchworks seems to continue display my old 
-> fullname: "Aguirre Rodriguez, Sergio Alberto"... I guess it's 
-> in a static data cache somewhere, maybe?
-> 
-> Does anyone know how to overcome this kind of scenario, and 
-> force what --from param says?
+?????? wrote:
+> Im wondering these values DOES make any sense ?
 
-I send patches with an explicit "From: Anand Gadiyar <gadiyar@ti.com>"
-line in the content. This seems to work okay.
+Googling around you can find these settings for a board based on s3c2440
+I think you can compare it with yours and noting the differences for 
+you. What is the best configuration you get?
 
-Can you check if this works for you?
+/* Configuration for 640x480 SHARP LQ080V3DG01 */
+.lcdcon5 = S3C2410_LCDCON5_FRM565 |
+S3C2410_LCDCON5_INVVLINE |
+S3C2410_LCDCON5_INVVFRAME |
+S3C2410_LCDCON5_PWREN |
+S3C2410_LCDCON5_HWSWP,
 
-- Anand
+.type        = S3C2410_LCDCON1_TFT,
+.width        = 640,
+.height        = 480,
+
+.pixclock    = 166667, /* HCLK/4 */
+.xres        = 640,
+.yres        = 480,
+.bpp        = 16,
+.left_margin    = 48,
+.right_margin    = 18,
+.hsync_len    = 4,
+.upper_margin    = 33,
+.lower_margin    = 10,
+.vsync_len    = 4,
+
+Best luck!
+-- 
+            ,,,
+           (o o)
+======oOO==(_)==OOo======
+
+Gianluca Renzi
+R&D
+phone: +39.0542.609120
+fax:   +39.0542.609212
+
+       .oooO  Oooo.
+======(   )==(   )=======
+        \ (    ) /
+         \_)  (_/
