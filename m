@@ -1,80 +1,57 @@
-From: grfstrm@users.sourceforge.net (=?ISO-8859-1?Q?Anders_Grafstr=F6m?=)
-Date: Fri, 12 Mar 2010 18:30:36 +0100
-Subject: [PATCH 03/11] Thumb-2: Implementation of the unified start-up
-	and	exceptions code
-In-Reply-To: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
-References: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
-Message-ID: <4B9A7A3C.9000304@users.sourceforge.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 12 Mar 2010 18:49:54 +0100
+Subject: [PATCH] Voipac PXA270: UDC and UHC support
+In-Reply-To: <201003101243.54008.marek.vasut@gmail.com> (Marek Vasut's message
+	of "Wed\, 10 Mar 2010 12\:43\:53 +0100")
+References: <201003100543.00221.marek.vasut@gmail.com>
+	<201003101243.54008.marek.vasut@gmail.com>
+Message-ID: <87hbol77lp.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index b55cb03..9341b38 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -33,14 +33,7 @@ ret_fast_syscall:
->  	/* perform architecture specific actions before user return */
->  	arch_ret_to_user r1, lr
->  
-> -	@ fast_restore_user_regs
-> -	ldr	r1, [sp, #S_OFF + S_PSR]	@ get calling cpsr
-> -	ldr	lr, [sp, #S_OFF + S_PC]!	@ get pc
-> -	msr	spsr_cxsf, r1			@ save in spsr_svc
-> -	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
-> -	mov	r0, r0
-> -	add	sp, sp, #S_FRAME_SIZE - S_PC
-> -	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +	restore_user_regs fast = 1, offset = S_OFF
->   UNWIND(.fnend		)
->  
->  /*
-> @@ -73,14 +66,7 @@ no_work_pending:
->  	/* perform architecture specific actions before user return */
->  	arch_ret_to_user r1, lr
->  
-> -	@ slow_restore_user_regs
-> -	ldr	r1, [sp, #S_PSR]		@ get calling cpsr
-> -	ldr	lr, [sp, #S_PC]!		@ get pc
-> -	msr	spsr_cxsf, r1			@ save in spsr_svc
-> -	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
-> -	mov	r0, r0
-> -	add	sp, sp, #S_FRAME_SIZE - S_PC
-> -	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +	restore_user_regs fast = 0, offset = 0
->  ENDPROC(ret_to_user)
->  
->  /*
+Marek Vasut <marek.vasut@gmail.com> writes:
 
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> +
-> +	.macro	restore_user_regs, fast = 0, offset = 0
-> +	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
-> +	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
-> +	msr	spsr_cxsf, r1			@ save in spsr_svc
-> +	.if	\fast
-> +	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
-> +	.else
-> +	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
-> +	.endif
-> +	add	sp, sp, #S_FRAME_SIZE - S_PC
-> +	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +	.endm
+> Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
+>> Hi,
+>> this patch adds UDC and UHC support (and formating fix, I hope you dont
+>>  mind Eric).
+>> 
+>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> 
+> revised patch
 
-This commit seems to have broken things for ARM720T and it looks like
-the removal of the "mov r0, r0" instruction in restore_user_regs is what caused it.
+snip
+> +/******************************************************************************
+> + * USB Gadget
+> + ******************************************************************************/
+> +#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
+> +static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+> +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
+> +};
+That won't work I think. gpio_vbus is not dealt with by pxa27x_udc.
+The way to go would rather be something like :
 
-The patch below makes it work again but why?
+#include <linux/usb/gpio_vbus.h>
+static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+        .gpio_pullup      = <to be filled in>,
+};
 
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 7e9ed1e..516d14e 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -102,6 +102,7 @@
- 	.else
- 	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
- 	.endif
-+	mov	r0, r0
- 	add	sp, sp, #S_FRAME_SIZE - S_PC
- 	movs	pc, lr				@ return & move spsr_svc into cpsr
- 	.endm
+struct gpio_vbus_mach_info gpio_vbus_data = {
+        .gpio_vbus = GPIO41_VPAC270_UDC_DETECT,
+        .gpio_vbus_inverted = 0,
+        .gpio_pullup = -1,
+};
+
+Add add a "gpio_vbus" device, with platform_data set to gpio_vbus_data.
+
+As a matter of fact, there are not a lot of cases where an UDC can work without :
+ - a GPIO for pullup
+ - or the udc_command() callback implemented
+The only working case I see is a hardwired D+ pin to the Vdd, but that seems an
+exterme in board design I've never met before. This lets me think you should
+find and the add the correct GPIO for pullup.
+
+Cheers.
+
+--
+Robert
