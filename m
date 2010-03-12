@@ -1,66 +1,25 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 12 Mar 2010 22:42:39 +0100
-Subject: [PATCH] Voipac PXA270: UDC and UHC support
-In-Reply-To: <87hbol77lp.fsf@free.fr>
-References: <201003100543.00221.marek.vasut@gmail.com>
-	<201003101243.54008.marek.vasut@gmail.com> <87hbol77lp.fsf@free.fr>
-Message-ID: <201003122242.39957.marek.vasut@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 12 Mar 2010 16:44:07 -0500 (EST)
+Subject: [PATCH 03/11] Thumb-2: Implementation of the unified start-up and
+	exceptions code
+In-Reply-To: <20100312211614.GC1146@n2100.arm.linux.org.uk>
+References: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
+	<4B9A7A3C.9000304@users.sourceforge.net>
+	<20100312211614.GC1146@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1003121640280.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 12. b?ezna 2010 18:49:54 Robert Jarzmik napsal(a):
-> Marek Vasut <marek.vasut@gmail.com> writes:
-> > Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
-> >> Hi,
-> >> this patch adds UDC and UHC support (and formating fix, I hope you dont
-> >>  mind Eric).
-> >>
-> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> >
-> > revised patch
-> 
-> snip
-> 
-> > +/***********************************************************************
-> >******* + * USB Gadget
-> > +
-> > *************************************************************************
-> >*****/ +#if
-> > defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODUL
-> >E) +static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
-> > +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
-> > +};
-> 
-> That won't work I think. gpio_vbus is not dealt with by pxa27x_udc.
-> The way to go would rather be something like :
-> 
-> #include <linux/usb/gpio_vbus.h>
-> static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
->         .gpio_pullup      = <to be filled in>,
-> };
-> 
-> struct gpio_vbus_mach_info gpio_vbus_data = {
->         .gpio_vbus = GPIO41_VPAC270_UDC_DETECT,
->         .gpio_vbus_inverted = 0,
->         .gpio_pullup = -1,
-> };
-> 
-> Add add a "gpio_vbus" device, with platform_data set to gpio_vbus_data.
-> 
-> As a matter of fact, there are not a lot of cases where an UDC can work
->  without : - a GPIO for pullup
->  - or the udc_command() callback implemented
-> The only working case I see is a hardwired D+ pin to the Vdd, but that
->  seems an exterme in board design I've never met before. This lets me think
->  you should find and the add the correct GPIO for pullup.
+On Fri, 12 Mar 2010, Russell King - ARM Linux wrote:
 
-Could you tell me which one pullup gpio is ? Here's the schematic:
-http://www.voipac.com/downloads/pxa/270/baseboard/doc/bb270v22sch.pdf
+> So yes, your patch is absolutely required - all ARMv5 and below are
+> facing a hazard as the kernel stands.  It might explain some of the
+> weird behaviours people have been reporting as well.
+> 
+> Please cleanup the description and submit to the patch system.
 
-Thanks
-> 
-> Cheers.
-> 
-> --
-> Robert
-> 
+And please add a small comment along side the otherwise seemingly 
+useless nop.
+
+
+Nicolas
