@@ -1,86 +1,133 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 12 Mar 2010 10:09:03 +0530
-Subject: [PATCH 02/11] ST SPEAr: Added basic header files for SPEAr3xx
-	machine family
-In-Reply-To: <20100311103321.GB16376@n2100.arm.linux.org.uk>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<20100311103321.GB16376@n2100.arm.linux.org.uk>
-Message-ID: <4B99C567.6070804@st.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 12 Mar 2010 10:18:40 +0530
+Subject: [PATCH 17/19] omap: Add DSI regulator supply to OMAP3EVM board
+	file
+In-Reply-To: <20100311234847.4500.24584.stgit@baageli.muru.com>
+References: <20100311234404.4500.82861.stgit@baageli.muru.com>
+	<20100311234847.4500.24584.stgit@baageli.muru.com>
+Message-ID: <19F8576C6E063C45BE387C64729E7394044DD32D7B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2010 4:03 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 03, 2010 at 10:37:32AM +0530, Viresh KUMAR wrote:
->> diff --git a/arch/arm/mach-spear3xx/include/mach/dma.h b/arch/arm/mach-spear3xx/include/mach/dma.h
->> new file mode 100644
->> index 0000000..9b93bc6
->> --- /dev/null
->> +++ b/arch/arm/mach-spear3xx/include/mach/dma.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + * arch/arm/mach-spear3xx/include/mach/dma.h
->> + *
->> + * Generic DMA support for SPEAr3xx machine family
->> + *
->> + * Copyright (C) 2009 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef __ASM_ARCH_DMA_H
->> +#define __ASM_ARCH_DMA_H
->> +
->> +#endif /* __ASM_ARCH_DMA_H */
->> +
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Friday, March 12, 2010 5:19 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Tomi Valkeinen; linux-omap at vger.kernel.org; Hiremath, Vaibhav
+> Subject: [PATCH 17/19] omap: Add DSI regulator supply to OMAP3EVM board file
 > 
-> You don't need to provide this file if you don't use it.
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-
-It will be removed.
-
->> diff --git a/arch/arm/mach-spear3xx/include/mach/vmalloc.h b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
->> new file mode 100644
->> index 0000000..4f236f3
->> --- /dev/null
->> +++ b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
->> @@ -0,0 +1,22 @@
->> +/*
->> + * arch/arm/mach-spear3xx/include/mach/vmalloc.h
->> + *
->> + * Defining Vmalloc area for SPEAr3xx machine family
->> + *
->> + * Copyright (C) 2009 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef __ASM_MACH_VMALLOC_H
->> +#define __ASM_MACH_VMALLOC_H
->> +
->> +#include <mach/memory.h>
->> +
->> +#define VMALLOC_SIZE		(0x30000000)
->> +#define VMALLOC_END		(PAGE_OFFSET + VMALLOC_SIZE)
+> With recent changes happened in OMAP2/3 DSS library for regulator interface,
+> it
+> is required to define DSI regulator supply, without this DSS (in turn Fbdev)
+> fails to get regulator.
 > 
-> Don't define it like this - define VMALLOC_END to be the maximum virtual
-> address which you can permit the vmalloc area to extend to - which is
-> generally the start of your peripheral mappings.
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3evm.c |   16 +++++++++++-----
+>  1 files changed, 11 insertions(+), 5 deletions(-)
 > 
-> It's rather pointless defining it in terms of PAGE_OFFSET, because this
-> can vary, whereas the start of your peripheral mappings tends to be
-> fixed.
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> omap2/board-omap3evm.c
+> index 017bb2f..a05de10 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -514,9 +514,15 @@ static struct regulator_init_data omap3_evm_vdac = {
+>  };
 > 
+>  /* VPLL2 for digital video outputs */
+> -static struct regulator_consumer_supply omap3_evm_vpll2_supply = {
+> -	.supply		= "vdvi",
+> -	.dev		= &omap3_evm_lcd_device.dev,
+> +static struct regulator_consumer_supply omap3_evm_vpll2_supplies[] = {
+> +	{
+> +		.supply		= "vdvi",
+> +		.dev		= &omap3_evm_lcd_device.dev,
+> +	},
+> +	{
+> +		.supply		= "vdds_dsi",
+> +		.dev		= &omap3_evm_dss_device.dev,
+> +	},
+>  };
+> 
+>  static struct regulator_init_data omap3_evm_vpll2 = {
+> @@ -530,8 +536,8 @@ static struct regulator_init_data omap3_evm_vpll2 = {
+>  		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+>  					| REGULATOR_CHANGE_STATUS,
+>  	},
+> -	.num_consumer_supplies	= 1,
+> -	.consumer_supplies	= &omap3_evm_vpll2_supply,
+> +	.num_consumer_supplies	= ARRAY_SIZE(omap3_evm_vpll2_supplies),
+> +	.consumer_supplies	= omap3_evm_vpll2_supplies,
+>  };
+> 
+>  static struct twl4030_platform_data omap3evm_twldata = {
+[Hiremath, Vaibhav] Tony,
+Please use the patch below, I have fixed Mark's comments to use devname instead of dev.
 
-OK. Will be changed.
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index ea1014b..f5c815a 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -514,10 +514,8 @@ static struct regulator_init_data omap3_evm_vdac = {
+ };
+
+ /* VPLL2 for digital video outputs */
+-static struct regulator_consumer_supply omap3_evm_vpll2_supply = {
+-       .supply         = "vdds_dsi",
+-       .dev            = &omap3_evm_dss_device.dev,
+-};
++static struct regulator_consumer_supply omap3_evm_vpll2_supply =
++       REGULATOR_SUPPLY("vdds_dsi", "omapdss");
+
+ static struct regulator_init_data omap3_evm_vpll2 = {
+        .constraints = {
 
 
-regards,
-viresh kumar
+[Hiremath, Vaibhav] Since you have already merged the patch , I have created patch on top of linux-omap/master below.
+
+
+
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index a05de10..f5c815a 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -514,16 +514,8 @@ static struct regulator_init_data omap3_evm_vdac = {
+ };
+
+ /* VPLL2 for digital video outputs */
+-static struct regulator_consumer_supply omap3_evm_vpll2_supplies[] = {
+-       {
+-               .supply         = "vdvi",
+-               .dev            = &omap3_evm_lcd_device.dev,
+-       },
+-       {
+-               .supply         = "vdds_dsi",
+-               .dev            = &omap3_evm_dss_device.dev,
+-       },
+-};
++static struct regulator_consumer_supply omap3_evm_vpll2_supply =
++       REGULATOR_SUPPLY("vdds_dsi", "omapdss");
+
+ static struct regulator_init_data omap3_evm_vpll2 = {
+        .constraints = {
+@@ -536,8 +528,8 @@ static struct regulator_init_data omap3_evm_vpll2 = {
+                .valid_ops_mask         = REGULATOR_CHANGE_MODE
+                                        | REGULATOR_CHANGE_STATUS,
+        },
+-       .num_consumer_supplies  = ARRAY_SIZE(omap3_evm_vpll2_supplies),
+-       .consumer_supplies      = omap3_evm_vpll2_supplies,
++       .num_consumer_supplies  = 1,
++       .consumer_supplies      = &omap3_evm_vpll2_supply,
+ };
+
+ static struct twl4030_platform_data omap3evm_twldata = {
+diff --git a/drivers/mtd/maps/omap_nor.c b/drivers/mtd/maps/omap_nor.c
+deleted file mode 100644
+index e69de29..0000000
+
+Thanks,
+Vaibhav
