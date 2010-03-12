@@ -1,221 +1,34 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 12 Mar 2010 09:49:07 +0530
-Subject: [PATCH 05/11] ST SPEAr: Added clock framework for SPEAr platform
+Date: Fri, 12 Mar 2010 09:52:57 +0530
+Subject: [PATCH 05/11] ST SPEAr: Added clock framework for SPEAr	platform
 	and machines
-In-Reply-To: <63386a3d1003102300q23ea536bje956f8d5c7e333a2@mail.gmail.com>
-References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>	
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>	
+In-Reply-To: <20100311102845.GA16376@n2100.arm.linux.org.uk>
+References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
+	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003102300q23ea536bje956f8d5c7e333a2@mail.gmail.com>
-Message-ID: <4B99C0BB.7080900@st.com>
+	<20100311102845.GA16376@n2100.arm.linux.org.uk>
+Message-ID: <4B99C1A1.3070402@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2010 12:30 PM, Linus Walleij wrote:
-> 2010/3/3 Viresh KUMAR <viresh.kumar@st.com>:
+On 3/11/2010 3:58 PM, Russell King - ARM Linux wrote:
+> On Wed, Mar 03, 2010 at 10:37:35AM +0530, Viresh KUMAR wrote:
+>> +/* array of all spear 3xx clock lookups */
+>> +static struct clk_lookup *spear_clk_lookups[] = {
+>> +	/* root clks */
+>> +	&osc_32k_cl,
+>> +	&osc_24m_cl,
 > 
->> +{
->> +       unsigned int val;
->> +
->> +       if (!clk->en_reg)
->> +               return -EFAULT;
->> +
->> +       val = readl(clk->en_reg);
->> +       if (unlikely(clk->flags & RESET_TO_ENABLE))
->> +               val &= ~(1 << clk->en_reg_bit);
->> +       else
->> +               val |= 1 << clk->en_reg_bit;
->> +       writel(val, clk->en_reg);
-> 
-> I don't understand one bit of this. What happens if the RESET_TO_ENABLE
-> flag is set for the clock? The exact same bit is &-masked and then
-> immediately |:ed to 1 again. Then it is written to the register. Practical
-> effect: absolutely none.
-> 
-> Is there a writel(val, clk->en_reg); missing from the unlikely() execution
-> path?
-
-Already explained by shiraz.
-
-> 
->> +
->> +       return 0;
->> +}
->> +
->> +static void generic_clk_disable(struct clk *clk)
->> +{
->> +       unsigned int val;
->> +
->> +       if (!clk->en_reg)
->> +               return;
->> +
->> +       val = readl(clk->en_reg);
->> +       if (unlikely(clk->flags & RESET_TO_ENABLE))
->> +               val |= 1 << clk->en_reg_bit;
->> +       else
->> +               val &= ~(1 << clk->en_reg_bit);
-> 
-> Same issue here...
-> 
->> +
->> +       writel(val, clk->en_reg);
->> +}
->> +
->> +/* generic clk ops */
->> +static struct clkops generic_clkops = {
->> +       .enable = generic_clk_enable,
->> +       .disable = generic_clk_disable,
->> +};
->> +
->> +/*
->> + * clk_enable - inform the system when the clock source should be running.
->> + * @clk: clock source
->> + *
->> + * If the clock can not be enabled/disabled, this should return success.
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_enable(struct clk *clk)
->> +{
->> +       unsigned long flags;
->> +       int ret = 0;
->> +
->> +       if (!clk || IS_ERR(clk))
->> +               return -EFAULT;
->> +
->> +       spin_lock_irqsave(&clocks_lock, flags);
->> +       if (clk->usage_count++ == 0) {
-> 
-> Isnt if (++clk.>usage_count == 1) easier to understand, or is it just me?
-> BTW doing this:
-> clk->usage_count++;
-> if (clk->usage_count == 1)
-> will not use more memory, the compiler optimize this, so choose the
-> version you think is most readable. If you think this is very readable, by
-> all means keep it.
+> This is rather wasteful - rather than defining structures, and then having
+> a one-time-used set of pointers to the structures, why not just declare
+> the whole lot as an array like most other implementations do?
 > 
 
-I will simplify it, to make it more readable.
-
->> +               if (clk->ops && clk->ops->enable)
->> +                       ret = clk->ops->enable(clk);
->> +       }
->> +       spin_unlock_irqrestore(&clocks_lock, flags);
->> +
->> +       return ret;
->> +}
->> +EXPORT_SYMBOL(clk_enable);
->> +
->> +/*
->> + * clk_disable - inform the system when the clock source is no longer required.
->> + * @clk: clock source
->> + *
->> + * Inform the system that a clock source is no longer required by
->> + * a driver and may be shut down.
->> + *
->> + * Implementation detail: if the clock source is shared between
->> + * multiple drivers, clk_enable() calls must be balanced by the
->> + * same number of clk_disable() calls for the clock source to be
->> + * disabled.
->> + */
->> +void clk_disable(struct clk *clk)
->> +{
->> +       unsigned long flags;
->> +
->> +       if (!clk || IS_ERR(clk))
->> +               return;
->> +
->> +       WARN_ON(clk->usage_count == 0);
->> +
->> +       spin_lock_irqsave(&clocks_lock, flags);
->> +       if (--clk->usage_count == 0) {
-> 
-> Same readability issue here.
-
-I will simplify it, to make it more readable.
-
-> 
->> +       if (!clk || IS_ERR(clk) || !parent || IS_ERR(parent))
->> +               return -EFAULT;
->> +       if (clk->usage_count == 0)
->> +               return -EBUSY;
-> 
-> Why will the clk_set_parent() call fail if there are *no* users of the clock?
-> Should it not be the other way around? Or what am I misunderstanding here?
-> 
-
-My mistake. should be !=.
-
->> +       if (!clk->pclk_sel)
->> +               return -EPERM;
->> +       if (clk->pclk == parent)
->> +               return 0;
->> +
->> +       for (i = 0; i < clk->pclk_sel->pclk_count; i++) {
->> +               if (clk->pclk_sel->pclk_info[i].pclk == parent) {
->> +                       found = 1;
->> +                       break;
->> +               }
->> +       }
->> +
->> +       if (!found)
->> +               return -EPERM;
-> 
-> What about -ENODEV or so? (I don't know what people typically
-> use for clocks that don't exist.)
-
-Will correct it to return correct error.
-
-> 
->> + */
->> +void recalc_root_clocks(void)
->> +{
->> +       propagate_rate(&root_clks);
->> +}
-> 
-> I understand (I think) how speed change can propagate through the clocks.
-> However I think it will be hard to notify users that the clock rate has changed,
-> because there is nothing in the clk framework that supports that. If you have
-> drivers with dynamic clocks, do you have any plans on how you will
-> notify drivers?
-> 
-> OMAP uses CPUfreq but that is really about the CPU. As it happens, all
-> their clk:s always change frequency at the same operating points as the
-> CPU. So they can have pre/post calls from CPUfreq in their code, but
-> this will not work with things like PrimeCells where other users of the cell
-> may not have operating points correlated with CPU operating points.
-> 
-> (I'm not requesting you to solve this problem, more to be aware of it.)
-> 
-
-already answered by shiraz.
-
->> diff --git a/arch/arm/plat-spear/include/plat/clkdev.h b/arch/arm/plat-spear/include/plat/clkdev.h
->> +/* clk values */
->> +#define KHZ                    (1000)
->> +#define MHZ                    (1000000)
-> 
-> This looks far to generic to be hidden in some weird special architecture.
-> And I *think* the preferred way to encode frequencies in the kernel is raw
-> Hertz measure with all the extra zeroes.
-> 
-> Doing
-> .foo = MHZ *48;
-> 
-> Is a bit awkward, don't you think it's better to do:
-> #define MHZ(f)  f * 1000000
-> .foo = MHZ(48);
-> 
-> If you absolutely want to do this, I would suggest to add the KHZ and MHZ
-> macros to some global kernel file but I honestly cannot say which one.
-> Perhaps inlcude/linux/clk.h?
-> 
-
-I will better remove them.
-
+I did it to make it more readable. But, obviously it is wasting some amount
+of memory for just nothing. Will change it with an array implementation.
 
 regards,
 viresh kumar.
