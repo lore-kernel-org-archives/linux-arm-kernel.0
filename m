@@ -1,33 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Mar 2010 15:51:56 +0000
-Subject: Wrong cache flush function used in
-	arch/arm/boot/compressed/head.S?
-In-Reply-To: <20100312100511.GQ19843@pengutronix.de>
-References: <20100312100511.GQ19843@pengutronix.de>
-Message-ID: <1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Mar 2010 09:12:05 -0800
+Subject: [PATCH 17/19] omap: Add DSI regulator supply to OMAP3EVM board
+	file
+In-Reply-To: <19F8576C6E063C45BE387C64729E7394044DD32D7B@dbde02.ent.ti.com>
+References: <20100311234404.4500.82861.stgit@baageli.muru.com>
+	<20100311234847.4500.24584.stgit@baageli.muru.com>
+	<19F8576C6E063C45BE387C64729E7394044DD32D7B@dbde02.ent.ti.com>
+Message-ID: <20100312171204.GE2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-03-12 at 10:05 +0000, Sascha Hauer wrote:
-> 0e056f20f18d0efa5da920f3cf8532adc56d5779 contains the following hunk:
-> 
->                 .word   0x00060000              @ ARMv5TEJ
->                 .word   0x000f0000
-> -               b       __armv4_mmu_cache_on
-> -               b       __armv4_mmu_cache_off
-> -               b       __armv5tej_mmu_cache_flush
-> +               W(b)    __armv4_mmu_cache_on
-> +               W(b)    __armv4_mmu_cache_off
-> +               W(b)    __armv4_mmu_cache_flush
-> 
-> Is this intentional? I do not see any problems in my kernel, but I
-> use the same code in my bootloader and it doesn't seem to work correctly
-> on my arm926 based system.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [100311 20:45]:
+> [Hiremath, Vaibhav] Tony,
+> Please use the patch below, I have fixed Mark's comments to use devname instead of dev.
 
-It wasn't intentional. I think I got it wrong when trying to solve a
-merge conflict and I just added the original hunk.
+Sorry, looks like I missed Mark's comments while reading the
+thread at:
 
-Thanks.
+http://patchwork.kernel.org/patch/84823/
 
--- 
-Catalin
+I can't get either of your patches to apply. Please just repost your
+whole patch against the 2.6.34-rc1 with the Acked-by from Tomi.
+
+Also, please read the mailing list instructions we have at:
+
+http://www.elinux.org/Netiquette
+
+Basically one patch per mail. In format that can be applied as it is.
+Patches inlined, not quoted-printable. I don't want to manually re-edit
+the patches, it's a complete waste of time.
+ 
+> diff --git a/drivers/mtd/maps/omap_nor.c b/drivers/mtd/maps/omap_nor.c
+> deleted file mode 100644
+> index e69de29..0000000
+
+And this part we don't want to apply, it's not related to this patch.
+
+Regards,
+
+Tony
