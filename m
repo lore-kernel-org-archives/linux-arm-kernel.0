@@ -1,127 +1,29 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Fri, 12 Mar 2010 11:33:18 +0530
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <009901cac18b$cc93e5a0$544ff780@am.dhcp.ti.com>
-References: <618f0c911003010327s290fcce1ud665b5a16392aea1@mail.gmail.com>
-	<011301cac0b6$542b1190$544ff780@am.dhcp.ti.com>
-	<618f0c911003110252i36d6fc31wbaef4ad7a17565b1@mail.gmail.com>
-	<004401cac137$cccbf0c0$544ff780@am.dhcp.ti.com>
-	<618f0c911003110942s2f663928ie1203244fbd32da7@mail.gmail.com>
-	<009901cac18b$cc93e5a0$544ff780@am.dhcp.ti.com>
-Message-ID: <618f0c911003112203q2bdf88a4s7b8307f1ca8a693c@mail.gmail.com>
+From: chripell@fsfe.org (christian pellegrin)
+Date: Fri, 12 Mar 2010 08:25:08 +0100
+Subject: [PATCH v2] Fix GPIOs bank H and J not being preserved during
+	suspend
+In-Reply-To: <20100308161604.GF24864@trinity.fluff.org>
+References: <cabda6421003080317t37124990v72ac56906719c091@mail.gmail.com>
+	<1268047288-11166-1-git-send-email-chripell@fsfe.org>
+	<20100308155522.GE24864@trinity.fluff.org>
+	<cabda6421003080814j2e17b664x1806a418928e09d4@mail.gmail.com>
+	<20100308161604.GF24864@trinity.fluff.org>
+Message-ID: <cabda6421003112325w23628518tf12f2a7dae7b69ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Madhusudhan wrote:
->
->
->> -----Original Message-----
->> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of
->> Venkatraman S
->> Sent: Thursday, March 11, 2010 11:43 AM
->> To: Madhusudhan
->> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> linux-omap at vger.kernel.org
->> Subject: Re: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
->> autoloading feature
->>
->> Madhusudhan <madhu.cr@ti.com> wrote:
->> >> -----Original Message-----
->> >> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of
->> >> Venkatraman S
->> >> Sent: Thursday, March 11, 2010 4:52 AM
->> >> To: Madhusudhan
->> >> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> >> linux-omap at vger.kernel.org
->> >> Subject: Re: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
->> >> autoloading feature
->> >>
->> >> Madhusudhan <madhu.cr@ti.com> wrote:
->> >> >> -----Original Message-----
->> >> >> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
->> >> >> owner at vger.kernel.org] On Behalf Of Venkatraman S
->> >> >> Sent: Monday, March 01, 2010 5:27 AM
->> >> >> To: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> >> >> linux-omap at vger.kernel.org
->> >> >> Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
->> >> >> autoloading feature
->> >> >>
->> >> >> Start to use the sDMA descriptor autoloading feature.
->> >> >> For large datablocks, the MMC driver has to repeatedly setup,
->> program
->> >> >> and teardown the
->> >> >> dma channel for each element of the sglist received in
->> >> omap_hsmmc_request.
->> >> >>
->> >> >> By using descriptor autoloading, transfers from / to each element of
->> >> >> the sglist is pre programmed
->> >> >> into a linked list. The sDMA driver completes the entire transaction
->> >> >> and provides a single interrupt.
->> >> >>
->> >> >> Due to this, number of dma interrupts for a typical 100MB transfer
->> on
->> >> the
->> >> >> MMC is
->> >> >> reduced from 25000 to about 400 (approximate). Transfer speeds are
->> >> >> improved by ~5%
->> >> >> (Though it varies on the size of read / write & improves on huge
->> >> >> transfers)
->> >> >>
->> >> >> Descriptor autoloading is available only in 3630 and 4430 (as of
->> now).
->> >> >> Hence normal DMA
->> >> >> mode is also retained.
->> >> >>
->> >> >> Tested on omap4430 sdp.
->> >> >>
->> >> >> Signed-off-by: Venkatraman S <svenkatr@ti.com>
->> >> >
->> >> > I don't see any issues with this patch except the concern I had on
->> the
->> >> first
->> >> > patch in the series. Why is that change linked to this series?
->> >> >
->> >> ? Thanks. The problem was seen only in the context of using descriptor
->> >> load. Would
->> >> you prefer that I post it as a separate patch ?
->> >
->> > My point is why that change is needed for this feature to work?
->> >
->> > When DMA is completed and a callback is received the ch can be freed.
->> Once
->> > TC is received the core is notified of the same.
->> >
->> > Can the first patch be dropped? Or do you see issues?
->> Yes there are issues without this patch when the scatterlist is large
->> (300+ blocks), where the dma completion interrupt is received but the
->> mmc driver hangs waiting for TC. I don't see the issue if I delay the
->> execution of omap_free_dma inside the dma callback.
->
-> This is strange. Ideally after the dma cb is received the transfer complete
-> interrupt should fire.
->
-> Your first patch would break a corner erroneous case the driver is already
-> handling. A scenario where TC was received before DMA cb came. There is
-> timeout logic in the driver which handles this case to let the request
-> succeed if a dma cb was received after a while otherwise err out. See the
-> function omap_hsmmc_start_dma_transfer.
->
-> Is there a way to keep both the cases handled? If not we have to make
-> changes based on which of these scenario is very odd.
+On Mon, Mar 8, 2010 at 5:16 PM, Ben Dooks <ben-linux@fluff.org> wrote:
 
-   I think these cases are already handled properly. All actions are
-taken if, and only if, TC is received.
-Once TC is received, the sequence of execution is unaltered by DMA
-callback. Dma callback
-is effectively a no-op after the final block is transmitted.
+> Can we have that as a seperate patch with that information in it, to show
+> what is being changed. Thanks.
+>
 
-   We can in fact get rid of the timeout logic. Of course, the DMA
-channel is cleared
-once the TC is received, hence there would be no spurious DMA callbacks during
-the start of next transaction. [The only hanging case is when the TC
-is never triggerred,
-even after a successful transfer, but that's another issue altogether]
+ack, the patches in-reply-to to this email. Thanks.
 
-Regards,
-Venkat.
+
+-- 
+Christian Pellegrin, see http://www.evolware.org/chri/
+"Real Programmers don't play tennis, or any other sport which requires
+you to change clothes. Mountain climbing is OK, and Real Programmers
+wear their climbing boots to work in case a mountain should suddenly
+spring up in the middle of the computer room."
