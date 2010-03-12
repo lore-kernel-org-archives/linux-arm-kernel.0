@@ -1,65 +1,36 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Mon, 29 Mar 2010 17:35:45 +0800
-Subject: [PATCH] mtd: pxa3xx_nand: fix reset timeout on mmp2
-Message-ID: <mailman.437.1273818198.2170.linux-arm-kernel@lists.infradead.org>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Fri, 12 Mar 2010 12:26:03 -0500
+Subject: [PATCH] [ARM] pxa: reserve more irq for board
+Message-ID: <mailman.452.1274095154.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For mmp2 board, reset command would always have timeout when enable
-the IRQ processing. The command done would comes after exit the IRQ
-processing whatever the timeout value is set.
+By default, only 16 IRQs are reserved for board IRQ. While genirq is used,
+more board IRQs should be reserved. Now update the default BOARD IRQs to 64.
 
-Change reset command use polling mode fix the issue.
-
-Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/include/mach/irqs.h |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 31ebc78..2eebd20 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1099,6 +1099,10 @@ static int prepare_command_pool(struct
-pxa3xx_nand *nand, int command,
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
+b/arch/arm/mach-pxa/include/mach/irqs.h
+index ffc8314..010c205 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -127,12 +127,8 @@
 
- 		break;
- 	case NAND_CMD_RESET:
-+		/* on some platform, it is stranger that when issue reset command,
-+		 * cmd done would not come till timeout cause irq exit.
-+		 * Force polling mode for reset command*/
-+		use_polling = 1;
- 		cmd = cmdset.reset;
- 		info->ndcb0[0] |= NDCB0_CMD_TYPE(5)
- 				| cmd;
-@@ -1123,7 +1127,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- {
- 	struct pxa3xx_nand_info *info = mtd->priv;
- 	struct pxa3xx_nand *nand = info->nand_data;
--	int ret, exec_cmd;
-+	int ret, exec_cmd, polling_mode;
+ #if defined(CONFIG_MACH_H4700)
+ #define IRQ_BOARD_END		(IRQ_BOARD_START + 70)
+-#elif defined(CONFIG_MACH_ZYLONITE)
+-#define IRQ_BOARD_END		(IRQ_BOARD_START + 32)
+-#elif defined(CONFIG_PXA_EZX)
+-#define IRQ_BOARD_END		(IRQ_BOARD_START + 23)
+ #else
+-#define IRQ_BOARD_END		(IRQ_BOARD_START + 16)
++#define IRQ_BOARD_END		(IRQ_BOARD_START + 64)
+ #endif
 
- 	/* if this is a x16 device ,then convert the input
- 	 * "byte" address into a "word" address appropriate
-@@ -1140,6 +1144,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- 	}
-
- 	DBG_NAND(printk("command %x, page %x\n", command, page_addr));
-+	polling_mode = use_polling;
- 	exec_cmd = prepare_command_pool(nand, command, column, page_addr);
- 	if (exec_cmd) {
- 		init_completion(&nand->cmd_complete);
-@@ -1160,6 +1165,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- 		disable_int(nand, NDCR_INT_MASK);
- 		nand->state &= ~STATE_CMD_PREPARED;
- 	}
-+	use_polling = polling_mode;
- }
-
- static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+ /*
 -- 
 1.5.6.5
