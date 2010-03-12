@@ -1,34 +1,86 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 12 Mar 2010 09:52:57 +0530
-Subject: [PATCH 05/11] ST SPEAr: Added clock framework for SPEAr	platform
-	and machines
-In-Reply-To: <20100311102845.GA16376@n2100.arm.linux.org.uk>
+Date: Fri, 12 Mar 2010 10:09:03 +0530
+Subject: [PATCH 02/11] ST SPEAr: Added basic header files for SPEAr3xx
+	machine family
+In-Reply-To: <20100311103321.GB16376@n2100.arm.linux.org.uk>
 References: <1267592861-26911-1-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-2-git-send-email-viresh.kumar@st.com>
 	<1267592861-26911-3-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-4-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-5-git-send-email-viresh.kumar@st.com>
-	<1267592861-26911-6-git-send-email-viresh.kumar@st.com>
-	<20100311102845.GA16376@n2100.arm.linux.org.uk>
-Message-ID: <4B99C1A1.3070402@st.com>
+	<20100311103321.GB16376@n2100.arm.linux.org.uk>
+Message-ID: <4B99C567.6070804@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2010 3:58 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 03, 2010 at 10:37:35AM +0530, Viresh KUMAR wrote:
->> +/* array of all spear 3xx clock lookups */
->> +static struct clk_lookup *spear_clk_lookups[] = {
->> +	/* root clks */
->> +	&osc_32k_cl,
->> +	&osc_24m_cl,
+On 3/11/2010 4:03 PM, Russell King - ARM Linux wrote:
+> On Wed, Mar 03, 2010 at 10:37:32AM +0530, Viresh KUMAR wrote:
+>> diff --git a/arch/arm/mach-spear3xx/include/mach/dma.h b/arch/arm/mach-spear3xx/include/mach/dma.h
+>> new file mode 100644
+>> index 0000000..9b93bc6
+>> --- /dev/null
+>> +++ b/arch/arm/mach-spear3xx/include/mach/dma.h
+>> @@ -0,0 +1,18 @@
+>> +/*
+>> + * arch/arm/mach-spear3xx/include/mach/dma.h
+>> + *
+>> + * Generic DMA support for SPEAr3xx machine family
+>> + *
+>> + * Copyright (C) 2009 ST Microelectronics
+>> + * Viresh Kumar<viresh.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef __ASM_ARCH_DMA_H
+>> +#define __ASM_ARCH_DMA_H
+>> +
+>> +#endif /* __ASM_ARCH_DMA_H */
+>> +
 > 
-> This is rather wasteful - rather than defining structures, and then having
-> a one-time-used set of pointers to the structures, why not just declare
-> the whole lot as an array like most other implementations do?
+> You don't need to provide this file if you don't use it.
 > 
 
-I did it to make it more readable. But, obviously it is wasting some amount
-of memory for just nothing. Will change it with an array implementation.
+It will be removed.
+
+>> diff --git a/arch/arm/mach-spear3xx/include/mach/vmalloc.h b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
+>> new file mode 100644
+>> index 0000000..4f236f3
+>> --- /dev/null
+>> +++ b/arch/arm/mach-spear3xx/include/mach/vmalloc.h
+>> @@ -0,0 +1,22 @@
+>> +/*
+>> + * arch/arm/mach-spear3xx/include/mach/vmalloc.h
+>> + *
+>> + * Defining Vmalloc area for SPEAr3xx machine family
+>> + *
+>> + * Copyright (C) 2009 ST Microelectronics
+>> + * Viresh Kumar<viresh.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef __ASM_MACH_VMALLOC_H
+>> +#define __ASM_MACH_VMALLOC_H
+>> +
+>> +#include <mach/memory.h>
+>> +
+>> +#define VMALLOC_SIZE		(0x30000000)
+>> +#define VMALLOC_END		(PAGE_OFFSET + VMALLOC_SIZE)
+> 
+> Don't define it like this - define VMALLOC_END to be the maximum virtual
+> address which you can permit the vmalloc area to extend to - which is
+> generally the start of your peripheral mappings.
+> 
+> It's rather pointless defining it in terms of PAGE_OFFSET, because this
+> can vary, whereas the start of your peripheral mappings tends to be
+> fixed.
+> 
+
+OK. Will be changed.
+
 
 regards,
-viresh kumar.
+viresh kumar
