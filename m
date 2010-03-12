@@ -1,56 +1,81 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 12 Mar 2010 16:00:40 +0100
-Subject: [PATCH 1/2] Add support for Olimex SAM9-L9261 SBC
-In-Reply-To: <20100312110032.2e57fdce@rechenknecht2k7>
-References: <20100312105817.4392b594@rechenknecht2k7>
-	<20100312110032.2e57fdce@rechenknecht2k7>
-Message-ID: <4B9A5718.2040500@atmel.com>
+From: scott@jumpnowtek.com (Scott Ellis)
+Date: Fri, 12 Mar 2010 10:21:47 -0500
+Subject: [PATCH 2/6] SPI omap2_mcspi: Add max_clk_div field to mcspi
+	platform config
+Message-ID: <1268407307.14445.51.camel@quad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The McSPI_CHxCONF.CLKD register field has different limits for the
+OMAP3 then the OMAP24xx. As per recommendation from the linux-omap
+list, added a field for max_clk_div to the platform data for use in 
+omap2_mcspi.c.
 
-First and foremost, thank you for doing this job. It is indeed always a
-good idea to submit work to the community.
+Used in a subsequent patch. 
 
-Le 12/03/2010 11:00, Benjamin Valentin :
+Signed-off-by: Scott Ellis <scott@jumpnowtek.com>
 
-[..]
+ arch/arm/mach-omap2/devices.c           |   16 ++++++++++++++++
+ arch/arm/plat-omap/include/plat/mcspi.h |    1 +
+ 2 files changed, 17 insertions(+), 0 deletions(-)
 
-> diff -ru linux-2.6.34-rc1/drivers/video/atmel_lcdfb.c linux-2.6.34-rc1-olimex/drivers/video/atmel_lcdfb.c
-> --- linux-2.6.34-rc1/drivers/video/atmel_lcdfb.c	2010-02-24 19:52:17.000000000 +0100
-> +++ linux-2.6.34-rc1-olimex/drivers/video/atmel_lcdfb.c	2010-02-25 16:11:58.665578876 +0100
-
-In a separate patch please. You will also have to sent it to
-linux-fbdev-devel mailing list.
-
-> @@ -21,6 +21,7 @@
->  #include <mach/board.h>
->  #include <mach/cpu.h>
->  #include <mach/gpio.h>
-> +#include <asm/mach-types.h>
->  
->  #include <video/atmel_lcdc.h>
->  
-> @@ -548,6 +549,10 @@
->  	if (!(info->var.sync & FB_SYNC_VERT_HIGH_ACT))
->  		value |= ATMEL_LCDC_INVFRAME_INVERTED;
->  
-> +	if (machine_is_sam9_l9261()) {
-> +		value |= ATMEL_LCDC_INVCLK_INVERTED;
-> +	}
-> +
-
-Anyway, I think the driver is not the place to add this configuration.
-You will have to configure it in the board file:
-default_lcdcon2 field of the atmel_lcdfb_info structure.
-Check the arch/avr32/boards/atngw100/mrmr.c file as an example.
-
->  	switch (info->var.bits_per_pixel) {
->  		case 1:	value |= ATMEL_LCDC_PIXELSIZE_1; break;
->  		case 2: value |= ATMEL_LCDC_PIXELSIZE_2; break;
-> 
-
-Bye,
--- 
-Nicolas Ferre
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 23e4d77..d4ad126 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -302,6 +302,11 @@ static inline void omap_init_sti(void) {}
+ 
+ static struct omap2_mcspi_platform_config omap2_mcspi1_config = {
+ 	.num_cs		= 4,
++#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
++	.max_clk_div	= 0x0c,
++#else
++	.max_clk_div	= 0x0f,
++#endif
+ };
+ 
+ static struct resource omap2_mcspi1_resources[] = {
+@@ -324,6 +329,11 @@ static struct platform_device omap2_mcspi1 = {
+ 
+ static struct omap2_mcspi_platform_config omap2_mcspi2_config = {
+ 	.num_cs		= 2,
++#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
++	.max_clk_div	= 0x0c,
++#else
++	.max_clk_div	= 0x0f,
++#endif
+ };
+ 
+ static struct resource omap2_mcspi2_resources[] = {
+@@ -348,6 +358,11 @@ static struct platform_device omap2_mcspi2 = {
+ 	defined(CONFIG_ARCH_OMAP4)
+ static struct omap2_mcspi_platform_config omap2_mcspi3_config = {
+ 	.num_cs		= 2,
++#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
++	.max_clk_div	= 0x0c,
++#else
++	.max_clk_div	= 0x0f,
++#endif
+ };
+ 
+ static struct resource omap2_mcspi3_resources[] = {
+@@ -372,6 +387,7 @@ static struct platform_device omap2_mcspi3 = {
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+ static struct omap2_mcspi_platform_config omap2_mcspi4_config = {
+ 	.num_cs		= 1,
++	.max_clk_div	= 0x0c,
+ };
+ 
+ static struct resource omap2_mcspi4_resources[] = {
+diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
+index 1254e49..9fadddd 100644
+--- a/arch/arm/plat-omap/include/plat/mcspi.h
++++ b/arch/arm/plat-omap/include/plat/mcspi.h
+@@ -3,6 +3,7 @@
+ 
+ struct omap2_mcspi_platform_config {
+ 	unsigned short	num_cs;
++	unsigned short	max_clk_div;
+ };
+ 
+ struct omap2_mcspi_device_config {
