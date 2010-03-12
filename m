@@ -1,51 +1,92 @@
-From: saaguirre@ti.com (Aguirre, Sergio)
-Date: Fri, 12 Mar 2010 11:51:57 -0600
-Subject: [PATCH] arm: Fix .gitignore for boot/compressed folder
-In-Reply-To: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
-References: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
-Message-ID: <A24693684029E5489D1D202277BE894453FB180F@dlee02.ent.ti.com>
+From: wellsk40@gmail.com (Kevin Wells)
+Date: Fri, 12 Mar 2010 12:44:54 -0800
+Subject: Git pull request: ARM LPC32XX architecture
+Message-ID: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aguirre, Sergio
-Sent: Thursday, February 25, 2010 9:56 AM
-> This should complements changes done in:
-> 
->   commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
->   Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
->   Date:   Fri Jan 8 14:42:43 2010 -0800
-> 
->       arm: add support for LZO-compressed kernels
-> 
-> It missed to do the respective changes in '.gitignore' file.
+Hi Russell, please pull the reviewed LPC32xx arch files from the
+Pengutronix GIT server at:
 
-Hi,
+	git://git.pengutronix.de/git/ukl/linux-2.6.git wells/lpc32xx
 
-I did not receive any reply about this patch so far.
+This adds support for the ARM: LPC32xx architecture.
 
-- Is it acceptable?
-- Should I resend it somewhere else?
+Kevin Wells (11):
+     ARM: LPC32XX: Initial arch header files
+     ARM: LPC32XX: Debug and IRQ macros
+     ARM: LPC32XX: Clock driver
+     ARM: LPC32XX: GPIO, timer, and IRQ drivers
+     ARM: LPC32XX: System suspend support
+     ARM: LPC32XX: Serial support code
+     ARM: LPC32XX: Misc support functions
+     ARM: LPC32XX: Phytec 3250 platform support
+     ARM: LPC32XX: Arch config menu supoport and makefiles
+     ARM: LPC32XX: Default PHY3250 kernel config (ramdisk)
+     ARM: Add support for the LPC32XX arch
 
-Regards,
-Sergio
+arch/arm/Kconfig                                 |   15 +
+arch/arm/Makefile                                |    1 +
+arch/arm/configs/phy3250_defconfig               | 1099 +++++++++++++++++++++
+arch/arm/mach-lpc32xx/Kconfig                    |   33 +
+arch/arm/mach-lpc32xx/Makefile                   |    8 +
+arch/arm/mach-lpc32xx/Makefile.boot              |    4 +
+arch/arm/mach-lpc32xx/clock.c                    | 1137 ++++++++++++++++++++++
+arch/arm/mach-lpc32xx/clock.h                    |   38 +
+arch/arm/mach-lpc32xx/common.c                   |  271 +++++
+arch/arm/mach-lpc32xx/common.h                   |   73 ++
+arch/arm/mach-lpc32xx/gpiolib.c                  |  446 +++++++++
+arch/arm/mach-lpc32xx/include/mach/clkdev.h      |   25 +
+arch/arm/mach-lpc32xx/include/mach/debug-macro.S |   31 +
+arch/arm/mach-lpc32xx/include/mach/entry-macro.S |   47 +
+arch/arm/mach-lpc32xx/include/mach/gpio.h        |   74 ++
+arch/arm/mach-lpc32xx/include/mach/hardware.h    |   34 +
+arch/arm/mach-lpc32xx/include/mach/i2c.h         |   63 ++
+arch/arm/mach-lpc32xx/include/mach/io.h          |   27 +
+arch/arm/mach-lpc32xx/include/mach/irqs.h        |  117 +++
+arch/arm/mach-lpc32xx/include/mach/memory.h      |   27 +
+arch/arm/mach-lpc32xx/include/mach/platform.h    |  694 ++++++++++++
+arch/arm/mach-lpc32xx/include/mach/system.h      | 2 +
+arch/arm/mach-lpc32xx/include/mach/timex.h       |   28 +
+arch/arm/mach-lpc32xx/include/mach/uncompress.h  |   60 ++
+arch/arm/mach-lpc32xx/include/mach/vmalloc.h     |   24 +
+arch/arm/mach-lpc32xx/irq.c                      |  432 ++++++++
+arch/arm/mach-lpc32xx/phy3250.c                  |  397 ++++++++
+arch/arm/mach-lpc32xx/pm.c                       |  145 +++
+arch/arm/mach-lpc32xx/serial.c                   |  190 ++++
+arch/arm/mach-lpc32xx/suspend.S                  |  151 +++
+arch/arm/mach-lpc32xx/timer.c                    |  182 ++++
+31 files changed, 5925 insertions(+), 0 deletions(-)
+create mode 100644 arch/arm/configs/phy3250_defconfig
+create mode 100644 arch/arm/mach-lpc32xx/Kconfig
+create mode 100644 arch/arm/mach-lpc32xx/Makefile
+create mode 100644 arch/arm/mach-lpc32xx/Makefile.boot
+create mode 100644 arch/arm/mach-lpc32xx/clock.c
+create mode 100644 arch/arm/mach-lpc32xx/clock.h
+create mode 100644 arch/arm/mach-lpc32xx/common.c
+create mode 100644 arch/arm/mach-lpc32xx/common.h
+create mode 100644 arch/arm/mach-lpc32xx/gpiolib.c
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/clkdev.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/debug-macro.S
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/entry-macro.S
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/gpio.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/hardware.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/i2c.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/io.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/irqs.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/memory.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/platform.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/system.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/timex.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/uncompress.h
+create mode 100644 arch/arm/mach-lpc32xx/include/mach/vmalloc.h
+create mode 100644 arch/arm/mach-lpc32xx/irq.c
+create mode 100644 arch/arm/mach-lpc32xx/phy3250.c
+create mode 100644 arch/arm/mach-lpc32xx/pm.c
+create mode 100644 arch/arm/mach-lpc32xx/serial.c
+create mode 100644 arch/arm/mach-lpc32xx/suspend.S
+create mode 100644 arch/arm/mach-lpc32xx/timer.c
 
-> 
-> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
-> ---
->  arch/arm/boot/compressed/.gitignore |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/.gitignore
-> b/arch/arm/boot/compressed/.gitignore
-> index ab204db..bb984af 100644
-> --- a/arch/arm/boot/compressed/.gitignore
-> +++ b/arch/arm/boot/compressed/.gitignore
-> @@ -1,3 +1,5 @@
->  font.c
-> -piggy.gz
-> +piggy.gzip
-> +piggy.lzo
-> +lib1funcs.S
->  vmlinux.lds
-> --
-> 1.6.3.3
+thanks,
+Kevin Wells
+NXP Semiconductors
