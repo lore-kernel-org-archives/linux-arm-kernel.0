@@ -1,40 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Mar 2010 21:16:14 +0000
-Subject: [PATCH 03/11] Thumb-2: Implementation of the unified start-up
-	and exceptions code
-In-Reply-To: <4B9A7A3C.9000304@users.sourceforge.net>
-References: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
-	<4B9A7A3C.9000304@users.sourceforge.net>
-Message-ID: <20100312211614.GC1146@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 12 Mar 2010 22:42:39 +0100
+Subject: [PATCH] Voipac PXA270: UDC and UHC support
+In-Reply-To: <87hbol77lp.fsf@free.fr>
+References: <201003100543.00221.marek.vasut@gmail.com>
+	<201003101243.54008.marek.vasut@gmail.com> <87hbol77lp.fsf@free.fr>
+Message-ID: <201003122242.39957.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 12, 2010 at 06:30:36PM +0100, Anders Grafstr?m wrote:
-> This commit seems to have broken things for ARM720T and it looks like
-> the removal of the "mov r0, r0" instruction in restore_user_regs is
-> what caused it.
+Dne P? 12. b?ezna 2010 18:49:54 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
+> >> Hi,
+> >> this patch adds UDC and UHC support (and formating fix, I hope you dont
+> >>  mind Eric).
+> >>
+> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >
+> > revised patch
 > 
-> The patch below makes it work again but why?
+> snip
+> 
+> > +/***********************************************************************
+> >******* + * USB Gadget
+> > +
+> > *************************************************************************
+> >*****/ +#if
+> > defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODUL
+> >E) +static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+> > +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
+> > +};
+> 
+> That won't work I think. gpio_vbus is not dealt with by pxa27x_udc.
+> The way to go would rather be something like :
+> 
+> #include <linux/usb/gpio_vbus.h>
+> static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+>         .gpio_pullup      = <to be filled in>,
+> };
+> 
+> struct gpio_vbus_mach_info gpio_vbus_data = {
+>         .gpio_vbus = GPIO41_VPAC270_UDC_DETECT,
+>         .gpio_vbus_inverted = 0,
+>         .gpio_pullup = -1,
+> };
+> 
+> Add add a "gpio_vbus" device, with platform_data set to gpio_vbus_data.
+> 
+> As a matter of fact, there are not a lot of cases where an UDC can work
+>  without : - a GPIO for pullup
+>  - or the udc_command() callback implemented
+> The only working case I see is a hardwired D+ pin to the Vdd, but that
+>  seems an exterme in board design I've never met before. This lets me think
+>  you should find and the add the correct GPIO for pullup.
 
-Because the 'add' instruction will end up touching the _userspace_
-stack pointer, not the SVC stack pointer.
+Could you tell me which one pullup gpio is ? Here's the schematic:
+http://www.voipac.com/downloads/pxa/270/baseboard/doc/bb270v22sch.pdf
 
-It's a question of timing in the core - the ldmdb instruction accesses
-the user sp+lr, which is still in progress when the following instruction
-is executed.  So, referencing 'sp' in the following instruction ends up
-hitting the user mode stack pointer.
-
-I'm surprised this hasn't caused more problems - there is a stipulated
-requirement that banked registers are _NOT_ accessed by the instruction
-following a ldm { }^ instruction - this requirement goes all the way up
-to V5T as defined by DDI0100I and below:
-
-  In ARM architecture versions earlier than ARMv6, this form of LDM must
-  not be followed by an instruction that accesses banked registers. A
-  following NOP is a good way to ensure this.
-
-So yes, your patch is absolutely required - all ARMv5 and below are
-facing a hazard as the kernel stands.  It might explain some of the
-weird behaviours people have been reporting as well.
-
-Please cleanup the description and submit to the patch system.
+Thanks
+> 
+> Cheers.
+> 
+> --
+> Robert
+> 
