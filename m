@@ -1,34 +1,29 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Fri, 12 Mar 2010 13:48:12 +0530
-Subject: [PATCH 03/03] omap hsmmc: adaptation of sdma descriptor
-	autoloading feature
-In-Reply-To: <20100311183944.GJ2900@atomide.com>
-References: <618f0c911003100612l33b1fec9s163720a5a93a1787@mail.gmail.com>
-	<20100310224110.GW2900@atomide.com>
-	<618f0c911003110708s5015f2bftb443b9ea57cb6477@mail.gmail.com>
-	<20100311183944.GJ2900@atomide.com>
-Message-ID: <618f0c911003120018q581154cel48fc130567f99fb3@mail.gmail.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Fri, 12 Mar 2010 10:30:12 +0200
+Subject: [PATCH 1/3] usb: Fix compile error for omaps for musb_hdrc
+In-Reply-To: <20100311180322.20537.3614.stgit@baageli.muru.com>
+References: <20100311180023.20537.27516.stgit@baageli.muru.com>
+	<20100311180322.20537.3614.stgit@baageli.muru.com>
+Message-ID: <20100312083012.GZ20878@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
-> * Venkatraman S <svenkatr@ti.com> [100311 07:04]:
->> Tony Lindgren wrote:
->> >
->> > Does the driver still work in PIO mode?
->> >
->> > We need to have the drivers capable to fail over to PIO mode
->> > as the DMA channels can run out.
->> >
->>
->> ? ?The driver doesn't have an automatic fallback to PIO,
->> even without my patch. A error return from omap_request_dma is
->> propogated all the way back to the transfer request.
->> ? The decision to use_dma (the variable) is unaltered.
+On Thu, Mar 11, 2010 at 07:03:22PM +0100, ext Tony Lindgren wrote:
+>CONFIG_ARCH_OMAP34XX is now CONFIG_ARCH_OMAP3.
 >
-> OK, that might explain some nasty surprises then..
+>But since drivers/usb/musb/omap2430.c use CONFIG_PM for these
+>registers and functions, do the same for the header.
 >
-> With these patches, does the driver still work in PIO mode though?
+>Otherwise we get the following for most omap3 defconfigs:
+>
+>drivers/usb/musb/omap2430.c:261: error: expected identifier or '(' before 'do'
+>drivers/usb/musb/omap2430.c:261: error: expected identifier or '(' before 'while'
+>drivers/usb/musb/omap2430.c:268: error: expected identifier or '(' before 'do'
+>drivers/usb/musb/omap2430.c:268: error: expected identifier or '(' before 'while'
+>
+>Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-No. The workhorse code to actually push the data byte by byte
-is not present in the hsmmc driver.
+I sent a version for that yesterday. Sorry :-(
+
+-- 
+balbi
