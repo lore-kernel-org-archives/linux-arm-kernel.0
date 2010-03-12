@@ -1,57 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 12 Mar 2010 18:49:54 +0100
-Subject: [PATCH] Voipac PXA270: UDC and UHC support
-In-Reply-To: <201003101243.54008.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Wed\, 10 Mar 2010 12\:43\:53 +0100")
-References: <201003100543.00221.marek.vasut@gmail.com>
-	<201003101243.54008.marek.vasut@gmail.com>
-Message-ID: <87hbol77lp.fsf@free.fr>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Fri, 12 Mar 2010 11:51:57 -0600
+Subject: [PATCH] arm: Fix .gitignore for boot/compressed folder
+In-Reply-To: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
+References: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
+Message-ID: <A24693684029E5489D1D202277BE894453FB180F@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+From: Aguirre, Sergio
+Sent: Thursday, February 25, 2010 9:56 AM
+> This should complements changes done in:
+> 
+>   commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
+>   Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+>   Date:   Fri Jan 8 14:42:43 2010 -0800
+> 
+>       arm: add support for LZO-compressed kernels
+> 
+> It missed to do the respective changes in '.gitignore' file.
 
-> Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
->> Hi,
->> this patch adds UDC and UHC support (and formating fix, I hope you dont
->>  mind Eric).
->> 
->> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> 
-> revised patch
+Hi,
 
-snip
-> +/******************************************************************************
-> + * USB Gadget
-> + ******************************************************************************/
-> +#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
-> +static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
-> +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
-> +};
-That won't work I think. gpio_vbus is not dealt with by pxa27x_udc.
-The way to go would rather be something like :
+I did not receive any reply about this patch so far.
 
-#include <linux/usb/gpio_vbus.h>
-static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
-        .gpio_pullup      = <to be filled in>,
-};
+- Is it acceptable?
+- Should I resend it somewhere else?
 
-struct gpio_vbus_mach_info gpio_vbus_data = {
-        .gpio_vbus = GPIO41_VPAC270_UDC_DETECT,
-        .gpio_vbus_inverted = 0,
-        .gpio_pullup = -1,
-};
+Regards,
+Sergio
 
-Add add a "gpio_vbus" device, with platform_data set to gpio_vbus_data.
-
-As a matter of fact, there are not a lot of cases where an UDC can work without :
- - a GPIO for pullup
- - or the udc_command() callback implemented
-The only working case I see is a hardwired D+ pin to the Vdd, but that seems an
-exterme in board design I've never met before. This lets me think you should
-find and the add the correct GPIO for pullup.
-
-Cheers.
-
---
-Robert
+> 
+> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
+> ---
+>  arch/arm/boot/compressed/.gitignore |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/.gitignore
+> b/arch/arm/boot/compressed/.gitignore
+> index ab204db..bb984af 100644
+> --- a/arch/arm/boot/compressed/.gitignore
+> +++ b/arch/arm/boot/compressed/.gitignore
+> @@ -1,3 +1,5 @@
+>  font.c
+> -piggy.gz
+> +piggy.gzip
+> +piggy.lzo
+> +lib1funcs.S
+>  vmlinux.lds
+> --
+> 1.6.3.3
