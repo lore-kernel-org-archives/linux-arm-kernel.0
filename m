@@ -1,25 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Mar 2010 21:03:53 +0000
-Subject: Git pull request: ARM LPC32XX architecture
-In-Reply-To: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
-References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
-Message-ID: <20100312210353.GB1146@n2100.arm.linux.org.uk>
+Date: Fri, 12 Mar 2010 21:16:14 +0000
+Subject: [PATCH 03/11] Thumb-2: Implementation of the unified start-up
+	and exceptions code
+In-Reply-To: <4B9A7A3C.9000304@users.sourceforge.net>
+References: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
+	<4B9A7A3C.9000304@users.sourceforge.net>
+Message-ID: <20100312211614.GC1146@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 12, 2010 at 12:44:54PM -0800, Kevin Wells wrote:
-> Hi Russell, please pull the reviewed LPC32xx arch files from the
-> Pengutronix GIT server at:
+On Fri, Mar 12, 2010 at 06:30:36PM +0100, Anders Grafstr?m wrote:
+> This commit seems to have broken things for ARM720T and it looks like
+> the removal of the "mov r0, r0" instruction in restore_user_regs is
+> what caused it.
 > 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git wells/lpc32xx
+> The patch below makes it work again but why?
 
-FYI, I'm not pulling anything new until I've seen Linus take the stuff
-that's already queued up.
+Because the 'add' instruction will end up touching the _userspace_
+stack pointer, not the SVC stack pointer.
 
-Linus has finally said that he will take the bits of the ARM merge
-which missed the truncated merge window, so that might be tomorrow.
+It's a question of timing in the core - the ldmdb instruction accesses
+the user sp+lr, which is still in progress when the following instruction
+is executed.  So, referencing 'sp' in the following instruction ends up
+hitting the user mode stack pointer.
 
-However, what I do want to avoid this time around is having an
-excessive number of merge conflicts, which may require a pause to
-sort out (and I might ask people to bring their trees up to date
-first.)
+I'm surprised this hasn't caused more problems - there is a stipulated
+requirement that banked registers are _NOT_ accessed by the instruction
+following a ldm { }^ instruction - this requirement goes all the way up
+to V5T as defined by DDI0100I and below:
+
+  In ARM architecture versions earlier than ARMv6, this form of LDM must
+  not be followed by an instruction that accesses banked registers. A
+  following NOP is a good way to ensure this.
+
+So yes, your patch is absolutely required - all ARMv5 and below are
+facing a hazard as the kernel stands.  It might explain some of the
+weird behaviours people have been reporting as well.
+
+Please cleanup the description and submit to the patch system.
