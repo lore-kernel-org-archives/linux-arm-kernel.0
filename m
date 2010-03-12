@@ -1,42 +1,41 @@
-From: saaguirre@ti.com (Aguirre, Sergio)
-Date: Fri, 12 Mar 2010 08:00:12 -0600
-Subject: [PATCH 12/19] omap: Fix gpio_resume_after_retention
-In-Reply-To: <20100312131902.GD3802@nokia.com>
-References: <20100311234404.4500.82861.stgit@baageli.muru.com>
-	<20100311234834.4500.12726.stgit@baageli.muru.com>
-	<A24693684029E5489D1D202277BE894453FB11F8@dlee02.ent.ti.com>
-	<20100311235640.GW2900@atomide.com>
-	<A24693684029E5489D1D202277BE894453FB1216@dlee02.ent.ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0321EC96B2@dbde02.ent.ti.com>
-	<20100312131902.GD3802@nokia.com>
-Message-ID: <A24693684029E5489D1D202277BE894453FB143B@dlee02.ent.ti.com>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Roberto Jimenez)
+Date: Fri, 12 Mar 2010 11:23:46 -0300
+Subject: [PATCH 1/2] ARM: mach-sa1100: Fix for compiler warning of
+	uninitialized variable.
+Message-ID: <1268403827-16127-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is a fix for the compiler warning: 'new_ppcr' may be used
+uninitialized in this function.
 
+Signed-off-by: Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+---
+ arch/arm/mach-sa1100/cpu-sa1100.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-From: Felipe Balbi [mailto:felipe.balbi at nokia.com]
-Sent: Friday, March 12, 2010 7:19 AM
-> On Fri, Mar 12, 2010 at 11:37:50AM +0100, ext Gadiyar, Anand wrote:
-> >I send patches with an explicit "From: Anand Gadiyar <gadiyar@ti.com>"
-> >line in the content. This seems to work okay.
-> >
-> >Can you check if this works for you?
-> 
-> $ git config --global sendemail.from "Sergio Aguirre <saaguirre@ti.com>"
-> $ git send-email --to linux-omap at vger.kernel.org --from saaguirre at ti.com
-> 0001-mypatch.patch
-> 
-> This will forge git to add the From: Sergio Aguirre <saaguirre@ti.com>
-> when sending the patches
-
-Great!
-
-Thanks, Anand and Felipe. I'll definitely experiment with those 2.
-
-Regards,
-Sergio
-
-> 
-> --
-> balbi
+diff --git a/arch/arm/mach-sa1100/cpu-sa1100.c b/arch/arm/mach-sa1100/cpu-sa1100.c
+index ef81787..a98712e 100644
+--- a/arch/arm/mach-sa1100/cpu-sa1100.c
++++ b/arch/arm/mach-sa1100/cpu-sa1100.c
+@@ -184,16 +184,15 @@ static int sa1100_target(struct cpufreq_policy *policy,
+ {
+ 	unsigned int cur = sa11x0_getspeed(0);
+ 	unsigned int new_ppcr;
+-
+ 	struct cpufreq_freqs freqs;
++
++	new_ppcr = sa11x0_freq_to_ppcr(target_freq);
+ 	switch(relation){
+ 	case CPUFREQ_RELATION_L:
+-		new_ppcr = sa11x0_freq_to_ppcr(target_freq);
+ 		if (sa11x0_ppcr_to_freq(new_ppcr) > policy->max)
+ 			new_ppcr--;
+ 		break;
+ 	case CPUFREQ_RELATION_H:
+-		new_ppcr = sa11x0_freq_to_ppcr(target_freq);
+ 		if ((sa11x0_ppcr_to_freq(new_ppcr) > target_freq) &&
+ 		    (sa11x0_ppcr_to_freq(new_ppcr - 1) >= policy->min))
+ 			new_ppcr--;
+-- 
+1.7.0.1
