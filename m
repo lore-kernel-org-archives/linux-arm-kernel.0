@@ -1,81 +1,33 @@
-From: scott@jumpnowtek.com (Scott Ellis)
-Date: Fri, 12 Mar 2010 10:21:47 -0500
-Subject: [PATCH 2/6] SPI omap2_mcspi: Add max_clk_div field to mcspi
-	platform config
-Message-ID: <1268407307.14445.51.camel@quad>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Mar 2010 15:51:56 +0000
+Subject: Wrong cache flush function used in
+	arch/arm/boot/compressed/head.S?
+In-Reply-To: <20100312100511.GQ19843@pengutronix.de>
+References: <20100312100511.GQ19843@pengutronix.de>
+Message-ID: <1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The McSPI_CHxCONF.CLKD register field has different limits for the
-OMAP3 then the OMAP24xx. As per recommendation from the linux-omap
-list, added a field for max_clk_div to the platform data for use in 
-omap2_mcspi.c.
+On Fri, 2010-03-12 at 10:05 +0000, Sascha Hauer wrote:
+> 0e056f20f18d0efa5da920f3cf8532adc56d5779 contains the following hunk:
+> 
+>                 .word   0x00060000              @ ARMv5TEJ
+>                 .word   0x000f0000
+> -               b       __armv4_mmu_cache_on
+> -               b       __armv4_mmu_cache_off
+> -               b       __armv5tej_mmu_cache_flush
+> +               W(b)    __armv4_mmu_cache_on
+> +               W(b)    __armv4_mmu_cache_off
+> +               W(b)    __armv4_mmu_cache_flush
+> 
+> Is this intentional? I do not see any problems in my kernel, but I
+> use the same code in my bootloader and it doesn't seem to work correctly
+> on my arm926 based system.
 
-Used in a subsequent patch. 
+It wasn't intentional. I think I got it wrong when trying to solve a
+merge conflict and I just added the original hunk.
 
-Signed-off-by: Scott Ellis <scott@jumpnowtek.com>
+Thanks.
 
- arch/arm/mach-omap2/devices.c           |   16 ++++++++++++++++
- arch/arm/plat-omap/include/plat/mcspi.h |    1 +
- 2 files changed, 17 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 23e4d77..d4ad126 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -302,6 +302,11 @@ static inline void omap_init_sti(void) {}
- 
- static struct omap2_mcspi_platform_config omap2_mcspi1_config = {
- 	.num_cs		= 4,
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-+	.max_clk_div	= 0x0c,
-+#else
-+	.max_clk_div	= 0x0f,
-+#endif
- };
- 
- static struct resource omap2_mcspi1_resources[] = {
-@@ -324,6 +329,11 @@ static struct platform_device omap2_mcspi1 = {
- 
- static struct omap2_mcspi_platform_config omap2_mcspi2_config = {
- 	.num_cs		= 2,
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-+	.max_clk_div	= 0x0c,
-+#else
-+	.max_clk_div	= 0x0f,
-+#endif
- };
- 
- static struct resource omap2_mcspi2_resources[] = {
-@@ -348,6 +358,11 @@ static struct platform_device omap2_mcspi2 = {
- 	defined(CONFIG_ARCH_OMAP4)
- static struct omap2_mcspi_platform_config omap2_mcspi3_config = {
- 	.num_cs		= 2,
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-+	.max_clk_div	= 0x0c,
-+#else
-+	.max_clk_div	= 0x0f,
-+#endif
- };
- 
- static struct resource omap2_mcspi3_resources[] = {
-@@ -372,6 +387,7 @@ static struct platform_device omap2_mcspi3 = {
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- static struct omap2_mcspi_platform_config omap2_mcspi4_config = {
- 	.num_cs		= 1,
-+	.max_clk_div	= 0x0c,
- };
- 
- static struct resource omap2_mcspi4_resources[] = {
-diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
-index 1254e49..9fadddd 100644
---- a/arch/arm/plat-omap/include/plat/mcspi.h
-+++ b/arch/arm/plat-omap/include/plat/mcspi.h
-@@ -3,6 +3,7 @@
- 
- struct omap2_mcspi_platform_config {
- 	unsigned short	num_cs;
-+	unsigned short	max_clk_div;
- };
- 
- struct omap2_mcspi_device_config {
+-- 
+Catalin
