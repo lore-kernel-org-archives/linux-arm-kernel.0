@@ -1,117 +1,21 @@
-From: benpicco@zedat.fu-berlin.de (Benjamin Valentin)
-Date: Fri, 12 Mar 2010 11:02:41 +0100
-Subject: [PATCH 2/2] Quick fix for the audio clocks on SAM9-L9261
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Mar 2010 10:04:54 +0000
+Subject: [PATCH 1/2] Add support for Olimex SAM9-L9261 SBC
 In-Reply-To: <20100312110032.2e57fdce@rechenknecht2k7>
 References: <20100312105817.4392b594@rechenknecht2k7>
 	<20100312110032.2e57fdce@rechenknecht2k7>
-Message-ID: <20100312110241.3d97237b@rechenknecht2k7>
+Message-ID: <20100312100454.GA29306@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dimitar Dimitrov <dimitar@olimex.com>
+On Fri, Mar 12, 2010 at 11:00:32AM +0100, Benjamin Valentin wrote:
+> diff -urpN -x CVS linux-2.6.34-rc1/arch/arm/configs/sam9_l9261_defconfig linux-2.6.34-rc1-olimex/arch/arm/configs/sam9_l9261_defconfig
+> --- linux-2.6.34-rc1/arch/arm/configs/sam9_l9261_defconfig	1970-01-01 02:00:00.000000000 +0200
+> +++ linux-2.6.34-rc1-olimex/arch/arm/configs/sam9_l9261_defconfig	2008-10-28 06:08:46.000000000 +0200
+> @@ -0,0 +1,1606 @@
 
->From 10a85229b2357c89d5170efde5ac0e1cba4c9f9e Mon Sep 17 00:00:00 2001
-From: Dimitar Dimitrov <dimitar@olimex.com>
-Date: Wed, 27 May 2009 08:11:37 +0300
-Subject: [PATCH] Quick fix for the audio clocks on SAM9-L9261
+Please think about your reviewers when you send patches - do you think
+it's reasonable to expect reviewers to scroll through 1600 lines before
+they get to something interesting to read?
 
-This patch together with support from SAM9-L9261 hardware fix an issue with
-audio clocks. AT73C213 needs MCLK and BCLK with equal phase. The MCLK from
-AT91SAM9XXX clock output and BCLK from the SSC TK clock output are not
-phase-synchronized. Thus the SAM9-L9261 board provides external hardware
-divison by 8 from MCLK to BCLK, ensuring zero phase difference.
-
-See: http://www.at91.com/phpbb/viewtopic.php?t=2633
----
- sound/spi/at73c213.c |   54 ++++++++++++++++++++++++++++++++++++++-----------
- 1 files changed, 42 insertions(+), 12 deletions(-)
-
-diff --git a/sound/spi/at73c213.c b/sound/spi/at73c213.c
-index 4c7b051..325e534 100644
---- a/sound/spi/at73c213.c
-+++ b/sound/spi/at73c213.c
-@@ -29,6 +29,8 @@
- 
- #include <linux/atmel-ssc.h>
- 
-+#include <asm/mach-types.h>
-+
- #include <linux/spi/spi.h>
- #include <linux/spi/at73c213.h>
- 
-@@ -114,7 +116,11 @@ snd_at73c213_write_reg(struct snd_at73c213 *chip, u8 reg, u8 val)
- static struct snd_pcm_hardware snd_at73c213_playback_hw = {
- 	.info		= SNDRV_PCM_INFO_INTERLEAVED |
- 			  SNDRV_PCM_INFO_BLOCK_TRANSFER,
-+#ifdef __BIG_ENDIAN
- 	.formats	= SNDRV_PCM_FMTBIT_S16_BE,
-+#else
-+	.formats	= SNDRV_PCM_FMTBIT_S16_LE,
-+#endif
- 	.rates		= SNDRV_PCM_RATE_CONTINUOUS,
- 	.rate_min	= 8000,  /* Replaced by chip->bitrate later. */
- 	.rate_max	= 50000, /* Replaced by chip->bitrate later. */
-@@ -144,7 +150,8 @@ static int snd_at73c213_set_bitrate(struct snd_at73c213 *chip)
- 	 * as practical to the desired target rate.
- 	 *
- 	 * The DAC master clock (MCLK) is programmable, and is either 256
--	 * or (not here) 384 times the I2S output clock (BCLK).
-+	 * or (not here) 384 times the I2S frame clock (LRC), that is
-+	 * 8 or 12 times the output bit clock (BCLK).
- 	 */
- 
- 	/* SSC clock / (bitrate * stereo * 16-bit). */
-@@ -747,17 +754,40 @@ cleanup:
-  */
- static int __devinit snd_at73c213_ssc_init(struct snd_at73c213 *chip)
- {
--	/*
--	 * Continuous clock output.
--	 * Starts on falling TF.
--	 * Delay 1 cycle (1 bit).
--	 * Periode is 16 bit (16 - 1).
--	 */
--	ssc_writel(chip->ssc->regs, TCMR,
--			SSC_BF(TCMR_CKO, 1)
--			| SSC_BF(TCMR_START, 4)
--			| SSC_BF(TCMR_STTDLY, 1)
--			| SSC_BF(TCMR_PERIOD, 16 - 1));
-+	if (machine_is_sam9_l9261()) {
-+		/*
-+		 * dimitar at olimex.com : AT73C213 needs MCLK and BCLK with equal
-+		 * phase. The MCLK from AT91SAM9XXX clock output and BCLK from
-+		 * the SSC TK clock output are not phase-synchronized. Thus
-+		 * the SAM9-L9261 board provides external hardware divison by
-+		 * 8 from MCLK to BCLK, ensuring zero phase difference.
-+		 * See: http://www.at91.com/phpbb/viewtopic.php?t=2633
-+		 *
-+		 * TK is clock input.
-+		 * Clock source is TK pin.
-+		 * Starts on falling TF.
-+		 * Delay 1 cycle (1 bit).
-+		 * Period is 16 bit (16 - 1).
-+		 */
-+		ssc_writel(chip->ssc->regs, TCMR,
-+				SSC_BF(TCMR_CKS, 2)
-+				| SSC_BF(TCMR_CKO, 0)
-+				| SSC_BF(TCMR_START, 4)
-+				| SSC_BF(TCMR_STTDLY, 1)
-+				| SSC_BF(TCMR_PERIOD, 16 - 1));
-+	} else {
-+		/*
-+		 * Continuous clock output.
-+		 * Starts on falling TF.
-+		 * Delay 1 cycle (1 bit).
-+		 * Period is 16 bit (16 - 1).
-+		 */
-+		ssc_writel(chip->ssc->regs, TCMR,
-+				SSC_BF(TCMR_CKO, 1)
-+				| SSC_BF(TCMR_START, 4)
-+				| SSC_BF(TCMR_STTDLY, 1)
-+				| SSC_BF(TCMR_PERIOD, 16 - 1));
-+	}
- 	/*
- 	 * Data length is 16 bit (16 - 1).
- 	 * Transmit MSB first.
--- 
-1.5.6.1
+Always split defconfig patches into a separate patch.
