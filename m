@@ -1,100 +1,42 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 14 Mar 2010 11:29:02 +0200
-Subject: [PATCH 1/5] [ARM] pxa/cm-x300.c: add battery charger support
-In-Reply-To: <1268127832-20563-1-git-send-email-grinberg@compulab.co.il>
-References: <1268127832-20563-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4B9CAC5E.1020709@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Mar 2010 15:06:51 +0000
+Subject: scary warning in atags.c -- 2.6.34-rc1
+In-Reply-To: <201003131415.00156.marek.vasut@gmail.com>
+References: <20100313103913.GA9812@elf.ucw.cz>
+	<201003131415.00156.marek.vasut@gmail.com>
+Message-ID: <20100313150651.GB4627@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Sat, Mar 13, 2010 at 02:15:00PM +0100, Marek Vasut wrote:
+> Dne So 13. b?ezna 2010 11:39:13 Pavel Machek napsal(a):
+> > Hi!
+> > 
+> > Scary warning on HTC Dream:
+> > 
+> > [    0.220000] ------------[ cut here ]------------
+> > [    0.220000] WARNING: at arch/arm/kernel/atags.c:60
+> > init_atags_procfs+0x5c/0xe8()
+> > [    0.220000] Modules linked in:
+> > [    0.220000] [<c0025250>] (unwind_backtrace+0x0/0xdc) from
+> > [<c0032e1c>] (warn_slowp)
+> > [    0.220000] [<c0032e1c>] (warn_slowpath_common+0x4c/0x80) from
+> > [<c000b4b8>] (init_)
+> > [    0.220000] [<c000b4b8>] (init_atags_procfs+0x5c/0xe8) from
+> > [<c002033c>] (do_one_i)
+> > [    0.220000] [<c002033c>] (do_one_initcall+0x5c/0x1bc) from
+> > [<c0008584>] (kernel_in)
+> > [    0.220000] [<c0008584>] (kernel_init+0x94/0x148) from [<c00217b4>]
+> > (kernel_thread)
+> > [    0.220000] ---[ end trace 1b75b31a2719ed1c ]---
+> > [    0.230000] bio: create slab <bio-0> at 0
+> > [    0.230000] Switching to clocksource dg_timer
+> > 
+> > Hmm, what are atags anyway?
+> > 							Pavel
+> > 
+> Atags are data passed by the bootloader to kernel (like memory size,
+> machine id ...).
 
-Any update on this?
-
-On 03/09/10 11:43, Igor Grinberg wrote:
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/mach-pxa/cm-x300.c |   57 ++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 56 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index d37cfa1..0e538d8 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -30,6 +30,8 @@
->  #include <linux/i2c/pca953x.h>
->  
->  #include <linux/mfd/da903x.h>
-> +#include <linux/power_supply.h>
-> +#include <linux/apm-emulation.h>
->  
->  #include <linux/spi/spi.h>
->  #include <linux/spi/spi_gpio.h>
-> @@ -584,12 +586,65 @@ static void __init cm_x300_init_rtc(void)
->  static inline void cm_x300_init_rtc(void) {}
->  #endif
->  
-> +/* Battery */
-> +struct power_supply_info cm_x300_psy_info = {
-> +	.name = "battery",
-> +	.technology = POWER_SUPPLY_TECHNOLOGY_LIPO,
-> +	.voltage_max_design = 4200000,
-> +	.voltage_min_design = 3000000,
-> +	.use_for_apm = 1,
-> +};
-> +
-> +static void cm_x300_battery_low(void)
-> +{
-> +#if defined(CONFIG_APM_EMULATION)
-> +	apm_queue_event(APM_LOW_BATTERY);
-> +#endif
-> +}
-> +
-> +static void cm_x300_battery_critical(void)
-> +{
-> +#if defined(CONFIG_APM_EMULATION)
-> +	apm_queue_event(APM_CRITICAL_SUSPEND);
-> +#endif
-> +}
-> +
-> +struct da9030_battery_info cm_x300_battery_info = {
-> +	.battery_info = &cm_x300_psy_info,
-> +
-> +	.charge_milliamp = 1000,
-> +	.charge_millivolt = 4200,
-> +
-> +	.vbat_low = 3600,
-> +	.vbat_crit = 3400,
-> +	.vbat_charge_start = 4100,
-> +	.vbat_charge_stop = 4200,
-> +	.vbat_charge_restart = 4000,
-> +
-> +	.vcharge_min = 3200,
-> +	.vcharge_max = 5500,
-> +
-> +	.tbat_low = 197,
-> +	.tbat_high = 78,
-> +	.tbat_restart = 100,
-> +
-> +	.batmon_interval = 0,
-> +
-> +	.battery_low = cm_x300_battery_low,
-> +	.battery_critical = cm_x300_battery_critical,
-> +};
-> +
->  /* DA9030 */
->  struct da903x_subdev_info cm_x300_da9030_subdevs[] = {
->  	{
->  		.name = "da903x-backlight",
->  		.id = DA9030_ID_WLED,
-> -	}
-> +	},
-> +	{
-> +		.name = "da903x-battery",
-> +		.id = DA9030_ID_BAT,
-> +		.platform_data = &cm_x300_battery_info,
-> +	},
->  };
->  
->  static struct da903x_platform_data cm_x300_da9030_info = {
->   
+Your bootloader is broken - it doesn't terminate the ATAG list correctly.
+You'd have thought that getting two values correct would be simple...
