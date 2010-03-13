@@ -1,48 +1,144 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 13 Mar 2010 12:19:37 +0530
-Subject: [PATCH 00/10] ARM: ftrace: cleanups, Thumb-2, and dynamic ftrace (v2)
-Message-ID: <1268462987-8271-1-git-send-email-rabin@rab.in>
+Date: Sat, 13 Mar 2010 12:19:38 +0530
+Subject: [PATCH 01/10] ARM: ftrace: clean up mcount assembly indentation
+In-Reply-To: <1268462987-8271-1-git-send-email-rabin@rab.in>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+Message-ID: <1268462987-8271-2-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: Fixes as per review comments.  The only code changes are the #error in 0004
-and the removal of the #ifdef in 0009.  The rest are comments and commit
-message rewording/expansion.
+The mcount implementation currently uses a different indentation style
+from the rest of the file (and the rest of the ARM assembly in the
+kernel).  Clean it up.
 
-This series contains fixes and improvements to the ARM ftrace support.  It adds
-Thumb-2 support and re-implements the dynamic ftrace support.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/kernel/entry-common.S |   88 ++++++++++++++++++++--------------------
+ 1 files changed, 44 insertions(+), 44 deletions(-)
 
-"ftrace: allow building without frame pointers" and "ftrace: pass KBUILD_CFLAGS
-to record_mcount.pl" are non-ARM-specific ftrace patches which are required to
-support the ARM functionality.
-
-Cleanups / docs:
-
-  ARM: ftrace: clean up mcount assembly indentation
-  ARM: ftrace: document mcount formats
-
-Thumb-2:
-
-  ftrace: allow building without frame pointers
-  ARM: ftrace: allow building without frame pointers
-  ARM: ftrace: add ENDPROC annotations
-  ARM: ftrace: add Thumb-2 support
-
-Dynamic ftrace:
-
-  ftrace: pass KBUILD_CFLAGS to record_mcount.pl
-  ARM: ftrace: fix and update dynamic ftrace
-  ARM: ftrace: add Thumb-2 support to dynamic ftrace
-  ARM: ftrace: enable dynamic ftrace
-
- Makefile                       |    7 ++
- arch/arm/Kconfig               |    2 +
- arch/arm/Kconfig.debug         |    5 +
- arch/arm/include/asm/ftrace.h  |   20 ++++-
- arch/arm/kernel/armksyms.c     |    2 +
- arch/arm/kernel/entry-common.S |  178 +++++++++++++++++++++++++++-----------
- arch/arm/kernel/ftrace.c       |  188 +++++++++++++++++++++++++++++----------
- kernel/trace/Kconfig           |    2 +-
- scripts/Makefile.build         |    3 +-
- scripts/recordmcount.pl        |    2 +
- 10 files changed, 307 insertions(+), 102 deletions(-)
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 2c1db77..0b042bd 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -94,73 +94,73 @@ ENDPROC(ret_from_fork)
+ #ifdef CONFIG_FUNCTION_TRACER
+ #ifdef CONFIG_DYNAMIC_FTRACE
+ ENTRY(mcount)
+-	stmdb sp!, {r0-r3, lr}
+-	mov r0, lr
+-	sub r0, r0, #MCOUNT_INSN_SIZE
++	stmdb	sp!, {r0-r3, lr}
++	mov	r0, lr
++	sub	r0, r0, #MCOUNT_INSN_SIZE
+ 
+ 	.globl mcount_call
+ mcount_call:
+-	bl ftrace_stub
+-	ldr lr, [fp, #-4]			@ restore lr
+-	ldmia sp!, {r0-r3, pc}
++	bl	ftrace_stub
++	ldr	lr, [fp, #-4]			@ restore lr
++	ldmia	sp!, {r0-r3, pc}
+ 
+ ENTRY(ftrace_caller)
+-	stmdb sp!, {r0-r3, lr}
+-	ldr r1, [fp, #-4]
+-	mov r0, lr
+-	sub r0, r0, #MCOUNT_INSN_SIZE
++	stmdb	sp!, {r0-r3, lr}
++	ldr	r1, [fp, #-4]
++	mov	r0, lr
++	sub	r0, r0, #MCOUNT_INSN_SIZE
+ 
+ 	.globl ftrace_call
+ ftrace_call:
+-	bl ftrace_stub
+-	ldr lr, [fp, #-4]			@ restore lr
+-	ldmia sp!, {r0-r3, pc}
++	bl	ftrace_stub
++	ldr	lr, [fp, #-4]			@ restore lr
++	ldmia	sp!, {r0-r3, pc}
+ 
+ #else
+ 
+ ENTRY(__gnu_mcount_nc)
+-	stmdb sp!, {r0-r3, lr}
+-	ldr r0, =ftrace_trace_function
+-	ldr r2, [r0]
+-	adr r0, ftrace_stub
+-	cmp r0, r2
+-	bne gnu_trace
+-	ldmia sp!, {r0-r3, ip, lr}
+-	mov pc, ip
++	stmdb	sp!, {r0-r3, lr}
++	ldr	r0, =ftrace_trace_function
++	ldr	r2, [r0]
++	adr	r0, ftrace_stub
++	cmp	r0, r2
++	bne	gnu_trace
++	ldmia	sp!, {r0-r3, ip, lr}
++	mov	pc, ip
+ 
+ gnu_trace:
+-	ldr r1, [sp, #20]			@ lr of instrumented routine
+-	mov r0, lr
+-	sub r0, r0, #MCOUNT_INSN_SIZE
+-	mov lr, pc
+-	mov pc, r2
+-	ldmia sp!, {r0-r3, ip, lr}
+-	mov pc, ip
++	ldr	r1, [sp, #20]			@ lr of instrumented routine
++	mov	r0, lr
++	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mov	lr, pc
++	mov	pc, r2
++	ldmia	sp!, {r0-r3, ip, lr}
++	mov	pc, ip
+ 
+ ENTRY(mcount)
+-	stmdb sp!, {r0-r3, lr}
+-	ldr r0, =ftrace_trace_function
+-	ldr r2, [r0]
+-	adr r0, ftrace_stub
+-	cmp r0, r2
+-	bne trace
+-	ldr lr, [fp, #-4]			@ restore lr
+-	ldmia sp!, {r0-r3, pc}
++	stmdb	sp!, {r0-r3, lr}
++	ldr	r0, =ftrace_trace_function
++	ldr	r2, [r0]
++	adr	r0, ftrace_stub
++	cmp	r0, r2
++	bne	trace
++	ldr	lr, [fp, #-4]			@ restore lr
++	ldmia	sp!, {r0-r3, pc}
+ 
+ trace:
+-	ldr r1, [fp, #-4]			@ lr of instrumented routine
+-	mov r0, lr
+-	sub r0, r0, #MCOUNT_INSN_SIZE
+-	mov lr, pc
+-	mov pc, r2
+-	ldr lr, [fp, #-4]			@ restore lr
+-	ldmia sp!, {r0-r3, pc}
++	ldr	r1, [fp, #-4]			@ lr of instrumented routine
++	mov	r0, lr
++	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mov	lr, pc
++	mov	pc, r2
++	ldr	lr, [fp, #-4]			@ restore lr
++	ldmia	sp!, {r0-r3, pc}
+ 
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ 
+ 	.globl ftrace_stub
+ ftrace_stub:
+-	mov pc, lr
++	mov	pc, lr
+ 
+ #endif /* CONFIG_FUNCTION_TRACER */
+ 
+-- 
+1.7.0
