@@ -1,25 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 12 Mar 2010 16:44:07 -0500 (EST)
-Subject: [PATCH 03/11] Thumb-2: Implementation of the unified start-up and
-	exceptions code
-In-Reply-To: <20100312211614.GC1146@n2100.arm.linux.org.uk>
-References: <20090602130549.12732.15147.stgit@pc1117.cambridge.arm.com>
-	<4B9A7A3C.9000304@users.sourceforge.net>
-	<20100312211614.GC1146@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1003121640280.31128@xanadu.home>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 13 Mar 2010 12:19:37 +0530
+Subject: [PATCH 00/10] ARM: ftrace: cleanups, Thumb-2, and dynamic ftrace (v2)
+Message-ID: <1268462987-8271-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Mar 2010, Russell King - ARM Linux wrote:
+v2: Fixes as per review comments.  The only code changes are the #error in 0004
+and the removal of the #ifdef in 0009.  The rest are comments and commit
+message rewording/expansion.
 
-> So yes, your patch is absolutely required - all ARMv5 and below are
-> facing a hazard as the kernel stands.  It might explain some of the
-> weird behaviours people have been reporting as well.
-> 
-> Please cleanup the description and submit to the patch system.
+This series contains fixes and improvements to the ARM ftrace support.  It adds
+Thumb-2 support and re-implements the dynamic ftrace support.
 
-And please add a small comment along side the otherwise seemingly 
-useless nop.
+"ftrace: allow building without frame pointers" and "ftrace: pass KBUILD_CFLAGS
+to record_mcount.pl" are non-ARM-specific ftrace patches which are required to
+support the ARM functionality.
 
+Cleanups / docs:
 
-Nicolas
+  ARM: ftrace: clean up mcount assembly indentation
+  ARM: ftrace: document mcount formats
+
+Thumb-2:
+
+  ftrace: allow building without frame pointers
+  ARM: ftrace: allow building without frame pointers
+  ARM: ftrace: add ENDPROC annotations
+  ARM: ftrace: add Thumb-2 support
+
+Dynamic ftrace:
+
+  ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+  ARM: ftrace: fix and update dynamic ftrace
+  ARM: ftrace: add Thumb-2 support to dynamic ftrace
+  ARM: ftrace: enable dynamic ftrace
+
+ Makefile                       |    7 ++
+ arch/arm/Kconfig               |    2 +
+ arch/arm/Kconfig.debug         |    5 +
+ arch/arm/include/asm/ftrace.h  |   20 ++++-
+ arch/arm/kernel/armksyms.c     |    2 +
+ arch/arm/kernel/entry-common.S |  178 +++++++++++++++++++++++++++-----------
+ arch/arm/kernel/ftrace.c       |  188 +++++++++++++++++++++++++++++----------
+ kernel/trace/Kconfig           |    2 +-
+ scripts/Makefile.build         |    3 +-
+ scripts/recordmcount.pl        |    2 +
+ 10 files changed, 307 insertions(+), 102 deletions(-)
