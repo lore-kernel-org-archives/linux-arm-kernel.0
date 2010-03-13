@@ -1,22 +1,16 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 13 Mar 2010 12:17:59 +0100
-Subject: staging/dream: fix gpio_input compilation
-Message-ID: <20100313111759.GA2317@elf.ucw.cz>
+Date: Sat, 13 Mar 2010 13:27:54 +0100
+Subject: 2.6.34-rc1 on zaurus: does it boot for you?
+Message-ID: <20100313122754.GD2192@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-gpio_* drivers still need drivers in staging. Yes, that will need to
-be fixed, but at least fix compilation for now.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/drivers/staging/dream/Makefile b/drivers/staging/dream/Makefile
-index 2b79151..43d1eec 100644
---- a/drivers/staging/dream/Makefile
-+++ b/drivers/staging/dream/Makefile
-@@ -1,3 +1,4 @@
-+EXTRA_CFLAGS=-Idrivers/staging/dream/include
- obj-$(CONFIG_MSM_ADSP)		+= qdsp5/ smd/
- obj-$(CONFIG_MSM_CAMERA)	+= camera/
- obj-$(CONFIG_INPUT_GPIO)	+= gpio_axis.o gpio_event.o gpio_input.o gpio_matrix.o gpio_output.o
+I tried compiling 2.6.34-rc1, and it does not boot :-(. It does not
+seem to even reset the framebuffer (I'm using kexec -- so it stays
+stuck on on previous screen).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
