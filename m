@@ -1,39 +1,69 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sat, 13 Mar 2010 12:42:42 -0500
-Subject: [PATCH 08/10] ARM: ftrace: fix and update dynamic ftrace
-In-Reply-To: <1268462987-8271-9-git-send-email-rabin@rab.in>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-9-git-send-email-rabin@rab.in>
-Message-ID: <1268502162.3366.10.camel@localhost>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 13 Mar 2010 23:00:55 +0100
+Subject: [PATCH] Voipac PXA270: UDC and UHC support
+In-Reply-To: <87hbol77lp.fsf@free.fr>
+References: <201003100543.00221.marek.vasut@gmail.com>
+	<201003101243.54008.marek.vasut@gmail.com> <87hbol77lp.fsf@free.fr>
+Message-ID: <201003132300.55480.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-03-13 at 12:19 +0530, Rabin Vincent wrote:
-> This adds mcount recording and updates dynamic ftrace for ARM to work
-> with the new ftrace dyamic tracing implementation.  It also adds support
-> for the mcount format used by newer ARM compilers.
+Dne P? 12. b?ezna 2010 18:49:54 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
+> >> Hi,
+> >> this patch adds UDC and UHC support (and formating fix, I hope you dont
+> >>  mind Eric).
+> >>
+> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >
+> > revised patch
 > 
-> With dynamic tracing, mcount() is implemented as a nop.  Callsites are
-> patched on startup with nops, and dynamically patched to call to the
-> ftrace_caller() routine as needed.
+> snip
 > 
-> Signed-off-by: Rabin Vincent <rabin@rab.i
-
-
-> diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
-> index f3c9c0a..319af1e 100755
-> --- a/scripts/recordmcount.pl
-> +++ b/scripts/recordmcount.pl
-> @@ -268,6 +268,8 @@ if ($arch eq "x86_64") {
->  } elsif ($arch eq "arm") {
->      $alignment = 2;
->      $section_type = '%progbits';
-> +    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24)" .
-> +			"\\s+(__gnu_mcount_nc|mcount)\$";
->  
->  } elsif ($arch eq "ia64") {
->      $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s_mcount\$";
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
+> > +/***********************************************************************
+> >******* + * USB Gadget
+> > +
+> > *************************************************************************
+> >*****/ +#if
+> > defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODUL
+> >E) +static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+> > +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
+> > +};
+> 
+> That won't work I think. gpio_vbus is not dealt with by pxa27x_udc.
+> The way to go would rather be something like :
+> 
+> #include <linux/usb/gpio_vbus.h>
+> static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+>         .gpio_pullup      = <to be filled in>,
+> };
+> 
+> struct gpio_vbus_mach_info gpio_vbus_data = {
+>         .gpio_vbus = GPIO41_VPAC270_UDC_DETECT,
+>         .gpio_vbus_inverted = 0,
+>         .gpio_pullup = -1,
+> };
+> 
+> Add add a "gpio_vbus" device, with platform_data set to gpio_vbus_data.
+> 
+> As a matter of fact, there are not a lot of cases where an UDC can work
+>  without : - a GPIO for pullup
+>  - or the udc_command() callback implemented
+> The only working case I see is a hardwired D+ pin to the Vdd, but that
+>  seems an exterme in board design I've never met before. This lets me think
+>  you should find and the add the correct GPIO for pullup.
+> 
+> Cheers.
+> 
+> --
+> Robert
+> 
+Updated patch attached.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-Voipac-PXA270-UDC-and-UHC-support.patch
+Type: text/x-patch
+Size: 4188 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100313/3ecfd342/attachment.bin>
