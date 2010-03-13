@@ -1,165 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 13 Mar 2010 13:38:41 +0100
-Subject: Dream: Hook up trackball to drivers/staging interface
-Message-ID: <20100313123841.GE2192@elf.ucw.cz>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 13 Mar 2010 14:15:00 +0100
+Subject: scary warning in atags.c -- 2.6.34-rc1
+In-Reply-To: <20100313103913.GA9812@elf.ucw.cz>
+References: <20100313103913.GA9812@elf.ucw.cz>
+Message-ID: <201003131415.00156.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-With this and fixes from -rc4, applied on top of -working-mmc tree, I
-get working trackball. (Tested with cat, not evtest).
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/arch/arm/mach-msm/board-dream.c b/arch/arm/mach-msm/board-dream.c
-index d40ce48..f48c797 100644
---- a/arch/arm/mach-msm/board-dream.c
-+++ b/arch/arm/mach-msm/board-dream.c
-@@ -31,6 +31,132 @@
- #include "board-dream.h"
- #include "proc_comm.h"
- 
-+#include <linux/gpio.h>
-+
-+/*
-+ * Input devices
-+ */
-+
-+#ifndef CONFIG_INPUT_GPIO
-+#error Gpio input is very recommended on Dream
-+#else
-+#include "../../../drivers/staging/dream/include/linux/gpio_event.h"
-+struct dream_axis_info {
-+	struct gpio_event_axis_info info;
-+	uint16_t in_state;
-+	uint16_t out_state;
-+};
-+static bool nav_just_on;
-+static int nav_on_jiffies;
-+
-+uint16_t dream_axis_map(struct gpio_event_axis_info *info, uint16_t in)
-+{
-+	struct dream_axis_info *ai = container_of(info, struct dream_axis_info, info);
-+	uint16_t out = ai->out_state;
-+
-+	if (nav_just_on) {
-+		if (jiffies == nav_on_jiffies || jiffies == nav_on_jiffies + 1)
-+			goto ignore;
-+		nav_just_on = 0;
-+	}
-+	if((ai->in_state ^ in) & 1)
-+		out--;
-+	if((ai->in_state ^ in) & 2)
-+		out++;
-+	ai->out_state = out;
-+ignore:
-+	ai->in_state = in;
-+	return out;
-+}
-+
-+int dream_nav_power(const struct gpio_event_platform_data *pdata, bool on)
-+{
-+	gpio_set_value(DREAM_GPIO_JOG_EN, on);
-+	if (on) {
-+		nav_just_on = 1;
-+		nav_on_jiffies = jiffies;
-+	}
-+	return 0;
-+}
-+
-+static uint32_t dream_4_x_axis_gpios[] = {
-+	DREAM_4_BALL_LEFT_0, DREAM_4_BALL_RIGHT_0
-+};
-+static uint32_t dream_5_x_axis_gpios[] = {
-+	DREAM_5_BALL_LEFT_0, DREAM_5_BALL_RIGHT_0
-+};
-+
-+static struct dream_axis_info dream_x_axis = {
-+	.info = {
-+		.info.func = gpio_event_axis_func,
-+		.count = ARRAY_SIZE(dream_5_x_axis_gpios),
-+		.type = EV_REL,
-+		.code = REL_X,
-+		.decoded_size = 1U << ARRAY_SIZE(dream_5_x_axis_gpios),
-+		.map = dream_axis_map,
-+		.gpio = dream_5_x_axis_gpios,
-+		.flags = GPIOEAF_PRINT_UNKNOWN_DIRECTION /*| GPIOEAF_PRINT_RAW | GPIOEAF_PRINT_EVENT */
-+	}
-+};
-+
-+static uint32_t dream_4_y_axis_gpios[] = {
-+	DREAM_4_BALL_UP_0, DREAM_4_BALL_DOWN_0
-+};
-+static uint32_t dream_5_y_axis_gpios[] = {
-+	DREAM_5_BALL_UP_0, DREAM_5_BALL_DOWN_0
-+};
-+
-+static struct dream_axis_info dream_y_axis = {
-+	.info = {
-+		.info.func = gpio_event_axis_func,
-+		.count = ARRAY_SIZE(dream_5_y_axis_gpios),
-+		.type = EV_REL,
-+		.code = REL_Y,
-+		.decoded_size = 1U << ARRAY_SIZE(dream_5_y_axis_gpios),
-+		.map = dream_axis_map,
-+		.gpio = dream_5_y_axis_gpios,
-+		.flags = GPIOEAF_PRINT_UNKNOWN_DIRECTION /*| GPIOEAF_PRINT_RAW | GPIOEAF_PRINT_EVENT */
-+	}
-+};
-+
-+static struct gpio_event_direct_entry dream_nav_buttons[] = {
-+	{ DREAM_GPIO_NAVI_ACT_N, BTN_MOUSE }
-+};
-+
-+static struct gpio_event_input_info dream_nav_button_info = {
-+	.info.func = gpio_event_input_func,
-+	.flags = 0,
-+	.type = EV_KEY,
-+	.keymap = dream_nav_buttons,
-+	.keymap_size = ARRAY_SIZE(dream_nav_buttons)
-+};
-+
-+static struct gpio_event_info *dream_nav_info[] = {
-+	&dream_x_axis.info.info,
-+	&dream_y_axis.info.info,
-+	&dream_nav_button_info.info
-+};
-+
-+static struct gpio_event_platform_data dream_nav_data = {
-+	.name = "dream-nav",
-+	.info = dream_nav_info,
-+	.info_count = ARRAY_SIZE(dream_nav_info),
-+	.power = dream_nav_power,
-+};
-+
-+static struct platform_device dream_nav_device = {
-+	.name = GPIO_EVENT_DEV_NAME,
-+	.id = 2,
-+	.dev = {
-+		.platform_data = &dream_nav_data,
-+	},
-+};
-+#endif
-+
-+/*
-+ * Core stuff
-+ */
-+
- extern int dream_init_mmc(unsigned int);
- 
- static struct platform_device *devices[] __initdata = {
-@@ -39,6 +165,9 @@ static struct platform_device *devices[] __initdata = {
- 	&msm_device_nand,
- 	&msm_device_hsusb,
- 	&msm_device_i2c,
-+#ifdef CONFIG_INPUT_GPIO
-+	&dream_nav_device,
-+#endif
- };
- 
- extern struct sys_timer msm_timer;
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Dne So 13. b?ezna 2010 11:39:13 Pavel Machek napsal(a):
+> Hi!
+> 
+> Scary warning on HTC Dream:
+> 
+> [    0.220000] ------------[ cut here ]------------
+> [    0.220000] WARNING: at arch/arm/kernel/atags.c:60
+> init_atags_procfs+0x5c/0xe8()
+> [    0.220000] Modules linked in:
+> [    0.220000] [<c0025250>] (unwind_backtrace+0x0/0xdc) from
+> [<c0032e1c>] (warn_slowp)
+> [    0.220000] [<c0032e1c>] (warn_slowpath_common+0x4c/0x80) from
+> [<c000b4b8>] (init_)
+> [    0.220000] [<c000b4b8>] (init_atags_procfs+0x5c/0xe8) from
+> [<c002033c>] (do_one_i)
+> [    0.220000] [<c002033c>] (do_one_initcall+0x5c/0x1bc) from
+> [<c0008584>] (kernel_in)
+> [    0.220000] [<c0008584>] (kernel_init+0x94/0x148) from [<c00217b4>]
+> (kernel_thread)
+> [    0.220000] ---[ end trace 1b75b31a2719ed1c ]---
+> [    0.230000] bio: create slab <bio-0> at 0
+> [    0.230000] Switching to clocksource dg_timer
+> 
+> Hmm, what are atags anyway?
+> 							Pavel
+> 
+Atags are data passed by the bootloader to kernel (like memory size, machine id 
+...).
