@@ -1,57 +1,37 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sun, 14 Mar 2010 12:56:03 -0400
-Subject: [PATCH 03/10] ftrace: allow building without frame pointers
-In-Reply-To: <1268462987-8271-4-git-send-email-rabin@rab.in>
+Date: Sun, 14 Mar 2010 12:56:06 -0400
+Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
+In-Reply-To: <1268462987-8271-5-git-send-email-rabin@rab.in>
 References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-4-git-send-email-rabin@rab.in>
-Message-ID: <1268585763.13400.3.camel@localhost>
+	<1268462987-8271-5-git-send-email-rabin@rab.in>
+Message-ID: <1268585766.13400.4.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, 2010-03-13 at 12:19 +0530, Rabin Vincent wrote:
-> With current gcc, compiling with both -pg and -fomit-frame-pointer is
-> not allowed.  However, -pg can be used to build without actually
-> specying -fno-omit-frame-pointer, upon which the defaut behaviour for
-> the target will be used.
+> With a new enough GCC, ARM function tracing can be supported without the
+> need for frame pointers.  This is essential for Thumb-2 support, since
+> frame pointers aren't available then.
 > 
-> On ARM, it is not possible to build a Thumb-2 kernel with
-> -fno-omit-frame-pointer (FRAME_POINTERS depends on !THUMB2_KERNEL). In
-> order to support ftrace for Thumb-2, we need to be able to allow a
-> combination of FUNCTION_TRACER and !FRAME_POINTER.  We do this by
-> omitting -fomit-frame-pointer if ftrace is enabled.
-> 
-> Acked-by: Frederic Weisbecker <fweisbec@gmail.com>
 > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
-> v2: Better comment.
-> 
->  Makefile |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Makefile b/Makefile
-> index 08ff02d..61404e0 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -546,8 +546,15 @@ endif
->  ifdef CONFIG_FRAME_POINTER
->  KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
->  else
-> +# Some targets (ARM with Thumb2, for example), can't be built with frame
-> +# pointers.  For those, we don't have FUNCTION_TRACER automatically
-> +# select FRAME_POINTER.  However, FUNCTION_TRACER adds -pg, and this is
-> +# incompatible with -fomit-frame-pointer with current GCC, so we don't use
-> +# -fomit-frame-pointer with FUNCTION_TRACER.
-> +ifndef CONFIG_FUNCTION_TRACER
->  KBUILD_CFLAGS	+= -fomit-frame-pointer
 
-I believe this is correct, but have you tested this on other archs other
-than ARM? I can do it for x86 and PPC, but it will need to wait as those
-machines are currently performing stress tests.
+> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+> index 13e13d4..e10519f 100644
+> --- a/kernel/trace/Kconfig
+> +++ b/kernel/trace/Kconfig
+> @@ -124,7 +124,7 @@ if FTRACE
+>  config FUNCTION_TRACER
+>  	bool "Kernel Function Tracer"
+>  	depends on HAVE_FUNCTION_TRACER
+> -	select FRAME_POINTER
+> +	select FRAME_POINTER if (!ARM_UNWIND)
+
+I'm fine with this if the ARM maintainers are.
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
 -- Steve
 
->  endif
-> +endif
->  
->  ifdef CONFIG_DEBUG_INFO
->  KBUILD_CFLAGS	+= -g
+>  	select KALLSYMS
+>  	select GENERIC_TRACER
+>  	select CONTEXT_SWITCH_TRACER
