@@ -1,37 +1,45 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sun, 14 Mar 2010 12:56:06 -0400
-Subject: [PATCH 04/10] ARM: ftrace: allow building without frame pointers
-In-Reply-To: <1268462987-8271-5-git-send-email-rabin@rab.in>
+Date: Sun, 14 Mar 2010 12:56:11 -0400
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <1268462987-8271-8-git-send-email-rabin@rab.in>
 References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-5-git-send-email-rabin@rab.in>
-Message-ID: <1268585766.13400.4.camel@localhost>
+	<1268462987-8271-8-git-send-email-rabin@rab.in>
+Message-ID: <1268585771.13400.5.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, 2010-03-13 at 12:19 +0530, Rabin Vincent wrote:
-> With a new enough GCC, ARM function tracing can be supported without the
-> need for frame pointers.  This is essential for Thumb-2 support, since
-> frame pointers aren't available then.
+> On ARM, we have two ABIs, and the ABI used is controlled via a config
+> option.  Object files built with one ABI can't be merged with object
+> files built with the other ABI.  So, record_mcount.pl needs to use the
+> same compiler flags as the kernel when generating the object file with
+> the mcount locations.  Ensure this by passing CFLAGS to the script.
 > 
 > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  scripts/Makefile.build |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+> index 0b94d2f..2535c11 100644
+> --- a/scripts/Makefile.build
+> +++ b/scripts/Makefile.build
+> @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
+>  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+>  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
+>  	"$(if $(CONFIG_64BIT),64,32)" \
+> -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+> +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
+> +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
 
-> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> index 13e13d4..e10519f 100644
-> --- a/kernel/trace/Kconfig
-> +++ b/kernel/trace/Kconfig
-> @@ -124,7 +124,7 @@ if FTRACE
->  config FUNCTION_TRACER
->  	bool "Kernel Function Tracer"
->  	depends on HAVE_FUNCTION_TRACER
-> -	select FRAME_POINTER
-> +	select FRAME_POINTER if (!ARM_UNWIND)
+Again, I'll have to test this on other archs, just to make sure its does
+not cause any side effects. Oh, I forgot I now have a MIPS board I can
+test on too. I'll probably do this on Monday.
 
-I'm fine with this if the ARM maintainers are.
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Thanks,
 
 -- Steve
 
->  	select KALLSYMS
->  	select GENERIC_TRACER
->  	select CONTEXT_SWITCH_TRACER
+>  	"$(if $(part-of-module),1,0)" "$(@)";
+>  endif
+>  
