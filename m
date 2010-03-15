@@ -1,57 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 15 Mar 2010 08:22:22 +0200
-Subject: [PATCH 1/2] mx1: fix build when DEBUG_LL is enabled
-In-Reply-To: <20100311105637.GE16376@n2100.arm.linux.org.uk>
-References: <e5558b1571cff8472994ed51622339fd9e517f5e.1268129163.git.baruch@tkos.co.il>
-	<20100311103940.GA19320@pengutronix.de>
-	<20100311105637.GE16376@n2100.arm.linux.org.uk>
-Message-ID: <20100315062222.GA27515@jasper.tkos.co.il>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 15 Mar 2010 11:58:51 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
+	in linux
+In-Reply-To: <20100315062041.GD31126@trinity.fluff.org>
+References: <4B9DB823.1040809@st.com>
+	<20100315062041.GD31126@trinity.fluff.org>
+Message-ID: <4B9DD3A3.7050106@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel, Uwe,
-On Thu, Mar 11, 2010 at 10:56:37AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 11, 2010 at 11:39:41AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Tue, Mar 09, 2010 at 12:12:04PM +0200, Baruch Siach wrote:
-> > > Commit "mx1: prefix SOC specific defines with MX1_ and deprecate old names"
-> > > redefined the IO_ADDRESS macro in a way that is incompatible with
-> > > debug-macro.S. Reintroduce AVIC_IO_ADDRESS, and use it in debug-macro.S.
-> > This feels wrong.  Can you please instead fix IMX_IO_ADDRESS?
-> > 
-> > Something like:
-> > 
-> > 	#ifdef __ASSEMBLY__
-> > 	#define IOREG(x) (x)
-> > 	#else
-> > 	#define IOREG(x) ((void __force __iomem *)(x))
-> > 	#endif
-> > 
-> > 	#define IMX_IO_ADDRESS(addr, module) IOREG(\
-> > 	...
-> > 
-> > could work.  Don't know if the cast to unsigned long works in assembler.
-> > Maybe it's unneeded?  Don't remember.
-> 
-> This is what I put in place for OMAP:
-> 
-> #ifdef __ASSEMBLER__
-> #define IOMEM(x)                (x)
-> #else
-> #define IOMEM(x)                ((void __force __iomem *)(x))
-> #endif
-> 
-> and then define all your device virtual addresses as normal hex integers
-> wrapped in IOMEM().
-> 
-> You can then use those symbols in assembly and C without any harm.
+Ben,
 
-OK. I'll try this approach and send an updated patch shortly.
+On 3/15/2010 11:50 AM, Ben Dooks wrote:
+>> > I have provided this selection from "make menuconfig", based on selection I
+>> > configure hardware at initialization time. Basically these selections will
+>> > decide which device is present in the system when it boots.
+> This is really bad idea, what happens if you have a selection of
+> boards with mutually-exclusive peripheral sets? Making these sorts of
+> decisions at compile time is always a bad idea, it leaves people making
+> distributitions a lot of extra work.
+> 
+> My first idea would be to add a function which is given a bitmap or
+> list of devices to register, and this function sorts out what hardware
+> bits to set as needed and then register if the selection is possible.
+> 
 
-baruch
+I agree with your idea to pass a bitmap to kernel at some time
+(probably at boot time), so that it can configure all required peripherals.
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Now, For this we need some interface or channel through which we provide
+this information to kernel. This is what precisely i have done. The channel i
+provided is through Kconfig and the function "s300_configure", accepts this 
+bitmap and configures hardware.
+
+Isn't it correct?
+
+regards,
+viresh kumar.
