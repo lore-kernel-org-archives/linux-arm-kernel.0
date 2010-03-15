@@ -1,60 +1,36 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 15 Mar 2010 01:02:39 +0000
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <20100311133353.GC25011@n2100.arm.linux.org.uk>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-	<20100311133353.GC25011@n2100.arm.linux.org.uk>
-Message-ID: <20100315010238.GJ6491@shareable.org>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 15 Mar 2010 12:35:37 +0900
+Subject: [GIT PULL] genesis updates for 2.6.34-rc2
+Message-ID: <20100315033537.GA14529@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Sat, Mar 06, 2010 at 09:24:49PM +1100, dave b wrote:
-> > I had already reported it to debian -
-> > http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=572653
-> > 
-> > I have cc'ed linux-arm-kernel into this email.
-> 
-> I think most of the points have already been convered, but just for
-> completeness,
-> 
-> What is the history of the hardware you're running these builds on?
-> Has it proven itself on previous kernel versions running much the same
-> tests?
-> 
-> Another point to consider: how are you running the compiler - is it
-> over NFS from a PC?
-> 
-> The reason I ask is that you can suffer from very weird corruption
-> issues - I have a nice illustration of one which takes a copy of 1GB
-> worth of data each day, and every once in a while, bytes 8-15 of a
-> naturally aligned 16 byte block in the data become corrupted somewhere
-> between the network and disk.  The probability of corruption happening
-> is around 0.0000001%, but it still happens... and that makes it
-> extremely difficult to track down.
+Please pull from:
 
-We had annoying corruption in some totally different hardware a few
-years ago, but not quite as rare as that.
+	master.kernel.org:/pub/scm/linux/kernel/git/lethal/genesis-2.6.git
 
-It was only on ext3 filesystems, not vfat as was supplied with the
-SDK.  It turned out that the chip's IDE driver started DMA like this:
+Which contains:
 
-    1. Write to DMA address and count registers.
-    2. Flush D-cache.
-    3. Write start DMA command to DMA controller.
+Magnus Damm (8):
+      ARM: mach-shmobile: G3EVM KEYSC platform data
+      ARM: mach-shmobile: G3EVM FLCTL platform data
+      mtd: enable sh_flctl on SH-Mobile ARM
+      ARM: mach-shmobile: sh7367 SDHI vector merge
+      ARM: mach-shmobile: sh7377 SDHI vector merge
+      ARM: mach-shmobile: sh7372 SDHI vector merge
+      ARM: mach-shmobile: ap4evb SDHI0 platform data V2
+      video: enable sh_mobile_lcdc on SH-Mobile ARM
 
-We found step 1 preloaded the first 128 bytes into a chip FIFO
-(undocumented of course), although the DMA didn't start until step 3.
-Swapping steps 1 and 2 fixed it.
+NISHIMOTO Hiroki (1):
+      ARM: mach-shmobile: G4EVM KEYSC platform data
 
-The chip supplier hadn't encountered corruption because the code path
-from vfat down always had the side effect of flushing those cachelines.
-
-With the cache handling complexity that some ARMs now seem to require,
-I wonder if you're seeing a similarly missed cache flush?  Adding
-cache flushes at strategic points throughout the kernel was very
-helpful in narrowing down the one we saw.
-
--- Jamie
+ arch/arm/mach-shmobile/board-ap4evb.c |   32 +++++++++
+ arch/arm/mach-shmobile/board-g3evm.c  |  122 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-g4evm.c  |   57 +++++++++++++++
+ arch/arm/mach-shmobile/clock-sh7367.c |    7 ++
+ arch/arm/mach-shmobile/intc-sh7367.c  |   46 ++++++------
+ arch/arm/mach-shmobile/intc-sh7372.c  |   46 ++++++------
+ arch/arm/mach-shmobile/intc-sh7377.c  |   36 +++++-----
+ drivers/mtd/nand/Kconfig              |    2 +-
+ drivers/video/Kconfig                 |    2 +-
+ 9 files changed, 285 insertions(+), 65 deletions(-)
