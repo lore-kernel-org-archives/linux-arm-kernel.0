@@ -1,30 +1,41 @@
-From: shiraz.hashim@st.com (Shiraz HASHIM)
-Date: Mon, 15 Mar 2010 19:23:18 +0530
-Subject: QUERY: How to handle sharing of interrupt between
-	different	peripherals.
-In-Reply-To: <20100315111100.GC700@n2100.arm.linux.org.uk>
-References: <4B9DB99A.5040104@st.com>
-	<20100315111100.GC700@n2100.arm.linux.org.uk>
-Message-ID: <4B9E3BCE.1060809@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Mar 2010 15:15:42 +0100
+Subject: Wrong cache flush function used in
+	arch/arm/boot/compressed/head.S?
+In-Reply-To: <1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
+References: <20100312100511.GQ19843@pengutronix.de>
+	<1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100315141542.GA19843@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2010 4:41 PM, Russell King - ARM Linux wrote:
-> We do have a system for having a multi-level approach to interrupt decoding.
-> Since you have a register which allows you to identify the source of the
-> interrupt, I'd recommend for maximum system performance that you use it.
+On Fri, Mar 12, 2010 at 03:51:56PM +0000, Catalin Marinas wrote:
+> On Fri, 2010-03-12 at 10:05 +0000, Sascha Hauer wrote:
+> > 0e056f20f18d0efa5da920f3cf8532adc56d5779 contains the following hunk:
+> > 
+> >                 .word   0x00060000              @ ARMv5TEJ
+> >                 .word   0x000f0000
+> > -               b       __armv4_mmu_cache_on
+> > -               b       __armv4_mmu_cache_off
+> > -               b       __armv5tej_mmu_cache_flush
+> > +               W(b)    __armv4_mmu_cache_on
+> > +               W(b)    __armv4_mmu_cache_off
+> > +               W(b)    __armv4_mmu_cache_flush
+> > 
+> > Is this intentional? I do not see any problems in my kernel, but I
+> > use the same code in my bootloader and it doesn't seem to work correctly
+> > on my arm926 based system.
 > 
-> Shared interrupts have the disadvantage that you need to run each handler
-> every time a device on the shared interrupt signals, which can be very
-> wasteful both in terms of instruction cache lines and IO accesses.
-> 
-> Search arch/arm/ for set_irq_chained_handler to find examples of who to
-> deal with multi-level handling of IRQs.
+> It wasn't intentional. I think I got it wrong when trying to solve a
+> merge conflict and I just added the original hunk.
 
-OK. So we need to create virtual irqs (defined by s/w), for shared irqs
-which are mapped on to the real irq (defined by the H/W) through
-set_irq_chained_handler, right?
-thanks for your help.
+Ok, I just sent a patch to the patch system.
 
-regards
-Shiraz
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
