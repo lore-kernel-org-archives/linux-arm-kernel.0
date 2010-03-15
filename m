@@ -1,69 +1,38 @@
-From: saaguirre@ti.com (Sergio Aguirre)
-Date: Mon, 15 Mar 2010 18:04:07 -0500
-Subject: [PATCH 2/7] OMAP3: serial: Use dev_* macros instead of printk
-In-Reply-To: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
-References: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
-Message-ID: <1268694252-21985-3-git-send-email-saaguirre@ti.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 15 Mar 2010 23:20:27 +0000
+Subject: [PULL] Please pull bjdooks' for-linus/samsung-fixes
+Message-ID: <20100315232027.GA11570@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have a struct device populated at the time we are
-printing the errors, using dev_* macros makes more sense,
-as could give a better idea where the error/warning came from.
+Please pull the following ARM/Samsung fixes:
 
-Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
----
- arch/arm/mach-omap2/serial.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+The following changes since commit a3d3203e4bb40f253b1541e310dc0f9305be7c84:
+  Linus Torvalds (1):
+        Merge branch 'release' of git://git.kernel.org/.../lenb/linux-acpi-2.6
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index ef91fc0..a55e6ae 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -550,7 +550,7 @@ static ssize_t sleep_timeout_store(struct device *dev,
- 	unsigned int value;
- 
- 	if (sscanf(buf, "%u", &value) != 1) {
--		printk(KERN_ERR "sleep_timeout_store: Invalid value\n");
-+		dev_err(dev, "sleep_timeout_store: Invalid value\n");
- 		return -EINVAL;
- 	}
- 
-@@ -666,8 +666,8 @@ void __init omap_serial_early_init(void)
- 
- 		/* Don't map zero-based physical address */
- 		if (p->mapbase == 0) {
--			printk(KERN_WARNING "omap serial: No physical address"
--			       " for uart#%d, so skipping early_init...\n", i);
-+			dev_warn(dev, "no physical address for uart#%d,"
-+				 " so skipping early_init...\n", i);
- 			continue;
- 		}
- 		/*
-@@ -676,21 +676,21 @@ void __init omap_serial_early_init(void)
- 		 */
- 		p->membase = ioremap(p->mapbase, SZ_8K);
- 		if (!p->membase) {
--			printk(KERN_ERR "ioremap failed for uart%i\n", i + 1);
-+			dev_err(dev, "ioremap failed for uart%i\n", i + 1);
- 			continue;
- 		}
- 
- 		sprintf(name, "uart%d_ick", i + 1);
- 		uart->ick = clk_get(NULL, name);
- 		if (IS_ERR(uart->ick)) {
--			printk(KERN_ERR "Could not get uart%d_ick\n", i + 1);
-+			dev_err(dev, "Could not get uart%d_ick\n", i + 1);
- 			uart->ick = NULL;
- 		}
- 
- 		sprintf(name, "uart%d_fck", i+1);
- 		uart->fck = clk_get(NULL, name);
- 		if (IS_ERR(uart->fck)) {
--			printk(KERN_ERR "Could not get uart%d_fck\n", i + 1);
-+			dev_err(dev, "Could not get uart%d_fck\n", i + 1);
- 			uart->fck = NULL;
- 		}
- 
+are available in the git repository at:
+
+  git://git.fluff.org/bjdooks/linux.git for-linus/samsung-fixes
+
+Ben Dooks (2):
+      ARM: SAMSUNG: Fix build error from stale define in <plat/uncompress.h>
+      ARM: SAMSUNG: Fixup commit 4e6d488af37980d224cbf298224db6173673f362
+
+Vasily Khoruzhick (2):
+      ARM: S3C2440: Fix s3c2440 cpufreq compilation post move.
+      ARM: SAMSUNG: Add suspend/resume support for S3C PWM driver
+
+ .../s3c2440-cpufreq.c                              |    0
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s5p6440/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s5p6442/include/mach/debug-macro.S   |    2 +-
+ arch/arm/plat-samsung/include/plat/uncompress.h    |    2 -
+ arch/arm/plat-samsung/pwm.c                        |   35 ++++++++++++++++++++
+ 6 files changed, 38 insertions(+), 5 deletions(-)
+ rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c2440-cpufreq.c (100%)
+
 -- 
-1.6.3.3
+Ben (ben at fluff.org, http://www.fluff.org/)
+
+  'a smiley only costs 4 bytes'
