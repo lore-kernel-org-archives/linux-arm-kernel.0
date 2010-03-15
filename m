@@ -1,18 +1,39 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Mon, 15 Mar 2010 16:00:03 +0900
-Subject: QUERY: How to handle sharing of interrupt between different
-	peripherals.
-In-Reply-To: <4B9DD9F0.60603@st.com>
-References: <4B9DB99A.5040104@st.com>
-	<1b68c6791003142218q24fd8516id75d6964201da3f2@mail.gmail.com>
-	<4B9DD766.7010504@st.com>
-	<1b68c6791003142350t1a671bf0k4777d8d4df8c5ab7@mail.gmail.com>
-	<4B9DD9F0.60603@st.com>
-Message-ID: <1b68c6791003150000s4417e982ofa7dc2998575bd67@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 15 Mar 2010 12:36:09 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
+	in linux
+In-Reply-To: <20100315062041.GD31126@trinity.fluff.org>
+References: <4B9DB823.1040809@st.com>
+	<20100315062041.GD31126@trinity.fluff.org>
+Message-ID: <4B9DDC61.3090609@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 15, 2010 at 3:55 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
-> Second: Now UART, SDIO, SPI, I2S all have a common interrupt line, this is what
-> we need to handle. For this IRQF_SHARED is a better way.
-ok, I misunderstood.
+Ben,
+
+On 3/15/2010 11:50 AM, Ben Dooks wrote:
+>> > I have provided this selection from "make menuconfig", based on selection I
+>> > configure hardware at initialization time. Basically these selections will
+>> > decide which device is present in the system when it boots.
+> This is really bad idea, what happens if you have a selection of
+> boards with mutually-exclusive peripheral sets?
+
+In this case, we can have different defconfig files for different boards.
+
+> Making these sorts of
+> decisions at compile time is always a bad idea, it leaves people making
+> distributitions a lot of extra work.
+> 
+
+I agree with this point but what is the other way for this.
+
+Doing this at runtime will have following issue:
+
+User have inserted a module and by mistake or lack of knowledge,
+he disabled already working IP(due to multiplexing). Now with Kconfig concept 
+this is taken care of at the beginning only. User can't select peripherals which
+can't be enabled simultaneously.
+
+
+regards,
+viresh kumar.
