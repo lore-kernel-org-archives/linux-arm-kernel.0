@@ -1,37 +1,93 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Mon, 15 Mar 2010 07:55:38 -0500
-Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
-	in linux
-In-Reply-To: <4B9DD46E.7060704@st.com>
-References: <4B9DB823.1040809@st.com>		<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>		<4B9DC239.90407@st.com>	<1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
-	<4B9DD46E.7060704@st.com>
-Message-ID: <4B9E2E4A.5070604@billgatliff.com>
+From: arm@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 15 Mar 2010 13:04:45 +0000
+Subject: [PATCH] pxa: fix for UART reference in section text for a number
+	of platforms.
+In-Reply-To: <f17812d71003150543o24b4d3e0sd94aca7f53d535fe@mail.gmail.com>
+References: <4B94DC52.1040201@cam.ac.uk>	<f17812d71003080348k7ff5cd77lf5e1262ce1ccf14@mail.gmail.com>
+	<f17812d71003080410y7d5dad83t28e6855aa4ad5cfc@mail.gmail.com>
+	<4B953773.6050904@jic23.retrosnub.co.uk>
+	<f17812d71003150543o24b4d3e0sd94aca7f53d535fe@mail.gmail.com>
+Message-ID: <4B9E306D.8050104@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh KUMAR wrote:
-> Actually, different peripherals share IO Pads (PL_GPIOs) and GPIO lines. Sending
-> patch for drivers to support this doesn't look a great idea to me. Further this 
-> may cause problems to users, for example: User have entered a inserted a module
-> and by mistake or lack of knowledge, he disables already working IP. Now with 
-> Kconfig concept this is taken care of at the beginning only. User can't select
-> peripherals which can't be enabled simultaneously.
->   
+On 03/15/10 12:43, Eric Miao wrote:
+> On Tue, Mar 9, 2010 at 1:44 AM, Jonathan Cameron
+> <arm@jic23.retrosnub.co.uk> wrote:
+>> On 03/08/10 12:10, Eric Miao wrote:
+>>> On Mon, Mar 8, 2010 at 7:48 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>>> What's the background?
+>>>>
+>>>
+>>> OK, I saw the thread. So this is basically going to move the "UART" to
+>>> bss, which doesn't get discarded. However, my 'devel' branch has been
+>>> modified a bit to support off chip UART decompressing messages to be
+>>> displayed, I'm afraid this needs to be updated a bit.
+>>
+>> The same problem will occur with the other two variables changed by
+>> this function, so how about the following (against your tree, but tested
+>> against mainline with a couple of patches lifted from your tree). Builds
+>> fine for imote2, startgate2 and arcom_zeus. Just testing a full build
+>> of all pxa platforms to see if anything similar is hiding elsewhere.
+>>
+>> [PATCH] pxa: fix for uart_base and friends reference in section.
+>>
+>> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+> 
+> Merged with some minor changes as below, let me know if you
+> are OK with this.
+Good point, that's a neater solution.
+Thanks Eric!
 
-Better to leave that knowledge out of the drivers and Kconfig, and just
-let the system "blow up" at runtime if a bad combination is attempted. 
-Making the system any smarter than that leads to drivers that are really
-difficult to reuse elsewhere.
-
-The "blow up" scenario isn't usually literal, of course, and the problem
-is almost always spotted very early in the development effort.  So it
-doesn't lead to problems.  The alternatives do.
-
-
-b.g.
-
--- 
-Bill Gatliff
-Embedded systems training and consulting
-http://billgatliff.com
-bgat at billgatliff.com
+Jonathan
+> 
+> commit 11f4f3150254477bbe19a847c5aed747f3eeff2a
+> Author: Jonathan Cameron <arm@jic23.retrosnub.co.uk>
+> Date:   Mon Mar 8 17:44:19 2010 +0000
+> 
+>     [ARM] pxa: fix for variables in uncompress.h being discarded
+> 
+>     Due to commit:
+> 
+>         5de813b  ARM: Eliminate decompressor -Dstatic= PIC hack
+> 
+>     The data section will be discarded for the decompressor, thus move the
+>     static variables into BSS section by initializing them at run-time.
+> 
+>     Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+> 
+> diff --git a/arch/arm/mach-pxa/include/mach/uncompress.h
+> b/arch/arm/mach-pxa/include/mach/uncompress.h
+> index 5ef91d9..759b851 100644
+> --- a/arch/arm/mach-pxa/include/mach/uncompress.h
+> +++ b/arch/arm/mach-pxa/include/mach/uncompress.h
+> @@ -16,9 +16,9 @@
+>  #define BTUART_BASE	(0x40200000)
+>  #define STUART_BASE	(0x40700000)
+> 
+> -static unsigned long uart_base = FFUART_BASE;
+> -static unsigned int uart_shift = 2;
+> -static unsigned int uart_is_pxa = 1;
+> +static unsigned long uart_base;
+> +static unsigned int uart_shift;
+> +static unsigned int uart_is_pxa;
+> 
+>  static inline unsigned char uart_read(int offset)
+>  {
+> @@ -56,6 +56,11 @@ static inline void flush(void)
+> 
+>  static inline void arch_decomp_setup(void)
+>  {
+> +	/* initialize to default */
+> +	uart_base = FFUART_BASE;
+> +	uart_shift = 2;
+> +	uart_is_pxa = 1;
+> +
+>  	if (machine_is_littleton() || machine_is_intelmote2()
+>  	    || machine_is_csb726() || machine_is_stargate2()
+>  	    || machine_is_cm_x300() || machine_is_balloon3())
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
