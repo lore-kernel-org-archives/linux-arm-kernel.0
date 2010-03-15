@@ -1,26 +1,19 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 15 Mar 2010 12:04:15 +0530
-Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
-	in linux
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C47A6CDC@dbde02.ent.ti.com>
-References: <4B9DB823.1040809@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C47A6C90@dbde02.ent.ti.com>
-	<4B9DC28F.3060209@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C47A6CDC@dbde02.ent.ti.com>
-Message-ID: <4B9DD4E7.3060308@st.com>
+Date: Mon, 15 Mar 2010 12:14:54 +0530
+Subject: QUERY: How to handle sharing of interrupt between different
+	peripherals.
+In-Reply-To: <1b68c6791003142218q24fd8516id75d6964201da3f2@mail.gmail.com>
+References: <4B9DB99A.5040104@st.com>
+	<1b68c6791003142218q24fd8516id75d6964201da3f2@mail.gmail.com>
+Message-ID: <4B9DD766.7010504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2010 10:58 AM, Shilimkar, Santosh wrote:
->> > But the standard drivers which are already in mainline may not support these platform
->> > data.
->> > 
-> Driver won't change major way. I was saying passing additional information via
-> platform data to drivers. Even with Kconfig stuff, you need to touch drivers to take care of
-> your exceptions.
-> 
-> Am I missing something?
+On 3/15/2010 10:48 AM, jassi brar wrote:
+> On Mon, Mar 15, 2010 at 1:37 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>> In our SOC (SPEArxxx), we have few peripherals which share common interrupt
+>> line.
+> how about set_irq_chained_handler ?
 
-We need only a platform specific function (spear300_configure), that will take care of this.
-We don't need to change anything in driver for this. I feel Driver is not supposed to know
-what platform specific configuration is required to enable the device.
+I think it is not for this purpose. Better to use IRQF_SHARED in normal
+request_irq. what do you say?
