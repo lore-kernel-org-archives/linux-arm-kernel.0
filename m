@@ -1,37 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Mar 2010 11:11:00 +0000
-Subject: QUERY: How to handle sharing of interrupt between different
-	peripherals.
-In-Reply-To: <4B9DB99A.5040104@st.com>
-References: <4B9DB99A.5040104@st.com>
-Message-ID: <20100315111100.GC700@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 15 Mar 2010 14:22:38 +0300
+Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
+In-Reply-To: <1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
+References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
+	<1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
+Message-ID: <4B9E187E.6090802@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 15, 2010 at 10:07:46AM +0530, Viresh KUMAR wrote:
-> In our SOC (SPEArxxx), we have few peripherals which share common interrupt
-> line. For example we can have GPIO (PL061), SPI (PL022) and SDIO (Arasan) sharing
-> same physical IRQ line. Now there is a register in SOC which can give status of
-> this interrupt line (i.e. source of interrupt). We have standard drivers for
-> all of these, and these drivers don't request IRQ in shared mode.
+Hello.
 
-Ultimately, we have all ARM peripherals sharing one interrupt line -
-because the CPU only has one IRQ-level interrupt signal.  That doesn't
-mean that we hang all interrupt handlers off the same IRQ number though.
+Wang Hui wrote:
 
-> How should we handle these IRQs now. One way i have been thinking of is to write
-> a wrapper layer for this type of IRQs for our SOC, which will register actual
-> IRQ numbers. Standard drivers can be provided virtual IRQ numbers for
-> registration. Now this wrapper, based on source of interrupt can call the
-> irq_handler for standard drivers.
+> On omap2/3 series platforms, the musb can't raise id pin change
+> detection interrupt, so we must change otg mode through sysfs
+> interface manually. Currently when the musb is in B mode, if we
+> want musb to be changed to A mode, we should plug a mini-A cable
+> and then execute echo host > /sys/devices/platform/musb_hdrc/mode.
+> But if the musb is in A mode, we can't change it to B mode through
+> this method.
+> To solve this problem, add a process for sending end session request.
+> This process works like this, if the musb is in A mode, it will send
+> an end session request first, then it will follow original routine:
+> start a new session, during this session, it will identify whether
+> A or B is plugging in the socket,  then it will init controller to A
+> or B mode according to its identification.
+>
+> Usage: change cable as you desired,
+>        change musb mode by #>echo host[peripheral] > /sys/devices/\
+>        platform/musb_hdrc/mode,
+>        then you will get required musb mode.
+>
+> Signed-off-by: Wang Hui <Hui.Wang@windriver.com>
+> ---
+>  drivers/usb/musb/omap2430.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> index 3fe1686..b02897e 100644
+> --- a/drivers/usb/musb/omap2430.c
+> +++ b/drivers/usb/musb/omap2430.c
+> @@ -194,6 +194,11 @@ int musb_platform_set_mode(struct musb *musb, u8 musb_mode)
+>  {
+>  	u8	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+>  
+> +	if ((devctl & MUSB_DEVCTL_BDEVICE) == 0x0) {
+> +		devctl &= ~MUSB_DEVCTL_SESSION;
+> +		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
+> +	}
+> +
+>  	devctl |= MUSB_DEVCTL_SESSION;
+>  	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
+>   
 
-We do have a system for having a multi-level approach to interrupt decoding.
-Since you have a register which allows you to identify the source of the
-interrupt, I'd recommend for maximum system performance that you use it.
+   The whole musb_platform_set_mode() seems to be implemented 
+incorrectly on OMAPs -- it shouldn't touch the DevCtl.Session bit. This 
+function should control the ID pin override instead -- if the controller 
+supports it. SRP must be initiated thru other means, i.e. 'srp' file in 
+sysfs.
 
-Shared interrupts have the disadvantage that you need to run each handler
-every time a device on the shared interrupt signals, which can be very
-wasteful both in terms of instruction cache lines and IO accesses.
-
-Search arch/arm/ for set_irq_chained_handler to find examples of who to
-deal with multi-level handling of IRQs.
+WBR, Sergei
