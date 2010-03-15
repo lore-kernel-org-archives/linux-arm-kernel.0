@@ -1,34 +1,33 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 16 Mar 2010 00:15:06 +0530
-Subject: [PATCH 03/10] ftrace: allow building without frame pointers
-In-Reply-To: <1268501792.3366.7.camel@localhost>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-4-git-send-email-rabin@rab.in>
-	<1268501792.3366.7.camel@localhost>
-Message-ID: <20100315184506.GA2303@debian>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Mar 2010 11:57:15 -0700
+Subject: QUERY: How to handle SOC Configuration (Peripheral
+	Multiplexing) in linux
+In-Reply-To: <20100315170940.GB13878@sirena.org.uk>
+References: <4B9DB823.1040809@st.com>
+	<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>
+	<4B9DC239.90407@st.com> <4B9E2D7E.1020702@billgatliff.com>
+	<4B9E5A29.1090407@st.com> <4B9E65FB.1070501@billgatliff.com>
+	<20100315170940.GB13878@sirena.org.uk>
+Message-ID: <20100315185715.GX2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 13, 2010 at 12:36:32PM -0500, Steven Rostedt wrote:
-> On Sat, 2010-03-13 at 12:19 +0530, Rabin Vincent wrote:
-> >  ifdef CONFIG_FRAME_POINTER
-> >  KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
-> >  else
-> > +# Some targets (ARM with Thumb2, for example), can't be built with frame
-> > +# pointers.  For those, we don't have FUNCTION_TRACER automatically
-> > +# select FRAME_POINTER.  However, FUNCTION_TRACER adds -pg, and this is
-> > +# incompatible with -fomit-frame-pointer with current GCC, so we don't use
-> > +# -fomit-frame-pointer with FUNCTION_TRACER.
-> > +ifndef CONFIG_FUNCTION_TRACER
-> >  KBUILD_CFLAGS	+= -fomit-frame-pointer
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [100315 10:29]:
+> On Mon, Mar 15, 2010 at 11:53:15AM -0500, Bill Gatliff wrote:
 > 
-> I believe this is correct, but have you tested this on other archs other
-> than ARM? I can do it for x86 and PPC, but it will need to wait as those
-> machines are currently performing stress tests.
+> > It's true that for a specific SoC, you *do* know such things.  So you
+> > handle that the way the at91 guys have done: you provide a
+> > at91sam9263_devices.c:at91_add_device_usbh(struct at91_usbh_data *data),
+> > and _that_ function sets up pins, etc. before it registers the generic
+> > platform device.  The driver is always a generic platform one, and gets
+> 
+> That does depend on the SoC, at least for the pin muxing - with some
+> SoCs there's a lot of options for where the signals are brought out so
+> the pin mux configuration really does need to be board specific.
 
-I've tested the series on x86-64.
+Additionally the muxing needs to be done dynamically in some cases.
 
-Note that this particular change will not currently affect other archs
-since they still have the "select FRAME_POINTER" in FUNCTION_TRACER.
+For example, the GPIO pins need to be dynamically remuxed for the PM
+idle modes on omaps.
 
-Rabin
+Tony
