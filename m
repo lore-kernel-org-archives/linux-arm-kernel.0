@@ -1,68 +1,42 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 15 Mar 2010 10:58:01 +0530
-Subject: QUERY: How to handle SOC Configuration (Peripheral
-	Multiplexing) in linux
-In-Reply-To: <4B9DC28F.3060209@st.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Mon, 15 Mar 2010 14:41:15 +0900
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
+	in linux
+In-Reply-To: <4B9DC239.90407@st.com>
 References: <4B9DB823.1040809@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C47A6C90@dbde02.ent.ti.com>
-	<4B9DC28F.3060209@st.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C47A6CDC@dbde02.ent.ti.com>
+	<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>
+	<4B9DC239.90407@st.com>
+Message-ID: <1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shiraz HASHIM [mailto:shiraz.hashim at st.com]
-> Sent: Monday, March 15, 2010 10:46 AM
-> To: Shilimkar, Santosh
-> Cc: Viresh KUMAR; linux-arm-kernel at lists.infradead.org; Armando VISCONTI
-> Subject: Re: QUERY: How to handle SOC Configuration (Peripheral Multiplexing) in linux
-> 
-> Hello Santosh,
-> 
-> On 3/15/2010 10:27 AM, Shilimkar, Santosh wrote:
-> >> -----Original Message-----
-> >> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> >> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
-> >> Sent: Monday, March 15, 2010 10:02 AM
-> >> To: linux-arm-kernel at lists.infradead.org
-> >> Cc: Armando VISCONTI; 'Shiraz HASHIM'
-> >> Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing) in linux
-> >>
-> >> Hello everybody,
-> >>
-> >> In our SOC's (SPEArxxx), we have many peripheral sharing PL_GPIO pins and so
-> >> only few peripherals can be selected in a configuration. This is configurable
-> >> using a set of registers. Now the problem is to make following work:
-> >>
-> >> 1. How to do this selection in kernel in a simple way?
-> >> 2. Based on this selection hardware registers needs to be configured.
-> >>
-> >> I propose following solution to solve this issue, but i am not sure if it is
-> >> acceptable by community.
-> >>
-> >> Please see if it is fine. Or if there is any other way people may already be
-> >> following for similar issues.
-> >>
-> >> I have provided this selection from "make menuconfig", based on selection I
-> >> configure hardware at initialization time. Basically these selections will
-> >> decide which device is present in the system when it boots.
-> >>
-> >> There are modes in which SOC can be configured and in these modes
-> >> peripherals can be selected.
-> >>
-> > Since the data is board dependent, why don't you make this information as platform
-> > data for devices and pass that information from board files depending on board type.
-> >
-> > This gives you flexibility as well and you don't need unnecessary cluttering of
-> > Kconfig entries.
-> 
-> But the standard drivers which are already in mainline may not support these platform
-> data.
-> 
-Driver won't change major way. I was saying passing additional information via
-platform data to drivers. Even with Kconfig stuff, you need to touch drivers to take care of
-your exceptions.
+On Mon, Mar 15, 2010 at 2:14 PM, Shiraz HASHIM <shiraz.hashim@st.com> wrote:
+> Hello Jassi,
+>
+> On 3/15/2010 10:17 AM, jassi brar wrote:
+>> On Mon, Mar 15, 2010 at 1:31 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>>> In our SOC's (SPEArxxx), we have many peripheral sharing PL_GPIO pins and so
+>>> only few peripherals can be selected in a configuration. This is configurable
+>>> using a set of registers. Now the problem is to make following work:
+>>>
+>>> 1. How to do this selection in kernel in a simple way?
+>>> 2. Based on this selection hardware registers needs to be configured.
+>> Why can't you make the drivers acquire and setup the necessary pins during
+>> probe?
+>> Among other benefits, it enables you to use the same kernel image and device
+>> drivers as modules -- if a GPIO can be used by two different device
+>> controllers, you
+>> can switch the 'mode' of the board by simple rmmod-insmod
+>
+> I think the problem is we cannot change the standard drivers (already in the
+> mainline). So if the standard driver doesn't support this in its probe, then
+> how should we manage this?
+Though the drivers should already have done that, but still you can always
+submit patches to improve.
 
-Am I missing something?
-
-- Santosh
+> Further these configurations are board dependent, so I think driver must be
+> independent of this.
+Don't really understand this. Viresh said that the SoC can configure GPIOs for
+a controller or the other, which is quite common and is handled during probe.
+Also, it's desirable to have one kernel image run on many machines with the
+same SOC.
