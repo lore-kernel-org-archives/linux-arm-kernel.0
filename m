@@ -1,59 +1,52 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 15 Mar 2010 23:19:19 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add suspend/resume support for S3C PWM
-	driver
-In-Reply-To: <201003152324.15260.anarsoul@gmail.com>
-References: <1268663228-27515-1-git-send-email-anarsoul@gmail.com>
-	<201003152217.02781.anarsoul@gmail.com>
-	<4B9E9946.9030607@metafoo.de>
-	<201003152324.15260.anarsoul@gmail.com>
-Message-ID: <4B9EB267.3010300@metafoo.de>
+From: konkers@google.com (Erik Gilling)
+Date: Mon, 15 Mar 2010 15:38:36 -0700
+Subject: [RFC/PATCH] ARM: add Tegra support
+In-Reply-To: <4B96798C.6060201@compulab.co.il>
+References: <4B96798C.6060201@compulab.co.il>
+Message-ID: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Tue, Mar 9, 2010 at 9:38 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+> This patch adds basic support for Nvidia Tegra2 platform.
 
-Vasily Khoruzhick wrote:
-> ? ????????? ?? 15 ????? 2010 22:32:06 ????? Lars-Peter Clausen
-> ???????:
->
->> Hi
->>
->> Because it would require to implement the same functionality over
->> and over again. Furthermore it would require each generic driver
->> using the pwm api to provide such callbacks. And you - as a user
->> of the api - will have to know about this oddity. In my opinion
->> it is a detail specific to the samsung platform and should be
->> hidden behind the common interface.
->>
->> - Lars
->
-> So, you want to configure corresponding GPIO pin as output and set
-> it to low in pwm_disable, re-configure it as PWM output in
-> pwm_enable, and disable/enable PWM during suspend/resume cycle? If
-> so - it's easy to implement, but I want to hear Ben's opinion.
->
-> Regards Vasily
-Hi
+This code seems to be our port from
+git://android.git.kernel.org/kernel/tegra.git with some features
+removed, minor cleanups, and many trivial changes.  These changes make
+it difficult for us to track improvements and bug fixes in either
+direction.  We're happy that other people are interested in our work
+however are disappointed that our opinions were not sought before
+making these changes and posting nor was any attribution given to the
+work's authors.
 
-Yes. That's what I would prefer. The PWM is, if I'm not mistaken,
-implicitly turned of during suspend anyway.
-One problem that arises is that the PWM pins have different numbers on
-different Samsung SoC types, which was iirc the reason why the driver
-has been written without pin configuring support.
-But if the mapping is needed anyway it might also be desirable to
-configure the corresponding pin as PWM pin in the drivers probe
-function. Cause this currently has to be done separately as well.
+We're still in the process here at Google of cleaning up the port for
+submission.  We should have our changes rebased on 34-rc1 without the
+android-common code by the end of the day.  We've been maintaining a
+patchstack which separates out the functional subsystems.  Would
+people here prefer to see that or a collapsed patch like this one.
 
-But yes, lets wait for Ben's opinion.
+Specific issues with this patch with respect to our work:
 
-- - Lars
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.9 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org
+Lots of trival changes like moving files around, renaming variables,
+and re-wording/re-formating comments (sometimes changing the meaning
+of the comment incorrectly)
 
-iEYEARECAAYFAkuesmYACgkQBX4mSR26RiMd5ACffExKN2W9L6/MzLi7b4wG/xa3
-fHUAn02pW+1m1KdDfyyrUtW1GW8Az+9c
-=IrGE
------END PGP SIGNATURE-----
+Removal of SMP, L2 cache, and pinmux support.
+
+Removal of the gpio_names header.  Because tegra does not define GPIOs
+numerically, it is impossible to convert a gpio name (i.e. PN6) from a
+schematic to a GPIO number without consulting and interpreting the
+datasheet.
+
+Removal of the tegra_gpio_enable and tegra_gpio_disable functions.
+Because of the way pin muxing is implemented in tegra, gpio
+configuration does not map into the pinmuxing subsystem.
+
+Removal of pr_debug lines from the clock code.
+
+Changing the way peripheral clocks are defined to use two separate
+tables which are required to be kept in sync by hand.
+
+Removal of some pll entries.
+
+-Erik
