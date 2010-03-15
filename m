@@ -1,86 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Mar 2010 18:09:05 +0000
-Subject: [RFC/PATCH] ARM: add Tegra support
-In-Reply-To: <4B96798C.6060201@compulab.co.il>
-References: <4B96798C.6060201@compulab.co.il>
-Message-ID: <20100315180904.GH700@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 15 Mar 2010 13:22:51 -0500
+Subject: [spi-devel-general] [PATCH 0/3] spi: driver for Cirrus EP93xx
+	SPI	controller
+In-Reply-To: <cover.1268669236.git.mika.westerberg@iki.fi>
+References: <cover.1268669236.git.mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B0270842697636853334B@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 09, 2010 at 06:38:36PM +0200, Mike Rapoport wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3b18128..d479cd8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -750,6 +750,17 @@ config ARCH_U8500
->  	help
->  	  Support for ST-Ericsson's Ux500 architecture
->
-> +config ARCH_TEGRA
-> +        bool "NVIDIA Tegra"
-> +        select GENERIC_TIME
-> +        select GENERIC_CLOCKEVENTS
-> +        select GENERIC_GPIO
-> +        select HAVE_CLK
-> +        select COMMON_CLKDEV
-> +        help
-> +          This enables support for NVIDIA Tegra based systems (Tegra APX,
-> +          Tegra 6xx and Tegra 2 series).
-> +
+On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
+> Hello,
+> 
+> This series provides SPI master controller driver implementation for
+> Cirrus Logic EP93xx controllers.
+> 
+> I've tested this on my TS-7260 board with SPI EEPROM (through at25 driver)
+> and with few SD/MMC cards that I own (through mmc_spi driver). Unfortunately
+> I don't have other SPI devices so if someone wants to try this, it would be
+> great (see [1] for example code that I used with MMC cards).
+> 
+> This series applies on top of Linus' 2.6.34-rc1.
+> 
+> Please review.
+> 
+> Thanks,
+> MW
 
-Please don't blindly add to the end of a sorted list; this causes disgusting
-merge conflicts.  Please add to the correct place in the list instead.
+Hello Mika,
 
-"NVIDIA" belongs after "Nuvoton NUC93X CPU" but before
-"Philips Nexperia PNX4008 Mobile".
+I also have a SPI driver (originally from Bluewater Systems) that I have been
+sitting on.  Your's has the advantage of using interrupts and is already
+coded for 16-bit targets, mine is currently polled and only handles 8-bit
+targets.
 
-> +static struct platform_device debug_uart = {
-> +	.name = "serial8250",
-> +	.id = 0,
+Based on that I'll try to help you get yours merged instead.
 
-PLAT8250_DEV_xxx please.
+I already responded to patch 2/3.  Overall it's fine I would just like
+the code moved a bit in the source files.  Please review the comments.
 
-> +static void __init tegra_harmony_fixup(struct machine_desc *desc,
-> +				       struct tag *tags,
-> +				       char **cmdline, struct meminfo *mi)
-> +{
-> +	mi->nr_banks = 2;
-> +	mi->bank[0].start = PHYS_OFFSET;
-> +	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-> +	mi->bank[0].size = (448*1024*1024);
+Patch 3/3 looks ok initially.  I think you are hindering the chip-select
+options but I will work that out when I go through the patch 1/3.
 
-Parens aren't required.
+Patch 1/3 looks good for a start.  The only problem I see is your
+limitation to only using built-in gpio's for chipselects.
 
-> diff --git a/arch/arm/mach-tegra/include/mach/vmalloc.h b/arch/arm/mach-tegra/include/mach/vmalloc.h
-> new file mode 100644
-> index 0000000..33444b1
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/include/mach/vmalloc.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * arch/arm/mach-tegra/include/mach/vmalloc.h
-> + *
-> + * Copyright (C) 2010 Google, Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#ifndef __MACH_TEGRA_VMALLOC_H
-> +#define __MACH_TEGRA_VMALLOC_H
-> +
-> +#define VMALLOC_END        ((PAGE_OFFSET) + 0x38000000)
+I will try to get your patches merged into my tree this week and test
+them.  At that point I will provide more feedback and try to address
+the chipselect limitation.
 
-So if PAGE_OFFSET were to be 0xe0000000, this would still be valid?
-And what if PAGE_OFFSET were 0x80000000 ?
+Thanks for the submission.
 
-Wouldn't it be better to define it in terms of the maximum address
-as defined by the hardware maps - so that selecting 2GB of userspace
-gives you more kernel space?
+Regards,
+Hartley
