@@ -1,39 +1,52 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 15 Mar 2010 11:58:51 +0530
-Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
+Date: Mon, 15 Mar 2010 12:02:14 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
 	in linux
-In-Reply-To: <20100315062041.GD31126@trinity.fluff.org>
-References: <4B9DB823.1040809@st.com>
-	<20100315062041.GD31126@trinity.fluff.org>
-Message-ID: <4B9DD3A3.7050106@st.com>
+In-Reply-To: <1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
+References: <4B9DB823.1040809@st.com>	
+	<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>	
+	<4B9DC239.90407@st.com>
+	<1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
+Message-ID: <4B9DD46E.7060704@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
-
-On 3/15/2010 11:50 AM, Ben Dooks wrote:
->> > I have provided this selection from "make menuconfig", based on selection I
->> > configure hardware at initialization time. Basically these selections will
->> > decide which device is present in the system when it boots.
-> This is really bad idea, what happens if you have a selection of
-> boards with mutually-exclusive peripheral sets? Making these sorts of
-> decisions at compile time is always a bad idea, it leaves people making
-> distributitions a lot of extra work.
+On 3/15/2010 11:11 AM, jassi brar wrote:
+> On Mon, Mar 15, 2010 at 2:14 PM, Shiraz HASHIM <shiraz.hashim@st.com> wrote:
+>> Hello Jassi,
+>>
+>> On 3/15/2010 10:17 AM, jassi brar wrote:
+>>> On Mon, Mar 15, 2010 at 1:31 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>>>> In our SOC's (SPEArxxx), we have many peripheral sharing PL_GPIO pins and so
+>>>> only few peripherals can be selected in a configuration. This is configurable
+>>>> using a set of registers. Now the problem is to make following work:
+>>>>
+>>>> 1. How to do this selection in kernel in a simple way?
+>>>> 2. Based on this selection hardware registers needs to be configured.
+>>> Why can't you make the drivers acquire and setup the necessary pins during
+>>> probe?
+>>> Among other benefits, it enables you to use the same kernel image and device
+>>> drivers as modules -- if a GPIO can be used by two different device
+>>> controllers, you
+>>> can switch the 'mode' of the board by simple rmmod-insmod
+>>
+>> I think the problem is we cannot change the standard drivers (already in the
+>> mainline). So if the standard driver doesn't support this in its probe, then
+>> how should we manage this?
+> Though the drivers should already have done that, but still you can always
+> submit patches to improve.
 > 
-> My first idea would be to add a function which is given a bitmap or
-> list of devices to register, and this function sorts out what hardware
-> bits to set as needed and then register if the selection is possible.
+>> Further these configurations are board dependent, so I think driver must be
+>> independent of this.
+> Don't really understand this. Viresh said that the SoC can configure GPIOs for
+> a controller or the other, which is quite common and is handled during probe.
+> Also, it's desirable to have one kernel image run on many machines with the
+> same SOC.
 > 
 
-I agree with your idea to pass a bitmap to kernel at some time
-(probably at boot time), so that it can configure all required peripherals.
-
-Now, For this we need some interface or channel through which we provide
-this information to kernel. This is what precisely i have done. The channel i
-provided is through Kconfig and the function "s300_configure", accepts this 
-bitmap and configures hardware.
-
-Isn't it correct?
-
-regards,
-viresh kumar.
+Actually, different peripherals share IO Pads (PL_GPIOs) and GPIO lines. Sending
+patch for drivers to support this doesn't look a great idea to me. Further this 
+may cause problems to users, for example: User have entered a inserted a module
+and by mistake or lack of knowledge, he disables already working IP. Now with 
+Kconfig concept this is taken care of at the beginning only. User can't select
+peripherals which can't be enabled simultaneously.
