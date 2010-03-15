@@ -1,30 +1,49 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Mon, 15 Mar 2010 19:44:27 +0000
-Subject: [PATCH 2/3] ep93xx: added chip revision reading function
-In-Reply-To: <3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
-References: <cover.1268669236.git.mika.westerberg@iki.fi>
-	<774b9c08b6e9484a2ca5084b8b6019aa18dddd99.1268669236.git.mika.westerberg@iki.fi>
-	<3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
-Message-ID: <56d259a01003151244l352eeb50p95e97912b3df159a@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 15 Mar 2010 22:16:57 +0200
+Subject: [PATCH] ARM: SAMSUNG: Add suspend/resume support for S3C PWM
+	driver
+In-Reply-To: <4B9E8C25.80904@metafoo.de>
+References: <1268663228-27515-1-git-send-email-anarsoul@gmail.com>
+	<4B9E8C25.80904@metafoo.de>
+Message-ID: <201003152217.02781.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika, thanks, great work
+? ????????? ?? 15 ????? 2010 21:36:05 ????? Lars-Peter Clausen ???????:
 
-On 3/15/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> Added a new function: ep93xx_chip_revision() which reads chip revision from the
->  sysconfig register.
->
->  + * %EP93XX_CHIP_REV_D0
->  + * %EP93XX_CHIP_REV_D1
->  + * %EP93XX_CHIP_REV_E0
->  + * %EP93XX_CHIP_REV_E1
->  + * %EP93XX_CHIP_REV_E2
->  + *
->  + * and in future maybe something else. See also <mach/platform.h>.
+> Hi
+> 
+> There is still one big issue left regarding pwm suspend/resume.
+> If the invert bit is not set, the pwm will generate a HIGH signal when
+> being inactive, when the bit is set it will generate a HIGH signal when
+> active.
+> As a result any pin to which the pwm signal is routed will appear as
+> active until the pwm resume handler is called. This usually takes a few
+> 100 ms seconds and so for a short period of time we'll get the wrong
+> signal on pwm pins.
+> For correct behavior the pwm driver would have to check all pins to
+> which it's signal might be routed and if it's actually is configure the
+> pin as LOW output.
+> Upon resume the pin then has to be reconfigured as a pwm pin, only after
+> the invert bit has been set.
+> 
+> I know that it previously has been stated, that it is not desired for
+> the pwm driver to know about gpio pins. But in my opinion to ensure
+> correct behavior it is unavoidable.
+> 
+> - Lars
 
-There will be no future revisions, if that's what you mean. Cirrus
-dropped out of the ARM business and discontinued development of this
-product line on 1st April 2008 so E2 is the last.
+Hi, why not to leave this job for driver that use PWM? This driver should 
+disable PWM before going to suspend and ensure that GPIO pin is in right 
+state. (For example, I'm using pwm-bl callbacks to manage gpio pin state when 
+PWM is disabled).
 
-   M
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100315/8292d817/attachment.sig>
