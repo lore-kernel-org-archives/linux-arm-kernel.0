@@ -1,51 +1,45 @@
-From: Hui.Wang@windriver.com (Wang Hui)
-Date: Mon, 15 Mar 2010 18:23:42 +0800
-Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
-In-Reply-To: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-Message-ID: <1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
+From: shiraz.hashim@st.com (Shiraz HASHIM)
+Date: Mon, 15 Mar 2010 15:52:29 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
+	in linux
+In-Reply-To: <1b68c6791003150237k3d1508d3meb8370509dcfc9a8@mail.gmail.com>
+References: <4B9DB823.1040809@st.com>	
+	<20100315062041.GD31126@trinity.fluff.org>
+	<4B9DD3A3.7050106@st.com>	 <4B9DF2FF.3000706@st.com>
+	<4B9DF966.6050504@st.com>
+	<1b68c6791003150237k3d1508d3meb8370509dcfc9a8@mail.gmail.com>
+Message-ID: <4B9E0A65.2090103@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On omap2/3 series platforms, the musb can't raise id pin change
-detection interrupt, so we must change otg mode through sysfs
-interface manually. Currently when the musb is in B mode, if we
-want musb to be changed to A mode, we should plug a mini-A cable
-and then execute echo host > /sys/devices/platform/musb_hdrc/mode.
-But if the musb is in A mode, we can't change it to B mode through
-this method.
-To solve this problem, add a process for sending end session request.
-This process works like this, if the musb is in A mode, it will send
-an end session request first, then it will follow original routine:
-start a new session, during this session, it will identify whether
-A or B is plugging in the socket,  then it will init controller to A
-or B mode according to its identification.
+Jassi,
 
-Usage: change cable as you desired,
-       change musb mode by #>echo host[peripheral] > /sys/devices/\
-       platform/musb_hdrc/mode,
-       then you will get required musb mode.
+On 3/15/2010 3:07 PM, jassi brar wrote:
+> On Mon, Mar 15, 2010 at 6:09 PM, Shiraz HASHIM <shiraz.hashim@st.com> wrote:
+>> > yes, and if you see, should any one require it dynamically? Each user
+>> > would have his own board with static devices. This configuration (of
+>> > selecting multiplexed devices) depends on his board configuration, which
+>> > is the responsibility of the board configuration file.
+> sorry for barging in but ...
 
-Signed-off-by: Wang Hui <Hui.Wang@windriver.com>
----
- drivers/usb/musb/omap2430.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+your comments are most welcome.
 
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index 3fe1686..b02897e 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -194,6 +194,11 @@ int musb_platform_set_mode(struct musb *musb, u8 musb_mode)
- {
- 	u8	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+> usually device makers(that release product versions with same SoC but
+> different devices)
+> want a single kernel image that detects the machine type and
+> accordingly populate the
+> device support. Managing separate images for similar devices is
+> considered inefficient.
+
+Actually you have pointed to right thing and this is really important.
+Some architectures (I think ppc) have device tree option to pass the
+hardware configuration to the kernel from bootloader.
+I dont know such option exists for arm. Lets hear others' opinions.
+
+Following link exactly targets this
+http://ols.fedoraproject.org/OLS/Reprints-2008/likely2-reprint.pdf
+
+regards
+Shiraz
+
  
-+	if ((devctl & MUSB_DEVCTL_BDEVICE) == 0x0) {
-+		devctl &= ~MUSB_DEVCTL_SESSION;
-+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-+	}
-+
- 	devctl |= MUSB_DEVCTL_SESSION;
- 	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
- 
--- 
-1.5.6.5
