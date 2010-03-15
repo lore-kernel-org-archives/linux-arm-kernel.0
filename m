@@ -1,39 +1,30 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 15 Mar 2010 12:36:09 +0530
+From: armando.visconti@st.com (Armando VISCONTI)
+Date: Mon, 15 Mar 2010 09:42:39 +0100
 Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
 	in linux
-In-Reply-To: <20100315062041.GD31126@trinity.fluff.org>
+In-Reply-To: <4B9DD3A3.7050106@st.com>
 References: <4B9DB823.1040809@st.com>
 	<20100315062041.GD31126@trinity.fluff.org>
-Message-ID: <4B9DDC61.3090609@st.com>
+	<4B9DD3A3.7050106@st.com>
+Message-ID: <4B9DF2FF.3000706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+Viresh,
 
-On 3/15/2010 11:50 AM, Ben Dooks wrote:
->> > I have provided this selection from "make menuconfig", based on selection I
->> > configure hardware at initialization time. Basically these selections will
->> > decide which device is present in the system when it boots.
-> This is really bad idea, what happens if you have a selection of
-> boards with mutually-exclusive peripheral sets?
+> Now, For this we need some interface or channel through which we provide
+> this information to kernel. This is what precisely i have done. The channel i
+> provided is through Kconfig and the function "s300_configure", accepts this 
+> bitmap and configures hardware.
+>   
+I'm not getting this point.
 
-In this case, we can have different defconfig files for different boards.
+If you do it thru Kconfig still it would be fixed a compilation time.
+Do you agree or am I missing something?
 
-> Making these sorts of
-> decisions at compile time is always a bad idea, it leaves people making
-> distributitions a lot of extra work.
-> 
+So, probably the correct way is passing peripheral selection information 
+thru
+bootargs.
+What do you think?
 
-I agree with this point but what is the other way for this.
-
-Doing this at runtime will have following issue:
-
-User have inserted a module and by mistake or lack of knowledge,
-he disabled already working IP(due to multiplexing). Now with Kconfig concept 
-this is taken care of at the beginning only. User can't select peripherals which
-can't be enabled simultaneously.
-
-
-regards,
-viresh kumar.
+Armando
