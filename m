@@ -1,41 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Mar 2010 15:15:42 +0100
-Subject: Wrong cache flush function used in
-	arch/arm/boot/compressed/head.S?
-In-Reply-To: <1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
-References: <20100312100511.GQ19843@pengutronix.de>
-	<1268409116.16433.28.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100315141542.GA19843@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 15 Mar 2010 16:27:08 +0200
+Subject: [PATCH] ARM: SAMSUNG: Add suspend/resume support for S3C PWM driver
+Message-ID: <1268663228-27515-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 12, 2010 at 03:51:56PM +0000, Catalin Marinas wrote:
-> On Fri, 2010-03-12 at 10:05 +0000, Sascha Hauer wrote:
-> > 0e056f20f18d0efa5da920f3cf8532adc56d5779 contains the following hunk:
-> > 
-> >                 .word   0x00060000              @ ARMv5TEJ
-> >                 .word   0x000f0000
-> > -               b       __armv4_mmu_cache_on
-> > -               b       __armv4_mmu_cache_off
-> > -               b       __armv5tej_mmu_cache_flush
-> > +               W(b)    __armv4_mmu_cache_on
-> > +               W(b)    __armv4_mmu_cache_off
-> > +               W(b)    __armv4_mmu_cache_flush
-> > 
-> > Is this intentional? I do not see any problems in my kernel, but I
-> > use the same code in my bootloader and it doesn't seem to work correctly
-> > on my arm926 based system.
-> 
-> It wasn't intentional. I think I got it wrong when trying to solve a
-> merge conflict and I just added the original hunk.
+Reset period_ns and duty_ns values in suspend handler to avoid skip of
+configuration if same values passed to pwm_config;
+Restore invertion bit in resume handler.
 
-Ok, I just sent a patch to the patch system.
+Without this patch PWM works incorrectly after resume from suspend.
 
-Sascha
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/plat-samsung/pwm.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
-
+diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
+index ef019f2..f2d1139 100644
+--- a/arch/arm/plat-samsung/pwm.c
++++ b/arch/arm/plat-samsung/pwm.c
+@@ -379,6 +379,39 @@ static int __devexit s3c_pwm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int s3c_pwm_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct pwm_device *pwm = platform_get_drvdata(pdev);
++
++	/* No one preserve these values during suspend so reset them
++	 * Otherwise driver leaves PWM unconfigured if same values
++	 * passed to pwm_config
++	 */
++	pwm->period_ns = 0;
++	pwm->duty_ns = 0;
++
++	return 0;
++}
++
++static int s3c_pwm_resume(struct platform_device *pdev)
++{
++	struct pwm_device *pwm = platform_get_drvdata(pdev);
++	unsigned long tcon;
++
++	/* Restore invertion */
++	tcon = __raw_readl(S3C2410_TCON);
++	tcon |= pwm_tcon_invert(pwm);
++	__raw_writel(tcon, S3C2410_TCON);
++
++	return 0;
++}
++
++#else
++#define s3c_pwm_suspend NULL
++#define s3c_pwm_resume NULL
++#endif
++
+ static struct platform_driver s3c_pwm_driver = {
+ 	.driver		= {
+ 		.name	= "s3c24xx-pwm",
+@@ -386,6 +419,8 @@ static struct platform_driver s3c_pwm_driver = {
+ 	},
+ 	.probe		= s3c_pwm_probe,
+ 	.remove		= __devexit_p(s3c_pwm_remove),
++	.suspend	= s3c_pwm_suspend,
++	.resume		= s3c_pwm_resume,
+ };
+ 
+ static int __init pwm_init(void)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.2
