@@ -1,99 +1,30 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 15 Mar 2010 20:36:05 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add suspend/resume support for S3C PWM
-	driver
-In-Reply-To: <1268663228-27515-1-git-send-email-anarsoul@gmail.com>
-References: <1268663228-27515-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <4B9E8C25.80904@metafoo.de>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Mon, 15 Mar 2010 19:44:27 +0000
+Subject: [PATCH 2/3] ep93xx: added chip revision reading function
+In-Reply-To: <3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
+References: <cover.1268669236.git.mika.westerberg@iki.fi>
+	<774b9c08b6e9484a2ca5084b8b6019aa18dddd99.1268669236.git.mika.westerberg@iki.fi>
+	<3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
+Message-ID: <56d259a01003151244l352eeb50p95e97912b3df159a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
-> Reset period_ns and duty_ns values in suspend handler to avoid skip of
-> configuration if same values passed to pwm_config;
-> Restore invertion bit in resume handler.
+Hi Mika, thanks, great work
+
+On 3/15/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> Added a new function: ep93xx_chip_revision() which reads chip revision from the
+>  sysconfig register.
 >
-> Without this patch PWM works incorrectly after resume from suspend.
->
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->   
-Hi
+>  + * %EP93XX_CHIP_REV_D0
+>  + * %EP93XX_CHIP_REV_D1
+>  + * %EP93XX_CHIP_REV_E0
+>  + * %EP93XX_CHIP_REV_E1
+>  + * %EP93XX_CHIP_REV_E2
+>  + *
+>  + * and in future maybe something else. See also <mach/platform.h>.
 
-There is still one big issue left regarding pwm suspend/resume.
-If the invert bit is not set, the pwm will generate a HIGH signal when
-being inactive, when the bit is set it will generate a HIGH signal when
-active.
-As a result any pin to which the pwm signal is routed will appear as
-active until the pwm resume handler is called. This usually takes a few
-100 ms seconds and so for a short period of time we'll get the wrong
-signal on pwm pins.
-For correct behavior the pwm driver would have to check all pins to
-which it's signal might be routed and if it's actually is configure the
-pin as LOW output.
-Upon resume the pin then has to be reconfigured as a pwm pin, only after
-the invert bit has been set.
+There will be no future revisions, if that's what you mean. Cirrus
+dropped out of the ARM business and discontinued development of this
+product line on 1st April 2008 so E2 is the last.
 
-I know that it previously has been stated, that it is not desired for
-the pwm driver to know about gpio pins. But in my opinion to ensure
-correct behavior it is unavoidable.
-
-- Lars
-
-> ---
->  arch/arm/plat-samsung/pwm.c |   35 +++++++++++++++++++++++++++++++++++
->  1 files changed, 35 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
-> index ef019f2..f2d1139 100644
-> --- a/arch/arm/plat-samsung/pwm.c
-> +++ b/arch/arm/plat-samsung/pwm.c
-> @@ -379,6 +379,39 @@ static int __devexit s3c_pwm_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int s3c_pwm_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct pwm_device *pwm = platform_get_drvdata(pdev);
-> +
-> +	/* No one preserve these values during suspend so reset them
-> +	 * Otherwise driver leaves PWM unconfigured if same values
-> +	 * passed to pwm_config
-> +	 */
-> +	pwm->period_ns = 0;
-> +	pwm->duty_ns = 0;
-> +
-> +	return 0;
-> +}
-> +
-> +static int s3c_pwm_resume(struct platform_device *pdev)
-> +{
-> +	struct pwm_device *pwm = platform_get_drvdata(pdev);
-> +	unsigned long tcon;
-> +
-> +	/* Restore invertion */
-> +	tcon = __raw_readl(S3C2410_TCON);
-> +	tcon |= pwm_tcon_invert(pwm);
-> +	__raw_writel(tcon, S3C2410_TCON);
-> +
-> +	return 0;
-> +}
-> +
-> +#else
-> +#define s3c_pwm_suspend NULL
-> +#define s3c_pwm_resume NULL
-> +#endif
-> +
->  static struct platform_driver s3c_pwm_driver = {
->  	.driver		= {
->  		.name	= "s3c24xx-pwm",
-> @@ -386,6 +419,8 @@ static struct platform_driver s3c_pwm_driver = {
->  	},
->  	.probe		= s3c_pwm_probe,
->  	.remove		= __devexit_p(s3c_pwm_remove),
-> +	.suspend	= s3c_pwm_suspend,
-> +	.resume		= s3c_pwm_resume,
->  };
->  
->  static int __init pwm_init(void)
->   
+   M
