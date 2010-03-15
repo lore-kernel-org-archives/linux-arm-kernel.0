@@ -1,118 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Mar 2010 12:15:23 -0700
-Subject: [GIT PULL] omap fixes for 2.6.34-rc1
-Message-ID: <20100315191523.GA2900@atomide.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 15 Mar 2010 20:21:37 +0100
+Subject: [PATCH] Voipac PXA270: UDC and UHC support
+In-Reply-To: <201003132300.55480.marek.vasut@gmail.com> (Marek Vasut's message
+	of "Sat, 13 Mar 2010 23:00:55 +0100")
+References: <201003100543.00221.marek.vasut@gmail.com>
+	<201003101243.54008.marek.vasut@gmail.com> <87hbol77lp.fsf@free.fr>
+	<201003132300.55480.marek.vasut@gmail.com>
+Message-ID: <87ljdtpf0e.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Marek Vasut <marek.vasut@gmail.com> writes:
 
-Please pull omap fixes from:
+> Dne P? 12. b?ezna 2010 18:49:54 Robert Jarzmik napsal(a):
+>> Marek Vasut <marek.vasut@gmail.com> writes:
+>> > Dne St 10. b?ezna 2010 05:43:00 Marek Vasut napsal(a):
+>> >> Hi,
+>> >> this patch adds UDC and UHC support (and formating fix, I hope you dont
+>> >>  mind Eric).
+>> >>
+>> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> >
+>> > revised patch
+Yes, I feel that one much better.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+One minor comments remain for me.
+> +/******************************************************************************
+> + * USB Gadget
+> + ******************************************************************************/
+> +#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
+> +static struct gpio_vbus_mach_info vpac270_gpio_vbus_info = {
+> +	.gpio_vbus		= GPIO41_VPAC270_UDC_DETECT,
+> +	.gpio_pullup		= -1,
+> +};
+> +
+> +static struct platform_device vpac270_gpio_vbus = {
+> +	.name	= "gpio-vbus",
+> +	.id	= -1,
+> +	.dev	= {
+> +		.platform_data	= &vpac270_gpio_vbus_info,
+> +	},
+> +};
+> +
+> +static void vpac270_udc_command(int cmd) 
+> +{
+> +	if (cmd == PXA2XX_UDC_CMD_CONNECT)
+> +		UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
+> +	else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
+> +		UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE);
 
-Regards,
+In the "DISCONNECT" case, you reset UP2OCR_HXOE, meaning the usb port isn't a
+USB Device anymore (neither a USB host). If that's on purpose, then all good, in
+the other case, don't reset that one.
 
-Tony
+Otherwise, you can add for the UDC part :
+Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-
-The following changes since commit 57d54889cd00db2752994b389ba714138652e60c:
-  Linus Torvalds (1):
-        Linux 2.6.34-rc1
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Aaro Koskinen (2):
-      omap: pass the reboot command to the boot loader
-      omap: mach-omap2/io.c: fix function declarations
-
-Andrea Gelmini (1):
-      omap: Checkpatch cleanup for blizzard.h
-
-Andrew Clayton (1):
-      ARM/OMAP: Remove the +x bit from a couple of source files
-
-Enric Balletbo i Serra (1):
-      omap3: Fix support for the LEDs connected to GPIO outputs on IGEP v2board
-
-Felipe Balbi (1):
-      omap2/3/4: ehci: avoid compiler error with touchbook
-
-Francisco Alecrim (1):
-      omap2: add USB initialization for tusb6010
-
-Grazvydas Ignotas (1):
-      omap3: pandora: add missing i2c3 board_info
-
-Janusz Krzysztofik (1):
-      omap: McBSP: Drop unnecessary status/error bit clearing on reg_cacheretrieved register values
-
-Kevin Hilman (2):
-      OMAP2: cpu_is_omap2*: fix compile-time removal of unused code
-      OMAP4: fix temporary hacks that break multi-omap PM
-
-Santosh Shilimkar (1):
-      omap4: Fix build break by moving omap_smc1 into a separate .S
-
-Sergio Aguirre (1):
-      omap: Fix gpio_resume_after_retention
-
-Suman Anna (1):
-      omap2/3/4: mailbox: remove compiler warning
-
-Thomas Weber (1):
-      OMAP2: serial.c: Fix number of uarts in early_init
-
-Tony Lindgren (3):
-      omap3: Fix compile for Touch Book early_param
-      omap2: Update n8x0 defconfig to test multi-omap and DMA api changes
-      omap: Enable PM_RUNTIME in defconfigs to avoid USB compile errors
-
- arch/arm/configs/cm_t35_defconfig            |    2 +-
- arch/arm/configs/n770_defconfig              |    1 +
- arch/arm/configs/n8x0_defconfig              |  160 +++++++++++++++++++++++---
- arch/arm/configs/omap3_beagle_defconfig      |    1 +
- arch/arm/configs/omap3_defconfig             |    2 +-
- arch/arm/configs/omap3_evm_defconfig         |    1 +
- arch/arm/configs/omap3_touchbook_defconfig   |    2 +-
- arch/arm/configs/omap_3430sdp_defconfig      |    1 +
- arch/arm/configs/omap_3630sdp_defconfig      |    2 +-
- arch/arm/configs/omap_h2_1610_defconfig      |    1 +
- arch/arm/configs/omap_zoom2_defconfig        |    1 +
- arch/arm/configs/omap_zoom3_defconfig        |    2 +-
- arch/arm/configs/rx51_defconfig              |    1 +
- arch/arm/mach-omap2/Makefile                 |    3 +
- arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-3630sdp.c          |    2 +-
- arch/arm/mach-omap2/board-4430sdp.c          |   26 +----
- arch/arm/mach-omap2/board-am3517evm.c        |    2 +-
- arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
- arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
- arch/arm/mach-omap2/board-igep0020.c         |   56 ++++++---
- arch/arm/mach-omap2/board-n8x0.c             |   98 ++++++++++++++++
- arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c     |   12 ++-
- arch/arm/mach-omap2/board-omap3touchbook.c   |   12 +-
- arch/arm/mach-omap2/board-overo.c            |    2 +-
- arch/arm/mach-omap2/board-zoom3.c            |    2 +-
- arch/arm/mach-omap2/clock2420_data.c         |    1 +
- arch/arm/mach-omap2/io.c                     |   21 ++--
- arch/arm/mach-omap2/mailbox.c                |   12 +-
- arch/arm/mach-omap2/omap44xx-smc.S           |   32 +++++
- arch/arm/mach-omap2/prcm.c                   |    4 +-
- arch/arm/mach-omap2/serial.c                 |   15 ++-
- arch/arm/mach-omap2/usb-ehci.c               |    6 +-
- arch/arm/plat-omap/gpio.c                    |   10 +-
- arch/arm/plat-omap/include/plat/blizzard.h   |    2 +-
- arch/arm/plat-omap/include/plat/cpu.h        |    8 +-
- arch/arm/plat-omap/include/plat/prcm.h       |    2 +-
- arch/arm/plat-omap/include/plat/system.h     |    6 +-
- arch/arm/plat-omap/include/plat/usb.h        |    2 +-
- arch/arm/plat-omap/mcbsp.c                   |   12 +--
- 42 files changed, 403 insertions(+), 132 deletions(-)
- mode change 100755 => 100644 arch/arm/mach-omap2/board-3630sdp.c
- mode change 100755 => 100644 arch/arm/mach-omap2/board-zoom-peripherals.c
- create mode 100644 arch/arm/mach-omap2/omap44xx-smc.S
+-- 
+Robert
