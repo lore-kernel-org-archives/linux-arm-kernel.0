@@ -1,34 +1,46 @@
 From: saaguirre@ti.com (Sergio Aguirre)
-Date: Mon, 15 Mar 2010 18:04:09 -0500
-Subject: [PATCH 4/7] omap3: zoom2/3 / 3630sdp: Don't init always all uarts
+Date: Mon, 15 Mar 2010 18:04:12 -0500
+Subject: [PATCH 7/7] omap3: zoom2/3: Register only 1 8250 port
 In-Reply-To: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
 References: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
-Message-ID: <1268694252-21985-5-git-send-email-saaguirre@ti.com>
+Message-ID: <1268694252-21985-8-git-send-email-saaguirre@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is useless, since in Zoom2/3 boards, the ports aren't even
-physically accessible.
-
-They must be explicitly initted in the board-zoom2.c, board-zoom3.c
-and board-3630sdp.c files instead.
+There's no more serial ports available, so, doesn't make sense
+to create 4 device nodes.
 
 Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
 ---
- arch/arm/mach-omap2/board-zoom-peripherals.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ arch/arm/configs/omap_zoom2_defconfig |    2 +-
+ arch/arm/configs/omap_zoom3_defconfig |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index ca95d8d..6b39849 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -280,7 +280,6 @@ static void enable_board_wakeup_source(void)
- void __init zoom_peripherals_init(void)
- {
- 	omap_i2c_init();
--	omap_serial_init();
- 	usb_musb_init(&musb_board_data);
- 	enable_board_wakeup_source();
- }
+diff --git a/arch/arm/configs/omap_zoom2_defconfig b/arch/arm/configs/omap_zoom2_defconfig
+index f5c6e11..881faea 100644
+--- a/arch/arm/configs/omap_zoom2_defconfig
++++ b/arch/arm/configs/omap_zoom2_defconfig
+@@ -661,7 +661,7 @@ CONFIG_DEVKMEM=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=32
+-CONFIG_SERIAL_8250_RUNTIME_UARTS=4
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
+diff --git a/arch/arm/configs/omap_zoom3_defconfig b/arch/arm/configs/omap_zoom3_defconfig
+index ea9a501..5e55b55 100644
+--- a/arch/arm/configs/omap_zoom3_defconfig
++++ b/arch/arm/configs/omap_zoom3_defconfig
+@@ -680,7 +680,7 @@ CONFIG_DEVKMEM=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=32
+-CONFIG_SERIAL_8250_RUNTIME_UARTS=4
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
 -- 
 1.6.3.3
