@@ -1,108 +1,40 @@
-From: armando.visconti@st.com (Armando VISCONTI)
-Date: Mon, 15 Mar 2010 11:10:20 +0100
-Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
-	in linux
-In-Reply-To: <4B9DF966.6050504@st.com>
-References: <4B9DB823.1040809@st.com>
-	<20100315062041.GD31126@trinity.fluff.org>
-	<4B9DD3A3.7050106@st.com> <4B9DF2FF.3000706@st.com>
-	<4B9DF966.6050504@st.com>
-Message-ID: <4B9E078C.4010706@st.com>
+From: Hui.Wang@windriver.com (Wang Hui)
+Date: Mon, 15 Mar 2010 18:23:41 +0800
+Subject: [PATCH 1/2] USB: musb: add two states to handle vbus error
+Message-ID: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shiraz,
+When the MUSB is configured as host mode or OTG mode, the xceiv->state
+will be set to OTG_STATE_A_IDLE or OTG_STATE_B_IDLE unconditionally
+during init process. These init states can change to other
+states When the MUSB module detects id pin change, devices connect or
+disconnect.
+But on some platforms(omap2, omap3), the id pin change
+can't raise IRQ request to the MUSB module, so on these platforms,
+the init xceiv->state will be A_IDLE or B_IDLE. Under this condition,
+when we want the MUSB to act as a host and hotplug a usb device in
+mini-B side of the cable, the MUSB will have a possibility to suffer
+power underrun under A_IDLE or B_IDLE state, So here adding these
+two states under which we can handle VBUSERROR IRQ.
 
->> If you do it thru Kconfig still it would be fixed a compilation time.
->> Do you agree or am I missing something?
->>     
->
-> yes, and if you see, should any one require it dynamically? Each user 
-> would have his own board with static devices. This configuration (of 
-> selecting multiplexed devices) depends on his board configuration, which
-> is the responsibility of the board configuration file.
->   
-This was also my understanding at the beginning.
-But looking at the response from the community it
-looks that it is better to have a single image for all boards
-which is capable at runtime to be configured in the proper way.
+Signed-off-by: Wang Hui <Hui.Wang@windriver.com>
+---
+ drivers/usb/musb/musb_core.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
->> So, probably the correct way is passing peripheral selection information
->> thru
->> bootargs.
->> What do you think?
->>     
->
-> This is very specific to how an SoC provides multiplexing options and will
-> vary greatly. Which option of bootargs are you talking about?
->   
-Of course not a standard bootargs option.
-I was more talking about a new specific option that is
-passed thru bootargs and directed to a specific SPEAr function that
-can apply the proper cfg and register setting, like someone (Ben?)
-was suggesting.
-
-In this option you should pass a bitmap or something like that.
-
-Let me know your opinion on it.
-
-Armando
-
-
-
-
-Shiraz HASHIM wrote:
-> Armando,
->
-> On 3/15/2010 2:12 PM, Armando VISCONTI wrote:
->   
->>> Now, For this we need some interface or channel through which we provide
->>> this information to kernel. This is what precisely i have done. The
->>> channel i
->>> provided is through Kconfig and the function "s300_configure", accepts
->>> this bitmap and configures hardware.
->>>   
->>>       
->> I'm not getting this point.
->>     
->
-> yes, Actually this is what we are saying. Seemingly the best option is
-> to do it during compilation time, except if we have some standard way
-> at booting.
->
->   
->> If you do it thru Kconfig still it would be fixed a compilation time.
->> Do you agree or am I missing something?
->>     
->
-> yes, and if you see, should any one require it dynamically? Each user 
-> would have his own board with static devices. This configuration (of 
-> selecting multiplexed devices) depends on his board configuration, which
-> is the responsibility of the board configuration file.
->
->   
->> So, probably the correct way is passing peripheral selection information
->> thru
->> bootargs.
->> What do you think?
->>     
->
-> This is very specific to how an SoC provides multiplexing options and will
-> vary greatly. Which option of bootargs are you talking about?
->
-> regards
-> Shiraz
->   
-
-
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index b4bbf8f..655413c 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -516,6 +516,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
+ 			 * another reset is due (at least for high speed,
+ 			 * to redo the chirp etc), it might work OK...
+ 			 */
++		case OTG_STATE_A_IDLE:
++		case OTG_STATE_B_IDLE:
+ 		case OTG_STATE_A_WAIT_BCON:
+ 		case OTG_STATE_A_WAIT_VRISE:
+ 			if (musb->vbuserr_retry) {
 -- 
--- "Every step appears to be the unavoidable consequence of the
--- preceding one." (A. Einstein) 
--- 
-Armando Visconti                  Mobile: (+39) 346 8879146
-Senior SW Engineer                Fax:    (+39) 02 93519290
-CPG                               Work:   (+39) 02 93519683
-Computer System Division          e-mail: armando.visconti at st.com
-ST Microelectronics               TINA:   051  4683
-                                    
- 
+1.5.6.5
