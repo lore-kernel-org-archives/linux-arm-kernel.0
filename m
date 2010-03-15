@@ -1,202 +1,118 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 15 Mar 2010 14:05:38 -0500
-Subject: [spi-devel-general] [PATCH 3/3] ep93xx: SPI driver platform
-	support	code
-In-Reply-To: <7346460bf58ddd90037e92e70f44e60df64540fe.1268669236.git.mika.westerberg@iki.fi>
-References: <cover.1268669236.git.mika.westerberg@iki.fi>
-	<7346460bf58ddd90037e92e70f44e60df64540fe.1268669236.git.mika.westerberg@iki.fi>
-Message-ID: <0D753D10438DA54287A00B02708426976368533454@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Mar 2010 12:15:23 -0700
+Subject: [GIT PULL] omap fixes for 2.6.34-rc1
+Message-ID: <20100315191523.GA2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
-> This patch adds platform side support code for EP93xx SPI driver. This
-> includes clock, resources and muxing. There is a new function:
-> ep93xx_register_spi() that can be used by board support code to
-> register new SPI devices for the board.
->
-> Patch depends on the previous patch which adds function ep93xx_chip_revision().
->
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+Hi Linus,
 
-Mika,
+Please pull omap fixes from:
 
-Some initial comments.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-> ---
->  arch/arm/mach-ep93xx/clock.c                    |   21 +++++++++++
->  arch/arm/mach-ep93xx/core.c                     |   42 +++++++++++++++++++++++
->  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
->  arch/arm/mach-ep93xx/include/mach/platform.h    |    2 +
->  4 files changed, 66 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-> index 5f80092..1dc22cc 100644
-> --- a/arch/arm/mach-ep93xx/clock.c
-> +++ b/arch/arm/mach-ep93xx/clock.c
-> @@ -100,6 +100,10 @@ static struct clk clk_pwm = {
->  	.parent		= &clk_xtali,
->  	.rate		= EP93XX_EXT_CLK_RATE,
->  };
-> +static struct clk clk_spi = {
-> +	.parent		= &clk_xtali,
-> +	.rate		= EP93XX_EXT_CLK_RATE / 2,
-> +};
+Regards,
 
-Please put the clk_spi before the clk_pwm.
- 
->  static struct clk clk_video = {
->  	.sw_locked	= 1,
-> @@ -187,6 +191,7 @@ static struct clk_lookup clocks[] = {
->  	INIT_CK("ep93xx-keypad",	NULL,		&clk_keypad),
->  	INIT_CK("ep93xx-fb",		NULL,		&clk_video),
->  	INIT_CK(NULL,			"pwm_clk",	&clk_pwm),
-> +	INIT_CK(NULL,			"spi_clk",	&clk_spi),
+Tony
 
-Ditto.
 
-Also, change the init so we can use dev_id matching.
+The following changes since commit 57d54889cd00db2752994b389ba714138652e60c:
+  Linus Torvalds (1):
+        Linux 2.6.34-rc1
 
-+	INIT_CLK("ep93xx-spi",		NULL,		&clk_spi),
+are available in the git repository at:
 
->  	INIT_CK(NULL,			"m2p0",		&clk_m2p0),
->  	INIT_CK(NULL,			"m2p1",		&clk_m2p1),
->  	INIT_CK(NULL,			"m2p2",		&clk_m2p2),
-> @@ -480,6 +485,22 @@ static int __init ep93xx_clock_init(void)
->  		clk_p.rate / 1000000);
->  
->  	clkdev_add_table(clocks, ARRAY_SIZE(clocks));
-> +
-> +	/*
-> +	 * EP93xx SSP clock rate was doubled in version E2 and forwards. For
-> +	 * more information see:
-> +	 *     http://www.cirrus.com/en/pubs/appNote/AN273REV4.pdf
-> +	 */
-> +	if (ep93xx_chip_revision() >= EP93XX_CHIP_REV_E2) {
-> +		struct clk *clk;
-> +
-> +		clk = clk_get(NULL, "spi_clk");
-> +		if (!IS_ERR(clk)) {
-> +			clk->rate *= 2;
-> +			clk_put(clk);
-> +		}
-> +	}
-> +
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-Please move this block before the pr_info's.
+Aaro Koskinen (2):
+      omap: pass the reboot command to the boot loader
+      omap: mach-omap2/io.c: fix function declarations
 
-Also, no need to use clk_get/clk_put.  Just do:
+Andrea Gelmini (1):
+      omap: Checkpatch cleanup for blizzard.h
 
-+	if (ep93xx_chip_revision() >= EP93XX_CHIP_REV_E2)
-+		clk_spi.rate *= 2;
+Andrew Clayton (1):
+      ARM/OMAP: Remove the +x bit from a couple of source files
 
->  	return 0;
->  }
->  arch_initcall(ep93xx_clock_init);
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 2e496c9..36a7833 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -31,6 +31,7 @@
->  #include <linux/amba/serial.h>
->  #include <linux/i2c.h>
->  #include <linux/i2c-gpio.h>
-> +#include <linux/clk.h>
+Enric Balletbo i Serra (1):
+      omap3: Fix support for the LEDs connected to GPIO outputs on IGEP v2board
 
-Is this include necessary?
+Felipe Balbi (1):
+      omap2/3/4: ehci: avoid compiler error with touchbook
 
->  
->  #include <mach/hardware.h>
->  #include <mach/fb.h>
-> @@ -389,6 +390,47 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
->  	platform_device_register(&ep93xx_eth_device);
->  }
->  
-> +static struct resource ep93xx_spi_resources[] = {
-> +	{
-> +		.start	= EP93XX_SPI_PHYS_BASE,
-> +		.end	= EP93XX_SPI_PHYS_BASE + SZ_4K - 1,
+Francisco Alecrim (1):
+      omap2: add USB initialization for tusb6010
 
-The spi resource is only + 0x18 - 1.
+Grazvydas Ignotas (1):
+      omap3: pandora: add missing i2c3 board_info
 
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start	= IRQ_EP93XX_SSP,
+Janusz Krzysztofik (1):
+      omap: McBSP: Drop unnecessary status/error bit clearing on reg_cacheretrieved register values
 
-Please add the .end value also:
+Kevin Hilman (2):
+      OMAP2: cpu_is_omap2*: fix compile-time removal of unused code
+      OMAP4: fix temporary hacks that break multi-omap PM
 
-+		.end		= IRQ_EP93XX_SSP,
+Santosh Shilimkar (1):
+      omap4: Fix build break by moving omap_smc1 into a separate .S
 
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +static struct platform_device ep93xx_spi_device = {
-> +	.name		= "ep93xx-spi",
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(ep93xx_spi_resources),
-> +	.resource	= ep93xx_spi_resources,
-> +};
-> +
-> +/**
-> + * ep93xx_register_spi() - registers spi platform device
-> + * @info: ep93xx board specific spi info
-> + *
-> + * This function registers platform device for the EP93xx SPI controller and
-> + * also makes sure that SPI pins are muxed so that I2S is not using those
-> + * pins. Caller should allocate necessary GPIO lines and register any SPI
-> + * devices before calling this (see also spi_register_board_info()).
-> + *
-> + * Returns %0 in success and negative value in case of failure.
-> + */
-> +int __init ep93xx_register_spi(struct ep93xx_spi_info *info)
-> +{
-> +	/*
-> +	 * When SPI is used, we need to make sure that I2S is muxed off from
-> +	 * SPI pins.
-> +	 */
-> +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONSSP);
-> +
-> +	ep93xx_spi_device.dev.platform_data = info;
-> +	return platform_device_register(&ep93xx_spi_device);
-> +}
->  
->  /*************************************************************************
->   * EP93xx i2c peripheral handling
-> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> index 93e2ecc..b1e096f 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> @@ -106,6 +106,7 @@
->  
->  #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
->  
-> +#define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
->  #define EP93XX_SPI_BASE			EP93XX_APB_IOMEM(0x000a0000)
->  
->  #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
-> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
-> index 8603837..1f02147 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
-> @@ -9,6 +9,7 @@ struct i2c_board_info;
->  struct platform_device;
->  struct ep93xxfb_mach_info;
->  struct ep93xx_keypad_platform_data;
-> +struct ep93xx_spi_info;
->  
->  struct ep93xx_eth_data
->  {
-> @@ -49,6 +50,7 @@ void ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
->  			 struct i2c_board_info *devices, int num);
->  void ep93xx_register_fb(struct ep93xxfb_mach_info *data);
->  void ep93xx_register_pwm(int pwm0, int pwm1);
-> +int ep93xx_register_spi(struct ep93xx_spi_info *info);
+Sergio Aguirre (1):
+      omap: Fix gpio_resume_after_retention
 
-Please move this up, above ep93xx_register_i2c, to match how it is in the
-core.c file.
+Suman Anna (1):
+      omap2/3/4: mailbox: remove compiler warning
 
->  int ep93xx_pwm_acquire_gpio(struct platform_device *pdev);
->  void ep93xx_pwm_release_gpio(struct platform_device *pdev);
->  void ep93xx_register_keypad(struct ep93xx_keypad_platform_data *data);
+Thomas Weber (1):
+      OMAP2: serial.c: Fix number of uarts in early_init
+
+Tony Lindgren (3):
+      omap3: Fix compile for Touch Book early_param
+      omap2: Update n8x0 defconfig to test multi-omap and DMA api changes
+      omap: Enable PM_RUNTIME in defconfigs to avoid USB compile errors
+
+ arch/arm/configs/cm_t35_defconfig            |    2 +-
+ arch/arm/configs/n770_defconfig              |    1 +
+ arch/arm/configs/n8x0_defconfig              |  160 +++++++++++++++++++++++---
+ arch/arm/configs/omap3_beagle_defconfig      |    1 +
+ arch/arm/configs/omap3_defconfig             |    2 +-
+ arch/arm/configs/omap3_evm_defconfig         |    1 +
+ arch/arm/configs/omap3_touchbook_defconfig   |    2 +-
+ arch/arm/configs/omap_3430sdp_defconfig      |    1 +
+ arch/arm/configs/omap_3630sdp_defconfig      |    2 +-
+ arch/arm/configs/omap_h2_1610_defconfig      |    1 +
+ arch/arm/configs/omap_zoom2_defconfig        |    1 +
+ arch/arm/configs/omap_zoom3_defconfig        |    2 +-
+ arch/arm/configs/rx51_defconfig              |    1 +
+ arch/arm/mach-omap2/Makefile                 |    3 +
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-3630sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c          |   26 +----
+ arch/arm/mach-omap2/board-am3517evm.c        |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c         |   56 ++++++---
+ arch/arm/mach-omap2/board-n8x0.c             |   98 ++++++++++++++++
+ arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |   12 ++-
+ arch/arm/mach-omap2/board-omap3touchbook.c   |   12 +-
+ arch/arm/mach-omap2/board-overo.c            |    2 +-
+ arch/arm/mach-omap2/board-zoom3.c            |    2 +-
+ arch/arm/mach-omap2/clock2420_data.c         |    1 +
+ arch/arm/mach-omap2/io.c                     |   21 ++--
+ arch/arm/mach-omap2/mailbox.c                |   12 +-
+ arch/arm/mach-omap2/omap44xx-smc.S           |   32 +++++
+ arch/arm/mach-omap2/prcm.c                   |    4 +-
+ arch/arm/mach-omap2/serial.c                 |   15 ++-
+ arch/arm/mach-omap2/usb-ehci.c               |    6 +-
+ arch/arm/plat-omap/gpio.c                    |   10 +-
+ arch/arm/plat-omap/include/plat/blizzard.h   |    2 +-
+ arch/arm/plat-omap/include/plat/cpu.h        |    8 +-
+ arch/arm/plat-omap/include/plat/prcm.h       |    2 +-
+ arch/arm/plat-omap/include/plat/system.h     |    6 +-
+ arch/arm/plat-omap/include/plat/usb.h        |    2 +-
+ arch/arm/plat-omap/mcbsp.c                   |   12 +--
+ 42 files changed, 403 insertions(+), 132 deletions(-)
+ mode change 100755 => 100644 arch/arm/mach-omap2/board-3630sdp.c
+ mode change 100755 => 100644 arch/arm/mach-omap2/board-zoom-peripherals.c
+ create mode 100644 arch/arm/mach-omap2/omap44xx-smc.S
