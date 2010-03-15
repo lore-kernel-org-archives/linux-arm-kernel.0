@@ -1,97 +1,86 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 15 Mar 2010 13:06:24 -0500
-Subject: [spi-devel-general] [PATCH 2/3] ep93xx: added chip revision
-	reading	function
-In-Reply-To: <3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
-References: <cover.1268669236.git.mika.westerberg@iki.fi>
-	<3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
-Message-ID: <0D753D10438DA54287A00B027084269763685332EF@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Mar 2010 18:09:05 +0000
+Subject: [RFC/PATCH] ARM: add Tegra support
+In-Reply-To: <4B96798C.6060201@compulab.co.il>
+References: <4B96798C.6060201@compulab.co.il>
+Message-ID: <20100315180904.GH700@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
-> Added a new function: ep93xx_chip_revision() which reads chip revision from 
-> the sysconfig register.
+On Tue, Mar 09, 2010 at 06:38:36PM +0200, Mike Rapoport wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 3b18128..d479cd8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -750,6 +750,17 @@ config ARCH_U8500
+>  	help
+>  	  Support for ST-Ericsson's Ux500 architecture
 >
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> +config ARCH_TEGRA
+> +        bool "NVIDIA Tegra"
+> +        select GENERIC_TIME
+> +        select GENERIC_CLOCKEVENTS
+> +        select GENERIC_GPIO
+> +        select HAVE_CLK
+> +        select COMMON_CLKDEV
+> +        help
+> +          This enables support for NVIDIA Tegra based systems (Tegra APX,
+> +          Tegra 6xx and Tegra 2 series).
+> +
 
-Hello Mike,
+Please don't blindly add to the end of a sorted list; this causes disgusting
+merge conflicts.  Please add to the correct place in the list instead.
 
-A couple comments below.
+"NVIDIA" belongs after "Nuvoton NUC93X CPU" but before
+"Philips Nexperia PNX4008 Mobile".
 
-> ---
->  arch/arm/mach-ep93xx/core.c                  |   26 ++++++++++++++++++++++++++
->  arch/arm/mach-ep93xx/include/mach/platform.h |   11 +++++++++++
->  2 files changed, 37 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 90fb591..2e496c9 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -64,6 +64,32 @@ void __init ep93xx_map_io(void)
->  	iotable_init(ep93xx_io_desc, ARRAY_SIZE(ep93xx_io_desc));
->  }
->  
-> +/**
-> + * ep93xx_chip_revision() - returns EP93xx chip revision
-> + *
-> + * Returns EP93xx chip revision number read from sysconfig register. Possible
-> + * values can be one of the following:
-> + *
-> + * %EP93XX_CHIP_REV_A
-> + * %EP93XX_CHIP_REV_B
-> + * %EP93XX_CHIP_REV_C
-> + * %EP93XX_CHIP_REV_D0
-> + * %EP93XX_CHIP_REV_D1
-> + * %EP93XX_CHIP_REV_E0
-> + * %EP93XX_CHIP_REV_E1
-> + * %EP93XX_CHIP_REV_E2
-> + *
-> + * and in future maybe something else. See also <mach/platform.h>.
-> + */
-> +u8 ep93xx_chip_revision(void)
+> +static struct platform_device debug_uart = {
+> +	.name = "serial8250",
+> +	.id = 0,
+
+PLAT8250_DEV_xxx please.
+
+> +static void __init tegra_harmony_fixup(struct machine_desc *desc,
+> +				       struct tag *tags,
+> +				       char **cmdline, struct meminfo *mi)
 > +{
-> +	u32 v;
+> +	mi->nr_banks = 2;
+> +	mi->bank[0].start = PHYS_OFFSET;
+> +	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+> +	mi->bank[0].size = (448*1024*1024);
+
+Parens aren't required.
+
+> diff --git a/arch/arm/mach-tegra/include/mach/vmalloc.h b/arch/arm/mach-tegra/include/mach/vmalloc.h
+> new file mode 100644
+> index 0000000..33444b1
+> --- /dev/null
+> +++ b/arch/arm/mach-tegra/include/mach/vmalloc.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * arch/arm/mach-tegra/include/mach/vmalloc.h
+> + *
+> + * Copyright (C) 2010 Google, Inc.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
 > +
-> +	v = __raw_readl(EP93XX_SYSCON_SYSCFG);
-> +	v &= EP93XX_SYSCON_SYSCFG_REV_MASK;
-> +	v >>= EP93XX_SYSCON_SYSCFG_REV_SHIFT;
-> +	return (u8)v;
-> +}
-
-Please change the return type to 'int' and remove the (u8) cast.
-
-Also, please move this block up so that it's right after the #include's.
-
->  
->  /*************************************************************************
->   * Timer handling for EP93xx
-> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
-> index c6dc14d..8603837 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
-> @@ -33,6 +33,17 @@ static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
->  	ep93xx_devcfg_set_clear(0x00, bits);
->  }
->  
-> +#define EP93XX_CHIP_REV_A      0
-> +#define EP93XX_CHIP_REV_B      1
-> +#define EP93XX_CHIP_REV_C      2
-> +#define EP93XX_CHIP_REV_D0     3
-> +#define EP93XX_CHIP_REV_D1     4
-> +#define EP93XX_CHIP_REV_E0     5
-> +#define EP93XX_CHIP_REV_E1     6
-> +#define EP93XX_CHIP_REV_E2     7
-
-Please use tabs instead of spaces above.
-
+> +#ifndef __MACH_TEGRA_VMALLOC_H
+> +#define __MACH_TEGRA_VMALLOC_H
 > +
-> +u8 ep93xx_chip_revision(void);
-> +
+> +#define VMALLOC_END        ((PAGE_OFFSET) + 0x38000000)
 
-Also, please move this block up so it's right after the struct ep93xx_eth_data
-stuff.
+So if PAGE_OFFSET were to be 0xe0000000, this would still be valid?
+And what if PAGE_OFFSET were 0x80000000 ?
 
->  void ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr);
->  void ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
-> 			 struct i2c_board_info *devices, int num);
+Wouldn't it be better to define it in terms of the maximum address
+as defined by the hardware maps - so that selecting 2GB of userspace
+gives you more kernel space?
