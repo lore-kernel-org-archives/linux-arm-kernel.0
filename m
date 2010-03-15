@@ -1,47 +1,45 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Mon, 15 Mar 2010 10:08:58 +0100
-Subject: [PATCH] serial: fix possible imx deadlock
-Message-ID: <80k4tehryt.fsf@merkur.tec.linutronix.de>
+From: shiraz.hashim@st.com (Shiraz HASHIM)
+Date: Mon, 15 Mar 2010 14:39:58 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
+	in linux
+In-Reply-To: <4B9DF2FF.3000706@st.com>
+References: <4B9DB823.1040809@st.com>
+	<20100315062041.GD31126@trinity.fluff.org>
+	<4B9DD3A3.7050106@st.com> <4B9DF2FF.3000706@st.com>
+Message-ID: <4B9DF966.6050504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a possible deadlock situation with the port and timer
-locks. The calling paths for the deadlock situation are:
+Armando,
 
-1. imx_set_termios() -> LOCK(port.lock)
-      -> del_timer_sync() -> LOCK(timer.base.lock)
+On 3/15/2010 2:12 PM, Armando VISCONTI wrote:
+>> Now, For this we need some interface or channel through which we provide
+>> this information to kernel. This is what precisely i have done. The
+>> channel i
+>> provided is through Kconfig and the function "s300_configure", accepts
+>> this bitmap and configures hardware.
+>>   
+> I'm not getting this point.
 
-2. run_timer_softirq() -> LOCK(timer.base.lock)
-      -> imx_timeout() -> LOCK(port.lock)
+yes, Actually this is what we are saying. Seemingly the best option is
+to do it during compilation time, except if we have some standard way
+at booting.
 
-This patch is against 2.6.34-rc1.
+> If you do it thru Kconfig still it would be fixed a compilation time.
+> Do you agree or am I missing something?
 
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- drivers/serial/imx.c |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-diff -Naurp a/drivers/serial/imx.c b/drivers/serial/imx.c
---- a/drivers/serial/imx.c	2010-03-08 19:45:44.000000000 +0100
-+++ b/drivers/serial/imx.c	2010-03-15 09:52:39.855261060 +0100
-@@ -836,6 +836,12 @@ imx_set_termios(struct uart_port *port, 
- 	baud = uart_get_baud_rate(port, termios, old, 50, port->uartclk / 16);
- 	quot = uart_get_divisor(port, baud);
- 
-+	/*
-+	 * Stop our timer. This is done with the port unlocked
-+	 * to avoid possible deadlock against the timer function.
-+	 */
-+	del_timer_sync(&sport->timer);
-+
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 
- 	sport->port.read_status_mask = 0;
-@@ -860,8 +866,6 @@ imx_set_termios(struct uart_port *port, 
- 			sport->port.ignore_status_mask |= URXD_OVRRUN;
- 	}
- 
--	del_timer_sync(&sport->timer);
--
- 	/*
- 	 * Update the per-port timeout.
- 	 */
+yes, and if you see, should any one require it dynamically? Each user 
+would have his own board with static devices. This configuration (of 
+selecting multiplexed devices) depends on his board configuration, which
+is the responsibility of the board configuration file.
+
+> So, probably the correct way is passing peripheral selection information
+> thru
+> bootargs.
+> What do you think?
+
+This is very specific to how an SoC provides multiplexing options and will
+vary greatly. Which option of bootargs are you talking about?
+
+regards
+Shiraz
