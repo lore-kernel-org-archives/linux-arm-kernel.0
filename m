@@ -1,46 +1,35 @@
 From: saaguirre@ti.com (Sergio Aguirre)
-Date: Mon, 15 Mar 2010 18:04:12 -0500
-Subject: [PATCH 7/7] omap3: zoom2/3: Register only 1 8250 port
+Date: Mon, 15 Mar 2010 18:04:11 -0500
+Subject: [PATCH 6/7] omap3: zoom 2/3: Change debugboard serial port id
 In-Reply-To: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
 References: <1268694252-21985-1-git-send-email-saaguirre@ti.com>
-Message-ID: <1268694252-21985-8-git-send-email-saaguirre@ti.com>
+Message-ID: <1268694252-21985-7-git-send-email-saaguirre@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no more serial ports available, so, doesn't make sense
-to create 4 device nodes.
+This is now changed to PLAT8250_DEV_PLATFORM (= 0), because
+it's the only port that's going to be initialized in
+Zoom 2/3 boards.
+
+So, it doesn't make sense to keep the hardcoded 3 value anymore.
 
 Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
 ---
- arch/arm/configs/omap_zoom2_defconfig |    2 +-
- arch/arm/configs/omap_zoom3_defconfig |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-zoom-debugboard.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/omap_zoom2_defconfig b/arch/arm/configs/omap_zoom2_defconfig
-index f5c6e11..881faea 100644
---- a/arch/arm/configs/omap_zoom2_defconfig
-+++ b/arch/arm/configs/omap_zoom2_defconfig
-@@ -661,7 +661,7 @@ CONFIG_DEVKMEM=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=32
--CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=1
- CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_MANY_PORTS=y
- CONFIG_SERIAL_8250_SHARE_IRQ=y
-diff --git a/arch/arm/configs/omap_zoom3_defconfig b/arch/arm/configs/omap_zoom3_defconfig
-index ea9a501..5e55b55 100644
---- a/arch/arm/configs/omap_zoom3_defconfig
-+++ b/arch/arm/configs/omap_zoom3_defconfig
-@@ -680,7 +680,7 @@ CONFIG_DEVKMEM=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=32
--CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=1
- CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_MANY_PORTS=y
- CONFIG_SERIAL_8250_SHARE_IRQ=y
+diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
+index bb4018b..e15d2e8 100644
+--- a/arch/arm/mach-omap2/board-zoom-debugboard.c
++++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
+@@ -96,7 +96,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 
+ static struct platform_device zoom_debugboard_serial_device = {
+ 	.name			= "serial8250",
+-	.id			= 3,
++	.id			= PLAT8250_DEV_PLATFORM,
+ 	.dev			= {
+ 		.platform_data	= serial_platform_data,
+ 	},
 -- 
 1.6.3.3
