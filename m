@@ -1,26 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Mar 2010 10:05:06 +0000
-Subject: [PATCH, RESEND] imx: make IMX_IO_ADDRESS assembly compatible
-In-Reply-To: <84a2844cbb84d061f848657c1d2cafca86a22de5.1268728618.git.baruch@tkos.co.il>
-References: <f5e757c320c6ba285c43f296013c2937ad8aa460.1268721011.git.baruch@tkos.co.il>
-	<84a2844cbb84d061f848657c1d2cafca86a22de5.1268728618.git.baruch@tkos.co.il>
-Message-ID: <20100316100506.GA1823@n2100.arm.linux.org.uk>
+From: Hui.Wang@windriver.com (wanghui)
+Date: Tue, 16 Mar 2010 18:13:50 +0800
+Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
+In-Reply-To: <20100315161024.GC3879@gandalf>
+References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
+	<1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
+	<4B9E187E.6090802@ru.mvista.com> <20100315161024.GC3879@gandalf>
+Message-ID: <4B9F59DE.4070807@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 10:41:45AM +0200, Baruch Siach wrote:
-> +#ifdef __ASSEMBLER__
-> +#define IOMEM(addr,base,size,virt)	((addr) - (base) + (virt))
-> +#else
-> +#define IOMEM(addr,base,size,virt)			\
-> +	((void __force __iomem *)			\
-> +	(((unsigned long) ((addr) - (base)) < size) ?	\
-> +	(addr) - (base) + (virt) : 0))
-> +#endif
+Felipe Balbi wrote:
+> On Mon, Mar 15, 2010 at 02:22:38PM +0300, Sergei Shtylyov wrote:
+>   
+>>    The whole musb_platform_set_mode() seems to be implemented 
+>> incorrectly on OMAPs -- it shouldn't touch the DevCtl.Session bit. This 
+>>     
+>
+> correct. It should be changing the id pin rules just like in tusb6010.c
+>
+>   
+>> function should control the ID pin override instead -- if the controller 
+>> supports it. SRP must be initiated thru other means, i.e. 'srp' file in 
+>> sysfs.
+>>     
+>
+> via musb_gadget_wakeup()
+>
+>   
+Thank you for your comments.
+It is right that in this function, we should only change id pin rules 
+according to user's choice, and
+leave mode transition to the ISR.
+But things are different on omap platforms, because the id pin change 
+can't trigger ISR.
+For example, when we configure the kernel, we choose musb working as OTG 
+mode. Then we plug a mini-A or a mini-B cable in the socket, after
+that we execute insmod g_ether.ko, at this time, the musb will 
+initialize to A or B working mode. how to change
+its working mode from A to B or B to A at this time? I think if the 
+platform can support id detection ISR, your method
+is workable. But on omap platforms, we must change cable(id pin state) 
+manually first, then let the controller to re-initiate a session forcibly.
+This action (clear/set session bit) don't 100% equal to send a SRP, and 
+i don't really want to send a SRP too.
 
-If you look at:
-
-http://lists.arm.linux.org.uk/lurker/message/20100311.105637.21ac15c1.en.html
-
-you'll see this definition is incompatible with my stated aim for this
-macro.
+If without this function for omap platforms, we can change musb working 
+mode only through rebooting kernel or rmmod/insmod gadget driver module.
