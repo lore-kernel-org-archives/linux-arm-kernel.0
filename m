@@ -1,25 +1,68 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 16 Mar 2010 11:01:13 +0900
-Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
-	in linux
-In-Reply-To: <20100315131540.GD700@n2100.arm.linux.org.uk>
-References: <4B9DB823.1040809@st.com>
-	<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>
-	<4B9DC239.90407@st.com>
-	<1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
-	<4B9DD46E.7060704@st.com>
-	<20100315131540.GD700@n2100.arm.linux.org.uk>
-Message-ID: <1b68c6791003151901w219cb016xd5b2513e2357d632@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 16 Mar 2010 08:09:35 +0200
+Subject: [spi-devel-general] [PATCH 0/3] spi: driver for Cirrus EP93xx
+	SPI controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636853334B@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1268669236.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636853334B@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100316060935.GB12813@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 15, 2010 at 10:15 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 15, 2010 at 12:02:14PM +0530, Viresh KUMAR wrote:
-> That means if you leave the configuration of pins to modular drivers,
-> pins are left unconfigured, and you could have some of them floating
-> increasing your power consumption.
-Thanks for the invaluable insight.
-Sometimes, I wish there was some mechanism to automatically
-compile such advices, from experts in long and numerous
-threads of discussion, into some checklist/faq for developers.
+On Mon, Mar 15, 2010 at 01:22:51PM -0500, H Hartley Sweeten wrote:
+> On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
+> > Hello,
+> > 
+> > This series provides SPI master controller driver implementation for
+> > Cirrus Logic EP93xx controllers.
+> > 
+> > I've tested this on my TS-7260 board with SPI EEPROM (through at25 driver)
+> > and with few SD/MMC cards that I own (through mmc_spi driver). Unfortunately
+> > I don't have other SPI devices so if someone wants to try this, it would be
+> > great (see [1] for example code that I used with MMC cards).
+> > 
+> > This series applies on top of Linus' 2.6.34-rc1.
+> > 
+> > Please review.
+> > 
+> > Thanks,
+> > MW
+> 
+> Hello Mika,
+
+Hi,
+
+> I also have a SPI driver (originally from Bluewater Systems) that I have been
+> sitting on.  Your's has the advantage of using interrupts and is already
+> coded for 16-bit targets, mine is currently polled and only handles 8-bit
+> targets.
+> 
+> Based on that I'll try to help you get yours merged instead.
+
+That sounds good. Thanks!
+
+> 
+> I already responded to patch 2/3.  Overall it's fine I would just like
+> the code moved a bit in the source files.  Please review the comments.
+> 
+> Patch 3/3 looks ok initially.  I think you are hindering the chip-select
+> options but I will work that out when I go through the patch 1/3.
+> 
+> Patch 1/3 looks good for a start.  The only problem I see is your
+> limitation to only using built-in gpio's for chipselects.
+
+I'll wait a bit to get more review comments from different people and then
+send updated series.
+
+BTW: do you mean that we should support some external GPIO chips
+or something like that also as chipselects? As far as I can understand
+EP93xx chips don't have dedicated chipselects for SPI.
+
+> I will try to get your patches merged into my tree this week and test
+> them.  At that point I will provide more feedback and try to address
+> the chipselect limitation.
+
+Thanks.
+
+Regards,
+MW
