@@ -1,30 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Mar 2010 20:49:30 +0000
-Subject: [PATCH] ARM: Fix "BUG: scheduling while atomic:
-	swapper/0/0x00000002"
-In-Reply-To: <1268745149-8685-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1268745149-8685-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100316204930.GA13948@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 16 Mar 2010 22:55:48 +0100
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
+	in linux
+In-Reply-To: <4B9F8A2B.9020307@st.com>
+References: <4B9DB823.1040809@st.com>
+	<63386a3d1003151055v6d3e2ee0q848fcbb4c7a29a06@mail.gmail.com>
+	<4B9F8A2B.9020307@st.com>
+Message-ID: <63386a3d1003161455x4c67cddcnbb9d00b95884bdaa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 06:42:29PM +0530, Santosh Shilimkar wrote:
-> This patch fixes the preempt leak in the cpuidle path invoked from
-> cpu-hotplug
-> log:
-> BUG: scheduling while atomic: swapper/0/0x00000002
-> <d>Modules linked in:
-> Backtrace:
-> [<c0024f90>] (dump_backtrace+0x0/0x110) from [<c01762c4>] (dump_stack+0x18/0x1c)
->  r7:c0218cc4 r6:c0341f00 r5:c7836000 r4:00000000
-> [<c01762ac>] (dump_stack+0x0/0x1c) from [<c003d94c>] (__schedule_bug+0x60/0x70)
-> [<c003d8ec>] (__schedule_bug+0x0/0x70) from [<c0176914>] (schedule+0x98/0x7b8)
->  r5:c7836000 r4:c7836000
-> [<c017687c>] (schedule+0x0/0x7b8) from [<c00228c4>] (cpu_idle+0xb4/0xd4)
-> # [<c0022810>] (cpu_idle+0x0/0xd4) from [<c01744e8>] (secondary_start_kernel+0xe0/0xf0)
->  r5:c7836000 r4:c020a220
-> [<c0174408>] (secondary_start_kernel+0x0/0xf0) from [<c0031150>] (set_cpu_power_state+0x40/0x44)
->  r7:c0218cc4 r6:00000001 r5:00000001 r4:c7836000
-> Backtrace aborted due to bad frame pointer <c7837fbc>
+(CC to Martin who wrote the nice padmux code in case he wants to add
+something.)
 
-Can you describe the conditions which leads up to this please?
+2010/3/16 Shiraz HASHIM <shiraz.hashim@st.com>:
+
+> I was trying to go through u300 code and it looks clean enough. I need your
+> help in understanding it better. In your case you try to configure the pin mux
+> and then, even if it fails the device (through amba_device_register) is registered.
+> Now if the driver is enabled in the kernel (or it is insmod) then the driver in
+> its "probe" would stuck somewhere.
+
+Yep it's because it's not going to fail in current system configs. We request to
+mux in MMC/SD + SPI pins, then the rest of the settings (which are vast)
+are left untouched.
+
+> Do we need to handle such scenarios. Am I missing something?
+
+No you're correct, but these circumstances does not occur currently on the
+U300. But the framework is prepared to handle them.
+
+> Further, if you can describe what is onmask field (of pmx) and what
+> devices/options are multiplexed with (say) spi, it would help me better understand
+> the code.
+
+.onmask should be something like .bits really, it's tuples of mask+bits to
+be set in registers to activate the selected padmux setting. It's all
+specific to the DB3xxx system controller, nothing you should worry too
+much about really.
+
+>> We've actually seen usecases where you need to dynamically remux while
+>> drivers are running but these have been rare and on older chips I think.
+>
+> You mean to say dynamically remapping pins to achieve some function with
+> the same driver? or taking out one driver and inserting another after changing
+> mux config.
+
+Actually switching back and forth between using pins in one way and then
+in another way for different usecases. Not like every microsecond, but on
+minute interval. We tried to avoid it and on the Linux port this was never
+the case.
+
+> In any case one of the objective is to keep same linux image for different
+> configurations/boards. Isn't it ?
+
+That's more of a side effect. We did have compile-time dependencies that
+cannot even be avoided with the devicetree code. For example the U300 series
+had physical RAM at different addresses depending on model, that can *never*
+be handled with a single kernel image, so we could just give up that idea
+immediately....
+
+Linus
