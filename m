@@ -1,39 +1,23 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 16 Mar 2010 11:41:31 +0000
-Subject: [RFC PATCH 1/6] ARM: pmu: register IRQs at runtime
-In-Reply-To: <1268414985-22699-2-git-send-email-will.deacon@arm.com>
-References: <1268414985-22699-1-git-send-email-will.deacon@arm.com>
-	<1268414985-22699-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20100316114131.GC4116@wear.picochip.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 16 Mar 2010 19:49:06 +0800
+Subject: [PATCH 2/4] mmp: support ssp in pxa168
+In-Reply-To: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
+References: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
+Message-ID: <f17812d71003160449h74ba2d24mfb5b9bd2485b4f38@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 12, 2010 at 05:29:39PM +0000, Will Deacon wrote:
-> The current PMU infrastructure for ARM requires that the IRQs for the PMU
-> device are fixed at compile time and are selected based on the ARCH_ or MACH_
-> flags. This has the disadvantage of tying the Kernel down to a particular board
-> as far as profiling is concerned.
-> 
-> This patch replaces the compile-time IRQ registration with a runtime mechanism
-> which allows the IRQs to be passed in from the board initialisation files using
-> the pmu_device_register() function.
-> 
-> A further advantage of this change is that there is scope for registering
-> different types of performance counters in the future by adding a new field
-> to the arm_pmu_type enumeration.
-> 
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Jamie Iles <jamie.iles@picochip.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-Hi Will,
+On Wed, Mar 10, 2010 at 9:14 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 75fe4b02234f6476e72827508f11f1035d7aaf68 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 10 Mar 2010 06:32:43 -0500
+> Subject: [PATCH] [ARM] mmp: support ssp in pxa168
+>
+> Support ssp in pxa168. The basic function of SSP is same as pxa, but clock
+> source and IRQ is changed.
+>
 
-I much prefer this rather than the old static list that we had before. As an
-aside, do you know of any ARM PMU's that need memory resources in addition to
-the IRQ's? If so perhaps a platform_device might be an easy way of extending
-this.
+Haojian,
 
-Anyway,
-
-Acked-by: Jamie Iles <jamie.iles@picochip.com>
-
-Jamie
+Could you please help rebase this against my 'ssp_cleanup' branch?
