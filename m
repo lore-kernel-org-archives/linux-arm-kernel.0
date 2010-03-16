@@ -1,58 +1,32 @@
-From: budheej@gmail.com (Budhee Jamaich)
-Date: Wed, 17 Mar 2010 01:17:45 +0200
-Subject: mapping uncached memory
-Message-ID: <57314e841003161617l53dc3a50la969369f0161ccdd@mail.gmail.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Tue, 16 Mar 2010 23:52:17 +0000
+Subject: [spi-devel-general] [PATCH 2/3] ep93xx: added chip revision
+	reading function
+In-Reply-To: <0D753D10438DA54287A00B02708426976368534001@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1268669236.git.mika.westerberg@iki.fi>
+	<3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B027084269763685332EF@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B02708426976368534001@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <56d259a01003161652n40abcb8s115fd8d054118c82@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hello,
+On 3/16/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+> On Monday, March 15, 2010 11:06 AM, H Hartley Sweeten wrote:
+>  > On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
+>  >> + * %EP93XX_CHIP_REV_A
+>  >> + * %EP93XX_CHIP_REV_B
+>  >> + * %EP93XX_CHIP_REV_C
+>  >> + * %EP93XX_CHIP_REV_D0
+>  >> + * %EP93XX_CHIP_REV_D1
+>  >> + * %EP93XX_CHIP_REV_E0
+>  >> + * %EP93XX_CHIP_REV_E1
+>  >> + * %EP93XX_CHIP_REV_E2
 
-we are looking for ways to map memory as uncached,
-so remote devices reading/writing to this memory will see consistent data.
+Come to that, I've never heard of revisions A B or C.
+Even D0 now is so rare as to be nonexistent.
+I have a very early EP board, the Armadillo-9. and even that is E0, so
+I'd certainly drop [ABC] unless you have some evidence of their
+existence
 
-
-these are the alternatives we currently see:
-
-
-1. clean cache after every write to the memory (/invalidate the cache
-before every read)
-
-this can be done using dmac_clean/inv_range and outer_clean/inv_range
-just like in dma_cache_maint.
-btw - what's the difference between the dmac_* and the outer_*
-functions ? why both are needed ?
-
-disadvantage: this will be needed to be called before/after every memory access
-
-
-
-
-
-2. use pgprot_noncached when assigning vma->vm_page_prot in our
-driver's mmap method
-
-
-will that really work ? all memory accesses will be uncached ?
-
-
-
-
-
-
-
-
-3. use dma_alloc_coherent in some way
-
-cons: documentation says we still need to use cache clean/inv
-operations, so this might not really be of any advantage. but if that
-is so, what's the idea behind coherent pools of memory ? how does it
-work at all ?
-
-
-
-
-what do you say ?
-
-
-thank you all very much in advance
-budhee
+     M
