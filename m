@@ -1,43 +1,41 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Tue, 16 Mar 2010 16:11:59 +0200
-Subject: [RFC/PATCH] ARM: add Tegra support
-In-Reply-To: <a55d774e1003160644k4d5fa093x261f789d8a4005d5@mail.gmail.com>
-References: <4B96798C.6060201@compulab.co.il>	
-	<4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>	
-	<4B9F462C.7060902@compulab.co.il>
-	<a55d774e1003160644k4d5fa093x261f789d8a4005d5@mail.gmail.com>
-Message-ID: <4B9F91AF.7000602@compulab.co.il>
+From: me@felipebalbi.com (Felipe Balbi)
+Date: Tue, 16 Mar 2010 16:46:45 +0200
+Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
+In-Reply-To: <4B9F59DE.4070807@windriver.com>
+References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
+	<1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
+	<4B9E187E.6090802@ru.mvista.com> <20100315161024.GC3879@gandalf>
+	<4B9F59DE.4070807@windriver.com>
+Message-ID: <20100316144644.GA3870@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi,
 
-Brian Swetland wrote:
-> On Tue, Mar 16, 2010 at 1:49 AM, Mike Rapoport <mike@compulab.co.il> wrote:
->> Erik Gilling wrote:
->>> On Tue, Mar 9, 2010 at 9:38 AM, Mike Rapoport <mike@compulab.co.il> wrote:
->>>> This patch adds basic support for Nvidia Tegra2 platform.
->>> This code seems to be our port from
->>> git://android.git.kernel.org/kernel/tegra.git with some features
->>> removed, minor cleanups, and many trivial changes.  These changes make
->>> it difficult for us to track improvements and bug fixes in either
->>> direction.
->> Neither Nvidia nor Google showed any movements towards the mainline and
->> it was completely not clear if such plans exist at all. I've posted the
->> patch a week ago and there were no comments from you since then.
+On Tue, Mar 16, 2010 at 06:13:50PM +0800, wanghui wrote:
+> Thank you for your comments.
+> It is right that in this function, we should only change id pin rules 
+> according to user's choice, and
+> leave mode transition to the ISR.
+> But things are different on omap platforms, because the id pin change 
+> can't trigger ISR.
+> For example, when we configure the kernel, we choose musb working as OTG 
+> mode. Then we plug a mini-A or a mini-B cable in the socket, after
+> that we execute insmod g_ether.ko, at this time, the musb will 
+> initialize to A or B working mode. how to change
+> its working mode from A to B or B to A at this time? I think if the 
+> platform can support id detection ISR, your method
+> is workable. But on omap platforms, we must change cable(id pin state) 
+> manually first, then let the controller to re-initiate a session forcibly.
+> This action (clear/set session bit) don't 100% equal to send a SRP, and 
+> i don't really want to send a SRP too.
 > 
-> It does help if you cc the authors when sending revised patches out
-> for commentary (as git-send-email does by default, etc), since it's
-> easy to miss things on high traffic lists like lkml or lakml.  We
-> first noticed the patch you sent out late Sunday evening, and Erik
-> sent a reply out the following afternoon.
+> If without this function for omap platforms, we can change musb working 
+> mode only through rebooting kernel or rmmod/insmod gadget driver module.
 
-Agree. I should have cc'ed Eric and Colin. Still, I'd expect more 
-constructive comments than those Eric has sent.
-
-> Brian
-
+it should be doable with the transceiver ISR. When you get id pin irq,
+you should put the transceiver into A_IDLE state and power up vbus. MUSB
+changes to host mode automatically.
 
 -- 
-Sincerely yours,
-Mike.
+balbi
