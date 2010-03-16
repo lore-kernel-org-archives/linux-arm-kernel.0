@@ -1,52 +1,39 @@
-From: Hui.Wang@windriver.com (wanghui)
-Date: Tue, 16 Mar 2010 18:49:33 +0800
-Subject: [PATCH 1/2] USB: musb: add two states to handle vbus error
-In-Reply-To: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-Message-ID: <4B9F623D.6060406@windriver.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 16 Mar 2010 11:41:31 +0000
+Subject: [RFC PATCH 1/6] ARM: pmu: register IRQs at runtime
+In-Reply-To: <1268414985-22699-2-git-send-email-will.deacon@arm.com>
+References: <1268414985-22699-1-git-send-email-will.deacon@arm.com>
+	<1268414985-22699-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20100316114131.GC4116@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On omap platforms, when configuring the kernel, if we choose the musb 
-work as host or OTG mode and we plug
-a mini-A cable into the socket, after the kernel boot up in host mode or 
-insmod gadget driver in OTG mode,
-the state of musb's xceiv is A_IDLE or B_IDLE correspondingly because id 
-change can't trigger ISR. Under this
-condition, if we hotplug a usb device(without self-powered) at the other 
-side of the cable, the musb will suffer a vbus error,
-This patch can handle this vbus error.
+On Fri, Mar 12, 2010 at 05:29:39PM +0000, Will Deacon wrote:
+> The current PMU infrastructure for ARM requires that the IRQs for the PMU
+> device are fixed at compile time and are selected based on the ARCH_ or MACH_
+> flags. This has the disadvantage of tying the Kernel down to a particular board
+> as far as profiling is concerned.
+> 
+> This patch replaces the compile-time IRQ registration with a runtime mechanism
+> which allows the IRQs to be passed in from the board initialisation files using
+> the pmu_device_register() function.
+> 
+> A further advantage of this change is that there is scope for registering
+> different types of performance counters in the future by adding a new field
+> to the arm_pmu_type enumeration.
+> 
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Will,
 
-Wang Hui wrote:
-> When the MUSB is configured as host mode or OTG mode, the xceiv->state
-> will be set to OTG_STATE_A_IDLE or OTG_STATE_B_IDLE unconditionally
-> during init process. These init states can change to other
-> states When the MUSB module detects id pin change, devices connect or
-> disconnect.
-> But on some platforms(omap2, omap3), the id pin change
-> can't raise IRQ request to the MUSB module, so on these platforms,
-> the init xceiv->state will be A_IDLE or B_IDLE. Under this condition,
-> when we want the MUSB to act as a host and hotplug a usb device in
-> mini-B side of the cable, the MUSB will have a possibility to suffer
-> power underrun under A_IDLE or B_IDLE state, So here adding these
-> two states under which we can handle VBUSERROR IRQ.
->
-> Signed-off-by: Wang Hui <Hui.Wang@windriver.com>
-> ---
->  drivers/usb/musb/musb_core.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> index b4bbf8f..655413c 100644
-> --- a/drivers/usb/musb/musb_core.c
-> +++ b/drivers/usb/musb/musb_core.c
-> @@ -516,6 +516,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
->  			 * another reset is due (at least for high speed,
->  			 * to redo the chirp etc), it might work OK...
->  			 */
-> +		case OTG_STATE_A_IDLE:
-> +		case OTG_STATE_B_IDLE:
->  		case OTG_STATE_A_WAIT_BCON:
->  		case OTG_STATE_A_WAIT_VRISE:
->  			if (musb->vbuserr_retry) {
->   
+I much prefer this rather than the old static list that we had before. As an
+aside, do you know of any ARM PMU's that need memory resources in addition to
+the IRQ's? If so perhaps a platform_device might be an easy way of extending
+this.
+
+Anyway,
+
+Acked-by: Jamie Iles <jamie.iles@picochip.com>
+
+Jamie
