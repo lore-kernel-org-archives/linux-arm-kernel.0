@@ -1,23 +1,17 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 16 Mar 2010 19:49:06 +0800
-Subject: [PATCH 2/4] mmp: support ssp in pxa168
-In-Reply-To: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
-References: <771cded01003100514r70f0f53eydda7b916f92bef64@mail.gmail.com>
-Message-ID: <f17812d71003160449h74ba2d24mfb5b9bd2485b4f38@mail.gmail.com>
+Date: Tue, 16 Mar 2010 19:52:45 +0800
+Subject: [PATCH 0/8] pxa: ssp code cleanup
+Message-ID: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 10, 2010 at 9:14 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 75fe4b02234f6476e72827508f11f1035d7aaf68 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 10 Mar 2010 06:32:43 -0500
-> Subject: [PATCH] [ARM] mmp: support ssp in pxa168
->
-> Support ssp in pxa168. The basic function of SSP is same as pxa, but clock
-> source and IRQ is changed.
->
+Which includes the following patches:
 
-Haojian,
-
-Could you please help rebase this against my 'ssp_cleanup' branch?
+     [PATCH 1/8] input: remove now deprecated corgi_ts.c touchscreen driver
+     [PATCH 2/8] [ARM] pxa: remove now un-used corgi_ssp.c and corgi_lcd.c
+     [PATCH 3/8] [ARM] pxa: remove the now legacy SSP API
+     [PATCH 4/8] [ARM] pxa: correct SSCR0_SCR to support multiple SoCs
+     [PATCH 5/8] [ARM] pxa: merge regs-ssp.h into ssp.h
+     [PATCH 6/8] [ARM] pxa: remove unnecessary #include of <mach/ssp.h>
+     [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
+     [PATCH 8/8] [ARM] pxa: remove incorrect select PXA_SSP in Kconfig
