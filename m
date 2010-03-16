@@ -1,112 +1,128 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Mar 2010 17:26:30 -0000
-Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
-	for ARM11MPCore
-In-Reply-To: <4B9817CF.2050807@windriver.com>
-References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>
-	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
-	<4B9817CF.2050807@windriver.com>
-Message-ID: <000001cac52d$d13ff3f0$73bfdbd0$@deacon@arm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 16 Mar 2010 12:54:37 -0500
+Subject: [PATCH] ep93xx/core.c: remove redundant static variable
+In-Reply-To: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <0D753D10438DA54287A00B0270842697636858C6FE@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Use the pointer to the passed board support data directly instead of 
+copying it to local static variables.
 
-> Do you think you can try the patch below?
-> 
-> It seems we might not need to change to using the atomic_add_return(0,...) because using the
-> atomic_inc() and atomic_dec() will end up using the memory barriers.
-> 
-> I would certainly rather fix kgdb vs mucking with the internals of cpu_relax().
-> 
-> 
-> Jason.
-> 
-> --- a/kernel/kgdb.c
-> +++ b/kernel/kgdb.c
-> @@ -580,14 +580,13 @@ static void kgdb_wait(struct pt_regs *re
->  	 * Make sure the above info reaches the primary CPU before
->  	 * our cpu_in_kgdb[] flag setting does:
->  	 */
-> -	smp_wmb();
-> -	atomic_set(&cpu_in_kgdb[cpu], 1);
-> +	atomic_inc(&cpu_in_kgdb[cpu]);
-> 
->  	/* Disable any cpu specific hw breakpoints */
->  	kgdb_disable_hw_debug(regs);
-> 
->  	/* Wait till primary CPU is done with debugging */
-> -	while (atomic_read(&passive_cpu_wait[cpu]))
-> +	while (atomic_add_return(0, &passive_cpu_wait[cpu]))
->  		cpu_relax();
-> 
->  	kgdb_info[cpu].debuggerinfo = NULL;
-> @@ -598,7 +597,7 @@ static void kgdb_wait(struct pt_regs *re
->  		arch_kgdb_ops.correct_hw_break();
-> 
->  	/* Signal the primary CPU that we are done: */
-> -	atomic_set(&cpu_in_kgdb[cpu], 0);
-> +	atomic_dec(&cpu_in_kgdb[cpu]);
->  	touch_softlockup_watchdog_sync();
->  	clocksource_touch_watchdog();
->  	local_irq_restore(flags);
-> @@ -1493,7 +1492,7 @@ acquirelock:
->  	 * spin_lock code is good enough as a barrier so we don't
->  	 * need one here:
->  	 */
-> -	atomic_set(&cpu_in_kgdb[ks->cpu], 1);
-> +	atomic_inc(&cpu_in_kgdb[ks->cpu]);
-> 
->  #ifdef CONFIG_SMP
->  	/* Signal the other CPUs to enter kgdb_wait() */
-> @@ -1505,7 +1504,7 @@ acquirelock:
->  	 * Wait for the other CPUs to be notified and be waiting for us:
->  	 */
->  	for_each_online_cpu(i) {
-> -		while (!atomic_read(&cpu_in_kgdb[i]))
-> +		while (!atomic_add_return(0, &cpu_in_kgdb[i]))
->  			cpu_relax();
->  	}
-> 
-> @@ -1528,7 +1527,7 @@ acquirelock:
-> 
->  	kgdb_info[ks->cpu].debuggerinfo = NULL;
->  	kgdb_info[ks->cpu].task = NULL;
-> -	atomic_set(&cpu_in_kgdb[ks->cpu], 0);
-> +	atomic_dec(&cpu_in_kgdb[ks->cpu]);
-> 
->  	if (!kgdb_single_step) {
->  		for (i = NR_CPUS-1; i >= 0; i--)
-> @@ -1538,7 +1537,7 @@ acquirelock:
->  		 * from the debugger.
->  		 */
->  		for_each_online_cpu(i) {
-> -			while (atomic_read(&cpu_in_kgdb[i]))
-> +			while (atomic_add_return(0, &cpu_in_kgdb[i]))
->  				cpu_relax();
->  		}
->  	}
-> @@ -1742,11 +1741,11 @@ EXPORT_SYMBOL_GPL(kgdb_unregister_io_mod
->   */
->  void kgdb_breakpoint(void)
->  {
-> -	atomic_set(&kgdb_setting_breakpoint, 1);
-> +	atomic_inc(&kgdb_setting_breakpoint);
->  	wmb(); /* Sync point before breakpoint */
->  	arch_kgdb_breakpoint();
->  	wmb(); /* Sync point after breakpoint */
-> -	atomic_set(&kgdb_setting_breakpoint, 0);
-> +	atomic_dec(&kgdb_setting_breakpoint);
->  }
->  EXPORT_SYMBOL_GPL(kgdb_breakpoint);
-> 
+This updates the ethernet, i2c, and framebuffer devices.
 
-What's the status on this patch? Russell has applied the ARM SMP code to his
-tree now, so it would be good to get this patch into KGDB to avoid the deadlock
-on ARM11MPCore.
+While here, also document the functions used to register the devices.
 
-I only ask because I can't see it in -next [although I see kgdb.c has moved!].
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Cheers,
+---
 
-Will
+V2: spotted a couple others in addition to the ethernet device.
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 90fb591..5f5bc6d 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -330,8 +330,10 @@ static struct platform_device ep93xx_ohci_device = {
+ 	.resource	= ep93xx_ohci_resources,
+ };
+ 
+-static struct ep93xx_eth_data ep93xx_eth_data;
+ 
++/*************************************************************************
++ * EP93xx ethernet peripheral handling
++ *************************************************************************/
+ static struct resource ep93xx_eth_resource[] = {
+ 	{
+ 		.start	= EP93XX_ETHERNET_PHYS_BASE,
+@@ -347,19 +349,22 @@ static struct resource ep93xx_eth_resource[] = {
+ static struct platform_device ep93xx_eth_device = {
+ 	.name		= "ep93xx-eth",
+ 	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &ep93xx_eth_data,
+-	},
+ 	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
+ 	.resource	= ep93xx_eth_resource,
+ };
+ 
++/**
++ * ep93xx_register_eth - Register the built-in ethernet platform device.
++ * @data:	platform specific ethernet configuration
++ * @copy_addr:	flag indicating that the MAC address should be copied
++ *		from the IndAd registers (as programmed by the bootloader)
++ */
+ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
+ {
+ 	if (copy_addr)
+ 		memcpy_fromio(data->dev_addr, EP93XX_ETHERNET_BASE + 0x50, 6);
+ 
+-	ep93xx_eth_data = *data;
++	ep93xx_eth_device.dev.platform_data = data;
+ 	platform_device_register(&ep93xx_eth_device);
+ }
+ 
+@@ -367,14 +372,17 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
+ /*************************************************************************
+  * EP93xx i2c peripheral handling
+  *************************************************************************/
+-static struct i2c_gpio_platform_data ep93xx_i2c_data;
+-
+ static struct platform_device ep93xx_i2c_device = {
+ 	.name			= "i2c-gpio",
+ 	.id			= 0,
+-	.dev.platform_data	= &ep93xx_i2c_data,
+ };
+ 
++/**
++ * ep93xx_register_i2c - Register the i2c platform device.
++ * @data:	platform specific i2c-gpio configurtion
++ * @devices:	platform specific i2c bus device information
++ * @num:	the number of devices on the i2c bus
++ */
+ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+ 				struct i2c_board_info *devices, int num)
+ {
+@@ -393,7 +401,7 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+ 		     (data->scl_is_open_drain << 0),
+ 		     EP93XX_GPIO_EEDRIVE);
+ 
+-	ep93xx_i2c_data = *data;
++	ep93xx_i2c_device.dev.platform_data = data;
+ 	i2c_register_board_info(0, devices, num);
+ 	platform_device_register(&ep93xx_i2c_device);
+ }
+@@ -514,8 +522,6 @@ EXPORT_SYMBOL(ep93xx_pwm_release_gpio);
+ /*************************************************************************
+  * EP93xx video peripheral handling
+  *************************************************************************/
+-static struct ep93xxfb_mach_info ep93xxfb_data;
+-
+ static struct resource ep93xx_fb_resource[] = {
+ 	{
+ 		.start		= EP93XX_RASTER_PHYS_BASE,
+@@ -528,7 +534,6 @@ static struct platform_device ep93xx_fb_device = {
+ 	.name			= "ep93xx-fb",
+ 	.id			= -1,
+ 	.dev			= {
+-		.platform_data	= &ep93xxfb_data,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 		.dma_mask		= &ep93xx_fb_device.dev.coherent_dma_mask,
+ 	},
+@@ -536,9 +541,13 @@ static struct platform_device ep93xx_fb_device = {
+ 	.resource		= ep93xx_fb_resource,
+ };
+ 
++/**
++ * ep93xx_register_fb - Register the framebuffer platform device.
++ * @data:	platform specific framebuffer configuration
++ */
+ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
+ {
+-	ep93xxfb_data = *data;
++	ep93xx_fb_device.dev.platform_data = data;
+ 	platform_device_register(&ep93xx_fb_device);
+ }
+ 
