@@ -1,41 +1,123 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Tue, 16 Mar 2010 16:46:45 +0200
-Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
-In-Reply-To: <4B9F59DE.4070807@windriver.com>
-References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-	<1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
-	<4B9E187E.6090802@ru.mvista.com> <20100315161024.GC3879@gandalf>
-	<4B9F59DE.4070807@windriver.com>
-Message-ID: <20100316144644.GA3870@gandalf>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 16 Mar 2010 11:53:26 -0500
+Subject: [spi-devel-general] [PATCH 2/3] ep93xx: added chip revision
+	reading	function
+In-Reply-To: <0D753D10438DA54287A00B027084269763685332EF@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1268669236.git.mika.westerberg@iki.fi>
+	<3d93e748eb068963a9378b454ba9cd117cbbc737.1268669236.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B027084269763685332EF@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <0D753D10438DA54287A00B02708426976368534001@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday, March 15, 2010 11:06 AM, H Hartley Sweeten wrote:
+> On Monday, March 15, 2010 9:26 AM, Mika Westerberg wrote:
+>> Added a new function: ep93xx_chip_revision() which reads chip revision from 
+>> the sysconfig register.
+>>
+>> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+>
+> Hello Mike,
+>
+> A couple comments below.
 
-On Tue, Mar 16, 2010 at 06:13:50PM +0800, wanghui wrote:
-> Thank you for your comments.
-> It is right that in this function, we should only change id pin rules 
-> according to user's choice, and
-> leave mode transition to the ISR.
-> But things are different on omap platforms, because the id pin change 
-> can't trigger ISR.
-> For example, when we configure the kernel, we choose musb working as OTG 
-> mode. Then we plug a mini-A or a mini-B cable in the socket, after
-> that we execute insmod g_ether.ko, at this time, the musb will 
-> initialize to A or B working mode. how to change
-> its working mode from A to B or B to A at this time? I think if the 
-> platform can support id detection ISR, your method
-> is workable. But on omap platforms, we must change cable(id pin state) 
-> manually first, then let the controller to re-initiate a session forcibly.
-> This action (clear/set session bit) don't 100% equal to send a SRP, and 
-> i don't really want to send a SRP too.
-> 
-> If without this function for omap platforms, we can change musb working 
-> mode only through rebooting kernel or rmmod/insmod gadget driver module.
+After merging your patch I had some second thoughts on my comments. Please see below.
 
-it should be doable with the transceiver ISR. When you get id pin irq,
-you should put the transceiver into A_IDLE state and power up vbus. MUSB
-changes to host mode automatically.
+>> ---
+>>  arch/arm/mach-ep93xx/core.c                  |   26 ++++++++++++++++++++++++++
+>>  arch/arm/mach-ep93xx/include/mach/platform.h |   11 +++++++++++
+>>  2 files changed, 37 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index 90fb591..2e496c9 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>> @@ -64,6 +64,32 @@ void __init ep93xx_map_io(void)
+>>  	iotable_init(ep93xx_io_desc, ARRAY_SIZE(ep93xx_io_desc));
+>>  }
+>>  
+>> +/**
+>> + * ep93xx_chip_revision() - returns EP93xx chip revision
+>> + *
+>> + * Returns EP93xx chip revision number read from sysconfig register. Possible
+>> + * values can be one of the following:
+>> + *
+>> + * %EP93XX_CHIP_REV_A
+>> + * %EP93XX_CHIP_REV_B
+>> + * %EP93XX_CHIP_REV_C
+>> + * %EP93XX_CHIP_REV_D0
+>> + * %EP93XX_CHIP_REV_D1
+>> + * %EP93XX_CHIP_REV_E0
+>> + * %EP93XX_CHIP_REV_E1
+>> + * %EP93XX_CHIP_REV_E2
+>> + *
+>> + * and in future maybe something else. See also <mach/platform.h>.
+>> + */
 
--- 
-balbi
+As noted by Martin Guy, the E2 revision will be the last one released by Cirrus.
+
+The comment is a bit wordy.  How about just:
+
++/**
++ * ep93xx_chip_revision - Returns the EP93xx chip revision.
++ *
++ * See <mach/platform.h> for more information.
++ */
+
+>> +u8 ep93xx_chip_revision(void)
+>> +{
+>> +	u32 v;
+>> +
+>> +	v = __raw_readl(EP93XX_SYSCON_SYSCFG);
+>> +	v &= EP93XX_SYSCON_SYSCFG_REV_MASK;
+>> +	v >>= EP93XX_SYSCON_SYSCFG_REV_SHIFT;
+>> +	return (u8)v;
+>> +}
+>
+> Please change the return type to 'int' and remove the (u8) cast.
+>
+> Also, please move this block up so that it's right after the #include's.
+
+Actually, please move the function down to right after the:
+
+EXPORT_SYMBOL(ep93xx_devcfg_set_clear);
+
+I would like to keep all the syscon helper functions together.
+
+>>  
+>>  /*************************************************************************
+>>   * Timer handling for EP93xx
+>> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+>> index c6dc14d..8603837 100644
+>> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
+>> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+>> @@ -33,6 +33,17 @@ static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
+>>  	ep93xx_devcfg_set_clear(0x00, bits);
+>>  }
+>>  
+>> +#define EP93XX_CHIP_REV_A      0
+>> +#define EP93XX_CHIP_REV_B      1
+>> +#define EP93XX_CHIP_REV_C      2
+>> +#define EP93XX_CHIP_REV_D0     3
+>> +#define EP93XX_CHIP_REV_D1     4
+>> +#define EP93XX_CHIP_REV_E0     5
+>> +#define EP93XX_CHIP_REV_E1     6
+>> +#define EP93XX_CHIP_REV_E2     7
+>
+> Please use tabs instead of spaces above.
+>
+>> +
+>> +u8 ep93xx_chip_revision(void);
+>> +
+>
+> Also, please move this block up so it's right after the struct ep93xx_eth_data
+> stuff.
+
+Moving the function above means these are actually in the correct place.
+
+>>  void ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr);
+>>  void ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+>> 			 struct i2c_board_info *devices, int num);
+
+Regards,
+Hartley
