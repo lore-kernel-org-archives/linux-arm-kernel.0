@@ -1,48 +1,44 @@
 From: konkers@google.com (konkers at google.com)
-Date: Mon, 15 Mar 2010 23:41:20 -0700
-Subject: [RFC/PATCH 02/10] [ARM] tegra: Add IRQ support
-In-Reply-To: <1268721688-27550-2-git-send-email-konkers@google.com>
+Date: Mon, 15 Mar 2010 23:41:26 -0700
+Subject: [RFC/PATCH 08/10] [ARM] tegra: Add framebuffer driver
+In-Reply-To: <1268721688-27550-8-git-send-email-konkers@google.com>
 References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
 	<1268721688-27550-1-git-send-email-konkers@google.com>
 	<1268721688-27550-2-git-send-email-konkers@google.com>
-Message-ID: <1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-4-git-send-email-konkers@google.com>
+	<1268721688-27550-5-git-send-email-konkers@google.com>
+	<1268721688-27550-6-git-send-email-konkers@google.com>
+	<1268721688-27550-7-git-send-email-konkers@google.com>
+	<1268721688-27550-8-git-send-email-konkers@google.com>
+Message-ID: <1268721688-27550-9-git-send-email-konkers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Erik Gilling <konkers@android.com>
+From: Colin Cross <ccross@android.com>
 
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/mach-tegra/Makefile            |    1 +
- arch/arm/mach-tegra/include/mach/irqs.h |  173 +++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/irq.c               |   34 ++++++
- 3 files changed, 208 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/include/mach/irqs.h
- create mode 100644 arch/arm/mach-tegra/irq.c
+ arch/arm/mach-tegra/include/mach/tegra_fb.h |   24 +
+ drivers/video/Kconfig                       |   11 +
+ drivers/video/Makefile                      |    1 +
+ drivers/video/tegrafb.c                     |  620 +++++++++++++++++++++++++++
+ 4 files changed, 656 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/tegra_fb.h
+ create mode 100644 drivers/video/tegrafb.c
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 81f003d..a0d2c5b 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -1,2 +1,3 @@
- obj-y                                   += common.o
- obj-y                                   += io.o
-+obj-y                                   += irq.o
-diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+diff --git a/arch/arm/mach-tegra/include/mach/tegra_fb.h b/arch/arm/mach-tegra/include/mach/tegra_fb.h
 new file mode 100644
-index 0000000..78e1a48
+index 0000000..f173544
 --- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/irqs.h
-@@ -0,0 +1,173 @@
++++ b/arch/arm/mach-tegra/include/mach/tegra_fb.h
+@@ -0,0 +1,24 @@
 +/*
-+ * arch/arm/mach-tegra/include/mach/irqs.h
++ * arch/arm/mach-tegra/include/mach/tegra_fb.h
 + *
 + * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *	Erik Gilling <konkers@google.com>
++ * Author: Colin Cross <ccross@android.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -55,170 +51,59 @@ index 0000000..78e1a48
 + *
 + */
 +
-+#ifndef __MACH_TEGRA_IRQS_H
-+#define __MACH_TEGRA_IRQS_H
++struct tegra_fb_lcd_data {
++	int	fb_xres;
++	int	fb_yres;
++	int	lcd_xres;
++	int	lcd_yres;
++	int	bits_per_pixel;
++};
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 5a5c303..b2e68e2 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1074,6 +1074,17 @@ config FB_RIVA_BACKLIGHT
+ 	help
+ 	  Say Y here if you want to control the backlight of your display.
+ 
++config FB_TEGRA
++	tristate "NVIDIA Tegra SoC display support"
++	depends on ARCH_TEGRA && FB = y
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
++	default FB
++	help
++	  This driver supports the NVIDIA Tegra systems-on-a-chip.  This
++	  driver can not be compiled as a module.
 +
-+#define INT_GIC_BASE			0
-+
-+#define IRQ_LOCALTIMER                  29
-+
-+/* Primary Interrupt Controller */
-+#define INT_PRI_BASE			(INT_GIC_BASE + 32)
-+#define INT_TMR1			(INT_PRI_BASE + 0)
-+#define INT_TMR2			(INT_PRI_BASE + 1)
-+#define INT_RTC				(INT_PRI_BASE + 2)
-+#define INT_I2S2			(INT_PRI_BASE + 3)
-+#define INT_SHR_SEM_INBOX_IBF		(INT_PRI_BASE + 4)
-+#define INT_SHR_SEM_INBOX_IBE		(INT_PRI_BASE + 5)
-+#define INT_SHR_SEM_OUTBOX_IBF		(INT_PRI_BASE + 6)
-+#define INT_SHR_SEM_OUTBOX_IBE		(INT_PRI_BASE + 7)
-+#define INT_VDE_UCQ_ERROR		(INT_PRI_BASE + 8)
-+#define INT_VDE_SYNC_TOKEN		(INT_PRI_BASE + 9)
-+#define INT_VDE_BSE_V			(INT_PRI_BASE + 10)
-+#define INT_VDE_BSE_A			(INT_PRI_BASE + 11)
-+#define INT_VDE_SXE			(INT_PRI_BASE + 12)
-+#define INT_I2S1			(INT_PRI_BASE + 13)
-+#define INT_SDMMC1			(INT_PRI_BASE + 14)
-+#define INT_SDMMC2			(INT_PRI_BASE + 15)
-+#define INT_XIO				(INT_PRI_BASE + 16)
-+#define INT_VDE				(INT_PRI_BASE + 17)
-+#define INT_AVP_UCQ			(INT_PRI_BASE + 18)
-+#define INT_SDMMC3			(INT_PRI_BASE + 19)
-+#define INT_USB				(INT_PRI_BASE + 20)
-+#define INT_USB2			(INT_PRI_BASE + 21)
-+#define INT_PRI_RES_22			(INT_PRI_BASE + 22)
-+#define INT_EIDE			(INT_PRI_BASE + 23)
-+#define INT_NANDFLASH			(INT_PRI_BASE + 24)
-+#define INT_VCP				(INT_PRI_BASE + 25)
-+#define INT_APB_DMA			(INT_PRI_BASE + 26)
-+#define INT_AHB_DMA			(INT_PRI_BASE + 27)
-+#define INT_GNT_0			(INT_PRI_BASE + 28)
-+#define INT_GNT_1			(INT_PRI_BASE + 29)
-+#define INT_OWR				(INT_PRI_BASE + 30)
-+#define INT_SDMMC4			(INT_PRI_BASE + 31)
-+
-+/* Secondary Interrupt Controller */
-+#define INT_SEC_BASE			(INT_PRI_BASE + 32)
-+#define INT_GPIO1			(INT_SEC_BASE + 0)
-+#define INT_GPIO2			(INT_SEC_BASE + 1)
-+#define INT_GPIO3			(INT_SEC_BASE + 2)
-+#define INT_GPIO4			(INT_SEC_BASE + 3)
-+#define INT_UARTA			(INT_SEC_BASE + 4)
-+#define INT_UARTB			(INT_SEC_BASE + 5)
-+#define INT_I2C				(INT_SEC_BASE + 6)
-+#define INT_SPI				(INT_SEC_BASE + 7)
-+#define INT_TWC				(INT_SEC_BASE + 8)
-+#define INT_TMR3			(INT_SEC_BASE + 9)
-+#define INT_TMR4			(INT_SEC_BASE + 10)
-+#define INT_FLOW_RSM0			(INT_SEC_BASE + 11)
-+#define INT_FLOW_RSM1			(INT_SEC_BASE + 12)
-+#define INT_SPDIF			(INT_SEC_BASE + 13)
-+#define INT_UARTC			(INT_SEC_BASE + 14)
-+#define INT_MIPI			(INT_SEC_BASE + 15)
-+#define INT_EVENTA			(INT_SEC_BASE + 16)
-+#define INT_EVENTB			(INT_SEC_BASE + 17)
-+#define INT_EVENTC			(INT_SEC_BASE + 18)
-+#define INT_EVENTD			(INT_SEC_BASE + 19)
-+#define INT_VFIR			(INT_SEC_BASE + 20)
-+#define INT_DVC				(INT_SEC_BASE + 21)
-+#define INT_SYS_STATS_MON		(INT_SEC_BASE + 22)
-+#define INT_GPIO5			(INT_SEC_BASE + 23)
-+#define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
-+#define INT_CPU2_PMU_INTR		(INT_SEC_BASE + 25)
-+#define INT_SEC_RES_26			(INT_SEC_BASE + 26)
-+#define INT_S_LINK1			(INT_SEC_BASE + 27)
-+#define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
-+#define INT_AHB_DMA_COP			(INT_SEC_BASE + 29)
-+#define INT_DMA_TX			(INT_SEC_BASE + 30)
-+#define INT_DMA_RX			(INT_SEC_BASE + 31)
-+
-+/* Tertiary Interrupt Controller */
-+#define INT_TRI_BASE			(INT_SEC_BASE + 32)
-+#define INT_HOST1X_COP_SYNCPT		(INT_TRI_BASE + 0)
-+#define INT_HOST1X_MPCORE_SYNCPT	(INT_TRI_BASE + 1)
-+#define INT_HOST1X_COP_GENERAL		(INT_TRI_BASE + 2)
-+#define INT_HOST1X_MPCORE_GENERAL	(INT_TRI_BASE + 3)
-+#define INT_MPE_GENERAL			(INT_TRI_BASE + 4)
-+#define INT_VI_GENERAL			(INT_TRI_BASE + 5)
-+#define INT_EPP_GENERAL			(INT_TRI_BASE + 6)
-+#define INT_ISP_GENERAL			(INT_TRI_BASE + 7)
-+#define INT_2D_GENERAL			(INT_TRI_BASE + 8)
-+#define INT_DISPLAY_GENERAL		(INT_TRI_BASE + 9)
-+#define INT_DISPLAY_B_GENERAL		(INT_TRI_BASE + 10)
-+#define INT_HDMI			(INT_TRI_BASE + 11)
-+#define INT_TVO_GENERAL			(INT_TRI_BASE + 12)
-+#define INT_MC_GENERAL			(INT_TRI_BASE + 13)
-+#define INT_EMC_GENERAL			(INT_TRI_BASE + 14)
-+#define INT_TRI_RES_15			(INT_TRI_BASE + 15)
-+#define INT_TRI_RES_16			(INT_TRI_BASE + 16)
-+#define INT_AC97			(INT_TRI_BASE + 17)
-+#define INT_SPI_2			(INT_TRI_BASE + 18)
-+#define INT_SPI_3			(INT_TRI_BASE + 19)
-+#define INT_I2C2			(INT_TRI_BASE + 20)
-+#define INT_KBC				(INT_TRI_BASE + 21)
-+#define INT_EXTERNAL_PMU		(INT_TRI_BASE + 22)
-+#define INT_GPIO6			(INT_TRI_BASE + 23)
-+#define INT_TVDAC			(INT_TRI_BASE + 24)
-+#define INT_GPIO7			(INT_TRI_BASE + 25)
-+#define INT_UARTD			(INT_TRI_BASE + 26)
-+#define INT_UARTE			(INT_TRI_BASE + 27)
-+#define INT_I2C3			(INT_TRI_BASE + 28)
-+#define INT_SPI4			(INT_TRI_BASE + 29)
-+#define INT_TRI_RES_30			(INT_TRI_BASE + 30)
-+#define INT_SW_RESERVED			(INT_TRI_BASE + 31)
-+
-+/* Quaternary Interrupt Controller */
-+#define INT_QUAD_BASE			(INT_TRI_BASE + 32)
-+#define INT_SNOR			(INT_QUAD_BASE + 0)
-+#define INT_USB3			(INT_QUAD_BASE + 1)
-+#define INT_PCIE_INTR			(INT_QUAD_BASE + 2)
-+#define INT_PCIE_MSI			(INT_QUAD_BASE + 3)
-+#define INT_QUAD_RES_4			(INT_QUAD_BASE + 4)
-+#define INT_QUAD_RES_5			(INT_QUAD_BASE + 5)
-+#define INT_QUAD_RES_6			(INT_QUAD_BASE + 6)
-+#define INT_QUAD_RES_7			(INT_QUAD_BASE + 7)
-+#define INT_APB_DMA_CH0			(INT_QUAD_BASE + 8)
-+#define INT_APB_DMA_CH1			(INT_QUAD_BASE + 9)
-+#define INT_APB_DMA_CH2			(INT_QUAD_BASE + 10)
-+#define INT_APB_DMA_CH3			(INT_QUAD_BASE + 11)
-+#define INT_APB_DMA_CH4			(INT_QUAD_BASE + 12)
-+#define INT_APB_DMA_CH5			(INT_QUAD_BASE + 13)
-+#define INT_APB_DMA_CH6			(INT_QUAD_BASE + 14)
-+#define INT_APB_DMA_CH7			(INT_QUAD_BASE + 15)
-+#define INT_APB_DMA_CH8			(INT_QUAD_BASE + 16)
-+#define INT_APB_DMA_CH9			(INT_QUAD_BASE + 17)
-+#define INT_APB_DMA_CH10		(INT_QUAD_BASE + 18)
-+#define INT_APB_DMA_CH11		(INT_QUAD_BASE + 19)
-+#define INT_APB_DMA_CH12		(INT_QUAD_BASE + 20)
-+#define INT_APB_DMA_CH13		(INT_QUAD_BASE + 21)
-+#define INT_APB_DMA_CH14		(INT_QUAD_BASE + 22)
-+#define INT_APB_DMA_CH15		(INT_QUAD_BASE + 23)
-+#define INT_QUAD_RES_24			(INT_QUAD_BASE + 24)
-+#define INT_QUAD_RES_25			(INT_QUAD_BASE + 25)
-+#define INT_QUAD_RES_26			(INT_QUAD_BASE + 26)
-+#define INT_QUAD_RES_27			(INT_QUAD_BASE + 27)
-+#define INT_QUAD_RES_28			(INT_QUAD_BASE + 28)
-+#define INT_QUAD_RES_29			(INT_QUAD_BASE + 29)
-+#define INT_QUAD_RES_30			(INT_QUAD_BASE + 30)
-+#define INT_QUAD_RES_31			(INT_QUAD_BASE + 31)
-+
-+#define INT_GPIO_BASE			(INT_QUAD_BASE + 32)
-+#define INT_GPIO_NR			(28 * 8)
-+
-+#define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+ config FB_I810
+ 	tristate "Intel 810/815 support (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && FB && PCI && X86_32 && AGP_INTEL
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index 4ecb30c..d4a14f2 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -129,6 +129,7 @@ obj-$(CONFIG_XEN_FBDEV_FRONTEND)  += xen-fbfront.o
+ obj-$(CONFIG_FB_CARMINE)          += carminefb.o
+ obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
+ obj-$(CONFIG_FB_MSM)              += msm/
++obj-$(CONFIG_FB_TEGRA)            += tegrafb.o
+ 
+ # Platform or fallback drivers go here
+ obj-$(CONFIG_FB_UVESA)            += uvesafb.o
+diff --git a/drivers/video/tegrafb.c b/drivers/video/tegrafb.c
 new file mode 100644
-index 0000000..2e8cdb0
+index 0000000..634022b
 --- /dev/null
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -0,0 +1,34 @@
++++ b/drivers/video/tegrafb.c
+@@ -0,0 +1,620 @@
 +/*
-+ * Copyright (C) 2010 Google, Inc.
++ * drivers/video/tegrafb.c
 + *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *         Travis Geiselbrecht <travis@palm.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -231,22 +116,607 @@ index 0000000..2e8cdb0
 + *
 + */
 +
++#include <linux/fb.h>
++#include <linux/module.h>
 +#include <linux/kernel.h>
-+#include <linux/init.h>
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
 +#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/io.h>
++#include <linux/clk.h>
++#include <linux/wait.h>
++#include <asm/cacheflush.h>
++#include <mach/tegra_fb.h>
 +
-+#include <mach/io.h>
-+#include <mach/iomap.h>
++#define DEBUG 1
 +
-+#include "board.h"
++#define DC_CMD_GENERAL_INCR_SYNCPT		0x000
++#define DC_CMD_GENERAL_INCR_SYNCPT_CNTRL	0x001
++#define DC_CMD_GENERAL_INCR_SYNCPT_ERROR	0x002
++#define DC_CMD_WIN_A_INCR_SYNCPT		0x008
++#define DC_CMD_WIN_A_INCR_SYNCPT_CNTRL		0x009
++#define DC_CMD_WIN_A_INCR_SYNCPT_ERROR		0x00a
++#define DC_CMD_WIN_B_INCR_SYNCPT		0x010
++#define DC_CMD_WIN_B_INCR_SYNCPT_CNTRL		0x011
++#define DC_CMD_WIN_B_INCR_SYNCPT_ERROR		0x012
++#define DC_CMD_WIN_C_INCR_SYNCPT		0x018
++#define DC_CMD_WIN_C_INCR_SYNCPT_CNTRL		0x019
++#define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
++#define DC_CMD_CONT_SYNCPT_VSYNC		0x028
++#define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
++#define DC_CMD_DISPLAY_COMMAND			0x032
++#define DC_CMD_SIGNAL_RAISE			0x033
++#define DC_CMD_INT_STATUS			0x037
++#define DC_CMD_INT_MASK				0x038
++#define DC_CMD_INT_ENABLE			0x039
++#define DC_CMD_INT_TYPE				0x03a
++#define DC_CMD_INT_POLARITY			0x03b
++#define DC_CMD_SIGNAL_RAISE1			0x03c
++#define DC_CMD_SIGNAL_RAISE2			0x03d
++#define DC_CMD_SIGNAL_RAISE3			0x03e
++#define DC_CMD_STATE_ACCESS			0x040
++#define DC_CMD_STATE_CONTROL			0x041
++#define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
++#define DC_CMD_REG_ACT_CONTROL			0x043
++#define DC_WINC_A_COLOR_PALETTE			0x500
++#define DC_WINC_A_PALETTE_COLOR_EXT		0x600
++#define DC_WIN_A_WIN_OPTIONS			0x700
++#define DC_WIN_A_BYTE_SWAP			0x701
++#define DC_WIN_A_BUFFER_CONTROL			0x702
++#define DC_WIN_A_COLOR_DEPTH			0x703
++#define DC_WIN_A_POSITION			0x704
++#define DC_WIN_A_SIZE				0x705
++#define DC_WIN_A_PRESCALED_SIZE			0x706
++#define DC_WIN_A_H_INITIAL_DDA			0x707
++#define DC_WIN_A_V_INITIAL_DDA			0x708
++#define DC_WIN_A_DDA_INCREMENT			0x709
++#define DC_WIN_A_LINE_STRIDE			0x70a
++#define DC_WIN_A_BUF_STRIDE			0x70b
++#define DC_WINBUF_A_START_ADDR			0x800
++#define DC_WINBUF_A_ADDR_H_OFFSET		0x806
++#define DC_WINBUF_A_ADDR_V_OFFSET		0x808
 +
-+void __init tegra_init_irq(void)
++
++#define DC_INT_CTXSW				(1<<0)
++#define DC_INT_FRAME_END			(1<<1)
++#define DC_INT_V_BLANK				(1<<2)
++#define DC_INT_H_BLANK				(1<<3)
++#define DC_INT_V_PULSE3				(1<<4)
++
++#define DC_COLOR_DEPTH_P1			0
++#define DC_COLOR_DEPTH_P2			1
++#define DC_COLOR_DEPTH_P4			2
++#define DC_COLOR_DEPTH_P8			3
++#define DC_COLOR_DEPTH_B4G4R4A4			4
++#define DC_COLOR_DEPTH_B5G5R5A			5
++#define DC_COLOR_DEPTH_B5G6R5			6
++#define DC_COLOR_DEPTH_AB5G5R5			7
++#define DC_COLOR_DEPTH_B8G8R8A8			12
++#define DC_COLOR_DEPTH_R8G8B8A8			13
++#define DC_COLOR_DEPTH_B6x2G6x2R6x2A8		14
++#define DC_COLOR_DEPTH_R6x2G6x2B6x2A8		15
++#define DC_COLOR_DEPTH_YCbCr422			16
++#define DC_COLOR_DEPTH_YUV422			17
++#define DC_COLOR_DEPTH_YCbCr420P		18
++#define DC_COLOR_DEPTH_YUV420P			19
++#define DC_COLOR_DEPTH_YCbCr422P		20
++#define DC_COLOR_DEPTH_YUV422P			21
++#define DC_COLOR_DEPTH_YCbCr422R		22
++#define DC_COLOR_DEPTH_YUV422R			23
++#define DC_COLOR_DEPTH_YCbCr422RA		24
++#define DC_COLOR_DEPTH_YUV422RA			25
++
++struct tegra_fb_info {
++	struct clk *clk;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	void __iomem *reg_base;
++	wait_queue_head_t event_wq;
++	unsigned int wait_condition;
++	int lcd_xres;
++	int lcd_yres;
++	int irq;
++};
++
++static void tegra_fb_writel(struct tegra_fb_info *tegra_fb, u32 val, unsigned long reg)
 +{
-+	gic_dist_init(0, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE), 29);
-+	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
++	writel(val, tegra_fb->reg_base + reg*sizeof(u32));
 +}
++
++static u32 tegra_fb_readl(struct tegra_fb_info *tegra_fb, unsigned long reg)
++{
++	return readl(tegra_fb->reg_base + reg*sizeof(u32));
++}
++
++/* palette attary used by the fbcon */
++u32 pseudo_palette[16];
++
++irqreturn_t tegra_fb_irq(int irq, void *ptr)
++{
++	struct fb_info *info = ptr;
++	struct tegra_fb_info *tegra_fb = info->par;
++
++	u32 reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_STATUS);
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_STATUS);
++
++	tegra_fb->wait_condition = 1;
++	wake_up(&tegra_fb->event_wq);
++	return IRQ_HANDLED;
++}
++
++static int tegra_fb_wait_for_event(struct tegra_fb_info *tegra_fb, unsigned long timeout, u32 irq_mask)
++{
++	u32 reg;
++
++	tegra_fb->wait_condition = 0;
++
++	reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_MASK);
++	reg |= irq_mask;
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_MASK);
++
++	/* Clear any pending interrupt */
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_STATUS);
++
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_ENABLE);
++
++	/* Wait for the irq to fire */
++	wait_event_interruptible_timeout(tegra_fb->event_wq, tegra_fb->wait_condition, timeout);
++
++	tegra_fb_writel(tegra_fb, 0, DC_CMD_INT_ENABLE);
++
++	if (!tegra_fb->wait_condition) {
++		pr_warning("%s: wait for vsync timed out\n", __func__);
++		return 1;
++	}
++	return 0;
++}
++
++/* Writes to many registers in the display block are buffered.
++ * tegra_fb_activate requests an update of the main registers from their
++ * double-buffered registers, which takes effect at the end of the next frame,
++ * and then waits for the frame_end IRQ.
++ */
++static void tegra_fb_activate(struct tegra_fb_info *tegra_fb)
++{
++	int vsync_count = 0;
++
++	if (unlikely(tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3)) {
++		pr_warning("%s: update already activated!\n", __func__);
++		return;
++	}
++
++	tegra_fb_writel(tegra_fb, (1 << 8) | (1 << 9), DC_CMD_STATE_CONTROL);
++	tegra_fb_writel(tegra_fb, (1 << 0) | (1 << 1), DC_CMD_STATE_CONTROL);
++	while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
++		vsync_count++;
++		if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
++			break;
++	}
++	if (unlikely(vsync_count > 1))
++		pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
++}
++
++
++static int tegra_fb_open(struct fb_info *info, int user)
++{
++	return 0;
++}
++
++static int tegra_fb_release(struct fb_info *info, int user)
++{
++	return 0;
++}
++
++static int tegra_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
++{
++	if ((var->xres != info->var.xres) ||
++	    (var->yres != info->var.yres) ||
++	    (var->xres_virtual != info->var.xres_virtual) ||
++	    (var->yres_virtual != info->var.yres_virtual) ||
++	    (var->grayscale != info->var.grayscale))
++		return -EINVAL;
++	return 0;
++}
++
++static int tegra_fb_set_par(struct fb_info *info)
++{
++	struct tegra_fb_info *tegra_fb = info->par;
++	struct fb_var_screeninfo *var = &info->var;
++	struct fb_fix_screeninfo *fix = &info->fix;
++	u32 color_depth;
++	unsigned int h_dda;
++	unsigned int v_dda;
++
++	/* we only support RGB ordering for now */
++	switch (var->bits_per_pixel) {
++	case 32:
++	case 24:
++		var->red.offset = 0;
++		var->red.length = 8;
++		var->green.offset = 8;
++		var->green.length = 8;
++		var->blue.offset = 16;
++		var->blue.length = 8;
++		color_depth = DC_COLOR_DEPTH_B8G8R8A8;
++		break;
++	case 16:
++		var->red.offset = 11;
++		var->red.length = 5;
++		var->green.offset = 5;
++		var->green.length = 6;
++		var->blue.offset = 0;
++		var->blue.length = 5;
++		color_depth = DC_COLOR_DEPTH_B5G6R5;
++		break;
++	default:
++		return -1;
++	}
++	fix->line_length = var->xres * var->bits_per_pixel / 8;
++
++	h_dda = (var->xres * 0x1000) / (tegra_fb->lcd_xres - 1);
++	v_dda = (var->yres * 0x1000) / (tegra_fb->lcd_yres - 1);
++
++	tegra_fb_writel(tegra_fb, tegra_fb->lcd_yres<<16 | tegra_fb->lcd_xres,
++		DC_WIN_A_SIZE);
++	tegra_fb_writel(tegra_fb, var->yres<<16 | fix->line_length,
++		DC_WIN_A_PRESCALED_SIZE);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_H_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_V_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, v_dda << 16 | h_dda, DC_WIN_A_DDA_INCREMENT);
++	tegra_fb_writel(tegra_fb, color_depth, DC_WIN_A_COLOR_DEPTH);
++	tegra_fb_writel(tegra_fb, fix->line_length, DC_WIN_A_LINE_STRIDE);
++	return 0;
++}
++
++static int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
++	unsigned blue, unsigned transp, struct fb_info *info)
++{
++	struct fb_var_screeninfo *var = &info->var;
++
++	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
++	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
++		u32 v;
++
++		if (regno >= 16)
++			return -EINVAL;
++
++		v = (red << var->red.offset) |
++			(green << var->green.offset) |
++			(blue << var->blue.offset);
++
++		((u32 *)info->pseudo_palette)[regno] = v;
++	}
++
++	return 0;
++}
++
++static int tegra_fb_blank(int blank, struct fb_info *info)
++{
++	return 0;
++}
++
++static int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
++{
++	struct tegra_fb_info *tegra_fb = info->par;
++	char __iomem *flush_start;
++	char __iomem *flush_end;
++	u32 addr;
++
++	flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
++	flush_end = flush_start + (var->yres * info->fix.line_length);
++
++	info->var.xoffset = var->xoffset;
++	info->var.yoffset = var->yoffset;
++
++	addr = info->fix.smem_start + (var->yoffset * info->fix.line_length) +
++		(var->xoffset * (var->bits_per_pixel/8));
++
++	tegra_fb_writel(tegra_fb, addr, DC_WINBUF_A_START_ADDR);
++	tegra_fb_activate(tegra_fb);
++	return 0;
++}
++
++static void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
++{
++	cfb_fillrect(info, rect);
++}
++
++static void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
++{
++	cfb_copyarea(info, region);
++}
++
++static void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
++{
++	cfb_imageblit(info, image);
++}
++
++static int tegra_fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
++{
++	return 0;
++}
++
++static int tegra_fb_sync(struct fb_info *info)
++{
++	return 0;
++}
++
++#ifdef DEBUG
++#define DUMP_REG(a) pr_info("%-32s\t%03x\t%08x\n", #a, a, tegra_fb_readl(tegra_fb, a));
++static void dump_regs(struct tegra_fb_info *tegra_fb)
++{
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_CONT_SYNCPT_VSYNC);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE);
++	DUMP_REG(DC_CMD_INT_STATUS);
++	DUMP_REG(DC_CMD_INT_MASK);
++	DUMP_REG(DC_CMD_INT_ENABLE);
++	DUMP_REG(DC_CMD_INT_TYPE);
++	DUMP_REG(DC_CMD_INT_POLARITY);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE1);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE2);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE3);
++	DUMP_REG(DC_CMD_STATE_ACCESS);
++	DUMP_REG(DC_CMD_STATE_CONTROL);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_REG_ACT_CONTROL);
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_WINC_A_COLOR_PALETTE);
++	DUMP_REG(DC_WINC_A_PALETTE_COLOR_EXT);
++	DUMP_REG(DC_WIN_A_WIN_OPTIONS);
++	DUMP_REG(DC_WIN_A_BYTE_SWAP);
++	DUMP_REG(DC_WIN_A_BUFFER_CONTROL);
++	DUMP_REG(DC_WIN_A_COLOR_DEPTH);
++	DUMP_REG(DC_WIN_A_POSITION);
++	DUMP_REG(DC_WIN_A_SIZE);
++	DUMP_REG(DC_WIN_A_PRESCALED_SIZE);
++	DUMP_REG(DC_WIN_A_H_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_V_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_DDA_INCREMENT);
++	DUMP_REG(DC_WIN_A_LINE_STRIDE);
++	DUMP_REG(DC_WIN_A_BUF_STRIDE);
++	DUMP_REG(DC_WINBUF_A_START_ADDR);
++	DUMP_REG(DC_WINBUF_A_ADDR_H_OFFSET);
++	DUMP_REG(DC_WINBUF_A_ADDR_V_OFFSET);
++}
++#endif
++
++static struct fb_ops tegra_fb_ops = {
++	.owner = THIS_MODULE,
++	.fb_open = tegra_fb_open,
++	.fb_release = tegra_fb_release,
++	.fb_check_var = tegra_fb_check_var,
++	.fb_set_par = tegra_fb_set_par,
++	.fb_setcolreg = tegra_fb_setcolreg,
++	.fb_pan_display = tegra_fb_pan_display,
++	.fb_blank = tegra_fb_blank,
++	.fb_fillrect = tegra_fb_fillrect,
++	.fb_copyarea = tegra_fb_copyarea,
++	.fb_imageblit = tegra_fb_imageblit,
++	.fb_cursor = tegra_fb_cursor,
++	.fb_sync = tegra_fb_sync,
++};
++
++static int tegra_plat_probe(struct platform_device *pdev)
++{
++	struct fb_info *info;
++	struct tegra_fb_info *tegra_fb;
++	struct clk *clk;
++	struct resource	*res;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	int ret = 0;
++	void __iomem *reg_base;
++	void __iomem *fb_base;
++	unsigned long fb_size;
++	unsigned long fb_phys;
++	int irq;
++	struct tegra_fb_lcd_data *lcd_data = pdev->dev.platform_data;
++
++	info = framebuffer_alloc(sizeof(struct tegra_fb_info), &pdev->dev);
++	if (!info) {
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0) {
++		pr_debug("%s: no irq\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		pr_debug("%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
++	}
++
++	reg_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!reg_mem) {
++		pr_debug("%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_free;
++	}
++
++	reg_base = ioremap(res->start, resource_size(res));
++	if (!reg_base) {
++		pr_debug("%s: registers can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_reg;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res) {
++		pr_debug("%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_reg;
++	}
++
++	fb_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!fb_mem) {
++		pr_debug("%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_iounmap_reg;
++	}
++
++	fb_size = resource_size(res);
++	fb_phys = res->start;
++	fb_base = ioremap_nocache(fb_phys, fb_size);
++	if (!fb_base) {
++		pr_debug("%s: fb can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_fb;
++	}
++
++	clk = clk_get(&pdev->dev, NULL);
++	if (!clk) {
++		pr_debug("%s: can't get clock\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_fb;
++	}
++	clk_enable(clk);
++
++	tegra_fb = info->par;
++	tegra_fb->clk = clk;
++	tegra_fb->fb_mem = fb_mem;
++	tegra_fb->reg_mem = reg_mem;
++	tegra_fb->reg_base = reg_base;
++	tegra_fb->irq = irq;
++	tegra_fb->lcd_xres = lcd_data->lcd_xres;
++	tegra_fb->lcd_yres = lcd_data->lcd_yres;
++
++	info->fbops = &tegra_fb_ops;
++	info->pseudo_palette = pseudo_palette;
++	info->screen_base = fb_base;
++	info->screen_size = fb_size;
++
++	strlcpy(info->fix.id, "tegra_fb", sizeof(info->fix.id));
++	info->fix.type = FB_TYPE_PACKED_PIXELS;
++	info->fix.visual = FB_VISUAL_TRUECOLOR;
++	info->fix.xpanstep   = 1;
++	info->fix.ypanstep   = 1;
++	info->fix.accel	  = FB_ACCEL_NONE;
++	info->fix.smem_start = fb_phys;
++	info->fix.smem_len = fb_size;
++
++	info->var.xres			= lcd_data->fb_xres;
++	info->var.yres			= lcd_data->fb_yres;
++	info->var.xres_virtual		= lcd_data->fb_xres;
++	info->var.yres_virtual		= lcd_data->fb_yres*2;
++	info->var.bits_per_pixel	= lcd_data->bits_per_pixel;
++	info->var.activate		= FB_ACTIVATE_NOW;
++	info->var.height		= -1;
++	info->var.width			= -1;
++	info->var.pixclock		= 24500;
++	info->var.left_margin		= 0;
++	info->var.right_margin		= 0;
++	info->var.upper_margin		= 0;
++	info->var.lower_margin		= 0;
++	info->var.hsync_len		= 0;
++	info->var.vsync_len		= 0;
++	info->var.vmode			= FB_VMODE_NONINTERLACED;
++
++	if (request_irq(irq, tegra_fb_irq, IRQF_DISABLED,
++			dev_name(&pdev->dev), info)) {
++		pr_debug("%s: request_irq %d failed\n",
++			pdev->name, irq);
++		ret = -EBUSY;
++		goto err_clk_disable;
++	}
++
++	init_waitqueue_head(&tegra_fb->event_wq);
++
++	/* Enable writes to Window A */
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++
++	tegra_fb_set_par(info);
++
++	dev_info(&pdev->dev, "base address: %08x (%08x)\n",
++			(unsigned int)info->fix.smem_start,
++			(unsigned int)info->screen_base);
++
++#ifdef DEBUG
++	dump_regs(tegra_fb);
++#endif
++
++	register_framebuffer(info);
++	platform_set_drvdata(pdev, info);
++	return 0;
++
++err_clk_disable:
++	clk_disable(clk);
++err_iounmap_fb:
++	iounmap(fb_base);
++err_release_resource_fb:
++	release_resource(fb_mem);
++err_iounmap_reg:
++	iounmap(reg_base);
++err_release_resource_reg:
++	release_resource(reg_mem);
++err_free:
++	framebuffer_release(info);
++err:
++	return ret;
++}
++
++static int tegra_plat_remove(struct platform_device *pdev)
++{
++	struct fb_info *fb = platform_get_drvdata(pdev);
++	struct tegra_fb_info *tegra_fb = fb->par;
++	clk_disable(tegra_fb->clk);
++	iounmap(fb->screen_base);
++	release_resource(tegra_fb->fb_mem);
++	iounmap(tegra_fb->reg_base);
++	release_resource(tegra_fb->reg_mem);
++	framebuffer_release(fb);
++	return 0;
++}
++
++struct platform_driver tegra_platform_driver = {
++	.probe = tegra_plat_probe,
++	.remove = tegra_plat_remove,
++	.driver = {
++		.name = "tegrafb",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init tegra_fb_init(void)
++{
++	int e;
++	e = platform_driver_register(&tegra_platform_driver);
++	if (e) {
++		pr_info("tegrafb: platform_driver_register failed\n");
++		return e;
++	}
++	return e;
++}
++
++static void __exit tegra_exit(void)
++{
++	platform_driver_unregister(&tegra_platform_driver);
++}
++
++module_exit(tegra_exit);
++module_init(tegra_fb_init);
 -- 
 1.6.5.6
