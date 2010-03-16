@@ -1,128 +1,37 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 16 Mar 2010 12:54:37 -0500
-Subject: [PATCH] ep93xx/core.c: remove redundant static variable
-In-Reply-To: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <0D753D10438DA54287A00B0270842697636858C6FE@AUSP01VMBX24.collaborationhost.net>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Tue, 16 Mar 2010 13:52:09 -0500
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <000001cac52d$d13ff3f0$73bfdbd0$@deacon@arm.com>
+References: <1268150768-6597-1-git-send-email-will.deacon@arm.com>	<20100309162202.GB17251@n2100.arm.linux.org.uk>	<000f01cabfa6$76951ac0$63bf5040$@deacon@arm.com>	<20100309164926.GC17251@n2100.arm.linux.org.uk>
+	<001001cabfb2$4a75d2c0$df617840$@deacon@arm.com>
+	<4B9817CF.2050807@windriver.com>
+	<000001cac52d$d13ff3f0$73bfdbd0$@deacon@arm.com>
+Message-ID: <4B9FD359.6040509@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the pointer to the passed board support data directly instead of 
-copying it to local static variables.
+On 03/16/2010 12:26 PM, Will Deacon wrote:
+> Hi Jason,
+>
+>   
+> What's the status on this patch? Russell has applied the ARM SMP code to his
+> tree now, so it would be good to get this patch into KGDB to avoid the deadlock
+> on ARM11MPCore.
+>
+>   
 
-This updates the ethernet, i2c, and framebuffer devices.
+Linux-next presently reflects the state of the outstanding pull request
+I have to Linus.  I have yet to hear back any word as to what happened
+with my pull request.
 
-While here, also document the functions used to register the devices.
+> I only ask because I can't see it in -next [although I see kgdb.c has moved!].
+>   
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
+It lives in kernel/debug/debug_core.c, assuming the code in linux-next
+gets pulled into Linus's tree.  I already have an updated version of the
+patch for the new structure, but not pushed to linux-next while my pull
+request is in limbo.
 
----
 
-V2: spotted a couple others in addition to the ethernet device.
-
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 90fb591..5f5bc6d 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -330,8 +330,10 @@ static struct platform_device ep93xx_ohci_device = {
- 	.resource	= ep93xx_ohci_resources,
- };
- 
--static struct ep93xx_eth_data ep93xx_eth_data;
- 
-+/*************************************************************************
-+ * EP93xx ethernet peripheral handling
-+ *************************************************************************/
- static struct resource ep93xx_eth_resource[] = {
- 	{
- 		.start	= EP93XX_ETHERNET_PHYS_BASE,
-@@ -347,19 +349,22 @@ static struct resource ep93xx_eth_resource[] = {
- static struct platform_device ep93xx_eth_device = {
- 	.name		= "ep93xx-eth",
- 	.id		= -1,
--	.dev		= {
--		.platform_data	= &ep93xx_eth_data,
--	},
- 	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
- 	.resource	= ep93xx_eth_resource,
- };
- 
-+/**
-+ * ep93xx_register_eth - Register the built-in ethernet platform device.
-+ * @data:	platform specific ethernet configuration
-+ * @copy_addr:	flag indicating that the MAC address should be copied
-+ *		from the IndAd registers (as programmed by the bootloader)
-+ */
- void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
- {
- 	if (copy_addr)
- 		memcpy_fromio(data->dev_addr, EP93XX_ETHERNET_BASE + 0x50, 6);
- 
--	ep93xx_eth_data = *data;
-+	ep93xx_eth_device.dev.platform_data = data;
- 	platform_device_register(&ep93xx_eth_device);
- }
- 
-@@ -367,14 +372,17 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
- /*************************************************************************
-  * EP93xx i2c peripheral handling
-  *************************************************************************/
--static struct i2c_gpio_platform_data ep93xx_i2c_data;
--
- static struct platform_device ep93xx_i2c_device = {
- 	.name			= "i2c-gpio",
- 	.id			= 0,
--	.dev.platform_data	= &ep93xx_i2c_data,
- };
- 
-+/**
-+ * ep93xx_register_i2c - Register the i2c platform device.
-+ * @data:	platform specific i2c-gpio configurtion
-+ * @devices:	platform specific i2c bus device information
-+ * @num:	the number of devices on the i2c bus
-+ */
- void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
- 				struct i2c_board_info *devices, int num)
- {
-@@ -393,7 +401,7 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
- 		     (data->scl_is_open_drain << 0),
- 		     EP93XX_GPIO_EEDRIVE);
- 
--	ep93xx_i2c_data = *data;
-+	ep93xx_i2c_device.dev.platform_data = data;
- 	i2c_register_board_info(0, devices, num);
- 	platform_device_register(&ep93xx_i2c_device);
- }
-@@ -514,8 +522,6 @@ EXPORT_SYMBOL(ep93xx_pwm_release_gpio);
- /*************************************************************************
-  * EP93xx video peripheral handling
-  *************************************************************************/
--static struct ep93xxfb_mach_info ep93xxfb_data;
--
- static struct resource ep93xx_fb_resource[] = {
- 	{
- 		.start		= EP93XX_RASTER_PHYS_BASE,
-@@ -528,7 +534,6 @@ static struct platform_device ep93xx_fb_device = {
- 	.name			= "ep93xx-fb",
- 	.id			= -1,
- 	.dev			= {
--		.platform_data	= &ep93xxfb_data,
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 		.dma_mask		= &ep93xx_fb_device.dev.coherent_dma_mask,
- 	},
-@@ -536,9 +541,13 @@ static struct platform_device ep93xx_fb_device = {
- 	.resource		= ep93xx_fb_resource,
- };
- 
-+/**
-+ * ep93xx_register_fb - Register the framebuffer platform device.
-+ * @data:	platform specific framebuffer configuration
-+ */
- void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
- {
--	ep93xxfb_data = *data;
-+	ep93xx_fb_device.dev.platform_data = data;
- 	platform_device_register(&ep93xx_fb_device);
- }
- 
+Jason.
