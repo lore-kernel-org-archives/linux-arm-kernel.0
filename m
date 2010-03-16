@@ -1,16 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 16 Mar 2010 10:40:44 +0000
-Subject: [PULL] Please pull bjdooks' for-linus/samsung-fixes
-In-Reply-To: <20100315232027.GA11570@fluff.org.uk>
-References: <20100315232027.GA11570@fluff.org.uk>
-Message-ID: <20100316104044.GA21604@sirena.org.uk>
+From: Hui.Wang@windriver.com (wanghui)
+Date: Tue, 16 Mar 2010 18:49:33 +0800
+Subject: [PATCH 1/2] USB: musb: add two states to handle vbus error
+In-Reply-To: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
+References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
+Message-ID: <4B9F623D.6060406@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 15, 2010 at 11:20:27PM +0000, Ben Dooks wrote:
+On omap platforms, when configuring the kernel, if we choose the musb 
+work as host or OTG mode and we plug
+a mini-A cable into the socket, after the kernel boot up in host mode or 
+insmod gadget driver in OTG mode,
+the state of musb's xceiv is A_IDLE or B_IDLE correspondingly because id 
+change can't trigger ISR. Under this
+condition, if we hotplug a usb device(without self-powered) at the other 
+side of the cable, the musb will suffer a vbus error,
+This patch can handle this vbus error.
 
-> Ben Dooks (2):
->       ARM: SAMSUNG: Fix build error from stale define in <plat/uncompress.h>
-
-This should already be in Russell's tree as part of patch 5985/2 (not
-that this duplication should do any harm, git should just cope).
+Wang Hui wrote:
+> When the MUSB is configured as host mode or OTG mode, the xceiv->state
+> will be set to OTG_STATE_A_IDLE or OTG_STATE_B_IDLE unconditionally
+> during init process. These init states can change to other
+> states When the MUSB module detects id pin change, devices connect or
+> disconnect.
+> But on some platforms(omap2, omap3), the id pin change
+> can't raise IRQ request to the MUSB module, so on these platforms,
+> the init xceiv->state will be A_IDLE or B_IDLE. Under this condition,
+> when we want the MUSB to act as a host and hotplug a usb device in
+> mini-B side of the cable, the MUSB will have a possibility to suffer
+> power underrun under A_IDLE or B_IDLE state, So here adding these
+> two states under which we can handle VBUSERROR IRQ.
+>
+> Signed-off-by: Wang Hui <Hui.Wang@windriver.com>
+> ---
+>  drivers/usb/musb/musb_core.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> index b4bbf8f..655413c 100644
+> --- a/drivers/usb/musb/musb_core.c
+> +++ b/drivers/usb/musb/musb_core.c
+> @@ -516,6 +516,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
+>  			 * another reset is due (at least for high speed,
+>  			 * to redo the chirp etc), it might work OK...
+>  			 */
+> +		case OTG_STATE_A_IDLE:
+> +		case OTG_STATE_B_IDLE:
+>  		case OTG_STATE_A_WAIT_BCON:
+>  		case OTG_STATE_A_WAIT_VRISE:
+>  			if (musb->vbuserr_retry) {
+>   
