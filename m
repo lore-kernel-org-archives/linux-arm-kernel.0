@@ -1,58 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 16 Mar 2010 07:25:14 +0100
-Subject: [PATCH] locomo: replace locomo_{readl/writel} macros with
-	__raw_{readw/writew}
-In-Reply-To: <0D753D10438DA54287A00B027084269763682CDA12@AUSP01VMBX24.collaborationhost.net>
-References: <BD79186B4FD85F4B8E60E381CAEE1909022427CF@mi8nycmail19.Mi8.com>
-	<f17812d71003090526r33325407n250c92b1947d9fcf@mail.gmail.com>
-	<0D753D10438DA54287A00B027084269763682CDA12@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100316062514.GA1528@ucw.cz>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 16 Mar 2010 08:35:39 +0200
+Subject: [PATCH 3/3] mx25: fix build when DEBUG_LL is enabled
+In-Reply-To: <20100311105637.GE16376@n2100.arm.linux.org.uk>
+References: <20100311105637.GE16376@n2100.arm.linux.org.uk>
+Message-ID: <da11b37fde9654572dad78b514ba49864ac0fcd2.1268721011.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2010-03-09 11:25:44, H Hartley Sweeten wrote:
-> On Tuesday, March 09, 2010 6:26 AM, Eric Miao wrote:
-> > On Tue, Mar 9, 2010 at 8:18 AM, H Hartley Sweeten
-> > <hartleys@visionengravers.com> wrote:
-> >> The locomo_readl and locomo_writel macros are misnamed. Both
-> >> use (*(volatile u16 *)(addr)) so they should be a *w variety.
-> >>
-> >> Instead of renaming the macros just replace them tree wide with
-> >> __raw_readw and __raw_writew.
-> >>
-> >> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Eric Miao <eric.y.miao@gmail.com>
-> >>
-> >
-> > Hey Hartley,
-> >
-> > Could you please rebase this on top of my 'devel' branch? And note
-> > locomo_{read,write}l() may also be used in sub-device drivers like
-> > keyboard, LEDs and etc.
-> 
-> Follow up to my previous reply.
-> 
-> If there are out-of-tree users of locomo_writel and locomo_readl, the
-> following should allow leaving the macros temporarily and get them to
-> switch.
-> 
-> When I rebase to your devel branch I can include this if you think it
-> is necessary.
+From: Alex Greshgorin <alexg@orex-cr.com>
 
-> -#define locomo_writel(val,addr)	({ *(volatile u16 *)(addr) = (val); })
-> -#define locomo_readl(addr)	(*(volatile u16 *)(addr))
-> +static inline void __deprecated locomo_writel(u16 val, void __iomem *addr)
-> +{
-> +	/* deprecated; use the function below instead */
-> +	__raw_writew(val, addr);
-> +}
+Commit "imx25: redefine MX25_IO_ADDRESS using IMX_IO_ADDRESS" removed the
+MX25_AIPS1_IO_ADDRESS macro which is used in debug-macro.S. Include
+mach/hardware.h, and use the higher level IMX_IO_ADDRESS which is assembly
+compatible
 
-I'm not sure if we want people to commonly use function begining with
-__raw_. Normally, such functions are think-twice internal-only...
+Signed-off-by: Alex Greshgorin <alexg@orex-cr.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Why not readw()/writew()?
-									Pavel
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 4c7d9f8..da75db8 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -22,9 +22,9 @@
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx25.h>
++#include <mach/hardware.h>
+ #define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	MX25_AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_VADDR	IMX_IO_ADDRESS(UART1_BASE_ADDR, MX25_AIPS1)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX2
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.0
