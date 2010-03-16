@@ -1,48 +1,60 @@
-From: Hui.Wang@windriver.com (wanghui)
-Date: Tue, 16 Mar 2010 18:13:50 +0800
-Subject: [PATCH 2/2] USB: musb: omap2430: add mode change from A to B
-In-Reply-To: <20100315161024.GC3879@gandalf>
-References: <1268648622-28529-1-git-send-email-Hui.Wang@windriver.com>
-	<1268648622-28529-2-git-send-email-Hui.Wang@windriver.com>
-	<4B9E187E.6090802@ru.mvista.com> <20100315161024.GC3879@gandalf>
-Message-ID: <4B9F59DE.4070807@windriver.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 16 Mar 2010 12:19:07 +0200
+Subject: [PATCH] ARM: sort the memory layout report by address
+Message-ID: <06dbc8f0e15bf48be70cd43ee6a5ab78b82711a8.1268734689.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi wrote:
-> On Mon, Mar 15, 2010 at 02:22:38PM +0300, Sergei Shtylyov wrote:
->   
->>    The whole musb_platform_set_mode() seems to be implemented 
->> incorrectly on OMAPs -- it shouldn't touch the DevCtl.Session bit. This 
->>     
->
-> correct. It should be changing the id pin rules just like in tusb6010.c
->
->   
->> function should control the ID pin override instead -- if the controller 
->> supports it. SRP must be initiated thru other means, i.e. 'srp' file in 
->> sysfs.
->>     
->
-> via musb_gadget_wakeup()
->
->   
-Thank you for your comments.
-It is right that in this function, we should only change id pin rules 
-according to user's choice, and
-leave mode transition to the ISR.
-But things are different on omap platforms, because the id pin change 
-can't trigger ISR.
-For example, when we configure the kernel, we choose musb working as OTG 
-mode. Then we plug a mini-A or a mini-B cable in the socket, after
-that we execute insmod g_ether.ko, at this time, the musb will 
-initialize to A or B working mode. how to change
-its working mode from A to B or B to A at this time? I think if the 
-platform can support id detection ISR, your method
-is workable. But on omap platforms, we must change cable(id pin state) 
-manually first, then let the controller to re-initiate a session forcibly.
-This action (clear/set session bit) don't 100% equal to send a SRP, and 
-i don't really want to send a SRP too.
+Put the pkmap and the modules lines at the end of the list since they reside
+lower than the kernel text in virtual memory address space.
 
-If without this function for omap platforms, we can change musb working 
-mode only through rebooting kernel or rmmod/insmod gadget driver module.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/mm/init.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 7829cb5..876f814 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -656,13 +656,13 @@ void __init mem_init(void)
+ #endif
+ 			"    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+ 			"    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n"
++			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
++			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
++			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n"
+ #ifdef CONFIG_HIGHMEM
+ 			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+ #endif
+-			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+-			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
+-			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
+-			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n",
++			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n",
+ 
+ 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
+ 				(PAGE_SIZE)),
+@@ -672,15 +672,15 @@ void __init mem_init(void)
+ #endif
+ 			MLM(VMALLOC_START, VMALLOC_END),
+ 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
++
++			MLK_ROUNDUP(__init_begin, __init_end),
++			MLK_ROUNDUP(_text, _etext),
++			MLK_ROUNDUP(_data, _edata),
+ #ifdef CONFIG_HIGHMEM
+ 			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
+ 				(PAGE_SIZE)),
+ #endif
+-			MLM(MODULES_VADDR, MODULES_END),
+-
+-			MLK_ROUNDUP(__init_begin, __init_end),
+-			MLK_ROUNDUP(_text, _etext),
+-			MLK_ROUNDUP(_data, _edata));
++			MLM(MODULES_VADDR, MODULES_END));
+ 
+ #undef MLK
+ #undef MLM
+-- 
+1.7.0
