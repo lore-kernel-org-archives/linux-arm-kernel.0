@@ -1,38 +1,25 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 15 Mar 2010 23:20:27 +0000
-Subject: [PULL] Please pull bjdooks' for-linus/samsung-fixes
-Message-ID: <20100315232027.GA11570@fluff.org.uk>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Tue, 16 Mar 2010 11:01:13 +0900
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
+	in linux
+In-Reply-To: <20100315131540.GD700@n2100.arm.linux.org.uk>
+References: <4B9DB823.1040809@st.com>
+	<1b68c6791003142147y200fff12vc805fbd07f1c0ef4@mail.gmail.com>
+	<4B9DC239.90407@st.com>
+	<1b68c6791003142241q274b573dl3e60bf25be462e68@mail.gmail.com>
+	<4B9DD46E.7060704@st.com>
+	<20100315131540.GD700@n2100.arm.linux.org.uk>
+Message-ID: <1b68c6791003151901w219cb016xd5b2513e2357d632@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please pull the following ARM/Samsung fixes:
-
-The following changes since commit a3d3203e4bb40f253b1541e310dc0f9305be7c84:
-  Linus Torvalds (1):
-        Merge branch 'release' of git://git.kernel.org/.../lenb/linux-acpi-2.6
-
-are available in the git repository at:
-
-  git://git.fluff.org/bjdooks/linux.git for-linus/samsung-fixes
-
-Ben Dooks (2):
-      ARM: SAMSUNG: Fix build error from stale define in <plat/uncompress.h>
-      ARM: SAMSUNG: Fixup commit 4e6d488af37980d224cbf298224db6173673f362
-
-Vasily Khoruzhick (2):
-      ARM: S3C2440: Fix s3c2440 cpufreq compilation post move.
-      ARM: SAMSUNG: Add suspend/resume support for S3C PWM driver
-
- .../s3c2440-cpufreq.c                              |    0
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |    2 +-
- arch/arm/mach-s5p6440/include/mach/debug-macro.S   |    2 +-
- arch/arm/mach-s5p6442/include/mach/debug-macro.S   |    2 +-
- arch/arm/plat-samsung/include/plat/uncompress.h    |    2 -
- arch/arm/plat-samsung/pwm.c                        |   35 ++++++++++++++++++++
- 6 files changed, 38 insertions(+), 5 deletions(-)
- rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c2440-cpufreq.c (100%)
-
--- 
-Ben (ben at fluff.org, http://www.fluff.org/)
-
-  'a smiley only costs 4 bytes'
+On Mon, Mar 15, 2010 at 10:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 15, 2010 at 12:02:14PM +0530, Viresh KUMAR wrote:
+> That means if you leave the configuration of pins to modular drivers,
+> pins are left unconfigured, and you could have some of them floating
+> increasing your power consumption.
+Thanks for the invaluable insight.
+Sometimes, I wish there was some mechanism to automatically
+compile such advices, from experts in long and numerous
+threads of discussion, into some checklist/faq for developers.
