@@ -1,23 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 16 Mar 2010 13:23:05 +0000
-Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
-In-Reply-To: <f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
-	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
-	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
-	<20100316125955.GB7287@rakim.wolfsonmicro.main>
-	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-Message-ID: <20100316132305.GA8875@rakim.wolfsonmicro.main>
+From: shiraz.hashim@st.com (Shiraz HASHIM)
+Date: Tue, 16 Mar 2010 19:09:55 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral Multiplexing)
+	in linux
+In-Reply-To: <63386a3d1003151055v6d3e2ee0q848fcbb4c7a29a06@mail.gmail.com>
+References: <4B9DB823.1040809@st.com>
+	<63386a3d1003151055v6d3e2ee0q848fcbb4c7a29a06@mail.gmail.com>
+Message-ID: <4B9F8A2B.9020307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 09:04:22PM +0800, Eric Miao wrote:
+Hello Linus,
 
-> So do you have any detailed plan in your mind? I'm basically thinking if
-> it's possible to setup a common topic branch with pxa-ssp changes to
-> be a common baseline for both trees.
+On 3/15/2010 11:25 PM, Linus Walleij wrote:
+> Please contemplate arch/arm/mach-u300/padmux.[c|h] if you have time.
+> We have there a runtime padmuxing API similar to what is used for regulators
+> and clocks. E.g in arch/arm/mach-u300/mmc.c:
+> 
+> /*
+>  * Setup padmuxing for MMC. Since this must always be
+>  * compiled into the kernel, pmx is never released.
+>  */
+> pmx = pmx_get(mmcsd_device, U300_APP_PMX_MMC_SETTING);
+> 
+> if (IS_ERR(pmx))
+>       pr_warning("Could not get padmux handle\n");
+> else {
+>     ret = pmx_activate(mmcsd_device, pmx);
+>     if (IS_ERR_VALUE(ret))
+>          pr_warning("Could not activate padmuxing\n");
+> }
+> 
+> This API can be used to switch in/out padmux settings in runtime. I think
+> these things will always be platform-specific because people will always have
+> their favourite way of configuring GPIO pins etc. (Note: we're not *just*
+> muxing GPIO with this framework, far from, as you see above also the entire
+> MMC/SD block connections can be muxed in/out.)
 
-How about creating a branch off 2.6.34-rc1, doing the updates that need
-to be shared on that branch and then when we're happy pulling that topic
-branch into both the PXA and ASoC development trees?  If required we can
-always merge that branch multiple times into our trees.
+I was trying to go through u300 code and it looks clean enough. I need your
+help in understanding it better. In your case you try to configure the pin mux
+and then, even if it fails the device (through amba_device_register) is registered.
+Now if the driver is enabled in the kernel (or it is insmod) then the driver in
+its "probe" would stuck somewhere.
+Do we need to handle such scenarios. Am I missing something?
+Further, if you can describe what is onmask field (of pmx) and what
+devices/options are multiplexed with (say) spi, it would help me better understand
+the code.
+ 
+> We've actually seen usecases where you need to dynamically remux while
+> drivers are running but these have been rare and on older chips I think.
+
+You mean to say dynamically remapping pins to achieve some function with
+the same driver? or taking out one driver and inserting another after changing
+mux config.
+In any case one of the objective is to keep same linux image for different
+configurations/boards. Isn't it ?
+
+thanks a lot.
+regards
+Shiraz
