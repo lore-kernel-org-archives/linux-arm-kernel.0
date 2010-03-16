@@ -1,32 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 16 Mar 2010 14:08:34 +0000
-Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
-In-Reply-To: <f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
-References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
-	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
-	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
-	<20100316125955.GB7287@rakim.wolfsonmicro.main>
-	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-	<20100316132305.GA8875@rakim.wolfsonmicro.main>
-	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
-Message-ID: <20100316140834.GB9365@rakim.wolfsonmicro.main>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 16 Mar 2010 16:11:59 +0200
+Subject: [RFC/PATCH] ARM: add Tegra support
+In-Reply-To: <a55d774e1003160644k4d5fa093x261f789d8a4005d5@mail.gmail.com>
+References: <4B96798C.6060201@compulab.co.il>	
+	<4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>	
+	<4B9F462C.7060902@compulab.co.il>
+	<a55d774e1003160644k4d5fa093x261f789d8a4005d5@mail.gmail.com>
+Message-ID: <4B9F91AF.7000602@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 09:47:58PM +0800, Eric Miao wrote:
+Hi Brian,
 
-> After that, there could be only minor changes, which could be easily
-> merged either way, and I'd be happy to see ASoC tree add good
-> support the pxa ssp. So what I'm thinking now is actually which one
-> is easier, to merge asoc into pxa and get ssp cleaned up or to rebase
-> asoc onto this ssp cleanup branch. I might need to take a look into
-> what's going on inside asoc to evaluate this.
+Brian Swetland wrote:
+> On Tue, Mar 16, 2010 at 1:49 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+>> Erik Gilling wrote:
+>>> On Tue, Mar 9, 2010 at 9:38 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+>>>> This patch adds basic support for Nvidia Tegra2 platform.
+>>> This code seems to be our port from
+>>> git://android.git.kernel.org/kernel/tegra.git with some features
+>>> removed, minor cleanups, and many trivial changes.  These changes make
+>>> it difficult for us to track improvements and bug fixes in either
+>>> direction.
+>> Neither Nvidia nor Google showed any movements towards the mainline and
+>> it was completely not clear if such plans exist at all. I've posted the
+>> patch a week ago and there were no comments from you since then.
+> 
+> It does help if you cc the authors when sending revised patches out
+> for commentary (as git-send-email does by default, etc), since it's
+> easy to miss things on high traffic lists like lkml or lakml.  We
+> first noticed the patch you sent out late Sunday evening, and Erik
+> sent a reply out the following afternoon.
 
-Rebasing isn't an option for ASoC - it gets merged into Takashi's tree
-for one thing (and I don't see any reason why rebasing would be required
-anyway, no point in discarding history).  A merge into ASoC should be
-sufficient, right now there's no changes at all in the SSP code against
-Linus' tree so that'll be trivial anyway at the minute.
+Agree. I should have cc'ed Eric and Colin. Still, I'd expect more 
+constructive comments than those Eric has sent.
 
-There's also no need to pick one route for the merge - if we do merges
-and avoid rebasing then git will cope fine.
+> Brian
+
+
+-- 
+Sincerely yours,
+Mike.
