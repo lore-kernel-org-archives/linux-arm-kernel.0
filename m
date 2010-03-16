@@ -1,23 +1,17 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 16 Mar 2010 08:35:36 +0200
-Subject: [PATCH 0/3] imx: fix build of assembly code using P2V macros
-In-Reply-To: <20100311105637.GE16376@n2100.arm.linux.org.uk>
-References: <20100311105637.GE16376@n2100.arm.linux.org.uk>
-Message-ID: <cover.1268721010.git.baruch@tkos.co.il>
+From: konkers@google.com (konkers at google.com)
+Date: Mon, 15 Mar 2010 23:41:18 -0700
+Subject: [RFC/PATCH 00/10] Tegra2 support
+In-Reply-To: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+Message-ID: <1268721688-27550-1-git-send-email-konkers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches fixes the build of mx1 and mx25 which CONFIG_DEBUG_LL is 
-enabled. The first patch makes IMX_IO_ADDRESS compatible with assmebly code, 
-and the other two use IMX_IO_ADDRESS to fix debug-macro.S.
+Here's the cleaned up patch stack as promised.  We've incorporated the feedback
+from Gary and Russel.
 
-Alex Greshgorin (1):
-  mx25: fix build when DEBUG_LL is enabled
+I've pushed these patches to the linux-tegra-2.6.34-rc1 branch at
+git://android.git.kernel.org/kernel/tegra.git
 
-Baruch Siach (2):
-  imx: make IMX_IO_ADDRESS assembly compatible
-  mx1: fix build when DEBUG_LL is enabled
-
- arch/arm/plat-mxc/include/mach/debug-macro.S |    6 +++---
- arch/arm/plat-mxc/include/mach/hardware.h    |   16 ++++++++++++----
- 2 files changed, 15 insertions(+), 7 deletions(-)
+Cheers,
+   Erik
