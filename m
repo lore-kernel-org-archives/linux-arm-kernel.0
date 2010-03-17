@@ -1,110 +1,33 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 17 Mar 2010 08:52:43 -0700
-Subject: [PATCH 6/6] davinci: sparse: gpio: void casting
-In-Reply-To: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
-References: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1268841163-5868-7-git-send-email-khilman@deeprootsystems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Mar 2010 16:06:15 -0000
+Subject: [RFC PATCH 1/6] ARM: pmu: register IRQs at runtime
+In-Reply-To: <20100316114131.GC4116@wear.picochip.com>
+References: <1268414985-22699-1-git-send-email-will.deacon@arm.com>
+	<1268414985-22699-2-git-send-email-will.deacon@arm.com>
+	<20100316114131.GC4116@wear.picochip.com>
+Message-ID: <000101cac5eb$c5abaf70$51030e50$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup usage of void pointers when using genirq.  genirq API
-takes and returns void *, where this GPIO API is using those
-as __iomem pointers.
+Hi Jamie,
+ 
+> I much prefer this rather than the old static list that we had before. As an
+> aside, do you know of any ARM PMU's that need memory resources in addition to
+> the IRQ's? If so perhaps a platform_device might be an easy way of extending
+> this.
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-davinci/gpio.c |   27 ++++++++++++++++++---------
- 1 files changed, 18 insertions(+), 9 deletions(-)
+Well, the ARM11MPCore SCU counters are memory mapped and I have a feeling that
+anything [counter-wise] outside the CPU core will likely be memory mapped in the
+future.
 
-diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-index 3f77062..5476ad1 100644
---- a/arch/arm/mach-davinci/gpio.c
-+++ b/arch/arm/mach-davinci/gpio.c
-@@ -36,6 +36,15 @@ static struct gpio_controller __iomem __init *gpio2controller(unsigned gpio)
- 	return __gpio_to_controller(gpio);
- }
+I've had a go at using a platform_device instead of the struct pmu_irqs, I'll post
+the changes for you to take a look at.
  
-+static inline struct gpio_controller __iomem *irq2controller(int irq)
-+{
-+	struct gpio_controller __iomem *g;
-+
-+	g = (__force struct gpio_controller __iomem *)get_irq_chip_data(irq);
-+
-+	return g;
-+}
-+
- static int __init davinci_gpio_irq_setup(void);
- 
- /*--------------------------------------------------------------------------*/
-@@ -161,7 +170,7 @@ pure_initcall(davinci_gpio_setup);
- 
- static void gpio_irq_disable(unsigned irq)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	__raw_writel(mask, &g->clr_falling);
-@@ -170,7 +179,7 @@ static void gpio_irq_disable(unsigned irq)
- 
- static void gpio_irq_enable(unsigned irq)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 	unsigned status = irq_desc[irq].status;
- 
-@@ -186,7 +195,7 @@ static void gpio_irq_enable(unsigned irq)
- 
- static int gpio_irq_type(unsigned irq, unsigned trigger)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-@@ -215,7 +224,7 @@ static struct irq_chip gpio_irqchip = {
- static void
- gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = 0xffff;
- 
- 	/* we only care about one bank */
-@@ -276,7 +285,7 @@ static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
- 
- static int gpio_irq_type_unbanked(unsigned irq, unsigned trigger)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-@@ -362,7 +371,7 @@ static int __init davinci_gpio_irq_setup(void)
- 		for (gpio = 0; gpio < soc_info->gpio_unbanked; gpio++, irq++) {
- 			set_irq_chip(irq, &gpio_irqchip_unbanked);
- 			set_irq_data(irq, (void *) __gpio_mask(gpio));
--			set_irq_chip_data(irq, g);
-+			set_irq_chip_data(irq, (__force void *) g);
- 			irq_desc[irq].status |= IRQ_TYPE_EDGE_BOTH;
- 		}
- 
-@@ -385,12 +394,12 @@ static int __init davinci_gpio_irq_setup(void)
- 
- 		/* set up all irqs in this bank */
- 		set_irq_chained_handler(bank_irq, gpio_irq_handler);
--		set_irq_chip_data(bank_irq, g);
--		set_irq_data(bank_irq, (void *)irq);
-+		set_irq_chip_data(bank_irq, (__force void *) g);
-+		set_irq_data(bank_irq, (void *) irq);
- 
- 		for (i = 0; i < 16 && gpio < ngpio; i++, irq++, gpio++) {
- 			set_irq_chip(irq, &gpio_irqchip);
--			set_irq_chip_data(irq, g);
-+			set_irq_chip_data(irq, (__force void *) g);
- 			set_irq_data(irq, (void *) __gpio_mask(gpio));
- 			set_irq_handler(irq, handle_simple_irq);
- 			set_irq_flags(irq, IRQF_VALID);
--- 
-1.7.0.2
+> Acked-by: Jamie Iles <jamie.iles@picochip.com>
+
+Thanks for that. Please take a look at the platform_device version and see what
+you reckon.
+
+Cheers,
+
+Will
