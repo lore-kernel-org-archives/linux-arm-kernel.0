@@ -1,43 +1,45 @@
 From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Wed, 17 Mar 2010 10:11:56 +0300
-Subject: [PATCH 2/2] [ARM] [IMX]: Fix clock usecount counter from underflow.
-In-Reply-To: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
+Date: Wed, 17 Mar 2010 10:11:55 +0300
+Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for argument
+	validity.
+Message-ID: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_disable() is called for already disabled clock clk->usecount
-value is decremented anyway. This leads to a problem that sequent
-clk_enable() call doesn't enable the clock as expected.
+The checks for clk argument are doubled in __clk_disable() and
+__clk_enable() functions and thus may be skipped in clk_disable() and
+clk_enable() bodies.
 
 Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/clock.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/plat-mxc/clock.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 2daec3c..fd7596c 100644
+index 323ff8c..2daec3c 100644
 --- a/arch/arm/plat-mxc/clock.c
 +++ b/arch/arm/plat-mxc/clock.c
-@@ -53,10 +53,15 @@ static void __clk_disable(struct clk *clk)
- 	if (clk == NULL || IS_ERR(clk))
- 		return;
+@@ -82,9 +82,6 @@ int clk_enable(struct clk *clk)
+ {
+ 	int ret = 0;
  
-+        if (!clk->usecount) {
-+                printk(KERN_ERR "Trying to disable a clock with 0 usecount\n");
-+                WARN_ON(1);
-+                return;
-+        }
-+
- 	__clk_disable(clk->parent);
- 	__clk_disable(clk->secondary);
- 
--	WARN_ON(!clk->usecount);
- 	if (!(--clk->usecount) && clk->disable)
- 		clk->disable(clk);
- }
+-	if (clk == NULL || IS_ERR(clk))
+-		return -EINVAL;
+-
+ 	mutex_lock(&clocks_mutex);
+ 	ret = __clk_enable(clk);
+ 	mutex_unlock(&clocks_mutex);
+@@ -99,9 +96,6 @@ EXPORT_SYMBOL(clk_enable);
+  */
+ void clk_disable(struct clk *clk)
+ {
+-	if (clk == NULL || IS_ERR(clk))
+-		return;
+-
+ 	mutex_lock(&clocks_mutex);
+ 	__clk_disable(clk);
+ 	mutex_unlock(&clocks_mutex);
 -- 
 1.6.6.1
