@@ -1,41 +1,45 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 17 Mar 2010 13:14:39 +0800
-Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
-In-Reply-To: <20100316140834.GB9365@rakim.wolfsonmicro.main>
-References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
-	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
-	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
-	<20100316125955.GB7287@rakim.wolfsonmicro.main>
-	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-	<20100316132305.GA8875@rakim.wolfsonmicro.main>
-	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
-	<20100316140834.GB9365@rakim.wolfsonmicro.main>
-Message-ID: <f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 17 Mar 2010 10:51:44 +0530
+Subject: [PATCH] ARM: Fix "BUG: scheduling while atomic:
+	swapper/0/0x00000002"
+In-Reply-To: <20100316204930.GA13948@n2100.arm.linux.org.uk>
+References: <1268745149-8685-1-git-send-email-santosh.shilimkar@ti.com>
+	<20100316204930.GA13948@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C489BF19@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 10:08 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Mar 16, 2010 at 09:47:58PM +0800, Eric Miao wrote:
->
->> After that, there could be only minor changes, which could be easily
->> merged either way, and I'd be happy to see ASoC tree add good
->> support the pxa ssp. So what I'm thinking now is actually which one
->> is easier, to merge asoc into pxa and get ssp cleaned up or to rebase
->> asoc onto this ssp cleanup branch. I might need to take a look into
->> what's going on inside asoc to evaluate this.
->
-> Rebasing isn't an option for ASoC - it gets merged into Takashi's tree
-> for one thing (and I don't see any reason why rebasing would be required
-> anyway, no point in discarding history). ?A merge into ASoC should be
-> sufficient, right now there's no changes at all in the SSP code against
-> Linus' tree so that'll be trivial anyway at the minute.
->
-> There's also no need to pick one route for the merge - if we do merges
-> and avoid rebasing then git will cope fine.
->
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Wednesday, March 17, 2010 2:20 AM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> Subject: Re: [PATCH] ARM: Fix "BUG: scheduling while atomic: swapper/0/0x00000002"
+> 
+> On Tue, Mar 16, 2010 at 06:42:29PM +0530, Santosh Shilimkar wrote:
+> > This patch fixes the preempt leak in the cpuidle path invoked from
+> > cpu-hotplug
+> > log:
+> > BUG: scheduling while atomic: swapper/0/0x00000002
+> > <d>Modules linked in:
+> > Backtrace:
+> > [<c0024f90>] (dump_backtrace+0x0/0x110) from [<c01762c4>] (dump_stack+0x18/0x1c)
+> >  r7:c0218cc4 r6:c0341f00 r5:c7836000 r4:00000000
+> > [<c01762ac>] (dump_stack+0x0/0x1c) from [<c003d94c>] (__schedule_bug+0x60/0x70)
+> > [<c003d8ec>] (__schedule_bug+0x0/0x70) from [<c0176914>] (schedule+0x98/0x7b8)
+> >  r5:c7836000 r4:c7836000
+> > [<c017687c>] (schedule+0x0/0x7b8) from [<c00228c4>] (cpu_idle+0xb4/0xd4)
+> > # [<c0022810>] (cpu_idle+0x0/0xd4) from [<c01744e8>] (secondary_start_kernel+0xe0/0xf0)
+> >  r5:c7836000 r4:c020a220
+> > [<c0174408>] (secondary_start_kernel+0x0/0xf0) from [<c0031150>] (set_cpu_power_state+0x40/0x44)
+> >  r7:c0218cc4 r6:00000001 r5:00000001 r4:c7836000
+> > Backtrace aborted due to bad frame pointer <c7837fbc>
+> 
+> Can you describe the conditions which leads up to this please?
 
-Mark,
+On SMP kernel with PREEMPT enabled, if you try to offline the CPU using hot-plug and then
+bring it back(online), you will get this dump. Since CPU is taken out from idle thread, the
+process shown is 2.
 
-I'm seeing no merge conflict between my ssp_cleanup and Takashi's
-latest tree, which branch do you suggest to merge then?
+Regards,
+Santosh
