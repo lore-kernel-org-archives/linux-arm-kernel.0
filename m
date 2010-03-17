@@ -1,55 +1,81 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Wed, 17 Mar 2010 13:57:57 +0300
-Subject: [PATCH 2/2] [ARM] [IMX]: Fix clock usecount counter from
-	underflow.
-In-Reply-To: <eedb5541003170315t55f3aff1n4dadd25d08a35d7b@mail.gmail.com>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-	<1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
-	<20100317092042.GB16150@pengutronix.de>
-	<eedb5541003170315t55f3aff1n4dadd25d08a35d7b@mail.gmail.com>
-Message-ID: <acc484891003170357t151171e7of57a459cc46e9c4e@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 17 Mar 2010 10:09:53 -0400
+Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
+In-Reply-To: <20100317100538.GC13166@opensource.wolfsonmicro.com>
+References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
+	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
+	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
+	<20100316125955.GB7287@rakim.wolfsonmicro.main>
+	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
+	<20100316132305.GA8875@rakim.wolfsonmicro.main>
+	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
+	<20100316140834.GB9365@rakim.wolfsonmicro.main>
+	<f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
+	<20100317100538.GC13166@opensource.wolfsonmicro.com>
+Message-ID: <771cded01003170709g7967192bhec65ac337051e11f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
-
-and thank you for helpful comments.
-
-2010/3/17 javier Martin <javier.martin@vista-silicon.com>
-
-> 2010/3/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > I'm not sure this is worth it.  IMHO an unbalanced clk_disable is a
-> > severe bug that doesn't need to be handled smoothly.
-> >
-> > But maybe move the WARN_ON before the __clk_disable(clk->parent)?  This
-> > way the disabled parent clock cannot stop the message to appear.
-> >
-> > Other than that, please use WARN instead of printk + WARN_ON.  Then the
-> > message is printed only after the oops begin marker.
+On Wed, Mar 17, 2010 at 5:05 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Mar 17, 2010 at 01:14:39PM +0800, Eric Miao wrote:
 >
-> I agree with Uwe, I myself tried to do something similar in the past and
-> people
-> made me realize that we don't have to fix here what is really a problem in
-> some
-> driver which calls unbalanced disable/enable.
+>> I'm seeing no merge conflict between my ssp_cleanup and Takashi's
+>> latest tree, which branch do you suggest to merge then?
 >
-> However, I think using WARN would be a good idea since it allows the
-> kernel hacker
-> to track an error which according to my own experience is very
-> difficult to detect.
+> I'm not sure what you're asking here but if you're looking for any
+> incompatible changes in ASoC they've not been implemented yet, the issue
+> is that due to the stuff Liam is working on at the minute there are
+> likely to be incompatible changes in the current release cycle which
+> would mean that merging new drivers (like Haojian posted) via a non-ALSA
+> tree would lead to problems after the trees are been merged together.
 >
->
-I agree with all of you that this patch is not a bug fix, but definitely a
-misfeature elimination.
 
-WARN must be present anyway to inform about an incident of multiple
-clk_disable() calls, no doubt. But I assume that if a board can be easily
-left in working condition after all, this could help the kernel hacker too.
+Hi Mark & Eric,
 
-Let me send a patch with respect to Uwe's comments firstly.
+There're some ssp fixes after 2.6.34-rc1 that result ssp code
+different between pxa tree and asoc tree (neither Eric's ssp cleanup
+patch nor my patch). If those fixes  could be merged into 2.6.34-rc2,
+I want to know whether ASoC tree will sync to them. If so, it seems
+that we could work at the same point. What's your opinion, Mark?
 
-With best wishes,
-Vladimir
+By the way, I reformat my patches on Eric's git since one of my patch
+is contained in his branch. Now I attach them for review first.
+
+Thanks
+Haojian
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/96ceefa3/attachment-0001.htm>
+A non-text attachment was scrubbed...
+Name: 0001-ASoC-split-pxa-ssp-for-reusing-code.patch
+Type: text/x-patch
+Size: 43910 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/6cc81079/attachment-0005.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002--ARM-pxa-remove-ifdef-in-ssp.h.patch
+Type: text/x-patch
+Size: 4501 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/6cc81079/attachment-0006.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003--ARM-mmp-support-ssp-in-pxa168.patch
+Type: text/x-patch
+Size: 8934 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/6cc81079/attachment-0007.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0004-ASoC-support-codec-via-ssp-interface-in-aspenite.patch
+Type: text/x-patch
+Size: 20797 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/6cc81079/attachment-0008.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0005--ARM-mmp-enable-ssp-in-aspenite.patch
+Type: text/x-patch
+Size: 1444 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/6cc81079/attachment-0009.bin>
