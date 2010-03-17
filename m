@@ -1,45 +1,57 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 17 Mar 2010 08:52:37 -0700
-Subject: [PATCH 0/6] davinci fixes for 2.6.34-rc
-Message-ID: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 17 Mar 2010 08:52:38 -0700
+Subject: [PATCH 1/6] davinci: timers: don't enable timer until clocksource is
+	initialized
+In-Reply-To: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
+References: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1268841163-5868-2-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of davinci fixes is targeted for the next 2.6.34-rc,
-and are also available in the 'davinci-fixes' branch of:
+On da830, when the same timer is used for clocksource and clockevent,
+the timer can be started before the clockevent is
+registered/initialzed.  This creates a window where a timer
+interrupt might fire before the clockevent handler has been
+setup and causes a crash.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
+This patch moves the actual enable/start of the timer after
+the clockevent has ben registered.
 
-Kevin
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/mach-davinci/time.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-
-Brian Niebuhr (1):
-  davinci: edma: clear events in edma_start()
-
-Kevin Hilman (4):
-  davinci: timers: don't enable timer until clocksource is initialized
-  davinci: DM365: fix duplicate default IRQ priorities
-  davinci: misc cleanups from sparse
-  davinci: sparse: gpio: void casting
-
-Sekhar Nori (1):
-  davinci: da8xx/omap-l1: fix build error when CONFIG_DAVINCI_MUX is
-    undefined
-
- arch/arm/mach-davinci/board-dm644x-evm.c   |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c  |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c       |    2 +-
- arch/arm/mach-davinci/cdce949.c            |    1 +
- arch/arm/mach-davinci/clock.c              |    1 +
- arch/arm/mach-davinci/devices.c            |    2 +
- arch/arm/mach-davinci/dm355.c              |    2 +-
- arch/arm/mach-davinci/dm365.c              |    3 +-
- arch/arm/mach-davinci/dm644x.c             |    4 +-
- arch/arm/mach-davinci/dm646x.c             |    6 ++--
- arch/arm/mach-davinci/dma.c                |    3 +-
- arch/arm/mach-davinci/gpio.c               |   41 +++++++++++++++++-----------
- arch/arm/mach-davinci/include/mach/da8xx.h |    4 +++
- arch/arm/mach-davinci/include/mach/gpio.h  |    8 +++---
- arch/arm/mach-davinci/mux.c                |    1 +
- arch/arm/mach-davinci/time.c               |    6 +++-
- 16 files changed, 54 insertions(+), 34 deletions(-)
+diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+index 42d985b..9e0b106 100644
+--- a/arch/arm/mach-davinci/time.c
++++ b/arch/arm/mach-davinci/time.c
+@@ -253,8 +253,6 @@ static void __init timer_init(void)
+ 			irq = USING_COMPARE(t) ? dtip[i].cmp_irq : irq;
+ 			setup_irq(irq, &t->irqaction);
+ 		}
+-
+-		timer32_config(&timers[i]);
+ 	}
+ }
+ 
+@@ -331,6 +329,7 @@ static void __init davinci_timer_init(void)
+ 	unsigned int clocksource_id;
+ 	static char err[] __initdata = KERN_ERR
+ 		"%s: can't register clocksource!\n";
++	int i;
+ 
+ 	clockevent_id = soc_info->timer_info->clockevent_id;
+ 	clocksource_id = soc_info->timer_info->clocksource_id;
+@@ -389,6 +388,9 @@ static void __init davinci_timer_init(void)
+ 
+ 	clockevent_davinci.cpumask = cpumask_of(0);
+ 	clockevents_register_device(&clockevent_davinci);
++
++	for (i=0; i< ARRAY_SIZE(timers); i++)
++		timer32_config(&timers[i]);
+ }
+ 
+ struct sys_timer davinci_timer = {
+-- 
+1.7.0.2
