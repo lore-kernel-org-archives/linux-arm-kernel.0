@@ -1,277 +1,370 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Mar 2010 16:11:28 +0000
-Subject: [RFC PATCH 2/6] ARM: Realview: register PMU IRQs during board
-	initialisation
-In-Reply-To: <1268842288-30960-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 17 Mar 2010 16:11:27 +0000
+Subject: [RFC PATCH 1/6] ARM: pmu: register IRQs at runtime
+In-Reply-To: <20100316114131.GC4116@wear.picochip.com>
 References: <20100316114131.GC4116@wear.picochip.com>
-	<1268842288-30960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1268842288-30960-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1268842288-30960-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the initialisation routines for the Realview boards so that
-they register their PMU IRQs with the PMU framework in the Kernel.
+The current PMU infrastructure for ARM requires that the IRQs for the PMU
+device are fixed at compile time and are selected based on the ARCH_ or MACH_
+flags. This has the disadvantage of tying the Kernel down to a particular board
+as far as profiling is concerned.
+
+This patch replaces the compile-time IRQ registration with a runtime mechanism
+which allows the IRQs to be registered with the framework as a platform_device.
+
+A further advantage of this change is that there is scope for registering
+different types of performance counters in the future by changing the id of
+the platform_device and attaching different resources to it.
 
 Cc: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-realview/realview_eb.c     |   32 ++++++++++++++++++++++++++++++
- arch/arm/mach-realview/realview_pb1176.c |   15 ++++++++++++++
- arch/arm/mach-realview/realview_pb11mp.c |   32 ++++++++++++++++++++++++++++++
- arch/arm/mach-realview/realview_pba8.c   |   15 ++++++++++++++
- arch/arm/mach-realview/realview_pbx.c    |   32 ++++++++++++++++++++++++++++++
- 5 files changed, 126 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/pmu.h   |   30 +++++-----
+ arch/arm/kernel/perf_event.c |   36 +++++++------
+ arch/arm/kernel/pmu.c        |  121 ++++++++++++++++++++++++++----------------
+ 3 files changed, 110 insertions(+), 77 deletions(-)
 
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 7d857d3..a4a101a 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -31,6 +31,7 @@
- #include <asm/irq.h>
- #include <asm/leds.h>
- #include <asm/mach-types.h>
-+#include <asm/pmu.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/icst307.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -294,6 +295,36 @@ static struct resource realview_eb_isp1761_resources[] = {
- 	},
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 2829b9f..92866dc 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -12,33 +12,33 @@
+ #ifndef __ARM_PMU_H__
+ #define __ARM_PMU_H__
+ 
+-#ifdef CONFIG_CPU_HAS_PMU
+-
+-struct pmu_irqs {
+-	const int   *irqs;
+-	int	    num_irqs;
++enum arm_pmu_type {
++	ARM_PMU_DEVICE_CPU	= 0,
++	ARM_NUM_PMU_DEVICES,
  };
  
-+static struct resource pmu_resources[] = {
-+	[0] = {
-+		.start		= IRQ_EB11MP_PMU_CPU0,
-+		.end		= IRQ_EB11MP_PMU_CPU0,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[1] = {
-+		.start		= IRQ_EB11MP_PMU_CPU1,
-+		.end		= IRQ_EB11MP_PMU_CPU1,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[2] = {
-+		.start		= IRQ_EB11MP_PMU_CPU2,
-+		.end		= IRQ_EB11MP_PMU_CPU2,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[3] = {
-+		.start		= IRQ_EB11MP_PMU_CPU3,
-+		.end		= IRQ_EB11MP_PMU_CPU3,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
++#ifdef CONFIG_CPU_HAS_PMU
 +
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= ARRAY_SIZE(pmu_resources),
-+	.resource		= pmu_resources,
-+};
-+
- static void __init gic_init_irq(void)
+ /**
+  * reserve_pmu() - reserve the hardware performance counters
+  *
+  * Reserve the hardware performance counters in the system for exclusive use.
+- * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
++ * The platform_device for the system is returned on success, ERR_PTR()
+  * encoded error on failure.
+  */
+-extern const struct pmu_irqs *
+-reserve_pmu(void);
++extern struct platform_device *
++reserve_pmu(enum arm_pmu_type device);
+ 
+ /**
+  * release_pmu() - Relinquish control of the performance counters
+  *
+  * Release the performance counters and allow someone else to use them.
+  * Callers must have disabled the counters and released IRQs before calling
+- * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
++ * this. The platform_device returned from reserve_pmu() must be passed as
+  * a cookie.
+  */
+ extern int
+-release_pmu(const struct pmu_irqs *irqs);
++release_pmu(struct platform_device *pdev);
+ 
+ /**
+  * init_pmu() - Initialise the PMU.
+@@ -48,24 +48,24 @@ release_pmu(const struct pmu_irqs *irqs);
+  * the actual hardware initialisation.
+  */
+ extern int
+-init_pmu(void);
++init_pmu(enum arm_pmu_type device);
+ 
+ #else /* CONFIG_CPU_HAS_PMU */
+ 
+-static inline const struct pmu_irqs *
+-reserve_pmu(void)
++static inline struct platform_device *
++reserve_pmu(enum arm_pmu_type device)
  {
- 	if (core_tile_eb11mp() || core_tile_a9mp()) {
-@@ -407,6 +438,7 @@ static void __init realview_eb_init(void)
- 		 * Bits:  .... ...0 0111 1001 0000 .... .... .... */
- 		l2x0_init(__io_address(REALVIEW_EB11MP_L220_BASE), 0x00790000, 0xfe000fff);
- #endif
-+		platform_device_register(&pmu_device);
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
+ static inline int
+-release_pmu(const struct pmu_irqs *irqs)
++release_pmu(struct platform_device *pdev)
+ {
+ 	return -ENODEV;
+ }
+ 
+ static inline int
+-init_pmu(void)
++init_pmu(enum arm_pmu_type device)
+ {
+ 	return -ENODEV;
+ }
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index c45a155..7b7e3ab 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/perf_event.h>
++#include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
+ 
+@@ -26,7 +27,7 @@
+ #include <asm/pmu.h>
+ #include <asm/stacktrace.h>
+ 
+-static const struct pmu_irqs *pmu_irqs;
++static struct platform_device *pmu_device;
+ 
+ /*
+  * Hardware lock to serialize accesses to PMU registers. Needed for the
+@@ -317,35 +318,36 @@ armpmu_reserve_hardware(void)
+ 	int i;
+ 	int err;
+ 
+-	pmu_irqs = reserve_pmu();
+-	if (IS_ERR(pmu_irqs)) {
++	pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
++	if (IS_ERR(pmu_device)) {
+ 		pr_warning("unable to reserve pmu\n");
+-		return PTR_ERR(pmu_irqs);
++		return PTR_ERR(pmu_device);
  	}
  
- 	realview_flash_register(&realview_eb_flash_resource, 1);
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index 44392e5..85429cb 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -31,6 +31,7 @@
- #include <asm/irq.h>
- #include <asm/leds.h>
- #include <asm/mach-types.h>
-+#include <asm/pmu.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/icst307.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -263,6 +264,19 @@ static struct resource realview_pb1176_isp1761_resources[] = {
- 	},
- };
+-	init_pmu();
++	init_pmu(ARM_PMU_DEVICE_CPU);
  
-+static struct resource pmu_resource = {
-+	.start		= IRQ_DC1176_PMU_CPU0,
-+	.end		= IRQ_DC1176_PMU_CPU0,
-+	.flags		= IORESOURCE_IRQ,
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= 1,
-+	.resource		= &pmu_resource,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	/* ARM1176 DevChip GIC, primary */
-@@ -324,6 +338,7 @@ static void __init realview_pb1176_init(void)
- 	realview_eth_register(NULL, realview_pb1176_smsc911x_resources);
- 	platform_device_register(&realview_i2c_device);
- 	realview_usb_register(realview_pb1176_isp1761_resources);
-+	platform_device_register(&pmu_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index 3e02731..3ab4447 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -31,6 +31,7 @@
- #include <asm/irq.h>
- #include <asm/leds.h>
- #include <asm/mach-types.h>
-+#include <asm/pmu.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/icst307.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -260,6 +261,36 @@ static struct resource realview_pb11mp_isp1761_resources[] = {
- 	},
- };
- 
-+static struct resource pmu_resources[] = {
-+	[0] = {
-+		.start		= IRQ_TC11MP_PMU_CPU0,
-+		.end		= IRQ_TC11MP_PMU_CPU0,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[1] = {
-+		.start		= IRQ_TC11MP_PMU_CPU1,
-+		.end		= IRQ_TC11MP_PMU_CPU1,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[2] = {
-+		.start		= IRQ_TC11MP_PMU_CPU2,
-+		.end		= IRQ_TC11MP_PMU_CPU2,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[3] = {
-+		.start		= IRQ_TC11MP_PMU_CPU3,
-+		.end		= IRQ_TC11MP_PMU_CPU3,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= ARRAY_SIZE(pmu_resources),
-+	.resource		= pmu_resources,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	unsigned int pldctrl;
-@@ -329,6 +360,7 @@ static void __init realview_pb11mp_init(void)
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&realview_cf_device);
- 	realview_usb_register(realview_pb11mp_isp1761_resources);
-+	platform_device_register(&pmu_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index fe4e25c..7b36ea9 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -30,6 +30,7 @@
- #include <asm/irq.h>
- #include <asm/leds.h>
- #include <asm/mach-types.h>
-+#include <asm/pmu.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/icst307.h>
- 
-@@ -250,6 +251,19 @@ static struct resource realview_pba8_isp1761_resources[] = {
- 	},
- };
- 
-+static struct resource pmu_resource = {
-+	.start		= IRQ_PBA8_PMU,
-+	.end		= IRQ_PBA8_PMU,
-+	.flags		= IORESOURCE_IRQ,
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= 1,
-+	.resource		= &pmu_resource,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	/* ARM PB-A8 on-board GIC */
-@@ -296,6 +310,7 @@ static void __init realview_pba8_init(void)
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&realview_cf_device);
- 	realview_usb_register(realview_pba8_isp1761_resources);
-+	platform_device_register(&pmu_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index d94857e..a235ba3 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -29,6 +29,7 @@
- #include <asm/irq.h>
- #include <asm/leds.h>
- #include <asm/mach-types.h>
-+#include <asm/pmu.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -270,6 +271,36 @@ static struct resource realview_pbx_isp1761_resources[] = {
- 	},
- };
- 
-+static struct resource pmu_resources[] = {
-+	[0] = {
-+		.start		= IRQ_PBX_PMU_CPU0,
-+		.end		= IRQ_PBX_PMU_CPU0,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[1] = {
-+		.start		= IRQ_PBX_PMU_CPU1,
-+		.end		= IRQ_PBX_PMU_CPU1,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[2] = {
-+		.start		= IRQ_PBX_PMU_CPU2,
-+		.end		= IRQ_PBX_PMU_CPU2,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[3] = {
-+		.start		= IRQ_PBX_PMU_CPU3,
-+		.end		= IRQ_PBX_PMU_CPU3,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= ARRAY_SIZE(pmu_resources),
-+	.resource		= pmu_resources,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	/* ARM PBX on-board GIC */
-@@ -354,6 +385,7 @@ static void __init realview_pbx_init(void)
- 		/* 16KB way size, 8-way associativity, parity disabled
- 		 * Bits:  .. 0 0 0 0 1 00 1 0 1 001 0 000 0 .... .... .... */
- 		l2x0_init(l2x0_base, 0x02520000, 0xc0000fff);
-+		platform_device_register(&pmu_device);
+-	if (pmu_irqs->num_irqs < 1) {
++	if (pmu_device->num_resources < 1) {
+ 		pr_err("no irqs for PMUs defined\n");
+ 		return -ENODEV;
  	}
- #endif
  
+-	for (i = 0; i < pmu_irqs->num_irqs; ++i) {
+-		err = request_irq(pmu_irqs->irqs[i], armpmu->handle_irq,
++	for (i = 0; i < pmu_device->num_resources; ++i) {
++		err = request_irq(platform_get_irq(pmu_device, i),
++				  armpmu->handle_irq,
+ 				  IRQF_DISABLED | IRQF_NOBALANCING,
+ 				  "armpmu", NULL);
+ 		if (err) {
+-			pr_warning("unable to request IRQ%d for ARM "
+-				   "perf counters\n", pmu_irqs->irqs[i]);
++			pr_warning("unable to request IRQ%d for ARM perf "
++				"counters\n", platform_get_irq(pmu_device, i));
+ 			break;
+ 		}
+ 	}
+ 
+ 	if (err) {
+ 		for (i = i - 1; i >= 0; --i)
+-			free_irq(pmu_irqs->irqs[i], NULL);
+-		release_pmu(pmu_irqs);
+-		pmu_irqs = NULL;
++			free_irq(platform_get_irq(pmu_device, i), NULL);
++		release_pmu(pmu_device);
++		pmu_device = NULL;
+ 	}
+ 
+ 	return err;
+@@ -356,12 +358,12 @@ armpmu_release_hardware(void)
+ {
+ 	int i;
+ 
+-	for (i = pmu_irqs->num_irqs - 1; i >= 0; --i)
+-		free_irq(pmu_irqs->irqs[i], NULL);
++	for (i = pmu_device->num_resources - 1; i >= 0; --i)
++		free_irq(platform_get_irq(pmu_device, i), NULL);
+ 	armpmu->stop();
+ 
+-	release_pmu(pmu_irqs);
+-	pmu_irqs = NULL;
++	release_pmu(pmu_device);
++	pmu_device = NULL;
+ }
+ 
+ static atomic_t active_events = ATOMIC_INIT(0);
+diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+index a124312..a42fb60 100644
+--- a/arch/arm/kernel/pmu.c
++++ b/arch/arm/kernel/pmu.c
+@@ -2,6 +2,7 @@
+  *  linux/arch/arm/kernel/pmu.c
+  *
+  *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
++ *  Copyright (C) 2010 ARM Ltd, Will Deacon
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -14,60 +15,71 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/pmu.h>
+ 
+-/*
+- * Define the IRQs for the system. We could use something like a platform
+- * device but that seems fairly heavyweight for this. Also, the performance
+- * counters can't be removed or hotplugged.
+- *
+- * Ordering is important: init_pmu() will use the ordering to set the affinity
+- * to the corresponding core. e.g. the first interrupt will go to cpu 0, the
+- * second goes to cpu 1 etc.
+- */
+-static const int irqs[] = {
+-#if defined(CONFIG_ARCH_OMAP2)
+-	3,
+-#elif defined(CONFIG_ARCH_BCMRING)
+-	IRQ_PMUIRQ,
+-#elif defined(CONFIG_MACH_REALVIEW_EB)
+-	IRQ_EB11MP_PMU_CPU0,
+-	IRQ_EB11MP_PMU_CPU1,
+-	IRQ_EB11MP_PMU_CPU2,
+-	IRQ_EB11MP_PMU_CPU3,
+-#elif defined(CONFIG_ARCH_OMAP3)
+-	INT_34XX_BENCH_MPU_EMUL,
+-#elif defined(CONFIG_ARCH_IOP32X)
+-	IRQ_IOP32X_CORE_PMU,
+-#elif defined(CONFIG_ARCH_IOP33X)
+-	IRQ_IOP33X_CORE_PMU,
+-#elif defined(CONFIG_ARCH_PXA)
+-	IRQ_PMU,
+-#endif
+-};
++static volatile long pmu_lock;
++
++static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
++
++static int __devinit pmu_device_probe(struct platform_device *pdev)
++{
++
++	if (pdev->id >= ARM_NUM_PMU_DEVICES) {
++		pr_warning("PMU: Received registration request for unknown "
++				"device %d\n", pdev->id);
++		return -EINVAL;
++	}
++
++	if (pmu_devices[pdev->id])
++		pr_warning("PMU: Registering new PMU device type %d overwrites "
++				"previous registration!\n", pdev->id);
++	else
++		pr_info("PMU: Registered new PMU device of type %d\n",
++				pdev->id);
++
++	pmu_devices[pdev->id] = pdev;
++	return 0;
++}
+ 
+-static const struct pmu_irqs pmu_irqs = {
+-	.irqs	    = irqs,
+-	.num_irqs   = ARRAY_SIZE(irqs),
++static struct platform_driver pmu_driver = {
++	.driver		= {
++		.name	= "arm-pmu",
++	},
++	.probe		= pmu_device_probe,
+ };
+ 
+-static volatile long pmu_lock;
++static int __init register_pmu_driver(void)
++{
++	return platform_driver_register(&pmu_driver);
++}
++device_initcall(register_pmu_driver);
+ 
+-const struct pmu_irqs *
+-reserve_pmu(void)
++struct platform_device *
++reserve_pmu(enum arm_pmu_type device)
+ {
+-	return test_and_set_bit_lock(0, &pmu_lock) ? ERR_PTR(-EBUSY) :
+-		&pmu_irqs;
++	struct platform_device *pdev;
++
++	if (test_and_set_bit_lock(device, &pmu_lock)) {
++		pdev = ERR_PTR(-EBUSY);
++	} else if (pmu_devices[device] == NULL) {
++		clear_bit_unlock(device, &pmu_lock);
++		pdev = ERR_PTR(-ENODEV);
++	} else {
++		pdev = pmu_devices[device];
++	}
++
++	return pdev;
+ }
+ EXPORT_SYMBOL_GPL(reserve_pmu);
+ 
+ int
+-release_pmu(const struct pmu_irqs *irqs)
++release_pmu(struct platform_device *pdev)
+ {
+-	if (WARN_ON(irqs != &pmu_irqs))
++	if (WARN_ON(pdev != pmu_devices[pdev->id]))
+ 		return -EINVAL;
+-	clear_bit_unlock(0, &pmu_lock);
++	clear_bit_unlock(pdev->id, &pmu_lock);
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(release_pmu);
+@@ -79,7 +91,7 @@ set_irq_affinity(int irq,
+ #ifdef CONFIG_SMP
+ 	int err = irq_set_affinity(irq, cpumask_of(cpu));
+ 	if (err)
+-		pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++		pr_warning("PMU: Unable to set irq affinity (irq=%d, cpu=%u)\n",
+ 			   irq, cpu);
+ 	return err;
+ #else
+@@ -87,17 +99,36 @@ set_irq_affinity(int irq,
+ #endif
+ }
+ 
+-int
+-init_pmu(void)
++static int
++init_cpu_pmu(void)
+ {
+ 	int i, err = 0;
++	struct platform_device *pdev = pmu_devices[ARM_PMU_DEVICE_CPU];
+ 
+-	for (i = 0; i < pmu_irqs.num_irqs; ++i) {
+-		err = set_irq_affinity(pmu_irqs.irqs[i], i);
++	for (i = 0; i < pdev->num_resources; ++i) {
++		err = set_irq_affinity(platform_get_irq(pdev, i), i);
+ 		if (err)
+ 			break;
+ 	}
+ 
+ 	return err;
+ }
++
++int
++init_pmu(enum arm_pmu_type device)
++{
++	int err = 0;
++
++	switch (device) {
++	case ARM_PMU_DEVICE_CPU:
++		err = init_cpu_pmu();
++		break;
++	default:
++		pr_warning("PMU: Attempt to initialise unknown device %d\n",
++				device);
++		err = -EINVAL;
++	}
++
++	return err;
++}
+ EXPORT_SYMBOL_GPL(init_pmu);
 -- 
 1.6.3.3
