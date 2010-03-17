@@ -1,25 +1,26 @@
-From: budheej@gmail.com (Budhee Jamaich)
-Date: Wed, 17 Mar 2010 11:09:03 +0200
-Subject: mapping uncached memory
-In-Reply-To: <20100317081520.GA15954@n2100.arm.linux.org.uk>
-References: <57314e841003161617l53dc3a50la969369f0161ccdd@mail.gmail.com>
-	<20100316235422.GC13948@n2100.arm.linux.org.uk>
-	<57314e841003170102y2b2634f1na9c18282f344d3c2@mail.gmail.com>
-	<20100317081520.GA15954@n2100.arm.linux.org.uk>
-Message-ID: <57314e841003170209q669735fcid63331697f393794@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 17 Mar 2010 10:13:49 +0100
+Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for
+	argument validity.
+In-Reply-To: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
+References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <20100317091349.GA16150@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 10:15 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> No - if it did, it would contradict the previous sentence. ?What it's
-> referring to is that on weakly ordered CPUs, you may need barriers.
->
+Hello Vladimir,
 
-thank you so much.
+On Wed, Mar 17, 2010 at 10:11:55AM +0300, Vladimir Zapolskiy wrote:
+> The checks for clk argument are doubled in __clk_disable() and
+> __clk_enable() functions and thus may be skipped in clk_disable() and
+> clk_enable() bodies.
+Maybe better get rid of the test in __clk_{en,dis}able, as these are
+called more often?  Actually I think even a WARN_ON(clk == NULL ||
+IS_ERR(clk)) would be OK.
 
-can you please just give me a hint so i can understand the underlying
-mechanism that makes  dma_alloc_coherent work ?
-how does the hardware know not to cache access to these addresses ?
+Best regards
+Uwe
 
-again thank you so much
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
