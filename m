@@ -1,29 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Mar 2010 14:32:40 +0000
-Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
-In-Reply-To: <f17812d71003170707g9290903ra98fa9f4d0942a86@mail.gmail.com>
-References: <1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
-	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
-	<20100316125955.GB7287@rakim.wolfsonmicro.main>
-	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-	<20100316132305.GA8875@rakim.wolfsonmicro.main>
-	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
-	<20100316140834.GB9365@rakim.wolfsonmicro.main>
-	<f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
-	<20100317100538.GC13166@opensource.wolfsonmicro.com>
-	<f17812d71003170707g9290903ra98fa9f4d0942a86@mail.gmail.com>
-Message-ID: <20100317143239.GB12208@rakim.wolfsonmicro.main>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 17 Mar 2010 10:58:48 -0400 (EDT)
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+Message-ID: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 10:07:12PM +0800, Eric Miao wrote:
+On Wed, 17 Mar 2010, Hemanth V wrote:
 
-> I tried a trivial merge of 'pxa-ssp' branch in your tree, and there's
-> a conflict but it's fixable. There won't be much change to make in
-> my 'ssp_cleanup' branch except for the pxa168 base support. What
-> I can do is I'll try constantly merge of the asoc tree, and see if I can
-> provide a conflict resolve which could be later used during upstream
-> merge.
+> 
+> ----- Original Message ----- From: "Nicolas Pitre" <nico@fluxnic.net>
+> To: "Hemanth V" <hemanthv@ti.com>
+> Cc: <linux-mmc@vger.kernel.org>; <pierre@ossman.eu>
+> Sent: Wednesday, March 17, 2010 7:19 PM
+> Subject: Re: Highmem issues with MMC filesystem
+> 
+> 
+> > On Wed, 17 Mar 2010, Hemanth V wrote:
+> > 
+> > > Hi All,
+> > > 
+> > > We are trying to enable highmem support for OMAP based boards, while doing
+> > > so
+> > > we are
+> > > unable to boot poky UI if the filesystem is in a MMC card.
+> > > 
+> > > The poky UI comes up fine if the filesystem is in NAND or NFS,
+> > > while with MMC it gives errors like segmentation faults/syntax error while
+> > > there are none.
+> > > Seems like read from MMC is getting corrupted.
+> > 
+> > Yes, this is a known issue with highmem on ARM architectures v6 and
+> > later, related to some cache mishandling.  This is not a MMC issue as
+> > the problem occurs when booting from SATA too. The problem is still
+> > investigated.
+> > 
+> 
+> Nicolas, Russel are there any more details available which might help
+> in investigating this further.
 
-OK, I guess.  Please keep the SSP cleanup branch (including any ASoC
-machine drivers) around so it can be merged both ways if needed.
+The only conclusion I came to so far is that ARMv5 where highmem works 
+just fine in all cases has VIVT cache whereas ARMv6 has VIPT cache.  
+And the problem with VIPT caches occurs when direct DMA is involved, 
+otherwise there is no problem if PIO or NFS is used.  Sprinkling some 
+flush_cache_all() in a few places makes things work, but this is not a 
+satisfactory solution.
+
+
+Nicolas
