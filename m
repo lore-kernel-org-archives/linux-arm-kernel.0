@@ -1,28 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Mar 2010 10:05:38 +0000
-Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
-In-Reply-To: <f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
-References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
-	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
-	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
-	<20100316125955.GB7287@rakim.wolfsonmicro.main>
-	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
-	<20100316132305.GA8875@rakim.wolfsonmicro.main>
-	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
-	<20100316140834.GB9365@rakim.wolfsonmicro.main>
-	<f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
-Message-ID: <20100317100538.GC13166@opensource.wolfsonmicro.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 17 Mar 2010 11:15:04 +0100
+Subject: [PATCH 2/2] [ARM] [IMX]: Fix clock usecount counter from
+	underflow.
+In-Reply-To: <20100317092042.GB16150@pengutronix.de>
+References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
+	<1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
+	<20100317092042.GB16150@pengutronix.de>
+Message-ID: <eedb5541003170315t55f3aff1n4dadd25d08a35d7b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 01:14:39PM +0800, Eric Miao wrote:
+2010/3/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> I'm not sure this is worth it. ?IMHO an unbalanced clk_disable is a
+> severe bug that doesn't need to be handled smoothly.
+>
+> But maybe move the WARN_ON before the __clk_disable(clk->parent)? ?This
+> way the disabled parent clock cannot stop the message to appear.
+>
+> Other than that, please use WARN instead of printk + WARN_ON. ?Then the
+> message is printed only after the oops begin marker.
 
-> I'm seeing no merge conflict between my ssp_cleanup and Takashi's
-> latest tree, which branch do you suggest to merge then?
+I agree with Uwe, I myself tried to do something similar in the past and people
+made me realize that we don't have to fix here what is really a problem in some
+driver which calls unbalanced disable/enable.
 
-I'm not sure what you're asking here but if you're looking for any
-incompatible changes in ASoC they've not been implemented yet, the issue
-is that due to the stuff Liam is working on at the minute there are
-likely to be incompatible changes in the current release cycle which
-would mean that merging new drivers (like Haojian posted) via a non-ALSA
-tree would lead to problems after the trees are been merged together.
+However, I think using WARN would be a good idea since it allows the
+kernel hacker
+to track an error which according to my own experience is very
+difficult to detect.
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
