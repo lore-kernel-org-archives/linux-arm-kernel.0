@@ -1,29 +1,41 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 17 Mar 2010 04:34:57 +0000
-Subject: mapping uncached memory
-In-Reply-To: <20100316235422.GC13948@n2100.arm.linux.org.uk>
-References: <57314e841003161617l53dc3a50la969369f0161ccdd@mail.gmail.com>
-	<20100316235422.GC13948@n2100.arm.linux.org.uk>
-Message-ID: <20100317043457.GA31847@shareable.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 17 Mar 2010 13:14:39 +0800
+Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
+In-Reply-To: <20100316140834.GB9365@rakim.wolfsonmicro.main>
+References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
+	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
+	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
+	<20100316125955.GB7287@rakim.wolfsonmicro.main>
+	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
+	<20100316132305.GA8875@rakim.wolfsonmicro.main>
+	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
+	<20100316140834.GB9365@rakim.wolfsonmicro.main>
+Message-ID: <f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> Note that the whole "DMA to user mapped pages" issue is a _big_ can of
-> worms and doesn't appear to have any sane and non-expensive solutions.
+On Tue, Mar 16, 2010 at 10:08 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Mar 16, 2010 at 09:47:58PM +0800, Eric Miao wrote:
+>
+>> After that, there could be only minor changes, which could be easily
+>> merged either way, and I'd be happy to see ASoC tree add good
+>> support the pxa ssp. So what I'm thinking now is actually which one
+>> is easier, to merge asoc into pxa and get ssp cleaned up or to rebase
+>> asoc onto this ssp cleanup branch. I might need to take a look into
+>> what's going on inside asoc to evaluate this.
+>
+> Rebasing isn't an option for ASoC - it gets merged into Takashi's tree
+> for one thing (and I don't see any reason why rebasing would be required
+> anyway, no point in discarding history). ?A merge into ASoC should be
+> sufficient, right now there's no changes at all in the SSP code against
+> Linus' tree so that'll be trivial anyway at the minute.
+>
+> There's also no need to pick one route for the merge - if we do merges
+> and avoid rebasing then git will cope fine.
+>
 
-I'm still worried about whether this means certain programs,
-especially well-known open source databases, are broken on some ARMs
-when they use O_DIRECT file access.
+Mark,
 
-Fyi, O_DIRECT is flag to open(), mostly used by databases and programs
-like QEMU, and sometimes from scripts using "dd oflag=direct" and "dd
-iflag=direct".
-
-It tells the kernel that reads and writes are to bypass the page
-cache.  That causes DMA to happen between the userspace buffers given
-to read() and write(), and the disk interface.
-
-Unfortunately, this isn't some obscure specialised driver interface :-(
-
--- Jamie
+I'm seeing no merge conflict between my ssp_cleanup and Takashi's
+latest tree, which branch do you suggest to merge then?
