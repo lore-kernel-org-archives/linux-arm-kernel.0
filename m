@@ -1,61 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Mar 2010 10:20:44 +0100
-Subject: [PATCH 2/2] [ARM] [IMX]: Fix clock usecount counter from
-	underflow.
-In-Reply-To: <1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-	<1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20100317092042.GB16150@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 17 Mar 2010 10:05:38 +0000
+Subject: [PATCH 7/8] [ARM] pxa: move ssp into common plat-pxa
+In-Reply-To: <f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
+References: <1268740373-27407-1-git-send-email-eric.y.miao@gmail.com>
+	<1268740373-27407-8-git-send-email-eric.y.miao@gmail.com>
+	<771cded01003160549t73b30cccr7ba56722c28f013c@mail.gmail.com>
+	<20100316125955.GB7287@rakim.wolfsonmicro.main>
+	<f17812d71003160604q38846792i18efbcf9fb7208f@mail.gmail.com>
+	<20100316132305.GA8875@rakim.wolfsonmicro.main>
+	<f17812d71003160647v22569487k4f767da7dae6d298@mail.gmail.com>
+	<20100316140834.GB9365@rakim.wolfsonmicro.main>
+	<f17812d71003162214y10e98491v928b5c51d1bf2616@mail.gmail.com>
+Message-ID: <20100317100538.GC13166@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 10:11:56AM +0300, Vladimir Zapolskiy wrote:
-> If clk_disable() is called for already disabled clock clk->usecount
-> value is decremented anyway. This leads to a problem that sequent
-> clk_enable() call doesn't enable the clock as expected.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/plat-mxc/clock.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-> index 2daec3c..fd7596c 100644
-> --- a/arch/arm/plat-mxc/clock.c
-> +++ b/arch/arm/plat-mxc/clock.c
-> @@ -53,10 +53,15 @@ static void __clk_disable(struct clk *clk)
->  	if (clk == NULL || IS_ERR(clk))
->  		return;
->  
-> +        if (!clk->usecount) {
-> +                printk(KERN_ERR "Trying to disable a clock with 0 usecount\n");
-> +                WARN_ON(1);
-> +                return;
-> +        }
-> +
->  	__clk_disable(clk->parent);
->  	__clk_disable(clk->secondary);
->  
-> -	WARN_ON(!clk->usecount);
->  	if (!(--clk->usecount) && clk->disable)
->  		clk->disable(clk);
->  }
-I'm not sure this is worth it.  IMHO an unbalanced clk_disable is a
-severe bug that doesn't need to be handled smoothly.
+On Wed, Mar 17, 2010 at 01:14:39PM +0800, Eric Miao wrote:
 
-But maybe move the WARN_ON before the __clk_disable(clk->parent)?  This
-way the disabled parent clock cannot stop the message to appear.
+> I'm seeing no merge conflict between my ssp_cleanup and Takashi's
+> latest tree, which branch do you suggest to merge then?
 
-Other than that, please use WARN instead of printk + WARN_ON.  Then the
-message is printed only after the oops begin marker.
-
-And your indention is broken.  Please use tabs.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I'm not sure what you're asking here but if you're looking for any
+incompatible changes in ASoC they've not been implemented yet, the issue
+is that due to the stuff Liam is working on at the minute there are
+likely to be incompatible changes in the current release cycle which
+would mean that merging new drivers (like Haojian posted) via a non-ALSA
+tree would lead to problems after the trees are been merged together.
