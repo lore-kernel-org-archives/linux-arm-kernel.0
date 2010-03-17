@@ -1,53 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 17 Mar 2010 10:58:48 -0400 (EDT)
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-Message-ID: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 17 Mar 2010 08:52:37 -0700
+Subject: [PATCH 0/6] davinci fixes for 2.6.34-rc
+Message-ID: <1268841163-5868-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Mar 2010, Hemanth V wrote:
+This series of davinci fixes is targeted for the next 2.6.34-rc,
+and are also available in the 'davinci-fixes' branch of:
 
-> 
-> ----- Original Message ----- From: "Nicolas Pitre" <nico@fluxnic.net>
-> To: "Hemanth V" <hemanthv@ti.com>
-> Cc: <linux-mmc@vger.kernel.org>; <pierre@ossman.eu>
-> Sent: Wednesday, March 17, 2010 7:19 PM
-> Subject: Re: Highmem issues with MMC filesystem
-> 
-> 
-> > On Wed, 17 Mar 2010, Hemanth V wrote:
-> > 
-> > > Hi All,
-> > > 
-> > > We are trying to enable highmem support for OMAP based boards, while doing
-> > > so
-> > > we are
-> > > unable to boot poky UI if the filesystem is in a MMC card.
-> > > 
-> > > The poky UI comes up fine if the filesystem is in NAND or NFS,
-> > > while with MMC it gives errors like segmentation faults/syntax error while
-> > > there are none.
-> > > Seems like read from MMC is getting corrupted.
-> > 
-> > Yes, this is a known issue with highmem on ARM architectures v6 and
-> > later, related to some cache mishandling.  This is not a MMC issue as
-> > the problem occurs when booting from SATA too. The problem is still
-> > investigated.
-> > 
-> 
-> Nicolas, Russel are there any more details available which might help
-> in investigating this further.
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
 
-The only conclusion I came to so far is that ARMv5 where highmem works 
-just fine in all cases has VIVT cache whereas ARMv6 has VIPT cache.  
-And the problem with VIPT caches occurs when direct DMA is involved, 
-otherwise there is no problem if PIO or NFS is used.  Sprinkling some 
-flush_cache_all() in a few places makes things work, but this is not a 
-satisfactory solution.
+Kevin
 
 
-Nicolas
+Brian Niebuhr (1):
+  davinci: edma: clear events in edma_start()
+
+Kevin Hilman (4):
+  davinci: timers: don't enable timer until clocksource is initialized
+  davinci: DM365: fix duplicate default IRQ priorities
+  davinci: misc cleanups from sparse
+  davinci: sparse: gpio: void casting
+
+Sekhar Nori (1):
+  davinci: da8xx/omap-l1: fix build error when CONFIG_DAVINCI_MUX is
+    undefined
+
+ arch/arm/mach-davinci/board-dm644x-evm.c   |    2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c  |    2 +-
+ arch/arm/mach-davinci/board-sffsdr.c       |    2 +-
+ arch/arm/mach-davinci/cdce949.c            |    1 +
+ arch/arm/mach-davinci/clock.c              |    1 +
+ arch/arm/mach-davinci/devices.c            |    2 +
+ arch/arm/mach-davinci/dm355.c              |    2 +-
+ arch/arm/mach-davinci/dm365.c              |    3 +-
+ arch/arm/mach-davinci/dm644x.c             |    4 +-
+ arch/arm/mach-davinci/dm646x.c             |    6 ++--
+ arch/arm/mach-davinci/dma.c                |    3 +-
+ arch/arm/mach-davinci/gpio.c               |   41 +++++++++++++++++-----------
+ arch/arm/mach-davinci/include/mach/da8xx.h |    4 +++
+ arch/arm/mach-davinci/include/mach/gpio.h  |    8 +++---
+ arch/arm/mach-davinci/mux.c                |    1 +
+ arch/arm/mach-davinci/time.c               |    6 +++-
+ 16 files changed, 54 insertions(+), 34 deletions(-)
