@@ -1,56 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Mar 2010 12:11:14 -0700
-Subject: [PATCH] arm: Fix mounting root on omaps with CPU_V6 and CPU_V7
-In-Reply-To: <1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
-References: <20100317175731.GE2900@atomide.com>
-	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100317191114.GH2900@atomide.com>
+From: ccross@google.com (Colin Cross)
+Date: Wed, 17 Mar 2010 14:26:32 -0700
+Subject: mapping uncached memory
+In-Reply-To: <20100317081520.GA15954@n2100.arm.linux.org.uk>
+References: <57314e841003161617l53dc3a50la969369f0161ccdd@mail.gmail.com>
+	<20100316235422.GC13948@n2100.arm.linux.org.uk>
+	<57314e841003170102y2b2634f1na9c18282f344d3c2@mail.gmail.com>
+	<20100317081520.GA15954@n2100.arm.linux.org.uk>
+Message-ID: <d73d4eaf1003171426y35f9c431l93182fa73b3a5084@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Catalin Marinas <catalin.marinas@arm.com> [100317 11:04]:
-> On Wed, 2010-03-17 at 17:57 +0000, Tony Lindgren wrote:
-> > Here's an updated version of this patch with more details.
-> > 
-> > Looks like VFPv3 is only available on V7:
-> > 
-> > http://www.arm.com/products/processors/technologies/vector-floating-point.php
-> 
-> But does it cause any problem if the feature is enabled in the kernel?
-> The vfp_init() code should check for its presence and set the hwcap
-> accordingly.
+On Wed, Mar 17, 2010 at 1:15 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Mar 17, 2010 at 10:02:09AM +0200, Budhee Jamaich wrote:
+>> On Wed, Mar 17, 2010 at 1:54 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> from Documentation/DMA-API.txt:
+>>
+>> "void *
+>> dma_alloc_coherent(struct device *dev, size_t size,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *dma_handle, gfp_t flag)
+>>
+>> Consistent memory is memory for which a write by either the device or
+>> the processor can immediately be read by the processor or device
+>> without having to worry about caching effects. ?(You may however need
+>> to make sure to flush the processor's write buffers before telling
+>> devices to read that memory.)"
+>>
+>>
+>>
+>> That last sentence - what does it really say ? That I still need to
+>> manually clean/invalidate the caches myself ?
+>
+> No - if it did, it would contradict the previous sentence. ?What it's
+> referring to is that on weakly ordered CPUs, you may need barriers.
 
-Yeah, it causes the problem posted in the patch description. I took a
-quick look at it and at least the VFPFMRX in vfpmacros.h for CONFIG_VFPv3
-is a problem.
-
-Also I think we would need to have separate vfp_get_double functions
-in vfphw.S for VFPv2 and 3 that get used based on the features.
- 
-> Ideally, we should fix the VFP handling code to cope with dynamic
-> detection.
-
-I agree, being able to boot the same kernel and avoiding tens of
-recompiles to test something is a major time saver :)
- 
-> > HAS_TLS reg is only on ARM11 starting with r1p0:
-> > 
-> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0211k/Babeihid.html
-> > 
-> > So that explains why it won't work on omap2420 as it's r0p2.
-> 
-> Same here, would it work with dynamic detection?
-
-Hmm I believe here the problem is __switch_to in entry-armv.S.
-I don't think we want to dynamically test it every time.. Or
-at least it would have to be optimized out in most cases.
-
-> I would like to get v6+v7 support working fine together on RealView
-> boards as well (though not much spare time) but without disabling the
-> features that are present on v7 if they can be detected at run-time.
-
-I totally agree with you there.
-
-Regards,
-
-Tony
+Tegra2 needs a wmb() and an L2 cache sync on dma_alloc_coherent memory
+before handing it to the device.  Currently, I am using Catalin's
+patches for machine-specific wmb() implementations to do both
+operations using a wmb() and keep the L2 details out of the drivers.
+Is that the correct use of those patches?  Is there any other way to
+handle dma_alloc_coherent memory on ARMv7?
