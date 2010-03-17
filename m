@@ -1,45 +1,90 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Wed, 17 Mar 2010 10:11:55 +0300
-Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for argument
-	validity.
-Message-ID: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 17 Mar 2010 08:52:56 +0100
+Subject: [PATCH] ep93xx/core.c: remove redundant static variable
+In-Reply-To: <0D753D10438DA54287A00B0270842697636858C6FE@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697636858C6FE@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <19360.35416.358644.406403@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The checks for clk argument are doubled in __clk_disable() and
-__clk_enable() functions and thus may be skipped in clk_disable() and
-clk_enable() bodies.
+Hi,
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-mxc/clock.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+> Use the pointer to the passed board support data directly instead of 
+> copying it to local static variables.
+> 
+> This updates the ethernet, i2c, and framebuffer devices.
+> 
+> While here, also document the functions used to register the devices.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> 
+> ---
+> 
+> V2: spotted a couple others in addition to the ethernet device.
+> 
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 90fb591..5f5bc6d 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -330,8 +330,10 @@ static struct platform_device ep93xx_ohci_device = {
+>  	.resource	= ep93xx_ohci_resources,
+>  };
+>  
+> -static struct ep93xx_eth_data ep93xx_eth_data;
+>  
+> +/*************************************************************************
+> + * EP93xx ethernet peripheral handling
+> + *************************************************************************/
+>  static struct resource ep93xx_eth_resource[] = {
+>  	{
+>  		.start	= EP93XX_ETHERNET_PHYS_BASE,
+> @@ -347,19 +349,22 @@ static struct resource ep93xx_eth_resource[] = {
+>  static struct platform_device ep93xx_eth_device = {
+>  	.name		= "ep93xx-eth",
+>  	.id		= -1,
+> -	.dev		= {
+> -		.platform_data	= &ep93xx_eth_data,
+> -	},
+>  	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
+>  	.resource	= ep93xx_eth_resource,
+>  };
+>  
+> +/**
+> + * ep93xx_register_eth - Register the built-in ethernet platform device.
+> + * @data:	platform specific ethernet configuration
+> + * @copy_addr:	flag indicating that the MAC address should be copied
+> + *		from the IndAd registers (as programmed by the bootloader)
+> + */
+>  void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
+>  {
+>  	if (copy_addr)
+>  		memcpy_fromio(data->dev_addr, EP93XX_ETHERNET_BASE + 0x50, 6);
+>  
+> -	ep93xx_eth_data = *data;
+> +	ep93xx_eth_device.dev.platform_data = data;
+>  	platform_device_register(&ep93xx_eth_device);
+>  }
+>
+I don't think this is a good idea.
+In a multi platform kernel each platform that could potentially
+register the device needs to have the platform_data lying around in
+memory even if it's never used.
 
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 323ff8c..2daec3c 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -82,9 +82,6 @@ int clk_enable(struct clk *clk)
- {
- 	int ret = 0;
- 
--	if (clk == NULL || IS_ERR(clk))
--		return -EINVAL;
--
- 	mutex_lock(&clocks_mutex);
- 	ret = __clk_enable(clk);
- 	mutex_unlock(&clocks_mutex);
-@@ -99,9 +96,6 @@ EXPORT_SYMBOL(clk_enable);
-  */
- void clk_disable(struct clk *clk)
- {
--	if (clk == NULL || IS_ERR(clk))
--		return;
--
- 	mutex_lock(&clocks_mutex);
- 	__clk_disable(clk);
- 	mutex_unlock(&clocks_mutex);
+In the old way the platforms could have the platform_data that is
+passed to the ep93xx_register_eth() function marked as __initdata and
+only one copy that is actually used would be kept.
+
+
+Lothar Wa?mann
 -- 
-1.6.6.1
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
