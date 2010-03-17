@@ -1,39 +1,43 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 17 Mar 2010 11:15:04 +0100
-Subject: [PATCH 2/2] [ARM] [IMX]: Fix clock usecount counter from
-	underflow.
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Wed, 17 Mar 2010 14:03:31 +0300
+Subject: [PATCH 2/2 v2] [ARM] [IMX]: Fix clock use counter from underflow on
+	multiple clk_disable().
 In-Reply-To: <20100317092042.GB16150@pengutronix.de>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-	<1268809916-6525-2-git-send-email-vzapolskiy@gmail.com>
-	<20100317092042.GB16150@pengutronix.de>
-Message-ID: <eedb5541003170315t55f3aff1n4dadd25d08a35d7b@mail.gmail.com>
+References: <20100317092042.GB16150@pengutronix.de>
+Message-ID: <1268823811-9035-1-git-send-email-vzapolskiy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> I'm not sure this is worth it. ?IMHO an unbalanced clk_disable is a
-> severe bug that doesn't need to be handled smoothly.
->
-> But maybe move the WARN_ON before the __clk_disable(clk->parent)? ?This
-> way the disabled parent clock cannot stop the message to appear.
->
-> Other than that, please use WARN instead of printk + WARN_ON. ?Then the
-> message is printed only after the oops begin marker.
+If clk_disable() is called for already disabled clock clk->usecount
+value is decremented anyway. This leads to a problem that sequent
+clk_enable() call doesn't enable the clock as expected.
 
-I agree with Uwe, I myself tried to do something similar in the past and people
-made me realize that we don't have to fix here what is really a problem in some
-driver which calls unbalanced disable/enable.
+Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/plat-mxc/clock.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-However, I think using WARN would be a good idea since it allows the
-kernel hacker
-to track an error which according to my own experience is very
-difficult to detect.
-
+diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+index 2daec3c..3189275 100644
+--- a/arch/arm/plat-mxc/clock.c
++++ b/arch/arm/plat-mxc/clock.c
+@@ -53,10 +53,14 @@ static void __clk_disable(struct clk *clk)
+ 	if (clk == NULL || IS_ERR(clk))
+ 		return;
+ 
++	if (!clk->usecount) {
++		WARN(1, "Trying to disable a clock with 0 usecount\n");
++		return;
++	}
++
+ 	__clk_disable(clk->parent);
+ 	__clk_disable(clk->secondary);
+ 
+-	WARN_ON(!clk->usecount);
+ 	if (!(--clk->usecount) && clk->disable)
+ 		clk->disable(clk);
+ }
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.6.6.1
