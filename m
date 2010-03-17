@@ -1,74 +1,48 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 17 Mar 2010 16:30:23 +0000
-Subject: QUERY: How to handle SOC Configuration (Peripheral
-	Multiplexing) in linux
-In-Reply-To: <4B9DDC61.3090609@st.com>
-References: <4B9DB823.1040809@st.com>
-	<20100315062041.GD31126@trinity.fluff.org>
-	<4B9DDC61.3090609@st.com>
-Message-ID: <20100317163023.GF31126@trinity.fluff.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 17 Mar 2010 11:39:02 -0500
+Subject: [PATCH] ep93xx/core.c: remove redundant static variable
+In-Reply-To: <19360.35416.358644.406403@ipc1.ka-ro>
+References: <0D753D10438DA54287A00B02708426976368534061@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697636858C6FE@AUSP01VMBX24.collaborationhost.net>
+	<19360.35416.358644.406403@ipc1.ka-ro>
+Message-ID: <0D753D10438DA54287A00B0270842697636858D3AE@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 15, 2010 at 12:36:09PM +0530, Viresh KUMAR wrote:
-> Ben,
+On Wednesday, March 17, 2010 12:53 AM, Lothar Wa?mann wrote:
+>
+> Hi,
+
+Hello.
+
+>> Use the pointer to the passed board support data directly instead of 
+>> copying it to local static variables.
+>> 
+>> This updates the ethernet, i2c, and framebuffer devices.
+>> 
+>> While here, also document the functions used to register the devices.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>> 
+>> ---
+
+> I don't think this is a good idea.
+> In a multi platform kernel each platform that could potentially
+> register the device needs to have the platform_data lying around in
+> memory even if it's never used.
 > 
-> On 3/15/2010 11:50 AM, Ben Dooks wrote:
-> >> > I have provided this selection from "make menuconfig", based on selection I
-> >> > configure hardware at initialization time. Basically these selections will
-> >> > decide which device is present in the system when it boots.
-> > This is really bad idea, what happens if you have a selection of
-> > boards with mutually-exclusive peripheral sets?
-> 
-> In this case, we can have different defconfig files for different boards.
+> In the old way the platforms could have the platform_data that is
+> passed to the ep93xx_register_eth() function marked as __initdata and
+> only one copy that is actually used would be kept.
 
-That is not acceptable, it makes life difficult for things like the
-autobuilder (more configurations to process), for people trying to
-package software distributions (each kernel requires a package, a set
-of modules, requiring time to build and space to store).
+Ok. That makes sense.
 
-The configuration is known to the board initialisation code in the
-kernel, and thus it should be requesting a set of features from the
-core SoC implementation saying what it wants. This can then ensure
-that the configuration is mutually exclusive, ensure any resources
-such as GPIO are correctly configured, etc.
+Based on that, all the ep93xx board init code needs to be checked to
+make sure any data that is passed to the core code and copied to a local
+static variable is marked as __initdata.
 
-Note, currently the s3c2410_defconfig builds 123Mbyte of modules.
-Think about having m-machines' worth of those littering your development
-system.
- 
-> > Making these sorts of
-> > decisions at compile time is always a bad idea, it leaves people making
-> > distributitions a lot of extra work.
-> > 
-> 
-> I agree with this point but what is the other way for this.
-> 
-> Doing this at runtime will have following issue:
-> 
-> User have inserted a module and by mistake or lack of knowledge,
-> he disabled already working IP(due to multiplexing). Now with Kconfig concept 
-> this is taken care of at the beginning only. User can't select peripherals which
-> can't be enabled simultaneously.
+I'll rework this and post a new patch in a bit.
 
-Generally, all devices are registered at initialisation time. If there is
-the chance of dynamically loading drivers afterwards, either you'll have
-to do one of the following:
-
-1) Change the driver to call the SoC code in the probe() code to ensure
-   that it can get the required SoC resources
-
-2) Ensure the board has reseved the SoC resources for the device at start
-   time
-
-Note, also unless you have very specific modules, your Kconfig approach
-will break down if you forget to update the root-fs when changing the
-kernel, otherwise modules you can't load will be left around.
-
-Generally, runtime controls are much better than build time.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Thanks,
+Hartley
