@@ -1,54 +1,36 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 17 Mar 2010 17:33:22 -0400
-Subject: [PATCH] [ARM] mmp: enable ssp in aspenite
-Message-ID: <mailman.244.1268879550.2170.linux-arm-kernel@lists.infradead.org>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Wed, 17 Mar 2010 13:34:50 +0300
+Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for argument
+	validity.
+In-Reply-To: <20100317091349.GA16150@pengutronix.de>
+References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
+	<20100317091349.GA16150@pengutronix.de>
+Message-ID: <acc484891003170334p133ee328y2d1b17533b672ac5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure both ssp and wm8753 in aspenite.
+Hello Uwe,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/mach-mmp/aspenite.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+__clk_enable() and __clk_disable() are recursive with another arguments,
+that means it is hardly possible to remove the checks from them.
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index a2d307e..244655d 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -59,6 +59,13 @@ static unsigned long common_pin_config[] __initdata = {
- 	/* UART1 */
- 	GPIO107_UART1_RXD,
- 	GPIO108_UART1_TXD,
-+
-+	/* SSP1 */
-+	GPIO113_I2S_MCLK,
-+	GPIO114_I2S_FRM,
-+	GPIO115_I2S_BCLK,
-+	GPIO116_I2S_RXD,
-+	GPIO117_I2S_TXD,
- };
+2010/3/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
- static struct smc91x_platdata smc91x_info = {
-@@ -123,12 +130,18 @@ static struct pxa3xx_nand_platform_data
-aspenite_nand_info = {
- 	.nr_parts	= ARRAY_SIZE(aspenite_nand_partitions),
- };
-
-+static struct i2c_board_info aspenite_i2c_info[] __initdata = {
-+	{ I2C_BOARD_INFO("wm8753", 0x1b), },
-+};
-+
- static void __init common_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(common_pin_config));
-
- 	/* on-chip devices */
- 	pxa168_add_uart(1);
-+	pxa168_add_twsi(1, NULL, ARRAY_AND_SIZE(aspenite_i2c_info));
-+	pxa168_add_ssp(1);
- 	pxa168_add_nand(&aspenite_nand_info);
-
- 	/* off-chip devices */
--- 
-1.5.6.5
+> Hello Vladimir,
+>
+> On Wed, Mar 17, 2010 at 10:11:55AM +0300, Vladimir Zapolskiy wrote:
+> > The checks for clk argument are doubled in __clk_disable() and
+> > __clk_enable() functions and thus may be skipped in clk_disable() and
+> > clk_enable() bodies.
+> Maybe better get rid of the test in __clk_{en,dis}able, as these are
+> called more often?  Actually I think even a WARN_ON(clk == NULL ||
+> IS_ERR(clk)) would be OK.
+>
+> Best regards
+> Uwe
+>
+> With best wishes,
+Vladimir
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100317/08a7f91b/attachment-0001.htm>
