@@ -1,91 +1,129 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 18 Mar 2010 12:20:10 +0000
-Subject: [RFC PATCH 1/6] ARM: pmu: register IRQs at runtime
-In-Reply-To: <1268842288-30960-1-git-send-email-will.deacon@arm.com>
-References: <20100316114131.GC4116@wear.picochip.com>
-	<1268842288-30960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20100318122010.GC4177@wear.picochip.com>
+From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
+Date: Thu, 18 Mar 2010 08:32:23 -0400
+Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
+In-Reply-To: <1268904552-2355-1-git-send-email-virtuoso@slind.org>
+References: <20100310173503.GC12345@n2100.arm.linux.org.uk>
+	<1268904552-2355-1-git-send-email-virtuoso@slind.org>
+Message-ID: <20100318123223.GA6855@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 04:11:27PM +0000, Will Deacon wrote:
-> The current PMU infrastructure for ARM requires that the IRQs for the PMU
-> device are fixed at compile time and are selected based on the ARCH_ or MACH_
-> flags. This has the disadvantage of tying the Kernel down to a particular board
-> as far as profiling is concerned.
+* Alexander Shishkin (virtuoso at slind.org) wrote:
+> On systems where ldrexh/strexh are not available, use a generic local
+> version.
 > 
-> This patch replaces the compile-time IRQ registration with a runtime mechanism
-> which allows the IRQs to be registered with the framework as a platform_device.
-> 
-> A further advantage of this change is that there is scope for registering
-> different types of performance counters in the future by changing the id of
-> the platform_device and attaching different resources to it.
-Hi Will,
-
-This seems like a nice approach to the problem. A couple of pedantic comments
-inline!
-
-Jamie
-> Cc: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+> CC: linux-arm-kernel-bounces at lists.infradead.org
+> CC: Imre Deak <imre.deak@nokia.com>
+> CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
 > ---
->  arch/arm/include/asm/pmu.h   |   30 +++++-----
->  arch/arm/kernel/perf_event.c |   36 +++++++------
->  arch/arm/kernel/pmu.c        |  121 ++++++++++++++++++++++++++----------------
->  3 files changed, 110 insertions(+), 77 deletions(-)
-[snip]
-> +static int __devinit pmu_device_probe(struct platform_device *pdev)
+>  arch/arm/include/asm/system.h |   61 ++++++++++++++++++++++++++++++++++-------
+>  1 files changed, 51 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index d65b2f5..a2ee41f 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -218,6 +218,39 @@ do {									\
+>  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+>  } while (0)
+>  
+> +static inline unsigned long __xchg_local_generic(unsigned long x,
+> +						 volatile void *ptr, int size)
 > +{
+> +	extern void __bad_xchg(volatile void *, int);
+> +	unsigned long ret;
+> +	unsigned long flags;
 > +
-> +	if (pdev->id >= ARM_NUM_PMU_DEVICES) {
-> +		pr_warning("PMU: Received registration request for unknown "
-> +				"device %d\n", pdev->id);
-> +		return -EINVAL;
+> +	switch (size) {
+> +	case 1:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned char *)ptr;
+> +		*(volatile unsigned char *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +
+> +	case 2:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned short *)ptr;
+> +		*(volatile unsigned short *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +
+> +	case 4:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned long *)ptr;
+> +		*(volatile unsigned long *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
 > +	}
 > +
-> +	if (pmu_devices[pdev->id])
-> +		pr_warning("PMU: Registering new PMU device type %d overwrites "
-> +				"previous registration!\n", pdev->id);
-> +	else
-> +		pr_info("PMU: Registered new PMU device of type %d\n",
-> +				pdev->id);
+> +	return ret;
+> +}
 > +
-> +	pmu_devices[pdev->id] = pdev;
-struct pdev->id is a signed integer so we should check that it's not less than
-0 so we don't overrun pmu_devices..
-> @@ -79,7 +91,7 @@ set_irq_affinity(int irq,
->  #ifdef CONFIG_SMP
->  	int err = irq_set_affinity(irq, cpumask_of(cpu));
->  	if (err)
-> -		pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> +		pr_warning("PMU: Unable to set irq affinity (irq=%d, cpu=%u)\n",
->  			   irq, cpu);
-How about we stick a '#define pr_fmt(fmt) "PMU: " fmt' before the includes so
-we get consistent naming if we add more pr_*() statements?
->  	return err;
->  #else
-> @@ -87,17 +99,36 @@ set_irq_affinity(int irq,
->  #endif
->  }
->  
-> -int
-> -init_pmu(void)
-> +static int
-> +init_cpu_pmu(void)
->  {
->  	int i, err = 0;
-> +	struct platform_device *pdev = pmu_devices[ARM_PMU_DEVICE_CPU];
-Just to be safe:
+>  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+>  /*
+>   * On the StrongARM, "swp" is terminally broken since it bypasses the
+> @@ -262,6 +295,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +#ifdef CONFIG_CPU_32v6K
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+> +#else
+> +	case 2:
+> +		ret = __xchg_local_generic(x, ptr, 2);
+> +		break;
 
-if (!pdev)
-	return -ENODEV;
-> -	for (i = 0; i < pmu_irqs.num_irqs; ++i) {
-> -		err = set_irq_affinity(pmu_irqs.irqs[i], i);
-> +	for (i = 0; i < pdev->num_resources; ++i) {
-> +		err = set_irq_affinity(platform_get_irq(pdev, i), i);
->  		if (err)
->  			break;
->  	}
->  
->  	return err;
->  }
+Calling __xchg_local_generic as an underlying xchg() implementation on
+SMP is buggy. I think we have to surround this by "#ifndef CONFIG_SMP",
+so it generates a "__bad_xchg(ptr, size), ret = 0;" error for short xchg
+on SMP. That's odd though, as a program that builds on UP will break on
+SMP.
+
+Thanks,
+
+Mathieu
+
+> +#endif
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
+> @@ -277,17 +326,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  #error SMP is not supported on this platform
+>  #endif
+>  	case 1:
+> -		raw_local_irq_save(flags);
+> -		ret = *(volatile unsigned char *)ptr;
+> -		*(volatile unsigned char *)ptr = x;
+> -		raw_local_irq_restore(flags);
+> -		break;
+> -
+> +	case 2:
+>  	case 4:
+> -		raw_local_irq_save(flags);
+> -		ret = *(volatile unsigned long *)ptr;
+> -		*(volatile unsigned long *)ptr = x;
+> -		raw_local_irq_restore(flags);
+> +		ret = __xchg_local_generic(x, ptr, size);
+>  		break;
+>  #else
+>  	case 1:
+> -- 
+> 1.6.3.3
+> 
+
+-- 
+Mathieu Desnoyers
+Operating System Efficiency Consultant
+EfficiOS Inc.
+http://www.efficios.com
