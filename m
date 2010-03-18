@@ -1,41 +1,26 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Thu, 18 Mar 2010 15:24:23 -0500
-Subject: devicetree in arm
-In-Reply-To: <20100318132358.GE19544@n2100.arm.linux.org.uk>
-References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
-	<20100318132358.GE19544@n2100.arm.linux.org.uk>
-Message-ID: <4BA28BF7.2080403@billgatliff.com>
+From: konkers@google.com (Erik Gilling)
+Date: Thu, 18 Mar 2010 13:30:45 -0700
+Subject: [RFC/PATCH 00/10] Tegra2 support
+In-Reply-To: <20100318083220.GA8267@n2100.arm.linux.org.uk>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+	<1268721688-27550-1-git-send-email-konkers@google.com>
+	<20100318083220.GA8267@n2100.arm.linux.org.uk>
+Message-ID: <4344f3c71003181330v3c548182u411dd8eaf9fd34b7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Thu, Mar 18, 2010 at 07:14:05AM -0600, Grant Likely wrote:
->   
->> ARM device tree support is very much in flux, and that particular
->> branch gets rebased a lot as device tree code from Sparc, Microblaze
->> and Powerpc is merged into drivers/of.  I may have ended up pushing
->> out to test-devicetree without the ARM patches applied.  I'll look at
->> it today, make sure the ARM stuff is all there, and then push it out
->> again.
+On Thu, Mar 18, 2010 at 1:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 15, 2010 at 11:41:18PM -0700, konkers at google.com wrote:
+>> Here's the cleaned up patch stack as promised. ?We've incorporated the feedback
+>> from Gary and Russel.
 >>
->> Note however that this is only very basic support.  It doesn't yet
->> have the code needed to register devices and drivers from device tree
->> data.  That will be coming real-soon-now.
->>     
+>> I've pushed these patches to the linux-tegra-2.6.34-rc1 branch at
+>> git://android.git.kernel.org/kernel/tegra.git
 >
-> Is someone going to do a device tree example port to a 'real' platform
-> rather than simple the ARM evaluation boards?
->
-> As I've said previously, I'm not going to accept device tree stuff until
-> I see a working implementation on a set of real platforms.
->   
+> Please change all the mach/io.h and asm/io.h to linux/io.h, and mach/gpio.h
+> and asm/gpio.h to linux/gpio.h.
 
-I can give it a spin on a couple of the boards I have here.  I'm already
-using device trees on my PPC platforms.
+I assume I want to use asm/io.h in entry-macro.S and debug-macro.S, yes?
 
-
-b.g.
-
--- 
-Bill Gatliff
-bgat at billgatliff.com
+-Erik
