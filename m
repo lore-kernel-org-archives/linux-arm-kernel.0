@@ -1,28 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Mar 2010 14:19:30 +0000
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-Message-ID: <20100318141930.GF19544@n2100.arm.linux.org.uk>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Thu, 18 Mar 2010 17:23:34 +0300
+Subject: [PATCH 1/2 v2] imx: optimize __clk_enable() and __clk_disable()
+	functions.
+In-Reply-To: <1268918865-15401-1-git-send-email-vzapolskiy@gmail.com>
+References: <20100318083728.GB1369@pengutronix.de>
+	<1268918865-15401-1-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <fcda838a1003180723x42eb01f1rcf0843aacb7b5f82@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 07:00:06PM +0530, Shilimkar, Santosh wrote:
-> Or could it be that there is appropriate cacheflush happening but data gets
-> stuck in CPU writebuffers instead of reaching to main memory. In this case
-> too DMA won't see the contents and a barrier (dsb) is necessary to ensure
-> that write buffer is drained before DMA takes over the buffer.
+On Thu, Mar 18, 2010 at 4:27 PM, Vladimir Zapolskiy
+<vzapolskiy@gmail.com> wrote:
+> To remove unnecessary calls of functions with invalid argumets make
+> the checks before a call.
+>
+> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+> ---
+> ?arch/arm/plat-mxc/clock.c | ? 25 ++++++++++++-------------
+> ?1 files changed, 12 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> index 323ff8c..ec4af90 100644
+> --- a/arch/arm/plat-mxc/clock.c
+> +++ b/arch/arm/plat-mxc/clock.c
+> @@ -50,24 +50,25 @@ static DEFINE_MUTEX(clocks_mutex);
+>
+> ?static void __clk_disable(struct clk *clk)
+> ?{
+> - ? ? ? if (clk == NULL || IS_ERR(clk))
+> - ? ? ? ? ? ? ? return;
+> -
+> - ? ? ? __clk_disable(clk->parent);
+> - ? ? ? __clk_disable(clk->secondary);
+> -
+> ? ? ? ?WARN_ON(!clk->usecount);
+> +
+> ? ? ? ?if (!(--clk->usecount) && clk->disable)
+> ? ? ? ? ? ? ? ?clk->disable(clk);
+> +
+> + ? ? ? if (clk->secondary)
+> + ? ? ? ? ? ? ? __clk_disable(clk->secondary);
+> +
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? __clk_disable(clk->parent);
+> ?}
+>
+> ?static int __clk_enable(struct clk *clk)
+> ?{
+> - ? ? ? if (clk == NULL || IS_ERR(clk))
+> - ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? __clk_enable(clk->parent);
+>
+> - ? ? ? __clk_enable(clk->parent);
+> - ? ? ? __clk_enable(clk->secondary);
+> + ? ? ? if (clk->secondary)
+> + ? ? ? ? ? ? ? __clk_enable(clk->secondary);
+>
+> ? ? ? ?if (clk->usecount++ == 0 && clk->enable)
+> ? ? ? ? ? ? ? ?clk->enable(clk);
+> @@ -99,9 +100,7 @@ EXPORT_SYMBOL(clk_enable);
+> ?*/
+> ?void clk_disable(struct clk *clk)
+> ?{
+> - ? ? ? if (clk == NULL || IS_ERR(clk))
+> - ? ? ? ? ? ? ? return;
+> -
+> + ? ? ? BUG_ON(clk == NULL || IS_ERR(clk));
+> ? ? ? ?mutex_lock(&clocks_mutex);
+> ? ? ? ?__clk_disable(clk);
+> ? ? ? ?mutex_unlock(&clocks_mutex);
+> --
+> 1.6.6.1
+>
+>
+One potential issue is still exists, there is no valid checks and
+unbinding of return values in __clk_enable() recursive calls.
 
-That would imply that the data on the device is becoming corrupted.
-
-What exactly is the problem that we're discussing?  Is it that the data
-on the block device is becoming corrupted, or is the data being read off
-the block device corrupted?
+With best wishes,
+Vladimir
