@@ -1,47 +1,134 @@
-From: armando.visconti@st.com (Armando VISCONTI)
-Date: Thu, 18 Mar 2010 14:45:39 +0100
-Subject: devicetree in arm
-In-Reply-To: <20100318132358.GE19544@n2100.arm.linux.org.uk>
-References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
-	<20100318132358.GE19544@n2100.arm.linux.org.uk>
-Message-ID: <4BA22E83.3080000@st.com>
+From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
+Date: Thu, 18 Mar 2010 09:50:08 -0400
+Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
+In-Reply-To: <1268919221-2748-1-git-send-email-virtuoso@slind.org>
+References: <20100318123223.GA6855@Krystal>
+	<1268919221-2748-1-git-send-email-virtuoso@slind.org>
+Message-ID: <20100318135008.GA11800@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+* Alexander Shishkin (virtuoso at slind.org) wrote:
+> On systems where ldrexh/strexh are not available, use a generic local
+> version or __bad_xchg() on SMP.
+> 
+> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+> CC: linux-arm-kernel-bounces at lists.infradead.org
+> CC: Imre Deak <imre.deak@nokia.com>
+> CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
+> ---
+>  arch/arm/include/asm/system.h |   65 ++++++++++++++++++++++++++++++++++------
+>  1 files changed, 55 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index d65b2f5..82248ae 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -218,6 +218,39 @@ do {									\
+>  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+>  } while (0)
+>  
+> +static inline unsigned long __xchg_local_generic(unsigned long x,
+> +						 volatile void *ptr, int size)
+> +{
+> +	extern void __bad_xchg(volatile void *, int);
+> +	unsigned long ret;
+> +	unsigned long flags;
+> +
+> +	switch (size) {
+> +	case 1:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned char *)ptr;
+> +		*(volatile unsigned char *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +
+> +	case 2:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned short *)ptr;
+> +		*(volatile unsigned short *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +
+> +	case 4:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned long *)ptr;
+> +		*(volatile unsigned long *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+>  /*
+>   * On the StrongARM, "swp" is terminally broken since it bypasses the
+> @@ -262,6 +295,26 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +#ifdef CONFIG_CPU_32v6K
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+> +#else
+> +	case 2:
+> +#ifdef CONFIG_SMP
+> +		__bad_xchg(ptr, size), ret = 0;
 
+You don't need to put this one explicitly. See the default case of the
+switch.
 
->> ARM device tree support is very much in flux, and that particular
->> branch gets rebased a lot as device tree code from Sparc, Microblaze
->> and Powerpc is merged into drivers/of.  I may have ended up pushing
->> out to test-devicetree without the ARM patches applied.  I'll look at
->> it today, make sure the ARM stuff is all there, and then push it out
->> again.
->>
->> Note however that this is only very basic support.  It doesn't yet
->> have the code needed to register devices and drivers from device tree
->> data.  That will be coming real-soon-now.
->>     
->
-> Is someone going to do a device tree example port to a 'real' platform
-> rather than simple the ARM evaluation boards?
->   
-As part of the discussion we had recently with you guys I can tell you
-that we are of course interested into this devicetree info passed
-as booting option.
+But.. thinking about it. It's bad to have a 2-byte xchg primitive that
+only works on UP and breaks the build on SMP. We should instead
+implement a workaround based on __cmpxchg4 to perform the 2-byte xchg().
 
-We are currently in the process of submitting on this mailing list
-the patch V2 for SPEAr family architectures for reviewing.
+Thanks,
 
-> As I've said previously, I'm not going to accept device tree stuff until
-> I see a working implementation on a set of real platforms.
->   
-Just after submitting patch V2 we might take a look to this patch and 
-try it out
-on our SPEAr platforms. It might take long as it is not exactly
-our first priority.
+Mathieu
 
-We will keep you informed on this.
+> +#else
+> +		ret = __xchg_local_generic(x, ptr, 2);
+> +#endif
+> +		break;
+> +#endif
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
+> @@ -277,17 +330,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  #error SMP is not supported on this platform
+>  #endif
+>  	case 1:
+> -		raw_local_irq_save(flags);
+> -		ret = *(volatile unsigned char *)ptr;
+> -		*(volatile unsigned char *)ptr = x;
+> -		raw_local_irq_restore(flags);
+> -		break;
+> -
+> +	case 2:
+>  	case 4:
+> -		raw_local_irq_save(flags);
+> -		ret = *(volatile unsigned long *)ptr;
+> -		*(volatile unsigned long *)ptr = x;
+> -		raw_local_irq_restore(flags);
+> +		ret = __xchg_local_generic(x, ptr, size);
+>  		break;
+>  #else
+>  	case 1:
+> -- 
+> 1.6.3.3
+> 
 
-Regards,
-Arm
+-- 
+Mathieu Desnoyers
+Operating System Efficiency Consultant
+EfficiOS Inc.
+http://www.efficios.com
