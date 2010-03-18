@@ -1,27 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Mar 2010 09:23:52 +0000
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-Message-ID: <20100318092352.GD8267@n2100.arm.linux.org.uk>
+From: virtuoso@slind.org (Alexander Shishkin)
+Date: Thu, 18 Mar 2010 11:29:12 +0200
+Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
+In-Reply-To: <20100310173503.GC12345@n2100.arm.linux.org.uk>
+References: <20100310173503.GC12345@n2100.arm.linux.org.uk>
+Message-ID: <1268904552-2355-1-git-send-email-virtuoso@slind.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 10:58:48AM -0400, Nicolas Pitre wrote:
-> On Wed, 17 Mar 2010, Hemanth V wrote:
-> > Nicolas, Russel are there any more details available which might help
-> > in investigating this further.
-> 
-> The only conclusion I came to so far is that ARMv5 where highmem works 
-> just fine in all cases has VIVT cache whereas ARMv6 has VIPT cache.  
-> And the problem with VIPT caches occurs when direct DMA is involved, 
-> otherwise there is no problem if PIO or NFS is used.  Sprinkling some 
-> flush_cache_all() in a few places makes things work, but this is not a 
-> satisfactory solution.
+On systems where ldrexh/strexh are not available, use a generic local
+version.
 
-This sounds like the problem we had with the DMA API.  Since that's now
-fixed, there shouldn't be a problem with the latest (-rc) kernels, or
-a kernel with my old streaming DMA patches applied.
+Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+CC: linux-arm-kernel-bounces at lists.infradead.org
+CC: Imre Deak <imre.deak@nokia.com>
+CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
+---
+ arch/arm/include/asm/system.h |   61 ++++++++++++++++++++++++++++++++++-------
+ 1 files changed, 51 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index d65b2f5..a2ee41f 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -218,6 +218,39 @@ do {									\
+ 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+ } while (0)
+ 
++static inline unsigned long __xchg_local_generic(unsigned long x,
++						 volatile void *ptr, int size)
++{
++	extern void __bad_xchg(volatile void *, int);
++	unsigned long ret;
++	unsigned long flags;
++
++	switch (size) {
++	case 1:
++		raw_local_irq_save(flags);
++		ret = *(volatile unsigned char *)ptr;
++		*(volatile unsigned char *)ptr = x;
++		raw_local_irq_restore(flags);
++		break;
++
++	case 2:
++		raw_local_irq_save(flags);
++		ret = *(volatile unsigned short *)ptr;
++		*(volatile unsigned short *)ptr = x;
++		raw_local_irq_restore(flags);
++		break;
++
++	case 4:
++		raw_local_irq_save(flags);
++		ret = *(volatile unsigned long *)ptr;
++		*(volatile unsigned long *)ptr = x;
++		raw_local_irq_restore(flags);
++		break;
++	}
++
++	return ret;
++}
++
+ #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+ /*
+  * On the StrongARM, "swp" is terminally broken since it bypasses the
+@@ -262,6 +295,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+ 			: "r" (x), "r" (ptr)
+ 			: "memory", "cc");
+ 		break;
++#ifdef CONFIG_CPU_32v6K
++	case 2:
++		asm volatile("@	__xchg2\n"
++		"1:	ldrexh	%0, [%3]\n"
++		"	strexh	%1, %2, [%3]\n"
++		"	teq	%1, #0\n"
++		"	bne	1b"
++			: "=&r" (ret), "=&r" (tmp)
++			: "r" (x), "r" (ptr)
++			: "memory", "cc");
++		break;
++#else
++	case 2:
++		ret = __xchg_local_generic(x, ptr, 2);
++		break;
++#endif
+ 	case 4:
+ 		asm volatile("@	__xchg4\n"
+ 		"1:	ldrex	%0, [%3]\n"
+@@ -277,17 +326,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+ #error SMP is not supported on this platform
+ #endif
+ 	case 1:
+-		raw_local_irq_save(flags);
+-		ret = *(volatile unsigned char *)ptr;
+-		*(volatile unsigned char *)ptr = x;
+-		raw_local_irq_restore(flags);
+-		break;
+-
++	case 2:
+ 	case 4:
+-		raw_local_irq_save(flags);
+-		ret = *(volatile unsigned long *)ptr;
+-		*(volatile unsigned long *)ptr = x;
+-		raw_local_irq_restore(flags);
++		ret = __xchg_local_generic(x, ptr, size);
+ 		break;
+ #else
+ 	case 1:
+-- 
+1.6.3.3
