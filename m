@@ -1,117 +1,41 @@
-From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
-Date: Thu, 18 Mar 2010 15:30:09 -0400
-Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
-In-Reply-To: <20100318190023.GA30833@localhost>
-References: <20100318123223.GA6855@Krystal>
-	<1268919221-2748-1-git-send-email-virtuoso@slind.org>
-	<20100318135008.GA11800@Krystal> <20100318163315.GJ30422@localhost>
-	<20100318172141.GB1902@Krystal> <20100318190023.GA30833@localhost>
-Message-ID: <20100318193009.GA14283@Krystal>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Thu, 18 Mar 2010 15:24:23 -0500
+Subject: devicetree in arm
+In-Reply-To: <20100318132358.GE19544@n2100.arm.linux.org.uk>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+	<20100318132358.GE19544@n2100.arm.linux.org.uk>
+Message-ID: <4BA28BF7.2080403@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Imre Deak (imre.deak at nokia.com) wrote:
-> On Thu, Mar 18, 2010 at 06:21:41PM +0100, ext Mathieu Desnoyers wrote:
-> > * Imre Deak (imre.deak at nokia.com) wrote:
-> > > On Thu, Mar 18, 2010 at 02:50:08PM +0100, ext Mathieu Desnoyers wrote:
-> > > > * Alexander Shishkin (virtuoso at slind.org) wrote:
-> > > > > On systems where ldrexh/strexh are not available, use a generic local
-> > > > > version or __bad_xchg() on SMP.
-> > > > > 
-> > > > > Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-> > > > > CC: linux-arm-kernel-bounces at lists.infradead.org
-> > > > > CC: Imre Deak <imre.deak@nokia.com>
-> > > > > CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
-> > > > > ---
-> > > > >  arch/arm/include/asm/system.h |   65 ++++++++++++++++++++++++++++++++++------
-> > > > >  1 files changed, 55 insertions(+), 10 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> > > > > index d65b2f5..82248ae 100644
-> > > > > --- a/arch/arm/include/asm/system.h
-> > > > > +++ b/arch/arm/include/asm/system.h
-> > > > > @@ -218,6 +218,39 @@ do {									\
-> > > > >  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
-> > > > >  } while (0)
-> > > > >  
-> > > > > +static inline unsigned long __xchg_local_generic(unsigned long x,
-> > > > > +						 volatile void *ptr, int size)
-> > > > > +{
-> > > > > +	extern void __bad_xchg(volatile void *, int);
-> > > > > +	unsigned long ret;
-> > > > > +	unsigned long flags;
-> > > > > +
-> > > > > +	switch (size) {
-> > > > > +	case 1:
-> > > > > +		raw_local_irq_save(flags);
-> > > > > +		ret = *(volatile unsigned char *)ptr;
-> > > > > +		*(volatile unsigned char *)ptr = x;
-> > > > > +		raw_local_irq_restore(flags);
-> > > > > +		break;
-> > > > > +
-> > > > > +	case 2:
-> > > > > +		raw_local_irq_save(flags);
-> > > > > +		ret = *(volatile unsigned short *)ptr;
-> > > > > +		*(volatile unsigned short *)ptr = x;
-> > > > > +		raw_local_irq_restore(flags);
-> > > > > +		break;
-> > > > > +
-> > > > > +	case 4:
-> > > > > +		raw_local_irq_save(flags);
-> > > > > +		ret = *(volatile unsigned long *)ptr;
-> > > > > +		*(volatile unsigned long *)ptr = x;
-> > > > > +		raw_local_irq_restore(flags);
-> > > > > +		break;
-> > > > > +	}
-> > > > > +
-> > > > > +	return ret;
-> > > > > +}
-> > > > > +
-> > > > >  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
-> > > > >  /*
-> > > > >   * On the StrongARM, "swp" is terminally broken since it bypasses the
-> > > > > @@ -262,6 +295,26 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
-> > > > >  			: "r" (x), "r" (ptr)
-> > > > >  			: "memory", "cc");
-> > > > >  		break;
-> > > > > +#ifdef CONFIG_CPU_32v6K
-> > > > > +	case 2:
-> > > > > +		asm volatile("@	__xchg2\n"
-> > > > > +		"1:	ldrexh	%0, [%3]\n"
-> > > > > +		"	strexh	%1, %2, [%3]\n"
-> > > > > +		"	teq	%1, #0\n"
-> > > > > +		"	bne	1b"
-> > > > > +			: "=&r" (ret), "=&r" (tmp)
-> > > > > +			: "r" (x), "r" (ptr)
-> > > > > +			: "memory", "cc");
-> > > > > +		break;
-> > > > > +#else
-> > > > > +	case 2:
-> > > > > +#ifdef CONFIG_SMP
-> > > > > +		__bad_xchg(ptr, size), ret = 0;
-> > > > 
-> > > 
-> > > On a related note, why can't we have __bad_xchg as an undefined function
-> > > for detecting the error already in build time? That seems to be the
-> > > approach in similar places.
-> > 
-> > And, unless I am missing your point entirely, this is exactly what is
-> > done here.
-> 
-> __bad_xchg is defined in arch/arm/kernel/traps.c, so at the moment
-> we'll only get a runtime error.
+Russell King - ARM Linux wrote:
+> On Thu, Mar 18, 2010 at 07:14:05AM -0600, Grant Likely wrote:
+>   
+>> ARM device tree support is very much in flux, and that particular
+>> branch gets rebased a lot as device tree code from Sparc, Microblaze
+>> and Powerpc is merged into drivers/of.  I may have ended up pushing
+>> out to test-devicetree without the ARM patches applied.  I'll look at
+>> it today, make sure the ARM stuff is all there, and then push it out
+>> again.
+>>
+>> Note however that this is only very basic support.  It doesn't yet
+>> have the code needed to register devices and drivers from device tree
+>> data.  That will be coming real-soon-now.
+>>     
+>
+> Is someone going to do a device tree example port to a 'real' platform
+> rather than simple the ARM evaluation boards?
+>
+> As I've said previously, I'm not going to accept device tree stuff until
+> I see a working implementation on a set of real platforms.
+>   
 
-*blink* oh.. why is it defined at all ? A linker error would be fine
-here. That's what I thought was being done in the first place.
+I can give it a spin on a couple of the boards I have here.  I'm already
+using device trees on my PPC platforms.
 
-Mathieu
 
-> 
-> --Imre
-> 
+b.g.
 
 -- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+Bill Gatliff
+bgat at billgatliff.com
