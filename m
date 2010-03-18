@@ -1,171 +1,148 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 18 Mar 2010 18:00:53 -0500
-Subject: [PATCH] vic: factor out common init code
-Message-ID: <0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 18 Mar 2010 16:57:10 -0700
+Subject: [RFC/PATCH 03/10] [ARM] tegra: Add clock support
+In-Reply-To: <20100318084205.GB8267@n2100.arm.linux.org.uk>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+	<1268721688-27550-1-git-send-email-konkers@google.com>
+	<1268721688-27550-2-git-send-email-konkers@google.com>
+	<1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-4-git-send-email-konkers@google.com>
+	<20100318084205.GB8267@n2100.arm.linux.org.uk>
+Message-ID: <d73d4eaf1003181657l2b62b133me654b1fb3255ce0b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This factors out the common initialization code for the two vic
-vendors into easier maintainable functions.
+On Thu, Mar 18, 2010 at 1:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 15, 2010 at 11:41:21PM -0700, konkers at google.com wrote:
+>> From: Colin Cross <ccross@android.com>
+>>
+>> Signed-off-by: Colin Cross <ccross@android.com>
+>> Signed-off-by: Erik Gilling <konkers@android.com>
+>> ---
+>> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-tegra/Makefile ? ? ? ? ? ? ?| ? ?2 +
+>> ?arch/arm/mach-tegra/clock.c ? ? ? ? ? ? ? | ?191 +++++++
+>> ?arch/arm/mach-tegra/clock.h ? ? ? ? ? ? ? | ?103 ++++
+>> ?arch/arm/mach-tegra/common.c ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-tegra/include/mach/clkdev.h | ? 32 ++
+>> ?arch/arm/mach-tegra/tegra2_clocks.c ? ? ? | ?837 +++++++++++++++++++++++++++++
+>> ?7 files changed, 1167 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-tegra/clock.c
+>> ?create mode 100644 arch/arm/mach-tegra/clock.h
+>> ?create mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
+>> ?create mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 1232104..a5be2d6 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -576,6 +576,7 @@ config ARCH_TEGRA
+>> ? ? ? ? ?select GENERIC_CLOCKEVENTS
+>> ? ? ? ? ?select GENERIC_GPIO
+>> ? ? ? ? ?select HAVE_CLK
+>> + ? ? ? ?select COMMON_CLKDEV
+>
+> These should be indented using tabs, not spaces.
+Fixed
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Andrea Gallo <andrea.gallo@stericsson.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+>> +/**
+>> + * clk_preinit - initialize any fields in the struct clk before clk init
+>> + * @clk: struct clk * to initialize
+>> + *
+>> + * Initialize any struct clk fields needed before normal clk initialization
+>> + * can run. ?No return value.
+>> + */
+>> +void clk_preinit(struct clk *c)
+>> +{
+>> + ? ? c->lock = __SPIN_LOCK_UNLOCKED(c->lock);
+>
+> ? ? ? ?spin_lock_init(&c->lock);
+Fixed
 
----
+>> +int clk_set_parent(struct clk *c, struct clk *parent)
+>> +{
+>> + ? ? unsigned long flags;
+>> + ? ? int ret = 0;
+>> + ? ? spin_lock_irqsave(&c->lock, flags);
+>> + ? ? if (c->ops && c->ops->set_parent)
+>> + ? ? ? ? ? ? ret = c->ops->set_parent(c, parent);
+>> + ? ? else
+>> + ? ? ? ? ? ? BUG();
+>
+> Does this condition really justify crashing the kernel? ?Why not just
+> return an error?
+Changed to return -ENOSYS
 
-diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-index 1cf999a..ba65f6e 100644
---- a/arch/arm/common/vic.c
-+++ b/arch/arm/common/vic.c
-@@ -266,13 +266,53 @@ static int vic_set_wake(unsigned int irq, unsigned int on)
- #endif /* CONFIG_PM */
- 
- static struct irq_chip vic_chip = {
--	.name	= "VIC",
--	.ack	= vic_ack_irq,
--	.mask	= vic_mask_irq,
--	.unmask	= vic_unmask_irq,
--	.set_wake = vic_set_wake,
-+	.name		= "VIC",
-+	.ack		= vic_ack_irq,
-+	.mask		= vic_mask_irq,
-+	.unmask		= vic_unmask_irq,
-+	.set_wake	= vic_set_wake,
- };
- 
-+static void __init vic_disable(void __iomem *base)
-+{
-+	writel(0, base + VIC_INT_SELECT);
-+	writel(0, base + VIC_INT_ENABLE);
-+	writel(~0, base + VIC_INT_ENABLE_CLEAR);
-+	writel(0, base + VIC_IRQ_STATUS);
-+	writel(0, base + VIC_ITCR);
-+	writel(~0, base + VIC_INT_SOFT_CLEAR);
-+}
-+
-+static void __init vic_clear_interrupts(void __iomem *base)
-+{
-+	unsigned int i;
-+
-+	writel(0, base + VIC_PL190_VECT_ADDR);
-+	for (i = 0; i < 19; i++) {
-+		unsigned int value;
-+
-+		value = readl(base + VIC_PL190_VECT_ADDR);
-+		writel(value, base + VIC_PL190_VECT_ADDR);
-+	}
-+}
-+
-+static void __init vic_set_irq_sources(void __iomem *base,
-+				unsigned int irq_start, u32 vic_sources)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < 32; i++) {
-+		if (vic_sources & (1 << i)) {
-+			unsigned int irq = irq_start + i;
-+
-+			set_irq_chip(irq, &vic_chip);
-+			set_irq_chip_data(irq, base);
-+			set_irq_handler(irq, handle_level_irq);
-+			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		}
-+	}
-+}
-+
- /*
-  * The PL190 cell from ARM has been modified by ST to handle 64 interrupts.
-  * The original cell has 32 interrupts, while the modified one has 64,
-@@ -287,13 +327,7 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
- 
- 	/* Disable all interrupts initially. */
--
--	writel(0, base + VIC_INT_SELECT);
--	writel(0, base + VIC_INT_ENABLE);
--	writel(~0, base + VIC_INT_ENABLE_CLEAR);
--	writel(0, base + VIC_IRQ_STATUS);
--	writel(0, base + VIC_ITCR);
--	writel(~0, base + VIC_INT_SOFT_CLEAR);
-+	vic_disable(base);
- 
- 	/*
- 	 * Make sure we clear all existing interrupts. The vector registers
-@@ -302,13 +336,8 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 	 * the second base address, which is 0x20 in the page
- 	 */
- 	if (vic_2nd_block) {
--		writel(0, base + VIC_PL190_VECT_ADDR);
--		for (i = 0; i < 19; i++) {
--			unsigned int value;
-+		vic_clear_interrupts(base);
- 
--			value = readl(base + VIC_PL190_VECT_ADDR);
--			writel(value, base + VIC_PL190_VECT_ADDR);
--		}
- 		/* ST has 16 vectors as well, but we don't enable them by now */
- 		for (i = 0; i < 16; i++) {
- 			void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
-@@ -318,16 +347,7 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 		writel(32, base + VIC_PL190_DEF_VECT_ADDR);
- 	}
- 
--	for (i = 0; i < 32; i++) {
--		if (vic_sources & (1 << i)) {
--			unsigned int irq = irq_start + i;
--
--			set_irq_chip(irq, &vic_chip);
--			set_irq_chip_data(irq, base);
--			set_irq_handler(irq, handle_level_irq);
--			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--		}
--	}
-+	vic_set_irq_sources(base, irq_start, vic_sources);
- }
- 
- /**
-@@ -365,37 +385,14 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
- 	}
- 
- 	/* Disable all interrupts initially. */
-+	vic_disable(base);
- 
--	writel(0, base + VIC_INT_SELECT);
--	writel(0, base + VIC_INT_ENABLE);
--	writel(~0, base + VIC_INT_ENABLE_CLEAR);
--	writel(0, base + VIC_IRQ_STATUS);
--	writel(0, base + VIC_ITCR);
--	writel(~0, base + VIC_INT_SOFT_CLEAR);
--
--	/*
--	 * Make sure we clear all existing interrupts
--	 */
--	writel(0, base + VIC_PL190_VECT_ADDR);
--	for (i = 0; i < 19; i++) {
--		unsigned int value;
--
--		value = readl(base + VIC_PL190_VECT_ADDR);
--		writel(value, base + VIC_PL190_VECT_ADDR);
--	}
-+	/* Make sure we clear all existing interrupts */
-+	vic_clear_interrupts(base);
- 
- 	vic_init2(base);
- 
--	for (i = 0; i < 32; i++) {
--		if (vic_sources & (1 << i)) {
--			unsigned int irq = irq_start + i;
--
--			set_irq_chip(irq, &vic_chip);
--			set_irq_chip_data(irq, base);
--			set_irq_handler(irq, handle_level_irq);
--			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--		}
--	}
-+	vic_set_irq_sources(base, irq_start, vic_sources);
- 
- 	vic_pm_register(base, irq_start, resume_sources);
- }
+>> +int clk_set_rate(struct clk *c, unsigned long rate)
+>> +{
+>> + ? ? int ret = 0;
+>> + ? ? unsigned long flags;
+>> + ? ? spin_lock_irqsave(&c->lock, flags);
+>> + ? ? if (c->ops && c->ops->set_rate)
+>> + ? ? ? ? ? ? ret = c->ops->set_rate(c, rate);
+>> + ? ? else
+>> + ? ? ? ? ? ? BUG();
+>
+> Ditto.
+>
+>> +unsigned long clk_get_rate(struct clk *c)
+>> +{
+>> + ? ? int ret = 0;
+>> + ? ? unsigned long flags;
+>> + ? ? spin_lock_irqsave(&c->lock, flags);
+>> + ? ? if (c->ops && c->ops->get_rate)
+>> + ? ? ? ? ? ? ret = c->ops->get_rate(c);
+>> + ? ? else if (c->parent)
+>> + ? ? ? ? ? ? ret = clk_get_rate(c->parent);
+>> + ? ? else
+>> + ? ? ? ? ? ? BUG();
+>
+> Ditto.
+>
+>> +/* PLL Functions */
+>> +static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
+>> +{
+>> + ? ? u32 val;
+>> + ? ? unsigned long input_rate;
+>> + ? ? const struct clk_pll_table *sel;
+>> +
+>> + ? ? pr_debug("%s on clock %s\n", __func__, c->name);
+>> + ? ? /* BUG_ON(c->refcnt != 0); */
+>> +
+>> + ? ? input_rate = clk_get_rate(c->parent);
+>> + ? ? for (sel = c->pll_table; sel->input_rate != 0; sel++) {
+>> + ? ? ? ? ? ? if (sel->input_rate == input_rate && sel->output_rate == rate) {
+>> + ? ? ? ? ? ? ? ? ? ? c->n = sel->n;
+>> + ? ? ? ? ? ? ? ? ? ? c->m = sel->m;
+>> + ? ? ? ? ? ? ? ? ? ? c->p = sel->p;
+>> + ? ? ? ? ? ? ? ? ? ? c->cpcon = sel->cpcon;
+>> + ? ? ? ? ? ? ? ? ? ? val = clk_readl(c->reg + PLL_BASE);
+>> + ? ? ? ? ? ? ? ? ? ? if (c->flags & PLL_FIXED)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val |= PLL_BASE_OVERRIDE;
+>> + ? ? ? ? ? ? ? ? ? ? val &= ~(PLL_BASE_DIVP_MASK | PLL_BASE_DIVN_MASK |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?PLL_BASE_DIVM_MASK);
+>> + ? ? ? ? ? ? ? ? ? ? val |= (c->m << PLL_BASE_DIVM_SHIFT) |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (c->n << PLL_BASE_DIVN_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? BUG_ON(c->p > 2);
+>> + ? ? ? ? ? ? ? ? ? ? if (c->p == 2)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val |= 1 << PLL_BASE_DIVP_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? clk_writel(val, c->reg + PLL_BASE);
+>> + ? ? ? ? ? ? ? ? ? ? c->rate = rate;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? if (c->flags & PLL_HAS_CPCON) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val = c->cpcon << PLL_MISC_CPCON_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? clk_writel(val, c->reg + PLL_MISC);
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ? ? ? ? return 0;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> + ? ? return 1;
+>
+> What's this 'return 1' on error and 'return 0' on ?success? ?The clk API
+> uses standard Linux error codes, which are negative constants on error.
+> Please use a standard constant from the errno.h headers.
+Fixed, along with all the other improper return values in tegra2_clocks.c
+
+Thanks for the review,
+Colin
