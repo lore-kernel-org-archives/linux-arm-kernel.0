@@ -1,65 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Mar 2010 11:13:46 +0000
-Subject: [PATCH] arm: Fix mounting root on omaps with CPU_V6 and CPU_V7
-In-Reply-To: <20100317191114.GH2900@atomide.com>
-References: <20100317175731.GE2900@atomide.com>
-	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
-	<20100317191114.GH2900@atomide.com>
-Message-ID: <1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Thu, 18 Mar 2010 13:15:58 +0200
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <20100318092352.GD8267@n2100.arm.linux.org.uk>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+Message-ID: <c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-17 at 19:11 +0000, Tony Lindgren wrote:
-> * Catalin Marinas <catalin.marinas@arm.com> [100317 11:04]:
-> > On Wed, 2010-03-17 at 17:57 +0000, Tony Lindgren wrote:
-> > > Here's an updated version of this patch with more details.
-> > >
-> > > Looks like VFPv3 is only available on V7:
-> > >
-> > > http://www.arm.com/products/processors/technologies/vector-floating-point.php
-> >
-> > But does it cause any problem if the feature is enabled in the kernel?
-> > The vfp_init() code should check for its presence and set the hwcap
-> > accordingly.
-> 
-> Yeah, it causes the problem posted in the patch description. I took a
-> quick look at it and at least the VFPFMRX in vfpmacros.h for CONFIG_VFPv3
-> is a problem.
-
-This would indeed need more checking to avoid reading some registers
-which aren't present on ARMv6.
-
-I think the main problem with just falling back to VFPv2 is the lack of
-NEON support even if the CPU supports it.
-
-> Also I think we would need to have separate vfp_get_double functions
-> in vfphw.S for VFPv2 and 3 that get used based on the features.
-
-I don't think that's causing problems (or at least we can identify where
-the function gets called for higher VFP registers). Even with VFPv3, you
-may not have the D16-D31 registers.
-
-> > > HAS_TLS reg is only on ARM11 starting with r1p0:
-> > >
-> > > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0211k/Babeihid.html
-> > >
-> > > So that explains why it won't work on omap2420 as it's r0p2.
-> >
-> > Same here, would it work with dynamic detection?
-> 
-> Hmm I believe here the problem is __switch_to in entry-armv.S.
-> I don't think we want to dynamically test it every time.. Or
-> at least it would have to be optimized out in most cases.
-
-But if you disable this, you won't be able to use an SMP build on both
-v6 and v7. Anyway, I don't think that dynamically checking this would
-introduce performance penalties, the __switch_to code is pretty complex
-already with all the notifier calls.
-
-We may also have optimised user space that reads the TLS register
-directly rather than going through the kuser helper, in which case we
-would need a kernel built only for ARMv7 (maybe that's acceptable in
-this situation).
-
--- 
-Catalin
+>> The only conclusion I came to so far is that ARMv5 where highmem works
+>> just fine in all cases has VIVT cache whereas ARMv6 has VIPT cache.
+>> And the problem with VIPT caches occurs when direct DMA is involved,
+>> otherwise there is no problem if PIO or NFS is used. ?Sprinkling some
+>> flush_cache_all() in a few places makes things work, but this is not a
+>> satisfactory solution.
+>
+> This sounds like the problem we had with the DMA API. ?Since that's now
+> fixed, there shouldn't be a problem with the latest (-rc) kernels, or
+> a kernel with my old streaming DMA patches applied.
+The failure happens also on 2.6.34.rc1,  as Nico said, it looks like
+that buffers that are subject to DMA remain dirty, as I understand it,
+for vipt nonaliasing cpu's, the kernel doesn't clean user space cache
+lines. if I force kmap_atomic/kunmap_atomic to highmem pages that are
+not mapped by the kernel (kmap_high_get returns null), then the issue
+disappears.
+saeed
