@@ -1,38 +1,27 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Thu, 18 Mar 2010 10:07:45 -0400
-Subject: [PATCH] arm 32v6k fix comment 2-byte cmpxchg
-Message-ID: <20100318140745.GA718@Krystal>
+From: jason.mcmullan@netronome.com (Jason McMullan)
+Date: Thu, 18 Mar 2010 10:10:16 -0400
+Subject: devicetree in arm
+In-Reply-To: <fa686aa41003180654y56b8ea4elee3c13590b896c5a@mail.gmail.com>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
+	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+	<20100318132358.GE19544@n2100.arm.linux.org.uk>
+	<fa686aa41003180654y56b8ea4elee3c13590b896c5a@mail.gmail.com>
+Message-ID: <d91d07041003180710t243403e9g18ef3704d1f2b2fd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ecd322c9b3e4ac70f9f108badde3eb6b99c7993d introduced a 2-byte cmpxchg with
-an incorrect assembly comment (labeled __cmpxchg1).
+I'm also interested in the Device Tree for ARM.
 
-Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Nicolas Pitre <nico@cam.org>
-CC: Russell King <rmk+kernel@arm.linux.org.uk>
-CC: Alexander Shishkin <virtuoso@slind.org>
----
- arch/arm/include/asm/system.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We're planning on having several devices with the same basic
+layout, but several stuffing options. It would be preferable
+to have a Device Tree blob that the bootloader can pass to
+a generic kernel, instead of allocating several ARM Machine
+IDs, one for each layout.
 
-Index: linux-2.6-lttng/arch/arm/include/asm/system.h
-===================================================================
---- linux-2.6-lttng.orig/arch/arm/include/asm/system.h	2010-03-18 09:43:40.000000000 -0400
-+++ linux-2.6-lttng/arch/arm/include/asm/system.h	2010-03-18 09:44:19.000000000 -0400
-@@ -372,7 +372,7 @@ static inline unsigned long __cmpxchg(vo
- 		break;
- 	case 2:
- 		do {
--			asm volatile("@ __cmpxchg1\n"
-+			asm volatile("@ __cmpxchg2\n"
- 			"	ldrexh	%1, [%2]\n"
- 			"	mov	%0, #0\n"
- 			"	teq	%1, %3\n"
+I've been watching these threads, and am eager to start
+using the combined infrastructure once it becomes widely
+available.
 
--- 
-Mathieu Desnoyers
-Operating System Efficiency Consultant
-EfficiOS Inc.
-http://www.efficios.com
+--
+Jason McMullan
+Netronome Systems
