@@ -1,57 +1,138 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 18 Mar 2010 09:37:28 +0100
-Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for
-	argument validity.
-In-Reply-To: <acc484891003170334p133ee328y2d1b17533b672ac5@mail.gmail.com>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-	<20100317091349.GA16150@pengutronix.de>
-	<acc484891003170334p133ee328y2d1b17533b672ac5@mail.gmail.com>
-Message-ID: <20100318083728.GB1369@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Mar 2010 08:42:05 +0000
+Subject: [RFC/PATCH 03/10] [ARM] tegra: Add clock support
+In-Reply-To: <1268721688-27550-4-git-send-email-konkers@google.com>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+	<1268721688-27550-1-git-send-email-konkers@google.com>
+	<1268721688-27550-2-git-send-email-konkers@google.com>
+	<1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-4-git-send-email-konkers@google.com>
+Message-ID: <20100318084205.GB8267@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 01:34:50PM +0300, Vladimir Zapolskiy wrote:
-> Hello Uwe,
+On Mon, Mar 15, 2010 at 11:41:21PM -0700, konkers at google.com wrote:
+> From: Colin Cross <ccross@android.com>
 > 
-> __clk_enable() and __clk_disable() are recursive with another arguments,
-> that means it is hardly possible to remove the checks from them.
-ah, at least the check for NULL cannot go away.  However IS_ERR(clk)
-should hardly matter, shouldn't it?
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Signed-off-by: Erik Gilling <konkers@android.com>
+> ---
+>  arch/arm/Kconfig                          |    1 +
+>  arch/arm/mach-tegra/Makefile              |    2 +
+>  arch/arm/mach-tegra/clock.c               |  191 +++++++
+>  arch/arm/mach-tegra/clock.h               |  103 ++++
+>  arch/arm/mach-tegra/common.c              |    1 +
+>  arch/arm/mach-tegra/include/mach/clkdev.h |   32 ++
+>  arch/arm/mach-tegra/tegra2_clocks.c       |  837 +++++++++++++++++++++++++++++
+>  7 files changed, 1167 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-tegra/clock.c
+>  create mode 100644 arch/arm/mach-tegra/clock.h
+>  create mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
+>  create mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1232104..a5be2d6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -576,6 +576,7 @@ config ARCH_TEGRA
+>          select GENERIC_CLOCKEVENTS
+>          select GENERIC_GPIO
+>          select HAVE_CLK
+> +        select COMMON_CLKDEV
 
-Maybe the generated code is more optimal when doing:
+These should be indented using tabs, not spaces.
 
-	static void __clk_disable(struct clk *clk)
-	{
-		WARN_ON(!clk->usecount);
+> +/**
+> + * clk_preinit - initialize any fields in the struct clk before clk init
+> + * @clk: struct clk * to initialize
+> + *
+> + * Initialize any struct clk fields needed before normal clk initialization
+> + * can run.  No return value.
+> + */
+> +void clk_preinit(struct clk *c)
+> +{
+> +	c->lock = __SPIN_LOCK_UNLOCKED(c->lock);
 
-		if (clk->parent)
-			__clk_disable(clk->parent);
+	spin_lock_init(&c->lock);
 
-		if (clk->secondary)
-			__clk_disable(clk->secondary);
+> +int clk_set_parent(struct clk *c, struct clk *parent)
+> +{
+> +	unsigned long flags;
+> +	int ret = 0;
+> +	spin_lock_irqsave(&c->lock, flags);
+> +	if (c->ops && c->ops->set_parent)
+> +		ret = c->ops->set_parent(c, parent);
+> +	else
+> +		BUG();
 
-		if (!(--clk->usecount) && clk->disable)
-			clk->disable(clk);
-	}
+Does this condition really justify crashing the kernel?  Why not just
+return an error?
 
-	void clk_disable(struct clk *clk)
-	{
-		BUG_ON(clk == NULL || IS_ERR(clk));
-		mutex_lock(&clocks_mutex);
-		__clk_disable(clk);
-		mutex_unlock(&clocks_mutex);
-	}
- 
-So unless the compiler optimizes well, this reduces the calls of
-__clk_disable from three to one for a clock without parent and
-secondary.
+> +int clk_set_rate(struct clk *c, unsigned long rate)
+> +{
+> +	int ret = 0;
+> +	unsigned long flags;
+> +	spin_lock_irqsave(&c->lock, flags);
+> +	if (c->ops && c->ops->set_rate)
+> +		ret = c->ops->set_rate(c, rate);
+> +	else
+> +		BUG();
 
-While at it I wonder if it isn't more correct in __clk_disable to
-disable the clock first and only then parent and secondary?!
+Ditto.
 
-Best regards
-Uwe
+> +unsigned long clk_get_rate(struct clk *c)
+> +{
+> +	int ret = 0;
+> +	unsigned long flags;
+> +	spin_lock_irqsave(&c->lock, flags);
+> +	if (c->ops && c->ops->get_rate)
+> +		ret = c->ops->get_rate(c);
+> +	else if (c->parent)
+> +		ret = clk_get_rate(c->parent);
+> +	else
+> +		BUG();
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ditto.
+
+> +/* PLL Functions */
+> +static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
+> +{
+> +	u32 val;
+> +	unsigned long input_rate;
+> +	const struct clk_pll_table *sel;
+> +
+> +	pr_debug("%s on clock %s\n", __func__, c->name);
+> +	/* BUG_ON(c->refcnt != 0); */
+> +
+> +	input_rate = clk_get_rate(c->parent);
+> +	for (sel = c->pll_table; sel->input_rate != 0; sel++) {
+> +		if (sel->input_rate == input_rate && sel->output_rate == rate) {
+> +			c->n = sel->n;
+> +			c->m = sel->m;
+> +			c->p = sel->p;
+> +			c->cpcon = sel->cpcon;
+> +			val = clk_readl(c->reg + PLL_BASE);
+> +			if (c->flags & PLL_FIXED)
+> +				val |= PLL_BASE_OVERRIDE;
+> +			val &= ~(PLL_BASE_DIVP_MASK | PLL_BASE_DIVN_MASK |
+> +				 PLL_BASE_DIVM_MASK);
+> +			val |= (c->m << PLL_BASE_DIVM_SHIFT) |
+> +				(c->n << PLL_BASE_DIVN_SHIFT);
+> +			BUG_ON(c->p > 2);
+> +			if (c->p == 2)
+> +				val |= 1 << PLL_BASE_DIVP_SHIFT;
+> +			clk_writel(val, c->reg + PLL_BASE);
+> +			c->rate = rate;
+> +
+> +			if (c->flags & PLL_HAS_CPCON) {
+> +				val = c->cpcon << PLL_MISC_CPCON_SHIFT;
+> +				clk_writel(val, c->reg + PLL_MISC);
+> +			}
+> +			return 0;
+> +		}
+> +	}
+> +	return 1;
+
+What's this 'return 1' on error and 'return 0' on  success?  The clk API
+uses standard Linux error codes, which are negative constants on error.
+Please use a standard constant from the errno.h headers.
