@@ -1,94 +1,26 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Thu, 18 Mar 2010 18:33:15 +0200
-Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
-In-Reply-To: <20100318135008.GA11800@Krystal>
-References: <20100318123223.GA6855@Krystal>
-	<1268919221-2748-1-git-send-email-virtuoso@slind.org>
-	<20100318135008.GA11800@Krystal>
-Message-ID: <20100318163315.GJ30422@localhost>
+From: konkers@google.com (Erik Gilling)
+Date: Thu, 18 Mar 2010 09:40:19 -0700
+Subject: [RFC/PATCH 00/10] Tegra2 support
+In-Reply-To: <20100318083220.GA8267@n2100.arm.linux.org.uk>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+	<1268721688-27550-1-git-send-email-konkers@google.com>
+	<20100318083220.GA8267@n2100.arm.linux.org.uk>
+Message-ID: <4344f3c71003180940k7225b96bp9ef6ec54f9c64bef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 02:50:08PM +0100, ext Mathieu Desnoyers wrote:
-> * Alexander Shishkin (virtuoso at slind.org) wrote:
-> > On systems where ldrexh/strexh are not available, use a generic local
-> > version or __bad_xchg() on SMP.
-> > 
-> > Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-> > CC: linux-arm-kernel-bounces at lists.infradead.org
-> > CC: Imre Deak <imre.deak@nokia.com>
-> > CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
-> > ---
-> >  arch/arm/include/asm/system.h |   65 ++++++++++++++++++++++++++++++++++------
-> >  1 files changed, 55 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> > index d65b2f5..82248ae 100644
-> > --- a/arch/arm/include/asm/system.h
-> > +++ b/arch/arm/include/asm/system.h
-> > @@ -218,6 +218,39 @@ do {									\
-> >  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
-> >  } while (0)
-> >  
-> > +static inline unsigned long __xchg_local_generic(unsigned long x,
-> > +						 volatile void *ptr, int size)
-> > +{
-> > +	extern void __bad_xchg(volatile void *, int);
-> > +	unsigned long ret;
-> > +	unsigned long flags;
-> > +
-> > +	switch (size) {
-> > +	case 1:
-> > +		raw_local_irq_save(flags);
-> > +		ret = *(volatile unsigned char *)ptr;
-> > +		*(volatile unsigned char *)ptr = x;
-> > +		raw_local_irq_restore(flags);
-> > +		break;
-> > +
-> > +	case 2:
-> > +		raw_local_irq_save(flags);
-> > +		ret = *(volatile unsigned short *)ptr;
-> > +		*(volatile unsigned short *)ptr = x;
-> > +		raw_local_irq_restore(flags);
-> > +		break;
-> > +
-> > +	case 4:
-> > +		raw_local_irq_save(flags);
-> > +		ret = *(volatile unsigned long *)ptr;
-> > +		*(volatile unsigned long *)ptr = x;
-> > +		raw_local_irq_restore(flags);
-> > +		break;
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
-> >  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
-> >  /*
-> >   * On the StrongARM, "swp" is terminally broken since it bypasses the
-> > @@ -262,6 +295,26 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
-> >  			: "r" (x), "r" (ptr)
-> >  			: "memory", "cc");
-> >  		break;
-> > +#ifdef CONFIG_CPU_32v6K
-> > +	case 2:
-> > +		asm volatile("@	__xchg2\n"
-> > +		"1:	ldrexh	%0, [%3]\n"
-> > +		"	strexh	%1, %2, [%3]\n"
-> > +		"	teq	%1, #0\n"
-> > +		"	bne	1b"
-> > +			: "=&r" (ret), "=&r" (tmp)
-> > +			: "r" (x), "r" (ptr)
-> > +			: "memory", "cc");
-> > +		break;
-> > +#else
-> > +	case 2:
-> > +#ifdef CONFIG_SMP
-> > +		__bad_xchg(ptr, size), ret = 0;
-> 
+On Thu, Mar 18, 2010 at 1:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 15, 2010 at 11:41:18PM -0700, konkers at google.com wrote:
+>> Here's the cleaned up patch stack as promised. ?We've incorporated the feedback
+>> from Gary and Russel.
+>>
+>> I've pushed these patches to the linux-tegra-2.6.34-rc1 branch at
+>> git://android.git.kernel.org/kernel/tegra.git
+>
+> Please change all the mach/io.h and asm/io.h to linux/io.h, and mach/gpio.h
+> and asm/gpio.h to linux/gpio.h.
 
-On a related note, why can't we have __bad_xchg as an undefined function
-for detecting the error already in build time? That seems to be the
-approach in similar places.
+Thanks,  Will do.
 
---Imre
+-Erik
