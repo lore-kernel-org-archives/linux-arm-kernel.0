@@ -1,61 +1,27 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 18 Mar 2010 16:21:29 +0300
-Subject: [PATCH 2/2 v2] [ARM] [IMX]: Fix clock use counter from underflow
-	on multiple clk_disable().
-In-Reply-To: <20100318083004.GA1369@pengutronix.de>
-References: <20100317092042.GB16150@pengutronix.de>
-	<1268823811-9035-1-git-send-email-vzapolskiy@gmail.com>
-	<20100318083004.GA1369@pengutronix.de>
-Message-ID: <fcda838a1003180621t1f1f2627ofadc212caf1a3b7e@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Mar 2010 13:23:59 +0000
+Subject: devicetree in arm
+In-Reply-To: <fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
+	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+Message-ID: <20100318132358.GE19544@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe
+On Thu, Mar 18, 2010 at 07:14:05AM -0600, Grant Likely wrote:
+> ARM device tree support is very much in flux, and that particular
+> branch gets rebased a lot as device tree code from Sparc, Microblaze
+> and Powerpc is merged into drivers/of.  I may have ended up pushing
+> out to test-devicetree without the ARM patches applied.  I'll look at
+> it today, make sure the ARM stuff is all there, and then push it out
+> again.
+> 
+> Note however that this is only very basic support.  It doesn't yet
+> have the code needed to register devices and drivers from device tree
+> data.  That will be coming real-soon-now.
 
-2010/3/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hi Vladimir,
->
-> On Wed, Mar 17, 2010 at 02:03:31PM +0300, Vladimir Zapolskiy wrote:
->> If clk_disable() is called for already disabled clock clk->usecount
->> value is decremented anyway. This leads to a problem that sequent
->> clk_enable() call doesn't enable the clock as expected.
->>
->> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> ---
->> ?arch/arm/plat-mxc/clock.c | ? ?6 +++++-
->> ?1 files changed, 5 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
->> index 2daec3c..3189275 100644
->> --- a/arch/arm/plat-mxc/clock.c
->> +++ b/arch/arm/plat-mxc/clock.c
->> @@ -53,10 +53,14 @@ static void __clk_disable(struct clk *clk)
->> ? ? ? if (clk == NULL || IS_ERR(clk))
->> ? ? ? ? ? ? ? return;
->>
->> + ? ? if (!clk->usecount) {
->> + ? ? ? ? ? ? WARN(1, "Trying to disable a clock with 0 usecount\n");
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +
-> The advantage of just using
->
-> ? ? ? ?WARN(!clk->usecount, "Trying to disable a disabled clock\n");
->
-> is that the error isn't caught and so is more likely to be fixed :-)
-> I'n not a native English speaker, but I think "Trying to disable a clock
-> with 0 usecount" isn't a proper English sentence.
->
+Is someone going to do a device tree example port to a 'real' platform
+rather than simple the ARM evaluation boards?
 
-I see, thank you. But why don't you use BUG() here, if this testifies
-to a higher level bug and after such a call the whole kernel can be
-unmaintainable on run-time?
-
-> Best regards
-> Uwe
->
-
-Best wishes,
-Vladimir
+As I've said previously, I'm not going to accept device tree stuff until
+I see a working implementation on a set of real platforms.
