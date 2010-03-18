@@ -1,70 +1,35 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 18 Mar 2010 16:07:19 +0300
-Subject: [PATCH 1/2] [ARM] [IMX]: Removed superfluous checks for argument
-	validity.
-In-Reply-To: <20100318083728.GB1369@pengutronix.de>
-References: <1268809916-6525-1-git-send-email-vzapolskiy@gmail.com>
-	<20100317091349.GA16150@pengutronix.de>
-	<acc484891003170334p133ee328y2d1b17533b672ac5@mail.gmail.com>
-	<20100318083728.GB1369@pengutronix.de>
-Message-ID: <fcda838a1003180607g6ce06fa5m1d9732b5af87ab98@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 18 Mar 2010 07:14:05 -0600
+Subject: devicetree in arm
+In-Reply-To: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
+Message-ID: <fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Thu, Mar 18, 2010 at 6:04 AM, Mark Ryden <markryde@gmail.com> wrote:
+> Hello,
+> According to :
+> http://lwn.net/Articles/375296/
+> Some patches that add basic ARM device tree support
+> were sent,
+>
+> In the link above, there is a link to a git tree here:
+> git://git.secretlab.ca/git/linux-2.6 test-devicetree
+>
+> I git-cloned this tree, and I don't have arch/arm/kernel/devtree.c
+>
+> Am I missing something ?
 
-2010/3/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> On Wed, Mar 17, 2010 at 01:34:50PM +0300, Vladimir Zapolskiy wrote:
-> > Hello Uwe,
-> >
-> > __clk_enable() and __clk_disable() are recursive with another arguments,
-> > that means it is hardly possible to remove the checks from them.
-> ah, at least the check for NULL cannot go away. ?However IS_ERR(clk)
-> should hardly matter, shouldn't it?
->
-> Maybe the generated code is more optimal when doing:
->
-> ? ? ? ?static void __clk_disable(struct clk *clk)
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?WARN_ON(!clk->usecount);
->
-> ? ? ? ? ? ? ? ?if (clk->parent)
-> ? ? ? ? ? ? ? ? ? ? ? ?__clk_disable(clk->parent);
->
-> ? ? ? ? ? ? ? ?if (clk->secondary)
-> ? ? ? ? ? ? ? ? ? ? ? ?__clk_disable(clk->secondary);
->
-> ? ? ? ? ? ? ? ?if (!(--clk->usecount) && clk->disable)
-> ? ? ? ? ? ? ? ? ? ? ? ?clk->disable(clk);
-> ? ? ? ?}
->
-> ? ? ? ?void clk_disable(struct clk *clk)
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?BUG_ON(clk == NULL || IS_ERR(clk));
-> ? ? ? ? ? ? ? ?mutex_lock(&clocks_mutex);
-> ? ? ? ? ? ? ? ?__clk_disable(clk);
-> ? ? ? ? ? ? ? ?mutex_unlock(&clocks_mutex);
-> ? ? ? ?}
->
-> So unless the compiler optimizes well, this reduces the calls of
-> __clk_disable from three to one for a clock without parent and
-> secondary.
->
+ARM device tree support is very much in flux, and that particular
+branch gets rebased a lot as device tree code from Sparc, Microblaze
+and Powerpc is merged into drivers/of.  I may have ended up pushing
+out to test-devicetree without the ARM patches applied.  I'll look at
+it today, make sure the ARM stuff is all there, and then push it out
+again.
 
-I hope I got your view on optimization of calls, because I just wanted
-to reduce 6 LOCs with the patch :)
-Anyway better to do both optimizations at the same time.
+Note however that this is only very basic support.  It doesn't yet
+have the code needed to register devices and drivers from device tree
+data.  That will be coming real-soon-now.
 
-> While at it I wonder if it isn't more correct in __clk_disable to
-> disable the clock first and only then parent and secondary?!
->
-
-Looks like a reasonable assumption.
-
-> Best regards
-> Uwe
->
-
-Best wishes,
-Vladimir
+g.
