@@ -1,38 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Mar 2010 17:51:21 +0000
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <alpine.LFD.2.00.1003181205020.31128@xanadu.home>
-References: <alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-	<20100318141930.GF19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003181205020.31128@xanadu.home>
-Message-ID: <20100318175120.GA7081@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 18 Mar 2010 19:37:29 +0100
+Subject: [PATCH] ARM: pxa/raumfeld: fix button name
+Message-ID: <1268937449-5654-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 12:17:50PM -0400, Nicolas Pitre wrote:
-> On Thu, 18 Mar 2010, Russell King - ARM Linux wrote:
-> > What exactly is the problem that we're discussing?  Is it that the data
-> > on the block device is becoming corrupted, or is the data being read off
-> > the block device corrupted?
-> 
-> Data read from a DMA based block device is corrupted in memory and 
-> causing all sorts of misbehavior such as segmentation faults in user 
-> space, or EXT2 complaining about broken filesystem metadata.
+This fixes a warning when booting 2.6.34-rc2:
 
-Isn't ext2 metadata read into lowmem pages?
+[   26.619814] ------------[ cut here ]------------
+[   26.624604] WARNING: at fs/proc/generic.c:316 __xlate_proc_name+0xac/0xc0()
+[   26.631555] name 'on/off button'
+[   26.634753] Modules linked in:
 
-The ext2 bitmap code sources its backing store from the old fs buffercache
-code, which can only use lowmem - so the ext2 bitmaps are in lowmem (see
-set_bh_page).  The superblock comes from the buffercache (grep for sb_bread)
-as well, so that's lowmem, and it looks to me like inode reading also
-comes via the buffercache.
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Eric Miao <eric.miao@marvell.com>
+Cc: Sven Neumann <s.neumann@raumfeld.com>
+---
+ arch/arm/mach-pxa/raumfeld.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-It seems that all ext2 metadata is in lowmem, so I don't get the highmem
-interaction causing ext2 fs metadata corruption.
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 3184bdc..9bf86b6 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -444,7 +444,7 @@ static struct gpio_keys_button gpio_keys_button[] = {
+ 		.active_low		= 0,
+ 		.wakeup			= 0,
+ 		.debounce_interval	= 5, /* ms */
+-		.desc			= "on/off button",
++		.desc			= "on_off button",
+ 	},
+ };
+ 
+-- 
+1.6.6.2
