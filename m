@@ -1,113 +1,23 @@
-From: virtuoso@slind.org (Alexander Shishkin)
-Date: Thu, 18 Mar 2010 15:33:41 +0200
-Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
-In-Reply-To: <20100318123223.GA6855@Krystal>
-References: <20100318123223.GA6855@Krystal>
-Message-ID: <1268919221-2748-1-git-send-email-virtuoso@slind.org>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Thu, 18 Mar 2010 15:42:25 +0200
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <20100318112453.GA19544@n2100.arm.linux.org.uk>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+Message-ID: <c70ff3ad1003180642n1d9410a9g35c24b06df6afef0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems where ldrexh/strexh are not available, use a generic local
-version or __bad_xchg() on SMP.
+> In no case does the kernel ever clean user space cache lines for DMA;
+> that's not the responsibility of the DMA API.
+I understand that it's not the DMA API's responsibility to flush user
+space cache lines, but other parts of the kernel should do that right?
+otherwise DIRECT_IO won't work (though the issue here has nothing to
+do with DIRECT_IO).
 
-Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-CC: linux-arm-kernel-bounces at lists.infradead.org
-CC: Imre Deak <imre.deak@nokia.com>
-CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
----
- arch/arm/include/asm/system.h |   65 ++++++++++++++++++++++++++++++++++------
- 1 files changed, 55 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..82248ae 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -218,6 +218,39 @@ do {									\
- 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
- } while (0)
- 
-+static inline unsigned long __xchg_local_generic(unsigned long x,
-+						 volatile void *ptr, int size)
-+{
-+	extern void __bad_xchg(volatile void *, int);
-+	unsigned long ret;
-+	unsigned long flags;
-+
-+	switch (size) {
-+	case 1:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned char *)ptr;
-+		*(volatile unsigned char *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
-+	case 2:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned short *)ptr;
-+		*(volatile unsigned short *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
-+	case 4:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned long *)ptr;
-+		*(volatile unsigned long *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
- #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
- /*
-  * On the StrongARM, "swp" is terminally broken since it bypasses the
-@@ -262,6 +295,26 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 			: "r" (x), "r" (ptr)
- 			: "memory", "cc");
- 		break;
-+#ifdef CONFIG_CPU_32v6K
-+	case 2:
-+		asm volatile("@	__xchg2\n"
-+		"1:	ldrexh	%0, [%3]\n"
-+		"	strexh	%1, %2, [%3]\n"
-+		"	teq	%1, #0\n"
-+		"	bne	1b"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+#else
-+	case 2:
-+#ifdef CONFIG_SMP
-+		__bad_xchg(ptr, size), ret = 0;
-+#else
-+		ret = __xchg_local_generic(x, ptr, 2);
-+#endif
-+		break;
-+#endif
- 	case 4:
- 		asm volatile("@	__xchg4\n"
- 		"1:	ldrex	%0, [%3]\n"
-@@ -277,17 +330,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- #error SMP is not supported on this platform
- #endif
- 	case 1:
--		raw_local_irq_save(flags);
--		ret = *(volatile unsigned char *)ptr;
--		*(volatile unsigned char *)ptr = x;
--		raw_local_irq_restore(flags);
--		break;
--
-+	case 2:
- 	case 4:
--		raw_local_irq_save(flags);
--		ret = *(volatile unsigned long *)ptr;
--		*(volatile unsigned long *)ptr = x;
--		raw_local_irq_restore(flags);
-+		ret = __xchg_local_generic(x, ptr, size);
- 		break;
- #else
- 	case 1:
--- 
-1.6.3.3
+saeed
