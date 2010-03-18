@@ -1,71 +1,75 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 18 Mar 2010 16:27:45 +0300
-Subject: [PATCH 1/2 v2] imx: optimize __clk_enable() and __clk_disable()
-	functions.
-In-Reply-To: <20100318083728.GB1369@pengutronix.de>
-References: <20100318083728.GB1369@pengutronix.de>
-Message-ID: <1268918865-15401-1-git-send-email-vzapolskiy@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 18 Mar 2010 19:00:06 +0530
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To remove unnecessary calls of functions with invalid argumets make
-the checks before a call.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Nicolas Pitre
+> Sent: Thursday, March 18, 2010 6:50 PM
+> To: Russell King - ARM Linux
+> Cc: linux-mmc at vger.kernel.org; V, Hemanth; saeed bishara; pierre at ossman.eu; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: Highmem issues with MMC filesystem
+> 
+> On Thu, 18 Mar 2010, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Mar 18, 2010 at 01:15:58PM +0200, saeed bishara wrote:
+> > > >> The only conclusion I came to so far is that ARMv5 where highmem works
+> > > >> just fine in all cases has VIVT cache whereas ARMv6 has VIPT cache.
+> > > >> And the problem with VIPT caches occurs when direct DMA is involved,
+> > > >> otherwise there is no problem if PIO or NFS is used. ?Sprinkling some
+> > > >> flush_cache_all() in a few places makes things work, but this is not a
+> > > >> satisfactory solution.
+> > > >
+> > > > This sounds like the problem we had with the DMA API. ?Since that's now
+> > > > fixed, there shouldn't be a problem with the latest (-rc) kernels, or
+> > > > a kernel with my old streaming DMA patches applied.
+> > > The failure happens also on 2.6.34.rc1,  as Nico said, it looks like
+> > > that buffers that are subject to DMA remain dirty, as I understand it,
+> > > for vipt nonaliasing cpu's, the kernel doesn't clean user space cache
+> > > lines. if I force kmap_atomic/kunmap_atomic to highmem pages that are
+> > > not mapped by the kernel (kmap_high_get returns null), then the issue
+> > > disappears.
+> >
+> > In no case does the kernel ever clean user space cache lines for DMA;
+> > that's not the responsibility of the DMA API.
+> 
+> Let's forget about user space.  Even some kernel space memory is
+> affected too.
+> 
+> The issue as I see it is that highmem pages being DMA'd to may be cached
+> even when they're unmapped on VIPT machines.  And the DMA code performs
+> L1 cache maintenance only on pages which are virtually mapped.
+> 
+> Contrary to VIVT caches which have to be flushed all the time, VIPT
+> caches may avoid cache flushing in some cases, which may lead to some
+> highmem pages not being mapped but still cached somehow.  But so far I
+> just can't find how that could happen.
+> 
+> The only way a highmem page can be unmapped is through kunmap_atomic()
+> where an explicit __cpuc_flush_dcache_area() is performed, or through
+> flush_all_zero_pkmaps() where flush_cache_kmaps() translates into
+> flush_cache_all().
+> 
+> So something allows for some highmem pages to escape cache flushing when
+> unmapped.  But I can't find it.
+> 
+Or could it be that there is appropriate cacheflush happening but data gets
+stuck in CPU writebuffers instead of reaching to main memory. In this case
+too DMA won't see the contents and a barrier (dsb) is necessary to ensure
+that write buffer is drained before DMA takes over the buffer.
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
----
- arch/arm/plat-mxc/clock.c |   25 ++++++++++++-------------
- 1 files changed, 12 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 323ff8c..ec4af90 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -50,24 +50,25 @@ static DEFINE_MUTEX(clocks_mutex);
- 
- static void __clk_disable(struct clk *clk)
- {
--	if (clk == NULL || IS_ERR(clk))
--		return;
--
--	__clk_disable(clk->parent);
--	__clk_disable(clk->secondary);
--
- 	WARN_ON(!clk->usecount);
-+
- 	if (!(--clk->usecount) && clk->disable)
- 		clk->disable(clk);
-+
-+	if (clk->secondary)
-+		__clk_disable(clk->secondary);
-+
-+	if (clk->parent)
-+		__clk_disable(clk->parent);
- }
- 
- static int __clk_enable(struct clk *clk)
- {
--	if (clk == NULL || IS_ERR(clk))
--		return -EINVAL;
-+	if (clk->parent)
-+		__clk_enable(clk->parent);
- 
--	__clk_enable(clk->parent);
--	__clk_enable(clk->secondary);
-+	if (clk->secondary)
-+		__clk_enable(clk->secondary);
- 
- 	if (clk->usecount++ == 0 && clk->enable)
- 		clk->enable(clk);
-@@ -99,9 +100,7 @@ EXPORT_SYMBOL(clk_enable);
-  */
- void clk_disable(struct clk *clk)
- {
--	if (clk == NULL || IS_ERR(clk))
--		return;
--
-+	BUG_ON(clk == NULL || IS_ERR(clk));
- 	mutex_lock(&clocks_mutex);
- 	__clk_disable(clk);
- 	mutex_unlock(&clocks_mutex);
--- 
-1.6.6.1
+Regards,
+Santosh
