@@ -1,35 +1,33 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 18 Mar 2010 07:14:05 -0600
-Subject: devicetree in arm
-In-Reply-To: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
-References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
-Message-ID: <fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Thu, 18 Mar 2010 14:17:43 +0100
+Subject: [PATCH] OMAP: Devkit8000: Add missing package selection
+Message-ID: <1268918263-22127-1-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 6:04 AM, Mark Ryden <markryde@gmail.com> wrote:
-> Hello,
-> According to :
-> http://lwn.net/Articles/375296/
-> Some patches that add basic ARM device tree support
-> were sent,
->
-> In the link above, there is a link to a git tree here:
-> git://git.secretlab.ca/git/linux-2.6 test-devicetree
->
-> I git-cloned this tree, and I don't have arch/arm/kernel/devtree.c
->
-> Am I missing something ?
+Add missing selection of CUS package.
+Replace whitespace with tab.
 
-ARM device tree support is very much in flux, and that particular
-branch gets rebased a lot as device tree code from Sparc, Microblaze
-and Powerpc is merged into drivers/of.  I may have ended up pushing
-out to test-devicetree without the ARM patches applied.  I'll look at
-it today, make sure the ARM stuff is all there, and then push it out
-again.
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/mach-omap2/Kconfig |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-Note however that this is only very basic support.  It doesn't yet
-have the code needed to register devices and drivers from device tree
-data.  That will be coming real-soon-now.
-
-g.
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index a8a3d1e..e776075 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -59,8 +59,9 @@ config MACH_OMAP3_BEAGLE
+ 	select OMAP_PACKAGE_CBB
+ 
+ config MACH_DEVKIT8000
+-        bool "DEVKIT8000 board"
+-        depends on ARCH_OMAP3
++	bool "DEVKIT8000 board"
++	depends on ARCH_OMAP3
++	select OMAP_PACKAGE_CUS
+ 
+ config MACH_OMAP_LDP
+ 	bool "OMAP3 LDP board"
+-- 
+1.6.4.4
