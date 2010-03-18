@@ -1,23 +1,47 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Thu, 18 Mar 2010 15:42:25 +0200
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <20100318112453.GA19544@n2100.arm.linux.org.uk>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-Message-ID: <c70ff3ad1003180642n1d9410a9g35c24b06df6afef0@mail.gmail.com>
+From: armando.visconti@st.com (Armando VISCONTI)
+Date: Thu, 18 Mar 2010 14:45:39 +0100
+Subject: devicetree in arm
+In-Reply-To: <20100318132358.GE19544@n2100.arm.linux.org.uk>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+	<20100318132358.GE19544@n2100.arm.linux.org.uk>
+Message-ID: <4BA22E83.3080000@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> In no case does the kernel ever clean user space cache lines for DMA;
-> that's not the responsibility of the DMA API.
-I understand that it's not the DMA API's responsibility to flush user
-space cache lines, but other parts of the kernel should do that right?
-otherwise DIRECT_IO won't work (though the issue here has nothing to
-do with DIRECT_IO).
+Russell,
 
-saeed
+
+>> ARM device tree support is very much in flux, and that particular
+>> branch gets rebased a lot as device tree code from Sparc, Microblaze
+>> and Powerpc is merged into drivers/of.  I may have ended up pushing
+>> out to test-devicetree without the ARM patches applied.  I'll look at
+>> it today, make sure the ARM stuff is all there, and then push it out
+>> again.
+>>
+>> Note however that this is only very basic support.  It doesn't yet
+>> have the code needed to register devices and drivers from device tree
+>> data.  That will be coming real-soon-now.
+>>     
+>
+> Is someone going to do a device tree example port to a 'real' platform
+> rather than simple the ARM evaluation boards?
+>   
+As part of the discussion we had recently with you guys I can tell you
+that we are of course interested into this devicetree info passed
+as booting option.
+
+We are currently in the process of submitting on this mailing list
+the patch V2 for SPEAr family architectures for reviewing.
+
+> As I've said previously, I'm not going to accept device tree stuff until
+> I see a working implementation on a set of real platforms.
+>   
+Just after submitting patch V2 we might take a look to this patch and 
+try it out
+on our SPEAr platforms. It might take long as it is not exactly
+our first priority.
+
+We will keep you informed on this.
+
+Regards,
+Arm
