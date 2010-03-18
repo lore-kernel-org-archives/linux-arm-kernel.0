@@ -1,53 +1,94 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 18 Mar 2010 12:17:50 -0400 (EDT)
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <20100318141930.GF19544@n2100.arm.linux.org.uk>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-	<20100318141930.GF19544@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1003181205020.31128@xanadu.home>
+From: imre.deak@nokia.com (Imre Deak)
+Date: Thu, 18 Mar 2010 18:33:15 +0200
+Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
+In-Reply-To: <20100318135008.GA11800@Krystal>
+References: <20100318123223.GA6855@Krystal>
+	<1268919221-2748-1-git-send-email-virtuoso@slind.org>
+	<20100318135008.GA11800@Krystal>
+Message-ID: <20100318163315.GJ30422@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Mar 2010, Russell King - ARM Linux wrote:
+On Thu, Mar 18, 2010 at 02:50:08PM +0100, ext Mathieu Desnoyers wrote:
+> * Alexander Shishkin (virtuoso at slind.org) wrote:
+> > On systems where ldrexh/strexh are not available, use a generic local
+> > version or __bad_xchg() on SMP.
+> > 
+> > Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+> > CC: linux-arm-kernel-bounces at lists.infradead.org
+> > CC: Imre Deak <imre.deak@nokia.com>
+> > CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
+> > ---
+> >  arch/arm/include/asm/system.h |   65 ++++++++++++++++++++++++++++++++++------
+> >  1 files changed, 55 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> > index d65b2f5..82248ae 100644
+> > --- a/arch/arm/include/asm/system.h
+> > +++ b/arch/arm/include/asm/system.h
+> > @@ -218,6 +218,39 @@ do {									\
+> >  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+> >  } while (0)
+> >  
+> > +static inline unsigned long __xchg_local_generic(unsigned long x,
+> > +						 volatile void *ptr, int size)
+> > +{
+> > +	extern void __bad_xchg(volatile void *, int);
+> > +	unsigned long ret;
+> > +	unsigned long flags;
+> > +
+> > +	switch (size) {
+> > +	case 1:
+> > +		raw_local_irq_save(flags);
+> > +		ret = *(volatile unsigned char *)ptr;
+> > +		*(volatile unsigned char *)ptr = x;
+> > +		raw_local_irq_restore(flags);
+> > +		break;
+> > +
+> > +	case 2:
+> > +		raw_local_irq_save(flags);
+> > +		ret = *(volatile unsigned short *)ptr;
+> > +		*(volatile unsigned short *)ptr = x;
+> > +		raw_local_irq_restore(flags);
+> > +		break;
+> > +
+> > +	case 4:
+> > +		raw_local_irq_save(flags);
+> > +		ret = *(volatile unsigned long *)ptr;
+> > +		*(volatile unsigned long *)ptr = x;
+> > +		raw_local_irq_restore(flags);
+> > +		break;
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+> >  /*
+> >   * On the StrongARM, "swp" is terminally broken since it bypasses the
+> > @@ -262,6 +295,26 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+> >  			: "r" (x), "r" (ptr)
+> >  			: "memory", "cc");
+> >  		break;
+> > +#ifdef CONFIG_CPU_32v6K
+> > +	case 2:
+> > +		asm volatile("@	__xchg2\n"
+> > +		"1:	ldrexh	%0, [%3]\n"
+> > +		"	strexh	%1, %2, [%3]\n"
+> > +		"	teq	%1, #0\n"
+> > +		"	bne	1b"
+> > +			: "=&r" (ret), "=&r" (tmp)
+> > +			: "r" (x), "r" (ptr)
+> > +			: "memory", "cc");
+> > +		break;
+> > +#else
+> > +	case 2:
+> > +#ifdef CONFIG_SMP
+> > +		__bad_xchg(ptr, size), ret = 0;
+> 
 
-> On Thu, Mar 18, 2010 at 07:00:06PM +0530, Shilimkar, Santosh wrote:
-> > Or could it be that there is appropriate cacheflush happening but data gets
-> > stuck in CPU writebuffers instead of reaching to main memory. In this case
-> > too DMA won't see the contents and a barrier (dsb) is necessary to ensure
-> > that write buffer is drained before DMA takes over the buffer.
+On a related note, why can't we have __bad_xchg as an undefined function
+for detecting the error already in build time? That seems to be the
+approach in similar places.
 
-No, this is not the issue.
-
-> What exactly is the problem that we're discussing?  Is it that the data
-> on the block device is becoming corrupted, or is the data being read off
-> the block device corrupted?
-
-Data read from a DMA based block device is corrupted in memory and 
-causing all sorts of misbehavior such as segmentation faults in user 
-space, or EXT2 complaining about broken filesystem metadata.  This is 
-serious enough to prevent a successful boot to a login prompt.  Of 
-course the filesystem is just fine as using the same kernel and limiting 
-the memory size so highmem doesn't get involved "fixes" the issue.  
-Also keeping highmem pages active and adding a couple flush_cache_all() 
-in some places also apparently "fixes" the issue.
-
-Given that systems with VIVT caches have a full cache flush on each task 
-switch, I added such a cache flush in the ARMv6 case as well to see what 
-would happen.  And this _almost_ "fixed" the issue as long as there is 
-enough running tasks at once on the system to enforce that cache flush 
-often enough.  But with a single task running, such as gcc, then the 
-segmentation faults come back.
-
-See my previous email for my current hypothesis about the actual 
-problem.
-
-
-Nicolas
+--Imre
