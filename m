@@ -1,26 +1,40 @@
-From: konkers@google.com (Erik Gilling)
-Date: Thu, 18 Mar 2010 13:30:45 -0700
-Subject: [RFC/PATCH 00/10] Tegra2 support
-In-Reply-To: <20100318083220.GA8267@n2100.arm.linux.org.uk>
-References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
-	<1268721688-27550-1-git-send-email-konkers@google.com>
-	<20100318083220.GA8267@n2100.arm.linux.org.uk>
-Message-ID: <4344f3c71003181330v3c548182u411dd8eaf9fd34b7@mail.gmail.com>
+From: mike@compulab.co.il (mike at compulab.co.il)
+Date: Thu, 18 Mar 2010 22:41:07 +0200
+Subject: [RFC/PATCH 09/10] [ARM] tegra: harmony: Add harmony board file
+In-Reply-To: <4344f3c71003171927l6723017kc6104276052cc30@mail.gmail.com>
+References: <1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-4-git-send-email-konkers@google.com>
+	<1268721688-27550-5-git-send-email-konkers@google.com>
+	<1268721688-27550-6-git-send-email-konkers@google.com>
+	<1268721688-27550-7-git-send-email-konkers@google.com>
+	<1268721688-27550-8-git-send-email-konkers@google.com>
+	<1268721688-27550-9-git-send-email-konkers@google.com>
+	<1268721688-27550-10-git-send-email-konkers@google.com>
+	<4BA090F8.20706@compulab.co.il>
+	<4344f3c71003171927l6723017kc6104276052cc30@mail.gmail.com>
+Message-ID: <20100318204055.GB28116@gentoodev.compulab.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 1:32 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 15, 2010 at 11:41:18PM -0700, konkers at google.com wrote:
->> Here's the cleaned up patch stack as promised. ?We've incorporated the feedback
->> from Gary and Russel.
->>
->> I've pushed these patches to the linux-tegra-2.6.34-rc1 branch at
->> git://android.git.kernel.org/kernel/tegra.git
->
-> Please change all the mach/io.h and asm/io.h to linux/io.h, and mach/gpio.h
-> and asm/gpio.h to linux/gpio.h.
+On Wed, Mar 17, 2010 at 07:27:04PM -0700, Erik Gilling wrote:
+> On Wed, Mar 17, 2010 at 1:21 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+> >
+> > I think that both panel definition and pinmux can be in the board-harmony.c
+> > and thus the board-harmony.h is not needed.
+> 
+> In our experience board files get sufficiently cluttered with platform
+> device definitions, callbacks, and fixups that splitting them apart
+> make them much easer to deal with.  See the sholes support at
+> http://android.git.kernel.org/?p=kernel/omap.git;a=tree;f=arch/arm/mach-omap2;hb=android-omap-2.6.32
+> .
 
-I assume I want to use asm/io.h in entry-macro.S and debug-macro.S, yes?
+I'm not sure that staring over with several small files for different
+board features is that necessary. If the board file becomes bloated than
+it'd make sense to split it. But a board file with three platform device
+definitions and mux table is not that big...
 
--Erik
+> -Erik
+
+--
+Sincerely yours,
+Mike.
