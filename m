@@ -1,27 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Mar 2010 13:23:59 +0000
-Subject: devicetree in arm
-In-Reply-To: <fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
-References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
-	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
-Message-ID: <20100318132358.GE19544@n2100.arm.linux.org.uk>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Thu, 18 Mar 2010 16:27:45 +0300
+Subject: [PATCH 1/2 v2] imx: optimize __clk_enable() and __clk_disable()
+	functions.
+In-Reply-To: <20100318083728.GB1369@pengutronix.de>
+References: <20100318083728.GB1369@pengutronix.de>
+Message-ID: <1268918865-15401-1-git-send-email-vzapolskiy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 07:14:05AM -0600, Grant Likely wrote:
-> ARM device tree support is very much in flux, and that particular
-> branch gets rebased a lot as device tree code from Sparc, Microblaze
-> and Powerpc is merged into drivers/of.  I may have ended up pushing
-> out to test-devicetree without the ARM patches applied.  I'll look at
-> it today, make sure the ARM stuff is all there, and then push it out
-> again.
-> 
-> Note however that this is only very basic support.  It doesn't yet
-> have the code needed to register devices and drivers from device tree
-> data.  That will be coming real-soon-now.
+To remove unnecessary calls of functions with invalid argumets make
+the checks before a call.
 
-Is someone going to do a device tree example port to a 'real' platform
-rather than simple the ARM evaluation boards?
+Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+---
+ arch/arm/plat-mxc/clock.c |   25 ++++++++++++-------------
+ 1 files changed, 12 insertions(+), 13 deletions(-)
 
-As I've said previously, I'm not going to accept device tree stuff until
-I see a working implementation on a set of real platforms.
+diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+index 323ff8c..ec4af90 100644
+--- a/arch/arm/plat-mxc/clock.c
++++ b/arch/arm/plat-mxc/clock.c
+@@ -50,24 +50,25 @@ static DEFINE_MUTEX(clocks_mutex);
+ 
+ static void __clk_disable(struct clk *clk)
+ {
+-	if (clk == NULL || IS_ERR(clk))
+-		return;
+-
+-	__clk_disable(clk->parent);
+-	__clk_disable(clk->secondary);
+-
+ 	WARN_ON(!clk->usecount);
++
+ 	if (!(--clk->usecount) && clk->disable)
+ 		clk->disable(clk);
++
++	if (clk->secondary)
++		__clk_disable(clk->secondary);
++
++	if (clk->parent)
++		__clk_disable(clk->parent);
+ }
+ 
+ static int __clk_enable(struct clk *clk)
+ {
+-	if (clk == NULL || IS_ERR(clk))
+-		return -EINVAL;
++	if (clk->parent)
++		__clk_enable(clk->parent);
+ 
+-	__clk_enable(clk->parent);
+-	__clk_enable(clk->secondary);
++	if (clk->secondary)
++		__clk_enable(clk->secondary);
+ 
+ 	if (clk->usecount++ == 0 && clk->enable)
+ 		clk->enable(clk);
+@@ -99,9 +100,7 @@ EXPORT_SYMBOL(clk_enable);
+  */
+ void clk_disable(struct clk *clk)
+ {
+-	if (clk == NULL || IS_ERR(clk))
+-		return;
+-
++	BUG_ON(clk == NULL || IS_ERR(clk));
+ 	mutex_lock(&clocks_mutex);
+ 	__clk_disable(clk);
+ 	mutex_unlock(&clocks_mutex);
+-- 
+1.6.6.1
