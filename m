@@ -1,48 +1,52 @@
-From: hemanthv@ti.com (Hemanth V)
-Date: Wed, 17 Mar 2010 20:10:15 +0530
-Subject: Highmem issues with MMC filesystem
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-Message-ID: <043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 18 Mar 2010 09:30:04 +0100
+Subject: [PATCH 2/2 v2] [ARM] [IMX]: Fix clock use counter from
+	underflow on multiple clk_disable().
+In-Reply-To: <1268823811-9035-1-git-send-email-vzapolskiy@gmail.com>
+References: <20100317092042.GB16150@pengutronix.de>
+	<1268823811-9035-1-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <20100318083004.GA1369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vladimir,
 
------ Original Message ----- 
-From: "Nicolas Pitre" <nico@fluxnic.net>
-To: "Hemanth V" <hemanthv@ti.com>
-Cc: <linux-mmc@vger.kernel.org>; <pierre@ossman.eu>
-Sent: Wednesday, March 17, 2010 7:19 PM
-Subject: Re: Highmem issues with MMC filesystem
-
-
-> On Wed, 17 Mar 2010, Hemanth V wrote:
->
->> Hi All,
->>
->> We are trying to enable highmem support for OMAP based boards, while 
->> doing so
->> we are
->> unable to boot poky UI if the filesystem is in a MMC card.
->>
->> The poky UI comes up fine if the filesystem is in NAND or NFS,
->> while with MMC it gives errors like segmentation faults/syntax error 
->> while
->> there are none.
->> Seems like read from MMC is getting corrupted.
->
-> Yes, this is a known issue with highmem on ARM architectures v6 and
-> later, related to some cache mishandling.  This is not a MMC issue as
-> the problem occurs when booting from SATA too. The problem is still
-> investigated.
->
-
-Nicolas, Russel are there any more details available which might help
-in investigating this further.
-
-Thanks
-Hemanth
-
->
-> Nicolas
+On Wed, Mar 17, 2010 at 02:03:31PM +0300, Vladimir Zapolskiy wrote:
+> If clk_disable() is called for already disabled clock clk->usecount
+> value is decremented anyway. This leads to a problem that sequent
+> clk_enable() call doesn't enable the clock as expected.
 > 
+> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/plat-mxc/clock.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> index 2daec3c..3189275 100644
+> --- a/arch/arm/plat-mxc/clock.c
+> +++ b/arch/arm/plat-mxc/clock.c
+> @@ -53,10 +53,14 @@ static void __clk_disable(struct clk *clk)
+>  	if (clk == NULL || IS_ERR(clk))
+>  		return;
+>  
+> +	if (!clk->usecount) {
+> +		WARN(1, "Trying to disable a clock with 0 usecount\n");
+> +		return;
+> +	}
+> +
+The advantage of just using
+
+	WARN(!clk->usecount, "Trying to disable a disabled clock\n");
+
+is that the error isn't caught and so is more likely to be fixed :-)
+I'n not a native English speaker, but I think "Trying to disable a clock
+with 0 usecount" isn't a proper English sentence.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
