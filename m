@@ -1,109 +1,65 @@
-From: virtuoso@slind.org (Alexander Shishkin)
-Date: Thu, 18 Mar 2010 11:29:12 +0200
-Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
-In-Reply-To: <20100310173503.GC12345@n2100.arm.linux.org.uk>
-References: <20100310173503.GC12345@n2100.arm.linux.org.uk>
-Message-ID: <1268904552-2355-1-git-send-email-virtuoso@slind.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Mar 2010 11:13:46 +0000
+Subject: [PATCH] arm: Fix mounting root on omaps with CPU_V6 and CPU_V7
+In-Reply-To: <20100317191114.GH2900@atomide.com>
+References: <20100317175731.GE2900@atomide.com>
+	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
+	<20100317191114.GH2900@atomide.com>
+Message-ID: <1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems where ldrexh/strexh are not available, use a generic local
-version.
+On Wed, 2010-03-17 at 19:11 +0000, Tony Lindgren wrote:
+> * Catalin Marinas <catalin.marinas@arm.com> [100317 11:04]:
+> > On Wed, 2010-03-17 at 17:57 +0000, Tony Lindgren wrote:
+> > > Here's an updated version of this patch with more details.
+> > >
+> > > Looks like VFPv3 is only available on V7:
+> > >
+> > > http://www.arm.com/products/processors/technologies/vector-floating-point.php
+> >
+> > But does it cause any problem if the feature is enabled in the kernel?
+> > The vfp_init() code should check for its presence and set the hwcap
+> > accordingly.
+> 
+> Yeah, it causes the problem posted in the patch description. I took a
+> quick look at it and at least the VFPFMRX in vfpmacros.h for CONFIG_VFPv3
+> is a problem.
 
-Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-CC: linux-arm-kernel-bounces at lists.infradead.org
-CC: Imre Deak <imre.deak@nokia.com>
-CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
----
- arch/arm/include/asm/system.h |   61 ++++++++++++++++++++++++++++++++++-------
- 1 files changed, 51 insertions(+), 10 deletions(-)
+This would indeed need more checking to avoid reading some registers
+which aren't present on ARMv6.
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..a2ee41f 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -218,6 +218,39 @@ do {									\
- 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
- } while (0)
- 
-+static inline unsigned long __xchg_local_generic(unsigned long x,
-+						 volatile void *ptr, int size)
-+{
-+	extern void __bad_xchg(volatile void *, int);
-+	unsigned long ret;
-+	unsigned long flags;
-+
-+	switch (size) {
-+	case 1:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned char *)ptr;
-+		*(volatile unsigned char *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
-+	case 2:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned short *)ptr;
-+		*(volatile unsigned short *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
-+	case 4:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned long *)ptr;
-+		*(volatile unsigned long *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
- #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
- /*
-  * On the StrongARM, "swp" is terminally broken since it bypasses the
-@@ -262,6 +295,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 			: "r" (x), "r" (ptr)
- 			: "memory", "cc");
- 		break;
-+#ifdef CONFIG_CPU_32v6K
-+	case 2:
-+		asm volatile("@	__xchg2\n"
-+		"1:	ldrexh	%0, [%3]\n"
-+		"	strexh	%1, %2, [%3]\n"
-+		"	teq	%1, #0\n"
-+		"	bne	1b"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+#else
-+	case 2:
-+		ret = __xchg_local_generic(x, ptr, 2);
-+		break;
-+#endif
- 	case 4:
- 		asm volatile("@	__xchg4\n"
- 		"1:	ldrex	%0, [%3]\n"
-@@ -277,17 +326,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- #error SMP is not supported on this platform
- #endif
- 	case 1:
--		raw_local_irq_save(flags);
--		ret = *(volatile unsigned char *)ptr;
--		*(volatile unsigned char *)ptr = x;
--		raw_local_irq_restore(flags);
--		break;
--
-+	case 2:
- 	case 4:
--		raw_local_irq_save(flags);
--		ret = *(volatile unsigned long *)ptr;
--		*(volatile unsigned long *)ptr = x;
--		raw_local_irq_restore(flags);
-+		ret = __xchg_local_generic(x, ptr, size);
- 		break;
- #else
- 	case 1:
+I think the main problem with just falling back to VFPv2 is the lack of
+NEON support even if the CPU supports it.
+
+> Also I think we would need to have separate vfp_get_double functions
+> in vfphw.S for VFPv2 and 3 that get used based on the features.
+
+I don't think that's causing problems (or at least we can identify where
+the function gets called for higher VFP registers). Even with VFPv3, you
+may not have the D16-D31 registers.
+
+> > > HAS_TLS reg is only on ARM11 starting with r1p0:
+> > >
+> > > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0211k/Babeihid.html
+> > >
+> > > So that explains why it won't work on omap2420 as it's r0p2.
+> >
+> > Same here, would it work with dynamic detection?
+> 
+> Hmm I believe here the problem is __switch_to in entry-armv.S.
+> I don't think we want to dynamically test it every time.. Or
+> at least it would have to be optimized out in most cases.
+
+But if you disable this, you won't be able to use an SMP build on both
+v6 and v7. Anyway, I don't think that dynamically checking this would
+introduce performance penalties, the __switch_to code is pretty complex
+already with all the notifier calls.
+
+We may also have optimised user space that reads the TLS register
+directly rather than going through the kuser helper, in which case we
+would need a kernel built only for ARMv7 (maybe that's acceptable in
+this situation).
+
 -- 
-1.6.3.3
+Catalin
