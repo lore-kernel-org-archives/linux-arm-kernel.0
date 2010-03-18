@@ -1,57 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Mar 2010 22:03:52 +0000
-Subject: mapping uncached memory
-In-Reply-To: <d73d4eaf1003171426y35f9c431l93182fa73b3a5084@mail.gmail.com>
-References: <d73d4eaf1003171426y35f9c431l93182fa73b3a5084@mail.gmail.com>
-Message-ID: <1268863432.32682.2.camel@e102109-lin.cambridge.arm.com>
+From: konkers@google.com (Erik Gilling)
+Date: Wed, 17 Mar 2010 19:19:48 -0700
+Subject: [RFC/PATCH 06/10] [ARM] tegra: add GPIO support
+In-Reply-To: <4BA08F98.4050904@compulab.co.il>
+References: <4344f3c71003151538r7dc30e01uc9885ca5d3f327cd@mail.gmail.com>
+	<1268721688-27550-1-git-send-email-konkers@google.com>
+	<1268721688-27550-2-git-send-email-konkers@google.com>
+	<1268721688-27550-3-git-send-email-konkers@google.com>
+	<1268721688-27550-4-git-send-email-konkers@google.com>
+	<1268721688-27550-5-git-send-email-konkers@google.com>
+	<1268721688-27550-6-git-send-email-konkers@google.com>
+	<1268721688-27550-7-git-send-email-konkers@google.com>
+	<4BA08F98.4050904@compulab.co.il>
+Message-ID: <4344f3c71003171919p5aa841d9k17205eee067f3109@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-17 at 21:26 +0000, Colin Cross wrote:
-> On Wed, Mar 17, 2010 at 1:15 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Mar 17, 2010 at 10:02:09AM +0200, Budhee Jamaich wrote:
-> >> On Wed, Mar 17, 2010 at 1:54 AM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> from Documentation/DMA-API.txt:
-> >>
-> >> "void *
-> >> dma_alloc_coherent(struct device *dev, size_t size,
-> >>                              dma_addr_t *dma_handle, gfp_t flag)
-> >>
-> >> Consistent memory is memory for which a write by either the device or
-> >> the processor can immediately be read by the processor or device
-> >> without having to worry about caching effects.  (You may however need
-> >> to make sure to flush the processor's write buffers before telling
-> >> devices to read that memory.)"
-> >>
-> >>
-> >>
-> >> That last sentence - what does it really say ? That I still need to
-> >> manually clean/invalidate the caches myself ?
-> >
-> > No - if it did, it would contradict the previous sentence.  What it's
-> > referring to is that on weakly ordered CPUs, you may need barriers.
-> 
-> Tegra2 needs a wmb() and an L2 cache sync on dma_alloc_coherent memory
-> before handing it to the device.  
+On Wed, Mar 17, 2010 at 1:15 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+> konkers at google.com wrote:
+>> +void tegra_gpio_enable(int gpio)
+>> +{
+>> + ? ? ? tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
+>> +}
+>> +
+>> +void tegra_gpio_disable(int gpio)
+>> +{
+>> + ? ? ? tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
+>> +}
+>
+> Can you please elaborate why these two are required? They are not referenced
+> anywhere ...
 
-RealView boards with an L2 cache needs such thing as well.
+These are needed to switch a pin/pad from peripheral mode to gpio
+mode.  Since tegra does peripheral muxing by pingroup but gpio muxing
+by pin this does not fit into the pinmux code.  It's intended to be
+used in board files much like pin muxing.
 
-> Currently, I am using Catalin's
-> patches for machine-specific wmb() implementations to do both
-> operations using a wmb() and keep the L2 details out of the drivers.
-> Is that the correct use of those patches?  
+>> +++ b/arch/arm/mach-tegra/include/mach/gpio-names.h
+>
+> I'm still not convinced that gpio-names.h is needed, although it may be
+> hadny for board gpio defines. Anyway, I'd put it into arch/arm/mach-tegra
+> rather than arch/arm/mach-tegra/include/mach because ?it shouldn't be
+> available for anything except arch/arm/mach-tegra.
 
-Yes, the driver should only invoke a barrier rather than the L2 cache
-specific functions.
+The tegra architecture does not define GPIOs numerically so treating
+them as integers has no useful meaning.  It's true that these should
+only be used in the board files.  I'll move the file into
+arch/arm/mach-tegra.
 
-> Is there any other way to
-> handle dma_alloc_coherent memory on ARMv7?
-
-I'm not aware of a different way. You could use streaming DMA API via
-the dma_map_*() etc functions but this is cached memory and the
-corresponding functions perform the flushing.
-
--- 
-Catalin
+-Erik
