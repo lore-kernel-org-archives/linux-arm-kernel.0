@@ -1,31 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Mar 2010 12:36:16 +0000
-Subject: Can physical flash initramfs cpio address be given to bootm?
-In-Reply-To: <3d1967ab1003171209j43a9a005l4be5d2faf38fec31@mail.gmail.com>
-References: <3d1967ab1003171209j43a9a005l4be5d2faf38fec31@mail.gmail.com>
-Message-ID: <20100319123616.GC21280@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 19 Mar 2010 09:17:19 -0400 (EDT)
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <20100319015523.GD14108@shareable.org>
+References: <alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
+	<20100318141930.GF19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003181205020.31128@xanadu.home>
+	<20100319015523.GD14108@shareable.org>
+Message-ID: <alpine.LFD.2.00.1003190908330.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 17, 2010 at 03:09:14PM -0400, Brian Hutchinson wrote:
-> Can I use the physical flash address of a initramfs with the u-boot
-> bootm command?  The kernel doesn't appear to like it .... see below.
+On Fri, 19 Mar 2010, Jamie Lokier wrote:
 
-bootm has nothing to do with the kernel, so I think you want to ask
-this question on a different (uboot?) mailing list.
-
-> When I do a bootm 0x20080000 (physical flash location of kernel)
-> 0x20280000 (mkimage of cpio.gz made with -T ramdisk) the physical
-> flash address of the initramfs gets passed to kernel via ATAGS and the
-> kernel doesn't like it:
+> Nicolas Pitre wrote:
+> > Data read from a DMA based block device is corrupted in memory and 
+> > causing all sorts of misbehavior such as segmentation faults in user 
+> > space, or EXT2 complaining about broken filesystem metadata.
 > 
-> INITRD: 0x20280040+0x00c8bdb6 extends beyond physical memory - disabling initrd
+> I doubt it is related, but just in case: I've seen similar on a
+> no-doubt completely unrelated ARM9 system on now-ancient kernels:
+> occasional ext3 metadata corruption.
+> 
+> In my case it was due to a bug in the chip's IDE driver, which did:
+[...]
 
-The initrd image must be in RAM; there's no getting around this because
-the kernel wants to convert addresses to struct page pointers and other
-magical stuff like that which can only be done with RAM.
+Driver bugs would tend to be visible with or without highmem in play.
 
-> How do you all load a initramfs from flash???
+And in this case, the same SATA driver is used on two different system, 
+one being ARMv5 with absolutely no issues with highmem, and the other 
+being ARMv6 with highmem problems.  So that pretty much rules out IDE 
+driver bugs.
 
-You have to copy it into RAM first.  I don't know how to tell uboot to
-do that, I'm not a uboot expert.
+Furthermore the same highmem issues were reported to occur on an OMAP 
+system with the filesystem on a MMC card i.e. different CPU manufacturer 
+with a different block device driver.
+
+So the issue really seems to be about ARMv5 (works) vs ARMv6 (doesn't 
+work), which makes some sense given the huge difference between both 
+cache models.
+
+
+Nicolas
