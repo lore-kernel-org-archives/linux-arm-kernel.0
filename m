@@ -1,37 +1,92 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Fri, 19 Mar 2010 14:54:44 -0500
-Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
-In-Reply-To: <20100310215321.GP2900@atomide.com>
-References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
-	<1268143623-22361-2-git-send-email-saeed@marvell.com>
-	<20100310215321.GP2900@atomide.com>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203BA3AE030@dlee02.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 19 Mar 2010 16:14:16 -0400 (EDT)
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <alpine.LFD.2.00.1003191359440.31128@xanadu.home>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
+	<20100319144647.GG21280@n2100.arm.linux.org.uk>
+	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+	<alpine.LFD.2.00.1003191359440.31128@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1003191600580.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 19 Mar 2010, Nicolas Pitre wrote:
 
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Tony Lindgren
-> Sent: Wednesday, March 10, 2010 3:53 PM
+> A highmem page can have 2 states: virtually mapped in the pkmap area, or 
+> not mapped at all.  When it is mapped then page_address() returns a 
+> valid virtual address for it.  In that case the cache for that mapping 
+> can be valid, even dirty.  So the DMA API will perform cache handling 
+> before/after the DMA operation.
+> 
+> However, before the page is unmapped, the VIVT cache has to be flushed 
+> for that page.  This is why the DMA code currently doesn't bother doing 
+> any L1 cache handling when a highmem page is not mapped -- the cache 
+> just can't refer to such a page.
+> 
+> But on ARMv6 this is different.  The L1 cache is VIPT and it therefore 
+> doesn't have to be flushed as often as a VIVT cache.  Still, as far as I 
+> know, the highmem code currently always flush any page to be unmapped.  
+> But somewhere somehow an unmapped highmem page becomes subject to DMA 
+> and apparently can still be L1 cached.  But the DMA code doesn't flush 
+> its cache due to the page not being mapped and then problems occur.
 
-> > +#ifdef CONFIG_OUTER_CACHE
-> > +   mrc     p15, 0, r0, c1, c0, 1
-> > +   bic     r0, r0, #0x2
-> > +   mcr     p15, 0, r0, c1, c0, 1           @ disable L2 cache
-> > +#endif
-> >     ldmfd   sp!, {pc}
-> >  ENDPROC(cpu_v7_proc_fin)
->
-> This one is a bit tricky. I know of three different ways
-> to disable the L2 cache depending on the hardware. One of
-> them is what you have above. The second is via SMI, and
-> then the first one won't work. The third is via external
-> secure monitor calls used on some omaps at least. And in
-> the third case the first two methods won't work.
+And here's a patch to test that hypothesis.  With this patch, all the 
+issues with highmem on my ARMv6 system are gone.
 
-On A8 cores with integrated L2 cache the L2EN bit is banked after r0px series (you won't find r0 systems anywhere). As such the above code is good on OMAP3 and many other A8's.  Other bits in this same register have issues which you warn of.  But not the L2EN.
+Note this is suboptimal.  I still have to open my ARM ARM and see if we 
+can do cache maintenance on the L1 cache using physical addresses to 
+avoid the IRQ disable, PTE setup and TLB flush altogether.
 
-On A9 which uses outer cache the above won't work.  The external PL310 (or variant) is memory mapped.  To handle a different sequence is needed all together.
+Also, with this, a couple cache flushes elsewhere could be removed from 
+the highmem code for VIPT caches.  But some of them are tricky and 
+require more thoughts.
 
-Regards,
-Richard W.
+Oh and yes usage of KM_L2_CACHE in this IRQ disabled context is safe.
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 0da7ecc..79771b0 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -22,8 +22,14 @@
+ #include <asm/highmem.h>
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
++#include <asm/system.h>
++#include <asm/kmap_types.h>
++#include <asm/fixmap.h>
++#include <asm/pgtable.h>
+ #include <asm/sizes.h>
+ 
++#include "mm.h"
++
+ /* Sanity check size */
+ #if (CONSISTENT_DMA_SIZE % SZ_2M)
+ #error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
+@@ -464,6 +470,18 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 				vaddr += offset;
+ 				op(vaddr, len, dir);
+ 				kunmap_high(page);
++			} else if (cache_is_vipt_nonaliasing()) {
++				unsigned long va, idx, pte, flags;
++				unsigned long pa = page_to_phys(page);
++				idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
++				va = __fix_to_virt(FIX_KMAP_BEGIN + idx);
++				pte = pfn_pte(pa >> PAGE_SHIFT, PAGE_KERNEL);
++				local_irq_save(flags);
++				set_pte_ext(TOP_PTE(va), pte, 0);
++				local_flush_tlb_kernel_page(va);
++				vaddr = (void*)va + offset;
++				op(vaddr, len, dir);
++				local_irq_restore(flags);
+ 			}
+ 		} else {
+ 			vaddr = page_address(page) + offset;
