@@ -1,119 +1,114 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Mar 2010 11:28:44 +0100
-Subject: [PATCH 4/5] i.MX51: determine silicon revision dynamically
+Date: Fri, 19 Mar 2010 11:28:43 +0100
+Subject: [PATCH 3/5] i.MX51: map TZIC dynamically
 In-Reply-To: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
 References: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1268994525-32495-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1268994525-32495-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale redboot passes the silicon revision via
-ATAG_REVISION. Remove this bootloader dependency by
-doing the same as redboot does in the Kernel.
+This looks cleaner and allows us to call mx51_revision
+later when we can use ioremap to determine the silicon
+revision dynamically.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx5/cpu.c               |   53 +++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mx51.h |   13 ++++----
- 2 files changed, 60 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx5/mm.c                |   27 +++++++++++++--------------
+ arch/arm/plat-mxc/include/mach/mx51.h |   11 +++--------
+ 2 files changed, 16 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-index 41c769f..2d37785 100644
---- a/arch/arm/mach-mx5/cpu.c
-+++ b/arch/arm/mach-mx5/cpu.c
-@@ -14,9 +14,62 @@
- #include <linux/types.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/module.h>
- #include <mach/hardware.h>
- #include <asm/io.h>
- 
-+static int cpu_silicon_rev = -1;
-+
-+#define SI_REV 0x48
-+
-+static void query_silicon_parameter(void)
-+{
-+	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
-+	u32 rev;
-+
-+	if (!rom) {
-+		cpu_silicon_rev = -EINVAL;
-+		return;
-+	}
-+
-+	rev = readl(rom + SI_REV);
-+	switch (rev) {
-+	case 0x1:
-+		cpu_silicon_rev = MX51_CHIP_REV_1_0;
-+		break;
-+	case 0x2:
-+		cpu_silicon_rev = MX51_CHIP_REV_1_1;
-+		break;
-+	case 0x10:
-+		cpu_silicon_rev = MX51_CHIP_REV_2_0;
-+		break;
-+	case 0x20:
-+		cpu_silicon_rev = MX51_CHIP_REV_3_0;
-+		break;
-+	default:
-+		cpu_silicon_rev = 0;
-+	}
-+
-+	iounmap(rom);
-+}
-+
-+/*
-+ * Returns:
-+ *	the silicon revision of the cpu
-+ *	-EINVAL - not a mx51
-+ */
-+int mx51_revision(void)
-+{
-+	if (!cpu_is_mx51())
-+		return -EINVAL;
-+
-+	if (cpu_silicon_rev == -1)
-+		query_silicon_parameter();
-+
-+	return cpu_silicon_rev;
-+}
-+EXPORT_SYMBOL(mx51_revision);
-+
- static int __init post_cpu_init(void)
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index c21e18b..9fe7beb 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -35,11 +35,6 @@ static struct map_desc mxc_io_desc[] __initdata = {
+ 		.length = MX51_DEBUG_SIZE,
+ 		.type = MT_DEVICE
+ 	}, {
+-		.virtual = MX51_TZIC_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(MX51_TZIC_BASE_ADDR),
+-		.length = MX51_TZIC_SIZE,
+-		.type = MT_DEVICE
+-	}, {
+ 		.virtual = MX51_AIPS1_BASE_ADDR_VIRT,
+ 		.pfn = __phys_to_pfn(MX51_AIPS1_BASE_ADDR),
+ 		.length = MX51_AIPS1_SIZE,
+@@ -69,14 +64,6 @@ static struct map_desc mxc_io_desc[] __initdata = {
+  */
+ void __init mx51_map_io(void)
  {
- 	unsigned int reg;
+-	u32 tzic_addr;
+-
+-	if (mx51_revision() < MX51_CHIP_REV_2_0)
+-		tzic_addr = 0x8FFFC000;
+-	else
+-		tzic_addr = 0xE0003000;
+-	mxc_io_desc[2].pfn =  __phys_to_pfn(tzic_addr);
+-
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
+ 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG_BASE_ADDR));
+@@ -85,5 +72,17 @@ void __init mx51_map_io(void)
+ 
+ void __init mx51_init_irq(void)
+ {
+-	tzic_init_irq(MX51_IO_ADDRESS(MX51_TZIC_BASE_ADDR));
++	unsigned long tzic_addr;
++	void __iomem *tzic_virt;
++
++	if (mx51_revision() < MX51_CHIP_REV_2_0)
++		tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
++	else
++		tzic_addr = MX51_TZIC_BASE_ADDR;
++
++	tzic_virt = ioremap(tzic_addr, SZ_16K);
++	if (!tzic_virt)
++		panic("unable to map TZIC interrupt controller\n");
++
++	tzic_init_irq(tzic_virt);
+ }
 diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index f1396bd..fd255a9 100644
+index 771532b..f1396bd 100644
 --- a/arch/arm/plat-mxc/include/mach/mx51.h
 +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -28,6 +28,12 @@
-  */
+@@ -14,7 +14,7 @@
+  * FB100000	70000000	1M	SPBA 0
+  * FB000000	73F00000	1M	AIPS 1
+  * FB200000	83F00000	1M	AIPS 2
+- * FA100000	8FFFC000	16K	TZIC (interrupt controller)
++ *		8FFFC000	16K	TZIC (interrupt controller)
+  *         	90000000	256M	CSD0 SDRAM/DDR
+  *         	A0000000	256M	CSD1 SDRAM/DDR
+  *         	B0000000	128M	CS0 Flash
+@@ -49,9 +49,8 @@
+ #define MX51_GPU_BASE_ADDR		0x20000000
+ #define MX51_GPU2D_BASE_ADDR		0xD0000000
  
- /*
-+ * IROM
-+ */
-+#define MX51_IROM_BASE_ADDR		0x0
-+#define MX51_IROM_SIZE			SZ_64K
-+
-+/*
-  * IRAM
-  */
- #define MX51_IRAM_BASE_ADDR		0x1FFE0000	/* internal ram */
-@@ -438,12 +444,7 @@
+-#define MX51_TZIC_BASE_ADDR		0x8FFFC000
+-#define MX51_TZIC_BASE_ADDR_VIRT	0xFA100000
+-#define MX51_TZIC_SIZE			SZ_16K
++#define MX51_TZIC_BASE_ADDR_TO1		0x8FFFC000
++#define MX51_TZIC_BASE_ADDR		0xE0000000
  
- #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
+ #define MX51_DEBUG_BASE_ADDR		0x60000000
+ #define MX51_DEBUG_BASE_ADDR_VIRT	0xFA200000
+@@ -232,7 +231,6 @@
+ #define MX51_IO_ADDRESS(x)					\
+ 	(void __iomem *)					\
+ 	(MX51_IS_MODULE(x, IRAM) ? MX51_IRAM_IO_ADDRESS(x) :	\
+-	MX51_IS_MODULE(x, TZIC) ? MX51_TZIC_IO_ADDRESS(x) :	\
+ 	MX51_IS_MODULE(x, DEBUG) ? MX51_DEBUG_IO_ADDRESS(x) :	\
+ 	MX51_IS_MODULE(x, SPBA0) ? MX51_SPBA0_IO_ADDRESS(x) :	\
+ 	MX51_IS_MODULE(x, AIPS1) ? MX51_AIPS1_IO_ADDRESS(x) :	\
+@@ -246,9 +244,6 @@
+ #define MX51_IRAM_IO_ADDRESS(x)  \
+ 	(((x) - MX51_IRAM_BASE_ADDR) + MX51_IRAM_BASE_ADDR_VIRT)
  
--extern unsigned int system_rev;
+-#define MX51_TZIC_IO_ADDRESS(x)  \
+-	(((x) - MX51_TZIC_BASE_ADDR) + MX51_TZIC_BASE_ADDR_VIRT)
 -
--static inline unsigned int mx51_revision(void)
--{
--	return system_rev;
--}
-+extern int mx51_revision(void);
- #endif
+ #define MX51_DEBUG_IO_ADDRESS(x)  \
+ 	(((x) - MX51_DEBUG_BASE_ADDR) + MX51_DEBUG_BASE_ADDR_VIRT)
  
- #endif	/*  __ASM_ARCH_MXC_MX51_H__ */
 -- 
 1.7.0
