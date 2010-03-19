@@ -1,38 +1,31 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Mar 2010 11:28:41 +0100
-Subject: [PATCH 1/5] i.MX51 Babbage: Add uncompress output
+Date: Fri, 19 Mar 2010 11:28:42 +0100
+Subject: [PATCH 2/5] i.MX51: Use correct clock for gpt
 In-Reply-To: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
 References: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1268994525-32495-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1268994525-32495-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The gpt uses the ipg clock, not ipg_perclk
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/uncompress.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-index 52e476a..b6d3d0f 100644
---- a/arch/arm/plat-mxc/include/mach/uncompress.h
-+++ b/arch/arm/plat-mxc/include/mach/uncompress.h
-@@ -66,6 +66,7 @@ static inline void flush(void)
- #define MX2X_UART1_BASE_ADDR	0x1000a000
- #define MX3X_UART1_BASE_ADDR	0x43F90000
- #define MX3X_UART2_BASE_ADDR	0x43F94000
-+#define MX51_UART1_BASE_ADDR	0x73fbc000
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index be90c03..8f85f73 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -757,7 +757,7 @@ DEFINE_CLOCK(uart3_ipg_clk, 2, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG7_OFFSET,
  
- static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- {
-@@ -101,6 +102,9 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 	case MACH_TYPE_MAGX_ZN5:
- 		uart_base = MX3X_UART2_BASE_ADDR;
- 		break;
-+	case MACH_TYPE_MX51_BABBAGE:
-+		uart_base = MX51_UART1_BASE_ADDR;
-+		break;
- 	default:
- 		break;
- 	}
+ /* GPT */
+ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+-	NULL,  NULL, &ipg_perclk, NULL);
++	NULL,  NULL, &ipg_clk, NULL);
+ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+ 
 -- 
 1.7.0
