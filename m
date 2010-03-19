@@ -1,45 +1,38 @@
-From: hemanthv@ti.com (Hemanth V)
-Date: Thu, 18 Mar 2010 20:11:01 +0530
-Subject: Highmem issues with MMC filesystem
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-	<20100318141930.GF19544@n2100.arm.linux.org.uk>
-Message-ID: <0b0f01cac6a9$0a8b8990$LocalHost@wipblrx0099946>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 19 Mar 2010 11:28:41 +0100
+Subject: [PATCH 1/5] i.MX51 Babbage: Add uncompress output
+In-Reply-To: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
+References: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1268994525-32495-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Original Message ----- 
-From: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
-To: "Shilimkar, Santosh" <santosh.shilimkar@ti.com>
-Cc: "Nicolas Pitre" <nico@fluxnic.net>; <linux-mmc@vger.kernel.org>; "V, 
-Hemanth" <hemanthv@ti.com>; "saeed bishara" <saeed.bishara@gmail.com>; 
-<pierre@ossman.eu>; <linux-arm-kernel@lists.infradead.org>
-Sent: Thursday, March 18, 2010 7:49 PM
-Subject: Re: Highmem issues with MMC filesystem
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/uncompress.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-
-> On Thu, Mar 18, 2010 at 07:00:06PM +0530, Shilimkar, Santosh wrote:
->> Or could it be that there is appropriate cacheflush happening but data 
->> gets
->> stuck in CPU writebuffers instead of reaching to main memory. In this 
->> case
->> too DMA won't see the contents and a barrier (dsb) is necessary to ensure
->> that write buffer is drained before DMA takes over the buffer.
->
-> That would imply that the data on the device is becoming corrupted.
->
-> What exactly is the problem that we're discussing?  Is it that the data
-> on the block device is becoming corrupted, or is the data being read off
-> the block device corrupted?
->
-
-It seems like data being read off the block device is being corrupted,
-since if we replace highmem kernel with a non-highmem kernel
-the filesystem is able to bootup fine. 
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+index 52e476a..b6d3d0f 100644
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -66,6 +66,7 @@ static inline void flush(void)
+ #define MX2X_UART1_BASE_ADDR	0x1000a000
+ #define MX3X_UART1_BASE_ADDR	0x43F90000
+ #define MX3X_UART2_BASE_ADDR	0x43F94000
++#define MX51_UART1_BASE_ADDR	0x73fbc000
+ 
+ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ {
+@@ -101,6 +102,9 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ 	case MACH_TYPE_MAGX_ZN5:
+ 		uart_base = MX3X_UART2_BASE_ADDR;
+ 		break;
++	case MACH_TYPE_MX51_BABBAGE:
++		uart_base = MX51_UART1_BASE_ADDR;
++		break;
+ 	default:
+ 		break;
+ 	}
+-- 
+1.7.0
