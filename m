@@ -1,44 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Mar 2010 18:26:52 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 19 Mar 2010 14:27:24 -0400 (EDT)
 Subject: Highmem issues with MMC filesystem
-In-Reply-To: <alpine.LFD.2.00.1003191348231.31128@xanadu.home>
-References: <alpine.LFD.2.00.1003191348231.31128@xanadu.home>
-Message-ID: <1269023212.22473.5.camel@e102109-lin.cambridge.arm.com>
+In-Reply-To: <alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
+	<20100319144647.GG21280@n2100.arm.linux.org.uk>
+	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1003191359440.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-03-19 at 17:59 +0000, Nicolas Pitre wrote:
-> On Fri, 19 Mar 2010, Russell King - ARM Linux wrote:
-> 
-> > On Fri, Mar 19, 2010 at 09:17:19AM -0400, Nicolas Pitre wrote:
-> > > And in this case, the same SATA driver is used on two different system,
-> > > one being ARMv5 with absolutely no issues with highmem, and the other
-> > > being ARMv6 with highmem problems.  So that pretty much rules out IDE
-> > > driver bugs.
-> >
-> > No it doesn't - there's more changes between ARMv5 and ARMv6 than just
-> > the cache model.  There's weak memory ordering effects too.
-> 
-> Sure.  But at the moment we have:
-> 
->  - ARMv5 without highmem -> works
-> 
->  - ARMv5 with highmem -> works
-> 
->  - ARMv6 without highmem -> works
-> 
->  - ARMv6 with highmem -> fails
-> 
-> In all four cases the SATA driver, the hard disk and the filesystem on
-> it are identical.  In the two ARMv5 cases the system and the kernel are
-> identical.  Ditto for the two ARMv6 cases.
+On Fri, 19 Mar 2010, Nicolas Pitre wrote:
 
-Which ARMv6 processor is this?
+> On Fri, 19 Mar 2010, Catalin Marinas wrote:
+> 
+> > > On Fri, Mar 19, 2010 at 02:41:17PM +0000, Catalin Marinas wrote:
+> > > > On Thu, 2010-03-18 at 13:20 +0000, Nicolas Pitre wrote:
+> > > > > The only way a highmem page can be unmapped is through kunmap_atomic()
+> > > > > where an explicit __cpuc_flush_dcache_area() is performed, or through
+> > > > > flush_all_zero_pkmaps() where flush_cache_kmaps() translates into
+> > > > > flush_cache_all().
+> > > >
+> > > > The thing that I couldn't fully understand with the kunmap_atomic()
+> > > > function is that there is a path (when kvaddr < FIXADDR_START) where no
+> > > > cache flushing occurs. Can this not happen?
+> > > 
+> > > kunmap interfaces are not for cache flushing; the cache flushing is
+> > > only there to ensure consistency when unmapping a mapping on VIVT CPUs.
+> > 
+> > I agree, but then why don't we conditionally call
+> > __cpuc_flush_dcache_area() in kunmap_atomic() so that we avoid this
+> > flush on non-aliasing VIPT?
+> 
+> We should indeed.
 
-Is the SATA driver using DMA (I think I read this in the thread but it
-started as MMC issues and got confused)?
+Wait...  This is actually going to make the issue even worse.
 
-Thanks.
+Not that this isn't a good idea, but here's how the system works at the 
+moment with highmem.
 
--- 
-Catalin
+A highmem page can have 2 states: virtually mapped in the pkmap area, or 
+not mapped at all.  When it is mapped then page_address() returns a 
+valid virtual address for it.  In that case the cache for that mapping 
+can be valid, even dirty.  So the DMA API will perform cache handling 
+before/after the DMA operation.
+
+However, before the page is unmapped, the VIVT cache has to be flushed 
+for that page.  This is why the DMA code currently doesn't bother doing 
+any L1 cache handling when a highmem page is not mapped -- the cache 
+just can't refer to such a page.
+
+But on ARMv6 this is different.  The L1 cache is VIPT and it therefore 
+doesn't have to be flushed as often as a VIVT cache.  Still, as far as I 
+know, the highmem code currently always flush any page to be unmapped.  
+But somewhere somehow an unmapped highmem page becomes subject to DMA 
+and apparently can still be L1 cached.  But the DMA code doesn't flush 
+its cache due to the page not being mapped and then problems occur.
+
+Two solutions:
+
+1) We find the remaining places where highmem pages may get unmapped and 
+   make sure the cache for them is always flushed at that point.  This 
+   is most likely when some highmem pages are removed from a user space 
+   process or the like.
+
+2) We stop flushing the cache for highmem pages when they get unmapped 
+   on VIPT systems. This includes kunmap_atomic() and flush_cache_kmaps().
+   However that means that we need a way to flush the cache for unmapped
+   highmem pages, preferably using physical addresses since by vertue of 
+   not being mapped they don't have any kernel virtual address attached 
+   to them (is that possible?).
+
+
+Nicolas
