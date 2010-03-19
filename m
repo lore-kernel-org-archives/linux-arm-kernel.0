@@ -1,32 +1,30 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Fri, 19 Mar 2010 18:16:59 +0300
-Subject: [PATCH 3/3] imx31: add watchdog device on litekit board.
-In-Reply-To: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
-References: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <1269011819-23257-1-git-send-email-vzapolskiy@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Mar 2010 08:32:23 -0700
+Subject: [PATCH] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100319085403.GB8451@n2100.arm.linux.org.uk>
+References: <20100317175731.GE2900@atomide.com>
+	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
+	<20100317191114.GH2900@atomide.com>
+	<1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
+	<20100318170021.GN2900@atomide.com>
+	<20100319013521.GP2900@atomide.com>
+	<20100319034645.GG14108@shareable.org>
+	<20100319085403.GB8451@n2100.arm.linux.org.uk>
+Message-ID: <20100319153223.GR2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SoC build-in watchdog device on litekit
-board.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100319 01:50]:
+> On Fri, Mar 19, 2010 at 03:46:45AM +0000, Jamie Lokier wrote:
+> > I'm thinking, why not an alternative() macro like on x86, which is a
+> > very nice way to describe run-time patches of one or a few instructions
+> > which depend on arch feature bits.
+> 
+> Having XIP support prevents that kind of thing.
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx3/mx31lite-db.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+How about we store the HWCAP_TLS flag into 0xffff0ff4 for
+__kuser_get_tls? That way the userspace won't be able to set
+it.
 
-diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-index ccd8742..0201683 100644
---- a/arch/arm/mach-mx3/mx31lite-db.c
-+++ b/arch/arm/mach-mx3/mx31lite-db.c
-@@ -206,5 +206,6 @@ void __init mx31lite_db_init(void)
- 	mxc_register_device(&mxcsdhc_device0, &mmc_pdata);
- 	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
- 	platform_device_register(&litekit_led_device);
-+	mxc_register_device(&imx_wdt_device0, NULL);
- }
- 
--- 
-1.6.6.1
+Tony
