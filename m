@@ -1,49 +1,39 @@
-From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
-Date: Thu, 18 Mar 2010 22:12:22 -0400
-Subject: [PATCH 1/1] [RFC] arm: add half-word __xchg
-In-Reply-To: <20100319014906.GC14108@shareable.org>
-References: <20100318123223.GA6855@Krystal>
-	<1268919221-2748-1-git-send-email-virtuoso@slind.org>
-	<20100318135008.GA11800@Krystal>
-	<20100319014906.GC14108@shareable.org>
-Message-ID: <20100319021222.GA17388@Krystal>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Mar 2010 20:24:48 -0700
+Subject: [PATCH] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100319013521.GP2900@atomide.com>
+References: <20100317175731.GE2900@atomide.com>
+	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
+	<20100317191114.GH2900@atomide.com>
+	<1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
+	<20100318170021.GN2900@atomide.com>
+	<20100319013521.GP2900@atomide.com>
+Message-ID: <20100319032448.GQ2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Lokier (jamie at shareable.org) wrote:
-> Mathieu Desnoyers wrote:
-> > But.. thinking about it. It's bad to have a 2-byte xchg primitive that
-> > only works on UP and breaks the build on SMP. We should instead
-> > implement a workaround based on __cmpxchg4 to perform the 2-byte xchg().
-> 
-> This exposes why there should be __cmpxchg_bool() versions, which do
-> not loop, preferably in the generic kernel API, because the workaround
-> using __cmpxchg4 has to add yet another pointless loop nesting to all
-> cmpxchg users.
+* Tony Lindgren <tony@atomide.com> [100318 18:31]:
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -269,6 +269,24 @@ static void __init cacheid_init(void)
+>  extern struct proc_info_list *lookup_processor_type(unsigned int);
+>  extern struct machine_desc *lookup_machine_type(unsigned int);
+>  
+> +#ifdef CONFIG_CPU_V6
+> +static void __init feat_v6_fixup(void)
+> +{
+> +	int id = read_cpuid_id();
+> +
+> +	if (id & 0x000f0000 != 0x00070000)
+> +		return;
+> +
+> +	/* HWCAP_TLS is available only on V6 r1p0 and later */
+> +	if (((id >> 20) & 3) == 0)
+> +		elf_hwcap &= ~HWCAP_TLS;
+> +}
 
-The workaround I propose is to use __cmpxchg4 in a loop for 2-byte xchg()
-fallback on arm; it is not related to cmpxchg() in any way. I don't
-think one single use-case justifies the creation of a __cmpxchg_bool()
-across all architectures.
+This test probably needs to only look at ARM1136, and ignore others
+such as ARM1176. Will take a look tomorrow.
 
-Also, I've never seen where having a cmpxchg primitive returning a
-boolean is more efficient than returning the value read, ever. If we
-have to loop, then we can re-use the value that has been read by
-cmpxchg, while the version returning a boolean would need a read to
-re-read the next value.
-
-So.. I am afraid I am probably missing your point entirely, because I
-don't see how this can improve anything.
-
-Thanks,
-
-Mathieu
-
-> 
-> --- Jamie
-
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+Tony
