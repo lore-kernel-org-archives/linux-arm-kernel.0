@@ -1,92 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 19 Mar 2010 16:14:16 -0400 (EDT)
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <alpine.LFD.2.00.1003191359440.31128@xanadu.home>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
-	<20100319144647.GG21280@n2100.arm.linux.org.uk>
-	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
-	<alpine.LFD.2.00.1003191359440.31128@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1003191600580.31128@xanadu.home>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 19 Mar 2010 14:57:21 -0700
+Subject: [PATCH] serial: fix possible imx deadlock
+In-Reply-To: <20100315134556.GX19843@pengutronix.de>
+References: <80k4tehryt.fsf@merkur.tec.linutronix.de>
+	<20100315134556.GX19843@pengutronix.de>
+Message-ID: <20100319145721.0af2203c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Mar 2010, Nicolas Pitre wrote:
+On Mon, 15 Mar 2010 14:45:57 +0100
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-> A highmem page can have 2 states: virtually mapped in the pkmap area, or 
-> not mapped at all.  When it is mapped then page_address() returns a 
-> valid virtual address for it.  In that case the cache for that mapping 
-> can be valid, even dirty.  So the DMA API will perform cache handling 
-> before/after the DMA operation.
+> On Mon, Mar 15, 2010 at 10:08:58AM +0100, John Ogness wrote:
+> > This patch fixes a possible deadlock situation with the port and timer
+> > locks. The calling paths for the deadlock situation are:
+> > 
+> > 1. imx_set_termios() -> LOCK(port.lock)
+> >       -> del_timer_sync() -> LOCK(timer.base.lock)
+> > 
+> > 2. run_timer_softirq() -> LOCK(timer.base.lock)
+> >       -> imx_timeout() -> LOCK(port.lock)
+> > 
+> > This patch is against 2.6.34-rc1.
+> > 
+> > Signed-off-by: John Ogness <john.ogness@linutronix.de>
+> > ---
+> >  drivers/serial/imx.c |    8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> > diff -Naurp a/drivers/serial/imx.c b/drivers/serial/imx.c
+> > --- a/drivers/serial/imx.c	2010-03-08 19:45:44.000000000 +0100
+> > +++ b/drivers/serial/imx.c	2010-03-15 09:52:39.855261060 +0100
+> > @@ -836,6 +836,12 @@ imx_set_termios(struct uart_port *port, 
+> >  	baud = uart_get_baud_rate(port, termios, old, 50, port->uartclk / 16);
+> >  	quot = uart_get_divisor(port, baud);
+> >  
+> > +	/*
+> > +	 * Stop our timer. This is done with the port unlocked
+> > +	 * to avoid possible deadlock against the timer function.
+> > +	 */
+> > +	del_timer_sync(&sport->timer);
+> > +
 > 
-> However, before the page is unmapped, the VIVT cache has to be flushed 
-> for that page.  This is why the DMA code currently doesn't bother doing 
-> any L1 cache handling when a highmem page is not mapped -- the cache 
-> just can't refer to such a page.
-> 
-> But on ARMv6 this is different.  The L1 cache is VIPT and it therefore 
-> doesn't have to be flushed as often as a VIVT cache.  Still, as far as I 
-> know, the highmem code currently always flush any page to be unmapped.  
-> But somewhere somehow an unmapped highmem page becomes subject to DMA 
-> and apparently can still be L1 cached.  But the DMA code doesn't flush 
-> its cache due to the page not being mapped and then problems occur.
+> Is this call needed here anyway? Only few drivers have it. Does anyone
+> have more insights on this?
 
-And here's a patch to test that hypothesis.  With this patch, all the 
-issues with highmem on my ARMv6 system are gone.
+The other drivers might be buggy ;)
 
-Note this is suboptimal.  I still have to open my ARM ARM and see if we 
-can do cache maintenance on the L1 cache using physical addresses to 
-avoid the IRQ disable, PTE setup and TLB flush altogether.
+I think the del_timer can probably be removed, as the later
+imx_enable_ms() will do a mod_timer() on it.  Unless that
+imx_enable_ms() doesn't get performed, of course..
 
-Also, with this, a couple cache flushes elsewhere could be removed from 
-the highmem code for VIPT caches.  But some of them are tricky and 
-require more thoughts.
+Plus it could be that we want to kill the timer because we're about to
+change various pieces of state and we don't want the timer handler
+running while that state is in flux.  Presumably that's why it's all
+done under the spinlock.
 
-Oh and yes usage of KM_L2_CACHE in this IRQ disabled context is safe.
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 0da7ecc..79771b0 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -22,8 +22,14 @@
- #include <asm/highmem.h>
- #include <asm/cacheflush.h>
- #include <asm/tlbflush.h>
-+#include <asm/system.h>
-+#include <asm/kmap_types.h>
-+#include <asm/fixmap.h>
-+#include <asm/pgtable.h>
- #include <asm/sizes.h>
- 
-+#include "mm.h"
-+
- /* Sanity check size */
- #if (CONSISTENT_DMA_SIZE % SZ_2M)
- #error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
-@@ -464,6 +470,18 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
- 				vaddr += offset;
- 				op(vaddr, len, dir);
- 				kunmap_high(page);
-+			} else if (cache_is_vipt_nonaliasing()) {
-+				unsigned long va, idx, pte, flags;
-+				unsigned long pa = page_to_phys(page);
-+				idx = KM_L2_CACHE + KM_TYPE_NR * smp_processor_id();
-+				va = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-+				pte = pfn_pte(pa >> PAGE_SHIFT, PAGE_KERNEL);
-+				local_irq_save(flags);
-+				set_pte_ext(TOP_PTE(va), pte, 0);
-+				local_flush_tlb_kernel_page(va);
-+				vaddr = (void*)va + offset;
-+				op(vaddr, len, dir);
-+				local_irq_restore(flags);
- 			}
- 		} else {
- 			vaddr = page_address(page) + offset;
+Moving the del_timer_sync() to outside the spinlock might introduce
+races though - perhaps userspace can cause the timer to get re-enabled
+after it's been del_timer()'ed.
