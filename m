@@ -1,83 +1,71 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 19 Mar 2010 10:15:14 +0530
-Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
-	in linux
-In-Reply-To: <20100317163023.GF31126@trinity.fluff.org>
-References: <4B9DB823.1040809@st.com>
-	<20100315062041.GD31126@trinity.fluff.org>
-	<4B9DDC61.3090609@st.com>
-	<20100317163023.GF31126@trinity.fluff.org>
-Message-ID: <4BA3015A.7020904@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 19 Mar 2010 14:48:16 +0900
+Subject: [PATCH 3/3] ARM: S5PV210: Bug fix on PWM Timer
+Message-ID: <1268977696-26286-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2010 10:00 PM, Ben Dooks wrote:
-> On Mon, Mar 15, 2010 at 12:36:09PM +0530, Viresh KUMAR wrote:
->> Ben,
->>
->> On 3/15/2010 11:50 AM, Ben Dooks wrote:
->>>>> I have provided this selection from "make menuconfig", based on selection I
->>>>> configure hardware at initialization time. Basically these selections will
->>>>> decide which device is present in the system when it boots.
->>> This is really bad idea, what happens if you have a selection of
->>> boards with mutually-exclusive peripheral sets?
->>
->> In this case, we can have different defconfig files for different boards.
-> 
-> That is not acceptable, it makes life difficult for things like the
-> autobuilder (more configurations to process), for people trying to
-> package software distributions (each kernel requires a package, a set
-> of modules, requiring time to build and space to store).
-> 
-> The configuration is known to the board initialisation code in the
-> kernel, and thus it should be requesting a set of features from the
-> core SoC implementation saying what it wants. This can then ensure
-> that the configuration is mutually exclusive, ensure any resources
-> such as GPIO are correctly configured, etc.
-> 
-> Note, currently the s3c2410_defconfig builds 123Mbyte of modules.
-> Think about having m-machines' worth of those littering your development
-> system.
->  
->>> Making these sorts of
->>> decisions at compile time is always a bad idea, it leaves people making
->>> distributitions a lot of extra work.
->>>
->>
->> I agree with this point but what is the other way for this.
->>
->> Doing this at runtime will have following issue:
->>
->> User have inserted a module and by mistake or lack of knowledge,
->> he disabled already working IP(due to multiplexing). Now with Kconfig concept 
->> this is taken care of at the beginning only. User can't select peripherals which
->> can't be enabled simultaneously.
-> 
-> Generally, all devices are registered at initialisation time. If there is
-> the chance of dynamically loading drivers afterwards, either you'll have
-> to do one of the following:
-> 
-> 1) Change the driver to call the SoC code in the probe() code to ensure
->    that it can get the required SoC resources
-> 
-> 2) Ensure the board has reseved the SoC resources for the device at start
->    time
-> 
-> Note, also unless you have very specific modules, your Kconfig approach
-> will break down if you forget to update the root-fs when changing the
-> kernel, otherwise modules you can't load will be left around.
-> 
-> Generally, runtime controls are much better than build time.
-> 
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-Thanks guys.
-All of you gave great inputs, this discussion helped me a lot.
+This patch fixes below bugs:
+- Return value in the pwm_cfg_src_is_tclk
+- Return value in the tcfg_to_divisor
+- Return value in the pwm_tdiv_has_div1
+- Return value in the pwm_tdiv_div_bits
 
-This is what I understood,
-1. Mux config decision must be done at run time.
-2. Mux config will be board dependent.
-3. Mux config should be one time and should be discouraged to be done again as this
-can cause board failures or more power consumption. 
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv210/include/mach/pwm-clock.h |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-thanks,
-viresh kumar.
+diff --git a/arch/arm/mach-s5pv210/include/mach/pwm-clock.h b/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
+index 69027fe..c22c8fa 100644
+--- a/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
++++ b/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
+@@ -21,14 +21,14 @@
+ 
+ /**
+  * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
+- * @cfg: The timer TCFG1 register bits shifted down to 0.
++ * @tcfg: The timer TCFG1 register bits shifted down to 0.
+  *
+  * Return true if the given configuration from TCFG1 is a TCLK instead
+  * any of the TDIV clocks.
+  */
+ static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
+ {
+-	return tcfg == S3C2410_TCFG1_MUX_TCLK;
++	return tcfg == S3C64XX_TCFG1_MUX_TCLK;
+ }
+ 
+ /**
+@@ -40,7 +40,7 @@ static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
+  */
+ static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
+ {
+-	return 1 << (1 + tcfg1);
++	return 1 << tcfg1;
+ }
+ 
+ /**
+@@ -50,7 +50,7 @@ static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
+  */
+ static inline unsigned int pwm_tdiv_has_div1(void)
+ {
+-	return 0;
++	return 1;
+ }
+ 
+ /**
+@@ -61,7 +61,7 @@ static inline unsigned int pwm_tdiv_has_div1(void)
+  */
+ static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
+ {
+-	return ilog2(div) - 1;
++	return ilog2(div);
+ }
+ 
+ #define S3C_TCFG1_MUX_TCLK S3C2410_TCFG1_MUX_TCLK
+-- 
+1.6.2.5
