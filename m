@@ -1,37 +1,83 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Fri, 19 Mar 2010 03:46:45 +0000
-Subject: [PATCH] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and check
-	for it on V6
-In-Reply-To: <20100319013521.GP2900@atomide.com>
-References: <20100317175731.GE2900@atomide.com>
-	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
-	<20100317191114.GH2900@atomide.com>
-	<1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
-	<20100318170021.GN2900@atomide.com>
-	<20100319013521.GP2900@atomide.com>
-Message-ID: <20100319034645.GG14108@shareable.org>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Fri, 19 Mar 2010 10:15:14 +0530
+Subject: QUERY: How to handle SOC Configuration (Peripheral	Multiplexing)
+	in linux
+In-Reply-To: <20100317163023.GF31126@trinity.fluff.org>
+References: <4B9DB823.1040809@st.com>
+	<20100315062041.GD31126@trinity.fluff.org>
+	<4B9DDC61.3090609@st.com>
+	<20100317163023.GF31126@trinity.fluff.org>
+Message-ID: <4BA3015A.7020904@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
-> Also, I wonder if the change __kuser_get_tls is safe?
+On 3/17/2010 10:00 PM, Ben Dooks wrote:
+> On Mon, Mar 15, 2010 at 12:36:09PM +0530, Viresh KUMAR wrote:
+>> Ben,
+>>
+>> On 3/15/2010 11:50 AM, Ben Dooks wrote:
+>>>>> I have provided this selection from "make menuconfig", based on selection I
+>>>>> configure hardware at initialization time. Basically these selections will
+>>>>> decide which device is present in the system when it boots.
+>>> This is really bad idea, what happens if you have a selection of
+>>> boards with mutually-exclusive peripheral sets?
+>>
+>> In this case, we can have different defconfig files for different boards.
 > 
-> +	ldr     r0, [pc, #(16 - 8)]		@ TLS set at 0xffff0ff0?
-> +	cmp	r0, #0				@ assume hw TLS if not set
-> +	mrceq	p15, 0, r0, c13, c0, 3		@ read TLS register
+> That is not acceptable, it makes life difficult for things like the
+> autobuilder (more configurations to process), for people trying to
+> package software distributions (each kernel requires a package, a set
+> of modules, requiring time to build and space to store).
+> 
+> The configuration is known to the board initialisation code in the
+> kernel, and thus it should be requesting a set of features from the
+> core SoC implementation saying what it wants. This can then ensure
+> that the configuration is mutually exclusive, ensure any resources
+> such as GPIO are correctly configured, etc.
+> 
+> Note, currently the s3c2410_defconfig builds 123Mbyte of modules.
+> Think about having m-machines' worth of those littering your development
+> system.
+>  
+>>> Making these sorts of
+>>> decisions at compile time is always a bad idea, it leaves people making
+>>> distributitions a lot of extra work.
+>>>
+>>
+>> I agree with this point but what is the other way for this.
+>>
+>> Doing this at runtime will have following issue:
+>>
+>> User have inserted a module and by mistake or lack of knowledge,
+>> he disabled already working IP(due to multiplexing). Now with Kconfig concept 
+>> this is taken care of at the beginning only. User can't select peripherals which
+>> can't be enabled simultaneously.
+> 
+> Generally, all devices are registered at initialisation time. If there is
+> the chance of dynamically loading drivers afterwards, either you'll have
+> to do one of the following:
+> 
+> 1) Change the driver to call the SoC code in the probe() code to ensure
+>    that it can get the required SoC resources
+> 
+> 2) Ensure the board has reseved the SoC resources for the device at start
+>    time
+> 
+> Note, also unless you have very specific modules, your Kconfig approach
+> will break down if you forget to update the root-fs when changing the
+> kernel, otherwise modules you can't load will be left around.
+> 
+> Generally, runtime controls are much better than build time.
+> 
 
-You cannot assume the TLS value is non-zero, because it's provided by
-userspace to use however it wants.  It doesn't even have to be an address.
+Thanks guys.
+All of you gave great inputs, this discussion helped me a lot.
 
-I'm thinking, why not an alternative() macro like on x86, which is a
-very nice way to describe run-time patches of one or a few instructions
-which depend on arch feature bits.
+This is what I understood,
+1. Mux config decision must be done at run time.
+2. Mux config will be board dependent.
+3. Mux config should be one time and should be discouraged to be done again as this
+can cause board failures or more power consumption. 
 
-Then all that switch_to() logic could be made the size it was before.
-
-An alternative() macro could make a lot of other chip-dependent calls
-smaller too, i.e. all those which dispatch through function pointers
-at present for cache flushing etc - they could become direct calls, or
-an inline instruction or two when possible.
-
--- Jamie
+thanks,
+viresh kumar.
