@@ -1,77 +1,119 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Mar 2010 11:28:45 +0100
-Subject: [PATCH 5/5] i.MX51: remove NFC AXI static mapping
+Date: Fri, 19 Mar 2010 11:28:44 +0100
+Subject: [PATCH 4/5] i.MX51: determine silicon revision dynamically
 In-Reply-To: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
 References: <1268994525-32495-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1268994525-32495-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1268994525-32495-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This area contains the Nand Flash controller registers. There
-is no need to map them statically as the Nand driver uses ioremap().
+Freescale redboot passes the silicon revision via
+ATAG_REVISION. Remove this bootloader dependency by
+doing the same as redboot does in the Kernel.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx5/mm.c                |    5 -----
- arch/arm/plat-mxc/include/mach/mx51.h |    9 ++-------
- 2 files changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/mach-mx5/cpu.c               |   53 +++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mx51.h |   13 ++++----
+ 2 files changed, 60 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index 9fe7beb..b7677ef 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -49,11 +49,6 @@ static struct map_desc mxc_io_desc[] __initdata = {
- 		.pfn = __phys_to_pfn(MX51_AIPS2_BASE_ADDR),
- 		.length = MX51_AIPS2_SIZE,
- 		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_NFC_AXI_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_NFC_AXI_BASE_ADDR),
--		.length = MX51_NFC_AXI_SIZE,
--		.type = MT_DEVICE
- 	},
- };
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 41c769f..2d37785 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -14,9 +14,62 @@
+ #include <linux/types.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/module.h>
+ #include <mach/hardware.h>
+ #include <asm/io.h>
  
++static int cpu_silicon_rev = -1;
++
++#define SI_REV 0x48
++
++static void query_silicon_parameter(void)
++{
++	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
++	u32 rev;
++
++	if (!rom) {
++		cpu_silicon_rev = -EINVAL;
++		return;
++	}
++
++	rev = readl(rom + SI_REV);
++	switch (rev) {
++	case 0x1:
++		cpu_silicon_rev = MX51_CHIP_REV_1_0;
++		break;
++	case 0x2:
++		cpu_silicon_rev = MX51_CHIP_REV_1_1;
++		break;
++	case 0x10:
++		cpu_silicon_rev = MX51_CHIP_REV_2_0;
++		break;
++	case 0x20:
++		cpu_silicon_rev = MX51_CHIP_REV_3_0;
++		break;
++	default:
++		cpu_silicon_rev = 0;
++	}
++
++	iounmap(rom);
++}
++
++/*
++ * Returns:
++ *	the silicon revision of the cpu
++ *	-EINVAL - not a mx51
++ */
++int mx51_revision(void)
++{
++	if (!cpu_is_mx51())
++		return -EINVAL;
++
++	if (cpu_silicon_rev == -1)
++		query_silicon_parameter();
++
++	return cpu_silicon_rev;
++}
++EXPORT_SYMBOL(mx51_revision);
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
 diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index fd255a9..5aad344 100644
+index f1396bd..fd255a9 100644
 --- a/arch/arm/plat-mxc/include/mach/mx51.h
 +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -23,7 +23,7 @@
-  *         	C8000000	64M	CS3 Flash
-  *         	CC000000	32M	CS4 SRAM
-  *         	CE000000	32M	CS5 SRAM
-- * F9000000	CFFF0000	64K	NFC (NAND Flash AXI)
-+ *		CFFF0000	64K	NFC (NAND Flash AXI)
-  *
+@@ -28,6 +28,12 @@
   */
  
-@@ -46,7 +46,6 @@
-  * NFC
+ /*
++ * IROM
++ */
++#define MX51_IROM_BASE_ADDR		0x0
++#define MX51_IROM_SIZE			SZ_64K
++
++/*
+  * IRAM
   */
- #define MX51_NFC_AXI_BASE_ADDR		0xCFFF0000	/* NAND flash AXI */
--#define MX51_NFC_AXI_BASE_ADDR_VIRT	0xF9000000
- #define MX51_NFC_AXI_SIZE		SZ_64K
+ #define MX51_IRAM_BASE_ADDR		0x1FFE0000	/* internal ram */
+@@ -438,12 +444,7 @@
  
- /*
-@@ -240,8 +239,7 @@
- 	MX51_IS_MODULE(x, DEBUG) ? MX51_DEBUG_IO_ADDRESS(x) :	\
- 	MX51_IS_MODULE(x, SPBA0) ? MX51_SPBA0_IO_ADDRESS(x) :	\
- 	MX51_IS_MODULE(x, AIPS1) ? MX51_AIPS1_IO_ADDRESS(x) :	\
--	MX51_IS_MODULE(x, AIPS2) ? MX51_AIPS2_IO_ADDRESS(x) :	\
--	MX51_IS_MODULE(x, NFC_AXI) ? MX51_NFC_AXI_IO_ADDRESS(x) : \
-+	MX51_IS_MODULE(x, AIPS2) ? MX51_AIPS2_IO_ADDRESS(x) : \
- 	0xDEADBEEF)
+ #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
  
- /*
-@@ -262,9 +260,6 @@
- #define MX51_AIPS2_IO_ADDRESS(x)  \
- 	(((x) - MX51_AIPS2_BASE_ADDR) + MX51_AIPS2_BASE_ADDR_VIRT)
- 
--#define MX51_NFC_AXI_IO_ADDRESS(x) \
--	(((x) - MX51_NFC_AXI_BASE_ADDR) + MX51_NFC_AXI_BASE_ADDR_VIRT)
+-extern unsigned int system_rev;
 -
- #define MX51_IS_MEM_DEVICE_NONSHARED(x)		0
+-static inline unsigned int mx51_revision(void)
+-{
+-	return system_rev;
+-}
++extern int mx51_revision(void);
+ #endif
  
- /*
+ #endif	/*  __ASM_ARCH_MXC_MX51_H__ */
 -- 
 1.7.0
