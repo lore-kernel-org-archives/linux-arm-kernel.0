@@ -1,10 +1,8 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 19 Mar 2010 09:17:19 -0400 (EDT)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Mar 2010 13:27:50 +0000
 Subject: Highmem issues with MMC filesystem
-In-Reply-To: <20100319015523.GD14108@shareable.org>
-References: <alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+In-Reply-To: <alpine.LFD.2.00.1003190908330.31128@xanadu.home>
+References: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
 	<20100318092352.GD8267@n2100.arm.linux.org.uk>
 	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
 	<20100318112453.GA19544@n2100.arm.linux.org.uk>
@@ -13,38 +11,24 @@ References: <alpine.LFD.2.00.1003170946250.31128@xanadu.home>
 	<20100318141930.GF19544@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1003181205020.31128@xanadu.home>
 	<20100319015523.GD14108@shareable.org>
-Message-ID: <alpine.LFD.2.00.1003190908330.31128@xanadu.home>
+	<alpine.LFD.2.00.1003190908330.31128@xanadu.home>
+Message-ID: <20100319132750.GE21280@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Mar 2010, Jamie Lokier wrote:
+On Fri, Mar 19, 2010 at 09:17:19AM -0400, Nicolas Pitre wrote:
+> And in this case, the same SATA driver is used on two different system, 
+> one being ARMv5 with absolutely no issues with highmem, and the other 
+> being ARMv6 with highmem problems.  So that pretty much rules out IDE 
+> driver bugs.
 
-> Nicolas Pitre wrote:
-> > Data read from a DMA based block device is corrupted in memory and 
-> > causing all sorts of misbehavior such as segmentation faults in user 
-> > space, or EXT2 complaining about broken filesystem metadata.
-> 
-> I doubt it is related, but just in case: I've seen similar on a
-> no-doubt completely unrelated ARM9 system on now-ancient kernels:
-> occasional ext3 metadata corruption.
-> 
-> In my case it was due to a bug in the chip's IDE driver, which did:
-[...]
+No it doesn't - there's more changes between ARMv5 and ARMv6 than just
+the cache model.  There's weak memory ordering effects too.
 
-Driver bugs would tend to be visible with or without highmem in play.
+A missing barrier or a badly implemented barrier can result in ARMv5
+and earlier working perfectly, but ARMv6+ randomly failing.
 
-And in this case, the same SATA driver is used on two different system, 
-one being ARMv5 with absolutely no issues with highmem, and the other 
-being ARMv6 with highmem problems.  So that pretty much rules out IDE 
-driver bugs.
-
-Furthermore the same highmem issues were reported to occur on an OMAP 
-system with the filesystem on a MMC card i.e. different CPU manufacturer 
-with a different block device driver.
-
-So the issue really seems to be about ARMv5 (works) vs ARMv6 (doesn't 
-work), which makes some sense given the huge difference between both 
-cache models.
-
-
-Nicolas
+Eg, we know that ARMv6+ CPUs with L2 cache, the wmb() implementation is
+not sufficient, and DMA can be started before the write to
+dma_alloc_coherent memory has become visible to the DMA controller, and
+that's a topic of discussion at the present time.
