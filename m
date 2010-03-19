@@ -1,34 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Mar 2010 13:27:50 +0000
-Subject: Highmem issues with MMC filesystem
-In-Reply-To: <alpine.LFD.2.00.1003190908330.31128@xanadu.home>
-References: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
-	<20100318092352.GD8267@n2100.arm.linux.org.uk>
-	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
-	<20100318112453.GA19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
-	<20100318141930.GF19544@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003181205020.31128@xanadu.home>
-	<20100319015523.GD14108@shareable.org>
-	<alpine.LFD.2.00.1003190908330.31128@xanadu.home>
-Message-ID: <20100319132750.GE21280@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Mar 2010 13:48:20 +0000
+Subject: [PATCH v4 0/4] ARM mandatory barriers
+Message-ID: <20100319134614.14625.18408.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 19, 2010 at 09:17:19AM -0400, Nicolas Pitre wrote:
-> And in this case, the same SATA driver is used on two different system, 
-> one being ARMv5 with absolutely no issues with highmem, and the other 
-> being ARMv6 with highmem problems.  So that pretty much rules out IDE 
-> driver bugs.
+Hi,
 
-No it doesn't - there's more changes between ARMv5 and ARMv6 than just
-the cache model.  There's weak memory ordering effects too.
+Updated series on the ARM mandatory barriers. As per Russell's
+suggestion, most platform seem to define the mb() as dsb(); outer_sync()
+and it makes sense to make this the default (if CONFIG_OUTER_CACHE_SYNC
+is defined). The patch still allows per-platform barriers via the
+CONFIG_ARCH_HAS_BARRIERS option.
 
-A missing barrier or a badly implemented barrier can result in ARMv5
-and earlier working perfectly, but ARMv6+ randomly failing.
 
-Eg, we know that ARMv6+ CPUs with L2 cache, the wmb() implementation is
-not sufficient, and DMA can be started before the write to
-dma_alloc_coherent memory has become visible to the DMA controller, and
-that's a topic of discussion at the present time.
+Catalin Marinas (4):
+      ARM: Move the outer_cache definitions into a separate file
+      ARM: Add outer_cache_fns.sync function pointer
+      ARM: Add L2x0 outer_sync() support
+      ARM: Change the mandatory barriers implementation
+
+
+ arch/arm/include/asm/cacheflush.h |   38 -------------------
+ arch/arm/include/asm/outercache.h |   75 +++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/system.h     |   14 ++++---
+ arch/arm/mm/Kconfig               |   13 ++++++
+ arch/arm/mm/cache-l2x0.c          |   10 +++++
+ 5 files changed, 107 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm/include/asm/outercache.h
+
+-- 
+Catalin
