@@ -1,214 +1,44 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 19 Mar 2010 11:48:42 -0400
-Subject: [PATCH 4/5] ASoc: support codec via ssp interface in aspenite
-In-Reply-To: <20100318120153.GG3080@opensource.wolfsonmicro.com>
-References: <771cded01003171931s6b2a9502o379492396e41e82b@mail.gmail.com>
-	<20100318120153.GG3080@opensource.wolfsonmicro.com>
-Message-ID: <771cded01003190848h386ba184u2bc3ed0ea6ad093a@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Mar 2010 08:58:05 -0700
+Subject: [PATCH] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100319085317.GA8451@n2100.arm.linux.org.uk>
+References: <20100317175731.GE2900@atomide.com>
+	<1268849278.19565.28.camel@e102109-lin.cambridge.arm.com>
+	<20100317191114.GH2900@atomide.com>
+	<1268910826.15334.32.camel@e102109-lin.cambridge.arm.com>
+	<20100318170021.GN2900@atomide.com>
+	<20100319013521.GP2900@atomide.com>
+	<20100319085317.GA8451@n2100.arm.linux.org.uk>
+Message-ID: <20100319155805.GS2900@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 18, 2010 at 8:01 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 17, 2010 at 10:31:43PM -0400, Haojian Zhuang wrote:
->
->> ?sound/soc/pxa/Kconfig ? ? ?| ? 15 ++-
->> ?sound/soc/pxa/Makefile ? ? | ? ?4 +
->> ?sound/soc/pxa/aspenite.c ? | ?200 +++++++++++++++++++++++
->> ?sound/soc/pxa/pxa168-ssp.c | ?383 ++++++++++++++++++++++++++++++++++++++++++++
->> ?sound/soc/pxa/pxa168-ssp.h | ? 42 +++++
->
-> As I said when you posted this patch previously you need to split this
-> up into two separate patches, one adding support for the SSP DAI and the
-> other adding the machine driver. ?The PXA168 support is a separate thing
-> to the Aspenite machine support. ?Please address this for the next
-> iteration of the patch.
->
-Fixed.
->> + ? ? /* Speaker connected to LOUT2/OUT4 & OUT3/ROUT2 */
->> + ? ? {"Headset Speaker", NULL, "LOUT2"},
->> + ? ? {"Headset Speaker", NULL, "OUT4"},
->> + ? ? {"Headset Speaker", NULL, "OUT3"},
->> + ? ? {"Headset Speaker", NULL, "ROUT2"},
->
-> This looks like it's two speakers rahter than a single one?
->
-Changed to two speakers.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100319 01:49]:
+> On Thu, Mar 18, 2010 at 06:35:21PM -0700, Tony Lindgren wrote:
+> > -#if defined(CONFIG_HAS_TLS_REG)
+> > -	mcr	p15, 0, r3, c13, c0, 3		@ set TLS register
+> > -#elif !defined(CONFIG_TLS_REG_EMUL)
+> > -	mov	r4, #0xffff0fff
+> > -	str	r3, [r4, #-15]			@ TLS val at 0xffff0ff0
+> > +#if !defined(CONFIG_TLS_REG_EMUL)
+> > +	ldr	r4, =elf_hwcap
+> > +	ldr	r4, [r4, #0]
+> > +	tst	r4, #HWCAP_TLS			@ hardware with TLS?
+> 
+> This is really really inefficient.  Both the second ldr and tst will stall
+> the pipeline because they need to wait for the result of the precending
+> ldr.  Can we do better by re-ordering some instructions?
 
->> + ? ? rate = ?params_rate(params);
->> + ? ? width = snd_pcm_format_physical_width(params_format(params));
->> + ? ? channel = params_channels(params);
->> + ? ? ret = seek_mclk_conf(rate, width, channel);
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? return ret;
->
-> seek_mclk_conf() hasn't been prototyped or declared at this point.
->
-> Probably better to include some blank space betwen the assignment of
-> width and channel and this stuff for legibility.
->
-seek_mclk_conf() is declared in pxa168-ssp.h.
+Or set ifdef CONFIG_CPU_V6 and test for the cp15 id register every time..
+ 
+> Also, the ifndef seems incorrect - if we have TLS_REG_EMUL we seem to omit
+> all this code.
 
->> + ? ? index = ret;
->> + ? ? mclk = get_mclk(ret);
->> +
->> + ? ? /* set codec DAI configuration */
->> + ? ? ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | SND_SOC_DAIFMT_NB_IF
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | SND_SOC_DAIFMT_CBS_CFS);
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? return ret;
->
-> As I said last time it seems odd that you are using an inverted frame
-> clock here - why is this? ?A comment explaining the decision would be
-> better.
->
-New comment is added into code.
+Is the current ifdef elif wrong? The current code does not seem to
+do anything if TLS_REG_EMUL is set and HAS_TLS_REG is not set.
+HAS_TLS_REG depends !TLS_REG_EMUL.
 
->> +static int aspenite_hifi_hw_free(struct snd_pcm_substream *substream)
->> +{
->> + ? ? return 0;
->> +}
->
-> As I said last time please remove this function if it's empty. ?It is
-> very disappointing to see all these review comments from last time which
-> have not been addressed.
->
-Fixed.
+Regards,
 
->> +/* Seek the index of MCLK configuration table */
->> +int seek_mclk_conf(int rate, int format, int channel)
->> +{
->> + ? ? int i;
->> +
->> + ? ? for (i = 0; i < ARRAY_SIZE(mclk_conf); i++) {
->> + ? ? ? ? ? ? if ((mclk_conf[i].rate == rate)
->> + ? ? ? ? ? ? ? ? ? ? && (mclk_conf[i].format == format)
->> + ? ? ? ? ? ? ? ? ? ? && (mclk_conf[i].channel == channel))
->> + ? ? ? ? ? ? ? ? ? ? return i;
->> + ? ? }
->> + ? ? return -EINVAL;
->> +}
->
-> These functions should all be either static or namespaced. ?If they're
-> supposed to be used by machine drivers they need EXPORT_SYMBOL_GPL().
->
-Fixed.
-
->> + * Set the SSP ports SYSCLK only from Audio SYSCLK.
->> + */
->> +static int pxa168_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int freq, int dir)
->> +{
->> + ? ? struct ssp_priv *priv = cpu_dai->private_data;
->> + ? ? struct ssp_device *ssp = priv->ssp;
->> + ? ? unsigned int sscr0, data, asysdr, asspdr;
->> +
->> + ? ? dev_dbg(&ssp->pdev->dev, "%s id: %d, clk_id %d, freq %u\n",
->> + ? ? ? ? ? ? __func__, cpu_dai->id, clk_id, freq);
->> +
->> + ? ? switch (clk_id) {
->> + ? ? case PXA168_ASYSCLK_MASTER:
->> + ? ? case PXA168_ASYSCLK_SLAVE:
->> + ? ? ? ? ? ? break;
->
-> Are these really two different clocks, or is it the same clock as an
-> input and and ouput in which case the dir parameter should be being
-> used.
->
-It's same clock. Code is changed.
-
->> + ? ? ssp_disable(ssp);
->> + ? ? clk_disable(ssp->clk); ? ? ? ? ? ? ? ? ?/* SSP port internal clock */
->> +
->> + ? ? /* clear ECS, NCS, MOD, ACS */
->> + ? ? sscr0 = ssp_read_reg(ssp, SSCR0);
->> + ? ? data = sscr0 & ~(SSCR0_ECS | SSCR0_NCS | SSCR0_MOD | SSCR0_ACS);
->> + ? ? if (sscr0 != data)
->> + ? ? ? ? ? ? ssp_write_reg(ssp, SSCR0, data);
->> +
->> + ? ? /* update divider register in MPMU */
->> + ? ? __raw_writel(asysdr, MPMU_ASYSDR);
->> + ? ? __raw_writel(asspdr, MPMU_ASSPDR);
->> +
->> + ? ? clk_enable(ssp->clk); ? ? ? ? ? ? ? ? ? /* SSP port internal clock */
->> + ? ? ssp_enable(ssp);
->
-> Should the clock enable perhaps be folded into ssp_enable()?
->
-No, I think that it's unnecessary.
-
->> +static int pxa168_ssp_hw_params(struct snd_pcm_substream *substream,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_pcm_hw_params *params,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_soc_dai *dai)
->> +{
->
-> Does this really need to be different to the PXA2xx SSP port? ?I'm not
-> spotting anything in here that looks outrageously different. ?I'm not
-> spotting anything in here that looks outrageously different. ?I'm not
-> spotting anything in here that looks outrageously different. ?I'm not
-> spotting anything in here that looks outrageously different.
->
-Some difference is still existed since cpu_is_pxa3xx() is used. It's
-valid for ARCH_PXA, not ARCH_MMP.
-
->> +struct snd_soc_dai pxa168_ssp_dai[PXA168_DAI_SSP_MAX];
->> +EXPORT_SYMBOL(pxa168_ssp_dai);
->
-> EXPORT_SYMBOL_GPL, the ASoC core is _GPL.
->
-Fixed.
-
->> + ? ? for (i = 0; i < PXA168_DAI_SSP_MAX; i++) {
->> + ? ? ? ? ? ? dai = &pxa168_ssp_dai[i];
->> + ? ? ? ? ? ? dai->name = "pxa168-ssp";
->> + ? ? ? ? ? ? dai->id = i;
->> + ? ? ? ? ? ? dai->playback.channels_min = 1;
->> + ? ? ? ? ? ? dai->playback.channels_max = 2;
->> + ? ? ? ? ? ? dai->playback.rates = PXA168_SSP_RATES;
->> + ? ? ? ? ? ? dai->playback.formats = PXA168_SSP_FORMATS;
->> + ? ? ? ? ? ? dai->capture.channels_min = 1;
->> + ? ? ? ? ? ? dai->capture.channels_max = 2;
->> + ? ? ? ? ? ? dai->capture.rates = PXA168_SSP_RATES;
->> + ? ? ? ? ? ? dai->capture.formats = PXA168_SSP_FORMATS;
->> + ? ? ? ? ? ? dai->ops = &pxa168_ssp_dai_ops;
->
-> Why are these being initialised at runtime? ?There's no system
-> dependencies in the initialisation.
->
-OK. Changed it.
-
->> +
->> +#define PXA168_SSP_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 | ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | ? \
->> + ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | ? \
->> + ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_88200 | ? \
->> + ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_RATE_96000)
->
-> This is SNDRV_PCM_RATE_8000_96000. ?Neither this nor the format define
-> should be being exported to others drivers.
->
-Fixed.
-
->> +/* pxa DAI SSP IDs */
->> +enum {
->> + ? ? PXA168_DAI_SSP1,
->> + ? ? PXA168_DAI_SSP2,
->> + ? ? PXA168_DAI_SSP3,
->> + ? ? PXA168_DAI_SSP4,
->> + ? ? PXA168_DAI_SSP5,
->> + ? ? PXA168_DAI_SSP_MAX,
->> +};
->
-> ...
->
->> +extern struct snd_soc_dai pxa168_ssp_dai[5];
->
-> These two aren't joined up with each other.
->
-Fixed.
-
-Fixed patches will be sent in a new conversation.
-
-Thanks
-Haojian
+Tony
