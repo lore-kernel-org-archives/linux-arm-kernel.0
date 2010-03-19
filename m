@@ -1,43 +1,48 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 19 Mar 2010 13:47:59 -0400 (EDT)
+Date: Fri, 19 Mar 2010 13:59:28 -0400 (EDT)
 Subject: Highmem issues with MMC filesystem
-In-Reply-To: <1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
-References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
-	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
-	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+In-Reply-To: <20100319132750.GE21280@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1003171050160.31128@xanadu.home>
 	<20100318092352.GD8267@n2100.arm.linux.org.uk>
 	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
 	<20100318112453.GA19544@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
-	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
-	<20100319144647.GG21280@n2100.arm.linux.org.uk>
-	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C489CB4A@dbde02.ent.ti.com>
+	<20100318141930.GF19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003181205020.31128@xanadu.home>
+	<20100319015523.GD14108@shareable.org>
+	<alpine.LFD.2.00.1003190908330.31128@xanadu.home>
+	<20100319132750.GE21280@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1003191348231.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Mar 2010, Catalin Marinas wrote:
+On Fri, 19 Mar 2010, Russell King - ARM Linux wrote:
 
-> > On Fri, Mar 19, 2010 at 02:41:17PM +0000, Catalin Marinas wrote:
-> > > On Thu, 2010-03-18 at 13:20 +0000, Nicolas Pitre wrote:
-> > > > The only way a highmem page can be unmapped is through kunmap_atomic()
-> > > > where an explicit __cpuc_flush_dcache_area() is performed, or through
-> > > > flush_all_zero_pkmaps() where flush_cache_kmaps() translates into
-> > > > flush_cache_all().
-> > >
-> > > The thing that I couldn't fully understand with the kunmap_atomic()
-> > > function is that there is a path (when kvaddr < FIXADDR_START) where no
-> > > cache flushing occurs. Can this not happen?
-> > 
-> > kunmap interfaces are not for cache flushing; the cache flushing is
-> > only there to ensure consistency when unmapping a mapping on VIVT CPUs.
+> On Fri, Mar 19, 2010 at 09:17:19AM -0400, Nicolas Pitre wrote:
+> > And in this case, the same SATA driver is used on two different system, 
+> > one being ARMv5 with absolutely no issues with highmem, and the other 
+> > being ARMv6 with highmem problems.  So that pretty much rules out IDE 
+> > driver bugs.
 > 
-> I agree, but then why don't we conditionally call
-> __cpuc_flush_dcache_area() in kunmap_atomic() so that we avoid this
-> flush on non-aliasing VIPT?
+> No it doesn't - there's more changes between ARMv5 and ARMv6 than just
+> the cache model.  There's weak memory ordering effects too.
 
-We should indeed.
+Sure.  But at the moment we have:
+
+ - ARMv5 without highmem -> works
+
+ - ARMv5 with highmem -> works
+
+ - ARMv6 without highmem -> works
+
+ - ARMv6 with highmem -> fails
+
+In all four cases the SATA driver, the hard disk and the filesystem on 
+it are identical.  In the two ARMv5 cases the system and the kernel are 
+identical.  Ditto for the two ARMv6 cases.
+
+And the kernel used is the very latest i.e. v2.6.34-rc1-1642-gfc7f99c.
 
 
 Nicolas
