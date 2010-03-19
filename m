@@ -1,66 +1,58 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Mar 2010 14:33:06 +0000
-Subject: [PATCH v5 2/4] ARM: Add outer_cache_fns.sync function pointer
+Date: Fri, 19 Mar 2010 14:33:11 +0000
+Subject: [PATCH v5 3/4] ARM: Add L2x0 outer_sync() support
 In-Reply-To: <20100319143047.11748.9186.stgit@e102109-lin.cambridge.arm.com>
 References: <20100319143047.11748.9186.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100319143306.11748.81315.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100319143311.11748.76264.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the outer_cache_fns.sync function pointer together
-with the OUTER_CACHE_SYNC config option that can be used to drain the
-write buffer of the outer cache.
+The L2x0 cache controllers need to explicitly drain their write buffer
+even for Normal Noncacheable memory accesses.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/outercache.h |   14 ++++++++++++++
- arch/arm/mm/Kconfig               |    6 ++++++
- 2 files changed, 20 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig      |    1 +
+ arch/arm/mm/cache-l2x0.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index c8571cb..25f76ba 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -25,6 +25,9 @@ struct outer_cache_fns {
- 	void (*inv_range)(unsigned long, unsigned long);
- 	void (*clean_range)(unsigned long, unsigned long);
- 	void (*flush_range)(unsigned long, unsigned long);
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-+	void (*sync)(void);
-+#endif
- };
- 
- #ifdef CONFIG_OUTER_CACHE
-@@ -58,4 +61,15 @@ static inline void outer_flush_range(unsigned long start, unsigned long end)
- 
- #endif
- 
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-+static inline void outer_sync(void)
-+{
-+	if (outer_cache.sync)
-+		outer_cache.sync();
-+}
-+#else
-+static inline void outer_sync(void)
-+{ }
-+#endif
-+
- #endif	/* __ASM_OUTERCACHE_H */
 diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c4ed9f9..88a24de 100644
+index 88a24de..55a2a00 100644
 --- a/arch/arm/mm/Kconfig
 +++ b/arch/arm/mm/Kconfig
-@@ -736,6 +736,12 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
- config OUTER_CACHE
- 	bool
+@@ -763,6 +763,7 @@ config CACHE_L2X0
+ 		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || ARCH_NOMADIK || ARCH_OMAP4
+ 	default y
+ 	select OUTER_CACHE
++	select OUTER_CACHE_SYNC
+ 	help
+ 	  This option enables the L2x0 PrimeCell.
  
-+config OUTER_CACHE_SYNC
-+	bool
-+	help
-+	  The outer cache has a outer_cache_fns.sync function pointer
-+	  that can be used to drain the write buffer of the outer cache.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 0733463..21ad68b 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -93,6 +93,15 @@ static inline void l2x0_flush_line(unsigned long addr)
+ }
+ #endif
+ 
++static void l2x0_cache_sync(void)
++{
++	unsigned long flags;
 +
- config CACHE_FEROCEON_L2
- 	bool "Enable the Feroceon L2 cache controller"
- 	depends on ARCH_KIRKWOOD || ARCH_MV78XX0
++	spin_lock_irqsave(&l2x0_lock, flags);
++	cache_sync();
++	spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
+ static inline void l2x0_inv_all(void)
+ {
+ 	unsigned long flags;
+@@ -225,6 +234,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	outer_cache.inv_range = l2x0_inv_range;
+ 	outer_cache.clean_range = l2x0_clean_range;
+ 	outer_cache.flush_range = l2x0_flush_range;
++	outer_cache.sync = l2x0_cache_sync;
+ 
+ 	printk(KERN_INFO "L2X0 cache controller enabled\n");
+ }
