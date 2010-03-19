@@ -1,7 +1,7 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Mar 2010 14:48:16 +0900
-Subject: [PATCH 3/3] ARM: S5PV210: Bug fix on PWM Timer
-Message-ID: <1268977696-26286-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 19 Mar 2010 14:48:06 +0900
+Subject: [PATCH 2/3] ARM: S5P6442: Bug fix on PWM Timer
+Message-ID: <1268977686-26254-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,13 +16,13 @@ This patch fixes below bugs:
 Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/pwm-clock.h |   10 +++++-----
+ arch/arm/mach-s5p6442/include/mach/pwm-clock.h |   10 +++++-----
  1 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/pwm-clock.h b/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
-index 69027fe..c22c8fa 100644
---- a/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
-+++ b/arch/arm/mach-s5pv210/include/mach/pwm-clock.h
+diff --git a/arch/arm/mach-s5p6442/include/mach/pwm-clock.h b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
+index 15e8525..6e90fce 100644
+--- a/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
++++ b/arch/arm/mach-s5p6442/include/mach/pwm-clock.h
 @@ -21,14 +21,14 @@
  
  /**
