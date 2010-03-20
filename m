@@ -1,65 +1,37 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Sat, 20 Mar 2010 11:58:06 +0000
-Subject: [PATCH] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <badfd5ba1003200420xc0680c1h8b4cccd02a8fdaba@mail.gmail.com>
-References: <20100320085507.4038.96426.stgit@pauliusz>
-	<1269078083.4028.5586.camel@macbook.infradead.org>
-	<badfd5ba1003200420xc0680c1h8b4cccd02a8fdaba@mail.gmail.com>
-Message-ID: <1269086286.4028.6039.camel@macbook.infradead.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 20 Mar 2010 13:09:39 +0100
+Subject: [PATCH 1/3] watchdog: Add support for the Freescale MXC watchdog
+In-Reply-To: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
+References: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <20100320120939.GA5515@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-03-20 at 13:20 +0200, Paulius Zaleckas wrote:
-> On Sat, Mar 20, 2010 at 11:41 AM, David Woodhouse <dwmw2@infradead.org> wrote:
-> > On Sat, 2010-03-20 at 10:55 +0200, Paulius Zaleckas wrote:
-> >> -             uint64_t x;
-> >> +             /*
-> >> +              * force x variable to r2/r3 registers since ldrd instruction
-> >> +              * requires first register to be even.
-> >> +              */
-> >> +             register uint64_t x asm ("r2");
-> >> +
-> >>               asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
-> >
-> > Hm, isn't there an asm constraint which will force it into an
-> > appropriate register pair?
-> 
-> Not that I know of...
-> 
-> > Failing that, "=&r2,r4,r6,r8" ought to work.
-> 
-> No, fails with error: matching constraint not valid in output operand
+On Fri, Mar 19, 2010 at 06:13:27PM +0300, Vladimir Zapolskiy wrote:
+> Add driver for the Freescale MXC SoCs built-in watchdog.
 
-Hm, crap -- GCC on ARM doesn't let you give specific registers, so that
-trick doesn't work.
+Any improvements over/differences to this one?
 
-Strictly speaking, I think your version is wrong -- although you force
-the variable 'x' to be stored in r2/r3, you don't actually force GCC to
-use r2/r3 as the output registers for the asm statement -- it could
-happily use other registers, then move their contents into r2/r3
-afterwards.
+http://article.gmane.org/gmane.linux.ports.arm.kernel/70753
 
-Obviously it _won't_ do that most of the time, but it _could_. GCC PR
-#15089 was filed for the fact that sometimes it does, but I think Nico
-was missing the point -- GCC is _allowed_ to do that, and if it makes
-you sad then you should be asking for better assembly constraints which
-would allow you to tell it not to.
+(Read the thread for the comments I received)
 
-See the __asmeq() macro in <asm/system.h> for a dirty hack which will
-check which registers are used and abort at compile time, although your
-compilation is going to fail anyway so I'm not sure it makes much of a
-difference in this particular case.
+Coincidence, I wanted to pick up my version and finish it next week. We have to
+agree how to continue. I like mine a tad better (there are some mixups of
+MX1/2+ capabilities in yours, e.g. SETTIMEOUT) and it also got review already,
+but of course I am biased ;) What do you suggest?
 
-The real fix here is to add an asm constraint to GCC which allows you to
-specify "any even GPR" (or whatever's most suitable for the ldrd
-instruction). Being able to give specific registers, like you can on
-other architectures, would be useful too.
+Regards,
 
-Please file a PR, then resubmit your patch with a comment explaining
-that the code is known to be broken because GCC doesn't allow you to do
-any better, and containing a reference to your PR. If people copy your
-code, I want them to at least know that they're propagating a bug.
+   Wolfram
 
 -- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100320/dddf8ec8/attachment.sig>
