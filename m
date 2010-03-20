@@ -1,28 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 20 Mar 2010 11:37:24 -0400 (EDT)
-Subject: [PATCH] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <19364.58488.817538.692599@pilspetsen.it.uu.se>
-References: <20100320085507.4038.96426.stgit@pauliusz>
-	<1269078083.4028.5586.camel@macbook.infradead.org>
-	<badfd5ba1003200420xc0680c1h8b4cccd02a8fdaba@mail.gmail.com>
-	<1269086286.4028.6039.camel@macbook.infradead.org>
-	<19364.58488.817538.692599@pilspetsen.it.uu.se>
-Message-ID: <alpine.LFD.2.00.1003201132500.31128@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 20 Mar 2010 16:42:20 +0000
+Subject: [PATCH 5/6] ASoC: enable wm8753 in aspenite
+In-Reply-To: <771cded01003190854o39aae5bj6ae5279a5316b73d@mail.gmail.com>
+References: <771cded01003190854o39aae5bj6ae5279a5316b73d@mail.gmail.com>
+Message-ID: <20100320164220.GA1549@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Mar 2010, Mikael Pettersson wrote:
+On Fri, Mar 19, 2010 at 11:54:40AM -0400, Haojian Zhuang wrote:
 
-> I missed the start of this thread, but looking at orion_nand.c I fail to
-> see why you'd need to mess with inline asm for reading a sequence of u64
-> values from an I/O location to an array.
+I note that you're not copying any of these ALSA patches to the ALSA
+list...
 
-The reason for doing so with inline asm in the first place was not 
-discussed in this thread.
+> +	rate =  params_rate(params);
+> +	width = snd_pcm_format_physical_width(params_format(params));
+> +	channel = params_channels(params);
+> +	ret = pxa168_seek_mclk_conf(rate, width, channel);
+> +	if (ret < 0)
+> +		return ret;
+> +	index = ret;
+> +	mclk = pxa168_get_mclk(ret);
 
-> Rewriting that to proper C generates a nice ldrd;strd loop with my gcc-4.4.3.
+Now that it's slightly clearer that this is exported from the SSP driver
+the interface here looks odd - there doesn't seem to be any reason to
+expose anything of the PXA internal configuration outside the SSP
+driver, especially given that the configurations are expressed in terms
+of an index into a table of configuration values which aren't much use
+to anything outside the SSP driver.
 
-Sure, GCC version 4.4.3 does the right thing.  Not all of them do.
+A function allowing the MCLK rate to be queried seems reasonable since
+this can be used to configure external devices (as you're doing here)
+but this block of code and the subsequent passing of index back into the
+driver both seem like boilerplate which every user (or at least most
+users) will have to do so it'd be better to save them the effort.
 
+> +	/* set codec DAI configuration */
+> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
+> +				  | SND_SOC_DAIFMT_NB_IF
+> +				  | SND_SOC_DAIFMT_CBS_CFS);
+> +	if (ret < 0)
+> +		return ret;
 
-Nicolas
+Each time you've posted this I've asked you why you're using an inverted
+frame clock for the DAI.  IIRC last time you posted this you said that
+you'd add a comment explaining this but I don't see one here?
+
+I'd also suggest not running the SSP port in I2S mode if you can avoid
+it - the controller is really just emulating I2S, which makes the
+configuration rather fragile.  The DSP modes are more natural for the
+PXA hardware, I'd suggest using one of those.
