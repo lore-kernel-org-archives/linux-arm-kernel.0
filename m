@@ -1,50 +1,49 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 20 Mar 2010 20:20:07 +0200
-Subject: [PATCH 2/4] Locate kernel at 0x30108000 if PM_H1940 is enabled
+Date: Sat, 20 Mar 2010 20:20:08 +0200
+Subject: [PATCH 3/4] s3c244x: configure GPG13-15 as input before suspend
 In-Reply-To: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
 References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1269109209-26237-3-git-send-email-anarsoul@gmail.com>
+Message-ID: <1269109209-26237-4-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If PM_H1940 is enabled, kernel _must_ be located upper then 0x30008000,
-because this area (0x30000000-0x30100000) can be used by bootloader. If kernel
-is located at 0x30008000, bootloader will corrupt kernel's code during
-resume.
+According to datasheet GPG13-15 must be configured as input in NAND
+boot mode, otherwise device will not be able to wake up.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/Makefile                   |    2 ++
- arch/arm/mach-s3c2410/Makefile.boot |   10 +++++++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c2440/s3c244x.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2703222..58e4d8e 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -110,6 +110,8 @@ CHECKFLAGS	+= -D__arm__
- head-y		:= arch/arm/kernel/head$(MMUEXT).o arch/arm/kernel/init_task.o
- textofs-y	:= 0x00008000
- textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
-+# We don't want the htc bootloader to corrupt kernel during resume
-+textofs-$(CONFIG_PM_H1940)      := 0x00108000
- # SA1111 DMA bug: we don't want the kernel to live in precious DMA-able memory
- ifeq ($(CONFIG_ARCH_SA1100),y)
- textofs-$(CONFIG_SA1111) := 0x00208000
-diff --git a/arch/arm/mach-s3c2410/Makefile.boot b/arch/arm/mach-s3c2410/Makefile.boot
-index 7dab2a0..58c1dd7 100644
---- a/arch/arm/mach-s3c2410/Makefile.boot
-+++ b/arch/arm/mach-s3c2410/Makefile.boot
-@@ -1,3 +1,7 @@
--   zreladdr-y	:= 0x30008000
--params_phys-y	:= 0x30000100
--
-+ifeq ($(CONFIG_PM_H1940),y)
-+	zreladdr-y		:= 0x30108000
-+	params_phys-y	:= 0x30100100
-+else
-+	zreladdr-y		:= 0x30008000
-+	params_phys-y	:= 0x30000100
-+endif
+diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
+index 5e4a97e..b100e92 100644
+--- a/arch/arm/mach-s3c2440/s3c244x.c
++++ b/arch/arm/mach-s3c2440/s3c244x.c
+@@ -21,6 +21,7 @@
+ #include <linux/sysdev.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -146,6 +147,17 @@ static struct sleep_save s3c244x_sleep[] = {
+ static int s3c244x_suspend(struct sys_device *dev, pm_message_t state)
+ {
+ 	s3c_pm_do_save(s3c244x_sleep, ARRAY_SIZE(s3c244x_sleep));
++#ifdef CONFIG_S3C_DEV_NAND
++	/* According to S3C2442 user's manual, page 7-17,
++	 * when the system is operating in NAND boot mode,
++	 * the hardware pin configuration - EINT[23:21] ???
++	 * must be set as input for starting up after
++	 * wakeup from sleep mode
++	 */
++	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPIO_INPUT);
++	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPIO_INPUT);
++	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPIO_INPUT);
++#endif
+ 	return 0;
+ }
+ 
 -- 
 1.7.0.2
