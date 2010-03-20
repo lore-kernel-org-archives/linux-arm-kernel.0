@@ -1,22 +1,43 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 20 Mar 2010 15:29:33 +0800
-Subject: [PATCH 6/6] mmp: enable ssp in aspenite
-In-Reply-To: <771cded01003190855ga13edb0xf37ef928292ccdb1@mail.gmail.com>
-References: <771cded01003190855ga13edb0xf37ef928292ccdb1@mail.gmail.com>
-Message-ID: <f17812d71003200029w3d1bbf5cuaad4e2ec888cd6a1@mail.gmail.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Sat, 20 Mar 2010 10:55:07 +0200
+Subject: [PATCH] MTD: Fix Orion NAND driver compilation with ARM OABI
+Message-ID: <20100320085507.4038.96426.stgit@pauliusz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 19, 2010 at 11:55 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 3394adfc507802fd1bb1905541eb639daa0de0eb Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 17 Mar 2010 17:33:22 -0400
-> Subject: [PATCH] [ARM] mmp: enable ssp in aspenite
->
-> Configure both ssp and wm8753 in aspenite.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
+We must tell GCC to use even register for variable passed
+to ldrd instruction. Without this patch GCC 4.2.1 puts this
+variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
+r2/r3. This does not change anything when EABI and OABI
+compilation works OK.
 
-Applied to 'ssp_cleanup'.
+Without this patch and with OABI I get:
+  CC      drivers/mtd/nand/orion_nand.o
+/tmp/ccMkwOCs.s: Assembler messages:
+/tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
+make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
+
+Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+---
+
+ drivers/mtd/nand/orion_nand.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index f59c074..cb5175e 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -60,7 +60,12 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	}
+ 	buf64 = (uint64_t *)buf;
+ 	while (i < len/8) {
+-		uint64_t x;
++		/*
++		 * force x variable to r2/r3 registers since ldrd instruction
++		 * requires first register to be even.
++		 */
++		register uint64_t x asm ("r2");
++
+ 		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+ 		buf64[i++] = x;
+ 	}
