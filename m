@@ -1,140 +1,71 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Sat, 20 Mar 2010 20:49:07 +0200
-Subject: [PATCH] uImage: Allow to specify MKIMAGE
-Message-ID: <20100320184907.8036.82488.stgit@localhost.localdomain>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Sat, 20 Mar 2010 14:31:03 -0500
+Subject: [PATCH v2 2/3] ep93xx: added chip revision reading function
+In-Reply-To: <56d259a01003201140o8852165w7d1b3384927e70f7@mail.gmail.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
+	<c222c3df9c94d9ec919817f640a953e4f45ae99b.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003201107s758b420bmafa154714a8a8fee@mail.gmail.com>
+	<20100320182500.GF30801@buzzloop.caiaq.de>
+	<56d259a01003201140o8852165w7d1b3384927e70f7@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B02708426976368B755D3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
----
+On Saturday, March 20, 2010 11:41 AM, Martin Guy wrote:
+> On 3/20/10, Daniel Mack <daniel@caiaq.de> wrote:
+>> On Sat, Mar 20, 2010 at 06:07:50PM +0000, Martin Guy wrote:
+>>>   The chip revision is normally placed in the global unsigned int
+>>> "system_rev", which is also reported by /proc/cpuinfo.
+>>
+>> No, that's the hardware revision number, which is different from the
+>>  chip revision number.
+>
+> The board revision? Right, thanks. I don't see a place to report this
+> in cpuinfo, since it is the SoC revision, which is neither the ARM CPU
+> it contains nor the board that conatins the SoC.
+>
+>> If the ep93xx provides a unique serial number, then this could be an
+>>  idea. I would still only set it in case it has not been given by the
+>>  bootloader though.
+>
+> It does, world-unique, burned into the chip. Thanks again.
 
- arch/arm/boot/Makefile          |    4 ++--
- arch/avr32/boot/images/Makefile |    4 ++--
- arch/blackfin/boot/Makefile     |    4 ++--
- arch/microblaze/boot/Makefile   |    4 ++--
- arch/sh/boot/Makefile           |    4 ++--
- scripts/mkuboot.sh              |    1 +
- 6 files changed, 11 insertions(+), 10 deletions(-)
+Hello all,
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 4a590f4..8659463 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -11,7 +11,7 @@
- # Copyright (C) 1995-2002 Russell King
- #
- 
--MKIMAGE         := $(srctree)/scripts/mkuboot.sh
-+MKIMAGE         := $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
- 
- ifneq ($(MACHINE),)
- include $(srctree)/$(MACHINE)/Makefile.boot
-@@ -60,7 +60,7 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- endif
- 
- quiet_cmd_uimage = UIMAGE  $@
--      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
-+      cmd_uimage = $(MKIMAGE) -A arm -O linux -T kernel \
- 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
- 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
- 
-diff --git a/arch/avr32/boot/images/Makefile b/arch/avr32/boot/images/Makefile
-index 1848bf0..f89c51d 100644
---- a/arch/avr32/boot/images/Makefile
-+++ b/arch/avr32/boot/images/Makefile
-@@ -6,7 +6,7 @@
- # for more details.
- #
- 
--MKIMAGE		:= $(srctree)/scripts/mkuboot.sh
-+MKIMAGE		:= $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
- 
- extra-y		:= vmlinux.bin vmlinux.gz
- 
-@@ -18,7 +18,7 @@ $(obj)/vmlinux.gz: $(obj)/vmlinux.bin FORCE
- 	$(call if_changed,gzip)
- 
- quiet_cmd_uimage = UIMAGE $@
--      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A avr32 -O linux -T kernel	\
-+      cmd_uimage = $(MKIMAGE) -A avr32 -O linux -T kernel	\
- 		-C gzip -a $(CONFIG_LOAD_ADDRESS) -e $(CONFIG_ENTRY_ADDRESS)	\
- 		-n 'Linux-$(KERNELRELEASE)' -d $< $@
- 
-diff --git a/arch/blackfin/boot/Makefile b/arch/blackfin/boot/Makefile
-index d1b3d60..cc82dc6 100644
---- a/arch/blackfin/boot/Makefile
-+++ b/arch/blackfin/boot/Makefile
-@@ -6,7 +6,7 @@
- # for more details.
- #
- 
--MKIMAGE := $(srctree)/scripts/mkuboot.sh
-+MKIMAGE := $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
- 
- targets := vmImage vmImage.bin vmImage.bz2 vmImage.gz vmImage.lzma vmImage.xip
- extra-y += vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xip
-@@ -16,7 +16,7 @@ UIMAGE_OPTS-$(CONFIG_RAMKERNEL) += -a $(CONFIG_BOOT_LOAD)
- UIMAGE_OPTS-$(CONFIG_ROMKERNEL) += -a $(CONFIG_ROM_BASE) -x
- 
- quiet_cmd_uimage = UIMAGE  $@
--      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A $(ARCH) -O linux -T kernel \
-+      cmd_uimage = $(MKIMAGE) -A $(ARCH) -O linux -T kernel \
-                    -C $(2) -n '$(MACHINE)-$(KERNELRELEASE)' \
-                    -e $(shell $(NM) vmlinux | awk '$$NF == "__start" {print $$1}') \
-                    $(UIMAGE_OPTS-y) -d $< $@
-diff --git a/arch/microblaze/boot/Makefile b/arch/microblaze/boot/Makefile
-index 902cf98..2674b84 100644
---- a/arch/microblaze/boot/Makefile
-+++ b/arch/microblaze/boot/Makefile
-@@ -2,7 +2,7 @@
- # arch/microblaze/boot/Makefile
- #
- 
--MKIMAGE := $(srctree)/scripts/mkuboot.sh
-+MKIMAGE := $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
- 
- obj-y += linked_dtb.o
- 
-@@ -40,7 +40,7 @@ quiet_cmd_strip = STRIP   $@
-       cmd_strip = $(STRIP) -K _start -K _end -K __log_buf -K _fdt_start vmlinux -o $@
- 
- quiet_cmd_uimage = UIMAGE  $@.ub
--      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A microblaze -O linux -T kernel \
-+      cmd_uimage = $(MKIMAGE) -A microblaze -O linux -T kernel \
-                    -C none -n 'Linux-$(KERNELRELEASE)' \
-                    -a $(CONFIG_KERNEL_BASE_ADDR) -e $(CONFIG_KERNEL_BASE_ADDR) \
-                    -d $@ $@.ub
-diff --git a/arch/sh/boot/Makefile b/arch/sh/boot/Makefile
-index 1ce6362..a3d5cc5 100644
---- a/arch/sh/boot/Makefile
-+++ b/arch/sh/boot/Makefile
-@@ -8,7 +8,7 @@
- # Copyright (C) 1999 Stuart Menefy
- #
- 
--MKIMAGE := $(srctree)/scripts/mkuboot.sh
-+MKIMAGE := $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
- 
- #
- # Assign safe dummy values if these variables are not defined,
-@@ -60,7 +60,7 @@ KERNEL_ENTRY	:= $(shell /bin/bash -c 'printf "0x%08x" \
- 			$(CONFIG_ZERO_PAGE_OFFSET) + $(CONFIG_ENTRY_OFFSET)]')
- 
- quiet_cmd_uimage = UIMAGE  $@
--      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A sh -O linux -T kernel \
-+      cmd_uimage = $(MKIMAGE) -A sh -O linux -T kernel \
- 		   -C $(2) -a $(KERNEL_LOAD) -e $(KERNEL_ENTRY) \
- 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
- 
-diff --git a/scripts/mkuboot.sh b/scripts/mkuboot.sh
-index 2e3d3cd..690f25f 100755
---- a/scripts/mkuboot.sh
-+++ b/scripts/mkuboot.sh
-@@ -11,6 +11,7 @@ if [ -z "${MKIMAGE}" ]; then
- 	if [ -z "${MKIMAGE}" ]; then
- 		# Doesn't exist
- 		echo '"mkimage" command not found - U-Boot images will not be built' >&2
-+		echo 'You can use MKIMAGE to specify path (eg. MKIMAGE=/tmp/mkimage)' >&2
- 		exit 0;
- 	fi
- fi
+Just to clarify things.
+
+'system_rev' is an unsigned int exported from arch/arm/kernel/setup.c
+It is filled in with the ATAG_REVISION data passed from the bootloader.
+What this data actually means is specific to the bootloader.
+
+'system_serial_low' and 'system_serial_high' are also unsigned int's
+exported from arch/arm/kernel/setup.c.  These are filled in with the
+ATAG_SERIAL data passed from the bootloader.  Again, what this data
+actually means is specific to the bootloader.
+
+These three values are exposed to the user via /proc/cpuinfo.  The
+seq_operations that handle this are also in arch/arm/kernel/setup.c.
+
+Mika's patch has nothing to do with these.  As already noted, the
+chip revision needs to be determined in order to figure out the
+correct internal frequency of the SSP peripheral clock.
+
+This chip revision is currently not exposed to the user in any fashion.
+
+The ep93xx unique serial number, also called the MaverickCrunch ID, can
+be found in the Sercurity registers.  There are actually two of them.
+One is a 32-bit unique ID the other is a 128-bit random ID.  Random
+meaning random per chip not per boot since it is created by means of
+fuseable links on the chip that are set during manufacture.  These
+also are not currently exposed to the user in any fashion.
+
+I had submitted a patch previously that adds an architecture specific
+extension to /proc/cpuinfo that would allow exposing this information
+on the ep93xx.  The same extension could be used on platforms like the
+TS-7200 to show the jumper settings on the board.
+
+If there is any interest I will re-post that patch series.
+
+Regards,
+Hartley
