@@ -1,32 +1,54 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Sat, 20 Mar 2010 18:40:48 +0000
-Subject: [PATCH v2 2/3] ep93xx: added chip revision reading function
-In-Reply-To: <20100320182500.GF30801@buzzloop.caiaq.de>
-References: <cover.1268930557.git.mika.westerberg@iki.fi>
-	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
-	<c222c3df9c94d9ec919817f640a953e4f45ae99b.1268930557.git.mika.westerberg@iki.fi>
-	<56d259a01003201107s758b420bmafa154714a8a8fee@mail.gmail.com>
-	<20100320182500.GF30801@buzzloop.caiaq.de>
-Message-ID: <56d259a01003201140o8852165w7d1b3384927e70f7@mail.gmail.com>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Sat, 20 Mar 2010 21:40:07 +0300
+Subject: [PATCH 1/3] watchdog: Add support for the Freescale MXC watchdog
+In-Reply-To: <20100320120939.GA5515@pengutronix.de> (Wolfram Sang's message of
+	"Sat, 20 Mar 2010 13:09:39 +0100")
+References: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
+	<20100320120939.GA5515@pengutronix.de>
+Message-ID: <87aau2x2ew.fsf@vovsem.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/10, Daniel Mack <daniel@caiaq.de> wrote:
-> On Sat, Mar 20, 2010 at 06:07:50PM +0000, Martin Guy wrote:
->  >   The chip revision is normally placed in the global unsigned int
->  > "system_rev", which is also reported by /proc/cpuinfo.
+Wolfram Sang <w.sang@pengutronix.de> writes:
+
+> On Fri, Mar 19, 2010 at 06:13:27PM +0300, Vladimir Zapolskiy wrote:
+>> Add driver for the Freescale MXC SoCs built-in watchdog.
 >
-> No, that's the hardware revision number, which is different from the
->  chip revision number.
+> Any improvements over/differences to this one?
+>
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/70753
+>
+> (Read the thread for the comments I received)
+>
+> Coincidence, I wanted to pick up my version and finish it next week. We have to
+> agree how to continue. I like mine a tad better (there are some mixups of
+> MX1/2+ capabilities in yours, e.g. SETTIMEOUT) and it also got review already,
+> but of course I am biased ;) What do you suggest?
+>
+> Regards,
+>
+>    Wolfram
 
-The board revision? Right, thanks. I don't see a place to report this
-in cpuinfo, since it is the SoC revision, which is neither the ARM CPU
-it contains nor the board that conatins the SoC.
+Hi Wolfram,
 
-> If the ep93xx provides a unique serial number, then this could be an
->  idea. I would still only set it in case it has not been given by the
->  bootloader though.
+that's a surprise for me, haven't noticed your version of the driver in
+the maillist, and wrote one more watchdog driver :)
 
-It does, world-unique, burned into the chip. Thanks again.
+The driver is extremely simple, so from my biased position only minor
+benefits can be found in my version:
+* introduced spinlock to protect concurrent write to registers
+* SETTIMEOUT option is present and it works well on imx31
+* correct zero byte write()
+* clock enabled only when watchdog node is opened
+* dynamic wdt structure, which potentially simplifies future support of
+  several watchdogs found on imx51 and imx37 IIRC
+* no critical message on close with unset NOWAYOUT on non-imx1 SoCs
 
-    M
+Your pretty good version supports imx1, and I cann't test my version on
+imx1, because I don't have such hardware on hand.
+
+Obviously better to update your reviewed one, and I hope some comments or even
+updates from my side could be accepted by you :)
+
+With best wishes,
+Vladimir
