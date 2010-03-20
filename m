@@ -1,38 +1,34 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Sat, 20 Mar 2010 19:48:21 +0000
-Subject: [PATCH v2 2/3] ep93xx: added chip revision reading function
-In-Reply-To: <0D753D10438DA54287A00B02708426976368B755D3@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1268930557.git.mika.westerberg@iki.fi>
-	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
-	<c222c3df9c94d9ec919817f640a953e4f45ae99b.1268930557.git.mika.westerberg@iki.fi>
-	<56d259a01003201107s758b420bmafa154714a8a8fee@mail.gmail.com>
-	<20100320182500.GF30801@buzzloop.caiaq.de>
-	<56d259a01003201140o8852165w7d1b3384927e70f7@mail.gmail.com>
-	<0D753D10438DA54287A00B02708426976368B755D3@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <56d259a01003201248r37c238fck9499bab795fda7dd@mail.gmail.com>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Sat, 20 Mar 2010 16:46:03 -0400
+Subject: [PATCH] uImage: Allow to specify MKIMAGE
+In-Reply-To: <20100320184907.8036.82488.stgit@localhost.localdomain>
+References: <20100320184907.8036.82488.stgit@localhost.localdomain>
+Message-ID: <8bd0f97a1003201346xc927340r39f33b9a6b599792@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
->  The ep93xx unique serial number, also called the MaverickCrunch ID, can
->  be found in the Sercurity registers.  There are actually two of them.
->  One is a 32-bit unique ID the other is a 128-bit random ID.  Random
->  meaning random per chip not per boot since it is created by means of
->  fuseable links on the chip that are set during manufacture.  These
->  also are not currently exposed to the user in any fashion.
+On Sat, Mar 20, 2010 at 14:49, Paulius Zaleckas wrote:
+> --- a/arch/blackfin/boot/Makefile
+> +++ b/arch/blackfin/boot/Makefile
+> @@ -6,7 +6,7 @@
+> ?# for more details.
+> ?#
 >
->  I had submitted a patch previously that adds an architecture specific
->  extension to /proc/cpuinfo that would allow exposing this information
->  on the ep93xx.  The same extension could be used on platforms like the
->  TS-7200 to show the jumper settings on the board.
+> -MKIMAGE := $(srctree)/scripts/mkuboot.sh
+> +MKIMAGE := $(CONFIG_SHELL) $(srctree)/scripts/mkuboot.sh
 >
->  If there is any interest I will re-post that patch series.
+> ?targets := vmImage vmImage.bin vmImage.bz2 vmImage.gz vmImage.lzma vmImage.xip
+> ?extra-y += vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xip
+> @@ -16,7 +16,7 @@ UIMAGE_OPTS-$(CONFIG_RAMKERNEL) += -a $(CONFIG_BOOT_LOAD)
+> ?UIMAGE_OPTS-$(CONFIG_ROMKERNEL) += -a $(CONFIG_ROM_BASE) -x
+>
+> ?quiet_cmd_uimage = UIMAGE ?$@
+> - ? ? ?cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A $(ARCH) -O linux -T kernel \
+> + ? ? ?cmd_uimage = $(MKIMAGE) -A $(ARCH) -O linux -T kernel \
+> ? ? ? ? ? ? ? ? ? ?-C $(2) -n '$(MACHINE)-$(KERNELRELEASE)' \
+> ? ? ? ? ? ? ? ? ? ?-e $(shell $(NM) vmlinux | awk '$$NF == "__start" {print $$1}') \
+> ? ? ? ? ? ? ? ? ? ?$(UIMAGE_OPTS-y) -d $< $@
 
-Thanks.
-
-Yes, being able to see the unique ID is certainly useful. I use this
-in userspace to set a different MAC address on each board for DHCP
-purposes in a classroom of otherwise identical diskless X terminals
-based on this chip.
-
-    M
+looks straightforward, and doesnt matter to me, so
+Acked-by: Mike Frysinger <vapier@gentoo.org>
+-mike
