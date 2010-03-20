@@ -1,45 +1,21 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 20 Mar 2010 11:07:15 +0530
-Subject: [PATCH] ARM: Fix "BUG: scheduling while atomic:
-	swapper/0/0x00000002"
-In-Reply-To: <20100319121312.GA21280@n2100.arm.linux.org.uk>
-References: <1268745149-8685-1-git-send-email-santosh.shilimkar@ti.com>
-	<20100316204930.GA13948@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C489BF19@dbde02.ent.ti.com>
-	<20100319121312.GA21280@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C494809C@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 20 Mar 2010 14:36:57 +0800
+Subject: [PATCH 2/6] pxa: remove ifdef in ssp.h
+In-Reply-To: <771cded01003190852s1dffcc27wf85e8d76eb85299b@mail.gmail.com>
+References: <771cded01003190852s1dffcc27wf85e8d76eb85299b@mail.gmail.com>
+Message-ID: <f17812d71003192336o73635e3ak14f00662a328ec0b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, March 19, 2010 5:43 PM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas
-> Subject: Re: [PATCH] ARM: Fix "BUG: scheduling while atomic: swapper/0/0x00000002"
-> 
-> On Wed, Mar 17, 2010 at 10:51:44AM +0530, Shilimkar, Santosh wrote:
-> > On SMP kernel with PREEMPT enabled, if you try to offline the CPU using hot-plug and then
-> > bring it back(online), you will get this dump. Since CPU is taken out from idle thread, the
-> > process shown is 2.
-> 
-> Hmm, I don't think this is how we should be solving this problem.
-> x86 calls init_idle() on the idle task when it's re-used, and this
-> resets the preempt count amongst other things.  So maybe we want to
-> do this instead in the __cpu_up path:
-> 
-> 	if (!idle) {
-> 		idle = fork_idle(cpu);
-> 		if (IS_ERR(idle)) {
-> 			printk(KERN_ERR "CPU%u: fork() failed\n", cpu);
-> 			return PTR_ERR(idle);
-> 		}
-> 		ci->idle = idle;
-> -	}
-> +	} else {
-> +		init_idle(idle);
-> +	}
-This doesn't fix the dump. Will have look at this in more details on the same lines
-as you suggested.
+On Fri, Mar 19, 2010 at 11:52 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 51d51bbed57b60e1d70e41e8c7fdc33d3566a028 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 17 Mar 2010 11:21:18 -0400
+> Subject: [PATCH] [ARM] pxa: remove ifdef in ssp.h
+>
+> Try to keep minimum ifdef in ssp.h.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-- Santosh
+Applied to 'ssp_cleanup'
