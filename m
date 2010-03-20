@@ -1,49 +1,51 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 20 Mar 2010 20:20:08 +0200
-Subject: [PATCH 3/4] s3c244x: configure GPG13-15 as input before suspend
+Date: Sat, 20 Mar 2010 20:20:09 +0200
+Subject: [PATCH 4/4] Add suspend/resume support for RX1950
 In-Reply-To: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
 References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1269109209-26237-4-git-send-email-anarsoul@gmail.com>
+Message-ID: <1269109209-26237-5-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to datasheet GPG13-15 must be configured as input in NAND
-boot mode, otherwise device will not be able to wake up.
-
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-s3c2440/s3c244x.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/pm.c |    4 ++--
+ arch/arm/mm/mmu.c          |    5 +++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
-index 5e4a97e..b100e92 100644
---- a/arch/arm/mach-s3c2440/s3c244x.c
-+++ b/arch/arm/mach-s3c2440/s3c244x.c
-@@ -21,6 +21,7 @@
- #include <linux/sysdev.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
+diff --git a/arch/arm/mach-s3c2410/pm.c b/arch/arm/mach-s3c2410/pm.c
+index 966119c..6a61486 100644
+--- a/arch/arm/mach-s3c2410/pm.c
++++ b/arch/arm/mach-s3c2410/pm.c
+@@ -60,10 +60,10 @@ static void s3c2410_pm_prepare(void)
+ 		__raw_writel(calc, phys_to_virt(H1940_SUSPEND_CHECKSUM));
+ 	}
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -146,6 +147,17 @@ static struct sleep_save s3c244x_sleep[] = {
- static int s3c244x_suspend(struct sys_device *dev, pm_message_t state)
- {
- 	s3c_pm_do_save(s3c244x_sleep, ARRAY_SIZE(s3c244x_sleep));
-+#ifdef CONFIG_S3C_DEV_NAND
-+	/* According to S3C2442 user's manual, page 7-17,
-+	 * when the system is operating in NAND boot mode,
-+	 * the hardware pin configuration - EINT[23:21] ???
-+	 * must be set as input for starting up after
-+	 * wakeup from sleep mode
-+	 */
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPIO_INPUT);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPIO_INPUT);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPIO_INPUT);
-+#endif
- 	return 0;
- }
+-	/* the RX3715 uses similar code and the same H1940 and the
++	/* RX3715 and RX1950 use similar to H1940 code and the
+ 	 * same offsets for resume and checksum pointers */
  
+-	if (machine_is_rx3715()) {
++	if (machine_is_rx3715() || machine_is_rx1950()) {
+ 		void *base = phys_to_virt(H1940_SUSPEND_CHECK);
+ 		unsigned long ptr;
+ 		unsigned long calc = 0;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 1708da8..b882f8c 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -864,9 +864,10 @@ void __init reserve_node_zero(pg_data_t *pgdat)
+ 	if (machine_is_p720t())
+ 		res_size = 0x00014000;
+ 
+-	/* H1940 and RX3715 need to reserve this for suspend */
++	/* H1940, RX3715 and RX1950 need to reserve this for suspend */
+ 
+-	if (machine_is_h1940() || machine_is_rx3715()) {
++	if (machine_is_h1940() || machine_is_rx3715()
++		|| machine_is_rx1950()) {
+ 		reserve_bootmem_node(pgdat, 0x30003000, 0x1000,
+ 				BOOTMEM_DEFAULT);
+ 		reserve_bootmem_node(pgdat, 0x30081000, 0x1000,
 -- 
 1.7.0.2
