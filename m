@@ -1,51 +1,69 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 20 Mar 2010 16:42:20 +0000
-Subject: [PATCH 5/6] ASoC: enable wm8753 in aspenite
-In-Reply-To: <771cded01003190854o39aae5bj6ae5279a5316b73d@mail.gmail.com>
-References: <771cded01003190854o39aae5bj6ae5279a5316b73d@mail.gmail.com>
-Message-ID: <20100320164220.GA1549@opensource.wolfsonmicro.com>
+Date: Sat, 20 Mar 2010 17:00:50 +0000
+Subject: [PATCH 1/6] ASoC: split pxa ssp for reusing code
+In-Reply-To: <771cded01003190851w2bb94ca2w1faf2a5fffa11794@mail.gmail.com>
+References: <771cded01003190851w2bb94ca2w1faf2a5fffa11794@mail.gmail.com>
+Message-ID: <20100320170049.GB1549@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 19, 2010 at 11:54:40AM -0400, Haojian Zhuang wrote:
+On Fri, Mar 19, 2010 at 11:51:55AM -0400, Haojian Zhuang wrote:
+> Subject: [PATCH] ASoC: split pxa ssp for reusing code
 
-I note that you're not copying any of these ALSA patches to the ALSA
-list...
+Again, please remember to CC ALSA patches to the ALSA list.  You should
+also remember to CC Liam, my ASoC comaintainer.
 
-> +	rate =  params_rate(params);
-> +	width = snd_pcm_format_physical_width(params_format(params));
-> +	channel = params_channels(params);
-> +	ret = pxa168_seek_mclk_conf(rate, width, channel);
-> +	if (ret < 0)
-> +		return ret;
-> +	index = ret;
-> +	mclk = pxa168_get_mclk(ret);
+> hw_params() isn't put in common ssp files since cpu_is_pxa3xx() is used. The
+> cpu_is_pxa3xx() macro is only valid in ARCH_PXA and it's used to distinguish
+> pxa2xx and pxa3xx. This macro is meaning less in other architectures. So keep
+> this function in device specific driver.
 
-Now that it's slightly clearer that this is exported from the SSP driver
-the interface here looks odd - there doesn't seem to be any reason to
-expose anything of the PXA internal configuration outside the SSP
-driver, especially given that the configurations are expressed in terms
-of an index into a table of configuration values which aren't much use
-to anything outside the SSP driver.
+Looking at the code it seems (like I mentioned before) it'd be much
+better to factor this out so that the common code is in a library
+function which both PXA and MMP variants can use it, with the PXA3xx
+specific stuff calling the library function and overriding its behaviour
+(eg, by overwriting the registers) where required.
 
-A function allowing the MCLK rate to be queried seems reasonable since
-this can be used to configure external devices (as you're doing here)
-but this block of code and the subsequent passing of index back into the
-driver both seem like boilerplate which every user (or at least most
-users) will have to do so it'd be better to save them the effort.
+Like I keep saying the SSP port configuration is really rather fragile
+(in part due to the documentation issues) so forking this code seems
+like it's going to be painful in the long run.
 
-> +	/* set codec DAI configuration */
-> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
-> +				  | SND_SOC_DAIFMT_NB_IF
-> +				  | SND_SOC_DAIFMT_CBS_CFS);
-> +	if (ret < 0)
-> +		return ret;
+Some other stuff below...
 
-Each time you've posted this I've asked you why you're using an inverted
-frame clock for the DAI.  IIRC last time you posted this you said that
-you'd add a comment explaining this but I don't see one here?
+> - * TODO:
+> - *  o Test network mode for > 16bit sample size
 
-I'd also suggest not running the SSP port in I2S mode if you can avoid
-it - the controller is really just emulating I2S, which makes the
-configuration rather fragile.  The DSP modes are more natural for the
-PXA hardware, I'd suggest using one of those.
+Have you actually done this testing?
+
+> -static void ssp_enable(struct ssp_device *ssp)
+> +void ssp_enable(struct ssp_device *ssp)
+>  {
+>  	uint32_t sscr0;
+> 
+
+If this is being marked non-static presumably it should be exported too?
+Similarly for most of the other functions.  Might be worth considering
+the namespacing too and shoving some pxa_ or similar prefixes on there
+if the function is going global, right now there's a mix of ssp_ and
+pxa_ssp_ being exported.
+
+> +/*
+> + * pxa2xx-ssp.c  --  ALSA Soc Audio Layer
+> + *
+
+I'm not a big fan of the naming here since this also covers PXA3xx
+devices.  Is there some general term for the non-MMP processors which
+could be used - I'm not aware of one but I might've missed something?
+
+> +enum {
+> +	PXA2XX_DAI_SSP1,
+> +	PXA2XX_DAI_SSP2,
+> +	PXA2XX_DAI_SSP3,
+> +	PXA2XX_DAI_SSP4,
+> +	PXA2XX_DAI_SSP_MAX,
+> +};
+
+TBH I'd be much happier with #defines here - the use of an enum is
+rather random given that none of the other defines use one and since the
+particular values on this one really matter (as a result of being array
+indexes) something that sets the values explicitly seems better.
