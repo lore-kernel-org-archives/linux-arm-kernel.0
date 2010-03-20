@@ -1,41 +1,28 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Sat, 20 Mar 2010 09:41:23 +0000
-Subject: [PATCH] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <20100320085507.4038.96426.stgit@pauliusz>
-References: <20100320085507.4038.96426.stgit@pauliusz>
-Message-ID: <1269078083.4028.5586.camel@macbook.infradead.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Sat, 20 Mar 2010 10:44:25 +0100
+Subject: Using of cached values
+In-Reply-To: <2703439e1003200222y16147d81x27b0a8bcc804c338@mail.gmail.com>
+References: <2703439e1003200222y16147d81x27b0a8bcc804c338@mail.gmail.com>
+Message-ID: <20100320094425.GB30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-03-20 at 10:55 +0200, Paulius Zaleckas wrote:
-> We must tell GCC to use even register for variable passed
-> to ldrd instruction. Without this patch GCC 4.2.1 puts this
-> variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
-> r2/r3. This does not change anything when EABI and OABI
-> compilation works OK.
-> 
-> Without this patch and with OABI I get:
-> /tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
-> make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
+On Sat, Mar 20, 2010 at 06:22:43PM +0900, Mogambo Park wrote:
+>   I wants to know - How safe to read register values one time in a structure
+> and use value from there, assume no write is performed on the
+> register? I see many
+> files in sound/soc/codec/ do that.
 
- ...
-> -		uint64_t x;
-> +		/*
-> +		 * force x variable to r2/r3 registers since ldrd instruction
-> +		 * requires first register to be even.
-> +		 */
-> +		register uint64_t x asm ("r2");
-> +
->  		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+Why shouldn't that be safe? Do you expect your cache to get lost?
 
-Hm, isn't there an asm constraint which will force it into an
-appropriate register pair? Failing that, "=&2,4,6,8" ought to work.
-(Um, and why the earlyclobber? Why can't io_base be passed in in one of
-the same registers?)
+> is it becos sometime the register may return not accurate value on
+> busy bus by h/w mistake?
+> OR I should always read from register even if his value is not
+> expected to change?
 
-We should try to avoid making our constraints more restrictive than they
-need to be.
+If the register content does not change, you can use a cached value.
+That can be a lot faster and less power-consuming than going over the
+bus and reading from the device. Depending on the bus in use and how
+often you do that of course.
 
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+Daniel
