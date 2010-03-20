@@ -1,329 +1,490 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 8 Mar 2010 11:28:43 -0500
-Subject: [PATCH] input: enable onkey driver of max8925
-Message-ID: <mailman.465.1274320017.2170.linux-arm-kernel@lists.infradead.org>
+From: leiwen@marvell.com (Lei Wen)
+Date: Sat, 20 Mar 2010 19:01:23 +0800
+Subject: [PATCH 01/25] pxa3xx_nand: condense the flash definition
+Message-ID: <mailman.2.1276839175.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement onkey driver. While ONKEY is held for 3 seconds, KEY_POWER
-event occurs.
+Adding a new flash definition would need less code.
+Keep the platform passing flash defition method.
+If one flash is both defined in platform data and builtin table,
+driver would select the one from platform data first.
 
+By this way, platform could select the timing most suit for itself,
+not need to follow the common settings.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/input/misc/Kconfig         |   10 +++
- drivers/input/misc/Makefile        |    1 +
- drivers/input/misc/max8925_onkey.c |  148 ++++++++++++++++++++++++++++++++=
-++++
- 3 files changed, 159 insertions(+), 0 deletions(-)
- create mode 100644 drivers/input/misc/max8925_onkey.c
+ arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   37 ----
+ drivers/mtd/nand/Kconfig                     |    7 -
+ drivers/mtd/nand/pxa3xx_nand.c               |  241 +++++++-------------------
+ 3 files changed, 66 insertions(+), 219 deletions(-)
 
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 23140a3..5505b5c 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -50,6 +50,16 @@ config INPUT_M68K_BEEP
- 	tristate "M68k Beeper support"
- 	depends on M68K
+diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+index 3478eae..7e5a28f 100644
+--- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
++++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+@@ -4,43 +4,6 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
 
-+config INPUT_MAX8925_ONKEY
-+	tristate "MAX8925 ONKEY support"
-+	depends on MFD_MAX8925
-+	help
-+	  Support the ONKEY of MAX8925 PMICs as an input device
-+	  reporting power button status.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called max8925_onkey.
-+
- config INPUT_APANEL
- 	tristate "Fujitsu Lifebook Application Panel buttons"
- 	depends on X86 && I2C && LEDS_CLASS
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index 7e95a5d..71e9111 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_HP_SDC_RTC)		+=3D hp_sdc_rtc.o
- obj-$(CONFIG_INPUT_IXP4XX_BEEPER)	+=3D ixp4xx-beeper.o
- obj-$(CONFIG_INPUT_KEYSPAN_REMOTE)	+=3D keyspan_remote.o
- obj-$(CONFIG_INPUT_M68K_BEEP)		+=3D m68kspkr.o
-+obj-$(CONFIG_INPUT_MAX8925_ONKEY)	+=3D max8925_onkey.o
- obj-$(CONFIG_INPUT_PCAP)		+=3D pcap_keys.o
- obj-$(CONFIG_INPUT_PCF50633_PMU)	+=3D pcf50633-input.o
- obj-$(CONFIG_INPUT_PCSPKR)		+=3D pcspkr.o
-diff --git a/drivers/input/misc/max8925_onkey.c
-b/drivers/input/misc/max8925_onkey.c
-new file mode 100644
-index 0000000..0da2cff
---- /dev/null
-+++ b/drivers/input/misc/max8925_onkey.c
-@@ -0,0 +1,148 @@
-+/**
-+ * max8925_onkey.c - MAX8925 ONKEY driver
-+ *
-+ * Copyright (C) 2009 Marvell International Ltd.
-+ *      Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  U=
-SA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/i2c.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/mfd/max8925.h>
-+#include <linux/slab.h>
-+
-+#define HARDRESET_EN		(1 << 7)
-+#define PWREN_EN		(1 << 7)
-+
-+struct max8925_onkey_info {
-+	struct input_dev	*idev;
-+	struct max8925_chip	*chip;
-+	struct i2c_client	*i2c;
-+	struct device		*dev;
-+	int			irq;
+-struct pxa3xx_nand_timing {
+-	unsigned int	tCH;  /* Enable signal hold time */
+-	unsigned int	tCS;  /* Enable signal setup time */
+-	unsigned int	tWH;  /* ND_nWE high duration */
+-	unsigned int	tWP;  /* ND_nWE pulse time */
+-	unsigned int	tRH;  /* ND_nRE high duration */
+-	unsigned int	tRP;  /* ND_nRE pulse width */
+-	unsigned int	tR;   /* ND_nWE high to ND_nRE low for read */
+-	unsigned int	tWHR; /* ND_nWE high to ND_nRE low for status read */
+-	unsigned int	tAR;  /* ND_ALE low to ND_nRE low delay */
+-};
+-
+-struct pxa3xx_nand_cmdset {
+-	uint16_t	read1;
+-	uint16_t	read2;
+-	uint16_t	program;
+-	uint16_t	read_status;
+-	uint16_t	read_id;
+-	uint16_t	erase;
+-	uint16_t	reset;
+-	uint16_t	lock;
+-	uint16_t	unlock;
+-	uint16_t	lock_status;
+-};
+-
+-struct pxa3xx_nand_flash {
+-	const struct pxa3xx_nand_timing *timing; /* NAND Flash timing */
+-	const struct pxa3xx_nand_cmdset *cmdset;
+-
+-	uint32_t page_per_block;/* Pages per block (PG_PER_BLK) */
+-	uint32_t page_size;	/* Page size in bytes (PAGE_SZ) */
+-	uint32_t flash_width;	/* Width of Flash memory (DWIDTH_M) */
+-	uint32_t dfc_width;	/* Width of flash controller(DWIDTH_C) */
+-	uint32_t num_blocks;	/* Number of physical blocks in Flash */
+-	uint32_t chip_id;
+-};
+-
+ struct pxa3xx_nand_platform_data {
+
+ 	/* the data flash bus is shared between the Static Memory
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 98a04b3..9a35d92 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -399,13 +399,6 @@ config MTD_NAND_PXA3xx
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors
+
+-config MTD_NAND_PXA3xx_BUILTIN
+-	bool "Use builtin definitions for some NAND chips (deprecated)"
+-	depends on MTD_NAND_PXA3xx
+-	help
+-	  This enables builtin definitions for some NAND chips. This
+-	  is deprecated in favor of platform specific data.
+-
+ config MTD_NAND_CM_X270
+ 	tristate "Support for NAND Flash on CM-X270 modules"
+ 	depends on MTD_NAND && MACH_ARMCORE
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index e02fa4f..013e075 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -113,6 +113,41 @@ enum {
+ 	STATE_PIO_WRITING,
+ };
+
++struct pxa3xx_nand_timing {
++	uint32_t	tCH;  /* Enable signal hold time */
++	uint32_t	tCS;  /* Enable signal setup time */
++	uint32_t	tWH;  /* ND_nWE high duration */
++	uint32_t	tWP;  /* ND_nWE pulse time */
++	uint32_t	tRH;  /* ND_nRE high duration */
++	uint32_t	tRP;  /* ND_nRE pulse width */
++	uint32_t	tR;   /* ND_nWE high to ND_nRE low for read */
++	uint32_t	tWHR; /* ND_nWE high to ND_nRE low for status read */
++	uint32_t	tAR;  /* ND_ALE low to ND_nRE low delay */
 +};
 +
-+/*
-+ * MAX8925 gives us an interrupt when ONKEY is held for 3 seconds.
-+ * max8925_set_bits() operates I2C bus and may sleep. So implement
-+ * it in thread IRQ handler.
-+ */
-+static irqreturn_t max8925_onkey_handler(int irq, void *data)
-+{
-+	struct max8925_onkey_info *info =3D data;
-+
-+	input_report_key(info->idev, KEY_POWER, 1);
-+	input_sync(info->idev);
-+
-+	/* Enable hardreset to halt if system isn't shutdown on time */
-+	max8925_set_bits(info->i2c, MAX8925_SYSENSEL,
-+			 HARDRESET_EN, HARDRESET_EN);
-+	return IRQ_HANDLED;
-+}
-+
-+static int __devinit max8925_onkey_probe(struct platform_device *pdev)
-+{
-+	struct max8925_chip *chip =3D dev_get_drvdata(pdev->dev.parent);
-+	struct max8925_onkey_info *info;
-+	int irq, ret;
-+
-+	info =3D kzalloc(sizeof(struct max8925_onkey_info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+	info->chip =3D chip;
-+	info->i2c =3D chip->i2c;
-+	info->dev =3D &pdev->dev;
-+	irq =3D chip->irq_base + MAX8925_IRQ_GPM_SW_3SEC;
-+
-+	info->idev =3D input_allocate_device();
-+	if (!info->idev) {
-+		dev_err(chip->dev, "Failed to allocate input dev\n");
-+		ret =3D -ENOMEM;
-+		goto out_input;
-+	}
-+
-+	ret =3D request_threaded_irq(irq, NULL, max8925_onkey_handler,
-+				   IRQF_ONESHOT, "onkey", info);
-+	if (ret < 0) {
-+		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
-+			irq, ret);
-+		goto out_irq;
-+	}
-+
-+	info->idev->name =3D "max8925_on";
-+	info->idev->phys =3D "max8925_on/input0";
-+	info->idev->id.bustype =3D BUS_I2C;
-+	info->idev->dev.parent =3D &pdev->dev;
-+	info->irq =3D irq;
-+	info->idev->evbit[0] =3D BIT_MASK(EV_KEY);
-+	info->idev->keybit[BIT_WORD(KEY_POWER)] =3D BIT_MASK(KEY_POWER);
-+
-+	ret =3D input_register_device(info->idev);
-+	if (ret) {
-+		dev_err(chip->dev, "Can't register input device: %d\n", ret);
-+		goto out;
-+	}
-+	platform_set_drvdata(pdev, info);
-+
-+	return 0;
-+
-+out:
-+	free_irq(info->irq, info);
-+out_irq:
-+	input_free_device(info->idev);
-+out_input:
-+	kfree(info);
-+	return ret;
-+}
-+
-+static int __devexit max8925_onkey_remove(struct platform_device *pdev)
-+{
-+	struct max8925_onkey_info *info =3D platform_get_drvdata(pdev);
-+
-+	free_irq(info->irq, info);
-+	input_unregister_device(info->idev);
-+	kfree(info);
-+	platform_set_drvdata(pdev, NULL);
-+	return 0;
-+}
-+
-+static struct platform_driver max8925_onkey_driver =3D {
-+	.driver		=3D {
-+		.name	=3D "max8925-onkey",
-+		.owner	=3D THIS_MODULE,
-+	},
-+	.probe		=3D max8925_onkey_probe,
-+	.remove		=3D __devexit_p(max8925_onkey_remove),
++struct pxa3xx_nand_cmdset {
++	uint16_t	read1;
++	uint16_t	read2;
++	uint16_t	program;
++	uint16_t	read_status;
++	uint16_t	read_id;
++	uint16_t	erase;
++	uint16_t	reset;
++	uint16_t	lock;
++	uint16_t	unlock;
++	uint16_t	lock_status;
 +};
 +
-+static int __init max8925_onkey_init(void)
-+{
-+	return platform_driver_register(&max8925_onkey_driver);
-+}
-+module_init(max8925_onkey_init);
++struct pxa3xx_nand_flash {
++	uint32_t	chip_id;
++	uint16_t	page_per_block; /* Pages per block (PG_PER_BLK) */
++	uint16_t 	page_size;	/* Page size in bytes (PAGE_SZ) */
++	uint8_t		flash_width;	/* Width of Flash memory (DWIDTH_M) */
++	uint8_t 	dfc_width;	/* Width of flash controller(DWIDTH_C) */
++	uint32_t	num_blocks;	/* Number of physical blocks in Flash */
++	struct pxa3xx_nand_timing *timing;	/* NAND Flash timing */
++};
 +
-+static void __exit max8925_onkey_exit(void)
-+{
-+	platform_driver_unregister(&max8925_onkey_driver);
-+}
-+module_exit(max8925_onkey_exit);
-+
-+MODULE_DESCRIPTION("Maxim MAX8925 ONKEY driver");
-+MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
-+MODULE_LICENSE("GPL");
---=20
-1.5.6.5
+ struct pxa3xx_nand_info {
+ 	struct nand_chip	nand_chip;
 
---001636e0a70fa0bfc90486fcbf3f
-Content-Type: text/x-patch; charset=US-ASCII; 
-	name="0003-input-enable-onkey-driver-of-max8925.patch"
-Content-Disposition: attachment; 
-	filename="0003-input-enable-onkey-driver-of-max8925.patch"
-Content-Transfer-Encoding: base64
-X-Attachment-Id: f_g9ex4p9j0
+@@ -177,20 +212,7 @@ MODULE_PARM_DESC(use_dma, "enable DMA for data
+transfering to/from NAND HW");
+ static struct pxa3xx_nand_timing default_timing;
+ static struct pxa3xx_nand_flash default_flash;
 
-RnJvbSAxN2MzN2YzZmQxNjExODNhM2ZhMjBiZmVmZjU4YWJkYzI4OWQzZmUyIE1vbiBTZXAgMTcg
-MDA6MDA6MDAgMjAwMQpGcm9tOiBIYW9qaWFuIFpodWFuZyA8aGFvamlhbi56aHVhbmdAbWFydmVs
-bC5jb20+CkRhdGU6IE1vbiwgOCBNYXIgMjAxMCAxMToyODo0MyAtMDUwMApTdWJqZWN0OiBbUEFU
-Q0hdIGlucHV0OiBlbmFibGUgb25rZXkgZHJpdmVyIG9mIG1heDg5MjUKCkltcGxlbWVudCBvbmtl
-eSBkcml2ZXIuIFdoaWxlIE9OS0VZIGlzIGhlbGQgZm9yIDMgc2Vjb25kcywgS0VZX1BPV0VSCmV2
-ZW50IG9jY3Vycy4KClNpZ25lZC1vZmYtYnk6IEhhb2ppYW4gWmh1YW5nIDxoYW9qaWFuLnpodWFu
-Z0BtYXJ2ZWxsLmNvbT4KLS0tCiBkcml2ZXJzL2lucHV0L21pc2MvS2NvbmZpZyAgICAgICAgIHwg
-ICAxMCArKysKIGRyaXZlcnMvaW5wdXQvbWlzYy9NYWtlZmlsZSAgICAgICAgfCAgICAxICsKIGRy
-aXZlcnMvaW5wdXQvbWlzYy9tYXg4OTI1X29ua2V5LmMgfCAgMTQ4ICsrKysrKysrKysrKysrKysr
-KysrKysrKysrKysrKysrKysrKwogMyBmaWxlcyBjaGFuZ2VkLCAxNTkgaW5zZXJ0aW9ucygrKSwg
-MCBkZWxldGlvbnMoLSkKIGNyZWF0ZSBtb2RlIDEwMDY0NCBkcml2ZXJzL2lucHV0L21pc2MvbWF4
-ODkyNV9vbmtleS5jCgpkaWZmIC0tZ2l0IGEvZHJpdmVycy9pbnB1dC9taXNjL0tjb25maWcgYi9k
-cml2ZXJzL2lucHV0L21pc2MvS2NvbmZpZwppbmRleCAyMzE0MGEzLi41NTA1YjVjIDEwMDY0NAot
-LS0gYS9kcml2ZXJzL2lucHV0L21pc2MvS2NvbmZpZworKysgYi9kcml2ZXJzL2lucHV0L21pc2Mv
-S2NvbmZpZwpAQCAtNTAsNiArNTAsMTYgQEAgY29uZmlnIElOUFVUX002OEtfQkVFUAogCXRyaXN0
-YXRlICJNNjhrIEJlZXBlciBzdXBwb3J0IgogCWRlcGVuZHMgb24gTTY4SwogCitjb25maWcgSU5Q
-VVRfTUFYODkyNV9PTktFWQorCXRyaXN0YXRlICJNQVg4OTI1IE9OS0VZIHN1cHBvcnQiCisJZGVw
-ZW5kcyBvbiBNRkRfTUFYODkyNQorCWhlbHAKKwkgIFN1cHBvcnQgdGhlIE9OS0VZIG9mIE1BWDg5
-MjUgUE1JQ3MgYXMgYW4gaW5wdXQgZGV2aWNlCisJICByZXBvcnRpbmcgcG93ZXIgYnV0dG9uIHN0
-YXR1cy4KKworCSAgVG8gY29tcGlsZSB0aGlzIGRyaXZlciBhcyBhIG1vZHVsZSwgY2hvb3NlIE0g
-aGVyZTogdGhlIG1vZHVsZQorCSAgd2lsbCBiZSBjYWxsZWQgbWF4ODkyNV9vbmtleS4KKwogY29u
-ZmlnIElOUFVUX0FQQU5FTAogCXRyaXN0YXRlICJGdWppdHN1IExpZmVib29rIEFwcGxpY2F0aW9u
-IFBhbmVsIGJ1dHRvbnMiCiAJZGVwZW5kcyBvbiBYODYgJiYgSTJDICYmIExFRFNfQ0xBU1MKZGlm
-ZiAtLWdpdCBhL2RyaXZlcnMvaW5wdXQvbWlzYy9NYWtlZmlsZSBiL2RyaXZlcnMvaW5wdXQvbWlz
-Yy9NYWtlZmlsZQppbmRleCA3ZTk1YTVkLi43MWU5MTExIDEwMDY0NAotLS0gYS9kcml2ZXJzL2lu
-cHV0L21pc2MvTWFrZWZpbGUKKysrIGIvZHJpdmVycy9pbnB1dC9taXNjL01ha2VmaWxlCkBAIC0x
-Nyw2ICsxNyw3IEBAIG9iai0kKENPTkZJR19IUF9TRENfUlRDKQkJKz0gaHBfc2RjX3J0Yy5vCiBv
-YmotJChDT05GSUdfSU5QVVRfSVhQNFhYX0JFRVBFUikJKz0gaXhwNHh4LWJlZXBlci5vCiBvYmot
-JChDT05GSUdfSU5QVVRfS0VZU1BBTl9SRU1PVEUpCSs9IGtleXNwYW5fcmVtb3RlLm8KIG9iai0k
-KENPTkZJR19JTlBVVF9NNjhLX0JFRVApCQkrPSBtNjhrc3Brci5vCitvYmotJChDT05GSUdfSU5Q
-VVRfTUFYODkyNV9PTktFWSkJKz0gbWF4ODkyNV9vbmtleS5vCiBvYmotJChDT05GSUdfSU5QVVRf
-UENBUCkJCSs9IHBjYXBfa2V5cy5vCiBvYmotJChDT05GSUdfSU5QVVRfUENGNTA2MzNfUE1VKQkr
-PSBwY2Y1MDYzMy1pbnB1dC5vCiBvYmotJChDT05GSUdfSU5QVVRfUENTUEtSKQkJKz0gcGNzcGty
-Lm8KZGlmZiAtLWdpdCBhL2RyaXZlcnMvaW5wdXQvbWlzYy9tYXg4OTI1X29ua2V5LmMgYi9kcml2
-ZXJzL2lucHV0L21pc2MvbWF4ODkyNV9vbmtleS5jCm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4
-IDAwMDAwMDAuLjBkYTJjZmYKLS0tIC9kZXYvbnVsbAorKysgYi9kcml2ZXJzL2lucHV0L21pc2Mv
-bWF4ODkyNV9vbmtleS5jCkBAIC0wLDAgKzEsMTQ4IEBACisvKioKKyAqIG1heDg5MjVfb25rZXku
-YyAtIE1BWDg5MjUgT05LRVkgZHJpdmVyCisgKgorICogQ29weXJpZ2h0IChDKSAyMDA5IE1hcnZl
-bGwgSW50ZXJuYXRpb25hbCBMdGQuCisgKiAgICAgIEhhb2ppYW4gWmh1YW5nIDxoYW9qaWFuLnpo
-dWFuZ0BtYXJ2ZWxsLmNvbT4KKyAqCisgKiBUaGlzIGZpbGUgaXMgc3ViamVjdCB0byB0aGUgdGVy
-bXMgYW5kIGNvbmRpdGlvbnMgb2YgdGhlIEdOVSBHZW5lcmFsCisgKiBQdWJsaWMgTGljZW5zZS4g
-U2VlIHRoZSBmaWxlICJDT1BZSU5HIiBpbiB0aGUgbWFpbiBkaXJlY3Rvcnkgb2YgdGhpcworICog
-YXJjaGl2ZSBmb3IgbW9yZSBkZXRhaWxzLgorICoKKyAqIFRoaXMgcHJvZ3JhbSBpcyBkaXN0cmli
-dXRlZCBpbiB0aGUgaG9wZSB0aGF0IGl0IHdpbGwgYmUgdXNlZnVsLAorICogYnV0IFdJVEhPVVQg
-QU5ZIFdBUlJBTlRZOyB3aXRob3V0IGV2ZW4gdGhlIGltcGxpZWQgd2FycmFudHkgb2YKKyAqIE1F
-UkNIQU5UQUJJTElUWSBvciBGSVRORVNTIEZPUiBBIFBBUlRJQ1VMQVIgUFVSUE9TRS4gIFNlZSB0
-aGUKKyAqIEdOVSBHZW5lcmFsIFB1YmxpYyBMaWNlbnNlIGZvciBtb3JlIGRldGFpbHMuCisgKgor
-ICogWW91IHNob3VsZCBoYXZlIHJlY2VpdmVkIGEgY29weSBvZiB0aGUgR05VIEdlbmVyYWwgUHVi
-bGljIExpY2Vuc2UKKyAqIGFsb25nIHdpdGggdGhpcyBwcm9ncmFtOyBpZiBub3QsIHdyaXRlIHRv
-IHRoZSBGcmVlIFNvZnR3YXJlCisgKiBGb3VuZGF0aW9uLCBJbmMuLCA1OSBUZW1wbGUgUGxhY2Us
-IFN1aXRlIDMzMCwgQm9zdG9uLCBNQSAgMDIxMTEtMTMwNyAgVVNBCisgKi8KKworI2luY2x1ZGUg
-PGxpbnV4L2tlcm5lbC5oPgorI2luY2x1ZGUgPGxpbnV4L21vZHVsZS5oPgorI2luY2x1ZGUgPGxp
-bnV4L3BsYXRmb3JtX2RldmljZS5oPgorI2luY2x1ZGUgPGxpbnV4L2kyYy5oPgorI2luY2x1ZGUg
-PGxpbnV4L2lucHV0Lmg+CisjaW5jbHVkZSA8bGludXgvaW50ZXJydXB0Lmg+CisjaW5jbHVkZSA8
-bGludXgvbWZkL21heDg5MjUuaD4KKyNpbmNsdWRlIDxsaW51eC9zbGFiLmg+CisKKyNkZWZpbmUg
-SEFSRFJFU0VUX0VOCQkoMSA8PCA3KQorI2RlZmluZSBQV1JFTl9FTgkJKDEgPDwgNykKKworc3Ry
-dWN0IG1heDg5MjVfb25rZXlfaW5mbyB7CisJc3RydWN0IGlucHV0X2RldgkqaWRldjsKKwlzdHJ1
-Y3QgbWF4ODkyNV9jaGlwCSpjaGlwOworCXN0cnVjdCBpMmNfY2xpZW50CSppMmM7CisJc3RydWN0
-IGRldmljZQkJKmRldjsKKwlpbnQJCQlpcnE7Cit9OworCisvKgorICogTUFYODkyNSBnaXZlcyB1
-cyBhbiBpbnRlcnJ1cHQgd2hlbiBPTktFWSBpcyBoZWxkIGZvciAzIHNlY29uZHMuCisgKiBtYXg4
-OTI1X3NldF9iaXRzKCkgb3BlcmF0ZXMgSTJDIGJ1cyBhbmQgbWF5IHNsZWVwLiBTbyBpbXBsZW1l
-bnQKKyAqIGl0IGluIHRocmVhZCBJUlEgaGFuZGxlci4KKyAqLworc3RhdGljIGlycXJldHVybl90
-IG1heDg5MjVfb25rZXlfaGFuZGxlcihpbnQgaXJxLCB2b2lkICpkYXRhKQoreworCXN0cnVjdCBt
-YXg4OTI1X29ua2V5X2luZm8gKmluZm8gPSBkYXRhOworCisJaW5wdXRfcmVwb3J0X2tleShpbmZv
-LT5pZGV2LCBLRVlfUE9XRVIsIDEpOworCWlucHV0X3N5bmMoaW5mby0+aWRldik7CisKKwkvKiBF
-bmFibGUgaGFyZHJlc2V0IHRvIGhhbHQgaWYgc3lzdGVtIGlzbid0IHNodXRkb3duIG9uIHRpbWUg
-Ki8KKwltYXg4OTI1X3NldF9iaXRzKGluZm8tPmkyYywgTUFYODkyNV9TWVNFTlNFTCwKKwkJCSBI
-QVJEUkVTRVRfRU4sIEhBUkRSRVNFVF9FTik7CisJcmV0dXJuIElSUV9IQU5ETEVEOworfQorCitz
-dGF0aWMgaW50IF9fZGV2aW5pdCBtYXg4OTI1X29ua2V5X3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9k
-ZXZpY2UgKnBkZXYpCit7CisJc3RydWN0IG1heDg5MjVfY2hpcCAqY2hpcCA9IGRldl9nZXRfZHJ2
-ZGF0YShwZGV2LT5kZXYucGFyZW50KTsKKwlzdHJ1Y3QgbWF4ODkyNV9vbmtleV9pbmZvICppbmZv
-OworCWludCBpcnEsIHJldDsKKworCWluZm8gPSBremFsbG9jKHNpemVvZihzdHJ1Y3QgbWF4ODky
-NV9vbmtleV9pbmZvKSwgR0ZQX0tFUk5FTCk7CisJaWYgKCFpbmZvKQorCQlyZXR1cm4gLUVOT01F
-TTsKKwlpbmZvLT5jaGlwID0gY2hpcDsKKwlpbmZvLT5pMmMgPSBjaGlwLT5pMmM7CisJaW5mby0+
-ZGV2ID0gJnBkZXYtPmRldjsKKwlpcnEgPSBjaGlwLT5pcnFfYmFzZSArIE1BWDg5MjVfSVJRX0dQ
-TV9TV18zU0VDOworCisJaW5mby0+aWRldiA9IGlucHV0X2FsbG9jYXRlX2RldmljZSgpOworCWlm
-ICghaW5mby0+aWRldikgeworCQlkZXZfZXJyKGNoaXAtPmRldiwgIkZhaWxlZCB0byBhbGxvY2F0
-ZSBpbnB1dCBkZXZcbiIpOworCQlyZXQgPSAtRU5PTUVNOworCQlnb3RvIG91dF9pbnB1dDsKKwl9
-CisKKwlyZXQgPSByZXF1ZXN0X3RocmVhZGVkX2lycShpcnEsIE5VTEwsIG1heDg5MjVfb25rZXlf
-aGFuZGxlciwKKwkJCQkgICBJUlFGX09ORVNIT1QsICJvbmtleSIsIGluZm8pOworCWlmIChyZXQg
-PCAwKSB7CisJCWRldl9lcnIoY2hpcC0+ZGV2LCAiRmFpbGVkIHRvIHJlcXVlc3QgSVJROiAjJWQ6
-ICVkXG4iLAorCQkJaXJxLCByZXQpOworCQlnb3RvIG91dF9pcnE7CisJfQorCisJaW5mby0+aWRl
-di0+bmFtZSA9ICJtYXg4OTI1X29uIjsKKwlpbmZvLT5pZGV2LT5waHlzID0gIm1heDg5MjVfb24v
-aW5wdXQwIjsKKwlpbmZvLT5pZGV2LT5pZC5idXN0eXBlID0gQlVTX0kyQzsKKwlpbmZvLT5pZGV2
-LT5kZXYucGFyZW50ID0gJnBkZXYtPmRldjsKKwlpbmZvLT5pcnEgPSBpcnE7CisJaW5mby0+aWRl
-di0+ZXZiaXRbMF0gPSBCSVRfTUFTSyhFVl9LRVkpOworCWluZm8tPmlkZXYtPmtleWJpdFtCSVRf
-V09SRChLRVlfUE9XRVIpXSA9IEJJVF9NQVNLKEtFWV9QT1dFUik7CisKKwlyZXQgPSBpbnB1dF9y
-ZWdpc3Rlcl9kZXZpY2UoaW5mby0+aWRldik7CisJaWYgKHJldCkgeworCQlkZXZfZXJyKGNoaXAt
-PmRldiwgIkNhbid0IHJlZ2lzdGVyIGlucHV0IGRldmljZTogJWRcbiIsIHJldCk7CisJCWdvdG8g
-b3V0OworCX0KKwlwbGF0Zm9ybV9zZXRfZHJ2ZGF0YShwZGV2LCBpbmZvKTsKKworCXJldHVybiAw
-OworCitvdXQ6CisJZnJlZV9pcnEoaW5mby0+aXJxLCBpbmZvKTsKK291dF9pcnE6CisJaW5wdXRf
-ZnJlZV9kZXZpY2UoaW5mby0+aWRldik7CitvdXRfaW5wdXQ6CisJa2ZyZWUoaW5mbyk7CisJcmV0
-dXJuIHJldDsKK30KKworc3RhdGljIGludCBfX2RldmV4aXQgbWF4ODkyNV9vbmtleV9yZW1vdmUo
-c3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKK3sKKwlzdHJ1Y3QgbWF4ODkyNV9vbmtleV9p
-bmZvICppbmZvID0gcGxhdGZvcm1fZ2V0X2RydmRhdGEocGRldik7CisKKwlmcmVlX2lycShpbmZv
-LT5pcnEsIGluZm8pOworCWlucHV0X3VucmVnaXN0ZXJfZGV2aWNlKGluZm8tPmlkZXYpOworCWtm
-cmVlKGluZm8pOworCXBsYXRmb3JtX3NldF9kcnZkYXRhKHBkZXYsIE5VTEwpOworCXJldHVybiAw
-OworfQorCitzdGF0aWMgc3RydWN0IHBsYXRmb3JtX2RyaXZlciBtYXg4OTI1X29ua2V5X2RyaXZl
-ciA9IHsKKwkuZHJpdmVyCQk9IHsKKwkJLm5hbWUJPSAibWF4ODkyNS1vbmtleSIsCisJCS5vd25l
-cgk9IFRISVNfTU9EVUxFLAorCX0sCisJLnByb2JlCQk9IG1heDg5MjVfb25rZXlfcHJvYmUsCisJ
-LnJlbW92ZQkJPSBfX2RldmV4aXRfcChtYXg4OTI1X29ua2V5X3JlbW92ZSksCit9OworCitzdGF0
-aWMgaW50IF9faW5pdCBtYXg4OTI1X29ua2V5X2luaXQodm9pZCkKK3sKKwlyZXR1cm4gcGxhdGZv
-cm1fZHJpdmVyX3JlZ2lzdGVyKCZtYXg4OTI1X29ua2V5X2RyaXZlcik7Cit9Cittb2R1bGVfaW5p
-dChtYXg4OTI1X29ua2V5X2luaXQpOworCitzdGF0aWMgdm9pZCBfX2V4aXQgbWF4ODkyNV9vbmtl
-eV9leGl0KHZvaWQpCit7CisJcGxhdGZvcm1fZHJpdmVyX3VucmVnaXN0ZXIoJm1heDg5MjVfb25r
-ZXlfZHJpdmVyKTsKK30KK21vZHVsZV9leGl0KG1heDg5MjVfb25rZXlfZXhpdCk7CisKK01PRFVM
-RV9ERVNDUklQVElPTigiTWF4aW0gTUFYODkyNSBPTktFWSBkcml2ZXIiKTsKK01PRFVMRV9BVVRI
-T1IoIkhhb2ppYW4gWmh1YW5nIDxoYW9qaWFuLnpodWFuZ0BtYXJ2ZWxsLmNvbT4iKTsKK01PRFVM
-RV9MSUNFTlNFKCJHUEwiKTsKLS0gCjEuNS42LjUKCg==
---001636e0a70fa0bfc90486fcbf3f--
+-static struct pxa3xx_nand_cmdset smallpage_cmdset = {
+-	.read1		= 0x0000,
+-	.read2		= 0x0050,
+-	.program	= 0x1080,
+-	.read_status	= 0x0070,
+-	.read_id	= 0x0090,
+-	.erase		= 0xD060,
+-	.reset		= 0x00FF,
+-	.lock		= 0x002A,
+-	.unlock		= 0x2423,
+-	.lock_status	= 0x007A,
+-};
+-
+-static struct pxa3xx_nand_cmdset largepage_cmdset = {
++const static struct pxa3xx_nand_cmdset cmdset = {
+ 	.read1		= 0x3000,
+ 	.read2		= 0x0050,
+ 	.program	= 0x1080,
+@@ -203,143 +225,26 @@ static struct pxa3xx_nand_cmdset largepage_cmdset = {
+ 	.lock_status	= 0x007A,
+ };
+
+-#ifdef CONFIG_MTD_NAND_PXA3xx_BUILTIN
+-static struct pxa3xx_nand_timing samsung512MbX16_timing = {
+-	.tCH	= 10,
+-	.tCS	= 0,
+-	.tWH	= 20,
+-	.tWP	= 40,
+-	.tRH	= 30,
+-	.tRP	= 40,
+-	.tR	= 11123,
+-	.tWHR	= 110,
+-	.tAR	= 10,
+-};
+-
+-static struct pxa3xx_nand_flash samsung512MbX16 = {
+-	.timing		= &samsung512MbX16_timing,
+-	.cmdset		= &smallpage_cmdset,
+-	.page_per_block	= 32,
+-	.page_size	= 512,
+-	.flash_width	= 16,
+-	.dfc_width	= 16,
+-	.num_blocks	= 4096,
+-	.chip_id	= 0x46ec,
+-};
+-
+-static struct pxa3xx_nand_flash samsung2GbX8 = {
+-	.timing		= &samsung512MbX16_timing,
+-	.cmdset		= &smallpage_cmdset,
+-	.page_per_block	= 64,
+-	.page_size	= 2048,
+-	.flash_width	= 8,
+-	.dfc_width	= 8,
+-	.num_blocks	= 2048,
+-	.chip_id	= 0xdaec,
++static struct pxa3xx_nand_timing __devinitdata timing[] = {
++	/* Samsung NAND series */
++	{ 10,  0, 20, 40, 30, 40, 11123, 110, 10, },
++	/* Micron NAND series */
++	{ 10, 25, 15, 25, 15, 30, 25000,  60, 10, },
++	/* ST NAND series */
++	{ 10, 35, 15, 25, 15, 25, 25000,  60, 10, },
+ };
+
+-static struct pxa3xx_nand_flash samsung32GbX8 = {
+-	.timing		= &samsung512MbX16_timing,
+-	.cmdset		= &smallpage_cmdset,
+-	.page_per_block	= 128,
+-	.page_size	= 4096,
+-	.flash_width	= 8,
+-	.dfc_width	= 8,
+-	.num_blocks	= 8192,
+-	.chip_id	= 0xd7ec,
++static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
++	{ 0x46ec,  32,  512, 16, 16, 4096, &timing[0], },
++	{ 0xdaec,  64, 2048,  8,  8, 2048, &timing[0], },
++	{ 0xd7ec, 128, 4096,  8,  8, 8192, &timing[0], },
++	{ 0xa12c,  64, 2048,  8,  8, 1024, &timing[1], },
++	{ 0xb12c,  64, 2048, 16, 16, 1024, &timing[1], },
++	{ 0xdc2c,  64, 2048,  8,  8, 4096, &timing[1], },
++	{ 0xcc2c,  64, 2048, 16, 16, 4096, &timing[1], },
++	{ 0xba20,  64, 2048, 16, 16, 2048, &timing[2], },
+ };
+
+-static struct pxa3xx_nand_timing micron_timing = {
+-	.tCH	= 10,
+-	.tCS	= 25,
+-	.tWH	= 15,
+-	.tWP	= 25,
+-	.tRH	= 15,
+-	.tRP	= 30,
+-	.tR	= 25000,
+-	.tWHR	= 60,
+-	.tAR	= 10,
+-};
+-
+-static struct pxa3xx_nand_flash micron1GbX8 = {
+-	.timing		= &micron_timing,
+-	.cmdset		= &largepage_cmdset,
+-	.page_per_block	= 64,
+-	.page_size	= 2048,
+-	.flash_width	= 8,
+-	.dfc_width	= 8,
+-	.num_blocks	= 1024,
+-	.chip_id	= 0xa12c,
+-};
+-
+-static struct pxa3xx_nand_flash micron1GbX16 = {
+-	.timing		= &micron_timing,
+-	.cmdset		= &largepage_cmdset,
+-	.page_per_block	= 64,
+-	.page_size	= 2048,
+-	.flash_width	= 16,
+-	.dfc_width	= 16,
+-	.num_blocks	= 1024,
+-	.chip_id	= 0xb12c,
+-};
+-
+-static struct pxa3xx_nand_flash micron4GbX8 = {
+-	.timing		= &micron_timing,
+-	.cmdset		= &largepage_cmdset,
+-	.page_per_block	= 64,
+-	.page_size	= 2048,
+-	.flash_width	= 8,
+-	.dfc_width	= 8,
+-	.num_blocks	= 4096,
+-	.chip_id	= 0xdc2c,
+-};
+-
+-static struct pxa3xx_nand_flash micron4GbX16 = {
+-	.timing		= &micron_timing,
+-	.cmdset		= &largepage_cmdset,
+-	.page_per_block	= 64,
+-	.page_size	= 2048,
+-	.flash_width	= 16,
+-	.dfc_width	= 16,
+-	.num_blocks	= 4096,
+-	.chip_id	= 0xcc2c,
+-};
+-
+-static struct pxa3xx_nand_timing stm2GbX16_timing = {
+-	.tCH = 10,
+-	.tCS = 35,
+-	.tWH = 15,
+-	.tWP = 25,
+-	.tRH = 15,
+-	.tRP = 25,
+-	.tR = 25000,
+-	.tWHR = 60,
+-	.tAR = 10,
+-};
+-
+-static struct pxa3xx_nand_flash stm2GbX16 = {
+-	.timing = &stm2GbX16_timing,
+-	.cmdset	= &largepage_cmdset,
+-	.page_per_block = 64,
+-	.page_size = 2048,
+-	.flash_width = 16,
+-	.dfc_width = 16,
+-	.num_blocks = 2048,
+-	.chip_id = 0xba20,
+-};
+-
+-static struct pxa3xx_nand_flash *builtin_flash_types[] = {
+-	&samsung512MbX16,
+-	&samsung2GbX8,
+-	&samsung32GbX8,
+-	&micron1GbX8,
+-	&micron1GbX16,
+-	&micron4GbX8,
+-	&micron4GbX16,
+-	&stm2GbX16,
+-};
+-#endif /* CONFIG_MTD_NAND_PXA3xx_BUILTIN */
+-
+ #define NDTR0_tCH(c)	(min((c), 7) << 19)
+ #define NDTR0_tCS(c)	(min((c), 7) << 16)
+ #define NDTR0_tWH(c)	(min((c), 7) << 11)
+@@ -412,7 +317,6 @@ static int prepare_read_prog_cmd(struct
+pxa3xx_nand_info *info,
+ 			uint16_t cmd, int column, int page_addr)
+ {
+ 	const struct pxa3xx_nand_flash *f = info->flash_info;
+-	const struct pxa3xx_nand_cmdset *cmdset = f->cmdset;
+
+ 	/* calculate data size */
+ 	switch (f->page_size) {
+@@ -445,7 +349,7 @@ static int prepare_read_prog_cmd(struct
+pxa3xx_nand_info *info,
+ 		 */
+ 		info->ndcb1 = page_addr << 8;
+
+-	if (cmd == cmdset->program)
++	if (cmd == cmdset.program)
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(1) | NDCB0_AUTO_RS;
+
+ 	return 0;
+@@ -463,20 +367,18 @@ static int prepare_erase_cmd(struct
+pxa3xx_nand_info *info,
+
+ static int prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
+ {
+-	const struct pxa3xx_nand_cmdset *cmdset = info->flash_info->cmdset;
+-
+ 	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
+ 	info->ndcb1 = 0;
+ 	info->ndcb2 = 0;
+
+-	if (cmd == cmdset->read_id) {
++	if (cmd == cmdset.read_id) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(3);
+ 		info->data_size = 8;
+-	} else if (cmd == cmdset->read_status) {
++	} else if (cmd == cmdset.read_status) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(4);
+ 		info->data_size = 8;
+-	} else if (cmd == cmdset->reset || cmd == cmdset->lock ||
+-		   cmd == cmdset->unlock) {
++	} else if (cmd == cmdset.reset || cmd == cmdset.lock ||
++		   cmd == cmdset.unlock) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(5);
+ 	} else
+ 		return -EINVAL;
+@@ -700,8 +602,6 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 				int column, int page_addr)
+ {
+ 	struct pxa3xx_nand_info *info = mtd->priv;
+-	const struct pxa3xx_nand_flash *flash_info = info->flash_info;
+-	const struct pxa3xx_nand_cmdset *cmdset = flash_info->cmdset;
+ 	int ret;
+
+ 	info->use_dma = (use_dma) ? 1 : 0;
+@@ -718,7 +618,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 		info->buf_start = mtd->writesize + column;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
+
+-		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
++		if (prepare_read_prog_cmd(info, cmdset.read1, column, page_addr))
+ 			break;
+
+ 		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+@@ -735,7 +635,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 		info->buf_count = mtd->writesize + mtd->oobsize;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
+
+-		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
++		if (prepare_read_prog_cmd(info, cmdset.read1, column, page_addr))
+ 			break;
+
+ 		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+@@ -761,14 +661,14 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 	case NAND_CMD_PAGEPROG:
+ 		info->use_ecc = (info->seqin_column >= mtd->writesize) ? 0 : 1;
+
+-		if (prepare_read_prog_cmd(info, cmdset->program,
++		if (prepare_read_prog_cmd(info, cmdset.program,
+ 				info->seqin_column, info->seqin_page_addr))
+ 			break;
+
+ 		pxa3xx_nand_do_cmd(info, NDSR_WRDREQ);
+ 		break;
+ 	case NAND_CMD_ERASE1:
+-		if (prepare_erase_cmd(info, cmdset->erase, page_addr))
++		if (prepare_erase_cmd(info, cmdset.erase, page_addr))
+ 			break;
+
+ 		pxa3xx_nand_do_cmd(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+@@ -783,13 +683,13 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 				info->read_id_bytes : 1;
+
+ 		if (prepare_other_cmd(info, (command == NAND_CMD_READID) ?
+-				cmdset->read_id : cmdset->read_status))
++				cmdset.read_id : cmdset.read_status))
+ 			break;
+
+ 		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ);
+ 		break;
+ 	case NAND_CMD_RESET:
+-		if (prepare_other_cmd(info, cmdset->reset))
++		if (prepare_other_cmd(info, cmdset.reset))
+ 			break;
+
+ 		ret = pxa3xx_nand_do_cmd(info, NDSR_CS0_CMDD);
+@@ -925,12 +825,10 @@ static int pxa3xx_nand_ecc_correct(struct mtd_info *mtd,
+
+ static int __readid(struct pxa3xx_nand_info *info, uint32_t *id)
+ {
+-	const struct pxa3xx_nand_flash *f = info->flash_info;
+-	const struct pxa3xx_nand_cmdset *cmdset = f->cmdset;
+ 	uint32_t ndcr;
+ 	uint8_t  id_buff[8];
+
+-	if (prepare_other_cmd(info, cmdset->read_id)) {
++	if (prepare_other_cmd(info, cmdset.read_id)) {
+ 		printk(KERN_ERR "failed to prepare command\n");
+ 		return -EINVAL;
+ 	}
+@@ -1027,11 +925,6 @@ static int pxa3xx_nand_detect_config(struct
+pxa3xx_nand_info *info)
+ 	default_flash.flash_width = ndcr & NDCR_DWIDTH_M ? 16 : 8;
+ 	default_flash.dfc_width = ndcr & NDCR_DWIDTH_C ? 16 : 8;
+
+-	if (default_flash.page_size == 2048)
+-		default_flash.cmdset = &largepage_cmdset;
+-	else
+-		default_flash.cmdset = &smallpage_cmdset;
+-
+ 	/* set info fields needed to __readid */
+ 	info->flash_info = &default_flash;
+ 	info->read_id_bytes = (default_flash.page_size == 2048) ? 4 : 2;
+@@ -1067,7 +960,7 @@ static int pxa3xx_nand_detect_config(struct
+pxa3xx_nand_info *info)
+ 		info->row_addr_cycles = 2;
+
+ 	pxa3xx_nand_detect_timing(info, &default_timing);
+-	default_flash.timing = &default_timing;
++	memcpy(&default_flash.timing, &default_timing, sizeof(default_timing));
+
+ 	return 0;
+ }
+@@ -1096,10 +989,9 @@ static int pxa3xx_nand_detect_flash(struct
+pxa3xx_nand_info *info,
+ 			return 0;
+ 	}
+
+-#ifdef CONFIG_MTD_NAND_PXA3xx_BUILTIN
+ 	for (i = 0; i < ARRAY_SIZE(builtin_flash_types); i++) {
+
+-		f = builtin_flash_types[i];
++		f = &builtin_flash_types[i];
+
+ 		if (pxa3xx_nand_config_flash(info, f))
+ 			continue;
+@@ -1110,7 +1002,6 @@ static int pxa3xx_nand_detect_flash(struct
+pxa3xx_nand_info *info,
+ 		if (id == f->chip_id)
+ 			return 0;
+ 	}
+-#endif
+
+ 	dev_warn(&info->pdev->dev,
+ 		 "failed to detect configured nand flash; found %04x instead of\n",
+-- 
+1.7.0.4
