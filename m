@@ -1,46 +1,50 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Sun, 21 Mar 2010 04:30:00 +0530
-Subject: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
-In-Reply-To: <20100320030239.GD11448@atomide.com>
-References: <20100320003605.GA11448@atomide.com>
-	<20100320004746.GB11448@atomide.com>
-	<20100320024827.GC11448@atomide.com>
-	<20100320030239.GD11448@atomide.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703045F314F@dbde02.ent.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 21 Mar 2010 11:36:37 +0100
+Subject: [PATCH 1/3] watchdog: Add support for the Freescale MXC watchdog
+In-Reply-To: <87aau2x2ew.fsf@vovsem.com>
+References: <1269011607-23077-1-git-send-email-vzapolskiy@gmail.com>
+	<20100320120939.GA5515@pengutronix.de> <87aau2x2ew.fsf@vovsem.com>
+Message-ID: <20100321103637.GA26984@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vladimir,
 
+On Sat, Mar 20, 2010 at 09:40:07PM +0300, Vladimir Zapolskiy wrote:
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Friday, March 19, 2010 10:03 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Cc: Pais, Allen; Pandita, Vikram
-> Subject: Re: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+> The driver is extremely simple, so from my biased position only minor
+> benefits can be found in my version:
+> * introduced spinlock to protect concurrent write to registers
+> * SETTIMEOUT option is present and it works well on imx31
+> * correct zero byte write()
+> * clock enabled only when watchdog node is opened
+> * dynamic wdt structure, which potentially simplifies future support of
+>   several watchdogs found on imx51 and imx37 IIRC
+> * no critical message on close with unset NOWAYOUT on non-imx1 SoCs
 > 
-> * Tony Lindgren <tony@atomide.com> [100319 19:43]:
-> > * Tony Lindgren <tony@atomide.com> [100319 17:42]:
-> > > * Tony Lindgren <tony@atomide.com> [100319 17:30]:
-> > > > Hi all,
-> > > >
-> > > > Got a zoom3 finally! This is needed to boot with DEBUG_LL +
-> earlyprintk.
-> > >
-> > > And of course it won't compile because of a missing #.
-> > > Here's the working version.
-> >
-> > One more time. Looks like what I posted is not enough, we
-> > also need to make sure the mapping does not overlap with
-> > other regions. So basically we can't use 0xfb000000 like
-> > we currently have, let's use 0xf7000000 instead unless
-> > somebody has better ideas.
+> Your pretty good version supports imx1, and I cann't test my version on
+> imx1, because I don't have such hardware on hand.
 > 
-> And now 0xf7000000 is in vmalloc area.. Needs to be looked
-> more.
+> Obviously better to update your reviewed one, and I hope some comments or even
+> updates from my side could be accepted by you :)
 
-On internal TI trees, we do have 0xfa400000 working.
-Guess that is the magic number.
+Thanks for agreeing on the procedure and pointing out the benefits of your
+driver. I will surely have a look at them and don't be surprised if you will
+find this or that incorporated ;) I haven't really started yet, so I might be
+missing something: What races do you want to protect against with the spinlock?
+The ping?
 
-> 
-> Tony
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100321/56fe7884/attachment.sig>
