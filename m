@@ -1,41 +1,119 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 21 Mar 2010 21:43:36 +0100
-Subject: bit errors on spitz
-In-Reply-To: <1268384824.4963.35.camel@utx.utx.cz>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<f17812d71003072137u51be17a1ie3e50e30dea16f77@mail.gmail.com>
-	<20100308072858.GA29939@atrey.karlin.mff.cuni.cz>
-	<20100308082530.GA1982@atrey.karlin.mff.cuni.cz>
-	<4B98EF5D.5000609@warmcat.com>
-	<1268322155.3990.114.camel@hammer.suse.cz>
-	<4B995EE1.1050609@warmcat.com>
-	<1268384824.4963.35.camel@utx.utx.cz>
-Message-ID: <20100321204335.GM1933@elf.ucw.cz>
+From: julia@diku.dk (Julia Lawall)
+Date: Sun, 21 Mar 2010 21:48:53 +0100 (CET)
+Subject: [PATCH] arch/arm/mach-pxa: avoid NULL dereference in error handling
+	code
+Message-ID: <Pine.LNX.4.64.1003212147360.12371@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2010-03-12 10:07:04, Stanislav Brabec wrote:
-> Andy Green wrote: 
-> > On 03/11/10 15:42, Somebody in the thread at some point said:
-> > > Andy Green wrote:
-> > >
-> > >> I saw very similar failures for a long time on our iMX31 based device.
-> > >> Eventually I found a Freescale errata where the RAM inside the USB2
-> > >> macrocell started to make single bit errors below 1.38V Vcore; ours was
-> > >> 1.4V at that time but dipped on CPU load.
-> > >
-> > > Good tip. It seems that nobody ported driver for the voltage control
-> > > chip ISL6271 from 2.4 kernel, and bootloader probably does not set
-> > > correct values.
+From: Julia Lawall <julia@diku.dk>
 
-Are we sure about this one? If we have wrong voltages on various
-parts, that kind-off explains it.
+The assignments of res to the results of the two calls to
+platform_get_resource make it impossible to use res in the error handling
+code in the arguments to release_mem_region.
 
-Would it be possible to measure (Voltmeter) difference between 2.4
-kernel and 2.6 kernel?
+At the same time, code of the form res->end - res->start + 1 is converted
+to use resource_size.
 
-								Pavel
+The semantic match that finds the former problem is as follows:
+(http://coccinelle.lip6.fr/)
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+// <smpl>
+@r exists@
+expression E, E1;
+identifier f;
+statement S1,S3;
+iterator iter;
+@@
+
+if ((E == NULL && ...) || ...)
+{
+  ... when != false ((E == NULL && ...) || ...)
+      when != true  ((E != NULL && ...) || ...)
+      when != iter(E,...) S1
+      when != E = E1
+(
+  sizeof(E->f)
+|
+* E->f
+)
+  ... when any
+  return ...;
+}
+else S3
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+ arch/arm/mach-pxa/ssp.c             |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/ssp.c b/arch/arm/mach-pxa/ssp.c
+index a81d6db..9fdbd38 100644
+--- a/arch/arm/mach-pxa/ssp.c
++++ b/arch/arm/mach-pxa/ssp.c
+@@ -349,6 +349,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id = platform_get_device_id(pdev);
+ 	struct resource *res;
++	struct resource *pres;
+ 	struct ssp_device *ssp;
+ 	int ret = 0;
+ 
+@@ -372,8 +373,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ 		goto err_free_clk;
+ 	}
+ 
+-	res = request_mem_region(res->start, res->end - res->start + 1,
+-			pdev->name);
++	res = request_mem_region(res->start, resource_size(res), pdev->name);
+ 	if (res == NULL) {
+ 		dev_err(&pdev->dev, "failed to request memory resource\n");
+ 		ret = -EBUSY;
+@@ -382,7 +382,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ 
+ 	ssp->phys_base = res->start;
+ 
+-	ssp->mmio_base = ioremap(res->start, res->end - res->start + 1);
++	ssp->mmio_base = ioremap(res->start, resource_size(res));
+ 	if (ssp->mmio_base == NULL) {
+ 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+ 		ret = -ENODEV;
+@@ -396,21 +396,21 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ 		goto err_free_io;
+ 	}
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (res == NULL) {
++	pres = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (pres == NULL) {
+ 		dev_err(&pdev->dev, "no SSP RX DRCMR defined\n");
+ 		ret = -ENODEV;
+ 		goto err_free_io;
+ 	}
+-	ssp->drcmr_rx = res->start;
++	ssp->drcmr_rx = pres->start;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (res == NULL) {
++	pres = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++	if (pres == NULL) {
+ 		dev_err(&pdev->dev, "no SSP TX DRCMR defined\n");
+ 		ret = -ENODEV;
+ 		goto err_free_io;
+ 	}
+-	ssp->drcmr_tx = res->start;
++	ssp->drcmr_tx = pres->start;
+ 
+ 	/* PXA2xx/3xx SSP ports starts from 1 and the internal pdev->id
+ 	 * starts from 0, do a translation here
+@@ -429,7 +429,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ err_free_io:
+ 	iounmap(ssp->mmio_base);
+ err_free_mem:
+-	release_mem_region(res->start, res->end - res->start + 1);
++	release_mem_region(res->start, resource_size(res));
+ err_free_clk:
+ 	clk_put(ssp->clk);
+ err_free:
