@@ -1,30 +1,55 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 22 Mar 2010 22:09:00 +0100
-Subject: PXA3xx internal SRAM
-In-Reply-To: <20100321124739.GG30801@buzzloop.caiaq.de>
-References: <20100321124739.GG30801@buzzloop.caiaq.de>
-Message-ID: <63386a3d1003221409j63413b5o7a0515836eaa8b86@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Mar 2010 22:09:46 +0100
+Subject: [PULL REQUEST] runtime physoffset [Was: change boot requirements]
+In-Reply-To: <20100308121550.GC9233@matterhorn.verdurent.com>
+References: <20100119083803.GA17904@pengutronix.de>
+	<20100122115831.GA8377@pengutronix.de>
+	<20100125173201.GA14834@pengutronix.de>
+	<4B5DF1C9.6090102@bluewatersys.com>
+	<20100130210231.GC16345@pengutronix.de>
+	<20100204095147.GA6562@pengutronix.de>
+	<20100212110350.GB18221@pengutronix.de>
+	<20100308121550.GC9233@matterhorn.verdurent.com>
+Message-ID: <20100322210946.GE10157@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/21 Daniel Mack <daniel@caiaq.de>:
+Hello,
 
-> I wonder what this could be used for. Is there any kind of cache that
-> would be worth putting there to speed up things for example?
+On Mon, Mar 08, 2010 at 02:15:50PM +0200, Amit Kucheria wrote:
+> On 10 Feb 12, Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > On Thu, Feb 04, 2010 at 10:51:47AM +0100, Uwe Kleine-K?nig wrote:
+> > > > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
+> > > >   Linus Torvalds (1):
+> > > >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
+> > > > 
+> > > > are available in the git repository at:
+> > > > 
+> > > >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> > > 
+> > > Can you please pull this branch for the .34 merge window?  Since the
+> > > last post one new patch was added to that branch.  I'll send it in reply
+> > > to this mail.
+> > Do you consider pulling?  If not, can you please say why?
+> > 
+> > Best regards
+> > Uwe
+> 
+> Bumping up this thread since these patches are necessary to reach our
+> eventual goal of a common kernel.
+Actually the patches in arm/booting are only some cleanups.  This series
+contained in arm/booting doesn't contain the two runtime physoffset
+patches[1]
 
-Some ARM systems have TCM (Tightly Coupled Memory) which are similar
-in character but actually a feature of the ARM platforms rather than a custom
-memory for a certain SoC.
+Russell?
 
-You can find some documentation on how this can be used in
-Documentation/arm/tcm.txt, as you can see we can compile code there
-and the memory left after that can be used as a generic memory pool
-for fast always-on memory.
+Best regards
+Uwe
 
-I raised the question as to whether the IRQ vectors could be put into
-this memory but Russell says this is unfortunately not possible, because
-the top of the vector page is also used for other things. I don't know if
-this entire page can be moved to fast memory though, perhaps that
-concept need to be revisited?
+[1] these are in my arm/booting-pu branch
 
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
