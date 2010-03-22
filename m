@@ -1,101 +1,35 @@
-From: rdunlap@xenotime.net (Randy Dunlap)
-Date: Sun, 21 Mar 2010 17:33:55 -0700
-Subject: [PATCH] Cosmetic:Partially remove deprecated __initcall() and
-	change to
-In-Reply-To: <4BA407AC.5030506@gmail.com>
-References: <1269028291-9103-1-git-send-email-justinmattock@gmail.com>
-	<4BA40115.2000509@xenotime.net> <4BA407AC.5030506@gmail.com>
-Message-ID: <4BA6BAF3.10603@xenotime.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 21 Mar 2010 20:47:22 -0400
+Subject: PXA3xx internal SRAM
+In-Reply-To: <20100321124739.GG30801@buzzloop.caiaq.de>
+References: <20100321124739.GG30801@buzzloop.caiaq.de>
+Message-ID: <771cded01003211747n29be55a3p7608578ff1744f51@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/10 16:24, Justin P. Mattock wrote:
-> On 03/19/2010 03:56 PM, Randy Dunlap wrote:
->> On 03/19/10 12:51, Justin P. Mattock wrote:
->>> After doing some things on a small issue,
->>> I noticed through web surfing, that there were patches
->>> submitted pertaining that __initcall is deprecated,
->>> and device_initcall should be used.
->>
->> Where was this discussion?  Do you have any pointers to it?
->>
-> 
-> The best info on this is scripts/checkpatch.pl
-> line #2664
-> 
-> when I found this I just did a quick search of __initcall
-> (which gives hits here and there)
-> https://patchwork.kernel.org/patch/23344/
-> (also found others at around 2008 or so)
+On Sun, Mar 21, 2010 at 8:47 AM, Daniel Mack <daniel@caiaq.de> wrote:
+> The pxa3xx series features a comparatively big and fast internal SRAM of
+> 256KB which is currently unused by the Linux kernel except for a 4-byte
+> return vector from suspend.
+>
+> I wonder what this could be used for. Is there any kind of cache that
+> would be worth putting there to speed up things for example?
+> And could the uncompressor probably benfit from that?
+>
+> Daniel
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-Thanks.  IMO there should be something in the kernel source tree
-that says explicitly that __initcall is deprecated and should be
-replaced by using <whatever should be used>.  That's missing.
+The size of internal SRAM isn't always 256KB. It could be 128KB, 256KB
+or 702KB. In marvell BSP, there's a memory management driver (aka IMM)
+to handle internal SRAM. So driver or user application could make use
+of it. And one part of internal SRAM is reserved for low power idle
+mode. But both of these two features aren't pushed into community yet.
 
-
->> I don't see any mention of __initcall being deprecated in
->> Linus' mainline git tree, or in linux-next, or in mmotm.
->> Where are those patches?
->>
-> 
-> I don't know(I'm out of the social pipeline when it comes to Linux news,
-> and updates)..
-> like in the explanation part of the patch
-> I was looking into something else, then ran into this,
-> so as a break(from what I was originally doing)
-> decided to do this and submit.
-> 
->>
->>> So as a change of subject(since what I was looking at
->>> was frustrating me),I decided to grep the whole tree
->>> and make the change(partially).
->>>
->>> Currently I'm running this patch on my system, kernel compiles
->>> without any errors or warnings.(thought there would be a speed increase
->>> but didn't see much(if any)).
->>
->> No, __initcall(x) is just a shorthand version of typing
->> device_initcall(x).  They do the same thing.
->>
-> 
-> yep, that's what I found out as well(reason for the cosmetic
-> in the subject line).
-> 
->>> Biggest problem I have though is testing this on other hardware types
->>> (I only have a macbook,and an iMac).
->>> So please if you have the access to other arch/hardware types please
->>> test.
->>>
->>> Now what I mean by partially is the __initcall function is still
->>> there, so(if any) userspace apps/libs depend on this it's there
->>> so they dont break and/or any other subsystem, that needs time
->>> to make the changes.
->>
->> The only thing that might be affected is building out-of-tree drivers,
->> but those are easy to fix.
->>
-> 
-> alright..main concern is making sure things don't break in the
-> kernel(even though things do).
-> 
-> I can have a go at the header files, submit
-> then if it's something people agree they want to do, then they
-> can go from there(if not it's fine as well).
-> 
->>> Note:
->>> the remaining files that still have __initcall in them are:
->>> (according to grep)
->>>
->>> arch/um/include/shared/init.h
->>> include/linux/init.h
->>> scripts/checkpatch.pl
->>>
->>> either I or somebody else, can change this(although a bit
->>> concerned about breaking things).
->>>
->>> Signed-off-by: Justin P. Mattock<justinmattock@gmail.com>
->>> ---
-
-
--- 
-~Randy
+Thanks
+Haojian
