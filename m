@@ -1,180 +1,313 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Mon, 22 Mar 2010 20:27:49 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+Date: Mon, 22 Mar 2010 20:29:19 +0100
+Subject: [PATCH 06/07] Add common platform devices for TCC8xxx SoCs
 In-Reply-To: <20100322191900.GF2040@bluebox.local>
 References: <20100322191900.GF2040@bluebox.local>
-Message-ID: <20100322192748.GK2040@bluebox.local>
+Message-ID: <20100322192919.GL2040@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Map the IO ranges of TCC8xxx peripherals.
+This patch introduces a first set of platform devices for integrated
+peripherals of TCC8xxx processors. Drivers for these devices are
+available and will be posted in a second step.
 
 Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
 ---
- arch/arm/mach-tcc8k/Makefile        |    2 +-
- arch/arm/mach-tcc8k/io.c            |   82 +++++++++++++++++++++++++++++++++++
- arch/arm/plat-tcc/include/mach/io.h |   53 ++++++++++++++++++++++
- 3 files changed, 136 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-tcc8k/io.c
- create mode 100644 arch/arm/plat-tcc/include/mach/io.h
+ arch/arm/mach-tcc8k/Makefile  |    2 +-
+ arch/arm/mach-tcc8k/devices.c |  274 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 275 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-tcc8k/devices.c
 
 diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
-index 5673868..09552e2 100644
+index 09552e2..e8a1134 100644
 --- a/arch/arm/mach-tcc8k/Makefile
 +++ b/arch/arm/mach-tcc8k/Makefile
 @@ -3,5 +3,5 @@
  #
  
  # Common support
--obj-y += clock.o irq.o time.o
-+obj-y += clock.o irq.o time.o io.o
+-obj-y += clock.o irq.o time.o io.o
++obj-y += clock.o irq.o time.o io.o devices.o
  
-diff --git a/arch/arm/mach-tcc8k/io.c b/arch/arm/mach-tcc8k/io.c
+diff --git a/arch/arm/mach-tcc8k/devices.c b/arch/arm/mach-tcc8k/devices.c
 new file mode 100644
-index 0000000..1187fca
+index 0000000..b6273af
 --- /dev/null
-+++ b/arch/arm/mach-tcc8k/io.c
-@@ -0,0 +1,82 @@
++++ b/arch/arm/mach-tcc8k/devices.c
+@@ -0,0 +1,274 @@
 +/*
-+ * linux/arch/arm/mach-tcc8k/io.c
++ * linux/arch/arm/mach-tcc8k/devices.c
 + *
-+ * (C) 2009 Hans J. Koch <hjk@linutronix.de>
-+ *
-+ * derived from TCC83xx io.c
 + * Copyright (C) Telechips, Inc.
++ * Modifications for mainline (C) 2009 Hans J. Koch <hjk@linutronix.de>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Licensed under the terms of GPL v2.
++ *
 + */
 +
-+#include <linux/kernel.h>
 +#include <linux/init.h>
++#include <linux/dma-mapping.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
 +
-+#include <asm/tlb.h>
-+#include <asm/mach/map.h>
 +#include <asm/io.h>
++#include <asm/mach/map.h>
 +
 +#include <mach/tcc8k-regs.h>
++#include <mach/irqs.h>
 +
-+/*
-+ * The machine specific code may provide the extra mapping besides the
-+ * default mapping provided here.
-+ */
-+static struct map_desc tcc8k_io_desc[] __initdata = {
++static u64 tcc8k_dmamask = DMA_BIT_MASK(32);
++
++#ifdef CONFIG_MTD_NAND_TCC
++/* NAND controller */
++static struct resource tcc_nand_resources[] = {
 +	{
-+		.virtual	= CS1_BASE_VIRT,	/* CS1 (CS8900) */
-+		.pfn		= __phys_to_pfn(CS1_BASE),
-+		.length		= CS1_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= AHB_PERI_BASE_VIRT,	/* AHB peripherals */
-+		.pfn		= __phys_to_pfn(AHB_PERI_BASE),
-+		.length		= AHB_PERI_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= APB0_PERI_BASE_VIRT,	/* APB peripherals */
-+		.pfn		= __phys_to_pfn(APB0_PERI_BASE),
-+		.length		= APB0_PERI_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= APB1_PERI_BASE_VIRT,	/* APB peripherals */
-+		.pfn		= __phys_to_pfn(APB1_PERI_BASE),
-+		.length		= APB1_PERI_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= EXT_MEM_CTRL_BASE_VIRT, /* Ext. mem.contr. */
-+		.pfn		= __phys_to_pfn(EXT_MEM_CTRL_BASE),
-+		.length		= EXT_MEM_CTRL_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= INT_SRAM_BASE_VIRT,	/* Internal SRAM */
-+		.pfn		= __phys_to_pfn(INT_SRAM_BASE),
-+		.length		= INT_SRAM_SIZE,
-+		.type		= MT_DEVICE
-+	},
-+	{
-+		.virtual	= DATA_TCM_BASE_VIRT,	/* Data TCM */
-+		.pfn		= __phys_to_pfn(DATA_TCM_BASE),
-+		.length		= DATA_TCM_SIZE,
-+		.type		= MT_DEVICE
++		.start	= NFC_BASE,
++		.end	= NFC_BASE + 0x7f,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= INT_NFC,
++		.end	= INT_NFC,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+/*
-+ * Maps common IO regions for tcc8k.
-+ *
-+ */
-+void __init tcc8k_map_common_io(void)
++struct platform_device tcc_nand_device = {
++	.name = "tcc_nand",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(tcc_nand_resources),
++	.resource = tcc_nand_resources,
++};
++#endif
++
++#ifdef CONFIG_MMC_TCC8K
++/* MMC controller */
++static struct resource tcc8k_mmc0_resource[] = {
++	{
++		.start = INT_SD0,
++		.end   = INT_SD0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tcc8k_mmc1_resource[] = {
++	{
++		.start = INT_SD1,
++		.end   = INT_SD1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device tcc8k_mmc0_device = {
++	.name		= "tcc-mmc",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(tcc8k_mmc0_resource),
++	.resource	= tcc8k_mmc0_resource,
++	.dev		= {
++		.dma_mask		= &tcc8k_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	}
++};
++
++struct platform_device tcc8k_mmc1_device = {
++	.name		= "tcc-mmc",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(tcc8k_mmc1_resource),
++	.resource	= tcc8k_mmc1_resource,
++	.dev		= {
++		.dma_mask		= &tcc8k_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	}
++};
++
++static inline void tcc8k_init_mmc(void)
 +{
-+	iotable_init(tcc8k_io_desc, ARRAY_SIZE(tcc8k_io_desc));
-+	local_flush_tlb_all();
-+	flush_cache_all();
++	u32 reg = __raw_readl(GPIOPS_BASE + GPIOPS_FS1_OFFS);
++
++	reg |= GPIOPS_FS1_SDH0_BITS | GPIOPS_FS1_SDH1_BITS;
++	__raw_writel(reg, GPIOPS_BASE + GPIOPS_FS1_OFFS);
++
++	platform_device_register(&tcc8k_mmc0_device);
++	platform_device_register(&tcc8k_mmc1_device);
++}
++#else
++static inline void tcc8k_init_mmc(void) { }
++#endif
++
++#ifdef CONFIG_SERIAL_TCC
++static struct resource uart0_resources[] = {
++	[0] = {
++		.start	= UART0_BASE,
++		.end	= UART0_BASE + 0xff,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UART0,
++		.end	= INT_UART0,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device tcc8k_uart0_device = {
++	.name		= "tcc-uart",
++	.id		= 0,
++	.resource	= uart0_resources,
++	.num_resources	= ARRAY_SIZE(uart0_resources),
++};
++
++static inline void tcc8k_init_uart(void)
++{
++	u32 reg = __raw_readl(GPIOPU_BASE + GPIOPU_FS0_OFFS);
++
++	reg |= GPIOPU_FS0_TXD0 | GPIOPU_FS0_RXD0 |
++		GPIOPU_FS0_CTS0 | GPIOPU_FS0_RTS0;
++	__raw_writel(reg, GPIOPU_BASE + GPIOPU_FS0_OFFS);
++
++	platform_device_register(&tcc8k_uart0_device);
++}
++#else
++static inline void tcc8k_init_uart(void) { }
++#endif
++
++#ifdef CONFIG_USB_OHCI_HCD
++static int tcc8k_ohci_init(struct device *dev)
++{
++	u32 reg;
++
++	/* Use GPIO PK19 as VBUS control output */
++	reg = __raw_readl(GPIOPK_BASE + GPIOPK_FS0_OFFS);
++	reg &= ~(1 << 19);
++	__raw_writel(reg, GPIOPK_BASE + GPIOPK_FS0_OFFS);
++	reg = __raw_readl(GPIOPK_BASE + GPIOPK_FS1_OFFS);
++	reg &= ~(1 << 19);
++	__raw_writel(reg, GPIOPK_BASE + GPIOPK_FS1_OFFS);
++
++	reg = __raw_readl(GPIOPK_BASE + GPIOPK_DOE_OFFS);
++	reg |= (1 << 19);
++	__raw_writel(reg, GPIOPK_BASE + GPIOPK_DOE_OFFS);
++	/* Turn on VBUS */
++	reg = __raw_readl(GPIOPK_BASE + GPIOPK_DAT_OFFS);
++	reg |= (1 << 19);
++	__raw_writel(reg, GPIOPK_BASE + GPIOPK_DAT_OFFS);
++
++	return 0;
 +}
 +
-diff --git a/arch/arm/plat-tcc/include/mach/io.h b/arch/arm/plat-tcc/include/mach/io.h
-new file mode 100644
-index 0000000..7d84370
---- /dev/null
-+++ b/arch/arm/plat-tcc/include/mach/io.h
-@@ -0,0 +1,53 @@
-+/*
-+ * Based on:    linux/include/asm-arm/arch-sa1100/io.h
-+ * Author : <linux@telechips.com>
-+ * Created: June 10, 2008
-+ * Description: IO definitions for TCC8300 processors and boards
-+ *
-+ * Copyright (C) 1997-1999 Russell King
-+ * Copyright (C) 2008-2009 Telechips
-+ *
-+ * Modifications for mainline (C) 2009 Hans J. Koch <hjk@linutronix.de>
-+ *
-+ * Licensed under the terms of the GNU Public License version 2.
-+ */
++static struct resource tcc8k_ohci0_resources[] = {
++	[0] = {
++		.start = USBH0_BASE,
++		.end   = USBH0_BASE + 0x5c,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = INT_USBH0,
++		.end   = INT_USBH0,
++		.flags = IORESOURCE_IRQ,
++	}
++};
 +
-+#ifndef __ASM_ARM_ARCH_IO_H
-+#define __ASM_ARM_ARCH_IO_H
++static struct resource tcc8k_ohci1_resources[] = {
++	[0] = {
++		.start = USBH1_BASE,
++		.end   = USBH1_BASE + 0x5c,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = INT_USBH1,
++		.end   = INT_USBH1,
++		.flags = IORESOURCE_IRQ,
++	}
++};
 +
-+#define IO_SPACE_LIMIT 0xffffffff
++static struct tccohci_platform_data tcc8k_ohci0_platform_data = {
++	.controller	= 0,
++	.port_mode	= PMM_PERPORT_MODE,
++	.init		= tcc8k_ohci_init,
++};
 +
-+/*
-+ * We don't actually have real ISA nor PCI buses, but there is so many
-+ * drivers out there that might just work if we fake them...
-+ */
-+#define __io(a)			((void __iomem *)(PCIO_BASE + (a)))
-+#define __mem_pci(a)		(a)
++static struct tccohci_platform_data tcc8k_ohci1_platform_data = {
++	.controller	= 1,
++	.port_mode	= PMM_PERPORT_MODE,
++	.init		= tcc8k_ohci_init,
++};
 +
-+/*
-+ * ----------------------------------------------------------------------------
-+ * I/O mapping
-+ * ----------------------------------------------------------------------------
-+ */
++static struct platform_device ohci0_device = {
++	.name = "tcc-ohci",
++	.id = 0,
++	.dev = {
++		.dma_mask = &tcc8k_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &tcc8k_ohci0_platform_data,
++	},
++	.num_resources  = ARRAY_SIZE(tcc8k_ohci0_resources),
++	.resource       = tcc8k_ohci0_resources,
++};
 +
-+#define PCIO_BASE	0
++static struct platform_device ohci1_device = {
++	.name = "tcc-ohci",
++	.id = 1,
++	.dev = {
++		.dma_mask = &tcc8k_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &tcc8k_ohci1_platform_data,
++	},
++	.num_resources  = ARRAY_SIZE(tcc8k_ohci1_resources),
++	.resource       = tcc8k_ohci1_resources,
++};
 +
-+/* Address Map of Internal Peripherials (Base 0x80000000) */
-+#define IO_PHYS_A			0x80000000
-+#define IO_OFFSET_A			0x70000000 /* Virtual IO = 0xF0000000 */
-+#define IO_SIZE_A			0x100000
-+#define IO_VIRT_A			(IO_PHYS + IO_OFFSET)
-+#define IO_ADDRESS_A(pa)	((pa) + IO_OFFSET)
-+#define IO_P2V_A(pa)		((pa) + IO_OFFSET)
-+#define IO_V2P_A(va)		((va) - IO_OFFSET)
-+
-+/* Address Map of Internal Peripherials (Base 0x90000000) */
-+#define IO_PHYS_B			0x90000000
-+#define IO_OFFSET_B			0x61000000 /* Virtual IO = 0xF1000000 */
-+#define IO_SIZE_B			0x100000
-+#define IO_VIRT_B			(IO_PHYS + IO_OFFSET)
-+#define IO_ADDRESS_B(pa)	((pa) + IO_OFFSET)
-+#define IO_P2V_B(pa)		((pa) + IO_OFFSET)
-+#define IO_V2P_B(va)		((va) - IO_OFFSET)
-+
++static void __init tcc8k_init_usbhost(void)
++{
++	platform_device_register(&ohci0_device);
++	platform_device_register(&ohci1_device);
++}
++#else
++static void __init tcc8k_init_usbhost(void) { }
 +#endif
++
++/* USB device controller*/
++#ifdef CONFIG_USB_GADGET_TCC8K
++static struct resource udc_resources[] = {
++	[0] = {
++		.start = INT_USBD,
++		.end   = INT_USBD,
++		.flags = IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start = INT_UDMA,
++		.end   = INT_UDMA,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device tcc8k_udc_device = {
++	.name = "tcc-udc",
++	.id = 0,
++	.resource = udc_resources,
++	.num_resources = ARRAY_SIZE(udc_resources),
++	.dev = {
++		 .dma_mask = &tcc8k_dmamask,
++		 .coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++
++static void __init tcc8k_init_usb_gadget(void)
++{
++	platform_device_register(&tcc8k_udc_device);
++}
++#else
++static void __init tcc8k_init_usb_gadget(void) { }
++#endif	/* CONFIG_USB_GADGET_TCC83X */
++
++static int __init tcc8k_init_devices(void)
++{
++	tcc8k_init_uart();
++	tcc8k_init_mmc();
++	tcc8k_init_usbhost();
++	tcc8k_init_usb_gadget();
++	return 0;
++}
++
++arch_initcall(tcc8k_init_devices);
 -- 
 1.6.3.3
