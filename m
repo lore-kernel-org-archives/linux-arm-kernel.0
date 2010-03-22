@@ -1,193 +1,45 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Mon, 22 Mar 2010 14:58:20 +0530
-Subject: [PATCH] Kirkwood: Marvell GuruPlug support
-Message-ID: <1269250100-31824-1-git-send-email-gores@marvell.com>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Mon, 22 Mar 2010 12:15:25 +0100
+Subject: [PATCH] atmel_serial: Atmel RS485 support
+In-Reply-To: <4BA695E4.70105@bluewatersys.com>
+References: <4BA335A8.1000205@evidence.eu.com>
+	<4BA695E4.70105@bluewatersys.com>
+Message-ID: <4BA7514D.3020901@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GuruPlug Standard: 1 Gb Ethernet, 2 USB 2.0
-GuruPlug Plus: 2 Gb Ethernet, 2 USB 2.0, 1 eSATA, 1 uSD slot
+Hi Ryan,
 
-References:
-http://www.globalscaletechnologies.com/t-guruplugdetails.aspx
-http://plugcomputer.org
+    first of all, thank you for your feedback.
 
-This patch is for GuruPlug Plus, but it supports Standard version
-as well.
+To me, all comments seem to be reasonable, except maybe the following one:
 
-Signed-off-by: Siddarth Gore <gores@marvell.com>
----
- arch/arm/mach-kirkwood/Kconfig          |    6 ++
- arch/arm/mach-kirkwood/Makefile         |    1 +
- arch/arm/mach-kirkwood/guruplug-setup.c |  131 +++++++++++++++++++++++++++++++
- 3 files changed, 138 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+>>  
+>> +static void atmel_start_rx(struct uart_port *port);
+>> +static void atmel_stop_rx(struct uart_port *port);
+> 
+> Can you move these functions, so that these declarations are not needed?
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 17879a8..05a8552 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -38,6 +38,12 @@ config MACH_ESATA_SHEEVAPLUG
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell eSATA SheevaPlug Reference Board.
- 
-+config MACH_GURUPLUG
-+	bool "Marvell GuruPlug Reference Board"
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell GuruPlug Reference Board.
-+
- config MACH_TS219
- 	bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
- 	help
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index a5530e3..85b3a39 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
- obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
- obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
- obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
-+obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
- obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
- obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
- obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
-diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-new file mode 100644
-index 0000000..54d07c8
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/guruplug-setup.c
-@@ -0,0 +1,131 @@
-+/*
-+ * arch/arm/mach-kirkwood/guruplug-setup.c
-+ *
-+ * Marvell GuruPlug Reference Board Setup
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <mach/kirkwood.h>
-+#include <plat/mvsdio.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+static struct mtd_partition guruplug_nand_parts[] = {
-+	{
-+		.name = "u-boot",
-+		.offset = 0,
-+		.size = SZ_1M
-+	}, {
-+		.name = "uImage",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = SZ_4M
-+	}, {
-+		.name = "root",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = MTDPART_SIZ_FULL
-+	},
-+};
-+
-+static struct mv643xx_eth_platform_data guruplug_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-+};
-+
-+static struct mv643xx_eth_platform_data guruplug_ge01_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
-+};
-+
-+static struct mv_sata_platform_data guruplug_sata_data = {
-+	.n_ports	= 1,
-+};
-+
-+static struct mvsdio_platform_data guruplug_mvsdio_data = {
-+	/* unfortunately the CD signal has not been connected */
-+};
-+
-+static struct gpio_led guruplug_led_pins[] = {
-+	{
-+		.name			= "guruplug:red:health",
-+		.gpio			= 46,
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "guruplug:green:health",
-+		.gpio			= 47,
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "guruplug:red:wmode",
-+		.gpio			= 48,
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "guruplug:green:wmode",
-+		.gpio			= 49,
-+		.active_low		= 1,
-+	},
-+};
-+
-+static struct gpio_led_platform_data guruplug_led_data = {
-+	.leds		= guruplug_led_pins,
-+	.num_leds	= ARRAY_SIZE(guruplug_led_pins),
-+};
-+
-+static struct platform_device guruplug_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &guruplug_led_data,
-+	}
-+};
-+
-+static unsigned int guruplug_mpp_config[] __initdata = {
-+	MPP46_GPIO,	/* M_RLED */
-+	MPP47_GPIO,	/* M_GLED */
-+	MPP48_GPIO,	/* B_RLED */
-+	MPP49_GPIO,	/* B_GLED */
-+	0
-+};
-+
-+static void __init guruplug_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_init();
-+	kirkwood_mpp_conf(guruplug_mpp_config);
-+
-+	kirkwood_uart0_init();
-+	kirkwood_nand_init(ARRAY_AND_SIZE(guruplug_nand_parts), 25);
-+
-+	kirkwood_ehci_init();
-+	kirkwood_ge00_init(&guruplug_ge00_data);
-+	kirkwood_ge01_init(&guruplug_ge01_data);
-+	kirkwood_sata_init(&guruplug_sata_data);
-+	kirkwood_sdio_init(&guruplug_mvsdio_data);
-+
-+	platform_device_register(&guruplug_leds);
-+}
-+
-+MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
-+	/* Maintainer: Siddarth Gore <gores@marvell.com> */
-+	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= guruplug_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
--- 
-1.6.0.3
+Actually, atmel_stop_rx is already defined, and I prefer to not move it 
+(since I change it, people may get confused by the diff...).
+I also think that atmel_start_rx (which is added by the patch) should be 
+near to atmel_stop_rx...
+
+
+
+>> +        UART_PUT_IDR(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
+>> port->read_status_mask);
+> 
+> This line, and a couple of others, extend over 80 characters. Could you
+> please split them up.
+
+Of course. I'm going to split them up and use a backslash at the end of 
+  the original lines.
+
+
+I will create a new patch according to your comments, test it and submit 
+again to the mailing list.
+
+Many thanks again,
+
+                 Claudio
