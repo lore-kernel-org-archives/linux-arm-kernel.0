@@ -1,47 +1,48 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 22 Mar 2010 14:06:53 +0100
-Subject: [PATCH] Voipac PXA270: UDC and UHC support
-In-Reply-To: <f17812d71003212104i2fd2fec6n1db149f23424f3aa@mail.gmail.com>
-References: <201003100543.00221.marek.vasut@gmail.com>
-	<201003220428.49585.marek.vasut@gmail.com>
-	<f17812d71003212104i2fd2fec6n1db149f23424f3aa@mail.gmail.com>
-Message-ID: <201003221406.53658.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 22 Mar 2010 21:31:03 +0800
+Subject: [GIT PULL] pxa: fixes for v2.6.34-rc2
+Message-ID: <f17812d71003220631q226bc53aodb256140de2eb051@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 22. b?ezna 2010 05:04:28 Eric Miao napsal(a):
-> On Mon, Mar 22, 2010 at 11:28 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne Po 22. b?ezna 2010 02:57:33 Eric Miao napsal(a):
-> >> >> +static void vpac270_udc_command(int cmd)
-> >> >> +{
-> >> >> +     if (cmd == PXA2XX_UDC_CMD_CONNECT)
-> >> >> +             UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
-> >> >> +     else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
-> >> >> +             UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE |
-> >> >> UP2OCR_DPPUBE);
-> >> >
-> >> > In the "DISCONNECT" case, you reset UP2OCR_HXOE, meaning the usb port
-> >> > isn't a USB Device anymore (neither a USB host). If that's on purpose,
-> >> > then all good, in the other case, don't reset that one.
-> >>
-> >> Marek??
-> >
-> > I wasn't able to get it running without reseting the HXOE (so it's there
-> > based on my tests with the hardware). I'll have to investigate it
-> > properly when I have more time.
-> >
-> > So Eric, could you push this in? I'll send a fix if I figure out
-> > something's wrong here.
-> 
-> Could you modify the patch a bit to leave a NOTE there in the
-> commit message so we can track? As well as Robert's reviewed-by.
-> Thanks.
-> 
-Updated patch included
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-Voipac-PXA270-UDC-and-UHC-support.patch
-Type: text/x-patch
-Size: 4421 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100322/f9f50e9e/attachment.bin>
+Russell,
+
+The following changes since commit 220bf991b0366cc50a94feede3d7341fa5710ee4:
+  Linus Torvalds (1):
+        Linux 2.6.34-rc2
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+
+Dan Carpenter (1):
+      pxa168fb: fix incorrect resource calculation
+
+Daniel Mack (1):
+      [ARM] pxa/raumfeld: fix button name
+
+Eric Miao (3):
+      [ARM] mmp: fix for variables in uncompress.h being discarded
+      [ARM] pxa: remove unnecessary 'select FB_W100' from some platforms
+      [ARM] pxa/sharpsl: add dependency of max1111 driver to sharpsl_pm
+
+H Hartley Sweeten (2):
+      [ARM] locomo: fix SPI register offset
+      [ARM] locomo: fix unpaired spin_lock_irqsave
+
+Huang Weiyi (1):
+      [ARM] pxa/raumfeld: remove duplicated #include
+
+Jonathan Cameron (2):
+      [ARM] pxa: fix for variables in uncompress.h being discarded
+      [ARM] pxa: remove spi cs gpio direction to avoid clash with driver
+
+ arch/arm/common/locomo.c                    |   10 +++++-----
+ arch/arm/mach-mmp/include/mach/uncompress.h |    5 ++++-
+ arch/arm/mach-pxa/Kconfig                   |   11 +++++++----
+ arch/arm/mach-pxa/imote2.c                  |    4 ----
+ arch/arm/mach-pxa/include/mach/uncompress.h |   11 ++++++++---
+ arch/arm/mach-pxa/raumfeld.c                |    4 +---
+ arch/arm/mach-pxa/stargate2.c               |    5 -----
+ drivers/video/pxa168fb.c                    |    2 +-
+ 8 files changed, 26 insertions(+), 26 deletions(-)
