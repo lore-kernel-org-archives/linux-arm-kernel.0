@@ -1,45 +1,32 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Mon, 22 Mar 2010 12:15:25 +0100
-Subject: [PATCH] atmel_serial: Atmel RS485 support
-In-Reply-To: <4BA695E4.70105@bluewatersys.com>
-References: <4BA335A8.1000205@evidence.eu.com>
-	<4BA695E4.70105@bluewatersys.com>
-Message-ID: <4BA7514D.3020901@evidence.eu.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Mar 2010 11:45:32 +0000
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <alpine.LFD.2.00.1003191449180.31128@xanadu.home>
+References: <c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
+	<20100319144647.GG21280@n2100.arm.linux.org.uk>
+	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+	<alpine.LFD.2.00.1003191359440.31128@xanadu.home>
+	<20100319183820.GB27710@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003191449180.31128@xanadu.home>
+Message-ID: <20100322114532.GA11355@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
-
-    first of all, thank you for your feedback.
-
-To me, all comments seem to be reasonable, except maybe the following one:
-
->>  
->> +static void atmel_start_rx(struct uart_port *port);
->> +static void atmel_stop_rx(struct uart_port *port);
+On Fri, Mar 19, 2010 at 02:51:39PM -0400, Nicolas Pitre wrote:
+> Nicolas
+> > Let's get a fresh set of clear bug reports giving all relevant information.
+> > Let's not continue to scatter small little bits of information in multiple
+> > emails.
 > 
-> Can you move these functions, so that these declarations are not needed?
+> I think I did, less than 30 minutes ago.
 
-Actually, atmel_stop_rx is already defined, and I prefer to not move it 
-(since I change it, people may get confused by the diff...).
-I also think that atmel_start_rx (which is added by the patch) should be 
-near to atmel_stop_rx...
+If you don't want to involve me in a discussion that I can clearly
+understand, that's fine, just don't expect me to be quick about
+applying any resulting patch.
 
-
-
->> +        UART_PUT_IDR(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
->> port->read_status_mask);
-> 
-> This line, and a couple of others, extend over 80 characters. Could you
-> please split them up.
-
-Of course. I'm going to split them up and use a backslash at the end of 
-  the original lines.
-
-
-I will create a new patch according to your comments, test it and submit 
-again to the mailing list.
-
-Many thanks again,
-
-                 Claudio
+I've tried to make reasonable requests, but it seems that as per
+normal, reasonable requests get ignored.
