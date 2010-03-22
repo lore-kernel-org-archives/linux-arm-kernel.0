@@ -1,46 +1,38 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Mon, 22 Mar 2010 12:05:38 +0000
-Subject: [PATCH] Kirkwood: Marvell GuruPlug support
-References: <1269250100-31824-1-git-send-email-gores@marvell.com>
-Message-ID: <i13k77-9sp.ln1@chipmunk.wormnet.eu>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 22 Mar 2010 08:36:02 -0400 (EDT)
+Subject: Highmem issues with MMC filesystem
+In-Reply-To: <20100322114532.GA11355@n2100.arm.linux.org.uk>
+References: <c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+	<20100318112453.GA19544@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
+	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
+	<20100319144647.GG21280@n2100.arm.linux.org.uk>
+	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
+	<alpine.LFD.2.00.1003191359440.31128@xanadu.home>
+	<20100319183820.GB27710@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1003191449180.31128@xanadu.home>
+	<20100322114532.GA11355@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1003220829550.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Siddarth Gore <gores@marvell.com> wrote:
->
-> GuruPlug Standard: 1 Gb Ethernet, 2 USB 2.0
-> GuruPlug Plus: 2 Gb Ethernet, 2 USB 2.0, 1 eSATA, 1 uSD slot
-> 
-> References:
-> http://www.globalscaletechnologies.com/t-guruplugdetails.aspx
-> http://plugcomputer.org
-> 
-> This patch is for GuruPlug Plus, but it supports Standard version
-> as well.
-> 
-> Signed-off-by: Siddarth Gore <gores@marvell.com>
-> ---
-> arch/arm/mach-kirkwood/Kconfig          |    6 ++
-> arch/arm/mach-kirkwood/Makefile         |    1 +
-> arch/arm/mach-kirkwood/guruplug-setup.c |  131 +++++++++++++++++++++++++++++++
-> 3 files changed, 138 insertions(+), 0 deletions(-)
-> create mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
-> 
-> diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-> new file mode 100644
-> index 0000000..54d07c8
-> --- /dev/null
-> +++ b/arch/arm/mach-kirkwood/guruplug-setup.c
-> @@ -0,0 +1,131 @@
->
-Any harm in merging this into the sheevaplug-setup code, like the openrd 
-code?
+On Mon, 22 Mar 2010, Russell King - ARM Linux wrote:
 
-http://git.marvell.com/?p=orion.git;a=commit;h=b2fdb5660fccc060e47658baad8911a963397ced
+> On Fri, Mar 19, 2010 at 02:51:39PM -0400, Nicolas Pitre wrote:
+> > Nicolas
+> > > Let's get a fresh set of clear bug reports giving all relevant information.
+> > > Let's not continue to scatter small little bits of information in multiple
+> > > emails.
+> > 
+> > I think I did, less than 30 minutes ago.
+> 
+> If you don't want to involve me in a discussion that I can clearly
+> understand, that's fine, just don't expect me to be quick about
+> applying any resulting patch.
 
-Cheers
+There are no patches to be applied at this point.  When I have a proper 
+patch to submit I'll summarize the issues along with the patch.
 
--- 
-Alexander Clouter
-.sigmonster says: BOFH excuse #179:
-                  multicasts on broken packets
+
+Nicolas
