@@ -1,45 +1,26 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Mar 2010 21:56:12 +0800
-Subject: [PATCH] Voipac PXA270: UDC and UHC support
-In-Reply-To: <201003221406.53658.marek.vasut@gmail.com>
-References: <201003100543.00221.marek.vasut@gmail.com>
-	<201003220428.49585.marek.vasut@gmail.com>
-	<f17812d71003212104i2fd2fec6n1db149f23424f3aa@mail.gmail.com>
-	<201003221406.53658.marek.vasut@gmail.com>
-Message-ID: <f17812d71003220656s60c71676l5bd609162766d9da@mail.gmail.com>
+Date: Mon, 22 Mar 2010 21:56:51 +0800
+Subject: [PATCH] Voipac PXA270: Add ethernet support
+In-Reply-To: <f17812d71003211923m67b42072l5f170698a5dde451@mail.gmail.com>
+References: <201003100544.14268.marek.vasut@gmail.com>
+	<201003101244.21456.marek.vasut@gmail.com>
+	<f17812d71003211923m67b42072l5f170698a5dde451@mail.gmail.com>
+Message-ID: <f17812d71003220656m711a6000ne4ea51ad057e619f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 22, 2010 at 9:06 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne Po 22. b?ezna 2010 05:04:28 Eric Miao napsal(a):
->> On Mon, Mar 22, 2010 at 11:28 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> > Dne Po 22. b?ezna 2010 02:57:33 Eric Miao napsal(a):
->> >> >> +static void vpac270_udc_command(int cmd)
->> >> >> +{
->> >> >> + ? ? if (cmd == PXA2XX_UDC_CMD_CONNECT)
->> >> >> + ? ? ? ? ? ? UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
->> >> >> + ? ? else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
->> >> >> + ? ? ? ? ? ? UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE |
->> >> >> UP2OCR_DPPUBE);
->> >> >
->> >> > In the "DISCONNECT" case, you reset UP2OCR_HXOE, meaning the usb port
->> >> > isn't a USB Device anymore (neither a USB host). If that's on purpose,
->> >> > then all good, in the other case, don't reset that one.
->> >>
->> >> Marek??
->> >
->> > I wasn't able to get it running without reseting the HXOE (so it's there
->> > based on my tests with the hardware). I'll have to investigate it
->> > properly when I have more time.
->> >
->> > So Eric, could you push this in? I'll send a fix if I figure out
->> > something's wrong here.
+On Mon, Mar 22, 2010 at 10:23 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Wed, Mar 10, 2010 at 7:44 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> Dne St 10. b?ezna 2010 05:44:14 Marek Vasut napsal(a):
+>>> Hi,
+>>> this patch adds ethernet support
+>>>
+>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>>>
+>> revised patch
 >>
->> Could you modify the patch a bit to leave a NOTE there in the
->> commit message so we can track? As well as Robert's reviewed-by.
->> Thanks.
->>
-> Updated patch included
+>
+> This looks OK but depends on the previous UDC patch to be merged.
 >
 
-Applied to 'devel'.
+Now applied to 'devel'.
