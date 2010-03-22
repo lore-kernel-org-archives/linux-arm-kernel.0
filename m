@@ -1,25 +1,31 @@
-From: b.hutchman@gmail.com (Brian Hutchinson)
-Date: Mon, 22 Mar 2010 13:54:09 -0400
-Subject: Can physical flash initramfs cpio address be given to bootm?
-In-Reply-To: <20100322090854.GB10684@pengutronix.de>
-References: <3d1967ab1003171209j43a9a005l4be5d2faf38fec31@mail.gmail.com>
-	<20100319123616.GC21280@n2100.arm.linux.org.uk>
-	<20100322090854.GB10684@pengutronix.de>
-Message-ID: <3d1967ab1003221054l102b1638veb5d2086a07c681a@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 22 Mar 2010 11:11:51 -0700
+Subject: [RFC 17/18] arm: mm: Add SW emulation for ARM domain manager
+	feature
+In-Reply-To: <1264437609.6275.110.camel@pc1117.cambridge.arm.com>
+References: <1263250057-26692-18-git-send-email-dwalker@codeaurora.org>
+	<1264437609.6275.110.camel@pc1117.cambridge.arm.com>
+Message-ID: <1269281511.31379.53.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In my research it appears other ports allow this but patches have been
-submitted to ARM kernel to keep from having to do a useless copy from
-flash to RAM only to have the Kernel relocate the ramdisk yet again
-... but the patches have not been accepted.
+On Mon, 2010-01-25 at 16:40 +0000, Catalin Marinas wrote:
+> Hi Daniel,
+> 
+> On Mon, 2010-01-11 at 22:47 +0000, Daniel Walker wrote:
+> > Do not set domain manager bits in cp15 dacr.  Emulate using SW.  Add
+> > kernel hooks to handle domain changes, permission faults, and context
+> > switches.
+> 
+> In case you were not aware, there's a patch around (I think since 2007)
+> that removes the domain switching entirely from the kernel (given that
+> they have been deprecated for some time and may disappear completely in
+> the future):
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005616.html
+> 
 
-I can do it, it just appears like a wasted step that wastes time
-booting a embedded system.
+I didn't find this in 2.6.34 ? Are you re-writing it? Why has it been
+around so long out of mainline?
 
-I'm currently investigating some of the patches that have been
-submitted regarding this issue.
-
-Regards,
-
-Brian
+Daniel
