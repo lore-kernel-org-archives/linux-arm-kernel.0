@@ -1,24 +1,129 @@
 From: christofferdall@christofferdall.dk (Christoffer Dall)
-Date: Sun, 21 Mar 2010 21:06:02 -0400
-Subject: [C/R ARM][PATCH 0/3] Linux Checkpoint-Restart - ARM port
-Message-ID: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+Date: Sun, 21 Mar 2010 21:06:04 -0400
+Subject: [C/R ARM][PATCH 2/3] ARM: Add the eclone system call
+In-Reply-To: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+Message-ID: <1269219965-23923-3-git-send-email-christofferdall@christofferdall.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following there will be two preparatory patches for an ARM port of the
-checkpoint-restart code and finally a third patch implementing the
-architecture-specific parts of c/r.
+In addition to doing everything that clone() system call does, the
+eclone() system call:
 
-The preparatory patches consist of a systrace implementation for ARM
-based on a previous patch from Roland McGrath and an eclone implementation
-for ARM. The systrace implementation is partial and provides the needed
-functionality for c/r.
+	- allows additional clone flags (31 of 32 bits in the flags
+	  parameter to clone() are in use)
 
-There is a separate patch for the user space code, which supports
-cross-compilation, extracting headers for ARM and an eclone implementation
-for ARM.
+	- allows user to specify a pid for the child process in its
+	  active and ancestor pid namespaces.
 
-The kernel patches presented here are based on the ckpt-v20 patch set.
+Eclone is needed for restarting a process from a checkpoint. See more
+in Documentation/eclone and refer to the original LKML posting:
+http://lkml.org/lkml/2009/11/11/361
 
+The new system call for ARM has number 366.
+
+Cc: rmk at arm.linux.org.uk
+Cc: libc-ports <libc-ports@sourceware.org>
+Cc: Sukadev Bhattiprolu <sukadev@linux.vnet.ibm.com>
 Signed-off-by: Christoffer Dall <christofferdall@christofferdall.dk>
 Acked-by: Oren Laadan <orenl@cs.columbia.edu>
+---
+ arch/arm/include/asm/unistd.h  |    1 +
+ arch/arm/kernel/calls.S        |    1 +
+ arch/arm/kernel/entry-common.S |    6 ++++++
+ arch/arm/kernel/sys_arm.c      |   39 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+index cf9cdaa..f295a6c 100644
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -392,6 +392,7 @@
+ #define __NR_rt_tgsigqueueinfo		(__NR_SYSCALL_BASE+363)
+ #define __NR_perf_event_open		(__NR_SYSCALL_BASE+364)
+ #define __NR_recvmmsg			(__NR_SYSCALL_BASE+365)
++#define __NR_eclone			(__NR_SYSCALL_BASE+366)
+ 
+ /*
+  * The following SWIs are ARM private.
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 9314a2d..5ef0b03 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -375,6 +375,7 @@
+ 		CALL(sys_rt_tgsigqueueinfo)
+ 		CALL(sys_perf_event_open)
+ /* 365 */	CALL(sys_recvmmsg)
++		CALL(sys_eclone_wrapper)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index f694f4d..9ead15d 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -386,6 +386,12 @@ sys_clone_wrapper:
+ 		b	sys_clone
+ ENDPROC(sys_clone_wrapper)
+ 
++sys_eclone_wrapper:
++		add	ip, sp, #S_OFF
++		str	ip, [sp, #0]
++		b	sys_eclone
++ENDPROC(sys_eclone_wrapper)
++
+ sys_sigreturn_wrapper:
+ 		add	r0, sp, #S_OFF
+ 		b	sys_sigreturn
+diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
+index ae4027b..fd8199d 100644
+--- a/arch/arm/kernel/sys_arm.c
++++ b/arch/arm/kernel/sys_arm.c
+@@ -183,6 +183,45 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
+ 	return do_fork(clone_flags, newsp, regs, 0, parent_tidptr, child_tidptr);
+ }
+ 
++asmlinkage int sys_eclone(unsigned flags_low, struct clone_args __user *uca,
++			  int args_size, pid_t __user *pids,
++			  struct pt_regs *regs)
++{
++	int rc;
++	struct clone_args kca;
++	unsigned long flags;
++	int __user *parent_tidp;
++	int __user *child_tidp;
++	unsigned long __user stack;
++	unsigned long stack_size;
++
++	rc = fetch_clone_args_from_user(uca, args_size, &kca);
++	if (rc)
++		return rc;
++
++	/*
++	 * TODO: Convert 'clone-flags' to 64-bits on all architectures.
++	 * TODO: When ->clone_flags_high is non-zero, copy it in to the
++	 * 	 higher word(s) of 'flags':
++	 *
++	 * 		flags = (kca.clone_flags_high << 32) | flags_low;
++	 */
++	flags = flags_low;
++	parent_tidp = (int *)(unsigned long)kca.parent_tid_ptr;
++	child_tidp = (int *)(unsigned long)kca.child_tid_ptr;
++
++	stack_size = (unsigned long)kca.child_stack_size;
++	if (stack_size)
++		return -EINVAL;
++
++	stack = (unsigned long)kca.child_stack;
++	if (!stack)
++		stack = regs->ARM_sp;
++
++	return do_fork_with_pids(flags, stack, regs, stack_size, parent_tidp,
++				child_tidp, kca.nr_pids, pids);
++}
++
+ asmlinkage int sys_vfork(struct pt_regs *regs)
+ {
+ 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->ARM_sp, regs, 0, NULL, NULL);
+-- 
+1.5.6.5
