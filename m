@@ -1,41 +1,193 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Mar 2010 10:08:54 +0100
-Subject: Can physical flash initramfs cpio address be given to bootm?
-In-Reply-To: <20100319123616.GC21280@n2100.arm.linux.org.uk>
-References: <3d1967ab1003171209j43a9a005l4be5d2faf38fec31@mail.gmail.com>
-	<20100319123616.GC21280@n2100.arm.linux.org.uk>
-Message-ID: <20100322090854.GB10684@pengutronix.de>
+From: gores@marvell.com (Siddarth Gore)
+Date: Mon, 22 Mar 2010 14:58:20 +0530
+Subject: [PATCH] Kirkwood: Marvell GuruPlug support
+Message-ID: <1269250100-31824-1-git-send-email-gores@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+GuruPlug Standard: 1 Gb Ethernet, 2 USB 2.0
+GuruPlug Plus: 2 Gb Ethernet, 2 USB 2.0, 1 eSATA, 1 uSD slot
 
-On Fri, Mar 19, 2010 at 12:36:16PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 17, 2010 at 03:09:14PM -0400, Brian Hutchinson wrote:
-> > Can I use the physical flash address of a initramfs with the u-boot
-> > bootm command?  The kernel doesn't appear to like it .... see below.
-> 
-> bootm has nothing to do with the kernel, so I think you want to ask
-> this question on a different (uboot?) mailing list.
-> 
-> > When I do a bootm 0x20080000 (physical flash location of kernel)
-> > 0x20280000 (mkimage of cpio.gz made with -T ramdisk) the physical
-> > flash address of the initramfs gets passed to kernel via ATAGS and the
-> > kernel doesn't like it:
-> > 
-> > INITRD: 0x20280040+0x00c8bdb6 extends beyond physical memory - disabling initrd
-> 
-> The initrd image must be in RAM; there's no getting around this because
-> the kernel wants to convert addresses to struct page pointers and other
-> magical stuff like that which can only be done with RAM.
-Is this a problem of the implementation or a techical one?  Some time
-ago we hit the same problem and IIRC it was only that the memory was
-allocated before unpacking and freed at the end.  If that's the only
-issue than we can skip it if the initrd lives outside RAM!?
+References:
+http://www.globalscaletechnologies.com/t-guruplugdetails.aspx
+http://plugcomputer.org
+
+This patch is for GuruPlug Plus, but it supports Standard version
+as well.
+
+Signed-off-by: Siddarth Gore <gores@marvell.com>
+---
+ arch/arm/mach-kirkwood/Kconfig          |    6 ++
+ arch/arm/mach-kirkwood/Makefile         |    1 +
+ arch/arm/mach-kirkwood/guruplug-setup.c |  131 +++++++++++++++++++++++++++++++
+ 3 files changed, 138 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 17879a8..05a8552 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -38,6 +38,12 @@ config MACH_ESATA_SHEEVAPLUG
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell eSATA SheevaPlug Reference Board.
  
-Best regards
-Uwe
-
++config MACH_GURUPLUG
++	bool "Marvell GuruPlug Reference Board"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell GuruPlug Reference Board.
++
+ config MACH_TS219
+ 	bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index a5530e3..85b3a39 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
++obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
+ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
+ obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
+ obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+new file mode 100644
+index 0000000..54d07c8
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -0,0 +1,131 @@
++/*
++ * arch/arm/mach-kirkwood/guruplug-setup.c
++ *
++ * Marvell GuruPlug Reference Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/gpio.h>
++#include <linux/leds.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/kirkwood.h>
++#include <plat/mvsdio.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mtd_partition guruplug_nand_parts[] = {
++	{
++		.name = "u-boot",
++		.offset = 0,
++		.size = SZ_1M
++	}, {
++		.name = "uImage",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = SZ_4M
++	}, {
++		.name = "root",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = MTDPART_SIZ_FULL
++	},
++};
++
++static struct mv643xx_eth_platform_data guruplug_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
++};
++
++static struct mv643xx_eth_platform_data guruplug_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
++};
++
++static struct mv_sata_platform_data guruplug_sata_data = {
++	.n_ports	= 1,
++};
++
++static struct mvsdio_platform_data guruplug_mvsdio_data = {
++	/* unfortunately the CD signal has not been connected */
++};
++
++static struct gpio_led guruplug_led_pins[] = {
++	{
++		.name			= "guruplug:red:health",
++		.gpio			= 46,
++		.active_low		= 1,
++	},
++	{
++		.name			= "guruplug:green:health",
++		.gpio			= 47,
++		.active_low		= 1,
++	},
++	{
++		.name			= "guruplug:red:wmode",
++		.gpio			= 48,
++		.active_low		= 1,
++	},
++	{
++		.name			= "guruplug:green:wmode",
++		.gpio			= 49,
++		.active_low		= 1,
++	},
++};
++
++static struct gpio_led_platform_data guruplug_led_data = {
++	.leds		= guruplug_led_pins,
++	.num_leds	= ARRAY_SIZE(guruplug_led_pins),
++};
++
++static struct platform_device guruplug_leds = {
++	.name	= "leds-gpio",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &guruplug_led_data,
++	}
++};
++
++static unsigned int guruplug_mpp_config[] __initdata = {
++	MPP46_GPIO,	/* M_RLED */
++	MPP47_GPIO,	/* M_GLED */
++	MPP48_GPIO,	/* B_RLED */
++	MPP49_GPIO,	/* B_GLED */
++	0
++};
++
++static void __init guruplug_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_init();
++	kirkwood_mpp_conf(guruplug_mpp_config);
++
++	kirkwood_uart0_init();
++	kirkwood_nand_init(ARRAY_AND_SIZE(guruplug_nand_parts), 25);
++
++	kirkwood_ehci_init();
++	kirkwood_ge00_init(&guruplug_ge00_data);
++	kirkwood_ge01_init(&guruplug_ge01_data);
++	kirkwood_sata_init(&guruplug_sata_data);
++	kirkwood_sdio_init(&guruplug_mvsdio_data);
++
++	platform_device_register(&guruplug_leds);
++}
++
++MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
++	/* Maintainer: Siddarth Gore <gores@marvell.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= guruplug_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.0.3
