@@ -1,29 +1,39 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Mar 2010 10:36:27 +0800
-Subject: [PATCH] locomo.c: spi register offset bugfix
-In-Reply-To: <0D753D10438DA54287A00B027084269763683A71C0@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B027084269763683A71C0@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <f17812d71003211936m33d39380l2b5c2638015b295e@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 22 Mar 2010 04:28:49 +0100
+Subject: [PATCH] Voipac PXA270: UDC and UHC support
+In-Reply-To: <f17812d71003211857n4fc2de73q8c937c74fec5a46@mail.gmail.com>
+References: <201003100543.00221.marek.vasut@gmail.com> <87ljdtpf0e.fsf@free.fr>
+	<f17812d71003211857n4fc2de73q8c937c74fec5a46@mail.gmail.com>
+Message-ID: <201003220428.49585.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 11, 2010 at 1:11 AM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> The locomo spi registers are all defined in locomo.h as offsets
-> from the first spi register LOCOMO_SPI (0x60), which is itself
-> an offset from the locomo base address. ?To correctly access
-> these registers LOCOMO_SPI must always be included in the
-> address calculation.
->
-> There are two places in locomo.c where this is not done. ?The
-> first one, in locomo_suspend, actually results in a write to
-> LOCOMO_ST instead of LOCOMO_SPICT. ?The second is in __locomo_probe
-> and results in a write to LOCOMO_MCSX2 instead of LOCOMO_SPIIE.
->
-> Fix these by including LOCOMO_SPI in the calculation.
->
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
->
+Dne Po 22. b?ezna 2010 02:57:33 Eric Miao napsal(a):
+> >> +static void vpac270_udc_command(int cmd)
+> >> +{
+> >> +     if (cmd == PXA2XX_UDC_CMD_CONNECT)
+> >> +             UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
+> >> +     else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
+> >> +             UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE);
+> >
+> > In the "DISCONNECT" case, you reset UP2OCR_HXOE, meaning the usb port
+> > isn't a USB Device anymore (neither a USB host). If that's on purpose,
+> > then all good, in the other case, don't reset that one.
+> 
+> Marek??
 
-Applied to 'fix'.
+I wasn't able to get it running without reseting the HXOE (so it's there based 
+on my tests with the hardware). I'll have to investigate it properly when I have 
+more time.
+
+So Eric, could you push this in? I'll send a fix if I figure out something's 
+wrong here.
+
+Thanks
+> 
+> > Otherwise, you can add for the UDC part :
+> > Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> >
+> > --
+> > Robert
+> 
