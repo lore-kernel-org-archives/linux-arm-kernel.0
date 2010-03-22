@@ -1,40 +1,117 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 21 Mar 2010 20:58:28 -0400
-Subject: Using of cached values
-In-Reply-To: <2703439e1003200222y16147d81x27b0a8bcc804c338@mail.gmail.com>
-References: <2703439e1003200222y16147d81x27b0a8bcc804c338@mail.gmail.com>
-Message-ID: <771cded01003211758l1e6627berc57f718f017683ed@mail.gmail.com>
+From: justinmattock@gmail.com (Justin P. mattock)
+Date: Sun, 21 Mar 2010 18:04:08 -0700
+Subject: [PATCH] Cosmetic:Partially remove deprecated __initcall() and
+	change to
+In-Reply-To: <4BA6BAF3.10603@xenotime.net>
+References: <1269028291-9103-1-git-send-email-justinmattock@gmail.com>
+	<4BA40115.2000509@xenotime.net> <4BA407AC.5030506@gmail.com>
+	<4BA6BAF3.10603@xenotime.net>
+Message-ID: <4BA6C208.6010000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 20, 2010 at 5:22 AM, Mogambo Park <mogambo.kztrj@gmail.com> wrote:
-> good morning
+On 03/21/2010 05:33 PM, Randy Dunlap wrote:
+> On 03/19/10 16:24, Justin P. Mattock wrote:
+>> On 03/19/2010 03:56 PM, Randy Dunlap wrote:
+>>> On 03/19/10 12:51, Justin P. Mattock wrote:
+>>>> After doing some things on a small issue,
+>>>> I noticed through web surfing, that there were patches
+>>>> submitted pertaining that __initcall is deprecated,
+>>>> and device_initcall should be used.
+>>>
+>>> Where was this discussion?  Do you have any pointers to it?
+>>>
+>>
+>> The best info on this is scripts/checkpatch.pl
+>> line #2664
+>>
+>> when I found this I just did a quick search of __initcall
+>> (which gives hits here and there)
+>> https://patchwork.kernel.org/patch/23344/
+>> (also found others at around 2008 or so)
 >
-> ?I wants to know - How safe to read register values one time in a structure
-> and use value from there, assume no write is performed on the
-> register? I see many
-> files in sound/soc/codec/ do that.
-Of course, it's safe. Since registers (CONTROL registers) are only
-updated by processor, all writing operations are managed by codec
-driver.
-
->
-> is it becos sometime the register may return not accurate value on
-> busy bus by h/w mistake?
-> OR I should always read from register even if his value is not
-> expected to change?
+> Thanks.  IMO there should be something in the kernel source tree
+> that says explicitly that __initcall is deprecated and should be
+> replaced by using<whatever should be used>.  That's missing.
 >
 
-Using cached registers is based on suche reasons in below.
+agree..
 
-1. Some chip can only support write. Reading register isn't supported
-by hardware, like WM8753 (codec with I2C interface), MAX8660(PMIC). So
-we have to use cache registers.
-2. We use cache registers because of performance and power benefit. In
-platform, codec or PMIC is always connected to bus. Accessing these
-chips cost time and power. All CONTROL (not STATUS) registers should
-only be updated by processor. Processor should be the only one owner
-of these chips. So we could use cache registers for CONTROL registers.
+I should of searched the source tree for something
+that says deprecated and so forth before doing anything(the 
+checkpatch.pl was something I noticed down the line but doesn't say 
+deprecated(say's explicitly).
 
-Thanks
-Haojian
+
+>
+>>> I don't see any mention of __initcall being deprecated in
+>>> Linus' mainline git tree, or in linux-next, or in mmotm.
+>>> Where are those patches?
+>>>
+>>
+>> I don't know(I'm out of the social pipeline when it comes to Linux news,
+>> and updates)..
+>> like in the explanation part of the patch
+>> I was looking into something else, then ran into this,
+>> so as a break(from what I was originally doing)
+>> decided to do this and submit.
+>>
+>>>
+>>>> So as a change of subject(since what I was looking at
+>>>> was frustrating me),I decided to grep the whole tree
+>>>> and make the change(partially).
+>>>>
+>>>> Currently I'm running this patch on my system, kernel compiles
+>>>> without any errors or warnings.(thought there would be a speed increase
+>>>> but didn't see much(if any)).
+>>>
+>>> No, __initcall(x) is just a shorthand version of typing
+>>> device_initcall(x).  They do the same thing.
+>>>
+>>
+>> yep, that's what I found out as well(reason for the cosmetic
+>> in the subject line).
+>>
+>>>> Biggest problem I have though is testing this on other hardware types
+>>>> (I only have a macbook,and an iMac).
+>>>> So please if you have the access to other arch/hardware types please
+>>>> test.
+>>>>
+>>>> Now what I mean by partially is the __initcall function is still
+>>>> there, so(if any) userspace apps/libs depend on this it's there
+>>>> so they dont break and/or any other subsystem, that needs time
+>>>> to make the changes.
+>>>
+>>> The only thing that might be affected is building out-of-tree drivers,
+>>> but those are easy to fix.
+>>>
+>>
+>> alright..main concern is making sure things don't break in the
+>> kernel(even though things do).
+>>
+>> I can have a go at the header files, submit
+>> then if it's something people agree they want to do, then they
+>> can go from there(if not it's fine as well).
+>>
+>>>> Note:
+>>>> the remaining files that still have __initcall in them are:
+>>>> (according to grep)
+>>>>
+>>>> arch/um/include/shared/init.h
+>>>> include/linux/init.h
+>>>> scripts/checkpatch.pl
+>>>>
+>>>> either I or somebody else, can change this(although a bit
+>>>> concerned about breaking things).
+>>>>
+>>>> Signed-off-by: Justin P. Mattock<justinmattock@gmail.com>
+>>>> ---
+>
+>
+
+
+In any case I'll leave this to you guys to decide.
+The patch is in cyberspace now, so if/when this ever
+is decided it's there(patch), then can be used then.
+
+Justin P. Mattock
