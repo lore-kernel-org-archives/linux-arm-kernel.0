@@ -1,349 +1,121 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Mon, 22 Mar 2010 12:04:22 +0800
-Subject: [PATCH] pxa3xx_nand: unify prepare command
-Message-ID: <mailman.371.1273136716.2170.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 22 Mar 2010 19:42:27 +0800
+Subject: [PATCH] pxa3xx_nand: remove detect configure function
+Message-ID: <mailman.375.1273136796.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the interface simpler which could make both debug
-and enhancement easier.
+For large page size nand chip, like 4k and 8k, we unable to
+just use register setting left by bootloader to actually tell
+the original page size. This is due to limitaton of the hardware,
+it only has a little more than 2k ram buffer internal.
+
+So when we try to do 4k or larger page size chip operation,
+we need to seperate the original page size to what we could
+offer, like 2k or less.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |  256 +++++++++++++++++++++-------------------
- 1 files changed, 136 insertions(+), 120 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |   78 ----------------------------------------
+ 1 files changed, 0 insertions(+), 78 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 85de7f7..854adad 100644
+index 7a8ff38..2c7f925 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -28,6 +28,7 @@
+@@ -218,13 +218,6 @@ static int use_dma = 1;
+ module_param(use_dma, bool, 0444);
+ MODULE_PARM_DESC(use_dma, "enable DMA for data transfering to/from NAND HW");
 
- #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
- #define NAND_STOP_DELAY		(2 * HZ/50)
-+#define PAGE_CHUNK_SIZE		(2048)
-
- /* registers and bit definitions */
- #define NDCR		(0x00) /* Control register */
-@@ -78,6 +79,7 @@
- #define NDSR_RDDREQ		(0x1 << 1)
- #define NDSR_WRCMDREQ		(0x1)
-
-+#define NDCB0_ST_ROW_EN         (0x1 << 26)
- #define NDCB0_AUTO_RS		(0x1 << 25)
- #define NDCB0_CSEL		(0x1 << 24)
- #define NDCB0_CMD_TYPE_MASK	(0x7 << 21)
-@@ -334,7 +336,7 @@ static void pxa3xx_nand_start(struct pxa3xx_nand_info *info)
- 	uint32_t ndcr;
-
- 	ndcr = info->reg_ndcr;
--	ndcr |= NDCR_ECC_EN;
-+	ndcr |= info->use_ecc ? NDCR_ECC_EN : 0;
- 	ndcr |= info->use_dma ? NDCR_DMA_EN : NDCR_STOP_ON_UNCOR;
- 	ndcr |= NDCR_ND_RUN;
-
-@@ -363,61 +365,6 @@ static void pxa3xx_nand_stop(struct pxa3xx_nand_info *info)
- 	}
+-/*
+- * Default NAND flash controller configuration setup by the
+- * bootloader. This configuration is used only when pdata->keep_config is set
+- */
+-static struct pxa3xx_nand_timing default_timing;
+-static struct pxa3xx_nand_flash default_flash;
+-
+ const static struct pxa3xx_nand_cmdset cmdset = {
+ 	.read1		= 0x3000,
+ 	.read2		= 0x0050,
+@@ -824,77 +817,6 @@ static int pxa3xx_nand_config_flash(struct
+pxa3xx_nand_info *info,
+ 	return 0;
  }
 
--static void prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
--		uint16_t cmd, int column, int page_addr)
+-static void pxa3xx_nand_detect_timing(struct pxa3xx_nand_info *info,
+-				      struct pxa3xx_nand_timing *t)
 -{
--	pxa3xx_set_datasize(info);
+-	unsigned long nand_clk = clk_get_rate(info->clk);
+-	uint32_t ndtr0 = nand_readl(info, NDTR0CS0);
+-	uint32_t ndtr1 = nand_readl(info, NDTR1CS0);
 -
--	/* generate values for NDCBx registers */
--	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
--	info->ndcb1 = 0;
--	info->ndcb2 = 0;
--	info->ndcb0 |= NDCB0_ADDR_CYC(info->row_addr_cycles + info->col_addr_cycles);
+-	t->tCH = cycle2ns(tCH_NDTR0(ndtr0), nand_clk);
+-	t->tCS = cycle2ns(tCS_NDTR0(ndtr0), nand_clk);
+-	t->tWH = cycle2ns(tWH_NDTR0(ndtr0), nand_clk);
+-	t->tWP = cycle2ns(tWP_NDTR0(ndtr0), nand_clk);
+-	t->tRH = cycle2ns(tRH_NDTR0(ndtr0), nand_clk);
+-	t->tRP = cycle2ns(tRP_NDTR0(ndtr0), nand_clk);
 -
--	if (info->col_addr_cycles == 2) {
--		/* large block, 2 cycles for column address
--		 * row address starts from 3rd cycle
--		 */
--		info->ndcb1 |= page_addr << 16;
--		if (info->row_addr_cycles == 3)
--			info->ndcb2 = (page_addr >> 16) & 0xff;
--	} else
--		/* small block, 1 cycles for column address
--		 * row address starts from 2nd cycle
--		 */
--		info->ndcb1 = page_addr << 8;
--
--	if (cmd == cmdset.program)
--		info->ndcb0 |= NDCB0_CMD_TYPE(1) | NDCB0_AUTO_RS;
+-	t->tR = cycle2ns(tR_NDTR1(ndtr1), nand_clk);
+-	t->tWHR = cycle2ns(tWHR_NDTR1(ndtr1), nand_clk);
+-	t->tAR = cycle2ns(tAR_NDTR1(ndtr1), nand_clk);
 -}
 -
--static void prepare_erase_cmd(struct pxa3xx_nand_info *info,
--			uint16_t cmd, int page_addr)
+-static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
 -{
--	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
--	info->ndcb0 |= NDCB0_CMD_TYPE(2) | NDCB0_AUTO_RS | NDCB0_ADDR_CYC(3);
--	info->ndcb1 = page_addr;
--	info->ndcb2 = 0;
--}
+-	uint32_t ndcr = nand_readl(info, NDCR);
+-	struct nand_flash_dev *type = NULL;
+-	uint32_t id = -1;
+-	int i;
 -
--static void prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
--{
--	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
--	info->ndcb1 = 0;
--	info->ndcb2 = 0;
+-	default_flash.page_per_block = ndcr & NDCR_PG_PER_BLK ? 64 : 32;
+-	default_flash.page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
+-	default_flash.flash_width = ndcr & NDCR_DWIDTH_M ? 16 : 8;
+-	default_flash.dfc_width = ndcr & NDCR_DWIDTH_C ? 16 : 8;
 -
--	if (cmd == cmdset.read_id) {
--		info->ndcb0 |= NDCB0_CMD_TYPE(3);
--		info->data_size = 8;
--	} else if (cmd == cmdset.read_status) {
--		info->ndcb0 |= NDCB0_CMD_TYPE(4);
--		info->data_size = 8;
--	} else if (cmd == cmdset.reset || cmd == cmdset.lock ||
--		   cmd == cmdset.unlock) {
--		info->ndcb0 |= NDCB0_CMD_TYPE(5);
--	}
--}
+-	/* set info fields needed to __readid */
+-	info->read_id_bytes = (default_flash.page_size == 2048) ? 4 : 2;
+-	info->reg_ndcr = ndcr;
 -
- static void enable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
- {
- 	uint32_t ndcr;
-@@ -555,94 +502,167 @@ static inline int is_buf_blank(uint8_t *buf, size_t len)
- 	return 1;
- }
-
--static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
--				int column, int page_addr)
-+static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
-+		uint16_t column, int page_addr)
- {
--	struct pxa3xx_nand_info *info = mtd->priv;
--	int ret, exec_cmd = 0;
-+	uint16_t cmd;
-+	int addr_cycle, exec_cmd, ndcb0;
-+	struct mtd_info *mtd = info->mtd;
-+
-+	ndcb0 = 0;
-+	addr_cycle = 0;
-+	exec_cmd = 1;
-
--	info->use_dma = (use_dma) ? 1 : 0;
--	info->use_ecc = 0;
--	info->data_size = 0;
--	info->state = 0;
-+	/* reset data and oob column point to handle data */
-+	info->buf_start		= 0;
-+	info->buf_count		= 0;
-+	info->oob_size		= 0;
-+	info->use_ecc		= 0;
-
- 	switch (command) {
-+	case NAND_CMD_READ0:
-+	case NAND_CMD_PAGEPROG:
-+		info->use_ecc = 1;
- 	case NAND_CMD_READOOB:
--		/* disable HW ECC to get all the OOB data */
--		info->buf_count = mtd->writesize + mtd->oobsize;
--		info->buf_start = mtd->writesize + column;
--		memset(info->data_buff, 0xFF, info->buf_count);
-+		pxa3xx_set_datasize(info);
-+		break;
-+	case NAND_CMD_SEQIN:
-+		exec_cmd = 0;
-+		break;
-+	default:
-+		info->ndcb1 = 0;
-+		info->ndcb2 = 0;
-+		break;
-+	}
-
--		prepare_read_prog_cmd(info, cmdset.read1, column, page_addr);
-+	info->ndcb0 = ndcb0;
-+	addr_cycle = NDCB0_ADDR_CYC(info->row_addr_cycles
-+			+ info->col_addr_cycles);
-
--		/* We only are OOB, so if the data has error, does not matter */
--		if (info->retcode == ERR_DBERR)
--			info->retcode = ERR_NONE;
-+	switch (command) {
-+	case NAND_CMD_READOOB:
-+	case NAND_CMD_READ0:
-
--		exec_cmd = 1;
--		break;
-+		cmd  = cmdset.read1;
-+		if (command == NAND_CMD_READOOB)
-+			info->buf_start = mtd->writesize + column;
-+		else
-+			info->buf_start = column;
-+
-+		if (unlikely(info->page_size < PAGE_CHUNK_SIZE))
-+			info->ndcb0 |= NDCB0_CMD_TYPE(0)
-+					| addr_cycle
-+					| (cmd & NDCB0_CMD1_MASK);
-+		else
-+			info->ndcb0 |= NDCB0_CMD_TYPE(0)
-+					| NDCB0_DBC
-+					| addr_cycle
-+					| cmd;
-
--	case NAND_CMD_READ0:
--		info->use_ecc = 1;
--		info->retcode = ERR_NONE;
--		info->buf_start = column;
--		info->buf_count = mtd->writesize + mtd->oobsize;
--		memset(info->data_buff, 0xFF, info->buf_count);
-+	case NAND_CMD_SEQIN:
-+		/* small page addr setting */
-+		if (unlikely(info->page_size < PAGE_CHUNK_SIZE)) {
-+			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
-+					| (column & 0xFF);
-
--		prepare_read_prog_cmd(info, cmdset.read1, column, page_addr);
--		if (info->retcode == ERR_DBERR) {
--			/* for blank page (all 0xff), HW will calculate its ECC as
--			 * 0, which is different from the ECC information within
--			 * OOB, ignore such double bit errors
--			 */
--			if (is_buf_blank(info->data_buff, mtd->writesize))
--				info->retcode = ERR_NONE;
-+			info->ndcb2 = 0;
-+		}
-+		else {
-+			info->ndcb1 = ((page_addr & 0xFFFF) << 16)
-+					| (column & 0xFFFF);
-+
-+			if (page_addr & 0xFF0000)
-+				info->ndcb2 = (page_addr & 0xFF0000) >> 16;
-+			else
-+				info->ndcb2 = 0;
- 		}
-
--		exec_cmd = 1;
--		break;
--	case NAND_CMD_SEQIN:
--		info->buf_start = column;
- 		info->buf_count = mtd->writesize + mtd->oobsize;
--		memset(info->data_buff, 0xff, info->buf_count);
-+		memset(info->data_buff, 0xFF, info->buf_count);
-
--		/* save column/page_addr for next CMD_PAGEPROG */
--		info->seqin_column = column;
--		info->seqin_page_addr = page_addr;
- 		break;
-+
- 	case NAND_CMD_PAGEPROG:
--		info->use_ecc = (info->seqin_column >= mtd->writesize) ? 0 : 1;
-+		if (is_buf_blank(info->data_buff, (mtd->writesize + mtd->oobsize))) {
-+			exec_cmd = 0;
-+			break;
-+		}
-
--		prepare_read_prog_cmd(info, cmdset.program,
--				info->seqin_column, info->seqin_page_addr);
-+		cmd = cmdset.program;
- 		info->state |= STATE_IS_WRITE;
--		exec_cmd = 1;
--		break;
--	case NAND_CMD_ERASE1:
--		prepare_erase_cmd(info, cmdset.erase, page_addr);
--		exec_cmd = 1;
--	case NAND_CMD_ERASE2:
-+		info->ndcb0 |= NDCB0_CMD_TYPE(0x1)
-+				| NDCB0_AUTO_RS
-+				| NDCB0_ST_ROW_EN
-+				| NDCB0_DBC
-+				| cmd
-+				| addr_cycle;
- 		break;
-+
- 	case NAND_CMD_READID:
-+		cmd = cmdset.read_id;
-+		info->buf_count = info->read_id_bytes;
-+		info->ndcb0 |= NDCB0_CMD_TYPE(3)
-+				| NDCB0_ADDR_CYC(1)
-+				| cmd;
-+
-+		info->data_size = 8;
-+		break;
-+
- 	case NAND_CMD_STATUS:
--		info->use_dma = 0;	/* force PIO read */
--		info->buf_start = 0;
--		info->buf_count = (command == NAND_CMD_READID) ?
--				info->read_id_bytes : 1;
 -
--		prepare_other_cmd(info, (command == NAND_CMD_READID) ?
--				cmdset.read_id : cmdset.read_status);
--		exec_cmd = 1;
-+		cmd = cmdset.read_status;
-+		info->buf_count = 1;
-+		info->ndcb0 |= NDCB0_CMD_TYPE(4)
-+				| NDCB0_ADDR_CYC(1)
-+				| cmd;
-+
-+		info->data_size = 8;
-+		break;
-+
-+	case NAND_CMD_ERASE1:
-+		cmd = cmdset.erase;
-+		info->ndcb0 |= NDCB0_CMD_TYPE(2)
-+				| NDCB0_AUTO_RS
-+				| NDCB0_ADDR_CYC(3)
-+				| NDCB0_DBC
-+				| cmd;
-+		info->ndcb1 = page_addr;
-+		info->ndcb2 = 0;
-+
- 		break;
- 	case NAND_CMD_RESET:
--		prepare_other_cmd(info, cmdset.reset);
--		exec_cmd = 1;
-+		cmd = cmdset.reset;
-+		info->ndcb0 |= NDCB0_CMD_TYPE(5)
-+				| cmd;
-+
- 		break;
-+
-+	case NAND_CMD_ERASE2:
-+		exec_cmd = 0;
-+		break;
-+
- 	default:
--		printk(KERN_ERR "non-supported command.\n");
-+		exec_cmd = 0;
-+		printk(KERN_ERR "pxa3xx-nand: non-supported command %x\n", command);
- 		break;
- 	}
-
-+	return exec_cmd;
-+}
-+
-+static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
-+				int column, int page_addr)
-+{
-+	struct pxa3xx_nand_info *info = mtd->priv;
-+	int ret, exec_cmd;
-+
-+	/* if this is a x16 device ,then convert the input
-+	 * "byte" address into a "word" address appropriate
-+	 * for indexing a word-oriented device
-+	 */
-+	if (info->reg_ndcr & NDCR_DWIDTH_M)
-+		column /= 2;
-+
-+	exec_cmd = prepare_command_pool(info, command, column, page_addr);
- 	if (exec_cmd) {
- 		init_completion(&info->cmd_complete);
- 		info->state |= STATE_CMD_PREPARED;
-@@ -657,10 +677,6 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- 		pxa3xx_nand_stop(info);
- 		disable_int(info, NDCR_INT_MASK);
- 		info->state &= ~STATE_CMD_PREPARED;
--		if (info->retcode == ERR_DBERR) {
--			printk(KERN_ERR "double bit error @ page %08x\n", page_addr);
--			info->retcode = ERR_NONE;
+-	pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
+-	id = *((uint16_t *)(info->data_buff));
+-
+-	/* Lookup the flash id */
+-	id = (id >> 8) & 0xff;		/* device id is byte 2 */
+-	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
+-		if (id == nand_flash_ids[i].id) {
+-			type =  &nand_flash_ids[i];
+-			break;
 -		}
- 	}
- }
-
+-	}
+-
+-	if (!type)
+-		return -ENODEV;
+-
+-	/* fill the missing flash information */
+-	i = __ffs(default_flash.page_per_block * default_flash.page_size);
+-	default_flash.num_blocks = type->chipsize << (20 - i);
+-
+-	info->oob_size = (default_flash.page_size == 2048) ? 64 : 16;
+-
+-	/* calculate addressing information */
+-	info->col_addr_cycles = (default_flash.page_size == 2048) ? 2 : 1;
+-
+-	if (default_flash.num_blocks * default_flash.page_per_block > 65536)
+-		info->row_addr_cycles = 3;
+-	else
+-		info->row_addr_cycles = 2;
+-
+-	pxa3xx_nand_detect_timing(info, &default_timing);
+-	memcpy(&default_flash.timing, &default_timing, sizeof(default_timing));
+-
+-	return 0;
+-}
+-
+ /* the maximum possible buffer size for large page with OOB data
+  * is: 2048 + 64 = 2112 bytes, allocate a page here for both the
+  * data buffer and the DMA descriptor
 -- 
 1.5.6.5
