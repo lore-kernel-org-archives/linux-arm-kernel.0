@@ -1,38 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Mar 2010 21:47:06 +0100
-Subject: [PATCH 1/3] gpiolib: make names array and its values const
-In-Reply-To: <1265620180-14150-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100203155558.GH11354@pengutronix.de>
-	<1265620180-14150-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100322204706.GA10157@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Mar 2010 14:00:45 -0700
+Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
+In-Reply-To: <13B9B4C6EF24D648824FF11BE896716203BA3AE030@dlee02.ent.ti.com>
+References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
+	<1268143623-22361-2-git-send-email-saeed@marvell.com>
+	<20100310215321.GP2900@atomide.com>
+	<13B9B4C6EF24D648824FF11BE896716203BA3AE030@dlee02.ent.ti.com>
+Message-ID: <20100322210045.GU11448@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Mon, Feb 08, 2010 at 10:09:38AM +0100, Uwe Kleine-K?nig wrote:
-> gpiolib doesn't need to modify the names and I assume most initializers
-> use sting constants that shouldn't be modified anyhow.
+* Woodruff, Richard <r-woodruff2@ti.com> [100319 12:51]:
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Kevin Wells <kevin.wells@nxp.com>
-> ---
->  drivers/gpio/gpiolib.c      |    2 +-
->  drivers/gpio/pca953x.c      |    2 +-
->  include/asm-generic/gpio.h  |    2 +-
->  include/linux/i2c/pca953x.h |    2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> > bounces at lists.infradead.org] On Behalf Of Tony Lindgren
+> > Sent: Wednesday, March 10, 2010 3:53 PM
+> 
+> > > +#ifdef CONFIG_OUTER_CACHE
+> > > +   mrc     p15, 0, r0, c1, c0, 1
+> > > +   bic     r0, r0, #0x2
+> > > +   mcr     p15, 0, r0, c1, c0, 1           @ disable L2 cache
+> > > +#endif
+> > >     ldmfd   sp!, {pc}
+> > >  ENDPROC(cpu_v7_proc_fin)
+> >
+> > This one is a bit tricky. I know of three different ways
+> > to disable the L2 cache depending on the hardware. One of
+> > them is what you have above. The second is via SMI, and
+> > then the first one won't work. The third is via external
+> > secure monitor calls used on some omaps at least. And in
+> > the third case the first two methods won't work.
+> 
+> On A8 cores with integrated L2 cache the L2EN bit is banked after r0px series (you won't find r0 systems anywhere). As such the above code is good on OMAP3 and many other A8's.  Other bits in this same register have issues which you warn of.  But not the L2EN.
+> 
+> On A9 which uses outer cache the above won't work.  The external PL310 (or variant) is memory mapped.  To handle a different sequence is needed all together.
 
-I haven't received feed back for these patches.  Would you care to take
-them?  If yes, should I resend?  Alternatively you can get them from 
+Sounds like we need something like:
 
-	git://git.pengutronix.de/git/ukl/linux-2.6.git gpiolib/names
+ENTRY(cpu_v7_proc_fin)
+...
+	mcr	p15, 0, r0, c1, c0, 0	@ disable caches
+	b	cpu_v7_arch_proc_fin	@ disable L2 cache
+	ldmfd	sp!, {pc}
+ENDPROC(cpu_v7_proc_fin)
 
-whatever is easiest for you ...
+And then cpu_v7_arch_proc_fin can be implemented for the platforms
+that need special handling.
 
-Best regards
-Uwe
+Regards,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
