@@ -1,55 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Mar 2010 22:09:46 +0100
-Subject: [PULL REQUEST] runtime physoffset [Was: change boot requirements]
-In-Reply-To: <20100308121550.GC9233@matterhorn.verdurent.com>
-References: <20100119083803.GA17904@pengutronix.de>
-	<20100122115831.GA8377@pengutronix.de>
-	<20100125173201.GA14834@pengutronix.de>
-	<4B5DF1C9.6090102@bluewatersys.com>
-	<20100130210231.GC16345@pengutronix.de>
-	<20100204095147.GA6562@pengutronix.de>
-	<20100212110350.GB18221@pengutronix.de>
-	<20100308121550.GC9233@matterhorn.verdurent.com>
-Message-ID: <20100322210946.GE10157@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 22 Mar 2010 22:13:53 +0100
+Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+In-Reply-To: <20100322192748.GK2040@bluebox.local>
+References: <20100322191900.GF2040@bluebox.local>
+	<20100322192748.GK2040@bluebox.local>
+Message-ID: <63386a3d1003221413p29784233rc0952fba5d921e18@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2010/3/22 Hans J. Koch <hjk@linutronix.de>:
 
-On Mon, Mar 08, 2010 at 02:15:50PM +0200, Amit Kucheria wrote:
-> On 10 Feb 12, Uwe Kleine-K?nig wrote:
-> > Hello Russell,
-> > 
-> > On Thu, Feb 04, 2010 at 10:51:47AM +0100, Uwe Kleine-K?nig wrote:
-> > > > The following changes since commit 499a2673713c85734a54c37dd90b4b729de399c4:
-> > > >   Linus Torvalds (1):
-> > > >         Merge branch 'for-linus' of git://git.kernel.org/.../dtor/input
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-> > > 
-> > > Can you please pull this branch for the .34 merge window?  Since the
-> > > last post one new patch was added to that branch.  I'll send it in reply
-> > > to this mail.
-> > Do you consider pulling?  If not, can you please say why?
-> > 
-> > Best regards
-> > Uwe
-> 
-> Bumping up this thread since these patches are necessary to reach our
-> eventual goal of a common kernel.
-Actually the patches in arm/booting are only some cleanups.  This series
-contained in arm/booting doesn't contain the two runtime physoffset
-patches[1]
+> Map the IO ranges of TCC8xxx peripherals.
+> (...)
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .virtual ? ? ? ?= DATA_TCM_BASE_VIRT, ? /* Data TCM */
+> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DATA_TCM_BASE),
+> + ? ? ? ? ? ? ? .length ? ? ? ? = DATA_TCM_SIZE,
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+> + ? ? ? },
 
-Russell?
+Hey, that no peripheral, that's onchip TCM memory, MT_DEVICE is
+very inappropriate since it will cause readthrough/writethrough.
 
-Best regards
-Uwe
+Please use the generic TCM memory support as described in
+Documentation/arm/tcm.txt for your TCM memory, example of
+a platform using this can be found in arch/arm/mach-u300,
+just grep -r for TCM. Note the flag in arch/arm/Kconfig as well.
 
-[1] these are in my arm/booting-pu branch
+Any problems, ask.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Yours,
+Linus Walleij
