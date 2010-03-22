@@ -1,45 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Mar 2010 14:20:25 -0700
-Subject: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94026F126B9C@dbde02.ent.ti.com>
-References: <20100320024827.GC11448@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E94026F126B9C@dbde02.ent.ti.com>
-Message-ID: <20100322212025.GW11448@atomide.com>
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Mon, 22 Mar 2010 22:54:47 +0100
+Subject: [PATCH 1/3] i2c/pxa: remove unused macro
+In-Reply-To: <20100322210411.GD10157@pengutronix.de>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100322210411.GD10157@pengutronix.de>
+Message-ID: <4BA7E727.9000905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pais, Allen <allen.pais@ti.com> [100322 00:14]:
->  
-> > > > Hi all,
-> > > > 
-> > > > Got a zoom3 finally! This is needed to boot with DEBUG_LL 
-> > + earlyprintk.
-> > > 
-> > > And of course it won't compile because of a missing #.
-> > > Here's the working version.
-> > 
-> > One more time. Looks like what I posted is not enough, we
-> > also need to make sure the mapping does not overlap with
-> > other regions. So basically we can't use 0xfb000000 like
-> > we currently have, let's use 0xf7000000 instead unless
-> > somebody has better ideas.
+Op 22-03-10 22:04, Uwe Kleine-K?nig schreef:
+> Hi Ben,
 > 
->  With this patch[DEBUG_LL + earlyprintk],
->  I still haven't been able to boot the kernel.
->  Is it working on your side.
->   
->  The commit am using is : a842b5f9ce70e1b738eabb4d719860070180ed1c
+> On Wed, Feb 24, 2010 at 12:01:44PM +0100, Uwe Kleine-K?nig wrote:
+>> Commit
+>>
+>> 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
+>>
+>> removed all uses of eedbg, so the definition can go, too.
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: Roel Kluin <roel.kluin@gmail.com>
+>> Acked-by: Pavel Machek <pavel@ucw.cz>
+> ping
 
-I think you will also need the 3630 serial fixes series posted
-recently.
+FWIW:
 
-I just merged those into omap-fixes-for-linus (and master)
-branch(es). Maybe give it a try with at commit
-b3c7740a120c8a7775cb63b4d094466da5c01692 + this patch?
-
-BTW, I'm still seeing mux errors on zoom3, have not yet
-looked into those.
-
-Regards,
-
-Tony
+Acked-by: Roel Kluin <roel.kluin@gmail.com>
