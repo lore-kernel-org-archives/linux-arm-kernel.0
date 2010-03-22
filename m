@@ -1,8 +1,13 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 22 Mar 2010 08:36:02 -0400 (EDT)
+Date: Mon, 22 Mar 2010 08:50:26 -0400 (EDT)
 Subject: Highmem issues with MMC filesystem
-In-Reply-To: <20100322114532.GA11355@n2100.arm.linux.org.uk>
-References: <c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
+In-Reply-To: <13544.10.24.255.18.1269248733.squirrel@dbdmail.itg.ti.com>
+References: <037201cac5d7$6c5b8c60$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003170946250.31128@xanadu.home>
+	<043e01cac5df$c3ec1b90$LocalHost@wipblrx0099946>
+	<alpine.LFD.2.00.1003171050160.31128@xanadu.home>
+	<20100318092352.GD8267@n2100.arm.linux.org.uk>
+	<c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
 	<20100318112453.GA19544@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1003180904440.31128@xanadu.home>
 	<1269009677.31227.10.camel@e102109-lin.cambridge.arm.com>
@@ -10,29 +15,42 @@ References: <c70ff3ad1003180415x58e29baaj9b8b77e6378cb0cb@mail.gmail.com>
 	<1269010320.31227.13.camel@e102109-lin.cambridge.arm.com>
 	<alpine.LFD.2.00.1003191347230.31128@xanadu.home>
 	<alpine.LFD.2.00.1003191359440.31128@xanadu.home>
-	<20100319183820.GB27710@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1003191449180.31128@xanadu.home>
-	<20100322114532.GA11355@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1003220829550.31128@xanadu.home>
+	<alpine.LFD.2.00.1003191600580.31128@xanadu.home>
+	<13544.10.24.255.18.1269248733.squirrel@dbdmail.itg.ti.com>
+Message-ID: <alpine.LFD.2.00.1003220847380.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Mar 2010, Russell King - ARM Linux wrote:
+On Mon, 22 Mar 2010, Hemanth V wrote:
 
-> On Fri, Mar 19, 2010 at 02:51:39PM -0400, Nicolas Pitre wrote:
-> > Nicolas
-> > > Let's get a fresh set of clear bug reports giving all relevant information.
-> > > Let's not continue to scatter small little bits of information in multiple
-> > > emails.
-> > 
-> > I think I did, less than 30 minutes ago.
+> > On Fri, 19 Mar 2010, Nicolas Pitre wrote:
+> >
+> >> A highmem page can have 2 states: virtually mapped in the pkmap area, or
+> >> not mapped at all.  When it is mapped then page_address() returns a
+> >> valid virtual address for it.  In that case the cache for that mapping
+> >> can be valid, even dirty.  So the DMA API will perform cache handling
+> >> before/after the DMA operation.
+> >>
+> >> However, before the page is unmapped, the VIVT cache has to be flushed
+> >> for that page.  This is why the DMA code currently doesn't bother doing
+> >> any L1 cache handling when a highmem page is not mapped -- the cache
+> >> just can't refer to such a page.
+> >>
+> >> But on ARMv6 this is different.  The L1 cache is VIPT and it therefore
+> >> doesn't have to be flushed as often as a VIVT cache.  Still, as far as I
+> >> know, the highmem code currently always flush any page to be unmapped.
+> >> But somewhere somehow an unmapped highmem page becomes subject to DMA
+> >> and apparently can still be L1 cached.  But the DMA code doesn't flush
+> >> its cache due to the page not being mapped and then problems occur.
+> >
+> > And here's a patch to test that hypothesis.  With this patch, all the
+> > issues with highmem on my ARMv6 system are gone.
+> >
 > 
-> If you don't want to involve me in a discussion that I can clearly
-> understand, that's fine, just don't expect me to be quick about
-> applying any resulting patch.
+> Modified version of this patch also solves the problem for 2.6.32-rc7
+> on ARM v7.
 
-There are no patches to be applied at this point.  When I have a proper 
-patch to submit I'll summarize the issues along with the patch.
+OK thanks for testing.  I'll work on a proper patch now.
 
 
 Nicolas
