@@ -1,30 +1,31 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Mar 2010 15:19:50 +0000
-Subject: [PATCH 3/5] ARM: Correct the VFPv3 detection
+Date: Mon, 22 Mar 2010 15:19:56 +0000
+Subject: [PATCH 4/5] ARM: Align machine_desc.phys_io to a 1MB section
 In-Reply-To: <20100322151729.6353.79984.stgit@e102109-lin.cambridge.arm.com>
 References: <20100322151729.6353.79984.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100322151950.6353.47048.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100322151956.6353.88717.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A CPU has VFPv3 hardware if the FPSID[19:16] bits are 2 or more.
-Currently Linux was only checking for 3 or more.
+Platforms like RealView don't pass a section-aligned pointer via the
+machine_desc structure. This patch aligns the pointer in the
+__create_page_tables function. Reported by Tony Thompson.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/vfp/vfpmodule.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/head.S |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 7f3f59f..a420cb9 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -545,7 +545,7 @@ static int __init vfp_init(void)
- 		 */
- 		elf_hwcap |= HWCAP_VFP;
- #ifdef CONFIG_VFPv3
--		if (VFP_arch >= 3) {
-+		if (VFP_arch >= 2) {
- 			elf_hwcap |= HWCAP_VFPv3;
- 
- 			/*
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index eb62bf9..82ea924 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -302,6 +302,8 @@ __create_page_tables:
+ 	movhi	r3, #0x0800
+ 	add	r6, r0, r3
+ 	ldr	r3, [r8, #MACHINFO_PHYSIO]
++	mov	r3, r3, lsr #20			@ 1MB-aligned address
++	mov	r3, r3, lsl #20
+ 	orr	r3, r3, r7
+ 1:	str	r3, [r0], #4
+ 	add	r3, r3, #1 << 20
