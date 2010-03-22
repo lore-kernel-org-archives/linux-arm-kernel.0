@@ -1,50 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Mar 2010 22:04:11 +0100
-Subject: [PATCH 1/3] i2c/pxa: remove unused macro
-In-Reply-To: <1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100224110044.GB15181@pengutronix.de>
-	<1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100322210411.GD10157@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 22 Mar 2010 22:09:00 +0100
+Subject: PXA3xx internal SRAM
+In-Reply-To: <20100321124739.GG30801@buzzloop.caiaq.de>
+References: <20100321124739.GG30801@buzzloop.caiaq.de>
+Message-ID: <63386a3d1003221409j63413b5o7a0515836eaa8b86@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+2010/3/21 Daniel Mack <daniel@caiaq.de>:
 
-On Wed, Feb 24, 2010 at 12:01:44PM +0100, Uwe Kleine-K?nig wrote:
-> Commit
-> 
-> 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
-> 
-> removed all uses of eedbg, so the definition can go, too.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Roel Kluin <roel.kluin@gmail.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-ping
+> I wonder what this could be used for. Is there any kind of cache that
+> would be worth putting there to speed up things for example?
 
-Uwe
-> ---
->  drivers/i2c/busses/i2c-pxa.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index 7647a20..b3c6c9d 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -216,8 +216,6 @@ static void i2c_pxa_show_state(struct pxa_i2c *i2c, int lno, const char *fname)
->  #define decode_ICR(val) do { } while (0)
->  #endif
->  
-> -#define eedbg(lvl, x...) do { if ((lvl) < 1) { printk(KERN_DEBUG "" x); } } while(0)
-> -
->  static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
->  static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
->  
-> -- 
-> 1.6.6.2
+Some ARM systems have TCM (Tightly Coupled Memory) which are similar
+in character but actually a feature of the ARM platforms rather than a custom
+memory for a certain SoC.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+You can find some documentation on how this can be used in
+Documentation/arm/tcm.txt, as you can see we can compile code there
+and the memory left after that can be used as a generic memory pool
+for fast always-on memory.
+
+I raised the question as to whether the IRQ vectors could be put into
+this memory but Russell says this is unfortunately not possible, because
+the top of the vector page is also used for other things. I don't know if
+this entire page can be moved to fast memory though, perhaps that
+concept need to be revisited?
+
+Linus Walleij
