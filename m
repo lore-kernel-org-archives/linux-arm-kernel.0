@@ -1,31 +1,40 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Mon, 22 Mar 2010 22:54:47 +0100
-Subject: [PATCH 1/3] i2c/pxa: remove unused macro
-In-Reply-To: <20100322210411.GD10157@pengutronix.de>
-References: <20100224110044.GB15181@pengutronix.de>
-	<1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100322210411.GD10157@pengutronix.de>
-Message-ID: <4BA7E727.9000905@gmail.com>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Mon, 22 Mar 2010 23:24:58 +0100
+Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+In-Reply-To: <63386a3d1003221413p29784233rc0952fba5d921e18@mail.gmail.com>
+References: <20100322191900.GF2040@bluebox.local>
+	<20100322192748.GK2040@bluebox.local>
+	<63386a3d1003221413p29784233rc0952fba5d921e18@mail.gmail.com>
+Message-ID: <20100322222458.GA2547@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 22-03-10 22:04, Uwe Kleine-K?nig schreef:
-> Hi Ben,
+On Mon, Mar 22, 2010 at 10:13:53PM +0100, Linus Walleij wrote:
+> 2010/3/22 Hans J. Koch <hjk@linutronix.de>:
 > 
-> On Wed, Feb 24, 2010 at 12:01:44PM +0100, Uwe Kleine-K?nig wrote:
->> Commit
->>
->> 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
->>
->> removed all uses of eedbg, so the definition can go, too.
->>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->> Cc: Roel Kluin <roel.kluin@gmail.com>
->> Acked-by: Pavel Machek <pavel@ucw.cz>
-> ping
+> > Map the IO ranges of TCC8xxx peripherals.
+> > (...)
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .virtual ? ? ? ?= DATA_TCM_BASE_VIRT, ? /* Data TCM */
+> > + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DATA_TCM_BASE),
+> > + ? ? ? ? ? ? ? .length ? ? ? ? = DATA_TCM_SIZE,
+> > + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+> > + ? ? ? },
+> 
+> Hey, that no peripheral, that's onchip TCM memory, MT_DEVICE is
+> very inappropriate since it will cause readthrough/writethrough.
+> 
+> Please use the generic TCM memory support as described in
+> Documentation/arm/tcm.txt for your TCM memory, example of
+> a platform using this can be found in arch/arm/mach-u300,
+> just grep -r for TCM. Note the flag in arch/arm/Kconfig as well.
 
-FWIW:
+Thanks for that hint. Will fix.
 
-Acked-by: Roel Kluin <roel.kluin@gmail.com>
+Hans
+
+> 
+> Any problems, ask.
+> 
+> Yours,
+> Linus Walleij
