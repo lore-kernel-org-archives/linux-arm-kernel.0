@@ -1,32 +1,37 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Mar 2010 09:57:33 +0800
-Subject: [PATCH] Voipac PXA270: UDC and UHC support
-In-Reply-To: <87ljdtpf0e.fsf@free.fr>
-References: <201003100543.00221.marek.vasut@gmail.com>
-	<201003101243.54008.marek.vasut@gmail.com>
-	<87hbol77lp.fsf@free.fr> <201003132300.55480.marek.vasut@gmail.com>
-	<87ljdtpf0e.fsf@free.fr>
-Message-ID: <f17812d71003211857n4fc2de73q8c937c74fec5a46@mail.gmail.com>
+Date: Mon, 22 Mar 2010 10:10:52 +0800
+Subject: [PATCH] Voipac PXA270
+In-Reply-To: <201003101620.17501.marek.vasut@gmail.com>
+References: <201003100247.27059.marek.vasut@gmail.com>
+	<201003101237.26819.marek.vasut@gmail.com>
+	<20100310133529.GK28972@buzzloop.caiaq.de>
+	<201003101620.17501.marek.vasut@gmail.com>
+Message-ID: <f17812d71003211910u1ae21bc4ofea3bb8b61b41e45@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static void vpac270_udc_command(int cmd)
->> +{
->> + ? ? if (cmd == PXA2XX_UDC_CMD_CONNECT)
->> + ? ? ? ? ? ? UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
->> + ? ? else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
->> + ? ? ? ? ? ? UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE);
->
-> In the "DISCONNECT" case, you reset UP2OCR_HXOE, meaning the usb port isn't a
-> USB Device anymore (neither a USB host). If that's on purpose, then all good, in
-> the other case, don't reset that one.
+On Wed, Mar 10, 2010 at 11:20 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne St 10. b?ezna 2010 14:35:29 Daniel Mack napsal(a):
+>> On Wed, Mar 10, 2010 at 12:37:26PM +0100, Marek Vasut wrote:
+>> > Dne St 10. b?ezna 2010 07:18:40 Mike Rapoport napsal(a):
+>> > > Do these defines really deserve dedicated .h file? Why cannot they live
+>> > > in the arch/arm/mach-pxa/vpac270.c?
+>> >
+>> > I'm not moving this in. I dont want to polute the .c file with stuff that
+>> > should obviously go into the header file. Besides there'll be more GPIOs
+>> > defined and that'd make the .c file less readable, which I want to avoid.
+>>
+>> The question is - are they shared? If they're not and will never be used
+>> by anything else then this .c file, I'd also vote for not having an
+>> extra header file for them.
+>>
+>> Daniel
+>>
+> Yes, they are used in the PCMCIA driver. And I'd rather avoid having GPIO
+> definitions scattered across multiple files.
 >
 
-Marek??
-
-> Otherwise, you can add for the UDC part :
-> Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> --
-> Robert
->
+Mmm... that's because PCMCIA driver is not abstracted well enough to
+allow all platform specific stuffs back into board file. Once that's done,
+these shared definitions could be avoided to live in a separate header
+file. For now, it's OK.
