@@ -1,37 +1,174 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 22 Mar 2010 08:57:39 +0100
-Subject: PXA3xx internal SRAM
-In-Reply-To: <771cded01003211747n29be55a3p7608578ff1744f51@mail.gmail.com>
-References: <20100321124739.GG30801@buzzloop.caiaq.de>
-	<771cded01003211747n29be55a3p7608578ff1744f51@mail.gmail.com>
-Message-ID: <20100322075739.GI30801@buzzloop.caiaq.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 22 Mar 2010 16:19:04 +0800
+Subject: [PATCH] arch/arm/mach-pxa: avoid NULL dereference in error
+	handling code
+In-Reply-To: <Pine.LNX.4.64.1003212147360.12371@ask.diku.dk>
+References: <Pine.LNX.4.64.1003212147360.12371@ask.diku.dk>
+Message-ID: <f17812d71003220119i68ecc705ud1422161b77ab2ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 21, 2010 at 08:47:22PM -0400, Haojian Zhuang wrote:
-> On Sun, Mar 21, 2010 at 8:47 AM, Daniel Mack <daniel@caiaq.de> wrote:
-> > The pxa3xx series features a comparatively big and fast internal SRAM of
-> > 256KB which is currently unused by the Linux kernel except for a 4-byte
-> > return vector from suspend.
-> >
-> > I wonder what this could be used for. Is there any kind of cache that
-> > would be worth putting there to speed up things for example?
-> > And could the uncompressor probably benfit from that?
-> >
-> > Daniel
-> 
-> The size of internal SRAM isn't always 256KB. It could be 128KB, 256KB
-> or 702KB. In marvell BSP, there's a memory management driver (aka IMM)
-> to handle internal SRAM. So driver or user application could make use
-> of it. And one part of internal SRAM is reserved for low power idle
-> mode. But both of these two features aren't pushed into community yet.
+On Mon, Mar 22, 2010 at 4:48 AM, Julia Lawall <julia@diku.dk> wrote:
+> From: Julia Lawall <julia@diku.dk>
+>
+> The assignments of res to the results of the two calls to
+> platform_get_resource make it impossible to use res in the error handling
+> code in the arguments to release_mem_region.
+>
 
-Ok. I was more thinking about any kernel specific kind of cache that has
-a fix size of 128kb or 256kb and which is consulted regularily. But I
-don't know which kind of cache that could be.
+Nice catch, I've yet made a small change to move the block of getting
+dma resource earlier so to avoid introducing another variable pres.
 
-As that's not neccessarily ARM-related, I copied LKML. Maybe anyone has
-an idea.
+> At the same time, code of the form res->end - res->start + 1 is converted
+> to use resource_size.
+>
 
-Thanks,
-Daniel
+OK, I've separated this into an individual patch with the above one,
+rebased against my 'ssp_cleanup' branch as follows (note: the ssp.c
+has been moved to plat-pxa for code sharing):
+
+=====================================================
+commit 97be6e52dc0aabaea07222bd0486e3b2df3e1baa
+Author: Julia Lawall <julia@diku.dk>
+Date:   Mon Mar 22 16:11:55 2010 +0800
+
+    [ARM] pxa: avoid NULL dereferencing in error handling of ssp.c
+
+    The assignments of res to the results of the two calls to
+    platform_get_resource make it impossible to use res in the error handling
+    code in the arguments to release_mem_region.
+
+    The semantic match that finds the former problem is as follows:
+    (http://coccinelle.lip6.fr/)
+
+    // <smpl>
+    @r exists@
+    expression E, E1;
+    identifier f;
+    statement S1,S3;
+    iterator iter;
+    @@
+
+    if ((E == NULL && ...) || ...)
+    {
+     ... when != false ((E == NULL && ...) || ...)
+         when != true  ((E != NULL && ...) || ...)
+         when != iter(E,...) S1
+         when != E = E1
+    (
+     sizeof(E->f)
+    |
+    * E->f
+    )
+     ... when any
+     return ...;
+    }
+    else S3
+    // </smpl>
+
+    Signed-off-by: Julia Lawall <julia@diku.dk>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index cfebcd8..3bf704d 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -92,6 +92,22 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ 		goto err_free;
+ 	}
+
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (res == NULL) {
++		dev_err(&pdev->dev, "no SSP RX DRCMR defined\n");
++		ret = -ENODEV;
++		goto err_free_clk;
++	}
++	ssp->drcmr_rx = res->start;
++
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++	if (res == NULL) {
++		dev_err(&pdev->dev, "no SSP TX DRCMR defined\n");
++		ret = -ENODEV;
++		goto err_free_clk;
++	}
++	ssp->drcmr_tx = res->start;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL) {
+ 		dev_err(&pdev->dev, "no memory resource defined\n");
+@@ -123,22 +139,6 @@ static int __devinit ssp_probe(struct
+platform_device *pdev)
+ 		goto err_free_io;
+ 	}
+
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "no SSP RX DRCMR defined\n");
+-		ret = -ENODEV;
+-		goto err_free_io;
+-	}
+-	ssp->drcmr_rx = res->start;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "no SSP TX DRCMR defined\n");
+-		ret = -ENODEV;
+-		goto err_free_io;
+-	}
+-	ssp->drcmr_tx = res->start;
+-
+ 	/* PXA2xx/3xx SSP ports starts from 1 and the internal pdev->id
+ 	 * starts from 0, do a translation here
+ 	 */
+
+===============================================================================
+
+commit 00921f0d5f21f213b8407d348b53fdce4ad383bd
+Author: Julia Lawall <julia@diku.dk>
+Date:   Mon Mar 22 16:16:24 2010 +0800
+
+    [ARM] pxa: use resource_size() in ssp.c
+
+    Signed-off-by: Julia Lawall <julia@diku.dk>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index 3bf704d..52c07cc 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -115,7 +115,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ 		goto err_free_clk;
+ 	}
+
+-	res = request_mem_region(res->start, res->end - res->start + 1,
++	res = request_mem_region(res->start, resource_size(res),
+ 			pdev->name);
+ 	if (res == NULL) {
+ 		dev_err(&pdev->dev, "failed to request memory resource\n");
+@@ -125,7 +125,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+
+ 	ssp->phys_base = res->start;
+
+-	ssp->mmio_base = ioremap(res->start, res->end - res->start + 1);
++	ssp->mmio_base = ioremap(res->start, resource_size(res));
+ 	if (ssp->mmio_base == NULL) {
+ 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+ 		ret = -ENODEV;
+@@ -156,7 +156,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
+ err_free_io:
+ 	iounmap(ssp->mmio_base);
+ err_free_mem:
+-	release_mem_region(res->start, res->end - res->start + 1);
++	release_mem_region(res->start, resource_size(res));
+ err_free_clk:
+ 	clk_put(ssp->clk);
+ err_free:
+@@ -176,7 +176,7 @@ static int __devexit ssp_remove(struct
+platform_device *pdev)
+ 	iounmap(ssp->mmio_base);
+
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(res->start, res->end - res->start + 1);
++	release_mem_region(res->start, resource_size(res));
+
+ 	clk_put(ssp->clk);
