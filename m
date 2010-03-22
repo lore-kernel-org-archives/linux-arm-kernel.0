@@ -1,40 +1,49 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Mar 2010 22:03:35 +0100
-Subject: [PATCH] MAINTAINERS: add i2c tree for embedded platforms
-In-Reply-To: <1267441936-4432-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100301113840.4d6b4e7d@hyperion.delvare>
-	<1267441936-4432-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100322210335.GC10157@pengutronix.de>
+Date: Mon, 22 Mar 2010 22:04:11 +0100
+Subject: [PATCH 1/3] i2c/pxa: remove unused macro
+In-Reply-To: <1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100322210411.GD10157@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Ben,
 
-On Mon, Mar 01, 2010 at 12:12:16PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Jean Delvare <khali@linux-fr.org>
-> ---
->  MAINTAINERS |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+On Wed, Feb 24, 2010 at 12:01:44PM +0100, Uwe Kleine-K?nig wrote:
+> Commit
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f520dd0..a01745b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2658,6 +2658,7 @@ M:	"Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
->  L:	linux-i2c at vger.kernel.org
->  W:	http://i2c.wiki.kernel.org/
->  T:	quilt kernel.org/pub/linux/kernel/people/jdelvare/linux-2.6/jdelvare-i2c/
-> +T:	git git://git.fluff.org/bjdooks/linux.git next-i2c
->  S:	Maintained
->  F:	Documentation/i2c/
->  F:	drivers/i2c/
-> -- 
-> 1.7.0
-
+> 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
+> 
+> removed all uses of eedbg, so the definition can go, too.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Roel Kluin <roel.kluin@gmail.com>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
 ping
 
 Uwe
+> ---
+>  drivers/i2c/busses/i2c-pxa.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index 7647a20..b3c6c9d 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -216,8 +216,6 @@ static void i2c_pxa_show_state(struct pxa_i2c *i2c, int lno, const char *fname)
+>  #define decode_ICR(val) do { } while (0)
+>  #endif
+>  
+> -#define eedbg(lvl, x...) do { if ((lvl) < 1) { printk(KERN_DEBUG "" x); } } while(0)
+> -
+>  static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
+>  static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
+>  
+> -- 
+> 1.6.6.2
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
