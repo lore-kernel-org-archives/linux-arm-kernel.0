@@ -1,17 +1,14 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Tue, 23 Mar 2010 19:45:53 +0100
-Subject: [PATCH 0/8] MXC: mach-mx31_3ds: Patch series that enable the
-	support for Freescale i.MX31 3-Stack development board.
+Date: Tue, 23 Mar 2010 19:46:57 +0100
+Subject: [PATCH 1/8] MXC: mach-mx31_3ds: Update variable names over recent
+	mach name modification.
 In-Reply-To: <1269369741.3276.162.camel@realization>
 References: <1269369741.3276.162.camel@realization>
-Message-ID: <1269369953.3276.164.camel@realization>
+Message-ID: <1269370017.3276.165.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From c6d0b6f134ea1d78f782a2057f17315e6fd6b5d1 Mon Sep 17 00:00:00 2001
-From: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-Date: Tue, 19 Jan 2010 16:43:45 +0100
-Subject: [PATCH 1/8] MXC: mach-mx31_3ds: Update variable names over recent mach name modification.
+
 
 Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
 ---
