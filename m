@@ -1,39 +1,56 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 23 Mar 2010 23:39:52 +0000
-Subject: ARM caches variants.
-In-Reply-To: <1269355564.13209.56.camel@e102109-lin.cambridge.arm.com>
-References: <4BA8B672.7030508@xenomai.org>
-	<1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
-	<4BA8BF0A.6030907@xenomai.org>
-	<1269351756.13209.34.camel@e102109-lin.cambridge.arm.com>
-	<4BA8C932.6060701@xenomai.org>
-	<1269354835.13209.45.camel@e102109-lin.cambridge.arm.com>
-	<4BA8D2BB.9080504@xenomai.org>
-	<1269355564.13209.56.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100323233952.GF20130@shareable.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Mar 2010 21:38:25 +0000
+Subject: [PATCH 2/5] ARM: Implement read/write for ownership in the
+	ARMv6 DMA cache ops
+In-Reply-To: <20100322151945.6353.7333.stgit@e102109-lin.cambridge.arm.com>
+References: <20100322151729.6353.79984.stgit@e102109-lin.cambridge.arm.com>
+	<20100322151945.6353.7333.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100323213825.GI19572@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> > > Even if you have a 1-way associative cache (some processors allow the
-> > > disabling of the other 3 ways if you want to try), the tag stored with
-> > > the cache line is different between different VAs on a VIVT cache.
-> > >
-> > > So with two different VAs mapping the same PA, if a VA0 access allocates
-> > > the cache line and VA1 would find the same cache line via the index
-> > > calculation, it would get a cache miss because the tags for VA0 and VA1
-> > > do not match.
-> > 
-> > But if we assume that it evicts the contents of VA0 and allocates the
-> > cache for VA1 when VA1 is accessed, the system would just work. 
-> 
-> That's correct, for this particular case it should work (though I think
-> fully associative caches are not that common).
+On Mon, Mar 22, 2010 at 03:19:45PM +0000, Catalin Marinas wrote:
+> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+> index 9d89c67..b9f2cbd 100644
+> --- a/arch/arm/mm/cache-v6.S
+> +++ b/arch/arm/mm/cache-v6.S
+> @@ -211,6 +211,9 @@ v6_dma_inv_range:
+>  	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
+>  #endif
+>  1:
+> +#ifdef CONFIG_SMP
+> +	str	r0, [r0]			@ write for ownership
+> +#endif
+>  #ifdef HARVARD_CACHE
+>  	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
+>  #else
+> @@ -231,6 +234,9 @@ v6_dma_inv_range:
+>  v6_dma_clean_range:
+>  	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+>  1:
+> +#ifdef CONFIG_SMP
+> +	ldr	r2, [r0]			@ read for ownership
+> +#endif
+>  #ifdef HARVARD_CACHE
+>  	mcr	p15, 0, r0, c7, c10, 1		@ clean D line
+>  #else
+> @@ -251,6 +257,10 @@ v6_dma_clean_range:
+>  ENTRY(v6_dma_flush_range)
+>  	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+>  1:
+> +#ifdef CONFIG_SMP
+> +	ldr	r2, [r0]			@ read for ownership
+> +	str	r2, [r0]			@ write for ownership
 
-I think you might have meant 1-way caches, or running then with 1-way,
-is never done.  But if you did have 1-way, then it might work. :-)
+What is the effect of using the register just loaded on ARMv6?  Does it
+stall like previous architectures?  If so, this str should use a different
+register.
 
-With 2-way or more, all bets are off because you don't know which way
-will be evicted.
+In any case, does reading then writing actually achieve anything over just
+a plain write?  read surely brings the cache line into shared mode, and
+a write to exclusive mode - so won't just a write do?
 
--- Jamie
+The converse argument is that with read allocate caches, this technique
+can result in faster code, so why don't we use it in dma_inv_range?
+
+Maybe this needs to be benchmarked to discover which method is optimal.
