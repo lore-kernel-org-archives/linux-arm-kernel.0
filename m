@@ -1,54 +1,27 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 23 Mar 2010 08:29:01 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
-In-Reply-To: <20100322192748.GK2040@bluebox.local>
-References: <20100322191900.GF2040@bluebox.local>
-	<20100322192748.GK2040@bluebox.local>
-Message-ID: <63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
+From: post@hendrik-sattler.de (Hendrik Sattler)
+Date: Tue, 23 Mar 2010 09:30:09 +0100
+Subject: [PATCH] USB: gadget: pxa25x: support additional IXP425 steppings
+In-Reply-To: <7FC3F153-EB1C-42AC-A5D7-119BCCB8C237@workware.net.au>
+References: <7FC3F153-EB1C-42AC-A5D7-119BCCB8C237@workware.net.au>
+Message-ID: <20100323093009.ms6zgeh5w44k40g4@v1539.ncsrv.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/22 Hans J. Koch <hjk@linutronix.de>:
+Zitat von Steve Bennett <steveb@workware.net.au>:
 
-> Map the IO ranges of TCC8xxx peripherals.
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .virtual ? ? ? ?= INT_SRAM_BASE_VIRT, ? /* Internal SRAM */
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(INT_SRAM_BASE),
-> + ? ? ? ? ? ? ? .length ? ? ? ? = INT_SRAM_SIZE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
-> + ? ? ? },
+> Here is a trivial patch to add support pxa25x_udc for additional IXP
+> steppings.
+>
+> Please let me know if I should send this anywhere else/instead.
 
-MT_DEVICE is probably inappropriate here as well.
+Your patch really is not the right approach.
 
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .virtual ? ? ? ?= DATA_TCM_BASE_VIRT, ? /* Data TCM */
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DATA_TCM_BASE),
-> + ? ? ? ? ? ? ? .length ? ? ? ? = DATA_TCM_SIZE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
-> + ? ? ? },
+I had a similar patch some time ago[1]. This driver part should  
+actually be reworked to not use that ifdef and switch-case thing (and  
+not read the cpu id register itself, either).
 
-Actually, look close at your specs here, because you seem to have both
-SRAM and TCM, usually you have ITCM+DTCM, so the thing that is
-called SRAM may be something else.
+[1]: http://www.spinics.net/lists/arm-kernel/msg62009.html
 
-Looking at the .h file:
+I am not up-to-date how far Russell got with his proposed changes.
 
-+#define INT_SRAM_BASE          0x30000000
-+#define INT_SRAM_SIZE          SZ_32K
-(...)
-+#define DATA_TCM_BASE          0xa0000000
-+#define DATA_TCM_SIZE          SZ_8K
-
-Check if the SRAM is really an SRAM and not ITCM (which can be
-suspected). Also check that the DTCM is really such a thing.
-(The code in arch/arm/kernel/tcm.c does this once you enable it,
-it will scream if the config of the system does not match what the
-CPU register is saying about ITCM+DTCM.)
-
-If the DTCM is really an embedded TCM you can move it wherever
-you want, even i physical memory space. It doesn't have to be on
-0xa0000000, this is probably only the place where your boot code
-locates it.
-
-Yours,
-Linus Walleij
+HS
