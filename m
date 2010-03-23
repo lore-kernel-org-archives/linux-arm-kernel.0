@@ -1,37 +1,39 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Tue, 23 Mar 2010 19:58:26 +0100
-Subject: [PATCH 8/8] MXC: mach-mx31_3ds: enable mc13783 touchscreen interface.
-In-Reply-To: <1269370655.3276.177.camel@realization>
-References: <1269369741.3276.162.camel@realization>
-	<1269370017.3276.165.camel@realization>
-	<1269370175.3276.168.camel@realization>
-	<1269370228.3276.169.camel@realization>
-	<1269370305.3276.171.camel@realization>
-	<1269370438.3276.173.camel@realization>
-	<1269370499.3276.174.camel@realization>
-	<1269370655.3276.177.camel@realization>
-Message-ID: <1269370706.3276.178.camel@realization>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Tue, 23 Mar 2010 18:35:39 +0000
+Subject: [PATCH] Kirkwood: Marvell GuruPlug support
+References: <1269250100-31824-1-git-send-email-gores@marvell.com>
+	<i13k77-9sp.ln1@chipmunk.wormnet.eu>
+	<1269348203.23313.198.camel@pe-dt434>
+	<20100323132331.GT13429@chipmunk>
+	<alpine.LFD.2.00.1003231247350.31128@xanadu.home>
+Message-ID: <r8en77-ug7.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nicolas Pitre <nico@fluxnic.net> wrote:
+>> 
+>> Fair enough, I thought (with the exception of the shameful removal of 
+>> the onboard questionable serial/jtag) the boards were identical, just 
+>> with extra USB/NIC ports added.
+> 
+> "questionable" ??
+>
+Yeah, I rejigged that sentence when originally slapping it together and 
+forgot to remove 'questionable'.
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
- arch/arm/mach-mx3/mach-mx31_3ds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+It was a shame the onboard readily available serial/jtag was removed on 
+the Guruplug.  The SheevaPlug makes a great home router[1] or streaming 
+radio client[2], but having to remember to carry a separate box to just 
+serial into it is a plain pain :-/
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 258e8d1..a430b5b 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -392,7 +392,7 @@ static struct mc13783_regulator_init_data mx31_3ds_regulators[] = {
- static struct mc13783_platform_data mc13783_pdata __initdata = {
- 	.regulators = mx31_3ds_regulators,
- 	.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
--	.flags  = MC13783_USE_REGULATOR,
-+	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
- };
- 
- /* SPI */
+Now if I could get a 4GB RAM version, I would have me some low power 
+HTTP proxy servers for work :)
+
+Cheers
+
+[1] USB xDSL modem plugged in
+[2] the student radio bods at my workplace love them for just this
+
 -- 
-1.6.3.3
+Alexander Clouter
+.sigmonster says: Oatmeal raisin.
