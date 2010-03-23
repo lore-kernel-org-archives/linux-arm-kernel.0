@@ -1,55 +1,53 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Tue, 23 Mar 2010 18:13:23 +0530
-Subject: [PATCH] Kirkwood: Marvell GuruPlug support
-In-Reply-To: <i13k77-9sp.ln1@chipmunk.wormnet.eu>
-References: <1269250100-31824-1-git-send-email-gores@marvell.com>
-	<i13k77-9sp.ln1@chipmunk.wormnet.eu>
-Message-ID: <1269348203.23313.198.camel@pe-dt434>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Mar 2010 12:53:46 +0000
+Subject: ARM caches variants.
+In-Reply-To: <4BA8B672.7030508@xenomai.org>
+References: <4BA8B672.7030508@xenomai.org>
+Message-ID: <1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-03-22 at 05:05 -0700, Alexander Clouter wrote:
-> Siddarth Gore <gores@marvell.com> wrote:
-> >
-> > GuruPlug Standard: 1 Gb Ethernet, 2 USB 2.0
-> > GuruPlug Plus: 2 Gb Ethernet, 2 USB 2.0, 1 eSATA, 1 uSD slot
-> > 
-> > References:
-> > http://www.globalscaletechnologies.com/t-guruplugdetails.aspx
-> > http://plugcomputer.org
-> > 
-> > This patch is for GuruPlug Plus, but it supports Standard version
-> > as well.
-> > 
-> > Signed-off-by: Siddarth Gore <gores@marvell.com>
-> > ---
-> > arch/arm/mach-kirkwood/Kconfig          |    6 ++
-> > arch/arm/mach-kirkwood/Makefile         |    1 +
-> > arch/arm/mach-kirkwood/guruplug-setup.c |  131 +++++++++++++++++++++++++++++++
-> > 3 files changed, 138 insertions(+), 0 deletions(-)
-> > create mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
-> > 
-> > diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-> > new file mode 100644
-> > index 0000000..54d07c8
-> > --- /dev/null
-> > +++ b/arch/arm/mach-kirkwood/guruplug-setup.c
-> > @@ -0,0 +1,131 @@
-> >
-> Any harm in merging this into the sheevaplug-setup code, like the openrd 
-> code?
-> 
-> http://git.marvell.com/?p=orion.git;a=commit;h=b2fdb5660fccc060e47658baad8911a963397ced
-> 
+On Tue, 2010-03-23 at 12:39 +0000, Gilles Chanteperdrix wrote:
+> As I understood, the VIVT cache has the following issues:
+> - issue #1; two processes may use the same virtual address for different
+> physical addresses, but will share the same cache line and see memory
+> corruption if no precaution is taken;
+> - issue #2; two processes may use different virtual addresses for the
+> same physical address (shared mapping), but will use different cache
+> lines, causing all sorts of incoherence if no precaution is taken;
+> - issue #3; the same process may use different virtual addresses for the
+> same physical address (same shared mapping mapped several time in the
+> same process virtual memory), basically almost the same issue as issue #2.
+[...]
+> Now, if we look at VIPT, aliasing caches:
+> - the physical tagging solves issue #1 automatically,
+> - the cache colouring technique used in arch_get_unmapped_area solves
+> issue #2 and #3 by ensuring that the areas using the same physical
+> address will end up using the same cache lines, and avoid aliases "by
+> construction".
+[...]
+> First question: did I get it right?
 
-No harm as such. but i think having separate setup files will be a
-cleaner approach, instead of adding more if(machine_is_<>) statements.
+Yes.
 
-Looks like openrd base/client are same boards with client having an
-extra ethernet port. sheevaplug and guruplug are two different boards
-(pcb's) having different gpio settings, peripherals, etc.
+> Second question: do issue #1, #2 and #3 have official non-ambiguous names?
 
--siddarth
+I don't think there are any official names. You could say cache aliasing
+though not sure it covers everything.
 
-> Cheers
-> 
+> Now, the stupid question: why not using the cache colouring technique
+> used for VIPT caches to solve issue #3 with VIVT caches?
+
+Because with aliasing VIPT it is guaranteed that if a virtual address
+has the same offset in a 16KB block (i.e. the same colour - there are
+only 4 colours given by bits 13 and 12 of the virtual address), you get
+the same cache line allocated for a given physical address. The tag of a
+cache line is given by bits 31..14 of the physical address.
+
+With VIVT, the cache tags are not aware of the physical address, hence
+you can have 2^20 colours (bits 31..12 of the virtual address). You
+would need to map a physical address at the same virtual address in all
+applications sharing it (and you may end up with uClinux :)).
+
+-- 
+Catalin
