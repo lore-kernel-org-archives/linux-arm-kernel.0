@@ -1,21 +1,20 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 23 Mar 2010 09:52:28 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Mar 2010 09:20:59 +0000
 Subject: [PATCH] USB: gadget: pxa25x: support additional IXP425 steppings
-In-Reply-To: <7FC3F153-EB1C-42AC-A5D7-119BCCB8C237@workware.net.au> (Steve
-	Bennett's message of "Tue, 23 Mar 2010 14:35:13 +1000")
+In-Reply-To: <5EB8CA3A-5EB4-4F98-B83F-5B1228CCD73C@workware.net.au>
 References: <7FC3F153-EB1C-42AC-A5D7-119BCCB8C237@workware.net.au>
-Message-ID: <m3tys78lo3.fsf@intrepid.localdomain>
+	<20100323093009.ms6zgeh5w44k40g4@v1539.ncsrv.de>
+	<5EB8CA3A-5EB4-4F98-B83F-5B1228CCD73C@workware.net.au>
+Message-ID: <20100323092059.GA4439@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steve Bennett <steveb@workware.net.au> writes:
+On Tue, Mar 23, 2010 at 06:37:36PM +1000, Steve Bennett wrote:
+> Russell, is there something stopping us going with your patch?
 
-> Here is a trivial patch to add support pxa25x_udc for additional IXP
-> steppings.
->
-> Please let me know if I should send this anywhere else/instead.
+Nothing really - only lack of motivation and sufficient reason to make
+the change.
 
-Looks good. You also need to provide the "Signed-off-by" line as per
-Documentation/SubmittingPatches.
--- 
-Krzysztof Halasa
+> Does it just need some updating/testing?
+
+After a year, it certainly will do.
