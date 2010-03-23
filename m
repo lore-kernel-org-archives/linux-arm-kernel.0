@@ -1,113 +1,81 @@
-From: serue@us.ibm.com (Serge E. Hallyn)
-Date: Tue, 23 Mar 2010 11:09:33 -0500
-Subject: [C/R ARM][PATCH 3/3] c/r: ARM implementation of checkpoint/restart
-In-Reply-To: <1269219965-23923-4-git-send-email-christofferdall@christofferdall.dk>
-References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
-	<1269219965-23923-4-git-send-email-christofferdall@christofferdall.dk>
-Message-ID: <20100323160933.GA4465@us.ibm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 23 Mar 2010 11:34:32 -0500
+Subject: [PATCH 2/3] ep93xx: add /proc/cpuinfo extension
+In-Reply-To: <20100323153554.GD2904@gw.healthdatacare.com>
+References: <0D753D10438DA54287A00B02708426976368DDCD38@AUSP01VMBX24.collaborationhost.net>
+	<20100323153554.GD2904@gw.healthdatacare.com>
+Message-ID: <0D753D10438DA54287A00B02708426976368E58039@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Christoffer Dall (christofferdall at christofferdall.dk):
-> Implements architecture specific requirements for checkpoint/restart on
-> ARM. The changes touch almost only c/r related code. Most of the work is
-> done in arch/arm/checkpoint.c, which implements checkpointing of the CPU
-> and necessary fields on the thread_info struct.
+On Tuesday, March 23, 2010 8:36 AM, Mika Westerberg wrote:
+> On Mon, Mar 22, 2010 at 01:39:00PM -0500, H Hartley Sweeten wrote:
+>> Add a callback to mach-ep93xx for the /proc/cpuinfo extension.
+>> 
+>> This cpuinfo extension dumps the processor unique ID and Maverick
+>> Key as well as the processor silicon revision and a number of
+>> boot configuration options.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> 
+>> ---
+
+[snip]
+
+>> +	seq_printf(m, "Boot mode\t: %s %ssync %sternal %d-bit\n",
+>> +		(val & EP93XX_SYSCON_SYSCFG_SBOOT) ? "serial" : "normal",
+>> +		(val & EP93XX_SYSCON_SYSCFG_LASDO) ? "" : "a",
+>> +		(val & EP93XX_SYSCON_SYSCFG_LEECLK) ? "in" : "ex",
+>> +		ep93xx_boot_width());
+>           ^^^^^^^^^^^^^^^^^
 > 
-> The ISA version (given by __LINUX_ARM_ARCH__) is checkpointed and verified
-> against the machine architecture on restart. If they differ, an error is
-> raised and restart aborted. It should be possible to restart on newer
-> architectures, but further investigation is warranted.
-> 
-> Regarding ThumbEE, the thumbee_state field on the thread_info is stored
-> in checkpoints when CONFIG_ARM_THUMBEE and 0 is stored otherwise. If
-> a value different than 0 is checkpointed and CONFIG_ARM_THUMBEE is not
-> set on the restore system, the restore is aborted. Feedback on this
-> implementation is very welcome.
-> 
-> We checkpoint whether the system is running with CONFIG_MMU or not and
-> require the same configuration for the system on which we restore the
-> process. It might be possible to allow something more fine-grained,
-> if it's worth the energy. Input on this item is also very welcome,
-> specifically from someone who knows the exact meaning of the end_brk
-> field.
-> 
-> Added support for syscall sys_checkpoint and sys_restart for ARM:
-> __NR_checkpoint         367
-> __NR_restart            368
-> 
-> 
-> Cc: rmk at arm.linux.org.uk
-> Signed-off-by: Christoffer Dall <christofferdall@christofferdall.dk>
-> Acked-by: Oren Laadan <orenl@cs.columbia.edu>
+> I got following compile error:
+>
+>  CC      arch/arm/mach-ep93xx/core.o
+> arch/arm/mach-ep93xx/core.c: In function 'ep93xx_cpuinfo':
+> arch/arm/mach-ep93xx/core.c:707: error: implicit declaration of function 'ep93xx_boot_width'
+> make[1]: *** [arch/arm/mach-ep93xx/core.o] Error 1
+> make: *** [arch/arm/mach-ep93xx] Error 2
+>
+> Should this function be included in the patch set also? I applied these on top of
+> latest mainline kernel.
 
-In terms of the cr api I don't see any problems.  Two nits below,
-but in any case
+Grr.. Left that piece out, sorry about that.
 
-Acked-by: Serge Hallyn <serue@us.ibm.com>
+I will post the updated patch in a bit.
 
-thanks, this is really cool, especially how minimal it is :)
--serge
+If you want to test this now, just put the following after the 
+ep93xx_chip_revision() in core.c (and of course the proper prototype in
+platform.h).
 
-...
+Regards,
+Hartley
 
-> +static int load_cpu_regs(struct ckpt_hdr_cpu *h, struct task_struct *t)
-> +{
-> +	int i;
-> +	struct pt_regs *regs = task_pt_regs(t);
-> +
-> +	memcpy(regs, &h->uregs, sizeof(struct pt_regs));
-> +
-> +	for (i = 0; i < 16; i++)
-> +		regs->uregs[i] = h->uregs[i];
-> +
-> +	/*
-> +	 * Restore only user-writable bits on the CPSR
-> +	 */
-> +	regs->ARM_cpsr = regs->ARM_cpsr |
-> +			 (h->ARM_cpsr & (PSR_N_BIT | PSR_Z_BIT |
-> +					 PSR_C_BIT | PSR_V_BIT |
-> +					 PSR_V_BIT | PSR_Q_BIT |
-> +					 PSR_E_BIT | PSR_GE_BITS));
-> +	regs->ARM_ORIG_r0 = h->ARM_ORIG_r0;
-> +
-> +	return 0;
-> +}
-> +
-> +/* read the cpu state and registers for the current task */
-> +int restore_cpu(struct ckpt_ctx *ctx)
-> +{
-> +	struct ckpt_hdr_cpu *h;
-> +	struct task_struct *t = current;
-> +	int ret;
-> +
-> +	h = ckpt_read_obj_type(ctx, sizeof(*h), CKPT_HDR_CPU);
-> +	if (IS_ERR(h))
-> +		return PTR_ERR(h);
-> +
-> +	ret = load_cpu_regs(h, t);
+---
 
-will load_cpu_regs() ever be changed to return anything but 0?  If
-not both fns can be simplified.
+/**
+ * ep93xx_boot_width() - returns the external bus width for the boot device
+ */
+int ep93xx_boot_width(void)
+{
+	u32 val;
+	int width;
 
-...
-
-> +int restore_mm_context(struct ckpt_ctx *ctx, struct mm_struct *mm)
-> +{
-> +	struct ckpt_hdr_mm_context *h;
-> +	int ret = 0;
-> +
-> +	h = ckpt_read_obj_type(ctx, sizeof(*h), CKPT_HDR_MM_CONTEXT);
-> +	if (IS_ERR(h))
-> +		return PTR_ERR(h);
-> +
-> +#if !CONFIG_MMU
-> +	mm->context.end_brk = h->end_brk;
-> +#endif
-> +
-> +	ckpt_hdr_put(ctx, h);
-> +	return ret;
-
-Again ret doesn't seem needed here.
-
--serge
+	val = __raw_readl(EP93XX_SYSCON_SYSCFG);
+	if (val & EP93XX_SYSCON_SYSCFG_LASDO) {
+		/* Sync boot */
+		if (val & EP93XX_SYSCON_SYSCFG_LCSN7)
+			width = 32;
+		else
+			width = 16;
+	} else {
+		/* Async boot */
+		if (val & EP93XX_SYSCON_SYSCFG_LCSN7)
+			width = 32;
+		else if (val & EP93XX_SYSCON_SYSCFG_LCSN6)
+			width = 16;
+		else
+			width = 8;
+	}
+	return width;
+}
