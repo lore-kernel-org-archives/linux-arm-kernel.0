@@ -1,35 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Mar 2010 21:27:36 +0000
-Subject: [PATCH v5 4/4] ARM: Change the mandatory barriers implementation
-In-Reply-To: <20100319143317.11748.81936.stgit@e102109-lin.cambridge.arm.com>
-References: <20100319143047.11748.9186.stgit@e102109-lin.cambridge.arm.com>
-	<20100319143317.11748.81936.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100323212736.GG19572@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 23 Mar 2010 23:49:49 +0000
+Subject: ARM caches variants.
+In-Reply-To: <1269351756.13209.34.camel@e102109-lin.cambridge.arm.com>
+References: <4BA8B672.7030508@xenomai.org>
+	<1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
+	<4BA8BF0A.6030907@xenomai.org>
+	<1269351756.13209.34.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100323234949.GG20130@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 19, 2010 at 02:33:17PM +0000, Catalin Marinas wrote:
-> The mandatory barriers (mb, rmb, wmb) are used even on uniprocessor
-> systems for things like ordering Normal Non-cacheable memory accesses
-> with DMA transfer (via Device memory writes). The current implementation
-> uses dmb() for mb() and friends but this is not sufficient. The DMB only
-> ensures the relative ordering of the observability of accesses by other
-> processors or devices acting as masters. In case of DMA transfers
-> started by writes to device memory, the relative ordering is not ensured
-> because accesses to slave ports of a device are not considered
-> observable by the DMB definition.
+Catalin Marinas wrote:
+> > In other word, is not the cache line used by virtual address addr:
+> > (addr % cache size) / (cache line size)
 > 
-> A DSB is required for the data to reach the main memory (even if mapped
-> as Normal Non-cacheable) before the device receives the notification to
-> begin the transfer. Furthermore, some L2 cache controllers (like L2x0 or
-> PL310) buffer stores to Normal Non-cacheable memory and this would need
-> to be drained with the outer_sync() function call.
+> With any cache line, you have an index and a tag for identifying it. The
+> cache may have multiple ways (e.g. 4-way associative) to speed up the
+> look-up. For a 32KB 4-way associative cache you have 8KB per way (2^13).
 > 
-> The patch also allows platforms to define their own mandatory barriers
-> implementation by selecting CONFIG_ARCH_HAS_BARRIERS and providing a
-> mach/barriers.h file.
+> If the cache line size is 32B (2^5), the index of a cache line is:
 > 
-> Note that the SMP barriers are unchanged (being DMBs as before) since
-> they are only guaranteed to work with Normal Cacheable memory.
+> addr & (2^13 - 1) >> 5
+> 
+> e.g. bits 12..5 from the VA are used for indexing the cache line.
+> 
+> The tag is given by the rest of the top bits, in the above case bits
+> 31..13 of the VA (if VIVT cache) or PA (VIPT cache).
+> 
+> The cache look-up for a VA goes something like this:
+> 
+>      1. extracts the index. With a 4-way associative cache there are 4
+>         possible cache lines for this index
+>      2. extracts the tag (from either VA or PA, depending on the cache
+>         type). For VIPT caches, it needs to do a TLB look-up as well to
+>         find the physical address
+>      3. check the four cache lines identified by the index at step 1
+>         against their tag
+>      4. if the tag matches, you get a hit, otherwise a miss
+> 
+> For your #2 and #3 issues, if two processes map the same PA using
+> different VAs, data can end up pretty much anywhere in a VIVT cache. If
+> you calculate the index and tag (used to identify a cache line) for two
+> different VAs, the only common part are bits 11..5 of the index (since
+> they are inside a page). If you want to have the same index and tag for
+> the two different VAs, you end up with having to use the same VA in both
+> processes.
+> 
+> With VIPT caches, the tag is the same for issues #2 and #3. The only
+> difference may be in a few top bits of the index. In the above case,
+> it's bit 12 of the VA which may differ. This gives you two page colours
+> (with 64KB 4-way associative cache you have 2 bits for the colour
+> resulting in 4 colours).
 
-Ok.
+That's a very helpful explanation, thank you.
+
+Am I to understand that "VIPT aliasing" means there are some of those
+bits and therefore >= 2 colours, and "VIPT non-aliasing" means the
+cache size / ways is <= PAGE_SIZE, and therefore has effectively 1 colour?
+
+Or does "non-aliasing" mean something else?
+
+I suspect some x86s have VIPT caches, especially AMD (I've seen timing
+measurements which clearly show page colour effects), and I can only
+imagine that aliasing is prevent by when a cache line requests to be
+filled from higher level cache (L2), something very similar to SMP
+MESI cache coherence gets involved to keep both lines consistent.
+
+That would make a "VIPT non-aliasing" cache that has multiple colours.
+Is that ever done on the ARM architecture?
+
+Thanks again,
+-- Jamie
