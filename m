@@ -1,61 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Mar 2010 10:04:14 +0000
-Subject: [RFC 17/18] arm: mm: Add SW emulation for ARM domain manager
-	feature
-In-Reply-To: <alpine.LFD.2.00.1003221628290.31128@xanadu.home>
-References: <1263250057-26692-18-git-send-email-dwalker@codeaurora.org>
-	<1264437609.6275.110.camel@pc1117.cambridge.arm.com>
-	<1269281511.31379.53.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003221457040.31128@xanadu.home>
-	<1269288091.31379.57.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003221628290.31128@xanadu.home>
-Message-ID: <1269338654.29545.26.camel@e102109-lin.cambridge.arm.com>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Tue, 23 Mar 2010 11:15:40 +0100
+Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+In-Reply-To: <63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
+References: <20100322191900.GF2040@bluebox.local>
+	<20100322192748.GK2040@bluebox.local>
+	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
+Message-ID: <20100323101540.GB2049@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-03-22 at 20:32 +0000, Nicolas Pitre wrote:
-> On Mon, 22 Mar 2010, Daniel Walker wrote:
+On Tue, Mar 23, 2010 at 08:29:01AM +0100, Linus Walleij wrote:
+> 2010/3/22 Hans J. Koch <hjk@linutronix.de>:
 > 
-> > On Mon, 2010-03-22 at 14:58 -0400, Nicolas Pitre wrote:
-> > > On Mon, 22 Mar 2010, Daniel Walker wrote:
-> > >
-> > > > On Mon, 2010-01-25 at 16:40 +0000, Catalin Marinas wrote:
-> > > > > Hi Daniel,
-> > > > >
-> > > > > On Mon, 2010-01-11 at 22:47 +0000, Daniel Walker wrote:
-> > > > > > Do not set domain manager bits in cp15 dacr.  Emulate using SW.  Add
-> > > > > > kernel hooks to handle domain changes, permission faults, and context
-> > > > > > switches.
-> > > > >
-> > > > > In case you were not aware, there's a patch around (I think since 2007)
-> > > > > that removes the domain switching entirely from the kernel (given that
-> > > > > they have been deprecated for some time and may disappear completely in
-> > > > > the future):
-> > > > >
-> > > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005616.html
-> > > > >
-> > > >
-> > > > I didn't find this in 2.6.34 ? Are you re-writing it? Why has it been
-> > > > around so long out of mainline?
-> > >
-> > > Because no real hardware out there needed it until recently, i.e.
-> > > inertia.
-> >
-> > Current MSM hardware needs it, just to cover up a defect in the
-> > processor. At least that's what this thread was originally about.
+> > Map the IO ranges of TCC8xxx peripherals.
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .virtual ? ? ? ?= INT_SRAM_BASE_VIRT, ? /* Internal SRAM */
+> > + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(INT_SRAM_BASE),
+> > + ? ? ? ? ? ? ? .length ? ? ? ? = INT_SRAM_SIZE,
+> > + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+> > + ? ? ? },
 > 
-> Some other processors should need it too for some architecturally
-> defined reasons. Would be a good thing if you could remove your
-> emulation and replace it with this patch, and confirm it works for you
-> by providing Tested-by tags.
+> MT_DEVICE is probably inappropriate here as well.
+> 
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .virtual ? ? ? ?= DATA_TCM_BASE_VIRT, ? /* Data TCM */
+> > + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DATA_TCM_BASE),
+> > + ? ? ? ? ? ? ? .length ? ? ? ? = DATA_TCM_SIZE,
+> > + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+> > + ? ? ? },
+> 
+> Actually, look close at your specs here, because you seem to have both
+> SRAM and TCM, usually you have ITCM+DTCM, so the thing that is
+> called SRAM may be something else.
+> 
+> Looking at the .h file:
+> 
+> +#define INT_SRAM_BASE          0x30000000
+> +#define INT_SRAM_SIZE          SZ_32K
+> (...)
+> +#define DATA_TCM_BASE          0xa0000000
+> +#define DATA_TCM_SIZE          SZ_8K
+> 
+> Check if the SRAM is really an SRAM and not ITCM (which can be
+> suspected).
 
-I posted an up-to-date patch yesterday or you can grab it from my devel
-branch -
-http://www.linux-arm.org/git?p=linux-2.6.git;a=shortlog;h=refs/heads/devel 
+I'm quite sure it's normal SRAM. I've got the boot ROM code sources, they
+use it for both code and variables, like any standard SRAM. 
 
-(the master branch on his tree is the same, only that it's
-merge-friendly rather than rebased but the git server got a bit slower I
-think because git gc stopped few some months ago).
+> Also check that the DTCM is really such a thing.
 
--- 
-Catalin
+Yep, I'll do this.
+
+> (The code in arch/arm/kernel/tcm.c does this once you enable it,
+> it will scream if the config of the system does not match what the
+> CPU register is saying about ITCM+DTCM.)
+
+OK, will try.
+
+> 
+> If the DTCM is really an embedded TCM you can move it wherever
+> you want, even i physical memory space. It doesn't have to be on
+> 0xa0000000, this is probably only the place where your boot code
+> locates it.
+
+Thanks a lot for your detailed review and your hints.
+
+Hans
+
+> 
+> Yours,
+> Linus Walleij
