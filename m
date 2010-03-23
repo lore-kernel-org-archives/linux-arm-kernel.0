@@ -1,39 +1,66 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 23 Mar 2010 18:35:39 +0000
-Subject: [PATCH] Kirkwood: Marvell GuruPlug support
-References: <1269250100-31824-1-git-send-email-gores@marvell.com>
-	<i13k77-9sp.ln1@chipmunk.wormnet.eu>
-	<1269348203.23313.198.camel@pe-dt434>
-	<20100323132331.GT13429@chipmunk>
-	<alpine.LFD.2.00.1003231247350.31128@xanadu.home>
-Message-ID: <r8en77-ug7.ln1@chipmunk.wormnet.eu>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Tue, 23 Mar 2010 22:26:39 +0200
+Subject: [patch v3 2/3] at91_udc HW glitch
+In-Reply-To: <20100203143803.528679118@gmail.com>
+References: <20100203143736.564974126@gmail.com>
+	<20100203143803.528679118@gmail.com>
+Message-ID: <cd73a99e1003231326r7623bbc0icba163f9b2e0e96e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nico@fluxnic.net> wrote:
->> 
->> Fair enough, I thought (with the exception of the shameful removal of 
->> the onboard questionable serial/jtag) the boards were identical, just 
->> with extra USB/NIC ports added.
-> 
-> "questionable" ??
+hi,
+
+> Add some delay to avoid reading CSR TXCOUNT too early after updating it.
 >
-Yeah, I rejigged that sentence when originally slapping it together and 
-forgot to remove 'questionable'.
+> Signed-off-by: Anti Sullin <anti.sullin@artecdesign.ee>
+> Signed-off-by: Harro Haan <hrhaan@gmail.com>
+> Acked-by: Remy Bohmer <linux@bohmer.net>
+> ---
+>  drivers/usb/gadget/at91_udc.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> Index: linux-2.6.31/drivers/usb/gadget/at91_udc.c
+> ===================================================================
+> --- linux-2.6.31.orig/drivers/usb/gadget/at91_udc.c
+> +++ linux-2.6.31/drivers/usb/gadget/at91_udc.c
+> @@ -366,6 +366,13 @@ rescan:
+>        if (is_done)
+>                done(ep, req, 0);
+>        else if (ep->is_pingpong) {
+> +               /*
+> +                * One dummy read to delay the code because of a HW glitch:
+> +                * CSR returns bad RXCOUNT when read too soon after updating
+> +                * RX_DATA_BK flags.
+> +                */
+> +               csr = __raw_readl(creg);
+> +
+>                bufferspace -= count;
+>                buf += count;
+>                goto rescan;
 
-It was a shame the onboard readily available serial/jtag was removed on 
-the Guruplug.  The SheevaPlug makes a great home router[1] or streaming 
-radio client[2], but having to remember to carry a separate box to just 
-serial into it is a plain pain :-/
+I see in the data-sheet (SAM9261 / SAM9263), the following for the
+UDP_ CSRx registers:
 
-Now if I could get a 4GB RAM version, I would have me some low power 
-HTTP proxy servers for work :)
+"WARNING: Due to synchronization between MCK and UDPCK, the software
+application must wait for the end of the write
+operation before executing another write by polling the bits which
+must be set/cleared."
 
-Cheers
+//! Clear flags of UDP UDP_CSR register and waits for synchronization
+#define Udp_ep_clr_flag(pInterface, endpoint, flags) { \
+    while (pInterface->UDP_CSR[endpoint] & (flags)) \
+        pInterface->UDP_CSR[endpoint] &= ~(flags); \
+     }
+//! Set flags of UDP UDP_CSR register and waits for synchronization
+#define Udp_ep_set_flag(pInterface, endpoint, flags) { \
+    while ( (pInterface->UDP_CSR[endpoint] & (flags)) != (flags) ) \
+       pInterface->UDP_CSR[endpoint] |= (flags); \
+    }
 
-[1] USB xDSL modem plugged in
-[2] the student radio bods at my workplace love them for just this
+The at91_udc driver does not seem to do that for its CSR register writes.
+So I was wondering if we implement what the datasheet says, would we
+still need the "fix" above.
 
--- 
-Alexander Clouter
-.sigmonster says: Oatmeal raisin.
+
+Regards,
+  Andrew Victor
