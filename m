@@ -1,58 +1,55 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Tue, 23 Mar 2010 13:39:14 +0100
-Subject: ARM caches variants.
-Message-ID: <4BA8B672.7030508@xenomai.org>
+From: gores@marvell.com (Siddarth Gore)
+Date: Tue, 23 Mar 2010 18:13:23 +0530
+Subject: [PATCH] Kirkwood: Marvell GuruPlug support
+In-Reply-To: <i13k77-9sp.ln1@chipmunk.wormnet.eu>
+References: <1269250100-31824-1-git-send-email-gores@marvell.com>
+	<i13k77-9sp.ln1@chipmunk.wormnet.eu>
+Message-ID: <1269348203.23313.198.camel@pe-dt434>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2010-03-22 at 05:05 -0700, Alexander Clouter wrote:
+> Siddarth Gore <gores@marvell.com> wrote:
+> >
+> > GuruPlug Standard: 1 Gb Ethernet, 2 USB 2.0
+> > GuruPlug Plus: 2 Gb Ethernet, 2 USB 2.0, 1 eSATA, 1 uSD slot
+> > 
+> > References:
+> > http://www.globalscaletechnologies.com/t-guruplugdetails.aspx
+> > http://plugcomputer.org
+> > 
+> > This patch is for GuruPlug Plus, but it supports Standard version
+> > as well.
+> > 
+> > Signed-off-by: Siddarth Gore <gores@marvell.com>
+> > ---
+> > arch/arm/mach-kirkwood/Kconfig          |    6 ++
+> > arch/arm/mach-kirkwood/Makefile         |    1 +
+> > arch/arm/mach-kirkwood/guruplug-setup.c |  131 +++++++++++++++++++++++++++++++
+> > 3 files changed, 138 insertions(+), 0 deletions(-)
+> > create mode 100644 arch/arm/mach-kirkwood/guruplug-setup.c
+> > 
+> > diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+> > new file mode 100644
+> > index 0000000..54d07c8
+> > --- /dev/null
+> > +++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+> > @@ -0,0 +1,131 @@
+> >
+> Any harm in merging this into the sheevaplug-setup code, like the openrd 
+> code?
+> 
+> http://git.marvell.com/?p=orion.git;a=commit;h=b2fdb5660fccc060e47658baad8911a963397ced
+> 
 
-Hi,
+No harm as such. but i think having separate setup files will be a
+cleaner approach, instead of adding more if(machine_is_<>) statements.
 
-I am trying to have a better understanding of the issues with the
-various types of caches used on ARM, and I came to a question I feel is
-really stupid, but can not find the answer myself.
+Looks like openrd base/client are same boards with client having an
+extra ethernet port. sheevaplug and guruplug are two different boards
+(pcb's) having different gpio settings, peripherals, etc.
 
-As I understood, the VIVT cache has the following issues:
-- issue #1; two processes may use the same virtual address for different
-physical addresses, but will share the same cache line and see memory
-corruption if no precaution is taken;
-- issue #2; two processes may use different virtual addresses for the
-same physical address (shared mapping), but will use different cache
-lines, causing all sorts of incoherence if no precaution is taken;
-- issue #3; the same process may use different virtual addresses for the
-same physical address (same shared mapping mapped several time in the
-same process virtual memory), basically almost the same issue as issue #2.
+-siddarth
 
-The Linux kernel, solves issue #1 and #2 by flushing the cache at every
-context switch, and issue #3 by remapping the multiply mapped shared
-mapping in "uncacheable, buffered only" mode if write buffer is
-sufficiently well behaved, or "uncacheable, unbuffered" mode if write
-buffer is buggy.
-
-Now, if we look at VIPT, aliasing caches:
-- the physical tagging solves issue #1 automatically,
-- the cache colouring technique used in arch_get_unmapped_area solves
-issue #2 and #3 by ensuring that the areas using the same physical
-address will end up using the same cache lines, and avoid aliases "by
-construction".
-
-VIPT non-aliasing caches have none of the three issues.
-
-First question: did I get it right?
-Second question: do issue #1, #2 and #3 have official non-ambiguous names?
-Now, the stupid question: why not using the cache colouring technique
-used for VIPT caches to solve issue #3 with VIVT caches?
-
-I have thought about several answers:
-- there is a technical reason which will make the cache colouring
-technique fail with VIVT;
-- the reason is purely historical, the two solutions were implemented at
-different times;
-- the issue #3 is a corner case and the cache colouring technique
-induces a potential waste of virtual address space, so the trade off is
-not interesting.
-
-Thanks in advance for your answer.
-
--- 
-					    Gilles.
+> Cheers
+> 
