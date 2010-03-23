@@ -1,32 +1,25 @@
-From: ibr@radix50.net (Baurzhan Ismagulov)
-Date: Tue, 23 Mar 2010 14:21:09 +0100
-Subject: [PATCH] Voipac PXA270
-In-Reply-To: <f17812d71003211910u1ae21bc4ofea3bb8b61b41e45@mail.gmail.com>
-References: <201003100247.27059.marek.vasut@gmail.com>
-	<201003101237.26819.marek.vasut@gmail.com>
-	<20100310133529.GK28972@buzzloop.caiaq.de>
-	<201003101620.17501.marek.vasut@gmail.com>
-	<f17812d71003211910u1ae21bc4ofea3bb8b61b41e45@mail.gmail.com>
-Message-ID: <20100323132109.GD9581@radix50.net>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 23 Mar 2010 13:34:16 +0000
+Subject: Query about Float Point Operation
+References: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+Message-ID: <yw1xpr2v5fhj.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 22, 2010 at 10:10:52AM +0800, Eric Miao wrote:
-> On Wed, Mar 10, 2010 at 11:20 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Yes, they are used in the PCMCIA driver. And I'd rather avoid having GPIO
-> > definitions scattered across multiple files.
-> 
-> Mmm... that's because PCMCIA driver is not abstracted well enough to
-> allow all platform specific stuffs back into board file. Once that's done,
-> these shared definitions could be avoided to live in a separate header
-> file.
+914059751 at qq.com writes:
 
-What is the recommended method to abstract that? For example, I have two
-boards with different GPIO pins assigned to mean certain external
-signals. I also ended up with GPIO definitions in a header, which is
-used by the driver, and I'd like to clean this up.
+> Hi , guys
+> I want to do float point operations in kernel like the following,
+>
+> int foo(double d)
+> {
+> return (int)d*d;
+> }
+>
+> May I ask any possibility of use float point operation in the kernel space?
 
-Thanks in advance,
+Floating-point in the kernel is not allowed.
+
 -- 
-Baurzhan Ismagulov
-http://www.kz-easy.com/
+M?ns Rullg?rd
+mans at mansr.com
