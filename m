@@ -1,36 +1,40 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 23 Mar 2010 12:34:23 -0500
-Subject: [PATCH v2 0/5] Mailbox: Fix some issues in mailbox module
-In-Reply-To: <496565EC904933469F292DDA3F1663E602CA2B9B29@dlee06.ent.ti.com>
-References: <496565EC904933469F292DDA3F1663E602CA2B9B29@dlee06.ent.ti.com>
-Message-ID: <4BA8FB9F.8080709@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 23 Mar 2010 12:48:06 -0400 (EDT)
+Subject: [PATCH] Kirkwood: Marvell GuruPlug support
+In-Reply-To: <20100323132331.GT13429@chipmunk>
+References: <1269250100-31824-1-git-send-email-gores@marvell.com>
+	<i13k77-9sp.ln1@chipmunk.wormnet.eu>
+	<1269348203.23313.198.camel@pe-dt434>
+	<20100323132331.GT13429@chipmunk>
+Message-ID: <alpine.LFD.2.00.1003231247350.31128@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/18/2010 1:06 AM, Guzman Lugo, Fernando wrote:
->  From 79f2b477b19c49b36c51e8589c0a3d52ecd9ec99 Mon Sep 17 00:00:00 2001
-> From: Fernando Guzman Lugo<x0095840@ti.com>
-> Date: Thu, 18 Feb 2010 01:06:34 -0600
-> Subject: [PATCH] Mailbox: Fix some issues in mailbox module
->
-> This set of patches fix some issue I found when I was working
-> with mailbox module.
->
-> Fernando Guzman Lugo (4):
->    Mailbox: free mailbox interrupt before freeing blk queue
->    Mailbox: flush pending deferred works before freeing blk queue
->    Mailbox: Check valid registered callback before calling
->    Mailbox: disable mailbox interrupt when request queue
->
-> Hiroshi DOYU (1):
->    Mailbox: new mutext lock for h/w mailbox configuration
->
->   arch/arm/plat-omap/mailbox.c |   29 ++++++++++++++++++++---------
->   1 files changed, 20 insertions(+), 9 deletions(-)
->
+On Tue, 23 Mar 2010, Alexander Clouter wrote:
 
-Cherry-picked until 2.6.34 rebase is available.
+> Hi,
+> 
+> * Siddarth Gore <gores@marvell.com> [2010-03-23 18:13:23+0530]:
+> >
+> > On Mon, 2010-03-22 at 05:05 -0700, Alexander Clouter wrote:
+> >
+> > > Any harm in merging this into the sheevaplug-setup code, like the openrd 
+> > > code?
+> > > 
+> > > http://git.marvell.com/?p=orion.git;a=commit;h=b2fdb5660fccc060e47658baad8911a963397ced
+> > 
+> > No harm as such. but i think having separate setup files will be a
+> > cleaner approach, instead of adding more if(machine_is_<>) statements.
+> > 
+> > Looks like openrd base/client are same boards with client having an
+> > extra ethernet port. sheevaplug and guruplug are two different boards
+> > (pcb's) having different gpio settings, peripherals, etc.
+> > 
+> Fair enough, I thought (with the exception of the shameful removal of 
+> the onboard questionable serial/jtag) the boards were identical, just 
+> with extra USB/NIC ports added.
 
-Pushed to dspbridge.
+"questionable" ??
 
-- omar
+
+Nicolas
