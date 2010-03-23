@@ -1,22 +1,68 @@
-From: 914059751@qq.com (=?gbk?B?uvrR7sr3?=)
-Date: Tue, 23 Mar 2010 20:57:55 +0800
-Subject: Query about Float Point Operation
-Message-ID: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Tue, 23 Mar 2010 14:15:54 +0100
+Subject: ARM caches variants.
+In-Reply-To: <1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
+References: <4BA8B672.7030508@xenomai.org>
+	<1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <4BA8BF0A.6030907@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi , guys
-I want to do float point operations in kernel like the following,
+Catalin Marinas wrote:
+> On Tue, 2010-03-23 at 12:39 +0000, Gilles Chanteperdrix wrote:
+>> As I understood, the VIVT cache has the following issues:
+>> - issue #1; two processes may use the same virtual address for different
+>> physical addresses, but will share the same cache line and see memory
+>> corruption if no precaution is taken;
+>> - issue #2; two processes may use different virtual addresses for the
+>> same physical address (shared mapping), but will use different cache
+>> lines, causing all sorts of incoherence if no precaution is taken;
+>> - issue #3; the same process may use different virtual addresses for the
+>> same physical address (same shared mapping mapped several time in the
+>> same process virtual memory), basically almost the same issue as issue #2.
+> [...]
+>> Now, if we look at VIPT, aliasing caches:
+>> - the physical tagging solves issue #1 automatically,
+>> - the cache colouring technique used in arch_get_unmapped_area solves
+>> issue #2 and #3 by ensuring that the areas using the same physical
+>> address will end up using the same cache lines, and avoid aliases "by
+>> construction".
+> [...]
+>> First question: did I get it right?
+> 
+> Yes.
+> 
+>> Second question: do issue #1, #2 and #3 have official non-ambiguous names?
+> 
+> I don't think there are any official names. You could say cache aliasing
+> though not sure it covers everything.
+> 
+>> Now, the stupid question: why not using the cache colouring technique
+>> used for VIPT caches to solve issue #3 with VIVT caches?
+> 
+> Because with aliasing VIPT it is guaranteed that if a virtual address
+> has the same offset in a 16KB block (i.e. the same colour - there are
+> only 4 colours given by bits 13 and 12 of the virtual address), you get
+> the same cache line allocated for a given physical address. The tag of a
+> cache line is given by bits 31..14 of the physical address.
+> 
+> With VIVT, the cache tags are not aware of the physical address, hence
+> you can have 2^20 colours (bits 31..12 of the virtual address). You
+> would need to map a physical address at the same virtual address in all
+> applications sharing it (and you may end up with uClinux :)).
 
-int foo(double d)
-{
+Ok. I do not get it. Let us do it in slow motion: as I understand, the
+problem with issue #2 and #3 is not really about the tag, but about two
+different virtual addresses ending up using different cache lines,
+whatever the tag. By using cache colouring, can not we ensure that they
+end up in the same cache line and simply evict each other because they
+do not have the same tag?
 
-return (int)d*d;
+In other word, is not the cache line used by virtual address addr:
+(addr % cache size) / (cache line size)
+?
 
-}
+Or is it precisely what armv6 guarantees?
 
-while compiling output error msg like following:
-cannt find eabi_dmul  balabla??????
-
-May I ask any possibility of use float point operation in the kernel space?
-Any hints/doc would be appreciated!
+-- 
+					    Gilles.
