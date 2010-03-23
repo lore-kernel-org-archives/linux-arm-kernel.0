@@ -1,27 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Mar 2010 21:33:45 +0000
-Subject: [PATCH 1/5] ARM: Use lazy cache flushing on ARMv7 SMP systems
-In-Reply-To: <20100322151939.6353.7646.stgit@e102109-lin.cambridge.arm.com>
-References: <20100322151729.6353.79984.stgit@e102109-lin.cambridge.arm.com>
-	<20100322151939.6353.7646.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100323213345.GH19572@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 23 Mar 2010 23:39:52 +0000
+Subject: ARM caches variants.
+In-Reply-To: <1269355564.13209.56.camel@e102109-lin.cambridge.arm.com>
+References: <4BA8B672.7030508@xenomai.org>
+	<1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
+	<4BA8BF0A.6030907@xenomai.org>
+	<1269351756.13209.34.camel@e102109-lin.cambridge.arm.com>
+	<4BA8C932.6060701@xenomai.org>
+	<1269354835.13209.45.camel@e102109-lin.cambridge.arm.com>
+	<4BA8D2BB.9080504@xenomai.org>
+	<1269355564.13209.56.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100323233952.GF20130@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 22, 2010 at 03:19:39PM +0000, Catalin Marinas wrote:
-> ARMv7 processors like Cortex-A9 broadcast the cache maintenance
-> operations in hardware. This patch allows the
-> flush_dcache_page/update_mmu_cache pair to work in lazy flushing mode
-> similar to the UP case.
+Catalin Marinas wrote:
+> > > Even if you have a 1-way associative cache (some processors allow the
+> > > disabling of the other 3 ways if you want to try), the tag stored with
+> > > the cache line is different between different VAs on a VIVT cache.
+> > >
+> > > So with two different VAs mapping the same PA, if a VA0 access allocates
+> > > the cache line and VA1 would find the same cache line via the index
+> > > calculation, it would get a cache miss because the tags for VA0 and VA1
+> > > do not match.
+> > 
+> > But if we assume that it evicts the contents of VA0 and allocates the
+> > cache for VA1 when VA1 is accessed, the system would just work. 
+> 
+> That's correct, for this particular case it should work (though I think
+> fully associative caches are not that common).
 
-Didn't Ben point out that there's a race with the lazy dcache flushing
-on SMP platforms?
+I think you might have meant 1-way caches, or running then with 1-way,
+is never done.  But if you did have 1-way, then it might work. :-)
 
-> The standard ICIALLU and BPIALL operations are not automatically
-> broadcast to the other CPUs in an MP system. The patch adds the Inner
-> Shareable variants, ICIALLUIS and BPIALLIS, if ARMv7 and SMP.
+With 2-way or more, all bets are off because you don't know which way
+will be evicted.
 
-Jargon overload.  (Just because it's in a specification does not mean
-the names are a good idea.)
-
-In any case, this should probably be two separate patches.
+-- Jamie
