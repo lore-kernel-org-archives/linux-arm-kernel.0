@@ -1,58 +1,54 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Mon, 22 Mar 2010 23:28:38 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
-In-Reply-To: <20100322192748.GK2040@bluebox.local>
-References: <20100322191900.GF2040@bluebox.local>
-	<20100322192748.GK2040@bluebox.local>
-Message-ID: <20100322222837.GB2547@local>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Mar 2010 17:09:28 -0700
+Subject: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608703045F314F@dbde02.ent.ti.com>
+References: <20100320003605.GA11448@atomide.com>
+	<20100320004746.GB11448@atomide.com>
+	<20100320024827.GC11448@atomide.com>
+	<20100320030239.GD11448@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC35608703045F314F@dbde02.ent.ti.com>
+Message-ID: <20100323000927.GX11448@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 22, 2010 at 08:27:49PM +0100, Hans J. Koch wrote:
-> Map the IO ranges of TCC8xxx peripherals.
+* Pandita, Vikram <vikram.pandita@ti.com> [100320 15:56]:
 > 
-> Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
-> ---
->  arch/arm/mach-tcc8k/Makefile        |    2 +-
->  arch/arm/mach-tcc8k/io.c            |   82 +++++++++++++++++++++++++++++++++++
->  arch/arm/plat-tcc/include/mach/io.h |   53 ++++++++++++++++++++++
->  3 files changed, 136 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-tcc8k/io.c
->  create mode 100644 arch/arm/plat-tcc/include/mach/io.h
 > 
-> diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
-> index 5673868..09552e2 100644
-> --- a/arch/arm/mach-tcc8k/Makefile
-> +++ b/arch/arm/mach-tcc8k/Makefile
-> @@ -3,5 +3,5 @@
->  #
->  
->  # Common support
-> -obj-y += clock.o irq.o time.o
-> +obj-y += clock.o irq.o time.o io.o
->  
-> diff --git a/arch/arm/mach-tcc8k/io.c b/arch/arm/mach-tcc8k/io.c
-> new file mode 100644
-> index 0000000..1187fca
-> --- /dev/null
-> +++ b/arch/arm/mach-tcc8k/io.c
-[...]
-> +
-> +/*
-> + * Maps common IO regions for tcc8k.
-> + *
-> + */
-> +void __init tcc8k_map_common_io(void)
-> +{
-> +	iotable_init(tcc8k_io_desc, ARRAY_SIZE(tcc8k_io_desc));
-> +	local_flush_tlb_all();
-> +	flush_cache_all();
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Friday, March 19, 2010 10:03 PM
+> > To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> > Cc: Pais, Allen; Pandita, Vikram
+> > Subject: Re: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+> > 
+> > * Tony Lindgren <tony@atomide.com> [100319 19:43]:
+> > > * Tony Lindgren <tony@atomide.com> [100319 17:42]:
+> > > > * Tony Lindgren <tony@atomide.com> [100319 17:30]:
+> > > > > Hi all,
+> > > > >
+> > > > > Got a zoom3 finally! This is needed to boot with DEBUG_LL +
+> > earlyprintk.
+> > > >
+> > > > And of course it won't compile because of a missing #.
+> > > > Here's the working version.
+> > >
+> > > One more time. Looks like what I posted is not enough, we
+> > > also need to make sure the mapping does not overlap with
+> > > other regions. So basically we can't use 0xfb000000 like
+> > > we currently have, let's use 0xf7000000 instead unless
+> > > somebody has better ideas.
+> > 
+> > And now 0xf7000000 is in vmalloc area.. Needs to be looked
+> > more.
+> 
+> On internal TI trees, we do have 0xfa400000 working.
+> Guess that is the magic number.
 
-Reviewing my own patch...
-These last to "flush" lines are probably crap, at least unneeded.
-I thought I threw them out, but somehow they crept in again.
-Will test and fix.
+Great and thanks for pointing out that hole in the mapping.
 
-Hans
+Here's an updated version of this patch using 0xfa400000. Few
+other things had to be updated accordingly.
 
-> +}
+Regards,
+
+Tony
