@@ -1,23 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Mar 2010 11:08:20 +0000
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 24 Mar 2010 12:11:33 +0100
 Subject: Device probe order (i2c regulator vs. platform device)
-In-Reply-To: <005401cacb41$821d46f0$8657d4d0$%szyprowski@samsung.com>
+In-Reply-To: <4BA9D93E.50705@warmcat.com>
 References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
-	<20100324102144.GA21935@rakim.wolfsonmicro.main>
-	<005401cacb41$821d46f0$8657d4d0$%szyprowski@samsung.com>
-Message-ID: <20100324110820.GA5831@opensource.wolfsonmicro.com>
+	<4BA9D93E.50705@warmcat.com>
+Message-ID: <005501cacb42$c5bbcde0$513369a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 24, 2010 at 12:02:30PM +0100, Marek Szyprowski wrote:
+Hello,
 
-> Ok, I get this idea, but this requires to move the i2c bus initialization
-> also to subsys_initcall. We use generic i2c-gpio driver. I suspect there
-> might be some unpredicted consequences on some other systems if we push
-> the patch that changes it init to subsys_initcall. I have no idea if the
-> gpiolib calls are available on all systems during the subsys_initcall.
+On Wednesday, March 24, 2010 10:20 AM Andy Green wrote:
 
-It's been OK for other I2C controllers.  GPIOs are another thing I'd
-expect to see available early since they're in a similar position where
-lots of other devices end up needing them in their probe so it'd seem
-surprising if there were a problem with bringing it up early.
+> On 03/24/10 07:10, Somebody in the thread at some point said:
+> > Hello,
+> >
+> > I've encountered a problem with regulator framework and the device
+> > probe order. In my system there is a pmic chip connected thought i2c
+> > bus and a platform device (let's call it A) that depends on the
+> > regulator device (for proper probing pmic chip must enable voltage to
+> > the device A). In the current configuration the i2c driver is also a
+> > platform device. However during the system initialization the device
+> > A is probed before the i2c driver would register pmic chip and its
+> > regulators.
+> >
+> > How I can delay probing the device A to the moment when the regulator
+> > device will be available in the system? Is there any generic was of
+> > changing the device probe order?
+> 
+> Delaying registering devices is only half the problem.  You must also
+> correct these device's parent dev to be the PMU's.
+>
+> Otherwise your suspend and resume ordering turns to crap and you will
+> immediately be in Hell, for example the PMIC may go down taking away
+> power from the SD Card before you finished talking to it.
+> 
+> With correct device parent ordering, then children are guaranteed to be
+> suspended before the parent, it means the PMIC won't go down until all
+> these guys registered as dependent on it have nicely gone down.
+
+That's true.
+ 
+> What I have been doing is adding a platform callback in the pmic
+> platform_data which is called at the end of pmic probe.
+> 
+> In the machine file, in the callback I then register everything that
+> relies on PMIC power arrangements, and correct the device parent at to
+> be the PMIC at the same time.
+> 
+> It would be very good is this was regularized somehow into a standard
+> API because it's absolutely a requirement for many boards that their
+> devices ARE dependent on PMU as a parent.
+
+Right, this is a really common case. Maybe this callback could be added
+to the regulator framework as well?
+
+On the other hand a more generic solution might be needed, because besides
+the PMU there might be some other dependences between various devices that
+not possible to be ensured in the current framework (I'm thinking of v4l2
+subdevs that link 2 separate devices together, but currently are used only
+with i2c clients).
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
