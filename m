@@ -1,29 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Mar 2010 23:07:29 +0000
-Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
-In-Reply-To: <1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-Message-ID: <20100324230729.GA21359@n2100.arm.linux.org.uk>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 24 Mar 2010 16:30:48 -0700
+Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
+In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A0391EEB9@EXDCVYMBSTM006.EQ1STM.local>
+References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
+	<e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
+	<e9c3a7c21003241501x1f1ed857pcaaaf8ea8dc563ec@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A0391EEB9@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <e9c3a7c21003241630u5c4c1f45qc0608c124a062350@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 24, 2010 at 08:04:58PM -0300, Marcelo Roberto Jimenez wrote:
-> -	debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
-> -			(state->csc_mask==0)?"<NONE> ":"",
-> -			(state->csc_mask&SS_DETECT)?"DETECT ":"",
-> -			(state->csc_mask&SS_READY)?"READY ":"",
-> -			(state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
-> -			(state->csc_mask&SS_BATWARN)?"BATWARN ":"",
-> -			(state->csc_mask&SS_STSCHG)?"STSCHG ":"",
-> -			(state->flags==0)?"<NONE> ":"",
-> -			(state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
-> -			(state->flags&SS_IOCARD)?"IOCARD ":"",
-> -			(state->flags&SS_RESET)?"RESET ":"",
-> -			(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
-> -			(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
-> +	debug(skt, 2,	"mask: %s%s%s%s%s%s "
-> +			"flags: %s%s%s%s%s%s Vcc %d Vpp %d irq %d\n",
+On Wed, Mar 24, 2010 at 3:13 PM, Linus WALLEIJ
+<linus.walleij@stericsson.com> wrote:
+> [Dan]
+>
+>> What are your semantics for keeping the transaction information alive
+>> until it gets consumed. ?Currently the dma_ctrl_flags have the
+>> DMA_CTRL_ACK bit to specify that the descriptor not be
+>> recycled/destroyed until the client has a chance to attach a dependent
+>> operation. ?Seems you need something similar to indicate that the
+>> residue information not be destroyed until it is consumed. ?In other
+>> words how does a client guarantee that the engine provides the
+>> information it needs?
+>
+> Well exactly to avoid that kind of trouble I STOP (or PAUSE),
+> get numer of bytes left, then terminate in that order. This
+> keeps the descriptor.
 
-NAK.  Breaking kernel messages across multiple lines makes them impossible
-to grep for.  checkpatch.pl is wrong on this one.
+But doesn't this assume you win the race with the engine completing
+and cleaning up the descriptor before the 'stop' takes effect?
+
+> Perhaps it's better to keep the two functions _pause() and
+> _get_residue() and indicate that device_terminate_all()
+> may destroy the state.
+
+The configuration issues will always be arch specific I grant you
+that, but I think we can define top level "operation query" and
+"channel control" apis in a generic/extensible fashion.  Something
+like:
+
+1/ Change ->device_terminate_all() into ->device_control():
+
+enum {
+	DMA_TERMINATE_ALL, /* legacy semantics */
+	DMA_PAUSE, /* your new primecell command semantics */
+} dma_crtl;
+
+int (*device_control)(struct dma_chan *chan, enum dma_ctrl cmd);
+
+
+2/ Change device_is_tx_complete to device_tx_status along the lines of
+what Guennadi and I talked about.
+
+--
+Dan
