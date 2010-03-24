@@ -1,13 +1,11 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 24 Mar 2010 14:08:50 -0700
+Date: Wed, 24 Mar 2010 14:25:35 -0700
 Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
 In-Reply-To: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
 References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
+Message-ID: <e9c3a7c21003241425m595f983fg520c9cace7ddce91@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-[ catching up on the patch backlog ]
 
 On Mon, Mar 8, 2010 at 6:52 AM, Linus Walleij
 <linus.walleij@stericsson.com> wrote:
@@ -58,28 +56,14 @@ On Mon, Mar 8, 2010 at 6:52 AM, Linus Walleij
 > + ? ? ? dma_addr_t addr;
 > + ? ? ? u8 addr_width:4;
 > +};
-> +
-> +/*
-> + * The following are extensions to the DMA engine framework
-> + * that are needed to use the engine with PrimeCells. We need
-> + * to configure devices and be able to stop transfers and
-> + * retrieve the number of bytes left on the channel for some
-> + * RX transfers when we don't know where and how the transfer
-> + * will occur.
-> + */
-> +void dma_set_ambaconfig(struct dma_chan *chan,
-> + ? ? ? ? ? ? ? ? ? ? ? struct amba_dma_channel_config *config);
-> +void dma_stop_channel(struct dma_chan *chan);
-> +u32 dma_get_channel_bytes_left(struct dma_chan *chan);
 
-I question if these last two can be generically promoted to dmaengine?
- I already discussed a potential dma_get_channel_bytes() synonym with
-Guennadi [1] (wrap ->device_is_tx_complete()), and dma_stop_channel()
-looks like it could wrap ->device_terminate_all().
+The usages of this seem to be constant data based off something that
+comes from the platform data or 'slave' device.  Could this constant
+data just be munged/merged into the platform data and we can look it
+up at runtime via chan->private.  Or am I oversimplifying?
 
-Thoughts?
+None the of the usages seem to justify forking from core dmaengine at
+this point (I reserve the right to be proven wrong later).
 
 --
 Dan
-
-[1]: http://marc.info/?l=linux-kernel&m=126324913710421&w=2
