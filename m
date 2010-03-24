@@ -1,108 +1,42 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Wed, 24 Mar 2010 18:30:52 +0530
-Subject: [PATCH] mmc: fix race condition between dma and omap_hsmmc callback
-Message-ID: <618f0c911003240600m1a38935av68f31a232ed8b8ad@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Mar 2010 13:11:31 +0000
+Subject: Device probe order (i2c regulator vs. platform device)
+In-Reply-To: <4BAA0AA6.80902@warmcat.com>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
+	<4BA9D93E.50705@warmcat.com>
+	<005501cacb42$c5bbcde0$513369a0$%szyprowski@samsung.com>
+	<4BAA0AA6.80902@warmcat.com>
+Message-ID: <20100324131131.GB26453@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses the possible race condition between the dma
-callback and hsmmc callback.
-All the 'post data transfer' cleanup activities are now done in the
-MMC TC handler.
-The schedule_timeout in omap_hsmmc_start_dma_transfer is hence not
-needed (which, incidentally,
-was also throwing a "schedule while atomic" warning when executed).
-Tested on OMAP4430 SDP.
+On Wed, Mar 24, 2010 at 12:50:46PM +0000, Andy Green wrote:
+> On 03/24/10 11:11, Somebody in the thread at some point said:
+> 
+> Hi -
+> 
+> >Right, this is a really common case. Maybe this callback could be added
+> >to the regulator framework as well?
 
-CC: Adrian Hunter <adrian.hunter@nokia.com>
-CC: Madhusudhan C <madhu.cr@ti.com>
-CC: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Venkatraman S <svenkatr@ti.com>
----
- drivers/mmc/host/omap_hsmmc.c |   40 ++++++++++++++++------------------------
- 1 files changed, 16 insertions(+), 24 deletions(-)
+Looks like there's somethin up with the quoting configuration in your
+mail client.  Apart from the bit where it's removing the name of the
+person you're quoting it appears to have dropped a level of indentation
+off the above quote, which is from you rather than me.
 
-The previous discussion about this patch is here
-https://patchwork.kernel.org/patch/82907/
-As requested, this is now posted as a separate patch instead of
-clubbing with another feature.
+> >On the other hand a more generic solution might be needed, because besides
+> >the PMU there might be some other dependences between various devices that
+> >not possible to be ensured in the current framework (I'm thinking of v4l2
+> >subdevs that link 2 separate devices together, but currently are used only
+> >with i2c clients).
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 83f0aff..9a70b36 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1046,8 +1046,18 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+> Right, it's a generic issue with needing to delay other device
+> registration until something else has completed probe, not just PMU.
+> PMU is just the most common parent.
 
- 	if (end_cmd || ((status & CC) && host->cmd))
- 		omap_hsmmc_cmd_done(host, host->cmd);
--	if ((end_trans || (status & TC)) && host->mrq)
-+	if ((end_trans || (status & TC)) && host->mrq) {
-+		if (host->dma_ch != -1) {
-+			omap_free_dma(host->dma_ch);
-+			host->dma_ch = -1;
-+			/*
-+			 * Callback run in interrupt context.
-+			 * mutex_unlock will throw a kernel warning if used.
-+			 */
-+			up(&host->sem);
-+		}
- 		omap_hsmmc_xfer_done(host, data);
-+	}
+> A callback is needed after probe() returned without error somehow.
 
- 	spin_unlock(&host->irq_lock);
-
-@@ -1267,13 +1277,6 @@ static void omap_hsmmc_dma_cb(int lch, u16
-ch_status, void *data)
- 		return;
- 	}
-
--	omap_free_dma(host->dma_ch);
--	host->dma_ch = -1;
--	/*
--	 * DMA Callback: run in interrupt context.
--	 * mutex_unlock will throw a kernel warning if used.
--	 */
--	up(&host->sem);
- }
-
- /*
-@@ -1282,7 +1285,7 @@ static void omap_hsmmc_dma_cb(int lch, u16
-ch_status, void *data)
- static int omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host,
- 					struct mmc_request *req)
- {
--	int dma_ch = 0, ret = 0, err = 1, i;
-+	int dma_ch = 0, ret = 0, i;
- 	struct mmc_data *data = req->data;
-
- 	/* Sanity check: all the SG entries must be aligned by block size. */
-@@ -1300,22 +1303,11 @@ static int
-omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host,
- 		return -EINVAL;
-
- 	/*
--	 * If for some reason the DMA transfer is still active,
--	 * we wait for timeout period and free the dma
-+	 * Can't process the request if the previous
-+	 * request is still active
- 	 */
--	if (host->dma_ch != -1) {
--		set_current_state(TASK_UNINTERRUPTIBLE);
--		schedule_timeout(100);
--		if (down_trylock(&host->sem)) {
--			omap_free_dma(host->dma_ch);
--			host->dma_ch = -1;
--			up(&host->sem);
--			return err;
--		}
--	} else {
--		if (down_trylock(&host->sem))
--			return err;
--	}
-+	if (down_trylock(&host->sem))
-+			return -EBUSY;
-
- 	ret = omap_request_dma(omap_hsmmc_get_dma_sync_dev(host, data),
- 			       "MMC/SD", omap_hsmmc_dma_cb, host, &dma_ch);
--- 
-1.6.3.3
+I rather suspect that the approach you suggest would have some usability
+issues, especially on PCs which don't by and by large have custom board
+code at all.  Something more data driven, or handled more in drivers, is
+probably in order if this does get done.  Anyway, this should probably
+be discussed elsewhere.
