@@ -1,48 +1,41 @@
-From: andy@warmcat.com (Andy Green)
-Date: Wed, 24 Mar 2010 09:19:58 +0000
-Subject: Device probe order (i2c regulator vs. platform device)
-In-Reply-To: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
-References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
-Message-ID: <4BA9D93E.50705@warmcat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Mar 2010 09:33:05 +0000
+Subject: ARM caches variants.
+In-Reply-To: <20100323233952.GF20130@shareable.org>
+References: <4BA8B672.7030508@xenomai.org>
+	<1269348826.13209.10.camel@e102109-lin.cambridge.arm.com>
+	<4BA8BF0A.6030907@xenomai.org>
+	<1269351756.13209.34.camel@e102109-lin.cambridge.arm.com>
+	<4BA8C932.6060701@xenomai.org>
+	<1269354835.13209.45.camel@e102109-lin.cambridge.arm.com>
+	<4BA8D2BB.9080504@xenomai.org>
+	<1269355564.13209.56.camel@e102109-lin.cambridge.arm.com>
+	<20100323233952.GF20130@shareable.org>
+Message-ID: <1269423185.29073.2.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/10 07:10, Somebody in the thread at some point said:
-> Hello,
->
-> I've encountered a problem with regulator framework and the device
-> probe order. In my system there is a pmic chip connected thought i2c
-> bus and a platform device (let's call it A) that depends on the
-> regulator device (for proper probing pmic chip must enable voltage to
-> the device A). In the current configuration the i2c driver is also a
-> platform device. However during the system initialization the device
-> A is probed before the i2c driver would register pmic chip and its
-> regulators.
->
-> How I can delay probing the device A to the moment when the regulator
-> device will be available in the system? Is there any generic was of
-> changing the device probe order?
+On Tue, 2010-03-23 at 23:39 +0000, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > > > Even if you have a 1-way associative cache (some processors allow the
+> > > > disabling of the other 3 ways if you want to try), the tag stored with
+> > > > the cache line is different between different VAs on a VIVT cache.
+> > > >
+> > > > So with two different VAs mapping the same PA, if a VA0 access allocates
+> > > > the cache line and VA1 would find the same cache line via the index
+> > > > calculation, it would get a cache miss because the tags for VA0 and VA1
+> > > > do not match.
+> > >
+> > > But if we assume that it evicts the contents of VA0 and allocates the
+> > > cache for VA1 when VA1 is accessed, the system would just work.
+> >
+> > That's correct, for this particular case it should work (though I think
+> > fully associative caches are not that common).
+> 
+> I think you might have meant 1-way caches
 
-Delaying registering devices is only half the problem.  You must also 
-correct these device's parent dev to be the PMU's.
+Yes, you are right - 1-way  caches (I think they are also called
+directly mapped caches, not sure).
 
-Otherwise your suspend and resume ordering turns to crap and you will 
-immediately be in Hell, for example the PMIC may go down taking away 
-power from the SD Card before you finished talking to it.
-
-With correct device parent ordering, then children are guaranteed to be 
-suspended before the parent, it means the PMIC won't go down until all 
-these guys registered as dependent on it have nicely gone down.
-
-What I have been doing is adding a platform callback in the pmic 
-platform_data which is called at the end of pmic probe.
-
-In the machine file, in the callback I then register everything that 
-relies on PMIC power arrangements, and correct the device parent at to 
-be the PMIC at the same time.
-
-It would be very good is this was regularized somehow into a standard 
-API because it's absolutely a requirement for many boards that their 
-devices ARE dependent on PMU as a parent.
-
--Andy
+-- 
+Catalin
