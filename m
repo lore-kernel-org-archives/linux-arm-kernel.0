@@ -1,26 +1,18 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Wed, 24 Mar 2010 14:44:12 +0100
-Subject: [PATCH] KS8695: enable console
-Message-ID: <4BAA172C.2070404@visionsystems.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Mar 2010 13:51:02 +0000
+Subject: AACI broken with commit 29a4f2d3
+Message-ID: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KS8695: enable console
+Hi,
 
-Add add_preferred_console() to ks8695_console_init() to
-enable the console
+The commit mentioned above adds a writel() to the AC97_POWERDOWN
+register which is half-word aligned and causing unaligned exceptions on
+a Cortex-A8. Is this register 16-bit only and we should use a writew()
+instead?
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+Thanks.
 
-Index: linux-2.6/drivers/serial/serial_ks8695.c
-===================================================================
---- linux-2.6.orig/drivers/serial/serial_ks8695.c
-+++ linux-2.6/drivers/serial/serial_ks8695.c
-@@ -650,6 +650,7 @@ static struct console ks8695_console = {
- 
- static int __init ks8695_console_init(void)
- {
-+	add_preferred_console(SERIAL_KS8695_DEVNAME, 0, NULL);
- 	register_console(&ks8695_console);
- 	return 0;
- }
+-- 
+Catalin
