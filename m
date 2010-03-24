@@ -1,22 +1,31 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 24 Mar 2010 16:03:02 -0700
-Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
-In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A0391EEB6@EXDCVYMBSTM006.EQ1STM.local>
-References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
-	<e9c3a7c21003241425m595f983fg520c9cace7ddce91@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A0391EEB6@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <e9c3a7c21003241603j4e5b948asfdecbb00f17bedd9@mail.gmail.com>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Roberto Jimenez)
+Date: Wed, 24 Mar 2010 20:04:57 -0300
+Subject: [PATCH 1/2] ARM: pcmcia: Fix for building DEBUG with sa11xx_base.c as
+	a module.
+Message-ID: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 24, 2010 at 3:08 PM, Linus WALLEIJ
-<linus.walleij@stericsson.com> wrote:
-> Do you prefer this latter solution? I'm OK with either, I just
-> think the runtime dma_set_ambaconfig() is a bit more elegant.
+This patch fixes a compilation issue when compiling PCMCIA SA1100
+support as a module with PCMCIA_DEBUG enabled. The symbol
+soc_pcmcia_debug was not beeing exported.
 
-I agree, too many hoops to jump through to shoehorn it into the
-current api.  Let's go with your current amba specific version for
-now.
+Signed-off-by: Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+---
+ drivers/pcmcia/soc_common.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
---
-Dan
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 6f1a86b..fd4c25a 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -65,6 +65,7 @@ void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
+ 		va_end(args);
+ 	}
+ }
++EXPORT_SYMBOL(soc_pcmcia_debug);
+ 
+ #endif
+ 
+-- 
+1.7.0.3
