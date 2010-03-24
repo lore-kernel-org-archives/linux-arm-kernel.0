@@ -1,31 +1,26 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Wed, 24 Mar 2010 14:32:18 +0300
-Subject: [PATCH 3/3] imx31: add rtc device on litekit board.
-In-Reply-To: <1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-References: <1269430338-22690-1-git-send-email-vzapolskiy@gmail.com>
-	<1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <1269430338-22690-3-git-send-email-vzapolskiy@gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Wed, 24 Mar 2010 12:39:19 +0100
+Subject: [PATCH] Samsung SoCs: CPU detection support (v4)
+In-Reply-To: <20100324070943.GA6779@july>
+References: <20100324070943.GA6779@july>
+Message-ID: <f333d3ab46b3a4d82c3406199326fc81@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SoC build-in RTC device on litekit board.
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx3/mx31lite-db.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Wed, 24 Mar 2010 16:09:43 +0900, Kyungmin Park <kmpark@infradead.org>
+wrote:
+> Store the CPU ID to cpu_id variable and use it to detect CPU
+> 
+> On S3C64XX, Some pheripherals such as OneNAND have different
+configuration
+> and handle it differently to do this it needs to detect CPU ID.
+> 
+> Also S5PC1XX is supported.
 
-diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-index 0201683..466996e 100644
---- a/arch/arm/mach-mx3/mx31lite-db.c
-+++ b/arch/arm/mach-mx3/mx31lite-db.c
-@@ -207,5 +207,6 @@ void __init mx31lite_db_init(void)
- 	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
- 	platform_device_register(&litekit_led_device);
- 	mxc_register_device(&imx_wdt_device0, NULL);
-+	mxc_register_device(&imx_rtc_device0, NULL);
- }
- 
+For the sake of completeness, would you consider adding support for
+s5p6440?
+
+        M.
 -- 
-1.6.6.1
+Who you jivin' with that Cosmik Debris?
