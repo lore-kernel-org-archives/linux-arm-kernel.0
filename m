@@ -1,115 +1,120 @@
 From: christofferdall@christofferdall.dk (Christoffer Dall)
-Date: Wed, 24 Mar 2010 20:42:41 +0100
-Subject: [C/R ARM][PATCH 2/3] ARM: Add the eclone system call
-In-Reply-To: <20100323210616.GB19572@n2100.arm.linux.org.uk>
+Date: Wed, 24 Mar 2010 20:46:55 +0100
+Subject: [C/R ARM][PATCH 3/3] c/r: ARM implementation of
+	checkpoint/restart
+In-Reply-To: <20100323160933.GA4465@us.ibm.com>
 References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
-	<1269219965-23923-3-git-send-email-christofferdall@christofferdall.dk>
-	<20100323210616.GB19572@n2100.arm.linux.org.uk>
-Message-ID: <7d08b87d1003241242k62cd125ex4b0fa0e24879fddb@mail.gmail.com>
+	<1269219965-23923-4-git-send-email-christofferdall@christofferdall.dk>
+	<20100323160933.GA4465@us.ibm.com>
+Message-ID: <7d08b87d1003241246i39c9163ch6426d2184de628b0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 23, 2010 at 10:06 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Mar 21, 2010 at 09:06:04PM -0400, Christoffer Dall wrote:
->> In addition to doing everything that clone() system call does, the
->> eclone() system call:
->
-> Some comments...
->
->> +sys_eclone_wrapper:
->> + ? ? ? ? ? ? add ? ? ip, sp, #S_OFF
->> + ? ? ? ? ? ? str ? ? ip, [sp, #0]
->> + ? ? ? ? ? ? b ? ? ? sys_eclone
->> +ENDPROC(sys_eclone_wrapper)
->
-> I'm curious why, if you want the entire set of registers, you don't just
-> do:
-> ? ? ? ? ? ? ? ?add ? ? r0, sp, #S_OFF
-> ? ? ? ? ? ? ? ?b ? ? ? sys_eclone
->
-> and load the syscall arguments out of regs->ARM_foo. ?This avoids the need
-> for additional stores.
->
-
-I simply copied the code from sys_clone. Do you prefer that I change
-it in both places?
-
->> +
->> ?sys_sigreturn_wrapper:
->> ? ? ? ? ? ? ? add ? ? r0, sp, #S_OFF
->> ? ? ? ? ? ? ? b ? ? ? sys_sigreturn
->> diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
->> index ae4027b..fd8199d 100644
->> --- a/arch/arm/kernel/sys_arm.c
->> +++ b/arch/arm/kernel/sys_arm.c
->> @@ -183,6 +183,45 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
->> ? ? ? return do_fork(clone_flags, newsp, regs, 0, parent_tidptr, child_tidptr);
->> ?}
+On Tue, Mar 23, 2010 at 5:09 PM, Serge E. Hallyn <serue@us.ibm.com> wrote:
+> Quoting Christoffer Dall (christofferdall at christofferdall.dk):
+>> Implements architecture specific requirements for checkpoint/restart on
+>> ARM. The changes touch almost only c/r related code. Most of the work is
+>> done in arch/arm/checkpoint.c, which implements checkpointing of the CPU
+>> and necessary fields on the thread_info struct.
 >>
->> +asmlinkage int sys_eclone(unsigned flags_low, struct clone_args __user *uca,
->> + ? ? ? ? ? ? ? ? ? ? ? int args_size, pid_t __user *pids,
->> + ? ? ? ? ? ? ? ? ? ? ? struct pt_regs *regs)
+>> The ISA version (given by __LINUX_ARM_ARCH__) is checkpointed and verified
+>> against the machine architecture on restart. If they differ, an error is
+>> raised and restart aborted. It should be possible to restart on newer
+>> architectures, but further investigation is warranted.
+>>
+>> Regarding ThumbEE, the thumbee_state field on the thread_info is stored
+>> in checkpoints when CONFIG_ARM_THUMBEE and 0 is stored otherwise. If
+>> a value different than 0 is checkpointed and CONFIG_ARM_THUMBEE is not
+>> set on the restore system, the restore is aborted. Feedback on this
+>> implementation is very welcome.
+>>
+>> We checkpoint whether the system is running with CONFIG_MMU or not and
+>> require the same configuration for the system on which we restore the
+>> process. It might be possible to allow something more fine-grained,
+>> if it's worth the energy. Input on this item is also very welcome,
+>> specifically from someone who knows the exact meaning of the end_brk
+>> field.
+>>
+>> Added support for syscall sys_checkpoint and sys_restart for ARM:
+>> __NR_checkpoint ? ? ? ? 367
+>> __NR_restart ? ? ? ? ? ?368
+>>
+>>
+>> Cc: rmk at arm.linux.org.uk
+>> Signed-off-by: Christoffer Dall <christofferdall@christofferdall.dk>
+>> Acked-by: Oren Laadan <orenl@cs.columbia.edu>
+>
+> In terms of the cr api I don't see any problems. ?Two nits below,
+> but in any case
+>
+> Acked-by: Serge Hallyn <serue@us.ibm.com>
+>
+> thanks, this is really cool, especially how minimal it is :)
+> -serge
+thanks
+>
+> ...
+>
+>> +static int load_cpu_regs(struct ckpt_hdr_cpu *h, struct task_struct *t)
 >> +{
->> + ? ? int rc;
->> + ? ? struct clone_args kca;
->> + ? ? unsigned long flags;
->> + ? ? int __user *parent_tidp;
->> + ? ? int __user *child_tidp;
->> + ? ? unsigned long __user stack;
->
-> __user on an integer type doesn't make any sense; integer types do not
-> have address spaces.
->
-
-thanks, will follow Sukadev's changes...
-
->> + ? ? unsigned long stack_size;
+>> + ? ? int i;
+>> + ? ? struct pt_regs *regs = task_pt_regs(t);
 >> +
->> + ? ? rc = fetch_clone_args_from_user(uca, args_size, &kca);
->> + ? ? if (rc)
->> + ? ? ? ? ? ? return rc;
+>> + ? ? memcpy(regs, &h->uregs, sizeof(struct pt_regs));
+>> +
+>> + ? ? for (i = 0; i < 16; i++)
+>> + ? ? ? ? ? ? regs->uregs[i] = h->uregs[i];
 >> +
 >> + ? ? /*
->> + ? ? ?* TODO: Convert 'clone-flags' to 64-bits on all architectures.
->> + ? ? ?* TODO: When ->clone_flags_high is non-zero, copy it in to the
->> + ? ? ?* ? ? ? higher word(s) of 'flags':
->> + ? ? ?*
->> + ? ? ?* ? ? ? ? ? ? ?flags = (kca.clone_flags_high << 32) | flags_low;
+>> + ? ? ?* Restore only user-writable bits on the CPSR
 >> + ? ? ?*/
->> + ? ? flags = flags_low;
->> + ? ? parent_tidp = (int *)(unsigned long)kca.parent_tid_ptr;
->> + ? ? child_tidp = (int *)(unsigned long)kca.child_tid_ptr;
->
-> This will produce sparse errors. ?Is there a reason why 'clone_args'
-> tid pointers aren't already pointers marked with __user ?
->
+>> + ? ? regs->ARM_cpsr = regs->ARM_cpsr |
+>> + ? ? ? ? ? ? ? ? ? ? ?(h->ARM_cpsr & (PSR_N_BIT | PSR_Z_BIT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?PSR_C_BIT | PSR_V_BIT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?PSR_V_BIT | PSR_Q_BIT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?PSR_E_BIT | PSR_GE_BITS));
+>> + ? ? regs->ARM_ORIG_r0 = h->ARM_ORIG_r0;
 >> +
->> + ? ? stack_size = (unsigned long)kca.child_stack_size;
->
-> Shouldn't this already be of integer type?
->
->> + ? ? if (stack_size)
->> + ? ? ? ? ? ? return -EINVAL;
->
-> So the stack must have a zero size? ?Is this missing a '!' ?
->
+>> + ? ? return 0;
+>> +}
 >> +
->> + ? ? stack = (unsigned long)kca.child_stack;
->> + ? ? if (!stack)
->> + ? ? ? ? ? ? stack = regs->ARM_sp;
+>> +/* read the cpu state and registers for the current task */
+>> +int restore_cpu(struct ckpt_ctx *ctx)
+>> +{
+>> + ? ? struct ckpt_hdr_cpu *h;
+>> + ? ? struct task_struct *t = current;
+>> + ? ? int ret;
 >> +
->> + ? ? return do_fork_with_pids(flags, stack, regs, stack_size, parent_tidp,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? child_tidp, kca.nr_pids, pids);
+>> + ? ? h = ckpt_read_obj_type(ctx, sizeof(*h), CKPT_HDR_CPU);
+>> + ? ? if (IS_ERR(h))
+>> + ? ? ? ? ? ? return PTR_ERR(h);
+>> +
+>> + ? ? ret = load_cpu_regs(h, t);
 >
-> Hmm, so let me get this syscall interface right. ?We have some arguments
-> passed in registers and others via a (variable sized?) structure. ?It seems
-> really weird to have, eg, a pointer to the pids and the number of pids
-> passed in two separate ways.
->
-> The grouping between what's passed in registers and via this clone_args
-> structure seems to be random. ?Can it be sanitized?
+> will load_cpu_regs() ever be changed to return anything but 0? ?If
+> not both fns can be simplified.
 >
 
-Thanks for you feedback. I will let the people behind eclone deal with
-the eclone specifics.
+you're right. I will put load_cpu_regs() inline in restore_cpu.
+> ...
+>
+>> +int restore_mm_context(struct ckpt_ctx *ctx, struct mm_struct *mm)
+>> +{
+>> + ? ? struct ckpt_hdr_mm_context *h;
+>> + ? ? int ret = 0;
+>> +
+>> + ? ? h = ckpt_read_obj_type(ctx, sizeof(*h), CKPT_HDR_MM_CONTEXT);
+>> + ? ? if (IS_ERR(h))
+>> + ? ? ? ? ? ? return PTR_ERR(h);
+>> +
+>> +#if !CONFIG_MMU
+>> + ? ? mm->context.end_brk = h->end_brk;
+>> +#endif
+>> +
+>> + ? ? ckpt_hdr_put(ctx, h);
+>> + ? ? return ret;
+>
+> Again ret doesn't seem needed here.
+indeed it doesn't.
+
+-Christoffer
