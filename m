@@ -1,42 +1,44 @@
-From: andy@warmcat.com (Andy Green)
-Date: Wed, 24 Mar 2010 13:22:13 +0000
-Subject: Device probe order (i2c regulator vs. platform device)
-In-Reply-To: <20100324131131.GB26453@rakim.wolfsonmicro.main>
-References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>	<4BA9D93E.50705@warmcat.com>	<005501cacb42$c5bbcde0$513369a0$%szyprowski@samsung.com>	<4BAA0AA6.80902@warmcat.com>
-	<20100324131131.GB26453@rakim.wolfsonmicro.main>
-Message-ID: <4BAA1205.6020309@warmcat.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Mar 2010 13:26:55 +0000
+Subject: [PATCH 5/8] MXC: mach-mx31_3ds: Add support for SD card slot
+	in the personality board.
+In-Reply-To: <1269370438.3276.173.camel@realization>
+References: <1269369741.3276.162.camel@realization>
+	<1269370017.3276.165.camel@realization>
+	<1269370175.3276.168.camel@realization>
+	<1269370228.3276.169.camel@realization>
+	<1269370305.3276.171.camel@realization>
+	<1269370438.3276.173.camel@realization>
+Message-ID: <20100324132654.GB26910@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/10 13:11, Somebody in the thread at some point said:
-> On Wed, Mar 24, 2010 at 12:50:46PM +0000, Andy Green wrote:
->> On 03/24/10 11:11, Somebody in the thread at some point said:
->>
->> Hi -
->>
->>> Right, this is a really common case. Maybe this callback could be added
->>> to the regulator framework as well?
->
-> Looks like there's somethin up with the quoting configuration in your
+On Tue, Mar 23, 2010 at 07:53:58PM +0100, Alberto Panizzo wrote:
 
-Must be bugs in rawhide thunderbird.
+> +static void mx31_3ds_setpower(struct device *dev, unsigned int vdd)
+> +{
+> +	int voltage = 0;
+> +
+> +	if (vdd <= ilog2(MMC_VDD_165_195))
+> +		voltage = 1800000;
+> +	else if (vdd == ilog2(MMC_VDD_20_21))
+> +		voltage = 2000000;
+> +	else
+> +		voltage = 2000000 + (vdd - 7) * 100000;
+> +
+> +	pr_debug("%s: vdd = %d -> REGU_VMMC2 = %d\n", __func__, vdd, voltage);
+> +
+> +	regulator_set_voltage(vmmc_reg, voltage, voltage);
 
->> Right, it's a generic issue with needing to delay other device
->> registration until something else has completed probe, not just PMU.
->> PMU is just the most common parent.
->
->> A callback is needed after probe() returned without error somehow.
->
-> I rather suspect that the approach you suggest would have some usability
-> issues, especially on PCs which don't by and by large have custom board
-> code at all.  Something more data driven, or handled more in drivers, is
-> probably in order if this does get done.  Anyway, this should probably
-> be discussed elsewhere.
+This code looks wrong - the MMC core is requesting voltage ranges but
+these are being non-linearly translated into specific voltages.  I
+rather suspect that the standard mmc_regulator_set_ocr() function ought
+to be able to cope with this, in conjunction with a regulator constraint
+limiting the minimum voltage to 1.8V.  If not, some comments explaining
+what's going on would really help.
 
-Fine, at the moment there are no arrangements for it and you have to go 
-hack callbacks in case by case, so anything would be better.
+> +static struct regulator_consumer_supply gpo3_consumers[] = {
+> +	{
+> +		.dev	= &mxcsdhc_device0.dev,
 
-I agree it's not arm-specific so this isn't the place, but it'll be sad 
-if it just disappears off the radar.
-
--Andy
+Use dev_name, not dev.
