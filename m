@@ -1,69 +1,48 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 24 Mar 2010 16:27:38 +0800
-Subject: [PATCH 1/2] arm: disable L2 cache in the v7 finish function
-In-Reply-To: <20100322210045.GU11448@atomide.com>
-References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
-	<1268143623-22361-2-git-send-email-saeed@marvell.com>
-	<20100310215321.GP2900@atomide.com>
-	<13B9B4C6EF24D648824FF11BE896716203BA3AE030@dlee02.ent.ti.com>
-	<20100322210045.GU11448@atomide.com>
-Message-ID: <f17812d71003240127j6fe09f8du63e44c4b8b00ea8e@mail.gmail.com>
+From: andy@warmcat.com (Andy Green)
+Date: Wed, 24 Mar 2010 09:19:58 +0000
+Subject: Device probe order (i2c regulator vs. platform device)
+In-Reply-To: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
+Message-ID: <4BA9D93E.50705@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 23, 2010 at 5:00 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Woodruff, Richard <r-woodruff2@ti.com> [100319 12:51]:
->>
->> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
->> > bounces at lists.infradead.org] On Behalf Of Tony Lindgren
->> > Sent: Wednesday, March 10, 2010 3:53 PM
->>
->> > > +#ifdef CONFIG_OUTER_CACHE
->> > > + ? mrc ? ? p15, 0, r0, c1, c0, 1
->> > > + ? bic ? ? r0, r0, #0x2
->> > > + ? mcr ? ? p15, 0, r0, c1, c0, 1 ? ? ? ? ? @ disable L2 cache
->> > > +#endif
->> > > ? ? ldmfd ? sp!, {pc}
->> > > ?ENDPROC(cpu_v7_proc_fin)
->> >
->> > This one is a bit tricky. I know of three different ways
->> > to disable the L2 cache depending on the hardware. One of
->> > them is what you have above. The second is via SMI, and
->> > then the first one won't work. The third is via external
->> > secure monitor calls used on some omaps at least. And in
->> > the third case the first two methods won't work.
->>
->> On A8 cores with integrated L2 cache the L2EN bit is banked after r0px series (you won't find r0 systems anywhere). As such the above code is good on OMAP3 and many other A8's. ?Other bits in this same register have issues which you warn of. ?But not the L2EN.
->>
->> On A9 which uses outer cache the above won't work. ?The external PL310 (or variant) is memory mapped. ?To handle a different sequence is needed all together.
+On 03/24/10 07:10, Somebody in the thread at some point said:
+> Hello,
 >
-> Sounds like we need something like:
+> I've encountered a problem with regulator framework and the device
+> probe order. In my system there is a pmic chip connected thought i2c
+> bus and a platform device (let's call it A) that depends on the
+> regulator device (for proper probing pmic chip must enable voltage to
+> the device A). In the current configuration the i2c driver is also a
+> platform device. However during the system initialization the device
+> A is probed before the i2c driver would register pmic chip and its
+> regulators.
 >
-> ENTRY(cpu_v7_proc_fin)
-> ...
-> ? ? ? ?mcr ? ? p15, 0, r0, c1, c0, 0 ? @ disable caches
-> ? ? ? ?b ? ? ? cpu_v7_arch_proc_fin ? ?@ disable L2 cache
-> ? ? ? ?ldmfd ? sp!, {pc}
-> ENDPROC(cpu_v7_proc_fin)
->
-> And then cpu_v7_arch_proc_fin can be implemented for the platforms
-> that need special handling.
->
+> How I can delay probing the device A to the moment when the regulator
+> device will be available in the system? Is there any generic was of
+> changing the device probe order?
 
-Yeah, sort of I agree.
+Delaying registering devices is only half the problem.  You must also 
+correct these device's parent dev to be the PMU's.
 
-For outer cache, I also doubt that we might need to flush the L2 before
-disabling, though this may depend on the exact behavior of the specific
-cache controller. Introduce something like outer_cache_fns.finish() may
-be something feasible.
+Otherwise your suspend and resume ordering turns to crap and you will 
+immediately be in Hell, for example the PMIC may go down taking away 
+power from the SD Card before you finished talking to it.
 
+With correct device parent ordering, then children are guaranteed to be 
+suspended before the parent, it means the PMIC won't go down until all 
+these guys registered as dependent on it have nicely gone down.
 
-> Regards,
->
-> Tony
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+What I have been doing is adding a platform callback in the pmic 
+platform_data which is called at the end of pmic probe.
+
+In the machine file, in the callback I then register everything that 
+relies on PMIC power arrangements, and correct the device parent at to 
+be the PMIC at the same time.
+
+It would be very good is this was regularized somehow into a standard 
+API because it's absolutely a requirement for many boards that their 
+devices ARE dependent on PMU as a parent.
+
+-Andy
