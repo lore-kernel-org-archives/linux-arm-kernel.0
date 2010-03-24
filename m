@@ -1,33 +1,22 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Wed, 24 Mar 2010 23:13:52 +0100
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 24 Mar 2010 16:03:02 -0700
 Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
-In-Reply-To: <e9c3a7c21003241501x1f1ed857pcaaaf8ea8dc563ec@mail.gmail.com>
+In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A0391EEB6@EXDCVYMBSTM006.EQ1STM.local>
 References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
-	<e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
-	<e9c3a7c21003241501x1f1ed857pcaaaf8ea8dc563ec@mail.gmail.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A0391EEB9@EXDCVYMBSTM006.EQ1STM.local>
+	<e9c3a7c21003241425m595f983fg520c9cace7ddce91@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A0391EEB6@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <e9c3a7c21003241603j4e5b948asfdecbb00f17bedd9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Dan]
+On Wed, Mar 24, 2010 at 3:08 PM, Linus WALLEIJ
+<linus.walleij@stericsson.com> wrote:
+> Do you prefer this latter solution? I'm OK with either, I just
+> think the runtime dma_set_ambaconfig() is a bit more elegant.
 
-> What are your semantics for keeping the transaction information alive
-> until it gets consumed.  Currently the dma_ctrl_flags have the
-> DMA_CTRL_ACK bit to specify that the descriptor not be
-> recycled/destroyed until the client has a chance to attach a dependent
-> operation.  Seems you need something similar to indicate that the
-> residue information not be destroyed until it is consumed.  In other
-> words how does a client guarantee that the engine provides the
-> information it needs?
+I agree, too many hoops to jump through to shoehorn it into the
+current api.  Let's go with your current amba specific version for
+now.
 
-Well exactly to avoid that kind of trouble I STOP (or PAUSE),
-get numer of bytes left, then terminate in that order. This
-keeps the descriptor.
-
-Perhaps it's better to keep the two functions _pause() and
-_get_residue() and indicate that device_terminate_all()
-may destroy the state.
-
-Yours,
-Linus Walleij
+--
+Dan
