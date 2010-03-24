@@ -1,43 +1,35 @@
-From: 914059751@qq.com (=?gbk?B?uvrR7sr3?=)
-Date: Tue, 23 Mar 2010 21:41:48 +0800
-Subject: Query about Float Point Operation
-Message-ID: <tencent_294E932A6E12E0191CF4271B@qq.com>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
+Date: Wed, 24 Mar 2010 20:20:19 -0300
+Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
+In-Reply-To: <20100324230729.GA21359@n2100.arm.linux.org.uk>
+References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100324230729.GA21359@n2100.arm.linux.org.uk>
+Message-ID: <cecb6d8f1003241620v55fb960ds14818bf3a03fa334@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WOW
-My audio codec drivers use float point operation heavily!
-Does that mean that I can ONLY implement it on USER space ?
- 
- 
------------------- Original ------------------
-From:  "M?ns Rullg?rd"<mans@mansr.com>;
-Date:  Tue, Mar 23, 2010 09:34 PM
-To:  "linux-arm-kernel"<linux-arm-kernel@lists.infradead.org>; 
-
-Subject:  Re: Query about Float Point Operation
-
- 
-914059751 at qq.com writes:
-
-> Hi , guys
-> I want to do float point operations in kernel like the following,
+On Wed, Mar 24, 2010 at 20:07, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Mar 24, 2010 at 08:04:58PM -0300, Marcelo Roberto Jimenez wrote:
+>> - ? ? debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask==0)?"<NONE> ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask&SS_DETECT)?"DETECT ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask&SS_READY)?"READY ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask&SS_BATWARN)?"BATWARN ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->csc_mask&SS_STSCHG)?"STSCHG ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags==0)?"<NONE> ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags&SS_IOCARD)?"IOCARD ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags&SS_RESET)?"RESET ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
+>> - ? ? ? ? ? ? ? ? ? ? (state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
+>> + ? ? debug(skt, 2, ? "mask: %s%s%s%s%s%s "
+>> + ? ? ? ? ? ? ? ? ? ? "flags: %s%s%s%s%s%s Vcc %d Vpp %d irq %d\n",
 >
-> int foo(double d)
-> {
-> return (int)d*d;
-> }
->
-> May I ask any possibility of use float point operation in the kernel space?
+> NAK. ?Breaking kernel messages across multiple lines makes them impossible
+> to grep for. ?checkpatch.pl is wrong on this one.
 
-Floating-point in the kernel is not allowed.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I will redo it, no problem. But just for my information, in that
+particular case, is it usefull to grep using format specifiers?
