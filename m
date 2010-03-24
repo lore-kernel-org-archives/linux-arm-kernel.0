@@ -1,51 +1,66 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Wed, 24 Mar 2010 22:38:59 +0100
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 24 Mar 2010 15:01:24 -0700
 Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
-In-Reply-To: <e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
+In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
 References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
 	<e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
+	<CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <e9c3a7c21003241501x1f1ed857pcaaaf8ea8dc563ec@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it happens I'm entertaining myself with this patchset
-right now...
+On Wed, Mar 24, 2010 at 2:38 PM, Linus WALLEIJ
+<linus.walleij@stericsson.com> wrote:
+> As it happens I'm entertaining myself with this patchset
+> right now...
+>
+>> > +void dma_set_ambaconfig(struct dma_chan *chan,
+>> > + ? ? ? ? ? ? ? ? ? ? ? struct amba_dma_channel_config *config);
+>> > +void dma_stop_channel(struct dma_chan *chan);
+>> > +u32 dma_get_channel_bytes_left(struct dma_chan *chan);
+>>
+>> I question if these last two can be generically promoted to dmaengine?
+>
+> OK...
+>
+> I renamed get_channel_bytes_left() to get_channel_residue() btw.
+>
+>> ?I already discussed a potential dma_get_channel_bytes() synonym with
+>> Guennadi [1] (wrap ->device_is_tx_complete()),
+>> and dma_stop_channel()
+>> looks like it could wrap ->device_terminate_all().
+>
+> Actually its a little bit like STOP/PAUSE/UNPAUSE on a tape
+> recorder, I find that in practice I have these two usecases:
+>
+> * STOP (as in cancel) the DMA transfer and retrieve the number
+> ?of bytes left at that point
+>
+> * PAUSE the DMA transfer and retrieve the number of bytes
+> ?left at that point, later UNPAUSE or STOP
+>
+> * retrieve the number of bytes left in an ongoing transfer,
+> ?a fluctuating value. This is typically nice for audio
+> ?progress bars to take some simple example.
+>
+> Right now, for the PrimeCells, I only need to be able to STOP the
+> channel and get the residual bytes at this time. So I'll create
+> something like dma_get_residue() in the DMA devices, and specify
+> the sematics such that if device_terminate_all() is called before
+> this point the residual at that time shall be returned, else
+> the current fluctuating value, would that be OK?
 
-> > +void dma_set_ambaconfig(struct dma_chan *chan,
-> > + ? ? ? ? ? ? ? ? ? ? ? struct amba_dma_channel_config *config);
-> > +void dma_stop_channel(struct dma_chan *chan);
-> > +u32 dma_get_channel_bytes_left(struct dma_chan *chan);
-> 
-> I question if these last two can be generically promoted to dmaengine?
+Sounds ok, and I would not mind renaming device_is_tx_complete() to
+device_tx_status() for this purpose.
 
-OK...
+What are your semantics for keeping the transaction information alive
+until it gets consumed.  Currently the dma_ctrl_flags have the
+DMA_CTRL_ACK bit to specify that the descriptor not be
+recycled/destroyed until the client has a chance to attach a dependent
+operation.  Seems you need something similar to indicate that the
+residue information not be destroyed until it is consumed.  In other
+words how does a client guarantee that the engine provides the
+information it needs?
 
-I renamed get_channel_bytes_left() to get_channel_residue() btw.
-
->  I already discussed a potential dma_get_channel_bytes() synonym with
-> Guennadi [1] (wrap ->device_is_tx_complete()),
-> and dma_stop_channel()
-> looks like it could wrap ->device_terminate_all().
-
-Actually its a little bit like STOP/PAUSE/UNPAUSE on a tape
-recorder, I find that in practice I have these two usecases:
-
-* STOP (as in cancel) the DMA transfer and retrieve the number
-  of bytes left at that point
-
-* PAUSE the DMA transfer and retrieve the number of bytes
-  left at that point, later UNPAUSE or STOP
-
-* retrieve the number of bytes left in an ongoing transfer,
-  a fluctuating value. This is typically nice for audio
-  progress bars to take some simple example.
-
-Right now, for the PrimeCells, I only need to be able to STOP the
-channel and get the residual bytes at this time. So I'll create
-something like dma_get_residue() in the DMA devices, and specify
-the sematics such that if device_terminate_all() is called before
-this point the residual at that time shall be returned, else
-the current fluctuating value, would that be OK?
-
-Yours,
-Linus Walleij
+--
+Dan
