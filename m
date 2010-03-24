@@ -1,69 +1,51 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 24 Mar 2010 14:25:35 -0700
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Wed, 24 Mar 2010 22:38:59 +0100
 Subject: [PATCH 1/5] ARM: define the PrimeCell DMA API
-In-Reply-To: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
+In-Reply-To: <e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
 References: <1268056327-16577-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <e9c3a7c21003241425m595f983fg520c9cace7ddce91@mail.gmail.com>
+	<e9c3a7c21003241408g2a704425g47ccdfb60d606683@mail.gmail.com>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A0391EEB1@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 8, 2010 at 6:52 AM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> This patch extends the DMA engine with a PrimeCell superset with
-> three functions: configure DMA channel, stop channel, and one for
-> getting the number of bytes pending on a channel. These have been
-> identified as the basic extensions needed to drive DMA on top of
-> the PL011 and PL180 PrimeCells.
->
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
-> ?include/linux/amba/dma.h | ? 44 ++++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 44 insertions(+), 0 deletions(-)
-> ?create mode 100644 include/linux/amba/dma.h
->
-> diff --git a/include/linux/amba/dma.h b/include/linux/amba/dma.h
-> new file mode 100644
-> index 0000000..13196af
-> --- /dev/null
-> +++ b/include/linux/amba/dma.h
-> @@ -0,0 +1,44 @@
-> +/*
-> + * ?linux/include/amba/dma.h
-> + *
-> + * ?Copyright (C) 2010 ST-Ericsson AB
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#if !defined(AMBA_DMA_H) && defined(CONFIG_DMADEVICES)
-> +#define AMBA_DMA_H
-> +
-> +/**
-> + * struct amba_dma_channel_request - this struct is passed in as
-> + * configuration data to a DMA engine in order to set up a certain
-> + * channel for DMA transport. Anything the DMA engine needs to
-> + * know about the PrimeCell shall be passed through this struct.
-> + * The DMA engine has to provide an additional function:
-> + * dma_set_ambaconfig() in order for it to work with PrimeCells.
-> + * @addr: this is the physical address where DMA data should be
-> + * read (RX) or written (TX)
-> + * @addr_width: this is the width of the source (RX) or target
-> + * (TX) register where DMA data shall be read/written, in bytes.
-> + * legal values: 1, 2, 4, 8.
-> + */
-> +struct amba_dma_channel_config {
-> + ? ? ? dma_addr_t addr;
-> + ? ? ? u8 addr_width:4;
-> +};
+As it happens I'm entertaining myself with this patchset
+right now...
 
-The usages of this seem to be constant data based off something that
-comes from the platform data or 'slave' device.  Could this constant
-data just be munged/merged into the platform data and we can look it
-up at runtime via chan->private.  Or am I oversimplifying?
+> > +void dma_set_ambaconfig(struct dma_chan *chan,
+> > + ? ? ? ? ? ? ? ? ? ? ? struct amba_dma_channel_config *config);
+> > +void dma_stop_channel(struct dma_chan *chan);
+> > +u32 dma_get_channel_bytes_left(struct dma_chan *chan);
+> 
+> I question if these last two can be generically promoted to dmaengine?
 
-None the of the usages seem to justify forking from core dmaengine at
-this point (I reserve the right to be proven wrong later).
+OK...
 
---
-Dan
+I renamed get_channel_bytes_left() to get_channel_residue() btw.
+
+>  I already discussed a potential dma_get_channel_bytes() synonym with
+> Guennadi [1] (wrap ->device_is_tx_complete()),
+> and dma_stop_channel()
+> looks like it could wrap ->device_terminate_all().
+
+Actually its a little bit like STOP/PAUSE/UNPAUSE on a tape
+recorder, I find that in practice I have these two usecases:
+
+* STOP (as in cancel) the DMA transfer and retrieve the number
+  of bytes left at that point
+
+* PAUSE the DMA transfer and retrieve the number of bytes
+  left at that point, later UNPAUSE or STOP
+
+* retrieve the number of bytes left in an ongoing transfer,
+  a fluctuating value. This is typically nice for audio
+  progress bars to take some simple example.
+
+Right now, for the PrimeCells, I only need to be able to STOP the
+channel and get the residual bytes at this time. So I'll create
+something like dma_get_residue() in the DMA devices, and specify
+the sematics such that if device_terminate_all() is called before
+this point the residual at that time shall be returned, else
+the current fluctuating value, would that be OK?
+
+Yours,
+Linus Walleij
