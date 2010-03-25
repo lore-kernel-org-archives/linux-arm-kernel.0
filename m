@@ -1,46 +1,21 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Thu, 25 Mar 2010 13:32:59 +0530
-Subject: [PATCH V2 00/12] Adding Support for SPEAr Platform under ARM
-	architecture
-In-Reply-To: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
-References: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <4BAB18B3.6050800@st.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 25 Mar 2010 09:20:23 +0100
+Subject: [PATCH] vic: factor out common init code
+In-Reply-To: <0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
+References: <AcrG7twc5wXJWTzzQtezYQpL1OiKYw==>
+	<0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <63386a3d1003250120m2d33233h60b202724a643a71@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/25/2010 12:56 PM, Viresh KUMAR wrote:
-> Following set of patches are for adding ST Microelctronics SPEAr Platform under
-> ARM architecture in Linux.
-> 
-> Hierarchy in SPEAr is as follows:
-> SPEAr (Platform)
-> 	- SPEAr3XX (3XX SOC series, based on ARM9)
-> 		- SPEAr300 (SOC)
-> 			- SPEAr300_EVB (Evaluation Board)
-> 		- SPEAr310 (SOC)
-> 			- SPEAr310_EVB (Evaluation Board)
-> 		- SPEAr320 (SOC)
-> 			- SPEAr320_EVB (Evaluation Board)
-> 	- SPEAr6XX (6XX SOC series, based on ARM9)
-> 		- SPEAr600 (SOC)
-> 			- SPEAr600_EVB (Evaluation Board)
-> 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
-> 		- SPEAr1300 (SOC)
-> 
-> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
-> under development phase.
-> 
-> Changes from V1:
-> 
-> 1. Changes done according to review comments
-> 2. Added support for GPIO PL061
-> 3. Removed unnecessary inclusions from defconfigs
-> 4. Removed GPT driver. GPT code merged with time.c
-> 5. Added support for pad multiplexing for spear
-> 
+2010/3/19 H Hartley Sweeten <hartleys@visionengravers.com>:
 
-Sorry. Please don't review this patch set. Something wrong
-happened in PATCH V2 09/12. I will send patch set again after correction.
+> This factors out the common initialization code for the two vic
+> vendors into easier maintainable functions.
 
-regards,
-viresh kumar.
+Sorry for the delay. Tested this on U300 and it works like a charm,
+good patch.
+
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Linus Walleij
