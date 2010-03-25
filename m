@@ -1,375 +1,365 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Thu, 25 Mar 2010 14:10:49 +0530
-Subject: [PATCH V2 Resend 06/12] ST SPEAr: Added source files for SPEAr
-	platform
-In-Reply-To: <1269506455-15173-6-git-send-email-viresh.kumar@st.com>
+Date: Thu, 25 Mar 2010 14:10:51 +0530
+Subject: [PATCH V2 Resend 08/12] ST SPEAr: Added source files for SPEAr6xx
+	machine family
+In-Reply-To: <1269506455-15173-8-git-send-email-viresh.kumar@st.com>
 References: <1269506455-15173-1-git-send-email-viresh.kumar@st.com>
 	<1269506455-15173-2-git-send-email-viresh.kumar@st.com>
 	<1269506455-15173-3-git-send-email-viresh.kumar@st.com>
 	<1269506455-15173-4-git-send-email-viresh.kumar@st.com>
 	<1269506455-15173-5-git-send-email-viresh.kumar@st.com>
 	<1269506455-15173-6-git-send-email-viresh.kumar@st.com>
-Message-ID: <1269506455-15173-7-git-send-email-viresh.kumar@st.com>
+	<1269506455-15173-7-git-send-email-viresh.kumar@st.com>
+	<1269506455-15173-8-git-send-email-viresh.kumar@st.com>
+Message-ID: <1269506455-15173-9-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 ---
- arch/arm/plat-spear/Kconfig  |   31 +++++
- arch/arm/plat-spear/Makefile |    6 +
- arch/arm/plat-spear/time.c   |  292 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 329 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-spear/Kconfig
- create mode 100644 arch/arm/plat-spear/Makefile
- create mode 100644 arch/arm/plat-spear/time.c
+ arch/arm/mach-spear6xx/Kconfig        |   20 ++++
+ arch/arm/mach-spear6xx/Kconfig600     |   17 ++++
+ arch/arm/mach-spear6xx/Makefile       |   12 +++
+ arch/arm/mach-spear6xx/Makefile.boot  |    3 +
+ arch/arm/mach-spear6xx/spear600.c     |   25 +++++
+ arch/arm/mach-spear6xx/spear600_evb.c |   51 +++++++++++
+ arch/arm/mach-spear6xx/spear6xx.c     |  158 +++++++++++++++++++++++++++++++++
+ 7 files changed, 286 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear6xx/Kconfig
+ create mode 100644 arch/arm/mach-spear6xx/Kconfig600
+ create mode 100644 arch/arm/mach-spear6xx/Makefile
+ create mode 100644 arch/arm/mach-spear6xx/Makefile.boot
+ create mode 100644 arch/arm/mach-spear6xx/spear600.c
+ create mode 100644 arch/arm/mach-spear6xx/spear600_evb.c
+ create mode 100644 arch/arm/mach-spear6xx/spear6xx.c
 
-diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
 new file mode 100644
-index 0000000..1bb3dbc
+index 0000000..bddba03
 --- /dev/null
-+++ b/arch/arm/plat-spear/Kconfig
-@@ -0,0 +1,31 @@
++++ b/arch/arm/mach-spear6xx/Kconfig
+@@ -0,0 +1,20 @@
 +#
-+# SPEAr Platform configuration file
++# SPEAr6XX Machine configuration file
 +#
 +
-+if PLAT_SPEAR
++if ARCH_SPEAR6XX
 +
 +choice
-+	prompt "ST SPEAr Family"
-+	default ARCH_SPEAR3XX
++	prompt "SPEAr6XX Family"
++	default MACH_SPEAR600
 +
-+config ARCH_SPEAR3XX
-+	bool "SPEAr3XX"
-+	select ARM_VIC
-+	select CPU_ARM926T
++config MACH_SPEAR600
++	bool "SPEAr600"
 +	help
-+	  Supports for ARM's SPEAR3XX family
-+
-+config ARCH_SPEAR6XX
-+	bool "SPEAr6XX"
-+	select ARM_VIC
-+	select CPU_ARM926T
-+	help
-+	  Supports for ARM's SPEAR6XX family
-+
++	  Supports ST SPEAr600 Machine
 +endchoice
 +
-+# Adding SPEAr machine specific configuration files
-+source "arch/arm/mach-spear3xx/Kconfig"
-+source "arch/arm/mach-spear6xx/Kconfig"
++# Adding SPEAr6XX machine specific configuration files
++source "arch/arm/mach-spear6xx/Kconfig600"
 +
-+endif
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
++endif #ARCH_SPEAR6XX
+diff --git a/arch/arm/mach-spear6xx/Kconfig600 b/arch/arm/mach-spear6xx/Kconfig600
 new file mode 100644
-index 0000000..96f9ac3
+index 0000000..9e19f65
 --- /dev/null
-+++ b/arch/arm/plat-spear/Makefile
-@@ -0,0 +1,6 @@
++++ b/arch/arm/mach-spear6xx/Kconfig600
+@@ -0,0 +1,17 @@
 +#
-+# SPEAr Platform specific Makefile
++# SPEAr600 machine configuration file
 +#
 +
-+# Common support
-+obj-y	:= clock.o time.o
-diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
++if MACH_SPEAR600
++
++choice
++	prompt "SPEAr600 Boards"
++	default BOARD_SPEAR600_EVB
++
++config	BOARD_SPEAR600_EVB
++	bool "SPEAr600 Evaluation Board"
++	help
++	  Supports ST SPEAr600 Evaluation Board
++endchoice
++
++endif	#MACH_SPEAR600
+diff --git a/arch/arm/mach-spear6xx/Makefile b/arch/arm/mach-spear6xx/Makefile
 new file mode 100644
-index 0000000..a1025d3
+index 0000000..cc1a4d8
 --- /dev/null
-+++ b/arch/arm/plat-spear/time.c
-@@ -0,0 +1,292 @@
++++ b/arch/arm/mach-spear6xx/Makefile
+@@ -0,0 +1,12 @@
++#
++# Makefile for SPEAr6XX machine series
++#
++
++# common files
++obj-y	+= clock.o spear6xx.o
++
++# spear600 specific files
++obj-$(CONFIG_MACH_SPEAR600) += spear600.o
++
++# spear600 boards files
++obj-$(CONFIG_BOARD_SPEAR600_EVB) += spear600_evb.o
+diff --git a/arch/arm/mach-spear6xx/Makefile.boot b/arch/arm/mach-spear6xx/Makefile.boot
+new file mode 100644
+index 0000000..7a1f3c0
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/Makefile.boot
+@@ -0,0 +1,3 @@
++zreladdr-y	:= 0x00008000
++params_phys-y	:= 0x00000100
++initrd_phys-y	:= 0x00800000
+diff --git a/arch/arm/mach-spear6xx/spear600.c b/arch/arm/mach-spear6xx/spear600.c
+new file mode 100644
+index 0000000..5c484c4
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear600.c
+@@ -0,0 +1,25 @@
 +/*
-+ * arch/arm/plat-spear/time.c
++ * arch/arm/mach-spear6xx/spear600.c
++ *
++ * SPEAr600 machine source file
 + *
 + * Copyright (C) 2009 ST Microelectronics
-+ * Shiraz Hashim<shiraz.hashim@st.com>
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/time.h>
-+#include <linux/irq.h>
-+#include <asm/mach/time.h>
-+#include <mach/irqs.h>
-+#include <mach/hardware.h>
-+#include <mach/spear.h>
++#include <linux/ptrace.h>
++#include <asm/irq.h>
 +#include <mach/generic.h>
++#include <mach/spear.h>
 +
++/* Add spear600 specific devices here */
++
++void __init spear600_init(void)
++{
++	/* call spear6xx family common init function */
++	spear6xx_init();
++}
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+new file mode 100644
+index 0000000..daff8d0
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -0,0 +1,51 @@
 +/*
-+ * We would use TIMER0 and TIMER1 as clockevent and clocksource.
-+ * Timer0 and Timer1 both belong to same gpt block in cpu subbsystem. Further
-+ * they share same functional clock. Any change in one's functional clock will
-+ * also affect other timer.
++ * arch/arm/mach-spear6xx/spear600_evb.c
++ *
++ * SPEAr600 evaluation board source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+#define CLKEVT	0	/* gpt0, channel0 as clockevent */
-+#define CLKSRC	1	/* gpt0, channel1 as clocksource */
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++#include <mach/generic.h>
++#include <mach/spear.h>
 +
-+/* Register offsets, x is channel number */
-+#define CR(x)		((x) * 0x80 + 0x80)
-+#define IR(x)		((x) * 0x80 + 0x84)
-+#define LOAD(x)		((x) * 0x80 + 0x88)
-+#define COUNT(x)	((x) * 0x80 + 0x8C)
++static struct amba_device *amba_devs[] __initdata = {
++	&gpio_device[0],
++	&gpio_device[1],
++	&gpio_device[2],
++	&uart_device[0],
++	&uart_device[1],
++};
 +
-+/* Reg bit definitions */
-+#define CTRL_INT_ENABLE		0x0100
-+#define CTRL_ENABLE		0x0020
-+#define CTRL_ONE_SHOT		0x0010
++static struct platform_device *plat_devs[] __initdata = {
++};
 +
-+#define CTRL_PRESCALER1		0x0
-+#define CTRL_PRESCALER2		0x1
-+#define CTRL_PRESCALER4		0x2
-+#define CTRL_PRESCALER8		0x3
-+#define CTRL_PRESCALER16	0x4
-+#define CTRL_PRESCALER32	0x5
-+#define CTRL_PRESCALER64	0x6
-+#define CTRL_PRESCALER128	0x7
-+#define CTRL_PRESCALER256	0x8
++static void __init spear600_evb_init(void)
++{
++	unsigned int i;
 +
-+#define INT_STATUS		0x1
++	/* call spear600 machine init function */
++	spear600_init();
 +
-+static __iomem void *gpt_base;
-+static struct clk *gpt_clk;
++	/* Add Platform Devices */
++	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
 +
-+static void clockevent_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *clk_event_dev);
-+static int clockevent_next_event(unsigned long evt,
-+				 struct clock_event_device *clk_event_dev);
++	/* Add Amba Devices */
++	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
++		amba_device_register(amba_devs[i], &iomem_resource);
++}
 +
++MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
++	.boot_params	=	0x00000100,
++	.map_io		=	spear6xx_map_io,
++	.init_irq	=	spear6xx_init_irq,
++	.timer		=	&spear_sys_timer,
++	.init_machine	=	spear600_evb_init,
++MACHINE_END
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+new file mode 100644
+index 0000000..b67e571
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -0,0 +1,158 @@
 +/*
-+ * Following clocksource_set_clock and clockevent_set_clock picked
-+ * from arch/mips/kernel/time.c
++ * arch/arm/mach-spear6xx/spear6xx.c
++ *
++ * SPEAr6XX machines common source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+void __init clocksource_set_clock(struct clocksource *cs, unsigned int clock)
-+{
-+	u64 temp;
-+	u32 shift;
++#include <linux/types.h>
++#include <linux/amba/pl061.h>
++#include <linux/types.h>
++#include <linux/ptrace.h>
++#include <linux/io.h>
++#include <asm/hardware/vic.h>
++#include <asm/irq.h>
++#include <asm/mach/arch.h>
++#include <mach/irqs.h>
++#include <mach/generic.h>
++#include <mach/spear.h>
 +
-+	/* Find a shift value */
-+	for (shift = 32; shift > 0; shift--) {
-+		temp = (u64) NSEC_PER_SEC << shift;
-+		do_div(temp, clock);
-+		if ((temp >> 32) == 0)
-+			break;
++/* Add spear6xx machines common devices here */
++/* uart device registeration */
++struct amba_device uart_device[] = {
++	{
++		.dev = {
++			.init_name = "uart0",
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_UART0_BASE,
++			.end = SPEAR6XX_ICM1_UART0_BASE +
++				SPEAR6XX_ICM1_UART0_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_UART_0, NO_IRQ},
++	}, {
++		.dev = {
++			.init_name = "uart1",
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_UART1_BASE,
++			.end = SPEAR6XX_ICM1_UART1_BASE +
++				SPEAR6XX_ICM1_UART1_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_UART_1, NO_IRQ},
 +	}
-+	cs->shift = shift;
-+	cs->mult = (u32) temp;
-+}
-+
-+void __init clockevent_set_clock(struct clock_event_device *cd,
-+	unsigned int clock)
-+{
-+	u64 temp;
-+	u32 shift;
-+
-+	/* Find a shift value */
-+	for (shift = 32; shift > 0; shift--) {
-+		temp = (u64) clock << shift;
-+		do_div(temp, NSEC_PER_SEC);
-+		if ((temp >> 32) == 0)
-+			break;
-+	}
-+	cd->shift = shift;
-+	cd->mult = (u32) temp;
-+}
-+
-+static cycle_t clocksource_read_cycles(struct clocksource *cs)
-+{
-+	return (cycle_t) readw(gpt_base + COUNT(CLKSRC));
-+}
-+
-+static struct clocksource clksrc = {
-+	.name = "tmr1",
-+	.rating = 200,		/* its a pretty decent clock */
-+	.read = clocksource_read_cycles,
-+	.mask = 0xFFFF,		/* 16 bits */
-+	.mult = 0,		/* to be computed */
-+	.shift = 0,		/* to be computed */
-+	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
 +};
 +
-+static void spear_clocksource_init(void)
-+{
-+	u32 tick_rate;
-+	u16 val;
-+
-+	/* program the prescaler (/256)*/
-+	writew(CTRL_PRESCALER256, gpt_base + CR(CLKSRC));
-+
-+	/* find out actual clock driving Timer */
-+	tick_rate = clk_get_rate(gpt_clk);
-+	tick_rate >>= CTRL_PRESCALER256;
-+
-+	writew(0xFFFF, gpt_base + LOAD(CLKSRC));
-+
-+	val = readw(gpt_base + CR(CLKSRC));
-+	val &= ~CTRL_ONE_SHOT;	/* autoreload mode */
-+	val |= CTRL_ENABLE ;
-+	writew(val, gpt_base + CR(CLKSRC));
-+
-+	clocksource_set_clock(&clksrc, tick_rate);
-+
-+	/* register the clocksource */
-+	clocksource_register(&clksrc);
-+}
-+
-+static struct clock_event_device clkevt = {
-+	.name = "tmr0",
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode = clockevent_set_mode,
-+	.set_next_event = clockevent_next_event,
-+	.shift = 0,	/* to be computed */
++/* gpio device registeration */
++static struct pl061_platform_data gpio_plat_data[] = {
++	{
++		.gpio_base	= 0,
++		.irq_base	= SPEAR_GPIO0_INT_BASE,
++	}, {
++		.gpio_base	= 8,
++		.irq_base	= SPEAR_GPIO1_INT_BASE,
++	}, {
++		.gpio_base	= 16,
++		.irq_base	= SPEAR_GPIO2_INT_BASE,
++	},
 +};
 +
-+static void clockevent_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *clk_event_dev)
-+{
-+	u32 period;
-+	u16 val;
-+
-+	/* stop the timer */
-+	val = readw(gpt_base + CR(CLKEVT));
-+	val &= ~CTRL_ENABLE;
-+	writew(val, gpt_base + CR(CLKEVT));
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		period = clk_get_rate(gpt_clk) / HZ;
-+		period >>= CTRL_PRESCALER16;
-+		writew(period, gpt_base + LOAD(CLKEVT));
-+
-+		val = readw(gpt_base + CR(CLKEVT));
-+		val &= ~CTRL_ONE_SHOT;
-+		val |= CTRL_ENABLE | CTRL_INT_ENABLE;
-+		writew(val, gpt_base + CR(CLKEVT));
-+
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		val = readw(gpt_base + CR(CLKEVT));
-+		val |= CTRL_ONE_SHOT;
-+		writew(val, gpt_base + CR(CLKEVT));
-+
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_RESUME:
-+
-+		break;
-+	default:
-+		pr_err("Invalid mode requested\n");
-+		break;
++struct amba_device gpio_device[] = {
++	{
++		.dev = {
++			.init_name = "gpio0",
++			.platform_data = &gpio_plat_data[0],
++		},
++		.res = {
++			.start = SPEAR6XX_CPU_GPIO_BASE,
++			.end = SPEAR6XX_CPU_GPIO_BASE +
++				SPEAR6XX_CPU_GPIO_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_LOCAL_GPIO, NO_IRQ},
++	}, {
++		.dev = {
++			.init_name = "gpio1",
++			.platform_data = &gpio_plat_data[1],
++		},
++		.res = {
++			.start = SPEAR6XX_ICM3_GPIO_BASE,
++			.end = SPEAR6XX_ICM3_GPIO_BASE +
++				SPEAR6XX_ICM3_GPIO_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_BASIC_GPIO, NO_IRQ},
++	}, {
++		.dev = {
++			.init_name = "gpio2",
++			.platform_data = &gpio_plat_data[2],
++		},
++		.res = {
++			.start = SPEAR6XX_ICM2_GPIO_BASE,
++			.end = SPEAR6XX_ICM2_GPIO_BASE +
++				SPEAR6XX_ICM2_GPIO_SIZE - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_APPL_GPIO, NO_IRQ},
 +	}
-+}
-+
-+static int clockevent_next_event(unsigned long cycles,
-+				 struct clock_event_device *clk_event_dev)
-+{
-+	u16 val;
-+
-+	writew(cycles, gpt_base + LOAD(CLKEVT));
-+
-+	val = readw(gpt_base + CR(CLKEVT));
-+	val |= CTRL_ENABLE | CTRL_INT_ENABLE;
-+	writew(val, gpt_base + CR(CLKEVT));
-+
-+	return 0;
-+}
-+
-+static irqreturn_t spear_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clkevt;
-+
-+	writew(INT_STATUS, gpt_base + IR(CLKEVT));
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction spear_timer_irq = {
-+	.name = "timer",
-+	.flags = IRQF_DISABLED | IRQF_TIMER,
-+	.handler = spear_timer_interrupt
 +};
 +
-+static void __init spear_clockevent_init(void)
++/* This will add devices, and do machine specific tasks */
++void __init spear6xx_init(void)
 +{
-+	u32 tick_rate;
-+
-+	/* program the prescaler */
-+	writew(CTRL_PRESCALER16, gpt_base + CR(CLKEVT));
-+
-+	tick_rate = clk_get_rate(gpt_clk);
-+	tick_rate >>= CTRL_PRESCALER16;
-+
-+	clockevent_set_clock(&clkevt, tick_rate);
-+
-+	clkevt.max_delta_ns = clockevent_delta2ns(0xfff0,
-+			&clkevt);
-+	clkevt.min_delta_ns = clockevent_delta2ns(3, &clkevt);
-+
-+	clkevt.cpumask = cpumask_of(0);
-+
-+	clockevents_register_device(&clkevt);
-+
-+	setup_irq(SPEAR_GPT0_CHAN0_IRQ, &spear_timer_irq);
++	/* nothing to do for now */
 +}
 +
-+void __init spear_setup_timer(void)
++/* This will initialize vic */
++void __init spear6xx_init_irq(void)
 +{
-+	struct clk *pll3_clk;
-+
-+	if (!request_mem_region(SPEAR_GPT0_BASE, SZ_1K, "gpt0")) {
-+		pr_err("%s:cannot get IO addr\n", __func__);
-+		return;
-+	}
-+
-+	gpt_base = (void __iomem *)ioremap(SPEAR_GPT0_BASE, SZ_1K);
-+	if (!gpt_base) {
-+		pr_err("%s:ioremap failed for gpt\n", __func__);
-+		goto err_mem;
-+	}
-+
-+	gpt_clk = clk_get_sys("gpt0", NULL);
-+	if (!gpt_clk) {
-+		pr_err("%s:couldn't get clk for gpt\n", __func__);
-+		goto err_iomap;
-+	}
-+
-+	pll3_clk = clk_get(NULL, "pll3_48m_clk");
-+	if (!pll3_clk) {
-+		pr_err("%s:couldn't get PLL3 as parent for gpt\n", __func__);
-+		goto err_iomap;
-+	}
-+
-+	clk_set_parent(gpt_clk, pll3_clk);
-+
-+	spear_clockevent_init();
-+	spear_clocksource_init();
-+
-+	return;
-+
-+err_iomap:
-+	iounmap(gpt_base);
-+
-+err_mem:
-+	release_mem_region(SPEAR_GPT0_BASE, SZ_1K);
++	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_PRI_BASE, 0, ~0, 0);
++	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0, 0);
 +}
 +
-+struct sys_timer spear_sys_timer = {
-+	.init = spear_setup_timer,
++/* Following will create static virtual/physical mappings */
++static struct map_desc spear6xx_io_desc[] __initdata = {
++	{
++		.virtual	= VA_SPEAR6XX_ICM1_UART0_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM1_UART0_BASE),
++		.length		= SPEAR6XX_ICM1_UART0_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_CPU_VIC_PRI_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_PRI_BASE),
++		.length		= SPEAR6XX_CPU_VIC_PRI_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_CPU_VIC_SEC_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_SEC_BASE),
++		.length		= SPEAR6XX_CPU_VIC_SEC_SIZE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_ICM3_SYS_CTRL_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SYS_CTRL_BASE),
++		.length		= SPEAR6XX_ICM3_MISC_REG_BASE,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	= VA_SPEAR6XX_ICM3_MISC_REG_BASE,
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
++		.length		= SPEAR6XX_ICM3_MISC_REG_SIZE,
++		.type		= MT_DEVICE
++	},
 +};
++
++/* This will create static memory mapping for selected devices */
++void __init spear6xx_map_io(void)
++{
++	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
++
++	/* This will initialize clock framework */
++	clk_init();
++}
 -- 
 1.6.0.2
