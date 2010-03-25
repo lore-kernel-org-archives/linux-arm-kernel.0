@@ -1,47 +1,89 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 25 Mar 2010 11:52:48 +0000
-Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
-Message-ID: <1269517968-27945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Mar 2010 12:02:37 +0000
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <4BAB4DE8.1030707@mvista.com>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
+	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
+	<s5h39zou023.wl%tiwai@suse.de>
+	<20100325113019.GA6590@n2100.arm.linux.org.uk>
+	<s5hvdckskev.wl%tiwai@suse.de>  <4BAB4DE8.1030707@mvista.com>
+Message-ID: <1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMDK6410 has a WM9713 connected to the AC97 interface, by default
-on the GPD pins though this can be changed with a switch on the board.
+On Thu, 2010-03-25 at 11:50 +0000, Philby John wrote:
+> On 03/25/2010 05:06 PM, Takashi Iwai wrote:
+> > At Thu, 25 Mar 2010 11:30:19 +0000,
+> > Russell King - ARM Linux wrote:
+> >>
+> >> On Thu, Mar 25, 2010 at 12:12:52PM +0100, Takashi Iwai wrote:
+> >>> At Wed, 24 Mar 2010 15:18:06 -0000,
+> >>> Will Deacon wrote:
+> >>>>
+> >>>> Hi Catalin,
+> >>>>
+> >>>>> aaci: Use writew() to the AC97_POWERDOWN 16-bit register
+> >>>>>
+> >>>>> From: Catalin Marinas<catalin.marinas@arm.com>
+> >>>>>
+> >>>>> The writel() introduced by commit 29a4f2d3 generates an alignment fault
+> >>>>> on ARM.
+> >>>>>
+> >>>>> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
+> >>>>> Cc: Philby John<pjohn@in.mvista.com>
+> >>>>> Cc: Takashi Iwai<tiwai@suse.de>
+> >>>>> ---
+> >>>>>   sound/arm/aaci.c |    2 +-
+> >>>>>   1 files changed, 1 insertions(+), 1 deletions(-)
+> >>>>>
+> >>>>> diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
+> >>>>> index 656e474..d66d4ff 100644
+> >>>>> --- a/sound/arm/aaci.c
+> >>>>> +++ b/sound/arm/aaci.c
+> >>>>> @@ -863,7 +863,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+> >>>>>           struct snd_ac97 *ac97;
+> >>>>>           int ret;
+> >>>>>
+> >>>>> - writel(0, aaci->base + AC97_POWERDOWN);
+> >>>>> + writew(0, aaci->base + AC97_POWERDOWN);
+> >>>>>           /*
+> >>>>>            * Assert AACIRESET for 2us
+> >>>>>            */
+> >>>>
+> >>>> A writel() looks wrong anyway because even if it could succeed, it would
+> >>>> send half of its write to AC97_EXTENDED_ID, which sounds suspiciously read-only
+> >>>> to me.
+> >>>>
+> >>>> Tested-by: Will Deacon<will.deacon@arm.com>
+> >>>
+> >>> Looking back at the original patch again, I wonder now whether using
+> >>> AC97_* for the register offset here is really correct.  Usually AC97
+> >>> registers are accessed indirectly.
+> >>>
+> >>> Is it just same 0x26, or is this intentional?
+> >>
+> >> The original patch is total crap.
+> >>
+> >> 1. You can't access AC97 registers via writel.
+> >> 2. If the offset is 0x26 (AACI_CSCH2 + AACI_IE + 2), this is writing to
+> >>     reserved bits in channel 2's interrupt enable register which has
+> >>     nothing to do with the slot 1/2 transmit registers.
+> >>
+> >> The patch could never have been tested in the first place.
+> >
+> > Thanks for checking.  Now I wonder why this fixed the original issue
+> > at all.  Obviously something wrong in either testing or problem
+> > analysis.
+> >
+> > Anyway, it's better to revert the patch first...
+> 
+> This was tested throughly but not for alignment and to verify the fix is
+> easy. All you need to do is revert the commit and then type reboot at
+> the command prompt. On reboot you will get "aaci-pl041 fpga:04: ac97
+> read back fail" failures, rendering audio non-functional on an ARM1176.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+I can confirm that it solves the reset issue on other RealView boards as
+well. Whether it's the correct fix I can't tell.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 2d5afd2..6878fbd 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -64,6 +64,7 @@
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/audio.h>
- 
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
- #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-@@ -254,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_ohci,
- 	&s3c_device_usb_hsotg,
-+	&s3c64xx_device_ac97,
- 	&s3c64xx_device_iisv4,
- 
- #ifdef CONFIG_REGULATOR
-@@ -652,6 +654,9 @@ static void __init smdk6410_machine_init(void)
- 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
-+	/* Board defualt with CFG2.1 off */
-+	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
-+
- 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
- }
- 
 -- 
-1.7.0.2
+Catalin
