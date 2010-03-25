@@ -1,55 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Mar 2010 08:35:37 +0100
-Subject: [PATCH 2/3] imx3: Add rtc platform device support
-In-Reply-To: <1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-References: <1269430338-22690-1-git-send-email-vzapolskiy@gmail.com>
-	<1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20100325073537.GZ2241@pengutronix.de>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Thu, 25 Mar 2010 13:32:59 +0530
+Subject: [PATCH V2 00/12] Adding Support for SPEAr Platform under ARM
+	architecture
+In-Reply-To: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
+References: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <4BAB18B3.6050800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
-
-On Wed, Mar 24, 2010 at 02:32:17PM +0300, Vladimir Zapolskiy wrote:
-> This patch adds support for build-in RTC device found on
-> Freescale imx31 and imx35 SoCs.
+On 3/25/2010 12:56 PM, Viresh KUMAR wrote:
+> Following set of patches are for adding ST Microelctronics SPEAr Platform under
+> ARM architecture in Linux.
 > 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/devices.c |   19 +++++++++++++++++++
->  arch/arm/mach-mx3/devices.h |    1 +
->  2 files changed, 20 insertions(+), 0 deletions(-)
+> Hierarchy in SPEAr is as follows:
+> SPEAr (Platform)
+> 	- SPEAr3XX (3XX SOC series, based on ARM9)
+> 		- SPEAr300 (SOC)
+> 			- SPEAr300_EVB (Evaluation Board)
+> 		- SPEAr310 (SOC)
+> 			- SPEAr310_EVB (Evaluation Board)
+> 		- SPEAr320 (SOC)
+> 			- SPEAr320_EVB (Evaluation Board)
+> 	- SPEAr6XX (6XX SOC series, based on ARM9)
+> 		- SPEAr600 (SOC)
+> 			- SPEAr600_EVB (Evaluation Board)
+> 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+> 		- SPEAr1300 (SOC)
 > 
-> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-> index f891115..1ffed28 100644
-> --- a/arch/arm/mach-mx3/devices.c
-> +++ b/arch/arm/mach-mx3/devices.c
-> @@ -588,6 +588,25 @@ struct platform_device imx_wdt_device0 = {
->  	.resource       = imx_wdt_resources,
+> Current patch will add support for SPEAr3XX and SPEAr6XX family. SPEAr13XX is
+> under development phase.
+> 
+> Changes from V1:
+> 
+> 1. Changes done according to review comments
+> 2. Added support for GPIO PL061
+> 3. Removed unnecessary inclusions from defconfigs
+> 4. Removed GPT driver. GPT code merged with time.c
+> 5. Added support for pad multiplexing for spear
+> 
 
-This patch does not apply. We do not have the watchdog in devices.c atm.
+Sorry. Please don't review this patch set. Something wrong
+happened in PATCH V2 09/12. I will send patch set again after correction.
 
->  };
->  
-> +static struct resource imx_rtc_resources[] = {
-> +	{
-> +		.start  = MX31_RTC_BASE_ADDR,
-> +		.end    = MX31_RTC_BASE_ADDR + 0x3fff,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start  = MX31_INT_RTC,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-
-Can you provide a fixup for i.MX35, please? See mx3_devices_init().
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+regards,
+viresh kumar.
