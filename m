@@ -1,107 +1,104 @@
-From: virtuoso@slind.org (Alexander Shishkin)
-Date: Thu, 25 Mar 2010 17:52:40 +0200
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <20100318135008.GA11800@Krystal>
-References: <20100318135008.GA11800@Krystal>
-Message-ID: <1269532360-18504-1-git-send-email-virtuoso@slind.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Mar 2010 16:01:26 +0000
+Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
+In-Reply-To: <20100325153043.GE6590@n2100.arm.linux.org.uk>
+References: <20100325145324.12837.85927.stgit@e102109-lin.cambridge.arm.com>
+	<20100325151030.GD6590@n2100.arm.linux.org.uk>
+	<1269530669.10064.28.camel@e102109-lin.cambridge.arm.com>
+	<20100325153043.GE6590@n2100.arm.linux.org.uk>
+Message-ID: <1269532886.10064.31.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems where ldrexh/strexh are not available,
-  * for pre-v6 systems, use a generic local version,
-  * for v6 without v6K, emulate xchg2 using 32-bit cmpxchg()
-    (it is not yet clear if xchg1 has to be emulated on such
-    systems as well, thus the "size" parameter).
+On Thu, 2010-03-25 at 15:30 +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 25, 2010 at 03:24:29PM +0000, Catalin Marinas wrote:
+> > On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
+> > > While this looks fine, I'd like to see a lot of Tested-by's against
+> > > this before it's merged - we've had similar code in show_mem()
+> > > which has proven to be quite problematical to get right for all the
+> > > various different combinations we have.
+> > >
+> > > However, we also have the same method in show_mem() which we know
+> > > works fine, so I'd also like to see the problem with using it in
+> > > mem_init() fully analysed - rather than a "possibly because".
+> >
+> > I can remove the "possibly" part :). The page_count() is given a page
+> > with some random flags and it thinks it's a compound page. It than tries
+> > to access page->first which isn't set, hence the error.
+> >
+> > The original code assumes that for a given node the map is contiguous
+> > and it calculates the page as (map + pfn). This is only true for
+> > flatmem. With sparsemem the page calculation is a bit more complicated
+> > but handled by pfn_to_page().
+> 
+> And show_mem() ?  It seems to suffer from the same problem.
 
-The __xchg_generic() function is based on the code that Jamie
-posted earlier.
+And that's a patch which fixes both (but as you said, it would be good
+if more people test it on various platforms).
 
-Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-CC: linux-arm-kernel-bounces at lists.infradead.org
-CC: Imre Deak <imre.deak@nokia.com>
-CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
-CC: Jamie Lokier <jamie@shareable.org>
+
+ARM: Fix kernel memory printing for sparsemem
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+The show_mem() and mem_init() function are assuming that the page map is
+contiguous and calculates the start and end page of a bank using (map +
+pfn). This fails with SPARSEMEM where pfn_to_page() must be used.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <Will.Deacon@arm.com>
+Cc: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
 ---
- arch/arm/include/asm/system.h |   53 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
+ arch/arm/mm/init.c |   14 ++++----------
+ 1 files changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..e7a17ab 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -218,6 +218,36 @@ do {									\
- 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
- } while (0)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index b69ac3a..4ee740a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -83,9 +83,6 @@ void show_mem(void)
+ 	printk("Mem-info:\n");
+ 	show_free_areas();
+ 	for_each_online_node(node) {
+-		pg_data_t *n = NODE_DATA(node);
+-		struct page *map = pgdat_page_nr(n, 0) - n->node_start_pfn;
+-
+ 		for_each_nodebank (i,mi,node) {
+ 			struct membank *bank = &mi->bank[i];
+ 			unsigned int pfn1, pfn2;
+@@ -94,8 +91,8 @@ void show_mem(void)
+ 			pfn1 = bank_pfn_start(bank);
+ 			pfn2 = bank_pfn_end(bank);
  
-+#ifdef __LINUX_ARM_ARCH__ >= 6
-+static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-+				      unsigned long new, int size);
-+
-+/*
-+ * emulate __xchg() using 32-bit __cmpxchg()
-+ */
-+static inline unsigned long __xchg_generic(unsigned long x,
-+						 volatile void *ptr, int size)
-+{
-+	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr & ~3UL);
-+	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
-+	unsigned long mask, add, ret;
-+
-+	mask = ~(((1 << (size * 8)) - 1) << shift);
-+	add = x << shift;
-+
-+	ret = *ptrbig;
-+	while (1) {
-+		unsigned long tmp = __cmpxchg(ptrbig, ret, (ret & mask) | add,
-+					      4);
-+		if (tmp == ret)
-+			break;
-+		ret = tmp;
-+	}
-+
-+	return ret;
-+}
-+#endif
-+
- #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
- /*
-  * On the StrongARM, "swp" is terminally broken since it bypasses the
-@@ -262,6 +292,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 			: "r" (x), "r" (ptr)
- 			: "memory", "cc");
- 		break;
-+#ifdef CONFIG_CPU_32v6K
-+	case 2:
-+		asm volatile("@	__xchg2\n"
-+		"1:	ldrexh	%0, [%3]\n"
-+		"	strexh	%1, %2, [%3]\n"
-+		"	teq	%1, #0\n"
-+		"	bne	1b"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+#else
-+	case 2:
-+		ret = __xchg_generic(x, ptr, 2);
-+		break;
-+#endif
- 	case 4:
- 		asm volatile("@	__xchg4\n"
- 		"1:	ldrex	%0, [%3]\n"
-@@ -283,6 +329,13 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 		raw_local_irq_restore(flags);
- 		break;
+-			page = map + pfn1;
+-			end  = map + pfn2;
++			page = pfn_to_page(pfn1);
++			end  = pfn_to_page(pfn2 - 1) + 1;
  
-+	case 2:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned short *)ptr;
-+		*(volatile unsigned short *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
- 	case 4:
- 		raw_local_irq_save(flags);
- 		ret = *(volatile unsigned long *)ptr;
+ 			do {
+ 				total++;
+@@ -600,9 +597,6 @@ void __init mem_init(void)
+ 	reserved_pages = free_pages = 0;
+ 
+ 	for_each_online_node(node) {
+-		pg_data_t *n = NODE_DATA(node);
+-		struct page *map = pgdat_page_nr(n, 0) - n->node_start_pfn;
+-
+ 		for_each_nodebank(i, &meminfo, node) {
+ 			struct membank *bank = &meminfo.bank[i];
+ 			unsigned int pfn1, pfn2;
+@@ -611,8 +605,8 @@ void __init mem_init(void)
+ 			pfn1 = bank_pfn_start(bank);
+ 			pfn2 = bank_pfn_end(bank);
+ 
+-			page = map + pfn1;
+-			end  = map + pfn2;
++			page = pfn_to_page(pfn1);
++			end  = pfn_to_page(pfn2 - 1) + 1;
+ 
+ 			do {
+ 				if (PageReserved(page))
+
+
 -- 
-1.6.3.3
+Catalin
