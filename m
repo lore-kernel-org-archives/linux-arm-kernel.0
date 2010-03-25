@@ -1,44 +1,35 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 25 Mar 2010 14:34:41 +0900
+From: maz@misterjones.org (Marc Zyngier)
+Date: Thu, 25 Mar 2010 05:44:30 +0000
 Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
 In-Reply-To: <4BAAD5BB.7050101@samsung.com>
 References: <4BAAD5BB.7050101@samsung.com>
-Message-ID: <1b68c6791003242234h106d9530p12b5a046a906227e@mail.gmail.com>
+Message-ID: <20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 12:17 PM, Joonyoung Shim
-<jy0922.shim@samsung.com> wrote:
-> The PL330 is currently the dma controller using at the S5PC1XX arm SoC.
-> This supports DMA_MEMCPY and DMA_SLAVE.
->
-> The datasheet for the PL330 can find below url:
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0424a/DDI0424A_dmac_pl330_r0p0_trm.pdf
->
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> ---
-> Change log:
->
-> v2: Convert into an amba_device driver.
-> ? ?Code clean and update from v1 patch review.
+On Thu, 25 Mar 2010 12:17:15 +0900
+Joonyoung Shim <jy0922.shim@samsung.com> wrote:
 
-[CC'ing Russell and Ben as stakeholders]
+> +/* instruction set functions */
+> +static inline int pl330_dmaaddh(u8 *desc_pool_virt, u16 imm, bool ra)
+> +{
+> +	u8 opcode = DMAADDH | (ra << 1);
+> +
+> +	writeb(opcode, desc_pool_virt++);
 
-Dear Maintainers
+desc_pool_virt is a virtual address (from dma_alloc_coherent). In such
+case, write[bwl] seems to be the wrong interface. I suggest the
+following code:
 
-I too have been writing a driver for PL330 after taking into account the
-suggestions of Russell, Ben and other participants of the thread
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/009856.html
+	*desc_pool_virt++ = opcode;
 
-If you don't think this driver conflicts with the theme of the thread,
-may I ask you
-to please put this driver on hold until you checkout my implementation
-of solution
-to the issue... which should be soon.
+> +	writew(imm, desc_pool_virt);
 
-Regards,
-Jaswinder Singh
-Solution-1 Group
-Linux Kernel Team
-System LSI Division
-Samsung Electronics Co., Ltd.
+Does anything ensure that this won't generate an unaligned access?
+
+> +	return 3;
+> +}
+
+	M.
+-- 
+I'm the slime oozin' out from your TV set...
