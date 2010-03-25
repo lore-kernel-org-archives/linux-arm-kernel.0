@@ -1,30 +1,46 @@
-From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Thu, 25 Mar 2010 18:22:33 +0100
-Subject: [PATCH 02/16] ARM mach-mx3: duplicated include
-In-Reply-To: <1269537767-7553-1-git-send-email-andrea.gelmini@gelma.net>
-References: <1269537767-7553-1-git-send-email-andrea.gelmini@gelma.net>
-Message-ID: <1269537767-7553-3-git-send-email-andrea.gelmini@gelma.net>
+From: matthias@kaehlcke.net (Matthias Kaehlcke)
+Date: Thu, 25 Mar 2010 18:28:12 +0100
+Subject: [BUG] i.MX25: Broken include in mach-mx25pdk.c
+In-Reply-To: <20100325164147.GA27698@jasper.tkos.co.il>
+References: <20100325161635.GI2328@darwin>
+	<20100325164147.GA27698@jasper.tkos.co.il>
+Message-ID: <20100325172811.GJ2328@darwin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-mx3/mach-pcm037.c: linux/fsl_devices.h is included more than once.
+hi,
 
-Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
----
- arch/arm/mach-mx3/mach-pcm037.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+El Thu, Mar 25, 2010 at 06:41:47PM +0200 Baruch Siach ha dit:
 
-diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
-index 11f5315..a550ae9 100644
---- a/arch/arm/mach-mx3/mach-pcm037.c
-+++ b/arch/arm/mach-mx3/mach-pcm037.c
-@@ -35,7 +35,6 @@
- #include <linux/can/platform/sja1000.h>
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
--#include <linux/fsl_devices.h>
- 
- #include <media/soc_camera.h>
- 
+> On Thu, Mar 25, 2010 at 05:16:35PM +0100, Matthias Kaehlcke wrote:
+> > compiling arch/arm/mach-mx25/mach-mx25pdk.c fails due to the missing
+> > include "linux/fec.h" and incomplete types that are supposed to
+> > defined in this header
+> > 
+> > i'd send a fix, but greping through the kernel tree i haven't been
+> > able to identify the file defining the missing elements, i suppose it's still
+> > sitting bored in some development tree waiting to be merged
+> 
+> Apply the patch at http://patchwork.ozlabs.org/patch/41235/.
+> 
+> For some reason this patch never made it to the mainline even after my 
+> repeated nagging :(.
+
+thanks for the pointer, baruch!
+
+david: is there any inconvenience to merge the patch to netdev? if so,
+what can be done to make it mergeable?
+
+regards
+
 -- 
-1.7.0.3.296.g9776a
+Matthias Kaehlcke
+Embedded Linux Developer
+Barcelona
+
+      The assumption that what currently exists must necessarily
+        exist is the acid that corrodes all visionary thinking
+                                                                 .''`.
+    using free software / Debian GNU/Linux | http://debian.org  : :'  :
+                                                                `. `'`
+gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
