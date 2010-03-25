@@ -1,79 +1,83 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Mar 2010 15:16:38 +0000
-Subject: [PATCH 6/6] ARM: pxa: register PMU IRQs during board initialisation
-In-Reply-To: <1269530198-19572-6-git-send-email-will.deacon@arm.com>
+Date: Thu, 25 Mar 2010 15:16:35 +0000
+Subject: [PATCH 3/6] ARM: OMAP: register PMU IRQs during board initialisation
+In-Reply-To: <1269530198-19572-3-git-send-email-will.deacon@arm.com>
 References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
 	<1269530198-19572-2-git-send-email-will.deacon@arm.com>
 	<1269530198-19572-3-git-send-email-will.deacon@arm.com>
-	<1269530198-19572-4-git-send-email-will.deacon@arm.com>
-	<1269530198-19572-5-git-send-email-will.deacon@arm.com>
-	<1269530198-19572-6-git-send-email-will.deacon@arm.com>
-Message-ID: <1269530198-19572-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1269530198-19572-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an initcall for the pxa platforms so that they
-register their PMU IRQs with the PMU framework in the Kernel.
+This patch updates the initialisation routines for the OMAP2 and OMAP3 boards
+so that they register their PMU IRQs with the PMU framework in the Kernel.
 
-Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/plat-pxa/Makefile |    2 +-
- arch/arm/plat-pxa/pmu.c    |   33 +++++++++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-pxa/pmu.c
+ arch/arm/mach-omap2/devices.c |   34 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 34 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
-index 0264bfb..f68da35 100644
---- a/arch/arm/plat-pxa/Makefile
-+++ b/arch/arm/plat-pxa/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for code common across different PXA processor families
- #
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 23e4d77..4a1c232 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -17,8 +17,10 @@
+ #include <linux/clk.h>
  
--obj-y	:= dma.o
-+obj-y	:= dma.o pmu.o
- 
- obj-$(CONFIG_GENERIC_GPIO)	+= gpio.o
- obj-$(CONFIG_PXA3xx)		+= mfp.o
-diff --git a/arch/arm/plat-pxa/pmu.c b/arch/arm/plat-pxa/pmu.c
-new file mode 100644
-index 0000000..267ceb6
---- /dev/null
-+++ b/arch/arm/plat-pxa/pmu.c
-@@ -0,0 +1,33 @@
-+/*
-+ * PMU IRQ registration for the PXA xscale PMU families.
-+ * Copyright (C) 2010 Will Deacon, ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <asm/pmu.h>
+ #include <mach/hardware.h>
 +#include <mach/irqs.h>
-+
-+static struct resource pmu_resource = {
-+	.start	= IRQ_PMU,
-+	.end	= IRQ_PMU,
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
++#include <asm/pmu.h>
+ 
+ #include <plat/control.h>
+ #include <plat/tc.h>
+@@ -453,6 +455,37 @@ static void omap_init_mcspi(void)
+ static inline void omap_init_mcspi(void) {}
+ #endif
+ 
++static struct resource omap2_pmu_resource = {
++	.start	= 3,
++	.end	= 3,
 +	.flags	= IORESOURCE_IRQ,
 +};
 +
-+static struct platform_device pmu_device = {
++static struct resource omap3_pmu_resource = {
++	.start	= INT_34XX_BENCH_MPU_EMUL,
++	.end	= INT_34XX_BENCH_MPU_EMUL,
++	.flags	= IORESOURCE_IRQ,
++};
++
++static struct platform_device omap_pmu_device = {
 +	.name		= "arm-pmu",
 +	.id		= ARM_PMU_DEVICE_CPU,
-+	.resource	= &pmu_resource,
 +	.num_resources	= 1,
 +};
 +
-+static int __init pxa_pmu_init(void)
++static void omap_init_pmu(void)
 +{
-+	platform_device_register(&pmu_device);
-+	return 0;
++	if (cpu_is_omap24xx())
++		omap_pmu_device.resource = &omap2_pmu_resource;
++	else if (cpu_is_omap34xx())
++		omap_pmu_device.resource = &omap3_pmu_resource;
++	else
++		return;
++
++	platform_device_register(&omap_pmu_device);
 +}
-+arch_initcall(pxa_pmu_init);
++
++
+ #ifdef CONFIG_OMAP_SHA1_MD5
+ static struct resource sha1_md5_resources[] = {
+ 	{
+@@ -797,6 +830,7 @@ static int __init omap2_init_devices(void)
+ 	omap_init_camera();
+ 	omap_init_mbox();
+ 	omap_init_mcspi();
++	omap_init_pmu();
+ 	omap_hdq_init();
+ 	omap_init_sti();
+ 	omap_init_sha1_md5();
 -- 
 1.6.3.3
