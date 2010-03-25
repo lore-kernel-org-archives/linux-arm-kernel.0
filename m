@@ -1,122 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 25 Mar 2010 12:15:19 +0100
-Subject: [PATCH 8/8] ARM: S5PV210: add support for s3c-fb driver on Aquila
-	machine
-In-Reply-To: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
-References: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1269515719-18519-9-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Mar 2010 11:30:19 +0000
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <s5h39zou023.wl%tiwai@suse.de>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
+	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
+	<s5h39zou023.wl%tiwai@suse.de>
+Message-ID: <20100325113019.GA6590@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds required platform definitions to enable s3c-fb
-driver. Two framebuffer windows in 480x800x16bpp mode are defined.
+On Thu, Mar 25, 2010 at 12:12:52PM +0100, Takashi Iwai wrote:
+> At Wed, 24 Mar 2010 15:18:06 -0000,
+> Will Deacon wrote:
+> > 
+> > Hi Catalin,
+> > 
+> > > aaci: Use writew() to the AC97_POWERDOWN 16-bit register
+> > > 
+> > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > 
+> > > The writel() introduced by commit 29a4f2d3 generates an alignment fault
+> > > on ARM.
+> > > 
+> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Philby John <pjohn@in.mvista.com>
+> > > Cc: Takashi Iwai <tiwai@suse.de>
+> > > ---
+> > >  sound/arm/aaci.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
+> > > index 656e474..d66d4ff 100644
+> > > --- a/sound/arm/aaci.c
+> > > +++ b/sound/arm/aaci.c
+> > > @@ -863,7 +863,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+> > >  	struct snd_ac97 *ac97;
+> > >  	int ret;
+> > > 
+> > > -	writel(0, aaci->base + AC97_POWERDOWN);
+> > > +	writew(0, aaci->base + AC97_POWERDOWN);
+> > >  	/*
+> > >  	 * Assert AACIRESET for 2us
+> > >  	 */
+> > 
+> > A writel() looks wrong anyway because even if it could succeed, it would
+> > send half of its write to AC97_EXTENDED_ID, which sounds suspiciously read-only
+> > to me.
+> > 
+> > Tested-by: Will Deacon <will.deacon@arm.com>
+> 
+> Looking back at the original patch again, I wonder now whether using
+> AC97_* for the register offset here is really correct.  Usually AC97
+> registers are accessed indirectly.
+> 
+> Is it just same 0x26, or is this intentional?
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/Kconfig       |    2 +
- arch/arm/mach-s5pv210/mach-aquila.c |   49 +++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+), 0 deletions(-)
+The original patch is total crap.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 3717b52..a7adc24 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -39,6 +39,8 @@ config MACH_AQUILA
- 	bool "Samsung Aquila"
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
-+	select S5PV210_SETUP_FB_24BPP
-+	select S3C_DEV_FB
- 	help
- 	  Machine support for the Samsung Aquila target based on S5PC110 SoC
- 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 6a1db39..10bc76e 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -12,6 +12,7 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/serial_core.h>
-+#include <linux/fb.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -20,11 +21,13 @@
- 
- #include <mach/map.h>
- #include <mach/regs-clock.h>
-+#include <mach/regs-fb.h>
- 
- #include <plat/regs-serial.h>
- #include <plat/s5pv210.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/fb.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -71,7 +74,50 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	},
- };
- 
-+/* Frame Buffer */
-+static struct s3c_fb_pd_win aquila_fb_win0 = {
-+	.win_mode = {
-+		.pixclock = 1000000000000ULL / ((16+16+2+480)*(28+3+2+800)*60),
-+		.left_margin = 16,
-+		.right_margin = 16,
-+		.upper_margin = 3,
-+		.lower_margin = 28,
-+		.hsync_len = 2,
-+		.vsync_len = 2,
-+		.xres = 480,
-+		.yres = 800,
-+	},
-+	.max_bpp = 32,
-+	.default_bpp = 16,
-+};
-+
-+static struct s3c_fb_pd_win aquila_fb_win1 = {
-+	.win_mode = {
-+		.pixclock = 1000000000000ULL / ((16+16+2+480)*(28+3+2+800)*60),
-+		.left_margin = 16,
-+		.right_margin = 16,
-+		.upper_margin = 3,
-+		.lower_margin = 28,
-+		.hsync_len = 2,
-+		.vsync_len = 2,
-+		.xres = 480,
-+		.yres = 800,
-+	},
-+	.max_bpp = 32,
-+	.default_bpp = 16,
-+};
-+
-+static struct s3c_fb_platdata aquila_lcd_pdata __initdata = {
-+	.win[0]		= &aquila_fb_win0,
-+	.win[1]		= &aquila_fb_win1,
-+	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
-+	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
-+			  VIDCON1_INV_VCLK | VIDCON1_INV_VDEN,
-+	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
-+};
-+
- static struct platform_device *aquila_devices[] __initdata = {
-+	&s3c_device_fb,
- };
- 
- static void __init aquila_map_io(void)
-@@ -83,6 +129,9 @@ static void __init aquila_map_io(void)
- 
- static void __init aquila_machine_init(void)
- {
-+	/* FB */
-+	s3c_fb_set_platdata(&aquila_lcd_pdata);
-+
- 	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
- }
- 
--- 
-1.6.4
+1. You can't access AC97 registers via writel.
+2. If the offset is 0x26 (AACI_CSCH2 + AACI_IE + 2), this is writing to
+   reserved bits in channel 2's interrupt enable register which has
+   nothing to do with the slot 1/2 transmit registers.
+
+The patch could never have been tested in the first place.
