@@ -1,18 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Mar 2010 16:36:04 +0000
-Subject: flush icache if VM_EXEC in flush_cache_page
-In-Reply-To: <20100325153546.GA10306@desktop>
-References: <20100325153546.GA10306@desktop>
-Message-ID: <20100325163604.GF6590@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 25 Mar 2010 18:41:47 +0200
+Subject: [BUG] i.MX25: Broken include in mach-mx25pdk.c
+In-Reply-To: <20100325161635.GI2328@darwin>
+References: <20100325161635.GI2328@darwin>
+Message-ID: <20100325164147.GA27698@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 11:35:46PM +0800, anfei wrote:
-> There is a little difference of flushing icache between flush_cache_page
-> and flush_cache_range, why not make them the same?  I think they have
-> the very similar semantic except the range.  If the vma is VM_EXEC, we
-> should flush the icache no matter what cache type, and if it's not,  
-> then it's not necessary.  Is it right?
+Hi Matthias,
 
-Are you seeing a problem which is fixed by this patch, or is this just
-theory?
+On Thu, Mar 25, 2010 at 05:16:35PM +0100, Matthias Kaehlcke wrote:
+> compiling arch/arm/mach-mx25/mach-mx25pdk.c fails due to the missing
+> include "linux/fec.h" and incomplete types that are supposed to
+> defined in this header
+> 
+> i'd send a fix, but greping through the kernel tree i haven't been
+> able to identify the file defining the missing elements, i suppose it's still
+> sitting bored in some development tree waiting to be merged
+
+Apply the patch at http://patchwork.ozlabs.org/patch/41235/.
+
+For some reason this patch never made it to the mainline even after my 
+repeated nagging :(.
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
