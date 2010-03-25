@@ -1,322 +1,539 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 25 Mar 2010 12:15:15 +0100
-Subject: [PATCH 4/8] ARM: Samsung: move driver strength gpio configuration
-	helper to common dir
+Date: Thu, 25 Mar 2010 12:15:14 +0100
+Subject: [PATCH 3/8] ARM: S5PV210: add gpiolib support
 In-Reply-To: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
 References: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1269515719-18519-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1269515719-18519-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver strength parameter can be changed not only on S5PC100 but also
-on S5PV210/S5PC110 platforms, so move the helper functions to the common
-plat-samsung directory.
+Add support for gpiolib calls. This is based on the gpiolib implementation
+from mach-s5c6440/mach-s3c64xx directories.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-s5p/Kconfig                          |    1 +
- arch/arm/plat-s5pc1xx/Kconfig                      |    2 +-
- arch/arm/plat-s5pc1xx/Makefile                     |    1 -
- arch/arm/plat-s5pc1xx/gpio-config.c                |   62 --------------------
- .../plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h   |   32 ----------
- arch/arm/plat-s5pc1xx/setup-fb-24bpp.c             |    1 -
- arch/arm/plat-samsung/Kconfig                      |   12 ++--
- arch/arm/plat-samsung/gpio-config.c                |   49 +++++++++++++++
- arch/arm/plat-samsung/include/plat/gpio-cfg.h      |   30 ++++++++++
- 9 files changed, 87 insertions(+), 103 deletions(-)
- delete mode 100644 arch/arm/plat-s5pc1xx/gpio-config.c
- delete mode 100644 arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
+ arch/arm/mach-s5pv210/Makefile                 |    2 +-
+ arch/arm/mach-s5pv210/gpio.c                   |  375 ++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/gpio.h      |   25 ++-
+ arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   59 ++++
+ 4 files changed, 458 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/gpio.c
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
 
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index d400a6a..92bd756 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -13,6 +13,7 @@ config PLAT_S5P
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_GPIO_TRACK
-+	select S5P_GPIO_DRVSTR
- 	select SAMSUNG_GPIOLIB_4BIT
- 	select S3C_GPIO_CFG_S3C64XX
- 	select S3C_GPIO_PULL_UPDOWN
-diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
-index c7ccdf2..79d3be7 100644
---- a/arch/arm/plat-s5pc1xx/Kconfig
-+++ b/arch/arm/plat-s5pc1xx/Kconfig
-@@ -16,9 +16,9 @@ config PLAT_S5PC1XX
- 	select SAMSUNG_IRQ_VIC_TIMER
- 	select S3C_GPIO_TRACK
- 	select S3C_GPIO_PULL_UPDOWN
-+	select S5P_GPIO_DRVSTR
- 	select S3C_GPIO_CFG_S3C24XX
- 	select S3C_GPIO_CFG_S3C64XX
--	select S5P_GPIO_CFG_S5PC1XX
- 	help
- 	  Base platform code for any Samsung S5PC1XX device
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 8ebf51c..cb1553c 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -12,7 +12,7 @@ obj-				:=
  
-diff --git a/arch/arm/plat-s5pc1xx/Makefile b/arch/arm/plat-s5pc1xx/Makefile
-index 278f268..66a8f3e 100644
---- a/arch/arm/plat-s5pc1xx/Makefile
-+++ b/arch/arm/plat-s5pc1xx/Makefile
-@@ -24,7 +24,6 @@ obj-$(CONFIG_CPU_S5PC100_CLOCK)	+= s5pc100-clock.o
+ # Core support for S5PV210 system
  
- # Device setup
+-obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
++obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o gpio.o
  
--obj-$(CONFIG_S5P_GPIO_CFG_S5PC1XX) += gpio-config.o
- obj-$(CONFIG_S5PC1XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
- obj-$(CONFIG_S5PC1XX_SETUP_I2C0) += setup-i2c0.o
- obj-$(CONFIG_S5PC1XX_SETUP_I2C1) += setup-i2c1.o
-diff --git a/arch/arm/plat-s5pc1xx/gpio-config.c b/arch/arm/plat-s5pc1xx/gpio-config.c
-deleted file mode 100644
-index a4f67e8..0000000
---- a/arch/arm/plat-s5pc1xx/gpio-config.c
-+++ /dev/null
-@@ -1,62 +0,0 @@
--/* linux/arch/arm/plat-s5pc1xx/gpio-config.c
-- *
-- * Copyright 2009 Samsung Electronics
-- *
-- * S5PC1XX GPIO Configuration.
-- *
-- * Based on plat-s3c64xx/gpio-config.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/gpio.h>
--#include <linux/io.h>
--
--#include <plat/gpio-core.h>
--#include <plat/gpio-cfg-s5pc1xx.h>
--
--s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin, unsigned int off)
--{
--	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
--	void __iomem *reg;
--	int shift = off * 2;
--	u32 drvstr;
--
--	if (!chip)
--		return -EINVAL;
--
--	reg = chip->base + 0x0C;
--
--	drvstr = __raw_readl(reg);
--	drvstr = 0xffff & (0x3 << shift);
--	drvstr = drvstr >> shift;
--
--	return (__force s5p_gpio_drvstr_t)drvstr;
--}
--EXPORT_SYMBOL(s5p_gpio_get_drvstr);
--
--int s5p_gpio_set_drvstr(unsigned int pin, unsigned int off,
--			s5p_gpio_drvstr_t drvstr)
--{
--	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
--	void __iomem *reg;
--	int shift = off * 2;
--	u32 tmp;
--
--	if (!chip)
--		return -EINVAL;
--
--	reg = chip->base + 0x0C;
--
--	tmp = __raw_readl(reg);
--	tmp |= drvstr << shift;
--
--	__raw_writel(tmp, reg);
--
--	return 0;
--}
--EXPORT_SYMBOL(s5p_gpio_set_drvstr);
-diff --git a/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h b/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
-deleted file mode 100644
-index 72ad59f..0000000
---- a/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/* linux/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg.h
-- *
-- * Copyright 2009 Samsung Electronic
-- *
-- * S5PC1XX Platform - GPIO pin configuration
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/* This file contains the necessary definitions to get the basic gpio
-- * pin configuration done such as setting a pin to input or output or
-- * changing the pull-{up,down} configurations.
-- */
--
--#ifndef __GPIO_CFG_S5PC1XX_H
--#define __GPIO_CFG_S5PC1XX_H __FILE__
--
--typedef unsigned int __bitwise__ s5p_gpio_drvstr_t;
--
--#define S5P_GPIO_DRVSTR_LV1	0x00
--#define S5P_GPIO_DRVSTR_LV2	0x01
--#define S5P_GPIO_DRVSTR_LV3	0x10
--#define S5P_GPIO_DRVSTR_LV4	0x11
--
--extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin, unsigned int off);
--
--extern int s5p_gpio_set_drvstr(unsigned int pin, unsigned int off,
--			s5p_gpio_drvstr_t drvstr);
--
--#endif /* __GPIO_CFG_S5PC1XX_H */
-diff --git a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c b/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-index 1a63768..b02c36f 100644
---- a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-+++ b/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-@@ -19,7 +19,6 @@
- #include <mach/map.h>
- #include <plat/fb.h>
- #include <plat/gpio-cfg.h>
--#include <plat/gpio-cfg-s5pc1xx.h>
+ # machine support
  
- #define DISR_OFFSET	0x7008
- 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index d552c65..59cae62 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -90,12 +90,6 @@ config S3C_GPIO_CFG_S3C64XX
- 	  Internal configuration to enable S3C64XX style GPIO configuration
- 	  functions.
- 
--config S5P_GPIO_CFG_S5PC1XX
--	bool
--	help
--	  Internal configuration to enable S5PC1XX style GPIO configuration
--	  functions.
--
- config S3C_GPIO_PULL_UPDOWN
- 	bool
- 	help
-@@ -111,6 +105,12 @@ config S3C_GPIO_PULL_UP
- 	help
- 	  Internal configuration to enable the correct GPIO pull helper
- 
-+config S5P_GPIO_DRVSTR
-+	bool
-+	help
-+	  Internal configuration to get and set correct GPIO driver strength
-+	  helper
+diff --git a/arch/arm/mach-s5pv210/gpio.c b/arch/arm/mach-s5pv210/gpio.c
+new file mode 100644
+index 0000000..4bfd21c
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/gpio.c
+@@ -0,0 +1,375 @@
++/* arch/arm/mach-s5pv210/gpio.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5PV210/S5PC110 - GPIOlib support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- config SAMSUNG_GPIO_EXTRA
- 	int "Number of additional GPIO pins"
- 	default 0
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index 44a84e8..e68748e 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -164,3 +164,52 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
- 	return (__force s3c_gpio_pull_t)pup;
- }
- #endif
++#include <linux/kernel.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <mach/map.h>
++#include <mach/gpio.h>
++#include <mach/regs-gpio.h>
++#include <plat/gpio-core.h>
++#include <plat/gpio-cfg.h>
++#include <plat/gpio-cfg-helpers.h>
 +
-+#ifdef CONFIG_S5P_GPIO_DRVSTR
-+s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
++#define OFF_GPCON	(0x00)
++#define OFF_GPDAT	(0x04)
++
++#define con_4bit_shift(__off) ((__off) * 4)
++
++#if 1
++#define gpio_dbg(x...) do { } while (0)
++#else
++#define gpio_dbg(x...) printk(KERN_DEBUG x)
++#endif
++
++static int s5pv210_gpiolib_input(struct gpio_chip *chip, unsigned offset)
 +{
-+	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-+	unsigned int off;
-+	void __iomem *reg;
-+	int shift;
-+	u32 drvstr;
++	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
++	void __iomem *base = ourchip->base;
++	unsigned long con;
 +
-+	if (!chip)
-+		return -EINVAL;
++	con = __raw_readl(base + OFF_GPCON);
++	con &= ~(0xf << con_4bit_shift(offset));
++	__raw_writel(con, base + OFF_GPCON);
 +
-+	off = chip->chip.base - pin;
-+	shift = off * 2;
-+	reg = chip->base + 0x0C;
-+
-+	drvstr = __raw_readl(reg);
-+	drvstr = 0xffff & (0x3 << shift);
-+	drvstr = drvstr >> shift;
-+
-+	return (__force s5p_gpio_drvstr_t)drvstr;
-+}
-+EXPORT_SYMBOL(s5p_gpio_get_drvstr);
-+
-+int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr)
-+{
-+	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-+	unsigned int off;
-+	void __iomem *reg;
-+	int shift;
-+	u32 tmp;
-+
-+	if (!chip)
-+		return -EINVAL;
-+
-+	off = chip->chip.base - pin;
-+	shift = off * 2;
-+	reg = chip->base + 0x0C;
-+
-+	tmp = __raw_readl(reg);
-+	tmp |= drvstr << shift;
-+
-+	__raw_writel(tmp, reg);
++	gpio_dbg("%s: %p: CON now %08lx\n", __func__, base, con);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(s5p_gpio_set_drvstr);
-+#endif	/* CONFIG_S5P_GPIO_DRVSTR */
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-index 29cd6a8..2f2bfc8 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-@@ -25,6 +25,7 @@
- #define __PLAT_GPIO_CFG_H __FILE__
++
++static int s5pv210_gpiolib_output(struct gpio_chip *chip,
++				       unsigned offset, int value)
++{
++	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
++	void __iomem *base = ourchip->base;
++	unsigned long con;
++	unsigned long dat;
++
++	con = __raw_readl(base + OFF_GPCON);
++	con &= ~(0xf << con_4bit_shift(offset));
++	con |= 0x1 << con_4bit_shift(offset);
++
++	dat = __raw_readl(base + OFF_GPDAT);
++	if (value)
++		dat |= 1 << offset;
++	else
++		dat &= ~(1 << offset);
++
++	__raw_writel(dat, base + OFF_GPDAT);
++	__raw_writel(con, base + OFF_GPCON);
++	__raw_writel(dat, base + OFF_GPDAT);
++
++	gpio_dbg("%s: %p: CON %08lx, DAT %08lx\n", __func__, base, con, dat);
++
++	return 0;
++}
++
++static struct s3c_gpio_cfg s5pv210_gpio_cfgs[] = {
++	{
++		/* standard */
++		.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
++		.set_pull	= s3c_gpio_setpull_updown,
++		.get_pull	= s3c_gpio_getpull_updown,
++	}, {
++		/* eint */
++		.cfg_eint	= 0xf,
++		.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
++		.set_pull	= s3c_gpio_setpull_updown,
++		.get_pull	= s3c_gpio_getpull_updown,
++	}, {
++		/* noint */
++		.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
++		.set_pull	= s3c_gpio_setpull_updown,
++		.get_pull	= s3c_gpio_getpull_updown,
++	},
++};
++
++static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
++	{
++		.base	= S5PV210_GPA0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPA0(0),
++			.ngpio	= S5PV210_GPIO_A0_NR,
++			.label	= "GPA0",
++		},
++	}, {
++		.base	= S5PV210_GPA1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPA1(0),
++			.ngpio	= S5PV210_GPIO_A1_NR,
++			.label	= "GPA1",
++		},
++	}, {
++		.base	= S5PV210_GPB_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPB(0),
++			.ngpio	= S5PV210_GPIO_B_NR,
++			.label	= "GPB",
++		},
++	}, {
++		.base	= S5PV210_GPC0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPC0(0),
++			.ngpio	= S5PV210_GPIO_C0_NR,
++			.label	= "GPC0",
++		},
++	}, {
++		.base	= S5PV210_GPC1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPC1(0),
++			.ngpio	= S5PV210_GPIO_C1_NR,
++			.label	= "GPC1",
++		},
++	}, {
++		.base	= S5PV210_GPD0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPD0(0),
++			.ngpio	= S5PV210_GPIO_D0_NR,
++			.label	= "GPD0",
++		},
++	}, {
++		.base	= S5PV210_GPD1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPD1(0),
++			.ngpio	= S5PV210_GPIO_D1_NR,
++			.label	= "GPD1",
++		},
++	}, {
++		.base	= S5PV210_GPE0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPE0(0),
++			.ngpio	= S5PV210_GPIO_E0_NR,
++			.label	= "GPE0",
++		},
++	}, {
++		.base	= S5PV210_GPE1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPE1(0),
++			.ngpio	= S5PV210_GPIO_E1_NR,
++			.label	= "GPE1",
++		},
++	}, {
++		.base	= S5PV210_GPF0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPF0(0),
++			.ngpio	= S5PV210_GPIO_F0_NR,
++			.label	= "GPF0",
++		},
++	}, {
++		.base	= S5PV210_GPF1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPF1(0),
++			.ngpio	= S5PV210_GPIO_F1_NR,
++			.label	= "GPF1",
++		},
++	}, {
++		.base	= S5PV210_GPF2_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPF2(0),
++			.ngpio	= S5PV210_GPIO_F2_NR,
++			.label	= "GPF2",
++		},
++	}, {
++		.base	= S5PV210_GPF3_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPF3(0),
++			.ngpio	= S5PV210_GPIO_F3_NR,
++			.label	= "GPF3",
++		},
++	}, {
++		.base	= S5PV210_GPG0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPG0(0),
++			.ngpio	= S5PV210_GPIO_G0_NR,
++			.label	= "GPG0",
++		},
++	}, {
++		.base	= S5PV210_GPG1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPG1(0),
++			.ngpio	= S5PV210_GPIO_G1_NR,
++			.label	= "GPG1",
++		},
++	}, {
++		.base	= S5PV210_GPG2_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPG2(0),
++			.ngpio	= S5PV210_GPIO_G2_NR,
++			.label	= "GPG2",
++		},
++	}, {
++		.base	= S5PV210_GPG3_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPG3(0),
++			.ngpio	= S5PV210_GPIO_G3_NR,
++			.label	= "GPG3",
++		},
++	}, {
++		.base	= S5PV210_GPH0_BASE,
++		.config	= &s5pv210_gpio_cfgs[1],
++		.chip	= {
++			.base	= S5PV210_GPH0(0),
++			.ngpio	= S5PV210_GPIO_H0_NR,
++			.label	= "GPH0",
++		},
++	}, {
++		.base	= S5PV210_GPH1_BASE,
++		.config	= &s5pv210_gpio_cfgs[1],
++		.chip	= {
++			.base	= S5PV210_GPH1(0),
++			.ngpio	= S5PV210_GPIO_H1_NR,
++			.label	= "GPH1",
++		},
++	}, {
++		.base	= S5PV210_GPH2_BASE,
++		.config	= &s5pv210_gpio_cfgs[1],
++		.chip	= {
++			.base	= S5PV210_GPH2(0),
++			.ngpio	= S5PV210_GPIO_H2_NR,
++			.label	= "GPH2",
++		},
++	}, {
++		.base	= S5PV210_GPH3_BASE,
++		.config	= &s5pv210_gpio_cfgs[1],
++		.chip	= {
++			.base	= S5PV210_GPH3(0),
++			.ngpio	= S5PV210_GPIO_H3_NR,
++			.label	= "GPH3",
++		},
++	}, {
++		.base	= S5PV210_GPI_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_GPI(0),
++			.ngpio	= S5PV210_GPIO_I_NR,
++			.label	= "GPI",
++		},
++	}, {
++		.base	= S5PV210_GPJ0_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPJ0(0),
++			.ngpio	= S5PV210_GPIO_J0_NR,
++			.label	= "GPJ0",
++		},
++	}, {
++		.base	= S5PV210_GPJ1_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPJ1(0),
++			.ngpio	= S5PV210_GPIO_J1_NR,
++			.label	= "GPJ1",
++		},
++	}, {
++		.base	= S5PV210_GPJ2_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPJ2(0),
++			.ngpio	= S5PV210_GPIO_J2_NR,
++			.label	= "GPJ2",
++		},
++	}, {
++		.base	= S5PV210_GPJ3_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPJ3(0),
++			.ngpio	= S5PV210_GPIO_J3_NR,
++			.label	= "GPJ3",
++		},
++	}, {
++		.base	= S5PV210_GPJ4_BASE,
++		.config	= &s5pv210_gpio_cfgs[0],
++		.chip	= {
++			.base	= S5PV210_GPJ4(0),
++			.ngpio	= S5PV210_GPIO_J4_NR,
++			.label	= "GPJ4",
++		},
++	}, {
++		.base	= S5PV210_MP0_1_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_MP0_1(0),
++			.ngpio	= S5PV210_GPIO_MP0_1_NR,
++			.label	= "MP0_1",
++		},
++	}, {
++		.base	= S5PV210_MP0_2_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_MP0_2(0),
++			.ngpio	= S5PV210_GPIO_MP0_2_NR,
++			.label	= "MP0_2",
++		},
++	}, {
++		.base	= S5PV210_MP0_3_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_MP0_3(0),
++			.ngpio	= S5PV210_GPIO_MP0_3_NR,
++			.label	= "MP0_3",
++		},
++	}, {
++		.base	= S5PV210_MP0_4_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_MP0_4(0),
++			.ngpio	= S5PV210_GPIO_MP0_4_NR,
++			.label	= "MP0_4",
++		},
++	}, {
++		.base	= S5PV210_MP0_5_BASE,
++		.config	= &s5pv210_gpio_cfgs[2],
++		.chip	= {
++			.base	= S5PV210_MP0_5(0),
++			.ngpio	= S5PV210_GPIO_MP0_5_NR,
++			.label	= "MP0_5",
++		},
++	},
++};
++
++static void __init s5pv210_gpio_add(struct s3c_gpio_chip *chip, int nr_chips)
++{
++	for (; nr_chips > 0; nr_chips--, chip++) {
++		chip->chip.direction_input = s5pv210_gpiolib_input;
++		chip->chip.direction_output = s5pv210_gpiolib_output;
++		s3c_gpiolib_add(chip);
++	}
++}
++
++
++static int __init s5pv210_gpiolib_init(void)
++{
++	struct s3c_gpio_chip *chips = s5pv210_gpio_4bit;
++	int nr_chips = ARRAY_SIZE(s5pv210_gpio_4bit);
++
++	s5pv210_gpio_add(chips, nr_chips);
++
++	return 0;
++}
++arch_initcall(s5pv210_gpiolib_init);
+diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
+index 533b020..d6046c7 100644
+--- a/arch/arm/mach-s5pv210/include/mach/gpio.h
++++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+@@ -46,6 +46,13 @@
+ #define S5PV210_GPIO_J2_NR	(8)
+ #define S5PV210_GPIO_J3_NR	(8)
+ #define S5PV210_GPIO_J4_NR	(5)
++#define S5PV210_GPIO_MP0_1_NR	(8)
++#define S5PV210_GPIO_MP0_2_NR	(4)
++#define S5PV210_GPIO_MP0_3_NR	(8)
++#define S5PV210_GPIO_MP0_4_NR	(8)
++#define S5PV210_GPIO_MP0_5_NR	(8)
++#define S5PV210_GPIO_MP0_6_NR	(8)
++#define S5PV210_GPIO_MP0_7_NR	(8)
  
- typedef unsigned int __bitwise__ s3c_gpio_pull_t;
-+typedef unsigned int __bitwise__ s5p_gpio_drvstr_t;
+ /* GPIO bank numbers */
  
- /* forward declaration if gpio-core.h hasn't been included */
- struct s3c_gpio_chip;
-@@ -107,4 +108,33 @@ extern int s3c_gpio_setpull(unsigned int pin, s3c_gpio_pull_t pull);
- */
- extern s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin);
+@@ -85,6 +92,14 @@ enum s5p_gpio_number {
+ 	S5PV210_GPIO_J2_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J1),
+ 	S5PV210_GPIO_J3_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J2),
+ 	S5PV210_GPIO_J4_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J3),
++	S5PV210_GPIO_MP0_1_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
++	S5PV210_GPIO_MP0_2_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_1),
++	S5PV210_GPIO_MP0_3_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_2),
++	S5PV210_GPIO_MP0_4_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_3),
++	S5PV210_GPIO_MP0_5_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_4),
++	S5PV210_GPIO_MP0_6_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_5),
++	S5PV210_GPIO_MP0_7_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_6),
++	S5PV210_GPIO_END        = S5PV210_GPIO_NEXT(S5PV210_GPIO_MP0_7),
+ };
  
-+/* Define values for the drvstr available for each gpio pin.
+ /* S5PV210 GPIO number definitions */
+@@ -115,13 +130,19 @@ enum s5p_gpio_number {
+ #define S5PV210_GPJ2(_nr)	(S5PV210_GPIO_J2_START + (_nr))
+ #define S5PV210_GPJ3(_nr)	(S5PV210_GPIO_J3_START + (_nr))
+ #define S5PV210_GPJ4(_nr)	(S5PV210_GPIO_J4_START + (_nr))
++#define S5PV210_MP0_1(_nr)	(S5PV210_GPIO_MP0_1_START + (_nr))
++#define S5PV210_MP0_2(_nr)	(S5PV210_GPIO_MP0_2_START + (_nr))
++#define S5PV210_MP0_3(_nr)	(S5PV210_GPIO_MP0_3_START + (_nr))
++#define S5PV210_MP0_4(_nr)	(S5PV210_GPIO_MP0_4_START + (_nr))
++#define S5PV210_MP0_5(_nr)	(S5PV210_GPIO_MP0_5_START + (_nr))
++#define S5PV210_MP0_6(_nr)	(S5PV210_GPIO_MP0_6_START + (_nr))
++#define S5PV210_MP0_7(_nr)	(S5PV210_GPIO_MP0_7_START + (_nr))
+ 
+ /* the end of the S5PV210 specific gpios */
+-#define S5PV210_GPIO_END	(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) + 1)
+ #define S3C_GPIO_END		S5PV210_GPIO_END
+ 
+ /* define the number of gpios we need to the one after the GPJ4() range */
+-#define ARCH_NR_GPIOS		(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) +	\
++#define ARCH_NR_GPIOS		(S5PV210_GPIO_END + \
+ 				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+ 
+ #include <asm-generic/gpio.h>
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+new file mode 100644
+index 0000000..24e4b7f
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+@@ -0,0 +1,59 @@
++/* linux/arch/arm/plat-s5pc1xx/include/plat/regs-gpio.h
 + *
-+ * These values control the value of the output signal driver strength,
-+ * configurable on most pins on the S5C series.
++ * Copyright 2009 Samsung Electronics Co.
++ *      Byungho Min <bhmin@samsung.com>
++ *
++ * S5PC210/S5PC110 - GPIO register definitions
 + */
-+#define S5P_GPIO_DRVSTR_LV1	((__force s5p_gpio_drvstr_t)0x00)
-+#define S5P_GPIO_DRVSTR_LV2	((__force s5p_gpio_drvstr_t)0x01)
-+#define S5P_GPIO_DRVSTR_LV3	((__force s5p_gpio_drvstr_t)0x10)
-+#define S5P_GPIO_DRVSTR_LV4	((__force s5p_gpio_drvstr_t)0x11)
 +
-+/**
-+ * s5c_gpio_get_drvstr() - get the driver streght value of a gpio pin
-+ * @pin: The pin number to get the settings for
-+ *
-+ * Read the driver streght value for the specified pin.
-+*/
-+extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin);
++#ifndef __ASM_PLAT_S5PC1XX_REGS_GPIO_H
++#define __ASM_PLAT_S5PC1XX_REGS_GPIO_H __FILE__
 +
-+/**
-+ * s3c_gpio_set_drvstr() - set the driver streght value of a gpio pin
-+ * @pin: The pin number to configure the driver streght value
-+ * @drvstr: The new value of the driver strength
-+ *
-+ * This function sets the driver strength value for the specified pin.
-+ * It will return 0 if successfull, or a negative error code if the pin
-+ * cannot support the requested setting.
-+*/
-+extern int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr);
++#include <mach/map.h>
 +
- #endif /* __PLAT_GPIO_CFG_H */
++#define S5PV210_GPIO_BASE	S5P_VA_GPIO
++#define S5PV210_GPA0_BASE	(S5PV210_GPIO_BASE + 0x0000)
++#define S5PV210_GPA1_BASE	(S5PV210_GPIO_BASE + 0x0020)
++#define S5PV210_GPB_BASE	(S5PV210_GPIO_BASE + 0x0040)
++#define S5PV210_GPC0_BASE	(S5PV210_GPIO_BASE + 0x0060)
++#define S5PV210_GPC1_BASE	(S5PV210_GPIO_BASE + 0x0080)
++#define S5PV210_GPD0_BASE	(S5PV210_GPIO_BASE + 0x00A0)
++#define S5PV210_GPD1_BASE	(S5PV210_GPIO_BASE + 0x00C0)
++#define S5PV210_GPE0_BASE	(S5PV210_GPIO_BASE + 0x00E0)
++#define S5PV210_GPE1_BASE	(S5PV210_GPIO_BASE + 0x0100)
++#define S5PV210_GPF0_BASE	(S5PV210_GPIO_BASE + 0x0120)
++#define S5PV210_GPF1_BASE	(S5PV210_GPIO_BASE + 0x0140)
++#define S5PV210_GPF2_BASE	(S5PV210_GPIO_BASE + 0x0160)
++#define S5PV210_GPF3_BASE	(S5PV210_GPIO_BASE + 0x0180)
++#define S5PV210_GPG0_BASE	(S5PV210_GPIO_BASE + 0x01A0)
++#define S5PV210_GPG1_BASE	(S5PV210_GPIO_BASE + 0x01C0)
++#define S5PV210_GPG2_BASE	(S5PV210_GPIO_BASE + 0x01E0)
++#define S5PV210_GPG3_BASE	(S5PV210_GPIO_BASE + 0x0200)
++#define S5PV210_GPH0_BASE	(S5PV210_GPIO_BASE + 0x0C00)
++#define S5PV210_GPH1_BASE	(S5PV210_GPIO_BASE + 0x0C20)
++#define S5PV210_GPH2_BASE	(S5PV210_GPIO_BASE + 0x0C40)
++#define S5PV210_GPH3_BASE	(S5PV210_GPIO_BASE + 0x0C60)
++#define S5PV210_GPI_BASE	(S5PV210_GPIO_BASE + 0x0220)
++#define S5PV210_GPJ0_BASE	(S5PV210_GPIO_BASE + 0x0240)
++#define S5PV210_GPJ1_BASE	(S5PV210_GPIO_BASE + 0x0260)
++#define S5PV210_GPJ2_BASE	(S5PV210_GPIO_BASE + 0x0280)
++#define S5PV210_GPJ3_BASE	(S5PV210_GPIO_BASE + 0x02A0)
++#define S5PV210_GPJ4_BASE	(S5PV210_GPIO_BASE + 0x02C0)
++#define S5PV210_MP0_1_BASE	(S5PV210_GPIO_BASE + 0x02E0)
++#define S5PV210_MP0_2_BASE	(S5PV210_GPIO_BASE + 0x0300)
++#define S5PV210_MP0_3_BASE	(S5PV210_GPIO_BASE + 0x0320)
++#define S5PV210_MP0_4_BASE	(S5PV210_GPIO_BASE + 0x0340)
++#define S5PV210_MP0_5_BASE	(S5PV210_GPIO_BASE + 0x0360)
++#define S5PV210_MP0_6_BASE	(S5PV210_GPIO_BASE + 0x0380)
++#define S5PV210_MP0_7_BASE	(S5PV210_GPIO_BASE + 0x03A0)
++#define S5PV210_EXT_INT_BASE	(S5PV210_GPIO_BASE + 0x0E00)
++#define S5PV210_PDNEN		(S5PV210_GPIO_BASE + 0x0F80)
++#define S5PC100_PDNEN_NORMAL	(0 << 0)
++
++#define S5PV210_PDNEN_CFG_PDNEN	(1 << 1)
++#define S5PV210_PDNEN_CFG_AUTO	(0 << 1)
++#define S5PV210_PDNEN_POWERDOWN	(1 << 0)
++#define S5PV210_PDNEN_NORMAL	(0 << 0)
++
++#endif /* __ASM_PLAT_S5PC1XX_REGS_GPIO_H */
++
 -- 
 1.6.4
