@@ -1,35 +1,36 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Thu, 25 Mar 2010 05:44:30 +0000
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <4BAAD5BB.7050101@samsung.com>
-References: <4BAAD5BB.7050101@samsung.com>
-Message-ID: <20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 25 Mar 2010 08:28:34 +0200
+Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
+In-Reply-To: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201003250828.56848.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Mar 2010 12:17:15 +0900
-Joonyoung Shim <jy0922.shim@samsung.com> wrote:
+? ????????? ?? 20 ????? 2010 20:20:05 ????? Vasily Khoruzhick ???????:
+> Following patch series add support for iPAQ RX1950 PDA - another
+> s3c2442-based machine.
+> Almost all drivers for this machine are included in mainline kernel, and
+> port only lacks battery, WiFi and sound support, they will be added later.
+> 
+> Port still uses machine-specific GPIO API, as generic GPIO lacks GPJ
+> support and RX1950 actively uses GPJ port. However I do not see any
+> benifits in using generic GPIO API in machine support file, as it will not
+> be used with CPU different from s3c2442.
+> 
+> Denis: I hope you'll add your Signed-off at least under first patch.
+> 
+> I doubt that I can get Signed-off from Victor Chukhantsev, as he doesn't
+> work on port for a long time.
+> 
+> Regards,
+> Vasily
 
-> +/* instruction set functions */
-> +static inline int pl330_dmaaddh(u8 *desc_pool_virt, u16 imm, bool ra)
-> +{
-> +	u8 opcode = DMAADDH | (ra << 1);
-> +
-> +	writeb(opcode, desc_pool_virt++);
-
-desc_pool_virt is a virtual address (from dma_alloc_coherent). In such
-case, write[bwl] seems to be the wrong interface. I suggest the
-following code:
-
-	*desc_pool_virt++ = opcode;
-
-> +	writew(imm, desc_pool_virt);
-
-Does anything ensure that this won't generate an unaligned access?
-
-> +	return 3;
-> +}
-
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+Ping :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100325/51f2f5a3/attachment.sig>
