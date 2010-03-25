@@ -1,273 +1,133 @@
-From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Roberto Jimenez)
-Date: Wed, 24 Mar 2010 20:45:10 -0300
-Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
-In-Reply-To: <1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-References: <1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-Message-ID: <1269474310-13970-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+From: matthltc@us.ibm.com (Matt Helsley)
+Date: Wed, 24 Mar 2010 18:11:32 -0700
+Subject: [C/R ARM][PATCH 1/3] ARM: Rudimentary syscall interfaces
+In-Reply-To: <7d08b87d1003241236n2b45e6f4ife36da841351df9d@mail.gmail.com>
+References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+	<1269219965-23923-2-git-send-email-christofferdall@christofferdall.dk>
+	<20100323205342.GA19572@n2100.arm.linux.org.uk>
+	<20100324020342.GB5704@count0.beaverton.ibm.com>
+	<Pine.LNX.4.64.1003240055050.5867@takamine.ncl.cs.columbia.edu>
+	<20100324140252.GC5704@count0.beaverton.ibm.com>
+	<4BAA3586.1020604@cs.columbia.edu>
+	<7d08b87d1003241236n2b45e6f4ife36da841351df9d@mail.gmail.com>
+Message-ID: <20100325011132.GE5704@count0.beaverton.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes checkpatch.pl issues in soc_common.c.
+On Wed, Mar 24, 2010 at 08:36:39PM +0100, Christoffer Dall wrote:
+> On Wed, Mar 24, 2010 at 4:53 PM, Oren Laadan <orenl@cs.columbia.edu> wrote:
+> >
+> >
+> > Matt Helsley wrote:
+> >>
+> >> On Wed, Mar 24, 2010 at 12:57:46AM -0400, Oren Laadan wrote:
+> >>>
+> >>> On Tue, 23 Mar 2010, Matt Helsley wrote:
+> >>>
+> >>>> On Tue, Mar 23, 2010 at 08:53:42PM +0000, Russell King - ARM Linux
+> >>>> wrote:
+> >>>>>
+> >>>>> On Sun, Mar 21, 2010 at 09:06:03PM -0400, Christoffer Dall wrote:
+> >>>>>>
+> >>>>>> This small commit introduces a global state of system calls for ARM
+> >>>>>> making it possible for a debugger or checkpointing to gain information
+> >>>>>> about another process' state with respect to system calls.
+> >>>>>
+> >>>>> I don't particularly like the idea that we always store the syscall
+> >>>>> number to memory for every system call, whether the stored version is
+> >>>>> used or not.
+> >>>>>
+> >>>>> Since ARM caches are generally not write allocate, this means mostly
+> >>>>> write-only variables can have a higher than expected expense.
+> >>>>>
+> >>>>> Is there not some thread flag which can be checked to see if we need to
+> >>>>> store the syscall number?
+> >>>>
+> >>>> Perhaps before we freeze the task we can save the syscall number on ARM.
+> >>>> The patches suggest that the signal delivery path -- which the freezer
+> >>>> utilizes -- has the syscall number already.
+> >
+> > Actually, the signal path doesn't have the syscall number, it has
+> > a binary "in syscall" value.
+> >
 
-Signed-off-by: Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
----
- drivers/pcmcia/soc_common.c |  128 +++++++++++++++++++++++--------------------
- 1 files changed, 68 insertions(+), 60 deletions(-)
+Argh. I read too much into the name :(.
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index fd4c25a..25c5b50 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -31,20 +31,20 @@
- ======================================================================*/
- 
- 
--#include <linux/module.h>
--#include <linux/moduleparam.h>
-+#include <linux/cpufreq.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
--#include <linux/timer.h>
- #include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
- #include <linux/mutex.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
- #include <linux/spinlock.h>
--#include <linux/cpufreq.h>
-+#include <linux/timer.h>
- 
- #include <mach/hardware.h>
--#include <asm/io.h>
- #include <asm/system.h>
- 
- #include "soc_common.h"
-@@ -69,7 +69,8 @@ EXPORT_SYMBOL(soc_pcmcia_debug);
- 
- #endif
- 
--#define to_soc_pcmcia_socket(x)	container_of(x, struct soc_pcmcia_socket, socket)
-+#define to_soc_pcmcia_socket(x)	\
-+	container_of(x, struct soc_pcmcia_socket, socket)
- 
- static unsigned short
- calc_speed(unsigned short *spds, int num, unsigned short dflt)
-@@ -86,11 +87,15 @@ calc_speed(unsigned short *spds, int num, unsigned short dflt)
- 	return speed;
- }
- 
--void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt, struct soc_pcmcia_timing *timing)
-+void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt,
-+	struct soc_pcmcia_timing *timing)
- {
--	timing->io = calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
--	timing->mem = calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
--	timing->attr = calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
-+	timing->io =
-+		calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
-+	timing->mem =
-+		calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
-+	timing->attr =
-+		calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
- }
- EXPORT_SYMBOL(soc_common_pcmcia_get_timing);
- 
-@@ -132,8 +137,8 @@ static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
-  *
-  * Convert PCMCIA socket state to our socket configure structure.
-  */
--static int
--soc_common_pcmcia_config_skt(struct soc_pcmcia_socket *skt, socket_state_t *state)
-+static int soc_common_pcmcia_config_skt(
-+	struct soc_pcmcia_socket *skt, socket_state_t *state)
- {
- 	int ret;
- 
-@@ -145,7 +150,8 @@ soc_common_pcmcia_config_skt(struct soc_pcmcia_socket *skt, socket_state_t *stat
- 		 */
- 		if (skt->irq_state != 1 && state->io_irq) {
- 			skt->irq_state = 1;
--			set_irq_type(skt->socket.pci_irq, IRQ_TYPE_EDGE_FALLING);
-+			set_irq_type(skt->socket.pci_irq,
-+				IRQ_TYPE_EDGE_FALLING);
- 		} else if (skt->irq_state == 1 && state->io_irq == 0) {
- 			skt->irq_state = 0;
- 			set_irq_type(skt->socket.pci_irq, IRQ_TYPE_NONE);
-@@ -299,24 +305,24 @@ soc_common_pcmcia_get_status(struct pcmcia_socket *sock, unsigned int *status)
-  * of power configuration, reset, &c. We also record the value of
-  * `state' in order to regurgitate it to the PCMCIA core later.
-  */
--static int
--soc_common_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
-+static int soc_common_pcmcia_set_socket(
-+	struct pcmcia_socket *sock, socket_state_t *state)
- {
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 
--	debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
--			(state->csc_mask==0)?"<NONE> ":"",
--			(state->csc_mask&SS_DETECT)?"DETECT ":"",
--			(state->csc_mask&SS_READY)?"READY ":"",
--			(state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
--			(state->csc_mask&SS_BATWARN)?"BATWARN ":"",
--			(state->csc_mask&SS_STSCHG)?"STSCHG ":"",
--			(state->flags==0)?"<NONE> ":"",
--			(state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
--			(state->flags&SS_IOCARD)?"IOCARD ":"",
--			(state->flags&SS_RESET)?"RESET ":"",
--			(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
--			(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
-+	debug(skt, 2, "mask: %s%s%s%s%s%s flags: %s%s%s%s%s%s Vcc %d Vpp %d irq %d\n",
-+			(state->csc_mask == 0)		? "<NONE> " :	"",
-+			(state->csc_mask & SS_DETECT)	? "DETECT " :	"",
-+			(state->csc_mask & SS_READY)	? "READY " :	"",
-+			(state->csc_mask & SS_BATDEAD)	? "BATDEAD " :	"",
-+			(state->csc_mask & SS_BATWARN)	? "BATWARN " :	"",
-+			(state->csc_mask & SS_STSCHG)	? "STSCHG " :	"",
-+			(state->flags == 0)		? "<NONE> " :	"",
-+			(state->flags & SS_PWR_AUTO)	? "PWR_AUTO " :	"",
-+			(state->flags & SS_IOCARD)	? "IOCARD " :	"",
-+			(state->flags & SS_RESET)	? "RESET " :	"",
-+			(state->flags & SS_SPKR_ENA)	? "SPKR_ENA " :	"",
-+			(state->flags & SS_OUTPUT_ENA)	? "OUTPUT_ENA " : "",
- 			state->Vcc, state->Vpp, state->io_irq);
- 
- 	return soc_common_pcmcia_config_skt(skt, state);
-@@ -331,8 +337,8 @@ soc_common_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
-  *
-  * Returns: 0 on success, -1 on error
-  */
--static int
--soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *map)
-+static int soc_common_pcmcia_set_io_map(
-+	struct pcmcia_socket *sock, struct pccard_io_map *map)
- {
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 	unsigned short speed = map->speed;
-@@ -341,14 +347,14 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
- 		map->map, map->speed, (unsigned long long)map->start,
- 		(unsigned long long)map->stop);
- 	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
--		(map->flags==0)?"<NONE>":"",
--		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
--		(map->flags&MAP_16BIT)?"16BIT ":"",
--		(map->flags&MAP_AUTOSZ)?"AUTOSZ ":"",
--		(map->flags&MAP_0WS)?"0WS ":"",
--		(map->flags&MAP_WRPROT)?"WRPROT ":"",
--		(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"",
--		(map->flags&MAP_PREFETCH)?"PREFETCH ":"");
-+		(map->flags == 0)		? "<NONE>"	: "",
-+		(map->flags & MAP_ACTIVE)	? "ACTIVE "	: "",
-+		(map->flags & MAP_16BIT)	? "16BIT "	: "",
-+		(map->flags & MAP_AUTOSZ)	? "AUTOSZ "	: "",
-+		(map->flags & MAP_0WS)		? "0WS "	: "",
-+		(map->flags & MAP_WRPROT)	? "WRPROT "	: "",
-+		(map->flags & MAP_USE_WAIT)	? "USE_WAIT "	: "",
-+		(map->flags & MAP_PREFETCH)	? "PREFETCH "	: "");
- 
- 	if (map->map >= MAX_IO_WIN) {
- 		printk(KERN_ERR "%s(): map (%d) out of range\n", __func__,
-@@ -385,8 +391,8 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
-  *
-  * Returns: 0 on success, -ERRNO on error
-  */
--static int
--soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map)
-+static int soc_common_pcmcia_set_mem_map(
-+	struct pcmcia_socket *sock, struct pccard_mem_map *map)
- {
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 	struct resource *res;
-@@ -395,14 +401,14 @@ soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map
- 	debug(skt, 2, "map %u speed %u card_start %08x\n",
- 		map->map, map->speed, map->card_start);
- 	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
--		(map->flags==0)?"<NONE>":"",
--		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
--		(map->flags&MAP_16BIT)?"16BIT ":"",
--		(map->flags&MAP_AUTOSZ)?"AUTOSZ ":"",
--		(map->flags&MAP_0WS)?"0WS ":"",
--		(map->flags&MAP_WRPROT)?"WRPROT ":"",
--		(map->flags&MAP_ATTRIB)?"ATTRIB ":"",
--		(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"");
-+		(map->flags == 0)		? "<NONE>"	: "",
-+		(map->flags & MAP_ACTIVE)	? "ACTIVE "	: "",
-+		(map->flags & MAP_16BIT)	? "16BIT "	: "",
-+		(map->flags & MAP_AUTOSZ)	? "AUTOSZ "	: "",
-+		(map->flags & MAP_0WS)		? "0WS "	: "",
-+		(map->flags & MAP_WRPROT)	? "WRPROT "	: "",
-+		(map->flags & MAP_ATTRIB)	? "ATTRIB "	: "",
-+		(map->flags & MAP_USE_WAIT)	? "USE_WAIT "	: "");
- 
- 	if (map->map >= MAX_WIN)
- 		return -EINVAL;
-@@ -457,8 +463,8 @@ static struct bittbl conf_bits[] = {
- 	{ SS_OUTPUT_ENA,	"SS_OUTPUT_ENA"	},
- };
- 
--static void
--dump_bits(char **p, const char *prefix, unsigned int val, struct bittbl *bits, int sz)
-+static void dump_bits(char **p, const char *prefix,
-+	unsigned int val, struct bittbl *bits, int sz)
- {
- 	char *b = *p;
- 	int i;
-@@ -476,13 +482,14 @@ dump_bits(char **p, const char *prefix, unsigned int val, struct bittbl *bits, i
-  *
-  * Returns: the number of characters added to the buffer
-  */
--static ssize_t show_status(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t show_status(
-+	struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct soc_pcmcia_socket *skt =
- 		container_of(dev, struct soc_pcmcia_socket, socket.dev);
- 	char *p = buf;
- 
--	p+=sprintf(p, "slot     : %d\n", skt->nr);
-+	p += sprintf(p, "slot     : %d\n", skt->nr);
- 
- 	dump_bits(&p, "status", skt->status,
- 		  status_bits, ARRAY_SIZE(status_bits));
-@@ -491,12 +498,12 @@ static ssize_t show_status(struct device *dev, struct device_attribute *attr, ch
- 	dump_bits(&p, "cs_flags", skt->cs_state.flags,
- 		  conf_bits, ARRAY_SIZE(conf_bits));
- 
--	p+=sprintf(p, "Vcc      : %d\n", skt->cs_state.Vcc);
--	p+=sprintf(p, "Vpp      : %d\n", skt->cs_state.Vpp);
--	p+=sprintf(p, "IRQ      : %d (%d)\n", skt->cs_state.io_irq,
-+	p += sprintf(p, "Vcc      : %d\n", skt->cs_state.Vcc);
-+	p += sprintf(p, "Vpp      : %d\n", skt->cs_state.Vpp);
-+	p += sprintf(p, "IRQ      : %d (%d)\n", skt->cs_state.io_irq,
- 		skt->socket.pci_irq);
- 	if (skt->ops->show_timing)
--		p+=skt->ops->show_timing(skt, p);
-+		p += skt->ops->show_timing(skt, p);
- 
- 	return p-buf;
- }
-@@ -589,7 +596,7 @@ soc_pcmcia_notifier(struct notifier_block *nb, unsigned long val, void *data)
- 
- 	mutex_lock(&soc_pcmcia_sockets_lock);
- 	list_for_each_entry(skt, &soc_pcmcia_sockets, node)
--		if ( skt->ops->frequency_change )
-+		if (skt->ops->frequency_change)
- 			ret += skt->ops->frequency_change(skt, val, freqs);
- 	mutex_unlock(&soc_pcmcia_sockets_lock);
- 
-@@ -615,7 +622,8 @@ fs_initcall(soc_pcmcia_cpufreq_register);
- 
- static void soc_pcmcia_cpufreq_unregister(void)
- {
--	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
-+	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block,
-+		CPUFREQ_TRANSITION_NOTIFIER);
- }
- module_exit(soc_pcmcia_cpufreq_unregister);
- 
--- 
-1.7.0.3
+> 
+> Well, this could be changed to pass the syscall number through
+> registers along to try_to_freeze without any mentionable performance
+> hit.
+
+Yes, that's possible. I was thinking we could still use your thread info
+field but only store to it when we know it will be useful for c/r rather
+than for each syscall. Personally, I'd rather avoid passing the extra
+parameter into try_to_freeze(). Your idea below seems better to me.
+
+> Re-using the assembly code or factoring it out so that it can be used
+> from multiple places doesn't seem very pleasing to me, as the assembly
+> code is in the critical path and written specifically for the context
+> of a process entering the kernel. Please correct me if I'm wrong.
+> 
+> I imagine simply a function in C, more or less re-implementing the
+> logic that's already in entry-common.S, might do the trick. I wouldn't
+> worry much about the performance in this case as it will not be used
+> often. The following _untested_ snippet illustrates my idea:
+> 
+> ---
+>  arch/arm/include/asm/syscall.h |   93 +++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 92 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
+> index 3b3248f..a7f2615 100644
+> --- a/arch/arm/include/asm/syscall.h
+> +++ b/arch/arm/include/asm/syscall.h
+> @@ -10,10 +10,101 @@
+>  #ifndef _ASM_ARM_SYSCALLS_H
+>  #define _ASM_ARM_SYSCALLS_H
+> 
+> +static inline int get_swi_instruction(struct task_struct *task,
+> +				      struct pt_regs *regs,
+> +				      unsigned long *instr)
+> +{
+> +	struct page *page = NULL;
+> +	unsigned long instr_addr;
+> +	unsigned long *ptr;
+> +	int ret;
+> +
+> +	instr_addr = regs->ARM_pc - 4;
+> +
+> +	down_read(&task->mm->mmap_sem);
+> +	ret = get_user_pages(task, task->mm, instr_addr,
+> +			     1, 0, 0, &page, NULL);
+> +	up_read(&task->mm->mmap_sem);
+> +
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ptr = (unsigned long *)kmap_atomic(page, KM_USER1);
+> +	memcpy(instr,
+> +	       ptr + (instr_addr >> PAGE_SHIFT),
+			^shouldn't this be:
+		      instr_addr & PAGE_MASK
+
+> +	       sizeof(unsigned long));
+> +	kunmap_atomic(ptr, KM_USER1);
+> +
+> +	page_cache_release(page);
+> +
+> +	return 0;
+> +}
+
+(again, not familiar with ARM so my understanding is:
+
+I guess swi is "syscall word immediate".
+
+The syscall nr is embedded in the instruction as an immediate
+value and you're getting a copy of that instruction using the value of
+the pc register just after the syscall instruction was executed.)
+
+Perhaps I am missing or forgetting something. Why isn't this as simple
+as calling get_user() or even copy_from_user() using instr_addr?
+
+Cheers,
+	-Matt Helsley
