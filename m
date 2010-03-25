@@ -1,290 +1,72 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Mar 2010 17:02:30 -0400 (EDT)
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-Message-ID: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Mar 2010 21:04:09 +0000
+Subject: RFC: ARM Boot standard for passing device tree blob
+In-Reply-To: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
+References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
+Message-ID: <20100325210409.GH24984@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 24, 2010 at 09:11:56AM -0600, Grant Likely wrote:
+> Hi all,
+> 
+> Since work is being done to add ARM Flattened Device Tree support to
+> both Linux and FreeBSD, I think it would be worth while to agree on a
+> common boot interface for passing a device tree blob from firmware to
+> the kernel (or in the case of kexec, from the old to new kernels).
+> I've drafted up something quickly on fdt.secretlab.ca.  The page can
+> be found here:
+> 
+> http://fdt.secretlab.ca/Boot_Environment#ARM
+> 
+> Feel free to modify the draft on the wiki if you notice any missing
+> details.  I've also posted the current text below so it is easy to
+> review and comment on.
+> 
+> (btw, the wiki at fdt.secretlab.ca should be moving to devicetree.org
+> in the near future, but I'll keep the old domain name around.
+> devicetree.org will be used to document new device tree bindings in an
+> OS-agnostic location.)
+> 
+> 
+> == ARM ==
+> See Documentation/arm/Booting and arch/arm/include/asm/setup.h in the
+> Linux kernel source tree for background information.  Some of the
+> content of this section is extracted from those files.
+> 
+> '''Draft'''
+> 
+> ===Required System State===
+> *Quiesce all DMA
+> *CPU register contents
+> **r0 = 0
+> **r1 = Linux machine number (as defined in the ARM Linux machine database) or 0
 
-The VIVT cache of a highmem page is always flushed before the page
-is unmapped.  This cache flush is explicit through flush_cache_kmaps()
-in flush_all_zero_pkmaps(), or through __cpuc_flush_dcache_area() in
-kunmap_atomic().  There is also an implicit flush of those highmem pages
-that were part of a process that just terminated making those pages free
-as the whole VIVT cache has to be flushed on every task switch. Hence
-unmapped highmem pages need no cache maintenance in that case.
+0 is a valid machine number.  What is your purpose of passing 0?
 
-However unmapped pages may still be cached with a VIPT cache because the
-cache is tagged with physical addresses.  There is no need for a whole
-cache flush during task switching for that reason, and despite the
-explicit cache flushes in flush_all_zero_pkmaps() and kunmap_atomic(),
-some highmem pages that were mapped in user space end up still cached
-even when they become unmapped.
+> **r2 = physical address of tagged parameter list in system RAM
+> *IRQs disabled
+> *MMU off
+> *Instruction cache either on or off
+> *Data cache turned off
 
-So, we do have to perform cache maintenance on those unmapped highmem
-pages in the context of DMA when using a VIPT cache.  Unfortunately,
-it is not possible to perform that cache maintenance using physical
-addresses as all the L1 cache maintenance coprocessor functions accept
-virtual addresses only.  Therefore we have no choice but to set up a
-temporary virtual mapping for that purpose.
+Would recommend saying "Data cache(s) turned off" so that L2 cache is
+included.
 
-And of course the explicit cache flushing when unmapping a highmem page
-on a system with a VIPT cache now can go, which should increase
-performance.
+> ===Minimal state for Flattened Device Tree Boot===
+> For FDT booting, the tagged list only needs to contain a single device
+> tree tag, and the device tree blob could be appended to the end of the
+> tagged list so that everything resides in the same region of memory.
 
-While at it, because the code in __flush_dcache_page() has to be modified
-anyway, let's also make sure the mapped highmem pages are pinned with
-kmap_high_get() for the duration of the cache maintenance operation.
-Because kunmap() does unmap highmem pages lazily, it was reported by
-Gary King <GKing@nvidia.com> that those pages ended up being unmapped
-during cache maintenance on SMP causing segmentation faults.
+That's a bad idea.  Sometimes the tagged list can be extended by wrappers
+around the kernel, and data placed at the end of the list would be
+overwritten.
 
-Signed-off-by: Nicolas Pitre <nico@marvell.com>
----
- arch/arm/include/asm/highmem.h    |   15 +++++-
- arch/arm/include/asm/kmap_types.h |    1 +
- arch/arm/mm/copypage-v6.c         |    9 +---
- arch/arm/mm/dma-mapping.c         |    5 ++
- arch/arm/mm/flush.c               |   25 +++++----
- arch/arm/mm/highmem.c             |   87 ++++++++++++++++++++++++++++++-
- 6 files changed, 122 insertions(+), 20 deletions(-)
+As the tagged list can encode arbitarily sized data chunks, there's no
+reason to use a pointer in the tagged list.  However, there is a problem:
+what do you do with a large chunk of data in the tagged list?  You can't
+allocate memory to copy it in the kernel because no memory allocators
+are up and running...
 
-diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
-index 7f36d00..feb988a 100644
---- a/arch/arm/include/asm/highmem.h
-+++ b/arch/arm/include/asm/highmem.h
-@@ -11,7 +11,11 @@
- 
- #define kmap_prot		PAGE_KERNEL
- 
--#define flush_cache_kmaps()	flush_cache_all()
-+#define flush_cache_kmaps() \
-+	do { \
-+		if (cache_is_vivt()) \
-+			flush_cache_all(); \
-+	} while (0)
- 
- extern pte_t *pkmap_page_table;
- 
-@@ -21,11 +25,20 @@ extern void *kmap_high(struct page *page);
- extern void *kmap_high_get(struct page *page);
- extern void kunmap_high(struct page *page);
- 
-+extern void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte);
-+extern void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte);
-+
-+/*
-+ * The following functions are already defined by <linux/highmem.h>
-+ * when CONFIG_HIGHMEM is not set.
-+ */
-+#ifdef CONFIG_HIGHMEM
- extern void *kmap(struct page *page);
- extern void kunmap(struct page *page);
- extern void *kmap_atomic(struct page *page, enum km_type type);
- extern void kunmap_atomic(void *kvaddr, enum km_type type);
- extern void *kmap_atomic_pfn(unsigned long pfn, enum km_type type);
- extern struct page *kmap_atomic_to_page(const void *ptr);
-+#endif
- 
- #endif
-diff --git a/arch/arm/include/asm/kmap_types.h b/arch/arm/include/asm/kmap_types.h
-index c019949..c4b2ea3 100644
---- a/arch/arm/include/asm/kmap_types.h
-+++ b/arch/arm/include/asm/kmap_types.h
-@@ -18,6 +18,7 @@ enum km_type {
- 	KM_IRQ1,
- 	KM_SOFTIRQ0,
- 	KM_SOFTIRQ1,
-+	KM_L1_CACHE,
- 	KM_L2_CACHE,
- 	KM_TYPE_NR
- };
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index 8bca4de..f55fa10 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -41,14 +41,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
- 	kfrom = kmap_atomic(from, KM_USER0);
- 	kto = kmap_atomic(to, KM_USER1);
- 	copy_page(kto, kfrom);
--#ifdef CONFIG_HIGHMEM
--	/*
--	 * kmap_atomic() doesn't set the page virtual address, and
--	 * kunmap_atomic() takes care of cache flushing already.
--	 */
--	if (page_address(to) != NULL)
--#endif
--		__cpuc_flush_dcache_area(kto, PAGE_SIZE);
-+	__cpuc_flush_dcache_area(kto, PAGE_SIZE);
- 	kunmap_atomic(kto, KM_USER1);
- 	kunmap_atomic(kfrom, KM_USER0);
- }
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 0da7ecc..e955dc4 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -464,6 +464,11 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
- 				vaddr += offset;
- 				op(vaddr, len, dir);
- 				kunmap_high(page);
-+			} else if (cache_is_vipt()) {
-+				pte_t saved_pte;
-+				vaddr = kmap_high_l1_vipt(page, &saved_pte);
-+				op(vaddr + offset, len, dir);
-+				kunmap_high_l1_vipt(page, saved_pte);
- 			}
- 		} else {
- 			vaddr = page_address(page) + offset;
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index e34f095..c6844cb 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -13,6 +13,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/cachetype.h>
-+#include <asm/highmem.h>
- #include <asm/smp_plat.h>
- #include <asm/system.h>
- #include <asm/tlbflush.h>
-@@ -152,21 +153,25 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
- 
- void __flush_dcache_page(struct address_space *mapping, struct page *page)
- {
--	void *addr = page_address(page);
--
- 	/*
- 	 * Writeback any data associated with the kernel mapping of this
- 	 * page.  This ensures that data in the physical page is mutually
- 	 * coherent with the kernels mapping.
- 	 */
--#ifdef CONFIG_HIGHMEM
--	/*
--	 * kmap_atomic() doesn't set the page virtual address, and
--	 * kunmap_atomic() takes care of cache flushing already.
--	 */
--	if (addr)
--#endif
--		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-+	if (!PageHighMem(page)) {
-+		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
-+	} else {
-+		void *addr = kmap_high_get(page);
-+		if (addr) {
-+			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-+			kunmap_high(page);
-+		} else if (cache_is_vipt()) {
-+			pte_t saved_pte;
-+			addr = kmap_high_l1_vipt(page, &saved_pte);
-+			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-+			kunmap_high_l1_vipt(page, saved_pte);
-+		}
-+	}
- 
- 	/*
- 	 * If this is a page cache page, and we have an aliasing VIPT cache,
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 2be1ec7..77b030f 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -79,7 +79,8 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
- 	unsigned int idx = type + KM_TYPE_NR * smp_processor_id();
- 
- 	if (kvaddr >= (void *)FIXADDR_START) {
--		__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-+		if (cache_is_vivt())
-+			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 		BUG_ON(vaddr != __fix_to_virt(FIX_KMAP_BEGIN + idx));
- 		set_pte_ext(TOP_PTE(vaddr), __pte(0), 0);
-@@ -124,3 +125,87 @@ struct page *kmap_atomic_to_page(const void *ptr)
- 	pte = TOP_PTE(vaddr);
- 	return pte_page(*pte);
- }
-+
-+#ifdef CONFIG_CPU_CACHE_VIPT
-+
-+#include <linux/percpu.h>
-+
-+/*
-+ * The VIVT cache of a highmem page is always flushed before the page
-+ * is unmapped. Hence unmapped highmem pages need no cache maintenance
-+ * in that case.
-+ *
-+ * However unmapped pages may still be cached with a VIPT cache, and
-+ * it is not possible to perform cache maintenance on them using physical
-+ * addresses unfortunately.  So we have no choice but to set up a temporary
-+ * virtual mapping for that purpose.
-+ *
-+ * Yet this VIPT cache maintenance may be triggered from DMA support
-+ * functions which are possibly called from interrupt context. As we don't
-+ * want to keep interrupt disabled all the time when such maintenance is
-+ * taking place, we therefore allow for some reentrancy by preserving and
-+ * restoring the previous fixmap entry before the interrupted context is
-+ * resumed.  If the reentrancy depth is 0 then there is no need to restore
-+ * the previous fixmap, and leaving the current one in place allow it to
-+ * be reused the next time without a TLB flush (common with DMA).
-+ */
-+
-+static DEFINE_PER_CPU(int, kmap_high_l1_vipt_depth);
-+
-+void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte)
-+{
-+	unsigned int idx, cpu = smp_processor_id();
-+	int *depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
-+	unsigned long vaddr, flags;
-+	pte_t pte, *ptep;
-+
-+	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
-+	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-+	ptep = TOP_PTE(vaddr);
-+	pte = mk_pte(page, kmap_prot);
-+
-+	if (!in_interrupt())
-+		preempt_disable();
-+
-+	raw_local_irq_save(flags);
-+	(*depth)++;
-+	if (pte_val(*ptep) == pte_val(pte)) {
-+		*saved_pte = pte;
-+	} else {
-+		*saved_pte = *ptep;
-+		set_pte_ext(ptep, pte, 0);
-+		local_flush_tlb_kernel_page(vaddr);
-+	}
-+	raw_local_irq_restore(flags);
-+
-+	return (void *)vaddr;
-+}
-+
-+void kunmap_high_l1_vipt(struct page *page, pte_t saved_pte)
-+{
-+	unsigned int idx, cpu = smp_processor_id();
-+	int *depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
-+	unsigned long vaddr, flags;
-+	pte_t pte, *ptep;
-+
-+	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
-+	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-+	ptep = TOP_PTE(vaddr);
-+	pte = mk_pte(page, kmap_prot);
-+
-+	BUG_ON(pte_val(*ptep) != pte_val(pte));
-+	BUG_ON(*depth <= 0);
-+
-+	raw_local_irq_save(flags);
-+	(*depth)--;
-+	if (*depth != 0 && pte_val(pte) != pte_val(saved_pte)) {
-+		set_pte_ext(ptep, saved_pte, 0);
-+		local_flush_tlb_kernel_page(vaddr);
-+	}
-+	raw_local_irq_restore(flags);
-+
-+	if (!in_interrupt())
-+		preempt_enable();
-+}
-+
-+#endif  /* CONFIG_CPU_CACHE_VIPT */
-
-
-Nicolas
+That's always been the catch-22 with passing binary data blobs to the
+kernel.
