@@ -1,101 +1,79 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Mar 2010 20:23:08 +0000
-Subject: [PATCH 1/4] cns3xxx: Add basic support for Cavium Networks
-	CNS3xxx processors
-In-Reply-To: <20100325201040.GA8014@oksana.dev.rtsoft.ru>
-References: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
-	<20100325201040.GA8014@oksana.dev.rtsoft.ru>
-Message-ID: <20100325202308.GA24984@n2100.arm.linux.org.uk>
+Date: Thu, 25 Mar 2010 20:31:07 +0000
+Subject: [PATCH 1/7 v2] Introduce plat-tcc
+In-Reply-To: <20100325200746.GD2047@bluebox.local>
+References: <20100325200427.GC2047@bluebox.local>
+	<20100325200746.GD2047@bluebox.local>
+Message-ID: <20100325203107.GB24984@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 11:10:40PM +0300, Anton Vorontsov wrote:
-> diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+On Thu, Mar 25, 2010 at 09:07:48PM +0100, Hans J. Koch wrote:
+> +#define __virt_to_bus(x)	__virt_to_phys(x)
+> +#define __bus_to_virt(x)	__phys_to_virt(x)
+> +#define __pfn_to_bus(x)		__pfn_to_phys(x)
+> +#define __bus_to_pfn(x)		__phys_to_pfn(x)
+
+You don't need to define any of these.
+
+> diff --git a/arch/arm/plat-tcc/include/mach/vmalloc.h b/arch/arm/plat-tcc/include/mach/vmalloc.h
 > new file mode 100644
-> index 0000000..924e4da
+> index 0000000..9635303
 > --- /dev/null
-> +++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-> @@ -0,0 +1,160 @@
-> +/*
-> + * Cavium Networks CNS3420 Validation Board
-> + *
-> + * Copyright 2000 Deep Blue Solutions Ltd
-> + * Copyright 2008 ARM Limited
-> + * Copyright 2008 Cavium Networks
-> + *		  Scott Shu
-> + * Copyright 2010 MontaVista Software, LLC.
-> + *		  Anton Vorontsov <avorontsov@mvista.com>
-> + *
-> + * This file is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, Version 2, as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/compiler.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/serial_8250.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/mach/time.h>
-> +#include <mach/hardware.h>
-> +#include <mach/io.h>
-
-linux/io.h please.
-
-> +static void __init cns3420_fixup(struct machine_desc *desc,
-> +				 struct tag *tags, char **cmdline,
-> +				 struct meminfo *mi)
-> +{
-> +	/* Fixup for old bootloaders. */
-> +	mi->nr_banks = 1;
-> +	mi->bank[0].start = 0x00000000;
-> +	mi->bank[0].size = SZ_128M;
-> +	mi->bank[0].node = 0;
-
-Can you not supply this via a built-in command line or a command line
-from the boot loader?
-
-> diff --git a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-> new file mode 100644
-> index 0000000..d0b4aff
-> --- /dev/null
-> +++ b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
+> +++ b/arch/arm/plat-tcc/include/mach/vmalloc.h
 > @@ -0,0 +1,11 @@
 > +/*
-> + * Copyright 2000 Russell King.
-> + * Copyright 2003 ARM Limited
-> + * Copyright 2008 Cavium Networks
+> + * Author: <linux@telechips.com>
+> + * Created: June 10, 2008
 > + *
-> + * This file is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, Version 2, as
-> + * published by the Free Software Foundation.
+> + * Copyright (C) 2000 Russell King.
+> + * Copyright (C) 2008-2009 Telechips
+> + *
+> + * Licensed under the terms of the GPL v2.
+> + */
+> +#define VMALLOC_END	  (PAGE_OFFSET + 0x10000000)
+
+Base address of IO rather than something dependent on PAGE_OFFSET?
+
+> +
+> diff --git a/arch/arm/plat-tcc/system.c b/arch/arm/plat-tcc/system.c
+> new file mode 100644
+> index 0000000..1a33ced
+> --- /dev/null
+> +++ b/arch/arm/plat-tcc/system.c
+> @@ -0,0 +1,24 @@
+> +/*
+> + * System functions for Telechips TCCxxxx SoCs
+> + *
+> + * Copyright (C) Hans J. Koch <hjk@linutronix.de>
+> + *
+> + * Licensed under the terms of the GPL v2.
+> + *
 > + */
 > +
-> +#define VMALLOC_END		(PAGE_OFFSET + 0x18000000)
+> +#include <asm/io.h>
 
-This should be defined as the maximum address of the vmalloc area,
-which should be independent of PAGE_OFFSET.
+linux/io.h ?
 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index c4ed9f9..488bcb1 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -384,7 +384,7 @@ config CPU_FEROCEON_OLD_ID
->  
->  # ARMv6
->  config CPU_V6
-> -	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-> +	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE || ARCH_CNS3XXX
-
-So I assume by this your platform can boot without having a processor of
-any kind?
-
-If not, why allow the user to disable the option?
+> +#include <mach/tcc8k-regs.h>
+> +
+> +/* System reboot */
+> +void plat_tcc_reboot(void)
+> +{
+> +	/* Make sure clocks are on */
+> +	__raw_writel(0xffffffff, CKC_BASE + BCLKCTR0_OFFS);
+> +
+> +	/* Enable watchdog reset */
+> +	__raw_writel(0x49, TIMER_BASE + TWDCFG_OFFS);
+> +	/* Wait for reset */
+> +	unreachable();
+> +}
+> +
+> -- 
+> 1.6.3.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
