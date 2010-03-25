@@ -1,22 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 Mar 2010 10:36:17 +0100
-Subject: [PATCH] i.MX25: Define address mapping macros
-In-Reply-To: <20100325085057.GG2328@darwin>
-References: <20100325085057.GG2328@darwin>
-Message-ID: <20100325093617.GA16329@pengutronix.de>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Thu, 25 Mar 2010 15:33:33 +0530
+Subject: [PATCH] removing compilation warning comming from clkdev.h
+In-Reply-To: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
+References: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <1269511413-30621-2-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Matthias,
+clkdev.h is using struct device *. Due to this compilation
+warning is comming. Removing this warning.
 
-On Thu, Mar 25, 2010 at 09:50:57AM +0100, Matthias Kaehlcke wrote:
-> Add macros for mapping physical addresses of i.MX25 registers to virtual
-> addresses
-Where do you need them?  MX25_IO_ADDRESS isn't enough?
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/include/asm/clkdev.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/include/asm/clkdev.h b/arch/arm/include/asm/clkdev.h
+index 7a0690d..b56c138 100644
+--- a/arch/arm/include/asm/clkdev.h
++++ b/arch/arm/include/asm/clkdev.h
+@@ -13,6 +13,7 @@
+ #define __ASM_CLKDEV_H
+ 
+ struct clk;
++struct device;
+ 
+ struct clk_lookup {
+ 	struct list_head	node;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.0.2
