@@ -1,38 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Mar 2010 15:24:29 +0000
-Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
-In-Reply-To: <20100325151030.GD6590@n2100.arm.linux.org.uk>
-References: <20100325145324.12837.85927.stgit@e102109-lin.cambridge.arm.com>
-	<20100325151030.GD6590@n2100.arm.linux.org.uk>
-Message-ID: <1269530669.10064.28.camel@e102109-lin.cambridge.arm.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Thu, 25 Mar 2010 17:25:05 +0200
+Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
+Message-ID: <20100325152505.17612.40158.stgit@pauliusz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 25, 2010 at 02:53:24PM +0000, Catalin Marinas wrote:
-> > Commit db9ef1a introduced information printing for the virtual kernel
-> > memory map but page/end calculation using the pfn goes wrong and
-> > page_count() generates a data abort or alignment fault (possibly because
-> > it gets to an uninitialised page structure that looks like a compound
-> > page).
-> 
-> While this looks fine, I'd like to see a lot of Tested-by's against
-> this before it's merged - we've had similar code in show_mem()
-> which has proven to be quite problematical to get right for all the
-> various different combinations we have.
-> 
-> However, we also have the same method in show_mem() which we know
-> works fine, so I'd also like to see the problem with using it in
-> mem_init() fully analysed - rather than a "possibly because".
+We must tell GCC to use even register for variable passed
+to ldrd instruction. Without this patch GCC 4.2.1 puts this
+variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
+r2/r3. This does not change anything when EABI and OABI
+compilation works OK.
 
-I can remove the "possibly" part :). The page_count() is given a page
-with some random flags and it thinks it's a compound page. It than tries
-to access page->first which isn't set, hence the error.
+Without this patch and with OABI I get:
+  CC      drivers/mtd/nand/orion_nand.o
+/tmp/ccMkwOCs.s: Assembler messages:
+/tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
+make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
 
-The original code assumes that for a given node the map is contiguous
-and it calculates the page as (map + pfn). This is only true for
-flatmem. With sparsemem the page calculation is a bit more complicated
-but handled by pfn_to_page().
+Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+---
 
--- 
-Catalin
+ drivers/mtd/nand/orion_nand.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index f59c074..d60fc57 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -60,7 +60,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	}
+ 	buf64 = (uint64_t *)buf;
+ 	while (i < len/8) {
+-		uint64_t x;
++		/*
++		 * Since GCC has no proper constraint (PR 43518)
++		 * force x variable to r2/r3 registers as ldrd instruction
++		 * requires first register to be even.
++		 */
++		register uint64_t x asm ("r2");
++
+ 		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+ 		buf64[i++] = x;
+ 	}
