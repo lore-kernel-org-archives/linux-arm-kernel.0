@@ -1,135 +1,234 @@
-From: orenl@cs.columbia.edu (Oren Laadan)
-Date: Wed, 24 Mar 2010 21:35:48 -0400
-Subject: [C/R ARM][PATCH 1/3] ARM: Rudimentary syscall interfaces
-In-Reply-To: <20100325011132.GE5704@count0.beaverton.ibm.com>
-References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
-	<1269219965-23923-2-git-send-email-christofferdall@christofferdall.dk>
-	<20100323205342.GA19572@n2100.arm.linux.org.uk>
-	<20100324020342.GB5704@count0.beaverton.ibm.com>
-	<Pine.LNX.4.64.1003240055050.5867@takamine.ncl.cs.columbia.edu>
-	<20100324140252.GC5704@count0.beaverton.ibm.com>
-	<4BAA3586.1020604@cs.columbia.edu>
-	<7d08b87d1003241236n2b45e6f4ife36da841351df9d@mail.gmail.com>
-	<20100325011132.GE5704@count0.beaverton.ibm.com>
-Message-ID: <4BAABDF4.8070904@cs.columbia.edu>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 24 Mar 2010 22:16:29 -0500
+Subject: [PATCH] locomo.c: use precalculated mmio address for LOCOMO_DAC access
+Message-ID: <0D753D10438DA54287A00B02708426976368EBDA71@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Instead of calculating the LOCOMO_DAC address for every read/write
+operation lets just do it once at the start of locomo_m62332_sendata
+and use 'mmio' instead of 'mapbase + LOCOMO_DAC'.
 
+Also, pass the 'mmio' to locomo_m62332_sendbit instead of 'mapbase'
+to remove those extra calculations also.
 
-Matt Helsley wrote:
-> On Wed, Mar 24, 2010 at 08:36:39PM +0100, Christoffer Dall wrote:
->> On Wed, Mar 24, 2010 at 4:53 PM, Oren Laadan <orenl@cs.columbia.edu> wrote:
->>>
->>> Matt Helsley wrote:
->>>> On Wed, Mar 24, 2010 at 12:57:46AM -0400, Oren Laadan wrote:
->>>>> On Tue, 23 Mar 2010, Matt Helsley wrote:
->>>>>
->>>>>> On Tue, Mar 23, 2010 at 08:53:42PM +0000, Russell King - ARM Linux
->>>>>> wrote:
->>>>>>> On Sun, Mar 21, 2010 at 09:06:03PM -0400, Christoffer Dall wrote:
->>>>>>>> This small commit introduces a global state of system calls for ARM
->>>>>>>> making it possible for a debugger or checkpointing to gain information
->>>>>>>> about another process' state with respect to system calls.
->>>>>>> I don't particularly like the idea that we always store the syscall
->>>>>>> number to memory for every system call, whether the stored version is
->>>>>>> used or not.
->>>>>>>
->>>>>>> Since ARM caches are generally not write allocate, this means mostly
->>>>>>> write-only variables can have a higher than expected expense.
->>>>>>>
->>>>>>> Is there not some thread flag which can be checked to see if we need to
->>>>>>> store the syscall number?
->>>>>> Perhaps before we freeze the task we can save the syscall number on ARM.
->>>>>> The patches suggest that the signal delivery path -- which the freezer
->>>>>> utilizes -- has the syscall number already.
->>> Actually, the signal path doesn't have the syscall number, it has
->>> a binary "in syscall" value.
->>>
-> 
-> Argh. I read too much into the name :(.
-> 
->> Well, this could be changed to pass the syscall number through
->> registers along to try_to_freeze without any mentionable performance
->> hit.
-> 
-> Yes, that's possible. I was thinking we could still use your thread info
-> field but only store to it when we know it will be useful for c/r rather
-> than for each syscall. Personally, I'd rather avoid passing the extra
-> parameter into try_to_freeze(). Your idea below seems better to me.
-> 
->> Re-using the assembly code or factoring it out so that it can be used
->> from multiple places doesn't seem very pleasing to me, as the assembly
->> code is in the critical path and written specifically for the context
->> of a process entering the kernel. Please correct me if I'm wrong.
->>
->> I imagine simply a function in C, more or less re-implementing the
->> logic that's already in entry-common.S, might do the trick. I wouldn't
->> worry much about the performance in this case as it will not be used
->> often. The following _untested_ snippet illustrates my idea:
->>
->> ---
->>  arch/arm/include/asm/syscall.h |   93 +++++++++++++++++++++++++++++++++++++++-
->>  1 files changed, 92 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
->> index 3b3248f..a7f2615 100644
->> --- a/arch/arm/include/asm/syscall.h
->> +++ b/arch/arm/include/asm/syscall.h
->> @@ -10,10 +10,101 @@
->>  #ifndef _ASM_ARM_SYSCALLS_H
->>  #define _ASM_ARM_SYSCALLS_H
->>
->> +static inline int get_swi_instruction(struct task_struct *task,
->> +				      struct pt_regs *regs,
->> +				      unsigned long *instr)
->> +{
->> +	struct page *page = NULL;
->> +	unsigned long instr_addr;
->> +	unsigned long *ptr;
->> +	int ret;
->> +
->> +	instr_addr = regs->ARM_pc - 4;
->> +
->> +	down_read(&task->mm->mmap_sem);
->> +	ret = get_user_pages(task, task->mm, instr_addr,
->> +			     1, 0, 0, &page, NULL);
->> +	up_read(&task->mm->mmap_sem);
->> +
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	ptr = (unsigned long *)kmap_atomic(page, KM_USER1);
->> +	memcpy(instr,
->> +	       ptr + (instr_addr >> PAGE_SHIFT),
-> 			^shouldn't this be:
-> 		      instr_addr & PAGE_MASK
-> 
->> +	       sizeof(unsigned long));
->> +	kunmap_atomic(ptr, KM_USER1);
->> +
->> +	page_cache_release(page);
->> +
->> +	return 0;
->> +}
-> 
-> (again, not familiar with ARM so my understanding is:
-> 
-> I guess swi is "syscall word immediate".
-> 
-> The syscall nr is embedded in the instruction as an immediate
-> value and you're getting a copy of that instruction using the value of
-> the pc register just after the syscall instruction was executed.)
-> 
-> Perhaps I am missing or forgetting something. Why isn't this as simple
-> as calling get_user() or even copy_from_user() using instr_addr?
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 
-In c/r, we only need it at restart when a task calls it on itself.
+---
 
-However the interface itself of get_syscall_nr() can be called by
-any task on another task.
-
-(In fact, I think that for the most part, saving the syscall number
-at checkpoint time may be better than figuring out at restart time).
-
-Oren.
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 9dff07c..24461d0 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -625,37 +625,37 @@ void locomo_gpio_write(struct device *dev, unsigned int bits, unsigned int set)
+ }
+ EXPORT_SYMBOL(locomo_gpio_write);
+ 
+-static void locomo_m62332_sendbit(void *mapbase, int bit)
++static void locomo_m62332_sendbit(void *mmio, int bit)
+ {
+ 	unsigned int r;
+ 
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+ 
+ 	if (bit & 1) {
+-		r = locomo_readl(mapbase + LOCOMO_DAC);
++		r = locomo_readl(mmio);
+ 		r |=  LOCOMO_DAC_SDAOEB;
+-		locomo_writel(r, mapbase + LOCOMO_DAC);
++		locomo_writel(r, mmio);
+ 		udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	} else {
+-		r = locomo_readl(mapbase + LOCOMO_DAC);
++		r = locomo_readl(mmio);
+ 		r &=  ~(LOCOMO_DAC_SDAOEB);
+-		locomo_writel(r, mapbase + LOCOMO_DAC);
++		locomo_writel(r, mmio);
+ 		udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	}
+ 
+ 	udelay(DAC_DATA_SETUP_TIME);	/* 250 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/*  4.0 usec */
+ }
+@@ -663,49 +663,49 @@ static void locomo_m62332_sendbit(void *mapbase, int bit)
+ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int channel)
+ {
+ 	struct locomo *lchip = locomo_chip_driver(ldev);
++	void *mmio = lchip->base + LOCOMO_DAC;
+ 	int i;
+ 	unsigned char data;
+ 	unsigned int r;
+-	void *mapbase = lchip->base;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&lchip->lock, flags);
+ 
+ 	/* Start */
+ 	udelay(DAC_BUS_FREE_TIME);	/* 5.0 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.0 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_START_HOLD_TIME);	/* 5.0 usec */
+ 	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+ 
+ 	/* Send slave address and W bit (LSB is W bit) */
+ 	data = (M62332_SLAVE_ADDR << 1) | M62332_W_BIT;
+ 	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, data >> (8 - i));
++		locomo_m62332_sendbit(mmio, data >> (8 - i));
+ 	}
+ 
+ 	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
++	if (locomo_readl(mmio) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
+ 		goto out;
+ 	}
+@@ -715,74 +715,74 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+ 	/*            = 1 : ch2 select              */
+ 	data = M62332_SUB_ADDR + channel;
+ 	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, data >> (8 - i));
++		locomo_m62332_sendbit(mmio, data >> (8 - i));
+ 	}
+ 
+ 	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
++	if (locomo_readl(mmio) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
+ 		goto out;
+ 	}
+ 
+ 	/* Send DAC data */
+ 	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, dac_data >> (8 - i));
++		locomo_m62332_sendbit(mmio, dac_data >> (8 - i));
+ 	}
+ 
+ 	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
++	if (locomo_readl(mmio) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+ 		printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
+ 	}
+ 
+ out:
+ 	/* stop */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+ 
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
++	r = locomo_readl(mmio);
+ 	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
++	locomo_writel(r, mmio);
+ 	udelay(DAC_LOW_SETUP_TIME);	/* 1000 nsec */
+ 	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+ 
