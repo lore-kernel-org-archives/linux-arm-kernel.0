@@ -1,46 +1,77 @@
-From: matthias@kaehlcke.net (Matthias Kaehlcke)
-Date: Thu, 25 Mar 2010 18:28:12 +0100
-Subject: [BUG] i.MX25: Broken include in mach-mx25pdk.c
-In-Reply-To: <20100325164147.GA27698@jasper.tkos.co.il>
-References: <20100325161635.GI2328@darwin>
-	<20100325164147.GA27698@jasper.tkos.co.il>
-Message-ID: <20100325172811.GJ2328@darwin>
+From: leochen@broadcom.com (Leo (Hao) Chen)
+Date: Thu, 25 Mar 2010 10:35:51 -0700
+Subject: [PATCH 4/6] ARM: BCMRING: register PMU IRQ during board
+	initialisation
+In-Reply-To: <1269530198-19572-5-git-send-email-will.deacon@arm.com>
+References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+	<1269530198-19572-2-git-send-email-will.deacon@arm.com>
+	<1269530198-19572-3-git-send-email-will.deacon@arm.com>
+	<1269530198-19572-4-git-send-email-will.deacon@arm.com>
+	<1269530198-19572-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20100325173551.GA1114@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Thanks Will.
 
-El Thu, Mar 25, 2010 at 06:41:47PM +0200 Baruch Siach ha dit:
+I like this version using the platform device.
 
-> On Thu, Mar 25, 2010 at 05:16:35PM +0100, Matthias Kaehlcke wrote:
-> > compiling arch/arm/mach-mx25/mach-mx25pdk.c fails due to the missing
-> > include "linux/fec.h" and incomplete types that are supposed to
-> > defined in this header
-> > 
-> > i'd send a fix, but greping through the kernel tree i haven't been
-> > able to identify the file defining the missing elements, i suppose it's still
-> > sitting bored in some development tree waiting to be merged
+Acked-by: Leo Chen <leochen@broadcom.com>
+
+On Thu, Mar 25, 2010 at 08:16:36AM -0700, Will Deacon wrote:
+> This patch updates the initialisation routine for the BCMRING platform
+> so that it registers its PMU IRQ with the PMU framework in the Kernel.
 > 
-> Apply the patch at http://patchwork.ozlabs.org/patch/41235/.
+> Cc: Leo Chen <leochen@broadcom.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-bcmring/arch.c |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
 > 
-> For some reason this patch never made it to the mainline even after my 
-> repeated nagging :(.
-
-thanks for the pointer, baruch!
-
-david: is there any inconvenience to merge the patch to netdev? if so,
-what can be done to make it mergeable?
-
-regards
+> diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
+> index 53dd2a9..2f13919 100644
+> --- a/arch/arm/mach-bcmring/arch.c
+> +++ b/arch/arm/mach-bcmring/arch.c
+> @@ -29,6 +29,7 @@
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/time.h>
+> +#include <asm/pmu.h>
+>  
+>  #include <asm/mach/arch.h>
+>  #include <mach/dma.h>
+> @@ -85,8 +86,23 @@ static struct platform_device nand_device = {
+>  	.num_resources	= ARRAY_SIZE(nand_resource),
+>  };
+>  
+> +static struct resource pmu_resource = {
+> +	.start	= IRQ_PMUIRQ,
+> +	.end	= IRQ_PMUIRQ,
+> +	.flags	= IORESOURCE_IRQ,
+> +};
+> +
+> +static struct platform_device pmu_device = {
+> +	.name		= "arm-pmu",
+> +	.id		= ARM_PMU_DEVICE_CPU,
+> +	.resource	= &pmu_resource,
+> +	.num_resources	= 1,
+> +};
+> +
+> +
+>  static struct platform_device *devices[] __initdata = {
+>  	&nand_device,
+> +	&pmu_device,
+>  };
+>  
+>  /****************************************************************************
+> -- 
+> 1.6.3.3
+> 
+> 
 
 -- 
-Matthias Kaehlcke
-Embedded Linux Developer
-Barcelona
 
-      The assumption that what currently exists must necessarily
-        exist is the acid that corrodes all visionary thinking
-                                                                 .''`.
-    using free software / Debian GNU/Linux | http://debian.org  : :'  :
-                                                                `. `'`
-gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
+Leo Hao Chen
+
+------------------------
+Life is short, run long.
