@@ -1,27 +1,36 @@
-From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
-Date: Thu, 25 Mar 2010 14:47:50 -0300
-Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
-In-Reply-To: <20100325170440.GC5424@comet.dominikbrodowski.net>
-References: <1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<1269474310-13970-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<20100325170440.GC5424@comet.dominikbrodowski.net>
-Message-ID: <cecb6d8f1003251047p34620f8fhc11884cdcb8a399f@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 25 Mar 2010 20:01:32 +0200
+Subject: [PATCH] i.MX25: Define address mapping macros
+In-Reply-To: <20100325115053.GH2328@darwin>
+References: <20100325085057.GG2328@darwin>
+	<20100325093617.GA16329@pengutronix.de>
+	<20100325115053.GH2328@darwin>
+Message-ID: <20100325180127.GB27698@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 14:04, Dominik Brodowski
-<linux@dominikbrodowski.net> wrote:
-> Russell,
->
-> do you prefer me pushing these patches upstream (possibly even for -rc3), or
-> do you wish to take these patches?
+Hi Matthias,
 
-If possible, please take a look at my other ARM patches, I have
-submitted a total of nine, but got feedback in only two of them (this
-beeing the second).
+On Thu, Mar 25, 2010 at 12:50:53PM +0100, Matthias Kaehlcke wrote:
+> El Thu, Mar 25, 2010 at 10:36:17AM +0100 Uwe Kleine-K?nig ha dit:
+> 
+> > On Thu, Mar 25, 2010 at 09:50:57AM +0100, Matthias Kaehlcke wrote:
+> > > Add macros for mapping physical addresses of i.MX25 registers to virtual
+> > > addresses
+> > Where do you need them?  MX25_IO_ADDRESS isn't enough?
+> 
+> MX25_AIPS1_IO_ADDRESS is used in arch/arm/plat-mxc/include/mach/debug-macro.S:
+> 
+> #define UART_VADDR  MX25_AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
+> 
+> i added the other two for completeness
 
-> Best,
-> ? ? ? ?Dominik
+See http://thread.gmane.org/gmane.linux.ports.arm.kernel/75691 for a different 
+approach, and discussion of the general problem.
 
-Regards,
-Marcelo.
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
