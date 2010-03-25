@@ -1,68 +1,58 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 25 Mar 2010 14:36:31 +0300
-Subject: [PATCH 2/3] imx3: Add rtc platform device support
-In-Reply-To: <20100325073537.GZ2241@pengutronix.de> (Sascha Hauer's message of
-	"Thu, 25 Mar 2010 08:35:37 +0100")
-References: <1269430338-22690-1-git-send-email-vzapolskiy@gmail.com>
-	<1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-	<20100325073537.GZ2241@pengutronix.de>
-Message-ID: <87d3yshbuo.fsf@vovsem.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Thu, 25 Mar 2010 20:48:04 +0900
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <3eeda0228e2396b052b17689e2f3318e@localhost>
+References: <4BAAD5BB.7050101@samsung.com>
+	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
+	<4BAB264C.2090502@samsung.com>
+	<960f4547118a62d5863ee38ba760844c@localhost>
+	<4BAB357B.7040108@samsung.com>
+	<3eeda0228e2396b052b17689e2f3318e@localhost>
+Message-ID: <4BAB4D74.7070909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sasha,
+On 3/25/2010 7:32 PM, Marc Zyngier wrote:
+> On Thu, 25 Mar 2010 19:05:47 +0900, Joonyoung Shim
+> <jy0922.shim@samsung.com> wrote:
+>> On 3/25/2010 6:32 PM, Marc Zyngier wrote:
+>>> On Thu, 25 Mar 2010 18:01:00 +0900, Joonyoung Shim
+>>> <jy0922.shim@samsung.com> wrote:
+>>>> On 3/25/2010 2:44 PM, Marc Zyngier wrote:
+>>>>> On Thu, 25 Mar 2010 12:17:15 +0900
+>>>>> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
+>>>>>
+>>>>>> +	writew(imm, desc_pool_virt);
+>>>> Right. The write[bwl] is api for address ioremapped of io device. I
+> will
+>>>> change these.
+>>>>
+>>>>> Does anything ensure that this won't generate an unaligned access?
+>>>>>
+>>>> PL330 DMA controller fetches variable length instructions that consist
+>>> of
+>>>> one to six bytes, so i think unaligned access is no problem.
+>>> I'm not too concerned about the device side of things. I'm more worried
+>>> about the CPU access when writing the 'imm' value to memory.
+>>>
+>>> Consider desc_pool_virt 16bit aligned when entering the function.
+> Writing
+>>> the opcode makes it unaligned and then writing the 'imm' value will
+>>> result
+>>> as an unaligned access.
+>>>
+>> Why desc_pool_virt should be aligned more than 16bit?
+> 
+> There is reason for desc_pool_virt to be 16bit aligned. It's just that you
+> have 50% chance that it will.
+> In such case, you will write 'imm' to a non 16bit-aligned address. In my
+> book, that's bad.
+> 
+> Same for pl330_dmamov(), which tries to write a 32bit value without
+> checking the proper alignment.
+> In such case, please use the put_unaligned macro to handle the possible
+> unaligned access.
+> 
 
->
-> On Wed, Mar 24, 2010 at 02:32:17PM +0300, Vladimir Zapolskiy wrote:
->> This patch adds support for build-in RTC device found on
->> Freescale imx31 and imx35 SoCs.
->> 
->> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->>  arch/arm/mach-mx3/devices.c |   19 +++++++++++++++++++
->>  arch/arm/mach-mx3/devices.h |    1 +
->>  2 files changed, 20 insertions(+), 0 deletions(-)
->> 
->> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
->> index f891115..1ffed28 100644
->> --- a/arch/arm/mach-mx3/devices.c
->> +++ b/arch/arm/mach-mx3/devices.c
->> @@ -588,6 +588,25 @@ struct platform_device imx_wdt_device0 = {
->>  	.resource       = imx_wdt_resources,
->
-> This patch does not apply. We do not have the watchdog in devices.c atm.
->
-
-please could you suggest the appropriate branch, because this patch is
-based on mxc-master branch, where the watchdog is already pushed, see
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/mxc-master
-
->>  };
->>  
->> +static struct resource imx_rtc_resources[] = {
->> +	{
->> +		.start  = MX31_RTC_BASE_ADDR,
->> +		.end    = MX31_RTC_BASE_ADDR + 0x3fff,
->> +		.flags  = IORESOURCE_MEM,
->> +	},
->> +	{
->> +		.start  = MX31_INT_RTC,
->> +		.flags  = IORESOURCE_IRQ,
->> +	},
->
-> Can you provide a fixup for i.MX35, please? See mx3_devices_init().
-
-Surely. Before patch submission I just checked that base address, size
-and interrupt number are equal for i.MX31 and i.MX35 SoCs, and I've
-found that in such cases the resources are defined using MX31 macros,
-see imx_ssi_resources or mxc_usbhX_resources as reference.
-
-Probably better to separate the devices.c file into two files? You see
-one day I hope i.MX37 support will be included into the Linux kernel,
-and it would be quite uncomfortable to support three kinds of peripheral
-in a single file.
-
---
-With best wishes,
-Vladimir
+OK. i will use put_unaligned.
+Thanks.
