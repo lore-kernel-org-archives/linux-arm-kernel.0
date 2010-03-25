@@ -1,76 +1,59 @@
-From: christofferdall@christofferdall.dk (Christoffer Dall)
-Date: Thu, 25 Mar 2010 11:29:45 +0100
-Subject: [C/R ARM][PATCH 1/3] ARM: Rudimentary syscall interfaces
-In-Reply-To: <20100325011753.GF5704@count0.beaverton.ibm.com>
-References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
-	<1269219965-23923-2-git-send-email-christofferdall@christofferdall.dk>
-	<20100323205342.GA19572@n2100.arm.linux.org.uk>
-	<20100324020342.GB5704@count0.beaverton.ibm.com>
-	<Pine.LNX.4.64.1003240055050.5867@takamine.ncl.cs.columbia.edu>
-	<20100324140252.GC5704@count0.beaverton.ibm.com>
-	<4BAA3586.1020604@cs.columbia.edu>
-	<7d08b87d1003241236n2b45e6f4ife36da841351df9d@mail.gmail.com>
-	<20100325011132.GE5704@count0.beaverton.ibm.com>
-	<20100325011753.GF5704@count0.beaverton.ibm.com>
-Message-ID: <7d08b87d1003250329t589ba41er2f1127190be078cf@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Thu, 25 Mar 2010 11:32:16 +0100
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <4BAB357B.7040108@samsung.com>
+References: <4BAAD5BB.7050101@samsung.com>
+	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
+	<4BAB264C.2090502@samsung.com>
+	<960f4547118a62d5863ee38ba760844c@localhost>
+	<4BAB357B.7040108@samsung.com>
+Message-ID: <3eeda0228e2396b052b17689e2f3318e@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 2:17 AM, Matt Helsley <matthltc@us.ibm.com> wrote:
-> On Wed, Mar 24, 2010 at 06:11:32PM -0700, Matt Helsley wrote:
->> On Wed, Mar 24, 2010 at 08:36:39PM +0100, Christoffer Dall wrote:
-> <snip>
->> > Re-using the assembly code or factoring it out so that it can be used
->> > from multiple places doesn't seem very pleasing to me, as the assembly
->> > code is in the critical path and written specifically for the context
->> > of a process entering the kernel. Please correct me if I'm wrong.
->> >
->> > I imagine simply a function in C, more or less re-implementing the
->> > logic that's already in entry-common.S, might do the trick. I wouldn't
->> > worry much about the performance in this case as it will not be used
->> > often. The following _untested_ snippet illustrates my idea:
->> >
->> > ---
->> > ?arch/arm/include/asm/syscall.h | ? 93 +++++++++++++++++++++++++++++++++++++++-
->> > ?1 files changed, 92 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
->> > index 3b3248f..a7f2615 100644
->> > --- a/arch/arm/include/asm/syscall.h
->> > +++ b/arch/arm/include/asm/syscall.h
->> > @@ -10,10 +10,101 @@
->> > ?#ifndef _ASM_ARM_SYSCALLS_H
->> > ?#define _ASM_ARM_SYSCALLS_H
->> >
->> > +static inline int get_swi_instruction(struct task_struct *task,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pt_regs *regs,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *instr)
->> > +{
->> > + ? struct page *page = NULL;
->> > + ? unsigned long instr_addr;
->> > + ? unsigned long *ptr;
->> > + ? int ret;
->> > +
->> > + ? instr_addr = regs->ARM_pc - 4;
->> > +
->> > + ? down_read(&task->mm->mmap_sem);
->> > + ? ret = get_user_pages(task, task->mm, instr_addr,
->> > + ? ? ? ? ? ? ? ? ? ? ? ?1, 0, 0, &page, NULL);
->> > + ? up_read(&task->mm->mmap_sem);
->> > +
->> > + ? if (ret < 0)
->> > + ? ? ? ? ? return ret;
->> > +
->> > + ? ptr = (unsigned long *)kmap_atomic(page, KM_USER1);
->> > + ? memcpy(instr,
->> > + ? ? ? ? ?ptr + (instr_addr >> PAGE_SHIFT),
->> ? ? ? ? ? ? ? ? ? ? ? ^shouldn't this be:
->> ? ? ? ? ? ? ? ? ? ? instr_addr & PAGE_MASK
->
-> Oops, made my own mistake. I think the address of the kmap'd instruction
-> would be:
->
-> ? ? ? ?ptr + (instr_addr & ~PAGE_MASK)
->
 
-Yes. Thanks for pointing it out.
+On Thu, 25 Mar 2010 19:05:47 +0900, Joonyoung Shim
+<jy0922.shim@samsung.com> wrote:
+> On 3/25/2010 6:32 PM, Marc Zyngier wrote:
+>> On Thu, 25 Mar 2010 18:01:00 +0900, Joonyoung Shim
+>> <jy0922.shim@samsung.com> wrote:
+>>> On 3/25/2010 2:44 PM, Marc Zyngier wrote:
+>>>> On Thu, 25 Mar 2010 12:17:15 +0900
+>>>> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
+>>>>
+>>>>> +	writew(imm, desc_pool_virt);
+>>> Right. The write[bwl] is api for address ioremapped of io device. I
+will
+>>> change these.
+>>>
+>>>> Does anything ensure that this won't generate an unaligned access?
+>>>>
+>>> PL330 DMA controller fetches variable length instructions that consist
+>> of
+>>> one to six bytes, so i think unaligned access is no problem.
+>> 
+>> I'm not too concerned about the device side of things. I'm more worried
+>> about the CPU access when writing the 'imm' value to memory.
+>> 
+>> Consider desc_pool_virt 16bit aligned when entering the function.
+Writing
+>> the opcode makes it unaligned and then writing the 'imm' value will
+>> result
+>> as an unaligned access.
+>> 
+> 
+> Why desc_pool_virt should be aligned more than 16bit?
+
+There is reason for desc_pool_virt to be 16bit aligned. It's just that you
+have 50% chance that it will.
+In such case, you will write 'imm' to a non 16bit-aligned address. In my
+book, that's bad.
+
+Same for pl330_dmamov(), which tries to write a 32bit value without
+checking the proper alignment.
+In such case, please use the put_unaligned macro to handle the possible
+unaligned access.
+
+        M.
+-- 
+Who you jivin' with that Cosmik Debris?
