@@ -1,1774 +1,856 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 25 Mar 2010 23:10:40 +0300
-Subject: [PATCH 1/4] cns3xxx: Add basic support for Cavium Networks CNS3xxx
-	processors
+Date: Thu, 25 Mar 2010 23:10:46 +0300
+Subject: [PATCH 2/4] cns3xxx: Add defconfig for CNS3420 validation board
 In-Reply-To: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
 References: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
-Message-ID: <20100325201040.GA8014@oksana.dev.rtsoft.ru>
+Message-ID: <20100325201046.GB8014@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a very basic support for ECONA CNS3xxx ARM11 MPcore
-(ARMv6) dual-core processors. Specifically, CNS3420VB rev 1.3 board
-is supported.
-
-With this patch CNS3420VP board is able to boot up to the userspace,
-with a console available on UART0.
-
-Note that SMP is not yet supported, as well as many peripheral
-devices. Support for these features will be added later.
-
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- MAINTAINERS                                      |    6 +
- arch/arm/Kconfig                                 |    9 +
- arch/arm/Makefile                                |    1 +
- arch/arm/mach-cns3xxx/Kconfig                    |   13 +
- arch/arm/mach-cns3xxx/Makefile                   |    2 +
- arch/arm/mach-cns3xxx/Makefile.boot              |    3 +
- arch/arm/mach-cns3xxx/cns3420vb.c                |  160 ++++++
- arch/arm/mach-cns3xxx/core.c                     |  285 ++++++++++
- arch/arm/mach-cns3xxx/core.h                     |   23 +
- arch/arm/mach-cns3xxx/include/mach/cns3xxx.h     |  655 ++++++++++++++++++++++
- arch/arm/mach-cns3xxx/include/mach/debug-macro.S |   21 +
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S |   82 +++
- arch/arm/mach-cns3xxx/include/mach/hardware.h    |   22 +
- arch/arm/mach-cns3xxx/include/mach/io.h          |   22 +
- arch/arm/mach-cns3xxx/include/mach/irqs.h        |   24 +
- arch/arm/mach-cns3xxx/include/mach/memory.h      |   26 +
- arch/arm/mach-cns3xxx/include/mach/system.h      |   29 +
- arch/arm/mach-cns3xxx/include/mach/timex.h       |   12 +
- arch/arm/mach-cns3xxx/include/mach/uncompress.h  |   55 ++
- arch/arm/mach-cns3xxx/include/mach/vmalloc.h     |   11 +
- arch/arm/mach-cns3xxx/pm.c                       |   86 +++
- arch/arm/mm/Kconfig                              |    2 +-
- 22 files changed, 1548 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-cns3xxx/Kconfig
- create mode 100644 arch/arm/mach-cns3xxx/Makefile
- create mode 100644 arch/arm/mach-cns3xxx/Makefile.boot
- create mode 100644 arch/arm/mach-cns3xxx/cns3420vb.c
- create mode 100644 arch/arm/mach-cns3xxx/core.c
- create mode 100644 arch/arm/mach-cns3xxx/core.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/hardware.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/io.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/irqs.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/memory.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/system.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/timex.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-cns3xxx/pm.c
+ arch/arm/configs/cns3420vb_defconfig |  833 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 833 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/cns3420vb_defconfig
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 449d444..93ebdf8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -586,6 +586,12 @@ F:	drivers/mtd/nand/bcm_umi_bch.c
- F:	drivers/mtd/nand/bcm_umi_hamming.c
- F:	drivers/mtd/nand/nand_bcm_umi.h
- 
-+ARM/CAVIUM NETWORKS CNS3XXX MACHINE SUPPORT
-+M:	Anton Vorontsov <avorontsov@mvista.com>
-+S:	Maintained
-+F:	arch/arm/mach-cns3xxx/
-+T:	git git://git.infradead.org/users/cbou/linux-cns3xxx.git
-+
- ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE
- M:	Hartley Sweeten <hsweeten@visionengravers.com>
- M:	Ryan Mallon <ryan@bluewatersys.com>
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c5408bf..4a95640 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -296,6 +296,13 @@ config ARCH_CLPS711X
- 	help
- 	  Support for Cirrus Logic 711x/721x based boards.
- 
-+config ARCH_CNS3XXX
-+	bool "Cavium Networks CNS3XXX family"
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
-+	help
-+	  Support for Cavium Networks CNS3XXX platform.
-+
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
- 	select CPU_FA526
-@@ -816,6 +823,8 @@ source "arch/arm/mach-bcmring/Kconfig"
- 
- source "arch/arm/mach-clps711x/Kconfig"
- 
-+source "arch/arm/mach-cns3xxx/Kconfig"
-+
- source "arch/arm/mach-davinci/Kconfig"
- 
- source "arch/arm/mach-dove/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ed820e7..3e312ec 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -121,6 +121,7 @@ machine-$(CONFIG_ARCH_AAEC2000)		:= aaec2000
- machine-$(CONFIG_ARCH_AT91)		:= at91
- machine-$(CONFIG_ARCH_BCMRING)		:= bcmring
- machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
-+machine-$(CONFIG_ARCH_CNS3XXX)		:= cns3xxx
- machine-$(CONFIG_ARCH_DAVINCI)		:= davinci
- machine-$(CONFIG_ARCH_DOVE)		:= dove
- machine-$(CONFIG_ARCH_EBSA110)		:= ebsa110
-diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
+diff --git a/arch/arm/configs/cns3420vb_defconfig b/arch/arm/configs/cns3420vb_defconfig
 new file mode 100644
-index 0000000..f730d8e
+index 0000000..dbf985b
 --- /dev/null
-+++ b/arch/arm/mach-cns3xxx/Kconfig
-@@ -0,0 +1,13 @@
-+menu "CNS3XXX platform type"
-+	depends on ARCH_CNS3XXX
-+
-+config MACH_CNS3420VB
-+	bool "Support for CNS3420 Validation Board"
-+	select ARM_GIC
-+	help
-+	  Include support for the Cavium Networks CNS3420 MPCore Platform
-+	  Baseboard.
-+	  This is a platform with an on-board ARM11 MPCore and has support
-+	  for USB, USB-OTG, MMC/SD/SDIO, SATA, PCI-E, etc.
-+
-+endmenu
-diff --git a/arch/arm/mach-cns3xxx/Makefile b/arch/arm/mach-cns3xxx/Makefile
-new file mode 100644
-index 0000000..427507a
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o
-+obj-$(CONFIG_MACH_CNS3420VB)		+= cns3420vb.o
-diff --git a/arch/arm/mach-cns3xxx/Makefile.boot b/arch/arm/mach-cns3xxx/Makefile.boot
-new file mode 100644
-index 0000000..7770128
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/Makefile.boot
-@@ -0,0 +1,3 @@
-+   zreladdr-y	:= 0x00008000
-+params_phys-y	:= 0x00000100
-+initrd_phys-y	:= 0x00C00000
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-new file mode 100644
-index 0000000..924e4da
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -0,0 +1,160 @@
-+/*
-+ * Cavium Networks CNS3420 Validation Board
-+ *
-+ * Copyright 2000 Deep Blue Solutions Ltd
-+ * Copyright 2008 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *		  Scott Shu
-+ * Copyright 2010 MontaVista Software, LLC.
-+ *		  Anton Vorontsov <avorontsov@mvista.com>
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/compiler.h>
-+#include <linux/serial_core.h>
-+#include <linux/serial_8250.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/mtd/partitions.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+#include <mach/hardware.h>
-+#include <mach/io.h>
-+#include <mach/cns3xxx.h>
-+#include <mach/irqs.h>
-+#include "core.h"
-+
-+/*
-+ * NOR Flash
-+ */
-+static struct mtd_partition cns3420_nor_partitions[] = {
-+	{
-+		.name		= "uboot",
-+		.size		= 0x00040000,
-+		.offset		= 0,
-+		.mask_flags	= MTD_WRITEABLE,
-+	}, {
-+		.name		= "kernel",
-+		.size		= 0x004C0000,
-+		.offset		= MTDPART_OFS_APPEND,
-+	}, {
-+		.name		= "filesystem",
-+		.size		= 0x7000000,
-+		.offset		= MTDPART_OFS_APPEND,
-+	}, {
-+		.name		= "filesystem2",
-+		.size		= 0x0AE0000,
-+		.offset		= MTDPART_OFS_APPEND,
-+	}, {
-+		.name		= "ubootenv",
-+		.size		= MTDPART_SIZ_FULL,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+};
-+
-+static struct physmap_flash_data cns3420_nor_pdata = {
-+	.width = 2,
-+	.parts = cns3420_nor_partitions,
-+	.nr_parts = ARRAY_SIZE(cns3420_nor_partitions),
-+};
-+
-+static struct resource cns3420_nor_res = {
-+	.start = CNS3XXX_FLASH_BASE,
-+	.end = CNS3XXX_FLASH_BASE + SZ_128M - 1,
-+	.flags = IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
-+};
-+
-+static struct platform_device cns3420_nor_pdev = {
-+	.name = "physmap-flash",
-+	.id = 0,
-+	.resource = &cns3420_nor_res,
-+	.num_resources = 1,
-+	.dev = {
-+		.platform_data = &cns3420_nor_pdata,
-+	},
-+};
-+
-+/*
-+ * UART
-+ */
-+static void __init cns3420_early_serial_setup(void)
-+{
-+#ifdef CONFIG_SERIAL_8250_CONSOLE
-+	static struct uart_port cns3420_serial_port = {
-+		.membase        = (void __iomem *)CNS3XXX_UART0_BASE_VIRT,
-+		.mapbase        = CNS3XXX_UART0_BASE,
-+		.irq            = IRQ_CNS3XXX_UART0,
-+		.iotype         = UPIO_MEM,
-+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
-+		.regshift       = 2,
-+		.uartclk        = 24000000,
-+		.line           = 0,
-+		.type           = PORT_16550A,
-+		.fifosize       = 16,
-+	};
-+
-+	early_serial_setup(&cns3420_serial_port);
-+#endif
-+}
-+
-+/*
-+ * Initialization
-+ */
-+static struct platform_device *cns3420_pdevs[] __initdata = {
-+	&cns3420_nor_pdev,
-+};
-+
-+static void __init cns3420_init(void)
-+{
-+	platform_add_devices(cns3420_pdevs, ARRAY_SIZE(cns3420_pdevs));
-+
-+	pm_power_off = cns3xxx_power_off;
-+}
-+
-+static struct map_desc cns3420_io_desc[] __initdata = {
-+	{
-+		.virtual	= CNS3XXX_UART0_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_UART0_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+static void __init cns3420_map_io(void)
-+{
-+	cns3xxx_map_io();
-+	iotable_init(cns3420_io_desc, ARRAY_SIZE(cns3420_io_desc));
-+
-+	cns3420_early_serial_setup();
-+}
-+
-+static void __init cns3420_fixup(struct machine_desc *desc,
-+				 struct tag *tags, char **cmdline,
-+				 struct meminfo *mi)
-+{
-+	/* Fixup for old bootloaders. */
-+	mi->nr_banks = 1;
-+	mi->bank[0].start = 0x00000000;
-+	mi->bank[0].size = SZ_128M;
-+	mi->bank[0].node = 0;
-+}
-+
-+MACHINE_START(CNS3420VB, "Cavium Networks CNS3420 Validation Board")
-+	.phys_io	= CNS3XXX_UART0_BASE,
-+	.io_pg_offst	= (CNS3XXX_UART0_BASE_VIRT >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.fixup		= cns3420_fixup,
-+	.map_io		= cns3420_map_io,
-+	.init_irq	= cns3xxx_init_irq,
-+	.timer		= &cns3xxx_timer,
-+	.init_machine	= cns3420_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-new file mode 100644
-index 0000000..4859cec
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/core.c
-@@ -0,0 +1,285 @@
-+/*
-+ * Copyright 1999 - 2003 ARM Limited
-+ * Copyright 2000 Deep Blue Solutions Ltd
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/irq.h>
-+#include <asm/hardware/gic.h>
-+#include <mach/cns3xxx.h>
-+#include "core.h"
-+
-+static struct map_desc cns3xxx_io_desc[] __initdata = {
-+	{
-+		.virtual	= CNS3XXX_TC11MP_TWD_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_TWD_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_GIC_CPU_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_GIC_DIST_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_TIMER1_2_3_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_TIMER1_2_3_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_GPIOA_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_GPIOA_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_GPIOB_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_GPIOB_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_MISC_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_MISC_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= CNS3XXX_PM_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_PM_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+void __init cns3xxx_map_io(void)
-+{
-+	iotable_init(cns3xxx_io_desc, ARRAY_SIZE(cns3xxx_io_desc));
-+}
-+
-+/* used by entry-macro.S */
-+void __iomem *gic_cpu_base_addr;
-+
-+void __init cns3xxx_init_irq(void)
-+{
-+	gic_cpu_base_addr = __io(CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT);
-+	gic_dist_init(0, __io(CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT), 29);
-+	gic_cpu_init(0, gic_cpu_base_addr);
-+}
-+
-+void cns3xxx_power_off(void)
-+{
-+	u32 __iomem *pm_base = __io(CNS3XXX_PM_BASE_VIRT);
-+	u32 clkctrl;
-+
-+	printk(KERN_INFO "powering system down...\n");
-+
-+	clkctrl = readl(pm_base + PM_SYS_CLK_CTRL_OFFSET);
-+	clkctrl &= 0xfffff1ff;
-+	clkctrl |= (0x5 << 9);		/* Hibernate */
-+	writel(clkctrl, pm_base + PM_SYS_CLK_CTRL_OFFSET);
-+
-+}
-+
-+/*
-+ * Timer
-+ */
-+static void __iomem *cns3xxx_tmr1;
-+
-+static void cns3xxx_timer_set_mode(enum clock_event_mode mode,
-+				   struct clock_event_device *clk)
-+{
-+	unsigned long ctrl = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	int pclk = cns3xxx_cpu_clock() / 8;
-+	int reload;
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		reload = pclk * 20 / (3 * HZ) * 0x25000;
-+		writel(reload, cns3xxx_tmr1 + TIMER1_AUTO_RELOAD_OFFSET);
-+		ctrl |= (1 << 0) | (1 << 2) | (1 << 9);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		/* period set, and timer enabled in 'next_event' hook */
-+		ctrl |= (1 << 2) | (1 << 9);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		ctrl = 0;
-+	}
-+
-+	writel(ctrl, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+}
-+
-+static int cns3xxx_timer_set_next_event(unsigned long evt,
-+					struct clock_event_device *unused)
-+{
-+	unsigned long ctrl = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	writel(evt, cns3xxx_tmr1 + TIMER1_AUTO_RELOAD_OFFSET);
-+	writel(ctrl | (1 << 0), cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device cns3xxx_tmr1_clockevent = {
-+	.name		= "cns3xxx timer1",
-+	.shift		= 8,
-+	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode	= cns3xxx_timer_set_mode,
-+	.set_next_event	= cns3xxx_timer_set_next_event,
-+	.rating		= 350,
-+	.cpumask	= cpu_all_mask,
-+};
-+
-+static void __init cns3xxx_clockevents_init(unsigned int timer_irq)
-+{
-+	cns3xxx_tmr1_clockevent.irq = timer_irq;
-+	cns3xxx_tmr1_clockevent.mult =
-+		div_sc((cns3xxx_cpu_clock() >> 3) * 1000000, NSEC_PER_SEC,
-+		       cns3xxx_tmr1_clockevent.shift);
-+	cns3xxx_tmr1_clockevent.max_delta_ns =
-+		clockevent_delta2ns(0xffffffff, &cns3xxx_tmr1_clockevent);
-+	cns3xxx_tmr1_clockevent.min_delta_ns =
-+		clockevent_delta2ns(0xf, &cns3xxx_tmr1_clockevent);
-+
-+	clockevents_register_device(&cns3xxx_tmr1_clockevent);
-+}
-+
-+/*
-+ * IRQ handler for the timer
-+ */
-+static irqreturn_t cns3xxx_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &cns3xxx_tmr1_clockevent;
-+	u32 __iomem *stat = cns3xxx_tmr1 + TIMER1_2_INTERRUPT_STATUS_OFFSET;
-+	u32 val;
-+
-+	/* Clear the interrupt */
-+	val = readl(stat);
-+	writel(val & ~(1 << 2), stat);
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction cns3xxx_timer_irq = {
-+	.name		= "timer",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= cns3xxx_timer_interrupt,
-+};
-+
-+static cycle_t cns3xxx_get_cycles(struct clocksource *cs)
-+{
-+	return ~readl(cns3xxx_tmr1 + TIMER2_COUNTER_OFFSET);
-+}
-+
-+static struct clocksource cns3xxx_clocksource = {
-+	.name	= "cns3xxx timer2",
-+	.rating	= 200,
-+	.read	= cns3xxx_get_cycles,
-+	.mask	= CLOCKSOURCE_MASK(32),
-+	.shift	= 20,
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static void __init cns3xxx_clocksource_init(void)
-+{
-+	u32 val;
-+
-+	/* let timer2 as periodic free-running clocksource, interrupt disable */
-+	val = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	val &= ~((1 << 3) | (1 << 4) | (1 << 5));
-+	writel(val, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	writel(0x5C800, cns3xxx_tmr1 + TIMER2_COUNTER_OFFSET);
-+	writel(0x5C800, cns3xxx_tmr1 + TIMER2_AUTO_RELOAD_OFFSET);
-+
-+	val = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	writel(val | (1 << 3), cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	cns3xxx_clocksource.mult =
-+		clocksource_khz2mult(1000, cns3xxx_clocksource.shift);
-+	clocksource_register(&cns3xxx_clocksource);
-+}
-+
-+/*
-+ * Set up the clock source and clock events devices
-+ */
-+static void __init __cns3xxx_timer_init(unsigned int timer_irq)
-+{
-+	u32 val;
-+	u32 irq_mask;
-+
-+	/*
-+	 * Initialise to a known state (all timers off)
-+	 */
-+
-+	/* disable timer1 and timer2 */
-+	writel(0, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	/* stop free running timer3 */
-+	writel(0, cns3xxx_tmr1 + TIMER_FREERUN_CONTROL_OFFSET);
-+
-+	/* timer1 */
-+	writel(0x5C800, cns3xxx_tmr1 + TIMER1_COUNTER_OFFSET);
-+	writel(0x5C800, cns3xxx_tmr1 + TIMER1_AUTO_RELOAD_OFFSET);
-+
-+	writel(0, cns3xxx_tmr1 + TIMER1_MATCH_V1_OFFSET);
-+	writel(0, cns3xxx_tmr1 + TIMER1_MATCH_V2_OFFSET);
-+
-+	/* mask irq, non-mask timer1 overflow */
-+	irq_mask = readl(cns3xxx_tmr1 + TIMER1_2_INTERRUPT_MASK_OFFSET);
-+	irq_mask &= ~(1 << 2);
-+	irq_mask |= 0x03;
-+	writel(irq_mask, cns3xxx_tmr1 + TIMER1_2_INTERRUPT_MASK_OFFSET);
-+
-+	/* down counter */
-+	val = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	val |= (1 << 9);
-+	writel(val, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	/* timer2 */
-+	writel(0, cns3xxx_tmr1 + TIMER2_MATCH_V1_OFFSET);
-+	writel(0, cns3xxx_tmr1 + TIMER2_MATCH_V2_OFFSET);
-+
-+	/* mask irq */
-+	irq_mask = readl(cns3xxx_tmr1 + TIMER1_2_INTERRUPT_MASK_OFFSET);
-+	irq_mask |= ((1 << 3) | (1 << 4) | (1 << 5));
-+	writel(irq_mask, cns3xxx_tmr1 + TIMER1_2_INTERRUPT_MASK_OFFSET);
-+
-+	/* down counter */
-+	val = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	val |= (1 << 10);
-+	writel(val, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	/* Make irqs happen for the system timer */
-+	setup_irq(timer_irq, &cns3xxx_timer_irq);
-+
-+	cns3xxx_clocksource_init();
-+	cns3xxx_clockevents_init(timer_irq);
-+}
-+
-+static void __init cns3xxx_timer_init(void)
-+{
-+	cns3xxx_tmr1 = __io(CNS3XXX_TIMER1_2_3_BASE_VIRT);
-+
-+	__cns3xxx_timer_init(IRQ_CNS3XXX_TIMER0);
-+}
-+
-+struct sys_timer cns3xxx_timer = {
-+	.init = cns3xxx_timer_init,
-+};
-diff --git a/arch/arm/mach-cns3xxx/core.h b/arch/arm/mach-cns3xxx/core.h
-new file mode 100644
-index 0000000..6b33ec1
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/core.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright 2000 Deep Blue Solutions Ltd
-+ * Copyright 2004 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __CNS3XXX_CORE_H
-+#define __CNS3XXX_CORE_H
-+
-+extern void __iomem *gic_cpu_base_addr;
-+extern struct sys_timer cns3xxx_timer;
-+
-+void __init cns3xxx_map_io(void);
-+void __init cns3xxx_init_irq(void);
-+void cns3xxx_power_off(void);
-+void cns3xxx_pwr_power_up(unsigned int block);
-+void cns3xxx_pwr_power_down(unsigned int block);
-+
-+#endif /* __CNS3XXX_CORE_H */
-diff --git a/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h b/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
-new file mode 100644
-index 0000000..3e71bce
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
-@@ -0,0 +1,655 @@
-+/*
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_BOARD_CNS3XXXH
-+#define __MACH_BOARD_CNS3XXXH
-+
-+/*
-+ * Memory map
-+ */
-+#define CNS3XXX_FLASH_BASE			0x10000000	/* Flash/SRAM Memory Bank 0 */
-+#define CNS3XXX_FLASH_SIZE			SZ_256M
-+
-+#define CNS3XXX_DDR2SDRAM_BASE			0x20000000	/* DDR2 SDRAM Memory */
-+
-+#define CNS3XXX_SPI_FLASH_BASE			0x60000000	/* SPI Serial Flash Memory */
-+
-+#define CNS3XXX_SWITCH_BASE			0x70000000	/* Switch and HNAT Control */
-+#define CNS3XXX_SWITCH_BASE_VIRT		0xFFF00000
-+
-+#define CNS3XXX_PPE_BASE			0x70001000	/* HANT	*/
-+#define CNS3XXX_PPE_BASE_VIRT			0xFFF50000
-+
-+#define CNS3XXX_EMBEDDED_SRAM_BASE		0x70002000	/* HANT Embedded SRAM */
-+#define CNS3XXX_EMBEDDED_SRAM_BASE_VIRT		0xFFF60000
-+
-+#define CNS3XXX_SSP_BASE			0x71000000	/* Synchronous Serial Port - SPI/PCM/I2C */
-+#define CNS3XXX_SSP_BASE_VIRT			0xFFF01000
-+
-+#define CNS3XXX_DMC_BASE			0x72000000	/* DMC Control (DDR2 SDRAM) */
-+#define CNS3XXX_DMC_BASE_VIRT			0xFFF02000
-+
-+#define CNS3XXX_SMC_BASE			0x73000000	/* SMC Control */
-+#define CNS3XXX_SMC_BASE_VIRT			0xFFF03000
-+
-+#define SMC_MEMC_STATUS_OFFSET			0x000
-+#define SMC_MEMIF_CFG_OFFSET			0x004
-+#define SMC_MEMC_CFG_SET_OFFSET			0x008
-+#define SMC_MEMC_CFG_CLR_OFFSET			0x00C
-+#define SMC_DIRECT_CMD_OFFSET			0x010
-+#define SMC_SET_CYCLES_OFFSET			0x014
-+#define SMC_SET_OPMODE_OFFSET			0x018
-+#define SMC_REFRESH_PERIOD_0_OFFSET		0x020
-+#define SMC_REFRESH_PERIOD_1_OFFSET		0x024
-+#define SMC_SRAM_CYCLES0_0_OFFSET		0x100
-+#define SMC_NAND_CYCLES0_0_OFFSET		0x100
-+#define SMC_OPMODE0_0_OFFSET			0x104
-+#define SMC_SRAM_CYCLES0_1_OFFSET		0x120
-+#define SMC_NAND_CYCLES0_1_OFFSET		0x120
-+#define SMC_OPMODE0_1_OFFSET			0x124
-+#define SMC_USER_STATUS_OFFSET			0x200
-+#define SMC_USER_CONFIG_OFFSET			0x204
-+#define SMC_ECC_STATUS_OFFSET			0x300
-+#define SMC_ECC_MEMCFG_OFFSET			0x304
-+#define SMC_ECC_MEMCOMMAND1_OFFSET		0x308
-+#define SMC_ECC_MEMCOMMAND2_OFFSET		0x30C
-+#define SMC_ECC_ADDR0_OFFSET			0x310
-+#define SMC_ECC_ADDR1_OFFSET			0x314
-+#define SMC_ECC_VALUE0_OFFSET			0x318
-+#define SMC_ECC_VALUE1_OFFSET			0x31C
-+#define SMC_ECC_VALUE2_OFFSET			0x320
-+#define SMC_ECC_VALUE3_OFFSET			0x324
-+#define SMC_PERIPH_ID_0_OFFSET			0xFE0
-+#define SMC_PERIPH_ID_1_OFFSET			0xFE4
-+#define SMC_PERIPH_ID_2_OFFSET			0xFE8
-+#define SMC_PERIPH_ID_3_OFFSET			0xFEC
-+#define SMC_PCELL_ID_0_OFFSET			0xFF0
-+#define SMC_PCELL_ID_1_OFFSET			0xFF4
-+#define SMC_PCELL_ID_2_OFFSET			0xFF8
-+#define SMC_PCELL_ID_3_OFFSET			0xFFC
-+
-+#define CNS3XXX_GPIOA_BASE			0x74000000	/* GPIO port A */
-+#define CNS3XXX_GPIOA_BASE_VIRT			0xFFF04000
-+
-+#define CNS3XXX_GPIOB_BASE			0x74800000	/* GPIO port B */
-+#define CNS3XXX_GPIOB_BASE_VIRT			0xFFF05000
-+
-+#define CNS3XXX_RTC_BASE			0x75000000	/* Real Time Clock */
-+#define CNS3XXX_RTC_BASE_VIRT			0xFFF06000
-+
-+#define RTC_SEC_OFFSET				0x00
-+#define RTC_MIN_OFFSET				0x04
-+#define RTC_HOUR_OFFSET				0x08
-+#define RTC_DAY_OFFSET				0x0C
-+#define RTC_SEC_ALM_OFFSET			0x10
-+#define RTC_MIN_ALM_OFFSET			0x14
-+#define RTC_HOUR_ALM_OFFSET			0x18
-+#define RTC_REC_OFFSET				0x1C
-+#define RTC_CTRL_OFFSET				0x20
-+#define RTC_INTR_STS_OFFSET			0x34
-+
-+#define CNS3XXX_MISC_BASE			0x76000000	/* Misc Control */
-+#define CNS3XXX_MISC_BASE_VIRT			0xFFF07000	/* Misc Control */
-+
-+#define CNS3XXX_PM_BASE				0x77000000	/* Power Management Control */
-+#define CNS3XXX_PM_BASE_VIRT			0xFFF08000
-+
-+#define PM_CLK_GATE_OFFSET			0x00
-+#define PM_SOFT_RST_OFFSET			0x04
-+#define PM_HS_CFG_OFFSET			0x08
-+#define PM_CACTIVE_STA_OFFSET			0x0C
-+#define PM_PWR_STA_OFFSET			0x10
-+#define PM_SYS_CLK_CTRL_OFFSET			0x14
-+#define PM_PLL_LCD_I2S_CTRL_OFFSET		0x18
-+#define PM_PLL_HM_PD_OFFSET			0x1C
-+
-+#define CNS3XXX_UART0_BASE			0x78000000	/* UART 0 */
-+#define CNS3XXX_UART0_BASE_VIRT			0xFFF09000
-+
-+#define CNS3XXX_UART1_BASE			0x78400000	/* UART 1 */
-+#define CNS3XXX_UART1_BASE_VIRT			0xFFF0A000
-+
-+#define CNS3XXX_UART2_BASE			0x78800000	/* UART 2 */
-+#define CNS3XXX_UART2_BASE_VIRT			0xFFF0B000
-+
-+#define CNS3XXX_DMAC_BASE			0x79000000	/* Generic DMA Control */
-+#define CNS3XXX_DMAC_BASE_VIRT			0xFFF0D000
-+
-+#define CNS3XXX_CORESIGHT_BASE			0x7A000000	/* CoreSight */
-+#define CNS3XXX_CORESIGHT_BASE_VIRT		0xFFF0E000
-+
-+#define CNS3XXX_CRYPTO_BASE			0x7B000000	/* Crypto */
-+#define CNS3XXX_CRYPTO_BASE_VIRT		0xFFF0F000
-+
-+#define CNS3XXX_I2S_BASE			0x7C000000	/* I2S */
-+#define CNS3XXX_I2S_BASE_VIRT			0xFFF10000
-+
-+#define CNS3XXX_TIMER1_2_3_BASE			0x7C800000	/* Timer */
-+#define CNS3XXX_TIMER1_2_3_BASE_VIRT		0xFFF10800
-+
-+#define TIMER1_COUNTER_OFFSET			0x00
-+#define TIMER1_AUTO_RELOAD_OFFSET		0x04
-+#define TIMER1_MATCH_V1_OFFSET			0x08
-+#define TIMER1_MATCH_V2_OFFSET			0x0C
-+
-+#define TIMER2_COUNTER_OFFSET			0x10
-+#define TIMER2_AUTO_RELOAD_OFFSET		0x14
-+#define TIMER2_MATCH_V1_OFFSET			0x18
-+#define TIMER2_MATCH_V2_OFFSET			0x1C
-+
-+#define TIMER1_2_CONTROL_OFFSET			0x30
-+#define TIMER1_2_INTERRUPT_STATUS_OFFSET	0x34
-+#define TIMER1_2_INTERRUPT_MASK_OFFSET		0x38
-+
-+#define TIMER_FREERUN_OFFSET			0x40
-+#define TIMER_FREERUN_CONTROL_OFFSET		0x44
-+
-+#define CNS3XXX_HCIE_BASE			0x7D000000	/* HCIE Control */
-+#define CNS3XXX_HCIE_BASE_VIRT			0xFFF30000
-+
-+#define CNS3XXX_RAID_BASE			0x7E000000	/* RAID Control */
-+#define CNS3XXX_RAID_BASE_VIRT			0xFFF12000
-+
-+#define CNS3XXX_AXI_IXC_BASE			0x7F000000	/* AXI IXC */
-+#define CNS3XXX_AXI_IXC_BASE_VIRT		0xFFF13000
-+
-+#define CNS3XXX_CLCD_BASE			0x80000000	/* LCD Control */
-+#define CNS3XXX_CLCD_BASE_VIRT			0xFFF14000
-+
-+#define CNS3XXX_USBOTG_BASE			0x81000000	/* USB OTG Control */
-+#define CNS3XXX_USBOTG_BASE_VIRT		0xFFF15000
-+
-+#define CNS3XXX_USB_BASE			0x82000000	/* USB Host Control */
-+#define CNS3XXX_USB_BASE_VIRT			0xFFF16000
-+
-+#define CNS3XXX_SATA2_BASE			0x83000000	/* SATA */
-+#define CNS3XXX_SATA2_SIZE			SZ_16M
-+#define CNS3XXX_SATA2_BASE_VIRT			0xFFF17000
-+
-+#define CNS3XXX_CAMERA_BASE			0x84000000	/* Camera Interface */
-+#define CNS3XXX_CAMERA_BASE_VIRT		0xFFF18000
-+
-+#define CNS3XXX_SDIO_BASE			0x85000000	/* SDIO */
-+#define CNS3XXX_SDIO_BASE_VIRT			0xFFF19000
-+
-+#define CNS3XXX_I2S_TDM_BASE			0x86000000	/* I2S TDM */
-+#define CNS3XXX_I2S_TDM_BASE_VIRT		0xFFF1A000
-+
-+#define CNS3XXX_2DG_BASE			0x87000000	/* 2D Graphic Control */
-+#define CNS3XXX_2DG_BASE_VIRT			0xFFF1B000
-+
-+#define CNS3XXX_USB_OHCI_BASE			0x88000000	/* USB OHCI */
-+#define CNS3XXX_USB_OHCI_BASE_VIRT		0xFFF1C000
-+
-+#define CNS3XXX_L2C_BASE			0x92000000	/* L2 Cache Control */
-+#define CNS3XXX_L2C_BASE_VIRT			0xFFF27000
-+
-+#define CNS3XXX_PCIE0_MEM_BASE			0xA0000000	/* PCIe Port 0 IO/Memory Space */
-+#define CNS3XXX_PCIE0_MEM_BASE_VIRT		0xE0000000
-+
-+#define CNS3XXX_PCIE0_HOST_BASE			0xAB000000	/* PCIe Port 0 RC Base */
-+#define CNS3XXX_PCIE0_HOST_BASE_VIRT		0xE1000000
-+
-+#define CNS3XXX_PCIE0_IO_BASE			0xAC000000	/* PCIe Port 0 */
-+#define CNS3XXX_PCIE0_IO_BASE_VIRT		0xE2000000
-+
-+#define CNS3XXX_PCIE0_CFG0_BASE			0xAD000000	/* PCIe Port 0 CFG Type 0 */
-+#define CNS3XXX_PCIE0_CFG0_BASE_VIRT		0xE3000000
-+
-+#define CNS3XXX_PCIE0_CFG1_BASE			0xAE000000	/* PCIe Port 0 CFG Type 1 */
-+#define CNS3XXX_PCIE0_CFG1_BASE_VIRT		0xE4000000
-+
-+#define CNS3XXX_PCIE0_MSG_BASE			0xAF000000	/* PCIe Port 0 Message Space */
-+#define CNS3XXX_PCIE0_MSG_BASE_VIRT		0xE5000000
-+
-+#define CNS3XXX_PCIE1_MEM_BASE			0xB0000000	/* PCIe Port 1 IO/Memory Space */
-+#define CNS3XXX_PCIE1_MEM_BASE_VIRT		0xE8000000
-+
-+#define CNS3XXX_PCIE1_HOST_BASE			0xBB000000	/* PCIe Port 1 RC Base */
-+#define CNS3XXX_PCIE1_HOST_BASE_VIRT		0xE9000000
-+
-+#define CNS3XXX_PCIE1_IO_BASE			0xBC000000	/* PCIe Port 1 */
-+#define CNS3XXX_PCIE1_IO_BASE_VIRT		0xEA000000
-+
-+#define CNS3XXX_PCIE1_CFG0_BASE			0xBD000000	/* PCIe Port 1 CFG Type 0 */
-+#define CNS3XXX_PCIE1_CFG0_BASE_VIRT		0xEB000000
-+
-+#define CNS3XXX_PCIE1_CFG1_BASE			0xBE000000	/* PCIe Port 1 CFG Type 1 */
-+#define CNS3XXX_PCIE1_CFG1_BASE_VIRT		0xEC000000
-+
-+#define CNS3XXX_PCIE1_MSG_BASE			0xBF000000	/* PCIe Port 1 Message Space */
-+#define CNS3XXX_PCIE1_MSG_BASE_VIRT		0xED000000
-+
-+/*
-+ * Testchip peripheral and fpga gic regions
-+ */
-+#define CNS3XXX_TC11MP_SCU_BASE			0x90000000	/* IRQ, Test chip */
-+#define CNS3XXX_TC11MP_SCU_BASE_VIRT		0xFF000000
-+
-+#define CNS3XXX_TC11MP_GIC_CPU_BASE		0x90000100	/* Test chip interrupt controller CPU interface */
-+#define CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT	0xFF000100
-+
-+#define CNS3XXX_TC11MP_TWD_BASE			0x90000600
-+#define CNS3XXX_TC11MP_TWD_BASE_VIRT		0xFF000600
-+
-+#define CNS3XXX_TC11MP_GIC_DIST_BASE		0x90001000	/* Test chip interrupt controller distributor */
-+#define CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT	0xFF001000
-+
-+#define CNS3XXX_TC11MP_L220_BASE		0x92002000	/* L220 registers */
-+#define CNS3XXX_TC11MP_L220_BASE_VIRT		0xFF002000
-+
-+/*
-+ * Misc block
-+ */
-+#define MISC_MEM_MAP_VALUE(offset) (*((volatile unsigned int *)(CNS3XXX_MISC_BASE_VIRT + offset)))
-+
-+#define MISC_MEMORY_REMAP_REG			MISC_MEM_MAP_VALUE(0x00)
-+#define MISC_CHIP_CONFIG_REG			MISC_MEM_MAP_VALUE(0x04)
-+#define MISC_DEBUG_PROBE_DATA_REG		MISC_MEM_MAP_VALUE(0x08)
-+#define MISC_DEBUG_PROBE_SELECTION_REG		MISC_MEM_MAP_VALUE(0x0C)
-+#define MISC_IO_PIN_FUNC_SELECTION_REG		MISC_MEM_MAP_VALUE(0x10)
-+#define MISC_GPIOA_PIN_ENABLE_REG		MISC_MEM_MAP_VALUE(0x14)
-+#define MISC_GPIOB_PIN_ENABLE_REG		MISC_MEM_MAP_VALUE(0x18)
-+#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_A	MISC_MEM_MAP_VALUE(0x1C)
-+#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_B	MISC_MEM_MAP_VALUE(0x20)
-+#define MISC_GPIOA_15_0_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x24)
-+#define MISC_GPIOA_16_31_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x28)
-+#define MISC_GPIOB_15_0_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x2C)
-+#define MISC_GPIOB_16_31_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x30)
-+#define MISC_IO_PULL_CTRL_REG			MISC_MEM_MAP_VALUE(0x34)
-+#define MISC_E_FUSE_31_0_REG			MISC_MEM_MAP_VALUE(0x40)
-+#define MISC_E_FUSE_63_32_REG			MISC_MEM_MAP_VALUE(0x44)
-+#define MISC_E_FUSE_95_64_REG			MISC_MEM_MAP_VALUE(0x48)
-+#define MISC_E_FUSE_127_96_REG			MISC_MEM_MAP_VALUE(0x4C)
-+#define MISC_SOFTWARE_TEST_1_REG		MISC_MEM_MAP_VALUE(0x50)
-+#define MISC_SOFTWARE_TEST_2_REG		MISC_MEM_MAP_VALUE(0x54)
-+
-+#define MISC_SATA_POWER_MODE			MISC_MEM_MAP_VALUE(0x310)
-+
-+#define MISC_USB_CFG_REG			MISC_MEM_MAP_VALUE(0x800)
-+#define MISC_USB_STS_REG			MISC_MEM_MAP_VALUE(0x804)
-+#define MISC_USBPHY00_CFG_REG			MISC_MEM_MAP_VALUE(0x808)
-+#define MISC_USBPHY01_CFG_REG			MISC_MEM_MAP_VALUE(0x80c)
-+#define MISC_USBPHY10_CFG_REG			MISC_MEM_MAP_VALUE(0x810)
-+#define MISC_USBPHY11_CFG_REG			MISC_MEM_MAP_VALUE(0x814)
-+
-+#define MISC_PCIEPHY_CMCTL0_REG			MISC_MEM_MAP_VALUE(0x900)
-+#define MISC_PCIEPHY_CMCTL1_REG			MISC_MEM_MAP_VALUE(0x904)
-+
-+#define MISC_PCIEPHY0_CTL_REG			MISC_MEM_MAP_VALUE(0x940)
-+#define MISC_PCIE0_AXIS_AWMISC_REG		MISC_MEM_MAP_VALUE(0x944)
-+#define MISC_PCIE0_AXIS_ARMISC_REG		MISC_MEM_MAP_VALUE(0x948)
-+#define MISC_PCIE0_AXIS_RMISC_REG		MISC_MEM_MAP_VALUE(0x94C)
-+#define MISC_PCIE0_AXIS_BMISC_REG		MISC_MEM_MAP_VALUE(0x950)
-+#define MISC_PCIE0_AXIM_RMISC_REG		MISC_MEM_MAP_VALUE(0x954)
-+#define MISC_PCIE0_AXIM_BMISC_REG		MISC_MEM_MAP_VALUE(0x958)
-+#define MISC_PCIE0_CTRL_REG			MISC_MEM_MAP_VALUE(0x95C)
-+#define MISC_PCIE0_PM_DEBUG_REG			MISC_MEM_MAP_VALUE(0x960)
-+#define MISC_PCIE0_RFC_DEBUG_REG		MISC_MEM_MAP_VALUE(0x964)
-+#define MISC_PCIE0_CXPL_DEBUGL_REG		MISC_MEM_MAP_VALUE(0x968)
-+#define MISC_PCIE0_CXPL_DEBUGH_REG		MISC_MEM_MAP_VALUE(0x96C)
-+#define MISC_PCIE0_DIAG_DEBUGH_REG		MISC_MEM_MAP_VALUE(0x970)
-+#define MISC_PCIE0_W1CLR_REG			MISC_MEM_MAP_VALUE(0x974)
-+#define MISC_PCIE0_INT_MASK_REG			MISC_MEM_MAP_VALUE(0x978)
-+#define MISC_PCIE0_INT_STATUS_REG		MISC_MEM_MAP_VALUE(0x97C)
-+
-+#define MISC_PCIEPHY1_CTL_REG			MISC_MEM_MAP_VALUE(0xa40)
-+#define MISC_PCIE1_AXIS_AWMISC_REG		MISC_MEM_MAP_VALUE(0xa44)
-+#define MISC_PCIE1_AXIS_ARMISC_REG		MISC_MEM_MAP_VALUE(0xa48)
-+#define MISC_PCIE1_AXIS_RMISC_REG		MISC_MEM_MAP_VALUE(0xa4C)
-+#define MISC_PCIE1_AXIS_BMISC_REG		MISC_MEM_MAP_VALUE(0xa50)
-+#define MISC_PCIE1_AXIM_RMISC_REG		MISC_MEM_MAP_VALUE(0xa54)
-+#define MISC_PCIE1_AXIM_BMISC_REG		MISC_MEM_MAP_VALUE(0xa58)
-+#define MISC_PCIE1_CTRL_REG			MISC_MEM_MAP_VALUE(0xa5C)
-+#define MISC_PCIE1_PM_DEBUG_REG			MISC_MEM_MAP_VALUE(0xa60)
-+#define MISC_PCIE1_RFC_DEBUG_REG		MISC_MEM_MAP_VALUE(0xa64)
-+#define MISC_PCIE1_CXPL_DEBUGL_REG		MISC_MEM_MAP_VALUE(0xa68)
-+#define MISC_PCIE1_CXPL_DEBUGH_REG		MISC_MEM_MAP_VALUE(0xa6C)
-+#define MISC_PCIE1_DIAG_DEBUGH_REG		MISC_MEM_MAP_VALUE(0xa70)
-+#define MISC_PCIE1_W1CLR_REG			MISC_MEM_MAP_VALUE(0xa74)
-+#define MISC_PCIE1_INT_MASK_REG			MISC_MEM_MAP_VALUE(0xa78)
-+#define MISC_PCIE1_INT_STATUS_REG		MISC_MEM_MAP_VALUE(0xa7C)
-+
-+/*
-+ * Power management and clock control
-+ */
-+#define PMU_REG_VALUE(offset) (*((volatile unsigned int *)(CNS3XXX_PM_BASE_VIRT + offset)))
-+
-+#define PM_CLK_GATE_REG					PMU_REG_VALUE(0x000)
-+#define PM_SOFT_RST_REG					PMU_REG_VALUE(0x004)
-+#define PM_HS_CFG_REG					PMU_REG_VALUE(0x008)
-+#define PM_CACTIVE_STA_REG				PMU_REG_VALUE(0x00C)
-+#define PM_PWR_STA_REG					PMU_REG_VALUE(0x010)
-+#define PM_CLK_CTRL_REG					PMU_REG_VALUE(0x014)
-+#define PM_PLL_LCD_I2S_CTRL_REG				PMU_REG_VALUE(0x018)
-+#define PM_PLL_HM_PD_CTRL_REG				PMU_REG_VALUE(0x01C)
-+#define PM_REGULAT_CTRL_REG				PMU_REG_VALUE(0x020)
-+#define PM_WDT_CTRL_REG					PMU_REG_VALUE(0x024)
-+#define PM_WU_CTRL0_REG					PMU_REG_VALUE(0x028)
-+#define PM_WU_CTRL1_REG					PMU_REG_VALUE(0x02C)
-+#define PM_CSR_REG					PMU_REG_VALUE(0x030)
-+
-+/* PM_CLK_GATE_REG */
-+#define PM_CLK_GATE_REG_OFFSET_SDIO			(25)
-+#define PM_CLK_GATE_REG_OFFSET_GPU			(24)
-+#define PM_CLK_GATE_REG_OFFSET_CIM			(23)
-+#define PM_CLK_GATE_REG_OFFSET_LCDC			(22)
-+#define PM_CLK_GATE_REG_OFFSET_I2S			(21)
-+#define PM_CLK_GATE_REG_OFFSET_RAID			(20)
-+#define PM_CLK_GATE_REG_OFFSET_SATA			(19)
-+#define PM_CLK_GATE_REG_OFFSET_PCIE0			(17)
-+#define PM_CLK_GATE_REG_OFFSET_PCIE1			(18)
-+#define PM_CLK_GATE_REG_OFFSET_USB_HOST			(16)
-+#define PM_CLK_GATE_REG_OFFSET_USB_OTG			(15)
-+#define PM_CLK_GATE_REG_OFFSET_TIMER			(14)
-+#define PM_CLK_GATE_REG_OFFSET_CRYPTO			(13)
-+#define PM_CLK_GATE_REG_OFFSET_HCIE			(12)
-+#define PM_CLK_GATE_REG_OFFSET_SWITCH			(11)
-+#define PM_CLK_GATE_REG_OFFSET_GPIO			(10)
-+#define PM_CLK_GATE_REG_OFFSET_UART3			(9)
-+#define PM_CLK_GATE_REG_OFFSET_UART2			(8)
-+#define PM_CLK_GATE_REG_OFFSET_UART1			(7)
-+#define PM_CLK_GATE_REG_OFFSET_RTC			(5)
-+#define PM_CLK_GATE_REG_OFFSET_GDMA			(4)
-+#define PM_CLK_GATE_REG_OFFSET_SPI_PCM_I2C		(3)
-+#define PM_CLK_GATE_REG_OFFSET_SMC_NFI			(1)
-+#define PM_CLK_GATE_REG_MASK				(0x03FFFFBA)
-+
-+/* PM_SOFT_RST_REG */
-+#define PM_SOFT_RST_REG_OFFST_WARM_RST_FLAG		(31)
-+#define PM_SOFT_RST_REG_OFFST_CPU1			(29)
-+#define PM_SOFT_RST_REG_OFFST_CPU0			(28)
-+#define PM_SOFT_RST_REG_OFFST_SDIO			(25)
-+#define PM_SOFT_RST_REG_OFFST_GPU			(24)
-+#define PM_SOFT_RST_REG_OFFST_CIM			(23)
-+#define PM_SOFT_RST_REG_OFFST_LCDC			(22)
-+#define PM_SOFT_RST_REG_OFFST_I2S			(21)
-+#define PM_SOFT_RST_REG_OFFST_RAID			(20)
-+#define PM_SOFT_RST_REG_OFFST_SATA			(19)
-+#define PM_SOFT_RST_REG_OFFST_PCIE1			(18)
-+#define PM_SOFT_RST_REG_OFFST_PCIE0			(17)
-+#define PM_SOFT_RST_REG_OFFST_USB_HOST			(16)
-+#define PM_SOFT_RST_REG_OFFST_USB_OTG			(15)
-+#define PM_SOFT_RST_REG_OFFST_TIMER			(14)
-+#define PM_SOFT_RST_REG_OFFST_CRYPTO			(13)
-+#define PM_SOFT_RST_REG_OFFST_HCIE			(12)
-+#define PM_SOFT_RST_REG_OFFST_SWITCH			(11)
-+#define PM_SOFT_RST_REG_OFFST_GPIO			(10)
-+#define PM_SOFT_RST_REG_OFFST_UART3			(9)
-+#define PM_SOFT_RST_REG_OFFST_UART2			(8)
-+#define PM_SOFT_RST_REG_OFFST_UART1			(7)
-+#define PM_SOFT_RST_REG_OFFST_RTC			(5)
-+#define PM_SOFT_RST_REG_OFFST_GDMA			(4)
-+#define PM_SOFT_RST_REG_OFFST_SPI_PCM_I2C		(3)
-+#define PM_SOFT_RST_REG_OFFST_DMC			(2)
-+#define PM_SOFT_RST_REG_OFFST_SMC_NFI			(1)
-+#define PM_SOFT_RST_REG_OFFST_GLOBAL			(0)
-+#define PM_SOFT_RST_REG_MASK				(0xF3FFFFBF)
-+
-+/* PMHS_CFG_REG */
-+#define PM_HS_CFG_REG_OFFSET_SDIO			(25)
-+#define PM_HS_CFG_REG_OFFSET_GPU			(24)
-+#define PM_HS_CFG_REG_OFFSET_CIM			(23)
-+#define PM_HS_CFG_REG_OFFSET_LCDC			(22)
-+#define PM_HS_CFG_REG_OFFSET_I2S			(21)
-+#define PM_HS_CFG_REG_OFFSET_RAID			(20)
-+#define PM_HS_CFG_REG_OFFSET_SATA			(19)
-+#define PM_HS_CFG_REG_OFFSET_PCIE1			(18)
-+#define PM_HS_CFG_REG_OFFSET_PCIE0			(17)
-+#define PM_HS_CFG_REG_OFFSET_USB_HOST			(16)
-+#define PM_HS_CFG_REG_OFFSET_USB_OTG			(15)
-+#define PM_HS_CFG_REG_OFFSET_TIMER			(14)
-+#define PM_HS_CFG_REG_OFFSET_CRYPTO			(13)
-+#define PM_HS_CFG_REG_OFFSET_HCIE			(12)
-+#define PM_HS_CFG_REG_OFFSET_SWITCH			(11)
-+#define PM_HS_CFG_REG_OFFSET_GPIO			(10)
-+#define PM_HS_CFG_REG_OFFSET_UART3			(9)
-+#define PM_HS_CFG_REG_OFFSET_UART2			(8)
-+#define PM_HS_CFG_REG_OFFSET_UART1			(7)
-+#define PM_HS_CFG_REG_OFFSET_RTC			(5)
-+#define PM_HS_CFG_REG_OFFSET_GDMA			(4)
-+#define PM_HS_CFG_REG_OFFSET_SPI_PCM_I2S		(3)
-+#define PM_HS_CFG_REG_OFFSET_DMC			(2)
-+#define PM_HS_CFG_REG_OFFSET_SMC_NFI			(1)
-+#define PM_HS_CFG_REG_MASK				(0x03FFFFBE)
-+#define PM_HS_CFG_REG_MASK_SUPPORT			(0x01100806)
-+
-+/* PM_CACTIVE_STA_REG */
-+#define PM_CACTIVE_STA_REG_OFFSET_SDIO			(25)
-+#define PM_CACTIVE_STA_REG_OFFSET_GPU			(24)
-+#define PM_CACTIVE_STA_REG_OFFSET_CIM			(23)
-+#define PM_CACTIVE_STA_REG_OFFSET_LCDC			(22)
-+#define PM_CACTIVE_STA_REG_OFFSET_I2S			(21)
-+#define PM_CACTIVE_STA_REG_OFFSET_RAID			(20)
-+#define PM_CACTIVE_STA_REG_OFFSET_SATA			(19)
-+#define PM_CACTIVE_STA_REG_OFFSET_PCIE1			(18)
-+#define PM_CACTIVE_STA_REG_OFFSET_PCIE0			(17)
-+#define PM_CACTIVE_STA_REG_OFFSET_USB_HOST		(16)
-+#define PM_CACTIVE_STA_REG_OFFSET_USB_OTG		(15)
-+#define PM_CACTIVE_STA_REG_OFFSET_TIMER			(14)
-+#define PM_CACTIVE_STA_REG_OFFSET_CRYPTO		(13)
-+#define PM_CACTIVE_STA_REG_OFFSET_HCIE			(12)
-+#define PM_CACTIVE_STA_REG_OFFSET_SWITCH		(11)
-+#define PM_CACTIVE_STA_REG_OFFSET_GPIO			(10)
-+#define PM_CACTIVE_STA_REG_OFFSET_UART3			(9)
-+#define PM_CACTIVE_STA_REG_OFFSET_UART2			(8)
-+#define PM_CACTIVE_STA_REG_OFFSET_UART1			(7)
-+#define PM_CACTIVE_STA_REG_OFFSET_RTC			(5)
-+#define PM_CACTIVE_STA_REG_OFFSET_GDMA			(4)
-+#define PM_CACTIVE_STA_REG_OFFSET_SPI_PCM_I2S		(3)
-+#define PM_CACTIVE_STA_REG_OFFSET_DMC			(2)
-+#define PM_CACTIVE_STA_REG_OFFSET_SMC_NFI		(1)
-+#define PM_CACTIVE_STA_REG_MASK				(0x03FFFFBE)
-+
-+/* PM_PWR_STA_REG */
-+#define PM_PWR_STA_REG_REG_OFFSET_SDIO			(25)
-+#define PM_PWR_STA_REG_REG_OFFSET_GPU			(24)
-+#define PM_PWR_STA_REG_REG_OFFSET_CIM			(23)
-+#define PM_PWR_STA_REG_REG_OFFSET_LCDC			(22)
-+#define PM_PWR_STA_REG_REG_OFFSET_I2S			(21)
-+#define PM_PWR_STA_REG_REG_OFFSET_RAID			(20)
-+#define PM_PWR_STA_REG_REG_OFFSET_SATA			(19)
-+#define PM_PWR_STA_REG_REG_OFFSET_PCIE1			(18)
-+#define PM_PWR_STA_REG_REG_OFFSET_PCIE0			(17)
-+#define PM_PWR_STA_REG_REG_OFFSET_USB_HOST		(16)
-+#define PM_PWR_STA_REG_REG_OFFSET_USB_OTG		(15)
-+#define PM_PWR_STA_REG_REG_OFFSET_TIMER			(14)
-+#define PM_PWR_STA_REG_REG_OFFSET_CRYPTO		(13)
-+#define PM_PWR_STA_REG_REG_OFFSET_HCIE			(12)
-+#define PM_PWR_STA_REG_REG_OFFSET_SWITCH		(11)
-+#define PM_PWR_STA_REG_REG_OFFSET_GPIO			(10)
-+#define PM_PWR_STA_REG_REG_OFFSET_UART3			(9)
-+#define PM_PWR_STA_REG_REG_OFFSET_UART2			(8)
-+#define PM_PWR_STA_REG_REG_OFFSET_UART1			(7)
-+#define PM_PWR_STA_REG_REG_OFFSET_RTC			(5)
-+#define PM_PWR_STA_REG_REG_OFFSET_GDMA			(4)
-+#define PM_PWR_STA_REG_REG_OFFSET_SPI_PCM_I2S		(3)
-+#define PM_PWR_STA_REG_REG_OFFSET_DMC			(2)
-+#define PM_PWR_STA_REG_REG_OFFSET_SMC_NFI		(1)
-+#define PM_PWR_STA_REG_REG_MASK				(0x03FFFFBE)
-+
-+/* PM_CLK_CTRL_REG */
-+#define PM_CLK_CTRL_REG_OFFSET_I2S_MCLK			(31)
-+#define PM_CLK_CTRL_REG_OFFSET_DDR2_CHG_EN		(30)
-+#define PM_CLK_CTRL_REG_OFFSET_PCIE_REF1_EN		(29)
-+#define PM_CLK_CTRL_REG_OFFSET_PCIE_REF0_EN		(28)
-+#define PM_CLK_CTRL_REG_OFFSET_TIMER_SIM_MODE		(27)
-+#define PM_CLK_CTRL_REG_OFFSET_I2SCLK_DIV		(24)
-+#define PM_CLK_CTRL_REG_OFFSET_I2SCLK_SEL		(22)
-+#define PM_CLK_CTRL_REG_OFFSET_CLKOUT_DIV		(20)
-+#define PM_CLK_CTRL_REG_OFFSET_CLKOUT_SEL		(16)
-+#define PM_CLK_CTRL_REG_OFFSET_MDC_DIV			(14)
-+#define PM_CLK_CTRL_REG_OFFSET_CRYPTO_CLK_SEL		(12)
-+#define PM_CLK_CTRL_REG_OFFSET_CPU_PWR_MODE		(9)
-+#define PM_CLK_CTRL_REG_OFFSET_PLL_DDR2_SEL		(7)
-+#define PM_CLK_CTRL_REG_OFFSET_DIV_IMMEDIATE		(6)
-+#define PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV		(4)
-+#define PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL		(0)
-+
-+#define PM_CPU_CLK_DIV(DIV) { \
-+	PM_CLK_CTRL_REG &= ~((0x3) << PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV); \
-+	PM_CLK_CTRL_REG |= (((DIV)&0x3) << PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV); \
-+}
-+
-+#define PM_PLL_CPU_SEL(CPU) { \
-+	PM_CLK_CTRL_REG &= ~((0xF) << PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL); \
-+	PM_CLK_CTRL_REG |= (((CPU)&0xF) << PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL); \
-+}
-+
-+/* PM_PLL_LCD_I2S_CTRL_REG */
-+#define PM_PLL_LCD_I2S_CTRL_REG_OFFSET_MCLK_SMC_DIV	(22)
-+#define PM_PLL_LCD_I2S_CTRL_REG_OFFSET_R_SEL		(17)
-+#define PM_PLL_LCD_I2S_CTRL_REG_OFFSET_PLL_LCD_P	(11)
-+#define PM_PLL_LCD_I2S_CTRL_REG_OFFSET_PLL_LCD_M	(3)
-+#define PM_PLL_LCD_I2S_CTRL_REG_OFFSET_PLL_LCD_S	(0)
-+
-+/* PM_PLL_HM_PD_CTRL_REG */
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1		(11)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0		(10)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_I2SCD		(6)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_I2S		(5)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_LCD		(4)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_USB		(3)
-+#define PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_RGMII		(2)
-+#define PM_PLL_HM_PD_CTRL_REG_MASK			(0x00000C7C)
-+
-+/* PM_WDT_CTRL_REG */
-+#define PM_WDT_CTRL_REG_OFFSET_RESET_CPU_ONLY		(0)
-+
-+/* PM_CSR_REG - Clock Scaling Register*/
-+#define PM_CSR_REG_OFFSET_CSR_EN			(30)
-+#define PM_CSR_REG_OFFSET_CSR_NUM			(0)
-+
-+#define CNS3XXX_PWR_CLK_EN(BLOCK) (0x1<<PM_CLK_GATE_REG_OFFSET_##BLOCK)
-+
-+/* Software reset*/
-+#define CNS3XXX_PWR_SOFTWARE_RST(BLOCK) (0x1<<PM_SOFT_RST_REG_OFFST_##BLOCK)
-+
-+/*
-+ * CNS3XXX support several power saving mode as following,
-+ * DFS, IDLE, HALT, DOZE, SLEEP, Hibernate
-+ */
-+#define CNS3XXX_PWR_CPU_MODE_DFS			(0)
-+#define CNS3XXX_PWR_CPU_MODE_IDLE			(1)
-+#define CNS3XXX_PWR_CPU_MODE_HALT			(2)
-+#define CNS3XXX_PWR_CPU_MODE_DOZE			(3)
-+#define CNS3XXX_PWR_CPU_MODE_SLEEP			(4)
-+#define CNS3XXX_PWR_CPU_MODE_HIBERNATE			(5)
-+
-+#define CNS3XXX_PWR_PLL(BLOCK)	(0x1<<PM_PLL_HM_PD_CTRL_REG_OFFSET_##BLOCK)
-+#define CNS3XXX_PWR_PLL_ALL	PM_PLL_HM_PD_CTRL_REG_MASK
-+
-+/* Change CPU frequency and divider */
-+#define CNS3XXX_PWR_PLL_CPU_300MHZ			(0)
-+#define CNS3XXX_PWR_PLL_CPU_333MHZ			(1)
-+#define CNS3XXX_PWR_PLL_CPU_366MHZ			(2)
-+#define CNS3XXX_PWR_PLL_CPU_400MHZ			(3)
-+#define CNS3XXX_PWR_PLL_CPU_433MHZ			(4)
-+#define CNS3XXX_PWR_PLL_CPU_466MHZ			(5)
-+#define CNS3XXX_PWR_PLL_CPU_500MHZ			(6)
-+#define CNS3XXX_PWR_PLL_CPU_533MHZ			(7)
-+#define CNS3XXX_PWR_PLL_CPU_566MHZ			(8)
-+#define CNS3XXX_PWR_PLL_CPU_600MHZ			(9)
-+#define CNS3XXX_PWR_PLL_CPU_633MHZ			(10)
-+#define CNS3XXX_PWR_PLL_CPU_666MHZ			(11)
-+#define CNS3XXX_PWR_PLL_CPU_700MHZ			(12)
-+
-+#define CNS3XXX_PWR_CPU_CLK_DIV_BY1			(0)
-+#define CNS3XXX_PWR_CPU_CLK_DIV_BY2			(1)
-+#define CNS3XXX_PWR_CPU_CLK_DIV_BY4			(2)
-+
-+/* Change DDR2 frequency */
-+#define CNS3XXX_PWR_PLL_DDR2_200MHZ			(0)
-+#define CNS3XXX_PWR_PLL_DDR2_266MHZ			(1)
-+#define CNS3XXX_PWR_PLL_DDR2_333MHZ			(2)
-+#define CNS3XXX_PWR_PLL_DDR2_400MHZ			(3)
-+
-+void cns3xxx_pwr_soft_rst(unsigned int block);
-+void cns3xxx_pwr_clk_en(unsigned int block);
-+int cns3xxx_cpu_clock(void);
-+
-+/*
-+ * ARM11 MPCore interrupt sources (primary GIC)
-+ */
-+#define IRQ_CNS3XXX_PMU			(IRQ_TC11MP_GIC_START + 0)
-+#define IRQ_CNS3XXX_SDIO		(IRQ_TC11MP_GIC_START + 1)
-+#define IRQ_CNS3XXX_L2CC		(IRQ_TC11MP_GIC_START + 2)
-+#define IRQ_CNS3XXX_RTC			(IRQ_TC11MP_GIC_START + 3)
-+#define IRQ_CNS3XXX_I2S			(IRQ_TC11MP_GIC_START + 4)
-+#define IRQ_CNS3XXX_PCM			(IRQ_TC11MP_GIC_START + 5)
-+#define IRQ_CNS3XXX_SPI			(IRQ_TC11MP_GIC_START + 6)
-+#define IRQ_CNS3XXX_I2C			(IRQ_TC11MP_GIC_START + 7)
-+#define IRQ_CNS3XXX_CIM			(IRQ_TC11MP_GIC_START + 8)
-+#define IRQ_CNS3XXX_GPU			(IRQ_TC11MP_GIC_START + 9)
-+#define IRQ_CNS3XXX_LCD			(IRQ_TC11MP_GIC_START + 10)
-+#define IRQ_CNS3XXX_GPIOA		(IRQ_TC11MP_GIC_START + 11)
-+#define IRQ_CNS3XXX_GPIOB		(IRQ_TC11MP_GIC_START + 12)
-+#define IRQ_CNS3XXX_UART0		(IRQ_TC11MP_GIC_START + 13)
-+#define IRQ_CNS3XXX_UART1		(IRQ_TC11MP_GIC_START + 14)
-+#define IRQ_CNS3XXX_UART2		(IRQ_TC11MP_GIC_START + 15)
-+#define IRQ_CNS3XXX_ARM11		(IRQ_TC11MP_GIC_START + 16)
-+
-+#define IRQ_CNS3XXX_SW_STATUS		(IRQ_TC11MP_GIC_START + 17)
-+#define IRQ_CNS3XXX_SW_R0TXC		(IRQ_TC11MP_GIC_START + 18)
-+#define IRQ_CNS3XXX_SW_R0RXC		(IRQ_TC11MP_GIC_START + 19)
-+#define IRQ_CNS3XXX_SW_R0QE		(IRQ_TC11MP_GIC_START + 20)
-+#define IRQ_CNS3XXX_SW_R0QF		(IRQ_TC11MP_GIC_START + 21)
-+#define IRQ_CNS3XXX_SW_R1TXC		(IRQ_TC11MP_GIC_START + 22)
-+#define IRQ_CNS3XXX_SW_R1RXC		(IRQ_TC11MP_GIC_START + 23)
-+#define IRQ_CNS3XXX_SW_R1QE		(IRQ_TC11MP_GIC_START + 24)
-+#define IRQ_CNS3XXX_SW_R1QF		(IRQ_TC11MP_GIC_START + 25)
-+#define IRQ_CNS3XXX_SW_PPE		(IRQ_TC11MP_GIC_START + 26)
-+
-+#define IRQ_CNS3XXX_CRYPTO		(IRQ_TC11MP_GIC_START + 27)
-+#define IRQ_CNS3XXX_HCIE		(IRQ_TC11MP_GIC_START + 28)
-+#define IRQ_CNS3XXX_PCIE0_DEVICE	(IRQ_TC11MP_GIC_START + 29)
-+#define IRQ_CNS3XXX_PCIE1_DEVICE	(IRQ_TC11MP_GIC_START + 30)
-+#define IRQ_CNS3XXX_USB_OTG		(IRQ_TC11MP_GIC_START + 31)
-+#define IRQ_CNS3XXX_USB_EHCI		(IRQ_TC11MP_GIC_START + 32)
-+#define IRQ_CNS3XXX_SATA		(IRQ_TC11MP_GIC_START + 33)
-+#define IRQ_CNS3XXX_RAID		(IRQ_TC11MP_GIC_START + 34)
-+#define IRQ_CNS3XXX_SMC			(IRQ_TC11MP_GIC_START + 35)
-+
-+#define IRQ_CNS3XXX_DMAC_ABORT		(IRQ_TC11MP_GIC_START + 36)
-+#define IRQ_CNS3XXX_DMAC0		(IRQ_TC11MP_GIC_START + 37)
-+#define IRQ_CNS3XXX_DMAC1		(IRQ_TC11MP_GIC_START + 38)
-+#define IRQ_CNS3XXX_DMAC2		(IRQ_TC11MP_GIC_START + 39)
-+#define IRQ_CNS3XXX_DMAC3		(IRQ_TC11MP_GIC_START + 40)
-+#define IRQ_CNS3XXX_DMAC4		(IRQ_TC11MP_GIC_START + 41)
-+#define IRQ_CNS3XXX_DMAC5		(IRQ_TC11MP_GIC_START + 42)
-+#define IRQ_CNS3XXX_DMAC6		(IRQ_TC11MP_GIC_START + 43)
-+#define IRQ_CNS3XXX_DMAC7		(IRQ_TC11MP_GIC_START + 44)
-+#define IRQ_CNS3XXX_DMAC8		(IRQ_TC11MP_GIC_START + 45)
-+#define IRQ_CNS3XXX_DMAC9		(IRQ_TC11MP_GIC_START + 46)
-+#define IRQ_CNS3XXX_DMAC10		(IRQ_TC11MP_GIC_START + 47)
-+#define IRQ_CNS3XXX_DMAC11		(IRQ_TC11MP_GIC_START + 48)
-+#define IRQ_CNS3XXX_DMAC12		(IRQ_TC11MP_GIC_START + 49)
-+#define IRQ_CNS3XXX_DMAC13		(IRQ_TC11MP_GIC_START + 50)
-+#define IRQ_CNS3XXX_DMAC14		(IRQ_TC11MP_GIC_START + 51)
-+#define IRQ_CNS3XXX_DMAC15		(IRQ_TC11MP_GIC_START + 52)
-+#define IRQ_CNS3XXX_DMAC16		(IRQ_TC11MP_GIC_START + 53)
-+#define IRQ_CNS3XXX_DMAC17		(IRQ_TC11MP_GIC_START + 54)
-+
-+#define IRQ_CNS3XXX_PCIE0_RC		(IRQ_TC11MP_GIC_START + 55)
-+#define IRQ_CNS3XXX_PCIE1_RC		(IRQ_TC11MP_GIC_START + 56)
-+#define IRQ_CNS3XXX_TIMER0		(IRQ_TC11MP_GIC_START + 57)
-+#define IRQ_CNS3XXX_TIMER1		(IRQ_TC11MP_GIC_START + 58)
-+#define IRQ_CNS3XXX_USB_OHCI		(IRQ_TC11MP_GIC_START + 59)
-+#define IRQ_CNS3XXX_TIMER2		(IRQ_TC11MP_GIC_START + 60)
-+#define IRQ_CNS3XXX_EXTERNAL_PIN0	(IRQ_TC11MP_GIC_START + 61)
-+#define IRQ_CNS3XXX_EXTERNAL_PIN1	(IRQ_TC11MP_GIC_START + 62)
-+#define IRQ_CNS3XXX_EXTERNAL_PIN2	(IRQ_TC11MP_GIC_START + 63)
-+
-+#define NR_IRQS_CNS3XXX			(IRQ_TC11MP_GIC_START + 64)
-+
-+#if !defined(NR_IRQS) || (NR_IRQS < NR_IRQS_CNS3XXX)
-+#undef NR_IRQS
-+#define NR_IRQS				NR_IRQS_CNS3XXX
-+#endif
-+
-+#endif	/* __MACH_BOARD_CNS3XXX_H */
-diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..d16ce7e
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-@@ -0,0 +1,21 @@
-+/*
-+ * Debugging macro include header
-+ *
-+ * Copyright 1994-1999 Russell King
-+ * Copyright 2008 Cavium Networks
-+ * Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+		.macro	addruart,rx
-+		mrc	p15, 0, \rx, c1, c0
-+		tst	\rx, #1			@ MMU enabled?
-+		moveq	\rx,      #0x10000000
-+		movne	\rx,      #0xf0000000	@ virtual base
-+		orr	\rx, \rx, #0x00009000
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..5e1c554
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-@@ -0,0 +1,82 @@
-+/*
-+ * Low-level IRQ helper macros for Cavium Networks platforms
-+ *
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <mach/hardware.h>
-+#include <asm/hardware/gic.h>
-+
-+		.macro	disable_fiq
-+		.endm
-+
-+		.macro  get_irqnr_preamble, base, tmp
-+		ldr	\base, =gic_cpu_base_addr
-+		ldr	\base, [\base]
-+		.endm
-+
-+		.macro  arch_ret_to_user, tmp1, tmp2
-+		.endm
-+
-+		/*
-+		 * The interrupt numbering scheme is defined in the
-+		 * interrupt controller spec.  To wit:
-+		 *
-+		 * Interrupts 0-15 are IPI
-+		 * 16-28 are reserved
-+		 * 29-31 are local.  We allow 30 to be used for the watchdog.
-+		 * 32-1020 are global
-+		 * 1021-1022 are reserved
-+		 * 1023 is "spurious" (no interrupt)
-+		 *
-+		 * For now, we ignore all local interrupts so only return an interrupt if it's
-+		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
-+		 *
-+		 * A simple read from the controller will tell us the number of the highest
-+                 * priority enabled interrupt.  We then just need to check whether it is in the
-+		 * valid range for an IRQ (30-1020 inclusive).
-+		 */
-+
-+		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-+
-+		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
-+
-+		ldr	\tmp, =1021
-+
-+		bic     \irqnr, \irqstat, #0x1c00
-+
-+		cmp     \irqnr, #29
-+		cmpcc	\irqnr, \irqnr
-+		cmpne	\irqnr, \tmp
-+		cmpcs	\irqnr, \irqnr
-+
-+		.endm
-+
-+		/* We assume that irqstat (the raw value of the IRQ acknowledge
-+		 * register) is preserved from the macro above.
-+		 * If there is an IPI, we immediately signal end of interrupt on the
-+		 * controller, since this requires the original irqstat value which
-+		 * we won't easily be able to recreate later.
-+		 */
-+
-+		.macro test_for_ipi, irqnr, irqstat, base, tmp
-+		bic	\irqnr, \irqstat, #0x1c00
-+		cmp	\irqnr, #16
-+		strcc	\irqstat, [\base, #GIC_CPU_EOI]
-+		cmpcs	\irqnr, \irqnr
-+		.endm
-+
-+		/* As above, this assumes that irqstat and base are preserved.. */
-+
-+		.macro test_for_ltirq, irqnr, irqstat, base, tmp
-+		bic	\irqnr, \irqstat, #0x1c00
-+		mov 	\tmp, #0
-+		cmp	\irqnr, #29
-+		moveq	\tmp, #1
-+		streq	\irqstat, [\base, #GIC_CPU_EOI]
-+		cmp	\tmp, #0
-+		.endm
-diff --git a/arch/arm/mach-cns3xxx/include/mach/hardware.h b/arch/arm/mach-cns3xxx/include/mach/hardware.h
-new file mode 100644
-index 0000000..57e0983
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/hardware.h
-@@ -0,0 +1,22 @@
-+/*
-+ * This file contains the hardware definitions of the Cavium Networks boards.
-+ *
-+ * Copyright 2003 ARM Limited.
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_HARDWARE_H
-+#define __MACH_HARDWARE_H
-+
-+#include <asm/sizes.h>
-+
-+/* macro to get at IO space when running virtually */
-+#define PCIBIOS_MIN_IO		0x00000000
-+#define PCIBIOS_MIN_MEM		0x00000000
-+#define pcibios_assign_all_busses()	1
-+
-+#endif
-diff --git a/arch/arm/mach-cns3xxx/include/mach/io.h b/arch/arm/mach-cns3xxx/include/mach/io.h
-new file mode 100644
-index 0000000..b4ff09a
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/io.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright 2008 Cavium Networks
-+ * Copyright 2003 ARM Limited
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __MACH_IO_H
-+#define __MACH_IO_H
-+
-+#define IO_SPACE_LIMIT 0xffffffff
-+
-+static inline void __iomem *__io(unsigned long addr)
-+{
-+	return (void __iomem *)addr;
-+}
-+
-+#define __io(a)			__typesafe_io(a)
-+#define __mem_pci(a)		(a)
-+
-+#endif
-diff --git a/arch/arm/mach-cns3xxx/include/mach/irqs.h b/arch/arm/mach-cns3xxx/include/mach/irqs.h
-new file mode 100644
-index 0000000..2ab96f8
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/irqs.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright 2000 Deep Blue Solutions Ltd.
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_IRQS_H
-+#define __MACH_IRQS_H
-+
-+#define IRQ_LOCALTIMER		29
-+#define IRQ_LOCALWDOG		30
-+#define IRQ_TC11MP_GIC_START	32
-+
-+#include <mach/cns3xxx.h>
-+
-+#ifndef NR_IRQS
-+#error "NR_IRQS not defined by the board-specific files"
-+#endif
-+
-+#endif
-diff --git a/arch/arm/mach-cns3xxx/include/mach/memory.h b/arch/arm/mach-cns3xxx/include/mach/memory.h
-new file mode 100644
-index 0000000..3b6b769
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/memory.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_MEMORY_H
-+#define __MACH_MEMORY_H
-+
-+/*
-+ * Physical DRAM offset.
-+ */
-+#define PHYS_OFFSET		UL(0x00000000)
-+
-+#define __phys_to_bus(x)	((x) + PHYS_OFFSET)
-+#define __bus_to_phys(x)	((x) - PHYS_OFFSET)
-+
-+#define __virt_to_bus(v)	__phys_to_bus(__virt_to_phys(v))
-+#define __bus_to_virt(b)	__phys_to_virt(__bus_to_phys(b))
-+#define __pfn_to_bus(p)		__phys_to_bus(__pfn_to_phys(p))
-+#define __bus_to_pfn(b)		__phys_to_pfn(__bus_to_phys(b))
-+
-+#endif
-diff --git a/arch/arm/mach-cns3xxx/include/mach/system.h b/arch/arm/mach-cns3xxx/include/mach/system.h
-new file mode 100644
-index 0000000..58bb03a
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/system.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright 2000 Deep Blue Solutions Ltd
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_SYSTEM_H
-+#define __MACH_SYSTEM_H
-+
-+#include <linux/io.h>
-+#include <asm/proc-fns.h>
-+#include <mach/hardware.h>
-+
-+static inline void arch_idle(void)
-+{
-+	/*
-+	 * This should do all the clock switching
-+	 * and wait for interrupt tricks
-+	 */
-+	cpu_do_idle();
-+}
-+
-+void arch_reset(char mode, const char *cmd);
-+
-+#endif
-diff --git a/arch/arm/mach-cns3xxx/include/mach/timex.h b/arch/arm/mach-cns3xxx/include/mach/timex.h
-new file mode 100644
-index 0000000..1fd0421
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/timex.h
-@@ -0,0 +1,12 @@
-+/*
-+ * Cavium Networks architecture timex specifications
-+ *
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define CLOCK_TICK_RATE		(50000000 / 16)
-diff --git a/arch/arm/mach-cns3xxx/include/mach/uncompress.h b/arch/arm/mach-cns3xxx/include/mach/uncompress.h
-new file mode 100644
-index 0000000..de8ead9
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/uncompress.h
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <mach/cns3xxx.h>
-+
-+#define AMBA_UART_DR(base)	(*(volatile unsigned char *)((base) + 0x00))
-+#define AMBA_UART_LCRH(base)	(*(volatile unsigned char *)((base) + 0x2c))
-+#define AMBA_UART_CR(base)	(*(volatile unsigned char *)((base) + 0x30))
-+#define AMBA_UART_FR(base)	(*(volatile unsigned char *)((base) + 0x18))
-+
-+/*
-+ * Return the UART base address
-+ */
-+static inline unsigned long get_uart_base(void)
-+{
-+	if (machine_is_cns3420vb())
-+		return CNS3XXX_UART0_BASE;
-+	else
-+		return 0;
-+}
-+
-+/*
-+ * This does not append a newline
-+ */
-+static inline void putc(int c)
-+{
-+	unsigned long base = get_uart_base();
-+
-+	while (AMBA_UART_FR(base) & (1 << 5))
-+		barrier();
-+
-+	AMBA_UART_DR(base) = c;
-+}
-+
-+static inline void flush(void)
-+{
-+	unsigned long base = get_uart_base();
-+
-+	while (AMBA_UART_FR(base) & (1 << 3))
-+		barrier();
-+}
-+
-+/*
-+ * nothing to do
-+ */
-+#define arch_decomp_setup()
-+#define arch_decomp_wdog()
-diff --git a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..d0b4aff
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-@@ -0,0 +1,11 @@
-+/*
-+ * Copyright 2000 Russell King.
-+ * Copyright 2003 ARM Limited
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define VMALLOC_END		(PAGE_OFFSET + 0x18000000)
-diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
-new file mode 100644
-index 0000000..725e1a4
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/pm.c
-@@ -0,0 +1,86 @@
-+/*
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/delay.h>
-+#include <mach/system.h>
-+#include <mach/cns3xxx.h>
-+
-+void cns3xxx_pwr_clk_en(unsigned int block)
-+{
-+	PM_CLK_GATE_REG |= (block & PM_CLK_GATE_REG_MASK);
-+}
-+
-+void cns3xxx_pwr_power_up(unsigned int block)
-+{
-+	PM_PLL_HM_PD_CTRL_REG &= ~(block & CNS3XXX_PWR_PLL_ALL);
-+
-+	/* Wait for 300us for the PLL output clock locked. */
-+	udelay(300);
-+};
-+
-+void cns3xxx_pwr_power_down(unsigned int block)
-+{
-+	/* write '1' to power down */
-+	PM_PLL_HM_PD_CTRL_REG |= (block & CNS3XXX_PWR_PLL_ALL);
-+};
-+
-+static void cns3xxx_pwr_soft_rst_force(unsigned int block)
-+{
-+	/*
-+	 * bit 0, 28, 29 => program low to reset,
-+	 * the other else program low and then high
-+	 */
-+	if (block & 0x30000001) {
-+		PM_SOFT_RST_REG &= ~(block & PM_SOFT_RST_REG_MASK);
-+	} else {
-+		PM_SOFT_RST_REG &= ~(block & PM_SOFT_RST_REG_MASK);
-+		PM_SOFT_RST_REG |= (block & PM_SOFT_RST_REG_MASK);
-+	}
-+}
-+
-+void cns3xxx_pwr_soft_rst(unsigned int block)
-+{
-+	static unsigned int soft_reset;
-+
-+	if (soft_reset & block) {
-+		/* SPI/I2C/GPIO use the same block, reset once. */
-+		return;
-+	} else {
-+		soft_reset |= block;
-+	}
-+	cns3xxx_pwr_soft_rst_force(block);
-+}
-+
-+void arch_reset(char mode, const char *cmd)
-+{
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA.
-+	 */
-+	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(GLOBAL));
-+}
-+
-+/*
-+ * cns3xxx_cpu_clock - return CPU/L2 clock
-+ *  aclk: cpu clock/2
-+ *  hclk: cpu clock/4
-+ *  pclk: cpu clock/8
-+ */
-+int cns3xxx_cpu_clock(void)
-+{
-+	int cpu;
-+	int cpu_sel;
-+	int div_sel;
-+
-+	cpu_sel = (PM_CLK_CTRL_REG >> PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL) & 0xf;
-+	div_sel = (PM_CLK_CTRL_REG >> PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV) & 0x3;
-+
-+	cpu = (300 + ((cpu_sel / 3) * 100) + ((cpu_sel % 3) * 33)) >> div_sel;
-+
-+	return cpu;
-+}
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c4ed9f9..488bcb1 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -384,7 +384,7 @@ config CPU_FEROCEON_OLD_ID
- 
- # ARMv6
- config CPU_V6
--	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-+	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE || ARCH_CNS3XXX
- 	select CPU_32v6
- 	select CPU_ABRT_EV6
- 	select CPU_PABRT_V6
++++ b/arch/arm/configs/cns3420vb_defconfig
+@@ -0,0 +1,833 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.34-rc2
++# Thu Mar 25 20:52:10 2010
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_TIME=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++CONFIG_HAVE_PROC_CPU=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_NEED_DMA_MAP_STATE=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_OPROFILE_ARMV6=y
++CONFIG_OPROFILE_ARM11_CORE=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
++
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_LOCALVERSION=""
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_HAVE_KERNEL_GZIP=y
++CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_KERNEL_GZIP=y
++# CONFIG_KERNEL_BZIP2 is not set
++# CONFIG_KERNEL_LZMA is not set
++# CONFIG_KERNEL_LZO is not set
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_SYSVIPC_SYSCTL=y
++# CONFIG_BSD_PROCESS_ACCT is not set
++
++#
++# RCU Subsystem
++#
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
++# CONFIG_TREE_RCU_TRACE is not set
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
++# CONFIG_CGROUP_DEBUG is not set
++# CONFIG_CGROUP_NS is not set
++# CONFIG_CGROUP_FREEZER is not set
++# CONFIG_CGROUP_DEVICE is not set
++# CONFIG_CPUSETS is not set
++# CONFIG_CGROUP_CPUACCT is not set
++# CONFIG_RESOURCE_COUNTERS is not set
++# CONFIG_CGROUP_SCHED is not set
++CONFIG_SYSFS_DEPRECATED=y
++CONFIG_SYSFS_DEPRECATED_V2=y
++CONFIG_RELAY=y
++CONFIG_NAMESPACES=y
++# CONFIG_UTS_NS is not set
++# CONFIG_IPC_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE=""
++CONFIG_RD_GZIP=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++# CONFIG_EMBEDDED is not set
++CONFIG_UID16=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS=y
++# CONFIG_KALLSYMS_EXTRA_PASS is not set
++CONFIG_HOTPLUG=y
++CONFIG_PRINTK=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++CONFIG_SHMEM=y
++CONFIG_AIO=y
++CONFIG_HAVE_PERF_EVENTS=y
++CONFIG_PERF_USE_VMALLOC=y
++
++#
++# Kernel Performance Events And Counters
++#
++# CONFIG_PERF_EVENTS is not set
++# CONFIG_PERF_COUNTERS is not set
++CONFIG_VM_EVENT_COUNTERS=y
++CONFIG_COMPAT_BRK=y
++CONFIG_SLAB=y
++# CONFIG_SLUB is not set
++# CONFIG_SLOB is not set
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=m
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
++CONFIG_SLOW_WORK=y
++# CONFIG_SLOW_WORK_DEBUG is not set
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_SLABINFO=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODULE_FORCE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
++# CONFIG_BLK_CGROUP is not set
++
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_DEADLINE=y
++CONFIG_IOSCHED_CFQ=m
++# CONFIG_CFQ_GROUP_IOSCHED is not set
++CONFIG_DEFAULT_DEADLINE=y
++# CONFIG_DEFAULT_CFQ is not set
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="deadline"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++CONFIG_INLINE_SPIN_UNLOCK=y
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++CONFIG_INLINE_SPIN_UNLOCK_IRQ=y
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++CONFIG_INLINE_READ_UNLOCK=y
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++CONFIG_INLINE_READ_UNLOCK_IRQ=y
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++CONFIG_INLINE_WRITE_UNLOCK=y
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++CONFIG_INLINE_WRITE_UNLOCK_IRQ=y
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
++# CONFIG_FREEZER is not set
++
++#
++# System Type
++#
++CONFIG_MMU=y
++# CONFIG_ARCH_AAEC2000 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_ARCH_VERSATILE is not set
++# CONFIG_ARCH_AT91 is not set
++# CONFIG_ARCH_BCMRING is not set
++# CONFIG_ARCH_CLPS711X is not set
++CONFIG_ARCH_CNS3XXX=y
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP23XX is not set
++# CONFIG_ARCH_IXP2000 is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
++# CONFIG_ARCH_KIRKWOOD is not set
++# CONFIG_ARCH_LOKI is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++# CONFIG_ARCH_W90X900 is not set
++# CONFIG_ARCH_NUC93X is not set
++# CONFIG_ARCH_PNX4008 is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_MSM is not set
++# CONFIG_ARCH_SHMOBILE is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C2410 is not set
++# CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5P6440 is not set
++# CONFIG_ARCH_S5P6442 is not set
++# CONFIG_ARCH_S5PC1XX is not set
++# CONFIG_ARCH_S5PV210 is not set
++# CONFIG_ARCH_SHARK is not set
++# CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_U8500 is not set
++# CONFIG_ARCH_NOMADIK is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP is not set
++
++#
++# CNS3XXX platform type
++#
++CONFIG_MACH_CNS3420VB=y
++
++#
++# Processor Type
++#
++CONFIG_CPU_V6=y
++# CONFIG_CPU_32v6K is not set
++CONFIG_CPU_32v6=y
++CONFIG_CPU_ABRT_EV6=y
++CONFIG_CPU_PABRT_V6=y
++CONFIG_CPU_CACHE_V6=y
++CONFIG_CPU_CACHE_VIPT=y
++CONFIG_CPU_COPY_V6=y
++CONFIG_CPU_TLB_V6=y
++CONFIG_CPU_HAS_ASID=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
++
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++CONFIG_CPU_ICACHE_DISABLE=y
++CONFIG_CPU_DCACHE_DISABLE=y
++# CONFIG_CPU_BPREDICT_DISABLE is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
++CONFIG_CPU_HAS_PMU=y
++# CONFIG_ARM_ERRATA_411920 is not set
++CONFIG_ARM_GIC=y
++
++#
++# Bus support
++#
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
++
++#
++# Kernel Features
++#
++# CONFIG_NO_HZ is not set
++# CONFIG_HIGH_RES_TIMERS is not set
++CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++CONFIG_PREEMPT_NONE=y
++# CONFIG_PREEMPT_VOLUNTARY is not set
++# CONFIG_PREEMPT is not set
++CONFIG_HZ=100
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_FLATMEM_MANUAL=y
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++# CONFIG_SPARSEMEM_MANUAL is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_PAGEFLAGS_EXTENDED=y
++CONFIG_SPLIT_PTLOCK_CPUS=4
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
++
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="console=ttyS0,38400 mem=128M root=/dev/mmcblk0p1 ro rootwait"
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
++
++#
++# CPU Power Management
++#
++# CONFIG_CPU_IDLE is not set
++
++#
++# Floating point emulation
++#
++
++#
++# At least one emulation must be selected
++#
++# CONFIG_FPE_NWFPE is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
++
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
++
++#
++# Power management options
++#
++# CONFIG_PM is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++# CONFIG_NET is not set
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
++CONFIG_STANDALONE=y
++CONFIG_PREVENT_FIRMWARE_BUILD=y
++CONFIG_FW_LOADER=y
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_EXTRA_FIRMWARE=""
++# CONFIG_SYS_HYPERVISOR is not set
++CONFIG_MTD=y
++# CONFIG_MTD_DEBUG is not set
++# CONFIG_MTD_TESTS is not set
++# CONFIG_MTD_CONCAT is not set
++CONFIG_MTD_PARTITIONS=y
++# CONFIG_MTD_REDBOOT_PARTS is not set
++CONFIG_MTD_CMDLINE_PARTS=y
++# CONFIG_MTD_AFS_PARTS is not set
++# CONFIG_MTD_AR7_PARTS is not set
++
++#
++# User Modules And Translation Layers
++#
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLKDEVS=y
++CONFIG_MTD_BLOCK=y
++# CONFIG_FTL is not set
++# CONFIG_NFTL is not set
++# CONFIG_INFTL is not set
++# CONFIG_RFD_FTL is not set
++# CONFIG_SSFDC is not set
++# CONFIG_MTD_OOPS is not set
++
++#
++# RAM/ROM/Flash chip drivers
++#
++CONFIG_MTD_CFI=y
++# CONFIG_MTD_JEDECPROBE is not set
++CONFIG_MTD_GEN_PROBE=y
++# CONFIG_MTD_CFI_ADV_OPTIONS is not set
++CONFIG_MTD_MAP_BANK_WIDTH_1=y
++CONFIG_MTD_MAP_BANK_WIDTH_2=y
++CONFIG_MTD_MAP_BANK_WIDTH_4=y
++# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
++CONFIG_MTD_CFI_I1=y
++CONFIG_MTD_CFI_I2=y
++# CONFIG_MTD_CFI_I4 is not set
++# CONFIG_MTD_CFI_I8 is not set
++# CONFIG_MTD_CFI_INTELEXT is not set
++CONFIG_MTD_CFI_AMDSTD=y
++# CONFIG_MTD_CFI_STAA is not set
++CONFIG_MTD_CFI_UTIL=y
++# CONFIG_MTD_RAM is not set
++# CONFIG_MTD_ROM is not set
++# CONFIG_MTD_ABSENT is not set
++
++#
++# Mapping drivers for chip access
++#
++# CONFIG_MTD_COMPLEX_MAPPINGS is not set
++CONFIG_MTD_PHYSMAP=y
++# CONFIG_MTD_PHYSMAP_COMPAT is not set
++# CONFIG_MTD_ARM_INTEGRATOR is not set
++# CONFIG_MTD_PLATRAM is not set
++
++#
++# Self-contained MTD device drivers
++#
++# CONFIG_MTD_SLRAM is not set
++# CONFIG_MTD_PHRAM is not set
++# CONFIG_MTD_MTDRAM is not set
++# CONFIG_MTD_BLOCK2MTD is not set
++
++#
++# Disk-On-Chip Device Drivers
++#
++# CONFIG_MTD_DOC2000 is not set
++# CONFIG_MTD_DOC2001 is not set
++# CONFIG_MTD_DOC2001PLUS is not set
++# CONFIG_MTD_NAND is not set
++# CONFIG_MTD_ONENAND is not set
++
++#
++# LPDDR flash memory drivers
++#
++# CONFIG_MTD_LPDDR is not set
++
++#
++# UBI - Unsorted block images
++#
++# CONFIG_MTD_UBI is not set
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_COW_COMMON is not set
++CONFIG_BLK_DEV_LOOP=y
++# CONFIG_BLK_DEV_CRYPTOLOOP is not set
++
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=20000
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MISC_DEVICES is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++CONFIG_SCSI_MOD=y
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_TGT is not set
++# CONFIG_SCSI_NETLINK is not set
++CONFIG_SCSI_PROC_FS=y
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++# CONFIG_CHR_DEV_SG is not set
++# CONFIG_CHR_DEV_SCH is not set
++# CONFIG_SCSI_MULTI_LUN is not set
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++CONFIG_SCSI_WAIT_SCAN=m
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_FC_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_LIBFC is not set
++# CONFIG_LIBFCOE is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++CONFIG_ATA=y
++# CONFIG_ATA_NONSTANDARD is not set
++CONFIG_ATA_VERBOSE_ERROR=y
++# CONFIG_SATA_PMP is not set
++CONFIG_SATA_AHCI_PLATFORM=y
++# CONFIG_ATA_SFF is not set
++# CONFIG_MD is not set
++# CONFIG_PHONE is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
++
++#
++# Userland interfaces
++#
++CONFIG_INPUT_MOUSEDEV=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
++# CONFIG_INPUT_JOYDEV is not set
++# CONFIG_INPUT_EVDEV is not set
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
++
++#
++# Hardware I/O ports
++#
++# CONFIG_SERIO is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
++
++#
++# Serial drivers
++#
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=4
++CONFIG_SERIAL_8250_RUNTIME_UARTS=4
++# CONFIG_SERIAL_8250_EXTENDED is not set
++
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++# CONFIG_SERIAL_TIMBERDALE is not set
++CONFIG_UNIX98_PTYS=y
++# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_IPMI_HANDLER is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_I2C is not set
++# CONFIG_SPI is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++
++#
++# Display device support
++#
++# CONFIG_DISPLAY_SUPPORT is not set
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++# CONFIG_MMC_DEBUG is not set
++# CONFIG_MMC_UNSAFE_RESUME is not set
++
++#
++# MMC/SD/SDIO Card Drivers
++#
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_BLOCK_BOUNCE=y
++# CONFIG_SDIO_UART is not set
++# CONFIG_MMC_TEST is not set
++
++#
++# MMC/SD/SDIO Host Controller Drivers
++#
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_RTC_LIB=y
++# CONFIG_RTC_CLASS is not set
++# CONFIG_DMADEVICES is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++
++#
++# TI VLYNQ
++#
++# CONFIG_STAGING is not set
++
++#
++# File systems
++#
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++# CONFIG_EXT2_FS_POSIX_ACL is not set
++# CONFIG_EXT2_FS_SECURITY is not set
++# CONFIG_EXT2_FS_XIP is not set
++# CONFIG_EXT3_FS is not set
++# CONFIG_EXT4_FS is not set
++CONFIG_FS_MBCACHE=y
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++# CONFIG_FS_POSIX_ACL is not set
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
++CONFIG_DNOTIFY=y
++CONFIG_INOTIFY=y
++CONFIG_INOTIFY_USER=y
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS_FS is not set
++CONFIG_AUTOFS4_FS=y
++# CONFIG_FUSE_FS is not set
++
++#
++# Caches
++#
++CONFIG_FSCACHE=y
++# CONFIG_FSCACHE_STATS is not set
++# CONFIG_FSCACHE_HISTOGRAM is not set
++# CONFIG_FSCACHE_DEBUG is not set
++# CONFIG_FSCACHE_OBJECT_LIST is not set
++# CONFIG_CACHEFILES is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++# CONFIG_MSDOS_FS is not set
++# CONFIG_VFAT_FS is not set
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++# CONFIG_TMPFS_POSIX_ACL is not set
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++# CONFIG_JFFS2_FS is not set
++# CONFIG_LOGFS is not set
++# CONFIG_CRAMFS is not set
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++# CONFIG_ROMFS_FS is not set
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++
++#
++# Partition Types
++#
++# CONFIG_PARTITION_ADVANCED is not set
++CONFIG_MSDOS_PARTITION=y
++# CONFIG_NLS is not set
++
++#
++# Kernel hacking
++#
++# CONFIG_PRINTK_TIME is not set
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_FRAME_WARN=1024
++# CONFIG_MAGIC_SYSRQ is not set
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_UNUSED_SYMBOLS is not set
++CONFIG_DEBUG_FS=y
++# CONFIG_HEADERS_CHECK is not set
++# CONFIG_DEBUG_KERNEL is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_FRAME_POINTER=y
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_LKDTM is not set
++# CONFIG_LATENCYTOP is not set
++# CONFIG_SYSCTL_SYSCALL_CHECK is not set
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_RING_BUFFER=y
++CONFIG_RING_BUFFER_ALLOW_SWAP=y
++CONFIG_TRACING_SUPPORT=y
++# CONFIG_FTRACE is not set
++# CONFIG_DYNAMIC_DEBUG is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_DEBUG_USER is not set
++# CONFIG_OC_ETM is not set
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
++# CONFIG_CRYPTO is not set
++# CONFIG_BINARY_PRINTF is not set
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_FIND_LAST_BIT=y
++CONFIG_CRC_CCITT=y
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_LZO_DECOMPRESS=y
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_BZIP2=y
++CONFIG_DECOMPRESS_LZMA=y
++CONFIG_DECOMPRESS_LZO=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_IOPORT=y
++CONFIG_HAS_DMA=y
++CONFIG_GENERIC_ATOMIC64=y
 -- 
 1.7.0
