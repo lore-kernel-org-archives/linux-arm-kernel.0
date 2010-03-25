@@ -1,83 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Mar 2010 15:16:35 +0000
-Subject: [PATCH 3/6] ARM: OMAP: register PMU IRQs during board initialisation
-In-Reply-To: <1269530198-19572-3-git-send-email-will.deacon@arm.com>
-References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
-	<1269530198-19572-2-git-send-email-will.deacon@arm.com>
-	<1269530198-19572-3-git-send-email-will.deacon@arm.com>
-Message-ID: <1269530198-19572-4-git-send-email-will.deacon@arm.com>
+Date: Thu, 25 Mar 2010 15:16:32 +0000
+Subject: [PATCH 0/6] ARM: pmu: provide a registration mechanism for IRQs [v3]
+Message-ID: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the initialisation routines for the OMAP2 and OMAP3 boards
-so that they register their PMU IRQs with the PMU framework in the Kernel.
+This is version 3 of the patch series originally posted here:
 
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011162.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011339.html
+
+Changes from version 2 include:
+
+- PXA PMU registration moved out of mach-pxa and into plat-pxa
+- Use of a platform_device to represent the PMU
+- Fixes in pmu.c in response to comments from Jamie Iles
+- Taken against 2.6.34-rc2
+
+I'd like to submit this to the patch system soon, so please let me
+know if the mach-* and plat-* changes require any further work.
+
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Jamie Iles <jamie.iles@picochip.com>
 Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-omap2/devices.c |   34 ++++++++++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
+Cc: Leo Chen <leochen@broadcom.com>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 23e4d77..4a1c232 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -17,8 +17,10 @@
- #include <linux/clk.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
-+#include <asm/pmu.h>
- 
- #include <plat/control.h>
- #include <plat/tc.h>
-@@ -453,6 +455,37 @@ static void omap_init_mcspi(void)
- static inline void omap_init_mcspi(void) {}
- #endif
- 
-+static struct resource omap2_pmu_resource = {
-+	.start	= 3,
-+	.end	= 3,
-+	.flags	= IORESOURCE_IRQ,
-+};
-+
-+static struct resource omap3_pmu_resource = {
-+	.start	= INT_34XX_BENCH_MPU_EMUL,
-+	.end	= INT_34XX_BENCH_MPU_EMUL,
-+	.flags	= IORESOURCE_IRQ,
-+};
-+
-+static struct platform_device omap_pmu_device = {
-+	.name		= "arm-pmu",
-+	.id		= ARM_PMU_DEVICE_CPU,
-+	.num_resources	= 1,
-+};
-+
-+static void omap_init_pmu(void)
-+{
-+	if (cpu_is_omap24xx())
-+		omap_pmu_device.resource = &omap2_pmu_resource;
-+	else if (cpu_is_omap34xx())
-+		omap_pmu_device.resource = &omap3_pmu_resource;
-+	else
-+		return;
-+
-+	platform_device_register(&omap_pmu_device);
-+}
-+
-+
- #ifdef CONFIG_OMAP_SHA1_MD5
- static struct resource sha1_md5_resources[] = {
- 	{
-@@ -797,6 +830,7 @@ static int __init omap2_init_devices(void)
- 	omap_init_camera();
- 	omap_init_mbox();
- 	omap_init_mcspi();
-+	omap_init_pmu();
- 	omap_hdq_init();
- 	omap_init_sti();
- 	omap_init_sha1_md5();
--- 
-1.6.3.3
+
+Will Deacon (6):
+  ARM: pmu: register IRQs at runtime
+  ARM: Realview: register PMU IRQs during board initialisation
+  ARM: OMAP: register PMU IRQs during board initialisation
+  ARM: BCMRING: register PMU IRQ during board initialisation
+  ARM: iop3xx: register PMU IRQs during board initialisation
+  ARM: pxa: register PMU IRQs during board initialisation
+
+ arch/arm/include/asm/pmu.h               |   32 ++++----
+ arch/arm/kernel/perf_event.c             |   36 +++++----
+ arch/arm/kernel/pmu.c                    |  127 +++++++++++++++++++----------
+ arch/arm/mach-bcmring/arch.c             |   16 ++++
+ arch/arm/mach-omap2/devices.c            |   34 ++++++++
+ arch/arm/mach-realview/realview_eb.c     |   32 ++++++++
+ arch/arm/mach-realview/realview_pb1176.c |   15 ++++
+ arch/arm/mach-realview/realview_pb11mp.c |   32 ++++++++
+ arch/arm/mach-realview/realview_pba8.c   |   15 ++++
+ arch/arm/mach-realview/realview_pbx.c    |   32 ++++++++
+ arch/arm/plat-iop/Makefile               |    2 +
+ arch/arm/plat-iop/pmu.c                  |   40 +++++++++
+ arch/arm/plat-pxa/Makefile               |    2 +-
+ arch/arm/plat-pxa/pmu.c                  |   33 ++++++++
+ 14 files changed, 371 insertions(+), 77 deletions(-)
+ create mode 100644 arch/arm/plat-iop/pmu.c
+ create mode 100644 arch/arm/plat-pxa/pmu.c
