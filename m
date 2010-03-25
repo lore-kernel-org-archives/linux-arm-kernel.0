@@ -1,856 +1,231 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 25 Mar 2010 23:10:46 +0300
-Subject: [PATCH 2/4] cns3xxx: Add defconfig for CNS3420 validation board
+Date: Thu, 25 Mar 2010 23:10:53 +0300
+Subject: [PATCH 3/4] cns3xxx: Add support for SDHCI controllers
 In-Reply-To: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
 References: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
-Message-ID: <20100325201046.GB8014@oksana.dev.rtsoft.ru>
+Message-ID: <20100325201053.GC8014@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CNS3xxx chips have SDHCI-compatible SDIO/SD/MMC controller. This patch
+adds the support using generic sdhci-pltfm driver.
+
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/configs/cns3420vb_defconfig |  833 ++++++++++++++++++++++++++++++++++
- 1 files changed, 833 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/cns3420vb_defconfig
 
-diff --git a/arch/arm/configs/cns3420vb_defconfig b/arch/arm/configs/cns3420vb_defconfig
+Depends on -mm tree.
+
+ arch/arm/mach-cns3xxx/Makefile    |    2 +-
+ arch/arm/mach-cns3xxx/cns3420vb.c |    2 +
+ arch/arm/mach-cns3xxx/devices.c   |  145 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-cns3xxx/devices.h   |   19 +++++
+ 4 files changed, 167 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-cns3xxx/devices.c
+ create mode 100644 arch/arm/mach-cns3xxx/devices.h
+
+diff --git a/arch/arm/mach-cns3xxx/Makefile b/arch/arm/mach-cns3xxx/Makefile
+index 427507a..1a28e48 100644
+--- a/arch/arm/mach-cns3xxx/Makefile
++++ b/arch/arm/mach-cns3xxx/Makefile
+@@ -1,2 +1,2 @@
+-obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o
++obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o devices.o
+ obj-$(CONFIG_MACH_CNS3420VB)		+= cns3420vb.o
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 924e4da..c292945 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -32,6 +32,7 @@
+ #include <mach/cns3xxx.h>
+ #include <mach/irqs.h>
+ #include "core.h"
++#include "devices.h"
+ 
+ /*
+  * NOR Flash
+@@ -111,6 +112,7 @@ static void __init cns3420_early_serial_setup(void)
+  */
+ static struct platform_device *cns3420_pdevs[] __initdata = {
+ 	&cns3420_nor_pdev,
++	&cns3xxx_sdhci_pdev,
+ };
+ 
+ static void __init cns3420_init(void)
+diff --git a/arch/arm/mach-cns3xxx/devices.c b/arch/arm/mach-cns3xxx/devices.c
 new file mode 100644
-index 0000000..dbf985b
+index 0000000..549ad0c
 --- /dev/null
-+++ b/arch/arm/configs/cns3420vb_defconfig
-@@ -0,0 +1,833 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.34-rc2
-+# Thu Mar 25 20:52:10 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_HAVE_PROC_CPU=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_NEED_DMA_MAP_STATE=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_OPROFILE_ARMV6=y
-+CONFIG_OPROFILE_ARM11_CORE=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
++++ b/arch/arm/mach-cns3xxx/devices.c
+@@ -0,0 +1,145 @@
++/*
++ * CNS3xxx common devices
++ *
++ * Copyright 2008 Cavium Networks
++ *		  Scott Shu
++ * Copyright 2010 MontaVista Software, LLC.
++ *		  Anton Vorontsov <avorontsov@mvista.com>
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, Version 2, as
++ * published by the Free Software Foundation.
++ */
 +
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_HAVE_KERNEL_GZIP=y
-+CONFIG_HAVE_KERNEL_LZO=y
-+CONFIG_KERNEL_GZIP=y
-+# CONFIG_KERNEL_BZIP2 is not set
-+# CONFIG_KERNEL_LZMA is not set
-+# CONFIG_KERNEL_LZO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+# CONFIG_BSD_PROCESS_ACCT is not set
++#include <linux/init.h>
++#include <linux/compiler.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/mmc/host.h>
++#include <linux/sdhci-pltfm.h>
++#include "../../../drivers/mmc/host/sdhci.h"
++#include "devices.h"
 +
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_TINY_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+# CONFIG_CGROUP_DEBUG is not set
-+# CONFIG_CGROUP_NS is not set
-+# CONFIG_CGROUP_FREEZER is not set
-+# CONFIG_CGROUP_DEVICE is not set
-+# CONFIG_CPUSETS is not set
-+# CONFIG_CGROUP_CPUACCT is not set
-+# CONFIG_RESOURCE_COUNTERS is not set
-+# CONFIG_CGROUP_SCHED is not set
-+CONFIG_SYSFS_DEPRECATED=y
-+CONFIG_SYSFS_DEPRECATED_V2=y
-+CONFIG_RELAY=y
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_RD_LZO=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_EXTRA_PASS is not set
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+CONFIG_HAVE_PERF_EVENTS=y
-+CONFIG_PERF_USE_VMALLOC=y
++/*
++ * SDHCI
++ */
++static struct resource cns3xxx_sdhci_resources[] = {
++	[0] = {
++		.start = CNS3XXX_SDIO_BASE,
++		.end   = CNS3XXX_SDIO_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_CNS3XXX_SDIO,
++		.end   = IRQ_CNS3XXX_SDIO,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+#
-+# Kernel Performance Events And Counters
-+#
-+# CONFIG_PERF_EVENTS is not set
-+# CONFIG_PERF_COUNTERS is not set
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_COMPAT_BRK=y
-+CONFIG_SLAB=y
-+# CONFIG_SLUB is not set
-+# CONFIG_SLOB is not set
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=m
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
++static int cns3xxx_sdhci_init(struct sdhci_host *host)
++{
++	u32 __iomem *gpioa = __io(CNS3XXX_MISC_BASE_VIRT + 0x0014);
++	u32 gpioa_pins = __raw_readl(gpioa);
 +
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+CONFIG_SLOW_WORK=y
-+# CONFIG_SLOW_WORK_DEBUG is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+# CONFIG_BLK_CGROUP is not set
++	/* MMC/SD pins share with GPIOA */
++	gpioa_pins |= 0x1fff0004;
++	__raw_writel(gpioa_pins, gpioa);
 +
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=m
-+# CONFIG_CFQ_GROUP_IOSCHED is not set
-+CONFIG_DEFAULT_DEADLINE=y
-+# CONFIG_DEFAULT_CFQ is not set
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="deadline"
-+# CONFIG_INLINE_SPIN_TRYLOCK is not set
-+# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK is not set
-+# CONFIG_INLINE_SPIN_LOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
-+CONFIG_INLINE_SPIN_UNLOCK=y
-+# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
-+CONFIG_INLINE_SPIN_UNLOCK_IRQ=y
-+# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_READ_TRYLOCK is not set
-+# CONFIG_INLINE_READ_LOCK is not set
-+# CONFIG_INLINE_READ_LOCK_BH is not set
-+# CONFIG_INLINE_READ_LOCK_IRQ is not set
-+# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
-+CONFIG_INLINE_READ_UNLOCK=y
-+# CONFIG_INLINE_READ_UNLOCK_BH is not set
-+CONFIG_INLINE_READ_UNLOCK_IRQ=y
-+# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_WRITE_TRYLOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK_BH is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
-+CONFIG_INLINE_WRITE_UNLOCK=y
-+# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
-+CONFIG_INLINE_WRITE_UNLOCK_IRQ=y
-+# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
-+# CONFIG_MUTEX_SPIN_ON_OWNER is not set
-+# CONFIG_FREEZER is not set
++	cns3xxx_pwr_clk_en(CNS3XXX_PWR_CLK_EN(SDIO));
++	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SDIO));
 +
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_BCMRING is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+CONFIG_ARCH_CNS3XXX=y
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_DOVE is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_NUC93X is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_SHMOBILE is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5P6440 is not set
-+# CONFIG_ARCH_S5P6442 is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_S5PV210 is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_U8500 is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
++	return 0;
++}
 +
-+#
-+# CNS3XXX platform type
-+#
-+CONFIG_MACH_CNS3420VB=y
++static unsigned int cns3xxx_sdhci_get_max_clk(struct sdhci_host *host)
++{
++	return 150000000;
++}
 +
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_V6=y
-+# CONFIG_CPU_32v6K is not set
-+CONFIG_CPU_32v6=y
-+CONFIG_CPU_ABRT_EV6=y
-+CONFIG_CPU_PABRT_V6=y
-+CONFIG_CPU_CACHE_V6=y
-+CONFIG_CPU_CACHE_VIPT=y
-+CONFIG_CPU_COPY_V6=y
-+CONFIG_CPU_TLB_V6=y
-+CONFIG_CPU_HAS_ASID=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
++static unsigned int cns3xxx_sdhci_get_timeout_clk(struct sdhci_host *host)
++{
++	return cns3xxx_sdhci_get_max_clk(host) / 100000;
++}
 +
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+CONFIG_CPU_ICACHE_DISABLE=y
-+CONFIG_CPU_DCACHE_DISABLE=y
-+# CONFIG_CPU_BPREDICT_DISABLE is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_CPU_HAS_PMU=y
-+# CONFIG_ARM_ERRATA_411920 is not set
-+CONFIG_ARM_GIC=y
++static void cns3xxx_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
++{
++	int div = 1;
++	u16 clk;
++	unsigned long timeout;
 +
-+#
-+# Bus support
-+#
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
++	if (clock == host->clock)
++		return;
 +
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
++	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
 +
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=ttyS0,38400 mem=128M root=/dev/mmcblk0p1 ro rootwait"
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
++	if (clock == 0)
++		goto out;
 +
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
++	while (host->max_clk / div > clock) {
++		/*
++		 * On CNS3xxx divider grows linearly up to 4, and then
++		 * exponentially up to 256.
++		 */
++		if (div < 4)
++			div += 1;
++		else if (div < 256)
++			div *= 2;
++		else
++			break;
++	}
 +
-+#
-+# Floating point emulation
-+#
++	dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
++		clock, host->max_clk / div);
 +
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
++	/* Divide by 3 is special. */
++	if (div != 3)
++		div >>= 1;
 +
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+# CONFIG_BINFMT_MISC is not set
++	clk = div << SDHCI_DIVIDER_SHIFT;
++	clk |= SDHCI_CLOCK_INT_EN;
++	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 +
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
++	timeout = 10;
++	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
++			& SDHCI_CLOCK_INT_STABLE)) {
++		if (timeout == 0)
++			return;
++		timeout--;
++		mdelay(1);
++	}
 +
-+#
-+# Device Drivers
-+#
++	clk |= SDHCI_CLOCK_CARD_EN;
++	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 +
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_SYS_HYPERVISOR is not set
-+CONFIG_MTD=y
-+# CONFIG_MTD_DEBUG is not set
-+# CONFIG_MTD_TESTS is not set
-+# CONFIG_MTD_CONCAT is not set
-+CONFIG_MTD_PARTITIONS=y
-+# CONFIG_MTD_REDBOOT_PARTS is not set
-+CONFIG_MTD_CMDLINE_PARTS=y
-+# CONFIG_MTD_AFS_PARTS is not set
-+# CONFIG_MTD_AR7_PARTS is not set
++	host->timeout_clk = cns3xxx_sdhci_get_timeout_clk(host);
++out:
++	host->clock = clock;
++}
 +
-+#
-+# User Modules And Translation Layers
-+#
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLKDEVS=y
-+CONFIG_MTD_BLOCK=y
-+# CONFIG_FTL is not set
-+# CONFIG_NFTL is not set
-+# CONFIG_INFTL is not set
-+# CONFIG_RFD_FTL is not set
-+# CONFIG_SSFDC is not set
-+# CONFIG_MTD_OOPS is not set
++static struct sdhci_ops cns3xxx_sdhci_ops = {
++	.get_max_clock		= cns3xxx_sdhci_get_max_clk,
++	.get_timeout_clock	= cns3xxx_sdhci_get_timeout_clk,
++	.set_clock		= cns3xxx_sdhci_set_clock,
++};
 +
-+#
-+# RAM/ROM/Flash chip drivers
-+#
-+CONFIG_MTD_CFI=y
-+# CONFIG_MTD_JEDECPROBE is not set
-+CONFIG_MTD_GEN_PROBE=y
-+# CONFIG_MTD_CFI_ADV_OPTIONS is not set
-+CONFIG_MTD_MAP_BANK_WIDTH_1=y
-+CONFIG_MTD_MAP_BANK_WIDTH_2=y
-+CONFIG_MTD_MAP_BANK_WIDTH_4=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
-+# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
-+# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
-+CONFIG_MTD_CFI_I1=y
-+CONFIG_MTD_CFI_I2=y
-+# CONFIG_MTD_CFI_I4 is not set
-+# CONFIG_MTD_CFI_I8 is not set
-+# CONFIG_MTD_CFI_INTELEXT is not set
-+CONFIG_MTD_CFI_AMDSTD=y
-+# CONFIG_MTD_CFI_STAA is not set
-+CONFIG_MTD_CFI_UTIL=y
-+# CONFIG_MTD_RAM is not set
-+# CONFIG_MTD_ROM is not set
-+# CONFIG_MTD_ABSENT is not set
++static struct sdhci_pltfm_data cns3xxx_sdhci_pdata = {
++	.ops = &cns3xxx_sdhci_ops,
++	.quirks = SDHCI_QUIRK_BROKEN_DMA |
++		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
++		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
++		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
++		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
++		  SDHCI_QUIRK_NONSTANDARD_CLOCK,
++	.init = cns3xxx_sdhci_init,
++};
 +
-+#
-+# Mapping drivers for chip access
-+#
-+# CONFIG_MTD_COMPLEX_MAPPINGS is not set
-+CONFIG_MTD_PHYSMAP=y
-+# CONFIG_MTD_PHYSMAP_COMPAT is not set
-+# CONFIG_MTD_ARM_INTEGRATOR is not set
-+# CONFIG_MTD_PLATRAM is not set
++struct platform_device cns3xxx_sdhci_pdev = {
++	.name		= "sdhci",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(cns3xxx_sdhci_resources),
++	.resource	= cns3xxx_sdhci_resources,
++	.dev		= {
++		.platform_data	= &cns3xxx_sdhci_pdata,
++	},
++};
+diff --git a/arch/arm/mach-cns3xxx/devices.h b/arch/arm/mach-cns3xxx/devices.h
+new file mode 100644
+index 0000000..c5bf5cf
+--- /dev/null
++++ b/arch/arm/mach-cns3xxx/devices.h
+@@ -0,0 +1,19 @@
++/*
++ * CNS3xxx common devices
++ *
++ * Copyright 2008 Cavium Networks
++ *		  Scott Shu
++ * Copyright 2010 MontaVista Software, LLC.
++ *		  Anton Vorontsov <avorontsov@mvista.com>
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, Version 2, as
++ * published by the Free Software Foundation.
++ */
 +
-+#
-+# Self-contained MTD device drivers
-+#
-+# CONFIG_MTD_SLRAM is not set
-+# CONFIG_MTD_PHRAM is not set
-+# CONFIG_MTD_MTDRAM is not set
-+# CONFIG_MTD_BLOCK2MTD is not set
++#ifndef __CNS3XXX_DEVICES_H_
++#define __CNS3XXX_DEVICES_H_
 +
-+#
-+# Disk-On-Chip Device Drivers
-+#
-+# CONFIG_MTD_DOC2000 is not set
-+# CONFIG_MTD_DOC2001 is not set
-+# CONFIG_MTD_DOC2001PLUS is not set
-+# CONFIG_MTD_NAND is not set
-+# CONFIG_MTD_ONENAND is not set
++extern struct platform_device cns3xxx_sdhci_pdev;
 +
-+#
-+# LPDDR flash memory drivers
-+#
-+# CONFIG_MTD_LPDDR is not set
-+
-+#
-+# UBI - Unsorted block images
-+#
-+# CONFIG_MTD_UBI is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+CONFIG_BLK_DEV_LOOP=y
-+# CONFIG_BLK_DEV_CRYPTOLOOP is not set
-+
-+#
-+# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
-+#
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=20000
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_MISC_DEVICES is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+CONFIG_SCSI_MOD=y
-+# CONFIG_RAID_ATTRS is not set
-+CONFIG_SCSI=y
-+CONFIG_SCSI_DMA=y
-+# CONFIG_SCSI_TGT is not set
-+# CONFIG_SCSI_NETLINK is not set
-+CONFIG_SCSI_PROC_FS=y
-+
-+#
-+# SCSI support type (disk, tape, CD-ROM)
-+#
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_CHR_DEV_ST is not set
-+# CONFIG_CHR_DEV_OSST is not set
-+# CONFIG_BLK_DEV_SR is not set
-+# CONFIG_CHR_DEV_SG is not set
-+# CONFIG_CHR_DEV_SCH is not set
-+# CONFIG_SCSI_MULTI_LUN is not set
-+# CONFIG_SCSI_CONSTANTS is not set
-+# CONFIG_SCSI_LOGGING is not set
-+# CONFIG_SCSI_SCAN_ASYNC is not set
-+CONFIG_SCSI_WAIT_SCAN=m
-+
-+#
-+# SCSI Transports
-+#
-+# CONFIG_SCSI_SPI_ATTRS is not set
-+# CONFIG_SCSI_FC_ATTRS is not set
-+# CONFIG_SCSI_SAS_LIBSAS is not set
-+# CONFIG_SCSI_SRP_ATTRS is not set
-+CONFIG_SCSI_LOWLEVEL=y
-+# CONFIG_LIBFC is not set
-+# CONFIG_LIBFCOE is not set
-+# CONFIG_SCSI_DEBUG is not set
-+# CONFIG_SCSI_DH is not set
-+# CONFIG_SCSI_OSD_INITIATOR is not set
-+CONFIG_ATA=y
-+# CONFIG_ATA_NONSTANDARD is not set
-+CONFIG_ATA_VERBOSE_ERROR=y
-+# CONFIG_SATA_PMP is not set
-+CONFIG_SATA_AHCI_PLATFORM=y
-+# CONFIG_ATA_SFF is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+# CONFIG_INPUT_FF_MEMLESS is not set
-+# CONFIG_INPUT_POLLDEV is not set
-+# CONFIG_INPUT_SPARSEKMAP is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+# CONFIG_INPUT_TOUCHSCREEN is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+# CONFIG_SERIO is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=4
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-+# CONFIG_SERIAL_8250_EXTENDED is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+# CONFIG_SERIAL_TIMBERDALE is not set
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+CONFIG_LEGACY_PTYS=y
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+# CONFIG_RAW_DRIVER is not set
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+# CONFIG_MMC_DEBUG is not set
-+# CONFIG_MMC_UNSAFE_RESUME is not set
-+
-+#
-+# MMC/SD/SDIO Card Drivers
-+#
-+CONFIG_MMC_BLOCK=y
-+CONFIG_MMC_BLOCK_BOUNCE=y
-+# CONFIG_SDIO_UART is not set
-+# CONFIG_MMC_TEST is not set
-+
-+#
-+# MMC/SD/SDIO Host Controller Drivers
-+#
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+# CONFIG_EXT2_FS_POSIX_ACL is not set
-+# CONFIG_EXT2_FS_SECURITY is not set
-+# CONFIG_EXT2_FS_XIP is not set
-+# CONFIG_EXT3_FS is not set
-+# CONFIG_EXT4_FS is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+CONFIG_INOTIFY=y
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+CONFIG_AUTOFS4_FS=y
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+CONFIG_FSCACHE=y
-+# CONFIG_FSCACHE_STATS is not set
-+# CONFIG_FSCACHE_HISTOGRAM is not set
-+# CONFIG_FSCACHE_DEBUG is not set
-+# CONFIG_FSCACHE_OBJECT_LIST is not set
-+# CONFIG_CACHEFILES is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+# CONFIG_MSDOS_FS is not set
-+# CONFIG_VFAT_FS is not set
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_JFFS2_FS is not set
-+# CONFIG_LOGFS is not set
-+# CONFIG_CRAMFS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+# CONFIG_PARTITION_ADVANCED is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_NLS is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_FRAME_WARN=1024
-+# CONFIG_MAGIC_SYSRQ is not set
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+# CONFIG_DEBUG_KERNEL is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_MEMORY_INIT=y
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+# CONFIG_LKDTM is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_RING_BUFFER=y
-+CONFIG_RING_BUFFER_ALLOW_SWAP=y
-+CONFIG_TRACING_SUPPORT=y
-+# CONFIG_FTRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_ARM_UNWIND is not set
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_OC_ETM is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_DEFAULT_SECURITY_SELINUX is not set
-+# CONFIG_DEFAULT_SECURITY_SMACK is not set
-+# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
-+CONFIG_DEFAULT_SECURITY_DAC=y
-+CONFIG_DEFAULT_SECURITY=""
-+# CONFIG_CRYPTO is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_BITREVERSE=y
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+CONFIG_CRC_CCITT=y
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+CONFIG_CRC32=y
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_LZO_DECOMPRESS=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_DECOMPRESS_LZO=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
-+CONFIG_GENERIC_ATOMIC64=y
++#endif /* __CNS3XXX_DEVICES_H_ */
 -- 
 1.7.0
