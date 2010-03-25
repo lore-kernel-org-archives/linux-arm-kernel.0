@@ -1,189 +1,421 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 25 Mar 2010 12:15:18 +0100
-Subject: [PATCH 7/8] ARM: S5PV210: add framebuffer platform helpers for s5pv210
-	based machines
+Date: Thu, 25 Mar 2010 12:15:17 +0100
+Subject: [PATCH 6/8] ARM: Samsung: move common framebuffer regs to common
+	platform directory
 In-Reply-To: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
 References: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1269515719-18519-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1269515719-18519-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common framebuffer device helpers and register defines
-for S5PV210 based machines.
+From: Pawel Osciak <p.osciak@samsung.com>
 
+The framebuffer register blocks on S5PC100 and S5PV210/S5PC110 differ
+only slightly. This patch extracts all register definitions that are
+common to S5PC100 and S5PC110 into plat-samsung/plat/regs-fb-v5.h and
+adds a new file with C110-specific register definitions to the
+mach-s5pv210/include/mach directory.
+
+Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig                   |    5 ++
- arch/arm/mach-s5pv210/Makefile                  |    4 ++
- arch/arm/mach-s5pv210/include/mach/irqs.h       |    5 ++
- arch/arm/mach-s5pv210/include/mach/map.h        |    3 +
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |    1 +
- arch/arm/mach-s5pv210/setup-fb-24bpp.c          |   62 +++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/fb.h         |    7 +++
- 7 files changed, 87 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/setup-fb-24bpp.c
+ arch/arm/mach-s5pc100/include/mach/regs-fb.h    |  130 +--------------------
+ arch/arm/mach-s5pv210/include/mach/regs-fb.h    |   91 +++++++++++++++
+ arch/arm/plat-samsung/include/plat/regs-fb-v5.h |  138 +++++++++++++++++++++++
+ 3 files changed, 236 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-fb.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v5.h
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index c42bcba..3717b52 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -15,6 +15,11 @@ config CPU_S5PV210
- 	help
- 	  Enable S5PV210 CPU support
+diff --git a/arch/arm/mach-s5pc100/include/mach/regs-fb.h b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
+index 1732cd2..c5d75c5 100644
+--- a/arch/arm/mach-s5pc100/include/mach/regs-fb.h
++++ b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
+@@ -3,137 +3,21 @@
+  * Copyright 2009 Samsung Electronics Co.
+  *   Pawel Osciak <p.osciak@samsung.com>
+  *
+- * Framebuffer register definitions for Samsung S5PC100.
++ * Machine-specific framebuffer definitions for Samsung S5PC100.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_FB_H
+-#define __ASM_ARCH_REGS_FB_H __FILE__
+-
+-#include <plat/regs-fb-v4.h>
+-
+-/* VP1 interface timing control */
+-#define VP1CON0						(0x118)
+-#define VP1_RATECON_EN					(1 << 31)
+-#define VP1_CLKRATE_MASK				(0xff)
+-
+-#define VP1CON1						(0x11c)
+-#define VP1_VTREGCON_EN					(1 << 31)
+-#define VP1_VBPD_MASK					(0xfff)
+-#define VP1_VBPD_SHIFT					(16)
+-
+-
+-#define WPALCON_H					(0x19c)
+-#define WPALCON_L					(0x1a0)
+-
+-/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
+- * different for WPAL2-4
+- */
+-/* In WPALCON_L (aka WPALCON) */
+-#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
+-#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
+-
+-/* To set W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
+- * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
+- */
+-#define WPALCON_L_WxPAL_L_MASK				(0x1)
+-#define WPALCON_L_W2PAL_L_SHIFT				(6)
+-#define WPALCON_L_W3PAL_L_SHIFT				(7)
+-#define WPALCON_L_W4PAL_L_SHIFT				(8)
+-
+-#define WPALCON_L_WxPAL_H_MASK				(0x3)
+-#define WPALCON_H_W2PAL_H_SHIFT				(9)
+-#define WPALCON_H_W3PAL_H_SHIFT				(13)
+-#define WPALCON_H_W4PAL_H_SHIFT				(17)
+-
+-/* Per-window alpha value registers */
+-/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
+- * for windows 1-4 alpha values consist of two parts, the 4 low bits are
+- * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
+- * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
+- */
+-#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
+-#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
+-
+-/* Only for window 0 in VIDW0ALPHAx. */
+-#define VIDW0ALPHAx_R(_x)				((_x) << 16)
+-#define VIDW0ALPHAx_R_MASK				(0xff << 16)
+-#define VIDW0ALPHAx_R_SHIFT				(16)
+-#define VIDW0ALPHAx_G(_x)				((_x) << 8)
+-#define VIDW0ALPHAx_G_MASK				(0xff << 8)
+-#define VIDW0ALPHAx_G_SHIFT				(8)
+-#define VIDW0ALPHAx_B(_x)				((_x) << 0)
+-#define VIDW0ALPHAx_B_MASK				(0xff << 0)
+-#define VIDW0ALPHAx_B_SHIFT				(0)
+-
+-/* Low 4 bits of alpha0-1 for windows 1-4 */
+-#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
+-#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
+-#define VIDW14ALPHAx_R_L_SHIFT				(16)
+-#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
+-#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
+-#define VIDW14ALPHAx_G_L_SHIFT				(8)
+-#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
+-#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
+-#define VIDW14ALPHAx_B_L_SHIFT				(0)
+-
+-
+-/* Per-window blending equation control registers */
+-#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
+-#define BLENDEQ1					(0x244)
+-#define BLENDEQ2					(0x248)
+-#define BLENDEQ3					(0x24c)
+-#define BLENDEQ4					(0x250)
+-
+-#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
+-#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
+-#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
+-#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
+-#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
+-#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
+-#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
+-#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
+-
+-#define BLENDCON					(0x260)
+-#define BLENDCON_8BIT_ALPHA				(1 << 0)
+-
+-/* Per-window palette base addresses (start of palette memory).
+- * Each window palette area consists of 256 32-bit entries.
+- * START is the first address (entry 0th), END is the address of 255th entry.
+  */
+-#define WIN0_PAL_BASE					(0x2400)
+-#define WIN0_PAL_END					(0x27fc)
+-#define WIN1_PAL_BASE					(0x2800)
+-#define WIN1_PAL_END					(0x2bfc)
+-#define WIN2_PAL_BASE					(0x2c00)
+-#define WIN2_PAL_END					(0x2ffc)
+-#define WIN3_PAL_BASE					(0x3000)
+-#define WIN3_PAL_END					(0x33fc)
+-#define WIN4_PAL_BASE					(0x3400)
+-#define WIN4_PAL_END					(0x37fc)
  
-+config S5PV210_SETUP_FB_24BPP
-+	bool
-+	help
-+          Common setup code for S5PV210 with an 24bpp RGB display helper.
-+
- config MACH_SMDKV210
- 	bool "SMDKV210"
- 	select CPU_S5PV210
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 67068c4..9a0af8b 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -14,6 +14,10 @@ obj-				:=
+-#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
+-#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
+-#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
+-#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
+-#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
++#ifndef __ASM_ARCH_MACH_REGS_FB_H
++#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
  
- obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o gpio.o
+-static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
+-{
+-	switch (window) {
+-	case 0: return WIN0_PAL(reg);
+-	case 1: return WIN1_PAL(reg);
+-	case 2: return WIN2_PAL(reg);
+-	case 3: return WIN3_PAL(reg);
+-	case 4: return WIN4_PAL(reg);
+-	}
++#include <plat/regs-fb-v5.h>
  
-+# Helper and device support
-+
-+obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
-+
- # machine support
+-	BUG();
+-}
++#define PRTCON						(0xc)
++#define PRTCON_PROTECT					(1 << 11)
  
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 62c5175..ee6e07b 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -143,4 +143,9 @@
  
- #define NR_IRQS 		(IRQ_EINT(31) + 1)
+-#endif /* __ASM_ARCH_REGS_FB_H */
++#endif /* __ASM_ARCH_MACH_REGS_FB_H */
  
-+/* Compatibility */
-+#define IRQ_LCD_FIFO		IRQ_LCD0
-+#define IRQ_LCD_VSYNC		IRQ_LCD1
-+#define IRQ_LCD_SYSTEM		IRQ_LCD2
-+
- #endif /* ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index c22694c..5903056 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -43,6 +43,8 @@
- 
- #define S5PV210_PA_SROMC	(0xE8000000)
- 
-+#define S5PV210_PA_FB		(0xF8000000)
-+
- #define S5PV210_PA_VIC0		(0xF2000000)
- #define S5P_PA_VIC0		S5PV210_PA_VIC0
- 
-@@ -61,5 +63,6 @@
- /* compatibiltiy defines. */
- #define S3C_PA_UART		S5PV210_PA_UART
- #define S3C_PA_IIC		S5PV210_PA_IIC0
-+#define S3C_PA_FB		S5PV210_PA_FB
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-index 40dd24f..0a3d7ad 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-@@ -128,6 +128,7 @@
- 
- #define S5P_RST_STAT		S5P_CLKREG(0xA000)
- #define S5P_OSC_CON		S5P_CLKREG(0x8000)
-+#define S5P_MDNIE_SEL		S5P_CLKREG(0x7008)
- #define S5P_MIPI_PHY_CON0	S5P_CLKREG(0x7200)
- #define S5P_MIPI_PHY_CON1	S5P_CLKREG(0x7204)
- #define S5P_MIPI_CONTROL	S5P_CLKREG(0xE814)
-diff --git a/arch/arm/mach-s5pv210/setup-fb-24bpp.c b/arch/arm/mach-s5pv210/setup-fb-24bpp.c
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-fb.h b/arch/arm/mach-s5pv210/include/mach/regs-fb.h
 new file mode 100644
-index 0000000..b039a55
+index 0000000..27fa497
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/setup-fb-24bpp.c
-@@ -0,0 +1,62 @@
++++ b/arch/arm/mach-s5pv210/include/mach/regs-fb.h
+@@ -0,0 +1,91 @@
 +/*
-+ * linux/arch/arm/plat-s5pv210/setup-fb-24bpp.c
++ * Copyright 2009 Samsung Electronics Co.
++ *   Pawel Osciak <p.osciak@samsung.com>
 + *
-+ * Copyright 2009 Samsung Electronics
-+ *
-+ * Base s5pv210 setup information for 24bpp LCD framebuffer
++ * Machine-specific framebuffer definitions for Samsung S5PC110.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/fb.h>
++#ifndef __ASM_ARCH_MACH_REGS_FB_H
++#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
 +
-+#include <mach/regs-fb.h>
-+#include <mach/gpio.h>
-+#include <mach/map.h>
-+#include <plat/fb.h>
-+#include <mach/regs-clock.h>
-+#include <plat/gpio-cfg.h>
++#include <plat/regs-fb-v5.h>
 +
-+void s5pv210_fb_gpio_setup_24bpp(void)
-+{
-+	unsigned int gpio = 0;
++/* WINCONx */
++#define WINCONx_BUFSTATUS_H				(1 << 31)
++#define WINCONx_BUFSEL_H				(1 << 30)
++#define WINCONx_LIMIT_ON				(1 << 29)
++#define WINCONx_EQ709					(1 << 28)
 +
-+	for (gpio = S5PV210_GPF0(0); gpio <= S5PV210_GPF0(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
 +
-+	for (gpio = S5PV210_GPF1(0); gpio <= S5PV210_GPF1(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
++/* VIDCON3 */
++#define VIDCON3						(0x0c)
++#define VIDCON3_VE_ON					(1 << 20)
++#define VIDCON3_CG_ON					(1 << 18)
++#define VIDCON3_GM_ON					(1 << 16)
++#define VIDCON3_HU_CSC_F_NARROW				(1 << 14)
++#define VIDCON3_HU_CSC_F_EQ709				(1 << 13)
++#define VIDCON3_HU_CSC_F_EN				(1 << 12)
++#define VIDCON3_HU_CSC_B_NARROW				(1 << 10)
++#define VIDCON3_HU_CSC_B_EQ709				(1 << 9)
++#define VIDCON3_HU_CSC_B_EN				(1 << 8)
++#define VIDCON3_HUE_EN					(1 << 7)
++#define VIDCON3_PC_DIR_NEG				(1 << 1)
++#define VIDCON3_PC_EN					(1 << 0)
 +
-+	for (gpio = S5PV210_GPF2(0); gpio <= S5PV210_GPF2(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
 +
-+	for (gpio = S5PV210_GPF3(0); gpio <= S5PV210_GPF3(3); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
++/* VIDTCON3 */
++#define VIDTCON3					(0x1c)
++#define VIDTCON3_VSYNC_EN				(1 << 31)
++#define VIDTCON3_FRM_EN					(1 << 29)
++#define VIDTCON3_INVFRM_LOW				(1 << 28)
++#define VIDTCON3_FRMVRATE_MASK				0xf
++#define VIDTCON3_FRMVRATE_SHIFT				(24)
++#define VIDTCON3_FRMVFPD_MASK				0xff
++#define VIDTCON3_FRMVFPD_SHIFT				(8)
++#define VIDTCON3_FRMVSPW_MASK				0xff
++#define VIDTCON3_FRMVSPW_SHIFT				(0)
 +
-+	/* Set DISPLAY_CONTROL register for Display path selection.
-+	 *
-+	 * ouput   |   RGB   |   I80   |   ITU
-+	 * -----------------------------------
-+	 *  00     |   MIE   |  FIMD   |  FIMD
-+	 *  01     | MDNIE   | MDNIE   |  FIMD
-+	 *  10     |  FIMD   |  FIMD   |  FIMD
-+	 *  11     |  FIMD   |  FIMD   |  FIMD
-+	 */
-+	writel(0x2, S5P_MDNIE_SEL);
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index ffc01a7..3b30d7b 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -77,4 +77,11 @@ extern void s3c64xx_fb_gpio_setup_24bpp(void);
-  */
- extern void s5pc100_fb_gpio_setup_24bpp(void);
- 
-+/**
-+ * s5pv210_fb_gpio_setup_24bpp() - S5PV210/S5PC110 setup function for 24bpp LCD
-+ *
-+ * Initialise the GPIO for an 24bpp LCD display on the RGB interface.
++
++#define SHADOWCON					(0x34)
++/* Set to disable window 4-0 shadow registers' update */
++#define SHADOWCON_W4_PROTECT				(1 << 14)
++#define SHADOWCON_W3_PROTECT				(1 << 13)
++#define SHADOWCON_W2_PROTECT				(1 << 12)
++#define SHADOWCON_W1_PROTECT				(1 << 11)
++#define SHADOWCON_W0_PROTECT				(1 << 10)
++
++
++/* Video buffer address shadow registers (read-only) */
++#define VIDW_BUF_START_SHADOW(_buf)			(0x20a0 + ((_buf) * 8))
++#define VIDW_BUF_END_SHADOW(_buf)			(0x20d0 + ((_buf) * 8))
++
++/* For windows 1-4 */
++#define WxKEY_ALPHA(_win)				(0x160 + ((_win) * 4))
++
++#define COLORGAINCON					(0x1c0)
++#define VESFRCON0					(0x1c4)
++#define VESFRCON1					(0x1c8)
++#define VESFRCON2					(0x1cc)
++
++/* Hue matrix coefficients */
++#define HUECOEF00					(0x1ec)
++#define HUECOEF01					(0x1f0)
++#define HUECOEF10					(0x1f4)
++#define HUECOEF11					(0x1f8)
++#define HUEOFFSET					(0x1fc)
++
++/* RTQOS control for windows 0-4*/
++#define WxRTQOSCON(_win)				(0x264 + ((_win) * 4))
++
++/* Gamma LUT data for index I1 and I0, where
++ * I0 = _index, I1 = _index + 1.
 + */
-+extern void s5pv210_fb_gpio_setup_24bpp(void);
++#define GAMMALUT_BASE					(0x37c)
++#define GAMMALUT_I1I0(_index)			(GAMMALUT_BASE + ((_index) * 4))
 +
- #endif /* __PLAT_S3C_FB_H */
++#endif /* __ASM_ARCH_MACH_REGS_FB_H */
++
+diff --git a/arch/arm/plat-samsung/include/plat/regs-fb-v5.h b/arch/arm/plat-samsung/include/plat/regs-fb-v5.h
+new file mode 100644
+index 0000000..0e0686d
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-fb-v5.h
+@@ -0,0 +1,138 @@
++/*
++ * Copyright 2009 Samsung Electronics Co.
++ *   Pawel Osciak <p.osciak@samsung.com>
++ *
++ * Common framebuffer register definitions for Samsung S5PC1xx family.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_REGS_FB_V5_H
++#define __ASM_ARCH_REGS_FB_V5_H __FILE__
++
++#include <plat/regs-fb-v4.h>
++
++/* VP1 interface timing control */
++#define VP1CON0						(0x118)
++#define VP1_RATECON_EN					(1 << 31)
++#define VP1_CLKRATE_MASK				(0xff)
++
++#define VP1CON1						(0x11c)
++#define VP1_VTREGCON_EN					(1 << 31)
++#define VP1_VBPD_MASK					(0xfff)
++#define VP1_VBPD_SHIFT					(16)
++
++
++#define WPALCON_H					(0x19c)
++#define WPALCON_L					(0x1a0)
++
++/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
++ * different for WPAL2-4
++ */
++/* In WPALCON_L (aka WPALCON) */
++#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
++#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
++
++/* W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
++ * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
++ */
++#define WPALCON_L_WxPAL_L_MASK				(0x1)
++#define WPALCON_L_W2PAL_L_SHIFT				(6)
++#define WPALCON_L_W3PAL_L_SHIFT				(7)
++#define WPALCON_L_W4PAL_L_SHIFT				(8)
++
++#define WPALCON_L_WxPAL_H_MASK				(0x3)
++#define WPALCON_H_W2PAL_H_SHIFT				(9)
++#define WPALCON_H_W3PAL_H_SHIFT				(13)
++#define WPALCON_H_W4PAL_H_SHIFT				(17)
++
++/* Per-window alpha value registers */
++/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
++ * for windows 1-4 alpha values consist of two parts, the 4 low bits are
++ * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
++ * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
++ */
++#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
++#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
++
++/* Only for window 0 in VIDW0ALPHAx. */
++#define VIDW0ALPHAx_R(_x)				((_x) << 16)
++#define VIDW0ALPHAx_R_MASK				(0xff << 16)
++#define VIDW0ALPHAx_R_SHIFT				(16)
++#define VIDW0ALPHAx_G(_x)				((_x) << 8)
++#define VIDW0ALPHAx_G_MASK				(0xff << 8)
++#define VIDW0ALPHAx_G_SHIFT				(8)
++#define VIDW0ALPHAx_B(_x)				((_x) << 0)
++#define VIDW0ALPHAx_B_MASK				(0xff << 0)
++#define VIDW0ALPHAx_B_SHIFT				(0)
++
++/* Low 4 bits of alpha0-1 for windows 1-4 */
++#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
++#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
++#define VIDW14ALPHAx_R_L_SHIFT				(16)
++#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
++#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
++#define VIDW14ALPHAx_G_L_SHIFT				(8)
++#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
++#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
++#define VIDW14ALPHAx_B_L_SHIFT				(0)
++
++
++/* Per-window blending equation control registers */
++#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
++#define BLENDEQ1					(0x244)
++#define BLENDEQ2					(0x248)
++#define BLENDEQ3					(0x24c)
++#define BLENDEQ4					(0x250)
++
++#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
++#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
++#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
++#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
++#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
++#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
++#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
++#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
++
++#define BLENDCON					(0x260)
++#define BLENDCON_8BIT_ALPHA				(1 << 0)
++
++/* Per-window palette base addresses (start of palette memory).
++ * Each window palette area consists of 256 32-bit entries.
++ * START is the first address (entry 0th), END is the address of 255th entry.
++ */
++#define WIN0_PAL_BASE					(0x2400)
++#define WIN0_PAL_END					(0x27fc)
++#define WIN1_PAL_BASE					(0x2800)
++#define WIN1_PAL_END					(0x2bfc)
++#define WIN2_PAL_BASE					(0x2c00)
++#define WIN2_PAL_END					(0x2ffc)
++#define WIN3_PAL_BASE					(0x3000)
++#define WIN3_PAL_END					(0x33fc)
++#define WIN4_PAL_BASE					(0x3400)
++#define WIN4_PAL_END					(0x37fc)
++
++#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
++#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
++#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
++#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
++#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
++
++static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
++{
++	switch (window) {
++	case 0: return WIN0_PAL(reg);
++	case 1: return WIN1_PAL(reg);
++	case 2: return WIN2_PAL(reg);
++	case 3: return WIN3_PAL(reg);
++	case 4: return WIN4_PAL(reg);
++	}
++
++	BUG();
++}
++
++
++#endif /* __ASM_ARCH_REGS_FB_V5_H */
++
 -- 
 1.6.4
