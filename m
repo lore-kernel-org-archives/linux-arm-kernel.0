@@ -1,89 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Mar 2010 12:02:37 +0000
-Subject: AACI broken with commit 29a4f2d3
-In-Reply-To: <4BAB4DE8.1030707@mvista.com>
-References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
-	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
-	<s5h39zou023.wl%tiwai@suse.de>
-	<20100325113019.GA6590@n2100.arm.linux.org.uk>
-	<s5hvdckskev.wl%tiwai@suse.de>  <4BAB4DE8.1030707@mvista.com>
-Message-ID: <1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
+From: hrhaan@gmail.com (Harro Haan)
+Date: Thu, 25 Mar 2010 13:03:28 +0100
+Subject: [patch v3 2/3] at91_udc HW glitch
+In-Reply-To: <cd73a99e1003231326r7623bbc0icba163f9b2e0e96e@mail.gmail.com>
+References: <20100203143736.564974126@gmail.com>
+	<20100203143803.528679118@gmail.com>
+	<cd73a99e1003231326r7623bbc0icba163f9b2e0e96e@mail.gmail.com>
+Message-ID: <6681f8e11003250503k20efc864ve6d916ad5a7c67b2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 11:50 +0000, Philby John wrote:
-> On 03/25/2010 05:06 PM, Takashi Iwai wrote:
-> > At Thu, 25 Mar 2010 11:30:19 +0000,
-> > Russell King - ARM Linux wrote:
-> >>
-> >> On Thu, Mar 25, 2010 at 12:12:52PM +0100, Takashi Iwai wrote:
-> >>> At Wed, 24 Mar 2010 15:18:06 -0000,
-> >>> Will Deacon wrote:
-> >>>>
-> >>>> Hi Catalin,
-> >>>>
-> >>>>> aaci: Use writew() to the AC97_POWERDOWN 16-bit register
-> >>>>>
-> >>>>> From: Catalin Marinas<catalin.marinas@arm.com>
-> >>>>>
-> >>>>> The writel() introduced by commit 29a4f2d3 generates an alignment fault
-> >>>>> on ARM.
-> >>>>>
-> >>>>> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
-> >>>>> Cc: Philby John<pjohn@in.mvista.com>
-> >>>>> Cc: Takashi Iwai<tiwai@suse.de>
-> >>>>> ---
-> >>>>>   sound/arm/aaci.c |    2 +-
-> >>>>>   1 files changed, 1 insertions(+), 1 deletions(-)
-> >>>>>
-> >>>>> diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-> >>>>> index 656e474..d66d4ff 100644
-> >>>>> --- a/sound/arm/aaci.c
-> >>>>> +++ b/sound/arm/aaci.c
-> >>>>> @@ -863,7 +863,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
-> >>>>>           struct snd_ac97 *ac97;
-> >>>>>           int ret;
-> >>>>>
-> >>>>> - writel(0, aaci->base + AC97_POWERDOWN);
-> >>>>> + writew(0, aaci->base + AC97_POWERDOWN);
-> >>>>>           /*
-> >>>>>            * Assert AACIRESET for 2us
-> >>>>>            */
-> >>>>
-> >>>> A writel() looks wrong anyway because even if it could succeed, it would
-> >>>> send half of its write to AC97_EXTENDED_ID, which sounds suspiciously read-only
-> >>>> to me.
-> >>>>
-> >>>> Tested-by: Will Deacon<will.deacon@arm.com>
-> >>>
-> >>> Looking back at the original patch again, I wonder now whether using
-> >>> AC97_* for the register offset here is really correct.  Usually AC97
-> >>> registers are accessed indirectly.
-> >>>
-> >>> Is it just same 0x26, or is this intentional?
-> >>
-> >> The original patch is total crap.
-> >>
-> >> 1. You can't access AC97 registers via writel.
-> >> 2. If the offset is 0x26 (AACI_CSCH2 + AACI_IE + 2), this is writing to
-> >>     reserved bits in channel 2's interrupt enable register which has
-> >>     nothing to do with the slot 1/2 transmit registers.
-> >>
-> >> The patch could never have been tested in the first place.
-> >
-> > Thanks for checking.  Now I wonder why this fixed the original issue
-> > at all.  Obviously something wrong in either testing or problem
-> > analysis.
-> >
-> > Anyway, it's better to revert the patch first...
-> 
-> This was tested throughly but not for alignment and to verify the fix is
-> easy. All you need to do is revert the commit and then type reboot at
-> the command prompt. On reboot you will get "aaci-pl041 fpga:04: ac97
-> read back fail" failures, rendering audio non-functional on an ARM1176.
+On 23 March 2010 21:26, Andrew Victor <avictor.za@gmail.com> wrote:
+>
+> hi,
+>
+>
+> I see in the data-sheet (SAM9261 / SAM9263), the following for the
+> UDP_ CSRx registers:
+>
+> "WARNING: Due to synchronization between MCK and UDPCK, the software
+> application must wait for the end of the write
+> operation before executing another write by polling the bits which
+> must be set/cleared."
+>
+> //! Clear flags of UDP UDP_CSR register and waits for synchronization
+> #define Udp_ep_clr_flag(pInterface, endpoint, flags) { \
+> ? ?while (pInterface->UDP_CSR[endpoint] & (flags)) \
+> ? ? ? ?pInterface->UDP_CSR[endpoint] &= ~(flags); \
+> ? ? }
+> //! Set flags of UDP UDP_CSR register and waits for synchronization
+> #define Udp_ep_set_flag(pInterface, endpoint, flags) { \
+> ? ?while ( (pInterface->UDP_CSR[endpoint] & (flags)) != (flags) ) \
+> ? ? ? pInterface->UDP_CSR[endpoint] |= (flags); \
+> ? ?}
+>
+> The at91_udc driver does not seem to do that for its CSR register writes.
+> So I was wondering if we implement what the datasheet says, would we
+> still need the "fix" above.
+>
+>
+> Regards,
+> ?Andrew Victor
 
-I can confirm that it solves the reset issue on other RealView boards as
-well. Whether it's the correct fix I can't tell.
+According to the following post it did not solve the problem:
 
--- 
-Catalin
+"There are references to syncronization issues between clock domains
+in documentation and source code. These references describe required
+delays when setting or clearing bits in CSR until the bit actually
+changes and the required delays between writing CSR and reading the
+data register. Incorporating the delays suggested in datasheet to code
+did not change anything, so I dug deeper."
+source:
+http://lists.arm.linux.org.uk/lurker/message/20090325.150843.f515c02f.en.html
+
+I did not test this myself, maybe Anti Sullin can give more details.
+
+Regards,
+
+Harro Haan
+
+BTW: same message, but now in plain text.
