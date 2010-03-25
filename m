@@ -1,58 +1,85 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 25 Mar 2010 20:48:04 +0900
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <3eeda0228e2396b052b17689e2f3318e@localhost>
-References: <4BAAD5BB.7050101@samsung.com>
-	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
-	<4BAB264C.2090502@samsung.com>
-	<960f4547118a62d5863ee38ba760844c@localhost>
-	<4BAB357B.7040108@samsung.com>
-	<3eeda0228e2396b052b17689e2f3318e@localhost>
-Message-ID: <4BAB4D74.7070909@samsung.com>
+From: pjohn@mvista.com (Philby John)
+Date: Thu, 25 Mar 2010 17:20:00 +0530
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <s5hvdckskev.wl%tiwai@suse.de>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>	<s5h39zou023.wl%tiwai@suse.de>	<20100325113019.GA6590@n2100.arm.linux.org.uk>
+	<s5hvdckskev.wl%tiwai@suse.de>
+Message-ID: <4BAB4DE8.1030707@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/25/2010 7:32 PM, Marc Zyngier wrote:
-> On Thu, 25 Mar 2010 19:05:47 +0900, Joonyoung Shim
-> <jy0922.shim@samsung.com> wrote:
->> On 3/25/2010 6:32 PM, Marc Zyngier wrote:
->>> On Thu, 25 Mar 2010 18:01:00 +0900, Joonyoung Shim
->>> <jy0922.shim@samsung.com> wrote:
->>>> On 3/25/2010 2:44 PM, Marc Zyngier wrote:
->>>>> On Thu, 25 Mar 2010 12:17:15 +0900
->>>>> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->>>>>
->>>>>> +	writew(imm, desc_pool_virt);
->>>> Right. The write[bwl] is api for address ioremapped of io device. I
-> will
->>>> change these.
+On 03/25/2010 05:06 PM, Takashi Iwai wrote:
+> At Thu, 25 Mar 2010 11:30:19 +0000,
+> Russell King - ARM Linux wrote:
+>>
+>> On Thu, Mar 25, 2010 at 12:12:52PM +0100, Takashi Iwai wrote:
+>>> At Wed, 24 Mar 2010 15:18:06 -0000,
+>>> Will Deacon wrote:
 >>>>
->>>>> Does anything ensure that this won't generate an unaligned access?
+>>>> Hi Catalin,
+>>>>
+>>>>> aaci: Use writew() to the AC97_POWERDOWN 16-bit register
 >>>>>
->>>> PL330 DMA controller fetches variable length instructions that consist
->>> of
->>>> one to six bytes, so i think unaligned access is no problem.
->>> I'm not too concerned about the device side of things. I'm more worried
->>> about the CPU access when writing the 'imm' value to memory.
+>>>>> From: Catalin Marinas<catalin.marinas@arm.com>
+>>>>>
+>>>>> The writel() introduced by commit 29a4f2d3 generates an alignment fault
+>>>>> on ARM.
+>>>>>
+>>>>> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
+>>>>> Cc: Philby John<pjohn@in.mvista.com>
+>>>>> Cc: Takashi Iwai<tiwai@suse.de>
+>>>>> ---
+>>>>>   sound/arm/aaci.c |    2 +-
+>>>>>   1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>>
+>>>>> diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
+>>>>> index 656e474..d66d4ff 100644
+>>>>> --- a/sound/arm/aaci.c
+>>>>> +++ b/sound/arm/aaci.c
+>>>>> @@ -863,7 +863,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+>>>>>   	struct snd_ac97 *ac97;
+>>>>>   	int ret;
+>>>>>
+>>>>> -	writel(0, aaci->base + AC97_POWERDOWN);
+>>>>> +	writew(0, aaci->base + AC97_POWERDOWN);
+>>>>>   	/*
+>>>>>   	 * Assert AACIRESET for 2us
+>>>>>   	 */
+>>>>
+>>>> A writel() looks wrong anyway because even if it could succeed, it would
+>>>> send half of its write to AC97_EXTENDED_ID, which sounds suspiciously read-only
+>>>> to me.
+>>>>
+>>>> Tested-by: Will Deacon<will.deacon@arm.com>
 >>>
->>> Consider desc_pool_virt 16bit aligned when entering the function.
-> Writing
->>> the opcode makes it unaligned and then writing the 'imm' value will
->>> result
->>> as an unaligned access.
+>>> Looking back at the original patch again, I wonder now whether using
+>>> AC97_* for the register offset here is really correct.  Usually AC97
+>>> registers are accessed indirectly.
 >>>
->> Why desc_pool_virt should be aligned more than 16bit?
-> 
-> There is reason for desc_pool_virt to be 16bit aligned. It's just that you
-> have 50% chance that it will.
-> In such case, you will write 'imm' to a non 16bit-aligned address. In my
-> book, that's bad.
-> 
-> Same for pl330_dmamov(), which tries to write a 32bit value without
-> checking the proper alignment.
-> In such case, please use the put_unaligned macro to handle the possible
-> unaligned access.
-> 
+>>> Is it just same 0x26, or is this intentional?
+>>
+>> The original patch is total crap.
+>>
+>> 1. You can't access AC97 registers via writel.
+>> 2. If the offset is 0x26 (AACI_CSCH2 + AACI_IE + 2), this is writing to
+>>     reserved bits in channel 2's interrupt enable register which has
+>>     nothing to do with the slot 1/2 transmit registers.
+>>
+>> The patch could never have been tested in the first place.
+>
+> Thanks for checking.  Now I wonder why this fixed the original issue
+> at all.  Obviously something wrong in either testing or problem
+> analysis.
+>
+> Anyway, it's better to revert the patch first...
 
-OK. i will use put_unaligned.
-Thanks.
+This was tested throughly but not for alignment and to verify the fix is 
+easy. All you need to do is revert the commit and then type reboot at 
+the command prompt. On reboot you will get "aaci-pl041 fpga:04: ac97 
+read back fail" failures, rendering audio non-functional on an ARM1176.
+
+The right fix would be to use writew() instead of writel()
+
+
+Regards,
+Philby
