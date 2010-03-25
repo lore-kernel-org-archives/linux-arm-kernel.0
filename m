@@ -1,21 +1,18 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 25 Mar 2010 09:20:23 +0100
-Subject: [PATCH] vic: factor out common init code
-In-Reply-To: <0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
-References: <AcrG7twc5wXJWTzzQtezYQpL1OiKYw==>
-	<0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <63386a3d1003250120m2d33233h60b202724a643a71@mail.gmail.com>
+Date: Thu, 25 Mar 2010 09:26:40 +0100
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <4BAAD5BB.7050101@samsung.com>
+References: <4BAAD5BB.7050101@samsung.com>
+Message-ID: <63386a3d1003250126j4726a709o6bb0dc1355dc911e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/19 H Hartley Sweeten <hartleys@visionengravers.com>:
+2010/3/25 Joonyoung Shim <jy0922.shim@samsung.com>:
 
-> This factors out the common initialization code for the two vic
-> vendors into easier maintainable functions.
+> The PL330 is currently the dma controller using at the S5PC1XX arm SoC.
+> This supports DMA_MEMCPY and DMA_SLAVE.
 
-Sorry for the delay. Tested this on U300 and it works like a charm,
-good patch.
-
-Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+Looks good to me now so:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
 Linus Walleij
