@@ -1,38 +1,39 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 25 Mar 2010 19:05:47 +0900
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <960f4547118a62d5863ee38ba760844c@localhost>
-References: <4BAAD5BB.7050101@samsung.com>
-	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
-	<4BAB264C.2090502@samsung.com>
-	<960f4547118a62d5863ee38ba760844c@localhost>
-Message-ID: <4BAB357B.7040108@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 25 Mar 2010 13:19:29 +0300
+Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
+In-Reply-To: <20100324230729.GA21359@n2100.arm.linux.org.uk>
+References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100324230729.GA21359@n2100.arm.linux.org.uk>
+Message-ID: <4BAB38B1.8080404@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/25/2010 6:32 PM, Marc Zyngier wrote:
-> On Thu, 25 Mar 2010 18:01:00 +0900, Joonyoung Shim
-> <jy0922.shim@samsung.com> wrote:
->> On 3/25/2010 2:44 PM, Marc Zyngier wrote:
->>> On Thu, 25 Mar 2010 12:17:15 +0900
->>> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->>>
->>>> +	writew(imm, desc_pool_virt);
->> Right. The write[bwl] is api for address ioremapped of io device. I will
->> change these.
->>
->>> Does anything ensure that this won't generate an unaligned access?
->>>
->> PL330 DMA controller fetches variable length instructions that consist
-> of
->> one to six bytes, so i think unaligned access is no problem.
-> 
-> I'm not too concerned about the device side of things. I'm more worried
-> about the CPU access when writing the 'imm' value to memory.
-> 
-> Consider desc_pool_virt 16bit aligned when entering the function. Writing
-> the opcode makes it unaligned and then writing the 'imm' value will result
-> as an unaligned access.
-> 
+Hello.
 
-Why desc_pool_virt should be aligned more than 16bit?
+Russell King - ARM Linux wrote:
+
+>> -	debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
+>> -			(state->csc_mask==0)?"<NONE> ":"",
+>> -			(state->csc_mask&SS_DETECT)?"DETECT ":"",
+>> -			(state->csc_mask&SS_READY)?"READY ":"",
+>> -			(state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
+>> -			(state->csc_mask&SS_BATWARN)?"BATWARN ":"",
+>> -			(state->csc_mask&SS_STSCHG)?"STSCHG ":"",
+>> -			(state->flags==0)?"<NONE> ":"",
+>> -			(state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
+>> -			(state->flags&SS_IOCARD)?"IOCARD ":"",
+>> -			(state->flags&SS_RESET)?"RESET ":"",
+>> -			(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
+>> -			(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
+>> +	debug(skt, 2,	"mask: %s%s%s%s%s%s "
+>> +			"flags: %s%s%s%s%s%s Vcc %d Vpp %d irq %d\n",
+>>     
+>
+> NAK.  Breaking kernel messages across multiple lines makes them impossible
+> to grep for.  checkpatch.pl is wrong on this one.
+>   
+
+   I'd disagree in this case. Anybody will hardly grep for "mask: 
+%s%s%s%s%s%sflags: %s%s%s%s%s%s".
+
+WBR, Sergei
