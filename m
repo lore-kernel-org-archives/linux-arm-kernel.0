@@ -1,108 +1,284 @@
-From: virtuoso@slind.org (Alexander Shishkin)
-Date: Thu, 25 Mar 2010 18:42:46 +0200
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <20100318135008.GA11800@Krystal>
-References: <20100318135008.GA11800@Krystal>
-Message-ID: <1269535366-25175-1-git-send-email-virtuoso@slind.org>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Thu, 25 Mar 2010 18:04:40 +0100
+Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
+In-Reply-To: <1269474310-13970-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+References: <1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<1269474310-13970-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+Message-ID: <20100325170440.GC5424@comet.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[fixed #if __LINUX_ARM_ARCH__]
-On systems where ldrexh/strexh are not available,
-  * for pre-v6 systems, use a generic local version,
-  * for v6 without v6K, emulate xchg2 using 32-bit cmpxchg()
-    (it is not yet clear if xchg1 has to be emulated on such
-    systems as well, thus the "size" parameter).
+Russell,
 
-The __xchg_generic() function is based on the code that Jamie
-posted earlier.
+do you prefer me pushing these patches upstream (possibly even for -rc3), or
+do you wish to take these patches?
 
-Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-CC: linux-arm-kernel-bounces at lists.infradead.org
-CC: Imre Deak <imre.deak@nokia.com>
-CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
-CC: Jamie Lokier <jamie@shareable.org>
----
- arch/arm/include/asm/system.h |   53 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
+Best,
+	Dominik
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..b9b5ec7 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -218,6 +218,36 @@ do {									\
- 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
- } while (0)
- 
-+#if __LINUX_ARM_ARCH__ >= 6
-+static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-+				      unsigned long new, int size);
-+
-+/*
-+ * emulate __xchg() using 32-bit __cmpxchg()
-+ */
-+static inline unsigned long __xchg_generic(unsigned long x,
-+						 volatile void *ptr, int size)
-+{
-+	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr & ~3UL);
-+	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
-+	unsigned long mask, add, ret;
-+
-+	mask = ~(((1 << (size * 8)) - 1) << shift);
-+	add = x << shift;
-+
-+	ret = *ptrbig;
-+	while (1) {
-+		unsigned long tmp = __cmpxchg(ptrbig, ret, (ret & mask) | add,
-+					      4);
-+		if (tmp == ret)
-+			break;
-+		ret = tmp;
-+	}
-+
-+	return ret;
-+}
-+#endif
-+
- #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
- /*
-  * On the StrongARM, "swp" is terminally broken since it bypasses the
-@@ -262,6 +292,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 			: "r" (x), "r" (ptr)
- 			: "memory", "cc");
- 		break;
-+#ifdef CONFIG_CPU_32v6K
-+	case 2:
-+		asm volatile("@	__xchg2\n"
-+		"1:	ldrexh	%0, [%3]\n"
-+		"	strexh	%1, %2, [%3]\n"
-+		"	teq	%1, #0\n"
-+		"	bne	1b"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+#else
-+	case 2:
-+		ret = __xchg_generic(x, ptr, 2);
-+		break;
-+#endif
- 	case 4:
- 		asm volatile("@	__xchg4\n"
- 		"1:	ldrex	%0, [%3]\n"
-@@ -283,6 +329,13 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 		raw_local_irq_restore(flags);
- 		break;
- 
-+	case 2:
-+		raw_local_irq_save(flags);
-+		ret = *(volatile unsigned short *)ptr;
-+		*(volatile unsigned short *)ptr = x;
-+		raw_local_irq_restore(flags);
-+		break;
-+
- 	case 4:
- 		raw_local_irq_save(flags);
- 		ret = *(volatile unsigned long *)ptr;
--- 
-1.6.3.3
+On Wed, Mar 24, 2010 at 08:45:10PM -0300, Marcelo Roberto Jimenez wrote:
+> This patch fixes checkpatch.pl issues in soc_common.c.
+> 
+> Signed-off-by: Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+> ---
+>  drivers/pcmcia/soc_common.c |  128 +++++++++++++++++++++++--------------------
+>  1 files changed, 68 insertions(+), 60 deletions(-)
+> 
+> diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+> index fd4c25a..25c5b50 100644
+> --- a/drivers/pcmcia/soc_common.c
+> +++ b/drivers/pcmcia/soc_common.c
+> @@ -31,20 +31,20 @@
+>  ======================================================================*/
+>  
+>  
+> -#include <linux/module.h>
+> -#include <linux/moduleparam.h>
+> +#include <linux/cpufreq.h>
+>  #include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+> -#include <linux/timer.h>
+>  #include <linux/mm.h>
+> +#include <linux/module.h>
+> +#include <linux/moduleparam.h>
+>  #include <linux/mutex.h>
+> -#include <linux/interrupt.h>
+> -#include <linux/irq.h>
+>  #include <linux/spinlock.h>
+> -#include <linux/cpufreq.h>
+> +#include <linux/timer.h>
+>  
+>  #include <mach/hardware.h>
+> -#include <asm/io.h>
+>  #include <asm/system.h>
+>  
+>  #include "soc_common.h"
+> @@ -69,7 +69,8 @@ EXPORT_SYMBOL(soc_pcmcia_debug);
+>  
+>  #endif
+>  
+> -#define to_soc_pcmcia_socket(x)	container_of(x, struct soc_pcmcia_socket, socket)
+> +#define to_soc_pcmcia_socket(x)	\
+> +	container_of(x, struct soc_pcmcia_socket, socket)
+>  
+>  static unsigned short
+>  calc_speed(unsigned short *spds, int num, unsigned short dflt)
+> @@ -86,11 +87,15 @@ calc_speed(unsigned short *spds, int num, unsigned short dflt)
+>  	return speed;
+>  }
+>  
+> -void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt, struct soc_pcmcia_timing *timing)
+> +void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt,
+> +	struct soc_pcmcia_timing *timing)
+>  {
+> -	timing->io = calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
+> -	timing->mem = calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+> -	timing->attr = calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+> +	timing->io =
+> +		calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
+> +	timing->mem =
+> +		calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+> +	timing->attr =
+> +		calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+>  }
+>  EXPORT_SYMBOL(soc_common_pcmcia_get_timing);
+>  
+> @@ -132,8 +137,8 @@ static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
+>   *
+>   * Convert PCMCIA socket state to our socket configure structure.
+>   */
+> -static int
+> -soc_common_pcmcia_config_skt(struct soc_pcmcia_socket *skt, socket_state_t *state)
+> +static int soc_common_pcmcia_config_skt(
+> +	struct soc_pcmcia_socket *skt, socket_state_t *state)
+>  {
+>  	int ret;
+>  
+> @@ -145,7 +150,8 @@ soc_common_pcmcia_config_skt(struct soc_pcmcia_socket *skt, socket_state_t *stat
+>  		 */
+>  		if (skt->irq_state != 1 && state->io_irq) {
+>  			skt->irq_state = 1;
+> -			set_irq_type(skt->socket.pci_irq, IRQ_TYPE_EDGE_FALLING);
+> +			set_irq_type(skt->socket.pci_irq,
+> +				IRQ_TYPE_EDGE_FALLING);
+>  		} else if (skt->irq_state == 1 && state->io_irq == 0) {
+>  			skt->irq_state = 0;
+>  			set_irq_type(skt->socket.pci_irq, IRQ_TYPE_NONE);
+> @@ -299,24 +305,24 @@ soc_common_pcmcia_get_status(struct pcmcia_socket *sock, unsigned int *status)
+>   * of power configuration, reset, &c. We also record the value of
+>   * `state' in order to regurgitate it to the PCMCIA core later.
+>   */
+> -static int
+> -soc_common_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
+> +static int soc_common_pcmcia_set_socket(
+> +	struct pcmcia_socket *sock, socket_state_t *state)
+>  {
+>  	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
+>  
+> -	debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
+> -			(state->csc_mask==0)?"<NONE> ":"",
+> -			(state->csc_mask&SS_DETECT)?"DETECT ":"",
+> -			(state->csc_mask&SS_READY)?"READY ":"",
+> -			(state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
+> -			(state->csc_mask&SS_BATWARN)?"BATWARN ":"",
+> -			(state->csc_mask&SS_STSCHG)?"STSCHG ":"",
+> -			(state->flags==0)?"<NONE> ":"",
+> -			(state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
+> -			(state->flags&SS_IOCARD)?"IOCARD ":"",
+> -			(state->flags&SS_RESET)?"RESET ":"",
+> -			(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
+> -			(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
+> +	debug(skt, 2, "mask: %s%s%s%s%s%s flags: %s%s%s%s%s%s Vcc %d Vpp %d irq %d\n",
+> +			(state->csc_mask == 0)		? "<NONE> " :	"",
+> +			(state->csc_mask & SS_DETECT)	? "DETECT " :	"",
+> +			(state->csc_mask & SS_READY)	? "READY " :	"",
+> +			(state->csc_mask & SS_BATDEAD)	? "BATDEAD " :	"",
+> +			(state->csc_mask & SS_BATWARN)	? "BATWARN " :	"",
+> +			(state->csc_mask & SS_STSCHG)	? "STSCHG " :	"",
+> +			(state->flags == 0)		? "<NONE> " :	"",
+> +			(state->flags & SS_PWR_AUTO)	? "PWR_AUTO " :	"",
+> +			(state->flags & SS_IOCARD)	? "IOCARD " :	"",
+> +			(state->flags & SS_RESET)	? "RESET " :	"",
+> +			(state->flags & SS_SPKR_ENA)	? "SPKR_ENA " :	"",
+> +			(state->flags & SS_OUTPUT_ENA)	? "OUTPUT_ENA " : "",
+>  			state->Vcc, state->Vpp, state->io_irq);
+>  
+>  	return soc_common_pcmcia_config_skt(skt, state);
+> @@ -331,8 +337,8 @@ soc_common_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
+>   *
+>   * Returns: 0 on success, -1 on error
+>   */
+> -static int
+> -soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *map)
+> +static int soc_common_pcmcia_set_io_map(
+> +	struct pcmcia_socket *sock, struct pccard_io_map *map)
+>  {
+>  	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
+>  	unsigned short speed = map->speed;
+> @@ -341,14 +347,14 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
+>  		map->map, map->speed, (unsigned long long)map->start,
+>  		(unsigned long long)map->stop);
+>  	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
+> -		(map->flags==0)?"<NONE>":"",
+> -		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
+> -		(map->flags&MAP_16BIT)?"16BIT ":"",
+> -		(map->flags&MAP_AUTOSZ)?"AUTOSZ ":"",
+> -		(map->flags&MAP_0WS)?"0WS ":"",
+> -		(map->flags&MAP_WRPROT)?"WRPROT ":"",
+> -		(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"",
+> -		(map->flags&MAP_PREFETCH)?"PREFETCH ":"");
+> +		(map->flags == 0)		? "<NONE>"	: "",
+> +		(map->flags & MAP_ACTIVE)	? "ACTIVE "	: "",
+> +		(map->flags & MAP_16BIT)	? "16BIT "	: "",
+> +		(map->flags & MAP_AUTOSZ)	? "AUTOSZ "	: "",
+> +		(map->flags & MAP_0WS)		? "0WS "	: "",
+> +		(map->flags & MAP_WRPROT)	? "WRPROT "	: "",
+> +		(map->flags & MAP_USE_WAIT)	? "USE_WAIT "	: "",
+> +		(map->flags & MAP_PREFETCH)	? "PREFETCH "	: "");
+>  
+>  	if (map->map >= MAX_IO_WIN) {
+>  		printk(KERN_ERR "%s(): map (%d) out of range\n", __func__,
+> @@ -385,8 +391,8 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
+>   *
+>   * Returns: 0 on success, -ERRNO on error
+>   */
+> -static int
+> -soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map)
+> +static int soc_common_pcmcia_set_mem_map(
+> +	struct pcmcia_socket *sock, struct pccard_mem_map *map)
+>  {
+>  	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
+>  	struct resource *res;
+> @@ -395,14 +401,14 @@ soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map
+>  	debug(skt, 2, "map %u speed %u card_start %08x\n",
+>  		map->map, map->speed, map->card_start);
+>  	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
+> -		(map->flags==0)?"<NONE>":"",
+> -		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
+> -		(map->flags&MAP_16BIT)?"16BIT ":"",
+> -		(map->flags&MAP_AUTOSZ)?"AUTOSZ ":"",
+> -		(map->flags&MAP_0WS)?"0WS ":"",
+> -		(map->flags&MAP_WRPROT)?"WRPROT ":"",
+> -		(map->flags&MAP_ATTRIB)?"ATTRIB ":"",
+> -		(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"");
+> +		(map->flags == 0)		? "<NONE>"	: "",
+> +		(map->flags & MAP_ACTIVE)	? "ACTIVE "	: "",
+> +		(map->flags & MAP_16BIT)	? "16BIT "	: "",
+> +		(map->flags & MAP_AUTOSZ)	? "AUTOSZ "	: "",
+> +		(map->flags & MAP_0WS)		? "0WS "	: "",
+> +		(map->flags & MAP_WRPROT)	? "WRPROT "	: "",
+> +		(map->flags & MAP_ATTRIB)	? "ATTRIB "	: "",
+> +		(map->flags & MAP_USE_WAIT)	? "USE_WAIT "	: "");
+>  
+>  	if (map->map >= MAX_WIN)
+>  		return -EINVAL;
+> @@ -457,8 +463,8 @@ static struct bittbl conf_bits[] = {
+>  	{ SS_OUTPUT_ENA,	"SS_OUTPUT_ENA"	},
+>  };
+>  
+> -static void
+> -dump_bits(char **p, const char *prefix, unsigned int val, struct bittbl *bits, int sz)
+> +static void dump_bits(char **p, const char *prefix,
+> +	unsigned int val, struct bittbl *bits, int sz)
+>  {
+>  	char *b = *p;
+>  	int i;
+> @@ -476,13 +482,14 @@ dump_bits(char **p, const char *prefix, unsigned int val, struct bittbl *bits, i
+>   *
+>   * Returns: the number of characters added to the buffer
+>   */
+> -static ssize_t show_status(struct device *dev, struct device_attribute *attr, char *buf)
+> +static ssize_t show_status(
+> +	struct device *dev, struct device_attribute *attr, char *buf)
+>  {
+>  	struct soc_pcmcia_socket *skt =
+>  		container_of(dev, struct soc_pcmcia_socket, socket.dev);
+>  	char *p = buf;
+>  
+> -	p+=sprintf(p, "slot     : %d\n", skt->nr);
+> +	p += sprintf(p, "slot     : %d\n", skt->nr);
+>  
+>  	dump_bits(&p, "status", skt->status,
+>  		  status_bits, ARRAY_SIZE(status_bits));
+> @@ -491,12 +498,12 @@ static ssize_t show_status(struct device *dev, struct device_attribute *attr, ch
+>  	dump_bits(&p, "cs_flags", skt->cs_state.flags,
+>  		  conf_bits, ARRAY_SIZE(conf_bits));
+>  
+> -	p+=sprintf(p, "Vcc      : %d\n", skt->cs_state.Vcc);
+> -	p+=sprintf(p, "Vpp      : %d\n", skt->cs_state.Vpp);
+> -	p+=sprintf(p, "IRQ      : %d (%d)\n", skt->cs_state.io_irq,
+> +	p += sprintf(p, "Vcc      : %d\n", skt->cs_state.Vcc);
+> +	p += sprintf(p, "Vpp      : %d\n", skt->cs_state.Vpp);
+> +	p += sprintf(p, "IRQ      : %d (%d)\n", skt->cs_state.io_irq,
+>  		skt->socket.pci_irq);
+>  	if (skt->ops->show_timing)
+> -		p+=skt->ops->show_timing(skt, p);
+> +		p += skt->ops->show_timing(skt, p);
+>  
+>  	return p-buf;
+>  }
+> @@ -589,7 +596,7 @@ soc_pcmcia_notifier(struct notifier_block *nb, unsigned long val, void *data)
+>  
+>  	mutex_lock(&soc_pcmcia_sockets_lock);
+>  	list_for_each_entry(skt, &soc_pcmcia_sockets, node)
+> -		if ( skt->ops->frequency_change )
+> +		if (skt->ops->frequency_change)
+>  			ret += skt->ops->frequency_change(skt, val, freqs);
+>  	mutex_unlock(&soc_pcmcia_sockets_lock);
+>  
+> @@ -615,7 +622,8 @@ fs_initcall(soc_pcmcia_cpufreq_register);
+>  
+>  static void soc_pcmcia_cpufreq_unregister(void)
+>  {
+> -	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+> +	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block,
+> +		CPUFREQ_TRANSITION_NOTIFIER);
+>  }
+>  module_exit(soc_pcmcia_cpufreq_unregister);
+>  
+> -- 
+> 1.7.0.3
+> 
