@@ -1,104 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Mar 2010 16:01:26 +0000
-Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
-In-Reply-To: <20100325153043.GE6590@n2100.arm.linux.org.uk>
-References: <20100325145324.12837.85927.stgit@e102109-lin.cambridge.arm.com>
-	<20100325151030.GD6590@n2100.arm.linux.org.uk>
-	<1269530669.10064.28.camel@e102109-lin.cambridge.arm.com>
-	<20100325153043.GE6590@n2100.arm.linux.org.uk>
-Message-ID: <1269532886.10064.31.camel@e102109-lin.cambridge.arm.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Thu, 25 Mar 2010 15:36:52 +0000
+Subject: [PATCH 1/6] ARM: pmu: register IRQs at runtime
+In-Reply-To: <1269530198-19572-2-git-send-email-will.deacon@arm.com>
+References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+	<1269530198-19572-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20100325153652.GL8118@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 15:30 +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 25, 2010 at 03:24:29PM +0000, Catalin Marinas wrote:
-> > On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
-> > > While this looks fine, I'd like to see a lot of Tested-by's against
-> > > this before it's merged - we've had similar code in show_mem()
-> > > which has proven to be quite problematical to get right for all the
-> > > various different combinations we have.
-> > >
-> > > However, we also have the same method in show_mem() which we know
-> > > works fine, so I'd also like to see the problem with using it in
-> > > mem_init() fully analysed - rather than a "possibly because".
-> >
-> > I can remove the "possibly" part :). The page_count() is given a page
-> > with some random flags and it thinks it's a compound page. It than tries
-> > to access page->first which isn't set, hence the error.
-> >
-> > The original code assumes that for a given node the map is contiguous
-> > and it calculates the page as (map + pfn). This is only true for
-> > flatmem. With sparsemem the page calculation is a bit more complicated
-> > but handled by pfn_to_page().
+On Thu, Mar 25, 2010 at 03:16:33PM +0000, Will Deacon wrote:
+> The current PMU infrastructure for ARM requires that the IRQs for the PMU
+> device are fixed at compile time and are selected based on the ARCH_ or MACH_
+> flags. This has the disadvantage of tying the Kernel down to a particular board
+> as far as profiling is concerned.
 > 
-> And show_mem() ?  It seems to suffer from the same problem.
+> This patch replaces the compile-time IRQ registration with a runtime mechanism
+> which allows the IRQs to be registered with the framework as a platform_device.
+> 
+> A further advantage of this change is that there is scope for registering
+> different types of performance counters in the future by changing the id of
+> the platform_device and attaching different resources to it.
+> 
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+[snip]
+> -	for (i = 0; i < pmu_irqs->num_irqs; ++i) {
+> -		err = request_irq(pmu_irqs->irqs[i], armpmu->handle_irq,
+> +	for (i = 0; i < pmu_device->num_resources; ++i) {
+> +		err = request_irq(platform_get_irq(pmu_device, i),
+> +				  armpmu->handle_irq,
+>  				  IRQF_DISABLED | IRQF_NOBALANCING,
+>  				  "armpmu", NULL);
+[snip]
+> @@ -356,12 +358,12 @@ armpmu_release_hardware(void)
+>  {
+>  	int i;
+>  
+> -	for (i = pmu_irqs->num_irqs - 1; i >= 0; --i)
+> -		free_irq(pmu_irqs->irqs[i], NULL);
+> +	for (i = pmu_device->num_resources - 1; i >= 0; --i)
+> +		free_irq(platform_get_irq(pmu_device, i), NULL);
+Hi Will,
 
-And that's a patch which fixes both (but as you said, it would be good
-if more people test it on various platforms).
+This looks fine at the moment as all PMU's only have IRQ resources but if we
+ever have any with memory resources then we'll need to check the return value
+of platform_get_irq() to make sure that the resource is a valid IRQ. Apologies
+for not spotting it before! If we had:
 
+	int irq = platform_get_irq(pmu_device, i);
+	if (irq < 0)
+		continue;
 
-ARM: Fix kernel memory printing for sparsemem
+or something similar to be a bit future proof then I'm happy with that and:
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Jamie Iles <jamie.iles@picochip.com>
 
-The show_mem() and mem_init() function are assuming that the page map is
-contiguous and calculates the start and end page of a bank using (map +
-pfn). This fails with SPARSEMEM where pfn_to_page() must be used.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <Will.Deacon@arm.com>
-Cc: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
----
- arch/arm/mm/init.c |   14 ++++----------
- 1 files changed, 4 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index b69ac3a..4ee740a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -83,9 +83,6 @@ void show_mem(void)
- 	printk("Mem-info:\n");
- 	show_free_areas();
- 	for_each_online_node(node) {
--		pg_data_t *n = NODE_DATA(node);
--		struct page *map = pgdat_page_nr(n, 0) - n->node_start_pfn;
--
- 		for_each_nodebank (i,mi,node) {
- 			struct membank *bank = &mi->bank[i];
- 			unsigned int pfn1, pfn2;
-@@ -94,8 +91,8 @@ void show_mem(void)
- 			pfn1 = bank_pfn_start(bank);
- 			pfn2 = bank_pfn_end(bank);
- 
--			page = map + pfn1;
--			end  = map + pfn2;
-+			page = pfn_to_page(pfn1);
-+			end  = pfn_to_page(pfn2 - 1) + 1;
- 
- 			do {
- 				total++;
-@@ -600,9 +597,6 @@ void __init mem_init(void)
- 	reserved_pages = free_pages = 0;
- 
- 	for_each_online_node(node) {
--		pg_data_t *n = NODE_DATA(node);
--		struct page *map = pgdat_page_nr(n, 0) - n->node_start_pfn;
--
- 		for_each_nodebank(i, &meminfo, node) {
- 			struct membank *bank = &meminfo.bank[i];
- 			unsigned int pfn1, pfn2;
-@@ -611,8 +605,8 @@ void __init mem_init(void)
- 			pfn1 = bank_pfn_start(bank);
- 			pfn2 = bank_pfn_end(bank);
- 
--			page = map + pfn1;
--			end  = map + pfn2;
-+			page = pfn_to_page(pfn1);
-+			end  = pfn_to_page(pfn2 - 1) + 1;
- 
- 			do {
- 				if (PageReserved(page))
-
-
--- 
-Catalin
+Jamie
