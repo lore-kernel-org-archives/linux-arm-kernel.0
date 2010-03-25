@@ -1,38 +1,47 @@
-From: matthias@kaehlcke.net (Matthias Kaehlcke)
-Date: Thu, 25 Mar 2010 12:50:53 +0100
-Subject: [PATCH] i.MX25: Define address mapping macros
-In-Reply-To: <20100325093617.GA16329@pengutronix.de>
-References: <20100325085057.GG2328@darwin>
-	<20100325093617.GA16329@pengutronix.de>
-Message-ID: <20100325115053.GH2328@darwin>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 25 Mar 2010 11:52:48 +0000
+Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
+Message-ID: <1269517968-27945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+The SMDK6410 has a WM9713 connected to the AC97 interface, by default
+on the GPD pins though this can be changed with a switch on the board.
 
-El Thu, Mar 25, 2010 at 10:36:17AM +0100 Uwe Kleine-K?nig ha dit:
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-> Hello Matthias,
-> 
-> On Thu, Mar 25, 2010 at 09:50:57AM +0100, Matthias Kaehlcke wrote:
-> > Add macros for mapping physical addresses of i.MX25 registers to virtual
-> > addresses
-> Where do you need them?  MX25_IO_ADDRESS isn't enough?
-
-MX25_AIPS1_IO_ADDRESS is used in arch/arm/plat-mxc/include/mach/debug-macro.S:
-
-#define UART_VADDR  MX25_AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
-
-i added the other two for completeness
-
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 2d5afd2..6878fbd 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -64,6 +64,7 @@
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
++#include <plat/audio.h>
+ 
+ #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+ #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
+@@ -254,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_ohci,
+ 	&s3c_device_usb_hsotg,
++	&s3c64xx_device_ac97,
+ 	&s3c64xx_device_iisv4,
+ 
+ #ifdef CONFIG_REGULATOR
+@@ -652,6 +654,9 @@ static void __init smdk6410_machine_init(void)
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+ 
++	/* Board defualt with CFG2.1 off */
++	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
++
+ 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
+ }
+ 
 -- 
-Matthias Kaehlcke
-Embedded Linux Developer
-Barcelona
-
-              We build too many walls and not enough bridges
-                             (Isaac Newton)
-                                                                 .''`.
-    using free software / Debian GNU/Linux | http://debian.org  : :'  :
-                                                                `. `'`
-gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
+1.7.0.2
