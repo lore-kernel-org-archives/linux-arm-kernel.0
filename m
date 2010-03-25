@@ -1,35 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Mar 2010 22:55:55 +0000
-Subject: [GIT PULL] generic arm for MSM
-In-Reply-To: <1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
-References: <1269553937.21793.40.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003251843320.694@xanadu.home>
-	<1269557364.21793.52.camel@c-dwalke-linux.qualcomm.com>
-	<20100325225300.GK24984@n2100.arm.linux.org.uk>
-	<1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100325225555.GL24984@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 25 Mar 2010 18:07:17 -0500
+Subject: [PATCH] locomo.c: restore LOCOMO_DAC (I2C bus) to idle state on resume
+Message-ID: <0D753D10438DA54287A00B02708426976368F67791@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 03:54:15PM -0700, Daniel Walker wrote:
-> On Thu, 2010-03-25 at 22:53 +0000, Russell King - ARM Linux wrote:
-> 
-> > http://www.home.arm.linux.org.uk/developer/
-> > 
-> > has a link to gitweb for it, and a url pointing to where it is on the
-> > ftp/http site:
-> > 
-> > # rmk's GIT tree
-> > # rmk's random kernel patches and git tree 
-> > 
-> > It's not like it's hidden.
-> 
-> for that url I get,
-> 
-> Forbidden
-> You don't have permission to access /developer/ on this server.
+The LOCOMO_DAC register actually controls an I2C bus with a
+M62332 DAC on it.  During suspend, a value of 0x00 is written
+to the register which causes the SDA and SCL lines to both
+be driven low.  This puts the I2C bus in a "wait" condition.
 
-http://www.arm.linux.org.uk/developer/
+At resume, the SDA and SCL lines should both be restored to
+a high state to put the I2C bus back into an "idle" state.
 
-sorry, I tend to use my own local copy of the site; the public copy is
-identical.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+
+---
+
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 9dff07c..422dadb 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -345,6 +345,10 @@ static int locomo_resume(struct platform_device *dev)
+ 	locomo_writel(r, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
+ 	locomo_writel(0x1, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KCMD);
+ 
++	r = locomo_readl(lchip->base + LOCOMO_DAC);
++	r |= LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
++	locomo_writel(r, lchip->base + LOCOMO_DAC);
++
+ 	spin_unlock_irqrestore(&lchip->lock, flags);
+ 
+ 	lchip->saved_state = NULL;
