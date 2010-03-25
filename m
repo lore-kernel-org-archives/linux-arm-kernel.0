@@ -1,41 +1,22 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Thu, 25 Mar 2010 10:32:37 +0100
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <4BAB264C.2090502@samsung.com>
-References: <4BAAD5BB.7050101@samsung.com>
-	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
-	<4BAB264C.2090502@samsung.com>
-Message-ID: <960f4547118a62d5863ee38ba760844c@localhost>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Mar 2010 10:36:17 +0100
+Subject: [PATCH] i.MX25: Define address mapping macros
+In-Reply-To: <20100325085057.GG2328@darwin>
+References: <20100325085057.GG2328@darwin>
+Message-ID: <20100325093617.GA16329@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Matthias,
 
-On Thu, 25 Mar 2010 18:01:00 +0900, Joonyoung Shim
-<jy0922.shim@samsung.com> wrote:
-> On 3/25/2010 2:44 PM, Marc Zyngier wrote:
->> On Thu, 25 Mar 2010 12:17:15 +0900
->> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->> 
->>> +	writew(imm, desc_pool_virt);
->> 
-> 
-> Right. The write[bwl] is api for address ioremapped of io device. I will
-> change these.
-> 
->> Does anything ensure that this won't generate an unaligned access?
->> 
-> 
-> PL330 DMA controller fetches variable length instructions that consist
-of
-> one to six bytes, so i think unaligned access is no problem.
+On Thu, Mar 25, 2010 at 09:50:57AM +0100, Matthias Kaehlcke wrote:
+> Add macros for mapping physical addresses of i.MX25 registers to virtual
+> addresses
+Where do you need them?  MX25_IO_ADDRESS isn't enough?
 
-I'm not too concerned about the device side of things. I'm more worried
-about the CPU access when writing the 'imm' value to memory.
+Best regards
+Uwe
 
-Consider desc_pool_virt 16bit aligned when entering the function. Writing
-the opcode makes it unaligned and then writing the 'imm' value will result
-as an unaligned access.
-
-        M.
 -- 
-Who you jivin' with that Cosmik Debris?
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
