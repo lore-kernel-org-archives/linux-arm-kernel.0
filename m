@@ -1,87 +1,43 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Thu, 25 Mar 2010 10:56:50 +0200
-Subject: [PATCH v2] ARM: Add support for LZMA-compressed kernel images
-In-Reply-To: <1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
-References: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
-Message-ID: <4BAB2552.9070704@gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Thu, 25 Mar 2010 18:01:00 +0900
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
+References: <4BAAD5BB.7050101@samsung.com>
+	<20100325054430.165311fa@taxman.wild-wind.fr.eu.org>
+Message-ID: <4BAB264C.2090502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2010 09:24 PM, Albin Tonnerre wrote:
-> This patch allows using a kernel image compressed with LZMA on ARM.
-> Extracting the image is fairly slow, but it might be useful on machines
-> with a very limited amount of storage, as the size benefit is quite
-> significant:
-> Gzip: Data Size:    1586352 Bytes = 1549.17 kB = 1.51 MB
-> LZMA: Data Size:    2135916 Bytes = 2085.86 kB = 2.04 MB
->
-> Signed-off-by: Albin Tonnerre<albin.tonnerre@free-electrons.com>
-> Tested-by: Martin Michlmayr<tbm@cyrius.com>
+On 3/25/2010 2:44 PM, Marc Zyngier wrote:
+> On Thu, 25 Mar 2010 12:17:15 +0900
+> Joonyoung Shim <jy0922.shim@samsung.com> wrote:
+> 
+>> +/* instruction set functions */
+>> +static inline int pl330_dmaaddh(u8 *desc_pool_virt, u16 imm, bool ra)
+>> +{
+>> +	u8 opcode = DMAADDH | (ra << 1);
+>> +
+>> +	writeb(opcode, desc_pool_virt++);
+> 
+> desc_pool_virt is a virtual address (from dma_alloc_coherent). In such
+> case, write[bwl] seems to be the wrong interface. I suggest the
+> following code:
+> 
+> 	*desc_pool_virt++ = opcode;
+> 
+>> +	writew(imm, desc_pool_virt);
+> 
 
-You can add
-Tested-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Right. The write[bwl] is api for address ioremapped of io device. I will
+change these.
 
-I think you should submit this patch to Russell's patch system.
+> Does anything ensure that this won't generate an unaligned access?
+> 
 
-> ---
-> v2: Updated to apply on top of 2.6.34-rc1
->
->   arch/arm/Kconfig                      |    1 +
->   arch/arm/boot/compressed/Makefile     |    1 +
->   arch/arm/boot/compressed/decompress.c |    4 ++++
->   arch/arm/boot/compressed/piggy.lzma.S |    6 ++++++
->   4 files changed, 12 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/boot/compressed/piggy.lzma.S
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3b18128..3ebc7c3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -21,6 +21,7 @@ config ARM
->   	select HAVE_GENERIC_DMA_COHERENT
->   	select HAVE_KERNEL_GZIP
->   	select HAVE_KERNEL_LZO
-> +	select HAVE_KERNEL_LZMA
->   	select HAVE_PERF_EVENTS
->   	select PERF_USE_VMALLOC
->   	help
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 97c89e7..53faa90 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -65,6 +65,7 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
->
->   suffix_$(CONFIG_KERNEL_GZIP) = gzip
->   suffix_$(CONFIG_KERNEL_LZO)  = lzo
-> +suffix_$(CONFIG_KERNEL_LZMA) = lzma
->
->   targets       := vmlinux vmlinux.lds \
->   		 piggy.$(suffix_y) piggy.$(suffix_y).o \
-> diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-> index 0da382f..d554df6 100644
-> --- a/arch/arm/boot/compressed/decompress.c
-> +++ b/arch/arm/boot/compressed/decompress.c
-> @@ -39,6 +39,10 @@ extern void error(char *);
->   #include "../../../../lib/decompress_unlzo.c"
->   #endif
->
-> +#ifdef CONFIG_KERNEL_LZMA
-> +#include "../../../../lib/decompress_unlzma.c"
-> +#endif
-> +
->   void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
->   {
->   	decompress(input, len, NULL, NULL, output, NULL, error);
-> diff --git a/arch/arm/boot/compressed/piggy.lzma.S b/arch/arm/boot/compressed/piggy.lzma.S
-> new file mode 100644
-> index 0000000..d7e69cf
-> --- /dev/null
-> +++ b/arch/arm/boot/compressed/piggy.lzma.S
-> @@ -0,0 +1,6 @@
-> +	.section .piggydata,#alloc
-> +	.globl	input_data
-> +input_data:
-> +	.incbin	"arch/arm/boot/compressed/piggy.lzma"
-> +	.globl	input_data_end
-> +input_data_end:
+PL330 DMA controller fetches variable length instructions that consist of
+one to six bytes, so i think unaligned access is no problem.
+
+>> +	return 3;
+>> +}
+> 
+> 	M.
