@@ -1,55 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Mar 2010 15:16:32 +0000
-Subject: [PATCH 0/6] ARM: pmu: provide a registration mechanism for IRQs [v3]
-Message-ID: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 25 Mar 2010 16:20:55 +0100
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <1b68c6791003250517y4e2789baoe147e5982c363682@mail.gmail.com>
+References: <4BAAD5BB.7050101@samsung.com>
+	<1b68c6791003242234h106d9530p12b5a046a906227e@mail.gmail.com>
+	<63386a3d1003250130w6f34854ag2ca163799e9b7bed@mail.gmail.com>
+	<1b68c6791003250517y4e2789baoe147e5982c363682@mail.gmail.com>
+Message-ID: <63386a3d1003250820x3cf81000i9d27e95c755b9ca8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 3 of the patch series originally posted here:
+2010/3/25 jassi brar <jassisinghbrar@gmail.com>:
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011162.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011339.html
+> My approach is to write a separate PL330 core driver as the backend which
+> can be reused by any DMA API implementer driver. That will avoid
+> having two copies of the PL330 driver, among other benefits.
 
-Changes from version 2 include:
+Seems like a rather good approach.
 
-- PXA PMU registration moved out of mach-pxa and into plat-pxa
-- Use of a platform_device to represent the PMU
-- Fixes in pmu.c in response to comments from Jamie Iles
-- Taken against 2.6.34-rc2
+> And if this patch is accepted, there
+> _will_ exist two copies of the PL330 driver -- one in drivers/dma/pl330_dmac.c
+> and another in arch/arm/plat-samsung/. Only the former will be lying unused
+> until some other SoC vendor decided to use PL330, because S3C has come too
+> long a way to change its drivers to driver/dma/ API and modify DMA
+> drivers for every SoC.
 
-I'd like to submit this to the patch system soon, so please let me
-know if the mach-* and plat-* changes require any further work.
+What's wrong with merging them later then? Refactoring FTW.
 
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Jamie Iles <jamie.iles@picochip.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Leo Chen <leochen@broadcom.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Eric Miao <eric.y.miao@gmail.com>
+> I have the pl330-core part almost ready, but i need time to implement
+> some _testable_
+> implementation of the scheme. If maintainers want to see structure of
+> my code, I can
+> share it too, but I think I pretty much made it clear.
 
+Why not just post it on the list? I'm curious! Since I'm working on a PrimeCell
+DMA API I would love to look at PrimeCell DMA engine drivers.
 
-Will Deacon (6):
-  ARM: pmu: register IRQs at runtime
-  ARM: Realview: register PMU IRQs during board initialisation
-  ARM: OMAP: register PMU IRQs during board initialisation
-  ARM: BCMRING: register PMU IRQ during board initialisation
-  ARM: iop3xx: register PMU IRQs during board initialisation
-  ARM: pxa: register PMU IRQs during board initialisation
-
- arch/arm/include/asm/pmu.h               |   32 ++++----
- arch/arm/kernel/perf_event.c             |   36 +++++----
- arch/arm/kernel/pmu.c                    |  127 +++++++++++++++++++----------
- arch/arm/mach-bcmring/arch.c             |   16 ++++
- arch/arm/mach-omap2/devices.c            |   34 ++++++++
- arch/arm/mach-realview/realview_eb.c     |   32 ++++++++
- arch/arm/mach-realview/realview_pb1176.c |   15 ++++
- arch/arm/mach-realview/realview_pb11mp.c |   32 ++++++++
- arch/arm/mach-realview/realview_pba8.c   |   15 ++++
- arch/arm/mach-realview/realview_pbx.c    |   32 ++++++++
- arch/arm/plat-iop/Makefile               |    2 +
- arch/arm/plat-iop/pmu.c                  |   40 +++++++++
- arch/arm/plat-pxa/Makefile               |    2 +-
- arch/arm/plat-pxa/pmu.c                  |   33 ++++++++
- 14 files changed, 371 insertions(+), 77 deletions(-)
- create mode 100644 arch/arm/plat-iop/pmu.c
- create mode 100644 arch/arm/plat-pxa/pmu.c
+Yours,
+Linus Walleij
