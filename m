@@ -1,30 +1,76 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 25 Mar 2010 10:22:33 +0000
-Subject: Device probe order (i2c regulator vs. platform device)
-In-Reply-To: <4BAA23E7.9010100@warmcat.com>
-References: <E4D3F24EA6C9E54F817833EAE0D912AC09C80E05C7@bssrvexch01.BS.local>
-	<4BA9D93E.50705@warmcat.com>
-	<20100324113241.GC5831@opensource.wolfsonmicro.com>
-	<4BAA017D.70503@warmcat.com>
-	<20100324140101.GC26453@rakim.wolfsonmicro.main>
-	<4BAA23E7.9010100@warmcat.com>
-Message-ID: <20100325102232.GC27729@rakim.wolfsonmicro.main>
+From: christofferdall@christofferdall.dk (Christoffer Dall)
+Date: Thu, 25 Mar 2010 11:29:45 +0100
+Subject: [C/R ARM][PATCH 1/3] ARM: Rudimentary syscall interfaces
+In-Reply-To: <20100325011753.GF5704@count0.beaverton.ibm.com>
+References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+	<1269219965-23923-2-git-send-email-christofferdall@christofferdall.dk>
+	<20100323205342.GA19572@n2100.arm.linux.org.uk>
+	<20100324020342.GB5704@count0.beaverton.ibm.com>
+	<Pine.LNX.4.64.1003240055050.5867@takamine.ncl.cs.columbia.edu>
+	<20100324140252.GC5704@count0.beaverton.ibm.com>
+	<4BAA3586.1020604@cs.columbia.edu>
+	<7d08b87d1003241236n2b45e6f4ife36da841351df9d@mail.gmail.com>
+	<20100325011132.GE5704@count0.beaverton.ibm.com>
+	<20100325011753.GF5704@count0.beaverton.ibm.com>
+Message-ID: <7d08b87d1003250329t589ba41er2f1127190be078cf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 24, 2010 at 02:38:31PM +0000, Andy Green wrote:
-> On 03/24/10 14:01, Somebody in the thread at some point said:
+On Thu, Mar 25, 2010 at 2:17 AM, Matt Helsley <matthltc@us.ibm.com> wrote:
+> On Wed, Mar 24, 2010 at 06:11:32PM -0700, Matt Helsley wrote:
+>> On Wed, Mar 24, 2010 at 08:36:39PM +0100, Christoffer Dall wrote:
+> <snip>
+>> > Re-using the assembly code or factoring it out so that it can be used
+>> > from multiple places doesn't seem very pleasing to me, as the assembly
+>> > code is in the critical path and written specifically for the context
+>> > of a process entering the kernel. Please correct me if I'm wrong.
+>> >
+>> > I imagine simply a function in C, more or less re-implementing the
+>> > logic that's already in entry-common.S, might do the trick. I wouldn't
+>> > worry much about the performance in this case as it will not be used
+>> > often. The following _untested_ snippet illustrates my idea:
+>> >
+>> > ---
+>> > ?arch/arm/include/asm/syscall.h | ? 93 +++++++++++++++++++++++++++++++++++++++-
+>> > ?1 files changed, 92 insertions(+), 1 deletions(-)
+>> >
+>> > diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
+>> > index 3b3248f..a7f2615 100644
+>> > --- a/arch/arm/include/asm/syscall.h
+>> > +++ b/arch/arm/include/asm/syscall.h
+>> > @@ -10,10 +10,101 @@
+>> > ?#ifndef _ASM_ARM_SYSCALLS_H
+>> > ?#define _ASM_ARM_SYSCALLS_H
+>> >
+>> > +static inline int get_swi_instruction(struct task_struct *task,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pt_regs *regs,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *instr)
+>> > +{
+>> > + ? struct page *page = NULL;
+>> > + ? unsigned long instr_addr;
+>> > + ? unsigned long *ptr;
+>> > + ? int ret;
+>> > +
+>> > + ? instr_addr = regs->ARM_pc - 4;
+>> > +
+>> > + ? down_read(&task->mm->mmap_sem);
+>> > + ? ret = get_user_pages(task, task->mm, instr_addr,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ?1, 0, 0, &page, NULL);
+>> > + ? up_read(&task->mm->mmap_sem);
+>> > +
+>> > + ? if (ret < 0)
+>> > + ? ? ? ? ? return ret;
+>> > +
+>> > + ? ptr = (unsigned long *)kmap_atomic(page, KM_USER1);
+>> > + ? memcpy(instr,
+>> > + ? ? ? ? ?ptr + (instr_addr >> PAGE_SHIFT),
+>> ? ? ? ? ? ? ? ? ? ? ? ^shouldn't this be:
+>> ? ? ? ? ? ? ? ? ? ? instr_addr & PAGE_MASK
+>
+> Oops, made my own mistake. I think the address of the kmap'd instruction
+> would be:
+>
+> ? ? ? ?ptr + (instr_addr & ~PAGE_MASK)
+>
 
-> >I really am very sure that nobody has ever reported any issues here -
-
-> There's plenty of out-of-tree code.  I'm not trying to blame you for
-
-I'm really wary of trusting out of tree reports since a high proportion
-of the time they turn out to be due to people not being aware of some
-existing support or things like API misuse.  New issues do crop up, but
-anecdotes about issues that have been diagnosed but not reported need to
-be taken with a grain of salt.
-
-Like I say, the regulator drivers just don't do anything in suspend
-in mainline which means that ordering issues from them seem a bit
-suspicious.
+Yes. Thanks for pointing it out.
