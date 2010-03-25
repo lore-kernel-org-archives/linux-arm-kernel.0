@@ -1,40 +1,38 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 25 Mar 2010 16:20:55 +0100
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <1b68c6791003250517y4e2789baoe147e5982c363682@mail.gmail.com>
-References: <4BAAD5BB.7050101@samsung.com>
-	<1b68c6791003242234h106d9530p12b5a046a906227e@mail.gmail.com>
-	<63386a3d1003250130w6f34854ag2ca163799e9b7bed@mail.gmail.com>
-	<1b68c6791003250517y4e2789baoe147e5982c363682@mail.gmail.com>
-Message-ID: <63386a3d1003250820x3cf81000i9d27e95c755b9ca8@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Mar 2010 15:24:29 +0000
+Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
+In-Reply-To: <20100325151030.GD6590@n2100.arm.linux.org.uk>
+References: <20100325145324.12837.85927.stgit@e102109-lin.cambridge.arm.com>
+	<20100325151030.GD6590@n2100.arm.linux.org.uk>
+Message-ID: <1269530669.10064.28.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/25 jassi brar <jassisinghbrar@gmail.com>:
+On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 25, 2010 at 02:53:24PM +0000, Catalin Marinas wrote:
+> > Commit db9ef1a introduced information printing for the virtual kernel
+> > memory map but page/end calculation using the pfn goes wrong and
+> > page_count() generates a data abort or alignment fault (possibly because
+> > it gets to an uninitialised page structure that looks like a compound
+> > page).
+> 
+> While this looks fine, I'd like to see a lot of Tested-by's against
+> this before it's merged - we've had similar code in show_mem()
+> which has proven to be quite problematical to get right for all the
+> various different combinations we have.
+> 
+> However, we also have the same method in show_mem() which we know
+> works fine, so I'd also like to see the problem with using it in
+> mem_init() fully analysed - rather than a "possibly because".
 
-> My approach is to write a separate PL330 core driver as the backend which
-> can be reused by any DMA API implementer driver. That will avoid
-> having two copies of the PL330 driver, among other benefits.
+I can remove the "possibly" part :). The page_count() is given a page
+with some random flags and it thinks it's a compound page. It than tries
+to access page->first which isn't set, hence the error.
 
-Seems like a rather good approach.
+The original code assumes that for a given node the map is contiguous
+and it calculates the page as (map + pfn). This is only true for
+flatmem. With sparsemem the page calculation is a bit more complicated
+but handled by pfn_to_page().
 
-> And if this patch is accepted, there
-> _will_ exist two copies of the PL330 driver -- one in drivers/dma/pl330_dmac.c
-> and another in arch/arm/plat-samsung/. Only the former will be lying unused
-> until some other SoC vendor decided to use PL330, because S3C has come too
-> long a way to change its drivers to driver/dma/ API and modify DMA
-> drivers for every SoC.
-
-What's wrong with merging them later then? Refactoring FTW.
-
-> I have the pl330-core part almost ready, but i need time to implement
-> some _testable_
-> implementation of the scheme. If maintainers want to see structure of
-> my code, I can
-> share it too, but I think I pretty much made it clear.
-
-Why not just post it on the list? I'm curious! Since I'm working on a PrimeCell
-DMA API I would love to look at PrimeCell DMA engine drivers.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
