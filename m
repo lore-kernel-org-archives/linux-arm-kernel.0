@@ -1,43 +1,56 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Fri, 26 Mar 2010 07:36:08 +0900
-Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
-In-Reply-To: <63386a3d1003250820x3cf81000i9d27e95c755b9ca8@mail.gmail.com>
-References: <4BAAD5BB.7050101@samsung.com>
-	<1b68c6791003242234h106d9530p12b5a046a906227e@mail.gmail.com>
-	<63386a3d1003250130w6f34854ag2ca163799e9b7bed@mail.gmail.com>
-	<1b68c6791003250517y4e2789baoe147e5982c363682@mail.gmail.com>
-	<63386a3d1003250820x3cf81000i9d27e95c755b9ca8@mail.gmail.com>
-Message-ID: <1b68c6791003251536q7ce451b1yc874f6e0347ab595@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Mar 2010 22:42:25 +0000
+Subject: [GIT PULL] generic arm for MSM
+In-Reply-To: <1269556378.21793.47.camel@c-dwalke-linux.qualcomm.com>
+References: <1269553937.21793.40.camel@c-dwalke-linux.qualcomm.com>
+	<20100325222959.GI24984@n2100.arm.linux.org.uk>
+	<1269556378.21793.47.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100325224225.GJ24984@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 12:20 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/3/25 jassi brar <jassisinghbrar@gmail.com>:
->> And if this patch is accepted, there
->> _will_ exist two copies of the PL330 driver -- one in drivers/dma/pl330_dmac.c
->> and another in arch/arm/plat-samsung/. Only the former will be lying unused
->> until some other SoC vendor decided to use PL330, because S3C has come too
->> long a way to change its drivers to driver/dma/ API and modify DMA
->> drivers for every SoC.
->
-> What's wrong with merging them later then? Refactoring FTW.
-The amount of code that will be modified or taken out of drivers/dma/pl330_dmac
-will so much that I will be left only with constrained data structures in
-the file to do tricks to make it work with the PL330 engine driver.
-I am not very keen on authoring the driver/dma/ driver but neither am I
-interested in having to cleanup someone else' code.
+On Thu, Mar 25, 2010 at 03:32:58PM -0700, Daniel Walker wrote:
+> On Thu, 2010-03-25 at 22:29 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Mar 25, 2010 at 02:52:17PM -0700, Daniel Walker wrote:
+> > > These are all mostly small patches that I've sent out a few times with
+> > > no comments. Let me know if you see any issues.
+> > > 
+> > > The following changes since commit 7ee744f22ffad619e23912a22d1b2795e10ed825:
+> > >   Stephen Rothwell (1):
+> > >         Add linux-next specific files for 20100324
+> > 
+> > This doesn't seem to be in Linus' tree - ah, no, it's based on linux-next.
+> > So, if I pull this, I get everyone's work into my tree.  To see what
+> > you're actually sending me, do this:
+> > 
+> > 	git diff --stat 9353685..
+> > 
+> > and it'll show you what you're sending me which isn't in my 'devel' branch
+> > already - and if you replace that git id with the latest Linus' commit in
+> > your tree...
+> > 
+> > So no thanks.  Will not pull the entire linux-next tree into mine.
+> 
+> Oh please why not! (just joking) ..
+> 
+> > Please build your tree on a more stable base, such as Linus' tree.
+> 
+> I thought you wanted stuff on your development tree? Where can I get
+> that other than in next? It's easy enough to put it on a linus tree if
+> that's acceptable.
 
->> I have the pl330-core part almost ready, but i need time to implement
->> some _testable_
->> implementation of the scheme. If maintainers want to see structure of
->> my code, I can
->> share it too, but I think I pretty much made it clear.
->
-> Why not just post it on the list? I'm curious! Since I'm working on a PrimeCell
-> DMA API I would love to look at PrimeCell DMA engine drivers.
-I'll post in a day or two when the PL330 core driver takes come shape
-closer to what it is supposed to look.
-That will help me getting suggestions for improvement, i hope.
+I've stated in the past that my 'devel' branch is a convenience thing;
+it saves me having to regularly - nightly - email SFR to say "you need
+branches A,B,C,D,E,F,G,H,I,J and K".
 
-regards.
+As such, it's regularly regenerated from a series of topic branches,
+and so at least the top commit is not stable.
+
+What I will object to are trees based on linux-next or my devel branch.
+If you have a dependence on something in my tree, please talk to me and
+I can shift it over to the 'devel-stable' branch (which as the name says,
+means that it *is* stable and thus can be used as a basis for trees.)
+
+I'm presently basing my topic branches off of Linus' commit 3971047.
+You can use that, or one of the -rc releases, or Linus' current tip.
+I don't mind which.
