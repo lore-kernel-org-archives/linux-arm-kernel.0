@@ -1,8 +1,7 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Thu, 25 Mar 2010 12:57:06 +0530
-Subject: [PATCH V2 10/12] ST SPEAr: Added default configuration files for
-	SPEAr machines
-In-Reply-To: <1269502028-12867-10-git-send-email-viresh.kumar@st.com>
+Date: Thu, 25 Mar 2010 12:57:08 +0530
+Subject: [PATCH V2 12/12] ST SPEAr: Adding gpio pad multiplexing support
+In-Reply-To: <1269502028-12867-12-git-send-email-viresh.kumar@st.com>
 References: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
 	<1269502028-12867-2-git-send-email-viresh.kumar@st.com>
 	<1269502028-12867-3-git-send-email-viresh.kumar@st.com>
@@ -13,3128 +12,2000 @@ References: <1269502028-12867-1-git-send-email-viresh.kumar@st.com>
 	<1269502028-12867-8-git-send-email-viresh.kumar@st.com>
 	<1269502028-12867-9-git-send-email-viresh.kumar@st.com>
 	<1269502028-12867-10-git-send-email-viresh.kumar@st.com>
-Message-ID: <1269502028-12867-11-git-send-email-viresh.kumar@st.com>
+	<1269502028-12867-11-git-send-email-viresh.kumar@st.com>
+	<1269502028-12867-12-git-send-email-viresh.kumar@st.com>
+Message-ID: <1269502028-12867-13-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+GPIO Pads in spear platform are are multiplexed in various machines.
+This patch adds support for this pad multiplexing.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear300_defconfig |  773 ++++++++++++++++++++++++++++++++++
- arch/arm/configs/spear310_defconfig |  775 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/spear320_defconfig |  775 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/spear600_defconfig |  760 ++++++++++++++++++++++++++++++++++
- 4 files changed, 3083 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/spear300_defconfig
- create mode 100644 arch/arm/configs/spear310_defconfig
- create mode 100644 arch/arm/configs/spear320_defconfig
- create mode 100644 arch/arm/configs/spear600_defconfig
+ arch/arm/mach-spear3xx/include/mach/generic.h |  161 +++++++++-
+ arch/arm/mach-spear3xx/spear300.c             |  358 ++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear300_evb.c         |   22 ++
+ arch/arm/mach-spear3xx/spear310.c             |  129 +++++++
+ arch/arm/mach-spear3xx/spear310_evb.c         |   30 ++
+ arch/arm/mach-spear3xx/spear320.c             |  374 +++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear320_evb.c         |   27 ++
+ arch/arm/mach-spear3xx/spear3xx.c             |  447 +++++++++++++++++++++++++
+ arch/arm/plat-spear/Makefile                  |    2 +-
+ arch/arm/plat-spear/include/plat/padmux.h     |   92 +++++
+ arch/arm/plat-spear/padmux.c                  |  164 +++++++++
+ 11 files changed, 1798 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/plat-spear/include/plat/padmux.h
+ create mode 100644 arch/arm/plat-spear/padmux.c
 
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear300_defconfig
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index aeea845..af7e02c 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -19,7 +19,9 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
++#include <plat/padmux.h>
+ 
++/* spear3xx declarations */
+ /*
+  * Each GPT has 2 timer channels
+  * Following GPT channels will be used as clock source and clockevent
+@@ -34,25 +36,170 @@ extern struct amba_device uart_device;
+ extern struct sys_timer spear_sys_timer;
+ 
+ /* Add spear3xx family function declarations here */
++void __init clk_init(void);
+ void __init spear3xx_map_io(void);
+ void __init spear3xx_init_irq(void);
+ void __init spear3xx_init(void);
+-void __init spear300_init(void);
+-void __init spear310_init(void);
+-void __init spear320_init(void);
+-void __init clk_init(void);
++void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
+ 
+-/* Add spear300 machine device structure declarations here */
++/* pad mux declarations */
++#define PMX_FIRDA_MASK		(1 << 14)
++#define PMX_I2C_MASK		(1 << 13)
++#define PMX_SSP_CS_MASK		(1 << 12)
++#define PMX_SSP_MASK		(1 << 11)
++#define PMX_MII_MASK		(1 << 10)
++#define PMX_GPIO_PIN0_MASK	(1 << 9)
++#define PMX_GPIO_PIN1_MASK	(1 << 8)
++#define PMX_GPIO_PIN2_MASK	(1 << 7)
++#define PMX_GPIO_PIN3_MASK	(1 << 6)
++#define PMX_GPIO_PIN4_MASK	(1 << 5)
++#define PMX_GPIO_PIN5_MASK	(1 << 4)
++#define PMX_UART0_MODEM_MASK	(1 << 3)
++#define PMX_UART0_MASK		(1 << 2)
++#define PMX_TIMER_3_4_MASK	(1 << 1)
++#define PMX_TIMER_1_2_MASK	(1 << 0)
++
++/* pad mux devices */
++extern struct pmx_dev pmx_firda;
++extern struct pmx_dev pmx_i2c;
++extern struct pmx_dev pmx_ssp_cs;
++extern struct pmx_dev pmx_ssp;
++extern struct pmx_dev pmx_mii;
++extern struct pmx_dev pmx_gpio_pin0;
++extern struct pmx_dev pmx_gpio_pin1;
++extern struct pmx_dev pmx_gpio_pin2;
++extern struct pmx_dev pmx_gpio_pin3;
++extern struct pmx_dev pmx_gpio_pin4;
++extern struct pmx_dev pmx_gpio_pin5;
++extern struct pmx_dev pmx_uart0_modem;
++extern struct pmx_dev pmx_uart0;
++extern struct pmx_dev pmx_timer_3_4;
++extern struct pmx_dev pmx_timer_1_2;
++
++#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
++/* padmux plgpio devices */
++extern struct pmx_dev pmx_plgpio_0_1;
++extern struct pmx_dev pmx_plgpio_2_3;
++extern struct pmx_dev pmx_plgpio_4_5;
++extern struct pmx_dev pmx_plgpio_6_9;
++extern struct pmx_dev pmx_plgpio_10_27;
++extern struct pmx_dev pmx_plgpio_28;
++extern struct pmx_dev pmx_plgpio_29;
++extern struct pmx_dev pmx_plgpio_30;
++extern struct pmx_dev pmx_plgpio_31;
++extern struct pmx_dev pmx_plgpio_32;
++extern struct pmx_dev pmx_plgpio_33;
++extern struct pmx_dev pmx_plgpio_34_36;
++extern struct pmx_dev pmx_plgpio_37_42;
++extern struct pmx_dev pmx_plgpio_43_44_47_48;
++extern struct pmx_dev pmx_plgpio_45_46_49_50;
++#endif
++
++extern struct pmx_driver pmx_driver;
++
++/* spear300 declarations */
+ #ifdef CONFIG_MACH_SPEAR300
++/* Add spear300 machine device structure declarations here */
+ extern struct amba_device gpio1_device;
++
++/* pad mux modes */
++extern struct pmx_mode nand_mode;
++extern struct pmx_mode nor_mode;
++extern struct pmx_mode photo_frame_mode;
++extern struct pmx_mode lend_ip_phone_mode;
++extern struct pmx_mode hend_ip_phone_mode;
++extern struct pmx_mode lend_wifi_phone_mode;
++extern struct pmx_mode hend_wifi_phone_mode;
++extern struct pmx_mode ata_pabx_wi2s_mode;
++extern struct pmx_mode ata_pabx_i2s_mode;
++extern struct pmx_mode caml_lcdw_mode;
++extern struct pmx_mode camu_lcd_mode;
++extern struct pmx_mode camu_wlcd_mode;
++extern struct pmx_mode caml_lcd_mode;
++
++/* pad mux devices */
++extern struct pmx_dev pmx_fsmc_2_chips;
++extern struct pmx_dev pmx_fsmc_4_chips;
++extern struct pmx_dev pmx_keyboard;
++extern struct pmx_dev pmx_clcd;
++extern struct pmx_dev pmx_telecom_gpio;
++extern struct pmx_dev pmx_telecom_tdm;
++extern struct pmx_dev pmx_telecom_spi_cs_i2c_clk;
++extern struct pmx_dev pmx_telecom_camera;
++extern struct pmx_dev pmx_telecom_dac;
++extern struct pmx_dev pmx_telecom_i2s;
++extern struct pmx_dev pmx_telecom_boot_pins;
++extern struct pmx_dev pmx_telecom_sdio_4bit;
++extern struct pmx_dev pmx_telecom_sdio_8bit;
++extern struct pmx_dev pmx_gpio1;
++
++void spear300_pmx_init(void);
++
++/* Add spear300 machine function declarations here */
++void __init spear300_init(void);
++
+ #endif /* CONFIG_MACH_SPEAR300 */
+ 
+-/* Add spear310 machine device structure declarations here */
++/* spear310 declarations */
+ #ifdef CONFIG_MACH_SPEAR310
++/* Add spear310 machine device structure declarations here */
++
++/* pad mux devices */
++extern struct pmx_dev pmx_emi_cs_0_1_4_5;
++extern struct pmx_dev pmx_emi_cs_2_3;
++extern struct pmx_dev pmx_uart1;
++extern struct pmx_dev pmx_uart2;
++extern struct pmx_dev pmx_uart3_4_5;
++extern struct pmx_dev pmx_fsmc;
++extern struct pmx_dev pmx_rs485_0_1;
++extern struct pmx_dev pmx_tdm0;
++
++void spear310_pmx_init(void);
++
++/* Add spear310 machine function declarations here */
++void __init spear310_init(void);
++
+ #endif /* CONFIG_MACH_SPEAR310 */
+ 
+-/* Add spear320 machine device structure declarations here */
++/* spear320 declarations */
+ #ifdef CONFIG_MACH_SPEAR320
++/* Add spear320 machine device structure declarations here */
++
++/* pad mux modes */
++extern struct pmx_mode auto_net_smii_mode;
++extern struct pmx_mode auto_net_mii_mode;
++extern struct pmx_mode auto_exp_mode;
++extern struct pmx_mode small_printers_mode;
++
++/* pad mux devices */
++extern struct pmx_dev pmx_clcd;
++extern struct pmx_dev pmx_emi;
++extern struct pmx_dev pmx_fsmc;
++extern struct pmx_dev pmx_spp;
++extern struct pmx_dev pmx_sdio;
++extern struct pmx_dev pmx_i2s;
++extern struct pmx_dev pmx_uart1;
++extern struct pmx_dev pmx_uart1_modem;
++extern struct pmx_dev pmx_uart2;
++extern struct pmx_dev pmx_touchscreen;
++extern struct pmx_dev pmx_can;
++extern struct pmx_dev pmx_sdio_led;
++extern struct pmx_dev pmx_pwm0;
++extern struct pmx_dev pmx_pwm1;
++extern struct pmx_dev pmx_pwm2;
++extern struct pmx_dev pmx_pwm3;
++extern struct pmx_dev pmx_ssp1;
++extern struct pmx_dev pmx_ssp2;
++extern struct pmx_dev pmx_mii1;
++extern struct pmx_dev pmx_smii0;
++extern struct pmx_dev pmx_smii1;
++extern struct pmx_dev pmx_i2c1;
++
++void spear320_pmx_init(void);
++
++/* Add spear320 machine function declarations here */
++void __init spear320_init(void);
++
+ #endif /* CONFIG_MACH_SPEAR320 */
+ 
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 63aca8f..66e7fcd 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -18,6 +18,357 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* pad multiplexing support */
++/* muxing registers */
++#define PAD_MUX_CONFIG_REG	0x00
++#define MODE_CONFIG_REG		0x04
++
++/* modes */
++#define NAND_MODE			(1 << 0)
++#define NOR_MODE			(1 << 1)
++#define PHOTO_FRAME_MODE		(1 << 2)
++#define LEND_IP_PHONE_MODE		(1 << 3)
++#define HEND_IP_PHONE_MODE		(1 << 4)
++#define LEND_WIFI_PHONE_MODE		(1 << 5)
++#define HEND_WIFI_PHONE_MODE		(1 << 6)
++#define ATA_PABX_WI2S_MODE		(1 << 7)
++#define ATA_PABX_I2S_MODE		(1 << 8)
++#define CAML_LCDW_MODE			(1 << 9)
++#define CAMU_LCD_MODE			(1 << 10)
++#define CAMU_WLCD_MODE			(1 << 11)
++#define CAML_LCD_MODE			(1 << 12)
++#define ALL_MODES			0x1FFF
++
++struct pmx_mode nand_mode = {
++	.id = NAND_MODE,
++	.name = "nand mode",
++	.mask = 0x00,
++};
++
++struct pmx_mode nor_mode = {
++	.id = NOR_MODE,
++	.name = "nor mode",
++	.mask = 0x01,
++};
++
++struct pmx_mode photo_frame_mode = {
++	.id = PHOTO_FRAME_MODE,
++	.name = "photo frame mode",
++	.mask = 0x02,
++};
++
++struct pmx_mode lend_ip_phone_mode = {
++	.id = LEND_IP_PHONE_MODE,
++	.name = "lend ip phone mode",
++	.mask = 0x03,
++};
++
++struct pmx_mode hend_ip_phone_mode = {
++	.id = HEND_IP_PHONE_MODE,
++	.name = "hend ip phone mode",
++	.mask = 0x04,
++};
++
++struct pmx_mode lend_wifi_phone_mode = {
++	.id = LEND_WIFI_PHONE_MODE,
++	.name = "lend wifi phone mode",
++	.mask = 0x05,
++};
++
++struct pmx_mode hend_wifi_phone_mode = {
++	.id = HEND_WIFI_PHONE_MODE,
++	.name = "hend wifi phone mode",
++	.mask = 0x06,
++};
++
++struct pmx_mode ata_pabx_wi2s_mode = {
++	.id = ATA_PABX_WI2S_MODE,
++	.name = "ata pabx wi2s mode",
++	.mask = 0x07,
++};
++
++struct pmx_mode ata_pabx_i2s_mode = {
++	.id = ATA_PABX_I2S_MODE,
++	.name = "ata pabx i2s mode",
++	.mask = 0x08,
++};
++
++struct pmx_mode caml_lcdw_mode = {
++	.id = CAML_LCDW_MODE,
++	.name = "caml lcdw mode",
++	.mask = 0x0C,
++};
++
++struct pmx_mode camu_lcd_mode = {
++	.id = CAMU_LCD_MODE,
++	.name = "camu lcd mode",
++	.mask = 0x0D,
++};
++
++struct pmx_mode camu_wlcd_mode = {
++	.id = CAMU_WLCD_MODE,
++	.name = "camu wlcd mode",
++	.mask = 0x0E,
++};
++
++struct pmx_mode caml_lcd_mode = {
++	.id = CAML_LCD_MODE,
++	.name = "caml lcd mode",
++	.mask = 0x0F,
++};
++
++/* devices */
++struct pmx_dev_mode pmx_fsmc_2_chips_modes[] = {
++	{
++		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
++			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
++		.mask = PMX_FIRDA_MASK,
++	},
++};
++
++struct pmx_dev pmx_fsmc_2_chips = {
++	.name = "fsmc_2_chips",
++	.modes = pmx_fsmc_2_chips_modes,
++	.mode_count = ARRAY_SIZE(pmx_fsmc_2_chips_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_fsmc_4_chips_modes[] = {
++	{
++		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
++			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
++		.mask = PMX_FIRDA_MASK | PMX_UART0_MASK,
++	},
++};
++
++struct pmx_dev pmx_fsmc_4_chips = {
++	.name = "fsmc_4_chips",
++	.modes = pmx_fsmc_4_chips_modes,
++	.mode_count = ARRAY_SIZE(pmx_fsmc_4_chips_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_keyboard_modes[] = {
++	{
++		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
++			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
++			CAML_LCDW_MODE | CAMU_LCD_MODE | CAMU_WLCD_MODE |
++			CAML_LCD_MODE,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_keyboard = {
++	.name = "keyboard",
++	.modes = pmx_keyboard_modes,
++	.mode_count = ARRAY_SIZE(pmx_keyboard_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_clcd_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK ,
++	}, {
++		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE |
++			CAMU_LCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_clcd = {
++	.name = "clcd",
++	.modes = pmx_clcd_modes,
++	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_gpio_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE | CAMU_LCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_MII_MASK,
++	}, {
++		.ids = LEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE,
++		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
++	}, {
++		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_WLCD_MODE,
++		.mask = PMX_MII_MASK | PMX_TIMER_3_4_MASK,
++	}, {
++		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE,
++		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK,
++	}, {
++		.ids = ATA_PABX_WI2S_MODE,
++		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK
++			| PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_gpio = {
++	.name = "telecom_gpio",
++	.modes = pmx_telecom_gpio_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_gpio_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_tdm_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
++			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE
++			| HEND_WIFI_PHONE_MODE | ATA_PABX_WI2S_MODE
++			| ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
++			| CAMU_WLCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_UART0_MODEM_MASK | PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_tdm = {
++	.name = "telecom_tdm",
++	.modes = pmx_telecom_tdm_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_tdm_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_spi_cs_i2c_clk_modes[] = {
++	{
++		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
++			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE
++			| ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE |
++			CAML_LCDW_MODE | CAML_LCD_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_spi_cs_i2c_clk = {
++	.name = "telecom_spi_cs_i2c_clk",
++	.modes = pmx_telecom_spi_cs_i2c_clk_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_spi_cs_i2c_clk_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_camera_modes[] = {
++	{
++		.ids = CAML_LCDW_MODE | CAML_LCD_MODE,
++		.mask = PMX_MII_MASK,
++	}, {
++		.ids = CAMU_LCD_MODE | CAMU_WLCD_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK | PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_camera = {
++	.name = "telecom_camera",
++	.modes = pmx_telecom_camera_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_camera_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_dac_modes[] = {
++	{
++		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
++			| CAMU_WLCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_TIMER_1_2_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_dac = {
++	.name = "telecom_dac",
++	.modes = pmx_telecom_dac_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_dac_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_i2s_modes[] = {
++	{
++		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE
++			| LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
++			ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
++			| CAMU_WLCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_i2s = {
++	.name = "telecom_i2s",
++	.modes = pmx_telecom_i2s_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_i2s_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_boot_pins_modes[] = {
++	{
++		.ids = NAND_MODE | NOR_MODE,
++		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
++			PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_boot_pins = {
++	.name = "telecom_boot_pins",
++	.modes = pmx_telecom_boot_pins_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_boot_pins_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_sdio_4bit_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
++			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
++			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
++			CAMU_WLCD_MODE | CAML_LCD_MODE | ATA_PABX_WI2S_MODE |
++			ATA_PABX_I2S_MODE,
++		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
++			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
++			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_sdio_4bit = {
++	.name = "telecom_sdio_4bit",
++	.modes = pmx_telecom_sdio_4bit_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_sdio_4bit_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_telecom_sdio_8bit_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
++			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
++			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
++			CAMU_WLCD_MODE | CAML_LCD_MODE,
++		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
++			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
++			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK | PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_telecom_sdio_8bit = {
++	.name = "telecom_sdio_8bit",
++	.modes = pmx_telecom_sdio_8bit_modes,
++	.mode_count = ARRAY_SIZE(pmx_telecom_sdio_8bit_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_gpio1_modes[] = {
++	{
++		.ids = PHOTO_FRAME_MODE,
++		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
++			PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio1 = {
++	.name = "arm gpio1",
++	.modes = pmx_gpio1_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio1_modes),
++	.enb_on_reset = 1,
++};
++
++/* pmx driver structure */
++struct pmx_driver pmx_driver = {
++	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x0000000f},
++	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
++};
++
+ /* Add spear300 specific devices here */
+ /* arm gpio1 device registeration */
+ static struct pl061_platform_data gpio1_plat_data = {
+@@ -38,8 +389,15 @@ struct amba_device gpio1_device = {
+ 	.irq = {IRQ_GEN_RAS_1, NO_IRQ},
+ };
+ 
++/* spear300 routines */
+ void __init spear300_init(void)
+ {
+ 	/* call spear3xx family common init function */
+ 	spear3xx_init();
+ }
++
++void spear300_pmx_init(void)
++{
++	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
++			SPEAR300_SOC_CONFIG_SIZE);
++}
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 1272a38..bb21db1 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -16,6 +16,22 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* padmux devices to enable */
++static struct pmx_dev *pmx_devs[] = {
++	/* spear3xx specific devices */
++	&pmx_i2c,
++	&pmx_ssp_cs,
++	&pmx_ssp,
++	&pmx_mii,
++	&pmx_uart0,
++
++	/* spear300 specific devices */
++	&pmx_fsmc_2_chips,
++	&pmx_clcd,
++	&pmx_telecom_sdio_4bit,
++	&pmx_gpio1,
++};
++
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+ 	&gpio_device,
+@@ -38,6 +54,12 @@ static void __init spear300_evb_init(void)
+ 	/* call spear300 machine init function */
+ 	spear300_init();
+ 
++	/* padmux initialization */
++	pmx_driver.mode = &photo_frame_mode;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
++	spear300_pmx_init();
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 6eb62f9..dd5a572 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -16,10 +16,139 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* pad multiplexing support */
++/* muxing registers */
++#define PAD_MUX_CONFIG_REG	0x08
++
++/* devices */
++struct pmx_dev_mode pmx_emi_cs_0_1_4_5_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_emi_cs_0_1_4_5 = {
++	.name = "emi_cs_0_1_4_5",
++	.modes = pmx_emi_cs_0_1_4_5_modes,
++	.mode_count = ARRAY_SIZE(pmx_emi_cs_0_1_4_5_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_emi_cs_2_3_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_TIMER_1_2_MASK,
++	},
++};
++
++struct pmx_dev pmx_emi_cs_2_3 = {
++	.name = "emi_cs_2_3",
++	.modes = pmx_emi_cs_2_3_modes,
++	.mode_count = ARRAY_SIZE(pmx_emi_cs_2_3_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart1_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_FIRDA_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart1 = {
++	.name = "uart1",
++	.modes = pmx_uart1_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart2_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_TIMER_1_2_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart2 = {
++	.name = "uart2",
++	.modes = pmx_uart2_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart3_4_5_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart3_4_5 = {
++	.name = "uart3_4_5",
++	.modes = pmx_uart3_4_5_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart3_4_5_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_fsmc_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_fsmc = {
++	.name = "fsmc",
++	.modes = pmx_fsmc_modes,
++	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_rs485_0_1_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_rs485_0_1 = {
++	.name = "rs485_0_1",
++	.modes = pmx_rs485_0_1_modes,
++	.mode_count = ARRAY_SIZE(pmx_rs485_0_1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_tdm0_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_tdm0 = {
++	.name = "tdm0",
++	.modes = pmx_tdm0_modes,
++	.mode_count = ARRAY_SIZE(pmx_tdm0_modes),
++	.enb_on_reset = 1,
++};
++
++/* pmx driver structure */
++struct pmx_driver pmx_driver = {
++	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
++};
++
+ /* Add spear310 specific devices here */
+ 
++/* spear310 routines */
+ void __init spear310_init(void)
+ {
+ 	/* call spear3xx family common init function */
+ 	spear3xx_init();
+ }
++
++void spear310_pmx_init(void)
++{
++	spear_pmx_init(&pmx_driver, SPEAR310_SOC_CONFIG_BASE,
++			SPEAR310_SOC_CONFIG_SIZE);
++}
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index e781b2b..7facf66 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -16,6 +16,30 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* padmux devices to enable */
++static struct pmx_dev *pmx_devs[] = {
++	/* spear3xx specific devices */
++	&pmx_i2c,
++	&pmx_ssp,
++	&pmx_gpio_pin0,
++	&pmx_gpio_pin1,
++	&pmx_gpio_pin2,
++	&pmx_gpio_pin3,
++	&pmx_gpio_pin4,
++	&pmx_gpio_pin5,
++	&pmx_uart0,
++
++	/* spear310 specific devices */
++	&pmx_emi_cs_0_1_4_5,
++	&pmx_emi_cs_2_3,
++	&pmx_uart1,
++	&pmx_uart2,
++	&pmx_uart3_4_5,
++	&pmx_fsmc,
++	&pmx_rs485_0_1,
++	&pmx_tdm0,
++};
++
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+ 	&gpio_device,
+@@ -37,6 +61,12 @@ static void __init spear310_evb_init(void)
+ 	/* call spear310 machine init function */
+ 	spear310_init();
+ 
++	/* padmux initialization */
++	pmx_driver.mode = NULL;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
++	spear310_pmx_init();
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 72d4548..2cedf5e 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -16,10 +16,384 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* pad multiplexing support */
++/* muxing registers */
++#define PAD_MUX_CONFIG_REG	0x0C
++#define MODE_CONFIG_REG		0x10
++
++/* modes */
++#define AUTO_NET_SMII_MODE	(1 << 0)
++#define AUTO_NET_MII_MODE	(1 << 1)
++#define AUTO_EXP_MODE		(1 << 2)
++#define SMALL_PRINTERS_MODE	(1 << 3)
++#define ALL_MODES		0xF
++
++struct pmx_mode auto_net_smii_mode = {
++	.id = AUTO_NET_SMII_MODE,
++	.name = "Automation Networking SMII Mode",
++	.mask = 0x00,
++};
++
++struct pmx_mode auto_net_mii_mode = {
++	.id = AUTO_NET_MII_MODE,
++	.name = "Automation Networking MII Mode",
++	.mask = 0x01,
++};
++
++struct pmx_mode auto_exp_mode = {
++	.id = AUTO_EXP_MODE,
++	.name = "Automation Expanded Mode",
++	.mask = 0x02,
++};
++
++struct pmx_mode small_printers_mode = {
++	.id = SMALL_PRINTERS_MODE,
++	.name = "Small Printers Mode",
++	.mask = 0x03,
++};
++
++/* devices */
++struct pmx_dev_mode pmx_clcd_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_clcd = {
++	.name = "clcd",
++	.modes = pmx_clcd_modes,
++	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_emi_modes[] = {
++	{
++		.ids = AUTO_EXP_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_emi = {
++	.name = "emi",
++	.modes = pmx_emi_modes,
++	.mode_count = ARRAY_SIZE(pmx_emi_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_fsmc_modes[] = {
++	{
++		.ids = ALL_MODES,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_fsmc = {
++	.name = "fsmc",
++	.modes = pmx_fsmc_modes,
++	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_spp_modes[] = {
++	{
++		.ids = SMALL_PRINTERS_MODE,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_spp = {
++	.name = "spp",
++	.modes = pmx_spp_modes,
++	.mode_count = ARRAY_SIZE(pmx_spp_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_sdio_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE |
++			SMALL_PRINTERS_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_sdio = {
++	.name = "sdio",
++	.modes = pmx_sdio_modes,
++	.mode_count = ARRAY_SIZE(pmx_sdio_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_i2s_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
++		.mask = PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_i2s = {
++	.name = "i2s",
++	.modes = pmx_i2s_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2s_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart1_modes[] = {
++	{
++		.ids = ALL_MODES,
++		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart1 = {
++	.name = "uart1",
++	.modes = pmx_uart1_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart1_modem_modes[] = {
++	{
++		.ids = AUTO_EXP_MODE,
++		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK |
++			PMX_SSP_CS_MASK,
++	}, {
++		.ids = SMALL_PRINTERS_MODE,
++		.mask = PMX_GPIO_PIN3_MASK | PMX_GPIO_PIN4_MASK |
++			PMX_GPIO_PIN5_MASK | PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart1_modem = {
++	.name = "uart1_modem",
++	.modes = pmx_uart1_modem_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart1_modem_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_uart2_modes[] = {
++	{
++		.ids = ALL_MODES,
++		.mask = PMX_FIRDA_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart2 = {
++	.name = "uart2",
++	.modes = pmx_uart2_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_touchscreen_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE,
++		.mask = PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_touchscreen = {
++	.name = "touchscreen",
++	.modes = pmx_touchscreen_modes,
++	.mode_count = ARRAY_SIZE(pmx_touchscreen_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_can_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE | AUTO_EXP_MODE,
++		.mask = PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
++			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
++	},
++};
++
++struct pmx_dev pmx_can = {
++	.name = "can",
++	.modes = pmx_can_modes,
++	.mode_count = ARRAY_SIZE(pmx_can_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_sdio_led_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
++		.mask = PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_sdio_led = {
++	.name = "sdio_led",
++	.modes = pmx_sdio_led_modes,
++	.mode_count = ARRAY_SIZE(pmx_sdio_led_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_pwm0_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
++		.mask = PMX_UART0_MODEM_MASK,
++	}, {
++		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_pwm0 = {
++	.name = "pwm0",
++	.modes = pmx_pwm0_modes,
++	.mode_count = ARRAY_SIZE(pmx_pwm0_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_pwm1_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
++		.mask = PMX_UART0_MODEM_MASK,
++	}, {
++		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_pwm1 = {
++	.name = "pwm1",
++	.modes = pmx_pwm1_modes,
++	.mode_count = ARRAY_SIZE(pmx_pwm1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_pwm2_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
++		.mask = PMX_SSP_CS_MASK,
++	}, {
++		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_pwm2 = {
++	.name = "pwm2",
++	.modes = pmx_pwm2_modes,
++	.mode_count = ARRAY_SIZE(pmx_pwm2_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_pwm3_modes[] = {
++	{
++		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_pwm3 = {
++	.name = "pwm3",
++	.modes = pmx_pwm3_modes,
++	.mode_count = ARRAY_SIZE(pmx_pwm3_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_ssp1_modes[] = {
++	{
++		.ids = SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_ssp1 = {
++	.name = "ssp1",
++	.modes = pmx_ssp1_modes,
++	.mode_count = ARRAY_SIZE(pmx_ssp1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_ssp2_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_ssp2 = {
++	.name = "ssp2",
++	.modes = pmx_ssp2_modes,
++	.mode_count = ARRAY_SIZE(pmx_ssp2_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_mii1_modes[] = {
++	{
++		.ids = AUTO_NET_MII_MODE,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_mii1 = {
++	.name = "mii1",
++	.modes = pmx_mii1_modes,
++	.mode_count = ARRAY_SIZE(pmx_mii1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_smii0_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_smii0 = {
++	.name = "smii0",
++	.modes = pmx_smii0_modes,
++	.mode_count = ARRAY_SIZE(pmx_smii0_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_smii1_modes[] = {
++	{
++		.ids = AUTO_NET_SMII_MODE | SMALL_PRINTERS_MODE,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_smii1 = {
++	.name = "smii1",
++	.modes = pmx_smii1_modes,
++	.mode_count = ARRAY_SIZE(pmx_smii1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_i2c1_modes[] = {
++	{
++		.ids = AUTO_EXP_MODE,
++		.mask = 0x0,
++	},
++};
++
++struct pmx_dev pmx_i2c1 = {
++	.name = "i2c1",
++	.modes = pmx_i2c1_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2c1_modes),
++	.enb_on_reset = 1,
++};
++
++/* pmx driver structure */
++struct pmx_driver pmx_driver = {
++	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x00000007},
++	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
++};
++
+ /* Add spear320 specific devices here */
+ 
++/* spear320 routines */
+ void __init spear320_init(void)
+ {
+ 	/* call spear3xx family common init function */
+ 	spear3xx_init();
+ }
++
++void spear320_pmx_init(void)
++{
++	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
++			SPEAR320_SOC_CONFIG_SIZE);
++}
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 85bc4d2..62ac685 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -16,6 +16,27 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++/* padmux devices to enable */
++static struct pmx_dev *pmx_devs[] = {
++	/* spear3xx specific devices */
++	&pmx_i2c,
++	&pmx_ssp,
++	&pmx_mii,
++	&pmx_uart0,
++
++	/* spear320 specific devices */
++	&pmx_fsmc,
++	&pmx_sdio,
++	&pmx_i2s,
++	&pmx_uart1,
++	&pmx_uart2,
++	&pmx_can,
++	&pmx_pwm0,
++	&pmx_pwm1,
++	&pmx_pwm2,
++	&pmx_mii1,
++};
++
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+ 	&gpio_device,
+@@ -37,6 +58,12 @@ static void __init spear320_evb_init(void)
+ 	/* call spear320 machine init function */
+ 	spear320_init();
+ 
++	/* padmux initialization */
++	pmx_driver.mode = &auto_net_mii_mode;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
++	spear320_pmx_init();
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 82ebcd3..e87313a 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -99,3 +99,450 @@ void __init spear3xx_map_io(void)
+ 	/* This will initialize clock framework */
+ 	clk_init();
+ }
++
++/* pad multiplexing support */
++/* devices */
++struct pmx_dev_mode pmx_firda_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_FIRDA_MASK,
++	},
++};
++
++struct pmx_dev pmx_firda = {
++	.name = "firda",
++	.modes = pmx_firda_modes,
++	.mode_count = ARRAY_SIZE(pmx_firda_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_i2c_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_I2C_MASK,
++	},
++};
++
++struct pmx_dev pmx_i2c = {
++	.name = "i2c",
++	.modes = pmx_i2c_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2c_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_ssp_cs_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_ssp_cs = {
++	.name = "ssp_chip_selects",
++	.modes = pmx_ssp_cs_modes,
++	.mode_count = ARRAY_SIZE(pmx_ssp_cs_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_ssp_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_SSP_MASK,
++	},
++};
++
++struct pmx_dev pmx_ssp = {
++	.name = "ssp",
++	.modes = pmx_ssp_modes,
++	.mode_count = ARRAY_SIZE(pmx_ssp_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_mii_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_mii = {
++	.name = "mii",
++	.modes = pmx_mii_modes,
++	.mode_count = ARRAY_SIZE(pmx_mii_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin0_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN0_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin0 = {
++	.name = "gpio_pin0",
++	.modes = pmx_gpio_pin0_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin0_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin1_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN1_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin1 = {
++	.name = "gpio_pin1",
++	.modes = pmx_gpio_pin1_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin1_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin2_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN2_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin2 = {
++	.name = "gpio_pin2",
++	.modes = pmx_gpio_pin2_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin2_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin3_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN3_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin3 = {
++	.name = "gpio_pin3",
++	.modes = pmx_gpio_pin3_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin3_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin4_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN4_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin4 = {
++	.name = "gpio_pin4",
++	.modes = pmx_gpio_pin4_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin4_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_gpio_pin5_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_GPIO_PIN5_MASK,
++	},
++};
++
++struct pmx_dev pmx_gpio_pin5 = {
++	.name = "gpio_pin5",
++	.modes = pmx_gpio_pin5_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpio_pin5_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_uart0_modem_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart0_modem = {
++	.name = "uart0_modem",
++	.modes = pmx_uart0_modem_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart0_modem_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_uart0_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_UART0_MASK,
++	},
++};
++
++struct pmx_dev pmx_uart0 = {
++	.name = "uart0",
++	.modes = pmx_uart0_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart0_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_timer_3_4_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_timer_3_4 = {
++	.name = "timer_3_4",
++	.modes = pmx_timer_3_4_modes,
++	.mode_count = ARRAY_SIZE(pmx_timer_3_4_modes),
++	.enb_on_reset = 0,
++};
++
++struct pmx_dev_mode pmx_timer_1_2_modes[] = {
++	{
++		.ids = 0xffffffff,
++		.mask = PMX_TIMER_1_2_MASK,
++	},
++};
++
++struct pmx_dev pmx_timer_1_2 = {
++	.name = "timer_1_2",
++	.modes = pmx_timer_1_2_modes,
++	.mode_count = ARRAY_SIZE(pmx_timer_1_2_modes),
++	.enb_on_reset = 0,
++};
++
++#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
++/* plgpios devices */
++struct pmx_dev_mode pmx_plgpio_0_1_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_FIRDA_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_0_1 = {
++	.name = "plgpio 0 and 1",
++	.modes = pmx_plgpio_0_1_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_0_1_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_2_3_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_UART0_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_2_3 = {
++	.name = "plgpio 2 and 3",
++	.modes = pmx_plgpio_2_3_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_2_3_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_4_5_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_I2C_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_4_5 = {
++	.name = "plgpio 4 and 5",
++	.modes = pmx_plgpio_4_5_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_4_5_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_6_9_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_SSP_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_6_9 = {
++	.name = "plgpio 6 to 9",
++	.modes = pmx_plgpio_6_9_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_6_9_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_10_27_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_MII_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_10_27 = {
++	.name = "plgpio 10 to 27",
++	.modes = pmx_plgpio_10_27_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_10_27_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_28_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN0_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_28 = {
++	.name = "plgpio 28",
++	.modes = pmx_plgpio_28_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_28_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_29_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN1_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_29 = {
++	.name = "plgpio 29",
++	.modes = pmx_plgpio_29_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_29_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_30_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN2_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_30 = {
++	.name = "plgpio 30",
++	.modes = pmx_plgpio_30_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_30_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_31_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN3_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_31 = {
++	.name = "plgpio 31",
++	.modes = pmx_plgpio_31_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_31_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_32_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN4_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_32 = {
++	.name = "plgpio 32",
++	.modes = pmx_plgpio_32_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_32_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_33_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_GPIO_PIN5_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_33 = {
++	.name = "plgpio 33",
++	.modes = pmx_plgpio_33_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_33_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_34_36_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_SSP_CS_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_34_36 = {
++	.name = "plgpio 34 to 36",
++	.modes = pmx_plgpio_34_36_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_34_36_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_37_42_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_UART0_MODEM_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_37_42 = {
++	.name = "plgpio 37 to 42",
++	.modes = pmx_plgpio_37_42_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_37_42_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_43_44_47_48_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_TIMER_1_2_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_43_44_47_48 = {
++	.name = "plgpio 43, 44, 47 and 48",
++	.modes = pmx_plgpio_43_44_47_48_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_43_44_47_48_modes),
++	.enb_on_reset = 1,
++};
++
++struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
++	{
++		.ids = 0x00,
++		.mask = PMX_TIMER_3_4_MASK,
++	},
++};
++
++struct pmx_dev pmx_plgpio_45_46_49_50 = {
++	.name = "plgpio 45, 46, 49 and 50",
++	.modes = pmx_plgpio_45_46_49_50_modes,
++	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
++	.enb_on_reset = 1,
++};
++
++#endif
++
++/* spear padmux initialization function */
++void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size)
++{
++	int ret = 0;
++
++	/* pad mux initialization */
++	pmx_driver->base = ioremap(base, size);
++	if (!pmx_driver->base) {
++		ret = -ENOMEM;
++		goto pmx_fail;
++	}
++
++	ret = pmx_register(pmx_driver);
++	iounmap(pmx_driver->base);
++
++pmx_fail:
++	if (ret)
++		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
++				ret);
++}
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 96f9ac3..6f4ad5e 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -3,4 +3,4 @@
+ #
+ 
+ # Common support
+-obj-y	:= clock.o time.o
++obj-y	:= clock.o padmux.o time.o
+diff --git a/arch/arm/plat-spear/include/plat/padmux.h b/arch/arm/plat-spear/include/plat/padmux.h
 new file mode 100644
-index 0000000..35e64d1
+index 0000000..877f3ad
 --- /dev/null
-+++ b/arch/arm/configs/spear300_defconfig
-@@ -0,0 +1,773 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.32
-+# Tue Mar 23 14:36:23 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
++++ b/arch/arm/plat-spear/include/plat/padmux.h
+@@ -0,0 +1,92 @@
++/*
++ * arch/arm/plat-spear/include/plat/padmux.h
++ *
++ * SPEAr platform specific gpio pads muxing file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_SWAP=y
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+# CONFIG_BSD_PROCESS_ACCT_V3 is not set
++#ifndef __PLAT_PADMUX_H
++#define __PLAT_PADMUX_H
 +
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+# CONFIG_IKCONFIG is not set
-+CONFIG_LOG_BUF_SHIFT=17
-+# CONFIG_GROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+# CONFIG_SYSFS_DEPRECATED_V2 is not set
-+# CONFIG_RELAY is not set
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
++#include <linux/types.h>
 +
-+#
-+# Kernel Performance Events And Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_SLUB_DEBUG=y
-+CONFIG_COMPAT_BRK=y
-+# CONFIG_SLAB is not set
-+CONFIG_SLUB=y
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_HAVE_CLK=y
++/*
++ * struct pmx_reg: configuration structure for mode reg and mux reg
++ *
++ * offset: offset of mode reg
++ * mask: mask of mode reg
++ */
++struct pmx_reg {
++	u32 offset;
++	u32 mask;
++};
 +
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+CONFIG_MODVERSIONS=y
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+CONFIG_BLK_DEV_BSG=y
-+# CONFIG_BLK_DEV_INTEGRITY is not set
++/*
++ * struct pmx_dev_mode: configuration structure every group of modes of a device
++ *
++ * ids: all modes for this configuration
++ * mask: mask for supported mode
++ */
++struct pmx_dev_mode {
++	u32 ids;
++	u32 mask;
++};
 +
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_AS=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_AS is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_FREEZER is not set
++/*
++ * struct pmx_mode: mode definition structure
++ *
++ * name: mode name
++ * mask: mode mask
++ */
++struct pmx_mode {
++	char *name;
++	u32 id;
++	u32 mask;
++};
 +
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR3XX=y
-+# CONFIG_ARCH_SPEAR6XX is not set
-+CONFIG_MACH_SPEAR300=y
-+# CONFIG_MACH_SPEAR310 is not set
-+# CONFIG_MACH_SPEAR320 is not set
-+CONFIG_BOARD_SPEAR300_EVB=y
++/*
++ * struct pmx_dev: device definition structure
++ *
++ * name: device name
++ * modes: device configuration array for different modes supported
++ * mode_count: size of modes array
++ * is_active: is peripheral active/enabled
++ * enb_on_reset: if 1, mask bits to be cleared in reg otherwise to be set in reg
++ */
++struct pmx_dev {
++	char *name;
++	struct pmx_dev_mode *modes;
++	u8 mode_count;
++	bool is_active;
++	bool enb_on_reset;
++};
 +
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
++/*
++ * struct pmx_driver: driver definition structure
++ *
++ * mode: mode to be set
++ * devs: array of pointer to pmx devices
++ * devs_count: ARRAY_SIZE of devs
++ * base: base address of soc config registers
++ * mode_reg: structure of mode config register
++ * mux_reg: structure of device mux config register
++ */
++struct pmx_driver {
++	struct pmx_mode *mode;
++	struct pmx_dev **devs;
++	u8 devs_count;
++	u32 *base;
++	struct pmx_reg mode_reg;
++	struct pmx_reg mux_reg;
++};
 +
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
-+CONFIG_COMMON_CLKDEV=y
++/* pmx functions */
++int pmx_register(struct pmx_driver *driver);
 +
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+# CONFIG_AEABI is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4096
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE=""
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+CONFIG_BINFMT_MISC=y
-+
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+CONFIG_FIRMWARE_IN_KERNEL=y
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+# CONFIG_BLK_DEV_LOOP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_93CX6 is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+# CONFIG_SCSI is not set
-+# CONFIG_SCSI_DMA is not set
-+# CONFIG_SCSI_NETLINK is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_POLLDEV is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+# CONFIG_INPUT_TOUCHSCREEN is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+CONFIG_SERIO=y
-+CONFIG_SERIO_SERPORT=y
-+# CONFIG_SERIO_AMBAKMI is not set
-+# CONFIG_SERIO_RAW is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+# CONFIG_SERIAL_8250 is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+# CONFIG_SERIAL_AMBA_PL010 is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+CONFIG_GPIO_PL061=y
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+# CONFIG_EXT2_FS_POSIX_ACL is not set
-+CONFIG_EXT2_FS_SECURITY=y
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+# CONFIG_EXT3_FS_POSIX_ACL is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+# CONFIG_JBD_DEBUG is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+# CONFIG_INOTIFY is not set
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+CONFIG_AUTOFS4_FS=m
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_ACORN_PARTITION is not set
-+# CONFIG_OSF_PARTITION is not set
-+# CONFIG_AMIGA_PARTITION is not set
-+# CONFIG_ATARI_PARTITION is not set
-+# CONFIG_MAC_PARTITION is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_BSD_DISKLABEL is not set
-+# CONFIG_MINIX_SUBPARTITION is not set
-+# CONFIG_SOLARIS_X86_PARTITION is not set
-+# CONFIG_UNIXWARE_DISKLABEL is not set
-+# CONFIG_LDM_PARTITION is not set
-+# CONFIG_SGI_PARTITION is not set
-+# CONFIG_ULTRIX_PARTITION is not set
-+# CONFIG_SUN_PARTITION is not set
-+# CONFIG_KARMA_PARTITION is not set
-+# CONFIG_EFI_PARTITION is not set
-+# CONFIG_SYSV68_PARTITION is not set
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=m
-+# CONFIG_NLS_ISO8859_1 is not set
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_SLUB_DEBUG_ON is not set
-+# CONFIG_SLUB_STATS is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+CONFIG_DEBUG_SPINLOCK=y
-+# CONFIG_DEBUG_MUTEXES is not set
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+CONFIG_RCU_CPU_STALL_DETECTOR=y
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_IRQSOFF_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_DEBUG_ERRORS is not set
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_SECURITY_FILE_CAPABILITIES is not set
-+# CONFIG_CRYPTO is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+# CONFIG_CRC_CCITT is not set
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+# CONFIG_CRC32 is not set
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
++#endif /* __PLAT_PADMUX_H */
+diff --git a/arch/arm/plat-spear/padmux.c b/arch/arm/plat-spear/padmux.c
 new file mode 100644
-index 0000000..cbbfd29
+index 0000000..d2aab3a
 --- /dev/null
-+++ b/arch/arm/configs/spear310_defconfig
-@@ -0,0 +1,775 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.32
-+# Tue Mar 23 14:37:01 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
-+
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_SWAP=y
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+# CONFIG_BSD_PROCESS_ACCT_V3 is not set
-+
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+# CONFIG_IKCONFIG is not set
-+CONFIG_LOG_BUF_SHIFT=17
-+# CONFIG_GROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+# CONFIG_SYSFS_DEPRECATED_V2 is not set
-+# CONFIG_RELAY is not set
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+
-+#
-+# Kernel Performance Events And Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_SLUB_DEBUG=y
-+CONFIG_COMPAT_BRK=y
-+# CONFIG_SLAB is not set
-+CONFIG_SLUB=y
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_HAVE_CLK=y
-+
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+CONFIG_MODVERSIONS=y
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+CONFIG_BLK_DEV_BSG=y
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_AS=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_AS is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_FREEZER is not set
-+
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR3XX=y
-+# CONFIG_ARCH_SPEAR6XX is not set
-+# CONFIG_MACH_SPEAR300 is not set
-+CONFIG_MACH_SPEAR310=y
-+# CONFIG_MACH_SPEAR320 is not set
-+# CONFIG_BOARD_SPEAR300_EVB is not set
-+CONFIG_BOARD_SPEAR310_EVB=y
-+
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
-+
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
-+CONFIG_COMMON_CLKDEV=y
-+
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+# CONFIG_AEABI is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4096
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE=""
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+CONFIG_BINFMT_MISC=y
-+
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+CONFIG_FIRMWARE_IN_KERNEL=y
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+# CONFIG_BLK_DEV_LOOP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_MG_DISK is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_93CX6 is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+# CONFIG_SCSI is not set
-+# CONFIG_SCSI_DMA is not set
-+# CONFIG_SCSI_NETLINK is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_POLLDEV is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+# CONFIG_INPUT_TOUCHSCREEN is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+CONFIG_SERIO=y
-+CONFIG_SERIO_SERPORT=y
-+# CONFIG_SERIO_AMBAKMI is not set
-+# CONFIG_SERIO_RAW is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+# CONFIG_SERIAL_8250 is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+# CONFIG_SERIAL_AMBA_PL010 is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+CONFIG_GPIO_PL061=y
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+# CONFIG_EXT2_FS_POSIX_ACL is not set
-+CONFIG_EXT2_FS_SECURITY=y
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+# CONFIG_EXT3_FS_POSIX_ACL is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+# CONFIG_JBD_DEBUG is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+# CONFIG_INOTIFY is not set
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+CONFIG_AUTOFS4_FS=m
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_ACORN_PARTITION is not set
-+# CONFIG_OSF_PARTITION is not set
-+# CONFIG_AMIGA_PARTITION is not set
-+# CONFIG_ATARI_PARTITION is not set
-+# CONFIG_MAC_PARTITION is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_BSD_DISKLABEL is not set
-+# CONFIG_MINIX_SUBPARTITION is not set
-+# CONFIG_SOLARIS_X86_PARTITION is not set
-+# CONFIG_UNIXWARE_DISKLABEL is not set
-+# CONFIG_LDM_PARTITION is not set
-+# CONFIG_SGI_PARTITION is not set
-+# CONFIG_ULTRIX_PARTITION is not set
-+# CONFIG_SUN_PARTITION is not set
-+# CONFIG_KARMA_PARTITION is not set
-+# CONFIG_EFI_PARTITION is not set
-+# CONFIG_SYSV68_PARTITION is not set
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=m
-+# CONFIG_NLS_ISO8859_1 is not set
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_SLUB_DEBUG_ON is not set
-+# CONFIG_SLUB_STATS is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+CONFIG_DEBUG_SPINLOCK=y
-+# CONFIG_DEBUG_MUTEXES is not set
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+CONFIG_RCU_CPU_STALL_DETECTOR=y
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_IRQSOFF_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_DEBUG_ERRORS is not set
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_SECURITY_FILE_CAPABILITIES is not set
-+# CONFIG_CRYPTO is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+# CONFIG_CRC_CCITT is not set
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+# CONFIG_CRC32 is not set
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
-new file mode 100644
-index 0000000..2ae3c11
---- /dev/null
-+++ b/arch/arm/configs/spear320_defconfig
-@@ -0,0 +1,775 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.32
-+# Tue Mar 23 14:37:12 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
-+
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_SWAP=y
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+# CONFIG_BSD_PROCESS_ACCT_V3 is not set
-+
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+# CONFIG_IKCONFIG is not set
-+CONFIG_LOG_BUF_SHIFT=17
-+# CONFIG_GROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+# CONFIG_SYSFS_DEPRECATED_V2 is not set
-+# CONFIG_RELAY is not set
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+
-+#
-+# Kernel Performance Events And Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_SLUB_DEBUG=y
-+CONFIG_COMPAT_BRK=y
-+# CONFIG_SLAB is not set
-+CONFIG_SLUB=y
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_HAVE_CLK=y
-+
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+CONFIG_MODVERSIONS=y
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+CONFIG_BLK_DEV_BSG=y
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_AS=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_AS is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_FREEZER is not set
-+
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR3XX=y
-+# CONFIG_ARCH_SPEAR6XX is not set
-+# CONFIG_MACH_SPEAR300 is not set
-+# CONFIG_MACH_SPEAR310 is not set
-+CONFIG_MACH_SPEAR320=y
-+# CONFIG_BOARD_SPEAR300_EVB is not set
-+CONFIG_BOARD_SPEAR320_EVB=y
-+
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
-+
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
-+CONFIG_COMMON_CLKDEV=y
-+
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+# CONFIG_AEABI is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4096
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE=""
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+CONFIG_BINFMT_MISC=y
-+
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+CONFIG_FIRMWARE_IN_KERNEL=y
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+# CONFIG_BLK_DEV_LOOP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_MG_DISK is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_93CX6 is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+# CONFIG_SCSI is not set
-+# CONFIG_SCSI_DMA is not set
-+# CONFIG_SCSI_NETLINK is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_POLLDEV is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+# CONFIG_INPUT_TOUCHSCREEN is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+CONFIG_SERIO=y
-+CONFIG_SERIO_SERPORT=y
-+# CONFIG_SERIO_AMBAKMI is not set
-+# CONFIG_SERIO_RAW is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+# CONFIG_SERIAL_8250 is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+# CONFIG_SERIAL_AMBA_PL010 is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+CONFIG_GPIO_PL061=y
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+# CONFIG_EXT2_FS_POSIX_ACL is not set
-+CONFIG_EXT2_FS_SECURITY=y
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+# CONFIG_EXT3_FS_POSIX_ACL is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+# CONFIG_JBD_DEBUG is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+# CONFIG_INOTIFY is not set
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+CONFIG_AUTOFS4_FS=m
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_ACORN_PARTITION is not set
-+# CONFIG_OSF_PARTITION is not set
-+# CONFIG_AMIGA_PARTITION is not set
-+# CONFIG_ATARI_PARTITION is not set
-+# CONFIG_MAC_PARTITION is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_BSD_DISKLABEL is not set
-+# CONFIG_MINIX_SUBPARTITION is not set
-+# CONFIG_SOLARIS_X86_PARTITION is not set
-+# CONFIG_UNIXWARE_DISKLABEL is not set
-+# CONFIG_LDM_PARTITION is not set
-+# CONFIG_SGI_PARTITION is not set
-+# CONFIG_ULTRIX_PARTITION is not set
-+# CONFIG_SUN_PARTITION is not set
-+# CONFIG_KARMA_PARTITION is not set
-+# CONFIG_EFI_PARTITION is not set
-+# CONFIG_SYSV68_PARTITION is not set
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=m
-+# CONFIG_NLS_ISO8859_1 is not set
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_SLUB_DEBUG_ON is not set
-+# CONFIG_SLUB_STATS is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+CONFIG_DEBUG_SPINLOCK=y
-+# CONFIG_DEBUG_MUTEXES is not set
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+CONFIG_RCU_CPU_STALL_DETECTOR=y
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_IRQSOFF_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_DEBUG_ERRORS is not set
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_SECURITY_FILE_CAPABILITIES is not set
-+# CONFIG_CRYPTO is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+# CONFIG_CRC_CCITT is not set
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+# CONFIG_CRC32 is not set
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
-diff --git a/arch/arm/configs/spear600_defconfig b/arch/arm/configs/spear600_defconfig
-new file mode 100644
-index 0000000..c85a029
---- /dev/null
-+++ b/arch/arm/configs/spear600_defconfig
-@@ -0,0 +1,760 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.32
-+# Tue Mar 23 14:37:26 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
-+
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_SWAP=y
-+CONFIG_SYSVIPC=y
-+CONFIG_SYSVIPC_SYSCTL=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+# CONFIG_BSD_PROCESS_ACCT_V3 is not set
-+
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+# CONFIG_IKCONFIG is not set
-+CONFIG_LOG_BUF_SHIFT=17
-+# CONFIG_GROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+# CONFIG_SYSFS_DEPRECATED_V2 is not set
-+# CONFIG_RELAY is not set
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+
-+#
-+# Kernel Performance Events And Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_SLUB_DEBUG=y
-+CONFIG_COMPAT_BRK=y
-+# CONFIG_SLAB is not set
-+CONFIG_SLUB=y
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_HAVE_CLK=y
-+
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+CONFIG_MODVERSIONS=y
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+CONFIG_BLK_DEV_BSG=y
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_AS=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_AS is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_FREEZER is not set
-+
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+CONFIG_PLAT_SPEAR=y
-+# CONFIG_ARCH_SPEAR3XX is not set
-+CONFIG_ARCH_SPEAR6XX=y
-+# CONFIG_MACH_SPEAR300 is not set
-+# CONFIG_MACH_SPEAR310 is not set
-+# CONFIG_MACH_SPEAR320 is not set
-+# CONFIG_BOARD_SPEAR300_EVB is not set
-+CONFIG_MACH_SPEAR600=y
-+CONFIG_BOARD_SPEAR600_EVB=y
-+
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
-+
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
-+CONFIG_COMMON_CLKDEV=y
-+
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+# CONFIG_AEABI is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4096
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE=""
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+CONFIG_BINFMT_MISC=y
-+# CONFIG_ARTHUR is not set
-+
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+CONFIG_FIRMWARE_IN_KERNEL=y
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+# CONFIG_BLK_DEV_LOOP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_93CX6 is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+# CONFIG_SCSI is not set
-+# CONFIG_SCSI_DMA is not set
-+# CONFIG_SCSI_NETLINK is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_POLLDEV is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+# CONFIG_INPUT_EVDEV is not set
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+CONFIG_SERIO=y
-+CONFIG_SERIO_SERPORT=y
-+# CONFIG_SERIO_AMBAKMI is not set
-+# CONFIG_SERIO_RAW is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+# CONFIG_SERIAL_8250 is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+# CONFIG_SERIAL_AMBA_PL010 is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_R3964 is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+CONFIG_GPIO_PL061=y
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+# CONFIG_EXT2_FS_POSIX_ACL is not set
-+CONFIG_EXT2_FS_SECURITY=y
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+# CONFIG_EXT3_FS_POSIX_ACL is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+# CONFIG_JBD_DEBUG is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+# CONFIG_FS_POSIX_ACL is not set
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+# CONFIG_INOTIFY is not set
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+CONFIG_AUTOFS4_FS=m
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_ACORN_PARTITION is not set
-+# CONFIG_OSF_PARTITION is not set
-+# CONFIG_AMIGA_PARTITION is not set
-+# CONFIG_ATARI_PARTITION is not set
-+# CONFIG_MAC_PARTITION is not set
-+CONFIG_MSDOS_PARTITION=y
-+# CONFIG_BSD_DISKLABEL is not set
-+# CONFIG_MINIX_SUBPARTITION is not set
-+# CONFIG_SOLARIS_X86_PARTITION is not set
-+# CONFIG_UNIXWARE_DISKLABEL is not set
-+# CONFIG_LDM_PARTITION is not set
-+# CONFIG_SGI_PARTITION is not set
-+# CONFIG_ULTRIX_PARTITION is not set
-+# CONFIG_SUN_PARTITION is not set
-+# CONFIG_KARMA_PARTITION is not set
-+# CONFIG_EFI_PARTITION is not set
-+# CONFIG_SYSV68_PARTITION is not set
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=m
-+# CONFIG_NLS_ISO8859_1 is not set
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_SLUB_DEBUG_ON is not set
-+# CONFIG_SLUB_STATS is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+CONFIG_DEBUG_SPINLOCK=y
-+# CONFIG_DEBUG_MUTEXES is not set
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+CONFIG_FRAME_POINTER=y
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+CONFIG_RCU_CPU_STALL_DETECTOR=y
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_IRQSOFF_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_DEBUG_ERRORS is not set
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_SECURITY_FILE_CAPABILITIES is not set
-+# CONFIG_CRYPTO is not set
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+# CONFIG_CRC_CCITT is not set
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+# CONFIG_CRC32 is not set
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
++++ b/arch/arm/plat-spear/padmux.c
+@@ -0,0 +1,164 @@
++/*
++ * arch/arm/plat-spear/include/plat/padmux.c
++ *
++ * SPEAr platform specific gpio pads muxing source file
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <plat/padmux.h>
++
++/*
++ * struct pmx: pmx definition structure
++ *
++ * base: base address of configuration registers
++ * mode_reg: mode configurations
++ * mux_reg: muxing configurations
++ * active_mode: pointer to current active mode
++ */
++struct pmx {
++	u32 base;
++	struct pmx_reg mode_reg;
++	struct pmx_reg mux_reg;
++	struct pmx_mode *active_mode;
++};
++
++static struct pmx *pmx;
++
++/**
++ * pmx_mode_set - Enables an multiplexing mode
++ * @mode - pointer to pmx mode
++ *
++ * It will set mode of operation in hardware.
++ * Returns -ve on Err otherwise 0
++ */
++static int pmx_mode_set(struct pmx_mode *mode)
++{
++	u32 val;
++
++	if (!mode->name)
++		return -EFAULT;
++
++	pmx->active_mode = mode;
++
++	val = readl(pmx->base + pmx->mode_reg.offset);
++	val &= ~pmx->mode_reg.mask;
++	val |= mode->mask & pmx->mode_reg.mask;
++	writel(val, pmx->base + pmx->mode_reg.offset);
++
++	return 0;
++}
++
++/**
++ * pmx_devs_enable - Enables list of devices
++ * @devs - pointer to pmx device array
++ * @count - number of devices to enable
++ *
++ * It will enable pads for all required peripherals once and only once.
++ * If peripheral is not supported by current mode then request is rejected.
++ * Conflicts between peripherals are not handled and peripherals will be
++ * enabled in the order they are present in pmx_dev array.
++ * In case of conflicts last peripheral enalbed will be present.
++ * Returns -ve on Err otherwise 0
++ */
++static int pmx_devs_enable(struct pmx_dev **devs, u8 count)
++{
++	u32 val, i, mask;
++
++	if (!count)
++		return -EINVAL;
++
++	val = readl(pmx->base + pmx->mux_reg.offset);
++	for (i = 0; i < count; i++) {
++		u8 j = 0;
++
++		if (!devs[i]->name || !devs[i]->modes) {
++			printk(KERN_ERR "padmux: dev name or modes is null\n");
++			continue;
++		}
++		/* check if peripheral exists in active mode */
++		if (pmx->active_mode) {
++			bool found = false;
++			for (j = 0; j < devs[i]->mode_count; j++) {
++				if (devs[i]->modes[j].ids &
++						pmx->active_mode->id) {
++					found = true;
++					break;
++				}
++			}
++			if (found == false) {
++				printk(KERN_ERR "%s device not available in %s"\
++						"mode\n", devs[i]->name,
++						pmx->active_mode->name);
++				continue;
++			}
++		}
++
++		/* enable peripheral */
++		mask = devs[i]->modes[j].mask & pmx->mux_reg.mask;
++		if (devs[i]->enb_on_reset)
++			val &= ~mask;
++		else
++			val |= mask;
++
++		devs[i]->is_active = true;
++	}
++	writel(val, pmx->base + pmx->mux_reg.offset);
++	kfree(pmx);
++
++	/* this will ensure that multiplexing can't be changed now */
++	pmx = (struct pmx *)-1;
++
++	return 0;
++}
++
++/**
++ * pmx_register - registers a platform requesting pad mux feature
++ * @driver - pointer to driver structure containing driver specific parameters
++ *
++ * Also this must be called only once. This will allocate memory for pmx
++ * structure, will call pmx_mode_set, will call pmx_devs_enable.
++ * Returns -ve on Err otherwise 0
++ */
++int pmx_register(struct pmx_driver *driver)
++{
++	int ret = 0;
++
++	if (pmx)
++		return -EPERM;
++	if (!driver->base || !driver->devs)
++		return -EFAULT;
++
++	pmx = kzalloc(sizeof(*pmx), GFP_KERNEL);
++	if (!pmx)
++		return -ENOMEM;
++
++	pmx->base = (u32)driver->base;
++	pmx->mode_reg.offset = driver->mode_reg.offset;
++	pmx->mode_reg.mask = driver->mode_reg.mask;
++	pmx->mux_reg.offset = driver->mux_reg.offset;
++	pmx->mux_reg.mask = driver->mux_reg.mask;
++
++	/* choose mode to enable */
++	if (driver->mode) {
++		ret = pmx_mode_set(driver->mode);
++		if (ret)
++			goto pmx_fail;
++	}
++	ret = pmx_devs_enable(driver->devs, driver->devs_count);
++	if (ret)
++		goto pmx_fail;
++
++	return 0;
++
++pmx_fail:
++	return ret;
++}
 -- 
 1.6.0.2
