@@ -1,82 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Mar 2010 08:54:52 +0100
-Subject: [PATCH 2/3] imx3: Add rtc platform device support
-In-Reply-To: <87d3yshbuo.fsf@vovsem.com>
-References: <1269430338-22690-1-git-send-email-vzapolskiy@gmail.com>
-	<1269430338-22690-2-git-send-email-vzapolskiy@gmail.com>
-	<20100325073537.GZ2241@pengutronix.de> <87d3yshbuo.fsf@vovsem.com>
-Message-ID: <20100326075452.GD2241@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 26 Mar 2010 09:14:45 +0100
+Subject: [GIT PULL] generic arm for MSM
+In-Reply-To: <1269559307.21793.78.camel@c-dwalke-linux.qualcomm.com>
+References: <1269553937.21793.40.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1003251843320.694@xanadu.home>
+	<1269557364.21793.52.camel@c-dwalke-linux.qualcomm.com>
+	<20100325225300.GK24984@n2100.arm.linux.org.uk>
+	<1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
+	<20100325225555.GL24984@n2100.arm.linux.org.uk>
+	<1269559307.21793.78.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100326081445.GB20553@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 02:36:31PM +0300, Vladimir Zapolskiy wrote:
-> Hi Sasha,
+Hello,
+
+> I tried to add both,
 > 
-> >
-> > On Wed, Mar 24, 2010 at 02:32:17PM +0300, Vladimir Zapolskiy wrote:
-> >> This patch adds support for build-in RTC device found on
-> >> Freescale imx31 and imx35 SoCs.
-> >> 
-> >> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> >> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> >> ---
-> >>  arch/arm/mach-mx3/devices.c |   19 +++++++++++++++++++
-> >>  arch/arm/mach-mx3/devices.h |    1 +
-> >>  2 files changed, 20 insertions(+), 0 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-> >> index f891115..1ffed28 100644
-> >> --- a/arch/arm/mach-mx3/devices.c
-> >> +++ b/arch/arm/mach-mx3/devices.c
-> >> @@ -588,6 +588,25 @@ struct platform_device imx_wdt_device0 = {
-> >>  	.resource       = imx_wdt_resources,
-> >
-> > This patch does not apply. We do not have the watchdog in devices.c atm.
-> >
+> ftp://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git
+> http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
 > 
-> please could you suggest the appropriate branch, because this patch is
-> based on mxc-master branch, where the watchdog is already pushed, see
-> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/mxc-master
+> and I got strange download failures ..
+It's recommended to have an actual copy of Linus' tree to fetch Russells
+into.  Then it works fine most of the time.
 
-Oh, my bad. I myself tried to push it on master and not on mxc-master.
-
-> 
-> >>  };
-> >>  
-> >> +static struct resource imx_rtc_resources[] = {
-> >> +	{
-> >> +		.start  = MX31_RTC_BASE_ADDR,
-> >> +		.end    = MX31_RTC_BASE_ADDR + 0x3fff,
-> >> +		.flags  = IORESOURCE_MEM,
-> >> +	},
-> >> +	{
-> >> +		.start  = MX31_INT_RTC,
-> >> +		.flags  = IORESOURCE_IRQ,
-> >> +	},
-> >
-> > Can you provide a fixup for i.MX35, please? See mx3_devices_init().
-> 
-> Surely. Before patch submission I just checked that base address, size
-> and interrupt number are equal for i.MX31 and i.MX35 SoCs, and I've
-> found that in such cases the resources are defined using MX31 macros,
-> see imx_ssi_resources or mxc_usbhX_resources as reference.
-
-Ok. I just saw that there are two defines without checking that they are
-actually identical.
-
-> 
-> Probably better to separate the devices.c file into two files? You see
-> one day I hope i.MX37 support will be included into the Linux kernel,
-> and it would be quite uncomfortable to support three kinds of peripheral
-> in a single file.
-
-We are already working on seperating them. Have a look at the i.MX21/27
-devices.c.
-
-Sascha
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
