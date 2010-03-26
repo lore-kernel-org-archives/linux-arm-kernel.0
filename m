@@ -1,66 +1,30 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Fri, 26 Mar 2010 16:22:57 +0300
-Subject: [PATCH 1/4] cns3xxx: Add basic support for Cavium Networks
-	CNS3xxx processors
-In-Reply-To: <20100325202308.GA24984@n2100.arm.linux.org.uk>
-References: <20100325200851.GA6470@oksana.dev.rtsoft.ru>
-	<20100325201040.GA8014@oksana.dev.rtsoft.ru>
-	<20100325202308.GA24984@n2100.arm.linux.org.uk>
-Message-ID: <20100326132257.GA23201@oksana.dev.rtsoft.ru>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Mar 2010 13:23:16 +0000
+Subject: ARM caches variants.
+In-Reply-To: <20100326054508.GA19308@shareable.org>
+References: <20100323234949.GG20130@shareable.org>
+	<1269423728.29073.11.camel@e102109-lin.cambridge.arm.com>
+	<20100326054508.GA19308@shareable.org>
+Message-ID: <1269609796.807.45.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 08:23:08PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 25, 2010 at 11:10:40PM +0300, Anton Vorontsov wrote:
-[...]
-> > +#include <mach/io.h>
+On Fri, 2010-03-26 at 05:45 +0000, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > Note that the I-cache on ARMv7 is an aliasing VIPT (when the way size >
+> > PAGE_SIZE).
 > 
-> linux/io.h please.
-
-Will fix, thanks.
-
-[...]
-> > +	mi->bank[0].node = 0;
+> Aliases in a read-only cache (I-cache) don't matter, so I presume you
+> mean it has multiple aliases against the D-cache?
 > 
-> Can you not supply this via a built-in command line or a command line
-> from the boot loader?
+> I think that would only affect what you have to do when flushing
+> I-cache lines after writing data, and then only if flushing has to use
+> the virtual address, not physical.  Is that right?
 
-Yep, mem=128M is actually specified in the defconfig, and
-this fixup is just a leftover. Will remove.
-
-> > +++ b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-[...]
-> > +#define VMALLOC_END		(PAGE_OFFSET + 0x18000000)
-> 
-> This should be defined as the maximum address of the vmalloc area,
-> which should be independent of PAGE_OFFSET.
-
-Ah, vmalloc has no fixed start address. Will fix.
-
-But then arm/mm/mmu.c:create_mapping() wrongly assumes that vmalloc
-starts at PAGE_OFFSET? At least it has 'md->virtual >= PAGE_OFFSET &&
-md->virtual < VMALLOC_END' check, and prints 'overlaps vmalloc space'
-error.
-
-> > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> > index c4ed9f9..488bcb1 100644
-> > --- a/arch/arm/mm/Kconfig
-> > +++ b/arch/arm/mm/Kconfig
-> > @@ -384,7 +384,7 @@ config CPU_FEROCEON_OLD_ID
-> >  
-> >  # ARMv6
-> >  config CPU_V6
-> > -	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-> > +	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE || ARCH_CNS3XXX
-> 
-> So I assume by this your platform can boot without having a processor of
-> any kind?
-
-:-) Will fix.
-
-Thanks!
+Flushing the L1 cache has to use the virtual address even on PIPT
+caches. In the Linux case, you can't use the kernel linear mapping to
+invalidate an I-cache line if the intention is to use the code in user
+space with a different virtual address.
 
 -- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+Catalin
