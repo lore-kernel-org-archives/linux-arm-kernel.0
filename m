@@ -1,40 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Mar 2010 11:11:22 +0000
-Subject: [PATCH] ARM: Use the correct NOP size in memmove for Thumb-2 kernel
-	builds
-Message-ID: <20100326111122.1066.8244.stgit@e102109-lin.cambridge.arm.com>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Fri, 26 Mar 2010 11:20:30 +0000
+Subject: [PATCH] orion5x: Set links to solid on D-Link DNS-323
+Message-ID: <20100326112030.GA29585@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling the kernel to Thumb-2, using a 16-bit NOP in the
-memmove() implementation causes the preceding ADD PC instruction to
-branch incorrectly in the middle of a 32-bit LDR or STR instruction. The
-memmove() code is no similar to the memcpy() template.
+Among other changes, commit b2a731aa ("D-link DNS-323 revision A1 power
+LED") changed the default behaviour of the power LED from solid to
+blinking.  This was done to match the original DNS-323 firmware which
+blinks during the boot process and sets the LED to solid when booting
+has completed.  However, the downside of this behaviour is that it
+requires userland code to change the LED, even for those who don't
+care about the behaviour of the original firmware.  Therefore, change
+it to solid again and let those who care about the original behaviour
+change the behaviour from userland.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/lib/memmove.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
 
-diff --git a/arch/arm/lib/memmove.S b/arch/arm/lib/memmove.S
-index 5025c86..938fc14 100644
---- a/arch/arm/lib/memmove.S
-+++ b/arch/arm/lib/memmove.S
-@@ -74,7 +74,7 @@ ENTRY(memmove)
- 		rsb	ip, ip, #32
- 		addne	pc, pc, ip		@ C is always clear here
- 		b	7f
--6:		nop
-+6:		W(nop)
- 		W(ldr)	r3, [r1, #-4]!
- 		W(ldr)	r4, [r1, #-4]!
- 		W(ldr)	r5, [r1, #-4]!
-@@ -85,7 +85,7 @@ ENTRY(memmove)
- 
- 		add	pc, pc, ip
- 		nop
--		nop
-+		W(nop)
- 		W(str)	r3, [r0, #-4]!
- 		W(str)	r4, [r0, #-4]!
- 		W(str)	r5, [r0, #-4]!
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -262,7 +262,7 @@ static struct gpio_led dns323_leds[] = {
+ 	{
+ 		.name = "power:blue",
+ 		.gpio = DNS323_GPIO_LED_POWER2,
+-		.default_trigger = "timer",
++		.default_trigger = "default-on",
+ 	}, {
+ 		.name = "right:amber",
+ 		.gpio = DNS323_GPIO_LED_RIGHT_AMBER,
+
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
