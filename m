@@ -1,30 +1,85 @@
-From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
-Date: Fri, 26 Mar 2010 18:57:07 -0300
-Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
-In-Reply-To: <20100326181800.GB21682@n2100.arm.linux.org.uk>
-References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<20100324230729.GA21359@n2100.arm.linux.org.uk>
-	<4BAB38B1.8080404@ru.mvista.com>
-	<20100326181800.GB21682@n2100.arm.linux.org.uk>
-Message-ID: <cecb6d8f1003261457x69c319c1w884ade1746f81e8b@mail.gmail.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Fri, 26 Mar 2010 23:01:51 +0100 (CET)
+Subject: [PATCH 1/7] arch/arm: Use set_cpus_allowed_ptr
+Message-ID: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 15:18, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Mar 25, 2010 at 01:19:29PM +0300, Sergei Shtylyov wrote:
->>
->> ? I'd disagree in this case. Anybody will hardly grep for "mask:
->> %s%s%s%s%s%sflags: %s%s%s%s%s%s".
->
-> Well, I disagree on a matter of principle with you. ?If you want to avoid
-> the line going over 80 columns, move the entire string onto the next line.
-> Then we can have the entire string intact _and_ we can have it fitting
-> within 80 columns.
+From: Julia Lawall <julia@diku.dk>
 
-This is no big deal. Also, I have already submitted the new patch and
-Valdis had a good point for egrep.
+Use set_cpus_allowed_ptr rather than set_cpus_allowed.
 
-Regards,
-Marcelo.
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@@
+expression E1,E2;
+@@
+
+- set_cpus_allowed(E1, cpumask_of_cpu(E2))
++ set_cpus_allowed_ptr(E1, cpumask_of(E2))
+
+@@
+expression E;
+identifier I;
+@@
+
+- set_cpus_allowed(E, I)
++ set_cpus_allowed_ptr(E, &I)
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+ arch/arm/mach-integrator/cpu.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff -u -p a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
+--- a/arch/arm/mach-integrator/cpu.c
++++ b/arch/arm/mach-integrator/cpu.c
+@@ -99,7 +99,7 @@ static int integrator_set_target(struct 
+ 	 * Bind to the specified CPU.  When this call returns,
+ 	 * we should be running on the right CPU.
+ 	 */
+-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
++	set_cpus_allowed_ptr(current, cpumask_of(cpu));
+ 	BUG_ON(cpu != smp_processor_id());
+ 
+ 	/* get current setting */
+@@ -127,7 +127,7 @@ static int integrator_set_target(struct 
+ 	freqs.cpu = policy->cpu;
+ 
+ 	if (freqs.old == freqs.new) {
+-		set_cpus_allowed(current, cpus_allowed);
++		set_cpus_allowed_ptr(current, &cpus_allowed);
+ 		return 0;
+ 	}
+ 
+@@ -150,7 +150,7 @@ static int integrator_set_target(struct 
+ 	/*
+ 	 * Restore the CPUs allowed mask.
+ 	 */
+-	set_cpus_allowed(current, cpus_allowed);
++	set_cpus_allowed_ptr(current, &cpus_allowed);
+ 
+ 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+ 
+@@ -166,7 +166,7 @@ static unsigned int integrator_get(unsig
+ 
+ 	cpus_allowed = current->cpus_allowed;
+ 
+-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
++	set_cpus_allowed_ptr(current, cpumask_of(cpu));
+ 	BUG_ON(cpu != smp_processor_id());
+ 
+ 	/* detect memory etc. */
+@@ -182,7 +182,7 @@ static unsigned int integrator_get(unsig
+ 
+ 	current_freq = icst_hz(&cclk_params, vco) / 1000; /* current freq */
+ 
+-	set_cpus_allowed(current, cpus_allowed);
++	set_cpus_allowed_ptr(current, &cpus_allowed);
+ 
+ 	return current_freq;
+ }
