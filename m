@@ -1,39 +1,27 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Mar 2010 13:34:18 +0000
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-Message-ID: <1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
+Date: Fri, 26 Mar 2010 13:37:45 +0000
+Subject: RFC: ARM Boot standard for passing device tree blob
+In-Reply-To: <20100325210409.GH24984@n2100.arm.linux.org.uk>
+References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
+	<20100325210409.GH24984@n2100.arm.linux.org.uk>
+Message-ID: <1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 21:02 +0000, Nicolas Pitre wrote:
-> --- a/arch/arm/include/asm/highmem.h
-> +++ b/arch/arm/include/asm/highmem.h
-> @@ -11,7 +11,11 @@
+On Thu, 2010-03-25 at 21:04 +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 24, 2010 at 09:11:56AM -0600, Grant Likely wrote:
+> > ===Required System State===
+[...]
+> > *IRQs disabled
+> > *MMU off
+> > *Instruction cache either on or off
+> > *Data cache turned off
 > 
->  #define kmap_prot              PAGE_KERNEL
-> 
-> -#define flush_cache_kmaps()    flush_cache_all()
-> +#define flush_cache_kmaps() \
-> +       do { \
-> +               if (cache_is_vivt()) \
-> +                       flush_cache_all(); \
-> +       } while (0)
+> Would recommend saying "Data cache(s) turned off" so that L2 cache is
+> included.
 
-Do the aliasing VIPT caches need flushing as well?
-
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -79,7 +79,8 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
->         unsigned int idx = type + KM_TYPE_NR * smp_processor_id();
-> 
->         if (kvaddr >= (void *)FIXADDR_START) {
-> -               __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-> +               if (cache_is_vivt())
-> +                       __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-
-Same here (and probably some other places in this patch, not sure).
+There are platforms where the L2 cache is turned on by the boot monitor
+(secure monitor) and Linux has no control over it (I think OMAP).
 
 -- 
 Catalin
