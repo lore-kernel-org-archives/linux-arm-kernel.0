@@ -1,31 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Mar 2010 23:03:43 +0000
-Subject: RFC: ARM Boot standard for passing device tree blob
-In-Reply-To: <fa686aa41003261252u7dc31bb6nca2e77ae8feb4355@mail.gmail.com>
-References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
-	<20100325210409.GH24984@n2100.arm.linux.org.uk>
-	<1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
-	<4BACF238.3040405@firmworks.com>
-	<fa686aa41003261113o7cd8612eh9b51904114902a3a@mail.gmail.com>
-	<alpine.LFD.2.00.1003261435460.694@xanadu.home>
-	<fa686aa41003261252u7dc31bb6nca2e77ae8feb4355@mail.gmail.com>
-Message-ID: <20100326230343.GC29179@n2100.arm.linux.org.uk>
+Date: Fri, 26 Mar 2010 23:06:18 +0000
+Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
+In-Reply-To: <cecb6d8f1003261457x69c319c1w884ade1746f81e8b@mail.gmail.com>
+References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100324230729.GA21359@n2100.arm.linux.org.uk>
+	<4BAB38B1.8080404@ru.mvista.com>
+	<20100326181800.GB21682@n2100.arm.linux.org.uk>
+	<cecb6d8f1003261457x69c319c1w884ade1746f81e8b@mail.gmail.com>
+Message-ID: <20100326230618.GD29179@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 01:52:24PM -0600, Grant Likely wrote:
-> I could change the statement to something like, "virtually tagged or
-> indexed data cache(s) must be off", or drop the statement entirely
-> since it is implied by the requirement that the MMU must be off.
+On Fri, Mar 26, 2010 at 06:57:07PM -0300, Marcelo Jimenez wrote:
+> On Fri, Mar 26, 2010 at 15:18, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Mar 25, 2010 at 01:19:29PM +0300, Sergei Shtylyov wrote:
+> >>
+> >> ? I'd disagree in this case. Anybody will hardly grep for "mask:
+> >> %s%s%s%s%s%sflags: %s%s%s%s%s%s".
+> >
+> > Well, I disagree on a matter of principle with you. ?If you want to avoid
+> > the line going over 80 columns, move the entire string onto the next line.
+> > Then we can have the entire string intact _and_ we can have it fitting
+> > within 80 columns.
+> 
+> This is no big deal. Also, I have already submitted the new patch and
+> Valdis had a good point for egrep.
 
-1. We're not going down the path of having differing conditions for
-   different caches; to do so would mean that we'd need to have two
-   entirely different sets of code to handle booting in the kernel.
-
-2. No ARM CPU supports having the D-cache enabled without the MMU; the
-   data cache needs to be told via the page tables what can be cached
-   and what can't - it needs to be told that RAM can cached but IO
-   devices must not be.
-
-In short, the MMU must always be off, which in turn means the D-cache
-must always be disabled.
+Sorry, I'm having stability issues with my MTA which inexplicably died
+about 12 hours ago, presumably due to the level of crap flying around
+the 'net nowadays.  This appears to be becoming a regular occurance in
+the last week. ;(
