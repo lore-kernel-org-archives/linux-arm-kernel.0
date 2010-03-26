@@ -1,32 +1,39 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 26 Mar 2010 06:33:25 -0700
-Subject: [GIT PULL] generic arm for MSM
-In-Reply-To: <20100326081445.GB20553@pengutronix.de>
-References: <1269553937.21793.40.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003251843320.694@xanadu.home>
-	<1269557364.21793.52.camel@c-dwalke-linux.qualcomm.com>
-	<20100325225300.GK24984@n2100.arm.linux.org.uk>
-	<1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
-	<20100325225555.GL24984@n2100.arm.linux.org.uk>
-	<1269559307.21793.78.camel@c-dwalke-linux.qualcomm.com>
-	<20100326081445.GB20553@pengutronix.de>
-Message-ID: <1269610405.18193.15.camel@desktop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Mar 2010 13:34:18 +0000
+Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
+In-Reply-To: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
+References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
+Message-ID: <1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-03-26 at 09:14 +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Thu, 2010-03-25 at 21:02 +0000, Nicolas Pitre wrote:
+> --- a/arch/arm/include/asm/highmem.h
+> +++ b/arch/arm/include/asm/highmem.h
+> @@ -11,7 +11,11 @@
 > 
-> > I tried to add both,
-> > 
-> > ftp://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git
-> > http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
-> > 
-> > and I got strange download failures ..
-> It's recommended to have an actual copy of Linus' tree to fetch Russells
-> into.  Then it works fine most of the time.
+>  #define kmap_prot              PAGE_KERNEL
+> 
+> -#define flush_cache_kmaps()    flush_cache_all()
+> +#define flush_cache_kmaps() \
+> +       do { \
+> +               if (cache_is_vivt()) \
+> +                       flush_cache_all(); \
+> +       } while (0)
 
-When I wrote the above I was setting these up as remotes, not
-downloading full trees.
+Do the aliasing VIPT caches need flushing as well?
 
-Daniel
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -79,7 +79,8 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
+>         unsigned int idx = type + KM_TYPE_NR * smp_processor_id();
+> 
+>         if (kvaddr >= (void *)FIXADDR_START) {
+> -               __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+> +               if (cache_is_vivt())
+> +                       __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+
+Same here (and probably some other places in this patch, not sure).
+
+-- 
+Catalin
