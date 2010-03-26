@@ -1,40 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 Mar 2010 10:30:47 +0100
-Subject: [GIT PULL] generic arm for MSM
-In-Reply-To: <20100326082300.GA6665@n2100.arm.linux.org.uk>
-References: <1269553937.21793.40.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003251843320.694@xanadu.home>
-	<1269557364.21793.52.camel@c-dwalke-linux.qualcomm.com>
-	<20100325225300.GK24984@n2100.arm.linux.org.uk>
-	<1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
-	<20100325225555.GL24984@n2100.arm.linux.org.uk>
-	<1269559307.21793.78.camel@c-dwalke-linux.qualcomm.com>
-	<20100326081445.GB20553@pengutronix.de>
-	<20100326082300.GA6665@n2100.arm.linux.org.uk>
-Message-ID: <20100326093047.GB14697@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Fri, 26 Mar 2010 10:47:19 +0100
+Subject: [PATCH 4/5] ARM: add PrimeCell generic DMA to PL011
+In-Reply-To: <1269579457.8895.5.camel@bnru03>
+References: <1268056365-17417-1-git-send-email-linus.walleij@stericsson.com>
+	<b328b2051003252142o1c142ca0h66135eb9129d1c99@mail.gmail.com>
+	<1269579457.8895.5.camel@bnru03>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A0391F4B7@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+[Srinidhi]
 
-> There shouldn't be any problem; that tree is an identical copy of my
-> local tree which uses no alternatives.  It always contains an entire
-> set of Linus' tree with no additional repacking.
-> 
-> The only reason to pull this tree into a copy of Linus' tree is that
-> it'll avoid fetching 400MB or so of Linus' pack files over http from
-> the UK, instead only fetching 34MB of objects.
-I looked some time ago and IIRC you had all of Linus' tree in a single
-pack file.  This resulted in trying to download these 400MB even though
-I only missed one day's worth of commits.  So today I always do
+> >
+> > +#include <mach/coh901318.h>
+> Is this accidentally added? Please update 5983/1 patch in Russell's
+> tracking system.
 
-	git remote update linus rmk
+OK I'll update the entire series when I'm finished with porting
+it on top of Dan's requested changes to DMAengine.
 
-which works well most of the time.
+Russell cannot commit them until the required changes from DMAengine
+are in actually, unless I push the PrimeCell DMA API through
+Dan's DMA tree.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Linus
