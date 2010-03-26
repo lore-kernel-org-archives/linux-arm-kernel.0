@@ -1,21 +1,30 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 26 Mar 2010 16:03:42 +0530
-Subject: [PATCH] removing compilation warning comming from <asm/irq.h>
-In-Reply-To: <20100326102301.GA9126@n2100.arm.linux.org.uk>
-References: <1269598410-15888-1-git-send-email-viresh.kumar@st.com>
-	<20100326102301.GA9126@n2100.arm.linux.org.uk>
-Message-ID: <4BAC8D86.2070709@st.com>
+Date: Fri, 26 Mar 2010 16:09:28 +0530
+Subject: [PATCH resend] removing compilation warning comming from <asm/irq.h>
+Message-ID: <1269599968-32459-1-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/26/2010 3:53 PM, Russell King - ARM Linux wrote:
-> On Fri, Mar 26, 2010 at 03:43:30PM +0530, Viresh KUMAR wrote:
->> irq.h is using struct pt_regs *. Due to this compilation
->> warning is comming. Removing this warning by adding declaration
->> of struct pt_regs.
-> 
-> That's badly placed.  Please re-read the file and place it in a more
-> appropriate location.
-> 
+irq.h is using struct pt_regs *. Due to this compilation
+warning is comming. Removing this warning by adding declaration
+of struct pt_regs.
 
-OK.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/include/asm/irq.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 328f14a..237282f 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -17,6 +17,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ struct irqaction;
++struct pt_regs;
+ extern void migrate_irqs(void);
+ 
+ extern void asm_do_IRQ(unsigned int, struct pt_regs *);
+-- 
+1.6.0.2
