@@ -1,20 +1,31 @@
-From: db.pub.mail@gmail.com (dave b)
-Date: Fri, 26 Mar 2010 21:12:34 +1100
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <20100315010238.GJ6491@shareable.org>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-	<20100311133353.GC25011@n2100.arm.linux.org.uk>
-	<20100315010238.GJ6491@shareable.org>
-Message-ID: <25ae2d691003260312h62b7f853s99a2fa483a6a0847@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Fri, 26 Mar 2010 15:43:30 +0530
+Subject: [PATCH] removing compilation warning comming from <asm/irq.h>
+Message-ID: <1269598410-15888-1-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I believe that the 2.6.32.7 kernel I compiled and was using on the
-device while compiling the 2.6.33 kernel had *issues* (although most
-likely not kernel related). In particular various issues (apt-get not
-working) including on one piece of hardware using the kernel binary as
-produced by others.
+irq.h is using struct pt_regs *. Due to this compilation
+warning is comming. Removing this warning by adding declaration
+of struct pt_regs.
 
-Thank you.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/include/asm/irq.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 328f14a..567c398 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -3,6 +3,8 @@
+ 
+ #include <mach/irqs.h>
+ 
++struct pt_regs;
++
+ #ifndef irq_canonicalize
+ #define irq_canonicalize(i)	(i)
+ #endif
+-- 
+1.6.0.2
