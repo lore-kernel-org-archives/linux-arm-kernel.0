@@ -1,95 +1,117 @@
-From: pjohn@mvista.com (Philby John)
-Date: Fri, 26 Mar 2010 16:58:31 +0530
-Subject: AACI broken with commit 29a4f2d3
-In-Reply-To: <20100325121614.GC6590@n2100.arm.linux.org.uk>
-References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
-	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
-	<s5h39zou023.wl%tiwai@suse.de>
-	<20100325113019.GA6590@n2100.arm.linux.org.uk>
-	<s5hvdckskev.wl%tiwai@suse.de> <4BAB4DE8.1030707@mvista.com>
-	<1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
-	<20100325121614.GC6590@n2100.arm.linux.org.uk>
-Message-ID: <1269602911.15413.6.camel@localhost.localdomain>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 26 Mar 2010 08:32:51 -0400 (EDT)
+Subject: [PATCH] arm: kprobes: fix register corruption with jprobes
+In-Reply-To: <1269586740-12813-1-git-send-email-ext-mika.1.westerberg@nokia.com>
+References: <1269586740-12813-1-git-send-email-ext-mika.1.westerberg@nokia.com>
+Message-ID: <alpine.LFD.2.00.1003260832180.694@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 12:16 +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 25, 2010 at 12:02:37PM +0000, Catalin Marinas wrote:
-> > I can confirm that it solves the reset issue on other RealView boards as
-> > well. Whether it's the correct fix I can't tell.
+On Fri, 26 Mar 2010, Mika Westerberg wrote:
+
+> Current implementation of jprobes allocates empty pt_regs from the stack which
+> is then passed to kprobe_handler() and eventually to singlestep(). Now when
+> instruction being simulated is STMFD (like in normal function prologues without
+> CONFIG_FRAME_POINTER), stores using SP actually write over top of the fabricated
+> pt_regs structure.
 > 
-> Something else is going on then.  Whatever, this patch is totally
-> incorrect and needs to be reverted.  It's not even doing what the
-> description in the documentation requires.
+> This can be reproduced for example by using LKDTM module:
 > 
-> I quote from page 3-18, which is mentioned in the commit message which
-> added this code:
+>     # modprobe lkdtm
+>     # mount -t debugfs none /sys/kernel/debug
+>     # echo PANIC > /sys/kernel/debug/provoke-crash/INT_HW_IRQ_EN
 > 
->   Data transmitted on slot 2 register, AACISL2TX The AACISL2TX register
->   is a read/write register. When a write occurs to this register the data
->   it contains is sent on the next available frame in slot 2. If a power
->   down is required, then data must be written to AACISL1TX location
->   address 0x26, which is recorded by the PrimeCell AACI. If the AACISL2TX
->   bit 16 is set, then the PrimeCell AACI goes into power down mode.
->   Table 3-11 shows the bit assignment of the AACISL2TX register.
+> after this, it fails with corrupted registers (before the requested crash would
+> occur):
 > 
-> And this is definitely NOT what Philby's code is doing.
+>     lkdtm: Crash point INT_HW_IRQ_EN of type PANIC hit, trigger in 9 rounds
+>     lkdtm: Crash point INT_HW_IRQ_EN of type PANIC hit, trigger in 8 rounds
+>     Internal error: Oops - undefined instruction: 0 [#1]
+>     last sysfs file: /sys/devices/platform/serial8250.0/sleep_timeout
+>     Modules linked in: lkdtm
+>     CPU: 0    Not tainted  (2.6.34-rc2 #69)
+>     PC is at irq_desc+0x1638/0xeeb0
+>     LR is at 0x25
+>     pc : [<c050b428>]    lr : [<00000025>]    psr: c80a0013
+>     sp : ce94bd60  ip : c050b3e8  fp : a0000013
+>     r10: c0aa453c  r9 : cf5d4000  r8 : ce9a1822
+>     r7 : c050b424  r6 : 00000025  r5 : c039d8f8  r4 : c050b3e8
+>     r3 : 00000001  r2 : cf4d0440  r1 : c039d8f8  r0 : 00000020
+>     Flags: NZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>     Control: 10c5387d  Table: 8e804019  DAC: 00000015
+>     Process sh (pid: 496, stack limit = 0xce94a2e8)
+>     Stack: (0xce94bd60 to 0xce94c000)
+>     bd60: c050b3e8 ce94bd60 00000025 c050b424 ce9a1822 00000025 00000025 ce94be58
+>     bd80: 0000004a c050ca1c ce9a1822 c002c070 ffffffff fa200000 0000004a c02991e0
+>     bda0: ce9a1822 e92d41f0 00000000 c039a890 c050c9e0 cfc72e00 0000004a c050ca1c
+>     bdc0: ce9a1822 cf5d4000 c0aa453c a0000013 00000000 ce94bde8 00000006 c02997c8
+>     bde0: c80a0013 ffffffff 0000004a cfc72e00 cf4d0440 00000001 c050c9e0 cfc72e00
+>     be00: 0000004a c050ca1c ce9a1822 cf5d4000 c0aa453c a0000013 c050c9e0 ce94be18
+>     be20: 0000004a c050ca1c ce9a1822 0000004a 0000004a 00000000 00000022 00000000
+>     be40: ce9a1822 c002c070 ffffffff fa200000 00000022 c02991e0 00000001 cf4d0810
+>     be60: 00000002 00004f48 c0aa453c 20000013 00000022 00000000 ce9a1822 cf5d4000
+>     be80: c0aa453c a0000013 000000d4 ce94bea0 c0074d40 c0299078 20000013 ffffffff
+>     bea0: 00000000 cfd33338 00000022 c018d8d4 c02b56fc cf4d0440 cf5d4000 ce9a1800
+>     bec0: 00000022 cf5d4574 cf420680 ce94a000 ce9a1800 c017b2c4 cf5d41f0 cf5d4130
+>     bee0: 60000013 00000000 cf4d0440 c004e6b8 cf5d4214 cf5d4214 c03a5870 00000022
+>     bf00: 00000022 00000000 cf5d4000 ce94a000 00000022 00000000 cf420680 c0178b3c
+>     bf20: cf4d0440 4001e000 c017b070 cf5fd440 00000000 c00aeb5c 00000001 cf420680
+>     bf40: 4001e000 ce94bf80 00000022 00000022 ce94a000 00000001 bef8a89c c00af3dc
+>     bf60: cf420680 4001e000 00000000 00000000 cf420680 00000022 4001e000 c00af530
+>     bf80: 00000000 00000000 00000022 00000000 00000022 4001e000 40185608 00000004
+>     bfa0: c002caa4 c002c900 00000022 4001e000 00000001 4001e000 00000022 00000000
+>     bfc0: 00000022 4001e000 40185608 00000004 00000022 00000014 00000001 bef8a89c
+>     bfe0: 00000000 bef8a880 400c7b88 401176bc 60000010 00000001 80cb0021 80cb0421
+>     Code: 000002cd 00000000 00000000 00000001 (dead4ead)
+>     ---[ end trace 2b46d5f2b682f370 ]---
+>     Kernel panic - not syncing: Fatal exception in interrupt
 > 
-> The original commit is wrong on soo many levels.
+> This patch allocates enough space (2 * sizeof(struct pt_regs)) from the stack to
+> prevent such corruption.
+> 
+> Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 
-Here is the background work I did previously for the original patch.
+Acked-by: Nicolas Pitre <nico@marvell.com>
 
-Dumped entire AACI registers when reading used to fail. The difference between
-a working and non-working probe is confined to just 4 registers.
 
-Working                         Non-Working
-
-0007C000: SL1RX                 00000000: SL1RX
-0004E530: SL2RX                 00000000: SL2RX
-00000A80: slot flags            00000A02: slot flags
-00000000: main flag register    00000002: main flag register
-
-Of which what's interesting are the "slot flags" and the "main flag register".
-The slot flag register (AACISLFR) has its 1st bit set to 1, meaning Slot 1
-transceiver is busy, when reading vendor/product id (times out after 10 tries).
-
-The manual mandates powering down of the aaci module to attain reset values
-(page 3-18, 2-7) by setting AACIRESET. But ofcourse to attain default state its useless
-putting them in any clean up routine. That's why I introduced them at probe time. Here is
-another way to solve the problem.
-
->From c10d6111657d881bea53d8559deb7422d0f46583 Mon Sep 17 00:00:00 2001
-From: Philby John <pjohn@in.mvista.com>
-Date: Fri, 26 Mar 2010 16:41:06 +0530
-Subject: [PATCH] Fix alignment faults on ARM Cortex introduced by commit 29a4f2d3
-
-The commit 29a4f2d3 uses writel() on the AC97_POWERDOWN register
-which is half-word aligned causing unaligned exceptions on a
-Cortex-A8. The original patch solved the "aaci-pl041 fpga:04:
-ac97 read back fail" issue on a soft reset. Reading from 0x26
-also clears AACISL1TX/AACISL2TX slots for transmit.
-
-Signed-off-by: Philby John <pjohn@mvista.com>
----
- sound/arm/aaci.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-index 656e474..6d677c2 100644
---- a/sound/arm/aaci.c
-+++ b/sound/arm/aaci.c
-@@ -863,7 +863,11 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
- 	struct snd_ac97 *ac97;
- 	int ret;
- 
--	writel(0, aaci->base + AC97_POWERDOWN);
-+	/*
-+	 * Fix: ac97 read back fail errors by reading
-+	 * from Power down register
-+	 */
-+	readw(aaci->base + 0x26);
- 	/*
- 	 * Assert AACIRESET for 2us
- 	 */
--- 
-1.7.0.1
+> ---
+>  arch/arm/kernel/kprobes.c |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index 60c62c3..610e0f5 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -393,6 +393,14 @@ void __kprobes jprobe_return(void)
+>  		/*
+>  		 * Setup an empty pt_regs. Fill SP and PC fields as
+>  		 * they're needed by longjmp_break_handler.
+> +		 *
+> +		 * We allocate some slack between the original SP and start of
+> +		 * our fabricated regs. To be precise we want to have worst case
+> +		 * covered which is STMFD with all 16 regs so we allocate 2 *
+> +		 * sizeof(struct_pt_regs)).
+> +		 *
+> +		 * This is to prevent any simulated instruction from writing
+> +		 * over the regs when they are accessing the stack.
+>  		 */
+>  		"sub    sp, %0, %1		\n\t"
+>  		"ldr    r0, ="__stringify(JPROBE_MAGIC_ADDR)"\n\t"
+> @@ -410,7 +418,7 @@ void __kprobes jprobe_return(void)
+>  		"ldmia	sp, {r0 - pc}		\n\t"
+>  		:
+>  		: "r" (kcb->jprobe_saved_regs.ARM_sp),
+> -		  "I" (sizeof(struct pt_regs)),
+> +		  "I" (sizeof(struct pt_regs) * 2),
+>  		  "J" (offsetof(struct pt_regs, ARM_sp)),
+>  		  "J" (offsetof(struct pt_regs, ARM_pc)),
+>  		  "J" (offsetof(struct pt_regs, ARM_cpsr))
+> -- 
+> 1.5.6.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
