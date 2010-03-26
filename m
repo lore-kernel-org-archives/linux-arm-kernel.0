@@ -1,85 +1,41 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Fri, 26 Mar 2010 23:01:51 +0100 (CET)
-Subject: [PATCH 1/7] arch/arm: Use set_cpus_allowed_ptr
-Message-ID: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Mar 2010 22:56:02 +0000
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <1269608410.807.23.camel@e102109-lin.cambridge.arm.com>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
+	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
+	<s5h39zou023.wl%tiwai@suse.de>
+	<20100325113019.GA6590@n2100.arm.linux.org.uk>
+	<s5hvdckskev.wl%tiwai@suse.de> <4BAB4DE8.1030707@mvista.com>
+	<1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
+	<20100325121614.GC6590@n2100.arm.linux.org.uk>
+	<1269602911.15413.6.camel@localhost.localdomain>
+	<1269608410.807.23.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100326225602.GA29179@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Fri, Mar 26, 2010 at 01:00:10PM +0000, Catalin Marinas wrote:
+> On Fri, 2010-03-26 at 11:28 +0000, Philby John wrote:
+> > --- a/sound/arm/aaci.c
+> > +++ b/sound/arm/aaci.c
+> > @@ -863,7 +863,11 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+> >         struct snd_ac97 *ac97;
+> >         int ret;
+> > 
+> > -       writel(0, aaci->base + AC97_POWERDOWN);
+> > +       /*
+> > +        * Fix: ac97 read back fail errors by reading
+> > +        * from Power down register
+> > +        */
+> > +       readw(aaci->base + 0x26);
+> 
+> I still don't understand this. Does aaci->base point to the AACI
+> registers? There is no register at offset 0x26 but there is one at 0x24
+> (32-bit AACIIE2).
 
-Use set_cpus_allowed_ptr rather than set_cpus_allowed.
+I've covered this several times, and I'm getting sick of saying it.
+aaci->base is the base address of the AACI.  aaci->base + 0x26 is a
+misaligned address to AACI channel 2 interrupt enable register.
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@@
-expression E1,E2;
-@@
-
-- set_cpus_allowed(E1, cpumask_of_cpu(E2))
-+ set_cpus_allowed_ptr(E1, cpumask_of(E2))
-
-@@
-expression E;
-identifier I;
-@@
-
-- set_cpus_allowed(E, I)
-+ set_cpus_allowed_ptr(E, &I)
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- arch/arm/mach-integrator/cpu.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff -u -p a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
---- a/arch/arm/mach-integrator/cpu.c
-+++ b/arch/arm/mach-integrator/cpu.c
-@@ -99,7 +99,7 @@ static int integrator_set_target(struct 
- 	 * Bind to the specified CPU.  When this call returns,
- 	 * we should be running on the right CPU.
- 	 */
--	set_cpus_allowed(current, cpumask_of_cpu(cpu));
-+	set_cpus_allowed_ptr(current, cpumask_of(cpu));
- 	BUG_ON(cpu != smp_processor_id());
- 
- 	/* get current setting */
-@@ -127,7 +127,7 @@ static int integrator_set_target(struct 
- 	freqs.cpu = policy->cpu;
- 
- 	if (freqs.old == freqs.new) {
--		set_cpus_allowed(current, cpus_allowed);
-+		set_cpus_allowed_ptr(current, &cpus_allowed);
- 		return 0;
- 	}
- 
-@@ -150,7 +150,7 @@ static int integrator_set_target(struct 
- 	/*
- 	 * Restore the CPUs allowed mask.
- 	 */
--	set_cpus_allowed(current, cpus_allowed);
-+	set_cpus_allowed_ptr(current, &cpus_allowed);
- 
- 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
- 
-@@ -166,7 +166,7 @@ static unsigned int integrator_get(unsig
- 
- 	cpus_allowed = current->cpus_allowed;
- 
--	set_cpus_allowed(current, cpumask_of_cpu(cpu));
-+	set_cpus_allowed_ptr(current, cpumask_of(cpu));
- 	BUG_ON(cpu != smp_processor_id());
- 
- 	/* detect memory etc. */
-@@ -182,7 +182,7 @@ static unsigned int integrator_get(unsig
- 
- 	current_freq = icst_hz(&cclk_params, vco) / 1000; /* current freq */
- 
--	set_cpus_allowed(current, cpus_allowed);
-+	set_cpus_allowed_ptr(current, &cpus_allowed);
- 
- 	return current_freq;
- }
+That's the fourth time I've said it.
