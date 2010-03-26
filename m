@@ -1,72 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 26 Mar 2010 05:38:10 +0100
-Subject: [PATCH] VPAC270: Add DS1339 RTC support
-Message-ID: <1269578290-16979-1-git-send-email-marek.vasut@gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi)
+Date: Fri, 26 Mar 2010 10:27:37 +0530
+Subject: [PATCH 4/5] ARM: add PrimeCell generic DMA to PL011
+In-Reply-To: <b328b2051003252142o1c142ca0h66135eb9129d1c99@mail.gmail.com>
+References: <1268056365-17417-1-git-send-email-linus.walleij@stericsson.com>
+	<b328b2051003252142o1c142ca0h66135eb9129d1c99@mail.gmail.com>
+Message-ID: <1269579457.8895.5.camel@bnru03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/vpac270.c |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+Linus,
 
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index fa428ca..0a9647b 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -36,6 +36,8 @@
- #include <mach/pxa27x-udc.h>
- #include <mach/udc.h>
- 
-+#include <plat/i2c.h>
-+
- #include "generic.h"
- #include "devices.h"
- 
-@@ -132,6 +134,10 @@ static unsigned long vpac270_pin_config[] __initdata = {
- 	GPIO95_AC97_nRESET,
- 	GPIO98_AC97_SYSCLK,
- 	GPIO113_GPIO,	/* TS IRQ */
-+
-+	/* I2C */
-+	GPIO117_I2C_SCL,
-+	GPIO118_I2C_SDA,
- };
- 
- /******************************************************************************
-@@ -398,6 +404,25 @@ static inline void vpac270_ts_init(void) {}
- #endif
- 
- /******************************************************************************
-+ * RTC
-+ ******************************************************************************/
-+#if defined(CONFIG_RTC_DRV_DS1307) || defined(CONFIG_RTC_DRV_DS1307_MODULE)
-+static struct i2c_board_info __initdata vpac270_i2c_devs[] = {
-+	{
-+		I2C_BOARD_INFO("ds1339", 0x68),
-+	},
-+};
-+
-+static void __init vpac270_rtc_init(void)
-+{
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(vpac270_i2c_devs));
-+}
-+#else
-+static inline void vpac270_rtc_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * Framebuffer
-  ******************************************************************************/
- #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-@@ -481,6 +506,7 @@ static void __init vpac270_init(void)
- 	vpac270_udc_init();
- 	vpac270_eth_init();
- 	vpac270_ts_init();
-+	vpac270_rtc_init();
- }
- 
- MACHINE_START(VPAC270, "Voipac PXA270")
--- 
-1.7.0
+> This extends the PL011 UART driver with generic DMA engine support
+> using the PrimeCell DMA engine interface.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  drivers/serial/amba-pl011.c |  649
+> ++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/amba/serial.h |    6 +
+>  2 files changed, 653 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/serial/amba-pl011.c b/drivers/serial/amba-pl011.c
+> index aad86ec..41ed380 100644
+> --- a/drivers/serial/amba-pl011.c
+> +++ b/drivers/serial/amba-pl011.c
+> @@ -7,6 +7,7 @@
+>  *
+>  *  Copyright 1999 ARM Limited
+>  *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+> + *  Copyright (C) 2010 ST-Ericsson SA
+>  *
+>  * This program is free software; you can redistribute it and/or
+> modify
+>  * it under the terms of the GNU General Public License as published
+> by
+> @@ -47,10 +48,17 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/serial.h>
+>  #include <linux/clk.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/scatterlist.h>
+> +#include <linux/completion.h>
+> +#include <linux/amba/dma.h>
+> 
+>  #include <asm/io.h>
+>  #include <asm/sizes.h>
+> 
+> +#include <mach/coh901318.h>
+Is this accidentally added? Please update 5983/1 patch in Russell's
+tracking system.
+
+regards,
+Srinidhi
