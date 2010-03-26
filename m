@@ -1,25 +1,24 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 26 Mar 2010 18:28:13 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
-In-Reply-To: <20100323101540.GB2049@bluebox.local>
-References: <20100322191900.GF2040@bluebox.local>
-	<20100322192748.GK2040@bluebox.local>
-	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
-	<20100323101540.GB2049@bluebox.local>
-Message-ID: <63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
+Date: Fri, 26 Mar 2010 18:31:50 +0100
+Subject: [PATCH] Including device.h and resource.h header files in
+	linux/amba/bus.h
+In-Reply-To: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
+References: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <63386a3d1003261031p63224296pd4b1a649108af00b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/23 Hans J. Koch <hjk@linutronix.de>:
-> On Tue, Mar 23, 2010 at 08:29:01AM +0100, Linus Walleij wrote:
->> 2010/3/22 Hans J. Koch <hjk@linutronix.de>:
->> Also check that the DTCM is really such a thing.
->
-> Yep, I'll do this.
+2010/3/25 Viresh KUMAR <viresh.kumar@st.com>:
 
-If you really have a system with *only* DTCM and no ITCM, I don't
-know if the TCM support in the kernel works with that right now,
-I've never seen a system with just ITCM or just DTCM, but if
-you can help me testing I will try to fix it up.
+> linux/amba/bus.h have dependencies on linux/device.h and linux/resource.h, but
+> it doesn't include them. We get compilation errors in our files which include
+> bus.h but doesn't include device.h and resource.h. This patch includes device.h
+> and resource.h in linux/amba/bus.h file.
 
-Linus
+The customs of the kernel is to not #include .h files into each other so much,
+the reason being that this easily goes out of hand. Instead #include
+device.h and resource.h into your sourcefile above the amba/bus.h
+inclusion.
+
+Yours,
+Linus Walleij
