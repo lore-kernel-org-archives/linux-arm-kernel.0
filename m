@@ -1,34 +1,33 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 26 Mar 2010 11:51:58 -0400 (EDT)
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1003261144020.694@xanadu.home>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Fri, 26 Mar 2010 11:56:34 -0400
+Subject: [PATCH 2/2] ARM: pcmcia: fix checkpatch.pl issues in soc_common.c
+In-Reply-To: Your message of "Wed, 24 Mar 2010 20:20:19 -0300."
+	<cecb6d8f1003241620v55fb960ds14818bf3a03fa334@mail.gmail.com>
+References: <1269471898-26301-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<1269471898-26301-2-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100324230729.GA21359@n2100.arm.linux.org.uk>
+	<cecb6d8f1003241620v55fb960ds14818bf3a03fa334@mail.gmail.com>
+Message-ID: <10080.1269618994@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Mar 2010, Catalin Marinas wrote:
+On Wed, 24 Mar 2010 20:20:19 -0300, Marcelo Jimenez said:
 
-> On Thu, 2010-03-25 at 21:02 +0000, Nicolas Pitre wrote:
-> > --- a/arch/arm/include/asm/highmem.h
-> > +++ b/arch/arm/include/asm/highmem.h
-> > @@ -11,7 +11,11 @@
-> > 
-> >  #define kmap_prot              PAGE_KERNEL
-> > 
-> > -#define flush_cache_kmaps()    flush_cache_all()
-> > +#define flush_cache_kmaps() \
-> > +       do { \
-> > +               if (cache_is_vivt()) \
-> > +                       flush_cache_all(); \
-> > +       } while (0)
-> 
-> Do the aliasing VIPT caches need flushing as well?
+>> - ? ? debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
 
-No idea.  Highmem is not supported with aliasing VIPT at the moment 
-anyway -- see commit 3f973e2216.  I don't have hardware with aliasing 
-VIPT cache either.
+> I will redo it, no problem. But just for my information, in that
+> particular case, is it usefull to grep using format specifiers?
 
+Until you find the format string, you really don't know for sure if
+it's a %d or a %u or a %alt-ctl-cokebottle so you end up grepping like this:
 
-Nicolas
+egrep 'mask: .*flags: .*Vcc .* Vpp .* irq'
+
+basically wildcarding your way across whatever %foo might be there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100326/ac330af8/attachment.sig>
