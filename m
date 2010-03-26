@@ -1,24 +1,36 @@
-From: csamsel@gmxpro.de (Christian Samsel)
-Date: Fri, 26 Mar 2010 13:53:47 +0100
-Subject: Problems with DNS-323 revision A1 power LED patch
-In-Reply-To: <87bpebl3q7.fsf@lechat.rtp-net.org>
-References: <20100326104300.GA28935@jirafa.cyrius.com>
-	<87bpebl3q7.fsf@lechat.rtp-net.org>
-Message-ID: <201003261353.48338.csamsel@gmxpro.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Mar 2010 13:00:10 +0000
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <1269602911.15413.6.camel@localhost.localdomain>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
+	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
+	<s5h39zou023.wl%tiwai@suse.de>
+	<20100325113019.GA6590@n2100.arm.linux.org.uk>
+	<s5hvdckskev.wl%tiwai@suse.de> <4BAB4DE8.1030707@mvista.com>
+	<1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
+	<20100325121614.GC6590@n2100.arm.linux.org.uk>
+	<1269602911.15413.6.camel@localhost.localdomain>
+Message-ID: <1269608410.807.23.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 26. M?rz 2010 12:30:40 schrieb Arnaud Patard:
-
-> This warning is there to tell people that a gpio direction was set but
-> the gpio has not been requested. I believe the following patch would fix
-> it (warning I've not build-tested it). If it's working, I'll send it
-> again with proper s-o-b.
+On Fri, 2010-03-26 at 11:28 +0000, Philby John wrote:
+> --- a/sound/arm/aaci.c
+> +++ b/sound/arm/aaci.c
+> @@ -863,7 +863,11 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+>         struct snd_ac97 *ac97;
+>         int ret;
 > 
-> Arnaud
+> -       writel(0, aaci->base + AC97_POWERDOWN);
+> +       /*
+> +        * Fix: ac97 read back fail errors by reading
+> +        * from Power down register
+> +        */
+> +       readw(aaci->base + 0x26);
 
-Martin prepared me a patched kernel which i just tested. the traceback is 
-gone. although i wasnt able to check if the led is still functional, cause i'm 
-not at home. i'll report back later the day, if not.
+I still don't understand this. Does aaci->base point to the AACI
+registers? There is no register at offset 0x26 but there is one at 0x24
+(32-bit AACIIE2).
 
-Christian
+-- 
+Catalin
