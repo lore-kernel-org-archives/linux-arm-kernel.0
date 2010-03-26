@@ -1,27 +1,53 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Mar 2010 13:37:45 +0000
-Subject: RFC: ARM Boot standard for passing device tree blob
-In-Reply-To: <20100325210409.GH24984@n2100.arm.linux.org.uk>
-References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
-	<20100325210409.GH24984@n2100.arm.linux.org.uk>
-Message-ID: <1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
+Date: Fri, 26 Mar 2010 13:54:45 +0000
+Subject: AACI broken with commit 29a4f2d3
+In-Reply-To: <4BACB256.3020404@mvista.com>
+References: <1269438662.29073.121.camel@e102109-lin.cambridge.arm.com>
+	<1269443418.29073.147.camel@e102109-lin.cambridge.arm.com>
+	<s5h39zou023.wl%tiwai@suse.de>
+	<20100325113019.GA6590@n2100.arm.linux.org.uk>
+	<s5hvdckskev.wl%tiwai@suse.de> <4BAB4DE8.1030707@mvista.com>
+	<1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
+	<20100325121614.GC6590@n2100.arm.linux.org.uk>
+	<1269602911.15413.6.camel@localhost.localdomain>
+	<1269608410.807.23.camel@e102109-lin.cambridge.arm.com>
+	<4BACB256.3020404@mvista.com>
+Message-ID: <1269611685.807.55.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-03-25 at 21:04 +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 24, 2010 at 09:11:56AM -0600, Grant Likely wrote:
-> > ===Required System State===
-[...]
-> > *IRQs disabled
-> > *MMU off
-> > *Instruction cache either on or off
-> > *Data cache turned off
+On Fri, 2010-03-26 at 13:10 +0000, Philby John wrote:
+> On 03/26/2010 06:30 PM, Catalin Marinas wrote:
+> > On Fri, 2010-03-26 at 11:28 +0000, Philby John wrote:
+> >> --- a/sound/arm/aaci.c
+> >> +++ b/sound/arm/aaci.c
+> >> @@ -863,7 +863,11 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
+> >>          struct snd_ac97 *ac97;
+> >>          int ret;
+> >>
+> >> -       writel(0, aaci->base + AC97_POWERDOWN);
+> >> +       /*
+> >> +        * Fix: ac97 read back fail errors by reading
+> >> +        * from Power down register
+> >> +        */
+> >> +       readw(aaci->base + 0x26);
+> >
+> > I still don't understand this. Does aaci->base point to the AACI
+> > registers? There is no register at offset 0x26 but there is one at 0x24
+> > (32-bit AACIIE2).
+> >
 > 
-> Would recommend saying "Data cache(s) turned off" so that L2 cache is
-> included.
+> I think there is a register at 0x26 for AACI, except that its not
+> defined in aaci.h. References in the manual such as "The AC-link signals
+> can be placed in low-power mode, when the power down control
+> and status register (0x26) of the CODEC is programmed to the
+> appropriate value, both AACIBITCLK and AACISDATAIN are brought to, and
+> held at 0.", refer to this register IMHO.
 
-There are platforms where the L2 cache is turned on by the boot monitor
-(secure monitor) and Linux has no control over it (I think OMAP).
+But the above says "the power down control and status register (0x26) of
+the CODEC". So this refers to the AC97 registers rather than the AACI
+registers. Your patch reads from the AACI registers. The AC97 registers
+I think are access with aaci_ac97_(read|write) functions.
 
 -- 
 Catalin
