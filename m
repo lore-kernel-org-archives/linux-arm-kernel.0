@@ -1,37 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Mar 2010 23:09:39 +0000
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <alpine.LFD.2.00.1003261144020.694@xanadu.home>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1003261144020.694@xanadu.home>
-Message-ID: <20100326230939.GF29179@n2100.arm.linux.org.uk>
+From: ulf.samuelsson@atmel.com (Ulf Samuelsson)
+Date: Sat, 27 Mar 2010 00:16:58 +0100
+Subject: request_irq in I2C driver causes kernel to freeze during probe, but
+	if done later - no problem!
+Message-ID: <4BAD406A.7070208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 11:51:58AM -0400, Nicolas Pitre wrote:
-> On Fri, 26 Mar 2010, Catalin Marinas wrote:
-> 
-> > On Thu, 2010-03-25 at 21:02 +0000, Nicolas Pitre wrote:
-> > > --- a/arch/arm/include/asm/highmem.h
-> > > +++ b/arch/arm/include/asm/highmem.h
-> > > @@ -11,7 +11,11 @@
-> > > 
-> > >  #define kmap_prot              PAGE_KERNEL
-> > > 
-> > > -#define flush_cache_kmaps()    flush_cache_all()
-> > > +#define flush_cache_kmaps() \
-> > > +       do { \
-> > > +               if (cache_is_vivt()) \
-> > > +                       flush_cache_all(); \
-> > > +       } while (0)
-> > 
-> > Do the aliasing VIPT caches need flushing as well?
-> 
-> No idea.  Highmem is not supported with aliasing VIPT at the moment 
-> anyway -- see commit 3f973e2216.  I don't have hardware with aliasing 
-> VIPT cache either.
+I am currently working on an I2C driver which requires an irq.
 
-I don't think we'll ever support aliasing VIPT caches with highmem -
-it'd quadruple the amount of kmap space that's required for things like
-KM_USER*.
+The driver was developed on a Beagleboard running linux-2.6.29-rc3
+(Android 1.6) where everything works OK.
+I then try the driver on a customer board, where they use 2.6.27.16
+(also Android 1.6) on a Qualcomm Snapdragon.
+
+In the "probe" for the driver, I request an irq.
+If the code below is active, then the driver completes the "probe"
+and can communicate with other I2C peripherals.
+(This is verified by listening to the I2C bus communications)
+After ~20 I2C messages to 3 different peripherals, the kernel freezes.
+The customer board does not have a console port!,
+so you can only read the bootlog if the boot succeeds.
+
+If the code below is ifdef'ed away. the boot succeeds.
+I have implemented a workaround, using sysfs, which allows me to request
+the irq manually after the system has completed the boot.
+
+If I do that, then the interrupts are accepted and the correct interrupt
+routine is called.
+
+
+#ifdef	MAXINT
+if (mxt->irq) {
+	error = request_irq(
+			mxt->irq,
+			mxt_irq_handler,
+			IRQF_TRIGGER_FALLING,
+			client->dev.driver->name,
+			mxt
+		);
+	if (error < 0) {
+		dev_err(&client->dev,
+			"failed to allocate irq %d\n", mxt->irq);
+		goto err_free_device;
+	}
+}
+#endif
+
+Some notes:
+"request_irq" completes with (error >= 0) so the error handling
+is not processed. This is verified by listening to the I2C bus.
+
+Since we take the appropriate interrupt, "mxt->irq" must be correct.
+Since we call the correct irq handler,"mxt_irq_handler" must be correct.
+"mxt" is a pointer to the driver local data.
+We use the same pointer when we request the irq in sysfs.
+Not sure about the contents of "client->dev.driver->name".
+
+If the interrupt is executing, then we would see some I2C communication
+as a result, but we do not see this, before the kernel freezes.
+
+The interrupt is (and should be) called on the falling edge of the
+interrupt.
+
+I am currently scratching my head, and need help with ideas...
+
+
+Best Regards
+Ulf Samuelsson
