@@ -1,39 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 26 Mar 2010 14:15:55 +0000
-Subject: AACI broken with commit 29a4f2d3
-In-Reply-To: <1269612734.807.73.camel@e102109-lin.cambridge.arm.com>
-References: <s5hvdckskev.wl%tiwai@suse.de> <4BAB4DE8.1030707@mvista.com>
-	<1269518557.10064.14.camel@e102109-lin.cambridge.arm.com>
-	<20100325121614.GC6590@n2100.arm.linux.org.uk>
-	<1269602911.15413.6.camel@localhost.localdomain>
-	<1269608410.807.23.camel@e102109-lin.cambridge.arm.com>
-	<4BACB256.3020404@mvista.com>
-	<1269611685.807.55.camel@e102109-lin.cambridge.arm.com>
-	<20100326140833.GK27692@sirena.org.uk>
-	<1269612734.807.73.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100326141555.GB19385@rakim.wolfsonmicro.main>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 26 Mar 2010 15:47:51 +0100
+Subject: [PATCH] netdev/fec.c: add phylib supporting to enable carrier
+	detection
+In-Reply-To: <1269597052-10104-1-git-send-email-bryan.wu@canonical.com>
+References: <1269597052-10104-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <20100326144751.GA22937@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 02:12:14PM +0000, Catalin Marinas wrote:
-> On Fri, 2010-03-26 at 14:08 +0000, Mark Brown wrote:
-> > On Fri, Mar 26, 2010 at 01:54:45PM +0000, Catalin Marinas wrote:
+On Fri, Mar 26, 2010 at 05:50:52PM +0800, Bryan Wu wrote:
+> BugLink: http://bugs.launchpad.net/bugs/457878
+> 
+>  - removed old MII phy control code
+>  - add phylib supporting
+>  - add ethtool interface to make user space NetworkManager works
+> 
+> Tested on Freescale i.MX51 Babbage board.
+> 
+> This patch is based on a patch from Frederic Rodo <fred.rodo@gmail.com>
+> 
+> Cc: Frederic Rodo <fred.rodo@gmail.com>
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 
-> > > But the above says "the power down control and status register (0x26) of
-> > > the CODEC". So this refers to the AC97 registers rather than the AACI
-> > > registers. Your patch reads from the AACI registers. The AC97 registers
-> > > I think are access with aaci_ac97_(read|write) functions.
+Great, will test it soon.
 
-> > Yes, they are - but note that some CODECs will power up in low power
-> > mode and therefore attempts to read immediately after the controller
-> > probe function starts executing may fail until the controller has issued
-> > a warm reset.
+Regards,
 
-> Yes, possibly. But my point is that accessing offset 0x26 in the AACI
-> register space has nothing to do with the AC97 power register. At offset
-> 0x26 in the AACI register space you find the top part of the AACIIE2
-> register (if you can even read this as a half-word).
+   Wolfram
 
-Oh, absolutely (see my earlier reply).  I just wanted to be clear that
-if there was some confusion about actually interacting with the CODEC
-register map there's a problem there.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100326/18d3fea2/attachment.sig>
