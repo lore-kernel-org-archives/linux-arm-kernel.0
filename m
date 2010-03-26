@@ -1,35 +1,40 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Fri, 26 Mar 2010 07:43:20 -1000
-Subject: RFC: ARM Boot standard for passing device tree blob
-In-Reply-To: <1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
-References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>	<20100325210409.GH24984@n2100.arm.linux.org.uk>
-	<1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <4BACF238.3040405@firmworks.com>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Fri, 26 Mar 2010 18:57:44 +0100
+Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+In-Reply-To: <63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
+References: <20100322191900.GF2040@bluebox.local>
+	<20100322192748.GK2040@bluebox.local>
+	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
+	<20100323101540.GB2049@bluebox.local>
+	<63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
+Message-ID: <20100326175740.GA2043@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On Thu, 2010-03-25 at 21:04 +0000, Russell King - ARM Linux wrote:
->   
->> On Wed, Mar 24, 2010 at 09:11:56AM -0600, Grant Likely wrote:
->>     
->>> ===Required System State===
->>>       
-> [...]
->   
->>> *IRQs disabled
->>> *MMU off
->>> *Instruction cache either on or off
->>> *Data cache turned off
->>>       
->> Would recommend saying "Data cache(s) turned off" so that L2 cache is
->> included.
->>     
->
-> There are platforms where the L2 cache is turned on by the boot monitor
-> (secure monitor) and Linux has no control over it (I think OMAP).
->   
+On Fri, Mar 26, 2010 at 06:28:13PM +0100, Linus Walleij wrote:
+> 2010/3/23 Hans J. Koch <hjk@linutronix.de>:
+> > On Tue, Mar 23, 2010 at 08:29:01AM +0100, Linus Walleij wrote:
+> >> 2010/3/22 Hans J. Koch <hjk@linutronix.de>:
+> >> Also check that the DTCM is really such a thing.
+> >
+> > Yep, I'll do this.
+> 
+> If you really have a system with *only* DTCM and no ITCM, I don't
+> know if the TCM support in the kernel works with that right now,
 
-What is the reason for turning off the data caches?  Leaving all caches 
-turned on and coherent with one another has always worked well for me at 
-the interface from firmware to a booted program.
+It won't, AFAICT. I removed TCM from the mappings in v2. Unfortunately,
+the Telechips manual doesn't say much about it, but always calls it
+"DTCM" or "Data TCM". I'll try to get more information, and come up
+with a patch later. It's not really important ATM.
+
+> I've never seen a system with just ITCM or just DTCM, but if
+> you can help me testing I will try to fix it up.
+
+If I change things in arch/arm/kernel/tcm.c, I'll Cc: you anyway since
+you're mentioned in the header. The code itself seems quite clear.
+
+Thanks,
+Hans
+
+> 
+> Linus
