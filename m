@@ -1,30 +1,30 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Sat, 27 Mar 2010 17:20:29 +0100
-Subject: [PATCH 2/7 v2] Add clock framework for plat-tcc
-In-Reply-To: <20100325203242.GC24984@n2100.arm.linux.org.uk>
+Date: Sat, 27 Mar 2010 17:33:54 +0100
+Subject: [PATCH 3/7 v2] Introduce plat-tcc irq framework
+In-Reply-To: <20100325203307.GD24984@n2100.arm.linux.org.uk>
 References: <20100325200427.GC2047@bluebox.local>
-	<20100325200915.GE2047@bluebox.local>
-	<20100325203242.GC24984@n2100.arm.linux.org.uk>
-Message-ID: <20100327162029.GC2035@bluebox.local>
+	<20100325201057.GF2047@bluebox.local>
+	<20100325203307.GD24984@n2100.arm.linux.org.uk>
+Message-ID: <20100327163354.GD2035@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 08:32:42PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 25, 2010 at 09:09:16PM +0100, Hans J. Koch wrote:
-> > +#define BCLKCTR0	(void __iomem *)(CKC_BASE + BCLKCTR0_OFFS)
-> > +#define BCLKCTR1	(void __iomem *)(CKC_BASE + BCLKCTR1_OFFS)
+On Thu, Mar 25, 2010 at 08:33:07PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 25, 2010 at 09:10:58PM +0100, Hans J. Koch wrote:
+> > +#include <linux/init.h>
+> > +#include <linux/module.h>
+> > +#include <linux/sched.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/ptrace.h>
+> > +
+> > +#include <asm/irq.h>
+> > +#include <asm/mach/irq.h>
+> > +#include <asm/io.h>
 > 
-> If you define CKC_BASE to have type 'void __iomem *' then all these
-> cases go away.
+> linux/io.h
 
-Done.
-
-> 
-> > +	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
-> 
-> And this won't warn in the future.
-
-Right :)
+Yep, and <linux/sched.h>, <linux/interrupt.h>, and <linux/ptrace.h> are not
+needed at all. Fixed.
 
 Thanks,
 Hans
