@@ -1,44 +1,69 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Sat, 27 Mar 2010 16:26:03 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
-In-Reply-To: <63386a3d1003270233k5c2a216fv33f3a0d88f8d7291@mail.gmail.com>
-References: <20100322191900.GF2040@bluebox.local>
-	<20100322192748.GK2040@bluebox.local>
-	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
-	<20100323101540.GB2049@bluebox.local>
-	<63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
-	<20100326175740.GA2043@bluebox.local>
-	<63386a3d1003270233k5c2a216fv33f3a0d88f8d7291@mail.gmail.com>
-Message-ID: <20100327152601.GA2035@bluebox.local>
+Date: Sat, 27 Mar 2010 17:02:47 +0100
+Subject: [PATCH 1/7 v2] Introduce plat-tcc
+In-Reply-To: <20100325203107.GB24984@n2100.arm.linux.org.uk>
+References: <20100325200427.GC2047@bluebox.local>
+	<20100325200746.GD2047@bluebox.local>
+	<20100325203107.GB24984@n2100.arm.linux.org.uk>
+Message-ID: <20100327160247.GB2035@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 27, 2010 at 10:33:22AM +0100, Linus Walleij wrote:
-> 2010/3/26 Hans J. Koch <hjk@linutronix.de>:
+On Thu, Mar 25, 2010 at 08:31:07PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 25, 2010 at 09:07:48PM +0100, Hans J. Koch wrote:
+> > +#define __virt_to_bus(x)	__virt_to_phys(x)
+> > +#define __bus_to_virt(x)	__phys_to_virt(x)
+> > +#define __pfn_to_bus(x)		__pfn_to_phys(x)
+> > +#define __bus_to_pfn(x)		__phys_to_pfn(x)
 > 
-> >> If you really have a system with *only* DTCM and no ITCM, I don't
-> >> know if the TCM support in the kernel works with that right now,
-> >
-> > It won't, AFAICT. I removed TCM from the mappings in v2. Unfortunately,
-> > the Telechips manual doesn't say much about it, but always calls it
-> > "DTCM" or "Data TCM". I'll try to get more information, and come up
-> > with a patch later. It's not really important ATM.
-> 
-> You really only need to include a call to
-> u32 tcm_status = read_cpuid_tcmstatus();
-> pr_info("TCM status 0x%08x", tcm_status);
-> 
-> To find out what kind of TCMs you have on your system,
-> if they are true TCMs!
-> 
-> Bit 1 is set if you have some ITCM, bit 16 is set if you have
-> some DTCM. Else it's something custom.
+> You don't need to define any of these.
 
-Yep, that's what I saw in your code. I'll try that as soon as I've got the
-time.
+Right. Removed.
+
+> 
+> > diff --git a/arch/arm/plat-tcc/include/mach/vmalloc.h b/arch/arm/plat-tcc/include/mach/vmalloc.h
+> > new file mode 100644
+> > index 0000000..9635303
+> > --- /dev/null
+> > +++ b/arch/arm/plat-tcc/include/mach/vmalloc.h
+> > @@ -0,0 +1,11 @@
+> > +/*
+> > + * Author: <linux@telechips.com>
+> > + * Created: June 10, 2008
+> > + *
+> > + * Copyright (C) 2000 Russell King.
+> > + * Copyright (C) 2008-2009 Telechips
+> > + *
+> > + * Licensed under the terms of the GPL v2.
+> > + */
+> > +#define VMALLOC_END	  (PAGE_OFFSET + 0x10000000)
+> 
+> Base address of IO rather than something dependent on PAGE_OFFSET?
+
+Fixed.
+
+> 
+> > +
+> > diff --git a/arch/arm/plat-tcc/system.c b/arch/arm/plat-tcc/system.c
+> > new file mode 100644
+> > index 0000000..1a33ced
+> > --- /dev/null
+> > +++ b/arch/arm/plat-tcc/system.c
+> > @@ -0,0 +1,24 @@
+> > +/*
+> > + * System functions for Telechips TCCxxxx SoCs
+> > + *
+> > + * Copyright (C) Hans J. Koch <hjk@linutronix.de>
+> > + *
+> > + * Licensed under the terms of the GPL v2.
+> > + *
+> > + */
+> > +
+> > +#include <asm/io.h>
+> 
+> linux/io.h ?
+
+OK.
 
 Thanks,
 Hans
-
-> 
-> Linus
