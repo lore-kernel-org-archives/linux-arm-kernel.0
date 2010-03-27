@@ -1,35 +1,22 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 27 Mar 2010 10:33:22 +0100
-Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
-In-Reply-To: <20100326175740.GA2043@bluebox.local>
-References: <20100322191900.GF2040@bluebox.local>
-	<20100322192748.GK2040@bluebox.local>
-	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
-	<20100323101540.GB2049@bluebox.local>
-	<63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
-	<20100326175740.GA2043@bluebox.local>
-Message-ID: <63386a3d1003270233k5c2a216fv33f3a0d88f8d7291@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 27 Mar 2010 10:11:32 +0000
+Subject: request_irq in I2C driver causes kernel to freeze during
+	probe, but if done later - no problem!
+In-Reply-To: <4BADAD55.1080304@atmel.com>
+References: <4BAD406A.7070208@atmel.com>
+	<20100326232421.GG29179@n2100.arm.linux.org.uk>
+	<4BAD4FDE.2010904@atmel.com> <4BAD5450.7020605@atmel.com>
+	<20100327011223.GG31126@trinity.fluff.org>
+	<4BADAD55.1080304@atmel.com>
+Message-ID: <20100327101132.GA9724@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/26 Hans J. Koch <hjk@linutronix.de>:
+On Sat, Mar 27, 2010 at 08:01:41AM +0100, Ulf Samuelsson wrote:
+> I assume that, since I request interrupt on falling edge
+> the interrupt will not be activated until the target
+> provides a new falling edge on the interrupt line.
 
->> If you really have a system with *only* DTCM and no ITCM, I don't
->> know if the TCM support in the kernel works with that right now,
->
-> It won't, AFAICT. I removed TCM from the mappings in v2. Unfortunately,
-> the Telechips manual doesn't say much about it, but always calls it
-> "DTCM" or "Data TCM". I'll try to get more information, and come up
-> with a patch later. It's not really important ATM.
-
-You really only need to include a call to
-u32 tcm_status = read_cpuid_tcmstatus();
-pr_info("TCM status 0x%08x", tcm_status);
-
-To find out what kind of TCMs you have on your system,
-if they are true TCMs!
-
-Bit 1 is set if you have some ITCM, bit 16 is set if you have
-some DTCM. Else it's something custom.
-
-Linus
+Does your interrupt controller support falling edge IRQs on the I2C
+controller?  Most SoCs provide you with only one fixed triggering
+method for on-board devices, which is normally only level sensitive.
