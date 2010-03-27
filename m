@@ -1,38 +1,50 @@
-From: ulf.samuelsson@atmel.com (Ulf Samuelsson)
-Date: Sat, 27 Mar 2010 12:06:33 +0100
-Subject: request_irq in I2C driver causes kernel to freeze duringprobe,
-	but if done later - no problem!
-References: <4BAD406A.7070208@atmel.com>
-	<20100326232421.GG29179@n2100.arm.linux.org.uk>
-	<4BAD4FDE.2010904@atmel.com> <4BAD5450.7020605@atmel.com>
-	<20100327011223.GG31126@trinity.fluff.org>
-	<4BADAD55.1080304@atmel.com>
-	<20100327101132.GA9724@n2100.arm.linux.org.uk>
-Message-ID: <0AB70C4BEF8D4E31B7147561BB63BE82@aeglos>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Sat, 27 Mar 2010 17:25:49 +0530
+Subject: [PATCH] Including device.h and resource.h header files in
+	linux/amba/bus.h
+In-Reply-To: <63386a3d1003270213t6939202dof4265d9c8372407a@mail.gmail.com>
+References: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
+	<63386a3d1003261031p63224296pd4b1a649108af00b@mail.gmail.com>
+	<22dbbef21003262207i3fa10157jf3b8577b307ce99d@mail.gmail.com>
+	<63386a3d1003270213t6939202dof4265d9c8372407a@mail.gmail.com>
+Message-ID: <22dbbef21003270455i1e7175cbxbbd2e2112931c192@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On Sat, Mar 27, 2010 at 08:01:41AM +0100, Ulf Samuelsson wrote:
->> I assume that, since I request interrupt on falling edge
->> the interrupt will not be activated until the target
->> provides a new falling edge on the interrupt line.
+On Sat, Mar 27, 2010 at 2:43 PM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/3/27 viresh kumar <viresh.linux@gmail.com>:
 >
-> Does your interrupt controller support falling edge IRQs on the I2C
-> controller?  Most SoCs provide you with only one fixed triggering
-> method for on-board devices, which is normally only level sensitive.
+>> Some time back i have initiated a thread regarding this type of issues. You can
+>> find them here:
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/010258.html
+>>
+>> And my understanding after the discussion was:
+>>
+>> It is the responsibility of a header files, using types definitions
+>> from outside world,
+>> to include all header files required for proper compilation.
+>> This is not the responsibility of the user using this file to add
+>> dependency header in
+>> his source files.
 >
+> On the other hand Documentation/SubmitChecklist contains this:
+>
+> 1: If you use a facility then #include the file that defines/declares
+> ? that facility. ?Don't depend on other header files pulling in ones
+> ? that you use.
 
+I agree on the above statement.
 
-It is not the I2C interrupt, it is a GPIO interrupt used by the external 
-device
-indicating it needs service
+But what if i don't want to use every type that is used in header file
+i am including. For ex: I don't want to use resource
+structure in my code and i need to include bus.h for some
+other definition. Then why should i get a compilation warning.
 
-The problem only occurs when the request_irq is executed in the probe.
-I have written a sysfs routine which will do the request_irq, later when I 
-get a shell.
-With this, rather cumbesome, method, everything seems to work OK.
+Again, according to above statement from submitchecklist:
+shouldn't bus.h include device.h and resource.h, as it is using
+these facilities.
 
-Best Regards
-Ulf Samuelsson
+regards,
+viresh kumar.
