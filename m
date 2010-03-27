@@ -1,34 +1,17 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 27 Mar 2010 21:57:04 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 27 Mar 2010 21:42:25 +0000
 Subject: [PATCH] Including device.h and resource.h header files in
 	linux/amba/bus.h
-In-Reply-To: <22dbbef21003270455i1e7175cbxbbd2e2112931c192@mail.gmail.com>
+In-Reply-To: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
 References: <1269511413-30621-1-git-send-email-viresh.kumar@st.com>
-	<63386a3d1003261031p63224296pd4b1a649108af00b@mail.gmail.com>
-	<22dbbef21003262207i3fa10157jf3b8577b307ce99d@mail.gmail.com>
-	<63386a3d1003270213t6939202dof4265d9c8372407a@mail.gmail.com>
-	<22dbbef21003270455i1e7175cbxbbd2e2112931c192@mail.gmail.com>
-Message-ID: <63386a3d1003271357i7cb5aa84w35a447ed34db8d72@mail.gmail.com>
+Message-ID: <20100327214225.GA13203@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Viresh]
-> On Sat, Mar 27, 2010 at 2:43 PM, Linus Walleij
->> On the other hand Documentation/SubmitChecklist contains this:
->>
->> 1: If you use a facility then #include the file that defines/declares
->> ? that facility. ?Don't depend on other header files pulling in ones
->> ? that you use.
->
-> I agree on the above statement.
->
->(...)
-> Again, according to above statement from submitchecklist:
-> shouldn't bus.h include device.h and resource.h, as it is using
-> these facilities.
+On Thu, Mar 25, 2010 at 03:33:32PM +0530, Viresh KUMAR wrote:
+> linux/amba/bus.h have dependencies on linux/device.h and linux/resource.h, but
+> it doesn't include them. We get compilation errors in our files which include
+> bus.h but doesn't include device.h and resource.h. This patch includes device.h
+> and resource.h in linux/amba/bus.h file.
 
-Yes I think you're right, looks like it should be applied then!
-Acked-by:
-
-Yours,
-Linus Walleij
+Ok.
