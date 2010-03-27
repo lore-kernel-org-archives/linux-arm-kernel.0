@@ -1,27 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Mar 2010 22:52:40 +0000
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <1269535366-25175-1-git-send-email-virtuoso@slind.org>
-References: <20100318135008.GA11800@Krystal>
-	<1269535366-25175-1-git-send-email-virtuoso@slind.org>
-Message-ID: <20100327225240.GC13203@n2100.arm.linux.org.uk>
+Date: Sat, 27 Mar 2010 22:55:22 +0000
+Subject: [PATCH] ARM: mach-sa1100: Put nanoEngine support back in the
+	kernel.
+In-Reply-To: <1268338199-32222-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+References: <1268338199-32222-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+Message-ID: <20100327225522.GD13203@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 06:42:46PM +0200, Alexander Shishkin wrote:
+On Thu, Mar 11, 2010 at 05:09:59PM -0300, Marcelo Roberto Jimenez wrote:
+> --- /dev/null
+> +++ b/arch/arm/configs/nanoengine_defconfig
+> @@ -0,0 +1,1396 @@
+
+Please don't include defconfigs along with other code.
+
 > +/*
-> + * emulate __xchg() using 32-bit __cmpxchg()
+> + * linux/arch/arm/mach-sa1100/nanoengine.c
+> + *
+> + * Bright Star Engineering's nanoEngine board init code.
+> + *
+> + * Copyright (C) 2009 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
 > + */
-> +static inline unsigned long __xchg_generic(unsigned long x,
-> +						 volatile void *ptr, int size)
-> +{
-> +	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr & ~3UL);
-> +	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/root_dev.h>
+> +#include <linux/tty.h>
 
-I wonder if we should be using __alignof__ here.
+Do you really need tty.h in here?
 
-	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
-		(__alignof__(unsigned long) - 1));
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/setup.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/flash.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/serial_sa1100.h>
+> +
+> +#include <mach/hardware.h>
+> +
+> +#include "generic.h"
+> +
+> +/* Flash bank 0 */
+> +static struct mtd_partition nanoengine_partitions[] = {
+> +	{
+> +	.name		= "nanoEngine boot firmware and parameter table",
 
-Rest of the patch looks fine; it'd be nice to get some tested-by's for it
-though.
+Each '{' should indent the next line by a tab.
