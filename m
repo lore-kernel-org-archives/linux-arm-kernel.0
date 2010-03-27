@@ -1,36 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Mar 2010 09:17:37 +0000
-Subject: request_irq in I2C driver causes kernel to freeze during probe,
-	but if done later - no problem!
-In-Reply-To: <4BAD4FDE.2010904@atmel.com>
-References: <4BAD406A.7070208@atmel.com>
-	<20100326232421.GG29179@n2100.arm.linux.org.uk>
-	<4BAD4FDE.2010904@atmel.com>
-Message-ID: <20100327091736.GI29179@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sat, 27 Mar 2010 10:33:22 +0100
+Subject: [PATCH 05/07] Basic IO mappings for mach-tcc8k
+In-Reply-To: <20100326175740.GA2043@bluebox.local>
+References: <20100322191900.GF2040@bluebox.local>
+	<20100322192748.GK2040@bluebox.local>
+	<63386a3d1003230029r7ed7c4adm107298686aa14d5e@mail.gmail.com>
+	<20100323101540.GB2049@bluebox.local>
+	<63386a3d1003261028rc9c24a2pb258a823118813cf@mail.gmail.com>
+	<20100326175740.GA2043@bluebox.local>
+Message-ID: <63386a3d1003270233k5c2a216fv33f3a0d88f8d7291@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 27, 2010 at 01:22:54AM +0100, Ulf Samuelsson wrote:
-> This is my interrupt routine, which always return IRQ_HANDLED.
-> sysfs shows that "mxt->invalid_irq_counter" is never incremented
-> even after I successfully enable the interrupt in sysfs.
-> 
-> mxt->dwork will always access the I2C bus but we dont see that.
-> 
-> static irqreturn_t mxt_irq_handler(int irq, void *_mxt)
-> {
-> 	struct	mxt_data *mxt = _mxt;
-> 	unsigned long	flags;
-> 	mxt->irq_counter++;
-> 	spin_lock_irqsave(&mxt->lock, flags);
-> 
-> 	if (mxt_valid_interrupt()) {
-> 		/* Macro, always returning 1  on these boards */
-> 		cancel_delayed_work(&mxt->dwork);
-> 		schedule_delayed_work(&mxt->dwork, 0);
-> 		mxt->valid_irq_counter++;
-> 	} else {
-> 		mxt->invalid_irq_counter++;
+2010/3/26 Hans J. Koch <hjk@linutronix.de>:
 
-The other thing is that in this case you should ultimately return
-IRQ_NONE from this handler.
+>> If you really have a system with *only* DTCM and no ITCM, I don't
+>> know if the TCM support in the kernel works with that right now,
+>
+> It won't, AFAICT. I removed TCM from the mappings in v2. Unfortunately,
+> the Telechips manual doesn't say much about it, but always calls it
+> "DTCM" or "Data TCM". I'll try to get more information, and come up
+> with a patch later. It's not really important ATM.
+
+You really only need to include a call to
+u32 tcm_status = read_cpuid_tcmstatus();
+pr_info("TCM status 0x%08x", tcm_status);
+
+To find out what kind of TCMs you have on your system,
+if they are true TCMs!
+
+Bit 1 is set if you have some ITCM, bit 16 is set if you have
+some DTCM. Else it's something custom.
+
+Linus
