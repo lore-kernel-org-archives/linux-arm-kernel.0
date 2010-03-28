@@ -1,60 +1,96 @@
-From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
-Date: Sat, 27 Mar 2010 21:00:48 -0400
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <20100328001429.GA16697@shareable.org>
-References: <20100318135008.GA11800@Krystal>
-	<1269535366-25175-1-git-send-email-virtuoso@slind.org>
-	<20100327225240.GC13203@n2100.arm.linux.org.uk>
-	<20100328001429.GA16697@shareable.org>
-Message-ID: <20100328010048.GB12449@Krystal>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Sat, 27 Mar 2010 21:22:47 -0400
+Subject: [RFC PATCH] create generic alignment api (v2)
+Message-ID: <20100328012247.GA17763@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Lokier (jamie at shareable.org) wrote:
-> Russell King - ARM Linux wrote:
-> > I wonder if we should be using __alignof__ here.
-> > 
-> > 	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
-> > 		(__alignof__(unsigned long) - 1));
-> 
-> Are there ARM targets with a smaller value from __alignof__()?
-> I think you meant:
-> 
-> 	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
-> 		~(unsigned long)(__alignof__(unsigned long) - 1));
-> 
-> Perhaps in asm-generic that has a place.  It would simplify the asm if
-> the alignment is 1 on some machine.
-> 
-> But I don't think it'd happen anyway.  There are machines which don't
-> require full alignment of long, but insufficiently aligned *atomic*
-> accesses like cmpxchg are *not atomic*.  x86 is one such machine.
+Rather than re-doing the "alignment on a type size" trick all over again at
+different levels, import the "ltt_align" from LTTng into kernel.h and make this
+available to everyone. Renaming to:
 
-I think you mean CMPXCHG8B and CMPXCHG16B ?
+- offset_align
+- offset_align_floor
+- object_align
+- object_align_floor
 
-If my memory serves me well, cmpxchg is fine with unaligned accesses on
-x86. But you are right in that other architectures will have a hard time
-with non-aligned cmpxchg. I'm just not sure about x86 specifically.
+Changelog since v1:
 
-Thanks,
+- Align on the object natural alignment
+    (rather than min(arch word alignment, natural alignment))
 
-Mathieu
+The advantage of separating the API in "object alignment" and "offset alignment"
+is that it gives more freedom to play with offset alignment. Very useful to
+implement a tracer ring-buffer alignment. (hint hint)
 
-> Fortunately GCC aligns the types sufficiently well - and we rely on
-> that all over the kernel.
-> 
-> I'm not sure about ARM, when doing a 64-bit cmpxchg, if the doubleword
-> must be 64-bit aligned to get atomicity.
-> 
-> Note that the posted code doesn't work as is for 64-bit longs: the
-> "mask" calculation overflows if called with size >= 4.
-> 
-> But seeing as this is for ARM only at present, I'd just change the
-> types to u32 and be done with it.  It does seem like a good thing to
-> go to asm-generic eventually though.
-> 
-> -- Jamie
+Typical users will use "object alignment", but infrastructures like tracers
+which need to perform dynamic alignment will typically use "offset alignment",
+because it allows to align with respect to a base rather than to pass an
+absolute address.
 
+We use "sizeof(object)" rather than "__alignof__()" object because alignof
+returns "recommended" object alignment for the architecture, which can be
+sub-optimal on some architectures. By ensuring alignment on the object size, we
+are sure to make the right choice.
+
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Alexander Shishkin <virtuoso@slind.org>,
+CC: linux-arm-kernel at lists.infradead.org
+CC: Imre Deak <imre.deak@nokia.com>
+CC: Jamie Lokier <jamie@shareable.org>
+CC: rostedt at goodmis.org
+CC: mingo at elte.hu
+---
+ include/linux/kernel.h |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+Index: linux-2.6-lttng/include/linux/kernel.h
+===================================================================
+--- linux-2.6-lttng.orig/include/linux/kernel.h	2010-03-27 20:46:07.000000000 -0400
++++ linux-2.6-lttng/include/linux/kernel.h	2010-03-27 21:17:52.000000000 -0400
+@@ -42,6 +42,41 @@ extern const char linux_proc_banner[];
+ #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+ #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
+ 
++/**
++ * offset_align - Calculate the offset needed to align an object on its natural
++ *                alignment towards higher addresses.
++ * @align_drift:  object offset from an "alignment"-aligned address.
++ * @alignment:    natural object alignment. Must be non-zero, power of 2.
++ *
++ * Returns the offset that must be added to align towards higher
++ * addresses.
++ */
++static inline size_t offset_align(size_t align_drift, size_t alignment)
++{
++	return (alignment - align_drift) & (alignment - 1);
++}
++
++/**
++ * offset_align_floor - Calculate the offset needed to align an object
++ *                      on its natural alignment towards lower addresses.
++ * @align_drift:  object offset from an "alignment"-aligned address.
++ * @alignment:    natural object alignment. Must be non-zero, power of 2.
++ *
++ * Returns the offset that must be substracted to align towards lower addresses.
++ */
++static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
++{
++	return (align_drift - alignment) & (alignment - 1);
++}
++
++#define object_align(object)						       \
++	((typeof(object))((size_t) object + offset_align((size_t) object,      \
++			  sizeof(object))))
++
++#define object_align_floor(object)					       \
++	((typeof(object))((size_t) object - offset_align_floor((size_t) object,\
++			  sizeof(object))))
++
+ #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+ 
+ #define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
 -- 
 Mathieu Desnoyers
 Operating System Efficiency R&D Consultant
