@@ -1,67 +1,52 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Sun, 28 Mar 2010 15:39:26 +0100
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <20100328010048.GB12449@Krystal>
-References: <20100318135008.GA11800@Krystal>
-	<1269535366-25175-1-git-send-email-virtuoso@slind.org>
-	<20100327225240.GC13203@n2100.arm.linux.org.uk>
-	<20100328001429.GA16697@shareable.org>
-	<20100328010048.GB12449@Krystal>
-Message-ID: <20100328143926.GE3417@shareable.org>
+From: imre.deak@nokia.com (Imre Deak)
+Date: Sun, 28 Mar 2010 18:40:29 +0300
+Subject: [RFC PATCH] create generic alignment api (v2)
+In-Reply-To: <20100328012247.GA17763@Krystal>
+References: <20100328012247.GA17763@Krystal>
+Message-ID: <20100328154029.GA21061@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Desnoyers wrote:
-> * Jamie Lokier (jamie at shareable.org) wrote:
-> > Russell King - ARM Linux wrote:
-> > > I wonder if we should be using __alignof__ here.
-> > > 
-> > > 	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
-> > > 		(__alignof__(unsigned long) - 1));
-> > 
-> > Are there ARM targets with a smaller value from __alignof__()?
-> > I think you meant:
-> > 
-> > 	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
-> > 		~(unsigned long)(__alignof__(unsigned long) - 1));
-> > 
-> > Perhaps in asm-generic that has a place.  It would simplify the asm if
-> > the alignment is 1 on some machine.
-> > 
-> > But I don't think it'd happen anyway.  There are machines which don't
-> > require full alignment of long, but insufficiently aligned *atomic*
-> > accesses like cmpxchg are *not atomic*.  x86 is one such machine.
-> 
-> I think you mean CMPXCHG8B and CMPXCHG16B ?
-> 
-> If my memory serves me well, cmpxchg is fine with unaligned accesses on
-> x86. But you are right in that other architectures will have a hard time
-> with non-aligned cmpxchg. I'm just not sure about x86 specifically.
+On Sun, Mar 28, 2010 at 03:22:47AM +0200, ext Mathieu Desnoyers wrote:
+>  [...]
+> +/**
+> + * offset_align - Calculate the offset needed to align an object on its natural
+> + *                alignment towards higher addresses.
+> + * @align_drift:  object offset from an "alignment"-aligned address.
+> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
+> + *
+> + * Returns the offset that must be added to align towards higher
+> + * addresses.
+> + */
+> +static inline size_t offset_align(size_t align_drift, size_t alignment)
+> +{
+> +	return (alignment - align_drift) & (alignment - 1);
+> +}
+> +
+> +/**
+> + * offset_align_floor - Calculate the offset needed to align an object
+> + *                      on its natural alignment towards lower addresses.
+> + * @align_drift:  object offset from an "alignment"-aligned address.
+> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
+> + *
+> + * Returns the offset that must be substracted to align towards lower addresses.
+> + */
+> +static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
+> +{
+> +	return (align_drift - alignment) & (alignment - 1);
+> +}
+> +
+> +#define object_align(object)						       \
+> +	((typeof(object))((size_t) object + offset_align((size_t) object,      \
+> +			  sizeof(object))))
+> +
+> +#define object_align_floor(object)					       \
+> +	((typeof(object))((size_t) object - offset_align_floor((size_t) object,\
+> +			  sizeof(object))))
+> +
 
-I'm surprised, I thought I'd read it somewhere, but you're right,
-except that CMPXCHG8B also permits arbitrary alignment, as an old
-Intel manual states:
+Here object must be a pointer, but then sizeof(object) will result in
+aligning to the arch word size not the object's natural alignment. Is
+this what you intended?
 
-    The integrity of the LOCK prefix is not affected by the alignment
-    of the memory field. Memory locking is observed for arbitrarily
-    misaligned fields.
-
-I didn't check anything about CMPXCHG16.
-
-What I'd misremembered was this:
-
-    To improve performance of applications, AMD64 processors can
-    speculatively execute instructions out of program order and
-    temporarily hold out-of-order results. However, certain rules are
-    followed with regard to normal cacheable accesses on naturally
-    aligned boundaries to WB memory.
-
-In other words, the x86 implicit SMP barriers are only guaranteed for
-naturally aligned accesses.
-
-ARM does requires naturally aligned atomics, and that's an issue if a
-kernel is built for OABI, which has 4-byte alignment for "long long".
-Fortunately it throws a noisy alignment fault, rather than being
-quietly non-atomic :-)
-
--- Jamie
+--Imre
