@@ -1,17 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Mar 2010 22:52:19 +0100
-Subject: [PATCH] ARM: Use the correct NOP size in memmove for Thumb-2
-	kernel builds
-In-Reply-To: <20100326111122.1066.8244.stgit@e102109-lin.cambridge.arm.com>
-References: <20100326111122.1066.8244.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100328215219.GB8614@n2100.arm.linux.org.uk>
+From: christofferdall@christofferdall.dk (Christoffer Dall)
+Date: Mon, 29 Mar 2010 00:55:11 +0200
+Subject: [C/R ARM][PATCH 3/3] c/r: ARM implementation of
+	checkpoint/restart
+In-Reply-To: <20100326030208.GA5815@linux-sh.org>
+References: <1269219965-23923-1-git-send-email-christofferdall@christofferdall.dk>
+	<1269219965-23923-4-git-send-email-christofferdall@christofferdall.dk>
+	<20100323211843.GC19572@n2100.arm.linux.org.uk>
+	<7d08b87d1003241348g347f092k1142318490e0bdcc@mail.gmail.com>
+	<20100326024759.GN19308@shareable.org>
+	<20100326030208.GA5815@linux-sh.org>
+Message-ID: <7d08b87d1003281555h1eb255f8ic3bcdec08008d5b2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 26, 2010 at 11:11:22AM +0000, Catalin Marinas wrote:
-> When compiling the kernel to Thumb-2, using a 16-bit NOP in the
-> memmove() implementation causes the preceding ADD PC instruction to
-> branch incorrectly in the middle of a 32-bit LDR or STR instruction. The
-> memmove() code is no similar to the memcpy() template.
+On Fri, Mar 26, 2010 at 5:02 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Fri, Mar 26, 2010 at 02:47:59AM +0000, Jamie Lokier wrote:
+>>
+>> It's possible in principle to run many non-MMU binaries on MMU
+>> kernels, but I've never heard of anyone doing it.
+>>
+> FDPIC supports running the same binaries with or without MMU depending on
+> your ABI, it's not really that uncommon, even if it's mostly just used
+> for prototyping.
+>
+I would imagine that the chance that a restart will fail anyway when
+restoring an MMU process on a non-MMU kernel. However, as you suggest,
+the other way around should be possible. Thanks for clearing that up.
 
-Ok.
+Specifically, do you know the meaning of the end_brk field on the
+mm_context_t struct and if I need to checkpoint it on restart for
+non-MMU systems (and potentially do something more clever during
+restart on an MMU kernel?)
