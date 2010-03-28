@@ -1,23 +1,125 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Mar 2010 00:18:20 +0000
-Subject: [PATCH 1/1] [RFCv2] arm: add half-word __xchg
-In-Reply-To: <20100328001429.GA16697@shareable.org>
-References: <20100318135008.GA11800@Krystal>
-	<1269535366-25175-1-git-send-email-virtuoso@slind.org>
-	<20100327225240.GC13203@n2100.arm.linux.org.uk>
-	<20100328001429.GA16697@shareable.org>
-Message-ID: <20100328001819.GF13203@n2100.arm.linux.org.uk>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Sat, 27 Mar 2010 20:55:45 -0400
+Subject: [RFC PATCH] create generic alignment api
+Message-ID: <20100328005545.GA12449@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 28, 2010 at 12:14:29AM +0000, Jamie Lokier wrote:
-> But seeing as this is for ARM only at present, I'd just change the
-> types to u32 and be done with it.  It does seem like a good thing to
-> go to asm-generic eventually though.
+* Russell King - ARM Linux (linux at arm.linux.org.uk) wrote:
+> On Thu, Mar 25, 2010 at 06:42:46PM +0200, Alexander Shishkin wrote:
+> > +/*
+> > + * emulate __xchg() using 32-bit __cmpxchg()
+> > + */
+> > +static inline unsigned long __xchg_generic(unsigned long x,
+> > +						 volatile void *ptr, int size)
+> > +{
+> > +	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr & ~3UL);
+> > +	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
+> 
+> I wonder if we should be using __alignof__ here.
+> 
+> 	unsigned long *ptrbig = (unsigned long *)((unsigned long)ptr &
+> 		(__alignof__(unsigned long) - 1));
+> 
 
-Which is why having it use __alignof__ now would be a good idea - it
-avoids someone blindly copying the code and then there being a subtle
-bug in it.
+Hrm, first, there is a missing "~" in the version you propose.
 
-I was wondering if a generic PTR_ALIGN(type, ptr) macro would be a
-good idea too.
+I'm not convinced __alignof__ is required to be as small as we think by
+any standard. If, for some reason, a compiler see it convenient to align
+everything on really large values, I think it could.
+
+We could use sizeof() here without any problem here though:
+
+	unsigned long *ptrbig = (unsigned long *)((unsigned long) ptr &
+		~(sizeof(unsigned long) - 1));
+
+And rather than doing this over and over again, we could create a
+generic header for that (derived from LTTng ltt_align):
+
+create generic alignment api
+
+Rather than re-doing the "alignment on a type size" trick all over again at
+different levels, import the "ltt_align" from LTTng into kernel.h and make this
+available to everyone. Renaming to:
+
+- offset_align
+- offset_align_floor
+- object_align
+- object_align_floor
+
+The advantage of separating the API in "object alignment" and "offset alignment"
+is that it gives more freedom to play with offset alignment. Very useful to
+implement a tracer ring-buffer alignment. (hint hint)
+
+Typical users will use "object alignment", but infrastructures like tracers
+which need to perform dynamic alignment will typically use "offset alignment",
+because it allows to align with respect to a base rather than to pass an
+absolute address.
+
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Alexander Shishkin <virtuoso@slind.org>,
+CC: linux-arm-kernel at lists.infradead.org
+CC: Imre Deak <imre.deak@nokia.com>
+CC: Jamie Lokier <jamie@shareable.org>
+CC: rostedt at goodmis.org
+CC: mingo at elte.hu
+---
+ include/linux/kernel.h |   37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+
+Index: linux-2.6-lttng/include/linux/kernel.h
+===================================================================
+--- linux-2.6-lttng.orig/include/linux/kernel.h	2010-03-27 20:46:07.000000000 -0400
++++ linux-2.6-lttng/include/linux/kernel.h	2010-03-27 20:50:39.000000000 -0400
+@@ -613,6 +613,43 @@ static inline void ftrace_dump(void) { }
+ 	_max1 > _max2 ? _max1 : _max2; })
+ 
+ /**
++ * offset_align - Calculate the offset needed to align an object on its natural
++ *                alignment towards higher addresses.
++ * @align_drift:  object offset from an architecture word-aligned address.
++ * @size_of_type: size of the type to align. Must be non-zero.
++ *
++ * Returns the offset that must be added to align towards higher
++ * addresses.
++ */
++static inline size_t offset_align(size_t align_drift, size_t size_of_type)
++{
++	size_t alignment = min(sizeof(void *), size_of_type);
++	return (alignment - align_drift) & (alignment - 1);
++}
++
++/**
++ * offset_align_floor - Calculate the offset needed to align an object
++ *                      on its natural alignment towards lower addresses.
++ * @align_drift:  object offset from an architecture word-aligned address.
++ * @size_of_type: size of the type to align. Must be non-zero.
++ *
++ * Returns the offset that must be substracted to align towards lower addresses.
++ */
++static inline size_t offset_align_floor(size_t align_drift, size_t size_of_type)
++{
++	size_t alignment = min(sizeof(void *), size_of_type);
++	return (align_drift - alignment) & (alignment - 1);
++}
++
++#define object_align(object)						       \
++	((typeof(object))((size_t) object + offset_align((size_t) object,      \
++			  sizeof(object))))
++
++#define object_align_floor(object)					       \
++	((typeof(object))((size_t) object - offset_align_floor((size_t) object,\
++			  sizeof(object))))
++
++/**
+  * clamp - return a value clamped to a given range with strict typechecking
+  * @val: current value
+  * @min: minimum allowable value
+
+
+-- 
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
