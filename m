@@ -1,7 +1,9 @@
 From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Sun, 28 Mar 2010 20:01:57 -0400
-Subject: [RFC PATCH] create generic alignment api (v4)
-Message-ID: <20100329000157.GA27379@Krystal>
+Date: Sun, 28 Mar 2010 20:09:00 -0400
+Subject: [RFC PATCH] create generic alignment api (v5)
+In-Reply-To: <20100328154029.GA21061@localhost>
+References: <20100328012247.GA17763@Krystal> <20100328154029.GA21061@localhost>
+Message-ID: <20100329000900.GB27379@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +15,11 @@ available to everyone. Renaming to:
 - object_align_floor()
 - offset_align()
 - offset_align_floor()
+
+Changelog since v4:
+- add missing ( ) around parameters within object_align() and
+  object_align_floor().
+- More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
 
 Changelog since v3:
 - optimize object_align*() so fewer instructions are needed for alignment of
@@ -57,7 +64,7 @@ CC: mingo at elte.hu
 Index: linux-2.6-lttng/include/linux/kernel.h
 ===================================================================
 --- linux-2.6-lttng.orig/include/linux/kernel.h	2010-03-27 20:46:07.000000000 -0400
-+++ linux-2.6-lttng/include/linux/kernel.h	2010-03-28 19:59:50.000000000 -0400
++++ linux-2.6-lttng/include/linux/kernel.h	2010-03-28 20:06:27.000000000 -0400
 @@ -37,10 +37,47 @@ extern const char linux_proc_banner[];
  
  #define STACK_MAGIC	0xdeadbeef
@@ -66,11 +73,11 @@ Index: linux-2.6-lttng/include/linux/kernel.h
 -#define __ALIGN_MASK(x,mask)	(((x)+(mask))&~(mask))
 -#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
 -#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
-+#define ALIGN(x,a)		__ALIGN_MASK((x), (typeof(x)) (a) - 1)
-+#define __ALIGN_MASK(x,mask)	(((x) + (mask)) & ~(mask))
++#define ALIGN(x, a)		__ALIGN_MASK((x), (typeof(x)) (a) - 1)
++#define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 +#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), (a)))
-+#define ALIGN_FLOOR(x,a)	__ALIGN_FLOOR_MASK((x), (typeof(x)) (a) - 1)
-+#define __ALIGN_FLOOR_MASK(x,mask)	((x) & ~(mask))
++#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK((x), (typeof(x)) (a) - 1)
++#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
 +#define PTR_ALIGN_FLOOR(p, a) \
 +			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), (a)))
 +#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
@@ -78,8 +85,8 @@ Index: linux-2.6-lttng/include/linux/kernel.h
 +/*
 + * Align pointer on natural object alignment. Object size must be power of two.
 + */
-+#define object_align(obj)	PTR_ALIGN(obj, sizeof(*obj))
-+#define object_align_floor(obj)	PTR_ALIGN_FLOOR(obj, sizeof(*obj))
++#define object_align(obj)	PTR_ALIGN((obj), sizeof(*(obj)))
++#define object_align_floor(obj)	PTR_ALIGN_FLOOR((obj), sizeof(*(obj)))
 +
 +/**
 + * offset_align - Calculate the offset needed to align an object on its natural
@@ -110,6 +117,7 @@ Index: linux-2.6-lttng/include/linux/kernel.h
  
  #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
  
+
 -- 
 Mathieu Desnoyers
 Operating System Efficiency R&D Consultant
