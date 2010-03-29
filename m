@@ -1,17 +1,25 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 29 Mar 2010 22:35:43 +0200
-Subject: [PATCH 01/16] ARM mach-at91: duplicated include
-In-Reply-To: <1269537767-7553-2-git-send-email-andrea.gelmini@gelma.net>
-References: <1269537767-7553-1-git-send-email-andrea.gelmini@gelma.net>
-	<1269537767-7553-2-git-send-email-andrea.gelmini@gelma.net>
-Message-ID: <cd73a99e1003291335v5e9456a1ief4a50201f6fbb2e@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Mar 2010 22:12:08 +0100
+Subject: [RFC 07/10] arm: allow passing an ELF64 header to elf_check_arch()
+In-Reply-To: <01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <20100329211208.GE28468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> arch/arm/mach-at91/board-sam9m10g45ek.c: mach/hardware.h is included more than once
->
-> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+On Mon, Mar 29, 2010 at 12:26:33PM +0300, Mika Westerberg wrote:
+> This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
+> enabled:
+> 
+> fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
+> fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
+> incompatible pointer type
+> 
+> ELF32 and ELF64 headers have common fields of same size (namely e_ident and
+> e_machine) which are checked in arm_elf_check_arch().
 
-Acked-by: Andrew Victor <linux@maxim.org.za>
+A smaller patch:
 
-Please submit the patch to Russell King's patch tracking system.
+-#define elf_check_arch elf_check_arch
++#define elf_check_arch(x) elf_check_arch((const struct elf32_hdr *)(x))
