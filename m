@@ -1,380 +1,256 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Mon, 29 Mar 2010 09:18:09 +0800
-Subject: [PATCH] mtd: pxa3xx_nand: show the real time used by the controller
-Message-ID: <mailman.431.1273818072.2170.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 29 Mar 2010 10:30:26 +0800
+Subject: [PATCH] mtd: pxa3xx_nand: add polling mode support
+Message-ID: <mailman.433.1273818103.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The electronic signal timing is not that simple that we set to timing
-register. Sometimes it is difficult to find current timing is not what
-NAND chip spec want. So we add show real timing function to give intuitive
-check whether current timing meet the need.
+Add polling mode to facilitate debugging.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |    1 +
- drivers/mtd/nand/pxa3xx_nand.c               |  239 ++++++++++++++++++++------
- 2 files changed, 189 insertions(+), 51 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |  119 +++++++++++++++++++++++++++-------------
+ 1 files changed, 80 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-index 7c99390..c428897 100644
---- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-+++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-@@ -15,6 +15,7 @@ struct pxa3xx_nand_platform_data {
-
- 	/* Whether the controller support using naked command set */
- 	int	naked_cmd_support;
-+	unsigned int RD_CNT_DEL;
-
- 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
- 	unsigned int				nr_parts[NUM_CHIP_SELECT];
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 94702df..56559e1 100644
+index 56559e1..31ebc78 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -90,6 +90,27 @@
- #define NDCR_WRCMDREQM          (0x1)
- #define NDCR_INT_MASK           (0xFFF)
+@@ -26,9 +26,10 @@
+ #include <mach/dma.h>
+ #include <plat/pxa3xx_nand.h>
 
-+/* Data Controller Timing Paramter x Register For CSx */
-+#define NDTR0_tADL(c)           (min_t(uint32_t, (c), 31) << 27)
-+#define NDTR0_SELCNTR           (0x1 << 26)
-+#define NDTR0_RD_CNT_DEL_MASK   (0xF << 22)
-+#define NDTR0_RD_CNT_DEL(x)     (((x) << 22) & NDTR0_RD_CNT_DEL_MASK)
-+#define NDTR0_tCH(c)            (min_t(uint32_t, (c), 7) << 19)
-+#define NDTR0_tCS(c)            (min_t(uint32_t, (c), 7) << 16)
-+#define NDTR0_tWH(c)            (min_t(uint32_t, (c), 7) << 11)
-+#define NDTR0_tWP(c)            (min_t(uint32_t, (c), 7) << 8)
-+#define NDTR0_sel_NRE_EDGE      (0x1 << 7)
-+#define NDTR0_ETRP              (0x1 << 6)
-+#define NDTR0_tRH(c)            (min_t(uint32_t, (c), 7) << 3)
-+#define NDTR0_tRP(c)            (min_t(uint32_t, (c), 7) << 0)
+-#define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
++#define	CHIP_DELAY_TIMEOUT	(100 * HZ/10)
+ #define NAND_STOP_DELAY		(2 * HZ/50)
+ #define PAGE_CHUNK_SIZE		(2048)
++#define OOB_CHUNK_SIZE		(64)
+ #define BCH_THRESHOLD           (8)
+ #define CMD_POOL_SIZE           (5)
+ #undef PXA3XX_NAND_DEBUG
+@@ -298,6 +299,10 @@ static int use_dma = 1;
+ module_param(use_dma, bool, 0444);
+ MODULE_PARM_DESC(use_dma, "enable DMA for data transfering to/from NAND HW");
+
++static int use_polling = 0;
++module_param(use_polling, bool, 0444);
++MODULE_PARM_DESC(use_polling, "Use full polling mode");
 +
-+#define NDTR1_tR(c)             (min_t(uint32_t, (c), 65535) << 16)
-+#define NDTR1_WAIT_MODE         (0x1 << 15)
-+#define NDTR1_PRESCALE          (0x1 << 14)
-+#define NDTR1_tRHW(c)           (min_t(uint32_t, (c), 3) << 8)
-+#define NDTR1_tWHR(c)           (min_t(uint32_t, (c), 15) << 4)
-+#define NDTR1_tAR(c)            (min_t(uint32_t, (c), 15) << 0)
-+
- #define NDSR_MASK		(0xfff)
- #define NDSR_RDY                (0x1 << 12)
- #define NDSR_FLASH_RDY          (0x1 << 11)
-@@ -166,6 +187,7 @@ enum {
- };
-
- struct pxa3xx_nand_timing {
-+	uint32_t	tADL; /* Adress to Write Data delay */
- 	uint32_t	tCH;  /* Enable signal hold time */
- 	uint32_t	tCS;  /* Enable signal setup time */
- 	uint32_t	tWH;  /* ND_nWE high duration */
-@@ -173,6 +195,7 @@ struct pxa3xx_nand_timing {
- 	uint32_t	tRH;  /* ND_nRE high duration */
- 	uint32_t	tRP;  /* ND_nRE pulse width */
- 	uint32_t	tR;   /* ND_nWE high to ND_nRE low for read */
-+	uint32_t	tRHW; /* delay for next command issue */
- 	uint32_t	tWHR; /* ND_nWE high to ND_nRE low for status read */
- 	uint32_t	tAR;  /* ND_ALE low to ND_nRE low delay */
- };
-@@ -254,6 +277,7 @@ struct pxa3xx_nand {
- 	uint8_t			use_ecc;
- 	uint8_t			use_dma;
- 	uint8_t			wait_mode;
-+	uint32_t		RD_CNT_DEL;
-
- 	/* relate to the command */
- 	uint32_t		state;
-@@ -297,82 +321,194 @@ const static struct pxa3xx_nand_cmdset cmdset = {
-  * detect the chip id before we know how to optimize further
-  */
- static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
--{ 0, 0, 0, 0, 0, 0, 0, { 40, 80, 60, 100, 80, 100, 90000, 400, 40, }, },
-+{ 0, 0, 0, 0, 0, 0, 0, { 0, 40, 80, 60, 100, 80, 100, 90000, 0, 400, 40, }, },
- { 0x46ec, 32, 512, 16, 16, ECC_HAMMIN, 4096, \
--	{ 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
-+	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
- { 0xdaec, 64, 2048, 8, 8, ECC_HAMMIN, 2048, \
--	{ 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
-+	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
+ static int naked_cmd_support = 0;
+ module_param(naked_cmd_support, bool, 0444);
+ MODULE_PARM_DESC(naked_cmd_support, "Whether the controller support
+using naked command set");
+@@ -329,7 +334,7 @@ static struct pxa3xx_nand_flash __devinitdata
+builtin_flash_types[] = {
  { 0xd3ec, 128, 2048, 8, 8, ECC_BCH, 4096, \
--	{ 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
-+	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
+ 	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
  { 0xd7ec, 128, 4096, 8, 8, ECC_BCH, 8192, \
--	{ 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
-+	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
+-	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
++	{ 0, 10, 0, 20, 40, 30, 40, 25000, 0, 110, 10, }, },
  { 0xa12c, 64, 2048, 8, 8, ECC_HAMMIN, 1024, \
--	{ 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
-+	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
+ 	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
  { 0xb12c, 64, 2048, 16, 16, ECC_HAMMIN, 1024, \
--	{ 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
-+	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
- { 0xdc2c, 64, 2048, 8, 8, ECC_HAMMIN, 4096, \
--	{ 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
-+	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
- { 0xcc2c, 64, 2048, 16, 16, ECC_HAMMIN, 4096, \
--	{ 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
-+	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
- { 0x382c, 128, 4096, 8, 8, ECC_BCH, 2048, \
--	{ 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
-+	{ 120, 8, 55, 15, 30, 30, 30, 25000, 60, 170, 15, }, },
- { 0xba20, 64, 2048, 16, 16, ECC_HAMMIN, 2048, \
--	{ 10, 35, 15, 25, 15, 25, 25000, 60, 10, }, },
-+	{ 0, 10, 35, 15, 25, 15, 25, 25000, 0, 60, 10, }, },
- };
+@@ -569,7 +574,8 @@ static void pxa3xx_nand_start(struct pxa3xx_nand *nand)
 
- static const char *mtd_names[] = {"pxa3xx_nand-0", "pxa3xx_nand-1", NULL};
+ 	info = nand->info[nand->chip_select];
+ 	ndcr = info->reg_ndcr;
+-	ndcr |= nand->use_dma ? NDCR_DMA_EN : NDCR_STOP_ON_UNCOR;
++	ndcr |= nand->use_dma ? NDCR_DMA_EN : 0;
++	ndcr |= use_polling ? NDCR_INT_MASK : 0;
+ 	ndcr |= NDCR_ND_RUN;
 
--#define NDTR0_tCH(c)	(min((c), 7) << 19)
--#define NDTR0_tCS(c)	(min((c), 7) << 16)
--#define NDTR0_tWH(c)	(min((c), 7) << 11)
--#define NDTR0_tWP(c)	(min((c), 7) << 8)
--#define NDTR0_tRH(c)	(min((c), 7) << 3)
--#define NDTR0_tRP(c)	(min((c), 7) << 0)
--
--#define NDTR1_tR(c)	(min((c), 65535) << 16)
--#define NDTR1_tWHR(c)	(min((c), 15) << 4)
--#define NDTR1_tAR(c)	(min((c), 15) << 0)
-+/* convert nano-seconds to nand flash controller clock cycles */
-+#define ns2cycle(ns, clk)       (int)(((ns) * (clk / 1000000) / 1000) + 1)
+ 	switch (nand->use_ecc) {
+@@ -764,9 +770,8 @@ static void pxa3xx_nand_data_dma_irq(int channel,
+void *data)
+ 	nand_writel(nand, NDSR, NDSR_WRDREQ | NDSR_RDDREQ);
+ }
 
--#define tCH_NDTR0(r)	(((r) >> 19) & 0x7)
--#define tCS_NDTR0(r)	(((r) >> 16) & 0x7)
--#define tWH_NDTR0(r)	(((r) >> 11) & 0x7)
--#define tWP_NDTR0(r)	(((r) >> 8) & 0x7)
--#define tRH_NDTR0(r)	(((r) >> 3) & 0x7)
--#define tRP_NDTR0(r)	(((r) >> 0) & 0x7)
-+/* convert nand flash controller clock cycles to nano-seconds */
-+#define cycle2ns(cycle, clk)    (cycle * 1000 / (clk / 1000000))
-
--#define tR_NDTR1(r)	(((r) >> 16) & 0xffff)
--#define tWHR_NDTR1(r)	(((r) >> 4) & 0xf)
--#define tAR_NDTR1(r)	(((r) >> 0) & 0xf)
-+/*
-+ * This function shows the real timing when NAND controller
-+ * send signal to the NAND chip.
-+ */
-+static void show_real_timing(uint32_t ndtr0, uint32_t ndtr1, unsigned
-long nand_clk)
-+{
-+	uint32_t rtADL, rtCH, rtCS, rtWH, rtWP, rtRH, rtRP;
-+	uint32_t rtR, rtRHW, rtWHR, rtAR, tmp;
-+
-+	rtCH = ((ndtr0 >> 19) & 0x7) + 1;
-+	rtCS = ((ndtr0 >> 16) & 0x7) + 1;
-+	rtWH = ((ndtr0 >> 11) & 0x7) + 1;
-+	rtWP = ((ndtr0 >> 8) & 0x7) + 1;
-+	rtADL= (ndtr0 >> 27) & 0x1f;
-+	rtRH = ((ndtr0 >> 3) & 0x7) + 1;
-+	rtRP = (ndtr0 & NDTR0_ETRP) ? ((0x8 | (ndtr0 & 0x7)) + 1)
-+			: ((ndtr0 & 0x7) + 1);
-+	rtRHW = (ndtr1 >> 8) & 0x3;
-+	rtWHR = (ndtr1 >> 4) & 0xf;
-+	rtAR = ndtr1 & 0xf;
-+	rtR = (ndtr1 >> 16) & 0xffff;
-+
-+	if (ndtr1 & NDTR1_PRESCALE)
-+		rtR *= 16;
-+
-+	rtR += rtCH + 2;
-+	switch(rtRHW) {
-+	case 0:
-+		rtRHW = 0;
-+		break;
-+	case 1:
-+		rtRHW = 16;
-+		break;
-+	case 2:
-+		rtRHW = 32;
-+		break;
-+	case 3:
-+		rtRHW = 48;
-+		break;
-+	}
-
--/* convert nano-seconds to nand flash controller clock cycles */
--#define ns2cycle(ns, clk)	(int)(((ns) * (clk / 1000000) / 1000) - 1)
-+	/*
-+	 * TWHR delay=max(tAR, max(0, tWHR-max(tWH, tCH)))
-+	 * TAR delay=max(tAR, max(0, tWHR-max(tWH, tCH))) + 2
-+	 */
-+	if (rtWH > rtCH)
-+		tmp = rtWH - 1;
-+	else
-+		tmp = rtCH - 1;
-+	if (rtADL != 0) {
-+		rtADL = rtADL - 3 - rtWP;
-+		rtADL = rtADL > 0 ? rtADL : 0;
-+		rtADL = rtADL + tmp + rtWP + 8;
-+	}
-+	if (rtWHR < tmp)
-+		rtWHR = rtAR;
-+	else {
-+		if (rtAR > (rtWHR - tmp))
-+			rtWHR = rtAR;
-+		else
-+			rtWHR = rtWHR - tmp;
-+	}
-+	rtAR = rtWHR + 2;
-+	printk("Shows real timing(ns):\n");
-+	if (ndtr0 & NDTR0_SELCNTR)
-+		printk("NDTR0 SELCNTR is set\n");
-+	else
-+		printk("NDTR0 SELCNTR is not set\n");
-+	if (ndtr0 & NDTR0_RD_CNT_DEL_MASK)
-+		printk("Read Strobe delay is %d\n",
-+				(ndtr0 & NDTR0_RD_CNT_DEL_MASK) >> 22);
-+	else
-+		printk("No Read Stobe delay\n");
-+	if (ndtr0 & NDTR0_sel_NRE_EDGE)
-+		printk("Controller is using falling edge to detect RE\n");
-+	else
-+		printk("Controller is using rising edge to detect RE\n");
-
--/* convert nand flash controller clock cycles to nano-seconds */
--#define cycle2ns(c, clk)	((((c) + 1) * 1000000 + clk / 500) / (clk / 1000))
-+	if (ndtr1 & NDTR1_WAIT_MODE)
-+		printk("NDTR1 wait mode is set\n");
-+	else
-+		printk("NDTR1 wait mode is not set\n");
-+
-+	printk("TADL is %ld TCH is %ld TCS is %ld TWH is %ld TWP is %ld TRH is %ld "
-+		"TRP is %ld TR is %ld TRHW is %ld TWHR is %ld TAR is %ld\n",
-+		cycle2ns(rtADL, nand_clk), cycle2ns(rtCH, nand_clk),
-+		cycle2ns(rtCS, nand_clk), cycle2ns(rtWH, nand_clk),
-+		cycle2ns(rtWP, nand_clk), cycle2ns(rtRH, nand_clk),
-+		cycle2ns(rtRP, nand_clk), cycle2ns(rtR, nand_clk),
-+		cycle2ns(rtRHW, nand_clk), cycle2ns(rtWHR, nand_clk),
-+		cycle2ns(rtAR, nand_clk));
-+}
-
- static void pxa3xx_nand_set_timing(struct pxa3xx_nand_info *info,
--				   const struct pxa3xx_nand_timing *t)
-+			   struct pxa3xx_nand_timing *t, int show_timing)
+-static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
++static int pxa3xx_nand_transaction(struct pxa3xx_nand *nand)
  {
- 	struct pxa3xx_nand *nand = info->nand_data;
- 	unsigned long nand_clk;
--	uint32_t ndtr0, ndtr1;
-+	uint32_t ndtr0, ndtr1, tRP, tR, tRHW, tADL;
+-	struct pxa3xx_nand *nand = devid;
+ 	struct pxa3xx_nand_info *info;
+ 	unsigned int status, is_completed = 0, cs, cmd_seqs, ndcb1, ndcb2;
+ 	unsigned int ready, cmd_done, page_done, badblock_detect;
+@@ -780,8 +785,10 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	cmd_seqs	= info->cmd_seqs;
 
- 	nand_clk = clk_get_rate(nand->clk);
--	ndtr0 = NDTR0_tCH(ns2cycle(t->tCH, nand_clk)) |
--		NDTR0_tCS(ns2cycle(t->tCS, nand_clk)) |
--		NDTR0_tWH(ns2cycle(t->tWH, nand_clk)) |
--		NDTR0_tWP(ns2cycle(t->tWP, nand_clk)) |
--		NDTR0_tRH(ns2cycle(t->tRH, nand_clk)) |
--		NDTR0_tRP(ns2cycle(t->tRP, nand_clk));
-+	ndtr0 = ndtr1 = 0;
-+	tRP = ns2cycle(t->tRP, nand_clk);
-+	tRP = (tRP > 0xf) ? 0xf : tRP;
-+	if (tRP > 0x7) {
-+		ndtr0 |= NDTR0_ETRP;
-+		tRP -= 0x7;
-+	}
-+	tR = ns2cycle(t->tR, nand_clk);
-+	if (tR > 0xffff) {
-+		ndtr1 |= NDTR1_PRESCALE;
-+		tR /= 16;
-+	}
-+	if (t->tRHW > 0) {
-+		tRHW = ns2cycle(t->tRHW, nand_clk);
-+		if (tRHW < 16)
-+			tRHW = 1;
-+		else {
-+			if (tRHW < 32)
-+				tRHW = 2;
-+			else
-+				tRHW = 3;
+ 	status = nand_readl(nand, NDSR);
+-	DBG_NAND(if (status != 0)
+-		printk("\t\t==cmd seqs %x, status %x, cs %x\n", cmd_seqs, status, cs));
++	if (!status)
++		return 0;
++	DBG_NAND(printk("\t\t==cmd seqs %x, status %x, cs %x\n",
++				cmd_seqs, status, cs));
+ 	nand->bad_count = (status & NDSR_ERR_CNT_MASK) >> 16;
+ 	if (status & NDSR_DBERR)
+ 		nand->retcode = ERR_DBERR;
+@@ -791,7 +798,7 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+
+ 		nand->state |= STATE_DATA_PROCESSING;
+ 		/* whether use dma to transfer data */
+-		if (nand->use_dma) {
++		if (nand->use_dma && !use_polling) {
+ 			disable_int(nand, NDCR_INT_MASK);
+ 			start_data_dma(nand, nand->state & STATE_IS_WRITE);
+ 			goto NORMAL_IRQ_EXIT;
+@@ -805,13 +812,20 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (status & ready) {
+ 		nand->state |= STATE_READY;
+ 		if (info->wait_ready[cmd_seqs]) {
+-			enable_int(nand, NDCR_WRCMDREQM);
++			if (!use_polling)
++				enable_int(nand, NDCR_WRCMDREQM | NDCR_CS0_CMDDM
++						| NDCR_CS1_CMDDM);
+ 			if (cmd_seqs == info->total_cmds)
+ 				is_completed = 1;
+ 		}
+ 	}
+ 	if (status & cmd_done) {
+ 		nand->state |= STATE_CMD_DONE;
++		if (info->wait_ready[cmd_seqs] && !(nand->state & STATE_READY)) {
++			status &= ~cmd_done;
++			if (!use_polling)
++				disable_int(nand, NDCR_CS0_CMDDM | NDCR_CS1_CMDDM);
 +		}
+ 		if (cmd_seqs == info->total_cmds && !info->wait_ready[cmd_seqs])
+ 			is_completed = 1;
+ 	}
+@@ -819,7 +833,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (status & NDSR_WRCMDREQ) {
+ 		status &= ~NDSR_WRCMDREQ;
+ 		if (info->wait_ready[cmd_seqs] && !(nand->state & STATE_READY)) {
+-			disable_int(nand, NDCR_WRCMDREQM);
++			if (!use_polling)
++				disable_int(nand, NDCR_WRCMDREQM);
+ 			goto IRQ_FORCE_EXIT;
+ 		}
+
+@@ -849,12 +864,36 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ IRQ_FORCE_EXIT:
+ 	/* clear NDSR to let the controller exit the IRQ */
+ 	nand_writel(nand, NDSR, status);
++NORMAL_IRQ_EXIT:
++	return is_completed;
++}
++
++static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
++{
++	struct pxa3xx_nand *nand = devid;
++	int is_completed;
++
++	is_completed = pxa3xx_nand_transaction(nand);
+ 	if (is_completed)
+ 		complete(&nand->cmd_complete);
+-NORMAL_IRQ_EXIT:
++
+ 	return IRQ_HANDLED;
+ }
+
++static int pxa3xx_nand_polling(struct pxa3xx_nand *nand, unsigned long timeout)
++{
++	int i, ret = 0;
++
++	for (i = 0; i < timeout; i++) {
++		ret = pxa3xx_nand_transaction(nand);
++		if (ret)
++			break;
++		udelay(5);
 +	}
-+	else
-+		tRHW = 0;
-+	tADL = (t->tADL > 0) ? ns2cycle(t->tADL, nand_clk) : 0;
 +
-+	if (nand->RD_CNT_DEL > 0)
-+		ndtr0 |= NDTR0_SELCNTR
-+			| (NDTR0_RD_CNT_DEL(nand->RD_CNT_DEL - 1));
++	return ret;
++}
 +
-+	ndtr0 |= NDTR0_tADL(tADL)
-+		| NDTR0_tCH(ns2cycle(t->tCH, nand_clk))
-+		| NDTR0_tCS(ns2cycle(t->tCS, nand_clk))
-+		| NDTR0_tWH(ns2cycle(t->tWH, nand_clk))
-+		| NDTR0_tWP(ns2cycle(t->tWP, nand_clk))
-+		| NDTR0_tRH(ns2cycle(t->tRH, nand_clk))
-+		| NDTR0_tRP(tRP)
-+		| NDTR0_SELCNTR;
-+
-+	if (nand->wait_mode)
-+		ndtr1 |= NDTR1_WAIT_MODE;
-+
-+	ndtr1 |= NDTR1_tR(tR)
-+		| NDTR1_tRHW(tRHW)
-+		| NDTR1_tWHR(ns2cycle(t->tWHR, nand_clk))
-+		| NDTR1_tAR(ns2cycle(t->tAR, nand_clk));
-
--	ndtr1 = NDTR1_tR(ns2cycle(t->tR, nand_clk)) |
--		NDTR1_tWHR(ns2cycle(t->tWHR, nand_clk)) |
--		NDTR1_tAR(ns2cycle(t->tAR, nand_clk));
-
--	info->ndtr0cs0 = ndtr0;
--	info->ndtr1cs0 = ndtr1;
- 	nand_writel(nand, NDTR0CS0, ndtr0);
- 	nand_writel(nand, NDTR1CS0, ndtr1);
-+	nand_writel(nand, NDREDEL, 0x0);
-+	info->ndtr0cs0 = ndtr0;
-+	info->ndtr1cs0 = ndtr1;
-+	if (show_timing)
-+		show_real_timing(ndtr0, ndtr1, nand_clk);
- }
-
- static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
-@@ -1060,7 +1196,7 @@ static int pxa3xx_nand_waitfunc(struct mtd_info
-*mtd, struct nand_chip *this)
- }
-
- static void pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
--				    const struct pxa3xx_nand_flash *f)
-+			    struct pxa3xx_nand_flash *f, int show_timing)
+ static inline int is_buf_blank(uint8_t *buf, size_t len)
  {
- 	struct pxa3xx_nand *nand = info->nand_data;
- 	struct platform_device *pdev = nand->pdev;
-@@ -1125,7 +1261,7 @@ static void pxa3xx_nand_config_flash(struct
+ 	for (; len > 0; len--)
+@@ -1107,8 +1146,11 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 		nand->state |= STATE_CMD_PREPARED;
+ 		pxa3xx_nand_start(nand);
+
+-		ret = wait_for_completion_timeout(&nand->cmd_complete,
+-				CHIP_DELAY_TIMEOUT);
++		if (!use_polling)
++			ret = wait_for_completion_timeout(&nand->cmd_complete,
++					CHIP_DELAY_TIMEOUT);
++		else
++			ret = pxa3xx_nand_polling(nand, CHIP_DELAY_TIMEOUT);
+ 		if (!ret) {
+ 			printk(KERN_ERR "Wait time out!!!\n");
+ 			nand_error_dump(nand);
+@@ -1229,31 +1271,30 @@ static void pxa3xx_nand_config_flash(struct
 pxa3xx_nand_info *info,
+ 	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
 
- 	info->reg_ndcr = ndcr;
+ 	switch (f->page_per_block) {
+-		case 32:
+-			ndcr |= NDCR_PG_PER_BLK(0x0);
+-			break;
+-		case 128:
+-			ndcr |= NDCR_PG_PER_BLK(0x1);
+-			break;
+-		case 256:
+-			ndcr |= NDCR_PG_PER_BLK(0x3);
+-			break;
+-		case 64:
+-		default:
+-			ndcr |= NDCR_PG_PER_BLK(0x2);
+-			break;
++	case 32:
++		ndcr |= NDCR_PG_PER_BLK(0x0);
++		break;
++	case 128:
++		ndcr |= NDCR_PG_PER_BLK(0x1);
++		break;
++	case 256:
++		ndcr |= NDCR_PG_PER_BLK(0x3);
++		break;
++	case 64:
++	default:
++		ndcr |= NDCR_PG_PER_BLK(0x2);
++		break;
+ 	}
 
--	pxa3xx_nand_set_timing(info, &f->timing);
-+	pxa3xx_nand_set_timing(info, &f->timing, show_timing);
+ 	switch (f->page_size) {
+-		case 512:
+-			ndcr |= NDCR_PAGE_SZ(0x0);
+-			break;
+-		case 2048:
+-		default:
+-			ndcr |= NDCR_PAGE_SZ(0x1);
+-			ndcr |= NDCR_FORCE_CSX;
+-			break;
+-
++	case 512:
++		ndcr |= NDCR_PAGE_SZ(0x0);
++		break;
++	case 2048:
++	default:
++		ndcr |= NDCR_PAGE_SZ(0x1);
++		ndcr |= NDCR_FORCE_CSX;
++		break;
+ 	}
+
+ 	ndcr |= NDCR_RD_ID_CNT(info->read_id_bytes);
+@@ -1264,11 +1305,11 @@ static void pxa3xx_nand_config_flash(struct
+pxa3xx_nand_info *info,
+ 	pxa3xx_nand_set_timing(info, &f->timing, show_timing);
  }
 
- /* the maximum possible buffer size for large page with OOB data
-@@ -1227,7 +1363,7 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand *nand)
- 	struct pxa3xx_nand_info *info = nand->info[nand->chip_select];
- 	struct mtd_info *mtd = get_mtd_by_info(info);
- 	/* use the common timing to make a try */
--	pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
-+	pxa3xx_nand_config_flash(info, &builtin_flash_types[0], 0);
- 	pxa3xx_nand_cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
- 	if (nand->state & STATE_READY)
- 		return 1;
-@@ -1270,7 +1406,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+-/* the maximum possible buffer size for large page with OOB data
+- * is: 2048 + 64 = 2112 bytes, allocate a page here for both the
+- * data buffer and the DMA descriptor
++/* the max buff size should be large than
++ * the largest size of page of NAND flash
++ * that currently controller support
+  */
+-#define MAX_BUFF_SIZE	PAGE_SIZE
++#define MAX_BUFF_SIZE	((PAGE_CHUNK_SIZE + OOB_CHUNK_SIZE) * 2) +
+sizeof(struct pxa_dma_desc)
 
- 		/* find the chip in default list */
- 		if (f->chip_id == id) {
--			pxa3xx_nand_config_flash(info, f);
-+			pxa3xx_nand_config_flash(info, f, 1);
- 			chip->cellinfo = info->data_buff[2];
- 			mtd->writesize = f->page_size;
- 			mtd->writesize_shift = ffs(mtd->writesize) - 1;
-@@ -1556,6 +1692,7 @@ static int __devinit pxa3xx_nand_probe(struct
-platform_device *pdev)
- 		return ret;
-
- 	nand = platform_get_drvdata(pdev);
-+	nand->RD_CNT_DEL = pdata->RD_CNT_DEL;
- 	for (cs = 0; cs < NUM_CHIP_SELECT; cs++) {
- 		info = nand->info[cs];
- 		mtd = get_mtd_by_info(info);
+ static struct nand_ecclayout hw_smallpage_ecclayout = {
+ 	.eccbytes = 6,
 -- 
 1.5.6.5
