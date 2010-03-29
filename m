@@ -1,40 +1,47 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 29 Mar 2010 12:07:16 -0700
-Subject: [GIT PULL] generic arm for MSM try2
-In-Reply-To: <alpine.LFD.2.00.1003291444130.694@xanadu.home>
-References: <1269560155.21793.89.camel@c-dwalke-linux.qualcomm.com>
-	<20100328214901.GA8614@n2100.arm.linux.org.uk>
-	<1269881777.17124.5.camel@c-dwalke-linux.qualcomm.com>
-	<20100329172841.GD28468@n2100.arm.linux.org.uk>
-	<1269884644.17124.19.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1003291444130.694@xanadu.home>
-Message-ID: <1269889636.17124.30.camel@c-dwalke-linux.qualcomm.com>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
+Date: Mon, 29 Mar 2010 16:10:33 -0300
+Subject: [PATCH] ARM: mach-sa1100: Put nanoEngine support back in the
+	kernel.
+In-Reply-To: <20100327225522.GD13203@n2100.arm.linux.org.uk>
+References: <1268338199-32222-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100327225522.GD13203@n2100.arm.linux.org.uk>
+Message-ID: <cecb6d8f1003291210q27c0dc47l7d81870e530bb6f0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-03-29 at 14:51 -0400, Nicolas Pitre wrote:
-> On Mon, 29 Mar 2010, Daniel Walker wrote:
-> 
-> > On Mon, 2010-03-29 at 18:28 +0100, Russell King - ARM Linux wrote:
-> > > By putting such a boilerplate at the start of the file without some
-> > > acknowledgement of its past history, they are effectively saying that
-> > > their copyright extends to everything in the file.  That's certainly
-> > > not the case; take a moment to consider how you'd feel if someone threw
-> > > their copyright boilerplate on a file you'd written.
-> > 
-> > There is git history on it. Anyone that looks at the git history would
-> > know right off we didn't write the whole file. There's nothing stopping
-> > other copyright holders from adding their copyright on top of ours.
-> 
-> I think it is far more logical to view it the other way around: you 
-> don't need to add your own copyright notice for minor changes to every 
-> files you touch as the Git history already captures your contribution 
-> credits.
+Hi Russel and Kristoffer,
 
-Git history captures who wrote the code, not who owns the code. I work
-for QuiC (Qualcomm Innovation Center) , however, the copyright is "Code
-Aurora Forum" .. The git history may list me as "@codeaurora.com" or
-"@quicinc.com" , so given that you really can't be sure of the copyright
-just with git history.
+On Sat, Mar 27, 2010 at 19:55, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> Please don't include defconfigs along with other code.
 
-Daniel
+Ok, I have removed the defconfig and put it in a separate patch.
+
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mtd/mtd.h>
+>> +#include <linux/mtd/partitions.h>
+>> +#include <linux/root_dev.h>
+>> +#include <linux/tty.h>
+>
+> Do you really need tty.h in here?
+
+No, I don't. :) Removed.
+
+>> +/* Flash bank 0 */
+>> +static struct mtd_partition nanoengine_partitions[] = {
+>> + ? ? {
+>> + ? ? .name ? ? ? ? ? = "nanoEngine boot firmware and parameter table",
+>
+> Each '{' should indent the next line by a tab.
+
+Ok, that was another "line over 80 characters" warning. Fixed.
+
+I will resubmit the patch, merged with the CPU FREQ patch, which is
+where it belongs. And a better changelog.
+
+Also I have removed Kristoffer's "Acked-by" because this is a changed version.
+
+Regards,
+Marcelo.
