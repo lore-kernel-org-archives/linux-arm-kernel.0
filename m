@@ -1,7 +1,7 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Mon, 29 Mar 2010 12:26:33 +0300
-Subject: [RFC 07/10] arm: allow passing an ELF64 header to elf_check_arch()
-In-Reply-To: <49c5365fe4f794390ca2a4de75365953e211ab3f.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Date: Mon, 29 Mar 2010 12:26:34 +0300
+Subject: [RFC 08/10] arm: kdump: add support for elfcorehdr= parameter
+In-Reply-To: <01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<7b747cd930c20ae4a625c981d88e2773c706fce9.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<e3c9449c42a735f9acee8e50af33762ffcadf7b4.1269854500.git.ext-mika.1.westerberg@nokia.com>
@@ -9,68 +9,61 @@ References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<5d4c557a427346c129c8f6cc43c5819177c05ff5.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<f05417b66eedd3c1fe32b433dcdae71a2a151da5.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<49c5365fe4f794390ca2a4de75365953e211ab3f.1269854500.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <4973ec4f4071a967bcb4f8d72bbe950204fcc83a.1269854500.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
-enabled:
-
-fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
-fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
-incompatible pointer type
-
-ELF32 and ELF64 headers have common fields of same size (namely e_ident and
-e_machine) which are checked in arm_elf_check_arch().
+This parameter is used by primary kernel to pass address of vmcore header to the
+dump capture kernel.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/include/asm/elf.h |    4 ++--
- arch/arm/kernel/elf.c      |    6 ++++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kernel/setup.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index bff0564..aa71815 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -92,8 +92,8 @@ struct elf32_hdr;
- /*
-  * This is used to ensure we don't load something for the wrong architecture.
-  */
--extern int elf_check_arch(const struct elf32_hdr *);
--#define elf_check_arch elf_check_arch
-+extern int arm_elf_check_arch(const struct elf32_hdr *);
-+#define elf_check_arch(x) arm_elf_check_arch((const struct elf32_hdr *)(x))
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 076454f..25a1664 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -20,6 +20,7 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -711,6 +712,30 @@ static void __init reserve_crashkernel(void)
+ static inline void reserve_crashkernel(void) {}
+ #endif /* CONFIG_KEXEC */
  
- extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
- #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d4a0da1..14e501b 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -4,11 +4,13 @@
- #include <linux/binfmts.h>
- #include <linux/elf.h>
- 
--int elf_check_arch(const struct elf32_hdr *x)
-+int arm_elf_check_arch(const struct elf32_hdr *x)
++/*
++ * Note: elfcorehdr_addr is not just limited to vmcore. It is also used by
++ * is_kdump_kernel() to determine if we are booting after a panic. Hence
++ * ifdef it under CONFIG_CRASH_DUMP and not CONFIG_PROC_VMCORE.
++ */
++
++#ifdef CONFIG_CRASH_DUMP
++/*
++ * elfcorehdr= specifies the location of elf core header stored by the crashed
++ * kernel. This option will be passed by kexec loader to the capture kernel.
++ */
++static int __init setup_elfcorehdr(char *arg)
++{
++	char *end;
++
++	if (!arg)
++		return -EINVAL;
++
++	elfcorehdr_addr = memparse(arg, &end);
++	return end > arg ? 0 : -EINVAL;
++}
++early_param("elfcorehdr", setup_elfcorehdr);
++#endif /* CONFIG_CRASH_DUMP */
++
+ void __init setup_arch(char **cmdline_p)
  {
- 	unsigned int eflags;
- 
- 	/* Make sure it's an ARM executable */
-+	if (x->e_ident[EI_CLASS] != ELF_CLASS)
-+		return 0;
- 	if (x->e_machine != EM_ARM)
- 		return 0;
- 
-@@ -35,7 +37,7 @@ int elf_check_arch(const struct elf32_hdr *x)
- 	}
- 	return 1;
- }
--EXPORT_SYMBOL(elf_check_arch);
-+EXPORT_SYMBOL(arm_elf_check_arch);
- 
- void elf_set_personality(const struct elf32_hdr *x)
- {
+ 	struct tag *tags = (struct tag *)&init_tags;
 -- 
 1.5.6.5
