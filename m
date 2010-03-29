@@ -1,155 +1,37 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Mon, 29 Mar 2010 19:57:56 +0100
-Subject: [PATCH] Add hotplug support to mcp251x driver
-Message-ID: <1269889076-5611-1-git-send-email-maz@misterjones.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 29 Mar 2010 14:51:26 -0400 (EDT)
+Subject: [GIT PULL] generic arm for MSM try2
+In-Reply-To: <1269884644.17124.19.camel@c-dwalke-linux.qualcomm.com>
+References: <1269560155.21793.89.camel@c-dwalke-linux.qualcomm.com>
+	<20100328214901.GA8614@n2100.arm.linux.org.uk>
+	<1269881777.17124.5.camel@c-dwalke-linux.qualcomm.com>
+	<20100329172841.GD28468@n2100.arm.linux.org.uk>
+	<1269884644.17124.19.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <alpine.LFD.2.00.1003291444130.694@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chip model can now be selected directly by matching the modalias name
-(instead of filling the .model field in platform_data), and allows the
-module to be auto-loaded. Previous behaviour is of course still supported.
+On Mon, 29 Mar 2010, Daniel Walker wrote:
 
-Convert the two in-tree users to this feature (icontrol & zeus).
-Tested on an Zeus platform (mcp2515).
+> On Mon, 2010-03-29 at 18:28 +0100, Russell King - ARM Linux wrote:
+> > By putting such a boilerplate at the start of the file without some
+> > acknowledgement of its past history, they are effectively saying that
+> > their copyright extends to everything in the file.  That's certainly
+> > not the case; take a moment to consider how you'd feel if someone threw
+> > their copyright boilerplate on a file you'd written.
+> 
+> There is git history on it. Anyone that looks at the git history would
+> know right off we didn't write the whole file. There's nothing stopping
+> other copyright holders from adding their copyright on top of ours.
 
-Signed-off-by: Marc Zyngier <maz@misterjones.org>
-Acked-by: Christian Pellegrin <chripell@fsfe.org>
-Cc: Edwin Peer <epeer@tmtservices.co.za>
----
- arch/arm/mach-pxa/icontrol.c         |    9 ++++-----
- arch/arm/mach-pxa/zeus.c             |    4 +---
- drivers/net/can/mcp251x.c            |   14 ++++++++++++++
- include/linux/can/platform/mcp251x.h |    4 ++--
- 4 files changed, 21 insertions(+), 10 deletions(-)
+I think it is far more logical to view it the other way around: you 
+don't need to add your own copyright notice for minor changes to every 
+files you touch as the Git history already captures your contribution 
+credits.
 
-diff --git a/arch/arm/mach-pxa/icontrol.c b/arch/arm/mach-pxa/icontrol.c
-index 771137f..5ccb0ce 100644
---- a/arch/arm/mach-pxa/icontrol.c
-+++ b/arch/arm/mach-pxa/icontrol.c
-@@ -73,7 +73,6 @@ static struct pxa2xx_spi_chip mcp251x_chip_info4 = {
- 
- static struct mcp251x_platform_data mcp251x_info = {
- 	.oscillator_frequency = 16E6,
--	.model                = CAN_MCP251X_MCP2515,
- 	.board_specific_setup = NULL,
- 	.power_enable         = NULL,
- 	.transceiver_enable   = NULL
-@@ -81,7 +80,7 @@ static struct mcp251x_platform_data mcp251x_info = {
- 
- static struct spi_board_info mcp251x_board_info[] = {
- 	{
--		.modalias        = "mcp251x",
-+		.modalias        = "mcp2515",
- 		.max_speed_hz    = 6500000,
- 		.bus_num         = 3,
- 		.chip_select     = 0,
-@@ -90,7 +89,7 @@ static struct spi_board_info mcp251x_board_info[] = {
- 		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ1)
- 	},
- 	{
--		.modalias        = "mcp251x",
-+		.modalias        = "mcp2515",
- 		.max_speed_hz    = 6500000,
- 		.bus_num         = 3,
- 		.chip_select     = 1,
-@@ -99,7 +98,7 @@ static struct spi_board_info mcp251x_board_info[] = {
- 		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ2)
- 	},
- 	{
--		.modalias        = "mcp251x",
-+		.modalias        = "mcp2515",
- 		.max_speed_hz    = 6500000,
- 		.bus_num         = 4,
- 		.chip_select     = 0,
-@@ -108,7 +107,7 @@ static struct spi_board_info mcp251x_board_info[] = {
- 		.irq             = gpio_to_irq(ICONTROL_MCP251x_nIRQ3)
- 	},
- 	{
--		.modalias        = "mcp251x",
-+		.modalias        = "mcp2515",
- 		.max_speed_hz    = 6500000,
- 		.bus_num         = 4,
- 		.chip_select     = 1,
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 39896d8..dbd2569 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -414,15 +414,13 @@ static int zeus_mcp2515_transceiver_enable(int enable)
- 
- static struct mcp251x_platform_data zeus_mcp2515_pdata = {
- 	.oscillator_frequency	= 16*1000*1000,
--	.model			= CAN_MCP251X_MCP2515,
- 	.board_specific_setup	= zeus_mcp2515_setup,
--	.transceiver_enable	= zeus_mcp2515_transceiver_enable,
- 	.power_enable		= zeus_mcp2515_transceiver_enable,
- };
- 
- static struct spi_board_info zeus_spi_board_info[] = {
- 	[0] = {
--		.modalias	= "mcp251x",
-+		.modalias	= "mcp2515",
- 		.platform_data	= &zeus_mcp2515_pdata,
- 		.irq		= gpio_to_irq(ZEUS_CAN_GPIO),
- 		.max_speed_hz	= 1*1000*1000,
-diff --git a/drivers/net/can/mcp251x.c b/drivers/net/can/mcp251x.c
-index f8cc168..f521579 100644
---- a/drivers/net/can/mcp251x.c
-+++ b/drivers/net/can/mcp251x.c
-@@ -922,12 +922,16 @@ static int __devinit mcp251x_can_probe(struct spi_device *spi)
- 	struct net_device *net;
- 	struct mcp251x_priv *priv;
- 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
-+	int model = spi_get_device_id(spi)->driver_data;
- 	int ret = -ENODEV;
- 
- 	if (!pdata)
- 		/* Platform data is required for osc freq */
- 		goto error_out;
- 
-+	if (model)
-+		pdata->model = model;
-+
- 	/* Allocate can/net device */
- 	net = alloc_candev(sizeof(struct mcp251x_priv), TX_ECHO_SKB_MAX);
- 	if (!net) {
-@@ -1117,6 +1121,15 @@ static int mcp251x_can_resume(struct spi_device *spi)
- #define mcp251x_can_resume NULL
- #endif
- 
-+static struct spi_device_id mcp251x_id_table[] = {
-+	{ "mcp251x", 	0 /* Use pdata.model */ },
-+	{ "mcp2510",	CAN_MCP251X_MCP2510 },
-+	{ "mcp2515",	CAN_MCP251X_MCP2515 },
-+	{ },
-+};
-+
-+MODULE_DEVICE_TABLE(spi, mcp251x_id_table);
-+
- static struct spi_driver mcp251x_can_driver = {
- 	.driver = {
- 		.name = DEVICE_NAME,
-@@ -1124,6 +1137,7 @@ static struct spi_driver mcp251x_can_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 
-+	.id_table = mcp251x_id_table,
- 	.probe = mcp251x_can_probe,
- 	.remove = __devexit_p(mcp251x_can_remove),
- 	.suspend = mcp251x_can_suspend,
-diff --git a/include/linux/can/platform/mcp251x.h b/include/linux/can/platform/mcp251x.h
-index 1448177..dba2826 100644
---- a/include/linux/can/platform/mcp251x.h
-+++ b/include/linux/can/platform/mcp251x.h
-@@ -26,8 +26,8 @@
- struct mcp251x_platform_data {
- 	unsigned long oscillator_frequency;
- 	int model;
--#define CAN_MCP251X_MCP2510 0
--#define CAN_MCP251X_MCP2515 1
-+#define CAN_MCP251X_MCP2510 0x2510
-+#define CAN_MCP251X_MCP2515 0x2515
- 	int (*board_specific_setup)(struct spi_device *spi);
- 	int (*transceiver_enable)(int enable);
- 	int (*power_enable) (int enable);
--- 
-1.7.0.3
+Again, it is best to keep copyright notices to files you create 
+yourself, or files that you significantly enhanced and/or rewrote (like 
+50% of the original content was replaced or the like).
+
+
+Nicolas
