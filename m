@@ -1,125 +1,67 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Mon, 29 Mar 2010 12:26:32 +0300
-Subject: [RFC 06/10] arm: kdump: implement copy_oldmem_page()
-In-Reply-To: <f05417b66eedd3c1fe32b433dcdae71a2a151da5.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Date: Mon, 29 Mar 2010 12:26:28 +0300
+Subject: [RFC 02/10] arm: kdump: implement crash_setup_regs()
+In-Reply-To: <7b747cd930c20ae4a625c981d88e2773c706fce9.1269854500.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
 	<7b747cd930c20ae4a625c981d88e2773c706fce9.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<e3c9449c42a735f9acee8e50af33762ffcadf7b4.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<0f8c479602b8957c49db7ac56b8f90ac6f4da5dc.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<5d4c557a427346c129c8f6cc43c5819177c05ff5.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<f05417b66eedd3c1fe32b433dcdae71a2a151da5.1269854500.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <49c5365fe4f794390ca2a4de75365953e211ab3f.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <e3c9449c42a735f9acee8e50af33762ffcadf7b4.1269854500.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is used by vmcore code to read a page from the old kernel memory.
+Implement machine specific function crash_setup_regs() which is responsible for
+storing machine state when crash occured.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/Makefile     |    1 +
- arch/arm/kernel/crash_dump.c |   82 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 83 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/crash_dump.c
+ arch/arm/include/asm/kexec.h |   35 ++++++++++++++++++++++++++++++++---
+ 1 files changed, 32 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 26d302c..ea023c6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
-+obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
+diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
+index df15a0d..4a4b66f 100644
+--- a/arch/arm/include/asm/kexec.h
++++ b/arch/arm/include/asm/kexec.h
+@@ -19,10 +19,39 @@
  
- obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
- AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
-diff --git a/arch/arm/kernel/crash_dump.c b/arch/arm/kernel/crash_dump.c
-new file mode 100644
-index 0000000..84382d3
---- /dev/null
-+++ b/arch/arm/kernel/crash_dump.c
-@@ -0,0 +1,82 @@
+ #ifndef __ASSEMBLY__
+ 
+-struct kimage;
+-/* Provide a dummy definition to avoid build failures. */
 +/*
-+ * arch/arm/kernel/crash_dump.c
++ * crash_setup_regs() - save registers for the panic kernel
++ * @newregs: registers are saved here
++ * @oldregs: registers to be saved (may be %NULL)
 + *
-+ * Copyright (C) 2010 Nokia Corporation.
-+ *
-+ * This code is heavily based on x86 version found in
-+ * arch/x86/kernel/crash_dump_32.c.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Author: Mika Westerberg
++ * Function copies machine registers from @oldregs to @newregs. If @oldregs is
++ * %NULL then current registers are stored there.
 + */
-+#include <linux/errno.h>
-+#include <linux/crash_dump.h>
-+#include <linux/uaccess.h>
-+#include <linux/highmem.h>
-+#include <linux/io.h>
-+
-+/* buffer used when copying an old page to userspace */
-+static void *kdump_buf_page;
-+
-+/* stores the physical address of elf header of crash image */
-+unsigned long long elfcorehdr_addr = ELFCORE_ADDR_MAX;
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is int he user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
+ static inline void crash_setup_regs(struct pt_regs *newregs,
+-                                        struct pt_regs *oldregs) { }
++				    struct pt_regs *oldregs)
 +{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = kmap_atomic_pfn(pfn, KM_PTE0);
-+
-+	if (userbuf) {
-+		if (!kdump_buf_page) {
-+			printk(KERN_WARNING "Kdump: kdump buffer page not "
-+				"allocated\n");
-+			kunmap_atomic(vaddr, KM_PTE0);
-+			return -EFAULT;
-+		}
-+
-+		copy_page(kdump_buf_page, vaddr);
-+		kunmap_atomic(vaddr, KM_PTE0);
-+
-+		if (copy_to_user(buf, vaddr + offset, csize))
-+			return -EFAULT;
++	if (oldregs) {
++		memcpy(newregs, oldregs, sizeof(*newregs));
 +	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+		kunmap_atomic(vaddr, KM_PTE0);
++		__asm__ __volatile__("mov %0, r0" : "=r"(newregs->ARM_r0));
++		__asm__ __volatile__("mov %0, r1" : "=r"(newregs->ARM_r1));
++		__asm__ __volatile__("mov %0, r2" : "=r"(newregs->ARM_r2));
++		__asm__ __volatile__("mov %0, r3" : "=r"(newregs->ARM_r3));
++		__asm__ __volatile__("mov %0, r4" : "=r"(newregs->ARM_r4));
++		__asm__ __volatile__("mov %0, r5" : "=r"(newregs->ARM_r5));
++		__asm__ __volatile__("mov %0, r6" : "=r"(newregs->ARM_r6));
++		__asm__ __volatile__("mov %0, r7" : "=r"(newregs->ARM_r7));
++		__asm__ __volatile__("mov %0, r8" : "=r"(newregs->ARM_r8));
++		__asm__ __volatile__("mov %0, r9" : "=r"(newregs->ARM_r9));
++		__asm__ __volatile__("mov %0, r10" : "=r"(newregs->ARM_r10));
++		__asm__ __volatile__("mov %0, r11" : "=r"(newregs->ARM_fp));
++		__asm__ __volatile__("mov %0, r12" : "=r"(newregs->ARM_ip));
++		__asm__ __volatile__("mov %0, r13" : "=r"(newregs->ARM_sp));
++		__asm__ __volatile__("mov %0, r14" : "=r"(newregs->ARM_lr));
++		__asm__ __volatile__("mov %0, r15" : "=r"(newregs->ARM_pc));
++		__asm__ __volatile__("mrs %0, cpsr" : "=r"(newregs->ARM_cpsr));
 +	}
-+
-+	return csize;
 +}
-+
-+static int __init kdump_buf_page_init(void)
-+{
-+	kdump_buf_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
-+	if (!kdump_buf_page) {
-+		printk(KERN_WARNING "Kdump: failed to allocate kdump buffer "
-+			"page\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+arch_initcall(kdump_buf_page_init);
+ 
+ #endif /* __ASSEMBLY__ */
+ 
 -- 
 1.5.6.5
