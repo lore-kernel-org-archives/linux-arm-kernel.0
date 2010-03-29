@@ -1,19 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 28 Mar 2010 19:34:03 -0400 (EDT)
+From: rkiyerpersonal@gmail.com (Rajanikanth H.V)
+Date: Mon, 29 Mar 2010 10:52:50 +0530
 Subject: Query about Float Point Operation
-In-Reply-To: <tencent_294E932A6E12E0191CF4271B@qq.com>
-References: <tencent_294E932A6E12E0191CF4271B@qq.com>
-Message-ID: <alpine.LFD.2.00.1003281933120.694@xanadu.home>
+In-Reply-To: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+References: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+Message-ID: <d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Mar 2010, ??? wrote:
+2010/3/23 ??? <914059751@qq.com>:
+> Hi , guys
+> I want to do float point operations in kernel like the following,
+>
+> int foo(double d)
+> {
+>
+> return (int)d*d;
+>
+> }
+>
+> while compiling output error msg like following:
+> cannt find eabi_dmul ?balabla??????
+>
+> May I ask any possibility of use float point operation in the kernel space?
+> Any hints/doc would be appreciated!
+I do not know how are you compiling the required function.
+Use hardware floating point support. If your target SOC support.
+Also verify whether Floating Point Emulation -> VFP is enabled in your config.
 
-> WOW
-> My audio codec drivers use float point operation heavily!
-> Does that mean that I can ONLY implement it on USER space ?
-
-Yes.  Software codecs don't belong in the kernel anyway.
-
-
-Nicolas
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
