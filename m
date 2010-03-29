@@ -1,53 +1,30 @@
-From: Dave.Martin@arm.com (Dave P. Martin)
-Date: Mon, 29 Mar 2010 12:24:30 +0100
-Subject: RFC: ARM Boot standard for passing device tree blob
-In-Reply-To: <20100326230343.GC29179@n2100.arm.linux.org.uk>
-References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
-	<20100325210409.GH24984@n2100.arm.linux.org.uk>
-	<1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
-	<4BACF238.3040405@firmworks.com>
-	<fa686aa41003261113o7cd8612eh9b51904114902a3a@mail.gmail.com>
-	<alpine.LFD.2.00.1003261435460.694@xanadu.home>
-	<fa686aa41003261252u7dc31bb6nca2e77ae8feb4355@mail.gmail.com>
-	<20100326230343.GC29179@n2100.arm.linux.org.uk>
-Message-ID: <000001cacf32$66d4b190$4044010a@Emea.Arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Mar 2010 14:24:51 +0100
+Subject: [PATCH] ARM: Fix the __arm_ioremap_caller() definition in nommu.c
+Message-ID: <20100329132450.1967.70117.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Commit 31aa8fd6 introduced the __arm_ioremap_caller() function but the
+nommu.c version did not have the _caller suffix.
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> Sent: 26 March 2010 23:04
-> To: Grant Likely
-> Cc: Nicolas Pitre; Mitch Bradley; Catalin Marinas; 
-> devicetree-discuss; Philippe Robin; David Rusling; Jeremy 
-> Kerr; Dave P Martin; linux-arm-kernel at lists.infradead.org
-> Subject: Re: RFC: ARM Boot standard for passing device tree blob
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/nommu.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-[...]
-
-> 2. No ARM CPU supports having the D-cache enabled without the MMU; the
->    data cache needs to be told via the page tables what can be cached
->    and what can't - it needs to be told that RAM can cached but IO
->    devices must not be.
-> 
-> In short, the MMU must always be off, which in turn means the 
-> D-cache must always be disabled.
-
-Further to this, it's worth pointing out that some systems have external
-caches (such as non-architected L2 cache etc.) which are not integrated into
-the the CPU.  If we allow D-cache to be turned on at all, we would have to
-be clear that external caches must be turned off or configured in a very
-precise way in order to avoid breaking the kernel's bootstrap process.  This
-is especially important when assumptions about the cache arrangement are not
-fixed at build time (in the device tree context, such assumptions generally
-won't be completely fixed).  There's a potential world of problems here---
-it seems best avoided.
-
-It could be worth clarifying that the L1 I-cache is the _only_ cache which
-is permitted to be enabled at kernel entry, and that all other caches in the
-system must be disabled.
-
-Cheers
----Dave
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 9bfeb6b..f8791ee 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -87,8 +87,8 @@ void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
+ }
+ EXPORT_SYMBOL(__arm_ioremap);
+ 
+-void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
+-			    unsigned int mtype, void *caller)
++void __iomem *__arm_ioremap_caller(unsigned long phys_addr, size_t size,
++				   unsigned int mtype, void *caller)
+ {
+ 	return __arm_ioremap(phys_addr, size, mtype);
+ }
