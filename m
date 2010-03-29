@@ -1,37 +1,35 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 29 Mar 2010 12:07:19 +0200
-Subject: [PATCH 1/7] arch/arm: Use set_cpus_allowed_ptr
-In-Reply-To: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
-References: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
-Message-ID: <1269857239.12097.250.camel@laptop>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Mon, 29 Mar 2010 11:59:45 +0100
+Subject: Query about Float Point Operation
+In-Reply-To: <d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
+References: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+	<d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
+Message-ID: <56d259a01003290359r29808e09p69d7fc8a0c4fa015@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-03-26 at 23:01 +0100, Julia Lawall wrote:
-> From: Julia Lawall <julia@diku.dk>
-> 
-> Use set_cpus_allowed_ptr rather than set_cpus_allowed.
-> 
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression E1,E2;
-> @@
-> 
-> - set_cpus_allowed(E1, cpumask_of_cpu(E2))
-> + set_cpus_allowed_ptr(E1, cpumask_of(E2))
-> 
-> @@
-> expression E;
-> identifier I;
-> @@
-> 
-> - set_cpus_allowed(E, I)
-> + set_cpus_allowed_ptr(E, &I)
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <julia@diku.dk>
+On 3/29/10, Rajanikanth H.V <rkiyerpersonal@gmail.com> wrote:
+> 2010/3/23 ??? <914059751@qq.com>:
+>  > Hi , guys
+>  > I want to do float point operations in kernel like the following,
+>  >
+>  > int foo(double d)
+>  > {
+>  >
+>  > return (int)d*d;
+>  >
+>  > }
+>  >
+>  > while compiling output error msg like following:
+>  > cannt find eabi_dmul  balabla??????
+>  >
+>  > May I ask any possibility of use float point operation in the kernel space?
+>  > Any hints/doc would be appreciated!
+>  I do not know how are you compiling the required function.
+>  Use hardware floating point support. If your target SOC support.
+>  Also verify whether Floating Point Emulation -> VFP is enabled in your config.
 
-Thanks for doing this Julia!
+Wrong. You cannot do floating point operations inside the linux kernel.
+At best, you can use fixed-point arithmetic.
+
+    M
