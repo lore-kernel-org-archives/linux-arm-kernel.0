@@ -1,26 +1,37 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 30 Mar 2010 00:41:24 +0100
-Subject: [RFC 07/10] arm: allow passing an ELF64 header to elf_check_arch()
-In-Reply-To: <01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <20100329234124.GF9876@shareable.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 30 Mar 2010 01:35:28 +0200
+Subject: [PATCH 0/5] ARM: PrimeCell DMA patches v4
+Message-ID: <1269905728-5452-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg wrote:
-> This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
-> enabled:
-> 
-> fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
-> fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
-> incompatible pointer type
-> 
-> ELF32 and ELF64 headers have common fields of same size (namely e_ident and
-> e_machine) which are checked in arm_elf_check_arch().
+This is a fourth iteration of the PrimeCell DMA API on top of the
+generic DMA devices (sibling to the DMA engine). It's based on
+the suggestion from Russell to try and define a specific extension
+subset for DMA devices.
 
-Wouldn't it be better to just disable the elf64 code entirely on
-32-bit archs, saving about half of the code size in vmcore.c which
-looks like it will never be called?
+Since last iteration the changes are:
 
--- Jamie
+- Some necessary extensions to the DMA engine were folded into
+  the generic DMA engine framework and are now pending in Dan's
+  -next tree.
+
+- I have now also implemented support for the PL022 PrimeCell.
+
+PL011, PL022 and PL180 drivers were tested on the U300 with the
+COH 901 318 DMA device.
+
+The PL011 driver was also tested on the U8500 with the pending
+DMA40 DMA device.
+
+We're running huge and high-speed transfers on all peripherals.
+It works.
+
+Patches will be added to the patch tracker soonish, but if this
+is eventually OK:ed by Russell I guess it will have to go in
+through Dan's DMA tree. Also Grant has to OK it as maintainer of
+the SPI subsystem.
+
+Yours,
+Linus Walleij
+ST-Ericsson SA
