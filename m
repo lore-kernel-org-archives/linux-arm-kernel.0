@@ -1,25 +1,33 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 29 Mar 2010 10:58:56 +0300
-Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
-In-Reply-To: <201003250828.56848.anarsoul@gmail.com>
-References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
-	<201003250828.56848.anarsoul@gmail.com>
-Message-ID: <201003291059.02425.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Mar 2010 09:11:32 +0100
+Subject: Query about Float Point Operation
+In-Reply-To: <d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
+References: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
+	<d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
+Message-ID: <20100329081132.GA9988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 25 ????? 2010 08:28:34 ????? Vasily Khoruzhick ???????:
+On Mon, Mar 29, 2010 at 10:52:50AM +0530, Rajanikanth H.V wrote:
+> 2010/3/23 ??? <914059751@qq.com>:
+> > Hi , guys
+> > I want to do float point operations in kernel like the following,
+> >
+> > int foo(double d)
+> > {
+> >
+> > return (int)d*d;
+> >
+> > }
+> >
+> > while compiling output error msg like following:
+> > cannt find eabi_dmul ?balabla??????
+> >
+> > May I ask any possibility of use float point operation in the kernel space?
+> > Any hints/doc would be appreciated!
+> I do not know how are you compiling the required function.
+> Use hardware floating point support. If your target SOC support.
 
-> Ping :)
-
-Ping again...
-
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100329/ef82192c/attachment.sig>
+And if you do this, you end up corrupting the FP state for user
+applications.  Then you will complain when your user applications
+don't work as you expect.
