@@ -1,26 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 29 Mar 2010 11:01:37 +0100
-Subject: request_irq in I2C driver causes kernel to freeze during
-	probe, but if done later - no problem!
-In-Reply-To: <20100327011223.GG31126@trinity.fluff.org>
-References: <4BAD406A.7070208@atmel.com>
-	<20100326232421.GG29179@n2100.arm.linux.org.uk>
-	<4BAD4FDE.2010904@atmel.com> <4BAD5450.7020605@atmel.com>
-	<20100327011223.GG31126@trinity.fluff.org>
-Message-ID: <20100329100136.GB13239@sirena.org.uk>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 29 Mar 2010 12:07:19 +0200
+Subject: [PATCH 1/7] arch/arm: Use set_cpus_allowed_ptr
+In-Reply-To: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
+References: <Pine.LNX.4.64.1003262301300.6480@ask.diku.dk>
+Message-ID: <1269857239.12097.250.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 27, 2010 at 01:12:23AM +0000, Ben Dooks wrote:
-> On Sat, Mar 27, 2010 at 01:41:52AM +0100, Ulf Samuelsson wrote:
+On Fri, 2010-03-26 at 23:01 +0100, Julia Lawall wrote:
+> From: Julia Lawall <julia@diku.dk>
+> 
+> Use set_cpus_allowed_ptr rather than set_cpus_allowed.
+> 
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression E1,E2;
+> @@
+> 
+> - set_cpus_allowed(E1, cpumask_of_cpu(E2))
+> + set_cpus_allowed_ptr(E1, cpumask_of(E2))
+> 
+> @@
+> expression E;
+> identifier I;
+> @@
+> 
+> - set_cpus_allowed(E, I)
+> + set_cpus_allowed_ptr(E, &I)
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
 
-> > I tried doing an I2C transfer inside the interrupt routine
-> > (this is my only way of logging)
-> > and then the I2C probe routine locked up already when
-> > doing the request_irq.
-
-> i2c transfers can sleep, thus you need somet thread or work-queue to
-> process them. 
-
-Or with current (post 2.6.29, IIRC 2.6.33 or later) kernels use a
-threaded IRQ handler for the I2C interactions.
+Thanks for doing this Julia!
