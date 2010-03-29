@@ -1,62 +1,95 @@
-From: 914059751@qq.com (rocky)
-Date: Mon, 29 Mar 2010 16:19:44 +0800
-Subject: =?gb2312?B?tPC4tDogUXVlcnkgYWJvdXQgRmxvYXQgUG9pbnQgT3BlcmF0aW9u?=
-In-Reply-To: <d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
-References: <tencent_1612D48D0AEC89DB53D9FFBB@qq.com>
-	<d82162471003282222q5e463306rd385c3ed54879e4d@mail.gmail.com>
-Message-ID: <1420D1D89B5845EABCFDDB44782A0A1B@dufan>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Mon, 29 Mar 2010 12:26:27 +0300
+Subject: [RFC 01/10] arm: kdump: reserve memory for crashkernel
+In-Reply-To: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <7b747cd930c20ae4a625c981d88e2773c706fce9.1269854500.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks you guys??
+Implemented ARM support for command line option "crashkernel=size at start" which
+allows user to reserve some memory for a dump capture kernel.
 
-Read the code in arch/arm/nwfpe/ and arch/arm/vfp, kernel DOES provide float
-point operation ONLY for user space in terms of two aspects.
-1:
-Employ hardware float point instructions, easy to implement, while increase
-die size of whole chip.
-2:
-Using software to emulate above hardware float point instructions, in short,
-decode every undefined instruction exceptions to inspect if that's an
-emulated float point instructs. While in this way kernel burden will
-increase as there are too many exceptions to be handled.
+Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+---
+ arch/arm/kernel/setup.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-So basically, no float point operation in kernel space.
-
-ROCKY
-B.R
-
------????-----
-???: Rajanikanth H.V [mailto:rkiyerpersonal at gmail.com] 
-????: 2010?3?29? 13:23
-???: ???
-??: linux-arm-kernel
-??: Re: Query about Float Point Operation
-
-2010/3/23 ??? <914059751@qq.com>:
-> Hi , guys
-> I want to do float point operations in kernel like the following,
->
-> int foo(double d)
-> {
->
-> return (int)d*d;
->
-> }
->
-> while compiling output error msg like following:
-> cannt find eabi_dmul ?balabla??????
->
-> May I ask any possibility of use float point operation in the kernel
-space?
-> Any hints/doc would be appreciated!
-I do not know how are you compiling the required function.
-Use hardware floating point support. If your target SOC support.
-Also verify whether Floating Point Emulation -> VFP is enabled in your
-config.
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..076454f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -19,6 +19,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
++#include <linux/kexec.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -661,6 +662,55 @@ static int __init customize_machine(void)
+ }
+ arch_initcall(customize_machine);
+ 
++#ifdef CONFIG_KEXEC
++static inline unsigned long long get_total_mem(void)
++{
++	unsigned long total;
++
++	total = max_low_pfn - min_low_pfn;
++	return total << PAGE_SHIFT;
++}
++
++/**
++ * reserve_crashkernel() - reserves memory are for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by a dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size, crash_base;
++	unsigned long long total_mem;
++	int ret;
++
++	total_mem = get_total_mem();
++	ret = parse_crashkernel(boot_command_line, total_mem,
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	ret = reserve_bootmem(crash_base, crash_size, BOOTMEM_EXCLUSIVE);
++	if (ret < 0) {
++		printk(KERN_WARNING "crashkernel reservation failed - "
++		       "memory is in use (0x%lx)\n", (unsigned long)crash_base);
++		return;
++	}
++
++	printk(KERN_INFO "Reserving %ldMB of memory@%ldMB "
++	       "for crashkernel (System RAM: %ldMB)\n",
++	       (unsigned long)(crash_size >> 20),
++	       (unsigned long)(crash_base >> 20),
++	       (unsigned long)(total_mem >> 20));
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++	insert_resource(&iomem_resource, &crashk_res);
++}
++#else
++static inline void reserve_crashkernel(void) {}
++#endif /* CONFIG_KEXEC */
++
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
+@@ -720,6 +770,7 @@ void __init setup_arch(char **cmdline_p)
+ #ifdef CONFIG_SMP
+ 	smp_init_cpus();
+ #endif
++	reserve_crashkernel();
+ 
+ 	cpu_init();
+ 	tcm_init();
+-- 
+1.5.6.5
