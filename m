@@ -1,26 +1,34 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Tue, 30 Mar 2010 09:23:35 +0200
-Subject: [PATCH] Add hotplug support to mcp251x driver
-In-Reply-To: <1269889076-5611-1-git-send-email-maz@misterjones.org>
-References: <1269889076-5611-1-git-send-email-maz@misterjones.org>
-Message-ID: <4BB1A6F7.1090600@grandegger.com>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Tue, 30 Mar 2010 10:26:32 +0300
+Subject: [RFC 07/10] arm: allow passing an ELF64 header to elf_check_arch()
+In-Reply-To: <20100329234124.GF9876@shareable.org>
+References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<01f3321661bf5d6fc4ba83a0e9fdaf99a7673abc.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<20100329234124.GF9876@shareable.org>
+Message-ID: <20100330072632.GE31448@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier wrote:
-> Chip model can now be selected directly by matching the modalias name
-> (instead of filling the .model field in platform_data), and allows the
-> module to be auto-loaded. Previous behaviour is of course still supported.
+On Tue, Mar 30, 2010 at 01:41:24AM +0200, ext Jamie Lokier wrote:
+> Mika Westerberg wrote:
+> > This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
+> > enabled:
+> > 
+> > fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
+> > fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
+> > incompatible pointer type
+> > 
+> > ELF32 and ELF64 headers have common fields of same size (namely e_ident and
+> > e_machine) which are checked in arm_elf_check_arch().
 > 
-> Convert the two in-tree users to this feature (icontrol & zeus).
-> Tested on an Zeus platform (mcp2515).
-> 
-> Signed-off-by: Marc Zyngier <maz@misterjones.org>
-> Acked-by: Christian Pellegrin <chripell@fsfe.org>
-> Cc: Edwin Peer <epeer@tmtservices.co.za>
+> Wouldn't it be better to just disable the elf64 code entirely on
+> 32-bit archs, saving about half of the code size in vmcore.c which
+> looks like it will never be called?
 
-Acked-by: Wolfgang Grandegger <wg@grandegger.com>
+I took this approach from the other architectures that implement kdump.
 
-for the Socket-CAN part.
+At least on those archs that support both 32 and 64-bit both versions should be
+supported. But I can add the required #ifdefs to vmcore code if preferred.
 
-Wolfgang.
+Thanks,
+MW
