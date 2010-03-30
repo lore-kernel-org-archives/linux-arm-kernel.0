@@ -1,322 +1,259 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 30 Mar 2010 16:11:55 -0700
-Subject: [PATCH 2/4] arm: msm: GPIO support for HTC Dream
-In-Reply-To: <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
-References: <>
- <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1269990717-2969-2-git-send-email-dwalker@codeaurora.org>
+Date: Tue, 30 Mar 2010 16:11:57 -0700
+Subject: [PATCH 4/4] arm: msm: trout add mmc support
+In-Reply-To: <1269990717-2969-3-git-send-email-dwalker@codeaurora.org>
+References: <> <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
+	<1269990717-2969-2-git-send-email-dwalker@codeaurora.org>
+	<1269990717-2969-3-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1269990717-2969-4-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pavel Machek <pavel@ucw.cz>
+This adds the platform data for MMC on trout.
 
-Add GPIO support for HTC Dream.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-[dwalker at codeaurora.org: renamed to trout]
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/Makefile           |    2 +-
- arch/arm/mach-msm/board-trout-gpio.c |  112 ++++++++++++++++++++++++
- arch/arm/mach-msm/board-trout.h      |  157 ++++++++++++++++++++++++++++++++++
- 3 files changed, 270 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-msm/board-trout-gpio.c
+ arch/arm/mach-msm/Makefile          |    2 +-
+ arch/arm/mach-msm/board-trout-mmc.c |  189 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/board-trout.c     |   11 ++
+ 3 files changed, 201 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-trout-mmc.c
 
 diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 47d47cb..fb9ab2d 100644
+index fb9ab2d..cde59dc 100644
 --- a/arch/arm/mach-msm/Makefile
 +++ b/arch/arm/mach-msm/Makefile
 @@ -9,5 +9,5 @@ obj-y += gpio.o
  obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
  obj-$(CONFIG_MSM_SMD) += last_radio_log.o
  
--obj-$(CONFIG_MACH_TROUT) += board-trout.o
-+obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
+-obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o
++obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o
  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
-diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
+diff --git a/arch/arm/mach-msm/board-trout-mmc.c b/arch/arm/mach-msm/board-trout-mmc.c
 new file mode 100644
-index 0000000..6e6bc76
+index 0000000..7a773f8
 --- /dev/null
-+++ b/arch/arm/mach-msm/board-trout-gpio.c
-@@ -0,0 +1,112 @@
-+/*
-+ * linux/arch/arm/mach-msm/gpio.c
-+ *
-+ * Copyright (C) 2005 HP Labs
-+ * Copyright (C) 2008 Google, Inc.
-+ * Copyright (C) 2009 Pavel Machek <pavel@ucw.cz>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
++++ b/arch/arm/mach-msm/board-trout-mmc.c
+@@ -0,0 +1,189 @@
++/* linux/arch/arm/mach-msm/board-trout-mmc.c
++** Author: Brian Swetland <swetland@google.com>
++*/
 +
 +#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/sdio_ids.h>
++#include <linux/err.h>
++#include <linux/debugfs.h>
++
++#include <asm/gpio.h>
++#include <asm/io.h>
++
++#include <mach/vreg.h>
++
++#include <mach/mmc.h>
++
++#include "devices.h"
 +
 +#include "board-trout.h"
 +
-+struct msm_gpio_chip {
-+	struct gpio_chip	chip;
-+	void __iomem		*reg;	/* Base of register bank */
-+	u8			shadow;
++#include "proc_comm.h"
++
++#define DEBUG_SDSLOT_VDD 1
++
++extern int msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
++			unsigned int stat_irq, unsigned long stat_irq_flags);
++
++/* ---- COMMON ---- */
++static void config_gpio_table(uint32_t *table, int len)
++{
++	int n;
++	unsigned id;
++	for(n = 0; n < len; n++) {
++		id = table[n];
++		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
++	}
++}
++
++/* ---- SDCARD ---- */
++
++static uint32_t sdcard_on_gpio_table[] = {
++	PCOM_GPIO_CFG(62, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA), /* CLK */
++	PCOM_GPIO_CFG(63, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), /* CMD */
++	PCOM_GPIO_CFG(64, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), /* DAT3 */
++	PCOM_GPIO_CFG(65, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), /* DAT2 */
++	PCOM_GPIO_CFG(66, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT1 */
++	PCOM_GPIO_CFG(67, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT0 */
 +};
 +
-+#define to_msm_gpio_chip(c) container_of(c, struct msm_gpio_chip, chip)
++static uint32_t sdcard_off_gpio_table[] = {
++	PCOM_GPIO_CFG(62, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CLK */
++	PCOM_GPIO_CFG(63, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CMD */
++	PCOM_GPIO_CFG(64, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT3 */
++	PCOM_GPIO_CFG(65, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT2 */
++	PCOM_GPIO_CFG(66, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT1 */
++	PCOM_GPIO_CFG(67, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT0 */
++};
 +
-+static int msm_gpiolib_get(struct gpio_chip *chip, unsigned offset)
++static uint opt_disable_sdcard;
++
++static int __init trout_disablesdcard_setup(char *str)
 +{
-+	struct msm_gpio_chip *msm_gpio = to_msm_gpio_chip(chip);
-+	unsigned mask = 1 << offset;
-+
-+	return !! (readb(msm_gpio->reg) & mask);
++	int cal = simple_strtol(str, NULL, 0);
++	
++	opt_disable_sdcard = cal;
++	return 1;
 +}
 +
-+static void msm_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
++__setup("board_trout.disable_sdcard=", trout_disablesdcard_setup);
++
++static struct vreg *vreg_sdslot;	/* SD slot power */
++
++struct mmc_vdd_xlat {
++	int mask;
++	int level;
++};
++
++static struct mmc_vdd_xlat mmc_vdd_table[] = {
++	{ MMC_VDD_165_195,	1800 },
++	{ MMC_VDD_20_21,	2050 },
++	{ MMC_VDD_21_22,	2150 },
++	{ MMC_VDD_22_23,	2250 },
++	{ MMC_VDD_23_24,	2350 },
++	{ MMC_VDD_24_25,	2450 },
++	{ MMC_VDD_25_26,	2550 },
++	{ MMC_VDD_26_27,	2650 },
++	{ MMC_VDD_27_28,	2750 },
++	{ MMC_VDD_28_29,	2850 },
++	{ MMC_VDD_29_30,	2950 },
++};
++
++static unsigned int sdslot_vdd = 0xffffffff;
++static unsigned int sdslot_vreg_enabled;
++
++static uint32_t trout_sdslot_switchvdd(struct device *dev, unsigned int vdd)
 +{
-+	struct msm_gpio_chip *msm_gpio = to_msm_gpio_chip(chip);
-+	unsigned mask = 1 << offset;
++	int i, rc;
 +
-+	if (val)
-+		msm_gpio->shadow |= mask;
-+	else
-+		msm_gpio->shadow &= ~mask;
++	BUG_ON(!vreg_sdslot);
 +
-+	writeb(msm_gpio->shadow, msm_gpio->reg);
-+}
++	if (vdd == sdslot_vdd)
++		return 0;
 +
-+static int msm_gpiolib_direction_input(struct gpio_chip *chip,
-+					unsigned offset)
-+{
-+	msm_gpiolib_set(chip, offset, 0);
-+	return 0;
-+}
++	sdslot_vdd = vdd;
 +
-+static int msm_gpiolib_direction_output(struct gpio_chip *chip,
-+					 unsigned offset, int val)
-+{
-+	msm_gpiolib_set(chip, offset, val);
-+	return 0;
-+}
-+
-+#define TROUT_GPIO_BANK(name, reg_num, base_gpio, shadow_val)		\
-+	{								\
-+		.chip = {						\
-+			.label		  = name,			\
-+			.direction_input  = msm_gpiolib_direction_input,\
-+			.direction_output = msm_gpiolib_direction_output, \
-+			.get		  = msm_gpiolib_get,		\
-+			.set		  = msm_gpiolib_set,		\
-+			.base		  = base_gpio,			\
-+			.ngpio		  = 8,				\
-+		},							\
-+		.reg = (void *) reg_num + TROUT_CPLD_BASE,		\
-+		.shadow = shadow_val,					\
++	if (vdd == 0) {
++#if DEBUG_SDSLOT_VDD
++		printk("%s: Disabling SD slot power\n", __func__);
++#endif
++		config_gpio_table(sdcard_off_gpio_table,
++				  ARRAY_SIZE(sdcard_off_gpio_table));
++		vreg_disable(vreg_sdslot);
++		sdslot_vreg_enabled = 0;
++		return 0;
 +	}
 +
-+static struct msm_gpio_chip msm_gpio_banks[] = {
-+#if defined(CONFIG_MSM_DEBUG_UART1)
-+        /* H2W pins <-> UART1 */
-+        TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x40),
-+#else
-+	/* H2W pins <-> UART3, Bluetooth <-> UART1 */
-+        TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x80),
++	if (!sdslot_vreg_enabled) {
++		rc = vreg_enable(vreg_sdslot);
++		if (rc) {
++			printk(KERN_ERR "%s: Error enabling vreg (%d)\n",
++			       __func__, rc);
++		}
++		config_gpio_table(sdcard_on_gpio_table,
++				  ARRAY_SIZE(sdcard_on_gpio_table));
++		sdslot_vreg_enabled = 1;
++	}
++
++	for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
++		if (mmc_vdd_table[i].mask == (1 << vdd)) {
++#if DEBUG_SDSLOT_VDD
++			printk("%s: Setting level to %u\n",
++			        __func__, mmc_vdd_table[i].level);
 +#endif
-+	/* I2C pull */
-+        TROUT_GPIO_BANK("MISC3", 0x02,   TROUT_GPIO_MISC3_BASE, 0x04),
-+        TROUT_GPIO_BANK("MISC4", 0x04,   TROUT_GPIO_MISC4_BASE, 0),
-+	/* mmdi 32k en */
-+        TROUT_GPIO_BANK("MISC5", 0x06,   TROUT_GPIO_MISC5_BASE, 0x04),
-+        TROUT_GPIO_BANK("INT2", 0x08,    TROUT_GPIO_INT2_BASE,  0),
-+        TROUT_GPIO_BANK("MISC1", 0x0a,   TROUT_GPIO_MISC1_BASE, 0),
-+        TROUT_GPIO_BANK("VIRTUAL", 0x12, TROUT_GPIO_VIRTUAL_BASE, 0),
-+};
++			rc = vreg_set_level(vreg_sdslot,
++					    mmc_vdd_table[i].level);
++			if (rc) {
++				printk(KERN_ERR
++				       "%s: Error setting vreg level (%d)\n",
++				       __func__, rc);
++			}
++			return 0;
++		}
++	}
 +
-+/*
-+ * Called from the processor-specific init to enable GPIO pin support.
-+ */
-+int __init trout_init_gpio(void)
-+{
-+        int i;
-+
-+        for (i = 0; i < ARRAY_SIZE(msm_gpio_banks); i++)
-+                gpiochip_add(&msm_gpio_banks[i].chip);
-+
++	printk(KERN_ERR "%s: Invalid VDD %d specified\n", __func__, vdd);
 +	return 0;
 +}
 +
-+postcore_initcall(trout_init_gpio);
++static unsigned int trout_sdslot_status(struct device *dev)
++{
++	unsigned int status;
 +
-diff --git a/arch/arm/mach-msm/board-trout.h b/arch/arm/mach-msm/board-trout.h
-index 4f345a5..308c4df 100644
---- a/arch/arm/mach-msm/board-trout.h
-+++ b/arch/arm/mach-msm/board-trout.h
-@@ -1,5 +1,162 @@
-+/* linux/arch/arm/mach-msm/board-trout.h
-+** Author: Brian Swetland <swetland@google.com>
-+*/
-+#ifndef __ARCH_ARM_MACH_MSM_BOARD_TROUT_H
-+#define __ARCH_ARM_MACH_MSM_BOARD_TROUT_H
++	status = (unsigned int) gpio_get_value(TROUT_GPIO_SDMC_CD_N);
++	return (!status);
++}
 +
-+#include <mach/board.h>
++#define TROUT_MMC_VDD	MMC_VDD_165_195 | MMC_VDD_20_21 | MMC_VDD_21_22 \
++			| MMC_VDD_22_23 | MMC_VDD_23_24 | MMC_VDD_24_25 \
++			| MMC_VDD_25_26 | MMC_VDD_26_27 | MMC_VDD_27_28 \
++			| MMC_VDD_28_29 | MMC_VDD_29_30
 +
-+#define MSM_SMI_BASE		0x00000000
-+#define MSM_SMI_SIZE		0x00800000
++static struct mmc_platform_data trout_sdslot_data = {
++	.ocr_mask	= TROUT_MMC_VDD,
++	.status		= trout_sdslot_status,
++	.translate_vdd	= trout_sdslot_switchvdd,
++};
 +
-+#define MSM_EBI_BASE		0x10000000
-+#define MSM_EBI_SIZE		0x06e00000
++int __init trout_init_mmc(unsigned int sys_rev)
++{
++	sdslot_vreg_enabled = 0;
 +
-+#define MSM_PMEM_GPU0_BASE	0x00000000
-+#define MSM_PMEM_GPU0_SIZE	0x00700000
++	vreg_sdslot = vreg_get(0, "gp6");
++	if (IS_ERR(vreg_sdslot))
++		return PTR_ERR(vreg_sdslot);
 +
-+#define MSM_PMEM_MDP_BASE	0x02000000
-+#define MSM_PMEM_MDP_SIZE	0x00800000
++	set_irq_wake(TROUT_GPIO_TO_INT(TROUT_GPIO_SDMC_CD_N), 1);
 +
-+#define MSM_PMEM_ADSP_BASE      0x02800000
-+#define MSM_PMEM_ADSP_SIZE	0x00800000
++	if (!opt_disable_sdcard)
++		msm_add_sdcc(2, &trout_sdslot_data,
++			     TROUT_GPIO_TO_INT(TROUT_GPIO_SDMC_CD_N), 0);
++	else
++		printk(KERN_INFO "trout: SD-Card interface disabled\n");
++	return 0;
++}
 +
-+#define MSM_PMEM_CAMERA_BASE	0x03000000
-+#define MSM_PMEM_CAMERA_SIZE	0x00800000
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 9793ff4..49d550e 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -30,6 +30,8 @@
+ #include "devices.h"
+ #include "board-trout.h"
+ 
++extern int trout_init_mmc(unsigned int);
 +
-+#define MSM_FB_BASE		0x03800000
-+#define MSM_FB_SIZE		0x00100000
+ static struct platform_device *devices[] __initdata = {
+ 	&msm_device_uart3,
+ 	&msm_device_smd,
+@@ -56,7 +58,16 @@ static void __init trout_fixup(struct machine_desc *desc, struct tag *tags,
+ 
+ static void __init trout_init(void)
+ {
++	int rc;
 +
-+#define MSM_LINUX_BASE		MSM_EBI_BASE
-+#define MSM_LINUX_SIZE		0x06500000
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
 +
-+#define MSM_PMEM_GPU1_SIZE	0x800000
-+#define MSM_PMEM_GPU1_BASE	MSM_RAM_CONSOLE_BASE - MSM_PMEM_GPU1_SIZE
-+
-+#define MSM_RAM_CONSOLE_BASE	MSM_EBI_BASE + 0x6d00000
-+#define MSM_RAM_CONSOLE_SIZE	128 * SZ_1K
-+
-+#if (MSM_FB_BASE + MSM_FB_SIZE) >= (MSM_PMEM_GPU1_BASE)
-+#error invalid memory map
++#ifdef CONFIG_MMC
++        rc = trout_init_mmc(system_rev);
++        if (rc)
++                printk(KERN_CRIT "%s: MMC init failure (%d)\n", __func__, rc);
 +#endif
 +
-+#define DECLARE_MSM_IOMAP
-+#include <mach/msm_iomap.h>
-+
-+#define TROUT_4_BALL_UP_0     1
-+#define TROUT_4_BALL_LEFT_0   18
-+#define TROUT_4_BALL_DOWN_0   57
-+#define TROUT_4_BALL_RIGHT_0  91
-+
-+#define TROUT_5_BALL_UP_0     94
-+#define TROUT_5_BALL_LEFT_0   18
-+#define TROUT_5_BALL_DOWN_0   90
-+#define TROUT_5_BALL_RIGHT_0  19
-+
-+#define TROUT_POWER_KEY     20
-+
-+#define TROUT_4_TP_LS_EN    19
-+#define TROUT_5_TP_LS_EN    1
+ }
  
- #define TROUT_CPLD_BASE   0xE8100000
- #define TROUT_CPLD_START  0x98000000
- #define TROUT_CPLD_SIZE   SZ_4K
- 
-+#define TROUT_GPIO_CABLE_IN1		(83)
-+#define TROUT_GPIO_CABLE_IN2		(49)
-+
-+#define TROUT_GPIO_START (128)
-+
-+#define TROUT_GPIO_INT_MASK0_REG            (0x0c)
-+#define TROUT_GPIO_INT_STAT0_REG            (0x0e)
-+#define TROUT_GPIO_INT_MASK1_REG            (0x14)
-+#define TROUT_GPIO_INT_STAT1_REG            (0x10)
-+
-+#define TROUT_GPIO_HAPTIC_PWM               (28)
-+#define TROUT_GPIO_PS_HOLD                  (25)
-+
-+#define TROUT_GPIO_MISC2_BASE               (TROUT_GPIO_START + 0x00)
-+#define TROUT_GPIO_MISC3_BASE               (TROUT_GPIO_START + 0x08)
-+#define TROUT_GPIO_MISC4_BASE               (TROUT_GPIO_START + 0x10)
-+#define TROUT_GPIO_MISC5_BASE               (TROUT_GPIO_START + 0x18)
-+#define TROUT_GPIO_INT2_BASE                (TROUT_GPIO_START + 0x20)
-+#define TROUT_GPIO_MISC1_BASE               (TROUT_GPIO_START + 0x28)
-+#define TROUT_GPIO_VIRTUAL_BASE             (TROUT_GPIO_START + 0x30)
-+#define TROUT_GPIO_INT5_BASE                (TROUT_GPIO_START + 0x48)
-+
-+#define TROUT_GPIO_CHARGER_EN               (TROUT_GPIO_MISC2_BASE + 0)
-+#define TROUT_GPIO_ISET                     (TROUT_GPIO_MISC2_BASE + 1)
-+#define TROUT_GPIO_H2W_DAT_DIR              (TROUT_GPIO_MISC2_BASE + 2)
-+#define TROUT_GPIO_H2W_CLK_DIR              (TROUT_GPIO_MISC2_BASE + 3)
-+#define TROUT_GPIO_H2W_DAT_GPO              (TROUT_GPIO_MISC2_BASE + 4)
-+#define TROUT_GPIO_H2W_CLK_GPO              (TROUT_GPIO_MISC2_BASE + 5)
-+#define TROUT_GPIO_H2W_SEL0                 (TROUT_GPIO_MISC2_BASE + 6)
-+#define TROUT_GPIO_H2W_SEL1                 (TROUT_GPIO_MISC2_BASE + 7)
-+
-+#define TROUT_GPIO_SPOTLIGHT_EN             (TROUT_GPIO_MISC3_BASE + 0)
-+#define TROUT_GPIO_FLASH_EN                 (TROUT_GPIO_MISC3_BASE + 1)
-+#define TROUT_GPIO_I2C_PULL                 (TROUT_GPIO_MISC3_BASE + 2)
-+#define TROUT_GPIO_TP_I2C_PULL              (TROUT_GPIO_MISC3_BASE + 3)
-+#define TROUT_GPIO_TP_EN                    (TROUT_GPIO_MISC3_BASE + 4)
-+#define TROUT_GPIO_JOG_EN                   (TROUT_GPIO_MISC3_BASE + 5)
-+#define TROUT_GPIO_UI_LED_EN                (TROUT_GPIO_MISC3_BASE + 6)
-+#define TROUT_GPIO_QTKEY_LED_EN             (TROUT_GPIO_MISC3_BASE + 7)
-+
-+#define TROUT_GPIO_VCM_PWDN                 (TROUT_GPIO_MISC4_BASE + 0)
-+#define TROUT_GPIO_USB_H2W_SW               (TROUT_GPIO_MISC4_BASE + 1)
-+#define TROUT_GPIO_COMPASS_RST_N            (TROUT_GPIO_MISC4_BASE + 2)
-+#define TROUT_GPIO_HAPTIC_EN_UP             (TROUT_GPIO_MISC4_BASE + 3)
-+#define TROUT_GPIO_HAPTIC_EN_MAIN           (TROUT_GPIO_MISC4_BASE + 4)
-+#define TROUT_GPIO_USB_PHY_RST_N            (TROUT_GPIO_MISC4_BASE + 5)
-+#define TROUT_GPIO_WIFI_PA_RESETX           (TROUT_GPIO_MISC4_BASE + 6)
-+#define TROUT_GPIO_WIFI_EN                  (TROUT_GPIO_MISC4_BASE + 7)
-+
-+#define TROUT_GPIO_BT_32K_EN                (TROUT_GPIO_MISC5_BASE + 0)
-+#define TROUT_GPIO_MAC_32K_EN               (TROUT_GPIO_MISC5_BASE + 1)
-+#define TROUT_GPIO_MDDI_32K_EN              (TROUT_GPIO_MISC5_BASE + 2)
-+#define TROUT_GPIO_COMPASS_32K_EN           (TROUT_GPIO_MISC5_BASE + 3)
-+
-+#define TROUT_GPIO_NAVI_ACT_N               (TROUT_GPIO_INT2_BASE + 0)
-+#define TROUT_GPIO_COMPASS_IRQ              (TROUT_GPIO_INT2_BASE + 1)
-+#define TROUT_GPIO_SLIDING_DET              (TROUT_GPIO_INT2_BASE + 2)
-+#define TROUT_GPIO_AUD_HSMIC_DET_N          (TROUT_GPIO_INT2_BASE + 3)
-+#define TROUT_GPIO_SD_DOOR_N                (TROUT_GPIO_INT2_BASE + 4)
-+#define TROUT_GPIO_CAM_BTN_STEP1_N          (TROUT_GPIO_INT2_BASE + 5)
-+#define TROUT_GPIO_CAM_BTN_STEP2_N          (TROUT_GPIO_INT2_BASE + 6)
-+#define TROUT_GPIO_TP_ATT_N                 (TROUT_GPIO_INT2_BASE + 7)
-+#define TROUT_GPIO_BANK0_FIRST_INT_SOURCE   (TROUT_GPIO_NAVI_ACT_N)
-+#define TROUT_GPIO_BANK0_LAST_INT_SOURCE    (TROUT_GPIO_TP_ATT_N)
-+
-+#define TROUT_GPIO_H2W_DAT_GPI              (TROUT_GPIO_MISC1_BASE + 0)
-+#define TROUT_GPIO_H2W_CLK_GPI              (TROUT_GPIO_MISC1_BASE + 1)
-+#define TROUT_GPIO_CPLD128_VER_0            (TROUT_GPIO_MISC1_BASE + 4)
-+#define TROUT_GPIO_CPLD128_VER_1            (TROUT_GPIO_MISC1_BASE + 5)
-+#define TROUT_GPIO_CPLD128_VER_2            (TROUT_GPIO_MISC1_BASE + 6)
-+#define TROUT_GPIO_CPLD128_VER_3            (TROUT_GPIO_MISC1_BASE + 7)
-+
-+#define TROUT_GPIO_SDMC_CD_N                (TROUT_GPIO_VIRTUAL_BASE + 0)
-+#define TROUT_GPIO_END                      (TROUT_GPIO_SDMC_CD_N)
-+#define TROUT_GPIO_BANK1_FIRST_INT_SOURCE   (TROUT_GPIO_SDMC_CD_N)
-+#define TROUT_GPIO_BANK1_LAST_INT_SOURCE    (TROUT_GPIO_SDMC_CD_N)
-+
-+#define TROUT_GPIO_VIRTUAL_TO_REAL_OFFSET \
-+	(TROUT_GPIO_INT5_BASE - TROUT_GPIO_VIRTUAL_BASE)
-+
-+#define TROUT_INT_START (NR_MSM_IRQS + NR_GPIO_IRQS)
-+#define TROUT_INT_BANK0_COUNT (8)
-+#define TROUT_INT_BANK1_START (TROUT_INT_START + TROUT_INT_BANK0_COUNT)
-+#define TROUT_INT_BANK1_COUNT (1)
-+#define TROUT_INT_END (TROUT_INT_START + TROUT_INT_BANK0_COUNT + \
-+			TROUT_INT_BANK1_COUNT - 1)
-+#define TROUT_GPIO_TO_INT(n) (((n) <= TROUT_GPIO_BANK0_LAST_INT_SOURCE) ? \
-+	(TROUT_INT_START - TROUT_GPIO_BANK0_FIRST_INT_SOURCE + (n)) : \
-+	(TROUT_INT_BANK1_START - TROUT_GPIO_BANK1_FIRST_INT_SOURCE + (n)))
-+
-+#define TROUT_INT_TO_BANK(n) ((n - TROUT_INT_START) / TROUT_INT_BANK0_COUNT)
-+#define TROUT_INT_TO_MASK(n) (1U << ((n - TROUT_INT_START) & 7))
-+#define TROUT_BANK_TO_MASK_REG(bank) \
-+	(bank ? TROUT_GPIO_INT_MASK1_REG : TROUT_GPIO_INT_MASK0_REG)
-+#define TROUT_BANK_TO_STAT_REG(bank) \
-+	(bank ? TROUT_GPIO_INT_STAT1_REG : TROUT_GPIO_INT_STAT0_REG)
-+
-+#endif /* GUARD */
+ static struct map_desc trout_io_desc[] __initdata = {
 -- 
 1.6.2.3
