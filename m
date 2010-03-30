@@ -1,42 +1,27 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 30 Mar 2010 23:33:05 +0100
-Subject: My TI Sitara AM3517 with fbdev piss me off since 12 hours
-References: <20100330202413.GQ1825@tamay-dogan.net>
-Message-ID: <yw1xzl1pxwwu.fsf@unicorn.mansr.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 30 Mar 2010 15:59:53 -0700
+Subject: [GIT PULL] generic arm for MSM try2
+In-Reply-To: <20100328214901.GA8614@n2100.arm.linux.org.uk>
+References: <1269560155.21793.89.camel@c-dwalke-linux.qualcomm.com>
+	<20100328214901.GA8614@n2100.arm.linux.org.uk>
+Message-ID: <1269989993.23416.18.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michelle Konzack <linux4michelle@tamay-dogan.net> writes:
+On Sun, 2010-03-28 at 22:49 +0100, Russell King - ARM Linux wrote:
+> On Thu, Mar 25, 2010 at 04:35:55PM -0700, Daniel Walker wrote:
+> > Ok, attempt #2 .. It's the same set of patches , only it's against
+> > mainline linus tree of the moment. I force updated it into the same
+> > "for-russell" branch.
+> > 
+> > btw, you might want to pay close attention to the "Fix incorrect
+> > permission faults" patch. That's the only non-small patch in the queue.
+> 
+> Well, I don't think it's fair on those who created abort-ev7.S to go
+> throwing a boilerplate copyright on the file which makes it look like
+> "Code Aurora Forum." wrote the entire thing.
 
-> Hello Guys,
->
-> today morning (for 12 hours) I have gotten my AUO  19"  Touchscreen  TFT
-> Display (G-Series; 1280x1024, 16M) and connected it using the FlatLink3D
-> to the Sitara...
->
-> Before I commit suicid can someone tell me how to get this runing?
->
-> If I connect my 4" and 8" TFT displays using 24bt  RGB  all  is  working
-> fine.  and yes I am currently reading the "AM35xx ARM Technical Referenc
-> Manual" (being in page 1233 currently)
->
-> How can I switch the Sitara to use the "FlatLink3D module"?
+Ok, I updated the same branch .. It's minus the copyright and license ,
+and I rebased it onto a more recent linus tree ..
 
-You'll probably have better luck asking on a TI-specific list.  The
-display system is the same as on OMAP3 so maybe someone over there can
-help you.  Be sure to mention what kernel and configuration you're
-using.
-
-> Thanks, Greetings and nice Day/Evening
->     Michelle Konzack
-> currently
->     System De-Administrator
->     1,2V Electronic Engineer
->     Tamay Dogan Nutwork
->     Debian GNU/Linux fbdev killer
-
-:-)
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Daniel
