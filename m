@@ -1,120 +1,48 @@
 From: chripell@fsfe.org (Christian Pellegrin)
-Date: Tue, 30 Mar 2010 10:22:47 +0200
-Subject: [PATCH v2.6.34-rc2] s3c: Adds support for banks H and J on S3C244X
-	CPUs
-Message-ID: <1269937367-7571-1-git-send-email-chripell@fsfe.org>
+Date: Tue, 30 Mar 2010 10:23:06 +0200
+Subject: [PATCH v2.6.34-rc2] s3c: Fix GPIOs bank H and J not being preserved
+	during suspend on S3C24XX
+Message-ID: <1269937386-7597-1-git-send-email-chripell@fsfe.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to gpiolib for GPIO bank J present on S3C244X
-CPUs.
+With this patch the platform-specific define for the last defined GPIO
+on S3C machines is used instead of a hard-coded value (which is right
+only for the s3c2410). The gpio_nr being incremented by 1 too much (look
+for the gpio_nr++ in the for instruction) is fixed too although it
+doesn't make any trouble on current S3C implementations.
 
 Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
 ---
- arch/arm/mach-s3c2410/include/mach/gpio-nrs.h |    4 ++++
- arch/arm/mach-s3c2410/include/mach/gpio.h     |    8 ++++++++
- arch/arm/plat-s3c24xx/gpiolib.c               |   16 +++++++++++++++-
- 3 files changed, 27 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/gpio-track.h |    2 +-
+ arch/arm/plat-samsung/pm-gpio.c                 |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-index 2edbb9c..f1f32e2 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-@@ -24,6 +24,7 @@
- #define S3C2410_GPIO_BANKF   (32*5)
- #define S3C2410_GPIO_BANKG   (32*6)
- #define S3C2410_GPIO_BANKH   (32*7)
-+#define S3C2410_GPIO_BANKJ   (32*8)
- 
- /* GPIO bank sizes */
- #define S3C2410_GPIO_A_NR	(32)
-@@ -34,6 +35,7 @@
- #define S3C2410_GPIO_F_NR	(32)
- #define S3C2410_GPIO_G_NR	(32)
- #define S3C2410_GPIO_H_NR	(32)
-+#define S3C2410_GPIO_J_NR	(32)
- 
- #if CONFIG_S3C_GPIO_SPACE != 0
- #error CONFIG_S3C_GPIO_SPACE cannot be zero at the moment
-@@ -53,6 +55,7 @@ enum s3c_gpio_number {
- 	S3C2410_GPIO_F_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_E),
- 	S3C2410_GPIO_G_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_F),
- 	S3C2410_GPIO_H_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_G),
-+	S3C2410_GPIO_J_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_H),
- };
- 
- #endif /* __ASSEMBLY__ */
-@@ -67,6 +70,7 @@ enum s3c_gpio_number {
- #define S3C2410_GPF(_nr)	(S3C2410_GPIO_F_START + (_nr))
- #define S3C2410_GPG(_nr)	(S3C2410_GPIO_G_START + (_nr))
- #define S3C2410_GPH(_nr)	(S3C2410_GPIO_H_START + (_nr))
-+#define S3C2410_GPJ(_nr)	(S3C2410_GPIO_J_START + (_nr))
- 
- /* compatibility until drivers can be modified */
- 
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-s3c2410/include/mach/gpio.h
-index 15f0b3e..1528fc7 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
-@@ -20,10 +20,18 @@
-  * devices that need GPIO.
-  */
- 
-+#ifdef CONFIG_CPU_S3C244X
-+#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
-+#else
- #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
-+#endif
- 
- #include <asm-generic/gpio.h>
- #include <mach/gpio-nrs.h>
- #include <mach/gpio-fns.h>
- 
-+#ifdef CONFIG_CPU_S3C244X
-+#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
-+#else
- #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
-+#endif
-diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-index 4f0f11a..0818a6e 100644
---- a/arch/arm/plat-s3c24xx/gpiolib.c
-+++ b/arch/arm/plat-s3c24xx/gpiolib.c
-@@ -26,6 +26,7 @@
- #include <plat/pm.h>
- 
- #include <mach/regs-gpio.h>
-+#include <mach/regs-gpioj.h>
- 
- static int s3c24xx_gpiolib_banka_input(struct gpio_chip *chip, unsigned offset)
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-track.h b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+index acb2591..6371eaa 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio-track.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+@@ -23,7 +23,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
  {
-@@ -151,7 +152,8 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
- 			.ngpio			= 16,
- 			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
- 		},
--	}, {
-+	},
-+	[7] = {
- 		.base	= S3C2410_GPHCON,
- 		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
- 		.chip	= {
-@@ -161,6 +163,18 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
- 			.ngpio			= 11,
- 		},
- 	},
-+#ifdef CONFIG_CPU_S3C244X
-+	[8] = {
-+		.base	= S3C2440_GPJCON,
-+		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
-+		.chip	= {
-+			.base			= S3C2410_GPJ(0),
-+			.owner			= THIS_MODULE,
-+			.label			= "GPIOJ",
-+			.ngpio			= 13,
-+		},
-+	},
-+#endif
- };
+ 	struct s3c_gpio_chip *chip;
  
- static __init int s3c24xx_gpiolib_init(void)
+-	if (pin > S3C2410_GPG(10))
++	if (pin > S3C_GPIO_END)
+ 		return NULL;
+ 
+ 	chip = &s3c24xx_gpios[pin/32];
+diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+index 69a4c7f..1aac746 100644
+--- a/arch/arm/plat-samsung/pm-gpio.c
++++ b/arch/arm/plat-samsung/pm-gpio.c
+@@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+ 			  ourchip->pm_save[2],
+ 			  ourchip->pm_save[3]);
+ 
+-		gpio_nr += ourchip->chip.ngpio;
++		gpio_nr += ourchip->chip.ngpio - 1;
+ 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+ 	}
+ }
 -- 
 1.5.6.5
