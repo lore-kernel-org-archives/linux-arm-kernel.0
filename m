@@ -1,82 +1,42 @@
-From: trimarchi@gandalf.sssup.it (Michael Trimarchi)
-Date: Tue, 30 Mar 2010 23:26:12 +0200
-Subject: [BUG] pxa27x_udc: possible recursive locking detected
-	in	pxa_ep_queue
-In-Reply-To: <87vdfqx2xw.fsf@free.fr>
-References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>	<87fx7guuzg.fsf@free.fr>	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>	<87ocltsda3.fsf@free.fr>	<20091223005313.13ba5061.ospite@studenti.unina.it>
-	<87vdfqx2xw.fsf@free.fr>
-Message-ID: <4BB26C74.8010104@gandalf.sssup.it>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 30 Mar 2010 23:33:05 +0100
+Subject: My TI Sitara AM3517 with fbdev piss me off since 12 hours
+References: <20100330202413.GQ1825@tamay-dogan.net>
+Message-ID: <yw1xzl1pxwwu.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Michelle Konzack <linux4michelle@tamay-dogan.net> writes:
 
+> Hello Guys,
+>
+> today morning (for 12 hours) I have gotten my AUO  19"  Touchscreen  TFT
+> Display (G-Series; 1280x1024, 16M) and connected it using the FlatLink3D
+> to the Sitara...
+>
+> Before I commit suicid can someone tell me how to get this runing?
+>
+> If I connect my 4" and 8" TFT displays using 24bt  RGB  all  is  working
+> fine.  and yes I am currently reading the "AM35xx ARM Technical Referenc
+> Manual" (being in page 1233 currently)
+>
+> How can I switch the Sitara to use the "FlatLink3D module"?
 
-Robert Jarzmik wrote:
-> Antonio Ospite <ospite@studenti.unina.it> writes:
->
->   
->> With your latest patch on top of 2.6.32 I get the "possible recursive
->> locking" message at the *first* cable unplug/plug cycle, I am appending
->> it here, the log is partial because I dumped it from RAM and something
->> was lost.
->>     
->
-> Thanks.
-> Now, lets have another try. This patch is a bit saner, and though I got the
-> "locking detected" you noticed without it, I didn't manage to get it with this
-> patch applied.
->
-> As your test platform is far better than mine, would you mind a bit of testing
-> ... again. This patch applies on top of v2.6.32.
->
-> Cheers.
->
-> --
-> Robert
->
-> >From 3ca70f842651f607790a2ff94f2b3a7ec223196d Mon Sep 17 00:00:00 2001
-> From: Robert Jarzmik <robert.jarzmik@free.fr>
-> Date: Sat, 12 Dec 2009 15:13:24 +0100
-> Subject: [PATCH] pxa27x_udc: Fix deadlocks on request queueing
->
-> As reported by Antonio, there are cases where the ep->lock
-> can be taken twice, triggering a deadlock.
-> The typical sequence is :
->  irq_handler
->    \
->     -> gadget.complete()
->        \
->         -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
->            \
->             -> gadget.complete()
->                \
->                 -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
->                                                ==> *deadlock*
-> The patch fixes this by :
->  - releasing the lock each time gadget.complete() is called
->  - adding a check in handle_ep() to detect a recursive call,
->    in which case the function becomes on no-op.
->
-> The patch is still not good enough for ep0. For this unique
-> endpoint, another well thought over patch will be needed.
->
-> Reported-by: Antonio Ospite <ospite@studenti.unina.it>
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  drivers/usb/gadget/pxa27x_udc.c |  114 +++++++++++++++++++++++++++------------
->  drivers/usb/gadget/pxa27x_udc.h |    6 ++
->  2 files changed, 85 insertions(+), 35 deletions(-)
->   
-+       /* don't modify queue heads during completion callback */
-+       if (spin_is_locked(&ep->lock)) {
-+               spin_unlock(&ep->lock);
-+               req->req.complete(&req->udc_usb_ep->usb_ep, &req->req);
-+               spin_lock(&ep->lock);
-+       } else
-+               req->req.complete(&req->udc_usb_ep->usb_ep, &req->req);
- }
+You'll probably have better luck asking on a TI-specific list.  The
+display system is the same as on OMAP3 so maybe someone over there can
+help you.  Be sure to mention what kernel and configuration you're
+using.
 
-I have fixed in the same way without pass the flag
+> Thanks, Greetings and nice Day/Evening
+>     Michelle Konzack
+> currently
+>     System De-Administrator
+>     1,2V Electronic Engineer
+>     Tamay Dogan Nutwork
+>     Debian GNU/Linux fbdev killer
 
-Michael
+:-)
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
