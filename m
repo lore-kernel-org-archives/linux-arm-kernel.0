@@ -1,97 +1,45 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 30 Mar 2010 20:32:01 +0200
-Subject: [PATCH 3/3] ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
-	handling
-In-Reply-To: <1269973921-29611-1-git-send-email-daniel@caiaq.de>
-References: <1269973921-29611-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1269973921-29611-3-git-send-email-daniel@caiaq.de>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 30 Mar 2010 23:02:16 +0400
+Subject: [PATCH v3 0/3] Support for Cavium Networks CNS3xxx machines
+Message-ID: <20100330190216.GA7611@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX3 SoCs have a silicon bug which corrupts CRC calculation of
-multi-block transfers when connected SDIO peripheral doesn't drive the
-BUSY line as required by the specs.
+Hi all,
 
-One way to prevent this is to only allow 1-bit transfers.
+v3 is on the way...
 
-Another way is playing tricks with the DMA engine, but this isn't
-mainline yet. So for now, we live with the performance drawback of 1-bit
-transfers until a nicer solution is found.
+Changes since v2:
 
-This patch introduces a new host controller callback 'init_card' which
-is for now only called from mmc_sdio_init_card().
+- We noticed that timer2 (which was used as a clock source) causes
+  nanosleep system call to misbehave. Until debugged, the timer2
+  support is removed.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Volker Ernst <volker.ernst@txtr.com>
-Cc: Jiri Kosina <jkosina@suse.cz>
----
- drivers/mmc/core/sdio.c   |    6 ++++++
- drivers/mmc/host/mxcmmc.c |   14 ++++++++++++++
- include/linux/mmc/host.h  |    3 +++
- 3 files changed, 23 insertions(+), 0 deletions(-)
+  It's fine since timer1 is still used as a clockevent, and provides
+  all needed timekeeping functionality. With these patches we want
+  a minimal (but rock solid) CNS3xxx support, all non-essential
+  features can wait.
 
-diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
-index 2dd4cfe..b9dee28 100644
---- a/drivers/mmc/core/sdio.c
-+++ b/drivers/mmc/core/sdio.c
-@@ -296,6 +296,12 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
- 	card->type = MMC_TYPE_SDIO;
- 
- 	/*
-+	 * Call the optional HC's init_card function to handle quirks.
-+	 */
-+	if (host->ops->init_card)
-+		host->ops->init_card(host, card);
-+
-+	/*
- 	 * For native busses:  set card RCA and quit open drain mode.
- 	 */
- 	if (!powered_resume && !mmc_host_is_spi(host)) {
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 83a4545..f584c1b 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -708,11 +708,25 @@ static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	spin_unlock_irqrestore(&host->lock, flags);
- }
- 
-+static void mxcmci_init_card(struct mmc_host *host, struct mmc_card *card)
-+{
-+	/*
-+	 * MX3 SoCs have a silicon bug which corrupts CRC calculation of
-+	 * multi-block transfers when connected SDIO peripheral doesn't
-+	 * drive the BUSY line as required by the specs.
-+	 * One way to prevent this is to only allow 1-bit transfers.
-+	 */
-+
-+	if (cpu_is_mx3() && card->type == MMC_TYPE_SDIO)
-+		host->caps &= ~MMC_CAP_4_BIT_DATA;
-+}
-+
- static const struct mmc_host_ops mxcmci_ops = {
- 	.request		= mxcmci_request,
- 	.set_ios		= mxcmci_set_ios,
- 	.get_ro			= mxcmci_get_ro,
- 	.enable_sdio_irq	= mxcmci_enable_sdio_irq,
-+	.init_card		= mxcmci_init_card,
- };
- 
- static int mxcmci_probe(struct platform_device *pdev)
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 43eaf5c..3196c84 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -108,6 +108,9 @@ struct mmc_host_ops {
- 	int	(*get_cd)(struct mmc_host *host);
- 
- 	void	(*enable_sdio_irq)(struct mmc_host *host, int enable);
-+
-+	/* optional callback for HC quirks */
-+	void	(*init_card)(struct mmc_host *host, struct mmc_card *card);
- };
- 
- struct mmc_card;
+  I.e. support for the second timer can be added as a separate
+  patch.
+
+- Updated some PCIe register definitions to make PCIe integration
+  more smooth.
+
+- Updated defconfig.
+
+Changes since v1:
+
+- Addressed Russell's comments;
+- CNS3420VB board support split into its own patch per Sergei's
+  comment;
+- This series no longer include AHCI and SDHCI patches. Because of
+  dependencies on other trees they aren't yet suitable for inclusion,
+  so no need to repost them again.
+
+Thanks!
+
 -- 
-1.7.0
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
