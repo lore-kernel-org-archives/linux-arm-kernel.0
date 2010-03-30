@@ -1,90 +1,60 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 30 Mar 2010 01:56:51 -0600
-Subject: [PATCH 3/4] OMAP4: prcm: Use logical OR instead of bitwise OR
-In-Reply-To: <20100330074801.11629.61888.stgit@localhost.localdomain>
-References: <20100330074801.11629.61888.stgit@localhost.localdomain>
-Message-ID: <20100330075649.11629.70713.stgit@localhost.localdomain>
+From: chripell@fsfe.org (Christian Pellegrin)
+Date: Tue, 30 Mar 2010 10:22:03 +0200
+Subject: [PATCH v2.6.34-rc2] s3c: Fix CONFIG_MTD_NAND_S3C2410_CLKSTOP
+Message-ID: <1269937323-7541-1-git-send-email-chripell@fsfe.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Option CONFIG_MTD_NAND_S3C2410_CLKSTOP was broken by higher MTD layers
+calling select_chip with -1 twice in a row. This patch fixes the problem
+by making sure that clk_disable is not called too many times.
 
-This patch fixes usage of bitwise OR in if conditions, and instead
-uses logical OR.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Abhijit Pagare <abhijitpagare@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
 ---
- arch/arm/mach-omap2/clockdomain.c |    6 +++---
- arch/arm/mach-omap2/powerdomain.c |    2 +-
- arch/arm/mach-omap2/prcm.c        |    4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/mtd/nand/s3c2410.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index b87ad66..6e568ec 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -240,7 +240,7 @@ static void _omap2_clkdm_set_hwsup(struct clockdomain *clkdm, int enable)
- 			bits = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
- 		else
- 			bits = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
--	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
-+	} else if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
- 		if (enable)
- 			bits = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
- 		else
-@@ -812,7 +812,7 @@ int omap2_clkdm_sleep(struct clockdomain *clkdm)
- 		cm_set_mod_reg_bits(OMAP24XX_FORCESTATE,
- 			    clkdm->pwrdm.ptr->prcm_offs, OMAP2_PM_PWSTCTRL);
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index fa6e9c7..9adecc6 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -37,6 +37,7 @@
+ #include <linux/slab.h>
+ #include <linux/clk.h>
+ #include <linux/cpufreq.h>
++#include <linux/bitops.h>
  
--	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
-+	} else if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+@@ -135,6 +136,9 @@ struct s3c2410_nand_info {
+ #ifdef CONFIG_CPU_FREQ
+ 	struct notifier_block	freq_transition;
+ #endif
++#ifdef CONFIG_MTD_NAND_S3C2410_CLKSTOP
++	unsigned long                   clk_running;
++#endif
+ };
  
- 		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_SLEEP <<
- 			 __ffs(clkdm->clktrctrl_mask));
-@@ -856,7 +856,7 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
- 		cm_clear_mod_reg_bits(OMAP24XX_FORCESTATE,
- 			      clkdm->pwrdm.ptr->prcm_offs, OMAP2_PM_PWSTCTRL);
+ /* conversion functions */
+@@ -333,7 +337,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
+ 	nmtd = this->priv;
+ 	info = nmtd->info;
  
--	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
-+	} else if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+-	if (chip != -1 && allow_clk_stop(info))
++	if (chip != -1 && allow_clk_stop(info) &&
++	    !test_and_set_bit(0, &info->clk_running))
+ 		clk_enable(info->clk);
  
- 		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_WAKEUP <<
- 			 __ffs(clkdm->clktrctrl_mask));
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 9a0fb38..ebfce7d 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -222,7 +222,7 @@ void pwrdm_init(struct powerdomain **pwrdm_list)
- {
- 	struct powerdomain **p = NULL;
+ 	cur = readl(info->sel_reg);
+@@ -356,7 +361,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
  
--	if (cpu_is_omap24xx() | cpu_is_omap34xx()) {
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
- 		pwrstctrl_reg_offs = OMAP2_PM_PWSTCTRL;
- 		pwrstst_reg_offs = OMAP2_PM_PWSTST;
- 	} else if (cpu_is_omap44xx()) {
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 81872aa..fc3fd38 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -123,7 +123,7 @@ struct omap3_prcm_regs prcm_context;
- u32 omap_prcm_get_reset_sources(void)
- {
- 	/* XXX This presumably needs modification for 34XX */
--	if (cpu_is_omap24xx() | cpu_is_omap34xx())
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
- 		return prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST) & 0x7f;
- 	if (cpu_is_omap44xx())
- 		return prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST) & 0x7f;
-@@ -157,7 +157,7 @@ void omap_prcm_arch_reset(char mode)
- 	else
- 		WARN_ON(1);
+ 	writel(cur, info->sel_reg);
  
--	if (cpu_is_omap24xx() | cpu_is_omap34xx())
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
- 		prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs,
- 						 OMAP2_RM_RSTCTRL);
- 	if (cpu_is_omap44xx())
+-	if (chip == -1 && allow_clk_stop(info))
++	if (chip == -1 && allow_clk_stop(info) &&
++	    test_and_clear_bit(0, &info->clk_running))
+ 		clk_disable(info->clk);
+ }
+ 
+-- 
+1.5.6.5
