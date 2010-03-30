@@ -1,26 +1,67 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 30 Mar 2010 08:57:26 -0400 (EDT)
-Subject: [GIT PULL] generic arm for MSM try2
-In-Reply-To: <1269943053.17138.41.camel@e102109-lin.cambridge.arm.com>
-References: <1269560155.21793.89.camel@c-dwalke-linux.qualcomm.com>
-	<20100328214901.GA8614@n2100.arm.linux.org.uk>
-	<1269881777.17124.5.camel@c-dwalke-linux.qualcomm.com>
-	<20100329172841.GD28468@n2100.arm.linux.org.uk>
-	<1269894478.17124.32.camel@c-dwalke-linux.qualcomm.com>
-	<1269899459.2038.22.camel@e102109-lin.cambridge.arm.com>
-	<1269900634.17124.34.camel@c-dwalke-linux.qualcomm.com>
-	<1269943053.17138.41.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1003300856020.694@xanadu.home>
+From: Dave.Martin@arm.com (Dave P. Martin)
+Date: Tue, 30 Mar 2010 14:32:24 +0100
+Subject: RFC: ARM Boot standard for passing device tree blob
+In-Reply-To: <20100330002638.GI9876@shareable.org>
+References: <fa686aa41003240811l6f40c8cfs6fdad496facdc089@mail.gmail.com>
+	<20100325210409.GH24984@n2100.arm.linux.org.uk>
+	<1269610665.807.51.camel@e102109-lin.cambridge.arm.com>
+	<4BACF238.3040405@firmworks.com>
+	<fa686aa41003261113o7cd8612eh9b51904114902a3a@mail.gmail.com>
+	<alpine.LFD.2.00.1003261435460.694@xanadu.home>
+	<fa686aa41003261252u7dc31bb6nca2e77ae8feb4355@mail.gmail.com>
+	<20100326230343.GC29179@n2100.arm.linux.org.uk>
+	<000001cacf32$66d4b190$4044010a@Emea.Arm.com>
+	<20100330002638.GI9876@shareable.org>
+Message-ID: <000001cad00d$6f7f0cb0$4044010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Mar 2010, Catalin Marinas wrote:
+Hi,
 
-> That's why I haven't added one either :). I think you can add Deep Blue
-> Solutions Ltd as well, unless Russell has any objections. But it's funny
-> for such a small file to have three copyright holders.
+> -----Original Message-----
+> From: Jamie Lokier [mailto:jamie at shareable.org] 
+> Sent: 30 March 2010 01:27
 
-And also a tad ridiculous IMHO.  Makes S/N ratio very low.
+[...]
 
+> > It could be worth clarifying that the L1 I-cache is the 
+> _only_ cache 
+> > which is permitted to be enabled at kernel entry, and that 
+> all other 
+> > caches in the system must be disabled.
+> 
+> Catalin said that on some platforms, the L2 cache is 
+> unavoidably enabled by the time of kernel boot and it cannot 
+> be turned off.
+> So the above cannot be satisfied.
 
-Nicolas
+OK, good catch--- that slipped my mind.
+
+I think the real requirement is that the kernel needs to be able to do
+I-side/D-side synchronisation at L1 (so that the kernel decompression phase
+works).  Other than this, we shouldn't need to do anything except access RAM
+until the device tree framework has discovered the cache configuration.
+
+So it seems adequate to require that:
+
+* The MMU must be off
+
+* For architected caches (i.e., those managed via CP15 operations):
+	* I-caches may be turned on
+	* D-caches and unified caches must be clean, invalidated and turned
+off
+
+* For non-architectured caches (those managed via implementation-specific
+mechanisms):
+      * Wherever possible, these caches should be clean, invalidated and
+turned off.  Otherwise:
+	* external unified caches must be clean and invalidated (the common
+case)
+	* external Harvard caches must be clean, invalidated and turned off
+(don't know if we have observed external Harvard caches in any design)
+
+I'll try and get additional clarification from my side on whether we're
+missing any important issue here.
+
+Cheers
+---Dave
