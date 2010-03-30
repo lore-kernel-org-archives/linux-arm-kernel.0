@@ -1,42 +1,33 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Tue, 30 Mar 2010 11:57:12 +0200
-Subject: [PATCH 0/5] ARM: PrimeCell DMA patches v4
-In-Reply-To: <1269905728-5452-1-git-send-email-linus.walleij@stericsson.com>
-References: <1269905728-5452-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A039B48CC@EXDCVYMBSTM006.EQ1STM.local>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 30 Mar 2010 12:25:54 +0100
+Subject: [PATCH] ARM: Implement copy_to_user_page() for noMMU
+In-Reply-To: <1269941435.17138.36.camel@e102109-lin.cambridge.arm.com>
+References: <20100329132457.1967.3394.stgit@e102109-lin.cambridge.arm.com>
+	<20100330013132.GA15598@shareable.org>
+	<1269941435.17138.36.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100330112554.GA27463@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Self]
+Catalin Marinas wrote:
+> > Other variations such as writing when a mapping is !VM_EXEC and later
+> > mapping or mprotecting the same shmem VM_EXEC, but it's even more
+> > forbidden semantically to write to a read-only mapping (and just as
+> > unchecked on nommu), and conversion of writable to VM_EXEC ought to
+> > flush i-cache at mprotect time.
+> 
+> ARM Linux doesn't do any cache maintenance for mprotect on VIPT or noMMU
+> hardware (not sure about VIVT). We discussed this in the past and it
+> wasn't clear whether it is required or not.
 
-> This is a fourth iteration of the PrimeCell DMA API on top of the
-> generic DMA devices (sibling to the DMA engine). It's based on
-> the suggestion from Russell to try and define a specific extension
-> subset for DMA devices.
+I still think it ought to happen on mprotect, but maybe that's a
+linux-arch discussion.  I saw IRIX actually has two PROT_EXEC flavours
+for mprotect so you can choose.
 
-Russell & Grant can you give some hint on the direction you
-see for this patch set?
+Back to this, just to double check, what about mapping?  E.g. where a
+shmem is mapped writable (but not executable), has executable code
+written to it by ptrace, and is later mapped in another process and
+executed.  Will the act of making the second mapping flush i-cache for
+that range?  (No-MMU doesn't need to flush caches on task switch)
 
-The problem we're facing is that next I will start adding DMA
-support for the U8500 and the MMCI derivate found in that platform
-doesn't *have* a PIO IRQ, which means the system cannot even
-boot without some solid DMA framework in place. (It is currently
-unbootable from the released kernels.)
-
-So unless there is some outstanding issue with this approach
-we pretty much need this now to keep working on mainlining
-the U8500.
-
-I would very much like to have the DMA patches for PrimeCell
-support pushed through Dan's tree, but that requires your ACKs
-of course, and it will inevitably collide with other PrimeCell
-patches for the next merge window (many submitted by myself
-admittedly).
-
-I can feed all the PrimeCell stuff to Dan if all agree that this
-is a good approach. Another approach is to apply the latest
-patches from Dan's tree to ARM and SPI alike and then feed
-the PrimeCell stuff through the ARM tree.
-
-Yours,
-Linus Walleij
+-- Jamie
