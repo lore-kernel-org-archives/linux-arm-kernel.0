@@ -1,31 +1,21 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 30 Mar 2010 12:44:36 -0500
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 30 Mar 2010 19:59:13 +0200
 Subject: [PATCH] vic: factor out common init code
-In-Reply-To: <20100330173841.GA30329@morgana.gnudd.com>
+In-Reply-To: <0D753D10438DA54287A00B02708426976369153870@AUSP01VMBX24.collaborationhost.net>
 References: <0D753D10438DA54287A00B0270842697636915380E@AUSP01VMBX24.collaborationhost.net>
-	<AcrG7twc5wXJWTzzQtezYQpL1OiKYw==>
 	<0D753D10438DA54287A00B02708426976368AC7704@AUSP01VMBX24.collaborationhost.net>
 	<63386a3d1003250120m2d33233h60b202724a643a71@mail.gmail.com>
 	<20100330173841.GA30329@morgana.gnudd.com>
-Message-ID: <0D753D10438DA54287A00B02708426976369153870@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B02708426976369153870@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <63386a3d1003301059y4c9803a3q8b8c7c72a655a000@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 30, 2010 10:39 AM, Alessandro Rubini wrote:
->>> Tested-by: Linus Walleij <linus.walleij@stericsson.com>
->> 
->> Are there any more comments/tested-by's on this patch?
->
-> Sorry. I tested on nomadik 8815 but forgot to report it.
->
-> Tested-by: Alessandro Rubini <rubini@unipv.it>
+2010/3/30 H Hartley Sweeten <hartleys@visionengravers.com>:
 
-Thanks!
+> I'll wait a couple more days to see if Ben Dooks has any comments.
+> Linus' Tested-by probably covers the same platform as Andrea Callo's.
 
-I'll wait a couple more days to see if Ben Dooks has any comments.
-Linus' Tested-by probably covers the same platform as Andrea Callo's.
-If there are no other comments I will add it to Russell's patch
-tracker next week.
+No, but Alessandros does :-)
 
-Regards,
-Hartley
+Linus
