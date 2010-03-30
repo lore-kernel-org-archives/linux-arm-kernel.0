@@ -1,27 +1,82 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Mar 2010 21:40:21 +0100
-Subject: mx31 snd and mc13783 codec status
-In-Reply-To: <4BB22576.1070108@epfl.ch>
-References: <4BB22576.1070108@epfl.ch>
-Message-ID: <20100330204021.GA4666@sirena.org.uk>
+From: trimarchi@gandalf.sssup.it (Michael Trimarchi)
+Date: Tue, 30 Mar 2010 23:26:12 +0200
+Subject: [BUG] pxa27x_udc: possible recursive locking detected
+	in	pxa_ep_queue
+In-Reply-To: <87vdfqx2xw.fsf@free.fr>
+References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>	<87fx7guuzg.fsf@free.fr>	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>	<87ocltsda3.fsf@free.fr>	<20091223005313.13ba5061.ospite@studenti.unina.it>
+	<87vdfqx2xw.fsf@free.fr>
+Message-ID: <4BB26C74.8010104@gandalf.sssup.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 30, 2010 at 06:23:18PM +0200, Valentin Longchamp wrote:
+Hi,
 
-> I have quickly hacked something based on what you had done for
-> pcm037 with the MC13783 codec in some of your first sound patches. I
-> know that this is not ready for mainline and I'm still struggling to
-> debug my code, but I would like to have results quite soon so that
-> my colleague could see what sounds (especially regarding to the
-> volume) our system is capable to produce.
 
-If you're struggling to find time to do full support for the CODEC a
-good technique is often to get just very basic fixed function support
-(say just DAC to headphone support) implemented and merged, then go back
-and implement
+Robert Jarzmik wrote:
+> Antonio Ospite <ospite@studenti.unina.it> writes:
+>
+>   
+>> With your latest patch on top of 2.6.32 I get the "possible recursive
+>> locking" message at the *first* cable unplug/plug cycle, I am appending
+>> it here, the log is partial because I dumped it from RAM and something
+>> was lost.
+>>     
+>
+> Thanks.
+> Now, lets have another try. This patch is a bit saner, and though I got the
+> "locking detected" you noticed without it, I didn't manage to get it with this
+> patch applied.
+>
+> As your test platform is far better than mine, would you mind a bit of testing
+> ... again. This patch applies on top of v2.6.32.
+>
+> Cheers.
+>
+> --
+> Robert
+>
+> >From 3ca70f842651f607790a2ff94f2b3a7ec223196d Mon Sep 17 00:00:00 2001
+> From: Robert Jarzmik <robert.jarzmik@free.fr>
+> Date: Sat, 12 Dec 2009 15:13:24 +0100
+> Subject: [PATCH] pxa27x_udc: Fix deadlocks on request queueing
+>
+> As reported by Antonio, there are cases where the ep->lock
+> can be taken twice, triggering a deadlock.
+> The typical sequence is :
+>  irq_handler
+>    \
+>     -> gadget.complete()
+>        \
+>         -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
+>            \
+>             -> gadget.complete()
+>                \
+>                 -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
+>                                                ==> *deadlock*
+> The patch fixes this by :
+>  - releasing the lock each time gadget.complete() is called
+>  - adding a check in handle_ep() to detect a recursive call,
+>    in which case the function becomes on no-op.
+>
+> The patch is still not good enough for ep0. For this unique
+> endpoint, another well thought over patch will be needed.
+>
+> Reported-by: Antonio Ospite <ospite@studenti.unina.it>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  drivers/usb/gadget/pxa27x_udc.c |  114 +++++++++++++++++++++++++++------------
+>  drivers/usb/gadget/pxa27x_udc.h |    6 ++
+>  2 files changed, 85 insertions(+), 35 deletions(-)
+>   
++       /* don't modify queue heads during completion callback */
++       if (spin_is_locked(&ep->lock)) {
++               spin_unlock(&ep->lock);
++               req->req.complete(&req->udc_usb_ep->usb_ep, &req->req);
++               spin_lock(&ep->lock);
++       } else
++               req->req.complete(&req->udc_usb_ep->usb_ep, &req->req);
+ }
 
-I'd also suggest looking at the current Freescale BSPs - obviously this
-device is used on a lot of Freescale reference boards and I believe
-there's a reasonably mainlineish driver in the BSPs they have for
-current devices.
+I have fixed in the same way without pass the flag
+
+Michael
