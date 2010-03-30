@@ -1,55 +1,33 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 30 Mar 2010 17:08:39 +0200
-Subject: [E3-hacking] [RFC][PATCH v2 1/5] omap1: Amstrad Delta: add FIQ
-	handler for serial keyboard port interrupt processing
-In-Reply-To: <20100329183211.F105C493B@blake.inputplus.co.uk>
-References: <201003291619.25878.jkrzyszt@tis.icnet.pl>
-	<201003291624.10034.jkrzyszt@tis.icnet.pl>
-	<20100329183211.F105C493B@blake.inputplus.co.uk>
-Message-ID: <201003301708.41634.jkrzyszt@tis.icnet.pl>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Tue, 30 Mar 2010 18:23:18 +0200
+Subject: mx31 snd and mc13783 codec status
+Message-ID: <4BB22576.1070108@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Monday 29 March 2010 20:32:11 Ralph Corderoy wrote:
-> Hi Janusz,
->
-> My ARM's not used much these days so I don't know how much this matters
-> and may be incorrect so I've cut down the CC list, but given it's a FIQ
-> handler and speed matters...
+Hi Sascha,
 
-Hi Ralph,
+For one of our experiments where our robots need to produce sound, I 
+would need a sound driver for mx31moboard platform.
 
-Not only speed; there is a very low size limit for FIQ handler and I already 
-have had problems with fitting into the available space with the code, so your 
-hints are really appreciated.
+I have quickly hacked something based on what you had done for pcm037 
+with the MC13783 codec in some of your first sound patches. I know that 
+this is not ready for mainline and I'm still struggling to debug my 
+code, but I would like to have results quite soon so that my colleague 
+could see what sounds (especially regarding to the volume) our system is 
+capable to produce.
 
-And thanks for pushing me into reading the ARM Assembly Language book, so I 
-would be able to do more than just understanding and copy-pasting the code ;).
+I would like to know if by any chance you have some updates on this code 
+? And do you know if your initial mc13783 codec support coupled with 
+mx31 had some limitations ? Our setup is quite straightforward, we have 
+direct connection from the mx31 to the mc13783 on a single SSI.
 
-> > +key:	@Is it a keyboard interrupt?
-> > +	ldr r11, [r12,#GPIO_INTERRUPT_STATUS]	@ get GPIO interrupt status
-> > +	and r10, r11, #MBRD_CLK_MASK		@ reveal keyboard bit
-> > +	cmp r10, #MBRD_CLK_MASK 		@ is keyboard bit low?
-> > +	bne mdm					@ no - spurious - try mdm
->
-> Couldn't that be an `ands' instruction if MBRD_CLK_MASK has one-bit set?
-> Then the cmp could be deleted.
+Thanks for your precisions.
 
-Agree.
+Val
 
-> > +state:
-> > +	ldr r10, [r9,#FIQ_STATE]
-> > +	cmp r10, #0				@ are we expecting start bit?
-> > +	bne data				@ no - in data processing state
->
-> Similarly, an `ldrs' here would make the cmp redundant.
-
-I'm not sure if the S suffix is also valid for memory transfer instructions, 
-so I readd linux-omap and linux-arm-kernel to the CC list.
-
-> There's other similar bits elsewhere.
-
-Yes, I'll try to recognize and optimize them all for next version.
-
-Thanks,
-Janusz
+-- 
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEB3494, Station 9, CH-1015 Lausanne
