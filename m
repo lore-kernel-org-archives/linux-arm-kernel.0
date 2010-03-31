@@ -1,22 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 31 Mar 2010 09:59:49 +0100
-Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
-In-Reply-To: <20100331010159.GI31126@trinity.fluff.org>
-References: <1269517968-27945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20100331010159.GI31126@trinity.fluff.org>
-Message-ID: <20100331085948.GA2504@opensource.wolfsonmicro.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Wed, 31 Mar 2010 15:01:12 +0300
+Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
+In-Reply-To: <alpine.LFD.2.00.1003251225500.694@xanadu.home>
+References: <20100325152505.17612.40158.stgit@pauliusz>
+	<alpine.LFD.2.00.1003251225500.694@xanadu.home>
+Message-ID: <4BB33988.9070608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 31, 2010 at 02:01:59AM +0100, Ben Dooks wrote:
-> On Thu, Mar 25, 2010 at 11:52:48AM +0000, Mark Brown wrote:
+On 03/25/2010 06:26 PM, Nicolas Pitre wrote:
+> On Thu, 25 Mar 2010, Paulius Zaleckas wrote:
+>
+>> We must tell GCC to use even register for variable passed
+>> to ldrd instruction. Without this patch GCC 4.2.1 puts this
+>> variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
+>> r2/r3. This does not change anything when EABI and OABI
+>> compilation works OK.
+>>
+>> Without this patch and with OABI I get:
+>>    CC      drivers/mtd/nand/orion_nand.o
+>> /tmp/ccMkwOCs.s: Assembler messages:
+>> /tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
+>> make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
+>>
+>> Signed-off-by: Paulius Zaleckas<paulius.zaleckas@gmail.com>
+>
+> Acked-by: Nicolas Pitre<nico@fluxnic.net>
 
-> > The SMDK6410 has a WM9713 connected to the AC97 interface, by default
-> > on the GPD pins though this can be changed with a switch on the board.
+David,
 
-> Hmm, I really don't like the fact that we've no good way of finding
-> out what the switch positions are...
+Will you take this patch?
+Or you are waiting till I will add all Cc as Jamie suggested?
 
-Not much we can do about the existing hardware, sadly.  There's a bunch
-of other similar switches on the board (like the one that selects
-between the two ethernet controllers) as well.
+>
+>> ---
+>>
+>>   drivers/mtd/nand/orion_nand.c |    8 +++++++-
+>>   1 files changed, 7 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+>> index f59c074..d60fc57 100644
+>> --- a/drivers/mtd/nand/orion_nand.c
+>> +++ b/drivers/mtd/nand/orion_nand.c
+>> @@ -60,7 +60,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+>>   	}
+>>   	buf64 = (uint64_t *)buf;
+>>   	while (i<  len/8) {
+>> -		uint64_t x;
+>> +		/*
+>> +		 * Since GCC has no proper constraint (PR 43518)
+>> +		 * force x variable to r2/r3 registers as ldrd instruction
+>> +		 * requires first register to be even.
+>> +		 */
+>> +		register uint64_t x asm ("r2");
+>> +
+>>   		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+>>   		buf64[i++] = x;
+>>   	}
+>>
