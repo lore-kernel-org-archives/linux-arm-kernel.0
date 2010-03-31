@@ -1,31 +1,30 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 31 Mar 2010 09:38:24 +0300
-Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
-In-Reply-To: <20100331011542.GN31126@trinity.fluff.org>
-References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
-	<20100331011542.GN31126@trinity.fluff.org>
-Message-ID: <201003310938.30403.anarsoul@gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 31 Mar 2010 14:43:13 +0800
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+Message-ID: <201003311443.13568.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 31 ????? 2010 04:15:42 ????? Ben Dooks ???????:
- 
-> > Port still uses machine-specific GPIO API, as generic GPIO lacks GPJ
-> > support and RX1950 actively uses GPJ port. However I do not see any
-> > benifits in using generic GPIO API in machine support file, as it will
-> > not be used with CPU different from s3c2442.
+Hi Russell,
+
+> LMB... logical memory blocks.
+
+Nice, will be good for the DT work too.
+
+> @@ -483,6 +484,13 @@ static void __init build_mem_type_table(void)
 > 
-> The samsung specific bits mirroring the gpio API will be removed, I will
-> add post a schedule for removal notice post the next kernel merge.
+>  #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+> 
+> +static void __init *early_alloc(unsigned long sz)
+> +{
+> +      void *ptr = __va(lmb_alloc(sz, sz));
+> +      memset(ptr, 0, PAGE_SIZE);
 
-Uh, but how to switch pin into function mode via gpiolib API?
+memset(ptr, 0, sz) ?
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100331/a55bfb0d/attachment.sig>
+Cheers,
+
+
+Jeremy
