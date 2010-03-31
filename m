@@ -1,38 +1,38 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 31 Mar 2010 15:29:46 +0200
-Subject: [PATCH 2/3] ARM: MXC: mxcmmc: Teach the driver SDIO operations
-In-Reply-To: <20100331130339.GX2241@pengutronix.de>
-References: <1269973921-29611-1-git-send-email-daniel@caiaq.de>
-	<1269973921-29611-2-git-send-email-daniel@caiaq.de>
-	<20100331130339.GX2241@pengutronix.de>
-Message-ID: <20100331132946.GH30807@buzzloop.caiaq.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 31 Mar 2010 07:32:47 -0600 (MDT)
+Subject: [GIT PULL] OMAP clock/hwmod fixes for 2.6.34-rc
+Message-ID: <alpine.DEB.2.00.1003310731500.14436@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 31, 2010 at 03:03:39PM +0200, Sascha Hauer wrote:
-> On Tue, Mar 30, 2010 at 08:32:00PM +0200, Daniel Mack wrote:
-> > +static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> > +{
-> > +	struct mxcmci_host *host = mmc_priv(mmc);
-> > +	unsigned long flags;
-> > +	u32 int_cntr;
-> > +
-> > +	spin_lock_irqsave(&host->lock, flags);
-> > +	host->use_sdio = enable;
-> > +	int_cntr = readl(host->base + MMC_REG_INT_CNTR);
-> > +
-> > +	if (enable)
-> > +		int_cntr |= INT_SDIO_IRQ_EN;
-> > +	else
-> > +		int_cntr &= ~INT_SDIO_IRQ_EN;
-> > +
-> > +	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
-> > +	spin_unlock_irqrestore(&host->lock, flags);
-> 
-> The other places where MMC_REG_INT_CNTR is touched should be protected
-> by this spinlock aswell.
 
-Hmm, all other place don't do a read/modify/write cycle, so I'd say the
-don't need protection?
+Hi Tony,
 
-Daniel
+The following changes since commit 2eaa9cfdf33b8d7fb7aff27792192e0019ae8fc6:
+  Linus Torvalds (1):
+        Linux 2.6.34-rc3
+
+are available in the git repository at:
+
+  git://git.pwsan.com/linux-2.6 for_2.6.34rc_a
+
+Rajendra Nayak (1):
+      OMAP4: prcm: Use logical OR instead of bitwise OR
+
+Ranjith Lohithakshan (1):
+      OMAP3: clock: fix enable bit used for dpll4_m4x2 clock
+
+Thara Gopinath (2):
+      OMAP: HWMOD: Adding clockdomain check
+      OMAP: HWMOD: Bug fixes in hwmod structure definitions
+
+ arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
+ arch/arm/mach-omap2/clockdomain.c            |    6 +++---
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
+ arch/arm/mach-omap2/powerdomain.c            |    2 +-
+ arch/arm/mach-omap2/prcm.c                   |    4 ++--
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 +-
+ 6 files changed, 11 insertions(+), 8 deletions(-)
+
+
+- Paul
