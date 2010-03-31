@@ -1,62 +1,34 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 8 Apr 2010 06:11:39 -0400
-Subject: [PATCH] mfd: enable onkey on max8925
-Message-ID: <mailman.459.1274252240.2170.linux-arm-kernel@lists.infradead.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 1 Apr 2010 00:15:50 +0530
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <1268585771.13400.5.camel@localhost>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+	<1268462987-8271-8-git-send-email-rabin@rab.in>
+	<1268585771.13400.5.camel@localhost>
+Message-ID: <20100331184549.GA20223@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable onkey feature in max8925 driver.
+On Sun, Mar 14, 2010 at 12:56:11PM -0400, Steven Rostedt wrote:
+> On Sat, 2010-03-13 at 12:19 +0530, Rabin Vincent wrote:
+> > diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+> > index 0b94d2f..2535c11 100644
+> > --- a/scripts/Makefile.build
+> > +++ b/scripts/Makefile.build
+> > @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
+> >  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+> >  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
+> >  	"$(if $(CONFIG_64BIT),64,32)" \
+> > -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+> > +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
+> > +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+> 
+> Again, I'll have to test this on other archs, just to make sure its does
+> not cause any side effects. Oh, I forgot I now have a MIPS board I can
+> test on too. I'll probably do this on Monday.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/mfd/max8925-core.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+I've now built PowerPC, SH, and MIPS kernels with dynamic ftrace enabled
+and checked that the obj files don't change as the result of this
+series.  I've run the MIPS kernel on QEMU and x86_64 on my PC.
 
-diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
-index f621bce..9c5a09d 100644
---- a/drivers/mfd/max8925-core.c
-+++ b/drivers/mfd/max8925-core.c
-@@ -90,6 +90,24 @@ static struct mfd_cell rtc_devs[] = {
- 	},
- };
-
-+static struct resource onkey_resources[] = {
-+	{
-+		.name	= "max8925-onkey",
-+		.start	= MAX8925_IRQ_GPM_SW_3SEC,
-+		.end	= MAX8925_IRQ_GPM_SW_3SEC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct mfd_cell onkey_devs[] = {
-+	{
-+		.name		= "max8925-onkey",
-+		.num_resources	= 1,
-+		.resources	= &onkey_resources[0],
-+		.id		= -1,
-+	},
-+};
-+
- #define MAX8925_REG_RESOURCE(_start, _end)	\
- {						\
- 	.start	= MAX8925_##_start,		\
-@@ -596,6 +614,15 @@ int __devinit max8925_device_init(struct
-max8925_chip *chip,
- 		dev_err(chip->dev, "Failed to add rtc subdev\n");
- 		goto out;
- 	}
-+
-+	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
-+			      ARRAY_SIZE(onkey_devs),
-+			      &onkey_resources[0], 0);
-+	if (ret < 0) {
-+		dev_err(chip->dev, "Failed to add onkey subdev\n");
-+		goto out;
-+	}
-+
- 	if (pdata && pdata->regulator[0]) {
- 		ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
- 				      ARRAY_SIZE(regulator_devs),
--- 
-1.5.6.5
+Rabin
