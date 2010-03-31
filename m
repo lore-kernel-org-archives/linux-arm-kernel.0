@@ -1,153 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 31 Mar 2010 11:53:40 +1100
-Subject: [PATCH] ARM: Add support for PCI domains
-In-Reply-To: <20100330191442.GA13557@oksana.dev.rtsoft.ru>
-References: <20100330191442.GA13557@oksana.dev.rtsoft.ru>
-Message-ID: <20100331005339.GC24912@verge.net.au>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 31 Mar 2010 02:01:59 +0100
+Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
+In-Reply-To: <1269517968-27945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1269517968-27945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20100331010159.GI31126@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 30, 2010 at 11:14:42PM +0400, Anton Vorontsov wrote:
-> This patch adds support for PCI domains on ARM platforms.
-> 
-> Also, protect asm/mach/pci.h from multiple inclustions, otherwise
-> build fails because of pci_domain_nr() and pci_proc_domain()
-> redefinitions.
-> 
-> p.s.
-> 
-> Not sure if it makes sense to do PCI domains support optional.
-> 
-> With PCI domains:
->    text    data     bss     dec     hex filename
-> 3407890  139808  102016 3649714  37b0b2 vmlinux
-> 
-> Without PCI domains:
->    text    data     bss     dec     hex filename
-> 3407730  139808  102016 3649554  37b012 vmlinux
-> 
-> I.e. 160 bytes saved. Is it worth the amount of ifdefs? We can
-> just make it always enabled (and it seems other architectures
-> always enable it).
-> 
-> pp.s.
-> I found that Richard Liu seem to have posted a similar patch[1],
-> but it wasn't propely signed off... Heh.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/006244.html
+On Thu, Mar 25, 2010 at 11:52:48AM +0000, Mark Brown wrote:
+> The SMDK6410 has a WM9713 connected to the AC97 interface, by default
+> on the GPD pins though this can be changed with a switch on the board.
 
-Seeing as arm is targeted as embedded, I suspect that saving every last byte
-is a good idea where possible.
-
-> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
-
-Reviewed-by: Simon Horman <horms@verge.net.au>
-
+Hmm, I really don't like the fact that we've no good way of finding
+out what the switch positions are...
+ 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/Kconfig                |    4 ++++
->  arch/arm/include/asm/mach/pci.h |   11 +++++++++++
->  arch/arm/include/asm/pci.h      |   15 +++++++++++++++
->  arch/arm/kernel/bios32.c        |    3 +++
->  4 files changed, 33 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d779e25..2a1bc52 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1075,6 +1075,10 @@ config PCI
->  	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
->  	  VESA. If you have PCI, say Y, otherwise N.
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> index 2d5afd2..6878fbd 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> @@ -64,6 +64,7 @@
+>  #include <plat/clock.h>
+>  #include <plat/devs.h>
+>  #include <plat/cpu.h>
+> +#include <plat/audio.h>
 >  
-> +config PCI_DOMAINS
-> +	bool
-> +	depends on PCI
+>  #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+>  #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
+> @@ -254,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+>  	&s3c_device_fb,
+>  	&s3c_device_ohci,
+>  	&s3c_device_usb_hsotg,
+> +	&s3c64xx_device_ac97,
+>  	&s3c64xx_device_iisv4,
+>  
+>  #ifdef CONFIG_REGULATOR
+> @@ -652,6 +654,9 @@ static void __init smdk6410_machine_init(void)
+>  	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+>  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+>  
+> +	/* Board defualt with CFG2.1 off */
+> +	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
 > +
->  config PCI_SYSCALL
->  	def_bool PCI
+>  	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
+>  }
 >  
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index a38bdc7..52f0da1 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -8,10 +8,16 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#ifndef __ASM_MACH_PCI_H
-> +#define __ASM_MACH_PCI_H
-> +
->  struct pci_sys_data;
->  struct pci_bus;
->  
->  struct hw_pci {
-> +#ifdef CONFIG_PCI_DOMAINS
-> +	int		domain;
-> +#endif
->  	struct list_head buses;
->  	int		nr_controllers;
->  	int		(*setup)(int nr, struct pci_sys_data *);
-> @@ -26,6 +32,9 @@ struct hw_pci {
->   * Per-controller structure
->   */
->  struct pci_sys_data {
-> +#ifdef CONFIG_PCI_DOMAINS
-> +	int		domain;
-> +#endif
->  	struct list_head node;
->  	int		busnr;		/* primary bus number			*/
->  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-> @@ -70,3 +79,5 @@ extern int pci_v3_setup(int nr, struct pci_sys_data *);
->  extern struct pci_bus *pci_v3_scan_bus(int nr, struct pci_sys_data *);
->  extern void pci_v3_preinit(void);
->  extern void pci_v3_postinit(void);
-> +
-> +#endif /* __ASM_MACH_PCI_H */
-> diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
-> index 4798011..92e2a83 100644
-> --- a/arch/arm/include/asm/pci.h
-> +++ b/arch/arm/include/asm/pci.h
-> @@ -4,8 +4,23 @@
->  #ifdef __KERNEL__
->  #include <asm-generic/pci-dma-compat.h>
->  
-> +#include <asm/mach/pci.h> /* for pci_sys_data */
->  #include <mach/hardware.h> /* for PCIBIOS_MIN_* */
->  
-> +#ifdef CONFIG_PCI_DOMAINS
-> +static inline int pci_domain_nr(struct pci_bus *bus)
-> +{
-> +	struct pci_sys_data *root = bus->sysdata;
-> +
-> +	return root->domain;
-> +}
-> +
-> +static inline int pci_proc_domain(struct pci_bus *bus)
-> +{
-> +	return pci_domain_nr(bus);
-> +}
-> +#endif /* CONFIG_PCI_DOMAINS */
-> +
->  #ifdef CONFIG_PCI_HOST_ITE8152
->  /* ITE bridge requires setting latency timer to avoid early bus access
->     termination by PIC bus mater devices
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index bd397e0..c6273a3 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -527,6 +527,9 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
->  		if (!sys)
->  			panic("PCI: unable to allocate sys data!");
->  
-> +#ifdef CONFIG_PCI_DOMAINS
-> +		sys->domain  = hw->domain;
-> +#endif
->  		sys->hw      = hw;
->  		sys->busnr   = busnr;
->  		sys->swizzle = hw->swizzle;
 > -- 
-> 1.7.0.3
+> 1.7.0.2
+> 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
