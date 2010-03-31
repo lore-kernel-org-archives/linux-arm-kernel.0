@@ -1,14 +1,14 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Wed, 31 Mar 2010 15:21:46 +0300
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 31 Mar 2010 14:26:04 +0200
 Subject: [PATCH] netdev/fec.c: add phylib supporting to enable carrier
 	detection (v2)
 In-Reply-To: <1270037444-8470-1-git-send-email-bryan.wu@canonical.com>
 References: <1270037444-8470-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <20100331122146.GQ7772@matterhorn.verdurent.com>
+Message-ID: <20100331122604.GV2241@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Mar 31, Bryan Wu wrote:
+On Wed, Mar 31, 2010 at 08:10:44PM +0800, Bryan Wu wrote:
 > BugLink: http://bugs.launchpad.net/bugs/457878
 > 
 > v2:
@@ -26,7 +26,10 @@ On 10 Mar 31, Bryan Wu wrote:
 > 
 > Cc: Frederic Rodo <fred.rodo@gmail.com>
 > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
 
 > ---
 >  drivers/net/Kconfig |    1 +
@@ -1419,8 +1422,10 @@ Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
 > -- 
 > 1.7.0.1
 > 
+> 
 
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
