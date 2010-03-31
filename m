@@ -1,38 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 31 Mar 2010 07:32:47 -0600 (MDT)
-Subject: [GIT PULL] OMAP clock/hwmod fixes for 2.6.34-rc
-Message-ID: <alpine.DEB.2.00.1003310731500.14436@utopia.booyaka.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 31 Mar 2010 15:35:07 +0200
+Subject: [PATCH] ARM: MXC: mxcmmc: misc cleanups
+In-Reply-To: <20100331123856.GW2241@pengutronix.de>
+References: <20100331123856.GW2241@pengutronix.de>
+Message-ID: <1270042507-18667-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Be more verbose on error messages and add one debug message.
 
-Hi Tony,
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Volker Ernst <volker.ernst@txtr.com>
+Cc: Jiri Kosina <jkosina@suse.cz>
+---
+ drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
+ 1 files changed, 13 insertions(+), 4 deletions(-)
 
-The following changes since commit 2eaa9cfdf33b8d7fb7aff27792192e0019ae8fc6:
-  Linus Torvalds (1):
-        Linux 2.6.34-rc3
-
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 for_2.6.34rc_a
-
-Rajendra Nayak (1):
-      OMAP4: prcm: Use logical OR instead of bitwise OR
-
-Ranjith Lohithakshan (1):
-      OMAP3: clock: fix enable bit used for dpll4_m4x2 clock
-
-Thara Gopinath (2):
-      OMAP: HWMOD: Adding clockdomain check
-      OMAP: HWMOD: Bug fixes in hwmod structure definitions
-
- arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
- arch/arm/mach-omap2/clockdomain.c            |    6 +++---
- arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
- arch/arm/mach-omap2/powerdomain.c            |    2 +-
- arch/arm/mach-omap2/prcm.c                   |    4 ++--
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 +-
- 6 files changed, 11 insertions(+), 8 deletions(-)
-
-
-- Paul
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index 2df9041..44a53ee 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
+ {
+ 	int i;
+ 
++	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
++
+ 	/* reset sequence */
+ 	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
+ 	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
+@@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
+ 		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
+ 				stat);
+ 		if (stat & STATUS_CRC_READ_ERR) {
++			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
+ 			data->error = -EILSEQ;
+ 		} else if (stat & STATUS_CRC_WRITE_ERR) {
+ 			u32 err_code = (stat >> 9) & 0x3;
+-			if (err_code == 2) /* No CRC response */
++			if (err_code == 2) { /* No CRC response */
++				dev_err(mmc_dev(host->mmc),
++					"%s: No CRC -ETIMEDOUT\n", __func__);
+ 				data->error = -ETIMEDOUT;
+-			else
++			} else {
++				dev_err(mmc_dev(host->mmc),
++					"%s: -EILSEQ\n", __func__);
+ 				data->error = -EILSEQ;
++			}
+ 		} else if (stat & STATUS_TIME_OUT_READ) {
++			dev_err(mmc_dev(host->mmc),
++				"%s: read -ETIMEDOUT\n", __func__);
+ 			data->error = -ETIMEDOUT;
+ 		} else {
++			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
+ 			data->error = -EIO;
+ 		}
+ 	} else {
+@@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
+ 	struct scatterlist *sg;
+ 	int stat, i;
+ 
+-	host->datasize = 0;
+-
+ 	host->data = data;
+ 	host->datasize = 0;
+ 
+-- 
+1.7.0
