@@ -1,72 +1,47 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 31 Mar 2010 15:35:07 +0200
-Subject: [PATCH] ARM: MXC: mxcmmc: misc cleanups
-In-Reply-To: <20100331123856.GW2241@pengutronix.de>
-References: <20100331123856.GW2241@pengutronix.de>
-Message-ID: <1270042507-18667-1-git-send-email-daniel@caiaq.de>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
+Date: Wed, 31 Mar 2010 11:26:28 -0300
+Subject: [PATCH] ARM: pcmcia: Adds nanoEngine PCMCIA support.
+In-Reply-To: <20100331064707.GA11428@isilmar.linta.de>
+References: <1269972879-27400-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
+	<20100331064707.GA11428@isilmar.linta.de>
+Message-ID: <w2ycecb6d8f1003310726lead65adcq2de9cb4b8560a034@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Be more verbose on error messages and add one debug message.
+Hi Dominik,
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Volker Ernst <volker.ernst@txtr.com>
-Cc: Jiri Kosina <jkosina@suse.cz>
----
- drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
- 1 files changed, 13 insertions(+), 4 deletions(-)
+On Wed, Mar 31, 2010 at 03:47, Dominik Brodowski
+<linux@dominikbrodowski.net> wrote:
+> On Tue, Mar 30, 2010 at 03:14:39PM -0300, Marcelo Roberto Jimenez wrote:
+>> This patch adds nanoEngine PCMCIA support, with support for two sockets.
+>>
+>> In order to have a fully functional pcmcia subsystem in a BSE nanoEngine board
+>> you should carefully read this:
+>>
+>> http://cambuca.ldhs.cetuc.puc-rio.br/nanoengine/
+>
+> That website still talks about pcmcia-cs ... which was superseded by
+> pcmciautils.
 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 2df9041..44a53ee 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
- {
- 	int i;
- 
-+	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
-+
- 	/* reset sequence */
- 	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
- 	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
-@@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
- 		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
- 				stat);
- 		if (stat & STATUS_CRC_READ_ERR) {
-+			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
- 			data->error = -EILSEQ;
- 		} else if (stat & STATUS_CRC_WRITE_ERR) {
- 			u32 err_code = (stat >> 9) & 0x3;
--			if (err_code == 2) /* No CRC response */
-+			if (err_code == 2) { /* No CRC response */
-+				dev_err(mmc_dev(host->mmc),
-+					"%s: No CRC -ETIMEDOUT\n", __func__);
- 				data->error = -ETIMEDOUT;
--			else
-+			} else {
-+				dev_err(mmc_dev(host->mmc),
-+					"%s: -EILSEQ\n", __func__);
- 				data->error = -EILSEQ;
-+			}
- 		} else if (stat & STATUS_TIME_OUT_READ) {
-+			dev_err(mmc_dev(host->mmc),
-+				"%s: read -ETIMEDOUT\n", __func__);
- 			data->error = -ETIMEDOUT;
- 		} else {
-+			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
- 			data->error = -EIO;
- 		}
- 	} else {
-@@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
- 	struct scatterlist *sg;
- 	int stat, i;
- 
--	host->datasize = 0;
--
- 	host->data = data;
- 	host->datasize = 0;
- 
--- 
-1.7.0
+Indeed, pcmcia-cs is not needed anymore, in fact, does not work with
+my setup, I am using pcmciautils now. The web site has not been
+updated because it refers to the project as it was with the kernel 2.4
+implementation. The link is there because there are two serious
+hardware problems when implementing PCMCIA with nanoengine: one is
+that it needs external logic, the other is that it is necessary to
+reprogram the bogus version of the CPLD that originally came with the
+nanoEngine board.
+
+> The patch gets an
+>
+> ? ? ? ?Acked-by: Dominik Brodowski <linux@dominikbrodowski.net>
+>
+> as I assume that Russell prefers to take it into his tree?
+
+Thanks!
+
+> Best,
+> ? ? ? ?Dominik
+
+Regards,
+Marcelo.
