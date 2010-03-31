@@ -1,35 +1,74 @@
 From: imre.deak@nokia.com (imre.deak at nokia.com)
-Date: Thu,  1 Apr 2010 00:23:25 +0300
-Subject: [RFC PATCH v4 2/3] ARM: VFP: make user_vfp struct packed
+Date: Thu,  1 Apr 2010 00:23:23 +0300
+Subject: [RFC PATCH v4 0/3] ARM: VFP: Save / restore VFP state on the signal
+	handler path
 In-Reply-To: <1269879460-1038-1-git-send-email-imre.deak@nokia.com>
 References: <1269879460-1038-1-git-send-email-imre.deak@nokia.com>
-Message-ID: <4df1d126213d8f321e932f85a4ddf3bbbfd7ea03.1270066971.git.imre.deak@nokia.com>
+Message-ID: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Imre Deak <imre.deak@nokia.com>
+Changes since v3:
+- Rebased against mainline v2.6.34-rc3, since some parts have already
+  been applied there.
 
-An upcoming patch will include user_vfp as a member in another struct and
-this will cause the next member to be 8 byte aligned as well. Since the
-struct is part of an ABI it's better not leave such alignment decisions
-to the compiler.
+Note that this problem might affect more people than previously thought.
+The CodeSourcery 2009q1-203 glibc_ports has some NEON optimized functions;
+for example using memset or memcpy in a signal handler and floating point
+in the main thread can corrupt the main thread's context. You can test this
+by replacing the floating point ops in the signal handler below with some
+dummy memset/memcpy.
 
-Signed-off-by: Imre Deak <imre.deak@nokia.com>
----
- arch/arm/include/asm/user.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I could only test these patches on a Cortex A8 UP system; it would be great
+if someone with an SMP board could give it a go. The test app to reproduce
+the problem (I've built it with -mfloat-abi=softfp -mfpu=neon):
 
-diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
-index df95e05..5660777 100644
---- a/arch/arm/include/asm/user.h
-+++ b/arch/arm/include/asm/user.h
-@@ -88,6 +88,6 @@ struct user{
- struct user_vfp {
- 	unsigned long long fpregs[32];
- 	unsigned long fpscr;
--};
-+} __attribute__((packed));
- 
- #endif /* _ARM_USER_H */
--- 
-1.7.0.2
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sys/time.h>
+
+void handler(int signum)
+{
+	volatile float f;
+
+	f = 50;
+	f /= 2;
+	f *= 2;
+	if (f != 50) {
+		printf("signal %3.3f\n", f);
+		exit(-1);
+	}
+}
+
+int main(int argc, char **argv)
+{
+	struct itimerval ival;
+
+	if (signal(SIGALRM, handler) == SIG_ERR) {
+		perror("signal");
+		exit(-1);
+	}
+
+	memset(&ival, 0, sizeof(ival));
+	ival.it_value.tv_usec = 1000;
+	ival.it_interval.tv_usec = 10000;
+
+	if (setitimer(ITIMER_REAL, &ival, NULL) < 0) {
+		perror("setitimer");
+		exit(-1);
+	}
+
+	while (1) {
+		volatile float f = 30;
+
+		f /= 3;
+		f *= 3;
+		if (f != 30) {
+			printf("main %3.3f\n", f);
+			exit(-1);
+		}
+	}
+}
