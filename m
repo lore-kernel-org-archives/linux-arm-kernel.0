@@ -1,149 +1,344 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 31 Mar 2010 16:55:54 +0200
-Subject: [PATCH 7/7 v4] Add board support for Telechips TCC8000-SDK board
-In-Reply-To: <20100331144543.GA2035@bluebox.local>
-References: <20100331144543.GA2035@bluebox.local>
-Message-ID: <20100331145554.GH2035@bluebox.local>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Roberto Jimenez)
+Date: Wed, 31 Mar 2010 12:23:28 -0300
+Subject: [PATCH] ARM: pcmcia: Adds nanoEngine PCMCIA support.
+Message-ID: <1270049008-11646-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Telechips TCC8000-SDK development board.
+This patch adds nanoEngine PCMCIA support, with support for two sockets.
 
-Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
+In order to have a fully functional pcmcia subsystem in a BSE nanoEngine board
+you should carefully read this:
+
+http://cambuca.ldhs.cetuc.puc-rio.br/nanoengine/
+
+Signed-off-by: Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+Acked-by: Dominik Brodowski <linux@dominikbrodowski.net>
 ---
- arch/arm/mach-tcc8k/Kconfig             |    6 +++
- arch/arm/mach-tcc8k/Makefile            |    3 ++
- arch/arm/mach-tcc8k/Makefile.boot       |    3 ++
- arch/arm/mach-tcc8k/board-tcc8000-sdk.c |   59 +++++++++++++++++++++++++++++++
- arch/arm/mach-tcc8k/board-tcc8000-sdk.h |   18 +++++++++
- 5 files changed, 89 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tcc8k/Makefile.boot
- create mode 100644 arch/arm/mach-tcc8k/board-tcc8000-sdk.c
- create mode 100644 arch/arm/mach-tcc8k/board-tcc8000-sdk.h
+ arch/arm/mach-sa1100/include/mach/nanoengine.h |   30 ++++
+ arch/arm/mach-sa1100/nanoengine.c              |    2 +-
+ drivers/pcmcia/Makefile                        |    3 +-
+ drivers/pcmcia/sa1100_generic.c                |    3 +
+ drivers/pcmcia/sa1100_generic.h                |    1 +
+ drivers/pcmcia/sa1100_nanoengine.c             |  219 ++++++++++++++++++++++++
+ 6 files changed, 256 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-sa1100/include/mach/nanoengine.h
+ create mode 100644 drivers/pcmcia/sa1100_nanoengine.c
 
-diff --git a/arch/arm/mach-tcc8k/Kconfig b/arch/arm/mach-tcc8k/Kconfig
-index ec7f71b..ad86415 100644
---- a/arch/arm/mach-tcc8k/Kconfig
-+++ b/arch/arm/mach-tcc8k/Kconfig
-@@ -2,4 +2,10 @@ if ARCH_TCC8K
- 
- comment "TCC8000 systems:"
- 
-+config MACH_TCC8000_SDK
-+	bool "Telechips TCC8000-SDK development kit"
-+	default y
-+	help
-+	  Support for the Telechips TCC8000-SDK board.
-+
- endif
-diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
-index e8a1134..cd92cde 100644
---- a/arch/arm/mach-tcc8k/Makefile
-+++ b/arch/arm/mach-tcc8k/Makefile
-@@ -5,3 +5,6 @@
- # Common support
- obj-y += clock.o irq.o time.o io.o devices.o
- 
-+# Specific board support
-+obj-$(CONFIG_MACH_TCC8000_SDK) += board-tcc8000-sdk.o
-+
-diff --git a/arch/arm/mach-tcc8k/Makefile.boot b/arch/arm/mach-tcc8k/Makefile.boot
+diff --git a/arch/arm/mach-sa1100/include/mach/nanoengine.h b/arch/arm/mach-sa1100/include/mach/nanoengine.h
 new file mode 100644
-index 0000000..f135c9d
+index 0000000..0537766
 --- /dev/null
-+++ b/arch/arm/mach-tcc8k/Makefile.boot
-@@ -0,0 +1,3 @@
-+   zreladdr-y		:= 0x20008000
-+params_phys-y		:= 0x20000100
-+initrd_phys-y		:= 0x20800000
-diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
-new file mode 100644
-index 0000000..545e586
---- /dev/null
-+++ b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
-@@ -0,0 +1,59 @@
++++ b/arch/arm/mach-sa1100/include/mach/nanoengine.h
+@@ -0,0 +1,30 @@
 +/*
-+ * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * arch/arm/mach-sa1100/include/mach/nanoengine.h
++ *
++ * This file contains the hardware specific definitions for nanoEngine.
++ * Only include this file from SA1100-specific files.
++ *
++ * Copyright (C) 2010 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach-types.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+
-+#include "board-tcc8000-sdk.h"
-+
-+#ifdef CONFIG_MTD_NAND_TCC
-+/* NAND */
-+static struct tcc_nand_platform_data tcc8k_sdk_nand_data = {
-+	.width = 1,
-+	.hw_ecc = 0,
-+};
-+#endif
-+
-+static void __init tcc8k_init(void)
-+{
-+#ifdef CONFIG_MTD_NAND_TCC
-+	tcc_nand_device.dev.platform_data = &tcc8k_sdk_nand_data;
-+	platform_device_register(&tcc_nand_device);
-+#endif
-+}
-+
-+static void __init tcc8k_timer_init(void)
-+{
-+	tcc_clocks_init(XI_FREQUENCY, XTI_FREQUENCY);
-+}
-+
-+static struct sys_timer tcc8k_timer = {
-+	.init	= tcc8k_timer_init,
-+};
-+
-+static void __init tcc8k_map_io(void)
-+{
-+	tcc8k_map_common_io();
-+}
-+
-+MACHINE_START(TCC8000_SDK, "Telechips TCC8000-SDK Demo Board")
-+	.phys_io	= 0x90000000,
-+	.io_pg_offst	= ((0xf1000000) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x00000100,
-+	.map_io		= tcc8k_map_io,
-+	.init_irq	= tcc8k_init_irq,
-+	.init_machine	= tcc8k_init,
-+	.timer		= &tcc8k_timer,
-+MACHINE_END
-diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.h b/arch/arm/mach-tcc8k/board-tcc8000-sdk.h
-new file mode 100644
-index 0000000..1d4e791
---- /dev/null
-+++ b/arch/arm/mach-tcc8k/board-tcc8000-sdk.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Some defines for arch/arm/mach-tcc8k/board-tcc8000-sdk.c
 + *
 + */
++#ifndef __ASM_ARCH_NANOENGINE_H
++#define __ASM_ARCH_NANOENGINE_H
 +
-+#ifndef _BOARD_TCC_8000_SDK_H_
-+#define _BOARD_TCC_8000_SDK_H_
++#define GPIO_PC_READY0	GPIO_GPIO(11) /* ready for socket 0 (active high)*/
++#define GPIO_PC_READY1	GPIO_GPIO(12) /* ready for socket 1 (active high) */
++#define GPIO_PC_CD0	GPIO_GPIO(13) /* detect for socket 0 (active low) */
++#define GPIO_PC_CD1	GPIO_GPIO(14) /* detect for socket 1 (active low) */
++#define GPIO_PC_RESET0	GPIO_GPIO(15) /* reset socket 0 */
++#define GPIO_PC_RESET1	GPIO_GPIO(16) /* reset socket 1 */
 +
-+extern void __init tcc8k_init_irq(void);
-+extern void __init tcc8k_map_common_io(void);
-+extern int __init tcc_clocks_init(unsigned long xi_freq,
-+					unsigned long xti_freq);
-+extern struct platform_device tcc_nand_device;
-+
-+#define XI_FREQUENCY	12000000
-+#define XTI_FREQUENCY	32768
++#define NANOENGINE_IRQ_GPIO_PC_READY0	IRQ_GPIO11
++#define NANOENGINE_IRQ_GPIO_PC_READY1	IRQ_GPIO12
++#define NANOENGINE_IRQ_GPIO_PC_CD0	IRQ_GPIO13
++#define NANOENGINE_IRQ_GPIO_PC_CD1	IRQ_GPIO14
 +
 +#endif
++
+diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
+index 73a7922..36cdc8a 100644
+--- a/arch/arm/mach-sa1100/nanoengine.c
++++ b/arch/arm/mach-sa1100/nanoengine.c
+@@ -3,7 +3,7 @@
+  *
+  * Bright Star Engineering's nanoEngine board init code.
+  *
+- * Copyright (C) 2009 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
++ * Copyright (C) 2010 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index 381b031..e12a721 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -48,8 +48,9 @@ sa1111_cs-$(CONFIG_SA1100_JORNADA720)		+= sa1100_jornada720.o
+ sa1100_cs-y					+= sa1100_generic.o
+ sa1100_cs-$(CONFIG_SA1100_ASSABET)		+= sa1100_assabet.o
+ sa1100_cs-$(CONFIG_SA1100_CERF)			+= sa1100_cerf.o
+-sa1100_cs-$(CONFIG_SA1100_COLLIE)              += pxa2xx_sharpsl.o
++sa1100_cs-$(CONFIG_SA1100_COLLIE)		+= pxa2xx_sharpsl.o
+ sa1100_cs-$(CONFIG_SA1100_H3600)		+= sa1100_h3600.o
++sa1100_cs-$(CONFIG_SA1100_NANOENGINE)		+= sa1100_nanoengine.o
+ sa1100_cs-$(CONFIG_SA1100_SHANNON)		+= sa1100_shannon.o
+ sa1100_cs-$(CONFIG_SA1100_SIMPAD)		+= sa1100_simpad.o
+ 
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index 5188962..a1fce5d 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -54,6 +54,9 @@ static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
+ #if defined(CONFIG_SA1100_H3100) || defined(CONFIG_SA1100_H3600)
+ 	pcmcia_h3600_init,
+ #endif
++#ifdef CONFIG_SA1100_NANOENGINE
++	pcmcia_nanoengine_init,
++#endif
+ #ifdef CONFIG_SA1100_SHANNON
+ 	pcmcia_shannon_init,
+ #endif
+diff --git a/drivers/pcmcia/sa1100_generic.h b/drivers/pcmcia/sa1100_generic.h
+index 794f96a..adb08db 100644
+--- a/drivers/pcmcia/sa1100_generic.h
++++ b/drivers/pcmcia/sa1100_generic.h
+@@ -13,6 +13,7 @@ extern int pcmcia_freebird_init(struct device *);
+ extern int pcmcia_gcplus_init(struct device *);
+ extern int pcmcia_graphicsmaster_init(struct device *);
+ extern int pcmcia_h3600_init(struct device *);
++extern int pcmcia_nanoengine_init(struct device *);
+ extern int pcmcia_pangolin_init(struct device *);
+ extern int pcmcia_pfs168_init(struct device *);
+ extern int pcmcia_shannon_init(struct device *);
+diff --git a/drivers/pcmcia/sa1100_nanoengine.c b/drivers/pcmcia/sa1100_nanoengine.c
+new file mode 100644
+index 0000000..3d2652e
+--- /dev/null
++++ b/drivers/pcmcia/sa1100_nanoengine.c
+@@ -0,0 +1,219 @@
++/*
++ * drivers/pcmcia/sa1100_nanoengine.c
++ *
++ * PCMCIA implementation routines for BSI nanoEngine.
++ *
++ * In order to have a fully functional pcmcia subsystem in a BSE nanoEngine
++ * board you should carefully read this:
++ * http://cambuca.ldhs.cetuc.puc-rio.br/nanoengine/
++ *
++ * Copyright (C) 2010 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
++ *
++ * Based on original work for kernel 2.4 by
++ * Miguel Freitas <miguel@cpti.cetuc.puc-rio.br>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/signal.h>
++
++#include <asm/mach-types.h>
++#include <asm/irq.h>
++
++#include <mach/hardware.h>
++#include <mach/nanoengine.h>
++
++#include "sa1100_generic.h"
++
++static struct pcmcia_irqs irqs_skt0[] = {
++	/* socket, IRQ, name */
++	{ 0, NANOENGINE_IRQ_GPIO_PC_CD0, "PC CD0" },
++};
++
++static struct pcmcia_irqs irqs_skt1[] = {
++	/* socket, IRQ, name */
++	{ 1, NANOENGINE_IRQ_GPIO_PC_CD1, "PC CD1" },
++};
++
++struct nanoengine_pins {
++	unsigned input_pins;
++	unsigned output_pins;
++	unsigned clear_outputs;
++	unsigned transition_pins;
++	unsigned pci_irq;
++	struct pcmcia_irqs *pcmcia_irqs;
++	unsigned pcmcia_irqs_size;
++};
++
++static struct nanoengine_pins nano_skts[] = {
++	{
++		.input_pins		= GPIO_PC_READY0 | GPIO_PC_CD0,
++		.output_pins		= GPIO_PC_RESET0,
++		.clear_outputs		= GPIO_PC_RESET0,
++		.transition_pins	= NANOENGINE_IRQ_GPIO_PC_CD0,
++		.pci_irq		= NANOENGINE_IRQ_GPIO_PC_READY0,
++		.pcmcia_irqs		= irqs_skt0,
++		.pcmcia_irqs_size	= ARRAY_SIZE(irqs_skt0)
++	}, {
++		.input_pins		= GPIO_PC_READY1 | GPIO_PC_CD1,
++		.output_pins		= GPIO_PC_RESET1,
++		.clear_outputs		= GPIO_PC_RESET1,
++		.transition_pins	= NANOENGINE_IRQ_GPIO_PC_CD1,
++		.pci_irq		= NANOENGINE_IRQ_GPIO_PC_READY1,
++		.pcmcia_irqs		= irqs_skt1,
++		.pcmcia_irqs_size	= ARRAY_SIZE(irqs_skt1)
++	}
++};
++
++unsigned num_nano_pcmcia_sockets = ARRAY_SIZE(nano_skts);
++
++static int nanoengine_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
++{
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return -ENXIO;
++
++	GPDR &= ~nano_skts[i].input_pins;
++	GPDR |= nano_skts[i].output_pins;
++	GPCR = nano_skts[i].clear_outputs;
++	set_irq_type(nano_skts[i].transition_pins, IRQ_TYPE_EDGE_BOTH);
++	skt->socket.pci_irq = nano_skts[i].pci_irq;
++
++	return soc_pcmcia_request_irqs(skt,
++		nano_skts[i].pcmcia_irqs, nano_skts[i].pcmcia_irqs_size);
++}
++
++/*
++ * Release all resources.
++ */
++static void nanoengine_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
++{
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return;
++
++	soc_pcmcia_free_irqs(skt,
++		nano_skts[i].pcmcia_irqs, nano_skts[i].pcmcia_irqs_size);
++}
++
++static int nanoengine_pcmcia_configure_socket(
++	struct soc_pcmcia_socket *skt, const socket_state_t *state)
++{
++	unsigned reset;
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return -ENXIO;
++
++	switch (i) {
++	case 0:
++		reset = GPIO_PC_RESET0;
++		break;
++	case 1:
++		reset = GPIO_PC_RESET1;
++		break;
++	default:
++		return -ENXIO;
++	}
++
++	if (state->flags & SS_RESET)
++		GPSR = reset;
++	else
++		GPCR = reset;
++
++	return 0;
++}
++
++static void nanoengine_pcmcia_socket_state(
++	struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
++{
++	unsigned long levels = GPLR;
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return;
++
++	memset(state, 0, sizeof(struct pcmcia_state));
++	switch (i) {
++	case 0:
++		state->ready = (levels & GPIO_PC_READY0) ? 1 : 0;
++		state->detect = !(levels & GPIO_PC_CD0) ? 1 : 0;
++		break;
++	case 1:
++		state->ready = (levels & GPIO_PC_READY1) ? 1 : 0;
++		state->detect = !(levels & GPIO_PC_CD1) ? 1 : 0;
++		break;
++	default:
++		return;
++	}
++	state->bvd1 = 1;
++	state->bvd2 = 1;
++	state->wrprot = 0; /* Not available */
++	state->vs_3v = 1; /* Can only apply 3.3V */
++	state->vs_Xv = 0;
++}
++
++/*
++ * Enable card status IRQs on (re-)initialisation.  This can
++ * be called at initialisation, power management event, or
++ * pcmcia event.
++ */
++static void nanoengine_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
++{
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return;
++
++	soc_pcmcia_enable_irqs(skt,
++		nano_skts[i].pcmcia_irqs, nano_skts[i].pcmcia_irqs_size);
++}
++
++/*
++ * Disable card status IRQs on suspend.
++ */
++static void nanoengine_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
++{
++	unsigned i = skt->nr;
++
++	if (i >= num_nano_pcmcia_sockets)
++		return;
++
++	soc_pcmcia_disable_irqs(skt,
++		nano_skts[i].pcmcia_irqs, nano_skts[i].pcmcia_irqs_size);
++}
++
++static struct pcmcia_low_level nanoengine_pcmcia_ops = {
++	.owner			= THIS_MODULE,
++
++	.hw_init		= nanoengine_pcmcia_hw_init,
++	.hw_shutdown		= nanoengine_pcmcia_hw_shutdown,
++
++	.configure_socket	= nanoengine_pcmcia_configure_socket,
++	.socket_state		= nanoengine_pcmcia_socket_state,
++	.socket_init		= nanoengine_pcmcia_socket_init,
++	.socket_suspend		= nanoengine_pcmcia_socket_suspend,
++};
++
++int pcmcia_nanoengine_init(struct device *dev)
++{
++	int ret = -ENODEV;
++
++	if (machine_is_nanoengine())
++		ret = sa11xx_drv_pcmcia_probe(
++			dev, &nanoengine_pcmcia_ops, 0, 2);
++
++	return ret;
++}
++
 -- 
-1.6.3.3
+1.7.0.3
