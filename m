@@ -1,65 +1,189 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Mon, 29 Mar 2010 17:35:45 +0800
-Subject: [PATCH] pxa3xx_nand: fix reset timeout on mmp2
-Message-ID: <mailman.391.1273137148.2170.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 31 Mar 2010 14:57:48 +0800
+Subject: [PATCH] [ARM] mmp: refresh nand timing
+Message-ID: <mailman.395.1273137211.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For mmp2 board, reset command would always have timeout when enable
-the IRQ processing. The command done would comes after exit the IRQ
-processing whatever the timeout value is set.
-
-Change reset command use polling mode fix the issue.
+Update the NAND clock of PXA168. And adjust the nand timing configuration.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/configs/pxa168_defconfig |   98 ++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-mmp/pxa168.c        |    2 +-
+ drivers/mtd/nand/pxa3xx_nand.c    |    5 +-
+ 3 files changed, 99 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/configs/pxa168_defconfig
+b/arch/arm/configs/pxa168_defconfig
+index 113511f..909bbfa 100644
+--- a/arch/arm/configs/pxa168_defconfig
++++ b/arch/arm/configs/pxa168_defconfig
+@@ -301,7 +301,7 @@ CONFIG_ALIGNMENT_TRAP=y
+ #
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="root=/dev/nfs rootfstype=nfs
+nfsroot=192.168.2.100:/nfsroot/
+ip=192.168.2.101:192.168.2.100::255.255.255.0::eth0:on
+console=ttyS0,115200 mem=128M"
++CONFIG_CMDLINE="root=/dev/mtdblock4 rootfstype=jffs2
+ip=192.168.2.101:192.168.2.100::255.255.255.0::eth0:on
+console=ttyS0,115200 mem=128M"
+ # CONFIG_XIP_KERNEL is not set
+ # CONFIG_KEXEC is not set
+
+@@ -438,7 +438,89 @@ CONFIG_EXTRA_FIRMWARE=""
+ # CONFIG_DEBUG_DEVRES is not set
+ # CONFIG_SYS_HYPERVISOR is not set
+ # CONFIG_CONNECTOR is not set
+-# CONFIG_MTD is not set
++CONFIG_MTD=y
++# CONFIG_MTD_DEBUG is not set
++# CONFIG_MTD_TESTS is not set
++# CONFIG_MTD_CONCAT is not set
++CONFIG_MTD_PARTITIONS=y
++# CONFIG_MTD_REDBOOT_PARTS is not set
++CONFIG_MTD_CMDLINE_PARTS=y
++# CONFIG_MTD_AFS_PARTS is not set
++# CONFIG_MTD_AR7_PARTS is not set
++
++#
++# User Modules And Translation Layers
++#
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLKDEVS=y
++CONFIG_MTD_BLOCK=y
++# CONFIG_FTL is not set
++# CONFIG_NFTL is not set
++# CONFIG_INFTL is not set
++# CONFIG_RFD_FTL is not set
++# CONFIG_SSFDC is not set
++# CONFIG_MTD_OOPS is not set
++
++#
++# RAM/ROM/Flash chip drivers
++#
++# CONFIG_MTD_CFI is not set
++# CONFIG_MTD_JEDECPROBE is not set
++CONFIG_MTD_MAP_BANK_WIDTH_1=y
++CONFIG_MTD_MAP_BANK_WIDTH_2=y
++CONFIG_MTD_MAP_BANK_WIDTH_4=y
++# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
++CONFIG_MTD_CFI_I1=y
++CONFIG_MTD_CFI_I2=y
++# CONFIG_MTD_CFI_I4 is not set
++# CONFIG_MTD_CFI_I8 is not set
++# CONFIG_MTD_RAM is not set
++# CONFIG_MTD_ROM is not set
++# CONFIG_MTD_ABSENT is not set
++
++#
++# Mapping drivers for chip access
++#
++# CONFIG_MTD_COMPLEX_MAPPINGS is not set
++# CONFIG_MTD_PLATRAM is not set
++
++#
++# Self-contained MTD device drivers
++#
++# CONFIG_MTD_SLRAM is not set
++# CONFIG_MTD_PHRAM is not set
++# CONFIG_MTD_MTDRAM is not set
++# CONFIG_MTD_BLOCK2MTD is not set
++
++#
++# Disk-On-Chip Device Drivers
++#
++# CONFIG_MTD_DOC2000 is not set
++# CONFIG_MTD_DOC2001 is not set
++# CONFIG_MTD_DOC2001PLUS is not set
++CONFIG_MTD_NAND=y
++# CONFIG_MTD_NAND_VERIFY_WRITE is not set
++# CONFIG_MTD_NAND_ECC_SMC is not set
++# CONFIG_MTD_NAND_MUSEUM_IDS is not set
++# CONFIG_MTD_NAND_GPIO is not set
++CONFIG_MTD_NAND_IDS=y
++# CONFIG_MTD_NAND_DISKONCHIP is not set
++CONFIG_MTD_NAND_PXA3xx=y
++# CONFIG_MTD_NAND_NANDSIM is not set
++# CONFIG_MTD_NAND_PLATFORM is not set
++# CONFIG_MTD_ONENAND is not set
++
++#
++# LPDDR flash memory drivers
++#
++# CONFIG_MTD_LPDDR is not set
++
++#
++# UBI - Unsorted block images
++#
++# CONFIG_MTD_UBI is not set
+ # CONFIG_PARPORT is not set
+ # CONFIG_BLK_DEV is not set
+ # CONFIG_MISC_DEVICES is not set
+@@ -720,6 +802,18 @@ CONFIG_MISC_FILESYSTEMS=y
+ # CONFIG_BEFS_FS is not set
+ # CONFIG_BFS_FS is not set
+ # CONFIG_EFS_FS is not set
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_FS_DEBUG=0
++CONFIG_JFFS2_FS_WRITEBUFFER=y
++# CONFIG_JFFS2_FS_WBUF_VERIFY is not set
++# CONFIG_JFFS2_SUMMARY is not set
++# CONFIG_JFFS2_FS_XATTR is not set
++# CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
++CONFIG_JFFS2_ZLIB=y
++# CONFIG_JFFS2_LZO is not set
++CONFIG_JFFS2_RTIME=y
++# CONFIG_JFFS2_RUBIN is not set
++# CONFIG_LOGFS is not set
+ CONFIG_CRAMFS=y
+ # CONFIG_SQUASHFS is not set
+ # CONFIG_VXFS_FS is not set
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 652ae66..722c9cf 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -78,7 +78,7 @@ static APBC_CLK(ssp3, PXA168_SSP3, 4, 0);
+ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
+ static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
+
+-static APMU_CLK(nand, NAND, 0x01db, 208000000);
++static APMU_CLK(nand, NAND, 0x019b, 156000000);
+
+ /* device and clock bindings */
+ static struct clk_lookup pxa168_clkregs[] = {
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 31ebc78..2eebd20 100644
+index 793b64c..7c871af 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1099,6 +1099,10 @@ static int prepare_command_pool(struct
-pxa3xx_nand *nand, int command,
+@@ -330,11 +330,11 @@ static struct pxa3xx_nand_flash __devinitdata
+builtin_flash_types[] = {
+ { 0x46ec, 32, 512, 16, 16, ECC_HAMMIN, 4096, \
+ 	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
+ { 0xdaec, 64, 2048, 8, 8, ECC_HAMMIN, 2048, \
+-	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
++	{ 0, 10, 0, 20, 40, 30, 40, 25000, 0, 110, 10, }, },
+ { 0xd3ec, 128, 2048, 8, 8, ECC_BCH, 4096, \
+ 	{ 0, 10, 0, 20, 40, 30, 40, 11123, 0, 110, 10, }, },
+ { 0xd7ec, 128, 4096, 8, 8, ECC_BCH, 8192, \
+-	{ 0, 10, 0, 20, 40, 30, 40, 25000, 0, 110, 10, }, },
++	{ 200, 10, 15, 10, 12, 10, 8, 60000, 20, 75, 10, }, },
+ { 0xa12c, 64, 2048, 8, 8, ECC_HAMMIN, 1024, \
+ 	{ 0, 10, 25, 15, 25, 15, 30, 25000, 0, 60, 10, }, },
+ { 0xb12c, 64, 2048, 16, 16, ECC_HAMMIN, 1024, \
+@@ -509,7 +509,6 @@ static void pxa3xx_nand_set_timing(struct
+pxa3xx_nand_info *info,
+ 		| NDTR1_tWHR(ns2cycle(t->tWHR, nand_clk))
+ 		| NDTR1_tAR(ns2cycle(t->tAR, nand_clk));
 
- 		break;
- 	case NAND_CMD_RESET:
-+		/* on some platform, it is stranger that when issue reset command,
-+		 * cmd done would not come till timeout cause irq exit.
-+		 * Force polling mode for reset command*/
-+		use_polling = 1;
- 		cmd = cmdset.reset;
- 		info->ndcb0[0] |= NDCB0_CMD_TYPE(5)
- 				| cmd;
-@@ -1123,7 +1127,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- {
- 	struct pxa3xx_nand_info *info = mtd->priv;
- 	struct pxa3xx_nand *nand = info->nand_data;
--	int ret, exec_cmd;
-+	int ret, exec_cmd, polling_mode;
-
- 	/* if this is a x16 device ,then convert the input
- 	 * "byte" address into a "word" address appropriate
-@@ -1140,6 +1144,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- 	}
-
- 	DBG_NAND(printk("command %x, page %x\n", command, page_addr));
-+	polling_mode = use_polling;
- 	exec_cmd = prepare_command_pool(nand, command, column, page_addr);
- 	if (exec_cmd) {
- 		init_completion(&nand->cmd_complete);
-@@ -1160,6 +1165,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
-*mtd, unsigned command,
- 		disable_int(nand, NDCR_INT_MASK);
- 		nand->state &= ~STATE_CMD_PREPARED;
- 	}
-+	use_polling = polling_mode;
- }
-
- static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+-
+ 	nand_writel(nand, NDTR0CS0, ndtr0);
+ 	nand_writel(nand, NDTR1CS0, ndtr1);
+ 	nand_writel(nand, NDREDEL, 0x0);
 -- 
 1.5.6.5
