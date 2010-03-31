@@ -1,53 +1,48 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Tue, 30 Mar 2010 18:14:12 -0700
-Subject: [PATCH 1/4] arm: msm: gpio support
-In-Reply-To: <0D753D10438DA54287A00B027084269763691C346E@AUSP01VMBX24.collaborationhost.net>
-References: <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
-	<0D753D10438DA54287A00B027084269763691C346E@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <d6200be21003301814m538a5902s649415d6cc7ec8fa@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 31 Mar 2010 02:15:42 +0100
+Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
+In-Reply-To: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100331011542.GN31126@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 30, 2010 at 4:58 PM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> On Tuesday, March 30, 2010 4:12 PM, Daniel Walker wrote:
->> From: Daniel Walker <c_dwalke@quicinc.com>
-...
->> +
->> +static void msm_gpio_irq_ack(unsigned int irq)
->> +{
->> + ? ? unsigned long irq_flags;
->> + ? ? struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
->> + ? ? unsigned b;
->> +
->> + ? ? spin_lock_irqsave(&msm_chip->lock, irq_flags);
->> +
->> + ? ? b = 1U << (irq - FIRST_GPIO_IRQ - msm_chip->chip.base);
->
-> Urk... That's a bit confusing...
->
-> You might want to make this a macro or an inline function with some kind
-> of comment.
->
+On Sat, Mar 20, 2010 at 08:20:05PM +0200, Vasily Khoruzhick wrote:
+> Following patch series add support for iPAQ RX1950 PDA - another s3c2442-based
+> machine.
+> Almost all drivers for this machine are included in mainline kernel, and port
+> only lacks battery, WiFi and sound support, they will be added later.
+> 
+> Port still uses machine-specific GPIO API, as generic GPIO lacks GPJ
+> support and RX1950 actively uses GPJ port. However I do not see any benifits
+> in using generic GPIO API in machine support file, as it will not be used
+> with CPU different from s3c2442.
 
-On a related note, why did you inline msm_gpio_clear_detect_status? It
-is used from two other functions.
+The samsung specific bits mirroring the gpio API will be removed, I will
+add post a schedule for removal notice post the next kernel merge.
+ 
+> Denis: I hope you'll add your Signed-off at least under first patch.
+> 
+> I doubt that I can get Signed-off from Victor Chukhantsev, as he doesn't
+> work on port for a long time. 
 
->> +
->> +#if MSM_GPIO_BROKEN_INT_CLEAR
->> + ? ? /* Save interrupts that already triggered before we loose them. */
->> + ? ? /* Any interrupt that triggers between the read of int_status */
->> + ? ? /* and the write to int_clear will still be lost though. */
->> + ? ? msm_chip->int_status_copy |= readl(msm_chip->regs.int_status);
->> + ? ? msm_chip->int_status_copy &= ~b;
->> +#endif
->> + ? ? writel(b, msm_chip->regs.int_clear);
->> +
->> + ? ? msm_gpio_update_both_edge_detect(msm_chip);
->> + ? ? spin_unlock_irqrestore(&msm_chip->lock, irq_flags);
->> +}
->> +
-...
+The patches look ok. I'm not sure if someone else can vouch for Victor's
+approval, or authenticty of patches. However if the main authours are
+willing to authenticate the code, then I'll accept this unless someone
+else objects.
+ 
+> Regards,
+> Vasily
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Arve Hj?nnev?g
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
