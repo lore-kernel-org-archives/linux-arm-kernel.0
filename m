@@ -1,16 +1,46 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 31 Mar 2010 23:55:18 +0530
-Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
-In-Reply-To: <tnxsk80r2dh.fsf@e102109-lin.cambridge.arm.com>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-7-git-send-email-rabin@rab.in>
-	<tnxsk80r2dh.fsf@e102109-lin.cambridge.arm.com>
-Message-ID: <20100331182518.GA30522@debian>
+From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
+Date: Wed, 31 Mar 2010 14:21:16 -0700
+Subject: [PATCH 1/4] arm: msm: gpio support
+In-Reply-To: <1270044182.2025.0.camel@m0nster>
+References: <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
+	<0D753D10438DA54287A00B027084269763691C346E@AUSP01VMBX24.collaborationhost.net>
+	<d6200be21003301814m538a5902s649415d6cc7ec8fa@mail.gmail.com>
+	<1270044182.2025.0.camel@m0nster>
+Message-ID: <l2ud6200be21003311421p8dc78179sf62b1d62d468528a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 16, 2010 at 10:23:54AM +0000, Catalin Marinas wrote:
-> If the ftrace_stub isn't .globl, the code compiles fine. My approach
-> would be something like this:
+2010/3/31 Daniel Walker <dwalker@codeaurora.org>:
+> On Tue, 2010-03-30 at 18:14 -0700, Arve Hj?nnev?g wrote:
+>> On Tue, Mar 30, 2010 at 4:58 PM, H Hartley Sweeten
+>> <hartleys@visionengravers.com> wrote:
+>> > On Tuesday, March 30, 2010 4:12 PM, Daniel Walker wrote:
+>> >> From: Daniel Walker <c_dwalke@quicinc.com>
+>> ...
+>> >> +
+>> >> +static void msm_gpio_irq_ack(unsigned int irq)
+>> >> +{
+>> >> + ? ? unsigned long irq_flags;
+>> >> + ? ? struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+>> >> + ? ? unsigned b;
+>> >> +
+>> >> + ? ? spin_lock_irqsave(&msm_chip->lock, irq_flags);
+>> >> +
+>> >> + ? ? b = 1U << (irq - FIRST_GPIO_IRQ - msm_chip->chip.base);
+>> >
+>> > Urk... That's a bit confusing...
+>> >
+>> > You might want to make this a macro or an inline function with some kind
+>> > of comment.
+>> >
+>>
+>> On a related note, why did you inline msm_gpio_clear_detect_status? It
+>> is used from two other functions.
+>>
+>
+> You mean other places in the Android tree?
 
-New patch below:
+No, you copied it three times in this file.
+
+-- 
+Arve Hj?nnev?g
