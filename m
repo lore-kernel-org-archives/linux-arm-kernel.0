@@ -1,140 +1,47 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 31 Mar 2010 11:41:27 +0530
-Subject: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
-In-Reply-To: <005401cad061$a8db7440$544ff780@am.dhcp.ti.com>
-References: <20100322212025.GW11448@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E94026F127117@dbde02.ent.ti.com>
-	<20100323152709.GD11448@atomide.com>
-	<005401cad061$a8db7440$544ff780@am.dhcp.ti.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E94026F32346C@dbde02.ent.ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 31 Mar 2010 09:15:38 +0300
+Subject: [PATCH 3/4] s3c244x: configure GPG13-15 as input before suspend
+In-Reply-To: <20100331011337.GM31126@trinity.fluff.org>
+References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+	<1269109209-26237-4-git-send-email-anarsoul@gmail.com>
+	<20100331011337.GM31126@trinity.fluff.org>
+Message-ID: <201003310915.44139.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Master branch will work fine for omap_zoom3_defconfig. Pls make sure to 
-use ttyS0 in bootargs.
+? ????????? ?? 31 ????? 2010 04:13:37 ????? Ben Dooks ???????:
 
-OMAP36XX ZOOM3 # boot
-LAN9x18 (0x92210000) detected.
-Read mac address: 00:08:EE:03:7D:EE
-start Auto negotiation... (take ~2sec)
-Auto negotiation complete, 100BaseTX, full duplex
-TFTP from server 172.24.136.151; our IP address is 172.24.190.192; sending through gateway 172.24.188.1
-Filename 'uImage_zoom3'.
-Load address: 0x80300000
-Loading: #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         ##########################################################
-done
-Bytes transferred = 1959780 (1de764 hex)
-## Booting image at 80300000 ...
-   Image Name:   Linux-2.6.34-rc2-07865-g2e51807
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    1959716 Bytes =  1.9 MB
-   Load Address: 80008000
-   Entry Point:  80008000
-   Verifying Checksum ... OK
-OK
+> > +#ifdef CONFIG_S3C_DEV_NAND
+> > +	/* According to S3C2442 user's manual, page 7-17,
+> > +	 * when the system is operating in NAND boot mode,
+> > +	 * the hardware pin configuration - EINT[23:21] ???
+> > +	 * must be set as input for starting up after
+> > +	 * wakeup from sleep mode
+> > +	 */
+> > +	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPIO_INPUT);
+> > +	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPIO_INPUT);
+> > +	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPIO_INPUT);
+> 
+> Please don't do this conditionally, we can compile kernels supporting
+> many machines, some of the machines might not be using this boot method.
+> 
+> I'll think over the solution.
+> 
+> 1) Make each machine add a relevant sysdev to hook suspend/resume.
+> 
+> 2) Update the nand driver to do this, but would (a) need to check what
+>    else is s3c2440 compatible, and (b) it doesn't know if the system
+>    has booted from NAND or not.
 
-Starting kernel ...
+Maybe it's better to do this in s3c2410_pm_prepare()? I see some machine-
+specific gpio configuration there.
 
-Uncompressing Linux... done, booting the kernel.
-Linux version 2.6.34-rc2-07865-g2e51807 (manju at u-host) (gcc version 4.3.3 (Sourcery G++ Lite 2009q1-203) ) #5 Wed Mar 31 11:51:19 IST 2010
-CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7f
-CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-Machine: OMAP Zoom3 board
-Memory policy: ECC disabled, Data cache writeback
-OMAP3630 ES1.0 (l2cache iva sgx neon isp 192mhz_clk )
-SRAM: Mapped pa 0x40200000 to va 0xfe400000 size: 0x100000
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
-Kernel command line: console=ttyS0,115200n8 root=/dev/nfs rw nfsroot=172.24.136.151:/home/manju/fs/alsa-fs target,nolock,tcp,rsize=1024,wsize=1024 mem=128M ip=dhcp
-
-Regards,
-Manjunath 
- 
-
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
-> Chikkature Rajashekar, Madhusudhan
-> Sent: Wednesday, March 31, 2010 5:05 AM
-> To: 'Tony Lindgren'; Pais, Allen
-> Cc: linux-arm-kernel at lists.infradead.org; 
-> linux-omap at vger.kernel.org; Pandita, Vikram
-> Subject: RE: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Tuesday, March 23, 2010 10:27 AM
-> > To: Pais, Allen
-> > Cc: linux-arm-kernel at lists.infradead.org; 
-> linux-omap at vger.kernel.org;
-> > Pandita, Vikram
-> > Subject: Re: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
-> > 
-> > * Pais, Allen <allen.pais@ti.com> [100322 22:42]:
-> > > > >
-> > > > >  With this patch[DEBUG_LL + earlyprintk],
-> > > > >  I still haven't been able to boot the kernel.
-> > > > >  Is it working on your side.
-> > > > >
-> > > > >  The commit am using is : 
-> a842b5f9ce70e1b738eabb4d719860070180ed1c
-> > > >
-> > > > I think you will also need the 3630 serial fixes series posted
-> > > > recently.
-> > > >
-> > > > I just merged those into omap-fixes-for-linus (and master)
-> > > > branch(es). Maybe give it a try with at commit
-> > > > b3c7740a120c8a7775cb63b4d094466da5c01692 + this patch?
-> > >
-> > >   Thanks, I'll pull in those fixes.
-> > >  I believe the mux errors are fixed. Have a look at
-> > >  http://dev.omapzoom.org/?p=manju/kernel-omap3-
-> > dev.git;a=commit;h=3499f5023ee90dc6ee3868a3147b87fe22a1d9b7
-> > >
-> > >  Patch must have been missed some how.
-> > 
-> > OK, we really should get fixes like that to mainline kernel ASAP
-> > to avoid duplicating the effort.
-> > 
-> > Then at least one issue remains for zoom3 to be usable..
-> > I'm getting tons of MMC errors trying to mount root on it:
-> > 
-> > mmcblk1: error -110 transferring data, sector 2097024, nr 
-> 8, card status
-> > 0x900
-> > end_request: I/O error, dev mmcblk1, sector 2097024
-> > ...
-> > 
-> > Any ideas if that's fixed somewhere also?
-> > 
-> Tony,
-> 
-> What is the branch on which the kernel is built? I tried the 
-> master branch
-> and the omap-fixes-for-linus both does not seem to boot Zoom3.
-> 
-> Regards,
-> Madhu
-> 
-> > Regards,
-> > 
-> > Tony
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100331/2da39d54/attachment.sig>
