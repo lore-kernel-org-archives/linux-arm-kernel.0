@@ -1,43 +1,160 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Wed, 31 Mar 2010 18:41:36 +0200
-Subject: [PATCH 2/3] ARM: MXC: mxcmmc: Teach the driver SDIO operations
-In-Reply-To: <20100331132946.GH30807@buzzloop.caiaq.de>
-References: <1269973921-29611-1-git-send-email-daniel@caiaq.de>
-	<1269973921-29611-2-git-send-email-daniel@caiaq.de>
-	<20100331130339.GX2241@pengutronix.de>
-	<20100331132946.GH30807@buzzloop.caiaq.de>
-Message-ID: <m2ke2d7436a1003310941t18aeab59qb41f96bc58618960@mail.gmail.com>
+From: madhu.cr@ti.com (Madhusudhan)
+Date: Wed, 31 Mar 2010 11:46:37 -0500
+Subject: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94026F32346C@dbde02.ent.ti.com>
+References: <20100322212025.GW11448@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E94026F127117@dbde02.ent.ti.com>
+	<20100323152709.GD11448@atomide.com>
+	<005401cad061$a8db7440$544ff780@am.dhcp.ti.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E94026F32346C@dbde02.ent.ti.com>
+Message-ID: <003c01cad0f1$bb260fd0$544ff780@am.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/31 Daniel Mack <daniel@caiaq.de>:
-> On Wed, Mar 31, 2010 at 03:03:39PM +0200, Sascha Hauer wrote:
->> On Tue, Mar 30, 2010 at 08:32:00PM +0200, Daniel Mack wrote:
->> > +static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
->> > +{
->> > + ? struct mxcmci_host *host = mmc_priv(mmc);
->> > + ? unsigned long flags;
->> > + ? u32 int_cntr;
->> > +
->> > + ? spin_lock_irqsave(&host->lock, flags);
->> > + ? host->use_sdio = enable;
->> > + ? int_cntr = readl(host->base + MMC_REG_INT_CNTR);
->> > +
->> > + ? if (enable)
->> > + ? ? ? ? ? int_cntr |= INT_SDIO_IRQ_EN;
->> > + ? else
->> > + ? ? ? ? ? int_cntr &= ~INT_SDIO_IRQ_EN;
->> > +
->> > + ? writel(int_cntr, host->base + MMC_REG_INT_CNTR);
->> > + ? spin_unlock_irqrestore(&host->lock, flags);
->>
->> The other places where MMC_REG_INT_CNTR is touched should be protected
->> by this spinlock aswell.
-> Hmm, all other place don't do a read/modify/write cycle, so I'd say the
-> don't need protection?
 
-If you miss spinlocks around the unconditional writes they might
-happen between your readl() and writel().
 
-Best Regards,
-Micha? Miros?aw
+> -----Original Message-----
+> From: G, Manjunath Kondaiah [mailto:manjugk at ti.com]
+> Sent: Wednesday, March 31, 2010 1:11 AM
+> To: Chikkature Rajashekar, Madhusudhan; 'Tony Lindgren'; Pais, Allen
+> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
+> Pandita, Vikram
+> Subject: RE: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+> 
+> Master branch will work fine for omap_zoom3_defconfig. Pls make sure to
+> use ttyS0 in bootargs.
+> 
+Yes. That works.
+
+Thanks,
+Madhu
+
+> OMAP36XX ZOOM3 # boot
+> LAN9x18 (0x92210000) detected.
+> Read mac address: 00:08:EE:03:7D:EE
+> start Auto negotiation... (take ~2sec)
+> Auto negotiation complete, 100BaseTX, full duplex
+> TFTP from server 172.24.136.151; our IP address is 172.24.190.192; sending
+> through gateway 172.24.188.1
+> Filename 'uImage_zoom3'.
+> Load address: 0x80300000
+> Loading: #################################################################
+>          #################################################################
+>          #################################################################
+>          #################################################################
+>          #################################################################
+>          ##########################################################
+> done
+> Bytes transferred = 1959780 (1de764 hex)
+> ## Booting image at 80300000 ...
+>    Image Name:   Linux-2.6.34-rc2-07865-g2e51807
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    1959716 Bytes =  1.9 MB
+>    Load Address: 80008000
+>    Entry Point:  80008000
+>    Verifying Checksum ... OK
+> OK
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> Linux version 2.6.34-rc2-07865-g2e51807 (manju at u-host) (gcc version 4.3.3
+> (Sourcery G++ Lite 2009q1-203) ) #5 Wed Mar 31 11:51:19 IST 2010
+> CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7f
+> CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+> Machine: OMAP Zoom3 board
+> Memory policy: ECC disabled, Data cache writeback
+> OMAP3630 ES1.0 (l2cache iva sgx neon isp 192mhz_clk )
+> SRAM: Mapped pa 0x40200000 to va 0xfe400000 size: 0x100000
+> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+> Kernel command line: console=ttyS0,115200n8 root=/dev/nfs rw
+> nfsroot=172.24.136.151:/home/manju/fs/alsa-fs
+> target,nolock,tcp,rsize=1024,wsize=1024 mem=128M ip=dhcp
+> 
+> Regards,
+> Manjunath
+> 
+> 
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org
+> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
+> > Chikkature Rajashekar, Madhusudhan
+> > Sent: Wednesday, March 31, 2010 5:05 AM
+> > To: 'Tony Lindgren'; Pais, Allen
+> > Cc: linux-arm-kernel at lists.infradead.org;
+> > linux-omap at vger.kernel.org; Pandita, Vikram
+> > Subject: RE: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+> >
+> >
+> >
+> > > -----Original Message-----
+> > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > > owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> > > Sent: Tuesday, March 23, 2010 10:27 AM
+> > > To: Pais, Allen
+> > > Cc: linux-arm-kernel at lists.infradead.org;
+> > linux-omap at vger.kernel.org;
+> > > Pandita, Vikram
+> > > Subject: Re: [PATCH] arm: Fix DEBUG_LL for omap zoom2/3
+> > >
+> > > * Pais, Allen <allen.pais@ti.com> [100322 22:42]:
+> > > > > >
+> > > > > >  With this patch[DEBUG_LL + earlyprintk],
+> > > > > >  I still haven't been able to boot the kernel.
+> > > > > >  Is it working on your side.
+> > > > > >
+> > > > > >  The commit am using is :
+> > a842b5f9ce70e1b738eabb4d719860070180ed1c
+> > > > >
+> > > > > I think you will also need the 3630 serial fixes series posted
+> > > > > recently.
+> > > > >
+> > > > > I just merged those into omap-fixes-for-linus (and master)
+> > > > > branch(es). Maybe give it a try with at commit
+> > > > > b3c7740a120c8a7775cb63b4d094466da5c01692 + this patch?
+> > > >
+> > > >   Thanks, I'll pull in those fixes.
+> > > >  I believe the mux errors are fixed. Have a look at
+> > > >  http://dev.omapzoom.org/?p=manju/kernel-omap3-
+> > > dev.git;a=commit;h=3499f5023ee90dc6ee3868a3147b87fe22a1d9b7
+> > > >
+> > > >  Patch must have been missed some how.
+> > >
+> > > OK, we really should get fixes like that to mainline kernel ASAP
+> > > to avoid duplicating the effort.
+> > >
+> > > Then at least one issue remains for zoom3 to be usable..
+> > > I'm getting tons of MMC errors trying to mount root on it:
+> > >
+> > > mmcblk1: error -110 transferring data, sector 2097024, nr
+> > 8, card status
+> > > 0x900
+> > > end_request: I/O error, dev mmcblk1, sector 2097024
+> > > ...
+> > >
+> > > Any ideas if that's fixed somewhere also?
+> > >
+> > Tony,
+> >
+> > What is the branch on which the kernel is built? I tried the
+> > master branch
+> > and the omap-fixes-for-linus both does not seem to boot Zoom3.
+> >
+> > Regards,
+> > Madhu
+> >
+> > > Regards,
+> > >
+> > > Tony
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe
+> > linux-omap" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
