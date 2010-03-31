@@ -1,57 +1,41 @@
-From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
-Date: Wed, 31 Mar 2010 11:41:07 -0300
-Subject: [PATCH] ARM: pcmcia: Adds nanoEngine PCMCIA support.
-In-Reply-To: <20100331070648.GA23391@pengutronix.de>
-References: <1269972879-27400-1-git-send-email-mroberto@cpti.cetuc.puc-rio.br>
-	<20100331070648.GA23391@pengutronix.de>
-Message-ID: <q2ncecb6d8f1003310741g542debabs1fd8044983cc1c37@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 31 Mar 2010 07:03:02 -0700
+Subject: [PATCH 1/4] arm: msm: gpio support
+In-Reply-To: <d6200be21003301814m538a5902s649415d6cc7ec8fa@mail.gmail.com>
+References: <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
+	<0D753D10438DA54287A00B027084269763691C346E@AUSP01VMBX24.collaborationhost.net>
+	<d6200be21003301814m538a5902s649415d6cc7ec8fa@mail.gmail.com>
+Message-ID: <1270044182.2025.0.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolgram,
+On Tue, 2010-03-30 at 18:14 -0700, Arve Hj?nnev?g wrote:
+> On Tue, Mar 30, 2010 at 4:58 PM, H Hartley Sweeten
+> <hartleys@visionengravers.com> wrote:
+> > On Tuesday, March 30, 2010 4:12 PM, Daniel Walker wrote:
+> >> From: Daniel Walker <c_dwalke@quicinc.com>
+> ...
+> >> +
+> >> +static void msm_gpio_irq_ack(unsigned int irq)
+> >> +{
+> >> +     unsigned long irq_flags;
+> >> +     struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
+> >> +     unsigned b;
+> >> +
+> >> +     spin_lock_irqsave(&msm_chip->lock, irq_flags);
+> >> +
+> >> +     b = 1U << (irq - FIRST_GPIO_IRQ - msm_chip->chip.base);
+> >
+> > Urk... That's a bit confusing...
+> >
+> > You might want to make this a macro or an inline function with some kind
+> > of comment.
+> >
+> 
+> On a related note, why did you inline msm_gpio_clear_detect_status? It
+> is used from two other functions.
+> 
 
-On Wed, Mar 31, 2010 at 04:06, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> Hi Marcelo,
->
-> On Tue, Mar 30, 2010 at 03:14:39PM -0300, Marcelo Roberto Jimenez wrote:
->> This patch adds nanoEngine PCMCIA support, with support for two sockets.
->> ...
->> +
->> + ? ? memset(state, 0, sizeof(struct pcmcia_state));
->> + ? ? switch (i) {
->> + ? ? case 0:
->> + ? ? ? ? ? ? state->ready ? ?= ?(levels & GPIO_PC_READY0) ? ?? 1 : 0;
->> + ? ? ? ? ? ? state->detect ? = !(levels & GPIO_PC_CD0) ? ? ? ? 1 : 0;
->
-> If lines are added at a later stage, all this indentation might have to be
-> redone. This breaks 'git blame'. Please just one space around operators as
-> suggested in CodingStyle, chapter 3.1.
+You mean other places in the Android tree?
 
-Sorry, I didn't know about that. I ran the patch through checkpatch.pl
-and it did not complain, so I thought it was ok. I will change that
-and resubmit.
-
->> +
->> +int pcmcia_nanoengine_init(struct device *dev)
->> +{
->> + ? ? int ret = -ENODEV;
->> +
->> + ? ? printk(KERN_INFO "BSE nanoEngine pcmcia support by "
->> + ? ? ? ? ? ? "Miguel Freitas & Marcelo Jimenez.\n");
->
-> Is this really necessary? Log would get quite messy if all drivers do this.
-> I haven't checked, can't you just use MODULE_AUTHOR here?
-
-I can remove it, in fact. It was there at the first version of the
-driver, so I just added my name. In this case, this file becomes part
-of another module, in this case the module is "sa1100_cs", so I don't
-think I could add MODULE_AUTHOR there, but I could use some advice
-here.
-
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-
-Thanks for your comments,
-Marcelo.
+Daniel
