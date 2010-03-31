@@ -1,74 +1,74 @@
 From: imre.deak@nokia.com (imre.deak at nokia.com)
-Date: Thu,  1 Apr 2010 00:23:23 +0300
-Subject: [RFC PATCH v4 0/3] ARM: VFP: Save / restore VFP state on the signal
-	handler path
+Date: Thu,  1 Apr 2010 00:23:24 +0300
+Subject: [RFC PATCH v4 1/3] ARM: VFP: fix the SMP versions of vfp_{sync,
+	flush}_hwstate
 In-Reply-To: <1269879460-1038-1-git-send-email-imre.deak@nokia.com>
 References: <1269879460-1038-1-git-send-email-imre.deak@nokia.com>
-Message-ID: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
+Message-ID: <cd3af9e47c866f29d3b58958e041a5a46609c7dd.1270066971.git.imre.deak@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v3:
-- Rebased against mainline v2.6.34-rc3, since some parts have already
-  been applied there.
+From: Imre Deak <imre.deak@nokia.com>
 
-Note that this problem might affect more people than previously thought.
-The CodeSourcery 2009q1-203 glibc_ports has some NEON optimized functions;
-for example using memset or memcpy in a signal handler and floating point
-in the main thread can corrupt the main thread's context. You can test this
-by replacing the floating point ops in the signal handler below with some
-dummy memset/memcpy.
+Recently the UP versions of these functions were refactored and as
+a side effect it became possible to call them for the current thread.
+This isn't true for the SMP versions however, so fix this up.
 
-I could only test these patches on a Cortex A8 UP system; it would be great
-if someone with an SMP board could give it a go. The test app to reproduce
-the problem (I've built it with -mfloat-abi=softfp -mfpu=neon):
+Signed-off-by: Imre Deak <imre.deak@nokia.com>
+---
+ arch/arm/vfp/vfpmodule.c |   31 ++++++++++---------------------
+ 1 files changed, 10 insertions(+), 21 deletions(-)
 
-#include <stdio.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <sys/time.h>
-
-void handler(int signum)
-{
-	volatile float f;
-
-	f = 50;
-	f /= 2;
-	f *= 2;
-	if (f != 50) {
-		printf("signal %3.3f\n", f);
-		exit(-1);
-	}
-}
-
-int main(int argc, char **argv)
-{
-	struct itimerval ival;
-
-	if (signal(SIGALRM, handler) == SIG_ERR) {
-		perror("signal");
-		exit(-1);
-	}
-
-	memset(&ival, 0, sizeof(ival));
-	ival.it_value.tv_usec = 1000;
-	ival.it_interval.tv_usec = 10000;
-
-	if (setitimer(ITIMER_REAL, &ival, NULL) < 0) {
-		perror("setitimer");
-		exit(-1);
-	}
-
-	while (1) {
-		volatile float f = 30;
-
-		f /= 3;
-		f *= 3;
-		if (f != 30) {
-			printf("main %3.3f\n", f);
-			exit(-1);
-		}
-	}
-}
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 7f3f59f..477f240 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -428,26 +428,6 @@ static void vfp_pm_init(void)
+ static inline void vfp_pm_init(void) { }
+ #endif /* CONFIG_PM */
+ 
+-/*
+- * Synchronise the hardware VFP state of a thread other than current with the
+- * saved one. This function is used by the ptrace mechanism.
+- */
+-#ifdef CONFIG_SMP
+-void vfp_sync_hwstate(struct thread_info *thread)
+-{
+-}
+-
+-void vfp_flush_hwstate(struct thread_info *thread)
+-{
+-	/*
+-	 * On SMP systems, the VFP state is automatically saved at every
+-	 * context switch. We mark the thread VFP state as belonging to a
+-	 * non-existent CPU so that the saved one will be reloaded when
+-	 * needed.
+-	 */
+-	thread->vfpstate.hard.cpu = NR_CPUS;
+-}
+-#else
+ void vfp_sync_hwstate(struct thread_info *thread)
+ {
+ 	unsigned int cpu = get_cpu();
+@@ -490,9 +470,18 @@ void vfp_flush_hwstate(struct thread_info *thread)
+ 		last_VFP_context[cpu] = NULL;
+ 	}
+ 
++#ifdef CONFIG_SMP
++	/*
++	 * For SMP we still have to take care of the case where the thread
++	 * migrates to another CPU and then back to the original CPU on which
++	 * the last VFP user is still the same thread. Mark the thread VFP
++	 * state as belonging to a non-existent CPU so that the saved one will
++	 * be reloaded in the above case.
++	 */
++	thread->vfpstate.hard.cpu = NR_CPUS;
++#endif
+ 	put_cpu();
+ }
+-#endif
+ 
+ #include <linux/smp.h>
+ 
+-- 
+1.7.0.2
