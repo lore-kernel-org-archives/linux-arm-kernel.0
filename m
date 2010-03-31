@@ -1,46 +1,21 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Wed, 31 Mar 2010 14:21:16 -0700
-Subject: [PATCH 1/4] arm: msm: gpio support
-In-Reply-To: <1270044182.2025.0.camel@m0nster>
-References: <1269990717-2969-1-git-send-email-dwalker@codeaurora.org>
-	<0D753D10438DA54287A00B027084269763691C346E@AUSP01VMBX24.collaborationhost.net>
-	<d6200be21003301814m538a5902s649415d6cc7ec8fa@mail.gmail.com>
-	<1270044182.2025.0.camel@m0nster>
-Message-ID: <l2ud6200be21003311421p8dc78179sf62b1d62d468528a@mail.gmail.com>
+From: purushtm1@gmail.com (purushothama s)
+Date: Wed, 31 Mar 2010 19:16:56 +0530
+Subject: SPI Bust mode support open-source(kernel-2.6.32 and higher version)
+	for i.mx27 target board.
+Message-ID: <t2z8730448c1003310646z4dbeb88ai24b7ed48215a88a5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/31 Daniel Walker <dwalker@codeaurora.org>:
-> On Tue, 2010-03-30 at 18:14 -0700, Arve Hj?nnev?g wrote:
->> On Tue, Mar 30, 2010 at 4:58 PM, H Hartley Sweeten
->> <hartleys@visionengravers.com> wrote:
->> > On Tuesday, March 30, 2010 4:12 PM, Daniel Walker wrote:
->> >> From: Daniel Walker <c_dwalke@quicinc.com>
->> ...
->> >> +
->> >> +static void msm_gpio_irq_ack(unsigned int irq)
->> >> +{
->> >> + ? ? unsigned long irq_flags;
->> >> + ? ? struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
->> >> + ? ? unsigned b;
->> >> +
->> >> + ? ? spin_lock_irqsave(&msm_chip->lock, irq_flags);
->> >> +
->> >> + ? ? b = 1U << (irq - FIRST_GPIO_IRQ - msm_chip->chip.base);
->> >
->> > Urk... That's a bit confusing...
->> >
->> > You might want to make this a macro or an inline function with some kind
->> > of comment.
->> >
->>
->> On a related note, why did you inline msm_gpio_clear_detect_status? It
->> is used from two other functions.
->>
->
-> You mean other places in the Android tree?
+Hi All,
 
-No, you copied it three times in this file.
+I am not able to find the SPI Burst mode support in
+open-source(kernel-2.6.32 and higher version) for i.mx27 target board.
+Any code or patch is available to resolve this issue ?
 
--- 
-Arve Hj?nnev?g
+Please let me know your suggestion.
+
+Regards
+Purushothama.S
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100331/4cb8ad35/attachment.htm>
