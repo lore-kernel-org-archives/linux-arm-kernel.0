@@ -1,63 +1,43 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 31 Mar 2010 02:26:51 +0100
-Subject: [PATCH 4/4] ARM: S3C6410: Declare IISv4 audio-bus clock
-In-Reply-To: <1268115034-5998-4-git-send-email-jassisinghbrar@gmail.com>
-References: <1268115034-5998-1-git-send-email-jassisinghbrar@gmail.com>
-	<1268115034-5998-2-git-send-email-jassisinghbrar@gmail.com>
-	<1268115034-5998-3-git-send-email-jassisinghbrar@gmail.com>
-	<1268115034-5998-4-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <20100331012651.GQ31126@trinity.fluff.org>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 31 Mar 2010 10:40:57 +0900
+Subject: [PATCH v2] PL330: Add PL330 DMA controller driver
+In-Reply-To: <20100331010744.GK31126@trinity.fluff.org>
+References: <4BAAD5BB.7050101@samsung.com>
+	<1b68c6791003251908w299806cbm1443728ea08cfb72@mail.gmail.com>
+	<20100331010744.GK31126@trinity.fluff.org>
+Message-ID: <t2r1b68c6791003301840n8b3f94b7xdbf8ddc1fe0165ff@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 09, 2010 at 03:10:34PM +0900, jassisinghbrar at gmail.com wrote:
-> From: Jassi Brar <jassi.brar@samsung.com>
-> 
-> Declare 'audio-bus' clock for IISv4 controller of S3C6410.
-> Even though the name is same as that for IISv3, the id is
-> set to -1(just one instance of the controller is available)
-> which helps always fetch the correct clock.
-
-ok, the series look fine.
-
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
->  arch/arm/mach-s3c64xx/clock.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-> index 6c286d5..da83595 100644
-> --- a/arch/arm/mach-s3c64xx/clock.c
-> +++ b/arch/arm/mach-s3c64xx/clock.c
-> @@ -670,6 +670,16 @@ static struct clksrc_clk clksrcs[] = {
->  		.sources	= &clkset_audio1,
->  	}, {
->  		.clk	= {
-> +			.name		= "audio-bus",
-> +			.id		= -1,  /* There's only one IISv4 port */
-> +			.ctrlbit        = S3C6410_CLKCON_SCLK_AUDIO2,
-> +			.enable		= s3c64xx_sclk_ctrl,
-> +		},
-> +		.reg_src	= { .reg = S3C6410_CLK_SRC2, .shift = 0, .size = 3  },
-> +		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 24, .size = 4  },
-> +		.sources	= &clkset_audio2,
-> +	}, {
-> +		.clk	= {
->  			.name		= "irda-bus",
->  			.id		= 0,
->  			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
-> -- 
-> 1.6.2.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Wed, Mar 31, 2010 at 10:07 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Fri, Mar 26, 2010 at 11:08:06AM +0900, jassi brar wrote:
+>> On Thu, Mar 25, 2010 at 12:17 PM, Joonyoung Shim
+>> <jy0922.shim@samsung.com> wrote:
+>> > +static struct pl330_desc *
+>> > +pl330_alloc_descriptor(struct pl330_chan *pl330_ch, gfp_t flags)
+>> > +{
+>> > + ? ? ? struct device *dev = pl330_ch->pl330_dev->common.dev;
+>> > + ? ? ? struct pl330_desc *desc;
+>> > + ? ? ? dma_addr_t phys;
+>> > +
+>> > + ? ? ? desc = kzalloc(sizeof(*desc), flags);
+>> > + ? ? ? if (!desc)
+>> > + ? ? ? ? ? ? ? return NULL;
+>> > +
+>> > + ? ? ? desc->desc_pool_virt = dma_alloc_coherent(dev, PL330_POOL_SIZE, &phys,
+>> > + ? ? ? ? ? ? ? ? ? ? ? flags);
+>> These allocations are inefficient and don't need to be done so often.
+>> My implementation allocates a pool of such buffers(size specified by
+>> DMA API driver)
+>> and manage them by simple pointer manipulation.
+>> Though the xfer requests for DMA API has to be managed in the DMA API driver.
+>
+> There's a dma pool implementation too in the kernel.
+I meant during 'probe' of the DMAC a chunk of dma consistent memory is allocated
+for MicroCode for each channel.
+We use the same chunk during xfers, since we can generate MC in a way that 256
+bytes are enough to do xfer of 2.5MB at burst size of 1 byte and for
+bulkier requests
+the DMA API driver can either break the bigger request or allocate
+bigger chunk for
+the channels.
