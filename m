@@ -1,22 +1,20 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 1 Apr 2010 08:06:25 +0200
-Subject: [regression] 2.6.34-rc1 to -rc3 on zaurus: no longer boots
-In-Reply-To: <20100315102830.GA10288@atrey.karlin.mff.cuni.cz>
-References: <20100313122754.GD2192@elf.ucw.cz>
-	<20100315102830.GA10288@atrey.karlin.mff.cuni.cz>
-Message-ID: <20100401060624.GA1329@ucw.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Apr 2010 02:47:56 -0700
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <201003311443.13568.jeremy.kerr@canonical.com>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<201003311443.13568.jeremy.kerr@canonical.com>
+Message-ID: <20100401094755.GK31200@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+* Jeremy Kerr <jeremy.kerr@canonical.com> [100330 23:39]:
+> Hi Russell,
+> 
+> > LMB... logical memory blocks.
+> 
+> Nice, will be good for the DT work too.
 
-> > I tried compiling 2.6.34-rc1, and it does not boot :-(. It does not
-> > seem to even reset the framebuffer (I'm using kexec -- so it stays
-> > stuck on on previous screen).
+Great, very nice clean up!
 
-Tried again with -rc2 and -rc3, and neither boots :-(. I did not have
-time to set up serial console, yet :-(. Any ideas?
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Acked-by: Tony Lindgren <tony@atomide.com>
