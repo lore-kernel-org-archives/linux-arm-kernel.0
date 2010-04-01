@@ -1,7 +1,7 @@
 From: leiwen@marvell.com (Lei Wen)
 Date: Thu, 1 Apr 2010 15:12:09 +0800
-Subject: [PATCH] pxa3xx_nand: fix power management support
-Message-ID: <mailman.399.1273137322.2170.linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH] mtd: pxa3xx_nand: fix power management support
+Message-ID: <mailman.445.1273818358.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
