@@ -1,28 +1,22 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 1 Apr 2010 19:00:04 +0200
+From: grfstrm@users.sourceforge.net (=?ISO-8859-1?Q?Anders_Grafstr=F6m?=)
+Date: Thu, 01 Apr 2010 19:29:59 +0200
 Subject: Memory corruption with 2.6.32.10, but not with 2.6.34-rc3
-In-Reply-To: <20100401165056.GA1138@suse.de>
+In-Reply-To: <20100401132156.GJ30807@buzzloop.caiaq.de>
 References: <20100401132156.GJ30807@buzzloop.caiaq.de>
-	<20100401165056.GA1138@suse.de>
-Message-ID: <20100401170004.GO30801@buzzloop.caiaq.de>
+Message-ID: <4BB4D817.1050603@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 01, 2010 at 09:50:56AM -0700, Greg KH wrote:
-> On Thu, Apr 01, 2010 at 03:21:56PM +0200, Daniel Mack wrote:
-> > So my current summary is that this is related to WiFi, but OTOH it still
-> > only happens when file system traffic is issued.
-> > 
-> > We would like to have a fix for this annoying bug in the stable series
-> > (especially 2.6.32.x) as well, but I don't have much ideas about where
-> > to search for it. Hence, I would appreciate if maintainers could think
-> > about any possible commits in the described time window which haven't
-> > reached stable. Does the description ring anyone's bell?
+Daniel Mack wrote:
+> We would like to have a fix for this annoying bug in the stable series
+> (especially 2.6.32.x) as well, but I don't have much ideas about where
+> to search for it. Hence, I would appreciate if maintainers could think
+> about any possible commits in the described time window which haven't
+> reached stable. Does the description ring anyone's bell?
 > 
-> I can't think of any USB specific patches that would be related to this,
-> sorry.
+> I can cherry-pick things if anyone pin-points something and run
+> lont-time tests again. Any pointer appreciated.
 
-Yes, I'd rule out USB anyway. It crashes without any USB function as
-well. I just copied you as the maintainer of the stable tree :)
+You could try this one:
 
-Daniel
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8e4971f2fb2380ce66196136e113d04196b80fcd
