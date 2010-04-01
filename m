@@ -1,11 +1,13 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Thu,  1 Apr 2010 10:03:23 +0200
-Subject: [PATCH 1/3] ARM: MXC: mxcmmc: misc cleanups
-Message-ID: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
+Date: Thu,  1 Apr 2010 10:03:24 +0200
+Subject: [PATCH 2/3] ARM: MXC: mxcmmc: Teach the driver SDIO operations
+In-Reply-To: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
+References: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
+Message-ID: <1270109005-9007-2-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Be more verbose on error messages and add one debug message.
+Successfully tested on MX31 hardware using libertas SDIO peripherals.
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
@@ -14,58 +16,156 @@ Cc: Volker Ernst <volker.ernst@txtr.com>
 Cc: Jiri Kosina <jkosina@suse.cz>
 Cc: Micha? Miros?aw <mirqus@gmail.com>
 ---
- drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
- 1 files changed, 13 insertions(+), 4 deletions(-)
+ drivers/mmc/host/mxcmmc.c |   70 +++++++++++++++++++++++++++++++++++++-------
+ 1 files changed, 59 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 2df9041..44a53ee 100644
+index 44a53ee..51e880c 100644
 --- a/drivers/mmc/host/mxcmmc.c
 +++ b/drivers/mmc/host/mxcmmc.c
-@@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
+@@ -119,6 +119,7 @@ struct mxcmci_host {
+ 	int			detect_irq;
+ 	int			dma;
+ 	int			do_dma;
++	int			use_sdio;
+ 	unsigned int		power_mode;
+ 	struct imxmmc_platform_data *pdata;
+ 
+@@ -138,6 +139,7 @@ struct mxcmci_host {
+ 	int			clock;
+ 
+ 	struct work_struct	datawork;
++	spinlock_t		lock;
+ };
+ 
+ static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios);
+@@ -226,6 +228,9 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
+ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+ 		unsigned int cmdat)
  {
- 	int i;
- 
-+	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
++	u32 int_cntr;
++	unsigned long flags;
 +
- 	/* reset sequence */
- 	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
- 	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
-@@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
- 		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
- 				stat);
- 		if (stat & STATUS_CRC_READ_ERR) {
-+			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
- 			data->error = -EILSEQ;
- 		} else if (stat & STATUS_CRC_WRITE_ERR) {
- 			u32 err_code = (stat >> 9) & 0x3;
--			if (err_code == 2) /* No CRC response */
-+			if (err_code == 2) { /* No CRC response */
-+				dev_err(mmc_dev(host->mmc),
-+					"%s: No CRC -ETIMEDOUT\n", __func__);
- 				data->error = -ETIMEDOUT;
--			else
-+			} else {
-+				dev_err(mmc_dev(host->mmc),
-+					"%s: -EILSEQ\n", __func__);
- 				data->error = -EILSEQ;
-+			}
- 		} else if (stat & STATUS_TIME_OUT_READ) {
-+			dev_err(mmc_dev(host->mmc),
-+				"%s: read -ETIMEDOUT\n", __func__);
- 			data->error = -ETIMEDOUT;
- 		} else {
-+			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
- 			data->error = -EIO;
- 		}
- 	} else {
-@@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
- 	struct scatterlist *sg;
- 	int stat, i;
+ 	WARN_ON(host->cmd != NULL);
+ 	host->cmd = cmd;
  
--	host->datasize = 0;
--
- 	host->data = data;
- 	host->datasize = 0;
+@@ -249,12 +254,16 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+ 		return -EINVAL;
+ 	}
  
++	int_cntr = INT_END_CMD_RES_EN;
++
+ 	if (mxcmci_use_dma(host))
+-		writel(INT_READ_OP_EN | INT_WRITE_OP_DONE_EN |
+-				INT_END_CMD_RES_EN,
+-				host->base + MMC_REG_INT_CNTR);
+-	else
+-		writel(INT_END_CMD_RES_EN, host->base + MMC_REG_INT_CNTR);
++		int_cntr |= INT_READ_OP_EN | INT_WRITE_OP_DONE_EN;
++
++	spin_lock_irqsave(&host->lock, flags);
++	if (host->use_sdio)
++		int_cntr |= INT_SDIO_IRQ_EN;
++	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
++	spin_unlock_irqrestore(&host->lock, flags);
+ 
+ 	writew(cmd->opcode, host->base + MMC_REG_CMD);
+ 	writel(cmd->arg, host->base + MMC_REG_ARG);
+@@ -266,7 +275,14 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+ static void mxcmci_finish_request(struct mxcmci_host *host,
+ 		struct mmc_request *req)
+ {
+-	writel(0, host->base + MMC_REG_INT_CNTR);
++	u32 int_cntr = 0;
++	unsigned long flags;
++
++	spin_lock_irqsave(&host->lock, flags);
++	if (host->use_sdio)
++		int_cntr |= INT_SDIO_IRQ_EN;
++	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
++	spin_unlock_irqrestore(&host->lock, flags);
+ 
+ 	host->req = NULL;
+ 	host->cmd = NULL;
+@@ -532,15 +548,27 @@ static void mxcmci_cmd_done(struct mxcmci_host *host, unsigned int stat)
+ static irqreturn_t mxcmci_irq(int irq, void *devid)
+ {
+ 	struct mxcmci_host *host = devid;
++	unsigned long flags;
++	bool sdio_irq;
+ 	u32 stat;
+ 
+ 	stat = readl(host->base + MMC_REG_STATUS);
+-	writel(stat, host->base + MMC_REG_STATUS);
++	writel(stat & ~STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
+ 
+ 	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
+ 
++	spin_lock_irqsave(&host->lock, flags);
++	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
++	spin_unlock_irqrestore(&host->lock, flags);
++
++	if (sdio_irq) {
++		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
++		mmc_signal_sdio_irq(host->mmc);
++	}
++
+ 	if (stat & STATUS_END_CMD_RESP)
+ 		mxcmci_cmd_done(host, stat);
++
+ #ifdef HAS_DMA
+ 	if (mxcmci_use_dma(host) &&
+ 		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
+@@ -677,11 +705,30 @@ static int mxcmci_get_ro(struct mmc_host *mmc)
+ 	return -ENOSYS;
+ }
+ 
++static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
++{
++	struct mxcmci_host *host = mmc_priv(mmc);
++	unsigned long flags;
++	u32 int_cntr;
++
++	spin_lock_irqsave(&host->lock, flags);
++	host->use_sdio = enable;
++	int_cntr = readl(host->base + MMC_REG_INT_CNTR);
++
++	if (enable)
++		int_cntr |= INT_SDIO_IRQ_EN;
++	else
++		int_cntr &= ~INT_SDIO_IRQ_EN;
++
++	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
++	spin_unlock_irqrestore(&host->lock, flags);
++}
+ 
+ static const struct mmc_host_ops mxcmci_ops = {
+-	.request	= mxcmci_request,
+-	.set_ios	= mxcmci_set_ios,
+-	.get_ro		= mxcmci_get_ro,
++	.request		= mxcmci_request,
++	.set_ios		= mxcmci_set_ios,
++	.get_ro			= mxcmci_get_ro,
++	.enable_sdio_irq	= mxcmci_enable_sdio_irq,
+ };
+ 
+ static int mxcmci_probe(struct platform_device *pdev)
+@@ -709,7 +756,7 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mmc->ops = &mxcmci_ops;
+-	mmc->caps = MMC_CAP_4_BIT_DATA;
++	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
+ 
+ 	/* MMC core transfer sizes tunable parameters */
+ 	mmc->max_hw_segs = 64;
+@@ -728,6 +775,7 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 
+ 	host->mmc = mmc;
+ 	host->pdata = pdev->dev.platform_data;
++	spin_lock_init(&host->lock);
+ 
+ 	if (host->pdata && host->pdata->ocr_avail)
+ 		mmc->ocr_avail = host->pdata->ocr_avail;
 -- 
 1.7.0
