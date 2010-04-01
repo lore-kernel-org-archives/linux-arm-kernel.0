@@ -1,43 +1,30 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 1 Apr 2010 01:34:24 +0200
-Subject: [PATCH] Arm nomadik : Vendor tool compatibility
-In-Reply-To: <577FAEEB8540FB4F9C91B6BB262576755905DC@XVS-DCFR-22.europe.corp.altran.com>
-References: <AcrQ47RPeBz4nhRMR9ORyzmB2isxaQ==>
-	<577FAEEB8540FB4F9C91B6BB262576755905DC@XVS-DCFR-22.europe.corp.altran.com>
-Message-ID: <x2y63386a3d1003311634l71486234n95f60e506b776948@mail.gmail.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Thu, 1 Apr 2010 01:15:20 +0100
+Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100325184316.GB20512@gw.healthdatacare.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
+	<20100325184316.GB20512@gw.healthdatacare.com>
+Message-ID: <s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/3/31 Lemetayer Jean Marie <jeanmarie.lemetayer@altran.com>:
+On 3/25/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+>  > > This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+>  > >  in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
+>  > >
+>  > >  Driver currently supports only interrupt driven mode but in future we may add
+>  > >  polling mode support as well.
 
-> +#ifdef CONFIG_VENDOR_TOOL_COMPATIBILITY
-> +static struct nand_ecclayout nomadik_ecc_layout = {
-> +?????? .eccbytes = 3 * 4,
-> +?????? .eccpos = {
-> +?????? ??????? 0x28, 0x29, 0x2A,
-> +?????? ??????? 0x2B, 0x2C, 0x2D,
-> +?????? ??????? 0x2E, 0x2F, 0x30,
-> +?????? ??????? 0x31, 0x32, 0x33},
-> +?????? .oobfree = {{0x02, 0x26}, {0x34, 0x0C} },
-> +};
-> +#else
-> ?static struct nand_ecclayout nomadik_ecc_layout = {
-> ??????? .eccbytes = 3 * 4,
-> ??????? .eccpos = { /* each subpage has 16 bytes: pos 2,3,4 hosts ECC */
-> @@ -54,6 +65,7 @@ static struct nand_ecclayout nomadik_ecc_layout = {
-> ??????? /* let's keep bytes 5,6,7 for us, just in case we change ECC algo */
-> ??????? .oobfree = { {0x08, 0x08}, {0x18, 0x08}, {0x28, 0x08}, {0x38, 0x08}
-> },
-> ?};
-> +#endif
+I've been staring more at this again and it looks (2 clock
+strangenesses and extensive control reg setting apart) like good code.
+I have another question: like the Cirrus driver, this takes 100% CPU
+doing busy wait for the current transfer to complete.
+Given that this driver is interrupt-based, is there any reason why it
+can't do something else in the meanwhile?
+Not that that's a reason not to include it in 2.6.35 - it works well
+and we can think whether to make it more efficient in N+1...
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-
-I don't think any of this layout belongs in the driver itself frankly speaking,
-I am facing the need to use this in U300 and we use yet *another*
-ECC layout with the FSMC, so we have to add yet another #ifdef.
-However I can fix that up with a patch on top of this one after it's
-queued.
-
-Yours,
-Linus Walleij
+   M
