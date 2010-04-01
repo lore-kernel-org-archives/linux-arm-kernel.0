@@ -1,34 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Apr 2010 05:13:09 -0700
-Subject: [PATCH 00/14] omap DEBUG_LL and multiboot changes for 2.6.34
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB032221AAC6@dbde02.ent.ti.com>
-References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB032221AAC6@dbde02.ent.ti.com>
-Message-ID: <20100401121309.GQ31200@atomide.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 1 Apr 2010 15:45:20 +0300
+Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
+In-Reply-To: <20100331011542.GN31126@trinity.fluff.org>
+References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
+	<20100331011542.GN31126@trinity.fluff.org>
+Message-ID: <201004011545.25648.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Gadiyar, Anand <gadiyar@ti.com> [100324 04:39]:
-> Tony Lindgren wrote:
-> > These patches clean up the DEBUG_LL code for mach-omap1 and mach-omap2
-> > and then makes multiboot work for mach-omap2.
+? ????????? ?? 31 ????? 2010 04:15:42 ????? Ben Dooks ???????:
+> On Sat, Mar 20, 2010 at 08:20:05PM +0200, Vasily Khoruzhick wrote:
+> > Following patch series add support for iPAQ RX1950 PDA - another
+> > s3c2442-based machine.
+> > Almost all drivers for this machine are included in mainline kernel, and
+> > port only lacks battery, WiFi and sound support, they will be added
+> > later.
 > > 
-> > Note that these patches currently allow only multiboot for 2420 + 36xx.
-> > Adding 2430 and omap4 needs further work.
-> > 
+> > Port still uses machine-specific GPIO API, as generic GPIO lacks GPJ
+> > support and RX1950 actively uses GPJ port. However I do not see any
+> > benifits in using generic GPIO API in machine support file, as it will
+> > not be used with CPU different from s3c2442.
 > 
-> Tony,
-> 
-> Purely out of curiosity (triggered by someone asking about 2430SDP on
-> the list), do you know what it'll take to get mutli-boot working on 2430?
+> The samsung specific bits mirroring the gpio API will be removed, I will
+> add post a schedule for removal notice post the next kernel merge.
 
-It should work assuming the debug_ll code worked earlier. Do you have
-the right serial port connected and CONFIG_EARLYPRINTK enabled? You
-also need earlyprink on the kernel cmdline.
- 
-> I'm not familiar with those boards of course - does anyone still have
-> them around?
+Btw, do you plan to merge Christians's patches to add GPJ bank support to 
+gpiolib anytime soon? I'd like to modify mach-rx1950.c to use gpiolib instead 
+of samsung-specific API, but can't do this without GPJ bank support. 
 
-Yeah, looks like people are using 2430.
-
-Tony
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100401/63081b96/attachment.sig>
