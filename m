@@ -1,39 +1,26 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu,  1 Apr 2010 11:48:56 +0200
-Subject: [PATCH] AT91: at91sam9g10 chip identification changed
-Message-ID: <1270115336-19488-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 1 Apr 2010 09:54:20 +0100
+Subject: [PATCH 1/4] pxa: add namespace on ssp
+In-Reply-To: <g2w771cded01004010045n56803dfbge90d3a70a731977d@mail.gmail.com>
+References: <k2s771cded01003310546y48e1431r71820b73f69e53d5@mail.gmail.com>
+	<y2pf17812d71004010033x5b3e789foa782dd6cd8af63ef@mail.gmail.com>
+	<g2w771cded01004010045n56803dfbge90d3a70a731977d@mail.gmail.com>
+Message-ID: <20100401085419.GC32025@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A bit in the at91sam9g10 identification number changed between Engineering
-Sample and final product. This patch will identify both as being at91sam9g10.
+On Thu, Apr 01, 2010 at 03:45:03PM +0800, Haojian Zhuang wrote:
+> On Thu, Apr 1, 2010 at 3:33 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/include/mach/cpu.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> > This is not necessary, provided that those functions are static already.
+> > Unless this driver is going to support a different SSP, in which case a
+> > separate driver is needed then.
 
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 5a06501..833659d 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -21,7 +21,7 @@
- #define ARCH_ID_AT91SAM9260	0x019803a0
- #define ARCH_ID_AT91SAM9261	0x019703a0
- #define ARCH_ID_AT91SAM9263	0x019607a0
--#define ARCH_ID_AT91SAM9G10	0x819903a0
-+#define ARCH_ID_AT91SAM9G10	0x019903a0
- #define ARCH_ID_AT91SAM9G20	0x019905a0
- #define ARCH_ID_AT91SAM9RL64	0x019b03a0
- #define ARCH_ID_AT91SAM9G45	0x819b05a0
-@@ -108,7 +108,7 @@ static inline unsigned long at91cap9_rev_identify(void)
- #endif
- 
- #ifdef CONFIG_ARCH_AT91SAM9G10
--#define cpu_is_at91sam9g10()	(at91_cpu_identify() == ARCH_ID_AT91SAM9G10)
-+#define cpu_is_at91sam9g10()	((at91_cpu_identify() & ~AT91_CIDR_EXT)	== ARCH_ID_AT91SAM9G10)
- #else
- #define cpu_is_at91sam9g10()	(0)
- #endif
--- 
-1.5.6.5
+> > What's the real motivation behind this?
+
+> It's the request from Mark. Both ssp_ and pxa_ssp_ prefix exist in
+> pxa-ssp.c. From the view of naming space, it's not align.
+
+Just to be clear, the main issue was that subsequent patches in the
+series made the symbols exported at which point they end up in the
+global namespace and the potential confusion is an issue.
