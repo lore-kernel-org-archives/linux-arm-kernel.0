@@ -1,45 +1,71 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 1 Apr 2010 10:02:23 +0200
-Subject: [PATCH] ARM: MXC: mxcmmc: Teach the driver SDIO operations
-In-Reply-To: <w2me2d7436a1003311034td3af4a49pdb1ac003a7d31c7d@mail.gmail.com>
-References: <m2ke2d7436a1003310941t18aeab59qb41f96bc58618960@mail.gmail.com>
-	<1270055079-30998-1-git-send-email-daniel@caiaq.de>
-	<w2me2d7436a1003311034td3af4a49pdb1ac003a7d31c7d@mail.gmail.com>
-Message-ID: <20100401080223.GI30801@buzzloop.caiaq.de>
+Date: Thu,  1 Apr 2010 10:03:23 +0200
+Subject: [PATCH 1/3] ARM: MXC: mxcmmc: misc cleanups
+Message-ID: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 31, 2010 at 07:34:14PM +0200, Micha? Miros?aw wrote:
-> 2010/3/31 Daniel Mack <daniel@caiaq.de>:
-> > Successfully tested on MX31 hardware using libertas SDIO peripherals.
-> >
-> > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Dan Williams <dan.j.williams@intel.com>
-> > Cc: Volker Ernst <volker.ernst@txtr.com>
-> > Cc: Jiri Kosina <jkosina@suse.cz>
-> > ---
-> > ?drivers/mmc/host/mxcmmc.c | ? 62 +++++++++++++++++++++++++++++++++++++-------
-> > ?1 files changed, 52 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> > index 44a53ee..f91a2c3 100644
-> > --- a/drivers/mmc/host/mxcmmc.c
-> > +++ b/drivers/mmc/host/mxcmmc.c
-> > @@ -119,6 +119,7 @@ struct mxcmci_host {
-> > ? ? ? ?int ? ? ? ? ? ? ? ? ? ? detect_irq;
-> > ? ? ? ?int ? ? ? ? ? ? ? ? ? ? dma;
-> > ? ? ? ?int ? ? ? ? ? ? ? ? ? ? do_dma;
-> > + ? ? ? int ? ? ? ? ? ? ? ? ? ? use_sdio;
-> > ? ? ? ?unsigned int ? ? ? ? ? ?power_mode;
-> > ? ? ? ?struct imxmmc_platform_data *pdata;
-> >
-> 
-> This field should be protected by the same spinlock as it is used to
-> set the reg's value.
+Be more verbose on error messages and add one debug message.
 
-Ok - I'll repost all three patches.
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Volker Ernst <volker.ernst@txtr.com>
+Cc: Jiri Kosina <jkosina@suse.cz>
+Cc: Micha? Miros?aw <mirqus@gmail.com>
+---
+ drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
+ 1 files changed, 13 insertions(+), 4 deletions(-)
 
-Again, thanks for your review.
-
-Daniel
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index 2df9041..44a53ee 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
+ {
+ 	int i;
+ 
++	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
++
+ 	/* reset sequence */
+ 	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
+ 	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
+@@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
+ 		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
+ 				stat);
+ 		if (stat & STATUS_CRC_READ_ERR) {
++			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
+ 			data->error = -EILSEQ;
+ 		} else if (stat & STATUS_CRC_WRITE_ERR) {
+ 			u32 err_code = (stat >> 9) & 0x3;
+-			if (err_code == 2) /* No CRC response */
++			if (err_code == 2) { /* No CRC response */
++				dev_err(mmc_dev(host->mmc),
++					"%s: No CRC -ETIMEDOUT\n", __func__);
+ 				data->error = -ETIMEDOUT;
+-			else
++			} else {
++				dev_err(mmc_dev(host->mmc),
++					"%s: -EILSEQ\n", __func__);
+ 				data->error = -EILSEQ;
++			}
+ 		} else if (stat & STATUS_TIME_OUT_READ) {
++			dev_err(mmc_dev(host->mmc),
++				"%s: read -ETIMEDOUT\n", __func__);
+ 			data->error = -ETIMEDOUT;
+ 		} else {
++			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
+ 			data->error = -EIO;
+ 		}
+ 	} else {
+@@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
+ 	struct scatterlist *sg;
+ 	int stat, i;
+ 
+-	host->datasize = 0;
+-
+ 	host->data = data;
+ 	host->datasize = 0;
+ 
+-- 
+1.7.0
