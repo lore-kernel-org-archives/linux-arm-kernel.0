@@ -1,27 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 1 Apr 2010 08:08:44 +0200
-Subject: weirdness with compiling a 2.6.33 kernel on arm debian
-In-Reply-To: <25ae2d691003260312h62b7f853s99a2fa483a6a0847@mail.gmail.com>
-References: <25ae2d691003051958x72040b47g29d842f1d389a6cf@mail.gmail.com>
-	<19346.6765.457769.167118@pilspetsen.it.uu.se>
-	<25ae2d691003060224x67ab1c9au5102c8a22518aff@mail.gmail.com>
-	<20100311133353.GC25011@n2100.arm.linux.org.uk>
-	<20100315010238.GJ6491@shareable.org>
-	<25ae2d691003260312h62b7f853s99a2fa483a6a0847@mail.gmail.com>
-Message-ID: <20100401060844.GB1329@ucw.cz>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 1 Apr 2010 09:26:06 +0300
+Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
+	<20100325184316.GB20512@gw.healthdatacare.com>
+	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+Message-ID: <20100401062606.GA7708@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2010-03-26 21:12:34, dave b wrote:
-> I believe that the 2.6.32.7 kernel I compiled and was using on the
-> device while compiling the 2.6.33 kernel had *issues* (although most
-> likely not kernel related). In particular various issues (apt-get not
-> working) including on one piece of hardware using the kernel binary as
-> produced by others.
+On Thu, Apr 01, 2010 at 01:15:20AM +0100, Martin Guy wrote:
+> On 3/25/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> >  > > This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+> >  > >  in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
+> >  > >
+> >  > >  Driver currently supports only interrupt driven mode but in future we may add
+> >  > >  polling mode support as well.
+> 
+> I've been staring more at this again and it looks (2 clock
+> strangenesses and extensive control reg setting apart) like good code.
 
-Interesting. I remember apt-get failing recently; I thought my
-databases went corrupt, but then it started to work magically...
+Thanks :)
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> I have another question: like the Cirrus driver, this takes 100% CPU
+> doing busy wait for the current transfer to complete.
+
+Well it sleeps in ep93xx_spi_process_transfer() while current
+transfer is complete. It shouldn't busy wait. At least that was not
+my intention. If you have lot of data to transfer (for example while
+using mmc_spi), the driver will be very busy.
+
+But I can take a look on this and see if there is something wrong.
+
+> Given that this driver is interrupt-based, is there any reason why it
+> can't do something else in the meanwhile?
+
+I had an idea that the driver could keep SPI controller interrupts
+enabled and start next transfer in interrupt handler but I didn't
+implement that yet, because first I wanted a driver that works.
+
+> Not that that's a reason not to include it in 2.6.35 - it works well
+> and we can think whether to make it more efficient in N+1...
+
+Yeah, maybe we can optimize that later.
+
+Thank you very much. It is good to hear that someone (else than me)
+has been using this :)
+
+Regards,
+MW
