@@ -1,100 +1,39 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu,  1 Apr 2010 10:03:25 +0200
-Subject: [PATCH 3/3] ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
-	handling
-In-Reply-To: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
-References: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1270109005-9007-3-git-send-email-daniel@caiaq.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu,  1 Apr 2010 11:48:56 +0200
+Subject: [PATCH] AT91: at91sam9g10 chip identification changed
+Message-ID: <1270115336-19488-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX3 SoCs have a silicon bug which corrupts CRC calculation of
-multi-block transfers when connected SDIO peripheral doesn't drive the
-BUSY line as required by the specs.
+A bit in the at91sam9g10 identification number changed between Engineering
+Sample and final product. This patch will identify both as being at91sam9g10.
 
-One way to prevent this is to only allow 1-bit transfers.
-
-Another way is playing tricks with the DMA engine, but this isn't
-mainline yet. So for now, we live with the performance drawback of 1-bit
-transfers until a nicer solution is found.
-
-This patch introduces a new host controller callback 'init_card' which
-is for now only called from mmc_sdio_init_card().
-
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Volker Ernst <volker.ernst@txtr.com>
-Cc: Jiri Kosina <jkosina@suse.cz>
-Cc: Micha? Miros?aw <mirqus@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/mmc/core/sdio.c   |    6 ++++++
- drivers/mmc/host/mxcmmc.c |   16 ++++++++++++++++
- include/linux/mmc/host.h  |    3 +++
- 3 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/include/mach/cpu.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
-index 2dd4cfe..b9dee28 100644
---- a/drivers/mmc/core/sdio.c
-+++ b/drivers/mmc/core/sdio.c
-@@ -296,6 +296,12 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
- 	card->type = MMC_TYPE_SDIO;
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+index 5a06501..833659d 100644
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ b/arch/arm/mach-at91/include/mach/cpu.h
+@@ -21,7 +21,7 @@
+ #define ARCH_ID_AT91SAM9260	0x019803a0
+ #define ARCH_ID_AT91SAM9261	0x019703a0
+ #define ARCH_ID_AT91SAM9263	0x019607a0
+-#define ARCH_ID_AT91SAM9G10	0x819903a0
++#define ARCH_ID_AT91SAM9G10	0x019903a0
+ #define ARCH_ID_AT91SAM9G20	0x019905a0
+ #define ARCH_ID_AT91SAM9RL64	0x019b03a0
+ #define ARCH_ID_AT91SAM9G45	0x819b05a0
+@@ -108,7 +108,7 @@ static inline unsigned long at91cap9_rev_identify(void)
+ #endif
  
- 	/*
-+	 * Call the optional HC's init_card function to handle quirks.
-+	 */
-+	if (host->ops->init_card)
-+		host->ops->init_card(host, card);
-+
-+	/*
- 	 * For native busses:  set card RCA and quit open drain mode.
- 	 */
- 	if (!powered_resume && !mmc_host_is_spi(host)) {
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 51e880c..2c53024 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -724,11 +724,27 @@ static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	spin_unlock_irqrestore(&host->lock, flags);
- }
- 
-+static void mxcmci_init_card(struct mmc_host *host, struct mmc_card *card)
-+{
-+	/*
-+	 * MX3 SoCs have a silicon bug which corrupts CRC calculation of
-+	 * multi-block transfers when connected SDIO peripheral doesn't
-+	 * drive the BUSY line as required by the specs.
-+	 * One way to prevent this is to only allow 1-bit transfers.
-+	 */
-+
-+	if (cpu_is_mx3() && card->type == MMC_TYPE_SDIO)
-+		host->caps &= ~MMC_CAP_4_BIT_DATA;
-+	else
-+		host->caps |= MMC_CAP_4_BIT_DATA;
-+}
-+
- static const struct mmc_host_ops mxcmci_ops = {
- 	.request		= mxcmci_request,
- 	.set_ios		= mxcmci_set_ios,
- 	.get_ro			= mxcmci_get_ro,
- 	.enable_sdio_irq	= mxcmci_enable_sdio_irq,
-+	.init_card		= mxcmci_init_card,
- };
- 
- static int mxcmci_probe(struct platform_device *pdev)
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 43eaf5c..3196c84 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -108,6 +108,9 @@ struct mmc_host_ops {
- 	int	(*get_cd)(struct mmc_host *host);
- 
- 	void	(*enable_sdio_irq)(struct mmc_host *host, int enable);
-+
-+	/* optional callback for HC quirks */
-+	void	(*init_card)(struct mmc_host *host, struct mmc_card *card);
- };
- 
- struct mmc_card;
+ #ifdef CONFIG_ARCH_AT91SAM9G10
+-#define cpu_is_at91sam9g10()	(at91_cpu_identify() == ARCH_ID_AT91SAM9G10)
++#define cpu_is_at91sam9g10()	((at91_cpu_identify() & ~AT91_CIDR_EXT)	== ARCH_ID_AT91SAM9G10)
+ #else
+ #define cpu_is_at91sam9g10()	(0)
+ #endif
 -- 
-1.7.0
+1.5.6.5
