@@ -1,1598 +1,940 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 02 Apr 2010 08:48:49 +0200
-Subject: [PATCH 01/16] ARM: S5PC1xx rename registers to match plat-s5p style
+Date: Fri, 02 Apr 2010 08:48:54 +0200
+Subject: [PATCH 06/16] ARM: Samsung: move S5PC100 support from plat-s5pc1xx to
+	plat-s5p framework
 In-Reply-To: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1270190944-21644-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1270190944-21644-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for moving support for S5PC100 SoC to plat-s5p framework (part 1).
-Rename all clock registers to match plat-s5p style.
+This patch moves S5PC100 SoC support to plat-s5p framework. Only cpu, clocks
+and basic interrupts are supported. Other peripherals will be moved by separate
+patches.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pc100/include/mach/system.h     |    2 +-
- arch/arm/plat-s5pc1xx/clock.c                   |  190 ++++++------
- arch/arm/plat-s5pc1xx/include/plat/regs-clock.h |  366 +++++++++++-----------
- arch/arm/plat-s5pc1xx/s5pc100-clock.c           |  180 ++++++------
- 4 files changed, 369 insertions(+), 369 deletions(-)
+ arch/arm/Kconfig                                   |    9 +-
+ arch/arm/Makefile                                  |    3 +-
+ arch/arm/mach-s5pc100/Kconfig                      |   23 +---
+ arch/arm/mach-s5pc100/Makefile                     |    8 +-
+ arch/arm/mach-s5pc100/cpu.c                        |   65 ++++-----
+ arch/arm/mach-s5pc100/include/mach/debug-macro.S   |    6 +-
+ arch/arm/mach-s5pc100/include/mach/entry-macro.S   |    8 +-
+ arch/arm/mach-s5pc100/include/mach/irqs.h          |   99 ++++++++++++-
+ arch/arm/mach-s5pc100/include/mach/map.h           |  151 ++++---------------
+ arch/arm/mach-s5pc100/include/mach/regs-clock.h    |    7 +-
+ arch/arm/mach-s5pc100/include/mach/regs-irq.h      |    5 -
+ arch/arm/mach-s5pc100/include/mach/system.h        |    7 +-
+ arch/arm/mach-s5pc100/include/mach/tick.h          |    4 +-
+ .../s5pc100-init.c => mach-s5pc100/init.c}         |    5 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |   19 ++--
+ arch/arm/mach-s5pc100/setup-i2c0.c                 |   25 ++++
+ arch/arm/plat-s5p/Kconfig                          |    2 +-
+ arch/arm/plat-s5p/cpu.c                            |   10 ++
+ arch/arm/plat-s5p/include/plat/s5pc100.h           |   33 +++++
+ arch/arm/plat-samsung/Kconfig                      |    2 +-
+ 20 files changed, 267 insertions(+), 224 deletions(-)
+ rename arch/arm/{plat-s5pc1xx/s5pc100-init.c => mach-s5pc100/init.c} (73%)
+ create mode 100644 arch/arm/mach-s5pc100/setup-i2c0.c
+ create mode 100644 arch/arm/plat-s5p/include/plat/s5pc100.h
 
-diff --git a/arch/arm/mach-s5pc100/include/mach/system.h b/arch/arm/mach-s5pc100/include/mach/system.h
-index f0d31a2..09aea4d 100644
---- a/arch/arm/mach-s5pc100/include/mach/system.h
-+++ b/arch/arm/mach-s5pc100/include/mach/system.h
-@@ -25,7 +25,7 @@ static void arch_idle(void)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5408bf..d05f7de 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -694,14 +694,14 @@ config ARCH_S5P6442
+ 	help
+ 	  Samsung S5P6442 CPU based systems
  
- static void arch_reset(char mode, const char *cmd)
- {
--	__raw_writel(S5PC100_SWRESET_RESETVAL, S5PC100_SWRESET);
-+	__raw_writel(S5P_SWRESET_RESETVAL, S5P_SWRESET);
- 	return;
- }
- #endif /* __ASM_ARCH_IRQ_H */
-diff --git a/arch/arm/plat-s5pc1xx/clock.c b/arch/arm/plat-s5pc1xx/clock.c
-index 387f231..1a07dd5 100644
---- a/arch/arm/plat-s5pc1xx/clock.c
-+++ b/arch/arm/plat-s5pc1xx/clock.c
-@@ -39,13 +39,13 @@ static int clk_48m_ctrl(struct clk *clk, int enable)
- 	/* can't rely on clock lock, this register has other usages */
- 	local_irq_save(flags);
+-config ARCH_S5PC1XX
+-	bool "Samsung S5PC1XX"
++config ARCH_S5PC100
++	bool "Samsung S5PC100"
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select CPU_V7
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	help
+-	  Samsung S5PC1XX series based systems
++	  Samsung S5PC100 series based systems
  
--	val = __raw_readl(S5PC100_CLKSRC1);
-+	val = __raw_readl(S5P_CLK_SRC1);
- 	if (enable)
--		val |= S5PC100_CLKSRC1_CLK48M_MASK;
-+		val |= S5P_CLK_SRC1_CLK48M_MASK;
- 	else
--		val &= ~S5PC100_CLKSRC1_CLK48M_MASK;
-+		val &= ~S5P_CLK_SRC1_CLK48M_MASK;
+ config ARCH_S5PV210
+ 	bool "Samsung S5PV210/S5PC110"
+@@ -885,7 +885,6 @@ source "arch/arm/mach-sa1100/Kconfig"
+ source "arch/arm/plat-samsung/Kconfig"
+ source "arch/arm/plat-s3c24xx/Kconfig"
+ source "arch/arm/plat-s5p/Kconfig"
+-source "arch/arm/plat-s5pc1xx/Kconfig"
  
--	__raw_writel(val, S5PC100_CLKSRC1);
-+	__raw_writel(val, S5P_CLK_SRC1);
- 	local_irq_restore(flags);
+ if ARCH_S3C2410
+ source "arch/arm/mach-s3c2400/Kconfig"
+@@ -903,9 +902,7 @@ source "arch/arm/mach-s5p6440/Kconfig"
  
- 	return 0;
-@@ -99,62 +99,62 @@ static int s5pc1xx_clk_gate(void __iomem *reg, struct clk *clk, int enable)
+ source "arch/arm/mach-s5p6442/Kconfig"
  
- static int s5pc100_clk_d00_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D00, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D00, clk, enable);
- }
+-if ARCH_S5PC1XX
+ source "arch/arm/mach-s5pc100/Kconfig"
+-endif
  
- static int s5pc100_clk_d01_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D01, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D01, clk, enable);
- }
+ source "arch/arm/mach-s5pv210/Kconfig"
  
- static int s5pc100_clk_d02_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D02, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D02, clk, enable);
- }
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ed820e7..245ce3b 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -165,7 +165,7 @@ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+ machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
+ machine-$(CONFIG_ARCH_S5P6442)		:= s5p6442
+-machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
++machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+@@ -190,7 +190,6 @@ plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
+ plat-$(CONFIG_PLAT_ORION)	:= orion
+ plat-$(CONFIG_PLAT_PXA)		:= pxa
+ plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
+-plat-$(CONFIG_PLAT_S5PC1XX)	:= s5pc1xx samsung
+ plat-$(CONFIG_PLAT_S5P)		:= s5p samsung
  
- static int s5pc100_clk_d10_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D10, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D10, clk, enable);
- }
+ ifeq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 27ec167..54c83a4 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -2,33 +2,20 @@
+ #	Byungho Min <bhmin@samsung.com>
+ #
+ # Licensed under GPLv2
+-
+ # Configuration options for the S5PC100 CPU
  
- static int s5pc100_clk_d11_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D11, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D11, clk, enable);
- }
++if ARCH_S5PC100
++
+ config CPU_S5PC100
+ 	bool
+-	select CPU_S5PC100_INIT
+-	select CPU_S5PC100_CLOCK
++	select PLAT_S5P
+ 	help
+ 	  Enable S5PC100 CPU support
  
- static int s5pc100_clk_d12_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D12, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D12, clk, enable);
- }
+-config S5PC100_SETUP_SDHCI
+-        bool
+-        select S5PC1XX_SETUP_SDHCI_GPIO
+-        help
+-          Internal helper functions for S5PC100 based SDHCI systems
+-
+ config MACH_SMDKC100
+ 	bool "SMDKC100"
+ 	select CPU_S5PC100
+-	select S3C_DEV_FB
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC1
+-	select S3C_DEV_HSMMC2
+-	select S5PC1XX_SETUP_I2C0
+-	select S5PC1XX_SETUP_I2C1
+-	select S5PC1XX_SETUP_FB_24BPP
+-	select S5PC100_SETUP_SDHCI
+ 	help
+ 	  Machine support for the Samsung SMDKC100
++
++endif
+diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+index 809ff10..8371cfb 100644
+--- a/arch/arm/mach-s5pc100/Makefile
++++ b/arch/arm/mach-s5pc100/Makefile
+@@ -11,11 +11,9 @@ obj-				:=
  
- static int s5pc100_clk_d13_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D13, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D13, clk, enable);
- }
+ # Core support for S5PC100 system
  
- static int s5pc100_clk_d14_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D14, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D14, clk, enable);
- }
+-obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
+-
+-# Helper and device support
+-
+-obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
++obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
++obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
  
- static int s5pc100_clk_d15_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D15, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D15, clk, enable);
- }
+ # machine support
++
+ obj-$(CONFIG_MACH_SMDKC100)	+= mach-smdkc100.o
+diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+index d79e757..7d65b61 100644
+--- a/arch/arm/mach-s5pc100/cpu.c
++++ b/arch/arm/mach-s5pc100/cpu.c
+@@ -22,47 +22,51 @@
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
  
- static int s5pc100_clk_d20_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_CLKGATE_D20, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_CLKGATE_D20, clk, enable);
- }
+-#include <asm/proc-fns.h>
+-
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
  
- int s5pc100_sclk0_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_SCLKGATE0, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_SCLKGATE0, clk, enable);
- }
++#include <asm/proc-fns.h>
++
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+ #include <asm/irq.h>
  
- int s5pc100_sclk1_ctrl(struct clk *clk, int enable)
- {
--	return s5pc1xx_clk_gate(S5PC100_SCLKGATE1, clk, enable);
-+	return s5pc1xx_clk_gate(S5P_SCLKGATE1, clk, enable);
- }
+-#include <plat/cpu-freq.h>
+ #include <plat/regs-serial.h>
+-#include <plat/regs-power.h>
++#include <mach/regs-clock.h>
  
- static struct clk s5pc100_init_clocks_disable[] = {
-@@ -163,43 +163,43 @@ static struct clk s5pc100_init_clocks_disable[] = {
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_DSI,
-+		.ctrlbit	= S5P_CLKGATE_D11_DSI,
- 	}, {
- 		.name		= "csi",
- 		.id		= -1,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_CSI,
-+		.ctrlbit	= S5P_CLKGATE_D11_CSI,
- 	}, {
- 		.name		= "ccan",
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_CCAN0,
-+		.ctrlbit	= S5P_CLKGATE_D14_CCAN0,
- 	}, {
- 		.name		= "ccan",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_CCAN1,
-+		.ctrlbit	= S5P_CLKGATE_D14_CCAN1,
- 	}, {
- 		.name		= "keypad",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_KEYIF,
-+		.ctrlbit	= S5P_CLKGATE_D15_KEYIF,
- 	}, {
- 		.name		= "hclkd2",
- 		.id		= -1,
- 		.parent		= NULL,
- 		.enable		= s5pc100_clk_d20_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D20_HCLKD2,
-+		.ctrlbit	= S5P_CLKGATE_D20_HCLKD2,
- 	}, {
- 		.name		= "iis-d2",
- 		.id		= -1,
- 		.parent		= NULL,
- 		.enable		= s5pc100_clk_d20_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D20_I2SD2,
-+		.ctrlbit	= S5P_CLKGATE_D20_I2SD2,
- 	},
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/clock.h>
+-#include <plat/sdhci.h>
+-#include <plat/iic-core.h>
+ #include <plat/s5pc100.h>
+ 
+ /* Initial IO mappings */
+ 
+ static struct map_desc s5pc100_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
++		.pfn		= __phys_to_pfn(S5PC100_PA_SYSTIMER),
++		.length		= SZ_16K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)VA_VIC2,
++		.pfn		= __phys_to_pfn(S5PC100_PA_VIC2),
++		.length		= SZ_16K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5PC100_VA_OTHERS,
++		.pfn		= __phys_to_pfn(S5PC100_PA_OTHERS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}
  };
  
-@@ -210,43 +210,43 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_INTC,
-+		.ctrlbit	= S5P_CLKGATE_D00_INTC,
- 	}, {
- 		.name		= "tzic",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_TZIC,
-+		.ctrlbit	= S5P_CLKGATE_D00_TZIC,
- 	}, {
- 		.name		= "cf-ata",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_CFCON,
-+		.ctrlbit	= S5P_CLKGATE_D00_CFCON,
- 	}, {
- 		.name		= "mdma",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_MDMA,
-+		.ctrlbit	= S5P_CLKGATE_D00_MDMA,
- 	}, {
- 		.name		= "g2d",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_G2D,
-+		.ctrlbit	= S5P_CLKGATE_D00_G2D,
- 	}, {
- 		.name		= "secss",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_SECSS,
-+		.ctrlbit	= S5P_CLKGATE_D00_SECSS,
- 	}, {
- 		.name		= "cssys",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d00_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D00_CSSYS,
-+		.ctrlbit	= S5P_CLKGATE_D00_CSSYS,
- 	},
+ static void s5pc100_idle(void)
+ {
+-	unsigned long tmp;
+-
+-	tmp = __raw_readl(S5PC100_PWR_CFG);
+-	tmp &= ~S5PC100_PWRCFG_CFG_DEEP_IDLE;
+-	tmp &= ~S5PC100_PWRCFG_CFG_WFI_MASK;
+-	tmp |= S5PC100_PWRCFG_CFG_WFI_DEEP_IDLE;
+-	__raw_writel(tmp, S5PC100_PWR_CFG);
++	if (!need_resched())
++		cpu_do_idle();
  
- 	/* Memory (D0_1) devices */
-@@ -255,37 +255,37 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_DMC,
-+		.ctrlbit	= S5P_CLKGATE_D01_DMC,
- 	}, {
- 		.name		= "sromc",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_SROMC,
-+		.ctrlbit	= S5P_CLKGATE_D01_SROMC,
- 	}, {
- 		.name		= "onenand",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_ONENAND,
-+		.ctrlbit	= S5P_CLKGATE_D01_ONENAND,
- 	}, {
- 		.name		= "nand",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_NFCON,
-+		.ctrlbit	= S5P_CLKGATE_D01_NFCON,
- 	}, {
- 		.name		= "intmem",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_INTMEM,
-+		.ctrlbit	= S5P_CLKGATE_D01_INTMEM,
- 	}, {
- 		.name		= "ebi",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d01_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D01_EBI,
-+		.ctrlbit	= S5P_CLKGATE_D01_EBI,
- 	},
+-	tmp = __raw_readl(S5PC100_OTHERS);
+-	tmp |= S5PC100_PMU_INT_DISABLE;
+-	__raw_writel(tmp, S5PC100_OTHERS);
+-
+-	cpu_do_idle();
++	local_irq_enable();
+ }
  
- 	/* System2 (D0_2) devices */
-@@ -294,13 +294,13 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_pd0,
- 		.enable		= s5pc100_clk_d02_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D02_SECKEY,
-+		.ctrlbit	= S5P_CLKGATE_D02_SECKEY,
- 	}, {
- 		.name		= "sdm",
- 		.id		= -1,
- 		.parent		= &clk_hd0,
- 		.enable		= s5pc100_clk_d02_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D02_SDM,
-+		.ctrlbit	= S5P_CLKGATE_D02_SDM,
- 	},
+ /* s5pc100_map_io
+@@ -73,35 +77,27 @@ static void s5pc100_idle(void)
+ void __init s5pc100_map_io(void)
+ {
+ 	iotable_init(s5pc100_iodesc, ARRAY_SIZE(s5pc100_iodesc));
+-
+-	/* initialise device information early */
+-	s5pc100_default_sdhci0();
+-	s5pc100_default_sdhci1();
+-	s5pc100_default_sdhci2();
+-
+-	/* the i2c devices are directly compatible with s3c2440 */
+-	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
+ }
  
- 	/* File (D1_0) devices */
-@@ -309,49 +309,49 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= 0,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_PDMA0,
-+		.ctrlbit	= S5P_CLKGATE_D10_PDMA0,
- 	}, {
- 		.name		= "pdma",
- 		.id		= 1,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_PDMA1,
-+		.ctrlbit	= S5P_CLKGATE_D10_PDMA1,
- 	}, {
- 		.name		= "usb-host",
- 		.id		= -1,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_USBHOST,
-+		.ctrlbit	= S5P_CLKGATE_D10_USBHOST,
- 	}, {
- 		.name		= "otg",
- 		.id		= -1,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_USBOTG,
-+		.ctrlbit	= S5P_CLKGATE_D10_USBOTG,
- 	}, {
- 		.name		= "modem",
- 		.id		= -1,
- 		.parent		= &clk_h,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_MODEMIF,
-+		.ctrlbit	= S5P_CLKGATE_D10_MODEMIF,
- 	}, {
- 		.name		= "hsmmc",
- 		.id		= 0,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_HSMMC0,
-+		.ctrlbit	= S5P_CLKGATE_D10_HSMMC0,
- 	}, {
- 		.name		= "hsmmc",
- 		.id		= 1,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_HSMMC1,
-+		.ctrlbit	= S5P_CLKGATE_D10_HSMMC1,
- 	}, {
- 		.name		= "hsmmc",
- 		.id		= 2,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_clk_d10_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D10_HSMMC2,
-+		.ctrlbit	= S5P_CLKGATE_D10_HSMMC2,
- 	},
+ void __init s5pc100_init_clocks(int xtal)
+ {
+-	printk(KERN_DEBUG "%s: initialising clocks\n", __func__);
++	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
++
+ 	s3c24xx_register_baseclocks(xtal);
+-	s5pc1xx_register_clocks();
++	s5p_register_clocks(xtal);
+ 	s5pc100_register_clocks();
+ 	s5pc100_setup_clocks();
+ }
  
- 	/* Multimedia1 (D1_1) devices */
-@@ -360,43 +360,43 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_LCD,
-+		.ctrlbit	= S5P_CLKGATE_D11_LCD,
- 	}, {
- 		.name		= "rotator",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_ROTATOR,
-+		.ctrlbit	= S5P_CLKGATE_D11_ROTATOR,
- 	}, {
- 		.name		= "fimc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_FIMC0,
-+		.ctrlbit	= S5P_CLKGATE_D11_FIMC0,
- 	}, {
- 		.name		= "fimc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_FIMC1,
-+		.ctrlbit	= S5P_CLKGATE_D11_FIMC1,
- 	}, {
- 		.name		= "fimc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_FIMC2,
-+		.ctrlbit	= S5P_CLKGATE_D11_FIMC2,
- 	}, {
- 		.name		= "jpeg",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_JPEG,
-+		.ctrlbit	= S5P_CLKGATE_D11_JPEG,
- 	}, {
- 		.name		= "g3d",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d11_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D11_G3D,
-+		.ctrlbit	= S5P_CLKGATE_D11_G3D,
- 	},
+ void __init s5pc100_init_irq(void)
+ {
+-	u32 vic_valid[] = {~0, ~0, ~0};
++	u32 vic[] = {~0, ~0, ~0};
  
- 	/* Multimedia2 (D1_2) devices */
-@@ -405,31 +405,31 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d12_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D12_TV,
-+		.ctrlbit	= S5P_CLKGATE_D12_TV,
- 	}, {
- 		.name		= "vp",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d12_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D12_VP,
-+		.ctrlbit	= S5P_CLKGATE_D12_VP,
- 	}, {
- 		.name		= "mixer",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d12_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D12_MIXER,
-+		.ctrlbit	= S5P_CLKGATE_D12_MIXER,
- 	}, {
- 		.name		= "hdmi",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d12_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D12_HDMI,
-+		.ctrlbit	= S5P_CLKGATE_D12_HDMI,
- 	}, {
- 		.name		= "mfc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d12_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D12_MFC,
-+		.ctrlbit	= S5P_CLKGATE_D12_MFC,
- 	},
+ 	/* VIC0, VIC1, and VIC2 are fully populated. */
+-	s5pc1xx_init_irq(vic_valid, ARRAY_SIZE(vic_valid));
++	s5p_init_irq(vic, ARRAY_SIZE(vic));
+ }
  
- 	/* System (D1_3) devices */
-@@ -438,49 +438,49 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_CHIPID,
-+		.ctrlbit	= S5P_CLKGATE_D13_CHIPID,
- 	}, {
- 		.name		= "gpio",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_GPIO,
-+		.ctrlbit	= S5P_CLKGATE_D13_GPIO,
- 	}, {
- 		.name		= "apc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_APC,
-+		.ctrlbit	= S5P_CLKGATE_D13_APC,
- 	}, {
- 		.name		= "iec",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_IEC,
-+		.ctrlbit	= S5P_CLKGATE_D13_IEC,
- 	}, {
- 		.name		= "timers",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_PWM,
-+		.ctrlbit	= S5P_CLKGATE_D13_PWM,
- 	}, {
- 		.name		= "systimer",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_SYSTIMER,
-+		.ctrlbit	= S5P_CLKGATE_D13_SYSTIMER,
- 	}, {
- 		.name		= "watchdog",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_WDT,
-+		.ctrlbit	= S5P_CLKGATE_D13_WDT,
- 	}, {
- 		.name		= "rtc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d13_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D13_RTC,
-+		.ctrlbit	= S5P_CLKGATE_D13_RTC,
- 	},
- 
- 	/* Connectivity (D1_4) devices */
-@@ -489,73 +489,73 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_UART0,
-+		.ctrlbit	= S5P_CLKGATE_D14_UART0,
- 	}, {
- 		.name		= "uart",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_UART1,
-+		.ctrlbit	= S5P_CLKGATE_D14_UART1,
- 	}, {
- 		.name		= "uart",
- 		.id		= 2,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_UART2,
-+		.ctrlbit	= S5P_CLKGATE_D14_UART2,
- 	}, {
- 		.name		= "uart",
- 		.id		= 3,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_UART3,
-+		.ctrlbit	= S5P_CLKGATE_D14_UART3,
- 	}, {
- 		.name		= "i2c",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_IIC,
-+		.ctrlbit	= S5P_CLKGATE_D14_IIC,
- 	}, {
- 		.name		= "hdmi-i2c",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_HDMI_IIC,
-+		.ctrlbit	= S5P_CLKGATE_D14_HDMI_IIC,
- 	}, {
- 		.name		= "spi",
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_SPI0,
-+		.ctrlbit	= S5P_CLKGATE_D14_SPI0,
- 	}, {
- 		.name		= "spi",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_SPI1,
-+		.ctrlbit	= S5P_CLKGATE_D14_SPI1,
- 	}, {
- 		.name		= "spi",
- 		.id		= 2,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_SPI2,
-+		.ctrlbit	= S5P_CLKGATE_D14_SPI2,
- 	}, {
- 		.name		= "irda",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_IRDA,
-+		.ctrlbit	= S5P_CLKGATE_D14_IRDA,
- 	}, {
- 		.name		= "hsitx",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_HSITX,
-+		.ctrlbit	= S5P_CLKGATE_D14_HSITX,
- 	}, {
- 		.name		= "hsirx",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d14_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D14_HSIRX,
-+		.ctrlbit	= S5P_CLKGATE_D14_HSIRX,
- 	},
- 
- 	/* Audio (D1_5) devices */
-@@ -564,55 +564,55 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_IIS0,
-+		.ctrlbit	= S5P_CLKGATE_D15_IIS0,
- 	}, {
- 		.name		= "iis",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_IIS1,
-+		.ctrlbit	= S5P_CLKGATE_D15_IIS1,
- 	}, {
- 		.name		= "iis",
- 		.id		= 2,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_IIS2,
-+		.ctrlbit	= S5P_CLKGATE_D15_IIS2,
- 	}, {
- 		.name		= "ac97",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_AC97,
-+		.ctrlbit	= S5P_CLKGATE_D15_AC97,
- 	}, {
- 		.name		= "pcm",
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_PCM0,
-+		.ctrlbit	= S5P_CLKGATE_D15_PCM0,
- 	}, {
- 		.name		= "pcm",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_PCM1,
-+		.ctrlbit	= S5P_CLKGATE_D15_PCM1,
- 	}, {
- 		.name		= "spdif",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_SPDIF,
-+		.ctrlbit	= S5P_CLKGATE_D15_SPDIF,
- 	}, {
- 		.name		= "adc",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_TSADC,
-+		.ctrlbit	= S5P_CLKGATE_D15_TSADC,
- 	}, {
- 		.name		= "cg",
- 		.id		= -1,
- 		.parent		= &clk_p,
- 		.enable		= s5pc100_clk_d15_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_D15_CG,
-+		.ctrlbit	= S5P_CLKGATE_D15_CG,
- 	},
- 
- 	/* Audio (D2_0) devices: all disabled */
-@@ -623,49 +623,49 @@ static struct clk s5pc100_init_clocks[] = {
- 		.id		= -1,
- 		.parent		= NULL,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_HPM,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_HPM,
- 	}, {
- 		.name		= "sclk_onenand",
- 		.id		= -1,
- 		.parent		= NULL,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_ONENAND,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_ONENAND,
- 	}, {
- 		.name		= "spi_48",
- 		.id		= 0,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI0_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_SPI0_48,
- 	}, {
- 		.name		= "spi_48",
- 		.id		= 1,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI1_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_SPI1_48,
- 	}, {
- 		.name		= "spi_48",
- 		.id		= 2,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI2_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_SPI2_48,
- 	}, {
- 		.name		= "mmc_48",
- 		.id		= 0,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC0_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_MMC0_48,
- 	}, {
- 		.name		= "mmc_48",
- 		.id		= 1,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC1_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_MMC1_48,
- 	}, {
- 		.name		= "mmc_48",
- 		.id		= 2,
- 		.parent		= &clk_48m,
- 		.enable		= s5pc100_sclk0_ctrl,
--		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC2_48,
-+		.ctrlbit	= S5P_CLKGATE_SCLK0_MMC2_48,
- 	},
- 	/* Special Clocks 1 */
+-struct sysdev_class s5pc100_sysclass = {
++static struct sysdev_class s5pc100_sysclass = {
+ 	.name	= "s5pc100-core",
  };
-diff --git a/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h b/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h
-index 24dec4e..5c9c4cb 100644
---- a/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h
-+++ b/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h
-@@ -3,7 +3,7 @@
+ 
+@@ -118,9 +114,10 @@ core_initcall(s5pc100_core_init);
+ 
+ int __init s5pc100_init(void)
+ {
+-	printk(KERN_DEBUG "S5PC100: Initialising architecture\n");
++	printk(KERN_INFO "S5PC100: Initializing architecture\n");
+ 
+-	s5pc1xx_idle = s5pc100_idle;
++	/* set idle function */
++	pm_idle = s5pc100_idle;
+ 
+ 	return sysdev_register(&s5pc100_sysdev);
+ }
+diff --git a/arch/arm/mach-s5pc100/include/mach/debug-macro.S b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
+index e181f57..70e02e9 100644
+--- a/arch/arm/mach-s5pc100/include/mach/debug-macro.S
++++ b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
+@@ -22,12 +22,14 @@
+ 	 * aligned and add in the offset when we load the value here.
+ 	 */
+ 
+-	.macro addruart, rx, tmp
++	.macro addruart, rx, rtmp
+ 		mrc	p15, 0, \rx, c1, c0
+ 		tst	\rx, #1
+ 		ldreq	\rx, = S3C_PA_UART
+-		ldrne	\rx, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
++		ldrne	\rx, = S3C_VA_UART
++#if CONFIG_DEBUG_S3C_UART != 0
+ 		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
++#endif
+ 	.endm
+ 
+ /* include the reset of the code which will do the work, we're only
+diff --git a/arch/arm/mach-s5pc100/include/mach/entry-macro.S b/arch/arm/mach-s5pc100/include/mach/entry-macro.S
+index 6713193..ba76af0 100644
+--- a/arch/arm/mach-s5pc100/include/mach/entry-macro.S
++++ b/arch/arm/mach-s5pc100/include/mach/entry-macro.S
+@@ -20,7 +20,7 @@
+ 	.endm
+ 
+ 	.macro	get_irqnr_preamble, base, tmp
+-	ldr	\base, =S3C_VA_VIC0
++	ldr	\base, =VA_VIC0
+ 	.endm
+ 
+ 	.macro	arch_ret_to_user, tmp1, tmp2
+@@ -29,18 +29,18 @@
+ 	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+ 
+ 	@ check the vic0
+-	mov	\irqnr, # S3C_IRQ_OFFSET + 31
++	mov	\irqnr, # S5P_IRQ_OFFSET + 31
+ 	ldr	\irqstat, [ \base, # VIC_IRQ_STATUS ]
+ 	teq	\irqstat, #0
+ 
+ 	@ otherwise try vic1
+-	addeq	\tmp, \base, #(S3C_VA_VIC1 - S3C_VA_VIC0)
++	addeq	\tmp, \base, #(VA_VIC1 - VA_VIC0)
+ 	addeq	\irqnr, \irqnr, #32
+ 	ldreq	\irqstat, [ \tmp, # VIC_IRQ_STATUS ]
+ 	teqeq	\irqstat, #0
+ 
+ 	@ otherwise try vic2
+-	addeq	\tmp, \base, #(S3C_VA_VIC2 - S3C_VA_VIC0)
++	addeq	\tmp, \base, #(VA_VIC2 - VA_VIC0)
+ 	addeq	\irqnr, \irqnr, #32
+ 	ldreq	\irqstat, [ \tmp, # VIC_IRQ_STATUS ]
+ 	teqeq	\irqstat, #0
+diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
+index b53fa48..6789eeb 100644
+--- a/arch/arm/mach-s5pc100/include/mach/irqs.h
++++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+@@ -11,9 +11,98 @@
+ 
+ #include <plat/irqs.h>
+ 
+-/* LCD */
+-#define IRQ_LCD_FIFO		IRQ_LCD0
+-#define IRQ_LCD_VSYNC		IRQ_LCD1
+-#define IRQ_LCD_SYSTEM		IRQ_LCD2
++/* VIC0: system, DMA, timer */
++#define IRQ_EINT16_31		S5P_IRQ_VIC0(16)
++#define IRQ_BATF		S5P_IRQ_VIC0(17)
++#define IRQ_MDMA		S5P_IRQ_VIC0(18)
++#define IRQ_PDMA0		S5P_IRQ_VIC0(19)
++#define IRQ_PDMA1		S5P_IRQ_VIC0(20)
++#define IRQ_TIMER0_VIC		S5P_IRQ_VIC0(21)
++#define IRQ_TIMER1_VIC		S5P_IRQ_VIC0(22)
++#define IRQ_TIMER2_VIC		S5P_IRQ_VIC0(23)
++#define IRQ_TIMER3_VIC		S5P_IRQ_VIC0(24)
++#define IRQ_TIMER4_VIC		S5P_IRQ_VIC0(25)
++#define IRQ_SYSTIMER		S5P_IRQ_VIC0(26)
++#define IRQ_WDT			S5P_IRQ_VIC0(27)
++#define IRQ_RTC_ALARM		S5P_IRQ_VIC0(28)
++#define IRQ_RTC_TIC		S5P_IRQ_VIC0(29)
++#define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
+ 
+-#endif /* __ASM_ARCH_IRQ_H */
++/* VIC1: ARM, power, memory, connectivity */
++#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
++#define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
++#define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
++#define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
++#define IRQ_CORTEX4		S5P_IRQ_VIC1(4)
++#define IRQ_IEMAPC		S5P_IRQ_VIC1(5)
++#define IRQ_IEMIEC		S5P_IRQ_VIC1(6)
++#define IRQ_ONENAND		S5P_IRQ_VIC1(7)
++#define IRQ_NFC			S5P_IRQ_VIC1(8)
++#define IRQ_CFC			S5P_IRQ_VIC1(9)
++#define IRQ_UART0		S5P_IRQ_VIC1(10)
++#define IRQ_UART1		S5P_IRQ_VIC1(11)
++#define IRQ_UART2		S5P_IRQ_VIC1(12)
++#define IRQ_UART3		S5P_IRQ_VIC1(13)
++#define IRQ_IIC			S5P_IRQ_VIC1(14)
++#define IRQ_SPI0		S5P_IRQ_VIC1(15)
++#define IRQ_SPI1		S5P_IRQ_VIC1(16)
++#define IRQ_SPI2		S5P_IRQ_VIC1(17)
++#define IRQ_IRDA		S5P_IRQ_VIC1(18)
++#define IRQ_CAN0		S5P_IRQ_VIC1(19)
++#define IRQ_CAN1		S5P_IRQ_VIC1(20)
++#define IRQ_HSIRX		S5P_IRQ_VIC1(21)
++#define IRQ_HSITX		S5P_IRQ_VIC1(22)
++#define IRQ_UHOST		S5P_IRQ_VIC1(23)
++#define IRQ_OTG			S5P_IRQ_VIC1(24)
++#define IRQ_MSM			S5P_IRQ_VIC1(25)
++#define IRQ_HSMMC0		S5P_IRQ_VIC1(26)
++#define IRQ_HSMMC1		S5P_IRQ_VIC1(27)
++#define IRQ_HSMMC2		S5P_IRQ_VIC1(28)
++#define IRQ_MIPICSI		S5P_IRQ_VIC1(29)
++#define IRQ_MIPIDSI		S5P_IRQ_VIC1(30)
++
++/* VIC2: multimedia, audio, security */
++#define IRQ_LCD0		S5P_IRQ_VIC2(0)
++#define IRQ_LCD1		S5P_IRQ_VIC2(1)
++#define IRQ_LCD2		S5P_IRQ_VIC2(2)
++#define IRQ_LCD3		S5P_IRQ_VIC2(3)
++#define IRQ_ROTATOR		S5P_IRQ_VIC2(4)
++#define IRQ_FIMC0		S5P_IRQ_VIC2(5)
++#define IRQ_FIMC1		S5P_IRQ_VIC2(6)
++#define IRQ_FIMC2		S5P_IRQ_VIC2(7)
++#define IRQ_JPEG		S5P_IRQ_VIC2(8)
++#define IRQ_2D			S5P_IRQ_VIC2(9)
++#define IRQ_3D			S5P_IRQ_VIC2(10)
++#define IRQ_MIXER		S5P_IRQ_VIC2(11)
++#define IRQ_HDMI		S5P_IRQ_VIC2(12)
++#define IRQ_IIC1		S5P_IRQ_VIC2(13)
++#define IRQ_MFC			S5P_IRQ_VIC2(14)
++#define IRQ_TVENC		S5P_IRQ_VIC2(15)
++#define IRQ_I2S0		S5P_IRQ_VIC2(16)
++#define IRQ_I2S1		S5P_IRQ_VIC2(17)
++#define IRQ_I2S2		S5P_IRQ_VIC2(18)
++#define IRQ_AC97		S5P_IRQ_VIC2(19)
++#define IRQ_PCM0		S5P_IRQ_VIC2(20)
++#define IRQ_PCM1		S5P_IRQ_VIC2(21)
++#define IRQ_SPDIF		S5P_IRQ_VIC2(22)
++#define IRQ_ADC			S5P_IRQ_VIC2(23)
++#define IRQ_PENDN		S5P_IRQ_VIC2(24)
++#define IRQ_TC			IRQ_PENDN
++#define IRQ_KEYPAD		S5P_IRQ_VIC2(25)
++#define IRQ_CG			S5P_IRQ_VIC2(26)
++#define IRQ_SEC			S5P_IRQ_VIC2(27)
++#define IRQ_SECRX		S5P_IRQ_VIC2(28)
++#define IRQ_SECTX		S5P_IRQ_VIC2(29)
++#define IRQ_SDMIRQ		S5P_IRQ_VIC2(30)
++#define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
++#define IRQ_VIC_END		S5P_IRQ_VIC2(31)
++
++#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
++
++#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
++					(S5P_IRQ_EINT_BASE + (x)-16))
++/* Set the default NR_IRQS */
++
++#define NR_IRQS		(IRQ_EINT(31) + 1)
++
++#endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index 4681ebe..a79b09f 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -3,9 +3,7 @@
   * Copyright 2009 Samsung Electronics Co.
   *	Byungho Min <bhmin@samsung.com>
   *
-- * S5PC1XX clock register definitions
-+ * S5PC100 clock register definitions
+- * Based on mach-s3c6400/include/mach/map.h
+- *
+- * S5PC1XX - Memory map definitions
++ * S5PC100 - Memory map definitions
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 as
-@@ -13,240 +13,240 @@
+@@ -16,135 +14,50 @@
+ #define __ASM_ARCH_MAP_H __FILE__
+ 
+ #include <plat/map-base.h>
++#include <plat/map-s5p.h>
+ 
+-/*
+- * map-base.h has already defined virtual memory address
+- * S3C_VA_IRQ		S3C_ADDR(0x00000000)	irq controller(s)
+- * S3C_VA_SYS		S3C_ADDR(0x00100000)	system control
+- * S3C_VA_MEM		S3C_ADDR(0x00200000)	system control (not used)
+- * S3C_VA_TIMER		S3C_ADDR(0x00300000)	timer block
+- * S3C_VA_WATCHDOG	S3C_ADDR(0x00400000)	watchdog
+- * S3C_VA_UART		S3C_ADDR(0x01000000)	UART
+- *
+- * S5PC100 specific virtual memory address can be defined here
+- * S5PC1XX_VA_GPIO	S3C_ADDR(0x00500000)	GPIO
+- *
+- */
+-
+-/* Chip ID */
+ #define S5PC100_PA_CHIPID	(0xE0000000)
+-#define S5PC1XX_PA_CHIPID	S5PC100_PA_CHIPID
+-#define S5PC1XX_VA_CHIPID	S3C_VA_SYS
+-
+-/* System */
+-#define S5PC100_PA_CLK		(0xE0100000)
+-#define S5PC100_PA_CLK_OTHER	(0xE0200000)
+-#define S5PC100_PA_PWR		(0xE0108000)
+-#define S5PC1XX_PA_CLK		S5PC100_PA_CLK
+-#define S5PC1XX_PA_PWR		S5PC100_PA_PWR
+-#define S5PC1XX_PA_CLK_OTHER	S5PC100_PA_CLK_OTHER
+-#define S5PC1XX_VA_CLK		(S3C_VA_SYS + 0x10000)
+-#define S5PC1XX_VA_PWR		(S3C_VA_SYS + 0x20000)
+-#define S5PC1XX_VA_CLK_OTHER	(S3C_VA_SYS + 0x30000)
+-
+-/* GPIO */
+-#define S5PC100_PA_GPIO		(0xE0300000)
+-#define S5PC1XX_PA_GPIO		S5PC100_PA_GPIO
+-#define S5PC1XX_VA_GPIO		S3C_ADDR(0x00500000)
+-
+-/* Interrupt */
+-#define S5PC100_PA_VIC		(0xE4000000)
+-#define S5PC100_VA_VIC		S3C_VA_IRQ
+-#define S5PC100_PA_VIC_OFFSET	0x100000
+-#define S5PC100_VA_VIC_OFFSET	0x10000
+-#define S5PC1XX_PA_VIC(x)	(S5PC100_PA_VIC + ((x) * S5PC100_PA_VIC_OFFSET))
+-#define S5PC1XX_VA_VIC(x)	(S5PC100_VA_VIC + ((x) * S5PC100_VA_VIC_OFFSET))
+-
+-/* DMA */
+-#define S5PC100_PA_MDMA		(0xE8100000)
+-#define S5PC100_PA_PDMA0	(0xE9000000)
+-#define S5PC100_PA_PDMA1	(0xE9200000)
+-
+-/* Timer */
+-#define S5PC100_PA_TIMER	(0xEA000000)
+-#define S5PC1XX_PA_TIMER	S5PC100_PA_TIMER
+-#define S5PC1XX_VA_TIMER	S3C_VA_TIMER
++#define S5P_PA_CHIPID		S5PC100_PA_CHIPID
+ 
+-/* RTC */
+-#define S5PC100_PA_RTC		(0xEA300000)
++#define S5PC100_PA_SYSCON	(0xE0100000)
++#define S5P_PA_SYSCON		S5PC100_PA_SYSCON
+ 
+-/* UART */
+-#define S5PC100_PA_UART		(0xEC000000)
+-#define S5PC1XX_PA_UART		S5PC100_PA_UART
+-#define S5PC1XX_VA_UART		S3C_VA_UART
++#define S5PC100_PA_OTHERS	(0xE0200000)
++#define S5PC100_VA_OTHERS	(S3C_VA_SYS + 0x10000)
+ 
+-/* I2C */
+-#define S5PC100_PA_I2C		(0xEC100000)
+-#define S5PC100_PA_I2C1		(0xEC200000)
+ 
+-/* USB HS OTG */
+-#define S5PC100_PA_USB_HSOTG	(0xED200000)
+-#define S5PC100_PA_USB_HSPHY	(0xED300000)
++#define S5PC100_PA_GPIO		(0xE0300000)
++#define S5P_PA_GPIO		S5PC100_PA_GPIO
++
++#define S5PC100_PA_VIC0		(0xE4000000)
++#define S5P_PA_VIC0		S5PC100_PA_VIC0
++
++#define S5PC100_PA_VIC1		(0xE4100000)
++#define S5P_PA_VIC1		S5PC100_PA_VIC1
+ 
+-/* SD/MMC */
+-#define S5PC100_PA_HSMMC(x)	(0xED800000 + ((x) * 0x100000))
+-#define S5PC100_PA_HSMMC0	S5PC100_PA_HSMMC(0)
+-#define S5PC100_PA_HSMMC1	S5PC100_PA_HSMMC(1)
+-#define S5PC100_PA_HSMMC2	S5PC100_PA_HSMMC(2)
++#define S5PC100_PA_VIC2		(0xE4200000)
++#define S5P_PA_VIC2		S5PC100_PA_VIC2
+ 
+-/* LCD */
+-#define S5PC100_PA_FB		(0xEE000000)
++#define S5PC100_PA_TIMER	(0xEA000000)
++#define S5P_PA_TIMER		S5PC100_PA_TIMER
+ 
+-/* Multimedia */
+-#define S5PC100_PA_G2D		(0xEE800000)
+-#define S5PC100_PA_JPEG		(0xEE500000)
+-#define S5PC100_PA_ROTATOR	(0xEE100000)
+-#define S5PC100_PA_G3D		(0xEF000000)
++#define S5PC100_PA_SYSTIMER	(0xEA100000)
+ 
+-/* I2S */
+-#define S5PC100_PA_I2S0		(0xF2000000)
+-#define S5PC100_PA_I2S1		(0xF2100000)
+-#define S5PC100_PA_I2S2		(0xF2200000)
++#define S5PC100_PA_UART		(0xEC000000)
+ 
+-/* KEYPAD */
+-#define S5PC100_PA_KEYPAD	(0xF3100000)
++#define S5P_PA_UART0		(S5PC100_PA_UART + 0x0)
++#define S5P_PA_UART1		(S5PC100_PA_UART + 0x400)
++#define S5P_PA_UART2		(S5PC100_PA_UART + 0x800)
++#define S5P_PA_UART3		(S5PC100_PA_UART + 0xC00)
++#define S5P_SZ_UART		SZ_256
+ 
+-/* ADC & TouchScreen */
+-#define S5PC100_PA_TSADC	(0xF3000000)
++#define S5PC100_PA_IIC0		(0xEC100000)
+ 
+-/* ETC */
+ #define S5PC100_PA_SDRAM	(0x20000000)
+-#define S5PC1XX_PA_SDRAM	S5PC100_PA_SDRAM
++#define S5P_PA_SDRAM		S5PC100_PA_SDRAM
+ 
+-/* compatibility defines. */
+-#define S3C_PA_RTC		S5PC100_PA_RTC
++/* compatibiltiy defines. */
+ #define S3C_PA_UART		S5PC100_PA_UART
+-#define S3C_PA_UART0		(S5PC100_PA_UART + 0x0)
+-#define S3C_PA_UART1		(S5PC100_PA_UART + 0x400)
+-#define S3C_PA_UART2		(S5PC100_PA_UART + 0x800)
+-#define S3C_PA_UART3		(S5PC100_PA_UART + 0xC00)
+-#define S3C_VA_UART0		(S3C_VA_UART + 0x0)
+-#define S3C_VA_UART1		(S3C_VA_UART + 0x400)
+-#define S3C_VA_UART2		(S3C_VA_UART + 0x800)
+-#define S3C_VA_UART3		(S3C_VA_UART + 0xC00)
+-#define S3C_UART_OFFSET		0x400
+-#define S3C_VA_UARTx(x)		(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+-#define S3C_PA_FB		S5PC100_PA_FB
+-#define S3C_PA_G2D		S5PC100_PA_G2D
+-#define S3C_PA_G3D		S5PC100_PA_G3D
+-#define S3C_PA_JPEG		S5PC100_PA_JPEG
+-#define S3C_PA_ROTATOR		S5PC100_PA_ROTATOR
+-#define S3C_VA_VIC0		(S3C_VA_IRQ + 0x0)
+-#define S3C_VA_VIC1		(S3C_VA_IRQ + 0x10000)
+-#define S3C_VA_VIC2		(S3C_VA_IRQ + 0x20000)
+-#define S3C_PA_IIC		S5PC100_PA_I2C
+-#define S3C_PA_IIC1		S5PC100_PA_I2C1
+-#define S3C_PA_USB_HSOTG	S5PC100_PA_USB_HSOTG
+-#define S3C_PA_USB_HSPHY	S5PC100_PA_USB_HSPHY
+-#define S3C_PA_HSMMC0		S5PC100_PA_HSMMC0
+-#define S3C_PA_HSMMC1		S5PC100_PA_HSMMC1
+-#define S3C_PA_HSMMC2		S5PC100_PA_HSMMC2
+-#define S3C_PA_KEYPAD		S5PC100_PA_KEYPAD
+-#define S3C_PA_TSADC		S5PC100_PA_TSADC
+-
+-#endif /* __ASM_ARCH_C100_MAP_H */
++#define S3C_PA_IIC		S5PC100_PA_IIC0
++
++#endif /* __ASM_ARCH_MAP_H */
+diff --git a/arch/arm/mach-s5pc100/include/mach/regs-clock.h b/arch/arm/mach-s5pc100/include/mach/regs-clock.h
+index 5c9c4cb..7f4c142 100644
+--- a/arch/arm/mach-s5pc100/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5pc100/include/mach/regs-clock.h
+@@ -13,8 +13,11 @@
  #ifndef __PLAT_REGS_CLOCK_H
  #define __PLAT_REGS_CLOCK_H __FILE__
  
--#define S5PC100_CLKREG(x)		(S5PC1XX_VA_CLK + (x))
--#define S5PC100_CLKREG_OTHER(x)		(S5PC1XX_VA_CLK_OTHER + (x))
-+#define S5P_CLKREG(x)		(S5PC1XX_VA_CLK + (x))
-+#define S5PC100_REG_OTHERS(x)	(S5PC1XX_VA_CLK_OTHER + (x))
+-#define S5P_CLKREG(x)		(S5PC1XX_VA_CLK + (x))
+-#define S5PC100_REG_OTHERS(x)	(S5PC1XX_VA_CLK_OTHER + (x))
++#include <mach/map.h>
++
++#define S5P_CLKREG(x)		(S3C_VA_SYS + (x))
++
++#define S5PC100_REG_OTHERS(x)	(S5PC100_VA_OTHERS + (x))
  
  /* s5pc100 register for clock */
--#define S5PC100_APLL_LOCK		S5PC100_CLKREG(0x00)
--#define S5PC100_MPLL_LOCK		S5PC100_CLKREG(0x04)
--#define S5PC100_EPLL_LOCK		S5PC100_CLKREG(0x08)
--#define S5PC100_HPLL_LOCK		S5PC100_CLKREG(0x0C)
-+#define S5P_APLL_LOCK		S5P_CLKREG(0x00)
-+#define S5P_MPLL_LOCK		S5P_CLKREG(0x04)
-+#define S5P_EPLL_LOCK		S5P_CLKREG(0x08)
-+#define S5P_HPLL_LOCK		S5P_CLKREG(0x0C)
+ #define S5P_APLL_LOCK		S5P_CLKREG(0x00)
+diff --git a/arch/arm/mach-s5pc100/include/mach/regs-irq.h b/arch/arm/mach-s5pc100/include/mach/regs-irq.h
+index 751ac15..d19f33e 100644
+--- a/arch/arm/mach-s5pc100/include/mach/regs-irq.h
++++ b/arch/arm/mach-s5pc100/include/mach/regs-irq.h
+@@ -16,9 +16,4 @@
+ #include <mach/map.h>
+ #include <asm/hardware/vic.h>
  
--#define S5PC100_APLL_CON		S5PC100_CLKREG(0x100)
--#define S5PC100_MPLL_CON		S5PC100_CLKREG(0x104)
--#define S5PC100_EPLL_CON		S5PC100_CLKREG(0x108)
--#define S5PC100_HPLL_CON		S5PC100_CLKREG(0x10C)
-+#define S5P_APLL_CON		S5P_CLKREG(0x100)
-+#define S5P_MPLL_CON		S5P_CLKREG(0x104)
-+#define S5P_EPLL_CON		S5P_CLKREG(0x108)
-+#define S5P_HPLL_CON		S5P_CLKREG(0x10C)
- 
--#define S5PC100_CLKSRC0			S5PC100_CLKREG(0x200)
--#define S5PC100_CLKSRC1			S5PC100_CLKREG(0x204)
--#define S5PC100_CLKSRC2			S5PC100_CLKREG(0x208)
--#define S5PC100_CLKSRC3			S5PC100_CLKREG(0x20C)
-+#define S5P_CLK_SRC0		S5P_CLKREG(0x200)
-+#define S5P_CLK_SRC1		S5P_CLKREG(0x204)
-+#define S5P_CLK_SRC2		S5P_CLKREG(0x208)
-+#define S5P_CLK_SRC3		S5P_CLKREG(0x20C)
- 
--#define S5PC100_CLKDIV0			S5PC100_CLKREG(0x300)
--#define S5PC100_CLKDIV1			S5PC100_CLKREG(0x304)
--#define S5PC100_CLKDIV2			S5PC100_CLKREG(0x308)
--#define S5PC100_CLKDIV3			S5PC100_CLKREG(0x30C)
--#define S5PC100_CLKDIV4			S5PC100_CLKREG(0x310)
-+#define S5P_CLK_DIV0		S5P_CLKREG(0x300)
-+#define S5P_CLK_DIV1		S5P_CLKREG(0x304)
-+#define S5P_CLK_DIV2		S5P_CLKREG(0x308)
-+#define S5P_CLK_DIV3		S5P_CLKREG(0x30C)
-+#define S5P_CLK_DIV4		S5P_CLKREG(0x310)
- 
--#define S5PC100_CLK_OUT			S5PC100_CLKREG(0x400)
-+#define S5P_CLK_OUT		S5P_CLKREG(0x400)
- 
--#define S5PC100_CLKGATE_D00		S5PC100_CLKREG(0x500)
--#define S5PC100_CLKGATE_D01		S5PC100_CLKREG(0x504)
--#define S5PC100_CLKGATE_D02		S5PC100_CLKREG(0x508)
-+#define S5P_CLKGATE_D00		S5P_CLKREG(0x500)
-+#define S5P_CLKGATE_D01		S5P_CLKREG(0x504)
-+#define S5P_CLKGATE_D02		S5P_CLKREG(0x508)
- 
--#define S5PC100_CLKGATE_D10		S5PC100_CLKREG(0x520)
--#define S5PC100_CLKGATE_D11		S5PC100_CLKREG(0x524)
--#define S5PC100_CLKGATE_D12		S5PC100_CLKREG(0x528)
--#define S5PC100_CLKGATE_D13		S5PC100_CLKREG(0x52C)
--#define S5PC100_CLKGATE_D14		S5PC100_CLKREG(0x530)
--#define S5PC100_CLKGATE_D15		S5PC100_CLKREG(0x534)
-+#define S5P_CLKGATE_D10		S5P_CLKREG(0x520)
-+#define S5P_CLKGATE_D11		S5P_CLKREG(0x524)
-+#define S5P_CLKGATE_D12		S5P_CLKREG(0x528)
-+#define S5P_CLKGATE_D13		S5P_CLKREG(0x52C)
-+#define S5P_CLKGATE_D14		S5P_CLKREG(0x530)
-+#define S5P_CLKGATE_D15		S5P_CLKREG(0x534)
- 
--#define S5PC100_CLKGATE_D20		S5PC100_CLKREG(0x540)
-+#define S5P_CLKGATE_D20		S5P_CLKREG(0x540)
- 
--#define S5PC100_SCLKGATE0		S5PC100_CLKREG(0x560)
--#define S5PC100_SCLKGATE1		S5PC100_CLKREG(0x564)
-+#define S5P_SCLKGATE0		S5P_CLKREG(0x560)
-+#define S5P_SCLKGATE1		S5P_CLKREG(0x564)
- 
- /* EPLL_CON */
--#define S5PC100_EPLL_EN			(1<<31)
--#define S5PC100_EPLL_MASK		0xffffffff
--#define S5PC100_EPLLVAL(_m, _p, _s)	((_m) << 16 | ((_p) << 8) | ((_s)))
-+#define S5P_EPLL_EN		(1<<31)
-+#define S5P_EPLL_MASK		0xffffffff
-+#define S5P_EPLLVAL(_m, _p, _s)	((_m) << 16 | ((_p) << 8) | ((_s)))
- 
- /* CLKSRC0..CLKSRC3 -> mostly removed due to clksrc updates */
--#define S5PC100_CLKSRC1_CLK48M_MASK	(0x1<<24)
--#define S5PC100_CLKSRC1_CLK48M_SHIFT	(24)
-+#define S5P_CLK_SRC1_CLK48M_MASK	(0x1<<24)
-+#define S5P_CLK_SRC1_CLK48M_SHIFT	(24)
- 
- /* CLKDIV0 */
--#define S5PC100_CLKDIV0_APLL_MASK		(0x1<<0)
--#define S5PC100_CLKDIV0_APLL_SHIFT		(0)
--#define S5PC100_CLKDIV0_ARM_MASK		(0x7<<4)
--#define S5PC100_CLKDIV0_ARM_SHIFT		(4)
--#define S5PC100_CLKDIV0_D0_MASK		(0x7<<8)
--#define S5PC100_CLKDIV0_D0_SHIFT		(8)
--#define S5PC100_CLKDIV0_PCLKD0_MASK		(0x7<<12)
--#define S5PC100_CLKDIV0_PCLKD0_SHIFT	(12)
--#define S5PC100_CLKDIV0_SECSS_MASK		(0x7<<16)
--#define S5PC100_CLKDIV0_SECSS_SHIFT		(16)
-+#define S5P_CLK_DIV0_APLL_MASK		(0x1<<0)
-+#define S5P_CLK_DIV0_APLL_SHIFT		(0)
-+#define S5P_CLK_DIV0_ARM_MASK		(0x7<<4)
-+#define S5P_CLK_DIV0_ARM_SHIFT		(4)
-+#define S5P_CLK_DIV0_D0_MASK		(0x7<<8)
-+#define S5P_CLK_DIV0_D0_SHIFT		(8)
-+#define S5P_CLK_DIV0_PCLKD0_MASK		(0x7<<12)
-+#define S5P_CLK_DIV0_PCLKD0_SHIFT	(12)
-+#define S5P_CLK_DIV0_SECSS_MASK		(0x7<<16)
-+#define S5P_CLK_DIV0_SECSS_SHIFT		(16)
- 
- /* CLKDIV1 (OneNAND clock only used in one place, removed) */
--#define S5PC100_CLKDIV1_APLL2_MASK		(0x7<<0)
--#define S5PC100_CLKDIV1_APLL2_SHIFT		(0)
--#define S5PC100_CLKDIV1_MPLL_MASK		(0x3<<4)
--#define S5PC100_CLKDIV1_MPLL_SHIFT		(4)
--#define S5PC100_CLKDIV1_MPLL2_MASK		(0x1<<8)
--#define S5PC100_CLKDIV1_MPLL2_SHIFT		(8)
--#define S5PC100_CLKDIV1_D1_MASK		(0x7<<12)
--#define S5PC100_CLKDIV1_D1_SHIFT		(12)
--#define S5PC100_CLKDIV1_PCLKD1_MASK		(0x7<<16)
--#define S5PC100_CLKDIV1_PCLKD1_SHIFT	(16)
--#define S5PC100_CLKDIV1_CAM_MASK		(0x1F<<24)
--#define S5PC100_CLKDIV1_CAM_SHIFT		(24)
-+#define S5P_CLK_DIV1_APLL2_MASK		(0x7<<0)
-+#define S5P_CLK_DIV1_APLL2_SHIFT		(0)
-+#define S5P_CLK_DIV1_MPLL_MASK		(0x3<<4)
-+#define S5P_CLK_DIV1_MPLL_SHIFT		(4)
-+#define S5P_CLK_DIV1_MPLL2_MASK		(0x1<<8)
-+#define S5P_CLK_DIV1_MPLL2_SHIFT		(8)
-+#define S5P_CLK_DIV1_D1_MASK		(0x7<<12)
-+#define S5P_CLK_DIV1_D1_SHIFT		(12)
-+#define S5P_CLK_DIV1_PCLKD1_MASK		(0x7<<16)
-+#define S5P_CLK_DIV1_PCLKD1_SHIFT	(16)
-+#define S5P_CLK_DIV1_CAM_MASK		(0x1F<<24)
-+#define S5P_CLK_DIV1_CAM_SHIFT		(24)
- 
- /* CLKDIV2 => removed in clksrc update */
- /* CLKDIV3 => removed in clksrc update, or not needed */
- /* CLKDIV4 => removed in clksrc update, or not needed */
- 
- /* HCLKD0/PCLKD0 Clock Gate 0 Registers */
--#define S5PC100_CLKGATE_D00_INTC		(1<<0)
--#define S5PC100_CLKGATE_D00_TZIC		(1<<1)
--#define S5PC100_CLKGATE_D00_CFCON		(1<<2)
--#define S5PC100_CLKGATE_D00_MDMA		(1<<3)
--#define S5PC100_CLKGATE_D00_G2D		(1<<4)
--#define S5PC100_CLKGATE_D00_SECSS		(1<<5)
--#define S5PC100_CLKGATE_D00_CSSYS		(1<<6)
-+#define S5P_CLKGATE_D00_INTC		(1<<0)
-+#define S5P_CLKGATE_D00_TZIC		(1<<1)
-+#define S5P_CLKGATE_D00_CFCON		(1<<2)
-+#define S5P_CLKGATE_D00_MDMA		(1<<3)
-+#define S5P_CLKGATE_D00_G2D		(1<<4)
-+#define S5P_CLKGATE_D00_SECSS		(1<<5)
-+#define S5P_CLKGATE_D00_CSSYS		(1<<6)
- 
- /* HCLKD0/PCLKD0 Clock Gate 1 Registers */
--#define S5PC100_CLKGATE_D01_DMC		(1<<0)
--#define S5PC100_CLKGATE_D01_SROMC		(1<<1)
--#define S5PC100_CLKGATE_D01_ONENAND		(1<<2)
--#define S5PC100_CLKGATE_D01_NFCON		(1<<3)
--#define S5PC100_CLKGATE_D01_INTMEM		(1<<4)
--#define S5PC100_CLKGATE_D01_EBI		(1<<5)
-+#define S5P_CLKGATE_D01_DMC		(1<<0)
-+#define S5P_CLKGATE_D01_SROMC		(1<<1)
-+#define S5P_CLKGATE_D01_ONENAND		(1<<2)
-+#define S5P_CLKGATE_D01_NFCON		(1<<3)
-+#define S5P_CLKGATE_D01_INTMEM		(1<<4)
-+#define S5P_CLKGATE_D01_EBI		(1<<5)
- 
- /* PCLKD0 Clock Gate 2 Registers */
--#define S5PC100_CLKGATE_D02_SECKEY		(1<<1)
--#define S5PC100_CLKGATE_D02_SDM		(1<<2)
-+#define S5P_CLKGATE_D02_SECKEY		(1<<1)
-+#define S5P_CLKGATE_D02_SDM		(1<<2)
- 
- /* HCLKD1/PCLKD1 Clock Gate 0 Registers */
--#define S5PC100_CLKGATE_D10_PDMA0		(1<<0)
--#define S5PC100_CLKGATE_D10_PDMA1		(1<<1)
--#define S5PC100_CLKGATE_D10_USBHOST		(1<<2)
--#define S5PC100_CLKGATE_D10_USBOTG		(1<<3)
--#define S5PC100_CLKGATE_D10_MODEMIF		(1<<4)
--#define S5PC100_CLKGATE_D10_HSMMC0		(1<<5)
--#define S5PC100_CLKGATE_D10_HSMMC1		(1<<6)
--#define S5PC100_CLKGATE_D10_HSMMC2		(1<<7)
-+#define S5P_CLKGATE_D10_PDMA0		(1<<0)
-+#define S5P_CLKGATE_D10_PDMA1		(1<<1)
-+#define S5P_CLKGATE_D10_USBHOST		(1<<2)
-+#define S5P_CLKGATE_D10_USBOTG		(1<<3)
-+#define S5P_CLKGATE_D10_MODEMIF		(1<<4)
-+#define S5P_CLKGATE_D10_HSMMC0		(1<<5)
-+#define S5P_CLKGATE_D10_HSMMC1		(1<<6)
-+#define S5P_CLKGATE_D10_HSMMC2		(1<<7)
- 
- /* HCLKD1/PCLKD1 Clock Gate 1 Registers */
--#define S5PC100_CLKGATE_D11_LCD		(1<<0)
--#define S5PC100_CLKGATE_D11_ROTATOR		(1<<1)
--#define S5PC100_CLKGATE_D11_FIMC0		(1<<2)
--#define S5PC100_CLKGATE_D11_FIMC1		(1<<3)
--#define S5PC100_CLKGATE_D11_FIMC2		(1<<4)
--#define S5PC100_CLKGATE_D11_JPEG		(1<<5)
--#define S5PC100_CLKGATE_D11_DSI		(1<<6)
--#define S5PC100_CLKGATE_D11_CSI		(1<<7)
--#define S5PC100_CLKGATE_D11_G3D		(1<<8)
-+#define S5P_CLKGATE_D11_LCD		(1<<0)
-+#define S5P_CLKGATE_D11_ROTATOR		(1<<1)
-+#define S5P_CLKGATE_D11_FIMC0		(1<<2)
-+#define S5P_CLKGATE_D11_FIMC1		(1<<3)
-+#define S5P_CLKGATE_D11_FIMC2		(1<<4)
-+#define S5P_CLKGATE_D11_JPEG		(1<<5)
-+#define S5P_CLKGATE_D11_DSI		(1<<6)
-+#define S5P_CLKGATE_D11_CSI		(1<<7)
-+#define S5P_CLKGATE_D11_G3D		(1<<8)
- 
- /* HCLKD1/PCLKD1 Clock Gate 2 Registers */
--#define S5PC100_CLKGATE_D12_TV		(1<<0)
--#define S5PC100_CLKGATE_D12_VP		(1<<1)
--#define S5PC100_CLKGATE_D12_MIXER		(1<<2)
--#define S5PC100_CLKGATE_D12_HDMI		(1<<3)
--#define S5PC100_CLKGATE_D12_MFC		(1<<4)
-+#define S5P_CLKGATE_D12_TV		(1<<0)
-+#define S5P_CLKGATE_D12_VP		(1<<1)
-+#define S5P_CLKGATE_D12_MIXER		(1<<2)
-+#define S5P_CLKGATE_D12_HDMI		(1<<3)
-+#define S5P_CLKGATE_D12_MFC		(1<<4)
- 
- /* HCLKD1/PCLKD1 Clock Gate 3 Registers */
--#define S5PC100_CLKGATE_D13_CHIPID		(1<<0)
--#define S5PC100_CLKGATE_D13_GPIO		(1<<1)
--#define S5PC100_CLKGATE_D13_APC		(1<<2)
--#define S5PC100_CLKGATE_D13_IEC		(1<<3)
--#define S5PC100_CLKGATE_D13_PWM		(1<<6)
--#define S5PC100_CLKGATE_D13_SYSTIMER	(1<<7)
--#define S5PC100_CLKGATE_D13_WDT		(1<<8)
--#define S5PC100_CLKGATE_D13_RTC		(1<<9)
-+#define S5P_CLKGATE_D13_CHIPID		(1<<0)
-+#define S5P_CLKGATE_D13_GPIO		(1<<1)
-+#define S5P_CLKGATE_D13_APC		(1<<2)
-+#define S5P_CLKGATE_D13_IEC		(1<<3)
-+#define S5P_CLKGATE_D13_PWM		(1<<6)
-+#define S5P_CLKGATE_D13_SYSTIMER	(1<<7)
-+#define S5P_CLKGATE_D13_WDT		(1<<8)
-+#define S5P_CLKGATE_D13_RTC		(1<<9)
- 
- /* HCLKD1/PCLKD1 Clock Gate 4 Registers */
--#define S5PC100_CLKGATE_D14_UART0		(1<<0)
--#define S5PC100_CLKGATE_D14_UART1		(1<<1)
--#define S5PC100_CLKGATE_D14_UART2		(1<<2)
--#define S5PC100_CLKGATE_D14_UART3		(1<<3)
--#define S5PC100_CLKGATE_D14_IIC		(1<<4)
--#define S5PC100_CLKGATE_D14_HDMI_IIC	(1<<5)
--#define S5PC100_CLKGATE_D14_SPI0		(1<<6)
--#define S5PC100_CLKGATE_D14_SPI1		(1<<7)
--#define S5PC100_CLKGATE_D14_SPI2		(1<<8)
--#define S5PC100_CLKGATE_D14_IRDA		(1<<9)
--#define S5PC100_CLKGATE_D14_CCAN0		(1<<10)
--#define S5PC100_CLKGATE_D14_CCAN1		(1<<11)
--#define S5PC100_CLKGATE_D14_HSITX		(1<<12)
--#define S5PC100_CLKGATE_D14_HSIRX		(1<<13)
-+#define S5P_CLKGATE_D14_UART0		(1<<0)
-+#define S5P_CLKGATE_D14_UART1		(1<<1)
-+#define S5P_CLKGATE_D14_UART2		(1<<2)
-+#define S5P_CLKGATE_D14_UART3		(1<<3)
-+#define S5P_CLKGATE_D14_IIC		(1<<4)
-+#define S5P_CLKGATE_D14_HDMI_IIC	(1<<5)
-+#define S5P_CLKGATE_D14_SPI0		(1<<6)
-+#define S5P_CLKGATE_D14_SPI1		(1<<7)
-+#define S5P_CLKGATE_D14_SPI2		(1<<8)
-+#define S5P_CLKGATE_D14_IRDA		(1<<9)
-+#define S5P_CLKGATE_D14_CCAN0		(1<<10)
-+#define S5P_CLKGATE_D14_CCAN1		(1<<11)
-+#define S5P_CLKGATE_D14_HSITX		(1<<12)
-+#define S5P_CLKGATE_D14_HSIRX		(1<<13)
- 
- /* HCLKD1/PCLKD1 Clock Gate 5 Registers */
--#define S5PC100_CLKGATE_D15_IIS0		(1<<0)
--#define S5PC100_CLKGATE_D15_IIS1		(1<<1)
--#define S5PC100_CLKGATE_D15_IIS2		(1<<2)
--#define S5PC100_CLKGATE_D15_AC97		(1<<3)
--#define S5PC100_CLKGATE_D15_PCM0		(1<<4)
--#define S5PC100_CLKGATE_D15_PCM1		(1<<5)
--#define S5PC100_CLKGATE_D15_SPDIF		(1<<6)
--#define S5PC100_CLKGATE_D15_TSADC		(1<<7)
--#define S5PC100_CLKGATE_D15_KEYIF		(1<<8)
--#define S5PC100_CLKGATE_D15_CG		(1<<9)
-+#define S5P_CLKGATE_D15_IIS0		(1<<0)
-+#define S5P_CLKGATE_D15_IIS1		(1<<1)
-+#define S5P_CLKGATE_D15_IIS2		(1<<2)
-+#define S5P_CLKGATE_D15_AC97		(1<<3)
-+#define S5P_CLKGATE_D15_PCM0		(1<<4)
-+#define S5P_CLKGATE_D15_PCM1		(1<<5)
-+#define S5P_CLKGATE_D15_SPDIF		(1<<6)
-+#define S5P_CLKGATE_D15_TSADC		(1<<7)
-+#define S5P_CLKGATE_D15_KEYIF		(1<<8)
-+#define S5P_CLKGATE_D15_CG		(1<<9)
- 
- /* HCLKD2 Clock Gate 0 Registers */
--#define S5PC100_CLKGATE_D20_HCLKD2		(1<<0)
--#define S5PC100_CLKGATE_D20_I2SD2		(1<<1)
-+#define S5P_CLKGATE_D20_HCLKD2		(1<<0)
-+#define S5P_CLKGATE_D20_I2SD2		(1<<1)
- 
- /* Special Clock Gate 0 Registers */
--#define	S5PC100_CLKGATE_SCLK0_HPM		(1<<0)
--#define	S5PC100_CLKGATE_SCLK0_PWI		(1<<1)
--#define	S5PC100_CLKGATE_SCLK0_ONENAND	(1<<2)
--#define	S5PC100_CLKGATE_SCLK0_UART		(1<<3)
--#define	S5PC100_CLKGATE_SCLK0_SPI0		(1<<4)
--#define	S5PC100_CLKGATE_SCLK0_SPI1		(1<<5)
--#define	S5PC100_CLKGATE_SCLK0_SPI2		(1<<6)
--#define	S5PC100_CLKGATE_SCLK0_SPI0_48	(1<<7)
--#define	S5PC100_CLKGATE_SCLK0_SPI1_48	(1<<8)
--#define	S5PC100_CLKGATE_SCLK0_SPI2_48	(1<<9)
--#define	S5PC100_CLKGATE_SCLK0_IRDA		(1<<10)
--#define	S5PC100_CLKGATE_SCLK0_USBHOST	(1<<11)
--#define	S5PC100_CLKGATE_SCLK0_MMC0		(1<<12)
--#define	S5PC100_CLKGATE_SCLK0_MMC1		(1<<13)
--#define	S5PC100_CLKGATE_SCLK0_MMC2		(1<<14)
--#define	S5PC100_CLKGATE_SCLK0_MMC0_48	(1<<15)
--#define	S5PC100_CLKGATE_SCLK0_MMC1_48	(1<<16)
--#define	S5PC100_CLKGATE_SCLK0_MMC2_48	(1<<17)
-+#define	S5P_CLKGATE_SCLK0_HPM		(1<<0)
-+#define	S5P_CLKGATE_SCLK0_PWI		(1<<1)
-+#define	S5P_CLKGATE_SCLK0_ONENAND	(1<<2)
-+#define	S5P_CLKGATE_SCLK0_UART		(1<<3)
-+#define	S5P_CLKGATE_SCLK0_SPI0		(1<<4)
-+#define	S5P_CLKGATE_SCLK0_SPI1		(1<<5)
-+#define	S5P_CLKGATE_SCLK0_SPI2		(1<<6)
-+#define	S5P_CLKGATE_SCLK0_SPI0_48	(1<<7)
-+#define	S5P_CLKGATE_SCLK0_SPI1_48	(1<<8)
-+#define	S5P_CLKGATE_SCLK0_SPI2_48	(1<<9)
-+#define	S5P_CLKGATE_SCLK0_IRDA		(1<<10)
-+#define	S5P_CLKGATE_SCLK0_USBHOST	(1<<11)
-+#define	S5P_CLKGATE_SCLK0_MMC0		(1<<12)
-+#define	S5P_CLKGATE_SCLK0_MMC1		(1<<13)
-+#define	S5P_CLKGATE_SCLK0_MMC2		(1<<14)
-+#define	S5P_CLKGATE_SCLK0_MMC0_48	(1<<15)
-+#define	S5P_CLKGATE_SCLK0_MMC1_48	(1<<16)
-+#define	S5P_CLKGATE_SCLK0_MMC2_48	(1<<17)
- 
- /* Special Clock Gate 1 Registers */
--#define	S5PC100_CLKGATE_SCLK1_LCD		(1<<0)
--#define	S5PC100_CLKGATE_SCLK1_FIMC0		(1<<1)
--#define	S5PC100_CLKGATE_SCLK1_FIMC1		(1<<2)
--#define	S5PC100_CLKGATE_SCLK1_FIMC2		(1<<3)
--#define	S5PC100_CLKGATE_SCLK1_TV54		(1<<4)
--#define	S5PC100_CLKGATE_SCLK1_VDAC54	(1<<5)
--#define	S5PC100_CLKGATE_SCLK1_MIXER		(1<<6)
--#define	S5PC100_CLKGATE_SCLK1_HDMI		(1<<7)
--#define	S5PC100_CLKGATE_SCLK1_AUDIO0	(1<<8)
--#define	S5PC100_CLKGATE_SCLK1_AUDIO1	(1<<9)
--#define	S5PC100_CLKGATE_SCLK1_AUDIO2	(1<<10)
--#define	S5PC100_CLKGATE_SCLK1_SPDIF		(1<<11)
--#define	S5PC100_CLKGATE_SCLK1_CAM		(1<<12)
+-/* interrupt controller */
+-#define S5PC1XX_VIC0REG(x)          		((x) + S5PC1XX_VA_VIC(0))
+-#define S5PC1XX_VIC1REG(x)          		((x) + S5PC1XX_VA_VIC(1))
+-#define S5PC1XX_VIC2REG(x)         		((x) + S5PC1XX_VA_VIC(2))
 -
--#define S5PC100_SWRESET		S5PC100_CLKREG_OTHER(0x000)
--#define S5PC100_OND_SWRESET	S5PC100_CLKREG_OTHER(0x008)
--#define S5PC100_GEN_CTRL	S5PC100_CLKREG_OTHER(0x100)
--#define S5PC100_GEN_STATUS	S5PC100_CLKREG_OTHER(0x104)
--#define S5PC100_MEM_SYS_CFG	S5PC100_CLKREG_OTHER(0x200)
--#define S5PC100_CAM_MUX_SEL	S5PC100_CLKREG_OTHER(0x300)
--#define S5PC100_MIXER_OUT_SEL	S5PC100_CLKREG_OTHER(0x304)
--#define S5PC100_LPMP_MODE_SEL	S5PC100_CLKREG_OTHER(0x308)
--#define S5PC100_MIPI_PHY_CON0	S5PC100_CLKREG_OTHER(0x400)
--#define S5PC100_MIPI_PHY_CON1	S5PC100_CLKREG_OTHER(0x414)
--#define S5PC100_HDMI_PHY_CON0	S5PC100_CLKREG_OTHER(0x420)
+ #endif /* __ASM_ARCH_REGS_IRQ_H */
+diff --git a/arch/arm/mach-s5pc100/include/mach/system.h b/arch/arm/mach-s5pc100/include/mach/system.h
+index 09aea4d..b247e8b 100644
+--- a/arch/arm/mach-s5pc100/include/mach/system.h
++++ b/arch/arm/mach-s5pc100/include/mach/system.h
+@@ -13,14 +13,11 @@
+ 
+ #include <linux/io.h>
+ #include <mach/map.h>
+-#include <plat/regs-clock.h>
 -
--#define S5PC100_SWRESET_RESETVAL	0xc100
--#define S5PC100_OTHER_SYS_INT	24
--#define S5PC100_OTHER_STA_TYPE	23
-+#define	S5P_CLKGATE_SCLK1_LCD		(1<<0)
-+#define	S5P_CLKGATE_SCLK1_FIMC0		(1<<1)
-+#define	S5P_CLKGATE_SCLK1_FIMC1		(1<<2)
-+#define	S5P_CLKGATE_SCLK1_FIMC2		(1<<3)
-+#define	S5P_CLKGATE_SCLK1_TV54		(1<<4)
-+#define	S5P_CLKGATE_SCLK1_VDAC54	(1<<5)
-+#define	S5P_CLKGATE_SCLK1_MIXER		(1<<6)
-+#define	S5P_CLKGATE_SCLK1_HDMI		(1<<7)
-+#define	S5P_CLKGATE_SCLK1_AUDIO0	(1<<8)
-+#define	S5P_CLKGATE_SCLK1_AUDIO1	(1<<9)
-+#define	S5P_CLKGATE_SCLK1_AUDIO2	(1<<10)
-+#define	S5P_CLKGATE_SCLK1_SPDIF		(1<<11)
-+#define	S5P_CLKGATE_SCLK1_CAM		(1<<12)
+-void (*s5pc1xx_idle)(void);
++#include <mach/regs-clock.h>
+ 
+ static void arch_idle(void)
+ {
+-	if (s5pc1xx_idle)
+-		s5pc1xx_idle();
++	/* nothing here yet */
+ }
+ 
+ static void arch_reset(char mode, const char *cmd)
+diff --git a/arch/arm/mach-s5pc100/include/mach/tick.h b/arch/arm/mach-s5pc100/include/mach/tick.h
+index f338c9e..20f6873 100644
+--- a/arch/arm/mach-s5pc100/include/mach/tick.h
++++ b/arch/arm/mach-s5pc100/include/mach/tick.h
+@@ -20,8 +20,8 @@
+  */
+ static inline u32 s3c24xx_ostimer_pending(void)
+ {
+-	u32 pend = __raw_readl(S3C_VA_VIC0 + VIC_RAW_STATUS);
+-	return pend & 1 << (IRQ_TIMER4_VIC - S5PC1XX_IRQ_VIC0(0));
++	u32 pend = __raw_readl(VA_VIC0 + VIC_RAW_STATUS);
++	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
+ }
+ 
+ #define TICK_MAX	(0xffffffff)
+diff --git a/arch/arm/plat-s5pc1xx/s5pc100-init.c b/arch/arm/mach-s5pc100/init.c
+similarity index 73%
+rename from arch/arm/plat-s5pc1xx/s5pc100-init.c
+rename to arch/arm/mach-s5pc100/init.c
+index c587108..b852cbc 100644
+--- a/arch/arm/plat-s5pc1xx/s5pc100-init.c
++++ b/arch/arm/mach-s5pc100/init.c
+@@ -3,7 +3,6 @@
+  * Copyright 2009 Samsung Electronics Co.
+  *      Byungho Min <bhmin@samsung.com>
+  *
+- * S5PC100 - CPU initialisation (common with other S5PC1XX chips)
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -19,9 +18,7 @@
+ #include <plat/s5pc100.h>
+ 
+ /* uart registration process */
+-
+ void __init s5pc100_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+-	/* The driver name is s3c6400-uart to reuse s3c6400_serial_drv  */
+-	s3c24xx_init_uartdevs("s3c6400-uart", s5pc1xx_uart_resources, cfg, no);
++	s3c24xx_init_uartdevs("s3c6400-uart", s5p_uart_resources, cfg, no);
+ }
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index ae3c52c..8dec25f 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -34,8 +34,6 @@
+ #include <asm/mach-types.h>
+ 
+ #include <plat/regs-serial.h>
+-#include <plat/gpio-cfg.h>
+-#include <plat/regs-gpio.h>
+ 
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+@@ -79,6 +77,7 @@ static struct s3c2410_uartcfg smdkc100_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++#if 0
+ /* I2C0 */
+ static struct i2c_board_info i2c_devs0[] __initdata = {
+ };
+@@ -140,10 +139,10 @@ static struct s3c_fb_platdata smdkc100_lcd_pdata __initdata = {
+ 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+ 	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
+ };
+-
+-static struct map_desc smdkc100_iodesc[] = {};
++#endif
+ 
+ static struct platform_device *smdkc100_devices[] __initdata = {
++#if 0
+ 	&s3c_device_i2c0,
+ 	&s3c_device_i2c1,
+ 	&s3c_device_fb,
+@@ -151,17 +150,19 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
+ 	&smdkc100_lcd_powerdev,
++#endif
+ };
+ 
+ static void __init smdkc100_map_io(void)
+ {
+-	s5pc1xx_init_io(smdkc100_iodesc, ARRAY_SIZE(smdkc100_iodesc));
++	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(smdkc100_uartcfgs, ARRAY_SIZE(smdkc100_uartcfgs));
+ }
+ 
+ static void __init smdkc100_machine_init(void)
+ {
++#if 0
+ 	/* I2C */
+ 	s3c_i2c0_set_platdata(NULL);
+ 	s3c_i2c1_set_platdata(NULL);
+@@ -175,14 +176,14 @@ static void __init smdkc100_machine_init(void)
+ 	gpio_request(S5PC100_GPH0(6), "GPH0");
+ 	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+ 	platform_add_devices(smdkc100_devices, ARRAY_SIZE(smdkc100_devices));
++#endif
+ }
+ 
+ MACHINE_START(SMDKC100, "SMDKC100")
+ 	/* Maintainer: Byungho Min <bhmin@samsung.com> */
+-	.phys_io	= S5PC100_PA_UART & 0xfff00000,
+-	.io_pg_offst	= (((u32)S5PC1XX_VA_UART) >> 18) & 0xfffc,
+-	.boot_params	= S5PC100_PA_SDRAM + 0x100,
+-
++	.phys_io	= S3C_PA_UART & 0xfff00000,
++	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
++	.boot_params	= S5P_PA_SDRAM + 0x100,
+ 	.init_irq	= s5pc100_init_irq,
+ 	.map_io		= smdkc100_map_io,
+ 	.init_machine	= smdkc100_machine_init,
+diff --git a/arch/arm/mach-s5pc100/setup-i2c0.c b/arch/arm/mach-s5pc100/setup-i2c0.c
+new file mode 100644
+index 0000000..8f65e58
+--- /dev/null
++++ b/arch/arm/mach-s5pc100/setup-i2c0.c
+@@ -0,0 +1,25 @@
++/* linux/arch/arm/mach-s5pc100/setup-i2c0.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * I2C0 GPIO configuration.
++ *
++ * Based on plat-s3c64xx/setup-i2c0.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+#define S5P_SWRESET		S5PC100_REG_OTHERS(0x000)
-+#define S5P_OND_SWRESET		S5PC100_REG_OTHERS(0x008)
-+#define S5P_GEN_CTRL		S5PC100_REG_OTHERS(0x100)
-+#define S5P_GEN_STATUS		S5PC100_REG_OTHERS(0x104)
-+#define S5P_MEM_SYS_CFG		S5PC100_REG_OTHERS(0x200)
-+#define S5P_CAM_MUX_SEL		S5PC100_REG_OTHERS(0x300)
-+#define S5P_MIXER_OUT_SEL	S5PC100_REG_OTHERS(0x304)
-+#define S5P_LPMP_MODE_SEL	S5PC100_REG_OTHERS(0x308)
-+#define S5P_MIPI_PHY_CON0	S5PC100_REG_OTHERS(0x400)
-+#define S5P_MIPI_PHY_CON1	S5PC100_REG_OTHERS(0x414)
-+#define S5P_HDMI_PHY_CON0	S5PC100_REG_OTHERS(0x420)
++#include <linux/kernel.h>
++#include <linux/types.h>
 +
-+#define S5P_SWRESET_RESETVAL	0xc100
-+#define S5P_OTHER_SYS_INT	24
-+#define S5P_OTHER_STA_TYPE	23
- #define STA_TYPE_EXPON		0
- #define STA_TYPE_SFR		1
++struct platform_device; /* don't need the contents */
++
++#include <plat/iic.h>
++
++void s3c_i2c0_cfg_gpio(struct platform_device *dev)
++{
++	/* Will be populated later */
++}
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index 92bd756..189be6e 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -7,7 +7,7 @@
  
--#define S5PC100_SLEEP_CFG_OSC_EN	0
-+#define S5P_SLEEP_CFG_OSC_EN	0
+ config PLAT_S5P
+ 	bool
+-	depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PV210)
++	depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210)
+ 	default y
+ 	select ARM_VIC
+ 	select NO_IOPORT
+diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
+index f92e5de..75cb8c3 100644
+--- a/arch/arm/plat-s5p/cpu.c
++++ b/arch/arm/plat-s5p/cpu.c
+@@ -19,12 +19,14 @@
+ #include <plat/cpu.h>
+ #include <plat/s5p6440.h>
+ #include <plat/s5p6442.h>
++#include <plat/s5pc100.h>
+ #include <plat/s5pv210.h>
  
- /* OTHERS Resgister */
--#define S5PC100_OTHERS_USB_SIG_MASK	(1 << 16)
--#define S5PC100_OTHERS_MIPI_DPHY_EN		(1 << 28)
-+#define S5P_OTHERS_USB_SIG_MASK	(1 << 16)
-+#define S5P_OTHERS_MIPI_DPHY_EN		(1 << 28)
+ /* table of supported CPUs */
  
- /* MIPI D-PHY Control Register 0 */
--#define S5PC100_MIPI_PHY_CON0_M_RESETN	(1 << 1)
--#define S5PC100_MIPI_PHY_CON0_S_RESETN	(1 << 0)
-+#define S5P_MIPI_PHY_CON0_M_RESETN	(1 << 1)
-+#define S5P_MIPI_PHY_CON0_S_RESETN	(1 << 0)
+ static const char name_s5p6440[] = "S5P6440";
+ static const char name_s5p6442[] = "S5P6442";
++static const char name_s5pc100[] = "S5PC100";
+ static const char name_s5pv210[] = "S5PV210/S5PC110";
  
- #endif /* _PLAT_REGS_CLOCK_H */
-diff --git a/arch/arm/plat-s5pc1xx/s5pc100-clock.c b/arch/arm/plat-s5pc1xx/s5pc100-clock.c
-index 2bf6c57..c391c61 100644
---- a/arch/arm/plat-s5pc1xx/s5pc100-clock.c
-+++ b/arch/arm/plat-s5pc1xx/s5pc100-clock.c
-@@ -75,7 +75,7 @@ static struct clksrc_clk clk_mout_apll = {
- 		.id		= -1,
- 	},
- 	.sources	= &clk_src_apll,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 0, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 0, .size = 1, },
- };
- 
- static unsigned long s5pc100_clk_dout_apll_get_rate(struct clk *clk)
-@@ -83,8 +83,8 @@ static unsigned long s5pc100_clk_dout_apll_get_rate(struct clk *clk)
- 	unsigned long rate = clk_get_rate(clk->parent);
- 	unsigned int ratio;
- 
--	ratio = __raw_readl(S5PC100_CLKDIV0) & S5PC100_CLKDIV0_APLL_MASK;
--	ratio >>= S5PC100_CLKDIV0_APLL_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_APLL_MASK;
-+	ratio >>= S5P_CLK_DIV0_APLL_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -103,8 +103,8 @@ static unsigned long s5pc100_clk_arm_get_rate(struct clk *clk)
- 	unsigned long rate = clk_get_rate(clk->parent);
- 	unsigned int ratio;
- 
--	ratio = __raw_readl(S5PC100_CLKDIV0) & S5PC100_CLKDIV0_ARM_MASK;
--	ratio >>= S5PC100_CLKDIV0_ARM_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_ARM_MASK;
-+	ratio >>= S5P_CLK_DIV0_ARM_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -119,8 +119,8 @@ static unsigned long s5pc100_clk_arm_round_rate(struct clk *clk,
- 		return rate;
- 
- 	div = (parent / rate) - 1;
--	if (div > S5PC100_CLKDIV0_ARM_MASK)
--		div = S5PC100_CLKDIV0_ARM_MASK;
-+	if (div > S5P_CLK_DIV0_ARM_MASK)
-+		div = S5P_CLK_DIV0_ARM_MASK;
- 
- 	return parent / (div + 1);
- }
-@@ -131,16 +131,16 @@ static int s5pc100_clk_arm_set_rate(struct clk *clk, unsigned long rate)
- 	u32 div;
- 	u32 val;
- 
--	if (rate < parent / (S5PC100_CLKDIV0_ARM_MASK + 1))
-+	if (rate < parent / (S5P_CLK_DIV0_ARM_MASK + 1))
- 		return -EINVAL;
- 
- 	rate = clk_round_rate(clk, rate);
- 	div = clk_get_rate(clk->parent) / rate;
- 
--	val = __raw_readl(S5PC100_CLKDIV0);
--	val &= S5PC100_CLKDIV0_ARM_MASK;
-+	val = __raw_readl(S5P_CLK_DIV0);
-+	val &= S5P_CLK_DIV0_ARM_MASK;
- 	val |= (div - 1);
--	__raw_writel(val, S5PC100_CLKDIV0);
-+	__raw_writel(val, S5P_CLK_DIV0);
- 
- 	return 0;
- }
-@@ -161,8 +161,8 @@ static unsigned long s5pc100_clk_dout_d0_bus_get_rate(struct clk *clk)
- 	unsigned long rate = clk_get_rate(clk->parent);
- 	unsigned int ratio;
- 
--	ratio = __raw_readl(S5PC100_CLKDIV0) & S5PC100_CLKDIV0_D0_MASK;
--	ratio >>= S5PC100_CLKDIV0_D0_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_D0_MASK;
-+	ratio >>= S5P_CLK_DIV0_D0_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -181,8 +181,8 @@ static unsigned long s5pc100_clk_dout_pclkd0_get_rate(struct clk *clk)
- 	unsigned long rate = clk_get_rate(clk->parent);
- 	unsigned int ratio;
- 
--	ratio = __raw_readl(S5PC100_CLKDIV0) & S5PC100_CLKDIV0_PCLKD0_MASK;
--	ratio >>= S5PC100_CLKDIV0_PCLKD0_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_PCLKD0_MASK;
-+	ratio >>= S5P_CLK_DIV0_PCLKD0_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -201,8 +201,8 @@ static unsigned long s5pc100_clk_dout_apll2_get_rate(struct clk *clk)
- 	unsigned long rate = clk_get_rate(clk->parent);
- 	unsigned int ratio;
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_APLL2_MASK;
--	ratio >>= S5PC100_CLKDIV1_APLL2_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_APLL2_MASK;
-+	ratio >>= S5P_CLK_DIV1_APLL2_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -233,7 +233,7 @@ static struct clksrc_clk clk_mout_mpll = {
- 		.id		= -1,
- 	},
- 	.sources	= &clk_src_mpll,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 4, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 4, .size = 1, },
- };
- 
- static struct clk *clkset_am_list[] = {
-@@ -252,7 +252,7 @@ static struct clksrc_clk clk_mout_am = {
- 		.id		= -1,
- 	},
- 	.sources	= &clk_src_am,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 16, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 16, .size = 1, },
- };
- 
- static unsigned long s5pc100_clk_dout_d1_bus_get_rate(struct clk *clk)
-@@ -262,8 +262,8 @@ static unsigned long s5pc100_clk_dout_d1_bus_get_rate(struct clk *clk)
- 
- 	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_D1_MASK;
--	ratio >>= S5PC100_CLKDIV1_D1_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_D1_MASK;
-+	ratio >>= S5P_CLK_DIV1_D1_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -293,7 +293,7 @@ static struct clksrc_clk clk_mout_onenand = {
- 		.id		= -1,
- 	},
- 	.sources	= &clk_src_onenand,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 24, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 24, .size = 1, },
- };
- 
- static unsigned long s5pc100_clk_dout_pclkd1_get_rate(struct clk *clk)
-@@ -303,8 +303,8 @@ static unsigned long s5pc100_clk_dout_pclkd1_get_rate(struct clk *clk)
- 
- 	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_PCLKD1_MASK;
--	ratio >>= S5PC100_CLKDIV1_PCLKD1_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_PCLKD1_MASK;
-+	ratio >>= S5P_CLK_DIV1_PCLKD1_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -325,8 +325,8 @@ static unsigned long s5pc100_clk_dout_mpll2_get_rate(struct clk *clk)
- 
- 	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_MPLL2_MASK;
--	ratio >>= S5PC100_CLKDIV1_MPLL2_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_MPLL2_MASK;
-+	ratio >>= S5P_CLK_DIV1_MPLL2_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -347,8 +347,8 @@ static unsigned long s5pc100_clk_dout_cam_get_rate(struct clk *clk)
- 
- 	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_CAM_MASK;
--	ratio >>= S5PC100_CLKDIV1_CAM_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_CAM_MASK;
-+	ratio >>= S5P_CLK_DIV1_CAM_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -369,8 +369,8 @@ static unsigned long s5pc100_clk_dout_mpll_get_rate(struct clk *clk)
- 
- 	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
- 
--	ratio = __raw_readl(S5PC100_CLKDIV1) & S5PC100_CLKDIV1_MPLL_MASK;
--	ratio >>= S5PC100_CLKDIV1_MPLL_SHIFT;
-+	ratio = __raw_readl(S5P_CLK_DIV1) & S5P_CLK_DIV1_MPLL_MASK;
-+	ratio >>= S5P_CLK_DIV1_MPLL_SHIFT;
- 
- 	return rate / (ratio + 1);
- }
-@@ -406,7 +406,7 @@ static struct clksrc_clk clk_mout_epll = {
- 		.id		= -1,
- 	},
- 	.sources = &clk_src_epll,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 8, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1, },
- };
- 
- /* HPLL */
-@@ -431,7 +431,7 @@ static struct clksrc_clk clk_mout_hpll = {
- 		.id		= -1,
- 	},
- 	.sources = &clk_src_hpll,
--	.reg_src = { .reg = S5PC100_CLKSRC0, .shift = 12, .size = 1, },
-+	.reg_src = { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1, },
- };
- 
- /* Peripherals */
-@@ -539,32 +539,32 @@ static struct clksrc_clk clksrc_audio[] = {
- 		.clk	= {
- 			.name		= "audio-bus",
- 			.id		= 0,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO0,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_AUDIO0,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_audio0,
--		.reg_div = { .reg = S5PC100_CLKDIV4, .shift = 12, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC3, .shift = 12, .size = 3, },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 3, },
+ static struct cpu_table cpu_ids[] __initdata = {
+@@ -45,6 +47,14 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.init		= s5p6442_init,
+ 		.name		= name_s5p6442,
  	}, {
- 		.clk	= {
- 			.name		= "audio-bus",
- 			.id		= 1,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO1,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_AUDIO1,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_audio1,
--		.reg_div = { .reg = S5PC100_CLKDIV4, .shift = 16, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC3, .shift = 16, .size = 3, },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 3, },
- 	}, {
- 		.clk	= {
- 			.name		= "audio-bus",
- 			.id		= 2,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO2,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_AUDIO2,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_audio2,
--		.reg_div = { .reg = S5PC100_CLKDIV4, .shift = 20, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC3, .shift = 20, .size = 3, },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 3, },
- 	},
- };
++		.idcode		= 0x43100000,
++		.idmask		= 0xfffff000,
++		.map_io		= s5pc100_map_io,
++		.init_clocks	= s5pc100_init_clocks,
++		.init_uarts	= s5pc100_init_uarts,
++		.init		= s5pc100_init,
++		.name		= name_s5pc100,
++	}, {
+ 		.idcode		= 0x43110000,
+ 		.idmask		= 0xfffff000,
+ 		.map_io		= s5pv210_map_io,
+diff --git a/arch/arm/plat-s5p/include/plat/s5pc100.h b/arch/arm/plat-s5p/include/plat/s5pc100.h
+new file mode 100644
+index 0000000..5f6099d
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/s5pc100.h
+@@ -0,0 +1,33 @@
++/* arch/arm/plat-s5p/include/plat/s5pc100.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * Header file for s5pc100 cpu support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/* Common init code for S5PC100 related SoCs */
++
++extern void s5pc100_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++extern void s5pc100_register_clocks(void);
++extern void s5pc100_setup_clocks(void);
++
++#ifdef CONFIG_CPU_S5PC100
++
++extern  int s5pc100_init(void);
++extern void s5pc100_init_irq(void);
++extern void s5pc100_map_io(void);
++extern void s5pc100_init_clocks(int xtal);
++
++#define s5pc100_init_uarts s5pc100_common_init_uarts
++
++#else
++#define s5pc100_init_clocks NULL
++#define s5pc100_init_uarts NULL
++#define s5pc100_map_io NULL
++#define s5pc100_init NULL
++#endif
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 59cae62..74fe5d6 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -6,7 +6,7 @@
  
-@@ -620,130 +620,130 @@ static struct clksrc_clk clksrc_clks[] = {
- 		.clk	= {
- 			.name		= "spi_bus",
- 			.id		= 0,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI0,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_SPI0,
- 			.enable		= s5pc100_sclk0_ctrl,
- 
- 		},
- 		.sources = &clkset_spi,
--		.reg_div = { .reg = S5PC100_CLKDIV2, .shift = 4, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC1, .shift = 4, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 4, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 4, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "spi_bus",
- 			.id		= 1,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI1,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_SPI1,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_spi,
--		.reg_div = { .reg = S5PC100_CLKDIV2, .shift = 8, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC1, .shift = 8, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 8, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 8, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "spi_bus",
- 			.id		= 2,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI2,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_SPI2,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_spi,
--		.reg_div = { .reg = S5PC100_CLKDIV2, .shift = 12, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC1, .shift = 12, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 12, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 12, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "uclk1",
- 			.id		= -1,
--			.ctrlbit        = S5PC100_CLKGATE_SCLK0_UART,
-+			.ctrlbit        = S5P_CLKGATE_SCLK0_UART,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_uart,
--		.reg_div = { .reg = S5PC100_CLKDIV2, .shift = 0, .size = 3, },
--		.reg_src = { .reg = S5PC100_CLKSRC1, .shift = 0, .size = 1, },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 0, .size = 3, },
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 0, .size = 1, },
- 	}, {
- 		.clk	= {
- 			.name		= "spdif",
- 			.id		= -1,
- 		},
- 		.sources	= &clkset_spdif,
--		.reg_src = { .reg = S5PC100_CLKSRC3, .shift = 24, .size = 2, },
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 24, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "lcd",
- 			.id		= -1,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_LCD,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_LCD,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_lcd_fimc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 12, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 12, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 12, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 12, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "fimc",
- 			.id		= 0,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC0,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_FIMC0,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_lcd_fimc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 16, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 16, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 16, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 16, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "fimc",
- 			.id		= 1,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC1,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_FIMC1,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources	= &clkset_lcd_fimc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 20, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 20, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 20, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 20, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "fimc",
- 			.id		= 2,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC2,
-+			.ctrlbit	= S5P_CLKGATE_SCLK1_FIMC2,
- 			.enable		= s5pc100_sclk1_ctrl,
- 		},
- 		.sources = &clkset_lcd_fimc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 24, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 24, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 24, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 24, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "mmc_bus",
- 			.id		= 0,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC0,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_MMC0,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_mmc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 0, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 0, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 0, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 0, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "mmc_bus",
- 			.id		= 1,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC1,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_MMC1,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_mmc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 4, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 4, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 4, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 4, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "mmc_bus",
- 			.id		= 2,
--			.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC2,
-+			.ctrlbit	= S5P_CLKGATE_SCLK0_MMC2,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources	= &clkset_mmc,
--		.reg_div = { .reg = S5PC100_CLKDIV3, .shift = 8, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC2, .shift = 8, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 8, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 8, .size = 2, },
- 	}, {
- 		.clk	= {
- 			.name		= "usbhost",
- 			.id		= -1,
--			.ctrlbit        = S5PC100_CLKGATE_SCLK0_USBHOST,
-+			.ctrlbit        = S5P_CLKGATE_SCLK0_USBHOST,
- 			.enable		= s5pc100_sclk0_ctrl,
- 		},
- 		.sources = &clkset_usbhost,
--		.reg_div = { .reg = S5PC100_CLKDIV2, .shift = 20, .size = 4, },
--		.reg_src = { .reg = S5PC100_CLKSRC1, .shift = 20, .size = 2, },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 20, .size = 4, },
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 20, .size = 2, },
- 	}
- };
- 
-@@ -775,8 +775,8 @@ void __init_or_cpufreq s5pc100_setup_clocks(void)
- 
- 	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
- 
--	clkdiv0 = __raw_readl(S5PC100_CLKDIV0);
--	clkdiv1 = __raw_readl(S5PC100_CLKDIV1);
-+	clkdiv0 = __raw_readl(S5P_CLK_DIV0);
-+	clkdiv1 = __raw_readl(S5P_CLK_DIV1);
- 
- 	printk(KERN_DEBUG "%s: clkdiv0 = %08x, clkdiv1 = %08x\n", __func__, clkdiv0, clkdiv1);
- 
-@@ -788,22 +788,22 @@ void __init_or_cpufreq s5pc100_setup_clocks(void)
- 
- 	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
- 
--	apll = s5pc1xx_get_pll(xtal, __raw_readl(S5PC100_APLL_CON));
--	mpll = s5pc1xx_get_pll(xtal, __raw_readl(S5PC100_MPLL_CON));
--	epll = s5pc1xx_get_pll(xtal, __raw_readl(S5PC100_EPLL_CON));
--	hpll = s5pc1xx_get_pll(xtal, __raw_readl(S5PC100_HPLL_CON));
-+	apll = s5pc1xx_get_pll(xtal, __raw_readl(S5P_APLL_CON));
-+	mpll = s5pc1xx_get_pll(xtal, __raw_readl(S5P_MPLL_CON));
-+	epll = s5pc1xx_get_pll(xtal, __raw_readl(S5P_EPLL_CON));
-+	hpll = s5pc1xx_get_pll(xtal, __raw_readl(S5P_HPLL_CON));
- 
- 	printk(KERN_INFO "S5PC100: Apll=%ld.%03ld Mhz, Mpll=%ld.%03ld Mhz"
- 		", Epll=%ld.%03ld Mhz, Hpll=%ld.%03ld Mhz\n",
- 		print_mhz(apll), print_mhz(mpll),
- 		print_mhz(epll), print_mhz(hpll));
- 
--	armclk = apll / GET_DIV(clkdiv0, S5PC100_CLKDIV0_APLL);
--	armclk = armclk / GET_DIV(clkdiv0, S5PC100_CLKDIV0_ARM);
--	hclkd0 = armclk / GET_DIV(clkdiv0, S5PC100_CLKDIV0_D0);
--	pclkd0 = hclkd0 / GET_DIV(clkdiv0, S5PC100_CLKDIV0_PCLKD0);
--	hclk = mpll / GET_DIV(clkdiv1, S5PC100_CLKDIV1_D1);
--	pclk = hclk / GET_DIV(clkdiv1, S5PC100_CLKDIV1_PCLKD1);
-+	armclk = apll / GET_DIV(clkdiv0, S5P_CLK_DIV0_APLL);
-+	armclk = armclk / GET_DIV(clkdiv0, S5P_CLK_DIV0_ARM);
-+	hclkd0 = armclk / GET_DIV(clkdiv0, S5P_CLK_DIV0_D0);
-+	pclkd0 = hclkd0 / GET_DIV(clkdiv0, S5P_CLK_DIV0_PCLKD0);
-+	hclk = mpll / GET_DIV(clkdiv1, S5P_CLK_DIV1_D1);
-+	pclk = hclk / GET_DIV(clkdiv1, S5P_CLK_DIV1_PCLKD1);
- 
- 	printk(KERN_INFO "S5PC100: ARMCLK=%ld.%03ld MHz, HCLKD0=%ld.%03ld MHz,"
- 		" PCLKD0=%ld.%03ld MHz\n, HCLK=%ld.%03ld MHz,"
+ config PLAT_SAMSUNG
+ 	bool
+-	depends on ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX || ARCH_S5PC1XX
++	depends on ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX
+ 	select NO_IOPORT
+ 	default y
+ 	help
 -- 
 1.6.4
