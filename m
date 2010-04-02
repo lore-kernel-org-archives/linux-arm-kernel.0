@@ -1,85 +1,35 @@
-From: tghk48@motorola.com (TAO HU)
-Date: Fri, 2 Apr 2010 15:00:52 +0800
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 2 Apr 2010 09:06:29 +0200
 Subject: [Question] race condition in mm/page_alloc.c regarding page->lru?
-In-Reply-To: <z2x28c262361004012215h2b2ea3dbu5260724f97f55b95@mail.gmail.com>
+In-Reply-To: <g2g5f4a33681004012051wedea9538w9da89e210b731422@mail.gmail.com>
 References: <i2i5f4a33681003312105m4cd42e9ayfe35cc0988c401b6@mail.gmail.com>
 	<g2g5f4a33681004012051wedea9538w9da89e210b731422@mail.gmail.com>
-	<20100402140406.d3d7f18e.kamezawa.hiroyu@jp.fujitsu.com>
-	<z2x28c262361004012215h2b2ea3dbu5260724f97f55b95@mail.gmail.com>
-Message-ID: <z2w5f4a33681004020000td60331aam2c6947954d78e46@mail.gmail.com>
+Message-ID: <20100402070629.GT30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, kamezawa hiroyu
+On Fri, Apr 02, 2010 at 11:51:33AM +0800, TAO HU wrote:
+> On Thu, Apr 1, 2010 at 12:05 PM, TAO HU <tghk48@motorola.com> wrote:
+> > We got a panic on our ARM (OMAP) based HW.
+> > Our code is based on 2.6.29 kernel (last commit for mm/page_alloc.c is
+> > cc2559bccc72767cb446f79b071d96c30c26439b)
+> >
+> > It appears to crash while going through pcp->list in
+> > buffered_rmqueue() of mm/page_alloc.c after checking vmlinux.
+> > "00100100" implies LIST_POISON1 that suggests a race condition between
+> > list_add() and list_del() in my personal view.
+> > However we not yet figure out locking problem regarding page.lru.
 
-Thanks for the hint!
+I'm sure this is just a memory corruption which is unrelated to code in
+the the memory management area. The code there just happens to trigger
+it as it is called frequently and is very sensitive to bogus data
 
-Hi, Minchan Kim
+Did you see the other thread I started off yesterday?
 
-Sorry. Not exactly sure your idea about <grep "page handling">.
-Below is a result of $ grep -n -r "list_del(&page->lru)" * in our src tree
+  http://lkml.indiana.edu/hypermail/linux/kernel/1004.0/00157.html
 
-arch/s390/mm/pgtable.c:83:	list_del(&page->lru);
-arch/s390/mm/pgtable.c:226:		list_del(&page->lru);
-arch/x86/mm/pgtable.c:60:	list_del(&page->lru);
-drivers/xen/balloon.c:154:	list_del(&page->lru);
-drivers/virtio/virtio_balloon.c:143:		list_del(&page->lru);
-fs/cifs/file.c:1780:		list_del(&page->lru);
-fs/btrfs/extent_io.c:2584:		list_del(&page->lru);
-fs/mpage.c:388:		list_del(&page->lru);
-include/linux/mm_inline.h:37:	list_del(&page->lru);
-include/linux/mm_inline.h:47:	list_del(&page->lru);
-kernel/kexec.c:391:		list_del(&page->lru);
-kernel/kexec.c:711:			list_del(&page->lru);
-mm/migrate.c:69:		list_del(&page->lru);
-mm/migrate.c:695: 		list_del(&page->lru);
-mm/hugetlb.c:467:			list_del(&page->lru);
-mm/hugetlb.c:509:			list_del(&page->lru);
-mm/hugetlb.c:836:		list_del(&page->lru);
-mm/hugetlb.c:844:			list_del(&page->lru);
-mm/hugetlb.c:900:			list_del(&page->lru);
-mm/hugetlb.c:1130:			list_del(&page->lru);
-mm/hugetlb.c:1809:		list_del(&page->lru);
-mm/vmscan.c:597:		list_del(&page->lru);
-mm/vmscan.c:1148:			list_del(&page->lru);
-mm/vmscan.c:1246:		list_del(&page->lru);
-mm/slub.c:827:	list_del(&page->lru);
-mm/slub.c:1249:	list_del(&page->lru);
-mm/slub.c:1263:		list_del(&page->lru);
-mm/slub.c:2419:			list_del(&page->lru);
-mm/slub.c:2809:				list_del(&page->lru);
-mm/readahead.c:65:		list_del(&page->lru);
-mm/readahead.c:100:		list_del(&page->lru);
-mm/page_alloc.c:532:		list_del(&page->lru);
-mm/page_alloc.c:679:		list_del(&page->lru);
-mm/page_alloc.c:741:		list_del(&page->lru);
-mm/page_alloc.c:820:			list_del(&page->lru);
-mm/page_alloc.c:1107:		list_del(&page->lru);
-mm/page_alloc.c:4784:		list_del(&page->lru);
+We could well see the same problem here. Not sure though as any kind of
+memory corruption ends up in Ooopses like the ones you see, but it could
+be a hint.
 
-On Fri, Apr 2, 2010 at 1:15 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> On Fri, Apr 2, 2010 at 2:04 PM, KAMEZAWA Hiroyuki
-> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
->> On Fri, 2 Apr 2010 11:51:33 +0800
->> TAO HU <tghk48@motorola.com> wrote:
->>
->>> 2 patches related to page_alloc.c were applied.
->>> Does anyone see a connection between the 2 patches and the panic?
->>> NOTE: the full patches are attached.
->>>
->>
->> I don't think there are relationship between patches and your panic.
->>
->> BTW, there is other case about the backlog rather than race in alloc_pages()
->> itself. If someone list_del(&page->lru) and the page is already freed,
->> you'll see the same backlog later.
->> Then, I doubt use-after-free case rather than complicated races.
->
-> It does make sense.
-> Please, grep "page handling" by out-of-mainline code.
-> If you found out, Please, post it.
->
-> --
-> Kind regards,
-> Minchan Kim
->
+Daniel
