@@ -1,53 +1,39 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 2 Apr 2010 16:41:23 +0800
-Subject: PXA168 suspend/resume issue and set_wake
-In-Reply-To: <y2s45a44e481004020100m32ecd3dv6931f2aca3267656@mail.gmail.com>
-References: <y2s45a44e481004020100m32ecd3dv6931f2aca3267656@mail.gmail.com>
-Message-ID: <p2mf17812d71004020141heb9b88a4xfcfdd297c5150be0@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 2 Apr 2010 10:43:22 +0100
+Subject: [PATCH 4/4] ASoC: enable wm8753 in aspenite
+In-Reply-To: <l2u771cded01004012140pa41dac0egc067ce7a1cbeed0@mail.gmail.com>
+References: <s2g771cded01003310548udc9ff8b8u35736bd95038f92c@mail.gmail.com>
+	<20100401182124.GB26650@opensource.wolfsonmicro.com>
+	<l2u771cded01004012140pa41dac0egc067ce7a1cbeed0@mail.gmail.com>
+Message-ID: <20100402094322.GB11134@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 2, 2010 at 4:00 PM, Jaya Kumar <jayakumar.lkml@gmail.com> wrote:
-> Hi Arm friends,
->
-> A quick question for you. I am experimenting with a PXA168 device and
-> noticed some odd behaviour with resume. The device can suspend and can
-> then be resumed, at least to serial console level after a gpio button
-> press. But then as part of the resume, I see some messages about
-> unbalanced IRQ wake disable. Then after that, button presses no longer
-> generate any interrupts. The irq count remains what it was at the
-> point of suspend. I took a quick scan at the PXA168 source code and
-> noticed:
->
-> pxa168.c:
-> pxa_init_gpio(IRQ_PXA168_GPIOX, 0, 127, NULL);
->
-> So no set_wake function, which I think explains the unbalanced IRQ
-> wake messages since gpio-keys would have tried to enable_irq_wake on
-> suspend which would do nothing since above has no set_wake and then on
-> resume gpio-keys would try to disable_irq_wake and cause the
-> unbalanced IRQ wake disable.
+On Fri, Apr 02, 2010 at 12:40:30PM +0800, Haojian Zhuang wrote:
+> On Fri, Apr 2, 2010 at 2:21 AM, Mark Brown
 
-Mmm... set_irq_wake_real() will return -ENXIO when no ".set_wake" is
-available for the IRQ chip, and depending on this result the wake_depth
-will be unbalanced during resume.
+> >> +/* Get the MCLK frequency */
+> >> +static int pxa168_get_mclk(int i)
 
-So I'm seeing two options:
+> > This stuff probably shouldn't be in the machine driver since pretty much
+> > all machine drivers are going to want exactly the same code - it should
+> > be in the library code. ?Probably best to have them take hw_params
+> > rather than require the machine driver to decode the format, rate and
+> > channel since that'll save a bit of per driver boiler plate if they
+> > don't otherwise need that information.
 
-1. with ".set_wake" being unavailable, the wake_depth should be
-made balanced (since no real set wake operation is being taken)
+> > As I said last time ideally machine drivers shouldn't have to see this
+> > at all, of course.
 
-2. or mark those GPIO buttons being not able to wakeup
+> This functions is used to get the sysclk. It's the parameter that is
+> used in hw_params() of machine driver since we need set codec and cpu
+> sysclock. But hw_params() of machine driver is invoked before
+> hw_params() of cpu_dai.
 
-> But I haven't quite understood why the
-> buttons fail to cause any interrupts after that. Has anyone
-> encountered anything similar and if so any patches I could look at?
->
-> Thanks,
-> jaya
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> That's the main reason. If hw_params() of cpu_dai is invoked before
+> machine driver. This issue won't exist.
+
+That's not the main point here - the code itself shouldn't be in the
+machine driver since pretty much all machine drivers need exactly the
+same code.  If they need to do this they should be calling functions
+provided by the CPU driver rather than cut'n'pasting the code.
