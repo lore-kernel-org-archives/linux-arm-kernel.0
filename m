@@ -1,44 +1,74 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Apr 2010 11:42:42 +0100
-Subject: mx31 snd and mc13783 codec status
-In-Reply-To: <20100402095358.GZ2241@pengutronix.de>
-References: <4BB22576.1070108@epfl.ch> <20100331083415.GR2241@pengutronix.de>
-	<4BB4C362.3000803@epfl.ch> <20100402095358.GZ2241@pengutronix.de>
-Message-ID: <20100402104241.GC27613@sirena.org.uk>
+Date: Fri,  2 Apr 2010 13:39:06 +0100
+Subject: [PATCH] i2c-s3c2410: Remove unconditional 1ms delay on each transfer
+Message-ID: <1270211946-25103-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 02, 2010 at 11:53:58AM +0200, Sascha Hauer wrote:
-> On Thu, Apr 01, 2010 at 06:01:38PM +0200, Valentin Longchamp wrote:
+The S3C I2C controller indicates completion of I2C transfers before
+the bus has a stop condition on it. In order to ensure that we do not
+attempt to start a new transfer before the bus is idle the driver
+currently inserts a 1ms delay. This is vastly larger than is generally
+required and has a visible effect on performance under load, such as
+when bringing up audio CODECs or reading back status information with
+non-bulk I2C reads.
 
-> > The thing is that I get a less than a second sound loop (I use aplay to  
-> > test, so userspace app should be ok), as if the buffer that the fiq asm  
-> > interrupt (from ssi_fiq.S) copies to the SSI hardware never was updated.
+Replace the sleep with a spin on the IIC status register for up to 1ms.
+This will busy wait but testing on my SMDK6410 system indicates that
+the overwhelming majority of transactions complete on the first spin,
+with maximum latencies of less than 10 spins so the absolute overhead
+of busy waiting should be at worst comprable to msleep(), and the
+overall system performance is dramatically improved.
 
-> > If I have understood the fiq behaviour correctly, you have a asm fiq  
-> > interrupt that does copy a larger tx buffer into the SSI hardware.  
-> > Besides it, you have the imx_ssi_timer_callback that checks when the tx  
-> > buffer was completely copied. If it is the case, then a new buffer tx  
-> > buffer is "issued" with the snd_pcm_period_elapsed call (and then  
-> > snd_pcm_update_hw_ptr0). Is this behaviour correct ?
+The main risk is poor interaction with multimaster systems where
+we may miss the bus going idle before the next transaction. Defend
+against this by falling back to the original 1ms delay after 20 spins.
 
-> Yes.
+The overall effect in my testing is an approximately 20% improvement
+in kernel startup time.
 
-What sample rate are you trying to play and what buffer size?  In my
-testing the FIQ was really struggling with most applications at sample
-rates over ~16kHz since you need each audio period to be long enough to
-at least fill the interval between timer polls but applications wanted
-to select buffer sizes that were consumed faster than the timer tick.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/i2c/busses/i2c-s3c2410.c |   20 ++++++++++++++++++--
+ 1 files changed, 18 insertions(+), 2 deletions(-)
 
-Using an application like speaker-test which has minimal overhead and no
-I/O to worry about helps too.
-
-> > If then it looks like on my system, I have a problem with the  
-> > snd_pcm_update_hw_ptr0 call.
-
-> You could try reverting b4e82b5b785670b68136765059d1afc65c0ae023. Though
-> I have tested it on my boards it may have some implications.
-
-I was seeing similar behaviour before and after that patch too, the main
-effect there was to improve the error handling when the FIQ and the
-timer get out of sync with each other.
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index d27072b..ba52543 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -482,7 +482,8 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
+ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 			      struct i2c_msg *msgs, int num)
+ {
+-	unsigned long timeout;
++	unsigned long iicstat, timeout;
++	int spins = 20;
+ 	int ret;
+ 
+ 	if (i2c->suspended)
+@@ -521,7 +522,22 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 
+ 	/* ensure the stop has been through the bus */
+ 
+-	msleep(1);
++	dev_dbg(i2c->dev, "waiting for bus idle\n");
++
++	/* first, try busy waiting briefly */
++	spins = 0;
++	do {
++		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
++	} while ((iicstat & S3C2410_IICSTAT_START) && --spins);
++
++	/* if that timed out sleep */
++	if (!spins) {
++		msleep(1);
++		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
++	}
++
++	if (iicstat & S3C2410_IICSTAT_START)
++		dev_warn(i2c->dev, "timeout waiting for bus idle\n");
+ 
+  out:
+ 	return ret;
+-- 
+1.7.0.3
