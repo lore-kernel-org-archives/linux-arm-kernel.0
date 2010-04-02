@@ -1,35 +1,79 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 2 Apr 2010 09:06:29 +0200
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Fri, 2 Apr 2010 16:22:56 +0900
 Subject: [Question] race condition in mm/page_alloc.c regarding page->lru?
-In-Reply-To: <g2g5f4a33681004012051wedea9538w9da89e210b731422@mail.gmail.com>
+In-Reply-To: <z2w5f4a33681004020000td60331aam2c6947954d78e46@mail.gmail.com>
 References: <i2i5f4a33681003312105m4cd42e9ayfe35cc0988c401b6@mail.gmail.com>
 	<g2g5f4a33681004012051wedea9538w9da89e210b731422@mail.gmail.com>
-Message-ID: <20100402070629.GT30801@buzzloop.caiaq.de>
+	<20100402140406.d3d7f18e.kamezawa.hiroyu@jp.fujitsu.com>
+	<z2x28c262361004012215h2b2ea3dbu5260724f97f55b95@mail.gmail.com>
+	<z2w5f4a33681004020000td60331aam2c6947954d78e46@mail.gmail.com>
+Message-ID: <q2t28c262361004020022v8eda0491t61e510a1caa0ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 02, 2010 at 11:51:33AM +0800, TAO HU wrote:
-> On Thu, Apr 1, 2010 at 12:05 PM, TAO HU <tghk48@motorola.com> wrote:
-> > We got a panic on our ARM (OMAP) based HW.
-> > Our code is based on 2.6.29 kernel (last commit for mm/page_alloc.c is
-> > cc2559bccc72767cb446f79b071d96c30c26439b)
-> >
-> > It appears to crash while going through pcp->list in
-> > buffered_rmqueue() of mm/page_alloc.c after checking vmlinux.
-> > "00100100" implies LIST_POISON1 that suggests a race condition between
-> > list_add() and list_del() in my personal view.
-> > However we not yet figure out locking problem regarding page.lru.
+On Fri, Apr 2, 2010 at 4:00 PM, TAO HU <tghk48@motorola.com> wrote:
+> Hi, kamezawa hiroyu
+>
+> Thanks for the hint!
+>
+> Hi, Minchan Kim
+>
+> Sorry. Not exactly sure your idea about <grep "page handling">.
+> Below is a result of $ grep -n -r "list_del(&page->lru)" * in our src tree
 
-I'm sure this is just a memory corruption which is unrelated to code in
-the the memory management area. The code there just happens to trigger
-it as it is called frequently and is very sensitive to bogus data
+It's not enough.
+Maybe you have to review your's patches based on mainline.
 
-Did you see the other thread I started off yesterday?
+>
+> arch/s390/mm/pgtable.c:83: ? ? ?list_del(&page->lru);
+> arch/s390/mm/pgtable.c:226: ? ? ? ? ? ? list_del(&page->lru);
+> arch/x86/mm/pgtable.c:60: ? ? ? list_del(&page->lru);
+> drivers/xen/balloon.c:154: ? ? ?list_del(&page->lru);
+> drivers/virtio/virtio_balloon.c:143: ? ? ? ? ? ?list_del(&page->lru);
+> fs/cifs/file.c:1780: ? ? ? ? ? ?list_del(&page->lru);
+> fs/btrfs/extent_io.c:2584: ? ? ? ? ? ? ?list_del(&page->lru);
+> fs/mpage.c:388: ? ? ? ? list_del(&page->lru);
+> include/linux/mm_inline.h:37: ? list_del(&page->lru);
+> include/linux/mm_inline.h:47: ? list_del(&page->lru);
+> kernel/kexec.c:391: ? ? ? ? ? ? list_del(&page->lru);
+> kernel/kexec.c:711: ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/migrate.c:69: ? ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/migrate.c:695: ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:467: ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:509: ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:836: ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:844: ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:900: ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/hugetlb.c:1130: ? ? ? ? ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/hugetlb.c:1809: ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/vmscan.c:597: ? ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/vmscan.c:1148: ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/vmscan.c:1246: ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/slub.c:827: ?list_del(&page->lru);
+> mm/slub.c:1249: list_del(&page->lru);
+> mm/slub.c:1263: ? ? ? ? list_del(&page->lru);
+> mm/slub.c:2419: ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/slub.c:2809: ? ? ? ? ? ? ? ? ? ? ? ? list_del(&page->lru);
+> mm/readahead.c:65: ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/readahead.c:100: ? ? ? ? ? ? list_del(&page->lru);
+> mm/page_alloc.c:532: ? ? ? ? ? ?list_del(&page->lru);
+> mm/page_alloc.c:679: ? ? ? ? ? ?list_del(&page->lru);
+> mm/page_alloc.c:741: ? ? ? ? ? ?list_del(&page->lru);
+> mm/page_alloc.c:820: ? ? ? ? ? ? ? ? ? ?list_del(&page->lru);
+> mm/page_alloc.c:1107: ? ? ? ? ? list_del(&page->lru);
+> mm/page_alloc.c:4784: ? ? ? ? ? list_del(&page->lru);
+>
+There are normal caller.
+I expected some bogus driver of out-of-mainline uses page directly
+without enough review.
 
-  http://lkml.indiana.edu/hypermail/linux/kernel/1004.0/00157.html
+Is your kernel working well except this bug?
+Do you see same oops call trace(about page-allocator) whenever kernel
+panic happens?
 
-We could well see the same problem here. Not sure though as any kind of
-memory corruption ends up in Ooopses like the ones you see, but it could
-be a hint.
+I mean if something not page-allocadtor breaks memory, you can see
+other symptoms. so we can doubt others(H/W, other subsystem).
 
-Daniel
+-- 
+Kind regards,
+Minchan Kim
