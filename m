@@ -1,79 +1,44 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Fri, 2 Apr 2010 10:56:33 +0100
-Subject: [PATCH 2/3] arm: Add config option for HOLES_IN_ZONE
-In-Reply-To: <1270167649-17824-2-git-send-email-mbohan@codeaurora.org>
-References: <1270167649-17824-1-git-send-email-mbohan@codeaurora.org>
-	<1270167649-17824-2-git-send-email-mbohan@codeaurora.org>
-Message-ID: <20100402095633.GB12886@csn.ul.ie>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 2 Apr 2010 11:42:42 +0100
+Subject: mx31 snd and mc13783 codec status
+In-Reply-To: <20100402095358.GZ2241@pengutronix.de>
+References: <4BB22576.1070108@epfl.ch> <20100331083415.GR2241@pengutronix.de>
+	<4BB4C362.3000803@epfl.ch> <20100402095358.GZ2241@pengutronix.de>
+Message-ID: <20100402104241.GC27613@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 01, 2010 at 05:20:48PM -0700, Michael Bohan wrote:
-> From: Michael Bohan <mbohan@quicinc.com>
-> 
-> This option is for FLATMEM configurations with multiple memory
-> banks that have end addresses not aligned to MAX_ORDER_NR_PAGES.
-> 
-> To save memory, ARM frees memmap regions for pfns associated with
-> gaps in the address map. When the VM code migrates pages, it will
-> assume that the memmap entries are valid.
-> 
-> This option adds extra checking with pfn_valid() to
-> ensure the memmap entries are valid. It may adversely impact
-> performance.
-> 
+On Fri, Apr 02, 2010 at 11:53:58AM +0200, Sascha Hauer wrote:
+> On Thu, Apr 01, 2010 at 06:01:38PM +0200, Valentin Longchamp wrote:
 
-It will impact performance although not necessarily in a way that's easy to
-detect because the biggest impact is on page-allocator-intensive-loads.
+> > The thing is that I get a less than a second sound loop (I use aplay to  
+> > test, so userspace app should be ok), as if the buffer that the fiq asm  
+> > interrupt (from ssi_fiq.S) copies to the SSI hardware never was updated.
 
-Have you managed to trigger this problem? I am assuming you are not
-referring to page migration as such but more likely when pages shuffle
-between lists in move_freepages(). To trigger a problem there, I think
-you would have to have a memory layout that had an
-max-order-unaligned-hole in the middle of a zone. Is that happening?
+> > If I have understood the fiq behaviour correctly, you have a asm fiq  
+> > interrupt that does copy a larger tx buffer into the SSI hardware.  
+> > Besides it, you have the imx_ssi_timer_callback that checks when the tx  
+> > buffer was completely copied. If it is the case, then a new buffer tx  
+> > buffer is "issued" with the snd_pcm_period_elapsed call (and then  
+> > snd_pcm_update_hw_ptr0). Is this behaviour correct ?
 
-If so, another possibility you may want to consider (if you haven't
-already) is to ensure in free_memmap() that if holes are being punched
-in the middle of a zone that they are only max-order aligned. This would
-avoid corruption problems without taking a performance hit.
+> Yes.
 
-> Change-Id: I48d8afb69db25b1f44d698f1a7da106911b4be1c
-> Signed-off-by: Michael Bohan <mbohan@quicinc.com>
-> Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
-> ---
->  arch/arm/Kconfig |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c5408bf..8dadce9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1233,6 +1233,20 @@ config OABI_COMPAT
->  config ARCH_HAS_HOLES_MEMORYMODEL
->  	bool
->  
-> +config HOLES_IN_ZONE
-> +	bool "Memory map has holes ending within MAX_ORDER_NR_PAGES"
-> +	default n
-> +	depends on FLATMEM
-> +	help
-> +	  Say 'y' here if you have multiple memory banks where the bank
-> +	  end addresses coresponding to the holes are not MAX_ORDER_NR_PAGES
-> +	  aligned. Failure to enable this in those circumstances will result
-> +	  in the VM code assuming ownership of pages with no memmap memory
-> +	  allocated for them. This option could impact performance as it
-> +	  performs extra checks in the VM code. As alternative, consider
-> +	  aligning end addresses to MAX_ORDER_NR_PAGES or changing MAX_ORDER
-> +	  to compensate for your alignment requirements.
-> +
->  # Discontigmem is deprecated
->  config ARCH_DISCONTIGMEM_ENABLE
->  	bool
-> -- 
-> 1.6.2.3
-> 
+What sample rate are you trying to play and what buffer size?  In my
+testing the FIQ was really struggling with most applications at sample
+rates over ~16kHz since you need each audio period to be long enough to
+at least fill the interval between timer polls but applications wanted
+to select buffer sizes that were consumed faster than the timer tick.
 
--- 
-Mel Gorman
-Part-time Phd Student                          Linux Technology Center
-University of Limerick                         IBM Dublin Software Lab
+Using an application like speaker-test which has minimal overhead and no
+I/O to worry about helps too.
+
+> > If then it looks like on my system, I have a problem with the  
+> > snd_pcm_update_hw_ptr0 call.
+
+> You could try reverting b4e82b5b785670b68136765059d1afc65c0ae023. Though
+> I have tested it on my boards it may have some implications.
+
+I was seeing similar behaviour before and after that patch too, the main
+effect there was to improve the error handling when the FIQ and the
+timer get out of sync with each other.
