@@ -1,400 +1,95 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 02 Apr 2010 08:49:02 +0200
-Subject: [PATCH 14/16] ARM: Samsung: Move external interrupts support from
-	plat-s5pc1xx to plat-s5p
+Date: Fri, 02 Apr 2010 08:48:57 +0200
+Subject: [PATCH 09/16] ARM: SMDKC100: enable frame buffer again
 In-Reply-To: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1270190944-21644-15-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1270190944-21644-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves external interrupts support code from plat-s5pc1xx to
-plat-s5p and enables support for it on ARCH_S5PC100. This code can be easily
-reused by S5PV210/S5PC110 and probably S5P6442.
+This patch enables support for s3c frame buffer driver on SMDKC100 machine.
+It also fixes the wrongly defined pixel clock value (it worked only before
+commit eb29a5cc0b601).
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pc100/Kconfig                  |    1 +
- arch/arm/mach-s5pc100/gpio.c                   |    5 +-
- arch/arm/mach-s5pc100/include/mach/gpio.h      |    8 +++
- arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    2 +-
- arch/arm/plat-s5p/Kconfig                      |   11 +++++
- arch/arm/plat-s5p/Makefile                     |    1 +
- arch/arm/plat-s5p/include/plat/gpio-ext.h      |   44 +++++++++++++++++++
- arch/arm/{plat-s5pc1xx => plat-s5p}/irq-eint.c |   55 ++++++++++++------------
- arch/arm/plat-s5pc1xx/include/plat/gpio-ext.h  |   44 -------------------
- 9 files changed, 97 insertions(+), 74 deletions(-)
- create mode 100644 arch/arm/plat-s5p/include/plat/gpio-ext.h
- rename arch/arm/{plat-s5pc1xx => plat-s5p}/irq-eint.c (80%)
- delete mode 100644 arch/arm/plat-s5pc1xx/include/plat/gpio-ext.h
+ arch/arm/mach-s5pc100/Kconfig         |    2 ++
+ arch/arm/mach-s5pc100/mach-smdkc100.c |   13 +++++--------
+ 2 files changed, 7 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index 168bf51..229763c 100644
+index 26e0028..1e7b9a7 100644
 --- a/arch/arm/mach-s5pc100/Kconfig
 +++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -9,6 +9,7 @@ if ARCH_S5PC100
- config CPU_S5PC100
- 	bool
- 	select PLAT_S5P
-+	select S5P_IRQ_EINT
+@@ -22,6 +22,8 @@ config S5PC100_SETUP_FB_24BPP
+ config MACH_SMDKC100
+ 	bool "SMDKC100"
+ 	select CPU_S5PC100
++	select S5PC100_SETUP_FB_24BPP
++	select S3C_DEV_FB
  	help
- 	  Enable S5PC100 CPU support
+ 	  Machine support for the Samsung SMDKC100
  
-diff --git a/arch/arm/mach-s5pc100/gpio.c b/arch/arm/mach-s5pc100/gpio.c
-index 9f6fbe1..32a90db 100644
---- a/arch/arm/mach-s5pc100/gpio.c
-+++ b/arch/arm/mach-s5pc100/gpio.c
-@@ -473,9 +473,10 @@ static __init void s5pc100_gpiolib_link(struct s3c_gpio_chip *chip)
- 			set_irq_handler(irq, handle_level_irq);
- 			set_irq_flags(irq, IRQF_VALID);
- 		}
--	} else if (chip->config == &gpio_cfg_eint)
--		chip->chip.to_irq = s5pc100_gpiolib_to_eint;
-+	} else
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index 8dec25f..44984be 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -85,7 +85,7 @@ static struct i2c_board_info i2c_devs0[] __initdata = {
+ /* I2C1 */
+ static struct i2c_board_info i2c_devs1[] __initdata = {
+ };
+-
++#endif
+ /* LCD power controller */
+ static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
+ 				   unsigned int power)
+@@ -118,8 +118,7 @@ static struct platform_device smdkc100_lcd_powerdev = {
+ static struct s3c_fb_pd_win smdkc100_fb_win0 = {
+ 	/* this is to ensure we use win0 */
+ 	.win_mode	= {
+-		.refresh	= 70,
+-		.pixclock	= (8+13+3+800)*(7+5+1+480),
++		.pixclock = 1000000000000ULL / ((8+13+3+800)*(7+5+1+480)*80),
+ 		.left_margin	= 8,
+ 		.right_margin	= 13,
+ 		.upper_margin	= 7,
+@@ -139,17 +138,16 @@ static struct s3c_fb_platdata smdkc100_lcd_pdata __initdata = {
+ 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+ 	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
+ };
+-#endif
+ 
+ static struct platform_device *smdkc100_devices[] __initdata = {
++	&s3c_device_fb,
++	&smdkc100_lcd_powerdev,
+ #if 0
+ 	&s3c_device_i2c0,
+ 	&s3c_device_i2c1,
+-	&s3c_device_fb,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
+-	&smdkc100_lcd_powerdev,
  #endif
-+	if (chip->config == &gpio_cfg_eint)
-+		chip->chip.to_irq = s5pc100_gpiolib_to_eint;
- }
- 
- static __init void s5pc100_gpiolib_add(struct s3c_gpio_chip *chips,
-diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-s5pc100/include/mach/gpio.h
-index 2c4cbe8..7e07016 100644
---- a/arch/arm/mach-s5pc100/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
-@@ -159,4 +159,12 @@ enum s3c_gpio_number {
- /* define the number of gpios we need to the one after the MP04() range */
- #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
- 
-+/* Common compatibility defines */
-+#define S5P_GPIO_EINT_SFN	S3C_GPIO_SFN(0x2)
-+#define S5P_GPH0(n)		S5PC100_GPH0(n)
-+#define S5P_GPH1(n)		S5PC100_GPH1(n)
-+#define S5P_GPH2(n)		S5PC100_GPH2(n)
-+#define S5P_GPH3(n)		S5PC100_GPH3(n)
-+#define S5P_GPIO_INT_GROUP_END	S5PC100_GPIO_INT_GROUP_END
-+
- #include <asm-generic/gpio.h>
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-index b523d84..57234fe 100644
---- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-@@ -60,7 +60,7 @@
- 
- /* Common part */
- /* External interrupt base is same at both s5pc100 and s5pc110 */
--#define S5PC1XX_EINT_BASE	(S5PC100_EINT_BASE)
-+#define S5P_EINT_BASE			(S5PC100_EINT_BASE)
- 
- #define S5PC100_GPx_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
- #define S5PC100_GPx_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 189be6e..bf00e0e 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -24,3 +24,14 @@ config PLAT_S5P
- 	select SAMSUNG_IRQ_UART
- 	help
- 	  Base platform code for Samsung's S5P series SoC.
-+
-+if PLAT_S5P
-+
-+# Configuration options shared by all S5P implementations
-+
-+config S5P_IRQ_EINT
-+	bool
-+	help
-+	  Common initialisation code for the EINT support on S5P platform
-+
-+endif
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 0ec09a9..db4801f 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -16,3 +16,4 @@ obj-y				+= dev-uart.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
- obj-y				+= irq.o
-+obj-$(CONFIG_S5P_IRQ_EINT)	+= irq-eint.o
-diff --git a/arch/arm/plat-s5p/include/plat/gpio-ext.h b/arch/arm/plat-s5p/include/plat/gpio-ext.h
-new file mode 100644
-index 0000000..b298335
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/gpio-ext.h
-@@ -0,0 +1,44 @@
-+/* linux/arch/arm/plat-s5p/include/plat/gpio-eint.h
-+ *
-+ * Copyright 2009 Samsung Electronics Co.
-+ *
-+ * External Interrupt (GPH0 ~ GPH3) control register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#define S5P_WKUP_INT_CON0_7		(S5P_EINT_BASE + 0x0)
-+#define S5P_WKUP_INT_CON8_15		(S5P_EINT_BASE + 0x4)
-+#define S5P_WKUP_INT_CON16_23		(S5P_EINT_BASE + 0x8)
-+#define S5P_WKUP_INT_CON24_31		(S5P_EINT_BASE + 0xC)
-+#define S5P_WKUP_INT_CON(x)		(S5P_WKUP_INT_CON0_7 + (x * 0x4))
-+
-+#define S5P_WKUP_INT_FLTCON0_3		(S5P_EINT_BASE + 0x80)
-+#define S5P_WKUP_INT_FLTCON4_7		(S5P_EINT_BASE + 0x84)
-+#define S5P_WKUP_INT_FLTCON8_11		(S5P_EINT_BASE + 0x88)
-+#define S5P_WKUP_INT_FLTCON12_15	(S5P_EINT_BASE + 0x8C)
-+#define S5P_WKUP_INT_FLTCON16_19	(S5P_EINT_BASE + 0x90)
-+#define S5P_WKUP_INT_FLTCON20_23	(S5P_EINT_BASE + 0x94)
-+#define S5P_WKUP_INT_FLTCON24_27	(S5P_EINT_BASE + 0x98)
-+#define S5P_WKUP_INT_FLTCON28_31	(S5P_EINT_BASE + 0x9C)
-+#define S5P_WKUP_INT_FLTCON(x)		(S5P_WKUP_INT_FLTCON0_3 + (x * 0x4))
-+
-+#define S5P_WKUP_INT_MASK0_7		(S5P_EINT_BASE + 0x100)
-+#define S5P_WKUP_INT_MASK8_15		(S5P_EINT_BASE + 0x104)
-+#define S5P_WKUP_INT_MASK16_23		(S5P_EINT_BASE + 0x108)
-+#define S5P_WKUP_INT_MASK24_31		(S5P_EINT_BASE + 0x10C)
-+#define S5P_WKUP_INT_MASK(x)		(S5P_WKUP_INT_MASK0_7 + (x * 0x4))
-+
-+#define S5P_WKUP_INT_PEND0_7		(S5P_EINT_BASE + 0x140)
-+#define S5P_WKUP_INT_PEND8_15		(S5P_EINT_BASE + 0x144)
-+#define S5P_WKUP_INT_PEND16_23		(S5P_EINT_BASE + 0x148)
-+#define S5P_WKUP_INT_PEND24_31		(S5P_EINT_BASE + 0x14C)
-+#define S5P_WKUP_INT_PEND(x)		(S5P_WKUP_INT_PEND0_7 + (x * 0x4))
-+
-+#define S5P_WKUP_INT_LOWLEV		(0x00)
-+#define S5P_WKUP_INT_HILEV		(0x01)
-+#define S5P_WKUP_INT_FALLEDGE		(0x02)
-+#define S5P_WKUP_INT_RISEEDGE		(0x03)
-+#define S5P_WKUP_INT_BOTHEDGE		(0x04)
-diff --git a/arch/arm/plat-s5pc1xx/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-similarity index 80%
-rename from arch/arm/plat-s5pc1xx/irq-eint.c
-rename to arch/arm/plat-s5p/irq-eint.c
-index 373122f..1e300d6 100644
---- a/arch/arm/plat-s5pc1xx/irq-eint.c
-+++ b/arch/arm/plat-s5p/irq-eint.c
-@@ -1,5 +1,5 @@
- /*
-- * linux/arch/arm/plat-s5pc1xx/irq-eint.c
-+ * linux/arch/arm/plat-s5p/irq-eint.c
-  *
-  *  Copyright 2009 Samsung Electronics Co.
-  *  Byungho Min <bhmin@samsung.com>
-@@ -7,7 +7,7 @@
-  *
-  * Based on plat-s3c64xx/irq-eint.c
-  *
-- * S5PC1XX - Interrupt handling for IRQ_EINT(x)
-+ * S5P - Interrupt handling for IRQ_EINT(x)
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -25,11 +25,12 @@
- #include <asm/hardware/vic.h>
- 
- #include <mach/map.h>
-+#include <mach/irqs.h>
-+#include <mach/regs-gpio.h>
- 
- #include <plat/gpio-cfg.h>
- #include <plat/gpio-ext.h>
- #include <plat/pm.h>
--#include <plat/regs-gpio.h>
- #include <plat/regs-irqtype.h>
- 
- /*
-@@ -45,9 +46,9 @@ static inline int s3c_get_eint(unsigned int irq)
- 	int real;
- 
- 	if (irq < IRQ_EINT16_31)
--		real = (irq - IRQ_EINT0);
-+		real = (irq - IRQ_EINT(0));
- 	else
--		real = (irq - S3C_IRQ_EINT_BASE) + IRQ_EINT16_31 - IRQ_EINT0;
-+		real = (irq - S5P_IRQ_EINT_BASE) + IRQ_EINT16_31 - IRQ_EINT(0);
- 
- 	return real;
- }
-@@ -72,9 +73,9 @@ static inline void s3c_irq_eint_mask(unsigned int irq)
- 	u32 mask;
- 	u32 bank = s3c_get_bank(irq);
- 
--	mask = __raw_readl(S5PC1XX_WKUP_INT_MASK(bank));
-+	mask = __raw_readl(S5P_WKUP_INT_MASK(bank));
- 	mask |= s3c_eint_to_bit(irq);
--	__raw_writel(mask, S5PC1XX_WKUP_INT_MASK(bank));
-+	__raw_writel(mask, S5P_WKUP_INT_MASK(bank));
- }
- 
- static void s3c_irq_eint_unmask(unsigned int irq)
-@@ -82,16 +83,16 @@ static void s3c_irq_eint_unmask(unsigned int irq)
- 	u32 mask;
- 	u32 bank = s3c_get_bank(irq);
- 
--	mask = __raw_readl(S5PC1XX_WKUP_INT_MASK(bank));
-+	mask = __raw_readl(S5P_WKUP_INT_MASK(bank));
- 	mask &= ~(s3c_eint_to_bit(irq));
--	__raw_writel(mask, S5PC1XX_WKUP_INT_MASK(bank));
-+	__raw_writel(mask, S5P_WKUP_INT_MASK(bank));
- }
- 
- static inline void s3c_irq_eint_ack(unsigned int irq)
- {
- 	u32 bank = s3c_get_bank(irq);
- 
--	__raw_writel(s3c_eint_to_bit(irq), S5PC1XX_WKUP_INT_PEND(bank));
-+	__raw_writel(s3c_eint_to_bit(irq), S5P_WKUP_INT_PEND(bank));
- }
- 
- static void s3c_irq_eint_maskack(unsigned int irq)
-@@ -114,23 +115,23 @@ static int s3c_irq_eint_set_type(unsigned int irq, unsigned int type)
- 		break;
- 
- 	case IRQ_TYPE_EDGE_RISING:
--		con = S5PC1XX_WKUP_INT_RISEEDGE;
-+		con = S5P_WKUP_INT_RISEEDGE;
- 		break;
- 
- 	case IRQ_TYPE_EDGE_FALLING:
--		con = S5PC1XX_WKUP_INT_FALLEDGE;
-+		con = S5P_WKUP_INT_FALLEDGE;
- 		break;
- 
- 	case IRQ_TYPE_EDGE_BOTH:
--		con = S5PC1XX_WKUP_INT_BOTHEDGE;
-+		con = S5P_WKUP_INT_BOTHEDGE;
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_LOW:
--		con = S5PC1XX_WKUP_INT_LOWLEV;
-+		con = S5P_WKUP_INT_LOWLEV;
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_HIGH:
--		con = S5PC1XX_WKUP_INT_HILEV;
-+		con = S5P_WKUP_INT_HILEV;
- 		break;
- 
- 	default:
-@@ -141,23 +142,23 @@ static int s3c_irq_eint_set_type(unsigned int irq, unsigned int type)
- 	gpio = real & (8 - 1);
- 	shift = gpio << 2;
- 
--	ctrl = __raw_readl(S5PC1XX_WKUP_INT_CON(bank));
-+	ctrl = __raw_readl(S5P_WKUP_INT_CON(bank));
- 	ctrl &= ~(0x7 << shift);
- 	ctrl |= con << shift;
--	__raw_writel(ctrl, S5PC1XX_WKUP_INT_CON(bank));
-+	__raw_writel(ctrl, S5P_WKUP_INT_CON(bank));
- 
- 	switch (real) {
- 	case 0 ... 7:
--			gpio = S5PC100_GPH0(gpio);
-+			gpio = S5P_GPH0(gpio);
- 		break;
- 	case 8 ... 15:
--			gpio = S5PC100_GPH1(gpio);
-+			gpio = S5P_GPH1(gpio);
- 		break;
- 	case 16 ... 23:
--			gpio = S5PC100_GPH2(gpio);
-+			gpio = S5P_GPH2(gpio);
- 		break;
- 	case 24 ... 31:
--			gpio = S5PC100_GPH3(gpio);
-+			gpio = S5P_GPH3(gpio);
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -187,8 +188,8 @@ static struct irq_chip s3c_irq_eint = {
-  */
- static inline void s3c_irq_demux_eint(unsigned int start, unsigned int end)
- {
--	u32 status = __raw_readl(S5PC1XX_WKUP_INT_PEND((start >> 3)));
--	u32 mask = __raw_readl(S5PC1XX_WKUP_INT_MASK((start >> 3)));
-+	u32 status = __raw_readl(S5P_WKUP_INT_PEND((start >> 3)));
-+	u32 mask = __raw_readl(S5P_WKUP_INT_MASK((start >> 3)));
- 	unsigned int irq;
- 
- 	status &= ~mask;
-@@ -237,7 +238,7 @@ static inline void s3c_irq_vic_eint_ack(unsigned int irq)
- 	u32 bank = s3c_get_bank(irq);
- 
- 	bit = s3c_eint_to_bit(irq);
--	__raw_writel(bit, S5PC1XX_WKUP_INT_PEND(bank));
-+	__raw_writel(bit, S5P_WKUP_INT_PEND(bank));
- }
- 
- static void s3c_irq_vic_eint_maskack(unsigned int irq)
-@@ -257,11 +258,11 @@ static struct irq_chip s3c_irq_vic_eint = {
- 	.set_wake	= s3c_irqext_wake,
  };
  
--static int __init s5pc1xx_init_irq_eint(void)
-+static int __init s5p_init_irq_eint(void)
- {
- 	int irq;
+@@ -168,7 +166,7 @@ static void __init smdkc100_machine_init(void)
+ 	s3c_i2c1_set_platdata(NULL);
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+-
++#endif
+ 	s3c_fb_set_platdata(&smdkc100_lcd_pdata);
  
--	for (irq = IRQ_EINT0; irq <= IRQ_EINT15; irq++) {
-+	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++) {
- 		set_irq_chip(irq, &s3c_irq_vic_eint);
- 		set_irq_handler(irq, handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID);
-@@ -278,4 +279,4 @@ static int __init s5pc1xx_init_irq_eint(void)
- 	return 0;
+ 	/* LCD init */
+@@ -176,7 +174,6 @@ static void __init smdkc100_machine_init(void)
+ 	gpio_request(S5PC100_GPH0(6), "GPH0");
+ 	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+ 	platform_add_devices(smdkc100_devices, ARRAY_SIZE(smdkc100_devices));
+-#endif
  }
  
--arch_initcall(s5pc1xx_init_irq_eint);
-+arch_initcall(s5p_init_irq_eint);
-diff --git a/arch/arm/plat-s5pc1xx/include/plat/gpio-ext.h b/arch/arm/plat-s5pc1xx/include/plat/gpio-ext.h
-deleted file mode 100644
-index 33ad267..0000000
---- a/arch/arm/plat-s5pc1xx/include/plat/gpio-ext.h
-+++ /dev/null
-@@ -1,44 +0,0 @@
--/* linux/arch/arm/plat-s5pc1xx/include/plat/gpio-eint.h
-- *
-- * Copyright 2009 Samsung Electronics Co.
-- *
-- * External Interrupt (GPH0 ~ GPH3) control register definitions
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#define S5PC1XX_WKUP_INT_CON0_7		(S5PC1XX_EINT_BASE + 0x0)
--#define S5PC1XX_WKUP_INT_CON8_15	(S5PC1XX_EINT_BASE + 0x4)
--#define S5PC1XX_WKUP_INT_CON16_23	(S5PC1XX_EINT_BASE + 0x8)
--#define S5PC1XX_WKUP_INT_CON24_31	(S5PC1XX_EINT_BASE + 0xC)
--#define S5PC1XX_WKUP_INT_CON(x)		(S5PC1XX_WKUP_INT_CON0_7 + (x * 0x4))
--
--#define S5PC1XX_WKUP_INT_FLTCON0_3	(S5PC1XX_EINT_BASE + 0x80)
--#define S5PC1XX_WKUP_INT_FLTCON4_7	(S5PC1XX_EINT_BASE + 0x84)
--#define S5PC1XX_WKUP_INT_FLTCON8_11	(S5PC1XX_EINT_BASE + 0x88)
--#define S5PC1XX_WKUP_INT_FLTCON12_15	(S5PC1XX_EINT_BASE + 0x8C)
--#define S5PC1XX_WKUP_INT_FLTCON16_19	(S5PC1XX_EINT_BASE + 0x90)
--#define S5PC1XX_WKUP_INT_FLTCON20_23	(S5PC1XX_EINT_BASE + 0x94)
--#define S5PC1XX_WKUP_INT_FLTCON24_27	(S5PC1XX_EINT_BASE + 0x98)
--#define S5PC1XX_WKUP_INT_FLTCON28_31	(S5PC1XX_EINT_BASE + 0x9C)
--#define S5PC1XX_WKUP_INT_FLTCON(x)	(S5PC1XX_WKUP_INT_FLTCON0_3 + (x * 0x4))
--
--#define S5PC1XX_WKUP_INT_MASK0_7	(S5PC1XX_EINT_BASE + 0x100)
--#define S5PC1XX_WKUP_INT_MASK8_15	(S5PC1XX_EINT_BASE + 0x104)
--#define S5PC1XX_WKUP_INT_MASK16_23	(S5PC1XX_EINT_BASE + 0x108)
--#define S5PC1XX_WKUP_INT_MASK24_31	(S5PC1XX_EINT_BASE + 0x10C)
--#define S5PC1XX_WKUP_INT_MASK(x)	(S5PC1XX_WKUP_INT_MASK0_7 + (x * 0x4))
--
--#define S5PC1XX_WKUP_INT_PEND0_7	(S5PC1XX_EINT_BASE + 0x140)
--#define S5PC1XX_WKUP_INT_PEND8_15	(S5PC1XX_EINT_BASE + 0x144)
--#define S5PC1XX_WKUP_INT_PEND16_23	(S5PC1XX_EINT_BASE + 0x148)
--#define S5PC1XX_WKUP_INT_PEND24_31	(S5PC1XX_EINT_BASE + 0x14C)
--#define S5PC1XX_WKUP_INT_PEND(x)	(S5PC1XX_WKUP_INT_PEND0_7 + (x * 0x4))
--
--#define S5PC1XX_WKUP_INT_LOWLEV		(0x00)
--#define S5PC1XX_WKUP_INT_HILEV		(0x01)
--#define S5PC1XX_WKUP_INT_FALLEDGE	(0x02)
--#define S5PC1XX_WKUP_INT_RISEEDGE	(0x03)
--#define S5PC1XX_WKUP_INT_BOTHEDGE	(0x04)
+ MACHINE_START(SMDKC100, "SMDKC100")
 -- 
 1.6.4
