@@ -1,74 +1,235 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri,  2 Apr 2010 14:15:09 +0100
-Subject: [PATCH v2] i2c-s3c2410: Remove unconditional 1ms delay on each
-	transfer
-Message-ID: <1270214109-28226-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: imre.deak@nokia.com (imre.deak at nokia.com)
+Date: Fri,  2 Apr 2010 17:36:03 +0300
+Subject: [RFC PATCH v5 2/2] ARM: VFP: preserve the HW context when calling
+	signal handlers
+In-Reply-To: <cover.1270199787.git.imre.deak@nokia.com>
+References: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
+	<cover.1270199787.git.imre.deak@nokia.com>
+Message-ID: <e15d90a0042327dd34a065f9cd463a02b25e6522.1270199787.git.imre.deak@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C I2C controller indicates completion of I2C transfers before
-the bus has a stop condition on it. In order to ensure that we do not
-attempt to start a new transfer before the bus is idle the driver
-currently inserts a 1ms delay. This is vastly larger than is generally
-required and has a visible effect on performance under load, such as
-when bringing up audio CODECs or reading back status information with
-non-bulk I2C reads.
+From: Imre Deak <imre.deak@nokia.com>
 
-Replace the sleep with a spin on the IIC status register for up to 1ms.
-This will busy wait but testing on my SMDK6410 system indicates that
-the overwhelming majority of transactions complete on the first spin,
-with maximum latencies of less than 10 spins so the absolute overhead
-of busy waiting should be at worst comprable to msleep(), and the
-overall system performance is dramatically improved.
+Signal handlers can use floating point, so prevent them to corrupt
+the main thread's VFP context. So far there were two signal stack
+frame formats defined based on the VFP implementation, but the user
+struct used for ptrace covers all posibilities, so use it for the
+signal stack too.
 
-The main risk is poor interaction with multimaster systems where
-we may miss the bus going idle before the next transaction. Defend
-against this by falling back to the original 1ms delay after 20 spins.
+Introduce also a new user struct for VFP exception registers. In
+this too fields not relevant to the current VFP architecture are
+ignored.
 
-The overall effect in my testing is an approximately 20% improvement
-in kernel startup time.
+Support to save / restore the exception registers was added by
+Will Deacon.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Imre Deak <imre.deak@nokia.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/ucontext.h |   23 +++++-----
+ arch/arm/include/asm/user.h     |   12 +++++-
+ arch/arm/kernel/signal.c        |   93 +++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 111 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index d27072b..ec3256c 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -482,7 +482,8 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
- static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
- 			      struct i2c_msg *msgs, int num)
+diff --git a/arch/arm/include/asm/ucontext.h b/arch/arm/include/asm/ucontext.h
+index bf65e9f..47f023a 100644
+--- a/arch/arm/include/asm/ucontext.h
++++ b/arch/arm/include/asm/ucontext.h
+@@ -59,23 +59,22 @@ struct iwmmxt_sigframe {
+ #endif /* CONFIG_IWMMXT */
+ 
+ #ifdef CONFIG_VFP
+-#if __LINUX_ARM_ARCH__ < 6
+-/* For ARM pre-v6, we use fstmiax and fldmiax.  This adds one extra
+- * word after the registers, and a word of padding@the end for
+- * alignment.  */
+ #define VFP_MAGIC		0x56465001
+-#define VFP_STORAGE_SIZE	152
+-#else
+-#define VFP_MAGIC		0x56465002
+-#define VFP_STORAGE_SIZE	144
+-#endif
+ 
+ struct vfp_sigframe
  {
--	unsigned long timeout;
-+	unsigned long iicstat, timeout;
-+	int spins = 20;
- 	int ret;
- 
- 	if (i2c->suspended)
-@@ -521,7 +522,21 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
- 
- 	/* ensure the stop has been through the bus */
- 
--	msleep(1);
-+	dev_dbg(i2c->dev, "waiting for bus idle\n");
+ 	unsigned long		magic;
+ 	unsigned long		size;
+-	union vfp_state		storage;
+-};
++	struct user_vfp		ufp;
++	struct user_vfp_exc	ufp_exc;
++} __attribute__((__aligned__(8)));
 +
-+	/* first, try busy waiting briefly */
-+	do {
-+		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-+	} while ((iicstat & S3C2410_IICSTAT_START) && --spins);
++/*
++ *  8 byte for magic and size, 264 byte for ufp, 12 bytes for ufp_exc,
++ *  4 bytes padding.
++ */
++#define VFP_STORAGE_SIZE	sizeof(struct vfp_sigframe)
 +
-+	/* if that timed out sleep */
-+	if (!spins) {
-+		msleep(1);
-+		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-+	}
-+
-+	if (iicstat & S3C2410_IICSTAT_START)
-+		dev_warn(i2c->dev, "timeout waiting for bus idle\n");
+ #endif /* CONFIG_VFP */
  
-  out:
- 	return ret;
+ /*
+@@ -91,7 +90,7 @@ struct aux_sigframe {
+ #ifdef CONFIG_IWMMXT
+ 	struct iwmmxt_sigframe	iwmmxt;
+ #endif
+-#if 0 && defined CONFIG_VFP /* Not yet saved.  */
++#ifdef CONFIG_VFP
+ 	struct vfp_sigframe	vfp;
+ #endif
+ 	/* Something that isn't a valid magic number for any coprocessor.  */
+diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+index df95e05..05ac4b0 100644
+--- a/arch/arm/include/asm/user.h
++++ b/arch/arm/include/asm/user.h
+@@ -83,11 +83,21 @@ struct user{
+ 
+ /*
+  * User specific VFP registers. If only VFPv2 is present, registers 16 to 31
+- * are ignored by the ptrace system call.
++ * are ignored by the ptrace system call and the signal handler.
+  */
+ struct user_vfp {
+ 	unsigned long long fpregs[32];
+ 	unsigned long fpscr;
+ };
+ 
++/*
++ * VFP exception registers exposed to user space during signal delivery.
++ * Fields not relavant to the current VFP architecture are ignored.
++ */
++struct user_vfp_exc {
++	unsigned long	fpexc;
++	unsigned long	fpinst;
++	unsigned long	fpinst2;
++};
++
+ #endif /* _ARM_USER_H */
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index e7714f3..907d5a6 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -18,6 +18,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/ucontext.h>
+ #include <asm/unistd.h>
++#include <asm/vfp.h>
+ 
+ #include "ptrace.h"
+ #include "signal.h"
+@@ -175,6 +176,90 @@ static int restore_iwmmxt_context(struct iwmmxt_sigframe *frame)
+ 
+ #endif
+ 
++#ifdef CONFIG_VFP
++
++static int preserve_vfp_context(struct vfp_sigframe __user *frame)
++{
++	struct thread_info *thread = current_thread_info();
++	struct vfp_hard_struct *h = &thread->vfpstate.hard;
++	const unsigned long magic = VFP_MAGIC;
++	const unsigned long size = VFP_STORAGE_SIZE;
++	int err = 0;
++
++	vfp_sync_hwstate(thread);
++	__put_user_error(magic, &frame->magic, err);
++	__put_user_error(size, &frame->size, err);
++
++	/*
++	 * Copy the floating point registers. There can be unused
++	 * registers see asm/hwcap.h for details.
++	 */
++	err |= __copy_to_user(&frame->ufp.fpregs, &h->fpregs,
++			      sizeof(h->fpregs));
++	/*
++	 * Copy the status and control register.
++	 */
++	__put_user_error(h->fpscr, &frame->ufp.fpscr, err);
++
++	/*
++	 * Copy the exception registers.
++	 */
++	__put_user_error(h->fpexc, &frame->ufp_exc.fpexc, err);
++	__put_user_error(h->fpinst, &frame->ufp_exc.fpinst, err);
++	__put_user_error(h->fpinst2, &frame->ufp_exc.fpinst2, err);
++
++	return err ? -EFAULT : 0;
++}
++
++static int restore_vfp_context(struct vfp_sigframe __user *frame)
++{
++	struct thread_info *thread = current_thread_info();
++	struct vfp_hard_struct *h = &thread->vfpstate.hard;
++	unsigned long magic;
++	unsigned long size;
++	unsigned long fpexc;
++	int err = 0;
++
++	__get_user_error(magic, &frame->magic, err);
++	__get_user_error(size, &frame->size, err);
++
++	if (err)
++		return -EFAULT;
++	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
++		return -EINVAL;
++
++	/*
++	 * Copy the floating point registers. There can be unused
++	 * registers see asm/hwcap.h for details.
++	 */
++	err |= __copy_from_user(&h->fpregs, &frame->ufp.fpregs,
++				sizeof(h->fpregs));
++	/*
++	 * Copy the status and control register.
++	 */
++	__get_user_error(h->fpscr, &frame->ufp.fpscr, err);
++
++	/*
++	 * Sanitise and restore the exception registers.
++	 */
++	__get_user_error(fpexc, &frame->ufp_exc.fpexc, err);
++	/* Ensure the VFP is enabled. */
++	fpexc |= FPEXC_EN;
++	/* Ensure FPINST2 is invalid and the exception flag is cleared. */
++	fpexc &= ~(FPEXC_EX | FPEXC_FP2V);
++	h->fpexc = fpexc;
++
++	__get_user_error(h->fpinst, &frame->ufp_exc.fpinst, err);
++	__get_user_error(h->fpinst2, &frame->ufp_exc.fpinst2, err);
++
++	if (!err)
++		vfp_flush_hwstate(thread);
++
++	return err ? -EFAULT : 0;
++}
++
++#endif
++
+ /*
+  * Do a signal return; undo the signal stack.  These are aligned to 64-bit.
+  */
+@@ -233,8 +318,8 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+ 		err |= restore_iwmmxt_context(&aux->iwmmxt);
+ #endif
+ #ifdef CONFIG_VFP
+-//	if (err == 0)
+-//		err |= vfp_restore_state(&sf->aux.vfp);
++	if (err == 0)
++		err |= restore_vfp_context(&aux->vfp);
+ #endif
+ 
+ 	return err;
+@@ -348,8 +433,8 @@ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+ 		err |= preserve_iwmmxt_context(&aux->iwmmxt);
+ #endif
+ #ifdef CONFIG_VFP
+-//	if (err == 0)
+-//		err |= vfp_save_state(&sf->aux.vfp);
++	if (err == 0)
++		err |= preserve_vfp_context(&aux->vfp);
+ #endif
+ 	__put_user_error(0, &aux->end_magic, err);
+ 
 -- 
-1.7.0.3
+1.7.0.2
