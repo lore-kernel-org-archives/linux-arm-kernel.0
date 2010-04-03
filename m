@@ -1,20 +1,40 @@
-From: sundar.iyer@stericsson.com (Sundar R IYER)
-Date: Sat, 3 Apr 2010 20:12:56 +0200
-Subject: Regulators vis-a-vis Power Domains
-Message-ID: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun,  4 Apr 2010 00:46:45 +0200
+Subject: [PATCH] ARM: add MAINTAINERS for U300
+Message-ID: <1270334805-20767-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All,
-?
-I have a few queries about regulators vis-a-vis power domains.
-?
-1. The documentation for the regulators mentions "power domains" and "switches" to be modeled as regulators. I am planning to model multiple "switches" for controlling supplies to various peripherals from a main master regulator as multiple regulators, childed from the parent regulator. Is this the right way to proceed ahead? Further the options for these switches will be only?a logical on/off. (BTW, I saw lots of TI stuff which is something related to power domains, but it doesn't model the regulator framework.)
-?
-2. In the same example below, should I instead model just the main regulator, and in the driver specific enable/disable, iterate through the list of consumers, and then accordingly enable/disable these switches according to the calling consumer?. In this way,?I can choose not to clutter those smaller switches as regulators in my regulator as well as peripheral driver code.?
-?
-3. Extending the same model, I want to use the _set_optimum API. Logically, enabling/disabling the child supply or setting an optimal load on the regulator must propagate the new load to any master regulator ( which can then again be set an optimal load). My understanding of this function shows me that?currently, this is not supported in the function. Am I right in deducing this or?have I failed to overlook some other portions in the regulator code?
-?
-Waiting for all your valuable replies!
-?
-Sundar
+From: Linus Walleij <linus@foobar.localdomain>
+
+This adds myself as maintainer of the U300 machine and associated
+system-on-chip drivers.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ MAINTAINERS |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3d29fa3..6eb978e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -971,6 +971,16 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.mcuos.com
+ S:	Maintained
+ 
++ARM/U300 MACHINE SUPPORT
++M:	Linus Walleij <linus.walleij@stericsson.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Supported
++F:	arch/arm/mach-u300/
++F:	drivers/i2c/busses/i2c-stu300.c
++F:	drivers/rtc/rtc-coh901331.c
++F:	drivers/watchdog/coh901327_wdt.c
++F:	drivers/dma/coh901318*
++
+ ARM/U8500 ARM ARCHITECTURE
+ M:	Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.6.6.1
