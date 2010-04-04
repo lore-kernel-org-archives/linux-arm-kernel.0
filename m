@@ -1,70 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 4 Apr 2010 14:10:58 +0100
-Subject: Regulators vis-a-vis Power Domains
-In-Reply-To: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
-References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <20100404131058.GA11705@opensource.wolfsonmicro.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun,  4 Apr 2010 16:08:38 +0200
+Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
+Message-ID: <1270390118-1802-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 03, 2010 at 08:12:56PM +0200, Sundar R IYER wrote:
+The timeout value is in jiffies, so it should be using HZ, not a plain
+number. Assume '100' means 100ms here and adapt accordingly.
 
-Please fix your mail client to word wrap within paragraphs; not doing
-this makes your messages harder to read and reply to.  I've reflowed below.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <maz@misterjones.org>
+Cc: Paul Shen <paul.shen@marvell.com>
+Cc: Mike Rapoport <mike@compulab.co.il>
+---
 
-> 1. The documentation for the regulators mentions "power domains" and
-> "switches" to be modeled as regulators. I am planning to model multiple
-> "switches" for controlling supplies to various peripherals from a main
-> master regulator as multiple regulators, childed from the parent
-> regulator. Is this the right way to proceed ahead? Further the options
+Janitorial fix, not tested due to no hardware.
 
-If you want to do this in the regulator framework, yes.
+ arch/arm/mach-pxa/viper.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> for these switches will be only?a logical on/off. (BTW, I saw lots of TI
-> stuff which is something related to power domains, but it doesn't model
-> the regulator framework.)
-
-Nor does the SH stuff.  With the power domains of a CPU it often doesn't
-buy terribly much to use the regulator framework - the power domains are
-often a small part of a much bigger picture for the CPU internal power
-management, often incorporating thing 
-
-> 2. In the same example below, should I instead model just the main
-> regulator, and in the driver specific enable/disable, iterate through
-> the list of consumers, and then accordingly enable/disable these
-> switches according to the calling consumer?. In this way,?I can choose
-> not to clutter those smaller switches as regulators in my regulator as
-> well as peripheral driver code.?
-
-I'm not entirely sure what you mean here.  No regulator driver should
-ever have any knowledge of its consumers, this will be handled by the
-regulator core, and regulators should not be making decisions about
-their own power state - this should also be done by the core.  Perhaps
-if you could provide a more concrete example your question might be
-clearer?
-
-> 3. Extending the same model, I want to use the _set_optimum API.
-> Logically, enabling/disabling the child supply or setting an optimal
-> load on the regulator must propagate the new load to any master
-> regulator ( which can then again be set an optimal load). My
-
-This isn't entirely clear, actually.  Translating the load on a child
-regulator to that on a parent regulator isn't trivial since the
-performance of both regulators needs to be taken into consideration -
-the child regulator will have its own requirements for the input.  These
-will obviously be influenced by the load it experiences but it's not
-as direct a mapping as is desirable for propagating up the tree in a
-generic fashion.
-
-> understanding of this function shows me that?currently, this is not
-> supported in the function. Am I right in deducing this or?have I failed
-> to overlook some other portions in the regulator code?
-
-There's no code to do this at the minute - like I say, it's not as easy
-as might be desirable.  The other thing to bear in mind here is that
-hardware is making this less and less relevant.  With modern regulators
-the regulator itself is capable of responding quickly enough to load
-changes to automatically switch between most if not all of the operating
-modes without software intervention.  This means that managing the mode
-in software generally ends up being less efficient than just leaving the
-hardware to it.
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index 1dd1334..c25921f 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -33,6 +33,7 @@
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+ #include <linux/gpio.h>
++#include <linux/jiffies.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/serial_8250.h>
+ #include <linux/smc91x.h>
+@@ -453,7 +454,7 @@ static struct i2c_gpio_platform_data i2c_bus_data = {
+ 	.sda_pin = VIPER_RTC_I2C_SDA_GPIO,
+ 	.scl_pin = VIPER_RTC_I2C_SCL_GPIO,
+ 	.udelay  = 10,
+-	.timeout = 100,
++	.timeout = HZ / 10,
+ };
+ 
+ static struct platform_device i2c_bus_device = {
+@@ -778,7 +779,7 @@ static void __init viper_tpm_init(void)
+ 		.sda_pin = VIPER_TPM_I2C_SDA_GPIO,
+ 		.scl_pin = VIPER_TPM_I2C_SCL_GPIO,
+ 		.udelay  = 10,
+-		.timeout = 100,
++		.timeout = HZ / 10,
+ 	};
+ 	char *errstr;
+ 
+-- 
+1.7.0
