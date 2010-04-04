@@ -1,40 +1,70 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun,  4 Apr 2010 00:46:45 +0200
-Subject: [PATCH] ARM: add MAINTAINERS for U300
-Message-ID: <1270334805-20767-1-git-send-email-linus.walleij@stericsson.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 4 Apr 2010 14:10:58 +0100
+Subject: Regulators vis-a-vis Power Domains
+In-Reply-To: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
+References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <20100404131058.GA11705@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus@foobar.localdomain>
+On Sat, Apr 03, 2010 at 08:12:56PM +0200, Sundar R IYER wrote:
 
-This adds myself as maintainer of the U300 machine and associated
-system-on-chip drivers.
+Please fix your mail client to word wrap within paragraphs; not doing
+this makes your messages harder to read and reply to.  I've reflowed below.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- MAINTAINERS |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> 1. The documentation for the regulators mentions "power domains" and
+> "switches" to be modeled as regulators. I am planning to model multiple
+> "switches" for controlling supplies to various peripherals from a main
+> master regulator as multiple regulators, childed from the parent
+> regulator. Is this the right way to proceed ahead? Further the options
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3d29fa3..6eb978e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -971,6 +971,16 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.mcuos.com
- S:	Maintained
- 
-+ARM/U300 MACHINE SUPPORT
-+M:	Linus Walleij <linus.walleij@stericsson.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm/mach-u300/
-+F:	drivers/i2c/busses/i2c-stu300.c
-+F:	drivers/rtc/rtc-coh901331.c
-+F:	drivers/watchdog/coh901327_wdt.c
-+F:	drivers/dma/coh901318*
-+
- ARM/U8500 ARM ARCHITECTURE
- M:	Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.6.6.1
+If you want to do this in the regulator framework, yes.
+
+> for these switches will be only?a logical on/off. (BTW, I saw lots of TI
+> stuff which is something related to power domains, but it doesn't model
+> the regulator framework.)
+
+Nor does the SH stuff.  With the power domains of a CPU it often doesn't
+buy terribly much to use the regulator framework - the power domains are
+often a small part of a much bigger picture for the CPU internal power
+management, often incorporating thing 
+
+> 2. In the same example below, should I instead model just the main
+> regulator, and in the driver specific enable/disable, iterate through
+> the list of consumers, and then accordingly enable/disable these
+> switches according to the calling consumer?. In this way,?I can choose
+> not to clutter those smaller switches as regulators in my regulator as
+> well as peripheral driver code.?
+
+I'm not entirely sure what you mean here.  No regulator driver should
+ever have any knowledge of its consumers, this will be handled by the
+regulator core, and regulators should not be making decisions about
+their own power state - this should also be done by the core.  Perhaps
+if you could provide a more concrete example your question might be
+clearer?
+
+> 3. Extending the same model, I want to use the _set_optimum API.
+> Logically, enabling/disabling the child supply or setting an optimal
+> load on the regulator must propagate the new load to any master
+> regulator ( which can then again be set an optimal load). My
+
+This isn't entirely clear, actually.  Translating the load on a child
+regulator to that on a parent regulator isn't trivial since the
+performance of both regulators needs to be taken into consideration -
+the child regulator will have its own requirements for the input.  These
+will obviously be influenced by the load it experiences but it's not
+as direct a mapping as is desirable for propagating up the tree in a
+generic fashion.
+
+> understanding of this function shows me that?currently, this is not
+> supported in the function. Am I right in deducing this or?have I failed
+> to overlook some other portions in the regulator code?
+
+There's no code to do this at the minute - like I say, it's not as easy
+as might be desirable.  The other thing to bear in mind here is that
+hardware is making this less and less relevant.  With modern regulators
+the regulator itself is capable of responding quickly enough to load
+changes to automatically switch between most if not all of the operating
+modes without software intervention.  This means that managing the mode
+in software generally ends up being less efficient than just leaving the
+hardware to it.
