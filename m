@@ -1,49 +1,65 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Mon, 5 Apr 2010 22:21:03 +0400
-Subject: Is anyone working on SD/MMC driver for i.MX35 ?
-In-Reply-To: <20100402012932.GE13989@pengutronix.de>
-References: <20100401125739.GE2045@bluebox.local>
-	<20100401132017.GA30804@buzzloop.caiaq.de>
-	<20100401132234.GG2045@bluebox.local>
-	<20100402012932.GE13989@pengutronix.de>
-Message-ID: <20100405182103.GB3316@oksana.dev.rtsoft.ru>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Mon,  5 Apr 2010 15:34:21 -0700
+Subject: [PATCH] arm: mm: Don't free prohibited memmap entries
+In-Reply-To: <>
+References: <>
+Message-ID: <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 02, 2010 at 03:29:32AM +0200, Wolfram Sang wrote:
-> On Thu, Apr 01, 2010 at 03:22:35PM +0200, Hans J. Koch wrote:
-> > On Thu, Apr 01, 2010 at 03:20:17PM +0200, Daniel Mack wrote:
-> > > On Thu, Apr 01, 2010 at 02:57:40PM +0200, Hans J. Koch wrote:
-> > > > I need to get the MMC interface of an i.MX35 to work in the near future.
-> > > > To avoid duplicate work, I'd like to know if anybody already started
-> > > > work on this.
-> > > 
-> > > Is the controller very different from the one which is already supported
-> > > for MX31?
-> > 
-> > Yep. Completely different beast. Unfortunately.
-> 
-> (CCing linux-mmc)
-> 
-> And it is a mess, really :(
-> 
-> The kernel already has an esdhc-driver (and Anton already worked around a
-> number of hardware-bugs), but is tied into an of-driver because the core was
-> also used on PowerPC. There, it utilizes a 32-bit-byte-swaper which is not
-> needed on ARM. So, one has to rip all that out, generalize the sdhc-platform
-> support (possibly also abstract the quirk support) and make sure nothing
-> breaks.
+From: Michael Bohan <mbohan@quicinc.com>
 
-FYI, there is sdhci-pltfm driver, + some patches to add
-quirks support:
+The VM subsystem assumes that there are valid memmap entries to
+the bank end aligned to MAX_ORDER_NR_PAGES. It will try and read
+these page structs, and so we cannot free any memmap entries that
+it may inspect.
 
-http://lkml.org/lkml/2010/3/16/337
+Signed-off-by: Michael Bohan <mbohan@quicinc.com>
+---
+ arch/arm/mm/init.c |   19 +++++++++----------
+ 1 files changed, 9 insertions(+), 10 deletions(-)
 
-These patches are already in the -mm tree.
-
-Thanks,
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 83db12a..dcd04bf 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -532,28 +532,27 @@ static void __init free_unused_memmap_node(int node, struct meminfo *mi)
+ 	unsigned int i;
+ 
+ 	/*
+-	 * [FIXME] This relies on each bank being in address order.  This
+-	 * may not be the case, especially if the user has provided the
+-	 * information on the command line.
++	 * This relies on each bank being in address order.
++	 * The banks are sorted previously in bootmem_init().
+ 	 */
+ 	for_each_nodebank(i, mi, node) {
+ 		struct membank *bank = &mi->bank[i];
+ 
+ 		bank_start = bank_pfn_start(bank);
+-		if (bank_start < prev_bank_end) {
+-			printk(KERN_ERR "MEM: unordered memory banks.  "
+-				"Not freeing memmap.\n");
+-			break;
+-		}
+ 
+ 		/*
+ 		 * If we had a previous bank, and there is a space
+ 		 * between the current bank and the previous, free it.
+ 		 */
+-		if (prev_bank_end && prev_bank_end != bank_start)
++		if (prev_bank_end && prev_bank_end < bank_start)
+ 			free_memmap(node, prev_bank_end, bank_start);
+ 
+-		prev_bank_end = bank_pfn_end(bank);
++		/*
++		 * Align up here since the VM subsystem insists that the
++		 * memmap entries are valid from the bank end aligned to
++		 * MAX_ORDER_NR_PAGES.
++		 */
++		prev_bank_end = ALIGN(bank_pfn_end(bank), MAX_ORDER_NR_PAGES);
+ 	}
+ }
+ 
 -- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+1.6.2.3
