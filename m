@@ -1,245 +1,78 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon,  5 Apr 2010 06:00:05 +0200
-Subject: [PATCH 3/3] Zipit Z2 WM8750 aSoC driver
-In-Reply-To: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
-References: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1270440005-25459-3-git-send-email-marek.vasut@gmail.com>
+Date: Mon,  5 Apr 2010 06:00:03 +0200
+Subject: [PATCH 1/3] WM8750: Convert to new API
+Message-ID: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for sound through the WM8750 codec on Zipit Z2.
-Also, this patch incorporates support for detecting headset jack
-insertion through the jack detection API.
+Register the WM8750 as a SPI or I2C device. This patch mostly shuffles code
+around. Hugely inspired by WM8753 which was already converted.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- sound/soc/pxa/Kconfig  |    8 ++
- sound/soc/pxa/Makefile |    2 +
- sound/soc/pxa/z2.c     |  246 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 256 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/pxa/z2.c
+ sound/soc/codecs/wm8750.c |  297 +++++++++++++++++++++------------------------
+ 1 files changed, 140 insertions(+), 157 deletions(-)
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 376e14a..495a36f 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -42,6 +42,14 @@ config SND_PXA2XX_SOC_SPITZ
- 	  Say Y if you want to add support for SoC audio on Sharp
- 	  Zaurus SL-Cxx00 models (Spitz, Borzoi and Akita).
+diff --git a/sound/soc/codecs/wm8750.c b/sound/soc/codecs/wm8750.c
+index 3e440c0..49411d1 100644
+--- a/sound/soc/codecs/wm8750.c
++++ b/sound/soc/codecs/wm8750.c
+@@ -30,11 +30,6 @@
  
-+config SND_PXA2XX_SOC_Z2
-+	tristate "SoC Audio support for Zipit Z2"
-+	depends on SND_PXA2XX_SOC && MACH_ZIPIT2
-+	select SND_PXA2XX_SOC_I2S
-+	select SND_SOC_WM8750
-+	help
-+	  Say Y if you want to add support for SoC audio on Zipit Z2.
-+
- config SND_PXA2XX_SOC_POODLE
- 	tristate "SoC Audio support for Poodle"
- 	depends on SND_PXA2XX_SOC && MACH_POODLE
-diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
-index f3e08fd..caa03d8 100644
---- a/sound/soc/pxa/Makefile
-+++ b/sound/soc/pxa/Makefile
-@@ -22,6 +22,7 @@ snd-soc-palm27x-objs := palm27x.o
- snd-soc-zylonite-objs := zylonite.o
- snd-soc-magician-objs := magician.o
- snd-soc-mioa701-objs := mioa701_wm9713.o
-+snd-soc-z2-objs := z2.o
- snd-soc-imote2-objs := imote2.o
- snd-soc-raumfeld-objs := raumfeld.o
+ #include "wm8750.h"
  
-@@ -36,6 +37,7 @@ obj-$(CONFIG_SND_PXA2XX_SOC_EM_X270) += snd-soc-em-x270.o
- obj-$(CONFIG_SND_PXA2XX_SOC_PALM27X) += snd-soc-palm27x.o
- obj-$(CONFIG_SND_PXA2XX_SOC_MAGICIAN) += snd-soc-magician.o
- obj-$(CONFIG_SND_PXA2XX_SOC_MIOA701) += snd-soc-mioa701.o
-+obj-$(CONFIG_SND_PXA2XX_SOC_Z2) += snd-soc-z2.o
- obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
- obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
- obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
-diff --git a/sound/soc/pxa/z2.c b/sound/soc/pxa/z2.c
-new file mode 100644
-index 0000000..c78c271
---- /dev/null
-+++ b/sound/soc/pxa/z2.c
-@@ -0,0 +1,246 @@
-+/*
-+ * linux/sound/soc/pxa/z2.c
-+ *
-+ * SoC Audio driver for Aeronix Zipit Z2
-+ *
-+ * Copyright (C) 2009 Ken McGuire <kenm@desertweyr.com>
-+ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+-/* codec private data */
+-struct wm8750_priv {
+-	unsigned int sysclk;
+-};
+-
+ /*
+  * wm8750 register cache
+  * We can't read the WM8750 register space when we
+@@ -54,6 +49,13 @@ static const u16 wm8750_reg[] = {
+ 	0x0079, 0x0079, 0x0079,          /* 40 */
+ };
+ 
++/* codec private data */
++struct wm8750_priv {
++	unsigned int sysclk;
++	struct snd_soc_codec codec;
++	u16 reg_cache[ARRAY_SIZE(wm8750_reg)];
++};
 +
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/timer.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
+ #define wm8750_reset(c)	snd_soc_write(c, WM8750_RESET, 0)
+ 
+ /*
+@@ -696,25 +698,90 @@ static int wm8750_resume(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct snd_soc_codec *wm8750_codec;
 +
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <sound/jack.h>
-+
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <mach/audio.h>
-+#include <mach/z2.h>
-+
-+#include "../codecs/wm8750.h"
-+#include "pxa2xx-pcm.h"
-+#include "pxa2xx-i2s.h"
-+
-+static struct snd_soc_card snd_soc_z2;
-+
-+static int z2_hw_params(struct snd_pcm_substream *substream,
-+	struct snd_pcm_hw_params *params)
++static int wm8750_probe(struct platform_device *pdev)
 +{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
-+	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
-+	unsigned int clk = 0;
++	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
++	struct snd_soc_codec *codec;
 +	int ret = 0;
 +
-+	switch (params_rate(params)) {
-+	case 8000:
-+	case 16000:
-+	case 48000:
-+	case 96000:
-+		clk = 12288000;
-+		break;
-+	case 11025:
-+	case 22050:
-+	case 44100:
-+		clk = 11289600;
-+		break;
++	if (!wm8750_codec) {
++		dev_err(&pdev->dev, "WM8750 codec not yet registered\n");
++		return -EINVAL;
 +	}
 +
-+	/* set codec DAI configuration */
-+	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S |
-+		SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS);
-+	if (ret < 0)
-+		return ret;
++	socdev->card->codec = wm8750_codec;
++	codec = wm8750_codec;
 +
-+	/* set cpu DAI configuration */
-+	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
-+		SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* set the codec system clock for DAC and ADC */
-+	ret = snd_soc_dai_set_sysclk(codec_dai, WM8750_SYSCLK, clk,
-+		SND_SOC_CLOCK_IN);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* set the I2S system clock as input (unused) */
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, PXA2XX_I2S_SYSCLK, 0,
-+		SND_SOC_CLOCK_IN);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_jack hs_jack;
-+
-+/* Headset jack detection DAPM pins */
-+static struct snd_soc_jack_pin hs_jack_pins[] = {
-+	{
-+		.pin	= "Mic Jack",
-+		.mask	= SND_JACK_MICROPHONE,
-+	},
-+	{
-+		.pin	= "Headphone Jack",
-+		.mask	= SND_JACK_HEADPHONE,
-+	},
-+};
-+
-+/* Headset jack detection gpios */
-+static struct snd_soc_jack_gpio hs_jack_gpios[] = {
-+	{
-+		.gpio		= GPIO37_ZIPITZ2_HEADSET_DETECT,
-+		.name		= "hsdet-gpio",
-+		.report		= SND_JACK_HEADSET,
-+		.debounce_time	= 200,
-+	},
-+};
-+
-+/* z2 machine dapm widgets */
-+static const struct snd_soc_dapm_widget wm8750_dapm_widgets[] = {
-+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
-+	SND_SOC_DAPM_MIC("Mic Jack", NULL),
-+	SND_SOC_DAPM_SPK("Ext Spk", NULL),
-+
-+	/* headset is a mic and mono headphone */
-+	SND_SOC_DAPM_HP("Headset Jack", NULL),
-+};
-+
-+/* Z2 machine audio_map */
-+static const struct snd_soc_dapm_route audio_map[] = {
-+
-+	/* headphone connected to LOUT1, ROUT1 */
-+	{"Headphone Jack", NULL, "LOUT1"},
-+	{"Headphone Jack", NULL, "ROUT1"},
-+
-+	/* ext speaker connected to LOUT2, ROUT2  */
-+	{"Ext Spk", NULL , "ROUT2"},
-+	{"Ext Spk", NULL , "LOUT2"},
-+
-+	/* mic is connected to R input 2 - with bias */
-+	{"RINPUT2", NULL, "Mic Bias"},
-+	{"Mic Bias", NULL, "Mic Jack"},
-+};
-+
-+/*
-+ * Logic for a wm8750 as connected on a Z2 Device
-+ */
-+static int z2_wm8750_init(struct snd_soc_codec *codec)
-+{
-+	int ret;
-+
-+	/* NC codec pins */
-+	snd_soc_dapm_disable_pin(codec, "LINPUT3");
-+	snd_soc_dapm_disable_pin(codec, "RINPUT3");
-+	snd_soc_dapm_disable_pin(codec, "OUT3");
-+	snd_soc_dapm_disable_pin(codec, "MONO");
-+
-+	/* Add z2 specific widgets */
-+	snd_soc_dapm_new_controls(codec, wm8750_dapm_widgets,
-+				 ARRAY_SIZE(wm8750_dapm_widgets));
-+
-+	/* Set up z2 specific audio paths */
-+	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
-+
-+	ret = snd_soc_dapm_sync(codec);
-+	if (ret)
++	/* register pcms */
++	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
++	if (ret < 0) {
++		printk(KERN_ERR "wm8750: failed to create pcms\n");
 +		goto err;
++	}
 +
-+	/* Jack detection API stuff */
-+	ret = snd_soc_jack_new(&snd_soc_z2, "Headset Jack", SND_JACK_HEADSET,
-+				&hs_jack);
-+	if (ret)
-+		goto err;
-+
-+	ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
-+				hs_jack_pins);
-+	if (ret)
-+		goto err;
-+
-+	ret = snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios),
-+				hs_jack_gpios);
-+	if (ret)
-+		goto err;
++	snd_soc_add_controls(codec, wm8750_snd_controls,
++				ARRAY_SIZE(wm8750_snd_controls));
++	wm8750_add_widgets(codec);
 +
 +	return 0;
 +
@@ -247,68 +80,347 @@ index 0000000..c78c271
 +	return ret;
 +}
 +
-+static struct snd_soc_ops z2_ops = {
-+	.hw_params = z2_hw_params,
-+};
-+
-+/* z2 digital audio interface glue - connects codec <--> CPU */
-+static struct snd_soc_dai_link z2_dai = {
-+	.name		= "wm8750",
-+	.stream_name	= "WM8750",
-+	.cpu_dai	= &pxa_i2s_dai,
-+	.codec_dai	= &wm8750_dai,
-+	.init		= z2_wm8750_init,
-+	.ops		= &z2_ops,
-+};
-+
-+/* z2 audio machine driver */
-+static struct snd_soc_card snd_soc_z2 = {
-+	.name		= "Z2",
-+	.platform	= &pxa2xx_soc_platform,
-+	.dai_link	= &z2_dai,
-+	.num_links	= 1,
-+};
-+
-+/* z2 audio subsystem */
-+static struct snd_soc_device z2_snd_devdata = {
-+	.card		= &snd_soc_z2,
-+	.codec_dev	= &soc_codec_dev_wm8750,
-+};
-+
-+static struct platform_device *z2_snd_device;
-+
-+static int __init z2_init(void)
++/* power down chip */
++static int wm8750_remove(struct platform_device *pdev)
 +{
-+	int ret;
++	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
 +
-+	if (!machine_is_zipit2())
-+		return -ENODEV;
++	snd_soc_free_pcms(socdev);
++	snd_soc_dapm_free(socdev);
 +
-+	z2_snd_device = platform_device_alloc("soc-audio", -1);
-+	if (!z2_snd_device)
++	return 0;
++}
++
++struct snd_soc_codec_device soc_codec_dev_wm8750 = {
++	.probe = 	wm8750_probe,
++	.remove = 	wm8750_remove,
++	.suspend = 	wm8750_suspend,
++	.resume =	wm8750_resume,
++};
++EXPORT_SYMBOL_GPL(soc_codec_dev_wm8750);
++
+ /*
+  * initialise the WM8750 driver
+  * register the mixer and dsp interfaces with the kernel
+  */
+-static int wm8750_init(struct snd_soc_device *socdev,
+-		       enum snd_soc_control_type control)
++static int wm8750_register(struct wm8750_priv *wm8750,
++			enum snd_soc_control_type control)
+ {
+-	struct snd_soc_codec *codec = socdev->card->codec;
++	struct snd_soc_codec *codec = &wm8750->codec;
+ 	int reg, ret = 0;
+ 
++	if (wm8750_codec) {
++		dev_err(codec->dev, "Multiple WM8750 devices not supported\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	mutex_init(&codec->mutex);
++	INIT_LIST_HEAD(&codec->dapm_widgets);
++	INIT_LIST_HEAD(&codec->dapm_paths);
++
+ 	codec->name = "WM8750";
+ 	codec->owner = THIS_MODULE;
++	codec->bias_level = SND_SOC_BIAS_STANDBY;
+ 	codec->set_bias_level = wm8750_set_bias_level;
+ 	codec->dai = &wm8750_dai;
+ 	codec->num_dai = 1;
+-	codec->reg_cache_size = ARRAY_SIZE(wm8750_reg);
+-	codec->reg_cache = kmemdup(wm8750_reg, sizeof(wm8750_reg), GFP_KERNEL);
+-	if (codec->reg_cache == NULL)
+-		return -ENOMEM;
++	codec->private_data = wm8750;
++	codec->reg_cache_size = ARRAY_SIZE(wm8750->reg_cache) + 1;
++	codec->reg_cache = &wm8750->reg_cache;
++	codec->private_data = wm8750;
++
++	memcpy(codec->reg_cache, wm8750_reg, sizeof(wm8750->reg_cache));
+ 
+ 	ret = snd_soc_codec_set_cache_io(codec, 7, 9, control);
+ 	if (ret < 0) {
+@@ -728,13 +795,6 @@ static int wm8750_init(struct snd_soc_device *socdev,
+ 		goto err;
+ 	}
+ 
+-	/* register pcms */
+-	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
+-	if (ret < 0) {
+-		printk(KERN_ERR "wm8750: failed to create pcms\n");
+-		goto err;
+-	}
+-
+ 	/* charge output caps */
+ 	wm8750_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+ 
+@@ -756,19 +816,37 @@ static int wm8750_init(struct snd_soc_device *socdev,
+ 	reg = snd_soc_read(codec, WM8750_RINVOL);
+ 	snd_soc_write(codec, WM8750_RINVOL, reg | 0x0100);
+ 
+-	snd_soc_add_controls(codec, wm8750_snd_controls,
+-				ARRAY_SIZE(wm8750_snd_controls));
+-	wm8750_add_widgets(codec);
+-	return ret;
++	wm8750_codec = codec;
++
++	ret = snd_soc_register_codec(codec);
++	if (ret != 0) {
++		dev_err(codec->dev, "Failed to register codec: %d\n", ret);
++		goto err;
++	}
+ 
++	ret = snd_soc_register_dais(&wm8750_dai, 1);
++	if (ret != 0) {
++		dev_err(codec->dev, "Failed to register DAIs: %d\n", ret);
++		goto err_codec;
++	}
++
++	return 0;
++
++err_codec:
++	snd_soc_unregister_codec(codec);
+ err:
+-	kfree(codec->reg_cache);
++	kfree(wm8750);
+ 	return ret;
+ }
+ 
+-/* If the i2c layer weren't so broken, we could pass this kind of data
+-   around */
+-static struct snd_soc_device *wm8750_socdev;
++static void wm8750_unregister(struct wm8750_priv *wm8750)
++{
++	wm8750_set_bias_level(&wm8750->codec, SND_SOC_BIAS_OFF);
++	snd_soc_unregister_dais(&wm8750_dai, 1);
++	snd_soc_unregister_codec(&wm8750->codec);
++	kfree(wm8750);
++	wm8750_codec = NULL;
++}
+ 
+ #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
+ 
+@@ -782,24 +860,26 @@ static struct snd_soc_device *wm8750_socdev;
+ static int wm8750_i2c_probe(struct i2c_client *i2c,
+ 			    const struct i2c_device_id *id)
+ {
+-	struct snd_soc_device *socdev = wm8750_socdev;
+-	struct snd_soc_codec *codec = socdev->card->codec;
+-	int ret;
++	struct snd_soc_codec *codec;
++	struct wm8750_priv *wm8750;
+ 
+-	i2c_set_clientdata(i2c, codec);
+-	codec->control_data = i2c;
++	wm8750 = kzalloc(sizeof(struct wm8750_priv), GFP_KERNEL);
++	if (wm8750 == NULL)
 +		return -ENOMEM;
+ 
+-	ret = wm8750_init(socdev, SND_SOC_I2C);
+-	if (ret < 0)
+-		pr_err("failed to initialise WM8750\n");
++        codec = &wm8750->codec;
++        codec->control_data = i2c;
++        i2c_set_clientdata(i2c, wm8750);
+ 
+-	return ret;
++        codec->dev = &i2c->dev;
 +
-+	platform_set_drvdata(z2_snd_device, &z2_snd_devdata);
-+	z2_snd_devdata.dev = &z2_snd_device->dev;
-+	ret = platform_device_add(z2_snd_device);
++	return wm8750_register(wm8750, SND_SOC_I2C);
+ }
+ 
+ static int wm8750_i2c_remove(struct i2c_client *client)
+ {
+-	struct snd_soc_codec *codec = i2c_get_clientdata(client);
+-	kfree(codec->reg_cache);
++        struct wm8750_priv *wm8750 = i2c_get_clientdata(client);
++        wm8750_unregister(wm8750);
+ 	return 0;
+ }
+ 
+@@ -818,66 +898,31 @@ static struct i2c_driver wm8750_i2c_driver = {
+ 	.remove =   wm8750_i2c_remove,
+ 	.id_table = wm8750_i2c_id,
+ };
+-
+-static int wm8750_add_i2c_device(struct platform_device *pdev,
+-				 const struct wm8750_setup_data *setup)
+-{
+-	struct i2c_board_info info;
+-	struct i2c_adapter *adapter;
+-	struct i2c_client *client;
+-	int ret;
+-
+-	ret = i2c_add_driver(&wm8750_i2c_driver);
+-	if (ret != 0) {
+-		dev_err(&pdev->dev, "can't add i2c driver\n");
+-		return ret;
+-	}
+-
+-	memset(&info, 0, sizeof(struct i2c_board_info));
+-	info.addr = setup->i2c_address;
+-	strlcpy(info.type, "wm8750", I2C_NAME_SIZE);
+-
+-	adapter = i2c_get_adapter(setup->i2c_bus);
+-	if (!adapter) {
+-		dev_err(&pdev->dev, "can't get i2c adapter %d\n",
+-			setup->i2c_bus);
+-		goto err_driver;
+-	}
+-
+-	client = i2c_new_device(adapter, &info);
+-	i2c_put_adapter(adapter);
+-	if (!client) {
+-		dev_err(&pdev->dev, "can't add i2c device at 0x%x\n",
+-			(unsigned int)info.addr);
+-		goto err_driver;
+-	}
+-
+-	return 0;
+-
+-err_driver:
+-	i2c_del_driver(&wm8750_i2c_driver);
+-	return -ENODEV;
+-}
+ #endif
+ 
+ #if defined(CONFIG_SPI_MASTER)
+ static int __devinit wm8750_spi_probe(struct spi_device *spi)
+ {
+-	struct snd_soc_device *socdev = wm8750_socdev;
+-	struct snd_soc_codec *codec = socdev->card->codec;
+-	int ret;
++	struct snd_soc_codec *codec;
++	struct wm8750_priv *wm8750;
 +
-+	if (ret)
-+		platform_device_put(z2_snd_device);
-+
-+	return ret;
-+}
-+
-+static void __exit z2_exit(void)
-+{
-+	platform_device_unregister(z2_snd_device);
-+}
-+
-+module_init(z2_init);
-+module_exit(z2_exit);
-+
-+MODULE_AUTHOR(	"Ken McGuire <kenm@desertweyr.com>, "
-+		"Marek Vasut <marek.vasut@gmail.com>");
-+MODULE_DESCRIPTION("ALSA SoC ZipitZ2");
-+MODULE_LICENSE("GPL");
++	wm8750 = kzalloc(sizeof(struct wm8750_priv), GFP_KERNEL);
++	if (wm8750 == NULL)
++		return -ENOMEM;
+ 
++	codec = &wm8750->codec;
+ 	codec->control_data = spi;
++	codec->dev = &spi->dev;
+ 
+-	ret = wm8750_init(socdev, SND_SOC_SPI);
+-	if (ret < 0)
+-		dev_err(&spi->dev, "failed to initialise WM8750\n");
++	dev_set_drvdata(&spi->dev, wm8750);
+ 
+-	return ret;
++	return wm8750_register(wm8750, SND_SOC_SPI);
+ }
+ 
+ static int __devexit wm8750_spi_remove(struct spi_device *spi)
+ {
++	struct wm8750_priv *wm8750 = dev_get_drvdata(&spi->dev);
++	wm8750_unregister(wm8750);
+ 	return 0;
+ }
+ 
+@@ -892,93 +937,31 @@ static struct spi_driver wm8750_spi_driver = {
+ };
+ #endif
+ 
+-static int wm8750_probe(struct platform_device *pdev)
++static int __init wm8750_modinit(void)
+ {
+-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
+-	struct wm8750_setup_data *setup = socdev->codec_data;
+-	struct snd_soc_codec *codec;
+-	struct wm8750_priv *wm8750;
+ 	int ret;
+-
+-	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
+-	if (codec == NULL)
+-		return -ENOMEM;
+-
+-	wm8750 = kzalloc(sizeof(struct wm8750_priv), GFP_KERNEL);
+-	if (wm8750 == NULL) {
+-		kfree(codec);
+-		return -ENOMEM;
+-	}
+-
+-	codec->private_data = wm8750;
+-	socdev->card->codec = codec;
+-	mutex_init(&codec->mutex);
+-	INIT_LIST_HEAD(&codec->dapm_widgets);
+-	INIT_LIST_HEAD(&codec->dapm_paths);
+-	wm8750_socdev = socdev;
+-
+-	ret = -ENODEV;
+-
+ #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
+-	if (setup->i2c_address) {
+-		ret = wm8750_add_i2c_device(pdev, setup);
+-	}
++	ret = i2c_add_driver(&wm8750_i2c_driver);
++	if (ret != 0)
++		pr_err("Failed to register WM8750 I2C driver: %d\n", ret);
+ #endif
+ #if defined(CONFIG_SPI_MASTER)
+-	if (setup->spi) {
+-		ret = spi_register_driver(&wm8750_spi_driver);
+-		if (ret != 0)
+-			printk(KERN_ERR "can't add spi driver");
+-	}
++	ret = spi_register_driver(&wm8750_spi_driver);
++	if (ret != 0)
++		pr_err("Failed to register WM8750 SPI driver: %d\n", ret);
+ #endif
+-
+-	if (ret != 0) {
+-		kfree(codec->private_data);
+-		kfree(codec);
+-	}
+-	return ret;
++	return 0;
+ }
++module_init(wm8750_modinit);
+ 
+-/* power down chip */
+-static int wm8750_remove(struct platform_device *pdev)
++static void __exit wm8750_exit(void)
+ {
+-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
+-	struct snd_soc_codec *codec = socdev->card->codec;
+-
+-	if (codec->control_data)
+-		wm8750_set_bias_level(codec, SND_SOC_BIAS_OFF);
+-	snd_soc_free_pcms(socdev);
+-	snd_soc_dapm_free(socdev);
+ #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
+-	i2c_unregister_device(codec->control_data);
+ 	i2c_del_driver(&wm8750_i2c_driver);
+ #endif
+ #if defined(CONFIG_SPI_MASTER)
+ 	spi_unregister_driver(&wm8750_spi_driver);
+ #endif
+-	kfree(codec->private_data);
+-	kfree(codec);
+-
+-	return 0;
+-}
+-
+-struct snd_soc_codec_device soc_codec_dev_wm8750 = {
+-	.probe = 	wm8750_probe,
+-	.remove = 	wm8750_remove,
+-	.suspend = 	wm8750_suspend,
+-	.resume =	wm8750_resume,
+-};
+-EXPORT_SYMBOL_GPL(soc_codec_dev_wm8750);
+-
+-static int __init wm8750_modinit(void)
+-{
+-	return snd_soc_register_dai(&wm8750_dai);
+-}
+-module_init(wm8750_modinit);
+-
+-static void __exit wm8750_exit(void)
+-{
+-	snd_soc_unregister_dai(&wm8750_dai);
+ }
+ module_exit(wm8750_exit);
+ 
 -- 
 1.7.0
