@@ -1,65 +1,26 @@
-From: mbohan@codeaurora.org (Michael Bohan)
-Date: Mon,  5 Apr 2010 15:34:21 -0700
-Subject: [PATCH] arm: mm: Don't free prohibited memmap entries
-In-Reply-To: <>
-References: <>
-Message-ID: <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
+From: ben@fluff.org (Ben Dooks)
+Date: Mon, 5 Apr 2010 23:44:02 +0100
+Subject: [PATCH v2] i2c-s3c2410: Remove unconditional 1ms delay on each
+	transfer
+In-Reply-To: <1270214109-28226-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1270214109-28226-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20100405224402.GA32401@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Bohan <mbohan@quicinc.com>
+On Fri, Apr 02, 2010 at 02:15:09PM +0100, Mark Brown wrote:
+> The S3C I2C controller indicates completion of I2C transfers before
+> the bus has a stop condition on it. In order to ensure that we do not
+> attempt to start a new transfer before the bus is idle the driver
+> currently inserts a 1ms delay. This is vastly larger than is generally
+> required and has a visible effect on performance under load, such as
+> when bringing up audio CODECs or reading back status information with
+> non-bulk I2C reads.
 
-The VM subsystem assumes that there are valid memmap entries to
-the bank end aligned to MAX_ORDER_NR_PAGES. It will try and read
-these page structs, and so we cannot free any memmap entries that
-it may inspect.
+ok, so far no problems with this on an s3c2440. I'll add it to the
+next tree.
 
-Signed-off-by: Michael Bohan <mbohan@quicinc.com>
----
- arch/arm/mm/init.c |   19 +++++++++----------
- 1 files changed, 9 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 83db12a..dcd04bf 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -532,28 +532,27 @@ static void __init free_unused_memmap_node(int node, struct meminfo *mi)
- 	unsigned int i;
- 
- 	/*
--	 * [FIXME] This relies on each bank being in address order.  This
--	 * may not be the case, especially if the user has provided the
--	 * information on the command line.
-+	 * This relies on each bank being in address order.
-+	 * The banks are sorted previously in bootmem_init().
- 	 */
- 	for_each_nodebank(i, mi, node) {
- 		struct membank *bank = &mi->bank[i];
- 
- 		bank_start = bank_pfn_start(bank);
--		if (bank_start < prev_bank_end) {
--			printk(KERN_ERR "MEM: unordered memory banks.  "
--				"Not freeing memmap.\n");
--			break;
--		}
- 
- 		/*
- 		 * If we had a previous bank, and there is a space
- 		 * between the current bank and the previous, free it.
- 		 */
--		if (prev_bank_end && prev_bank_end != bank_start)
-+		if (prev_bank_end && prev_bank_end < bank_start)
- 			free_memmap(node, prev_bank_end, bank_start);
- 
--		prev_bank_end = bank_pfn_end(bank);
-+		/*
-+		 * Align up here since the VM subsystem insists that the
-+		 * memmap entries are valid from the bank end aligned to
-+		 * MAX_ORDER_NR_PAGES.
-+		 */
-+		prev_bank_end = ALIGN(bank_pfn_end(bank), MAX_ORDER_NR_PAGES);
- 	}
- }
- 
 -- 
-1.6.2.3
+Ben (ben at fluff.org, http://www.fluff.org/)
+
+  'a smiley only costs 4 bytes'
