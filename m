@@ -1,37 +1,45 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Mon, 5 Apr 2010 22:14:34 +0400
-Subject: [PATCH 2/4] Driver for Zipit Z2 battery chip
-In-Reply-To: <201004050505.13273.marek.vasut@gmail.com>
-References: <201003101741.17840.marek.vasut@gmail.com>
-	<f17812d71003211927p2acd79d6i2a72a9ef0a159032@mail.gmail.com>
-	<201004050505.13273.marek.vasut@gmail.com>
-Message-ID: <20100405181434.GA3316@oksana.dev.rtsoft.ru>
+Date: Mon, 5 Apr 2010 22:21:03 +0400
+Subject: Is anyone working on SD/MMC driver for i.MX35 ?
+In-Reply-To: <20100402012932.GE13989@pengutronix.de>
+References: <20100401125739.GE2045@bluebox.local>
+	<20100401132017.GA30804@buzzloop.caiaq.de>
+	<20100401132234.GG2045@bluebox.local>
+	<20100402012932.GE13989@pengutronix.de>
+Message-ID: <20100405182103.GB3316@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 05, 2010 at 05:05:13AM +0200, Marek Vasut wrote:
-> Dne Po 22. b?ezna 2010 03:27:59 Eric Miao napsal(a):
-> > On Thu, Mar 11, 2010 at 12:41 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > > Hi,
-> > > This patch adds driver for Zipit Z2 battery chip called AER915. No
-> > > details are known about the chip. The chip is available through I2C bus
-> > > at address 0x55 and it's register 0x02 contains battery voltage.
-> > >
-> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+On Fri, Apr 02, 2010 at 03:29:32AM +0200, Wolfram Sang wrote:
+> On Thu, Apr 01, 2010 at 03:22:35PM +0200, Hans J. Koch wrote:
+> > On Thu, Apr 01, 2010 at 03:20:17PM +0200, Daniel Mack wrote:
+> > > On Thu, Apr 01, 2010 at 02:57:40PM +0200, Hans J. Koch wrote:
+> > > > I need to get the MMC interface of an i.MX35 to work in the near future.
+> > > > To avoid duplicate work, I'd like to know if anybody already started
+> > > > work on this.
+> > > 
+> > > Is the controller very different from the one which is already supported
+> > > for MX31?
 > > 
-> > Anton Vorontsov Cc'ed.
-> > 
-> Any updates/objections against merging ?
+> > Yep. Completely different beast. Unfortunately.
+> 
+> (CCing linux-mmc)
+> 
+> And it is a mess, really :(
+> 
+> The kernel already has an esdhc-driver (and Anton already worked around a
+> number of hardware-bugs), but is tied into an of-driver because the core was
+> also used on PowerPC. There, it utilizes a 32-bit-byte-swaper which is not
+> needed on ARM. So, one has to rip all that out, generalize the sdhc-platform
+> support (possibly also abstract the quirk support) and make sure nothing
+> breaks.
 
-Nope, looks OK.
+FYI, there is sdhci-pltfm driver, + some patches to add
+quirks support:
 
-Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+http://lkml.org/lkml/2010/3/16/337
 
-^^ This is for the case if you'd like to pass it via PXA tree
-   along with the platform support patch.
-
-If you want me to take this patch via battery-2.6, I can do it
-as well, just tell me.
+These patches are already in the -mm tree.
 
 Thanks,
 
