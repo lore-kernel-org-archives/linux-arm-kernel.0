@@ -1,44 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 5 Apr 2010 12:59:57 +0200
-Subject: Memory corruption with 2.6.32.10, but not with 2.6.34-rc3
-In-Reply-To: <20100401165857.GN30801@buzzloop.caiaq.de>
-References: <20100401132156.GJ30807@buzzloop.caiaq.de>
-	<20100401165144.GB1138@suse.de>
-	<20100401165857.GN30801@buzzloop.caiaq.de>
-Message-ID: <20100405105957.GA2302@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 5 Apr 2010 14:41:07 +0100
+Subject: [PATCH 2/3] WM8750: Fix SPITZ machine
+In-Reply-To: <1270440818-25790-2-git-send-email-marek.vasut@gmail.com>
+References: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
+	<1270440818-25790-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100405134106.GC6580@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 01, 2010 at 06:58:57PM +0200, Daniel Mack wrote:
-> On Thu, Apr 01, 2010 at 09:51:44AM -0700, Greg KH wrote:
-> > On Thu, Apr 01, 2010 at 03:21:56PM +0200, Daniel Mack wrote:
-> > > 
-> > > I can cherry-pick things if anyone pin-points something and run
-> > > lont-time tests again. Any pointer appreciated.
-> > 
-> > Oh, how about running 'git bisect' to try to find the solution?  Just
-> > remember to reverse 'good' and 'bad' for when you tell git bisect what
-> > the results are.
-> 
-> Jep, I thought about that of course. But unfortunately, the platform
-> got merged mainline in the middle of that time window which makes
-> bisecting tricky. And worse than that - every test run take around half
-> a day at least :(
-What you can do is backport the platform-support on top of rev initially
-marked good (in a branch named say foo) and when asked for testing do:
+On Mon, Apr 05, 2010 at 06:13:37AM +0200, Marek Vasut wrote:
+> This patch registers the WM8750 codec on a proper place on the SPITZ machine
+> after the WM8750 driver was converted to new API. Moreover, the incorrect code
 
-	git merge --no-commit foo
-	<test>
-	git reset --hard
-	git bisect {good|bad}
+We also need this for the Jive machine.  FWIW I'm checking for affected
+machines by doing 'grep -l wm8750 sound/soc/*/*.c'.
 
-Assuming the platform-support got in in one go (and you shouldn't test
-in the middle, which you can simply skip), the merge should always work
-just fine.
+> is hereby removed from the aSoC driver.
 
-Best regards
-Uwe
+ASoC.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
+> index c4cd2ac..d256f5f 100644
+> --- a/sound/soc/pxa/spitz.c
+> +++ b/sound/soc/pxa/spitz.c
+> @@ -322,17 +322,10 @@ static struct snd_soc_card snd_soc_spitz = {
+>  	.num_links = 1,
+>  };
+>  
+> -/* spitz audio private data */
+> -static struct wm8750_setup_data spitz_wm8750_setup = {
+> -	.i2c_bus = 0,
+> -	.i2c_address = 0x1b,
+> -};
+> -
+>  /* spitz audio subsystem */
+>  static struct snd_soc_device spitz_snd_devdata = {
+>  	.card = &snd_soc_spitz,
+>  	.codec_dev = &soc_codec_dev_wm8750,
+> -	.codec_data = &spitz_wm8750_setup,
+>  };
+
+So, this is going to break spitz if not merged in with the patch to
+update wm8750 since prior to the conversion of the driver the setup data
+is required while after the conversion the setup data structure no
+longer exists and will therefore cause compile failures.
+
+As I've mentioned several times before I urge you to look at how this
+transition was done for wm8731 for an example of how this sort of change
+can be done without too much disruption.
