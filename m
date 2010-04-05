@@ -1,29 +1,41 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 05 Apr 2010 15:12:18 +0100
-Subject: [alsa-devel] [PATCH 3/3] Zipit Z2 WM8750 aSoC driver
-In-Reply-To: <20100405134228.GD6580@rakim.wolfsonmicro.main>
-References: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
-	<1270440818-25790-3-git-send-email-marek.vasut@gmail.com>
-	<20100405134228.GD6580@rakim.wolfsonmicro.main>
-Message-ID: <1270476738.7419.4.camel@odin>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Mon, 5 Apr 2010 22:14:34 +0400
+Subject: [PATCH 2/4] Driver for Zipit Z2 battery chip
+In-Reply-To: <201004050505.13273.marek.vasut@gmail.com>
+References: <201003101741.17840.marek.vasut@gmail.com>
+	<f17812d71003211927p2acd79d6i2a72a9ef0a159032@mail.gmail.com>
+	<201004050505.13273.marek.vasut@gmail.com>
+Message-ID: <20100405181434.GA3316@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-04-05 at 14:42 +0100, Mark Brown wrote:
-> On Mon, Apr 05, 2010 at 06:13:38AM +0200, Marek Vasut wrote:
-> > This patch adds support for sound through the WM8750 codec on Zipit Z2.
-> > Also, this patch incorporates support for detecting headset jack
-> > insertion through the jack detection API.
+On Mon, Apr 05, 2010 at 05:05:13AM +0200, Marek Vasut wrote:
+> Dne Po 22. b?ezna 2010 03:27:59 Eric Miao napsal(a):
+> > On Thu, Mar 11, 2010 at 12:41 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > > Hi,
+> > > This patch adds driver for Zipit Z2 battery chip called AER915. No
+> > > details are known about the chip. The chip is available through I2C bus
+> > > at address 0x55 and it's register 0x02 contains battery voltage.
+> > >
+> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 > > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> This all looks good.
+> > Anton Vorontsov Cc'ed.
+> > 
+> Any updates/objections against merging ?
 
-Fine by me too.
+Nope, looks OK.
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+
+^^ This is for the case if you'd like to pass it via PXA tree
+   along with the platform support patch.
+
+If you want me to take this patch via battery-2.6, I can do it
+as well, just tell me.
+
+Thanks,
 
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
