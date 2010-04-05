@@ -1,97 +1,44 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Mon, 5 Apr 2010 19:49:44 +0900
-Subject: [Question] race condition in mm/page_alloc.c regarding page->lru?
-In-Reply-To: <20100405101424.GA21207@csn.ul.ie>
-References: <i2i5f4a33681003312105m4cd42e9ayfe35cc0988c401b6@mail.gmail.com>
-	<g2g5f4a33681004012051wedea9538w9da89e210b731422@mail.gmail.com>
-	<20100402135955.645F.A69D9226@jp.fujitsu.com>
-	<20100402094805.GA12886@csn.ul.ie>
-	<h2rd6200be21004021759x4ae83403i4daa206d47b7d523@mail.gmail.com>
-	<20100405101424.GA21207@csn.ul.ie>
-Message-ID: <n2n28c262361004050349t943cdc03t7079f3066660e3d3@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 5 Apr 2010 12:59:57 +0200
+Subject: Memory corruption with 2.6.32.10, but not with 2.6.34-rc3
+In-Reply-To: <20100401165857.GN30801@buzzloop.caiaq.de>
+References: <20100401132156.GJ30807@buzzloop.caiaq.de>
+	<20100401165144.GB1138@suse.de>
+	<20100401165857.GN30801@buzzloop.caiaq.de>
+Message-ID: <20100405105957.GA2302@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mel and Arve.
+On Thu, Apr 01, 2010 at 06:58:57PM +0200, Daniel Mack wrote:
+> On Thu, Apr 01, 2010 at 09:51:44AM -0700, Greg KH wrote:
+> > On Thu, Apr 01, 2010 at 03:21:56PM +0200, Daniel Mack wrote:
+> > > 
+> > > I can cherry-pick things if anyone pin-points something and run
+> > > lont-time tests again. Any pointer appreciated.
+> > 
+> > Oh, how about running 'git bisect' to try to find the solution?  Just
+> > remember to reverse 'good' and 'bad' for when you tell git bisect what
+> > the results are.
+> 
+> Jep, I thought about that of course. But unfortunately, the platform
+> got merged mainline in the middle of that time window which makes
+> bisecting tricky. And worse than that - every test run take around half
+> a day at least :(
+What you can do is backport the platform-support on top of rev initially
+marked good (in a branch named say foo) and when asked for testing do:
 
-On Mon, Apr 5, 2010 at 7:14 PM, Mel Gorman <mel@csn.ul.ie> wrote:
-> On Fri, Apr 02, 2010 at 05:59:00PM -0700, Arve Hj?nnev?g wrote:
->> On Fri, Apr 2, 2010 at 2:48 AM, Mel Gorman <mel@csn.ul.ie> wrote:
->> > On Fri, Apr 02, 2010 at 02:03:23PM +0900, KOSAKI Motohiro wrote:
->> >> Cc to Mel,
->> >>
->> >> > 2 patches related to page_alloc.c were applied.
->> >> > Does anyone see a connection between the 2 patches and the panic?
->> >> > NOTE: the full patches are attached.
->> >>
->> >> I think your attached two patches are perfectly unrelated your problem.
->> >>
->> >
->> > Agreed. It's unlikely that there is a race as such in the page
->> > allocator. In buffered_rmqueue that you initially talk about, the lists
->> > being manipulated are per-cpu lists. About the only way to corrupt them
->> > is if you had a NMI hander that called the page allocator. I really hope
->> > your platform is not doing anything like that.
->> >
->> > A double free of page->lru is a possibility. You could try reproducing
->> > the problem with CONFIG_DEBUG_LIST enabled to see if anything falls out.
->> >
->> >> "mm: Add min_free_order_shift tunable." seems makes zero sense. I don't think this patch
->> >> need to be merge.
->> >>
->> >
->> > It makes a marginal amount of sense. Basically what it does is allowing
->> > high-order allocations to go much further below their watermarks than is
->> > currently allowed. If the platform in question is doing a lot of high-order
->> > allocations, this patch could be seen to "fix" the problem but you wouldn't
->> > touch mainline with it with a barge pole. It would be more stable to fix
->> > the drivers to not use high order allocations or use a mempool.
->> >
->>
->> The high order allocation that caused problems was the first level
->> page table for each process.
->
-> Out of curiousity, how big is that allocation? Is it specific to
-> android? If it is, I guess it can be let slide but if it's common, it
+	git merge --no-commit foo
+	<test>
+	git reset --hard
+	git bisect {good|bad}
 
-It is the specific on ARM. You can refer get_pgd_slow in arch/arm/mm/pgd.c.
-It allocates order 2 page for pgd.
+Assuming the platform-support got in in one go (and you shouldn't test
+in the middle, which you can simply skip), the merge should always work
+just fine.
 
-> would be worth thinking of an arch-hook that tells the VM that a
-> particular high-order is very common. For example, one possibility would
-> be to ask kswapd to always reclaim at a given order even if the
-> watermarks required are for a lower order.
-
-Just out of curiosity, too.
-
-Normally, embedded system don't have fork-bomb workload.
-But I think android's case is some different.
-That's because Dalvik(JVM) keeps many memory which are anon pages for byte codes
-by itself as possible as.
-So system always doesn't have enough memory.
-In addition, most of embedded system don't have swap. It makes system
-worse, too.
-So current reclaimer can't be work well.
-
-I am not sure my assumption.
-Arve, my guessing is right?
-If it is so, Dalvik have to solve this problem?
-For example, AFAIK, android kernel has low memory killer.
-If kernel signals memory pressure, Dalvik have to discard some
-anon pages which has byte codes for executable.
-
-It is just my guessing about android. If I misunderstood about android,
-please, correct me. :)
-
->
->> Each time a new process started the
->> kernel would empty the entire page cache to create contiguous free
->> memory.
->
-> I ask because I'm surprised the entire page cache got chucked out
-
-Maybe it was because system has lots of anon pages but no swap.
+Best regards
+Uwe
 
 -- 
-Kind regards,
-Minchan Kim
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
