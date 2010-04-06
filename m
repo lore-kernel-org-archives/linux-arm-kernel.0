@@ -1,19 +1,52 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 6 Apr 2010 21:36:35 +0200
-Subject: [PATCH] KS8695: enable console
-In-Reply-To: <4BAA172C.2070404@visionsystems.de>
-References: <4BAA172C.2070404@visionsystems.de>
-Message-ID: <j2kcd73a99e1004061236kdaa69491o4609b22aa4fce36d@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 06 Apr 2010 21:44:00 +0100
+Subject: Regulators vis-a-vis Power Domains
+In-Reply-To: <20100406155812.GR31126@trinity.fluff.org>
+References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
+	<20100404131058.GA11705@opensource.wolfsonmicro.com>
+	<20100406155812.GR31126@trinity.fluff.org>
+Message-ID: <1270586640.3229.72.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Yegor,
+On Tue, 2010-04-06 at 16:58 +0100, Ben Dooks wrote: 
+> On Sun, Apr 04, 2010 at 02:10:58PM +0100, Mark Brown wrote:
+> > On Sat, Apr 03, 2010 at 08:12:56PM +0200, Sundar R IYER wrote:
+> > 
+> > Please fix your mail client to word wrap within paragraphs; not doing
+> > this makes your messages harder to read and reply to.  I've reflowed below.
+> > 
+> > > 1. The documentation for the regulators mentions "power domains" and
+> > > "switches" to be modeled as regulators. I am planning to model multiple
+> > > "switches" for controlling supplies to various peripherals from a main
+> > > master regulator as multiple regulators, childed from the parent
+> > > regulator. Is this the right way to proceed ahead? Further the options
+> > 
+> > If you want to do this in the regulator framework, yes.
+> > 
+> > > for these switches will be only a logical on/off. (BTW, I saw lots of TI
+> > > stuff which is something related to power domains, but it doesn't model
+> > > the regulator framework.)
+> > 
+> > Nor does the SH stuff.  With the power domains of a CPU it often doesn't
+> > buy terribly much to use the regulator framework - the power domains are
+> > often a small part of a much bigger picture for the CPU internal power
+> > management, often incorporating thing 
+> 
+> I personally think there is merit to having the regulator framework at
+> least play a part in these, as is possible the powerdomains are being
+> fed from external regulators and/or power switches. I see it as good
+> way of using existing support to do useful work.
 
-> KS8695: enable console
->
-> Add add_preferred_console() to ks8695_console_init() to
-> enable the console
->
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+I tend to agree here, although I think it's still early days for this
+technology and maybe some hybrid approach will eventually emerge.
 
-Acked-by: Andrew Victor <linux@maxim.org.za>
+Fwiw, I'm adding regulator support to other types of tightly coupled
+CPU/DSP voltage control i.e. OMAP4 SmartReflex. 
+
+Liam  
+
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
