@@ -1,40 +1,33 @@
-From: jakob.viketoft@bitsim.com (Jakob Viketoft)
-Date: Tue, 06 Apr 2010 23:50:54 +0200
-Subject: AC97 problems with pxa...
-Message-ID: <4BBBACBE.7040505@bitsim.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Apr 2010 22:57:26 +0100
+Subject: Regulators vis-a-vis Power Domains
+In-Reply-To: <1270586640.3229.72.camel@odin>
+References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
+	<20100404131058.GA11705@opensource.wolfsonmicro.com>
+	<20100406155812.GR31126@trinity.fluff.org>
+	<1270586640.3229.72.camel@odin>
+Message-ID: <20100406215725.GA11983@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Tue, Apr 06, 2010 at 09:44:00PM +0100, Liam Girdwood wrote:
+> On Tue, 2010-04-06 at 16:58 +0100, Ben Dooks wrote: 
+> > On Sun, Apr 04, 2010 at 02:10:58PM +0100, Mark Brown wrote:
 
-I'm trying to add sound support to a Toradex Colibri 270 v2 card, but
-have run into some strangeness which I don't quite understand. The v2 of
-this card uses the WM9712 codec and I've written a machine driver to tie
-the codec and the pxa2xx-ac97 driver together. I'm using the 2.6.33.1
-kernel and my machine driver is a simplified version of the tosa driver
-(no power management or headphone jack logic). However, I get two problems:
-1. Internal clock and headphone output is turned off in the
-AC97_POWERDOWN register and I can't see where to (properly) turn it on,
-neither in kernel space or in userland. No-one else using this codec
-seem to be doing it.
-2. The init function defined in my snd_soc_card struct doesn't seem to
-get called, resulting in way too many mixer settings (I have a number of
-snd_soc_dapm_nc_pin calls) with alsa, but might it also have something
-to do with problem 1?
+> > > Nor does the SH stuff.  With the power domains of a CPU it often doesn't
+> > > buy terribly much to use the regulator framework - the power domains are
 
-When explicitly writing 0 (the ugly way) to the AC97_POWERDOWN register
-I get perfect sound output, but I would like to do it the right way.
+> > I personally think there is merit to having the regulator framework at
+> > least play a part in these, as is possible the powerdomains are being
+> > fed from external regulators and/or power switches. I see it as good
+> > way of using existing support to do useful work.
 
-Two error reports from the dmesg output that might be relevant:
-* pxa2xx_ac97_try_cold_reset: cold reset timeout (GSR=0x44)
-* Error: Driver 'pxa2xx-ac97' is already registered, aborting...
+> I tend to agree here, although I think it's still early days for this
+> technology and maybe some hybrid approach will eventually emerge.
 
-The AC97 interface is added in the machine initialization through the
-pxa_set_ac97_info() in the same way as tosa and many others and this
-could explain the second error message...
-
-Any insight would be appreciated!
-
-Regards,
-
-	/Jakob
+Yes, once the control goes off chip the regulator framework definitely
+makes sense.  It's only for things on the same die where there may be
+less of a clear separation for the power supplies and where there's
+likely to not be much more than simple power switching that it *might*
+be worth doing something custom which more directly represents what's
+going on.
