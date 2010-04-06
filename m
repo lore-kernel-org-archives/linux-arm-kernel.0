@@ -1,52 +1,30 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Tue, 06 Apr 2010 21:44:00 +0100
-Subject: Regulators vis-a-vis Power Domains
-In-Reply-To: <20100406155812.GR31126@trinity.fluff.org>
-References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
-	<20100404131058.GA11705@opensource.wolfsonmicro.com>
-	<20100406155812.GR31126@trinity.fluff.org>
-Message-ID: <1270586640.3229.72.camel@odin>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Tue, 6 Apr 2010 23:27:55 +0200
+Subject: [PATCH 1/2] AT91 slow-clock suspend: don't wait when turning PLLs
+	off
+In-Reply-To: <20100303213329.GA500@alarsen.net>
+References: <20100303213329.GA500@alarsen.net>
+Message-ID: <w2ocd73a99e1004061427t322f8d4cmecd708ad16580f00@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-04-06 at 16:58 +0100, Ben Dooks wrote: 
-> On Sun, Apr 04, 2010 at 02:10:58PM +0100, Mark Brown wrote:
-> > On Sat, Apr 03, 2010 at 08:12:56PM +0200, Sundar R IYER wrote:
-> > 
-> > Please fix your mail client to word wrap within paragraphs; not doing
-> > this makes your messages harder to read and reply to.  I've reflowed below.
-> > 
-> > > 1. The documentation for the regulators mentions "power domains" and
-> > > "switches" to be modeled as regulators. I am planning to model multiple
-> > > "switches" for controlling supplies to various peripherals from a main
-> > > master regulator as multiple regulators, childed from the parent
-> > > regulator. Is this the right way to proceed ahead? Further the options
-> > 
-> > If you want to do this in the regulator framework, yes.
-> > 
-> > > for these switches will be only a logical on/off. (BTW, I saw lots of TI
-> > > stuff which is something related to power domains, but it doesn't model
-> > > the regulator framework.)
-> > 
-> > Nor does the SH stuff.  With the power domains of a CPU it often doesn't
-> > buy terribly much to use the regulator framework - the power domains are
-> > often a small part of a much bigger picture for the CPU internal power
-> > management, often incorporating thing 
-> 
-> I personally think there is merit to having the regulator framework at
-> least play a part in these, as is possible the powerdomains are being
-> fed from external regulators and/or power switches. I see it as good
-> way of using existing support to do useful work.
+hi Anders,
 
-I tend to agree here, although I think it's still early days for this
-technology and maybe some hybrid approach will eventually emerge.
+> From: Julien Langer <julien.langer@gmail.com>
+>
+> AT91: when turning off the PLLs during suspend, don't wait for the lock flag
+> to be set. Previously the code would always run into the loop limitation
+> of 1000 iterations because the flag is never set when turning the PLLs off.
+>
+> Signed-off-by: Julien Langer <julien.langer@gmail.com>
+> Signed-off-by: Anders Larsen <al@alarsen.net>
+> Cc: Andrew Victor <avictor.za@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Fwiw, I'm adding regulator support to other types of tightly coupled
-CPU/DSP voltage control i.e. OMAP4 SmartReflex. 
+During suspend we set the MULA and MULB bits to 0 to disable the
+PLL's.  When disabled, the PLLs will never "lock".
 
-Liam  
+   Acked-by: Andrew Victor <linux@maxim.org.za>
 
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+
+Russell:  This is patch 5975/1 in the patch-system.
