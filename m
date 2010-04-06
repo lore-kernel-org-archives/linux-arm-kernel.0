@@ -1,81 +1,52 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 6 Apr 2010 12:44:55 +0200
-Subject: [PATCH 1/3] ARM: MXC: mxcmmc: misc cleanups
-In-Reply-To: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
-References: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
-Message-ID: <20100406104455.GW30801@buzzloop.caiaq.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Apr 2010 13:05:46 +0200
+Subject: arch/arm/mach-mx3/clock-imx35.c
+In-Reply-To: <201004051029.24242.a.babich@rez.ru>
+References: <201004051029.24242.a.babich@rez.ru>
+Message-ID: <20100406110546.GC3688@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is this series ok to go in?
-Sascha, will this go thru your tree?
+[Added alkml to cc:]
 
-Thanks,
-Daniel
+Please do not send patches to me directly without ccing the list.
 
-On Thu, Apr 01, 2010 at 10:03:23AM +0200, Daniel Mack wrote:
-> Be more verbose on error messages and add one debug message.
+On Mon, Apr 05, 2010 at 10:29:24AM +0600, Alexei Babich wrote:
+> Good morning, Sascha.
+> I propose a patch for get_rate_uart () UART for iMX35:
 > 
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Volker Ernst <volker.ernst@txtr.com>
-> Cc: Jiri Kosina <jkosina@suse.cz>
-> Cc: Micha? Miros?aw <mirqus@gmail.com>
-> ---
->  drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
->  1 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> index 2df9041..44a53ee 100644
-> --- a/drivers/mmc/host/mxcmmc.c
-> +++ b/drivers/mmc/host/mxcmmc.c
-> @@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
+> ----
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index 9f3e943..04bff7c 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -185,7 +185,7 @@ static unsigned long get_rate_uart(struct clk *clk)
 >  {
->  	int i;
->  
-> +	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
-> +
->  	/* reset sequence */
->  	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
->  	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
-> @@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
->  		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
->  				stat);
->  		if (stat & STATUS_CRC_READ_ERR) {
-> +			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
->  			data->error = -EILSEQ;
->  		} else if (stat & STATUS_CRC_WRITE_ERR) {
->  			u32 err_code = (stat >> 9) & 0x3;
-> -			if (err_code == 2) /* No CRC response */
-> +			if (err_code == 2) { /* No CRC response */
-> +				dev_err(mmc_dev(host->mmc),
-> +					"%s: No CRC -ETIMEDOUT\n", __func__);
->  				data->error = -ETIMEDOUT;
-> -			else
-> +			} else {
-> +				dev_err(mmc_dev(host->mmc),
-> +					"%s: -EILSEQ\n", __func__);
->  				data->error = -EILSEQ;
-> +			}
->  		} else if (stat & STATUS_TIME_OUT_READ) {
-> +			dev_err(mmc_dev(host->mmc),
-> +				"%s: read -ETIMEDOUT\n", __func__);
->  			data->error = -ETIMEDOUT;
->  		} else {
-> +			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
->  			data->error = -EIO;
->  		}
->  	} else {
-> @@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
->  	struct scatterlist *sg;
->  	int stat, i;
->  
-> -	host->datasize = 0;
-> -
->  	host->data = data;
->  	host->datasize = 0;
->  
-> -- 
-> 1.7.0
-> 
+>         unsigned long pdr3 = __raw_readl(CCM_BASE + CCM_PDR3);
+>         unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
+> -       unsigned long div = get_3_3_div(pdr4 >> 10);
+> +       unsigned long div = ((pdr4 >> 10) & 0x3f) + 1;
+
+The get_3_3_div function was implemented based on an old datasheet which
+describes the dividers as
+
+(div[5:3] + 1) * (div[2:0] + 1)
+
+Looking at the current datasheet it seems that Freescale dropped this
+completely and the actual divider is just register value + 1.
+
+I don't know if there is hardware around which needs get_3_3_div or if
+we can drop this function completely. Does anyone have information about
+this?
+
+Anyway, this is not the only place affected. The otg clock, perclk0, csi
+and sdhc clock need a fix aswell.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
