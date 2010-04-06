@@ -1,85 +1,72 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 07 Apr 2010 09:40:23 +1200
-Subject: [PATCH] ep93xx: gpio.c: local functions should be static
-In-Reply-To: <0D753D10438DA54287A00B0270842697636A7E997B@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B027084269763682CDD93@AUSP01VMBX24.collaborationhost.net>
-	<0D753D10438DA54287A00B0270842697636A7E997B@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4BBBAA47.1050300@bluewatersys.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Tue, 6 Apr 2010 23:45:42 +0200
+Subject: [PATCH 2/2] AT91 slow-clock resume: don't restore the PLL
+	settings when the PLL was off
+In-Reply-To: <20100303213341.GA654@alarsen.net>
+References: <20100303213341.GA654@alarsen.net>
+Message-ID: <x2qcd73a99e1004061445j8698c478z9f021d5f3dd8f81b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> Ryan,
-> 
-> Any comments on this?
+hi Anders,
 
-Looks fine.
+> From: Julien Langer <julien.langer@gmail.com>
+>
+> AT91: Don't try to restore the PLL settings on resume when the PLLs were turned
+> off before suspending.
+>
+> We run into this problem with the PLLB on the at91: ohci-at91 disables the PLLB
+> when going to suspend. The slowclock code however tries to do the same: It
+> saves the PLLB register value and when restoring the value during resume it
+> waits for the PLLB to lock again. However the PLL will never lock and the loop
+> would run into its timeout because the slowclock code just stored and restored
+> an empty register.
+> Fix the problem by only restoring PLLA/PLLB when the registers were != 0.
+>
+> Signed-off-by: Julien Langer <julien.langer@gmail.com>
+> Signed-off-by: Anders Larsen <al@alarsen.net>
+> Cc: Andrew Victor <avictor.za@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+> @@ -199,16 +207,22 @@ ENTRY(at91_slow_clock)
+>
+>        /* Restore PLLB setting */
+>        ldr     r3, .saved_pllbr
+> +       cmp r3, #0
+> +       beq 5f
+>        str     r3, [r1, #(AT91_CKGR_PLLBR - AT91_PMC)]
+>
+>        wait_pllblock
+>
+> +5:
+>        /* Restore PLLA setting */
+>        ldr     r3, .saved_pllar
+> +       cmp r3, #0
+> +       beq 6f
+>        str     r3, [r1, #(AT91_CKGR_PLLAR - AT91_PMC)]
+>
+>        wait_pllalock
+>
+> +6:
 
-> Regards,
-> Hartley
-> 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
-> Sent: Tuesday, March 09, 2010 1:58 PM
-> To: ARM Kernel
-> Cc: ryan at bluewatersys.com
-> Subject: [PATCH] ep93xx: gpio.c: local functions should be static
-> 
-> The functions ep93xx_gpio_update_int_params and ep93xx_gpio_int_mask
-> are not exported and should be static.  This was overlooked when
-> moving the code from core.c.
-> 
-> Also, change the comment to better indicate what this code is for.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
-> 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
-> index cc377ae..cf547ad 100644
-> --- a/arch/arm/mach-ep93xx/gpio.c
-> +++ b/arch/arm/mach-ep93xx/gpio.c
-> @@ -25,7 +25,7 @@
->  #include <mach/hardware.h>
->  
->  /*************************************************************************
-> - * GPIO handling for EP93xx
-> + * Interrupt handling for EP93xx on-chip GPIOs
->   *************************************************************************/
->  static unsigned char gpio_int_unmasked[3];
->  static unsigned char gpio_int_enabled[3];
-> @@ -40,7 +40,7 @@ static const u8 eoi_register_offset[3]		= { 0x98, 0xb4, 0x54 };
->  static const u8 int_en_register_offset[3]	= { 0x9c, 0xb8, 0x58 };
->  static const u8 int_debounce_register_offset[3]	= { 0xa8, 0xc4, 0x64 };
->  
-> -void ep93xx_gpio_update_int_params(unsigned port)
-> +static void ep93xx_gpio_update_int_params(unsigned port)
->  {
->  	BUG_ON(port > 2);
->  
-> @@ -56,7 +56,7 @@ void ep93xx_gpio_update_int_params(unsigned port)
->  		EP93XX_GPIO_REG(int_en_register_offset[port]));
->  }
->  
-> -void ep93xx_gpio_int_mask(unsigned line)
-> +static inline void ep93xx_gpio_int_mask(unsigned line)
->  {
->  	gpio_int_unmasked[line >> 3] &= ~(1 << (line & 7));
->  }
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I don't think it's sufficient skip the "wait for lock" if the
+PLLA/PLLB value is 0.
+For example, since bit 29 of PLLA is always 1, the wait_pllalock will
+always run - even if MULA is 0 (which means the PLLA is disabled) and
+will therefore never lock.
+Similarly, for other bits in the register which might happen to be set.
+
+The code should rather be something like:
+  Save PLLA
+  Save PLLB
+  ... wait for interrupt ....
+  Restore PLLB
+  if (PLLB & AT91_PMC_MUL != 0)
+      Wait for PLLB to lock
+  Restore PLLA
+  if (PLLA & AT91_PMC_MUL != 0)
+      Wait for PLLA to lock
 
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Regards,
+  Andrew Victor
