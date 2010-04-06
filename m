@@ -1,30 +1,42 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Tue, 6 Apr 2010 13:15:12 +0900
-Subject: [PATCH] mm: Check if any page in a pageblock is reserved before
-	marking it MIGRATE_RESERVE
-In-Reply-To: <1270523356-1728-1-git-send-email-arve@android.com>
-References: <20100405101424.GA21207@csn.ul.ie>
-	<1270523356-1728-1-git-send-email-arve@android.com>
-Message-ID: <k2g28c262361004052115ie21bd036hcbdbdb7750f2942b@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 6 Apr 2010 08:44:18 +0300
+Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
+	<20100325184316.GB20512@gw.healthdatacare.com>
+	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+Message-ID: <20100406054418.GA27465@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 6, 2010 at 12:09 PM, Arve Hj?nnev?g <arve@android.com> wrote:
-> This fixes a problem where the first pageblock got marked MIGRATE_RESERVE even
-> though it only had a few free pages. This in turn caused no contiguous memory
-> to be reserved and frequent kswapd wakeups that emptied the caches to get more
-> contiguous memory.
+On Thu, Apr 01, 2010 at 01:15:20AM +0100, Martin Guy wrote:
+> On 3/25/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> >  > > This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+> >  > >  in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
+> >  > >
+> >  > >  Driver currently supports only interrupt driven mode but in future we may add
+> >  > >  polling mode support as well.
+> 
+> I've been staring more at this again and it looks (2 clock
+> strangenesses and extensive control reg setting apart) like good code.
+> I have another question: like the Cirrus driver, this takes 100% CPU
+> doing busy wait for the current transfer to complete.
 
-It would be better to add following your description of previous mail thread.
-It can help others understand it in future.
+Hi,
 
-On Fri, Apr 02, 2010 at 05:59:00PM -0700, Arve Hj?nnev?g wrote:
-...
-"I think this happens by default on arm. The kernel starts at offset
-0x8000 to leave room for boot parameters, and in recent kernel
-versions (>~2.6.26-29) this memory is freed."
+I tried to find out whether the driver did something wrong to get
+into busylooping but couldn't find anything. In case of MMC/SD
+cards, through mmc_spi, transfer sizes are >= 512 bytes at a time
+and FIFO size is only 8 bytes (or words) so the CPU is expected to
+be pretty busy serving interrupts from the SSP.
 
+I'm about to post updated series with your comments addressed. I
+also added support for polling transfers.
 
--- 
-Kind regards,
-Minchan Kim
+> Given that this driver is interrupt-based, is there any reason why it
+> can't do something else in the meanwhile?
+> Not that that's a reason not to include it in 2.6.35 - it works well
+> and we can think whether to make it more efficient in N+1...
