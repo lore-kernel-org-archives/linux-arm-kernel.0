@@ -1,49 +1,81 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Tue, 6 Apr 2010 11:12:21 +0200
-Subject: Is anyone working on SD/MMC driver for i.MX35 ?
-In-Reply-To: <20100405182103.GB3316@oksana.dev.rtsoft.ru>
-References: <20100401125739.GE2045@bluebox.local>
-	<20100401132017.GA30804@buzzloop.caiaq.de>
-	<20100401132234.GG2045@bluebox.local>
-	<20100402012932.GE13989@pengutronix.de>
-	<20100405182103.GB3316@oksana.dev.rtsoft.ru>
-Message-ID: <20100406091220.GA2036@bluebox.local>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 6 Apr 2010 12:44:55 +0200
+Subject: [PATCH 1/3] ARM: MXC: mxcmmc: misc cleanups
+In-Reply-To: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
+References: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20100406104455.GW30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 05, 2010 at 10:21:03PM +0400, Anton Vorontsov wrote:
-> On Fri, Apr 02, 2010 at 03:29:32AM +0200, Wolfram Sang wrote:
-> > On Thu, Apr 01, 2010 at 03:22:35PM +0200, Hans J. Koch wrote:
-> > > On Thu, Apr 01, 2010 at 03:20:17PM +0200, Daniel Mack wrote:
-> > > > On Thu, Apr 01, 2010 at 02:57:40PM +0200, Hans J. Koch wrote:
-> > > > > I need to get the MMC interface of an i.MX35 to work in the near future.
-> > > > > To avoid duplicate work, I'd like to know if anybody already started
-> > > > > work on this.
-> > > > 
-> > > > Is the controller very different from the one which is already supported
-> > > > for MX31?
-> > > 
-> > > Yep. Completely different beast. Unfortunately.
-> > 
-> > (CCing linux-mmc)
-> > 
-> > And it is a mess, really :(
-> > 
-> > The kernel already has an esdhc-driver (and Anton already worked around a
-> > number of hardware-bugs), but is tied into an of-driver because the core was
-> > also used on PowerPC. There, it utilizes a 32-bit-byte-swaper which is not
-> > needed on ARM. So, one has to rip all that out, generalize the sdhc-platform
-> > support (possibly also abstract the quirk support) and make sure nothing
-> > breaks.
-> 
-> FYI, there is sdhci-pltfm driver, + some patches to add
-> quirks support:
-> 
-> http://lkml.org/lkml/2010/3/16/337
-> 
-> These patches are already in the -mm tree.
-
-Thanks a lot for all your hints! Will have a deeper look at that.
+Is this series ok to go in?
+Sascha, will this go thru your tree?
 
 Thanks,
-Hans
+Daniel
+
+On Thu, Apr 01, 2010 at 10:03:23AM +0200, Daniel Mack wrote:
+> Be more verbose on error messages and add one debug message.
+> 
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Volker Ernst <volker.ernst@txtr.com>
+> Cc: Jiri Kosina <jkosina@suse.cz>
+> Cc: Micha? Miros?aw <mirqus@gmail.com>
+> ---
+>  drivers/mmc/host/mxcmmc.c |   17 +++++++++++++----
+>  1 files changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> index 2df9041..44a53ee 100644
+> --- a/drivers/mmc/host/mxcmmc.c
+> +++ b/drivers/mmc/host/mxcmmc.c
+> @@ -151,6 +151,8 @@ static void mxcmci_softreset(struct mxcmci_host *host)
+>  {
+>  	int i;
+>  
+> +	dev_dbg(mmc_dev(host->mmc), "mxcmci_softreset\n");
+> +
+>  	/* reset sequence */
+>  	writew(STR_STP_CLK_RESET, host->base + MMC_REG_STR_STP_CLK);
+>  	writew(STR_STP_CLK_RESET | STR_STP_CLK_START_CLK,
+> @@ -290,16 +292,25 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
+>  		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
+>  				stat);
+>  		if (stat & STATUS_CRC_READ_ERR) {
+> +			dev_err(mmc_dev(host->mmc), "%s: -EILSEQ\n", __func__);
+>  			data->error = -EILSEQ;
+>  		} else if (stat & STATUS_CRC_WRITE_ERR) {
+>  			u32 err_code = (stat >> 9) & 0x3;
+> -			if (err_code == 2) /* No CRC response */
+> +			if (err_code == 2) { /* No CRC response */
+> +				dev_err(mmc_dev(host->mmc),
+> +					"%s: No CRC -ETIMEDOUT\n", __func__);
+>  				data->error = -ETIMEDOUT;
+> -			else
+> +			} else {
+> +				dev_err(mmc_dev(host->mmc),
+> +					"%s: -EILSEQ\n", __func__);
+>  				data->error = -EILSEQ;
+> +			}
+>  		} else if (stat & STATUS_TIME_OUT_READ) {
+> +			dev_err(mmc_dev(host->mmc),
+> +				"%s: read -ETIMEDOUT\n", __func__);
+>  			data->error = -ETIMEDOUT;
+>  		} else {
+> +			dev_err(mmc_dev(host->mmc), "%s: -EIO\n", __func__);
+>  			data->error = -EIO;
+>  		}
+>  	} else {
+> @@ -433,8 +444,6 @@ static int mxcmci_transfer_data(struct mxcmci_host *host)
+>  	struct scatterlist *sg;
+>  	int stat, i;
+>  
+> -	host->datasize = 0;
+> -
+>  	host->data = data;
+>  	host->datasize = 0;
+>  
+> -- 
+> 1.7.0
+> 
