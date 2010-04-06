@@ -1,85 +1,69 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 6 Apr 2010 16:58:13 +0100
-Subject: Regulators vis-a-vis Power Domains
-In-Reply-To: <20100404131058.GA11705@opensource.wolfsonmicro.com>
-References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
-	<20100404131058.GA11705@opensource.wolfsonmicro.com>
-Message-ID: <20100406155812.GR31126@trinity.fluff.org>
+Date: Tue, 6 Apr 2010 16:59:51 +0100
+Subject: [PATCH 02/16] drivers: serial: S5PC100 serial driver cleanup
+In-Reply-To: <1270190944-21644-3-git-send-email-m.szyprowski@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100406155951.GS31126@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 04, 2010 at 02:10:58PM +0100, Mark Brown wrote:
-> On Sat, Apr 03, 2010 at 08:12:56PM +0200, Sundar R IYER wrote:
+On Fri, Apr 02, 2010 at 08:48:50AM +0200, Marek Szyprowski wrote:
+> Remove unnecessary Kconfig entry. S5PC100 has exactly the same driver as
+> S3C6400/S3C6410/S5P6440.
 > 
-> Please fix your mail client to word wrap within paragraphs; not doing
-> this makes your messages harder to read and reply to.  I've reflowed below.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/serial/Kconfig  |   10 +---------
+>  drivers/serial/Makefile |    1 -
+>  2 files changed, 1 insertions(+), 10 deletions(-)
 > 
-> > 1. The documentation for the regulators mentions "power domains" and
-> > "switches" to be modeled as regulators. I am planning to model multiple
-> > "switches" for controlling supplies to various peripherals from a main
-> > master regulator as multiple regulators, childed from the parent
-> > regulator. Is this the right way to proceed ahead? Further the options
-> 
-> If you want to do this in the regulator framework, yes.
-> 
-> > for these switches will be only?a logical on/off. (BTW, I saw lots of TI
-> > stuff which is something related to power domains, but it doesn't model
-> > the regulator framework.)
-> 
-> Nor does the SH stuff.  With the power domains of a CPU it often doesn't
-> buy terribly much to use the regulator framework - the power domains are
-> often a small part of a much bigger picture for the CPU internal power
-> management, often incorporating thing 
+> diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+> index f55c494..b68ea18 100644
+> --- a/drivers/serial/Kconfig
+> +++ b/drivers/serial/Kconfig
+> @@ -534,21 +534,13 @@ config SERIAL_S3C24A0
+>  
+>  config SERIAL_S3C6400
+>  	tristate "Samsung S3C6400/S3C6410/S5P6440 Seria port support"
 
-I personally think there is merit to having the regulator framework at
-least play a part in these, as is possible the powerdomains are being
-fed from external regulators and/or power switches. I see it as good
-way of using existing support to do useful work.
+it would have been nice to update the list of supported devices above.
 
-I've already seen an example of powerdomains hacked into the clock
-framework, but this isn't really the place for it to be as it ends
-up adding switch-on latencies to the system and hides things from the
-driver.
- 
-> > 2. In the same example below, should I instead model just the main
-> > regulator, and in the driver specific enable/disable, iterate through
-> > the list of consumers, and then accordingly enable/disable these
-> > switches according to the calling consumer?. In this way,?I can choose
-> > not to clutter those smaller switches as regulators in my regulator as
-> > well as peripheral driver code.?
+> -	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440)
+> +	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5PC100)
+>  	select SERIAL_SAMSUNG_UARTS_4
+>  	default y
+>  	help
+>  	  Serial port support for the Samsung S3C6400, S3C6410 and S5P6440
+>  	  SoCs
+>  
+> -config SERIAL_S5PC100
+> -	tristate "Samsung S5PC100 Serial port support"
+> -	depends on SERIAL_SAMSUNG && CPU_S5PC100
+> -	select SERIAL_SAMSUNG_UARTS_4
+> -	default y
+> -	help
+> -	  Serial port support for the Samsung S5PC100 SoCs
+> -
+>  config SERIAL_S5PV210
+>  	tristate "Samsung S5PV210 Serial port support"
+>  	depends on SERIAL_SAMSUNG && (CPU_S5PV210 || CPU_S5P6442)
+> diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
+> index 6aa4723..328f107 100644
+> --- a/drivers/serial/Makefile
+> +++ b/drivers/serial/Makefile
+> @@ -44,7 +44,6 @@ obj-$(CONFIG_SERIAL_S3C2412) += s3c2412.o
+>  obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
+>  obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
+>  obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
+> -obj-$(CONFIG_SERIAL_S5PC100) += s3c6400.o
+>  obj-$(CONFIG_SERIAL_S5PV210) += s5pv210.o
+>  obj-$(CONFIG_SERIAL_MAX3100) += max3100.o
+>  obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
+> -- 
+> 1.6.4
 > 
-> I'm not entirely sure what you mean here.  No regulator driver should
-> ever have any knowledge of its consumers, this will be handled by the
-> regulator core, and regulators should not be making decisions about
-> their own power state - this should also be done by the core.  Perhaps
-> if you could provide a more concrete example your question might be
-> clearer?
-> 
-> > 3. Extending the same model, I want to use the _set_optimum API.
-> > Logically, enabling/disabling the child supply or setting an optimal
-> > load on the regulator must propagate the new load to any master
-> > regulator ( which can then again be set an optimal load). My
-> 
-> This isn't entirely clear, actually.  Translating the load on a child
-> regulator to that on a parent regulator isn't trivial since the
-> performance of both regulators needs to be taken into consideration -
-> the child regulator will have its own requirements for the input.  These
-> will obviously be influenced by the load it experiences but it's not
-> as direct a mapping as is desirable for propagating up the tree in a
-> generic fashion.
-> 
-> > understanding of this function shows me that?currently, this is not
-> > supported in the function. Am I right in deducing this or?have I failed
-> > to overlook some other portions in the regulator code?
-> 
-> There's no code to do this at the minute - like I say, it's not as easy
-> as might be desirable.  The other thing to bear in mind here is that
-> hardware is making this less and less relevant.  With modern regulators
-> the regulator itself is capable of responding quickly enough to load
-> changes to automatically switch between most if not all of the operating
-> modes without software intervention.  This means that managing the mode
-> in software generally ends up being less efficient than just leaving the
-> hardware to it.
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
