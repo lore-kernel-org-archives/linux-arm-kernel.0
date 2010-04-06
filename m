@@ -1,20 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Apr 2010 23:08:17 +0100
-Subject: [PATCH] arm: mm: Don't free prohibited memmap entries
-In-Reply-To: <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
-References: <> <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
-Message-ID: <20100406220817.GE12831@n2100.arm.linux.org.uk>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Tue, 06 Apr 2010 15:08:52 -0700
+Subject: [GIT PULL] generic arm for MSM
+In-Reply-To: <20100406220418.GD12831@n2100.arm.linux.org.uk>
+References: <1269557364.21793.52.camel@c-dwalke-linux.qualcomm.com>
+	<20100325225300.GK24984@n2100.arm.linux.org.uk>
+	<1269557655.21793.53.camel@c-dwalke-linux.qualcomm.com>
+	<20100325225555.GL24984@n2100.arm.linux.org.uk>
+	<1269559307.21793.78.camel@c-dwalke-linux.qualcomm.com>
+	<20100326081445.GB20553@pengutronix.de>
+	<20100326082300.GA6665@n2100.arm.linux.org.uk>
+	<1270163491.16695.27.camel@c-dwalke-linux.qualcomm.com>
+	<20100406213532.GC12831@n2100.arm.linux.org.uk>
+	<1270591225.9066.52.camel@c-dwalke-linux.qualcomm.com>
+	<20100406220418.GD12831@n2100.arm.linux.org.uk>
+Message-ID: <1270591732.9066.54.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 05, 2010 at 03:34:21PM -0700, Michael Bohan wrote:
-> From: Michael Bohan <mbohan@quicinc.com>
+On Tue, 2010-04-06 at 23:04 +0100, Russell King - ARM Linux wrote:
+>  
+> > Does you server list anything wrong happening, cause those 550 errors
+> > seem pretty suspect. It could also be some sort of firewall thing on my
+> > end. I'm assuming no one else has reported anything like this before
+> > right?
 > 
-> The VM subsystem assumes that there are valid memmap entries to
-> the bank end aligned to MAX_ORDER_NR_PAGES. It will try and read
-> these page structs, and so we cannot free any memmap entries that
-> it may inspect.
+> The 550 errors are because the unpacked objects don't exist; they're
+> already inside one of Linus' pack files which you should already have.
+> 
+> That's the point - you should already have these git IDs (the ones you
+> explicitly refer to) so there should be no reason for git to even
+> consider fetching them via http or ftp.
 
-1. are you enabling ARCH_HAS_HOLES_MEMORYMODEL ?
-2. where does it try to access these page structs without trying
-   pfn_valid() to check whether a page struct exists first?
+So your saying that the git defect .. I'm using a fairly recent version
+of git 1.7.0 .. There are slightly more recent ones which I can try
+also.
+
+Daniel
