@@ -1,36 +1,35 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Apr 2010 00:59:27 +0200
-Subject: [PATCH 2/4] Driver for Zipit Z2 battery chip
-In-Reply-To: <20100406163733.GA26444@oksana.dev.rtsoft.ru>
-References: <201003101741.17840.marek.vasut@gmail.com>
-	<i2gf17812d71004051959g9d29b19du2f0f0b99826331ae@mail.gmail.com>
-	<20100406163733.GA26444@oksana.dev.rtsoft.ru>
-Message-ID: <201004070059.27364.marek.vasut@gmail.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Tue, 06 Apr 2010 17:33:17 -0700
+Subject: [PATCH] arm: mm: Don't free prohibited memmap entries
+In-Reply-To: <20100406220817.GE12831@n2100.arm.linux.org.uk>
+References: <> <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
+	<20100406220817.GE12831@n2100.arm.linux.org.uk>
+Message-ID: <4BBBD2CD.2010205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 6. dubna 2010 18:37:33 Anton Vorontsov napsal(a):
-> On Tue, Apr 06, 2010 at 10:59:05AM +0800, Eric Miao wrote:
-> [...]
-> 
-> > >> Any updates/objections against merging ?
-> > >
-> > > Nope, looks OK.
-> > >
-> > > Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-> > >
-> > > ^^ This is for the case if you'd like to pass it via PXA tree
-> > >   along with the platform support patch.
-> > >
-> > > If you want me to take this patch via battery-2.6, I can do it
-> > > as well, just tell me.
-> >
-> > Anton,
-> >
-> > It's a battery driver, and I'd be glad if you can help merge this.
-> 
-> OK, applied to battery-2.6.git.
-> 
-> Thanks,
-> 
-Thanks Anton. Thanks Eric.
+On 4/6/2010 3:08 PM, Russell King - ARM Linux wrote:
+> 1. are you enabling ARCH_HAS_HOLES_MEMORYMODEL ?
+>    
+
+Yes, although this does not impact the problem I'm dealing with.  That 
+option is only used for /proc/pagetypeinfo currently.  It would be good 
+if we could consolidate ARCH_HAS_HOLES_MEMORYMODEL and HOLES_IN_ZONE, 
+but that may be out of scope for this change.
+
+> 2. where does it try to access these page structs without trying
+>     pfn_valid() to check whether a page struct exists first?
+>    
+
+The specific piece of code that is causing crashes in my scenario is in 
+vm/page_alloc.c:move_freepages(), called from move_freepages_block().  
+The code in move_freepages_block aligns the end_pfn to the closest page 
+block, which may take us to invalid memmap entries.
+
+The macro that conditionally saves us in this case is the 
+pfn_valid_within(), called from move_freepages().  If HOLES_IN_ZONE is 
+configured, this option calls down to pfn_valid() to make sure the page 
+has a valid memmap entry.  There are likely other cases where this is an 
+issue as well that I haven't run into.
+
+Michael
