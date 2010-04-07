@@ -1,76 +1,84 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu,  8 Apr 2010 01:12:42 +0200
-Subject: [PATCH 04/11] ARM: define the PrimeCell DMA API v5
-Message-ID: <1270681962-5504-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu,  8 Apr 2010 01:12:23 +0200
+Subject: [PATCH 02/11] ARM: MMCI: pass max frequency from platform
+Message-ID: <1270681943-4985-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the DMA engine with a PrimeCell superset with
-one function to configure the DMA channel. This has been
-identified as the basic extension needed to drive DMA on top of
-the PL011, PL022 and PL180 PrimeCells.
+This introduce the field f_max into the mmci_platform_data,
+making it possible to pass in a desired block clocking frequency
+from a board configuration. This is often more desirable than
+using a module parameter. We keep the module parameter as a
+fallback as well as the default frequency specified for this
+parameter if a parameter is not provided.
+
+This also adds some kerneldoc style documentation to the
+platform data struct in mmci.h.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Acked-by: Dan Williams <dan.j.williams@intel.com>
 ---
- include/linux/amba/dma.h |   49 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 49 insertions(+), 0 deletions(-)
- create mode 100644 include/linux/amba/dma.h
+ drivers/mmc/host/mmci.c   |   13 ++++++++++++-
+ include/linux/amba/mmci.h |   23 ++++++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/amba/dma.h b/include/linux/amba/dma.h
-new file mode 100644
-index 0000000..382ef01
---- /dev/null
-+++ b/include/linux/amba/dma.h
-@@ -0,0 +1,49 @@
-+/*
-+ *  linux/include/amba/dma.h
-+ *
-+ *  Copyright (C) 2010 ST-Ericsson AB
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#if !defined(AMBA_DMA_H) && defined(CONFIG_DMADEVICES)
-+#define AMBA_DMA_H
-+
-+#include <linux/dma-mapping.h>
-+struct dma_chan;
-+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 7e70c1a..ff115d9 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -631,7 +631,18 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	mmc->ops = &mmci_ops;
+ 	mmc->f_min = (host->mclk + 511) / 512;
+-	mmc->f_max = min(host->mclk, fmax);
++	/*
++	 * If the platform data supplies a maximum operating
++	 * frequency, this takes precedence. Else, we fall back
++	 * to using the module parameter, which has a (low)
++	 * default value in case it is not specified. Either
++	 * value must not exceed the clock rate into the block,
++	 * of course.
++	 */
++	if (plat->f_max)
++		mmc->f_max = min(host->mclk, plat->f_max);
++	else
++		mmc->f_max = min(host->mclk, fmax);
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
+ #ifdef CONFIG_REGULATOR
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 6b42417..7e466fe 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -6,8 +6,29 @@
+ 
+ #include <linux/mmc/host.h>
+ 
 +/**
-+ * struct amba_dma_channel_config - this struct is passed in as
-+ * configuration data to a DMA engine in order to set up a certain
-+ * channel for DMA transport. Anything the DMA engine needs to
-+ * know about the PrimeCell shall be passed through this struct.
-+ * The DMA engine has to provide an additional function:
-+ * dma_set_ambaconfig() in order for it to work with PrimeCells.
-+ * @addr: this is the physical address where DMA data should be
-+ * read (RX) or written (TX)
-+ * @addr_width: this is the width of the source (RX) or target
-+ * (TX) register where DMA data shall be read/written, in bytes.
-+ * legal values: 1, 2, 4, 8.
-+ * @direction: whether the data goes in or out on this channel,
-+ * right now.
-+ * @maxburst: the maximum number of words (note: words, not bytes)
-+ * that can be sent in one burst to the device. Typically something
-+ * like half the FIFO depth on I/O peripherals so you don't
-+ * overflow it.
++ * struct mmci_platform_data - platform configuration for the MMCI
++ * (also known as PL180) block.
++ * @f_max: the maximum operational frequency for this host in this
++ * platform configuration. When this is specified it takes precedence
++ * over the module parameter for the same frequency.
++ * @ocr_mask: available voltages on the 4 pins from the block, this
++ * is ignored if a regulator is used, see the MMC_VDD_* masks in
++ * mmc/host.h
++ * @translate_vdd: a callback function to translate a MMC_VDD_*
++ * mask into a value to be binary or:ed and written into the
++ * MMCIPWR register of the block
++ * @status: if no GPIO read function was given to the block in
++ * gpio_wp (below) this function will be called to determine
++ * whether a card is present in the MMC slot or not
++ * @gpio_wp: read this GPIO pin to see if the card is write protected
++ * @gpio_cd: read this GPIO pin to detect card insertion
++ * @capabilities: the capabilities of the block as implemented in
++ * this platform, signify anything MMC_CAP_* from mmc/host.h
 + */
-+struct amba_dma_channel_config {
-+	dma_addr_t addr;
-+	u8 addr_width:4;
-+	enum dma_data_direction direction;
-+	int maxburst;
-+};
-+
-+/*
-+ * The following is an extension to the DMA engine framework
-+ * that is needed to use the engine with PrimeCells.
-+ */
-+void dma_set_ambaconfig(struct dma_chan *chan,
-+			struct amba_dma_channel_config *config);
-+
-+#endif /* AMBA_DMA_H */
+ struct mmci_platform_data {
+-	unsigned int ocr_mask;			/* available voltages */
++	unsigned int f_max;
++	unsigned int ocr_mask;
+ 	u32 (*translate_vdd)(struct device *, unsigned int);
+ 	unsigned int (*status)(struct device *);
+ 	int	gpio_wp;
 -- 
 1.6.3.3
