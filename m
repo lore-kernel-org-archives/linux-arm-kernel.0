@@ -1,29 +1,29 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Apr 2010 22:52:08 +0200
-Subject: [regression] 2.6.34-rc1 to -rc3 on zaurus: no longer boots
-In-Reply-To: <201004072226.34272.maciej.rutecki@gmail.com>
-References: <20100313122754.GD2192@elf.ucw.cz> <20100401060624.GA1329@ucw.cz>
-	<201004072226.34272.maciej.rutecki@gmail.com>
-Message-ID: <201004072252.08354.marek.vasut@gmail.com>
+From: wellsk40@gmail.com (wellsk40 at gmail.com)
+Date: Wed,  7 Apr 2010 15:21:42 -0700
+Subject: [PATCH] ARM: LPC32XX: pm.c - added needed include for slab.h
+Message-ID: <1270678902-25509-1-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 7. dubna 2010 22:26:34 Maciej Rutecki napsal(a):
-> On czwartek, 1 kwietnia 2010 o 08:06:25 Pavel Machek wrote:
-> > Hi!
-> >
-> > > > I tried compiling 2.6.34-rc1, and it does not boot :-(. It does not
-> > > > seem to even reset the framebuffer (I'm using kexec -- so it stays
-> > > > stuck on on previous screen).
-> >
-> > Tried again with -rc2 and -rc3, and neither boots :-(. I did not have
-> > time to set up serial console, yet :-(. Any ideas?
-> > 								Pavel
-> 
-> I created a Bugzilla entry at
-> https://bugzilla.kernel.org/show_bug.cgi?id=15712
-> for your bug report, please add your address to the CC list in there,
->  thanks!
-> 
-Pavel, you broke it ... and here you say something about sane arm maintainers 
-;-)
+From: Kevin Wells <wellsk40@gmail.com>
+
+Added slab.h include recently needed for kmalloc/kfree
+See commit 5a0e3ad6af8660be21ca98a971cd00f331318c05
+---
+ arch/arm/mach-lpc32xx/pm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
+index d792e2e..a6e2aed 100644
+--- a/arch/arm/mach-lpc32xx/pm.c
++++ b/arch/arm/mach-lpc32xx/pm.c
+@@ -66,6 +66,7 @@
+ 
+ #include <linux/suspend.h>
+ #include <linux/io.h>
++#include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+-- 
+1.6.6.1
