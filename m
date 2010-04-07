@@ -1,58 +1,29 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Apr 2010 22:50:22 +0200
-Subject: [PATCH 2/3] WM8750: Fix SPITZ machine
-In-Reply-To: <20100405134106.GC6580@rakim.wolfsonmicro.main>
-References: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
-	<1270440818-25790-2-git-send-email-marek.vasut@gmail.com>
-	<20100405134106.GC6580@rakim.wolfsonmicro.main>
-Message-ID: <201004072250.22351.marek.vasut@gmail.com>
+Date: Wed, 7 Apr 2010 22:52:08 +0200
+Subject: [regression] 2.6.34-rc1 to -rc3 on zaurus: no longer boots
+In-Reply-To: <201004072226.34272.maciej.rutecki@gmail.com>
+References: <20100313122754.GD2192@elf.ucw.cz> <20100401060624.GA1329@ucw.cz>
+	<201004072226.34272.maciej.rutecki@gmail.com>
+Message-ID: <201004072252.08354.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 5. dubna 2010 15:41:07 Mark Brown napsal(a):
-> On Mon, Apr 05, 2010 at 06:13:37AM +0200, Marek Vasut wrote:
-> > This patch registers the WM8750 codec on a proper place on the SPITZ
-> > machine after the WM8750 driver was converted to new API. Moreover, the
-> > incorrect code
-> 
-> We also need this for the Jive machine.  FWIW I'm checking for affected
-> machines by doing 'grep -l wm8750 sound/soc/*/*.c'.
-
-Will send a separate patch for that
-> 
-> > is hereby removed from the aSoC driver.
-> 
-> ASoC.
-> 
-> > diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
-> > index c4cd2ac..d256f5f 100644
-> > --- a/sound/soc/pxa/spitz.c
-> > +++ b/sound/soc/pxa/spitz.c
-> > @@ -322,17 +322,10 @@ static struct snd_soc_card snd_soc_spitz = {
-> >  	.num_links = 1,
-> >  };
+Dne St 7. dubna 2010 22:26:34 Maciej Rutecki napsal(a):
+> On czwartek, 1 kwietnia 2010 o 08:06:25 Pavel Machek wrote:
+> > Hi!
 > >
-> > -/* spitz audio private data */
-> > -static struct wm8750_setup_data spitz_wm8750_setup = {
-> > -	.i2c_bus = 0,
-> > -	.i2c_address = 0x1b,
-> > -};
-> > -
-> >  /* spitz audio subsystem */
-> >  static struct snd_soc_device spitz_snd_devdata = {
-> >  	.card = &snd_soc_spitz,
-> >  	.codec_dev = &soc_codec_dev_wm8750,
-> > -	.codec_data = &spitz_wm8750_setup,
-> >  };
+> > > > I tried compiling 2.6.34-rc1, and it does not boot :-(. It does not
+> > > > seem to even reset the framebuffer (I'm using kexec -- so it stays
+> > > > stuck on on previous screen).
+> >
+> > Tried again with -rc2 and -rc3, and neither boots :-(. I did not have
+> > time to set up serial console, yet :-(. Any ideas?
+> > 								Pavel
 > 
-> So, this is going to break spitz if not merged in with the patch to
-> update wm8750 since prior to the conversion of the driver the setup data
-> is required while after the conversion the setup data structure no
-> longer exists and will therefore cause compile failures.
+> I created a Bugzilla entry at
+> https://bugzilla.kernel.org/show_bug.cgi?id=15712
+> for your bug report, please add your address to the CC list in there,
+>  thanks!
 > 
-> As I've mentioned several times before I urge you to look at how this
-> transition was done for wm8731 for an example of how this sort of change
-> can be done without too much disruption.
-> 
-Can you possibly elaborate ? I was unable to find it.
-Thanks
+Pavel, you broke it ... and here you say something about sane arm maintainers 
+;-)
