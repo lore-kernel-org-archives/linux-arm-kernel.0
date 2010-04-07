@@ -1,84 +1,201 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu,  8 Apr 2010 01:12:23 +0200
-Subject: [PATCH 02/11] ARM: MMCI: pass max frequency from platform
-Message-ID: <1270681943-4985-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu,  8 Apr 2010 01:13:05 +0200
+Subject: [PATCH 06/11] ARM: add generic PrimeCell interface to DMA40 v1
+Message-ID: <1270681985-6022-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduce the field f_max into the mmci_platform_data,
-making it possible to pass in a desired block clocking frequency
-from a board configuration. This is often more desirable than
-using a module parameter. We keep the module parameter as a
-fallback as well as the default frequency specified for this
-parameter if a parameter is not provided.
-
-This also adds some kerneldoc style documentation to the
-platform data struct in mmci.h.
+This extends the DMA engine driver for the DMA40 used in the
+U8500 platform with the generic PrimeCell interface,
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/mmc/host/mmci.c   |   13 ++++++++++++-
- include/linux/amba/mmci.h |   23 ++++++++++++++++++++++-
- 2 files changed, 34 insertions(+), 2 deletions(-)
+This is new in this patch set and applies on top of the
+driver queued in Andrew Mortons tree.
+---
+ drivers/dma/ste_dma40.c |  128 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 125 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 7e70c1a..ff115d9 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -631,7 +631,18 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index e4295a2..f86b99f 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -14,6 +14,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
++#include <linux/amba/dma.h>
  
- 	mmc->ops = &mmci_ops;
- 	mmc->f_min = (host->mclk + 511) / 512;
--	mmc->f_max = min(host->mclk, fmax);
-+	/*
-+	 * If the platform data supplies a maximum operating
-+	 * frequency, this takes precedence. Else, we fall back
-+	 * to using the module parameter, which has a (low)
-+	 * default value in case it is not specified. Either
-+	 * value must not exceed the clock rate into the block,
-+	 * of course.
-+	 */
-+	if (plat->f_max)
-+		mmc->f_max = min(host->mclk, plat->f_max);
+ #include <plat/ste_dma40.h>
+ 
+@@ -205,6 +206,9 @@ struct d40_chan {
+ 	struct d40_def_lcsp		 log_def;
+ 	struct d40_lcla_elem		 lcla;
+ 	struct d40_log_lli_full		*lcpa;
++	/* AMBA extensions */
++	dma_addr_t			amba_addr;
++	enum dma_data_direction		amba_direction;
+ };
+ 
+ /**
+@@ -1830,7 +1834,10 @@ static int d40_prep_slave_sg_log(struct d40_desc *d40d,
+ 			lli_max = 1;
+ 
+ 	if (direction == DMA_FROM_DEVICE) {
+-		dev_addr = d40c->base->plat_data->dev_rx[d40c->dma_cfg.src_dev_type];
++		if (d40c->amba_addr)
++			dev_addr = d40c->amba_addr;
++		else
++			dev_addr = d40c->base->plat_data->dev_rx[d40c->dma_cfg.src_dev_type];
+ 		total_size = d40_log_sg_to_dev(&d40c->lcla,
+ 					       sgl, sg_len,
+ 					       &d40d->lli_log,
+@@ -1842,7 +1849,10 @@ static int d40_prep_slave_sg_log(struct d40_desc *d40d,
+ 					       dev_addr, lli_max,
+ 					       d40c->base->plat_data->llis_per_log);
+ 	} else if (direction == DMA_TO_DEVICE) {
+-		dev_addr = d40c->base->plat_data->dev_tx[d40c->dma_cfg.dst_dev_type];
++		if (d40c->amba_addr)
++			dev_addr = d40c->amba_addr;
++		else
++			dev_addr = d40c->base->plat_data->dev_tx[d40c->dma_cfg.dst_dev_type];
+ 		total_size = d40_log_sg_to_dev(&d40c->lcla,
+ 					       sgl, sg_len,
+ 					       &d40d->lli_log,
+@@ -1973,14 +1983,29 @@ static enum dma_status d40_tx_status(struct dma_chan *chan,
+ 				     struct dma_tx_state *txstate)
+ {
+ 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
++	void __iomem *active_reg;
+ 	dma_cookie_t last_used;
+ 	dma_cookie_t last_complete;
++	u32 status;
+ 	int ret;
+ 
+ 	last_complete = d40c->completed;
+ 	last_used = chan->cookie;
+ 
+-	ret = dma_async_is_complete(cookie, last_complete, last_used);
++	/* check for pause first */
++	if (d40c->phy_chan->num % 2 == 0)
++		active_reg = d40c->base->virtbase + D40_DREG_ACTIVE;
 +	else
-+		mmc->f_max = min(host->mclk, fmax);
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
++		active_reg = d40c->base->virtbase + D40_DREG_ACTIVO;
++
++	status = (readl(active_reg) &
++		  D40_CHAN_POS_MASK(d40c->phy_chan->num)) >>
++		D40_CHAN_POS(d40c->phy_chan->num);
++
++	if (status == D40_DMA_SUSPENDED)
++		ret = DMA_PAUSED;
++	else
++		ret = dma_async_is_complete(cookie, last_complete, last_used);
  
- #ifdef CONFIG_REGULATOR
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index 6b42417..7e466fe 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -6,8 +6,29 @@
+ 	if (txstate) {
+ 		txstate->last = last_complete;
+@@ -2026,6 +2051,103 @@ static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd)
+ 	return -ENXIO;
+ }
  
- #include <linux/mmc/host.h>
++/* PrimeCell DMA extension */
++void dma_set_ambaconfig(struct dma_chan *chan,
++			struct amba_dma_channel_config *config)
++{
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
++	struct stedma40_chan_cfg *cfg = &d40c->dma_cfg;
++	enum stedma40_periph_data_width addr_width;
++	int psize;
++
++	switch (config->addr_width) {
++	case 1:
++		addr_width = STEDMA40_BYTE_WIDTH;
++		break;
++	case 2:
++		addr_width = STEDMA40_HALFWORD_WIDTH;
++		break;
++	case 4:
++		addr_width = STEDMA40_WORD_WIDTH;
++		break;
++	case 8:
++		addr_width = STEDMA40_DOUBLEWORD_WIDTH;
++		break;
++	default:
++		dev_err(d40c->base->dev,
++			"illegal peripheral address width requested (%d)\n",
++			config->addr_width);
++		return;
++	}
++
++	if (config->maxburst >= 16)
++		psize = STEDMA40_PSIZE_LOG_16;
++	else if (config->maxburst >= 8)
++		psize = STEDMA40_PSIZE_LOG_8;
++	else if (config->maxburst >= 4)
++		psize = STEDMA40_PSIZE_LOG_4;
++	else
++		psize = STEDMA40_PSIZE_LOG_1;
++
++	if (config->direction == DMA_FROM_DEVICE) {
++		dma_addr_t dev_addr_rx =
++			d40c->base->plat_data->dev_rx[cfg->src_dev_type];
++
++		if (dev_addr_rx)
++			dev_warn(d40c->base->dev,
++				 "channel has a pre-wired RX address %08x "
++				 "overriding with %08x\n",
++				 dev_addr_rx, config->addr);
++		if (cfg->dir != STEDMA40_PERIPH_TO_MEM)
++			dev_warn(d40c->base->dev,
++				 "channel was not configured for peripheral "
++				 "to memory transfer (%d) overriding\n",
++				 cfg->dir);
++		cfg->dir = STEDMA40_PERIPH_TO_MEM;
++	} else if (config->direction == DMA_TO_DEVICE) {
++		dma_addr_t dev_addr_tx =
++			d40c->base->plat_data->dev_tx[cfg->dst_dev_type];
++
++		if (dev_addr_tx)
++			dev_warn(d40c->base->dev,
++				 "channel has a pre-wired TX address %08x "
++				 "overriding with %08x\n",
++				 dev_addr_tx, config->addr);
++		if (cfg->dir != STEDMA40_MEM_TO_PERIPH)
++			dev_warn(d40c->base->dev,
++				 "channel was not configured for memory "
++				 "to peripheral transfer (%d) overriding\n",
++				 cfg->dir);
++		cfg->dir = STEDMA40_MEM_TO_PERIPH;
++	} else {
++		dev_err(d40c->base->dev,
++			"unrecognized channel direction %d\n",
++			config->direction);
++		return;
++	}
++
++	/* Set up all the endpoint configs */
++	cfg->src_info.data_width = addr_width;
++	cfg->src_info.psize = psize;
++	cfg->src_info.endianess = STEDMA40_LITTLE_ENDIAN;
++	cfg->src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL;
++	cfg->dst_info.data_width = addr_width;
++	cfg->dst_info.psize = psize;
++	cfg->dst_info.endianess = STEDMA40_LITTLE_ENDIAN;
++	cfg->dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL;
++
++	/* These settings will take precedence later */
++	d40c->amba_addr = config->addr;
++	d40c->amba_direction = config->direction;
++	dev_dbg(d40c->base->dev,
++		"configured channel %s for %s, data width %d, "
++		"maxburst %d bytes, LE, no flow control\n",
++		dma_chan_name(chan),
++		(config->direction == DMA_FROM_DEVICE) ? "RX" : "TX",
++		config->addr_width,
++		config->maxburst);
++}
++
+ /* Initialization functions */
  
-+/**
-+ * struct mmci_platform_data - platform configuration for the MMCI
-+ * (also known as PL180) block.
-+ * @f_max: the maximum operational frequency for this host in this
-+ * platform configuration. When this is specified it takes precedence
-+ * over the module parameter for the same frequency.
-+ * @ocr_mask: available voltages on the 4 pins from the block, this
-+ * is ignored if a regulator is used, see the MMC_VDD_* masks in
-+ * mmc/host.h
-+ * @translate_vdd: a callback function to translate a MMC_VDD_*
-+ * mask into a value to be binary or:ed and written into the
-+ * MMCIPWR register of the block
-+ * @status: if no GPIO read function was given to the block in
-+ * gpio_wp (below) this function will be called to determine
-+ * whether a card is present in the MMC slot or not
-+ * @gpio_wp: read this GPIO pin to see if the card is write protected
-+ * @gpio_cd: read this GPIO pin to detect card insertion
-+ * @capabilities: the capabilities of the block as implemented in
-+ * this platform, signify anything MMC_CAP_* from mmc/host.h
-+ */
- struct mmci_platform_data {
--	unsigned int ocr_mask;			/* available voltages */
-+	unsigned int f_max;
-+	unsigned int ocr_mask;
- 	u32 (*translate_vdd)(struct device *, unsigned int);
- 	unsigned int (*status)(struct device *);
- 	int	gpio_wp;
+ static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
 -- 
 1.6.3.3
