@@ -1,30 +1,29 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu,  8 Apr 2010 01:12:00 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-Message-ID: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu,  8 Apr 2010 01:12:33 +0200
+Subject: [PATCH 03/11] ARM: U300: set f_max to 24 MHz for MMCI
+Message-ID: <1270681953-5244-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fifth iteration of this ever growing patch set
-for PrimeCell DMA support, reposting the entire series.
+This employs the frequency setting mechanism introduced to the
+MMCI to specify that this system can actually be clocked at 24 MHz.
 
-This now depend on stuff pending in Dan Williams async_tx
-(DMA Devices/Engine) tree and Andrew Mortons tree where
-the new DMA40 driver for U8500 is queued.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-u300/mmc.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I suggest putting these into Andrews tree now, since:
-
-A) 4 of the patches it touches MMCI code which is hanled
-   by Andrew
-
-B) It extends the DMA40 driver which is now pending in
-   his tree as well.
-
-C) Since there doesn't seem to be any consensus of whether
-   this is the right way forward, it needs some wider
-   testing I believe.
-
-OK?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index c2549b8..88506d0 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -102,6 +102,7 @@ int __devinit mmc_init(struct amba_device *adev)
+ 	 * we have a regulator we can control instead.
+ 	 */
+ 	/* Nominally 2.85V on our platform */
++	mmci_card->mmc0_plat_data.f_max = 24000000;
+ 	mmci_card->mmc0_plat_data.status = mmc_status;
+ 	mmci_card->mmc0_plat_data.gpio_wp = -1;
+ 	mmci_card->mmc0_plat_data.gpio_cd = -1;
+-- 
+1.6.3.3
