@@ -1,50 +1,26 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Wed, 07 Apr 2010 10:38:07 +0100
-Subject: Regulators vis-a-vis Power Domains
-In-Reply-To: <20100406215725.GA11983@sirena.org.uk>
-References: <33A307AF30D7BF4F811B1568FE7A9B180320EBB6@EXDCVYMBSTM006.EQ1STM.local>
-	<20100404131058.GA11705@opensource.wolfsonmicro.com>
-	<20100406155812.GR31126@trinity.fluff.org>
-	<1270586640.3229.72.camel@odin>
-	<20100406215725.GA11983@sirena.org.uk>
-Message-ID: <1270633087.3248.27.camel@odin>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 7 Apr 2010 10:54:49 +0100
+Subject: AC97 problems with pxa...
+In-Reply-To: <4BBC5254.7040200@bitsim.com>
+References: <4BBBACBE.7040505@bitsim.com>
+	<201004070950.37809.marek.vasut@gmail.com>
+	<4BBC5254.7040200@bitsim.com>
+Message-ID: <20100407095449.GA13576@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-04-06 at 22:57 +0100, Mark Brown wrote:
-> On Tue, Apr 06, 2010 at 09:44:00PM +0100, Liam Girdwood wrote:
-> > On Tue, 2010-04-06 at 16:58 +0100, Ben Dooks wrote: 
-> > > On Sun, Apr 04, 2010 at 02:10:58PM +0100, Mark Brown wrote:
-> 
-> > > > Nor does the SH stuff.  With the power domains of a CPU it often doesn't
-> > > > buy terribly much to use the regulator framework - the power domains are
-> 
-> > > I personally think there is merit to having the regulator framework at
-> > > least play a part in these, as is possible the powerdomains are being
-> > > fed from external regulators and/or power switches. I see it as good
-> > > way of using existing support to do useful work.
-> 
-> > I tend to agree here, although I think it's still early days for this
-> > technology and maybe some hybrid approach will eventually emerge.
-> 
-> Yes, once the control goes off chip the regulator framework definitely
-> makes sense.  It's only for things on the same die where there may be
-> less of a clear separation for the power supplies and where there's
-> likely to not be much more than simple power switching that it *might*
-> be worth doing something custom which more directly represents what's
-> going on.
+On Wed, Apr 07, 2010 at 11:37:24AM +0200, Jakob Viketoft wrote:
 
-I agree, although the concepts are pretty much the same wrt software in
-that both external PMIC regulators and internal on die voltage domains
-both control power to their consumers. We already have supply dependency
-support and consumer ref counting in regulator core so voltage domain
-support _may_ work well by adding a simplified method to register a
-domain graph with the regulator core. There may be other small bits and
-pieces to add too but I cant think of anything major atm.
+Please don't top post...
 
-Liam
+> Do you mean mixing the AC97 non-asoc and asoc drivers or the drivers
+> for the WM9712? I can't see the possibility of mixing anything for
+> the WM9712, but I'm unsure of the distinction between the different
+> AC97 pieces.
 
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+...without context it's hard to work out what you are talking about.
+
+> Should this make a difference? My module init function gets called,
+> it's just the snd_soc_dai_link[0].init function that doesn't.
+
+Build soc-core.c with #define DEBUG at the top then look at your logs
