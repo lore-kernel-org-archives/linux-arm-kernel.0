@@ -1,29 +1,75 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu,  8 Apr 2010 01:12:33 +0200
-Subject: [PATCH 03/11] ARM: U300: set f_max to 24 MHz for MMCI
-Message-ID: <1270681953-5244-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu,  8 Apr 2010 01:12:14 +0200
+Subject: [PATCH 01/11] ARM: MMCI: support 8bit mode on the ST Micro version
+Message-ID: <1270681934-4726-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This employs the frequency setting mechanism introduced to the
-MMCI to specify that this system can actually be clocked at 24 MHz.
+This adds support for an 8bit wide bus to the card (data lines
+MCIDAT0 through 7 exist) on the ST Micro version and alters the
+U300 platform to support this. Also add some ST_ prefix to the
+ST-specific registers.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/mach-u300/mmc.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-u300/mmc.c |    2 +-
+ drivers/mmc/host/mmci.c  |    6 ++++--
+ drivers/mmc/host/mmci.h  |    6 ++++--
+ 3 files changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-index c2549b8..88506d0 100644
+index 77fbb1e..c2549b8 100644
 --- a/arch/arm/mach-u300/mmc.c
 +++ b/arch/arm/mach-u300/mmc.c
-@@ -102,6 +102,7 @@ int __devinit mmc_init(struct amba_device *adev)
- 	 * we have a regulator we can control instead.
- 	 */
- 	/* Nominally 2.85V on our platform */
-+	mmci_card->mmc0_plat_data.f_max = 24000000;
- 	mmci_card->mmc0_plat_data.status = mmc_status;
+@@ -106,7 +106,7 @@ int __devinit mmc_init(struct amba_device *adev)
  	mmci_card->mmc0_plat_data.gpio_wp = -1;
  	mmci_card->mmc0_plat_data.gpio_cd = -1;
+ 	mmci_card->mmc0_plat_data.capabilities = MMC_CAP_MMC_HIGHSPEED |
+-		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA;
++		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+ 
+ 	mmcsd_device->platform_data = (void *) &mmci_card->mmc0_plat_data;
+ 
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 84c103a..7e70c1a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -55,14 +55,16 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 			host->cclk = host->mclk / (2 * (clk + 1));
+ 		}
+ 		if (host->hw_designer == AMBA_VENDOR_ST)
+-			clk |= MCI_FCEN; /* Bug fix in ST IP block */
++			clk |= MCI_ST_FCEN; /* Bug fix in ST IP block */
+ 		clk |= MCI_CLK_ENABLE;
+ 		/* This hasn't proven to be worthwhile */
+ 		/* clk |= MCI_CLK_PWRSAVE; */
+ 	}
+ 
+ 	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
+-		clk |= MCI_WIDE_BUS;
++		clk |= MCI_4BIT_BUS;
++	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
++		clk |= MCI_ST_8BIT_BUS;
+ 
+ 	writel(clk, host->base + MMCICLOCK);
+ }
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 1ceb9a9..d77062e 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -25,9 +25,11 @@
+ #define MCI_CLK_ENABLE		(1 << 8)
+ #define MCI_CLK_PWRSAVE		(1 << 9)
+ #define MCI_CLK_BYPASS		(1 << 10)
+-#define MCI_WIDE_BUS		(1 << 11)
++#define MCI_4BIT_BUS		(1 << 11)
++/* 8bit wide buses supported in ST Micro versions */
++#define MCI_ST_8BIT_BUS		(1 << 12)
+ /* HW flow control on the ST Micro version */
+-#define MCI_FCEN		(1 << 13)
++#define MCI_ST_FCEN		(1 << 13)
+ 
+ #define MMCIARGUMENT		0x008
+ #define MMCICOMMAND		0x00c
 -- 
 1.6.3.3
