@@ -1,26 +1,14 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Apr 2010 10:54:49 +0100
-Subject: AC97 problems with pxa...
-In-Reply-To: <4BBC5254.7040200@bitsim.com>
-References: <4BBBACBE.7040505@bitsim.com>
-	<201004070950.37809.marek.vasut@gmail.com>
-	<4BBC5254.7040200@bitsim.com>
-Message-ID: <20100407095449.GA13576@rakim.wolfsonmicro.main>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 7 Apr 2010 12:48:57 +0200
+Subject: Anyone working on Cortex A9 watchdogs?
+Message-ID: <o2m63386a3d1004070348k41e56824xbecd769f055f7939@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 07, 2010 at 11:37:24AM +0200, Jakob Viketoft wrote:
+As far as I can read from the kernel source there is no support for the per-cpu
+watchdogs found in the Cortex A9 MPCORE in Linux right now.
 
-Please don't top post...
+Is anyone working on this, or am I not reading the kernel source correctly?
 
-> Do you mean mixing the AC97 non-asoc and asoc drivers or the drivers
-> for the WM9712? I can't see the possibility of mixing anything for
-> the WM9712, but I'm unsure of the distinction between the different
-> AC97 pieces.
-
-...without context it's hard to work out what you are talking about.
-
-> Should this make a difference? My module init function gets called,
-> it's just the snd_soc_dai_link[0].init function that doesn't.
-
-Build soc-core.c with #define DEBUG at the top then look at your logs
+Yours,
+Linus Walleij
