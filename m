@@ -1,57 +1,29 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Apr 2010 09:50:37 +0200
-Subject: AC97 problems with pxa...
-In-Reply-To: <4BBBACBE.7040505@bitsim.com>
-References: <4BBBACBE.7040505@bitsim.com>
-Message-ID: <201004070950.37809.marek.vasut@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed,  7 Apr 2010 11:40:37 +0300
+Subject: [PATCH] [ARM] pxa/regs-u2d: add missing new line.
+Message-ID: <1270629637-3257-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 6. dubna 2010 23:50:54 Jakob Viketoft napsal(a):
-> Hello!
-> 
-> I'm trying to add sound support to a Toradex Colibri 270 v2 card, but
-> have run into some strangeness which I don't quite understand. The v2 of
-> this card uses the WM9712 codec and I've written a machine driver to tie
-> the codec and the pxa2xx-ac97 driver together. I'm using the 2.6.33.1
-> kernel and my machine driver is a simplified version of the tosa driver
-> (no power management or headphone jack logic). However, I get two problems:
-> 1. Internal clock and headphone output is turned off in the
-> AC97_POWERDOWN register and I can't see where to (properly) turn it on,
-> neither in kernel space or in userland. No-one else using this codec
-> seem to be doing it.
-> 2. The init function defined in my snd_soc_card struct doesn't seem to
-> get called, resulting in way too many mixer settings (I have a number of
-> snd_soc_dapm_nc_pin calls) with alsa, but might it also have something
-> to do with problem 1?
-> 
-> When explicitly writing 0 (the ugly way) to the AC97_POWERDOWN register
-> I get perfect sound output, but I would like to do it the right way.
-> 
-> Two error reports from the dmesg output that might be relevant:
-> * pxa2xx_ac97_try_cold_reset: cold reset timeout (GSR=0x44)
-> * Error: Driver 'pxa2xx-ac97' is already registered, aborting...
-> 
 
-Aren't you mixing ASoC driver with non-ASoC driver? Check how this is done on 
-the palmtx for example (and the pxa27x.c asoc driver)
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-pxa/include/mach/regs-u2d.h |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> The AC97 interface is added in the machine initialization through the
-> pxa_set_ac97_info() in the same way as tosa and many others and this
-> could explain the second error message...
-> 
-> Any insight would be appreciated!
-> 
-> Regards,
-> 
-> 	/Jakob
-> 
-> 
-
-CC Mark Brown
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-pxa/include/mach/regs-u2d.h b/arch/arm/mach-pxa/include/mach/regs-u2d.h
+index 44b0b20..c15c0c5 100644
+--- a/arch/arm/mach-pxa/include/mach/regs-u2d.h
++++ b/arch/arm/mach-pxa/include/mach/regs-u2d.h
+@@ -166,7 +166,8 @@
+ #define U2DMACSR_BUSERRTYPE	(7 << 10)	/* PX Bus Error Type */
+ #define U2DMACSR_EORINTR	(1 << 9)	/* End Of Receive */
+ #define U2DMACSR_REQPEND	(1 << 8)	/* Request Pending */
+-#define U2DMACSR_RASINTR	(1 << 4)	/* Request After Channel Stopped (read / write 1 clear) */#define U2DMACSR_STOPINTR	(1 << 3)	/* Stop Interrupt (read only) */
++#define U2DMACSR_RASINTR	(1 << 4)	/* Request After Channel Stopped (read / write 1 clear) */
++#define U2DMACSR_STOPINTR	(1 << 3)	/* Stop Interrupt (read only) */
+ #define U2DMACSR_ENDINTR	(1 << 2)	/* End Interrupt (read / write 1 clear) */
+ #define U2DMACSR_STARTINTR	(1 << 1)	/* Start Interrupt (read / write 1 clear) */
+ #define U2DMACSR_BUSERRINTR	(1 << 0)	/* Bus Error Interrupt (read / write 1 clear) */
+-- 
+1.6.4.4
