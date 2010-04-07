@@ -1,310 +1,348 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu,  8 Apr 2010 01:12:53 +0200
-Subject: [PATCH 05/11] ARM: add generic PrimeCell interface to COH 901 318 v5
-Message-ID: <1270681973-5763-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu,  8 Apr 2010 01:14:30 +0200
+Subject: [PATCH 11/11] ARM: config Ux500 PL011 PL022 for DMA v1
+Message-ID: <1270682070-7579-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the DMA engine driver for the COH 901 318 used in the
-U300 platform with the generic PrimeCell interface.
+This will configure the platform data for the PL011 and PL022
+PrimeCells found in the Ux500 to use DMA with the generic
+PrimeCell DMA engine.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/dma/coh901318.c     |  146 +++++++++++++++++++++++++++++++++++++++++++
- drivers/dma/coh901318_lli.c |   78 ++++++++++++++++++++++-
- 2 files changed, 221 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c |  236 +++++++++++++++++++++++++++++------
+ 1 files changed, 195 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index 4233440..1d5ed16 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -21,6 +21,7 @@
- #include <linux/uaccess.h>
- #include <linux/debugfs.h>
- #include <mach/coh901318.h>
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 6e95678..2cad265 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -14,7 +14,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/amba/bus.h>
 +#include <linux/amba/dma.h>
+ #include <linux/amba/pl022.h>
++#include <linux/amba/serial.h>
+ #include <linux/spi/spi.h>
  
- #include "coh901318_lli.h"
+ #include <asm/mach-types.h>
+@@ -31,21 +33,137 @@
+ #define __MEM_4K_RESOURCE(x) \
+ 	.res = {.start = (x), .end = (x) + SZ_4K - 1, .flags = IORESOURCE_MEM}
  
-@@ -72,6 +73,9 @@ struct coh901318_chan {
- 	unsigned long nbr_active_done;
- 	unsigned long busy;
- 
-+	u32 amba_addr;
-+	u32 amba_ctrl;
++#ifdef CONFIG_STE_DMA40
++struct stedma40_chan_cfg uart0_dma_cfg_rx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_PERIPH_TO_MEM,
++	.src_dev_type =  STEDMA40_DEV_UART0_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
 +
- 	struct coh901318_base *base;
++static struct stedma40_chan_cfg uart0_dma_cfg_tx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_MEM_TO_PERIPH,
++	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
++	.dst_dev_type = STEDMA40_DEV_UART0_TX,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
++
++struct stedma40_chan_cfg uart1_dma_cfg_rx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_PERIPH_TO_MEM,
++	.src_dev_type =  STEDMA40_DEV_UART1_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
++
++static struct stedma40_chan_cfg uart1_dma_cfg_tx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_MEM_TO_PERIPH,
++	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
++	.dst_dev_type = STEDMA40_DEV_UART1_TX,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
++
++struct stedma40_chan_cfg uart2_dma_cfg_rx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_PERIPH_TO_MEM,
++	.src_dev_type =  STEDMA40_DEV_UART2_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
++
++static struct stedma40_chan_cfg uart2_dma_cfg_tx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_MEM_TO_PERIPH,
++	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
++	.dst_dev_type = STEDMA40_DEV_UART2_TX,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
++};
++#endif
++
++static struct amba_pl011_data uart0_plat = {
++#ifdef CONFIG_STE_DMA40
++	.dma_filter = stedma40_filter,
++	.dma_rx_param = &uart0_dma_cfg_rx,
++	.dma_tx_param = &uart0_dma_cfg_tx,
++#endif
++};
++
++static struct amba_pl011_data uart1_plat = {
++#ifdef CONFIG_STE_DMA40
++	.dma_filter = stedma40_filter,
++	.dma_rx_param = &uart1_dma_cfg_rx,
++	.dma_tx_param = &uart1_dma_cfg_tx,
++#endif
++};
++
++static struct amba_pl011_data uart2_plat = {
++#ifdef CONFIG_STE_DMA40
++	.dma_filter = stedma40_filter,
++	.dma_rx_param = &uart2_dma_cfg_rx,
++	.dma_tx_param = &uart2_dma_cfg_tx,
++#endif
++};
++
+ /* These are active devices on this board */
+ static struct amba_device uart0_device = {
+-	.dev = { .init_name = "uart0" },
++	.dev =  {
++		.coherent_dma_mask = ~0,
++		.init_name = "uart0",
++		.platform_data = &uart0_plat,
++	},
+ 	__MEM_4K_RESOURCE(U8500_UART0_BASE),
+ 	.irq = {IRQ_UART0, NO_IRQ},
  };
  
-@@ -190,6 +194,9 @@ static inline struct coh901318_chan *to_coh901318_chan(struct dma_chan *chan)
- static inline dma_addr_t
- cohc_dev_addr(struct coh901318_chan *cohc)
- {
-+	/* PrimeCell supplied address will take precedence */
-+	if (cohc->amba_addr)
-+		return cohc->amba_addr;
- 	return cohc->base->platform->chan_conf[cohc->id].dev_addr;
- }
+ static struct amba_device uart1_device = {
+-	.dev = { .init_name = "uart1" },
++	.dev =  {
++		.coherent_dma_mask = ~0,
++		.init_name = "uart1",
++		.platform_data = &uart1_plat,
++	},
+ 	__MEM_4K_RESOURCE(U8500_UART1_BASE),
+ 	.irq = {IRQ_UART1, NO_IRQ},
+ };
  
-@@ -1055,6 +1062,14 @@ coh901318_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ static struct amba_device uart2_device = {
+-	.dev = { .init_name = "uart2" },
++	.dev =  {
++		.coherent_dma_mask = ~0,
++		.init_name = "uart2",
++		.platform_data = &uart2_plat,
++	},
+ 	__MEM_4K_RESOURCE(U8500_UART2_BASE),
+ 	.irq = {IRQ_UART2, NO_IRQ},
+ };
+@@ -84,10 +202,44 @@ static struct spi_board_info u8500_spi_devices[] = {
+ 	},
+ };
  
- 	params = cohc_chan_param(cohc);
- 	config = params->config;
-+	/*
-+	 * Add primecell-specific control on top, make
-+	 * sure the bits you set per peripheral channel are
-+	 * cleared in the default config from the platform.
-+	 */
-+	ctrl_chained |= cohc->amba_ctrl;
-+	ctrl_last |= cohc->amba_ctrl;
-+	ctrl |= cohc->amba_ctrl;
- 
- 	if (direction == DMA_TO_DEVICE) {
- 		u32 tx_flags = COH901318_CX_CTRL_PRDD_SOURCE |
-@@ -1113,6 +1128,12 @@ coh901318_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	if (ret)
- 		goto err_lli_fill;
- 
-+	/*
-+	 * Set the default ctrl for the channel to the one from the lli,
-+	 * things may have changed due to odd buffer alignment etc.
-+	 */
-+	coh901318_set_ctrl(cohc, lli->control);
-+
- 	COH_DBG(coh901318_list_print(cohc, lli));
- 
- 	/* Pick a descriptor to handle this transfer */
-@@ -1239,6 +1260,131 @@ coh901318_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd)
- 
- 	return 0;
- }
-+
-+/*
-+ * Here we wrap in the PrimeCell dma interface
-+ */
-+struct burst_table {
-+	int burst_8bit;
-+	int burst_16bit;
-+	int burst_32bit;
-+	u32 reg;
++#ifdef CONFIG_STE_DMA40
++struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_PERIPH_TO_MEM,
++	.src_dev_type =  STEDMA40_DEV_SSP0_RX,
++	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
 +};
 +
-+static const struct burst_table burst_sizes[] = {
-+	{
-+		.burst_8bit = 64,
-+		.burst_16bit = 32,
-+		.burst_32bit = 16,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_64_BYTES,
-+	},
-+	{
-+		.burst_8bit = 48,
-+		.burst_16bit = 24,
-+		.burst_32bit = 12,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_48_BYTES,
-+	},
-+	{
-+		.burst_8bit = 32,
-+		.burst_16bit = 16,
-+		.burst_32bit = 8,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_32_BYTES,
-+	},
-+	{
-+		.burst_8bit = 16,
-+		.burst_16bit = 8,
-+		.burst_32bit = 4,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_16_BYTES,
-+	},
-+	{
-+		.burst_8bit = 8,
-+		.burst_16bit = 4,
-+		.burst_32bit = 2,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_8_BYTES,
-+	},
-+	{
-+		.burst_8bit = 4,
-+		.burst_16bit = 2,
-+		.burst_32bit = 1,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_4_BYTES,
-+	},
-+	{
-+		.burst_8bit = 2,
-+		.burst_16bit = 1,
-+		.burst_32bit = 0,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_2_BYTES,
-+	},
-+	{
-+		.burst_8bit = 1,
-+		.burst_16bit = 0,
-+		.burst_32bit = 0,
-+		.reg = COH901318_CX_CTRL_BURST_COUNT_1_BYTE,
-+	},
++static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
++	.channel_type = (STEDMA40_CHANNEL_IN_LOG_MODE|
++			 STEDMA40_LCHAN_SRC_LOG_DST_LOG|STEDMA40_NO_TIM_FOR_LINK|
++			 STEDMA40_LOW_PRIORITY_CHANNEL),
++	.dir = STEDMA40_MEM_TO_PERIPH,
++	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
++	.dst_dev_type = STEDMA40_DEV_SSP0_TX,
++	.src_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.src_info.data_width = STEDMA40_BYTE_WIDTH,
++	.dst_info.endianess = STEDMA40_LITTLE_ENDIAN,
++	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
 +};
-+
-+void dma_set_ambaconfig(struct dma_chan *chan,
-+			struct amba_dma_channel_config *config)
-+{
-+	struct coh901318_chan *cohc = to_coh901318_chan(chan);
-+	int maxburst = config->maxburst;
-+	u32 amba_ctrl = 0;
-+	int i = 0;
-+
-+	dev_dbg(COHC_2_DEV(cohc), "configure channel for %d byte transfers\n",
-+		config->addr_width);
-+	switch (config->addr_width)  {
-+	case 1:
-+		amba_ctrl |=
-+			COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS |
-+			COH901318_CX_CTRL_DST_BUS_SIZE_8_BITS;
-+
-+		while (i < ARRAY_SIZE(burst_sizes)) {
-+			if (burst_sizes[i].burst_8bit <= maxburst)
-+				break;
-+			i++;
-+		}
-+
-+		break;
-+	case 2:
-+		amba_ctrl |=
-+			COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS |
-+			COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
-+
-+		while (i < ARRAY_SIZE(burst_sizes)) {
-+			if (burst_sizes[i].burst_16bit <= maxburst)
-+				break;
-+			i++;
-+		}
-+
-+		break;
-+	case 4:
-+		/* Direction doesn't matter here, it's 32/32 bits */
-+		amba_ctrl |=
-+			COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
-+			COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
-+
-+		while (i < ARRAY_SIZE(burst_sizes)) {
-+			if (burst_sizes[i].burst_32bit <= maxburst)
-+				break;
-+			i++;
-+		}
-+
-+		break;
-+	default:
-+		dev_err(COHC_2_DEV(cohc),
-+			"bad ambaconfig: alien address width\n");
-+		return;
-+	}
-+
-+	amba_ctrl |= burst_sizes[i].reg;
-+	dev_dbg(COHC_2_DEV(cohc),
-+		"selected burst size %d bytes for address width %d bytes, maxburst %d\n",
-+		burst_sizes[i].burst_8bit, config->addr_width, maxburst);
-+
-+	cohc->amba_addr = config->addr;
-+	cohc->amba_ctrl = amba_ctrl;
-+}
-+
- void coh901318_base_init(struct dma_device *dma, const int *pick_chans,
- 			 struct coh901318_base *base)
- {
-diff --git a/drivers/dma/coh901318_lli.c b/drivers/dma/coh901318_lli.c
-index 9f7e0e6..f37db49 100644
---- a/drivers/dma/coh901318_lli.c
-+++ b/drivers/dma/coh901318_lli.c
-@@ -153,6 +153,39 @@ coh901318_lli_fill_memcpy(struct coh901318_pool *pool,
- 	lli->src_addr = src;
- 	lli->dst_addr = dst;
- 
-+	/*
-+	 * The DMA hardware will increase its pointer by 1,
-+	 * 2 or 4 bytes at a time depending on configuration.
-+	 * If using som oddly-aligned buffer this will cause
-+	 * performance problems.
-+	 */
-+#if 0
-+	ctrl_chained &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
-+	ctrl_eom &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
-+	ctrl_chained &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
-+	ctrl_eom &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
-+	if (src & 0x01) {
-+		ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
-+	} else if (src & 0x02) {
-+		ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
-+	} else {
-+		ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
-+	}
-+	if (dst & 0x01) {
-+		ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_8_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_SRC_DST_SIZE_8_BITS;
-+	} else if (dst & 0x02) {
-+		ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
-+	} else {
-+		ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
-+		ctrl_eom |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
-+	}
 +#endif
 +
- 	while (lli->link_addr) {
- 		lli->control = ctrl_chained | MAX_DMA_PACKET_SIZE;
- 		lli->src_addr = src;
-@@ -268,13 +301,52 @@ coh901318_lli_fill_sg(struct coh901318_pool *pool,
- 		else
- 			ctrl_sg = ctrl ? ctrl : ctrl_last;
- 
--
--		if (dir == DMA_TO_DEVICE)
-+		/*
-+		 * If the physical address is only divisible by 1 or
-+		 * two, we have to lower the destination bus size to
-+		 * the least common denominator
-+		 */
-+		if (dir == DMA_TO_DEVICE) {
- 			/* increment source address */
- 			src = sg_phys(sg);
--		else
-+#if 0
-+			ctrl_sg &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
-+			ctrl_chained &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
-+			if (src & 0x01) {
-+				pr_err("Aligned src buffer to 8bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
-+			} else if (src & 0x02) {
-+				pr_err("Aligned src buffer to 16bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
-+			} else {
-+				pr_err("Aligned src buffer to 32bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
-+			}
+ static struct pl022_ssp_controller ssp0_platform_data = {
+ 	.bus_id = 0,
+-	/* pl022 not yet supports dma */
++#ifdef CONFIG_STE_DMA40
++	.enable_dma = 1,
++	.dma_filter = stedma40_filter,
++	.dma_rx_param = &ssp0_dma_cfg_rx,
++	.dma_tx_param = &ssp0_dma_cfg_tx,
++#else
+ 	.enable_dma = 0,
 +#endif
-+		} else {
- 			/* increment destination address */
- 			dst =  sg_phys(sg);
-+#if 0
-+			ctrl_sg &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
-+			ctrl_chained &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
-+			if (dst & 0x01) {
-+				pr_err("Aligned dst buffer to 8bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_DST_BUS_SIZE_8_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_8_BITS;
-+			} else if (dst & 0x02) {
-+				pr_err("Aligned dst buffer to 16bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
-+			} else {
-+				pr_err("Aligned dst buffer to 32bit access\n");
-+				ctrl_sg |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
-+				ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
-+			}
-+#endif
-+		}
+ 	/* on this platform, gpio 31,142,144,214 &
+ 	 * 224 are connected as chip selects
+ 	 */
+@@ -247,21 +399,23 @@ struct stedma40_chan_cfg dma40_memcpy_conf_log = {
  
- 		bytes_to_transfer = sg_dma_len(sg);
+ /*
+  * Mapping between destination event lines and physical device address.
+- * The event line is tied to a device and therefor the address is constant.
++ * The event line is tied to a device and therefore the address is constant.
++ * When the address comes from a primecell it will be configured in runtime
++ * and we set the address to -1 as a placeholder.
+  */
+ const static dma_addr_t dma40_tx_map[STEDMA40_DEV_MAX] = {
+-	[STEDMA40_DEV_SPI0_TX] = 0,
+-	[STEDMA40_DEV_SD_MMC0_TX] = 0,
+-	[STEDMA40_DEV_SD_MMC1_TX] = 0,
+-	[STEDMA40_DEV_SD_MMC2_TX] = 0,
++	[STEDMA40_DEV_SPI0_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC0_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC1_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC2_TX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_I2C1_TX] = 0,
+ 	[STEDMA40_DEV_I2C3_TX] = 0,
+ 	[STEDMA40_DEV_I2C2_TX] = 0,
+-	[STEDMA40_DEV_SSP0_TX] = 0,
+-	[STEDMA40_DEV_SSP1_TX] = 0,
+-	[STEDMA40_DEV_UART2_TX] = 0,
+-	[STEDMA40_DEV_UART1_TX] = 0,
+-	[STEDMA40_DEV_UART0_TX] = 0,
++	[STEDMA40_DEV_SSP0_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SSP1_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_UART2_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_UART1_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_UART0_TX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_MSP2_TX] = 0,
+ 	[STEDMA40_DEV_I2C0_TX] = 0,
+ 	[STEDMA40_DEV_USB_OTG_OEP_8] = 0,
+@@ -276,23 +430,23 @@ const static dma_addr_t dma40_tx_map[STEDMA40_DEV_MAX] = {
+ 	[STEDMA40_DEV_DST_SXA1_RX_TX] = 0,
+ 	[STEDMA40_DEV_DST_SXA2_RX_TX] = 0,
+ 	[STEDMA40_DEV_DST_SXA3_RX_TX] = 0,
+-	[STEDMA40_DEV_SD_MM2_TX] = 0,
+-	[STEDMA40_DEV_SD_MM0_TX] = 0,
++	[STEDMA40_DEV_SD_MM2_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM0_TX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_MSP1_TX] = 0,
+ 	[STEDMA40_SLIM0_CH0_TX] = 0,
+ 	[STEDMA40_DEV_MSP0_TX] = 0,
+-	[STEDMA40_DEV_SD_MM1_TX] = 0,
+-	[STEDMA40_DEV_SPI2_TX] = 0,
++	[STEDMA40_DEV_SD_MM1_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SPI2_TX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_I2C3_TX2] = 0,
+-	[STEDMA40_DEV_SPI1_TX] = 0,
++	[STEDMA40_DEV_SPI1_TX] = -1,  /* PrimeCell DMA */
+ 	[STEDMA40_DEV_USB_OTG_OEP_4_12] = 0,
+ 	[STEDMA40_DEV_USB_OTG_OEP_5_13] = 0,
+ 	[STEDMA40_DEV_USB_OTG_OEP_6_14] = 0,
+ 	[STEDMA40_DEV_USB_OTG_OEP_7_15] = 0,
+-	[STEDMA40_DEV_SPI3_TX] = 0,
+-	[STEDMA40_DEV_SD_MM3_TX] = 0,
+-	[STEDMA40_DEV_SD_MM4_TX] = 0,
+-	[STEDMA40_DEV_SD_MM5_TX] = 0,
++	[STEDMA40_DEV_SPI3_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM3_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM4_TX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM5_TX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_DST_SXA4_RX_TX] = 0,
+ 	[STEDMA40_DEV_DST_SXA5_RX_TX] = 0,
+ 	[STEDMA40_DEV_DST_SXA6_RX_TX] = 0,
+@@ -307,19 +461,19 @@ const static dma_addr_t dma40_tx_map[STEDMA40_DEV_MAX] = {
  
+ /* Mapping between source event lines and physical device address */
+ const static dma_addr_t dma40_rx_map[STEDMA40_DEV_MAX] = {
+-	[STEDMA40_DEV_SPI0_RX] = 0,
+-	[STEDMA40_DEV_SD_MMC0_RX] = 0,
+-	[STEDMA40_DEV_SD_MMC1_RX] = 0,
+-	[STEDMA40_DEV_SD_MMC2_RX] = 0,
++	[STEDMA40_DEV_SPI0_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC0_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC1_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MMC2_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_I2C1_RX] = 0,
+ 	[STEDMA40_DEV_I2C3_RX] = 0,
+ 	[STEDMA40_DEV_I2C2_RX] = 0,
+-	[STEDMA40_DEV_SSP0_RX] = 0,
+-	[STEDMA40_DEV_SSP1_RX] = 0,
++	[STEDMA40_DEV_SSP0_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SSP1_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_MCDE_RX] = 0,
+-	[STEDMA40_DEV_UART2_RX] = 0,
+-	[STEDMA40_DEV_UART1_RX] = 0,
+-	[STEDMA40_DEV_UART0_RX] = 0,
++	[STEDMA40_DEV_UART2_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_UART1_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_UART0_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_MSP2_RX] = 0,
+ 	[STEDMA40_DEV_I2C0_RX] = 0,
+ 	[STEDMA40_DEV_USB_OTG_IEP_8] = 0,
+@@ -334,23 +488,23 @@ const static dma_addr_t dma40_rx_map[STEDMA40_DEV_MAX] = {
+ 	[STEDMA40_DEV_SRC_SXA1_RX_TX] = 0,
+ 	[STEDMA40_DEV_SRC_SXA2_RX_TX] = 0,
+ 	[STEDMA40_DEV_SRC_SXA3_RX_TX] = 0,
+-	[STEDMA40_DEV_SD_MM2_RX] = 0,
+-	[STEDMA40_DEV_SD_MM0_RX] = 0,
++	[STEDMA40_DEV_SD_MM2_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM0_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_MSP1_RX] = 0,
+ 	[STEDMA40_SLIM0_CH0_RX] = 0,
+ 	[STEDMA40_DEV_MSP0_RX] = 0,
+-	[STEDMA40_DEV_SD_MM1_RX] = 0,
+-	[STEDMA40_DEV_SPI2_RX] = 0,
++	[STEDMA40_DEV_SD_MM1_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SPI2_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_I2C3_RX2] = 0,
+-	[STEDMA40_DEV_SPI1_RX] = 0,
++	[STEDMA40_DEV_SPI1_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_USB_OTG_IEP_4_12] = 0,
+ 	[STEDMA40_DEV_USB_OTG_IEP_5_13] = 0,
+ 	[STEDMA40_DEV_USB_OTG_IEP_6_14] = 0,
+ 	[STEDMA40_DEV_USB_OTG_IEP_7_15] = 0,
+-	[STEDMA40_DEV_SPI3_RX] = 0,
+-	[STEDMA40_DEV_SD_MM3_RX] = 0,
+-	[STEDMA40_DEV_SD_MM4_RX] = 0,
+-	[STEDMA40_DEV_SD_MM5_RX] = 0,
++	[STEDMA40_DEV_SPI3_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM3_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM4_RX] = -1, /* PrimeCell DMA */
++	[STEDMA40_DEV_SD_MM5_RX] = -1, /* PrimeCell DMA */
+ 	[STEDMA40_DEV_SRC_SXA4_RX_TX] = 0,
+ 	[STEDMA40_DEV_SRC_SXA5_RX_TX] = 0,
+ 	[STEDMA40_DEV_SRC_SXA6_RX_TX] = 0,
 -- 
 1.6.3.3
