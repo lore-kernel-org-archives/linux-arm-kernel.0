@@ -1,32 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 8 Apr 2010 15:12:47 +0100
-Subject: AC97 problems with pxa...
-In-Reply-To: <4BBDE2BD.6000708@bitsim.com>
-References: <4BBBACBE.7040505@bitsim.com>
-	<201004070950.37809.marek.vasut@gmail.com>
-	<4BBC5254.7040200@bitsim.com>
-	<20100407095449.GA13576@rakim.wolfsonmicro.main>
-	<4BBD9F28.9080804@bitsim.com>
-	<20100408095415.GC6303@rakim.wolfsonmicro.main>
-	<4BBDD480.8020708@bitsim.com>
-	<20100408134946.GD30647@rakim.wolfsonmicro.main>
-	<4BBDE2BD.6000708@bitsim.com>
-Message-ID: <20100408141247.GE30647@rakim.wolfsonmicro.main>
+From: ivo.clarysse@gmail.com (Ivo Clarysse)
+Date: Thu, 8 Apr 2010 16:13:27 +0200
+Subject: [PATCH v3 0/2] ARM: MXC: mxc_nand: support i.MX21
+In-Reply-To: <20100408133303.GK3688@pengutronix.de>
+References: <q2tba216b431004060652jeb9df33eqd141836e46980f00@mail.gmail.com>
+	<20100407134039.GE3688@pengutronix.de>
+	<o2oba216b431004080520u924ffafby3a88e18471b560b@mail.gmail.com>
+	<20100408133303.GK3688@pengutronix.de>
+Message-ID: <o2qba216b431004080713n9a264511qc4066544cdac10aa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 08, 2010 at 04:05:49PM +0200, Jakob Viketoft wrote:
+Allow mxc_nand.c to function on i.MX21 SoCs, since:
 
-> The log output with kobject listed (do you need more info?)
+1) On i.MX21, if the NFC_INT_MASK bit in NFC_CONFIG1 is set, the NFC_INT
+ bit of NFC_CONFIG2 always reads out zero, even if an operation is
+ completed.
 
-> kobject: 'colibri270-v2-asoc' (c3c20bc0): kobject_add_internal:
-> parent: 'drivers', set: 'drivers'
-> kobject: 'colibri270-v2-asoc' (c3c20bc0): kobject_uevent_env
-> kobject: 'colibri270-v2-asoc' (c3c20bc0): fill_kobj_path: path =
-> '/bus/platform/drivers/colibri270-v2-asoc'
-> ALSA device list:
->   No soundcards found.
+2) On i.MX21, sending a RESET command to the NAND flash controller does
+ not trigger an interrupt, nor does it cause the NFC_INT bit of
+ NFC_CONFIG2 to get set.
 
-So you've registered a driver for someting called 'collabri270-v2-asoc'
-- what is that?  This doesn't seem to correspond to the code you
-previously posted and there's no soc-audio anywhere here...
+3) After reset is performed, NFC registers are again in their
+ default values.
+
+This patch series:
+
+- (Re-)sets all NFC registers after reset
+
+- Uses enable_irq / disable_irq_nosync instead of NFC_INT_MASK
+  to mask NFC interrupts (allowing NFC_CONFIG2:NFC_INT to used on i.MX21)
