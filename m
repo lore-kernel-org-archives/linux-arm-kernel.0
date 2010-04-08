@@ -1,64 +1,41 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Apr 2010 09:59:36 +0200
-Subject: [PATCH] ARM: S5P: Add System Timer
-In-Reply-To: <1269916185-30533-1-git-send-email-kgene.kim@samsung.com>
-References: <1269916185-30533-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <001b01cad6f1$71bdd890$553989b0$%szyprowski@samsung.com>
+Date: Thu, 08 Apr 2010 10:08:07 +0200
+Subject: [PATCH 02/16] drivers: serial: S5PC100 serial driver cleanup
+In-Reply-To: <20100406155951.GS31126@trinity.fluff.org>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-3-git-send-email-m.szyprowski@samsung.com>
+	<20100406155951.GS31126@trinity.fluff.org>
+Message-ID: <001c01cad6f2$a1da52f0$e58ef8d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Tuesday, March 30, 2010 4:30 AM Kukjin Kim wrote:
+On Tuesday, April 06, 2010 6:00 PM Ben Dooks wrote:
 
-> From: Jongpill Lee <boyko.lee@samsung.com>
+> On Fri, Apr 02, 2010 at 08:48:50AM +0200, Marek Szyprowski wrote:
+> > Remove unnecessary Kconfig entry. S5PC100 has exactly the same driver as
+> > S3C6400/S3C6410/S5P6440.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  drivers/serial/Kconfig  |   10 +---------
+> >  drivers/serial/Makefile |    1 -
+> >  2 files changed, 1 insertions(+), 10 deletions(-)
+> >
+> > diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+> > index f55c494..b68ea18 100644
+> > --- a/drivers/serial/Kconfig
+> > +++ b/drivers/serial/Kconfig
+> > @@ -534,21 +534,13 @@ config SERIAL_S3C24A0
+> >
+> >  config SERIAL_S3C6400
+> >  	tristate "Samsung S3C6400/S3C6410/S5P6440 Seria port support"
 > 
-> This patch addes system timer for Samsung S5P series SoCs
-> 
-> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> it would have been nice to update the list of supported devices above.
 
-I've tested this patch on Samsung Aquila board and it works fine.
-
-> ...
-
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> index a278832..22ed209 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> @@ -94,5 +94,5 @@ MACHINE_START(SMDKV210, "SMDKV210")
->  	.init_irq	= s5pv210_init_irq,
->  	.map_io		= smdkv210_map_io,
->  	.init_machine	= smdkv210_machine_init,
-> -	.timer		= &s3c24xx_timer,
-> +	.timer		= &s5p_systimer,
->  MACHINE_END
-
-What about mach-smdkc110.c ?
-
-> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-> index d400a6a..a73fc56 100644
-> --- a/arch/arm/plat-s5p/Kconfig
-> +++ b/arch/arm/plat-s5p/Kconfig
-> @@ -23,3 +23,10 @@ config PLAT_S5P
->  	select SAMSUNG_IRQ_UART
->  	help
->  	  Base platform code for Samsung's S5P series SoC.
-> +
-> +config SYSTIMER_S5P
-> +	bool
-> +	depends on (ARCH_S5P6442 || ARCH_S5PV210)
-> +	default y
-> +	help
-> +	  Support System Timer for S5P Series
-
-IMHO 'S5P_SYSTIMER' would be a better name, but it is only a matter
-of taste.
-
-A new Kconfig option to conditionally disable plat-samsung/time.c timer
-build would be nice to disable unused code on S5PV210.
-
-> ...
+Ok. I will fix this in the next iteration of the patches.
 
 Best regards
 --
