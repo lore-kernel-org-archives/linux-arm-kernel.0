@@ -1,10 +1,10 @@
 From: jakob.viketoft@bitsim.com (Jakob Viketoft)
-Date: Thu, 08 Apr 2010 16:05:49 +0200
+Date: Thu, 08 Apr 2010 16:06:42 +0200
 Subject: AC97 problems with pxa...
 In-Reply-To: <20100408134946.GD30647@rakim.wolfsonmicro.main>
 References: <4BBBACBE.7040505@bitsim.com>	<201004070950.37809.marek.vasut@gmail.com>	<4BBC5254.7040200@bitsim.com>	<20100407095449.GA13576@rakim.wolfsonmicro.main>	<4BBD9F28.9080804@bitsim.com>	<20100408095415.GC6303@rakim.wolfsonmicro.main>	<4BBDD480.8020708@bitsim.com>
 	<20100408134946.GD30647@rakim.wolfsonmicro.main>
-Message-ID: <4BBDE2BD.6000708@bitsim.com>
+Message-ID: <4BBDE2F2.60603@bitsim.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -75,8 +75,8 @@ kobject: 'colibri270-v2-asoc' (c3c20bc0): fill_kobj_path: path =
 ALSA device list:
    No soundcards found.
 
-It's a small step forward, but now I need to find out what happened to 
-the sound card...
+It's a small step forward (the DAI gets registered), but now I need to 
+find out what happened to the sound card...
 
 > _______________________________________________
 > linux-arm-kernel mailing list
