@@ -1,26 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 8 Apr 2010 11:34:38 +0200
-Subject: [PATCH 1/3] ARM: MXC: mxcmmc: misc cleanups
-In-Reply-To: <20100406104455.GW30801@buzzloop.caiaq.de>
-References: <1270109005-9007-1-git-send-email-daniel@caiaq.de>
-	<20100406104455.GW30801@buzzloop.caiaq.de>
-Message-ID: <20100408093438.GG3688@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Apr 2010 10:38:52 +0100
+Subject: [PATCH] Fix ioremap_cached()/ioremap_wc() for SMP platforms
+Message-ID: <20100408093852.GC31407@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 06, 2010 at 12:44:55PM +0200, Daniel Mack wrote:
-> Is this series ok to go in?
-> Sascha, will this go thru your tree?
+Write combining/cached device mappings are not setting the shared bit,
+which could potentially cause problems on SMP systems since the cache
+lines won't participate in the cache coherency protocol.
 
-Can do. One of your patches touches the generic SDIO layer. Can I have
-an acked-by from someone involved in it?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+--
+This doesn't make it any more legal to use ioremap*() on main system
+RAM than it was before this change; it does mean that ioremap_wc()
+regions are correctly marked as shared which happens to agree with
+the main system RAM mappings.  Strictly to the arch. spec. for ARMv6+,
+it remains "unpredictable" to use ioremap*() on main system RAM.
 
-Sascha
+ arch/arm/mm/mmu.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9d4da6a..4223d08 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -420,6 +420,10 @@ static void __init build_mem_type_table(void)
+ 		user_pgprot |= L_PTE_SHARED;
+ 		kern_pgprot |= L_PTE_SHARED;
+ 		vecs_pgprot |= L_PTE_SHARED;
++		mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
++		mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
++		mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
++		mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
+ 		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
+ 		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
+ #endif
