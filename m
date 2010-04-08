@@ -1,78 +1,41 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 8 Apr 2010 11:13:10 +0100
-Subject: [PATCH] atmel_serial: Atmel RS485 support v2
-In-Reply-To: <4BBD8C9D.3070401@evidence.eu.com>
-References: <4BB053C4.7050700@evidence.eu.com>
-	<4BB10304.6090006@bluewatersys.com>
-	<4BB1BF49.2000609@evidence.eu.com>
-	<4BB252E3.3030703@bluewatersys.com>
-	<4BBD8C9D.3070401@evidence.eu.com>
-Message-ID: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 8 Apr 2010 18:53:53 +0800
+Subject: [regression] 2.6.34-rc1 to -rc3 on zaurus: no longer boots
+In-Reply-To: <20100408044409.GA14982@elf.ucw.cz>
+References: <20100313122754.GD2192@elf.ucw.cz> <20100401060624.GA1329@ucw.cz>
+	<201004072226.34272.maciej.rutecki@gmail.com>
+	<201004072252.08354.marek.vasut@gmail.com>
+	<20100408044409.GA14982@elf.ucw.cz>
+Message-ID: <i2mf17812d71004080353oa8459642v33f88993eee87a99@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK - assorted problems, notably locking ones caused by the sysfs stuff
-which should probably be dropped.
+On Thu, Apr 8, 2010 at 12:44 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Wed 2010-04-07 22:52:08, Marek Vasut wrote:
+>> Dne St 7. dubna 2010 22:26:34 Maciej Rutecki napsal(a):
+>> > On czwartek, 1 kwietnia 2010 o 08:06:25 Pavel Machek wrote:
+>> > > Hi!
+>> > >
+>> > > > > I tried compiling 2.6.34-rc1, and it does not boot :-(. It does not
+>> > > > > seem to even reset the framebuffer (I'm using kexec -- so it stays
+>> > > > > stuck on on previous screen).
+>> > >
+>> > > Tried again with -rc2 and -rc3, and neither boots :-(. I did not have
+>> > > time to set up serial console, yet :-(. Any ideas?
+>> >
+>> > I created a Bugzilla entry at
+>> > https://bugzilla.kernel.org/show_bug.cgi?id=15712
+>> > for your bug report, please add your address to the CC list in there,
+>> > ?thanks!
+>> >
+>> Pavel, you broke it ... and here you say something about sane arm maintainers
+>> ;-)
+>
+> ? You know which patch causes it ?
 
-> +#define TIOCSRS485	0x5461
+Just have some time to try this out on my corgi, and the kernel runs
+happily.
 
-Please provide TIOCGRS485 as well
+Pavel,
 
-
-
-> +static ssize_t show_rs485(struct device *dev, struct device_attribute *attr,
-> +			   char *buf)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct uart_port *port = platform_get_drvdata(pdev);
-> +	unsigned int current_mode;
-> +
-> +	current_mode = UART_GET_MR(port) & ATMEL_US_USMODE;
-> +	return snprintf(buf, PAGE_SIZE, "%u\n", current_mode);
-> +}
-
-You should have TIOCGRS485 for providing the info back as part of the API
-
-> +
-> +static ssize_t set_rs485(struct device *dev, struct device_attribute *attr,
-> +			  const char *buf, size_t len)
-
-Expain the locking on this could you - I don't see what protects against
-parallel ioctl and sysfs stuff ?
-
-> +static DEVICE_ATTR(rs485, 0644, show_rs485, set_rs485);
-
-Why should this be public read ?
-
-> +	/* Resetting serial mode to RS232 (0x0) */
-> +	mode &= ~ATMEL_US_USMODE;
-> +
-> +	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
-> +		dev_dbg(port->dev, "Setting UART to RS485\n");
-> +		UART_PUT_TTGR(port, atmel_port->rs485.delay_rts_before_send);
-> +		mode |= ATMEL_US_USMODE_RS485;
-> +	} else {
-> +		dev_dbg(port->dev, "Setting UART to RS232\n");
-
-Locking versus sysfs ?
-
-> +	UART_PUT_IDR(port, atmel_port->tx_done_mask);
-> +
-> +	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-> +		atmel_start_rx(port);
->  }
-
-Ditto
-
-> -		UART_PUT_IER(port, ATMEL_US_ENDTX | ATMEL_US_TXBUFE);
-> +		if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-> +			atmel_stop_rx(port);
-> +
-
-Ditto
-
-
-Given the locking mess you are going to create I would suggest dropping
-the sysfs stuff.
-
-Alan
+Which exact model are you running your kernel?
