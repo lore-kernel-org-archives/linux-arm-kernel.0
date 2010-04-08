@@ -1,92 +1,66 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Thu, 8 Apr 2010 08:35:08 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-In-Reply-To: <v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
-	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 08 Apr 2010 14:41:30 +0800
+Subject: devicetree in arm
+In-Reply-To: <k2tfa686aa41004072331p7541292ajc35521cf24fd24c6@mail.gmail.com>
+References: <dac45061003180504k49a9f303y4329530a5b475108@mail.gmail.com>
+	<fa686aa41003180614g574b9d91o5926f94a59ad5ec9@mail.gmail.com>
+	<20100318132358.GE19544@n2100.arm.linux.org.uk>	<4BA28BF7.2080403@billgatliff.com>
+	<k2tfa686aa41004072331p7541292ajc35521cf24fd24c6@mail.gmail.com>
+Message-ID: <4BBD7A9A.9090501@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Dan]
+Grant Likely wrote:
+> On Thu, Mar 18, 2010 at 2:24 PM, Bill Gatliff <bgat@billgatliff.com> wrote:
+>   
+>> Russell King - ARM Linux wrote:
+>>     
+>>> On Thu, Mar 18, 2010 at 07:14:05AM -0600, Grant Likely wrote:
+>>>
+>>>       
+>>>> ARM device tree support is very much in flux, and that particular
+>>>> branch gets rebased a lot as device tree code from Sparc, Microblaze
+>>>> and Powerpc is merged into drivers/of.  I may have ended up pushing
+>>>> out to test-devicetree without the ARM patches applied.  I'll look at
+>>>> it today, make sure the ARM stuff is all there, and then push it out
+>>>> again.
+>>>>
+>>>> Note however that this is only very basic support.  It doesn't yet
+>>>> have the code needed to register devices and drivers from device tree
+>>>> data.  That will be coming real-soon-now.
+>>>>
+>>>>         
+>>> Is someone going to do a device tree example port to a 'real' platform
+>>> rather than simple the ARM evaluation boards?
+>>>
+>>> As I've said previously, I'm not going to accept device tree stuff until
+>>> I see a working implementation on a set of real platforms.
+>>>
+>>>       
+>> I can give it a spin on a couple of the boards I have here.  I'm already
+>> using device trees on my PPC platforms.
+>>     
+>
+> Hi Bill.  I've just pushed out my tree with a bit of the device tree
+> probing working on the versatile platform.  It works with the QEMU
+> branch that Jeremy Kerr is maintaining.  Here are the git trees, and
+> the web page that describes how to build it:
+>
+> git://git.secretlab.ca/git/linux-2.6 test-devicetree
+> git://git://kernel.ubuntu.com/jk/dt/qemu.git
+> https://wiki.ubuntu.com/KernelTeam/ARMDeviceTrees
+>
+> I've got stuff working on real hardware too, but it's not fully baked
+> yet.  Right now qemu is the least trouble.
+>
+> g.
+>
+>   
 
-> > I suggest putting these into Andrews tree now, since:
-> >
-> > A) 4 of the patches it touches MMCI code which is hanled
-> > ? by Andrew
-> 
-> Ok, but it looks like they do not have a build dependency on dma bits
-> so they could be merged separately i.e. on top of the async_tx branch.
+Grant and Jeremy,
 
-Well:
+I'm very happy to try that on my real Freescale i.MX51 board. Any hints 
+about that?
 
-[PATCH 04/11] ARM: define the PrimeCell DMA API v5
-Is independent. (One .h-file.)
-
-[PATCH 05/11] ARM: add generic PrimeCell interface to COH 901 318 v5
-[PATCH 06/11] ARM: add generic PrimeCell interface to DMA40 v1
-Depends on 04 AND has a merge dependency on the recent patches for generic
-channel control and status, and then the DMA40 driver which is now
-Picked into Andrews -mm. So the whole thing does depend on async_tx
-HEAD.
-
-Is it possible to move the two DMA40 patches over from -mm to async_tx
-to atleast lower the complexity a little bit? (Should be to just
-apply them...)
-
-If this is done, you could apply the above three patches to the
-async_tx tree.
-
-[PATCH 07/11] ARM: add PrimeCell generic DMA to MMCI/PL180 v5
-This is where is starts to get complicated because this patch
-Depends on 01, 02, 03, 04. So it has to be applied to a tree
-which contains all of it.
-
-[PATCH 08/11] ARM: add PrimeCell generic DMA to PL011 v5
-Just depends on 04 (that's the idea, a generic PrimeCell interface)
-so could be applied to the async_tx tree
-if the others go in there.
-
-[PATCH 09/11] ARM: add PrimeCell generic DMA to PL022 v5
-Same thing, plus it is Acked-by: Grant and OK to merge into
-async_tx if 04 is there.
-
-[PATCH 10/11] ARM: config U300 PL180 PL011 PL022 for DMA v5
-[PATCH 11/11] ARM: config Ux500 PL011 PL022 for DMA v1
-These should go in through the ARM tree really, it's platform
-data.
-
-> > B) It extends the DMA40 driver which is now pending in
-> > ? his tree as well.
-> >
-> > C) Since there doesn't seem to be any consensus of whether
-> > ? this is the right way forward, it needs some wider
-> > ? testing I believe.
-> 
-> No consensus with respect to which pieces, the Primecell driver or
-> something outside of drivers/dma?  Forgive me for missing recent
-> conversations if this has been discussed to death already.
-
-Well, I'd want Russell to comment on that, I think from the
-PrimeCell point of view it is important that the file we put
-in place in <linux/amba/dma.h> is something that will really
-be likely to a good path forward for all PrimeCell and derivates.
-And I really would like Russell to ACK that first, he historically
-watches over the PrimeCell stuff.
-
-But that said I think we're pretty solid:
-- Implementation for three vastly different PrimeCells
-- Implementation for two vastly different DMA engines
-- It works in these combos (we've had lots of internal testing on these)
-
-> I can go ahead and queue up the dma bits unless you would prefer, and
-> Andrew agrees, to take this all through the -mm tree?
-
-If it's OK with Russell, putting 04-06 plus 09 through async_tx 
-tree is a good starter.
-
-07 is problematic and require the entire series to be applied
-in one go, 08 could be applied as well but needs Russells ACK.
-
-Yours,
-Linus Walleij
+Cheers,
+-Bryan
