@@ -1,30 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 8 Apr 2010 16:05:26 +0100
-Subject: [alsa-devel] [PATCH] WM8750: Convert to new API
-In-Reply-To: <1270738749-5048-1-git-send-email-marek.vasut@gmail.com>
-References: <1270738749-5048-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100408150526.GA6792@sirena.org.uk>
+From: jakob.viketoft@bitsim.com (Jakob Viketoft)
+Date: Thu, 08 Apr 2010 17:07:25 +0200
+Subject: AC97 problems with pxa...
+In-Reply-To: <20100408144414.GA29288@rakim.wolfsonmicro.main>
+References: <201004070950.37809.marek.vasut@gmail.com>	<4BBC5254.7040200@bitsim.com>	<20100407095449.GA13576@rakim.wolfsonmicro.main>	<4BBD9F28.9080804@bitsim.com>	<20100408095415.GC6303@rakim.wolfsonmicro.main>	<4BBDD480.8020708@bitsim.com>	<20100408134946.GD30647@rakim.wolfsonmicro.main>	<4BBDE2BD.6000708@bitsim.com>	<20100408141247.GE30647@rakim.wolfsonmicro.main>	<4BBDE9B7.8080502@bitsim.com>
+	<20100408144414.GA29288@rakim.wolfsonmicro.main>
+Message-ID: <4BBDF12D.5030302@bitsim.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 08, 2010 at 04:59:09PM +0200, Marek Vasut wrote:
 
-> @@ -172,6 +198,10 @@ static int __init jive_init(void)
->  	if (!machine_is_jive())
->  		return 0;
->  
-> +	ret = wm8750_i2c_setup();
-> +	if (ret != 0)
-> +		return ret;
-> +
 
-Quoting from my mail of 15:58 (5 minutes ago!):
+Mark Brown wrote:
+> On Thu, Apr 08, 2010 at 04:35:35PM +0200, Jakob Viketoft wrote:
+> 
+>> I had moved the platform_add_devices call in the board init file
+>> while tracking. Moving it back up a few lines in the code make my
+>> machine driver pop up as the sound card. Is this the correct
+> 
+> You shouldn't be registering the soc-audio device in arch/arm at all.
 
-| The WM8750 on the JIVE is connected using SPI, not I2C.  You'll want to
-| CC in the JIVE and S3C maintainer too (Ben Dooks for both).  Looking at
-| the Jive machine file it's actually registering the SPI device in
-| arch/arm already so there shouldn't be any need to add any registration
-| code at all.
+I don't, so no worries there. I just register my colibri-v2-asoc machine 
+driver device.
 
-To repeat, the WM8750 on JIVE is connected using SPI, not I2C.  This
-means you should not be registering an I2C device.
+> 
+>> behaviour? As suggested I have added the asoc device to my machine
+>> driver to look more like the palmtx is doing things. Does this mean
+>> I'm down to finding the right setting with amixer to get things
+>> running? New debug output:
+> 
+> It appears so, yes.
+
+I finally got it working, thanks for all the help! Will be posting a 
+patch after cleanup and when the rest of the system is working.
+
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
