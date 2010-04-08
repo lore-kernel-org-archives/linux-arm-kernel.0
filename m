@@ -1,41 +1,81 @@
-From: jakob.viketoft@bitsim.com (Jakob Viketoft)
-Date: Thu, 08 Apr 2010 17:07:25 +0200
-Subject: AC97 problems with pxa...
-In-Reply-To: <20100408144414.GA29288@rakim.wolfsonmicro.main>
-References: <201004070950.37809.marek.vasut@gmail.com>	<4BBC5254.7040200@bitsim.com>	<20100407095449.GA13576@rakim.wolfsonmicro.main>	<4BBD9F28.9080804@bitsim.com>	<20100408095415.GC6303@rakim.wolfsonmicro.main>	<4BBDD480.8020708@bitsim.com>	<20100408134946.GD30647@rakim.wolfsonmicro.main>	<4BBDE2BD.6000708@bitsim.com>	<20100408141247.GE30647@rakim.wolfsonmicro.main>	<4BBDE9B7.8080502@bitsim.com>
-	<20100408144414.GA29288@rakim.wolfsonmicro.main>
-Message-ID: <4BBDF12D.5030302@bitsim.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 8 Apr 2010 21:02:56 +0530
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+Message-ID: <20100408153111.GA2598@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 25, 2010 at 11:32:48PM +0000, Russell King - ARM Linux wrote:
+> The patch below is the combined patch; individual patches can be found
+> in the arm:lmb patches on the website or the lmb branch of my git tree;
+> this should be considered unstable.
 
+Something like the following is needed to make initrds work after this
+patch:
 
-Mark Brown wrote:
-> On Thu, Apr 08, 2010 at 04:35:35PM +0200, Jakob Viketoft wrote:
-> 
->> I had moved the platform_add_devices call in the board init file
->> while tracking. Moving it back up a few lines in the code make my
->> machine driver pop up as the sound card. Is this the correct
-> 
-> You shouldn't be registering the soc-audio device in arch/arm at all.
-
-I don't, so no worries there. I just register my colibri-v2-asoc machine 
-driver device.
-
-> 
->> behaviour? As suggested I have added the asoc device to my machine
->> driver to look more like the palmtx is doing things. Does this mean
->> I'm down to finding the right setting with amixer to get things
->> running? New debug output:
-> 
-> It appears so, yes.
-
-I finally got it working, thanks for all the help! Will be posting a 
-patch after cleanup and when the rest of the system is working.
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 8b2853a..8c12214 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -11,6 +11,7 @@
+ #include <linux/errno.h>
+ #include <linux/swap.h>
+ #include <linux/init.h>
++#include <linux/initrd.h>
+ #include <linux/bootmem.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+@@ -32,9 +33,6 @@
+ 
+ #include "mm.h"
+ 
+-static unsigned long phys_initrd_start __initdata = 0;
+-static unsigned long phys_initrd_size __initdata = 0;
+-
+ static int __init early_initrd(char *p)
+ {
+ 	unsigned long start, size;
+@@ -44,8 +42,8 @@ static int __init early_initrd(char *p)
+ 	if (*endp == ',') {
+ 		size = memparse(endp + 1, NULL);
+ 
+-		phys_initrd_start = start;
+-		phys_initrd_size = size;
++		initrd_start = __phys_to_virt(start);
++		initrd_end = initrd_start + size;
+ 	}
+ 	return 0;
+ }
+@@ -55,8 +53,8 @@ static int __init parse_tag_initrd(const struct tag *tag)
+ {
+ 	printk(KERN_WARNING "ATAG_INITRD is deprecated; "
+ 		"please update your bootloader.\n");
+-	phys_initrd_start = __virt_to_phys(tag->u.initrd.start);
+-	phys_initrd_size = tag->u.initrd.size;
++	initrd_start = tag->u.initrd.start;
++	initrd_end = initrd_start + tag->u.initrd.size;
+ 	return 0;
+ }
+ 
+@@ -64,8 +62,8 @@ __tagtable(ATAG_INITRD, parse_tag_initrd);
+ 
+ static int __init parse_tag_initrd2(const struct tag *tag)
+ {
+-	phys_initrd_start = tag->u.initrd.start;
+-	phys_initrd_size = tag->u.initrd.size;
++	initrd_start = __phys_to_virt(tag->u.initrd.start);
++	initrd_end = initrd_start + tag->u.initrd.size;
+ 	return 0;
+ }
+ 
+@@ -284,7 +282,7 @@ void __init arm_lmb_reserve(void)
+ #else
+ 	lmb_reserve(__pa(_stext), _end - _stext);
+ #endif
+-	lmb_reserve(phys_initrd_start, phys_initrd_size);
++	lmb_reserve(__pa(initrd_start), initrd_end - initrd_start);
+ 	arm_mm_lmb_reserve();
+ }
+ 
