@@ -1,1080 +1,1032 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 09 Apr 2010 08:57:46 +0200
-Subject: [PATCH 5/5] drivers: mtd: add Samsung SoC OneNAND driver
-In-Reply-To: <1270796266-8272-1-git-send-email-m.szyprowski@samsung.com>
-References: <1270796266-8272-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1270796266-8272-6-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Apr 2010 12:11:05 +0100
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100408182715.GF31407@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100408153111.GA2598@debian>
+	<20100408182715.GF31407@n2100.arm.linux.org.uk>
+Message-ID: <20100409111105.GA2804@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+On Thu, Apr 08, 2010 at 07:27:15PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 08, 2010 at 09:02:56PM +0530, Rabin Vincent wrote:
+> > On Thu, Mar 25, 2010 at 11:32:48PM +0000, Russell King - ARM Linux wrote:
+> > > The patch below is the combined patch; individual patches can be found
+> > > in the arm:lmb patches on the website or the lmb branch of my git tree;
+> > > this should be considered unstable.
+> > 
+> > Something like the following is needed to make initrds work after this
+> > patch:
+> 
+> This to me looks like a very large patch for what is a small problem -
+> that is the assignment of initrd_start/initrd_size got lost along the
+> way.
+> 
+> I'd much rather have the smaller patch; keep the initrd parameters in
+> the physical address space for as long as possible, and only convert
+> them to the virtual address space once we've finished mm initialisation.
 
-This patch adds a driver for OneNAND controller on Samsung SoCs.
-Following SoCs are supported: S3C6400, S3C6410, S5PC100 and S5PC110.
+Here's a revised version which should resolve the initrd problem.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/mtd/onenand/Kconfig   |    7 +
- drivers/mtd/onenand/Makefile  |    1 +
- drivers/mtd/onenand/samsung.c | 1019 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1027 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/onenand/samsung.c
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/include/asm/lmb.h               |   16 +++
+ arch/arm/include/asm/mach/arch.h         |    1 +
+ arch/arm/kernel/setup.c                  |    3 +
+ arch/arm/mach-clps711x/edb7211-arch.c    |    8 ++
+ arch/arm/mach-clps711x/mm.c              |    1 -
+ arch/arm/mach-integrator/common.h        |    1 +
+ arch/arm/mach-integrator/core.c          |   11 ++
+ arch/arm/mach-integrator/integrator_ap.c |    1 +
+ arch/arm/mach-integrator/integrator_cp.c |    1 +
+ arch/arm/mach-ixp4xx/common.c            |    1 -
+ arch/arm/mach-omap1/board-htcherald.c    |    1 -
+ arch/arm/mach-omap2/omap_hwmod.c         |    1 -
+ arch/arm/mach-pxa/palmt5.c               |    7 +
+ arch/arm/mach-pxa/palmtreo.c             |    9 ++
+ arch/arm/mach-s3c2410/mach-h1940.c       |    9 ++
+ arch/arm/mach-s3c2440/mach-rx3715.c      |    9 ++
+ arch/arm/mach-u300/u300.c                |   17 +++
+ arch/arm/mm/init.c                       |  202 ++++++++----------------------
+ arch/arm/mm/mm.h                         |    8 +-
+ arch/arm/mm/mmu.c                        |  153 +++++++++--------------
+ arch/arm/mm/nommu.c                      |   22 +---
+ 22 files changed, 210 insertions(+), 273 deletions(-)
 
-diff --git a/drivers/mtd/onenand/Kconfig b/drivers/mtd/onenand/Kconfig
-index 3a9f157..9a49d68 100644
---- a/drivers/mtd/onenand/Kconfig
-+++ b/drivers/mtd/onenand/Kconfig
-@@ -30,6 +30,13 @@ config MTD_ONENAND_OMAP2
- 	  Support for a OneNAND flash device connected to an OMAP2/OMAP3 CPU
- 	  via the GPMC memory controller.
- 
-+config MTD_ONENAND_SAMSUNG
-+        tristate "OneNAND on Samsung SOC controller support"
-+        depends on MTD_ONENAND && (ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210)
-+        help
-+          Support for a OneNAND flash device connected to an Samsung SOC
-+          S3C64XX/S5PC1XX controller.
-+
- config MTD_ONENAND_OTP
- 	bool "OneNAND OTP Support"
- 	select HAVE_MTD_OTP
-diff --git a/drivers/mtd/onenand/Makefile b/drivers/mtd/onenand/Makefile
-index 64b6cc6..2b7884c 100644
---- a/drivers/mtd/onenand/Makefile
-+++ b/drivers/mtd/onenand/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_MTD_ONENAND)		+= onenand.o
- # Board specific.
- obj-$(CONFIG_MTD_ONENAND_GENERIC)	+= generic.o
- obj-$(CONFIG_MTD_ONENAND_OMAP2)		+= omap2.o
-+obj-$(CONFIG_MTD_ONENAND_SAMSUNG)       += samsung.o
- 
- # Simulator
- obj-$(CONFIG_MTD_ONENAND_SIM)		+= onenand_sim.o
-diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5408bf..48254a4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -10,6 +10,7 @@ config ARM
+ 	default y
+ 	select HAVE_AOUT
+ 	select HAVE_IDE
++	select HAVE_LMB
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+ 	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+diff --git a/arch/arm/include/asm/lmb.h b/arch/arm/include/asm/lmb.h
 new file mode 100644
-index 0000000..a902f2e
+index 0000000..1f49657
 --- /dev/null
-+++ b/drivers/mtd/onenand/samsung.c
-@@ -0,0 +1,1019 @@
-+/*
-+ * Samsung S3C64XX/S5PC1XX OneNAND driver
-+ *
-+ *  Copyright (C) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Implementation:
-+ *	Emulate the pseudo BufferRAM
-+ */
++++ b/arch/arm/include/asm/lmb.h
+@@ -0,0 +1,16 @@
++#ifndef _ASM_ARM_LMB_H
++#define _ASM_ARM_LMB_H
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/mach/flash.h>
-+#include <plat/regs-onenand.h>
-+
-+#include <linux/io.h>
-+
-+#ifdef SAMSUNG_DEBUG
-+#define DPRINTK(format, args...)					      \
-+do {									      \
-+	printk(KERN_INFO "%s[%d]: " format "\n", __func__, __LINE__, ##args); \
-+} while (0)
++#ifdef CONFIG_MMU
++extern phys_addr_t lowmem_end_addr;
++#define LMB_REAL_LIMIT	lowmem_end_addr
 +#else
-+#define DPRINTK(...)			do { } while (0)
++#define LMB_REAL_LIMIT	0
 +#endif
 +
-+enum soc_type {
-+	TYPE_S3C6400,
-+	TYPE_S3C6410,
-+	TYPE_S5PC100,
-+	TYPE_S5PC110,
-+};
++struct meminfo;
++struct machine_desc;
 +
-+#define S3C64XX_AHB_ADDR		0x20000000
-+#define S5PC100_AHB_ADDR		0xB0000000
++extern void arm_lmb_init(struct meminfo *, struct machine_desc *);
 +
-+#define ONENAND_ERASE_STATUS		0x00
-+#define ONENAND_MULTI_ERASE_SET		0x01
-+#define ONENAND_ERASE_START		0x03
-+#define ONENAND_UNLOCK_START		0x08
-+#define ONENAND_UNLOCK_END		0x09
-+#define ONENAND_LOCK_START		0x0A
-+#define ONENAND_LOCK_END		0x0B
-+#define ONENAND_LOCK_TIGHT_START	0x0C
-+#define ONENAND_LOCK_TIGHT_END		0x0D
-+#define ONENAND_UNLOCK_ALL		0x0E
-+#define ONENAND_OTP_ACCESS		0x12
-+#define ONENAND_SPARE_ACCESS_ONLY	0x13
-+#define ONENAND_MAIN_ACCESS_ONLY	0x14
-+#define ONENAND_ERASE_VERIFY		0x15
-+#define ONENAND_MAIN_SPARE_ACCESS	0x16
-+#define ONENAND_PIPELINE_READ		0x4000
-+
-+#if defined(CONFIG_ARCH_S3C64XX)
-+#define MAP_00				(0x0 << 24)
-+#define MAP_01				(0x1 << 24)
-+#define MAP_10				(0x2 << 24)
-+#define MAP_11				(0x3 << 24)
-+#elif defined(CONFIG_ARCH_S5PC100) || defined(CONFIG_ARCH_S5PV210)
-+#define MAP_00				(0x0 << 26)
-+#define MAP_01				(0x1 << 26)
-+#define MAP_10				(0x2 << 26)
-+#define MAP_11				(0x3 << 26)
 +#endif
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index c59842d..f634dbe 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -37,6 +37,7 @@ struct machine_desc {
+ 	void			(*fixup)(struct machine_desc *,
+ 					 struct tag *, char **,
+ 					 struct meminfo *);
++	void			(*reserve)(void);/* reserve lmb blocks	*/
+ 	void			(*map_io)(void);/* IO mapping function	*/
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..4f132f7 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -25,6 +25,7 @@
+ #include <linux/smp.h>
+ #include <linux/fs.h>
+ #include <linux/proc_fs.h>
++#include <linux/lmb.h>
+ 
+ #include <asm/unified.h>
+ #include <asm/cpu.h>
+@@ -714,6 +715,8 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	parse_early_param();
+ 
++	arm_lmb_init(&meminfo, mdesc);
 +
-+/* The 'addr' is byte address. It makes a 16-bit word */
-+#define CMD_MAP_00(addr)		(MAP_00 | ((addr) << 1))
-+#define CMD_MAP_01(mem_addr)		(MAP_01 | (mem_addr))
-+#define CMD_MAP_10(mem_addr)		(MAP_10 | (mem_addr))
-+#define CMD_MAP_11(addr)		(MAP_11 | ((addr) << 2))
+ 	paging_init(mdesc);
+ 	request_standard_resources(&meminfo, mdesc);
+ 
+diff --git a/arch/arm/mach-clps711x/edb7211-arch.c b/arch/arm/mach-clps711x/edb7211-arch.c
+index dc81cc6..aba952c 100644
+--- a/arch/arm/mach-clps711x/edb7211-arch.c
++++ b/arch/arm/mach-clps711x/edb7211-arch.c
+@@ -18,6 +18,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ #include <linux/init.h>
++#include <linux/lmb.h>
+ #include <linux/types.h>
+ #include <linux/string.h>
+ 
+@@ -29,6 +30,12 @@
+ 
+ extern void edb7211_map_io(void);
+ 
++/* Reserve screen memory region at the start of main system memory. */
++static void __init edb7211_reserve(void)
++{
++	lmb_reserve(PHYS_OFFSET, 0x00020000);
++}
 +
-+#define S3C6400_FBA_SHIFT		10
-+#define S3C6400_FPA_SHIFT		4
-+#define S3C6400_FSA_SHIFT		2
+ static void __init
+ fixup_edb7211(struct machine_desc *desc, struct tag *tags,
+ 	      char **cmdline, struct meminfo *mi)
+@@ -57,6 +64,7 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	.boot_params	= 0xc0020100,	/* 0xc0000000 - 0xc001ffff can be video RAM */
+ 	.fixup		= fixup_edb7211,
+ 	.map_io		= edb7211_map_io,
++	.reserve	= edb7211_reserve,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/mm.c b/arch/arm/mach-clps711x/mm.c
+index a7b4591..9865921 100644
+--- a/arch/arm/mach-clps711x/mm.c
++++ b/arch/arm/mach-clps711x/mm.c
+@@ -22,7 +22,6 @@
+ #include <linux/kernel.h>
+ #include <linux/mm.h>
+ #include <linux/init.h>
+-#include <linux/bootmem.h>
+ 
+ #include <asm/sizes.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
+index 609c49d..87cfeed 100644
+--- a/arch/arm/mach-integrator/common.h
++++ b/arch/arm/mach-integrator/common.h
+@@ -1,2 +1,3 @@
+ extern void integrator_time_init(unsigned long, unsigned int);
+ extern unsigned long integrator_gettimeoffset(void);
++void integrator_reserve(void);
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 8b390e3..417c772 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -14,6 +14,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/lmb.h>
+ #include <linux/sched.h>
+ #include <linux/smp.h>
+ #include <linux/termios.h>
+@@ -334,3 +335,13 @@ void __init integrator_time_init(unsigned long reload, unsigned int ctrl)
+ 	 */
+ 	setup_irq(IRQ_TIMERINT1, &integrator_timer_irq);
+ }
 +
-+#define S3C6410_FBA_SHIFT		12
-+#define S3C6410_FPA_SHIFT		6
-+#define S3C6410_FSA_SHIFT		4
++/*
++ * We need to stop things allocating the low memory; ideally we need a
++ * better implementation of GFP_DMA which does not assume that DMA-able
++ * memory starts at zero.
++ */
++void __init integrator_reserve(void)
++{
++	lmb_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
++}
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 8138a7e..9fbde0d 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -350,6 +350,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+ 	.io_pg_offst	= ((0xf1600000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x00000100,
+ 	.map_io		= ap_map_io,
++	.reserve	= integrator_reserve,
+ 	.init_irq	= ap_init_irq,
+ 	.timer		= &ap_timer,
+ 	.init_machine	= ap_init,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 66ef86d..8de5f35 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -585,6 +585,7 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
+ 	.io_pg_offst	= ((0xf1600000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x00000100,
+ 	.map_io		= intcp_map_io,
++	.reserve	= integrator_reserve,
+ 	.init_irq	= intcp_init_irq,
+ 	.timer		= &cp_timer,
+ 	.init_machine	= intcp_init,
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 71728d3..0bce097 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -21,7 +21,6 @@
+ #include <linux/tty.h>
+ #include <linux/platform_device.h>
+ #include <linux/serial_core.h>
+-#include <linux/bootmem.h>
+ #include <linux/interrupt.h>
+ #include <linux/bitops.h>
+ #include <linux/time.h>
+diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+index e36639f..8e313b4 100644
+--- a/arch/arm/mach-omap1/board-htcherald.c
++++ b/arch/arm/mach-omap1/board-htcherald.c
+@@ -28,7 +28,6 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/input.h>
+-#include <linux/bootmem.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index c664947..aa3e209 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -43,7 +43,6 @@
+ #include <linux/err.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
+-#include <linux/bootmem.h>
+ 
+ #include <plat/common.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
+index d902a81..b33fbe3 100644
+--- a/arch/arm/mach-pxa/palmt5.c
++++ b/arch/arm/mach-pxa/palmt5.c
+@@ -21,6 +21,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
++#include <linux/lmb.h>
+ #include <linux/pda_power.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/gpio.h>
+@@ -396,6 +397,11 @@ static void __init palmt5_udc_init(void)
+ 	}
+ }
+ 
++static void __init palmt5_reserve(void)
++{
++	lmb_reserve(0xa0200000, 0x1000);
++}
 +
-+#define S5PC100_FBA_SHIFT		13
-+#define S5PC100_FPA_SHIFT		7
-+#define S5PC100_FSA_SHIFT		5
+ static void __init palmt5_init(void)
+ {
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmt5_pin_config));
+@@ -421,6 +427,7 @@ MACHINE_START(PALMT5, "Palm Tungsten|T5")
+ 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0xa0000100,
+ 	.map_io		= pxa_map_io,
++	.reserve	= palmt5_reserve,
+ 	.init_irq	= pxa27x_init_irq,
+ 	.timer		= &pxa_timer,
+ 	.init_machine	= palmt5_init
+diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
+index d8b4469..e712b86 100644
+--- a/arch/arm/mach-pxa/palmtreo.c
++++ b/arch/arm/mach-pxa/palmtreo.c
+@@ -20,6 +20,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
++#include <linux/lmb.h>
+ #include <linux/pda_power.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/gpio.h>
+@@ -633,6 +634,12 @@ static void __init treo_lcd_power_init(void)
+ 	treo_lcd_screen.pxafb_lcd_power = treo_lcd_power;
+ }
+ 
++static void __init treo_reserve(void)
++{
++	lmb_reserve(0xa0000000, 0x1000);
++	lmb_reserve(0xa2000000, 0x1000);
++}
 +
-+/* S5PC110 specific definitions */
-+#define S5PC110_DMA_OFFSET		0x600000
-+#define S5PC110_DMA_SRC_ADDR		0x400
-+#define S5PC110_DMA_SRC_CFG		0x404
-+#define S5PC110_DMA_DST_ADDR		0x408
-+#define S5PC110_DMA_DST_CFG		0x40C
-+#define S5PC110_DMA_TRANS_SIZE		0x414
-+#define S5PC110_DMA_TRANS_CMD		0x418
-+#define S5PC110_DMA_TRANS_STATUS	0x41C
-+#define S5PC110_DMA_TRANS_DIR		0x420
+ static void __init treo_init(void)
+ {
+ 	pxa_set_ffuart_info(NULL);
+@@ -668,6 +675,7 @@ MACHINE_START(TREO680, "Palm Treo 680")
+ 	.io_pg_offst    = io_p2v(0x40000000),
+ 	.boot_params    = 0xa0000100,
+ 	.map_io         = pxa_map_io,
++	.reserve	= treo_reserve,
+ 	.init_irq       = pxa27x_init_irq,
+ 	.timer          = &pxa_timer,
+ 	.init_machine   = treo680_init,
+@@ -691,6 +699,7 @@ MACHINE_START(CENTRO, "Palm Centro 685")
+ 	.io_pg_offst    = io_p2v(0x40000000),
+ 	.boot_params    = 0xa0000100,
+ 	.map_io         = pxa_map_io,
++	.reserve	= treo_reserve,
+ 	.init_irq       = pxa27x_init_irq,
+ 	.timer          = &pxa_timer,
+        .init_machine   = centro_init,
+diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
+index fbedd07..bfbcdd0 100644
+--- a/arch/arm/mach-s3c2410/mach-h1940.c
++++ b/arch/arm/mach-s3c2410/mach-h1940.c
+@@ -15,6 +15,7 @@
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
++#include <linux/lmb.h>
+ #include <linux/timer.h>
+ #include <linux/init.h>
+ #include <linux/sysdev.h>
+@@ -301,6 +302,13 @@ static void __init h1940_map_io(void)
+ 	s3c_pm_init();
+ }
+ 
++/* H1940 and RX3715 need to reserve this for suspend */
++static void __init h1940_reserve(void)
++{
++	lmb_reserve(0x30003000, 0x1000);
++	lmb_reserve(0x30081000, 0x1000);
++}
 +
-+#define S5PC110_DMA_CFG_SINGLE		(0x0 << 16)
-+#define S5PC110_DMA_CFG_4BURST		(0x2 << 16)
-+#define S5PC110_DMA_CFG_8BURST		(0x3 << 16)
-+#define S5PC110_DMA_CFG_16BURST		(0x4 << 16)
+ static void __init h1940_init_irq(void)
+ {
+ 	s3c24xx_init_irq();
+@@ -342,6 +350,7 @@ MACHINE_START(H1940, "IPAQ-H1940")
+ 	.io_pg_offst	= (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
+ 	.boot_params	= S3C2410_SDRAM_PA + 0x100,
+ 	.map_io		= h1940_map_io,
++	.reserve	= h1940_reserve,
+ 	.init_irq	= h1940_init_irq,
+ 	.init_machine	= h1940_init,
+ 	.timer		= &s3c24xx_timer,
+diff --git a/arch/arm/mach-s3c2440/mach-rx3715.c b/arch/arm/mach-s3c2440/mach-rx3715.c
+index 1e836e5..76aa734 100644
+--- a/arch/arm/mach-s3c2440/mach-rx3715.c
++++ b/arch/arm/mach-s3c2440/mach-rx3715.c
+@@ -15,6 +15,7 @@
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
++#include <linux/lmb.h>
+ #include <linux/timer.h>
+ #include <linux/init.h>
+ #include <linux/tty.h>
+@@ -191,6 +192,13 @@ static void __init rx3715_map_io(void)
+ 	s3c24xx_init_uarts(rx3715_uartcfgs, ARRAY_SIZE(rx3715_uartcfgs));
+ }
+ 
++/* H1940 and RX3715 need to reserve this for suspend */
++static void __init rx3715_reserve(void)
++{
++	lmb_reserve(0x30003000, 0x1000);
++	lmb_reserve(0x30081000, 0x1000);
++}
 +
-+#define S5PC110_DMA_CFG_INC		(0x0 << 8)
-+#define S5PC110_DMA_CFG_CNT		(0x1 << 8)
-+
-+#define S5PC110_DMA_CFG_8BIT		(0x0 << 0)
-+#define S5PC110_DMA_CFG_16BIT		(0x1 << 0)
-+#define S5PC110_DMA_CFG_32BIT		(0x2 << 0)
-+
-+#define S5PC110_DMA_SRC_CFG_READ	(S5PC110_DMA_CFG_16BURST | \
-+					S5PC110_DMA_CFG_INC | \
-+					S5PC110_DMA_CFG_16BIT)
-+#define S5PC110_DMA_DST_CFG_READ	(S5PC110_DMA_CFG_16BURST | \
-+					S5PC110_DMA_CFG_INC | \
-+					S5PC110_DMA_CFG_32BIT)
-+#define S5PC110_DMA_SRC_CFG_WRITE	(S5PC110_DMA_CFG_16BURST | \
-+					S5PC110_DMA_CFG_INC | \
-+					S5PC110_DMA_CFG_32BIT)
-+#define S5PC110_DMA_DST_CFG_WRITE	(S5PC110_DMA_CFG_16BURST | \
-+					S5PC110_DMA_CFG_INC | \
-+					S5PC110_DMA_CFG_16BIT)
-+
-+#define S5PC110_DMA_TRANS_CMD_TDC	(0x1 << 18)
-+#define S5PC110_DMA_TRANS_CMD_TEC	(0x1 << 16)
-+#define S5PC110_DMA_TRANS_CMD_TR	(0x1 << 0)
-+
-+#define S5PC110_DMA_TRANS_STATUS_TD	(0x1 << 18)
-+#define S5PC110_DMA_TRANS_STATUS_TB	(0x1 << 17)
-+#define S5PC110_DMA_TRANS_STATUS_TE	(0x1 << 16)
-+
-+#define S5PC110_DMA_DIR_READ		0x0
-+#define S5PC110_DMA_DIR_WRITE		0x1
-+
-+
-+
-+struct s3c_onenand {
-+	struct mtd_info	*mtd;
-+	struct platform_device	*pdev;
-+	enum soc_type	type;
-+	void __iomem	*base;
-+	void __iomem	*ahb_addr;
-+	int		bootram_command;
-+	void __iomem	*page_buf;
-+	void __iomem	*oob_buf;
-+	unsigned int	(*mem_addr)(int fba, int fpa, int fsa);
-+	void __iomem	*dma_addr;
-+	unsigned long	phys_base;
-+#ifdef CONFIG_MTD_PARTITIONS
-+	struct mtd_partition *parts;
+ static void __init rx3715_init_irq(void)
+ {
+ 	s3c24xx_init_irq();
+@@ -214,6 +222,7 @@ MACHINE_START(RX3715, "IPAQ-RX3715")
+ 	.io_pg_offst	= (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
+ 	.boot_params	= S3C2410_SDRAM_PA + 0x100,
+ 	.map_io		= rx3715_map_io,
++	.reserve	= rx3715_reserve,
+ 	.init_irq	= rx3715_init_irq,
+ 	.init_machine	= rx3715_init_machine,
+ 	.timer		= &s3c24xx_timer,
+diff --git a/arch/arm/mach-u300/u300.c b/arch/arm/mach-u300/u300.c
+index d2a0b88..4fb8660 100644
+--- a/arch/arm/mach-u300/u300.c
++++ b/arch/arm/mach-u300/u300.c
+@@ -14,6 +14,7 @@
+ #include <linux/sched.h>
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
++#include <linux/lmb.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <mach/hardware.h>
+@@ -22,6 +23,21 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++static void __init u300_reserve(void)
++{
++	/*
++	 * U300 - This platform family can share physical memory
++	 * between two ARM cpus, one running Linux and the other
++	 * running another OS.
++	 */
++#ifdef CONFIG_MACH_U300_SINGLE_RAM
++#if ((CONFIG_MACH_U300_ACCESS_MEM_SIZE & 1) == 1) && \
++	CONFIG_MACH_U300_2MB_ALIGNMENT_FIX
++        lmb_reserve(PHYS_OFFSET, 0x00100000);
 +#endif
-+};
-+
-+static struct s3c_onenand *onenand;
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+static const char *part_probes[] = { "cmdlinepart", NULL, };
 +#endif
-+
-+static int s3c_read_reg(int offset)
-+{
-+	return readl(onenand->base + offset);
 +}
 +
-+static void s3c_write_reg(int value, int offset)
-+{
-+	writel(value, onenand->base + offset);
-+}
-+
-+static int s3c_read_cmd(unsigned int cmd)
-+{
-+	return readl(onenand->ahb_addr + cmd);
-+}
-+
-+static void s3c_write_cmd(int value, unsigned int cmd)
-+{
-+	writel(value, onenand->ahb_addr + cmd);
-+}
-+
-+#ifdef SAMSUNG_DEBUG
-+static void s3c_dump_reg(void)
-+{
+ static void __init u300_init_machine(void)
+ {
+ 	u300_init_devices();
+@@ -49,6 +65,7 @@ MACHINE_START(U300, MACH_U300_STRING)
+ 	.io_pg_offst	= ((U300_AHB_PER_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= BOOT_PARAMS_OFFSET,
+ 	.map_io		= u300_map_io,
++	.reserve	= u300_reserve,
+ 	.init_irq	= u300_init_irq,
+ 	.timer		= &u300_timer,
+ 	.init_machine	= u300_init_machine,
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 7829cb5..6eb00f8 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -15,8 +15,8 @@
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+ #include <linux/initrd.h>
+-#include <linux/sort.h>
+ #include <linux/highmem.h>
++#include <linux/lmb.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/sections.h>
+@@ -150,119 +150,21 @@ static void __init find_node_limits(int node, struct meminfo *mi,
+ 	}
+ }
+ 
+-/*
+- * FIXME: We really want to avoid allocating the bootmap bitmap
+- * over the top of the initrd.  Hopefully, this is located towards
+- * the start of a bank, so if we allocate the bootmap bitmap at
+- * the end, we won't clash.
+- */
+-static unsigned int __init
+-find_bootmap_pfn(int node, struct meminfo *mi, unsigned int bootmap_pages)
+-{
+-	unsigned int start_pfn, i, bootmap_pfn;
+-
+-	start_pfn   = PAGE_ALIGN(__pa(_end)) >> PAGE_SHIFT;
+-	bootmap_pfn = 0;
+-
+-	for_each_nodebank(i, mi, node) {
+-		struct membank *bank = &mi->bank[i];
+-		unsigned int start, end;
+-
+-		start = bank_pfn_start(bank);
+-		end   = bank_pfn_end(bank);
+-
+-		if (end < start_pfn)
+-			continue;
+-
+-		if (start < start_pfn)
+-			start = start_pfn;
+-
+-		if (end <= start)
+-			continue;
+-
+-		if (end - start >= bootmap_pages) {
+-			bootmap_pfn = start;
+-			break;
+-		}
+-	}
+-
+-	if (bootmap_pfn == 0)
+-		BUG();
+-
+-	return bootmap_pfn;
+-}
+-
+-static int __init check_initrd(struct meminfo *mi)
+-{
+-	int initrd_node = -2;
+-#ifdef CONFIG_BLK_DEV_INITRD
+-	unsigned long end = phys_initrd_start + phys_initrd_size;
+-
+-	/*
+-	 * Make sure that the initrd is within a valid area of
+-	 * memory.
+-	 */
+-	if (phys_initrd_size) {
+-		unsigned int i;
+-
+-		initrd_node = -1;
+-
+-		for (i = 0; i < mi->nr_banks; i++) {
+-			struct membank *bank = &mi->bank[i];
+-			if (bank_phys_start(bank) <= phys_initrd_start &&
+-			    end <= bank_phys_end(bank))
+-				initrd_node = bank->node;
+-		}
+-	}
+-
+-	if (initrd_node == -1) {
+-		printk(KERN_ERR "INITRD: 0x%08lx+0x%08lx extends beyond "
+-		       "physical memory - disabling initrd\n",
+-		       phys_initrd_start, phys_initrd_size);
+-		phys_initrd_start = phys_initrd_size = 0;
+-	}
+-#endif
+-
+-	return initrd_node;
+-}
+-
+-static inline void map_memory_bank(struct membank *bank)
+-{
+-#ifdef CONFIG_MMU
+-	struct map_desc map;
+-
+-	map.pfn = bank_pfn_start(bank);
+-	map.virtual = __phys_to_virt(bank_phys_start(bank));
+-	map.length = bank_phys_size(bank);
+-	map.type = MT_MEMORY;
+-
+-	create_mapping(&map);
+-#endif
+-}
+-
+ static void __init bootmem_init_node(int node, struct meminfo *mi,
+ 	unsigned long start_pfn, unsigned long end_pfn)
+ {
+-	unsigned long boot_pfn;
+ 	unsigned int boot_pages;
++	phys_addr_t bitmap;
+ 	pg_data_t *pgdat;
+ 	int i;
+ 
+ 	/*
+-	 * Map the memory banks for this node.
+-	 */
+-	for_each_nodebank(i, mi, node) {
+-		struct membank *bank = &mi->bank[i];
+-
+-		if (!bank->highmem)
+-			map_memory_bank(bank);
+-	}
+-
+-	/*
+-	 * Allocate the bootmem bitmap page.
++	 * Allocate the bootmem bitmap page.  This must be in a region
++	 * of memory which has already been mapped.
+ 	 */
+ 	boot_pages = bootmem_bootmap_pages(end_pfn - start_pfn);
+-	boot_pfn = find_bootmap_pfn(node, mi, boot_pages);
++	bitmap = lmb_alloc_base(boot_pages << PAGE_SHIFT, L1_CACHE_BYTES,
++				__pfn_to_phys(end_pfn));
+ 
+ 	/*
+ 	 * Initialise the bootmem allocator for this node, handing the
+@@ -270,7 +172,7 @@ static void __init bootmem_init_node(int node, struct meminfo *mi,
+ 	 */
+ 	node_set_online(node);
+ 	pgdat = NODE_DATA(node);
+-	init_bootmem_node(pgdat, boot_pfn, start_pfn, end_pfn);
++	init_bootmem_node(pgdat, __phys_to_pfn(bitmap), start_pfn, end_pfn);
+ 
+ 	for_each_nodebank(i, mi, node) {
+ 		struct membank *bank = &mi->bank[i];
+@@ -279,31 +181,16 @@ static void __init bootmem_init_node(int node, struct meminfo *mi,
+ 	}
+ 
+ 	/*
+-	 * Reserve the bootmem bitmap for this node.
++	 * Reserve the LMB reserved regions in bootmem for this node.
+ 	 */
+-	reserve_bootmem_node(pgdat, boot_pfn << PAGE_SHIFT,
+-			     boot_pages << PAGE_SHIFT, BOOTMEM_DEFAULT);
+-}
+-
+-static void __init bootmem_reserve_initrd(int node)
+-{
+-#ifdef CONFIG_BLK_DEV_INITRD
+-	pg_data_t *pgdat = NODE_DATA(node);
+-	int res;
+-
+-	res = reserve_bootmem_node(pgdat, phys_initrd_start,
+-			     phys_initrd_size, BOOTMEM_EXCLUSIVE);
+-
+-	if (res == 0) {
+-		initrd_start = __phys_to_virt(phys_initrd_start);
+-		initrd_end = initrd_start + phys_initrd_size;
+-	} else {
+-		printk(KERN_ERR
+-			"INITRD: 0x%08lx+0x%08lx overlaps in-use "
+-			"memory region - disabling initrd\n",
+-			phys_initrd_start, phys_initrd_size);
++	for (i = 0; i < lmb.reserved.cnt; i++) {
++		phys_addr_t start = lmb_start_pfn(&lmb.reserved, i);
++		if (start >= start_pfn &&
++		    lmb_end_pfn(&lmb.reserved, i) <= end_pfn)
++			reserve_bootmem_node(pgdat, __pfn_to_phys(start),
++				lmb_size_bytes(&lmb.reserved, i),
++				BOOTMEM_DEFAULT);
+ 	}
+-#endif
+ }
+ 
+ static void __init bootmem_free_node(int node, struct meminfo *mi)
+@@ -387,25 +274,41 @@ static void arm_memory_present(struct meminfo *mi, int node)
+ }
+ #endif
+ 
+-static int __init meminfo_cmp(const void *_a, const void *_b)
++void __init arm_lmb_init(struct meminfo *mi, struct machine_desc *mdesc)
+ {
+-	const struct membank *a = _a, *b = _b;
+-	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
+-	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
 +	int i;
 +
-+	for (i = 0; i < 0x400; i += 0x40) {
-+		printk(KERN_INFO "0x%08X: 0x%08x 0x%08x 0x%08x 0x%08x\n",
-+			(unsigned int) onenand->base + i,
-+			s3c_read_reg(i), s3c_read_reg(i + 0x10),
-+			s3c_read_reg(i + 0x20), s3c_read_reg(i + 0x30));
++	for (i = 0; i < mi->nr_banks; i++)
++		lmb_add(mi->bank[i].start, mi->bank[i].size);
++
++	/* Register the kernel text, kernel data and initrd with lmb. */
++#ifdef CONFIG_XIP_KERNEL
++	lmb_reserve(__pa(_data), _end - _data);
++#else
++	lmb_reserve(__pa(_stext), _end - _stext);
++#endif
++#ifdef CONFIG_BLK_DEV_INITRD
++	if (phys_initrd_size) {
++		lmb_reserve(phys_initrd_start, phys_initrd_size);
++
++		/* Now convert initrd to virtual addresses */
++		initrd_start = __phys_to_virt(phys_initrd_start);
++		initrd_end = initrd_start + phys_initrd_size;
 +	}
-+}
 +#endif
 +
-+static unsigned int s3c6400_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S3C6400_FBA_SHIFT) | (fpa << S3C6400_FPA_SHIFT) |
-+		(fsa << S3C6400_FSA_SHIFT);
-+}
-+
-+static unsigned int s3c6410_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S3C6410_FBA_SHIFT) | (fpa << S3C6410_FPA_SHIFT) |
-+		(fsa << S3C6410_FSA_SHIFT);
-+}
-+
-+static unsigned int s5pc100_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S5PC100_FBA_SHIFT) | (fpa << S5PC100_FPA_SHIFT) |
-+		(fsa << S5PC100_FSA_SHIFT);
-+}
-+
-+static void s3c_onenand_reset(void)
-+{
-+	unsigned long timeout = 0x10000;
-+	int stat;
-+
-+	s3c_write_reg(ONENAND_MEM_RESET_COLD, MEM_RESET_OFFSET);
-+	while (1 && timeout--) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & RST_CMP)
-+			break;
-+	}
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	/* Clear interrupt */
-+	s3c_write_reg(0x0, INT_ERR_ACK_OFFSET);
-+	/* Clear the ECC status */
-+	s3c_write_reg(0x0, ECC_ERR_STAT_OFFSET);
-+}
-+
-+static unsigned short s3c_onenand_readw(void __iomem *addr)
-+{
-+	struct onenand_chip *this = onenand->mtd->priv;
-+	int reg = addr - this->base;
-+	int word_addr = reg >> 1;
-+	int value;
-+
-+	/* It's used for probing time */
-+	switch (reg) {
-+	case ONENAND_REG_MANUFACTURER_ID:
-+		return s3c_read_reg(MANUFACT_ID_OFFSET);
-+	case ONENAND_REG_DEVICE_ID:
-+		return s3c_read_reg(DEVICE_ID_OFFSET);
-+	case ONENAND_REG_VERSION_ID:
-+		return s3c_read_reg(FLASH_VER_ID_OFFSET);
-+	case ONENAND_REG_DATA_BUFFER_SIZE:
-+		return s3c_read_reg(DATA_BUF_SIZE_OFFSET);
-+	case ONENAND_REG_TECHNOLOGY:
-+		return s3c_read_reg(TECH_OFFSET);
-+	case ONENAND_REG_SYS_CFG1:
-+		return s3c_read_reg(MEM_CFG_OFFSET);
-+
-+	/* Used at unlock all status */
-+	case ONENAND_REG_CTRL_STATUS:
-+		return 0;
-+
-+	case ONENAND_REG_WP_STATUS:
-+		return ONENAND_WP_US;
-+
-+	default:
-+		break;
-+	}
-+
-+	/* BootRAM access control */
-+	if ((unsigned int) addr < ONENAND_DATARAM && onenand->bootram_command) {
-+		if (word_addr == 0)
-+			return s3c_read_reg(MANUFACT_ID_OFFSET);
-+		if (word_addr == 1)
-+			return s3c_read_reg(DEVICE_ID_OFFSET);
-+		if (word_addr == 2)
-+			return s3c_read_reg(FLASH_VER_ID_OFFSET);
-+	}
-+
-+	value = s3c_read_cmd(CMD_MAP_11(word_addr)) & 0xffff;
-+	dev_info(&onenand->mtd->dev, "s3c_onenand_readw:  Illegal access"
-+		" at reg 0x%x, value 0x%x\n", word_addr, value);
-+	return value;
-+}
-+
-+static void s3c_onenand_writew(unsigned short value, void __iomem *addr)
-+{
-+	struct onenand_chip *this = onenand->mtd->priv;
-+	int reg = addr - this->base;
-+	int word_addr = reg >> 1;
-+
-+	/* It's used for probing time */
-+	switch (reg) {
-+	case ONENAND_REG_SYS_CFG1:
-+		s3c_write_reg(value, MEM_CFG_OFFSET);
-+		return;
-+
-+	case ONENAND_REG_START_ADDRESS1:
-+	case ONENAND_REG_START_ADDRESS2:
-+		return;
-+
-+	/* Lock/lock-tight/unlock/unlock_all */
-+	case ONENAND_REG_START_BLOCK_ADDRESS:
-+		return;
-+
-+	default:
-+		break;
-+	}
-+
-+	/* BootRAM access control */
-+	if ((unsigned int) addr < ONENAND_DATARAM) {
-+		if (value == ONENAND_CMD_READID) {
-+			onenand->bootram_command = 1;
-+			return;
-+		}
-+		if (value == ONENAND_CMD_RESET) {
-+			s3c_write_reg(ONENAND_MEM_RESET_COLD, MEM_RESET_OFFSET);
-+			onenand->bootram_command = 0;
-+			return;
-+		}
-+	}
-+
-+	dev_info(&onenand->mtd->dev, "s3c_onenand_writew: Illegal access"
-+		" at reg 0x%x, value 0x%x\n", word_addr, value);
-+
-+	s3c_write_cmd(value, CMD_MAP_11(word_addr));
-+}
-+
-+static int s3c_onenand_wait(struct mtd_info *mtd, int state)
-+{
-+	unsigned int flags = INT_ACT;
-+	unsigned int stat, ecc;
-+	unsigned long timeout;
-+
-+	switch (state) {
-+	case FL_READING:
-+		flags |= BLK_RW_CMP | LOAD_CMP;
-+		break;
-+	case FL_WRITING:
-+		flags |= BLK_RW_CMP | PGM_CMP;
-+		break;
-+	case FL_ERASING:
-+		flags |= BLK_RW_CMP | ERS_CMP;
-+		break;
-+	case FL_LOCKING:
-+		flags |= BLK_RW_CMP;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	/* The 20 msec is enough */
-+	timeout = jiffies + msecs_to_jiffies(20);
-+	while (time_before(jiffies, timeout)) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & flags)
-+			break;
-+
-+		if (state != FL_READING)
-+			cond_resched();
-+	}
-+	/* To get correct interrupt status in timeout case */
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	/*
-+	 * In the Spec. it checks the controller status first
-+	 * However if you get the correct information in case of
-+	 * power off recovery (POR) test, it should read ECC status first
-+	 */
-+	if (stat & LOAD_CMP) {
-+		ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
-+		if (ecc & ONENAND_ECC_4BIT_UNCORRECTABLE) {
-+			dev_info(&mtd->dev, "onenand_wait: ECC error"
-+				 " = 0x%04x\n", ecc);
-+			mtd->ecc_stats.failed++;
-+			return -EBADMSG;
-+		}
-+	}
-+
-+	if (stat & (LOCKED_BLK | ERS_FAIL | PGM_FAIL | LD_FAIL_ECC_ERR)) {
-+		dev_info(&mtd->dev, "onenand_wait: controller error = 0x%04x\n",
-+			 stat);
-+		if (stat & LOCKED_BLK)
-+			dev_info(&mtd->dev, "onenand_wait: it's locked error"
-+				 " = 0x%04x\n", stat);
-+
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int s3c_onenand_command(struct mtd_info *mtd, int cmd, loff_t addr,
-+			       size_t len)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	unsigned int *m, *s;
-+	int fba, fpa, fsa = 0;
-+	unsigned int mem_addr;
-+	int i, mcount, scount;
-+	int index;
-+
-+	fba = (int) (addr >> this->erase_shift);
-+	fpa = (int) (addr >> this->page_shift);
-+	fpa &= this->page_mask;
-+
-+	mem_addr = onenand->mem_addr(fba, fpa, fsa);
-+
-+	switch (cmd) {
-+	case ONENAND_CMD_READ:
-+	case ONENAND_CMD_READOOB:
-+	case ONENAND_CMD_BUFFERRAM:
-+		ONENAND_SET_NEXT_BUFFERRAM(this);
-+	default:
-+		break;
-+	}
-+
-+	index = ONENAND_CURRENT_BUFFERRAM(this);
-+
-+	/*
-+	 * Emulate Two BufferRAMs and access with 4 bytes pointer
-+	 */
-+	m = (unsigned int *) onenand->page_buf;
-+	s = (unsigned int *) onenand->oob_buf;
-+
-+	if (index) {
-+		m += (this->writesize >> 2);
-+		s += (mtd->oobsize >> 2);
-+	}
-+
-+	mcount = mtd->writesize >> 2;
-+	scount = mtd->oobsize >> 2;
-+
-+	switch (cmd) {
-+	case ONENAND_CMD_READ:
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			*m++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_READOOB:
-+		s3c_write_reg(TSRF, TRANS_SPARE_OFFSET);
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			*m++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+
-+		/* Spare */
-+		for (i = 0; i < scount; i++)
-+			*s++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+
-+		s3c_write_reg(0, TRANS_SPARE_OFFSET);
-+		return 0;
-+
-+	case ONENAND_CMD_PROG:
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			s3c_write_cmd(*m++, CMD_MAP_01(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_PROGOOB:
-+		s3c_write_reg(TSRF, TRANS_SPARE_OFFSET);
-+
-+		/* Main - dummy write */
-+		for (i = 0; i < mcount; i++)
-+			s3c_write_cmd(0xffffffff, CMD_MAP_01(mem_addr));
-+
-+		/* Spare */
-+		for (i = 0; i < scount; i++)
-+			s3c_write_cmd(*s++, CMD_MAP_01(mem_addr));
-+
-+		s3c_write_reg(0, TRANS_SPARE_OFFSET);
-+		return 0;
-+
-+	case ONENAND_CMD_UNLOCK_ALL:
-+		s3c_write_cmd(ONENAND_UNLOCK_ALL, CMD_MAP_10(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_ERASE:
-+		s3c_write_cmd(ONENAND_ERASE_START, CMD_MAP_10(mem_addr));
-+		return 0;
-+
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static unsigned char *s3c_get_bufferram(struct mtd_info *mtd, int area)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	int index = ONENAND_CURRENT_BUFFERRAM(this);
-+	unsigned char *p;
-+
-+	if (area == ONENAND_DATARAM) {
-+		p = (unsigned char *) onenand->page_buf;
-+		if (index == 1)
-+			p += this->writesize;
-+	} else {
-+		p = (unsigned char *) onenand->oob_buf;
-+		if (index == 1)
-+			p += mtd->oobsize;
-+	}
-+
-+	return p;
-+}
-+
-+static int onenand_read_bufferram(struct mtd_info *mtd, int area,
-+				  unsigned char *buffer, int offset,
-+				  size_t count)
-+{
-+	unsigned char *p;
-+
-+	p = s3c_get_bufferram(mtd, area);
-+	memcpy(buffer, p + offset, count);
-+	return 0;
-+}
-+
-+static int onenand_write_bufferram(struct mtd_info *mtd, int area,
-+				   const unsigned char *buffer, int offset,
-+				   size_t count)
-+{
-+	unsigned char *p;
-+
-+	p = s3c_get_bufferram(mtd, area);
-+	memcpy(p + offset, buffer, count);
-+	return 0;
-+}
-+
-+static int s5pc110_dma_ops(void *dst, void *src, size_t count, int direction)
-+{
-+	void __iomem *base = onenand->dma_addr;
-+	int status;
-+
-+	writel(src, base + S5PC110_DMA_SRC_ADDR);
-+	writel(dst, base + S5PC110_DMA_DST_ADDR);
-+
-+	if (direction == S5PC110_DMA_DIR_READ) {
-+		writel(S5PC110_DMA_SRC_CFG_READ, base + S5PC110_DMA_SRC_CFG);
-+		writel(S5PC110_DMA_DST_CFG_READ, base + S5PC110_DMA_DST_CFG);
-+	} else {
-+		writel(S5PC110_DMA_SRC_CFG_WRITE, base + S5PC110_DMA_SRC_CFG);
-+		writel(S5PC110_DMA_DST_CFG_WRITE, base + S5PC110_DMA_DST_CFG);
-+	}
-+
-+	writel(count, base + S5PC110_DMA_TRANS_SIZE);
-+	writel(direction, base + S5PC110_DMA_TRANS_DIR);
-+
-+	writel(S5PC110_DMA_TRANS_CMD_TR, base + S5PC110_DMA_TRANS_CMD);
-+
-+	do {
-+		status = readl(base + S5PC110_DMA_TRANS_STATUS);
-+	} while (!(status & S5PC110_DMA_TRANS_STATUS_TD));
-+
-+	if (status & S5PC110_DMA_TRANS_STATUS_TE) {
-+		writel(S5PC110_DMA_TRANS_CMD_TEC, base + S5PC110_DMA_TRANS_CMD);
-+		writel(S5PC110_DMA_TRANS_CMD_TDC, base + S5PC110_DMA_TRANS_CMD);
-+		return -EIO;
-+	}
-+
-+	writel(S5PC110_DMA_TRANS_CMD_TDC, base + S5PC110_DMA_TRANS_CMD);
-+
-+	return 0;
-+}
-+
-+static int s5pc110_read_bufferram(struct mtd_info *mtd, int area,
-+		unsigned char *buffer, int offset, size_t count)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	void __iomem *bufferram;
-+	void __iomem *p;
-+	void *buf = (void *) buffer;
-+	dma_addr_t dma_src, dma_dst;
-+	int err;
-+
-+	p = bufferram = this->base + area;
-+	if (ONENAND_CURRENT_BUFFERRAM(this)) {
-+		if (area == ONENAND_DATARAM)
-+			p += this->writesize;
-+		else
-+			p += mtd->oobsize;
-+	}
-+
-+	if (offset & 3 || (size_t) buf & 3 ||
-+		!onenand->dma_addr || count != mtd->writesize)
-+		goto normal;
-+
-+	/* Handle vmalloc address */
-+	if (buf >= high_memory) {
-+		struct page *page;
-+
-+		if (((size_t) buf & PAGE_MASK) !=
-+		    ((size_t) (buf + count - 1) & PAGE_MASK))
-+			goto normal;
-+		page = vmalloc_to_page(buf);
-+		if (!page)
-+			goto normal;
-+		buf = page_address(page) + ((size_t) buf & ~PAGE_MASK);
-+	}
-+
-+	/* DMA routine */
-+	dma_src = onenand->phys_base + (p - this->base);
-+	dma_dst = dma_map_single(&onenand->pdev->dev,
-+			buf, count, DMA_FROM_DEVICE);
-+	if (dma_mapping_error(&onenand->pdev->dev, dma_dst)) {
-+		dev_err(&onenand->pdev->dev,
-+			"Couldn't DMA map a %d byte buffer\n", count);
-+		goto normal;
-+	}
-+	err = s5pc110_dma_ops((void *) dma_dst, (void *) dma_src,
-+			count, S5PC110_DMA_DIR_READ);
-+	dma_unmap_single(&onenand->pdev->dev, dma_dst, count, DMA_FROM_DEVICE);
-+
-+	if (!err)
-+		return 0;
-+
-+normal:
-+	if (count != mtd->writesize) {
-+		/* Copy the bufferram to memory to prevent unaligned access */
-+		memcpy(this->page_buf, bufferram, mtd->writesize);
-+		p = this->page_buf + offset;
-+	}
-+
-+	memcpy(buffer, p, count);
-+
-+	return 0;
-+}
-+
-+static int s3c_onenand_bbt_wait(struct mtd_info *mtd, int state)
-+{
-+	unsigned int flags = INT_ACT | LOAD_CMP;
-+	unsigned int stat;
-+	unsigned long timeout;
-+
-+	/* The 20 msec is enough */
-+	timeout = jiffies + msecs_to_jiffies(20);
-+	while (time_before(jiffies, timeout)) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & flags)
-+			break;
-+	}
-+	/* To get correct interrupt status in timeout case */
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	if (stat & LD_FAIL_ECC_ERR) {
-+		s3c_onenand_reset();
-+		return ONENAND_BBT_READ_ERROR;
-+	}
-+
-+	if (stat & LOAD_CMP) {
-+		int ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
-+		if (ecc & ONENAND_ECC_4BIT_UNCORRECTABLE) {
-+			s3c_onenand_reset();
-+			return ONENAND_BBT_READ_ERROR;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void s3c_onenand_check_lock_status(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	unsigned int block, end;
-+	int tmp;
-+
-+	end = this->chipsize >> this->erase_shift;
-+
-+	for (block = 0; block < end; block++) {
-+		tmp = s3c_read_cmd(CMD_MAP_01(onenand->mem_addr(block, 0, 0)));
-+
-+		if (s3c_read_reg(INT_ERR_STAT_OFFSET) & LOCKED_BLK) {
-+			dev_err(&mtd->dev, "block %d is write-protected!\n",
-+				block);
-+			s3c_write_reg(LOCKED_BLK, INT_ERR_ACK_OFFSET);
-+		}
-+	}
-+}
-+
-+static void s3c_onenand_do_lock_cmd(struct mtd_info *mtd, loff_t ofs,
-+				    size_t len, int cmd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	int start, end, start_mem_addr, end_mem_addr;
-+
-+	start = ofs >> this->erase_shift;
-+	start_mem_addr = onenand->mem_addr(start, 0, 0);
-+	end = start + (len >> this->erase_shift) - 1;
-+	end_mem_addr = onenand->mem_addr(end, 0, 0);
-+
-+	if (cmd == ONENAND_CMD_LOCK) {
-+		s3c_write_cmd(ONENAND_LOCK_START, CMD_MAP_10(start_mem_addr));
-+		s3c_write_cmd(ONENAND_LOCK_END, CMD_MAP_10(end_mem_addr));
-+	} else {
-+		s3c_write_cmd(ONENAND_UNLOCK_START, CMD_MAP_10(start_mem_addr));
-+		s3c_write_cmd(ONENAND_UNLOCK_END, CMD_MAP_10(end_mem_addr));
-+	}
-+
-+	this->wait(mtd, FL_LOCKING);
-+}
-+
-+static void s3c_unlock_all(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	loff_t ofs = 0;
-+	size_t len = this->chipsize;
-+
-+	if (this->options & ONENAND_HAS_UNLOCK_ALL) {
-+		/* Write unlock command */
-+		this->command(mtd, ONENAND_CMD_UNLOCK_ALL, 0, 0);
-+
-+		/* No need to check return value */
-+		this->wait(mtd, FL_LOCKING);
-+
-+		/* Workaround for all block unlock in DDP */
-+		if (!ONENAND_IS_DDP(this)) {
-+			s3c_onenand_check_lock_status(mtd);
-+			return;
-+		}
-+
-+		/* All blocks on another chip */
-+		ofs = this->chipsize >> 1;
-+		len = this->chipsize >> 1;
-+	}
-+
-+	s3c_onenand_do_lock_cmd(mtd, ofs, len, ONENAND_CMD_UNLOCK);
-+
-+	s3c_onenand_check_lock_status(mtd);
-+}
-+
-+static void s3c_onenand_setup(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+
-+	onenand->mtd = mtd;
-+
-+	if (onenand->type == TYPE_S3C6400)
-+		onenand->mem_addr = s3c6400_mem_addr;
-+	if (onenand->type == TYPE_S3C6410)
-+		onenand->mem_addr = s3c6410_mem_addr;
-+	if (onenand->type == TYPE_S5PC100)
-+		onenand->mem_addr = s5pc100_mem_addr;
-+	if (onenand->type == TYPE_S5PC110) {
-+		/* Use generic onenand functions */
-+		this->read_bufferram = s5pc110_read_bufferram;
-+		return;
-+	}
-+
-+	this->read_word = s3c_onenand_readw;
-+	this->write_word = s3c_onenand_writew;
-+
-+	this->wait = s3c_onenand_wait;
-+	this->bbt_wait = s3c_onenand_bbt_wait;
-+	this->unlock_all = s3c_unlock_all;
-+	this->command = s3c_onenand_command;
-+
-+	this->read_bufferram = onenand_read_bufferram;
-+	this->write_bufferram = onenand_write_bufferram;
-+}
-+
-+static int s3c_onenand_probe(struct platform_device *pdev)
-+{
-+	struct onenand_platform_data *pdata;
-+	struct onenand_chip *this;
-+	struct mtd_info *mtd;
-+	struct resource *r;
-+	int size, err;
-+	unsigned long ahb_addr = 0, ahb_addr_size;
-+	unsigned long onenand_ctrl_cfg = 0;
-+
-+	pdata = pdev->dev.platform_data;
-+	/* No need to check pdata. the platform data is optional */
-+
-+	size = sizeof(struct mtd_info) + sizeof(struct onenand_chip);
-+	mtd = kzalloc(size, GFP_KERNEL);
-+	if (!mtd) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	onenand = kzalloc(sizeof(struct s3c_onenand), GFP_KERNEL);
-+	if (!onenand) {
-+		err = -ENOMEM;
-+		goto onenand_fail;
-+	}
-+
-+	this = (struct onenand_chip *) &mtd[1];
-+	mtd->priv = this;
-+	mtd->dev.parent = &pdev->dev;
-+	mtd->owner = THIS_MODULE;
-+	onenand->pdev = pdev;
-+	onenand->type = platform_get_device_id(pdev)->driver_data;
-+
-+	s3c_onenand_setup(mtd);
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		dev_err(&pdev->dev, "no resource defined\n");
-+		return -ENXIO;
-+		goto resource_failed;
-+	}
-+
-+	r = request_mem_region(r->start, resource_size(r), pdev->name);
-+	if (!r) {
-+		dev_err(&pdev->dev, "failed to request memory resource\n");
-+		err = -EBUSY;
-+		goto request_failed;
-+	}
-+
-+	onenand->base = ioremap(r->start, resource_size(r));
-+	if (!onenand->base) {
-+		err = -EFAULT;
-+		goto ioremap_failed;
-+	}
-+	/* Set onenand_chip also */
-+	this->base = onenand->base;
-+
-+	if (onenand->type == TYPE_S3C6400 || onenand->type == TYPE_S3C6410) {
-+		ahb_addr = S3C64XX_AHB_ADDR;
-+		ahb_addr_size = SZ_64M;
-+	} else if (onenand->type == TYPE_S5PC100) {
-+		ahb_addr = S5PC100_AHB_ADDR;
-+		ahb_addr_size = SZ_256M - SZ_32M;
-+	} else if (onenand->type == TYPE_S5PC110) {
-+		onenand->dma_addr =
-+			ioremap(r->start + S5PC110_DMA_OFFSET, 0x800);
-+		if (!onenand->dma_addr)
-+			onenand->dma_addr = 0;
-+		onenand->phys_base = S5PC110_ONENAND_BASE;
-+	}
-+
-+	/*
-+	 * We only used as followings
-+	 * S5PC100                              S3C64XX
-+	 * MAP_01 0xB4000000 ~ 0xB4FFFFFF       0x21000000 ~ 0x21FFFFFF
-+	 * MAP_10 0xB8000000 ~ 0xB8FFFFFF       0x22000000 ~ 0x22FFFFFF
-+	 * MAP_11 0xBC000000 ~ 0xBCFFFFFF       0x23000000 ~ 0x23FFFFFF
-+	 */
-+	if (ahb_addr) {
-+		/* We don't use last 32MiB */
-+		onenand->ahb_addr = ioremap(ahb_addr, ahb_addr_size);
-+		if (!onenand->ahb_addr) {
-+			err = -EINVAL;
-+			goto ahb_failed;
-+		}
-+
-+		/* Allocate 4KiB BufferRAM */
-+		onenand->page_buf = kzalloc(SZ_4K * sizeof(char), GFP_KERNEL);
-+		if (!onenand->page_buf) {
-+			err = -ENOMEM;
-+			goto page_buf_fail;
-+		}
-+
-+		/* Allocate 128 SpareRAM */
-+		onenand->oob_buf = kzalloc(128 * sizeof(char), GFP_KERNEL);
-+		if (!onenand->oob_buf) {
-+			err = -ENOMEM;
-+			goto oob_buf_fail;
-+		}
-+	}
-+
-+	/* Use runtime badblock check */
-+	this->options |= ONENAND_SKIP_UNLOCK_CHECK;
-+
-+	if (onenand->type == TYPE_S5PC110) {
-+		onenand_ctrl_cfg = readl(onenand->dma_addr + 0x100);
-+		if ((onenand_ctrl_cfg & ONENAND_SYS_CFG1_SYNC_WRITE) &&
-+		    onenand->dma_addr)
-+			writel(onenand_ctrl_cfg & ~ONENAND_SYS_CFG1_SYNC_WRITE,
-+					onenand->dma_addr + 0x100);
-+		else
-+			onenand_ctrl_cfg = 0;
-+	}
-+
-+	if (onenand_scan(mtd, 1)) {
-+		err = -EFAULT;
-+		goto scan_failed;
-+	}
-+
-+	if (onenand->type == TYPE_S5PC110) {
-+		if (onenand_ctrl_cfg && onenand->dma_addr)
-+			writel(onenand_ctrl_cfg, onenand->dma_addr + 0x100);
-+	}
-+
-+	if (ahb_addr) {
-+		/* S3C don't handle subpage write */
-+		mtd->subpage_sft = 0;
-+		this->subpagesize = mtd->writesize;
-+	}
-+
-+	if (s3c_read_reg(MEM_CFG_OFFSET) & ONENAND_SYS_CFG1_SYNC_READ)
-+		dev_info(&mtd->dev, "OneNAND Sync. Burst Read enabled\n");
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	err = parse_mtd_partitions(mtd, part_probes, &onenand->parts, 0);
-+	if (err > 0)
-+		add_mtd_partitions(mtd, onenand->parts, err);
-+	else if (err <= 0 && pdata && pdata->parts)
-+		add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
-+	else
++	arm_mm_lmb_reserve();
++
++	/* reserve any lmb areas */
++	if (mdesc->reserve)
++		mdesc->reserve();
+ }
+ 
+ void __init bootmem_init(void)
+ {
+ 	struct meminfo *mi = &meminfo;
+ 	unsigned long min, max_low, max_high;
+-	int node, initrd_node;
+-
+-	sort(&mi->bank, mi->nr_banks, sizeof(mi->bank[0]), meminfo_cmp, NULL);
+-
+-	/*
+-	 * Locate which node contains the ramdisk image, if any.
+-	 */
+-	initrd_node = check_initrd(mi);
++	int node;
+ 
+ 	max_low = max_high = 0;
+ 
+@@ -432,18 +335,6 @@ void __init bootmem_init(void)
+ 		bootmem_init_node(node, mi, min, node_low);
+ 
+ 		/*
+-		 * Reserve any special node zero regions.
+-		 */
+-		if (node == 0)
+-			reserve_node_zero(NODE_DATA(node));
+-
+-		/*
+-		 * If the initrd is in this node, reserve its memory.
+-		 */
+-		if (node == initrd_node)
+-			bootmem_reserve_initrd(node);
+-
+-		/*
+ 		 * Sparsemem tries to allocate bootmem in memory_present(),
+ 		 * so must be done after the fixed reservations
+ 		 */
+@@ -566,6 +457,13 @@ void __init mem_init(void)
+ 	unsigned long reserved_pages, free_pages;
+ 	int i, node;
+ 
++#ifdef CONFIG_SA1111
++	lmb_free(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
 +#endif
-+		err = add_mtd_device(mtd);
 +
-+	platform_set_drvdata(pdev, mtd);
++	lmb_analyze();
++	lmb_dump_all();
 +
-+	return 0;
-+scan_failed:
-+	kfree(onenand->oob_buf);
-+oob_buf_fail:
-+	kfree(onenand->page_buf);
-+page_buf_fail:
-+	if (onenand->ahb_addr)
-+		iounmap(onenand->ahb_addr);
-+ahb_failed:
-+	if (onenand->dma_addr)
-+		iounmap(onenand->dma_addr);
-+	iounmap(onenand->base);
-+ioremap_failed:
-+	release_mem_region(r->start, resource_size(r));
-+request_failed:
-+resource_failed:
-+	kfree(onenand);
-+onenand_fail:
-+	kfree(mtd);
-+	return err;
-+}
-+
-+static int __devexit s3c_onenand_remove(struct platform_device *pdev)
+ #ifndef CONFIG_DISCONTIGMEM
+ 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+ #endif
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index a888363..966dc45 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -28,10 +28,6 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+ 
+ #endif
+ 
+-struct map_desc;
+-struct meminfo;
+-struct pglist_data;
+-
+-void __init create_mapping(struct map_desc *md);
+ void __init bootmem_init(void);
+-void reserve_node_zero(struct pglist_data *pgdat);
++void arm_lmb_reserve(void);
++void arm_mm_lmb_reserve(void);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9d4da6a..81eb08a 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -11,9 +11,10 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
+-#include <linux/bootmem.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
++#include <linux/lmb.h>
++#include <linux/sort.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/mach-types.h>
+@@ -483,6 +484,13 @@ static void __init build_mem_type_table(void)
+ 
+ #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+ 
++static void __init *early_alloc(unsigned long sz)
 +{
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+
-+	onenand_release(mtd);
-+	if (onenand->ahb_addr)
-+		iounmap(onenand->ahb_addr);
-+	if (onenand->dma_addr)
-+		iounmap(onenand->dma_addr);
-+	iounmap(onenand->base);
-+	platform_set_drvdata(pdev, NULL);
-+	kfree(onenand->oob_buf);
-+	kfree(onenand->page_buf);
-+	kfree(onenand);
-+	kfree(mtd);
-+	return 0;
++	void *ptr = __va(lmb_alloc(sz, sz));
++	memset(ptr, 0, PAGE_SIZE);
++	return ptr;
 +}
 +
-+static int s3c_pm_ops_suspend(struct device *dev)
+ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  const struct mem_type *type)
+@@ -490,7 +498,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd)) {
+-		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
++		pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
+ 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
+ 	}
+ 
+@@ -599,7 +607,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
+  * offsets, and we take full advantage of sections and
+  * supersections.
+  */
+-void __init create_mapping(struct map_desc *md)
++static void __init create_mapping(struct map_desc *md)
+ {
+ 	unsigned long phys, addr, length, end;
+ 	const struct mem_type *type;
+@@ -693,6 +701,9 @@ early_param("vmalloc", early_vmalloc);
+ 
+ #define VMALLOC_MIN	(void *)(VMALLOC_END - vmalloc_reserve)
+ 
++/* FIXME: we need to teach LMB about the highmem boundary */
++phys_addr_t lowmem_end_addr = PHYS_OFFSET + 32*1048576;
++
+ static void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
+@@ -822,100 +833,23 @@ static inline void prepare_page_table(void)
+ }
+ 
+ /*
+- * Reserve the various regions of node 0
++ * Reserve the special regions of memory
+  */
+-void __init reserve_node_zero(pg_data_t *pgdat)
++void __init arm_mm_lmb_reserve(void)
+ {
+-	unsigned long res_size = 0;
+-
+-	/*
+-	 * Register the kernel text and data with bootmem.
+-	 * Note that this can only be in node 0.
+-	 */
+-#ifdef CONFIG_XIP_KERNEL
+-	reserve_bootmem_node(pgdat, __pa(_data), _end - _data,
+-			BOOTMEM_DEFAULT);
+-#else
+-	reserve_bootmem_node(pgdat, __pa(_stext), _end - _stext,
+-			BOOTMEM_DEFAULT);
+-#endif
+-
+ 	/*
+ 	 * Reserve the page tables.  These are already in use,
+ 	 * and can only be in node 0.
+ 	 */
+-	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
+-			     PTRS_PER_PGD * sizeof(pgd_t), BOOTMEM_DEFAULT);
+-
+-	/*
+-	 * Hmm... This should go elsewhere, but we really really need to
+-	 * stop things allocating the low memory; ideally we need a better
+-	 * implementation of GFP_DMA which does not assume that DMA-able
+-	 * memory starts at zero.
+-	 */
+-	if (machine_is_integrator() || machine_is_cintegrator())
+-		res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
+-
+-	/*
+-	 * These should likewise go elsewhere.  They pre-reserve the
+-	 * screen memory region at the start of main system memory.
+-	 */
+-	if (machine_is_edb7211())
+-		res_size = 0x00020000;
+-	if (machine_is_p720t())
+-		res_size = 0x00014000;
+-
+-	/* H1940 and RX3715 need to reserve this for suspend */
+-
+-	if (machine_is_h1940() || machine_is_rx3715()) {
+-		reserve_bootmem_node(pgdat, 0x30003000, 0x1000,
+-				BOOTMEM_DEFAULT);
+-		reserve_bootmem_node(pgdat, 0x30081000, 0x1000,
+-				BOOTMEM_DEFAULT);
+-	}
+-
+-	if (machine_is_palmld() || machine_is_palmtx()) {
+-		reserve_bootmem_node(pgdat, 0xa0000000, 0x1000,
+-				BOOTMEM_EXCLUSIVE);
+-		reserve_bootmem_node(pgdat, 0xa0200000, 0x1000,
+-				BOOTMEM_EXCLUSIVE);
+-	}
+-
+-	if (machine_is_treo680() || machine_is_centro()) {
+-		reserve_bootmem_node(pgdat, 0xa0000000, 0x1000,
+-				BOOTMEM_EXCLUSIVE);
+-		reserve_bootmem_node(pgdat, 0xa2000000, 0x1000,
+-				BOOTMEM_EXCLUSIVE);
+-	}
+-
+-	if (machine_is_palmt5())
+-		reserve_bootmem_node(pgdat, 0xa0200000, 0x1000,
+-				BOOTMEM_EXCLUSIVE);
+-
+-	/*
+-	 * U300 - This platform family can share physical memory
+-	 * between two ARM cpus, one running Linux and the other
+-	 * running another OS.
+-	 */
+-	if (machine_is_u300()) {
+-#ifdef CONFIG_MACH_U300_SINGLE_RAM
+-#if ((CONFIG_MACH_U300_ACCESS_MEM_SIZE & 1) == 1) &&	\
+-	CONFIG_MACH_U300_2MB_ALIGNMENT_FIX
+-		res_size = 0x00100000;
+-#endif
+-#endif
+-	}
++	lmb_reserve(__pa(swapper_pg_dir), PTRS_PER_PGD * sizeof(pgd_t));
+ 
+ #ifdef CONFIG_SA1111
+ 	/*
+ 	 * Because of the SA1111 DMA bug, we want to preserve our
+ 	 * precious DMA-able memory...
+ 	 */
+-	res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
++	lmb_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
+ #endif
+-	if (res_size)
+-		reserve_bootmem_node(pgdat, PHYS_OFFSET, res_size,
+-				BOOTMEM_DEFAULT);
+ }
+ 
+ /*
+@@ -934,7 +868,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	/*
+ 	 * Allocate the vector page early.
+ 	 */
+-	vectors = alloc_bootmem_low_pages(PAGE_SIZE);
++	vectors = early_alloc(PAGE_SIZE);
+ 
+ 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+@@ -1006,13 +940,46 @@ static void __init kmap_init(void)
+ {
+ #ifdef CONFIG_HIGHMEM
+ 	pmd_t *pmd = pmd_off_k(PKMAP_BASE);
+-	pte_t *pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
++	pte_t *pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
+ 	BUG_ON(!pmd_none(*pmd) || !pte);
+ 	__pmd_populate(pmd, __pa(pte) | _PAGE_KERNEL_TABLE);
+ 	pkmap_page_table = pte + PTRS_PER_PTE;
+ #endif
+ }
+ 
++static inline void map_memory_bank(struct membank *bank)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+	struct onenand_chip *this = mtd->priv;
++	struct map_desc map;
 +
-+	this->wait(mtd, FL_PM_SUSPENDED);
-+	return mtd->suspend(mtd);
++	map.pfn = bank_pfn_start(bank);
++	map.virtual = __phys_to_virt(bank_phys_start(bank));
++	map.length = bank_phys_size(bank);
++	map.type = MT_MEMORY;
++
++	create_mapping(&map);
 +}
 +
-+static  int s3c_pm_ops_resume(struct device *dev)
++static void __init map_lowmem(void)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+	struct onenand_chip *this = mtd->priv;
++	struct meminfo *mi = &meminfo;
++	int i;
 +
-+	mtd->resume(mtd);
-+	this->unlock_all(mtd);
-+	return 0;
++	/* Map all the lowmem memory banks. */
++	for (i = 0; i < mi->nr_banks; i++) {
++		struct membank *bank = &mi->bank[i];
++
++		if (!bank->highmem)
++			map_memory_bank(bank);
++	}
 +}
 +
-+static const struct dev_pm_ops s3c_pm_ops = {
-+	.suspend	= s3c_pm_ops_suspend,
-+	.resume		= s3c_pm_ops_resume,
-+};
-+
-+static struct platform_device_id s3c_onenand_driver_ids[] = {
-+	{
-+		.name		= "s3c6400-onenand",
-+		.driver_data	= TYPE_S3C6400,
-+	}, {
-+		.name		= "s3c6410-onenand",
-+		.driver_data	= TYPE_S3C6410,
-+	}, {
-+		.name		= "s5pc100-onenand",
-+		.driver_data	= TYPE_S5PC100,
-+	}, {
-+		.name		= "s5pc110-onenand",
-+		.driver_data	= TYPE_S5PC110,
-+	}, { },
-+};
-+MODULE_DEVICE_TABLE(platform, s3c_onenand_driver_ids);
-+
-+static struct platform_driver s3c_onenand_driver = {
-+	.id_table	= s3c_onenand_driver_ids,
-+	.driver         = {
-+		.name	= "samsung-onenand",
-+		.pm	= &s3c_pm_ops,
-+	},
-+	.probe          = s3c_onenand_probe,
-+	.remove         = __devexit_p(s3c_onenand_remove),
-+};
-+
-+static int __init s3c_onenand_init(void)
++static int __init meminfo_cmp(const void *_a, const void *_b)
 +{
-+	return platform_driver_register(&s3c_onenand_driver);
++	const struct membank *a = _a, *b = _b;
++	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
++	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
 +}
 +
-+static void __exit s3c_onenand_exit(void)
-+{
-+	platform_driver_unregister(&s3c_onenand_driver);
-+}
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps, and sets up the zero page, bad page and bad page tables.
+@@ -1021,20 +988,22 @@ void __init paging_init(struct machine_desc *mdesc)
+ {
+ 	void *zero_page;
+ 
++	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 +
-+module_init(s3c_onenand_init);
-+module_exit(s3c_onenand_exit);
+ 	build_mem_type_table();
+ 	sanity_check_meminfo();
+ 	prepare_page_table();
+-	bootmem_init();
++	map_lowmem();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
+ 
+ 	top_pmd = pmd_off_k(0xffff0000);
+ 
+-	/*
+-	 * allocate the zero page.  Note that this always succeeds and
+-	 * returns a zeroed result.
+-	 */
+-	zero_page = alloc_bootmem_low_pages(PAGE_SIZE);
++	/* allocate the zero page. */
++	zero_page = early_alloc(PAGE_SIZE);
 +
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Kyungmin Park <kyungmin.park@samsung.com>");
-+MODULE_DESCRIPTION("Samsung OneNAND controller support");
-+MODULE_ALIAS("platform:samsung-onenand");
--- 
-1.6.4
++	bootmem_init();
++
+ 	empty_zero_page = virt_to_page(zero_page);
+ 	__flush_dcache_page(NULL, empty_zero_page);
+ }
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 9bfeb6b..ce00558 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -6,8 +6,8 @@
+ #include <linux/module.h>
+ #include <linux/mm.h>
+ #include <linux/pagemap.h>
+-#include <linux/bootmem.h>
+ #include <linux/io.h>
++#include <linux/lmb.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/sections.h>
+@@ -17,30 +17,14 @@
+ 
+ #include "mm.h"
+ 
+-/*
+- * Reserve the various regions of node 0
+- */
+-void __init reserve_node_zero(pg_data_t *pgdat)
++void __init arm_mm_lmb_reserve(void)
+ {
+ 	/*
+-	 * Register the kernel text and data with bootmem.
+-	 * Note that this can only be in node 0.
+-	 */
+-#ifdef CONFIG_XIP_KERNEL
+-	reserve_bootmem_node(pgdat, __pa(_data), _end - _data,
+-			BOOTMEM_DEFAULT);
+-#else
+-	reserve_bootmem_node(pgdat, __pa(_stext), _end - _stext,
+-			BOOTMEM_DEFAULT);
+-#endif
+-
+-	/*
+ 	 * Register the exception vector page.
+ 	 * some architectures which the DRAM is the exception vector to trap,
+ 	 * alloc_page breaks with error, although it is not NULL, but "0."
+ 	 */
+-	reserve_bootmem_node(pgdat, CONFIG_VECTORS_BASE, PAGE_SIZE,
+-			BOOTMEM_DEFAULT);
++	lmb_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
+ }
+ 
+ /*
