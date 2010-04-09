@@ -1,34 +1,53 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Fri, 9 Apr 2010 19:08:16 +0100
-Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
-References: <cover.1268930557.git.mika.westerberg@iki.fi>
-	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
-	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
-	<20100325184316.GB20512@gw.healthdatacare.com>
-	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
-	<20100406054418.GA27465@gw.healthdatacare.com>
-	<s2g56d259a01004060550me72bd64cr35e4a83c495d6909@mail.gmail.com>
-	<20100406181839.GA2685@gw.healthdatacare.com>
-	<x2r56d259a01004061428raffb32e9o1d42570c79c0ee56@mail.gmail.com>
-	<l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
-Message-ID: <t2o56d259a01004091108y7b17c2dw2cded23120d670de@mail.gmail.com>
+From: buildroot@browserseal.com (Sasha Sirotkin)
+Date: Sat, 10 Apr 2010 00:36:13 +0300
+Subject: Confusion regarding ARMv5 MMU access permissions 
+Message-ID: <4BBF9DCD.3040007@browserseal.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, I mean
+I'm trying to figure out how ARMv5 MMU access permissions work in 
+general and on Linux in particular.
 
--	unsigned n;	/* Number of bytes to send to the TX FIFO */
-+	unsigned n;	/* Number of words to send to the TX FIFO */
+Table B4-1 MMU access permissions (from the ARM Architecture Reference 
+Manual) does not make sense to me and trying to correlate it with
+ * Permission translation:
+ *  YUWD   AP    SVC    User
+ *  0xxx  0x00    no acc    no acc
+ *  100x  0x00    r/o    no acc
+ *  10x0  0x00    r/o    no acc
+ *  1011  0x55    r/w    no acc
+ *  110x  0xaa    r/w    r/o
+ *  11x0  0xaa    r/w    r/o
+ *  1111  0xff    r/w    r/w
 
-and
+from armv3_set_pte_ext makes even less sense.
 
--	n = t->len - espi->tx;	/* Total number of bytes waiting to be
--				 * sent to the TX FIFO for this transfer */
-+	/* Number of words still to be sent to the TX FIFO */
-+	n = (t->len - espi->tx) / (bits_per_word(espi) > 8 ? 2 : 1);
+Can please anybody shed some light on this black magic?
 
-sorry about that.
+What YUWD stand for? How AP from the above table relate to AP[0:1] bits 
+in the ARM page table ? How should I read ARM MMU access permissions table:
+S R APXa AP[1:0] Privileged permissions User permissions Description
+0 0  0       0b00     No access No access All accesses generate 
+permission faults
+x x  0       0b01     Read/write No access Privileged access only
+x x  0       0b10     Read/write Read only Writes in User mode generate 
+permission faults
+x x  0       0b11     Read/write Read/write Full access
+0 0 1        0b00     - - RESERVED
+0 0 1        0b01     Read only No access Privileged read only
+0 0 1        0b10     Read only Read only Privileged/User read only
+0 0 1        0b11     - - RESERVED
 
-    M
+The S and R bits are deprecated in VMSAv6. The following entries apply 
+to legacy systems only.
+
+0 1 0 0b00 Read only Read only Privileged/User read only
+1 0 0 0b00 Read only No access Privileged read only
+1 1 0 0b00 - - RESERVED
+0 1 1 0bxx - - RESERVED
+1 0 1 0bxx - - RESERVED
+1 1 1 0bxx - - RESERVED
+
+And what does that x (don't care !?) mean ?
+
+Thanks a lot, hope this is the right place to ask these kinds of questions.
