@@ -1,31 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Apr 2010 12:13:00 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <201003311443.13568.jeremy.kerr@canonical.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<201003311443.13568.jeremy.kerr@canonical.com>
-Message-ID: <20100409111300.GB2804@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 9 Apr 2010 12:16:09 +0100
+Subject: [alsa-devel] [PATCH 1/4] pxa: add namespace on ssp
+In-Reply-To: <k2s771cded01003310546y48e1431r71820b73f69e53d5@mail.gmail.com>
+References: <k2s771cded01003310546y48e1431r71820b73f69e53d5@mail.gmail.com>
+Message-ID: <20100409111609.GA13281@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 31, 2010 at 02:43:13PM +0800, Jeremy Kerr wrote:
-> Hi Russell,
+On Wed, Mar 31, 2010 at 08:46:42AM -0400, Haojian Zhuang wrote:
+> From b52a0d2687e82f81d38198cb450b6a39a9e53851 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 31 Mar 2010 15:08:55 -0400
+> Subject: [PATCH] [ARM] pxa: add namespace on ssp
 > 
-> > LMB... logical memory blocks.
-> 
-> Nice, will be good for the DT work too.
-> 
-> > @@ -483,6 +484,13 @@ static void __init build_mem_type_table(void)
-> > 
-> >  #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
-> > 
-> > +static void __init *early_alloc(unsigned long sz)
-> > +{
-> > +      void *ptr = __va(lmb_alloc(sz, sz));
-> > +      memset(ptr, 0, PAGE_SIZE);
-> 
-> memset(ptr, 0, sz) ?
+> In order to prevent code ambiguous, add namespace on functions in ssp driver.
 
-Yes, thanks for catching that.  That's not fixed in the revised version
-I just sent, but will be fixed in the final version.  (IOW, I just
-committed that correction.)
+Liam acked these on IRC so I was going to apply them (the interface for
+the sysclk configuration should be fixed, but that can be done as a
+followup patch) but I can't seem to find a branch that these apply to -
+they don't apply cleanly to either Eric's ssp_cleanup branch, the ASoC
+for-2.6.35 branch, nor a merge of the two.
