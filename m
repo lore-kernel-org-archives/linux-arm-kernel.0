@@ -1,114 +1,115 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sat, 10 Apr 2010 18:54:43 +0300
-Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
-References: <cover.1268930557.git.mika.westerberg@iki.fi>
-	<9de3769ae253830fb0eebc98d299137c59c69b8c.1268930557.git.mika.westerberg@iki.fi>
-	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
-	<20100325184316.GB20512@gw.healthdatacare.com>
-	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
-	<20100406054418.GA27465@gw.healthdatacare.com>
-	<s2g56d259a01004060550me72bd64cr35e4a83c495d6909@mail.gmail.com>
-	<20100406181839.GA2685@gw.healthdatacare.com>
-	<x2r56d259a01004061428raffb32e9o1d42570c79c0ee56@mail.gmail.com>
-	<l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
-Message-ID: <20100410155443.GG2685@gw.healthdatacare.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sat, 10 Apr 2010 21:32:39 +0100
+Subject: [PATCH 2/2] ixp4xx/vulcan: add PCI support
+In-Reply-To: <1270931559-9414-1-git-send-email-maz@misterjones.org>
+References: <1270931559-9414-1-git-send-email-maz@misterjones.org>
+Message-ID: <1270931559-9414-2-git-send-email-maz@misterjones.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 09, 2010 at 06:56:49PM +0100, Martin Guy wrote:
-> 
-> you end up with:
-> 
->         while (espi->tx < t->len) {
->                 ep93xx_do_write(espi, t);
-> 
->                 while (ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_BSY);
-> 
->                 ep93xx_do_read(espi, t);
->         }
-> 
-> This makes each interrupt routine take about 2ms to complete. I don't
-> know if that's unacceptably long or not.
+Add PCI support for the Vulcan board, supporting USB and CF ports.
+The PC/104 bus (actually a hack on the second CarBus slot) is not
+currently supported.
 
-Yeah. It's probably bad thing to spend that much time in interrupt
-handler.
+Signed-off-by: Marc Zyngier <maz@misterjones.org>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+---
+ arch/arm/mach-ixp4xx/Makefile     |    1 +
+ arch/arm/mach-ixp4xx/vulcan-pci.c |   73 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ixp4xx/vulcan-pci.c
 
-> I've coded up a version that works differently, by filling the TX FIFO
-> and returning from the IRQ routine - it then get interrupted again
-> when the TX FIFO is half empty (and the RX FIFO is half full), at
-> which point it empties and fills them
-> and waits for another interrupt.
-> The end of the transfer has to be handled specially because the
-> interrupt is held high as long as the TX FIFO is half empty or less,
-> so we have to busy-wait while the final four words are transmitted and
-> received, concluding the transfer.
-> 
-> The result is an increase in MMC card read or write speed from 232kB/s
-> to 315kB/s and a decrease in CPU usage from 100% to 55-60%, tested
-> with plain 1GB SD card.
-> A 2GB MLC card instead gets 323kB/sec in read and 319kB/sec in write (!).
-> 
-> SDHC cards don't work at all - they are rejected by the MMC-SPI driver
-> (eror -38, ENOSYS: Function not implemented), the same as happens with
-> the old CIrrus driver.
-> 
-> I've only changed the ep93xx_spi_read_write() function in your v2
-> interrupting driver: the new version is below. Would you see if it
-> works with your other SPI hardware?
-
-I tested your version with few SD cards (one of them is SDHC) and
-works without any problems (and performance is better). Also tested
-with SPI EEPROM through at25 driver and it works well.
-
-However, I would really like to have this code to be simpler and
-to be suitable for polling as well. I wrote myself version that is
-based on yours and also borrowed this fifo_level thingy from
-amba-pl022 driver. I tested it with the same devices and performance
-seems to be in par with your version.
-
-Can you try following with your devices?
-
-struct ep93xx_spi {
-	...
-	size_t	fifo_level;
-};
-
-static int ep93xx_spi_read_write(struct ep93xx_spi *espi)
-{
-        struct spi_message *msg;
-        struct spi_transfer *t;
-        unsigned long flags;
-
-        spin_lock_irqsave(&espi->lock, flags);
-        msg = espi->current_msg;
-        spin_unlock_irqrestore(&espi->lock, flags);
-
-        t = msg->state;
-
-        if (espi->tx == 0 && espi->rx == 0)
-                espi->fifo_level = 0;
-
-        while ((ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_RNE) &&
-                espi->rx < t->len) {
-                ep93xx_do_read(espi, t);
-                espi->fifo_level--;
-        }
-
-        while (espi->fifo_level < 8 && espi->tx < t->len) {
-                ep93xx_do_write(espi, t);
-                espi->fifo_level++;
-        }
-
-        /* is transfer finished? */
-        if (espi->tx == t->len && espi->rx == t->len) {
-                msg->actual_length += t->len;
-                return t->len;
-        }
-
-        return 0;
-}
-
-Thanks,
-MW
+diff --git a/arch/arm/mach-ixp4xx/Makefile b/arch/arm/mach-ixp4xx/Makefile
+index ab39693..d807fc3 100644
+--- a/arch/arm/mach-ixp4xx/Makefile
++++ b/arch/arm/mach-ixp4xx/Makefile
+@@ -16,6 +16,7 @@ obj-pci-$(CONFIG_MACH_DSMG600)		+= dsmg600-pci.o
+ obj-pci-$(CONFIG_MACH_GATEWAY7001)	+= gateway7001-pci.o
+ obj-pci-$(CONFIG_MACH_WG302V2)		+= wg302v2-pci.o
+ obj-pci-$(CONFIG_MACH_FSG)		+= fsg-pci.o
++obj-pci-$(CONFIG_MACH_ARCOM_VULCAN)	+= vulcan-pci.o
+ 
+ obj-y	+= common.o
+ 
+diff --git a/arch/arm/mach-ixp4xx/vulcan-pci.c b/arch/arm/mach-ixp4xx/vulcan-pci.c
+new file mode 100644
+index 0000000..f3111c6
+--- /dev/null
++++ b/arch/arm/mach-ixp4xx/vulcan-pci.c
+@@ -0,0 +1,73 @@
++/*
++ * arch/arch/mach-ixp4xx/vulcan-pci.c
++ *
++ * Vulcan board-level PCI initialization
++ *
++ * Copyright (C) 2010 Marc Zyngier <maz@misterjones.org>
++ *
++ * based on ixdp425-pci.c:
++ *	Copyright (C) 2002 Intel Corporation.
++ *	Copyright (C) 2003-2004 MontaVista Software, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/pci.h>
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <asm/mach/pci.h>
++#include <asm/mach-types.h>
++
++/* PCI controller GPIO to IRQ pin mappings */
++#define INTA	2
++#define INTB	3
++
++void __init vulcan_pci_preinit(void)
++{
++#ifndef CONFIG_IXP4XX_INDIRECT_PCI
++	/*
++	 * Cardbus bridge wants way more than the SoC can actually offer,
++	 * and leaves the whole PCI bus in a mess. Artificially limit it
++	 * to 8MB per region. Of course indirect mode doesn't have this
++	 * limitation...
++	 */
++	pci_cardbus_mem_size = SZ_8M;
++	pr_info("Vulcan PCI: limiting CardBus memory size to %dMB\n",
++		(int)(pci_cardbus_mem_size >> 20));
++#endif
++	set_irq_type(IXP4XX_GPIO_IRQ(INTA), IRQ_TYPE_LEVEL_LOW);
++	set_irq_type(IXP4XX_GPIO_IRQ(INTB), IRQ_TYPE_LEVEL_LOW);
++	ixp4xx_pci_preinit();
++}
++
++static int __init vulcan_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++{
++	if (slot == 1)
++		return IXP4XX_GPIO_IRQ(INTA);
++
++	if (slot == 2)
++		return IXP4XX_GPIO_IRQ(INTB);
++
++	return -1;
++}
++
++struct hw_pci vulcan_pci __initdata = {
++	.nr_controllers	= 1,
++	.preinit	= vulcan_pci_preinit,
++	.swizzle	= pci_std_swizzle,
++	.setup		= ixp4xx_setup,
++	.scan		= ixp4xx_scan_bus,
++	.map_irq	= vulcan_map_irq,
++};
++
++int __init vulcan_pci_init(void)
++{
++	if (machine_is_arcom_vulcan())
++		pci_common_init(&vulcan_pci);
++	return 0;
++}
++
++subsys_initcall(vulcan_pci_init);
+-- 
+1.7.0.4
