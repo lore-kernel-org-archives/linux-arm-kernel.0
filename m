@@ -1,27 +1,57 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 11 Apr 2010 16:13:39 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
-References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
-	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <n2n63386a3d1004110713w74a16713g13f32219b610d3a6@mail.gmail.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Sun, 11 Apr 2010 15:24:21 +0100
+Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100410155443.GG2685@gw.healthdatacare.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
+	<20100325184316.GB20512@gw.healthdatacare.com>
+	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+	<20100406054418.GA27465@gw.healthdatacare.com>
+	<s2g56d259a01004060550me72bd64cr35e4a83c495d6909@mail.gmail.com>
+	<20100406181839.GA2685@gw.healthdatacare.com>
+	<x2r56d259a01004061428raffb32e9o1d42570c79c0ee56@mail.gmail.com>
+	<l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
+	<20100410155443.GG2685@gw.healthdatacare.com>
+Message-ID: <j2g56d259a01004110724q7e038392r9b7b33772b66e1f1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 4/10/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+>  Can you try following with your devices?
 
-are you OK with pushing these patches from this series:
+Woo, nice one!
+Same CPU usage (~57%) same throughput (315kb/s) and it's much more
+elegant. :) Just using repeated interrupts to handle the last 4 words
+instead of the nasty busy-wait loops seems fairer to other interrupts
+too!
 
-patch 01 - <linux/amba/dma.h>
-patch 08 - DMA for drivers/serial/amba-pl011.c
+You can make it even smaller be removing some redundant checks
+deriving from the fact that it's synchronous, so N writes always cause
+N reads:
 
-through Dan's async_tx / DMAengine tree?
+>         if (espi->tx == 0 && espi->rx == 0)
+>                 espi->fifo_level = 0;
 
-I think those are the ones which need your Acked-by to proceed.
+can be
 
-If you have some other idea of how these patches should be twisted
-around please let me know!
+         if (espi->tx == 0)
+                 espi->fifo_level = 0;
 
-Yours,
-Linus Walleij
+,
+
+>         while ((ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_RNE) &&
+>                 espi->rx < t->len) {
+
+         while ((ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_RNE)) {
+
+and
+
+>         /* is transfer finished? */
+>         if (espi->tx == t->len && espi->rx == t->len) {
+
+         if (espi->rx == t->len) {
+
+Cheers!
+
+    M
