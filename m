@@ -1,56 +1,379 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Apr 2010 18:23:58 +0100
-Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
-Message-ID: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 13 Apr 2010 01:32:24 +0800
+Subject: [PATCH 3/4] ASoC: support pxa168 ssp in ASoC
+In-Reply-To: <n2i771cded01003310548t228e55d2p885a67333d259bea@mail.gmail.com>
+References: <n2i771cded01003310548t228e55d2p885a67333d259bea@mail.gmail.com>
+Message-ID: <w2of17812d71004121032sc7a613a1u9d48c8b460298f0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linux expects that if a CPU modifies a memory location, then that
-modification will eventually become visible to other CPUs in the system.
+On Wed, Mar 31, 2010 at 8:48 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 76dcbf165f72a620d8460fc43351179388fcb440 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 17 Mar 2010 17:31:04 -0400
+> Subject: [PATCH] ASoC: support pxa168 ssp in ASoC
+>
+> Support pxa168 ssp in ASoC. The SSP bit clock mechanism is totally different
+> from pxa2xx series.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/include/mach/regs-mpmu.h | ? 48 ++++++++
+> ?sound/soc/pxa/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +-
+> ?sound/soc/pxa/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?2 +
+> ?sound/soc/pxa/pxa168-ssp.c ? ? ? ? ? ? ? ? | ?166 ++++++++++++++++++++++++++++
+> ?sound/soc/pxa/pxa168-ssp.h ? ? ? ? ? ? ? ? | ? 64 +++++++++++
+> ?5 files changed, 285 insertions(+), 1 deletions(-)
+> ?create mode 100644 arch/arm/mach-mmp/include/mach/regs-mpmu.h
+> ?create mode 100644 sound/soc/pxa/pxa168-ssp.c
+> ?create mode 100644 sound/soc/pxa/pxa168-ssp.h
+>
+> diff --git a/arch/arm/mach-mmp/include/mach/regs-mpmu.h
+> b/arch/arm/mach-mmp/include/mach/regs-mpmu.h
+> new file mode 100644
+> index 0000000..0d57236
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/include/mach/regs-mpmu.h
+> @@ -0,0 +1,48 @@
+> +/*
+> + * linux/arch/arm/mach-mmp/include/mach/regs-mpmu.h
+> + *
+> + * ? Main Power Management Unit
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_MACH_REGS_MPMU_H
+> +#define __ASM_MACH_REGS_MPMU_H
+> +
+> +#include <mach/addr-map.h>
+> +
+> +#define MPMU_VIRT_BASE (APB_VIRT_BASE + 0x50000)
+> +#define MPMU_REG(off) ?(MPMU_VIRT_BASE + (off))
+> +
+> +#define MPMU_CPCR ? ? ?MPMU_REG(0x0000)
+> +#define MPMU_FCCR ? ? ?MPMU_REG(0x0008)
+> +#define MPMU_POCR ? ? ?MPMU_REG(0x000c)
+> +#define MPMU_POSR ? ? ?MPMU_REG(0x0010)
+> +#define MPMU_SUCCR ? ? MPMU_REG(0x0014)
+> +#define MPMU_VRCR ? ? ?MPMU_REG(0x0018)
+> +#define MPMU_OHCR ? ? ?MPMU_REG(0x001c)
+> +#define MPMU_GPCR ? ? ?MPMU_REG(0x0030)
+> +#define MPMU_PLL2CR ? ?MPMU_REG(0x0034)
+> +#define MPMU_SCCR ? ? ?MPMU_REG(0x0038)
+> +#define MPMU_CWUCRM ? ?MPMU_REG(0x004c)
+> +#define MPMU_PLL1_REG1 MPMU_REG(0x0050)
+> +#define MPMU_PLL1_REG2 MPMU_REG(0x0054)
+> +#define MPMU_PLL1_SSC ?MPMU_REG(0x0058)
+> +#define MPMU_PLL2_REG1 MPMU_REG(0x0060)
+> +#define MPMU_PLL2_REG2 MPMU_REG(0x0064)
+> +#define MPMU_PLL2_SSC ?MPMU_REG(0x0068)
+> +#define MPMU_TS ? ? ? ? ? ? ? ?MPMU_REG(0x0080)
+> +#define MPMU_WDTPCR ? ?MPMU_REG(0x0200)
+> +#define MPMU_APCR ? ? ?MPMU_REG(0x1000)
+> +#define MPMU_APSR ? ? ?MPMU_REG(0x1004)
+> +#define MPMU_APRR ? ? ?MPMU_REG(0x1020)
+> +#define MPMU_ACGR ? ? ?MPMU_REG(0x1024)
+> +#define MPMU_ARSR ? ? ?MPMU_REG(0x1028)
+> +#define MPMU_AWUCRS ? ?MPMU_REG(0x1048)
+> +#define MPMU_AWUCRM ? ?MPMU_REG(0x104c)
+> +#define MPMU_ASYSDR ? ?MPMU_REG(0x1050)
+> +#define MPMU_ASSPDR ? ?MPMU_REG(0x1054)
+> +
+> +#endif /* __ASM_MACH_REGS_APMU_H */
+> diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+> index 7be1d5f..286d52a 100644
+> --- a/sound/soc/pxa/Kconfig
+> +++ b/sound/soc/pxa/Kconfig
+> @@ -1,6 +1,6 @@
+> ?config SND_PXA2XX_SOC
+> ? ? ? ?tristate "SoC Audio for the Intel PXA2xx chip"
+> - ? ? ? depends on ARCH_PXA
+> + ? ? ? depends on ARCH_PXA || ARCH_MMP
+> ? ? ? ?select SND_PXA2XX_LIB
+> ? ? ? ?help
+> ? ? ? ? ?Say Y or M if you want to add support for codecs attached to
+> @@ -25,6 +25,10 @@ config SND_PXA2XX_SOC_SSP
+> ? ? ? ?tristate
+> ? ? ? ?select PXA_SSP
+>
+> +config SND_PXA168_SOC_SSP
+> + ? ? ? tristate
+> + ? ? ? select PXA_SSP
+> +
+> ?config SND_PXA2XX_SOC_CORGI
+> ? ? ? ?tristate "SoC Audio support for Sharp Zaurus SL-C7x0"
+> ? ? ? ?depends on SND_PXA2XX_SOC && PXA_SHARP_C7xx
+> diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
+> index 33c1579..a74e6c9 100644
+> --- a/sound/soc/pxa/Makefile
+> +++ b/sound/soc/pxa/Makefile
+> @@ -3,11 +3,13 @@ snd-soc-pxa2xx-objs := pxa2xx-pcm.o
+> ?snd-soc-pxa2xx-ac97-objs := pxa2xx-ac97.o
+> ?snd-soc-pxa2xx-i2s-objs := pxa2xx-i2s.o
+> ?snd-soc-pxa2xx-ssp-objs := pxa-ssp.o pxa2xx-ssp.o
+> +snd-soc-pxa168-ssp-objs := pxa-ssp.o pxa168-ssp.o
+>
+> ?obj-$(CONFIG_SND_PXA2XX_SOC) += snd-soc-pxa2xx.o
+> ?obj-$(CONFIG_SND_PXA2XX_SOC_AC97) += snd-soc-pxa2xx-ac97.o
+> ?obj-$(CONFIG_SND_PXA2XX_SOC_I2S) += snd-soc-pxa2xx-i2s.o
+> ?obj-$(CONFIG_SND_PXA2XX_SOC_SSP) += snd-soc-pxa2xx-ssp.o
+> +obj-$(CONFIG_SND_PXA168_SOC_SSP) += snd-soc-pxa168-ssp.o
+>
+> ?# PXA Machine Support
+> ?snd-soc-corgi-objs := corgi.o
+> diff --git a/sound/soc/pxa/pxa168-ssp.c b/sound/soc/pxa/pxa168-ssp.c
+> new file mode 100644
+> index 0000000..d28d18a
+> --- /dev/null
+> +++ b/sound/soc/pxa/pxa168-ssp.c
+> @@ -0,0 +1,166 @@
+> +/*
+> + * pxa168-ssp.c ?-- ?ALSA Soc Audio Layer
+> + *
+> + * Copyright 2009-2010 Marvell International Ltd.
+> + * ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
+> + *
+> + * ?This program is free software; you can redistribute ?it and/or modify it
+> + * ?under ?the terms of ?the GNU General ?Public License as published by the
+> + * ?Free Software Foundation; ?either version 2 of the ?License, or (at your
+> + * ?option) any later version.
+> + *
+> + * TODO:
+> + * ?o Test network mode
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +
+> +#include <sound/core.h>
+> +#include <sound/soc.h>
+> +#include <sound/pcm.h>
+> +#include <sound/pcm_params.h>
+> +#include <sound/pxa2xx-lib.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/dma.h>
+> +#include <mach/regs-apbc.h>
+> +#include <mach/regs-apmu.h>
+> +#include <mach/regs-mpmu.h>
+> +#include <plat/ssp.h>
+> +
+> +#include "pxa2xx-pcm.h"
+> +#include "pxa168-ssp.h"
+> +#include "pxa-ssp.h"
+> +
+> +/*
+> + * Set the SSP ports SYSCLK only from Audio SYSCLK.
+> + */
+> +static int pxa168_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int freq, int dir)
+> +{
+> + ? ? ? struct ssp_priv *priv = cpu_dai->private_data;
+> + ? ? ? struct ssp_device *ssp = priv->ssp;
+> + ? ? ? unsigned int sscr0, data, asysdr, asspdr;
+> +
+> + ? ? ? dev_dbg(&ssp->pdev->dev, "%s id: %d, clk_id %d, freq %u\n",
+> + ? ? ? ? ? ? ? __func__, cpu_dai->id, clk_id, freq);
+> +
+> + ? ? ? /* freq is the index of mclk_conf table */
+> + ? ? ? if ((freq < 0) || (freq >= ARRAY_SIZE(mclk_conf))) {
+> + ? ? ? ? ? ? ? dev_warn(&ssp->pdev->dev, "Wrong frequency index:%d\n", freq);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> + ? ? ? asysdr = (mclk_conf[freq].mclk_num << 16)
+> + ? ? ? ? ? ? ? | mclk_conf[freq].mclk_denom;
+> + ? ? ? asspdr = 0;
+> + ? ? ? /* If ASYSCLK is supplied by pxa168, ASSPDR should be configured. */
+> + ? ? ? if (dir == SND_SOC_CLOCK_OUT)
+> + ? ? ? ? ? ? ? asspdr = (mclk_conf[freq].bclk_num << 16)
+> + ? ? ? ? ? ? ? ? ? ? ? | mclk_conf[freq].bclk_denom;
+> +
+> + ? ? ? pxa_ssp_disable(ssp);
+> + ? ? ? clk_disable(ssp->clk); ? ? ? ? ? ? ? ? ?/* SSP port internal clock */
+> +
+> + ? ? ? /* clear ECS, NCS, MOD, ACS */
+> + ? ? ? sscr0 = pxa_ssp_read_reg(ssp, SSCR0);
+> + ? ? ? data = sscr0 & ~(SSCR0_ECS | SSCR0_NCS | SSCR0_MOD | SSCR0_ACS);
+> + ? ? ? if (sscr0 != data)
+> + ? ? ? ? ? ? ? pxa_ssp_write_reg(ssp, SSCR0, data);
+> +
+> + ? ? ? /* update divider register in MPMU */
+> + ? ? ? __raw_writel(asysdr, MPMU_ASYSDR);
+> + ? ? ? __raw_writel(asspdr, MPMU_ASSPDR);
+> +
+> + ? ? ? clk_enable(ssp->clk); ? ? ? ? ? ? ? ? ? /* SSP port internal clock */
+> + ? ? ? pxa_ssp_enable(ssp);
+> + ? ? ? return 0;
+> +}
+> +
+> +static int pxa168_ssp_hw_free(struct snd_pcm_substream *substream,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct snd_soc_dai *dai)
+> +{
+> + ? ? ? struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> + ? ? ? struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
+> + ? ? ? struct ssp_priv *priv = cpu_dai->private_data;
+> + ? ? ? struct ssp_device *ssp = priv->ssp;
+> +
+> + ? ? ? pxa_ssp_disable(ssp);
+> + ? ? ? /* update divider register in MPMU */
+> + ? ? ? __raw_writel(0, MPMU_ASYSDR);
+> + ? ? ? __raw_writel(0, MPMU_ASSPDR);
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct snd_soc_dai_ops pxa168_ssp_dai_ops = {
+> + ? ? ? .hw_free ? ? ? ?= pxa168_ssp_hw_free,
+> + ? ? ? .set_sysclk ? ? = pxa168_ssp_set_dai_sysclk,
+> +};
+> +
+> +#define PXA168_SSP_RATES ? ? ? SNDRV_PCM_RATE_8000_96000
+> +#define PXA168_SSP_FORMATS ? ? (SNDRV_PCM_FMTBIT_S16_LE | ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_FMTBIT_S24_LE | ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_FMTBIT_S32_LE)
+> +
+> +#define PXA168_SSP_DAI(_id) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? .name ? = "pxa168-ssp", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? .id ? ? = _id, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? .playback = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? .channels_min = 1, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .channels_max = 2, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .rates = PXA168_SSP_RATES, ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .formats = PXA168_SSP_FORMATS, ? ? ? ? ? ? ? ? ?\
+> + ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? .capture = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .channels_min = 1, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .channels_max = 2, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .rates = PXA168_SSP_RATES, ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? .formats = PXA168_SSP_FORMATS, ? ? ? ? ? ? ? ? ?\
+> + ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? .ops = &pxa168_ssp_dai_ops, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> +}
+> +
+> +struct snd_soc_dai pxa168_ssp_dai[] = {
+> + ? ? ? PXA168_SSP_DAI(PXA168_DAI_SSP1),
+> + ? ? ? PXA168_SSP_DAI(PXA168_DAI_SSP2),
+> + ? ? ? PXA168_SSP_DAI(PXA168_DAI_SSP3),
+> + ? ? ? PXA168_SSP_DAI(PXA168_DAI_SSP4),
+> + ? ? ? PXA168_SSP_DAI(PXA168_DAI_SSP5),
+> +};
+> +EXPORT_SYMBOL_GPL(pxa168_ssp_dai);
+> +
+> +static int __init pxa168_ssp_init(void)
+> +{
+> + ? ? ? struct snd_soc_dai *dai;
+> + ? ? ? int i, ret;
+> +
+> + ? ? ? for (i = 0; i < ARRAY_SIZE(pxa168_ssp_dai); i++) {
+> + ? ? ? ? ? ? ? dai = &pxa168_ssp_dai[i];
+> + ? ? ? ? ? ? ? ret = pxa_ssp_register_dai(dai);
+> + ? ? ? ? ? ? ? if (ret)
+> + ? ? ? ? ? ? ? ? ? ? ? return ret;
+> + ? ? ? }
+> + ? ? ? return ret;
+> +}
+> +module_init(pxa168_ssp_init);
+> +
+> +static void __exit pxa168_ssp_exit(void)
+> +{
+> + ? ? ? struct snd_soc_dai *dai = NULL;
+> + ? ? ? int i;
+> +
+> + ? ? ? for (i = 0; i < ARRAY_SIZE(pxa168_ssp_dai); i++) {
+> + ? ? ? ? ? ? ? dai = &pxa168_ssp_dai[i];
+> + ? ? ? ? ? ? ? snd_soc_unregister_dai(dai);
+> + ? ? ? }
+> +}
+> +module_exit(pxa168_ssp_exit);
+> +
+> +/* Module information */
+> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
+> +MODULE_DESCRIPTION("PXA168 SSP SoC Interface");
+> +MODULE_LICENSE("GPL");
+> +
+> diff --git a/sound/soc/pxa/pxa168-ssp.h b/sound/soc/pxa/pxa168-ssp.h
+> new file mode 100644
+> index 0000000..bf73137
+> --- /dev/null
+> +++ b/sound/soc/pxa/pxa168-ssp.h
+> @@ -0,0 +1,64 @@
+> +/*
+> + * ASoC PXA168 SSP port support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef _PXA168_SSP_H
+> +#define _PXA168_SSP_H
+> +
+> +/* pxa DAI SSP IDs */
+> +#define PXA168_DAI_SSP1 ? ? ? ? ? ? ? ? ? ? ? ?0
+> +#define PXA168_DAI_SSP2 ? ? ? ? ? ? ? ? ? ? ? ?1
+> +#define PXA168_DAI_SSP3 ? ? ? ? ? ? ? ? ? ? ? ?2
+> +#define PXA168_DAI_SSP4 ? ? ? ? ? ? ? ? ? ? ? ?3
+> +#define PXA168_DAI_SSP5 ? ? ? ? ? ? ? ? ? ? ? ?4
+> +
+> +/* PXA168 SSP SYSCLK source */
+> +#define PXA168_ASYSCLK_MASTER ? ? ? ? ?0 ? ? ? /* ASYSCLK master -- pxa168 */
+> +#define PXA168_ASYSCLK_SLAVE ? ? ? ? ? 1 ? ? ? /* ASYSCLK slave -- pxa168 */
+> +
+> +struct pxa168_ssp_mclk {
+> + ? ? ? unsigned int ? ?rate;
+> + ? ? ? unsigned int ? ?format;
+> + ? ? ? unsigned int ? ?channel;
+> + ? ? ? unsigned int ? ?mclk;
+> + ? ? ? unsigned int ? ?mclk_denom;
+> + ? ? ? unsigned int ? ?mclk_num;
+> + ? ? ? unsigned int ? ?bclk;
+> + ? ? ? unsigned int ? ?bclk_denom;
+> + ? ? ? unsigned int ? ?bclk_num;
+> +};
+> +
+> +/*
+> + * This table is used while CPU is clock master.
+> + * MCLK = 312MHz * ASYSCLK_DENOM / ASYSCLK_NUM
+> + * BCLK = MCLK * SSPSCLK_DENOM / SSPSCLK_NUM
+> + */
+> +static const struct pxa168_ssp_mclk mclk_conf[] = {
+> + ? ? ? /* rate, fmt, chn, mclk, ? den, num, bclk, den, num */
+> + ? ? ? {96000, 16, 2, 12288000, ?64, 1625, 6144000, ?1, ?2},
+> + ? ? ? {96000, 16, 1, 12288000, ?64, 1625, 1536000, ?1, ?8},
+> + ? ? ? {88200, 16, 2, 11289600, 294, 8125, 5644800, ?1, ?2},
+> + ? ? ? {88200, 16, 1, 11289600, 294, 8125, 1411200, ?1, ?8},
+> + ? ? ? {48000, 16, 2, 12288000, ?64, 1625, 3072000, ?1, ?4},
+> + ? ? ? {48000, 16, 1, 12288000, ?64, 1625, ?768000, ?1, 16},
+> + ? ? ? {44100, 16, 2, 11289600, 294, 8125, 2822400, ?1, ?4},
+> + ? ? ? {44100, 16, 1, 11289600, 294, 8125, ?705600, ?1, 16},
+> + ? ? ? {32000, 16, 2, 12288000, ?64, 1625, 2048000, ?1, ?6},
+> + ? ? ? {32000, 16, 1, 12288000, ?64, 1625, ?512000, ?1, 24},
+> + ? ? ? {22050, 16, 2, 11289600, 294, 8125, 1411200, ?1, ?8},
+> + ? ? ? {22050, 16, 1, 11289600, 294, 8125, ?352800, ?1, 32},
+> + ? ? ? {16000, 16, 2, 12288000, ?64, 1625, 1024000, ?1, 12},
+> + ? ? ? {16000, 16, 1, 12288000, ?64, 1625, ?256000, ?1, 48},
+> + ? ? ? {11025, 16, 2, 11289600, 294, 8125, ?705600, ?1, 16},
+> + ? ? ? {11025, 16, 1, 11289600, 294, 8125, ?176400, ?1, 64},
+> + ? ? ? { 8000, 16, 2, 12288000, ?64, 1625, ?512000, ?1, 24},
+> + ? ? ? { 8000, 16, 1, 12288000, ?64, 1625, ?128000, ?1, 96},
+> +};
+> +
 
-On an ARM11MPCore processor, loads are prioritised over stores so it is
-possible for a store operation to be postponed if a polling loop immediately
-follows it. If the variable being polled indirectly depends on the outstanding
-store [for example, another CPU may be polling the variable that is pending
-modification] then there is the potential for deadlock if interrupts are
-disabled. This deadlock occurs in the KGDB testsuire when executing on an
-SMP ARM11MPCore configuration.
+It's not a good idea to have a static array in the header file. And as
+Mark pointed out in the comment to the later patch, this array and
+the related functions could be well placed into some common places.
+And I'm not sure if this applies to pxa910 as well, which could be
+well ended up in common.c or pxa{168,910}.c.
 
-This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
-forcing the write buffer to drain while inside a polling loop on an SMP system.
-If the Kernel is not compiled for SMP support, this will expand to a barrier()
-as before.
-
-Cc: KGDB Mailing List <kgdb-bugreport@lists.sourceforge.net>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Jason Wessel <jason.wessel@windriver.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/processor.h |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index 6a89567..da2078e 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -91,7 +91,16 @@ extern void release_thread(struct task_struct *);
- 
- unsigned long get_wchan(struct task_struct *p);
- 
-+#if __LINUX_ARM_ARCH__ == 6
-+/*
-+ * The store buffer on ARM11MPCore is not guaranteed to drain when the CPU
-+ * is performing aggresive loads. This is usually the case in a polling loop,
-+ * so we add a memory barrier to allow any pending stores to complete.
-+ */
-+#define cpu_relax()			smp_mb()
-+#else
- #define cpu_relax()			barrier()
-+#endif
- 
- /*
-  * Create a new kernel thread
--- 
-1.6.3.3
+> +extern struct snd_soc_dai pxa168_ssp_dai[];
+> +
+> +#endif
+> --
+> 1.5.6.5
+>
