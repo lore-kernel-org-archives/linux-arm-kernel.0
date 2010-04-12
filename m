@@ -1,21 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Apr 2010 22:05:21 +0100
-Subject: [RFC 09/10] arm: implement reserve memory early parameter
-In-Reply-To: <9c79bfd3046abe3165a79b6ef10c1938c455fa71.1269854500.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
-	<9c79bfd3046abe3165a79b6ef10c1938c455fa71.1269854500.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <20100412210521.GW3048@n2100.arm.linux.org.uk>
+Date: Mon, 12 Apr 2010 22:11:15 +0100
+Subject: [PATCH] arm: mm: Don't free prohibited memmap entries
+In-Reply-To: <4BBBD2CD.2010205@codeaurora.org>
+References: <> <1270506861-14461-1-git-send-email-mbohan@codeaurora.org>
+	<20100406220817.GE12831@n2100.arm.linux.org.uk>
+	<4BBBD2CD.2010205@codeaurora.org>
+Message-ID: <20100412211115.GX3048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 29, 2010 at 12:26:35PM +0300, Mika Westerberg wrote:
-> Implemented mem=size$start early parameter which makes it possible to reserve
-> some memory from the kernel. This can be used for dump capture kernels to
-> preserve any memory used by the primary kernel.
+On Tue, Apr 06, 2010 at 05:33:17PM -0700, Michael Bohan wrote:
+> On 4/6/2010 3:08 PM, Russell King - ARM Linux wrote:
+>> 1. are you enabling ARCH_HAS_HOLES_MEMORYMODEL ?
+>>    
+>
+> Yes, although this does not impact the problem I'm dealing with.  That  
+> option is only used for /proc/pagetypeinfo currently.  It would be good  
+> if we could consolidate ARCH_HAS_HOLES_MEMORYMODEL and HOLES_IN_ZONE,  
+> but that may be out of scope for this change.
+>
+>> 2. where does it try to access these page structs without trying
+>>     pfn_valid() to check whether a page struct exists first?
+>>    
+>
+> The specific piece of code that is causing crashes in my scenario is in  
+> vm/page_alloc.c:move_freepages(), called from move_freepages_block().   
+> The code in move_freepages_block aligns the end_pfn to the closest page  
+> block, which may take us to invalid memmap entries.
+>
+> The macro that conditionally saves us in this case is the  
+> pfn_valid_within(), called from move_freepages().  If HOLES_IN_ZONE is  
+> configured, this option calls down to pfn_valid() to make sure the page  
+> has a valid memmap entry.  There are likely other cases where this is an  
+> issue as well that I haven't run into.
 
-Please note that if we move ARM over to LMB, these patches will have to
-be redone.
+Well, there's two ways to look at this - either you should ensure
+that memory is available up to MAX_ORDER_NR_PAGES, possibly reducing
+this number of that's necessary to achive this.
 
-However, I'm not sure why this is required - it appears that x86 doesn't
-require this kind of feature.  Can you explain in more detail how this
-new parameter format would be used?
+Or, we need to have ARCH_HAS_HOLES_MEMORYMODEL needs to select
+HOLES_IN_ZONE so we get proper checking of PFNs - maybe conditional on
+MSM.  I think most users of ARCH_HAS_HOLES_MEMORYMODEL align memory to
+a power-of-two amount of memory, and so MAX_ORDER_NR_PAGES doesn't
+cause them a problem.
