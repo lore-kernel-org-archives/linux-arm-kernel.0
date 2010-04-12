@@ -1,20 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Apr 2010 19:43:13 +0100
-Subject: [RFC,PATCH] arm: use param address to establish params mapping
-In-Reply-To: <1270090784.325445.260542527481.1.gpush@pororo>
-References: <1270090784.325445.260542527481.1.gpush@pororo>
-Message-ID: <20100412184313.GE3048@n2100.arm.linux.org.uk>
+Date: Mon, 12 Apr 2010 19:44:10 +0100
+Subject: [PATCH] AT91: at91sam9g10 chip identification changed
+In-Reply-To: <1270115336-19488-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1270115336-19488-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20100412184410.GF3048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 01, 2010 at 10:59:44AM +0800, Jeremy Kerr wrote:
-> Currently, __create_page_tables assumes that the boot params are within
-> the first MB of physical memory, and creates a translation from the kernel
-> direct mapping region based on this assumption.
+On Thu, Apr 01, 2010 at 11:48:56AM +0200, Nicolas Ferre wrote:
+> A bit in the at91sam9g10 identification number changed between Engineering
+> Sample and final product. This patch will identify both as being at91sam9g10.
 > 
-> Rather than guessing, use the atags/params address instead. This also
-> means we don't have to rely on PHYS_ADDR to create the mapping.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-As we still potentially have boot loaders which don't pass a valid value
-in r2, can you please add some protection against random values being
-passed rather than assuming that it always contains a valid value?
+An ack from Andrew would be nice to have.
