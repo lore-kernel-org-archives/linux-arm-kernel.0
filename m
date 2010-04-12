@@ -1,34 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Apr 2010 20:12:11 +0100
-Subject: [PATCH 01/16] rtc: remove unused #include <linux/version.h>
-In-Reply-To: <1270727313-1212-1-git-send-email-weiyi.huang@gmail.com>
-References: <1270727313-1212-1-git-send-email-weiyi.huang@gmail.com>
-Message-ID: <20100412191211.GK3048@n2100.arm.linux.org.uk>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 12 Apr 2010 21:13:19 +0200
+Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
+In-Reply-To: <m2rf17812d71004121057n5131d025pb4965f45b61271f@mail.gmail.com>
+References: <1270390118-1802-1-git-send-email-w.sang@pengutronix.de>
+	<m2rf17812d71004121057n5131d025pb4965f45b61271f@mail.gmail.com>
+Message-ID: <20100412211319.5a43c65b@hyperion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Weiyi <weiyi.huang@gmail.com>
+On Tue, 13 Apr 2010 01:57:51 +0800, Eric Miao wrote:
+> On Sun, Apr 4, 2010 at 10:08 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> > The timeout value is in jiffies, so it should be using HZ, not a plain
+> > number. Assume '100' means 100ms here and adapt accordingly.
+> >
+> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > Cc: Eric Miao <eric.y.miao@gmail.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Marc Zyngier <maz@misterjones.org>
+> > Cc: Paul Shen <paul.shen@marvell.com>
+> > Cc: Mike Rapoport <mike@compulab.co.il>
+> > ---
+> >
+> > Janitorial fix, not tested due to no hardware.
+> >
+> > ?arch/arm/mach-pxa/viper.c | ? ?5 +++--
+> > ?1 files changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+> > index 1dd1334..c25921f 100644
+> > --- a/arch/arm/mach-pxa/viper.c
+> > +++ b/arch/arm/mach-pxa/viper.c
+> > @@ -33,6 +33,7 @@
+> > ?#include <linux/pm.h>
+> > ?#include <linux/sched.h>
+> > ?#include <linux/gpio.h>
+> > +#include <linux/jiffies.h>
+> > ?#include <linux/i2c-gpio.h>
+> > ?#include <linux/serial_8250.h>
+> > ?#include <linux/smc91x.h>
+> > @@ -453,7 +454,7 @@ static struct i2c_gpio_platform_data i2c_bus_data = {
+> > ? ? ? ?.sda_pin = VIPER_RTC_I2C_SDA_GPIO,
+> > ? ? ? ?.scl_pin = VIPER_RTC_I2C_SCL_GPIO,
+> > ? ? ? ?.udelay ?= 10,
+> > - ? ? ? .timeout = 100,
+> > + ? ? ? .timeout = HZ / 10,
+> > ?};
+> >
+> > ?static struct platform_device i2c_bus_device = {
+> > @@ -778,7 +779,7 @@ static void __init viper_tpm_init(void)
+> > ? ? ? ? ? ? ? ?.sda_pin = VIPER_TPM_I2C_SDA_GPIO,
+> > ? ? ? ? ? ? ? ?.scl_pin = VIPER_TPM_I2C_SCL_GPIO,
+> > ? ? ? ? ? ? ? ?.udelay ?= 10,
+> > - ? ? ? ? ? ? ? .timeout = 100,
+> > + ? ? ? ? ? ? ? .timeout = HZ / 10,
+> > ? ? ? ?};
+> > ? ? ? ?char *errstr;
+> >
+> 
+> One other better and cleaner approach to such inconsistency issue is
+> to have a timeout_ms field, and having i2c-gpio.c driver to convert this
+> to jiffies using msec_to_jiffies() at run-time.
 
-Remove unused #include <linux/version.h>('s) in
-  drivers/rtc/rtc-pl031.c
+With what benefit? Expressing time values in units of HZ is very
+frequent in the kernel code and shouldn't actually surprise anyone.
 
-Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/rtc/rtc-pl031.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 3587d99..cfbe129 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -23,7 +23,6 @@
- #include <linux/io.h>
- #include <linux/bcd.h>
- #include <linux/delay.h>
--#include <linux/version.h>
- #include <linux/slab.h>
- 
- /*
 -- 
-1.6.1.3
+Jean Delvare
