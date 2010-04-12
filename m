@@ -1,32 +1,46 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Mon, 12 Apr 2010 17:55:38 +0200
-Subject: [PATCH] atmel_serial: Atmel RS485 support v2
-In-Reply-To: <20100412094328.GA18182@frolo.macqel>
-References: <20100412094328.GA18182@frolo.macqel>
-Message-ID: <4BC3427A.2030801@evidence.eu.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Apr 2010 11:36:20 -0400 (EDT)
+Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
+In-Reply-To: <w2hc70ff3ad1004120056za5960033ja97e2046d17a7f24@mail.gmail.com>
+References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
+	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1003261144020.694@xanadu.home>
+	<alpine.LFD.2.00.1004111033010.7232@xanadu.home>
+	<w2hc70ff3ad1004120056za5960033ja97e2046d17a7f24@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1004121122050.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe De Muyter ha scritto:
-> On Wed, Feb 13, 2008 at 08:28:49AM +0000, Alan Cox wrote:
->   
->>> Thank you for the feedback.
->>>
->>> Let me know if this new version solves the above problems.
->>>       
->> Looks good to me. Thanks for the quick clean up.
->>     
->
-> Could someone add somewhere (Documentation, or usr/include/linux/serial.h)
-> a precise documentation of how this is to be used from user-space,
-> and implemented in other drivers ?
->   
+On Mon, 12 Apr 2010, saeed bishara wrote:
 
-I can add a short Documention/ file containing information about how to
-use ioctls with this driver.
+> Nico, thanks for the patch.
+> I've ported it for 2.6.32.9 kernel, can you have a look at the
+> attached patch?
 
-I'll add the document when I'll submit the final patch.
+That patch is bad.
 
-Regards,
+|diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+|index b9590a7..5286d71 100644
+|--- a/arch/arm/mm/dma-mapping.c
+|+++ b/arch/arm/mm/dma-mapping.c
+|@@ -602,6 +602,11 @@ static void dma_cache_maint_contiguous(struct page *page, unsigned long offset,
+| 			vaddr += offset;
+| 			inner_op(vaddr, vaddr + size);
+| 			kunmap_high(page);
+|+		} else if (cache_is_vipt()) {
+|+			pte_t saved_pte;
+|+			vaddr = kmap_high_l1_vipt(page, &saved_pte);
+|+			inner_op(vaddr, vaddr + size);
+|+			kunmap_high_l1_vipt(page, saved_pte);
+| 		}
+| 	}
 
-            Claudio
+You should add 'offset' to 'vaddr' before passing it to inner_op(), just 
+like it is done 6 lines above it.
+
+Also you left out the addition of the unconditional flush in 
+v6_copy_user_highpage_nonaliasing() which is needed now that 
+kunmap_atomic() doesn't flush the cache anymore on ARMv6.
+
+
+Nicolas
