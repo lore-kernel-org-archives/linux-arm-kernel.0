@@ -1,81 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Apr 2010 20:20:10 +0100
-Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
-In-Reply-To: <20100412211319.5a43c65b@hyperion.delvare>
-References: <1270390118-1802-1-git-send-email-w.sang@pengutronix.de>
-	<m2rf17812d71004121057n5131d025pb4965f45b61271f@mail.gmail.com>
-	<20100412211319.5a43c65b@hyperion.delvare>
-Message-ID: <20100412192010.GM3048@n2100.arm.linux.org.uk>
+Date: Mon, 12 Apr 2010 20:23:45 +0100
+Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
+In-Reply-To: <n2n63386a3d1004110713w74a16713g13f32219b610d3a6@mail.gmail.com>
+References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
+	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
+	<n2n63386a3d1004110713w74a16713g13f32219b610d3a6@mail.gmail.com>
+Message-ID: <20100412192345.GN3048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 12, 2010 at 09:13:19PM +0200, Jean Delvare wrote:
-> On Tue, 13 Apr 2010 01:57:51 +0800, Eric Miao wrote:
-> > On Sun, Apr 4, 2010 at 10:08 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> > > The timeout value is in jiffies, so it should be using HZ, not a plain
-> > > number. Assume '100' means 100ms here and adapt accordingly.
-> > >
-> > > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > > Cc: Eric Miao <eric.y.miao@gmail.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Marc Zyngier <maz@misterjones.org>
-> > > Cc: Paul Shen <paul.shen@marvell.com>
-> > > Cc: Mike Rapoport <mike@compulab.co.il>
-> > > ---
-> > >
-> > > Janitorial fix, not tested due to no hardware.
-> > >
-> > > ?arch/arm/mach-pxa/viper.c | ? ?5 +++--
-> > > ?1 files changed, 3 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-> > > index 1dd1334..c25921f 100644
-> > > --- a/arch/arm/mach-pxa/viper.c
-> > > +++ b/arch/arm/mach-pxa/viper.c
-> > > @@ -33,6 +33,7 @@
-> > > ?#include <linux/pm.h>
-> > > ?#include <linux/sched.h>
-> > > ?#include <linux/gpio.h>
-> > > +#include <linux/jiffies.h>
-> > > ?#include <linux/i2c-gpio.h>
-> > > ?#include <linux/serial_8250.h>
-> > > ?#include <linux/smc91x.h>
-> > > @@ -453,7 +454,7 @@ static struct i2c_gpio_platform_data i2c_bus_data = {
-> > > ? ? ? ?.sda_pin = VIPER_RTC_I2C_SDA_GPIO,
-> > > ? ? ? ?.scl_pin = VIPER_RTC_I2C_SCL_GPIO,
-> > > ? ? ? ?.udelay ?= 10,
-> > > - ? ? ? .timeout = 100,
-> > > + ? ? ? .timeout = HZ / 10,
-> > > ?};
-> > >
-> > > ?static struct platform_device i2c_bus_device = {
-> > > @@ -778,7 +779,7 @@ static void __init viper_tpm_init(void)
-> > > ? ? ? ? ? ? ? ?.sda_pin = VIPER_TPM_I2C_SDA_GPIO,
-> > > ? ? ? ? ? ? ? ?.scl_pin = VIPER_TPM_I2C_SCL_GPIO,
-> > > ? ? ? ? ? ? ? ?.udelay ?= 10,
-> > > - ? ? ? ? ? ? ? .timeout = 100,
-> > > + ? ? ? ? ? ? ? .timeout = HZ / 10,
-> > > ? ? ? ?};
-> > > ? ? ? ?char *errstr;
-> > >
-> > 
-> > One other better and cleaner approach to such inconsistency issue is
-> > to have a timeout_ms field, and having i2c-gpio.c driver to convert this
-> > to jiffies using msec_to_jiffies() at run-time.
+On Sun, Apr 11, 2010 at 04:13:39PM +0200, Linus Walleij wrote:
+> Russell,
 > 
-> With what benefit? Expressing time values in units of HZ is very
-> frequent in the kernel code and shouldn't actually surprise anyone.
+> are you OK with pushing these patches from this series:
+> 
+> patch 01 - <linux/amba/dma.h>
+> patch 08 - DMA for drivers/serial/amba-pl011.c
+> 
+> through Dan's async_tx / DMAengine tree?
+> 
+> I think those are the ones which need your Acked-by to proceed.
+> 
+> If you have some other idea of how these patches should be twisted
+> around please let me know!
 
-Actually, this patch shows there is confusion.
-
-"Assume '100' means 100ms here and adapt accordingly."
-
-Since this patch is for ARM, where HZ=100, the above patch is not a
-simple "convert how we derive this constant" patch - it's a functional
-change, reducing the timeouts by a factor of 10.
-
-Could that be because the patch author misinterpreted the HZ-based
-values?
-
-I suspect I'm not the only one who thinks that the latter of "HZ / 10"
-"100ms" is easier to read and comprehend without mistake.
+I do think it would be of value for someone to try to get this working
+on the Realview boards to ensure that these patches are well proven...
+unfortunately I don't have the bandwidth to do that at present.
