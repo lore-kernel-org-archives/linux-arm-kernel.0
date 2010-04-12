@@ -1,22 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 12 Apr 2010 11:37:02 +0100
-Subject: [alsa-devel] [PATCH 3/3] Zipit Z2 WM8750 aSoC driver
-In-Reply-To: <201004092348.23009.marek.vasut@gmail.com>
-References: <1270440005-25459-1-git-send-email-marek.vasut@gmail.com>
-	<20100405134228.GD6580@rakim.wolfsonmicro.main>
-	<1270476738.7419.4.camel@odin>
-	<201004092348.23009.marek.vasut@gmail.com>
-Message-ID: <20100412103701.GA32087@rakim.wolfsonmicro.main>
+From: amit.walambe@eurotech.com (Amit Walambe)
+Date: Mon, 12 Apr 2010 16:32:14 +0530
+Subject: [PATCH 1/2] ixp4xx: base support for Arcom Vulcan
+In-Reply-To: <20100412082224.08dadc09@taxman.wild-wind.fr.eu.org>
+References: <1270931559-9414-1-git-send-email-maz@misterjones.org>
+	<20100412112045.58dad272@ironhide>
+	<20100412082224.08dadc09@taxman.wild-wind.fr.eu.org>
+Message-ID: <20100412163214.7e31b171@ironhide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 09, 2010 at 11:48:22PM +0200, Marek Vasut wrote:
+Hi Marc,
+On Mon, 12 Apr 2010 08:22:24 +0100
+Marc Zyngier <maz@misterjones.org> wrote:
+> Actually, this port was done over the week-end *without* access to
+> Arcom/Eurotech's source code (the only thing I was able to download
+> from the Eurotech web site is the board documentation). I'm usually
+> extra careful when it comes to attributions... 
+Sorry, I wasn't aware of that. If you did it independently, then I
+don't think attribution is required at all.
 
-> Mark, can you apply this as well? Thanks
+> Some of the settings have been reverse-engineered from the bootloader
+> (the EXP_CS* timing section), and the rest is only based on the
+> documentation. That's probably why there is no PC/104 support yet
+> (still working on it).
+You are most welcome to borrow from the existing Vulcan port. If you
+would like to refer to it, please let me know. I will be glad to share
+the patches.
 
-Applied, thanks.  
-
-Stuff like this is one of the reasons it's better to send patches as new
-rather than as replies (and resend the whole series) - especially when
-you send many revisions of things it can be hard to track which versions
-are current.
+Thanks and regards,
+- Amit
