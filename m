@@ -1,72 +1,107 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 13 Apr 2010 07:04:01 +0800
-Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
-In-Reply-To: <20100412215326.GD6148@shareable.org>
-References: <20100412193943.GP3048@n2100.arm.linux.org.uk>
-	<20100412215326.GD6148@shareable.org>
-Message-ID: <l2jf17812d71004121604l403639bfr321d9e46050e037a@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 13 Apr 2010 08:53:16 +0900
+Subject: [PATCH] MAINTAINERS: arch/arm/s3c and arch/arm/s5p
+In-Reply-To: <1271102450.2131.27.camel@Joe-Laptop.home>
+References: <cover.1269655208.git.joe@perches.com>
+	<0c97f736400ec243e71ba794ae7046a61d2449c1.1269655208.git.joe@perches.com>
+	<20100412194737.GS3048@n2100.arm.linux.org.uk>
+	<1271102450.2131.27.camel@Joe-Laptop.home>
+Message-ID: <h2p9c9fda241004121653te938caa2u42e39c31f27e85e1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 5:53 AM, Jamie Lokier <jamie@shareable.org> wrote:
-> Russell King - ARM Linux wrote:
->> On Mon, Apr 12, 2010 at 09:32:35PM +0200, Jean Delvare wrote:
->> > On Mon, 12 Apr 2010 20:20:10 +0100, Russell King - ARM Linux wrote:
->> > > On Mon, Apr 12, 2010 at 09:13:19PM +0200, Jean Delvare wrote:
->> > > > On Tue, 13 Apr 2010 01:57:51 +0800, Eric Miao wrote:
->> > > > > One other better and cleaner approach to such inconsistency issue is
->> > > > > to have a timeout_ms field, and having i2c-gpio.c driver to convert this
->> > > > > to jiffies using msec_to_jiffies() at run-time.
->> > > >
->> > > > With what benefit? Expressing time values in units of HZ is very
->> > > > frequent in the kernel code and shouldn't actually surprise anyone.
->> > >
->> > > Actually, this patch shows there is confusion.
->> > >
->> > > "Assume '100' means 100ms here and adapt accordingly."
->> > >
->> > > Since this patch is for ARM, where HZ=100, the above patch is not a
->> > > simple "convert how we derive this constant" patch - it's a functional
->> > > change, reducing the timeouts by a factor of 10.
->> > >
->> > > Could that be because the patch author misinterpreted the HZ-based
->> > > values?
->> >
->> > I admit I would have assumed 100 -> HZ, as hard-coded HZ-dependent
->> > value typically assume HZ=100.
->> >
->> > > I suspect I'm not the only one who thinks that the latter of "HZ / 10"
->> > > "100ms" is easier to read and comprehend without mistake.
->> >
->> > OTOH, converting from ms to jiffies each time you need the value has a
->> > cost.
->>
->> True; what I did for MMC stuff is converted it from ms to jiffies at
->> initialization time when copying it in from platform data in the
->> driver's probe function.
->>
->> I'm not saying that I care either way, I'm merely showing that dealing
->> with HZ-based values can be (maybe unexpectedly) more error prone.
->
-> HZ is used a lot in kernel timeouts, so even though it's confusing, it
-> is something everyone ought to get used to.
+Hi,
 
-I don't understand why people has to live with confusions where there is
-apparently a cleaner way to go. HZ is everywhere, and as long as they
-live within their own driver code, that's OK.
+On Tue, Apr 13, 2010 at 5:00 AM, Joe Perches <joe@perches.com> wrote:
+> On Mon, 2010-04-12 at 20:47 +0100, Russell King - ARM Linux wrote:
+>> This is Samsung stuff, it should be copied to Ben (added).
+>
+> Maybe this is appropriate?
+
+No, s5p stubs are maintained by Samsung.
+Of course Ben work on core part together, e.g., clock, interrupt.
+
+Most s5pc1XX are done by Marek and Kyungmin Park except plat-samsung.
+common part of Samsung SoCs.
+
+Thank you,
+Kyungmin Park
 
 >
-> But I agree it is too confusing. ?An obvious remedy is:
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+> ?MAINTAINERS | ? 40 ++++++++--------------------------------
+> ?1 files changed, 8 insertions(+), 32 deletions(-)
 >
-> #define milliseconds(ms) (((ms) * HZ + 999) / 1000)
-> #define seconds(s) ? ? ? ((s) * HZ)
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7a9ccda..5a0d6ef 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -902,48 +902,24 @@ W: ? ? ? ?http://www.fluff.org/ben/linux/
+> ?S: ? ? Maintained
+> ?F: ? ? arch/arm/plat-s3c/
+> ?F: ? ? arch/arm/plat-s3c24xx/
+> +F: ? ? arch/arm/plat-samsung/
 >
+> -ARM/S3C2410 ARM ARCHITECTURE
+> +ARM/S3Cxxxx ARM ARCHITECTURE
+> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
+> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> ?W: ? ? http://www.fluff.org/ben/linux/
+> ?S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c2410/
+> -
+> -ARM/S3C2440 ARM ARCHITECTURE
+> -M: ? ? Ben Dooks <ben-linux@fluff.org>
+> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -W: ? ? http://www.fluff.org/ben/linux/
+> -S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c2440/
+> -
+> -ARM/S3C2442 ARM ARCHITECTURE
+> -M: ? ? Ben Dooks <ben-linux@fluff.org>
+> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -W: ? ? http://www.fluff.org/ben/linux/
+> -S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c2442/
+> -
+> -ARM/S3C2443 ARM ARCHITECTURE
+> -M: ? ? Ben Dooks <ben-linux@fluff.org>
+> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -W: ? ? http://www.fluff.org/ben/linux/
+> -S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c2443/
+> -
+> -ARM/S3C6400 ARM ARCHITECTURE
+> -M: ? ? Ben Dooks <ben-linux@fluff.org>
+> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -W: ? ? http://www.fluff.org/ben/linux/
+> -S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c6400/
+> +F: ? ? arch/arm/mach-s3c????/
+> +F: ? ? arch/arm/plat-s3c????/
+>
+> -ARM/S3C6410 ARM ARCHITECTURE
+> +ARM/S5Pxxxx ARM ARCHITECTURE
+> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
 
-This is to reinvent the wheel as there are already msecs_to_jiffies()
-and usecs_to_jiffies(), and vice versa. The only benefit of using macros
-instead of a function is for constants. This, however, can be worked
-around as Russell suggested. The additional run-time cost by this
-function, compared with a unit of jiffies, is insignificant.
+It should be Byungho Min but now changed to Marek and Kyungmin Park
 
-> -- Jamie
+> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> ?W: ? ? http://www.fluff.org/ben/linux/
+> ?S: ? ? Maintained
+> -F: ? ? arch/arm/mach-s3c6410/
+> +F: ? ? arch/arm/mach-s5p????/
+> +F: ? ? arch/arm/plat-s5p/
+> +F: ? ? arch/arm/plat-s5p????/
+>
+> ?ARM/SHMOBILE ARM ARCHITECTURE
+> ?M: ? ? Paul Mundt <lethal@linux-sh.org>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
