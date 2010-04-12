@@ -1,56 +1,27 @@
 From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 12 Apr 2010 22:53:26 +0100
-Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
-In-Reply-To: <20100412193943.GP3048@n2100.arm.linux.org.uk>
-Message-ID: <20100412215326.GD6148@shareable.org>
+Date: Mon, 12 Apr 2010 23:04:40 +0100
+Subject: [RFC PATCH v5 0/2] ARM: VFP: Save / restore VFP state on the
+	signal handler path
+In-Reply-To: <cover.1270199787.git.imre.deak@nokia.com>
+References: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
+	<cover.1270199787.git.imre.deak@nokia.com>
+Message-ID: <20100412220440.GF6148@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Apr 12, 2010 at 09:32:35PM +0200, Jean Delvare wrote:
-> > On Mon, 12 Apr 2010 20:20:10 +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Apr 12, 2010 at 09:13:19PM +0200, Jean Delvare wrote:
-> > > > On Tue, 13 Apr 2010 01:57:51 +0800, Eric Miao wrote:
-> > > > > One other better and cleaner approach to such inconsistency issue is
-> > > > > to have a timeout_ms field, and having i2c-gpio.c driver to convert this
-> > > > > to jiffies using msec_to_jiffies() at run-time.
-> > > > 
-> > > > With what benefit? Expressing time values in units of HZ is very
-> > > > frequent in the kernel code and shouldn't actually surprise anyone.
-> > > 
-> > > Actually, this patch shows there is confusion.
-> > > 
-> > > "Assume '100' means 100ms here and adapt accordingly."
-> > > 
-> > > Since this patch is for ARM, where HZ=100, the above patch is not a
-> > > simple "convert how we derive this constant" patch - it's a functional
-> > > change, reducing the timeouts by a factor of 10.
-> > > 
-> > > Could that be because the patch author misinterpreted the HZ-based
-> > > values?
-> > 
-> > I admit I would have assumed 100 -> HZ, as hard-coded HZ-dependent
-> > value typically assume HZ=100.
-> > 
-> > > I suspect I'm not the only one who thinks that the latter of "HZ / 10"
-> > > "100ms" is easier to read and comprehend without mistake.
-> > 
-> > OTOH, converting from ms to jiffies each time you need the value has a
-> > cost.
+imre.deak at nokia.com wrote:
+> From: Imre Deak <imre.deak@nokia.com>
 > 
-> True; what I did for MMC stuff is converted it from ms to jiffies at
-> initialization time when copying it in from platform data in the
-> driver's probe function.
-> 
-> I'm not saying that I care either way, I'm merely showing that dealing
-> with HZ-based values can be (maybe unexpectedly) more error prone.
+> Changes since v4:
+> - Do not add the packed attribute to user_vfp or user_vfp_exc.
+>   I added packed to these structs to prevent the extra padding in
+>   vfp_sigframe. But actually the padding is in accordance with the
+>   ARM ABI.
 
-HZ is used a lot in kernel timeouts, so even though it's confusing, it
-is something everyone ought to get used to.
+EABI, OABI or both?
 
-But I agree it is too confusing.  An obvious remedy is:
-
-#define milliseconds(ms) (((ms) * HZ + 999) / 1000)
-#define seconds(s)       ((s) * HZ)
+In general it's a really good idea, if you know there will be padding,
+to insert dummy fields where the padding goes so that it doesn't make
+any difference what compiler, ABI and settings are used.
 
 -- Jamie
