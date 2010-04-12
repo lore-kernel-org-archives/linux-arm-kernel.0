@@ -1,38 +1,35 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 12 Apr 2010 14:01:17 -0500
-Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
-In-Reply-To: <20100412184904.GG3048@n2100.arm.linux.org.uk>
-References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
-	<20100412184904.GG3048@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Apr 2010 20:10:07 +0100
+Subject: [PATCH 1/2] AT91 slow-clock suspend: don't wait when turning
+	PLLs off
+In-Reply-To: <w2ocd73a99e1004061427t322f8d4cmecd708ad16580f00@mail.gmail.com>
+References: <20100303213329.GA500@alarsen.net>
+	<w2ocd73a99e1004061427t322f8d4cmecd708ad16580f00@mail.gmail.com>
+Message-ID: <20100412191006.GJ3048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 12, 2010 11:49 AM, Russell King wrote:
-> On Thu, Apr 01, 2010 at 05:32:18PM -0500, H Hartley Sweeten wrote:
->> The ARCH_REQUIRE_GPIOLIB config option will select GPIOLIB which
->> in turn will select GENERIC_GPIO.  Because of this, there is no
->> reason to do the select GENERIC_GPIO in arch/arm/Kconfig for the
->> architectures that have ARCH_REQUIRE_GPIOLIB.
->
-> This kind of patch normally causes regular merge conflicts, which
-> historically have caused a repeated number of headaches - there's
-> a similar patch for GENERIC_TIME which is pending.
->
-> I suggest waiting until we're closer to the merge window than we
-> are at present; I'll bring my devel stuff to a freeze state before
-> hand so we can get these two patches merged - maybe around the
-> -rc7 release.
->
-> Please ping me closer to that.
+On Tue, Apr 06, 2010 at 11:27:55PM +0200, Andrew Victor wrote:
+> hi Anders,
+> 
+> > From: Julien Langer <julien.langer@gmail.com>
+> >
+> > AT91: when turning off the PLLs during suspend, don't wait for the lock flag
+> > to be set. Previously the code would always run into the loop limitation
+> > of 1000 iterations because the flag is never set when turning the PLLs off.
+> >
+> > Signed-off-by: Julien Langer <julien.langer@gmail.com>
+> > Signed-off-by: Anders Larsen <al@alarsen.net>
+> > Cc: Andrew Victor <avictor.za@gmail.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> During suspend we set the MULA and MULB bits to 0 to disable the
+> PLL's.  When disabled, the PLLs will never "lock".
+> 
+>    Acked-by: Andrew Victor <linux@maxim.org.za>
+> 
+> 
+> Russell:  This is patch 5975/1 in the patch-system.
 
-Will do.
-
-I just wanted to get this out there to make sure nobody saw any issues.
-
-I will hold this until around -rc7 as you requested and just collect any
-Ack's, etc., that show up.  Eric Miao has already sent an Acked-by that
-I will add then.
-
-Regards,
-Hartley
+Thanks; I see your ack has been added to that patch.  Should I assume that
+this is for -rc rather than -devel?
