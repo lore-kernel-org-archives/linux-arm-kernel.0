@@ -1,46 +1,56 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 12 Apr 2010 11:36:20 -0400 (EDT)
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <w2hc70ff3ad1004120056za5960033ja97e2046d17a7f24@mail.gmail.com>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1003261144020.694@xanadu.home>
-	<alpine.LFD.2.00.1004111033010.7232@xanadu.home>
-	<w2hc70ff3ad1004120056za5960033ja97e2046d17a7f24@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1004121122050.7232@xanadu.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Apr 2010 18:23:58 +0100
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+Message-ID: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Apr 2010, saeed bishara wrote:
+Linux expects that if a CPU modifies a memory location, then that
+modification will eventually become visible to other CPUs in the system.
 
-> Nico, thanks for the patch.
-> I've ported it for 2.6.32.9 kernel, can you have a look at the
-> attached patch?
+On an ARM11MPCore processor, loads are prioritised over stores so it is
+possible for a store operation to be postponed if a polling loop immediately
+follows it. If the variable being polled indirectly depends on the outstanding
+store [for example, another CPU may be polling the variable that is pending
+modification] then there is the potential for deadlock if interrupts are
+disabled. This deadlock occurs in the KGDB testsuire when executing on an
+SMP ARM11MPCore configuration.
 
-That patch is bad.
+This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+forcing the write buffer to drain while inside a polling loop on an SMP system.
+If the Kernel is not compiled for SMP support, this will expand to a barrier()
+as before.
 
-|diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-|index b9590a7..5286d71 100644
-|--- a/arch/arm/mm/dma-mapping.c
-|+++ b/arch/arm/mm/dma-mapping.c
-|@@ -602,6 +602,11 @@ static void dma_cache_maint_contiguous(struct page *page, unsigned long offset,
-| 			vaddr += offset;
-| 			inner_op(vaddr, vaddr + size);
-| 			kunmap_high(page);
-|+		} else if (cache_is_vipt()) {
-|+			pte_t saved_pte;
-|+			vaddr = kmap_high_l1_vipt(page, &saved_pte);
-|+			inner_op(vaddr, vaddr + size);
-|+			kunmap_high_l1_vipt(page, saved_pte);
-| 		}
-| 	}
+Cc: KGDB Mailing List <kgdb-bugreport@lists.sourceforge.net>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Jason Wessel <jason.wessel@windriver.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/processor.h |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-You should add 'offset' to 'vaddr' before passing it to inner_op(), just 
-like it is done 6 lines above it.
-
-Also you left out the addition of the unconditional flush in 
-v6_copy_user_highpage_nonaliasing() which is needed now that 
-kunmap_atomic() doesn't flush the cache anymore on ARMv6.
-
-
-Nicolas
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 6a89567..da2078e 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -91,7 +91,16 @@ extern void release_thread(struct task_struct *);
+ 
+ unsigned long get_wchan(struct task_struct *p);
+ 
++#if __LINUX_ARM_ARCH__ == 6
++/*
++ * The store buffer on ARM11MPCore is not guaranteed to drain when the CPU
++ * is performing aggresive loads. This is usually the case in a polling loop,
++ * so we add a memory barrier to allow any pending stores to complete.
++ */
++#define cpu_relax()			smp_mb()
++#else
+ #define cpu_relax()			barrier()
++#endif
+ 
+ /*
+  * Create a new kernel thread
+-- 
+1.6.3.3
