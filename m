@@ -1,72 +1,35 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 12 Apr 2010 11:39:05 +0200
-Subject: [RFC] IDLE/DEEP IDLE scheduler modification for power savings
-Message-ID: <000001cada24$01a5ee90$04f1cbb0$%majewski@samsung.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Mon, 12 Apr 2010 11:03:58 +0100
+Subject: [PATCH v2 1/3] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100410155443.GG2685@gw.healthdatacare.com>
+References: <cover.1268930557.git.mika.westerberg@iki.fi>
+	<56d259a01003250649ubf0e32ejc15e4f3b45ec43cd@mail.gmail.com>
+	<20100325184316.GB20512@gw.healthdatacare.com>
+	<s2n56d259a01003311715ke5b93a96v9d453ec32f08ec29@mail.gmail.com>
+	<20100406054418.GA27465@gw.healthdatacare.com>
+	<s2g56d259a01004060550me72bd64cr35e4a83c495d6909@mail.gmail.com>
+	<20100406181839.GA2685@gw.healthdatacare.com>
+	<x2r56d259a01004061428raffb32e9o1d42570c79c0ee56@mail.gmail.com>
+	<l2j56d259a01004091056i91598adub4201b47c4a86a90@mail.gmail.com>
+	<20100410155443.GG2685@gw.healthdatacare.com>
+Message-ID: <y2q56d259a01004120303wff208c27kf601a6b6699a48e9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+and
 
-I'd like to ask for comments and possible ways of solution for the following
-problem:
+-         if (espi->tx == 0 && espi->rx == 0)
+-                 espi->fifo_level = 0;
 
-Some SoCs allow for entering IDLE mode when they know that the system will
-be
-"inactive" for some time (to be more precise it will execute the idle task -
-which prepares system to enter IDLE state). In that mode CPU core is not
-active
-(CPU core is clock gated) and may be woken up by several interrupts. IDLE
-mode entering is already implemented in the kernel and works smoothly.
+since it's always created as 0 and is always reset to 0 by the end of a transfer
 
-It is also possible in some SoCs to go even further and use the DEEP IDLE
-mode, which (like in the case of Samsung) allows for power gating for
-several
-internal blocks (including CPU). In this state chip PLLs are disabled and
-several hundreds of microseconds are needed to restore the processor state
-after waking up. The benefit of this mode is that the power consumption of
-the system can be significantly reduced. One of the possible use cases of
-this mode is the Low Power Audio Player in conjunction with ALSA and
-kernel's
-CPU idle framework. However the waking up from this state may be performed
-with use of smaller number of the wake up sources when compared to ordinary
-IDLE state (because of power gating of SoC internal blocks).
+and if you like
 
-One approach to solve the problem, and therefore deliver power savings,
-is to modify the ALSA driver and provide a switch to inform the CPU IDLE
-framework that it should now use the DEEP IDLE instead of IDLE when entering
-the Low Power Audio playback mode is expected.  This change may be performed
-by replacing the method for entering the IDLE mode to DEEP IDLE. Moreover
-some sources immune to power gating (like e.g. RTC timer) have to be used
-for waking up. The biggest problem for this approach is the kernel's policy
-violation, that no user program should directly change scheduling/idle
-policy.
+          /* is transfer finished? */
+-         if (espi->tx == t->len && espi->rx == t->len) {
++         if (espi->fifo_level == 0) {
 
-In my humble opinion, maybe a better solution would be to add a new
-scheduling
-policy or modify the CFS scheduler to evaluate if the time for next task
-execution is bigger than the time needed to wake up (and restore the system 
-state) from DEEP IDLE (in my case it is more than several hundred
-microseconds).
-This approach would allow for using existing CFS scheduler framework (as it
-is 
-done  with implementation of CFS, or Real-Time policies) and prevent from
-threads 
-mentioned above (i.e. changing the CPU Idle framework with some "external" 
-switch). One more advantage is that the DEEP IDLE mode could be used not
-only 
-in the above use case (after properly prepared for DEEP IDLE drivers, but
-this 
-is another issue). This can bring extra power savings for battery operated 
-systems.
+to save a couple of instructions
 
-So what is your opinion about integrating use of the DEEP IDLE state mode
-in the scheduler (either as new scheduling policy or modifying scheduler
-code)?
-
-Any comments will be appreciated.
-
-Best regards,
-
-Lukasz Majewski
-Samsung Poland R&D Center
-Platform Group
+    M
