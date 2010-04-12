@@ -1,878 +1,1941 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Apr 2010 16:04:17 +0100
-Subject: [PATCH 2/6] ARM: perf-events: add support for xscale PMUs
-In-Reply-To: <1271084661-2305-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 12 Apr 2010 16:04:20 +0100
+Subject: [PATCH 5/6] ARM: oprofile: remove old files and update KConfig
+In-Reply-To: <1271084661-2305-5-git-send-email-will.deacon@arm.com>
 References: <1271084661-2305-1-git-send-email-will.deacon@arm.com>
 	<1271084661-2305-2-git-send-email-will.deacon@arm.com>
-Message-ID: <1271084661-2305-3-git-send-email-will.deacon@arm.com>
+	<1271084661-2305-3-git-send-email-will.deacon@arm.com>
+	<1271084661-2305-4-git-send-email-will.deacon@arm.com>
+	<1271084661-2305-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1271084661-2305-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf-events framework for ARM only supports v6 and v7 cores.
+Enable hardware perf-events if CPU_HAS_PMU and select
+HAVE_OPROFILE if HAVE_PERF_EVENTS. If no hardware support
+is present, oprofile will fall back to timer mode.
 
-This patch adds support for xscale v1 and v2 PMUs to perf, based on the
-OProfile drivers in arch/arm/oprofile/op_model_xscale.c
+This patch also removes the old OProfile drivers in favour
+of the code implemented by perf.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |  827 +++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 821 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig                        |   26 +--
+ arch/arm/oprofile/Makefile              |    7 +-
+ arch/arm/oprofile/backtrace.c           |   83 ------
+ arch/arm/oprofile/op_arm_model.h        |   35 ---
+ arch/arm/oprofile/op_counter.h          |   27 --
+ arch/arm/oprofile/op_model_arm11_core.c |  162 -----------
+ arch/arm/oprofile/op_model_arm11_core.h |   45 ---
+ arch/arm/oprofile/op_model_mpcore.c     |  306 ---------------------
+ arch/arm/oprofile/op_model_mpcore.h     |   61 -----
+ arch/arm/oprofile/op_model_v6.c         |   78 ------
+ arch/arm/oprofile/op_model_v7.c         |  415 -----------------------------
+ arch/arm/oprofile/op_model_v7.h         |  103 -------
+ arch/arm/oprofile/op_model_xscale.c     |  444 -------------------------------
+ 13 files changed, 3 insertions(+), 1789 deletions(-)
+ delete mode 100644 arch/arm/oprofile/backtrace.c
+ delete mode 100644 arch/arm/oprofile/op_arm_model.h
+ delete mode 100644 arch/arm/oprofile/op_counter.h
+ delete mode 100644 arch/arm/oprofile/op_model_arm11_core.c
+ delete mode 100644 arch/arm/oprofile/op_model_arm11_core.h
+ delete mode 100644 arch/arm/oprofile/op_model_mpcore.c
+ delete mode 100644 arch/arm/oprofile/op_model_mpcore.h
+ delete mode 100644 arch/arm/oprofile/op_model_v6.c
+ delete mode 100644 arch/arm/oprofile/op_model_v7.c
+ delete mode 100644 arch/arm/oprofile/op_model_v7.h
+ delete mode 100644 arch/arm/oprofile/op_model_xscale.c
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 10a0bcd..381f121 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -2108,6 +2108,803 @@ static u32 __init armv7_reset_read_pmnc(void)
- 	return nb_cnt + 1;
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5408bf..6a4c5f6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -13,7 +13,7 @@ config ARM
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+ 	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+-	select HAVE_OPROFILE
++	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_KPROBES if (!XIP_KERNEL)
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+@@ -175,28 +175,6 @@ config ARM_L1_CACHE_SHIFT_6
+ 	help
+ 	  Setting ARM L1 cache line size to 64 Bytes.
  
-+/*
-+ * ARMv5 [xscale] Performance counter handling code.
-+ *
-+ * Based on xscale OProfile code.
-+ *
-+ * There are two variants of the xscale PMU that we support:
-+ * 	- xscale1pmu: 2 event counters and a cycle counter
-+ * 	- xscale2pmu: 4 event counters and a cycle counter
-+ * The two variants share event definitions, but have different
-+ * PMU structures.
-+ */
-+
-+enum xscale_perf_types {
-+	XSCALE_PERFCTR_ICACHE_MISS		= 0x00,
-+	XSCALE_PERFCTR_ICACHE_NO_DELIVER	= 0x01,
-+	XSCALE_PERFCTR_DATA_STALL		= 0x02,
-+	XSCALE_PERFCTR_ITLB_MISS		= 0x03,
-+	XSCALE_PERFCTR_DTLB_MISS		= 0x04,
-+	XSCALE_PERFCTR_BRANCH			= 0x05,
-+	XSCALE_PERFCTR_BRANCH_MISS		= 0x06,
-+	XSCALE_PERFCTR_INSTRUCTION		= 0x07,
-+	XSCALE_PERFCTR_DCACHE_FULL_STALL	= 0x08,
-+	XSCALE_PERFCTR_DCACHE_FULL_STALL_CONTIG	= 0x09,
-+	XSCALE_PERFCTR_DCACHE_ACCESS		= 0x0A,
-+	XSCALE_PERFCTR_DCACHE_MISS		= 0x0B,
-+	XSCALE_PERFCTR_DCACHE_WRITE_BACK	= 0x0C,
-+	XSCALE_PERFCTR_PC_CHANGED		= 0x0D,
-+	XSCALE_PERFCTR_BCU_REQUEST		= 0x10,
-+	XSCALE_PERFCTR_BCU_FULL			= 0x11,
-+	XSCALE_PERFCTR_BCU_DRAIN		= 0x12,
-+	XSCALE_PERFCTR_BCU_ECC_NO_ELOG		= 0x14,
-+	XSCALE_PERFCTR_BCU_1_BIT_ERR		= 0x15,
-+	XSCALE_PERFCTR_RMW			= 0x16,
-+	/* XSCALE_PERFCTR_CCNT is not hardware defined */
-+	XSCALE_PERFCTR_CCNT			= 0xFE,
-+	XSCALE_PERFCTR_UNUSED			= 0xFF,
-+};
-+
-+enum xscale_counters {
-+	XSCALE_CYCLE_COUNTER	= 1,
-+	XSCALE_COUNTER0,
-+	XSCALE_COUNTER1,
-+	XSCALE_COUNTER2,
-+	XSCALE_COUNTER3,
-+};
-+
-+static const unsigned xscale_perf_map[PERF_COUNT_HW_MAX] = {
-+	[PERF_COUNT_HW_CPU_CYCLES]	    = XSCALE_PERFCTR_CCNT,
-+	[PERF_COUNT_HW_INSTRUCTIONS]	    = XSCALE_PERFCTR_INSTRUCTION,
-+	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
-+	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
-+	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = XSCALE_PERFCTR_BRANCH,
-+	[PERF_COUNT_HW_BRANCH_MISSES]	    = XSCALE_PERFCTR_BRANCH_MISS,
-+	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
-+};
-+
-+static const unsigned xscale_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-+					   [PERF_COUNT_HW_CACHE_OP_MAX]
-+					   [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-+	[C(L1D)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= XSCALE_PERFCTR_DCACHE_ACCESS,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_DCACHE_MISS,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= XSCALE_PERFCTR_DCACHE_ACCESS,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_DCACHE_MISS,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(L1I)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_ICACHE_MISS,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_ICACHE_MISS,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(LL)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(DTLB)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_DTLB_MISS,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_DTLB_MISS,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(ITLB)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_ITLB_MISS,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= XSCALE_PERFCTR_ITLB_MISS,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(BPU)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+};
-+
-+#define	XSCALE_PMU_ENABLE	0x001
-+#define XSCALE_PMN_RESET	0x002
-+#define	XSCALE_CCNT_RESET	0x004
-+#define	XSCALE_PMU_RESET	(CCNT_RESET | PMN_RESET)
-+#define XSCALE_PMU_CNT64	0x008
-+
-+static inline int
-+xscalepmu_event_map(int config)
-+{
-+	int mapping = xscale_perf_map[config];
-+	if (HW_OP_UNSUPPORTED == mapping)
-+		mapping = -EOPNOTSUPP;
-+	return mapping;
-+}
-+
-+static u64
-+xscalepmu_raw_event(u64 config)
-+{
-+	return config & 0xff;
-+}
-+
-+#define XSCALE1_OVERFLOWED_MASK	0x700
-+#define XSCALE1_CCOUNT_OVERFLOW	0x400
-+#define XSCALE1_COUNT0_OVERFLOW	0x100
-+#define XSCALE1_COUNT1_OVERFLOW	0x200
-+#define XSCALE1_CCOUNT_INT_EN	0x040
-+#define XSCALE1_COUNT0_INT_EN	0x010
-+#define XSCALE1_COUNT1_INT_EN	0x020
-+#define XSCALE1_COUNT0_EVT_SHFT	12
-+#define XSCALE1_COUNT0_EVT_MASK	(0xff << XSCALE1_COUNT0_EVT_SHFT)
-+#define XSCALE1_COUNT1_EVT_SHFT	20
-+#define XSCALE1_COUNT1_EVT_MASK	(0xff << XSCALE1_COUNT1_EVT_SHFT)
-+
-+static inline u32
-+xscale1pmu_read_pmnc(void)
-+{
-+	u32 val;
-+	asm volatile("mrc p14, 0, %0, c0, c0, 0" : "=r" (val));
-+	return val;
-+}
-+
-+static inline void
-+xscale1pmu_write_pmnc(u32 val)
-+{
-+	/* upper 4bits and 7, 11 are write-as-0 */
-+	val &= 0xffff77f;
-+	asm volatile("mcr p14, 0, %0, c0, c0, 0" : : "r" (val));
-+}
-+
-+static inline int
-+xscale1_pmnc_counter_has_overflowed(unsigned long pmnc,
-+					enum xscale_counters counter)
-+{
-+	int ret = 0;
-+
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		ret = pmnc & XSCALE1_CCOUNT_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER0:
-+		ret = pmnc & XSCALE1_COUNT0_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER1:
-+		ret = pmnc & XSCALE1_COUNT1_OVERFLOW;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", counter);
-+	}
-+
-+	return ret;
-+}
-+
-+static irqreturn_t
-+xscale1pmu_handle_irq(int irq_num, void *dev)
-+{
-+	unsigned long pmnc;
-+	struct perf_sample_data data;
-+	struct cpu_hw_events *cpuc;
-+	struct pt_regs *regs;
-+	int idx;
-+
-+	/*
-+	 * NOTE: there's an A stepping erratum that states if an overflow
-+	 *       bit already exists and another occurs, the previous
-+	 *       Overflow bit gets cleared. There's no workaround.
-+	 *	 Fixed in B stepping or later.
-+	 */
-+	pmnc = xscale1pmu_read_pmnc();
-+
-+	/*
-+	 * Write the value back to clear the overflow flags. Overflow
-+	 * flags remain in pmnc for use below. We also disable the PMU
-+	 * while we process the interrupt.
-+	 */
-+	xscale1pmu_write_pmnc(pmnc & ~XSCALE_PMU_ENABLE);
-+
-+	if (!(pmnc & XSCALE1_OVERFLOWED_MASK))
-+		return IRQ_NONE;
-+
-+	regs = get_irq_regs();
-+
-+	perf_sample_data_init(&data, 0);
-+
-+	cpuc = &__get_cpu_var(cpu_hw_events);
-+	for (idx = 0; idx <= armpmu->num_events; ++idx) {
-+		struct perf_event *event = cpuc->events[idx];
-+		struct hw_perf_event *hwc;
-+
-+		if (!test_bit(idx, cpuc->active_mask))
-+			continue;
-+
-+		if (!xscale1_pmnc_counter_has_overflowed(pmnc, idx))
-+			continue;
-+
-+		hwc = &event->hw;
-+		armpmu_event_update(event, hwc, idx);
-+		data.period = event->hw.last_period;
-+		if (!armpmu_event_set_period(event, hwc, idx))
-+			continue;
-+
-+		if (perf_event_overflow(event, 0, &data, regs))
-+			armpmu->disable(hwc, idx);
-+	}
-+
-+	perf_event_do_pending();
-+
-+	/*
-+	 * Re-enable the PMU.
-+	 */
-+	pmnc = xscale1pmu_read_pmnc() | XSCALE_PMU_ENABLE;
-+	xscale1pmu_write_pmnc(pmnc);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void
-+xscale1pmu_enable_event(struct hw_perf_event *hwc, int idx)
-+{
-+	unsigned long val, mask, evt, flags;
-+
-+	switch (idx) {
-+	case XSCALE_CYCLE_COUNTER:
-+		mask = 0;
-+		evt = XSCALE1_CCOUNT_INT_EN;
-+		break;
-+	case XSCALE_COUNTER0:
-+		mask = XSCALE1_COUNT0_EVT_MASK;
-+		evt = (hwc->config_base << XSCALE1_COUNT0_EVT_SHFT) |
-+			XSCALE1_COUNT0_INT_EN;
-+		break;
-+	case XSCALE_COUNTER1:
-+		mask = XSCALE1_COUNT1_EVT_MASK;
-+		evt = (hwc->config_base << XSCALE1_COUNT1_EVT_SHFT) |
-+			XSCALE1_COUNT1_INT_EN;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", idx);
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale1pmu_read_pmnc();
-+	val &= ~mask;
-+	val |= evt;
-+	xscale1pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static void
-+xscale1pmu_disable_event(struct hw_perf_event *hwc, int idx)
-+{
-+	unsigned long val, mask, evt, flags;
-+
-+	switch (idx) {
-+	case XSCALE_CYCLE_COUNTER:
-+		mask = XSCALE1_CCOUNT_INT_EN;
-+		evt = 0;
-+		break;
-+	case XSCALE_COUNTER0:
-+		mask = XSCALE1_COUNT0_INT_EN | XSCALE1_COUNT0_EVT_MASK;
-+		evt = XSCALE_PERFCTR_UNUSED << XSCALE1_COUNT0_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER1:
-+		mask = XSCALE1_COUNT1_INT_EN | XSCALE1_COUNT1_EVT_MASK;
-+		evt = XSCALE_PERFCTR_UNUSED << XSCALE1_COUNT1_EVT_SHFT;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", idx);
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale1pmu_read_pmnc();
-+	val &= ~mask;
-+	val |= evt;
-+	xscale1pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static int
-+xscale1pmu_get_event_idx(struct cpu_hw_events *cpuc,
-+			struct hw_perf_event *event)
-+{
-+	if (XSCALE_PERFCTR_CCNT == event->config_base) {
-+		if (test_and_set_bit(XSCALE_CYCLE_COUNTER, cpuc->used_mask))
-+			return -EAGAIN;
-+
-+		return XSCALE_CYCLE_COUNTER;
-+	} else {
-+		if (!test_and_set_bit(XSCALE_COUNTER1, cpuc->used_mask)) {
-+			return XSCALE_COUNTER1;
-+		}
-+
-+		if (!test_and_set_bit(XSCALE_COUNTER0, cpuc->used_mask)) {
-+			return XSCALE_COUNTER0;
-+		}
-+
-+		return -EAGAIN;
-+	}
-+}
-+
-+static void
-+xscale1pmu_start(void)
-+{
-+	unsigned long flags, val;
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale1pmu_read_pmnc();
-+	val |= XSCALE_PMU_ENABLE;
-+	xscale1pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static void
-+xscale1pmu_stop(void)
-+{
-+	unsigned long flags, val;
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale1pmu_read_pmnc();
-+	val &= ~XSCALE_PMU_ENABLE;
-+	xscale1pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static inline u32
-+xscale1pmu_read_counter(int counter)
-+{
-+	u32 val = 0;
-+
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		asm volatile("mrc p14, 0, %0, c1, c0, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER0:
-+		asm volatile("mrc p14, 0, %0, c2, c0, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER1:
-+		asm volatile("mrc p14, 0, %0, c3, c0, 0" : "=r" (val));
-+		break;
-+	}
-+
-+	return val;
-+}
-+
-+static inline void
-+xscale1pmu_write_counter(int counter, u32 val)
-+{
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		asm volatile("mcr p14, 0, %0, c1, c0, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER0:
-+		asm volatile("mcr p14, 0, %0, c2, c0, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER1:
-+		asm volatile("mcr p14, 0, %0, c3, c0, 0" : : "r" (val));
-+		break;
-+	}
-+}
-+
-+static const struct arm_pmu xscale1pmu = {
-+	.id		= ARM_PERF_PMU_ID_XSCALE1,
-+	.handle_irq	= xscale1pmu_handle_irq,
-+	.enable		= xscale1pmu_enable_event,
-+	.disable	= xscale1pmu_disable_event,
-+	.event_map	= xscalepmu_event_map,
-+	.raw_event	= xscalepmu_raw_event,
-+	.read_counter	= xscale1pmu_read_counter,
-+	.write_counter	= xscale1pmu_write_counter,
-+	.get_event_idx	= xscale1pmu_get_event_idx,
-+	.start		= xscale1pmu_start,
-+	.stop		= xscale1pmu_stop,
-+	.num_events	= 3,
-+	.max_period	= (1LLU << 32) - 1,
-+};
-+
-+#define XSCALE2_OVERFLOWED_MASK	0x01f
-+#define XSCALE2_CCOUNT_OVERFLOW	0x001
-+#define XSCALE2_COUNT0_OVERFLOW	0x002
-+#define XSCALE2_COUNT1_OVERFLOW	0x004
-+#define XSCALE2_COUNT2_OVERFLOW	0x008
-+#define XSCALE2_COUNT3_OVERFLOW	0x010
-+#define XSCALE2_CCOUNT_INT_EN	0x001
-+#define XSCALE2_COUNT0_INT_EN	0x002
-+#define XSCALE2_COUNT1_INT_EN	0x004
-+#define XSCALE2_COUNT2_INT_EN	0x008
-+#define XSCALE2_COUNT3_INT_EN	0x010
-+#define XSCALE2_COUNT0_EVT_SHFT	0
-+#define XSCALE2_COUNT0_EVT_MASK	(0xff << XSCALE2_COUNT0_EVT_SHFT)
-+#define XSCALE2_COUNT1_EVT_SHFT	8
-+#define XSCALE2_COUNT1_EVT_MASK	(0xff << XSCALE2_COUNT1_EVT_SHFT)
-+#define XSCALE2_COUNT2_EVT_SHFT	16
-+#define XSCALE2_COUNT2_EVT_MASK	(0xff << XSCALE2_COUNT2_EVT_SHFT)
-+#define XSCALE2_COUNT3_EVT_SHFT	24
-+#define XSCALE2_COUNT3_EVT_MASK	(0xff << XSCALE2_COUNT3_EVT_SHFT)
-+
-+static inline u32
-+xscale2pmu_read_pmnc(void)
-+{
-+	u32 val;
-+	asm volatile("mrc p14, 0, %0, c0, c1, 0" : "=r" (val));
-+	/* bits 1-2 and 4-23 are read-unpredictable */
-+	return val & 0xff000009;
-+}
-+
-+static inline void
-+xscale2pmu_write_pmnc(u32 val)
-+{
-+	/* bits 4-23 are write-as-0, 24-31 are write ignored */
-+	val &= 0xf;
-+	asm volatile("mcr p14, 0, %0, c0, c1, 0" : : "r" (val));
-+}
-+
-+static inline u32
-+xscale2pmu_read_overflow_flags(void)
-+{
-+	u32 val;
-+	asm volatile("mrc p14, 0, %0, c5, c1, 0" : "=r" (val));
-+	return val;
-+}
-+
-+static inline void
-+xscale2pmu_write_overflow_flags(u32 val)
-+{
-+	asm volatile("mcr p14, 0, %0, c5, c1, 0" : : "r" (val));
-+}
-+
-+static inline u32
-+xscale2pmu_read_event_select(void)
-+{
-+	u32 val;
-+	asm volatile("mrc p14, 0, %0, c8, c1, 0" : "=r" (val));
-+	return val;
-+}
-+
-+static inline void
-+xscale2pmu_write_event_select(u32 val)
-+{
-+	asm volatile("mcr p14, 0, %0, c8, c1, 0" : : "r"(val));
-+}
-+
-+static inline u32
-+xscale2pmu_read_int_enable(void)
-+{
-+	u32 val;
-+	asm volatile("mrc p14, 0, %0, c4, c1, 0" : "=r" (val));
-+	return val;
-+}
-+
-+static void
-+xscale2pmu_write_int_enable(u32 val)
-+{
-+	asm volatile("mcr p14, 0, %0, c4, c1, 0" : : "r" (val));
-+}
-+
-+static inline int
-+xscale2_pmnc_counter_has_overflowed(unsigned long of_flags,
-+					enum xscale_counters counter)
-+{
-+	int ret = 0;
-+
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		ret = of_flags & XSCALE2_CCOUNT_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER0:
-+		ret = of_flags & XSCALE2_COUNT0_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER1:
-+		ret = of_flags & XSCALE2_COUNT1_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER2:
-+		ret = of_flags & XSCALE2_COUNT2_OVERFLOW;
-+		break;
-+	case XSCALE_COUNTER3:
-+		ret = of_flags & XSCALE2_COUNT3_OVERFLOW;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", counter);
-+	}
-+
-+	return ret;
-+}
-+
-+static irqreturn_t
-+xscale2pmu_handle_irq(int irq_num, void *dev)
-+{
-+	unsigned long pmnc, of_flags;
-+	struct perf_sample_data data;
-+	struct cpu_hw_events *cpuc;
-+	struct pt_regs *regs;
-+	int idx;
-+
-+	/* Disable the PMU. */
-+	pmnc = xscale2pmu_read_pmnc();
-+	xscale2pmu_write_pmnc(pmnc & ~XSCALE_PMU_ENABLE);
-+
-+	/* Check the overflow flag register. */
-+	of_flags = xscale2pmu_read_overflow_flags();
-+	if (!(of_flags & XSCALE2_OVERFLOWED_MASK))
-+		return IRQ_NONE;
-+
-+	/* Clear the overflow bits. */
-+	xscale2pmu_write_overflow_flags(of_flags);
-+
-+	regs = get_irq_regs();
-+
-+	perf_sample_data_init(&data, 0);
-+
-+	cpuc = &__get_cpu_var(cpu_hw_events);
-+	for (idx = 0; idx <= armpmu->num_events; ++idx) {
-+		struct perf_event *event = cpuc->events[idx];
-+		struct hw_perf_event *hwc;
-+
-+		if (!test_bit(idx, cpuc->active_mask))
-+			continue;
-+
-+		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
-+			continue;
-+
-+		hwc = &event->hw;
-+		armpmu_event_update(event, hwc, idx);
-+		data.period = event->hw.last_period;
-+		if (!armpmu_event_set_period(event, hwc, idx))
-+			continue;
-+
-+		if (perf_event_overflow(event, 0, &data, regs))
-+			armpmu->disable(hwc, idx);
-+	}
-+
-+	perf_event_do_pending();
-+
-+	/*
-+	 * Re-enable the PMU.
-+	 */
-+	pmnc = xscale2pmu_read_pmnc() | XSCALE_PMU_ENABLE;
-+	xscale2pmu_write_pmnc(pmnc);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void
-+xscale2pmu_enable_event(struct hw_perf_event *hwc, int idx)
-+{
-+	unsigned long flags, ien, evtsel;
-+
-+	ien = xscale2pmu_read_int_enable();
-+	evtsel = xscale2pmu_read_event_select();
-+
-+	switch (idx) {
-+	case XSCALE_CYCLE_COUNTER:
-+		ien |= XSCALE2_CCOUNT_INT_EN;
-+		break;
-+	case XSCALE_COUNTER0:
-+		ien |= XSCALE2_COUNT0_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT0_EVT_MASK;
-+		evtsel |= hwc->config_base << XSCALE2_COUNT0_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER1:
-+		ien |= XSCALE2_COUNT1_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT1_EVT_MASK;
-+		evtsel |= hwc->config_base << XSCALE2_COUNT1_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER2:
-+		ien |= XSCALE2_COUNT2_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT2_EVT_MASK;
-+		evtsel |= hwc->config_base << XSCALE2_COUNT2_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER3:
-+		ien |= XSCALE2_COUNT3_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT3_EVT_MASK;
-+		evtsel |= hwc->config_base << XSCALE2_COUNT3_EVT_SHFT;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", idx);
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	xscale2pmu_write_event_select(evtsel);
-+	xscale2pmu_write_int_enable(ien);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static void
-+xscale2pmu_disable_event(struct hw_perf_event *hwc, int idx)
-+{
-+	unsigned long flags, ien, evtsel;
-+
-+	ien = xscale2pmu_read_int_enable();
-+	evtsel = xscale2pmu_read_event_select();
-+
-+	switch (idx) {
-+	case XSCALE_CYCLE_COUNTER:
-+		ien &= ~XSCALE2_CCOUNT_INT_EN;
-+		break;
-+	case XSCALE_COUNTER0:
-+		ien &= ~XSCALE2_COUNT0_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT0_EVT_MASK;
-+		evtsel |= XSCALE_PERFCTR_UNUSED << XSCALE2_COUNT0_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER1:
-+		ien &= ~XSCALE2_COUNT1_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT1_EVT_MASK;
-+		evtsel |= XSCALE_PERFCTR_UNUSED << XSCALE2_COUNT1_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER2:
-+		ien &= ~XSCALE2_COUNT2_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT2_EVT_MASK;
-+		evtsel |= XSCALE_PERFCTR_UNUSED << XSCALE2_COUNT2_EVT_SHFT;
-+		break;
-+	case XSCALE_COUNTER3:
-+		ien &= ~XSCALE2_COUNT3_INT_EN;
-+		evtsel &= ~XSCALE2_COUNT3_EVT_MASK;
-+		evtsel |= XSCALE_PERFCTR_UNUSED << XSCALE2_COUNT3_EVT_SHFT;
-+		break;
-+	default:
-+		WARN_ONCE(1, "invalid counter number (%d)\n", idx);
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	xscale2pmu_write_event_select(evtsel);
-+	xscale2pmu_write_int_enable(ien);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static int
-+xscale2pmu_get_event_idx(struct cpu_hw_events *cpuc,
-+			struct hw_perf_event *event)
-+{
-+	int idx = xscale1pmu_get_event_idx(cpuc, event);
-+	if (idx >= 0)
-+		goto out;
-+
-+	if (!test_and_set_bit(XSCALE_COUNTER3, cpuc->used_mask))
-+		idx = XSCALE_COUNTER3;
-+	else if (!test_and_set_bit(XSCALE_COUNTER2, cpuc->used_mask))
-+		idx = XSCALE_COUNTER2;
-+out:
-+	return idx;
-+}
-+
-+static void
-+xscale2pmu_start(void)
-+{
-+	unsigned long flags, val;
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale2pmu_read_pmnc() & ~XSCALE_PMU_CNT64;
-+	val |= XSCALE_PMU_ENABLE;
-+	xscale2pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static void
-+xscale2pmu_stop(void)
-+{
-+	unsigned long flags, val;
-+
-+	spin_lock_irqsave(&pmu_lock, flags);
-+	val = xscale2pmu_read_pmnc();
-+	val &= ~XSCALE_PMU_ENABLE;
-+	xscale2pmu_write_pmnc(val);
-+	spin_unlock_irqrestore(&pmu_lock, flags);
-+}
-+
-+static inline u32
-+xscale2pmu_read_counter(int counter)
-+{
-+	u32 val = 0;
-+
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		asm volatile("mrc p14, 0, %0, c1, c1, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER0:
-+		asm volatile("mrc p14, 0, %0, c0, c2, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER1:
-+		asm volatile("mrc p14, 0, %0, c1, c2, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER2:
-+		asm volatile("mrc p14, 0, %0, c2, c2, 0" : "=r" (val));
-+		break;
-+	case XSCALE_COUNTER3:
-+		asm volatile("mrc p14, 0, %0, c3, c2, 0" : "=r" (val));
-+		break;
-+	}
-+
-+	return val;
-+}
-+
-+static inline void
-+xscale2pmu_write_counter(int counter, u32 val)
-+{
-+	switch (counter) {
-+	case XSCALE_CYCLE_COUNTER:
-+		asm volatile("mcr p14, 0, %0, c1, c1, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER0:
-+		asm volatile("mcr p14, 0, %0, c0, c2, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER1:
-+		asm volatile("mcr p14, 0, %0, c1, c2, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER2:
-+		asm volatile("mcr p14, 0, %0, c2, c2, 0" : : "r" (val));
-+		break;
-+	case XSCALE_COUNTER3:
-+		asm volatile("mcr p14, 0, %0, c3, c2, 0" : : "r" (val));
-+		break;
-+	}
-+}
-+
-+static const struct arm_pmu xscale2pmu = {
-+	.id		= ARM_PERF_PMU_ID_XSCALE2,
-+	.handle_irq	= xscale2pmu_handle_irq,
-+	.enable		= xscale2pmu_enable_event,
-+	.disable	= xscale2pmu_disable_event,
-+	.event_map	= xscalepmu_event_map,
-+	.raw_event	= xscalepmu_raw_event,
-+	.read_counter	= xscale2pmu_read_counter,
-+	.write_counter	= xscale2pmu_write_counter,
-+	.get_event_idx	= xscale2pmu_get_event_idx,
-+	.start		= xscale2pmu_start,
-+	.stop		= xscale2pmu_stop,
-+	.num_events	= 5,
-+	.max_period	= (1LLU << 32) - 1,
-+};
-+
- static int __init
- init_hw_perf_events(void)
- {
-@@ -2115,7 +2912,7 @@ init_hw_perf_events(void)
- 	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
- 	unsigned long part_number = (cpuid & 0xFFF0);
+-if OPROFILE
+-
+-config OPROFILE_ARMV6
+-	def_bool y
+-	depends on CPU_V6 && !SMP
+-	select OPROFILE_ARM11_CORE
+-
+-config OPROFILE_MPCORE
+-	def_bool y
+-	depends on CPU_V6 && SMP
+-	select OPROFILE_ARM11_CORE
+-
+-config OPROFILE_ARM11_CORE
+-	bool
+-
+-config OPROFILE_ARMV7
+-	def_bool y
+-	depends on CPU_V7 && !SMP
+-	bool
+-
+-endif
+-
+ config VECTORS_BASE
+ 	hex
+ 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+@@ -1276,7 +1254,7 @@ config HIGHPTE
  
--	/* We only support ARM CPUs implemented by ARM at the moment. */
-+	/* ARM Ltd CPUs. */
- 	if (0x41 == implementor) {
- 		switch (part_number) {
- 		case 0xB360:	/* ARM1136 */
-@@ -2157,15 +2954,33 @@ init_hw_perf_events(void)
- 			armv7pmu.num_events = armv7_reset_read_pmnc();
- 			perf_max_events = armv7pmu.num_events;
- 			break;
--		default:
--			pr_info("no hardware support available\n");
--			perf_max_events = -1;
-+		}
-+	/* Intel CPUs [xscale]. */
-+	} else if (0x69 == implementor) {
-+		part_number = (cpuid >> 13) & 0x7;
-+		switch (part_number) {
-+		case 1:
-+			armpmu = &xscale1pmu;
-+			memcpy(armpmu_perf_cache_map, xscale_perf_cache_map,
-+					sizeof(xscale_perf_cache_map));
-+			perf_max_events	= xscale1pmu.num_events;
-+			break;
-+		case 2:
-+			armpmu = &xscale2pmu;
-+			memcpy(armpmu_perf_cache_map, xscale_perf_cache_map,
-+					sizeof(xscale_perf_cache_map));
-+			perf_max_events	= xscale2pmu.num_events;
-+			break;
- 		}
- 	}
+ config HW_PERF_EVENTS
+ 	bool "Enable hardware performance counter support for perf events"
+-	depends on PERF_EVENTS && CPU_HAS_PMU && (CPU_V6 || CPU_V7)
++	depends on PERF_EVENTS && CPU_HAS_PMU
+ 	default y
+ 	help
+ 	  Enable hardware performance counter support for perf events. If
+diff --git a/arch/arm/oprofile/Makefile b/arch/arm/oprofile/Makefile
+index 88e31f5..e666eaf 100644
+--- a/arch/arm/oprofile/Makefile
++++ b/arch/arm/oprofile/Makefile
+@@ -6,9 +6,4 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
+ 		oprofilefs.o oprofile_stats.o \
+ 		timer_int.o )
  
--	if (armpmu)
-+	if (armpmu) {
- 		pr_info("enabled with %s PMU driver, %d counters available\n",
--			arm_pmu_names[armpmu->id], armpmu->num_events);
-+				arm_pmu_names[armpmu->id], armpmu->num_events);
-+	} else {
-+		pr_info("no hardware support available\n");
-+		perf_max_events = -1;
-+	}
- 
- 	return 0;
- }
+-oprofile-y				:= $(DRIVER_OBJS) common.o backtrace.o
+-oprofile-$(CONFIG_CPU_XSCALE)		+= op_model_xscale.o
+-oprofile-$(CONFIG_OPROFILE_ARM11_CORE)	+= op_model_arm11_core.o
+-oprofile-$(CONFIG_OPROFILE_ARMV6)	+= op_model_v6.o
+-oprofile-$(CONFIG_OPROFILE_MPCORE)	+= op_model_mpcore.o
+-oprofile-$(CONFIG_OPROFILE_ARMV7)	+= op_model_v7.o
++oprofile-y				:= $(DRIVER_OBJS) common.o
+diff --git a/arch/arm/oprofile/backtrace.c b/arch/arm/oprofile/backtrace.c
+deleted file mode 100644
+index d805a52..0000000
+--- a/arch/arm/oprofile/backtrace.c
++++ /dev/null
+@@ -1,83 +0,0 @@
+-/*
+- * Arm specific backtracing code for oprofile
+- *
+- * Copyright 2005 Openedhand Ltd.
+- *
+- * Author: Richard Purdie <rpurdie@openedhand.com>
+- *
+- * Based on i386 oprofile backtrace code by John Levon, David Smith
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-#include <linux/oprofile.h>
+-#include <linux/sched.h>
+-#include <linux/mm.h>
+-#include <linux/uaccess.h>
+-#include <asm/ptrace.h>
+-#include <asm/stacktrace.h>
+-
+-static int report_trace(struct stackframe *frame, void *d)
+-{
+-	unsigned int *depth = d;
+-
+-	if (*depth) {
+-		oprofile_add_trace(frame->pc);
+-		(*depth)--;
+-	}
+-
+-	return *depth == 0;
+-}
+-
+-/*
+- * The registers we're interested in are at the end of the variable
+- * length saved register structure. The fp points at the end of this
+- * structure so the address of this struct is:
+- * (struct frame_tail *)(xxx->fp)-1
+- */
+-struct frame_tail {
+-	struct frame_tail *fp;
+-	unsigned long sp;
+-	unsigned long lr;
+-} __attribute__((packed));
+-
+-static struct frame_tail* user_backtrace(struct frame_tail *tail)
+-{
+-	struct frame_tail buftail[2];
+-
+-	/* Also check accessibility of one struct frame_tail beyond */
+-	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
+-		return NULL;
+-	if (__copy_from_user_inatomic(buftail, tail, sizeof(buftail)))
+-		return NULL;
+-
+-	oprofile_add_trace(buftail[0].lr);
+-
+-	/* frame pointers should strictly progress back up the stack
+-	 * (towards higher addresses) */
+-	if (tail >= buftail[0].fp)
+-		return NULL;
+-
+-	return buftail[0].fp-1;
+-}
+-
+-void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
+-{
+-	struct frame_tail *tail = ((struct frame_tail *) regs->ARM_fp) - 1;
+-
+-	if (!user_mode(regs)) {
+-		struct stackframe frame;
+-		frame.fp = regs->ARM_fp;
+-		frame.sp = regs->ARM_sp;
+-		frame.lr = regs->ARM_lr;
+-		frame.pc = regs->ARM_pc;
+-		walk_stackframe(&frame, report_trace, &depth);
+-		return;
+-	}
+-
+-	while (depth-- && tail && !((unsigned long) tail & 3))
+-		tail = user_backtrace(tail);
+-}
+diff --git a/arch/arm/oprofile/op_arm_model.h b/arch/arm/oprofile/op_arm_model.h
+deleted file mode 100644
+index 8c4e4f6..0000000
+--- a/arch/arm/oprofile/op_arm_model.h
++++ /dev/null
+@@ -1,35 +0,0 @@
+-/**
+- * @file op_arm_model.h
+- * interface to ARM machine specific operations
+- *
+- * @remark Copyright 2004 Oprofile Authors
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- */
+-
+-#ifndef OP_ARM_MODEL_H
+-#define OP_ARM_MODEL_H
+-
+-struct op_arm_model_spec {
+-	int (*init)(void);
+-	unsigned int num_counters;
+-	int (*setup_ctrs)(void);
+-	int (*start)(void);
+-	void (*stop)(void);
+-	char *name;
+-};
+-
+-#ifdef CONFIG_CPU_XSCALE
+-extern struct op_arm_model_spec op_xscale_spec;
+-#endif
+-
+-extern struct op_arm_model_spec op_armv6_spec;
+-extern struct op_arm_model_spec op_mpcore_spec;
+-extern struct op_arm_model_spec op_armv7_spec;
+-
+-extern void arm_backtrace(struct pt_regs * const regs, unsigned int depth);
+-
+-extern int __init op_arm_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec);
+-extern void op_arm_exit(void);
+-#endif /* OP_ARM_MODEL_H */
+diff --git a/arch/arm/oprofile/op_counter.h b/arch/arm/oprofile/op_counter.h
+deleted file mode 100644
+index ca942a6..0000000
+--- a/arch/arm/oprofile/op_counter.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/**
+- * @file op_counter.h
+- *
+- * @remark Copyright 2004 Oprofile Authors
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- */
+-
+-#ifndef OP_COUNTER_H
+-#define OP_COUNTER_H
+-
+-/* Per performance monitor configuration as set via
+- * oprofilefs.
+- */
+-struct op_counter_config {
+-	unsigned long count;
+-	unsigned long enabled;
+-	unsigned long event;
+-	unsigned long unit_mask;
+-	unsigned long kernel;
+-	unsigned long user;
+-};
+-
+-extern struct op_counter_config *counter_config;
+-
+-#endif /* OP_COUNTER_H */
+diff --git a/arch/arm/oprofile/op_model_arm11_core.c b/arch/arm/oprofile/op_model_arm11_core.c
+deleted file mode 100644
+index ef3e265..0000000
+--- a/arch/arm/oprofile/op_model_arm11_core.c
++++ /dev/null
+@@ -1,162 +0,0 @@
+-/**
+- * @file op_model_arm11_core.c
+- * ARM11 Event Monitor Driver
+- * @remark Copyright 2004 ARM SMP Development Team
+- */
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/oprofile.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/smp.h>
+-
+-#include "op_counter.h"
+-#include "op_arm_model.h"
+-#include "op_model_arm11_core.h"
+-
+-/*
+- * ARM11 PMU support
+- */
+-static inline void arm11_write_pmnc(u32 val)
+-{
+-	/* upper 4bits and 7, 11 are write-as-0 */
+-	val &= 0x0ffff77f;
+-	asm volatile("mcr p15, 0, %0, c15, c12, 0" : : "r" (val));
+-}
+-
+-static inline u32 arm11_read_pmnc(void)
+-{
+-	u32 val;
+-	asm volatile("mrc p15, 0, %0, c15, c12, 0" : "=r" (val));
+-	return val;
+-}
+-
+-static void arm11_reset_counter(unsigned int cnt)
+-{
+-	u32 val = -(u32)counter_config[CPU_COUNTER(smp_processor_id(), cnt)].count;
+-	switch (cnt) {
+-	case CCNT:
+-		asm volatile("mcr p15, 0, %0, c15, c12, 1" : : "r" (val));
+-		break;
+-
+-	case PMN0:
+-		asm volatile("mcr p15, 0, %0, c15, c12, 2" : : "r" (val));
+-		break;
+-
+-	case PMN1:
+-		asm volatile("mcr p15, 0, %0, c15, c12, 3" : : "r" (val));
+-		break;
+-	}
+-}
+-
+-int arm11_setup_pmu(void)
+-{
+-	unsigned int cnt;
+-	u32 pmnc;
+-
+-	if (arm11_read_pmnc() & PMCR_E) {
+-		printk(KERN_ERR "oprofile: CPU%u PMU still enabled when setup new event counter.\n", smp_processor_id());
+-		return -EBUSY;
+-	}
+-
+-	/* initialize PMNC, reset overflow, D bit, C bit and P bit. */
+-	arm11_write_pmnc(PMCR_OFL_PMN0 | PMCR_OFL_PMN1 | PMCR_OFL_CCNT |
+-			 PMCR_C | PMCR_P);
+-
+-	for (pmnc = 0, cnt = PMN0; cnt <= CCNT; cnt++) {
+-		unsigned long event;
+-
+-		if (!counter_config[CPU_COUNTER(smp_processor_id(), cnt)].enabled)
+-			continue;
+-
+-		event = counter_config[CPU_COUNTER(smp_processor_id(), cnt)].event & 255;
+-
+-		/*
+-		 * Set event (if destined for PMNx counters)
+-		 */
+-		if (cnt == PMN0) {
+-			pmnc |= event << 20;
+-		} else if (cnt == PMN1) {
+-			pmnc |= event << 12;
+-		}
+-
+-		/*
+-		 * We don't need to set the event if it's a cycle count
+-		 * Enable interrupt for this counter
+-		 */
+-		pmnc |= PMCR_IEN_PMN0 << cnt;
+-		arm11_reset_counter(cnt);
+-	}
+-	arm11_write_pmnc(pmnc);
+-
+-	return 0;
+-}
+-
+-int arm11_start_pmu(void)
+-{
+-	arm11_write_pmnc(arm11_read_pmnc() | PMCR_E);
+-	return 0;
+-}
+-
+-int arm11_stop_pmu(void)
+-{
+-	unsigned int cnt;
+-
+-	arm11_write_pmnc(arm11_read_pmnc() & ~PMCR_E);
+-
+-	for (cnt = PMN0; cnt <= CCNT; cnt++)
+-		arm11_reset_counter(cnt);
+-
+-	return 0;
+-}
+-
+-/*
+- * CPU counters' IRQ handler (one IRQ per CPU)
+- */
+-static irqreturn_t arm11_pmu_interrupt(int irq, void *arg)
+-{
+-	struct pt_regs *regs = get_irq_regs();
+-	unsigned int cnt;
+-	u32 pmnc;
+-
+-	pmnc = arm11_read_pmnc();
+-
+-	for (cnt = PMN0; cnt <= CCNT; cnt++) {
+-		if ((pmnc & (PMCR_OFL_PMN0 << cnt)) && (pmnc & (PMCR_IEN_PMN0 << cnt))) {
+-			arm11_reset_counter(cnt);
+-			oprofile_add_sample(regs, CPU_COUNTER(smp_processor_id(), cnt));
+-		}
+-	}
+-	/* Clear counter flag(s) */
+-	arm11_write_pmnc(pmnc);
+-	return IRQ_HANDLED;
+-}
+-
+-int arm11_request_interrupts(const int *irqs, int nr)
+-{
+-	unsigned int i;
+-	int ret = 0;
+-
+-	for(i = 0; i < nr; i++) {
+-		ret = request_irq(irqs[i], arm11_pmu_interrupt, IRQF_DISABLED, "CP15 PMU", NULL);
+-		if (ret != 0) {
+-			printk(KERN_ERR "oprofile: unable to request IRQ%u for MPCORE-EM\n",
+-			       irqs[i]);
+-			break;
+-		}
+-	}
+-
+-	if (i != nr)
+-		while (i-- != 0)
+-			free_irq(irqs[i], NULL);
+-
+-	return ret;
+-}
+-
+-void arm11_release_interrupts(const int *irqs, int nr)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < nr; i++)
+-		free_irq(irqs[i], NULL);
+-}
+diff --git a/arch/arm/oprofile/op_model_arm11_core.h b/arch/arm/oprofile/op_model_arm11_core.h
+deleted file mode 100644
+index 1902b99..0000000
+--- a/arch/arm/oprofile/op_model_arm11_core.h
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/**
+- * @file op_model_arm11_core.h
+- * ARM11 Event Monitor Driver
+- * @remark Copyright 2004 ARM SMP Development Team
+- * @remark Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * @remark Copyright 2000-2004 MontaVista Software Inc
+- * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * @remark Copyright 2004 Intel Corporation
+- * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * @remark Copyright 2004 Oprofile Authors
+- *
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- */
+-#ifndef OP_MODEL_ARM11_CORE_H
+-#define OP_MODEL_ARM11_CORE_H
+-
+-/*
+- * Per-CPU PMCR
+- */
+-#define PMCR_E		(1 << 0)	/* Enable */
+-#define PMCR_P		(1 << 1)	/* Count reset */
+-#define PMCR_C		(1 << 2)	/* Cycle counter reset */
+-#define PMCR_D		(1 << 3)	/* Cycle counter counts every 64th cpu cycle */
+-#define PMCR_IEN_PMN0	(1 << 4)	/* Interrupt enable count reg 0 */
+-#define PMCR_IEN_PMN1	(1 << 5)	/* Interrupt enable count reg 1 */
+-#define PMCR_IEN_CCNT	(1 << 6)	/* Interrupt enable cycle counter */
+-#define PMCR_OFL_PMN0	(1 << 8)	/* Count reg 0 overflow */
+-#define PMCR_OFL_PMN1	(1 << 9)	/* Count reg 1 overflow */
+-#define PMCR_OFL_CCNT	(1 << 10)	/* Cycle counter overflow */
+-
+-#define PMN0 0
+-#define PMN1 1
+-#define CCNT 2
+-
+-#define CPU_COUNTER(cpu, counter)	((cpu) * 3 + (counter))
+-
+-int arm11_setup_pmu(void);
+-int arm11_start_pmu(void);
+-int arm11_stop_pmu(void);
+-int arm11_request_interrupts(const int *, int);
+-void arm11_release_interrupts(const int *, int);
+-
+-#endif
+diff --git a/arch/arm/oprofile/op_model_mpcore.c b/arch/arm/oprofile/op_model_mpcore.c
+deleted file mode 100644
+index f73ce87..0000000
+--- a/arch/arm/oprofile/op_model_mpcore.c
++++ /dev/null
+@@ -1,306 +0,0 @@
+-/**
+- * @file op_model_mpcore.c
+- * MPCORE Event Monitor Driver
+- * @remark Copyright 2004 ARM SMP Development Team
+- * @remark Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * @remark Copyright 2000-2004 MontaVista Software Inc
+- * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * @remark Copyright 2004 Intel Corporation
+- * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * @remark Copyright 2004 Oprofile Authors
+- *
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- *
+- *  Counters:
+- *    0: PMN0 on CPU0, per-cpu configurable event counter
+- *    1: PMN1 on CPU0, per-cpu configurable event counter
+- *    2: CCNT on CPU0
+- *    3: PMN0 on CPU1
+- *    4: PMN1 on CPU1
+- *    5: CCNT on CPU1
+- *    6: PMN0 on CPU1
+- *    7: PMN1 on CPU1
+- *    8: CCNT on CPU1
+- *    9: PMN0 on CPU1
+- *   10: PMN1 on CPU1
+- *   11: CCNT on CPU1
+- *   12-19: configurable SCU event counters
+- */
+-
+-/* #define DEBUG */
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/sched.h>
+-#include <linux/oprofile.h>
+-#include <linux/interrupt.h>
+-#include <linux/smp.h>
+-#include <linux/io.h>
+-
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
+-#include <mach/hardware.h>
+-#include <mach/board-eb.h>
+-#include <asm/system.h>
+-#include <asm/pmu.h>
+-
+-#include "op_counter.h"
+-#include "op_arm_model.h"
+-#include "op_model_arm11_core.h"
+-#include "op_model_mpcore.h"
+-
+-/*
+- * MPCore SCU event monitor support
+- */
+-#define SCU_EVENTMONITORS_VA_BASE __io_address(REALVIEW_EB11MP_SCU_BASE + 0x10)
+-
+-/*
+- * Bitmask of used SCU counters
+- */
+-static unsigned int scu_em_used;
+-static const struct pmu_irqs *pmu_irqs;
+-
+-/*
+- * 2 helper fns take a counter number from 0-7 (not the userspace-visible counter number)
+- */
+-static inline void scu_reset_counter(struct eventmonitor __iomem *emc, unsigned int n)
+-{
+-	writel(-(u32)counter_config[SCU_COUNTER(n)].count, &emc->MC[n]);
+-}
+-
+-static inline void scu_set_event(struct eventmonitor __iomem *emc, unsigned int n, u32 event)
+-{
+-	event &= 0xff;
+-	writeb(event, &emc->MCEB[n]);
+-}
+-
+-/*
+- * SCU counters' IRQ handler (one IRQ per counter => 2 IRQs per CPU)
+- */
+-static irqreturn_t scu_em_interrupt(int irq, void *arg)
+-{
+-	struct eventmonitor __iomem *emc = SCU_EVENTMONITORS_VA_BASE;
+-	unsigned int cnt;
+-
+-	cnt = irq - IRQ_EB11MP_PMU_SCU0;
+-	oprofile_add_sample(get_irq_regs(), SCU_COUNTER(cnt));
+-	scu_reset_counter(emc, cnt);
+-
+-	/* Clear overflow flag for this counter */
+-	writel(1 << (cnt + 16), &emc->PMCR);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-/* Configure just the SCU counters that the user has requested */
+-static void scu_setup(void)
+-{
+-	struct eventmonitor __iomem *emc = SCU_EVENTMONITORS_VA_BASE;
+-	unsigned int i;
+-
+-	scu_em_used = 0;
+-
+-	for (i = 0; i < NUM_SCU_COUNTERS; i++) {
+-		if (counter_config[SCU_COUNTER(i)].enabled &&
+-		    counter_config[SCU_COUNTER(i)].event) {
+-			scu_set_event(emc, i, 0); /* disable counter for now */
+-			scu_em_used |= 1 << i;
+-		}
+-	}
+-}
+-
+-static int scu_start(void)
+-{
+-	struct eventmonitor __iomem *emc = SCU_EVENTMONITORS_VA_BASE;
+-	unsigned int temp, i;
+-	unsigned long event;
+-	int ret = 0;
+-
+-	/*
+-	 * request the SCU counter interrupts that we need
+-	 */
+-	for (i = 0; i < NUM_SCU_COUNTERS; i++) {
+-		if (scu_em_used & (1 << i)) {
+-			ret = request_irq(IRQ_EB11MP_PMU_SCU0 + i, scu_em_interrupt, IRQF_DISABLED, "SCU PMU", NULL);
+-			if (ret) {
+-				printk(KERN_ERR "oprofile: unable to request IRQ%u for SCU Event Monitor\n",
+-				       IRQ_EB11MP_PMU_SCU0 + i);
+-				goto err_free_scu;
+-			}
+-		}
+-	}
+-
+-	/*
+-	 * clear overflow and enable interrupt for all used counters
+-	 */
+-	temp = readl(&emc->PMCR);
+-	for (i = 0; i < NUM_SCU_COUNTERS; i++) {
+-		if (scu_em_used & (1 << i)) {
+-			scu_reset_counter(emc, i);
+-			event = counter_config[SCU_COUNTER(i)].event;
+-			scu_set_event(emc, i, event);
+-
+-			/* clear overflow/interrupt */
+-			temp |= 1 << (i + 16);
+-			/* enable interrupt*/
+-			temp |= 1 << (i + 8);
+-		}
+-	}
+-
+-	/* Enable all 8 counters */
+-	temp |= PMCR_E;
+-	writel(temp, &emc->PMCR);
+-
+-	return 0;
+-
+- err_free_scu:
+-	while (i--)
+-		free_irq(IRQ_EB11MP_PMU_SCU0 + i, NULL);
+-	return ret;
+-}
+-
+-static void scu_stop(void)
+-{
+-	struct eventmonitor __iomem *emc = SCU_EVENTMONITORS_VA_BASE;
+-	unsigned int temp, i;
+-
+-	/* Disable counter interrupts */
+-	/* Don't disable all 8 counters (with the E bit) as they may be in use */
+-	temp = readl(&emc->PMCR);
+-	for (i = 0; i < NUM_SCU_COUNTERS; i++) {
+-		if (scu_em_used & (1 << i))
+-			temp &= ~(1 << (i + 8));
+-	}
+-	writel(temp, &emc->PMCR);
+-
+-	/* Free counter interrupts and reset counters */
+-	for (i = 0; i < NUM_SCU_COUNTERS; i++) {
+-		if (scu_em_used & (1 << i)) {
+-			scu_reset_counter(emc, i);
+-			free_irq(IRQ_EB11MP_PMU_SCU0 + i, NULL);
+-		}
+-	}
+-}
+-
+-struct em_function_data {
+-	int (*fn)(void);
+-	int ret;
+-};
+-
+-static void em_func(void *data)
+-{
+-	struct em_function_data *d = data;
+-	int ret = d->fn();
+-	if (ret)
+-		d->ret = ret;
+-}
+-
+-static int em_call_function(int (*fn)(void))
+-{
+-	struct em_function_data data;
+-
+-	data.fn = fn;
+-	data.ret = 0;
+-
+-	preempt_disable();
+-	smp_call_function(em_func, &data, 1);
+-	em_func(&data);
+-	preempt_enable();
+-
+-	return data.ret;
+-}
+-
+-/*
+- * Glue to stick the individual ARM11 PMUs and the SCU
+- * into the oprofile framework.
+- */
+-static int em_setup_ctrs(void)
+-{
+-	int ret;
+-
+-	/* Configure CPU counters by cross-calling to the other CPUs */
+-	ret = em_call_function(arm11_setup_pmu);
+-	if (ret == 0)
+-		scu_setup();
+-
+-	return 0;
+-}
+-
+-static int em_start(void)
+-{
+-	int ret;
+-
+-	pmu_irqs = reserve_pmu();
+-	if (IS_ERR(pmu_irqs)) {
+-		ret = PTR_ERR(pmu_irqs);
+-		goto out;
+-	}
+-
+-	ret = arm11_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	if (ret == 0) {
+-		em_call_function(arm11_start_pmu);
+-
+-		ret = scu_start();
+-		if (ret) {
+-			arm11_release_interrupts(pmu_irqs->irqs,
+-						 pmu_irqs->num_irqs);
+-		} else {
+-			release_pmu(pmu_irqs);
+-			pmu_irqs = NULL;
+-		}
+-	}
+-
+-out:
+-	return ret;
+-}
+-
+-static void em_stop(void)
+-{
+-	em_call_function(arm11_stop_pmu);
+-	arm11_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	scu_stop();
+-	release_pmu(pmu_irqs);
+-}
+-
+-/*
+- * Why isn't there a function to route an IRQ to a specific CPU in
+- * genirq?
+- */
+-static void em_route_irq(int irq, unsigned int cpu)
+-{
+-	struct irq_desc *desc = irq_desc + irq;
+-	const struct cpumask *mask = cpumask_of(cpu);
+-
+-	spin_lock_irq(&desc->lock);
+-	cpumask_copy(desc->affinity, mask);
+-	desc->chip->set_affinity(irq, mask);
+-	spin_unlock_irq(&desc->lock);
+-}
+-
+-static int em_setup(void)
+-{
+-	/*
+-	 * Send SCU PMU interrupts to the "owner" CPU.
+-	 */
+-	em_route_irq(IRQ_EB11MP_PMU_SCU0, 0);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU1, 0);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU2, 1);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU3, 1);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU4, 2);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU5, 2);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU6, 3);
+-	em_route_irq(IRQ_EB11MP_PMU_SCU7, 3);
+-
+-	return init_pmu();
+-}
+-
+-struct op_arm_model_spec op_mpcore_spec = {
+-	.init		= em_setup,
+-	.num_counters	= MPCORE_NUM_COUNTERS,
+-	.setup_ctrs	= em_setup_ctrs,
+-	.start		= em_start,
+-	.stop		= em_stop,
+-	.name		= "arm/mpcore",
+-};
+diff --git a/arch/arm/oprofile/op_model_mpcore.h b/arch/arm/oprofile/op_model_mpcore.h
+deleted file mode 100644
+index 73d8110..0000000
+--- a/arch/arm/oprofile/op_model_mpcore.h
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/**
+- * @file op_model_mpcore.c
+- * MPCORE Event Monitor Driver
+- * @remark Copyright 2004 ARM SMP Development Team
+- * @remark Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * @remark Copyright 2000-2004 MontaVista Software Inc
+- * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * @remark Copyright 2004 Intel Corporation
+- * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * @remark Copyright 2004 Oprofile Authors
+- *
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- */
+-#ifndef OP_MODEL_MPCORE_H
+-#define OP_MODEL_MPCORE_H
+-
+-struct eventmonitor {
+-	unsigned long PMCR;
+-	unsigned char MCEB[8];
+-	unsigned long MC[8];
+-};
+-
+-/*
+- * List of userspace counter numbers: note that the structure is important.
+- * The code relies on CPUn's counters being CPU0's counters + 3n
+- * and on CPU0's counters starting at 0
+- */
+-
+-#define COUNTER_CPU0_PMN0 0
+-#define COUNTER_CPU0_PMN1 1
+-#define COUNTER_CPU0_CCNT 2
+-
+-#define COUNTER_CPU1_PMN0 3
+-#define COUNTER_CPU1_PMN1 4
+-#define COUNTER_CPU1_CCNT 5
+-
+-#define COUNTER_CPU2_PMN0 6
+-#define COUNTER_CPU2_PMN1 7
+-#define COUNTER_CPU2_CCNT 8
+-
+-#define COUNTER_CPU3_PMN0 9
+-#define COUNTER_CPU3_PMN1 10
+-#define COUNTER_CPU3_CCNT 11
+-
+-#define COUNTER_SCU_MN0 12
+-#define COUNTER_SCU_MN1 13
+-#define COUNTER_SCU_MN2 14
+-#define COUNTER_SCU_MN3 15
+-#define COUNTER_SCU_MN4 16
+-#define COUNTER_SCU_MN5 17
+-#define COUNTER_SCU_MN6 18
+-#define COUNTER_SCU_MN7 19
+-#define NUM_SCU_COUNTERS 8
+-
+-#define SCU_COUNTER(number)	((number) + COUNTER_SCU_MN0)
+-
+-#define MPCORE_NUM_COUNTERS	SCU_COUNTER(NUM_SCU_COUNTERS)
+-
+-#endif
+diff --git a/arch/arm/oprofile/op_model_v6.c b/arch/arm/oprofile/op_model_v6.c
+deleted file mode 100644
+index a22357a..0000000
+--- a/arch/arm/oprofile/op_model_v6.c
++++ /dev/null
+@@ -1,78 +0,0 @@
+-/**
+- * @file op_model_v6.c
+- * ARM11 Performance Monitor Driver
+- *
+- * Based on op_model_xscale.c
+- *
+- * @remark Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * @remark Copyright 2000-2004 MontaVista Software Inc
+- * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * @remark Copyright 2004 Intel Corporation
+- * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * @remark Copyright 2004 OProfile Authors
+- *
+- * @remark Read the file COPYING
+- *
+- * @author Tony Lindgren <tony@atomide.com>
+- */
+-
+-/* #define DEBUG */
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/sched.h>
+-#include <linux/oprofile.h>
+-#include <linux/interrupt.h>
+-#include <asm/irq.h>
+-#include <asm/system.h>
+-#include <asm/pmu.h>
+-
+-#include "op_counter.h"
+-#include "op_arm_model.h"
+-#include "op_model_arm11_core.h"
+-
+-static const struct pmu_irqs *pmu_irqs;
+-
+-static void armv6_pmu_stop(void)
+-{
+-	arm11_stop_pmu();
+-	arm11_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	release_pmu(pmu_irqs);
+-	pmu_irqs = NULL;
+-}
+-
+-static int armv6_pmu_start(void)
+-{
+-	int ret;
+-
+-	pmu_irqs = reserve_pmu();
+-	if (IS_ERR(pmu_irqs)) {
+-		ret = PTR_ERR(pmu_irqs);
+-		goto out;
+-	}
+-
+-	ret = arm11_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	if (ret >= 0) {
+-		ret = arm11_start_pmu();
+-	} else {
+-		release_pmu(pmu_irqs);
+-		pmu_irqs = NULL;
+-	}
+-
+-out:
+-	return ret;
+-}
+-
+-static int armv6_detect_pmu(void)
+-{
+-	return 0;
+-}
+-
+-struct op_arm_model_spec op_armv6_spec = {
+-	.init		= armv6_detect_pmu,
+-	.num_counters	= 3,
+-	.setup_ctrs	= arm11_setup_pmu,
+-	.start		= armv6_pmu_start,
+-	.stop		= armv6_pmu_stop,
+-	.name		= "arm/armv6",
+-};
+diff --git a/arch/arm/oprofile/op_model_v7.c b/arch/arm/oprofile/op_model_v7.c
+deleted file mode 100644
+index 8642d08..0000000
+--- a/arch/arm/oprofile/op_model_v7.c
++++ /dev/null
+@@ -1,415 +0,0 @@
+-/**
+- * op_model_v7.c
+- * ARM V7 (Cortex A8) Event Monitor Driver
+- *
+- * Copyright 2008 Jean Pihet <jpihet@mvista.com>
+- * Copyright 2004 ARM SMP Development Team
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/oprofile.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/smp.h>
+-
+-#include <asm/pmu.h>
+-
+-#include "op_counter.h"
+-#include "op_arm_model.h"
+-#include "op_model_v7.h"
+-
+-/* #define DEBUG */
+-
+-
+-/*
+- * ARM V7 PMNC support
+- */
+-
+-static u32 cnt_en[CNTMAX];
+-
+-static inline void armv7_pmnc_write(u32 val)
+-{
+-	val &= PMNC_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c12, 0" : : "r" (val));
+-}
+-
+-static inline u32 armv7_pmnc_read(void)
+-{
+-	u32 val;
+-
+-	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (val));
+-	return val;
+-}
+-
+-static inline u32 armv7_pmnc_enable_counter(unsigned int cnt)
+-{
+-	u32 val;
+-
+-	if (cnt >= CNTMAX) {
+-		printk(KERN_ERR "oprofile: CPU%u enabling wrong PMNC counter"
+-			" %d\n", smp_processor_id(), cnt);
+-		return -1;
+-	}
+-
+-	if (cnt == CCNT)
+-		val = CNTENS_C;
+-	else
+-		val = (1 << (cnt - CNT0));
+-
+-	val &= CNTENS_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (val));
+-
+-	return cnt;
+-}
+-
+-static inline u32 armv7_pmnc_disable_counter(unsigned int cnt)
+-{
+-	u32 val;
+-
+-	if (cnt >= CNTMAX) {
+-		printk(KERN_ERR "oprofile: CPU%u disabling wrong PMNC counter"
+-			" %d\n", smp_processor_id(), cnt);
+-		return -1;
+-	}
+-
+-	if (cnt == CCNT)
+-		val = CNTENC_C;
+-	else
+-		val = (1 << (cnt - CNT0));
+-
+-	val &= CNTENC_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (val));
+-
+-	return cnt;
+-}
+-
+-static inline u32 armv7_pmnc_enable_intens(unsigned int cnt)
+-{
+-	u32 val;
+-
+-	if (cnt >= CNTMAX) {
+-		printk(KERN_ERR "oprofile: CPU%u enabling wrong PMNC counter"
+-			" interrupt enable %d\n", smp_processor_id(), cnt);
+-		return -1;
+-	}
+-
+-	if (cnt == CCNT)
+-		val = INTENS_C;
+-	else
+-		val = (1 << (cnt - CNT0));
+-
+-	val &= INTENS_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (val));
+-
+-	return cnt;
+-}
+-
+-static inline u32 armv7_pmnc_getreset_flags(void)
+-{
+-	u32 val;
+-
+-	/* Read */
+-	asm volatile("mrc p15, 0, %0, c9, c12, 3" : "=r" (val));
+-
+-	/* Write to clear flags */
+-	val &= FLAG_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (val));
+-
+-	return val;
+-}
+-
+-static inline int armv7_pmnc_select_counter(unsigned int cnt)
+-{
+-	u32 val;
+-
+-	if ((cnt == CCNT) || (cnt >= CNTMAX)) {
+-		printk(KERN_ERR "oprofile: CPU%u selecting wrong PMNC counteri"
+-			" %d\n", smp_processor_id(), cnt);
+-		return -1;
+-	}
+-
+-	val = (cnt - CNT0) & SELECT_MASK;
+-	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (val));
+-
+-	return cnt;
+-}
+-
+-static inline void armv7_pmnc_write_evtsel(unsigned int cnt, u32 val)
+-{
+-	if (armv7_pmnc_select_counter(cnt) == cnt) {
+-		val &= EVTSEL_MASK;
+-		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+-	}
+-}
+-
+-static void armv7_pmnc_reset_counter(unsigned int cnt)
+-{
+-	u32 cpu_cnt = CPU_COUNTER(smp_processor_id(), cnt);
+-	u32 val = -(u32)counter_config[cpu_cnt].count;
+-
+-	switch (cnt) {
+-	case CCNT:
+-		armv7_pmnc_disable_counter(cnt);
+-
+-		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (val));
+-
+-		if (cnt_en[cnt] != 0)
+-		    armv7_pmnc_enable_counter(cnt);
+-
+-		break;
+-
+-	case CNT0:
+-	case CNT1:
+-	case CNT2:
+-	case CNT3:
+-		armv7_pmnc_disable_counter(cnt);
+-
+-		if (armv7_pmnc_select_counter(cnt) == cnt)
+-		    asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (val));
+-
+-		if (cnt_en[cnt] != 0)
+-		    armv7_pmnc_enable_counter(cnt);
+-
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "oprofile: CPU%u resetting wrong PMNC counter"
+-			" %d\n", smp_processor_id(), cnt);
+-		break;
+-	}
+-}
+-
+-int armv7_setup_pmnc(void)
+-{
+-	unsigned int cnt;
+-
+-	if (armv7_pmnc_read() & PMNC_E) {
+-		printk(KERN_ERR "oprofile: CPU%u PMNC still enabled when setup"
+-			" new event counter.\n", smp_processor_id());
+-		return -EBUSY;
+-	}
+-
+-	/* Initialize & Reset PMNC: C bit and P bit */
+-	armv7_pmnc_write(PMNC_P | PMNC_C);
+-
+-
+-	for (cnt = CCNT; cnt < CNTMAX; cnt++) {
+-		unsigned long event;
+-		u32 cpu_cnt = CPU_COUNTER(smp_processor_id(), cnt);
+-
+-		/*
+-		 * Disable counter
+-		 */
+-		armv7_pmnc_disable_counter(cnt);
+-		cnt_en[cnt] = 0;
+-
+-		if (!counter_config[cpu_cnt].enabled)
+-			continue;
+-
+-		event = counter_config[cpu_cnt].event & 255;
+-
+-		/*
+-		 * Set event (if destined for PMNx counters)
+-		 * We don't need to set the event if it's a cycle count
+-		 */
+-		if (cnt != CCNT)
+-			armv7_pmnc_write_evtsel(cnt, event);
+-
+-		/*
+-		 * Enable interrupt for this counter
+-		 */
+-		armv7_pmnc_enable_intens(cnt);
+-
+-		/*
+-		 * Reset counter
+-		 */
+-		armv7_pmnc_reset_counter(cnt);
+-
+-		/*
+-		 * Enable counter
+-		 */
+-		armv7_pmnc_enable_counter(cnt);
+-		cnt_en[cnt] = 1;
+-	}
+-
+-	return 0;
+-}
+-
+-static inline void armv7_start_pmnc(void)
+-{
+-	armv7_pmnc_write(armv7_pmnc_read() | PMNC_E);
+-}
+-
+-static inline void armv7_stop_pmnc(void)
+-{
+-	armv7_pmnc_write(armv7_pmnc_read() & ~PMNC_E);
+-}
+-
+-/*
+- * CPU counters' IRQ handler (one IRQ per CPU)
+- */
+-static irqreturn_t armv7_pmnc_interrupt(int irq, void *arg)
+-{
+-	struct pt_regs *regs = get_irq_regs();
+-	unsigned int cnt;
+-	u32 flags;
+-
+-
+-	/*
+-	 * Stop IRQ generation
+-	 */
+-	armv7_stop_pmnc();
+-
+-	/*
+-	 * Get and reset overflow status flags
+-	 */
+-	flags = armv7_pmnc_getreset_flags();
+-
+-	/*
+-	 * Cycle counter
+-	 */
+-	if (flags & FLAG_C) {
+-		u32 cpu_cnt = CPU_COUNTER(smp_processor_id(), CCNT);
+-		armv7_pmnc_reset_counter(CCNT);
+-		oprofile_add_sample(regs, cpu_cnt);
+-	}
+-
+-	/*
+-	 * PMNC counters 0:3
+-	 */
+-	for (cnt = CNT0; cnt < CNTMAX; cnt++) {
+-		if (flags & (1 << (cnt - CNT0))) {
+-			u32 cpu_cnt = CPU_COUNTER(smp_processor_id(), cnt);
+-			armv7_pmnc_reset_counter(cnt);
+-			oprofile_add_sample(regs, cpu_cnt);
+-		}
+-	}
+-
+-	/*
+-	 * Allow IRQ generation
+-	 */
+-	armv7_start_pmnc();
+-
+-	return IRQ_HANDLED;
+-}
+-
+-int armv7_request_interrupts(const int *irqs, int nr)
+-{
+-	unsigned int i;
+-	int ret = 0;
+-
+-	for (i = 0; i < nr; i++) {
+-		ret = request_irq(irqs[i], armv7_pmnc_interrupt,
+-				IRQF_DISABLED, "CP15 PMNC", NULL);
+-		if (ret != 0) {
+-			printk(KERN_ERR "oprofile: unable to request IRQ%u"
+-				" for ARMv7\n",
+-			       irqs[i]);
+-			break;
+-		}
+-	}
+-
+-	if (i != nr)
+-		while (i-- != 0)
+-			free_irq(irqs[i], NULL);
+-
+-	return ret;
+-}
+-
+-void armv7_release_interrupts(const int *irqs, int nr)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < nr; i++)
+-		free_irq(irqs[i], NULL);
+-}
+-
+-#ifdef DEBUG
+-static void armv7_pmnc_dump_regs(void)
+-{
+-	u32 val;
+-	unsigned int cnt;
+-
+-	printk(KERN_INFO "PMNC registers dump:\n");
+-
+-	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (val));
+-	printk(KERN_INFO "PMNC  =0x%08x\n", val);
+-
+-	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (val));
+-	printk(KERN_INFO "CNTENS=0x%08x\n", val);
+-
+-	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (val));
+-	printk(KERN_INFO "INTENS=0x%08x\n", val);
+-
+-	asm volatile("mrc p15, 0, %0, c9, c12, 3" : "=r" (val));
+-	printk(KERN_INFO "FLAGS =0x%08x\n", val);
+-
+-	asm volatile("mrc p15, 0, %0, c9, c12, 5" : "=r" (val));
+-	printk(KERN_INFO "SELECT=0x%08x\n", val);
+-
+-	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (val));
+-	printk(KERN_INFO "CCNT  =0x%08x\n", val);
+-
+-	for (cnt = CNT0; cnt < CNTMAX; cnt++) {
+-		armv7_pmnc_select_counter(cnt);
+-		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (val));
+-		printk(KERN_INFO "CNT[%d] count =0x%08x\n", cnt-CNT0, val);
+-		asm volatile("mrc p15, 0, %0, c9, c13, 1" : "=r" (val));
+-		printk(KERN_INFO "CNT[%d] evtsel=0x%08x\n", cnt-CNT0, val);
+-	}
+-}
+-#endif
+-
+-static const struct pmu_irqs *pmu_irqs;
+-
+-static void armv7_pmnc_stop(void)
+-{
+-#ifdef DEBUG
+-	armv7_pmnc_dump_regs();
+-#endif
+-	armv7_stop_pmnc();
+-	armv7_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	release_pmu(pmu_irqs);
+-	pmu_irqs = NULL;
+-}
+-
+-static int armv7_pmnc_start(void)
+-{
+-	int ret;
+-
+-	pmu_irqs = reserve_pmu();
+-	if (IS_ERR(pmu_irqs))
+-		return PTR_ERR(pmu_irqs);
+-
+-#ifdef DEBUG
+-	armv7_pmnc_dump_regs();
+-#endif
+-	ret = armv7_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+-	if (ret >= 0) {
+-		armv7_start_pmnc();
+-	} else {
+-		release_pmu(pmu_irqs);
+-		pmu_irqs = NULL;
+-	}
+-
+-	return ret;
+-}
+-
+-static int armv7_detect_pmnc(void)
+-{
+-	return 0;
+-}
+-
+-struct op_arm_model_spec op_armv7_spec = {
+-	.init		= armv7_detect_pmnc,
+-	.num_counters	= 5,
+-	.setup_ctrs	= armv7_setup_pmnc,
+-	.start		= armv7_pmnc_start,
+-	.stop		= armv7_pmnc_stop,
+-	.name		= "arm/armv7",
+-};
+diff --git a/arch/arm/oprofile/op_model_v7.h b/arch/arm/oprofile/op_model_v7.h
+deleted file mode 100644
+index 9ca334b..0000000
+--- a/arch/arm/oprofile/op_model_v7.h
++++ /dev/null
+@@ -1,103 +0,0 @@
+-/**
+- * op_model_v7.h
+- * ARM v7 (Cortex A8) Event Monitor Driver
+- *
+- * Copyright 2008 Jean Pihet <jpihet@mvista.com>
+- * Copyright 2004 ARM SMP Development Team
+- * Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * Copyright 2000-2004 MontaVista Software Inc
+- * Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * Copyright 2004 Intel Corporation
+- * Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * Copyright 2004 Oprofile Authors
+- *
+- * Read the file COPYING
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef OP_MODEL_V7_H
+-#define OP_MODEL_V7_H
+-
+-/*
+- * Per-CPU PMNC: config reg
+- */
+-#define PMNC_E		(1 << 0)	/* Enable all counters */
+-#define PMNC_P		(1 << 1)	/* Reset all counters */
+-#define PMNC_C		(1 << 2)	/* Cycle counter reset */
+-#define PMNC_D		(1 << 3)	/* CCNT counts every 64th cpu cycle */
+-#define PMNC_X		(1 << 4)	/* Export to ETM */
+-#define PMNC_DP		(1 << 5)	/* Disable CCNT if non-invasive debug*/
+-#define	PMNC_MASK	0x3f		/* Mask for writable bits */
+-
+-/*
+- * Available counters
+- */
+-#define CCNT 		0
+-#define CNT0 		1
+-#define CNT1 		2
+-#define CNT2 		3
+-#define CNT3 		4
+-#define CNTMAX 		5
+-
+-#define CPU_COUNTER(cpu, counter)	((cpu) * CNTMAX + (counter))
+-
+-/*
+- * CNTENS: counters enable reg
+- */
+-#define CNTENS_P0	(1 << 0)
+-#define CNTENS_P1	(1 << 1)
+-#define CNTENS_P2	(1 << 2)
+-#define CNTENS_P3	(1 << 3)
+-#define CNTENS_C	(1 << 31)
+-#define	CNTENS_MASK	0x8000000f	/* Mask for writable bits */
+-
+-/*
+- * CNTENC: counters disable reg
+- */
+-#define CNTENC_P0	(1 << 0)
+-#define CNTENC_P1	(1 << 1)
+-#define CNTENC_P2	(1 << 2)
+-#define CNTENC_P3	(1 << 3)
+-#define CNTENC_C	(1 << 31)
+-#define	CNTENC_MASK	0x8000000f	/* Mask for writable bits */
+-
+-/*
+- * INTENS: counters overflow interrupt enable reg
+- */
+-#define INTENS_P0	(1 << 0)
+-#define INTENS_P1	(1 << 1)
+-#define INTENS_P2	(1 << 2)
+-#define INTENS_P3	(1 << 3)
+-#define INTENS_C	(1 << 31)
+-#define	INTENS_MASK	0x8000000f	/* Mask for writable bits */
+-
+-/*
+- * EVTSEL: Event selection reg
+- */
+-#define	EVTSEL_MASK	0x7f		/* Mask for writable bits */
+-
+-/*
+- * SELECT: Counter selection reg
+- */
+-#define	SELECT_MASK	0x1f		/* Mask for writable bits */
+-
+-/*
+- * FLAG: counters overflow flag status reg
+- */
+-#define FLAG_P0		(1 << 0)
+-#define FLAG_P1		(1 << 1)
+-#define FLAG_P2		(1 << 2)
+-#define FLAG_P3		(1 << 3)
+-#define FLAG_C		(1 << 31)
+-#define	FLAG_MASK	0x8000000f	/* Mask for writable bits */
+-
+-
+-int armv7_setup_pmu(void);
+-int armv7_start_pmu(void);
+-int armv7_stop_pmu(void);
+-int armv7_request_interrupts(const int *, int);
+-void armv7_release_interrupts(const int *, int);
+-
+-#endif
+diff --git a/arch/arm/oprofile/op_model_xscale.c b/arch/arm/oprofile/op_model_xscale.c
+deleted file mode 100644
+index 1d34a02..0000000
+--- a/arch/arm/oprofile/op_model_xscale.c
++++ /dev/null
+@@ -1,444 +0,0 @@
+-/**
+- * @file op_model_xscale.c
+- * XScale Performance Monitor Driver
+- *
+- * @remark Copyright 2000-2004 Deepak Saxena <dsaxena@mvista.com>
+- * @remark Copyright 2000-2004 MontaVista Software Inc
+- * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
+- * @remark Copyright 2004 Intel Corporation
+- * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
+- * @remark Copyright 2004 OProfile Authors
+- *
+- * @remark Read the file COPYING
+- *
+- * @author Zwane Mwaikambo
+- */
+-
+-/* #define DEBUG */
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/sched.h>
+-#include <linux/oprofile.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-
+-#include <asm/cputype.h>
+-#include <asm/pmu.h>
+-
+-#include "op_counter.h"
+-#include "op_arm_model.h"
+-
+-#define	PMU_ENABLE	0x001	/* Enable counters */
+-#define PMN_RESET	0x002	/* Reset event counters */
+-#define	CCNT_RESET	0x004	/* Reset clock counter */
+-#define	PMU_RESET	(CCNT_RESET | PMN_RESET)
+-#define PMU_CNT64	0x008	/* Make CCNT count every 64th cycle */
+-
+-/*
+- * Different types of events that can be counted by the XScale PMU
+- * as used by Oprofile userspace. Here primarily for documentation
+- * purposes.
+- */
+-
+-#define EVT_ICACHE_MISS			0x00
+-#define	EVT_ICACHE_NO_DELIVER		0x01
+-#define	EVT_DATA_STALL			0x02
+-#define	EVT_ITLB_MISS			0x03
+-#define	EVT_DTLB_MISS			0x04
+-#define	EVT_BRANCH			0x05
+-#define	EVT_BRANCH_MISS			0x06
+-#define	EVT_INSTRUCTION			0x07
+-#define	EVT_DCACHE_FULL_STALL		0x08
+-#define	EVT_DCACHE_FULL_STALL_CONTIG	0x09
+-#define	EVT_DCACHE_ACCESS		0x0A
+-#define	EVT_DCACHE_MISS			0x0B
+-#define	EVT_DCACE_WRITE_BACK		0x0C
+-#define	EVT_PC_CHANGED			0x0D
+-#define	EVT_BCU_REQUEST			0x10
+-#define	EVT_BCU_FULL			0x11
+-#define	EVT_BCU_DRAIN			0x12
+-#define	EVT_BCU_ECC_NO_ELOG		0x14
+-#define	EVT_BCU_1_BIT_ERR		0x15
+-#define	EVT_RMW				0x16
+-/* EVT_CCNT is not hardware defined */
+-#define EVT_CCNT			0xFE
+-#define EVT_UNUSED			0xFF
+-
+-struct pmu_counter {
+-	volatile unsigned long ovf;
+-	unsigned long reset_counter;
+-};
+-
+-enum { CCNT, PMN0, PMN1, PMN2, PMN3, MAX_COUNTERS };
+-
+-static struct pmu_counter results[MAX_COUNTERS];
+-
+-/*
+- * There are two versions of the PMU in current XScale processors
+- * with differing register layouts and number of performance counters.
+- * e.g. IOP32x is xsc1 whilst IOP33x is xsc2.
+- * We detect which register layout to use in xscale_detect_pmu()
+- */
+-enum { PMU_XSC1, PMU_XSC2 };
+-
+-struct pmu_type {
+-	int id;
+-	char *name;
+-	int num_counters;
+-	unsigned int int_enable;
+-	unsigned int cnt_ovf[MAX_COUNTERS];
+-	unsigned int int_mask[MAX_COUNTERS];
+-};
+-
+-static struct pmu_type pmu_parms[] = {
+-	{
+-		.id		= PMU_XSC1,
+-		.name		= "arm/xscale1",
+-		.num_counters	= 3,
+-		.int_mask	= { [PMN0] = 0x10, [PMN1] = 0x20,
+-				    [CCNT] = 0x40 },
+-		.cnt_ovf	= { [CCNT] = 0x400, [PMN0] = 0x100,
+-				    [PMN1] = 0x200},
+-	},
+-	{
+-		.id		= PMU_XSC2,
+-		.name		= "arm/xscale2",
+-		.num_counters	= 5,
+-		.int_mask	= { [CCNT] = 0x01, [PMN0] = 0x02,
+-				    [PMN1] = 0x04, [PMN2] = 0x08,
+-				    [PMN3] = 0x10 },
+-		.cnt_ovf	= { [CCNT] = 0x01, [PMN0] = 0x02,
+-				    [PMN1] = 0x04, [PMN2] = 0x08,
+-				    [PMN3] = 0x10 },
+-	},
+-};
+-
+-static struct pmu_type *pmu;
+-
+-static void write_pmnc(u32 val)
+-{
+-	if (pmu->id == PMU_XSC1) {
+-		/* upper 4bits and 7, 11 are write-as-0 */
+-		val &= 0xffff77f;
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c0, c0, 0" : : "r" (val));
+-	} else {
+-		/* bits 4-23 are write-as-0, 24-31 are write ignored */
+-		val &= 0xf;
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c0, c1, 0" : : "r" (val));
+-	}
+-}
+-
+-static u32 read_pmnc(void)
+-{
+-	u32 val;
+-
+-	if (pmu->id == PMU_XSC1)
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c0, c0, 0" : "=r" (val));
+-	else {
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c0, c1, 0" : "=r" (val));
+-		/* bits 1-2 and 4-23 are read-unpredictable */
+-		val &= 0xff000009;
+-	}
+-
+-	return val;
+-}
+-
+-static u32 __xsc1_read_counter(int counter)
+-{
+-	u32 val = 0;
+-
+-	switch (counter) {
+-	case CCNT:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c1, c0, 0" : "=r" (val));
+-		break;
+-	case PMN0:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c2, c0, 0" : "=r" (val));
+-		break;
+-	case PMN1:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c3, c0, 0" : "=r" (val));
+-		break;
+-	}
+-	return val;
+-}
+-
+-static u32 __xsc2_read_counter(int counter)
+-{
+-	u32 val = 0;
+-
+-	switch (counter) {
+-	case CCNT:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c1, c1, 0" : "=r" (val));
+-		break;
+-	case PMN0:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c0, c2, 0" : "=r" (val));
+-		break;
+-	case PMN1:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c1, c2, 0" : "=r" (val));
+-		break;
+-	case PMN2:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c2, c2, 0" : "=r" (val));
+-		break;
+-	case PMN3:
+-		__asm__ __volatile__ ("mrc p14, 0, %0, c3, c2, 0" : "=r" (val));
+-		break;
+-	}
+-	return val;
+-}
+-
+-static u32 read_counter(int counter)
+-{
+-	u32 val;
+-
+-	if (pmu->id == PMU_XSC1)
+-		val = __xsc1_read_counter(counter);
+-	else
+-		val = __xsc2_read_counter(counter);
+-
+-	return val;
+-}
+-
+-static void __xsc1_write_counter(int counter, u32 val)
+-{
+-	switch (counter) {
+-	case CCNT:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c1, c0, 0" : : "r" (val));
+-		break;
+-	case PMN0:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c2, c0, 0" : : "r" (val));
+-		break;
+-	case PMN1:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c3, c0, 0" : : "r" (val));
+-		break;
+-	}
+-}
+-
+-static void __xsc2_write_counter(int counter, u32 val)
+-{
+-	switch (counter) {
+-	case CCNT:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c1, c1, 0" : : "r" (val));
+-		break;
+-	case PMN0:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c0, c2, 0" : : "r" (val));
+-		break;
+-	case PMN1:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c1, c2, 0" : : "r" (val));
+-		break;
+-	case PMN2:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c2, c2, 0" : : "r" (val));
+-		break;
+-	case PMN3:
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c3, c2, 0" : : "r" (val));
+-		break;
+-	}
+-}
+-
+-static void write_counter(int counter, u32 val)
+-{
+-	if (pmu->id == PMU_XSC1)
+-		__xsc1_write_counter(counter, val);
+-	else
+-		__xsc2_write_counter(counter, val);
+-}
+-
+-static int xscale_setup_ctrs(void)
+-{
+-	u32 evtsel, pmnc;
+-	int i;
+-
+-	for (i = CCNT; i < MAX_COUNTERS; i++) {
+-		if (counter_config[i].enabled)
+-			continue;
+-
+-		counter_config[i].event = EVT_UNUSED;
+-	}
+-
+-	switch (pmu->id) {
+-	case PMU_XSC1:
+-		pmnc = (counter_config[PMN1].event << 20) | (counter_config[PMN0].event << 12);
+-		pr_debug("xscale_setup_ctrs: pmnc: %#08x\n", pmnc);
+-		write_pmnc(pmnc);
+-		break;
+-
+-	case PMU_XSC2:
+-		evtsel = counter_config[PMN0].event | (counter_config[PMN1].event << 8) |
+-			(counter_config[PMN2].event << 16) | (counter_config[PMN3].event << 24);
+-
+-		pr_debug("xscale_setup_ctrs: evtsel %#08x\n", evtsel);
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c8, c1, 0" : : "r" (evtsel));
+-		break;
+-	}
+-
+-	for (i = CCNT; i < MAX_COUNTERS; i++) {
+-		if (counter_config[i].event == EVT_UNUSED) {
+-			counter_config[i].event = 0;
+-			pmu->int_enable &= ~pmu->int_mask[i];
+-			continue;
+-		}
+-
+-		results[i].reset_counter = counter_config[i].count;
+-		write_counter(i, -(u32)counter_config[i].count);
+-		pmu->int_enable |= pmu->int_mask[i];
+-		pr_debug("xscale_setup_ctrs: counter%d %#08x from %#08lx\n", i,
+-			read_counter(i), counter_config[i].count);
+-	}
+-
+-	return 0;
+-}
+-
+-static void inline __xsc1_check_ctrs(void)
+-{
+-	int i;
+-	u32 pmnc = read_pmnc();
+-
+-	/* NOTE: there's an A stepping errata that states if an overflow */
+-	/*       bit already exists and another occurs, the previous     */
+-	/*       Overflow bit gets cleared. There's no workaround.	 */
+-	/*	 Fixed in B stepping or later			 	 */
+-
+-	/* Write the value back to clear the overflow flags. Overflow */
+-	/* flags remain in pmnc for use below */
+-	write_pmnc(pmnc & ~PMU_ENABLE);
+-
+-	for (i = CCNT; i <= PMN1; i++) {
+-		if (!(pmu->int_mask[i] & pmu->int_enable))
+-			continue;
+-
+-		if (pmnc & pmu->cnt_ovf[i])
+-			results[i].ovf++;
+-	}
+-}
+-
+-static void inline __xsc2_check_ctrs(void)
+-{
+-	int i;
+-	u32 flag = 0, pmnc = read_pmnc();
+-
+-	pmnc &= ~PMU_ENABLE;
+-	write_pmnc(pmnc);
+-
+-	/* read overflow flag register */
+-	__asm__ __volatile__ ("mrc p14, 0, %0, c5, c1, 0" : "=r" (flag));
+-
+-	for (i = CCNT; i <= PMN3; i++) {
+-		if (!(pmu->int_mask[i] & pmu->int_enable))
+-			continue;
+-
+-		if (flag & pmu->cnt_ovf[i])
+-			results[i].ovf++;
+-	}
+-
+-	/* writeback clears overflow bits */
+-	__asm__ __volatile__ ("mcr p14, 0, %0, c5, c1, 0" : : "r" (flag));
+-}
+-
+-static irqreturn_t xscale_pmu_interrupt(int irq, void *arg)
+-{
+-	int i;
+-	u32 pmnc;
+-
+-	if (pmu->id == PMU_XSC1)
+-		__xsc1_check_ctrs();
+-	else
+-		__xsc2_check_ctrs();
+-
+-	for (i = CCNT; i < MAX_COUNTERS; i++) {
+-		if (!results[i].ovf)
+-			continue;
+-
+-		write_counter(i, -(u32)results[i].reset_counter);
+-		oprofile_add_sample(get_irq_regs(), i);
+-		results[i].ovf--;
+-	}
+-
+-	pmnc = read_pmnc() | PMU_ENABLE;
+-	write_pmnc(pmnc);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static const struct pmu_irqs *pmu_irqs;
+-
+-static void xscale_pmu_stop(void)
+-{
+-	u32 pmnc = read_pmnc();
+-
+-	pmnc &= ~PMU_ENABLE;
+-	write_pmnc(pmnc);
+-
+-	free_irq(pmu_irqs->irqs[0], results);
+-	release_pmu(pmu_irqs);
+-	pmu_irqs = NULL;
+-}
+-
+-static int xscale_pmu_start(void)
+-{
+-	int ret;
+-	u32 pmnc;
+-
+-	pmu_irqs = reserve_pmu();
+-	if (IS_ERR(pmu_irqs))
+-		return PTR_ERR(pmu_irqs);
+-
+-	pmnc = read_pmnc();
+-
+-	ret = request_irq(pmu_irqs->irqs[0], xscale_pmu_interrupt,
+-			  IRQF_DISABLED, "XScale PMU", (void *)results);
+-
+-	if (ret < 0) {
+-		printk(KERN_ERR "oprofile: unable to request IRQ%d for XScale PMU\n",
+-		       pmu_irqs->irqs[0]);
+-		release_pmu(pmu_irqs);
+-		pmu_irqs = NULL;
+-		return ret;
+-	}
+-
+-	if (pmu->id == PMU_XSC1)
+-		pmnc |= pmu->int_enable;
+-	else {
+-		__asm__ __volatile__ ("mcr p14, 0, %0, c4, c1, 0" : : "r" (pmu->int_enable));
+-		pmnc &= ~PMU_CNT64;
+-	}
+-
+-	pmnc |= PMU_ENABLE;
+-	write_pmnc(pmnc);
+-	pr_debug("xscale_pmu_start: pmnc: %#08x mask: %08x\n", pmnc, pmu->int_enable);
+-	return 0;
+-}
+-
+-static int xscale_detect_pmu(void)
+-{
+-	int ret = 0;
+-	u32 id;
+-
+-	id = (read_cpuid(CPUID_ID) >> 13) & 0x7;
+-
+-	switch (id) {
+-	case 1:
+-		pmu = &pmu_parms[PMU_XSC1];
+-		break;
+-	case 2:
+-		pmu = &pmu_parms[PMU_XSC2];
+-		break;
+-	default:
+-		ret = -ENODEV;
+-		break;
+-	}
+-
+-	if (!ret) {
+-		op_xscale_spec.name = pmu->name;
+-		op_xscale_spec.num_counters = pmu->num_counters;
+-		pr_debug("xscale_detect_pmu: detected %s PMU\n", pmu->name);
+-	}
+-
+-	return ret;
+-}
+-
+-struct op_arm_model_spec op_xscale_spec = {
+-	.init		= xscale_detect_pmu,
+-	.setup_ctrs	= xscale_setup_ctrs,
+-	.start		= xscale_pmu_start,
+-	.stop		= xscale_pmu_stop,
+-};
+-
 -- 
 1.6.3.3
