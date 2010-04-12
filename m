@@ -1,39 +1,47 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 12 Apr 2010 10:56:06 +0300
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <alpine.LFD.2.00.1004111033010.7232@xanadu.home>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1003261144020.694@xanadu.home>
-	<alpine.LFD.2.00.1004111033010.7232@xanadu.home>
-Message-ID: <w2hc70ff3ad1004120056za5960033ja97e2046d17a7f24@mail.gmail.com>
+From: christian.glindkamp@taskit.de (Christian Glindkamp)
+Date: Mon, 12 Apr 2010 10:18:00 +0200
+Subject: [PATCH 0/2] Support for taskit AT91SAM9G20 boards
+In-Reply-To: <1268912416-4886-1-git-send-email-christian.glindkamp@taskit.de>
+References: <1268912416-4886-1-git-send-email-christian.glindkamp@taskit.de>
+Message-ID: <20100412101800.3a9b5554@christian.taskit.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nico, thanks for the patch.
-I've ported it for 2.6.32.9 kernel, can you have a look at the attached patch?
+On Thu, 18 Mar 2010 12:40:14 +0100
+Christian Glindkamp <christian.glindkamp@taskit.de> wrote:
 
-saeed
-
-On Sun, Apr 11, 2010 at 5:42 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> Russell,
->
-> Do you have concerns about patch #6007/1 that I might have missed?
-> Otherwise it would be nice to move it towards mainline for ARMv6
-> targets to work properly with highmem at last.
->
->
-> Nicolas
->
+> The following two patches contain a shared board file and defconfig for
+> the Stamp9G20 CPU module and the PortuxG20 SBC.
+> 
+> Christian Glindkamp (2):
+>   AT91: taskit PortuxG20 and Stamp9G20 board support
+>   AT91: add defconfig for taskit PortuxG20 and Stamp9G20
+> 
+>  arch/arm/configs/stamp9g20_defconfig | 1456 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/Kconfig           |   15 +
+>  arch/arm/mach-at91/Makefile          |    2 +
+>  arch/arm/mach-at91/board-stamp9g20.c |  317 ++++++++
+>  4 files changed, 1790 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/configs/stamp9g20_defconfig
+>  create mode 100644 arch/arm/mach-at91/board-stamp9g20.c
+> 
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-fix-highmem-with-VIPT-cache-and-DMA.patch
-Type: text/x-patch
-Size: 8951 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100412/68878bb9/attachment-0001.bin>
+
+Should I submit these patches to the patch tracker?
+
+-- 
+Development
+
+Tel.: ++49 30 611295-22
+Fax : ++49 30 611295-11
+--
+taskit GmbH
+Seelenbinderstr. 33 | D-12555 Berlin
+web: http://www.taskit.de
+Amtsgericht Charlottenburg: 93HRB39014
+Managing director: Thorsten Raulfs
+--
