@@ -1,51 +1,50 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 12 Apr 2010 22:38:11 +0300
-Subject: [PATCH 0/4] HP iPAQ RX1950 patch series
-In-Reply-To: <20100331011542.GN31126@trinity.fluff.org>
-References: <1269109209-26237-1-git-send-email-anarsoul@gmail.com>
-	<20100331011542.GN31126@trinity.fluff.org>
-Message-ID: <201004122238.16744.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Apr 2010 20:39:43 +0100
+Subject: [PATCH] mach-pxa/viper: Fix timeout usage for I2C
+In-Reply-To: <20100412213235.1688dda8@hyperion.delvare>
+References: <1270390118-1802-1-git-send-email-w.sang@pengutronix.de>
+	<m2rf17812d71004121057n5131d025pb4965f45b61271f@mail.gmail.com>
+	<20100412211319.5a43c65b@hyperion.delvare>
+	<20100412192010.GM3048@n2100.arm.linux.org.uk>
+	<20100412213235.1688dda8@hyperion.delvare>
+Message-ID: <20100412193943.GP3048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 31 ????? 2010 04:15:42 ????? Ben Dooks ???????:
-> On Sat, Mar 20, 2010 at 08:20:05PM +0200, Vasily Khoruzhick wrote:
-> > Following patch series add support for iPAQ RX1950 PDA - another
-> > s3c2442-based machine.
-> > Almost all drivers for this machine are included in mainline kernel, and
-> > port only lacks battery, WiFi and sound support, they will be added
-> > later.
+On Mon, Apr 12, 2010 at 09:32:35PM +0200, Jean Delvare wrote:
+> On Mon, 12 Apr 2010 20:20:10 +0100, Russell King - ARM Linux wrote:
+> > On Mon, Apr 12, 2010 at 09:13:19PM +0200, Jean Delvare wrote:
+> > > On Tue, 13 Apr 2010 01:57:51 +0800, Eric Miao wrote:
+> > > > One other better and cleaner approach to such inconsistency issue is
+> > > > to have a timeout_ms field, and having i2c-gpio.c driver to convert this
+> > > > to jiffies using msec_to_jiffies() at run-time.
+> > > 
+> > > With what benefit? Expressing time values in units of HZ is very
+> > > frequent in the kernel code and shouldn't actually surprise anyone.
 > > 
-> > Port still uses machine-specific GPIO API, as generic GPIO lacks GPJ
-> > support and RX1950 actively uses GPJ port. However I do not see any
-> > benifits in using generic GPIO API in machine support file, as it will
-> > not be used with CPU different from s3c2442.
-> 
-> The samsung specific bits mirroring the gpio API will be removed, I will
-> add post a schedule for removal notice post the next kernel merge.
-> 
-> > Denis: I hope you'll add your Signed-off at least under first patch.
+> > Actually, this patch shows there is confusion.
 > > 
-> > I doubt that I can get Signed-off from Victor Chukhantsev, as he doesn't
-> > work on port for a long time.
+> > "Assume '100' means 100ms here and adapt accordingly."
+> > 
+> > Since this patch is for ARM, where HZ=100, the above patch is not a
+> > simple "convert how we derive this constant" patch - it's a functional
+> > change, reducing the timeouts by a factor of 10.
+> > 
+> > Could that be because the patch author misinterpreted the HZ-based
+> > values?
 > 
-> The patches look ok. I'm not sure if someone else can vouch for Victor's
-> approval, or authenticty of patches. However if the main authours are
-> willing to authenticate the code, then I'll accept this unless someone
-> else objects.
+> I admit I would have assumed 100 -> HZ, as hard-coded HZ-dependent
+> value typically assume HZ=100.
+> 
+> > I suspect I'm not the only one who thinks that the latter of "HZ / 10"
+> > "100ms" is easier to read and comprehend without mistake.
+> 
+> OTOH, converting from ms to jiffies each time you need the value has a
+> cost.
 
-Hi, Ben
+True; what I did for MMC stuff is converted it from ms to jiffies at
+initialization time when copying it in from platform data in the
+driver's probe function.
 
-What modifications are neccessary for these patches to get them into your 
-tree?
-I can resend patch series if you want.
-
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100412/bb3f6354/attachment.sig>
+I'm not saying that I care either way, I'm merely showing that dealing
+with HZ-based values can be (maybe unexpectedly) more error prone.
