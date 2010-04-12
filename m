@@ -1,18 +1,15 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Apr 2010 19:51:32 +0100
-Subject: [PATCH] ARM: add MAINTAINERS for U300
-In-Reply-To: <1270334805-20767-1-git-send-email-linus.walleij@stericsson.com>
-References: <1270334805-20767-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100412185132.GI3048@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 13 Apr 2010 02:54:01 +0800
+Subject: [PATCH] VPAC270: Add touchscreen support
+In-Reply-To: <1269575154-1651-1-git-send-email-marek.vasut@gmail.com>
+References: <1269575154-1651-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <m2uf17812d71004121154v9d29e002s7ef5297cfa34d909@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 04, 2010 at 12:46:45AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus@foobar.localdomain>
-> 
-> This adds myself as maintainer of the U300 machine and associated
-> system-on-chip drivers.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+On Fri, Mar 26, 2010 at 11:45 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> This adds support for the UCB1400 touchscreen found in the VPAC270 device.
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-If not already dealt with, ok.
+Applied to 'devel'.
