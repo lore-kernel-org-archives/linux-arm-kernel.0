@@ -1,140 +1,391 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Tue, 13 Apr 2010 22:40:08 +0200
-Subject: [RFC PATCH 2/4] ARM: hw-breakpoint: add ARM backend for the
-	hw-breakpoint framework
-In-Reply-To: <1271173965.17356.28.camel@e102144-lin.cambridge.arm.com>
-References: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-2-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-3-git-send-email-will.deacon@arm.com>
-	<h2mc62985531004130632kd086ffe9o16edafc359fa0e2@mail.gmail.com>
-	<1271173965.17356.28.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20100413204000.GC5602@nowhere>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 14 Apr 2010 00:06:42 +0200
+Subject: [PATCH 1/2] [ARM] pxa: add minimal ULPI functionality for USB
+	host port 2 on PXA310.
+In-Reply-To: <fa93111b71cf1e43eef23869466072be4db67bcd.1270651775.git.grinberg@compulab.co.il>
+References: <cover.1270651775.git.grinberg@compulab.co.il>
+	<fa93111b71cf1e43eef23869466072be4db67bcd.1270651775.git.grinberg@compulab.co.il>
+Message-ID: <20100413220642.GW30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 04:52:45PM +0100, Will Deacon wrote:
-> On Tue, 2010-04-13 at 14:32 +0100, Frederic Weisbecker wrote:
-> > (WARNING: I've browsed the ARMv7 breakpoints implementation
-> > but I may have an erratic/incomplete understanding, then parts
-> > of this review might make little sense)
-> > 
-> It looks like you've understood it correctly. Actually, I have
-> a disclaimer of my own; I'm using a new mail client in the hope
-> that LKML won't drop my messages. Anyway...
+On Wed, Apr 07, 2010 at 06:05:22PM +0300, Igor Grinberg wrote:
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+>  arch/arm/mach-pxa/Makefile      |    1 +
+>  arch/arm/mach-pxa/pxa310-ulpi.c |  240 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-pxa/pxa310-ulpi.h |   85 ++++++++++++++
+>  3 files changed, 326 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
+>  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.h
 
+The USB OTG/ULPI framework could well be reused for that I think. All
+that you would need is a struct otg_io_access_ops with two function
+pointers to read and write registers. Then you can use otg_ulpi_create()
+to set up an ULPI compliant device connected to the bus.
 
-Looks like that worked as well :)
+Have a look at the MXC code, I believe adopting that framework is better
+than re-inventing it.
 
-
-
-> > 2010/3/10 Will Deacon <will.deacon@arm.com>:
-> > > The hw-breakpoint framework in the kernel requires architecture-specific
-> > > support in order to install, remove, validate and manage hardware
-> > > breakpoints.
-> > >
-> > > This patch adds preliminary support for this framework to the ARM
-> > > architecture, but restricts the number of watchpoints to a single resource
-> > > to get around the fact that the Data Fault Address Register is unpredictable
-> > > when a watchpoint debug exception is taken.
-> > 
-> > What do you mean here by unpredictable? It would be a pity to limit the
-> > resources to one register.
-> > 
-> By unpredictable I mean that the value in the DFAR is not defined to
-> correspond to the causative address in any way. This isn't the case
-> for a standard data abort, but it is in the case of a watchpoint
-> exception.
+Daniel
 
 
 
-Ok.
-
-
-
-> > 
-> > > +}
-> > > +
-> > > +/* Determine number of WRP registers available. */
-> > > +static int get_num_wrps(void)
-> > > +{
-> > > +       /*
-> > > +        * FIXME: When a watchpoint fires, the only way to work out which
-> > > +        * watchpoint it was is by disassembling the faulting instruction
-> > > +        * and working out the address of the memory access.
-> > 
-> > Doh! That must explain the problem with DFAR...
-> > That's really not convenient :-(
-> > 
-> I know, it makes life a lot harder for us. The most annoying thing is that
-> I'm yet to find a real implementation that *doesn't* set the DFAR to what
-> we want - we just can't rely on that!
-
-
-You mean that sometimes DFAR doesn't have the true ip origin of the
-exception?
-May be you can check the trapped regs to find the instruction pointer
-that caused the exception?
-
-
- 
-> > Ah and it will make ptrace support easier: the user writes into the val/ctrl
-> > fields directly as if they were the true registers, then you can just validate
-> > the fields you want without bitwise ops.
-> > 
-> I'm unsure about this. As mainline stands, ARM has no ptrace support for the
-> hardware breakpoint registers. This means that we could expose the
-> hardware resources in an idealised fashion via ptrace so that if the
-> interface varies between CPUs, userspace doesn't need to care. I had a
-> crack at this with another patch in the series here:
+> diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+> index 86bc87b..76d52f4 100644
+> --- a/arch/arm/mach-pxa/Makefile
+> +++ b/arch/arm/mach-pxa/Makefile
+> @@ -21,6 +21,7 @@ obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o pxa2xx.o pxa25x.o
+>  obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
+>  obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o pxa3xx.o smemc.o
+>  obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
+> +obj-$(CONFIG_CPU_PXA310)	+= pxa310-ulpi.o
+>  obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
+>  obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
+>  
+> diff --git a/arch/arm/mach-pxa/pxa310-ulpi.c b/arch/arm/mach-pxa/pxa310-ulpi.c
+> new file mode 100644
+> index 0000000..ab82db8
+> --- /dev/null
+> +++ b/arch/arm/mach-pxa/pxa310-ulpi.c
+> @@ -0,0 +1,240 @@
+> +/*
+> + * linux/arch/arm/mach-pxa/pxa310-ulpi.c
+> + *
+> + * PXA310 ULPI USB host implementation.
+> + *
+> + * Copyright (C) 2010 CompuLab Ltd.
+> + *
+> + * Igor Grinberg <grinberg@compulab.co.il>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/delay.h>
+> +#include <linux/clk.h>
+> +
+> +#include <mach/regs-u2d.h>
+> +
+> +#include "pxa310-ulpi.h"
+> +
+> +static void __iomem *u2d_mmio_base;
+> +
+> +static inline unsigned int u2d_readl(unsigned int off)
+> +{
+> +	return __raw_readl(u2d_mmio_base + off);
+> +}
+> +
+> +static inline void u2d_writel(unsigned int off, unsigned int val)
+> +{
+> +	__raw_writel(val, u2d_mmio_base + off);
+> +}
+> +
+> +static inline enum u2d_phy_mode ulpi_get_phymode(void)
+> +{
+> +	return (u2d_readl(U2DOTGUSR) & 0xF0000000) >> 28;
+> +}
+> +
+> +static bool ulpi_is_in_sync_mode(void)
+> +{
+> +	enum u2d_phy_mode state = ulpi_get_phymode();
+> +
+> +	return (state == SYNCH) || (state == PRE_SYNCH);
+> +}
+> +
+> +static int ulpi_poll(void)
+> +{
+> +	int timeout = 50000;
+> +
+> +	while (timeout--) {
+> +		if (!(u2d_readl(U2DOTGUCR) & U2DOTGUCR_RUN))
+> +			return 0;
+> +
+> +		cpu_relax();
+> +	}
+> +
+> +	pr_warning("%s: ULPI access timed out!\n", __func__);
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static int ulpi_reg_read(u8 reg, u8 *value)
+> +{
+> +	int err = 0;
+> +
+> +	if (!ulpi_is_in_sync_mode()) {
+> +		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
+> +		return -EBUSY;
+> +	}
+> +
+> +	u2d_writel(U2DOTGUCR,
+> +		   U2DOTGUCR_RUN | U2DOTGUCR_RNW | (reg << U2DOTGUCR_ADDR_S));
+> +	msleep(5);
+> +
+> +	err = ulpi_poll();
+> +	if (err)
+> +		return err;
+> +
+> +	*value = (u8)(u2d_readl(U2DOTGUCR) & U2DOTGUCR_RDATA);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ulpi_reg_write(u8 reg, u8 value)
+> +{
+> +	int err;
+> +
+> +	if (!ulpi_is_in_sync_mode()) {
+> +		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
+> +		return -EBUSY;
+> +	}
+> +
+> +	u2d_writel(U2DOTGUCR, U2DOTGUCR_RUN | (reg << U2DOTGUCR_ADDR_S)
+> +					    | (value << U2DOTGUCR_WDATA_S));
+> +	msleep(5);
+> +
+> +	err = ulpi_poll();
+> +	if (err)
+> +		return err;
+> +
+> +	return 0;
+> +}
+> +
+> +static int u2d_clk_enable(void)
+> +{
+> +	int err;
+> +	struct clk *u2d_clk;
+> +
+> +	u2d_clk = clk_get(NULL, "U2DCLK");
+> +	if (IS_ERR(u2d_clk)) {
+> +		err = PTR_ERR(u2d_clk);
+> +		pr_err("%s: failed to get U2DCLK: %d\n", __func__, err);
+> +		return err;
+> +	}
+> +	clk_enable(u2d_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static void u2d_otg_host_init(void)
+> +{
+> +	u32 u2dotgcr;
+> +
+> +	/* setup OTG controller registers */
+> +	u2dotgcr = u2d_readl(U2DOTGCR);
+> +	u2dotgcr |= U2DOTGCR_ULAF | U2DOTGCR_UTMID;
+> +	u2dotgcr &= ~(U2DOTGCR_SMAF | U2DOTGCR_CKAF);
+> +	u2d_writel(U2DOTGCR, u2dotgcr);
+> +	msleep(5);
+> +	u2d_writel(U2DOTGCR, u2dotgcr | U2DOTGCR_ULE);
+> +	msleep(5);
+> +
+> +	/* no OTG interrupts in host mode */
+> +	u2d_writel(U2DOTGICR, u2d_readl(U2DOTGICR) & ~U2DOTGICR_MASK);
+> +}
+> +
+> +static void u2d_ulpi_rtsm(void)
+> +{
+> +	u32 u2dotgcr;
+> +
+> +	/* put PHY to sync mode */
+> +	u2d_writel(U2DOTGCR, u2d_readl(U2DOTGCR) | U2DOTGCR_RTSM);
+> +	msleep(10);
+> +
+> +	/* setup OTG sync mode */
+> +	u2dotgcr = u2d_readl(U2DOTGCR) | U2DOTGCR_ULAF;
+> +	u2dotgcr &= ~(U2DOTGCR_SMAF | U2DOTGCR_CKAF);
+> +	u2d_writel(U2DOTGCR, u2dotgcr);
+> +}
+> +
+> +static void u2d_disable_otg_device(void)
+> +{
+> +	/* disable USB2 Device controller */
+> +	u2d_writel(U2DCR, u2d_readl(U2DCR) & ~U2DCR_UDE);
+> +	u2d_writel(U2DOTGCR, u2d_readl(U2DOTGCR) | U2DOTGCR_UTMID);
+> +
+> +	/* disable the otg interrupts */
+> +	u2d_writel(U2DOTGICR, u2d_readl(U2DOTGICR) & ~U2DOTGICR_MASK);
+> +}
+> +
+> +static int u2d_set_ulpi_serial(enum u2d_phy_mode mode)
+> +{
+> +	int err = 0;
+> +	u32 u2dotgcr;
+> +
+> +	/* enable the 15K Ohm pull-down resistor on D+ */
+> +	err = ulpi_reg_write(ULPI_OTG_CONTROL_SET, ULPI_OC_DPPULLDOWN);
+> +	if (err)
+> +		return err;
+> +
+> +	/* enable the 15K Ohm pull-down resistor on D- */
+> +	err = ulpi_reg_write(ULPI_OTG_CONTROL_SET, ULPI_OC_DMPULLDOWN);
+> +	if (err)
+> +		return err;
+> +
+> +	/* drive 5V on VBUS */
+> +	err = ulpi_reg_write(ULPI_OTG_CONTROL_SET, ULPI_OC_DRVVBUS);
+> +	if (err)
+> +		return err;
+> +
+> +	/* configure UHC for 6/3-pin serial mode */
+> +	if (mode == SER_6PIN)
+> +		u2d_writel(U2DP3CR, u2d_readl(U2DP3CR) & ~U2DP3CR_P2SS);
+> +	else if (mode == SER_3PIN)
+> +		u2d_writel(U2DP3CR, u2d_readl(U2DP3CR) | U2DP3CR_P2SS);
+> +
+> +	/* put PHY into host mode */
+> +	err = ulpi_reg_write(ULPI_FUNCTION_CONTROL_SET, 0x45);
+> +	if (err)
+> +		return err;
+> +
+> +	/* set PHY to serial 6/3 pin mode */
+> +	if (mode == SER_6PIN)
+> +		err = ulpi_reg_write(ULPI_INTERFACE_CONTROL, ULPI_IC_6PIN);
+> +	else if (mode == SER_3PIN)
+> +		err = ulpi_reg_write(ULPI_INTERFACE_CONTROL, ULPI_IC_3PIN);
+> +	if (err)
+> +		return err;
+> +
+> +	/* enable the serial mode */
+> +	u2dotgcr = u2d_readl(U2DOTGCR) | U2DOTGCR_SMAF;
+> +	u2d_writel(U2DOTGCR, u2dotgcr & ~(U2DOTGCR_ULAF | U2DOTGCR_CKAF));
+> +
+> +	return 0;
+> +}
+> +
+> +int pxa310_ulpi_init(enum u2d_phy_mode mode)
+> +{
+> +	int err;
+> +
+> +	err = u2d_clk_enable();
+> +	if (err)
+> +		goto err_out;
+> +
+> +	u2d_mmio_base = ioremap(U2D_PHYS_BASE, 0x1300);
+> +	if (u2d_mmio_base == NULL) {
+> +		pr_err("%s: failed to remap U2D registers address space\n",
+> +			__func__);
+> +		err = -ENOMEM;
+> +		goto err_out;
+> +	}
+> +
+> +	u2d_otg_host_init();
+> +	u2d_ulpi_rtsm();
+> +	u2d_disable_otg_device();
+> +
+> +	err = u2d_set_ulpi_serial(mode);
+> +	if (err)
+> +		goto err_out;
+> +
+> +	return 0;
+> +
+> +err_out:
+> +	pr_err("%s: ULPI init failed: %d\n", __func__, err);
+> +	return err;
+> +}
+> diff --git a/arch/arm/mach-pxa/pxa310-ulpi.h b/arch/arm/mach-pxa/pxa310-ulpi.h
+> new file mode 100644
+> index 0000000..87558f0
+> --- /dev/null
+> +++ b/arch/arm/mach-pxa/pxa310-ulpi.h
+> @@ -0,0 +1,85 @@
+> +/*
+> + * linux/arch/arm/mach-pxa/pxa310-ulpi.h
+> + *
+> + * PXA310 ULPI USB host header file.
+> + *
+> + * Copyright (C) 2010 CompuLab Ltd.
+> + *
+> + * Igor Grinberg <grinberg@compulab.co.il>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __PXA310_ULPI__
+> +#define __PXA310_ULPI__
+> +
+> +/* OTG Interrupts */
+> +#define U2DOTGICR_MASK		0x37F7F
+> +
+> +/* PXA310 USB OTG Controller */
+> +#define ULPI_VENDOR_LOW		0x0
+> +#define ULPI_VENDOR_HIGH		0x1
+> +#define ULPI_PRODUCT_LOW		0x2
+> +#define ULPI_PRODUCT_HIGH		0x3
+> +#define ULPI_FUNCTION_CONTROL		0x4
+> +#define ULPI_FUNCTION_CONTROL_SET	0x5
+> +#define ULPI_FUNCTION_CONTROL_CLEAR	0x6
+> +#define ULPI_INTERFACE_CONTROL		0x7
+> +#define ULPI_INTERFACE_CONTROL_SET	0x8
+> +#define ULPI_INTERFACE_CONTROL_CLEAR	0x9
+> +#define ULPI_OTG_CONTROL		0xA
+> +#define ULPI_OTG_CONTROL_SET		0xB
+> +#define ULPI_OTG_CONTROL_CLEAR		0xC
+> +#define ULPI_INT_RISE			0xD
+> +#define ULPI_INT_RISE_SET		0xE
+> +#define ULPI_INT_RISE_CLEAR		0xF
+> +#define ULPI_INT_FALL			0x10
+> +#define ULPI_INT_FALL_SET		0x11
+> +#define ULPI_INT_FALL_CLEAR		0x12
+> +#define ULPI_INT_STATUS		0x13
+> +#define ULPI_INT_LATCH			0x14
+> +#define ULPI_DEBUG			0x15
+> +#define ULPI_SCRATCH			0x16
+> +#define ULPI_SCRATCH_SET		0x17
+> +#define ULPI_SCRATCH_CLEAR		0x18
+> +
+> +#define ULPI_FC_RESET		(1 << 5)	/* XCVR Reset */
+> +#define ULPI_FC_SUSPENDM	(1 << 6)	/* XCVR SuspendM, Low Power Mode */
+> +
+> +#define ULPI_IC_6PIN		(1 << 0)	/* XCVR 6 pin mode */
+> +#define ULPI_IC_3PIN		(1 << 1)	/* XCVR 3 pin mode */
+> +#define ULPI_IC_CARKIT		(1 << 2)	/* Carkit mode */
+> +#define ULPI_IC_CLKSUSPENDM	(1 << 3)	/* Active low clock suspend */
+> +
+> +#define ULPI_OC_IDPULLUP	(1 << 0)	/* ID Pull Up, enable sampling of ID line */
+> +#define ULPI_OC_DPPULLDOWN	(1 << 1)	/* Enable the 15K Ohm pull down resistor on D+ */
+> +#define ULPI_OC_DMPULLDOWN	(1 << 2)	/* Enable the 15K Ohm pull down resistor on D- */
+> +#define ULPI_OC_DISCHRGVBUS	(1 << 3)	/* Discharge Vbus */
+> +#define ULPI_OC_CHRGVBUS	(1 << 4)	/* Charge Vbus, for Vbus pulsing SRP */
+> +#define ULPI_OC_DRVVBUS	(1 << 5)	/* Drive 5V on Vbus */
+> +#define ULPI_OC_DRVVBUSEXT	(1 << 6)	/* Drive Vbus using external supply */
+> +
+> +#define ULPI_INT_HOSTDISCON	(1 << 0)	/* Host Disconnect */
+> +#define ULPI_INT_VBUSVALID	(1 << 1)	/* Vbus Valid */
+> +#define ULPI_INT_SESSIONVALID	(1 << 2)	/* Session Valid */
+> +#define ULPI_INT_SESSIONEND	(1 << 3)	/* Session End */
+> +#define ULPI_INT_IDGND		(1 << 4)	/* current status of IDGND */
+> +
+> +#define U2DOTGUCR_ADDR_S	(16)
+> +#define U2DOTGUCR_WDATA_S	(8)
+> +
+> +#define U2D_PHYS_BASE   0x54100000
+> +
+> +enum u2d_phy_mode {
+> +	SYNCH		= 0,
+> +	CARKIT		= (1 << 0),
+> +	SER_3PIN	= (1 << 1),
+> +	SER_6PIN	= (1 << 2),
+> +	LOWPOWER	= (1 << 3),
+> +	PRE_SYNCH	= (1 << 4),
+> +};
+> +
+> +int pxa310_ulpi_init(enum u2d_phy_mode);
+> +
+> +#endif /* __PXA310_ULPI__ */
+> -- 
+> 1.6.4.4
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011169.html
-
-
-
-Ah, indeed if you need to abstract out various ARM versions, that's quite sensitive.
-I'm going to look at this thread too.
-
-
-
- 
-> > You seem to make a wrong assumption here.
-> > This is not because the breakpoint is task-bound that we don't
-> > want it to trigger on the kernel. We may want to trigger breakpoints
-> > on tasklist_lock accesses from a given task.
 > 
-> > The only case for which we don't want it to trigger on the kernel
-> > is for ptrace breakpoints.
-> > 
-> Surely we can't have breakpoints triggering on *any* part of the
-> breakpoint handling code path? Otherwise we'll just get stuck. That's
-> why I disallow breakpoints in the exception section.
-
-
-
-Ah indeed you really need to protect against recursion.
-
-But I'm unclear about the difference between Supervisor and System.
-May be System means the common kernel ring? And you enter into
-Supervisor when an exception triggers?
-
-Do these exceptions also concern page faults and not only debug
-exceptions?
-
- 
-> > I guess I should remove this tsk parameter as it makes the things
-> > only confusing. We should simply create ptrace breakpoints with
-> > bp->attr.exclude_kernel set to 1.
-> 
-> Sounds good to me. That also means that it's one less thing for the arch
-> to worry about!
-
-
-Yeah!
-
-
-
-> I'll take a look at the new constraints and allocation patches you
-> posted this morning and then adjust these patches accordingly.
-
-
-Thanks.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
