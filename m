@@ -1,40 +1,45 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 13 Apr 2010 09:48:33 +0200
-Subject: AACI broken with commit 29a4f2d3
-In-Reply-To: <20100412183148.GB3048@n2100.arm.linux.org.uk>
-References: <1269611685.807.55.camel@e102109-lin.cambridge.arm.com>
-	<20100326140833.GK27692@sirena.org.uk>
-	<1269612734.807.73.camel@e102109-lin.cambridge.arm.com>
-	<1269619671.30296.1.camel@localhost.localdomain>
-	<s5heij66b5o.wl%tiwai@suse.de> <4BB05A92.7010607@mvista.com>
-	<s5h4ojz4l16.wl%tiwai@suse.de> <s5hfx39dmp2.wl%tiwai@suse.de>
-	<20100406174157.GB12831@n2100.arm.linux.org.uk>
-	<s5hbpdwe9pf.wl%tiwai@suse.de>
-	<20100412183148.GB3048@n2100.arm.linux.org.uk>
-Message-ID: <s5hochn94j2.wl%tiwai@suse.de>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Tue, 13 Apr 2010 10:14:53 +0200
+Subject: [PATCH 2/2] AT91 slow-clock resume: don't restore the PLL
+	settings when the PLL was off
+In-Reply-To: <1270724213l.12911l.1l@i-dmzi_al.realan.de>
+References: <x2qcd73a99e1004061445j8698c478z9f021d5f3dd8f81b@mail.gmail.com>
+	<1270724213l.12911l.1l@i-dmzi_al.realan.de>
+Message-ID: <w2ocd73a99e1004130114g1e46ed2blbcfeef1c9cec0001@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Mon, 12 Apr 2010 19:31:48 +0100,
-Russell King - ARM Linux wrote:
-> 
-> On Tue, Apr 06, 2010 at 08:07:24PM +0200, Takashi Iwai wrote:
-> >  	writel(0x1fff, aaci->base + AACI_INTCLR);
-> >  	writel(aaci->maincr, aaci->base + AACI_MAINCR);
-> > -
-> > +	/*
-> > +	 * Fix: ac97 read back fail errors by reading
-> > +	 * from any arbitrary aaci register.
-> > +	 */
-> > +	readl(aaci->base + AACI_CSCH1);
-> 
-> This seems to be acceptable.
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+hi Anders,
 
-OK, I merged it now.
+> at91: slow-clock resume: Don't wait for a disabled PLL to lock.
+>
+> We run into this problem with the PLLB on the at91: ohci-at91 disables the PLLB
+> when going to suspend. The slowclock code however tries to do the same: It
+> saves the PLLB register value and when restoring the value during resume, it
+> waits for the PLLB to lock again. However the PLL will never lock and the loop
+> would run into its timeout because the slowclock code just stored and restored
+> an empty register.
+> This fixes the problem by only restoring PLLA/PLLB when they were enabled
+> at suspend time.
+>
+> Signed-off-by: Anders Larsen <al@alarsen.net>
+> Cc: Andrew Victor <avictor.za@gmail.com>
+> Cc: Julien Langer <julien.langer@gmail.com>
+
+> + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ?0xff0000)
+> + ? ? ? bne ? ? 1f
+> + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ~0xff0000)
+> + ? ? ? beq ? ? 2f
+> +1:
+> ? ? ? ?wait_pllblock
+> +2:
+
+AT91_PMC_MUL is 11 bits (so 0x7ff0000)
+
+Is the mask (0xff0000) correct in the above code?
+It looks like wait_pllblock will be skipped if the MUL field is set to
+0x100, 0x200, 0x300, etc.
 
 
-thanks,
-
-Takashi
+Regards,
+  Andrew Victor
