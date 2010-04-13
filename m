@@ -1,519 +1,728 @@
 From: konkers@android.com (konkers at android.com)
-Date: Tue, 13 Apr 2010 15:42:37 -0700
-Subject: [PATCH v2 04/10] [ARM] tegra: SMP support
-In-Reply-To: <1271198563-10424-4-git-send-email-konkers@android.com>
+Date: Tue, 13 Apr 2010 15:42:41 -0700
+Subject: [PATCH v2 08/10] [ARM] tegra: Add framebuffer driver
+In-Reply-To: <1271198563-10424-8-git-send-email-konkers@android.com>
 References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-1-git-send-email-konkers@android.com>
 	<1271198563-10424-2-git-send-email-konkers@android.com>
 	<1271198563-10424-3-git-send-email-konkers@android.com>
 	<1271198563-10424-4-git-send-email-konkers@android.com>
-Message-ID: <1271198563-10424-5-git-send-email-konkers@android.com>
+	<1271198563-10424-5-git-send-email-konkers@android.com>
+	<1271198563-10424-6-git-send-email-konkers@android.com>
+	<1271198563-10424-7-git-send-email-konkers@android.com>
+	<1271198563-10424-8-git-send-email-konkers@android.com>
+Message-ID: <1271198563-10424-9-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
+v2: Fixes from review by Russell King
+    - Use proper return values
+
+v2: Fixes from review by Jaya Kumar
+    - Comments on lcd resolution
+    - Remove stub functions
+    - Change DUMP_REG to pr_debug
+    - Add unregister_framebuffer to tegra_plat_remove
+
+v2: from Colin Cross
+    - adjust debugging
+
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/Kconfig                       |   12 ++-
- arch/arm/mach-tegra/Makefile           |    2 +
- arch/arm/mach-tegra/headsmp.S          |   61 +++++++++++++
- arch/arm/mach-tegra/hotplug.c          |  140 ++++++++++++++++++++++++++++
- arch/arm/mach-tegra/include/mach/smp.h |   30 ++++++
- arch/arm/mach-tegra/localtimer.c       |   25 +++++
- arch/arm/mach-tegra/platsmp.c          |  156 ++++++++++++++++++++++++++++++++
- 7 files changed, 422 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-tegra/headsmp.S
- create mode 100644 arch/arm/mach-tegra/hotplug.c
- create mode 100644 arch/arm/mach-tegra/include/mach/smp.h
- create mode 100644 arch/arm/mach-tegra/localtimer.c
- create mode 100644 arch/arm/mach-tegra/platsmp.c
+ arch/arm/mach-tegra/include/mach/tegra_fb.h |   27 ++
+ drivers/video/Kconfig                       |   10 +
+ drivers/video/Makefile                      |    1 +
+ drivers/video/tegrafb.c                     |  612 +++++++++++++++++++++++++++
+ 4 files changed, 650 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/tegra_fb.h
+ create mode 100644 drivers/video/tegrafb.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0d385b3..053d5cd 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1106,10 +1106,12 @@ source "kernel/time/Kconfig"
- config SMP
- 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
--		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
-+		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-+		 ARCH_U8500 || ARCH_TEGRA)
- 	depends on GENERIC_CLOCKEVENTS
- 	select USE_GENERIC_SMP_HELPERS
--	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
-+	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
-+		 ARCH_TEGRA)
- 	help
- 	  This enables support for systems with more than one CPU. If you have
- 	  a system with only one CPU, like most personal computers, say N. If
-@@ -1178,9 +1180,11 @@ config HOTPLUG_CPU
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
--		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
-+		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-+		ARCH_U8500 || ARCH_TEGRA)
- 	default y
--	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
-+	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
-+		ARCH_TEGRA)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e20546a..f339559 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -3,3 +3,5 @@ obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y                                   += clock.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
-+obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+diff --git a/arch/arm/mach-tegra/include/mach/tegra_fb.h b/arch/arm/mach-tegra/include/mach/tegra_fb.h
 new file mode 100644
-index 0000000..b5349b2
+index 0000000..84ae886
 --- /dev/null
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -0,0 +1,61 @@
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+        .section ".text.head", "ax"
-+	__CPUINIT
-+
++++ b/arch/arm/mach-tegra/include/mach/tegra_fb.h
+@@ -0,0 +1,27 @@
 +/*
-+ * Tegra specific entry point for secondary CPUs.
-+ *   The secondary kernel init calls v7_flush_dcache_all before it enables
-+ *   the L1; however, the L1 comes out of reset in an undefined state, so
-+ *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
-+ *   of cache lines with uninitialized data and uninitialized tags to get
-+ *   written out to memory, which does really unpleasant things to the main
-+ *   processor.  We fix this by performing an invalidate, rather than a
-+ *   clean + invalidate, before jumping into the kernel.
++ * arch/arm/mach-tegra/include/mach/tegra_fb.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
-+ENTRY(v7_invalidate_l1)
-+        mov     r0, #0
-+        mcr     p15, 2, r0, c0, c0, 0
-+        mrc     p15, 1, r0, c0, c0, 0
 +
-+        ldr     r1, =0x7fff
-+        and     r2, r1, r0, lsr #13
++/* Platform data structure to be passed to the driver */
++struct tegra_fb_lcd_data {
++	int	fb_xres;
++	int	fb_yres;
++	/* Resolution of the output to the LCD.  If different from the
++	   framebuffer resolution, the Tegra display block will scale it */
++	int	lcd_xres;
++	int	lcd_yres;
++	int	bits_per_pixel;
++};
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 6e16244..6751f4f 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1089,6 +1089,16 @@ config FB_RIVA_BACKLIGHT
+ 	help
+ 	  Say Y here if you want to control the backlight of your display.
+ 
++config FB_TEGRA
++	tristate "NVIDIA Tegra SoC display support"
++	depends on ARCH_TEGRA && FB = y
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
++	default FB
++	help
++	  This driver supports the NVIDIA Tegra systems-on-a-chip.
 +
-+        ldr     r1, =0x3ff
-+
-+        and     r3, r1, r0, lsr #3  @ NumWays - 1
-+        add     r2, r2, #1          @ NumSets
-+
-+        and     r0, r0, #0x7
-+        add     r0, r0, #4          @ SetShift
-+
-+        clz     r1, r3              @ WayShift
-+        add     r4, r3, #1          @ NumWays
-+1:      sub     r2, r2, #1          @ NumSets--
-+        mov     r3, r4              @ Temp = NumWays
-+2:      subs    r3, r3, #1          @ Temp--
-+        mov     r5, r3, lsl r1
-+        mov     r6, r2, lsl r0
-+        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
-+        mcr     p15, 0, r5, c7, c6, 2
-+        bgt     2b
-+        cmp     r2, #0
-+        bgt     1b
-+        dsb
-+        isb
-+        mov     pc, lr
-+ENDPROC(v7_invalidate_l1)
-+
-+ENTRY(tegra_secondary_startup)
-+	msr	cpsr_fsxc, #0xd3
-+        bl      v7_invalidate_l1
-+	mrc	p15, 0, r0, c0, c0, 5
-+        and	r0, r0, #15
-+        ldr     r1, =0x6000f100
-+        str     r0, [r1]
-+1:      ldr     r2, [r1]
-+        cmp     r0, r2
-+        beq     1b
-+        b       secondary_startup
-+ENDPROC(tegra_secondary_startup)
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+ config FB_I810
+ 	tristate "Intel 810/815 support (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && FB && PCI && X86_32 && AGP_INTEL
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index ddc2af2..d9098d6 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -131,6 +131,7 @@ obj-$(CONFIG_FB_CARMINE)          += carminefb.o
+ obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
+ obj-$(CONFIG_FB_MSM)              += msm/
+ obj-$(CONFIG_FB_NUC900)           += nuc900fb.o
++obj-$(CONFIG_FB_TEGRA)            += tegrafb.o
+ 
+ # Platform or fallback drivers go here
+ obj-$(CONFIG_FB_UVESA)            += uvesafb.o
+diff --git a/drivers/video/tegrafb.c b/drivers/video/tegrafb.c
 new file mode 100644
-index 0000000..464316c
+index 0000000..8f05c56
 --- /dev/null
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -0,0 +1,140 @@
++++ b/drivers/video/tegrafb.c
+@@ -0,0 +1,612 @@
 +/*
-+ *  linux/arch/arm/mach-realview/hotplug.c
++ * drivers/video/tegrafb.c
 + *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *         Travis Geiselbrecht <travis@palm.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
++
++#include <linux/fb.h>
++#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
-+
-+#include <asm/cacheflush.h>
-+
-+static DECLARE_COMPLETION(cpu_killed);
-+
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+	asm volatile(
-+	"	mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	mcr	p15, 0, %1, c7, c10, 4\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0)
-+	  : "cc");
-+}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+	"mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  :
-+	  : "cc");
-+}
-+
-+static inline void platform_do_lowpower(unsigned int cpu)
-+{
-+	/*
-+	 * there is no power-control hardware on this platform, so all
-+	 * we can do is put the core into WFI; this is safe as the calling
-+	 * code will have already disabled interrupts
-+	 */
-+	for (;;) {
-+		/*
-+		 * here's the WFI
-+		 */
-+		asm(".word	0xe320f003\n"
-+		    :
-+		    :
-+		    : "memory", "cc");
-+
-+		/*if (pen_release == cpu) {*/
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		/*}*/
-+
-+		/*
-+		 * getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * The trouble is, letting people know about this is not really
-+		 * possible, since we are currently running incoherently, and
-+		 * therefore cannot safely call printk() or anything else
-+		 */
-+#ifdef DEBUG
-+		printk(KERN_WARN "CPU%u: spurious wakeup call\n", cpu);
-+#endif
-+	}
-+}
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return wait_for_completion_timeout(&cpu_killed, 5000);
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+#ifdef DEBUG
-+	unsigned int this_cpu = hard_smp_processor_id();
-+
-+	if (cpu != this_cpu) {
-+		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
-+			   this_cpu, cpu);
-+		BUG();
-+	}
-+#endif
-+
-+	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-+	complete(&cpu_killed);
-+
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
-+}
-+
-+int mach_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-tegra/include/mach/smp.h
-new file mode 100644
-index 0000000..8b42dab
---- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/smp.h
-@@ -0,0 +1,30 @@
-+#ifndef ASMARM_ARCH_SMP_H
-+#define ASMARM_ARCH_SMP_H
-+
-+
-+#include <asm/hardware/gic.h>
-+
-+#define hard_smp_processor_id()			\
-+	({						\
-+		unsigned int cpunum;			\
-+		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
-+			: "=r" (cpunum));		\
-+		cpunum &= 0x0F;				\
-+	})
-+
-+/*
-+ * We use IRQ1 as the IPI
-+ */
-+static inline void smp_cross_call(const struct cpumask *mask)
-+{
-+	gic_raise_softirq(mask, 1);
-+}
-+
-+/*
-+ * Do nothing on MPcore.
-+ */
-+static inline void smp_cross_call_done(cpumask_t callmap)
-+{
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-new file mode 100644
-index 0000000..f81ca7c
---- /dev/null
-+++ b/arch/arm/mach-tegra/localtimer.c
-@@ -0,0 +1,25 @@
-+/*
-+ *  arch/arm/mach-tegra/localtimer.c
-+ *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/clockchips.h>
-+#include <asm/irq.h>
-+#include <asm/smp_twd.h>
-+#include <asm/localtimer.h>
-+
-+/*
-+ * Setup the local clock events for a CPU.
-+ */
-+void __cpuinit local_timer_setup(struct clock_event_device *evt)
-+{
-+	evt->irq = IRQ_LOCALTIMER;
-+	twd_timer_setup(evt);
-+}
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-new file mode 100644
-index 0000000..1c0fd92
---- /dev/null
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -0,0 +1,156 @@
-+/*
-+ *  linux/arch/arm/mach-tegra/platsmp.c
-+ *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ *  Copyright (C) 2009 Palm
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/init.h>
-+#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
 +#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/jiffies.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/clk.h>
++#include <linux/wait.h>
 +#include <asm/cacheflush.h>
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/localtimer.h>
-+#include <asm/smp_scu.h>
++#include <mach/tegra_fb.h>
 +
-+#include <mach/iomap.h>
++#define DC_CMD_GENERAL_INCR_SYNCPT		0x000
++#define DC_CMD_GENERAL_INCR_SYNCPT_CNTRL	0x001
++#define DC_CMD_GENERAL_INCR_SYNCPT_ERROR	0x002
++#define DC_CMD_WIN_A_INCR_SYNCPT		0x008
++#define DC_CMD_WIN_A_INCR_SYNCPT_CNTRL		0x009
++#define DC_CMD_WIN_A_INCR_SYNCPT_ERROR		0x00a
++#define DC_CMD_WIN_B_INCR_SYNCPT		0x010
++#define DC_CMD_WIN_B_INCR_SYNCPT_CNTRL		0x011
++#define DC_CMD_WIN_B_INCR_SYNCPT_ERROR		0x012
++#define DC_CMD_WIN_C_INCR_SYNCPT		0x018
++#define DC_CMD_WIN_C_INCR_SYNCPT_CNTRL		0x019
++#define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
++#define DC_CMD_CONT_SYNCPT_VSYNC		0x028
++#define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
++#define DC_CMD_DISPLAY_COMMAND			0x032
++#define DC_CMD_SIGNAL_RAISE			0x033
++#define DC_CMD_INT_STATUS			0x037
++#define DC_CMD_INT_MASK				0x038
++#define DC_CMD_INT_ENABLE			0x039
++#define DC_CMD_INT_TYPE				0x03a
++#define DC_CMD_INT_POLARITY			0x03b
++#define DC_CMD_SIGNAL_RAISE1			0x03c
++#define DC_CMD_SIGNAL_RAISE2			0x03d
++#define DC_CMD_SIGNAL_RAISE3			0x03e
++#define DC_CMD_STATE_ACCESS			0x040
++#define DC_CMD_STATE_CONTROL			0x041
++#define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
++#define DC_CMD_REG_ACT_CONTROL			0x043
++#define DC_WINC_A_COLOR_PALETTE			0x500
++#define DC_WINC_A_PALETTE_COLOR_EXT		0x600
++#define DC_WIN_A_WIN_OPTIONS			0x700
++#define DC_WIN_A_BYTE_SWAP			0x701
++#define DC_WIN_A_BUFFER_CONTROL			0x702
++#define DC_WIN_A_COLOR_DEPTH			0x703
++#define DC_WIN_A_POSITION			0x704
++#define DC_WIN_A_SIZE				0x705
++#define DC_WIN_A_PRESCALED_SIZE			0x706
++#define DC_WIN_A_H_INITIAL_DDA			0x707
++#define DC_WIN_A_V_INITIAL_DDA			0x708
++#define DC_WIN_A_DDA_INCREMENT			0x709
++#define DC_WIN_A_LINE_STRIDE			0x70a
++#define DC_WIN_A_BUF_STRIDE			0x70b
++#define DC_WINBUF_A_START_ADDR			0x800
++#define DC_WINBUF_A_ADDR_H_OFFSET		0x806
++#define DC_WINBUF_A_ADDR_V_OFFSET		0x808
 +
-+extern void tegra_secondary_startup(void);
 +
-+static DEFINE_SPINLOCK(boot_lock);
-+static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
++#define DC_INT_CTXSW				(1<<0)
++#define DC_INT_FRAME_END			(1<<1)
++#define DC_INT_V_BLANK				(1<<2)
++#define DC_INT_H_BLANK				(1<<3)
++#define DC_INT_V_PULSE3				(1<<4)
 +
-+#define EVP_CPU_RESET_VECTOR \
-+	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x4c)
-+#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
++#define DC_COLOR_DEPTH_P1			0
++#define DC_COLOR_DEPTH_P2			1
++#define DC_COLOR_DEPTH_P4			2
++#define DC_COLOR_DEPTH_P8			3
++#define DC_COLOR_DEPTH_B4G4R4A4			4
++#define DC_COLOR_DEPTH_B5G5R5A			5
++#define DC_COLOR_DEPTH_B5G6R5			6
++#define DC_COLOR_DEPTH_AB5G5R5			7
++#define DC_COLOR_DEPTH_B8G8R8A8			12
++#define DC_COLOR_DEPTH_R8G8B8A8			13
++#define DC_COLOR_DEPTH_B6x2G6x2R6x2A8		14
++#define DC_COLOR_DEPTH_R6x2G6x2B6x2A8		15
++#define DC_COLOR_DEPTH_YCbCr422			16
++#define DC_COLOR_DEPTH_YUV422			17
++#define DC_COLOR_DEPTH_YCbCr420P		18
++#define DC_COLOR_DEPTH_YUV420P			19
++#define DC_COLOR_DEPTH_YCbCr422P		20
++#define DC_COLOR_DEPTH_YUV422P			21
++#define DC_COLOR_DEPTH_YCbCr422R		22
++#define DC_COLOR_DEPTH_YUV422R			23
++#define DC_COLOR_DEPTH_YCbCr422RA		24
++#define DC_COLOR_DEPTH_YUV422RA			25
 +
-+void __cpuinit platform_secondary_init(unsigned int cpu)
++struct tegra_fb_info {
++	struct clk *clk;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	void __iomem *reg_base;
++	wait_queue_head_t event_wq;
++	unsigned int wait_condition;
++	/* Resolution of the output to the LCD.  If different from the
++	   framebuffer resolution, the Tegra display block will scale it */
++	int lcd_xres;
++	int lcd_yres;
++	int irq;
++};
++
++static void tegra_fb_writel(struct tegra_fb_info *tegra_fb, u32 val, unsigned long reg)
 +{
-+	trace_hardirqs_off();
-+
-+	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
-+	 */
-+	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x100);
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
++	writel(val, tegra_fb->reg_base + reg*sizeof(u32));
 +}
 +
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static u32 tegra_fb_readl(struct tegra_fb_info *tegra_fb, unsigned long reg)
 +{
-+	unsigned long old_boot_vector;
-+	unsigned long boot_vector;
-+	unsigned long timeout;
++	return readl(tegra_fb->reg_base + reg*sizeof(u32));
++}
++
++/* palette attary used by the fbcon */
++u32 pseudo_palette[16];
++
++irqreturn_t tegra_fb_irq(int irq, void *ptr)
++{
++	struct fb_info *info = ptr;
++	struct tegra_fb_info *tegra_fb = info->par;
++
++	u32 reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_STATUS);
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_STATUS);
++
++	tegra_fb->wait_condition = 1;
++	wake_up(&tegra_fb->event_wq);
++	return IRQ_HANDLED;
++}
++
++static int tegra_fb_wait_for_event(struct tegra_fb_info *tegra_fb, unsigned long timeout, u32 irq_mask)
++{
 +	u32 reg;
 +
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
++	tegra_fb->wait_condition = 0;
 +
++	reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_MASK);
++	reg |= irq_mask;
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_MASK);
 +
-+	/* set the reset vector to point to the secondary_startup routine */
++	/* Clear any pending interrupt */
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_STATUS);
 +
-+	boot_vector = virt_to_phys(tegra_secondary_startup);
-+	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
-+	writel(boot_vector, EVP_CPU_RESET_VECTOR);
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_ENABLE);
 +
-+	/* enable cpu clock on cpu1 */
-+	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-+	writel(reg & ~(1<<9), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
++	/* Wait for the irq to fire */
++	wait_event_interruptible_timeout(tegra_fb->event_wq, tegra_fb->wait_condition, timeout);
 +
-+	reg = (1<<13) | (1<<9) | (1<<5) | (1<<1);
-+	writel(reg, CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
++	tegra_fb_writel(tegra_fb, 0, DC_CMD_INT_ENABLE);
 +
-+	smp_wmb();
-+	flush_cache_all();
++	if (!tegra_fb->wait_condition) {
++		pr_warning("%s: wait for vsync timed out\n", __func__);
++		return -ETIMEDOUT;
++	}
++	return 0;
++}
 +
-+	/* unhalt the cpu */
-+	writel(0, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x14);
++/* Writes to many registers in the display block are buffered.
++ * tegra_fb_activate requests an update of the main registers from their
++ * double-buffered registers, which takes effect at the end of the next frame,
++ * and then waits for the frame_end IRQ.
++ */
++static void tegra_fb_activate(struct tegra_fb_info *tegra_fb)
++{
++	int vsync_count = 0;
 +
-+	timeout = jiffies + (1 * HZ);
-+	while (time_before(jiffies, timeout)) {
-+		if (readl(EVP_CPU_RESET_VECTOR) != boot_vector)
-+			break;
-+		udelay(10);
++	if (unlikely(tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3)) {
++		pr_warning("%s: update already activated!\n", __func__);
++		return;
 +	}
 +
-+	/* put the old boot vector back */
-+	writel(old_boot_vector, EVP_CPU_RESET_VECTOR);
++	tegra_fb_writel(tegra_fb, (1 << 8) | (1 << 9), DC_CMD_STATE_CONTROL);
++	tegra_fb_writel(tegra_fb, (1 << 0) | (1 << 1), DC_CMD_STATE_CONTROL);
++	while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
++		vsync_count++;
++		if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
++			break;
++	}
++	if (unlikely(vsync_count > 1))
++		pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
++}
 +
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
++
++static int tegra_fb_open(struct fb_info *info, int user)
++{
++	return 0;
++}
++
++static int tegra_fb_release(struct fb_info *info, int user)
++{
++	return 0;
++}
++
++static int tegra_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
++{
++	if ((var->xres != info->var.xres) ||
++	    (var->yres != info->var.yres) ||
++	    (var->xres_virtual != info->var.xres_virtual) ||
++	    (var->yres_virtual != info->var.yres_virtual) ||
++	    (var->grayscale != info->var.grayscale))
++		return -EINVAL;
++	return 0;
++}
++
++static int tegra_fb_set_par(struct fb_info *info)
++{
++	struct tegra_fb_info *tegra_fb = info->par;
++	struct fb_var_screeninfo *var = &info->var;
++	struct fb_fix_screeninfo *fix = &info->fix;
++	u32 color_depth;
++	unsigned int h_dda;
++	unsigned int v_dda;
++
++	/* we only support RGB ordering for now */
++	switch (var->bits_per_pixel) {
++	case 32:
++	case 24:
++		var->red.offset = 0;
++		var->red.length = 8;
++		var->green.offset = 8;
++		var->green.length = 8;
++		var->blue.offset = 16;
++		var->blue.length = 8;
++		color_depth = DC_COLOR_DEPTH_B8G8R8A8;
++		break;
++	case 16:
++		var->red.offset = 11;
++		var->red.length = 5;
++		var->green.offset = 5;
++		var->green.length = 6;
++		var->blue.offset = 0;
++		var->blue.length = 5;
++		color_depth = DC_COLOR_DEPTH_B5G6R5;
++		break;
++	default:
++		return -EINVAL;
++	}
++	fix->line_length = var->xres * var->bits_per_pixel / 8;
++
++	h_dda = (var->xres * 0x1000) / (tegra_fb->lcd_xres - 1);
++	v_dda = (var->yres * 0x1000) / (tegra_fb->lcd_yres - 1);
++
++	tegra_fb_writel(tegra_fb, tegra_fb->lcd_yres<<16 | tegra_fb->lcd_xres,
++		DC_WIN_A_SIZE);
++	tegra_fb_writel(tegra_fb, var->yres<<16 | fix->line_length,
++		DC_WIN_A_PRESCALED_SIZE);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_H_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_V_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, v_dda << 16 | h_dda, DC_WIN_A_DDA_INCREMENT);
++	tegra_fb_writel(tegra_fb, color_depth, DC_WIN_A_COLOR_DEPTH);
++	tegra_fb_writel(tegra_fb, fix->line_length, DC_WIN_A_LINE_STRIDE);
++	return 0;
++}
++
++static int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
++	unsigned blue, unsigned transp, struct fb_info *info)
++{
++	struct fb_var_screeninfo *var = &info->var;
++
++	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
++	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
++		u32 v;
++
++		if (regno >= 16)
++			return -EINVAL;
++
++		v = (red << var->red.offset) |
++			(green << var->green.offset) |
++			(blue << var->blue.offset);
++
++		((u32 *)info->pseudo_palette)[regno] = v;
++	}
 +
 +	return 0;
 +}
 +
-+/*
-+ * Initialise the CPU possible map early - this describes the CPUs
-+ * which may be present or become present in the system.
-+ */
-+void __init smp_init_cpus(void)
++static int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 +{
-+	unsigned int i, ncores = scu_get_core_count(scu_base);
++	struct tegra_fb_info *tegra_fb = info->par;
++	char __iomem *flush_start;
++	char __iomem *flush_end;
++	u32 addr;
 +
-+	for (i = 0; i < ncores; i++)
-+		cpu_set(i, cpu_possible_map);
++	flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
++	flush_end = flush_start + (var->yres * info->fix.line_length);
++
++	info->var.xoffset = var->xoffset;
++	info->var.yoffset = var->yoffset;
++
++	addr = info->fix.smem_start + (var->yoffset * info->fix.line_length) +
++		(var->xoffset * (var->bits_per_pixel/8));
++
++	tegra_fb_writel(tegra_fb, addr, DC_WINBUF_A_START_ADDR);
++	tegra_fb_activate(tegra_fb);
++	return 0;
 +}
 +
-+void __init smp_prepare_cpus(unsigned int max_cpus)
++static void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 +{
-+	unsigned int ncores = scu_get_core_count(scu_base);
-+	unsigned int cpu = smp_processor_id();
-+	int i;
++	cfb_fillrect(info, rect);
++}
 +
-+	smp_store_cpu_info(cpu);
++static void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
++{
++	cfb_copyarea(info, region);
++}
 +
-+	/*
-+	 * are we trying to boot more cores than exist?
-+	 */
-+	if (max_cpus > ncores)
-+		max_cpus = ncores;
++static void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
++{
++	cfb_imageblit(info, image);
++}
 +
-+	/*
-+	 * Initialise the present map, which describes the set of CPUs
-+	 * actually populated at the present time.
-+	 */
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
++#ifdef DEBUG
++#define DUMP_REG(a) dev_dbg(info->dev, "%-32s\t%03x\t%08x\n", #a, a, tegra_fb_readl(tegra_fb, a));
++static void dump_regs(struct fb_info *info)
++{
++	struct tegra_fb_info *tegra_fb = info->par;
 +
-+	/*
-+	 * Initialise the SCU if there are more than one CPU and let
-+	 * them know where to start. Note that, on modern versions of
-+	 * MILO, the "poke" doesn't actually do anything until each
-+	 * individual core is sent a soft interrupt to get it out of
-+	 * WFI
-+	 */
-+	if (max_cpus > 1) {
-+		percpu_timer_setup();
-+		scu_enable(scu_base);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_CONT_SYNCPT_VSYNC);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE);
++	DUMP_REG(DC_CMD_INT_STATUS);
++	DUMP_REG(DC_CMD_INT_MASK);
++	DUMP_REG(DC_CMD_INT_ENABLE);
++	DUMP_REG(DC_CMD_INT_TYPE);
++	DUMP_REG(DC_CMD_INT_POLARITY);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE1);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE2);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE3);
++	DUMP_REG(DC_CMD_STATE_ACCESS);
++	DUMP_REG(DC_CMD_STATE_CONTROL);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_REG_ACT_CONTROL);
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_WINC_A_COLOR_PALETTE);
++	DUMP_REG(DC_WINC_A_PALETTE_COLOR_EXT);
++	DUMP_REG(DC_WIN_A_WIN_OPTIONS);
++	DUMP_REG(DC_WIN_A_BYTE_SWAP);
++	DUMP_REG(DC_WIN_A_BUFFER_CONTROL);
++	DUMP_REG(DC_WIN_A_COLOR_DEPTH);
++	DUMP_REG(DC_WIN_A_POSITION);
++	DUMP_REG(DC_WIN_A_SIZE);
++	DUMP_REG(DC_WIN_A_PRESCALED_SIZE);
++	DUMP_REG(DC_WIN_A_H_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_V_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_DDA_INCREMENT);
++	DUMP_REG(DC_WIN_A_LINE_STRIDE);
++	DUMP_REG(DC_WIN_A_BUF_STRIDE);
++	DUMP_REG(DC_WINBUF_A_START_ADDR);
++	DUMP_REG(DC_WINBUF_A_ADDR_H_OFFSET);
++	DUMP_REG(DC_WINBUF_A_ADDR_V_OFFSET);
++}
++#endif
++
++static struct fb_ops tegra_fb_ops = {
++	.owner = THIS_MODULE,
++	.fb_open = tegra_fb_open,
++	.fb_release = tegra_fb_release,
++	.fb_check_var = tegra_fb_check_var,
++	.fb_set_par = tegra_fb_set_par,
++	.fb_setcolreg = tegra_fb_setcolreg,
++	.fb_pan_display = tegra_fb_pan_display,
++	.fb_fillrect = tegra_fb_fillrect,
++	.fb_copyarea = tegra_fb_copyarea,
++	.fb_imageblit = tegra_fb_imageblit,
++};
++
++static int tegra_plat_probe(struct platform_device *pdev)
++{
++	struct fb_info *info;
++	struct tegra_fb_info *tegra_fb;
++	struct clk *clk;
++	struct resource	*res;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	int ret = 0;
++	void __iomem *reg_base;
++	void __iomem *fb_base;
++	unsigned long fb_size;
++	unsigned long fb_phys;
++	int irq;
++	const struct tegra_fb_lcd_data *lcd_data = pdev->dev.platform_data;
++
++	info = framebuffer_alloc(sizeof(struct tegra_fb_info), &pdev->dev);
++	if (!info) {
++		ret = -ENOMEM;
++		goto err;
 +	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0) {
++		pr_debug("%s: no irq\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		pr_debug("%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
++	}
++
++	reg_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!reg_mem) {
++		pr_debug("%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_free;
++	}
++
++	reg_base = ioremap(res->start, resource_size(res));
++	if (!reg_base) {
++		pr_debug("%s: registers can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_reg;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res) {
++		pr_debug("%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_reg;
++	}
++
++	fb_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!fb_mem) {
++		pr_debug("%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_iounmap_reg;
++	}
++
++	fb_size = resource_size(res);
++	fb_phys = res->start;
++	fb_base = ioremap_nocache(fb_phys, fb_size);
++	if (!fb_base) {
++		pr_debug("%s: fb can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_fb;
++	}
++
++	clk = clk_get(&pdev->dev, NULL);
++	if (!clk) {
++		pr_debug("%s: can't get clock\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_fb;
++	}
++	clk_enable(clk);
++
++	tegra_fb = info->par;
++	tegra_fb->clk = clk;
++	tegra_fb->fb_mem = fb_mem;
++	tegra_fb->reg_mem = reg_mem;
++	tegra_fb->reg_base = reg_base;
++	tegra_fb->irq = irq;
++	tegra_fb->lcd_xres = lcd_data->lcd_xres;
++	tegra_fb->lcd_yres = lcd_data->lcd_yres;
++
++	info->fbops = &tegra_fb_ops;
++	info->pseudo_palette = pseudo_palette;
++	info->screen_base = fb_base;
++	info->screen_size = fb_size;
++
++	strlcpy(info->fix.id, "tegra_fb", sizeof(info->fix.id));
++	info->fix.type = FB_TYPE_PACKED_PIXELS;
++	info->fix.visual = FB_VISUAL_TRUECOLOR;
++	info->fix.xpanstep   = 1;
++	info->fix.ypanstep   = 1;
++	info->fix.accel	  = FB_ACCEL_NONE;
++	info->fix.smem_start = fb_phys;
++	info->fix.smem_len = fb_size;
++
++	info->var.xres			= lcd_data->fb_xres;
++	info->var.yres			= lcd_data->fb_yres;
++	info->var.xres_virtual		= lcd_data->fb_xres;
++	info->var.yres_virtual		= lcd_data->fb_yres*2;
++	info->var.bits_per_pixel	= lcd_data->bits_per_pixel;
++	info->var.activate		= FB_ACTIVATE_NOW;
++	info->var.height		= -1;
++	info->var.width			= -1;
++	info->var.pixclock		= 24500;
++	info->var.left_margin		= 0;
++	info->var.right_margin		= 0;
++	info->var.upper_margin		= 0;
++	info->var.lower_margin		= 0;
++	info->var.hsync_len		= 0;
++	info->var.vsync_len		= 0;
++	info->var.vmode			= FB_VMODE_NONINTERLACED;
++
++	if (request_irq(irq, tegra_fb_irq, IRQF_DISABLED,
++			dev_name(&pdev->dev), info)) {
++		pr_debug("%s: request_irq %d failed\n",
++			pdev->name, irq);
++		ret = -EBUSY;
++		goto err_clk_disable;
++	}
++
++	init_waitqueue_head(&tegra_fb->event_wq);
++
++	/* Enable writes to Window A */
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++
++#ifdef DEBUG
++	info->dev = &pdev->dev;
++	dev_dbg(info->dev, "Framebuffer registers before init:\n");
++	dump_regs(info);
++#endif
++
++	tegra_fb_set_par(info);
++
++#ifdef DEBUG
++	dev_dbg(info->dev, "Framebuffer registers after init:\n");
++	dump_regs(info);
++#endif
++
++	dev_info(&pdev->dev, "base address: %08x (%08x)\n",
++			(unsigned int)info->fix.smem_start,
++			(unsigned int)info->screen_base);
++
++	register_framebuffer(info);
++	platform_set_drvdata(pdev, info);
++	return 0;
++
++err_clk_disable:
++	clk_disable(clk);
++err_iounmap_fb:
++	iounmap(fb_base);
++err_release_resource_fb:
++	release_resource(fb_mem);
++err_iounmap_reg:
++	iounmap(reg_base);
++err_release_resource_reg:
++	release_resource(reg_mem);
++err_free:
++	framebuffer_release(info);
++err:
++	return ret;
 +}
++
++static int tegra_plat_remove(struct platform_device *pdev)
++{
++	struct fb_info *info = platform_get_drvdata(pdev);
++	struct tegra_fb_info *tegra_fb = info->par;
++	unregister_framebuffer(info);
++	clk_disable(tegra_fb->clk);
++	iounmap(info->screen_base);
++	release_resource(tegra_fb->fb_mem);
++	iounmap(tegra_fb->reg_base);
++	release_resource(tegra_fb->reg_mem);
++	framebuffer_release(info);
++	return 0;
++}
++
++struct platform_driver tegra_platform_driver = {
++	.probe = tegra_plat_probe,
++	.remove = tegra_plat_remove,
++	.driver = {
++		.name = "tegrafb",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init tegra_fb_init(void)
++{
++	int e;
++	e = platform_driver_register(&tegra_platform_driver);
++	if (e) {
++		pr_info("tegrafb: platform_driver_register failed\n");
++		return e;
++	}
++	return e;
++}
++
++static void __exit tegra_exit(void)
++{
++	platform_driver_unregister(&tegra_platform_driver);
++}
++
++module_exit(tegra_exit);
++module_init(tegra_fb_init);
 -- 
 1.6.5.6
