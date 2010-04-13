@@ -1,7 +1,7 @@
 From: konkers@android.com (konkers at android.com)
-Date: Tue, 13 Apr 2010 15:42:40 -0700
-Subject: [PATCH v2 07/10] [ARM] tegra: add pinmux support
-In-Reply-To: <1271198563-10424-7-git-send-email-konkers@android.com>
+Date: Tue, 13 Apr 2010 15:42:39 -0700
+Subject: [PATCH v2 06/10] [ARM] tegra: add GPIO support
+In-Reply-To: <1271198563-10424-6-git-send-email-konkers@android.com>
 References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-1-git-send-email-konkers@android.com>
 	<1271198563-10424-2-git-send-email-konkers@android.com>
@@ -9,49 +9,71 @@ References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-4-git-send-email-konkers@android.com>
 	<1271198563-10424-5-git-send-email-konkers@android.com>
 	<1271198563-10424-6-git-send-email-konkers@android.com>
-	<1271198563-10424-7-git-send-email-konkers@android.com>
-Message-ID: <1271198563-10424-8-git-send-email-konkers@android.com>
+Message-ID: <1271198563-10424-7-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Erik Gilling <konkers@android.com>
 
-v2: fixes from Russell King
-	- include linux/io.h instead of asm/io.h
+v2: fixes from Mike Rapoport:
+	- move gpio-names.h to arch/arm/mach-tegra
+    fixes from Russell King
+	- include linux/io.h and linux/gpio.h instead of asm/io.h
+	  and asm/gpio.h
+    additional changes:
+    	- add macros to convert between irq and gpio numbers for platform data
+	- change for_each_bit to for_each_set_bit in gpio.c
 
-Signed-off-by: Erik Gilling <konkers@android.com>
 Signed-off-by: Colin Cross <ccross@android.com>
+Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/mach-tegra/Makefile              |    2 +
- arch/arm/mach-tegra/include/mach/pinmux.h |  241 +++++++++++++
- arch/arm/mach-tegra/pinmux.c              |  548 +++++++++++++++++++++++++++++
- 3 files changed, 791 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/include/mach/pinmux.h
- create mode 100644 arch/arm/mach-tegra/pinmux.c
+ arch/arm/mach-tegra/Kconfig             |    1 +
+ arch/arm/mach-tegra/Makefile            |    1 +
+ arch/arm/mach-tegra/gpio-names.h        |  247 ++++++++++++++++++++++
+ arch/arm/mach-tegra/gpio.c              |  348 +++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/include/mach/gpio.h |   53 +++++
+ 5 files changed, 650 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/gpio-names.h
+ create mode 100644 arch/arm/mach-tegra/gpio.c
+ create mode 100644 arch/arm/mach-tegra/include/mach/gpio.h
 
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 64ab14f..1ec54d6 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
+ 	bool "Tegra 2 family"
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARCH_REQUIRE_GPIOLIB
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 122f7dc..5e47a71 100644
+index 01f47fd..122f7dc 100644
 --- a/arch/arm/mach-tegra/Makefile
 +++ b/arch/arm/mach-tegra/Makefile
-@@ -4,6 +4,8 @@ obj-y                                   += irq.o
+@@ -3,6 +3,7 @@ obj-y                                   += io.o
+ obj-y                                   += irq.o
  obj-y                                   += clock.o
  obj-y                                   += timer.o
- obj-y                                   += gpio.o
-+obj-y                                   += pinmux.o
-+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
++obj-y                                   += gpio.o
  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
  obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
  obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
+diff --git a/arch/arm/mach-tegra/gpio-names.h b/arch/arm/mach-tegra/gpio-names.h
 new file mode 100644
-index 0000000..02a706b
+index 0000000..f28220a
 --- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/pinmux.h
-@@ -0,0 +1,241 @@
++++ b/arch/arm/mach-tegra/gpio-names.h
+@@ -0,0 +1,247 @@
 +/*
-+ * linux/arch/arm/mach-tegra/include/mach/pinmux.h
++ * arch/arm/mach-tegra/include/mach/gpio-names.h
 + *
-+ * Copyright (C) 2010 Google, Inc.
++ * Copyright (c) 2010 Google, Inc
++ *
++ * Author:
++ *	Erik Gilling <konkers@google.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -61,244 +83,250 @@ index 0000000..02a706b
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
 + */
 +
-+#ifndef __MACH_TEGRA_PINMUX_H
-+#define __MACH_TEGRA_PINMUX_H
++#ifndef __MACH_TEGRA_GPIO_NAMES_H
++#define __MACH_TEGRA_GPIO_NAMES_H
 +
-+typedef enum {
-+	TEGRA_PINGROUP_ATA = 0,
-+	TEGRA_PINGROUP_ATB,
-+	TEGRA_PINGROUP_ATC,
-+	TEGRA_PINGROUP_ATD,
-+	TEGRA_PINGROUP_ATE,
-+	TEGRA_PINGROUP_CDEV1,
-+	TEGRA_PINGROUP_CDEV2,
-+	TEGRA_PINGROUP_CRTP,
-+	TEGRA_PINGROUP_CSUS,
-+	TEGRA_PINGROUP_DAP1,
-+	TEGRA_PINGROUP_DAP2,
-+	TEGRA_PINGROUP_DAP3,
-+	TEGRA_PINGROUP_DAP4,
-+	TEGRA_PINGROUP_DDC,
-+	TEGRA_PINGROUP_DTA,
-+	TEGRA_PINGROUP_DTB,
-+	TEGRA_PINGROUP_DTC,
-+	TEGRA_PINGROUP_DTD,
-+	TEGRA_PINGROUP_DTE,
-+	TEGRA_PINGROUP_DTF,
-+	TEGRA_PINGROUP_GMA,
-+	TEGRA_PINGROUP_GMB,
-+	TEGRA_PINGROUP_GMC,
-+	TEGRA_PINGROUP_GMD,
-+	TEGRA_PINGROUP_GME,
-+	TEGRA_PINGROUP_GPU,
-+	TEGRA_PINGROUP_GPU7,
-+	TEGRA_PINGROUP_GPV,
-+	TEGRA_PINGROUP_HDINT,
-+	TEGRA_PINGROUP_I2CP,
-+	TEGRA_PINGROUP_IRRX,
-+	TEGRA_PINGROUP_IRTX,
-+	TEGRA_PINGROUP_KBCA,
-+	TEGRA_PINGROUP_KBCB,
-+	TEGRA_PINGROUP_KBCC,
-+	TEGRA_PINGROUP_KBCD,
-+	TEGRA_PINGROUP_KBCE,
-+	TEGRA_PINGROUP_KBCF,
-+	TEGRA_PINGROUP_LCSN,
-+	TEGRA_PINGROUP_LD0,
-+	TEGRA_PINGROUP_LD1,
-+	TEGRA_PINGROUP_LD10,
-+	TEGRA_PINGROUP_LD11,
-+	TEGRA_PINGROUP_LD12,
-+	TEGRA_PINGROUP_LD13,
-+	TEGRA_PINGROUP_LD14,
-+	TEGRA_PINGROUP_LD15,
-+	TEGRA_PINGROUP_LD16,
-+	TEGRA_PINGROUP_LD17,
-+	TEGRA_PINGROUP_LD2,
-+	TEGRA_PINGROUP_LD3,
-+	TEGRA_PINGROUP_LD4,
-+	TEGRA_PINGROUP_LD5,
-+	TEGRA_PINGROUP_LD6,
-+	TEGRA_PINGROUP_LD7,
-+	TEGRA_PINGROUP_LD8,
-+	TEGRA_PINGROUP_LD9,
-+	TEGRA_PINGROUP_LDC,
-+	TEGRA_PINGROUP_LDI,
-+	TEGRA_PINGROUP_LHP0,
-+	TEGRA_PINGROUP_LHP1,
-+	TEGRA_PINGROUP_LHP2,
-+	TEGRA_PINGROUP_LHS,
-+	TEGRA_PINGROUP_LM0,
-+	TEGRA_PINGROUP_LM1,
-+	TEGRA_PINGROUP_LPP,
-+	TEGRA_PINGROUP_LPW0,
-+	TEGRA_PINGROUP_LPW1,
-+	TEGRA_PINGROUP_LPW2,
-+	TEGRA_PINGROUP_LSC0,
-+	TEGRA_PINGROUP_LSC1,
-+	TEGRA_PINGROUP_LSCK,
-+	TEGRA_PINGROUP_LSDA,
-+	TEGRA_PINGROUP_LSDI,
-+	TEGRA_PINGROUP_LSPI,
-+	TEGRA_PINGROUP_LVP0,
-+	TEGRA_PINGROUP_LVP1,
-+	TEGRA_PINGROUP_LVS,
-+	TEGRA_PINGROUP_OWC,
-+	TEGRA_PINGROUP_PMC,
-+	TEGRA_PINGROUP_PTA,
-+	TEGRA_PINGROUP_RM,
-+	TEGRA_PINGROUP_SDB,
-+	TEGRA_PINGROUP_SDC,
-+	TEGRA_PINGROUP_SDD,
-+	TEGRA_PINGROUP_SDIO1,
-+	TEGRA_PINGROUP_SLXA,
-+	TEGRA_PINGROUP_SLXC,
-+	TEGRA_PINGROUP_SLXD,
-+	TEGRA_PINGROUP_SLXK,
-+	TEGRA_PINGROUP_SPDI,
-+	TEGRA_PINGROUP_SPDO,
-+	TEGRA_PINGROUP_SPIA,
-+	TEGRA_PINGROUP_SPIB,
-+	TEGRA_PINGROUP_SPIC,
-+	TEGRA_PINGROUP_SPID,
-+	TEGRA_PINGROUP_SPIE,
-+	TEGRA_PINGROUP_SPIF,
-+	TEGRA_PINGROUP_SPIG,
-+	TEGRA_PINGROUP_SPIH,
-+	TEGRA_PINGROUP_UAA,
-+	TEGRA_PINGROUP_UAB,
-+	TEGRA_PINGROUP_UAC,
-+	TEGRA_PINGROUP_UAD,
-+	TEGRA_PINGROUP_UCA,
-+	TEGRA_PINGROUP_UCB,
-+	TEGRA_PINGROUP_UDA,
-+	/* these pin groups only have pullup and pull down control */
-+	TEGRA_PINGROUP_CK32,
-+	TEGRA_PINGROUP_DDRC,
-+	TEGRA_PINGROUP_PMCA,
-+	TEGRA_PINGROUP_PMCB,
-+	TEGRA_PINGROUP_PMCC,
-+	TEGRA_PINGROUP_PMCD,
-+	TEGRA_PINGROUP_PMCE,
-+	TEGRA_PINGROUP_XM2C,
-+	TEGRA_PINGROUP_XM2D,
-+	TEGRA_MAX_PINGROUP,
-+} tegra_pingroup_t;
-+
-+typedef enum {
-+	TEGRA_MUX_RSVD = 0x8000,
-+	TEGRA_MUX_RSVD1 = 0x8000,
-+	TEGRA_MUX_RSVD2 = 0x8001,
-+	TEGRA_MUX_RSVD3 = 0x8002,
-+	TEGRA_MUX_RSVD4 = 0x8003,
-+	TEGRA_MUX_NONE = -1,
-+	TEGRA_MUX_AHB_CLK,
-+	TEGRA_MUX_APB_CLK,
-+	TEGRA_MUX_AUDIO_SYNC,
-+	TEGRA_MUX_CRT,
-+	TEGRA_MUX_DAP1,
-+	TEGRA_MUX_DAP2,
-+	TEGRA_MUX_DAP3,
-+	TEGRA_MUX_DAP4,
-+	TEGRA_MUX_DAP5,
-+	TEGRA_MUX_DISPLAYA,
-+	TEGRA_MUX_DISPLAYB,
-+	TEGRA_MUX_EMC_TEST0_DLL,
-+	TEGRA_MUX_EMC_TEST1_DLL,
-+	TEGRA_MUX_GMI,
-+	TEGRA_MUX_GMI_INT,
-+	TEGRA_MUX_HDMI,
-+	TEGRA_MUX_I2C,
-+	TEGRA_MUX_I2C2,
-+	TEGRA_MUX_I2C3,
-+	TEGRA_MUX_IDE,
-+	TEGRA_MUX_IRDA,
-+	TEGRA_MUX_KBC,
-+	TEGRA_MUX_MIO,
-+	TEGRA_MUX_MIPI_HS,
-+	TEGRA_MUX_NAND,
-+	TEGRA_MUX_OSC,
-+	TEGRA_MUX_OWR,
-+	TEGRA_MUX_PCIE,
-+	TEGRA_MUX_PLLA_OUT,
-+	TEGRA_MUX_PLLC_OUT1,
-+	TEGRA_MUX_PLLM_OUT1,
-+	TEGRA_MUX_PLLP_OUT2,
-+	TEGRA_MUX_PLLP_OUT3,
-+	TEGRA_MUX_PLLP_OUT4,
-+	TEGRA_MUX_PWM,
-+	TEGRA_MUX_PWR_INTR,
-+	TEGRA_MUX_PWR_ON,
-+	TEGRA_MUX_RTCK,
-+	TEGRA_MUX_SDIO1,
-+	TEGRA_MUX_SDIO2,
-+	TEGRA_MUX_SDIO3,
-+	TEGRA_MUX_SDIO4,
-+	TEGRA_MUX_SFLASH,
-+	TEGRA_MUX_SPDIF,
-+	TEGRA_MUX_SPI1,
-+	TEGRA_MUX_SPI2,
-+	TEGRA_MUX_SPI2_ALT,
-+	TEGRA_MUX_SPI3,
-+	TEGRA_MUX_SPI4,
-+	TEGRA_MUX_TRACE,
-+	TEGRA_MUX_TWC,
-+	TEGRA_MUX_UARTA,
-+	TEGRA_MUX_UARTB,
-+	TEGRA_MUX_UARTC,
-+	TEGRA_MUX_UARTD,
-+	TEGRA_MUX_UARTE,
-+	TEGRA_MUX_ULPI,
-+	TEGRA_MUX_VI,
-+	TEGRA_MUX_VI_SENSOR_CLK,
-+	TEGRA_MUX_XIO,
-+	TEGRA_MAX_MUX,
-+} tegra_mux_func_t;
-+
-+typedef enum {
-+	TEGRA_PUPD_NORMAL = 0,
-+	TEGRA_PUPD_PULL_DOWN,
-+	TEGRA_PUPD_PULL_UP,
-+} tegra_pullupdown_t;
-+
-+typedef enum {
-+	TEGRA_TRI_NORMAL = 0,
-+	TEGRA_TRI_TRISTATE = 1,
-+} tegra_tristate_t;
-+
-+struct tegra_pingroup_config {
-+	tegra_pingroup_t	pingroup;
-+	tegra_mux_func_t	func;
-+	tegra_pullupdown_t	pupd;
-+	tegra_tristate_t	tristate;
-+};
-+
-+int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func);
-+int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate);
-+int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd);
-+
-+void tegra_pinmux_config_pingroup(tegra_pingroup_t pingroup,
-+				  tegra_mux_func_t func,
-+				  tegra_pullupdown_t pupd,
-+				  tegra_tristate_t tristate);
-+
-+void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len);
++#define TEGRA_GPIO_PA0		0
++#define TEGRA_GPIO_PA1		1
++#define TEGRA_GPIO_PA2		2
++#define TEGRA_GPIO_PA3		3
++#define TEGRA_GPIO_PA4		4
++#define TEGRA_GPIO_PA5		5
++#define TEGRA_GPIO_PA6		6
++#define TEGRA_GPIO_PA7		7
++#define TEGRA_GPIO_PB0		8
++#define TEGRA_GPIO_PB1		9
++#define TEGRA_GPIO_PB2		10
++#define TEGRA_GPIO_PB3		11
++#define TEGRA_GPIO_PB4		12
++#define TEGRA_GPIO_PB5		13
++#define TEGRA_GPIO_PB6		14
++#define TEGRA_GPIO_PB7		15
++#define TEGRA_GPIO_PC0		16
++#define TEGRA_GPIO_PC1		17
++#define TEGRA_GPIO_PC2		18
++#define TEGRA_GPIO_PC3		19
++#define TEGRA_GPIO_PC4		20
++#define TEGRA_GPIO_PC5		21
++#define TEGRA_GPIO_PC6		22
++#define TEGRA_GPIO_PC7		23
++#define TEGRA_GPIO_PD0		24
++#define TEGRA_GPIO_PD1		25
++#define TEGRA_GPIO_PD2		26
++#define TEGRA_GPIO_PD3		27
++#define TEGRA_GPIO_PD4		28
++#define TEGRA_GPIO_PD5		29
++#define TEGRA_GPIO_PD6		30
++#define TEGRA_GPIO_PD7		31
++#define TEGRA_GPIO_PE0		32
++#define TEGRA_GPIO_PE1		33
++#define TEGRA_GPIO_PE2		34
++#define TEGRA_GPIO_PE3		35
++#define TEGRA_GPIO_PE4		36
++#define TEGRA_GPIO_PE5		37
++#define TEGRA_GPIO_PE6		38
++#define TEGRA_GPIO_PE7		39
++#define TEGRA_GPIO_PF0		40
++#define TEGRA_GPIO_PF1		41
++#define TEGRA_GPIO_PF2		42
++#define TEGRA_GPIO_PF3		43
++#define TEGRA_GPIO_PF4		44
++#define TEGRA_GPIO_PF5		45
++#define TEGRA_GPIO_PF6		46
++#define TEGRA_GPIO_PF7		47
++#define TEGRA_GPIO_PG0		48
++#define TEGRA_GPIO_PG1		49
++#define TEGRA_GPIO_PG2		50
++#define TEGRA_GPIO_PG3		51
++#define TEGRA_GPIO_PG4		52
++#define TEGRA_GPIO_PG5		53
++#define TEGRA_GPIO_PG6		54
++#define TEGRA_GPIO_PG7		55
++#define TEGRA_GPIO_PH0		56
++#define TEGRA_GPIO_PH1		57
++#define TEGRA_GPIO_PH2		58
++#define TEGRA_GPIO_PH3		59
++#define TEGRA_GPIO_PH4		60
++#define TEGRA_GPIO_PH5		61
++#define TEGRA_GPIO_PH6		62
++#define TEGRA_GPIO_PH7		63
++#define TEGRA_GPIO_PI0		64
++#define TEGRA_GPIO_PI1		65
++#define TEGRA_GPIO_PI2		66
++#define TEGRA_GPIO_PI3		67
++#define TEGRA_GPIO_PI4		68
++#define TEGRA_GPIO_PI5		69
++#define TEGRA_GPIO_PI6		70
++#define TEGRA_GPIO_PI7		71
++#define TEGRA_GPIO_PJ0		72
++#define TEGRA_GPIO_PJ1		73
++#define TEGRA_GPIO_PJ2		74
++#define TEGRA_GPIO_PJ3		75
++#define TEGRA_GPIO_PJ4		76
++#define TEGRA_GPIO_PJ5		77
++#define TEGRA_GPIO_PJ6		78
++#define TEGRA_GPIO_PJ7		79
++#define TEGRA_GPIO_PK0		80
++#define TEGRA_GPIO_PK1		81
++#define TEGRA_GPIO_PK2		82
++#define TEGRA_GPIO_PK3		83
++#define TEGRA_GPIO_PK4		84
++#define TEGRA_GPIO_PK5		85
++#define TEGRA_GPIO_PK6		86
++#define TEGRA_GPIO_PK7		87
++#define TEGRA_GPIO_PL0		88
++#define TEGRA_GPIO_PL1		89
++#define TEGRA_GPIO_PL2		90
++#define TEGRA_GPIO_PL3		91
++#define TEGRA_GPIO_PL4		92
++#define TEGRA_GPIO_PL5		93
++#define TEGRA_GPIO_PL6		94
++#define TEGRA_GPIO_PL7		95
++#define TEGRA_GPIO_PM0		96
++#define TEGRA_GPIO_PM1		97
++#define TEGRA_GPIO_PM2		98
++#define TEGRA_GPIO_PM3		99
++#define TEGRA_GPIO_PM4		100
++#define TEGRA_GPIO_PM5		101
++#define TEGRA_GPIO_PM6		102
++#define TEGRA_GPIO_PM7		103
++#define TEGRA_GPIO_PN0		104
++#define TEGRA_GPIO_PN1		105
++#define TEGRA_GPIO_PN2		106
++#define TEGRA_GPIO_PN3		107
++#define TEGRA_GPIO_PN4		108
++#define TEGRA_GPIO_PN5		109
++#define TEGRA_GPIO_PN6		110
++#define TEGRA_GPIO_PN7		111
++#define TEGRA_GPIO_PO0		112
++#define TEGRA_GPIO_PO1		113
++#define TEGRA_GPIO_PO2		114
++#define TEGRA_GPIO_PO3		115
++#define TEGRA_GPIO_PO4		116
++#define TEGRA_GPIO_PO5		117
++#define TEGRA_GPIO_PO6		118
++#define TEGRA_GPIO_PO7		119
++#define TEGRA_GPIO_PP0		120
++#define TEGRA_GPIO_PP1		121
++#define TEGRA_GPIO_PP2		122
++#define TEGRA_GPIO_PP3		123
++#define TEGRA_GPIO_PP4		124
++#define TEGRA_GPIO_PP5		125
++#define TEGRA_GPIO_PP6		126
++#define TEGRA_GPIO_PP7		127
++#define TEGRA_GPIO_PQ0		128
++#define TEGRA_GPIO_PQ1		129
++#define TEGRA_GPIO_PQ2		130
++#define TEGRA_GPIO_PQ3		131
++#define TEGRA_GPIO_PQ4		132
++#define TEGRA_GPIO_PQ5		133
++#define TEGRA_GPIO_PQ6		134
++#define TEGRA_GPIO_PQ7		135
++#define TEGRA_GPIO_PR0		136
++#define TEGRA_GPIO_PR1		137
++#define TEGRA_GPIO_PR2		138
++#define TEGRA_GPIO_PR3		139
++#define TEGRA_GPIO_PR4		140
++#define TEGRA_GPIO_PR5		141
++#define TEGRA_GPIO_PR6		142
++#define TEGRA_GPIO_PR7		143
++#define TEGRA_GPIO_PS0		144
++#define TEGRA_GPIO_PS1		145
++#define TEGRA_GPIO_PS2		146
++#define TEGRA_GPIO_PS3		147
++#define TEGRA_GPIO_PS4		148
++#define TEGRA_GPIO_PS5		149
++#define TEGRA_GPIO_PS6		150
++#define TEGRA_GPIO_PS7		151
++#define TEGRA_GPIO_PT0		152
++#define TEGRA_GPIO_PT1		153
++#define TEGRA_GPIO_PT2		154
++#define TEGRA_GPIO_PT3		155
++#define TEGRA_GPIO_PT4		156
++#define TEGRA_GPIO_PT5		157
++#define TEGRA_GPIO_PT6		158
++#define TEGRA_GPIO_PT7		159
++#define TEGRA_GPIO_PU0		160
++#define TEGRA_GPIO_PU1		161
++#define TEGRA_GPIO_PU2		162
++#define TEGRA_GPIO_PU3		163
++#define TEGRA_GPIO_PU4		164
++#define TEGRA_GPIO_PU5		165
++#define TEGRA_GPIO_PU6		166
++#define TEGRA_GPIO_PU7		167
++#define TEGRA_GPIO_PV0		168
++#define TEGRA_GPIO_PV1		169
++#define TEGRA_GPIO_PV2		170
++#define TEGRA_GPIO_PV3		171
++#define TEGRA_GPIO_PV4		172
++#define TEGRA_GPIO_PV5		173
++#define TEGRA_GPIO_PV6		174
++#define TEGRA_GPIO_PV7		175
++#define TEGRA_GPIO_PW0		176
++#define TEGRA_GPIO_PW1		177
++#define TEGRA_GPIO_PW2		178
++#define TEGRA_GPIO_PW3		179
++#define TEGRA_GPIO_PW4		180
++#define TEGRA_GPIO_PW5		181
++#define TEGRA_GPIO_PW6		182
++#define TEGRA_GPIO_PW7		183
++#define TEGRA_GPIO_PX0		184
++#define TEGRA_GPIO_PX1		185
++#define TEGRA_GPIO_PX2		186
++#define TEGRA_GPIO_PX3		187
++#define TEGRA_GPIO_PX4		188
++#define TEGRA_GPIO_PX5		189
++#define TEGRA_GPIO_PX6		190
++#define TEGRA_GPIO_PX7		191
++#define TEGRA_GPIO_PY0		192
++#define TEGRA_GPIO_PY1		193
++#define TEGRA_GPIO_PY2		194
++#define TEGRA_GPIO_PY3		195
++#define TEGRA_GPIO_PY4		196
++#define TEGRA_GPIO_PY5		197
++#define TEGRA_GPIO_PY6		198
++#define TEGRA_GPIO_PY7		199
++#define TEGRA_GPIO_PZ0		200
++#define TEGRA_GPIO_PZ1		201
++#define TEGRA_GPIO_PZ2		202
++#define TEGRA_GPIO_PZ3		203
++#define TEGRA_GPIO_PZ4		204
++#define TEGRA_GPIO_PZ5		205
++#define TEGRA_GPIO_PZ6		206
++#define TEGRA_GPIO_PZ7		207
++#define TEGRA_GPIO_PAA0		208
++#define TEGRA_GPIO_PAA1		209
++#define TEGRA_GPIO_PAA2		210
++#define TEGRA_GPIO_PAA3		211
++#define TEGRA_GPIO_PAA4		212
++#define TEGRA_GPIO_PAA5		213
++#define TEGRA_GPIO_PAA6		214
++#define TEGRA_GPIO_PAA7		215
++#define TEGRA_GPIO_PBB0		216
++#define TEGRA_GPIO_PBB1		217
++#define TEGRA_GPIO_PBB2		218
++#define TEGRA_GPIO_PBB3		219
++#define TEGRA_GPIO_PBB4		220
++#define TEGRA_GPIO_PBB5		221
++#define TEGRA_GPIO_PBB6		222
++#define TEGRA_GPIO_PBB7		223
 +
 +#endif
-+
-diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
 new file mode 100644
-index 0000000..2cac079
+index 0000000..181e22b
 --- /dev/null
-+++ b/arch/arm/mach-tegra/pinmux.c
-@@ -0,0 +1,548 @@
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -0,0 +1,348 @@
 +/*
-+ * linux/arch/arm/mach-tegra/pinmux.c
++ * arch/arm/mach-tegra/gpio.c
 + *
-+ * Copyright (C) 2010 Google, Inc.
++ * Copyright (c) 2010 Google, Inc
++ *
++ * Author:
++ *	Erik Gilling <konkers@google.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -311,537 +339,393 @@ index 0000000..2cac079
 + *
 + */
 +
++#include <linux/init.h>
++#include <linux/irq.h>
 +
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/spinlock.h>
 +#include <linux/io.h>
++#include <linux/gpio.h>
 +
 +#include <mach/iomap.h>
-+#include <mach/pinmux.h>
 +
++#define GPIO_BANK(x)		((x) >> 5)
++#define GPIO_PORT(x)		(((x) >> 3) & 0x3)
++#define GPIO_BIT(x)		((x) & 0x7)
 +
-+#define TEGRA_TRI_STATE(x)	(0x14 + (4 * (x)))
-+#define TEGRA_PP_MUX_CTL(x)	(0x80 + (4 * (x)))
-+#define TEGRA_PP_PU_PD(x)	(0xa0 + (4 * (x)))
++#define GPIO_REG(x)		(IO_TO_VIRT(TEGRA_GPIO_BASE) +	\
++				 GPIO_BANK(x) * 0x80 +		\
++				 GPIO_PORT(x) * 4)
 +
-+#define REG_A 0
-+#define REG_B 1
-+#define REG_C 2
-+#define REG_D 3
-+#define REG_E 4
-+#define REG_F 5
-+#define REG_G 6
++#define GPIO_CNF(x)		(GPIO_REG(x) + 0x00)
++#define GPIO_OE(x)		(GPIO_REG(x) + 0x10)
++#define GPIO_OUT(x)		(GPIO_REG(x) + 0X20)
++#define GPIO_IN(x)		(GPIO_REG(x) + 0x30)
++#define GPIO_INT_STA(x)		(GPIO_REG(x) + 0x40)
++#define GPIO_INT_ENB(x)		(GPIO_REG(x) + 0x50)
++#define GPIO_INT_LVL(x)		(GPIO_REG(x) + 0x60)
++#define GPIO_INT_CLR(x)		(GPIO_REG(x) + 0x70)
 +
-+#define REG_N -1
++#define GPIO_MSK_CNF(x)		(GPIO_REG(x) + 0x800)
++#define GPIO_MSK_OE(x)		(GPIO_REG(x) + 0x810)
++#define GPIO_MSK_OUT(x)		(GPIO_REG(x) + 0X820)
++#define GPIO_MSK_INT_STA(x)	(GPIO_REG(x) + 0x840)
++#define GPIO_MSK_INT_ENB(x)	(GPIO_REG(x) + 0x850)
++#define GPIO_MSK_INT_LVL(x)	(GPIO_REG(x) + 0x860)
 +
-+struct tegra_pingroup_desc {
-+	const char *name;
-+	int funcs[4];
-+	s8 tri_reg; 		/* offset into the TRISTATE_REG_* register bank */
-+	s8 tri_bit; 		/* offset into the TRISTATE_REG_* register bit */
-+	s8 mux_reg;		/* offset into the PIN_MUX_CTL_* register bank */
-+	s8 mux_bit;		/* offset into the PIN_MUX_CTL_* register bit */
-+	s8 pupd_reg;		/* offset into the PULL_UPDOWN_REG_* register bank */
-+	s8 pupd_bit;		/* offset into the PULL_UPDOWN_REG_* register bit */
++#define GPIO_INT_LVL_MASK		0x010101
++#define GPIO_INT_LVL_EDGE_RISING	0x000101
++#define GPIO_INT_LVL_EDGE_FALLING	0x000100
++#define GPIO_INT_LVL_EDGE_BOTH		0x010100
++#define GPIO_INT_LVL_LEVEL_HIGH		0x000001
++#define GPIO_INT_LVL_LEVEL_LOW		0x000000
++
++struct tegra_gpio_bank {
++	int bank;
++	int irq;
++	spinlock_t lvl_lock[4];
 +};
 +
-+#define PINGROUP(pg_name, f0, f1, f2, f3,			\
-+		 tri_r, tri_b, mux_r, mux_b, pupd_r, pupd_b)	\
-+	[TEGRA_PINGROUP_ ## pg_name] = {			\
-+		.name = #pg_name,				\
-+		.funcs = {					\
-+			TEGRA_MUX_ ## f0,			\
-+			TEGRA_MUX_ ## f1,			\
-+			TEGRA_MUX_ ## f2,			\
-+			TEGRA_MUX_ ## f3,			\
-+		},						\
-+		.tri_reg = REG_ ## tri_r,			\
-+		.tri_bit = tri_b,				\
-+		.mux_reg = REG_ ## mux_r,			\
-+		.mux_bit = mux_b,				\
-+		.pupd_reg = REG_ ## pupd_r,			\
-+		.pupd_bit = pupd_b,				\
-+	}
 +
-+static const struct tegra_pingroup_desc pingroups[TEGRA_MAX_PINGROUP] = {
-+	PINGROUP(ATA,   IDE,       NAND,      GMI,       RSVD,          A, 0,  A, 24, A, 0),
-+	PINGROUP(ATB,   IDE,       NAND,      GMI,       SDIO4,         A, 1,  A, 16, A, 2),
-+	PINGROUP(ATC,   IDE,       NAND,      GMI,       SDIO4,         A, 2,  A, 22, A, 4),
-+	PINGROUP(ATD,   IDE,       NAND,      GMI,       SDIO4,         A, 3,  A, 20, A, 6),
-+	PINGROUP(ATE,   IDE,       NAND,      GMI,       RSVD,          B, 25, A, 12, A, 8),
-+	PINGROUP(CDEV1, OSC,       PLLA_OUT,  PLLM_OUT1, AUDIO_SYNC,    A, 4,  C, 2,  C, 0),
-+	PINGROUP(CDEV2, OSC,       AHB_CLK,   APB_CLK,   PLLP_OUT4,     A, 5,  C, 4,  C, 2),
-+	PINGROUP(CRTP,  CRT,       RSVD,      RSVD,      RSVD,          D, 14, G, 20, B, 24),
-+	PINGROUP(CSUS,  PLLC_OUT1, PLLP_OUT2, PLLP_OUT3, VI_SENSOR_CLK, A, 6,  C, 6,  D, 24),
-+	PINGROUP(DAP1,  DAP1,      RSVD,      GMI,       SDIO2,         A, 7,  C, 20, A, 10),
-+	PINGROUP(DAP2,  DAP2,      TWC,       RSVD,      GMI,           A, 8,  C, 22, A, 12),
-+	PINGROUP(DAP3,  DAP3,      RSVD,      RSVD,      RSVD,          A, 9,  C, 24, A, 14),
-+	PINGROUP(DAP4,  DAP4,      RSVD,      GMI,       RSVD,          A, 10, C, 26, A, 16),
-+	PINGROUP(DDC,   I2C2,      RSVD,      RSVD,      RSVD,          B, 31, C, 0,  E, 28),
-+	PINGROUP(DTA,   RSVD,      SDIO2,     VI,        RSVD,          A, 11, B, 20, A, 18),
-+	PINGROUP(DTB,   RSVD,      RSVD,      VI,        SPI1,          A, 12, B, 22, A, 20),
-+	PINGROUP(DTC,   RSVD,      RSVD,      VI,        RSVD,          A, 13, B, 26, A, 22),
-+	PINGROUP(DTD,   RSVD,      SDIO2,     VI,        RSVD,          A, 14, B, 28, A, 24),
-+	PINGROUP(DTE,   RSVD,      RSVD,      VI,        SPI1,          A, 15, B, 30, A, 26),
-+	PINGROUP(DTF,   I2C3,      RSVD,      VI,        RSVD,          D, 12, G, 30, A, 28),
-+	PINGROUP(GMA,   UARTE,     SPI3,      GMI,       SDIO4,         A, 28, B, 0,  E, 20),
-+	PINGROUP(GMB,   IDE,       NAND,      GMI,       GMI_INT,       B, 29, C, 28, E, 22),
-+	PINGROUP(GMC,   UARTD,     SPI4,      GMI,       SFLASH,        A, 29, B, 2,  E, 24),
-+	PINGROUP(GMD,   RSVD,      NAND,      GMI,       SFLASH,        B, 30, C, 30, E, 26),
-+	PINGROUP(GME,   RSVD,      DAP5,      GMI,       SDIO4,         B, 0,  D, 0,  C, 24),
-+	PINGROUP(GPU,   PWM,       UARTA,     GMI,       RSVD,          A, 16, D, 4,  B, 20),
-+	PINGROUP(GPU7,  RTCK,      RSVD,      RSVD,      RSVD,          D, 11, G, 28, B, 6),
-+	PINGROUP(GPV,   PCIE,      RSVD,      RSVD,      RSVD,          A, 17, D, 2,  A, 30),
-+	PINGROUP(HDINT, HDMI,      RSVD,      RSVD,      RSVD,          C, 23, B, 4,  D, 22),
-+	PINGROUP(I2CP,  I2C,       RSVD,      RSVD,      RSVD,          A, 18, C, 8,  B, 2),
-+	PINGROUP(IRRX,  UARTA,     UARTB,     GMI,       SPI4,          A, 20, C, 18, C, 22),
-+	PINGROUP(IRTX,  UARTA,     UARTB,     GMI,       SPI4,          A, 19, C, 16, C, 20),
-+	PINGROUP(KBCA,  KBC,       NAND,      SDIO2,     EMC_TEST0_DLL, A, 22, C, 10, B, 8),
-+	PINGROUP(KBCB,  KBC,       NAND,      SDIO2,     MIO,           A, 21, C, 12, B, 10),
-+	PINGROUP(KBCC,  KBC,       NAND,      TRACE,     EMC_TEST1_DLL, B, 26, C, 14, B, 12),
-+	PINGROUP(KBCD,  KBC,       NAND,      SDIO2,     MIO,           D, 10, G, 26, B, 14),
-+	PINGROUP(KBCE,  KBC,       NAND,      OWR,       RSVD,          A, 26, A, 28, E, 2),
-+	PINGROUP(KBCF,  KBC,       NAND,      TRACE,     MIO,           A, 27, A, 26, E, 0),
-+	PINGROUP(LCSN,  DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          C, 31, E, 12, D, 20),
-+	PINGROUP(LD0,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 0,  F, 0,  D, 12),
-+	PINGROUP(LD1,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 1,  F, 2,  D, 12),
-+	PINGROUP(LD10,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 10, F, 20, D, 12),
-+	PINGROUP(LD11,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 11, F, 22, D, 12),
-+	PINGROUP(LD12,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 12, F, 24, D, 12),
-+	PINGROUP(LD13,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 13, F, 26, D, 12),
-+	PINGROUP(LD14,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 14, F, 28, D, 12),
-+	PINGROUP(LD15,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 15, F, 30, D, 12),
-+	PINGROUP(LD16,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 16, G, 0,  D, 12),
-+	PINGROUP(LD17,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 17, G, 2,  D, 12),
-+	PINGROUP(LD2,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 2,  F, 4,  D, 12),
-+	PINGROUP(LD3,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 3,  F, 6,  D, 12),
-+	PINGROUP(LD4,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 4,  F, 8,  D, 12),
-+	PINGROUP(LD5,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 5,  F, 10, D, 12),
-+	PINGROUP(LD6,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 6,  F, 12, D, 12),
-+	PINGROUP(LD7,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 7,  F, 14, D, 12),
-+	PINGROUP(LD8,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 8,  F, 16, D, 12),
-+	PINGROUP(LD9,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 9,  F, 18, D, 12),
-+	PINGROUP(LDC,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 30, E, 14, D, 20),
-+	PINGROUP(LDI,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 6,  G, 16, D, 18),
-+	PINGROUP(LHP0,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 18, G, 10, D, 16),
-+	PINGROUP(LHP1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 19, G, 4,  D, 14),
-+	PINGROUP(LHP2,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 20, G, 6,  D, 14),
-+	PINGROUP(LHS,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          D, 7,  E, 22, D, 22),
-+	PINGROUP(LM0,   DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          C, 24, E, 26, D, 22),
-+	PINGROUP(LM1,   DISPLAYA,  DISPLAYB,  RSVD,      CRT,           C, 25, E, 28, D, 22),
-+	PINGROUP(LPP,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 8,  G, 14, D, 18),
-+	PINGROUP(LPW0,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 3,  E, 0,  D, 20),
-+	PINGROUP(LPW1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 4,  E, 2,  D, 20),
-+	PINGROUP(LPW2,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 5,  E, 4,  D, 20),
-+	PINGROUP(LSC0,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 27, E, 18, D, 22),
-+	PINGROUP(LSC1,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          C, 28, E, 20, D, 20),
-+	PINGROUP(LSCK,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          C, 29, E, 16, D, 20),
-+	PINGROUP(LSDA,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 1,  E, 8,  D, 20),
-+	PINGROUP(LSDI,  DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          D, 2,  E, 6,  D, 20),
-+	PINGROUP(LSPI,  DISPLAYA,  DISPLAYB,  XIO,       HDMI,          D, 0,  E, 10, D, 22),
-+	PINGROUP(LVP0,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 21, E, 30, D, 22),
-+	PINGROUP(LVP1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 22, G, 8,  D, 16),
-+	PINGROUP(LVS,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 26, E, 24, D, 22),
-+	PINGROUP(OWC,   OWR,       RSVD,      RSVD,      RSVD,          A, 31, B, 8,  E, 30),
-+	PINGROUP(PMC,   PWR_ON,    PWR_INTR,  RSVD,      RSVD,          A, 23, G, 18, N, -1),
-+	PINGROUP(PTA,   I2C2,      HDMI,      GMI,       RSVD,          A, 24, G, 22, B, 4),
-+	PINGROUP(RM,    I2C,       RSVD,      RSVD,      RSVD,          A, 25, A, 14, B, 0),
-+	PINGROUP(SDB,   UARTA,     PWM,       SDIO3,     SPI2,          D, 15, D, 10, N, -1),
-+	PINGROUP(SDC,   PWM,       TWC,       SDIO3,     SPI3,          B, 1,  D, 12, D, 28),
-+	PINGROUP(SDD,   UARTA,     PWM,       SDIO3,     SPI3,          B, 2,  D, 14, D, 30),
-+	PINGROUP(SDIO1, SDIO1,     RSVD,      UARTE,     UARTA,         A, 30, A, 30, E, 18),
-+	PINGROUP(SLXA,  PCIE,      SPI4,      SDIO3,     SPI2,          B, 3,  B, 6,  B, 22),
-+	PINGROUP(SLXC,  SPDIF,     SPI4,      SDIO3,     SPI2,          B, 5,  B, 10, B, 26),
-+	PINGROUP(SLXD,  SPDIF,     SPI4,      SDIO3,     SPI2,          B, 6,  B, 12, B, 28),
-+	PINGROUP(SLXK,  PCIE,      SPI4,      SDIO3,     SPI2,          B, 7,  B, 14, B, 30),
-+	PINGROUP(SPDI,  SPDIF,     RSVD,      I2C,       SDIO2,         B, 8,  D, 8,  B, 16),
-+	PINGROUP(SPDO,  SPDIF,     RSVD,      I2C,       SDIO2,         B, 9,  D, 6,  B, 18),
-+	PINGROUP(SPIA,  SPI1,      SPI2,      SPI3,      GMI,           B, 10, D, 30, C, 4),
-+	PINGROUP(SPIB,  SPI1,      SPI2,      SPI3,      GMI,           B, 11, D, 28, C, 6),
-+	PINGROUP(SPIC,  SPI1,      SPI2,      SPI3,      GMI,           B, 12, D, 26, C, 8),
-+	PINGROUP(SPID,  SPI2,      SPI1,      SPI2_ALT,  GMI,           B, 13, D, 24, C, 10),
-+	PINGROUP(SPIE,  SPI2,      SPI1,      SPI2_ALT,  GMI,           B, 14, D, 22, C, 12),
-+	PINGROUP(SPIF,  SPI3,      SPI1,      SPI2,      RSVD,          B, 15, D, 20, C, 14),
-+	PINGROUP(SPIG,  SPI3,      SPI2,      SPI2_ALT,  I2C,           B, 16, D, 18, C, 16),
-+	PINGROUP(SPIH,  SPI3,      SPI2,      SPI2_ALT,  I2C,           B, 17, D, 16, C, 18),
-+	PINGROUP(UAA,   SPI3,      MIPI_HS,   UARTA,     ULPI,          B, 18, A, 0,  D, 0),
-+	PINGROUP(UAB,   SPI2,      MIPI_HS,   UARTA,     ULPI,          B, 19, A, 2,  D, 2),
-+	PINGROUP(UAC,   OWR,       RSVD,      RSVD,      RSVD,          B, 20, A, 4,  D, 4),
-+	PINGROUP(UAD,   IRDA,      SPDIF,     UARTA,     SPI4,          B, 21, A, 6,  D, 6),
-+	PINGROUP(UCA,   UARTC,     RSVD,      GMI,       RSVD,          B, 22, B, 16, D, 8),
-+	PINGROUP(UCB,   UARTC,     PWM,       GMI,       RSVD,          B, 23, B, 18, D, 10),
-+	PINGROUP(UDA,   SPI1,      RSVD,      UARTD,     ULPI,          D, 13, A, 8,  E, 16),
-+	/* these pin groups only have pullup and pull down control */
-+	PINGROUP(CK32,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 14),
-+	PINGROUP(DDRC,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  D, 26),
-+	PINGROUP(PMCA,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 4),
-+	PINGROUP(PMCB,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 6),
-+	PINGROUP(PMCC,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 8),
-+	PINGROUP(PMCD,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 10),
-+	PINGROUP(PMCE,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 12),
-+	PINGROUP(XM2C,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  C, 30),
-+	PINGROUP(XM2D,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  C, 28),
++static struct tegra_gpio_bank tegra_gpio_banks[] = {
++	{.bank = 0, .irq = INT_GPIO1},
++	{.bank = 1, .irq = INT_GPIO2},
++	{.bank = 2, .irq = INT_GPIO3},
++	{.bank = 3, .irq = INT_GPIO4},
++	{.bank = 4, .irq = INT_GPIO5},
++	{.bank = 5, .irq = INT_GPIO6},
++	{.bank = 6, .irq = INT_GPIO7},
 +};
 +
-+static char *tegra_mux_names[TEGRA_MAX_MUX] = {
-+	[TEGRA_MUX_AHB_CLK] = "AHB_CLK",
-+	[TEGRA_MUX_APB_CLK] = "APB_CLK",
-+	[TEGRA_MUX_AUDIO_SYNC] = "AUDIO_SYNC",
-+	[TEGRA_MUX_CRT] = "CRT",
-+	[TEGRA_MUX_DAP1] = "DAP1",
-+	[TEGRA_MUX_DAP2] = "DAP2",
-+	[TEGRA_MUX_DAP3] = "DAP3",
-+	[TEGRA_MUX_DAP4] = "DAP4",
-+	[TEGRA_MUX_DAP5] = "DAP5",
-+	[TEGRA_MUX_DISPLAYA] = "DISPLAYA",
-+	[TEGRA_MUX_DISPLAYB] = "DISPLAYB",
-+	[TEGRA_MUX_EMC_TEST0_DLL] = "EMC_TEST0_DLL",
-+	[TEGRA_MUX_EMC_TEST1_DLL] = "EMC_TEST1_DLL",
-+	[TEGRA_MUX_GMI] = "GMI",
-+	[TEGRA_MUX_GMI_INT] = "GMI_INT",
-+	[TEGRA_MUX_HDMI] = "HDMI",
-+	[TEGRA_MUX_I2C] = "I2C",
-+	[TEGRA_MUX_I2C2] = "I2C2",
-+	[TEGRA_MUX_I2C3] = "I2C3",
-+	[TEGRA_MUX_IDE] = "IDE",
-+	[TEGRA_MUX_IRDA] = "IRDA",
-+	[TEGRA_MUX_KBC] = "KBC",
-+	[TEGRA_MUX_MIO] = "MIO",
-+	[TEGRA_MUX_MIPI_HS] = "MIPI_HS",
-+	[TEGRA_MUX_NAND] = "NAND",
-+	[TEGRA_MUX_OSC] = "OSC",
-+	[TEGRA_MUX_OWR] = "OWR",
-+	[TEGRA_MUX_PCIE] = "PCIE",
-+	[TEGRA_MUX_PLLA_OUT] = "PLLA_OUT",
-+	[TEGRA_MUX_PLLC_OUT1] = "PLLC_OUT1",
-+	[TEGRA_MUX_PLLM_OUT1] = "PLLM_OUT1",
-+	[TEGRA_MUX_PLLP_OUT2] = "PLLP_OUT2",
-+	[TEGRA_MUX_PLLP_OUT3] = "PLLP_OUT3",
-+	[TEGRA_MUX_PLLP_OUT4] = "PLLP_OUT4",
-+	[TEGRA_MUX_PWM] = "PWM",
-+	[TEGRA_MUX_PWR_INTR] = "PWR_INTR",
-+	[TEGRA_MUX_PWR_ON] = "PWR_ON",
-+	[TEGRA_MUX_RTCK] = "RTCK",
-+	[TEGRA_MUX_SDIO1] = "SDIO1",
-+	[TEGRA_MUX_SDIO2] = "SDIO2",
-+	[TEGRA_MUX_SDIO3] = "SDIO3",
-+	[TEGRA_MUX_SDIO4] = "SDIO4",
-+	[TEGRA_MUX_SFLASH] = "SFLASH",
-+	[TEGRA_MUX_SPDIF] = "SPDIF",
-+	[TEGRA_MUX_SPI1] = "SPI1",
-+	[TEGRA_MUX_SPI2] = "SPI2",
-+	[TEGRA_MUX_SPI2_ALT] = "SPI2_ALT",
-+	[TEGRA_MUX_SPI3] = "SPI3",
-+	[TEGRA_MUX_SPI4] = "SPI4",
-+	[TEGRA_MUX_TRACE] = "TRACE",
-+	[TEGRA_MUX_TWC] = "TWC",
-+	[TEGRA_MUX_UARTA] = "UARTA",
-+	[TEGRA_MUX_UARTB] = "UARTB",
-+	[TEGRA_MUX_UARTC] = "UARTC",
-+	[TEGRA_MUX_UARTD] = "UARTD",
-+	[TEGRA_MUX_UARTE] = "UARTE",
-+	[TEGRA_MUX_ULPI] = "ULPI",
-+	[TEGRA_MUX_VI] = "VI",
-+	[TEGRA_MUX_VI_SENSOR_CLK] = "VI_SENSOR_CLK",
-+	[TEGRA_MUX_XIO] = "XIO",
++static int tegra_gpio_compose(int bank, int port, int bit)
++{
++	return (bank << 5) | ((port & 0x3) << 3) | (bit & 0x7);
++}
++
++static void tegra_gpio_mask_write(u32 reg, int gpio, int value)
++{
++	u32 val;
++
++	val = 0x100 << GPIO_BIT(gpio);
++	if (value)
++		val |= 1 << GPIO_BIT(gpio);
++	__raw_writel(val, reg);
++}
++
++void tegra_gpio_enable(int gpio)
++{
++	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
++}
++
++void tegra_gpio_disable(int gpio)
++{
++	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
++}
++
++static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	tegra_gpio_mask_write(GPIO_MSK_OUT(offset), offset, value);
++}
++
++static int tegra_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return (__raw_readl(GPIO_IN(offset)) >> GPIO_BIT(offset)) & 0x1;
++}
++
++static int tegra_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	tegra_gpio_mask_write(GPIO_MSK_OE(offset), offset, 0);
++	return 0;
++}
++
++static int tegra_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
++					int value)
++{
++	tegra_gpio_set(chip, offset, value);
++	tegra_gpio_mask_write(GPIO_MSK_OE(offset), offset, 1);
++	return 0;
++}
++
++
++
++static struct gpio_chip tegra_gpio_chip = {
++	.label			= "tegra-gpio",
++	.direction_input	= tegra_gpio_direction_input,
++	.get			= tegra_gpio_get,
++	.direction_output	= tegra_gpio_direction_output,
++	.set			= tegra_gpio_set,
++	.base			= 0,
++	.ngpio			= ARCH_NR_GPIOS,
 +};
 +
-+static DEFINE_SPINLOCK(mux_lock);
-+
-+static const char *pingroup_name(tegra_pingroup_t pg)
++static void tegra_gpio_irq_ack(unsigned int irq)
 +{
-+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
-+		return "<UNKNOWN>";
++	int gpio = irq - INT_GPIO_BASE;
 +
-+	return pingroups[pg].name;
++	__raw_writel(1 << GPIO_BIT(gpio), GPIO_INT_CLR(gpio));
 +}
 +
-+static const char *func_name(tegra_mux_func_t func)
++static void tegra_gpio_irq_mask(unsigned int irq)
 +{
-+	if (func == TEGRA_MUX_RSVD1)
-+		return "RSVD1";
++	int gpio = irq - INT_GPIO_BASE;
 +
-+	if (func == TEGRA_MUX_RSVD2)
-+		return "RSVD2";
-+
-+	if (func == TEGRA_MUX_RSVD3)
-+		return "RSVD3";
-+
-+	if (func == TEGRA_MUX_RSVD4)
-+		return "RSVD4";
-+
-+	if (func == TEGRA_MUX_NONE)
-+		return "NONE";
-+
-+	if (func < 0 || func >=  TEGRA_MAX_MUX)
-+		return "<UNKNOWN>";
-+
-+	return tegra_mux_names[func];
++	tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 0);
 +}
 +
-+
-+static const char *tri_name(unsigned long val)
++static void tegra_gpio_irq_unmask(unsigned int irq)
 +{
-+	return val ? "TRISTATE" : "NORMAL";
++	int gpio = irq - INT_GPIO_BASE;
++
++	tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 1);
 +}
 +
-+static const char *pupd_name(unsigned long val)
++static int tegra_gpio_irq_set_type(unsigned int irq, unsigned int type)
 +{
-+	switch (val) {
-+	case 0:
-+		return "NORMAL";
-+
-+	case 1:
-+		return "PULL_DOWN";
-+
-+	case 2:
-+		return "PULL_UP";
-+
-+	default:
-+		return "RSVD";
-+	}
-+}
-+
-+
-+static inline unsigned long pg_readl(unsigned long offset)
-+{
-+	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
-+}
-+
-+static inline void pg_writel(unsigned long value, unsigned long offset)
-+{
-+	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
-+}
-+
-+int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func)
-+{
-+	int mux = -1;
-+	int i;
-+	unsigned long reg;
++	int gpio = irq - INT_GPIO_BASE;
++	struct tegra_gpio_bank *bank = get_irq_chip_data(irq);
++	int port = GPIO_PORT(gpio);
++	int lvl_type;
++	int val;
 +	unsigned long flags;
 +
-+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
-+		return -ERANGE;
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		lvl_type = GPIO_INT_LVL_EDGE_RISING;
++		break;
 +
-+	if (pingroups[pg].mux_reg == REG_N)
++	case IRQ_TYPE_EDGE_FALLING:
++		lvl_type = GPIO_INT_LVL_EDGE_FALLING;
++		break;
++
++	case IRQ_TYPE_EDGE_BOTH:
++		lvl_type = GPIO_INT_LVL_EDGE_BOTH;
++		break;
++
++	case IRQ_TYPE_LEVEL_HIGH:
++		lvl_type = GPIO_INT_LVL_LEVEL_HIGH;
++		break;
++
++	case IRQ_TYPE_LEVEL_LOW:
++		lvl_type = GPIO_INT_LVL_LEVEL_LOW;
++		break;
++
++	default:
 +		return -EINVAL;
++	}
 +
-+	if (func < 0)
-+		return -ERANGE;
++	spin_lock_irqsave(&bank->lvl_lock[port], flags);
 +
-+	if (func & TEGRA_MUX_RSVD) {
-+		mux = func & 0x3;
-+	} else {
-+		for (i = 0; i < 4; i++) {
-+			if (pingroups[pg].funcs[i] == func) {
-+				mux = i;
-+				break;
++	val = __raw_readl(GPIO_INT_LVL(gpio));
++	val &= ~(GPIO_INT_LVL_MASK << GPIO_BIT(gpio));
++	val |= lvl_type << GPIO_BIT(gpio);
++	__raw_writel(val, GPIO_INT_LVL(gpio));
++
++	spin_unlock_irqrestore(&bank->lvl_lock[port], flags);
++
++	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
++		__set_irq_handler_unlocked(irq, handle_level_irq);
++	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
++		__set_irq_handler_unlocked(irq, handle_edge_irq);
++
++	return 0;
++}
++
++static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct tegra_gpio_bank *bank;
++	int port;
++	int pin;
++	int unmasked = 0;
++
++	desc->chip->ack(irq);
++
++	bank = get_irq_data(irq);
++
++	for (port = 0; port < 4; port++) {
++		int gpio = tegra_gpio_compose(bank->bank, port, 0);
++		unsigned long sta = __raw_readl(GPIO_INT_STA(gpio)) &
++			__raw_readl(GPIO_INT_ENB(gpio));
++		u32 lvl = __raw_readl(GPIO_INT_LVL(gpio));
++
++		for_each_set_bit(pin, &sta, 8) {
++			__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
++
++			/* if gpio is edge triggered, clear condition
++			 * before executing the hander so that we don't
++			 * miss edges
++			 */
++			if (lvl & (0x100 << pin)) {
++				unmasked = 1;
++				desc->chip->unmask(irq);
 +			}
++
++			generic_handle_irq(gpio_to_irq(gpio + pin));
 +		}
 +	}
 +
-+	if (mux < 0)
-+		return -EINVAL;
++	if (!unmasked)
++		desc->chip->unmask(irq);
 +
-+	spin_lock_irqsave(&mux_lock, flags);
-+
-+	reg = pg_readl(TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
-+	reg &= ~(0x3 << pingroups[pg].mux_bit);
-+	reg |= mux << pingroups[pg].mux_bit;
-+	pg_writel(reg, TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
-+
-+	spin_unlock_irqrestore(&mux_lock, flags);
-+
-+	return 0;
-+}
-+
-+int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate)
-+{
-+	unsigned long reg;
-+	unsigned long flags;
-+
-+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
-+		return -ERANGE;
-+
-+	if (pingroups[pg].tri_reg == REG_N)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&mux_lock, flags);
-+
-+	reg = pg_readl(TEGRA_TRI_STATE(pingroups[pg].tri_reg));
-+	reg &= ~(0x1 << pingroups[pg].tri_bit);
-+	if (tristate)
-+		reg |= 1 << pingroups[pg].tri_bit;
-+	pg_writel(reg, TEGRA_TRI_STATE(pingroups[pg].tri_reg));
-+
-+	spin_unlock_irqrestore(&mux_lock, flags);
-+
-+	return 0;
-+}
-+
-+int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd)
-+{
-+	unsigned long reg;
-+	unsigned long flags;
-+
-+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
-+		return -ERANGE;
-+
-+	if (pingroups[pg].pupd_reg == REG_N)
-+		return -EINVAL;
-+
-+	if (pupd != TEGRA_PUPD_NORMAL &&
-+	    pupd != TEGRA_PUPD_PULL_DOWN &&
-+	    pupd != TEGRA_PUPD_PULL_UP)
-+		return -EINVAL;
-+
-+
-+	spin_lock_irqsave(&mux_lock, flags);
-+
-+	reg = pg_readl(TEGRA_PP_PU_PD(pingroups[pg].pupd_reg));
-+	reg &= ~(0x3 << pingroups[pg].pupd_bit);
-+	reg |= pupd << pingroups[pg].pupd_bit;
-+	pg_writel(reg, TEGRA_PP_PU_PD(pingroups[pg].pupd_reg));
-+
-+	spin_unlock_irqrestore(&mux_lock, flags);
-+
-+	return 0;
-+}
-+
-+void tegra_pinmux_config_pingroup(tegra_pingroup_t pingroup,
-+				 tegra_mux_func_t func,
-+				 tegra_pullupdown_t pupd,
-+				 tegra_tristate_t tristate)
-+{
-+	int err;
-+
-+	if (pingroups[pingroup].mux_reg != REG_N) {
-+		err = tegra_pinmux_set_func(pingroup, func);
-+		if (err < 0)
-+			pr_err("pinmux: can't set pingroup %s func to %s: %d\n",
-+			       pingroup_name(pingroup), func_name(func), err);
-+	}
-+
-+	if (pingroups[pingroup].pupd_reg != REG_N) {
-+		err = tegra_pinmux_set_pullupdown(pingroup, pupd);
-+		if (err < 0)
-+			pr_err("pinmux: can't set pingroup %s pullupdown to %s: %d\n",
-+			       pingroup_name(pingroup), pupd_name(pupd), err);
-+	}
-+
-+	if (pingroups[pingroup].tri_reg != REG_N) {
-+		err = tegra_pinmux_set_tristate(pingroup, tristate);
-+		if (err < 0)
-+			pr_err("pinmux: can't set pingroup %s tristate to %s: %d\n",
-+			       pingroup_name(pingroup), tri_name(func), err);
-+	}
 +}
 +
 +
++static struct irq_chip tegra_gpio_irq_chip = {
++	.name		= "GPIO",
++	.ack		= tegra_gpio_irq_ack,
++	.mask		= tegra_gpio_irq_mask,
++	.unmask		= tegra_gpio_irq_unmask,
++	.set_type	= tegra_gpio_irq_set_type,
++};
 +
-+void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len)
++
++/* This lock class tells lockdep that GPIO irqs are in a different
++ * category than their parents, so it won't report false recursion.
++ */
++static struct lock_class_key gpio_lock_class;
++
++static int __init tegra_gpio_init(void)
 +{
++	struct tegra_gpio_bank *bank;
 +	int i;
++	int j;
 +
-+	for (i = 0; i < len; i++)
-+		tegra_pinmux_config_pingroup(config[i].pingroup,
-+					     config[i].func,
-+					     config[i].pupd,
-+					     config[i].tristate);
++	for (i = 0; i < 7; i++) {
++		for (j = 0; j < 4; j++) {
++			int gpio = tegra_gpio_compose(i, j, 0);
++			__raw_writel(0x00, GPIO_INT_ENB(gpio));
++		}
++	}
++
++	gpiochip_add(&tegra_gpio_chip);
++
++	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + ARCH_NR_GPIOS); i++) {
++		bank = &tegra_gpio_banks[GPIO_BANK(irq_to_gpio(i))];
++
++		lockdep_set_class(&irq_desc[i].lock, &gpio_lock_class);
++		set_irq_chip_data(i, bank);
++		set_irq_chip(i, &tegra_gpio_irq_chip);
++		set_irq_handler(i, handle_simple_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
++		bank = &tegra_gpio_banks[i];
++
++		set_irq_chained_handler(bank->irq, tegra_gpio_irq_handler);
++		set_irq_data(bank->irq, bank);
++
++		for (j = 0; j < 4; j++)
++			spin_lock_init(&bank->lvl_lock[j]);
++	}
++
++	return 0;
 +}
 +
-+
-+
-+
++postcore_initcall(tegra_gpio_init);
 +
 +#ifdef	CONFIG_DEBUG_FS
 +
 +#include <linux/debugfs.h>
 +#include <linux/seq_file.h>
 +
-+static void dbg_pad_field(struct seq_file *s, int len)
-+{
-+	seq_putc(s, ',');
-+
-+	while (len-- > -1)
-+		seq_putc(s, ' ');
-+}
-+
-+static int dbg_pinmux_show(struct seq_file *s, void *unused)
++static int dbg_gpio_show(struct seq_file *s, void *unused)
 +{
 +	int i;
-+	int len;
++	int j;
 +
-+	for (i = 0; i < TEGRA_MAX_PINGROUP; i++) {
-+		unsigned long tri;
-+		unsigned long mux;
-+		unsigned long pupd;
-+
-+		seq_printf(s, "\t{TEGRA_PINGROUP_%s", pingroups[i].name);
-+		len = strlen(pingroups[i].name);
-+		dbg_pad_field(s, 5 - len);
-+
-+		if (pingroups[i].mux_reg == REG_N) {
-+			seq_printf(s, "TEGRA_MUX_NONE");
-+			len = strlen("NONE");
-+		} else {
-+			mux = (pg_readl(TEGRA_PP_MUX_CTL(pingroups[i].mux_reg)) >>
-+			       pingroups[i].mux_bit) & 0x3;
-+			if (pingroups[i].funcs[mux] == TEGRA_MUX_RSVD) {
-+				seq_printf(s, "TEGRA_MUX_RSVD%1lu", mux+1);
-+				len = 5;
-+			} else {
-+				seq_printf(s, "TEGRA_MUX_%s",
-+					   tegra_mux_names[pingroups[i].funcs[mux]]);
-+				len = strlen(tegra_mux_names[pingroups[i].funcs[mux]]);
-+			}
++	for (i = 0; i < 7; i++) {
++		for (j = 0; j < 4; j++) {
++			int gpio = tegra_gpio_compose(i, j, 0);
++			seq_printf(s, "%d:%d %02x %02x %02x %02x %02x %02x %06x\n",
++			       i, j,
++			       __raw_readl(GPIO_CNF(gpio)),
++			       __raw_readl(GPIO_OE(gpio)),
++			       __raw_readl(GPIO_OUT(gpio)),
++			       __raw_readl(GPIO_IN(gpio)),
++			       __raw_readl(GPIO_INT_STA(gpio)),
++			       __raw_readl(GPIO_INT_ENB(gpio)),
++			       __raw_readl(GPIO_INT_LVL(gpio)));
 +		}
-+		dbg_pad_field(s, 13-len);
-+
-+		if (pingroups[i].mux_reg == REG_N) {
-+			seq_printf(s, "TEGRA_PUPD_NORMAL");
-+			len = strlen("NORMAL");
-+		} else {
-+			pupd = (pg_readl(TEGRA_PP_PU_PD(pingroups[i].pupd_reg)) >>
-+				pingroups[i].pupd_bit) & 0x3;
-+			seq_printf(s, "TEGRA_PUPD_%s", pupd_name(pupd));
-+			len = strlen(pupd_name(pupd));
-+		}
-+		dbg_pad_field(s, 9 - len);
-+
-+		if (pingroups[i].tri_reg == REG_N) {
-+			seq_printf(s, "TEGRA_TRI_NORMAL");
-+		} else {
-+			tri = (pg_readl(TEGRA_TRI_STATE(pingroups[i].tri_reg)) >>
-+			       pingroups[i].tri_bit) & 0x1;
-+
-+			seq_printf(s, "TEGRA_TRI_%s", tri_name(tri));
-+		}
-+		seq_printf(s, "},\n");
 +	}
 +	return 0;
 +}
 +
-+static int dbg_pinmux_open(struct inode *inode, struct file *file)
++static int dbg_gpio_open(struct inode *inode, struct file *file)
 +{
-+	return single_open(file, dbg_pinmux_show, &inode->i_private);
++	return single_open(file, dbg_gpio_show, &inode->i_private);
 +}
 +
 +static const struct file_operations debug_fops = {
-+	.open		= dbg_pinmux_open,
++	.open		= dbg_gpio_open,
 +	.read		= seq_read,
 +	.llseek		= seq_lseek,
 +	.release	= single_release,
 +};
 +
-+static int __init tegra_pinmux_debuginit(void)
++static int __init tegra_gpio_debuginit(void)
 +{
-+	(void) debugfs_create_file("tegra_pinmux", S_IRUGO,
++	(void) debugfs_create_file("tegra_gpio", S_IRUGO,
 +					NULL, NULL, &debug_fops);
 +	return 0;
 +}
-+late_initcall(tegra_pinmux_debuginit);
++late_initcall(tegra_gpio_debuginit);
++#endif
+diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
+new file mode 100644
+index 0000000..540e822
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/gpio.h
+@@ -0,0 +1,53 @@
++/*
++ * arch/arm/mach-tegra/include/mach/gpio.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Erik Gilling <konkers@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_TEGRA_GPIO_H
++#define __MACH_TEGRA_GPIO_H
++
++#include <mach/irqs.h>
++
++#define ARCH_NR_GPIOS		INT_GPIO_NR
++
++#include <asm-generic/gpio.h>
++
++#define gpio_get_value		__gpio_get_value
++#define gpio_set_value		__gpio_set_value
++#define gpio_cansleep		__gpio_cansleep
++
++#define TEGRA_GPIO_TO_IRQ(gpio) (INT_GPIO_BASE + (gpio))
++#define TEGRA_IRQ_TO_GPIO(irq) ((gpio) - INT_GPIO_BASE)
++
++static inline int gpio_to_irq(unsigned int gpio)
++{
++	if (gpio < ARCH_NR_GPIOS)
++		return INT_GPIO_BASE + gpio;
++	return -EINVAL;
++}
++
++static inline int irq_to_gpio(unsigned int irq)
++{
++	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
++		return irq - INT_GPIO_BASE;
++	return -EINVAL;
++}
++
++void tegra_gpio_enable(int gpio);
++void tegra_gpio_disable(int gpio);
++
 +#endif
 -- 
 1.6.5.6
