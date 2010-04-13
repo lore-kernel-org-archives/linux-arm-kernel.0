@@ -1,168 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Apr 2010 16:52:45 +0100
-Subject: [RFC PATCH 2/4] ARM: hw-breakpoint: add ARM backend for the
-	hw-breakpoint framework
-In-Reply-To: <h2mc62985531004130632kd086ffe9o16edafc359fa0e2@mail.gmail.com>
-References: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-2-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-3-git-send-email-will.deacon@arm.com>
-	<h2mc62985531004130632kd086ffe9o16edafc359fa0e2@mail.gmail.com>
-Message-ID: <1271173965.17356.28.camel@e102144-lin.cambridge.arm.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 13 Apr 2010 11:10:30 -0500
+Subject: [PATCH 2.6.34-rc4 7/8] mx5: Add USB to Freescale MX51 Babbage
+In-Reply-To: <1271175030-3635-6-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-4-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-5-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-6-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271175030-3635-7-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frederic,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Many thanks for taking a look at the these patches, I appreciate the
-feedback.
+Updade mx51_defconfig to include USB host support.
+This patch applies to 2.6.34-rc4.
 
-On Tue, 2010-04-13 at 14:32 +0100, Frederic Weisbecker wrote:
-> (WARNING: I've browsed the ARMv7 breakpoints implementation
-> but I may have an erratic/incomplete understanding, then parts
-> of this review might make little sense)
-> 
-It looks like you've understood it correctly. Actually, I have
-a disclaimer of my own; I'm using a new mail client in the hope
-that LKML won't drop my messages. Anyway...
-> 
-> 2010/3/10 Will Deacon <will.deacon@arm.com>:
-> > The hw-breakpoint framework in the kernel requires architecture-specific
-> > support in order to install, remove, validate and manage hardware
-> > breakpoints.
-> >
-> > This patch adds preliminary support for this framework to the ARM
-> > architecture, but restricts the number of watchpoints to a single resource
-> > to get around the fact that the Data Fault Address Register is unpredictable
-> > when a watchpoint debug exception is taken.
-> 
-> What do you mean here by unpredictable? It would be a pity to limit the
-> resources to one register.
-> 
-By unpredictable I mean that the value in the DFAR is not defined to
-correspond to the causative address in any way. This isn't the case
-for a standard data abort, but it is in the case of a watchpoint
-exception.
-> 
-> > +}
-> > +
-> > +/* Determine number of WRP registers available. */
-> > +static int get_num_wrps(void)
-> > +{
-> > +       /*
-> > +        * FIXME: When a watchpoint fires, the only way to work out which
-> > +        * watchpoint it was is by disassembling the faulting instruction
-> > +        * and working out the address of the memory access.
-> 
-> Doh! That must explain the problem with DFAR...
-> That's really not convenient :-(
-> 
-I know, it makes life a lot harder for us. The most annoying thing is that
-I'm yet to find a real implementation that *doesn't* set the DFAR to what
-we want - we just can't rely on that!
-> 
-<snip>
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/configs/mx51_defconfig |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
-> > +       /* Setup the address register. */
-> > +       write_wb_reg(val_base + i, info->address);
-> > +
-> > +       /* Setup the control register. */
-> > +       write_wb_reg(ctrl_base + i, (info->type << 3) |
-> > +                       (info->privilege << 1) | (info->len << 5) | 1);
-
-> Ok, alternatively, why not having the control register in the arch
-> breakpoint structure:
-> 
-> u32   __reserved : 19,
->         len             :  7,
->         type           :  2,
->         privilege      :  2,
->         enabled      :  1;
-> 
-> It will avoid you to play with bitwise operations that may scale into dirty
-> and error prone as you may support more features from the control register
-> (link, mask, etc...).
-> 
-Nice, I like that a lot!
-
-> Ah and it will make ptrace support easier: the user writes into the val/ctrl
-> fields directly as if they were the true registers, then you can just validate
-> the fields you want without bitwise ops.
-> 
-I'm unsure about this. As mainline stands, ARM has no ptrace support for the
-hardware breakpoint registers. This means that we could expose the
-hardware resources in an idealised fashion via ptrace so that if the
-interface varies between CPUs, userspace doesn't need to care. I had a
-crack at this with another patch in the series here:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011169.html
-
-> > +       /* Check that the virtual address is in the proper range. */
-> > +       if (tsk) {
-> > +               if (!(info->privilege & ARM_BREAKPOINT_USER)) {
-> > +                       ret = -EFAULT;
-> > +                       goto out;
-> > +               }
-> > +       } else {
-> > +               if (!(info->privilege & ARM_BREAKPOINT_SUPER)) {
-> > +                       ret = -EFAULT;
-> > +                       goto out;
-> > +               }
-> > +       }
-> 
-> 
-> You seem to make a wrong assumption here.
-> This is not because the breakpoint is task-bound that we don't
-> want it to trigger on the kernel. We may want to trigger breakpoints
-> on tasklist_lock accesses from a given task.
-
-> The only case for which we don't want it to trigger on the kernel
-> is for ptrace breakpoints.
-> 
-Surely we can't have breakpoints triggering on *any* part of the
-breakpoint handling code path? Otherwise we'll just get stuck. That's
-why I disallow breakpoints in the exception section.
-
-> I guess I should remove this tsk parameter as it makes the things
-> only confusing. We should simply create ptrace breakpoints with
-> bp->attr.exclude_kernel set to 1.
-
-Sounds good to me. That also means that it's one less thing for the arch
-to worry about!
-> 
-> > +/*
-> > + * Release the user breakpoints used by ptrace.
-> > + */
-> > +void flush_ptrace_hw_breakpoint(struct task_struct *tsk)
-> > +{
-> > +       int i;
-> > +       struct thread_struct *t = &tsk->thread;
-> > +
-> > +       for (i = 0; i < HBP_NUM; i++) {
-> > +               unregister_hw_breakpoint(t->debug.hbp[i]);
-> > +               t->debug.hbp[i] = NULL;
-> > +       }
-> > +}
-> 
-> 
-> Do you actually support ptrace breakpoints?
-> 
-Yep. See the link mentioned above.
-> 
-> > +
-> > +void hw_breakpoint_pmu_unthrottle(struct perf_event *bp)
-> > +{
-> > +       /* TODO */
-> > +}
-> 
-> 
-> We don't need this callback anymore, it has been removed because
-> of ptrace corner cases...
-> 
-Ok, I'll remove it.
-
-I'll take a look at the new constraints and allocation patches you
-posted this morning and then adjust these patches accordingly.
-
-Thanks,
-
-Will
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+index c88e952..a708fd6 100644
+--- a/arch/arm/configs/mx51_defconfig
++++ b/arch/arm/configs/mx51_defconfig
+@@ -809,7 +809,22 @@ CONFIG_SSB_POSSIBLE=y
+ CONFIG_DUMMY_CONSOLE=y
+ # CONFIG_SOUND is not set
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB_SUPPORT=y
++CONFIG_USB_ARCH_HAS_HCD=y
++# CONFIG_USB_ARCH_HAS_OHCI is not set
++CONFIG_USB_ARCH_HAS_EHCI=y
++CONFIG_USB=y
++
++#
++# USB Host Controller Drivers
++#
++# CONFIG_USB_C67X00_HCD is not set
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_EHCI_MXC=y
++
++
+ CONFIG_MMC=y
+ # CONFIG_MMC_DEBUG is not set
+ # CONFIG_MMC_UNSAFE_RESUME is not set
+-- 
+1.6.0.4
