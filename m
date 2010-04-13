@@ -1,1605 +1,1533 @@
 From: konkers@android.com (konkers at android.com)
-Date: Tue, 13 Apr 2010 15:42:43 -0700
-Subject: [PATCH v2 10/10] [ARM] tegra: Add harmony_defconfig
-In-Reply-To: <1271198563-10424-10-git-send-email-konkers@android.com>
+Date: Tue, 13 Apr 2010 15:42:36 -0700
+Subject: [PATCH v2 03/10] [ARM] tegra: Add clock support
+In-Reply-To: <1271198563-10424-3-git-send-email-konkers@android.com>
 References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-1-git-send-email-konkers@android.com>
 	<1271198563-10424-2-git-send-email-konkers@android.com>
 	<1271198563-10424-3-git-send-email-konkers@android.com>
-	<1271198563-10424-4-git-send-email-konkers@android.com>
-	<1271198563-10424-5-git-send-email-konkers@android.com>
-	<1271198563-10424-6-git-send-email-konkers@android.com>
-	<1271198563-10424-7-git-send-email-konkers@android.com>
-	<1271198563-10424-8-git-send-email-konkers@android.com>
-	<1271198563-10424-9-git-send-email-konkers@android.com>
-	<1271198563-10424-10-git-send-email-konkers@android.com>
-Message-ID: <1271198563-10424-11-git-send-email-konkers@android.com>
+Message-ID: <1271198563-10424-4-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
-Signed-off-by: Colin Cross <ccross@android.com>
-Signed-off-by: Erik Gilling <konkers@android.com>
----
- arch/arm/configs/harmony_defconfig | 1569 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 1569 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/harmony_defconfig
+v2: fixes from Russell King:
+	- include linux/io.h instead of asm/io.h
+	- fix whitespace in Kconfig
+	- Use spin_lock_init to initialize lock
+	- Return -ENOSYS instead of BUG for unimplemented clock ops
+	- Use proper return values in tegra2 clock ops
+    additional changes:
+	- Rename some clocks to match dev_ids
+	- add rate propagation
+	- add debugfs entries
+	- add support for clock listed in clk_lookup under multiple dev_ids
 
-diff --git a/arch/arm/configs/harmony_defconfig b/arch/arm/configs/harmony_defconfig
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-tegra/Makefile              |    2 +
+ arch/arm/mach-tegra/clock.c               |  300 +++++++++
+ arch/arm/mach-tegra/clock.h               |  116 ++++
+ arch/arm/mach-tegra/common.c              |    1 +
+ arch/arm/mach-tegra/include/mach/clkdev.h |   32 +
+ arch/arm/mach-tegra/tegra2_clocks.c       |  985 +++++++++++++++++++++++++++++
+ 7 files changed, 1437 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/clock.c
+ create mode 100644 arch/arm/mach-tegra/clock.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 6af721e..0d385b3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -580,6 +580,7 @@ config ARCH_TEGRA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select COMMON_CLKDEV
+ 	select ARCH_HAS_BARRIERS if CACHE_L2X0
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index a0d2c5b..e20546a 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,3 +1,5 @@
+ obj-y                                   += common.o
+ obj-y                                   += io.o
+ obj-y                                   += irq.o
++obj-y                                   += clock.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
 new file mode 100644
-index 0000000..d2a0e93
+index 0000000..7ede182
 --- /dev/null
-+++ b/arch/arm/configs/harmony_defconfig
-@@ -0,0 +1,1569 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.34-rc1
-+# Mon Mar 15 21:20:01 2010
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_GENERIC_TIME=y
-+CONFIG_GENERIC_CLOCKEVENTS=y
-+CONFIG_HAVE_PROC_CPU=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_GENERIC_LOCKBREAK=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
-+
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_LOCK_KERNEL=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_HAVE_KERNEL_GZIP=y
-+CONFIG_HAVE_KERNEL_LZO=y
-+CONFIG_KERNEL_GZIP=y
-+# CONFIG_KERNEL_BZIP2 is not set
-+# CONFIG_KERNEL_LZMA is not set
-+# CONFIG_KERNEL_LZO is not set
-+CONFIG_SWAP=y
-+# CONFIG_SYSVIPC is not set
-+# CONFIG_POSIX_MQUEUE is not set
-+# CONFIG_BSD_PROCESS_ACCT is not set
-+# CONFIG_TASKSTATS is not set
-+# CONFIG_AUDIT is not set
-+
-+#
-+# RCU Subsystem
-+#
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_TINY_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
-+# CONFIG_RCU_FAST_NO_HZ is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=17
-+CONFIG_CGROUPS=y
-+CONFIG_CGROUP_DEBUG=y
-+# CONFIG_CGROUP_NS is not set
-+CONFIG_CGROUP_FREEZER=y
-+# CONFIG_CGROUP_DEVICE is not set
-+# CONFIG_CPUSETS is not set
-+CONFIG_CGROUP_CPUACCT=y
-+CONFIG_RESOURCE_COUNTERS=y
-+# CONFIG_CGROUP_MEM_RES_CTLR is not set
-+CONFIG_CGROUP_SCHED=y
-+CONFIG_FAIR_GROUP_SCHED=y
-+CONFIG_RT_GROUP_SCHED=y
-+# CONFIG_SYSFS_DEPRECATED_V2 is not set
-+# CONFIG_RELAY is not set
-+# CONFIG_NAMESPACES is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_LZO is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+CONFIG_EMBEDDED=y
-+CONFIG_UID16=y
-+# CONFIG_SYSCTL_SYSCALL is not set
-+CONFIG_KALLSYMS=y
-+# CONFIG_KALLSYMS_ALL is not set
-+# CONFIG_KALLSYMS_EXTRA_PASS is not set
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+# CONFIG_ELF_CORE is not set
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
-+CONFIG_HAVE_PERF_EVENTS=y
-+CONFIG_PERF_USE_VMALLOC=y
-+
-+#
-+# Kernel Performance Events And Counters
-+#
-+# CONFIG_PERF_EVENTS is not set
-+# CONFIG_PERF_COUNTERS is not set
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_COMPAT_BRK=y
-+CONFIG_SLAB=y
-+# CONFIG_SLUB is not set
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_USE_GENERIC_SMP_HELPERS=y
-+CONFIG_HAVE_CLK=y
-+
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_GCOV_KERNEL is not set
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+# CONFIG_MODVERSIONS is not set
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_STOP_MACHINE=y
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_BLK_DEV_INTEGRITY is not set
-+# CONFIG_BLK_CGROUP is not set
-+
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+# CONFIG_DEFAULT_CFQ is not set
-+CONFIG_DEFAULT_NOOP=y
-+CONFIG_DEFAULT_IOSCHED="noop"
-+# CONFIG_INLINE_SPIN_TRYLOCK is not set
-+# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK is not set
-+# CONFIG_INLINE_SPIN_LOCK_BH is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
-+# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_SPIN_UNLOCK is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_READ_TRYLOCK is not set
-+# CONFIG_INLINE_READ_LOCK is not set
-+# CONFIG_INLINE_READ_LOCK_BH is not set
-+# CONFIG_INLINE_READ_LOCK_IRQ is not set
-+# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_READ_UNLOCK is not set
-+# CONFIG_INLINE_READ_UNLOCK_BH is not set
-+# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
-+# CONFIG_INLINE_WRITE_TRYLOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK is not set
-+# CONFIG_INLINE_WRITE_LOCK_BH is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
-+# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
-+# CONFIG_INLINE_WRITE_UNLOCK is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
-+# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
-+# CONFIG_MUTEX_SPIN_ON_OWNER is not set
-+CONFIG_FREEZER=y
-+
-+#
-+# System Type
-+#
-+CONFIG_MMU=y
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_DOVE is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_NUC93X is not set
-+CONFIG_ARCH_TEGRA=y
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
-+# CONFIG_ARCH_U8500 is not set
-+
-+#
-+# NVIDIA Tegra options
-+#
-+CONFIG_ARCH_TEGRA_2x_SOC=y
-+CONFIG_MACH_HARMONY=y
-+CONFIG_TEGRA_DEBUG_UART_NONE=y
-+# CONFIG_TEGRA_DEBUG_UARTA is not set
-+# CONFIG_TEGRA_DEBUG_UARTB is not set
-+# CONFIG_TEGRA_DEBUG_UARTC is not set
-+# CONFIG_TEGRA_DEBUG_UARTD is not set
-+# CONFIG_TEGRA_DEBUG_UARTE is not set
-+
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32v6K=y
-+CONFIG_CPU_V7=y
-+CONFIG_CPU_32v7=y
-+CONFIG_CPU_ABRT_EV7=y
-+CONFIG_CPU_PABRT_V7=y
-+CONFIG_CPU_CACHE_V7=y
-+CONFIG_CPU_CACHE_VIPT=y
-+CONFIG_CPU_COPY_V6=y
-+CONFIG_CPU_TLB_V7=y
-+CONFIG_CPU_HAS_ASID=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
-+
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_ARM_THUMBEE is not set
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_BPREDICT_DISABLE is not set
-+CONFIG_HAS_TLS_REG=y
-+CONFIG_OUTER_CACHE=y
-+CONFIG_CACHE_L2X0=y
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_CPU_HAS_PMU=y
-+# CONFIG_ARM_ERRATA_430973 is not set
-+# CONFIG_ARM_ERRATA_458693 is not set
-+# CONFIG_ARM_ERRATA_460075 is not set
-+CONFIG_ARM_GIC=y
-+CONFIG_COMMON_CLKDEV=y
-+
-+#
-+# Bus support
-+#
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
-+
-+#
-+# Kernel Features
-+#
-+CONFIG_TICK_ONESHOT=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_SMP=y
-+CONFIG_HAVE_ARM_SCU=y
-+CONFIG_HAVE_ARM_TWD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_NR_CPUS=2
-+CONFIG_HOTPLUG_CPU=y
-+CONFIG_LOCAL_TIMERS=y
-+# CONFIG_PREEMPT_NONE is not set
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+CONFIG_PREEMPT=y
-+CONFIG_HZ=100
-+# CONFIG_THUMB2_KERNEL is not set
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+CONFIG_HIGHMEM=y
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_BOUNCE=y
-+CONFIG_VIRT_TO_BUS=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
-+
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="mem=448M at 0M console=ttyS0,115200n8 earlyprintk init=/bin/ash"
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
-+
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
-+
-+#
-+# Floating point emulation
-+#
-+
-+#
-+# At least one emulation must be selected
-+#
-+CONFIG_VFP=y
-+CONFIG_VFPv3=y
-+# CONFIG_NEON is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+# CONFIG_BINFMT_MISC is not set
-+
-+#
-+# Power management options
-+#
-+CONFIG_PM=y
-+# CONFIG_PM_DEBUG is not set
-+CONFIG_PM_SLEEP_SMP=y
-+CONFIG_PM_SLEEP=y
-+CONFIG_SUSPEND=y
-+CONFIG_SUSPEND_FREEZER=y
-+# CONFIG_APM_EMULATION is not set
-+# CONFIG_PM_RUNTIME is not set
-+CONFIG_PM_OPS=y
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+CONFIG_NET=y
-+
-+#
-+# Networking options
-+#
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_XFRM=y
-+# CONFIG_XFRM_USER is not set
-+# CONFIG_XFRM_SUB_POLICY is not set
-+# CONFIG_XFRM_MIGRATE is not set
-+# CONFIG_XFRM_STATISTICS is not set
-+CONFIG_XFRM_IPCOMP=y
-+CONFIG_NET_KEY=y
-+# CONFIG_NET_KEY_MIGRATE is not set
-+CONFIG_INET=y
-+# CONFIG_IP_MULTICAST is not set
-+# CONFIG_IP_ADVANCED_ROUTER is not set
-+CONFIG_IP_FIB_HASH=y
-+# CONFIG_IP_PNP is not set
-+# CONFIG_NET_IPIP is not set
-+# CONFIG_NET_IPGRE is not set
-+# CONFIG_ARPD is not set
-+# CONFIG_SYN_COOKIES is not set
-+# CONFIG_INET_AH is not set
-+CONFIG_INET_ESP=y
-+# CONFIG_INET_IPCOMP is not set
-+# CONFIG_INET_XFRM_TUNNEL is not set
-+CONFIG_INET_TUNNEL=y
-+CONFIG_INET_XFRM_MODE_TRANSPORT=y
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_TCP_CONG_ADVANCED is not set
-+CONFIG_TCP_CONG_CUBIC=y
-+CONFIG_DEFAULT_TCP_CONG="cubic"
-+# CONFIG_TCP_MD5SIG is not set
-+CONFIG_IPV6=y
-+CONFIG_IPV6_PRIVACY=y
-+CONFIG_IPV6_ROUTER_PREF=y
-+# CONFIG_IPV6_ROUTE_INFO is not set
-+CONFIG_IPV6_OPTIMISTIC_DAD=y
-+CONFIG_INET6_AH=y
-+CONFIG_INET6_ESP=y
-+CONFIG_INET6_IPCOMP=y
-+CONFIG_IPV6_MIP6=y
-+CONFIG_INET6_XFRM_TUNNEL=y
-+CONFIG_INET6_TUNNEL=y
-+CONFIG_INET6_XFRM_MODE_TRANSPORT=y
-+CONFIG_INET6_XFRM_MODE_TUNNEL=y
-+CONFIG_INET6_XFRM_MODE_BEET=y
-+# CONFIG_INET6_XFRM_MODE_ROUTEOPTIMIZATION is not set
-+CONFIG_IPV6_SIT=y
-+# CONFIG_IPV6_SIT_6RD is not set
-+CONFIG_IPV6_NDISC_NODETYPE=y
-+CONFIG_IPV6_TUNNEL=y
-+CONFIG_IPV6_MULTIPLE_TABLES=y
-+# CONFIG_IPV6_SUBTREES is not set
-+# CONFIG_IPV6_MROUTE is not set
-+# CONFIG_NETWORK_SECMARK is not set
-+# CONFIG_NETFILTER is not set
-+# CONFIG_IP_DCCP is not set
-+# CONFIG_IP_SCTP is not set
-+# CONFIG_RDS is not set
-+# CONFIG_TIPC is not set
-+# CONFIG_ATM is not set
-+# CONFIG_BRIDGE is not set
-+# CONFIG_NET_DSA is not set
-+# CONFIG_VLAN_8021Q is not set
-+# CONFIG_DECNET is not set
-+# CONFIG_LLC2 is not set
-+# CONFIG_IPX is not set
-+# CONFIG_ATALK is not set
-+# CONFIG_X25 is not set
-+# CONFIG_LAPB is not set
-+# CONFIG_ECONET is not set
-+# CONFIG_WAN_ROUTER is not set
-+# CONFIG_PHONET is not set
-+# CONFIG_IEEE802154 is not set
-+# CONFIG_NET_SCHED is not set
-+# CONFIG_DCB is not set
-+
-+#
-+# Network testing
-+#
-+# CONFIG_NET_PKTGEN is not set
-+# CONFIG_HAMRADIO is not set
-+# CONFIG_CAN is not set
-+# CONFIG_IRDA is not set
-+CONFIG_BT=y
-+CONFIG_BT_L2CAP=y
-+CONFIG_BT_SCO=y
-+CONFIG_BT_RFCOMM=y
-+CONFIG_BT_RFCOMM_TTY=y
-+CONFIG_BT_BNEP=y
-+# CONFIG_BT_BNEP_MC_FILTER is not set
-+# CONFIG_BT_BNEP_PROTO_FILTER is not set
-+CONFIG_BT_HIDP=y
-+
-+#
-+# Bluetooth device drivers
-+#
-+# CONFIG_BT_HCIBTSDIO is not set
-+CONFIG_BT_HCIUART=y
-+CONFIG_BT_HCIUART_H4=y
-+# CONFIG_BT_HCIUART_BCSP is not set
-+CONFIG_BT_HCIUART_LL=y
-+# CONFIG_BT_HCIVHCI is not set
-+# CONFIG_BT_MRVL is not set
-+# CONFIG_AF_RXRPC is not set
-+CONFIG_FIB_RULES=y
-+CONFIG_WIRELESS=y
-+# CONFIG_CFG80211 is not set
-+# CONFIG_LIB80211 is not set
-+
-+#
-+# CFG80211 needs to be enabled for MAC80211
-+#
-+# CONFIG_WIMAX is not set
-+CONFIG_RFKILL=y
-+# CONFIG_RFKILL_INPUT is not set
-+# CONFIG_NET_9P is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH=""
-+# CONFIG_DEVTMPFS is not set
-+CONFIG_STANDALONE=y
-+CONFIG_PREVENT_FIRMWARE_BUILD=y
-+CONFIG_FW_LOADER=y
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_CONNECTOR is not set
-+CONFIG_MTD=y
-+# CONFIG_MTD_DEBUG is not set
-+# CONFIG_MTD_TESTS is not set
-+# CONFIG_MTD_CONCAT is not set
-+CONFIG_MTD_PARTITIONS=y
-+# CONFIG_MTD_REDBOOT_PARTS is not set
-+CONFIG_MTD_CMDLINE_PARTS=y
-+# CONFIG_MTD_AFS_PARTS is not set
-+# CONFIG_MTD_AR7_PARTS is not set
-+
-+#
-+# User Modules And Translation Layers
-+#
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLKDEVS=y
-+CONFIG_MTD_BLOCK=y
-+# CONFIG_FTL is not set
-+# CONFIG_NFTL is not set
-+# CONFIG_INFTL is not set
-+# CONFIG_RFD_FTL is not set
-+# CONFIG_SSFDC is not set
-+# CONFIG_MTD_OOPS is not set
-+
-+#
-+# RAM/ROM/Flash chip drivers
-+#
-+# CONFIG_MTD_CFI is not set
-+# CONFIG_MTD_JEDECPROBE is not set
-+CONFIG_MTD_MAP_BANK_WIDTH_1=y
-+CONFIG_MTD_MAP_BANK_WIDTH_2=y
-+CONFIG_MTD_MAP_BANK_WIDTH_4=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
-+# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
-+# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
-+CONFIG_MTD_CFI_I1=y
-+CONFIG_MTD_CFI_I2=y
-+# CONFIG_MTD_CFI_I4 is not set
-+# CONFIG_MTD_CFI_I8 is not set
-+# CONFIG_MTD_RAM is not set
-+# CONFIG_MTD_ROM is not set
-+# CONFIG_MTD_ABSENT is not set
-+
-+#
-+# Mapping drivers for chip access
-+#
-+# CONFIG_MTD_COMPLEX_MAPPINGS is not set
-+# CONFIG_MTD_PLATRAM is not set
-+
-+#
-+# Self-contained MTD device drivers
-+#
-+# CONFIG_MTD_SLRAM is not set
-+# CONFIG_MTD_PHRAM is not set
-+# CONFIG_MTD_MTDRAM is not set
-+# CONFIG_MTD_BLOCK2MTD is not set
-+
-+#
-+# Disk-On-Chip Device Drivers
-+#
-+# CONFIG_MTD_DOC2000 is not set
-+# CONFIG_MTD_DOC2001 is not set
-+# CONFIG_MTD_DOC2001PLUS is not set
-+# CONFIG_MTD_NAND is not set
-+# CONFIG_MTD_ONENAND is not set
-+
-+#
-+# LPDDR flash memory drivers
-+#
-+# CONFIG_MTD_LPDDR is not set
-+
-+#
-+# UBI - Unsorted block images
-+#
-+# CONFIG_MTD_UBI is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+CONFIG_BLK_DEV_LOOP=y
-+# CONFIG_BLK_DEV_CRYPTOLOOP is not set
-+
-+#
-+# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
-+#
-+# CONFIG_BLK_DEV_NBD is not set
-+# CONFIG_BLK_DEV_RAM is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_ATA_OVER_ETH is not set
-+# CONFIG_MG_DISK is not set
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_AD525X_DPOT is not set
-+# CONFIG_ICS932S401 is not set
-+# CONFIG_ENCLOSURE_SERVICES is not set
-+# CONFIG_ISL29003 is not set
-+# CONFIG_DS1682 is not set
-+# CONFIG_C2PORT is not set
-+
-+#
-+# EEPROM support
-+#
-+# CONFIG_EEPROM_AT24 is not set
-+# CONFIG_EEPROM_LEGACY is not set
-+# CONFIG_EEPROM_MAX6875 is not set
-+# CONFIG_EEPROM_93CX6 is not set
-+# CONFIG_IWMC3200TOP is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+# CONFIG_SCSI is not set
-+# CONFIG_SCSI_DMA is not set
-+# CONFIG_SCSI_NETLINK is not set
-+# CONFIG_ATA is not set
-+CONFIG_MD=y
-+# CONFIG_BLK_DEV_MD is not set
-+CONFIG_BLK_DEV_DM=y
-+CONFIG_DM_DEBUG=y
-+CONFIG_DM_CRYPT=y
-+# CONFIG_DM_SNAPSHOT is not set
-+# CONFIG_DM_MIRROR is not set
-+# CONFIG_DM_ZERO is not set
-+# CONFIG_DM_MULTIPATH is not set
-+# CONFIG_DM_DELAY is not set
-+CONFIG_DM_UEVENT=y
-+CONFIG_NETDEVICES=y
-+CONFIG_DUMMY=y
-+# CONFIG_BONDING is not set
-+# CONFIG_MACVLAN is not set
-+# CONFIG_EQUALIZER is not set
-+# CONFIG_TUN is not set
-+# CONFIG_VETH is not set
-+# CONFIG_PHYLIB is not set
-+CONFIG_NET_ETHERNET=y
-+CONFIG_MII=y
-+# CONFIG_AX88796 is not set
-+CONFIG_SMC91X=y
-+# CONFIG_DM9000 is not set
-+# CONFIG_ETHOC is not set
-+# CONFIG_SMC911X is not set
-+# CONFIG_SMSC911X is not set
-+# CONFIG_DNET is not set
-+# CONFIG_IBM_NEW_EMAC_ZMII is not set
-+# CONFIG_IBM_NEW_EMAC_RGMII is not set
-+# CONFIG_IBM_NEW_EMAC_TAH is not set
-+# CONFIG_IBM_NEW_EMAC_EMAC4 is not set
-+# CONFIG_IBM_NEW_EMAC_NO_FLOW_CTRL is not set
-+# CONFIG_IBM_NEW_EMAC_MAL_CLR_ICINTSTAT is not set
-+# CONFIG_IBM_NEW_EMAC_MAL_COMMON_ERR is not set
-+# CONFIG_B44 is not set
-+# CONFIG_KS8842 is not set
-+# CONFIG_KS8851_MLL is not set
-+CONFIG_NETDEV_1000=y
-+CONFIG_NETDEV_10000=y
-+CONFIG_WLAN=y
-+# CONFIG_HOSTAP is not set
-+
-+#
-+# Enable WiMAX (Networking options) to see the WiMAX drivers
-+#
-+# CONFIG_WAN is not set
-+CONFIG_PPP=y
-+# CONFIG_PPP_MULTILINK is not set
-+# CONFIG_PPP_FILTER is not set
-+CONFIG_PPP_ASYNC=y
-+# CONFIG_PPP_SYNC_TTY is not set
-+CONFIG_PPP_DEFLATE=y
-+CONFIG_PPP_BSDCOMP=y
-+CONFIG_PPP_MPPE=y
-+# CONFIG_PPPOE is not set
-+# CONFIG_PPPOL2TP is not set
-+# CONFIG_SLIP is not set
-+CONFIG_SLHC=y
-+# CONFIG_NETCONSOLE is not set
-+# CONFIG_NETPOLL is not set
-+# CONFIG_NET_POLL_CONTROLLER is not set
-+# CONFIG_ISDN is not set
-+# CONFIG_PHONE is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+# CONFIG_INPUT_FF_MEMLESS is not set
-+# CONFIG_INPUT_POLLDEV is not set
-+# CONFIG_INPUT_SPARSEKMAP is not set
-+
-+#
-+# Userland interfaces
-+#
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_JOYDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+# CONFIG_TOUCHSCREEN_AD7879_I2C is not set
-+# CONFIG_TOUCHSCREEN_AD7879 is not set
-+# CONFIG_TOUCHSCREEN_DYNAPRO is not set
-+# CONFIG_TOUCHSCREEN_EETI is not set
-+# CONFIG_TOUCHSCREEN_FUJITSU is not set
-+# CONFIG_TOUCHSCREEN_GUNZE is not set
-+# CONFIG_TOUCHSCREEN_ELO is not set
-+# CONFIG_TOUCHSCREEN_WACOM_W8001 is not set
-+# CONFIG_TOUCHSCREEN_MCS5000 is not set
-+# CONFIG_TOUCHSCREEN_MTOUCH is not set
-+# CONFIG_TOUCHSCREEN_INEXIO is not set
-+# CONFIG_TOUCHSCREEN_MK712 is not set
-+# CONFIG_TOUCHSCREEN_PENMOUNT is not set
-+# CONFIG_TOUCHSCREEN_TOUCHRIGHT is not set
-+# CONFIG_TOUCHSCREEN_TOUCHWIN is not set
-+# CONFIG_TOUCHSCREEN_USB_COMPOSITE is not set
-+# CONFIG_TOUCHSCREEN_TOUCHIT213 is not set
-+# CONFIG_TOUCHSCREEN_TSC2007 is not set
-+# CONFIG_TOUCHSCREEN_W90X900 is not set
-+CONFIG_INPUT_MISC=y
-+# CONFIG_INPUT_ATI_REMOTE is not set
-+# CONFIG_INPUT_ATI_REMOTE2 is not set
-+# CONFIG_INPUT_KEYSPAN_REMOTE is not set
-+# CONFIG_INPUT_POWERMATE is not set
-+# CONFIG_INPUT_YEALINK is not set
-+# CONFIG_INPUT_CM109 is not set
-+CONFIG_INPUT_UINPUT=y
-+# CONFIG_INPUT_GPIO_ROTARY_ENCODER is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+# CONFIG_SERIO is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+# CONFIG_VT is not set
-+# CONFIG_DEVKMEM is not set
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=4
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-+# CONFIG_SERIAL_8250_EXTENDED is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+# CONFIG_SERIAL_TIMBERDALE is not set
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_IPMI_HANDLER is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_R3964 is not set
-+# CONFIG_RAW_DRIVER is not set
-+# CONFIG_TCG_TPM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_BOARDINFO=y
-+CONFIG_I2C_COMPAT=y
-+# CONFIG_I2C_CHARDEV is not set
-+CONFIG_I2C_HELPER_AUTO=y
-+
-+#
-+# I2C Hardware Bus support
-+#
-+
-+#
-+# I2C system bus drivers (mostly embedded / system-on-chip)
-+#
-+# CONFIG_I2C_DESIGNWARE is not set
-+# CONFIG_I2C_GPIO is not set
-+# CONFIG_I2C_OCORES is not set
-+# CONFIG_I2C_SIMTEC is not set
-+# CONFIG_I2C_XILINX is not set
-+
-+#
-+# External I2C/SMBus adapter drivers
-+#
-+# CONFIG_I2C_PARPORT_LIGHT is not set
-+# CONFIG_I2C_TAOS_EVM is not set
-+
-+#
-+# Other I2C/SMBus bus drivers
-+#
-+# CONFIG_I2C_PCA_PLATFORM is not set
-+# CONFIG_I2C_STUB is not set
-+
-+#
-+# Miscellaneous I2C Chip support
-+#
-+# CONFIG_SENSORS_TSL2550 is not set
-+# CONFIG_I2C_DEBUG_CORE is not set
-+# CONFIG_I2C_DEBUG_ALGO is not set
-+# CONFIG_I2C_DEBUG_BUS is not set
-+# CONFIG_I2C_DEBUG_CHIP is not set
-+# CONFIG_SPI is not set
-+
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+# CONFIG_GPIO_SYSFS is not set
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+# CONFIG_GPIO_IT8761E is not set
-+
-+#
-+# I2C GPIO expanders:
-+#
-+# CONFIG_GPIO_MAX7300 is not set
-+# CONFIG_GPIO_MAX732X is not set
-+# CONFIG_GPIO_PCA953X is not set
-+# CONFIG_GPIO_PCF857X is not set
-+# CONFIG_GPIO_ADP5588 is not set
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
-+CONFIG_W1=y
-+
-+#
-+# 1-wire Bus Masters
-+#
-+CONFIG_W1_MASTER_DS2482=y
-+# CONFIG_W1_MASTER_DS1WM is not set
-+# CONFIG_W1_MASTER_GPIO is not set
-+
-+#
-+# 1-wire Slaves
-+#
-+# CONFIG_W1_SLAVE_THERM is not set
-+# CONFIG_W1_SLAVE_SMEM is not set
-+# CONFIG_W1_SLAVE_DS2431 is not set
-+# CONFIG_W1_SLAVE_DS2433 is not set
-+# CONFIG_W1_SLAVE_DS2760 is not set
-+# CONFIG_W1_SLAVE_BQ27000 is not set
-+CONFIG_POWER_SUPPLY=y
-+# CONFIG_POWER_SUPPLY_DEBUG is not set
-+CONFIG_PDA_POWER=y
-+# CONFIG_BATTERY_DS2760 is not set
-+# CONFIG_BATTERY_DS2782 is not set
-+# CONFIG_BATTERY_BQ27x00 is not set
-+# CONFIG_BATTERY_MAX17040 is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_88PM860X is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_HTC_I2CPLD is not set
-+# CONFIG_TPS65010 is not set
-+# CONFIG_TWL4030_CORE is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_PMIC_DA903X is not set
-+# CONFIG_PMIC_ADP5520 is not set
-+# CONFIG_MFD_MAX8925 is not set
-+# CONFIG_MFD_WM8400 is not set
-+# CONFIG_MFD_WM831X is not set
-+# CONFIG_MFD_WM8350_I2C is not set
-+# CONFIG_MFD_WM8994 is not set
-+# CONFIG_MFD_PCF50633 is not set
-+# CONFIG_AB3100_CORE is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_DEBUG=y
-+# CONFIG_REGULATOR_DUMMY is not set
-+# CONFIG_REGULATOR_FIXED_VOLTAGE is not set
-+# CONFIG_REGULATOR_VIRTUAL_CONSUMER is not set
-+# CONFIG_REGULATOR_USERSPACE_CONSUMER is not set
-+# CONFIG_REGULATOR_BQ24022 is not set
-+# CONFIG_REGULATOR_MAX1586 is not set
-+# CONFIG_REGULATOR_MAX8649 is not set
-+# CONFIG_REGULATOR_MAX8660 is not set
-+# CONFIG_REGULATOR_LP3971 is not set
-+CONFIG_REGULATOR_TPS65023=y
-+# CONFIG_REGULATOR_TPS6507X is not set
-+CONFIG_MEDIA_SUPPORT=y
-+
-+#
-+# Multimedia core support
-+#
-+CONFIG_VIDEO_DEV=y
-+CONFIG_VIDEO_V4L2_COMMON=y
-+# CONFIG_VIDEO_ALLOW_V4L1 is not set
-+CONFIG_VIDEO_V4L1_COMPAT=y
-+# CONFIG_DVB_CORE is not set
-+CONFIG_VIDEO_MEDIA=y
-+
-+#
-+# Multimedia drivers
-+#
-+CONFIG_IR_CORE=y
-+CONFIG_VIDEO_IR=y
-+# CONFIG_MEDIA_ATTACH is not set
-+CONFIG_MEDIA_TUNER=y
-+# CONFIG_MEDIA_TUNER_CUSTOMISE is not set
-+CONFIG_MEDIA_TUNER_SIMPLE=y
-+CONFIG_MEDIA_TUNER_TDA8290=y
-+CONFIG_MEDIA_TUNER_TDA9887=y
-+CONFIG_MEDIA_TUNER_TEA5761=y
-+CONFIG_MEDIA_TUNER_TEA5767=y
-+CONFIG_MEDIA_TUNER_MT20XX=y
-+CONFIG_MEDIA_TUNER_XC2028=y
-+CONFIG_MEDIA_TUNER_XC5000=y
-+CONFIG_MEDIA_TUNER_MC44S803=y
-+CONFIG_VIDEO_V4L2=y
-+CONFIG_VIDEO_CAPTURE_DRIVERS=y
-+# CONFIG_VIDEO_ADV_DEBUG is not set
-+# CONFIG_VIDEO_FIXED_MINOR_RANGES is not set
-+CONFIG_VIDEO_HELPER_CHIPS_AUTO=y
-+CONFIG_VIDEO_IR_I2C=y
-+# CONFIG_VIDEO_VIVI is not set
-+# CONFIG_VIDEO_SAA5246A is not set
-+# CONFIG_VIDEO_SAA5249 is not set
-+# CONFIG_SOC_CAMERA is not set
-+CONFIG_RADIO_ADAPTERS=y
-+# CONFIG_I2C_SI4713 is not set
-+# CONFIG_RADIO_SI4713 is not set
-+# CONFIG_RADIO_SI470X is not set
-+# CONFIG_RADIO_TEA5764 is not set
-+# CONFIG_RADIO_SAA7706H is not set
-+# CONFIG_RADIO_TEF6862 is not set
-+CONFIG_DAB=y
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+CONFIG_VIDEO_OUTPUT_CONTROL=y
-+CONFIG_FB=y
-+# CONFIG_FIRMWARE_EDID is not set
-+# CONFIG_FB_DDC is not set
-+# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-+CONFIG_FB_CFB_FILLRECT=y
-+CONFIG_FB_CFB_COPYAREA=y
-+CONFIG_FB_CFB_IMAGEBLIT=y
-+# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
-+# CONFIG_FB_SYS_FILLRECT is not set
-+# CONFIG_FB_SYS_COPYAREA is not set
-+# CONFIG_FB_SYS_IMAGEBLIT is not set
-+# CONFIG_FB_FOREIGN_ENDIAN is not set
-+# CONFIG_FB_SYS_FOPS is not set
-+# CONFIG_FB_SVGALIB is not set
-+# CONFIG_FB_MACMODES is not set
-+# CONFIG_FB_BACKLIGHT is not set
-+# CONFIG_FB_MODE_HELPERS is not set
-+# CONFIG_FB_TILEBLITTING is not set
-+
-+#
-+# Frame buffer hardware drivers
-+#
-+# CONFIG_FB_S1D13XXX is not set
-+CONFIG_FB_TEGRA=y
-+# CONFIG_FB_VIRTUAL is not set
-+# CONFIG_FB_METRONOME is not set
-+# CONFIG_FB_MB862XX is not set
-+# CONFIG_FB_BROADSHEET is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+# CONFIG_DISPLAY_SUPPORT is not set
-+# CONFIG_LOGO is not set
-+# CONFIG_SOUND is not set
-+CONFIG_HID_SUPPORT=y
-+CONFIG_HID=y
-+# CONFIG_HIDRAW is not set
-+# CONFIG_HID_PID is not set
-+
-+#
-+# Special HID drivers
-+#
-+# CONFIG_HID_APPLE is not set
-+# CONFIG_HID_MAGICMOUSE is not set
-+# CONFIG_HID_WACOM is not set
-+CONFIG_USB_SUPPORT=y
-+CONFIG_USB_ARCH_HAS_HCD=y
-+# CONFIG_USB_ARCH_HAS_OHCI is not set
-+# CONFIG_USB_ARCH_HAS_EHCI is not set
-+# CONFIG_USB is not set
-+# CONFIG_USB_OTG_WHITELIST is not set
-+# CONFIG_USB_OTG_BLACKLIST_HUB is not set
-+# CONFIG_USB_MUSB_HDRC is not set
-+# CONFIG_USB_GADGET_MUSB_HDRC is not set
-+
-+#
-+# NOTE: USB_STORAGE depends on SCSI but BLK_DEV_SD may
-+#
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET_DEBUG=y
-+CONFIG_USB_GADGET_DEBUG_FILES=y
-+CONFIG_USB_GADGET_DEBUG_FS=y
-+CONFIG_USB_GADGET_VBUS_DRAW=500
-+CONFIG_USB_GADGET_SELECTED=y
-+# CONFIG_USB_GADGET_AT91 is not set
-+# CONFIG_USB_GADGET_ATMEL_USBA is not set
-+# CONFIG_USB_GADGET_FSL_USB2 is not set
-+# CONFIG_USB_GADGET_LH7A40X is not set
-+# CONFIG_USB_GADGET_OMAP is not set
-+# CONFIG_USB_GADGET_PXA25X is not set
-+CONFIG_USB_GADGET_R8A66597=y
-+CONFIG_USB_R8A66597=y
-+# CONFIG_USB_GADGET_PXA27X is not set
-+# CONFIG_USB_GADGET_S3C_HSOTG is not set
-+# CONFIG_USB_GADGET_IMX is not set
-+# CONFIG_USB_GADGET_S3C2410 is not set
-+# CONFIG_USB_GADGET_M66592 is not set
-+# CONFIG_USB_GADGET_AMD5536UDC is not set
-+# CONFIG_USB_GADGET_FSL_QE is not set
-+# CONFIG_USB_GADGET_CI13XXX is not set
-+# CONFIG_USB_GADGET_NET2280 is not set
-+# CONFIG_USB_GADGET_GOKU is not set
-+# CONFIG_USB_GADGET_LANGWELL is not set
-+# CONFIG_USB_GADGET_DUMMY_HCD is not set
-+CONFIG_USB_GADGET_DUALSPEED=y
-+# CONFIG_USB_ZERO is not set
-+# CONFIG_USB_AUDIO is not set
-+# CONFIG_USB_ETH is not set
-+# CONFIG_USB_GADGETFS is not set
-+# CONFIG_USB_FILE_STORAGE is not set
-+# CONFIG_USB_MASS_STORAGE is not set
-+# CONFIG_USB_G_SERIAL is not set
-+# CONFIG_USB_MIDI_GADGET is not set
-+# CONFIG_USB_G_PRINTER is not set
-+# CONFIG_USB_CDC_COMPOSITE is not set
-+# CONFIG_USB_G_NOKIA is not set
-+# CONFIG_USB_G_MULTI is not set
-+
-+#
-+# OTG and related infrastructure
-+#
-+# CONFIG_USB_GPIO_VBUS is not set
-+# CONFIG_USB_ULPI is not set
-+# CONFIG_NOP_USB_XCEIV is not set
-+CONFIG_MMC=y
-+# CONFIG_MMC_DEBUG is not set
-+CONFIG_MMC_UNSAFE_RESUME=y
-+
-+#
-+# MMC/SD/SDIO Card Drivers
-+#
-+CONFIG_MMC_BLOCK=y
-+# CONFIG_MMC_BLOCK_BOUNCE is not set
-+# CONFIG_SDIO_UART is not set
-+# CONFIG_MMC_TEST is not set
-+
-+#
-+# MMC/SD/SDIO Host Controller Drivers
-+#
-+# CONFIG_MMC_SDHCI is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_NEW_LEDS is not set
-+# CONFIG_ACCESSIBILITY is not set
-+CONFIG_RTC_LIB=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_HCTOSYS=y
-+CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
-+# CONFIG_RTC_DEBUG is not set
-+
-+#
-+# RTC interfaces
-+#
-+# CONFIG_RTC_INTF_SYSFS is not set
-+# CONFIG_RTC_INTF_PROC is not set
-+# CONFIG_RTC_INTF_DEV is not set
-+# CONFIG_RTC_DRV_TEST is not set
-+
-+#
-+# I2C RTC drivers
-+#
-+# CONFIG_RTC_DRV_DS1307 is not set
-+# CONFIG_RTC_DRV_DS1374 is not set
-+# CONFIG_RTC_DRV_DS1672 is not set
-+# CONFIG_RTC_DRV_MAX6900 is not set
-+# CONFIG_RTC_DRV_RS5C372 is not set
-+# CONFIG_RTC_DRV_ISL1208 is not set
-+# CONFIG_RTC_DRV_X1205 is not set
-+# CONFIG_RTC_DRV_PCF8563 is not set
-+# CONFIG_RTC_DRV_PCF8583 is not set
-+# CONFIG_RTC_DRV_M41T80 is not set
-+# CONFIG_RTC_DRV_BQ32K is not set
-+# CONFIG_RTC_DRV_S35390A is not set
-+# CONFIG_RTC_DRV_FM3130 is not set
-+# CONFIG_RTC_DRV_RX8581 is not set
-+# CONFIG_RTC_DRV_RX8025 is not set
-+
-+#
-+# SPI RTC drivers
-+#
-+
-+#
-+# Platform RTC drivers
-+#
-+# CONFIG_RTC_DRV_CMOS is not set
-+# CONFIG_RTC_DRV_DS1286 is not set
-+# CONFIG_RTC_DRV_DS1511 is not set
-+# CONFIG_RTC_DRV_DS1553 is not set
-+# CONFIG_RTC_DRV_DS1742 is not set
-+# CONFIG_RTC_DRV_STK17TA8 is not set
-+# CONFIG_RTC_DRV_M48T86 is not set
-+# CONFIG_RTC_DRV_M48T35 is not set
-+# CONFIG_RTC_DRV_M48T59 is not set
-+# CONFIG_RTC_DRV_MSM6242 is not set
-+# CONFIG_RTC_DRV_BQ4802 is not set
-+# CONFIG_RTC_DRV_RP5C01 is not set
-+# CONFIG_RTC_DRV_V3020 is not set
-+
-+#
-+# on-CPU RTC drivers
-+#
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_UIO is not set
-+
-+#
-+# TI VLYNQ
-+#
-+CONFIG_STAGING=y
-+# CONFIG_STAGING_EXCLUDE_BUILD is not set
-+# CONFIG_ECHO is not set
-+
-+#
-+# Qualcomm MSM Camera And Video
-+#
-+
-+#
-+# Camera Sensor Selection
-+#
-+# CONFIG_INPUT_GPIO is not set
-+# CONFIG_POHMELFS is not set
-+
-+#
-+# RAR Register Driver
-+#
-+# CONFIG_RAR_REGISTER is not set
-+# CONFIG_IIO is not set
-+# CONFIG_RAMZSWAP is not set
-+# CONFIG_BATMAN_ADV is not set
-+# CONFIG_STRIP is not set
-+# CONFIG_FB_SM7XX is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_POSIX_ACL=y
-+CONFIG_EXT2_FS_SECURITY=y
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+CONFIG_EXT3_FS_POSIX_ACL=y
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+# CONFIG_JBD_DEBUG is not set
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+CONFIG_FS_POSIX_ACL=y
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_OCFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+# CONFIG_DNOTIFY is not set
-+CONFIG_INOTIFY=y
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+# CONFIG_AUTOFS4_FS is not set
-+# CONFIG_FUSE_FS is not set
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=y
-+# CONFIG_MSDOS_FS is not set
-+CONFIG_VFAT_FS=y
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+# CONFIG_TMPFS_POSIX_ACL is not set
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+# CONFIG_JFFS2_FS is not set
-+# CONFIG_LOGFS is not set
-+# CONFIG_CRAMFS is not set
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+# CONFIG_ROMFS_FS is not set
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+CONFIG_NETWORK_FILESYSTEMS=y
-+# CONFIG_NFS_FS is not set
-+# CONFIG_NFSD is not set
-+# CONFIG_SMB_FS is not set
-+# CONFIG_CIFS is not set
-+# CONFIG_NCP_FS is not set
-+# CONFIG_CODA_FS is not set
-+# CONFIG_AFS_FS is not set
-+
-+#
-+# Partition Types
-+#
-+# CONFIG_PARTITION_ADVANCED is not set
-+CONFIG_MSDOS_PARTITION=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="iso8859-1"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+# CONFIG_NLS_ASCII is not set
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+# CONFIG_DLM is not set
-+
-+#
-+# Kernel hacking
-+#
-+CONFIG_PRINTK_TIME=y
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+# CONFIG_UNUSED_SYMBOLS is not set
-+CONFIG_DEBUG_FS=y
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+CONFIG_SCHEDSTATS=y
-+CONFIG_TIMER_STATS=y
-+# CONFIG_DEBUG_OBJECTS is not set
-+CONFIG_DEBUG_SLAB=y
-+# CONFIG_DEBUG_SLAB_LEAK is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_DEBUG_RT_MUTEXES is not set
-+# CONFIG_RT_MUTEX_TESTER is not set
-+# CONFIG_DEBUG_SPINLOCK is not set
-+CONFIG_DEBUG_MUTEXES=y
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+# CONFIG_DEBUG_HIGHMEM is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_VM=y
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+# CONFIG_DEBUG_MEMORY_INIT is not set
-+# CONFIG_DEBUG_LIST is not set
-+CONFIG_DEBUG_SG=y
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-+# CONFIG_LKDTM is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_SYSCTL_SYSCALL_CHECK is not set
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_IRQSOFF_TRACER is not set
-+# CONFIG_PREEMPT_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_DYNAMIC_DEBUG is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+CONFIG_ARM_UNWIND=y
-+# CONFIG_DEBUG_USER is not set
-+# CONFIG_DEBUG_ERRORS is not set
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+# CONFIG_DEBUG_LL is not set
-+# CONFIG_OC_ETM is not set
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_DEFAULT_SECURITY_SELINUX is not set
-+# CONFIG_DEFAULT_SECURITY_SMACK is not set
-+# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
-+CONFIG_DEFAULT_SECURITY_DAC=y
-+CONFIG_DEFAULT_SECURITY=""
-+CONFIG_CRYPTO=y
-+
-+#
-+# Crypto core or helper
-+#
-+CONFIG_CRYPTO_ALGAPI=y
-+CONFIG_CRYPTO_ALGAPI2=y
-+CONFIG_CRYPTO_AEAD=y
-+CONFIG_CRYPTO_AEAD2=y
-+CONFIG_CRYPTO_BLKCIPHER=y
-+CONFIG_CRYPTO_BLKCIPHER2=y
-+CONFIG_CRYPTO_HASH=y
-+CONFIG_CRYPTO_HASH2=y
-+CONFIG_CRYPTO_RNG2=y
-+CONFIG_CRYPTO_PCOMP=y
-+CONFIG_CRYPTO_MANAGER=y
-+CONFIG_CRYPTO_MANAGER2=y
-+# CONFIG_CRYPTO_GF128MUL is not set
-+# CONFIG_CRYPTO_NULL is not set
-+# CONFIG_CRYPTO_PCRYPT is not set
-+CONFIG_CRYPTO_WORKQUEUE=y
-+# CONFIG_CRYPTO_CRYPTD is not set
-+CONFIG_CRYPTO_AUTHENC=y
-+# CONFIG_CRYPTO_TEST is not set
-+
-+#
-+# Authenticated Encryption with Associated Data
-+#
-+# CONFIG_CRYPTO_CCM is not set
-+# CONFIG_CRYPTO_GCM is not set
-+# CONFIG_CRYPTO_SEQIV is not set
-+
-+#
-+# Block modes
-+#
-+CONFIG_CRYPTO_CBC=y
-+# CONFIG_CRYPTO_CTR is not set
-+# CONFIG_CRYPTO_CTS is not set
-+CONFIG_CRYPTO_ECB=y
-+# CONFIG_CRYPTO_LRW is not set
-+# CONFIG_CRYPTO_PCBC is not set
-+# CONFIG_CRYPTO_XTS is not set
-+
-+#
-+# Hash modes
-+#
-+CONFIG_CRYPTO_HMAC=y
-+# CONFIG_CRYPTO_XCBC is not set
-+# CONFIG_CRYPTO_VMAC is not set
-+
-+#
-+# Digest
-+#
-+# CONFIG_CRYPTO_CRC32C is not set
-+# CONFIG_CRYPTO_GHASH is not set
-+# CONFIG_CRYPTO_MD4 is not set
-+CONFIG_CRYPTO_MD5=y
-+# CONFIG_CRYPTO_MICHAEL_MIC is not set
-+# CONFIG_CRYPTO_RMD128 is not set
-+# CONFIG_CRYPTO_RMD160 is not set
-+# CONFIG_CRYPTO_RMD256 is not set
-+# CONFIG_CRYPTO_RMD320 is not set
-+CONFIG_CRYPTO_SHA1=y
-+# CONFIG_CRYPTO_SHA256 is not set
-+# CONFIG_CRYPTO_SHA512 is not set
-+# CONFIG_CRYPTO_TGR192 is not set
-+# CONFIG_CRYPTO_WP512 is not set
-+
-+#
-+# Ciphers
-+#
-+CONFIG_CRYPTO_AES=y
-+# CONFIG_CRYPTO_ANUBIS is not set
-+CONFIG_CRYPTO_ARC4=y
-+# CONFIG_CRYPTO_BLOWFISH is not set
-+# CONFIG_CRYPTO_CAMELLIA is not set
-+# CONFIG_CRYPTO_CAST5 is not set
-+# CONFIG_CRYPTO_CAST6 is not set
-+CONFIG_CRYPTO_DES=y
-+# CONFIG_CRYPTO_FCRYPT is not set
-+# CONFIG_CRYPTO_KHAZAD is not set
-+# CONFIG_CRYPTO_SALSA20 is not set
-+# CONFIG_CRYPTO_SEED is not set
-+# CONFIG_CRYPTO_SERPENT is not set
-+# CONFIG_CRYPTO_TEA is not set
-+CONFIG_CRYPTO_TWOFISH=y
-+CONFIG_CRYPTO_TWOFISH_COMMON=y
-+
-+#
-+# Compression
-+#
-+CONFIG_CRYPTO_DEFLATE=y
-+# CONFIG_CRYPTO_ZLIB is not set
-+# CONFIG_CRYPTO_LZO is not set
-+
-+#
-+# Random Number Generation
-+#
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_HW=y
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_BITREVERSE=y
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+CONFIG_CRC_CCITT=y
-+CONFIG_CRC16=y
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+CONFIG_CRC32=y
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_ZLIB_DEFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_IOPORT=y
-+CONFIG_HAS_DMA=y
-+CONFIG_NLATTR=y
++++ b/arch/arm/mach-tegra/clock.c
+@@ -0,0 +1,300 @@
++/*
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/list.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/debugfs.h>
++#include <asm/clkdev.h>
++
++#include "clock.h"
++
++static int clk_debugfs_reparent(struct clk *c);
++
++static LIST_HEAD(clocks);
++static DEFINE_MUTEX(clocks_mutex);
++
++struct clk *get_tegra_clock_by_name(const char *name)
++{
++	struct clk *c;
++	mutex_lock(&clocks_mutex);
++	list_for_each_entry(c, &clocks, node) {
++		if (strcmp(c->name, name) == 0) {
++			mutex_unlock(&clocks_mutex);
++			return c;
++		}
++	}
++	mutex_unlock(&clocks_mutex);
++	return NULL;
++}
++
++static int clk_reparent(struct clk *c, struct clk *parent)
++{
++	if (c->sibling.next && c->sibling.prev)
++		list_del_init(&c->sibling);
++	if (parent)
++		list_add(&c->sibling, &parent->children);
++	clk_debugfs_reparent(c);
++	return 0;
++}
++
++static void propagate_rate(struct clk *c)
++{
++	struct clk *clkp;
++	pr_debug("%s: %s\n", __func__, c->name);
++	list_for_each_entry(clkp, &c->children, sibling) {
++		pr_debug("   %s\n", clkp->name);
++		if (clkp->ops->recalculate_rate)
++			clkp->ops->recalculate_rate(clkp);
++		propagate_rate(clkp);
++	}
++}
++
++static int clk_register(struct clk *c)
++{
++	mutex_lock(&clocks_mutex);
++	list_add(&c->node, &clocks);
++	mutex_unlock(&clocks_mutex);
++	return 0;
++}
++
++void clk_init(struct clk *c)
++{
++	spin_lock_init(&c->lock);
++	INIT_LIST_HEAD(&c->children);
++	if (c->ops && c->ops->init)
++		c->ops->init(c);
++	clk_register(c);
++	if (c->parent)
++		list_add(&c->sibling, &c->parent->children);
++}
++
++int clk_enable(struct clk *c)
++{
++	int ret = 0;
++	unsigned long flags;
++	spin_lock_irqsave(&c->lock, flags);
++	if (c->refcnt == 0) {
++		if (c->parent) {
++			ret = clk_enable(c->parent);
++			if (ret)
++				goto err;
++		}
++
++		if (c->ops && c->ops->enable) {
++			ret = c->ops->enable(c);
++			if (ret) {
++				if (c->parent)
++					clk_disable(c->parent);
++				goto err;
++			}
++		}
++	}
++	c->refcnt++;
++err:
++	spin_unlock_irqrestore(&c->lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_enable);
++
++void clk_disable(struct clk *c)
++{
++	unsigned long flags;
++	spin_lock_irqsave(&c->lock, flags);
++	if (c->refcnt == 0) {
++		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
++		goto err;
++	}
++	if (c->refcnt == 1) {
++		if (c->parent)
++			clk_disable(c->parent);
++
++		if (c->ops && c->ops->disable)
++			c->ops->disable(c);
++	}
++	c->refcnt--;
++err:
++	spin_unlock_irqrestore(&c->lock, flags);
++}
++EXPORT_SYMBOL(clk_disable);
++
++int clk_set_parent(struct clk *c, struct clk *parent)
++{
++	unsigned long flags;
++	int ret = 0;
++	spin_lock_irqsave(&c->lock, flags);
++	if (c->ops && c->ops->set_parent)
++		ret = c->ops->set_parent(c, parent);
++	else
++		ret = -ENOSYS;
++	clk_reparent(c, c->parent);
++	propagate_rate(c);
++	spin_unlock_irqrestore(&c->lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *c)
++{
++	return c->parent;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
++int clk_set_rate(struct clk *c, unsigned long rate)
++{
++	int ret = 0;
++	unsigned long flags;
++	spin_lock_irqsave(&c->lock, flags);
++	if (c->ops && c->ops->set_rate)
++		ret = c->ops->set_rate(c, rate);
++	else
++		ret = -ENOSYS;
++	propagate_rate(c);
++	spin_unlock_irqrestore(&c->lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
++unsigned long clk_get_rate(struct clk *c)
++{
++	int ret = 0;
++	unsigned long flags;
++	spin_lock_irqsave(&c->lock, flags);
++	ret = c->rate;
++	spin_unlock_irqrestore(&c->lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_get_rate);
++
++void clk_enable_init_clocks(void)
++{
++	/*struct clk *clkp;
++
++	list_for_each_entry(clkp, &clocks, node) {
++		if (clkp->flags & ENABLE_ON_INIT)
++			clk_enable(clkp);
++	}*/
++}
++EXPORT_SYMBOL(clk_enable_init_clocks);
++
++int __init tegra_init_clock(void)
++{
++	tegra2_init_clocks();
++
++	clk_enable_init_clocks();
++	return 0;
++}
++
++#ifdef CONFIG_DEBUG_FS
++static struct dentry *clk_debugfs_root;
++
++static int clk_debugfs_register_one(struct clk *c)
++{
++	int err;
++	struct dentry *d, *child, *child_tmp;
++	struct clk *pa = c->parent;
++	char s[255];
++	char *p = s;
++
++	p += sprintf(p, "%s", c->name);
++	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
++	if (!d)
++		return -ENOMEM;
++	c->dent = d;
++
++	d = debugfs_create_u8("refcnt", S_IRUGO, c->dent, (u8 *)&c->refcnt);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
++	if (!d) {
++		err = -ENOMEM;
++		goto err_out;
++	}
++	return 0;
++
++err_out:
++	d = c->dent;
++	list_for_each_entry_safe(child, child_tmp, &d->d_subdirs, d_u.d_child)
++		debugfs_remove(child);
++	debugfs_remove(c->dent);
++	return err;
++}
++
++static int clk_debugfs_register(struct clk *c)
++{
++	int err;
++	struct clk *pa = c->parent;
++
++	if (pa && !pa->dent) {
++		err = clk_debugfs_register(pa);
++		if (err)
++			return err;
++	}
++
++	if (!c->dent) {
++		err = clk_debugfs_register_one(c);
++		if (err)
++			return err;
++	}
++	return 0;
++}
++
++static int __init clk_debugfs_init(void)
++{
++	struct clk *c;
++	struct dentry *d;
++	int err;
++
++	d = debugfs_create_dir("clock", NULL);
++	if (!d)
++		return -ENOMEM;
++	clk_debugfs_root = d;
++
++	list_for_each_entry(c, &clocks, node) {
++		err = clk_debugfs_register(c);
++		if (err)
++			goto err_out;
++	}
++	return 0;
++err_out:
++	debugfs_remove_recursive(clk_debugfs_root);
++	return err;
++}
++late_initcall(clk_debugfs_init);
++#endif
++
++static int clk_debugfs_reparent(struct clk *c)
++{
++	int ret = 0;
++	pr_debug("%s: %s %p %p %s\n", __func__, c->name, c->dent, c->parent,
++		c->parent ? c->parent->name : NULL);
++#ifdef CONFIG_DEBUG_FS
++	debugfs_remove(c->dent);
++	ret = clk_debugfs_register_one(c);
++#endif
++	return ret;
++}
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+new file mode 100644
+index 0000000..78cd30f
+--- /dev/null
++++ b/arch/arm/mach-tegra/clock.h
+@@ -0,0 +1,116 @@
++/*
++ * arch/arm/mach-tegra/include/mach/clock.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_TEGRA_CLOCK_H
++#define __MACH_TEGRA_CLOCK_H
++
++#include <asm/clkdev.h>
++
++#define ENABLE_ON_INIT	0x00000001
++#define DIV_U71		0x00000002
++#define DIV_U71_FIXED	0x00000004
++#define DIV_2		0x00000008
++#define PLL_FIXED	0x00000010
++#define PLL_HAS_CPCON	0x00000020
++#define MUX		0x00000040
++#define PLLD		0x00000080
++
++struct clk;
++
++struct clk_mux_sel {
++	struct clk	*input;
++	u32		value;
++};
++
++struct clk_pll_table {
++	unsigned long	input_rate;
++	unsigned long	output_rate;
++	u16		n;
++	u16		m;
++	u8		p;
++	u8		cpcon;
++};
++
++struct clk_ops {
++	void		(*init)(struct clk *);
++	int		(*enable)(struct clk *);
++	void		(*disable)(struct clk *);
++	void		(*recalc)(struct clk *);
++	int		(*set_parent)(struct clk *, struct clk *);
++	int		(*set_rate)(struct clk *, unsigned long);
++	unsigned long	(*get_rate)(struct clk *);
++	long		(*round_rate)(struct clk *, unsigned long);
++	unsigned long	(*recalculate_rate)(struct clk *);
++};
++
++struct clk {
++	/* node for master clocks list */
++	struct list_head		node;
++	struct list_head		children;	/* list of children */
++	struct list_head		sibling;	/* node for children */
++#ifdef CONFIG_DEBUG_FS
++	struct dentry 			*dent;
++#endif
++	struct clk_ops			*ops;
++	struct clk			*parent;
++	struct clk_lookup		lookup;
++	unsigned long			rate;
++	u32				flags;
++	u32				refcnt;
++	const char			*name;
++	u32				reg;
++	u32				reg_shift;
++	unsigned int			clk_num;
++	spinlock_t			lock;
++
++	/* PLL */
++	unsigned long			input_min;
++	unsigned long			input_max;
++	unsigned long			cf_min;
++	unsigned long			cf_max;
++	unsigned long			vco_min;
++	unsigned long			vco_max;
++	u32				m;
++	u32				n;
++	u32				p;
++	u32				cpcon;
++	const struct clk_pll_table	*pll_table;
++
++	/* DIV */
++	u32				div;
++
++	/* MUX */
++	const struct clk_mux_sel	*inputs;
++	u32				sel;
++	u32				reg_mask;
++};
++
++
++struct clk_duplicate {
++	const char *name;
++	struct clk_lookup lookup;
++};
++
++void tegra2_init_clocks(void);
++void clk_init(struct clk *clk);
++struct clk *get_tegra_clock_by_name(const char *name);
++
++unsigned long clk_measure_input_freq(void);
++
++#endif
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 20875ee..838bb5d 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -40,5 +40,6 @@ void __init tegra_init_cache(void)
+ 
+ void __init tegra_common_init(void)
+ {
++	tegra_init_clock();
+ 	tegra_init_cache();
+ }
+diff --git a/arch/arm/mach-tegra/include/mach/clkdev.h b/arch/arm/mach-tegra/include/mach/clkdev.h
+new file mode 100644
+index 0000000..412f5c6
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/clkdev.h
+@@ -0,0 +1,32 @@
++/*
++ * arch/arm/mach-tegra/include/mach/clkdev.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_CLKDEV_H
++#define __MACH_CLKDEV_H
++
++static inline int __clk_get(struct clk *clk)
++{
++	return 1;
++}
++
++static inline void __clk_put(struct clk *clk)
++{
++}
++
++#endif
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+new file mode 100644
+index 0000000..4abdc67
+--- /dev/null
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -0,0 +1,985 @@
++/*
++ * arch/arm/mach-tegra/tegra2_clocks.c
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/list.h>
++#include <linux/spinlock.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++
++#include <asm/clkdev.h>
++
++#include <mach/iomap.h>
++
++#include "clock.h"
++
++#define RST_DEVICES			0x004
++#define RST_DEVICES_SET			0x300
++#define RST_DEVICES_CLR			0x304
++
++#define CLK_OUT_ENB			0x010
++#define CLK_OUT_ENB_SET			0x320
++#define CLK_OUT_ENB_CLR			0x324
++
++#define OSC_CTRL			0x50
++#define OSC_CTRL_OSC_FREQ_MASK		(3<<30)
++#define OSC_CTRL_OSC_FREQ_13MHZ		(0<<30)
++#define OSC_CTRL_OSC_FREQ_19_2MHZ	(1<<30)
++#define OSC_CTRL_OSC_FREQ_12MHZ		(2<<30)
++#define OSC_CTRL_OSC_FREQ_26MHZ		(3<<30)
++
++#define OSC_FREQ_DET			0x58
++#define OSC_FREQ_DET_TRIG		(1<<31)
++
++#define OSC_FREQ_DET_STATUS		0x5C
++#define OSC_FREQ_DET_BUSY		(1<<31)
++#define OSC_FREQ_DET_CNT_MASK		0xFFFF
++
++#define PERIPH_CLK_SOURCE_MASK		(3<<30)
++#define PERIPH_CLK_SOURCE_SHIFT		30
++#define PERIPH_CLK_SOURCE_ENABLE	(1<<28)
++#define PERIPH_CLK_SOURCE_DIV_MASK	0xFF
++#define PERIPH_CLK_SOURCE_DIV_SHIFT	0
++
++#define PLL_BASE			0x0
++#define PLL_BASE_BYPASS			(1<<31)
++#define PLL_BASE_ENABLE			(1<<30)
++#define PLL_BASE_REF_ENABLE		(1<<29)
++#define PLL_BASE_OVERRIDE		(1<<28)
++#define PLL_BASE_LOCK			(1<<27)
++#define PLL_BASE_DIVP_MASK		(0x7<<20)
++#define PLL_BASE_DIVP_SHIFT		20
++#define PLL_BASE_DIVN_MASK		(0x3FF<<8)
++#define PLL_BASE_DIVN_SHIFT		8
++#define PLL_BASE_DIVM_MASK		(0x1F)
++#define PLL_BASE_DIVM_SHIFT		0
++
++#define PLL_OUT_RATIO_MASK		(0xFF<<8)
++#define PLL_OUT_RATIO_SHIFT		8
++#define PLL_OUT_OVERRIDE		(1<<2)
++#define PLL_OUT_CLKEN			(1<<1)
++#define PLL_OUT_RESET_DISABLE		(1<<0)
++
++
++#define PLL_MISC			0xc
++#define PLL_MISC_DCCON_SHIFT		20
++#define PLL_MISC_LOCK_ENABLE		(1<<18)
++#define PLL_MISC_CPCON_SHIFT		8
++#define PLL_MISC_LFCON_SHIFT		4
++#define PLL_MISC_VCOCON_SHIFT		0
++
++#define PLLD_MISC_CLKENABLE		(1<<30)
++#define PLLD_MISC_DIV_RST		(1<<23)
++#define PLLD_MISC_DCCON_SHIFT		12
++
++static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
++
++/* Lock clk_reg_lock around any non-atomic access to a register
++   that is shared by multiple clocks. */
++static DEFINE_SPINLOCK(clk_reg_lock);
++
++#define clk_writel(value, reg) \
++	__raw_writel(value, (u32)reg_clk_base + (reg))
++#define clk_readl(reg) \
++	__raw_readl((u32)reg_clk_base + (reg))
++
++unsigned long clk_measure_input_freq(void) {
++	u32 clock_autodetect;
++	clk_writel(OSC_FREQ_DET_TRIG | 1, OSC_FREQ_DET);
++	do {} while (clk_readl(OSC_FREQ_DET_STATUS) & OSC_FREQ_DET_BUSY);
++	clock_autodetect = clk_readl(OSC_FREQ_DET_STATUS);
++	if (clock_autodetect >= 732 - 3 && clock_autodetect <= 732 + 3) {
++		return 12000000;
++	} else if (clock_autodetect >= 794 - 3 && clock_autodetect <= 794 + 3) {
++		return 13000000;
++	} else if (clock_autodetect >= 1172 - 3 && clock_autodetect <= 1172 + 3) {
++		return 19200000;
++	} else if (clock_autodetect >= 1587 - 3 && clock_autodetect <= 1587 + 3) {
++		return 26000000;
++	} else {
++		pr_err("%s: Unexpected clock autodetect value %d", __func__, clock_autodetect);
++		BUG();
++		return 0;
++	}
++}
++
++static int clk_div71_possible_rate(struct clk *c, unsigned long rate)
++{
++	unsigned long input_rate = clk_get_rate(c);
++	int divider_u71;
++
++	divider_u71 = (input_rate*2)/rate;
++	if (rate * divider_u71 == input_rate*2)
++		return divider_u71 - 2;
++	else
++		return -EINVAL;
++}
++
++/* clk_m functions */
++static unsigned long tegra2_clk_m_autodetect_rate(struct clk *c)
++{
++	u32 auto_clock_control = clk_readl(OSC_CTRL) & ~OSC_CTRL_OSC_FREQ_MASK;
++
++	c->rate = clk_measure_input_freq();
++	switch (c->rate) {
++	case 12000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_12MHZ;
++		break;
++	case 13000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_13MHZ;
++		break;
++	case 19200000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_19_2MHZ;
++		break;
++	case 26000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_26MHZ;
++		break;
++	default:
++		pr_err("%s: Unexpected clock rate %ld", __func__, c->rate);
++		BUG();
++	}
++	clk_writel(auto_clock_control, OSC_CTRL);
++	return c->rate;
++}
++
++static void tegra2_clk_m_init(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	tegra2_clk_m_autodetect_rate(c);
++}
++
++static int tegra2_clk_m_enable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	return 0;
++}
++
++static void tegra2_clk_m_disable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	BUG();
++}
++
++static struct clk_ops tegra_clk_m_ops = {
++	.init     = tegra2_clk_m_init,
++	.enable   = tegra2_clk_m_enable,
++	.disable  = tegra2_clk_m_disable,
++};
++
++/* PLL Functions */
++static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val;
++	unsigned long input_rate;
++	const struct clk_pll_table *sel;
++
++	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
++	/* BUG_ON(c->refcnt != 0); */
++
++	input_rate = clk_get_rate(c->parent);
++	for (sel = c->pll_table; sel->input_rate != 0; sel++) {
++		if (sel->input_rate == input_rate && sel->output_rate == rate) {
++			c->n = sel->n;
++			c->m = sel->m;
++			c->p = sel->p;
++			c->cpcon = sel->cpcon;
++			val = clk_readl(c->reg + PLL_BASE);
++			if (c->flags & PLL_FIXED)
++				val |= PLL_BASE_OVERRIDE;
++			val &= ~(PLL_BASE_DIVP_MASK | PLL_BASE_DIVN_MASK |
++				 PLL_BASE_DIVM_MASK);
++			val |= (c->m << PLL_BASE_DIVM_SHIFT) |
++				(c->n << PLL_BASE_DIVN_SHIFT);
++			BUG_ON(c->p > 2);
++			if (c->p == 2)
++				val |= 1 << PLL_BASE_DIVP_SHIFT;
++			clk_writel(val, c->reg + PLL_BASE);
++			c->rate = rate;
++
++			if (c->flags & PLL_HAS_CPCON) {
++				val = c->cpcon << PLL_MISC_CPCON_SHIFT;
++				clk_writel(val, c->reg + PLL_MISC);
++			}
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++static int tegra2_pll_clk_enable(struct clk *c)
++{
++	u32 val;
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	val = clk_readl(c->reg + PLL_BASE);
++	val &= ~PLL_BASE_BYPASS;
++	val |= PLL_BASE_ENABLE;
++	clk_writel(val, c->reg + PLL_BASE);
++	return 0;
++}
++
++static void tegra2_pll_clk_disable(struct clk *c)
++{
++	u32 val;
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	val = clk_readl(c->reg);
++	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
++	clk_writel(val, c->reg);
++}
++
++static struct clk_ops tegra_pll_ops = {
++	.enable   = tegra2_pll_clk_enable,
++	.disable  = tegra2_pll_clk_disable,
++	.set_rate = tegra2_pll_clk_set_rate,
++};
++
++/* Clock divider ops */
++static int tegra2_pll_div_clk_enable(struct clk *c)
++{
++	u32 val;
++	u32 new_val;
++	unsigned long flags;
++
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->flags & DIV_U71) {
++		spin_lock_irqsave(&clk_reg_lock, flags);
++		val = clk_readl(c->reg);
++		new_val = val >> c->reg_shift;
++		new_val &= 0xFFFF;
++
++		new_val |= PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE;
++
++		val &= ~(0xFFFF << c->reg_shift);
++		val |= new_val << c->reg_shift;
++		clk_writel(val, c->reg);
++		spin_unlock_irqrestore(&clk_reg_lock, flags);
++		return 0;
++	} else if (c->flags & DIV_2) {
++		BUG_ON(!(c->flags & PLLD));
++		val = clk_readl(c->reg);
++		val &= ~PLLD_MISC_DIV_RST;
++		clk_writel(val, c->reg);
++		return 0;
++	}
++	return -EINVAL;
++}
++
++static void tegra2_pll_div_clk_disable(struct clk *c)
++{
++	u32 val;
++	u32 new_val;
++	unsigned long flags;
++
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->flags & DIV_U71) {
++		spin_lock_irqsave(&clk_reg_lock, flags);
++		val = clk_readl(c->reg);
++		new_val = val >> c->reg_shift;
++		new_val &= 0xFFFF;
++
++		new_val &= ~(PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE);
++
++		val &= ~(0xFFFF << c->reg_shift);
++		val |= new_val << c->reg_shift;
++		clk_writel(val, c->reg);
++		spin_unlock_irqrestore(&clk_reg_lock, flags);
++	} else if (c->flags & DIV_2) {
++		BUG_ON(!(c->flags & PLLD));
++		val = clk_readl(c->reg);
++		val |= PLLD_MISC_DIV_RST;
++		clk_writel(val, c->reg);
++	}
++}
++
++static int tegra2_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	unsigned long flags;
++	u32 val;
++	u32 new_val;
++	int divider_u71;
++	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
++	if (c->flags & DIV_U71) {
++		divider_u71 = clk_div71_possible_rate(c->parent, rate);
++		if (divider_u71 >= 0) {
++			/* Divider values for multiple PLL outputs are
++			   in the same register, so lock clk_reg_lock */
++			spin_lock_irqsave(&clk_reg_lock, flags);
++			val = clk_readl(c->reg);
++			new_val = val >> c->reg_shift;
++			new_val &= 0xFFFF;
++
++			if (c->flags & DIV_U71_FIXED)
++				new_val |= PLL_OUT_OVERRIDE;
++			new_val &= PLL_OUT_RATIO_MASK;
++			new_val |= divider_u71 << PLL_OUT_RATIO_SHIFT;
++
++			val &= ~(0xFFFF << c->reg_shift);
++			val |= new_val << c->reg_shift;
++			clk_writel(val, c->reg);
++			spin_unlock_irqrestore(&clk_reg_lock, flags);
++			c->rate = rate;
++			printk("set to %lu\n", c->rate);
++			return 0;
++		}
++	} else if (c->flags & DIV_2) {
++		if (clk_get_rate(c->parent) == rate * 2) {
++			c->rate = rate;
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++
++static struct clk_ops tegra_pll_div_ops = {
++	.enable   = tegra2_pll_div_clk_enable,
++	.disable  = tegra2_pll_div_clk_disable,
++	.set_rate = tegra2_pll_div_clk_set_rate,
++};
++
++/* Periph clk ops */
++static void tegra2_periph_clk_init(struct clk *c)
++{
++	u32 val;
++	const struct clk_mux_sel *mux = 0;
++	const struct clk_mux_sel *sel;
++	if (c->flags & MUX) {
++		val = clk_readl(c->reg);
++		for (sel = c->inputs; sel->input != NULL; sel++) {
++			if (val >> PERIPH_CLK_SOURCE_SHIFT == sel->value)
++				mux = sel;
++		}
++		BUG_ON(!mux);
++
++		c->ops->set_parent(c, mux->input);
++	} else {
++		c->ops->set_parent(c, c->inputs[0].input);
++	}
++}
++
++static int tegra2_periph_clk_enable(struct clk *c)
++{
++	u32 val = (1<<(c->clk_num%32));
++	unsigned long reg = (c->clk_num / 32) * 8;
++
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	clk_writel(val, CLK_OUT_ENB_SET + reg);
++	clk_writel(val, RST_DEVICES_CLR + reg);
++	return 0;
++}
++
++static void tegra2_periph_clk_disable(struct clk *c)
++{
++	u32 val = (1<<(c->clk_num%32));
++	unsigned long reg = (c->clk_num / 32) * 8;
++
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	clk_writel(val, CLK_OUT_ENB_CLR + reg);
++	clk_writel(val, RST_DEVICES_SET + reg);
++}
++
++static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
++{
++	u32 val;
++	const struct clk_mux_sel *sel;
++	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
++	for (sel = c->inputs; sel->input != NULL; sel++) {
++		if (sel->input == p) {
++			/*if (p != c->parent) {
++				if (c->parent)
++					clk_disable(c->parent);
++				clk_enable(p);
++			}*/
++			c->parent = p;
++			val = clk_readl(c->reg);
++			val &= ~PERIPH_CLK_SOURCE_MASK;
++			val |= (sel->value) << PERIPH_CLK_SOURCE_SHIFT;
++			clk_writel(val, c->reg);
++			c->rate = clk_get_rate(c->parent);
++			return 0;
++		}
++	}
++
++	return -EINVAL;
++}
++
++static int tegra2_periph_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val;
++	int divider_u71;
++	const struct clk_mux_sel *sel;
++	pr_debug("%s: %lu\n", __func__, rate);
++	for (sel = c->inputs; sel->input != NULL; sel++) {
++		if (c->flags & DIV_U71) {
++			divider_u71 = clk_div71_possible_rate(sel->input, rate);
++			if (divider_u71 >= 0) {
++				/* FIXME: ensure we don't go through a too-high rate */
++				if (c->ops && c->ops->set_parent)
++					c->ops->set_parent(c, sel->input);
++				udelay(1);
++				val = clk_readl(c->reg);
++				val &= ~PERIPH_CLK_SOURCE_DIV_MASK;
++				val |= divider_u71;
++				clk_writel(val, c->reg);
++				c->rate = rate;
++				return 0;
++			}
++		} else {
++			if (clk_get_rate(sel->input) == rate) {
++				if (c->ops && c->ops->set_parent)
++					c->ops->set_parent(c, sel->input);
++				return 0;
++			}
++		}
++	}
++	return -EINVAL;
++}
++
++static unsigned long tegra2_periph_clk_recalculate_rate(struct clk* c)
++{
++	/* FIXME: Divide by U71 divider value */
++	c->rate = c->parent->rate;
++	pr_debug("%s: %lu\n", c->name, c->rate);
++	return c->rate;
++}
++
++static struct clk_ops tegra_periph_clk_ops = {
++	.init       = &tegra2_periph_clk_init,
++	.enable     = &tegra2_periph_clk_enable,
++	.disable    = &tegra2_periph_clk_disable,
++	.set_parent = &tegra2_periph_clk_set_parent,
++	.set_rate   = &tegra2_periph_clk_set_rate,
++	.recalculate_rate = &tegra2_periph_clk_recalculate_rate,
++};
++
++static struct clk tegra_clk_32k = {
++	.name = "tegra_clk_32k",
++	.rate = 32678,
++	.ops  = NULL,
++};
++
++static struct clk tegra_clk_input = {
++	.name = "tegra_clk_input",
++	.flags = ENABLE_ON_INIT,
++	.rate = 12000000,
++	.ops = NULL,
++};
++
++static struct clk_pll_table tegra_pll_s_table[] = {
++	{32768, 12000000, 366, 1, 1, 0},
++	{32768, 13000000, 397, 1, 1, 0},
++	{32768, 19200000, 586, 1, 1, 0},
++	{32768, 26000000, 793, 1, 1, 0},
++	{0, 0, 0, 0, 0, 0},
++};
++
++static struct clk tegra_pll_s = {
++	.name = "tegra_pll_s",
++	.ops = &tegra_pll_ops,
++	.reg       = 0xf0,
++	.input_min = 32768,
++	.input_max = 32768,
++	.parent     = &tegra_clk_32k,
++	.cf_min    = 0, /* FIXME */
++	.cf_max    = 0, /* FIXME */
++	.vco_min   = 12000000,
++	.vco_max   = 26000000,
++	.pll_table = tegra_pll_s_table,
++};
++
++static struct clk_mux_sel tegra_clk_m_sel[] = {
++	{ .input = &tegra_clk_32k, .value = 0},
++	{ .input = &tegra_pll_s,  .value = 1},
++	{ 0, 0},
++};
++static struct clk tegra_clk_m = {
++	.name      = "tegra_clk_m",
++	.flags     = ENABLE_ON_INIT,
++	.ops       = &tegra_clk_m_ops,
++	.inputs    = tegra_clk_m_sel,
++	.reg       = 0x1fc,
++	.reg_mask  = (1<<28),
++	.reg_shift = 28,
++};
++
++static struct clk_pll_table tegra_pll_c_table[] = {
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_c = {
++	.name      = "tegra_pll_c",
++	.flags	   = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0x80,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_c_table,
++};
++
++static struct clk tegra_pll_c_out1 = {
++	.name      = "tegra_pll_c_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_c,
++	.reg       = 0x84,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_m_table[] = {
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_m = {
++	.name      = "tegra_pll_m",
++	.flags     = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0x90,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1200000000,
++	.pll_table = tegra_pll_m_table,
++};
++
++static struct clk tegra_pll_m_out1 = {
++	.name      = "tegra_pll_m_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_m,
++	.reg       = 0x94,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_p_table[] = {
++	{ 12000000, 216000000, 432, 12, 2, 8},
++	{ 13000000, 216000000, 432, 13, 2, 8},
++	{ 19200000, 216000000, 90,   4, 2, 1},
++	{ 26000000, 216000000, 432, 26, 2, 8},
++	{ 12000000, 432000000, 432, 12, 1, 8},
++	{ 13000000, 432000000, 432, 13, 1, 8},
++	{ 19200000, 432000000, 90,   4, 1, 1},
++	{ 26000000, 432000000, 432, 26, 1, 8},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_p = {
++	.name      = "tegra_pll_p",
++	.flags     = ENABLE_ON_INIT | PLL_FIXED | PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xa0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_p_table,
++};
++
++static struct clk tegra_pll_p_out1 = {
++	.name      = "tegra_pll_p_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa4,
++	.reg_shift = 0,
++};
++
++static struct clk tegra_pll_p_out2 = {
++	.name      = "tegra_pll_p_out2",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa4,
++	.reg_shift = 16,
++};
++
++static struct clk tegra_pll_p_out3 = {
++	.name      = "tegra_pll_p_out3",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa8,
++	.reg_shift = 0,
++};
++
++static struct clk tegra_pll_p_out4 = {
++	.name      = "tegra_pll_p_out4",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa8,
++	.reg_shift = 16,
++};
++
++static struct clk_pll_table tegra_pll_a_table[] = {
++	{ 28800000, 56448000, 49, 25, 1, 1},
++	{ 28800000, 73728000, 64, 25, 1, 1},
++	{ 28800000, 11289600, 49, 25, 1, 1},
++	{ 28800000, 12288000, 64, 25, 1, 1},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_a = {
++	.name      = "tegra_pll_a",
++	.flags     = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xb0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_pll_p_out1,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_a_table,
++};
++
++static struct clk tegra_pll_a_out0 = {
++	.name      = "tegra_pll_a_out0",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_a,
++	.reg       = 0xb4,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_d_table[] = {
++	{ 12000000, 1000000000, 1000, 12, 1, 12},
++	{ 13000000, 1000000000, 1000, 13, 1, 12},
++	{ 19200000, 1000000000, 625,  12, 1, 8},
++	{ 26000000, 1000000000, 1000, 26, 1, 12},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_d = {
++	.name      = "tegra_pll_d",
++	.flags     = PLL_HAS_CPCON | PLLD,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xd0,
++	.input_min = 2000000,
++	.input_max = 40000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 40000000,
++	.vco_max   = 1000000000,
++	.pll_table = tegra_pll_d_table,
++};
++
++static struct clk tegra_pll_d_out0 = {
++	.name      = "tegra_pll_d_out0",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_2 | PLLD,
++	.parent    = &tegra_pll_d,
++};
++
++static struct clk_pll_table tegra_pll_u_table[] = {
++	{ 12000000, 480000000, 960, 12, 1, 0},
++	{ 13000000, 480000000, 960, 13, 1, 0},
++	{ 19200000, 480000000, 200, 4,  1, 0},
++	{ 26000000, 480000000, 960, 26, 1, 0},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_u = {
++	.name      = "tegra_pll_u",
++	.flags     = 0,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xc0,
++	.input_min = 2000000,
++	.input_max = 40000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 480000000,
++	.vco_max   = 960000000,
++	.pll_table = tegra_pll_u_table,
++};
++
++static struct clk_pll_table tegra_pll_x_table[] = {
++	{ 12000000, 1000000000, 1000, 12, 1, 12},
++	{ 13000000, 1000000000, 1000, 13, 1, 12},
++	{ 19200000, 1000000000, 625,  12, 1, 8},
++	{ 26000000, 1000000000, 1000, 26, 1, 12},
++	{ 12000000, 750000000,  750,  12, 1, 12},
++	{ 13000000, 750000000,  750,  13, 1, 12},
++	{ 19200000, 750000000,  625,  16, 1, 8},
++	{ 26000000, 750000000,  750,  26, 1, 12},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_x = {
++	.name      = "tegra_pll_x",
++	.flags     = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xe0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1200000000,
++	.pll_table = tegra_pll_x_table,
++};
++
++static struct clk_mux_sel mux_pllm_pllc_pllp_plla[] = {
++	{ .input = &tegra_pll_m, .value = 0},
++	{ .input = &tegra_pll_c, .value = 1},
++	{ .input = &tegra_pll_p, .value = 2},
++	{ .input = &tegra_pll_a_out0, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_pllm_clkm[] = {
++	{ .input = &tegra_pll_p, .value = 0},
++	{ .input = &tegra_pll_c, .value = 1},
++	{ .input = &tegra_pll_m, .value = 2},
++	{ .input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_plla_audio_pllp_clkm[] = {
++	{.input = &tegra_pll_a, .value = 0},
++	/* FIXME: no mux defined for tegra_audio
++	{.input = &tegra_audio, .value = 1},*/
++	{.input = &tegra_pll_p, .value = 2},
++	{.input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_plld_pllc_clkm[] = {
++	{.input = &tegra_pll_p, .value = 0},
++	{.input = &tegra_pll_d_out0, .value = 1},
++	{.input = &tegra_pll_c, .value = 2},
++	{.input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_audio_clkm_clk32[] = {
++	{.input = &tegra_pll_p,     .value = 0},
++	{.input = &tegra_pll_c,     .value = 1},
++	/* FIXME: no mux defined for tegra_audio
++	{.input = &tegra_audio,     .value = 2},*/
++	{.input = &tegra_clk_m,     .value = 3},
++	{.input = &tegra_clk_32k,   .value = 4},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_pllm[] = {
++	{.input = &tegra_pll_p,     .value = 0},
++	{.input = &tegra_pll_c,     .value = 1},
++	{.input = &tegra_pll_m,     .value = 2},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_clk_m[] = {
++	{ .input = &tegra_clk_m, .value = 0},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_out3[] = {
++	{ .input = &tegra_pll_p_out3, .value = 0},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_clk_32k[] = {
++	{ .input = &tegra_clk_32k, .value = 0},
++	{ 0, 0},
++};
++
++#define PERIPH_CLK(_name, _dev, _con, _clk_num, _reg, _inputs, _flags) \
++	{						\
++		.name      = _name,			\
++		.lookup    = {				\
++			.dev_id    = _dev,		\
++			.con_id	   = _con,		\
++		},					\
++		.ops       = &tegra_periph_clk_ops,	\
++		.clk_num   = _clk_num,			\
++		.reg       = _reg,			\
++		.inputs    = _inputs,			\
++		.flags     = _flags,			\
++	}
++
++struct clk tegra_periph_clks[] = {
++	PERIPH_CLK("rtc",       "rtc-tegra",  NULL,   4,  0,     mux_clk_32k,                    0),
++	PERIPH_CLK("timer",     "timer",      NULL,   5,  0,     mux_clk_m,                      0),
++	PERIPH_CLK("i2s1",      "i2s.0",      NULL,   11, 0x100, mux_plla_audio_pllp_clkm,       MUX | DIV_U71),
++	PERIPH_CLK("i2s2",      "i2s.1",      NULL,   18, 0x104, mux_plla_audio_pllp_clkm,       MUX | DIV_U71),
++	/* FIXME: spdif has 2 clocks but 1 enable */
++	PERIPH_CLK("spdif_out", "spdif_out",  NULL,   10, 0x108, mux_plla_audio_pllp_clkm,       MUX | DIV_U71),
++	PERIPH_CLK("spdif_in",  "spdif_in",   NULL,   10, 0x10c, mux_pllp_pllc_pllm,             MUX | DIV_U71),
++	PERIPH_CLK("pwm",       "pwm",        NULL,   17, 0x110, mux_pllp_pllc_audio_clkm_clk32, MUX | DIV_U71),
++	PERIPH_CLK("spi",       "spi",        NULL,   43, 0x114, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("xio",       "xio",        NULL,   45, 0x120, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("twc",       "twc",        NULL,   16, 0x12c, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sbc1",      "spi_tegra.0",NULL,   41, 0x134, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sbc2",      "spi_tegra.1",NULL,   44, 0x118, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sbc3",      "spi_tegra.2",NULL,   46, 0x11c, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sbc4",      "spi_tegra.3",NULL,   68, 0x1b4, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("ide",       "ide",        NULL,   25, 0x144, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("ndflash",   "tegra_nand", NULL,   13, 0x160, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	/* FIXME: vfir shares an enable with uartb */
++	PERIPH_CLK("vfir",      "vfir",       NULL,   7,  0x168, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sdmmc1",    "sdhci-tegra.0",    NULL,   14, 0x150, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sdmmc2",    "sdhci-tegra.1",    NULL,   9,  0x154, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sdmmc3",    "sdhci-tegra.2",    NULL,   69, 0x1bc, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("sdmmc4",    "sdhci-tegra.3",    NULL,   15, 0x160, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("vde",       "vde",        NULL,   61, 0x1c8, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("csite",     "csite",      NULL,   73, 0x1d4, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	/* FIXME: what is la? */
++	PERIPH_CLK("la",        "la",         NULL,   76, 0x1f8, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("owr",       "owr",        NULL,   71, 0x1cc, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("nor",       "nor",        NULL,   42, 0x1d0, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("mipi",      "mipi",       NULL,   50, 0x174, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("i2c1",      "tegra-i2c.0",      NULL,   12, 0x124, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("i2c2",      "tegra-i2c.1",      NULL,   54, 0x198, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("i2c3",      "tegra-i2c.2",      NULL,   67, 0x1b8, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("dvc",       "tegra-i2c.3",      NULL,   47, 0x128, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("i2c1_i2c",  "tegra-i2c.0",      "i2c",  0, 0, mux_pllp_out3,        0),
++	PERIPH_CLK("i2c2_i2c",  "tegra-i2c.1",      "i2c",  0, 0, mux_pllp_out3,        0),
++	PERIPH_CLK("i2c3_i2c",  "tegra-i2c.2",      "i2c",  0, 0, mux_pllp_out3,        0),
++	PERIPH_CLK("dvc_i2c",   "tegra-i2c.3",      "i2c",  0, 0, mux_pllp_out3,        MUX | DIV_U71),
++	PERIPH_CLK("uarta",     "uart.0",     NULL,   6,  0x178, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("uartb",     "uart.1",     NULL,   7,  0x17c, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("uartc",     "uart.2",     NULL,   55, 0x1a0, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("uartd",     "uart.3",     NULL,   65, 0x1c0, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("uarte",     "uart.4",     NULL,   66, 0x1c4, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("3d",        "3d",         NULL,   24, 0x158, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	PERIPH_CLK("2d",        "2d",         NULL,   21, 0x15c, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	/* FIXME: vi and vi_sensor share an enable */
++	PERIPH_CLK("vi",        "vi",         NULL,   20, 0x148, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	PERIPH_CLK("vi_sensor", "vi_sensor",  NULL,   20, 0x1a8, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	PERIPH_CLK("epp",       "epp",        NULL,   19, 0x16c, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	PERIPH_CLK("mpe",       "mpe",        NULL,   60, 0x170, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	PERIPH_CLK("host1x",    "host1x",     NULL,   28, 0x180, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
++	/* FIXME: cve and tvo share an enable  */
++	PERIPH_CLK("cve",       "cve",        NULL,   49, 0x140, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("tvo",       "tvo",        NULL,   49, 0x188, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("hdmi",      "hdmi",       NULL,   51, 0x18c, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("tvdac",     "tvdac",      NULL,   53, 0x194, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("disp1",     "tegrafb.0",  NULL,   27, 0x138, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("disp2",     "tegrafb.1",  NULL,   26, 0x13c, mux_pllp_plld_pllc_clkm,        MUX | DIV_U71),
++	PERIPH_CLK("usbd",      "fsl-tegra-udc",      NULL,   22, 0,     mux_clk_m,                    0),
++	PERIPH_CLK("usb2",      "usb.1",      NULL,   58, 0,     mux_clk_m,                              0),
++	PERIPH_CLK("usb3",      "usb.2",      NULL,   59, 0,     mux_clk_m,                              0),
++};
++
++#define CLK_DUPLICATE(_name, _dev, _con) \
++	{						\
++		.name      = _name,			\
++		.lookup    = {				\
++			.dev_id    = _dev,		\
++			.con_id	   = _con,		\
++		},					\
++	}
++
++/* Some clocks may be used by different drivers depending on the board
++ * configuration.  List those here to register them twice in the clock lookup
++ * table under two names.
++ */
++struct clk_duplicate tegra_clk_duplicates[] = {
++	CLK_DUPLICATE("uarta", "tegra_uart.0", NULL),
++	CLK_DUPLICATE("uartb", "tegra_uart.1", NULL),
++	CLK_DUPLICATE("uartc", "tegra_uart.2", NULL),
++	CLK_DUPLICATE("uartd", "tegra_uart.3", NULL),
++	CLK_DUPLICATE("uarte", "tegra_uart.4", NULL),
++};
++
++#define CLK(dev, con, ck)     \
++	{       \
++		.dev_id = dev,  \
++		.con_id = con,  \
++		.clk = ck,  \
++	}
++
++struct clk_lookup tegra_clk_lookups[] = {
++	/* external root sources */
++	CLK(NULL, "input_clk",  &tegra_clk_input),
++	CLK(NULL, "32k_clk", &tegra_clk_32k),
++	CLK(NULL, "pll_s", &tegra_pll_s),
++	CLK(NULL, "clk_m", &tegra_clk_m),
++	CLK(NULL, "pll_m", &tegra_pll_m),
++	CLK(NULL, "pll_m_out1", &tegra_pll_m_out1),
++	CLK(NULL, "pll_c", &tegra_pll_c),
++	CLK(NULL, "pll_c_out1", &tegra_pll_c_out1),
++	CLK(NULL, "pll_p", &tegra_pll_p),
++	CLK(NULL, "pll_p_out1", &tegra_pll_p_out1),
++	CLK(NULL, "pll_p_out2", &tegra_pll_p_out2),
++	CLK(NULL, "pll_p_out3", &tegra_pll_p_out3),
++	CLK(NULL, "pll_p_out4", &tegra_pll_p_out4),
++	CLK(NULL, "pll_a",      &tegra_pll_a),
++	CLK(NULL, "pll_a_out0", &tegra_pll_a_out0),
++	CLK(NULL, "pll_d",      &tegra_pll_d),
++	CLK(NULL, "pll_d_out0", &tegra_pll_d_out0),
++	CLK(NULL, "pll_u",      &tegra_pll_u),
++	CLK(NULL, "pll_x",      &tegra_pll_x),
++};
++
++void tegra2_init_clocks(void)
++{
++	int i;
++	struct clk_lookup *cl;
++	struct clk *c;
++	struct clk_duplicate *cd;
++
++	for (i = 0; i < ARRAY_SIZE(tegra_clk_lookups); i++) {
++		cl = &tegra_clk_lookups[i];
++		clk_init(cl->clk);
++		clkdev_add(cl);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(tegra_periph_clks); i++) {
++		c = &tegra_periph_clks[i];
++		cl = &c->lookup;
++		cl->clk = c;
++
++		clk_init(cl->clk);
++		clkdev_add(cl);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
++		cd = &tegra_clk_duplicates[i];
++		c = get_tegra_clock_by_name(cd->name);
++		if (c) {
++			cl = &cd->lookup;
++			cl->clk = c;
++			clkdev_add(cl);
++		} else {
++			pr_err("%s: Unknown duplicate clock %s\n", __func__,
++				cd->name);
++		}
++	}
++}
 -- 
 1.6.5.6
