@@ -1,7 +1,9 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 13 Apr 2010 20:06:01 +0200
+Date: Tue, 13 Apr 2010 20:11:37 +0200
 Subject: [PATCH] ARM: mx3/lilly1131: add USB support
-Message-ID: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
+In-Reply-To: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
+References: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
+Message-ID: <1271182297-27984-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,23 +11,21 @@ Signed-off-by: Daniel Mack <daniel@caiaq.de>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
 
-While reviewing the MX5 USB patches, I realized that the lilly1131 USB
-patches didn't make it mainline. Don't know whether I forgot to post them
-or whether they got lost somewhere. Anyway - here's a rebased version.
+Another version with "select MXC_ULPI if USB_ULPI"
 
  arch/arm/mach-mx3/Kconfig          |    1 +
  arch/arm/mach-mx3/mach-mx31lilly.c |  145 ++++++++++++++++++++++++++++++++++++
  2 files changed, 146 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 3872af1..3d0c575 100644
+index 3872af1..bc71de3 100644
 --- a/arch/arm/mach-mx3/Kconfig
 +++ b/arch/arm/mach-mx3/Kconfig
 @@ -73,6 +73,7 @@ config MACH_MX31MOBOARD
  config MACH_MX31LILLY
  	bool "Support MX31 LILLY-1131 platforms (INCO startec)"
  	select ARCH_MX31
-+	select MXC_ULPI
++	select MXC_ULPI if USB_ULPI
  	help
  	  Include support for mx31 based LILLY1131 modules. This includes
  	  specific configurations for the board and its peripherals.
