@@ -1,45 +1,43 @@
 From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 13 Apr 2010 10:14:53 +0200
-Subject: [PATCH 2/2] AT91 slow-clock resume: don't restore the PLL
-	settings when the PLL was off
-In-Reply-To: <1270724213l.12911l.1l@i-dmzi_al.realan.de>
-References: <x2qcd73a99e1004061445j8698c478z9f021d5f3dd8f81b@mail.gmail.com>
-	<1270724213l.12911l.1l@i-dmzi_al.realan.de>
-Message-ID: <w2ocd73a99e1004130114g1e46ed2blbcfeef1c9cec0001@mail.gmail.com>
+Date: Tue, 13 Apr 2010 10:25:14 +0200
+Subject: [PATCH 1/2 v2] AT91: taskit PortuxG20 and Stamp9G20 board support
+In-Reply-To: <1268916069-21639-1-git-send-email-christian.glindkamp@taskit.de>
+References: <20100318115333.GD19544@n2100.arm.linux.org.uk>
+	<1268916069-21639-1-git-send-email-christian.glindkamp@taskit.de>
+Message-ID: <v2qcd73a99e1004130125y5daef203n241dfc130f7dcfb9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Anders,
+hi Christian,
 
-> at91: slow-clock resume: Don't wait for a disabled PLL to lock.
->
-> We run into this problem with the PLLB on the at91: ohci-at91 disables the PLLB
-> when going to suspend. The slowclock code however tries to do the same: It
-> saves the PLLB register value and when restoring the value during resume, it
-> waits for the PLLB to lock again. However the PLL will never lock and the loop
-> would run into its timeout because the slowclock code just stored and restored
-> an empty register.
-> This fixes the problem by only restoring PLLA/PLLB when they were enabled
-> at suspend time.
->
-> Signed-off-by: Anders Larsen <al@alarsen.net>
-> Cc: Andrew Victor <avictor.za@gmail.com>
-> Cc: Julien Langer <julien.langer@gmail.com>
+> Both boards share the same board file, as the PortuxG20 is basically an
+> SBC based on the Stamp9G20.
 
-> + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ?0xff0000)
-> + ? ? ? bne ? ? 1f
-> + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ~0xff0000)
-> + ? ? ? beq ? ? 2f
-> +1:
-> ? ? ? ?wait_pllblock
-> +2:
+> +config MACH_PORTUXG20
+> + ? ? ? bool "taskit PortuxG20"
+> + ? ? ? depends on ARCH_AT91SAM9G20
+> + ? ? ? help
+> + ? ? ? ? Select this if you are using taskit's PortuxG20.
+> + ? ? ? ? <http://www.taskit.de/en/>
+> +
+> +config MACH_STAMP9G20
+> + ? ? ? bool "taskit Stamp9G20 CPU module"
+> + ? ? ? depends on ARCH_AT91SAM9G20
+> + ? ? ? help
+> + ? ? ? ? Select this if you are using taskit's Stamp9G20 CPU module on its
+> + ? ? ? ? evaluation board.
+> + ? ? ? ? <http://www.taskit.de/en/>
 
-AT91_PMC_MUL is 11 bits (so 0x7ff0000)
+Please remove the "depends on ARCH_AT91SAM9G20" lines.
+These configuration options are in an "if ARCH_AT91SAM9G20" section,
+so the "depends on" are no longer needed.
 
-Is the mask (0xff0000) correct in the above code?
-It looks like wait_pllblock will be skipped if the MUL field is set to
-0x100, 0x200, 0x300, etc.
+Otherwise, the patches looks fine.
+  Acked-by:  Andrew Victor <linux@maxim.org.za>
+
+Please submit the patches to Russell King's patch-tracking system.
+Thanks.
 
 
 Regards,
-  Andrew Victor
+ Andrew Victor
