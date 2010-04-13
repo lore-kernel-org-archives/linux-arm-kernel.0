@@ -1,221 +1,216 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 13 Apr 2010 19:40:44 +0200
-Subject: [PATCH 2.6.34-rc4 6/8] mx5: Add USB support for Freescale MX51
-	Babbage
-In-Reply-To: <1271175030-3635-6-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271175030-3635-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271175030-3635-3-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271175030-3635-4-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271175030-3635-5-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271175030-3635-6-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100413174044.GR30801@buzzloop.caiaq.de>
+Date: Tue, 13 Apr 2010 20:06:01 +0200
+Subject: [PATCH] ARM: mx3/lilly1131: add USB support
+Message-ID: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 11:10:29AM -0500, Dinh.Nguyen at freescale.com wrote:
-> This patch updates the clocks, gpios, iomuxing and device structures for
-> enabling USB Host functionality on Freescale MX51 Babbage HW.
-> This patch applies to 2.6.34-rc4.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx51_babbage.c |   40 +++++++++++++++++++++++++-
->  arch/arm/mach-mx5/clock-mx51.c         |    8 +++++
->  arch/arm/mach-mx5/devices.c            |   49 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h            |    2 +
->  4 files changed, 98 insertions(+), 1 deletions(-)
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
 
-That should be split in two patches - one for common code and one for
-the board definition.
+While reviewing the MX5 USB patches, I realized that the lilly1131 USB
+patches didn't make it mainline. Don't know whether I forgot to post them
+or whether they got lost somewhere. Anyway - here's a rebased version.
 
+ arch/arm/mach-mx3/Kconfig          |    1 +
+ arch/arm/mach-mx3/mach-mx31lilly.c |  145 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 146 insertions(+), 0 deletions(-)
 
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 1338d6a..ddfa48b 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -13,6 +13,7 @@
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
->  #include <linux/gpio.h>
-> +#include <linux/delay.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -30,6 +31,8 @@
->  extern void __init mx5_usb_dr_init(void);
->  extern void __init mx5_usbh1_init(void);
->  
-> +#define GPIO_1_7  (0*32+7)
-> +
->  static struct platform_device *devices[] __initdata = {
->  	&mxc_fec_device,
->  };
-> @@ -50,6 +53,22 @@ static struct pad_desc mx51babbage_pads[] = {
->  	MX51_PAD_EIM_D26__UART3_TXD,
->  	MX51_PAD_EIM_D27__UART3_RTS,
->  	MX51_PAD_EIM_D24__UART3_CTS,
-> +
-> +	/* USB HOST1 */
-> +	MX51_PAD_GPIO_1_25__USBH1_CLK,
-> +	MX51_PAD_GPIO_1_26__USBH1_DIR,
-> +	MX51_PAD_GPIO_1_28__USBH1_NXT,
-> +	MX51_PAD_GPIO_1_11__USBH1_DATA0,
-> +	MX51_PAD_GPIO_1_12__USBH1_DATA1,
-> +	MX51_PAD_GPIO_1_13__USBH1_DATA2,
-> +	MX51_PAD_GPIO_1_14__USBH1_DATA3,
-> +	MX51_PAD_GPIO_1_15__USBH1_DATA4,
-> +	MX51_PAD_GPIO_1_16__USBH1_DATA5,
-> +	MX51_PAD_GPIO_1_17__USBH1_DATA6,
-> +	MX51_PAD_GPIO_1_18__USBH1_DATA7,
-> +
-> +	/* USB HUB reset line*/
-> +	MX51_PAD_GPIO_1_7__GPIO1_7,
->  };
->  
->  /* Serial ports */
-> @@ -64,12 +83,31 @@ static inline void mxc_init_imx_uart(void)
->  	mxc_register_device(&mxc_uart_device1, &uart_pdata);
->  	mxc_register_device(&mxc_uart_device2, &uart_pdata);
->  }
-> -#else /* !SERIAL_IMX */
-> +#else /* SERIAL_IMX */
->  static inline void mxc_init_imx_uart(void)
->  {
->  }
->  #endif /* SERIAL_IMX */
->  
-> +static inline void mx5_babbage_usbhub_reset(void)
-> +{
-> +	int ret;
-> +
-> +	/* Bring USB hub out of reset */
-> +	ret = gpio_request(GPIO_1_7, "GPIO1_7");
-> +	if (ret) {
-> +		printk("failed to get GPIO_1_7: %d\n", ret);
-> +		return;
-> +	}
-> +	gpio_direction_output(GPIO_1_7, 0);
-> +
-> +	/* USB HUB RESET - De-assert USB HUB RESET_N */
-> +	msleep(1);
-> +	gpio_set_value(GPIO_1_7, 0);
-> +	msleep(1);
-> +	gpio_set_value(GPIO_1_7, 1);
-> +}
-> +
->  /*
->   * Board specific initialization.
->   */
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index 8f85f73..36684d0 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -765,6 +765,10 @@ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* USB */
-> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> +	NULL,  NULL, &pll3_sw_clk, NULL);
-> +
->  #define _REGISTER_CLOCK(d, n, c) \
->         { \
->  		.dev_id = d, \
-> @@ -778,6 +782,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index 73f2342..3d8f66a 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -11,6 +11,7 @@
->   */
->  
->  #include <linux/platform_device.h>
-> +#include <linux/dma-mapping.h>
->  #include <mach/hardware.h>
->  #include <mach/gpio.h>
->  #include <mach/imx-uart.h>
-> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource usbotg_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR,
-> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_OTG,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbdr_host_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(usbotg_resources),
-> +	.resource = usbotg_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource usbh1_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR + 0x200,
-> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_H1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbh1_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(usbh1_resources),
-> +	.resource = usbh1_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
->  struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index f339ab8..95c45f9 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;
->  extern struct platform_device mxc_uart_device1;
->  extern struct platform_device mxc_uart_device2;
->  extern struct platform_device mxc_fec_device;
-> +extern struct platform_device mxc_usbdr_host_device;
-> +extern struct platform_device mxc_usbh1_device;
-> -- 
-> 1.6.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 3872af1..3d0c575 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -73,6 +73,7 @@ config MACH_MX31MOBOARD
+ config MACH_MX31LILLY
+ 	bool "Support MX31 LILLY-1131 platforms (INCO startec)"
+ 	select ARCH_MX31
++	select MXC_ULPI
+ 	help
+ 	  Include support for mx31 based LILLY1131 modules. This includes
+ 	  specific configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
+index 80847b0..d3d5877 100644
+--- a/arch/arm/mach-mx3/mach-mx31lilly.c
++++ b/arch/arm/mach-mx3/mach-mx31lilly.c
+@@ -27,12 +27,15 @@
+ #include <linux/types.h>
+ #include <linux/init.h>
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/smsc911x.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/mc13783.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -44,6 +47,8 @@
+ #include <mach/iomux-mx3.h>
+ #include <mach/board-mx31lilly.h>
+ #include <mach/spi.h>
++#include <mach/mxc_ehci.h>
++#include <mach/ulpi.h>
+ 
+ #include "devices.h"
+ 
+@@ -108,6 +113,137 @@ static struct platform_device physmap_flash_device = {
+ 	.num_resources = 1,
+ };
+ 
++/* USB */
++
++#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
++			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
++
++static int usbotg_init(struct platform_device *pdev)
++{
++	unsigned int pins[] = {
++		MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
++		MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
++		MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
++		MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
++		MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
++		MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
++		MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
++		MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
++		MX31_PIN_USBOTG_CLK__USBOTG_CLK,
++		MX31_PIN_USBOTG_DIR__USBOTG_DIR,
++		MX31_PIN_USBOTG_NXT__USBOTG_NXT,
++		MX31_PIN_USBOTG_STP__USBOTG_STP,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB OTG");
++
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_USB_4WIRE, true);
++	mxc_iomux_set_gpr(MUX_PGP_USB_COMMON, true);
++
++	/* chip select */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE2, IOMUX_CONFIG_GPIO),
++				"USBOTG_CS");
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), "USBH1 CS");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), 0);
++
++	return 0;
++}
++
++static int usbh1_init(struct platform_device *pdev)
++{
++	int pins[] = {
++		MX31_PIN_CSPI1_MOSI__USBH1_RXDM,
++		MX31_PIN_CSPI1_MISO__USBH1_RXDP,
++		MX31_PIN_CSPI1_SS0__USBH1_TXDM,
++		MX31_PIN_CSPI1_SS1__USBH1_TXDP,
++		MX31_PIN_CSPI1_SS2__USBH1_RCV,
++		MX31_PIN_CSPI1_SCLK__USBH1_OEB,
++		MX31_PIN_CSPI1_SPI_RDY__USBH1_FS,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H1");
++
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_MOSI, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_MISO, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS2, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SCLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SPI_RDY, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_USB_SUSPEND, true);
++
++	return 0;
++}
++
++static int usbh2_init(struct platform_device *pdev)
++{
++	int pins[] = {
++		MX31_PIN_USBH2_DATA0__USBH2_DATA0,
++		MX31_PIN_USBH2_DATA1__USBH2_DATA1,
++		MX31_PIN_USBH2_CLK__USBH2_CLK,
++		MX31_PIN_USBH2_DIR__USBH2_DIR,
++		MX31_PIN_USBH2_NXT__USBH2_NXT,
++		MX31_PIN_USBH2_STP__USBH2_STP,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H2");
++
++	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
++
++	/* chip select */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
++				"USBH2_CS");
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), "USBH2 CS");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), 0);
++
++	return 0;
++}
++
++static struct mxc_usbh_platform_data usbotg_pdata = {
++	.init	= usbotg_init,
++	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++
++static struct mxc_usbh_platform_data usbh1_pdata = {
++	.init	= usbh1_init,
++	.portsc	= MXC_EHCI_MODE_UTMI | MXC_EHCI_SERIAL,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_SINGLE_UNI,
++};
++
++static struct mxc_usbh_platform_data usbh2_pdata = {
++	.init	= usbh2_init,
++	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++
+ static struct platform_device *devices[] __initdata = {
+ 	&smsc91x_device,
+ 	&physmap_flash_device,
+@@ -183,6 +319,15 @@ static void __init mx31lilly_board_init(void)
+ 	spi_register_board_info(&mc13783_dev, 1);
+ 
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	/* USB */
++	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++
++	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
++	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
+ }
+ 
+ static void __init mx31lilly_timer_init(void)
+-- 
+1.7.0.3
