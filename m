@@ -1,52 +1,40 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 13 Apr 2010 14:53:21 +0300
-Subject: Query on direction_output fn of PL061 GPIO driver.
-In-Reply-To: <4BC45839.1080902@st.com>
-References: <4BC44C7E.20306@st.com> <20100413113237.GA2212@tarshish>
-	<4BC45839.1080902@st.com>
-Message-ID: <20100413115321.GB2212@tarshish>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 13 Apr 2010 07:59:56 -0400 (EDT)
+Subject: [RFC PATCH v5 0/2] ARM: VFP: Save / restore VFP state on the
+	signal handler path
+In-Reply-To: <20100413114218.GA22424@localhost>
+References: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
+	<cover.1270199787.git.imre.deak@nokia.com>
+	<20100412220440.GF6148@shareable.org>
+	<20100413114218.GA22424@localhost>
+Message-ID: <alpine.LFD.2.00.1004130757350.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Tue, 13 Apr 2010, Imre Deak wrote:
 
-On Tue, Apr 13, 2010 at 05:10:41PM +0530, Viresh KUMAR wrote:
-> On 4/13/2010 5:02 PM, Baruch Siach wrote:
-> >> > In current implementation, firstly value of GPIO pin is modified and then its
-> >> > direction is set to OUT. In our SOCs (ST SPEAr), this implementation doesn't
-> >> > work correctly (we have pl061 in our soc). Suppose previously pin is in IN mode,
-> >> > now writing val to it doesn't change anything because it is in IN mode and we
-> >> > can write to a pin only when it is in OUT mode. Now if its direction is
-> >> > changed to OUT then also its value will remain same and will not be changed to
-> >> > what we wanted.
-> >> > 
-> >> > Am i missing something?
-> > Probably not. This is a design bug in the PL061 hardware. Changing the 
-> > direction before the value makes the output value of the GPIO undefined 
-> > (apparently 0) for a short period of time. This is bad news for some 
-> > applications.
+> On Tue, Apr 13, 2010 at 12:04:40AM +0200, ext Jamie Lokier wrote:
+> > imre.deak at nokia.com wrote:
+> > > From: Imre Deak <imre.deak@nokia.com>
+> > > 
+> > > Changes since v4:
+> > > - Do not add the packed attribute to user_vfp or user_vfp_exc.
+> > >   I added packed to these structs to prevent the extra padding in
+> > >   vfp_sigframe. But actually the padding is in accordance with the
+> > >   ARM ABI.
 > > 
+> > EABI, OABI or both?
 > 
-> thanks for your prompt reply.
-> Ok. so this may cause problem on the board. 
-> Anyway if this is the issue, then writing value to val register has no effects.
+> I checked only EABI, which specifies alignment to the struct's alignment,
+> which is 8 bytes for struct user_vfp.
 > 
-> > Anyway, the right thing to do here is to reverse do just that, since the 
-> > current way of doing things is broken.
-> 
-> I didn't get it completely. If i got it correctly, maybe myself or you can just
-> send a patch to reverse this, i.e. writing val and setting direction.
-> Am i correct?
+> I haven't found an official OABI spec, but some googling turned up
+> that there the requirement is only to align to word size, so we'd
+> have a difference in the struct vfp_sigframe's size and the alignment
+> of the user_vfp_exc within.
 
-Correct. Please send a patch, and I'll ack it after review. Make sure to test 
-the patch before sending. I don't have access to this hardware anymore.  
-Estimating the length of the jitter on your platform (when switching direction 
-and value) would be even better. Please explain the issue and the jitter 
-problem in your commit log.
+I think that VFP is defined for EABI only anyway.  I doubt people are 
+using VFP with OABI in practice either.
 
-baruch
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Nicolas
