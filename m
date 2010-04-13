@@ -1,26 +1,53 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 13 Apr 2010 16:20:38 +0530
-Subject: Query on direction_output fn of PL061 GPIO driver.
-Message-ID: <4BC44C7E.20306@st.com>
+From: al@alarsen.net (Anders Larsen)
+Date: Tue, 13 Apr 2010 13:05:32 +0200
+Subject: [at91] Save power by disabling the processor clock when CPU is idle
+Message-ID: <1271156732l.25331l.7l@i-dmzi_al.realan.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
+Disable the processor clock when the CPU is idle.
 
-I have a query on PL061 GPIO drivers API pl061_direction_output().
-Purpose of this function is to set GPIO pin in OUT mode and set/reset
-its value.
+This saves much more power than merely entering 'Wait for Interrupt' mode.
+Since JTAG-debugging doesn't work when the processor clock is switched off,
+make it conditional on CONFIG_DEBUG_KERNEL.
 
-In current implementation, firstly value of GPIO pin is modified and then its
-direction is set to OUT. In our SOCs (ST SPEAr), this implementation doesn't
-work correctly (we have pl061 in our soc). Suppose previously pin is in IN mode,
-now writing val to it doesn't change anything because it is in IN mode and we
-can write to a pin only when it is in OUT mode. Now if its direction is
-changed to OUT then also its value will remain same and will not be changed to
-what we wanted.
+Signed-off-by: Anders Larsen <al@alarsen.net>
+Cc: Andrew Victor <avictor.za@gmail.com>
+---
+KernelVersion: 2.6.33
+
+ arch/arm/mach-at91/include/mach/system.h |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
 
-Am i missing something?
-
-regards,
-viresh kumar.
+Index: b/arch/arm/mach-at91/include/mach/system.h
+===================================================================
+--- a/arch/arm/mach-at91/include/mach/system.h
++++ b/arch/arm/mach-at91/include/mach/system.h
+@@ -24,21 +24,24 @@
+ #include <mach/hardware.h>
+ #include <mach/at91_st.h>
+ #include <mach/at91_dbgu.h>
++#include <mach/at91_pmc.h>
+ 
+ static inline void arch_idle(void)
+ {
++#ifndef CONFIG_DEBUG_KERNEL
+ 	/*
+ 	 * Disable the processor clock.  The processor will be automatically
+ 	 * re-enabled by an interrupt or by a reset.
+ 	 */
+-//	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-
++	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
++#else
+ 	/*
+ 	 * Set the processor (CP15) into 'Wait for Interrupt' mode.
+ 	 * Unlike disabling the processor clock via the PMC (above)
+ 	 *  this allows the processor to be woken via JTAG.
+ 	 */
+ 	cpu_do_idle();
++#endif
+ }
+ 
+ void (*at91_arch_reset)(void);
