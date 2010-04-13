@@ -1,107 +1,26 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 13 Apr 2010 08:53:16 +0900
-Subject: [PATCH] MAINTAINERS: arch/arm/s3c and arch/arm/s5p
-In-Reply-To: <1271102450.2131.27.camel@Joe-Laptop.home>
-References: <cover.1269655208.git.joe@perches.com>
-	<0c97f736400ec243e71ba794ae7046a61d2449c1.1269655208.git.joe@perches.com>
-	<20100412194737.GS3048@n2100.arm.linux.org.uk>
-	<1271102450.2131.27.camel@Joe-Laptop.home>
-Message-ID: <h2p9c9fda241004121653te938caa2u42e39c31f27e85e1@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 13 Apr 2010 02:26:36 +0200
+Subject: [PATCH] Arm nomadik : Vendor tool compatibility
+In-Reply-To: <y2l8cad0aa1004121229o894a17f0w9045882c214bd090@mail.gmail.com>
+References: <577FAEEB8540FB4F9C91B6BB262576755905DC@XVS-DCFR-22.europe.corp.altran.com>
+	<x2y63386a3d1003311634l71486234n95f60e506b776948@mail.gmail.com>
+	<y2l8cad0aa1004121229o894a17f0w9045882c214bd090@mail.gmail.com>
+Message-ID: <t2m63386a3d1004121726nb6afdad1q2d75ebba34caefa3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2010/4/12 Jean-Michel Hautbois <jhautbois@gmail.com>:
 
-On Tue, Apr 13, 2010 at 5:00 AM, Joe Perches <joe@perches.com> wrote:
-> On Mon, 2010-04-12 at 20:47 +0100, Russell King - ARM Linux wrote:
->> This is Samsung stuff, it should be copied to Ben (added).
->
-> Maybe this is appropriate?
+> What king of modification would you do ?
 
-No, s5p stubs are maintained by Samsung.
-Of course Ben work on core part together, e.g., clock, interrupt.
+Instead of coding the ECC layout into the driver I would move it to the
+machine config in arch/arm/mach-* and pass it in as platform data
+to the driver.
 
-Most s5pc1XX are done by Marek and Kyungmin Park except plat-samsung.
-common part of Samsung SoCs.
+> Do you think it shall be queued before your submission ?
 
-Thank you,
-Kyungmin Park
+I will fix it for all users the day I have time, please queue this
+as it is now.
 
->
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
-> ?MAINTAINERS | ? 40 ++++++++--------------------------------
-> ?1 files changed, 8 insertions(+), 32 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7a9ccda..5a0d6ef 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -902,48 +902,24 @@ W: ? ? ? ?http://www.fluff.org/ben/linux/
-> ?S: ? ? Maintained
-> ?F: ? ? arch/arm/plat-s3c/
-> ?F: ? ? arch/arm/plat-s3c24xx/
-> +F: ? ? arch/arm/plat-samsung/
->
-> -ARM/S3C2410 ARM ARCHITECTURE
-> +ARM/S3Cxxxx ARM ARCHITECTURE
-> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
-> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> ?W: ? ? http://www.fluff.org/ben/linux/
-> ?S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c2410/
-> -
-> -ARM/S3C2440 ARM ARCHITECTURE
-> -M: ? ? Ben Dooks <ben-linux@fluff.org>
-> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -W: ? ? http://www.fluff.org/ben/linux/
-> -S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c2440/
-> -
-> -ARM/S3C2442 ARM ARCHITECTURE
-> -M: ? ? Ben Dooks <ben-linux@fluff.org>
-> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -W: ? ? http://www.fluff.org/ben/linux/
-> -S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c2442/
-> -
-> -ARM/S3C2443 ARM ARCHITECTURE
-> -M: ? ? Ben Dooks <ben-linux@fluff.org>
-> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -W: ? ? http://www.fluff.org/ben/linux/
-> -S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c2443/
-> -
-> -ARM/S3C6400 ARM ARCHITECTURE
-> -M: ? ? Ben Dooks <ben-linux@fluff.org>
-> -L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -W: ? ? http://www.fluff.org/ben/linux/
-> -S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c6400/
-> +F: ? ? arch/arm/mach-s3c????/
-> +F: ? ? arch/arm/plat-s3c????/
->
-> -ARM/S3C6410 ARM ARCHITECTURE
-> +ARM/S5Pxxxx ARM ARCHITECTURE
-> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
-
-It should be Byungho Min but now changed to Marek and Kyungmin Park
-
-> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> ?W: ? ? http://www.fluff.org/ben/linux/
-> ?S: ? ? Maintained
-> -F: ? ? arch/arm/mach-s3c6410/
-> +F: ? ? arch/arm/mach-s5p????/
-> +F: ? ? arch/arm/plat-s5p/
-> +F: ? ? arch/arm/plat-s5p????/
->
-> ?ARM/SHMOBILE ARM ARCHITECTURE
-> ?M: ? ? Paul Mundt <lethal@linux-sh.org>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Yours,
+Linus Walleij
