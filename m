@@ -1,191 +1,332 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Apr 2010 19:20:48 +0200
-Subject: [PATCH 2.6.34-rc4 1/8] mx5: Add registration of GPIOs for MX51
-	Babbage board.
-In-Reply-To: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 13 Apr 2010 19:27:38 +0200
+Subject: [PATCH 2.6.34-rc4 3/8] mxc: Add platform specific USB
+	functions for Freescale MX51 HW
+In-Reply-To: <1271175030-3635-3-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100413172048.GB7882@pengutronix.de>
+	<1271175030-3635-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271175030-3635-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100413172738.GO30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 11:10:24AM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On Tue, Apr 13, 2010 at 11:10:26AM -0500, Dinh.Nguyen at freescale.com wrote:
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+> patch performs some platform specific USB HW initialization, and adds
+> the necessary defines.
 > 
-> Update /plat-mxc/gpio.c to support Freescale's MX51 Babbage HW.
 > This patch applies to 2.6.34-rc4.
 > 
 > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > ---
->  arch/arm/mach-mx5/board-mx51_babbage.c |    5 +++-
->  arch/arm/mach-mx5/devices.c            |   33 ++++++++++++++++++++++++++++++-
->  arch/arm/plat-mxc/gpio.c               |   32 +++++++++++++++++++++++++-----
->  3 files changed, 61 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index ee67a71..afbe400 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
->   * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
->   *
->   * The code contained herein is licensed under the GNU General Public
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
-> +#include <linux/gpio.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -75,6 +76,8 @@ static void __init mxc_board_init(void)
->  					ARRAY_SIZE(mx51babbage_pads));
->  	mxc_init_imx_uart();
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
-> +
-> +	mxc_register_gpios();
+>  arch/arm/plat-mxc/Makefile                |    2 +-
+>  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   48 +++++++
+>  arch/arm/plat-mxc/usb_common.c            |  190 +++++++++++++++++++++++++++++
+>  3 files changed, 239 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/usb_common.c
 
-On other i.MXs this is called in plat-mxc/irq.c. It should be called in
-plat-mxc/tzic.c then to avoid having this call in every board.
+There are several general problems with this.
 
->  }
->  
->  static void __init mx51_babbage_timer_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index d6fd396..73f2342 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -1,5 +1,6 @@
->  /*
->   * Copyright 2009 Amit Kucheria <amit.kucheria@canonical.com>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->   *
->   * The code contained herein is licensed under the GNU General Public
->   * License. You may obtain a copy of the GNU General Public License
-> @@ -11,7 +12,9 @@
->  
->  #include <linux/platform_device.h>
->  #include <mach/hardware.h>
-> +#include <mach/gpio.h>
->  #include <mach/imx-uart.h>
-> +#include <mach/irqs.h>
->  
->  static struct resource uart0[] = {
->  	{
-> @@ -89,8 +92,34 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> -/* Dummy definition to allow compiling in AVIC and TZIC simultaneously */
-> +struct mxc_gpio_port mxc_gpio_ports[] = {
+The functions you implement here are not at all common but purely
+specific to mx51, so the name of the file and functions as well as the
+location in the tree is plainly wrong.
 
-static please
+Also, this code also completely ignores all the work that has been done
+to keep things generic as much as possible. See below.
 
-> +	{
-> +		.chip.label = "gpio-0",
-> +		.base = MX51_IO_ADDRESS(MX51_GPIO1_BASE_ADDR),
-> +		.irq = MX51_MXC_INT_GPIO1_LOW,
-> +		.virtual_irq_start = MXC_GPIO_IRQ_START
-> +	},
-> +	{
-> +		.chip.label = "gpio-1",
-> +		.base = MX51_IO_ADDRESS(MX51_GPIO2_BASE_ADDR),
-> +		.irq = MX51_MXC_INT_GPIO2_LOW,
-> +		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 1
-> +	},
-> +	{
-> +		.chip.label = "gpio-2",
-> +		.base = MX51_IO_ADDRESS(MX51_GPIO3_BASE_ADDR),
-> +		.irq = MX51_MXC_INT_GPIO3_LOW,
-> +		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 2
-> +	},
-> +	{
-> +		.chip.label = "gpio-3",
-> +		.base = MX51_IO_ADDRESS(MX51_GPIO4_BASE_ADDR),
-> +		.irq = MX51_MXC_INT_GPIO4_LOW,
-> +		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 3
-> +	},
-> +};
-> +
->  int __init mxc_register_gpios(void)
->  {
-> -	return 0;
-> +	return mxc_gpio_init(mxc_gpio_ports, 4);
->  }
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 70b2389..1df23b2 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index 895bc3c..fa8ed78 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
 > @@ -3,7 +3,7 @@
->   * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
->   *
->   * Based on code from Freescale,
-> - * Copyright 2004-2006 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
->   *
->   * This program is free software; you can redistribute it and/or
->   * modify it under the terms of the GNU General Public License
-> @@ -38,7 +38,6 @@ static int gpio_table_size;
->  #define GPIO_ICR2	(cpu_is_mx1_mx2() ? 0x2C : 0x10)
->  #define GPIO_IMR	(cpu_is_mx1_mx2() ? 0x30 : 0x14)
->  #define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
-> -#define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
+>  #
 >  
->  #define GPIO_INT_LOW_LEV	(cpu_is_mx1_mx2() ? 0x3 : 0x0)
->  #define GPIO_INT_HIGH_LEV	(cpu_is_mx1_mx2() ? 0x2 : 0x1)
-> @@ -171,6 +170,25 @@ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
->  	}
->  }
+>  # Common support
+> -obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
+> +obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o usb_common.o
 >  
-> +/* one interrupt *per* gpio port */
-> +static void mx5_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  # MX51 uses the TZIC interrupt controller, older platforms use AVIC (irq.o)
+>  obj-$(CONFIG_MXC_TZIC) += tzic.o
+> diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> index 4b9b836..6edf8d7 100644
+> --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> @@ -1,6 +1,30 @@
+>  #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
+>  #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+>  
+> +#define USBOTG_OFFSET			0
+> +#define USBH1_OFFSET			0x200
+> +#define USBH2_OFFSET			0x400
+> +#define USBH3_OFFSET			0x600
+> +#define USBOTHER_REGS_OFFSET	0x800
+> +
+> +#define USBCMD_OFFSET			0x140
+> +
+> +#define ULPI_VIEWPORT_OFFSET	0x170
+> +#define PORTSC_OFFSET		0x184
+> +#define USBMODE_OFFSET		0x1a8
+> +#define USBMODE_CM_HOST		3
+> +
+> +#define USBCTRL_OFFSET					0
+> +#define USB_PHY_CTR_FUNC_OFFSET		0x8
+> +#define USB_PHY_CTR_FUNC2_OFFSET		0xc
+> +#define USB_CTRL_1_OFFSET				0x10
+> +
+> +
+> +/* USBCMD */
+> +#define UCMD_RUN_STOP           (1 << 0)        /* controller run/stop */
+> +#define UCMD_RESET		(1 << 1)	/* controller reset */
+> +#define UCMD_ITC_NO_THRESHOLD	 ~(0xff << 16)	/* Interrupt Threshold Control */
+> +
+>  /* values for portsc field */
+>  #define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
+>  #define MXC_EHCI_FORCE_FS		(1 << 24)
+> @@ -26,6 +50,30 @@
+>  #define MXC_EHCI_IPPUE_DOWN		(1 << 8)
+>  #define MXC_EHCI_IPPUE_UP		(1 << 9)
+>  
+> +/* USB_CTRL */
+> +#define UCTRL_OUIE		(1 << 28)	/* OTG ULPI intr enable */
+> +#define UCTRL_OWIE		(1 << 27)	/* OTG wakeup intr enable */
+> +#define UCTRL_OBPVAL_RXDP	(1 << 26)	/* OTG RxDp status in bypass mode */
+> +#define UCTRL_OBPVAL_RXDM	(1 << 25)	/* OTG RxDm status in bypass mode */
+> +#define UCTRL_OPM		(1 << 24)	/* OTG power mask */
+> +#define UCTRL_H1UIE		(1 << 12)	/* Host1 ULPI interrupt enable */
+> +#define UCTRL_H1WIE		(1 << 11)	/* HOST1 wakeup intr enable */
+> +#define UCTRL_H1PM		(1 <<  8)		/* HOST1 power mask */
+> +
+> +/* USB_PHY_CTRL_FUNC */
+> +#define USB_UTMI_PHYCTRL_OC_DIS	(1 << 8)	/* OTG Disable Overcurrent Event */
+> +#define USB_UH1_OC_DIS	(1 << 5)		/* UH1 Disable Overcurrent Event */
+> +
+> +/* USB_CTRL_1 */
+> +#define USB_CTRL_UH1_EXT_CLK_EN			(1 << 25)
+> +#define USB_CTRL_UH2_EXT_CLK_EN			(1 << 26)
+> +
+> +/* USB_PHY_CTRL_FUNC2*/
+> +#define USB_UTMI_PHYCTRL2_PLLDIV_MASK		0x3
+> +#define USB_UTMI_PHYCTRL2_PLLDIV_SHIFT		0
+> +#define USB_UTMI_PHYCTRL2_HSDEVSEL_MASK		0x3
+> +#define USB_UTMI_PHYCTRL2_HSDEVSEL_SHIFT	19
+> +
+>  struct mxc_usbh_platform_data {
+>  	int (*init)(struct platform_device *pdev);
+>  	int (*exit)(struct platform_device *pdev);
+> diff --git a/arch/arm/plat-mxc/usb_common.c b/arch/arm/plat-mxc/usb_common.c
+> new file mode 100644
+> index 0000000..b06c66e
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/usb_common.c
+> @@ -0,0 +1,190 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +/*
+> + *Include files
+> + */
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/fsl_devices.h>
+> +#include <mach/mxc_ehci.h>
+> +#include <mach/hardware.h>
+> +
+> +static void usbh1_set_ulpi_xcvr(void)
 > +{
-> +	u32 irq_stat;
-> +	u32 mask = 0xFFFFFFFF;
-> +	struct mxc_gpio_port *port = (struct mxc_gpio_port *)get_irq_data(irq);
+> +	u32 reg_value;
+> +	pr_debug("%s: \n", __func__);
+> +	void __iomem *usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
+
+You shouldn't mix declarations and code like this. The compiler should
+also have complained.
+
+> +	u32 usbh1_base = (u32)usb_base + USBH1_OFFSET;
+> +	u32 usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
 > +
-> +#ifdef MXC_GPIO_SPLIT_IRQ_2
-> +	if (irq == port->irq)
-> +		mask = 0x0000FFFF;
-> +	else
-> +		mask = 0xFFFF0000;
-> +#endif
+> +	/* Stop then Reset */
+> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
+> +	reg_value &= ~UCMD_RUN_STOP;
+> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbh1_base + USBCMD_OFFSET) & UCMD_RUN_STOP);
+
+This isn't good. If the above condition will never become true, the
+kernel hangs in an endless loop. There should be a timeout and a call to
+cpu_relax().
+
+> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
+> +	reg_value |= UCMD_RESET;
+> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbh1_base + USBCMD_OFFSET) & UCMD_RESET);
+
+Dito.
+
+> +	reg_value = __raw_readl(usbother_base + USB_CTRL_1_OFFSET);
+> +	__raw_writel(reg_value | USB_CTRL_UH1_EXT_CLK_EN, usbother_base + USB_CTRL_1_OFFSET);
 > +
-> +	irq_stat = __raw_readl(port->base + GPIO_ISR) &
-> +			(__raw_readl(port->base + GPIO_IMR) & mask);
-> +	mxc_gpio_irq_handler(port, irq_stat);
+> +	/* select ULPI PHY PTS=2 */
+> +	reg_value = __raw_readl(usbh1_base + PORTSC_OFFSET);
+> +	reg_value &= ~MXC_EHCI_MODE_SERIAL;
+> +	__raw_writel(reg_value |= MXC_EHCI_MODE_ULPI, usbh1_base + PORTSC_OFFSET);
+> +
+> +	reg_value = __raw_readl(usbother_base + USBCTRL_OFFSET);
+> +	reg_value &= ~(UCTRL_H1WIE | UCTRL_H1UIE);/* HOST1 wakeup/ULPI intr disable */
+> +	reg_value |= UCTRL_H1PM; /* HOST1 power mask */
+> +	__raw_writel(reg_value, usbother_base + USBCTRL_OFFSET);
+> +
+> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +	reg_value |= USB_UH1_OC_DIS; /* OC is not used */
+> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +
+> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
+> +	/* Interrupt Threshold Control:Immediate (no threshold) */
+> +	reg_value &= UCMD_ITC_NO_THRESHOLD;
+> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
+> +
+> +	/* reset the controller */
+> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
+> +	reg_value |= UCMD_RESET;
+> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
+
+These are all settings specific to the actual board implementation, and
+these cases are exactly what the abstract layer was invented for.
+
+In general, the code above should be made a lot more versatile and also
+be put in plat-mxc/ehci.c. Look at the implementations of mx2 and mx3
+and see how things are done there.
+
+> +
+> +	iounmap(usb_base);
+> +
+> +	/* allow controller to reset, and leave time for
+> +	* the ULPI transceiver to reset too.
+> +	*/
+> +	msleep(100);
 > +}
 > +
->  /* MX1 and MX3 has one interrupt *per* gpio port */
->  static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  {
-> @@ -289,11 +307,13 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
->  		/* its a serious configuration bug when it fails */
->  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
->  
-> -		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25()) {
-> -			/* setup one handler for each entry */
-> +		/* setup one handler for each entry */
-> +		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25())
->  			set_irq_chained_handler(port[i].irq, mx3_gpio_irq_handler);
-> -			set_irq_data(port[i].irq, &port[i]);
-> -		}
-> +		else if (cpu_is_mx51())
-> +			set_irq_chained_handler(port[i].irq, mx5_gpio_irq_handler);
+> +int fsl_usb_host_init(struct platform_device *pdev)
+> +{
+> +	pr_debug("%s: pdev=0x%p\n", __func__, pdev);
 > +
-> +		set_irq_data(port[i].irq, &port[i]);
->  	}
->  
->  	if (cpu_is_mx2()) {
-> -- 
-> 1.6.0.4
-> 
-> 
+> +	usbh1_set_ulpi_xcvr();
+> +
+> +	pr_debug("%s: success\n", __func__);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(fsl_usb_host_init);
+> +
+> +int fsl_usb_host_uninit(struct fsl_usb2_platform_data *pdata)
+> +{
+> +	pr_debug("%s\n", __func__);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(fsl_usb_host_uninit);
+> +
+> +static void otg_set_utmi_xcvr(void)
+> +{
+> +	u32 reg_value;
+> +	void __iomem *usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
+> +	u32 usbotg_base = (u32)usb_base + USBOTG_OFFSET;
+> +	u32 usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
+> +
+> +	pr_debug("otg_set_utmi_xcvr\n");
+> +
+> +	/* Stop then Reset */
+> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +	reg_value &= ~UCMD_RUN_STOP;
+> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP);
+> +
+> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +	reg_value |= UCMD_RESET;
+> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET);
+> +
+> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +	reg_value |= USB_UTMI_PHYCTRL_OC_DIS; /* OC is not used */
+> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +
+> +	reg_value = __raw_readl(usbother_base + USBCTRL_OFFSET);
+> +	reg_value &= ~(UCTRL_OPM | UCTRL_OWIE);/* OTG wakeup/power mask disable */
+> +	__raw_writel(reg_value, usbother_base + USBCTRL_OFFSET);
+> +
+> +	/* set UTMI xcvr */
+> +	reg_value = __raw_readl(usbotg_base + PORTSC_OFFSET);
+> +	reg_value &= ~MXC_EHCI_MODE_SERIAL;
+> +	__raw_writel(reg_value |= MXC_EHCI_MODE_UTMI, usbotg_base + PORTSC_OFFSET);
+> +
+> +	/* Set the PHY clock to 19.2MHz */
+> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
+> +	reg_value &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
+> +	reg_value |= 0x01;
+> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
+> +
+> +	/* Workaround an IC issue for ehci driver:
+> +	 * when turn off root hub port power, EHCI set
+> +	 * PORTSC reserved bits to be 0, but PTW with 0
+> +	 * means 8 bits tranceiver width, here change
+> +	 * it back to be 16 bits and do PHY diable and
+> +	 * then enable.
+> +	 */
+> +	reg_value = __raw_readl(usbotg_base + PORTSC_OFFSET);
+> +	reg_value |= MXC_EHCI_UTMI_16BIT;
+> +	__raw_writel(reg_value, usbotg_base + PORTSC_OFFSET);
+> +
+> +	/* need to reset the controller here so that the ID pin
+> +	 * is correctly detected.
+> +	 */
+> +	/* Stop then Reset */
+> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +	reg_value &= ~UCMD_RUN_STOP;
+> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP);
+> +
+> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +	reg_value |= UCMD_RESET;
+> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
+> +	while (__raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET);
+> +
+> +	iounmap(usb_base);
+> +	/* allow controller to reset, and leave time for
+> +	 * the ULPI transceiver to reset too.
+> +	 */
+> +	msleep(100);
+> +}
+> +
+> +int usbotg_init(struct platform_device *pdev)
+> +{
+> +	pr_debug("%s: pdev=0x%p\n", __func__, pdev);
+> +
+> +	otg_set_utmi_xcvr();
+> +
+> +	pr_debug("%s: success\n", __func__);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(usbotg_init);
+> +
+> +int usbotg_uninit(struct platform_device *pdev)
+> +{
+> +	pr_debug("%s\n", __func__);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(usbotg_uninit);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The second half of the file is just a copy of the first, and it is just
+there because things are not abstracted but hard-coded.
