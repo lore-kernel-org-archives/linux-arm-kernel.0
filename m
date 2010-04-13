@@ -1,43 +1,109 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 13 Apr 2010 10:25:14 +0200
-Subject: [PATCH 1/2 v2] AT91: taskit PortuxG20 and Stamp9G20 board support
-In-Reply-To: <1268916069-21639-1-git-send-email-christian.glindkamp@taskit.de>
-References: <20100318115333.GD19544@n2100.arm.linux.org.uk>
-	<1268916069-21639-1-git-send-email-christian.glindkamp@taskit.de>
-Message-ID: <v2qcd73a99e1004130125y5daef203n241dfc130f7dcfb9@mail.gmail.com>
+From: zero@colonel-panic.org (Peter Horton)
+Date: Tue, 13 Apr 2010 09:31:50 +0100
+Subject: [PATCH] Fix AT91SAM9G20 reset
+Message-ID: <20100413083150.GA6620@turtle.localnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Christian,
+Fix AT91SAM9G20 reset as per the errata in the data sheet.
 
-> Both boards share the same board file, as the PortuxG20 is basically an
-> SBC based on the Stamp9G20.
+If the SDRAM is not cleanly shutdown before reset it can be left driving
+the bus, which then stops the bootloader booting from NAND.
 
-> +config MACH_PORTUXG20
-> + ? ? ? bool "taskit PortuxG20"
-> + ? ? ? depends on ARCH_AT91SAM9G20
-> + ? ? ? help
-> + ? ? ? ? Select this if you are using taskit's PortuxG20.
-> + ? ? ? ? <http://www.taskit.de/en/>
-> +
-> +config MACH_STAMP9G20
-> + ? ? ? bool "taskit Stamp9G20 CPU module"
-> + ? ? ? depends on ARCH_AT91SAM9G20
-> + ? ? ? help
-> + ? ? ? ? Select this if you are using taskit's Stamp9G20 CPU module on its
-> + ? ? ? ? evaluation board.
-> + ? ? ? ? <http://www.taskit.de/en/>
+Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+--
 
-Please remove the "depends on ARCH_AT91SAM9G20" lines.
-These configuration options are in an "if ARCH_AT91SAM9G20" section,
-so the "depends on" are no longer needed.
-
-Otherwise, the patches looks fine.
-  Acked-by:  Andrew Victor <linux@maxim.org.za>
-
-Please submit the patches to Russell King's patch-tracking system.
-Thanks.
-
-
-Regards,
- Andrew Victor
+Index: linux-2.6.32/arch/arm/mach-at91/Makefile
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-15 09:53:27.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-15 09:53:27.000000000 +0000
+@@ -16,7 +16,7 @@
+ obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o at91sam9g20_reset.o
+  obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-15 09:53:27.000000000 +0000
+@@ -25,6 +25,8 @@
+ #include "generic.h"
+ #include "clock.h"
+ 
++extern void at91sam9g20_reset(void);
++
+ static struct map_desc at91sam9260_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= AT91_VA_BASE_SYS,
+@@ -327,7 +329,11 @@
+ 	else
+ 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
+ 
+-	at91_arch_reset = at91sam9260_reset;
++	if (cpu_is_at91sam9g20())
++		at91_arch_reset = at91sam9g20_reset;
++	else
++		at91_arch_reset = at91sam9260_reset;
++
+ 	pm_power_off = at91sam9260_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-15 09:55:17.000000000 +0000
+@@ -0,0 +1,50 @@
++/*
++ * (C) BitBox Ltd 2009
++ *
++ * reset AT91SAM9G20 as per errata
++ *
++ * unless the SDRAM is cleanly shutdown before we hit the
++ * reset register it can be left driving the data bus and
++ * killing the chance of a subsequent boot from NAND
++ */
++
++#define CP15_CR_I			(1 << 12)
++
++#define SYS_VIRT_OFS			(-0x01000000)
++
++#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
++#define  SDRAMC_TR			0x0004
++#define  SDRAMC_LPR			0x0010
++#define   SDRAMC_LPCB_POWER_DOWN	2
++
++#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
++#define  RSTC_CR			0x0000
++#define   RSTC_PROCRST			(1 << 0)
++#define   RSTC_PERRST			(1 << 2)
++#define   RSTC_KEY			(0xa5 << 24)
++
++			.arm
++
++			.globl	at91sam9g20_reset
++
++at91sam9g20_reset:	mov	r0, #0
++			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
++
++			mrc	p15, 0, r0, c1, c0, 0
++			orr	r0, r0, #CP15_CR_I
++			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
++
++			ldr	r0, =SDRAMC_BASE	@ preload constants
++			ldr	r1, =RSTC_BASE
++
++			mov	r2, #1
++			mov	r3, #SDRAMC_LPCB_POWER_DOWN
++			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
++
++			.balign	32			@ align to cache line
++
++			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
++			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
++			str	r4, [r1, #RSTC_CR]	@ reset processor
++
++			b	.
