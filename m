@@ -1,38 +1,122 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 13 Apr 2010 17:10:41 +0530
-Subject: Query on direction_output fn of PL061 GPIO driver.
-In-Reply-To: <20100413113237.GA2212@tarshish>
-References: <4BC44C7E.20306@st.com> <20100413113237.GA2212@tarshish>
-Message-ID: <4BC45839.1080902@st.com>
+From: imre.deak@nokia.com (Imre Deak)
+Date: Tue, 13 Apr 2010 14:42:18 +0300
+Subject: [RFC PATCH v5 0/2] ARM: VFP: Save / restore VFP state on the
+	signal handler path
+In-Reply-To: <20100412220440.GF6148@shareable.org>
+References: <1270070606-5732-1-git-send-email-imre.deak@nokia.com>
+	<cover.1270199787.git.imre.deak@nokia.com>
+	<20100412220440.GF6148@shareable.org>
+Message-ID: <20100413114218.GA22424@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2010 5:02 PM, Baruch Siach wrote:
->> > In current implementation, firstly value of GPIO pin is modified and then its
->> > direction is set to OUT. In our SOCs (ST SPEAr), this implementation doesn't
->> > work correctly (we have pl061 in our soc). Suppose previously pin is in IN mode,
->> > now writing val to it doesn't change anything because it is in IN mode and we
->> > can write to a pin only when it is in OUT mode. Now if its direction is
->> > changed to OUT then also its value will remain same and will not be changed to
->> > what we wanted.
->> > 
->> > Am i missing something?
-> Probably not. This is a design bug in the PL061 hardware. Changing the 
-> direction before the value makes the output value of the GPIO undefined 
-> (apparently 0) for a short period of time. This is bad news for some 
-> applications.
+On Tue, Apr 13, 2010 at 12:04:40AM +0200, ext Jamie Lokier wrote:
+> imre.deak at nokia.com wrote:
+> > From: Imre Deak <imre.deak@nokia.com>
+> > 
+> > Changes since v4:
+> > - Do not add the packed attribute to user_vfp or user_vfp_exc.
+> >   I added packed to these structs to prevent the extra padding in
+> >   vfp_sigframe. But actually the padding is in accordance with the
+> >   ARM ABI.
 > 
+> EABI, OABI or both?
 
-thanks for your prompt reply.
-Ok. so this may cause problem on the board. 
-Anyway if this is the issue, then writing value to val register has no effects.
+I checked only EABI, which specifies alignment to the struct's alignment,
+which is 8 bytes for struct user_vfp.
 
-> Anyway, the right thing to do here is to reverse do just that, since the 
-> current way of doing things is broken.
+I haven't found an official OABI spec, but some googling turned up
+that there the requirement is only to align to word size, so we'd
+have a difference in the struct vfp_sigframe's size and the alignment
+of the user_vfp_exc within.
 
-I didn't get it completely. If i got it correctly, maybe myself or you can just
-send a patch to reverse this, i.e. writing val and setting direction.
-Am i correct?
+> In general it's a really good idea, if you know there will be padding,
+> to insert dummy fields where the padding goes so that it doesn't make
+> any difference what compiler, ABI and settings are used.
 
-regards,
-viresh kumar.
+Ok. If I understand correctly this is needed for kernels with support
+for both OABI and EABI.
+
+There is implicit alignment in struct user_vfp and struct user_vfp_exc.
+I can fix up user_vfp_exc since it's new and not used by anyone, but
+user_vfp is used by ptrace. I don't see a problem adding the padding to
+it either since the kernel ever accesses it on a field-by-field basis,
+but for kernels built with an OABI compiler this would mean an increase
+in the struct's size. If this is not a problem I'd follow up with a 2/2
+patch according to the following.
+
+Please let me know if it's ok with you.
+
+--Imre
+
+--- a/arch/arm/include/asm/ucontext.h
++++ b/arch/arm/include/asm/ucontext.h
+@@ -59,23 +59,19 @@ struct iwmmxt_sigframe {
+ #endif /* CONFIG_IWMMXT */
+
+ #ifdef CONFIG_VFP
+-#if __LINUX_ARM_ARCH__ < 6
+-/* For ARM pre-v6, we use fstmiax and fldmiax.  This adds one extra
+- * word after the registers, and a word of padding@the end for
+- * alignment.  */
+ #define VFP_MAGIC              0x56465001
+-#define VFP_STORAGE_SIZE       152
+-#else
+-#define VFP_MAGIC              0x56465002
+-#define VFP_STORAGE_SIZE       144
+-#endif
+
+ struct vfp_sigframe
+ {
+        unsigned long           magic;
+        unsigned long           size;
+-       union vfp_state         storage;
+-};
++       struct user_vfp         ufp;
++       struct user_vfp_exc     ufp_exc;
++} __attribute__((__aligned__(8)));
++
++/* 8 bytes for magic and size, 264 bytes for ufp, 16 bytes for ufp_exc. */
++#define VFP_STORAGE_SIZE       sizeof(struct vfp_sigframe)
++
+ #endif /* CONFIG_VFP */
+
+ /*
+@@ -91,7 +87,7 @@ struct aux_sigframe {
+ #ifdef CONFIG_IWMMXT
+        struct iwmmxt_sigframe  iwmmxt;
+ #endif
+-#if 0 && defined CONFIG_VFP /* Not yet saved.  */
++#ifdef CONFIG_VFP
+        struct vfp_sigframe     vfp;
+ #endif
+        /* Something that isn't a valid magic number for any coprocessor.  */
+diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+index df95e05..07e66fa 100644
+--- a/arch/arm/include/asm/user.h
++++ b/arch/arm/include/asm/user.h
+@@ -83,11 +83,23 @@ struct user{
+
+ /*
+  * User specific VFP registers. If only VFPv2 is present, registers 16 to 31
+- * are ignored by the ptrace system call.
++ * are ignored by the ptrace system call and the signal handler.
+  */
+ struct user_vfp {
+        unsigned long long fpregs[32];
+        unsigned long fpscr;
++       unsigned long pad;
++};
++
++/*
++ * VFP exception registers exposed to user space during signal delivery.
++ * Fields not relavant to the current VFP architecture are ignored.
++ */
++struct user_vfp_exc {
++       unsigned long   fpexc;
++       unsigned long   fpinst;
++       unsigned long   fpinst2;
++       unsigned long   pad;
+ };
+
+ #endif /* _ARM_USER_H */
