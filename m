@@ -1,29 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Apr 2010 20:44:54 +0100
-Subject: [PATCH 2.6.34-rc4 1/8] mx5: Add registration of GPIOs for MX51
-	Babbage board.
-In-Reply-To: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100413194454.GB6289@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 14 Apr 2010 04:18:05 +0800
+Subject: [PATCH 1/2] [ARM] pxa: add minimal ULPI functionality for USB
+	host port 2 on PXA310.
+In-Reply-To: <fa93111b71cf1e43eef23869466072be4db67bcd.1270651775.git.grinberg@compulab.co.il>
+References: <cover.1270651775.git.grinberg@compulab.co.il>
+	<fa93111b71cf1e43eef23869466072be4db67bcd.1270651775.git.grinberg@compulab.co.il>
+Message-ID: <u2nf17812d71004131318z7889c6cdrc0898c62ac1e7622@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 11:10:24AM -0500, Dinh.Nguyen at freescale.com wrote:
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index d6fd396..73f2342 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -1,5 +1,6 @@
->  /*
->   * Copyright 2009 Amit Kucheria <amit.kucheria@canonical.com>
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->   *
->   * The code contained herein is licensed under the GNU General Public
->   * License. You may obtain a copy of the GNU General Public License
-> @@ -11,7 +12,9 @@
->  
->  #include <linux/platform_device.h>
->  #include <mach/hardware.h>
-> +#include <mach/gpio.h>
+On Wed, Apr 7, 2010 at 11:05 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 
-linux/gpio.h
+Include Jing as she's ULPI expert. I myself do not understand the
+ULPI well enough.
+
+One general comment though, do we need to make this a dedicated
+OTG driver within drivers/usb/otg/? as I know it's OTG capable, but
+might be hybrid somehow on pxa310.
