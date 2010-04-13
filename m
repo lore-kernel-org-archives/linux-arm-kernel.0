@@ -1,7 +1,7 @@
 From: konkers@android.com (konkers at android.com)
-Date: Tue, 13 Apr 2010 15:42:41 -0700
-Subject: [PATCH v2 08/10] [ARM] tegra: Add framebuffer driver
-In-Reply-To: <1271198563-10424-8-git-send-email-konkers@android.com>
+Date: Tue, 13 Apr 2010 15:42:40 -0700
+Subject: [PATCH v2 07/10] [ARM] tegra: add pinmux support
+In-Reply-To: <1271198563-10424-7-git-send-email-konkers@android.com>
 References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-1-git-send-email-konkers@android.com>
 	<1271198563-10424-2-git-send-email-konkers@android.com>
@@ -10,47 +10,48 @@ References: <1268721431-24434-1-git-send-email-konkers@google.com>
 	<1271198563-10424-5-git-send-email-konkers@android.com>
 	<1271198563-10424-6-git-send-email-konkers@android.com>
 	<1271198563-10424-7-git-send-email-konkers@android.com>
-	<1271198563-10424-8-git-send-email-konkers@android.com>
-Message-ID: <1271198563-10424-9-git-send-email-konkers@android.com>
+Message-ID: <1271198563-10424-8-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+From: Erik Gilling <konkers@android.com>
 
-v2: Fixes from review by Russell King
-    - Use proper return values
+v2: fixes from Russell King
+	- include linux/io.h instead of asm/io.h
 
-v2: Fixes from review by Jaya Kumar
-    - Comments on lcd resolution
-    - Remove stub functions
-    - Change DUMP_REG to pr_debug
-    - Add unregister_framebuffer to tegra_plat_remove
-
-v2: from Colin Cross
-    - adjust debugging
-
-Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/include/mach/tegra_fb.h |   27 ++
- drivers/video/Kconfig                       |   10 +
- drivers/video/Makefile                      |    1 +
- drivers/video/tegrafb.c                     |  612 +++++++++++++++++++++++++++
- 4 files changed, 650 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/include/mach/tegra_fb.h
- create mode 100644 drivers/video/tegrafb.c
+ arch/arm/mach-tegra/Makefile              |    2 +
+ arch/arm/mach-tegra/include/mach/pinmux.h |  241 +++++++++++++
+ arch/arm/mach-tegra/pinmux.c              |  548 +++++++++++++++++++++++++++++
+ 3 files changed, 791 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinmux.h
+ create mode 100644 arch/arm/mach-tegra/pinmux.c
 
-diff --git a/arch/arm/mach-tegra/include/mach/tegra_fb.h b/arch/arm/mach-tegra/include/mach/tegra_fb.h
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 122f7dc..5e47a71 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -4,6 +4,8 @@ obj-y                                   += irq.o
+ obj-y                                   += clock.o
+ obj-y                                   += timer.o
+ obj-y                                   += gpio.o
++obj-y                                   += pinmux.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
 new file mode 100644
-index 0000000..84ae886
+index 0000000..02a706b
 --- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/tegra_fb.h
-@@ -0,0 +1,27 @@
++++ b/arch/arm/mach-tegra/include/mach/pinmux.h
+@@ -0,0 +1,241 @@
 +/*
-+ * arch/arm/mach-tegra/include/mach/tegra_fb.h
++ * linux/arch/arm/mach-tegra/include/mach/pinmux.h
 + *
 + * Copyright (C) 2010 Google, Inc.
-+ * Author: Colin Cross <ccross@android.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -63,61 +64,241 @@ index 0000000..84ae886
 + *
 + */
 +
-+/* Platform data structure to be passed to the driver */
-+struct tegra_fb_lcd_data {
-+	int	fb_xres;
-+	int	fb_yres;
-+	/* Resolution of the output to the LCD.  If different from the
-+	   framebuffer resolution, the Tegra display block will scale it */
-+	int	lcd_xres;
-+	int	lcd_yres;
-+	int	bits_per_pixel;
++#ifndef __MACH_TEGRA_PINMUX_H
++#define __MACH_TEGRA_PINMUX_H
++
++typedef enum {
++	TEGRA_PINGROUP_ATA = 0,
++	TEGRA_PINGROUP_ATB,
++	TEGRA_PINGROUP_ATC,
++	TEGRA_PINGROUP_ATD,
++	TEGRA_PINGROUP_ATE,
++	TEGRA_PINGROUP_CDEV1,
++	TEGRA_PINGROUP_CDEV2,
++	TEGRA_PINGROUP_CRTP,
++	TEGRA_PINGROUP_CSUS,
++	TEGRA_PINGROUP_DAP1,
++	TEGRA_PINGROUP_DAP2,
++	TEGRA_PINGROUP_DAP3,
++	TEGRA_PINGROUP_DAP4,
++	TEGRA_PINGROUP_DDC,
++	TEGRA_PINGROUP_DTA,
++	TEGRA_PINGROUP_DTB,
++	TEGRA_PINGROUP_DTC,
++	TEGRA_PINGROUP_DTD,
++	TEGRA_PINGROUP_DTE,
++	TEGRA_PINGROUP_DTF,
++	TEGRA_PINGROUP_GMA,
++	TEGRA_PINGROUP_GMB,
++	TEGRA_PINGROUP_GMC,
++	TEGRA_PINGROUP_GMD,
++	TEGRA_PINGROUP_GME,
++	TEGRA_PINGROUP_GPU,
++	TEGRA_PINGROUP_GPU7,
++	TEGRA_PINGROUP_GPV,
++	TEGRA_PINGROUP_HDINT,
++	TEGRA_PINGROUP_I2CP,
++	TEGRA_PINGROUP_IRRX,
++	TEGRA_PINGROUP_IRTX,
++	TEGRA_PINGROUP_KBCA,
++	TEGRA_PINGROUP_KBCB,
++	TEGRA_PINGROUP_KBCC,
++	TEGRA_PINGROUP_KBCD,
++	TEGRA_PINGROUP_KBCE,
++	TEGRA_PINGROUP_KBCF,
++	TEGRA_PINGROUP_LCSN,
++	TEGRA_PINGROUP_LD0,
++	TEGRA_PINGROUP_LD1,
++	TEGRA_PINGROUP_LD10,
++	TEGRA_PINGROUP_LD11,
++	TEGRA_PINGROUP_LD12,
++	TEGRA_PINGROUP_LD13,
++	TEGRA_PINGROUP_LD14,
++	TEGRA_PINGROUP_LD15,
++	TEGRA_PINGROUP_LD16,
++	TEGRA_PINGROUP_LD17,
++	TEGRA_PINGROUP_LD2,
++	TEGRA_PINGROUP_LD3,
++	TEGRA_PINGROUP_LD4,
++	TEGRA_PINGROUP_LD5,
++	TEGRA_PINGROUP_LD6,
++	TEGRA_PINGROUP_LD7,
++	TEGRA_PINGROUP_LD8,
++	TEGRA_PINGROUP_LD9,
++	TEGRA_PINGROUP_LDC,
++	TEGRA_PINGROUP_LDI,
++	TEGRA_PINGROUP_LHP0,
++	TEGRA_PINGROUP_LHP1,
++	TEGRA_PINGROUP_LHP2,
++	TEGRA_PINGROUP_LHS,
++	TEGRA_PINGROUP_LM0,
++	TEGRA_PINGROUP_LM1,
++	TEGRA_PINGROUP_LPP,
++	TEGRA_PINGROUP_LPW0,
++	TEGRA_PINGROUP_LPW1,
++	TEGRA_PINGROUP_LPW2,
++	TEGRA_PINGROUP_LSC0,
++	TEGRA_PINGROUP_LSC1,
++	TEGRA_PINGROUP_LSCK,
++	TEGRA_PINGROUP_LSDA,
++	TEGRA_PINGROUP_LSDI,
++	TEGRA_PINGROUP_LSPI,
++	TEGRA_PINGROUP_LVP0,
++	TEGRA_PINGROUP_LVP1,
++	TEGRA_PINGROUP_LVS,
++	TEGRA_PINGROUP_OWC,
++	TEGRA_PINGROUP_PMC,
++	TEGRA_PINGROUP_PTA,
++	TEGRA_PINGROUP_RM,
++	TEGRA_PINGROUP_SDB,
++	TEGRA_PINGROUP_SDC,
++	TEGRA_PINGROUP_SDD,
++	TEGRA_PINGROUP_SDIO1,
++	TEGRA_PINGROUP_SLXA,
++	TEGRA_PINGROUP_SLXC,
++	TEGRA_PINGROUP_SLXD,
++	TEGRA_PINGROUP_SLXK,
++	TEGRA_PINGROUP_SPDI,
++	TEGRA_PINGROUP_SPDO,
++	TEGRA_PINGROUP_SPIA,
++	TEGRA_PINGROUP_SPIB,
++	TEGRA_PINGROUP_SPIC,
++	TEGRA_PINGROUP_SPID,
++	TEGRA_PINGROUP_SPIE,
++	TEGRA_PINGROUP_SPIF,
++	TEGRA_PINGROUP_SPIG,
++	TEGRA_PINGROUP_SPIH,
++	TEGRA_PINGROUP_UAA,
++	TEGRA_PINGROUP_UAB,
++	TEGRA_PINGROUP_UAC,
++	TEGRA_PINGROUP_UAD,
++	TEGRA_PINGROUP_UCA,
++	TEGRA_PINGROUP_UCB,
++	TEGRA_PINGROUP_UDA,
++	/* these pin groups only have pullup and pull down control */
++	TEGRA_PINGROUP_CK32,
++	TEGRA_PINGROUP_DDRC,
++	TEGRA_PINGROUP_PMCA,
++	TEGRA_PINGROUP_PMCB,
++	TEGRA_PINGROUP_PMCC,
++	TEGRA_PINGROUP_PMCD,
++	TEGRA_PINGROUP_PMCE,
++	TEGRA_PINGROUP_XM2C,
++	TEGRA_PINGROUP_XM2D,
++	TEGRA_MAX_PINGROUP,
++} tegra_pingroup_t;
++
++typedef enum {
++	TEGRA_MUX_RSVD = 0x8000,
++	TEGRA_MUX_RSVD1 = 0x8000,
++	TEGRA_MUX_RSVD2 = 0x8001,
++	TEGRA_MUX_RSVD3 = 0x8002,
++	TEGRA_MUX_RSVD4 = 0x8003,
++	TEGRA_MUX_NONE = -1,
++	TEGRA_MUX_AHB_CLK,
++	TEGRA_MUX_APB_CLK,
++	TEGRA_MUX_AUDIO_SYNC,
++	TEGRA_MUX_CRT,
++	TEGRA_MUX_DAP1,
++	TEGRA_MUX_DAP2,
++	TEGRA_MUX_DAP3,
++	TEGRA_MUX_DAP4,
++	TEGRA_MUX_DAP5,
++	TEGRA_MUX_DISPLAYA,
++	TEGRA_MUX_DISPLAYB,
++	TEGRA_MUX_EMC_TEST0_DLL,
++	TEGRA_MUX_EMC_TEST1_DLL,
++	TEGRA_MUX_GMI,
++	TEGRA_MUX_GMI_INT,
++	TEGRA_MUX_HDMI,
++	TEGRA_MUX_I2C,
++	TEGRA_MUX_I2C2,
++	TEGRA_MUX_I2C3,
++	TEGRA_MUX_IDE,
++	TEGRA_MUX_IRDA,
++	TEGRA_MUX_KBC,
++	TEGRA_MUX_MIO,
++	TEGRA_MUX_MIPI_HS,
++	TEGRA_MUX_NAND,
++	TEGRA_MUX_OSC,
++	TEGRA_MUX_OWR,
++	TEGRA_MUX_PCIE,
++	TEGRA_MUX_PLLA_OUT,
++	TEGRA_MUX_PLLC_OUT1,
++	TEGRA_MUX_PLLM_OUT1,
++	TEGRA_MUX_PLLP_OUT2,
++	TEGRA_MUX_PLLP_OUT3,
++	TEGRA_MUX_PLLP_OUT4,
++	TEGRA_MUX_PWM,
++	TEGRA_MUX_PWR_INTR,
++	TEGRA_MUX_PWR_ON,
++	TEGRA_MUX_RTCK,
++	TEGRA_MUX_SDIO1,
++	TEGRA_MUX_SDIO2,
++	TEGRA_MUX_SDIO3,
++	TEGRA_MUX_SDIO4,
++	TEGRA_MUX_SFLASH,
++	TEGRA_MUX_SPDIF,
++	TEGRA_MUX_SPI1,
++	TEGRA_MUX_SPI2,
++	TEGRA_MUX_SPI2_ALT,
++	TEGRA_MUX_SPI3,
++	TEGRA_MUX_SPI4,
++	TEGRA_MUX_TRACE,
++	TEGRA_MUX_TWC,
++	TEGRA_MUX_UARTA,
++	TEGRA_MUX_UARTB,
++	TEGRA_MUX_UARTC,
++	TEGRA_MUX_UARTD,
++	TEGRA_MUX_UARTE,
++	TEGRA_MUX_ULPI,
++	TEGRA_MUX_VI,
++	TEGRA_MUX_VI_SENSOR_CLK,
++	TEGRA_MUX_XIO,
++	TEGRA_MAX_MUX,
++} tegra_mux_func_t;
++
++typedef enum {
++	TEGRA_PUPD_NORMAL = 0,
++	TEGRA_PUPD_PULL_DOWN,
++	TEGRA_PUPD_PULL_UP,
++} tegra_pullupdown_t;
++
++typedef enum {
++	TEGRA_TRI_NORMAL = 0,
++	TEGRA_TRI_TRISTATE = 1,
++} tegra_tristate_t;
++
++struct tegra_pingroup_config {
++	tegra_pingroup_t	pingroup;
++	tegra_mux_func_t	func;
++	tegra_pullupdown_t	pupd;
++	tegra_tristate_t	tristate;
 +};
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 6e16244..6751f4f 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1089,6 +1089,16 @@ config FB_RIVA_BACKLIGHT
- 	help
- 	  Say Y here if you want to control the backlight of your display.
- 
-+config FB_TEGRA
-+	tristate "NVIDIA Tegra SoC display support"
-+	depends on ARCH_TEGRA && FB = y
-+	select FB_CFB_FILLRECT
-+	select FB_CFB_COPYAREA
-+	select FB_CFB_IMAGEBLIT
-+	default FB
-+	help
-+	  This driver supports the NVIDIA Tegra systems-on-a-chip.
 +
- config FB_I810
- 	tristate "Intel 810/815 support (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && FB && PCI && X86_32 && AGP_INTEL
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index ddc2af2..d9098d6 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -131,6 +131,7 @@ obj-$(CONFIG_FB_CARMINE)          += carminefb.o
- obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
- obj-$(CONFIG_FB_MSM)              += msm/
- obj-$(CONFIG_FB_NUC900)           += nuc900fb.o
-+obj-$(CONFIG_FB_TEGRA)            += tegrafb.o
- 
- # Platform or fallback drivers go here
- obj-$(CONFIG_FB_UVESA)            += uvesafb.o
-diff --git a/drivers/video/tegrafb.c b/drivers/video/tegrafb.c
++int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func);
++int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate);
++int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd);
++
++void tegra_pinmux_config_pingroup(tegra_pingroup_t pingroup,
++				  tegra_mux_func_t func,
++				  tegra_pullupdown_t pupd,
++				  tegra_tristate_t tristate);
++
++void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len);
++
++#endif
++
+diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
 new file mode 100644
-index 0000000..8f05c56
+index 0000000..2cac079
 --- /dev/null
-+++ b/drivers/video/tegrafb.c
-@@ -0,0 +1,612 @@
++++ b/arch/arm/mach-tegra/pinmux.c
+@@ -0,0 +1,548 @@
 +/*
-+ * drivers/video/tegrafb.c
++ * linux/arch/arm/mach-tegra/pinmux.c
 + *
 + * Copyright (C) 2010 Google, Inc.
-+ * Author: Colin Cross <ccross@android.com>
-+ *         Travis Geiselbrecht <travis@palm.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -130,599 +311,537 @@ index 0000000..8f05c56
 + *
 + */
 +
-+#include <linux/fb.h>
-+#include <linux/module.h>
++
 +#include <linux/kernel.h>
 +#include <linux/errno.h>
-+#include <linux/string.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/clk.h>
-+#include <linux/wait.h>
-+#include <asm/cacheflush.h>
-+#include <mach/tegra_fb.h>
++#include <linux/spinlock.h>
++#include <linux/io.h>
 +
-+#define DC_CMD_GENERAL_INCR_SYNCPT		0x000
-+#define DC_CMD_GENERAL_INCR_SYNCPT_CNTRL	0x001
-+#define DC_CMD_GENERAL_INCR_SYNCPT_ERROR	0x002
-+#define DC_CMD_WIN_A_INCR_SYNCPT		0x008
-+#define DC_CMD_WIN_A_INCR_SYNCPT_CNTRL		0x009
-+#define DC_CMD_WIN_A_INCR_SYNCPT_ERROR		0x00a
-+#define DC_CMD_WIN_B_INCR_SYNCPT		0x010
-+#define DC_CMD_WIN_B_INCR_SYNCPT_CNTRL		0x011
-+#define DC_CMD_WIN_B_INCR_SYNCPT_ERROR		0x012
-+#define DC_CMD_WIN_C_INCR_SYNCPT		0x018
-+#define DC_CMD_WIN_C_INCR_SYNCPT_CNTRL		0x019
-+#define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
-+#define DC_CMD_CONT_SYNCPT_VSYNC		0x028
-+#define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
-+#define DC_CMD_DISPLAY_COMMAND			0x032
-+#define DC_CMD_SIGNAL_RAISE			0x033
-+#define DC_CMD_INT_STATUS			0x037
-+#define DC_CMD_INT_MASK				0x038
-+#define DC_CMD_INT_ENABLE			0x039
-+#define DC_CMD_INT_TYPE				0x03a
-+#define DC_CMD_INT_POLARITY			0x03b
-+#define DC_CMD_SIGNAL_RAISE1			0x03c
-+#define DC_CMD_SIGNAL_RAISE2			0x03d
-+#define DC_CMD_SIGNAL_RAISE3			0x03e
-+#define DC_CMD_STATE_ACCESS			0x040
-+#define DC_CMD_STATE_CONTROL			0x041
-+#define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
-+#define DC_CMD_REG_ACT_CONTROL			0x043
-+#define DC_WINC_A_COLOR_PALETTE			0x500
-+#define DC_WINC_A_PALETTE_COLOR_EXT		0x600
-+#define DC_WIN_A_WIN_OPTIONS			0x700
-+#define DC_WIN_A_BYTE_SWAP			0x701
-+#define DC_WIN_A_BUFFER_CONTROL			0x702
-+#define DC_WIN_A_COLOR_DEPTH			0x703
-+#define DC_WIN_A_POSITION			0x704
-+#define DC_WIN_A_SIZE				0x705
-+#define DC_WIN_A_PRESCALED_SIZE			0x706
-+#define DC_WIN_A_H_INITIAL_DDA			0x707
-+#define DC_WIN_A_V_INITIAL_DDA			0x708
-+#define DC_WIN_A_DDA_INCREMENT			0x709
-+#define DC_WIN_A_LINE_STRIDE			0x70a
-+#define DC_WIN_A_BUF_STRIDE			0x70b
-+#define DC_WINBUF_A_START_ADDR			0x800
-+#define DC_WINBUF_A_ADDR_H_OFFSET		0x806
-+#define DC_WINBUF_A_ADDR_V_OFFSET		0x808
++#include <mach/iomap.h>
++#include <mach/pinmux.h>
 +
 +
-+#define DC_INT_CTXSW				(1<<0)
-+#define DC_INT_FRAME_END			(1<<1)
-+#define DC_INT_V_BLANK				(1<<2)
-+#define DC_INT_H_BLANK				(1<<3)
-+#define DC_INT_V_PULSE3				(1<<4)
++#define TEGRA_TRI_STATE(x)	(0x14 + (4 * (x)))
++#define TEGRA_PP_MUX_CTL(x)	(0x80 + (4 * (x)))
++#define TEGRA_PP_PU_PD(x)	(0xa0 + (4 * (x)))
 +
-+#define DC_COLOR_DEPTH_P1			0
-+#define DC_COLOR_DEPTH_P2			1
-+#define DC_COLOR_DEPTH_P4			2
-+#define DC_COLOR_DEPTH_P8			3
-+#define DC_COLOR_DEPTH_B4G4R4A4			4
-+#define DC_COLOR_DEPTH_B5G5R5A			5
-+#define DC_COLOR_DEPTH_B5G6R5			6
-+#define DC_COLOR_DEPTH_AB5G5R5			7
-+#define DC_COLOR_DEPTH_B8G8R8A8			12
-+#define DC_COLOR_DEPTH_R8G8B8A8			13
-+#define DC_COLOR_DEPTH_B6x2G6x2R6x2A8		14
-+#define DC_COLOR_DEPTH_R6x2G6x2B6x2A8		15
-+#define DC_COLOR_DEPTH_YCbCr422			16
-+#define DC_COLOR_DEPTH_YUV422			17
-+#define DC_COLOR_DEPTH_YCbCr420P		18
-+#define DC_COLOR_DEPTH_YUV420P			19
-+#define DC_COLOR_DEPTH_YCbCr422P		20
-+#define DC_COLOR_DEPTH_YUV422P			21
-+#define DC_COLOR_DEPTH_YCbCr422R		22
-+#define DC_COLOR_DEPTH_YUV422R			23
-+#define DC_COLOR_DEPTH_YCbCr422RA		24
-+#define DC_COLOR_DEPTH_YUV422RA			25
++#define REG_A 0
++#define REG_B 1
++#define REG_C 2
++#define REG_D 3
++#define REG_E 4
++#define REG_F 5
++#define REG_G 6
 +
-+struct tegra_fb_info {
-+	struct clk *clk;
-+	struct resource *reg_mem;
-+	struct resource *fb_mem;
-+	void __iomem *reg_base;
-+	wait_queue_head_t event_wq;
-+	unsigned int wait_condition;
-+	/* Resolution of the output to the LCD.  If different from the
-+	   framebuffer resolution, the Tegra display block will scale it */
-+	int lcd_xres;
-+	int lcd_yres;
-+	int irq;
++#define REG_N -1
++
++struct tegra_pingroup_desc {
++	const char *name;
++	int funcs[4];
++	s8 tri_reg; 		/* offset into the TRISTATE_REG_* register bank */
++	s8 tri_bit; 		/* offset into the TRISTATE_REG_* register bit */
++	s8 mux_reg;		/* offset into the PIN_MUX_CTL_* register bank */
++	s8 mux_bit;		/* offset into the PIN_MUX_CTL_* register bit */
++	s8 pupd_reg;		/* offset into the PULL_UPDOWN_REG_* register bank */
++	s8 pupd_bit;		/* offset into the PULL_UPDOWN_REG_* register bit */
 +};
 +
-+static void tegra_fb_writel(struct tegra_fb_info *tegra_fb, u32 val, unsigned long reg)
-+{
-+	writel(val, tegra_fb->reg_base + reg*sizeof(u32));
-+}
-+
-+static u32 tegra_fb_readl(struct tegra_fb_info *tegra_fb, unsigned long reg)
-+{
-+	return readl(tegra_fb->reg_base + reg*sizeof(u32));
-+}
-+
-+/* palette attary used by the fbcon */
-+u32 pseudo_palette[16];
-+
-+irqreturn_t tegra_fb_irq(int irq, void *ptr)
-+{
-+	struct fb_info *info = ptr;
-+	struct tegra_fb_info *tegra_fb = info->par;
-+
-+	u32 reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_STATUS);
-+	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_STATUS);
-+
-+	tegra_fb->wait_condition = 1;
-+	wake_up(&tegra_fb->event_wq);
-+	return IRQ_HANDLED;
-+}
-+
-+static int tegra_fb_wait_for_event(struct tegra_fb_info *tegra_fb, unsigned long timeout, u32 irq_mask)
-+{
-+	u32 reg;
-+
-+	tegra_fb->wait_condition = 0;
-+
-+	reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_MASK);
-+	reg |= irq_mask;
-+	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_MASK);
-+
-+	/* Clear any pending interrupt */
-+	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_STATUS);
-+
-+	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_ENABLE);
-+
-+	/* Wait for the irq to fire */
-+	wait_event_interruptible_timeout(tegra_fb->event_wq, tegra_fb->wait_condition, timeout);
-+
-+	tegra_fb_writel(tegra_fb, 0, DC_CMD_INT_ENABLE);
-+
-+	if (!tegra_fb->wait_condition) {
-+		pr_warning("%s: wait for vsync timed out\n", __func__);
-+		return -ETIMEDOUT;
-+	}
-+	return 0;
-+}
-+
-+/* Writes to many registers in the display block are buffered.
-+ * tegra_fb_activate requests an update of the main registers from their
-+ * double-buffered registers, which takes effect at the end of the next frame,
-+ * and then waits for the frame_end IRQ.
-+ */
-+static void tegra_fb_activate(struct tegra_fb_info *tegra_fb)
-+{
-+	int vsync_count = 0;
-+
-+	if (unlikely(tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3)) {
-+		pr_warning("%s: update already activated!\n", __func__);
-+		return;
++#define PINGROUP(pg_name, f0, f1, f2, f3,			\
++		 tri_r, tri_b, mux_r, mux_b, pupd_r, pupd_b)	\
++	[TEGRA_PINGROUP_ ## pg_name] = {			\
++		.name = #pg_name,				\
++		.funcs = {					\
++			TEGRA_MUX_ ## f0,			\
++			TEGRA_MUX_ ## f1,			\
++			TEGRA_MUX_ ## f2,			\
++			TEGRA_MUX_ ## f3,			\
++		},						\
++		.tri_reg = REG_ ## tri_r,			\
++		.tri_bit = tri_b,				\
++		.mux_reg = REG_ ## mux_r,			\
++		.mux_bit = mux_b,				\
++		.pupd_reg = REG_ ## pupd_r,			\
++		.pupd_bit = pupd_b,				\
 +	}
 +
-+	tegra_fb_writel(tegra_fb, (1 << 8) | (1 << 9), DC_CMD_STATE_CONTROL);
-+	tegra_fb_writel(tegra_fb, (1 << 0) | (1 << 1), DC_CMD_STATE_CONTROL);
-+	while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
-+		vsync_count++;
-+		if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
-+			break;
-+	}
-+	if (unlikely(vsync_count > 1))
-+		pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
++static const struct tegra_pingroup_desc pingroups[TEGRA_MAX_PINGROUP] = {
++	PINGROUP(ATA,   IDE,       NAND,      GMI,       RSVD,          A, 0,  A, 24, A, 0),
++	PINGROUP(ATB,   IDE,       NAND,      GMI,       SDIO4,         A, 1,  A, 16, A, 2),
++	PINGROUP(ATC,   IDE,       NAND,      GMI,       SDIO4,         A, 2,  A, 22, A, 4),
++	PINGROUP(ATD,   IDE,       NAND,      GMI,       SDIO4,         A, 3,  A, 20, A, 6),
++	PINGROUP(ATE,   IDE,       NAND,      GMI,       RSVD,          B, 25, A, 12, A, 8),
++	PINGROUP(CDEV1, OSC,       PLLA_OUT,  PLLM_OUT1, AUDIO_SYNC,    A, 4,  C, 2,  C, 0),
++	PINGROUP(CDEV2, OSC,       AHB_CLK,   APB_CLK,   PLLP_OUT4,     A, 5,  C, 4,  C, 2),
++	PINGROUP(CRTP,  CRT,       RSVD,      RSVD,      RSVD,          D, 14, G, 20, B, 24),
++	PINGROUP(CSUS,  PLLC_OUT1, PLLP_OUT2, PLLP_OUT3, VI_SENSOR_CLK, A, 6,  C, 6,  D, 24),
++	PINGROUP(DAP1,  DAP1,      RSVD,      GMI,       SDIO2,         A, 7,  C, 20, A, 10),
++	PINGROUP(DAP2,  DAP2,      TWC,       RSVD,      GMI,           A, 8,  C, 22, A, 12),
++	PINGROUP(DAP3,  DAP3,      RSVD,      RSVD,      RSVD,          A, 9,  C, 24, A, 14),
++	PINGROUP(DAP4,  DAP4,      RSVD,      GMI,       RSVD,          A, 10, C, 26, A, 16),
++	PINGROUP(DDC,   I2C2,      RSVD,      RSVD,      RSVD,          B, 31, C, 0,  E, 28),
++	PINGROUP(DTA,   RSVD,      SDIO2,     VI,        RSVD,          A, 11, B, 20, A, 18),
++	PINGROUP(DTB,   RSVD,      RSVD,      VI,        SPI1,          A, 12, B, 22, A, 20),
++	PINGROUP(DTC,   RSVD,      RSVD,      VI,        RSVD,          A, 13, B, 26, A, 22),
++	PINGROUP(DTD,   RSVD,      SDIO2,     VI,        RSVD,          A, 14, B, 28, A, 24),
++	PINGROUP(DTE,   RSVD,      RSVD,      VI,        SPI1,          A, 15, B, 30, A, 26),
++	PINGROUP(DTF,   I2C3,      RSVD,      VI,        RSVD,          D, 12, G, 30, A, 28),
++	PINGROUP(GMA,   UARTE,     SPI3,      GMI,       SDIO4,         A, 28, B, 0,  E, 20),
++	PINGROUP(GMB,   IDE,       NAND,      GMI,       GMI_INT,       B, 29, C, 28, E, 22),
++	PINGROUP(GMC,   UARTD,     SPI4,      GMI,       SFLASH,        A, 29, B, 2,  E, 24),
++	PINGROUP(GMD,   RSVD,      NAND,      GMI,       SFLASH,        B, 30, C, 30, E, 26),
++	PINGROUP(GME,   RSVD,      DAP5,      GMI,       SDIO4,         B, 0,  D, 0,  C, 24),
++	PINGROUP(GPU,   PWM,       UARTA,     GMI,       RSVD,          A, 16, D, 4,  B, 20),
++	PINGROUP(GPU7,  RTCK,      RSVD,      RSVD,      RSVD,          D, 11, G, 28, B, 6),
++	PINGROUP(GPV,   PCIE,      RSVD,      RSVD,      RSVD,          A, 17, D, 2,  A, 30),
++	PINGROUP(HDINT, HDMI,      RSVD,      RSVD,      RSVD,          C, 23, B, 4,  D, 22),
++	PINGROUP(I2CP,  I2C,       RSVD,      RSVD,      RSVD,          A, 18, C, 8,  B, 2),
++	PINGROUP(IRRX,  UARTA,     UARTB,     GMI,       SPI4,          A, 20, C, 18, C, 22),
++	PINGROUP(IRTX,  UARTA,     UARTB,     GMI,       SPI4,          A, 19, C, 16, C, 20),
++	PINGROUP(KBCA,  KBC,       NAND,      SDIO2,     EMC_TEST0_DLL, A, 22, C, 10, B, 8),
++	PINGROUP(KBCB,  KBC,       NAND,      SDIO2,     MIO,           A, 21, C, 12, B, 10),
++	PINGROUP(KBCC,  KBC,       NAND,      TRACE,     EMC_TEST1_DLL, B, 26, C, 14, B, 12),
++	PINGROUP(KBCD,  KBC,       NAND,      SDIO2,     MIO,           D, 10, G, 26, B, 14),
++	PINGROUP(KBCE,  KBC,       NAND,      OWR,       RSVD,          A, 26, A, 28, E, 2),
++	PINGROUP(KBCF,  KBC,       NAND,      TRACE,     MIO,           A, 27, A, 26, E, 0),
++	PINGROUP(LCSN,  DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          C, 31, E, 12, D, 20),
++	PINGROUP(LD0,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 0,  F, 0,  D, 12),
++	PINGROUP(LD1,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 1,  F, 2,  D, 12),
++	PINGROUP(LD10,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 10, F, 20, D, 12),
++	PINGROUP(LD11,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 11, F, 22, D, 12),
++	PINGROUP(LD12,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 12, F, 24, D, 12),
++	PINGROUP(LD13,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 13, F, 26, D, 12),
++	PINGROUP(LD14,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 14, F, 28, D, 12),
++	PINGROUP(LD15,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 15, F, 30, D, 12),
++	PINGROUP(LD16,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 16, G, 0,  D, 12),
++	PINGROUP(LD17,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 17, G, 2,  D, 12),
++	PINGROUP(LD2,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 2,  F, 4,  D, 12),
++	PINGROUP(LD3,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 3,  F, 6,  D, 12),
++	PINGROUP(LD4,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 4,  F, 8,  D, 12),
++	PINGROUP(LD5,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 5,  F, 10, D, 12),
++	PINGROUP(LD6,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 6,  F, 12, D, 12),
++	PINGROUP(LD7,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 7,  F, 14, D, 12),
++	PINGROUP(LD8,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 8,  F, 16, D, 12),
++	PINGROUP(LD9,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 9,  F, 18, D, 12),
++	PINGROUP(LDC,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 30, E, 14, D, 20),
++	PINGROUP(LDI,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 6,  G, 16, D, 18),
++	PINGROUP(LHP0,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 18, G, 10, D, 16),
++	PINGROUP(LHP1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 19, G, 4,  D, 14),
++	PINGROUP(LHP2,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 20, G, 6,  D, 14),
++	PINGROUP(LHS,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          D, 7,  E, 22, D, 22),
++	PINGROUP(LM0,   DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          C, 24, E, 26, D, 22),
++	PINGROUP(LM1,   DISPLAYA,  DISPLAYB,  RSVD,      CRT,           C, 25, E, 28, D, 22),
++	PINGROUP(LPP,   DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 8,  G, 14, D, 18),
++	PINGROUP(LPW0,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 3,  E, 0,  D, 20),
++	PINGROUP(LPW1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          D, 4,  E, 2,  D, 20),
++	PINGROUP(LPW2,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 5,  E, 4,  D, 20),
++	PINGROUP(LSC0,  DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 27, E, 18, D, 22),
++	PINGROUP(LSC1,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          C, 28, E, 20, D, 20),
++	PINGROUP(LSCK,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          C, 29, E, 16, D, 20),
++	PINGROUP(LSDA,  DISPLAYA,  DISPLAYB,  SPI3,      HDMI,          D, 1,  E, 8,  D, 20),
++	PINGROUP(LSDI,  DISPLAYA,  DISPLAYB,  SPI3,      RSVD,          D, 2,  E, 6,  D, 20),
++	PINGROUP(LSPI,  DISPLAYA,  DISPLAYB,  XIO,       HDMI,          D, 0,  E, 10, D, 22),
++	PINGROUP(LVP0,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 21, E, 30, D, 22),
++	PINGROUP(LVP1,  DISPLAYA,  DISPLAYB,  RSVD,      RSVD,          C, 22, G, 8,  D, 16),
++	PINGROUP(LVS,   DISPLAYA,  DISPLAYB,  XIO,       RSVD,          C, 26, E, 24, D, 22),
++	PINGROUP(OWC,   OWR,       RSVD,      RSVD,      RSVD,          A, 31, B, 8,  E, 30),
++	PINGROUP(PMC,   PWR_ON,    PWR_INTR,  RSVD,      RSVD,          A, 23, G, 18, N, -1),
++	PINGROUP(PTA,   I2C2,      HDMI,      GMI,       RSVD,          A, 24, G, 22, B, 4),
++	PINGROUP(RM,    I2C,       RSVD,      RSVD,      RSVD,          A, 25, A, 14, B, 0),
++	PINGROUP(SDB,   UARTA,     PWM,       SDIO3,     SPI2,          D, 15, D, 10, N, -1),
++	PINGROUP(SDC,   PWM,       TWC,       SDIO3,     SPI3,          B, 1,  D, 12, D, 28),
++	PINGROUP(SDD,   UARTA,     PWM,       SDIO3,     SPI3,          B, 2,  D, 14, D, 30),
++	PINGROUP(SDIO1, SDIO1,     RSVD,      UARTE,     UARTA,         A, 30, A, 30, E, 18),
++	PINGROUP(SLXA,  PCIE,      SPI4,      SDIO3,     SPI2,          B, 3,  B, 6,  B, 22),
++	PINGROUP(SLXC,  SPDIF,     SPI4,      SDIO3,     SPI2,          B, 5,  B, 10, B, 26),
++	PINGROUP(SLXD,  SPDIF,     SPI4,      SDIO3,     SPI2,          B, 6,  B, 12, B, 28),
++	PINGROUP(SLXK,  PCIE,      SPI4,      SDIO3,     SPI2,          B, 7,  B, 14, B, 30),
++	PINGROUP(SPDI,  SPDIF,     RSVD,      I2C,       SDIO2,         B, 8,  D, 8,  B, 16),
++	PINGROUP(SPDO,  SPDIF,     RSVD,      I2C,       SDIO2,         B, 9,  D, 6,  B, 18),
++	PINGROUP(SPIA,  SPI1,      SPI2,      SPI3,      GMI,           B, 10, D, 30, C, 4),
++	PINGROUP(SPIB,  SPI1,      SPI2,      SPI3,      GMI,           B, 11, D, 28, C, 6),
++	PINGROUP(SPIC,  SPI1,      SPI2,      SPI3,      GMI,           B, 12, D, 26, C, 8),
++	PINGROUP(SPID,  SPI2,      SPI1,      SPI2_ALT,  GMI,           B, 13, D, 24, C, 10),
++	PINGROUP(SPIE,  SPI2,      SPI1,      SPI2_ALT,  GMI,           B, 14, D, 22, C, 12),
++	PINGROUP(SPIF,  SPI3,      SPI1,      SPI2,      RSVD,          B, 15, D, 20, C, 14),
++	PINGROUP(SPIG,  SPI3,      SPI2,      SPI2_ALT,  I2C,           B, 16, D, 18, C, 16),
++	PINGROUP(SPIH,  SPI3,      SPI2,      SPI2_ALT,  I2C,           B, 17, D, 16, C, 18),
++	PINGROUP(UAA,   SPI3,      MIPI_HS,   UARTA,     ULPI,          B, 18, A, 0,  D, 0),
++	PINGROUP(UAB,   SPI2,      MIPI_HS,   UARTA,     ULPI,          B, 19, A, 2,  D, 2),
++	PINGROUP(UAC,   OWR,       RSVD,      RSVD,      RSVD,          B, 20, A, 4,  D, 4),
++	PINGROUP(UAD,   IRDA,      SPDIF,     UARTA,     SPI4,          B, 21, A, 6,  D, 6),
++	PINGROUP(UCA,   UARTC,     RSVD,      GMI,       RSVD,          B, 22, B, 16, D, 8),
++	PINGROUP(UCB,   UARTC,     PWM,       GMI,       RSVD,          B, 23, B, 18, D, 10),
++	PINGROUP(UDA,   SPI1,      RSVD,      UARTD,     ULPI,          D, 13, A, 8,  E, 16),
++	/* these pin groups only have pullup and pull down control */
++	PINGROUP(CK32,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 14),
++	PINGROUP(DDRC,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  D, 26),
++	PINGROUP(PMCA,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 4),
++	PINGROUP(PMCB,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 6),
++	PINGROUP(PMCC,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 8),
++	PINGROUP(PMCD,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 10),
++	PINGROUP(PMCE,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  E, 12),
++	PINGROUP(XM2C,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  C, 30),
++	PINGROUP(XM2D,  RSVD,      RSVD,      RSVD,      RSVD,          N, -1,  N, -1,  C, 28),
++};
++
++static char *tegra_mux_names[TEGRA_MAX_MUX] = {
++	[TEGRA_MUX_AHB_CLK] = "AHB_CLK",
++	[TEGRA_MUX_APB_CLK] = "APB_CLK",
++	[TEGRA_MUX_AUDIO_SYNC] = "AUDIO_SYNC",
++	[TEGRA_MUX_CRT] = "CRT",
++	[TEGRA_MUX_DAP1] = "DAP1",
++	[TEGRA_MUX_DAP2] = "DAP2",
++	[TEGRA_MUX_DAP3] = "DAP3",
++	[TEGRA_MUX_DAP4] = "DAP4",
++	[TEGRA_MUX_DAP5] = "DAP5",
++	[TEGRA_MUX_DISPLAYA] = "DISPLAYA",
++	[TEGRA_MUX_DISPLAYB] = "DISPLAYB",
++	[TEGRA_MUX_EMC_TEST0_DLL] = "EMC_TEST0_DLL",
++	[TEGRA_MUX_EMC_TEST1_DLL] = "EMC_TEST1_DLL",
++	[TEGRA_MUX_GMI] = "GMI",
++	[TEGRA_MUX_GMI_INT] = "GMI_INT",
++	[TEGRA_MUX_HDMI] = "HDMI",
++	[TEGRA_MUX_I2C] = "I2C",
++	[TEGRA_MUX_I2C2] = "I2C2",
++	[TEGRA_MUX_I2C3] = "I2C3",
++	[TEGRA_MUX_IDE] = "IDE",
++	[TEGRA_MUX_IRDA] = "IRDA",
++	[TEGRA_MUX_KBC] = "KBC",
++	[TEGRA_MUX_MIO] = "MIO",
++	[TEGRA_MUX_MIPI_HS] = "MIPI_HS",
++	[TEGRA_MUX_NAND] = "NAND",
++	[TEGRA_MUX_OSC] = "OSC",
++	[TEGRA_MUX_OWR] = "OWR",
++	[TEGRA_MUX_PCIE] = "PCIE",
++	[TEGRA_MUX_PLLA_OUT] = "PLLA_OUT",
++	[TEGRA_MUX_PLLC_OUT1] = "PLLC_OUT1",
++	[TEGRA_MUX_PLLM_OUT1] = "PLLM_OUT1",
++	[TEGRA_MUX_PLLP_OUT2] = "PLLP_OUT2",
++	[TEGRA_MUX_PLLP_OUT3] = "PLLP_OUT3",
++	[TEGRA_MUX_PLLP_OUT4] = "PLLP_OUT4",
++	[TEGRA_MUX_PWM] = "PWM",
++	[TEGRA_MUX_PWR_INTR] = "PWR_INTR",
++	[TEGRA_MUX_PWR_ON] = "PWR_ON",
++	[TEGRA_MUX_RTCK] = "RTCK",
++	[TEGRA_MUX_SDIO1] = "SDIO1",
++	[TEGRA_MUX_SDIO2] = "SDIO2",
++	[TEGRA_MUX_SDIO3] = "SDIO3",
++	[TEGRA_MUX_SDIO4] = "SDIO4",
++	[TEGRA_MUX_SFLASH] = "SFLASH",
++	[TEGRA_MUX_SPDIF] = "SPDIF",
++	[TEGRA_MUX_SPI1] = "SPI1",
++	[TEGRA_MUX_SPI2] = "SPI2",
++	[TEGRA_MUX_SPI2_ALT] = "SPI2_ALT",
++	[TEGRA_MUX_SPI3] = "SPI3",
++	[TEGRA_MUX_SPI4] = "SPI4",
++	[TEGRA_MUX_TRACE] = "TRACE",
++	[TEGRA_MUX_TWC] = "TWC",
++	[TEGRA_MUX_UARTA] = "UARTA",
++	[TEGRA_MUX_UARTB] = "UARTB",
++	[TEGRA_MUX_UARTC] = "UARTC",
++	[TEGRA_MUX_UARTD] = "UARTD",
++	[TEGRA_MUX_UARTE] = "UARTE",
++	[TEGRA_MUX_ULPI] = "ULPI",
++	[TEGRA_MUX_VI] = "VI",
++	[TEGRA_MUX_VI_SENSOR_CLK] = "VI_SENSOR_CLK",
++	[TEGRA_MUX_XIO] = "XIO",
++};
++
++static DEFINE_SPINLOCK(mux_lock);
++
++static const char *pingroup_name(tegra_pingroup_t pg)
++{
++	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
++		return "<UNKNOWN>";
++
++	return pingroups[pg].name;
++}
++
++static const char *func_name(tegra_mux_func_t func)
++{
++	if (func == TEGRA_MUX_RSVD1)
++		return "RSVD1";
++
++	if (func == TEGRA_MUX_RSVD2)
++		return "RSVD2";
++
++	if (func == TEGRA_MUX_RSVD3)
++		return "RSVD3";
++
++	if (func == TEGRA_MUX_RSVD4)
++		return "RSVD4";
++
++	if (func == TEGRA_MUX_NONE)
++		return "NONE";
++
++	if (func < 0 || func >=  TEGRA_MAX_MUX)
++		return "<UNKNOWN>";
++
++	return tegra_mux_names[func];
 +}
 +
 +
-+static int tegra_fb_open(struct fb_info *info, int user)
++static const char *tri_name(unsigned long val)
 +{
-+	return 0;
++	return val ? "TRISTATE" : "NORMAL";
 +}
 +
-+static int tegra_fb_release(struct fb_info *info, int user)
++static const char *pupd_name(unsigned long val)
 +{
-+	return 0;
-+}
++	switch (val) {
++	case 0:
++		return "NORMAL";
 +
-+static int tegra_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-+{
-+	if ((var->xres != info->var.xres) ||
-+	    (var->yres != info->var.yres) ||
-+	    (var->xres_virtual != info->var.xres_virtual) ||
-+	    (var->yres_virtual != info->var.yres_virtual) ||
-+	    (var->grayscale != info->var.grayscale))
-+		return -EINVAL;
-+	return 0;
-+}
++	case 1:
++		return "PULL_DOWN";
 +
-+static int tegra_fb_set_par(struct fb_info *info)
-+{
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	struct fb_var_screeninfo *var = &info->var;
-+	struct fb_fix_screeninfo *fix = &info->fix;
-+	u32 color_depth;
-+	unsigned int h_dda;
-+	unsigned int v_dda;
++	case 2:
++		return "PULL_UP";
 +
-+	/* we only support RGB ordering for now */
-+	switch (var->bits_per_pixel) {
-+	case 32:
-+	case 24:
-+		var->red.offset = 0;
-+		var->red.length = 8;
-+		var->green.offset = 8;
-+		var->green.length = 8;
-+		var->blue.offset = 16;
-+		var->blue.length = 8;
-+		color_depth = DC_COLOR_DEPTH_B8G8R8A8;
-+		break;
-+	case 16:
-+		var->red.offset = 11;
-+		var->red.length = 5;
-+		var->green.offset = 5;
-+		var->green.length = 6;
-+		var->blue.offset = 0;
-+		var->blue.length = 5;
-+		color_depth = DC_COLOR_DEPTH_B5G6R5;
-+		break;
 +	default:
++		return "RSVD";
++	}
++}
++
++
++static inline unsigned long pg_readl(unsigned long offset)
++{
++	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
++}
++
++static inline void pg_writel(unsigned long value, unsigned long offset)
++{
++	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
++}
++
++int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func)
++{
++	int mux = -1;
++	int i;
++	unsigned long reg;
++	unsigned long flags;
++
++	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
++		return -ERANGE;
++
++	if (pingroups[pg].mux_reg == REG_N)
 +		return -EINVAL;
-+	}
-+	fix->line_length = var->xres * var->bits_per_pixel / 8;
 +
-+	h_dda = (var->xres * 0x1000) / (tegra_fb->lcd_xres - 1);
-+	v_dda = (var->yres * 0x1000) / (tegra_fb->lcd_yres - 1);
++	if (func < 0)
++		return -ERANGE;
 +
-+	tegra_fb_writel(tegra_fb, tegra_fb->lcd_yres<<16 | tegra_fb->lcd_xres,
-+		DC_WIN_A_SIZE);
-+	tegra_fb_writel(tegra_fb, var->yres<<16 | fix->line_length,
-+		DC_WIN_A_PRESCALED_SIZE);
-+	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_H_INITIAL_DDA);
-+	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_V_INITIAL_DDA);
-+	tegra_fb_writel(tegra_fb, v_dda << 16 | h_dda, DC_WIN_A_DDA_INCREMENT);
-+	tegra_fb_writel(tegra_fb, color_depth, DC_WIN_A_COLOR_DEPTH);
-+	tegra_fb_writel(tegra_fb, fix->line_length, DC_WIN_A_LINE_STRIDE);
-+	return 0;
-+}
-+
-+static int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
-+	unsigned blue, unsigned transp, struct fb_info *info)
-+{
-+	struct fb_var_screeninfo *var = &info->var;
-+
-+	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
-+	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-+		u32 v;
-+
-+		if (regno >= 16)
-+			return -EINVAL;
-+
-+		v = (red << var->red.offset) |
-+			(green << var->green.offset) |
-+			(blue << var->blue.offset);
-+
-+		((u32 *)info->pseudo_palette)[regno] = v;
++	if (func & TEGRA_MUX_RSVD) {
++		mux = func & 0x3;
++	} else {
++		for (i = 0; i < 4; i++) {
++			if (pingroups[pg].funcs[i] == func) {
++				mux = i;
++				break;
++			}
++		}
 +	}
 +
++	if (mux < 0)
++		return -EINVAL;
++
++	spin_lock_irqsave(&mux_lock, flags);
++
++	reg = pg_readl(TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
++	reg &= ~(0x3 << pingroups[pg].mux_bit);
++	reg |= mux << pingroups[pg].mux_bit;
++	pg_writel(reg, TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
++
++	spin_unlock_irqrestore(&mux_lock, flags);
++
 +	return 0;
 +}
 +
-+static int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
++int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate)
 +{
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	char __iomem *flush_start;
-+	char __iomem *flush_end;
-+	u32 addr;
++	unsigned long reg;
++	unsigned long flags;
 +
-+	flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
-+	flush_end = flush_start + (var->yres * info->fix.line_length);
++	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
++		return -ERANGE;
 +
-+	info->var.xoffset = var->xoffset;
-+	info->var.yoffset = var->yoffset;
++	if (pingroups[pg].tri_reg == REG_N)
++		return -EINVAL;
 +
-+	addr = info->fix.smem_start + (var->yoffset * info->fix.line_length) +
-+		(var->xoffset * (var->bits_per_pixel/8));
++	spin_lock_irqsave(&mux_lock, flags);
 +
-+	tegra_fb_writel(tegra_fb, addr, DC_WINBUF_A_START_ADDR);
-+	tegra_fb_activate(tegra_fb);
++	reg = pg_readl(TEGRA_TRI_STATE(pingroups[pg].tri_reg));
++	reg &= ~(0x1 << pingroups[pg].tri_bit);
++	if (tristate)
++		reg |= 1 << pingroups[pg].tri_bit;
++	pg_writel(reg, TEGRA_TRI_STATE(pingroups[pg].tri_reg));
++
++	spin_unlock_irqrestore(&mux_lock, flags);
++
 +	return 0;
 +}
 +
-+static void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
++int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd)
 +{
-+	cfb_fillrect(info, rect);
++	unsigned long reg;
++	unsigned long flags;
++
++	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
++		return -ERANGE;
++
++	if (pingroups[pg].pupd_reg == REG_N)
++		return -EINVAL;
++
++	if (pupd != TEGRA_PUPD_NORMAL &&
++	    pupd != TEGRA_PUPD_PULL_DOWN &&
++	    pupd != TEGRA_PUPD_PULL_UP)
++		return -EINVAL;
++
++
++	spin_lock_irqsave(&mux_lock, flags);
++
++	reg = pg_readl(TEGRA_PP_PU_PD(pingroups[pg].pupd_reg));
++	reg &= ~(0x3 << pingroups[pg].pupd_bit);
++	reg |= pupd << pingroups[pg].pupd_bit;
++	pg_writel(reg, TEGRA_PP_PU_PD(pingroups[pg].pupd_reg));
++
++	spin_unlock_irqrestore(&mux_lock, flags);
++
++	return 0;
 +}
 +
-+static void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
++void tegra_pinmux_config_pingroup(tegra_pingroup_t pingroup,
++				 tegra_mux_func_t func,
++				 tegra_pullupdown_t pupd,
++				 tegra_tristate_t tristate)
 +{
-+	cfb_copyarea(info, region);
++	int err;
++
++	if (pingroups[pingroup].mux_reg != REG_N) {
++		err = tegra_pinmux_set_func(pingroup, func);
++		if (err < 0)
++			pr_err("pinmux: can't set pingroup %s func to %s: %d\n",
++			       pingroup_name(pingroup), func_name(func), err);
++	}
++
++	if (pingroups[pingroup].pupd_reg != REG_N) {
++		err = tegra_pinmux_set_pullupdown(pingroup, pupd);
++		if (err < 0)
++			pr_err("pinmux: can't set pingroup %s pullupdown to %s: %d\n",
++			       pingroup_name(pingroup), pupd_name(pupd), err);
++	}
++
++	if (pingroups[pingroup].tri_reg != REG_N) {
++		err = tegra_pinmux_set_tristate(pingroup, tristate);
++		if (err < 0)
++			pr_err("pinmux: can't set pingroup %s tristate to %s: %d\n",
++			       pingroup_name(pingroup), tri_name(func), err);
++	}
 +}
 +
-+static void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
++
++
++void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len)
 +{
-+	cfb_imageblit(info, image);
++	int i;
++
++	for (i = 0; i < len; i++)
++		tegra_pinmux_config_pingroup(config[i].pingroup,
++					     config[i].func,
++					     config[i].pupd,
++					     config[i].tristate);
 +}
 +
-+#ifdef DEBUG
-+#define DUMP_REG(a) dev_dbg(info->dev, "%-32s\t%03x\t%08x\n", #a, a, tegra_fb_readl(tegra_fb, a));
-+static void dump_regs(struct fb_info *info)
++
++
++
++
++#ifdef	CONFIG_DEBUG_FS
++
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++
++static void dbg_pad_field(struct seq_file *s, int len)
 +{
-+	struct tegra_fb_info *tegra_fb = info->par;
++	seq_putc(s, ',');
 +
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_CONT_SYNCPT_VSYNC);
-+	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
-+	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE);
-+	DUMP_REG(DC_CMD_INT_STATUS);
-+	DUMP_REG(DC_CMD_INT_MASK);
-+	DUMP_REG(DC_CMD_INT_ENABLE);
-+	DUMP_REG(DC_CMD_INT_TYPE);
-+	DUMP_REG(DC_CMD_INT_POLARITY);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE1);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE2);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE3);
-+	DUMP_REG(DC_CMD_STATE_ACCESS);
-+	DUMP_REG(DC_CMD_STATE_CONTROL);
-+	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_CMD_REG_ACT_CONTROL);
-+	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_WINC_A_COLOR_PALETTE);
-+	DUMP_REG(DC_WINC_A_PALETTE_COLOR_EXT);
-+	DUMP_REG(DC_WIN_A_WIN_OPTIONS);
-+	DUMP_REG(DC_WIN_A_BYTE_SWAP);
-+	DUMP_REG(DC_WIN_A_BUFFER_CONTROL);
-+	DUMP_REG(DC_WIN_A_COLOR_DEPTH);
-+	DUMP_REG(DC_WIN_A_POSITION);
-+	DUMP_REG(DC_WIN_A_SIZE);
-+	DUMP_REG(DC_WIN_A_PRESCALED_SIZE);
-+	DUMP_REG(DC_WIN_A_H_INITIAL_DDA);
-+	DUMP_REG(DC_WIN_A_V_INITIAL_DDA);
-+	DUMP_REG(DC_WIN_A_DDA_INCREMENT);
-+	DUMP_REG(DC_WIN_A_LINE_STRIDE);
-+	DUMP_REG(DC_WIN_A_BUF_STRIDE);
-+	DUMP_REG(DC_WINBUF_A_START_ADDR);
-+	DUMP_REG(DC_WINBUF_A_ADDR_H_OFFSET);
-+	DUMP_REG(DC_WINBUF_A_ADDR_V_OFFSET);
++	while (len-- > -1)
++		seq_putc(s, ' ');
 +}
-+#endif
 +
-+static struct fb_ops tegra_fb_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_open = tegra_fb_open,
-+	.fb_release = tegra_fb_release,
-+	.fb_check_var = tegra_fb_check_var,
-+	.fb_set_par = tegra_fb_set_par,
-+	.fb_setcolreg = tegra_fb_setcolreg,
-+	.fb_pan_display = tegra_fb_pan_display,
-+	.fb_fillrect = tegra_fb_fillrect,
-+	.fb_copyarea = tegra_fb_copyarea,
-+	.fb_imageblit = tegra_fb_imageblit,
++static int dbg_pinmux_show(struct seq_file *s, void *unused)
++{
++	int i;
++	int len;
++
++	for (i = 0; i < TEGRA_MAX_PINGROUP; i++) {
++		unsigned long tri;
++		unsigned long mux;
++		unsigned long pupd;
++
++		seq_printf(s, "\t{TEGRA_PINGROUP_%s", pingroups[i].name);
++		len = strlen(pingroups[i].name);
++		dbg_pad_field(s, 5 - len);
++
++		if (pingroups[i].mux_reg == REG_N) {
++			seq_printf(s, "TEGRA_MUX_NONE");
++			len = strlen("NONE");
++		} else {
++			mux = (pg_readl(TEGRA_PP_MUX_CTL(pingroups[i].mux_reg)) >>
++			       pingroups[i].mux_bit) & 0x3;
++			if (pingroups[i].funcs[mux] == TEGRA_MUX_RSVD) {
++				seq_printf(s, "TEGRA_MUX_RSVD%1lu", mux+1);
++				len = 5;
++			} else {
++				seq_printf(s, "TEGRA_MUX_%s",
++					   tegra_mux_names[pingroups[i].funcs[mux]]);
++				len = strlen(tegra_mux_names[pingroups[i].funcs[mux]]);
++			}
++		}
++		dbg_pad_field(s, 13-len);
++
++		if (pingroups[i].mux_reg == REG_N) {
++			seq_printf(s, "TEGRA_PUPD_NORMAL");
++			len = strlen("NORMAL");
++		} else {
++			pupd = (pg_readl(TEGRA_PP_PU_PD(pingroups[i].pupd_reg)) >>
++				pingroups[i].pupd_bit) & 0x3;
++			seq_printf(s, "TEGRA_PUPD_%s", pupd_name(pupd));
++			len = strlen(pupd_name(pupd));
++		}
++		dbg_pad_field(s, 9 - len);
++
++		if (pingroups[i].tri_reg == REG_N) {
++			seq_printf(s, "TEGRA_TRI_NORMAL");
++		} else {
++			tri = (pg_readl(TEGRA_TRI_STATE(pingroups[i].tri_reg)) >>
++			       pingroups[i].tri_bit) & 0x1;
++
++			seq_printf(s, "TEGRA_TRI_%s", tri_name(tri));
++		}
++		seq_printf(s, "},\n");
++	}
++	return 0;
++}
++
++static int dbg_pinmux_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, dbg_pinmux_show, &inode->i_private);
++}
++
++static const struct file_operations debug_fops = {
++	.open		= dbg_pinmux_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
 +};
 +
-+static int tegra_plat_probe(struct platform_device *pdev)
++static int __init tegra_pinmux_debuginit(void)
 +{
-+	struct fb_info *info;
-+	struct tegra_fb_info *tegra_fb;
-+	struct clk *clk;
-+	struct resource	*res;
-+	struct resource *reg_mem;
-+	struct resource *fb_mem;
-+	int ret = 0;
-+	void __iomem *reg_base;
-+	void __iomem *fb_base;
-+	unsigned long fb_size;
-+	unsigned long fb_phys;
-+	int irq;
-+	const struct tegra_fb_lcd_data *lcd_data = pdev->dev.platform_data;
-+
-+	info = framebuffer_alloc(sizeof(struct tegra_fb_info), &pdev->dev);
-+	if (!info) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		pr_debug("%s: no irq\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_free;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		pr_debug("%s: no mem resource\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_free;
-+	}
-+
-+	reg_mem = request_mem_region(res->start, resource_size(res), pdev->name);
-+	if (!reg_mem) {
-+		pr_debug("%s: request_mem_region failed\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_free;
-+	}
-+
-+	reg_base = ioremap(res->start, resource_size(res));
-+	if (!reg_base) {
-+		pr_debug("%s: registers can't be mapped\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_release_resource_reg;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		pr_debug("%s: no mem resource\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_iounmap_reg;
-+	}
-+
-+	fb_mem = request_mem_region(res->start, resource_size(res), pdev->name);
-+	if (!fb_mem) {
-+		pr_debug("%s: request_mem_region failed\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_iounmap_reg;
-+	}
-+
-+	fb_size = resource_size(res);
-+	fb_phys = res->start;
-+	fb_base = ioremap_nocache(fb_phys, fb_size);
-+	if (!fb_base) {
-+		pr_debug("%s: fb can't be mapped\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_release_resource_fb;
-+	}
-+
-+	clk = clk_get(&pdev->dev, NULL);
-+	if (!clk) {
-+		pr_debug("%s: can't get clock\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_iounmap_fb;
-+	}
-+	clk_enable(clk);
-+
-+	tegra_fb = info->par;
-+	tegra_fb->clk = clk;
-+	tegra_fb->fb_mem = fb_mem;
-+	tegra_fb->reg_mem = reg_mem;
-+	tegra_fb->reg_base = reg_base;
-+	tegra_fb->irq = irq;
-+	tegra_fb->lcd_xres = lcd_data->lcd_xres;
-+	tegra_fb->lcd_yres = lcd_data->lcd_yres;
-+
-+	info->fbops = &tegra_fb_ops;
-+	info->pseudo_palette = pseudo_palette;
-+	info->screen_base = fb_base;
-+	info->screen_size = fb_size;
-+
-+	strlcpy(info->fix.id, "tegra_fb", sizeof(info->fix.id));
-+	info->fix.type = FB_TYPE_PACKED_PIXELS;
-+	info->fix.visual = FB_VISUAL_TRUECOLOR;
-+	info->fix.xpanstep   = 1;
-+	info->fix.ypanstep   = 1;
-+	info->fix.accel	  = FB_ACCEL_NONE;
-+	info->fix.smem_start = fb_phys;
-+	info->fix.smem_len = fb_size;
-+
-+	info->var.xres			= lcd_data->fb_xres;
-+	info->var.yres			= lcd_data->fb_yres;
-+	info->var.xres_virtual		= lcd_data->fb_xres;
-+	info->var.yres_virtual		= lcd_data->fb_yres*2;
-+	info->var.bits_per_pixel	= lcd_data->bits_per_pixel;
-+	info->var.activate		= FB_ACTIVATE_NOW;
-+	info->var.height		= -1;
-+	info->var.width			= -1;
-+	info->var.pixclock		= 24500;
-+	info->var.left_margin		= 0;
-+	info->var.right_margin		= 0;
-+	info->var.upper_margin		= 0;
-+	info->var.lower_margin		= 0;
-+	info->var.hsync_len		= 0;
-+	info->var.vsync_len		= 0;
-+	info->var.vmode			= FB_VMODE_NONINTERLACED;
-+
-+	if (request_irq(irq, tegra_fb_irq, IRQF_DISABLED,
-+			dev_name(&pdev->dev), info)) {
-+		pr_debug("%s: request_irq %d failed\n",
-+			pdev->name, irq);
-+		ret = -EBUSY;
-+		goto err_clk_disable;
-+	}
-+
-+	init_waitqueue_head(&tegra_fb->event_wq);
-+
-+	/* Enable writes to Window A */
-+	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
-+
-+#ifdef DEBUG
-+	info->dev = &pdev->dev;
-+	dev_dbg(info->dev, "Framebuffer registers before init:\n");
-+	dump_regs(info);
-+#endif
-+
-+	tegra_fb_set_par(info);
-+
-+#ifdef DEBUG
-+	dev_dbg(info->dev, "Framebuffer registers after init:\n");
-+	dump_regs(info);
-+#endif
-+
-+	dev_info(&pdev->dev, "base address: %08x (%08x)\n",
-+			(unsigned int)info->fix.smem_start,
-+			(unsigned int)info->screen_base);
-+
-+	register_framebuffer(info);
-+	platform_set_drvdata(pdev, info);
-+	return 0;
-+
-+err_clk_disable:
-+	clk_disable(clk);
-+err_iounmap_fb:
-+	iounmap(fb_base);
-+err_release_resource_fb:
-+	release_resource(fb_mem);
-+err_iounmap_reg:
-+	iounmap(reg_base);
-+err_release_resource_reg:
-+	release_resource(reg_mem);
-+err_free:
-+	framebuffer_release(info);
-+err:
-+	return ret;
-+}
-+
-+static int tegra_plat_remove(struct platform_device *pdev)
-+{
-+	struct fb_info *info = platform_get_drvdata(pdev);
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	unregister_framebuffer(info);
-+	clk_disable(tegra_fb->clk);
-+	iounmap(info->screen_base);
-+	release_resource(tegra_fb->fb_mem);
-+	iounmap(tegra_fb->reg_base);
-+	release_resource(tegra_fb->reg_mem);
-+	framebuffer_release(info);
++	(void) debugfs_create_file("tegra_pinmux", S_IRUGO,
++					NULL, NULL, &debug_fops);
 +	return 0;
 +}
-+
-+struct platform_driver tegra_platform_driver = {
-+	.probe = tegra_plat_probe,
-+	.remove = tegra_plat_remove,
-+	.driver = {
-+		.name = "tegrafb",
-+		.owner = THIS_MODULE,
-+	},
-+};
-+
-+static int __init tegra_fb_init(void)
-+{
-+	int e;
-+	e = platform_driver_register(&tegra_platform_driver);
-+	if (e) {
-+		pr_info("tegrafb: platform_driver_register failed\n");
-+		return e;
-+	}
-+	return e;
-+}
-+
-+static void __exit tegra_exit(void)
-+{
-+	platform_driver_unregister(&tegra_platform_driver);
-+}
-+
-+module_exit(tegra_exit);
-+module_init(tegra_fb_init);
++late_initcall(tegra_pinmux_debuginit);
++#endif
 -- 
 1.6.5.6
