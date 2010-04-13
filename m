@@ -1,168 +1,62 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Tue, 13 Apr 2010 14:27:04 +0900
-Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-In-Reply-To: <20100412193536.GO3048@n2100.arm.linux.org.uk>
-References: <20100405123847C.fujita.tomonori@lab.ntt.co.jp>
-	<20100412193536.GO3048@n2100.arm.linux.org.uk>
-Message-ID: <20100413142607V.fujita.tomonori@lab.ntt.co.jp>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Tue, 13 Apr 2010 08:53:28 +0300
+Subject: [RFC 02/10] arm: kdump: implement crash_setup_regs()
+In-Reply-To: <20100412200144.GU3048@n2100.arm.linux.org.uk>
+References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<e3c9449c42a735f9acee8e50af33762ffcadf7b4.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<20100412200144.GU3048@n2100.arm.linux.org.uk>
+Message-ID: <20100413055328.GA21896@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Apr 2010 20:35:36 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Mon, Apr 05, 2010 at 12:39:32PM +0900, FUJITA Tomonori wrote:
-> > I don't have arm hardware that uses dmabounce so I can't confirm the
-> > problem but seems that dmabounce doesn't work for some drivers...
+On Mon, Apr 12, 2010 at 10:01:44PM +0200, ext Russell King - ARM Linux wrote:
+> On Mon, Mar 29, 2010 at 12:26:28PM +0300, Mika Westerberg wrote:
+> > Implement machine specific function crash_setup_regs() which is responsible for
+> > storing machine state when crash occured.
 > 
-> Patch reviews fine, except for one niggle.  I too don't have hardware
-> I can test (well, I do except the kernel stopped supporting the UDA1341
-> audio codec on the SA1110 Neponset.)
-
-Thanks for reviewing.
-
-> > @@ -171,10 +172,17 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
-> >  	read_lock_irqsave(&device_info->lock, flags);
-> >  
-> >  	list_for_each_entry(b, &device_info->safe_buffers, node)
-> > -		if (b->safe_dma_addr == safe_dma_addr) {
-> > -			rb = b;
-> > -			break;
-> > -		}
-> > +		if (for_sync) {
-> > +			if (b->safe_dma_addr <= safe_dma_addr &&
-> > +			    safe_dma_addr < b->safe_dma_addr + b->size) {
-> > +				rb = b;
-> > +				break;
-> > +			}
-> > +		} else
-> > +			if (b->safe_dma_addr == safe_dma_addr) {
-> > +				rb = b;
-> > +				break;
-> > +			}
+> Slightly concerned about this...
 > 
-> This is the niggle; I don't like this indentation style.  If you want to
-> indent this if () statement, then please format like this:
+> > +	} else {
+> > +		__asm__ __volatile__("mov %0, r0" : "=r"(newregs->ARM_r0));
+> > +		__asm__ __volatile__("mov %0, r1" : "=r"(newregs->ARM_r1));
+> > +		__asm__ __volatile__("mov %0, r2" : "=r"(newregs->ARM_r2));
+> > +		__asm__ __volatile__("mov %0, r3" : "=r"(newregs->ARM_r3));
+> > +		__asm__ __volatile__("mov %0, r4" : "=r"(newregs->ARM_r4));
+> > +		__asm__ __volatile__("mov %0, r5" : "=r"(newregs->ARM_r5));
+> > +		__asm__ __volatile__("mov %0, r6" : "=r"(newregs->ARM_r6));
+> > +		__asm__ __volatile__("mov %0, r7" : "=r"(newregs->ARM_r7));
+> > +		__asm__ __volatile__("mov %0, r8" : "=r"(newregs->ARM_r8));
+> > +		__asm__ __volatile__("mov %0, r9" : "=r"(newregs->ARM_r9));
+> > +		__asm__ __volatile__("mov %0, r10" : "=r"(newregs->ARM_r10));
+> > +		__asm__ __volatile__("mov %0, r11" : "=r"(newregs->ARM_fp));
+> > +		__asm__ __volatile__("mov %0, r12" : "=r"(newregs->ARM_ip));
+> > +		__asm__ __volatile__("mov %0, r13" : "=r"(newregs->ARM_sp));
+> > +		__asm__ __volatile__("mov %0, r14" : "=r"(newregs->ARM_lr));
+> > +		__asm__ __volatile__("mov %0, r15" : "=r"(newregs->ARM_pc));
+> > + 		__asm__ __volatile__("mrs %0, cpsr" : "=r"(newregs->ARM_cpsr));
 > 
-> 		} else {
-> 			if (b->safe...) {
-> 				...
-> 			}
-> 		}
+> How is whatever follows on supposed to work back from this state?  It's
+> entirely possible that the compiler will generate a load of asm between
+> each __asm__ statement corrupting the registers - and you can't save
+> all this state without having one register storing the 'newregs'
+> pointer.
+
+Yeah. I'll have to admit that this is copied from other archs. For example in
+x86 they do similar. Anyway I think that it is not necessary to get these
+exactly correct because what we are really interested are the frames before, e.g
+where the crash happened.
+
+> It'd probably be better to do something like:
 > 
-> or format it as:
+> 	__asm__ __volatile__("stmia %0, {r0 - r15}" : : "r" (&newregs->ARM_r0));
+> 	__asm__ __volatile__("mrs %0, cpsr" : "=r" (newregs->ARM_cpsr));
 > 
-> 		} else if (b->safe...) {
-> 			...
-> 		}
+> instead, which should mean only one register is (potentially) corrupted.
+> However, I still think you're going to have problems knowing what's in
+> each register.
 
-ok, here's the fixed patch.
+Thanks. I think we can live with one register corrupted (unless someone has
+better aproach for this). I'll use this in the next revision of the patches.
 
-=
-From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-
-Some network drivers do a partial sync with
-dma_sync_single_for_{device|cpu}. The dma_addr argument might not be
-the same as one as passed into the mapping API.
-
-This adds some tricks to find_safe_buffer() for
-dma_sync_single_for_{device|cpu}.
-
-Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
----
- arch/arm/common/dmabounce.c |   30 +++++++++++++++++++++---------
- 1 files changed, 21 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index cc0a932..2e6deec 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -163,7 +163,8 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
- 
- /* determine if a buffer is from our "safe" pool */
- static inline struct safe_buffer *
--find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_addr)
-+find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_addr,
-+		 int for_sync)
- {
- 	struct safe_buffer *b, *rb = NULL;
- 	unsigned long flags;
-@@ -171,9 +172,17 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
- 	read_lock_irqsave(&device_info->lock, flags);
- 
- 	list_for_each_entry(b, &device_info->safe_buffers, node)
--		if (b->safe_dma_addr == safe_dma_addr) {
--			rb = b;
--			break;
-+		if (for_sync) {
-+			if (b->safe_dma_addr <= safe_dma_addr &&
-+			    safe_dma_addr < b->safe_dma_addr + b->size) {
-+				rb = b;
-+				break;
-+			}
-+		} else {
-+			if (b->safe_dma_addr == safe_dma_addr) {
-+				rb = b;
-+				break;
-+			}
- 		}
- 
- 	read_unlock_irqrestore(&device_info->lock, flags);
-@@ -205,7 +214,8 @@ free_safe_buffer(struct dmabounce_device_info *device_info, struct safe_buffer *
- /* ************************************************** */
- 
- static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
--		dma_addr_t dma_addr, const char *where)
-+						dma_addr_t dma_addr, const char *where,
-+						int for_sync)
- {
- 	if (!dev || !dev->archdata.dmabounce)
- 		return NULL;
-@@ -216,7 +226,7 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
- 			pr_err("unknown device: Trying to %s invalid mapping\n", where);
- 		return NULL;
- 	}
--	return find_safe_buffer(dev->archdata.dmabounce, dma_addr);
-+	return find_safe_buffer(dev->archdata.dmabounce, dma_addr, for_sync);
- }
- 
- static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
-@@ -286,7 +296,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
- 		size_t size, enum dma_data_direction dir)
- {
--	struct safe_buffer *buf = find_safe_buffer_dev(dev, dma_addr, "unmap");
-+	struct safe_buffer *buf = find_safe_buffer_dev(dev, dma_addr, "unmap", 0);
- 
- 	if (buf) {
- 		BUG_ON(buf->size != size);
-@@ -398,7 +408,7 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
- 		__func__, addr, off, sz, dir);
- 
--	buf = find_safe_buffer_dev(dev, addr, __func__);
-+	buf = find_safe_buffer_dev(dev, addr, __func__, 1);
- 	if (!buf)
- 		return 1;
- 
-@@ -411,6 +421,8 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
- 
- 	if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) {
-+		if (addr != buf->safe_dma_addr)
-+			off = addr - buf->safe_dma_addr;
- 		dev_dbg(dev, "%s: copy back safe %p to unsafe %p size %d\n",
- 			__func__, buf->safe + off, buf->ptr + off, sz);
- 		memcpy(buf->ptr + off, buf->safe + off, sz);
-@@ -427,7 +439,7 @@ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
- 		__func__, addr, off, sz, dir);
- 
--	buf = find_safe_buffer_dev(dev, addr, __func__);
-+	buf = find_safe_buffer_dev(dev, addr, __func__, 1);
- 	if (!buf)
- 		return 1;
- 
--- 
-1.6.5
+Regards,
+MW
