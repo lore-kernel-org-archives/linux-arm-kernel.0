@@ -1,216 +1,70 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 13 Apr 2010 20:11:37 +0200
-Subject: [PATCH] ARM: mx3/lilly1131: add USB support
-In-Reply-To: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
-References: <1271181961-27844-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1271182297-27984-1-git-send-email-daniel@caiaq.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Apr 2010 19:57:46 +0100
+Subject: Query on direction_output fn of PL061 GPIO driver.
+In-Reply-To: <20100413115321.GB2212@tarshish>
+References: <4BC44C7E.20306@st.com> <20100413113237.GA2212@tarshish>
+	<4BC45839.1080902@st.com> <20100413115321.GB2212@tarshish>
+Message-ID: <20100413185746.GA6289@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
+On Tue, Apr 13, 2010 at 02:53:21PM +0300, Baruch Siach wrote:
+> Hi Viresh,
+> 
+> On Tue, Apr 13, 2010 at 05:10:41PM +0530, Viresh KUMAR wrote:
+> > On 4/13/2010 5:02 PM, Baruch Siach wrote:
+> > >> > In current implementation, firstly value of GPIO pin is modified and then its
+> > >> > direction is set to OUT. In our SOCs (ST SPEAr), this implementation doesn't
+> > >> > work correctly (we have pl061 in our soc). Suppose previously pin is in IN mode,
+> > >> > now writing val to it doesn't change anything because it is in IN mode and we
+> > >> > can write to a pin only when it is in OUT mode. Now if its direction is
+> > >> > changed to OUT then also its value will remain same and will not be changed to
+> > >> > what we wanted.
+> > >> > 
+> > >> > Am i missing something?
+> > > Probably not. This is a design bug in the PL061 hardware. Changing the 
+> > > direction before the value makes the output value of the GPIO undefined 
+> > > (apparently 0) for a short period of time. This is bad news for some 
+> > > applications.
+> > > 
+> > 
+> > thanks for your prompt reply.
+> > Ok. so this may cause problem on the board. 
+> > Anyway if this is the issue, then writing value to val register has no effects.
+> > 
+> > > Anyway, the right thing to do here is to reverse do just that, since the 
+> > > current way of doing things is broken.
+> > 
+> > I didn't get it completely. If i got it correctly, maybe myself or you can just
+> > send a patch to reverse this, i.e. writing val and setting direction.
+> > Am i correct?
+> 
+> Correct. Please send a patch, and I'll ack it after review. Make sure to test 
+> the patch before sending. I don't have access to this hardware anymore.  
+> Estimating the length of the jitter on your platform (when switching direction 
+> and value) would be even better. Please explain the issue and the jitter 
+> problem in your commit log.
 
-Another version with "select MXC_ULPI if USB_ULPI"
+I've had this patch floating around for some time to resolve this issue;
+though I wasn't sure if it was just a bug in the Realview board I had.
 
- arch/arm/mach-mx3/Kconfig          |    1 +
- arch/arm/mach-mx3/mach-mx31lilly.c |  145 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 146 insertions(+), 0 deletions(-)
+GPIO: Fix PL061 GPIO direction_output to set output level
 
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 3872af1..bc71de3 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -73,6 +73,7 @@ config MACH_MX31MOBOARD
- config MACH_MX31LILLY
- 	bool "Support MX31 LILLY-1131 platforms (INCO startec)"
- 	select ARCH_MX31
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for mx31 based LILLY1131 modules. This includes
- 	  specific configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
-index 80847b0..d3d5877 100644
---- a/arch/arm/mach-mx3/mach-mx31lilly.c
-+++ b/arch/arm/mach-mx3/mach-mx31lilly.c
-@@ -27,12 +27,15 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/clk.h>
-+#include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/smsc911x.h>
- #include <linux/mtd/physmap.h>
- #include <linux/spi/spi.h>
- #include <linux/mfd/mc13783.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
+PL061 hardware does not allow setting the output level prior to
+changing the direction to output; we have to set the level after
+changing the direction.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
+index aa8e7cb..cac9c0c 100644
+--- a/drivers/gpio/pl061.c
++++ b/drivers/gpio/pl061.c
+@@ -90,6 +90,7 @@ static int pl061_direction_output(struct gpio_chip *gc, unsigned offset,
+ 	gpiodir = readb(chip->base + GPIODIR);
+ 	gpiodir |= 1 << offset;
+ 	writeb(gpiodir, chip->base + GPIODIR);
++	writeb(!!value << offset, chip->base + (1 << (offset + 2)));
+ 	spin_unlock_irqrestore(&chip->lock, flags);
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -44,6 +47,8 @@
- #include <mach/iomux-mx3.h>
- #include <mach/board-mx31lilly.h>
- #include <mach/spi.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
- 
- #include "devices.h"
- 
-@@ -108,6 +113,137 @@ static struct platform_device physmap_flash_device = {
- 	.num_resources = 1,
- };
- 
-+/* USB */
-+
-+#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
-+			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+
-+static int usbotg_init(struct platform_device *pdev)
-+{
-+	unsigned int pins[] = {
-+		MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
-+		MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
-+		MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
-+		MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
-+		MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
-+		MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
-+		MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
-+		MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
-+		MX31_PIN_USBOTG_CLK__USBOTG_CLK,
-+		MX31_PIN_USBOTG_DIR__USBOTG_DIR,
-+		MX31_PIN_USBOTG_NXT__USBOTG_NXT,
-+		MX31_PIN_USBOTG_STP__USBOTG_STP,
-+	};
-+
-+	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB OTG");
-+
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_USB_4WIRE, true);
-+	mxc_iomux_set_gpr(MUX_PGP_USB_COMMON, true);
-+
-+	/* chip select */
-+	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE2, IOMUX_CONFIG_GPIO),
-+				"USBOTG_CS");
-+	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), "USBH1 CS");
-+	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), 0);
-+
-+	return 0;
-+}
-+
-+static int usbh1_init(struct platform_device *pdev)
-+{
-+	int pins[] = {
-+		MX31_PIN_CSPI1_MOSI__USBH1_RXDM,
-+		MX31_PIN_CSPI1_MISO__USBH1_RXDP,
-+		MX31_PIN_CSPI1_SS0__USBH1_TXDM,
-+		MX31_PIN_CSPI1_SS1__USBH1_TXDP,
-+		MX31_PIN_CSPI1_SS2__USBH1_RCV,
-+		MX31_PIN_CSPI1_SCLK__USBH1_OEB,
-+		MX31_PIN_CSPI1_SPI_RDY__USBH1_FS,
-+	};
-+
-+	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H1");
-+
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_MOSI, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_MISO, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS2, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_SCLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_CSPI1_SPI_RDY, USB_PAD_CFG);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_USB_SUSPEND, true);
-+
-+	return 0;
-+}
-+
-+static int usbh2_init(struct platform_device *pdev)
-+{
-+	int pins[] = {
-+		MX31_PIN_USBH2_DATA0__USBH2_DATA0,
-+		MX31_PIN_USBH2_DATA1__USBH2_DATA1,
-+		MX31_PIN_USBH2_CLK__USBH2_CLK,
-+		MX31_PIN_USBH2_DIR__USBH2_DIR,
-+		MX31_PIN_USBH2_NXT__USBH2_NXT,
-+		MX31_PIN_USBH2_STP__USBH2_STP,
-+	};
-+
-+	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H2");
-+
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
-+
-+	/* chip select */
-+	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
-+				"USBH2_CS");
-+	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), "USBH2 CS");
-+	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), 0);
-+
-+	return 0;
-+}
-+
-+static struct mxc_usbh_platform_data usbotg_pdata = {
-+	.init	= usbotg_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
-+};
-+
-+static struct mxc_usbh_platform_data usbh1_pdata = {
-+	.init	= usbh1_init,
-+	.portsc	= MXC_EHCI_MODE_UTMI | MXC_EHCI_SERIAL,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_SINGLE_UNI,
-+};
-+
-+static struct mxc_usbh_platform_data usbh2_pdata = {
-+	.init	= usbh2_init,
-+	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
-+};
-+
- static struct platform_device *devices[] __initdata = {
- 	&smsc91x_device,
- 	&physmap_flash_device,
-@@ -183,6 +319,15 @@ static void __init mx31lilly_board_init(void)
- 	spi_register_board_info(&mc13783_dev, 1);
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-+
-+	/* USB */
-+	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+
-+	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
-+	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- }
- 
- static void __init mx31lilly_timer_init(void)
--- 
-1.7.0.3
+ 	return 0;
