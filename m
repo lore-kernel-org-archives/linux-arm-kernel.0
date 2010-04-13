@@ -1,109 +1,43 @@
-From: zero@colonel-panic.org (Peter Horton)
-Date: Tue, 13 Apr 2010 09:31:50 +0100
-Subject: [PATCH] Fix AT91SAM9G20 reset
-Message-ID: <20100413083150.GA6620@turtle.localnet>
+From: al@alarsen.net (Anders Larsen)
+Date: Tue, 13 Apr 2010 10:46:50 +0200
+Subject: [PATCH 2/2] AT91 slow-clock resume: don't restore the PLL
+	settings when the PLL was off
+In-Reply-To: <w2ocd73a99e1004130114g1e46ed2blbcfeef1c9cec0001@mail.gmail.com>
+References: <w2ocd73a99e1004130114g1e46ed2blbcfeef1c9cec0001@mail.gmail.com>
+Message-ID: <1271148410l.25331l.4l@i-dmzi_al.realan.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix AT91SAM9G20 reset as per the errata in the data sheet.
+Hi Andrew,
 
-If the SDRAM is not cleanly shutdown before reset it can be left driving
-the bus, which then stops the bootloader booting from NAND.
+On 2010-04-13 10:14:53, Andrew Victor wrote:
+> > + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ?0xff0000)
+> > + ? ? ? bne ? ? 1f
+> > + ? ? ? tst ? ? r3, #(AT91_PMC_MUL & ~0xff0000)
+> > + ? ? ? beq ? ? 2f
+> > +1:
+> > ? ? ? ?wait_pllblock
+> > +2:
+> 
+> AT91_PMC_MUL is 11 bits (so 0x7ff0000)
 
-Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
---
+it's not possible to use that constant directly; there are too many bits
+set (the ARM instruction set has room for an 8-bit constant and a shift
+value)...
 
-Index: linux-2.6.32/arch/arm/mach-at91/Makefile
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-15 09:53:27.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-15 09:53:27.000000000 +0000
-@@ -16,7 +16,7 @@
- obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
-+obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o at91sam9g20_reset.o
-  obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-15 09:53:27.000000000 +0000
-@@ -25,6 +25,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9g20_reset(void);
-+
- static struct map_desc at91sam9260_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -327,7 +329,11 @@
- 	else
- 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
- 
--	at91_arch_reset = at91sam9260_reset;
-+	if (cpu_is_at91sam9g20())
-+		at91_arch_reset = at91sam9g20_reset;
-+	else
-+		at91_arch_reset = at91sam9260_reset;
-+
- 	pm_power_off = at91sam9260_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-15 09:55:17.000000000 +0000
-@@ -0,0 +1,50 @@
-+/*
-+ * (C) BitBox Ltd 2009
-+ *
-+ * reset AT91SAM9G20 as per errata
-+ *
-+ * unless the SDRAM is cleanly shutdown before we hit the
-+ * reset register it can be left driving the data bus and
-+ * killing the chance of a subsequent boot from NAND
-+ */
-+
-+#define CP15_CR_I			(1 << 12)
-+
-+#define SYS_VIRT_OFS			(-0x01000000)
-+
-+#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
-+#define  SDRAMC_TR			0x0004
-+#define  SDRAMC_LPR			0x0010
-+#define   SDRAMC_LPCB_POWER_DOWN	2
-+
-+#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
-+#define  RSTC_CR			0x0000
-+#define   RSTC_PROCRST			(1 << 0)
-+#define   RSTC_PERRST			(1 << 2)
-+#define   RSTC_KEY			(0xa5 << 24)
-+
-+			.arm
-+
-+			.globl	at91sam9g20_reset
-+
-+at91sam9g20_reset:	mov	r0, #0
-+			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
-+
-+			mrc	p15, 0, r0, c1, c0, 0
-+			orr	r0, r0, #CP15_CR_I
-+			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
-+
-+			ldr	r0, =SDRAMC_BASE	@ preload constants
-+			ldr	r1, =RSTC_BASE
-+
-+			mov	r2, #1
-+			mov	r3, #SDRAMC_LPCB_POWER_DOWN
-+			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
-+
-+			.balign	32			@ align to cache line
-+
-+			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
-+			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
-+			str	r4, [r1, #RSTC_CR]	@ reset processor
-+
-+			b	.
+> Is the mask (0xff0000) correct in the above code?
+> It looks like wait_pllblock will be skipped if the MUL field is set to
+> 0x100, 0x200, 0x300, etc.
+
+...so I made the test a two-step process; the first 'tst' checks if
+the bits masked by (AT91_PMC_MUL & 0xff0000) = 0x00ff0000 are all zero,
+the second 'tst' checks if the bits masked by
+(AT91_PMC_MUL & ~0xff0000) = 0x07000000 are zero, so all 11 bits are
+indeed tested.
+
+There might well be an easier way to do this, but I didn't manage to
+find it - the code isn't on a hot path anyway (it's executed _once_ upon
+resume after suspend).
+
+Cheers
+Anders
