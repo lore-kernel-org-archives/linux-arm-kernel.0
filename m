@@ -1,35 +1,75 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Wed, 14 Apr 2010 20:18:19 +0100
-Subject: [PATCH] pxa: make it clear by converting MMC 'delay_detect' to
-	millisecond
-In-Reply-To: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
-References: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
-Message-ID: <20100414201819.5ea440fc@taxman.wild-wind.fr.eu.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 14 Apr 2010 15:40:02 -0700
+Subject: [PATCH 05/11] ARM: add generic PrimeCell interface to COH 901 318
+	v5
+In-Reply-To: <1270681973-5763-1-git-send-email-linus.walleij@stericsson.com>
+References: <1270681973-5763-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <r2re9c3a7c21004141540o90fcbb07ja92dffcd71364f8b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Apr 2010 07:08:13 +0800
-Eric Miao <eric.y.miao@gmail.com> wrote:
+Hi Linus,
 
-> commit 4db1d6645934f49806bd1b49ae4c4176e9b7c843
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Wed Apr 14 07:00:42 2010 +0800
-> 
->     [ARM] pxa: make it clear by converting MMC 'delay_detect' to millisecond
-> 
->     delay_detect in HZ is confusing, convert it to be millisecond based. And
->     thus remove those unnecessary call to msecs_to_jiffies() at runtime for
->     this field. Other constants are converted assuming HZ == 100, which are
->     basically true for those platforms.
-> 
->     The assignment in csb726.c was incorrect, and is fixed in this patch as
->     a result.
-> 
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+On Wed, Apr 7, 2010 at 4:12 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> This extends the DMA engine driver for the COH 901 318 used in the
+> U300 platform with the generic PrimeCell interface.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> ?drivers/dma/coh901318.c ? ? | ?146 +++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/dma/coh901318_lli.c | ? 78 ++++++++++++++++++++++-
+> ?2 files changed, 221 insertions(+), 3 deletions(-)
+>
+[..]
+> diff --git a/drivers/dma/coh901318_lli.c b/drivers/dma/coh901318_lli.c
+> index 9f7e0e6..f37db49 100644
+> --- a/drivers/dma/coh901318_lli.c
+> +++ b/drivers/dma/coh901318_lli.c
+> @@ -153,6 +153,39 @@ coh901318_lli_fill_memcpy(struct coh901318_pool *pool,
+> ? ? ? ?lli->src_addr = src;
+> ? ? ? ?lli->dst_addr = dst;
+>
+> + ? ? ? /*
+> + ? ? ? ?* The DMA hardware will increase its pointer by 1,
+> + ? ? ? ?* 2 or 4 bytes at a time depending on configuration.
+> + ? ? ? ?* If using som oddly-aligned buffer this will cause
 
-For the Zeus part:
-Acked-by: Marc Zyngier <maz@misterjones.org>
+s/som/some/
 
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+> + ? ? ? ?* performance problems.
+> + ? ? ? ?*/
+> +#if 0
+> + ? ? ? ctrl_chained &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
+> + ? ? ? ctrl_eom &= ~COH901318_CX_CTRL_SRC_BUS_SIZE_MASK;
+> + ? ? ? ctrl_chained &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
+> + ? ? ? ctrl_eom &= ~COH901318_CX_CTRL_DST_BUS_SIZE_MASK;
+> + ? ? ? if (src & 0x01) {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_8_BITS;
+> + ? ? ? } else if (src & 0x02) {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_16_BITS;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS;
+> + ? ? ? }
+> + ? ? ? if (dst & 0x01) {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_8_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_SRC_DST_SIZE_8_BITS;
+> + ? ? ? } else if (dst & 0x02) {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_DST_BUS_SIZE_16_BITS;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? ctrl_chained |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
+> + ? ? ? ? ? ? ? ctrl_eom |= COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS;
+> + ? ? ? }
+> +#endif
+
+It looks like this bit twiddling code is duplicated three times.  Can
+it be moved to a static inline in a header file and hide the #if 0
+there as well.  I assume you want it for documentation purposes in
+case someone in the future has an unaligned usage model?
+
+--
+Dan
