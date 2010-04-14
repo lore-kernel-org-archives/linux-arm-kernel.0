@@ -1,47 +1,44 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 14 Apr 2010 17:34:22 +1000
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100409111105.GA2804@n2100.arm.linux.org.uk>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100408153111.GA2598@debian>
-	<20100408182715.GF31407@n2100.arm.linux.org.uk>
-	<20100409111105.GA2804@n2100.arm.linux.org.uk>
-Message-ID: <1271230462.13059.142.camel@pasglop>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Apr 2010 09:37:39 +0200
+Subject: [PATCH 2.6.34-rc4 1/8] mx5: Add registration of GPIOs for MX51
+	Babbage board.
+In-Reply-To: <20100414073138.GZ30801@buzzloop.caiaq.de>
+References: <1271175030-3635-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20100413164532.GM30801@buzzloop.caiaq.de>
+	<86A0E76937111F4C92FABEC0A2098851046C7A62@az33exm21>
+	<20100414065131.GD7882@pengutronix.de>
+	<20100414073138.GZ30801@buzzloop.caiaq.de>
+Message-ID: <20100414073739.GH7882@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-04-09 at 12:11 +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 08, 2010 at 07:27:15PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 08, 2010 at 09:02:56PM +0530, Rabin Vincent wrote:
-> > > On Thu, Mar 25, 2010 at 11:32:48PM +0000, Russell King - ARM Linux wrote:
-> > > > The patch below is the combined patch; individual patches can be found
-> > > > in the arm:lmb patches on the website or the lmb branch of my git tree;
-> > > > this should be considered unstable.
+On Wed, Apr 14, 2010 at 09:31:38AM +0200, Daniel Mack wrote:
+> On Wed, Apr 14, 2010 at 08:51:31AM +0200, Sascha Hauer wrote:
+> > On Tue, Apr 13, 2010 at 12:36:07PM -0700, Nguyen Dinh-R00091 wrote:
+> > > > +
+> > > > +#ifdef MXC_GPIO_SPLIT_IRQ_2
 > > > 
-> > > Something like the following is needed to make initrds work after this
-> > > patch:
+> > > Where is that macro defined?
+> > > [Dinh-FSL] - This macro is optional so that the interrupts can be broken
+> > > up into 2 sets.
 > > 
-> > This to me looks like a very large patch for what is a small problem -
-> > that is the assignment of initrd_start/initrd_size got lost along the
-> > way.
+> > What's the purpose of doing so?
 > > 
-> > I'd much rather have the smaller patch; keep the initrd parameters in
-> > the physical address space for as long as possible, and only convert
-> > them to the virtual address space once we've finished mm initialisation.
+> > Such compile time depencies are not a good idea since the board may want
+> > to decide whether to split the interrupts or not. Note that we support
+> > kernels for more than one board.
 > 
-> Here's a revised version which should resolve the initrd problem.
+> And I would have expected at least one active user. As it stands, it's
+> just dead code.
 
-BTW. I'm doing some cleanup of lmb, you can take a peek at my WIP in
-git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc.git branch
-"lmb".
+Ack, this should be removed. Anyone wanting this code will send a
+seperate patch and can explain what and why he wants to do.
 
-It shouldn't break your stuff, though you will probably need to add a
-call to lmb_set_current_limit() in the right place instead of setting
-LMB_REAL_LIMIT to lowmem_end_addr.
+Sascha
 
-Anyway, it's still WIP, but feel free to comment, and if there's
-something else you want me to do, cleanup or change in the core LMB, let
-me know.
 
-Cheers,
-Ben.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
