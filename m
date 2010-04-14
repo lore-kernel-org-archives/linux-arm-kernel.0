@@ -1,52 +1,29 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 14 Apr 2010 18:03:10 +0300
-Subject: [PATCH 1/2] [ARM] pxa: add minimal ULPI functionality for USB
-	host port 2 on PXA310.
-In-Reply-To: <q2of17812d71004131547n8a2384b5ta345e70997017acb@mail.gmail.com>
-References: <cover.1270651775.git.grinberg@compulab.co.il>
-	<fa93111b71cf1e43eef23869466072be4db67bcd.1270651775.git.grinberg@compulab.co.il>
-	<20100413220642.GW30801@buzzloop.caiaq.de>
-	<q2of17812d71004131547n8a2384b5ta345e70997017acb@mail.gmail.com>
-Message-ID: <4BC5D92E.7060408@compulab.co.il>
+From: cd2436@columbia.edu (Christoffer Dall)
+Date: Wed, 14 Apr 2010 17:29:07 +0200
+Subject: cache problems with mmap'ed data structure in KVM
+Message-ID: <q2p7d08b87d1004140829m9fc9bc6vab970f7c2e45aa0c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When booting a guest on an arm1136 physical cpu using my KVM
+implementation (https://wiki.ncl.cs.columbia.edu/wiki/index.php/AndroidVirt:MainPage),
+I get some distorted output in QEMU, which performs device emulation
+for the kernel and thereby emulates a pl011 serial device.
 
+QEMU shares a data structure with the kernel by mmap'ing a file
+descriptor like this:
+  env->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
+MAP_SHARED, env->kvm_fd, 0);
 
-On 04/14/10 01:47, Eric Miao wrote:
-> On Wed, Apr 14, 2010 at 6:06 AM, Daniel Mack <daniel@caiaq.de> wrote:
->   
->> On Wed, Apr 07, 2010 at 06:05:22PM +0300, Igor Grinberg wrote:
->>     
->>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
->>> ---
->>>  arch/arm/mach-pxa/Makefile      |    1 +
->>>  arch/arm/mach-pxa/pxa310-ulpi.c |  240 +++++++++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-pxa/pxa310-ulpi.h |   85 ++++++++++++++
->>>  3 files changed, 326 insertions(+), 0 deletions(-)
->>>  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
->>>  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.h
->>>       
->> The USB OTG/ULPI framework could well be reused for that I think. All
->> that you would need is a struct otg_io_access_ops with two function
->> pointers to read and write registers. Then you can use otg_ulpi_create()
->> to set up an ULPI compliant device connected to the bus.
->>
->>     
-> Right, that's what I'm thinking as well esp. since ULPI is a standard
-> (ok, kinds of) and I'm not seeing too much specialty of pxa3xx ULPI
-> except for the way to access registers. Cannot remember the detail
-> but the OTG might be a hybrid model on pxa310, and might be a
-> little bit different from others.
->
->   
-Eric, Daniel,
+The problem arises when the kernel writes to this data structure using
+the kernel virtual addresses. The data does not seem to be
+synchronized to the user space application reads.
 
-Thanks for the comments.
-So, the only right way is to patch OHCI to support the
-otg_io_access_ops, isn't it?
-Ok. I'll send a v2 in a couple of days.
+I'm guessing that I need to initiate a cache writeback on the kernel
+side and a re-read on the user space side, but I'm unsure what the
+right way to go about it is.
 
-Thanks,
-Igor
+Any help will be greatly (!) appreciated.
+
+Thank you,
+Christoffer Dall
