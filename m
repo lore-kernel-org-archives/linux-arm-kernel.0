@@ -1,29 +1,61 @@
-From: cd2436@columbia.edu (Christoffer Dall)
-Date: Wed, 14 Apr 2010 17:29:07 +0200
-Subject: cache problems with mmap'ed data structure in KVM
-Message-ID: <q2p7d08b87d1004140829m9fc9bc6vab970f7c2e45aa0c@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Wed, 14 Apr 2010 19:37:29 +0400
+Subject: [PATCH v3 0/3] Support for Cavium Networks CNS3xxx machines
+In-Reply-To: <20100330190216.GA7611@oksana.dev.rtsoft.ru>
+References: <20100330190216.GA7611@oksana.dev.rtsoft.ru>
+Message-ID: <20100414153729.GA20979@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a guest on an arm1136 physical cpu using my KVM
-implementation (https://wiki.ncl.cs.columbia.edu/wiki/index.php/AndroidVirt:MainPage),
-I get some distorted output in QEMU, which performs device emulation
-for the kernel and thereby emulates a pl011 serial device.
+Hello,
 
-QEMU shares a data structure with the kernel by mmap'ing a file
-descriptor like this:
-  env->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
-MAP_SHARED, env->kvm_fd, 0);
+On Tue, Mar 30, 2010 at 11:02:16PM +0400, Anton Vorontsov wrote:
+> v3 is on the way...
 
-The problem arises when the kernel writes to this data structure using
-the kernel virtual addresses. The data does not seem to be
-synchronized to the user space application reads.
+Russell, does this look OK to you?
 
-I'm guessing that I need to initiate a cache writeback on the kernel
-side and a re-read on the user space side, but I'm unsure what the
-right way to go about it is.
+If so, I'll wait for the next mach-types update, and then will
+ask you to pull the cns3xxx tree (or I can submit these patches
+via the patch tracker if you prefer that).
 
-Any help will be greatly (!) appreciated.
+Oh, and can you please take a look at these two as well:
 
-Thank you,
-Christoffer Dall
+[PATCH] ARM: Add support for PCI domains
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012461.html
+[PATCH] ARM: cns3xxx: Add support for PCI Express ports
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012462.html
+
+Thanks!
+
+> Changes since v2:
+> 
+> - We noticed that timer2 (which was used as a clock source) causes
+>   nanosleep system call to misbehave. Until debugged, the timer2
+>   support is removed.
+> 
+>   It's fine since timer1 is still used as a clockevent, and provides
+>   all needed timekeeping functionality. With these patches we want
+>   a minimal (but rock solid) CNS3xxx support, all non-essential
+>   features can wait.
+> 
+>   I.e. support for the second timer can be added as a separate
+>   patch.
+> 
+> - Updated some PCIe register definitions to make PCIe integration
+>   more smooth.
+> 
+> - Updated defconfig.
+> 
+> Changes since v1:
+> 
+> - Addressed Russell's comments;
+> - CNS3420VB board support split into its own patch per Sergei's
+>   comment;
+> - This series no longer include AHCI and SDHCI patches. Because of
+>   dependencies on other trees they aren't yet suitable for inclusion,
+>   so no need to repost them again.
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
