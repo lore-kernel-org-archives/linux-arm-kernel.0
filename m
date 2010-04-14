@@ -1,35 +1,45 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 15 Apr 2010 01:32:59 +0800
-Subject: [PATCH] pxa: make it clear by converting MMC 'delay_detect' to
-	millisecond
-In-Reply-To: <87hbne7xmo.fsf@free.fr>
-References: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
-	<87hbne7xmo.fsf@free.fr>
-Message-ID: <u2rf17812d71004141032t66d1658fn7a30787395f8bd76@mail.gmail.com>
+Date: Thu, 15 Apr 2010 01:49:03 +0800
+Subject: [PATCH 2/2] arm: invalidate TLBs when enabling mmu
+In-Reply-To: <1268153134.1000.14.camel@e102109-lin.cambridge.arm.com>
+References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
+	<1268143623-22361-2-git-send-email-saeed@marvell.com>
+	<1268143623-22361-3-git-send-email-saeed@marvell.com>
+	<1268153134.1000.14.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <s2uf17812d71004141049je7f7b8e5n7d19e89bcaf28fc4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 15, 2010 at 1:27 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Eric Miao <eric.y.miao@gmail.com> writes:
+On Wed, Mar 10, 2010 at 12:45 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, 2010-03-09 at 14:07 +0000, Saeed Bishara wrote:
+>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+>> ---
+>> ?arch/arm/boot/compressed/head.S | ? ?1 +
+>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S
+>> b/arch/arm/boot/compressed/head.S
+>> index 4fddc50..a1ab79f 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -489,6 +489,7 @@ __armv7_mmu_cache_on:
+>> ? ? ? ? ? ? ? ? mcr ? ? p15, 0, r0, c1, c0, 0 ? @ load control
+>> register
+>> ? ? ? ? ? ? ? ? mrc ? ? p15, 0, r0, c1, c0, 0 ? @ and read it back
+>> ? ? ? ? ? ? ? ? mov ? ? r0, #0
+>> + ? ? ? ? ? ? ? mcr ? ? p15, 0, r0, c8, c7, 0 ? @ invalidate I,D TLBs
+>> ? ? ? ? ? ? ? ? mcr ? ? p15, 0, r0, c7, c5, 4 ? @ ISB
+>> ? ? ? ? ? ? ? ? mov ? ? pc, r12
 >
->> commit 4db1d6645934f49806bd1b49ae4c4176e9b7c843
->> Author: Eric Miao <eric.y.miao@gmail.com>
->> Date: ? Wed Apr 14 07:00:42 2010 +0800
->>
->> ? ? [ARM] pxa: make it clear by converting MMC 'delay_detect' to millisecond
->>
->> ? ? delay_detect in HZ is confusing, convert it to be millisecond based. And
->> ? ? thus remove those unnecessary call to msecs_to_jiffies() at runtime for
->> ? ? this field. Other constants are converted assuming HZ == 100, which are
->> ? ? basically true for those platforms.
->>
->> ? ? The assignment in csb726.c was incorrect, and is fixed in this patch as
->> ? ? a result.
->>
->> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->
-> For mioa701 part, please find my :
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> The TLB invalidating is done earlier in the __armv7_mmu_cache_on
+> function, why do you need to do it again?
 >
 
-Thanks, Robert.
+Well, the only difference between these two "invalidate"s looks like one is
+before control register load and one after.
+
+We do have the problem of slow decompressing when this invalidate
+change is not there. I do suspect this might be Dove specific. But yet,
+Catalin, could you confirm the behavior difference of "invalidate" before
+and after MMU is actaully turned on?
