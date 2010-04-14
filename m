@@ -1,37 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Apr 2010 11:36:27 +0100
-Subject: [PATCH V2 Resend 05/12] ST SPEAr: Added clock framework for
-	SPEAr platform and machines
-In-Reply-To: <1269506455-15173-6-git-send-email-viresh.kumar@st.com>
-References: <1269506455-15173-1-git-send-email-viresh.kumar@st.com>
-	<1269506455-15173-2-git-send-email-viresh.kumar@st.com>
-	<1269506455-15173-3-git-send-email-viresh.kumar@st.com>
-	<1269506455-15173-4-git-send-email-viresh.kumar@st.com>
-	<1269506455-15173-5-git-send-email-viresh.kumar@st.com>
-	<1269506455-15173-6-git-send-email-viresh.kumar@st.com>
-Message-ID: <20100414103627.GA28940@n2100.arm.linux.org.uk>
+From: linux.melwyn@gmail.com (melwyn lobo)
+Date: Wed, 14 Apr 2010 12:16:56 +0530
+Subject: DMA Engine API performance issues
+In-Reply-To: <p2q121039231004132344pae57964atbd6587f6ed38c471@mail.gmail.com>
+References: <x2i121039231004132342sa230bfd4k832950fce534113f@mail.gmail.com>
+	<p2q121039231004132344pae57964atbd6587f6ed38c471@mail.gmail.com>
+Message-ID: <o2h121039231004132346q558648d5k55ea6f733f4ba871@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 02:10:48PM +0530, Viresh KUMAR wrote:
-> Clock framework for SPEAr is based upon clkdev framework for ARM
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  arch/arm/mach-spear3xx/clock.c               |  389 +++++++++++++++++++++
->  arch/arm/mach-spear3xx/include/mach/clkdev.h |   19 +
->  arch/arm/mach-spear6xx/clock.c               |  483 ++++++++++++++++++++++++++
->  arch/arm/mach-spear6xx/include/mach/clkdev.h |   19 +
->  arch/arm/plat-spear/clock.c                  |  435 +++++++++++++++++++++++
->  arch/arm/plat-spear/include/plat/clkdev.h    |   20 +
->  arch/arm/plat-spear/include/plat/clock.h     |  126 +++++++
->  7 files changed, 1491 insertions(+), 0 deletions(-)
->  create mode 100755 arch/arm/mach-spear3xx/clock.c
->  create mode 100644 arch/arm/mach-spear3xx/include/mach/clkdev.h
->  create mode 100755 arch/arm/mach-spear6xx/clock.c
->  create mode 100644 arch/arm/mach-spear6xx/include/mach/clkdev.h
->  create mode 100755 arch/arm/plat-spear/clock.c
->  create mode 100644 arch/arm/plat-spear/include/plat/clkdev.h
->  create mode 100755 arch/arm/plat-spear/include/plat/clock.h
+Subject edited to allow posting on ARM kernel list
 
-Please ensure that source files do not have the 'executable' bits set.
+On Wed, Apr 14, 2010 at 12:14 PM, melwyn lobo <linux.melwyn@gmail.com> wrote:
+> Forwarding the query also to arm kernel mailiing list.
+>
+> Regards,
+> M.
+>
+>
+> ---------- Forwarded message ----------
+> From: melwyn lobo <linux.melwyn@gmail.com>
+> Date: Wed, Apr 14, 2010 at 12:12 PM
+> Subject: DMA Engine API performance issues
+> To: dan.j.williams at intel.com, linux-arm-kernel at lists.arm.linux.org.uk,
+> linux-kernel at vger.kernel.org
+>
+>
+> Hello Dan,
+> I have some doubts regarding DMA API usage on its clients for example
+> MMC, ALSA, USB etc.
+>
+> I am going to take example of the ALSA framework. Audio data transfer
+> is initiated in soc_pcm_trigger(). This is called in an atomic
+> context,
+> with spinlock held and irqs disabled. Here most drivers enable data
+> transfer from the MSP peripheral to the audio codec via tx_submit
+> implementation
+> of the DMA engine driver. This enqueues the transaction in an active
+> list which calls for using spinlocks with bottom half disabled.
+> It is in this function when spin_unlock_bh() is called the kernel
+> detects irq's disabled and generates a warning.
+> So the workaround here for ALSA drivers would be to use tasklet or
+> workqueues to defer calling this in an interruptible context, which
+> would
+> cause performance problems (the same function soc_pcm_trigger is
+> called for stoppping the transfer) in cases where the stream has to be
+> repeatedly
+> stopped and started.
+>
+> So the core issue is use of spin_unlock_bh in an atomic context.
+> Workaround for removing the warnings would be:
+> 1. Use spin_lock with irqsave and corresponding unlock function which
+> does not generate a warning in a similar situation.
+> ?But this could be futile in one case where the tasklet is scheduled
+> from ksoftirqd which could lead to corruption.
+> ?Also this means the interrupts would be disabled (on the local cpu)
+> till the function executed which is not something
+> ?desirable.
+> 2. Use local_irq_enable() before calling the DMA APIs and disable once
+> done. This is a crude solution and understandably undesirable and
+> dangerous.
+>
+> The DMA Engine framework assumes that the channel interrupt handling
+> is done in a tasklet (dma_run_dependencies), which I believe is the
+> reason for the issue.
+>
+> Regards,
+> M.
+>
