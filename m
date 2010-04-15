@@ -1,40 +1,100 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 15 Apr 2010 09:58:31 +0200
-Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
-In-Reply-To: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
-References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
-Message-ID: <20100415075831.GL30801@buzzloop.caiaq.de>
+From: linux.melwyn@gmail.com (melwyn lobo)
+Date: Thu, 15 Apr 2010 14:43:59 +0530
+Subject: DMA Engine API performance issues
+In-Reply-To: <i2ge9c3a7c21004141708y87d01ab6h94c653e4efa11b8d@mail.gmail.com>
+References: <x2i121039231004132342sa230bfd4k832950fce534113f@mail.gmail.com>
+	<i2ge9c3a7c21004141708y87d01ab6h94c653e4efa11b8d@mail.gmail.com>
+Message-ID: <j2i121039231004150213i76ecc96ahb5d9af96c46b27ae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 14, 2010 at 02:02:47PM -0600, Badguy Badguy wrote:
->  I am attempting to boot the 2.6.33.2 Kernel on the LogicPD LiteKit iMX31.
-> we have a board based on this one, and I am using it and the dev kit with no
-> success.
-> 
-> I see a lot of support in the mainline kernel for this board, is it safe to
-> assume someone is able to boot this board using it?
-> 
-> I am running the lolo bootloader from Logic, version 2.4.0.
-> 
-> I have compiled the kernel using a fairly new ltib environment.
-> 
-> Currently I run 2.6.19.2 from Freescale / Logic with success but now desire
-> to upgrade the kernel to something with better MMC support, I am not stuck
-> on 2.6.33.2 if someone can recommend a newer kernel that has some of the
-> support I desire.
-> 
-> When I attempt to boot the kernel, It hangs and this is my only output:
->  Uncompressing Linux... done, booting the kernel.
+Thanks so much for your explanation.
+OK..Looking at IPU implementation, irq handling is enrtirely in the
+interrupt routine, therefore no need for spin_lock_bh stuff.
+But for lower interrupt latency reasons we need to stick with the
+tasklet handling for processing interrupts.
 
-Ah, one more thing: You need to pass a new variable to the kernel upon
-startup: "mx31lite_baseboard=1". This was done in order to split module
-code from baseboard code.
+We were contemplating another solution for locking at our end for DMA
+implementation
+For locking
+if(irqs_disabled())
+    spin_lock(&chan->lock);
+else
+    spin_lock_bh(&chan->lock);
 
-In case you're using the 2-stage loading mechanism, you need to teach
-this to your first-stage loader.
+for unlocking:
+if(irqs_disabled())
+    spin_unlock(&chan->lock);
+else
+    spin_unlock_bh(&chan->lock);
 
-Also make sure you're downloading the full image to RAM from LoLo. The
-new kernel is certainly bigger than the version you currently use.
+Although this works  fine, but will this be OK when we submit the driver.
 
-Daniel
+Regards,
+M
+
+On Thu, Apr 15, 2010 at 5:38 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Apr 13, 2010 at 11:42 PM, melwyn lobo <linux.melwyn@gmail.com> wrote:
+>> Hello Dan,
+>> I have some doubts regarding DMA API usage on its clients for example
+>> MMC, ALSA, USB etc.
+>>
+>> I am going to take example of the ALSA framework. Audio data transfer
+>> is initiated in soc_pcm_trigger(). This is called in an atomic
+>> context,
+>> with spinlock held and irqs disabled. Here most drivers enable data
+>> transfer from the MSP peripheral to the audio codec via tx_submit
+>> implementation
+>> of the DMA engine driver. This enqueues the transaction in an active
+>> list which calls for using spinlocks with bottom half disabled.
+>> It is in this function when spin_unlock_bh() is called the kernel
+>> detects irq's disabled and generates a warning.
+>> So the workaround here for ALSA drivers would be to use tasklet or
+>> workqueues to defer calling this in an interruptible context, which
+>> would
+>> cause performance problems (the same function soc_pcm_trigger is
+>> called for stoppping the transfer) in cases where the stream has to be
+>> repeatedly
+>> stopped and started.
+>>
+>> So the core issue is use of spin_unlock_bh in an atomic context.
+>> Workaround for removing the warnings would be:
+>> 1. Use spin_lock with irqsave and corresponding unlock function which
+>> does not generate a warning in a similar situation.
+>> ?But this could be futile in one case where the tasklet is scheduled
+>> from ksoftirqd which could lead to corruption.
+>> ?Also this means the interrupts would be disabled (on the local cpu)
+>> till the function executed which is not something
+>> ?desirable.
+>> 2. Use local_irq_enable() before calling the DMA APIs and disable once
+>> done. This is a crude solution and understandably undesirable and
+>> dangerous.
+>>
+>> The DMA Engine framework assumes that the channel interrupt handling
+>> is done in a tasklet (dma_run_dependencies), which I believe is the
+>> reason for the issue.
+>
+> dma_run_dependencies() is only needed in the channel switching case
+> which really only applies to the raid/mem-to-mem usage model (i.e. xor
+> on one channel followed by copy on another). ?In the mem-to-io model
+> you should not need to perform channel switching. ?I suggest following
+> what the other mem-to-io drivers (ipu, dw_dmac, coh...) have
+> implemented with their locks.
+>
+> In general the dmaengine api is meant to provide 1/ a method for
+> matching dma consumers with capable dma devices 2/ a platform agnostic
+> api for issuing mem-to-mem and simple mem-to-io (slave) dma. ?If the
+> current framework provides everything you need, then by all means use
+> it, but you may find there are architecture specific concerns that
+> cannot be supported under the existing mem-to-io model. ?In other
+> words the dmaengine abstraction stops being useful and gets in the way
+> when there are specific architecture considerations beyond simple
+> channel to slave-device associations. ?For example, dw_dmac and ipu
+> are successfully using the dma-slave interface while the PXA folks are
+> sticking with their local dma api.
+>
+> So use it if it simplifies your development more than it complicates it.
+>
+> --
+> Dan
+>
