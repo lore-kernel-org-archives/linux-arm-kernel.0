@@ -1,32 +1,72 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 15 Apr 2010 00:42:07 +0200
-Subject: [PATCH] pxa: make it clear by converting MMC 'delay_detect' to
-	millisecond
-In-Reply-To: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
-References: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
-Message-ID: <201004150042.07772.marek.vasut@gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 14 Apr 2010 17:08:24 -0700
+Subject: DMA Engine API performance issues
+In-Reply-To: <x2i121039231004132342sa230bfd4k832950fce534113f@mail.gmail.com>
+References: <x2i121039231004132342sa230bfd4k832950fce534113f@mail.gmail.com>
+Message-ID: <i2ge9c3a7c21004141708y87d01ab6h94c653e4efa11b8d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 14. dubna 2010 01:08:13 Eric Miao napsal(a):
-> commit 4db1d6645934f49806bd1b49ae4c4176e9b7c843
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Wed Apr 14 07:00:42 2010 +0800
-> 
->     [ARM] pxa: make it clear by converting MMC 'delay_detect' to
-> millisecond
-> 
->     delay_detect in HZ is confusing, convert it to be millisecond based.
-> And thus remove those unnecessary call to msecs_to_jiffies() at runtime
-> for this field. Other constants are converted assuming HZ == 100, which
-> are basically true for those platforms.
-> 
->     The assignment in csb726.c was incorrect, and is fixed in this patch as
->     a result.
-> 
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> 
+On Tue, Apr 13, 2010 at 11:42 PM, melwyn lobo <linux.melwyn@gmail.com> wrote:
+> Hello Dan,
+> I have some doubts regarding DMA API usage on its clients for example
+> MMC, ALSA, USB etc.
+>
+> I am going to take example of the ALSA framework. Audio data transfer
+> is initiated in soc_pcm_trigger(). This is called in an atomic
+> context,
+> with spinlock held and irqs disabled. Here most drivers enable data
+> transfer from the MSP peripheral to the audio codec via tx_submit
+> implementation
+> of the DMA engine driver. This enqueues the transaction in an active
+> list which calls for using spinlocks with bottom half disabled.
+> It is in this function when spin_unlock_bh() is called the kernel
+> detects irq's disabled and generates a warning.
+> So the workaround here for ALSA drivers would be to use tasklet or
+> workqueues to defer calling this in an interruptible context, which
+> would
+> cause performance problems (the same function soc_pcm_trigger is
+> called for stoppping the transfer) in cases where the stream has to be
+> repeatedly
+> stopped and started.
+>
+> So the core issue is use of spin_unlock_bh in an atomic context.
+> Workaround for removing the warnings would be:
+> 1. Use spin_lock with irqsave and corresponding unlock function which
+> does not generate a warning in a similar situation.
+> ?But this could be futile in one case where the tasklet is scheduled
+> from ksoftirqd which could lead to corruption.
+> ?Also this means the interrupts would be disabled (on the local cpu)
+> till the function executed which is not something
+> ?desirable.
+> 2. Use local_irq_enable() before calling the DMA APIs and disable once
+> done. This is a crude solution and understandably undesirable and
+> dangerous.
+>
+> The DMA Engine framework assumes that the channel interrupt handling
+> is done in a tasklet (dma_run_dependencies), which I believe is the
+> reason for the issue.
 
-For Palm*, Voipac270 and ZipitZ2:
+dma_run_dependencies() is only needed in the channel switching case
+which really only applies to the raid/mem-to-mem usage model (i.e. xor
+on one channel followed by copy on another).  In the mem-to-io model
+you should not need to perform channel switching.  I suggest following
+what the other mem-to-io drivers (ipu, dw_dmac, coh...) have
+implemented with their locks.
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+In general the dmaengine api is meant to provide 1/ a method for
+matching dma consumers with capable dma devices 2/ a platform agnostic
+api for issuing mem-to-mem and simple mem-to-io (slave) dma.  If the
+current framework provides everything you need, then by all means use
+it, but you may find there are architecture specific concerns that
+cannot be supported under the existing mem-to-io model.  In other
+words the dmaengine abstraction stops being useful and gets in the way
+when there are specific architecture considerations beyond simple
+channel to slave-device associations.  For example, dw_dmac and ipu
+are successfully using the dma-slave interface while the PXA folks are
+sticking with their local dma api.
+
+So use it if it simplifies your development more than it complicates it.
+
+--
+Dan
