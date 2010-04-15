@@ -1,46 +1,57 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Thu, 15 Apr 2010 13:44:54 -0400
-Subject: [PATCH] ARM: LPC32XX: Update PHY3250 MTD partition info
-Message-ID: <1271353494-13831-1-git-send-email-bengardiner@nanometrics.ca>
+Date: Thu, 15 Apr 2010 13:53:21 -0400
+Subject: [PATCH] ARM: LPC32XX: adding a LPC3XXX machine for backwards
+	compatibility
+Message-ID: <1271354001-14210-1-git-send-email-bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the two other partitions of the phycore3250's nand flash:
-u-boot and the u-boot environment partitions. The former can be useful
-if you are feeling adventurous and would like to upgrade u-boot. The
-later is very useful for userspace utilities like fw_setenv which can
-be used to modify the bootargs for the next reboot or insert many other
-useful scripts.
-
-In addition, adding these partitions brings the mtdblock numbers back
-to what they were with the 2.6.27.8 release of the linux kernel shipped
-with the phycore3250 evm.
+In the previous release of the lpc3250 kernel support -- a patch against
+2.6.27.8 -- the machine type registered was LPC3XXX. This patch proposes
+to enable a compatibiluty machine definition so that existing u-boots
+can use a newer kernel without being re-flashed.
 
 Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
 ---
- arch/arm/mach-lpc32xx/phy3250.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-lpc32xx/Kconfig   |    5 +++++
+ arch/arm/mach-lpc32xx/phy3250.c |   14 ++++++++++++++
+ 2 files changed, 19 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-lpc32xx/Kconfig b/arch/arm/mach-lpc32xx/Kconfig
+index d522922..fade298 100644
+--- a/arch/arm/mach-lpc32xx/Kconfig
++++ b/arch/arm/mach-lpc32xx/Kconfig
+@@ -47,4 +47,9 @@ config ARCH_LPC32XX_HSUART7_SELECT
+ 
+ endmenu
+ 
++config LPC3XXX_COMPAT
++	bool "Define also a LPC3XXX machine"
++	help
++	 Adds also a LPC3XXX machine for backwards compatibility with old u-boot versions.
++
+ endif
 diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index b908d17..2672b63 100644
+index 2672b63..a7d94d7 100644
 --- a/arch/arm/mach-lpc32xx/phy3250.c
 +++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -345,6 +345,16 @@ static int nandwp_enable(int enable)
- #define BLK_SIZE (512 * 32)
- static struct mtd_partition __initdata phy3250_nand_partition[] = {
- 	{
-+		.name	= "phy3250-uboot",
-+		.offset	= 0,
-+		.size	= (BLK_SIZE * 90)
-+	},
-+	{
-+		.name	= "phy3250-ubt-env",
-+		.offset	= (BLK_SIZE * 90),
-+		.size	= (BLK_SIZE * 10)
-+	},
-+	{
- 		.name	= "phy3250-kernel",
- 		.offset	= (BLK_SIZE * 100),
- 		.size	= (BLK_SIZE * 256)
+@@ -569,3 +569,17 @@ MACHINE_START(PHY3250, "Phytec 3250 board with the LPC3250 Microcontroller")
+ 	.timer		= &lpc32xx_timer,
+ 	.init_machine	= phy3250_board_init,
+ MACHINE_END
++
++#ifdef CONFIG_LPC3XXX_COMPAT
++MACHINE_START(LPC3XXX, "Phytec 3250 board with the LPC3250 Microcontroller")
++	/* Maintainer: Kevin Wells, NXP Semiconductors */
++	.phys_io	= LPC32XX_UART5_BASE,
++	.io_pg_offst	= ((IO_ADDRESS(LPC32XX_UART5_BASE))>>18) & 0xfffc,
++	.boot_params	= 0x80000100,
++	.map_io		= lpc32xx_map_io,
++	.init_irq	= lpc32xx_init_irq,
++	.timer		= &lpc32xx_timer,
++	.init_machine	= phy3250_board_init,
++MACHINE_END
++
++#endif
 -- 
 1.6.3.3
