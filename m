@@ -1,63 +1,92 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 15 Apr 2010 20:24:48 +0800
-Subject: [PATCH 2/2] arm: invalidate TLBs when enabling mmu
-In-Reply-To: <l2sf17812d71004150524w1dc68807i323660a42a52958f@mail.gmail.com>
-References: <1268143623-22361-1-git-send-email-saeed@marvell.com>
-	<1268143623-22361-2-git-send-email-saeed@marvell.com>
-	<1268143623-22361-3-git-send-email-saeed@marvell.com>
-	<20100414182726.GB13275@n2100.arm.linux.org.uk>
-	<l2sf17812d71004150524w1dc68807i323660a42a52958f@mail.gmail.com>
-Message-ID: <j2mf17812d71004150524y329c174ckfdd64dd252e0f9db@mail.gmail.com>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Thu, 15 Apr 2010 15:40:39 +0300
+Subject: [RFC 09/10] arm: implement reserve memory early parameter
+In-Reply-To: <20100412210521.GW3048@n2100.arm.linux.org.uk>
+References: <cover.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<9c79bfd3046abe3165a79b6ef10c1938c455fa71.1269854500.git.ext-mika.1.westerberg@nokia.com>
+	<20100412210521.GW3048@n2100.arm.linux.org.uk>
+Message-ID: <20100415124039.GD21896@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 15, 2010 at 8:24 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Apr 15, 2010 at 2:27 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Mar 09, 2010 at 04:07:03PM +0200, Saeed Bishara wrote:
->>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
->>> ---
->>> ?arch/arm/boot/compressed/head.S | ? ?1 +
->>> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
->>> index 4fddc50..a1ab79f 100644
->>> --- a/arch/arm/boot/compressed/head.S
->>> +++ b/arch/arm/boot/compressed/head.S
->>> @@ -489,6 +489,7 @@ __armv7_mmu_cache_on:
->>> ? ? ? ? ? ? ? mcr ? ? p15, 0, r0, c1, c0, 0 ? @ load control register
->>> ? ? ? ? ? ? ? mrc ? ? p15, 0, r0, c1, c0, 0 ? @ and read it back
->>> ? ? ? ? ? ? ? mov ? ? r0, #0
->>> + ? ? ? ? ? ? mcr ? ? p15, 0, r0, c8, c7, 0 ? @ invalidate I,D TLBs
->>> ? ? ? ? ? ? ? mcr ? ? p15, 0, r0, c7, c5, 4 ? @ ISB
->>> ? ? ? ? ? ? ? mov ? ? pc, r12
->>>
->>
->> This can't be unconditional - if we're running on PMSA (iow, uclinux)
->> we should not execute this instruction. ?Notice that the previous one
->> is conditional.
->>
->
-> This is true and needs to be fixed.
->
->> The other question is whether this should be done before or after the
->> ISB - if it's done before, my understanding is that it could occur
->> unordered with respect to the MMU being enabled - if that's indeed
->> the problem.
->>
->
-> Another noticeable difference is the slow decompressing happens so far on
-> kexec only, a normal boot without this additional "invalidate" does not
-> exhibit such slowness. This leads to me to suspect that the MMU state might
-> not be same between a normal bootup and a kexec soft reboot.
->
+On Mon, Apr 12, 2010 at 11:05:21PM +0200, ext Russell King - ARM Linux wrote:
+> On Mon, Mar 29, 2010 at 12:26:35PM +0300, Mika Westerberg wrote:
+> > Implemented mem=size$start early parameter which makes it possible to reserve
+> > some memory from the kernel. This can be used for dump capture kernels to
+> > preserve any memory used by the primary kernel.
+> 
+> Please note that if we move ARM over to LMB, these patches will have to
+> be redone.
+> 
+> However, I'm not sure why this is required - it appears that x86 doesn't
+> require this kind of feature.  Can you explain in more detail how this
+> new parameter format would be used?
 
-BTW: this happens on imx51 as well, so I suspect it's not Marvell dove
-specific.
+Hi,
 
-> I may overlooked, but it looks to me that after a 1:1 mapping of ther user
-> space area (from 0x0000_0000 to TASK_SIZE, which I guess will cause some
-> other issue if the kexec kernel start entry starts beyond TASK_SIZE?), the
-> MMU is NOT actually turned off through the reset. This might cause weird
-> behavior with the original sequence of __armv7_mmu_cache_on ??
->
+I investigated this further and it seems that this is, like you commented, not
+required. It should be enough to pass correct mem=size at start parameter to the
+dump capture kernel.
+
+I have following changes to get kernel linked into different address (in this
+case 0xc2008000):
+	arch/arm/Makefile: 			textofs-y := 0x02008000
+	arch/arm/mach-omap2/Makefile.boot:	zreladdr-y := 0x82008000
+
+Physical memory in this platform starts at 0x80000000.
+
+When I start the kernel with 'mem=32M at 0x82000000' boot fails in very early stage:
+
+[    0.000000] BUG: Bad page state in process swapper  pfn:82000
+[    0.000000] page:c2ac2000 count:0 mapcount:0 mapping:(null) index:0xffffffff
+[    0.000000] page flags: 0x92092(error|dirty|slab|writeback|swapcache|buddy)
+
+Is mem= parameter supposed to work so that I can pass also start address? Now it
+seems to still use hard-coded PHYS_OFFSET etc. Or maybe I'm doing something
+wrong here.
+
+I managed to get this working with following patch but it is probably not
+correct. Any ideas how to get it working properly?
+
+Thanks,
+MW
+
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 4312ee5..7036a2f 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -171,7 +171,8 @@
+  * direct-mapped view.  We assume this is the first page
+  * of RAM in the mem_map as well.
+  */
+-#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
++extern unsigned long phys_pfn_offset;
++#define PHYS_PFN_OFFSET	phys_pfn_offset
+ 
+ /*
+  * These are *only* valid on the kernel direct mapped RAM memory.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 25a1664..e61e57d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -90,6 +90,8 @@ EXPORT_SYMBOL(system_serial_high);
+ unsigned int elf_hwcap;
+ EXPORT_SYMBOL(elf_hwcap);
+ 
++unsigned long phys_pfn_offset = PHYS_OFFSET >> PAGE_SHIFT;
++EXPORT_SYMBOL(phys_pfn_offset);
+ 
+ #ifdef MULTI_CPU
+ struct processor processor;
+@@ -439,8 +441,10 @@ static int __init early_mem(char *p)
+ 
+ 	start = PHYS_OFFSET;
+ 	size  = memparse(p, &endp);
+-	if (*endp == '@')
++	if (*endp == '@') {
+ 		start = memparse(endp + 1, NULL);
++		phys_pfn_offset = start >> PAGE_SHIFT;
++	}
+ 
+ 	arm_add_memory(start, size);
+ 
