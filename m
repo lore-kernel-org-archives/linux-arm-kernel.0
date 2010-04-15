@@ -1,375 +1,490 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 15 Apr 2010 08:53:11 +0200
-Subject: [PATCH 2.6.34-rc4 3/3] mx5: Enable USB host funcionality on
-	Freescale MX51 Babbage HW
-In-Reply-To: <1271312718-10223-3-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1271312718-10223-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271312718-10223-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271312718-10223-3-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100415065311.GH30801@buzzloop.caiaq.de>
+Date: Thu, 15 Apr 2010 08:55:49 +0200
+Subject: [PATCH] pxa: make it clear by converting MMC 'delay_detect' to
+	millisecond
+In-Reply-To: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
+References: <i2lf17812d71004131608tef462c28u861748959c308c97@mail.gmail.com>
+Message-ID: <20100415065549.GI30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 15, 2010 at 01:25:18AM -0500, Dinh.Nguyen at freescale.com wrote:
-> This patch enables USB host functionality for Host1 and OTG port on
-> Freescale MX51 Babbage HW. This patch contains the board specific
-> HW initialization of the USB HW. Updates mx51_defconfig to enable
-> USB EHCI.
+On Wed, Apr 14, 2010 at 07:08:13AM +0800, Eric Miao wrote:
+> commit 4db1d6645934f49806bd1b49ae4c4176e9b7c843
+> Author: Eric Miao <eric.y.miao@gmail.com>
+> Date:   Wed Apr 14 07:00:42 2010 +0800
 > 
-> This patch applies to 2.6.34-rc4.
+>     [ARM] pxa: make it clear by converting MMC 'delay_detect' to millisecond
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/configs/mx51_defconfig           |   17 ++-
->  arch/arm/mach-mx5/board-mx51_babbage.c    |  267 ++++++++++++++++++++++++++++-
->  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   48 +++++
->  3 files changed, 330 insertions(+), 2 deletions(-)
+>     delay_detect in HZ is confusing, convert it to be millisecond based. And
+>     thus remove those unnecessary call to msecs_to_jiffies() at runtime for
+>     this field. Other constants are converted assuming HZ == 100, which are
+>     basically true for those platforms.
+> 
+>     The assignment in csb726.c was incorrect, and is fixed in this patch as
+>     a result.
+> 
+>     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-That should be at least two patches again - one for the board specific
-things, and one for generic stuff.
+For colibri and raumfeld:
 
-[...]
-
-> +static int babbage_usbotg_init(struct platform_device *pdev)
-> +{
-> +	u32 reg_value;
-> +	void __iomem *usb_base;
-> +	u32 usbotg_base;
-> +	u32 usbother_base;
-> +	int timeout;
-> +	int ret = 0;
-> +
-> +	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-> +	usbotg_base = (u32)usb_base + USBOTG_OFFSET;
-> +	usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
-> +
-> +	/* Stop then Reset */
-> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
-> +	reg_value &= ~UCMD_RUN_STOP;
-> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
-> +	reg_value |= UCMD_RESET;
-> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
-> +	reg_value |= USB_UTMI_PHYCTRL_OC_DIS; /* OC is not used */
-> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
-> +
-> +	reg_value = __raw_readl(usbother_base + USBCTRL_OFFSET);
-> +	reg_value &= ~(UCTRL_OPM | UCTRL_OWIE);/* OTG wakeup/power mask disable */
-> +	__raw_writel(reg_value, usbother_base + USBCTRL_OFFSET);
-> +
-> +	/* set UTMI xcvr */
-> +	reg_value = __raw_readl(usbotg_base + PORTSC_OFFSET);
-> +	reg_value &= ~MXC_EHCI_MODE_SERIAL;
-> +	__raw_writel(reg_value |= MXC_EHCI_MODE_UTMI, usbotg_base + PORTSC_OFFSET);
-
-This should already be done in drivers/usb/host/ehci-mxc.c, taking into
-account the .portsc value from your pdata. Maybe add some printk() there
-and see which values get passed.
-
-> +	/* Set the PHY clock to 19.2MHz */
-> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
-> +	reg_value &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
-> +	reg_value |= 0x01;
-> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
-> +
-> +	/* Workaround an IC issue for ehci driver:
-> +	 * when turn off root hub port power, EHCI set
-> +	 * PORTSC reserved bits to be 0, but PTW with 0
-> +	 * means 8 bits tranceiver width, here change
-> +	 * it back to be 16 bits and do PHY diable and
-> +	 * then enable.
-> +	 */
-> +	reg_value = __raw_readl(usbotg_base + PORTSC_OFFSET);
-> +	reg_value |= MXC_EHCI_UTMI_16BIT;
-> +	__raw_writel(reg_value, usbotg_base + PORTSC_OFFSET);
-> +
-> +	/* need to reset the controller here so that the ID pin
-> +	 * is correctly detected.
-> +	 */
-> +	/* Stop then Reset */
-> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
-> +	reg_value &= ~UCMD_RUN_STOP;
-> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	reg_value = __raw_readl(usbotg_base + USBCMD_OFFSET);
-> +	reg_value |= UCMD_RESET;
-> +	__raw_writel(reg_value, usbotg_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	/* allow controller to reset, and leave time for
-> +	 * the ULPI transceiver to reset too.
-> +	 */
-> +	msleep(100);
-> +error:
-> +	iounmap(usb_base);
-> +
-> +	pr_debug("%s: success\n", __func__);
-> +	return ret;
-> +}
-
-Hmm, no. Now all code is in your board code, so it's not reusable by
-other boards.
-
-Again, the code in this functions which writes to the registers should
-not contain any hard-coded assumptions or addresses, and should also be
-moved to generic places once it is generic.
-
-Please have a look at plat-mxc/ehci.c again and see how things are done
-for mx2 and mx3.
+Acked-by: Daniel Mack <daniel@caiaq.de>
 
 
-> +
-> +static struct mxc_usbh_platform_data dr_utmi_config = {
-> +	.init	= babbage_usbotg_init,
-> +	.portsc	= MXC_EHCI_UTMI_16BIT,
-> +	.flags	= MXC_EHCI_INTERNAL_PHY,
-> +};
-> +
-> +static int babbage_usbh1_init(struct platform_device *pdev)
-> +{
-> +	u32 reg_value;
-> +	void __iomem *usb_base;
-> +	u32 usbh1_base;
-> +	u32 usbother_base;
-> +	int timeout;
-> +	int ret = 0;
-> +
-> +	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-> +	usbh1_base = (u32)usb_base + USBH1_OFFSET;
-> +	usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
-> +
-> +	/* Stop then Reset */
-> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
-> +	reg_value &= ~UCMD_RUN_STOP;
-> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbh1_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
-> +	reg_value |= UCMD_RESET;
-> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
-> +	timeout = 0x100000;
-> +	while (--timeout && __raw_readl(usbh1_base + USBCMD_OFFSET) & UCMD_RESET)
-> +		cpu_relax();
-> +	if (!timeout) {
-> +		printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +		}
-> +
-> +	reg_value = __raw_readl(usbother_base + USB_CTRL_1_OFFSET);
-> +	__raw_writel(reg_value | USB_CTRL_UH1_EXT_CLK_EN, usbother_base + USB_CTRL_1_OFFSET);
-> +
-> +	/* select ULPI PHY PTS=2 */
-> +	reg_value = __raw_readl(usbh1_base + PORTSC_OFFSET);
-> +	reg_value &= ~MXC_EHCI_MODE_SERIAL;
-> +	__raw_writel(reg_value |= MXC_EHCI_MODE_ULPI, usbh1_base + PORTSC_OFFSET);
-> +
-> +	reg_value = __raw_readl(usbother_base + USBCTRL_OFFSET);
-> +	reg_value &= ~(UCTRL_H1WIE | UCTRL_H1UIE);/* HOST1 wakeup/ULPI intr disable */
-> +	reg_value |= UCTRL_H1PM; /* HOST1 power mask */
-> +	__raw_writel(reg_value, usbother_base + USBCTRL_OFFSET);
-> +
-> +	reg_value = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
-> +	reg_value |= USB_UH1_OC_DIS; /* OC is not used */
-> +	__raw_writel(reg_value, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
-> +
-> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
-> +	/* Interrupt Threshold Control:Immediate (no threshold) */
-> +	reg_value &= UCMD_ITC_NO_THRESHOLD;
-> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
-> +
-> +	/* reset the controller */
-> +	reg_value = __raw_readl(usbh1_base + USBCMD_OFFSET);
-> +	reg_value |= UCMD_RESET;
-> +	__raw_writel(reg_value, usbh1_base + USBCMD_OFFSET);
-> +
-> +error:
-> +	iounmap(usb_base);
-> +
-> +	/* allow controller to reset, and leave time for
-> +	* the ULPI transceiver to reset too.
-> +	*/
-> +	msleep(100);
-> +	return ret;
-> +}
-
-Again - once your code is generic, this second set of functions will not
-be needed anymore.
-
-> +static int gpio_usbh1_active(void)
-> +{
-> +	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
-> +	int ret;
-> +
-> +	/* Set USBH1_STP to GPIO and toggle it */
-> +	mxc_iomux_v3_setup_pad(&usbh1stp_gpio);
-> +	ret = gpio_request(27, "usbh1_stp");
-> +
-> +	if (ret) {
-> +		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
-> +		return ret;
-> +	}
-> +	gpio_direction_output(27, 0);
-> +	gpio_set_value(27, 1);
-> +	msleep(100);
-> +	gpio_free(27);
-> +	return 0;
-> +}
-> +
-> +static struct mxc_usbh_platform_data usbh1_config = {
-> +	.init	= babbage_usbh1_init,
-> +	.portsc	= MXC_EHCI_MODE_ULPI,
-> +	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
-> +};
-> +
-> +static inline void babbage_usbhub_reset(void)
-> +{
-> +	int ret;
-> +
-> +	/* Bring USB hub out of reset */
-> +	ret = gpio_request(GPIO_USB_HUB_RESET, "GPIO1_7");
-> +	if (ret) {
-> +		printk("failed to get GPIO_USB_HUB_RESET: %d\n", ret);
-> +		return;
-> +	}
-> +	gpio_direction_output(GPIO_USB_HUB_RESET, 0);
-> +
-> +	/* USB HUB RESET - De-assert USB HUB RESET_N */
-> +	msleep(1);
-> +	gpio_set_value(GPIO_USB_HUB_RESET, 0);
-> +	msleep(1);
-> +	gpio_set_value(GPIO_USB_HUB_RESET, 1);
-> +}
-> +
->  /*
->   * Board specific initialization.
->   */
->  static void __init mxc_board_init(void)
->  {
-> +	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
-> +
->  	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
->  					ARRAY_SIZE(mx51babbage_pads));
->  	mxc_init_imx_uart();
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
-> +
-> +	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-> +
-> +	gpio_usbh1_active();
-> +	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
-> +	/* setback USBH1_STP to be function */
-> +	mxc_iomux_v3_setup_pad(&usbh1stp);
-> +	babbage_usbhub_reset();
+> 
+> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+> index be9dc7a..fdda6be 100644
+> --- a/arch/arm/mach-pxa/cm-x300.c
+> +++ b/arch/arm/mach-pxa/cm-x300.c
+> @@ -433,7 +433,7 @@ static inline void cm_x300_init_nand(void) {}
+> 
+>  #if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
+>  static struct pxamci_platform_data cm_x300_mci_platform_data = {
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.gpio_card_detect	= GPIO82_MMC_IRQ,
+>  	.gpio_card_ro		= GPIO85_MMC_WP,
+> @@ -454,7 +454,7 @@ static void cm_x300_mci2_exit(struct device *dev,
+> void *data)
 >  }
->  
->  static void __init mx51_babbage_timer_init(void)
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> index 4b9b836..728eb36 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> @@ -1,6 +1,30 @@
->  #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
->  #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
->  
-> +#define USBOTG_OFFSET			0
-> +#define USBH1_OFFSET			0x200
-> +#define USBH2_OFFSET			0x400
-> +#define USBH3_OFFSET			0x600
-> +#define USBOTHER_REGS_OFFSET	0x800
-> +
-> +#define USBCMD_OFFSET			0x140
-> +
-> +#define ULPI_VIEWPORT_OFFSET	0x170
-> +#define PORTSC_OFFSET		0x184
-> +#define USBMODE_OFFSET		0x1a8
-> +#define USBMODE_CM_HOST		3
-> +
-> +#define USBCTRL_OFFSET					0
-> +#define USB_PHY_CTR_FUNC_OFFSET		0x8
-> +#define USB_PHY_CTR_FUNC2_OFFSET		0xc
-> +#define USB_CTRL_1_OFFSET				0x10
-> +
-> +
-> +/* USBCMD */
-> +#define UCMD_RUN_STOP           (1 << 0)        /* controller run/stop */
-> +#define UCMD_RESET		(1 << 1)	/* controller reset */
-> +#define UCMD_ITC_NO_THRESHOLD	 	(~(0xff << 16))	/* Interrupt Threshold Control */
-> +
->  /* values for portsc field */
->  #define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
->  #define MXC_EHCI_FORCE_FS		(1 << 24)
-> @@ -26,6 +50,30 @@
->  #define MXC_EHCI_IPPUE_DOWN		(1 << 8)
->  #define MXC_EHCI_IPPUE_UP		(1 << 9)
->  
-> +/* USB_CTRL */
-> +#define UCTRL_OUIE		(1 << 28)	/* OTG ULPI intr enable */
-> +#define UCTRL_OWIE		(1 << 27)	/* OTG wakeup intr enable */
-> +#define UCTRL_OBPVAL_RXDP	(1 << 26)	/* OTG RxDp status in bypass mode */
-> +#define UCTRL_OBPVAL_RXDM	(1 << 25)	/* OTG RxDm status in bypass mode */
-> +#define UCTRL_OPM		(1 << 24)	/* OTG power mask */
-> +#define UCTRL_H1UIE		(1 << 12)	/* Host1 ULPI interrupt enable */
-> +#define UCTRL_H1WIE		(1 << 11)	/* HOST1 wakeup intr enable */
-> +#define UCTRL_H1PM		(1 <<  8)		/* HOST1 power mask */
-> +
-> +/* USB_PHY_CTRL_FUNC */
-> +#define USB_UTMI_PHYCTRL_OC_DIS	(1 << 8)	/* OTG Disable Overcurrent Event */
-> +#define USB_UH1_OC_DIS	(1 << 5)		/* UH1 Disable Overcurrent Event */
-> +
-> +/* USB_CTRL_1 */
-> +#define USB_CTRL_UH1_EXT_CLK_EN			(1 << 25)
-> +#define USB_CTRL_UH2_EXT_CLK_EN			(1 << 26)
-> +
-> +/* USB_PHY_CTRL_FUNC2*/
-> +#define USB_UTMI_PHYCTRL2_PLLDIV_MASK		0x3
-> +#define USB_UTMI_PHYCTRL2_PLLDIV_SHIFT		0
-> +#define USB_UTMI_PHYCTRL2_HSDEVSEL_MASK		0x3
-> +#define USB_UTMI_PHYCTRL2_HSDEVSEL_SHIFT	19
-> +
->  struct mxc_usbh_platform_data {
->  	int (*init)(struct platform_device *pdev);
->  	int (*exit)(struct platform_device *pdev);
-> -- 
-> 1.6.0.4
 > 
+>  static struct pxamci_platform_data cm_x300_mci2_platform_data = {
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.init 			= cm_x300_mci2_init,
+>  	.exit			= cm_x300_mci2_exit,
+> diff --git a/arch/arm/mach-pxa/colibri-pxa3xx.c
+> b/arch/arm/mach-pxa/colibri-pxa3xx.c
+> index e6c0a22..199afa2 100644
+> --- a/arch/arm/mach-pxa/colibri-pxa3xx.c
+> +++ b/arch/arm/mach-pxa/colibri-pxa3xx.c
+> @@ -96,7 +96,7 @@ static void colibri_pxa3xx_mci_exit(struct device
+> *dev, void *data)
+>  }
+> 
+>  static struct pxamci_platform_data colibri_pxa3xx_mci_platform_data = {
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.init			= colibri_pxa3xx_mci_init,
+>  	.exit			= colibri_pxa3xx_mci_exit,
+> diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+> index da3156d..2d41f5c 100644
+> --- a/arch/arm/mach-pxa/corgi.c
+> +++ b/arch/arm/mach-pxa/corgi.c
+> @@ -437,6 +437,7 @@ static struct platform_device corgiled_device = {
+>   * to give the card a chance to fully insert/eject.
+>   */
+>  static struct pxamci_platform_data corgi_mci_platform_data = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.gpio_card_detect	= -1,
+>  	.gpio_card_ro		= CORGI_GPIO_nSD_WP,
+> @@ -679,7 +680,6 @@ static void __init corgi_init(void)
+>  	corgi_init_spi();
+> 
+>   	pxa_set_udc_info(&udc_info);
+> -	corgi_mci_platform_data.detect_delay = msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&corgi_mci_platform_data);
+>  	pxa_set_ficp_info(&corgi_ficp_platform_data);
+>  	pxa_set_i2c_info(NULL);
+> diff --git a/arch/arm/mach-pxa/csb726.c b/arch/arm/mach-pxa/csb726.c
+> index 88575b8..91fd4fe 100644
+> --- a/arch/arm/mach-pxa/csb726.c
+> +++ b/arch/arm/mach-pxa/csb726.c
+> @@ -125,18 +125,9 @@ static unsigned long csb726_pin_config[] = {
+>  	GPIO118_I2C_SDA,
+>  };
+> 
+> -static struct pxamci_platform_data csb726_mci_data;
+> -
+> -static int csb726_mci_init(struct device *dev,
+> -		irq_handler_t detect, void *data)
+> -{
+> -	csb726_mci_data.detect_delay = msecs_to_jiffies(500);
+> -	return 0;
+> -}
+> -
+>  static struct pxamci_platform_data csb726_mci = {
+> +	.detect_delay_ms	= 500,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+> -	.init			= csb726_mci_init,
+>  	/* FIXME setpower */
+>  	.gpio_card_detect	= CSB726_GPIO_MMC_DETECT,
+>  	.gpio_card_ro		= CSB726_GPIO_MMC_RO,
+> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+> index aab04f3..0517c17 100644
+> --- a/arch/arm/mach-pxa/em-x270.c
+> +++ b/arch/arm/mach-pxa/em-x270.c
+> @@ -626,6 +626,7 @@ static int em_x270_mci_get_ro(struct device *dev)
+>  }
+> 
+>  static struct pxamci_platform_data em_x270_mci_platform_data = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask		= MMC_VDD_20_21|MMC_VDD_21_22|MMC_VDD_22_23|
+>  				  MMC_VDD_24_25|MMC_VDD_25_26|MMC_VDD_26_27|
+>  				  MMC_VDD_27_28|MMC_VDD_28_29|MMC_VDD_29_30|
+> @@ -643,7 +644,6 @@ static void __init em_x270_init_mmc(void)
+>  	if (machine_is_em_x270())
+>  		em_x270_mci_platform_data.get_ro = em_x270_mci_get_ro;
+> 
+> -	em_x270_mci_platform_data.detect_delay	= msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&em_x270_mci_platform_data);
+>  }
+>  #else
+> diff --git a/arch/arm/mach-pxa/include/mach/mmc.h
+> b/arch/arm/mach-pxa/include/mach/mmc.h
+> index 02a69dc..9eb515b 100644
+> --- a/arch/arm/mach-pxa/include/mach/mmc.h
+> +++ b/arch/arm/mach-pxa/include/mach/mmc.h
+> @@ -9,7 +9,7 @@ struct mmc_host;
+> 
+>  struct pxamci_platform_data {
+>  	unsigned int ocr_mask;			/* available voltages */
+> -	unsigned long detect_delay;		/* delay in jiffies before detecting
+> cards after interrupt */
+> +	unsigned long detect_delay_ms;		/* delay in millisecond before
+> detecting cards after interrupt */
+>  	int (*init)(struct device *, irq_handler_t , void *);
+>  	int (*get_ro)(struct device *);
+>  	void (*setpower)(struct device *, unsigned int);
+> diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
+> index fa527b2..b3bffe7 100644
+> --- a/arch/arm/mach-pxa/littleton.c
+> +++ b/arch/arm/mach-pxa/littleton.c
+> @@ -272,7 +272,7 @@ static inline void littleton_init_keypad(void) {}
+> 
+>  #if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
+>  static struct pxamci_platform_data littleton_mci_platform_data = {
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.gpio_card_detect	= GPIO_MMC1_CARD_DETECT,
+>  	.gpio_card_ro		= -1,
+> diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+> index 63d65a2..330c328 100644
+> --- a/arch/arm/mach-pxa/lubbock.c
+> +++ b/arch/arm/mach-pxa/lubbock.c
+> @@ -478,7 +478,7 @@ static void lubbock_mci_exit(struct device *dev, void *data)
+> 
+>  static struct pxamci_platform_data lubbock_mci_platform_data = {
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+> -	.detect_delay		= 1,
+> +	.detect_delay_ms	= 10,
+>  	.init 			= lubbock_mci_init,
+>  	.get_ro			= lubbock_mci_get_ro,
+>  	.exit 			= lubbock_mci_exit,
+> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+> index 843fcca..1538ccc 100644
+> --- a/arch/arm/mach-pxa/mioa701.c
+> +++ b/arch/arm/mach-pxa/mioa701.c
+> @@ -425,6 +425,7 @@ struct gpio_vbus_mach_info gpio_vbus_data = {
+>   * to give the card a chance to fully insert/eject.
+>   */
+>  static struct pxamci_platform_data mioa701_mci_info = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask 		= MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.gpio_card_detect	= GPIO15_SDIO_INSERT,
+>  	.gpio_card_ro		= GPIO78_SDIO_RO,
+> @@ -790,7 +791,6 @@ static void __init mioa701_machine_init(void)
+>  	mio_gpio_request(ARRAY_AND_SIZE(global_gpios));
+>  	bootstrap_init();
+>  	set_pxa_fb_info(&mioa701_pxafb_info);
+> -	mioa701_mci_info.detect_delay = msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&mioa701_mci_info);
+>  	pxa_set_keypad_info(&mioa701_keypad_info);
+>  	wm97xx_bat_set_pdata(&mioa701_battery_data);
+> diff --git a/arch/arm/mach-pxa/mxm8x10.c b/arch/arm/mach-pxa/mxm8x10.c
+> index 8c9c6f0..462167a 100644
+> --- a/arch/arm/mach-pxa/mxm8x10.c
+> +++ b/arch/arm/mach-pxa/mxm8x10.c
+> @@ -325,7 +325,7 @@ static mfp_cfg_t mfp_cfg[] __initdata = {
+>  #if defined(CONFIG_MMC)
+>  static struct pxamci_platform_data mxm_8x10_mci_platform_data = {
+>  	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
+> -	.detect_delay = 1,
+> +	.detect_delay_ms = 10,
+>  	.gpio_card_detect = MXM_8X10_SD_nCD,
+>  	.gpio_card_ro = MXM_8X10_SD_WP,
+>  	.gpio_power = -1
+> diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
+> index f70c75b..1963819 100644
+> --- a/arch/arm/mach-pxa/palmld.c
+> +++ b/arch/arm/mach-pxa/palmld.c
+> @@ -168,7 +168,7 @@ static struct pxamci_platform_data
+> palmld_mci_platform_data = {
+>  	.gpio_card_detect	= GPIO_NR_PALMLD_SD_DETECT_N,
+>  	.gpio_card_ro		= GPIO_NR_PALMLD_SD_READONLY,
+>  	.gpio_power		= GPIO_NR_PALMLD_SD_POWER,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  /******************************************************************************
+> diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
+> index d902a81..5305a39 100644
+> --- a/arch/arm/mach-pxa/palmt5.c
+> +++ b/arch/arm/mach-pxa/palmt5.c
+> @@ -110,7 +110,7 @@ static struct pxamci_platform_data
+> palmt5_mci_platform_data = {
+>  	.gpio_card_detect	= GPIO_NR_PALMT5_SD_DETECT_N,
+>  	.gpio_card_ro		= GPIO_NR_PALMT5_SD_READONLY,
+>  	.gpio_power		= GPIO_NR_PALMT5_SD_POWER,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  /******************************************************************************
+> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+> index 717d7a6..033b567 100644
+> --- a/arch/arm/mach-pxa/palmtc.c
+> +++ b/arch/arm/mach-pxa/palmtc.c
+> @@ -121,7 +121,7 @@ static struct pxamci_platform_data
+> palmtc_mci_platform_data = {
+>  	.gpio_power		= GPIO_NR_PALMTC_SD_POWER,
+>  	.gpio_card_ro		= GPIO_NR_PALMTC_SD_READONLY,
+>  	.gpio_card_detect	= GPIO_NR_PALMTC_SD_DETECT_N,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  /******************************************************************************
+> diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
+> index 007b58c..ecc1a40 100644
+> --- a/arch/arm/mach-pxa/palmtx.c
+> +++ b/arch/arm/mach-pxa/palmtx.c
+> @@ -170,7 +170,7 @@ static struct pxamci_platform_data
+> palmtx_mci_platform_data = {
+>  	.gpio_card_detect	= GPIO_NR_PALMTX_SD_DETECT_N,
+>  	.gpio_card_ro		= GPIO_NR_PALMTX_SD_READONLY,
+>  	.gpio_power		= GPIO_NR_PALMTX_SD_POWER,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  /******************************************************************************
+> diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c
+> b/arch/arm/mach-pxa/pcm990-baseboard.c
+> index 9d0ecea..f56ae10 100644
+> --- a/arch/arm/mach-pxa/pcm990-baseboard.c
+> +++ b/arch/arm/mach-pxa/pcm990-baseboard.c
+> @@ -326,7 +326,7 @@ static void pcm990_mci_exit(struct device *dev, void *data)
+>  #define MSECS_PER_JIFFY (1000/HZ)
+> 
+>  static struct pxamci_platform_data pcm990_mci_platform_data = {
+> -	.detect_delay		= 250 / MSECS_PER_JIFFY,
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.init 			= pcm990_mci_init,
+>  	.setpower 		= pcm990_mci_setpower,
+> diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+> index d58a524..d0fbe3b 100644
+> --- a/arch/arm/mach-pxa/poodle.c
+> +++ b/arch/arm/mach-pxa/poodle.c
+> @@ -277,6 +277,7 @@ static void poodle_mci_exit(struct device *dev, void *data)
+>  }
+> 
+>  static struct pxamci_platform_data poodle_mci_platform_data = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.init 			= poodle_mci_init,
+>  	.setpower 		= poodle_mci_setpower,
+> @@ -450,7 +451,6 @@ static void __init poodle_init(void)
+>  	set_pxa_fb_parent(&poodle_locomo_device.dev);
+>  	set_pxa_fb_info(&poodle_fb_info);
+>  	pxa_set_udc_info(&udc_info);
+> -	poodle_mci_platform_data.detect_delay = msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&poodle_mci_platform_data);
+>  	pxa_set_ficp_info(&poodle_ficp_platform_data);
+>  	pxa_set_i2c_info(NULL);
+> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+> index 3184bdc..e0f85a0 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
+> +++ b/arch/arm/mach-pxa/raumfeld.c
+> @@ -716,7 +716,7 @@ static void raumfeld_mci_exit(struct device *dev,
+> void *data)
+>  static struct pxamci_platform_data raumfeld_mci_platform_data = {
+>  	.init			= raumfeld_mci_init,
+>  	.exit			= raumfeld_mci_exit,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  	.gpio_card_detect	= -1,
+>  	.gpio_card_ro		= -1,
+>  	.gpio_power		= -1,
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index 19b5109..9e03e8b 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -537,6 +537,7 @@ static void spitz_mci_setpower(struct device *dev,
+> unsigned int vdd)
+>  }
+> 
+>  static struct pxamci_platform_data spitz_mci_platform_data = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.setpower 		= spitz_mci_setpower,
+>  	.gpio_card_detect	= SPITZ_GPIO_nSD_DETECT,
+> @@ -757,7 +758,6 @@ static void __init common_init(void)
+>  	spitz_init_spi();
+> 
+>  	platform_add_devices(devices, ARRAY_SIZE(devices));
+> -	spitz_mci_platform_data.detect_delay = msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&spitz_mci_platform_data);
+>  	pxa_set_ohci_info(&spitz_ohci_platform_data);
+>  	pxa_set_ficp_info(&spitz_ficp_platform_data);
+> diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
+> index 2041eb1..af40d2a 100644
+> --- a/arch/arm/mach-pxa/stargate2.c
+> +++ b/arch/arm/mach-pxa/stargate2.c
+> @@ -464,8 +464,6 @@ static struct platform_device smc91x_device = {
+> 
+> 
+> 
+> -static struct pxamci_platform_data stargate2_mci_platform_data;
+> -
+>  /*
+>   * The card detect interrupt isn't debounced so we delay it by 250ms
+>   * to give the card a chance to fully insert / eject.
+> @@ -489,8 +487,6 @@ static int stargate2_mci_init(struct device *dev,
+>  		goto free_power_en;
+>  	}
+>  	gpio_direction_input(SG2_GPIO_nSD_DETECT);
+> -	/* Delay to allow for full insertion */
+> -	stargate2_mci_platform_data.detect_delay = msecs_to_jiffies(250);
+> 
+>  	err = request_irq(IRQ_GPIO(SG2_GPIO_nSD_DETECT),
+>  			  stargate2_detect_int,
+> @@ -529,6 +525,7 @@ static void stargate2_mci_exit(struct device *dev,
+> void *data)
+>  }
+> 
+>  static struct pxamci_platform_data stargate2_mci_platform_data = {
+> +	.detect_delay_ms = 250,
+>  	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.init = stargate2_mci_init,
+>  	.setpower = stargate2_mci_setpower,
+> diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+> index ad55279..7512b82 100644
+> --- a/arch/arm/mach-pxa/tosa.c
+> +++ b/arch/arm/mach-pxa/tosa.c
+> @@ -275,6 +275,7 @@ static void tosa_mci_exit(struct device *dev, void *data)
+>  }
+> 
+>  static struct pxamci_platform_data tosa_mci_platform_data = {
+> +	.detect_delay_ms	= 250,
+>  	.ocr_mask       	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.init           	= tosa_mci_init,
+>  	.exit           	= tosa_mci_exit,
+> @@ -926,7 +927,6 @@ static void __init tosa_init(void)
+>  	dummy = gpiochip_reserve(TOSA_SCOOP_JC_GPIO_BASE, 12);
+>  	dummy = gpiochip_reserve(TOSA_TC6393XB_GPIO_BASE, 16);
+> 
+> -	tosa_mci_platform_data.detect_delay = msecs_to_jiffies(250);
+>  	pxa_set_mci_info(&tosa_mci_platform_data);
+>  	pxa_set_udc_info(&udc_info);
+>  	pxa_set_ficp_info(&tosa_ficp_platform_data);
+> diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
+> index 797f254..6968911 100644
+> --- a/arch/arm/mach-pxa/trizeps4.c
+> +++ b/arch/arm/mach-pxa/trizeps4.c
+> @@ -349,7 +349,7 @@ static void trizeps4_mci_exit(struct device *dev,
+> void *data)
+> 
+>  static struct pxamci_platform_data trizeps4_mci_platform_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+> -	.detect_delay	= 1,
+> +	.detect_delay_ms= 10,
+>  	.init 		= trizeps4_mci_init,
+>  	.exit		= trizeps4_mci_exit,
+>  	.get_ro		= NULL,	/* write-protection not supported */
+> diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+> index 0a9647b..d858b97 100644
+> --- a/arch/arm/mach-pxa/vpac270.c
+> +++ b/arch/arm/mach-pxa/vpac270.c
+> @@ -191,7 +191,7 @@ static struct pxamci_platform_data
+> vpac270_mci_platform_data = {
+>  	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
+>  	.gpio_card_detect	= GPIO53_VPAC270_SD_DETECT_N,
+>  	.gpio_card_ro		= GPIO52_VPAC270_SD_READONLY,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  static void __init vpac270_mmc_init(void)
+> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+> index c837318..f5d1ae3 100644
+> --- a/arch/arm/mach-pxa/z2.c
+> +++ b/arch/arm/mach-pxa/z2.c
+> @@ -291,7 +291,7 @@ static struct pxamci_platform_data z2_mci_platform_data = {
+>  	.gpio_card_detect	= GPIO96_ZIPITZ2_SD_DETECT,
+>  	.gpio_power		= -1,
+>  	.gpio_card_ro		= -1,
+> -	.detect_delay		= 20,
+> +	.detect_delay_ms	= 200,
+>  };
+> 
+>  static void __init z2_mmc_init(void)
+> diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+> index 39896d8..3680f6a 100644
+> --- a/arch/arm/mach-pxa/zeus.c
+> +++ b/arch/arm/mach-pxa/zeus.c
+> @@ -644,7 +644,7 @@ static struct pxafb_mach_info zeus_fb_info = {
+> 
+>  static struct pxamci_platform_data zeus_mci_platform_data = {
+>  	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+> -	.detect_delay		= HZ/4,
+> +	.detect_delay_ms	= 250,
+>  	.gpio_card_detect       = ZEUS_MMC_CD_GPIO,
+>  	.gpio_card_ro           = ZEUS_MMC_WP_GPIO,
+>  	.gpio_card_ro_invert	= 1,
+> diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
+> index 2b4043c..c479cbe 100644
+> --- a/arch/arm/mach-pxa/zylonite.c
+> +++ b/arch/arm/mach-pxa/zylonite.c
+> @@ -218,7 +218,7 @@ static inline void zylonite_init_lcd(void) {}
+> 
+>  #if defined(CONFIG_MMC)
+>  static struct pxamci_platform_data zylonite_mci_platform_data = {
+> -	.detect_delay	= 20,
+> +	.detect_delay_ms= 200,
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.gpio_card_detect = EXT_GPIO(0),
+>  	.gpio_card_ro	= EXT_GPIO(2),
+> @@ -226,7 +226,7 @@ static struct pxamci_platform_data
+> zylonite_mci_platform_data = {
+>  };
+> 
+>  static struct pxamci_platform_data zylonite_mci2_platform_data = {
+> -	.detect_delay	= 20,
+> +	.detect_delay_ms= 200,
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.gpio_card_detect = EXT_GPIO(1),
+>  	.gpio_card_ro	= EXT_GPIO(3),
+> @@ -234,7 +234,7 @@ static struct pxamci_platform_data
+> zylonite_mci2_platform_data = {
+>  };
+> 
+>  static struct pxamci_platform_data zylonite_mci3_platform_data = {
+> -	.detect_delay	= 20,
+> +	.detect_delay_ms= 200,
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.gpio_card_detect = EXT_GPIO(30),
+>  	.gpio_card_ro	= EXT_GPIO(31),
+> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+> index 0d783f3..cafd388 100644
+> --- a/drivers/mmc/host/pxamci.c
+> +++ b/drivers/mmc/host/pxamci.c
+> @@ -543,7 +543,7 @@ static irqreturn_t pxamci_detect_irq(int irq, void *devid)
+>  {
+>  	struct pxamci_host *host = mmc_priv(devid);
+> 
+> -	mmc_detect_change(devid, host->pdata->detect_delay);
+> +	mmc_detect_change(devid, msecs_to_jiffies(host->pdata->detect_delay_ms));
+>  	return IRQ_HANDLED;
+>  }
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
