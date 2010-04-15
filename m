@@ -1,43 +1,46 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 15 Apr 2010 13:36:09 -0400
-Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
-	for ARM11MPCore
-In-Reply-To: <20100412173247.GA3048@n2100.arm.linux.org.uk>
-References: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
-	<20100412173247.GA3048@n2100.arm.linux.org.uk>
-Message-ID: <20100415173609.GA29752@mvista.com>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Thu, 15 Apr 2010 13:44:54 -0400
+Subject: [PATCH] ARM: LPC32XX: Update PHY3250 MTD partition info
+Message-ID: <1271353494-13831-1-git-send-email-bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Adding the two other partitions of the phycore3250's nand flash:
+u-boot and the u-boot environment partitions. The former can be useful
+if you are feeling adventurous and would like to upgrade u-boot. The
+later is very useful for userspace utilities like fw_setenv which can
+be used to modify the bootargs for the next reboot or insert many other
+useful scripts.
 
-On Mon, Apr 12, 2010 at 06:32:47PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 12, 2010 at 06:23:58PM +0100, Will Deacon wrote:
-> > This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
-> > forcing the write buffer to drain while inside a polling loop on an SMP system.
-> > If the Kernel is not compiled for SMP support, this will expand to a barrier()
-> > as before.
+In addition, adding these partitions brings the mtdblock numbers back
+to what they were with the 2.6.27.8 release of the linux kernel shipped
+with the phycore3250 evm.
 
-If I've followed these threads [1][2] correctly, this ARM11 MPCore issue
-was discovered while running the "KGDB: internal test suite" (KGDB_TESTS)
-and that problem is resolved via "kgdb: use atomic_inc and atomic_dec
-instead of atomic_set" [3].  If so, isn't the original ARM11 MPCore KGDB
-cpu_relax() issue just a red herring?  Shouldn't any polling loops
-which depend on specific (hardware) write/read order implement appropriate
-barriers rather than rely on cpu_relax() to guarantee order?  If
-perhaps there are indeed other cases where cpu_relax() is being used
-incorrectly, then maybe those should be fixed instead?  Just curious...
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+---
+ arch/arm/mach-lpc32xx/phy3250.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-
-> Linus asked how expensive (in terms of power rather than performance)
-> this was; so far that question has remained unanswered.  Can someone
-> please answer his question?
-
-Thanks!
-
---
-Regards,
-George
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/010691.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011076.html
-[3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff_plain;h=ae6bf53e0255c8ab04b6fe31806e318432570e3c
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index b908d17..2672b63 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -345,6 +345,16 @@ static int nandwp_enable(int enable)
+ #define BLK_SIZE (512 * 32)
+ static struct mtd_partition __initdata phy3250_nand_partition[] = {
+ 	{
++		.name	= "phy3250-uboot",
++		.offset	= 0,
++		.size	= (BLK_SIZE * 90)
++	},
++	{
++		.name	= "phy3250-ubt-env",
++		.offset	= (BLK_SIZE * 90),
++		.size	= (BLK_SIZE * 10)
++	},
++	{
+ 		.name	= "phy3250-kernel",
+ 		.offset	= (BLK_SIZE * 100),
+ 		.size	= (BLK_SIZE * 256)
+-- 
+1.6.3.3
