@@ -1,40 +1,38 @@
-From: hollis@penguinppc.org (Hollis Blanchard)
-Date: Thu, 15 Apr 2010 12:19:03 -0700
-Subject: [Android-virt] cache problems with mmap'ed data structure in KVM
-In-Reply-To: <q2p7d08b87d1004140829m9fc9bc6vab970f7c2e45aa0c@mail.gmail.com>
-References: <q2p7d08b87d1004140829m9fc9bc6vab970f7c2e45aa0c@mail.gmail.com>
-Message-ID: <v2nfb412d761004151219va46cd840v5b2b67f022536b70@mail.gmail.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 15 Apr 2010 22:03:22 +0100
+Subject: [Kgdb-bugreport] [PATCH] ARM: change definition of cpu_relax()
+	for ARM11MPCore
+In-Reply-To: <20100415173609.GA29752@mvista.com>
+References: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
+	<20100412173247.GA3048@n2100.arm.linux.org.uk>
+	<20100415173609.GA29752@mvista.com>
+Message-ID: <20100415210322.GB26494@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 14, 2010 at 8:29 AM, Christoffer Dall <cd2436@columbia.edu> wrote:
-> When booting a guest on an arm1136 physical cpu using my KVM
-> implementation (https://wiki.ncl.cs.columbia.edu/wiki/index.php/AndroidVirt:MainPage),
-> I get some distorted output in QEMU, which performs device emulation
-> for the kernel and thereby emulates a pl011 serial device.
->
-> QEMU shares a data structure with the kernel by mmap'ing a file
-> descriptor like this:
-> ?env->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
-> MAP_SHARED, env->kvm_fd, 0);
->
-> The problem arises when the kernel writes to this data structure using
-> the kernel virtual addresses. The data does not seem to be
-> synchronized to the user space application reads.
+George G. Davis wrote:
+> Hi,
+> 
+> On Mon, Apr 12, 2010 at 06:32:47PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Apr 12, 2010 at 06:23:58PM +0100, Will Deacon wrote:
+> > > This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+> > > forcing the write buffer to drain while inside a polling loop on an SMP system.
+> > > If the Kernel is not compiled for SMP support, this will expand to a barrier()
+> > > as before.
+> 
+> If I've followed these threads [1][2] correctly, this ARM11 MPCore issue
+> was discovered while running the "KGDB: internal test suite" (KGDB_TESTS)
+> and that problem is resolved via "kgdb: use atomic_inc and atomic_dec
+> instead of atomic_set" [3].  If so, isn't the original ARM11 MPCore KGDB
+> cpu_relax() issue just a red herring?  Shouldn't any polling loops
+> which depend on specific (hardware) write/read order implement appropriate
+> barriers rather than rely on cpu_relax() to guarantee order?
 
-It sounds like you've already figured out the VIVT caching problems.
+Note that the need to force the write buffer to drain is _not_ an
+ordering issue.  It's a buffer draining issue. :-)
 
-> I'm guessing that I need to initiate a cache writeback on the kernel
-> side and a re-read on the user space side, but I'm unsure what the
-> right way to go about it is.
+I'm not sure if Linux smp_wmb() guarantees to ensure prior writes will
+be visible to other CPUs in a short time, or if it only guarantees
+write order.
 
-The simplest might be to map this structure uncached on both sides
-(kernel and user).
-
-As an alternative, you might be able to use flush_user_range() and
-flush_kern_dcache_area() (see arch/arm/include/asm/cacheflush.h). That
-wouldn't really work with host SMP, but then again with host SMP you
-probably will have different cache design that will avoid the problem
-to begin with.
-
--Hollis
+-- Jamie
