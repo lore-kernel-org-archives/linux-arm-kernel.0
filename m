@@ -1,134 +1,54 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 16 Apr 2010 17:26:06 +0200
-Subject: [RFC PATCH 2/4] ARM: hw-breakpoint: add ARM backend for the
-	hw-breakpoint framework
-In-Reply-To: <1271427479.21600.1.camel@e102144-lin.cambridge.arm.com>
-References: <1268236874-7877-1-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-2-git-send-email-will.deacon@arm.com>
-	<1268236874-7877-3-git-send-email-will.deacon@arm.com>
-	<h2mc62985531004130632kd086ffe9o16edafc359fa0e2@mail.gmail.com>
-	<1271173965.17356.28.camel@e102144-lin.cambridge.arm.com>
-	<20100413204000.GC5602@nowhere>
-	<1271240821.11060.3.camel@e102144-lin.cambridge.arm.com>
-	<20100415225950.GI5069@nowhere>
-	<1271427479.21600.1.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20100416152605.GF5162@nowhere>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 16 Apr 2010 13:28:05 -0500
+Subject: [spi-devel-general] [PATCH v3 0/2] spi: driver for Cirrus
+	EP93xx	SPI controller
+In-Reply-To: <cover.1271156934.git.mika.westerberg@iki.fi>
+References: <cover.1271156934.git.mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 16, 2010 at 03:17:59PM +0100, Will Deacon wrote:
-> Hi Frederic,
-> > It's a cruel architecture...
-> > 
+On Tuesday, April 13, 2010 7:10 AM, Mika Westerberg wrote:
+> Hello,
 > 
-> It grows on you :)
-
-
-:-)))
-
-
- 
-> > Yeah, looking at how this is implemented across versions, it seems
-> > that they all share the same registers, but early versions have
-> > unfeatured reserved bytes in control registers that are filled
-> > with new features over time in subsequent versions.
-> > 
-> > It looks like the things are then forward compatible but not
-> > backward.
-> > 
-> > Isn't that enough to provide a ptrace interface? I mean you can't do
-> > much magic here. Having something that works everywhere would consist
-> > in implementing only the minimal set of features only.
+> This is third revision of the driver. Thanks to Martin Guy who tested and
+> reviewed the code.
 > 
-> I suppose the ptrace interface will involve bit-packing at some point anyway,
-> so mirroring the hardware configuration might not be as bad as I initially thought.
-> The hardware has some slightly more esoteric features [breakpoint linking, context
-> matching etc] that won't be supported in software for now so I'll ignore those bits.
-
-
-
-In fact, I guess watchpoint to breakpoint linking is something that userspace
-can use. But the context ID linking....well I haven't understood this part
-in ARM documentation :)
-
-
- 
-> > > I'm unsure about how to provide full protection though. You could still
-> > > set a breakpoint on the breakpoint handling code that exists outside of the
-> > > exception text. Do other archs suffer from this problem? I'm tempted
-> > > just to disallow Kernel breakpoints for now, but that would be a shame.
-> > 
-> > 
-> > In x86 we just write the control register to disable the breakpoints
-> > in the exception handler. (I suspect we don't do it early enough though).
-> > 
-> > You can do the same in ARM.
+> Changes since v2:
+> 	- corrected spi clock rate calculation
+> 	- interrupt handling is now more efficient
+> 	- driver now supports polling mode as well, this can be selected with
+> 	  'transfer_method' module parameter.
+> 	- controller is disabled in probe function
+> 	- some cosmetic changes
 > 
-> Ok.
-
-
-
-Speaking about this made me wonder about the current state in x86.
-For now it's safe because task bound breakpoint only allow userspace
-addresses.
-But this is not right because we want task bound to be able to trigger
-on kernel. Once we'll allow this, we need a bit of policy.
-
-Because yeah we can protect against recursion, but always partially.
-The only solution to really protect would be disabling the breakpoint
-as the very first operation in the trap handler.
-
-But that's ugly and may be costly as well.
-
-So what I'm going to do is to simply check attr.exclude_kernel on
-breakpoint creation and look if the address is in the kernel space.
-
-So that if you want to crash your machine why lurking at the very
-tight window of trap handler possible recursion, you need to be
-root :)
-
-Because when a perf event registers and doesn't have exclude_kernel,
-you need to be admin.
-
-Fortunately we don't have this security hole with the current rules,
-but I'll try to make this check more generic (will require archs that
-support breakpoints to implement arch_check_va_in_kernelspace()).
-
-
-> > If an arch has no choice but using sync breakpoints, it needs
-> > to handle that. It seems PowerPc has a similar problem, may be
-> > have a look at Prasad's patches.
+> I have been testing this on my TS-7260 board (ep9302 based) with mmc_spi and
+> at25 drivers.
 > 
-> Could you give me a pointer to these patches please [I can't see them on LKML]?
-> I *think* PowerPC is lucky enough to have hardware single step, so handling
-> synchronous breakpoints isn't *too* difficult. In ARM we have to work out the
-> address of the following instruction, which is quite tricky because it could be a
-> branch instruction [from a selection of instruction sets] and also be predicated.
-> GDB can handle this, but the Kernel doesn't have the capability to do so [there's
-> some code in arch/arm/ptrace.c but it's not feature complete].
-
-
-I don't remember exactly how this is handled. I remember a story about
-a one-shot breakpoint, ie: that triggers only once.
-
-Anyway, I have yet to review the latest version:
-
-http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-April/081714.html
-http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-April/081715.html
-http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-April/081716.html
-
-
-
+> Note that patch 2/2 depends on patch that is already in Russell's patch
+> tracking system:
+> 	http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5998/1
 > 
-> > If there is something that can be handled from the generic
-> > layer to help solving this problem, I'll try something.
-> 
-> Unfortunately this is very much an arch problem. As a half-way house, I might
-> implement only the ptrace part of hw-breakpoint for ARM. That way we can
-> force the client to handle stepping over the breakpoint and we also won't have
-> to worry about recursive breakpoints in the Kernel.
 
+Hello Mika,
 
-:-s
+I finally was able to get this working on my system.  Not sure what the issue
+was earlier.
 
-Yeah, we'll see what we can do.
+The only thing I don't like right off hand is the chip select handling.
+
+The way it currently is done you are limited to using only the built-in GPIO's
+of the EP93xx.  This prohibits a system from using an external i2c/spi/etc.
+gpio expander to provide more chip selects.  And if a platform is not setup
+correctly, the BUG_ON in cs_to_gpio in your example for the tx72xx is pretty
+nasty.
+
+Ryan and I worked out a runtime setup/cleanup for the spi device chip selects
+in the spi driver I have in my tree.  I will take a look at it and see how
+much trouble it will be to implement in your driver.
+
+Anyway, now that I have your driver functioning I will be able to actually
+provide some feedback to you.
+
+Regards,
+Hartley
