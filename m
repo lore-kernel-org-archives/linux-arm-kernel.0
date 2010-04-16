@@ -1,64 +1,41 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 15 Apr 2010 23:54:08 -0400
-Subject: [alsa-devel] [PATCH 1/4] pxa: add namespace on ssp
-In-Reply-To: <20100409111609.GA13281@sirena.org.uk>
-References: <k2s771cded01003310546y48e1431r71820b73f69e53d5@mail.gmail.com>
-	<20100409111609.GA13281@sirena.org.uk>
-Message-ID: <m2p771cded01004152054yc1e0d362z16b8f931339e6f36@mail.gmail.com>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Fri, 16 Apr 2010 15:37:23 +0200
+Subject: [PATCH] ARM: Fix "BUG: scheduling while atomic:
+	swapper/0/0x00000002"
+Message-ID: <33A307AF30D7BF4F811B1568FE7A9B18033BCFF3@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 9, 2010 at 7:16 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 31, 2010 at 08:46:42AM -0400, Haojian Zhuang wrote:
->> From b52a0d2687e82f81d38198cb450b6a39a9e53851 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Wed, 31 Mar 2010 15:08:55 -0400
->> Subject: [PATCH] [ARM] pxa: add namespace on ssp
->>
->> In order to prevent code ambiguous, add namespace on functions in ssp driver.
->
-> Liam acked these on IRC so I was going to apply them (the interface for
-> the sysclk configuration should be fixed, but that can be done as a
-> followup patch) but I can't seem to find a branch that these apply to -
-> they don't apply cleanly to either Eric's ssp_cleanup branch, the ASoC
-> for-2.6.35 branch, nor a merge of the two.
->
+Hi Santosh/Russell,
 
-Hi Mark,
 
-Excuse me for late response. Now patches are refreshed and they're
-still based on Eric's ssp-cleanup branch. Since these patches are
-relied on some ssp's fix. Do you want to immigrate these patches into
-ASoC's tree? Would you pull eric's ssp-cleanup branch into ASoC tree?
+>Hmm, I don't think this is how we should be solving this problem.
 
-Thanks
-Haojian
+>x86 calls init_idle() on the idle task when it's re-used, and this
+
+>resets the preempt count amongst other things.  So maybe we want to
+
+>do this instead in the __cpu_up path:
+
+The following patch fixes the dump messages at my end during re-onlining the offline CPU.
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 577543f..ee1d608 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -86,6 +86,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
+                                                return PTR_ERR(idle);
+                                }
+                                ci->idle = idle;
++              } else {
++                              /* fix any preempt leaks whilst going down */
++                              init_idle(idle, cpu);
+                }
+
+Please let me know if this is alright.
+
+Thanx!
+Sundar
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001--ARM-pxa-add-namespace-on-ssp.patch
-Type: text/x-patch
-Size: 17845 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100415/01d8b807/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ASoC-split-pxa-ssp-for-reusing-code.patch
-Type: text/x-patch
-Size: 42408 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100415/01d8b807/attachment-0005.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-ASoC-support-pxa168-ssp-in-ASoC.patch
-Type: text/x-patch
-Size: 12530 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100415/01d8b807/attachment-0006.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-ASoC-enable-wm8753-in-aspenite.patch
-Type: text/x-patch
-Size: 7531 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100415/01d8b807/attachment-0007.bin>
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100416/51e730a4/attachment.htm>
