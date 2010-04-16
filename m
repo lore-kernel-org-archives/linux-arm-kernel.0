@@ -1,154 +1,43 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 16 Apr 2010 14:16:08 -0500
-Subject: [PATCHv4 2.6.34-rc4 4/7] mx5: Enable board specific functions for
-	enabling USB host on Babbage
-In-Reply-To: <1271445371-18501-3-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271445371-18501-3-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1271445371-18501-4-git-send-email-Dinh.Nguyen@freescale.com>
+From: r.herring@freescale.com (Rob Herring)
+Date: Fri, 16 Apr 2010 14:35:17 -0500
+Subject: [RFC PATCH 03/10] mx51: convert iomux and wdog to ioremap
+Message-ID: <1271446524-26450-4-git-send-email-r.herring@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-
-This patch enables USB host functionality for Host1 and OTG port on
-Freescale MX51 Babbage HW. This patch contains the board specific
-HW initialization of the USB HW.
-
-This patch applies to 2.6.34-rc4.
-
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Signed-off-by: Rob Herring <r.herring@freescale.com>
 ---
- arch/arm/mach-mx5/board-mx51_babbage.c |   81 ++++++++++++++++++++++++++++++++
- 1 files changed, 81 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/mm.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index ee67a71..617f4e2 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -12,11 +12,14 @@
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index b7677ef..9c9ae3b 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -13,6 +13,7 @@
  
+ #include <linux/mm.h>
  #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/delay.h>
++#include <linux/io.h>
  
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx51.h>
-+#include <mach/mxc_ehci.h>
+ #include <asm/mach/map.h>
  
- #include <asm/irq.h>
- #include <asm/setup.h>
-@@ -26,6 +29,9 @@
- 
- #include "devices.h"
- 
-+#define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
-+#define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
-+
- static struct platform_device *devices[] __initdata = {
- 	&mxc_fec_device,
- };
-@@ -46,6 +52,22 @@ static struct pad_desc mx51babbage_pads[] = {
- 	MX51_PAD_EIM_D26__UART3_TXD,
- 	MX51_PAD_EIM_D27__UART3_RTS,
- 	MX51_PAD_EIM_D24__UART3_CTS,
-+
-+	/* USB HOST1 */
-+	MX51_PAD_USBH1_CLK__USBH1_CLK,
-+	MX51_PAD_USBH1_DIR__USBH1_DIR,
-+	MX51_PAD_USBH1_NXT__USBH1_NXT,
-+	MX51_PAD_USBH1_DATA0__USBH1_DATA0,
-+	MX51_PAD_USBH1_DATA1__USBH1_DATA1,
-+	MX51_PAD_USBH1_DATA2__USBH1_DATA2,
-+	MX51_PAD_USBH1_DATA3__USBH1_DATA3,
-+	MX51_PAD_USBH1_DATA4__USBH1_DATA4,
-+	MX51_PAD_USBH1_DATA5__USBH1_DATA5,
-+	MX51_PAD_USBH1_DATA6__USBH1_DATA6,
-+	MX51_PAD_USBH1_DATA7__USBH1_DATA7,
-+
-+	/* USB HUB reset line*/
-+	MX51_PAD_GPIO_1_7__GPIO1_7,
- };
- 
- /* Serial ports */
-@@ -66,15 +88,74 @@ static inline void mxc_init_imx_uart(void)
- }
- #endif /* SERIAL_IMX */
- 
-+static int gpio_usbh1_active(void)
-+{
-+	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
-+	int ret;
-+
-+	/* Set USBH1_STP to GPIO and toggle it */
-+	mxc_iomux_v3_setup_pad(&usbh1stp_gpio);
-+	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
-+
-+	if (ret) {
-+		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
-+		return ret;
-+	}
-+	gpio_direction_output(BABBAGE_USBH1_STP, 0);
-+	gpio_set_value(BABBAGE_USBH1_STP, 1);
-+	msleep(100);
-+	gpio_free(BABBAGE_USBH1_STP);
-+	return 0;
-+}
-+
-+static inline void babbage_usbhub_reset(void)
-+{
-+	int ret;
-+
-+	/* Bring USB hub out of reset */
-+	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
-+	if (ret) {
-+		printk(KERN_ERR"failed to get GPIO_USB_HUB_RESET: %d\n", ret);
-+		return;
-+	}
-+	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
-+
-+	/* USB HUB RESET - De-assert USB HUB RESET_N */
-+	msleep(1);
-+	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
-+	msleep(1);
-+	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
-+}
-+
-+static struct mxc_usbh_platform_data dr_utmi_config = {
-+	.portsc	= MXC_EHCI_UTMI_16BIT,
-+	.flags	= MXC_EHCI_INTERNAL_PHY,
-+};
-+
-+static struct mxc_usbh_platform_data usbh1_config = {
-+	.portsc	= MXC_EHCI_MODE_ULPI,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
-+};
-+
- /*
-  * Board specific initialization.
+@@ -59,9 +60,14 @@ static struct map_desc mxc_io_desc[] __initdata = {
   */
- static void __init mxc_board_init(void)
+ void __init mx51_map_io(void)
  {
-+	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
++	void __iomem *base;
 +
- 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
- 					ARRAY_SIZE(mx51babbage_pads));
- 	mxc_init_imx_uart();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
+-	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+-	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG_BASE_ADDR));
 +
-+	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-+
-+	gpio_usbh1_active();
-+	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
-+	/* setback USBH1_STP to be function */
-+	mxc_iomux_v3_setup_pad(&usbh1stp);
-+	babbage_usbhub_reset();
++	base = ioremap(MX51_IOMUXC_BASE_ADDR, SZ_4K);
++	mxc_iomux_v3_init(base);
++	base = ioremap(MX51_WDOG_BASE_ADDR, SZ_4K);
++	mxc_arch_reset_init(base);
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
  }
  
- static void __init mx51_babbage_timer_init(void)
 -- 
 1.6.0.4
