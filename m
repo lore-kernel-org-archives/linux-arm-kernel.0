@@ -1,41 +1,31 @@
-From: sundar.iyer@stericsson.com (Sundar R IYER)
-Date: Fri, 16 Apr 2010 15:37:23 +0200
-Subject: [PATCH] ARM: Fix "BUG: scheduling while atomic:
-	swapper/0/0x00000002"
-Message-ID: <33A307AF30D7BF4F811B1568FE7A9B18033BCFF3@EXDCVYMBSTM006.EQ1STM.local>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Sat, 17 Apr 2010 04:43:34 +0900
+Subject: [PATCH] MAINTAINERS: arch/arm/s3c and arch/arm/s5p
+In-Reply-To: <1271126826.4631.7.camel@Joe-Laptop.home>
+References: <cover.1269655208.git.joe@perches.com>
+	<0c97f736400ec243e71ba794ae7046a61d2449c1.1269655208.git.joe@perches.com>
+	<20100412194737.GS3048@n2100.arm.linux.org.uk>
+	<1271102450.2131.27.camel@Joe-Laptop.home>
+	<h2p9c9fda241004121653te938caa2u42e39c31f27e85e1@mail.gmail.com>
+	<1271126826.4631.7.camel@Joe-Laptop.home>
+Message-ID: <p2y9c9fda241004161243p924e06f0rb1ff64d5ae258819@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh/Russell,
+Please add me and marek.
+Ben how do you think? Marek is proper person since he posted a lot of s5p
+series patches.
+Note that byoungho min is no longer works on this series
 
+Thank you,
+Kyungmin Park
 
->Hmm, I don't think this is how we should be solving this problem.
+On Apr 12, 2010 7:47 PM, "Joe Perches" <joe@perches.com> wrote:
 
->x86 calls init_idle() on the idle task when it's re-used, and this
-
->resets the preempt count amongst other things.  So maybe we want to
-
->do this instead in the __cpu_up path:
-
-The following patch fixes the dump messages at my end during re-onlining the offline CPU.
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 577543f..ee1d608 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -86,6 +86,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
-                                                return PTR_ERR(idle);
-                                }
-                                ci->idle = idle;
-+              } else {
-+                              /* fix any preempt leaks whilst going down */
-+                              init_idle(idle, cpu);
-                }
-
-Please let me know if this is alright.
-
-Thanx!
-Sundar
+On Tue, 2010-04-13 at 08:53 +0900, Kyungmin Park wrote:
+> No, s5p stubs are maintained by Samsung.
+>...
+So perhaps you'll add yourself and the correct entries to MAINTAINERS?
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100416/51e730a4/attachment.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100417/d61388c4/attachment.htm>
