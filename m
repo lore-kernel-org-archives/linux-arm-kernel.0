@@ -1,26 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 16 Apr 2010 14:25:16 +0800
-Subject: 2.6.34-rc3 vs zaurus spitz: mistery solved
-In-Reply-To: <20100415180314.GC1443@ucw.cz>
-References: <20100415180314.GC1443@ucw.cz>
-Message-ID: <x2qf17812d71004152325v26785671r23aafd9444614590@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 16 Apr 2010 10:36:32 +0200
+Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
+In-Reply-To: <i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
+References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
+	<20100415075831.GL30801@buzzloop.caiaq.de>
+	<i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
+Message-ID: <20100416083632.GF30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 16, 2010 at 2:03 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
-> For some reason, spitz will hang very early in boot with SLUB. With
-> SLOB, it boots fine.
->
+On Thu, Apr 15, 2010 at 03:08:41PM -0600, Badguy Badguy wrote:
+> On Thu, Apr 15, 2010 at 1:58 AM, Daniel Mack <daniel@caiaq.de> wrote:
+> > Ah, one more thing: You need to pass a new variable to the kernel upon
+> > startup: "mx31lite_baseboard=1". This was done in order to split module
+> > code from baseboard code.
+> >
+> > In case you're using the 2-stage loading mechanism, you need to teach
+> > this to your first-stage loader.
+> >
+> Thanks for the response,
+> 
+>  I have added that parameter and still no love,
+> 
+> LOLO 2.4.0 provides the tags so I simply upload the kernel in elf
+> format and execute it passing the bootstring,
+> I also modified an older second stage bootloader I have from Hasan and
+> added the parameter and tried that for same result.
+> 
+> 
+> > Also make sure you're downloading the full image to RAM from LoLo. The
+> > new kernel is certainly bigger than the version you currently use.
+> >
+> 
+>  I think you are onto something regarding the whole kernel being
+> uploaded tho, as during uncompression I only get 3 periods and with
+> other working kernels I get much more, however it does complete
+> decompression.
 
-Weird, just wondering for what specific reason. Pavel, could you possibly
-paste the failure log if possible?
+That's ok.
 
-> SLUB worked fine in 2.6.33 and SLOB is hidden under CONFIG_EMBEDDED,
-> so it took a while to figure out.
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
->
+> this is why I attempted the Hasan bootloader again as I provide the
+> image as raw and provide the actual size in bytes.
+> this did not give any different results however, and the kernel
+> decompression still stops at 3 periods and states done, booting the
+> kernel.
+> 
+> so using the Hasan bootloader I provide:
+> 
+> load raw 0x81000000 1073016 /tftp/192.168.1.161:zImage
+                      ^^^^^^^
+This is the length of the kernel image, and I doubt this is right. Check
+the size of your zImage file again, it's almost certainly bigger than
+that.
+
+Daniel
