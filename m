@@ -1,57 +1,207 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 16 Apr 2010 14:16:10 -0500
-Subject: [PATCHv4 2.6.34-rc4 6/7] mxc-usb: Add call to initialize MXC USB HW
-	registers
-In-Reply-To: <1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Fri, 16 Apr 2010 14:16:09 -0500
+Subject: [PATCHv4 2.6.34-rc4 5/7] mxc: Add generic USB HW initialization for
+	MX51
+In-Reply-To: <1271445371-18501-4-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
 	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
 	<1271445371-18501-3-git-send-email-Dinh.Nguyen@freescale.com>
 	<1271445371-18501-4-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1271445371-18501-6-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-The placing of the function needs to be before setting the USBMODE
-register to host, since a reset and start is done in
-mxc_initialize_usb_hw.
+This patch adds USB HW initializiation code to /plat-mxc/ehci.c.
+	-Stops and resets USB HW
+	-Sets some specific PHY settings
+	-Stop and restart the USB HW.
+Renames mxc_set_usbcontrol to mxc_initialize_usb_hw.
 
 This patch applies to 2.6.34-rc4.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- drivers/usb/host/ehci-mxc.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/plat-mxc/ehci.c                  |  128 ++++++++++++++++++++++++++++-
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |    2 +-
+ 2 files changed, 127 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index ead59f4..7091b20 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -191,6 +191,11 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 		clk_enable(priv->ahbclk);
+diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
+index cb0b638..35ff1c1 100644
+--- a/arch/arm/plat-mxc/ehci.c
++++ b/arch/arm/plat-mxc/ehci.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License as published by the
+@@ -18,6 +19,7 @@
+ 
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/delay.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/mxc_ehci.h>
+@@ -50,9 +52,14 @@
+ #define MX35_H1_TLL_BIT		(1 << 5)
+ #define MX35_H1_USBTE_BIT	(1 << 4)
+ 
+-int mxc_set_usbcontrol(int port, unsigned int flags)
++int mxc_intialize_usb_hw(int port, unsigned int flags)
+ {
+ 	unsigned int v;
++	void __iomem *usb_base;
++	u32 usbotg_base;
++	u32 usbother_base;
++	int timeout;
++	int ret = 0;
+ #ifdef CONFIG_ARCH_MX3
+ 	if (cpu_is_mx31()) {
+ 		v = readl(MX31_IO_ADDRESS(MX31_OTG_BASE_ADDR +
+@@ -186,9 +193,126 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
+ 		return 0;
  	}
- 
-+	/* setup specific usb hw */
-+	ret = mxc_intialize_usb_hw(pdev->id, pdata->flags);
-+	if (ret < 0)
-+		goto err_init;
+ #endif /* CONFIG_MACH_MX27 */
++#ifdef CONFIG_ARCH_MX51
++	if (cpu_is_mx51()) {
++		usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
 +
- 	/* set USBMODE to host mode */
- 	temp = readl(hcd->regs + USBMODE_OFFSET);
- 	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-@@ -199,11 +204,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
- 	mdelay(10);
++		switch (port) {
++		case 0:	/* OTG port */
++			usbotg_base = (u32)usb_base + USBOTG_OFFSET;
++			break;
++		case 1:	/* Host 1 port */
++			usbotg_base = (u32)usb_base + USBH1_OFFSET;
++			break;
++		default:
++			printk(KERN_ERR"%s no such port %d\n", __func__, port);
++			ret = -ENOENT;
++			goto error;
++		}
++		usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
++
++		/* Stop then Reset */
++		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
++		v &= ~UCMD_RUN_STOP;
++		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
++		timeout = 0x100000;
++		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
++			cpu_relax();
++		if (!timeout) {
++			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
++			ret = -ETIMEDOUT;
++			goto error;
++		}
++
++		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
++		v |= UCMD_RESET;
++		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
++		timeout = 0x100000;
++		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
++			cpu_relax();
++		if (!timeout) {
++			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
++			ret = -ETIMEDOUT;
++			goto error;
++		}
++
++		switch (port) {
++		case 0:	/*OTG port */
++			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
++			v |= USB_UTMI_PHYCTRL_OC_DIS; /* OC is not used */
++			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
++
++			v = __raw_readl(usbother_base + USBCTRL_OFFSET);
++			v &= ~(UCTRL_OPM | UCTRL_OWIE);/* OTG wakeup/power mask disable */
++			__raw_writel(v, usbother_base + USBCTRL_OFFSET);
++
++			/* Set the PHY clock to 19.2MHz */
++			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++			v &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
++			v |= 0x01;
++			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++			break;
++		case 1:	/* Host 1 */
++			/*Host ULPI */
++			v = __raw_readl(usbother_base + USB_CTRL_1_OFFSET);
++			__raw_writel(v | USB_CTRL_UH1_EXT_CLK_EN, usbother_base + USB_CTRL_1_OFFSET);
++
++			v = __raw_readl(usbother_base + USBCTRL_OFFSET);
++			v &= ~(UCTRL_H1WIE | UCTRL_H1UIE);/* HOST1 wakeup/ULPI intr disable */
++			v |= UCTRL_H1PM; /* HOST1 power mask */
++			__raw_writel(v, usbother_base + USBCTRL_OFFSET);
++
++			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
++			v |= USB_UH1_OC_DIS; /* OC is not used */
++			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
++
++			v = __raw_readl(usbotg_base + USBCMD_OFFSET);
++			/* Interrupt Threshold Control:Immediate (no threshold) */
++			v &= UCMD_ITC_NO_THRESHOLD;
++			__raw_writel(v, usbotg_base + USBCMD_OFFSET);
++			break;
++		}
++
++		/* need to reset the controller here so that the ID pin
++		 * is correctly detected.
++		 */
++		/* Stop then Reset */
++		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
++		v &= ~UCMD_RUN_STOP;
++		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
++		timeout = 0x100000;
++		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
++			cpu_relax();
++		if (!timeout) {
++			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
++			ret = -ETIMEDOUT;
++			goto error;
++		}
++
++		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
++		v |= UCMD_RESET;
++		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
++		timeout = 0x100000;
++		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
++			cpu_relax();
++		if (!timeout) {
++			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
++			ret = -ETIMEDOUT;
++			goto error;
++		}
++
++		/* allow controller to reset, and leave time for
++		 * the ULPI transceiver to reset too.
++		 */
++		msleep(100);
++error:
++		iounmap(usb_base);
++		return ret;
++	}
++#endif
+ 	printk(KERN_WARNING
+ 		"%s() unable to setup USBCONTROL for this CPU\n", __func__);
+ 	return -EINVAL;
+ }
+-EXPORT_SYMBOL(mxc_set_usbcontrol);
++EXPORT_SYMBOL(mxc_intialize_usb_hw);
  
--	/* setup USBCONTROL. */
--	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
--	if (ret < 0)
--		goto err_init;
--
- 	/* Initialize the transceiver */
- 	if (pdata->otg) {
- 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index c5b1e7b..e61feac 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -83,7 +83,7 @@ struct mxc_usbh_platform_data {
+ 	struct otg_transceiver	*otg;
+ };
+ 
+-int mxc_set_usbcontrol(int port, unsigned int flags);
++int mxc_intialize_usb_hw(int port, unsigned int flags);
+ 
+ #endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
+ 
 -- 
 1.6.0.4
