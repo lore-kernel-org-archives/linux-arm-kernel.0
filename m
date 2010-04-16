@@ -1,68 +1,26 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 15 Apr 2010 19:35:34 -0500
-Subject: [PATCH] ARM: LPC32XX: Update PHY3250 MTD partition info
-In-Reply-To: <083DF309106F364B939360100EC290F80976AE806D@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1271353494-13831-1-git-send-email-bengardiner@nanometrics.ca>
-	<083DF309106F364B939360100EC290F80976AE806D@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <0D753D10438DA54287A00B0270842697636D69B0FB@AUSP01VMBX24.collaborationhost.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 16 Apr 2010 14:25:16 +0800
+Subject: 2.6.34-rc3 vs zaurus spitz: mistery solved
+In-Reply-To: <20100415180314.GC1443@ucw.cz>
+References: <20100415180314.GC1443@ucw.cz>
+Message-ID: <x2qf17812d71004152325v26785671r23aafd9444614590@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 15, 2010 5:18 PM, Kevin Wells wrote:
-> Hi Ben,
+On Fri, Apr 16, 2010 at 2:03 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
 >
-> Thanks for posting these. The MTD support is currently
-> only available on our GIT server, although we plan on
-> getting the MTD patches into the mtd subtree soon..
+> For some reason, spitz will hang very early in boot with SLUB. With
+> SLOB, it boots fine.
 >
->> Adding the two other partitions of the phycore3250's nand flash:
->> u-boot and the u-boot environment partitions. The former can be useful
->> if you are feeling adventurous and would like to upgrade u-boot. The
->> later is very useful for userspace utilities like fw_setenv which can
->> be used to modify the bootargs for the next reboot or insert many other
->> useful scripts.
->> 
->> In addition, adding these partitions brings the mtdblock numbers back
->> to what they were with the 2.6.27.8 release of the linux kernel shipped
->> with the phycore3250 evm.
->> 
->> Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
->> ---
->>  arch/arm/mach-lpc32xx/phy3250.c |   10 ++++++++++
->>  1 files changed, 10 insertions(+), 0 deletions(-)
->> 
->> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-
->> lpc32xx/phy3250.c
->> index b908d17..2672b63 100644
->> --- a/arch/arm/mach-lpc32xx/phy3250.c
->> +++ b/arch/arm/mach-lpc32xx/phy3250.c
->> @@ -345,6 +345,16 @@ static int nandwp_enable(int enable)
->>  #define BLK_SIZE (512 * 32)
->>  static struct mtd_partition __initdata phy3250_nand_partition[] = {
->>  	{
->> +		.name	= "phy3250-uboot",
->> +		.offset	= 0,
->> +		.size	= (BLK_SIZE * 90)
->> +	},
->> +	{
->> +		.name	= "phy3250-ubt-env",
->> +		.offset	= (BLK_SIZE * 90),
->> +		.size	= (BLK_SIZE * 10)
->> +	},
->> +	{
->>  		.name	= "phy3250-kernel",
->>  		.offset	= (BLK_SIZE * 100),
->>  		.size	= (BLK_SIZE * 256)
+
+Weird, just wondering for what specific reason. Pavel, could you possibly
+paste the failure log if possible?
+
+> SLUB worked fine in 2.6.33 and SLOB is hidden under CONFIG_EMBEDDED,
+> so it took a while to figure out.
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 >
-> This partitioning scheme isn't set it stone yet. We'll look at it
-> again once we get those patches up for review.
-
-The last two offsets could just be:
-
-	.offset	= MTDPART_OFS_APPEND,
-
-That way then automatically align to the next block offset.  It's
-cleaner and will make changing the partitioning scheme easier.
-
-Regards,
-Hartley
