@@ -1,186 +1,423 @@
 From: r.herring@freescale.com (Rob Herring)
-Date: Fri, 16 Apr 2010 14:35:15 -0500
-Subject: [RFC PATCH 01/10] mx51: convert static mappings in clock code
-Message-ID: <1271446524-26450-2-git-send-email-r.herring@freescale.com>
+Date: Fri, 16 Apr 2010 14:35:22 -0500
+Subject: [RFC PATCH 08/10] imx: Add MX53 core support
+Message-ID: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-convert plls and timer to ioremap.
-remove unused defines which are static mappings.
-
 Signed-off-by: Rob Herring <r.herring@freescale.com>
 ---
- arch/arm/mach-mx5/clock-mx51.c |   19 ++++++--
- arch/arm/mach-mx5/crm_regs.h   |  100 ----------------------------------------
- 2 files changed, 14 insertions(+), 105 deletions(-)
+ arch/arm/mach-mx5/Kconfig                    |    7 +++-
+ arch/arm/mach-mx5/Makefile.boot              |    9 +++--
+ arch/arm/mach-mx5/clock.c                    |   44 ++++++++++++++++++++++++
+ arch/arm/mach-mx5/cpu.c                      |    4 +-
+ arch/arm/mach-mx5/mm.c                       |   17 ++++++++-
+ arch/arm/plat-mxc/devices.c                  |   13 +++++++
+ arch/arm/plat-mxc/include/mach/common.h      |    3 ++
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    9 +++++
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h  |   47 ++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/irqs.h        |    2 +
+ arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
+ arch/arm/plat-mxc/include/mach/mx51.h        |    6 +++
+ arch/arm/plat-mxc/include/mach/mxc.h         |   13 +++++++
+ 13 files changed, 169 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/iomux-mx53.h
 
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index 1ee6ce4..726b7fe 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -38,6 +38,10 @@ static struct clk periph_apm_clk;
- static struct clk ahb_clk;
- static struct clk ipg_clk;
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 1576d51..12e9ce7 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -2,7 +2,11 @@ if ARCH_MX5
  
-+static void __iomem *pll1_base;
-+static void __iomem *pll2_base;
-+static void __iomem *pll3_base;
+ config ARCH_MX51
+ 	bool
+-	default y
++	select MXC_TZIC
++	select ARCH_MXC_IOMUX_V3
 +
++config ARCH_MX53
++	bool
+ 	select MXC_TZIC
+ 	select ARCH_MXC_IOMUX_V3
+ 
+@@ -10,6 +14,7 @@ comment "MX5 platforms:"
+ 
+ config MACH_MX51_BABBAGE
+ 	bool "Support MX51 BABBAGE platforms"
++	select ARCH_MX51
+ 	help
+ 	  Include support for MX51 Babbage platform, also known as MX51EVK in
+ 	  u-boot. This includes specific configurations for the board and its
+diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+index 9939a19..741f604 100644
+--- a/arch/arm/mach-mx5/Makefile.boot
++++ b/arch/arm/mach-mx5/Makefile.boot
+@@ -1,3 +1,6 @@
+-   zreladdr-y	:= 0x90008000
+-params_phys-y	:= 0x90000100
+-initrd_phys-y	:= 0x90800000
++   zreladdr-$(CONFIG_ARCH_MX51)	:= 0x90008000
++params_phys-$(CONFIG_ARCH_MX51)	:= 0x90000100
++initrd_phys-$(CONFIG_ARCH_MX51)	:= 0x90800000
++   zreladdr-$(CONFIG_ARCH_MX53)	:= 0x70008000
++params_phys-$(CONFIG_ARCH_MX53)	:= 0x70000100
++initrd_phys-$(CONFIG_ARCH_MX53)	:= 0x70800000
+diff --git a/arch/arm/mach-mx5/clock.c b/arch/arm/mach-mx5/clock.c
+index 726b7fe..6d0968d 100644
+--- a/arch/arm/mach-mx5/clock.c
++++ b/arch/arm/mach-mx5/clock.c
+@@ -33,6 +33,7 @@ static struct clk pll1_main_clk;
+ static struct clk pll1_sw_clk;
+ static struct clk pll2_sw_clk;
+ static struct clk pll3_sw_clk;
++static struct clk pll4_sw_clk;
+ static struct clk lp_apm_clk;
+ static struct clk periph_apm_clk;
+ static struct clk ahb_clk;
+@@ -41,6 +42,7 @@ static struct clk ipg_clk;
+ static void __iomem *pll1_base;
+ static void __iomem *pll2_base;
+ static void __iomem *pll3_base;
++static void __iomem *pll4_base;
+ 
  #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
  
- static int _clk_ccgr_enable(struct clk *clk)
-@@ -93,11 +97,11 @@ static inline u32 _get_mux(struct clk *parent, struct clk *m0,
- static inline void __iomem *_get_pll_base(struct clk *pll)
- {
- 	if (pll == &pll1_main_clk)
--		return MX51_DPLL1_BASE;
-+		return pll1_base;
- 	else if (pll == &pll2_sw_clk)
--		return MX51_DPLL2_BASE;
-+		return pll2_base;
+@@ -102,6 +104,8 @@ static inline void __iomem *_get_pll_base(struct clk *pll)
+ 		return pll2_base;
  	else if (pll == &pll3_sw_clk)
--		return MX51_DPLL3_BASE;
-+		return pll3_base;
+ 		return pll3_base;
++	else if (pll == &pll4_sw_clk)
++		return pll4_base;
  	else
  		BUG();
  
-@@ -805,6 +809,11 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 			unsigned long ckih1, unsigned long ckih2)
- {
- 	int i;
-+	__iomem void *base;
+@@ -654,6 +658,15 @@ static struct clk pll3_sw_clk = {
+ 	.disable = _clk_pll_disable,
+ };
+ 
++/* PLL4 SW supplies to display clocks */
++static struct clk pll4_sw_clk = {
++	.parent = &osc_clk,
++	.set_rate = _clk_pll_set_rate,
++	.get_rate = clk_pll_get_rate,
++	.enable = _clk_pll_enable,
++	.disable = _clk_pll_disable,
++};
 +
-+	pll1_base = ioremap(MX51_PLL1_BASE_ADDR, SZ_4K);
-+	pll2_base = ioremap(MX51_PLL2_BASE_ADDR, SZ_4K);
-+	pll3_base = ioremap(MX51_PLL3_BASE_ADDR, SZ_4K);
- 
- 	external_low_reference = ckil;
- 	external_high_reference = ckih1;
-@@ -820,7 +829,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 	clk_enable(&main_bus_clk);
- 
- 	/* System timer */
--	mxc_timer_init(&gpt_clk, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
--		MX51_MXC_INT_GPT);
-+	base = ioremap(MX51_GPT1_BASE_ADDR, SZ_4K);
-+	mxc_timer_init(&gpt_clk, base, MX51_MXC_INT_GPT);
+ /* Low-power Audio Playback Mode clock */
+ static struct clk lp_apm_clk = {
+ 	.parent = &osc_clk,
+@@ -833,3 +846,34 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 	mxc_timer_init(&gpt_clk, base, MX51_MXC_INT_GPT);
  	return 0;
  }
-diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
-index c776b9a..fbeb928 100644
---- a/arch/arm/mach-mx5/crm_regs.h
-+++ b/arch/arm/mach-mx5/crm_regs.h
-@@ -12,11 +12,6 @@
- #define __ARCH_ARM_MACH_MX51_CRM_REGS_H__
++
++int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
++			unsigned long ckih1, unsigned long ckih2)
++{
++	int i;
++	__iomem void *base;
++
++	pll1_base = ioremap(MX5x_FIXUP_ADDR(MX51_PLL1_BASE_ADDR), SZ_4K);
++	pll2_base = ioremap(MX5x_FIXUP_ADDR(MX51_PLL2_BASE_ADDR), SZ_4K);
++	pll3_base = ioremap(MX5x_FIXUP_ADDR(MX51_PLL3_BASE_ADDR), SZ_4K);
++	pll4_base = ioremap(MX5x_FIXUP_ADDR(MX5x_PLL4_BASE_ADDR), SZ_4K);
++
++	external_low_reference = ckil;
++	external_high_reference = ckih1;
++	ckih2_reference = ckih2;
++	oscillator_reference = osc;
++
++	for (i = 0; i < ARRAY_SIZE(lookups); i++)
++		clkdev_add(&lookups[i]);
++
++	clk_tree_init();
++
++	clk_enable(&cpu_clk);
++	clk_enable(&main_bus_clk);
++
++	/* System timer */
++	base = ioremap(MX5x_FIXUP_ADDR(MX51_GPT1_BASE_ADDR), SZ_4K);
++	mxc_timer_init(&gpt_clk, base, MX51_MXC_INT_GPT);
++	return 0;
++}
++
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 283ab7e..e5e0e30 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -78,7 +78,7 @@ static int __init post_cpu_init(void)
+ 	if (!cpu_is_mx51())
+ 		return 0;
  
- #define MX51_CCM_BASE		MX51_IO_ADDRESS(MX51_CCM_BASE_ADDR)
--#define MX51_DPLL1_BASE		MX51_IO_ADDRESS(MX51_PLL1_BASE_ADDR)
--#define MX51_DPLL2_BASE		MX51_IO_ADDRESS(MX51_PLL2_BASE_ADDR)
--#define MX51_DPLL3_BASE		MX51_IO_ADDRESS(MX51_PLL3_BASE_ADDR)
--#define MX51_CORTEXA8_BASE	MX51_IO_ADDRESS(MX51_ARM_BASE_ADDR)
--#define MX51_GPC_BASE		MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
+-	base = ioremap(MX51_AIPS1_BASE_ADDR, SZ_4K);
++	base = ioremap(MX5x_FIXUP_ADDR(MX51_AIPS1_BASE_ADDR), SZ_4K);
+ 	__raw_writel(0x0, base + 0x40);
+ 	__raw_writel(0x0, base + 0x44);
+ 	__raw_writel(0x0, base + 0x48);
+@@ -87,7 +87,7 @@ static int __init post_cpu_init(void)
+ 	__raw_writel(reg, base + 0x50);
+ 	iounmap(base);
  
- /* PLL Register Offsets */
- #define MXC_PLL_DP_CTL			0x00
-@@ -485,99 +480,4 @@
- #define MXC_CCM_CCGRx_CG1_OFFSET			2
- #define MXC_CCM_CCGRx_CG0_OFFSET			0
+-	base = ioremap(MX51_AIPS2_BASE_ADDR, SZ_4K);
++	base = ioremap(MX5x_FIXUP_ADDR(MX51_AIPS2_BASE_ADDR), SZ_4K);
+ 	__raw_writel(0x0, base + 0x40);
+ 	__raw_writel(0x0, base + 0x44);
+ 	__raw_writel(0x0, base + 0x48);
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index 8ad1d0c..1b0cf12 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -43,10 +43,12 @@ void __init mx5_map_io(void)
+ 	void __iomem *base;
  
--#define MXC_DPTC_LP_BASE	(MX51_GPC_BASE + 0x80)
--#define MXC_DPTC_GP_BASE	(MX51_GPC_BASE + 0x100)
--#define MXC_DVFS_CORE_BASE	(MX51_GPC_BASE + 0x180)
--#define MXC_DPTC_PER_BASE	(MX51_GPC_BASE + 0x1C0)
--#define MXC_PGC_IPU_BASE	(MX51_GPC_BASE + 0x220)
--#define MXC_PGC_VPU_BASE	(MX51_GPC_BASE + 0x240)
--#define MXC_PGC_GPU_BASE	(MX51_GPC_BASE + 0x260)
--#define MXC_SRPG_NEON_BASE	(MX51_GPC_BASE + 0x280)
--#define MXC_SRPG_ARM_BASE	(MX51_GPC_BASE + 0x2A0)
--#define MXC_SRPG_EMPGC0_BASE	(MX51_GPC_BASE + 0x2C0)
--#define MXC_SRPG_EMPGC1_BASE	(MX51_GPC_BASE + 0x2D0)
--#define MXC_SRPG_MEGAMIX_BASE	(MX51_GPC_BASE + 0x2E0)
--#define MXC_SRPG_EMI_BASE	(MX51_GPC_BASE + 0x300)
--
--/* CORTEXA8 platform */
--#define MXC_CORTEXA8_PLAT_PVID		(MX51_CORTEXA8_BASE + 0x0)
--#define MXC_CORTEXA8_PLAT_GPC		(MX51_CORTEXA8_BASE + 0x4)
--#define MXC_CORTEXA8_PLAT_PIC		(MX51_CORTEXA8_BASE + 0x8)
--#define MXC_CORTEXA8_PLAT_LPC		(MX51_CORTEXA8_BASE + 0xC)
--#define MXC_CORTEXA8_PLAT_NEON_LPC	(MX51_CORTEXA8_BASE + 0x10)
--#define MXC_CORTEXA8_PLAT_ICGC		(MX51_CORTEXA8_BASE + 0x14)
--#define MXC_CORTEXA8_PLAT_AMC		(MX51_CORTEXA8_BASE + 0x18)
--#define MXC_CORTEXA8_PLAT_NMC		(MX51_CORTEXA8_BASE + 0x20)
--#define MXC_CORTEXA8_PLAT_NMS		(MX51_CORTEXA8_BASE + 0x24)
--
--/* DVFS CORE */
--#define MXC_DVFSTHRS		(MXC_DVFS_CORE_BASE + 0x00)
--#define MXC_DVFSCOUN		(MXC_DVFS_CORE_BASE + 0x04)
--#define MXC_DVFSSIG1		(MXC_DVFS_CORE_BASE + 0x08)
--#define MXC_DVFSSIG0		(MXC_DVFS_CORE_BASE + 0x0C)
--#define MXC_DVFSGPC0		(MXC_DVFS_CORE_BASE + 0x10)
--#define MXC_DVFSGPC1		(MXC_DVFS_CORE_BASE + 0x14)
--#define MXC_DVFSGPBT		(MXC_DVFS_CORE_BASE + 0x18)
--#define MXC_DVFSEMAC		(MXC_DVFS_CORE_BASE + 0x1C)
--#define MXC_DVFSCNTR		(MXC_DVFS_CORE_BASE + 0x20)
--#define MXC_DVFSLTR0_0		(MXC_DVFS_CORE_BASE + 0x24)
--#define MXC_DVFSLTR0_1		(MXC_DVFS_CORE_BASE + 0x28)
--#define MXC_DVFSLTR1_0		(MXC_DVFS_CORE_BASE + 0x2C)
--#define MXC_DVFSLTR1_1		(MXC_DVFS_CORE_BASE + 0x30)
--#define MXC_DVFSPT0 		(MXC_DVFS_CORE_BASE + 0x34)
--#define MXC_DVFSPT1 		(MXC_DVFS_CORE_BASE + 0x38)
--#define MXC_DVFSPT2 		(MXC_DVFS_CORE_BASE + 0x3C)
--#define MXC_DVFSPT3 		(MXC_DVFS_CORE_BASE + 0x40)
--
--/* GPC */
--#define MXC_GPC_CNTR		(MX51_GPC_BASE + 0x0)
--#define MXC_GPC_PGR		(MX51_GPC_BASE + 0x4)
--#define MXC_GPC_VCR		(MX51_GPC_BASE + 0x8)
--#define MXC_GPC_ALL_PU		(MX51_GPC_BASE + 0xC)
--#define MXC_GPC_NEON		(MX51_GPC_BASE + 0x10)
--#define MXC_GPC_PGR_ARMPG_OFFSET	8
--#define MXC_GPC_PGR_ARMPG_MASK		(3 << 8)
--
--/* PGC */
--#define MXC_PGC_IPU_PGCR	(MXC_PGC_IPU_BASE + 0x0)
--#define MXC_PGC_IPU_PGSR	(MXC_PGC_IPU_BASE + 0xC)
--#define MXC_PGC_VPU_PGCR	(MXC_PGC_VPU_BASE + 0x0)
--#define MXC_PGC_VPU_PGSR	(MXC_PGC_VPU_BASE + 0xC)
--#define MXC_PGC_GPU_PGCR	(MXC_PGC_GPU_BASE + 0x0)
--#define MXC_PGC_GPU_PGSR	(MXC_PGC_GPU_BASE + 0xC)
--
--#define MXC_PGCR_PCR		1
--#define MXC_SRPGCR_PCR		1
--#define MXC_EMPGCR_PCR		1
--#define MXC_PGSR_PSR		1
--
--
--#define MXC_CORTEXA8_PLAT_LPC_DSM	(1 << 0)
--#define MXC_CORTEXA8_PLAT_LPC_DBG_DSM	(1 << 1)
--
--/* SRPG */
--#define MXC_SRPG_NEON_SRPGCR	(MXC_SRPG_NEON_BASE + 0x0)
--#define MXC_SRPG_NEON_PUPSCR	(MXC_SRPG_NEON_BASE + 0x4)
--#define MXC_SRPG_NEON_PDNSCR	(MXC_SRPG_NEON_BASE + 0x8)
--
--#define MXC_SRPG_ARM_SRPGCR	(MXC_SRPG_ARM_BASE + 0x0)
--#define MXC_SRPG_ARM_PUPSCR	(MXC_SRPG_ARM_BASE + 0x4)
--#define MXC_SRPG_ARM_PDNSCR	(MXC_SRPG_ARM_BASE + 0x8)
--
--#define MXC_SRPG_EMPGC0_SRPGCR	(MXC_SRPG_EMPGC0_BASE + 0x0)
--#define MXC_SRPG_EMPGC0_PUPSCR	(MXC_SRPG_EMPGC0_BASE + 0x4)
--#define MXC_SRPG_EMPGC0_PDNSCR	(MXC_SRPG_EMPGC0_BASE + 0x8)
--
--#define MXC_SRPG_EMPGC1_SRPGCR	(MXC_SRPG_EMPGC1_BASE + 0x0)
--#define MXC_SRPG_EMPGC1_PUPSCR	(MXC_SRPG_EMPGC1_BASE + 0x4)
--#define MXC_SRPG_EMPGC1_PDNSCR	(MXC_SRPG_EMPGC1_BASE + 0x8)
--
--#define MXC_SRPG_MEGAMIX_SRPGCR		(MXC_SRPG_MEGAMIX_BASE + 0x0)
--#define MXC_SRPG_MEGAMIX_PUPSCR		(MXC_SRPG_MEGAMIX_BASE + 0x4)
--#define MXC_SRPG_MEGAMIX_PDNSCR		(MXC_SRPG_MEGAMIX_BASE + 0x8)
--
--#define MXC_SRPGC_EMI_SRPGCR	(MXC_SRPGC_EMI_BASE + 0x0)
--#define MXC_SRPGC_EMI_PUPSCR	(MXC_SRPGC_EMI_BASE + 0x4)
--#define MXC_SRPGC_EMI_PDNSCR	(MXC_SRPGC_EMI_BASE + 0x8)
--
- #endif				/* __ARCH_ARM_MACH_MX51_CRM_REGS_H__ */
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
++	if (cpu_is_mx53())
++		mxc_io_desc[0].pfn -= __phys_to_pfn(0x20000000);
+ 
+-	base = ioremap(MX51_IOMUXC_BASE_ADDR, SZ_4K);
++	base = ioremap(MX5x_FIXUP_ADDR(MX51_IOMUXC_BASE_ADDR), SZ_4K);
+ 	mxc_iomux_v3_init(base);
+-	base = ioremap(MX51_WDOG_BASE_ADDR, SZ_4K);
++	base = ioremap(MX5x_FIXUP_ADDR(MX51_WDOG_BASE_ADDR), SZ_4K);
+ 	mxc_arch_reset_init(base);
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+ }
+@@ -67,3 +69,14 @@ void __init mx51_init_irq(void)
+ 
+ 	tzic_init_irq(tzic_virt);
+ }
++
++void __init mx5x_init_irq(void)
++{
++	void __iomem *tzic_virt;
++
++	tzic_virt = ioremap(MX5x_TZIC_BASE_ADDR, SZ_4K);
++	if (!tzic_virt)
++		panic("unable to map TZIC interrupt controller\n");
++	tzic_init_irq(tzic_virt);
++}
++
+diff --git a/arch/arm/plat-mxc/devices.c b/arch/arm/plat-mxc/devices.c
+index 56f2fb5..7c4c722 100644
+--- a/arch/arm/plat-mxc/devices.c
++++ b/arch/arm/plat-mxc/devices.c
+@@ -20,13 +20,26 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
++#include <mach/hardware.h>
+ 
+ int __init mxc_register_device(struct platform_device *pdev, void *data)
+ {
+ 	int ret;
++	int i;
+ 
+ 	pdev->dev.platform_data = data;
+ 
++	if (cpu_is_mx53()) {
++		for (i = 0; i < pdev->num_resources; i++) {
++			struct resource *r = &pdev->resource[i];
++			if (resource_type(r) != IORESOURCE_MEM)
++				continue;
++
++			r->start = MX5x_FIXUP_ADDR(r->start);
++			r->end = MX5x_FIXUP_ADDR(r->end);
++		}
++	}
++
+ 	ret = platform_device_register(pdev);
+ 	if (ret)
+ 		pr_debug("Unable to register platform device '%s': %d\n",
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 0766746..478cf7b 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -31,6 +31,7 @@ extern void mx27_init_irq(void);
+ extern void mx31_init_irq(void);
+ extern void mx35_init_irq(void);
+ extern void mx51_init_irq(void);
++extern void mx5x_init_irq(void);
+ extern void mxc91231_init_irq(void);
+ extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
+ extern int mx1_clocks_init(unsigned long fref);
+@@ -41,6 +42,8 @@ extern int mx31_clocks_init(unsigned long fref);
+ extern int mx35_clocks_init(void);
+ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
++extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
++			unsigned long ckih1, unsigned long ckih2);
+ extern int mxc91231_clocks_init(unsigned long fref);
+ extern int mxc_register_gpios(void);
+ extern int mxc_register_device(struct platform_device *pdev, void *data);
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index a99eedf..b71cb57 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -54,6 +54,15 @@
+ #define UART_VADDR	MX51_AIPS1_IO_ADDRESS(MX51_UART1_BASE_ADDR)
+ #endif
+ 
++#ifdef CONFIG_ARCH_MX53
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#include <mach/mx51.h>
++#define UART_PADDR	(MX51_UART1_BASE_ADDR - 0x20000000)
++#define UART_VADDR	MX51_AIPS1_IO_ADDRESS(MX51_UART1_BASE_ADDR)
++#endif
++
+ #ifdef CONFIG_ARCH_MXC91231
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+new file mode 100644
+index 0000000..38497d9
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __MACH_IOMUX_MX51_H__
++#define __MACH_IOMUX_MX51_H__
++
++#include <mach/iomux-v3.h>
++
++/*
++ * various IOMUX alternate output functions (1-7)
++ */
++typedef enum iomux_config {
++	IOMUX_CONFIG_ALT0,
++	IOMUX_CONFIG_ALT1,
++	IOMUX_CONFIG_ALT2,
++	IOMUX_CONFIG_ALT3,
++	IOMUX_CONFIG_ALT4,
++	IOMUX_CONFIG_ALT5,
++	IOMUX_CONFIG_ALT6,
++	IOMUX_CONFIG_ALT7,
++	IOMUX_CONFIG_GPIO,	/* added to help user use GPIO mode */
++	IOMUX_CONFIG_SION = 0x1 << 4,	/* LOOPBACK:MUX SION bit */
++} iomux_pin_cfg_t;
++
++/* Pad control groupings */
++#define MX53_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
++				PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST)
++
++/*
++ * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
++ * If <padname> or <padmode> refers to a GPIO, it is named
++ * GPIO_<unit>_<num> see also iomux-v3.h
++ */
++
++/*						PAD      MUX   ALT INPSE PATH PADCTRL */
++#define MX53_PAD_CSI0_D11__UART1_RXD	IOMUX_PAD(0x418, 0xEC, IOMUX_CONFIG_ALT2, 0x878, 1, MX53_UART1_PAD_CTRL)
++#define MX53_PAD_CSI0_D10__UART1_TXD	IOMUX_PAD(0x414, 0xE8, IOMUX_CONFIG_ALT2, 0x0, 0, MX53_UART1_PAD_CTRL)
++
++#endif /* __MACH_IOMUX_MX51_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+index 769a137..c8b7feb 100644
+--- a/arch/arm/plat-mxc/include/mach/irqs.h
++++ b/arch/arm/plat-mxc/include/mach/irqs.h
+@@ -25,6 +25,8 @@
+ /* these are ordered by size to support multi-SoC kernels */
+ #if defined CONFIG_ARCH_MX2
+ #define MXC_GPIO_IRQS		(32 * 6)
++#elif defined CONFIG_ARCH_MX53
++#define MXC_GPIO_IRQS		(32 * 6)
+ #elif defined CONFIG_ARCH_MX1
+ #define MXC_GPIO_IRQS		(32 * 4)
+ #elif defined CONFIG_ARCH_MX25
+diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+index 05e5b75..53275a6 100644
+--- a/arch/arm/plat-mxc/include/mach/memory.h
++++ b/arch/arm/plat-mxc/include/mach/memory.h
+@@ -17,6 +17,7 @@
+ #define MX27_PHYS_OFFSET	UL(0xa0000000)
+ #define MX3x_PHYS_OFFSET	UL(0x80000000)
+ #define MX51_PHYS_OFFSET	UL(0x90000000)
++#define MX53_PHYS_OFFSET	UL(0x70000000)
+ #define MXC91231_PHYS_OFFSET	UL(0x90000000)
+ 
+ #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
+@@ -34,6 +35,8 @@
+ #  define PHYS_OFFSET		MXC91231_PHYS_OFFSET
+ # elif defined CONFIG_ARCH_MX51
+ #  define PHYS_OFFSET		MX51_PHYS_OFFSET
++# elif defined CONFIG_ARCH_MX53
++#  define PHYS_OFFSET		MX53_PHYS_OFFSET
+ # endif
+ #endif
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index b83963f..7759df7 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -55,6 +55,7 @@
+ 
+ #define MX51_TZIC_BASE_ADDR_TO1		0x8FFFC000
+ #define MX51_TZIC_BASE_ADDR		0xE0000000
++#define MX5x_TZIC_BASE_ADDR		0x0FFFC000
+ 
+ #define MX51_DEBUG_BASE_ADDR		0x60000000
+ #define MX51_DEBUG_SIZE			(36 * SZ_1K)
+@@ -170,6 +171,7 @@
+ #define MX51_PLL1_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00080000)
+ #define MX51_PLL2_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00084000)
+ #define MX51_PLL3_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00088000)
++#define MX5x_PLL4_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x0008C000)
+ #define MX51_AHBMAX_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00094000)
+ #define MX51_IIM_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00098000)
+ #define MX51_CSU_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x0009C000)
+@@ -234,6 +236,10 @@
+ 	(MX51_IS_MODULE(x, AIPS1) ? MX51_AIPS1_IO_ADDRESS(x) :	\
+ 	0xDEADBEEF)
+ 
++#define MX5x_FIXUP_ADDR(x) ((cpu_is_mx53() && \
++	(MX51_IS_MODULE(x, AIPS1) || MX51_IS_MODULE(x, AIPS2) || MX51_IS_MODULE(x, SPBA0))) ? \
++	((x) - 0x20000000) : (x))
++
+ /*
+  * define the address mapping macros: in physical address order
+  */
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index ec85f14..b77f71e 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -31,6 +31,7 @@
+ #define MXC_CPU_MX31		31
+ #define MXC_CPU_MX35		35
+ #define MXC_CPU_MX51		51
++#define MXC_CPU_MX53		53
+ #define MXC_CPU_MXC91231	91231
+ 
+ #ifndef __ASSEMBLY__
+@@ -121,6 +122,18 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx51()		(0)
+ #endif
+ 
++#ifdef CONFIG_ARCH_MX53
++# ifdef mxc_cpu_type
++#  undef mxc_cpu_type
++#  define mxc_cpu_type __mxc_cpu_type
++# else
++#  define mxc_cpu_type MXC_CPU_MX53
++# endif
++# define cpu_is_mx53()		(mxc_cpu_type == MXC_CPU_MX53)
++#else
++# define cpu_is_mx53()		(0)
++#endif
++
+ #ifdef CONFIG_ARCH_MXC91231
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
 -- 
 1.6.0.4
