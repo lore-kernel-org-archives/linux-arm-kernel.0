@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 17 Apr 2010 13:34:51 +0800
-Subject: [PATCH 2/4] ASoC: split pxa ssp for reusing code
-Message-ID: <w2j771cded01004162234j579e1ea9p604fde978b680545@mail.gmail.com>
+Date: Sat, 17 Apr 2010 13:36:03 +0800
+Subject: [PATCH 3/4] ASoC: support pxa168 ssp in ASoC
+Message-ID: <w2t771cded01004162236m32c46db0t14ad4d17fc5faa68@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
