@@ -1,39 +1,51 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 17 Apr 2010 06:58:49 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-In-Reply-To: <t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
-References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
-	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
-	<t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
-Message-ID: <q2o63386a3d1004162158v296379fat2b376d5c4c087378@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sat, 17 Apr 2010 07:59:13 +0300
+Subject: [spi-devel-general] [PATCH v3 0/2] spi: driver for Cirrus
+	EP93xx SPI controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1271156934.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100417045913.GA19534@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/4/15 Dan Williams <dan.j.williams@intel.com>:
+On Fri, Apr 16, 2010 at 01:28:05PM -0500, H Hartley Sweeten wrote:
+> 
+> I finally was able to get this working on my system.  Not sure what the issue
+> was earlier.
 
-> Getting closer... I have pushed out the dma40 driver (v3), 4, and 6.
+Great :)
 
-That's great!
+> The only thing I don't like right off hand is the chip select handling.
+> 
+> The way it currently is done you are limited to using only the built-in GPIO's
+> of the EP93xx.  This prohibits a system from using an external i2c/spi/etc.
+> gpio expander to provide more chip selects.  And if a platform is not setup
+> correctly, the BUG_ON in cs_to_gpio in your example for the tx72xx is pretty
+> nasty.
 
-> The other patch in -mm I could take as well but that needs an ack from
-> Russell.
+Yes the example was just a hack.
 
-Nah, I'll push that in through Russells tree hopefully, it needs rebasing on
-the latest board setup code anyway.
+However, I'm not sure what you mean by limited only to built-in GPIOs? Currently
+the driver does:
 
-> 5 is pending the review comment and 9 does not apply cleanly (does it
-> depend on something in the spi tree?)
+        info->cs_control(spi->chip_select, value, info->data);
 
-OK I'm sending updated versions soon, along with a DMA40 bug fix
-all on top of async_tx instead.
+when it wants to assert/deassert the chip select. I don't see how this is
+limited to built-in GPIOs only (maybe I'm missing something). Now it is in
+responsibility of platform board files to allocate necessary chipselect lines,
+and translate 'spi->chip_select' and 'value' to something meaningful.
 
-Number 9 fails since it is based on -next where all the #include <slab.h>
-business has taken place, I don't know how that is resolved in the end
-but it now includes that include and applies cleanly on async_tx.
+> Ryan and I worked out a runtime setup/cleanup for the spi device chip selects
+> in the spi driver I have in my tree.  I will take a look at it and see how
+> much trouble it will be to implement in your driver.
 
-I'll keep working on getting the PL011 and PL180 DMA tested on the
-RealView somehow so those can also be accepted.
+Ok.
 
-Your,
-Linus Walleij
+> Anyway, now that I have your driver functioning I will be able to actually
+> provide some feedback to you.
+
+That sounds good.
+
+Thanks,
+MW
