@@ -1,26 +1,59 @@
-From: buildroot@browserseal.com (Sasha Sirotkin)
-Date: Sat, 17 Apr 2010 10:44:15 +0300
-Subject: Question about ARM set_pte_ext
-Message-ID: <4BC966CF.9040503@browserseal.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 17 Apr 2010 13:45:44 +0530
+Subject: [PATCH v2] ARM: Fix "BUG: scheduling while atomic:
+	swapper/0/0x00000002
+Message-ID: <1271492144-26995-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm still trying to understand the peculiarities of ARMv5 memory 
-management...
+This patch fixes the preempt leak in the cpuidle path invoked from
+cpu-hotplug. The fix is suggested by Russell King and is based
+on x86 idea of calling init_idle() on the idle task when it's
+re-used which also resets the preempt count amongst other things
 
-I have a question about ARM set_pte_ext or armv3_set_pte_ext to be more 
-specific.
-In the following lines
+dump:
+BUG: scheduling while atomic: swapper/0/0x00000002
+Modules linked in:
+Backtrace:
+[<c0024f90>] (dump_backtrace+0x0/0x110) from [<c0173bc4>] (dump_stack+0x18/0x1c)
+ r7:c02149e4 r6:c033df00 r5:c7836000 r4:00000000
+[<c0173bac>] (dump_stack+0x0/0x1c) from [<c003b4f0>] (__schedule_bug+0x60/0x70)
+[<c003b490>] (__schedule_bug+0x0/0x70) from [<c0174214>] (schedule+0x98/0x7b8)
+ r5:c7836000 r4:c7836000
+[<c017417c>] (schedule+0x0/0x7b8) from [<c00228c4>] (cpu_idle+0xb4/0xd4)
+# [<c0022810>] (cpu_idle+0x0/0xd4) from [<c0171dd8>] (secondary_start_kernel+0xe0/0xf0)
+ r5:c7836000 r4:c0205f40
+[<c0171cf8>] (secondary_start_kernel+0x0/0xf0) from [<c002d57c>] (prm_rmw_mod_reg_bits+0x88/0xa4)
+ r7:c02149e4 r6:00000001 r5:00000001 r4:c7836000
+Backtrace aborted due to bad frame pointer <c7837fbc>
 
-    tst    r3, #L_PTE_USER            @ user?
-    orrne    r2, r2, #PTE_SMALL_AP_URO_SRW
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Sundar R IYER <sundar.iyer@stericsson.com>
+---
+ arch/arm/kernel/smp.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-We are testing for L_PTE_USER not being set. Why not?
-
-Another question is about S & R bits of CP15 register 1, which on ARMv5 
-are used to control memory access in combination with AP bits. As 
-changing S & R bits requires to reset the MMU, basically it is 
-impossible to use them, if I wanted to configured a certain page to be, 
-for instance, read-only for both kernel and user modes?
-
-Thanks.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 57162af..3e14629 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -86,8 +86,14 @@ int __cpuinit __cpu_up(unsigned int cpu)
+ 			return PTR_ERR(idle);
+ 		}
+ 		ci->idle = idle;
++	} else {
++		/*
++		 * Since idle thread getting re-used, call
++		 * init_idle() to set up the idle thread for given
++		 * CPU. Additionally it also resets the preempt count
++		 */
++		init_idle(idle, cpu);
+ 	}
+-
+ 	/*
+ 	 * Allocate initial page tables to allow the new CPU to
+ 	 * enable the MMU safely.  This essentially means a set
+-- 
+1.6.0.4
