@@ -1,152 +1,241 @@
-From: xiaoxianghua@gmail.com (Xianghua Xiao)
-Date: Sat, 17 Apr 2010 11:00:03 -0500
-Subject: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-In-Reply-To: <1271446524-26450-11-git-send-email-r.herring@freescale.com>
-References: <1271446524-26450-11-git-send-email-r.herring@freescale.com>
-Message-ID: <l2xe6bf505b1004170900of2300635va0457cd61780bd11@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Sat, 17 Apr 2010 19:07:07 +0200
+Subject: [PATCHv4 2.6.34-rc4 5/7] mxc: Add generic USB HW
+	initialization for MX51
+In-Reply-To: <1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-4-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100417170706.GY30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a dumb question here, I know Freescale has evk for i.mx51, what's this
-mx53 evk here? I did not find anything related at freescale.com
-either.
-thanks,
+On Fri, Apr 16, 2010 at 02:16:09PM -0500, Dinh.Nguyen at freescale.com wrote:
+> This patch adds USB HW initializiation code to /plat-mxc/ehci.c.
+> 	-Stops and resets USB HW
+> 	-Sets some specific PHY settings
+> 	-Stop and restart the USB HW.
+> Renames mxc_set_usbcontrol to mxc_initialize_usb_hw.
+> 
+> This patch applies to 2.6.34-rc4.
 
-On Fri, Apr 16, 2010 at 2:35 PM, Rob Herring <r.herring@freescale.com> wrote:
-> Signed-off-by: Rob Herring <r.herring@freescale.com>
+Yes, the whole series looks _much_ better now, thanks!
+Some minor things below.
+
+
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > ---
-> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ?| ? ?7 +++
-> ?arch/arm/mach-mx5/Makefile ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mx5/board-mx53_evk.c | ? 88 ++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 96 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-mx5/board-mx53_evk.c
->
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index 12e9ce7..cc08120 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -20,4 +20,11 @@ config MACH_MX51_BABBAGE
-> ? ? ? ? ?u-boot. This includes specific configurations for the board and its
-> ? ? ? ? ?peripherals.
->
-> +config MACH_MX53_EVK
-> + ? ? ? bool "Support MX53 EVK platform"
-> + ? ? ? select ARCH_MX53
-> + ? ? ? help
-> + ? ? ? ? Include support for MX53 EVK platform. This includes specific
-> + ? ? ? ? configurations for the board and its peripherals.
+>  arch/arm/plat-mxc/ehci.c                  |  128 ++++++++++++++++++++++++++++-
+>  arch/arm/plat-mxc/include/mach/mxc_ehci.h |    2 +-
+>  2 files changed, 127 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
+> index cb0b638..35ff1c1 100644
+> --- a/arch/arm/plat-mxc/ehci.c
+> +++ b/arch/arm/plat-mxc/ehci.c
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify it
+>   * under the terms of the GNU General Public License as published by the
+> @@ -18,6 +19,7 @@
+>  
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+> +#include <linux/delay.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/mxc_ehci.h>
+> @@ -50,9 +52,14 @@
+>  #define MX35_H1_TLL_BIT		(1 << 5)
+>  #define MX35_H1_USBTE_BIT	(1 << 4)
+>  
+> -int mxc_set_usbcontrol(int port, unsigned int flags)
+> +int mxc_intialize_usb_hw(int port, unsigned int flags)
+
+This patch and the next one should be merged into one. The reason is
+that you rename a function here and the next patch follows that change.
+Especially when bisecting, this can lead to uncompilable checkouts of
+the tree when stopping in the middle.
+
+>  {
+>  	unsigned int v;
+> +	void __iomem *usb_base;
+> +	u32 usbotg_base;
+> +	u32 usbother_base;
+> +	int timeout;
+> +	int ret = 0;
+
+As you only use these variable in the MX51 case, ...
+
+>  #ifdef CONFIG_ARCH_MX3
+>  	if (cpu_is_mx31()) {
+>  		v = readl(MX31_IO_ADDRESS(MX31_OTG_BASE_ADDR +
+> @@ -186,9 +193,126 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
+>  		return 0;
+>  	}
+>  #endif /* CONFIG_MACH_MX27 */
+> +#ifdef CONFIG_ARCH_MX51
+> +	if (cpu_is_mx51()) {
+
+... they can be local -> here.
+
+> +		usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
 > +
-> ?endif
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index e4cf91f..201f01b 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -6,4 +6,5 @@
-> ?obj-y ? := cpu.o mm.o clock.o devices.o
->
-> ?obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-> +obj-$(CONFIG_MACH_MX53_EVK) += board-mx53_evk.o
->
-> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-> new file mode 100644
-> index 0000000..b9d3b55
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> +		switch (port) {
+> +		case 0:	/* OTG port */
+> +			usbotg_base = (u32)usb_base + USBOTG_OFFSET;
+> +			break;
+> +		case 1:	/* Host 1 port */
+> +			usbotg_base = (u32)usb_base + USBH1_OFFSET;
+> +			break;
+> +		default:
+> +			printk(KERN_ERR"%s no such port %d\n", __func__, port);
+> +			ret = -ENOENT;
+> +			goto error;
+> +		}
+> +		usbother_base = (u32)usb_base + USBOTHER_REGS_OFFSET;
+
+That cast shouldn't be needed.
+
+> +		/* Stop then Reset */
+> +		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +		v &= ~UCMD_RUN_STOP;
+> +		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
+> +		timeout = 0x100000;
+> +		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
+> +			cpu_relax();
+
+I'm thinking whether this __raw_readl/timeout procedure could be
+factored out to some static inline function?
+
+Also, the timeout seem _huge_.
+
+> +		if (!timeout) {
+> +			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
+> +			ret = -ETIMEDOUT;
+> +			goto error;
+> +		}
 > +
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * GNU General Public License for more details.
+> +		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +		v |= UCMD_RESET;
+> +		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
+> +		timeout = 0x100000;
+> +		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
+> +			cpu_relax();
+> +		if (!timeout) {
+> +			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
+> +			ret = -ETIMEDOUT;
+> +			goto error;
+> +		}
 > +
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
+> +		switch (port) {
+> +		case 0:	/*OTG port */
+> +			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +			v |= USB_UTMI_PHYCTRL_OC_DIS; /* OC is not used */
+> +			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
 > +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/platform_device.h>
+> +			v = __raw_readl(usbother_base + USBCTRL_OFFSET);
+> +			v &= ~(UCTRL_OPM | UCTRL_OWIE);/* OTG wakeup/power mask disable */
+> +			__raw_writel(v, usbother_base + USBCTRL_OFFSET);
 > +
-> +#include <mach/common.h>
-> +#include <mach/hardware.h>
-> +#include <mach/imx-uart.h>
-> +#include <mach/iomux-mx53.h>
+> +			/* Set the PHY clock to 19.2MHz */
+> +			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
+> +			v &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
+> +			v |= 0x01;
+> +			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
+> +			break;
+> +		case 1:	/* Host 1 */
+> +			/*Host ULPI */
+> +			v = __raw_readl(usbother_base + USB_CTRL_1_OFFSET);
+> +			__raw_writel(v | USB_CTRL_UH1_EXT_CLK_EN, usbother_base + USB_CTRL_1_OFFSET);
 > +
-> +#include <asm/irq.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
+> +			v = __raw_readl(usbother_base + USBCTRL_OFFSET);
+> +			v &= ~(UCTRL_H1WIE | UCTRL_H1UIE);/* HOST1 wakeup/ULPI intr disable */
+> +			v |= UCTRL_H1PM; /* HOST1 power mask */
+> +			__raw_writel(v, usbother_base + USBCTRL_OFFSET);
 > +
-> +#include "devices.h"
+> +			v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC_OFFSET);
+> +			v |= USB_UH1_OC_DIS; /* OC is not used */
+> +			__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC_OFFSET);
 > +
-> +static struct pad_desc mx51evk_pads[] = {
-> + ? ? ? /* UART1 */
-> + ? ? ? MX53_PAD_CSI0_D11__UART1_RXD,
-> + ? ? ? MX53_PAD_CSI0_D10__UART1_TXD,
-> +};
+> +			v = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +			/* Interrupt Threshold Control:Immediate (no threshold) */
+> +			v &= UCMD_ITC_NO_THRESHOLD;
+> +			__raw_writel(v, usbotg_base + USBCMD_OFFSET);
+> +			break;
+> +		}
 > +
-> +/* Serial ports */
-> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-> +static struct imxuart_platform_data uart_pdata = {
-> +// ? ? .flags = IMXUART_HAVE_RTSCTS,
-> +};
+> +		/* need to reset the controller here so that the ID pin
+> +		 * is correctly detected.
+> +		 */
+> +		/* Stop then Reset */
+> +		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +		v &= ~UCMD_RUN_STOP;
+> +		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
+> +		timeout = 0x100000;
+> +		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RUN_STOP)
+> +			cpu_relax();
+> +		if (!timeout) {
+> +			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
+> +			ret = -ETIMEDOUT;
+> +			goto error;
+> +		}
 > +
-> +static inline void mxc_init_imx_uart(void)
-> +{
-> + ? ? ? mxc_register_device(&mxc_uart_device0, &uart_pdata);
-> + ? ? ? mxc_register_device(&mxc_uart_device1, &uart_pdata);
-> + ? ? ? mxc_register_device(&mxc_uart_device2, &uart_pdata);
-> +}
-> +#else /* !SERIAL_IMX */
-> +static inline void mxc_init_imx_uart(void)
-> +{
-> +}
-> +#endif /* SERIAL_IMX */
+> +		v = __raw_readl(usbotg_base + USBCMD_OFFSET);
+> +		v |= UCMD_RESET;
+> +		__raw_writel(v, usbotg_base + USBCMD_OFFSET);
+> +		timeout = 0x100000;
+> +		while (--timeout && __raw_readl(usbotg_base + USBCMD_OFFSET) & UCMD_RESET)
+> +			cpu_relax();
+> +		if (!timeout) {
+> +			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
+> +			ret = -ETIMEDOUT;
+> +			goto error;
+> +		}
 > +
-> +/*
-> + * Board specific initialization.
-> + */
-> +static void __init mxc_board_init(void)
-> +{
-> +// ? ? mxc_iomux_v3_setup_multiple_pads(mx51evk_pads,
-> +// ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(mx51evk_pads));
-> + ? ? ? mxc_init_imx_uart();
-> + ? ? ? mxc_register_device(&mxc_fec_device, NULL);
-> +}
-> +
-> +static void __init mx53_evk_timer_init(void)
-> +{
-> + ? ? ? mx53_clocks_init(32768, 24000000, 22579200, 0);
-> +}
-> +
-> +static struct sys_timer mxc_timer = {
-> + ? ? ? .init ? = mx53_evk_timer_init,
-> +};
-> +
-> +MACHINE_START(MX53_EVK, "Freescale MX53 EVK Board")
-> + ? ? ? /* Maintainer: Rob Herring <r.herring@freescale.com> */
-> + ? ? ? .phys_io = MX51_AIPS1_BASE_ADDR - 0x20000000,
-> + ? ? ? .io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-> + ? ? ? .map_io = mx5_map_io,
-> + ? ? ? .init_irq = mx5x_init_irq,
-> + ? ? ? .init_machine = mxc_board_init,
-> + ? ? ? .timer = &mxc_timer,
-> +MACHINE_END
-> --
+> +		/* allow controller to reset, and leave time for
+> +		 * the ULPI transceiver to reset too.
+> +		 */
+> +		msleep(100);
+> +error:
+> +		iounmap(usb_base);
+> +		return ret;
+> +	}
+
+And especially because of the jump label, I think that function could be
+split now into individual chunks for the different platforms now.
+But that can be done later. I'll send in a patch once things are merged.
+
+Thanks,
+Daniel
+
+
+> +#endif
+>  	printk(KERN_WARNING
+>  		"%s() unable to setup USBCONTROL for this CPU\n", __func__);
+>  	return -EINVAL;
+>  }
+> -EXPORT_SYMBOL(mxc_set_usbcontrol);
+> +EXPORT_SYMBOL(mxc_intialize_usb_hw);
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> index c5b1e7b..e61feac 100644
+> --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> @@ -83,7 +83,7 @@ struct mxc_usbh_platform_data {
+>  	struct otg_transceiver	*otg;
+>  };
+>  
+> -int mxc_set_usbcontrol(int port, unsigned int flags);
+> +int mxc_intialize_usb_hw(int port, unsigned int flags);
+>  
+>  #endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
+>  
+> -- 
 > 1.6.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> 
