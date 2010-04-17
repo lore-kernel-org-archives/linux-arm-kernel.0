@@ -1,51 +1,38 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sat, 17 Apr 2010 07:59:13 +0300
-Subject: [spi-devel-general] [PATCH v3 0/2] spi: driver for Cirrus
-	EP93xx SPI controller
-In-Reply-To: <0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1271156934.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100417045913.GA19534@gw.healthdatacare.com>
+Date: Sat, 17 Apr 2010 08:15:46 +0300
+Subject: ep93xx SPI driver v3
+In-Reply-To: <r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
+References: <20100415173905.GJ2685@gw.healthdatacare.com>
+	<j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
+	<20100416042658.GK2685@gw.healthdatacare.com>
+	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
+	<20100416094444.GC6718@gw.healthdatacare.com>
+	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
+	<20100416171032.GD6718@gw.healthdatacare.com>
+	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
+Message-ID: <20100417051546.GB19534@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 16, 2010 at 01:28:05PM -0500, H Hartley Sweeten wrote:
-> 
-> I finally was able to get this working on my system.  Not sure what the issue
-> was earlier.
+On Sat, Apr 17, 2010 at 04:23:53AM +0100, Martin Guy wrote:
+> Yes, ep93xx DMA engine has two flavours: memory-to-peripheral, used
+> for most devices, and memory-to-memory, used for block memcpy and for
+> memory-to-SSP/SPI (== SD card).
+>
+> The easiest route would seem to be to get the M2M stuff working to do
+> memcpy fast. Can linux make use of that? I haven't yet seen anything
+> that can make use of a memory-to-memory copy DMA engine.
 
-Great :)
+I think that the M2M engine can also perform M2P transfers for
+SSPRX, SSPTX, and IDE in addition to memory-to-memory transfers.
 
-> The only thing I don't like right off hand is the chip select handling.
-> 
-> The way it currently is done you are limited to using only the built-in GPIO's
-> of the EP93xx.  This prohibits a system from using an external i2c/spi/etc.
-> gpio expander to provide more chip selects.  And if a platform is not setup
-> correctly, the BUG_ON in cs_to_gpio in your example for the tx72xx is pretty
-> nasty.
+There already is dma-m2p support and I guess that it can be extended
+to support M2M controller for IDE and SPI.
 
-Yes the example was just a hack.
+> If we can get that working, a reasonable second stage would make it
+> work for ep93xx-SPI transfers, making SD card access even less
+> CPU-intensive
 
-However, I'm not sure what you mean by limited only to built-in GPIOs? Currently
-the driver does:
+Yes.
 
-        info->cs_control(spi->chip_select, value, info->data);
-
-when it wants to assert/deassert the chip select. I don't see how this is
-limited to built-in GPIOs only (maybe I'm missing something). Now it is in
-responsibility of platform board files to allocate necessary chipselect lines,
-and translate 'spi->chip_select' and 'value' to something meaningful.
-
-> Ryan and I worked out a runtime setup/cleanup for the spi device chip selects
-> in the spi driver I have in my tree.  I will take a look at it and see how
-> much trouble it will be to implement in your driver.
-
-Ok.
-
-> Anyway, now that I have your driver functioning I will be able to actually
-> provide some feedback to you.
-
-That sounds good.
-
-Thanks,
 MW
