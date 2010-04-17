@@ -1,35 +1,39 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Sat, 17 Apr 2010 04:23:53 +0100
-Subject: ep93xx SPI driver v3
-In-Reply-To: <20100416171032.GD6718@gw.healthdatacare.com>
-References: <20100415173905.GJ2685@gw.healthdatacare.com>
-	<j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
-	<20100416042658.GK2685@gw.healthdatacare.com>
-	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
-	<20100416094444.GC6718@gw.healthdatacare.com>
-	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
-	<20100416171032.GD6718@gw.healthdatacare.com>
-Message-ID: <r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sat, 17 Apr 2010 06:58:49 +0200
+Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
+In-Reply-To: <t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
+References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
+	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
+	<t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
+Message-ID: <q2o63386a3d1004162158v296379fat2b376d5c4c087378@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc-ing to list...
+2010/4/15 Dan Williams <dan.j.williams@intel.com>:
 
-> Next thing (after possible bug fixes, that is) is probably to
-> implement proper DMA support. Unfortunately there is no platform
-> code for that yet, only M2P controller support :( which means that
->  we have to implement M2M controller support
+> Getting closer... I have pushed out the dma40 driver (v3), 4, and 6.
 
-Yes, ep93xx DMA engine has two flavours: memory-to-peripheral, used
-for most devices, and memory-to-memory, used for block memcpy and for
-memory-to-SSP/SPI (== SD card).
+That's great!
 
-The easiest route would seem to be to get the M2M stuff working to do
-memcpy fast. Can linux make use of that? I haven't yet seen anything
-that can make use of a memory-to-memory copy DMA engine.
+> The other patch in -mm I could take as well but that needs an ack from
+> Russell.
 
-If we can get that working, a reasonable second stage would make it
-work for ep93xx-SPI transfers, making SD card access even less
-CPU-intensive
+Nah, I'll push that in through Russells tree hopefully, it needs rebasing on
+the latest board setup code anyway.
 
-   M
+> 5 is pending the review comment and 9 does not apply cleanly (does it
+> depend on something in the spi tree?)
+
+OK I'm sending updated versions soon, along with a DMA40 bug fix
+all on top of async_tx instead.
+
+Number 9 fails since it is based on -next where all the #include <slab.h>
+business has taken place, I don't know how that is resolved in the end
+but it now includes that include and applies cleanly on async_tx.
+
+I'll keep working on getting the PL011 and PL180 DMA tested on the
+RealView somehow so those can also be accepted.
+
+Your,
+Linus Walleij
