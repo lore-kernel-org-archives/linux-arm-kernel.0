@@ -1,43 +1,31 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Sun, 18 Apr 2010 09:35:29 +0200
-Subject: [PATCH] ARM: pxa/raumfeld: fix button name
-Message-ID: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
+Date: Sun, 18 Apr 2010 09:46:01 +0200
+Subject: [PATCH 4/4] video: add driver for PXA3xx 2D graphics accelerator
+In-Reply-To: <20100225160558.GB28972@buzzloop.caiaq.de>
+References: <1247159091-28697-1-git-send-email-daniel@caiaq.de>
+	<1247159091-28697-2-git-send-email-daniel@caiaq.de>
+	<1247159091-28697-3-git-send-email-daniel@caiaq.de>
+	<1247159091-28697-4-git-send-email-daniel@caiaq.de>
+	<1247159091-28697-5-git-send-email-daniel@caiaq.de>
+	<20100225160558.GB28972@buzzloop.caiaq.de>
+Message-ID: <20100418074601.GZ30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"on/off button" was recently renamed to remove the slash character.
-Follow that change in the pin polarity detection as well.
+Hi,
 
-While at it, fix another cosmetic coding style flaw as well.
+this patch keeps on lurking around in tree since many months, and I
+would still like to push that to mainline. Is anyone interested to give
+some feedback on this? Below is a rebased version that applies to and
+compiles with Linus' current git HEAD.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-pxa/raumfeld.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+Thanks,
+Daniel
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 3bbc2d8..7582a12 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -1001,7 +1001,7 @@ static void __init raumfeld_common_init(void)
- 		int i;
- 
- 		for (i = 0; i < ARRAY_SIZE(gpio_keys_button); i++)
--			if (!strcmp(gpio_keys_button[i].desc, "on/off button"))
-+			if (!strcmp(gpio_keys_button[i].desc, "on_off button"))
- 				gpio_keys_button[i].active_low = 1;
- 	}
- 
-@@ -1027,8 +1027,7 @@ static void __init raumfeld_common_init(void)
- 		gpio_direction_output(GPIO_W2W_PDN, 0);
- 
- 	/* this can be used to switch off the device */
--	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY,
--				"supply shutdown");
-+	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY, "supply shutdown");
- 	if (ret < 0)
- 		pr_warning("Unable to request GPIO_SHUTDOWN_SUPPLY\n");
- 	else
--- 
-1.7.0.3
+
+On Thu, Feb 25, 2010 at 05:05:58PM +0100, Daniel Mack wrote:
+> Was anyone able to give that driver a try?
+> Haojian, you wanted to have a look IIRC?
+> 
+> I would appreciate seeing this in .35 if possible.
+> 
