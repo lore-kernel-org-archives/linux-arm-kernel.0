@@ -1,126 +1,64 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 18 Apr 2010 04:35:17 +0200
-Subject: [RFC PATCH 08/10] imx: Add MX53 core support
-In-Reply-To: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
-References: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
-Message-ID: <20100418023517.GC7882@pengutronix.de>
+Date: Sun, 18 Apr 2010 04:43:56 +0200
+Subject: [RFC PATCH 06/10] mx5: rename mx51_map_io to mx5_map_io
+In-Reply-To: <1271446524-26450-7-git-send-email-r.herring@freescale.com>
+References: <1271446524-26450-7-git-send-email-r.herring@freescale.com>
+Message-ID: <20100418024356.GD7882@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 16, 2010 at 02:35:22PM -0500, Rob Herring wrote:
+On Fri, Apr 16, 2010 at 02:35:20PM -0500, Rob Herring wrote:
+> Signed-off-by: Rob Herring <r.herring@freescale.com>
+> ---
+>  arch/arm/mach-mx5/board-mx51_babbage.c  |    2 +-
+>  arch/arm/mach-mx5/mm.c                  |    2 +-
+>  arch/arm/plat-mxc/include/mach/common.h |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index ee67a71..5c15d6e 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -91,7 +91,7 @@ MACHINE_START(MX51_BABBAGE, "Freescale MX51 Babbage Board")
+>  	.phys_io = MX51_AIPS1_BASE_ADDR,
+>  	.io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+>  	.boot_params = PHYS_OFFSET + 0x100,
+> -	.map_io = mx51_map_io,
+> +	.map_io = mx5_map_io,
 
-[snip]
+I think we should leave this as is and use a mx53_map_io for i.MX53.
+Then we can skip the somewhat mystical CPU detection later in this
+series.
 
-> +
-> +void __init mx5x_init_irq(void)
-
-What does the x stand for? Obviously not 1, so how about mx53_init_irq?
-
-> +{
-> +	void __iomem *tzic_virt;
-> +
-> +	tzic_virt = ioremap(MX5x_TZIC_BASE_ADDR, SZ_4K);
-> +	if (!tzic_virt)
-> +		panic("unable to map TZIC interrupt controller\n");
-> +	tzic_init_irq(tzic_virt);
-> +}
-> +
-> diff --git a/arch/arm/plat-mxc/devices.c b/arch/arm/plat-mxc/devices.c
-> index 56f2fb5..7c4c722 100644
-> --- a/arch/arm/plat-mxc/devices.c
-> +++ b/arch/arm/plat-mxc/devices.c
-> @@ -20,13 +20,26 @@
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
->  #include <mach/common.h>
-> +#include <mach/hardware.h>
->  
->  int __init mxc_register_device(struct platform_device *pdev, void *data)
->  {
->  	int ret;
-> +	int i;
->  
->  	pdev->dev.platform_data = data;
->  
-> +	if (cpu_is_mx53()) {
-> +		for (i = 0; i < pdev->num_resources; i++) {
-> +			struct resource *r = &pdev->resource[i];
-> +			if (resource_type(r) != IORESOURCE_MEM)
-> +				continue;
-> +
-> +			r->start = MX5x_FIXUP_ADDR(r->start);
-> +			r->end = MX5x_FIXUP_ADDR(r->end);
-> +		}
-> +	}
-
-This MX5x_FIXUP_ADDR stuff really looks painful. Please just use proper
-MX53_ defines and use them where appropriate. We can really effort a
-duplicate set of resources when both i.MX51 and i.MX53 support are
-compiled in. You might have a look how Uwe did this in
-arch/arm/mach-mx2/devices.c.
-
-> diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-> index b83963f..7759df7 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-> @@ -55,6 +55,7 @@
->  
->  #define MX51_TZIC_BASE_ADDR_TO1		0x8FFFC000
->  #define MX51_TZIC_BASE_ADDR		0xE0000000
-> +#define MX5x_TZIC_BASE_ADDR		0x0FFFC000
->  
->  #define MX51_DEBUG_BASE_ADDR		0x60000000
->  #define MX51_DEBUG_SIZE			(36 * SZ_1K)
-> @@ -170,6 +171,7 @@
->  #define MX51_PLL1_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00080000)
->  #define MX51_PLL2_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00084000)
->  #define MX51_PLL3_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00088000)
-> +#define MX5x_PLL4_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x0008C000)
->  #define MX51_AHBMAX_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00094000)
->  #define MX51_IIM_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x00098000)
->  #define MX51_CSU_BASE_ADDR	(MX51_AIPS2_BASE_ADDR + 0x0009C000)
-> @@ -234,6 +236,10 @@
->  	(MX51_IS_MODULE(x, AIPS1) ? MX51_AIPS1_IO_ADDRESS(x) :	\
->  	0xDEADBEEF)
->  
-> +#define MX5x_FIXUP_ADDR(x) ((cpu_is_mx53() && \
-> +	(MX51_IS_MODULE(x, AIPS1) || MX51_IS_MODULE(x, AIPS2) || MX51_IS_MODULE(x, SPBA0))) ? \
-> +	((x) - 0x20000000) : (x))
-> +
->  /*
->   * define the address mapping macros: in physical address order
+>  	.init_irq = mx51_init_irq,
+>  	.init_machine = mxc_board_init,
+>  	.timer = &mxc_timer,
+> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+> index fedacac..8ad1d0c 100644
+> --- a/arch/arm/mach-mx5/mm.c
+> +++ b/arch/arm/mach-mx5/mm.c
+> @@ -38,7 +38,7 @@ static struct map_desc mxc_io_desc[] __initdata = {
+>   * system startup to create static physical to virtual memory mappings
+>   * for the IO modules.
 >   */
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-> index ec85f14..b77f71e 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
-> @@ -31,6 +31,7 @@
->  #define MXC_CPU_MX31		31
->  #define MXC_CPU_MX35		35
->  #define MXC_CPU_MX51		51
-> +#define MXC_CPU_MX53		53
->  #define MXC_CPU_MXC91231	91231
+> -void __init mx51_map_io(void)
+> +void __init mx5_map_io(void)
+>  {
+>  	void __iomem *base;
 >  
->  #ifndef __ASSEMBLY__
-> @@ -121,6 +122,18 @@ extern unsigned int __mxc_cpu_type;
->  # define cpu_is_mx51()		(0)
->  #endif
->  
-> +#ifdef CONFIG_ARCH_MX53
-> +# ifdef mxc_cpu_type
-> +#  undef mxc_cpu_type
-> +#  define mxc_cpu_type __mxc_cpu_type
-> +# else
-> +#  define mxc_cpu_type MXC_CPU_MX53
-> +# endif
-> +# define cpu_is_mx53()		(mxc_cpu_type == MXC_CPU_MX53)
-> +#else
-> +# define cpu_is_mx53()		(0)
-> +#endif
-> +
->  #ifdef CONFIG_ARCH_MXC91231
->  # ifdef mxc_cpu_type
->  #  undef mxc_cpu_type
+> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> index 2941472..0766746 100644
+> --- a/arch/arm/plat-mxc/include/mach/common.h
+> +++ b/arch/arm/plat-mxc/include/mach/common.h
+> @@ -20,7 +20,7 @@ extern void mx25_map_io(void);
+>  extern void mx27_map_io(void);
+>  extern void mx31_map_io(void);
+>  extern void mx35_map_io(void);
+> -extern void mx51_map_io(void);
+> +extern void mx5_map_io(void);
+>  extern void mxc91231_map_io(void);
+>  extern void mxc_init_irq(void __iomem *);
+>  extern void tzic_init_irq(void __iomem *);
 > -- 
 > 1.6.0.4
 > 
