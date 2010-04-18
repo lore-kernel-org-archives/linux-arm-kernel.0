@@ -1,82 +1,43 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Sun, 18 Apr 2010 19:07:00 +0530
-Subject: [PATCH] mmc: fix race condition between dma and omap_hsmmc
-	callback
-In-Reply-To: <4BC43D99.6030809@nokia.com>
-References: <618f0c911003240600m1a38935av68f31a232ed8b8ad@mail.gmail.com>
-	<4BC43D99.6030809@nokia.com>
-Message-ID: <x2s618f0c911004180637gde02aecn57c650cc19d142f0@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 18 Apr 2010 14:45:02 +0100
+Subject: [PATCH 2/3] i2c/pxa: only define 'blue_murder'-function if
+	DEBUG is #defined
+In-Reply-To: <20100418132251.GB21364@pengutronix.de>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100228155502.GB16745@n2100.arm.linux.org.uk>
+	<20100418132251.GB21364@pengutronix.de>
+Message-ID: <20100418134502.GA15452@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 13, 2010 at 3:17 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
-> Venkatraman S wrote:
->>
->> This patch addresses the possible race condition between the dma
->> callback and hsmmc callback.
->
-> Can you explain the problem in more detail? ?If the final DMA interrupt
-> comes before TC then all should be well.
-   Actually it isn't, with descriptor loading. If the DMA callback arrives
-"too early", the MMC TC is missed sometimes. The last transfer in the log
-below is actually stalled waiting for TC. This happens more often when the
-transfer is large (> 300 blocks)
+On Sun, Apr 18, 2010 at 03:22:51PM +0200, Wolfram Sang wrote:
+> 
+> Sorry to bump this old thread, it dropped off my todo-list :(
+> 
+> On Sun, Feb 28, 2010 at 03:55:02PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 24, 2010 at 12:01:45PM +0100, Uwe Kleine-K?nig wrote:
+> > > From: Wolfram Sang <w.sang@pengutronix.de>
+> > > 
+> > > This talkative function is also called on timeouts. As timeouts can
+> > > happen on regular writes to EEPROMs (no error case), this creates false
+> > > positives.  Giving lots of details is interesting only for developers
+> > > anyhow, so just use the function if DEBUG is #defined.
+> > 
+> > Are you sure this is safe?  If you time out the write before it completes,
+> > how do you know if the write was successful?
+> > 
+> > I don't think this is "no error code" nor "false positive".  If the timeout
+> > is too short for your EEPROMs, then the timeout needs to be increased.
+> 
+> I am sure this is safe because we have retries. The eeprom driver first tries
+> to write data without a delay, because EEPROMs often have buffers. Once the
+> buffers are full, the chip will not answer to the next write request which will
+> result in a timeout for this write request. This is expected, so it will be
+> retried after some delay. Something like -EBUSY. Only if another "outer"
+> timeout passed after some retries, then we have a problem and this should be
+> user visible. But the timeout for the write request is nothing exceptional and
+> the user doesn't need to be informed about it, especially not in this detail.
+> This is what the patch is addressing.
 
->If it comes after, then we need
-> to be sure that the DMA has finished - particularly in the "read" case.
-> Neither the existing code nor this patch seems to address that issue.
->
-   With this patch the assumption is that MMC TC correctly signals the
-end of read / write as requested. I don't know if there are any specific reasons
-to believe otherwise.
-
-> Also, how can we be sure the final DMA interrupt doesn't race with the
-> start of the next request?
->
-Till the time omap_hsmmc_xfer_done is called, the next request is not
-expected to arrive.
-The requests are implicitly serialised by host->sem, which is released
-only on the DMA callback.
-The code releases the semaphore only after freeing the DMA channel.
----------------------------------------------------------------------------------------------
-
-mmc0: starting CMD17 arg 00000066 flags 000000b5
-mmc0:     blksz 512 blocks 1 flags 00000200 tsac 100 ms nsac 0
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD17, argument 0x00000066
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 1
-mmci-omap-hs mmci-omap-hs.0: final dma callback
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 2
-mmc0: req done (CMD17): 0: 00000900 00000000 00000000 00000000
-mmc0:     512 bytes transferred: 0
-mmc0: starting CMD18 arg 000025df flags 000000b5
-mmc0:     blksz 512 blocks 32 flags 00000200 tsac 100 ms nsac 0
-mmc0:     CMD12 arg 00000000 flags 0000049d
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD18, argument 0x000025df
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 1
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 2
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD12, argument 0x00000000
-mmci-omap-hs mmci-omap-hs.0: final dma callback
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 3
-mmc0: req done (CMD18): 0: 00000900 00000000 00000000 00000000
-mmc0:     16384 bytes transferred: 0
-mmc0:     (CMD12): 0: 00000b00 00000000 00000000 00000000
-mmc0: starting CMD18 arg 000025ff flags 000000b5
-mmc0:     blksz 512 blocks 192 flags 00000200 tsac 100 ms nsac 0
-mmc0:     CMD12 arg 00000000 flags 0000049d
-mmci-omap-hs mmci-omap-hs.0: new sglist 9fd00000 len =23
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD18, argument 0x000025ff
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 1
-mmci-omap-hs mmci-omap-hs.0: final dma callback
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 2
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD12, argument 0x00000000
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 3
-mmc0: req done (CMD18): 0: 00000900 00000000 00000000 00000000
-mmc0:     98304 bytes transferred: 0
-mmc0:     (CMD12): 0: 00000b00 00000000 00000000 00000000
-mmc0: starting CMD18 arg 000026bf flags 000000b5
-mmc0:     blksz 512 blocks 512 flags 00000200 tsac 100 ms nsac 0
-mmc0:     CMD12 arg 00000000 flags 0000049d
-mmci-omap-hs mmci-omap-hs.0: new sglist 9fd00000 len =26
-mmci-omap-hs mmci-omap-hs.0: mmc0: CMD18, argument 0x000026bf
-mmci-omap-hs mmci-omap-hs.0: IRQ Status is 1
-mmci-omap-hs mmci-omap-hs.0: final dma callback
+And what if it's not an EEPROM that you're talking to?
