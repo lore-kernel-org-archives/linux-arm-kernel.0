@@ -1,70 +1,54 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 18 Apr 2010 13:48:29 +0200
-Subject: [PATCH V2] mach-pxa/viper: Fix timeout usage for I2C
-In-Reply-To: <20100412213235.1688dda8@hyperion.delvare>
-References: <20100412213235.1688dda8@hyperion.delvare>
-Message-ID: <1271591309-22567-1-git-send-email-w.sang@pengutronix.de>
+Date: Sun, 18 Apr 2010 15:22:51 +0200
+Subject: [PATCH 2/3] i2c/pxa: only define 'blue_murder'-function if
+	DEBUG is #defined
+In-Reply-To: <20100228155502.GB16745@n2100.arm.linux.org.uk>
+References: <20100224110044.GB15181@pengutronix.de>
+	<1267009306-17227-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100228155502.GB16745@n2100.arm.linux.org.uk>
+Message-ID: <20100418132251.GB21364@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timeout value is in jiffies, so it should be using HZ, not a plain
-number. Assume with HZ=100 '100' means 1s here and adapt accordingly.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marc Zyngier <maz@misterjones.org>
-Cc: Paul Shen <paul.shen@marvell.com>
-Cc: Mike Rapoport <mike@compulab.co.il>
-Cc: Jean Delvare <khali@linux-fr.org>
----
+Sorry to bump this old thread, it dropped off my todo-list :(
 
-Changes since V1:
+On Sun, Feb 28, 2010 at 03:55:02PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 24, 2010 at 12:01:45PM +0100, Uwe Kleine-K?nig wrote:
+> > From: Wolfram Sang <w.sang@pengutronix.de>
+> > 
+> > This talkative function is also called on timeouts. As timeouts can
+> > happen on regular writes to EEPROMs (no error case), this creates false
+> > positives.  Giving lots of details is interesting only for developers
+> > anyhow, so just use the function if DEBUG is #defined.
+> 
+> Are you sure this is safe?  If you time out the write before it completes,
+> how do you know if the write was successful?
+> 
+> I don't think this is "no error code" nor "false positive".  If the timeout
+> is too short for your EEPROMs, then the timeout needs to be increased.
 
-* Don't assume 100 means 100ms
+I am sure this is safe because we have retries. The eeprom driver first tries
+to write data without a delay, because EEPROMs often have buffers. Once the
+buffers are full, the chip will not answer to the next write request which will
+result in a timeout for this write request. This is expected, so it will be
+retried after some delay. Something like -EBUSY. Only if another "outer"
+timeout passed after some retries, then we have a problem and this should be
+user visible. But the timeout for the write request is nothing exceptional and
+the user doesn't need to be informed about it, especially not in this detail.
+This is what the patch is addressing.
 
-Thanks for the comments!
+Kind regards,
 
-Admitted, the first try was a really bad guess. Maybe I got distracted from the
-previous patch for another arch where the value was 10000.
+   Wolfram
 
-While this may still not be the favoured solution for Eric, I think it is at
-least better than before, so it might be worth applying after all?
-
-Janitorial fix, not tested due to no hardware.
-
- arch/arm/mach-pxa/viper.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-index 1dd1334..12cf38c 100644
---- a/arch/arm/mach-pxa/viper.c
-+++ b/arch/arm/mach-pxa/viper.c
-@@ -33,6 +33,7 @@
- #include <linux/pm.h>
- #include <linux/sched.h>
- #include <linux/gpio.h>
-+#include <linux/jiffies.h>
- #include <linux/i2c-gpio.h>
- #include <linux/serial_8250.h>
- #include <linux/smc91x.h>
-@@ -453,7 +454,7 @@ static struct i2c_gpio_platform_data i2c_bus_data = {
- 	.sda_pin = VIPER_RTC_I2C_SDA_GPIO,
- 	.scl_pin = VIPER_RTC_I2C_SCL_GPIO,
- 	.udelay  = 10,
--	.timeout = 100,
-+	.timeout = HZ,
- };
- 
- static struct platform_device i2c_bus_device = {
-@@ -778,7 +779,7 @@ static void __init viper_tpm_init(void)
- 		.sda_pin = VIPER_TPM_I2C_SDA_GPIO,
- 		.scl_pin = VIPER_TPM_I2C_SCL_GPIO,
- 		.udelay  = 10,
--		.timeout = 100,
-+		.timeout = HZ,
- 	};
- 	char *errstr;
- 
 -- 
-1.7.0
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100418/56a7b943/attachment.sig>
