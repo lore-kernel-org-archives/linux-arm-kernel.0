@@ -1,34 +1,49 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sun, 18 Apr 2010 10:31:49 +0530
-Subject: [PATCH v2] ARM: Fix "BUG: scheduling while atomic:
-	swapper/0/0x00000002
-In-Reply-To: <20100417183336.GB24299@n2100.arm.linux.org.uk>
-References: <1271492144-26995-1-git-send-email-santosh.shilimkar@ti.com>
-	<20100417183336.GB24299@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C4F165C4@dbde02.ent.ti.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 18 Apr 2010 08:33:40 +0300
+Subject: [spi-devel-general] [PATCH v3 0/2] spi: driver for Cirrus
+	EP93xx SPI controller
+In-Reply-To: <s2i56d259a01004171143m74b06d85yd1cbb38ef7ce778e@mail.gmail.com>
+References: <cover.1271156934.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D710785@AUSP01VMBX24.collaborationhost.net>
+	<20100417045913.GA19534@gw.healthdatacare.com>
+	<s2i56d259a01004171143m74b06d85yd1cbb38ef7ce778e@mail.gmail.com>
+Message-ID: <20100418053340.GD19534@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Sunday, April 18, 2010 12:04 AM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas; Sundar R IYER
-> Subject: Re: [PATCH v2] ARM: Fix "BUG: scheduling while atomic: swapper/0/0x00000002
+On Sat, Apr 17, 2010 at 07:43:23PM +0100, Martin Guy wrote:
 > 
-> On Sat, Apr 17, 2010 at 01:45:44PM +0530, Santosh Shilimkar wrote:
-> > +		/*
-> > +		 * Since idle thread getting re-used, call
-> > +		 * init_idle() to set up the idle thread for given
-> > +		 * CPU. Additionally it also resets the preempt count
+> There's a further strangeness when a board has a single SPI device not
+> using any GPIO chip select. At present, clients seem to need to
+> declare that they have 1 chip select and to provide an empty
+> cs_control function that does nothing. For example:
 > 
-> "Since this idle thread is being re-used, call
-> init_idle() to reinitialize the thread structure."
+> static void null_cs_control(unsigned cs, unsigned value, void *data) {
+>        /* Sim.One only has MMC card and no GPIO chip select logic */
+> }
 > 
-> I don't think we need to mention the preempt count explicitly because
-> that's a detail of reinitializing the thread structure.
-Ok. 
-Will fix the description and if you are ok can submit to patch system
+> static struct ep93xx_spi_info simone_spi_info = {
+>        .num_chipselect = 1,
+>        .cs_control     = null_cs_control,
+>        .data           = NULL,
+> };
+> ...
+> static void __init simone_init_machine(void)
+> {
+> ...
+>        spi_register_board_info(simone_spi_board_info,
+> ARRAY_SIZE(simone_spi_board_info));
+>        ep93xx_register_spi(&simone_spi_info);
+> ...
+> 
+> Allowing cs_control to be NULL would do away with the empty function, but
+> when I just tried with num_chipselect = 0 the device did not appear. There
+> may be a better solution.
 
-Regards,
-Santosh
+There is a check in spi_master_register() where num_chipselect should be at
+least 1. This is probably why it failed in your case.
+
+However, I can add check to the driver that NULL cs_control is ok.
+
+Thanks,
+MW
