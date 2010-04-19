@@ -1,63 +1,36 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Mon, 19 Apr 2010 16:55:30 +0300
-Subject: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-In-Reply-To: <DE2504B3A515524BBE6934369EFDC0DA0937E201@az33exm20.fsl.freescale.net>
-References: <1271446524-26450-11-git-send-email-r.herring@freescale.com>
-	<85448.8831.qm@web51003.mail.re2.yahoo.com>
-	<DE2504B3A515524BBE6934369EFDC0DA0937E201@az33exm20.fsl.freescale.net>
-Message-ID: <20100419135530.GB2446@matterhorn.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Apr 2010 15:39:13 +0100
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+In-Reply-To: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
+References: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1271687953.11099.9.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Apr 19, Herring Robert-RA7055 wrote:
-> Fabio, 
+Hi Russell,
+
+> On Mon, Apr 12, 2010 at 06:23:58PM +0100, Will Deacon wrote:
+> > This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+> > forcing the write buffer to drain while inside a polling loop on an SMP system.
+> > If the Kernel is not compiled for SMP support, this will expand to a barrier()
+> > as before.
 > 
-> > -----Original Message-----
-> > From: Fabio Estevam [mailto:fabioestevam at yahoo.com] 
-> > Sent: Friday, April 16, 2010 5:15 PM
-> > To: linux-arm-kernel at lists.infradead.org; 
-> > s.hauer at pengutronix.de; amit.kucheria at canonical.com; Herring 
-> > Robert-RA7055
-> > Cc: Herring Robert-RA7055; u.kleine-koenig at pengutronix.de
-> > Subject: Re: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-> > 
-> > Rob,
-> > 
-> > --- On Fri, 4/16/10, Rob Herring <r.herring@freescale.com> wrote:
-> > 
-> > > From: Rob Herring <r.herring@freescale.com>
-> > > Subject: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-> > > To: linux-arm-kernel at lists.infradead.org, 
-> > s.hauer at pengutronix.de, amit.kucheria at canonical.com
-> > > Cc: "Rob Herring" <r.herring@freescale.com>
-> > > Date: Friday, April 16, 2010, 4:35 PM
-> > > Signed-off-by: Rob Herring <r.herring@freescale.com>
-> > > ---
-> > >  arch/arm/mach-mx5/Kconfig? ? ? ?
-> > > ? |? ? 7 +++
-> > >  arch/arm/mach-mx5/Makefile? ? ?
-> > > ???|? ? 1 +
-> > >  arch/arm/mach-mx5/board-mx53_evk.c |???88
-> > > ++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 96 insertions(+), 0 deletions(-)
-> > >  create mode 100644 arch/arm/mach-mx5/board-mx53_evk.c
-> > 
-> > Shouldn't the name of this file be mach-mx53_evk.c to match 
-> > the naming convention patches that Uwe sent?
-> 
-> Not when Babbage board is named board-mx51_babbage.c. 
-> 
+> Linus asked how expensive (in terms of power rather than performance)
+> this was; so far that question has remained unanswered.  Can someone
+> please answer his question?
 
-IMO, the current naming scheme of mach-* for SoC platforms and board-* for
-specific boards is a lot more intuitive than converting everything to mach-*.
+I gave my opinion on the potential performance impact here:
 
-Currently inside arch/arm/mach-*/ some platforms use the board-* scheme and
-some use the mach-* scheme.
+http://sourceforge.net/mailarchive/message.php?msg_name=000001cada64%24b9f84200%242de8c600%24%40deacon%40arm.com
 
-Regards,
-Amit
+To summarise: in the context of polling loops, I believe that the
+performance impact of adding an smp_mb() to cpu_relax() for v6 SMP
+is minimal. If cpu_relax() is used in other scenarios, the performance
+impact can only be reviewed on a case-by-case basis.
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Are there any other issues that need to be considered, or can I
+submit this to the patch system?
+
+Thanks,
+
+Will
