@@ -1,115 +1,70 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 19 Apr 2010 15:35:40 +0200
-Subject: zaurus spitz suspend/resume issue
-In-Reply-To: <i2i1f96a3531004181200ve1f71c03ydb7b4328cbcc6e26@mail.gmail.com>
-References: <i2i1f96a3531004181200ve1f71c03ydb7b4328cbcc6e26@mail.gmail.com>
-Message-ID: <20100419133540.GA1191@ucw.cz>
+From: shankar.vk@gmail.com (Uma shankar)
+Date: Mon, 19 Apr 2010 19:17:00 +0530
+Subject: Kmemcheck on ARMv7
+Message-ID: <n2y448a67a1004190647q3ae8b63aqbfb311aade287bf0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
->    Since resuming my spitz from a suspended state doesn't work in 2.6.34-rc3
->    at the moment, I've tried to find out what the problem is with
->    suspend/resume. Using CONFIG_PM_DEBUG I tried to test this by setting
->    /sys/power/pm_test to "core" and switching the device off with the power
->    button. This indeed suspends and resumes the device, but shows following
->    in the system log:
+      I  am  trying to   run  Kmemcheck on   a  Cortex ( ARM-v7)
+board  running  Linux 2.6.30.9
 
-It works here.
-
->    ------------[ cut here ]------------
->    WARNING: at kernel/irq/manage.c:361 set_irq_wake+0xa4/0x130()
->    Unbalanced IRQ 191 wake disable
-
---- ./arch/arm.ofic/mach-pxa/mfp-pxa2xx.c	2009-09-10 00:13:59.000000000 +0200
-+++ ./arch/arm/mach-pxa/mfp-pxa2xx.c	2009-12-29 03:16:40.000000000 +0100
-@@ -34,7 +34,6 @@
- struct gpio_desc {
- 	unsigned	valid		: 1;
- 	unsigned	can_wakeup	: 1;
--	unsigned	keypad_gpio	: 1;
- 	unsigned	dir_inverted	: 1;
- 	unsigned int	mask; /* bit mask in PWER or PKWR */
- 	unsigned int	mux_mask; /* bit mask of muxed gpio bits, 0 if no mux */
-@@ -178,9 +177,6 @@
- 	if (!d->valid)
- 		return -EINVAL;
- 
--	if (d->keypad_gpio)
--		return -EINVAL;
--
- 	mux_taken = (PWER & d->mux_mask) & (~d->mask);
- 	if (on && mux_taken)
- 		return -EBUSY;
-@@ -231,32 +227,6 @@
- #endif /* CONFIG_PXA25x */
- 
- #ifdef CONFIG_PXA27x
--static int pxa27x_pkwr_gpio[] = {
--	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
--	95, 96, 97, 98, 99, 100, 101, 102
--};
--
--int keypad_set_wake(unsigned int on)
--{
--	unsigned int i, gpio, mask = 0;
--
--	if (!on) {
--		PKWR = 0;
--		return 0;
--	}
--
--	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
--
--		gpio = pxa27x_pkwr_gpio[i];
--
--		if (gpio_desc[gpio].config & MFP_LPM_CAN_WAKEUP)
--			mask |= gpio_desc[gpio].mask;
--	}
--
--	PKWR = mask;
--	return 0;
--}
--
- #define PWER_WEMUX2_GPIO38	(1 << 16)
- #define PWER_WEMUX2_GPIO53	(2 << 16)
- #define PWER_WEMUX2_GPIO40	(3 << 16)
-@@ -273,6 +243,12 @@
- 	gpio_desc[(gpio)].mux_mask = PWER_ ## mux ## _MASK;	\
- } while (0)
- 
-+
-+static int pxa27x_pkwr_gpio[] = {
-+	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
-+	95, 96, 97, 98, 99, 100, 101, 102
-+};
-+
- static void __init pxa27x_mfp_init(void)
- {
- 	int i, gpio;
-@@ -291,7 +267,6 @@
- 	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
- 		gpio = pxa27x_pkwr_gpio[i];
- 		gpio_desc[gpio].can_wakeup = 1;
--		gpio_desc[gpio].keypad_gpio = 1;
- 		gpio_desc[gpio].mask = 1 << i;
- 	}
- 
---- ./arch/arm.ofic/mach-pxa/pxa27x.c	2009-09-10 00:13:59.000000000 +0200
-+++ ./arch/arm/mach-pxa/pxa27x.c	2009-12-29 03:13:00.000000000 +0100
-@@ -323,9 +323,6 @@
- 	if (gpio >= 0 && gpio < 128)
- 		return gpio_set_wake(gpio, on);
- 
--	if (irq == IRQ_KEYPAD)
--		return keypad_set_wake(on);
--
- 	switch (irq) {
- 	case IRQ_RTCAlrm:
- 		mask = PWER_RTC;
+At boot-up time,  as  soon  as  Timer-device is  enabled,   I  find
+that   timer  gets  disabled  because  system   gets spurious
+interrupts  on  that  irq  line.
 
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+PID hash table entries: 1024 (order: 10, 4096 bytes)
+Linux System timer initialize
+irq 23: nobody cared (try booting with the "irqpoll" option)
+[<c002e148>] (unwind_backtrace+0x0/0xe8) from [<c002c4b8>]
+(dump_stack+0x18/0x1c)
+[<c002c4b8>] (dump_stack+0x18/0x1c) from [<c006ad74>]
+(__report_bad_irq+0x80/0xb0)
+[<c006ad74>] (__report_bad_irq+0x80/0xb0) from [<c006af28>]
+(note_interrupt+0x184/0x1f0)
+[<c006af28>] (note_interrupt+0x184/0x1f0) from [<c006ba38>]
+(handle_edge_irq+0xe8/0x160)
+[<c006ba38>] (handle_edge_irq+0xe8/0x160) from [<c0027060>]
+(asm_do_IRQ+0x60/0x74)
+[<c0027060>] (asm_do_IRQ+0x60/0x74) from [<c0027a30>] (__irq_svc+0x30/0x80)
+Exception stack(0xc0373ec0 to 0xc0373f08)
+3ec0: 00000017 c0372000 00000002 00000000 00000002 c038e8f4 00000000 0aa00000
+3ee0: c0372000 c03bfc40 0000001f c0373f44 00000100 c0373f08 c0047ffc c0047c98
+3f00: 20000153 ffffffff
+[<c0027a30>] (__irq_svc+0x30/0x80) from [<c0047ffc>] (irq_exit+0x44/0x4c)
+[<c0047ffc>] (irq_exit+0x44/0x4c) from [<c0047ffc>] (irq_exit+0x44/0x4c)
+[<c0047ffc>] (irq_exit+0x44/0x4c) from [<c0027064>] (asm_do_IRQ+0x64/0x74)
+[<c0027064>] (asm_do_IRQ+0x64/0x74) from [<c0027a30>] (__irq_svc+0x30/0x80)
+Exception stack(0xc0373f78 to 0xc0373fc0)
+3f60:                                                       00000000 c037c15c
+3f80: 00000001 600001d3 955fffff c00242ec c0399f80 0aa00000 c0023000 412fc082
+3fa0: 0000001f c0373ff4 c0373fc0 c0373fc0 c0008974 c0019798 20000153 ffffffff
+[<c0027a30>] (__irq_svc+0x30/0x80) from [<c0008974>] (start_kernel+0x168/0x3e4)
+[<c0008974>] (start_kernel+0x168/0x3e4) from [<60008034>] (0x60008034)
+handlers:
+[<c003a604>] (sdp_timer_interrupt+0x0/0x38)
+Disabling IRQ #23
+Console: colour dummy device 80x30
+console [ttyS1] enabled
+Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
+Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
+
+
+Later,  when  calibrating delay  loop,  the system is hung  as timer
+is not working.
+
+The problem happens  even if  I  set    kmemcheck_enabled = 0  (
+disabled by default )  .
+( I also commented out   pagetable_init(&meminfo)  ).
+
+ If  you have seen this before,  please let me know.
+
+( The kmemcheck  patch  I am using ( written by  Ye Janboe ) was
+written for   ARM v6.   I am aware that  I may have to make some
+change in the
+instruction simulation handling for v7 . )
+
+            thanks
+              shankar
