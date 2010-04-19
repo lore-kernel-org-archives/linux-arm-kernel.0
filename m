@@ -1,36 +1,172 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Apr 2010 15:39:13 +0100
-Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
-In-Reply-To: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
-References: <1271093038-31773-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1271687953.11099.9.camel@e102144-lin.cambridge.arm.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 19 Apr 2010 07:48:17 -0700
+Subject: [PATCHv4 2.6.34-rc4 2/7] mx5: Add USB device definitions for
+	Freescale MX51 Babbage HW
+In-Reply-To: <20100419003252.GA15308@matterhorn.verdurent.com>
+References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<20100419003252.GA15308@matterhorn.verdurent.com>
+Message-ID: <86A0E76937111F4C92FABEC0A209885104733901@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+ 
 
-> On Mon, Apr 12, 2010 at 06:23:58PM +0100, Will Deacon wrote:
-> > This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
-> > forcing the write buffer to drain while inside a polling loop on an SMP system.
-> > If the Kernel is not compiled for SMP support, this will expand to a barrier()
-> > as before.
+-----Original Message-----
+From: Amit Kucheria [mailto:amit.kucheria at canonical.com] 
+Sent: Sunday, April 18, 2010 7:33 PM
+To: Nguyen Dinh-R00091
+Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+linux at arm.linux.org.uk; s.hauer at pengutronix.de;
+valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
+bryan.wu at canonical.com; Herring Robert-RA7055; Li Jun-R65092; Zhang
+Lily-R58066
+Subject: Re: [PATCHv4 2.6.34-rc4 2/7] mx5: Add USB device definitions
+for Freescale MX51 Babbage HW
+
+On 10 Apr 16, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> Linus asked how expensive (in terms of power rather than performance)
-> this was; so far that question has remained unanswered.  Can someone
-> please answer his question?
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
 
-I gave my opinion on the potential performance impact here:
+> patch adds device structures for USB Host1 and OTG port, and adds 
+> clocking information for USB HW.
+> 
+> This patch applies to 2.6.34-rc4.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
+>  arch/arm/mach-mx5/devices.c    |   49
+++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices.h    |    2 +
+>  3 files changed, 59 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/clock-mx51.c 
+> b/arch/arm/mach-mx5/clock-mx51.c index 1ee6ce4..1fe40e1 100644
+> --- a/arch/arm/mach-mx5/clock-mx51.c
+> +++ b/arch/arm/mach-mx5/clock-mx51.c
+> @@ -762,6 +762,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, 
+> MXC_CCM_CCGRx_CG9_OFFSET,  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2,
+MXC_CCM_CCGRx_CG10_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+>  
+> +/* USB */
+> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
+> +	NULL, NULL, &pll3_sw_clk, NULL);
+> +
+>  /* FEC */
+>  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+> @@ -779,6 +783,10 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+>  };
+>  
+>  static void clk_tree_init(void)
+> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
 
-http://sourceforge.net/mailarchive/message.php?msg_name=000001cada64%24b9f84200%242de8c600%24%40deacon%40arm.com
+> index 5070ae1..4b456d5 100644
 
-To summarise: in the context of polling loops, I believe that the
-performance impact of adding an smp_mb() to cpu_relax() for v6 SMP
-is minimal. If cpu_relax() is used in other scenarios, the performance
-impact can only be reviewed on a case-by-case basis.
+This part of the patch doesn't apply anymore. Please fix. Also, run
+scripts/checkpatch.pl on the series to catch some standard whitespace
+errors (like no new line at the end of this file)
 
-Are there any other issues that need to be considered, or can I
-submit this to the patch system?
+[Dinh] I'm not sure I know what you mean Amit? The mxc-ehci makes calls
+in the driver probe function to get the usb and usb_ahb clock. I have
+ran checkpatch.pl on all of the patches in Bryan Wu made that comment.
+There are only warnings for 80 characters on all of the patches. 
 
-Thanks,
+> --- a/arch/arm/mach-mx5/devices.c
+> +++ b/arch/arm/mach-mx5/devices.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+> +#include <linux/dma-mapping.h>
+>  #include <mach/hardware.h>
+>  #include <mach/imx-uart.h>
+>  #include <mach/irqs.h>
+> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
+>  	.resource = mxc_fec_resources,
+>  };
+>  
+> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct resource usbotg_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR,
+> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_OTG,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbdr_host_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 0,
+> +	.num_resources = ARRAY_SIZE(usbotg_resources),
+> +	.resource = usbotg_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct resource usbh1_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR + 0x200,
+> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_H1,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbh1_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 1,
+> +	.num_resources = ARRAY_SIZE(usbh1_resources),
+> +	.resource = usbh1_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+>  static struct mxc_gpio_port mxc_gpio_ports[] = {
+>  	{
+>  		.chip.label = "gpio-0",
+> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
 
-Will
+> index f339ab8..6497764 100644
+> --- a/arch/arm/mach-mx5/devices.h
+> +++ b/arch/arm/mach-mx5/devices.h
+> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;  
+> extern struct platform_device mxc_uart_device1;  extern struct 
+> platform_device mxc_uart_device2;  extern struct platform_device 
+> mxc_fec_device;
+> +extern struct platform_device mxc_usbdr_host_device; extern struct 
+> +platform_device mxc_usbh1_device;
+> \ No newline at end of file
+
+
+
+> --
+> 1.6.0.4
+> 
+
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
