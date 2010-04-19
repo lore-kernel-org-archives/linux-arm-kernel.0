@@ -1,18 +1,25 @@
-From: haavard.skinnemoen@atmel.com (Haavard Skinnemoen)
-Date: Mon, 19 Apr 2010 11:22:17 +0200
-Subject: [PATCH] MMC: atmel-mci: enable SD high speed support
-In-Reply-To: <1271671952-29204-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1271671952-29204-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20100419112217.16578d34@hskinnemoen-d830>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Mon, 19 Apr 2010 10:25:03 +0100
+Subject: ep93xx SPI driver v3
+In-Reply-To: <20100419064809.GF19534@gw.healthdatacare.com>
+References: <20100415173905.GJ2685@gw.healthdatacare.com>
+	<j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
+	<20100416042658.GK2685@gw.healthdatacare.com>
+	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
+	<20100416094444.GC6718@gw.healthdatacare.com>
+	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
+	<20100416171032.GD6718@gw.healthdatacare.com>
+	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
+	<4BCB7148.5040600@bluewatersys.com>
+	<20100419064809.GF19534@gw.healthdatacare.com>
+Message-ID: <m2l56d259a01004190225k19080786t84f79a29d78795a9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Enable high speed support for atmel-mci driver. This support is dependent of
-> the revision of the IP and, of course, the capacity of the SD card used.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 4/19/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+>  BTW: do you guys think that there is any real use of polling mode
+>  in the driver or should I drop it out completely?
 
-Looks good to me.
+Is there any advantage to it in terms of transfer speed or CPU efficiency?
 
-Reviewed-by: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
+   M
