@@ -1,25 +1,38 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 19 Apr 2010 12:35:21 +0100
-Subject: [alsa-devel] [PATCH 4/4] ASoC: enable wm8753 in aspenite
-In-Reply-To: <v2r771cded01004162237ya9dbd6dbk4924981518ddc583@mail.gmail.com>
-References: <v2r771cded01004162237ya9dbd6dbk4924981518ddc583@mail.gmail.com>
-Message-ID: <1271676921.3208.63.camel@odin>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 19 Apr 2010 06:42:29 -0600
+Subject: 32-bit transfers broken in OMAP SPI driver?
+In-Reply-To: <Pine.LNX.4.64.1004190950380.4080@axis700.grange>
+References: <Pine.LNX.4.64.1004190950380.4080@axis700.grange>
+Message-ID: <t2yfa686aa41004190542s2e1596abs11e0762e60ef73d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-04-17 at 13:37 +0800, Haojian Zhuang wrote:
-> >From 5d94b20b89185ae5a69c7ba5d1e998d568064def Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 19 Mar 2010 18:13:32 -0400
-> Subject: [PATCH] ASoC: enable wm8753 in aspenite
-> 
-> Enable wm8753 codec in aspenite via ssp interface.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cory, can you please take a look at this?
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+Thanks,
+g.
+
+On Mon, Apr 19, 2010 at 1:58 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Ran across drivers/spi/omap_spi_100k.c and its handling of > 16-bit
+> transfers seems buggy to me. Firstly, addresses do not get incremented in
+> omap1_spi100k_txrx_pio() (word_len <= 32) case, a fix for which seems to
+> be obvious, secondly, spi100k_write_data() and spi100k_read_data() only
+> write / read 16-bit data blocks, for which I'm not adventurous enough to
+> propose a patch without even touching the hardware;) Am I right? Maybe
+> just disable > 16-bit transfers altogether, since they are broken, and
+> thus, obviously, unused.
+>
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+>
+
+
 
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
