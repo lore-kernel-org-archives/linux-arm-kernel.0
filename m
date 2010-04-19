@@ -1,54 +1,53 @@
-From: rbairva@gmail.com (rd bairva)
-Date: Mon, 19 Apr 2010 15:58:29 +0530
-Subject: Fwd: Dmaengine query
-In-Reply-To: <m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-References: <v2mdbb048f61004132326r8ac75382k1e42321ff0ed484a@mail.gmail.com>
-	<v2he9c3a7c21004141730vcc79dd58t5478c9d83af9816@mail.gmail.com>
-	<m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-Message-ID: <s2ndbb048f61004190328u30aacb8ctdb66bacf061beeab@mail.gmail.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Mon, 19 Apr 2010 17:27:04 -0500
+Subject: [PATCHv5 2.6.34-rc4 5/5] mx5: Add USB to Freescale MX51 defconfig
+In-Reply-To: <1271716024-22990-4-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271716024-22990-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271716024-22990-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271716024-22990-4-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271716024-22990-5-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-On Thu, Apr 15, 2010 at 6:00 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Apr 13, 2010 at 11:26 PM, rd bairva <rbairva@gmail.com> wrote:
->> Hi Dan,
->>
->> ? ? ? ?I am currently writing dmaengine compatible DMA driver for our ARM
->> based architecture, But I am facing some performance issues doing
->> that.
->>
->> 1. dmaengine says callback should run in tasklet, and next transfer
->> cannot be scheduled from the callback.
->>
->> Due to these restrictions I am getting some performance issue while
->> playing sound in our architecture.
->>
->>
->> Can callback call in DMA driver be placed out of spin_lock to submit
->> new operations from callback? (only in asynchronous case)
->>
->> is this Ok? please comment.
->
-> Other dma driver authors are dropping the lock across the call to the
-> callback in the mem-to-io case. ?The compliance points in the
-> documentation are primarily targeted at the expectations of the
-> async_tx api. ?In the mem-to-io (slave dma) model you are not using
-> the async_tx api.
->
-> --
-> Dan
->
+Update mx51_defconfig to include USB EHCI by default.
 
-? ?My DMA controller supports device to device DMA transfers and we
-need it in some of our drivers. Existing DMA engine framework doesn't
-have support for device to device transfers.
+This patch applies to 2.6.34-rc4.
 
-Do you have any plans for device to device support in DMA engine?
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/configs/mx51_defconfig |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
-Can you suggest me some other suggestion for doing this?
-
-
-Regards
-Ramdayal
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+index c88e952..a708fd6 100644
+--- a/arch/arm/configs/mx51_defconfig
++++ b/arch/arm/configs/mx51_defconfig
+@@ -809,7 +809,22 @@ CONFIG_SSB_POSSIBLE=y
+ CONFIG_DUMMY_CONSOLE=y
+ # CONFIG_SOUND is not set
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB_SUPPORT=y
++CONFIG_USB_ARCH_HAS_HCD=y
++# CONFIG_USB_ARCH_HAS_OHCI is not set
++CONFIG_USB_ARCH_HAS_EHCI=y
++CONFIG_USB=y
++
++#
++# USB Host Controller Drivers
++#
++# CONFIG_USB_C67X00_HCD is not set
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_EHCI_MXC=y
++
++
+ CONFIG_MMC=y
+ # CONFIG_MMC_DEBUG is not set
+ # CONFIG_MMC_UNSAFE_RESUME is not set
+-- 
+1.6.0.4
