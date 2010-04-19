@@ -1,33 +1,42 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 19 Apr 2010 12:55:24 +0300
-Subject: ep93xx SPI driver v3
-In-Reply-To: <m2l56d259a01004190225k19080786t84f79a29d78795a9@mail.gmail.com>
-References: <j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
-	<20100416042658.GK2685@gw.healthdatacare.com>
-	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
-	<20100416094444.GC6718@gw.healthdatacare.com>
-	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
-	<20100416171032.GD6718@gw.healthdatacare.com>
-	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
-	<4BCB7148.5040600@bluewatersys.com>
-	<20100419064809.GF19534@gw.healthdatacare.com>
-	<m2l56d259a01004190225k19080786t84f79a29d78795a9@mail.gmail.com>
-Message-ID: <20100419095524.GG19534@gw.healthdatacare.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 19 Apr 2010 12:29:57 +0200
+Subject: [PATCH/RFC v1 0/3] [ARM] Add Samsung S5P camera interface driver
+Message-ID: <1271673000-3020-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 19, 2010 at 10:25:03AM +0100, Martin Guy wrote:
-> On 4/19/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> >  BTW: do you guys think that there is any real use of polling mode
-> >  in the driver or should I drop it out completely?
-> 
-> Is there any advantage to it in terms of transfer speed or CPU efficiency?
+Hello
 
-I guess no. At least for CPU efficiency.
+The following  patch series is a camera interface driver for the Samsung S5PC100 and S5PV210 SoCs.
+The camera interface in these chips can operate in three modes:
+- ITU-R or MIPI camera capture mode
+- Memory to memory mode enabling color format conversion, scaling, flipping and rotation,
+- LCD FIFO mode where it can be configured to transfer image data from memory to LCD controller, 
+  through its direct FIFO channel to LCD controller; this allows to lower main data bus 
+  bandwidth and memory requirements.
 
-Original motivation for implementing it was to let users choose which method they prefer
-but now I have second thoughts about that since interrupt mode seems to perform OK and
-I don't see any advantage of using polling here.
+There is no designated memory for FIMC device (it shares the system memory) and it requires 
+physically contiguous buffers.
+We are planning  to use separate video nodes, each supporting one of the aforementioned features.
 
-Thanks,
-MW
+The following patches implement memory to memory mode and require the memory to memory device framework
+posted by Pawel Osciak. Also in some use cases like video stream encoding, where FIMC acts as video 
+postprocessor, non contiguous multi-planar buffers, as discussed in this thread
+http://www.mail-archive.com/linux-media at vger.kernel.org/msg15850.html
+would be needed. To simplify things a bit, I did not add a code related to non contiguous multi-planar 
+formats in the following patches. 
+
+Any comments and suggestions are really appreciated.
+
+This series contains:
+
+[PATCH v1 1/3] ARM: S5P: Add FIMC driver platform helpers
+[PATCH v1 2/3] ARM: S5PC100: Add FIMC driver platform helpers
+[PATCH v1 3/3] ARM: S5P: Add Camera interface (video postprocessor) driver
+
+
+Regards,
+--
+Sylwester Nawrocki
+SPRC,
+Linux Platform Group
