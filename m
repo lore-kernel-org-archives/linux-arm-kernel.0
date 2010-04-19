@@ -1,70 +1,33 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Mon, 19 Apr 2010 15:06:24 +0530
-Subject: [PATCH] mmc: fix race condition between dma and omap_hsmmc
-	callback
-In-Reply-To: <4BCC0F32.6020409@nokia.com>
-References: <618f0c911003240600m1a38935av68f31a232ed8b8ad@mail.gmail.com>
-	<4BC43D99.6030809@nokia.com>
-	<x2s618f0c911004180637gde02aecn57c650cc19d142f0@mail.gmail.com>
-	<4BCC0F32.6020409@nokia.com>
-Message-ID: <h2y618f0c911004190236wd64b071dkee00026da2077d05@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 19 Apr 2010 12:55:24 +0300
+Subject: ep93xx SPI driver v3
+In-Reply-To: <m2l56d259a01004190225k19080786t84f79a29d78795a9@mail.gmail.com>
+References: <j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
+	<20100416042658.GK2685@gw.healthdatacare.com>
+	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
+	<20100416094444.GC6718@gw.healthdatacare.com>
+	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
+	<20100416171032.GD6718@gw.healthdatacare.com>
+	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
+	<4BCB7148.5040600@bluewatersys.com>
+	<20100419064809.GF19534@gw.healthdatacare.com>
+	<m2l56d259a01004190225k19080786t84f79a29d78795a9@mail.gmail.com>
+Message-ID: <20100419095524.GG19534@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adrian Hunter <adrian.hunter@nokia.com> wrote:
-> Venkatraman S wrote:
->>
->> On Tue, Apr 13, 2010 at 3:17 PM, Adrian Hunter <adrian.hunter@nokia.com>
->> wrote:
->>>
->>> Venkatraman S wrote:
->>>>
->>>> This patch addresses the possible race condition between the dma
->>>> callback and hsmmc callback.
->>>
->>> Can you explain the problem in more detail? ?If the final DMA interrupt
->>> comes before TC then all should be well.
->>
->> ? Actually it isn't, with descriptor loading. If the DMA callback arrives
->> "too early", the MMC TC is missed sometimes. The last transfer in the log
->> below is actually stalled waiting for TC. This happens more often when the
->> transfer is large (> 300 blocks)
->
-> You seem to be saying that, in the case of descriptor loading, the DMA
-> callback
-> does not indicate that the DMA is complete. ?Isn't that a problem with
-> descriptor
-> loading?
->
-  My understanding from the existing code
-<snip>
-        /*
-         * If for some reason the DMA transfer is still active,
-         * we wait for timeout period and free the dma
-         */
-        if (host->dma_ch != -1) {
-                set_current_state(TASK_UNINTERRUPTIBLE);
-</snip>
- is that it's rare, but not impossible, for the DMA to be active even
-when the TC has been received.
-  At the same time, I found one issue in descriptor loading
-after I sent the email yesterday, which could fix the problem I am seeing.
+On Mon, Apr 19, 2010 at 10:25:03AM +0100, Martin Guy wrote:
+> On 4/19/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> >  BTW: do you guys think that there is any real use of polling mode
+> >  in the driver or should I drop it out completely?
+> 
+> Is there any advantage to it in terms of transfer speed or CPU efficiency?
 
->>
->>> If it comes after, then we need
->>> to be sure that the DMA has finished - particularly in the "read" case.
->>> Neither the existing code nor this patch seems to address that issue.
->>>
->> ? With this patch the assumption is that MMC TC correctly signals the
->> end of read / write as requested. I don't know if there are any specific
->> reasons
->> to believe otherwise.
->
-> It would be nice if there were a way to check that the DMA is complete. i.e.
-> if TC is received but DMA is not complete then set an error by calling
-> omap_hsmmc_dma_cleanup() instead of omap_hsmmc_xfer_done()
->
-  Yes, I was testing such a mechanism as well.  Is it better to abort the
-transfer by setting an error, or do the omap_hsmmc_xfer_done() at the
-callback of whichever
-interrupt comes last ?
+I guess no. At least for CPU efficiency.
+
+Original motivation for implementing it was to let users choose which method they prefer
+but now I have second thoughts about that since interrupt mode seems to perform OK and
+I don't see any advantage of using polling here.
+
+Thanks,
+MW
