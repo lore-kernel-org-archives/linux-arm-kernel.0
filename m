@@ -1,42 +1,46 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 20 Apr 2010 07:38:34 +1200
-Subject: ep93xx SPI driver v3
-In-Reply-To: <20100419064809.GF19534@gw.healthdatacare.com>
-References: <20100415173905.GJ2685@gw.healthdatacare.com>
-	<j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
-	<20100416042658.GK2685@gw.healthdatacare.com>
-	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
-	<20100416094444.GC6718@gw.healthdatacare.com>
-	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
-	<20100416171032.GD6718@gw.healthdatacare.com>
-	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
-	<4BCB7148.5040600@bluewatersys.com>
-	<20100419064809.GF19534@gw.healthdatacare.com>
-Message-ID: <4BCCB13A.50807@bluewatersys.com>
+From: therealbadguy@gmail.com (Badguy Badguy)
+Date: Mon, 19 Apr 2010 13:40:50 -0600
+Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
+In-Reply-To: <20100416083632.GF30801@buzzloop.caiaq.de>
+References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
+	<20100415075831.GL30801@buzzloop.caiaq.de>
+	<i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
+	<20100416083632.GF30801@buzzloop.caiaq.de>
+Message-ID: <z2z3f34cd261004191240nce56a951jb24c4ce3c0c47503@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg wrote:
-> On Mon, Apr 19, 2010 at 08:53:28AM +1200, Ryan Mallon wrote:
->> Martin Guy wrote:
->>> If we can get that working, a reasonable second stage would make it
->>> work for ep93xx-SPI transfers, making SD card access even less
->>> CPU-intensive
->> Sine the M2M DMA support for the ep93xx is not in the mainline yet, I
->> would be happy for the SPI driver to be merged without DMA support, and
->> to have it added at a later date.
-> 
-> Yeah. This discussion actually referred to future improvements. We
-> can implement DMA support later on.
-> 
-> BTW: do you guys think that there is any real use of polling mode
-> in the driver or should I drop it out completely? I mean, if we are
-> going to add proper timeout / error reporting for polling, it makes
-> the driver more complex.
+>> so using the Hasan bootloader I provide:
+>>
+>> load raw 0x81000000 1073016 /tftp/192.168.1.161:zImage
+> ? ? ? ? ? ? ? ? ? ? ?^^^^^^^
+> This is the length of the kernel image, and I doubt this is right. Check
+> the size of your zImage file again, it's almost certainly bigger than
+> that.
+>
+> Daniel
+>
 
-I recall not being able to get interrupt mode working in the driver the
-Hartley and I worked on. I can't remember if this was a limitation of
-our hardware, or just bugs in the interrupt code. I'll try and find some
-time today to test the driver out.
+Ok, well I think my problem was simply that I did not have the console
+enabled! Oops!
+and once I seen the LED light go solid, I figured it was locked.
+(must not be being turned off)
 
-~Ryan
+I will mention that the serial port defaults to the 9600 baud implied
+by the driver, this was also giving me trouble.
+I note it attempts to read current state and use it, but must get it
+wrong have not dug deeper yet, simply changed default to what the
+bootloader is using 115200
+
+I cleaned up my config some more, removed some redundant stuff got it
+to boot to Oops from lack of FS support.
+cannot get to the NFS server, digging into that.
+
+Can I get a break down on how far you have run this kernel? Do you
+have file system support?
+I notice the NAND driver is throwing bad erase block warnings on a
+large number of blocks, I will change SOM and see if it continues.
+
+Exciting stuff! looking forward to helping move this forward as I get
+the stuff I need working working, thanks a bunch for your help.
+ -Chris
