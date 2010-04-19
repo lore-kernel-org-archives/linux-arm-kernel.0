@@ -1,172 +1,93 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 19 Apr 2010 07:48:17 -0700
-Subject: [PATCHv4 2.6.34-rc4 2/7] mx5: Add USB device definitions for
-	Freescale MX51 Babbage HW
-In-Reply-To: <20100419003252.GA15308@matterhorn.verdurent.com>
-References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20100419003252.GA15308@matterhorn.verdurent.com>
-Message-ID: <86A0E76937111F4C92FABEC0A209885104733901@az33exm21>
+From: ra7055@freescale.com (Herring Robert-RA7055)
+Date: Mon, 19 Apr 2010 07:53:11 -0700
+Subject: [RFC PATCH 08/10] imx: Add MX53 core support
+In-Reply-To: <20100418023517.GC7882@pengutronix.de>
+References: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
+	<20100418023517.GC7882@pengutronix.de>
+Message-ID: <DE2504B3A515524BBE6934369EFDC0DA0937E261@az33exm20.fsl.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+Sasha,
 
------Original Message-----
-From: Amit Kucheria [mailto:amit.kucheria at canonical.com] 
-Sent: Sunday, April 18, 2010 7:33 PM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-linux at arm.linux.org.uk; s.hauer at pengutronix.de;
-valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
-bryan.wu at canonical.com; Herring Robert-RA7055; Li Jun-R65092; Zhang
-Lily-R58066
-Subject: Re: [PATCHv4 2.6.34-rc4 2/7] mx5: Add USB device definitions
-for Freescale MX51 Babbage HW
-
-On 10 Apr 16, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+> Sent: Saturday, April 17, 2010 9:35 PM
+> To: Herring Robert-RA7055
+> Cc: linux-arm-kernel at lists.infradead.org; amit.kucheria at canonical.com
+> Subject: Re: [RFC PATCH 08/10] imx: Add MX53 core support
 > 
-> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
-
-> patch adds device structures for USB Host1 and OTG port, and adds 
-> clocking information for USB HW.
+> On Fri, Apr 16, 2010 at 02:35:22PM -0500, Rob Herring wrote:
 > 
-> This patch applies to 2.6.34-rc4.
+> [snip]
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
->  arch/arm/mach-mx5/devices.c    |   49
-++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h    |    2 +
->  3 files changed, 59 insertions(+), 0 deletions(-)
+> > +
+> > +void __init mx5x_init_irq(void)
 > 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c 
-> b/arch/arm/mach-mx5/clock-mx51.c index 1ee6ce4..1fe40e1 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -762,6 +762,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, 
-> MXC_CCM_CCGRx_CG9_OFFSET,  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2,
-MXC_CCM_CCGRx_CG10_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* USB */
-> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> +	NULL, NULL, &pll3_sw_clk, NULL);
-> +
->  /* FEC */
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
-> @@ -779,6 +783,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+> What does the x stand for? Obviously not 1, so how about 
+> mx53_init_irq?
 
-> index 5070ae1..4b456d5 100644
+All new MX5 chips will have memory map similar to MX53 rather than MX51.
+So this function will cover at least MX53 and MX50.
 
-This part of the patch doesn't apply anymore. Please fix. Also, run
-scripts/checkpatch.pl on the series to catch some standard whitespace
-errors (like no new line at the end of this file)
-
-[Dinh] I'm not sure I know what you mean Amit? The mxc-ehci makes calls
-in the driver probe function to get the usb and usb_ahb clock. I have
-ran checkpatch.pl on all of the patches in Bryan Wu made that comment.
-There are only warnings for 80 characters on all of the patches. 
-
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/platform_device.h>
->  #include <linux/gpio.h>
-> +#include <linux/dma-mapping.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/irqs.h>
-> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource usbotg_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR,
-> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_OTG,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbdr_host_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(usbotg_resources),
-> +	.resource = usbotg_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource usbh1_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR + 0x200,
-> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_H1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbh1_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(usbh1_resources),
-> +	.resource = usbh1_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-
-> index f339ab8..6497764 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;  
-> extern struct platform_device mxc_uart_device1;  extern struct 
-> platform_device mxc_uart_device2;  extern struct platform_device 
-> mxc_fec_device;
-> +extern struct platform_device mxc_usbdr_host_device; extern struct 
-> +platform_device mxc_usbh1_device;
-> \ No newline at end of file
-
-
-
-> --
-> 1.6.0.4
+> 
+> > +{
+> > +	void __iomem *tzic_virt;
+> > +
+> > +	tzic_virt = ioremap(MX5x_TZIC_BASE_ADDR, SZ_4K);
+> > +	if (!tzic_virt)
+> > +		panic("unable to map TZIC interrupt controller\n");
+> > +	tzic_init_irq(tzic_virt);
+> > +}
+> > +
+> > diff --git a/arch/arm/plat-mxc/devices.c 
+> b/arch/arm/plat-mxc/devices.c
+> > index 56f2fb5..7c4c722 100644
+> > --- a/arch/arm/plat-mxc/devices.c
+> > +++ b/arch/arm/plat-mxc/devices.c
+> > @@ -20,13 +20,26 @@
+> >  #include <linux/init.h>
+> >  #include <linux/platform_device.h>
+> >  #include <mach/common.h>
+> > +#include <mach/hardware.h>
+> >  
+> >  int __init mxc_register_device(struct platform_device 
+> *pdev, void *data)
+> >  {
+> >  	int ret;
+> > +	int i;
+> >  
+> >  	pdev->dev.platform_data = data;
+> >  
+> > +	if (cpu_is_mx53()) {
+> > +		for (i = 0; i < pdev->num_resources; i++) {
+> > +			struct resource *r = &pdev->resource[i];
+> > +			if (resource_type(r) != IORESOURCE_MEM)
+> > +				continue;
+> > +
+> > +			r->start = MX5x_FIXUP_ADDR(r->start);
+> > +			r->end = MX5x_FIXUP_ADDR(r->end);
+> > +		}
+> > +	}
+> 
+> This MX5x_FIXUP_ADDR stuff really looks painful. Please just 
+> use proper
+> MX53_ defines and use them where appropriate. We can really effort a
+> duplicate set of resources when both i.MX51 and i.MX53 support are
+> compiled in. You might have a look how Uwe did this in
+> arch/arm/mach-mx2/devices.c.
 > 
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+I agree it is a bit ugly, but it is all in effort to run a single kernel
+image. It is a 10 line change vs. 100's of lines of code
+duplicated/renamed. At that point, the question would be why even put
+them in the same mach dir because very little code would be common. MX2
+situation is a bit different as the top-level memory map is the same,
+but the peripherals are mixed up. Taking the MX2 approach, you will then
+have namespace collision with the device names, so all those need to be
+renamed too.
+
+What if I make the runtime fix-up only be done when building both chips?
+
+Regards,
+Rob
