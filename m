@@ -1,37 +1,33 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 19 Apr 2010 09:48:09 +0300
-Subject: ep93xx SPI driver v3
-In-Reply-To: <4BCB7148.5040600@bluewatersys.com>
-References: <20100415173905.GJ2685@gw.healthdatacare.com>
-	<j2u56d259a01004151645y47ec8254ree59189aaa6b5baa@mail.gmail.com>
-	<20100416042658.GK2685@gw.healthdatacare.com>
-	<l2p56d259a01004160211m17bc0f10gc63a5ca82436c8e3@mail.gmail.com>
-	<20100416094444.GC6718@gw.healthdatacare.com>
-	<p2l56d259a01004160455jdf290557yd102cf78d9f1252e@mail.gmail.com>
-	<20100416171032.GD6718@gw.healthdatacare.com>
-	<r2j56d259a01004162023tdf8f226aw5aab98bd54c03ac0@mail.gmail.com>
-	<4BCB7148.5040600@bluewatersys.com>
-Message-ID: <20100419064809.GF19534@gw.healthdatacare.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Apr 2010 08:18:38 +0100
+Subject: Change ARM Cache Type from Write-Back Cached Write Allocate to
+	Write-Back, No Allocate
+In-Reply-To: <4BCBC957.90302@ms1.techarea.org>
+References: <4BCBC957.90302@ms1.techarea.org>
+Message-ID: <20100419071838.GA5571@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 19, 2010 at 08:53:28AM +1200, Ryan Mallon wrote:
-> Martin Guy wrote:
-> > If we can get that working, a reasonable second stage would make it
-> > work for ep93xx-SPI transfers, making SD card access even less
-> > CPU-intensive
-> 
-> Sine the M2M DMA support for the ep93xx is not in the mainline yet, I
-> would be happy for the SPI driver to be merged without DMA support, and
-> to have it added at a later date.
+On Mon, Apr 19, 2010 at 11:09:11AM +0800, Richard Liu wrote:
+> Based on ARM11 MPCore TRM r1p0
+> Page 5-16
+>
+> At TLB table, TEX cache memory support 4 type cache types
+> 1) Noncachabled
+> 2) Write-Back cached Write Allocate, Buffered
+> 3) Write-Through cached, No Allocate on Write, Buffered
+> 4) Write-Back cached, No Allocate on Write, Buffered.
+>
+> From ARM's information, if change the TEX type to Write-Through,
+> the L1 Cache would be "behavior is noncacheable"
+> I think we can disable L1/L2 cache to reach the same result.
+>
+> If want to change the default setting from "Write-Back cached Write  
+> Allocate, Buffered" to "Write-Back cached, No Allocate on Write, 
+> Buffered".
+> How to modify the build_mem_type_table in file mmu.c?
+> And should it need more patches on others part like L1 or L2 coherence  
+> function?
 
-Yeah. This discussion actually referred to future improvements. We
-can implement DMA support later on.
-
-BTW: do you guys think that there is any real use of polling mode
-in the driver or should I drop it out completely? I mean, if we are
-going to add proper timeout / error reporting for polling, it makes
-the driver more complex.
-
-Thanks,
-MW
+MPCore hardware only supports write-back write-allocate or non-cacheable
+modes; so you can't change this.
