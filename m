@@ -1,33 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Apr 2010 08:18:38 +0100
-Subject: Change ARM Cache Type from Write-Back Cached Write Allocate to
-	Write-Back, No Allocate
-In-Reply-To: <4BCBC957.90302@ms1.techarea.org>
-References: <4BCBC957.90302@ms1.techarea.org>
-Message-ID: <20100419071838.GA5571@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 19 Apr 2010 09:38:59 +0200
+Subject: [PATCHv4 2.6.34-rc4 5/7] mxc: Add generic USB HW
+	initialization for MX51
+In-Reply-To: <20100419010340.GB15308@matterhorn.verdurent.com>
+References: <1271445371-18501-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-4-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271445371-18501-5-git-send-email-Dinh.Nguyen@freescale.com>
+	<20100417170706.GY30801@buzzloop.caiaq.de>
+	<20100419010340.GB15308@matterhorn.verdurent.com>
+Message-ID: <20100419073859.GA30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 19, 2010 at 11:09:11AM +0800, Richard Liu wrote:
-> Based on ARM11 MPCore TRM r1p0
-> Page 5-16
->
-> At TLB table, TEX cache memory support 4 type cache types
-> 1) Noncachabled
-> 2) Write-Back cached Write Allocate, Buffered
-> 3) Write-Through cached, No Allocate on Write, Buffered
-> 4) Write-Back cached, No Allocate on Write, Buffered.
->
-> From ARM's information, if change the TEX type to Write-Through,
-> the L1 Cache would be "behavior is noncacheable"
-> I think we can disable L1/L2 cache to reach the same result.
->
-> If want to change the default setting from "Write-Back cached Write  
-> Allocate, Buffered" to "Write-Back cached, No Allocate on Write, 
-> Buffered".
-> How to modify the build_mem_type_table in file mmu.c?
-> And should it need more patches on others part like L1 or L2 coherence  
-> function?
+On Mon, Apr 19, 2010 at 04:03:40AM +0300, Amit Kucheria wrote:
+> On 10 Apr 17, Daniel Mack wrote:
+> > > @@ -18,6 +19,7 @@
+> > >  
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/io.h>
+> > > +#include <linux/delay.h>
+> > >  
+> > >  #include <mach/hardware.h>
+> > >  #include <mach/mxc_ehci.h>
+> > > @@ -50,9 +52,14 @@
+> > >  #define MX35_H1_TLL_BIT		(1 << 5)
+> > >  #define MX35_H1_USBTE_BIT	(1 << 4)
+> > >  
+> > > -int mxc_set_usbcontrol(int port, unsigned int flags)
+> > > +int mxc_intialize_usb_hw(int port, unsigned int flags)
+> > 
+> > This patch and the next one should be merged into one. The reason is
+> > that you rename a function here and the next patch follows that change.
+> > Especially when bisecting, this can lead to uncompilable checkouts of
+> > the tree when stopping in the middle.
+> 
+> Also, patch 3 really belongs with this patch too since the #defines in
+> patch 3 are used here.
 
-MPCore hardware only supports write-back write-allocate or non-cacheable
-modes; so you can't change this.
+Well, as long as the defines are commited _before_ their users, it
+should be fine. But they can also be squashed into one, that's true.
+
+Thanks,
+Daniel
