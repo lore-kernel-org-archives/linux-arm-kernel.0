@@ -1,48 +1,115 @@
-From: ra7055@freescale.com (Herring Robert-RA7055)
-Date: Mon, 19 Apr 2010 06:33:09 -0700
-Subject: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-In-Reply-To: <85448.8831.qm@web51003.mail.re2.yahoo.com>
-References: <1271446524-26450-11-git-send-email-r.herring@freescale.com>
-	<85448.8831.qm@web51003.mail.re2.yahoo.com>
-Message-ID: <DE2504B3A515524BBE6934369EFDC0DA0937E201@az33exm20.fsl.freescale.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 19 Apr 2010 15:35:40 +0200
+Subject: zaurus spitz suspend/resume issue
+In-Reply-To: <i2i1f96a3531004181200ve1f71c03ydb7b4328cbcc6e26@mail.gmail.com>
+References: <i2i1f96a3531004181200ve1f71c03ydb7b4328cbcc6e26@mail.gmail.com>
+Message-ID: <20100419133540.GA1191@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio, 
+Hi!
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:fabioestevam at yahoo.com] 
-> Sent: Friday, April 16, 2010 5:15 PM
-> To: linux-arm-kernel at lists.infradead.org; 
-> s.hauer at pengutronix.de; amit.kucheria at canonical.com; Herring 
-> Robert-RA7055
-> Cc: Herring Robert-RA7055; u.kleine-koenig at pengutronix.de
-> Subject: Re: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-> 
-> Rob,
-> 
-> --- On Fri, 4/16/10, Rob Herring <r.herring@freescale.com> wrote:
-> 
-> > From: Rob Herring <r.herring@freescale.com>
-> > Subject: [RFC PATCH 10/10] mx5: Add MX53 EVK board support
-> > To: linux-arm-kernel at lists.infradead.org, 
-> s.hauer at pengutronix.de, amit.kucheria at canonical.com
-> > Cc: "Rob Herring" <r.herring@freescale.com>
-> > Date: Friday, April 16, 2010, 4:35 PM
-> > Signed-off-by: Rob Herring <r.herring@freescale.com>
-> > ---
-> >  arch/arm/mach-mx5/Kconfig? ? ? ?
-> > ? |? ? 7 +++
-> >  arch/arm/mach-mx5/Makefile? ? ?
-> > ???|? ? 1 +
-> >  arch/arm/mach-mx5/board-mx53_evk.c |???88
-> > ++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 96 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-mx5/board-mx53_evk.c
-> 
-> Shouldn't the name of this file be mach-mx53_evk.c to match 
-> the naming convention patches that Uwe sent?
+>    Since resuming my spitz from a suspended state doesn't work in 2.6.34-rc3
+>    at the moment, I've tried to find out what the problem is with
+>    suspend/resume. Using CONFIG_PM_DEBUG I tried to test this by setting
+>    /sys/power/pm_test to "core" and switching the device off with the power
+>    button. This indeed suspends and resumes the device, but shows following
+>    in the system log:
 
-Not when Babbage board is named board-mx51_babbage.c. 
+It works here.
 
-Rob
+>    ------------[ cut here ]------------
+>    WARNING: at kernel/irq/manage.c:361 set_irq_wake+0xa4/0x130()
+>    Unbalanced IRQ 191 wake disable
+
+--- ./arch/arm.ofic/mach-pxa/mfp-pxa2xx.c	2009-09-10 00:13:59.000000000 +0200
++++ ./arch/arm/mach-pxa/mfp-pxa2xx.c	2009-12-29 03:16:40.000000000 +0100
+@@ -34,7 +34,6 @@
+ struct gpio_desc {
+ 	unsigned	valid		: 1;
+ 	unsigned	can_wakeup	: 1;
+-	unsigned	keypad_gpio	: 1;
+ 	unsigned	dir_inverted	: 1;
+ 	unsigned int	mask; /* bit mask in PWER or PKWR */
+ 	unsigned int	mux_mask; /* bit mask of muxed gpio bits, 0 if no mux */
+@@ -178,9 +177,6 @@
+ 	if (!d->valid)
+ 		return -EINVAL;
+ 
+-	if (d->keypad_gpio)
+-		return -EINVAL;
+-
+ 	mux_taken = (PWER & d->mux_mask) & (~d->mask);
+ 	if (on && mux_taken)
+ 		return -EBUSY;
+@@ -231,32 +227,6 @@
+ #endif /* CONFIG_PXA25x */
+ 
+ #ifdef CONFIG_PXA27x
+-static int pxa27x_pkwr_gpio[] = {
+-	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
+-	95, 96, 97, 98, 99, 100, 101, 102
+-};
+-
+-int keypad_set_wake(unsigned int on)
+-{
+-	unsigned int i, gpio, mask = 0;
+-
+-	if (!on) {
+-		PKWR = 0;
+-		return 0;
+-	}
+-
+-	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
+-
+-		gpio = pxa27x_pkwr_gpio[i];
+-
+-		if (gpio_desc[gpio].config & MFP_LPM_CAN_WAKEUP)
+-			mask |= gpio_desc[gpio].mask;
+-	}
+-
+-	PKWR = mask;
+-	return 0;
+-}
+-
+ #define PWER_WEMUX2_GPIO38	(1 << 16)
+ #define PWER_WEMUX2_GPIO53	(2 << 16)
+ #define PWER_WEMUX2_GPIO40	(3 << 16)
+@@ -273,6 +243,12 @@
+ 	gpio_desc[(gpio)].mux_mask = PWER_ ## mux ## _MASK;	\
+ } while (0)
+ 
++
++static int pxa27x_pkwr_gpio[] = {
++	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
++	95, 96, 97, 98, 99, 100, 101, 102
++};
++
+ static void __init pxa27x_mfp_init(void)
+ {
+ 	int i, gpio;
+@@ -291,7 +267,6 @@
+ 	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
+ 		gpio = pxa27x_pkwr_gpio[i];
+ 		gpio_desc[gpio].can_wakeup = 1;
+-		gpio_desc[gpio].keypad_gpio = 1;
+ 		gpio_desc[gpio].mask = 1 << i;
+ 	}
+ 
+--- ./arch/arm.ofic/mach-pxa/pxa27x.c	2009-09-10 00:13:59.000000000 +0200
++++ ./arch/arm/mach-pxa/pxa27x.c	2009-12-29 03:13:00.000000000 +0100
+@@ -323,9 +323,6 @@
+ 	if (gpio >= 0 && gpio < 128)
+ 		return gpio_set_wake(gpio, on);
+ 
+-	if (irq == IRQ_KEYPAD)
+-		return keypad_set_wake(on);
+-
+ 	switch (irq) {
+ 	case IRQ_RTCAlrm:
+ 		mask = PWER_RTC;
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
