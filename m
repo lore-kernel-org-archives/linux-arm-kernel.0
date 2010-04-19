@@ -1,53 +1,176 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Mon, 19 Apr 2010 17:27:04 -0500
-Subject: [PATCHv5 2.6.34-rc4 5/5] mx5: Add USB to Freescale MX51 defconfig
-In-Reply-To: <1271716024-22990-4-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Mon, 19 Apr 2010 17:27:02 -0500
+Subject: [PATCHv5 2.6.34-rc4 3/5] mx5: Enable board specific functions for
+	enabling USB host on Babbage
+In-Reply-To: <1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1271716024-22990-1-git-send-email-Dinh.Nguyen@freescale.com>
 	<1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271716024-22990-3-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271716024-22990-4-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1271716024-22990-5-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271716024-22990-3-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Update mx51_defconfig to include USB EHCI by default.
+This patch enables USB host functionality for Host1 and OTG port on
+Freescale MX51 Babbage HW. This patch contains the board specific
+HW initialization of the USB HW.
 
 This patch applies to 2.6.34-rc4.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/configs/mx51_defconfig |   17 ++++++++++++++++-
- 1 files changed, 16 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx5/board-mx51_babbage.c |  104 ++++++++++++++++++++++++++++++++
+ 1 files changed, 104 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index c88e952..a708fd6 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -809,7 +809,22 @@ CONFIG_SSB_POSSIBLE=y
- CONFIG_DUMMY_CONSOLE=y
- # CONFIG_SOUND is not set
- # CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_SUPPORT=y
-+CONFIG_USB_ARCH_HAS_HCD=y
-+# CONFIG_USB_ARCH_HAS_OHCI is not set
-+CONFIG_USB_ARCH_HAS_EHCI=y
-+CONFIG_USB=y
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ee67a71..3b39a27 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -12,11 +12,15 @@
+ 
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/delay.h>
++#include <linux/io.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
++#include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/setup.h>
+@@ -26,6 +30,9 @@
+ 
+ #include "devices.h"
+ 
++#define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
++#define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
 +
-+#
-+# USB Host Controller Drivers
-+#
-+# CONFIG_USB_C67X00_HCD is not set
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+# CONFIG_USB_EHCI_TT_NEWSCHED is not set
-+CONFIG_USB_EHCI_MXC=y
+ static struct platform_device *devices[] __initdata = {
+ 	&mxc_fec_device,
+ };
+@@ -46,6 +53,22 @@ static struct pad_desc mx51babbage_pads[] = {
+ 	MX51_PAD_EIM_D26__UART3_TXD,
+ 	MX51_PAD_EIM_D27__UART3_RTS,
+ 	MX51_PAD_EIM_D24__UART3_CTS,
 +
++	/* USB HOST1 */
++	MX51_PAD_USBH1_CLK__USBH1_CLK,
++	MX51_PAD_USBH1_DIR__USBH1_DIR,
++	MX51_PAD_USBH1_NXT__USBH1_NXT,
++	MX51_PAD_USBH1_DATA0__USBH1_DATA0,
++	MX51_PAD_USBH1_DATA1__USBH1_DATA1,
++	MX51_PAD_USBH1_DATA2__USBH1_DATA2,
++	MX51_PAD_USBH1_DATA3__USBH1_DATA3,
++	MX51_PAD_USBH1_DATA4__USBH1_DATA4,
++	MX51_PAD_USBH1_DATA5__USBH1_DATA5,
++	MX51_PAD_USBH1_DATA6__USBH1_DATA6,
++	MX51_PAD_USBH1_DATA7__USBH1_DATA7,
 +
- CONFIG_MMC=y
- # CONFIG_MMC_DEBUG is not set
- # CONFIG_MMC_UNSAFE_RESUME is not set
++	/* USB HUB reset line*/
++	MX51_PAD_GPIO_1_7__GPIO1_7,
+ };
+ 
+ /* Serial ports */
+@@ -66,15 +89,96 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++static int gpio_usbh1_active(void)
++{
++	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
++	int ret;
++
++	/* Set USBH1_STP to GPIO and toggle it */
++	mxc_iomux_v3_setup_pad(&usbh1stp_gpio);
++	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
++
++	if (ret) {
++		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
++		return ret;
++	}
++	gpio_direction_output(BABBAGE_USBH1_STP, 0);
++	gpio_set_value(BABBAGE_USBH1_STP, 1);
++	msleep(100);
++	gpio_free(BABBAGE_USBH1_STP);
++	return 0;
++}
++
++static inline void babbage_usbhub_reset(void)
++{
++	int ret;
++
++	/* Bring USB hub out of reset */
++	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
++	if (ret) {
++		printk(KERN_ERR"failed to get GPIO_USB_HUB_RESET: %d\n", ret);
++		return;
++	}
++	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
++
++	/* USB HUB RESET - De-assert USB HUB RESET_N */
++	msleep(1);
++	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
++	msleep(1);
++	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
++}
++
++/* This function is board specific as the bit mask for the plldiv will also
++be different for other Freescale SoCs, thus a common bitmask is not
++possible and cannot get place in /plat-mxc/ehci.c.*/
++static int initialize_otg_port(struct platform_device *pdev)
++{
++	u32 v;
++	void __iomem *usb_base;
++	u32 usbother_base;
++
++	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
++	usbother_base = usb_base + USBOTHER_REGS_OFFSET;
++
++	/* Set the PHY clock to 19.2MHz */
++	v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++	v &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
++	v |= USB_PLL_DIV_19_2_MHZ;
++	__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++	iounmap(usb_base);
++	return 0;
++}
++
++static struct mxc_usbh_platform_data dr_utmi_config = {
++	.init		= initialize_otg_port,
++	.portsc	= MXC_EHCI_UTMI_16BIT,
++	.flags	= MXC_EHCI_INTERNAL_PHY,
++};
++
++static struct mxc_usbh_platform_data usbh1_config = {
++	.portsc	= MXC_EHCI_MODE_ULPI,
++	.flags	= (MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_ITC_NO_THRESHOLD),
++};
++
+ /*
+  * Board specific initialization.
+  */
+ static void __init mxc_board_init(void)
+ {
++	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
++
+ 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
+ 					ARRAY_SIZE(mx51babbage_pads));
+ 	mxc_init_imx_uart();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
++
++	gpio_usbh1_active();
++	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
++	/* setback USBH1_STP to be function */
++	mxc_iomux_v3_setup_pad(&usbh1stp);
++	babbage_usbhub_reset();
+ }
+ 
+ static void __init mx51_babbage_timer_init(void)
 -- 
 1.6.0.4
