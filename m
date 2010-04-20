@@ -1,145 +1,46 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue, 20 Apr 2010 10:07:06 +0300
-Subject: [PATCHv5 2.6.34-rc4 2/5] mx5: Add USB device definitions for
-	Freescale MX51 Babbage HW
-In-Reply-To: <1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1271716024-22990-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100420070706.GA2116@matterhorn.lan>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 20 Apr 2010 10:13:23 +0200
+Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
+In-Reply-To: <z2z3f34cd261004191240nce56a951jb24c4ce3c0c47503@mail.gmail.com>
+References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
+	<20100415075831.GL30801@buzzloop.caiaq.de>
+	<i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
+	<20100416083632.GF30801@buzzloop.caiaq.de>
+	<z2z3f34cd261004191240nce56a951jb24c4ce3c0c47503@mail.gmail.com>
+Message-ID: <20100420081323.GD30807@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
+On Mon, Apr 19, 2010 at 01:40:50PM -0600, Badguy Badguy wrote:
+> Ok, well I think my problem was simply that I did not have the console
+> enabled! Oops!
+> and once I seen the LED light go solid, I figured it was locked.
+> (must not be being turned off)
+> 
+> I will mention that the serial port defaults to the 9600 baud implied
+> by the driver, this was also giving me trouble.
+> I note it attempts to read current state and use it, but must get it
+> wrong have not dug deeper yet, simply changed default to what the
+> bootloader is using 115200
 
-This patch fails to apply for me. Can you confirm?
+Yes, you should pass that on the kernel command line.
 
-Regards,
-Amit
+> I cleaned up my config some more, removed some redundant stuff got it
+> to boot to Oops from lack of FS support.
+> cannot get to the NFS server, digging into that.
 
-On 10 Apr 19, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
-> patch adds device structures for USB Host1 and OTG port, and adds
-> clocking information for USB HW.
-> 
-> This patch applies to 2.6.34-rc4.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
->  arch/arm/mach-mx5/devices.c    |   49 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h    |    2 +
->  3 files changed, 59 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index 1ee6ce4..1fe40e1 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -762,6 +762,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
->  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* USB */
-> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> +	NULL, NULL, &pll3_sw_clk, NULL);
-> +
->  /* FEC */
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
-> @@ -779,6 +783,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index 5070ae1..4b456d5 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/platform_device.h>
->  #include <linux/gpio.h>
-> +#include <linux/dma-mapping.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/irqs.h>
-> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource usbotg_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR,
-> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_OTG,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbdr_host_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(usbotg_resources),
-> +	.resource = usbotg_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource usbh1_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR + 0x200,
-> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_H1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbh1_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(usbh1_resources),
-> +	.resource = usbh1_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index f339ab8..95c45f9 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;
->  extern struct platform_device mxc_uart_device1;
->  extern struct platform_device mxc_uart_device2;
->  extern struct platform_device mxc_fec_device;
-> +extern struct platform_device mxc_usbdr_host_device;
-> +extern struct platform_device mxc_usbh1_device;
-> -- 
-> 1.6.0.4
-> 
+Proably also some config issue? Works well here.
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+> Can I get a break down on how far you have run this kernel? Do you
+> have file system support?
+
+I can fully boot the board via NFS and have a working system with
+Ethernet, MMC/SDIO, LED, GPIO, SPI and USB support.
+
+> I notice the NAND driver is throwing bad erase block warnings on a
+> large number of blocks, I will change SOM and see if it continues.
+
+I'll again check for NAND and NOR later today, but I'm sure the chips
+are at least probed correctly.
+
+Daniel
