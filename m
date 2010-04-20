@@ -1,36 +1,96 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Tue, 20 Apr 2010 11:50:50 +0300
-Subject: [PATCH 4/8] arm: kdump: skip indirection page when crashing
+Date: Tue, 20 Apr 2010 11:50:51 +0300
+Subject: [PATCH 5/8] arm: kdump: implement copy_oldmem_page()
 In-Reply-To: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <9b6846594bb7f0563c8955feb91c92c59380a5cc.1271752135.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <64b17870ef427ff00e438e891827161f0942d30c.1271752135.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we are crashing there is no indirection page in place. Only control page is
-present.
+This function is used by vmcore code to read a page from the old kernel memory.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/relocate_kernel.S |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/kernel/Makefile     |    1 +
+ arch/arm/kernel/crash_dump.c |   58 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/crash_dump.c
 
-diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-index 61930eb..fd26f8d 100644
---- a/arch/arm/kernel/relocate_kernel.S
-+++ b/arch/arm/kernel/relocate_kernel.S
-@@ -10,6 +10,12 @@ relocate_new_kernel:
- 	ldr	r0,kexec_indirection_page
- 	ldr	r1,kexec_start_address
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 26d302c..ea023c6 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
++obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
  
-+	/*
-+	 * If there is no indirection page (we are doing crashdumps)
-+	 * skip any relocation.
-+	 */
-+	cmp	r0, #0
-+	beq	2f
- 
- 0:	/* top, read another word for the indirection page */
- 	ldr	r3, [r0],#4
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+diff --git a/arch/arm/kernel/crash_dump.c b/arch/arm/kernel/crash_dump.c
+new file mode 100644
+index 0000000..facf852
+--- /dev/null
++++ b/arch/arm/kernel/crash_dump.c
+@@ -0,0 +1,58 @@
++/*
++ * arch/arm/kernel/crash_dump.c
++ *
++ * Copyright (C) 2010 Nokia Corporation.
++ * Author: Mika Westerberg
++ *
++ * This code is taken from arch/x86/kernel/crash_dump_64.c
++ *   Created by: Hariprasad Nellitheertha (hari at in.ibm.com)
++ *   Copyright (C) IBM Corporation, 2004. All rights reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/errno.h>
++#include <linux/crash_dump.h>
++#include <linux/uaccess.h>
++#include <linux/io.h>
++
++/* stores the physical address of elf header of crash image */
++unsigned long long elfcorehdr_addr = ELFCORE_ADDR_MAX;
++
++/**
++ * copy_oldmem_page() - copy one page from old kernel memory
++ * @pfn: page frame number to be copied
++ * @buf: buffer where the copied page is placed
++ * @csize: number of bytes to copy
++ * @offset: offset in bytes into the page
++ * @userbuf: if set, @buf is int he user address space
++ *
++ * This function copies one page from old kernel memory into buffer pointed by
++ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
++ * copied or negative error in case of failure.
++ */
++ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
++			 size_t csize, unsigned long offset,
++			 int userbuf)
++{
++	void *vaddr;
++
++	if (!csize)
++		return 0;
++
++	vaddr = ioremap(pfn << PAGE_SHIFT, PAGE_SIZE);
++
++	if (userbuf) {
++		if (copy_to_user(buf, vaddr + offset, csize)) {
++			iounmap(vaddr);
++			return -EFAULT;
++		}
++	} else {
++		memcpy(buf, vaddr + offset, csize);
++	}
++
++	iounmap(vaddr);
++	return csize;
++}
 -- 
 1.5.6.5
