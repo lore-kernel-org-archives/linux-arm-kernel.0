@@ -1,52 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Apr 2010 23:41:08 +0100
-Subject: kernel virtual memory access (from app) does not generate segfault
-In-Reply-To: <20100420223106.GQ11723@shareable.org>
-References: <4BCD7076.9030802@browserseal.com>
-	<20100420093441.GD6684@trinity.fluff.org>
-	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
-	<20100420142047.GA7398@desktop>
-	<20100420170944.GE2234@trinity.fluff.org>
-	<20100420192813.GA29831@n2100.arm.linux.org.uk>
-	<20100420223106.GQ11723@shareable.org>
-Message-ID: <20100420224108.GA1432@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 20 Apr 2010 15:51:22 -0700
+Subject: Suspicious compilation warning
+In-Reply-To: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
+References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
+Message-ID: <20100420155122.6f2c26eb.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 20, 2010 at 11:31:06PM +0100, Jamie Lokier wrote:
-> Russell King - ARM Linux wrote:
-> > User programs do not have permission to read kernel addresses.  Trying to
-> > do so _should_ generate a permission fault.
-> >
-> > > probably best to get Russell's opinion.
-> > 
-> > 	if (user_mode(regs))
-> > 		goto bad_area;
-> > 
-> > should be sufficient, since userspace should not be accessing anything
-> > above TASK_SIZE, except for the exception page, which will always be
-> > mapped.
+On Mon, 19 Apr 2010 20:27:43 -0300
+Marcelo Jimenez <mroberto@cpti.cetuc.puc-rio.br> wrote:
+
+> I get this warning while compiling for ARM/SA1100:
 > 
-> Those two lines look good to me, or alternatively change
+> mm/sparse.c: In function '__section_nr':
+> mm/sparse.c:135: warning: 'root' is used uninitialized in this function
 > 
->         if (addr < TASK_SIZE)
-> to 
->         if (addr < TASK_SIZE || user_mode(regs))
+> With a small patch in fs/proc/meminfo.c, I find that NR_SECTION_ROOTS
+> is zero, which certainly explains the warning.
 > 
-> which lead to the same SIGSEGV by a more complicated route.  That will
-> continue to work if user-accessible pages are ever mapped using the
-> vmalloc lazy method.
+> # cat /proc/meminfo
+> NR_SECTION_ROOTS=0
+> NR_MEM_SECTIONS=32
+> SECTIONS_PER_ROOT=512
+> SECTIONS_SHIFT=5
+> MAX_PHYSMEM_BITS=32
 
-That'd be very disgusting if it ever happened.
+hm, who owns sparsemem nowadays? Nobody identifiable.
 
-> But a possible NAK: What happens when the kernel does get/put_user()
-> on an address > TASK_SIZE with kernel-only mapping?  user_mode()
-> returns 0, so the LDRT will loop in the kernel, won't it?
-
-No - the first data fault will cause the pgd entry to be copied, and then
-the subsequent data fault will be a permission fault.
-
-The difference between instruction faults and data faults is that we
-always interpret instruction faults on pre-ARMv6 CPUs as a 'translation
-fault' rather than a permission fault since they can't tell us what the
-problem was.
+Does it make physical sense to have SECTIONS_PER_ROOT > NR_MEM_SECTIONS?
