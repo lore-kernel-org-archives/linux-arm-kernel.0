@@ -1,91 +1,80 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Tue, 20 Apr 2010 18:19:23 -0500
-Subject: [PATCHv6 2.6.34-rc5 1/5] mxc: Update GPIO for USB support on
-	Freescale MX51 Babbage HW
-Message-ID: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Wed, 21 Apr 2010 00:54:56 +0100
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On 4/20/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+> On Tuesday, April 20, 2010 8:12 AM, Mika Westerberg wrote:
+> > This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+>  > in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
+>
+>  I discovered one gotcha with this driver.  Bear with me through this...
+>
+>  1. ep93xx_spi_process_message is called by the workqueue worker function to handle
+>    a spi_message queued in by the ep93xx_spi_transfer function.  Before starting
+>    the actual transfer the chip select to the device is asserted.
+>  2. ep93xx_spi_process_transfer processes each transfer in the spi_message, one at a
+>    time, and does a wait_for_completion on each transfer.
+>  3. When the entire spi_message has been transferred the chip select to the device
+>    is deasserted.
+>
+>  The problem is if a hardware design uses the SFRM1 pin as part of the chip select
+>  logic.  The EP93xx User's Guide states that "the SFRMOUT signal behaves as a slave
+>  Select" in Motorola SPI mode.  This signal behaves differently depending on the
+>  SPI_MODE_* used.
+>
+>  Modes 0 and 2:
+>   SFRMOUT is forced HIGH during idle periods.
+>   Start of transmission, SFRMOUT is driven LOW.
+>   Single word transmission, SFRMOUT is returned to its idle HIGH state one
+>     SCLKOUT period after the last bit has been captured.
+>   Back-to-back transmissions, SFRMOUT signal is pulsed HIGH between each
+>     data word transfer.  On completion the SFRMOUT pin returns to its idle
+>     HIGH state one SCLKOUT period after the last bit has been captured.
+>
+>  Modes 1 and 3:
+>   SFRMOUT is forced HIGH during idle periods.
+>   Start of transmission, SFRMOUT is driven LOW.
+>   Single word transmission, SFRMOUT is returned to its idle HIGH state one
+>     SCLKOUT period after the last bit has been captured.
+>   Back-to-back transmissions, SFRMOUT signal is held LOW between each
+>     data word transfer.  On completion the SFRMOUT pin returns to its idle
+>     HIGH state one SCLKOUT period after the last bit has been captured.
+>
+>  So, since each transfer does a wait_for_completion, all the data is transmitted
+>  which causes the SFRMOUT pin to go HIGH between each transfer in the message.
+>
+>  For devices like the sst25lf040a SPI Flash on the EDB93xx boards this causes a
+>  problem.  To read data from that device you need to send a two part message.  The
+>  first part is a write transfer with the one byte command and three byte address.
+>  This is then followed by a read transfer to get the data.  But since the SFRMOUT
+>  pin goes high this ends the command.
+>
+>  The driver Ryan and I worked on actually does work with the sst25lf040a on the
+>  EDB93xx boards.  But now that I know what the issue is, it was actually a race
+>  condition.  Sometimes it worked and sometimes it didn't...
+>
+>  I would think the Sim.One board (Martin?) would have the same issue with the mmc
+>  card since that design uses the SFRMOUT pin directly for the chip select.
+>
+>  Is there anyway to keep the transfers going in a muiltipart message?
 
-This patch is part of enabling USB for Freescale MX51 Babbage HW. This
-patch updates the iomux pins for USB, and gpio line for reset the
-USB hub on the MX51 Babbage HW.
+I just changed the SPI mode selection, which is in the board
+definition file, from Mode 0 to Mode 3 (the two modes that sample data
+on the rising clock edge, as required by MMC/SD). It dramatically
+increases linear block read throughput:
+MMC: from 307kB/sec to 353kB/sec
+SD: from 317 to 365
+SD MLC: from 327 to 378
+with 82000 interrupts per second and 60% cpu usage
 
-NOTE: This 5-patch series for enabling USB is functionally dependent
-on this patch:
-"mx5: Add registration of GPIOs for MX51 Babbage board"
+presumably because the poor card isn't being deselected once every byte.
 
-This patch applies to 2.6.34-rc5.
-
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   33 ++++++++++++++++----------
- 1 files changed, 20 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index b4f975e..80528cc 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -37,6 +38,11 @@ typedef enum iomux_config {
- 				PAD_CTL_SRE_FAST)
- #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
- 				PAD_CTL_SRE_FAST)
-+#define MX51_USBH1_PAD_CTRL	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
-+				PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
-+				PAD_CTL_PKE | PAD_CTL_HYS)
-+#define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
-+				PAD_CTL_SRE_FAST)
- 
- /*
-  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
-@@ -208,18 +214,19 @@ typedef enum iomux_config {
- #define MX51_PAD_KEY_COL3__KEY_COL3	IOMUX_PAD(0x658, 0x268, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_KEY_COL4__KEY_COL4	IOMUX_PAD(0x65C, 0x26C, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_KEY_COL5__KEY_COL5	IOMUX_PAD(0x660, 0x270, 0, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_25__USBH1_CLK	IOMUX_PAD(0x678, 0x278, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_26__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_27__USBH1_STP	IOMUX_PAD(0x680, 0x280, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_28__USBH1_NXT	IOMUX_PAD(0x684, 0x284, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_11__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_12__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_13__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_14__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_15__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_16__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_17__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_18__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, 2, 0x0, 0, NO_PAD_CTRL)
-+#define MX51_PAD_USBH1_CLK__USBH1_CLK	IOMUX_PAD(0x678, 0x278, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DIR__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_STP__USBH1_STP	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_STP__GPIO_1_27	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_GPIO, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_NXT__USBH1_NXT	IOMUX_PAD(0x684, 0x284, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA0__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA1__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA2__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA3__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA4__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA5__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA6__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
-+#define MX51_PAD_USBH1_DATA7__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
- #define MX51_PAD_GPIO_3_0__DI1_PIN11	IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_3_1__DI1_PIN12	IOMUX_PAD(0x6AC, 0x2AC, 4, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_3_2__DI1_PIN13	IOMUX_PAD(0x6B0, 0x2B0, 4, 0x0, 0, NO_PAD_CTRL)
-@@ -299,7 +306,7 @@ typedef enum iomux_config {
- #define MX51_PAD_GPIO_1_4__GPIO1_4	IOMUX_PAD(0x804, 0x3D8, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_5__GPIO1_5	IOMUX_PAD(0x808, 0x3DC, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_6__GPIO1_6	IOMUX_PAD(0x80C, 0x3E0, 0, 0x0, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_8__GPIO1_8	IOMUX_PAD(0x814, 0x3E8, 0, 0x0, 1, \
- 						(PAD_CTL_SRE_SLOW | PAD_CTL_DSE_MED | PAD_CTL_PUS_100K_UP |  PAD_CTL_HYS))
- #define MX51_PAD_GPIO_1_9__GPIO1_9	IOMUX_PAD(0x818, 0x3EC, 0, 0x0, 0, NO_PAD_CTRL)
--- 
-1.6.0.4
+   M
