@@ -1,19 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 20 Apr 2010 13:02:41 -0400 (EDT)
-Subject: [patch 0/4] Simtec patches for new Kirkwood based boad
-In-Reply-To: <20100420092617.075835456@fluff.org.uk>
-References: <20100420092617.075835456@fluff.org.uk>
-Message-ID: <alpine.LFD.2.00.1004201259140.7232@xanadu.home>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 20 Apr 2010 11:18:57 -0700
+Subject: [GIT PULL] generic arm for MSM try 3
+Message-ID: <1271787537.1986.10.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Apr 2010, Ben Dooks wrote:
 
-> Is there anytone currently picking up mach-kirkwood patches or should
-> this go to Russell's patch tracker?
+I dropped the copyright and rebased, but everything else is the same as
+the prior pull request.
 
-I usually do, and push them to git://git.marvell.com/orion.
-But I don't mind if you want to push them to the patch system instead.
+The following changes since commit 27ee8963708185b96bc84a149eb5336a249a7497:
+  Linus Torvalds (1):
+        Merge branch 'urgent' of git://git.kernel.org/.../brodo/pcmcia-2.6
 
+are available in the git repository at:
 
-Nicolas
+  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
+
+Daniel Walker (2):
+      arm: msm: allow ARCH_MSM to have v7 cpus
+      arm: msm: add oprofile pmu support
+
+Dave Estes (1):
+      arm: mm: qsd8x50: Fix incorrect permission faults
+
+Steve Muckle (1):
+      arm: msm: define HAVE_CLK for ARCH_MSM
+
+ arch/arm/Kconfig          |   11 ++++++-----
+ arch/arm/kernel/pmu.c     |    2 ++
+ arch/arm/mach-msm/Kconfig |    2 ++
+ arch/arm/mm/Kconfig       |    2 ++
+ arch/arm/mm/abort-ev7.S   |   38 ++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 50 insertions(+), 5 deletions(-)
