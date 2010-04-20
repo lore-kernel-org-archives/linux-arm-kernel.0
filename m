@@ -1,35 +1,63 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 20 Apr 2010 11:18:57 -0700
-Subject: [GIT PULL] generic arm for MSM try 3
-Message-ID: <1271787537.1986.10.camel@m0nster>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 20 Apr 2010 12:58:34 -0400 (EDT)
+Subject: [patch 4/4] ARM: kirkwood: Add Datong DTCOMMOD machine definition
+In-Reply-To: <20100420092725.687664503@fluff.org.uk>
+References: <20100420092617.075835456@fluff.org.uk>
+	<20100420092725.687664503@fluff.org.uk>
+Message-ID: <alpine.LFD.2.00.1004201251400.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 20 Apr 2010, Ben Dooks wrote:
 
-I dropped the copyright and rebased, but everything else is the same as
-the prior pull request.
+> +static void __init dtcommod_init(void)
+> +{
+> +	kirkwood_init();
+> +	kirkwood_mpp_conf(dtcommod_mpp_config);
+> +
+> +	kirkwood_uart0_init();
+> +	/* need to init nand, but we have RnB line */
 
-The following changes since commit 27ee8963708185b96bc84a149eb5336a249a7497:
-  Linus Torvalds (1):
-        Merge branch 'urgent' of git://git.kernel.org/.../brodo/pcmcia-2.6
+What's the purpose of that comment there?
 
-are available in the git repository at:
+> +
+> +	kirkwood_ge00_init(&dtcommod_ge0_data);
+> +	kirkwood_ge01_init(&dtcommod_ge1_data);
+> +	kirkwood_sata_init(&dtcommod_sata_data);
+> +	kirkwood_sdio_init(&dtcommod_mvsdio_data);
+> +
+> +	i2c_register_board_info(0, dtcommod_i2c_devs,
+> +				ARRAY_SIZE(dtcommod_i2c_devs));
+> +
+> +	gpio_request(GPIO_RNB, "NAND RnB");
+> +	gpio_direction_input(GPIO_RNB);
+> +
+> +	gpio_request(GPIO_SDPWR, "SD Power Enable");
+> +	gpio_direction_output(GPIO_SDPWR, 0);
+> +
+> +	kirkwood_nand_init_rnb(ARRAY_AND_SIZE(dtcommod_nand_parts),
+> +			       dtcommod_nand_rnb);
+> +
+> +	/* add the i2c bus info */
+> +
+> +	kirkwood_ehci_init();
+> +	kirkwood_i2c_init();
 
-  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
+And isn't that comment misplaced too?
 
-Daniel Walker (2):
-      arm: msm: allow ARCH_MSM to have v7 cpus
-      arm: msm: add oprofile pmu support
+> +}
+> +
+> +static int __init dtcommod_pci_init(void)
+> +{
+> +	if (machine_is_dtcommod())
+> +		kirkwood_pcie_init();
+> +
+> +	return 0;
+> +}
 
-Dave Estes (1):
-      arm: mm: qsd8x50: Fix incorrect permission faults
+You do have a PCIe slot/device, right?
 
-Steve Muckle (1):
-      arm: msm: define HAVE_CLK for ARCH_MSM
+Other than that, ACK.
 
- arch/arm/Kconfig          |   11 ++++++-----
- arch/arm/kernel/pmu.c     |    2 ++
- arch/arm/mach-msm/Kconfig |    2 ++
- arch/arm/mm/Kconfig       |    2 ++
- arch/arm/mm/abort-ev7.S   |   38 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 50 insertions(+), 5 deletions(-)
+
+Nicolas
