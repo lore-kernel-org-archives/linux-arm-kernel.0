@@ -1,86 +1,103 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 20 Apr 2010 10:39:36 +0100
-Subject: [PATCH] i2c-s3c2410: Enable i2c clock only on xfer
-In-Reply-To: <201004172342.43440.anarsoul@gmail.com>
-References: <201004172342.43440.anarsoul@gmail.com>
-Message-ID: <20100420093936.GE6684@trinity.fluff.org>
+From: Dave.Martin@arm.com (Dave P. Martin)
+Date: Tue, 20 Apr 2010 11:27:40 +0100
+Subject: kernel virtual memory access (from app) does not generate segfault
+In-Reply-To: <20100420093441.GD6684@trinity.fluff.org>
+References: <4BCD7076.9030802@browserseal.com>
+	<20100420093441.GD6684@trinity.fluff.org>
+Message-ID: <000001cae074$1b564ff0$4044010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 17, 2010 at 11:42:32PM +0300, Vasily Khoruzhick wrote:
-> I don't see any reason to keep i2c clock enabled all the time when i2c bus 
-> driver is loaded, and even more: it prevents me to disable uda1380 codec power 
-> - uda1380 doesn't respond on i2c xfers if its power was disabled during i2c 
-> clock is enabled.
-
-Weird. The SCL line should only be clocked when the block is generating
-transfers.
  
-> WinMobile enables i2c clock only on xfer (same for i2s clock)
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of Ben Dooks
+> Sent: 20 April 2010 10:35
+> To: Sasha Sirotkin
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: kernel virtual memory access (from app) does not 
+
+[..]
+
+> > For instance, this code generates a segfault allright
+> >
+> > int * aa;
+> > aa = 0xc0000000;
+> > *aa=42;
+> >
+> > However this code does not, instead the process simply 
+> hangs (and can 
+> > be
+> > killed)
+> >
+> > void (*func)(void);
+> > func = 0xc0000000;
+> > func();
 > 
-> Regards
-> Vasily
-
-> From 398bcaeb1bde17d4e33052d99dea914dad8378e0 Mon Sep 17 00:00:00 2001
-> From: Vasily Khoruzhick <anarsoul@gmail.com>
-> Date: Sat, 17 Apr 2010 23:32:52 +0300
-> Subject: [PATCH] i2c-s3c2410: Enable i2c clock only on xfer
+> Your first example writes to an area, your second is 
+> execution. IIRC, this version of the ARM architecture equates 
+> read and execute permission and so you may actually have 
+> permission to read this area and thus execute code in it.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> > I stumbled across this by accident. Just curious to 
+> understand why it 
+> > happens. Isn't it a bug ?
 > 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 1d8c986..662f6e4 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -541,7 +541,9 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
->  
->  	for (retry = 0; retry < adap->retries; retry++) {
->  
-> +		clk_enable(i2c->clk);
->  		ret = s3c24xx_i2c_doxfer(i2c, msgs, num);
-> +		clk_disable(i2c->clk);
+> Don't think so, other than you might not want that area to be 
+> readable by user space?
 
-I'll try and find out if there is any setup requirement between clock
-enable and the block being used.
+I tried reading that address (albeit on an old 2.6.28 kernel), and I get a
+segfault.
 
-It is probably worth moving the clk_enable() outside the loop to avoid
-calling it each time we try an transfer.
+Trying to execute in kernel space is the only thing that appears to hang.
+Attaching to the process in gdb, I observed that pc is always 0xc0000000
+when the process is stopped.
 
->  		if (ret != -EAGAIN)
->  			return ret;
-> @@ -812,8 +814,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->  
->  	dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
->  
-> -	clk_enable(i2c->clk);
-> -
+top accounts most of the CPU time as being consumed in the kernel.
 
-I'm not sure, but I think the clock should also be enabled when reading
-or writing registers. I'd be happier to see a patch where the setup
-functions also ensure that the clock is enabled.
+I think what is going on here is that the kernel is catching the expected
+prefetch abort, but the handler fails to send SIGSEGV to the user process
+--- the process is resumed with the same pc and we end up in an endless
+spin.
 
->  	/* map the registers */
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -- 
-> 1.7.0.4
-> 
+This only appears to apply to certain address ranges: substituting some
+other random unmapped address for 0xc0000000 (0x48000000 worked for me), we
+get the expected segfault.
+
+Does the prefetch abort handler assume that lr >= 0xc0000000 implies the
+fault came from inside the kernel?  Should it?
+
+arch/arm/mm/fault.c has:
+
+/* 
+...
+ * If the address is in kernel space (>= TASK_SIZE), then we are
+ * probably faulting in the vmalloc() area.
+...
+*/
+static int __kprobes
+do_translation_fault(unsigned long addr, unsigned int fsr,
+                     struct pt_regs *regs)
+{
+...
+        if (addr < TASK_SIZE)
+                return do_page_fault(addr, fsr, regs);
+
+So the common case for userspace prefetch aborts is do_page_fault()
+
+This suggests that the weirdness is caused by something in the remainder of
+do_translation_fault(), or something it calls.
 
 
+The comment preceding do_translation_fault() suggests a possible unsafe
+assumption which could lead to a security hole... but it really depends on
+what the handler code is trying to do.  Unfortunately, my understanding has
+broken down by this point.
 
+Is someone else able to comment on how this code responds to a user fault >=
+TASK_SIZE?
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Cheers
+---Dave
