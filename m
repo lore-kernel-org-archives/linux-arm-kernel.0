@@ -1,45 +1,36 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Tue, 20 Apr 2010 11:50:54 +0300
-Subject: [PATCH 8/8] arm: kdump: add CONFIG_CRASH_DUMP Kconfig option
+Date: Tue, 20 Apr 2010 11:50:50 +0300
+Subject: [PATCH 4/8] arm: kdump: skip indirection page when crashing
 In-Reply-To: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <7bb5e29aa8da6104c0f24c5fb45c93b860d0897f.1271752135.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <9b6846594bb7f0563c8955feb91c92c59380a5cc.1271752135.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CONFIG_CRASH_DUMP configuration option which is used by dump capture
-kernels. Dump capture kernel must be loaded into different physical address
-than the primary kernel. This means that PHYS_OFFSET must be different and
-it also should match the 'crashkernel=size at start' value passed to primary
-kernel command line.
+When we are crashing there is no indirection page in place. Only control page is
+present.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/Kconfig |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/kernel/relocate_kernel.S |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c5408bf..b8c37dc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1466,6 +1466,18 @@ config ATAGS_PROC
- 	  Should the atags used to boot the kernel be exported in an "atags"
- 	  file in procfs. Useful with kexec.
+diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+index 61930eb..fd26f8d 100644
+--- a/arch/arm/kernel/relocate_kernel.S
++++ b/arch/arm/kernel/relocate_kernel.S
+@@ -10,6 +10,12 @@ relocate_new_kernel:
+ 	ldr	r0,kexec_indirection_page
+ 	ldr	r1,kexec_start_address
  
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel (EXPERIMENTAL)"
-+	depends on EXPERIMENTAL
-+	help
-+	  Build a kernel suitable for use as kdump capture kernel. This should
-+	  be set only on dump capture kernels. Note that dump capture kernel
-+	  must be loaded into different physical address than the primary kernel
-+	  (e.g set PHYS_OFFSET and related mach/Makefile.boot parameters
-+	  to match value given in 'crashkernel=size at start').
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- endmenu
++	/*
++	 * If there is no indirection page (we are doing crashdumps)
++	 * skip any relocation.
++	 */
++	cmp	r0, #0
++	beq	2f
  
- menu "CPU Power Management"
+ 0:	/* top, read another word for the indirection page */
+ 	ldr	r3, [r0],#4
 -- 
 1.5.6.5
