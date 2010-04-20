@@ -1,70 +1,62 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Tue, 20 Apr 2010 11:50:52 +0300
-Subject: [PATCH 6/8] arm: allow passing an ELF64 header to elf_check_arch()
+Date: Tue, 20 Apr 2010 11:50:53 +0300
+Subject: [PATCH 7/8] arm: kdump: add support for elfcorehdr= parameter
 In-Reply-To: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <0f69b7e1155e6a1d2f9e8131bfd648d9a03e8763.1271752135.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <50990b5fa34f02e0451f49f658d30dfd389c4905.1271752135.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
-enabled:
-
-fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
-fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
-incompatible pointer type
-
-ELF32 and ELF64 headers have common fields of same size (namely e_ident and
-e_machine) which are checked in arm_elf_check_arch().
+This parameter is used by primary kernel to pass address of vmcore header to the
+dump capture kernel.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/include/asm/elf.h |    4 ++--
- arch/arm/kernel/elf.c      |    6 ++++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kernel/setup.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index bff0564..aa71815 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -92,8 +92,8 @@ struct elf32_hdr;
- /*
-  * This is used to ensure we don't load something for the wrong architecture.
-  */
--extern int elf_check_arch(const struct elf32_hdr *);
--#define elf_check_arch elf_check_arch
-+extern int arm_elf_check_arch(const struct elf32_hdr *);
-+#define elf_check_arch(x) arm_elf_check_arch((const struct elf32_hdr *)(x))
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 076454f..25a1664 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -20,6 +20,7 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -711,6 +712,30 @@ static void __init reserve_crashkernel(void)
+ static inline void reserve_crashkernel(void) {}
+ #endif /* CONFIG_KEXEC */
  
- extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
- #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d4a0da1..14e501b 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -4,11 +4,13 @@
- #include <linux/binfmts.h>
- #include <linux/elf.h>
- 
--int elf_check_arch(const struct elf32_hdr *x)
-+int arm_elf_check_arch(const struct elf32_hdr *x)
++/*
++ * Note: elfcorehdr_addr is not just limited to vmcore. It is also used by
++ * is_kdump_kernel() to determine if we are booting after a panic. Hence
++ * ifdef it under CONFIG_CRASH_DUMP and not CONFIG_PROC_VMCORE.
++ */
++
++#ifdef CONFIG_CRASH_DUMP
++/*
++ * elfcorehdr= specifies the location of elf core header stored by the crashed
++ * kernel. This option will be passed by kexec loader to the capture kernel.
++ */
++static int __init setup_elfcorehdr(char *arg)
++{
++	char *end;
++
++	if (!arg)
++		return -EINVAL;
++
++	elfcorehdr_addr = memparse(arg, &end);
++	return end > arg ? 0 : -EINVAL;
++}
++early_param("elfcorehdr", setup_elfcorehdr);
++#endif /* CONFIG_CRASH_DUMP */
++
+ void __init setup_arch(char **cmdline_p)
  {
- 	unsigned int eflags;
- 
- 	/* Make sure it's an ARM executable */
-+	if (x->e_ident[EI_CLASS] != ELF_CLASS)
-+		return 0;
- 	if (x->e_machine != EM_ARM)
- 		return 0;
- 
-@@ -35,7 +37,7 @@ int elf_check_arch(const struct elf32_hdr *x)
- 	}
- 	return 1;
- }
--EXPORT_SYMBOL(elf_check_arch);
-+EXPORT_SYMBOL(arm_elf_check_arch);
- 
- void elf_set_personality(const struct elf32_hdr *x)
- {
+ 	struct tag *tags = (struct tag *)&init_tags;
 -- 
 1.5.6.5
