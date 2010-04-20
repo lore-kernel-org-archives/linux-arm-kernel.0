@@ -1,46 +1,130 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Apr 2010 00:07:19 +0100
-Subject: Suspicious compilation warning
-In-Reply-To: <20100420155122.6f2c26eb.akpm@linux-foundation.org>
-References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
-	<20100420155122.6f2c26eb.akpm@linux-foundation.org>
-Message-ID: <20100420230719.GB1432@n2100.arm.linux.org.uk>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 20 Apr 2010 18:19:24 -0500
+Subject: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions for
+	Freescale MX51 Babbage HW
+In-Reply-To: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271805567-23068-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 20, 2010 at 03:51:22PM -0700, Andrew Morton wrote:
-> On Mon, 19 Apr 2010 20:27:43 -0300
-> Marcelo Jimenez <mroberto@cpti.cetuc.puc-rio.br> wrote:
-> 
-> > I get this warning while compiling for ARM/SA1100:
-> > 
-> > mm/sparse.c: In function '__section_nr':
-> > mm/sparse.c:135: warning: 'root' is used uninitialized in this function
-> > 
-> > With a small patch in fs/proc/meminfo.c, I find that NR_SECTION_ROOTS
-> > is zero, which certainly explains the warning.
-> > 
-> > # cat /proc/meminfo
-> > NR_SECTION_ROOTS=0
-> > NR_MEM_SECTIONS=32
-> > SECTIONS_PER_ROOT=512
-> > SECTIONS_SHIFT=5
-> > MAX_PHYSMEM_BITS=32
-> 
-> hm, who owns sparsemem nowadays? Nobody identifiable.
-> 
-> Does it make physical sense to have SECTIONS_PER_ROOT > NR_MEM_SECTIONS?
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Well, it'll be about this number on everything using sparsemem extreme:
+This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+patch adds device structures for USB Host1 and OTG port, and adds
+clocking information for USB HW.
 
-#define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
+This patch applies to 2.6.34-rc5.
 
-and with only 32 sections, this is going to give a NR_SECTION_ROOTS value
-of zero.  I think the calculation of NR_SECTIONS_ROOTS is wrong.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
+ arch/arm/mach-mx5/devices.c    |   49 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx5/devices.h    |    2 +
+ 3 files changed, 59 insertions(+), 0 deletions(-)
 
-#define NR_SECTION_ROOTS        (NR_MEM_SECTIONS / SECTIONS_PER_ROOT)
-
-Clearly if we have 1 mem section, we want to have one section root, so
-I think this division should round up any fractional part, thusly:
-
-#define NR_SECTION_ROOTS        ((NR_MEM_SECTIONS + SECTIONS_PER_ROOT - 1) / SECTIONS_PER_ROOT)
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 8f85f73..dcca330 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -761,6 +761,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+ 
++/* USB */
++DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
++	NULL, NULL, &pll3_sw_clk, NULL);
++
+ /* FEC */
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+@@ -778,6 +782,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+ 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+ 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
++	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
++	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
++	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
++	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index 5070ae1..e6262f3 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
+ #include <linux/gpio.h>
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+@@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
+ 	.resource = mxc_fec_resources,
+ };
+ 
++static u64 usb_dma_mask = DMA_BIT_MASK(32);
++
++static struct resource usbotg_resources[] = {
++	{
++		.start = MX51_OTG_BASE_ADDR,
++		.end = MX51_OTG_BASE_ADDR + 0x1ff,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = MX51_MXC_INT_USB_OTG,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_usbdr_host_device = {
++	.name = "mxc-ehci",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(usbotg_resources),
++	.resource = usbotg_resources,
++	.dev = {
++		.dma_mask = &usb_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++
++static struct resource usbh1_resources[] = {
++	{
++		.start = MX51_OTG_BASE_ADDR + 0x200,
++		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = MX51_MXC_INT_USB_H1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_usbh1_device = {
++	.name = "mxc-ehci",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(usbh1_resources),
++	.resource = usbh1_resources,
++	.dev = {
++		.dma_mask = &usb_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++
+ static struct mxc_gpio_port mxc_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index f339ab8..95c45f9 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;
+ extern struct platform_device mxc_uart_device1;
+ extern struct platform_device mxc_uart_device2;
+ extern struct platform_device mxc_fec_device;
++extern struct platform_device mxc_usbdr_host_device;
++extern struct platform_device mxc_usbh1_device;
+-- 
+1.6.0.4
