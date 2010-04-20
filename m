@@ -1,169 +1,46 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Tue, 20 Apr 2010 07:40:45 -0700
-Subject: [PATCHv5 2.6.34-rc4 2/5] mx5: Add USB device definitions for
-	Freescale MX51 Babbage HW
-In-Reply-To: <20100420070706.GA2116@matterhorn.lan>
-References: <1271716024-22990-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20100420070706.GA2116@matterhorn.lan>
-Message-ID: <86A0E76937111F4C92FABEC0A209885104733C3F@az33exm21>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 20 Apr 2010 18:11:34 +0300
+Subject: [PATCH v4 0/2] spi: driver for Cirrus EP93xx SPI controller
+Message-ID: <cover.1271774845.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+Hello,
 
-It was fine for me on rc4, but its failing for rc5. I'll rebase.
+This is fourth iteration of the driver. I tried to address most of the review
+comments I received.
 
-Dinh 
+Changes to previous version:
+	- dropped polling mode, there is no real use for that
+	- changes according review comments by Grant Likely, Martin Guy,
+	  and H. Hartley Sweeten
 
------Original Message-----
-From: Amit Kucheria [mailto:amit.kucheria at canonical.com] 
-Sent: Tuesday, April 20, 2010 2:07 AM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-linux at arm.linux.org.uk; s.hauer at pengutronix.de;
-valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
-bryan.wu at canonical.com; Herring Robert-RA7055; Li Jun-R65092; Zhang
-Lily-R58066
-Subject: Re: [PATCHv5 2.6.34-rc4 2/5] mx5: Add USB device definitions
-for Freescale MX51 Babbage HW
+Previous version can be found here (with review comments):
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012941.html
 
-Dinh,
+Let's hope I didn't forget anything.
 
-This patch fails to apply for me. Can you confirm?
+Tested with my TS-7260 board with mmc_spi and at25 drivers.
 
-Regards,
-Amit
+Note that patch 2/2 depends on patch that is already in Russell's patch
+tracking system:
+	http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5998/1
 
-On 10 Apr 19, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+Thanks,
+MW
 
-> patch adds device structures for USB Host1 and OTG port, and adds 
-> clocking information for USB HW.
-> 
-> This patch applies to 2.6.34-rc4.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
->  arch/arm/mach-mx5/devices.c    |   49
-++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h    |    2 +
->  3 files changed, 59 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c 
-> b/arch/arm/mach-mx5/clock-mx51.c index 1ee6ce4..1fe40e1 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -762,6 +762,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, 
-> MXC_CCM_CCGRx_CG9_OFFSET,  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2,
-MXC_CCM_CCGRx_CG10_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* USB */
-> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> +	NULL, NULL, &pll3_sw_clk, NULL);
-> +
->  /* FEC */
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
-> @@ -779,6 +783,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+Mika Westerberg (2):
+  spi: implemented driver for Cirrus EP93xx SPI controller
+  ep93xx: SPI driver platform support code
 
-> index 5070ae1..4b456d5 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/platform_device.h>
->  #include <linux/gpio.h>
-> +#include <linux/dma-mapping.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/irqs.h>
-> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource usbotg_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR,
-> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_OTG,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbdr_host_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(usbotg_resources),
-> +	.resource = usbotg_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource usbh1_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR + 0x200,
-> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_H1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbh1_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(usbh1_resources),
-> +	.resource = usbh1_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-
-> index f339ab8..95c45f9 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;  
-> extern struct platform_device mxc_uart_device1;  extern struct 
-> platform_device mxc_uart_device2;  extern struct platform_device 
-> mxc_fec_device;
-> +extern struct platform_device mxc_usbdr_host_device; extern struct 
-> +platform_device mxc_usbh1_device;
-> --
-> 1.6.0.4
-> 
-
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+ arch/arm/mach-ep93xx/clock.c                    |   14 +
+ arch/arm/mach-ep93xx/core.c                     |   48 ++
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
+ arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h  |   32 +
+ arch/arm/mach-ep93xx/include/mach/platform.h    |    2 +
+ drivers/spi/Kconfig                             |   11 +
+ drivers/spi/Makefile                            |    1 +
+ drivers/spi/ep93xx_spi.c                        |  992 +++++++++++++++++++++++
+ 8 files changed, 1101 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h
+ create mode 100644 drivers/spi/ep93xx_spi.c
