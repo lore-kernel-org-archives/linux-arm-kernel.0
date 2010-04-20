@@ -1,73 +1,56 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 20 Apr 2010 17:16:10 -0500
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-Message-ID: <0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 20 Apr 2010 23:31:06 +0100
+Subject: kernel virtual memory access (from app) does not generate segfault
+In-Reply-To: <20100420192813.GA29831@n2100.arm.linux.org.uk>
+References: <4BCD7076.9030802@browserseal.com>
+	<20100420093441.GD6684@trinity.fluff.org>
+	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
+	<20100420142047.GA7398@desktop>
+	<20100420170944.GE2234@trinity.fluff.org>
+	<20100420192813.GA29831@n2100.arm.linux.org.uk>
+Message-ID: <20100420223106.GQ11723@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 20, 2010 8:12 AM, Mika Westerberg wrote:
->
-> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
-> in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
+Russell King - ARM Linux wrote:
+> On Tue, Apr 20, 2010 at 06:09:44PM +0100, Ben Dooks wrote:
+> > On Tue, Apr 20, 2010 at 10:20:47PM +0800, anfei wrote:
+> > > On Tue, Apr 20, 2010 at 11:27:40AM +0100, Dave P. Martin wrote:
+> > > > > From: linux-arm-kernel-bounces at lists.infradead.org 
+> > > > > [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> > > > > Behalf Of Ben Dooks
+> > > > > Your first example writes to an area, your second is 
+> > > > > execution. IIRC, this version of the ARM architecture equates 
+> > > > > read and execute permission and so you may actually have 
+> > > > > permission to read this area and thus execute code in it.
 > 
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> User programs do not have permission to read kernel addresses.  Trying to
+> do so _should_ generate a permission fault.
+>
+> > probably best to get Russell's opinion.
+> 
+> 	if (user_mode(regs))
+> 		goto bad_area;
+> 
+> should be sufficient, since userspace should not be accessing anything
+> above TASK_SIZE, except for the exception page, which will always be
+> mapped.
 
-Mika,
+Those two lines look good to me, or alternatively change
 
-I discovered one gotcha with this driver.  Bear with me through this...
+        if (addr < TASK_SIZE)
+to 
+        if (addr < TASK_SIZE || user_mode(regs))
 
-1. ep93xx_spi_process_message is called by the workqueue worker function to handle
-   a spi_message queued in by the ep93xx_spi_transfer function.  Before starting
-   the actual transfer the chip select to the device is asserted.
-2. ep93xx_spi_process_transfer processes each transfer in the spi_message, one at a
-   time, and does a wait_for_completion on each transfer.
-3. When the entire spi_message has been transferred the chip select to the device
-   is deasserted.
+which lead to the same SIGSEGV by a more complicated route.  That will
+continue to work if user-accessible pages are ever mapped using the
+vmalloc lazy method.  Currently not, and I'm sure if that's ever done
+it will be noticed quickly :-)
 
-The problem is if a hardware design uses the SFRM1 pin as part of the chip select
-logic.  The EP93xx User's Guide states that "the SFRMOUT signal behaves as a slave
-Select" in Motorola SPI mode.  This signal behaves differently depending on the
-SPI_MODE_* used.
+But a possible NAK: What happens when the kernel does get/put_user()
+on an address > TASK_SIZE with kernel-only mapping?  user_mode()
+returns 0, so the LDRT will loop in the kernel, won't it?
 
-Modes 0 and 2:
-  SFRMOUT is forced HIGH during idle periods.
-  Start of transmission, SFRMOUT is driven LOW.
-  Single word transmission, SFRMOUT is returned to its idle HIGH state one
-    SCLKOUT period after the last bit has been captured.
-  Back-to-back transmissions, SFRMOUT signal is pulsed HIGH between each
-    data word transfer.  On completion the SFRMOUT pin returns to its idle
-    HIGH state one SCLKOUT period after the last bit has been captured.
+Reviewed-by: Jamie Lokier <jamie@shareable.org>
 
-Modes 1 and 3:
-  SFRMOUT is forced HIGH during idle periods.
-  Start of transmission, SFRMOUT is driven LOW.
-  Single word transmission, SFRMOUT is returned to its idle HIGH state one
-    SCLKOUT period after the last bit has been captured.
-  Back-to-back transmissions, SFRMOUT signal is held LOW between each
-    data word transfer.  On completion the SFRMOUT pin returns to its idle
-    HIGH state one SCLKOUT period after the last bit has been captured.
-
-So, since each transfer does a wait_for_completion, all the data is transmitted
-which causes the SFRMOUT pin to go HIGH between each transfer in the message.
-
-For devices like the sst25lf040a SPI Flash on the EDB93xx boards this causes a
-problem.  To read data from that device you need to send a two part message.  The
-first part is a write transfer with the one byte command and three byte address.
-This is then followed by a read transfer to get the data.  But since the SFRMOUT
-pin goes high this ends the command.
-
-The driver Ryan and I worked on actually does work with the sst25lf040a on the
-EDB93xx boards.  But now that I know what the issue is, it was actually a race
-condition.  Sometimes it worked and sometimes it didn't...
-
-I would think the Sim.One board (Martin?) would have the same issue with the mmc
-card since that design uses the SFRMOUT pin directly for the chip select.
-
-Is there anyway to keep the transfers going in a muiltipart message?
-
-Regards,
-Hartley
+-- Jamie
