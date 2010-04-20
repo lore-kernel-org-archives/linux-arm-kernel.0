@@ -1,94 +1,145 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 20 Apr 2010 14:58:53 +0800
-Subject: zaurus spitz suspend/resume issue
-In-Reply-To: <20100419133540.GA1191@ucw.cz>
-References: <i2i1f96a3531004181200ve1f71c03ydb7b4328cbcc6e26@mail.gmail.com>
-	<20100419133540.GA1191@ucw.cz>
-Message-ID: <i2pf17812d71004192358hd49d803nf82b44d5f3585212@mail.gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Tue, 20 Apr 2010 10:07:06 +0300
+Subject: [PATCHv5 2.6.34-rc4 2/5] mx5: Add USB device definitions for
+	Freescale MX51 Babbage HW
+In-Reply-To: <1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271716024-22990-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271716024-22990-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100420070706.GA2116@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 19, 2010 at 9:35 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
->> ? ?Since resuming my spitz from a suspended state doesn't work in 2.6.34-rc3
->> ? ?at the moment, I've tried to find out what the problem is with
->> ? ?suspend/resume. Using CONFIG_PM_DEBUG I tried to test this by setting
->> ? ?/sys/power/pm_test to "core" and switching the device off with the power
->> ? ?button. This indeed suspends and resumes the device, but shows following
->> ? ?in the system log:
->
-> It works here.
->
+Dinh,
 
-Or maybe we should allow these GPIOs to wakeup the system when either
-configured as generic GPIOs or keypad GPIOs.
+This patch fails to apply for me. Can you confirm?
 
-Cortez,
+Regards,
+Amit
 
-Could you give the following patch a try?
+On 10 Apr 19, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+> patch adds device structures for USB Host1 and OTG port, and adds
+> clocking information for USB HW.
+> 
+> This patch applies to 2.6.34-rc4.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
+>  arch/arm/mach-mx5/devices.c    |   49 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices.h    |    2 +
+>  3 files changed, 59 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+> index 1ee6ce4..1fe40e1 100644
+> --- a/arch/arm/mach-mx5/clock-mx51.c
+> +++ b/arch/arm/mach-mx5/clock-mx51.c
+> @@ -762,6 +762,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+>  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+>  
+> +/* USB */
+> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
+> +	NULL, NULL, &pll3_sw_clk, NULL);
+> +
+>  /* FEC */
+>  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+> @@ -779,6 +783,10 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+>  };
+>  
+>  static void clk_tree_init(void)
+> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+> index 5070ae1..4b456d5 100644
+> --- a/arch/arm/mach-mx5/devices.c
+> +++ b/arch/arm/mach-mx5/devices.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+> +#include <linux/dma-mapping.h>
+>  #include <mach/hardware.h>
+>  #include <mach/imx-uart.h>
+>  #include <mach/irqs.h>
+> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
+>  	.resource = mxc_fec_resources,
+>  };
+>  
+> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct resource usbotg_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR,
+> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_OTG,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbdr_host_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 0,
+> +	.num_resources = ARRAY_SIZE(usbotg_resources),
+> +	.resource = usbotg_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct resource usbh1_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR + 0x200,
+> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_H1,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbh1_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 1,
+> +	.num_resources = ARRAY_SIZE(usbh1_resources),
+> +	.resource = usbh1_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+>  static struct mxc_gpio_port mxc_gpio_ports[] = {
+>  	{
+>  		.chip.label = "gpio-0",
+> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+> index f339ab8..95c45f9 100644
+> --- a/arch/arm/mach-mx5/devices.h
+> +++ b/arch/arm/mach-mx5/devices.h
+> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;
+>  extern struct platform_device mxc_uart_device1;
+>  extern struct platform_device mxc_uart_device2;
+>  extern struct platform_device mxc_fec_device;
+> +extern struct platform_device mxc_usbdr_host_device;
+> +extern struct platform_device mxc_usbh1_device;
+> -- 
+> 1.6.0.4
+> 
 
-commit a510268069ed9ad0931339d6dc835ef4f1588876
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Tue Apr 20 14:52:50 2010 +0800
-
-    [ARM] pxa: allow keypad GPIOs to wakeup when configured as generic
-
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-index cf6b720..29301d2 100644
---- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-+++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-@@ -178,8 +178,17 @@ int gpio_set_wake(unsigned int gpio, unsigned int on)
- 	if (!d->valid)
- 		return -EINVAL;
-
--	if (d->keypad_gpio)
--		return -EINVAL;
-+	/* Allow keypad GPIOs to wakeup system when
-+	 * configured as generic GPIOs.
-+	 */
-+	if (d->keypad_gpio && (MFP_AF(d->config) == 0) &&
-+	    (d->config & MFP_LPM_CAN_WAKEUP)) {
-+		if (on)
-+			PKWR |= d->mask;
-+		else
-+			PKWR &= ~d->mask;
-+		return 0;
-+	}
-
- 	mux_taken = (PWER & d->mux_mask) & (~d->mask);
- 	if (on && mux_taken)
-@@ -239,21 +248,25 @@ static int pxa27x_pkwr_gpio[] = {
- int keypad_set_wake(unsigned int on)
- {
- 	unsigned int i, gpio, mask = 0;
--
--	if (!on) {
--		PKWR = 0;
--		return 0;
--	}
-+	struct gpio_desc *d;
-
- 	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
-
- 		gpio = pxa27x_pkwr_gpio[i];
-+		d = &gpio_desc[gpio];
-
--		if (gpio_desc[gpio].config & MFP_LPM_CAN_WAKEUP)
-+		/* skip if configured as generic GPIO */
-+		if (MFP_AF(d->config) == 0)
-+			continue;
-+
-+		if (d->config & MFP_LPM_CAN_WAKEUP)
- 			mask |= gpio_desc[gpio].mask;
- 	}
-
--	PKWR = mask;
-+	if (on)
-+		PKWR |= mask;
-+	else
-+		PKWR &= ~mask;
- 	return 0;
- }
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
