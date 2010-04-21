@@ -1,54 +1,193 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Wed, 21 Apr 2010 10:21:10 -0700
-Subject: orion5x and GPIO blink question
-In-Reply-To: <1271836632.2330.128.camel@pasglop>
-References: <1271836632.2330.128.camel@pasglop>
-Message-ID: <1271870470.1629.85.camel@rex>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 21 Apr 2010 13:00:56 -0500
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100421104651.GO19534@gw.healthdatacare.com>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
+	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
+	<20100421104651.GO19534@gw.healthdatacare.com>
+Message-ID: <0D753D10438DA54287A00B0270842697636D8C8672@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-04-21 at 17:57 +1000, Benjamin Herrenschmidt wrote:
-> While fixing up the dns-323 support for rev C I noticed something fishy
-> when you use leds-gpio with the "set_blink" callback like the dns323
-> code does for using HW blinking.
-> 
-> The problem is that there's pretty much no clean way to turn the
-> blinking off via this API. It sucks, ie, it's a bug in the leds
-> subsystem imho, blinking should have it's own enable/disable argument
-> rather than relying on set_brightness() to stop blinking but that's how
-> they did it so there's no point arguing about it.
+On Wednesday, April 21, 2010 3:47 AM, Mika Westerberg wrote:
+> On Tue, Apr 20, 2010 at 08:52:26PM -0500, H Hartley Sweeten wrote:
+>> On Tuesday, April 20, 2010 6:10 PM, Martin Guy wrote:
+>>> Not easily, but it seems a likely cause.
+>>> To prevent card deselection mid-message I think we would need to
+>>> handle multi-transfer messages by making the start of transfers 2..N
+>>> continuous with the end of transfers 1..N-1 instead of draining the
+>>> reply from each one before starting the next.
+>>> 
+>>> Am I on the right track?
+>> 
+>> Yes.  I'm just not sure how to implement this.
+>
+> I made a hack that allows transfer handler to continue to the next transfer directly
+> if there is no special per transfer settings in the message. Could you try that out
+> and report whether SFRMOUT works better with it?
+>
+> Note that this is just to make sure that we are on the right track.
+>
+> Patch is against v4 of the driver.
+>
+> Thanks,
+> MW
+>
+> diff --git a/drivers/spi/ep93xx_spi.c b/drivers/spi/ep93xx_spi.c
+> index 310032d..11dcdd1 100644
+> --- a/drivers/spi/ep93xx_spi.c
+> +++ b/drivers/spi/ep93xx_spi.c
+> @@ -106,6 +106,8 @@ struct ep93xx_spi {
+>  	unsigned long			min_rate;
+>  	unsigned long			max_rate;
+>  	bool				running;
+> +	bool				can_continue;
+> +	struct spi_transfer 		*last_transfer;
+>  	struct workqueue_struct		*wq;
+>  	struct work_struct		msg_work;
+>  	struct completion		wait;
+> @@ -380,6 +382,7 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+>  	struct ep93xx_spi *espi = spi_master_get_devdata(spi->master);
+>  	struct spi_transfer *t;
+>  	unsigned long flags;
+> +	bool can_continue = true;
+>  
+>  	if (!msg || !msg->complete)
+>  		return -EINVAL;
+> @@ -387,11 +390,21 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+>  	/* first validate each transfer */
+>  	list_for_each_entry(t, &msg->transfers, transfer_list) {
+>  		if (t->bits_per_word) {
+> +			can_continue = false;
+>  			if (t->bits_per_word < 4 || t->bits_per_word > 16)
+>  				return -EINVAL;
+>  		}
+> -		if (t->speed_hz && t->speed_hz < espi->min_rate)
+> +		if (t->speed_hz) {
+> +			can_continue = false;
+> +			if (t->speed_hz < espi->min_rate)
+>  				return -EINVAL;
+> +		}
+> +		if (t->cs_change &&
+> +			!list_is_last(&t->transfer_list, &msg->transfers)) {
+> +			can_continue = false;
+> +		}
+> +		if (t->delay_usecs)
+> +			can_continue = false;
+>  	}
+>  
+>  	/*
+> @@ -400,7 +413,7 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+>  	 * error in transfer and @msg->state is used to hold pointer to the
+>  	 * current transfer (or %NULL if no active current transfer).
+>  	 */
+> -	msg->state = NULL;
+> +	msg->state = (void *)can_continue;
+>  	msg->status = 0;
+>  	msg->actual_length = 0;
+>  
+> @@ -606,10 +619,33 @@ static void ep93xx_spi_process_message(struct ep93xx_spi *espi,
+>  	ep93xx_spi_chip_setup(espi, spi_get_ctldata(msg->spi));
+>  	ep93xx_spi_select_device(espi, msg->spi);
+>  
+> -	list_for_each_entry(t, &msg->transfers, transfer_list) {
+> -		ep93xx_spi_process_transfer(espi, msg, t);
+> -		if (msg->status)
+> -			break;
+> +	if (msg->state) {
+> +		espi->can_continue = true;
+> +		espi->last_transfer = list_entry(msg->transfers.prev, struct spi_transfer,
+> +						 transfer_list);
+> +	} else {
+> +		espi->can_continue = false;
+> +		espi->last_transfer = NULL;
+> +	}
+> +
+> +	/*
+> +	 * In case there is no transfer specific settings in this message we
+> +	 * can transfer the whole message with interrupts. Otherwise we need
+> +	 * to perform transfer specific stuff in thread context.
+> +	 */
+> +	if (espi->can_continue) {
+> +		msg->state = list_first_entry(&msg->transfers, struct spi_transfer,
+> +					      transfer_list);
+> +		espi->rx = 0;
+> +		espi->tx = 0;
+> +		ep93xx_spi_enable_interrupts(espi);
+> +		wait_for_completion(&espi->wait);
+> +	} else {
+> +		list_for_each_entry(t, &msg->transfers, transfer_list) {
+> +			ep93xx_spi_process_transfer(espi, msg, t);
+> +			if (msg->status)
+> +				break;
+> +		}
+>  	}
+>  
+>  	/*
+> @@ -792,6 +828,24 @@ static irqreturn_t ep93xx_spi_interrupt(int irq, void *dev_id)
+>  			 * interrupt then.
+>  			 */
+>  			return IRQ_HANDLED;
+> +		} else {
+> +			/*
+> +			 * If we can continue directly to the next transfer, do
+> +			 * that now.
+> +			 */
+> +			if (espi->can_continue) {
+> +				struct spi_message *msg = espi->current_msg;
+> +				struct spi_transfer *t = msg->state;
+> +
+> +				if (t != espi->last_transfer) {
+> +					msg->state = list_entry(t->transfer_list.next, struct spi_transfer,
+> +								transfer_list);
+> +					espi->rx = 0;
+> +					espi->tx = 0;
+> +					return IRQ_HANDLED;
+> +				}
+> +			}
+> +			/* otherwise we are ready */
+>  		}
+>  	}
+ 
+Same results are your v4 driver.  But, I think your on the right track.
 
-If you have blink enabled/disabled options along with set_brightness you
-can end up in a state where you disable blinking but the brightness the
-LED is left with is effectively random. This is why the LED core does
-things that way and I stand by that as it gives defined behaviour (and
-mirrors the sysfs interface).
+I think the problem is in the ep93xx_spi_read_write routine.  That function
+returns 0 as long as there is still data left in the current transfer.  The
+only time it doesn't return 0, which will cause the can_continue, is when:
 
-I appreciate in the world of GPIO controllers and the leds-gpio layer
-this is tricky to implement but this is more of a mismatch between the
-GPIO layer and the LED subsystem which was not addressed in the design
-of leds-gpio.
+	if (espi->rx == t->len) {
+		msg->actual_length += t->len;
+		return t->len;
+	}
 
-> Now, one way to fix that would be to have the orion5x GPIO stuff simply
-> clear the blink bit whenever orion_gpio_set_value() is called.
-> 
-> Would that break any known setup ? (Other than slightly slowing down
-> the GPIO accesses which might be undesirable).
-> 
-> Another solution might be to be a bit smarter and have leds-gpio
-> implement a different set_blink() function that takes an additional
-> enable/disable argument, and would call that whenever set_brightness is
-> called on a currently blinking GPIO.
-> 
-> But that means fixing all the in-tree users of leds-gpio set_blink()
-> callback (I haven't counted, but it should be easily greppable).
-> 
-> Opinions ?
+At this point the tx and rx fifos will both be empty, which causes the SSP
+peripheral to raise the SFRM signal.
 
-I'd be ok with either solution but the bug seems to be in leds-gpio and
-therefore fixing it there by adding the extra parameter would have
-slight preference rather than having the GPIO layer do magic.
+A picture is worth a thousand words... Attached is a logic analyzer capture
+of the Read-ID command and response from the SPI Flash.  EGPIO7 is my chip
+select to the flash.  The first 4 SPI MOSI (Tx) blocks are the 0x90, 0x00,
+0x00, 0x00 command to the flash.  You will notice that the SFRM line is
+asserted for those bytes.  A bit later are the 2 SPI MISO (Rx) responses
+from the flash with the ManID/DevID, again with the SFRM line asserted.
 
-Cheers,
+If the can_continue stuff worked correctly the second block should be right
+with the first block.
 
-Richard
+I'm going to try hacking the spi flash driver to send the command/response
+as a 6-byte full duplex message to make sure it works.
+
+Regards,
+Hartley
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ep93xx_spi.PNG
+Type: image/png
+Size: 38169 bytes
+Desc: ep93xx_spi.PNG
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100421/4959d367/attachment-0001.png>
