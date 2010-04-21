@@ -1,27 +1,50 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 20 Apr 2010 23:43:23 -0700
-Subject: udelay() broken for SMP cores?
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
-References: <4BCE60C4.8020505@codeaurora.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
-Message-ID: <4BCE9E8B.2070103@codeaurora.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 21 Apr 2010 14:51:19 +0800
+Subject: [PATCH] USB: gadget: pxa2xx: allow -1 for invalid gpio
+In-Reply-To: <89D837B3-BCDC-48A4-BBF9-B292AE55D7AB@workware.net.au>
+References: <89D837B3-BCDC-48A4-BBF9-B292AE55D7AB@workware.net.au>
+Message-ID: <n2mf17812d71004202351w6a2edf79h53ff830733710687@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 21, 2010 at 2:30 PM, Steve Bennett <steveb@workware.net.au> wrote:
+> gpio must be int, not u16, otherwise -1 isn't recognised
+> by gpio_is_valid().
+>
+> Signed-off-by: Steve Bennett <steveb@workware.net.au>
 
->> I looked at arch/arm/lib/delay.S and it looks like __udelay and
->> __const_udelay won't work correctly for SMP cores. The code just uses
->> the loops_per_jiffy variable instead of the per-CPU loops per jiffy data.
->>
->> Is anyone already working on a fix for that? If not, I can fix it up in
->> a way that's hopefully palatable to the community.
-> 
+Ack.
 
-> If you have case where individual CPUs are running at different speed and different
-> Tick rate then only this can make difference.
+And better submit a patch as well for pxa2xx_udc.c to allow -1 as no GPIO.
 
-Yes. I was talking about the case where the CPUs could be running at 
-different speeds.
-
-Thanks,
-Saravana
+> ---
+> ?arch/arm/include/asm/mach/udc_pxa2xx.h | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/mach/udc_pxa2xx.h b/arch/arm/include/asm/mach/udc_pxa2xx.h
+> index f3eabf1..833306e 100644
+> --- a/arch/arm/include/asm/mach/udc_pxa2xx.h
+> +++ b/arch/arm/include/asm/mach/udc_pxa2xx.h
+> @@ -21,8 +21,8 @@ struct pxa2xx_udc_mach_info {
+> ? ? ? ? * here. ?Note that sometimes the signals go through inverters...
+> ? ? ? ? */
+> ? ? ? ?bool ? ?gpio_vbus_inverted;
+> - ? ? ? u16 ? ? gpio_vbus; ? ? ? ? ? ? ? ? ? ? ?/* high == vbus present */
+> + ? ? ? int ? ? gpio_vbus; ? ? ? ? ? ? ? ? ? ? ?/* high == vbus present */
+> ? ? ? ?bool ? ?gpio_pullup_inverted;
+> - ? ? ? u16 ? ? gpio_pullup; ? ? ? ? ? ? ? ? ? ?/* high == pullup activated */
+> + ? ? ? int ? ? gpio_pullup; ? ? ? ? ? ? ? ? ? ?/* high == pullup activated */
+> ?};
+>
+>
+>
+> --
+> ?Web: Embedded Web Framework - http://uweb.workware.net.au/
+> WorkWare Systems Pty Ltd
+> W: www.workware.net.au ? ? ?P: 0434 921 300
+> E: steveb at workware.net.au ? F: 07 3102 9221
+>
+>
+>
+>
+>
