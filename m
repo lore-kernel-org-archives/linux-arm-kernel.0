@@ -1,21 +1,35 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 22 Apr 2010 00:53:19 +0530
-Subject: [PATCH 05/10] ARM: ftrace: add ENDPROC annotations
-In-Reply-To: <20100313084546.GA30400@n2100.arm.linux.org.uk>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-6-git-send-email-rabin@rab.in>
-	<20100313084546.GA30400@n2100.arm.linux.org.uk>
-Message-ID: <20100421192319.GA16719@debian>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 21 Apr 2010 20:25:14 +0100
+Subject: Simply disabling MMU in cpu_v7_reset doesn't work for kexec
+In-Reply-To: <n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
+References: <w2mf17812d71004210618vc68963cbn7ed50483a56140b7@mail.gmail.com>
+	<n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
+Message-ID: <20100421192514.GP27575@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 13, 2010 at 08:45:46AM +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 13, 2010 at 12:19:42PM +0530, Rabin Vincent wrote:
-> >  
-> >  	.globl ftrace_stub
-> > -ftrace_stub:
-> > +ENTRY(ftrace_stub)
+Eric Miao wrote:
+> On Wed, Apr 21, 2010 at 9:18 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > Tried the following simple code to disable MMU in cpu_v7_reset()
+> > doesn't seem to work for kexec reboot. I was expecting the
+> > following instructions after MMU is disabled are still reachable
+> > in the instruction fetching pipe.
 > 
-> ENTRY does the .globl for you, so please kill your own version.
+> 	.align	5
+>  ENTRY(cpu_v7_reset)
+> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+> +	bic	r1, r1, #0x0001			@ ...............m
+> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
+>  	mov	pc, r0
+>  ENDPROC(cpu_v7_reset)
 
-Updated patch below.
+Judging by
+
+    http://lists.infradead.org/pipermail/barebox/2010-January/000528.html
+
+(Scroll down to the cache-armv7.c version)
+
+Turning off the MMU might be a bit more complicated.
+
+-- Jamie
