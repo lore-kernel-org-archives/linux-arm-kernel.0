@@ -1,65 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Apr 2010 22:54:25 +0100
-Subject: kernel virtual memory access (from app) does not generatesegfault
-In-Reply-To: <20100421214447.GK26616@n2100.arm.linux.org.uk>
-References: <000001cae074$1b564ff0$4044010a@Emea.Arm.com>
-	<20100420142047.GA7398@desktop>
-	<20100420170944.GE2234@trinity.fluff.org>
-	<20100420192813.GA29831@n2100.arm.linux.org.uk>
-	<20100420223106.GQ11723@shareable.org>
-	<20100420224108.GA1432@n2100.arm.linux.org.uk>
-	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
-	<20100421193534.GC26616@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1004211723230.7232@xanadu.home>
-	<20100421214447.GK26616@n2100.arm.linux.org.uk>
-Message-ID: <20100421215425.GL26616@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 22 Apr 2010 06:10:59 +0800
+Subject: [PATCH 1/2] SA1100: fix wrong CPU type for h3100 and h3600
+In-Reply-To: <1271875749-2891-2-git-send-email-mad_soft@inbox.ru>
+References: <1271875749-2891-1-git-send-email-mad_soft@inbox.ru>
+	<1271875749-2891-2-git-send-email-mad_soft@inbox.ru>
+Message-ID: <j2nf17812d71004211510kbdb8c3c6j731f07e774c2c95c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 10:44:47PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 21, 2010 at 05:24:51PM -0400, Nicolas Pitre wrote:
-> > On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Apr 21, 2010 at 12:17:41PM +0100, Dave P. Martin wrote:
-> > > >  
-> > > > 
-> > > > > -----Original Message-----
-> > > > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> > > > > Sent: 20 April 2010 23:41
-> > > > > To: Jamie Lokier
-> > > > > Cc: Ben Dooks; anfei; Dave P Martin; 
-> > > > > linux-arm-kernel at lists.infradead.org
-> > > > > Subject: Re: kernel virtual memory access (from app) does not 
-> > > > > generatesegfault
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > The difference between instruction faults and data faults is 
-> > > > > that we always interpret instruction faults on pre-ARMv6 CPUs 
-> > > > > as a 'translation fault' rather than a permission fault since 
-> > > > > they can't tell us what the problem was.
-> > > > 
-> > > > Note that my observations were on an armv7 kernel.  Should we still hit the
-> > > > same bit of code in this case, or have I misdiagnosed the problem?
-> > > 
-> > > If it was ARMv7, we should be reading the IFSR, which should be telling
-> > > us that there's a permission fault trying to read instructions from
-> > > 0xc0000000.
-> > > 
-> > > If changing do_translation_fault() on a recent kernel fixes your problem,
-> > > something's going wrong.  Any chance you could add some debugging to
-> > > do_PrefetchAbort() so that when you see your test program running
-> > > (eg, if (strcmp(current->comm, "progname") == 0) { ... }) you could
-> > > dump out the values of ifsr and addr please?
-> > 
-> > If I remember right, the original bug report mentioned ARM926.
-> 
-> So here we go again with confusion raining.
-> 
-> Someone please tell me _definitively_ _what_ is being seen on _what_ CPU,
-> and separate the two issues into two different threads.  I'm going to
-> ignore any further comments on this issue until that's done.  Life is
-> too short to try to work this out on my own.
+On Thu, Apr 22, 2010 at 2:49 AM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> They have StrongARM SA1110, not SA1100.
+>
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 
-Actually, no, you're creating the confusion; this sub-thread is about
-the behaviour on ARMv7, as a completely separate subject from ARM926.
+Looks correct to me.
+
+> ---
+> ?arch/arm/mach-sa1100/Kconfig | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+> index b17d52f..fd4c52b 100644
+> --- a/arch/arm/mach-sa1100/Kconfig
+> +++ b/arch/arm/mach-sa1100/Kconfig
+> @@ -57,7 +57,7 @@ config SA1100_COLLIE
+> ?config SA1100_H3100
+> ? ? ? ?bool "Compaq iPAQ H3100"
+> ? ? ? ?select HTC_EGPIO
+> - ? ? ? select CPU_FREQ_SA1100
+> + ? ? ? select CPU_FREQ_SA1110
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on the Compaq iPAQ
+> ? ? ? ? ?H3100 handheld computer. ?Information about this machine and the
+> @@ -68,7 +68,7 @@ config SA1100_H3100
+> ?config SA1100_H3600
+> ? ? ? ?bool "Compaq iPAQ H3600/H3700"
+> ? ? ? ?select HTC_EGPIO
+> - ? ? ? select CPU_FREQ_SA1100
+> + ? ? ? select CPU_FREQ_SA1110
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on the Compaq iPAQ
+> ? ? ? ? ?H3600 handheld computer. ?Information about this machine and the
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
