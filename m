@@ -1,40 +1,56 @@
-From: Dinh.Nguyen@freescale.com (Dinh Nguyen)
-Date: Tue, 13 Apr 2010 14:05:08 -0500
-Subject: [2.6.34-fixes 1/1] mx5: Fix build error for mx51_defconfig
-Message-ID: <3a30bc0788e02ba069c003d194680a2d39ef1c1a.1271883980.git.amit.kucheria@canonical.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Apr 2010 17:24:51 -0400 (EDT)
+Subject: kernel virtual memory access (from app) does not generatesegfault
+In-Reply-To: <20100421193534.GC26616@n2100.arm.linux.org.uk>
+References: <4BCD7076.9030802@browserseal.com>
+	<20100420093441.GD6684@trinity.fluff.org>
+	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
+	<20100420142047.GA7398@desktop>
+	<20100420170944.GE2234@trinity.fluff.org>
+	<20100420192813.GA29831@n2100.arm.linux.org.uk>
+	<20100420223106.GQ11723@shareable.org>
+	<20100420224108.GA1432@n2100.arm.linux.org.uk>
+	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
+	<20100421193534.GC26616@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1004211723230.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need to include <asm/div64.h> for do_div calls. Fixes the following error:
+On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
 
-arch/arm/mach-mx5/clock-mx51.c: In function 'clk_pll_get_rate':
-arch/arm/mach-mx5/clock-mx51.c:149: error: implicit declaration of function
-'do_div'
-make[1]: *** [arch/arm/mach-mx5/clock-mx51.o] Error 1
+> On Wed, Apr 21, 2010 at 12:17:41PM +0100, Dave P. Martin wrote:
+> >  
+> > 
+> > > -----Original Message-----
+> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+> > > Sent: 20 April 2010 23:41
+> > > To: Jamie Lokier
+> > > Cc: Ben Dooks; anfei; Dave P Martin; 
+> > > linux-arm-kernel at lists.infradead.org
+> > > Subject: Re: kernel virtual memory access (from app) does not 
+> > > generatesegfault
+> > 
+> > [...]
+> > 
+> > > The difference between instruction faults and data faults is 
+> > > that we always interpret instruction faults on pre-ARMv6 CPUs 
+> > > as a 'translation fault' rather than a permission fault since 
+> > > they can't tell us what the problem was.
+> > 
+> > Note that my observations were on an armv7 kernel.  Should we still hit the
+> > same bit of code in this case, or have I misdiagnosed the problem?
+> 
+> If it was ARMv7, we should be reading the IFSR, which should be telling
+> us that there's a permission fault trying to read instructions from
+> 0xc0000000.
+> 
+> If changing do_translation_fault() on a recent kernel fixes your problem,
+> something's going wrong.  Any chance you could add some debugging to
+> do_PrefetchAbort() so that when you see your test program running
+> (eg, if (strcmp(current->comm, "progname") == 0) { ... }) you could
+> dump out the values of ifsr and addr please?
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
----
- arch/arm/mach-mx5/clock-mx51.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index 8f85f73..1ee6ce4 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
- 
- #include <asm/clkdev.h>
-+#include <asm/div64.h>
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
--- 
-1.7.0.4
+If I remember right, the original bug report mentioned ARM926.
 
 
--- 
--------------------------------------------------------------------------
-Amit Kucheria,				 Kernel Developer, Verdurent
--------------------------------------------------------------------------
+Nicolas
