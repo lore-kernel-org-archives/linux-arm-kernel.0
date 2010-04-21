@@ -1,97 +1,148 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 20 Apr 2010 19:11:05 -0500
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
-	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
-Message-ID: <0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 21 Apr 2010 02:23:07 +0200
+Subject: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions for
+	Freescale MX51 Babbage HW
+In-Reply-To: <1271805567-23068-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271805567-23068-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100421002307.GN30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 20, 2010 4:55 PM, Martin Guy wrote:
-> On 4/20/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
->> On Tuesday, April 20, 2010 8:12 AM, Mika Westerberg wrote:
->>> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
->>> in EP93xx chips (EP9301, EP9302, EP9307, EP9312 and EP9315).
->>
->> I discovered one gotcha with this driver.  Bear with me through this...
->>
->> 1. ep93xx_spi_process_message is called by the workqueue worker function to handle
->>    a spi_message queued in by the ep93xx_spi_transfer function.  Before starting
->>    the actual transfer the chip select to the device is asserted.
->> 2. ep93xx_spi_process_transfer processes each transfer in the spi_message, one at a
->>    time, and does a wait_for_completion on each transfer.
->> 3. When the entire spi_message has been transferred the chip select to the device
->>    is deasserted.
->>
->> The problem is if a hardware design uses the SFRM1 pin as part of the chip select
->> logic.  The EP93xx User's Guide states that "the SFRMOUT signal behaves as a slave
->> Select" in Motorola SPI mode.  This signal behaves differently depending on the
->> SPI_MODE_* used.
->>
->> Modes 0 and 2:
->>  SFRMOUT is forced HIGH during idle periods.
->>  Start of transmission, SFRMOUT is driven LOW.
->>  Single word transmission, SFRMOUT is returned to its idle HIGH state one
->>    SCLKOUT period after the last bit has been captured.
->>  Back-to-back transmissions, SFRMOUT signal is pulsed HIGH between each
->>    data word transfer.  On completion the SFRMOUT pin returns to its idle
->>    HIGH state one SCLKOUT period after the last bit has been captured.
->>
->> Modes 1 and 3:
->>  SFRMOUT is forced HIGH during idle periods.
->>  Start of transmission, SFRMOUT is driven LOW.
->>  Single word transmission, SFRMOUT is returned to its idle HIGH state one
->>    SCLKOUT period after the last bit has been captured.
->>  Back-to-back transmissions, SFRMOUT signal is held LOW between each
->>    data word transfer.  On completion the SFRMOUT pin returns to its idle
->>    HIGH state one SCLKOUT period after the last bit has been captured.
->>
->> So, since each transfer does a wait_for_completion, all the data is transmitted
->> which causes the SFRMOUT pin to go HIGH between each transfer in the message.
->>
->> For devices like the sst25lf040a SPI Flash on the EDB93xx boards this causes a
->> problem.  To read data from that device you need to send a two part message.  The
->> first part is a write transfer with the one byte command and three byte address.
->> This is then followed by a read transfer to get the data.  But since the SFRMOUT
->> pin goes high this ends the command.
->>
->> The driver Ryan and I worked on actually does work with the sst25lf040a on the
->> EDB93xx boards.  But now that I know what the issue is, it was actually a race
->> condition.  Sometimes it worked and sometimes it didn't...
->>
->> I would think the Sim.One board (Martin?) would have the same issue with the mmc
->> card since that design uses the SFRMOUT pin directly for the chip select.
->>
->> Is there anyway to keep the transfers going in a muiltipart message?
->
-> I just changed the SPI mode selection, which is in the board
-> definition file, from Mode 0 to Mode 3 (the two modes that sample data
-> on the rising clock edge, as required by MMC/SD). It dramatically
-> increases linear block read throughput:
-> MMC: from 307kB/sec to 353kB/sec
-> SD: from 317 to 365
-> SD MLC: from 327 to 378
-> with 82000 interrupts per second and 60% cpu usage
->
-> presumably because the poor card isn't being deselected once every byte.
+Hi Dinh,
 
-Yes, Mode 3 should perform better since the protocol is not enforcing the
-chip select deassertion between every byte.
+On Tue, Apr 20, 2010 at 06:19:24PM -0500, Dinh.Nguyen at freescale.com wrote:
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+> patch adds device structures for USB Host1 and OTG port, and adds
+> clocking information for USB HW.
+> 
+> This patch applies to 2.6.34-rc5.
 
-You should still be getting a chip select deassertion between every transfer
-in a multipart message since the Sim.One uses the SFRM1 line for the chip select.
-I haven't actually looked through the mmc_spi driver to see if this happens.
+Hmm, this one still doesn't apply for me. Can you double-check with a
+fresh checkout of 2.6.34-rc5 please?
 
-Is there any possibility you could look at the actual bus with a logic analyzer?
+Other than that, I'm ok with the patches now. Sascha, do you have more
+objections? I couldn't test the whole thing as I lack mx5 hardware, but
+it looks sane now, and it doesn't break anything for mx3.
 
-My concern with the comments above is that currently this driver will not work
-on the EDB93xx boards with the SPI Flash device.  I did hack one of my boards
-to remove the SFRM1 signal from the chip select and it does "fix" the problem.
-But, that's kind of an ugly solution for most users.
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Regards,
-Hartley
+For the patches 3/5 and 4/5 of this series, you can have my
+
+Reviewed-by: Daniel Mack <daniel@caiaq.de>
+
+Thanks,
+Daniel
+
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
+>  arch/arm/mach-mx5/devices.c    |   49 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices.h    |    2 +
+>  3 files changed, 59 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+> index 8f85f73..dcca330 100644
+> --- a/arch/arm/mach-mx5/clock-mx51.c
+> +++ b/arch/arm/mach-mx5/clock-mx51.c
+> @@ -761,6 +761,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+>  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+>  
+> +/* USB */
+> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
+> +	NULL, NULL, &pll3_sw_clk, NULL);
+> +
+>  /* FEC */
+>  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+> @@ -778,6 +782,10 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+>  };
+>  
+>  static void clk_tree_init(void)
+> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+> index 5070ae1..e6262f3 100644
+> --- a/arch/arm/mach-mx5/devices.c
+> +++ b/arch/arm/mach-mx5/devices.c
+> @@ -11,6 +11,7 @@
+>   */
+>  
+>  #include <linux/platform_device.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/gpio.h>
+>  #include <mach/hardware.h>
+>  #include <mach/imx-uart.h>
+> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
+>  	.resource = mxc_fec_resources,
+>  };
+>  
+> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct resource usbotg_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR,
+> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_OTG,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbdr_host_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 0,
+> +	.num_resources = ARRAY_SIZE(usbotg_resources),
+> +	.resource = usbotg_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct resource usbh1_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR + 0x200,
+> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_H1,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbh1_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 1,
+> +	.num_resources = ARRAY_SIZE(usbh1_resources),
+> +	.resource = usbh1_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+>  static struct mxc_gpio_port mxc_gpio_ports[] = {
+>  	{
+>  		.chip.label = "gpio-0",
+> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+> index f339ab8..95c45f9 100644
+> --- a/arch/arm/mach-mx5/devices.h
+> +++ b/arch/arm/mach-mx5/devices.h
+> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;
+>  extern struct platform_device mxc_uart_device1;
+>  extern struct platform_device mxc_uart_device2;
+>  extern struct platform_device mxc_fec_device;
+> +extern struct platform_device mxc_usbdr_host_device;
+> +extern struct platform_device mxc_usbh1_device;
+> -- 
+> 1.6.0.4
+> 
