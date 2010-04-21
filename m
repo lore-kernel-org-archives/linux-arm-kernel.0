@@ -1,35 +1,192 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Wed, 21 Apr 2010 15:53:53 +0100
-Subject: SPI trouble on Colibri 270 (PXA)...
-In-Reply-To: <4BCEF3D4.2030704@viketoft.se>
-References: <4BCD96F0.5010506@viketoft.se>
-	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>
-	<4BCDC645.5090001@viketoft.se>
-	<201004211144.41781.marek.vasut@gmail.com>
-	<j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>
-	<p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>
-	<4BCEF3D4.2030704@viketoft.se>
-Message-ID: <u2z56d259a01004210753l50a37766sdc2e0339e0400e78@mail.gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Wed, 21 Apr 2010 08:10:43 -0700
+Subject: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions for
+	Freescale MX51 Babbage HW
+In-Reply-To: <20100421002307.GN30801@buzzloop.caiaq.de>
+References: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271805567-23068-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<20100421002307.GN30801@buzzloop.caiaq.de>
+Message-ID: <86A0E76937111F4C92FABEC0A209885104733FDD@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/21/10, Jakob Viketoft <jakob@viketoft.se> wrote:
-> Martin Guy wrote:
-> > On 4/21/10, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > >  I thought we were talking about SPI?
-> >
-> > We are. It affects boards that have a single SD/MMC card on the SPI
-> > bus and use SFRMOUT as the chip select line, which impacts how the SPI
-> > driver needs to handle multi-part messages without dropping CS between
-> > transfers
->
->  Does this mean that this is a know issue with the pxa2xx spi driver? At the
-> moment I'm rather pressed for time and have instead opted for compressing
-> the two transfers (read command and actual read) into one. There is a slight
-> memory overhead in writing, but nothing that will impact our system...
+Hi Daniel,
 
-No, it means I'm on the wrong thread and I'm talking complete rubbish.
-That was about the ep93x-spi-mmc problems in the next room.
-Sorry about that. Just ignore me, I'm confused...
+Functionally, this series of 5-patches for USB is dependent on this
+commit:
 
-    M
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> Update /plat-mxc/gpio.c to support Freescale's MX51 Babbage HW.
+> This patch applies to 2.6.34-rc5.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+
+Amit said "I'll include this in the mx5 tree to push to Sascha."
+
+Dinh
+
+ 
+
+-----Original Message-----
+From: linux-kernel-owner@vger.kernel.org
+[mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Daniel Mack
+Sent: Tuesday, April 20, 2010 7:23 PM
+To: Nguyen Dinh-R00091
+Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+linux at arm.linux.org.uk; s.hauer at pengutronix.de;
+valentin.longchamp at epfl.ch; grant.likely at secretlab.ca;
+bryan.wu at canonical.com; amit.kucheria at canonical.com; Li Jun-R65092;
+Zhang Lily-R58066
+Subject: Re: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions
+for Freescale MX51 Babbage HW
+
+Hi Dinh,
+
+On Tue, Apr 20, 2010 at 06:19:24PM -0500, Dinh.Nguyen at freescale.com
+wrote:
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+
+> patch adds device structures for USB Host1 and OTG port, and adds 
+> clocking information for USB HW.
+> 
+> This patch applies to 2.6.34-rc5.
+
+Hmm, this one still doesn't apply for me. Can you double-check with a
+fresh checkout of 2.6.34-rc5 please?
+
+Other than that, I'm ok with the patches now. Sascha, do you have more
+objections? I couldn't test the whole thing as I lack mx5 hardware, but
+it looks sane now, and it doesn't break anything for mx3.
+
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+
+For the patches 3/5 and 4/5 of this series, you can have my
+
+Reviewed-by: Daniel Mack <daniel@caiaq.de>
+
+Thanks,
+Daniel
+
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
+>  arch/arm/mach-mx5/devices.c    |   49
+++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices.h    |    2 +
+>  3 files changed, 59 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/clock-mx51.c 
+> b/arch/arm/mach-mx5/clock-mx51.c index 8f85f73..dcca330 100644
+> --- a/arch/arm/mach-mx5/clock-mx51.c
+> +++ b/arch/arm/mach-mx5/clock-mx51.c
+> @@ -761,6 +761,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, 
+> MXC_CCM_CCGRx_CG9_OFFSET,  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2,
+MXC_CCM_CCGRx_CG10_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+>  
+> +/* USB */
+> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
+> +	NULL, NULL, &pll3_sw_clk, NULL);
+> +
+>  /* FEC */
+>  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+>  	NULL,  NULL, &ipg_clk, NULL);
+> @@ -778,6 +782,10 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+>  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+>  };
+>  
+>  static void clk_tree_init(void)
+> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+
+> index 5070ae1..e6262f3 100644
+> --- a/arch/arm/mach-mx5/devices.c
+> +++ b/arch/arm/mach-mx5/devices.c
+> @@ -11,6 +11,7 @@
+>   */
+>  
+>  #include <linux/platform_device.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/gpio.h>
+>  #include <mach/hardware.h>
+>  #include <mach/imx-uart.h>
+> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
+>  	.resource = mxc_fec_resources,
+>  };
+>  
+> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct resource usbotg_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR,
+> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_OTG,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbdr_host_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 0,
+> +	.num_resources = ARRAY_SIZE(usbotg_resources),
+> +	.resource = usbotg_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct resource usbh1_resources[] = {
+> +	{
+> +		.start = MX51_OTG_BASE_ADDR + 0x200,
+> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MX51_MXC_INT_USB_H1,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxc_usbh1_device = {
+> +	.name = "mxc-ehci",
+> +	.id = 1,
+> +	.num_resources = ARRAY_SIZE(usbh1_resources),
+> +	.resource = usbh1_resources,
+> +	.dev = {
+> +		.dma_mask = &usb_dma_mask,
+> +		.coherent_dma_mask = DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+>  static struct mxc_gpio_port mxc_gpio_ports[] = {
+>  	{
+>  		.chip.label = "gpio-0",
+> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+
+> index f339ab8..95c45f9 100644
+> --- a/arch/arm/mach-mx5/devices.h
+> +++ b/arch/arm/mach-mx5/devices.h
+> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;  
+> extern struct platform_device mxc_uart_device1;  extern struct 
+> platform_device mxc_uart_device2;  extern struct platform_device 
+> mxc_fec_device;
+> +extern struct platform_device mxc_usbdr_host_device; extern struct 
+> +platform_device mxc_usbh1_device;
+> --
+> 1.6.0.4
+> 
+--
+To unsubscribe from this list: send the line "unsubscribe linux-kernel"
+in the body of a message to majordomo at vger.kernel.org More majordomo
+info at  http://vger.kernel.org/majordomo-info.html
+Please read the FAQ at  http://www.tux.org/lkml/
