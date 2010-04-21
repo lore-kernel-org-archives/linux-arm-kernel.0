@@ -1,149 +1,31 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 21 Apr 2010 14:47:37 +0200
-Subject: [PATCH 7/7 v5] Add board support for Telechips TCC8000-SDK board
-In-Reply-To: <20100421123814.GC1995@bluebox.local>
-References: <20100421123814.GC1995@bluebox.local>
-Message-ID: <20100421124737.GJ1995@bluebox.local>
+From: jakob@viketoft.se (Jakob Viketoft)
+Date: Wed, 21 Apr 2010 14:47:16 +0200
+Subject: SPI trouble on Colibri 270 (PXA)...
+In-Reply-To: <p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>
+References: <4BCD96F0.5010506@viketoft.se>	
+	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>	
+	<4BCDC645.5090001@viketoft.se>	
+	<201004211144.41781.marek.vasut@gmail.com>	
+	<j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>
+	<p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>
+Message-ID: <4BCEF3D4.2030704@viketoft.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Telechips TCC8000-SDK development board.
+Martin Guy wrote:
+> On 4/21/10, Eric Miao <eric.y.miao@gmail.com> wrote:
+> 
+>>  I thought we were talking about SPI?
+> 
+> We are. It affects boards that have a single SD/MMC card on the SPI
+> bus and use SFRMOUT as the chip select line, which impacts how the SPI
+> driver needs to handle multi-part messages without dropping CS between
+> transfers
 
-Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
----
- arch/arm/mach-tcc8k/Kconfig             |    6 +++
- arch/arm/mach-tcc8k/Makefile            |    3 ++
- arch/arm/mach-tcc8k/Makefile.boot       |    3 ++
- arch/arm/mach-tcc8k/board-tcc8000-sdk.c |   59 +++++++++++++++++++++++++++++++
- arch/arm/mach-tcc8k/board-tcc8000-sdk.h |   18 +++++++++
- 5 files changed, 89 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tcc8k/Makefile.boot
- create mode 100644 arch/arm/mach-tcc8k/board-tcc8000-sdk.c
- create mode 100644 arch/arm/mach-tcc8k/board-tcc8000-sdk.h
+Does this mean that this is a know issue with the pxa2xx spi driver? At 
+the moment I'm rather pressed for time and have instead opted for 
+compressing the two transfers (read command and actual read) into one. 
+There is a slight memory overhead in writing, but nothing that will 
+impact our system...
 
-diff --git a/arch/arm/mach-tcc8k/Kconfig b/arch/arm/mach-tcc8k/Kconfig
-index ec7f71b..ad86415 100644
---- a/arch/arm/mach-tcc8k/Kconfig
-+++ b/arch/arm/mach-tcc8k/Kconfig
-@@ -2,4 +2,10 @@ if ARCH_TCC8K
- 
- comment "TCC8000 systems:"
- 
-+config MACH_TCC8000_SDK
-+	bool "Telechips TCC8000-SDK development kit"
-+	default y
-+	help
-+	  Support for the Telechips TCC8000-SDK board.
-+
- endif
-diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
-index e8a1134..cd92cde 100644
---- a/arch/arm/mach-tcc8k/Makefile
-+++ b/arch/arm/mach-tcc8k/Makefile
-@@ -5,3 +5,6 @@
- # Common support
- obj-y += clock.o irq.o time.o io.o devices.o
- 
-+# Specific board support
-+obj-$(CONFIG_MACH_TCC8000_SDK) += board-tcc8000-sdk.o
-+
-diff --git a/arch/arm/mach-tcc8k/Makefile.boot b/arch/arm/mach-tcc8k/Makefile.boot
-new file mode 100644
-index 0000000..f135c9d
---- /dev/null
-+++ b/arch/arm/mach-tcc8k/Makefile.boot
-@@ -0,0 +1,3 @@
-+   zreladdr-y		:= 0x20008000
-+params_phys-y		:= 0x20000100
-+initrd_phys-y		:= 0x20800000
-diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
-new file mode 100644
-index 0000000..545e586
---- /dev/null
-+++ b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach-types.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+
-+#include "board-tcc8000-sdk.h"
-+
-+#ifdef CONFIG_MTD_NAND_TCC
-+/* NAND */
-+static struct tcc_nand_platform_data tcc8k_sdk_nand_data = {
-+	.width = 1,
-+	.hw_ecc = 0,
-+};
-+#endif
-+
-+static void __init tcc8k_init(void)
-+{
-+#ifdef CONFIG_MTD_NAND_TCC
-+	tcc_nand_device.dev.platform_data = &tcc8k_sdk_nand_data;
-+	platform_device_register(&tcc_nand_device);
-+#endif
-+}
-+
-+static void __init tcc8k_timer_init(void)
-+{
-+	tcc_clocks_init(XI_FREQUENCY, XTI_FREQUENCY);
-+}
-+
-+static struct sys_timer tcc8k_timer = {
-+	.init	= tcc8k_timer_init,
-+};
-+
-+static void __init tcc8k_map_io(void)
-+{
-+	tcc8k_map_common_io();
-+}
-+
-+MACHINE_START(TCC8000_SDK, "Telechips TCC8000-SDK Demo Board")
-+	.phys_io	= 0x90000000,
-+	.io_pg_offst	= ((0xf1000000) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x00000100,
-+	.map_io		= tcc8k_map_io,
-+	.init_irq	= tcc8k_init_irq,
-+	.init_machine	= tcc8k_init,
-+	.timer		= &tcc8k_timer,
-+MACHINE_END
-diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.h b/arch/arm/mach-tcc8k/board-tcc8000-sdk.h
-new file mode 100644
-index 0000000..1d4e791
---- /dev/null
-+++ b/arch/arm/mach-tcc8k/board-tcc8000-sdk.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Some defines for arch/arm/mach-tcc8k/board-tcc8000-sdk.c
-+ *
-+ */
-+
-+#ifndef _BOARD_TCC_8000_SDK_H_
-+#define _BOARD_TCC_8000_SDK_H_
-+
-+extern void __init tcc8k_init_irq(void);
-+extern void __init tcc8k_map_common_io(void);
-+extern int __init tcc_clocks_init(unsigned long xi_freq,
-+					unsigned long xti_freq);
-+extern struct platform_device tcc_nand_device;
-+
-+#define XI_FREQUENCY	12000000
-+#define XTI_FREQUENCY	32768
-+
-+#endif
--- 
-1.6.3.3
+	/Jakob
