@@ -1,92 +1,76 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Wed, 21 Apr 2010 21:37:31 +0300
-Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
-Message-ID: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 21 Apr 2010 20:16:00 +0100
+Subject: kernel virtual memory access (from app) does not generatesegfault
+In-Reply-To: <000101cae16c$b2d08cd0$4044010a@Emea.Arm.com>
+References: <20100420093441.GD6684@trinity.fluff.org>
+	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
+	<20100420142047.GA7398@desktop>
+	<20100420170944.GE2234@trinity.fluff.org>
+	<20100420192813.GA29831@n2100.arm.linux.org.uk>
+	<20100420223106.GQ11723@shareable.org>
+	<20100420224108.GA1432@n2100.arm.linux.org.uk>
+	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
+	<20100421124317.GA9408@desktop>
+	<000101cae16c$b2d08cd0$4044010a@Emea.Arm.com>
+Message-ID: <20100421191600.GO27575@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk->usecount can be used by platform code to check if a clock is active or
-not.
+Dave P. Martin wrote:
+>  
+> 
+> > -----Original Message-----
+> > From: anfei [mailto:anfei.zhou at gmail.com] 
+> > Sent: 21 April 2010 13:43
+> > To: Dave P Martin
+> > Cc: 'Russell King - ARM Linux'; Jamie Lokier; Ben Dooks; 
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: kernel virtual memory access (from app) does not 
+> > generatesegfault
+> 
+> [...]
+> 
+> > > > The difference between instruction faults and data faults 
+> > is that we 
+> > > > always interpret instruction faults on pre-ARMv6 CPUs as a 
+> > > > 'translation fault' rather than a permission fault since 
+> > they can't 
+> > > > tell us what the problem was.
+> > > 
+> > > Note that my observations were on an armv7 kernel.  Should we still 
+> > > hit the same bit of code in this case, or have I 
+> > misdiagnosed the problem?
+> > > 
+> > You said your kernel is .28, so it seems too old and this 
+> > commit may fix
+> > it: 
+> > commit d25ef8b86e6a58f5476bf6e4a8da730b335f68fa
+> > 	ARM: 5728/1: Proper prefetch abort handling on ARMv6 and ARMv7
+> > 
+> 
+> Just to clarify, this problem was not specific to 2.6.28.  I also see the
+> same issue on the 2.6.31 Ubuntu lucid kernel.
+> 
+> So I guess I did misdiagnose the problem, though the affected code did look
+> worth tweaking anyway--- the suggested fixes looked sensible to me.
+> 
+> I see this patch didn't hit mainline before 2.6.32; I'll suggest to the
+> Ubuntu folks that they merge this, but I guess it's not critical for them
+> --- I don't think they've seen any real-life instances of this problem yet.
 
-Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
----
- arch/arm/plat-mxc/clock.c |   37 ++++++++++++++++++++++++-------------
- 1 files changed, 24 insertions(+), 13 deletions(-)
+The two-liner proposed earlier should fix all ARMs doing userspace
+execution > TASK_SIZE - the problem which started this thread.  But
+not kernel space accidentally executing an NX page > TASK_SIZE due to
+some bug, which can only occur on ARMv6/v7 due to NX.
 
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 323ff8c..c791f38 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -50,15 +50,15 @@ static DEFINE_MUTEX(clocks_mutex);
- 
- static void __clk_disable(struct clk *clk)
- {
--	if (clk == NULL || IS_ERR(clk))
-+	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
- 		return;
- 
--	__clk_disable(clk->parent);
--	__clk_disable(clk->secondary);
--
--	WARN_ON(!clk->usecount);
--	if (!(--clk->usecount) && clk->disable)
--		clk->disable(clk);
-+	if (!(--clk->usecount)) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+		__clk_disable(clk->parent);
-+		__clk_disable(clk->secondary);
-+	}
- }
- 
- static int __clk_enable(struct clk *clk)
-@@ -66,12 +66,13 @@ static int __clk_enable(struct clk *clk)
- 	if (clk == NULL || IS_ERR(clk))
- 		return -EINVAL;
- 
--	__clk_enable(clk->parent);
--	__clk_enable(clk->secondary);
--
--	if (clk->usecount++ == 0 && clk->enable)
--		clk->enable(clk);
-+	if (clk->usecount++ == 0) {
-+		__clk_enable(clk->parent);
-+		__clk_enable(clk->secondary);
- 
-+		if (clk->enable)
-+			clk->enable(clk);
-+	}
- 	return 0;
- }
- 
-@@ -160,17 +161,27 @@ EXPORT_SYMBOL(clk_set_rate);
- int clk_set_parent(struct clk *clk, struct clk *parent)
- {
- 	int ret = -EINVAL;
-+	struct clk *prev_parent = clk->parent;
- 
- 	if (clk == NULL || IS_ERR(clk) || parent == NULL ||
- 	    IS_ERR(parent) || clk->set_parent == NULL)
- 		return ret;
- 
-+	if (clk->usecount != 0) {
-+		clk_enable(parent);
-+	}
-+
- 	mutex_lock(&clocks_mutex);
- 	ret = clk->set_parent(clk, parent);
--	if (ret == 0)
-+	if (ret == 0) {
- 		clk->parent = parent;
-+	}
- 	mutex_unlock(&clocks_mutex);
- 
-+	if (clk->usecount != 0) {
-+		clk_disable(prev_parent);
-+	}
-+
- 	return ret;
- }
- EXPORT_SYMBOL(clk_set_parent);
--- 
-1.7.0.4
+The above patch addresses ARMv6/v7 with NX mappings - and probably
+only those > TASK_SIZE; NX mappings < TASK_SIZE should have been
+caught by the PROT_EXEC check already in fault.c.
+
+If I'm right, the NX one is more serious if you can trip a kernel bug
+into doing this, because it'll result in an unkillable process, stuck
+in kernel mode and spinning.  But only if you trip a kernel bug.
+
+So both patches look useful.
+
+-- Jamie
