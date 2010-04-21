@@ -1,35 +1,23 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 21 Apr 2010 20:25:14 +0100
-Subject: Simply disabling MMU in cpu_v7_reset doesn't work for kexec
-In-Reply-To: <n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
-References: <w2mf17812d71004210618vc68963cbn7ed50483a56140b7@mail.gmail.com>
-	<n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
-Message-ID: <20100421192514.GP27575@shareable.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 22 Apr 2010 00:56:00 +0530
+Subject: [PATCH 00/10] ARM: ftrace: cleanups, Thumb-2, and dynamic
+	ftrace (v2)
+In-Reply-To: <1268462987-8271-1-git-send-email-rabin@rab.in>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+Message-ID: <20100421192600.GA17985@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> On Wed, Apr 21, 2010 at 9:18 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > Tried the following simple code to disable MMU in cpu_v7_reset()
-> > doesn't seem to work for kexec reboot. I was expecting the
-> > following instructions after MMU is disabled are still reachable
-> > in the instruction fetching pipe.
-> 
-> 	.align	5
->  ENTRY(cpu_v7_reset)
-> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
-> +	bic	r1, r1, #0x0001			@ ...............m
-> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
-> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
->  	mov	pc, r0
->  ENDPROC(cpu_v7_reset)
+Hi Steven,
 
-Judging by
+On Sat, Mar 13, 2010 at 12:19:37PM +0530, Rabin Vincent wrote:
+> This series contains fixes and improvements to the ARM ftrace support.  It adds
+> Thumb-2 support and re-implements the dynamic ftrace support.
 
-    http://lists.infradead.org/pipermail/barebox/2010-January/000528.html
+Do you have any further concerns about this patchset?
 
-(Scroll down to the cache-armv7.c version)
+If not, do you mind if I try to send in the series (v2 + the two updated
+patches) via the ARM patch system, since most of the patches only touch
+code under arch/arm/?
 
-Turning off the MMU might be a bit more complicated.
-
--- Jamie
+Rabin
