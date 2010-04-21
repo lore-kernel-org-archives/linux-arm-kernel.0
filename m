@@ -1,192 +1,194 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Wed, 21 Apr 2010 08:10:43 -0700
-Subject: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions for
-	Freescale MX51 Babbage HW
-In-Reply-To: <20100421002307.GN30801@buzzloop.caiaq.de>
-References: <1271805567-23068-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271805567-23068-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20100421002307.GN30801@buzzloop.caiaq.de>
-Message-ID: <86A0E76937111F4C92FABEC0A209885104733FDD@az33exm21>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Wed, 21 Apr 2010 10:13:13 -0500
+Subject: [PATCHv7 2.6.34-rc5 3/5] mx5: Enable board specific functions for
+	enabling USB host on Babbage
+In-Reply-To: <1271862795-7986-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1271862795-7986-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271862795-7986-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271862795-7986-3-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Functionally, this series of 5-patches for USB is dependent on this
-commit:
+This patch enables USB host functionality for Host1 and OTG port on
+Freescale MX51 Babbage HW. This patch contains the board specific
+HW initialization of the USB HW.
 
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Update /plat-mxc/gpio.c to support Freescale's MX51 Babbage HW.
-> This patch applies to 2.6.34-rc5.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+This patch applies to 2.6.34-rc5.
 
-Amit said "I'll include this in the mx5 tree to push to Sascha."
-
-Dinh
-
- 
-
------Original Message-----
-From: linux-kernel-owner@vger.kernel.org
-[mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Daniel Mack
-Sent: Tuesday, April 20, 2010 7:23 PM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-linux at arm.linux.org.uk; s.hauer at pengutronix.de;
-valentin.longchamp at epfl.ch; grant.likely at secretlab.ca;
-bryan.wu at canonical.com; amit.kucheria at canonical.com; Li Jun-R65092;
-Zhang Lily-R58066
-Subject: Re: [PATCHv6 2.6.34-rc5 2/5] mx5: Add USB device definitions
-for Freescale MX51 Babbage HW
-
-Hi Dinh,
-
-On Tue, Apr 20, 2010 at 06:19:24PM -0500, Dinh.Nguyen at freescale.com
-wrote:
-> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
-
-> patch adds device structures for USB Host1 and OTG port, and adds 
-> clocking information for USB HW.
-> 
-> This patch applies to 2.6.34-rc5.
-
-Hmm, this one still doesn't apply for me. Can you double-check with a
-fresh checkout of 2.6.34-rc5 please?
-
-Other than that, I'm ok with the patches now. Sascha, do you have more
-objections? I couldn't test the whole thing as I lack mx5 hardware, but
-it looks sane now, and it doesn't break anything for mx3.
-
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-
-For the patches 3/5 and 4/5 of this series, you can have my
-
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 Reviewed-by: Daniel Mack <daniel@caiaq.de>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |  121 ++++++++++++++++++++++++++++++++
+ 1 files changed, 121 insertions(+), 0 deletions(-)
 
-Thanks,
-Daniel
-
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    8 ++++++
->  arch/arm/mach-mx5/devices.c    |   49
-++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h    |    2 +
->  3 files changed, 59 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c 
-> b/arch/arm/mach-mx5/clock-mx51.c index 8f85f73..dcca330 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -761,6 +761,10 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, 
-> MXC_CCM_CCGRx_CG9_OFFSET,  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2,
-MXC_CCM_CCGRx_CG10_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* USB */
-> +DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> +	NULL, NULL, &pll3_sw_clk, NULL);
-> +
->  /* FEC */
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
-> @@ -778,6 +782,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> +	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-
-> index 5070ae1..e6262f3 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -11,6 +11,7 @@
->   */
->  
->  #include <linux/platform_device.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/gpio.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
-> @@ -92,6 +93,54 @@ struct platform_device mxc_fec_device = {
->  	.resource = mxc_fec_resources,
->  };
->  
-> +static u64 usb_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource usbotg_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR,
-> +		.end = MX51_OTG_BASE_ADDR + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_OTG,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbdr_host_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(usbotg_resources),
-> +	.resource = usbotg_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource usbh1_resources[] = {
-> +	{
-> +		.start = MX51_OTG_BASE_ADDR + 0x200,
-> +		.end = MX51_OTG_BASE_ADDR + 0x200 + 0x1ff,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_USB_H1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device mxc_usbh1_device = {
-> +	.name = "mxc-ehci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(usbh1_resources),
-> +	.resource = usbh1_resources,
-> +	.dev = {
-> +		.dma_mask = &usb_dma_mask,
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-
-> index f339ab8..95c45f9 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -2,3 +2,5 @@ extern struct platform_device mxc_uart_device0;  
-> extern struct platform_device mxc_uart_device1;  extern struct 
-> platform_device mxc_uart_device2;  extern struct platform_device 
-> mxc_fec_device;
-> +extern struct platform_device mxc_usbdr_host_device; extern struct 
-> +platform_device mxc_usbh1_device;
-> --
-> 1.6.0.4
-> 
---
-To unsubscribe from this list: send the line "unsubscribe linux-kernel"
-in the body of a message to majordomo at vger.kernel.org More majordomo
-info at  http://vger.kernel.org/majordomo-info.html
-Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ee67a71..bd182d0 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -12,11 +12,15 @@
+ 
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/delay.h>
++#include <linux/io.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
++#include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/setup.h>
+@@ -26,6 +30,9 @@
+ 
+ #include "devices.h"
+ 
++#define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
++#define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
++
+ static struct platform_device *devices[] __initdata = {
+ 	&mxc_fec_device,
+ };
+@@ -46,6 +53,22 @@ static struct pad_desc mx51babbage_pads[] = {
+ 	MX51_PAD_EIM_D26__UART3_TXD,
+ 	MX51_PAD_EIM_D27__UART3_RTS,
+ 	MX51_PAD_EIM_D24__UART3_CTS,
++
++	/* USB HOST1 */
++	MX51_PAD_USBH1_CLK__USBH1_CLK,
++	MX51_PAD_USBH1_DIR__USBH1_DIR,
++	MX51_PAD_USBH1_NXT__USBH1_NXT,
++	MX51_PAD_USBH1_DATA0__USBH1_DATA0,
++	MX51_PAD_USBH1_DATA1__USBH1_DATA1,
++	MX51_PAD_USBH1_DATA2__USBH1_DATA2,
++	MX51_PAD_USBH1_DATA3__USBH1_DATA3,
++	MX51_PAD_USBH1_DATA4__USBH1_DATA4,
++	MX51_PAD_USBH1_DATA5__USBH1_DATA5,
++	MX51_PAD_USBH1_DATA6__USBH1_DATA6,
++	MX51_PAD_USBH1_DATA7__USBH1_DATA7,
++
++	/* USB HUB reset line*/
++	MX51_PAD_GPIO_1_7__GPIO1_7,
+ };
+ 
+ /* Serial ports */
+@@ -66,15 +89,113 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++static int gpio_usbh1_active(void)
++{
++	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
++	int ret;
++
++	/* Set USBH1_STP to GPIO and toggle it */
++	mxc_iomux_v3_setup_pad(&usbh1stp_gpio);
++	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
++
++	if (ret) {
++		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
++		return ret;
++	}
++	gpio_direction_output(BABBAGE_USBH1_STP, 0);
++	gpio_set_value(BABBAGE_USBH1_STP, 1);
++	msleep(100);
++	gpio_free(BABBAGE_USBH1_STP);
++	return 0;
++}
++
++static inline void babbage_usbhub_reset(void)
++{
++	int ret;
++
++	/* Bring USB hub out of reset */
++	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
++	if (ret) {
++		printk(KERN_ERR"failed to get GPIO_USB_HUB_RESET: %d\n", ret);
++		return;
++	}
++	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
++
++	/* USB HUB RESET - De-assert USB HUB RESET_N */
++	msleep(1);
++	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
++	msleep(1);
++	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
++}
++
++/* This function is board specific as the bit mask for the plldiv will also
++be different for other Freescale SoCs, thus a common bitmask is not
++possible and cannot get place in /plat-mxc/ehci.c.*/
++static int initialize_otg_port(struct platform_device *pdev)
++{
++	u32 v;
++	void __iomem *usb_base;
++	u32 usbother_base;
++
++	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
++	usbother_base = usb_base + USBOTHER_REGS_OFFSET;
++
++	/* Set the PHY clock to 19.2MHz */
++	v = __raw_readl(usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++	v &= ~USB_UTMI_PHYCTRL2_PLLDIV_MASK;
++	v |= USB_PLL_DIV_19_2_MHZ;
++	__raw_writel(v, usbother_base + USB_PHY_CTR_FUNC2_OFFSET);
++	iounmap(usb_base);
++	return 0;
++}
++
++static int initialize_usbh1_port(struct platform_device *pdev)
++{
++	u32 v;
++	void __iomem *usb_base;
++	u32 usbother_base;
++
++	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
++	usbother_base = usb_base + USBOTHER_REGS_OFFSET;
++
++	/* The clock for the USBH1 ULPI port will come externally from the PHY. */
++	v = __raw_readl(usbother_base + USB_CTRL_1_OFFSET);
++	__raw_writel(v | USB_CTRL_UH1_EXT_CLK_EN, usbother_base + USB_CTRL_1_OFFSET);
++	iounmap(usb_base);
++	return 0;
++}
++
++static struct mxc_usbh_platform_data dr_utmi_config = {
++	.init		= initialize_otg_port,
++	.portsc	= MXC_EHCI_UTMI_16BIT,
++	.flags	= MXC_EHCI_INTERNAL_PHY,
++};
++
++static struct mxc_usbh_platform_data usbh1_config = {
++	.init		= initialize_usbh1_port,
++	.portsc	= MXC_EHCI_MODE_ULPI,
++	.flags	= (MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_ITC_NO_THRESHOLD),
++};
++
+ /*
+  * Board specific initialization.
+  */
+ static void __init mxc_board_init(void)
+ {
++	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
++
+ 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
+ 					ARRAY_SIZE(mx51babbage_pads));
+ 	mxc_init_imx_uart();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
++
++	gpio_usbh1_active();
++	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
++	/* setback USBH1_STP to be function */
++	mxc_iomux_v3_setup_pad(&usbh1stp);
++	babbage_usbhub_reset();
+ }
+ 
+ static void __init mx51_babbage_timer_init(void)
+-- 
+1.6.0.4
