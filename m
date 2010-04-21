@@ -1,30 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Apr 2010 21:15:16 +0100
-Subject: [RFC/PATCH] dns323: Support for HW rev C1
-In-Reply-To: <20100421180737.GE4586@mail.wantstofly.org>
-References: <1271838486.2330.139.camel@pasglop>
-	<20100421180737.GE4586@mail.wantstofly.org>
-Message-ID: <20100421201516.GG26616@n2100.arm.linux.org.uk>
+Date: Wed, 21 Apr 2010 21:21:15 +0100
+Subject: udelay() broken for SMP cores?
+In-Reply-To: <20100421195225.GS27575@shareable.org>
+References: <4BCE60C4.8020505@codeaurora.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
+	<4BCE9E8B.2070103@codeaurora.org>
+	<20100421072243.GA913@n2100.arm.linux.org.uk>
+	<ea62885d30e4bbfb84db59758fa9e946.squirrel@www.codeaurora.org>
+	<20100421095036.GA13971@n2100.arm.linux.org.uk>
+	<20100421100008.GE13114@shareable.org>
+	<20100421192911.GA26616@n2100.arm.linux.org.uk>
+	<20100421195225.GS27575@shareable.org>
+Message-ID: <20100421202115.GH26616@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 08:07:37PM +0200, Lennert Buytenhek wrote:
-> On Wed, Apr 21, 2010 at 06:28:06PM +1000, Benjamin Herrenschmidt wrote:
+On Wed, Apr 21, 2010 at 08:52:25PM +0100, Jamie Lokier wrote:
+> Russell King - ARM Linux wrote:
+> > We could go to ns delays, but then we have a big problem - the cost of
+> > calculating the number of loops starts to become significant compared to
+> > the delays - and that's a quality of implementation factor.  In fact,
+> > the existing cost has always been significant for short delays for
+> > slower (sub-100MHz) ARMs.
 > 
-> >  - Identifying the board requires the ethernet PHY ID as far as I can
-> > tell (at least that's how d-link userspace tools do it). I've put some
-> > code in dns323_setup.c to do it, it's a bit gross but I don't think
-> > trying to tie links with the ethernet driver would be any cleaner.
-> >
-> >  - I'm not totally sure what's the right approach for changing the
-> > config of the PHY LEDs... the PHY drivers have no hooks for that and no
-> > way that I have in mind to pass some platform data or something driver
-> > specific like that over.
-> 
-> Just register a different machine ID for the rev C1 board and pass
-> that in from the boot loader, that'll solve all these problems.
+> I'm surprised it makes much difference to, say, 20MHz ARMs because you
+> could structure it as a nested loop, the inner one executed once per
+> microsecond and calibrated to 1us.  The delays don't have to be super
+> accurate.
 
-Or use the system_rev for what it's meant for; it was invented to deal
-with the differences between rev 3,4,5 netwinders - or more specifically
-revision 4 netwinders where the fan control hardware is different from
-rev 3 and 5.
+You don't understand the issue.  On older ARMs, the single 32-bit
+multiply is not cheap; it shows up as having a significant time
+expense for very short delays - and that _does_ matter.
+
+Consider system performance where you're driving a bus using udelay()
+to provide 1us timings, but udelay ends up taking 10us instead every
+time because of the calculation for number of loops for a 1us timing.
+
+> With a fixed-speed clock register known at compile time, the
+> calculation tends to constant-fold nicely, even for ns delays.  Not
+> suitable for multi-target kernels but good on single-target.
+
+Here you're making a very big assumption - that there's some register
+you can read which is regularly clocked.  That's not true on a lot of
+older ARMs, where we struggle to satisfy sched_clock() due to lack of
+such a register.
