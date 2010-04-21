@@ -1,41 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Apr 2010 20:48:44 +0100
-Subject: Simply disabling MMU in cpu_v7_reset doesn't work for kexec
-In-Reply-To: <n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
-References: <w2mf17812d71004210618vc68963cbn7ed50483a56140b7@mail.gmail.com>
-	<n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
-Message-ID: <20100421194844.GF26616@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 21 Apr 2010 20:52:25 +0100
+Subject: udelay() broken for SMP cores?
+In-Reply-To: <20100421192911.GA26616@n2100.arm.linux.org.uk>
+References: <4BCE60C4.8020505@codeaurora.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
+	<4BCE9E8B.2070103@codeaurora.org>
+	<20100421072243.GA913@n2100.arm.linux.org.uk>
+	<ea62885d30e4bbfb84db59758fa9e946.squirrel@www.codeaurora.org>
+	<20100421095036.GA13971@n2100.arm.linux.org.uk>
+	<20100421100008.GE13114@shareable.org>
+	<20100421192911.GA26616@n2100.arm.linux.org.uk>
+Message-ID: <20100421195225.GS27575@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 09:19:06PM +0800, Eric Miao wrote:
-> On Wed, Apr 21, 2010 at 9:18 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > Tried the following simple code to disable MMU in cpu_v7_reset() doesn't
-> > seem to work for kexec reboot. I was expecting the following instructions
-> > after MMU is disabled are still reachable in the instruction fetching pipe.
-> >
+Russell King - ARM Linux wrote:
+> On Wed, Apr 21, 2010 at 11:00:08AM +0100, Jamie Lokier wrote:
+> > Russell King - ARM Linux wrote:
+> > > Well, the assumption is that the CPUs will be running at their fastest
+> > > speed at boot time, and therefore loops_per_jiffy will be calibrated
+> > > such that we guarantee _at least_ the asked-for delay - which is the
+> > > only guarantee udelay has.
+> > 
+> > That's an interesting and not altogether reliable assumption.
 > 
-> 	.align	5
->  ENTRY(cpu_v7_reset)
-> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
-> +	bic	r1, r1, #0x0001			@ ...............m
-> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
-> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
->  	mov	pc, r0
->  ENDPROC(cpu_v7_reset)
+> That depends which bit you're talking about.  udelay() must give you the
+> delay you asked for, or a longer delay.  If it gives you a shorter delay,
+> it's buggy plain and simple.
+> 
+> > On a device I'm working with, we just read a fixed-speed clock
+> > register in a loop.  It's slower than the CPU register loop, but given
+> > udelay counts in great big slow _microsecond_ delays (how quaint! ;-)
+> > that's fine.
+> 
+> We could go to ns delays, but then we have a big problem - the cost of
+> calculating the number of loops starts to become significant compared to
+> the delays - and that's a quality of implementation factor.  In fact,
+> the existing cost has always been significant for short delays for
+> slower (sub-100MHz) ARMs.
 
-The procedure expected here is:
+I'm surprised it makes much difference to, say, 20MHz ARMs because you
+could structure it as a nested loop, the inner one executed once per
+microsecond and calibrated to 1us.  The delays don't have to be super
+accurate.
 
-1. invalidate caches
-2. drain buffers
-3. invalidate TLBs
-4. disable MMU et.al.
-5. jump to the address in r0.
+With a fixed-speed clock register known at compile time, the
+calculation tends to constant-fold nicely, even for ns delays.  Not
+suitable for multi-target kernels but good on single-target.
 
-The reason this is permitted is because cpu_v7_proc_fin _must_ be called
-before hand, which is expected to disable all interrupts, and flush and
-disable the caches.
-
-It might be worth given the speculative behaviour of V7 to also invalidate
-TLBs after a dsb and isb after step 4 instead of before step 4 - and (iirc)
-also doing an isb after invalidating the TLBs.
+-- Jamie
