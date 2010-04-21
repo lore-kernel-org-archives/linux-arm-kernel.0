@@ -1,49 +1,41 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 21 Apr 2010 20:45:40 +0100
-Subject: kernel virtual memory access (from app) does not generate segfault
-In-Reply-To: <20100421131149.GB9408@desktop>
-References: <4BCD7076.9030802@browserseal.com>
-	<20100420093441.GD6684@trinity.fluff.org>
-	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
-	<20100420142047.GA7398@desktop>
-	<20100420170944.GE2234@trinity.fluff.org>
-	<20100420192813.GA29831@n2100.arm.linux.org.uk>
-	<20100421131149.GB9408@desktop>
-Message-ID: <20100421194540.GR27575@shareable.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Apr 2010 20:48:44 +0100
+Subject: Simply disabling MMU in cpu_v7_reset doesn't work for kexec
+In-Reply-To: <n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
+References: <w2mf17812d71004210618vc68963cbn7ed50483a56140b7@mail.gmail.com>
+	<n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
+Message-ID: <20100421194844.GF26616@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-anfei wrote:
-> ARM: Proper prefetch abort handling on pre-ARMv6
+On Wed, Apr 21, 2010 at 09:19:06PM +0800, Eric Miao wrote:
+> On Wed, Apr 21, 2010 at 9:18 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > Tried the following simple code to disable MMU in cpu_v7_reset() doesn't
+> > seem to work for kexec reboot. I was expecting the following instructions
+> > after MMU is disabled are still reachable in the instruction fetching pipe.
+> >
 > 
-> Instruction faults on pre-ARMv6 CPUs are interpreted as
-> a 'translation fault', but do_translation_fault doesn't
-> handle well if user mode trying to run instruction above
-> TASK_SIZE, and result in the infinite retry of that
-> instruction.
-> 
-> Signed-off-by: Anfei Zhou <anfei.zhou@gmail.com>
-> ---
->  arch/arm/mm/fault.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 9d40c34..8ad75e9 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -393,6 +393,9 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  	if (addr < TASK_SIZE)
->  		return do_page_fault(addr, fsr, regs);
->  
-> +	if (user_mode(regs))
-> +		goto bad_area;
-> +
->  	index = pgd_index(addr);
->  
->  	/*
+> 	.align	5
+>  ENTRY(cpu_v7_reset)
+> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+> +	bic	r1, r1, #0x0001			@ ...............m
+> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
+>  	mov	pc, r0
+>  ENDPROC(cpu_v7_reset)
 
-Looks good to me.
+The procedure expected here is:
 
-Reviewed-by: Jamie Lokier <jamie@shareable.org>
+1. invalidate caches
+2. drain buffers
+3. invalidate TLBs
+4. disable MMU et.al.
+5. jump to the address in r0.
 
--- Jamie
+The reason this is permitted is because cpu_v7_proc_fin _must_ be called
+before hand, which is expected to disable all interrupts, and flush and
+disable the caches.
+
+It might be worth given the speculative behaviour of V7 to also invalidate
+TLBs after a dsb and isb after step 4 instead of before step 4 - and (iirc)
+also doing an isb after invalidating the TLBs.
