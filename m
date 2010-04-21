@@ -1,34 +1,21 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 21 Apr 2010 22:49:09 +0400
-Subject: [PATCH 2/2] SA1100: add processor check to sa1110-cpufreq driver
-In-Reply-To: <1271875749-2891-1-git-send-email-mad_soft@inbox.ru>
-References: <1271875749-2891-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1271875749-2891-3-git-send-email-mad_soft@inbox.ru>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 22 Apr 2010 00:53:19 +0530
+Subject: [PATCH 05/10] ARM: ftrace: add ENDPROC annotations
+In-Reply-To: <20100313084546.GA30400@n2100.arm.linux.org.uk>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+	<1268462987-8271-6-git-send-email-rabin@rab.in>
+	<20100313084546.GA30400@n2100.arm.linux.org.uk>
+Message-ID: <20100421192319.GA16719@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just to make sure that this driver won't run on StrongArm SA1100
-when both SA1100 and SA1110 cpufreq drivers are built in (usually
-in multimachine config). SA1100 driver already has similar check.
+On Sat, Mar 13, 2010 at 08:45:46AM +0000, Russell King - ARM Linux wrote:
+> On Sat, Mar 13, 2010 at 12:19:42PM +0530, Rabin Vincent wrote:
+> >  
+> >  	.globl ftrace_stub
+> > -ftrace_stub:
+> > +ENTRY(ftrace_stub)
+> 
+> ENTRY does the .globl for you, so please kill your own version.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- arch/arm/mach-sa1100/cpu-sa1110.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-sa1100/cpu-sa1110.c b/arch/arm/mach-sa1100/cpu-sa1110.c
-index 63b32b6..7252874 100644
---- a/arch/arm/mach-sa1100/cpu-sa1110.c
-+++ b/arch/arm/mach-sa1100/cpu-sa1110.c
-@@ -363,6 +363,9 @@ static int __init sa1110_clk_init(void)
- 	struct sdram_params *sdram;
- 	const char *name = sdram_name;
- 
-+	if (!cpu_is_sa1110())
-+		return -ENODEV;
-+
- 	if (!name[0]) {
- 		if (machine_is_assabet())
- 			name = "TC59SM716-CL3";
--- 
-1.7.0.4
+Updated patch below.
