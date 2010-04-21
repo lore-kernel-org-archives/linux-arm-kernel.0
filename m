@@ -1,48 +1,84 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 22 Apr 2010 00:47:37 +0200
-Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
-In-Reply-To: <q2h3f34cd261004211535vb6ebbaa0k551449e9a1a10285@mail.gmail.com>
-References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
-	<20100415075831.GL30801@buzzloop.caiaq.de>
-	<i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
-	<20100416083632.GF30801@buzzloop.caiaq.de>
-	<z2z3f34cd261004191240nce56a951jb24c4ce3c0c47503@mail.gmail.com>
-	<20100420081323.GD30807@buzzloop.caiaq.de>
-	<q2h3f34cd261004211535vb6ebbaa0k551449e9a1a10285@mail.gmail.com>
-Message-ID: <20100421224737.GU30801@buzzloop.caiaq.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Apr 2010 18:59:03 -0400 (EDT)
+Subject: kernel virtual memory access (from app) does not generatesegfault
+In-Reply-To: <20100421215425.GL26616@n2100.arm.linux.org.uk>
+References: <000001cae074$1b564ff0$4044010a@Emea.Arm.com>
+	<20100420142047.GA7398@desktop>
+	<20100420170944.GE2234@trinity.fluff.org>
+	<20100420192813.GA29831@n2100.arm.linux.org.uk>
+	<20100420223106.GQ11723@shareable.org>
+	<20100420224108.GA1432@n2100.arm.linux.org.uk>
+	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
+	<20100421193534.GC26616@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1004211723230.7232@xanadu.home>
+	<20100421214447.GK26616@n2100.arm.linux.org.uk>
+	<20100421215425.GL26616@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1004211848151.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 04:35:12PM -0600, Badguy Badguy wrote:
-> Thanks for your input.
+On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
+
+> On Wed, Apr 21, 2010 at 10:44:47PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Apr 21, 2010 at 05:24:51PM -0400, Nicolas Pitre wrote:
+> > > On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
+> > > 
+> > > > On Wed, Apr 21, 2010 at 12:17:41PM +0100, Dave P. Martin wrote:
+> > > > >  
+> > > > > 
+> > > > > > -----Original Message-----
+> > > > > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+> > > > > > Sent: 20 April 2010 23:41
+> > > > > > To: Jamie Lokier
+> > > > > > Cc: Ben Dooks; anfei; Dave P Martin; 
+> > > > > > linux-arm-kernel at lists.infradead.org
+> > > > > > Subject: Re: kernel virtual memory access (from app) does not 
+> > > > > > generatesegfault
+> > > > > 
+> > > > > [...]
+> > > > > 
+> > > > > > The difference between instruction faults and data faults is 
+> > > > > > that we always interpret instruction faults on pre-ARMv6 CPUs 
+> > > > > > as a 'translation fault' rather than a permission fault since 
+> > > > > > they can't tell us what the problem was.
+> > > > > 
+> > > > > Note that my observations were on an armv7 kernel.  Should we still hit the
+> > > > > same bit of code in this case, or have I misdiagnosed the problem?
+> > > > 
+> > > > If it was ARMv7, we should be reading the IFSR, which should be telling
+> > > > us that there's a permission fault trying to read instructions from
+> > > > 0xc0000000.
+> > > > 
+> > > > If changing do_translation_fault() on a recent kernel fixes your problem,
+> > > > something's going wrong.  Any chance you could add some debugging to
+> > > > do_PrefetchAbort() so that when you see your test program running
+> > > > (eg, if (strcmp(current->comm, "progname") == 0) { ... }) you could
+> > > > dump out the values of ifsr and addr please?
+> > > 
+> > > If I remember right, the original bug report mentioned ARM926.
+> > 
+> > So here we go again with confusion raining.
+> > 
+> > Someone please tell me _definitively_ _what_ is being seen on _what_ CPU,
+> > and separate the two issues into two different threads.  I'm going to
+> > ignore any further comments on this issue until that's done.  Life is
+> > too short to try to work this out on my own.
 > 
-> I got the NFS to mount, was missing an option in the config.
-> 
-> but now I get a panic - not syncing: Attempted to kill init!
+> Actually, no, you're creating the confusion; this sub-thread is about
+> the behaviour on ARMv7, as a completely separate subject from ARM926.
 
-That can have tons of reasons. Try setting CONFIG_DEBUG_USER=y in your
-.config and pass user_debug=255 in the kernel command line. That will
-give you a more verbose output about why user space programms crash.
+It is well possible that I missed the subject transition.
 
-> I verified I am passing the string via bootloader:
-> init=/sbin/init
->  this is a symlink to my busybox.
-> 
-> I think perhaps this is a complier problem, not 100% sure tho.
-> I believe I have recompiled the busybox via ltib and that should have solved it.
+The only person who provided a test program is Sasha Sirotkin who said:
 
-Earlier in this thread you said that you run the same RootFS with an
-older kernel, at least I got you so. If that's true, compare their
-configs again.
+On Tue, 20 Apr 2010, Sasha Sirotkin wrote:
 
-My rough guess is some confusion in the OABI/EABI and floating point
-settings.
+> P.S. My kernel is 2.6.32.7 and the CPU is ARM926EJ-S rev 5 (v5l)
 
-> can you tell me what toolchain you are using to compile this kernel?
-> where you obtained it? did you compile it yourself?
+Message-id: <4BCD7076.9030802@browserseal.com>
 
-I'm using buildroot (http://buildroot.busybox.net) for such things, and
-the complete toolchain is built from scratch, yes. Eventually, you'll
-get a complete rootfs.
+Only later did Dave P. Martin mention having made similar observations 
+on an ARMv7.
 
-Daniel
+
+Nicolas
