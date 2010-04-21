@@ -1,61 +1,48 @@
-From: therealbadguy@gmail.com (Badguy Badguy)
-Date: Wed, 21 Apr 2010 16:35:12 -0600
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 22 Apr 2010 00:47:37 +0200
 Subject: iMX31 LogicPD LiteKit Kernel 2.6.33.2
-In-Reply-To: <20100420081323.GD30807@buzzloop.caiaq.de>
+In-Reply-To: <q2h3f34cd261004211535vb6ebbaa0k551449e9a1a10285@mail.gmail.com>
 References: <w2i3f34cd261004141302xdeb23378hfc4d795a6c9811c2@mail.gmail.com>
 	<20100415075831.GL30801@buzzloop.caiaq.de>
 	<i2i3f34cd261004151408ta09b0ca5lfe8bcd6289fb77ba@mail.gmail.com>
 	<20100416083632.GF30801@buzzloop.caiaq.de>
 	<z2z3f34cd261004191240nce56a951jb24c4ce3c0c47503@mail.gmail.com>
 	<20100420081323.GD30807@buzzloop.caiaq.de>
-Message-ID: <q2h3f34cd261004211535vb6ebbaa0k551449e9a1a10285@mail.gmail.com>
+	<q2h3f34cd261004211535vb6ebbaa0k551449e9a1a10285@mail.gmail.com>
+Message-ID: <20100421224737.GU30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your input.
+On Wed, Apr 21, 2010 at 04:35:12PM -0600, Badguy Badguy wrote:
+> Thanks for your input.
+> 
+> I got the NFS to mount, was missing an option in the config.
+> 
+> but now I get a panic - not syncing: Attempted to kill init!
 
-I got the NFS to mount, was missing an option in the config.
+That can have tons of reasons. Try setting CONFIG_DEBUG_USER=y in your
+.config and pass user_debug=255 in the kernel command line. That will
+give you a more verbose output about why user space programms crash.
 
-but now I get a panic - not syncing: Attempted to kill init!
+> I verified I am passing the string via bootloader:
+> init=/sbin/init
+>  this is a symlink to my busybox.
+> 
+> I think perhaps this is a complier problem, not 100% sure tho.
+> I believe I have recompiled the busybox via ltib and that should have solved it.
 
-I verified I am passing the string via bootloader:
-init=/sbin/init
- this is a symlink to my busybox.
+Earlier in this thread you said that you run the same RootFS with an
+older kernel, at least I got you so. If that's true, compare their
+configs again.
 
-I think perhaps this is a complier problem, not 100% sure tho.
-I believe I have recompiled the busybox via ltib and that should have solved it.
+My rough guess is some confusion in the OABI/EABI and floating point
+settings.
 
-can you tell me what toolchain you are using to compile this kernel?
-where you obtained it? did you compile it yourself?
+> can you tell me what toolchain you are using to compile this kernel?
+> where you obtained it? did you compile it yourself?
 
-I am using one from an older ltib, as the current one they are using
-throws the error that it miscompiles the __weak directive.
-I am using:
- gcc-4.1.2
+I'm using buildroot (http://buildroot.busybox.net) for such things, and
+the complete toolchain is built from scratch, yes. Eventually, you'll
+get a complete rootfs.
 
- gcc-4.1.1 is the one that throws the error.
-
->> Can I get a break down on how far you have run this kernel? Do you
->> have file system support?
->
-> I can fully boot the board via NFS and have a working system with
-> Ethernet, MMC/SDIO, LED, GPIO, SPI and USB support.
->
-
-I notice that these drivers are loading correctly, and look good as
-far as the initialization goes.
-
->> I notice the NAND driver is throwing bad erase block warnings on a
->> large number of blocks, I will change SOM and see if it continues.
->
-> I'll again check for NAND and NOR later today, but I'm sure the chips
-> are at least probed correctly.
->
-
- I did an erase on the memory, and this has stopped the bad block
-warnings, good enough for now.
-
-
-Thanks!
-
-  Chris
+Daniel
