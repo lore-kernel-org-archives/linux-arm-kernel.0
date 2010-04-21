@@ -1,44 +1,143 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 21 Apr 2010 20:07:37 +0200
-Subject: [RFC/PATCH] dns323: Support for HW rev C1
-In-Reply-To: <1271838486.2330.139.camel@pasglop>
-References: <1271838486.2330.139.camel@pasglop>
-Message-ID: <20100421180737.GE4586@mail.wantstofly.org>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Wed, 21 Apr 2010 21:34:36 +0300
+Subject: [PATCH] mxc: Change gpt timer code to be more generic by using V2
+	instead of MX3
+Message-ID: <d882e9d8c3986d793a331071afdeb8c48229040f.1271864854.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 06:28:06PM +1000, Benjamin Herrenschmidt wrote:
+Replace mx3_ with v2_ since the register layout is the same for all SoCs using
+version 2 of the timer (mx25, mx31, mx37 and now mx51)
 
->  - Identifying the board requires the ethernet PHY ID as far as I can
-> tell (at least that's how d-link userspace tools do it). I've put some
-> code in dns323_setup.c to do it, it's a bit gross but I don't think
-> trying to tie links with the ethernet driver would be any cleaner.
->
->  - I'm not totally sure what's the right approach for changing the
-> config of the PHY LEDs... the PHY drivers have no hooks for that and no
-> way that I have in mind to pass some platform data or something driver
-> specific like that over.
+Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+---
+ arch/arm/plat-mxc/time.c |   44 ++++++++++++++++++++++----------------------
+ 1 files changed, 22 insertions(+), 22 deletions(-)
 
-Just register a different machine ID for the rev C1 board and pass
-that in from the boot loader, that'll solve all these problems.
-
-
-> Of course a device-tree would help a lot here but you guys don't
-> have that yet :-)
-
-A device tree would also be useless here if you would use it to pass
-the kernel incorrect info.  Yet you wouldn't be blaming the device tree
-mechanism in that case -- while if people pass in the wrong machine IDs,
-it's suddenly the fault of the machine ID system.
-
-I would agree with you that the machine ID system has some shortcomings,
-but as far as criticism on it goes, I don't think this particular bit is
-valid or fair.  Let's not go overboard on the machine ID system bashing. :-)
-
-
->  - I whack the SATA LED control register directly from dns323_setup.c, a
-> bit gross but whatever code is already in sata_mv.c doesn't make my LEDs
-> blink :-) I think it fails to set bit 0 but I'm not 100% sure, I haven't
-> had a chance to debug further).
-
-Are your disks using NCQ?
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index c1ce51a..714bdef 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -54,14 +54,14 @@
+ #define MX2_TSTAT_COMP		(1 << 0)
+ 
+ /* MX31, MX35, MX25, MXC91231, MX5 */
+-#define MX3_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
+-#define MX3_TCTL_CLK_IPG	(1 << 6)
+-#define MX3_TCTL_FRR		(1 << 9)
+-#define MX3_IR			0x0c
+-#define MX3_TSTAT		0x08
+-#define MX3_TSTAT_OF1		(1 << 0)
+-#define MX3_TCN			0x24
+-#define MX3_TCMP		0x10
++#define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
++#define V2_TCTL_CLK_IPG		(1 << 6)
++#define V2_TCTL_FRR		(1 << 9)
++#define V2_IR			0x0c
++#define V2_TSTAT		0x08
++#define V2_TSTAT_OF1		(1 << 0)
++#define V2_TCN			0x24
++#define V2_TCMP			0x10
+ 
+ #define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
+ #define timer_is_v2()	(!timer_is_v1())
+@@ -76,7 +76,7 @@ static inline void gpt_irq_disable(void)
+ 	unsigned int tmp;
+ 
+ 	if (timer_is_v2())
+-		__raw_writel(0, timer_base + MX3_IR);
++		__raw_writel(0, timer_base + V2_IR);
+ 	else {
+ 		tmp = __raw_readl(timer_base + MXC_TCTL);
+ 		__raw_writel(tmp & ~MX1_2_TCTL_IRQEN, timer_base + MXC_TCTL);
+@@ -86,7 +86,7 @@ static inline void gpt_irq_disable(void)
+ static inline void gpt_irq_enable(void)
+ {
+ 	if (timer_is_v2())
+-		__raw_writel(1<<0, timer_base + MX3_IR);
++		__raw_writel(1<<0, timer_base + V2_IR);
+ 	else {
+ 		__raw_writel(__raw_readl(timer_base + MXC_TCTL) | MX1_2_TCTL_IRQEN,
+ 			timer_base + MXC_TCTL);
+@@ -110,9 +110,9 @@ static cycle_t mx1_2_get_cycles(struct clocksource *cs)
+ 	return __raw_readl(timer_base + MX1_2_TCN);
+ }
+ 
+-static cycle_t mx3_get_cycles(struct clocksource *cs)
++static cycle_t v2_get_cycles(struct clocksource *cs)
+ {
+-	return __raw_readl(timer_base + MX3_TCN);
++	return __raw_readl(timer_base + V2_TCN);
+ }
+ 
+ static struct clocksource clocksource_mxc = {
+@@ -129,7 +129,7 @@ static int __init mxc_clocksource_init(struct clk *timer_clk)
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+ 	if (timer_is_v2())
+-		clocksource_mxc.read = mx3_get_cycles;
++		clocksource_mxc.read = v2_get_cycles;
+ 
+ 	clocksource_mxc.mult = clocksource_hz2mult(c,
+ 					clocksource_mxc.shift);
+@@ -153,16 +153,16 @@ static int mx1_2_set_next_event(unsigned long evt,
+ 				-ETIME : 0;
+ }
+ 
+-static int mx3_set_next_event(unsigned long evt,
++static int v2_set_next_event(unsigned long evt,
+ 			      struct clock_event_device *unused)
+ {
+ 	unsigned long tcmp;
+ 
+-	tcmp = __raw_readl(timer_base + MX3_TCN) + evt;
++	tcmp = __raw_readl(timer_base + V2_TCN) + evt;
+ 
+-	__raw_writel(tcmp, timer_base + MX3_TCMP);
++	__raw_writel(tcmp, timer_base + V2_TCMP);
+ 
+-	return (int)(tcmp - __raw_readl(timer_base + MX3_TCN)) < 0 ?
++	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
+ 				-ETIME : 0;
+ }
+ 
+@@ -192,8 +192,8 @@ static void mxc_set_mode(enum clock_event_mode mode,
+ 	if (mode != clockevent_mode) {
+ 		/* Set event time into far-far future */
+ 		if (timer_is_v2())
+-			__raw_writel(__raw_readl(timer_base + MX3_TCN) - 3,
+-					timer_base + MX3_TCMP);
++			__raw_writel(__raw_readl(timer_base + V2_TCN) - 3,
++					timer_base + V2_TCMP);
+ 		else
+ 			__raw_writel(__raw_readl(timer_base + MX1_2_TCN) - 3,
+ 					timer_base + MX1_2_TCMP);
+@@ -245,7 +245,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
+ 	uint32_t tstat;
+ 
+ 	if (timer_is_v2())
+-		tstat = __raw_readl(timer_base + MX3_TSTAT);
++		tstat = __raw_readl(timer_base + V2_TSTAT);
+ 	else
+ 		tstat = __raw_readl(timer_base + MX1_2_TSTAT);
+ 
+@@ -276,7 +276,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+ 	if (timer_is_v2())
+-		clockevent_mxc.set_next_event = mx3_set_next_event;
++		clockevent_mxc.set_next_event = v2_set_next_event;
+ 
+ 	clockevent_mxc.mult = div_sc(c, NSEC_PER_SEC,
+ 					clockevent_mxc.shift);
+@@ -308,7 +308,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+ 
+ 	if (timer_is_v2())
+-		tctl_val = MX3_TCTL_CLK_IPG | MX3_TCTL_FRR | MX3_TCTL_WAITEN | MXC_TCTL_TEN;
++		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+ 	else
+ 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+ 
+-- 
+1.7.0.4
