@@ -1,35 +1,72 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 21 Apr 2010 18:31:40 +1000
-Subject: [RFC/PATCH] dns323: Support for HW rev C1
-In-Reply-To: <1271838486.2330.139.camel@pasglop>
-References: <1271838486.2330.139.camel@pasglop>
-Message-ID: <1271838700.2330.143.camel@pasglop>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 21 Apr 2010 16:33:58 +0800
+Subject: [PATCH] serial/imx: only parse for iomem resources once
+Message-ID: <1271838838.643120.804272014834.1.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-04-21 at 18:28 +1000, Benjamin Herrenschmidt wrote:
-> This patch adds support for HW rev C1 of this critter. I have figured
-> out -most- of the GPIO layout, though there are still some unknowns.
-> 
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> ---
-> 
-> Some of it is a tad hackish, so I'm open to suggestions as to how to do
-> it better and I'm happy to split the drivers/net part upon request, this
-> is really just [RFC] at this stage. 
+Currently, the iomem resources are parsed in serial_imx_probe, then
+again in imx_request_port and imx_release_port.
 
-Oh a couple more things...
+This change uses the imx_port data to retrieve the start and size of the
+memory region, rather than re-parsing the resources through
+platform_get_resource.
 
-The fans are controlled via 2 GPIOs on this (see the explanation in the
-patch). Do you guys think I should create some kind of pseudo hwmon
-device so it can be controlled with one file where you write "off",
-"low", "high", or should I just let userspace cope.
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Also, it would be nice for said userspace to know the HW revision to be
-able to get the right fan control method for example.
+---
+ drivers/serial/imx.c |   18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-Do you have a hook in ARM for adding something to /proc/cpuinfo where I
-could export the board revision ? Or a "standard" practice to do that ?
-
-Cheers,
-Ben.
+diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+index e579d7a..7de6bf7 100644
+--- a/drivers/serial/imx.c
++++ b/drivers/serial/imx.c
+@@ -192,6 +192,7 @@ struct imx_port {
+ 	unsigned int		irda_inv_tx:1;
+ 	unsigned short		trcv_delay; /* transceiver delay */
+ 	struct clk		*clk;
++	unsigned long		mapsize;
+ };
+ 
+ #ifdef CONFIG_IRDA
+@@ -945,11 +946,8 @@ static const char *imx_type(struct uart_port *port)
+  */
+ static void imx_release_port(struct uart_port *port)
+ {
+-	struct platform_device *pdev = to_platform_device(port->dev);
+-	struct resource *mmres;
+-
+-	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mmres->start, mmres->end - mmres->start + 1);
++	struct imx_port *imx_port = container_of(port, struct imx_port, port);
++	release_mem_region(imx_port->port.mapbase, imx_port->mapsize);
+ }
+ 
+ /*
+@@ -957,15 +955,10 @@ static void imx_release_port(struct uart_port *port)
+  */
+ static int imx_request_port(struct uart_port *port)
+ {
+-	struct platform_device *pdev = to_platform_device(port->dev);
+-	struct resource *mmres;
++	struct imx_port *imx_port = container_of(port, struct imx_port, port);
+ 	void *ret;
+ 
+-	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!mmres)
+-		return -ENODEV;
+-
+-	ret = request_mem_region(mmres->start, mmres->end - mmres->start + 1,
++	ret = request_mem_region(imx_port->port.mapbase, imx_port->mapsize,
+ 			"imx-uart");
+ 
+ 	return  ret ? 0 : -EBUSY;
+@@ -1245,6 +1238,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 	sport->port.dev = &pdev->dev;
+ 	sport->port.mapbase = res->start;
+ 	sport->port.membase = base;
++	sport->mapsize = res->end - res->start + 1;
+ 	sport->port.type = PORT_IMX,
+ 	sport->port.iotype = UPIO_MEM;
+ 	sport->port.irq = platform_get_irq(pdev, 0);
