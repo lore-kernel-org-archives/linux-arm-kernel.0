@@ -1,62 +1,67 @@
 From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 21 Apr 2010 22:00:13 +0100
-Subject: kernel virtual memory access (from app) does not generatesegfault
-In-Reply-To: <20100421194052.GE26616@n2100.arm.linux.org.uk>
-References: <20100420142047.GA7398@desktop>
-	<20100420170944.GE2234@trinity.fluff.org>
-	<20100420192813.GA29831@n2100.arm.linux.org.uk>
-	<20100420223106.GQ11723@shareable.org>
-	<20100420224108.GA1432@n2100.arm.linux.org.uk>
-	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
-	<20100421124317.GA9408@desktop>
-	<000101cae16c$b2d08cd0$4044010a@Emea.Arm.com>
-	<20100421191600.GO27575@shareable.org>
-	<20100421194052.GE26616@n2100.arm.linux.org.uk>
-Message-ID: <20100421210013.GZ27575@shareable.org>
+Date: Wed, 21 Apr 2010 22:10:17 +0100
+Subject: Simply disabling MMU in cpu_v7_reset doesn't work for kexec
+In-Reply-To: <20100421194844.GF26616@n2100.arm.linux.org.uk>
+References: <w2mf17812d71004210618vc68963cbn7ed50483a56140b7@mail.gmail.com>
+	<n2jf17812d71004210619qee8b8467u135fdbb44ff33049@mail.gmail.com>
+	<20100421194844.GF26616@n2100.arm.linux.org.uk>
+Message-ID: <20100421211017.GA27575@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell King - ARM Linux wrote:
-> On Wed, Apr 21, 2010 at 08:16:00PM +0100, Jamie Lokier wrote:
-> > The two-liner proposed earlier should fix all ARMs doing userspace
-> > execution > TASK_SIZE - the problem which started this thread.  But
-> > not kernel space accidentally executing an NX page > TASK_SIZE due to
-> > some bug, which can only occur on ARMv6/v7 due to NX.
+> On Wed, Apr 21, 2010 at 09:19:06PM +0800, Eric Miao wrote:
+> > On Wed, Apr 21, 2010 at 9:18 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > > Tried the following simple code to disable MMU in cpu_v7_reset() doesn't
+> > > seem to work for kexec reboot. I was expecting the following instructions
+> > > after MMU is disabled are still reachable in the instruction fetching pipe.
+> > >
+> > 
+> > 	.align	5
+> >  ENTRY(cpu_v7_reset)
+> > +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+> > +	bic	r1, r1, #0x0001			@ ...............m
+> > +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+> > +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
+> >  	mov	pc, r0
+> >  ENDPROC(cpu_v7_reset)
 > 
-> Sorry James, that's wrong.
+> The procedure expected here is:
+> 
+> 1. invalidate caches
+> 2. drain buffers
+> 3. invalidate TLBs
+> 4. disable MMU et.al.
+> 5. jump to the address in r0.
+> 
+> The reason this is permitted is because cpu_v7_proc_fin _must_ be called
+> before hand, which is expected to disable all interrupts, and flush and
+> disable the caches.
 
-It's Jamie, btw.  Always has been.
+Isn't step 1 above redundant, because caches are already disabled and
+flushed?
 
-> ARMv6 and ARMv7 use the IFSR, which gives us the error code - and
-> that distinguishes between a translation fault and a permission
-> fault.  An attempt to execute a NX page generates a permission
-> fault, and therefore we end up calling do_page_fault() rather than
-> indirecting via do_translation_fault().
+> It might be worth given the speculative behaviour of V7 to also invalidate
+> TLBs after a dsb and isb after step 4 instead of before step 4 - and (iirc)
+> also doing an isb after invalidating the TLBs.
 
-That's a fine explanation, but I'd already grokked it, thanks to your
-earlier hint.  So what's wrong about what I said above?  Rephrased as:
+Mightn't the CPU refill one entry in the TLB between steps 3 and 4,
+just by fetching the instructions - even non-speculatively?
 
-Kernel executes NX page > TASK_SIZE:
+Fwiw, the lengthy patch here:
 
-    Without patch, loops calling do_translation_fault() which
-    just returns because the pte is already mapped and valid.
-    With patch, goes to do_page_fault().
+   http://lists.infradead.org/pipermail/barebox/2010-January/000528.html
 
-    -> Fixed by the IFSR patch.
+does exactly this in the ARMv7 part:
 
-User executes NX page > TASK_SIZE
+1. Turn off MMU and caches (one mcr).
+2. Clean and flush caches.
+3. Invalidate TLBs.
+4. Invalidate BTC.
+5. DSB.
+6. ISB.
+7. Return to caller / destination.
 
-    -> Fixed by the two-liner or IFSR patch, it doesn't matter.
-       Either one directs these to do_page_fault().
-
-Kernel executes NX page < TASK_SIZE:
-
-    -> Already caught by PROT_EXEC + FSR_LNF_PX check in
-       do_translation_fault -> do_page-fault -> access_error.
-
-User executes NX page < TASK_SIZE:
-
-    -> Already caught by PROT_EXEC + FSR_LNF_PX check in
-       do_translation_fault -> do_page-fault -> access_error.
+I don't know if it expects the final instructions to be direct-mapped.
 
 -- Jamie
