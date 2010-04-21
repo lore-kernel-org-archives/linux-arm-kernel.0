@@ -1,155 +1,102 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Wed, 21 Apr 2010 13:46:51 +0300
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
-	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
-	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100421104651.GO19534@gw.healthdatacare.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 21 Apr 2010 18:47:29 +0800
+Subject: SPI trouble on Colibri 270 (PXA)...
+In-Reply-To: <201004211144.41781.marek.vasut@gmail.com>
+References: <4BCD96F0.5010506@viketoft.se>
+	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>
+	<4BCDC645.5090001@viketoft.se>
+	<201004211144.41781.marek.vasut@gmail.com>
+Message-ID: <j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 20, 2010 at 08:52:26PM -0500, H Hartley Sweeten wrote:
-> On Tuesday, April 20, 2010 6:10 PM, Martin Guy wrote:
-> > Not easily, but it seems a likely cause.
-> > To prevent card deselection mid-message I think we would need to
-> > handle multi-transfer messages by making the start of transfers 2..N
-> > continuous with the end of transfers 1..N-1 instead of draining the
-> > reply from each one before starting the next.
-> > 
-> > Am I on the right track?
-> 
-> Yes.  I'm just not sure how to implement this.
+On Wed, Apr 21, 2010 at 5:44 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne ?t 20. dubna 2010 17:20:37 Jakob Viketoft napsal(a):
+>> Eric Miao wrote:
+>> > On Tue, Apr 20, 2010 at 7:58 PM, Jakob Viketoft <jakob@viketoft.se> wrote:
+>> <...>
+>>
+>> >> I haven't seen any other board using the same combination (the m25p80
+>> >> and the pxa2xx), but I'm still opting for an error on my part
+>> >> somewhere. I've attached my SPI configuration (board setup) in the end
+>> >> of the mail.
+>> >
+>> > Not looked into m25p80 code, but CS is normally asserted before a
+>> > transfer begins and deasserted after a transfer is done. I doubt there
+>> > are some cases where the transfer is not set up correctly.
+>>
+>> Well, in this case when doing a read you must set up a write transfer to
+>> write the read command + address and then a read transfer to actually
+>> read back the data. In this case the cs musn't be deasserted between
+>> transfers because this means the operation is terminated.
+>>
+>> > Actually, cs_assert() and cs_deassert() are there in pxa2xx_spi.c as two
+>> > very good debugging point to print out the transfer information to see
+>> > if they are setup correctly.
+>>
+>> When I look at how these two are used I get a an serie of assert,
+>> assert, deassert for each read operation (which should be correct
+>> behaviour). This suggests that something else is deasserting the cs or
+>> that the CPU is doing something on it's own accord. Hmmm...
+>>
+>> Regards,
+>>
+>> ? ? ? /Jakob
+>>
+>
+> You can try using gpio-spi driver as used in palmz72.c ... I had issues with
+> pxa2xx-spi interfacing the OV96xx camera, but it worked well for me with gpio-
+> spi.
+>
+> Looking at it now, it seems the patch was never merged, here's a shortened
+> version, try something similar:
+>
+> From 777212ce6d3bacea76281aa3d74839a3c38b32a4 Mon Sep 17 00:00:00 2001
+> From: Marek Vasut <marek.vasut@gmail.com>
+> Date: Sat, 22 Aug 2009 05:15:10 +0200
+> Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
+> ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?126
+> +++++++++++++++++++++++++++++-
+> ?2 files changed, 130 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
+> index c3645aa..e4449ad 100644
+> --- a/arch/arm/mach-pxa/palmz72.c
+> +++ b/arch/arm/mach-pxa/palmz72.c
+> @@ -30,6 +30,7 @@
+> ?#include <linux/wm97xx_batt.h>
+> ?#include <linux/power_supply.h>
+> ?#include <linux/usb/gpio_vbus.h>
+> +#include <linux/i2c-gpio.h>
+>
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -120,6 +123,28 @@ static unsigned long palmz72_pin_config[] __initdata = {
+> ? ? ? ?GPIO22_GPIO, ? ?/* LCD border color */
+> ? ? ? ?GPIO96_GPIO, ? ?/* lcd power */
+>
+> + ? ? ? /* I2C */
+> + ? ? ? GPIO117_GPIO, ? /* I2C_SCL */
+> + ? ? ? GPIO118_GPIO, ? /* I2C_SDA */
+>
+> +static struct i2c_gpio_platform_data palmz72_i2c_bus_data = {
+> + ? ? ? .sda_pin = 118,
+> + ? ? ? .scl_pin = 117,
+> + ? ? ? .udelay ?= 10,
+> + ? ? ? .timeout = 100,
+> +};
+> +
+> +static struct platform_device palmz72_i2c_bus_device = {
+> + ? ? ? .name ? ? ? ? ? = "i2c-gpio",
+> + ? ? ? .id ? ? ? ? ? ? = 0, /* we use this as a replacement for i2c-pxa */
+> + ? ? ? .dev = {
+> + ? ? ? ? ? ? ? .platform_data = &palmz72_i2c_bus_data,
+> + ? ? ? }
+> +};
+>
 
-I made a hack that allows transfer handler to continue to the next transfer directly
-if there is no special per transfer settings in the message. Could you try that out
-and report whether SFRMOUT works better with it?
-
-Note that this is just to make sure that we are on the right track.
-
-Patch is against v4 of the driver.
-
-Thanks,
-MW
-
-diff --git a/drivers/spi/ep93xx_spi.c b/drivers/spi/ep93xx_spi.c
-index 310032d..11dcdd1 100644
---- a/drivers/spi/ep93xx_spi.c
-+++ b/drivers/spi/ep93xx_spi.c
-@@ -106,6 +106,8 @@ struct ep93xx_spi {
- 	unsigned long			min_rate;
- 	unsigned long			max_rate;
- 	bool				running;
-+	bool				can_continue;
-+	struct spi_transfer 		*last_transfer;
- 	struct workqueue_struct		*wq;
- 	struct work_struct		msg_work;
- 	struct completion		wait;
-@@ -380,6 +382,7 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 	struct ep93xx_spi *espi = spi_master_get_devdata(spi->master);
- 	struct spi_transfer *t;
- 	unsigned long flags;
-+	bool can_continue = true;
- 
- 	if (!msg || !msg->complete)
- 		return -EINVAL;
-@@ -387,11 +390,21 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 	/* first validate each transfer */
- 	list_for_each_entry(t, &msg->transfers, transfer_list) {
- 		if (t->bits_per_word) {
-+			can_continue = false;
- 			if (t->bits_per_word < 4 || t->bits_per_word > 16)
- 				return -EINVAL;
- 		}
--		if (t->speed_hz && t->speed_hz < espi->min_rate)
-+		if (t->speed_hz) {
-+			can_continue = false;
-+			if (t->speed_hz < espi->min_rate)
- 				return -EINVAL;
-+		}
-+		if (t->cs_change &&
-+			!list_is_last(&t->transfer_list, &msg->transfers)) {
-+			can_continue = false;
-+		}
-+		if (t->delay_usecs)
-+			can_continue = false;
- 	}
- 
- 	/*
-@@ -400,7 +413,7 @@ static int ep93xx_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 	 * error in transfer and @msg->state is used to hold pointer to the
- 	 * current transfer (or %NULL if no active current transfer).
- 	 */
--	msg->state = NULL;
-+	msg->state = (void *)can_continue;
- 	msg->status = 0;
- 	msg->actual_length = 0;
- 
-@@ -606,10 +619,33 @@ static void ep93xx_spi_process_message(struct ep93xx_spi *espi,
- 	ep93xx_spi_chip_setup(espi, spi_get_ctldata(msg->spi));
- 	ep93xx_spi_select_device(espi, msg->spi);
- 
--	list_for_each_entry(t, &msg->transfers, transfer_list) {
--		ep93xx_spi_process_transfer(espi, msg, t);
--		if (msg->status)
--			break;
-+	if (msg->state) {
-+		espi->can_continue = true;
-+		espi->last_transfer = list_entry(msg->transfers.prev, struct spi_transfer,
-+						 transfer_list);
-+	} else {
-+		espi->can_continue = false;
-+		espi->last_transfer = NULL;
-+	}
-+
-+	/*
-+	 * In case there is no transfer specific settings in this message we
-+	 * can transfer the whole message with interrupts. Otherwise we need
-+	 * to perform transfer specific stuff in thread context.
-+	 */
-+	if (espi->can_continue) {
-+		msg->state = list_first_entry(&msg->transfers, struct spi_transfer,
-+					      transfer_list);
-+		espi->rx = 0;
-+		espi->tx = 0;
-+		ep93xx_spi_enable_interrupts(espi);
-+		wait_for_completion(&espi->wait);
-+	} else {
-+		list_for_each_entry(t, &msg->transfers, transfer_list) {
-+			ep93xx_spi_process_transfer(espi, msg, t);
-+			if (msg->status)
-+				break;
-+		}
- 	}
- 
- 	/*
-@@ -792,6 +828,24 @@ static irqreturn_t ep93xx_spi_interrupt(int irq, void *dev_id)
- 			 * interrupt then.
- 			 */
- 			return IRQ_HANDLED;
-+		} else {
-+			/*
-+			 * If we can continue directly to the next transfer, do
-+			 * that now.
-+			 */
-+			if (espi->can_continue) {
-+				struct spi_message *msg = espi->current_msg;
-+				struct spi_transfer *t = msg->state;
-+
-+				if (t != espi->last_transfer) {
-+					msg->state = list_entry(t->transfer_list.next, struct spi_transfer,
-+								transfer_list);
-+					espi->rx = 0;
-+					espi->tx = 0;
-+					return IRQ_HANDLED;
-+				}
-+			}
-+			/* otherwise we are ready */
- 		}
- 	}
- 
+I thought we were talking about SPI?
