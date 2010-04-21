@@ -1,34 +1,17 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Apr 2010 18:46:39 -0500
-Subject: [PATCH v2 04/10] [ARM] tegra: SMP support
-In-Reply-To: <1271198563-10424-5-git-send-email-konkers@android.com>
-References: <1268721431-24434-1-git-send-email-konkers@google.com>
-	<1271198563-10424-1-git-send-email-konkers@android.com>
-	<1271198563-10424-2-git-send-email-konkers@android.com>
-	<1271198563-10424-3-git-send-email-konkers@android.com>
-	<1271198563-10424-4-git-send-email-konkers@android.com>
-	<1271198563-10424-5-git-send-email-konkers@android.com>
-Message-ID: <20100421234639.GA2593@lixom.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Apr 2010 08:37:56 +0900
+Subject: [PATCH 1/4] pxa: add namespace on ssp
+In-Reply-To: <q2yf17812d71004211517kf54116acxe788927a53048e26@mail.gmail.com>
+References: <n2t771cded01004162234sb67befcfp60ba67bfe1a8117f@mail.gmail.com>
+	<q2yf17812d71004211517kf54116acxe788927a53048e26@mail.gmail.com>
+Message-ID: <20100421233755.GA22879@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 22, 2010 at 06:17:29AM +0800, Eric Miao wrote:
 
-Minor nitpick, but if you're going to repost for other reasons it might
-be worth to address:
+> Sorry I'm still not convinced that this is a necessary change, could
+> you point me to some place where there are naming conflicts?
 
-On Tue, Apr 13, 2010 at 03:42:37PM -0700, konkers at android.com wrote:
-> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> new file mode 100644
-> index 0000000..b5349b2
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/headsmp.S
-> @@ -0,0 +1,61 @@
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-
-Looks like this whole file uses spaces instead of tabs. You have a few other places
-in the patchkit that does the same.
-
-
--Olof
+Look at Liam's recent posting about the updated ASoC device model - that
+introduces a number of incompatible API changes.
