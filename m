@@ -1,59 +1,62 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 21 Apr 2010 12:30:01 +0530
-Subject: [PATCH] PL061 GPIO: Changing *_irq_chip_data with *_irq_data for real
-	irqs.
-Message-ID: <1271833201-4482-1-git-send-email-viresh.kumar@st.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Wed, 21 Apr 2010 10:00:39 +0300
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
+	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100421070039.GK19534@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PL061 driver is using set_irq_chip_data and get_irq_chip_data for real irq
-lines. It must be using *_irq_data functions instead. As chip_data is used by
-interrupt controllers also, which makes vic write at incorrect addresses.
+On Tue, Apr 20, 2010 at 08:52:26PM -0500, H Hartley Sweeten wrote:
+> On Tuesday, April 20, 2010 6:10 PM, Martin Guy wrote:
+> > I have noticed on card insertion, the last line of:
+> > 
+> > mmc0: problem reading switch capabilities, performance might suffer.
+> > mmc0: host does not support reading read-only switch. assuming write-enable.
+> > mmc0: new SD card on SPI
+> > mmcblk0: mmc0:0000 SD    952 MiB
+> >  mmcblk0: p1 p2 p4
+> > mmcblk0: retrying using single block read
+> 
+> That message might be related to the SFRM1 line being deasserted.
 
-Also, pl061_direction_output doesn't set value of gpio to value passed to it.
-Adding code to set value of GPIO pin to requrested value.
+This message comes, depending on the card you are using.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/gpio/pl061.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+It is easily reproduced with following command:
 
-diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
-index 3ad1eeb..0a30124 100644
---- a/drivers/gpio/pl061.c
-+++ b/drivers/gpio/pl061.c
-@@ -86,10 +86,10 @@ static int pl061_direction_output(struct gpio_chip *gc, unsigned offset,
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&chip->lock, flags);
--	writeb(!!value << offset, chip->base + (1 << (offset + 2)));
- 	gpiodir = readb(chip->base + GPIODIR);
- 	gpiodir |= 1 << offset;
- 	writeb(gpiodir, chip->base + GPIODIR);
-+	writeb(!!value << offset, chip->base + (1 << (offset + 2)));
- 	spin_unlock_irqrestore(&chip->lock, flags);
- 
- 	return 0;
-@@ -203,7 +203,7 @@ static struct irq_chip pl061_irqchip = {
- 
- static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
- {
--	struct list_head *chip_list = get_irq_chip_data(irq);
-+	struct list_head *chip_list = get_irq_data(irq);
- 	struct list_head *ptr;
- 	struct pl061_gpio *chip;
- 
-@@ -296,9 +296,9 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 			goto iounmap;
- 		}
- 		INIT_LIST_HEAD(chip_list);
--		set_irq_chip_data(irq, chip_list);
-+		set_irq_data(irq, chip_list);
- 	} else
--		chip_list = get_irq_chip_data(irq);
-+		chip_list = get_irq_data(irq);
- 	list_add(&chip->list, chip_list);
- 
- 	for (i = 0; i < PL061_GPIO_NR; i++) {
--- 
-1.6.0.2
+	# fdisk -l
+
+Problem there seems to be that fdisk (and also part of block layer that reads
+partition table) seeks to the end of the disk and reads last block. I remember
+reading some mail thread about the matter and it could be that some cards
+do read-ahead which causes the response message to return failure (address error
+as a response to STOP message which is completely bogus).
+
+You can enable MMC debugging and see if this is the case with your card also.
+
+I actually debugged this further some time ago and after failure if card status
+register is read, there is no failure at all (card is in correct state).
+
+> You could try cutting the trace going to pin 1 (CS pin) of the mmc socket and
+> jumpering it to one of the EGPIO pins on JP15 (the LCD header) or JP16 (the
+> keypad header).  You will of course need to modify your platform init to use
+> the new chip select line.
+> 
+> > and the SDHC cards I have don't work at all, spewing tons of:
+> > mmcblk0: error -38 sending status comand
+> > mmcblk0: error -38 sending read/write command, response 0x4, card status 0xff04
+> > end_request: I/O error, dev mmcblk0, sector 7744509
+> 
+> I haven't seen those error messages before.  Of course I don't have any SDHC
+> cards... ;-)
+
+With my TS-7260 board, SDHC cards work (but it uses GPIO lines).
+
+MW
