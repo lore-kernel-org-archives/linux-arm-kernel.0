@@ -1,45 +1,51 @@
-From: jakob@viketoft.se (Jakob Viketoft)
-Date: Thu, 22 Apr 2010 16:36:01 +0200
-Subject: SPI trouble on Colibri 270 (PXA)...
-In-Reply-To: <g2xf17812d71004210607n4f3d82f2m4712d3bb97ef4924@mail.gmail.com>
-References: <4BCD96F0.5010506@viketoft.se>
-	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>
-	<4BCDC645.5090001@viketoft.se>
-	<201004211144.41781.marek.vasut@gmail.com>
-	<j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>
-	<p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>
-	<4BCEF3D4.2030704@viketoft.se>
-	<g2xf17812d71004210607n4f3d82f2m4712d3bb97ef4924@mail.gmail.com>
-Message-ID: <4BD05ED1.4020806@viketoft.se>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Apr 2010 16:37:44 +0200
+Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
+In-Reply-To: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
+References: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
+Message-ID: <20100422143744.GC32348@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> On Wed, Apr 21, 2010 at 8:47 PM, Jakob Viketoft <jakob@viketoft.se> wrote:
->> Martin Guy wrote:
->>> On 4/21/10, Eric Miao <eric.y.miao@gmail.com> wrote:
->>>
->>>>  I thought we were talking about SPI?
->>> We are. It affects boards that have a single SD/MMC card on the SPI
->>> bus and use SFRMOUT as the chip select line, which impacts how the SPI
->>> driver needs to handle multi-part messages without dropping CS between
->>> transfers
->> Does this mean that this is a know issue with the pxa2xx spi driver? At the
->> moment I'm rather pressed for time and have instead opted for compressing
->> the two transfers (read command and actual read) into one.
+On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
+> clk->usecount can be used by platform code to check if a clock is active or
+> not.
 > 
-> I'm expecting this to be correct code, i.e. by combining read command
-> transfer and actual read transfer into a single message, with .cs_change
-> indicating that CS not changed during transfer. No?
+> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> ---
+>  arch/arm/plat-mxc/clock.c |   37 ++++++++++++++++++++++++-------------
+>  1 files changed, 24 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> index 323ff8c..c791f38 100644
+> --- a/arch/arm/plat-mxc/clock.c
+> +++ b/arch/arm/plat-mxc/clock.c
+> @@ -50,15 +50,15 @@ static DEFINE_MUTEX(clocks_mutex);
+>  
+>  static void __clk_disable(struct clk *clk)
+>  {
+> -	if (clk == NULL || IS_ERR(clk))
+> +	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
+>  		return;
+>  
+> -	__clk_disable(clk->parent);
+> -	__clk_disable(clk->secondary);
+> -
+> -	WARN_ON(!clk->usecount);
+> -	if (!(--clk->usecount) && clk->disable)
+> -		clk->disable(clk);
+> +	if (!(--clk->usecount)) {
+> +		if (clk->disable)
+> +			clk->disable(clk);
+> +		__clk_disable(clk->parent);
+> +		__clk_disable(clk->secondary);
+> +	}
+>  }
+This removes the WARN_ON if the clock is already off.  Is this intended?
 
-The original code currently combines the two transfers in one message as
-you say (leaving CS asserted unless cs_change is set). However, I don't
-know if it's a problem with scheduling or that the interrupt takes too
-long to serve, but on my platform the two transfers (in the same
-message) doesn't go back-to-back as they should and CS gets deasserted
-in the middle. Thus I have combined the two transfers into one and the
-message only hold this single transfer. Now things work at my end, but
-it's annoying that I don't have time to track down the real issue at the
-moment...
+Best regards
+Uwe
 
-	/Jakob
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
