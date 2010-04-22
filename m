@@ -1,69 +1,35 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 22 Apr 2010 15:03:08 +0300
-Subject: [PATCH 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <20100422120308.GD26418@gw.healthdatacare.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 22 Apr 2010 13:09:03 +0100
+Subject: Can I use VFP in work queue context ?
+References: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
+	<20100422100939.GG6684@trinity.fluff.org>
+Message-ID: <yw1x8w8f1yg0.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 20, 2010 at 11:50:46AM +0300, Mika Westerberg wrote:
-> Hello,
-> 
-> This is revised series of kdump code, now without "RFC"-prefix. Original
-> series can be found here:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012353.html
-> 
-> Changes to previous version:
-> 	- crash_setup_regs() uses Russell's suggestion for saving registers
-> 	- copy_oldmem_page() code is changed to use ioremap()
-> 	- there is no need for special 'mem=' parameters
-> 
-> I've been testing this on my N900.
-> 
-> I have patches for kexec-tools ready and send them once this kernel part is
-> accepted.
+Ben Dooks <ben-linux@fluff.org> writes:
 
-Hi,
+> On Wed, Apr 21, 2010 at 06:11:18PM -0500, Anbumony, Kasi Lakshman Karthi wrote:
+>> I have done some optimization in NEON (Neon/VFP sharing the same
+>> register set) and using it in my driver running in (Linux) kernel
+>> space. The neon optimized code will be used under a work queue
+>> context and not under any interrupt. Going by the design of Linux
+>> kernel, it looks like there is no context save and restore on VFP
+>> registers whenever there is a context switch from user mode to
+>> kernel mode, but Linux handles the same for user space processes.
+>> 
+>> Currently I am not seeing any issues (may be lucky) with my
+>> implementation (any exceptions) and was wondering whether it is
+>> safe to use of neon code in work queue context? My development
+>> platform is OMAP 3 (ARM cortex A-8) and using Android with Linux
+>> kernel: 2.6.29.
+>
+> No FP in the kernel.
+>
+> I expect this applies to NEON too.
 
-Any comments on this?
+Same registers, so yes.
 
-Thanks,
-MW
-
-> 
-> As a sidenote: I got crashkernel booting correctly just by modifying PHYS_OFFSET
-> and mach/Makefile.boot for my platform. So it is enough just to pass 'mem=size'
-> to dump capture kernel. This is documented in Kconfig CONFIG_CRASH_DUMP.
-> 
-> Regards,
-> MW
-> 
-> Mika Westerberg (8):
->   arm: kdump: reserve memory for crashkernel
->   arm: kdump: implement crash_setup_regs()
->   arm: kdump: implement machine_crash_shutdown()
->   arm: kdump: skip indirection page when crashing
->   arm: kdump: implement copy_oldmem_page()
->   arm: allow passing an ELF64 header to elf_check_arch()
->   arm: kdump: add support for elfcorehdr= parameter
->   arm: kdump: add CONFIG_CRASH_DUMP Kconfig option
-> 
->  arch/arm/Kconfig                  |   12 ++++++
->  arch/arm/include/asm/elf.h        |    4 +-
->  arch/arm/include/asm/kexec.h      |   22 +++++++++-
->  arch/arm/kernel/Makefile          |    1 +
->  arch/arm/kernel/crash_dump.c      |   58 ++++++++++++++++++++++++++++
->  arch/arm/kernel/elf.c             |    6 ++-
->  arch/arm/kernel/machine_kexec.c   |    4 ++
->  arch/arm/kernel/relocate_kernel.S |    6 +++
->  arch/arm/kernel/setup.c           |   76 +++++++++++++++++++++++++++++++++++++
->  9 files changed, 182 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm/kernel/crash_dump.c
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+M?ns Rullg?rd
+mans at mansr.com
