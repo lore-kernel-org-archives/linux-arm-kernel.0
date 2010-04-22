@@ -1,11 +1,27 @@
-From: rmk@ftp.linux.org.uk (Russell King)
-Date: Thu, 22 Apr 2010 18:48:20 +0100
-Subject: RMK is offline
-Message-ID: <20100422174820.GA3797@ZenIV.linux.org.uk>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Thu, 22 Apr 2010 12:57:51 -0500
+Subject: [PATCH 1/2] omap: pm34xx: Enable IO / IO-CHAIN wakeups for PER
+In-Reply-To: <87aasw5oyx.fsf@deeprootsystems.com>
+References: <1271295665-26187-1-git-send-email-mike@android.com>
+	<87aasw5oyx.fsf@deeprootsystems.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203BABB8733@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FYI, I've lost ADSL at 2am last night due to some planned engineering
-works by the telco; currently there's no estimate on when things will
-be returned.  Unfortunately, It's taken most of today to get the ISP
-to note a fault - but seemingly they still haven't raised it with BT.
+
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Kevin Hilman
+
+> I'm a little puzzled on this one.  My understanding is that the IO pad
+> is only armed when CORE is in RET or OFF.
+
+For ES3 and before the io ring wake was 'armed' when ever core went to idle.  When core power state changed accounting was done for state.
+
+This scheme created a small time window where per wake events could be lost in handoff from gpio to io daisy chain when targeting chip off.
+
+In ES3.1 the EN_IO_CHAIN bit was added as a way to cover this hole.  It allows enabling the wake up daisy chain in software prior to idling core.  The trm does detail the exact steps.
+
+The 3.1 bug fix covered the transition window observed going to chip states but probably can cover here.  I'm not sure about the patch as applied with studying.
+
+Regards,
+Richard W.
