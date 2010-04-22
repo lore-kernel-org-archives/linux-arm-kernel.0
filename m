@@ -1,51 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 22 Apr 2010 16:37:44 +0200
-Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
-In-Reply-To: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
-References: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
-Message-ID: <20100422143744.GC32348@pengutronix.de>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Thu, 22 Apr 2010 16:42:22 +0200
+Subject: AT91: how to use additional 128mb RAM on the at91sam9g45ek?
+Message-ID: <4BD0604E.7060209@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
-> clk->usecount can be used by platform code to check if a clock is active or
-> not.
-> 
-> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
-> ---
->  arch/arm/plat-mxc/clock.c |   37 ++++++++++++++++++++++++-------------
->  1 files changed, 24 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-> index 323ff8c..c791f38 100644
-> --- a/arch/arm/plat-mxc/clock.c
-> +++ b/arch/arm/plat-mxc/clock.c
-> @@ -50,15 +50,15 @@ static DEFINE_MUTEX(clocks_mutex);
->  
->  static void __clk_disable(struct clk *clk)
->  {
-> -	if (clk == NULL || IS_ERR(clk))
-> +	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
->  		return;
->  
-> -	__clk_disable(clk->parent);
-> -	__clk_disable(clk->secondary);
-> -
-> -	WARN_ON(!clk->usecount);
-> -	if (!(--clk->usecount) && clk->disable)
-> -		clk->disable(clk);
-> +	if (!(--clk->usecount)) {
-> +		if (clk->disable)
-> +			clk->disable(clk);
-> +		__clk_disable(clk->parent);
-> +		__clk_disable(clk->secondary);
-> +	}
->  }
-This removes the WARN_ON if the clock is already off.  Is this intended?
+I use at91sam9g45-ek with the kernel 2.6.33. Following this post http://www.at91.com/forum/viewtopic.php/f,12/t,18589/p,30450/ I configured 256Mb in U-Boot, but when Linux kernel starts it ignores the second area saying:
 
-Best regards
-Uwe
+CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+CPU: VIVT data cache, VIVT instruction cache
+Machine: Atmel AT91SAM9G45-EKES
+Memory policy: ECC disabled, Data cache writeback
+Ignoring RAM at 20000000-27ffffff (vmalloc region overlap).
+Clocks: CPU 400 MHz, master 133 MHz, main 12.000 MHz
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The first area 0x70000000-0x77ffffff will be mapped to 0xc0000000
+the second area 20000000-27ffffff will be mapped to 0x70000000, that is smaller than 0xc0000000 and thus invalid.
+
+What can I do to use RAM from both banks to get 256Mb of RAM?
+
+Best regards,
+Yegor
