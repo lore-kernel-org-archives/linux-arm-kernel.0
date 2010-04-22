@@ -1,333 +1,35 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 22 Apr 2010 18:18:02 +0200 (CEST)
-Subject: [PATCH] ARM: add DMA support to sh7372, enable DMA for SDHI
-Message-ID: <Pine.LNX.4.64.1004221806410.4655@axis700.grange>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Thu, 22 Apr 2010 11:58:51 -0500
+Subject: Can I use VFP in work queue context ?
+In-Reply-To: <201004221549.26344.siarhei.siamashka@nokia.com>
+References: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
+	<201004221549.26344.siarhei.siamashka@nokia.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203BABB8676@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds DMA support for the sh7372 sh-mobile ARM core, using the shdma
-dmaengine driver, and uses DMA for the SDHI SD-card controller on this SoC.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Siarhei Siamashka
 
-This depends on the clock and dmaengine patch-series from Magnus, and on 
-my "DMA for tmio" patch series
+> I also thought about the possibility to use NEON in the kernel some time ago,
+> but did not pursue it further, expecting negative feedback similar to what you
+> are getting now ;-)
+>
+> Some MMX/SSE2 code exists in the kernel already if you grep the sources. It
+> might give you some ideas. Naturally preemption has to be disabled and NEON
+> state fully saved/restored on entry/exit, like in 'kernel_fpu_begin' and
+> 'kernel_fpu_end' functions for x86. For ARM Cortex-A8 using NEON may be a bit
+> more difficult because NEON is in a separate power domain and may be switched
+> off at the time you want to use it. There may be some other technical problems
+> for sure, so the comments from someone knowledgeable would be very
+> interesting to read.
 
-http://www.spinics.net/lists/linux-sh/index.html#04711
+VFP/NEON executed in the kernel while in some others processes context does seem like a big no (or at least requiring details as you point out).
 
-but already does a better job by taking into account one of the comments 
-and adding DMA slave IDs in a CPU-specific header instead of a global 
-location.
+But a work queue is built on a half backed process which is schedulable.  VFP context handling is tied to a process so it would seem a smaller task to allow VFP to work against this. If the work queue executes in a unique context it could follow the same lazy strategy a user space one does.
 
- arch/arm/mach-shmobile/board-ap4evb.c        |    9 +
- arch/arm/mach-shmobile/include/mach/sh7372.h |   10 ++
- arch/arm/mach-shmobile/setup-sh7372.c        |  223 ++++++++++++++++++++++++++
- 3 files changed, 242 insertions(+), 0 deletions(-)
+Or is that way off?
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 66e195c..d2bb7b0 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -23,6 +23,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-+#include <linux/mfd/sh_mobile_sdhi.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
-@@ -208,6 +209,11 @@ static struct platform_device keysc_device = {
- };
- 
- /* SDHI0 */
-+static struct sh_mobile_sdhi_info sdhi0_info = {
-+	.dma_slave_tx = SHDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx = SHDMA_SLAVE_SDHI0_RX,
-+};
-+
- static struct resource sdhi0_resources[] = {
- 	[0] = {
- 		.name	= "SDHI0",
-@@ -226,6 +232,9 @@ static struct platform_device sdhi0_device = {
- 	.num_resources  = ARRAY_SIZE(sdhi0_resources),
- 	.resource       = sdhi0_resources,
- 	.id             = 0,
-+	.dev	= {
-+		.platform_data	= &sdhi0_info,
-+	},
- };
- 
- static struct platform_device *ap4evb_devices[] __initdata = {
-diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/include/mach/sh7372.h
-index dc34f00..57e033a 100644
---- a/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh7372.h
-@@ -431,4 +431,14 @@ enum {
- 	GPIO_FN_SDENC_DV_CLKI,
- };
- 
-+/* DMA slave IDs */
-+enum {
-+	SHDMA_SLAVE_SDHI0_RX,
-+	SHDMA_SLAVE_SDHI0_TX,
-+	SHDMA_SLAVE_SDHI1_RX,
-+	SHDMA_SLAVE_SDHI1_TX,
-+	SHDMA_SLAVE_SDHI2_RX,
-+	SHDMA_SLAVE_SDHI2_TX,
-+};
-+
- #endif /* __ASM_SH7372_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index 1bcd279..b2788d0 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -26,9 +26,11 @@
- #include <linux/input.h>
- #include <linux/io.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_dma.h>
- #include <linux/sh_intc.h>
- #include <linux/sh_timer.h>
- #include <mach/hardware.h>
-+#include <mach/sh7372.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-@@ -169,6 +171,224 @@ static struct platform_device cmt10_device = {
- 	.num_resources	= ARRAY_SIZE(cmt10_resources),
- };
- 
-+/* DMA */
-+/* Transmit sizes and respective CHCR register values */
-+enum {
-+	XMIT_SZ_8BIT		= 0,
-+	XMIT_SZ_16BIT		= 1,
-+	XMIT_SZ_32BIT		= 2,
-+	XMIT_SZ_64BIT		= 7,
-+	XMIT_SZ_128BIT		= 3,
-+	XMIT_SZ_256BIT		= 4,
-+	XMIT_SZ_512BIT		= 5,
-+};
-+
-+/* log2(size / 8) - used to calculate number of transfers */
-+#define TS_SHIFT {			\
-+	[XMIT_SZ_8BIT]		= 0,	\
-+	[XMIT_SZ_16BIT]		= 1,	\
-+	[XMIT_SZ_32BIT]		= 2,	\
-+	[XMIT_SZ_64BIT]		= 3,	\
-+	[XMIT_SZ_128BIT]	= 4,	\
-+	[XMIT_SZ_256BIT]	= 5,	\
-+	[XMIT_SZ_512BIT]	= 6,	\
-+}
-+
-+#define TS_INDEX2VAL(i) ((((i) & 3) << 3) | \
-+			 (((i) & 0xc) << (20 - 2)))
-+
-+static const struct sh_dmae_slave_config sh7724_dmae_slaves[] = {
-+	{
-+		.slave_id	= SHDMA_SLAVE_SDHI0_TX,
-+		.addr		= 0xe6850030,
-+		.chcr		= DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xc1,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_SDHI0_RX,
-+		.addr		= 0xe6850030,
-+		.chcr		= DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xc2,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_SDHI1_TX,
-+		.addr		= 0xe6860030,
-+		.chcr		= DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xc9,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_SDHI1_RX,
-+		.addr		= 0xe6860030,
-+		.chcr		= DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xca,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_SDHI2_TX,
-+		.addr		= 0xe6870030,
-+		.chcr		= DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xcd,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_SDHI2_RX,
-+		.addr		= 0xe6870030,
-+		.chcr		= DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL(XMIT_SZ_16BIT),
-+		.mid_rid	= 0xce,
-+	},
-+};
-+
-+static const struct sh_dmae_channel sh7724_dmae_channels[] = {
-+	{
-+		.offset = 0,
-+		.dmars = 0,
-+		.dmars_bit = 0,
-+	}, {
-+		.offset = 0x10,
-+		.dmars = 0,
-+		.dmars_bit = 8,
-+	}, {
-+		.offset = 0x20,
-+		.dmars = 4,
-+		.dmars_bit = 0,
-+	}, {
-+		.offset = 0x30,
-+		.dmars = 4,
-+		.dmars_bit = 8,
-+	}, {
-+		.offset = 0x50,
-+		.dmars = 8,
-+		.dmars_bit = 0,
-+	}, {
-+		.offset = 0x60,
-+		.dmars = 8,
-+		.dmars_bit = 8,
-+	}
-+};
-+
-+static const unsigned int ts_shift[] = TS_SHIFT;
-+
-+static struct sh_dmae_pdata dma_platform_data = {
-+	.slave		= sh7724_dmae_slaves,
-+	.slave_num	= ARRAY_SIZE(sh7724_dmae_slaves),
-+	.channel	= sh7724_dmae_channels,
-+	.channel_num	= ARRAY_SIZE(sh7724_dmae_channels),
-+	.ts_low_shift	= 3,
-+	.ts_low_mask	= 0x18,
-+	.ts_high_shift	= (20 - 2),	/* 2 bits for shifted low TS */
-+	.ts_high_mask	= 0x00300000,
-+	.ts_shift	= ts_shift,
-+	.ts_shift_num	= ARRAY_SIZE(ts_shift),
-+	.dmaor_init	= DMAOR_DME,
-+};
-+
-+/* Resource order important! */
-+static struct resource sh7724_dmae0_resources[] = {
-+	{
-+		/* Channel registers and DMAOR */
-+		.start	= 0xfe008020,
-+		.end	= 0xfe00808f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMARSx */
-+		.start	= 0xfe009000,
-+		.end	= 0xfe00900b,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMA error IRQ */
-+		.start	= 246,
-+		.end	= 246,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		/* IRQ for channels 0-5 */
-+		.start	= 240,
-+		.end	= 245,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+/* Resource order important! */
-+static struct resource sh7724_dmae1_resources[] = {
-+	{
-+		/* Channel registers and DMAOR */
-+		.start	= 0xfe018020,
-+		.end	= 0xfe01808f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMARSx */
-+		.start	= 0xfe019000,
-+		.end	= 0xfe01900b,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMA error IRQ */
-+		.start	= 254,
-+		.end	= 254,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		/* IRQ for channels 0-5 */
-+		.start	= 248,
-+		.end	= 253,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+/* Resource order important! */
-+static struct resource sh7724_dmae2_resources[] = {
-+	{
-+		/* Channel registers and DMAOR */
-+		.start	= 0xfe028020,
-+		.end	= 0xfe02808f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMARSx */
-+		.start	= 0xfe029000,
-+		.end	= 0xfe02900b,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		/* DMA error IRQ */
-+		.start	= 262,
-+		.end	= 262,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		/* IRQ for channels 0-5 */
-+		.start	= 256,
-+		.end	= 261,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device dma0_device = {
-+	.name		= "sh-dma-engine",
-+	.id		= 0,
-+	.resource	= sh7724_dmae0_resources,
-+	.num_resources	= ARRAY_SIZE(sh7724_dmae0_resources),
-+	.dev		= {
-+		.platform_data	= &dma_platform_data,
-+	},
-+};
-+
-+static struct platform_device dma1_device = {
-+	.name		= "sh-dma-engine",
-+	.id		= 1,
-+	.resource	= sh7724_dmae1_resources,
-+	.num_resources	= ARRAY_SIZE(sh7724_dmae1_resources),
-+	.dev		= {
-+		.platform_data	= &dma_platform_data,
-+	},
-+};
-+
-+static struct platform_device dma2_device = {
-+	.name		= "sh-dma-engine",
-+	.id		= 2,
-+	.resource	= sh7724_dmae2_resources,
-+	.num_resources	= ARRAY_SIZE(sh7724_dmae2_resources),
-+	.dev		= {
-+		.platform_data	= &dma_platform_data,
-+	},
-+};
-+
- static struct platform_device *sh7372_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -178,6 +398,9 @@ static struct platform_device *sh7372_early_devices[] __initdata = {
- 	&scif5_device,
- 	&scif6_device,
- 	&cmt10_device,
-+	&dma0_device,
-+	&dma1_device,
-+	&dma2_device,
- };
- 
- void __init sh7372_add_standard_devices(void)
--- 
-1.6.2.4
+Regards,
+Richard W.
