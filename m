@@ -1,71 +1,63 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 23 Apr 2010 09:29:23 +1200
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <20100422054519.GA26418@gw.healthdatacare.com>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
-	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
-	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
-	<20100421104651.GO19534@gw.healthdatacare.com>
-	<0D753D10438DA54287A00B0270842697636D8C8672@AUSP01VMBX24.collaborationhost.net>
-	<20100422054519.GA26418@gw.healthdatacare.com>
-Message-ID: <4BD0BFB3.9060907@bluewatersys.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 22 Apr 2010 15:31:39 -0700
+Subject: [PATCH 1/2] omap: pm34xx: Enable IO / IO-CHAIN wakeups for PER
+In-Reply-To: <s2y8bb80c381004211750hd8d62be8hfa0bead1dbfa8d2b@mail.gmail.com>
+	(Mike Chan's message of "Wed\, 21 Apr 2010 17\:50\:12 -0700")
+References: <1271295665-26187-1-git-send-email-mike@android.com>
+	<87aasw5oyx.fsf@deeprootsystems.com>
+	<s2y8bb80c381004211750hd8d62be8hfa0bead1dbfa8d2b@mail.gmail.com>
+Message-ID: <87wrvzxgok.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg wrote:
-> On Wed, Apr 21, 2010 at 01:00:56PM -0500, H Hartley Sweeten wrote:
->> Same results are your v4 driver.  But, I think your on the right track.
-> 
-> Thanks for testing.
-> 
->> I think the problem is in the ep93xx_spi_read_write routine.  That function
->> returns 0 as long as there is still data left in the current transfer.  The
->> only time it doesn't return 0, which will cause the can_continue, is when:
+Mike Chan <mike@android.com> writes:
+
+> On Wed, Apr 21, 2010 at 5:07 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Mike Chan <mike@android.com> writes:
 >>
->> 	if (espi->rx == t->len) {
->> 		msg->actual_length += t->len;
->> 		return t->len;
->> 	}
+>>> IO events can also come from GPIO modules, which reside in the PER domain.
+>>> It is possible for the PER to enter RET while CORE is still in ON.
+>>> If GPIO 2-6 are enabled for IO-pad wakeups, the PER domain will not
+>>> wakeup in this case, unless we enable it.
+>>>
+>>> Signed-off-by: Mike Chan <mike@android.com>
 >>
->> At this point the tx and rx fifos will both be empty, which causes the SSP
->> peripheral to raise the SFRM signal.
-> 
-> True.
-> 
->> A picture is worth a thousand words... Attached is a logic analyzer capture
->> of the Read-ID command and response from the SPI Flash.  EGPIO7 is my chip
->> select to the flash.  The first 4 SPI MOSI (Tx) blocks are the 0x90, 0x00,
->> 0x00, 0x00 command to the flash.  You will notice that the SFRM line is
->> asserted for those bytes.  A bit later are the 2 SPI MISO (Rx) responses
->> from the flash with the ManID/DevID, again with the SFRM line asserted.
-> 
-> Yeah, it clearly shows that SFRMOUT is deasserted between transfers :(
-> 
-> I will try to work out some sort of hack which will keep the FIFOs from
-> emptying.
-> 
-> MW
+>> Hi Mike,
+>>
+>> I'm a little puzzled on this one. ?My understanding is that the IO pad
+>> is only armed when CORE is in RET or OFF.
+>>
+>
+> The issue we are seeing is when the device is active but idle, if CORE
+> is ON and PER is in RET and the omap is sitting in swfi. If the user
+> presses a keypad button, IO pad doesn't wake us out of idle. Setting a
+> wakeup if PER or CORE goes into RET solve this.
+>
+>> I need to dig a little more in the TRM on this one to clarify.
+>>
+>
+> I was looking at 4.11.2.2 I/O Wake-Up Mechanism (pg 421)
+>
 
-I still have not found time to test this, but I think this is the
-problem we had we resulted in us using polling mode rather than
-interrupts. If the spi fifo empties then it will deassert the frame
-signal. By using polling code we could ensure that the fifos would not
-drain at the incorrect time. The other solution is to use an externally
-drivable signal for the frame (such as a gpio), but this is obviously
-not possible on some existing hardware.
+Yeah, that's the right place.
 
-~Ryan
+After a little more digging and asking around, this looks like a good
+fix, but there's a minor problem with the implementation:
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+In the section of the TRM you referenced the following sentence is
+hiding:
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+  "Software must wait for the I/O daisy chain to complete before it
+   transitions the PER domain to a nonfunctional state."
+
+In the proposed patch, it's likely that PER could transition to
+INACTIVE/RET/OFF before the IO wakeups are enabled.  For example, if
+nothing in PER is active except UART3, then PER will transition to an
+idle state right after omap_uart_prepare_idle(2), which is before
+the IO wakeups are currently enabled.
+
+To be perfectly safe, the IO wakeups should be enabled before PER is
+allowed to transition.
+
+Kevin
