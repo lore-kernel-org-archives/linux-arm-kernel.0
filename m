@@ -1,30 +1,28 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Thu, 22 Apr 2010 15:28:27 +0100
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D7F4E7F@AUSP01VMBX24.collaborationhost.net>
-	<20100421071629.GL19534@gw.healthdatacare.com>
-	<0D753D10438DA54287A00B0270842697636D8C84DA@AUSP01VMBX24.collaborationhost.net>
-	<20100421165420.GP19534@gw.healthdatacare.com>
-	<0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <x2g56d259a01004220728i7f07d492t4c4f63e0ef2e38d9@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Apr 2010 16:33:43 +0200
+Subject: [PATCH] serial/imx: only parse for iomem resources once
+In-Reply-To: <1271838838.643120.804272014834.1.gpush@pororo>
+References: <1271838838.643120.804272014834.1.gpush@pororo>
+Message-ID: <20100422143343.GB32348@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/22/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
->  First, every spi transaction, including a single byte transfer, is
->  going to generate at least two interrupts.  One when the interrupts
->  are first enabled because the TX FIFO is empty.  And a second when
->  that byte has been transferred and the TX FIFO is again empty.
->
->  The first interrupt can be prevented by priming the TX FIFO before
->  enabling the interrupts.  All you need to do is call ep93xx_spi_read_write
->  right before ep93xx_spi_enable_interrupts.
+On Wed, Apr 21, 2010 at 04:33:58PM +0800, Jeremy Kerr wrote:
+> Currently, the iomem resources are parsed in serial_imx_probe, then
+> again in imx_request_port and imx_release_port.
+> 
+> This change uses the imx_port data to retrieve the start and size of the
+> memory region, rather than re-parsing the resources through
+> platform_get_resource.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+What are the effects for this regarding run time?  How often are
+request_port and release_port called?  I wonder if it's worth to save
+the value.  Or what else than run time is your concern?
 
-Nice. That increases the data throughput from 367 to 372 kB/sec and
-reduces the CPU usage from 61 to 60.2% for large transfers
+Best regards
+Uwe
 
-    M
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
