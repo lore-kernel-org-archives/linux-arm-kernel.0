@@ -1,117 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Apr 2010 13:56:23 +0200
-Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
-In-Reply-To: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
-References: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
-Message-ID: <20100422115623.GR7882@pengutronix.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 22 Apr 2010 15:03:08 +0300
+Subject: [PATCH 0/8] Initial implementation of kdump for ARM
+In-Reply-To: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <20100422120308.GD26418@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
-> clk->usecount can be used by platform code to check if a clock is active or
-> not.
+On Tue, Apr 20, 2010 at 11:50:46AM +0300, Mika Westerberg wrote:
+> Hello,
+> 
+> This is revised series of kdump code, now without "RFC"-prefix. Original
+> series can be found here:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012353.html
+> 
+> Changes to previous version:
+> 	- crash_setup_regs() uses Russell's suggestion for saving registers
+> 	- copy_oldmem_page() code is changed to use ioremap()
+> 	- there is no need for special 'mem=' parameters
+> 
+> I've been testing this on my N900.
+> 
+> I have patches for kexec-tools ready and send them once this kernel part is
+> accepted.
 
-The patch seems mostly fine but the commit log not. How about something like
-'This patch fixes the clock refcounting when reparenting is used.'
+Hi,
 
-A reference to
+Any comments on this?
 
-http://www.spinics.net/lists/arm-kernel/msg85879.html
-
-might help aswell.
+Thanks,
+MW
 
 > 
-> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
-> ---
->  arch/arm/plat-mxc/clock.c |   37 ++++++++++++++++++++++++-------------
->  1 files changed, 24 insertions(+), 13 deletions(-)
+> As a sidenote: I got crashkernel booting correctly just by modifying PHYS_OFFSET
+> and mach/Makefile.boot for my platform. So it is enough just to pass 'mem=size'
+> to dump capture kernel. This is documented in Kconfig CONFIG_CRASH_DUMP.
 > 
-> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-> index 323ff8c..c791f38 100644
-> --- a/arch/arm/plat-mxc/clock.c
-> +++ b/arch/arm/plat-mxc/clock.c
-> @@ -50,15 +50,15 @@ static DEFINE_MUTEX(clocks_mutex);
->  
->  static void __clk_disable(struct clk *clk)
->  {
-> -	if (clk == NULL || IS_ERR(clk))
-> +	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
->  		return;
->  
-> -	__clk_disable(clk->parent);
-> -	__clk_disable(clk->secondary);
-> -
-> -	WARN_ON(!clk->usecount);
-> -	if (!(--clk->usecount) && clk->disable)
-> -		clk->disable(clk);
-> +	if (!(--clk->usecount)) {
-> +		if (clk->disable)
-> +			clk->disable(clk);
-> +		__clk_disable(clk->parent);
-> +		__clk_disable(clk->secondary);
-> +	}
->  }
->  
->  static int __clk_enable(struct clk *clk)
-> @@ -66,12 +66,13 @@ static int __clk_enable(struct clk *clk)
->  	if (clk == NULL || IS_ERR(clk))
->  		return -EINVAL;
->  
-> -	__clk_enable(clk->parent);
-> -	__clk_enable(clk->secondary);
-> -
-> -	if (clk->usecount++ == 0 && clk->enable)
-> -		clk->enable(clk);
-> +	if (clk->usecount++ == 0) {
-> +		__clk_enable(clk->parent);
-> +		__clk_enable(clk->secondary);
->  
-> +		if (clk->enable)
-> +			clk->enable(clk);
-> +	}
->  	return 0;
->  }
->  
-> @@ -160,17 +161,27 @@ EXPORT_SYMBOL(clk_set_rate);
->  int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
->  	int ret = -EINVAL;
-> +	struct clk *prev_parent = clk->parent;
->  
->  	if (clk == NULL || IS_ERR(clk) || parent == NULL ||
->  	    IS_ERR(parent) || clk->set_parent == NULL)
->  		return ret;
->  
-> +	if (clk->usecount != 0) {
-> +		clk_enable(parent);
-> +	}
-> +
->  	mutex_lock(&clocks_mutex);
->  	ret = clk->set_parent(clk, parent);
-> -	if (ret == 0)
-> +	if (ret == 0) {
->  		clk->parent = parent;
-> +	}
-
-Please remove this hunk. It does not change anything except violating
-the coding style. Also, please remove unnecessary braces.
-
->  	mutex_unlock(&clocks_mutex);
->  
-> +	if (clk->usecount != 0) {
-> +		clk_disable(prev_parent);
-> +	}
-> +
->  	return ret;
->  }
->  EXPORT_SYMBOL(clk_set_parent);
-> -- 
-> 1.7.0.4
+> Regards,
+> MW
+> 
+> Mika Westerberg (8):
+>   arm: kdump: reserve memory for crashkernel
+>   arm: kdump: implement crash_setup_regs()
+>   arm: kdump: implement machine_crash_shutdown()
+>   arm: kdump: skip indirection page when crashing
+>   arm: kdump: implement copy_oldmem_page()
+>   arm: allow passing an ELF64 header to elf_check_arch()
+>   arm: kdump: add support for elfcorehdr= parameter
+>   arm: kdump: add CONFIG_CRASH_DUMP Kconfig option
+> 
+>  arch/arm/Kconfig                  |   12 ++++++
+>  arch/arm/include/asm/elf.h        |    4 +-
+>  arch/arm/include/asm/kexec.h      |   22 +++++++++-
+>  arch/arm/kernel/Makefile          |    1 +
+>  arch/arm/kernel/crash_dump.c      |   58 ++++++++++++++++++++++++++++
+>  arch/arm/kernel/elf.c             |    6 ++-
+>  arch/arm/kernel/machine_kexec.c   |    4 ++
+>  arch/arm/kernel/relocate_kernel.S |    6 +++
+>  arch/arm/kernel/setup.c           |   76 +++++++++++++++++++++++++++++++++++++
+>  9 files changed, 182 insertions(+), 7 deletions(-)
+>  create mode 100644 arch/arm/kernel/crash_dump.c
 > 
 > 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
