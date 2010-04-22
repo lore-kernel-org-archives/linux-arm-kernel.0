@@ -1,22 +1,46 @@
-From: rbairva@gmail.com (rd bairva)
-Date: Thu, 22 Apr 2010 09:35:42 +0530
-Subject: Dmaengine query
-In-Reply-To: <m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-References: <v2mdbb048f61004132326r8ac75382k1e42321ff0ed484a@mail.gmail.com>
-	<v2he9c3a7c21004141730vcc79dd58t5478c9d83af9816@mail.gmail.com>
-	<m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-Message-ID: <v2ydbb048f61004212105n80341b00p89b80565b94459e5@mail.gmail.com>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Thu, 22 Apr 2010 11:26:29 +0200
+Subject: [PATCH 2/2] SA1100: add processor check to sa1110-cpufreq driver
+In-Reply-To: <1271875749-2891-3-git-send-email-mad_soft@inbox.ru>
+References: <1271875749-2891-1-git-send-email-mad_soft@inbox.ru>
+	<1271875749-2891-3-git-send-email-mad_soft@inbox.ru>
+Message-ID: <20100422112629.c42e69af.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My DMA controller supports device to device DMA transfers and we
-need it in some of our drivers. Existing DMA engine framework doesn't
-have support for device to device transfers.
 
-Do you have any plans for device to device support in DMA engine?
+Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
 
-Can you suggest me some other suggestion for doing this?
+On Wed, 21 Apr 2010 22:49:09 +0400
+Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+
+> Just to make sure that this driver won't run on StrongArm SA1100
+> when both SA1100 and SA1110 cpufreq drivers are built in (usually
+> in multimachine config). SA1100 driver already has similar check.
+> 
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> ---
+>  arch/arm/mach-sa1100/cpu-sa1110.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-sa1100/cpu-sa1110.c b/arch/arm/mach-sa1100/cpu-sa1110.c
+> index 63b32b6..7252874 100644
+> --- a/arch/arm/mach-sa1100/cpu-sa1110.c
+> +++ b/arch/arm/mach-sa1100/cpu-sa1110.c
+> @@ -363,6 +363,9 @@ static int __init sa1110_clk_init(void)
+>  	struct sdram_params *sdram;
+>  	const char *name = sdram_name;
+>  
+> +	if (!cpu_is_sa1110())
+> +		return -ENODEV;
+> +
+>  	if (!name[0]) {
+>  		if (machine_is_assabet())
+>  			name = "TC59SM716-CL3";
+> -- 
+> 1.7.0.4
+> 
 
 
-Regards
-Ramdayal
+-- 
+Kristoffer Ericson <kristoffer.ericson@gmail.com>
