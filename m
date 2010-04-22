@@ -1,36 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 22 Apr 2010 15:40:46 -0400 (EDT)
-Subject: Can I use VFP in work queue context ?
-In-Reply-To: <13B9B4C6EF24D648824FF11BE896716203BABB88B0@dlee02.ent.ti.com>
-References: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
-	<201004221549.26344.siarhei.siamashka@nokia.com>
-	<13B9B4C6EF24D648824FF11BE896716203BABB8676@dlee02.ent.ti.com>
-	<alpine.LFD.2.00.1004221314530.7232@xanadu.home>
-	<13B9B4C6EF24D648824FF11BE896716203BABB88B0@dlee02.ent.ti.com>
-Message-ID: <alpine.LFD.2.00.1004221538250.7232@xanadu.home>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Thu, 22 Apr 2010 21:19:32 +0100
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D940C95@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D7F4E7F@AUSP01VMBX24.collaborationhost.net>
+	<20100421071629.GL19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C84DA@AUSP01VMBX24.collaborationhost.net>
+	<20100421165420.GP19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
+	<x2g56d259a01004220728i7f07d492t4c4f63e0ef2e38d9@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D940C95@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <x2w56d259a01004221319y27d25d30sbe8b548c4d7932fd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Apr 2010, Woodruff, Richard wrote:
+On 4/22/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>  > Further, on a suspicion about the silliness of the per-transfer
+>  > bits_per_word being checked right down the bottom of the lowest lever
+>  > byte-read/writing routine instead of once per transfer, I split
+>  > ep93xx_spi_read and _write into 8 and 16-bit variants, and checked
+>  > t->bits_per_word once outside the read and write loops.
+>  >
+>  > This gives:
+>  >      60.0% 59.3%  285906 irq/MB
+>
+>
+> It looks like splitting the 8/16-bit read/write routines does help
+>  with cpu usage compared to the tests above.  Was the data transfer
+>  (kB/sec) any better?
 
-> 
-> > From: Nicolas Pitre [mailto:nico at fluxnic.net]
-> > Sent: Thursday, April 22, 2010 12:20 PM
-> 
-> > > If the work queue executes in a unique context it could follow the
-> > > same lazy strategy a user space one does.
-> >
-> > It could... but that begs the question: what is this that requires so
-> > much processing power within the kernel?  This really needs to be fully
-> > understood and justified before even considering a possible VFP usage in
-> > the kernel.
-> 
-> A simple candidate is Neon memory copy. It can perform much better 
-> than the ARM based one. There are a few unfortunate copies associated 
-> with some networking devices which see decent benefit.
-
-The benefit is often lost when you need to defer them to a schedulable 
-kernel thread though.
-
-
-Nicolas
+No, exactly the same.
