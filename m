@@ -1,55 +1,136 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 22 Apr 2010 12:19:56 +0200
-Subject: [PATCH] ARM: pxa/raumfeld: fix button name
-In-Reply-To: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
-References: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
-Message-ID: <20100422101956.GV30801@buzzloop.caiaq.de>
+From: Dave.Martin@arm.com (Dave P. Martin)
+Date: Thu, 22 Apr 2010 11:56:09 +0100
+Subject: kernel virtual memory access (from app) does not generatesegfault
+In-Reply-To: <alpine.LFD.2.00.1004211848151.7232@xanadu.home>
+References: <000001cae074$1b564ff0$4044010a@Emea.Arm.com>
+	<20100420142047.GA7398@desktop>
+	<20100420170944.GE2234@trinity.fluff.org>
+	<20100420192813.GA29831@n2100.arm.linux.org.uk>
+	<20100420223106.GQ11723@shareable.org>
+	<20100420224108.GA1432@n2100.arm.linux.org.uk>
+	<000001cae144$4281a9a0$4044010a@Emea.Arm.com>
+	<20100421193534.GC26616@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1004211723230.7232@xanadu.home>
+	<20100421214447.GK26616@n2100.arm.linux.org.uk>
+	<20100421215425.GL26616@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1004211848151.7232@xanadu.home>
+Message-ID: <000001cae20a$6ab7c820$4044010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 18, 2010 at 09:35:29AM +0200, Daniel Mack wrote:
-> "on/off button" was recently renamed to remove the slash character.
-> Follow that change in the pin polarity detection as well.
-> 
-> While at it, fix another cosmetic coding style flaw as well.
-> 
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
+Hi there, 
 
-Eric, can you apply this? Would be nice to have it in .34, but not
-totally mandatory.
-
-Thanks,
-Daniel
-
-
-> ---
->  arch/arm/mach-pxa/raumfeld.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+> -----Original Message-----
+> From: Nicolas Pitre [mailto:nico at fluxnic.net] 
+> Sent: 21 April 2010 23:59
+> To: Russell King - ARM Linux
+> Cc: linux-arm-kernel at lists.infradead.org; anfei; Jamie 
+> Lokier; Dave P Martin; Ben Dooks
+> Subject: Re: kernel virtual memory access (from app) does not 
+> generatesegfault
 > 
-> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-> index 3bbc2d8..7582a12 100644
-> --- a/arch/arm/mach-pxa/raumfeld.c
-> +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -1001,7 +1001,7 @@ static void __init raumfeld_common_init(void)
->  		int i;
->  
->  		for (i = 0; i < ARRAY_SIZE(gpio_keys_button); i++)
-> -			if (!strcmp(gpio_keys_button[i].desc, "on/off button"))
-> +			if (!strcmp(gpio_keys_button[i].desc, "on_off button"))
->  				gpio_keys_button[i].active_low = 1;
->  	}
->  
-> @@ -1027,8 +1027,7 @@ static void __init raumfeld_common_init(void)
->  		gpio_direction_output(GPIO_W2W_PDN, 0);
->  
->  	/* this can be used to switch off the device */
-> -	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY,
-> -				"supply shutdown");
-> +	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY, "supply shutdown");
->  	if (ret < 0)
->  		pr_warning("Unable to request GPIO_SHUTDOWN_SUPPLY\n");
->  	else
-> -- 
-> 1.7.0.3
+> On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
 > 
+> > On Wed, Apr 21, 2010 at 10:44:47PM +0100, Russell King - 
+> ARM Linux wrote:
+> > > On Wed, Apr 21, 2010 at 05:24:51PM -0400, Nicolas Pitre wrote:
+> > > > On Wed, 21 Apr 2010, Russell King - ARM Linux wrote:
+> > > > 
+> > > > > On Wed, Apr 21, 2010 at 12:17:41PM +0100, Dave P. 
+> Martin wrote:
+> > > > > >  
+> > > > > > 
+> > > > > > > -----Original Message-----
+> > > > > > > From: Russell King - ARM Linux 
+> > > > > > > [mailto:linux at arm.linux.org.uk]
+> > > > > > > Sent: 20 April 2010 23:41
+> > > > > > > To: Jamie Lokier
+> > > > > > > Cc: Ben Dooks; anfei; Dave P Martin; 
+> > > > > > > linux-arm-kernel at lists.infradead.org
+> > > > > > > Subject: Re: kernel virtual memory access (from app) does 
+> > > > > > > not generatesegfault
+> > > > > > 
+> > > > > > [...]
+> > > > > > 
+> > > > > > > The difference between instruction faults and 
+> data faults is 
+> > > > > > > that we always interpret instruction faults on pre-ARMv6 
+> > > > > > > CPUs as a 'translation fault' rather than a 
+> permission fault 
+> > > > > > > since they can't tell us what the problem was.
+> > > > > > 
+> > > > > > Note that my observations were on an armv7 kernel.  
+> Should we 
+> > > > > > still hit the same bit of code in this case, or 
+> have I misdiagnosed the problem?
+> > > > > 
+> > > > > If it was ARMv7, we should be reading the IFSR, which 
+> should be 
+> > > > > telling us that there's a permission fault trying to read 
+> > > > > instructions from 0xc0000000.
+> > > > > 
+> > > > > If changing do_translation_fault() on a recent kernel 
+> fixes your 
+> > > > > problem, something's going wrong.  Any chance you 
+> could add some 
+> > > > > debugging to
+> > > > > do_PrefetchAbort() so that when you see your test program 
+> > > > > running (eg, if (strcmp(current->comm, "progname") == 
+> 0) { ... 
+> > > > > }) you could dump out the values of ifsr and addr please?
+> > > > 
+> > > > If I remember right, the original bug report mentioned ARM926.
+> > > 
+> > > So here we go again with confusion raining.
+> > > 
+> > > Someone please tell me _definitively_ _what_ is being 
+> seen on _what_ 
+> > > CPU, and separate the two issues into two different threads.  I'm 
+> > > going to ignore any further comments on this issue until that's 
+> > > done.  Life is too short to try to work this out on my own.
+> > 
+> > Actually, no, you're creating the confusion; this 
+> sub-thread is about 
+> > the behaviour on ARMv7, as a completely separate subject 
+> from ARM926.
+> 
+> It is well possible that I missed the subject transition.
+> 
+> The only person who provided a test program is Sasha Sirotkin 
+> who said:
+> 
+> On Tue, 20 Apr 2010, Sasha Sirotkin wrote:
+> 
+> > P.S. My kernel is 2.6.32.7 and the CPU is ARM926EJ-S rev 5 (v5l)
+> 
+> Message-id: <4BCD7076.9030802@browserseal.com>
+> 
+> Only later did Dave P. Martin mention having made similar 
+> observations on an ARMv7.
+
+To clarify:
+
+	* I haven't tested this on 926 myself
+	* On armv7, I have observed the problem only on *old* kernels
+(<2.6.32; which lack any of the patches under discussion)
+	* Using 2.6.34-rc1 (from rmk's versatile branch) on armv7, I get the
+expected SEGV when userspace tries to execute >= TASK_SIZE
+
+so...
+	* Sasha's problem is caused by a problem in the current kernel on
+926.
+	* My problem relates to v7 and has already been fixed (but isn't
+fixed in the Ubuntu kernels yet)
+
+The test case was
+
+int main(void)
+{
+	((void (*)(void))0xc0000000)();
+	return 0;
+}
+
+Hope this makes things clearer.
+
+Cheers
+---Dave
