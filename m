@@ -1,137 +1,125 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Thu, 22 Apr 2010 16:28:42 +0300
-Subject: [PATCH 1/1] mx5: Add registration of GPIOs for MX5 devices
-Message-ID: <a2d23fc5b7650221913ad0d23d08fa4525efe194.1271942210.git.amit.kucheria@verdurent.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Thu, 22 Apr 2010 15:11:42 +0100
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D7F4E7F@AUSP01VMBX24.collaborationhost.net>
+	<20100421071629.GL19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C84DA@AUSP01VMBX24.collaborationhost.net>
+	<20100421165420.GP19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <g2t56d259a01004220711saff1b824p5f3cc76cab649a6b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On 4/22/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>  I have added some debug messages to the driver trying to figure out
+>  how to chain the transfers in a message together in order to keep
+>  the SFRM signal asserted for the entire message.  I still haven't
+>  worked out a good solution but I did notice something else.
+>
+>  First, every spi transaction, including a single byte transfer, is
+>  going to generate at least two interrupts.  One when the interrupts
+>  are first enabled because the TX FIFO is empty.  And a second when
+>  that byte has been transferred and the TX FIFO is again empty.
+>
+>  The first interrupt can be prevented by priming the TX FIFO before
+>  enabling the interrupts.  All you need to do is call ep93xx_spi_read_write
+>  right before ep93xx_spi_enable_interrupts.
 
-Register the gpio irqs on Freescale's MX51 Babbage HW.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
----
- arch/arm/mach-mx5/devices.c |   33 +++++++++++++++++++++++++++++++--
- arch/arm/plat-mxc/gpio.c    |    5 ++---
- arch/arm/plat-mxc/tzic.c    |    4 +++-
- 3 files changed, 36 insertions(+), 6 deletions(-)
+>  Second, at high clock rates the RX FIFO will actually start to
+>  fill as you are putting data into the TX FIFO.  If you add an inner
+>  reader loop to the writer loop in ep93xx_spi_read_write you can
+>  take advantage of this and reduce the number of interrupts generated
+>  for large transfers.
+>
+>  For instance the mmc_spi driver regularly does 3 transfer messages
+>  where the last transfer is a 512 byte read.  With your current v4
+>  driver this message averages 69 interrupts to complete.  By adding
+>  the inner reader it reduces the number of interrupts to an average
+>  of 40.
 
-diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-index d6fd396..5070ae1 100644
---- a/arch/arm/mach-mx5/devices.c
-+++ b/arch/arm/mach-mx5/devices.c
-@@ -1,5 +1,6 @@
- /*
-  * Copyright 2009 Amit Kucheria <amit.kucheria@canonical.com>
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -10,8 +11,10 @@
-  */
- 
- #include <linux/platform_device.h>
-+#include <linux/gpio.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
-+#include <mach/irqs.h>
- 
- static struct resource uart0[] = {
- 	{
-@@ -89,8 +92,34 @@ struct platform_device mxc_fec_device = {
- 	.resource = mxc_fec_resources,
- };
- 
--/* Dummy definition to allow compiling in AVIC and TZIC simultaneously */
-+static struct mxc_gpio_port mxc_gpio_ports[] = {
-+	{
-+		.chip.label = "gpio-0",
-+		.base = MX51_IO_ADDRESS(MX51_GPIO1_BASE_ADDR),
-+		.irq = MX51_MXC_INT_GPIO1_LOW,
-+		.virtual_irq_start = MXC_GPIO_IRQ_START
-+	},
-+	{
-+		.chip.label = "gpio-1",
-+		.base = MX51_IO_ADDRESS(MX51_GPIO2_BASE_ADDR),
-+		.irq = MX51_MXC_INT_GPIO2_LOW,
-+		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 1
-+	},
-+	{
-+		.chip.label = "gpio-2",
-+		.base = MX51_IO_ADDRESS(MX51_GPIO3_BASE_ADDR),
-+		.irq = MX51_MXC_INT_GPIO3_LOW,
-+		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 2
-+	},
-+	{
-+		.chip.label = "gpio-3",
-+		.base = MX51_IO_ADDRESS(MX51_GPIO4_BASE_ADDR),
-+		.irq = MX51_MXC_INT_GPIO4_LOW,
-+		.virtual_irq_start = MXC_GPIO_IRQ_START + 32 * 3
-+	},
-+};
+I assume you mean something like
+
+        /* read as long as RX FIFO has frames in it */
+        while (ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_RNE) {
+                ep93xx_do_read(espi, t);
+                espi->fifo_level--;
+        }
+
+        /* write as long as TX FIFO has room */
+        while (espi->fifo_level < SPI_FIFO_SIZE && espi->tx < t->len) {
+                ep93xx_do_write(espi, t);
+                espi->fifo_level++;
 +
- int __init mxc_register_gpios(void)
- {
--	return 0;
-+	return mxc_gpio_init(mxc_gpio_ports, ARRAY_SIZE(mxc_gpio_ports));
- }
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 70b2389..71437c6 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -3,7 +3,7 @@
-  * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-  *
-  * Based on code from Freescale,
-- * Copyright 2004-2006 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-  *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License
-@@ -38,7 +38,6 @@ static int gpio_table_size;
- #define GPIO_ICR2	(cpu_is_mx1_mx2() ? 0x2C : 0x10)
- #define GPIO_IMR	(cpu_is_mx1_mx2() ? 0x30 : 0x14)
- #define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
--#define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
- 
- #define GPIO_INT_LOW_LEV	(cpu_is_mx1_mx2() ? 0x3 : 0x0)
- #define GPIO_INT_HIGH_LEV	(cpu_is_mx1_mx2() ? 0x2 : 0x1)
-@@ -289,7 +288,7 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 		/* its a serious configuration bug when it fails */
- 		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
- 
--		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25()) {
-+		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
- 			/* setup one handler for each entry */
- 			set_irq_chained_handler(port[i].irq, mx3_gpio_irq_handler);
- 			set_irq_data(port[i].irq, &port[i]);
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index afa6709..9b86d2a 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C)2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -19,6 +19,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/common.h>
- 
- /*
-  *****************************************
-@@ -144,6 +145,7 @@ void __init tzic_init_irq(void __iomem *irqbase)
- 		set_irq_handler(i, handle_level_irq);
- 		set_irq_flags(i, IRQF_VALID);
- 	}
-+	mxc_register_gpios();
- 
- 	pr_info("TrustZone Interrupt Controller (TZIC) initialized\n");
- }
--- 
-1.7.0.4
++               while (ep93xx_spi_read_u8(espi, SSPSR) & SSPSR_RNE) {
++                       ep93xx_do_read(espi, t);
++                       espi->fifo_level--;
++               }
+        }
+
+Well, you're gonna love this :)
+
+I've run some timing tests on this, and it turns out to give the same
+data transfer speed but take more system CPU time: 64% instead of 60%,
+i.e it is slower.
+
+You are seeing a lower interrupt count, not because more useful work
+is being done in each interrupt, but only because the extra code in
+the inner loop makes the interrupt routine slower. Bear with me...
+
+I'm using v4 with mika's continuity hack compiled for speed not space
+and averaging the vmstat "sy" output column over 50 seconds while
+block-reading 20 meg with dd from /dev/mmcblk0 to /dev/null using a
+fairly old Sandisk 1MB SD card and clocking at 3.7 MHz.
+All tests report 367 or 368 kB/sec; the variability of the system time
+average in successive runs is about 1%
+
+Figures are (commas separate values from successive runs)
+v4 with Mika's hack:
+     61.9,60.2%  234724,234727 irq/MB
+with "while" reader in write loop:
+     63.4,64.5%  197772,97801 irq/MB
+with "if" reader in while loop:
+     61.9,62.5%  197845,197847  irq/MB
+with an "if" reader after the write loop:
+     66.0,67.1%  278207,277166 irq/MB
+with a "while" reader after the write loop:
+     67.0%  275000 irq/MB
+
+Further, on a suspicion about the silliness of the per-transfer
+bits_per_word being checked right down the bottom of the lowest lever
+byte-read/writing routine instead of once per transfer, I split
+ep93xx_spi_read and _write into 8 and 16-bit variants, and checked
+t->bits_per_word once outside the read and write loops.
+
+This gives:
+     60.0% 59.3%  285906 irq/MB
+
+Note: it takes *more* interrupts to transfer a megabyte when the
+interrupt routine is more efficient!
+
+The reason is that almost all of those interrupts happen while waiting
+for the last 4, 3, 2 or 1 bytes of a transfer to arrive in the RX
+FIFO. On this dreadful chip there is no interrupt mechanism to say
+"the TX buffer is empty and the received data has finished arriving".
+There is only "the TX buffer is half empty or less" and "the RX buffer
+is half full or more", so repeated interrupts now perform the function
+that the old busy-wait loop performed in v1.
+
+This is another good reason to unite multiple transfers into one
+continuous stream, to have less of this effective busy-waiting with
+interrupts spinning madly.
+
+It now occurs to me that another step in CPU efficiency could be had
+by abusing the receive-fifo-is-half-full interrupt to signal the
+completion of a transfer. This would only work for transfers of four
+or more words and would need some careful jiggery-pokery at end of
+transfer to turn the tx-fifo-is-half-empty interrupt enable off and
+ensure that exactly four words would end up in the RX FIFO.
+It's a horrible thought, and I suspect that the DMA engine is the real answer.
+
+   M
