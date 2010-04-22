@@ -1,62 +1,33 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 21 Apr 2010 16:47:13 -0700
-Subject: udelay() broken for SMP cores?
-In-Reply-To: <20100421193305.GB26616@n2100.arm.linux.org.uk>
-References: <4BCE60C4.8020505@codeaurora.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
-	<4BCE9E8B.2070103@codeaurora.org>
-	<20100421072243.GA913@n2100.arm.linux.org.uk>
-	<ea62885d30e4bbfb84db59758fa9e946.squirrel@www.codeaurora.org>
-	<20100421095036.GA13971@n2100.arm.linux.org.uk>
-	<d6e7a481ba26beb786f922f95a75875d.squirrel@www.codeaurora.org>
-	<20100421193305.GB26616@n2100.arm.linux.org.uk>
-Message-ID: <4BCF8E81.4080906@codeaurora.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 21 Apr 2010 17:07:50 -0700
+Subject: [PATCH 1/2] omap: pm34xx: Enable IO / IO-CHAIN wakeups for PER
+In-Reply-To: <1271295665-26187-1-git-send-email-mike@android.com> (Mike Chan's
+	message of "Wed\, 14 Apr 2010 18\:41\:04 -0700")
+References: <1271295665-26187-1-git-send-email-mike@android.com>
+Message-ID: <87aasw5oyx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Apr 21, 2010 at 03:31:03AM -0700, skannan at codeaurora.org wrote:
->>> Well, the assumption is that the CPUs will be running at their fastest
->>> speed at boot time, and therefore loops_per_jiffy will be calibrated
->>> such that we guarantee _at least_ the asked-for delay - which is the
->>> only guarantee udelay has.
->> Even if the boot assumption is true, cpufreq actively changes the
->> loops_per_jiffy value when it changes freq. So, this could still mess up
->> the _at least_ guarantee.
-> 
-> Actually, it doesn't on SMP - if you build the kernel with SMP enabled,
-> the code which fiddles with loops_per_jiffy is disabled.  See the
-> #ifndef wrapping around adjust_jiffies() in drivers/cpufreq/cpufreq.c.
+Mike Chan <mike@android.com> writes:
 
-My comment above was for the non-SMP case (it was a reply to your 
-comment about non-SMP case). In non-SMP case, cpufreq changes LPJ and 
-the freq switch can happen while udelay is looping. That would mess up 
-the minimum delay guarantee of udelay.
+> IO events can also come from GPIO modules, which reside in the PER domain.
+> It is possible for the PER to enter RET while CORE is still in ON.
+> If GPIO 2-6 are enabled for IO-pad wakeups, the PER domain will not
+> wakeup in this case, unless we enable it.
+>
+> Signed-off-by: Mike Chan <mike@android.com>
 
-I was aware that cpufreq doesn't change LPJ for SMP. But I think they do 
-that because they don't know where the arch specific per-CPU 
-loops_per_jiffy is located. They expect the cpufreq driver to do the lpj 
-scaling. So, per-CPU lpj is still going to change. At least, that's what 
-I took out of the following comment:
+Hi Mike,
 
-/*
-  * This function alters the system "loops_per_jiffy" for the clock
-  * speed change.  Note that loops_per_jiffy cannot be updated on SMP
-  * systems as each CPU might be scaled differently. So, use the arch
-  * per-CPU loops_per_jiffy value wherever possible.
-  */
+I'm a little puzzled on this one.  My understanding is that the IO pad
+is only armed when CORE is in RET or OFF.
 
+I need to dig a little more in the TRM on this one to clarify.
 
-> So, on SMP with cpufreq, the global loops_per_jiffy is a fixed value.
-> Provided it was calibrated with the CPU running at max clock rate,
-> the guarantee is satisfied for all CPUs in the system.
+If CORE is staying on, it might be that your GPIO module level wakeups
+are not being configured correctly.  Please check the 'Known Problems'
+section of the OMAP PM wiki[1], search for 'GPIO module-level wakeups'
 
-As mentioned earlier, I think the cpufreq driver for that specific arch 
-is supposed to handle the LPJ changes. But let's assume that's not true. 
-So, wouldn't this still be a problem? You could be doing udelay as if 
-you are running at 1 GHz but you are actually running at 100 MHz. I 
-would think that would be bad for performance and power (wasting cycles 
-without going into WFI, etc).
+Kevin
 
-Thanks,
-Saravana
+[1] http://elinux.org/OMAP_Power_Management#Known_Problems
