@@ -1,45 +1,43 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 21 Apr 2010 21:47:14 -0500
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <20100421165420.GP19534@gw.healthdatacare.com>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D7F4E7F@AUSP01VMBX24.collaborationhost.net>
-	<20100421071629.GL19534@gw.healthdatacare.com>
-	<0D753D10438DA54287A00B0270842697636D8C84DA@AUSP01VMBX24.collaborationhost.net>
-	<20100421165420.GP19534@gw.healthdatacare.com>
-Message-ID: <0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
+From: uri@jdland.co.il (Uri Simchoni)
+Date: Thu, 22 Apr 2010 06:23:12 +0300
+Subject: Bug#552270: Marvell CESA driver and Kirkwood
+In-Reply-To: <20100421081302.GB31506@Chamillionaire.breakpoint.cc>
+References: <4B12F9E7.1020207@gmail.com>
+	<20091130211531.GK18101@deprecation.cyrius.com>
+	<4B144627.7060901@gmail.com>
+	<20091204212847.GC28480@deprecation.cyrius.com>
+	<4BCB4009.70707@gmail.com>
+	<20100418191719.GA2508@Chamillionaire.breakpoint.cc>
+	<4BCE125F.30200@gmail.com>
+	<20100421081302.GB31506@Chamillionaire.breakpoint.cc>
+Message-ID: <4BCFC120.5010306@jdland.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika,
+I have some IPSec background but am not familiar with the Linux implementation (I'm using the mv_cesa for SSL acceleration through a usermode interface I'm working on). Can you point me to the nearest howto? I suppose I could have a look.
+Thanks,
+Uri.
 
-I have added some debug messages to the driver trying to figure out
-how to chain the transfers in a message together in order to keep
-the SFRM signal asserted for the entire message.  I still haven't
-worked out a good solution but I did notice something else.
-
-First, every spi transaction, including a single byte transfer, is
-going to generate at least two interrupts.  One when the interrupts
-are first enabled because the TX FIFO is empty.  And a second when
-that byte has been transferred and the TX FIFO is again empty.
-
-The first interrupt can be prevented by priming the TX FIFO before
-enabling the interrupts.  All you need to do is call ep93xx_spi_read_write
-right before ep93xx_spi_enable_interrupts.
-
-Second, at high clock rates the RX FIFO will actually start to
-fill as you are putting data into the TX FIFO.  If you add an inner
-reader loop to the writer loop in ep93xx_spi_read_write you can
-take advantage of this and reduce the number of interrupts generated
-for large transfers.
-
-For instance the mmc_spi driver regularly does 3 transfer messages
-where the last transfer is a 512 byte read.  With your current v4
-driver this message averages 69 interrupts to complete.  By adding
-the inner reader it reduces the number of interrupts to an average
-of 40.
-
-Regards,
-Hartley
+On 4/21/2010 11:13 AM, Sebastian Andrzej Siewior wrote:
+> * L.C. | 2010-04-20 22:45:19 [+0200]:
+> 
+>> Sebastian, here is the OOPS from the latest cryptodev git tree
+>> (2.6.33), more clue than I thought, it looks?:
+> 
+> No I don't. I look at it this weekend. I need just to setup IPsec in
+> order to reproduce this, right?
+> 
+>> ------------------------------------cut
+>> flip> ping 10.10.10.230
+>> PING 10.10.10.23[51252.081262] Unable to handle kernel NULL pointer
+>> dereference at virtual address 00000034
+>> 0 (10.10.10.230)[51252.090530] pgd = c0004000
+>> 56(84) bytes of[51252.094632] [00000034] *pgd=00000000 data.
+>>
+<snip>
+> 
+> Sebastian
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
