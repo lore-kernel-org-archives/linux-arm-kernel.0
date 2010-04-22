@@ -1,17 +1,22 @@
-From: kasi.anbumony@ti.com (Anbumony, Kasi Lakshman Karthi)
-Date: Wed, 21 Apr 2010 18:11:18 -0500
-Subject: Can I use VFP in work queue context ? 
-Message-ID: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
+From: rbairva@gmail.com (rd bairva)
+Date: Thu, 22 Apr 2010 09:35:42 +0530
+Subject: Dmaengine query
+In-Reply-To: <m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
+References: <v2mdbb048f61004132326r8ac75382k1e42321ff0ed484a@mail.gmail.com>
+	<v2he9c3a7c21004141730vcc79dd58t5478c9d83af9816@mail.gmail.com>
+	<m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
+Message-ID: <v2ydbb048f61004212105n80341b00p89b80565b94459e5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have done some optimization in NEON (Neon/VFP sharing the same register set) and using it in my driver running in (Linux) kernel space. The neon optimized code will be used under a work queue context and not under any interrupt. Going by the design of Linux kernel, it looks like there is no context save and restore on VFP registers whenever there is a context switch from user mode to kernel mode, but Linux handles the same for user space processes.
+My DMA controller supports device to device DMA transfers and we
+need it in some of our drivers. Existing DMA engine framework doesn't
+have support for device to device transfers.
 
-Currently I am not seeing any issues (may be lucky) with my implementation (any exceptions) and was wondering whether it is safe to use of neon code in work queue context? My development platform is OMAP 3 (ARM cortex A-8) and using Android with Linux kernel: 2.6.29.
+Do you have any plans for device to device support in DMA engine?
 
-Thanks
--Anbumony, Kasi Lakshman Karthi
+Can you suggest me some other suggestion for doing this?
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100421/c337dc9a/attachment-0001.htm>
+
+Regards
+Ramdayal
