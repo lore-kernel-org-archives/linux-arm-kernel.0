@@ -1,17 +1,25 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 22 Apr 2010 14:47:50 +0300
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Apr 2010 13:56:23 +0200
 Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
 In-Reply-To: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
 References: <b9f250fee8e5300e859b2afc234868ba7632f619.1271864861.git.amit.kucheria@canonical.com>
-Message-ID: <20100422114747.GB14819@jasper.tkos.co.il>
+Message-ID: <20100422115623.GR7882@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Amit,
 
 On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
 > clk->usecount can be used by platform code to check if a clock is active or
 > not.
+
+The patch seems mostly fine but the commit log not. How about something like
+'This patch fixes the clock refcounting when reparenting is used.'
+
+A reference to
+
+http://www.spinics.net/lists/arm-kernel/msg85879.html
+
+might help aswell.
+
 > 
 > Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
 > ---
@@ -22,9 +30,48 @@ On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
 > index 323ff8c..c791f38 100644
 > --- a/arch/arm/plat-mxc/clock.c
 > +++ b/arch/arm/plat-mxc/clock.c
-
-[snip]
-
+> @@ -50,15 +50,15 @@ static DEFINE_MUTEX(clocks_mutex);
+>  
+>  static void __clk_disable(struct clk *clk)
+>  {
+> -	if (clk == NULL || IS_ERR(clk))
+> +	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
+>  		return;
+>  
+> -	__clk_disable(clk->parent);
+> -	__clk_disable(clk->secondary);
+> -
+> -	WARN_ON(!clk->usecount);
+> -	if (!(--clk->usecount) && clk->disable)
+> -		clk->disable(clk);
+> +	if (!(--clk->usecount)) {
+> +		if (clk->disable)
+> +			clk->disable(clk);
+> +		__clk_disable(clk->parent);
+> +		__clk_disable(clk->secondary);
+> +	}
+>  }
+>  
+>  static int __clk_enable(struct clk *clk)
+> @@ -66,12 +66,13 @@ static int __clk_enable(struct clk *clk)
+>  	if (clk == NULL || IS_ERR(clk))
+>  		return -EINVAL;
+>  
+> -	__clk_enable(clk->parent);
+> -	__clk_enable(clk->secondary);
+> -
+> -	if (clk->usecount++ == 0 && clk->enable)
+> -		clk->enable(clk);
+> +	if (clk->usecount++ == 0) {
+> +		__clk_enable(clk->parent);
+> +		__clk_enable(clk->secondary);
+>  
+> +		if (clk->enable)
+> +			clk->enable(clk);
+> +	}
+>  	return 0;
+>  }
+>  
 > @@ -160,17 +161,27 @@ EXPORT_SYMBOL(clk_set_rate);
 >  int clk_set_parent(struct clk *clk, struct clk *parent)
 >  {
@@ -38,9 +85,6 @@ On Wed, Apr 21, 2010 at 09:37:31PM +0300, Amit Kucheria wrote:
 > +	if (clk->usecount != 0) {
 > +		clk_enable(parent);
 > +	}
-
-Unnecessary braces here. See chapter 3 of Documentation/CodingStyle.
-
 > +
 >  	mutex_lock(&clocks_mutex);
 >  	ret = clk->set_parent(clk, parent);
@@ -49,25 +93,25 @@ Unnecessary braces here. See chapter 3 of Documentation/CodingStyle.
 >  		clk->parent = parent;
 > +	}
 
-Ditto
+Please remove this hunk. It does not change anything except violating
+the coding style. Also, please remove unnecessary braces.
 
 >  	mutex_unlock(&clocks_mutex);
 >  
 > +	if (clk->usecount != 0) {
 > +		clk_disable(prev_parent);
 > +	}
-
-Ditto
-
 > +
 >  	return ret;
 >  }
 >  EXPORT_SYMBOL(clk_set_parent);
 > -- 
-
-baruch
+> 1.7.0.4
+> 
+> 
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
