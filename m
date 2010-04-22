@@ -1,26 +1,55 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 22 Apr 2010 11:09:39 +0100
-Subject: Can I use VFP in work queue context ?
-In-Reply-To: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
-References: <2A1038AD87AFFA4291065666737B4EAA08CB0BA1BC@dlee06.ent.ti.com>
-Message-ID: <20100422100939.GG6684@trinity.fluff.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 22 Apr 2010 12:19:56 +0200
+Subject: [PATCH] ARM: pxa/raumfeld: fix button name
+In-Reply-To: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
+References: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20100422101956.GV30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 06:11:18PM -0500, Anbumony, Kasi Lakshman Karthi wrote:
-> I have done some optimization in NEON (Neon/VFP sharing the same register set) and using it in my driver running in (Linux) kernel space. The neon optimized code will be used under a work queue context and not under any interrupt. Going by the design of Linux kernel, it looks like there is no context save and restore on VFP registers whenever there is a context switch from user mode to kernel mode, but Linux handles the same for user space processes.
+On Sun, Apr 18, 2010 at 09:35:29AM +0200, Daniel Mack wrote:
+> "on/off button" was recently renamed to remove the slash character.
+> Follow that change in the pin polarity detection as well.
 > 
-> Currently I am not seeing any issues (may be lucky) with my implementation (any exceptions) and was wondering whether it is safe to use of neon code in work queue context? My development platform is OMAP 3 (ARM cortex A-8) and using Android with Linux kernel: 2.6.29.
+> While at it, fix another cosmetic coding style flaw as well.
+> 
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-No FP in the kernel.
+Eric, can you apply this? Would be nice to have it in .34, but not
+totally mandatory.
 
-I expect this applies to NEON too.
+Thanks,
+Daniel
 
-If you're doing intensive processing in a work queue, you're probably
-trying to solve the problem in the wrong place.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> ---
+>  arch/arm/mach-pxa/raumfeld.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+> index 3bbc2d8..7582a12 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
+> +++ b/arch/arm/mach-pxa/raumfeld.c
+> @@ -1001,7 +1001,7 @@ static void __init raumfeld_common_init(void)
+>  		int i;
+>  
+>  		for (i = 0; i < ARRAY_SIZE(gpio_keys_button); i++)
+> -			if (!strcmp(gpio_keys_button[i].desc, "on/off button"))
+> +			if (!strcmp(gpio_keys_button[i].desc, "on_off button"))
+>  				gpio_keys_button[i].active_low = 1;
+>  	}
+>  
+> @@ -1027,8 +1027,7 @@ static void __init raumfeld_common_init(void)
+>  		gpio_direction_output(GPIO_W2W_PDN, 0);
+>  
+>  	/* this can be used to switch off the device */
+> -	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY,
+> -				"supply shutdown");
+> +	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY, "supply shutdown");
+>  	if (ret < 0)
+>  		pr_warning("Unable to request GPIO_SHUTDOWN_SUPPLY\n");
+>  	else
+> -- 
+> 1.7.0.3
+> 
