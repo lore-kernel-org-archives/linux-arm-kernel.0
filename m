@@ -1,63 +1,104 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 22 Apr 2010 15:31:39 -0700
-Subject: [PATCH 1/2] omap: pm34xx: Enable IO / IO-CHAIN wakeups for PER
-In-Reply-To: <s2y8bb80c381004211750hd8d62be8hfa0bead1dbfa8d2b@mail.gmail.com>
-	(Mike Chan's message of "Wed\, 21 Apr 2010 17\:50\:12 -0700")
-References: <1271295665-26187-1-git-send-email-mike@android.com>
-	<87aasw5oyx.fsf@deeprootsystems.com>
-	<s2y8bb80c381004211750hd8d62be8hfa0bead1dbfa8d2b@mail.gmail.com>
-Message-ID: <87wrvzxgok.fsf@deeprootsystems.com>
+From: tim.gardner@canonical.com (Tim Gardner)
+Date: Thu, 22 Apr 2010 17:00:00 -0600
+Subject: [PATCH 1/1] arm: mxc: utilise usecount field in clock operations
+In-Reply-To: <d501dcf8dbe98ed7f5aa9e7b34e68f0e1076ac84.1271968118.git.amit.kucheria@verdurent.com>
+References: <d501dcf8dbe98ed7f5aa9e7b34e68f0e1076ac84.1271968118.git.amit.kucheria@verdurent.com>
+Message-ID: <4BD0D4F0.9090605@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Chan <mike@android.com> writes:
-
-> On Wed, Apr 21, 2010 at 5:07 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> Mike Chan <mike@android.com> writes:
->>
->>> IO events can also come from GPIO modules, which reside in the PER domain.
->>> It is possible for the PER to enter RET while CORE is still in ON.
->>> If GPIO 2-6 are enabled for IO-pad wakeups, the PER domain will not
->>> wakeup in this case, unless we enable it.
->>>
->>> Signed-off-by: Mike Chan <mike@android.com>
->>
->> Hi Mike,
->>
->> I'm a little puzzled on this one. ?My understanding is that the IO pad
->> is only armed when CORE is in RET or OFF.
->>
+On 04/22/2010 02:30 PM, Amit Kucheria wrote:
+> From: Amit Kucheria<amit.kucheria@canonical.com>
 >
-> The issue we are seeing is when the device is active but idle, if CORE
-> is ON and PER is in RET and the omap is sitting in swfi. If the user
-> presses a keypad button, IO pad doesn't wake us out of idle. Setting a
-> wakeup if PER or CORE goes into RET solve this.
+> This patch fixes the clock refcounting when reparenting is used.
 >
->> I need to dig a little more in the TRM on this one to clarify.
->>
+> Sascha just pointed out a good explanation of refcounting here:
+> http://www.spinics.net/lists/arm-kernel/msg85879.html
 >
-> I was looking at 4.11.2.2 I/O Wake-Up Mechanism (pg 421)
+> Signed-off-by: Amit Kucheria<amit.kucheria@canonical.com>
+> ---
+>   arch/arm/plat-mxc/clock.c |   34 ++++++++++++++++++++++------------
+>   1 files changed, 22 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> index 323ff8c..14781cc 100644
+> --- a/arch/arm/plat-mxc/clock.c
+> +++ b/arch/arm/plat-mxc/clock.c
+> @@ -50,15 +50,16 @@ static DEFINE_MUTEX(clocks_mutex);
+>
+>   static void __clk_disable(struct clk *clk)
+>   {
+> -	if (clk == NULL || IS_ERR(clk))
+> +	WARN_ON(!clk->usecount);
+> +	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
+>   		return;
 >
 
-Yeah, that's the right place.
+The clk==NULL check seem superfluous if WARN_ON(!clk->usecount) has 
+already dereferenced clk (and possibly crashed). You might need two 
+statements if its likely that clk could be NULL.
 
-After a little more digging and asking around, this looks like a good
-fix, but there's a minor problem with the implementation:
+> -	__clk_disable(clk->parent);
+> -	__clk_disable(clk->secondary);
+> -
+> -	WARN_ON(!clk->usecount);
+> -	if (!(--clk->usecount)&&  clk->disable)
+> -		clk->disable(clk);
+> +	if (!(--clk->usecount)) {
+> +		if (clk->disable)
+> +			clk->disable(clk);
+> +		__clk_disable(clk->parent);
+> +		__clk_disable(clk->secondary);
+> +	}
+>   }
+>
+>   static int __clk_enable(struct clk *clk)
+> @@ -66,12 +67,13 @@ static int __clk_enable(struct clk *clk)
+>   	if (clk == NULL || IS_ERR(clk))
+>   		return -EINVAL;
+>
+> -	__clk_enable(clk->parent);
+> -	__clk_enable(clk->secondary);
+> -
+> -	if (clk->usecount++ == 0&&  clk->enable)
+> -		clk->enable(clk);
+> +	if (clk->usecount++ == 0) {
+> +		__clk_enable(clk->parent);
+> +		__clk_enable(clk->secondary);
+>
+> +		if (clk->enable)
+> +			clk->enable(clk);
+> +	}
+>   	return 0;
+>   }
+>
+> @@ -160,17 +162,25 @@ EXPORT_SYMBOL(clk_set_rate);
+>   int clk_set_parent(struct clk *clk, struct clk *parent)
+>   {
+>   	int ret = -EINVAL;
+> +	struct clk *prev_parent = clk->parent;
+>
+>   	if (clk == NULL || IS_ERR(clk) || parent == NULL ||
+>   	    IS_ERR(parent) || clk->set_parent == NULL)
+>   		return ret;
+>
+> +	if (clk->usecount != 0)
+> +		clk_enable(parent);
+> +
+>   	mutex_lock(&clocks_mutex);
+>   	ret = clk->set_parent(clk, parent);
+>   	if (ret == 0)
+>   		clk->parent = parent;
+> +
+>   	mutex_unlock(&clocks_mutex);
+>
+> +	if (clk->usecount != 0)
+> +		clk_disable(prev_parent);
+> +
+>   	return ret;
+>   }
+>   EXPORT_SYMBOL(clk_set_parent);
 
-In the section of the TRM you referenced the following sentence is
-hiding:
 
-  "Software must wait for the I/O daisy chain to complete before it
-   transitions the PER domain to a nonfunctional state."
-
-In the proposed patch, it's likely that PER could transition to
-INACTIVE/RET/OFF before the IO wakeups are enabled.  For example, if
-nothing in PER is active except UART3, then PER will transition to an
-idle state right after omap_uart_prepare_idle(2), which is before
-the IO wakeups are currently enabled.
-
-To be perfectly safe, the IO wakeups should be enabled before PER is
-allowed to transition.
-
-Kevin
+-- 
+Tim Gardner tim.gardner at canonical.com
