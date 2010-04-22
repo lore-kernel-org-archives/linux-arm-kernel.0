@@ -1,50 +1,45 @@
-From: mike@android.com (Mike Chan)
-Date: Wed, 21 Apr 2010 17:50:12 -0700
-Subject: [PATCH 1/2] omap: pm34xx: Enable IO / IO-CHAIN wakeups for PER
-In-Reply-To: <87aasw5oyx.fsf@deeprootsystems.com>
-References: <1271295665-26187-1-git-send-email-mike@android.com>
-	<87aasw5oyx.fsf@deeprootsystems.com>
-Message-ID: <s2y8bb80c381004211750hd8d62be8hfa0bead1dbfa8d2b@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 21 Apr 2010 21:47:14 -0500
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100421165420.GP19534@gw.healthdatacare.com>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D7F4E7F@AUSP01VMBX24.collaborationhost.net>
+	<20100421071629.GL19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C84DA@AUSP01VMBX24.collaborationhost.net>
+	<20100421165420.GP19534@gw.healthdatacare.com>
+Message-ID: <0D753D10438DA54287A00B0270842697636D8C8CDD@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 21, 2010 at 5:07 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Mike Chan <mike@android.com> writes:
->
->> IO events can also come from GPIO modules, which reside in the PER domain.
->> It is possible for the PER to enter RET while CORE is still in ON.
->> If GPIO 2-6 are enabled for IO-pad wakeups, the PER domain will not
->> wakeup in this case, unless we enable it.
->>
->> Signed-off-by: Mike Chan <mike@android.com>
->
-> Hi Mike,
->
-> I'm a little puzzled on this one. ?My understanding is that the IO pad
-> is only armed when CORE is in RET or OFF.
->
+Mika,
 
-The issue we are seeing is when the device is active but idle, if CORE
-is ON and PER is in RET and the omap is sitting in swfi. If the user
-presses a keypad button, IO pad doesn't wake us out of idle. Setting a
-wakeup if PER or CORE goes into RET solve this.
+I have added some debug messages to the driver trying to figure out
+how to chain the transfers in a message together in order to keep
+the SFRM signal asserted for the entire message.  I still haven't
+worked out a good solution but I did notice something else.
 
-> I need to dig a little more in the TRM on this one to clarify.
->
+First, every spi transaction, including a single byte transfer, is
+going to generate at least two interrupts.  One when the interrupts
+are first enabled because the TX FIFO is empty.  And a second when
+that byte has been transferred and the TX FIFO is again empty.
 
-I was looking at 4.11.2.2 I/O Wake-Up Mechanism (pg 421)
+The first interrupt can be prevented by priming the TX FIFO before
+enabling the interrupts.  All you need to do is call ep93xx_spi_read_write
+right before ep93xx_spi_enable_interrupts.
 
-> If CORE is staying on, it might be that your GPIO module level wakeups
-> are not being configured correctly. ?Please check the 'Known Problems'
-> section of the OMAP PM wiki[1], search for 'GPIO module-level wakeups'
->
+Second, at high clock rates the RX FIFO will actually start to
+fill as you are putting data into the TX FIFO.  If you add an inner
+reader loop to the writer loop in ep93xx_spi_read_write you can
+take advantage of this and reduce the number of interrupts generated
+for large transfers.
 
-I will check to see if we have somethign mis-configured.
+For instance the mmc_spi driver regularly does 3 transfer messages
+where the last transfer is a 512 byte read.  With your current v4
+driver this message averages 69 interrupts to complete.  By adding
+the inner reader it reduces the number of interrupts to an average
+of 40.
 
--- Mike
-
-> Kevin
->
-> [1] http://elinux.org/OMAP_Power_Management#Known_Problems
->
+Regards,
+Hartley
