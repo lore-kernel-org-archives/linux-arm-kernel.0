@@ -1,32 +1,34 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 25 Apr 2010 03:59:26 +0200
-Subject: [PATCH 1/7] PL330: Add common core driver
-In-Reply-To: <n2y1b68c6791004231620lcd670271u3a9d33bb52c10e37@mail.gmail.com>
-References: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
-	<j2x63386a3d1004231449ta90046b5pc29622b58a87b99a@mail.gmail.com>
-	<n2y1b68c6791004231620lcd670271u3a9d33bb52c10e37@mail.gmail.com>
-Message-ID: <q2y63386a3d1004241859v8b31f756rb6ff9b4a7452ba@mail.gmail.com>
+From: allenpais777@yahoo.com (Allen Pais)
+Date: Thu, 22 Apr 2010 23:55:03 -0700 (PDT)
+Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA 
+Message-ID: <315970.20396.qm@web35302.mail.mud.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/4/24 jassi brar <jassisinghbrar@gmail.com>:
+Nicolas,
 
-> You mean the DMA engine driver for PL330, right?
-> Since Joonyoung's driver was pre-empted by these patches,
-> he might want to re-write parts of his driver for this backend.
-> If he doesn't show any interest in a few days, I'll do it.
+   As mentioned by Hemanth, we were facing issues with 
+highmem and MMC, but this is resolved now with the patch
+you shared. 
 
-Great, my interest here is mainly that this PrimeCell has
-a DMAengine API, if it e.g. runs the DMAengine tests
-nicely, we know it works.
+   Here's the patch for your ref.[its reverted cause of the
+issue] 
+http://dev.omapzoom.org/?p=integration/kernel-omap3.git;a=commit;h=f6427e74a3c08fa5e30c99de0e9e8ed9d3b65b74
 
-> Btw, I think that driver should be divided in two files
-> drivers/dma/api-pl330.c with common code and
-> drivers/dma/<soc>-pl330.c for platform specific stuff like IRQ,
-> registers base mapping and other quirks(if any). Any opinions?
+  But currently we are facing issues with test cases such
+as AV Playback, mp3 play, image capture, camera 
+capture+mpeg4 encode. 
 
-Sounds like a plan, this design pattern is already in a lot
-of shared peripherals like drivers/usb/musb for example.
+  Am not sure what's causing this break, any pointer would be
+helpful.
 
-Yours,
-Linus Walleij
+Thanks,
+
+- Allen
+
+
+
+      
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100422/5d72c555/attachment.htm>
