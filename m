@@ -1,24 +1,40 @@
-From: r.herring@freescale.com (Rob Herring)
-Date: Fri, 23 Apr 2010 16:02:25 -0500
-Subject: [RFC PATCH 08/10] imx: Add MX53 core support
-In-Reply-To: <20100423193709.GB18310@pengutronix.de>
-References: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
-	<20100423193709.GB18310@pengutronix.de>
-Message-ID: <1272056545.20896.58.camel@ra7055-linux>
+From: mmarek@suse.cz (Michal Marek)
+Date: Fri, 23 Apr 2010 22:59:54 +0200
+Subject: [PATCH] [ARM] .gitignore: Ignore piggy.lzo,
+	lib1funcs.S and vmlinux
+In-Reply-To: <1272015498-10749-1-git-send-email-mroth@nessie.de>
+References: <1272015498-10749-1-git-send-email-mroth@nessie.de>
+Message-ID: <4BD20A4A.7040408@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
+On 23.4.2010 11:38, Michael Roth wrote:
+> Commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c added LZO compressed
+> kernels, lib1funcs.S is copied from the appropriate ARM sub-arch
+> and vmlinux is the obvious fruit of all efforts.
 
-On Fri, 2010-04-23 at 12:37 -0700, Uwe Kleine-K?nig wrote:
-> all in all this looks like a sort of minimal change to make it work
-> (which is good), but it destroys the efforts spend in the past to use
-> proper name spaces and have understandable, modular and easy code.  So
-> according to my preferences about how to program the patch is wrong.
+vmlinux started to show up in 'git status' after 6db823c, which changed
+vmlinux to /vmlinux in the top-level .gitignore.
+
+BTW, there is already *.lzo in the top-level .gitignore in linux-next,
+so you could omit piggy.lzo, but anyway
+
+Acked-by: Michal Marek <mmarek@suse.cz>
+
+
+> Signed-off-by: Michael Roth <mroth@nessie.de>
+> ---
+>  arch/arm/boot/compressed/.gitignore |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-Thanks for you comments. The minimal change was the whole point and why
-it is just RFC. I wanted input before going any further. It seems a bit
-pointless to me to create devices-mx53.c, clock-mx53.c, etc. all for a
-simple shift in register base.
-
-Rob
+> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+> index ab204db..6dac3d0 100644
+> --- a/arch/arm/boot/compressed/.gitignore
+> +++ b/arch/arm/boot/compressed/.gitignore
+> @@ -1,3 +1,6 @@
+>  font.c
+> +lib1funcs.S
+>  piggy.gz
+> +piggy.lzo
+> +vmlinux
+>  vmlinux.lds
