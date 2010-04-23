@@ -1,69 +1,50 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Fri, 23 Apr 2010 17:09:17 +0200
-Subject: Q: sched_clock() vs. clocksource, how to implement correctly
-Message-ID: <20100423150917.GA25714@sig21.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 23 Apr 2010 18:13:16 +0300
+Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
+In-Reply-To: <alpine.LFD.2.00.1004230853230.7232@xanadu.home>
+References: <20100325152505.17612.40158.stgit@pauliusz>
+	<alpine.LFD.2.00.1003251225500.694@xanadu.home>
+	<4BB33988.9070608@gmail.com> <1272023778.6917.6.camel@localhost>
+	<alpine.LFD.2.00.1004230853230.7232@xanadu.home>
+Message-ID: <1272035596.11751.1437.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2010-04-23 at 08:54 -0400, Nicolas Pitre wrote:
+> On Fri, 23 Apr 2010, Artem Bityutskiy wrote:
+> 
+> > On Wed, 2010-03-31 at 15:01 +0300, Paulius Zaleckas wrote:
+> > > On 03/25/2010 06:26 PM, Nicolas Pitre wrote:
+> > > > On Thu, 25 Mar 2010, Paulius Zaleckas wrote:
+> > > >
+> > > >> We must tell GCC to use even register for variable passed
+> > > >> to ldrd instruction. Without this patch GCC 4.2.1 puts this
+> > > >> variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
+> > > >> r2/r3. This does not change anything when EABI and OABI
+> > > >> compilation works OK.
+> > > >>
+> > > >> Without this patch and with OABI I get:
+> > > >>    CC      drivers/mtd/nand/orion_nand.o
+> > > >> /tmp/ccMkwOCs.s: Assembler messages:
+> > > >> /tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
+> > > >> make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
+> > > >>
+> > > >> Signed-off-by: Paulius Zaleckas<paulius.zaleckas@gmail.com>
+> > > >
+> > > > Acked-by: Nicolas Pitre<nico@fluxnic.net>
+> > > 
+> > > David,
+> > > 
+> > > Will you take this patch?
+> > > Or you are waiting till I will add all Cc as Jamie suggested?
+> > 
+> > Meanwhile, I've pushed your patch to my l2-mtd-2.6.git / dunno.
+> 
+> I think it should go to mainline.  It is not perfect, but still better 
+> than the current situation.
 
-I'm trying to figure out how to correctly implement sched_clock()
-for an ARM board.  However, looking at existing implementations
-leaves me rather confused.
+Fine with me, but not up to me. But I guess Andrew could merge it.
 
-E.g. arch/arm/mach-u300/timer.c has
-
-static cycle_t u300_get_cycles(struct clocksource *cs)
-{
-	return (cycles_t) readl(U300_TIMER_APP_VBASE + U300_TIMER_APP_GPT2CC);
-}
-
-static struct clocksource clocksource_u300_1mhz = {
-	.name           = "GPT2",
-	.rating         = 300, /* Reasonably fast and accurate clock source */
-	.read           = u300_get_cycles,
-	.mask           = CLOCKSOURCE_MASK(32), /* 32 bits */
-	/* 22 calculated using the algorithm in arch/mips/kernel/time.c */
-	.shift          = 22,
-	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
-};
-
-unsigned long long notrace sched_clock(void)
-{
-	return clocksource_cyc2ns(clocksource_u300_1mhz.read(
-				  &clocksource_u300_1mhz),
-				  clocksource_u300_1mhz.mult,
-				  clocksource_u300_1mhz.shift);
-}
-
-Thus, sched_clock() is based on a 1MHz 32bit counter which wraps
-after about 71 minutes.  There are a few similar sched_clock()
-implementations in the tree.
-
-Questions:
-
-- Isn't sched_clock() supposed to be extended to 64bit so
-  that it practically never wraps?
-  (old implementations use cnt32_to_63())
-
-- What would be the effect on scheduling when sched_clock() wraps?
-
-- What is the effect of the sched_clock() frequency on scheduling?
-  Is there a benefit from setting the freq as high as possible?
-
-- Is struct timecounter + struct cyclecounter + timecounter_read()
-  designated way to implement sched_clock() with a 32bit hw counter?
-
-  arch/microblaze/kernel/timer.c seems to be the only user
-  of timecounter/cyclecounter in arch/, but I don't get what it does.
-
-  Or is it better to stick with cnt32_to_63()?
-
-- Also regarding the clocksource.shift value, I found
-  http://lkml.org/lkml/2008/5/8/270 and it seems to suggest
-  to use a low shift value, whereas arch/mips/kernel/time.c
-  seems to result in a large one. Is the posting correct?
-
-
-Thanks,
-Johannes
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
