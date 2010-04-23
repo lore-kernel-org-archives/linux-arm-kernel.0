@@ -1,50 +1,43 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 23 Apr 2010 18:13:16 +0300
-Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <alpine.LFD.2.00.1004230853230.7232@xanadu.home>
-References: <20100325152505.17612.40158.stgit@pauliusz>
-	<alpine.LFD.2.00.1003251225500.694@xanadu.home>
-	<4BB33988.9070608@gmail.com> <1272023778.6917.6.camel@localhost>
-	<alpine.LFD.2.00.1004230853230.7232@xanadu.home>
-Message-ID: <1272035596.11751.1437.camel@localhost.localdomain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Apr 2010 16:37:46 +0100
+Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
+In-Reply-To: <20100331182518.GA30522@debian>
+References: <20100331182518.GA30522@debian>
+Message-ID: <1272037066.15107.58.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-04-23 at 08:54 -0400, Nicolas Pitre wrote:
-> On Fri, 23 Apr 2010, Artem Bityutskiy wrote:
+On Wed, 2010-03-31 at 19:25 +0100, Rabin Vincent wrote:
+> From bf828a0c069b1bb3f6bf4e68f1dceecab396c286 Mon Sep 17 00:00:00 2001
+> From: Rabin Vincent <rabin@rab.in>
+> Date: Sun, 14 Feb 2010 01:18:34 +0530
+> Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
 > 
-> > On Wed, 2010-03-31 at 15:01 +0300, Paulius Zaleckas wrote:
-> > > On 03/25/2010 06:26 PM, Nicolas Pitre wrote:
-> > > > On Thu, 25 Mar 2010, Paulius Zaleckas wrote:
-> > > >
-> > > >> We must tell GCC to use even register for variable passed
-> > > >> to ldrd instruction. Without this patch GCC 4.2.1 puts this
-> > > >> variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
-> > > >> r2/r3. This does not change anything when EABI and OABI
-> > > >> compilation works OK.
-> > > >>
-> > > >> Without this patch and with OABI I get:
-> > > >>    CC      drivers/mtd/nand/orion_nand.o
-> > > >> /tmp/ccMkwOCs.s: Assembler messages:
-> > > >> /tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
-> > > >> make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
-> > > >>
-> > > >> Signed-off-by: Paulius Zaleckas<paulius.zaleckas@gmail.com>
-> > > >
-> > > > Acked-by: Nicolas Pitre<nico@fluxnic.net>
-> > > 
-> > > David,
-> > > 
-> > > Will you take this patch?
-> > > Or you are waiting till I will add all Cc as Jamie suggested?
-> > 
-> > Meanwhile, I've pushed your patch to my l2-mtd-2.6.git / dunno.
+> Fix the mcount routines to build and run on a kernel built with the
+> Thumb-2 instruction set by correcting the following errors using the
+> fixes suggested by Catalin Marinas:
 > 
-> I think it should go to mainline.  It is not perfect, but still better 
-> than the current situation.
+>  - Problem: The following assembler errors appear at the "adr r0,
+>    ftrace_stub" instruction:
+> 
+>    entry-common.S: Assembler messages:
+>    entry-common.S:179: Error: invalid immediate for address calculation (value = 0x00000004)
+> 
+>    Fix: The errors don't occur with a non-global symbol, so use one.
+> 
+>  - Problem: The "mov lr, pc" does not set the lsb when storing the pc in
+>    lr.  The called function returns with "bx lr", and the mode changes
+>    to ARM.
+> 
+>    Fix: Add a label on the return address and use "adr lr, BSYM(label)".
+> 
+> We don't modify the old mcount because it won't be built when using
+> Thumb-2.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Fine with me, but not up to me. But I guess Andrew could merge it.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Catalin
