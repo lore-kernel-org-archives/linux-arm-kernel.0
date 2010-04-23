@@ -1,56 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Apr 2010 16:11:07 -0700
-Subject: [PATCH 03/28] omap: gpio: fix incorrect matching of IRQ_TYPE_EDGE_BOTH
+Date: Fri, 23 Apr 2010 16:11:12 -0700
+Subject: [PATCH 04/28] omap: DMA: Init CDAC to zero
 In-Reply-To: <20100423230829.31953.17334.stgit@baageli.muru.com>
 References: <20100423230829.31953.17334.stgit@baageli.muru.com>
-Message-ID: <20100423231107.31953.72733.stgit@baageli.muru.com>
+Message-ID: <20100423231112.31953.32544.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+From: manjugk manjugk <manjugk@ti.com>
 
-Since IRQ_TYPE_EDGE_BOTH is defined as (IRQ_TYPE_EDGE_FALLING |
-IRQ_TYPE_EDGE_RISING), testing against it with a bitwise AND also matches
-both single-edge cases in addition to the intended both edges case. Fix it,
-replacing with a more accurate expression.
+The register DMA4_CDAC needs to be initialized to zero
+before starting DMA transfer.
 
-Created and tested againts linux-2.6.34-rc3.
-Applicable to 2.6.33-stable as well.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Govindraj R <govindraj.raja@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Reported-by:S, Venkatraman <svenkatr@ti.com>
+Signed-off-by: Manjunatha GK <manjugk@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/gpio.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/dma.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 76a347b..45a225d 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -798,7 +798,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- 	case METHOD_MPUIO:
- 		reg += OMAP_MPUIO_GPIO_INT_EDGE;
- 		l = __raw_readl(reg);
--		if (trigger & IRQ_TYPE_EDGE_BOTH)
-+		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
- 			bank->toggle_mask |= 1 << gpio;
- 		if (trigger & IRQ_TYPE_EDGE_RISING)
- 			l |= 1 << gpio;
-@@ -812,7 +812,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- 	case METHOD_GPIO_1510:
- 		reg += OMAP1510_GPIO_INT_CONTROL;
- 		l = __raw_readl(reg);
--		if (trigger & IRQ_TYPE_EDGE_BOTH)
-+		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
- 			bank->toggle_mask |= 1 << gpio;
- 		if (trigger & IRQ_TYPE_EDGE_RISING)
- 			l |= 1 << gpio;
-@@ -846,7 +846,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
- 	case METHOD_GPIO_7XX:
- 		reg += OMAP7XX_GPIO_INT_CONTROL;
- 		l = __raw_readl(reg);
--		if (trigger & IRQ_TYPE_EDGE_BOTH)
-+		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
- 			bank->toggle_mask |= 1 << gpio;
- 		if (trigger & IRQ_TYPE_EDGE_RISING)
- 			l |= 1 << gpio;
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 2ab224c..f6c9bdc 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -936,6 +936,15 @@ void omap_start_dma(int lch)
+ {
+ 	u32 l;
+ 
++	/*
++	 * The CPC/CDAC register needs to be initialized to zero
++	 * before starting dma transfer.
++	 */
++	if (cpu_is_omap15xx())
++		dma_write(0, CPC(lch));
++	else
++		dma_write(0, CDAC(lch));
++
+ 	if (!omap_dma_in_1510_mode() && dma_chan[lch].next_lch != -1) {
+ 		int next_lch, cur_lch;
+ 		char dma_chan_link_map[OMAP_DMA4_LOGICAL_DMA_CH_COUNT];
