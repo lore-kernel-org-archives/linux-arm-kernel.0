@@ -1,58 +1,126 @@
-From: janboe.ye@gmail.com (Janboe Ye)
-Date: Fri, 23 Apr 2010 12:26:26 +0800
-Subject: [PATCH 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <20100423041106.GG3028@esdhcp04058.research.nokia.com>
-References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-	<20100422120308.GD26418@gw.healthdatacare.com>
-	<20100423030556.GA8012@localhost.localdomain>
-	<20100423041106.GG3028@esdhcp04058.research.nokia.com>
-Message-ID: <20100423042626.GA2997@localhost.localdomain>
+From: post@hendrik-sattler.de (Hendrik Sattler)
+Date: Fri, 23 Apr 2010 06:36:59 +0200
+Subject: [PATCH] USB: gadget: pxa25x: support additional IXP425 steppings
+In-Reply-To: <1271987339-4659-1-git-send-email-steveb@workware.net.au>
+References: <CDBB3FAC-22FA-43F8-ADD1-FC8C57ABCD1E@workware.net.au>
+	<1271987339-4659-1-git-send-email-steveb@workware.net.au>
+Message-ID: <201004230636.59351.post@hendrik-sattler.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are some other hard code address in some boards.
+Am Freitag 23 April 2010 03:48:59 schrieb Steve Bennett:
+> Use generic cpu_is_...
+> Modified version of patch by Hendrik Sattler
+> 
+> Signed-off-by: Steve Bennett <steveb@workware.net.au>
 
-For example, beagle board boot_params is 0x80000100.
+I'd really like to see this go in.
 
-I guest nokia's Nseris does not use atags for transfering params.
+Signed-off-by: Hendrik Sattler<post@hendrik-sattler.de>
 
-When I test my relocated kernel, it blocks at machinee initialization.
-
-Maybe there is other address mapping issue. I will look it tomorrow.
-
-Janboe
-
-On Fri, Apr 23, 2010 at 07:11:06AM +0300, Mika Westerberg wrote:
-> On Fri, Apr 23, 2010 at 05:05:56AM +0200, ext Janboe Ye wrote:
-> > I am trying this. But it seems need to do a lot work to make kdump
-> > to work on other omap3 board.
+> ---
+>  drivers/usb/gadget/pxa25x_udc.c |   74
+> +++++++------------------------------- 1 files changed, 14 insertions(+),
+> 60 deletions(-)
 > 
-> You need to have userspace tools (in this case kexec-tools) which load the
-> crashkernel into the running kernel. I'm planning to send my kexec-tools
-> patches to upstream after the kernel part is accepted (so that they can be
-> in sync) but I can provide you the patches if needed.
+> diff --git a/drivers/usb/gadget/pxa25x_udc.c
+> b/drivers/usb/gadget/pxa25x_udc.c index be5fb34..b63b65c 100644
+> --- a/drivers/usb/gadget/pxa25x_udc.c
+> +++ b/drivers/usb/gadget/pxa25x_udc.c
+> @@ -2096,39 +2096,11 @@ static struct pxa25x_udc memory = {
+>  #endif /* !CONFIG_USB_PXA25X_SMALL */
+>  };
 > 
-> For kernel part, I believe only thing that needs to be done is to make sure
-> that PHYS_OFFSET of the crashkernel is configured correctly.
+> -#define CP15R0_VENDOR_MASK	0xffffe000
+> -
+> -#if	defined(CONFIG_ARCH_PXA)
+> -#define CP15R0_XSCALE_VALUE	0x69052000	/* intel/arm/xscale */
+> -
+> -#elif	defined(CONFIG_ARCH_IXP4XX)
+> -#define CP15R0_XSCALE_VALUE	0x69054000	/* intel/arm/ixp4xx */
+> -
+> -#endif
+> -
+>  #define CP15R0_PROD_MASK	0x000003f0
+> -#define PXA25x			0x00000100	/* and PXA26x */
+> -#define PXA210			0x00000120
+> -
+>  #define CP15R0_REV_MASK		0x0000000f
+> -
+>  #define CP15R0_PRODREV_MASK	(CP15R0_PROD_MASK | CP15R0_REV_MASK)
 > 
-> For example in my platform (and I guess all OMAP3s) physical memory starts
-> at 0x80000000 and this is the PHYS_OFFSET used by the primary kernel. I decided
-> to load crashkernel at physical address 0x84000000.
+>  #define PXA255_A0		0x00000106	/* or PXA260_B1 */
+> -#define PXA250_C0		0x00000105	/* or PXA26x_B0 */
+> -#define PXA250_B2		0x00000104
+> -#define PXA250_B1		0x00000103	/* or PXA260_A0 */
+> -#define PXA250_B0		0x00000102
+> -#define PXA250_A1		0x00000101
+> -#define PXA250_A0		0x00000100
+> -
+> -#define PXA210_C0		0x00000125
+> -#define PXA210_B2		0x00000124
+> -#define PXA210_B1		0x00000123
+> -#define PXA210_B0		0x00000122
+> -#define IXP425_A0		0x000001c1
+> -#define IXP425_B0		0x000001f1
+> -#define IXP465_AD		0x00000200
 > 
-> So I boot the primary kernel with 'crashkernel=32M at 0x84000000'. Now memory for
-> crashkernel is reserved.
+>  /*
+>   *	probe - binds to the platform device
+> @@ -2137,42 +2109,24 @@ static int __init pxa25x_udc_probe(struct
+> platform_device *pdev) {
+>  	struct pxa25x_udc *dev = &memory;
+>  	int retval, vbus_irq, irq;
+> -	u32 chiprev;
 > 
-> Only thing left is to load the craskernel itself which is done like (with patched
-> kexec-tools):
+> -	/* insist on Intel/ARM/XScale */
+> -	asm("mrc%? p15, 0, %0, c0, c0" : "=r" (chiprev));
+> -	if ((chiprev & CP15R0_VENDOR_MASK) != CP15R0_XSCALE_VALUE) {
+> -		pr_err("%s: not XScale!\n", driver_name);
+> -		return -ENODEV;
+> -	}
+> +#if defined(CONFIG_ARCH_PXA)
+> +	if (cpu_is_pxa210() || cpu_is_pxa25x()) {
+> +		if ((read_cpuid_id() & CP15R0_PRODREV_MASK) == PXA255_A0)
+> +			dev->has_cfr = 1;
+> +		/* PXA250_A0/A1 "not released"; ep 13, 15 unusable */
+> +		/* PXA21x/PXA25x with stepping < C0: OUT-DMA is broken ... */
+> +	} else {
 > 
-> 	# kexec -p /boot/zImage.crash --command-line="..."
-> 
-> What kind of problems you are having?
-> 
-> Thanks,
-> MW
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -	/* trigger chiprev-specific logic */
+> -	switch (chiprev & CP15R0_PRODREV_MASK) {
+> -#if	defined(CONFIG_ARCH_PXA)
+> -	case PXA255_A0:
+> -		dev->has_cfr = 1;
+> -		break;
+> -	case PXA250_A0:
+> -	case PXA250_A1:
+> -		/* A0/A1 "not released"; ep 13, 15 unusable */
+> -		/* fall through */
+> -	case PXA250_B2: case PXA210_B2:
+> -	case PXA250_B1: case PXA210_B1:
+> -	case PXA250_B0: case PXA210_B0:
+> -		/* OUT-DMA is broken ... */
+> -		/* fall through */
+> -	case PXA250_C0: case PXA210_C0:
+> -		break;
+> -#elif	defined(CONFIG_ARCH_IXP4XX)
+> -	case IXP425_A0:
+> -	case IXP425_B0:
+> -	case IXP465_AD:
+> +#elif defined(CONFIG_ARCH_IXP4XX)
+> +	if (cpu_is_ixp42x() || cpu_is_ixp43x() || cpu_is_ixp46x())
+>  		dev->has_cfr = 1;
+> -		break;
+> +	else {
+> +
+> +#else
+> +	{
+>  #endif
+> -	default:
+> -		pr_err("%s: unrecognized processor: %08x\n",
+> -			driver_name, chiprev);
+> +		pr_err("%s: unrecognized processor\n", driver_name);
+>  		/* iop3xx, ixp4xx, ... */
+>  		return -ENODEV;
+>  	}
