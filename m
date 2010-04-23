@@ -1,120 +1,75 @@
-From: steveb@workware.net.au (Steve Bennett)
-Date: Fri, 23 Apr 2010 11:48:59 +1000
-Subject: [PATCH] USB: gadget: pxa25x: support additional IXP425 steppings
-In-Reply-To: <CDBB3FAC-22FA-43F8-ADD1-FC8C57ABCD1E@workware.net.au>
-References: <CDBB3FAC-22FA-43F8-ADD1-FC8C57ABCD1E@workware.net.au>
-Message-ID: <1271987339-4659-1-git-send-email-steveb@workware.net.au>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Fri, 23 Apr 2010 10:36:44 +0800
+Subject: [PATCH - kexec] arm: place initrd to safer place according to zImage
+	length
+Message-ID: <h2xf17812d71004221936s779a4585r8b458f7f2630f7b1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use generic cpu_is_...
-Modified version of patch by Hendrik Sattler
+commit 4b6d55c7780dbf383c6b64e560d459d15a891006
+Author: Eric Miao <eric.miao@canonical.com>
+Date:   Fri Apr 23 10:19:43 2010 +0800
 
-Signed-off-by: Steve Bennett <steveb@workware.net.au>
----
- drivers/usb/gadget/pxa25x_udc.c |   74 +++++++-------------------------------
- 1 files changed, 14 insertions(+), 60 deletions(-)
+    arm: place initrd to safer place according to zImage length
 
-diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
-index be5fb34..b63b65c 100644
---- a/drivers/usb/gadget/pxa25x_udc.c
-+++ b/drivers/usb/gadget/pxa25x_udc.c
-@@ -2096,39 +2096,11 @@ static struct pxa25x_udc memory = {
- #endif /* !CONFIG_USB_PXA25X_SMALL */
- };
- 
--#define CP15R0_VENDOR_MASK	0xffffe000
--
--#if	defined(CONFIG_ARCH_PXA)
--#define CP15R0_XSCALE_VALUE	0x69052000	/* intel/arm/xscale */
--
--#elif	defined(CONFIG_ARCH_IXP4XX)
--#define CP15R0_XSCALE_VALUE	0x69054000	/* intel/arm/ixp4xx */
--
--#endif
--
- #define CP15R0_PROD_MASK	0x000003f0
--#define PXA25x			0x00000100	/* and PXA26x */
--#define PXA210			0x00000120
--
- #define CP15R0_REV_MASK		0x0000000f
--
- #define CP15R0_PRODREV_MASK	(CP15R0_PROD_MASK | CP15R0_REV_MASK)
- 
- #define PXA255_A0		0x00000106	/* or PXA260_B1 */
--#define PXA250_C0		0x00000105	/* or PXA26x_B0 */
--#define PXA250_B2		0x00000104
--#define PXA250_B1		0x00000103	/* or PXA260_A0 */
--#define PXA250_B0		0x00000102
--#define PXA250_A1		0x00000101
--#define PXA250_A0		0x00000100
--
--#define PXA210_C0		0x00000125
--#define PXA210_B2		0x00000124
--#define PXA210_B1		0x00000123
--#define PXA210_B0		0x00000122
--#define IXP425_A0		0x000001c1
--#define IXP425_B0		0x000001f1
--#define IXP465_AD		0x00000200
- 
- /*
-  *	probe - binds to the platform device
-@@ -2137,42 +2109,24 @@ static int __init pxa25x_udc_probe(struct platform_device *pdev)
+    The original fixed address of 0x800000 may be overwritten after the
+    kernel is decompressed.  Assume a maximum decompression ratio of 4
+    and place initrd right after that, just to be safer.
+
+    Signed-off-by: Eric Miao <eric.miao@canonical.com>
+
+diff --git a/kexec/arch/arm/kexec-zImage-arm.c
+b/kexec/arch/arm/kexec-zImage-arm.c
+index 72fcdd8..1a446d9 100644
+--- a/kexec/arch/arm/kexec-zImage-arm.c
++++ b/kexec/arch/arm/kexec-zImage-arm.c
+@@ -130,7 +130,7 @@ struct tag * atag_read_tags(void)
+ static
+ int atag_arm_load(struct kexec_info *info, unsigned long base,
+ 	const char *command_line, off_t command_line_len,
+-	const char *initrd, off_t initrd_len)
++	const char *initrd, off_t initrd_len, off_t initrd_off)
  {
- 	struct pxa25x_udc *dev = &memory;
- 	int retval, vbus_irq, irq;
--	u32 chiprev;
- 
--	/* insist on Intel/ARM/XScale */
--	asm("mrc%? p15, 0, %0, c0, c0" : "=r" (chiprev));
--	if ((chiprev & CP15R0_VENDOR_MASK) != CP15R0_XSCALE_VALUE) {
--		pr_err("%s: not XScale!\n", driver_name);
--		return -ENODEV;
--	}
-+#if defined(CONFIG_ARCH_PXA)
-+	if (cpu_is_pxa210() || cpu_is_pxa25x()) {
-+		if ((read_cpuid_id() & CP15R0_PRODREV_MASK) == PXA255_A0)
-+			dev->has_cfr = 1;
-+		/* PXA250_A0/A1 "not released"; ep 13, 15 unusable */
-+		/* PXA21x/PXA25x with stepping < C0: OUT-DMA is broken ... */
-+	} else {
- 
--	/* trigger chiprev-specific logic */
--	switch (chiprev & CP15R0_PRODREV_MASK) {
--#if	defined(CONFIG_ARCH_PXA)
--	case PXA255_A0:
--		dev->has_cfr = 1;
--		break;
--	case PXA250_A0:
--	case PXA250_A1:
--		/* A0/A1 "not released"; ep 13, 15 unusable */
--		/* fall through */
--	case PXA250_B2: case PXA210_B2:
--	case PXA250_B1: case PXA210_B1:
--	case PXA250_B0: case PXA210_B0:
--		/* OUT-DMA is broken ... */
--		/* fall through */
--	case PXA250_C0: case PXA210_C0:
--		break;
--#elif	defined(CONFIG_ARCH_IXP4XX)
--	case IXP425_A0:
--	case IXP425_B0:
--	case IXP465_AD:
-+#elif defined(CONFIG_ARCH_IXP4XX)
-+	if (cpu_is_ixp42x() || cpu_is_ixp43x() || cpu_is_ixp46x())
- 		dev->has_cfr = 1;
--		break;
-+	else {
+ 	struct tag *saved_tags = atag_read_tags();
+ 	char *buf;
+@@ -196,10 +196,8 @@ int atag_arm_load(struct kexec_info *info,
+unsigned long base,
+ 	add_segment(info, buf, len, base, len);
+
+ 	if (initrd) {
+-		struct memory_range *range;
+-		int ranges;
+-		get_memory_ranges(&range, &ranges, info->kexec_flags);
+-		*initrd_start = locate_hole(info, initrd_len, getpagesize(),
+range[0].start + 0x800000, ULONG_MAX, INT_MAX);
++		*initrd_start = locate_hole(info, initrd_len, getpagesize(),
++				initrd_off, ULONG_MAX, INT_MAX);
+ 		if (*initrd_start == ULONG_MAX)
+ 			return -1;
+ 		add_segment(info, initrd, initrd_len, *initrd_start, initrd_len);
+@@ -219,6 +217,7 @@ int zImage_arm_load(int argc, char **argv, const
+char *buf, off_t len,
+ 	const char *ramdisk;
+ 	char *ramdisk_buf;
+ 	off_t ramdisk_length;
++	off_t ramdisk_offset;
+ 	int opt;
+ #define OPT_APPEND	'a'
+ #define OPT_RAMDISK	'r'
+@@ -271,9 +270,14 @@ int zImage_arm_load(int argc, char **argv, const
+char *buf, off_t len,
+ 	if (base == ULONG_MAX)
+ 		return -1;
+
++	/* assume the maximum kernel compression ratio is 4,
++	 * and just to be safe, place ramdisk after that
++	 */
++	ramdisk_offset = base + len * 4;
 +
-+#else
-+	{
- #endif
--	default:
--		pr_err("%s: unrecognized processor: %08x\n",
--			driver_name, chiprev);
-+		pr_err("%s: unrecognized processor\n", driver_name);
- 		/* iop3xx, ixp4xx, ... */
- 		return -ENODEV;
- 	}
--- 
-1.7.0.3
+ 	if (atag_arm_load(info, base + atag_offset,
+ 			 command_line, command_line_len,
+-			 ramdisk_buf, ramdisk_length)    == -1)
++			 ramdisk_buf, ramdisk_length, ramdisk_offset) == -1)
+ 		return -1;
+
+ 	add_segment(info, buf, len, base + offset, len);
