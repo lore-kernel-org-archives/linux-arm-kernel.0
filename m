@@ -1,47 +1,59 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 23 Apr 2010 09:17:41 +0300
-Subject: [PATCH] arm/plat-mxc: Fix forgotten renaming in timer.c
-In-Reply-To: <1271998183-14294-1-git-send-email-w.sang@pengutronix.de>
-References: <1271998183-14294-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20100423061741.GA2112@matterhorn.lan>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 23 Apr 2010 09:33:08 +0300
+Subject: [PATCH v2.6.34-rc2] s3c: Fix GPIOs bank H and J not being
+	preserved during suspend on S3C24XX
+In-Reply-To: <1269937386-7597-1-git-send-email-chripell@fsfe.org>
+References: <1269937386-7597-1-git-send-email-chripell@fsfe.org>
+Message-ID: <201004230933.21902.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Apr 23, Wolfram Sang wrote:
-> Commit "mxc: Change gpt timer code to be more generic by using V2
-> instead of MX3" forgot to replace one occurence causing a build
-> failure.
+? ????????? ?? 30 ????? 2010 11:23:06 ????? Christian Pellegrin ???????:
+> With this patch the platform-specific define for the last defined GPIO
+> on S3C machines is used instead of a hard-coded value (which is right
+> only for the s3c2410). The gpio_nr being incremented by 1 too much (look
+> for the gpio_nr++ in the for instruction) is fixed too although it
+> doesn't make any trouble on current S3C implementations.
 > 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Amit Kucheria <amit.kucheria@canonical.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-
-Oops-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
-
-Thanks for the catch. :)
+> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
 > ---
->  arch/arm/plat-mxc/time.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s3c2410/include/mach/gpio-track.h |    2 +-
+>  arch/arm/plat-samsung/pm-gpio.c                 |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-> index 714bdef..f9a1b05 100644
-> --- a/arch/arm/plat-mxc/time.c
-> +++ b/arch/arm/plat-mxc/time.c
-> @@ -102,7 +102,7 @@ static void gpt_irq_acknowledge(void)
->  			__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP,
->  				timer_base + MX1_2_TSTAT);
->  	} else if (timer_is_v2())
-> -		__raw_writel(MX3_TSTAT_OF1, timer_base + MX3_TSTAT);
-> +		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+> b/arch/arm/mach-s3c2410/include/mach/gpio-track.h index acb2591..6371eaa
+> 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+> @@ -23,7 +23,7 @@ static inline struct s3c_gpio_chip
+> *s3c_gpiolib_getchip(unsigned int pin) {
+>  	struct s3c_gpio_chip *chip;
+> 
+> -	if (pin > S3C2410_GPG(10))
+> +	if (pin > S3C_GPIO_END)
+>  		return NULL;
+> 
+>  	chip = &s3c24xx_gpios[pin/32];
+> diff --git a/arch/arm/plat-samsung/pm-gpio.c
+> b/arch/arm/plat-samsung/pm-gpio.c index 69a4c7f..1aac746 100644
+> --- a/arch/arm/plat-samsung/pm-gpio.c
+> +++ b/arch/arm/plat-samsung/pm-gpio.c
+> @@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+>  			  ourchip->pm_save[2],
+>  			  ourchip->pm_save[3]);
+> 
+> -		gpio_nr += ourchip->chip.ngpio;
+> +		gpio_nr += ourchip->chip.ngpio - 1;
+>  		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+>  	}
 >  }
->  
->  static cycle_t mx1_2_get_cycles(struct clocksource *cs)
-> -- 
-> 1.7.0
-> 
-
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100423/4a85e3ff/attachment.sig>
