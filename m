@@ -1,76 +1,124 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 23 Apr 2010 15:06:03 -0400 (EDT)
-Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <20100325204619.GC19308@shareable.org>
-References: <20100325152505.17612.40158.stgit@pauliusz>
-	<20100325204619.GC19308@shareable.org>
-Message-ID: <alpine.LFD.2.00.1004231443340.7232@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 23 Apr 2010 21:26:46 +0200
+Subject: [RFC PATCH 08/10] imx: Add MX53 core support
+In-Reply-To: <DE2504B3A515524BBE6934369EFDC0DA0937E261@az33exm20.fsl.freescale.net>
+References: <1271446524-26450-9-git-send-email-r.herring@freescale.com>
+	<20100418023517.GC7882@pengutronix.de>
+	<DE2504B3A515524BBE6934369EFDC0DA0937E261@az33exm20.fsl.freescale.net>
+Message-ID: <20100423192646.GA18310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Mar 2010, Jamie Lokier wrote:
+On Mon, Apr 19, 2010 at 07:53:11AM -0700, Herring Robert-RA7055 wrote:
+> Sasha,
+I'm always annoyed when people mistype my name, but I don't want to be
+appear too picky about it.  So I hint you for Sascha (with a 'c') here
+to save him from appearing too picky :-)
 
-> Paulius Zaleckas wrote:
-> > Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+> > Sent: Saturday, April 17, 2010 9:35 PM
+> > To: Herring Robert-RA7055
+> > Cc: linux-arm-kernel at lists.infradead.org; amit.kucheria at canonical.com
+> > Subject: Re: [RFC PATCH 08/10] imx: Add MX53 core support
+> > 
+> > On Fri, Apr 16, 2010 at 02:35:22PM -0500, Rob Herring wrote:
+> > 
+> > [snip]
+> > 
+> > > +
+> > > +void __init mx5x_init_irq(void)
+> > 
+> > What does the x stand for? Obviously not 1, so how about 
+> > mx53_init_irq?
 > 
-> It's probably worth including the people who weighed in on the
-> discussion with 'Cc:' headers.
+> All new MX5 chips will have memory map similar to MX53 rather than MX51.
+> So this function will cover at least MX53 and MX50.
+I agree with Sascha here. mx5x should only be used if x can be 1, too.
+Otherwise you need to think about another name.  I don't have a good
+idea though.  If I had to choose a name I might use fish names to group
+them, only fearing we will start to discuss which fishes to choose :-)
+ 
+> > > +{
+> > > +	void __iomem *tzic_virt;
+> > > +
+> > > +	tzic_virt = ioremap(MX5x_TZIC_BASE_ADDR, SZ_4K);
+> > > +	if (!tzic_virt)
+> > > +		panic("unable to map TZIC interrupt controller\n");
+> > > +	tzic_init_irq(tzic_virt);
+> > > +}
+> > > +
+> > > diff --git a/arch/arm/plat-mxc/devices.c 
+> > b/arch/arm/plat-mxc/devices.c
+> > > index 56f2fb5..7c4c722 100644
+> > > --- a/arch/arm/plat-mxc/devices.c
+> > > +++ b/arch/arm/plat-mxc/devices.c
+> > > @@ -20,13 +20,26 @@
+> > >  #include <linux/init.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <mach/common.h>
+> > > +#include <mach/hardware.h>
+> > >  
+> > >  int __init mxc_register_device(struct platform_device 
+> > *pdev, void *data)
+> > >  {
+> > >  	int ret;
+> > > +	int i;
+> > >  
+> > >  	pdev->dev.platform_data = data;
+> > >  
+> > > +	if (cpu_is_mx53()) {
+> > > +		for (i = 0; i < pdev->num_resources; i++) {
+> > > +			struct resource *r = &pdev->resource[i];
+> > > +			if (resource_type(r) != IORESOURCE_MEM)
+> > > +				continue;
+> > > +
+> > > +			r->start = MX5x_FIXUP_ADDR(r->start);
+> > > +			r->end = MX5x_FIXUP_ADDR(r->end);
+> > > +		}
+> > > +	}
+> > 
+> > This MX5x_FIXUP_ADDR stuff really looks painful. Please just 
+> > use proper
+> > MX53_ defines and use them where appropriate. We can really effort a
+> > duplicate set of resources when both i.MX51 and i.MX53 support are
+> > compiled in. You might have a look how Uwe did this in
+> > arch/arm/mach-mx2/devices.c.
+> > 
 > 
-> > -		uint64_t x;
-> > +		/*
-> > +		 * Since GCC has no proper constraint (PR 43518)
-> > +		 * force x variable to r2/r3 registers as ldrd instruction
-> > +		 * requires first register to be even.
-> > +		 */
-> > +		register uint64_t x asm ("r2");
-> > +
-> >  		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
-> >  		buf64[i++] = x;
+> I agree it is a bit ugly, but it is all in effort to run a single kernel
+> image. It is a 10 line change vs. 100's of lines of code
+> duplicated/renamed. At that point, the question would be why even put
+> them in the same mach dir because very little code would be common. MX2
+> situation is a bit different as the top-level memory map is the same,
+> but the peripherals are mixed up. Taking the MX2 approach, you will then
+> have namespace collision with the device names, so all those need to be
+> renamed too.
 > 
-> The "register...asm" looks fine, but it occurs to me the constraints
-> are too weak (and they were before), so GCC could optimise that to the
-> wrong behaviour.
-> 
-> The "volatile" prevents GCC deleting the asm if it's output isn't
-> used, but it doesn't stop GCC from reordering the asms, for example if
-> it decides to unroll the loop.  It probably won't reorder in that
-> case, but it could.  The result would be out of order values stored
-> into buf[].  It could even move the ldrd earlier than the prior byte
-> accesses, or after the later byte accesses.
+> What if I make the runtime fix-up only be done when building both chips?
+on an mx51-only build it's already optimised by the compiler,
+nevertheless I second Sascha here.  MX5x_FIXUP_ADDR is obfuscating.
+Still more in an if (cpu_is_mx53()) block.
 
-I don't see how that could happen.  The store into buf[] puts a 
-dependency on the output constraint of the inline asm statement.  And by 
-vertue of being volatile, gcc cannot cache the result of the output from 
-the asm as if it was a pure function.
+My long-term plan here is to use functions instead of static (and
+probably duplicated) device structs.  A while back I sent a patch:
 
-> Any one of these should fix it:
-> 
->    - Make io_base a pointer-to-volatile-u64 or cast it in the asm, and
->      make sure to dereference it and use an "m" constraint (or
->      tighter, such as "Q", if ldrd needs it).  It must be u64, not
->      pointer-to-void, to tell GCC the size.  That tells GCC which memory
->      the asm accesses, and the volatile dereference should tell GCC
->      not to reorder them in principle (but the GCC manual doesn't
->      make a specific promise about this for asms).
+	http://mid.gmane.org/1258403708-10287-16-git-send-email-u.kleine-koenig at pengutronix.de
 
-The LDRD has special range constraints on its addressing mode which is 
-not expressable with any of the available gcc memory constraints.
+I couldn't convice Sascha to consider it good, but I still think it's
+the best approach.  Only the existing devices are created and the
+functions like imx_add_mxc_nand live in .init.text and so don't occupy
+memory after booting.
 
-> You aren't supposed to dereference pointers used with read{b,w,l}
-> anyway.  It doesn't matter in this driver because we "know" it's only
-> used on an SoC where read{b,w,l} don't do any address translation.
-> But will that always be true?  I suppose the cleanest approach is to
-> define readq, the 64-bit analogue of readl, and use that here.  x86
-> already defines readq, so it's got precedent.
+Today I'd let imx_add_mxc_nand return a pointer to the created device to
+be able to hand it over to e.g. a regulator.
 
-But yet it is not all ARM variants that can do 64-bit accesses.  
-Anything pre ARMv5 doesn't have the LDRD instruction, and the equivalent 
-LDM is not a possible substitute with regard to memory bus access 
-either.
+So I recommend using proper MX53_... defines, too, until I convinced
+Sascha to like my approach ;-)
 
-So I'd prefer to keep it as an obvious local exception that happens to 
-exploit some specifics of the actual hardware implementation rather than 
-something that was architecturally defined.
+Best regards
+Uwe
 
-
-Nicolas
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
