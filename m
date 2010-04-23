@@ -1,35 +1,76 @@
-From: rmk@ftp.linux.org.uk (Russell King)
-Date: Fri, 23 Apr 2010 19:55:20 +0100
-Subject: RMK is offline
-In-Reply-To: <20100422174820.GA3797@ZenIV.linux.org.uk>
-References: <20100422174820.GA3797@ZenIV.linux.org.uk>
-Message-ID: <20100423185519.GA27166@ZenIV.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 23 Apr 2010 15:06:03 -0400 (EDT)
+Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
+In-Reply-To: <20100325204619.GC19308@shareable.org>
+References: <20100325152505.17612.40158.stgit@pauliusz>
+	<20100325204619.GC19308@shareable.org>
+Message-ID: <alpine.LFD.2.00.1004231443340.7232@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 22, 2010 at 06:48:20PM +0100, Russell King wrote:
-> FYI, I've lost ADSL at 2am last night due to some planned engineering
-> works by the telco; currently there's no estimate on when things will
-> be returned.  Unfortunately, It's taken most of today to get the ISP
-> to note a fault - but seemingly they still haven't raised it with BT.
+On Thu, 25 Mar 2010, Jamie Lokier wrote:
 
-Update: they raised it with BT, BT say there's no fault, so bounced the
-problem back to the ISP.  The ISP ran a check, and can see that there's
-a fault in the BT network, and so have bounced the fault back to BT
-again.
+> Paulius Zaleckas wrote:
+> > Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> 
+> It's probably worth including the people who weighed in on the
+> discussion with 'Cc:' headers.
+> 
+> > -		uint64_t x;
+> > +		/*
+> > +		 * Since GCC has no proper constraint (PR 43518)
+> > +		 * force x variable to r2/r3 registers as ldrd instruction
+> > +		 * requires first register to be even.
+> > +		 */
+> > +		register uint64_t x asm ("r2");
+> > +
+> >  		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+> >  		buf64[i++] = x;
+> 
+> The "register...asm" looks fine, but it occurs to me the constraints
+> are too weak (and they were before), so GCC could optimise that to the
+> wrong behaviour.
+> 
+> The "volatile" prevents GCC deleting the asm if it's output isn't
+> used, but it doesn't stop GCC from reordering the asms, for example if
+> it decides to unroll the loop.  It probably won't reorder in that
+> case, but it could.  The result would be out of order values stored
+> into buf[].  It could even move the ldrd earlier than the prior byte
+> accesses, or after the later byte accesses.
 
-So this fault is probably going to bounce back and forth between the ISP
-and BT forth for a while.
+I don't see how that could happen.  The store into buf[] puts a 
+dependency on the output constraint of the inline asm statement.  And by 
+vertue of being volatile, gcc cannot cache the result of the output from 
+the asm as if it was a pure function.
 
-It has exactly the same symptoms as the problem we had when BT switched
-us from the 20CN to 21CN stuff, so I'm not hopeful that anything will be
-resolved soon.
+> Any one of these should fix it:
+> 
+>    - Make io_base a pointer-to-volatile-u64 or cast it in the asm, and
+>      make sure to dereference it and use an "m" constraint (or
+>      tighter, such as "Q", if ldrd needs it).  It must be u64, not
+>      pointer-to-void, to tell GCC the size.  That tells GCC which memory
+>      the asm accesses, and the volatile dereference should tell GCC
+>      not to reorder them in principle (but the GCC manual doesn't
+>      make a specific promise about this for asms).
 
-As my only other net access is (currently) via other peoples connections
-(in this case, the gliding club) I will only be checking mail and maybe
-committing stuff to my git tree very sporadically - and probably won't
-be sending any pull requests to Linus until the BT situation is sorted.
+The LDRD has special range constraints on its addressing mode which is 
+not expressable with any of the available gcc memory constraints.
 
-So in summary, please be patient, and please realise that this fault
-prevents me doing _any_ work what so ever - whether that be community or
-paid work.
+> You aren't supposed to dereference pointers used with read{b,w,l}
+> anyway.  It doesn't matter in this driver because we "know" it's only
+> used on an SoC where read{b,w,l} don't do any address translation.
+> But will that always be true?  I suppose the cleanest approach is to
+> define readq, the 64-bit analogue of readl, and use that here.  x86
+> already defines readq, so it's got precedent.
+
+But yet it is not all ARM variants that can do 64-bit accesses.  
+Anything pre ARMv5 doesn't have the LDRD instruction, and the equivalent 
+LDM is not a possible substitute with regard to memory bus access 
+either.
+
+So I'd prefer to keep it as an obvious local exception that happens to 
+exploit some specifics of the actual hardware implementation rather than 
+something that was architecturally defined.
+
+
+Nicolas
