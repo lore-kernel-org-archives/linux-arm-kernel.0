@@ -1,33 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Apr 2010 15:38:11 +0100
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)
-In-Reply-To: <20100409180033.5003.19340.stgit@e101986-lin>
-References: <20100409175628.5003.10282.stgit@e101986-lin>
-	<20100409180033.5003.19340.stgit@e101986-lin>
-Message-ID: <1272033491.15107.57.camel@e102109-lin.cambridge.arm.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Fri, 23 Apr 2010 17:09:17 +0200
+Subject: Q: sched_clock() vs. clocksource, how to implement correctly
+Message-ID: <20100423150917.GA25714@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-04-09 at 19:00 +0100, Leif Lindholm wrote:
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -152,8 +152,10 @@ ENTRY(cpu_v7_set_pte_ext)
->  
->  	tst	r1, #L_PTE_USER
->  	orrne	r3, r3, #PTE_EXT_AP1
-> +#ifndef CONFIG_SWP_EMULATE
->  	tstne	r3, #PTE_EXT_APX
->  	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
-> +#endif
+Hi,
 
-I think we could use:
+I'm trying to figure out how to correctly implement sched_clock()
+for an ARM board.  However, looking at existing implementations
+leaves me rather confused.
 
-#ifndef CONFIG_CPU_HAS_TLS_REG
-...
-#endif
+E.g. arch/arm/mach-u300/timer.c has
 
-And since we always have a TLS register on ARMv7, we can probably remove
-these lines entirely.
+static cycle_t u300_get_cycles(struct clocksource *cs)
+{
+	return (cycles_t) readl(U300_TIMER_APP_VBASE + U300_TIMER_APP_GPT2CC);
+}
 
--- 
-Catalin
+static struct clocksource clocksource_u300_1mhz = {
+	.name           = "GPT2",
+	.rating         = 300, /* Reasonably fast and accurate clock source */
+	.read           = u300_get_cycles,
+	.mask           = CLOCKSOURCE_MASK(32), /* 32 bits */
+	/* 22 calculated using the algorithm in arch/mips/kernel/time.c */
+	.shift          = 22,
+	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
+unsigned long long notrace sched_clock(void)
+{
+	return clocksource_cyc2ns(clocksource_u300_1mhz.read(
+				  &clocksource_u300_1mhz),
+				  clocksource_u300_1mhz.mult,
+				  clocksource_u300_1mhz.shift);
+}
+
+Thus, sched_clock() is based on a 1MHz 32bit counter which wraps
+after about 71 minutes.  There are a few similar sched_clock()
+implementations in the tree.
+
+Questions:
+
+- Isn't sched_clock() supposed to be extended to 64bit so
+  that it practically never wraps?
+  (old implementations use cnt32_to_63())
+
+- What would be the effect on scheduling when sched_clock() wraps?
+
+- What is the effect of the sched_clock() frequency on scheduling?
+  Is there a benefit from setting the freq as high as possible?
+
+- Is struct timecounter + struct cyclecounter + timecounter_read()
+  designated way to implement sched_clock() with a 32bit hw counter?
+
+  arch/microblaze/kernel/timer.c seems to be the only user
+  of timecounter/cyclecounter in arch/, but I don't get what it does.
+
+  Or is it better to stick with cnt32_to_63()?
+
+- Also regarding the clocksource.shift value, I found
+  http://lkml.org/lkml/2008/5/8/270 and it seems to suggest
+  to use a low shift value, whereas arch/mips/kernel/time.c
+  seems to result in a large one. Is the posting correct?
+
+
+Thanks,
+Johannes
