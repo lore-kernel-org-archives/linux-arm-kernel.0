@@ -1,41 +1,38 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 23 Apr 2010 14:56:18 +0300
-Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <4BB33988.9070608@gmail.com>
-References: <20100325152505.17612.40158.stgit@pauliusz>
-	<alpine.LFD.2.00.1003251225500.694@xanadu.home>
-	<4BB33988.9070608@gmail.com>
-Message-ID: <1272023778.6917.6.camel@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 23 Apr 2010 14:38:27 +0200
+Subject: [PATCH 2/2] i.MX35: remove get_3_3_div helper function
+In-Reply-To: <4BD172A3.8050500@ru.mvista.com>
+References: <1272008426-14435-1-git-send-email-s.hauer@pengutronix.de>
+	<1272008426-14435-3-git-send-email-s.hauer@pengutronix.de>
+	<4BD172A3.8050500@ru.mvista.com>
+Message-ID: <20100423123827.GC7882@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-31 at 15:01 +0300, Paulius Zaleckas wrote:
-> On 03/25/2010 06:26 PM, Nicolas Pitre wrote:
-> > On Thu, 25 Mar 2010, Paulius Zaleckas wrote:
-> >
-> >> We must tell GCC to use even register for variable passed
-> >> to ldrd instruction. Without this patch GCC 4.2.1 puts this
-> >> variable to r2/r3 on EABI and r3/r4 on OABI, so force it to
-> >> r2/r3. This does not change anything when EABI and OABI
-> >> compilation works OK.
-> >>
-> >> Without this patch and with OABI I get:
-> >>    CC      drivers/mtd/nand/orion_nand.o
-> >> /tmp/ccMkwOCs.s: Assembler messages:
-> >> /tmp/ccMkwOCs.s:63: Error: first destination register must be even -- `ldrd r3,[ip]'
-> >> make[5]: *** [drivers/mtd/nand/orion_nand.o] Error 1
-> >>
-> >> Signed-off-by: Paulius Zaleckas<paulius.zaleckas@gmail.com>
-> >
-> > Acked-by: Nicolas Pitre<nico@fluxnic.net>
-> 
-> David,
-> 
-> Will you take this patch?
-> Or you are waiting till I will add all Cc as Jamie suggested?
+On Fri, Apr 23, 2010 at 02:12:51PM +0400, Sergei Shtylyov wrote:
+>>  static unsigned long get_rate_uart(struct clk *clk)
+>>  {
+>>  	unsigned long pdr3 = __raw_readl(CCM_BASE + CCM_PDR3);
+>>  	unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
+>> -	unsigned long div = get_3_3_div(pdr4 >> 10);
+>> +	unsigned long div = ((pdr4 >> 10) & 0x3f) + 1;
+>>   	if (pdr3 & (1 << 14))
+>>  		return get_rate_arm() / div;
+>> @@ -218,7 +213,7 @@ static unsigned long get_rate_sdhc(struct clk *clk)
+>>  		break;
+>>  	}
+>>  -	return rate / get_3_3_div(div);
+>> +	return rate / (div + 1);
+>>   
+>
+>   You're adding 1 to divisor twice here...
 
-Meanwhile, I've pushed your patch to my l2-mtd-2.6.git / dunno.
+Look again, these hunks are in two different functions.
+
+Sascha
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
