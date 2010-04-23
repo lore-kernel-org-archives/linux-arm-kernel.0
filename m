@@ -1,62 +1,196 @@
-From: vernoninhand@gmail.com (Vernon Sauder)
-Date: Fri, 23 Apr 2010 12:55:20 -0400
-Subject: SPI trouble on Colibri 270 (PXA)...
-In-Reply-To: <4BD05ED1.4020806@viketoft.se>
-References: <4BCD96F0.5010506@viketoft.se>	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>	<4BCDC645.5090001@viketoft.se>	<201004211144.41781.marek.vasut@gmail.com>	<j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>	<p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>	<4BCEF3D4.2030704@viketoft.se>	<g2xf17812d71004210607n4f3d82f2m4712d3bb97ef4924@mail.gmail.com>
-	<4BD05ED1.4020806@viketoft.se>
-Message-ID: <4BD1D0F8.60705@gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 23 Apr 2010 12:24:03 -0500
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <20100423052003.GF26418@gw.healthdatacare.com>
+References: <e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
+	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
+	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D85BE26@AUSP01VMBX24.collaborationhost.net>
+	<20100421104651.GO19534@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D8C8672@AUSP01VMBX24.collaborationhost.net>
+	<20100422175503.GE26418@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D9410F0@AUSP01VMBX24.collaborationhost.net>
+	<20100423052003.GF26418@gw.healthdatacare.com>
+Message-ID: <0D753D10438DA54287A00B0270842697636D9419BC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jakob Viketoft wrote, On 04/22/2010 10:36 AM:
-> Eric Miao wrote:
->> On Wed, Apr 21, 2010 at 8:47 PM, Jakob Viketoft <jakob@viketoft.se>
->> wrote:
->>> Martin Guy wrote:
->>>> On 4/21/10, Eric Miao <eric.y.miao@gmail.com> wrote:
->>>>
->>>>>  I thought we were talking about SPI?
->>>> We are. It affects boards that have a single SD/MMC card on the SPI
->>>> bus and use SFRMOUT as the chip select line, which impacts how the SPI
->>>> driver needs to handle multi-part messages without dropping CS between
->>>> transfers
->>> Does this mean that this is a know issue with the pxa2xx spi driver?
->>> At the
->>> moment I'm rather pressed for time and have instead opted for
->>> compressing
->>> the two transfers (read command and actual read) into one.
+On Thursday, April 22, 2010 10:20 PM, Mika Westerberg wrote:
+> On Thu, Apr 22, 2010 at 03:43:24PM -0500, H Hartley Sweeten wrote:
+>> On Thursday, April 22, 2010 10:55 AM, Mika Westerberg wrote:
+>>> Could you test this in your setup?
+>> 
+>> Same results.
+>
+> OK. thanks for testing.
+>
+>> I hacked your driver to allow me to toggle a gpio when the interrupt routine
+>> starts and exits.
+>> 
+>> I captured the 4 byte write/2 byte read caused by the spi_write_then_read in
+>> the sst25l driver when it does the Read-ID command.  The chip select goes low
+>> followed by the first 4 byte transfer of the message due to the fifo's getting
+>> primed.  This transfer actually doesn't finish since the rx data has not been
+>> received.  So the interrupts just get enabled as normal.
+>> 
+>> The data starts transferring when the first byte is placed in the tx fifo.  It
+>> takes about 4.45us to send/receive the 4 bytes.  Approximately 15.9us after the
+>> last byte has been received the interrupt routine starts.  It then takes about
+>> 5.7us for the second 2 byte transfer to start.  So there is a total of about
+>> 21.6us between the two transfers where SFRM is deasserted.
+>
+> If I understand this correctly, for this particular message it might have worked if
+> the priming is not done? What I mean is that if we start the transfer in interrupt
+> handler and after the transfer is finished, immediately continue with the next one
+> (like in the patch) could it make SFRM to stay asserted (at least shorten the gap)?
+
+Hmmm.. It might have.  I didn't test that before I started hacking...
+
+>>>  /*
+>>>   * ep93xx_spi_process_message() - process one SPI message
+>>>   * @espi: ep93xx SPI controller struct
+>>> @@ -569,6 +669,8 @@ static void ep93xx_spi_process_message(struct ep93xx_spi *espi,
+>>>  	struct spi_transfer *t;
+>>>  	int err;
+>>>  
+>>> +	espi->continuous = (bool)msg->state;
+>>> +
+>>>  	/*
+>>>  	 * Enable the SPI controller and its clock.
+>>>  	 */
+>>> @@ -606,12 +708,43 @@ static void ep93xx_spi_process_message(struct ep93xx_spi *espi,
+>>>  	ep93xx_spi_chip_setup(espi, spi_get_ctldata(msg->spi));
+>>>  	ep93xx_spi_select_device(espi, msg->spi);
+>>>  
+>>> -	list_for_each_entry(t, &msg->transfers, transfer_list) {
+>>> -		ep93xx_spi_process_transfer(espi, msg, t);
+>>> -		if (msg->status)
+>>> -			break;
+>>> +	if (espi->continuous) {
+>>> +		/*
+>>> +		 * We can transfer all the transfers continuously.
+>>> +		 */
+>>> +		espi->rx = 0;
+>>> +		espi->tx = 0;
+>>> +		msg->state = list_first_entry(&msg->transfers, struct spi_transfer,
+>>> +					transfer_list);
+>>> +
+>>> +		/* prime the first transfer */
+>>> +		if (ep93xx_spi_read_write(espi)) {
+>> 
+>> On the first read/write for a transfer this condition can never succeed.
+>> 
+>> The ep93xx_spi_read_write function first empties the rx fifo then fills the
+>> tx fifo.  Putting any data in the tx fifo means that you are going to have to
+>> come back to empty the rx fifo.
+>> 
+>> So, the block below never executes.
+>
+> I also figured that out after I sent the hack to you...
+>
+>>> +			/*
+>>> +			 * Transfer was completed. Pick next one and continue
+>>> +			 * if necessary.
+>>> +			 */
+>>> +			t = msg->state;
+>>> +			if (list_is_last(&t->transfer_list, &msg->transfers))
+>>> +				goto done;
+>>> +
+>>> +			espi->rx = 0;
+>>> +			espi->tx = 0;
+>>> +			msg->state = list_entry(t->transfer_list.next,
+>>> +						struct spi_transfer,
+>>> +						transfer_list);
+>>> +		}
+>>> +
+>>> +		ep93xx_spi_enable_interrupts(espi);
+>>> +		wait_for_completion(&espi->wait);
+>> 
+>> Even if the first read/write did succeed you are not starting the second transfer.
+>> This is just passing the operation off to the interrupt routine using the second
+>> transfer in the message.
+>
+> Right.
+>
+>>> -/**
+>>>   * ep93xx_spi_interrupt() - SPI interrupt handler
+>>>   * @irq: IRQ number (not used)
+>>>   * @dev_id: pointer to EP93xx controller struct
+>>> @@ -792,6 +841,27 @@ static irqreturn_t ep93xx_spi_interrupt(int irq, void *dev_id)
+>>>  			 * interrupt then.
+>>>  			 */
+>>>  			return IRQ_HANDLED;
+>>> +		} else {
+>>> +			struct spi_message *msg = espi->current_msg;
+>>> +			struct spi_transfer *t = msg->state;
+>>> +
+>>> +			if (!espi->continuous)
+>>> +				goto done;
+>>> +
+>>> +			if (!list_is_last(&t->transfer_list, &msg->transfers)) {
+>>> +				/*
+>>> +				 * Pick next transfer and refill the FIFO.
+>>> +				 */
+>>> +				msg->state = list_entry(t->transfer_list.next,
+>>> +							struct spi_transfer,
+>>> +							transfer_list);
+>>> +				espi->rx = 0;
+>>> +				espi->tx = 0;
+>>> +
+>>> +				ep93xx_spi_read_write(espi);
+>>> +				return IRQ_HANDLED;
+>>> +			}
 >>
->> I'm expecting this to be correct code, i.e. by combining read command
->> transfer and actual read transfer into a single message, with .cs_change
->> indicating that CS not changed during transfer. No?
-> 
-> The original code currently combines the two transfers in one message as
-> you say (leaving CS asserted unless cs_change is set). However, I don't
-> know if it's a problem with scheduling or that the interrupt takes too
-> long to serve, but on my platform the two transfers (in the same
-> message) doesn't go back-to-back as they should and CS gets deasserted
-> in the middle. Thus I have combined the two transfers into one and the
-> message only hold this single transfer. Now things work at my end, but
-> it's annoying that I don't have time to track down the real issue at the
-> moment...
-> 
->     /Jakob
-> 
+>> Here the N transfer has been completed and we are trying to continue with the N+1
+>> transfer.  This should work but I need to figure out a way to capture it with my
+>> logic analyzer.  The only problem is if the N transfer is complete that means the
+>> tx and rx fifos are empty so the SFRM signal is going to be deasserted.  The N+1
+>> transfer might start really soon after but there will still be a glitch in the SFRM
+>> signal.
+>
+> It would be great if you manage to capture it with the logic analyzer.
+> Even if we get small glitch it means that we are going into right
+> direction (then we just need to figure out how to keep the FIFO
+> from emptying).
 
-As part of this thread:
-http://permalink.gmane.org/gmane.linux.kernel.spi.devel/1517
-I added the following note to Documentation/spi/pxa2xx. I have not
-checked to see if the patch hit mainline. Is this part of the answer to
-your question?
+I still haven't been able to catch this.
 
-> +NOTE: the SPI driver cannot control the chip select if SSPFRM is used, so the
-> +chipselect is dropped after each spi_transfer.  Most devices need chip select
-> +asserted around the complete message.  Use SSPFRM as a GPIO (through cs_control)
-> +to accomodate these chips.
+> Other alternative is to use polling mode in v3 of the driver and
+> see if it works better.
 
-That was my solution to using the pxa2xx SPI with M25Pxx flash.
+I think the interrupt mode is still the better way to go.
 
--- 
+I was able to hack your driver to keep the continuous transfer going in a multi-transaction
+message.  Unfortunately I don't have an easy way to generate a diff to send the necessary
+patch.  The hack does work with the sst25l driver.  It correctly detects the end of the
+first 4 byte transfer and immediately chains in the second 2 byte transfer.  It ends up
+looking like this:
+
+WWWWwwIRRRRFCRRFi
+
+Where:
+  'W' is a write for the current transfer
+  'w' is a write for the next transfer
+  'I' is the start of the interrupt
+  'R' is a read for the current transfer
+  'F' is the completion of the current transfer
+  'C' is the chain to the next transfer
+  'i' is the end of the interrupt
+
+So, at the start of the message the fifo's get primed with the 4+2 of the entire message.
+Then interrupts are enabled.  When the interrupt occurs the first 4 byte transfer is read.
+When that completes the interrupt routine chains to the next transfer and then reads the
+next 2 bytes.  When that completes the message is finished so the interrupts get disabled
+and espi->wait is completed.
+
+Unfortunately is seems to break the mmc_spi driver for some reason.  I still haven't
+figured out why.
+
+If you can post your latest updates to the v4 driver I will create a patch against it
+so others can test this also.
+
 Regards,
- Vernon Sauder
- (: !Have a great day! :)
+Hartley
