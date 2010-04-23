@@ -1,126 +1,33 @@
-From: post@hendrik-sattler.de (Hendrik Sattler)
-Date: Fri, 23 Apr 2010 06:36:59 +0200
-Subject: [PATCH] USB: gadget: pxa25x: support additional IXP425 steppings
-In-Reply-To: <1271987339-4659-1-git-send-email-steveb@workware.net.au>
-References: <CDBB3FAC-22FA-43F8-ADD1-FC8C57ABCD1E@workware.net.au>
-	<1271987339-4659-1-git-send-email-steveb@workware.net.au>
-Message-ID: <201004230636.59351.post@hendrik-sattler.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 23 Apr 2010 06:49:43 +0200
+Subject: [PATCH] arm/plat-mxc: Fix forgotten renaming in timer.c
+Message-ID: <1271998183-14294-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 23 April 2010 03:48:59 schrieb Steve Bennett:
-> Use generic cpu_is_...
-> Modified version of patch by Hendrik Sattler
-> 
-> Signed-off-by: Steve Bennett <steveb@workware.net.au>
+Commit "mxc: Change gpt timer code to be more generic by using V2
+instead of MX3" forgot to replace one occurence causing a build
+failure.
 
-I'd really like to see this go in.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Amit Kucheria <amit.kucheria@canonical.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/plat-mxc/time.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Signed-off-by: Hendrik Sattler<post@hendrik-sattler.de>
-
-> ---
->  drivers/usb/gadget/pxa25x_udc.c |   74
-> +++++++------------------------------- 1 files changed, 14 insertions(+),
-> 60 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/pxa25x_udc.c
-> b/drivers/usb/gadget/pxa25x_udc.c index be5fb34..b63b65c 100644
-> --- a/drivers/usb/gadget/pxa25x_udc.c
-> +++ b/drivers/usb/gadget/pxa25x_udc.c
-> @@ -2096,39 +2096,11 @@ static struct pxa25x_udc memory = {
->  #endif /* !CONFIG_USB_PXA25X_SMALL */
->  };
-> 
-> -#define CP15R0_VENDOR_MASK	0xffffe000
-> -
-> -#if	defined(CONFIG_ARCH_PXA)
-> -#define CP15R0_XSCALE_VALUE	0x69052000	/* intel/arm/xscale */
-> -
-> -#elif	defined(CONFIG_ARCH_IXP4XX)
-> -#define CP15R0_XSCALE_VALUE	0x69054000	/* intel/arm/ixp4xx */
-> -
-> -#endif
-> -
->  #define CP15R0_PROD_MASK	0x000003f0
-> -#define PXA25x			0x00000100	/* and PXA26x */
-> -#define PXA210			0x00000120
-> -
->  #define CP15R0_REV_MASK		0x0000000f
-> -
->  #define CP15R0_PRODREV_MASK	(CP15R0_PROD_MASK | CP15R0_REV_MASK)
-> 
->  #define PXA255_A0		0x00000106	/* or PXA260_B1 */
-> -#define PXA250_C0		0x00000105	/* or PXA26x_B0 */
-> -#define PXA250_B2		0x00000104
-> -#define PXA250_B1		0x00000103	/* or PXA260_A0 */
-> -#define PXA250_B0		0x00000102
-> -#define PXA250_A1		0x00000101
-> -#define PXA250_A0		0x00000100
-> -
-> -#define PXA210_C0		0x00000125
-> -#define PXA210_B2		0x00000124
-> -#define PXA210_B1		0x00000123
-> -#define PXA210_B0		0x00000122
-> -#define IXP425_A0		0x000001c1
-> -#define IXP425_B0		0x000001f1
-> -#define IXP465_AD		0x00000200
-> 
->  /*
->   *	probe - binds to the platform device
-> @@ -2137,42 +2109,24 @@ static int __init pxa25x_udc_probe(struct
-> platform_device *pdev) {
->  	struct pxa25x_udc *dev = &memory;
->  	int retval, vbus_irq, irq;
-> -	u32 chiprev;
-> 
-> -	/* insist on Intel/ARM/XScale */
-> -	asm("mrc%? p15, 0, %0, c0, c0" : "=r" (chiprev));
-> -	if ((chiprev & CP15R0_VENDOR_MASK) != CP15R0_XSCALE_VALUE) {
-> -		pr_err("%s: not XScale!\n", driver_name);
-> -		return -ENODEV;
-> -	}
-> +#if defined(CONFIG_ARCH_PXA)
-> +	if (cpu_is_pxa210() || cpu_is_pxa25x()) {
-> +		if ((read_cpuid_id() & CP15R0_PRODREV_MASK) == PXA255_A0)
-> +			dev->has_cfr = 1;
-> +		/* PXA250_A0/A1 "not released"; ep 13, 15 unusable */
-> +		/* PXA21x/PXA25x with stepping < C0: OUT-DMA is broken ... */
-> +	} else {
-> 
-> -	/* trigger chiprev-specific logic */
-> -	switch (chiprev & CP15R0_PRODREV_MASK) {
-> -#if	defined(CONFIG_ARCH_PXA)
-> -	case PXA255_A0:
-> -		dev->has_cfr = 1;
-> -		break;
-> -	case PXA250_A0:
-> -	case PXA250_A1:
-> -		/* A0/A1 "not released"; ep 13, 15 unusable */
-> -		/* fall through */
-> -	case PXA250_B2: case PXA210_B2:
-> -	case PXA250_B1: case PXA210_B1:
-> -	case PXA250_B0: case PXA210_B0:
-> -		/* OUT-DMA is broken ... */
-> -		/* fall through */
-> -	case PXA250_C0: case PXA210_C0:
-> -		break;
-> -#elif	defined(CONFIG_ARCH_IXP4XX)
-> -	case IXP425_A0:
-> -	case IXP425_B0:
-> -	case IXP465_AD:
-> +#elif defined(CONFIG_ARCH_IXP4XX)
-> +	if (cpu_is_ixp42x() || cpu_is_ixp43x() || cpu_is_ixp46x())
->  		dev->has_cfr = 1;
-> -		break;
-> +	else {
-> +
-> +#else
-> +	{
->  #endif
-> -	default:
-> -		pr_err("%s: unrecognized processor: %08x\n",
-> -			driver_name, chiprev);
-> +		pr_err("%s: unrecognized processor\n", driver_name);
->  		/* iop3xx, ixp4xx, ... */
->  		return -ENODEV;
->  	}
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 714bdef..f9a1b05 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -102,7 +102,7 @@ static void gpt_irq_acknowledge(void)
+ 			__raw_writel(MX2_TSTAT_CAPT | MX2_TSTAT_COMP,
+ 				timer_base + MX1_2_TSTAT);
+ 	} else if (timer_is_v2())
+-		__raw_writel(MX3_TSTAT_OF1, timer_base + MX3_TSTAT);
++		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
+ }
+ 
+ static cycle_t mx1_2_get_cycles(struct clocksource *cs)
+-- 
+1.7.0
