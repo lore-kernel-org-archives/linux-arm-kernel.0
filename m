@@ -1,97 +1,62 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Fri, 23 Apr 2010 18:29:33 +0200
-Subject: Q: sched_clock() vs. clocksource, how to implement correctly
-In-Reply-To: <20100423150917.GA25714@sig21.net>
-References: <20100423150917.GA25714@sig21.net>
-Message-ID: <20100423182933.0df45b53@mschwide.boeblingen.de.ibm.com>
+From: vernoninhand@gmail.com (Vernon Sauder)
+Date: Fri, 23 Apr 2010 12:55:20 -0400
+Subject: SPI trouble on Colibri 270 (PXA)...
+In-Reply-To: <4BD05ED1.4020806@viketoft.se>
+References: <4BCD96F0.5010506@viketoft.se>	<q2sf17812d71004200614n58fb6cabgd0686d3ab6788b23@mail.gmail.com>	<4BCDC645.5090001@viketoft.se>	<201004211144.41781.marek.vasut@gmail.com>	<j2tf17812d71004210347gd9ad8530w409b8d6e3a732c1c@mail.gmail.com>	<p2y56d259a01004210411ie5f4b723n6cfd25e96333813@mail.gmail.com>	<4BCEF3D4.2030704@viketoft.se>	<g2xf17812d71004210607n4f3d82f2m4712d3bb97ef4924@mail.gmail.com>
+	<4BD05ED1.4020806@viketoft.se>
+Message-ID: <4BD1D0F8.60705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Apr 2010 17:09:17 +0200
-Johannes Stezenbach <js@sig21.net> wrote:
-
-> I'm trying to figure out how to correctly implement sched_clock()
-> for an ARM board.  However, looking at existing implementations
-> leaves me rather confused.
+Jakob Viketoft wrote, On 04/22/2010 10:36 AM:
+> Eric Miao wrote:
+>> On Wed, Apr 21, 2010 at 8:47 PM, Jakob Viketoft <jakob@viketoft.se>
+>> wrote:
+>>> Martin Guy wrote:
+>>>> On 4/21/10, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>>>
+>>>>>  I thought we were talking about SPI?
+>>>> We are. It affects boards that have a single SD/MMC card on the SPI
+>>>> bus and use SFRMOUT as the chip select line, which impacts how the SPI
+>>>> driver needs to handle multi-part messages without dropping CS between
+>>>> transfers
+>>> Does this mean that this is a know issue with the pxa2xx spi driver?
+>>> At the
+>>> moment I'm rather pressed for time and have instead opted for
+>>> compressing
+>>> the two transfers (read command and actual read) into one.
+>>
+>> I'm expecting this to be correct code, i.e. by combining read command
+>> transfer and actual read transfer into a single message, with .cs_change
+>> indicating that CS not changed during transfer. No?
 > 
-> E.g. arch/arm/mach-u300/timer.c has
+> The original code currently combines the two transfers in one message as
+> you say (leaving CS asserted unless cs_change is set). However, I don't
+> know if it's a problem with scheduling or that the interrupt takes too
+> long to serve, but on my platform the two transfers (in the same
+> message) doesn't go back-to-back as they should and CS gets deasserted
+> in the middle. Thus I have combined the two transfers into one and the
+> message only hold this single transfer. Now things work at my end, but
+> it's annoying that I don't have time to track down the real issue at the
+> moment...
 > 
-> static cycle_t u300_get_cycles(struct clocksource *cs)
-> {
-> 	return (cycles_t) readl(U300_TIMER_APP_VBASE + U300_TIMER_APP_GPT2CC);
-> }
+>     /Jakob
 > 
-> static struct clocksource clocksource_u300_1mhz = {
-> 	.name           = "GPT2",
-> 	.rating         = 300, /* Reasonably fast and accurate clock source */
-> 	.read           = u300_get_cycles,
-> 	.mask           = CLOCKSOURCE_MASK(32), /* 32 bits */
-> 	/* 22 calculated using the algorithm in arch/mips/kernel/time.c */
-> 	.shift          = 22,
-> 	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
-> };
-> 
-> unsigned long long notrace sched_clock(void)
-> {
-> 	return clocksource_cyc2ns(clocksource_u300_1mhz.read(
-> 				  &clocksource_u300_1mhz),
-> 				  clocksource_u300_1mhz.mult,
-> 				  clocksource_u300_1mhz.shift);
-> }
-> 
-> Thus, sched_clock() is based on a 1MHz 32bit counter which wraps
-> after about 71 minutes.  There are a few similar sched_clock()
-> implementations in the tree.
 
-Not good.
- 
-> Questions:
-> 
-> - Isn't sched_clock() supposed to be extended to 64bit so
->   that it practically never wraps?
->   (old implementations use cnt32_to_63())
+As part of this thread:
+http://permalink.gmane.org/gmane.linux.kernel.spi.devel/1517
+I added the following note to Documentation/spi/pxa2xx. I have not
+checked to see if the patch hit mainline. Is this part of the answer to
+your question?
 
-Yes, sched_clock() is supposed to return a monotonic timestamp.
- 
-> - What would be the effect on scheduling when sched_clock() wraps?
+> +NOTE: the SPI driver cannot control the chip select if SSPFRM is used, so the
+> +chipselect is dropped after each spi_transfer.  Most devices need chip select
+> +asserted around the complete message.  Use SSPFRM as a GPIO (through cs_control)
+> +to accomodate these chips.
 
-It would confuse the process accounting and the scheduling I guess.
-
-> - What is the effect of the sched_clock() frequency on scheduling?
->   Is there a benefit from setting the freq as high as possible?
-
-With a higher frequency the precision of the accounting increases and
-the scheduling fairness increases.
-
-> - Is struct timecounter + struct cyclecounter + timecounter_read()
->   designated way to implement sched_clock() with a 32bit hw counter?
-> 
->   arch/microblaze/kernel/timer.c seems to be the only user
->   of timecounter/cyclecounter in arch/, but I don't get what it does.
-> 
->   Or is it better to stick with cnt32_to_63()?
-
-cnt32_to_63() is a way to extend the 32 bit clocksource to a useable
-sched_clock() provider. One way or the other you have to extend the 32
-bits of the 1MHz counter to something bigger. The obvious way is to
-count the number of wraps and use this number as the upper 32 bits
-just like cnt32_to_63() does. You just have to make sure that the
-clocksource is read frequently enough to get all the wraps. A non-idle
-cpu will tick with HZ frequency and the clock will be read often
-enough, for an idle cpu the maximum sleep time needs to be limited.
-
-> - Also regarding the clocksource.shift value, I found
->   http://lkml.org/lkml/2008/5/8/270 and it seems to suggest
->   to use a low shift value, whereas arch/mips/kernel/time.c
->   seems to result in a large one. Is the posting correct?
-
-Low shift values have the advantage that the 64-bit calculations do not
-overflow so easily. But there are fairly large shift values in use
-(20, 24, even 32 bit) in the current kernel tree, so I wouldn't worry
-about bigger shift values.
+That was my solution to using the pxa2xx SPI with M25Pxx flash.
 
 -- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+Regards,
+ Vernon Sauder
+ (: !Have a great day! :)
