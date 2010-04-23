@@ -1,39 +1,28 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 23 Apr 2010 10:43:42 +0200
-Subject: [PATCH] pxa32xx_nand: add support for partition table parsing
-Message-ID: <mailman.316.1272057985.2170.linux-arm-kernel@lists.infradead.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 23 Apr 2010 23:49:34 +0200
+Subject: [PATCH 1/7] PL330: Add common core driver
+In-Reply-To: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <j2x63386a3d1004231449ta90046b5pc29622b58a87b99a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxa32xx_nand driver doesn't support partition tables from the
-command line. This patch adds support for it.
+2010/4/21  <jassisinghbrar@gmail.com>:
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/mtd/nand/pxa3xx_nand.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+> PL330 is a configurable DMA controller PrimeCell device.
+> The register map of the device is well defined.
+> The configuration of a particular implementation can be
+> read from the six configuration registers CR0-4,Dn.
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 5d55152..e02fa4f 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1320,6 +1320,17 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 		goto fail_free_irq;
- 	}
- 
-+	if (mtd_has_cmdlinepart()) {
-+		static const char *probes[] = { "cmdlinepart", NULL };
-+		struct mtd_partition *parts;
-+		int nr_parts;
-+
-+		nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
-+
-+		if (nr_parts)
-+			return add_mtd_partitions(mtd, parts, nr_parts);
-+	}
-+
- 	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
- 
- fail_free_irq:
--- 
-1.7.0.4
+I think this looks better for every iteration and is definately ripe
+for merge, so FWIW:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+
+> The exported interface should be sufficient to implement
+> a driver for any DMA API.
+
+Will you make an attempt at doing this in time for the next
+merge window as well? That would be perfect.
+
+Yours,
+Linus Walleij
