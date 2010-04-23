@@ -1,131 +1,25 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 23 Apr 2010 09:34:08 +0300
-Subject: [PATCH v2.6.34-rc2] s3c: Adds support for banks H and J on
-	S3C244X CPUs
-In-Reply-To: <1269937367-7571-1-git-send-email-chripell@fsfe.org>
-References: <1269937367-7571-1-git-send-email-chripell@fsfe.org>
-Message-ID: <201004230934.14960.anarsoul@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 23 Apr 2010 09:40:24 +0200
+Subject: i.MX35 Clock patches
+Message-ID: <1272008426-14435-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 30 ????? 2010 11:22:47 ????? Christian Pellegrin ???????:
-> This patch adds support to gpiolib for GPIO bank J present on S3C244X
-> CPUs.
-> 
-> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Here are some clock fixes for i.MX35.
 
-> ---
->  arch/arm/mach-s3c2410/include/mach/gpio-nrs.h |    4 ++++
->  arch/arm/mach-s3c2410/include/mach/gpio.h     |    8 ++++++++
->  arch/arm/plat-s3c24xx/gpiolib.c               |   16 +++++++++++++++-
->  3 files changed, 27 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h index 2edbb9c..f1f32e2
-> 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-> @@ -24,6 +24,7 @@
->  #define S3C2410_GPIO_BANKF   (32*5)
->  #define S3C2410_GPIO_BANKG   (32*6)
->  #define S3C2410_GPIO_BANKH   (32*7)
-> +#define S3C2410_GPIO_BANKJ   (32*8)
-> 
->  /* GPIO bank sizes */
->  #define S3C2410_GPIO_A_NR	(32)
-> @@ -34,6 +35,7 @@
->  #define S3C2410_GPIO_F_NR	(32)
->  #define S3C2410_GPIO_G_NR	(32)
->  #define S3C2410_GPIO_H_NR	(32)
-> +#define S3C2410_GPIO_J_NR	(32)
-> 
->  #if CONFIG_S3C_GPIO_SPACE != 0
->  #error CONFIG_S3C_GPIO_SPACE cannot be zero at the moment
-> @@ -53,6 +55,7 @@ enum s3c_gpio_number {
->  	S3C2410_GPIO_F_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_E),
->  	S3C2410_GPIO_G_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_F),
->  	S3C2410_GPIO_H_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_G),
-> +	S3C2410_GPIO_J_START = S3C2410_GPIO_NEXT(S3C2410_GPIO_H),
->  };
-> 
->  #endif /* __ASSEMBLY__ */
-> @@ -67,6 +70,7 @@ enum s3c_gpio_number {
->  #define S3C2410_GPF(_nr)	(S3C2410_GPIO_F_START + (_nr))
->  #define S3C2410_GPG(_nr)	(S3C2410_GPIO_G_START + (_nr))
->  #define S3C2410_GPH(_nr)	(S3C2410_GPIO_H_START + (_nr))
-> +#define S3C2410_GPJ(_nr)	(S3C2410_GPIO_J_START + (_nr))
-> 
->  /* compatibility until drivers can be modified */
-> 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h
-> b/arch/arm/mach-s3c2410/include/mach/gpio.h index 15f0b3e..1528fc7 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
-> @@ -20,10 +20,18 @@
->   * devices that need GPIO.
->   */
-> 
-> +#ifdef CONFIG_CPU_S3C244X
-> +#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
-> +#else
->  #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
-> +#endif
-> 
->  #include <asm-generic/gpio.h>
->  #include <mach/gpio-nrs.h>
->  #include <mach/gpio-fns.h>
-> 
-> +#ifdef CONFIG_CPU_S3C244X
-> +#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
-> +#else
->  #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
-> +#endif
-> diff --git a/arch/arm/plat-s3c24xx/gpiolib.c
-> b/arch/arm/plat-s3c24xx/gpiolib.c index 4f0f11a..0818a6e 100644
-> --- a/arch/arm/plat-s3c24xx/gpiolib.c
-> +++ b/arch/arm/plat-s3c24xx/gpiolib.c
-> @@ -26,6 +26,7 @@
->  #include <plat/pm.h>
-> 
->  #include <mach/regs-gpio.h>
-> +#include <mach/regs-gpioj.h>
-> 
->  static int s3c24xx_gpiolib_banka_input(struct gpio_chip *chip, unsigned
-> offset) {
-> @@ -151,7 +152,8 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
->  			.ngpio			= 16,
->  			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
->  		},
-> -	}, {
-> +	},
-> +	[7] = {
->  		.base	= S3C2410_GPHCON,
->  		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
->  		.chip	= {
-> @@ -161,6 +163,18 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
->  			.ngpio			= 11,
->  		},
->  	},
-> +#ifdef CONFIG_CPU_S3C244X
-> +	[8] = {
-> +		.base	= S3C2440_GPJCON,
-> +		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
-> +		.chip	= {
-> +			.base			= S3C2410_GPJ(0),
-> +			.owner			= THIS_MODULE,
-> +			.label			= "GPIOJ",
-> +			.ngpio			= 13,
-> +		},
-> +	},
-> +#endif
->  };
-> 
->  static __init int s3c24xx_gpiolib_init(void)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100423/c9397c9c/attachment.sig>
+Sascha
+
+The following changes since commit 2ba3abd8186f24c7fb418927025b4e2120e3a362:
+  Linus Torvalds (1):
+        Merge branch 'pm-fixes' of git://git.kernel.org/.../rafael/suspend-2.6
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git mxc-pu
+
+Sascha Hauer (2):
+      i.MX35: Fix arm/ahb clock calculation
+      i.MX35: remove get_3_3_div helper function
+
+ arch/arm/mach-mx3/clock-imx35.c |   17 +++++++----------
+ 1 files changed, 7 insertions(+), 10 deletions(-)
