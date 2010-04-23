@@ -1,34 +1,22 @@
-From: allenpais777@yahoo.com (Allen Pais)
-Date: Thu, 22 Apr 2010 23:55:03 -0700 (PDT)
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA 
-Message-ID: <315970.20396.qm@web35302.mail.mud.yahoo.com>
+From: rmk@ftp.linux.org.uk (Russell King)
+Date: Fri, 23 Apr 2010 15:40:58 +0100
+Subject: [RFC] Prohibit ioremap() on kernel managed RAM
+Message-ID: <20100423144058.GA11637@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+> Above change is necessary but what an alternative approach is for this. 
+> There are many use case where ioremap* is needed.
 
-   As mentioned by Hemanth, we were facing issues with 
-highmem and MMC, but this is resolved now with the patch
-you shared. 
+This is a very difficult issue to answer; the only way we can safely
+remap RAM with different attributes is if we disable the existing
+mappings - but since we create those with 1MB sections, that's far
+from easy to achieve.
 
-   Here's the patch for your ref.[its reverted cause of the
-issue] 
-http://dev.omapzoom.org/?p=integration/kernel-omap3.git;a=commit;h=f6427e74a3c08fa5e30c99de0e9e8ed9d3b65b74
+I think a viable safe solution is to set aside some RAM at boot (which
+the kernel doesn't manage at all) and then use ioremap on that; that
+approach will still work with this patch in place.
 
-  But currently we are facing issues with test cases such
-as AV Playback, mp3 play, image capture, camera 
-capture+mpeg4 encode. 
-
-  Am not sure what's causing this break, any pointer would be
-helpful.
-
-Thanks,
-
-- Allen
-
-
-
-      
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100422/5d72c555/attachment.htm>
+Note that I've applied this patch to my devel tree, which has been
+pushed out; please note that I'm making use of others 'net connections
+to do this.
