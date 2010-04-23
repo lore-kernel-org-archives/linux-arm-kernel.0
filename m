@@ -1,33 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Apr 2010 16:12:10 -0700
-Subject: [PATCH 28/28] omap: delete unused bootloader tag variables
-In-Reply-To: <20100423230829.31953.17334.stgit@baageli.muru.com>
-References: <20100423230829.31953.17334.stgit@baageli.muru.com>
-Message-ID: <20100423231210.31953.2729.stgit@baageli.muru.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Sat, 24 Apr 2010 08:20:48 +0900
+Subject: [PATCH 1/7] PL330: Add common core driver
+In-Reply-To: <j2x63386a3d1004231449ta90046b5pc29622b58a87b99a@mail.gmail.com>
+References: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
+	<j2x63386a3d1004231449ta90046b5pc29622b58a87b99a@mail.gmail.com>
+Message-ID: <n2y1b68c6791004231620lcd670271u3a9d33bb52c10e37@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaro Koskinen <Aaro.Koskinen@nokia.com>
+On Sat, Apr 24, 2010 at 6:49 AM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/4/21 ?<jassisinghbrar@gmail.com>:
+>
+>> PL330 is a configurable DMA controller PrimeCell device.
+>> The register map of the device is well defined.
+>> The configuration of a particular implementation can be
+>> read from the six configuration registers CR0-4,Dn.
+>
+> I think this looks better for every iteration and is definately ripe
+> for merge, so FWIW:
+> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Thanks.
 
-They are not needed and add over 512 bytes to kernel data.
+>> The exported interface should be sufficient to implement
+>> a driver for any DMA API.
+>
+> Will you make an attempt at doing this in time for the next
+> merge window as well? That would be perfect.
+Actually I said "any DMA API" i.e, some platform, like S3C,
+may choose to implement their own API.
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/plat-omap/common.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+You mean the DMA engine driver for PL330, right?
+Since Joonyoung's driver was pre-empted by these patches,
+he might want to re-write parts of his driver for this backend.
+If he doesn't show any interest in a few days, I'll do it.
 
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index 01cbb48..f12f0e3 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -44,9 +44,6 @@
- 
- #define NO_LENGTH_CHECK 0xffffffff
- 
--unsigned char omap_bootloader_tag[512];
--int omap_bootloader_tag_len;
--
- struct omap_board_config_kernel *omap_board_config;
- int omap_board_config_size;
- 
+Btw, I think that driver should be divided in two files
+drivers/dma/api-pl330.c with common code and
+drivers/dma/<soc>-pl330.c for platform specific stuff like IRQ,
+registers base mapping and other quirks(if any). Any opinions?
