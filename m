@@ -1,34 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 23 Apr 2010 14:22:01 -0400 (EDT)
-Subject: [PATCH v2] MTD: Fix Orion NAND driver compilation with ARM OABI
-In-Reply-To: <20100423110037.f8790476.akpm@linux-foundation.org>
-References: <20100325152505.17612.40158.stgit@pauliusz>
-	<alpine.LFD.2.00.1003251225500.694@xanadu.home>
-	<4BB33988.9070608@gmail.com> <1272023778.6917.6.camel@localhost>
-	<alpine.LFD.2.00.1004230853230.7232@xanadu.home>
-	<1272035596.11751.1437.camel@localhost.localdomain>
-	<alpine.LFD.2.00.1004231308300.7232@xanadu.home>
-	<20100423110037.f8790476.akpm@linux-foundation.org>
-Message-ID: <alpine.LFD.2.00.1004231421130.7232@xanadu.home>
+From: rmk@ftp.linux.org.uk (Russell King)
+Date: Fri, 23 Apr 2010 19:55:20 +0100
+Subject: RMK is offline
+In-Reply-To: <20100422174820.GA3797@ZenIV.linux.org.uk>
+References: <20100422174820.GA3797@ZenIV.linux.org.uk>
+Message-ID: <20100423185519.GA27166@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Apr 2010, Andrew Morton wrote:
+On Thu, Apr 22, 2010 at 06:48:20PM +0100, Russell King wrote:
+> FYI, I've lost ADSL at 2am last night due to some planned engineering
+> works by the telco; currently there's no estimate on when things will
+> be returned.  Unfortunately, It's taken most of today to get the ISP
+> to note a fault - but seemingly they still haven't raised it with BT.
 
-> On Fri, 23 Apr 2010 13:50:10 -0400 (EDT)
-> Nicolas Pitre <nico@fluxnic.net> wrote:
-> 
-> > > Fine with me, but not up to me. But I guess Andrew could merge it.
-> > 
-> > The patch is providing a fix to my own code, and I acked it already. The 
-> > root of the problem is a defficiency in gcc, and dwmw2 asked that a PR 
-> > be filled for that and a reference to it added to the patch.  This has 
-> > been done.
-> 
-> Well, I merged it and can send it upstream.  But Jamie's observations
-> give me pause?
+Update: they raised it with BT, BT say there's no fault, so bounced the
+problem back to the ISP.  The ISP ran a check, and can see that there's
+a fault in the BT network, and so have bounced the fault back to BT
+again.
 
-What observation?  Let me find that.
+So this fault is probably going to bounce back and forth between the ISP
+and BT forth for a while.
 
+It has exactly the same symptoms as the problem we had when BT switched
+us from the 20CN to 21CN stuff, so I'm not hopeful that anything will be
+resolved soon.
 
-Nicolas
+As my only other net access is (currently) via other peoples connections
+(in this case, the gliding club) I will only be checking mail and maybe
+committing stuff to my git tree very sporadically - and probably won't
+be sending any pull requests to Linus until the BT situation is sorted.
+
+So in summary, please be patient, and please realise that this fault
+prevents me doing _any_ work what so ever - whether that be community or
+paid work.
