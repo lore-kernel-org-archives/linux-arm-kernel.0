@@ -1,52 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Apr 2010 16:11:05 -0700
-Subject: [PATCH 02/28] arm: omap1: remove dead code from timer32k.c
+Date: Fri, 23 Apr 2010 16:11:07 -0700
+Subject: [PATCH 03/28] omap: gpio: fix incorrect matching of IRQ_TYPE_EDGE_BOTH
 In-Reply-To: <20100423230829.31953.17334.stgit@baageli.muru.com>
 References: <20100423230829.31953.17334.stgit@baageli.muru.com>
-Message-ID: <20100423231105.31953.57929.stgit@baageli.muru.com>
+Message-ID: <20100423231107.31953.72733.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <felipe.balbi@nokia.com>
+From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Trivial patch, no functional changes
+Since IRQ_TYPE_EDGE_BOTH is defined as (IRQ_TYPE_EDGE_FALLING |
+IRQ_TYPE_EDGE_RISING), testing against it with a bitwise AND also matches
+both single-edge cases in addition to the intended both edges case. Fix it,
+replacing with a more accurate expression.
 
-Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
+Created and tested againts linux-2.6.34-rc3.
+Applicable to 2.6.33-stable as well.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/timer32k.c |   15 ---------------
- 1 files changed, 0 insertions(+), 15 deletions(-)
+ arch/arm/plat-omap/gpio.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
-index 9ad1185..20cfbcc 100644
---- a/arch/arm/mach-omap1/timer32k.c
-+++ b/arch/arm/mach-omap1/timer32k.c
-@@ -68,12 +68,6 @@ struct sys_timer omap_timer;
-  * ---------------------------------------------------------------------------
-  */
- 
--#if defined(CONFIG_ARCH_OMAP16XX)
--#define TIMER_32K_SYNCHRONIZED		0xfffbc410
--#else
--#error OMAP 32KHz timer does not currently work on 15XX!
--#endif
--
- /* 16xx specific defines */
- #define OMAP1_32K_TIMER_BASE		0xfffb9000
- #define OMAP1_32K_TIMER_CR		0x08
-@@ -150,15 +144,6 @@ static struct clock_event_device clockevent_32k_timer = {
- 	.set_mode	= omap_32k_timer_set_mode,
- };
- 
--/*
-- * The 32KHz synchronized timer is an additional timer on 16xx.
-- * It is always running.
-- */
--static inline unsigned long omap_32k_sync_timer_read(void)
--{
--	return omap_readl(TIMER_32K_SYNCHRONIZED);
--}
--
- static irqreturn_t omap_32k_timer_interrupt(int irq, void *dev_id)
- {
- 	struct clock_event_device *evt = &clockevent_32k_timer;
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 76a347b..45a225d 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -798,7 +798,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 	case METHOD_MPUIO:
+ 		reg += OMAP_MPUIO_GPIO_INT_EDGE;
+ 		l = __raw_readl(reg);
+-		if (trigger & IRQ_TYPE_EDGE_BOTH)
++		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+ 			bank->toggle_mask |= 1 << gpio;
+ 		if (trigger & IRQ_TYPE_EDGE_RISING)
+ 			l |= 1 << gpio;
+@@ -812,7 +812,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 	case METHOD_GPIO_1510:
+ 		reg += OMAP1510_GPIO_INT_CONTROL;
+ 		l = __raw_readl(reg);
+-		if (trigger & IRQ_TYPE_EDGE_BOTH)
++		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+ 			bank->toggle_mask |= 1 << gpio;
+ 		if (trigger & IRQ_TYPE_EDGE_RISING)
+ 			l |= 1 << gpio;
+@@ -846,7 +846,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 	case METHOD_GPIO_7XX:
+ 		reg += OMAP7XX_GPIO_INT_CONTROL;
+ 		l = __raw_readl(reg);
+-		if (trigger & IRQ_TYPE_EDGE_BOTH)
++		if ((trigger & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH)
+ 			bank->toggle_mask |= 1 << gpio;
+ 		if (trigger & IRQ_TYPE_EDGE_RISING)
+ 			l |= 1 << gpio;
