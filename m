@@ -1,75 +1,35 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Fri, 23 Apr 2010 10:36:44 +0800
-Subject: [PATCH - kexec] arm: place initrd to safer place according to zImage
-	length
-Message-ID: <h2xf17812d71004221936s779a4585r8b458f7f2630f7b1@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 23 Apr 2010 11:02:05 +0800
+Subject: [PATCH] serial/imx: only parse for iomem resources once
+In-Reply-To: <20100422143343.GB32348@pengutronix.de>
+References: <1271838838.643120.804272014834.1.gpush@pororo>
+	<20100422143343.GB32348@pengutronix.de>
+Message-ID: <201004231102.06849.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 4b6d55c7780dbf383c6b64e560d459d15a891006
-Author: Eric Miao <eric.miao@canonical.com>
-Date:   Fri Apr 23 10:19:43 2010 +0800
+Hi Uwe,
 
-    arm: place initrd to safer place according to zImage length
+> What are the effects for this regarding run time?  How often are
+> request_port and release_port called?  I wonder if it's worth to save
+> the value.  Or what else than run time is your concern?
 
-    The original fixed address of 0x800000 may be overwritten after the
-    kernel is decompressed.  Assume a maximum decompression ratio of 4
-    and place initrd right after that, just to be safer.
+I'm not too concerned with the reduction in run time here - I'd like to be 
+able to parse the UART config from the device tree, rather than using 
+platform_get_{irq,resource}.
 
-    Signed-off-by: Eric Miao <eric.miao@canonical.com>
+With this patch, all of the existing parsing is done in serial_imx_probe(). 
+This means we can just abstract the parsing once, rather than having to check 
+what parsing method (platform or devtree) we're using in request_port and 
+release_port as well.
 
-diff --git a/kexec/arch/arm/kexec-zImage-arm.c
-b/kexec/arch/arm/kexec-zImage-arm.c
-index 72fcdd8..1a446d9 100644
---- a/kexec/arch/arm/kexec-zImage-arm.c
-+++ b/kexec/arch/arm/kexec-zImage-arm.c
-@@ -130,7 +130,7 @@ struct tag * atag_read_tags(void)
- static
- int atag_arm_load(struct kexec_info *info, unsigned long base,
- 	const char *command_line, off_t command_line_len,
--	const char *initrd, off_t initrd_len)
-+	const char *initrd, off_t initrd_len, off_t initrd_off)
- {
- 	struct tag *saved_tags = atag_read_tags();
- 	char *buf;
-@@ -196,10 +196,8 @@ int atag_arm_load(struct kexec_info *info,
-unsigned long base,
- 	add_segment(info, buf, len, base, len);
+See serial_imx_probe_pdata and serial_imx_probe_dt in:
 
- 	if (initrd) {
--		struct memory_range *range;
--		int ranges;
--		get_memory_ranges(&range, &ranges, info->kexec_flags);
--		*initrd_start = locate_hole(info, initrd_len, getpagesize(),
-range[0].start + 0x800000, ULONG_MAX, INT_MAX);
-+		*initrd_start = locate_hole(info, initrd_len, getpagesize(),
-+				initrd_off, ULONG_MAX, INT_MAX);
- 		if (*initrd_start == ULONG_MAX)
- 			return -1;
- 		add_segment(info, initrd, initrd_len, *initrd_start, initrd_len);
-@@ -219,6 +217,7 @@ int zImage_arm_load(int argc, char **argv, const
-char *buf, off_t len,
- 	const char *ramdisk;
- 	char *ramdisk_buf;
- 	off_t ramdisk_length;
-+	off_t ramdisk_offset;
- 	int opt;
- #define OPT_APPEND	'a'
- #define OPT_RAMDISK	'r'
-@@ -271,9 +270,14 @@ int zImage_arm_load(int argc, char **argv, const
-char *buf, off_t len,
- 	if (base == ULONG_MAX)
- 		return -1;
+http://kernel.ubuntu.com/git?p=jk/dt/linux-2.6.git;a=blob;f=drivers/serial/imx.c;h=a54f6464d35920a81fdcc9fd93de3283260ab839;hb=2610717ecacfba0db34ad5b28ed6379560108912
 
-+	/* assume the maximum kernel compression ratio is 4,
-+	 * and just to be safe, place ramdisk after that
-+	 */
-+	ramdisk_offset = base + len * 4;
-+
- 	if (atag_arm_load(info, base + atag_offset,
- 			 command_line, command_line_len,
--			 ramdisk_buf, ramdisk_length)    == -1)
-+			 ramdisk_buf, ramdisk_length, ramdisk_offset) == -1)
- 		return -1;
+for my intended (work-in-progress) approach.
 
- 	add_segment(info, buf, len, base + offset, len);
+Cheers,
+
+
+Jeremy
