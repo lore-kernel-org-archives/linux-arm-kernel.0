@@ -1,104 +1,100 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Apr 2010 16:10:55 -0700
-Subject: [PATCH 00/28] omap fixes for v2.6.34-rc5
-Message-ID: <20100423230829.31953.17334.stgit@baageli.muru.com>
+Date: Fri, 23 Apr 2010 16:11:00 -0700
+Subject: [PATCH 01/28] omap: fix clocksource_32k to start from zero
+In-Reply-To: <20100423230829.31953.17334.stgit@baageli.muru.com>
+References: <20100423230829.31953.17334.stgit@baageli.muru.com>
+Message-ID: <20100423231100.31953.40329.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Aaro Koskinen <aaro.koskinen@nokia.com>
 
-Here are some omap fixes for review. Mostly trivial stuff.
+When the 32k sync timer is used for sched_clock(), it should count
+time from the kernel boot (clocksource init) instead of the last HW
+reset. Otherwise printk.time values will jump suddenly during the boot:
 
-Sorry for posting these so late in the -rc cycle. Travel,
-meetings and ELC sucked up quite a bit of my time over past
-month.
+	[    0.000000] calling  omap2_clk_arch_init+0x0/0x138 @ 1
+	[    0.000000] initcall omap2_clk_arch_init+0x0/0x138 returned -22 after 0 usecs
+	[    0.000000] initcall omap2_clk_arch_init+0x0/0x138 returned with error code -22
+	[    0.000000] calling  omap_init_clocksource_32k+0x0/0x98 @ 1
+	[  508.697937] initcall omap_init_clocksource_32k+0x0/0x98 returned 0 after 0 usecs
+	[  508.697967] calling  omap_init_devices+0x0/0x38 @ 1
+	[  508.698425] initcall omap_init_devices+0x0/0x38 returned 0 after 0 usecs
 
-Regards,
+This will confuse tools such as scripts/bootgraph.pl.
 
-Tony
-
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/plat-omap/common.c |   19 ++++++++++++++-----
+ 1 files changed, 14 insertions(+), 5 deletions(-)
 
-Aaro Koskinen (2):
-      omap: fix clocksource_32k to start from zero
-      omap: delete unused bootloader tag variables
-
-Abraham Arce (1):
-      OMAP4: Clocks: Change SPI Instance Names
-
-Enric Balletbo i Serra (1):
-      omap3: Fix EHCI port for IGEP v2 board
-
-Felipe Balbi (1):
-      arm: omap1: remove dead code from timer32k.c
-
-Francisco Alecrim (1):
-      n8x0_defconfig: remove CONFIG_NILFS2_FS override
-
-Janusz Krzysztofik (1):
-      omap: gpio: fix incorrect matching of IRQ_TYPE_EDGE_BOTH
-
-Jarkko Nikula (2):
-      omap: rx51_defconfig: Remove duplicate phonet
-      omap: rx51_defconfig: Remove CONFIG_SYSFS_DEPRECATED*=y options
-
-Richard Woodruff (1):
-      omap4: Fix build break when used with gcc-4.4.1 (2009-q3)
-
-Santosh Shilimkar (2):
-      OMAP4: Fix for CONTROL register Base
-      omap4: Fix McBSP4 base address
-
-Thomas Weber (8):
-      omap: Devkit8000: Fix wrong usb port on Devkit8000
-      omap: board-sdp-flash.c: Fix typos in debug output
-      omap: Devkit8000: Fix typo in supplies
-      omap: Devkit8000: Add missing package selection
-      omap: Devkit8000: Fix typo in pin name
-      omap: Devkit8000: Remove unnecessary include file
-      omap: Devkit8000: Change position of init calls
-      omap: Devkit8000: Remove unused pins
-
-Tony Lindgren (2):
-      omap2: Fix ARM processor check for 24xx
-      omap: Fix n8x0 mmc_mmc_init compile warnings and typos
-
-kishore kadiyala (1):
-      OMAP4-HSMMC: FIX for MMC5 Controller IRQ Base
-
-manjugk manjugk (1):
-      omap: DMA: Init CDAC to zero
-
-stanley.miao (4):
-      omap: fix the compile error if CONFIG_MTD_NAND_OMAP2 is notenabled
-      omap: remove one of the define of INT_34XX_BENCH_MPU_EMUL
-      AM3517: initialize i2c subsystem after mux subsystem
-      omap: fix a gpmc nand problem
-
-
- arch/arm/configs/n8x0_defconfig                |    1 -
- arch/arm/configs/rx51_defconfig                |    3 --
- arch/arm/mach-omap1/timer32k.c                 |   15 ---------
- arch/arm/mach-omap2/Kconfig                    |    6 ++--
- arch/arm/mach-omap2/board-am3517evm.c          |    4 +-
- arch/arm/mach-omap2/board-devkit8000.c         |   39 ++++++------------------
- arch/arm/mach-omap2/board-igep0020.c           |    8 ++---
- arch/arm/mach-omap2/board-n8x0.c               |   18 ++++++-----
- arch/arm/mach-omap2/board-sdp-flash.c          |    8 ++---
- arch/arm/mach-omap2/clock44xx_data.c           |    8 ++---
- arch/arm/mach-omap2/devices.c                  |    2 +
- arch/arm/mach-omap2/gpmc-nand.c                |    3 ++
- arch/arm/mach-omap2/include/mach/entry-macro.S |    2 +
- arch/arm/mach-omap2/omap-headsmp.S             |    6 ++--
- arch/arm/mach-omap2/omap44xx-smc.S             |    2 +
- arch/arm/plat-omap/common.c                    |   22 +++++++++-----
- arch/arm/plat-omap/dma.c                       |    9 ++++++
- arch/arm/plat-omap/gpio.c                      |    6 ++--
- arch/arm/plat-omap/include/plat/irqs.h         |    2 -
- arch/arm/plat-omap/include/plat/mcbsp.h        |    2 +
- arch/arm/plat-omap/include/plat/nand.h         |    7 ++++
- arch/arm/plat-omap/include/plat/omap44xx.h     |    2 +
- 22 files changed, 80 insertions(+), 95 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 088c1a0..01cbb48 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -100,10 +100,17 @@ EXPORT_SYMBOL(omap_get_var_config);
+ 
+ #include <linux/clocksource.h>
+ 
++/*
++ * offset_32k holds the init time counter value. It is then subtracted
++ * from every counter read to achieve a counter that counts time from the
++ * kernel boot (needed for sched_clock()).
++ */
++static u32 offset_32k __read_mostly;
++
+ #ifdef CONFIG_ARCH_OMAP16XX
+ static cycle_t omap16xx_32k_read(struct clocksource *cs)
+ {
+-	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED);
++	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
+ }
+ #else
+ #define omap16xx_32k_read	NULL
+@@ -112,7 +119,7 @@ static cycle_t omap16xx_32k_read(struct clocksource *cs)
+ #ifdef CONFIG_ARCH_OMAP2420
+ static cycle_t omap2420_32k_read(struct clocksource *cs)
+ {
+-	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10);
++	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
+ }
+ #else
+ #define omap2420_32k_read	NULL
+@@ -121,7 +128,7 @@ static cycle_t omap2420_32k_read(struct clocksource *cs)
+ #ifdef CONFIG_ARCH_OMAP2430
+ static cycle_t omap2430_32k_read(struct clocksource *cs)
+ {
+-	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10);
++	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
+ }
+ #else
+ #define omap2430_32k_read	NULL
+@@ -130,7 +137,7 @@ static cycle_t omap2430_32k_read(struct clocksource *cs)
+ #ifdef CONFIG_ARCH_OMAP3
+ static cycle_t omap34xx_32k_read(struct clocksource *cs)
+ {
+-	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10);
++	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
+ }
+ #else
+ #define omap34xx_32k_read	NULL
+@@ -139,7 +146,7 @@ static cycle_t omap34xx_32k_read(struct clocksource *cs)
+ #ifdef CONFIG_ARCH_OMAP4
+ static cycle_t omap44xx_32k_read(struct clocksource *cs)
+ {
+-	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10);
++	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
+ }
+ #else
+ #define omap44xx_32k_read	NULL
+@@ -227,6 +234,8 @@ static int __init omap_init_clocksource_32k(void)
+ 		clocksource_32k.mult = clocksource_hz2mult(32768,
+ 					    clocksource_32k.shift);
+ 
++		offset_32k = clocksource_32k.read(&clocksource_32k);
++
+ 		if (clocksource_register(&clocksource_32k))
+ 			printk(err, clocksource_32k.name);
+ 	}
