@@ -1,47 +1,33 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 23 Apr 2010 19:57:40 +0530
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <1272032133.15107.53.camel@e102109-lin.cambridge.arm.com>
-References: <20100408094818.GD31407@n2100.arm.linux.org.uk>
-	<1272032133.15107.53.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5092778@dbde02.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Apr 2010 15:38:11 +0100
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)
+In-Reply-To: <20100409180033.5003.19340.stgit@e101986-lin>
+References: <20100409175628.5003.10282.stgit@e101986-lin>
+	<20100409180033.5003.19340.stgit@e101986-lin>
+Message-ID: <1272033491.15107.57.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Friday, April 23, 2010 7:46 PM
-> To: Russell King - ARM Linux
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] Prohibit ioremap() on kernel managed RAM
-> 
-> On Thu, 2010-04-08 at 10:48 +0100, Russell King - ARM Linux wrote:
-> > ARMv6 and above have a restriction whereby aliasing virtual:physical
-> > mappings must not have differing memory type and sharability
-> > attributes.  Strictly, this covers the memory type (strongly ordered,
-> > device, memory), cache attributes (uncached, write combine, write
-> > through, write back read alloc, write back write alloc) and the
-> > shared bit.
-> >
-> > However, using ioremap() and its variants on system RAM results in
-> > mappings which differ in these attributes from the main system RAM
-> > mapping.  Other architectures which similar restrictions approch this
-> > problem in the same way - they do not permit ioremap on main system
-> > RAM.
-> >
-> > Make ARM behave in the same way, with a WARN_ON() such that users can
-> > be traced and an alternative approach found.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> BTW, why not do this for /dev/mem mappings with O_SYNC? I think I sent
-> you a patch some time ago but I can re-post it.
-> 
-Above change is necessary but what an alternative approach is for this. 
-There are many use case where ioremap* is needed.
+On Fri, 2010-04-09 at 19:00 +0100, Leif Lindholm wrote:
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -152,8 +152,10 @@ ENTRY(cpu_v7_set_pte_ext)
+>  
+>  	tst	r1, #L_PTE_USER
+>  	orrne	r3, r3, #PTE_EXT_AP1
+> +#ifndef CONFIG_SWP_EMULATE
+>  	tstne	r3, #PTE_EXT_APX
+>  	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+> +#endif
 
-Regards,
-Santosh
+I think we could use:
+
+#ifndef CONFIG_CPU_HAS_TLS_REG
+...
+#endif
+
+And since we always have a TLS register on ARMv7, we can probably remove
+these lines entirely.
+
+-- 
+Catalin
