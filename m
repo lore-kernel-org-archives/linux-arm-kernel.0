@@ -1,202 +1,300 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Thu, 22 Apr 2010 23:51:15 -0500
-Subject: [PATCHv8 2.6.34-rc5 3/5] mx5: Enable board specific functions for
-	enabling USB host on Babbage
-In-Reply-To: <1271998277-3949-2-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Thu, 22 Apr 2010 23:51:16 -0500
+Subject: [PATCHv8 2.6.34-rc5 4/5] mxc: Add generic USB HW initialization for
+	MX51
+In-Reply-To: <1271998277-3949-3-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1271998277-3949-1-git-send-email-Dinh.Nguyen@freescale.com>
 	<1271998277-3949-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1271998277-3949-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1271998277-3949-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1271998277-3949-4-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-This patch enables USB host functionality for Host1 and OTG port on
-Freescale MX51 Babbage HW. This patch contains the board specific
-HW initialization of the USB HW.
+This patch adds USB HW initializiation code to /plat-mxc/ehci.c.
+	-Stops and resets USB HW
+	-Sets some specific PHY settings
+	-Stop and restart the USB HW.
+Renames mxc_set_usbcontrol to mxc_initialize_usb_hw.
+The placing of the mxc_initialize_usb_hw needs to be before setting
+the USBMODE register to host, since a reset and restart is done in
+mxc_initialize_usb_hw.
+Adds new register bit defines for the USB HW on Freescale
+SoCs.
 
 This patch applies to 2.6.34-rc5.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 Reviewed-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-mx5/board-mx51_babbage.c |  129 ++++++++++++++++++++++++++++++++
- 1 files changed, 129 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/ehci.c                  |  170 ++++++++++++++++++++++++++++-
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |   14 ++-
+ drivers/usb/host/ehci-mxc.c               |   10 +-
+ 3 files changed, 186 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index ee67a71..99f7ea9 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -12,11 +12,15 @@
+diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
+index cb0b638..6b02c45 100644
+--- a/arch/arm/plat-mxc/ehci.c
++++ b/arch/arm/plat-mxc/ehci.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License as published by the
+@@ -18,6 +19,7 @@
  
- #include <linux/init.h>
  #include <linux/platform_device.h>
-+#include <linux/gpio.h>
+ #include <linux/io.h>
 +#include <linux/delay.h>
-+#include <linux/io.h>
  
- #include <mach/common.h>
  #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx51.h>
-+#include <mach/mxc_ehci.h>
+ #include <mach/mxc_ehci.h>
+@@ -50,7 +52,50 @@
+ #define MX35_H1_TLL_BIT		(1 << 5)
+ #define MX35_H1_USBTE_BIT	(1 << 4)
  
- #include <asm/irq.h>
- #include <asm/setup.h>
-@@ -26,6 +30,17 @@
- 
- #include "devices.h"
- 
-+#define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
-+#define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
+-int mxc_set_usbcontrol(int port, unsigned int flags)
++#define MXC_OTG_OFFSET		0
++#define MXC_H1_OFFSET		0x200
 +
-+/* USB_CTRL_1 */
-+#define MX51_USB_CTRL_1_OFFSET			0x10
-+#define MX51_USB_CTRL_UH1_EXT_CLK_EN		(1 << 25)
++/* USB_CTRL */
++#define MXC_OTG_UCTRL_OWIE_BIT		(1 << 27)	/* OTG wakeup intr enable */
++#define MXC_OTG_UCTRL_OPM_BIT		(1 << 24)	/* OTG power mask */
++#define MXC_H1_UCTRL_H1UIE_BIT		(1 << 12)	/* Host1 ULPI interrupt enable */
++#define MXC_H1_UCTRL_H1WIE_BIT		(1 << 11)	/* HOST1 wakeup intr enable */
++#define MXC_H1_UCTRL_H1PM_BIT		(1 <<  8)		/* HOST1 power mask */
 +
-+#define	MX51_USB_PLLDIV_12_MHZ		0x00
-+#define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
-+#define	MX51_USB_PLL_DIV_24_MHZ	0x02
++/* USB_PHY_CTRL_FUNC */
++#define MXC_OTG_PHYCTRL_OC_DIS_BIT	(1 << 8)	/* OTG Disable Overcurrent Event */
++#define MXC_H1_OC_DIS_BIT			(1 << 5)	/* UH1 Disable Overcurrent Event */
 +
- static struct platform_device *devices[] __initdata = {
- 	&mxc_fec_device,
- };
-@@ -46,6 +61,22 @@ static struct pad_desc mx51babbage_pads[] = {
- 	MX51_PAD_EIM_D26__UART3_TXD,
- 	MX51_PAD_EIM_D27__UART3_RTS,
- 	MX51_PAD_EIM_D24__UART3_CTS,
++#define MXC_USBCMD_OFFSET			0x140
 +
-+	/* USB HOST1 */
-+	MX51_PAD_USBH1_CLK__USBH1_CLK,
-+	MX51_PAD_USBH1_DIR__USBH1_DIR,
-+	MX51_PAD_USBH1_NXT__USBH1_NXT,
-+	MX51_PAD_USBH1_DATA0__USBH1_DATA0,
-+	MX51_PAD_USBH1_DATA1__USBH1_DATA1,
-+	MX51_PAD_USBH1_DATA2__USBH1_DATA2,
-+	MX51_PAD_USBH1_DATA3__USBH1_DATA3,
-+	MX51_PAD_USBH1_DATA4__USBH1_DATA4,
-+	MX51_PAD_USBH1_DATA5__USBH1_DATA5,
-+	MX51_PAD_USBH1_DATA6__USBH1_DATA6,
-+	MX51_PAD_USBH1_DATA7__USBH1_DATA7,
++/* USBCMD */
++#define MXC_UCMD_RUN_BIT		(1 << 0)	/* controller run/stop */
++#define MXC_UCMD_RESET_BIT		(1 << 1)	/* controller reset */
++#define MXC_UCMD_ITC_NO_THRESHOLD_MASK	(~(0xff << 16))	/* Interrupt Threshold Control */
 +
-+	/* USB HUB reset line*/
-+	MX51_PAD_GPIO_1_7__GPIO1_7,
- };
- 
- /* Serial ports */
-@@ -66,15 +97,113 @@ static inline void mxc_init_imx_uart(void)
- }
- #endif /* SERIAL_IMX */
- 
-+static int gpio_usbh1_active(void)
++/* This function is a version of David Brownell's handshake function in
++ * ehci-hcd.c. This function uses cpu_relax instead of udelay().
++ *
++ * @addr: Address of register
++ * @mask: bits to look@in result of read
++ * @done: value of those bits when handshake succeeds
++ * @timeout: timeout in count
++ *
++ * This function waits for certain bits in the HW to stick before moving
++ * on and provides a timeout in the case where those bits do not stick.
++ */
++static inline int hw_handshake(u32 addr, u32 mask, int done, int timeout)
 +{
-+	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
-+	int ret;
++	while (--timeout && ((__raw_readl(addr) & mask) != done))
++			cpu_relax();
 +
-+	/* Set USBH1_STP to GPIO and toggle it */
-+	mxc_iomux_v3_setup_pad(&usbh1stp_gpio);
-+	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
++	if (timeout)
++		return 0;
++	else
++		return -ETIMEDOUT;
++}
 +
-+	if (ret) {
-+		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
++int mxc_initialize_usb_hw(int port, unsigned int flags)
+ {
+ 	unsigned int v;
+ #ifdef CONFIG_ARCH_MX3
+@@ -186,9 +231,130 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
+ 		return 0;
+ 	}
+ #endif /* CONFIG_MACH_MX27 */
++#ifdef CONFIG_ARCH_MX51
++	if (cpu_is_mx51()) {
++		void __iomem *usb_base;
++		u32 usbotg_base;
++		u32 usbother_base;
++		int ret = 0;
++
++		usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
++
++		switch (port) {
++		case 0:	/* OTG port */
++			usbotg_base = usb_base + MXC_OTG_OFFSET;
++			break;
++		case 1:	/* Host 1 port */
++			usbotg_base = usb_base + MXC_H1_OFFSET;
++			break;
++		default:
++			printk(KERN_ERR"%s no such port %d\n", __func__, port);
++			ret = -ENOENT;
++			goto error;
++		}
++		usbother_base = usb_base + MX5_USBOTHER_REGS_OFFSET;
++
++		/* Stop then Reset */
++		v = __raw_readl(usbotg_base + MXC_USBCMD_OFFSET);
++		v &= ~MXC_UCMD_RUN_BIT;
++		__raw_writel(v, usbotg_base + MXC_USBCMD_OFFSET);
++		ret = hw_handshake(usbotg_base + MXC_USBCMD_OFFSET, MXC_UCMD_RUN_BIT, 0, 500);
++		if (ret) {
++			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
++			goto error;
++		}
++
++		v = __raw_readl(usbotg_base + MXC_USBCMD_OFFSET);
++		v |= MXC_UCMD_RESET_BIT;
++		__raw_writel(v, usbotg_base + MXC_USBCMD_OFFSET);
++		ret = hw_handshake(usbotg_base + MXC_USBCMD_OFFSET, MXC_UCMD_RESET_BIT, 0, 500);
++		if (ret) {
++			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
++			goto error;
++		}
++
++		switch (port) {
++		case 0:	/*OTG port */
++			if (flags & MXC_EHCI_INTERNAL_PHY) {
++				v = __raw_readl(usbother_base + MXC_USB_PHY_CTR_FUNC_OFFSET);
++
++				if (flags & MXC_EHCI_POWER_PINS_ENABLED)
++					v |= (MXC_OTG_PHYCTRL_OC_DIS_BIT | MXC_OTG_UCTRL_OPM_BIT); /* OC/USBPWR is not used */
++				else
++					v &= ~(MXC_OTG_PHYCTRL_OC_DIS_BIT | MXC_OTG_UCTRL_OPM_BIT); /* OC/USBPWR is used */
++				__raw_writel(v, usbother_base + MXC_USB_PHY_CTR_FUNC_OFFSET);
++
++				v = __raw_readl(usbother_base + MXC_USBCTRL_OFFSET);
++				if (flags & MXC_EHCI_WAKEUP_ENABLED)
++					v |= MXC_OTG_UCTRL_OWIE_BIT;/* OTG wakeup enable */
++				else
++					v &= ~MXC_OTG_UCTRL_OWIE_BIT;/* OTG wakeup disable */
++				__raw_writel(v, usbother_base + MXC_USBCTRL_OFFSET);
++			}
++			break;
++		case 1:	/* Host 1 */
++			/*Host ULPI */
++			v = __raw_readl(usbother_base + MXC_USBCTRL_OFFSET);
++			if (flags & MXC_EHCI_WAKEUP_ENABLED)
++				v &= ~(MXC_H1_UCTRL_H1WIE_BIT | MXC_H1_UCTRL_H1UIE_BIT);/* HOST1 wakeup/ULPI intr disable */
++			else
++				v &= ~(MXC_H1_UCTRL_H1WIE_BIT | MXC_H1_UCTRL_H1UIE_BIT);/* HOST1 wakeup/ULPI intr disable */
++
++			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
++				v &= ~MXC_H1_UCTRL_H1PM_BIT; /* HOST1 power mask used*/
++			else
++				v |= MXC_H1_UCTRL_H1PM_BIT; /* HOST1 power mask used*/
++			__raw_writel(v, usbother_base + MXC_USBCTRL_OFFSET);
++
++			v = __raw_readl(usbother_base + MXC_USB_PHY_CTR_FUNC_OFFSET);
++			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
++				v &= ~MXC_H1_OC_DIS_BIT; /* OC is used */
++			else
++				v |= MXC_H1_OC_DIS_BIT; /* OC is not used */
++			__raw_writel(v, usbother_base + MXC_USB_PHY_CTR_FUNC_OFFSET);
++
++			v = __raw_readl(usbotg_base + MXC_USBCMD_OFFSET);
++			if (flags & MXC_EHCI_ITC_NO_THRESHOLD)
++				/* Interrupt Threshold Control:Immediate (no threshold) */
++				v &= MXC_UCMD_ITC_NO_THRESHOLD_MASK;
++			__raw_writel(v, usbotg_base + MXC_USBCMD_OFFSET);
++			break;
++		}
++
++		/* need to reset the controller here so that the ID pin
++		 * is correctly detected.
++		 */
++		/* Stop then Reset */
++		v = __raw_readl(usbotg_base + MXC_USBCMD_OFFSET);
++		v &= ~MXC_UCMD_RUN_BIT;
++		__raw_writel(v, usbotg_base + MXC_USBCMD_OFFSET);
++		ret = hw_handshake(usbotg_base + MXC_USBCMD_OFFSET, MXC_UCMD_RUN_BIT, 0, 500);
++		if (ret) {
++			printk(KERN_ERR "%s could not stop usb hardware\n", __func__);
++			goto error;
++		}
++
++		v = __raw_readl(usbotg_base + MXC_USBCMD_OFFSET);
++		v |= MXC_UCMD_RESET_BIT;
++		__raw_writel(v, usbotg_base + MXC_USBCMD_OFFSET);
++		ret = hw_handshake(usbotg_base + MXC_USBCMD_OFFSET, MXC_UCMD_RESET_BIT, 0, 500);
++		if (ret) {
++			printk(KERN_ERR "%s could not reset usb hardware\n", __func__);
++			goto error;
++		}
++
++		/* allow controller to reset, and leave time for
++		 * the ULPI transceiver to reset too.
++		 */
++		msleep(100);
++error:
++		iounmap(usb_base);
 +		return ret;
 +	}
-+	gpio_direction_output(BABBAGE_USBH1_STP, 0);
-+	gpio_set_value(BABBAGE_USBH1_STP, 1);
-+	msleep(100);
-+	gpio_free(BABBAGE_USBH1_STP);
-+	return 0;
-+}
-+
-+static inline void babbage_usbhub_reset(void)
-+{
-+	int ret;
-+
-+	/* Bring USB hub out of reset */
-+	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
-+	if (ret) {
-+		printk(KERN_ERR"failed to get GPIO_USB_HUB_RESET: %d\n", ret);
-+		return;
-+	}
-+	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
-+
-+	/* USB HUB RESET - De-assert USB HUB RESET_N */
-+	msleep(1);
-+	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
-+	msleep(1);
-+	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
-+}
-+
-+/* This function is board specific as the bit mask for the plldiv will also
-+be different for other Freescale SoCs, thus a common bitmask is not
-+possible and cannot get place in /plat-mxc/ehci.c.*/
-+static int initialize_otg_port(struct platform_device *pdev)
-+{
-+	u32 v;
-+	void __iomem *usb_base;
-+	u32 usbother_base;
-+
-+	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-+	usbother_base = usb_base + MX5_USBOTHER_REGS_OFFSET;
-+
-+	/* Set the PHY clock to 19.2MHz */
-+	v = __raw_readl(usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
-+	v &= ~MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK;
-+	v |= MX51_USB_PLL_DIV_19_2_MHZ;
-+	__raw_writel(v, usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
-+	iounmap(usb_base);
-+	return 0;
-+}
-+
-+static int initialize_usbh1_port(struct platform_device *pdev)
-+{
-+	u32 v;
-+	void __iomem *usb_base;
-+	u32 usbother_base;
-+
-+	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-+	usbother_base = usb_base + MX5_USBOTHER_REGS_OFFSET;
-+
-+	/* The clock for the USBH1 ULPI port will come externally from the PHY. */
-+	v = __raw_readl(usbother_base + MX51_USB_CTRL_1_OFFSET);
-+	__raw_writel(v | MX51_USB_CTRL_UH1_EXT_CLK_EN, usbother_base + MX51_USB_CTRL_1_OFFSET);
-+	iounmap(usb_base);
-+	return 0;
-+}
-+
-+static struct mxc_usbh_platform_data dr_utmi_config = {
-+	.init		= initialize_otg_port,
-+	.portsc	= MXC_EHCI_UTMI_16BIT,
-+	.flags	= MXC_EHCI_INTERNAL_PHY,
-+};
-+
-+static struct mxc_usbh_platform_data usbh1_config = {
-+	.init		= initialize_usbh1_port,
-+	.portsc	= MXC_EHCI_MODE_ULPI,
-+	.flags	= (MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_ITC_NO_THRESHOLD),
-+};
-+
- /*
-  * Board specific initialization.
-  */
- static void __init mxc_board_init(void)
- {
-+	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
-+
- 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
- 					ARRAY_SIZE(mx51babbage_pads));
- 	mxc_init_imx_uart();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-+
-+	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-+
-+	gpio_usbh1_active();
-+	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
-+	/* setback USBH1_STP to be function */
-+	mxc_iomux_v3_setup_pad(&usbh1stp);
-+	babbage_usbhub_reset();
++#endif
+ 	printk(KERN_WARNING
+ 		"%s() unable to setup USBCONTROL for this CPU\n", __func__);
+ 	return -EINVAL;
  }
+-EXPORT_SYMBOL(mxc_set_usbcontrol);
++EXPORT_SYMBOL(mxc_initialize_usb_hw);
  
- static void __init mx51_babbage_timer_init(void)
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index 4b9b836..7fc5f99 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -25,6 +25,18 @@
+ #define MXC_EHCI_INTERNAL_PHY		(1 << 7)
+ #define MXC_EHCI_IPPUE_DOWN		(1 << 8)
+ #define MXC_EHCI_IPPUE_UP		(1 << 9)
++#define MXC_EHCI_WAKEUP_ENABLED	(1 << 10)
++#define MXC_EHCI_ITC_NO_THRESHOLD	(1 << 11)
++
++#define MXC_USBCTRL_OFFSET		0
++#define MXC_USB_PHY_CTR_FUNC_OFFSET	0x8
++#define MXC_USB_PHY_CTR_FUNC2_OFFSET	0xc
++
++#define MX5_USBOTHER_REGS_OFFSET	0x800
++
++/* USB_PHY_CTRL_FUNC2*/
++#define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
++#define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
+ 
+ struct mxc_usbh_platform_data {
+ 	int (*init)(struct platform_device *pdev);
+@@ -35,7 +47,7 @@ struct mxc_usbh_platform_data {
+ 	struct otg_transceiver	*otg;
+ };
+ 
+-int mxc_set_usbcontrol(int port, unsigned int flags);
++int mxc_initialize_usb_hw(int port, unsigned int flags);
+ 
+ #endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
+ 
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index ead59f4..bb8d092 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -191,6 +191,11 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		clk_enable(priv->ahbclk);
+ 	}
+ 
++	/* setup specific usb hw */
++	ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
++	if (ret < 0)
++		goto err_init;
++
+ 	/* set USBMODE to host mode */
+ 	temp = readl(hcd->regs + USBMODE_OFFSET);
+ 	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
+@@ -199,11 +204,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
+ 	mdelay(10);
+ 
+-	/* setup USBCONTROL. */
+-	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
+-	if (ret < 0)
+-		goto err_init;
+-
+ 	/* Initialize the transceiver */
+ 	if (pdata->otg) {
+ 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
 -- 
 1.6.0.4
