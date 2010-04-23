@@ -1,43 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Apr 2010 16:37:46 +0100
-Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
-In-Reply-To: <20100331182518.GA30522@debian>
-References: <20100331182518.GA30522@debian>
-Message-ID: <1272037066.15107.58.camel@e102109-lin.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 23 Apr 2010 11:00:51 +0200
+Subject: udelay() broken for SMP cores?
+In-Reply-To: <20100421095036.GA13971@n2100.arm.linux.org.uk>
+References: <4BCE60C4.8020505@codeaurora.org>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
+	<4BCE9E8B.2070103@codeaurora.org>
+	<20100421072243.GA913@n2100.arm.linux.org.uk>
+	<ea62885d30e4bbfb84db59758fa9e946.squirrel@www.codeaurora.org>
+	<20100421095036.GA13971@n2100.arm.linux.org.uk>
+Message-ID: <20100423090050.GA2213@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-03-31 at 19:25 +0100, Rabin Vincent wrote:
-> From bf828a0c069b1bb3f6bf4e68f1dceecab396c286 Mon Sep 17 00:00:00 2001
-> From: Rabin Vincent <rabin@rab.in>
-> Date: Sun, 14 Feb 2010 01:18:34 +0530
-> Subject: [PATCH 06/10] ARM: ftrace: add Thumb-2 support
-> 
-> Fix the mcount routines to build and run on a kernel built with the
-> Thumb-2 instruction set by correcting the following errors using the
-> fixes suggested by Catalin Marinas:
-> 
->  - Problem: The following assembler errors appear at the "adr r0,
->    ftrace_stub" instruction:
-> 
->    entry-common.S: Assembler messages:
->    entry-common.S:179: Error: invalid immediate for address calculation (value = 0x00000004)
-> 
->    Fix: The errors don't occur with a non-global symbol, so use one.
-> 
->  - Problem: The "mov lr, pc" does not set the lsb when storing the pc in
->    lr.  The called function returns with "bx lr", and the mode changes
->    to ARM.
-> 
->    Fix: Add a label on the return address and use "adr lr, BSYM(label)".
-> 
-> We don't modify the old mcount because it won't be built when using
-> Thumb-2.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+Hi!
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Is this an ARM specific decision? Cpufreq certainly supports per cpu scaling
+> > and x86 udelay uses per-CPU data. So your concern should apply for x86
+> > too. I had the same concern and was planning on bring it up in the cpufreq
+> > mailing list after I made sure I didn't misunderstand anything.
+> 
+> Well, x86 looks buggy in this regard as well - the loops_per_jiffy
+> value used is for a CPU which may not run the delay loop.
+
+x86 assumes all cores to be essentially same.
+
+> > Btw, your concern should apply for single core scaling too, right? Context
+> > switch can complete within max udelay (general - 5ms, ARM - 2ms) time and
+> > CPU could have jumped
+> > from lowest to highest speed in that time and mess up udelay. I didn't see
+> > any code in cpufreq that deferred scaling during udelay. So, that's something
+> > I plan to ask cpufreq folks too.
+> 
+> Well, the assumption is that the CPUs will be running at their fastest
+> speed at boot time, and therefore loops_per_jiffy will be calibrated
+> such that we guarantee _at least_ the asked-for delay - which is the
+> only guarantee udelay has.
+
+Well, some machines can't reach max cpu speed on battery power, so
+there may be a problem there.
 
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
