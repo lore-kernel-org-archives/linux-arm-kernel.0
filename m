@@ -1,39 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Apr 2010 16:11:29 -0700
-Subject: [PATCH 11/28] omap: Devkit8000: Fix wrong usb port on Devkit8000
+Date: Fri, 23 Apr 2010 16:11:32 -0700
+Subject: [PATCH 12/28] OMAP4: Clocks: Change SPI Instance Names
 In-Reply-To: <20100423230829.31953.17334.stgit@baageli.muru.com>
 References: <20100423230829.31953.17334.stgit@baageli.muru.com>
-Message-ID: <20100423231129.31953.42867.stgit@baageli.muru.com>
+Message-ID: <20100423231132.31953.60178.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Weber <weber@corscience.de>
+From: Abraham Arce <x0066660@ti.com>
 
-Disable the nonexistent ehci port on Devkit8000.
+Change the name for the spi instances on omap44xx_clks to match
+the names omap2 spi driver gives:
 
-Signed-off-by: Thomas Weber <weber@corscience.de>
-Acked-by: Anand Gadiyar <gadiyar@ti.com>
+omap-mcspi.1 -> omap2_mcspi.1
+omap-mcspi.2 -> omap2_mcspi.2
+omap-mcspi.3 -> omap2_mcspi.3
+omap-mcspi.4 -> omap2_mcspi.4
+
+Signed-off-by: Abraham Arce <x0066660@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-devkit8000.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clock44xx_data.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 5bfc13b..db4c093 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -639,12 +639,12 @@ static struct omap_musb_board_data musb_board_data = {
- static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
- 
- 	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
--	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-+	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
- 	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
- 
- 	.phy_reset  = true,
- 	.reset_gpio_port[0]  = -EINVAL,
--	.reset_gpio_port[1]  = 147,
-+	.reset_gpio_port[1]  = -EINVAL,
- 	.reset_gpio_port[2]  = -EINVAL
- };
- 
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 28b1079..a5c0c9c 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -2671,10 +2671,10 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("omap-mcbsp.2",	"ick",				&dummy_ck,	CK_443X),
+ 	CLK("omap-mcbsp.3",	"ick",				&dummy_ck,	CK_443X),
+ 	CLK("omap-mcbsp.4",	"ick",				&dummy_ck,	CK_443X),
+-	CLK("omap-mcspi.1",	"ick",				&dummy_ck,	CK_443X),
+-	CLK("omap-mcspi.2",	"ick",				&dummy_ck,	CK_443X),
+-	CLK("omap-mcspi.3",	"ick",				&dummy_ck,	CK_443X),
+-	CLK("omap-mcspi.4",	"ick",				&dummy_ck,	CK_443X),
++	CLK("omap2_mcspi.1",	"ick",			&dummy_ck,	CK_443X),
++	CLK("omap2_mcspi.2",	"ick",			&dummy_ck,	CK_443X),
++	CLK("omap2_mcspi.3",	"ick",			&dummy_ck,	CK_443X),
++	CLK("omap2_mcspi.4",	"ick",			&dummy_ck,	CK_443X),
+ 	CLK(NULL,	"uart1_ick",			&dummy_ck,	CK_443X),
+ 	CLK(NULL,	"uart2_ick",			&dummy_ck,	CK_443X),
+ 	CLK(NULL,	"uart3_ick",			&dummy_ck,	CK_443X),
