@@ -1,44 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 23 Apr 2010 11:00:51 +0200
-Subject: udelay() broken for SMP cores?
-In-Reply-To: <20100421095036.GA13971@n2100.arm.linux.org.uk>
-References: <4BCE60C4.8020505@codeaurora.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C4FEED81@dbde02.ent.ti.com>
-	<4BCE9E8B.2070103@codeaurora.org>
-	<20100421072243.GA913@n2100.arm.linux.org.uk>
-	<ea62885d30e4bbfb84db59758fa9e946.squirrel@www.codeaurora.org>
-	<20100421095036.GA13971@n2100.arm.linux.org.uk>
-Message-ID: <20100423090050.GA2213@ucw.cz>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Fri, 23 Apr 2010 18:29:33 +0200
+Subject: Q: sched_clock() vs. clocksource, how to implement correctly
+In-Reply-To: <20100423150917.GA25714@sig21.net>
+References: <20100423150917.GA25714@sig21.net>
+Message-ID: <20100423182933.0df45b53@mschwide.boeblingen.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, 23 Apr 2010 17:09:17 +0200
+Johannes Stezenbach <js@sig21.net> wrote:
 
-> > Is this an ARM specific decision? Cpufreq certainly supports per cpu scaling
-> > and x86 udelay uses per-CPU data. So your concern should apply for x86
-> > too. I had the same concern and was planning on bring it up in the cpufreq
-> > mailing list after I made sure I didn't misunderstand anything.
+> I'm trying to figure out how to correctly implement sched_clock()
+> for an ARM board.  However, looking at existing implementations
+> leaves me rather confused.
 > 
-> Well, x86 looks buggy in this regard as well - the loops_per_jiffy
-> value used is for a CPU which may not run the delay loop.
-
-x86 assumes all cores to be essentially same.
-
-> > Btw, your concern should apply for single core scaling too, right? Context
-> > switch can complete within max udelay (general - 5ms, ARM - 2ms) time and
-> > CPU could have jumped
-> > from lowest to highest speed in that time and mess up udelay. I didn't see
-> > any code in cpufreq that deferred scaling during udelay. So, that's something
-> > I plan to ask cpufreq folks too.
+> E.g. arch/arm/mach-u300/timer.c has
 > 
-> Well, the assumption is that the CPUs will be running at their fastest
-> speed at boot time, and therefore loops_per_jiffy will be calibrated
-> such that we guarantee _at least_ the asked-for delay - which is the
-> only guarantee udelay has.
+> static cycle_t u300_get_cycles(struct clocksource *cs)
+> {
+> 	return (cycles_t) readl(U300_TIMER_APP_VBASE + U300_TIMER_APP_GPT2CC);
+> }
+> 
+> static struct clocksource clocksource_u300_1mhz = {
+> 	.name           = "GPT2",
+> 	.rating         = 300, /* Reasonably fast and accurate clock source */
+> 	.read           = u300_get_cycles,
+> 	.mask           = CLOCKSOURCE_MASK(32), /* 32 bits */
+> 	/* 22 calculated using the algorithm in arch/mips/kernel/time.c */
+> 	.shift          = 22,
+> 	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+> };
+> 
+> unsigned long long notrace sched_clock(void)
+> {
+> 	return clocksource_cyc2ns(clocksource_u300_1mhz.read(
+> 				  &clocksource_u300_1mhz),
+> 				  clocksource_u300_1mhz.mult,
+> 				  clocksource_u300_1mhz.shift);
+> }
+> 
+> Thus, sched_clock() is based on a 1MHz 32bit counter which wraps
+> after about 71 minutes.  There are a few similar sched_clock()
+> implementations in the tree.
 
-Well, some machines can't reach max cpu speed on battery power, so
-there may be a problem there.
+Not good.
+ 
+> Questions:
+> 
+> - Isn't sched_clock() supposed to be extended to 64bit so
+>   that it practically never wraps?
+>   (old implementations use cnt32_to_63())
+
+Yes, sched_clock() is supposed to return a monotonic timestamp.
+ 
+> - What would be the effect on scheduling when sched_clock() wraps?
+
+It would confuse the process accounting and the scheduling I guess.
+
+> - What is the effect of the sched_clock() frequency on scheduling?
+>   Is there a benefit from setting the freq as high as possible?
+
+With a higher frequency the precision of the accounting increases and
+the scheduling fairness increases.
+
+> - Is struct timecounter + struct cyclecounter + timecounter_read()
+>   designated way to implement sched_clock() with a 32bit hw counter?
+> 
+>   arch/microblaze/kernel/timer.c seems to be the only user
+>   of timecounter/cyclecounter in arch/, but I don't get what it does.
+> 
+>   Or is it better to stick with cnt32_to_63()?
+
+cnt32_to_63() is a way to extend the 32 bit clocksource to a useable
+sched_clock() provider. One way or the other you have to extend the 32
+bits of the 1MHz counter to something bigger. The obvious way is to
+count the number of wraps and use this number as the upper 32 bits
+just like cnt32_to_63() does. You just have to make sure that the
+clocksource is read frequently enough to get all the wraps. A non-idle
+cpu will tick with HZ frequency and the clock will be read often
+enough, for an idle cpu the maximum sleep time needs to be limited.
+
+> - Also regarding the clocksource.shift value, I found
+>   http://lkml.org/lkml/2008/5/8/270 and it seems to suggest
+>   to use a low shift value, whereas arch/mips/kernel/time.c
+>   seems to result in a large one. Is the posting correct?
+
+Low shift values have the advantage that the 64-bit calculations do not
+overflow so easily. But there are fairly large shift values in use
+(20, 24, even 32 bit) in the current kernel tree, so I wouldn't worry
+about bigger shift values.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+blue skies,
+   Martin.
+
+"Reality continues to ruin my life." - Calvin.
