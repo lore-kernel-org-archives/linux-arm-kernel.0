@@ -1,7 +1,7 @@
 From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Sat, 24 Apr 2010 16:42:15 +0200
-Subject: [PATCH] net/ipsec: don't treat EINPROGRESS as a regular error
-In-Reply-To: <4BCE125F.30200@gmail.com>
+Date: Sat, 24 Apr 2010 17:12:07 +0200
+Subject: Bug#552270: Marvell CESA driver and Kirkwood
+In-Reply-To: <4BCFC120.5010306@jdland.co.il>
 References: <4B12F9E7.1020207@gmail.com>
 	<20091130211531.GK18101@deprecation.cyrius.com>
 	<4B144627.7060901@gmail.com>
@@ -9,34 +9,40 @@ References: <4B12F9E7.1020207@gmail.com>
 	<4BCB4009.70707@gmail.com>
 	<20100418191719.GA2508@Chamillionaire.breakpoint.cc>
 	<4BCE125F.30200@gmail.com>
-Message-ID: <20100424144215.GA9057@Chamillionaire.breakpoint.cc>
+	<20100421081302.GB31506@Chamillionaire.breakpoint.cc>
+	<4BCFC120.5010306@jdland.co.il>
+Message-ID: <20100424151207.GB9057@Chamillionaire.breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a driver might drop EINPROGRESS because its internal queue is full and
-not because something went wrong. In that case there will be another
-call back invocation and the stack should not free the skb.
+* Uri Simchoni | 2010-04-22 06:23:12 [+0300]:
 
-Signed-off-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
----
- net/xfrm/xfrm_output.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+>I have some IPSec background but am not familiar with the Linux implementation (I'm using the mv_cesa for SSL acceleration through a usermode interface I'm working on). Can you point me to the nearest howto? I suppose I could have a look.
 
-diff --git a/net/xfrm/xfrm_output.c b/net/xfrm/xfrm_output.c
-index 6a32915..34dd460 100644
---- a/net/xfrm/xfrm_output.c
-+++ b/net/xfrm/xfrm_output.c
-@@ -86,10 +86,10 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
- 		spin_unlock_bh(&x->lock);
- 
- 		err = x->type->output(x, skb);
-+resume:
- 		if (err == -EINPROGRESS)
- 			goto out_exit;
- 
--resume:
- 		if (err) {
- 			XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTSTATEPROTOERROR);
- 			goto error_nolock;
--- 
-1.6.6.1
+If it is possible, please post some patches which describe the user land
+interface.
+
+For IPSec I use this[0] shell script which sets up a connection. Good for
+testing :) So you need two boxes, start the script on both machines and
+the first ping that reached my orion box triggered that error. I just
+sent something that looked like a fix.
+
+I enabled list and sg debugging and a flood ping triggered a couple of
+warning. Could you please look at this?
+
+IPsec requests authenc(hmac(sha1),cbc(aes)) so right now it reqeusts two
+cesa provided algorithms. A single ping results in around 30ms RTT.
+Disabling hmac(sha1) gives me less than 1ms.
+Implementing authenc() for IPsec should speed things up. Right I'm stuck
+with hacking DMA support.
+
+For now I think lowering priority of hmac() should fix the problem. A
+direct request "mv-hmac-sha1" should still returned the mv driver. What
+do you thing?
+
+Need to run now....
+
+>Thanks,
+>Uri.
+
+Sebastian
