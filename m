@@ -1,45 +1,48 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Sat, 24 Apr 2010 19:14:43 +0100
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-Message-ID: <p2h56d259a01004241114qb1b1815em9657e5a857a9d4ee@mail.gmail.com>
+From: uri@jdland.co.il (Uri Simchoni)
+Date: Sat, 24 Apr 2010 21:43:35 +0300
+Subject: Bug#552270: Marvell CESA driver and Kirkwood
+In-Reply-To: <20100424151207.GB9057@Chamillionaire.breakpoint.cc>
+References: <4B12F9E7.1020207@gmail.com>
+	<20091130211531.GK18101@deprecation.cyrius.com>
+	<4B144627.7060901@gmail.com>
+	<20091204212847.GC28480@deprecation.cyrius.com>
+	<4BCB4009.70707@gmail.com>
+	<20100418191719.GA2508@Chamillionaire.breakpoint.cc>
+	<4BCE125F.30200@gmail.com>
+	<20100421081302.GB31506@Chamillionaire.breakpoint.cc>
+	<4BCFC120.5010306@jdland.co.il>
+	<20100424151207.GB9057@Chamillionaire.breakpoint.cc>
+Message-ID: <4BD33BD7.80400@jdland.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, another little fix:
+On 4/24/2010 6:12 PM, Sebastian Andrzej Siewior wrote:
+> * Uri Simchoni | 2010-04-22 06:23:12 [+0300]:
+> 
+> For IPSec I use this[0] shell script which sets up a connection. Good for
+> testing :) 
+Thanks, That'll save time setting it up...
+> I enabled list and sg debugging and a flood ping triggered a couple of
+> warning. Could you please look at this?
+Sure.
+> 
+> IPsec requests authenc(hmac(sha1),cbc(aes)) so right now it reqeusts two
+> cesa provided algorithms. A single ping results in around 30ms RTT.
+Since the CESA does each operation faster than sw (at least when the packet size exceeds some threshold), I see no reason for it to slow the process down. The slowness probably is somehow caused by the same thing that causes the oops, or by debug warning prints.
 
-EP93xx User's Manual -> Synchronous Serial Port -> Registers
-
-SSPIIR description:
-"Read Only
-Note: A write to this register clears the receive overrun interrupt,
-regardless of the data
-      value written."
-
-It doesn't affect the RIS/TIS ones, which are caused by the state of the device.
-
-so
-
-static irqreturn_t ep93xx_spi_interrupt(int irq, void *dev_id)
-{
-...
-        if (!(irq_status & (SSPIIR_RORIS | SSPIIR_TIS | SSPIIR_RIS)))
-                return IRQ_NONE; /* not for us */
-
--       /* clear the interrupt */
--       ep93xx_spi_write_u8(espi, SSPICR, 0);
-
-        /*
-         * If we got ROR (receive overrun) interrupt we know that something is
-         * wrong. Just abort the message.
-         */
-        if (unlikely(irq_status & SSPIIR_RORIS)) {
-+               /* clear the overrun interrupt */
-+               ep93xx_spi_write_u8(espi, SSPICR, 0);
-                dev_warn(&espi->pdev->dev,
-                         "receive overrun, aborting the message\n");
-                espi->current_msg->status = -EIO;
-        } else {
+> Disabling hmac(sha1) gives me less than 1ms.
+> Implementing authenc() for IPsec should speed things up. Right I'm stuck
+> with hacking DMA support.
+Well, so far I wasn't able to figure out how it all fits together - sure, the CESA can do AES-CBC+HMAC-SHA1 in one run, but I'm not sure it's suitable for IPSec, or that the crypto infrastructure supports a HW driver for combined operation. (the CESA is probably not suitable for SSL because of alignment problems, IPSec is better in that respect).
+> 
+> For now I think lowering priority of hmac() should fix the problem. A
+> direct request "mv-hmac-sha1" should still returned the mv driver. What
+> do you thing?
+> 
+I think there's a bug here I should find and fix. Till then perhaps the mv-hmac-sha1 driver should not be registered at all.
+> Need to run now....
+> 
+>> Thanks,
+>> Uri.
+> 
+> Sebastian
