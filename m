@@ -1,122 +1,35 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Sat, 24 Apr 2010 22:50:11 +0200
-Subject: Q: sched_clock() vs. clocksource, how to implement correctly
-In-Reply-To: <20100423182933.0df45b53@mschwide.boeblingen.de.ibm.com>
-References: <20100423150917.GA25714@sig21.net>
-	<20100423182933.0df45b53@mschwide.boeblingen.de.ibm.com>
-Message-ID: <20100424205011.GA21632@sig21.net>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 25 Apr 2010 09:18:21 +0800
+Subject: [PATCH] net/ipsec: don't treat EINPROGRESS as a regular error
+In-Reply-To: <20100424144215.GA9057@Chamillionaire.breakpoint.cc>
+References: <4B12F9E7.1020207@gmail.com>
+	<20091130211531.GK18101@deprecation.cyrius.com>
+	<4B144627.7060901@gmail.com>
+	<20091204212847.GC28480@deprecation.cyrius.com>
+	<4BCB4009.70707@gmail.com>
+	<20100418191719.GA2508@Chamillionaire.breakpoint.cc>
+	<4BCE125F.30200@gmail.com>
+	<20100424144215.GA9057@Chamillionaire.breakpoint.cc>
+Message-ID: <20100425011821.GA5284@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 23, 2010 at 06:29:33PM +0200, Martin Schwidefsky wrote:
-> On Fri, 23 Apr 2010 17:09:17 +0200 > Johannes Stezenbach <js@sig21.net> wrote:
-> > 
-> > - Isn't sched_clock() supposed to be extended to 64bit so
-> >   that it practically never wraps?
-> >   (old implementations use cnt32_to_63())
+On Sat, Apr 24, 2010 at 04:42:15PM +0200, Sebastian Andrzej Siewior wrote:
+> a driver might drop EINPROGRESS because its internal queue is full and
+> not because something went wrong. In that case there will be another
+> call back invocation and the stack should not free the skb.
 > 
-> Yes, sched_clock() is supposed to return a monotonic timestamp.
+> Signed-off-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 
-OK, searching LXR for sched_clock, I think serveral
-sched_clock() implementations across architectures
-have the wrapping issue.
+This should only be possible when we use the MAY_BACKLOG flag,
+as otherwise EINPROGRESS should never be used on the completion
+function unless it's a real error.
 
-BTW, wrapping sched_clock() also causes printk() timestamps to
-wrap, so the problem should be easy to spot.
-
-> > - What would be the effect on scheduling when sched_clock() wraps?
-> 
-> It would confuse the process accounting and the scheduling I guess.
-
-That's a bit vague ;-/
-Let's try that: Could it cause processes calling e.g. nanosleep()
-to sleep much longer than intended (e.g. until sched_clock() wraps
-again)?   Or can it only cause a momentary scheduler hickup,
-i.e. the scheduler might make one wrong scheduling decision
-per sched_clock() wrap?  Given that there are serveral platforms
-with wrapping sched_clock() I guess the latter.
-
-> > - Is struct timecounter + struct cyclecounter + timecounter_read()
-> >   designated way to implement sched_clock() with a 32bit hw counter?
-> > 
-> >   arch/microblaze/kernel/timer.c seems to be the only user
-> >   of timecounter/cyclecounter in arch/, but I don't get what it does.
-> > 
-> >   Or is it better to stick with cnt32_to_63()?
-> 
-> cnt32_to_63() is a way to extend the 32 bit clocksource to a useable
-> sched_clock() provider. One way or the other you have to extend the 32
-> bits of the 1MHz counter to something bigger. The obvious way is to
-> count the number of wraps and use this number as the upper 32 bits
-> just like cnt32_to_63() does. You just have to make sure that the
-> clocksource is read frequently enough to get all the wraps. A non-idle
-> cpu will tick with HZ frequency and the clock will be read often
-> enough, for an idle cpu the maximum sleep time needs to be limited.
-
-Somehow I got the impression that cnt32_to_63() is old-style,
-and using clocksource_cyc2ns() is new-style.  Essentially I wanted to
-avoid the do_div() in sched_clock() (like e.g. in
-arm/mach-versatile/core.c), and just using clocksource_cyc2ns()
-looked simple and elegant.  Bummer that it's wrong.
-
-It seems that arch/arm/plat-orion/time.c is about the only
-one which gets it completely right according to your description.
-I'll quote it here for discussion:
-
-/*
- * Orion's sched_clock implementation. It has a resolution of
- * at least 7.5ns (133MHz TCLK) and a maximum value of 834 days.
- *
- * Because the hardware timer period is quite short (21 secs if
- * 200MHz TCLK) and because cnt32_to_63() needs to be called at
- * least once per half period to work properly, a kernel timer is
- * set up to ensure this requirement is always met.
- */
-#define TCLK2NS_SCALE_FACTOR 8
-
-static unsigned long tclk2ns_scale;
-
-unsigned long long sched_clock(void)
-{
-	unsigned long long v = cnt32_to_63(0xffffffff - readl(TIMER0_VAL));
-	return (v * tclk2ns_scale) >> TCLK2NS_SCALE_FACTOR;
-}
-
-static struct timer_list cnt32_to_63_keepwarm_timer;
-
-static void cnt32_to_63_keepwarm(unsigned long data)
-{
-	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-	(void) sched_clock();
-}
-
-static void __init setup_sched_clock(unsigned long tclk)
-{
-	unsigned long long v;
-	unsigned long data;
-
-	v = NSEC_PER_SEC;
-	v <<= TCLK2NS_SCALE_FACTOR;
-	v += tclk/2;
-	do_div(v, tclk);
-	/*
-	 * We want an even value to automatically clear the top bit
-	 * returned by cnt32_to_63() without an additional run time
-	 * instruction. So if the LSB is 1 then round it up.
-	 */
-	if (v & 1)
-		v++;
-	tclk2ns_scale = v;
-
-	data = (0xffffffffUL / tclk / 2 - 2) * HZ;
-	setup_timer(&cnt32_to_63_keepwarm_timer, cnt32_to_63_keepwarm, data);
-	mod_timer(&cnt32_to_63_keepwarm_timer, round_jiffies(jiffies + data));
-}
-
-
-BTW, even though this uses TCLK2NS_SCALE_FACTOR of 8, the same file
-uses a shift vaue of 20 for the orion_clksrc...
-
+Which algorithm is generating EINPROGRESS in this case?
 
 Thanks,
-Johannes
+-- 
+Visit Openswan at http://www.openswan.org/
+Email: Herbert Xu ~{PmV>HI~} <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
