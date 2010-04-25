@@ -1,46 +1,55 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Sun, 25 Apr 2010 17:29:28 +0200
-Subject: [PATCH] net/ipsec: don't treat EINPROGRESS as a regular error
-In-Reply-To: <20100425011821.GA5284@gondor.apana.org.au>
-References: <4B12F9E7.1020207@gmail.com>
-	<20091130211531.GK18101@deprecation.cyrius.com>
-	<4B144627.7060901@gmail.com>
-	<20091204212847.GC28480@deprecation.cyrius.com>
-	<4BCB4009.70707@gmail.com>
-	<20100418191719.GA2508@Chamillionaire.breakpoint.cc>
-	<4BCE125F.30200@gmail.com>
-	<20100424144215.GA9057@Chamillionaire.breakpoint.cc>
-	<20100425011821.GA5284@gondor.apana.org.au>
-Message-ID: <20100425152928.GA14489@Chamillionaire.breakpoint.cc>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Sun, 25 Apr 2010 14:55:08 -0500
+Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <p2h56d259a01004241114qb1b1815em9657e5a857a9d4ee@mail.gmail.com>
+References: <cover.1271774845.git.mika.westerberg@iki.fi>
+	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<p2h56d259a01004241114qb1b1815em9657e5a857a9d4ee@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B0270842697636D9B7E4F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Herbert Xu | 2010-04-25 09:18:21 [+0800]:
+On Saturday, April 24, 2010 11:15 AM, Martin Guy wrote:
+> Hi, another little fix:
+> 
+> EP93xx User's Manual -> Synchronous Serial Port -> Registers
+> 
+> SSPIIR description:
+> "Read Only
+> Note: A write to this register clears the receive overrun interrupt,
+> regardless of the data
+>       value written."
+> 
+> It doesn't affect the RIS/TIS ones, which are caused by the state of the device.
+> 
+> so
+> 
+> static irqreturn_t ep93xx_spi_interrupt(int irq, void *dev_id)
+> {
+> ...
+>         if (!(irq_status & (SSPIIR_RORIS | SSPIIR_TIS | SSPIIR_RIS)))
+>                 return IRQ_NONE; /* not for us */
+> 
+> -       /* clear the interrupt */
+> -       ep93xx_spi_write_u8(espi, SSPICR, 0);
+> 
+>         /*
+>          * If we got ROR (receive overrun) interrupt we know that something is
+>          * wrong. Just abort the message.
+>          */
+>         if (unlikely(irq_status & SSPIIR_RORIS)) {
+> +               /* clear the overrun interrupt */
+> +               ep93xx_spi_write_u8(espi, SSPICR, 0);
+>                 dev_warn(&espi->pdev->dev,
+>                          "receive overrun, aborting the message\n");
+>                 espi->current_msg->status = -EIO;
+>         } else {
 
->This should only be possible when we use the MAY_BACKLOG flag,
->as otherwise EINPROGRESS should never be used on the completion
->function unless it's a real error.
-Urgh, right. I think I lost it.
+With this patch the interrupts only get cleared if it's a ROR interrupt.
 
->Which algorithm is generating EINPROGRESS in this case?
-The call stack looks like the following:
+Do the RIS/TIS interrupts get cleared by the upper layers?  If so, do we
+really need to clear the ROR interrupt here?
 
-  crypto_authenc_givencrypt_done()
-   \crypto_authenc_ahash
-    \crypto_ahash_digest()
-     \mv_hash_digest()
-      \crypto_enqueue_request() <= -EINPROGRESS
-  crypto_authenc_givencrypt_done() err is EINPROGRESS
-   \aead_request_complete()
-    \xfrm_output_resume()
-
-So I get in xfrm_output_one() with err == -EINPROGRESS. Now, that one
-gets survided. The segfault happens later when xfrm_output_one() is
-called with err = 0 for the same skb. The segfaults happens during 
-   x = dst->xfrm;
-is executed.
-
->Thanks,
->-- 
-
-Sebastian
+Regards,
+Hartley
