@@ -1,53 +1,162 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Mon, 26 Apr 2010 12:03:30 +0300
-Subject: [PATCH 1/2] kexec: add phys_offset field
-In-Reply-To: <cover.1272271391.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1272271391.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <e376969c3d29696ce11488af59605ada56fdccff.1272271391.git.ext-mika.1.westerberg@nokia.com>
+Date: Mon, 26 Apr 2010 12:03:29 +0300
+Subject: [PATCH 0/2] kexec-tools: ARM kernel crashdump support
+Message-ID: <cover.1272271391.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new field 'phys_offset' to struct elf_info. This field is used to calculate
-virtual address of PT_LOAD segment on architectures where physical memory
-doesn't always start at address 0 (namely ARM).
+Hello,
 
-Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
----
- kexec/crashdump-elf.c |    9 ++++++++-
- kexec/crashdump.h     |    1 +
- 2 files changed, 9 insertions(+), 1 deletions(-)
+These patches bring ARM kernel crashdump support for kexec-tools. They need
+kernel support which was posted on LAKML while ago[1]. I should've sent them
+both at the same time so that people actually could try them but apparently I
+didn't. Sorry about that. I can sent the whole series again if preferred.
 
-diff --git a/kexec/crashdump-elf.c b/kexec/crashdump-elf.c
-index 6bcef8d..1291174 100644
---- a/kexec/crashdump-elf.c
-+++ b/kexec/crashdump-elf.c
-@@ -236,7 +236,14 @@ int FUNC(struct kexec_info *info,
- 		 * memory region.
- 		 */
- 		phdr->p_paddr = mstart;
--		phdr->p_vaddr = mstart + elf_info->page_offset;
-+		/*
-+		 * In some architectures (namely ARM), physical memory doesn't
-+		 * always start at 0 so we need to calculate virtual address
-+		 * based on elf_info->phys_offset like:
-+		 *     virt = phys + page_offset - phys_offset
-+		 */
-+		phdr->p_vaddr = mstart + elf_info->page_offset -
-+				elf_info->phys_offset;
- 		phdr->p_filesz	= phdr->p_memsz	= mend - mstart + 1;
- 		/* Do we need any alignment of segments? */
- 		phdr->p_align	= 0;
-diff --git a/kexec/crashdump.h b/kexec/crashdump.h
-index 30d6f29..8c0ccda 100644
---- a/kexec/crashdump.h
-+++ b/kexec/crashdump.h
-@@ -27,6 +27,7 @@ struct crash_elf_info {
- 	unsigned long backup_src_end;
- 
- 	unsigned long long page_offset;
-+	unsigned long long phys_offset;
- 	unsigned long lowmem_limit;
- 
- 	int (*get_note_info)(int cpu, uint64_t *addr, uint64_t *len);
--- 
-1.5.6.5
+Only zImage format is currently supported.
+
+In addition, I have modified sample gdb macros from
+kernel/Documentation/kdump/gdbmacrox.txt to work with ARM crashdumps. They are
+included in the end of this email in case someone finds them useful.
+
+I have been testing these on my N900.
+
+Thanks,
+MW
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/013245.html
+
+Mika Westerberg (2):
+  kexec: add phys_offset field
+  kexec: implement ARM crashdump support
+
+ kexec/arch/arm/Makefile           |    1 +
+ kexec/arch/arm/crashdump-arm.c    |  318 +++++++++++++++++++++++++++++++++++++
+ kexec/arch/arm/crashdump-arm.h    |   19 +++
+ kexec/arch/arm/kexec-arm.c        |    5 -
+ kexec/arch/arm/kexec-zImage-arm.c |   47 +++++-
+ kexec/crashdump-elf.c             |    9 +-
+ kexec/crashdump.h                 |    1 +
+ 7 files changed, 392 insertions(+), 8 deletions(-)
+ create mode 100644 kexec/arch/arm/crashdump-arm.c
+ create mode 100644 kexec/arch/arm/crashdump-arm.h
+
+------------------------- ~/.gdbinit -------------------------
+#
+# Useful gdb macros for ARM kdumps. Derived from macros
+# in Documentation/kdump/gdbmacros.txt.
+#
+# Credits:
+# Alexander Nyberg <alexn@telia.com>
+# V Srivatsa <vatsa@in.ibm.com>
+# Maneesh Soni <maneesh@in.ibm.com>
+# Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+#
+
+define arch_current_thread_info
+	set $current_thread_info = \
+		(struct thread_info *)((unsigned long)$sp & ~(8192-1))
+end
+
+define current
+	arch_current_thread_info
+
+	set $current = $current_thread_info->task
+end
+
+define ps
+	set $tasks_off=((size_t)&((struct task_struct *)0)->tasks)
+	set $init_t=&init_task
+	set $next_t=(((char *)($init_t->tasks).next) - $tasks_off)
+
+	# get current task
+	current
+
+	printf "PID        COMMAND              TASK\n"
+
+	while ($next_t != $init_t)
+		set $next_t=(struct task_struct *)$next_t
+
+		printf "%-10d %-20s 0x%x", $next_t->pid, $next_t->comm, $next_t
+		if ($next_t == $current)
+			printf "*\n"
+		else
+			printf "\n"
+		end
+
+		set $next_t=(char *)($next_t->tasks.next) - $tasks_off
+	end
+end
+
+define dmesg
+	set $i = 0
+	set $end_idx = (log_end - 1) & (log_buf_len - 1)
+
+	while ($i < logged_chars)
+		set $idx = (log_end - 1 - logged_chars + $i) & (log_buf_len - 1)
+
+		if ($idx + 100 <= $end_idx) || \
+		   ($end_idx <= $idx && $idx + 100 < log_buf_len)
+			printf "%.100s", &log_buf[$idx]
+			set $i = $i + 100
+		else
+			printf "%c", log_buf[$idx]
+			set $i = $i + 1
+		end
+	end
+end
+document dmesg
+	print the kernel ring buffer
+end
+
+define lsfs
+	set $fs = file_systems
+
+	while ($fs != 0)
+		printf "%-20s %p\n", $fs->name, $fs
+		set $fs = $fs->next
+	end
+end
+document lsfs
+	prints registered filesystems
+end
+
+define print_mount_path
+	if ($arg0 != $arg1->d_parent)
+		print_mount_path $arg0->d_parent $arg1
+	end
+	if ($arg0->d_name.name[0] != '/')
+		printf "/%s", $arg0->d_name.name
+	end
+end
+
+define print_mount
+	if ($arg0 != $arg1)
+		print_mount $arg0->mnt_parent $arg1
+	end
+
+	print_mount_path $arg0->mnt_mountpoint $arg0->mnt_mountpoint->d_parent
+end
+
+define mounts
+	current
+	set $vfsmount_off=((size_t)&((struct vfsmount *)0)->mnt_list)
+	set $root = $current->nsproxy->mnt_ns->root
+	set $r_prev = $root->mnt_list.prev
+	set $r_next = $root->mnt_list.next
+	set $mnt=(struct vfsmount *)((char *)($r_next) - $vfsmount_off)
+	while ($r_next != $r_prev)
+		printf "%-20s %p %-10s ", $mnt->mnt_devname, $mnt, $mnt->mnt_sb->s_id
+		if ($mnt->mnt_parent == $root)
+			printf "/"
+		else
+			print_mount $mnt $root
+		end
+		printf "\n"
+
+		set $r_next = $mnt->mnt_list.next
+		set $mnt=(struct vfsmount *)((char *)($r_next) - $vfsmount_off)
+	end
+end
+document mounts
+	prints out all mounts
+end
