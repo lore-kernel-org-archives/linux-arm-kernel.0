@@ -1,27 +1,71 @@
-From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Mon, 26 Apr 2010 12:16:15 +0300
-Subject: [PATCH 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <4BD4EBDB.6090209@samsung.com>
-References: <cover.1271752135.git.ext-mika.1.westerberg@nokia.com>
-	<20100422120308.GD26418@gw.healthdatacare.com>
-	<20100423030556.GA8012@localhost.localdomain>
-	<20100423041106.GG3028@esdhcp04058.research.nokia.com>
-	<4BD4EBDB.6090209@samsung.com>
-Message-ID: <20100426091615.GP3028@esdhcp04058.research.nokia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 26 Apr 2010 10:30:41 +0100
+Subject: [RFC PATCH] ARM: Implement phys_mem_access_prot() to avoid
+	attributes aliasing
+Message-ID: <20100426093041.14126.86355.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 26, 2010 at 03:26:51AM +0200, ext Joonyoung Shim wrote:
-> On 4/23/2010 1:11 PM, Mika Westerberg wrote:
-> > You need to have userspace tools (in this case kexec-tools) which load the
-> > crashkernel into the running kernel. I'm planning to send my kexec-tools
-> > patches to upstream after the kernel part is accepted (so that they can be
-> > in sync) but I can provide you the patches if needed.
-> 
-> I want to test your patches too. Can you send me the kexec-tools patches?
+ARMv7 onwards requires that there are no aliases to the same physical
+location using different memory types (i.e. Normal vs Strongly Ordered).
+Access to SO mappings when the unaligned accesses are handled in
+hardware is also Unpredictable (pgprot_noncached() mappings in user
+space).
 
-I sent those patches to LAKML and kexec list. You can pick them up from here:
-	http://lists.infradead.org/pipermail/kexec/2010-April/004029.html
+The /dev/mem driver requires uncached mappings with O_SYNC. The patch
+implements the phys_mem_access_prot() function which generates Strongly
+Ordered memory attributes if !pfn_valid() (independent of O_SYNC) and
+Normal Noncacheable (writecombine) if O_SYNC.
 
-Regards,
-MW
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/pgtable.h |    3 +++
+ arch/arm/mm/mmu.c              |   14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 1139768..6fae619 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -317,6 +317,9 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+ #if __LINUX_ARM_ARCH__ >= 7
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
++#define __HAVE_PHYS_MEM_ACCESS_PROT
++extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++				     unsigned long size, pgprot_t vma_prot);
+ #else
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 241c24a..deb62cc 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -14,6 +14,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
++#include <linux/fs.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/mach-types.h>
+@@ -485,6 +486,19 @@ static void __init build_mem_type_table(void)
+ 	}
+ }
+ 
++#if __LINUX_ARM_ARCH__ >= 7
++pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++			      unsigned long size, pgprot_t vma_prot)
++{
++	if (!pfn_valid(pfn))
++		return pgprot_noncached(vma_prot);
++	else if (file->f_flags & O_SYNC)
++		return pgprot_writecombine(vma_prot);
++	return vma_prot;
++}
++EXPORT_SYMBOL(phys_mem_access_prot);
++#endif
++
+ #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+ 
+ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
