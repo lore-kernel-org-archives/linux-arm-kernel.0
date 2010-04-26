@@ -1,541 +1,542 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 26 Apr 2010 01:04:34 -0600
-Subject: [PATCH 08/10] OMAP3 clock: rename RATE_IN_343X,
-	RATE_IN_3430ES2 to match reality
+Date: Mon, 26 Apr 2010 01:04:25 -0600
+Subject: [PATCH 04/10] OMAP2+ PRCM: convert remaining PRCM macros to the
+	_SHIFT/_MASK suffixes
 In-Reply-To: <20100426070217.9743.92728.stgit@localhost.localdomain>
 References: <20100426070217.9743.92728.stgit@localhost.localdomain>
-Message-ID: <20100426070432.9743.2866.stgit@localhost.localdomain>
+Message-ID: <20100426070424.9743.59832.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the RATE_IN_343X clksel_rate.rate flag to be RATE_IN_3XXX, to reflect
-that these rates are valid on all OMAP3 platforms, not just 343X.
-
-Also rename the RATE_IN_OMAP3430ES2 clksel_rate.rate flag to be
-RATE_IN_OMAP3430ES2PLUS, to reflect that these flags are valid on all
-OMAP3 platforms after 3430ES2.
-
-This patch should not result in any functional changes.
+Fix all of the remaining PRCM register shift/bitmask macros that did not
+use the _SHIFT/_MASK suffixes to use them.  This makes the use of these
+macros consistent.  It is intended to reduce error, as code can be inspected
+visually by reviewers to ensure that bitshifts and bitmasks are used in
+the appropriate places.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Ranjith Lohithakshan <ranjithl@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/clock3xxx_data.c    |  237 ++++++++++++++++---------------
- arch/arm/mach-omap2/clock_common_data.c |   12 +-
- arch/arm/plat-omap/include/plat/clock.h |    3 
- 3 files changed, 127 insertions(+), 125 deletions(-)
+ arch/arm/mach-omap2/cm.h          |    5 +
+ arch/arm/mach-omap2/pm24xx.c      |   21 +++--
+ arch/arm/mach-omap2/pm34xx.c      |   30 ++++----
+ arch/arm/mach-omap2/powerdomain.c |    2 -
+ arch/arm/mach-omap2/prcm-common.h |  146 +++++++++++++++++++------------------
+ arch/arm/mach-omap2/prcm.c        |    4 +
+ arch/arm/mach-omap2/prm.h         |   18 ++---
+ 7 files changed, 114 insertions(+), 112 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 56bd0d8..68aae9f 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -110,32 +110,32 @@ static struct clk virt_38_4m_ck = {
- };
+diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
+index 94728b1..b6ab183 100644
+--- a/arch/arm/mach-omap2/cm.h
++++ b/arch/arm/mach-omap2/cm.h
+@@ -134,10 +134,11 @@ static inline u32 cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
  
- static const struct clksel_rate osc_sys_12m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
+ /* CM_ICLKEN_GFX */
+ #define OMAP_EN_GFX_SHIFT				0
+-#define OMAP_EN_GFX					(1 << 0)
++#define OMAP_EN_GFX_MASK				(1 << 0)
  
- static const struct clksel_rate osc_sys_13m_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate osc_sys_16_8m_rates[] = {
--	{ .div = 1, .val = 5, .flags = RATE_IN_3430ES2 },
-+	{ .div = 1, .val = 5, .flags = RATE_IN_3430ES2PLUS },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate osc_sys_19_2m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate osc_sys_26m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate osc_sys_38_4m_rates[] = {
--	{ .div = 1, .val = 4, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 4, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -163,8 +163,8 @@ static struct clk osc_sys_ck = {
- };
- 
- static const struct clksel_rate div2_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -213,22 +213,22 @@ static struct clk sys_clkout1 = {
- /* CM CLOCKS */
- 
- static const struct clksel_rate div16_dpll_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
--	{ .div = 5, .val = 5, .flags = RATE_IN_343X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_343X },
--	{ .div = 7, .val = 7, .flags = RATE_IN_343X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_343X },
--	{ .div = 9, .val = 9, .flags = RATE_IN_343X },
--	{ .div = 10, .val = 10, .flags = RATE_IN_343X },
--	{ .div = 11, .val = 11, .flags = RATE_IN_343X },
--	{ .div = 12, .val = 12, .flags = RATE_IN_343X },
--	{ .div = 13, .val = 13, .flags = RATE_IN_343X },
--	{ .div = 14, .val = 14, .flags = RATE_IN_343X },
--	{ .div = 15, .val = 15, .flags = RATE_IN_343X },
--	{ .div = 16, .val = 16, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
-+	{ .div = 5, .val = 5, .flags = RATE_IN_3XXX },
-+	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
-+	{ .div = 7, .val = 7, .flags = RATE_IN_3XXX },
-+	{ .div = 8, .val = 8, .flags = RATE_IN_3XXX },
-+	{ .div = 9, .val = 9, .flags = RATE_IN_3XXX },
-+	{ .div = 10, .val = 10, .flags = RATE_IN_3XXX },
-+	{ .div = 11, .val = 11, .flags = RATE_IN_3XXX },
-+	{ .div = 12, .val = 12, .flags = RATE_IN_3XXX },
-+	{ .div = 13, .val = 13, .flags = RATE_IN_3XXX },
-+	{ .div = 14, .val = 14, .flags = RATE_IN_3XXX },
-+	{ .div = 15, .val = 15, .flags = RATE_IN_3XXX },
-+	{ .div = 16, .val = 16, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -450,37 +450,37 @@ static struct clk dpll3_x2_ck = {
- };
- 
- static const struct clksel_rate div31_dpll3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3430ES2 },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3430ES2 },
--	{ .div = 5, .val = 5, .flags = RATE_IN_3430ES2 },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3430ES2 },
--	{ .div = 7, .val = 7, .flags = RATE_IN_3430ES2 },
--	{ .div = 8, .val = 8, .flags = RATE_IN_3430ES2 },
--	{ .div = 9, .val = 9, .flags = RATE_IN_3430ES2 },
--	{ .div = 10, .val = 10, .flags = RATE_IN_3430ES2 },
--	{ .div = 11, .val = 11, .flags = RATE_IN_3430ES2 },
--	{ .div = 12, .val = 12, .flags = RATE_IN_3430ES2 },
--	{ .div = 13, .val = 13, .flags = RATE_IN_3430ES2 },
--	{ .div = 14, .val = 14, .flags = RATE_IN_3430ES2 },
--	{ .div = 15, .val = 15, .flags = RATE_IN_3430ES2 },
--	{ .div = 16, .val = 16, .flags = RATE_IN_3430ES2 },
--	{ .div = 17, .val = 17, .flags = RATE_IN_3430ES2 },
--	{ .div = 18, .val = 18, .flags = RATE_IN_3430ES2 },
--	{ .div = 19, .val = 19, .flags = RATE_IN_3430ES2 },
--	{ .div = 20, .val = 20, .flags = RATE_IN_3430ES2 },
--	{ .div = 21, .val = 21, .flags = RATE_IN_3430ES2 },
--	{ .div = 22, .val = 22, .flags = RATE_IN_3430ES2 },
--	{ .div = 23, .val = 23, .flags = RATE_IN_3430ES2 },
--	{ .div = 24, .val = 24, .flags = RATE_IN_3430ES2 },
--	{ .div = 25, .val = 25, .flags = RATE_IN_3430ES2 },
--	{ .div = 26, .val = 26, .flags = RATE_IN_3430ES2 },
--	{ .div = 27, .val = 27, .flags = RATE_IN_3430ES2 },
--	{ .div = 28, .val = 28, .flags = RATE_IN_3430ES2 },
--	{ .div = 29, .val = 29, .flags = RATE_IN_3430ES2 },
--	{ .div = 30, .val = 30, .flags = RATE_IN_3430ES2 },
--	{ .div = 31, .val = 31, .flags = RATE_IN_3430ES2 },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 5, .val = 5, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 6, .val = 6, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 7, .val = 7, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 8, .val = 8, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 9, .val = 9, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 10, .val = 10, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 11, .val = 11, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 12, .val = 12, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 13, .val = 13, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 14, .val = 14, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 15, .val = 15, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 16, .val = 16, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 17, .val = 17, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 18, .val = 18, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 19, .val = 19, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 20, .val = 20, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 21, .val = 21, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 22, .val = 22, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 23, .val = 23, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 24, .val = 24, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 25, .val = 25, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 26, .val = 26, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 27, .val = 27, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 28, .val = 28, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 29, .val = 29, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 30, .val = 30, .flags = RATE_IN_3430ES2PLUS },
-+	{ .div = 31, .val = 31, .flags = RATE_IN_3430ES2PLUS },
- 	{ .div = 0 },
- };
- 
-@@ -708,12 +708,12 @@ static const struct clksel omap_96m_alwon_fck_clksel[] = {
- };
- 
- static const struct clksel_rate omap_96m_dpll_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate omap_96m_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -799,12 +799,12 @@ static struct clk dpll4_m3x2_ck = {
- };
- 
- static const struct clksel_rate omap_54m_d4m3x2_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate omap_54m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -825,12 +825,12 @@ static struct clk omap_54m_fck = {
- };
- 
- static const struct clksel_rate omap_48m_cm96m_rates[] = {
--	{ .div = 2, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 2, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate omap_48m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -1049,22 +1049,22 @@ static struct clk dpll5_m2_ck = {
- /* CM EXTERNAL CLOCK OUTPUTS */
- 
- static const struct clksel_rate clkout2_src_core_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate clkout2_src_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate clkout2_src_96m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate clkout2_src_54m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -1090,11 +1090,11 @@ static struct clk clkout2_src_ck = {
- };
- 
- static const struct clksel_rate sys_clkout2_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 8, .val = 3, .flags = RATE_IN_343X },
--	{ .div = 16, .val = 4, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 8, .val = 3, .flags = RATE_IN_3XXX },
-+	{ .div = 16, .val = 4, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -1125,9 +1125,9 @@ static struct clk corex2_fck = {
- /* DPLL power domain clock controls */
- 
- static const struct clksel_rate div4_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -1161,8 +1161,8 @@ static struct clk mpu_ck = {
- 
- /* arm_fck is divided by two when DPLL1 locked; otherwise, passthrough mpu_ck */
- static const struct clksel_rate arm_fck_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -1333,9 +1333,9 @@ static struct clk gfx_cg2_ck = {
- 
- static const struct clksel_rate sgx_core_rates[] = {
- 	{ .div = 2, .val = 5, .flags = RATE_IN_36XX },
--	{ .div = 3, .val = 0, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 6, .val = 2, .flags = RATE_IN_343X },
-+	{ .div = 3, .val = 0, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 6, .val = 2, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -1351,7 +1351,7 @@ static const struct clksel_rate sgx_corex2_rates[] = {
- };
- 
- static const struct clksel_rate sgx_96m_rates[] = {
--	{ .div = 1,  .val = 3, .flags = RATE_IN_343X },
-+	{ .div = 1,  .val = 3, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -1576,12 +1576,12 @@ static struct clk i2c1_fck = {
-  * MCBSP 2, 3, 4 get their 96MHz clock from per_96m_fck.
-  */
- static const struct clksel_rate common_mcbsp_96m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
- static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -1714,12 +1714,12 @@ static struct clk hdq_fck = {
- /* DPLL3-derived clock */
- 
- static const struct clksel_rate ssi_ssr_corex2_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_343X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
-+	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
-+	{ .div = 8, .val = 8, .flags = RATE_IN_3XXX },
- 	{ .div = 0 }
- };
- 
-@@ -2353,18 +2353,18 @@ static struct clk usbhost_ick = {
- /* WKUP */
- 
- static const struct clksel_rate usim_96m_rates[] = {
--	{ .div = 2,  .val = 3, .flags = RATE_IN_343X },
--	{ .div = 4,  .val = 4, .flags = RATE_IN_343X },
--	{ .div = 8,  .val = 5, .flags = RATE_IN_343X },
--	{ .div = 10, .val = 6, .flags = RATE_IN_343X },
-+	{ .div = 2,  .val = 3, .flags = RATE_IN_3XXX },
-+	{ .div = 4,  .val = 4, .flags = RATE_IN_3XXX },
-+	{ .div = 8,  .val = 5, .flags = RATE_IN_3XXX },
-+	{ .div = 10, .val = 6, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
- static const struct clksel_rate usim_120m_rates[] = {
--	{ .div = 4,  .val = 7,	.flags = RATE_IN_343X },
--	{ .div = 8,  .val = 8,	.flags = RATE_IN_343X },
--	{ .div = 16, .val = 9,	.flags = RATE_IN_343X },
--	{ .div = 20, .val = 10, .flags = RATE_IN_343X },
-+	{ .div = 4,  .val = 7,	.flags = RATE_IN_3XXX },
-+	{ .div = 8,  .val = 8,	.flags = RATE_IN_3XXX },
-+	{ .div = 16, .val = 9,	.flags = RATE_IN_3XXX },
-+	{ .div = 20, .val = 10, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -2951,22 +2951,22 @@ static struct clk mcbsp4_fck = {
- /* More information: ARM Cortex-A8 Technical Reference Manual, sect 10.1 */
- 
- static const struct clksel_rate emu_src_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
- static const struct clksel_rate emu_src_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
- static const struct clksel_rate emu_src_per_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
- static const struct clksel_rate emu_src_mpu_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -2995,10 +2995,10 @@ static struct clk emu_src_ck = {
- };
- 
- static const struct clksel_rate pclk_emu_rates[] = {
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_343X },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
-+	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -3019,9 +3019,9 @@ static struct clk pclk_fck = {
- };
- 
- static const struct clksel_rate pclkx2_emu_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -3069,9 +3069,9 @@ static struct clk traceclk_src_fck = {
- };
- 
- static const struct clksel_rate traceclk_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
- 	{ .div = 0 },
- };
- 
-@@ -3488,14 +3488,8 @@ int __init omap3xxx_clk_init(void)
- 	struct omap_clk *c;
- 	u32 cpu_clkflg = CK_3XXX;
- 
--	if (cpu_is_omap3517()) {
--		cpu_mask = RATE_IN_343X | RATE_IN_3430ES2;
--		cpu_clkflg |= CK_3517;
--	} else if (cpu_is_omap3505()) {
--		cpu_mask = RATE_IN_343X | RATE_IN_3430ES2;
--		cpu_clkflg |= CK_3505;
--	} else if (cpu_is_omap34xx()) {
--		cpu_mask = RATE_IN_343X;
-+	if (cpu_is_omap34xx()) {
-+		cpu_mask = RATE_IN_3XXX;
- 		cpu_clkflg |= CK_343X;
- 
- 		/*
-@@ -3506,10 +3500,17 @@ int __init omap3xxx_clk_init(void)
- 			/* No 3430ES1-only rates exist, so no RATE_IN_3430ES1 */
- 			cpu_clkflg |= CK_3430ES1;
- 		} else {
--			cpu_mask |= RATE_IN_3430ES2;
-+			cpu_mask |= RATE_IN_3430ES2PLUS;
- 			cpu_clkflg |= CK_3430ES2;
- 		}
-+	} else if (cpu_is_omap3517()) {
-+		cpu_mask = RATE_IN_3XXX | RATE_IN_3430ES2PLUS;
-+		cpu_clkflg |= CK_3517;
-+	} else if (cpu_is_omap3505()) {
-+		cpu_mask = RATE_IN_3XXX | RATE_IN_3430ES2PLUS;
-+		cpu_clkflg |= CK_3505;
- 	}
+ /* CM_IDLEST_GFX */
+-#define OMAP_ST_GFX					(1 << 0)
++#define OMAP_ST_GFX_MASK				(1 << 0)
 +
- 	if (omap3_has_192mhz_clk())
- 		omap_96m_alwon_fck = omap_96m_alwon_fck_3630;
  
-diff --git a/arch/arm/mach-omap2/clock_common_data.c b/arch/arm/mach-omap2/clock_common_data.c
-index 6f96dc4..1cf8131 100644
---- a/arch/arm/mach-omap2/clock_common_data.c
-+++ b/arch/arm/mach-omap2/clock_common_data.c
-@@ -20,20 +20,20 @@
+ /* CM_IDLEST indicator */
+ #define OMAP24XX_CM_IDLEST_VAL		0
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index ca6d373..3bb34b9 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -70,8 +70,8 @@ static int omap2_fclks_active(void)
+ 	f2 = cm_read_mod_reg(CORE_MOD, OMAP24XX_CM_FCLKEN2);
  
- /* clksel_rate data common to 24xx/343x */
- const struct clksel_rate gpt_32k_rates[] = {
--	 { .div = 1, .val = 0, .flags = RATE_IN_24XX | RATE_IN_343X },
-+	 { .div = 1, .val = 0, .flags = RATE_IN_24XX | RATE_IN_3XXX },
- 	 { .div = 0 }
- };
+ 	/* Ignore UART clocks.  These are handled by UART core (serial.c) */
+-	f1 &= ~(OMAP24XX_EN_UART1 | OMAP24XX_EN_UART2);
+-	f2 &= ~OMAP24XX_EN_UART3;
++	f1 &= ~(OMAP24XX_EN_UART1_MASK | OMAP24XX_EN_UART2_MASK);
++	f2 &= ~OMAP24XX_EN_UART3_MASK;
  
- const struct clksel_rate gpt_sys_rates[] = {
--	 { .div = 1, .val = 1, .flags = RATE_IN_24XX | RATE_IN_343X },
-+	 { .div = 1, .val = 1, .flags = RATE_IN_24XX | RATE_IN_3XXX },
- 	 { .div = 0 }
- };
+ 	if (f1 | f2)
+ 		return 1;
+@@ -181,13 +181,13 @@ static int omap2_allow_mpu_retention(void)
  
- const struct clksel_rate gfx_l3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX | RATE_IN_343X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX | RATE_IN_343X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_243X | RATE_IN_343X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_243X | RATE_IN_343X },
-+	{ .div = 1, .val = 1, .flags = RATE_IN_24XX | RATE_IN_3XXX },
-+	{ .div = 2, .val = 2, .flags = RATE_IN_24XX | RATE_IN_3XXX },
-+	{ .div = 3, .val = 3, .flags = RATE_IN_243X | RATE_IN_3XXX },
-+	{ .div = 4, .val = 4, .flags = RATE_IN_243X | RATE_IN_3XXX },
- 	{ .div = 0 }
- };
+ 	/* Check for MMC, UART2, UART1, McSPI2, McSPI1 and DSS1. */
+ 	l = cm_read_mod_reg(CORE_MOD, CM_FCLKEN1);
+-	if (l & (OMAP2420_EN_MMC | OMAP24XX_EN_UART2 |
+-		 OMAP24XX_EN_UART1 | OMAP24XX_EN_MCSPI2 |
+-		 OMAP24XX_EN_MCSPI1 | OMAP24XX_EN_DSS1_MASK))
++	if (l & (OMAP2420_EN_MMC_MASK | OMAP24XX_EN_UART2_MASK |
++		 OMAP24XX_EN_UART1_MASK | OMAP24XX_EN_MCSPI2_MASK |
++		 OMAP24XX_EN_MCSPI1_MASK | OMAP24XX_EN_DSS1_MASK))
+ 		return 0;
+ 	/* Check for UART3. */
+ 	l = cm_read_mod_reg(CORE_MOD, OMAP24XX_CM_FCLKEN2);
+-	if (l & OMAP24XX_EN_UART3)
++	if (l & OMAP24XX_EN_UART3_MASK)
+ 		return 0;
+ 	if (sti_console_enabled)
+ 		return 0;
+@@ -215,12 +215,12 @@ static void omap2_enter_mpu_retention(void)
  
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 9c551d6..dfc472c 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -198,12 +198,13 @@ extern struct clk dummy_ck;
- /* Clksel_rate flags */
- #define RATE_IN_242X		(1 << 0)
- #define RATE_IN_243X		(1 << 1)
--#define RATE_IN_343X		(1 << 2)	/* rates common to all 343X */
-+#define RATE_IN_3XXX		(1 << 2)	/* rates common to all OMAP3 */
- #define RATE_IN_3430ES2		(1 << 3)	/* 3430ES2 rates only */
- #define RATE_IN_36XX		(1 << 4)
- #define RATE_IN_4430		(1 << 5)
+ 		/* Try to enter MPU retention */
+ 		prm_write_mod_reg((0x01 << OMAP_POWERSTATE_SHIFT) |
+-				  OMAP_LOGICRETSTATE,
++				  OMAP_LOGICRETSTATE_MASK,
+ 				  MPU_MOD, OMAP2_PM_PWSTCTRL);
+ 	} else {
+ 		/* Block MPU retention */
  
- #define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
+-		prm_write_mod_reg(OMAP_LOGICRETSTATE, MPU_MOD,
++		prm_write_mod_reg(OMAP_LOGICRETSTATE_MASK, MPU_MOD,
+ 						 OMAP2_PM_PWSTCTRL);
+ 		only_idle = 1;
+ 	}
+@@ -288,7 +288,8 @@ static int omap2_pm_suspend(void)
+ 	u32 wken_wkup, mir1;
  
-+#define RATE_IN_3430ES2PLUS	(RATE_IN_3430ES2 | RATE_IN_36XX)
+ 	wken_wkup = prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+-	prm_write_mod_reg(wken_wkup & ~OMAP24XX_EN_GPT1, WKUP_MOD, PM_WKEN);
++	wken_wkup &= ~OMAP24XX_EN_GPT1_MASK;
++	prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
  
- #endif
+ 	/* Mask GPT1 */
+ 	mir1 = omap_readl(0x480fe0a4);
+@@ -469,7 +470,7 @@ static void __init prcm_setup_regs(void)
+ 			  OMAP24XX_GR_MOD, OMAP2_PRCM_VOLTCTRL_OFFSET);
+ 
+ 	/* Enable wake-up events */
+-	prm_write_mod_reg(OMAP24XX_EN_GPIOS | OMAP24XX_EN_GPT1,
++	prm_write_mod_reg(OMAP24XX_EN_GPIOS_MASK | OMAP24XX_EN_GPT1_MASK,
+ 			  WKUP_MOD, PM_WKEN);
+ }
+ 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index b5ea831..e46a5e2 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -851,7 +851,7 @@ static void __init prcm_setup_regs(void)
+ 			CM_AUTOIDLE);
+ 	}
+ 
+-	omap_ctrl_writel(OMAP3430_AUTOIDLE, OMAP2_CONTROL_SYSCONFIG);
++	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
+ 
+ 	/*
+ 	 * Set all plls to autoidle. This is needed until autoidle is
+@@ -881,12 +881,12 @@ static void __init prcm_setup_regs(void)
+ 			     OMAP3_PRM_CLKSRC_CTRL_OFFSET);
+ 
+ 	/* setup wakup source */
+-	prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1 |
+-			  OMAP3430_EN_GPT1 | OMAP3430_EN_GPT12,
++	prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1_MASK |
++			  OMAP3430_EN_GPT1_MASK | OMAP3430_EN_GPT12_MASK,
+ 			  WKUP_MOD, PM_WKEN);
+ 	/* No need to write EN_IO, that is always enabled */
+-	prm_write_mod_reg(OMAP3430_EN_GPIO1 | OMAP3430_EN_GPT1 |
+-			  OMAP3430_EN_GPT12,
++	prm_write_mod_reg(OMAP3430_EN_GPIO1_MASK | OMAP3430_EN_GPT1_MASK |
++			  OMAP3430_EN_GPT12_MASK,
+ 			  WKUP_MOD, OMAP3430_PM_MPUGRPSEL);
+ 	/* For some reason IO doesn't generate wakeup event even if
+ 	 * it is selected to mpu wakeup goup */
+@@ -898,18 +898,18 @@ static void __init prcm_setup_regs(void)
+ 				OMAP3430_DSS_MOD, PM_WKEN);
+ 
+ 	/* Enable wakeups in PER */
+-	prm_write_mod_reg(OMAP3430_EN_GPIO2 | OMAP3430_EN_GPIO3 |
+-			  OMAP3430_EN_GPIO4 | OMAP3430_EN_GPIO5 |
+-			  OMAP3430_EN_GPIO6 | OMAP3430_EN_UART3 |
+-			  OMAP3430_EN_MCBSP2 | OMAP3430_EN_MCBSP3 |
+-			  OMAP3430_EN_MCBSP4,
++	prm_write_mod_reg(OMAP3430_EN_GPIO2_MASK | OMAP3430_EN_GPIO3_MASK |
++			  OMAP3430_EN_GPIO4_MASK | OMAP3430_EN_GPIO5_MASK |
++			  OMAP3430_EN_GPIO6_MASK | OMAP3430_EN_UART3_MASK |
++			  OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
++			  OMAP3430_EN_MCBSP4_MASK,
+ 			  OMAP3430_PER_MOD, PM_WKEN);
+ 	/* and allow them to wake up MPU */
+-	prm_write_mod_reg(OMAP3430_GRPSEL_GPIO2_MASK | OMAP3430_EN_GPIO3 |
+-			  OMAP3430_GRPSEL_GPIO4_MASK | OMAP3430_EN_GPIO5 |
+-			  OMAP3430_GRPSEL_GPIO6_MASK | OMAP3430_EN_UART3 |
+-			  OMAP3430_EN_MCBSP2 | OMAP3430_EN_MCBSP3 |
+-			  OMAP3430_EN_MCBSP4,
++	prm_write_mod_reg(OMAP3430_GRPSEL_GPIO2_MASK | OMAP3430_EN_GPIO3_MASK |
++			  OMAP3430_GRPSEL_GPIO4_MASK | OMAP3430_EN_GPIO5_MASK |
++			  OMAP3430_GRPSEL_GPIO6_MASK | OMAP3430_EN_UART3_MASK |
++			  OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
++			  OMAP3430_EN_MCBSP4_MASK,
+ 			  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
+ 
+ 	/* Don't attach IVA interrupts */
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 637fdfe..4a91d38 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -1004,7 +1004,7 @@ int pwrdm_wait_transition(struct powerdomain *pwrdm)
+ 
+ 	/* XXX Is this udelay() value meaningful? */
+ 	while ((prm_read_mod_reg(pwrdm->prcm_offs, pwrstst_reg_offs) &
+-		OMAP_INTRANSITION) &&
++		OMAP_INTRANSITION_MASK) &&
+ 	       (c++ < PWRDM_TRANSITION_BAILOUT))
+ 			udelay(1);
+ 
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 90f603d..ed2379f 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -132,63 +132,63 @@
+ 
+ /* CM_FCLKEN1_CORE, CM_ICLKEN1_CORE, PM_WKEN1_CORE shared bits */
+ #define OMAP2420_EN_MMC_SHIFT				26
+-#define OMAP2420_EN_MMC					(1 << 26)
++#define OMAP2420_EN_MMC_MASK				(1 << 26)
+ #define OMAP24XX_EN_UART2_SHIFT				22
+-#define OMAP24XX_EN_UART2				(1 << 22)
++#define OMAP24XX_EN_UART2_MASK				(1 << 22)
+ #define OMAP24XX_EN_UART1_SHIFT				21
+-#define OMAP24XX_EN_UART1				(1 << 21)
++#define OMAP24XX_EN_UART1_MASK				(1 << 21)
+ #define OMAP24XX_EN_MCSPI2_SHIFT			18
+-#define OMAP24XX_EN_MCSPI2				(1 << 18)
++#define OMAP24XX_EN_MCSPI2_MASK				(1 << 18)
+ #define OMAP24XX_EN_MCSPI1_SHIFT			17
+-#define OMAP24XX_EN_MCSPI1				(1 << 17)
++#define OMAP24XX_EN_MCSPI1_MASK				(1 << 17)
+ #define OMAP24XX_EN_MCBSP2_SHIFT			16
+-#define OMAP24XX_EN_MCBSP2				(1 << 16)
++#define OMAP24XX_EN_MCBSP2_MASK				(1 << 16)
+ #define OMAP24XX_EN_MCBSP1_SHIFT			15
+-#define OMAP24XX_EN_MCBSP1				(1 << 15)
++#define OMAP24XX_EN_MCBSP1_MASK				(1 << 15)
+ #define OMAP24XX_EN_GPT12_SHIFT				14
+-#define OMAP24XX_EN_GPT12				(1 << 14)
++#define OMAP24XX_EN_GPT12_MASK				(1 << 14)
+ #define OMAP24XX_EN_GPT11_SHIFT				13
+-#define OMAP24XX_EN_GPT11				(1 << 13)
++#define OMAP24XX_EN_GPT11_MASK				(1 << 13)
+ #define OMAP24XX_EN_GPT10_SHIFT				12
+-#define OMAP24XX_EN_GPT10				(1 << 12)
++#define OMAP24XX_EN_GPT10_MASK				(1 << 12)
+ #define OMAP24XX_EN_GPT9_SHIFT				11
+-#define OMAP24XX_EN_GPT9				(1 << 11)
++#define OMAP24XX_EN_GPT9_MASK				(1 << 11)
+ #define OMAP24XX_EN_GPT8_SHIFT				10
+-#define OMAP24XX_EN_GPT8				(1 << 10)
++#define OMAP24XX_EN_GPT8_MASK				(1 << 10)
+ #define OMAP24XX_EN_GPT7_SHIFT				9
+-#define OMAP24XX_EN_GPT7				(1 << 9)
++#define OMAP24XX_EN_GPT7_MASK				(1 << 9)
+ #define OMAP24XX_EN_GPT6_SHIFT				8
+-#define OMAP24XX_EN_GPT6				(1 << 8)
++#define OMAP24XX_EN_GPT6_MASK				(1 << 8)
+ #define OMAP24XX_EN_GPT5_SHIFT				7
+-#define OMAP24XX_EN_GPT5				(1 << 7)
++#define OMAP24XX_EN_GPT5_MASK				(1 << 7)
+ #define OMAP24XX_EN_GPT4_SHIFT				6
+-#define OMAP24XX_EN_GPT4				(1 << 6)
++#define OMAP24XX_EN_GPT4_MASK				(1 << 6)
+ #define OMAP24XX_EN_GPT3_SHIFT				5
+-#define OMAP24XX_EN_GPT3				(1 << 5)
++#define OMAP24XX_EN_GPT3_MASK				(1 << 5)
+ #define OMAP24XX_EN_GPT2_SHIFT				4
+-#define OMAP24XX_EN_GPT2				(1 << 4)
++#define OMAP24XX_EN_GPT2_MASK				(1 << 4)
+ #define OMAP2420_EN_VLYNQ_SHIFT				3
+-#define OMAP2420_EN_VLYNQ				(1 << 3)
++#define OMAP2420_EN_VLYNQ_MASK				(1 << 3)
+ 
+ /* CM_FCLKEN2_CORE, CM_ICLKEN2_CORE, PM_WKEN2_CORE shared bits */
+ #define OMAP2430_EN_GPIO5_SHIFT				10
+-#define OMAP2430_EN_GPIO5				(1 << 10)
++#define OMAP2430_EN_GPIO5_MASK				(1 << 10)
+ #define OMAP2430_EN_MCSPI3_SHIFT			9
+-#define OMAP2430_EN_MCSPI3				(1 << 9)
++#define OMAP2430_EN_MCSPI3_MASK				(1 << 9)
+ #define OMAP2430_EN_MMCHS2_SHIFT			8
+-#define OMAP2430_EN_MMCHS2				(1 << 8)
++#define OMAP2430_EN_MMCHS2_MASK				(1 << 8)
+ #define OMAP2430_EN_MMCHS1_SHIFT			7
+-#define OMAP2430_EN_MMCHS1				(1 << 7)
++#define OMAP2430_EN_MMCHS1_MASK				(1 << 7)
+ #define OMAP24XX_EN_UART3_SHIFT				2
+-#define OMAP24XX_EN_UART3				(1 << 2)
++#define OMAP24XX_EN_UART3_MASK				(1 << 2)
+ #define OMAP24XX_EN_USB_SHIFT				0
+-#define OMAP24XX_EN_USB					(1 << 0)
++#define OMAP24XX_EN_USB_MASK				(1 << 0)
+ 
+ /* CM_ICLKEN2_CORE, PM_WKEN2_CORE shared bits */
+ #define OMAP2430_EN_MDM_INTC_SHIFT			11
+-#define OMAP2430_EN_MDM_INTC				(1 << 11)
++#define OMAP2430_EN_MDM_INTC_MASK			(1 << 11)
+ #define OMAP2430_EN_USBHS_SHIFT				6
+-#define OMAP2430_EN_USBHS				(1 << 6)
++#define OMAP2430_EN_USBHS_MASK				(1 << 6)
+ 
+ /* CM_IDLEST1_CORE, PM_WKST1_CORE shared bits */
+ #define OMAP2420_ST_MMC_SHIFT				26
+@@ -246,9 +246,9 @@
+ 
+ /* CM_FCLKEN_WKUP, CM_ICLKEN_WKUP, PM_WKEN_WKUP shared bits */
+ #define OMAP24XX_EN_GPIOS_SHIFT				2
+-#define OMAP24XX_EN_GPIOS				(1 << 2)
++#define OMAP24XX_EN_GPIOS_MASK				(1 << 2)
+ #define OMAP24XX_EN_GPT1_SHIFT				0
+-#define OMAP24XX_EN_GPT1				(1 << 0)
++#define OMAP24XX_EN_GPT1_MASK				(1 << 0)
+ 
+ /* PM_WKST_WKUP, CM_IDLEST_WKUP shared bits */
+ #define OMAP24XX_ST_GPIOS_SHIFT				(1 << 2)
+@@ -267,47 +267,47 @@
+ #define OMAP3430_REV_MASK				(0xff << 0)
+ 
+ /* CM_SYSCONFIG, PRM_SYSCONFIG shared bits */
+-#define OMAP3430_AUTOIDLE				(1 << 0)
++#define OMAP3430_AUTOIDLE_MASK				(1 << 0)
+ 
+ /* CM_FCLKEN1_CORE, CM_ICLKEN1_CORE, PM_WKEN1_CORE shared bits */
+-#define OMAP3430_EN_MMC2				(1 << 25)
++#define OMAP3430_EN_MMC2_MASK				(1 << 25)
+ #define OMAP3430_EN_MMC2_SHIFT				25
+-#define OMAP3430_EN_MMC1				(1 << 24)
++#define OMAP3430_EN_MMC1_MASK				(1 << 24)
+ #define OMAP3430_EN_MMC1_SHIFT				24
+-#define OMAP3430_EN_MCSPI4				(1 << 21)
++#define OMAP3430_EN_MCSPI4_MASK				(1 << 21)
+ #define OMAP3430_EN_MCSPI4_SHIFT			21
+-#define OMAP3430_EN_MCSPI3				(1 << 20)
++#define OMAP3430_EN_MCSPI3_MASK				(1 << 20)
+ #define OMAP3430_EN_MCSPI3_SHIFT			20
+-#define OMAP3430_EN_MCSPI2				(1 << 19)
++#define OMAP3430_EN_MCSPI2_MASK				(1 << 19)
+ #define OMAP3430_EN_MCSPI2_SHIFT			19
+-#define OMAP3430_EN_MCSPI1				(1 << 18)
++#define OMAP3430_EN_MCSPI1_MASK				(1 << 18)
+ #define OMAP3430_EN_MCSPI1_SHIFT			18
+-#define OMAP3430_EN_I2C3				(1 << 17)
++#define OMAP3430_EN_I2C3_MASK				(1 << 17)
+ #define OMAP3430_EN_I2C3_SHIFT				17
+-#define OMAP3430_EN_I2C2				(1 << 16)
++#define OMAP3430_EN_I2C2_MASK				(1 << 16)
+ #define OMAP3430_EN_I2C2_SHIFT				16
+-#define OMAP3430_EN_I2C1				(1 << 15)
++#define OMAP3430_EN_I2C1_MASK				(1 << 15)
+ #define OMAP3430_EN_I2C1_SHIFT				15
+-#define OMAP3430_EN_UART2				(1 << 14)
++#define OMAP3430_EN_UART2_MASK				(1 << 14)
+ #define OMAP3430_EN_UART2_SHIFT				14
+-#define OMAP3430_EN_UART1				(1 << 13)
++#define OMAP3430_EN_UART1_MASK				(1 << 13)
+ #define OMAP3430_EN_UART1_SHIFT				13
+-#define OMAP3430_EN_GPT11				(1 << 12)
++#define OMAP3430_EN_GPT11_MASK				(1 << 12)
+ #define OMAP3430_EN_GPT11_SHIFT				12
+-#define OMAP3430_EN_GPT10				(1 << 11)
++#define OMAP3430_EN_GPT10_MASK				(1 << 11)
+ #define OMAP3430_EN_GPT10_SHIFT				11
+-#define OMAP3430_EN_MCBSP5				(1 << 10)
++#define OMAP3430_EN_MCBSP5_MASK				(1 << 10)
+ #define OMAP3430_EN_MCBSP5_SHIFT			10
+-#define OMAP3430_EN_MCBSP1				(1 << 9)
++#define OMAP3430_EN_MCBSP1_MASK				(1 << 9)
+ #define OMAP3430_EN_MCBSP1_SHIFT			9
+-#define OMAP3430_EN_FSHOSTUSB				(1 << 5)
++#define OMAP3430_EN_FSHOSTUSB_MASK			(1 << 5)
+ #define OMAP3430_EN_FSHOSTUSB_SHIFT			5
+-#define OMAP3430_EN_D2D					(1 << 3)
++#define OMAP3430_EN_D2D_MASK				(1 << 3)
+ #define OMAP3430_EN_D2D_SHIFT				3
+ 
+ /* CM_ICLKEN1_CORE, PM_WKEN1_CORE shared bits */
+-#define OMAP3430_EN_HSOTGUSB				(1 << 4)
+-#define OMAP3430_EN_HSOTGUSB_SHIFT				4
++#define OMAP3430_EN_HSOTGUSB_MASK			(1 << 4)
++#define OMAP3430_EN_HSOTGUSB_SHIFT			4
+ 
+ /* PM_WKST1_CORE, CM_IDLEST1_CORE shared bits */
+ #define OMAP3430_ST_MMC2_SHIFT				25
+@@ -352,21 +352,21 @@
+ #define OMAP3430_ST_D2D_MASK				(1 << 3)
+ 
+ /* CM_FCLKEN_WKUP, CM_ICLKEN_WKUP, PM_WKEN_WKUP shared bits */
+-#define OMAP3430_EN_GPIO1				(1 << 3)
++#define OMAP3430_EN_GPIO1_MASK				(1 << 3)
+ #define OMAP3430_EN_GPIO1_SHIFT				3
+-#define OMAP3430_EN_GPT12				(1 << 1)
++#define OMAP3430_EN_GPT12_MASK				(1 << 1)
+ #define OMAP3430_EN_GPT12_SHIFT				1
+-#define OMAP3430_EN_GPT1				(1 << 0)
++#define OMAP3430_EN_GPT1_MASK				(1 << 0)
+ #define OMAP3430_EN_GPT1_SHIFT				0
+ 
+ /* CM_FCLKEN_WKUP, PM_WKEN_WKUP shared bits */
+-#define OMAP3430_EN_SR2					(1 << 7)
++#define OMAP3430_EN_SR2_MASK				(1 << 7)
+ #define OMAP3430_EN_SR2_SHIFT				7
+-#define OMAP3430_EN_SR1					(1 << 6)
++#define OMAP3430_EN_SR1_MASK				(1 << 6)
+ #define OMAP3430_EN_SR1_SHIFT				6
+ 
+ /* CM_ICLKEN_WKUP, PM_WKEN_WKUP shared bits */
+-#define OMAP3430_EN_GPT12				(1 << 1)
++#define OMAP3430_EN_GPT12_MASK				(1 << 1)
+ #define OMAP3430_EN_GPT12_SHIFT				1
+ 
+ /* CM_IDLEST_WKUP, PM_WKST_WKUP shared bits */
+@@ -386,47 +386,47 @@
+  * CM_SLEEPDEP_PER, PM_WKDEP_IVA2, PM_WKDEP_GFX,
+  * PM_WKDEP_DSS, PM_WKDEP_CAM, PM_WKDEP_PER, PM_WKDEP_NEON shared bits
+  */
+-#define OMAP3430_EN_MPU					(1 << 1)
++#define OMAP3430_EN_MPU_MASK				(1 << 1)
+ #define OMAP3430_EN_MPU_SHIFT				1
+ 
+ /* CM_FCLKEN_PER, CM_ICLKEN_PER, PM_WKEN_PER shared bits */
+-#define OMAP3430_EN_GPIO6				(1 << 17)
++#define OMAP3430_EN_GPIO6_MASK				(1 << 17)
+ #define OMAP3430_EN_GPIO6_SHIFT				17
+-#define OMAP3430_EN_GPIO5				(1 << 16)
++#define OMAP3430_EN_GPIO5_MASK				(1 << 16)
+ #define OMAP3430_EN_GPIO5_SHIFT				16
+-#define OMAP3430_EN_GPIO4				(1 << 15)
++#define OMAP3430_EN_GPIO4_MASK				(1 << 15)
+ #define OMAP3430_EN_GPIO4_SHIFT				15
+-#define OMAP3430_EN_GPIO3				(1 << 14)
++#define OMAP3430_EN_GPIO3_MASK				(1 << 14)
+ #define OMAP3430_EN_GPIO3_SHIFT				14
+-#define OMAP3430_EN_GPIO2				(1 << 13)
++#define OMAP3430_EN_GPIO2_MASK				(1 << 13)
+ #define OMAP3430_EN_GPIO2_SHIFT				13
+-#define OMAP3430_EN_UART3				(1 << 11)
++#define OMAP3430_EN_UART3_MASK				(1 << 11)
+ #define OMAP3430_EN_UART3_SHIFT				11
+-#define OMAP3430_EN_GPT9				(1 << 10)
++#define OMAP3430_EN_GPT9_MASK				(1 << 10)
+ #define OMAP3430_EN_GPT9_SHIFT				10
+-#define OMAP3430_EN_GPT8				(1 << 9)
++#define OMAP3430_EN_GPT8_MASK				(1 << 9)
+ #define OMAP3430_EN_GPT8_SHIFT				9
+-#define OMAP3430_EN_GPT7				(1 << 8)
++#define OMAP3430_EN_GPT7_MASK				(1 << 8)
+ #define OMAP3430_EN_GPT7_SHIFT				8
+-#define OMAP3430_EN_GPT6				(1 << 7)
++#define OMAP3430_EN_GPT6_MASK				(1 << 7)
+ #define OMAP3430_EN_GPT6_SHIFT				7
+-#define OMAP3430_EN_GPT5				(1 << 6)
++#define OMAP3430_EN_GPT5_MASK				(1 << 6)
+ #define OMAP3430_EN_GPT5_SHIFT				6
+-#define OMAP3430_EN_GPT4				(1 << 5)
++#define OMAP3430_EN_GPT4_MASK				(1 << 5)
+ #define OMAP3430_EN_GPT4_SHIFT				5
+-#define OMAP3430_EN_GPT3				(1 << 4)
++#define OMAP3430_EN_GPT3_MASK				(1 << 4)
+ #define OMAP3430_EN_GPT3_SHIFT				4
+-#define OMAP3430_EN_GPT2				(1 << 3)
++#define OMAP3430_EN_GPT2_MASK				(1 << 3)
+ #define OMAP3430_EN_GPT2_SHIFT				3
+ 
+ /* CM_FCLKEN_PER, CM_ICLKEN_PER, PM_WKEN_PER, PM_WKST_PER shared bits */
+ /* XXX Possible TI documentation bug: should the PM_WKST_PER EN_* bits
+  * be ST_* bits instead? */
+-#define OMAP3430_EN_MCBSP4				(1 << 2)
++#define OMAP3430_EN_MCBSP4_MASK				(1 << 2)
+ #define OMAP3430_EN_MCBSP4_SHIFT			2
+-#define OMAP3430_EN_MCBSP3				(1 << 1)
++#define OMAP3430_EN_MCBSP3_MASK				(1 << 1)
+ #define OMAP3430_EN_MCBSP3_SHIFT			1
+-#define OMAP3430_EN_MCBSP2				(1 << 0)
++#define OMAP3430_EN_MCBSP2_MASK				(1 << 0)
+ #define OMAP3430_EN_MCBSP2_SHIFT			0
+ 
+ /* CM_IDLEST_PER, PM_WKST_PER shared bits */
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 07a60f1..c201374 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -158,10 +158,10 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
+ 		WARN_ON(1);
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs,
++		prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
+ 						 OMAP2_RM_RSTCTRL);
+ 	if (cpu_is_omap44xx())
+-		prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs,
++		prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
+ 						 OMAP4_RM_RSTCTRL);
+ }
+ 
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index 5fba2aa..7bffb6e 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -284,7 +284,7 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+ #define OMAP_OFFLOADMODE_MASK				(0x3 << 3)
+ #define OMAP_ONLOADMODE_SHIFT				1
+ #define OMAP_ONLOADMODE_MASK				(0x3 << 1)
+-#define OMAP_ENABLE					(1 << 0)
++#define OMAP_ENABLE_MASK				(1 << 0)
+ 
+ /* PRM_RSTTIME */
+ /* Named RM_RSTTIME_WKUP on the 24xx */
+@@ -296,8 +296,8 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+ /* PRM_RSTCTRL */
+ /* Named RM_RSTCTRL_WKUP on the 24xx */
+ /* 2420 calls RST_DPLL3 'RST_DPLL' */
+-#define OMAP_RST_DPLL3					(1 << 2)
+-#define OMAP_RST_GS					(1 << 1)
++#define OMAP_RST_DPLL3_MASK				(1 << 2)
++#define OMAP_RST_GS_MASK				(1 << 1)
+ 
+ 
+ /*
+@@ -316,7 +316,7 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+  *	 PM_PWSTST_DSS, PM_PWSTST_CAM, PM_PWSTST_PER, PM_PWSTST_EMU,
+  *	 PM_PWSTST_NEON
+  */
+-#define OMAP_INTRANSITION				(1 << 20)
++#define OMAP_INTRANSITION_MASK				(1 << 20)
+ 
+ 
+ /*
+@@ -338,7 +338,7 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+  * 3430: RM_RSTST_IVA2, RM_RSTST_MPU, RM_RSTST_GFX, RM_RSTST_DSS,
+  *	 RM_RSTST_CAM, RM_RSTST_PER, RM_RSTST_NEON
+  */
+-#define OMAP_COREDOMAINWKUP_RST				(1 << 3)
++#define OMAP_COREDOMAINWKUP_RST_MASK			(1 << 3)
+ 
+ /*
+  * 24XX: RM_RSTST_MPU, RM_RSTST_GFX, RM_RSTST_DSP
+@@ -347,7 +347,7 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+  *
+  * 3430: RM_RSTST_CORE, RM_RSTST_EMU
+  */
+-#define OMAP_DOMAINWKUP_RST				(1 << 2)
++#define OMAP_DOMAINWKUP_RST_MASK			(1 << 2)
+ 
+ /*
+  * 24XX: RM_RSTST_MPU, RM_RSTST_WKUP, RM_RSTST_DSP
+@@ -357,8 +357,8 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+  *
+  * 3430: RM_RSTST_CORE, RM_RSTST_EMU
+  */
+-#define OMAP_GLOBALWARM_RST				(1 << 1)
+-#define OMAP_GLOBALCOLD_RST				(1 << 0)
++#define OMAP_GLOBALWARM_RST_MASK			(1 << 1)
++#define OMAP_GLOBALCOLD_RST_MASK			(1 << 0)
+ 
+ /*
+  * 24XX: PM_WKDEP_GFX, PM_WKDEP_MPU, PM_WKDEP_CORE, PM_WKDEP_DSP
+@@ -382,7 +382,7 @@ static inline u32 prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+  *	 PM_PWSTCTRL_DSS, PM_PWSTCTRL_CAM, PM_PWSTCTRL_PER,
+  *	 PM_PWSTCTRL_NEON
+  */
+-#define OMAP_LOGICRETSTATE				(1 << 2)
++#define OMAP_LOGICRETSTATE_MASK				(1 << 2)
+ 
+ /*
+  * 24XX: PM_PWSTCTRL_MPU, PM_PWSTCTRL_CORE, PM_PWSTCTRL_GFX,
