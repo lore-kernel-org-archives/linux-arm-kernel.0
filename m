@@ -1,7 +1,7 @@
 From: Franke.M@sebakmt.com (Markus Franke)
-Date: Mon, 26 Apr 2010 12:16:08 +0200
-Subject: No initial console with linux-2.6.22 on AT91SAM9261
-Message-ID: <OFCFF5291E.D3439CEA-ONC1257711.0036ADE6-C1257711.00386A6E@sebakmt.com>
+Date: Mon, 26 Apr 2010 12:19:09 +0200
+Subject: No initial console with linux-2.6.22 on Atmel Arm AT9261
+Message-ID: <OF69644844.746826F2-ONC1257711.00389697-C1257711.0038B0EC@sebakmt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -149,4 +149,4 @@ communication in error, please notify the sender and destroy and delete any copi
 received."
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100426/8faad65d/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100426/cb4c275e/attachment-0001.htm>
