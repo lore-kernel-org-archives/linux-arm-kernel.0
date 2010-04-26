@@ -1,42 +1,25 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 26 Apr 2010 23:23:48 +0200
-Subject: [PATCH] vpac/pxa270: remove TS_IRQ magic number
-Message-ID: <1272317028-3650-1-git-send-email-marek.vasut@gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 26 Apr 2010 16:18:00 -0700
+Subject: [GIT PULL] generic arm for MSM try 3
+In-Reply-To: <1271787537.1986.10.camel@m0nster>
+References: <1271787537.1986.10.camel@m0nster>
+Message-ID: <1272323880.32741.7.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The touchscreen GPIO IRQ was used as a magic number. Define it properly in the
-board header file. This is a simple cleanup patch.
+On Tue, 2010-04-20 at 11:18 -0700, Daniel Walker wrote:
+> I dropped the copyright and rebased, but everything else is the same as
+> the prior pull request.
+> 
+> The following changes since commit 27ee8963708185b96bc84a149eb5336a249a7497:
+>   Linus Torvalds (1):
+>         Merge branch 'urgent' of git://git.kernel.org/.../brodo/pcmcia-2.6
+> 
+> are available in the git repository at:
+> 
+>   git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/include/mach/vpac270.h |    2 ++
- arch/arm/mach-pxa/vpac270.c              |    2 +-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+Did I get this one wrong somehow, or are you not accepting pull requests
+right now?
 
-diff --git a/arch/arm/mach-pxa/include/mach/vpac270.h b/arch/arm/mach-pxa/include/mach/vpac270.h
-index 0d82c47..7bfa3dd 100644
---- a/arch/arm/mach-pxa/include/mach/vpac270.h
-+++ b/arch/arm/mach-pxa/include/mach/vpac270.h
-@@ -37,4 +37,6 @@
- 
- #define	GPIO36_VPAC270_IDE_IRQ		36
- 
-+#define	GPIO113_VPAC270_TS_IRQ		113
-+
- #endif
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index 6575b8f..a1b39c4 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -388,7 +388,7 @@ static pxa2xx_audio_ops_t vpac270_ac97_pdata = {
- };
- 
- static struct ucb1400_pdata vpac270_ucb1400_pdata = {
--	.irq		= IRQ_GPIO(113),
-+	.irq		= IRQ_GPIO(GPIO113_VPAC270_TS_IRQ),
- };
- 
- static struct platform_device vpac270_ucb1400_device = {
--- 
-1.7.0
+Daniel
