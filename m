@@ -1,28 +1,63 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Mon, 26 Apr 2010 15:41:19 +0900
-Subject: [PATCH 1/7] PL330: Add common core driver
-In-Reply-To: <20100426045627.GI28105@trinity.fluff.org>
-References: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
-	<j2x63386a3d1004231449ta90046b5pc29622b58a87b99a@mail.gmail.com>
-	<n2y1b68c6791004231620lcd670271u3a9d33bb52c10e37@mail.gmail.com>
-	<q2y63386a3d1004241859v8b31f756rb6ff9b4a7452ba@mail.gmail.com>
-	<20100426045627.GI28105@trinity.fluff.org>
-Message-ID: <q2q1b68c6791004252341k51da90d0xfaf2850b90d7c46c@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 26 Apr 2010 01:04:20 -0600
+Subject: [PATCH 00/10] OMAP PRCM, clock: some cleanup patches for 2.6.35
+Message-ID: <20100426070217.9743.92728.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 26, 2010 at 1:56 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Sun, Apr 25, 2010 at 03:59:26AM +0200, Linus Walleij wrote:
->> 2010/4/24 jassi brar <jassisinghbrar@gmail.com>:
->> > Btw, I think that driver should be divided in two files
->> > drivers/dma/api-pl330.c with common code and
->> > drivers/dma/<soc>-pl330.c for platform specific stuff like IRQ,
->> > registers base mapping and other quirks(if any). Any opinions?
->
-> Possibly, but I think it may be better to pass these things via platform
-> device for registers and irqs, and platform data for the quirks.
-Some platforms implement just one i/f either secure or non-secure, others
-might implement both. Having a separate file for platforms would make
-it possible to switch between secure and non-secure i/fs acc to the needs
-of the platform. Similarly for the DMAC reset mechanism.
-Also, I am afraid, managing quirks in common code might get trickier over time.
+Hello,
+
+these patches undertake some cleanup on the OMAP2/3 PRCM macros and the
+OMAP clock code.  Nothing too earthshattering in this series -
+
+
+- Paul
+
+---
+
+size:
+   text    data     bss     dec     hex filename
+3665327  200160  103840 3969327  3c912f vmlinux.omap3beagle.orig
+3663919  200576  103392 3967887  3c8b8f vmlinux.omap3beagle.patched
+
+Felipe Balbi (1):
+      OMAP1 clock: fix section mismatch on clk_init
+
+Paul Walmsley (9):
+      OMAP2 PRCM: convert OMAP2 PRCM macros to the _SHIFT/_MASK suffixes
+      OMAP3 PRCM: convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes
+      OMAP2+ PRCM: convert remaining PRCM macros to the _SHIFT/_MASK suffixes
+      OMAP3: PM: PM_MPUGRPSEL writes should use GRPSEL macros, not EN macros
+      OMAP2+ clock: remove DEFAULT_RATE clksel_rate flag
+      OMAP2+ clock: clean up clkt_clksel.c
+      OMAP3 clock: rename RATE_IN_343X, RATE_IN_3430ES2 to match reality
+      OMAP3 clock: remove unnecessary duplicate of dpll4_m2_ck, added for 36xx
+      OMAP clock: resolve old checkpatch and CodingStyle issues with plat-omap/clock.c
+
+
+ arch/arm/mach-omap1/clock.c             |    2 
+ arch/arm/mach-omap1/clock.h             |    2 
+ arch/arm/mach-omap2/clkt2xxx_apll.c     |    4 
+ arch/arm/mach-omap2/clkt_clksel.c       |  472 +++++++++++++++++++------------
+ arch/arm/mach-omap2/clock.c             |    9 +
+ arch/arm/mach-omap2/clock.h             |   11 -
+ arch/arm/mach-omap2/clock2420_data.c    |   50 ++-
+ arch/arm/mach-omap2/clock2430_data.c    |   54 ++--
+ arch/arm/mach-omap2/clock3xxx_data.c    |  406 ++++++++++-----------------
+ arch/arm/mach-omap2/clock_common_data.c |   12 -
+ arch/arm/mach-omap2/clockdomain.c       |    4 
+ arch/arm/mach-omap2/cm-regbits-24xx.h   |  236 ++++++++--------
+ arch/arm/mach-omap2/cm-regbits-34xx.h   |  222 +++++++--------
+ arch/arm/mach-omap2/cm.h                |    5 
+ arch/arm/mach-omap2/control.c           |    7 
+ arch/arm/mach-omap2/pm24xx.c            |  126 ++++----
+ arch/arm/mach-omap2/pm34xx.c            |  202 +++++++------
+ arch/arm/mach-omap2/powerdomain.c       |   26 +-
+ arch/arm/mach-omap2/prcm-common.h       |  146 +++++-----
+ arch/arm/mach-omap2/prcm.c              |    4 
+ arch/arm/mach-omap2/prm-regbits-24xx.h  |  120 ++++----
+ arch/arm/mach-omap2/prm-regbits-34xx.h  |  360 ++++++++++++------------
+ arch/arm/mach-omap2/prm.h               |   18 +
+ arch/arm/plat-omap/clock.c              |   28 +-
+ arch/arm/plat-omap/include/plat/clock.h |   14 -
+ 25 files changed, 1288 insertions(+), 1252 deletions(-)
