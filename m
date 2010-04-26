@@ -1,138 +1,126 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Apr 2010 12:00:06 -0700
-Subject: [GIT PULL] omap fixes for v2.6.34-rc5
-Message-ID: <20100426190005.GJ7225@atomide.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 26 Apr 2010 21:46:07 +0200
+Subject: [PATCH] pxa/vpac270: add ide support
+Message-ID: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patch adds support for the on-board IDE channel. I tested this with a CDROM
+connected over 2.5-3.5 IDE reduction with external power supplied to the CDROM.
+This was not tested with the Voipac 270-HDD-000 (official Voipac HDD module),
+but I expect no problems.
 
-Please pull omap fixes from:
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/Kconfig                |    1 +
+ arch/arm/mach-pxa/include/mach/vpac270.h |    2 +
+ arch/arm/mach-pxa/vpac270.c              |   50 ++++++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 0 deletions(-)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Regards,
-
-Tony
-
-
-The following changes since commit b91ce4d14a21fc04d165be30319541e0f9204f15:
-  Linus Torvalds (1):
-        Merge git://git.kernel.org/.../davem/net-2.6
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Aaro Koskinen (2):
-      omap: fix clocksource_32k to start from zero
-      omap: delete unused bootloader tag variables
-
-Abraham Arce (1):
-      OMAP4: Clocks: Change SPI Instance Names
-
-Enric Balletbo i Serra (1):
-      omap3: Fix EHCI port for IGEP v2 board
-
-Felipe Balbi (1):
-      arm: omap1: remove dead code from timer32k.c
-
-Francisco Alecrim (1):
-      n8x0_defconfig: remove CONFIG_NILFS2_FS override
-
-Janusz Krzysztofik (1):
-      omap: gpio: fix incorrect matching of IRQ_TYPE_EDGE_BOTH
-
-Jarkko Nikula (2):
-      omap: rx51_defconfig: Remove duplicate phonet
-      omap: rx51_defconfig: Remove CONFIG_SYSFS_DEPRECATED*=y options
-
-Rajendra Nayak (1):
-      OMAP4: prcm: Use logical OR instead of bitwise OR
-
-Ranjith Lohithakshan (1):
-      OMAP3: clock: fix enable bit used for dpll4_m4x2 clock
-
-Richard Woodruff (1):
-      omap4: Fix build break when used with gcc-4.4.1 (2009-q3)
-
-Santosh Shilimkar (2):
-      OMAP4: Fix for CONTROL register Base
-      omap4: Fix McBSP4 base address
-
-Sergio Aguirre (7):
-      OMAP3: serial: Check for zero-based physical addr
-      OMAP3: serial: Use dev_* macros instead of printk
-      omap2/3/4: serial: Remove condition for getting uart4_phys
-      omap3: zoom2/3 / 3630sdp: Don't init always all uarts
-      omap3: 3630sdp: Explicitly enable all UARTs
-      omap3: zoom 2/3: Change debugboard serial port id
-      omap3: zoom2/3: Register only 1 8250 port
-
-Thara Gopinath (2):
-      OMAP: HWMOD: Adding clockdomain check
-      OMAP: HWMOD: Bug fixes in hwmod structure definitions
-
-Thomas Weber (8):
-      omap: Devkit8000: Fix wrong usb port on Devkit8000
-      omap: board-sdp-flash.c: Fix typos in debug output
-      omap: Devkit8000: Fix typo in supplies
-      omap: Devkit8000: Add missing package selection
-      omap: Devkit8000: Fix typo in pin name
-      omap: Devkit8000: Remove unnecessary include file
-      omap: Devkit8000: Change position of init calls
-      omap: Devkit8000: Remove unused pins
-
-Tony Lindgren (4):
-      Merge branch 'omap-fixes-for-tony' of git://dev.omapzoom.org/pub/scm/saaguirre/linux-omap-camera into omap-fixes-for-linus
-      Merge branch 'for_2.6.34rc_a' of git://git.pwsan.com/linux-2.6 into omap-fixes-for-linus
-      omap2: Fix ARM processor check for 24xx
-      omap: Fix n8x0 mmc_mmc_init compile warnings and typos
-
-kishore kadiyala (1):
-      OMAP4-HSMMC: FIX for MMC5 Controller IRQ Base
-
-manjugk manjugk (1):
-      omap: DMA: Init CDAC to zero
-
-stanley.miao (4):
-      omap: fix the compile error if CONFIG_MTD_NAND_OMAP2 is notenabled
-      omap: remove one of the define of INT_34XX_BENCH_MPU_EMUL
-      AM3517: initialize i2c subsystem after mux subsystem
-      omap: fix a gpmc nand problem
-
- arch/arm/configs/n8x0_defconfig                |    1 -
- arch/arm/configs/omap_zoom2_defconfig          |    2 +-
- arch/arm/configs/omap_zoom3_defconfig          |    2 +-
- arch/arm/configs/rx51_defconfig                |    3 --
- arch/arm/mach-omap1/timer32k.c                 |   15 ---------
- arch/arm/mach-omap2/Kconfig                    |    6 ++-
- arch/arm/mach-omap2/board-3630sdp.c            |    1 +
- arch/arm/mach-omap2/board-am3517evm.c          |    4 +-
- arch/arm/mach-omap2/board-devkit8000.c         |   39 +++++------------------
- arch/arm/mach-omap2/board-igep0020.c           |    8 ++--
- arch/arm/mach-omap2/board-n8x0.c               |   18 +++++-----
- arch/arm/mach-omap2/board-sdp-flash.c          |    8 ++--
- arch/arm/mach-omap2/board-zoom-debugboard.c    |    2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c   |    1 -
- arch/arm/mach-omap2/clock3xxx_data.c           |    2 +-
- arch/arm/mach-omap2/clock44xx_data.c           |    8 ++--
- arch/arm/mach-omap2/clockdomain.c              |    6 ++--
- arch/arm/mach-omap2/devices.c                  |    2 +-
- arch/arm/mach-omap2/gpmc-nand.c                |    3 ++
- arch/arm/mach-omap2/include/mach/entry-macro.S |    2 +-
- arch/arm/mach-omap2/omap-headsmp.S             |    6 ++--
- arch/arm/mach-omap2/omap44xx-smc.S             |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c               |    3 ++
- arch/arm/mach-omap2/powerdomain.c              |    2 +-
- arch/arm/mach-omap2/prcm.c                     |    4 +-
- arch/arm/mach-omap2/serial.c                   |   35 +++++++++++----------
- arch/arm/plat-omap/common.c                    |   22 ++++++++-----
- arch/arm/plat-omap/dma.c                       |    9 +++++
- arch/arm/plat-omap/gpio.c                      |    6 ++--
- arch/arm/plat-omap/include/plat/irqs.h         |    2 -
- arch/arm/plat-omap/include/plat/mcbsp.h        |    2 +-
- arch/arm/plat-omap/include/plat/nand.h         |    7 ++++
- arch/arm/plat-omap/include/plat/omap44xx.h     |    2 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h   |    2 +-
- 34 files changed, 113 insertions(+), 124 deletions(-)
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 12e16b9..5db128c 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -258,6 +258,7 @@ config MACH_COLIBRI320
+ config MACH_VPAC270
+ 	bool "Voipac PXA270"
+ 	select PXA27x
++	select HAVE_PATA_PLATFORM
+ 	help
+ 	  PXA270 based Single Board Computer.
+ 
+diff --git a/arch/arm/mach-pxa/include/mach/vpac270.h b/arch/arm/mach-pxa/include/mach/vpac270.h
+index b90b380..0d82c47 100644
+--- a/arch/arm/mach-pxa/include/mach/vpac270.h
++++ b/arch/arm/mach-pxa/include/mach/vpac270.h
+@@ -35,4 +35,6 @@
+ 
+ #define	GPIO114_VPAC270_ETH_IRQ		114
+ 
++#define	GPIO36_VPAC270_IDE_IRQ		36
++
+ #endif
+diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+index 0a9647b..6575b8f 100644
+--- a/arch/arm/mach-pxa/vpac270.c
++++ b/arch/arm/mach-pxa/vpac270.c
+@@ -23,6 +23,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/dm9000.h>
+ #include <linux/ucb1400.h>
++#include <linux/ata_platform.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -138,6 +139,10 @@ static unsigned long vpac270_pin_config[] __initdata = {
+ 	/* I2C */
+ 	GPIO117_I2C_SCL,
+ 	GPIO118_I2C_SDA,
++
++	/* IDE */
++	GPIO36_GPIO,	/* IDE IRQ */
++	GPIO80_DREQ_1,
+ };
+ 
+ /******************************************************************************
+@@ -487,6 +492,50 @@ static inline void vpac270_lcd_init(void) {}
+ #endif
+ 
+ /******************************************************************************
++ * PATA IDE
++ ******************************************************************************/
++#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
++static struct pata_platform_info vpac270_pata_pdata = {
++	.ioport_shift	= 1,
++	.irq_flags	= IRQF_TRIGGER_RISING,
++};
++
++static struct resource vpac270_ide_resources[] = {
++	[0] = {	/* I/O Base address */
++	       .start	= PXA_CS3_PHYS + 0x120,
++	       .end	= PXA_CS3_PHYS + 0x13f,
++	       .flags	= IORESOURCE_MEM
++	},
++	[1] = {	/* CTL Base address */
++	       .start	= PXA_CS3_PHYS + 0x15c,
++	       .end	= PXA_CS3_PHYS + 0x15f,
++	       .flags	= IORESOURCE_MEM
++	},
++	[2] = {	/* IDE IRQ pin */
++	       .start	= gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
++	       .end	= gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
++	       .flags	= IORESOURCE_IRQ
++	}
++};
++
++static struct platform_device vpac270_ide_device = {
++	.name		= "pata_platform",
++	.num_resources	= ARRAY_SIZE(vpac270_ide_resources),
++	.resource	= vpac270_ide_resources,
++	.dev		= {
++		.platform_data	= &vpac270_pata_pdata,
++	}
++};
++
++static void __init vpac270_ide_init(void)
++{
++	platform_device_register(&vpac270_ide_device);
++}
++#else
++static inline void vpac270_ide_init(void) {}
++#endif
++
++/******************************************************************************
+  * Machine init
+  ******************************************************************************/
+ static void __init vpac270_init(void)
+@@ -507,6 +556,7 @@ static void __init vpac270_init(void)
+ 	vpac270_eth_init();
+ 	vpac270_ts_init();
+ 	vpac270_rtc_init();
++	vpac270_ide_init();
+ }
+ 
+ MACHINE_START(VPAC270, "Voipac PXA270")
+-- 
+1.7.0
