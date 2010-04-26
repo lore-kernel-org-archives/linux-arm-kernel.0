@@ -1,48 +1,80 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Mon, 26 Apr 2010 15:18:43 +0200
-Subject: Q: sched_clock() vs. clocksource, how to implement correctly
-In-Reply-To: <20100424205011.GA21632@sig21.net>
-References: <20100423150917.GA25714@sig21.net>
-	<20100423182933.0df45b53@mschwide.boeblingen.de.ibm.com>
-	<20100424205011.GA21632@sig21.net>
-Message-ID: <20100426131843.GA28332@sig21.net>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Mon, 26 Apr 2010 15:35:35 +0100
+Subject: [spi-devel-general] [PATCH v4 1/2] spi: implemented driver for
+	Cirrus EP93xx SPI controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636D9B7E66@AUSP01VMBX24.collaborationhost.net>
+References: <e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636D8C8672@AUSP01VMBX24.collaborationhost.net>
+	<20100422175503.GE26418@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D9410F0@AUSP01VMBX24.collaborationhost.net>
+	<20100423052003.GF26418@gw.healthdatacare.com>
+	<0D753D10438DA54287A00B0270842697636D9419BC@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697636D9B794A@AUSP01VMBX24.collaborationhost.net>
+	<y2x56d259a01004250229he9cb2ee3pf69669c9226f80fb@mail.gmail.com>
+	<m2l56d259a01004250238s99d6c869s1ee084b36f9736a0@mail.gmail.com>
+	<0D753D10438DA54287A00B0270842697636D9B7E66@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <k2l56d259a01004260735nb44e9dddy5b08668787070ac7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 24, 2010 at 10:50:11PM +0200, Johannes Stezenbach wrote:
-> /*
->  * Orion's sched_clock implementation. It has a resolution of
->  * at least 7.5ns (133MHz TCLK) and a maximum value of 834 days.
->  *
->  * Because the hardware timer period is quite short (21 secs if
->  * 200MHz TCLK) and because cnt32_to_63() needs to be called at
->  * least once per half period to work properly, a kernel timer is
->  * set up to ensure this requirement is always met.
->  */
-> #define TCLK2NS_SCALE_FACTOR 8
+On 4/25/10, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>  During the 512+2+1 message that is sent when the mmc_spi driver is
+>  doing a block read, the 512 byte transfer goes like this:
+>
+>  1) 8 writes, prime the tx fifo
+>         SFRMOUT asserts when the first bit of the first byte starts
+>         transmitting
+>  2) Interrupt
+>  3) 8 reads, we must have emptied the tx fifo and filled the rx fifo
+>         SFRMOUT de-asserts after the the last bit of the last byte is
+>         received
 
-I found the following discussion of the sched_clock()
-implementation trade-offs very informative:
-http://lkml.org/lkml/2010/4/15/299
+Are you printk-ing the diagnostics in the irq routine?
+If so, that slows it down enough to ensure every 8-word block underruns.
 
-It mentions clocksource_calc_mult_shift() which was added in 2.6.33,
-however I had some difficulties understanding the meaning of the minsec
-parameter, especially since all existing callers use a value of 4.
-But when using minsec = 365*24*60*60 (1 year) it results in the shift value of 8.
+Here are stats for 512-word transfers from SD card at 3.7 MHz; figures are
+number of underruns/total number of reads and the distribution of
+words read per interrupt [0..8], collected during the transfer and
+printed once the transfer is over)
 
-So finally the pieces connect together :-)
+1/102 [1,0,2,0,0,100,0,0,1]
+1/102 [1,0,2,0,0,100,0,0,1]
+1/102 [1,0,2,0,0,100,0,0,1]
+2/104 [1,1,0,2,21,76,3,1,2]
+3/102 [1,1,1,1,11,85,1,1,3]
+4/100 [1,0,1,1,7,83,3,2,4]
 
-> BTW, even though this uses TCLK2NS_SCALE_FACTOR of 8, the same file
-> uses a shift vaue of 20 for the orion_clksrc...
-
-It seems clocksource_cyc2ns() is used in kernel/time/timekeeping.c
-and kernel/time/clocksource.c only on relatively
-small delta values, so there's no need to worry
-about overflow and a large clocksource.shift and .mult is OK.
-
-(Apparently the minsec value of 4 mentioned above is suitable
-for timekeeping?  Where does the 4 come from?)
+while 1- and 2-word transfers seem to be caught on the second interrupt.
+[1,2,0,0,0,0,0,0,0]
+[1,1,0,0,0,0,0,0,0]
 
 
-Thanks,
-Johannes
+>  I have modifed my board so that I now have an external GPIO for the chip
+>  select.
+Yes, we'll have to do that too.
+
+>  > I'll run a few more tests, e.g. dropping the clock rate
+>
+> With a slow enough clock you can probably get to a point where SFRMOUT
+>  will stay deasserted during the entire 512 byte transfer
+
+I've tried it down to 400kHz and transfers still underrun (!)
+
+So it does seem that SFRMOUT cannot be used as a chip select unless we
+revert to the old busy-wait-for-whole-transfer code, which causes 100%
+CPU usage during transfers.
+and 1ms-long pauses (for 512 words at 3.7MHz).
+
+This suggests that we can only handle SFRMOUT used as chip select
+correctly by reinstating polling mode, adding the continuous transfer
+code and allowing the board definition code to specify that polling
+mode be used for such devices.
+(much as I hate polling mode :)
+
+>  But it would
+>  still de-assert during the switch to the next transfer in the message.
+
+Am I right in thinking that the GPIO chip select currently remains
+asserted as it should during a multi-transfer message?
+
+    M
