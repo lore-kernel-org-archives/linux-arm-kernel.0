@@ -1,22 +1,61 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 27 Apr 2010 06:15:17 +0200
-Subject: [PATCH] ARM: pxa/raumfeld: fix button name
-In-Reply-To: <y2uf17812d71004261937i6c34e7a1m40ce8c8873488a5b@mail.gmail.com>
-References: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
-	<20100422101956.GV30801@buzzloop.caiaq.de>
-	<20100426210332.GX30801@buzzloop.caiaq.de>
-	<y2uf17812d71004261937i6c34e7a1m40ce8c8873488a5b@mail.gmail.com>
-Message-ID: <20100427041517.GA30801@buzzloop.caiaq.de>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Tue, 27 Apr 2010 09:46:38 +0530
+Subject: [PATCH 00/14] ux500 re-org and U5500 support
+Message-ID: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 27, 2010 at 10:37:02AM +0800, Eric Miao wrote:
-> On Tue, Apr 27, 2010 at 5:03 AM, Daniel Mack <daniel@caiaq.de> wrote:
-> > Ping?
-> >
-> 
-> Mind if I put it to the queue of the next merge window?
+This series reorganizes the ux500 files to allow sharing of
+code between different SoCs in the Ux500 family, and adds
+basic support for U5500.
 
-No problem. Thanks!
+Rabin Vincent (14):
+  ux500: add SOC Kconfig variables
+  ux500: add per-SoC register definitions
+  ux500: allow choice of the DEBUG_LL UART
+  ux500: move irq and common maps to cpu.c
+  ux500: move gpio macros to common header
+  ux500: put common devices into devices.c
+  ux500: put DB8500-specific devices in devices-db8500.c
+  ux500: move UART devices to devices.c
+  ux500: reorganize i2c devices
+  ux500: move gpio devices to devices-db8500.c
+  ux500: move sys_timer to cpu.c
+  ux500: use UX500_* macros instead of U8500_*
+  ux500: rename cpu-u8500.c to cpu-db8500.c
+  ux500: add U5500 support
 
-Daniel
+ arch/arm/mach-ux500/Kconfig                    |   40 ++++-
+ arch/arm/mach-ux500/Makefile                   |    6 +-
+ arch/arm/mach-ux500/board-mop500.c             |  116 +++-----------
+ arch/arm/mach-ux500/board-u5500.c              |   41 +++++
+ arch/arm/mach-ux500/clock.c                    |    4 +
+ arch/arm/mach-ux500/cpu-db5500.c               |   50 ++++++
+ arch/arm/mach-ux500/cpu-db8500.c               |   78 +++++++++
+ arch/arm/mach-ux500/cpu-u8500.c                |  202 ------------------------
+ arch/arm/mach-ux500/cpu.c                      |   99 ++++++++++++
+ arch/arm/mach-ux500/devices-db5500.c           |   46 ++++++
+ arch/arm/mach-ux500/devices-db8500.c           |  107 +++++++++++++
+ arch/arm/mach-ux500/devices.c                  |   88 ++++++++++
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |  103 ++++++++++++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |  135 ++++++++++++++++
+ arch/arm/mach-ux500/include/mach/debug-macro.S |   12 ++-
+ arch/arm/mach-ux500/include/mach/devices.h     |   29 ++++
+ arch/arm/mach-ux500/include/mach/entry-macro.S |    2 +-
+ arch/arm/mach-ux500/include/mach/gpio.h        |   38 +++++
+ arch/arm/mach-ux500/include/mach/hardware.h    |  196 ++++++++++--------------
+ arch/arm/mach-ux500/include/mach/irqs.h        |    1 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   23 +++-
+ arch/arm/mach-ux500/platsmp.c                  |   10 +-
+ 22 files changed, 991 insertions(+), 435 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-u5500.c
+ create mode 100644 arch/arm/mach-ux500/cpu-db5500.c
+ create mode 100644 arch/arm/mach-ux500/cpu-db8500.c
+ delete mode 100644 arch/arm/mach-ux500/cpu-u8500.c
+ create mode 100644 arch/arm/mach-ux500/cpu.c
+ create mode 100644 arch/arm/mach-ux500/devices-db5500.c
+ create mode 100644 arch/arm/mach-ux500/devices-db8500.c
+ create mode 100644 arch/arm/mach-ux500/devices.c
+ create mode 100644 arch/arm/mach-ux500/include/mach/db5500-regs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/db8500-regs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/devices.h
