@@ -1,129 +1,91 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Tue, 27 Apr 2010 08:24:19 -0700
-Subject: [PATCHv8 2.6.34-rc5 4/5] mxc: Add generic USB HW initialization
-	for MX51
-In-Reply-To: <20100426210202.GW30801@buzzloop.caiaq.de>
-References: <1271998277-3949-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271998277-3949-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271998277-3949-3-git-send-email-Dinh.Nguyen@freescale.com>
-	<1271998277-3949-4-git-send-email-Dinh.Nguyen@freescale.com>
-	<20100426210202.GW30801@buzzloop.caiaq.de>
-Message-ID: <86A0E76937111F4C92FABEC0A209885104796838@az33exm21>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 27 Apr 2010 10:18:43 -0500
+Subject: [PATCHv9 2.6.34-rc5 1/5] mxc: Update GPIO for USB support on
+	Freescale MX51 Babbage HW
+Message-ID: <1272381527-30354-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-I appreciate your feedback. With PATCHv8 2.6.34-rc5 3/5, I did indeed
-test that we needed to move mxc_initialize_usb_hw before setting the
-USBMODE as the reset and restart would clear out the UBSMODE. 
+This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+patch updates the iomux pins for USB, and gpio line for reset the
+USB hub on the MX51 Babbage HW.
 
-With PATCHv9, I tested mxc_initialize_usb_hw to see if we really need to
-reset and restart the USB  core, and found that we do not. It must have
-been from earlier cores that we may have needed to do that. So with
-PATCHv9, I kept the call to mxc_initialize_usb_hw in the same place as
-the previous call to usb_control, and remove the reset/restart in
-mxc_initialize_usb_hw().
+NOTE: This 5-patch series for enabling USB is functionally dependent
+on this patch:
+"mx5: Add registration of GPIOs for MX51 Babbage board"
 
-I have tested this on my MX51 Babbage board.
+This patch applies to 2.6.34-rc5.
 
-Thanks,
-Dinh 
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |   33 ++++++++++++++++----------
+ 1 files changed, 20 insertions(+), 13 deletions(-)
 
------Original Message-----
-From: Daniel Mack [mailto:daniel at caiaq.de] 
-Sent: Monday, April 26, 2010 4:02 PM
-To: Nguyen Dinh-R00091
-Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-linux at arm.linux.org.uk; s.hauer at pengutronix.de;
-valentin.longchamp at epfl.ch; grant.likely at secretlab.ca;
-bryan.wu at canonical.com; amit.kucheria at canonical.com; Li Jun-R65092;
-Zhang Lily-R58066
-Subject: Re: [PATCHv8 2.6.34-rc5 4/5] mxc: Add generic USB HW
-initialization for MX51
-
-On Thu, Apr 22, 2010 at 11:51:16PM -0500, Dinh.Nguyen at freescale.com
-wrote:
-
-[...]
-
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h 
-> b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> index 4b9b836..7fc5f99 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> @@ -25,6 +25,18 @@
->  #define MXC_EHCI_INTERNAL_PHY		(1 << 7)
->  #define MXC_EHCI_IPPUE_DOWN		(1 << 8)
->  #define MXC_EHCI_IPPUE_UP		(1 << 9)
-> +#define MXC_EHCI_WAKEUP_ENABLED	(1 << 10)
-> +#define MXC_EHCI_ITC_NO_THRESHOLD	(1 << 11)
-> +
-> +#define MXC_USBCTRL_OFFSET		0
-> +#define MXC_USB_PHY_CTR_FUNC_OFFSET	0x8
-> +#define MXC_USB_PHY_CTR_FUNC2_OFFSET	0xc
-> +
-> +#define MX5_USBOTHER_REGS_OFFSET	0x800
-> +
-> +/* USB_PHY_CTRL_FUNC2*/
-> +#define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
-> +#define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
->  
->  struct mxc_usbh_platform_data {
->  	int (*init)(struct platform_device *pdev); @@ -35,7 +47,7 @@
-struct 
-> mxc_usbh_platform_data {
->  	struct otg_transceiver	*otg;
->  };
->  
-> -int mxc_set_usbcontrol(int port, unsigned int flags);
-> +int mxc_initialize_usb_hw(int port, unsigned int flags);
->  
->  #endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
->  
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-
-> index ead59f4..bb8d092 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -191,6 +191,11 @@ static int ehci_mxc_drv_probe(struct
-platform_device *pdev)
->  		clk_enable(priv->ahbclk);
->  	}
->  
-> +	/* setup specific usb hw */
-> +	ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-> +	if (ret < 0)
-> +		goto err_init;
-> +
->  	/* set USBMODE to host mode */
->  	temp = readl(hcd->regs + USBMODE_OFFSET);
->  	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET); @@ 
-> -199,11 +204,6 @@ static int ehci_mxc_drv_probe(struct platform_device
-*pdev)
->  	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
->  	mdelay(10);
->  
-> -	/* setup USBCONTROL. */
-> -	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
-> -	if (ret < 0)
-> -		goto err_init;
-> -
->  	/* Initialize the transceiver */
->  	if (pdata->otg) {
->  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
-
-I think there's still one concern left for the move of this function
-block, right? Dinh, is this actually necessary? Could you try calling
-mxc_initialize_usb_hw() from the location where mxc_set_usbcontrol() was
-used to be called? Or is there anything I overlook?
-
-This might look like nit-picking to you, but as Sascha explained, there
-is a certain risk of breaking functionality for existing boards, and if
-we can avoid that, we should.
-
-Meanwhile, I prepared a patch to clean up plat-mxc/ehci.c. I'll send it
-out once this series is accepted.
-
-Thanks,
-Daniel
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b4f975e..80528cc 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -37,6 +38,11 @@ typedef enum iomux_config {
+ 				PAD_CTL_SRE_FAST)
+ #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+ 				PAD_CTL_SRE_FAST)
++#define MX51_USBH1_PAD_CTRL	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
++				PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
++				PAD_CTL_PKE | PAD_CTL_HYS)
++#define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
++				PAD_CTL_SRE_FAST)
+ 
+ /*
+  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+@@ -208,18 +214,19 @@ typedef enum iomux_config {
+ #define MX51_PAD_KEY_COL3__KEY_COL3	IOMUX_PAD(0x658, 0x268, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_KEY_COL4__KEY_COL4	IOMUX_PAD(0x65C, 0x26C, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_KEY_COL5__KEY_COL5	IOMUX_PAD(0x660, 0x270, 0, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_25__USBH1_CLK	IOMUX_PAD(0x678, 0x278, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_26__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_27__USBH1_STP	IOMUX_PAD(0x680, 0x280, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_28__USBH1_NXT	IOMUX_PAD(0x684, 0x284, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_11__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_12__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_13__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_14__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_15__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_16__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_17__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, 2, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_18__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, 2, 0x0, 0, NO_PAD_CTRL)
++#define MX51_PAD_USBH1_CLK__USBH1_CLK	IOMUX_PAD(0x678, 0x278, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DIR__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_STP__USBH1_STP	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_STP__GPIO_1_27	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_GPIO, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_NXT__USBH1_NXT	IOMUX_PAD(0x684, 0x284, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA0__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA1__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA2__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA3__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA4__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA5__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA6__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
++#define MX51_PAD_USBH1_DATA7__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+ #define MX51_PAD_GPIO_3_0__DI1_PIN11	IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_3_1__DI1_PIN12	IOMUX_PAD(0x6AC, 0x2AC, 4, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_3_2__DI1_PIN13	IOMUX_PAD(0x6B0, 0x2B0, 4, 0x0, 0, NO_PAD_CTRL)
+@@ -299,7 +306,7 @@ typedef enum iomux_config {
+ #define MX51_PAD_GPIO_1_4__GPIO1_4	IOMUX_PAD(0x804, 0x3D8, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_5__GPIO1_5	IOMUX_PAD(0x808, 0x3DC, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_6__GPIO1_6	IOMUX_PAD(0x80C, 0x3E0, 0, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, NO_PAD_CTRL)
++#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, MX51_GPIO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_8__GPIO1_8	IOMUX_PAD(0x814, 0x3E8, 0, 0x0, 1, \
+ 						(PAD_CTL_SRE_SLOW | PAD_CTL_DSE_MED | PAD_CTL_PUS_100K_UP |  PAD_CTL_HYS))
+ #define MX51_PAD_GPIO_1_9__GPIO1_9	IOMUX_PAD(0x818, 0x3EC, 0, 0x0, 0, NO_PAD_CTRL)
+-- 
+1.6.0.4
