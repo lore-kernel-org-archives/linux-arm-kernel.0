@@ -1,33 +1,52 @@
-From: hunterd42@gmail.com (David Hunter)
-Date: Mon, 26 Apr 2010 19:46:09 -0700
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 27 Apr 2010 11:16:44 +0800
 Subject: [PATCH] pxa: Remove unused MFP LPM definition
-Message-ID: <4BD64FF1.2090007@gmail.com>
+In-Reply-To: <4BD64FF1.2090007@gmail.com>
+References: <4BD64FF1.2090007@gmail.com>
+Message-ID: <s2yf17812d71004262016xb120ea1j2d0d7dd14ebd3d28@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MFP_LPM_INPUT snuck in some time ago as part of "[PATCH] pxa: better
-MFP low power state support for pxa25x/pxa27x", but went unused in the
-final revision of said patch. Using it on PXA3xx would cause an
-out-of-bounds access of mfpr_table[]. Let's remove it before someone
-gets hurt.
+On Tue, Apr 27, 2010 at 10:46 AM, David Hunter <hunterd42@gmail.com> wrote:
+> MFP_LPM_INPUT snuck in some time ago as part of "[PATCH] pxa: better
+> MFP low power state support for pxa25x/pxa27x", but went unused in the
+> final revision of said patch. Using it on PXA3xx would cause an
+> out-of-bounds access of mfpr_table[]. Let's remove it before someone
+> gets hurt.
+>
 
-Signed-off-by: David Hunter <hunterd42@gmail.com>
----
-  arch/arm/plat-pxa/include/plat/mfp.h |    1 -
-  1 files changed, 0 insertions(+), 1 deletions(-)
+Instead of removing this potentially useful low power mode pin status, what
+about the following patch:
 
-diff --git a/arch/arm/plat-pxa/include/plat/mfp.h 
-b/arch/arm/plat-pxa/include/plat/mfp.h
-index 857a683..c5d24e9 100644
---- a/arch/arm/plat-pxa/include/plat/mfp.h
-+++ b/arch/arm/plat-pxa/include/plat/mfp.h
-@@ -378,7 +378,6 @@ typedef unsigned long mfp_cfg_t;
-  #define MFP_LPM_PULL_LOW       (0x3 << 16)
-  #define MFP_LPM_PULL_HIGH      (0x4 << 16)
-  #define MFP_LPM_FLOAT          (0x5 << 16)
--#define MFP_LPM_INPUT          (0x6 << 16)
-  #define MFP_LPM_STATE_MASK     (0x7 << 16)
-  #define MFP_LPM_STATE(x)       (((x) >> 16) & 0x7)
+commit f5d406d50f924c82ddf469f120fa420f0499d901
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Tue Apr 27 11:14:24 2010 +0800
 
---
-1.6.0.3
+    [ARM] pxa: allow MFP_LPM_INPUT to be explicitly specified
+
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index e5b7921..1d1419b 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -81,6 +81,7 @@ static int __mfp_config_gpio(unsigned gpio, unsigned long c)
+ 		PGSR(bank) &= ~mask;
+ 		is_out = 1;
+ 		break;
++	case MFP_LPM_INPUT:
+ 	case MFP_LPM_DEFAULT:
+ 		break;
+ 	default:
+diff --git a/arch/arm/plat-pxa/mfp.c b/arch/arm/plat-pxa/mfp.c
+index be58f9f..b77e018 100644
+--- a/arch/arm/plat-pxa/mfp.c
++++ b/arch/arm/plat-pxa/mfp.c
+@@ -110,6 +110,7 @@ static const unsigned long mfpr_lpm[] = {
+ 	MFPR_LPM_PULL_LOW,
+ 	MFPR_LPM_PULL_HIGH,
+ 	MFPR_LPM_FLOAT,
++	MFPR_LPM_INPUT,
+ };
+
+ /* mapping of MFP_PULL_* definitions to MFPR_PULL_* register bits */
