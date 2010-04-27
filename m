@@ -1,1509 +1,455 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 27 Apr 2010 15:25:44 +0800
-Subject: [PATCH 2/3] input: remove obsolete {corgi,spitz,tosa}kbd.c
-Message-ID: <m2mf17812d71004270025xc4ced0a8y188c525184304dec@mail.gmail.com>
+Date: Tue, 27 Apr 2010 15:26:27 +0800
+Subject: [PATCH 3/3] pxa: remove pxa_gpio_mode() and files
+Message-ID: <l2kf17812d71004270026ubd8b77aide4cae5d7ae80f3d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 856661df1bfb7c90bc83fa97d8f98fc4740fca9d
+commit 661c3f058f56cbbf22444198c7ef2e1d1e89234f
 Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Tue Apr 27 14:50:54 2010 +0800
+Date:   Tue Apr 27 15:09:33 2010 +0800
 
-    input: remove obsolete {corgi,spitz,tosa}kbd.c
+    [ARM] pxa: remove pxa_gpio_mode() and files
 
     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-index a74ee12..a829338 100644
---- a/drivers/input/keyboard/Kconfig
-+++ b/drivers/input/keyboard/Kconfig
-@@ -143,19 +143,6 @@ config KEYBOARD_BFIN
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called bf54x-keys.
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 3126a35..baabb3c 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -28,7 +28,6 @@
 
--config KEYBOARD_CORGI
--	tristate "Corgi keyboard (deprecated)"
--	depends on PXA_SHARPSL
--	help
--	  Say Y here to enable the keyboard on the Sharp Zaurus SL-C7xx
--	  series of PDAs.
--
--	  This driver is now deprecated, use generic GPIO based matrix
--	  keyboard driver instead.
--
--	  To compile this driver as a module, choose M here: the
--	  module will be called corgikbd.
--
- config KEYBOARD_LKKBD
- 	tristate "DECstation/VAXstation LK201/LK401 keyboard"
- 	select SERIO
-@@ -339,19 +326,6 @@ config KEYBOARD_PXA930_ROTARY
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called pxa930_rotary.
-
--config KEYBOARD_SPITZ
--	tristate "Spitz keyboard (deprecated)"
--	depends on PXA_SHARPSL
--	help
--	  Say Y here to enable the keyboard on the Sharp Zaurus SL-C1000,
--	  SL-C3000 and Sl-C3100 series of PDAs.
--
--	  This driver is now deprecated, use generic GPIO based matrix
--	  keyboard driver instead.
--
--	  To compile this driver as a module, choose M here: the
--	  module will be called spitzkbd.
--
- config KEYBOARD_STOWAWAY
- 	tristate "Stowaway keyboard"
- 	select SERIO
-@@ -414,18 +388,6 @@ config KEYBOARD_TWL4030
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called twl4030_keypad.
-
--config KEYBOARD_TOSA
--	tristate "Tosa keyboard (deprecated)"
--	depends on MACH_TOSA
--	help
--	  Say Y here to enable the keyboard on the Sharp Zaurus SL-6000x (Tosa)
--
--	  This driver is now deprecated, use generic GPIO based matrix
--	  keyboard driver instead.
--
--	  To compile this driver as a module, choose M here: the
--	  module will be called tosakbd.
--
- config KEYBOARD_XTKBD
- 	tristate "XT keyboard"
- 	select SERIO
-diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
-index 706c6b5..9a74127 100644
---- a/drivers/input/keyboard/Makefile
-+++ b/drivers/input/keyboard/Makefile
-@@ -11,7 +11,6 @@ obj-$(CONFIG_KEYBOARD_AMIGA)		+= amikbd.o
- obj-$(CONFIG_KEYBOARD_ATARI)		+= atakbd.o
- obj-$(CONFIG_KEYBOARD_ATKBD)		+= atkbd.o
- obj-$(CONFIG_KEYBOARD_BFIN)		+= bf54x-keys.o
--obj-$(CONFIG_KEYBOARD_CORGI)		+= corgikbd.o
- obj-$(CONFIG_KEYBOARD_DAVINCI)		+= davinci_keyscan.o
- obj-$(CONFIG_KEYBOARD_EP93XX)		+= ep93xx_keypad.o
- obj-$(CONFIG_KEYBOARD_GPIO)		+= gpio_keys.o
-@@ -33,10 +32,8 @@ obj-$(CONFIG_KEYBOARD_PXA27x)		+= pxa27x_keypad.o
- obj-$(CONFIG_KEYBOARD_PXA930_ROTARY)	+= pxa930_rotary.o
- obj-$(CONFIG_KEYBOARD_QT2160)		+= qt2160.o
- obj-$(CONFIG_KEYBOARD_SH_KEYSC)		+= sh_keysc.o
--obj-$(CONFIG_KEYBOARD_SPITZ)		+= spitzkbd.o
- obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
- obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
--obj-$(CONFIG_KEYBOARD_TOSA)		+= tosakbd.o
- obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
- obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
- obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
-diff --git a/drivers/input/keyboard/corgikbd.c
-b/drivers/input/keyboard/corgikbd.c
-deleted file mode 100644
-index 634af6a..0000000
---- a/drivers/input/keyboard/corgikbd.c
-+++ /dev/null
-@@ -1,414 +0,0 @@
--/*
-- *  Keyboard driver for Sharp Corgi models (SL-C7xx)
-- *
-- *  Copyright (c) 2004-2005 Richard Purdie
-- *
-- *  Based on xtkbd.c/locomkbd.c
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- *
-- */
--
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/init.h>
--#include <linux/input.h>
--#include <linux/interrupt.h>
--#include <linux/jiffies.h>
--#include <linux/module.h>
--#include <linux/slab.h>
--
--#include <mach/corgi.h>
+ #include <mach/reset.h>
+ #include <mach/gpio.h>
 -#include <mach/pxa2xx-gpio.h>
--#include <asm/hardware/scoop.h>
--
--#define KB_ROWS				8
--#define KB_COLS				12
--#define KB_ROWMASK(r)		(1 << (r))
--#define SCANCODE(r,c)		( ((r)<<4) + (c) + 1 )
--/* zero code, 124 scancodes */
--#define	NR_SCANCODES		( SCANCODE(KB_ROWS-1,KB_COLS-1) +1 +1 )
--
--#define SCAN_INTERVAL		(50) /* ms */
--#define HINGE_SCAN_INTERVAL	(250) /* ms */
--
--#define CORGI_KEY_CALENDER	KEY_F1
--#define CORGI_KEY_ADDRESS	KEY_F2
--#define CORGI_KEY_FN		KEY_F3
--#define CORGI_KEY_CANCEL	KEY_F4
--#define CORGI_KEY_OFF		KEY_SUSPEND
--#define CORGI_KEY_EXOK		KEY_F5
--#define CORGI_KEY_EXCANCEL	KEY_F6
--#define CORGI_KEY_EXJOGDOWN	KEY_F7
--#define CORGI_KEY_EXJOGUP	KEY_F8
--#define CORGI_KEY_JAP1		KEY_LEFTCTRL
--#define CORGI_KEY_JAP2		KEY_LEFTALT
--#define CORGI_KEY_MAIL		KEY_F10
--#define CORGI_KEY_OK		KEY_F11
--#define CORGI_KEY_MENU		KEY_F12
--
--static unsigned char corgikbd_keycode[NR_SCANCODES] = {
--	0,
-                                             /* 0 */
--	0, KEY_1, KEY_3, KEY_5, KEY_6, KEY_7, KEY_9, KEY_0, KEY_BACKSPACE,
-0, 0, 0, 0, 0, 0, 0, 	                      /* 1-16 */
--	0, KEY_2, KEY_4, KEY_R, KEY_Y, KEY_8, KEY_I, KEY_O, KEY_P, 0, 0, 0,
-0, 0, 0, 0,                                   /* 17-32 */
--	KEY_TAB, KEY_Q, KEY_E, KEY_T, KEY_G, KEY_U, KEY_J, KEY_K, 0, 0, 0,
-0, 0, 0, 0, 0,                                 /* 33-48 */
--	CORGI_KEY_CALENDER, KEY_W, KEY_S, KEY_F, KEY_V, KEY_H, KEY_M, KEY_L,
-0, KEY_RIGHTSHIFT, 0, 0, 0, 0, 0, 0,         /* 49-64 */
--	CORGI_KEY_ADDRESS, KEY_A, KEY_D, KEY_C, KEY_B, KEY_N, KEY_DOT, 0,
-KEY_ENTER, 0, KEY_LEFTSHIFT, 0, 0, 0, 0, 0, 	  /* 65-80 */
--	CORGI_KEY_MAIL, KEY_Z, KEY_X, KEY_MINUS, KEY_SPACE, KEY_COMMA, 0,
-KEY_UP, 0, 0, 0, CORGI_KEY_FN, 0, 0, 0, 0,            /* 81-96 */
--	KEY_SYSRQ, CORGI_KEY_JAP1, CORGI_KEY_JAP2, CORGI_KEY_CANCEL,
-CORGI_KEY_OK, CORGI_KEY_MENU, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, 0, 0,
-0, 0, 0, 0,  /* 97-112 */
--	CORGI_KEY_OFF, CORGI_KEY_EXOK, CORGI_KEY_EXCANCEL,
-CORGI_KEY_EXJOGDOWN, CORGI_KEY_EXJOGUP, 0, 0, 0, 0, 0, 0, 0,   /*
-113-124 */
--};
--
--
--struct corgikbd {
--	unsigned char keycode[ARRAY_SIZE(corgikbd_keycode)];
--	struct input_dev *input;
--
--	spinlock_t lock;
--	struct timer_list timer;
--	struct timer_list htimer;
--
--	unsigned int suspended;
--	unsigned long suspend_jiffies;
--};
--
--#define KB_DISCHARGE_DELAY	10
--#define KB_ACTIVATE_DELAY	10
--
--/* Helper functions for reading the keyboard matrix
-- * Note: We should really be using the generic gpio functions to alter
-- *       GPDR but it requires a function call per GPIO bit which is
-- *       excessive when we need to access 12 bits@once, multiple times.
-- * These functions must be called within local_irq_save()/local_irq_restore()
-- * or similar.
-- */
--static inline void corgikbd_discharge_all(void)
--{
--	/* STROBE All HiZ */
--	GPCR2  = CORGI_GPIO_ALL_STROBE_BIT;
--	GPDR2 &= ~CORGI_GPIO_ALL_STROBE_BIT;
--}
--
--static inline void corgikbd_activate_all(void)
--{
--	/* STROBE ALL -> High */
--	GPSR2  = CORGI_GPIO_ALL_STROBE_BIT;
--	GPDR2 |= CORGI_GPIO_ALL_STROBE_BIT;
--
--	udelay(KB_DISCHARGE_DELAY);
--
--	/* Clear any interrupts we may have triggered when altering the GPIO lines */
--	GEDR1 = CORGI_GPIO_HIGH_SENSE_BIT;
--	GEDR2 = CORGI_GPIO_LOW_SENSE_BIT;
--}
--
--static inline void corgikbd_activate_col(int col)
--{
--	/* STROBE col -> High, not col -> HiZ */
--	GPSR2 = CORGI_GPIO_STROBE_BIT(col);
--	GPDR2 = (GPDR2 & ~CORGI_GPIO_ALL_STROBE_BIT) | CORGI_GPIO_STROBE_BIT(col);
--}
--
--static inline void corgikbd_reset_col(int col)
--{
--	/* STROBE col -> Low */
--	GPCR2 = CORGI_GPIO_STROBE_BIT(col);
--	/* STROBE col -> out, not col -> HiZ */
--	GPDR2 = (GPDR2 & ~CORGI_GPIO_ALL_STROBE_BIT) | CORGI_GPIO_STROBE_BIT(col);
--}
--
--#define GET_ROWS_STATUS(c)	(((GPLR1 & CORGI_GPIO_HIGH_SENSE_BIT) >>
-CORGI_GPIO_HIGH_SENSE_RSHIFT) | ((GPLR2 & CORGI_GPIO_LOW_SENSE_BIT) <<
-CORGI_GPIO_LOW_SENSE_LSHIFT))
+
+ #include "generic.h"
+
+@@ -128,33 +127,3 @@ void __init pxa_map_io(void)
+ 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
+ 	get_clk_frequency_khz(1);
+ }
 -
 -/*
-- * The corgi keyboard only generates interrupts when a key is pressed.
-- * When a key is pressed, we enable a timer which then scans the
-- * keyboard to detect when the key is released.
+- * Configure pins for GPIO or other functions
 - */
--
--/* Scan the hardware keyboard and push any changes up through the
-input layer */
--static void corgikbd_scankeyboard(struct corgikbd *corgikbd_data)
+-int pxa_gpio_mode(int gpio_mode)
 -{
--	unsigned int row, col, rowd;
 -	unsigned long flags;
--	unsigned int num_pressed;
+-	int gpio = gpio_mode & GPIO_MD_MASK_NR;
+-	int fn = (gpio_mode & GPIO_MD_MASK_FN) >> 8;
+-	int gafr;
 -
--	if (corgikbd_data->suspended)
--		return;
+-	if (gpio > pxa_last_gpio)
+-		return -EINVAL;
 -
--	spin_lock_irqsave(&corgikbd_data->lock, flags);
--
--	num_pressed = 0;
--	for (col = 0; col < KB_COLS; col++) {
--		/*
--		 * Discharge the output driver capacitatance
--		 * in the keyboard matrix. (Yes it is significant..)
--		 */
--
--		corgikbd_discharge_all();
--		udelay(KB_DISCHARGE_DELAY);
--
--		corgikbd_activate_col(col);
--		udelay(KB_ACTIVATE_DELAY);
--
--		rowd = GET_ROWS_STATUS(col);
--		for (row = 0; row < KB_ROWS; row++) {
--			unsigned int scancode, pressed;
--
--			scancode = SCANCODE(row, col);
--			pressed = rowd & KB_ROWMASK(row);
--
--			input_report_key(corgikbd_data->input,
-corgikbd_data->keycode[scancode], pressed);
--
--			if (pressed)
--				num_pressed++;
--
--			if (pressed && (corgikbd_data->keycode[scancode] == CORGI_KEY_OFF)
--					&& time_after(jiffies, corgikbd_data->suspend_jiffies + HZ)) {
--				input_event(corgikbd_data->input, EV_PWR, CORGI_KEY_OFF, 1);
--				corgikbd_data->suspend_jiffies=jiffies;
--			}
--		}
--		corgikbd_reset_col(col);
--	}
--
--	corgikbd_activate_all();
--
--	input_sync(corgikbd_data->input);
--
--	/* if any keys are pressed, enable the timer */
--	if (num_pressed)
--		mod_timer(&corgikbd_data->timer, jiffies + msecs_to_jiffies(SCAN_INTERVAL));
--
--	spin_unlock_irqrestore(&corgikbd_data->lock, flags);
--}
--
--/*
-- * corgi keyboard interrupt handler.
-- */
--static irqreturn_t corgikbd_interrupt(int irq, void *dev_id)
--{
--	struct corgikbd *corgikbd_data = dev_id;
--
--	if (!timer_pending(&corgikbd_data->timer)) {
--		/** wait chattering delay **/
--		udelay(20);
--		corgikbd_scankeyboard(corgikbd_data);
--	}
--
--	return IRQ_HANDLED;
--}
--
--/*
-- * corgi timer checking for released keys
-- */
--static void corgikbd_timer_callback(unsigned long data)
--{
--	struct corgikbd *corgikbd_data = (struct corgikbd *) data;
--	corgikbd_scankeyboard(corgikbd_data);
--}
--
--/*
-- * The hinge switches generate no interrupt so they need to be
-- * monitored by a timer.
-- *
-- * We debounce the switches and pass them to the input system.
-- *
-- *  gprr == 0x00 - Keyboard with Landscape Screen
-- *          0x08 - No Keyboard with Portrait Screen
-- *          0x0c - Keyboard and Screen Closed
-- */
--
--#define READ_GPIO_BIT(x)    (GPLR(x) & GPIO_bit(x))
--#define HINGE_STABLE_COUNT 2
--static int sharpsl_hinge_state;
--static int hinge_count;
--
--static void corgikbd_hinge_timer(unsigned long data)
--{
--	struct corgikbd *corgikbd_data = (struct corgikbd *) data;
--	unsigned long gprr;
--	unsigned long flags;
--
--	gprr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_GPRR) &
-(CORGI_SCP_SWA | CORGI_SCP_SWB);
--	gprr |= (READ_GPIO_BIT(CORGI_GPIO_AK_INT) != 0);
--	if (gprr != sharpsl_hinge_state) {
--		hinge_count = 0;
--		sharpsl_hinge_state = gprr;
--	} else if (hinge_count < HINGE_STABLE_COUNT) {
--		hinge_count++;
--		if (hinge_count >= HINGE_STABLE_COUNT) {
--			spin_lock_irqsave(&corgikbd_data->lock, flags);
--
--			input_report_switch(corgikbd_data->input, SW_LID,
-((sharpsl_hinge_state & CORGI_SCP_SWA) != 0));
--			input_report_switch(corgikbd_data->input, SW_TABLET_MODE,
-((sharpsl_hinge_state & CORGI_SCP_SWB) != 0));
--			input_report_switch(corgikbd_data->input, SW_HEADPHONE_INSERT,
-(READ_GPIO_BIT(CORGI_GPIO_AK_INT) != 0));
--			input_sync(corgikbd_data->input);
--
--			spin_unlock_irqrestore(&corgikbd_data->lock, flags);
--		}
--	}
--	mod_timer(&corgikbd_data->htimer, jiffies +
-msecs_to_jiffies(HINGE_SCAN_INTERVAL));
--}
--
--#ifdef CONFIG_PM
--static int corgikbd_suspend(struct platform_device *dev, pm_message_t state)
--{
--	int i;
--	struct corgikbd *corgikbd = platform_get_drvdata(dev);
--
--	corgikbd->suspended = 1;
--	/* strobe 0 is the power key so this can't be made an input for
--	   powersaving therefore i = 1 */
--	for (i = 1; i < CORGI_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(CORGI_GPIO_KEY_STROBE(i) | GPIO_IN);
+-	local_irq_save(flags);
+-	if (gpio_mode & GPIO_DFLT_LOW)
+-		GPCR(gpio) = GPIO_bit(gpio);
+-	else if (gpio_mode & GPIO_DFLT_HIGH)
+-		GPSR(gpio) = GPIO_bit(gpio);
+-	if (gpio_mode & GPIO_MD_MASK_DIR)
+-		GPDR(gpio) |= GPIO_bit(gpio);
+-	else
+-		GPDR(gpio) &= ~GPIO_bit(gpio);
+-	gafr = GAFR(gpio) & ~(0x3 << (((gpio) & 0xf)*2));
+-	GAFR(gpio) = gafr |  (fn  << (((gpio) & 0xf)*2));
+-	local_irq_restore(flags);
 -
 -	return 0;
 -}
--
--static int corgikbd_resume(struct platform_device *dev)
--{
--	int i;
--	struct corgikbd *corgikbd = platform_get_drvdata(dev);
--
--	for (i = 1; i < CORGI_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(CORGI_GPIO_KEY_STROBE(i) | GPIO_OUT | GPIO_DFLT_HIGH);
--
--	/* Upon resume, ignore the suspend key for a short while */
--	corgikbd->suspend_jiffies=jiffies;
--	corgikbd->suspended = 0;
--
--	return 0;
--}
--#else
--#define corgikbd_suspend	NULL
--#define corgikbd_resume		NULL
--#endif
--
--static int __devinit corgikbd_probe(struct platform_device *pdev)
--{
--	struct corgikbd *corgikbd;
--	struct input_dev *input_dev;
--	int i, err = -ENOMEM;
--
--	corgikbd = kzalloc(sizeof(struct corgikbd), GFP_KERNEL);
--	input_dev = input_allocate_device();
--	if (!corgikbd || !input_dev)
--		goto fail;
--
--	platform_set_drvdata(pdev, corgikbd);
--
--	corgikbd->input = input_dev;
--	spin_lock_init(&corgikbd->lock);
--
--	/* Init Keyboard rescan timer */
--	init_timer(&corgikbd->timer);
--	corgikbd->timer.function = corgikbd_timer_callback;
--	corgikbd->timer.data = (unsigned long) corgikbd;
--
--	/* Init Hinge Timer */
--	init_timer(&corgikbd->htimer);
--	corgikbd->htimer.function = corgikbd_hinge_timer;
--	corgikbd->htimer.data = (unsigned long) corgikbd;
--
--	corgikbd->suspend_jiffies=jiffies;
--
--	memcpy(corgikbd->keycode, corgikbd_keycode, sizeof(corgikbd->keycode));
--
--	input_dev->name = "Corgi Keyboard";
--	input_dev->phys = "corgikbd/input0";
--	input_dev->id.bustype = BUS_HOST;
--	input_dev->id.vendor = 0x0001;
--	input_dev->id.product = 0x0001;
--	input_dev->id.version = 0x0100;
--	input_dev->dev.parent = &pdev->dev;
--
--	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REP) |
--		BIT_MASK(EV_PWR) | BIT_MASK(EV_SW);
--	input_dev->keycode = corgikbd->keycode;
--	input_dev->keycodesize = sizeof(unsigned char);
--	input_dev->keycodemax = ARRAY_SIZE(corgikbd_keycode);
--
--	for (i = 0; i < ARRAY_SIZE(corgikbd_keycode); i++)
--		set_bit(corgikbd->keycode[i], input_dev->keybit);
--	clear_bit(0, input_dev->keybit);
--	set_bit(SW_LID, input_dev->swbit);
--	set_bit(SW_TABLET_MODE, input_dev->swbit);
--	set_bit(SW_HEADPHONE_INSERT, input_dev->swbit);
--
--	err = input_register_device(corgikbd->input);
--	if (err)
--		goto fail;
--
--	mod_timer(&corgikbd->htimer, jiffies + msecs_to_jiffies(HINGE_SCAN_INTERVAL));
--
--	/* Setup sense interrupts - RisingEdge Detect, sense lines as inputs */
--	for (i = 0; i < CORGI_KEY_SENSE_NUM; i++) {
--		pxa_gpio_mode(CORGI_GPIO_KEY_SENSE(i) | GPIO_IN);
--		if (request_irq(CORGI_IRQ_GPIO_KEY_SENSE(i), corgikbd_interrupt,
--				IRQF_DISABLED | IRQF_TRIGGER_RISING,
--				"corgikbd", corgikbd))
--			printk(KERN_WARNING "corgikbd: Can't get IRQ: %d!\n", i);
--	}
--
--	/* Set Strobe lines as outputs - set high */
--	for (i = 0; i < CORGI_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(CORGI_GPIO_KEY_STROBE(i) | GPIO_OUT | GPIO_DFLT_HIGH);
--
--	/* Setup the headphone jack as an input */
--	pxa_gpio_mode(CORGI_GPIO_AK_INT | GPIO_IN);
--
--	return 0;
--
-- fail:	input_free_device(input_dev);
--	kfree(corgikbd);
--	return err;
--}
--
--static int __devexit corgikbd_remove(struct platform_device *pdev)
--{
--	int i;
--	struct corgikbd *corgikbd = platform_get_drvdata(pdev);
--
--	for (i = 0; i < CORGI_KEY_SENSE_NUM; i++)
--		free_irq(CORGI_IRQ_GPIO_KEY_SENSE(i), corgikbd);
--
--	del_timer_sync(&corgikbd->htimer);
--	del_timer_sync(&corgikbd->timer);
--
--	input_unregister_device(corgikbd->input);
--
--	kfree(corgikbd);
--
--	return 0;
--}
--
--static struct platform_driver corgikbd_driver = {
--	.probe		= corgikbd_probe,
--	.remove		= __devexit_p(corgikbd_remove),
--	.suspend	= corgikbd_suspend,
--	.resume		= corgikbd_resume,
--	.driver		= {
--		.name	= "corgi-keyboard",
--		.owner	= THIS_MODULE,
--	},
--};
--
--static int __init corgikbd_init(void)
--{
--	return platform_driver_register(&corgikbd_driver);
--}
--
--static void __exit corgikbd_exit(void)
--{
--	platform_driver_unregister(&corgikbd_driver);
--}
--
--module_init(corgikbd_init);
--module_exit(corgikbd_exit);
--
--MODULE_AUTHOR("Richard Purdie <rpurdie@rpsys.net>");
--MODULE_DESCRIPTION("Corgi Keyboard Driver");
--MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:corgi-keyboard");
-diff --git a/drivers/input/keyboard/spitzkbd.c
-b/drivers/input/keyboard/spitzkbd.c
+-EXPORT_SYMBOL(pxa_gpio_mode);
+diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-gpio.h
+b/arch/arm/mach-pxa/include/mach/pxa2xx-gpio.h
 deleted file mode 100644
-index 1396742..0000000
---- a/drivers/input/keyboard/spitzkbd.c
+index 1209c44..0000000
+--- a/arch/arm/mach-pxa/include/mach/pxa2xx-gpio.h
 +++ /dev/null
-@@ -1,496 +0,0 @@
--/*
-- *  Keyboard driver for Sharp Spitz, Borzoi and Akita (SL-Cxx00 series)
-- *
-- *  Copyright (c) 2005 Richard Purdie
-- *
-- *  Based on corgikbd.c
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- *
-- */
--
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/init.h>
--#include <linux/input.h>
--#include <linux/interrupt.h>
--#include <linux/jiffies.h>
--#include <linux/module.h>
--#include <linux/slab.h>
--
--#include <mach/spitz.h>
--#include <mach/pxa2xx-gpio.h>
--
--#define KB_ROWS			7
--#define KB_COLS			11
--#define KB_ROWMASK(r)		(1 << (r))
--#define SCANCODE(r,c)		(((r)<<4) + (c) + 1)
--#define	NR_SCANCODES		((KB_ROWS<<4) + 1)
--
--#define SCAN_INTERVAL		(50) /* ms */
--#define HINGE_SCAN_INTERVAL	(150) /* ms */
--
--#define SPITZ_KEY_CALENDER	KEY_F1
--#define SPITZ_KEY_ADDRESS	KEY_F2
--#define SPITZ_KEY_FN		KEY_F3
--#define SPITZ_KEY_CANCEL	KEY_F4
--#define SPITZ_KEY_EXOK		KEY_F5
--#define SPITZ_KEY_EXCANCEL	KEY_F6
--#define SPITZ_KEY_EXJOGDOWN	KEY_F7
--#define SPITZ_KEY_EXJOGUP	KEY_F8
--#define SPITZ_KEY_JAP1		KEY_LEFTALT
--#define SPITZ_KEY_JAP2		KEY_RIGHTCTRL
--#define SPITZ_KEY_SYNC		KEY_F9
--#define SPITZ_KEY_MAIL		KEY_F10
--#define SPITZ_KEY_OK		KEY_F11
--#define SPITZ_KEY_MENU		KEY_F12
--
--static unsigned char spitzkbd_keycode[NR_SCANCODES] = {
--	0,
-                                             /* 0 */
--	KEY_LEFTCTRL, KEY_1, KEY_3, KEY_5, KEY_6, KEY_7, KEY_9, KEY_0,
-KEY_BACKSPACE, SPITZ_KEY_EXOK, SPITZ_KEY_EXCANCEL, 0, 0, 0, 0, 0,  /*
-1-16 */
--	0, KEY_2, KEY_4, KEY_R, KEY_Y, KEY_8, KEY_I, KEY_O, KEY_P,
-SPITZ_KEY_EXJOGDOWN, SPITZ_KEY_EXJOGUP, 0, 0, 0, 0, 0, /* 17-32 */
--	KEY_TAB, KEY_Q, KEY_E, KEY_T, KEY_G, KEY_U, KEY_J, KEY_K, 0, 0, 0,
-0, 0, 0, 0, 0,                                 /* 33-48 */
--	SPITZ_KEY_ADDRESS, KEY_W, KEY_S, KEY_F, KEY_V, KEY_H, KEY_M, KEY_L,
-0, KEY_RIGHTSHIFT, 0, 0, 0, 0, 0, 0,         /* 49-64 */
--	SPITZ_KEY_CALENDER, KEY_A, KEY_D, KEY_C, KEY_B, KEY_N, KEY_DOT, 0,
-KEY_ENTER, KEY_LEFTSHIFT, 0, 0, 0, 0, 0, 0,	  /* 65-80 */
--	SPITZ_KEY_MAIL, KEY_Z, KEY_X, KEY_MINUS, KEY_SPACE, KEY_COMMA, 0,
-KEY_UP, 0, 0, SPITZ_KEY_FN, 0, 0, 0, 0, 0,      /* 81-96 */
--	KEY_SYSRQ, SPITZ_KEY_JAP1, SPITZ_KEY_JAP2, SPITZ_KEY_CANCEL,
-SPITZ_KEY_OK, SPITZ_KEY_MENU, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, 0, 0,
-0, 0, 0, 0  /* 97-112 */
--};
--
--static int spitz_strobes[] = {
--	SPITZ_GPIO_KEY_STROBE0,
--	SPITZ_GPIO_KEY_STROBE1,
--	SPITZ_GPIO_KEY_STROBE2,
--	SPITZ_GPIO_KEY_STROBE3,
--	SPITZ_GPIO_KEY_STROBE4,
--	SPITZ_GPIO_KEY_STROBE5,
--	SPITZ_GPIO_KEY_STROBE6,
--	SPITZ_GPIO_KEY_STROBE7,
--	SPITZ_GPIO_KEY_STROBE8,
--	SPITZ_GPIO_KEY_STROBE9,
--	SPITZ_GPIO_KEY_STROBE10,
--};
--
--static int spitz_senses[] = {
--	SPITZ_GPIO_KEY_SENSE0,
--	SPITZ_GPIO_KEY_SENSE1,
--	SPITZ_GPIO_KEY_SENSE2,
--	SPITZ_GPIO_KEY_SENSE3,
--	SPITZ_GPIO_KEY_SENSE4,
--	SPITZ_GPIO_KEY_SENSE5,
--	SPITZ_GPIO_KEY_SENSE6,
--};
--
--struct spitzkbd {
--	unsigned char keycode[ARRAY_SIZE(spitzkbd_keycode)];
--	struct input_dev *input;
--	char phys[32];
--
--	spinlock_t lock;
--	struct timer_list timer;
--	struct timer_list htimer;
--
--	unsigned int suspended;
--	unsigned long suspend_jiffies;
--};
--
--#define KB_DISCHARGE_DELAY	10
--#define KB_ACTIVATE_DELAY	10
--
--/* Helper functions for reading the keyboard matrix
-- * Note: We should really be using the generic gpio functions to alter
-- *       GPDR but it requires a function call per GPIO bit which is
-- *       excessive when we need to access 11 bits@once, multiple times.
-- * These functions must be called within local_irq_save()/local_irq_restore()
-- * or similar.
-- */
--static inline void spitzkbd_discharge_all(void)
--{
--	/* STROBE All HiZ */
--	GPCR0  =  SPITZ_GPIO_G0_STROBE_BIT;
--	GPDR0 &= ~SPITZ_GPIO_G0_STROBE_BIT;
--	GPCR1  =  SPITZ_GPIO_G1_STROBE_BIT;
--	GPDR1 &= ~SPITZ_GPIO_G1_STROBE_BIT;
--	GPCR2  =  SPITZ_GPIO_G2_STROBE_BIT;
--	GPDR2 &= ~SPITZ_GPIO_G2_STROBE_BIT;
--	GPCR3  =  SPITZ_GPIO_G3_STROBE_BIT;
--	GPDR3 &= ~SPITZ_GPIO_G3_STROBE_BIT;
--}
--
--static inline void spitzkbd_activate_all(void)
--{
--	/* STROBE ALL -> High */
--	GPSR0  =  SPITZ_GPIO_G0_STROBE_BIT;
--	GPDR0 |=  SPITZ_GPIO_G0_STROBE_BIT;
--	GPSR1  =  SPITZ_GPIO_G1_STROBE_BIT;
--	GPDR1 |=  SPITZ_GPIO_G1_STROBE_BIT;
--	GPSR2  =  SPITZ_GPIO_G2_STROBE_BIT;
--	GPDR2 |=  SPITZ_GPIO_G2_STROBE_BIT;
--	GPSR3  =  SPITZ_GPIO_G3_STROBE_BIT;
--	GPDR3 |=  SPITZ_GPIO_G3_STROBE_BIT;
--
--	udelay(KB_DISCHARGE_DELAY);
--
--	/* Clear any interrupts we may have triggered when altering the GPIO lines */
--	GEDR0 = SPITZ_GPIO_G0_SENSE_BIT;
--	GEDR1 = SPITZ_GPIO_G1_SENSE_BIT;
--	GEDR2 = SPITZ_GPIO_G2_SENSE_BIT;
--	GEDR3 = SPITZ_GPIO_G3_SENSE_BIT;
--}
--
--static inline void spitzkbd_activate_col(int col)
--{
--	int gpio = spitz_strobes[col];
--	GPDR0 &= ~SPITZ_GPIO_G0_STROBE_BIT;
--	GPDR1 &= ~SPITZ_GPIO_G1_STROBE_BIT;
--	GPDR2 &= ~SPITZ_GPIO_G2_STROBE_BIT;
--	GPDR3 &= ~SPITZ_GPIO_G3_STROBE_BIT;
--	GPSR(gpio) = GPIO_bit(gpio);
--	GPDR(gpio) |= GPIO_bit(gpio);
--}
--
--static inline void spitzkbd_reset_col(int col)
--{
--	int gpio = spitz_strobes[col];
--	GPDR0 &= ~SPITZ_GPIO_G0_STROBE_BIT;
--	GPDR1 &= ~SPITZ_GPIO_G1_STROBE_BIT;
--	GPDR2 &= ~SPITZ_GPIO_G2_STROBE_BIT;
--	GPDR3 &= ~SPITZ_GPIO_G3_STROBE_BIT;
--	GPCR(gpio) = GPIO_bit(gpio);
--	GPDR(gpio) |= GPIO_bit(gpio);
--}
--
--static inline int spitzkbd_get_row_status(int col)
--{
--	return ((GPLR0 >> 12) & 0x01) | ((GPLR0 >> 16) & 0x02)
--		| ((GPLR2 >> 25) & 0x04) | ((GPLR1 << 1) & 0x08)
--		| ((GPLR1 >> 0) & 0x10) | ((GPLR1 >> 1) & 0x60);
--}
--
--/*
-- * The spitz keyboard only generates interrupts when a key is pressed.
-- * When a key is pressed, we enable a timer which then scans the
-- * keyboard to detect when the key is released.
-- */
--
--/* Scan the hardware keyboard and push any changes up through the
-input layer */
--static void spitzkbd_scankeyboard(struct spitzkbd *spitzkbd_data)
--{
--	unsigned int row, col, rowd;
--	unsigned long flags;
--	unsigned int num_pressed, pwrkey = ((GPLR(SPITZ_GPIO_ON_KEY) &
-GPIO_bit(SPITZ_GPIO_ON_KEY)) != 0);
--
--	if (spitzkbd_data->suspended)
--		return;
--
--	spin_lock_irqsave(&spitzkbd_data->lock, flags);
--
--	num_pressed = 0;
--	for (col = 0; col < KB_COLS; col++) {
--		/*
--		 * Discharge the output driver capacitatance
--		 * in the keyboard matrix. (Yes it is significant..)
--		 */
--
--		spitzkbd_discharge_all();
--		udelay(KB_DISCHARGE_DELAY);
--
--		spitzkbd_activate_col(col);
--		udelay(KB_ACTIVATE_DELAY);
--
--		rowd = spitzkbd_get_row_status(col);
--		for (row = 0; row < KB_ROWS; row++) {
--			unsigned int scancode, pressed;
--
--			scancode = SCANCODE(row, col);
--			pressed = rowd & KB_ROWMASK(row);
--
--			input_report_key(spitzkbd_data->input,
-spitzkbd_data->keycode[scancode], pressed);
--
--			if (pressed)
--				num_pressed++;
--		}
--		spitzkbd_reset_col(col);
--	}
--
--	spitzkbd_activate_all();
--
--	input_report_key(spitzkbd_data->input, SPITZ_KEY_SYNC,
-(GPLR(SPITZ_GPIO_SYNC) & GPIO_bit(SPITZ_GPIO_SYNC)) != 0 );
--	input_report_key(spitzkbd_data->input, KEY_SUSPEND, pwrkey);
--
--	if (pwrkey && time_after(jiffies, spitzkbd_data->suspend_jiffies +
-msecs_to_jiffies(1000))) {
--		input_event(spitzkbd_data->input, EV_PWR, KEY_SUSPEND, 1);
--		spitzkbd_data->suspend_jiffies = jiffies;
--	}
--
--	input_sync(spitzkbd_data->input);
--
--	/* if any keys are pressed, enable the timer */
--	if (num_pressed)
--		mod_timer(&spitzkbd_data->timer, jiffies + msecs_to_jiffies(SCAN_INTERVAL));
--
--	spin_unlock_irqrestore(&spitzkbd_data->lock, flags);
--}
--
--/*
-- * spitz keyboard interrupt handler.
-- */
--static irqreturn_t spitzkbd_interrupt(int irq, void *dev_id)
--{
--	struct spitzkbd *spitzkbd_data = dev_id;
--
--	if (!timer_pending(&spitzkbd_data->timer)) {
--		/** wait chattering delay **/
--		udelay(20);
--		spitzkbd_scankeyboard(spitzkbd_data);
--	}
--
--	return IRQ_HANDLED;
--}
--
--/*
-- * spitz timer checking for released keys
-- */
--static void spitzkbd_timer_callback(unsigned long data)
--{
--	struct spitzkbd *spitzkbd_data = (struct spitzkbd *) data;
--
--	spitzkbd_scankeyboard(spitzkbd_data);
--}
--
--/*
-- * The hinge switches generate an interrupt.
-- * We debounce the switches and pass them to the input system.
-- */
--
--static irqreturn_t spitzkbd_hinge_isr(int irq, void *dev_id)
--{
--	struct spitzkbd *spitzkbd_data = dev_id;
--
--	if (!timer_pending(&spitzkbd_data->htimer))
--		mod_timer(&spitzkbd_data->htimer, jiffies +
-msecs_to_jiffies(HINGE_SCAN_INTERVAL));
--
--	return IRQ_HANDLED;
--}
--
--#define HINGE_STABLE_COUNT 2
--static int sharpsl_hinge_state;
--static int hinge_count;
--
--static void spitzkbd_hinge_timer(unsigned long data)
--{
--	struct spitzkbd *spitzkbd_data = (struct spitzkbd *) data;
--	unsigned long state;
--	unsigned long flags;
--
--	state = GPLR(SPITZ_GPIO_SWA) &
-(GPIO_bit(SPITZ_GPIO_SWA)|GPIO_bit(SPITZ_GPIO_SWB));
--	state |= (GPLR(SPITZ_GPIO_AK_INT) & GPIO_bit(SPITZ_GPIO_AK_INT));
--	if (state != sharpsl_hinge_state) {
--		hinge_count = 0;
--		sharpsl_hinge_state = state;
--	} else if (hinge_count < HINGE_STABLE_COUNT) {
--		hinge_count++;
--	}
--
--	if (hinge_count >= HINGE_STABLE_COUNT) {
--		spin_lock_irqsave(&spitzkbd_data->lock, flags);
--
--		input_report_switch(spitzkbd_data->input, SW_LID,
-((GPLR(SPITZ_GPIO_SWA) & GPIO_bit(SPITZ_GPIO_SWA)) != 0));
--		input_report_switch(spitzkbd_data->input, SW_TABLET_MODE,
-((GPLR(SPITZ_GPIO_SWB) & GPIO_bit(SPITZ_GPIO_SWB)) != 0));
--		input_report_switch(spitzkbd_data->input, SW_HEADPHONE_INSERT,
-((GPLR(SPITZ_GPIO_AK_INT) & GPIO_bit(SPITZ_GPIO_AK_INT)) != 0));
--		input_sync(spitzkbd_data->input);
--
--		spin_unlock_irqrestore(&spitzkbd_data->lock, flags);
--	} else {
--		mod_timer(&spitzkbd_data->htimer, jiffies +
-msecs_to_jiffies(HINGE_SCAN_INTERVAL));
--	}
--}
--
--#ifdef CONFIG_PM
--static int spitzkbd_suspend(struct platform_device *dev, pm_message_t state)
--{
--	int i;
--	struct spitzkbd *spitzkbd = platform_get_drvdata(dev);
--	spitzkbd->suspended = 1;
--
--	/* Set Strobe lines as inputs - *except* strobe line 0 leave this
--	   enabled so we can detect a power button press for resume */
--	for (i = 1; i < SPITZ_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(spitz_strobes[i] | GPIO_IN);
--
--	return 0;
--}
--
--static int spitzkbd_resume(struct platform_device *dev)
--{
--	int i;
--	struct spitzkbd *spitzkbd = platform_get_drvdata(dev);
--
--	for (i = 0; i < SPITZ_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(spitz_strobes[i] | GPIO_OUT | GPIO_DFLT_HIGH);
--
--	/* Upon resume, ignore the suspend key for a short while */
--	spitzkbd->suspend_jiffies = jiffies;
--	spitzkbd->suspended = 0;
--
--	return 0;
--}
--#else
--#define spitzkbd_suspend	NULL
--#define spitzkbd_resume		NULL
--#endif
--
--static int __devinit spitzkbd_probe(struct platform_device *dev)
--{
--	struct spitzkbd *spitzkbd;
--	struct input_dev *input_dev;
--	int i, err = -ENOMEM;
--
--	spitzkbd = kzalloc(sizeof(struct spitzkbd), GFP_KERNEL);
--	input_dev = input_allocate_device();
--	if (!spitzkbd || !input_dev)
--		goto fail;
--
--	platform_set_drvdata(dev, spitzkbd);
--	strcpy(spitzkbd->phys, "spitzkbd/input0");
--
--	spin_lock_init(&spitzkbd->lock);
--
--	/* Init Keyboard rescan timer */
--	init_timer(&spitzkbd->timer);
--	spitzkbd->timer.function = spitzkbd_timer_callback;
--	spitzkbd->timer.data = (unsigned long) spitzkbd;
--
--	/* Init Hinge Timer */
--	init_timer(&spitzkbd->htimer);
--	spitzkbd->htimer.function = spitzkbd_hinge_timer;
--	spitzkbd->htimer.data = (unsigned long) spitzkbd;
--
--	spitzkbd->suspend_jiffies = jiffies;
--
--	spitzkbd->input = input_dev;
--
--	input_dev->name = "Spitz Keyboard";
--	input_dev->phys = spitzkbd->phys;
--	input_dev->dev.parent = &dev->dev;
--
--	input_dev->id.bustype = BUS_HOST;
--	input_dev->id.vendor = 0x0001;
--	input_dev->id.product = 0x0001;
--	input_dev->id.version = 0x0100;
--
--	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REP) |
--		BIT_MASK(EV_PWR) | BIT_MASK(EV_SW);
--	input_dev->keycode = spitzkbd->keycode;
--	input_dev->keycodesize = sizeof(unsigned char);
--	input_dev->keycodemax = ARRAY_SIZE(spitzkbd_keycode);
--
--	memcpy(spitzkbd->keycode, spitzkbd_keycode, sizeof(spitzkbd->keycode));
--	for (i = 0; i < ARRAY_SIZE(spitzkbd_keycode); i++)
--		set_bit(spitzkbd->keycode[i], input_dev->keybit);
--	clear_bit(0, input_dev->keybit);
--	set_bit(KEY_SUSPEND, input_dev->keybit);
--	set_bit(SW_LID, input_dev->swbit);
--	set_bit(SW_TABLET_MODE, input_dev->swbit);
--	set_bit(SW_HEADPHONE_INSERT, input_dev->swbit);
--
--	err = input_register_device(input_dev);
--	if (err)
--		goto fail;
--
--	mod_timer(&spitzkbd->htimer, jiffies + msecs_to_jiffies(HINGE_SCAN_INTERVAL));
--
--	/* Setup sense interrupts - RisingEdge Detect, sense lines as inputs */
--	for (i = 0; i < SPITZ_KEY_SENSE_NUM; i++) {
--		pxa_gpio_mode(spitz_senses[i] | GPIO_IN);
--		if (request_irq(IRQ_GPIO(spitz_senses[i]), spitzkbd_interrupt,
--				IRQF_DISABLED|IRQF_TRIGGER_RISING,
--				"Spitzkbd Sense", spitzkbd))
--			printk(KERN_WARNING "spitzkbd: Can't get Sense IRQ: %d!\n", i);
--	}
--
--	/* Set Strobe lines as outputs - set high */
--	for (i = 0; i < SPITZ_KEY_STROBE_NUM; i++)
--		pxa_gpio_mode(spitz_strobes[i] | GPIO_OUT | GPIO_DFLT_HIGH);
--
--	pxa_gpio_mode(SPITZ_GPIO_SYNC | GPIO_IN);
--	pxa_gpio_mode(SPITZ_GPIO_ON_KEY | GPIO_IN);
--	pxa_gpio_mode(SPITZ_GPIO_SWA | GPIO_IN);
--	pxa_gpio_mode(SPITZ_GPIO_SWB | GPIO_IN);
--
--	request_irq(SPITZ_IRQ_GPIO_SYNC, spitzkbd_interrupt,
--		    IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--		    "Spitzkbd Sync", spitzkbd);
--	request_irq(SPITZ_IRQ_GPIO_ON_KEY, spitzkbd_interrupt,
--		    IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--		    "Spitzkbd PwrOn", spitzkbd);
--	request_irq(SPITZ_IRQ_GPIO_SWA, spitzkbd_hinge_isr,
--		    IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--		    "Spitzkbd SWA", spitzkbd);
--	request_irq(SPITZ_IRQ_GPIO_SWB, spitzkbd_hinge_isr,
--		    IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--		    "Spitzkbd SWB", spitzkbd);
--	request_irq(SPITZ_IRQ_GPIO_AK_INT, spitzkbd_hinge_isr,
--		    IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--		    "Spitzkbd HP", spitzkbd);
--
--	return 0;
--
-- fail:	input_free_device(input_dev);
--	kfree(spitzkbd);
--	return err;
--}
--
--static int __devexit spitzkbd_remove(struct platform_device *dev)
--{
--	int i;
--	struct spitzkbd *spitzkbd = platform_get_drvdata(dev);
--
--	for (i = 0; i < SPITZ_KEY_SENSE_NUM; i++)
--		free_irq(IRQ_GPIO(spitz_senses[i]), spitzkbd);
--
--	free_irq(SPITZ_IRQ_GPIO_SYNC, spitzkbd);
--	free_irq(SPITZ_IRQ_GPIO_ON_KEY, spitzkbd);
--	free_irq(SPITZ_IRQ_GPIO_SWA, spitzkbd);
--	free_irq(SPITZ_IRQ_GPIO_SWB, spitzkbd);
--	free_irq(SPITZ_IRQ_GPIO_AK_INT, spitzkbd);
--
--	del_timer_sync(&spitzkbd->htimer);
--	del_timer_sync(&spitzkbd->timer);
--
--	input_unregister_device(spitzkbd->input);
--
--	kfree(spitzkbd);
--
--	return 0;
--}
--
--static struct platform_driver spitzkbd_driver = {
--	.probe		= spitzkbd_probe,
--	.remove		= __devexit_p(spitzkbd_remove),
--	.suspend	= spitzkbd_suspend,
--	.resume		= spitzkbd_resume,
--	.driver		= {
--		.name	= "spitz-keyboard",
--		.owner	= THIS_MODULE,
--	},
--};
--
--static int __init spitzkbd_init(void)
--{
--	return platform_driver_register(&spitzkbd_driver);
--}
--
--static void __exit spitzkbd_exit(void)
--{
--	platform_driver_unregister(&spitzkbd_driver);
--}
--
--module_init(spitzkbd_init);
--module_exit(spitzkbd_exit);
--
--MODULE_AUTHOR("Richard Purdie <rpurdie@rpsys.net>");
--MODULE_DESCRIPTION("Spitz Keyboard Driver");
--MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:spitz-keyboard");
-diff --git a/drivers/input/keyboard/tosakbd.c b/drivers/input/keyboard/tosakbd.c
-deleted file mode 100644
-index 3910f26..0000000
---- a/drivers/input/keyboard/tosakbd.c
-+++ /dev/null
-@@ -1,431 +0,0 @@
--/*
-- *  Keyboard driver for Sharp Tosa models (SL-6000x)
-- *
-- *  Copyright (c) 2005 Dirk Opfer
-- *  Copyright (c) 2007 Dmitry Baryshkov
-- *
-- *  Based on xtkbd.c/locomkbd.c/corgikbd.c
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/input.h>
--#include <linux/delay.h>
--#include <linux/interrupt.h>
--#include <linux/slab.h>
+@@ -1,375 +0,0 @@
+-#ifndef __ASM_ARCH_PXA2XX_GPIO_H
+-#define __ASM_ARCH_PXA2XX_GPIO_H
+-
+-#warning Please use mfp-pxa2[57]x.h instead of pxa2xx-gpio.h
 -
 -#include <mach/gpio.h>
--#include <mach/tosa.h>
 -
--#define KB_ROWMASK(r)		(1 << (r))
--#define SCANCODE(r, c)		(((r)<<4) + (c) + 1)
--#define NR_SCANCODES		SCANCODE(TOSA_KEY_SENSE_NUM - 1,
-TOSA_KEY_STROBE_NUM - 1) + 1
+-/* GPIO alternate function assignments */
 -
--#define SCAN_INTERVAL		(HZ/10)
+-#define GPIO1_RST		1	/* reset */
+-#define GPIO6_MMCCLK		6	/* MMC Clock */
+-#define GPIO7_48MHz		7	/* 48 MHz clock output */
+-#define GPIO8_MMCCS0		8	/* MMC Chip Select 0 */
+-#define GPIO9_MMCCS1		9	/* MMC Chip Select 1 */
+-#define GPIO10_RTCCLK		10	/* real time clock (1 Hz) */
+-#define GPIO11_3_6MHz		11	/* 3.6 MHz oscillator out */
+-#define GPIO12_32KHz		12	/* 32 kHz out */
+-#define GPIO12_CIF_DD_7		12	/* Camera data pin 7 */
+-#define GPIO13_MBGNT		13	/* memory controller grant */
+-#define GPIO14_MBREQ		14	/* alternate bus master request */
+-#define GPIO15_nCS_1		15	/* chip select 1 */
+-#define GPIO16_PWM0		16	/* PWM0 output */
+-#define GPIO17_PWM1		17	/* PWM1 output */
+-#define GPIO17_CIF_DD_6		17	/* Camera data pin 6 */
+-#define GPIO18_RDY		18	/* Ext. Bus Ready */
+-#define GPIO19_DREQ1		19	/* External DMA Request */
+-#define GPIO20_DREQ0		20	/* External DMA Request */
+-#define GPIO23_SCLK		23	/* SSP clock */
+-#define GPIO23_CIF_MCLK		23	/* Camera Master Clock */
+-#define GPIO24_SFRM		24	/* SSP Frame */
+-#define GPIO24_CIF_FV		24	/* Camera frame start signal */
+-#define GPIO25_STXD		25	/* SSP transmit */
+-#define GPIO25_CIF_LV		25	/* Camera line start signal */
+-#define GPIO26_SRXD		26	/* SSP receive */
+-#define GPIO26_CIF_PCLK		26	/* Camera Pixel Clock */
+-#define GPIO27_SEXTCLK		27	/* SSP ext_clk */
+-#define GPIO27_CIF_DD_0		27	/* Camera data pin 0 */
+-#define GPIO28_BITCLK		28	/* AC97/I2S bit_clk */
+-#define GPIO29_SDATA_IN		29	/* AC97 Sdata_in0 / I2S Sdata_in */
+-#define GPIO30_SDATA_OUT	30	/* AC97/I2S Sdata_out */
+-#define GPIO31_SYNC		31	/* AC97/I2S sync */
+-#define GPIO32_SDATA_IN1	32	/* AC97 Sdata_in1 */
+-#define GPIO32_SYSCLK		32	/* I2S System Clock */
+-#define GPIO32_MMCCLK		32	/* MMC Clock (PXA270) */
+-#define GPIO33_nCS_5		33	/* chip select 5 */
+-#define GPIO34_FFRXD		34	/* FFUART receive */
+-#define GPIO34_MMCCS0		34	/* MMC Chip Select 0 */
+-#define GPIO35_FFCTS		35	/* FFUART Clear to send */
+-#define GPIO36_FFDCD		36	/* FFUART Data carrier detect */
+-#define GPIO37_FFDSR		37	/* FFUART data set ready */
+-#define GPIO38_FFRI		38	/* FFUART Ring Indicator */
+-#define GPIO39_MMCCS1		39	/* MMC Chip Select 1 */
+-#define GPIO39_FFTXD		39	/* FFUART transmit data */
+-#define GPIO40_FFDTR		40	/* FFUART data terminal Ready */
+-#define GPIO41_FFRTS		41	/* FFUART request to send */
+-#define GPIO42_BTRXD		42	/* BTUART receive data */
+-#define GPIO42_HWRXD		42	/* HWUART receive data */
+-#define GPIO42_CIF_MCLK		42	/* Camera Master Clock */
+-#define GPIO43_BTTXD		43	/* BTUART transmit data */
+-#define GPIO43_HWTXD		43	/* HWUART transmit data */
+-#define GPIO43_CIF_FV		43	/* Camera frame start signal */
+-#define GPIO44_BTCTS		44	/* BTUART clear to send */
+-#define GPIO44_HWCTS		44	/* HWUART clear to send */
+-#define GPIO44_CIF_LV		44	/* Camera line start signal */
+-#define GPIO45_BTRTS		45	/* BTUART request to send */
+-#define GPIO45_HWRTS		45	/* HWUART request to send */
+-#define GPIO45_AC97_SYSCLK	45	/* AC97 System Clock */
+-#define GPIO45_CIF_PCLK		45	/* Camera Pixel Clock */
+-#define GPIO46_ICPRXD		46	/* ICP receive data */
+-#define GPIO46_STRXD		46	/* STD_UART receive data */
+-#define GPIO47_ICPTXD		47	/* ICP transmit data */
+-#define GPIO47_STTXD		47	/* STD_UART transmit data */
+-#define GPIO47_CIF_DD_0		47	/* Camera data pin 0 */
+-#define GPIO48_nPOE		48	/* Output Enable for Card Space */
+-#define GPIO48_CIF_DD_5		48	/* Camera data pin 5 */
+-#define GPIO49_nPWE		49	/* Write Enable for Card Space */
+-#define GPIO50_nPIOR		50	/* I/O Read for Card Space */
+-#define GPIO50_CIF_DD_3		50	/* Camera data pin 3 */
+-#define GPIO51_nPIOW		51	/* I/O Write for Card Space */
+-#define GPIO51_CIF_DD_2		51	/* Camera data pin 2 */
+-#define GPIO52_nPCE_1		52	/* Card Enable for Card Space */
+-#define GPIO52_CIF_DD_4		52	/* Camera data pin 4 */
+-#define GPIO53_nPCE_2		53	/* Card Enable for Card Space */
+-#define GPIO53_MMCCLK		53	/* MMC Clock */
+-#define GPIO53_CIF_MCLK		53	/* Camera Master Clock */
+-#define GPIO54_MMCCLK		54	/* MMC Clock */
+-#define GPIO54_pSKTSEL		54	/* Socket Select for Card Space */
+-#define GPIO54_nPCE_2		54	/* Card Enable for Card Space (PXA27x) */
+-#define GPIO54_CIF_PCLK		54	/* Camera Pixel Clock */
+-#define GPIO55_nPREG		55	/* Card Address bit 26 */
+-#define GPIO55_CIF_DD_1		55	/* Camera data pin 1 */
+-#define GPIO56_nPWAIT		56	/* Wait signal for Card Space */
+-#define GPIO57_nIOIS16		57	/* Bus Width select for I/O Card Space */
+-#define GPIO58_LDD_0		58	/* LCD data pin 0 */
+-#define GPIO59_LDD_1		59	/* LCD data pin 1 */
+-#define GPIO60_LDD_2		60	/* LCD data pin 2 */
+-#define GPIO61_LDD_3		61	/* LCD data pin 3 */
+-#define GPIO62_LDD_4		62	/* LCD data pin 4 */
+-#define GPIO63_LDD_5		63	/* LCD data pin 5 */
+-#define GPIO64_LDD_6		64	/* LCD data pin 6 */
+-#define GPIO65_LDD_7		65	/* LCD data pin 7 */
+-#define GPIO66_LDD_8		66	/* LCD data pin 8 */
+-#define GPIO66_MBREQ		66	/* alternate bus master req */
+-#define GPIO67_LDD_9		67	/* LCD data pin 9 */
+-#define GPIO67_MMCCS0		67	/* MMC Chip Select 0 */
+-#define GPIO68_LDD_10		68	/* LCD data pin 10 */
+-#define GPIO68_MMCCS1		68	/* MMC Chip Select 1 */
+-#define GPIO69_LDD_11		69	/* LCD data pin 11 */
+-#define GPIO69_MMCCLK		69	/* MMC_CLK */
+-#define GPIO70_LDD_12		70	/* LCD data pin 12 */
+-#define GPIO70_RTCCLK		70	/* Real Time clock (1 Hz) */
+-#define GPIO71_LDD_13		71	/* LCD data pin 13 */
+-#define GPIO71_3_6MHz		71	/* 3.6 MHz Oscillator clock */
+-#define GPIO72_LDD_14		72	/* LCD data pin 14 */
+-#define GPIO72_32kHz		72	/* 32 kHz clock */
+-#define GPIO73_LDD_15		73	/* LCD data pin 15 */
+-#define GPIO73_MBGNT		73	/* Memory controller grant */
+-#define GPIO74_LCD_FCLK		74	/* LCD Frame clock */
+-#define GPIO75_LCD_LCLK		75	/* LCD line clock */
+-#define GPIO76_LCD_PCLK		76	/* LCD Pixel clock */
+-#define GPIO77_LCD_ACBIAS	77	/* LCD AC Bias */
+-#define GPIO78_nCS_2		78	/* chip select 2 */
+-#define GPIO79_nCS_3		79	/* chip select 3 */
+-#define GPIO80_nCS_4		80	/* chip select 4 */
+-#define GPIO81_NSCLK		81	/* NSSP clock */
+-#define GPIO81_CIF_DD_0		81	/* Camera data pin 0 */
+-#define GPIO82_NSFRM		82	/* NSSP Frame */
+-#define GPIO82_CIF_DD_5		82	/* Camera data pin 5 */
+-#define GPIO83_NSTXD		83	/* NSSP transmit */
+-#define GPIO83_CIF_DD_4		83	/* Camera data pin 4 */
+-#define GPIO84_NSRXD		84	/* NSSP receive */
+-#define GPIO84_CIF_FV		84	/* Camera frame start signal */
+-#define GPIO85_nPCE_1		85	/* Card Enable for Card Space (PXA27x) */
+-#define GPIO85_CIF_LV		85	/* Camera line start signal */
+-#define GPIO90_CIF_DD_4		90	/* Camera data pin 4 */
+-#define GPIO91_CIF_DD_5		91	/* Camera data pin 5 */
+-#define GPIO92_MMCDAT0		92	/* MMC DAT0 (PXA27x) */
+-#define GPIO93_CIF_DD_6		93	/* Camera data pin 6 */
+-#define GPIO94_CIF_DD_5		94	/* Camera data pin 5 */
+-#define GPIO95_CIF_DD_4		95	/* Camera data pin 4 */
+-#define GPIO96_FFRXD		96	/* FFUART recieve */
+-#define GPIO98_FFRTS		98	/* FFUART request to send */
+-#define GPIO98_CIF_DD_0		98	/* Camera data pin 0 */
+-#define GPIO99_FFTXD		99	/* FFUART transmit data */
+-#define GPIO100_FFCTS		100	/* FFUART Clear to send */
+-#define GPIO102_nPCE_1		102	/* PCMCIA (PXA27x) */
+-#define GPIO103_CIF_DD_3	103	/* Camera data pin 3 */
+-#define GPIO104_CIF_DD_2	104	/* Camera data pin 2 */
+-#define GPIO105_CIF_DD_1	105	/* Camera data pin 1 */
+-#define GPIO106_CIF_DD_9	106	/* Camera data pin 9 */
+-#define GPIO107_CIF_DD_8	107	/* Camera data pin 8 */
+-#define GPIO108_CIF_DD_7	108	/* Camera data pin 7 */
+-#define GPIO109_MMCDAT1		109	/* MMC DAT1 (PXA27x) */
+-#define GPIO110_MMCDAT2		110	/* MMC DAT2 (PXA27x) */
+-#define GPIO110_MMCCS0		110	/* MMC Chip Select 0 (PXA27x) */
+-#define GPIO111_MMCDAT3		111	/* MMC DAT3 (PXA27x) */
+-#define GPIO111_MMCCS1		111	/* MMC Chip Select 1 (PXA27x) */
+-#define GPIO112_MMCCMD		112	/* MMC CMD (PXA27x) */
+-#define GPIO113_I2S_SYSCLK	113	/* I2S System Clock (PXA27x) */
+-#define GPIO113_AC97_RESET_N	113	/* AC97 NRESET on (PXA27x) */
+-#define GPIO114_CIF_DD_1	114	/* Camera data pin 1 */
+-#define GPIO115_CIF_DD_3	115	/* Camera data pin 3 */
+-#define GPIO116_CIF_DD_2	116	/* Camera data pin 2 */
 -
--#define KB_DISCHARGE_DELAY	10
--#define KB_ACTIVATE_DELAY	10
+-/* GPIO alternate function mode & direction */
 -
--static unsigned short tosakbd_keycode[NR_SCANCODES] = {
--0,
--0, KEY_W, 0, 0, 0, KEY_K, KEY_BACKSPACE, KEY_P,
--0, 0, 0, 0, 0, 0, 0, 0,
--KEY_Q, KEY_E, KEY_T, KEY_Y, 0, KEY_O, KEY_I, KEY_COMMA,
--0, 0, 0, 0, 0, 0, 0, 0,
--KEY_A, KEY_D, KEY_G, KEY_U, 0, KEY_L, KEY_ENTER, KEY_DOT,
--0, 0, 0, 0, 0, 0, 0, 0,
--KEY_Z, KEY_C, KEY_V, KEY_J, TOSA_KEY_ADDRESSBOOK, TOSA_KEY_CANCEL,
-TOSA_KEY_CENTER, TOSA_KEY_OK,
--KEY_LEFTSHIFT, 0, 0, 0, 0, 0, 0, 0,
--KEY_S, KEY_R, KEY_B, KEY_N, TOSA_KEY_CALENDAR, TOSA_KEY_HOMEPAGE,
-KEY_LEFTCTRL, TOSA_KEY_LIGHT,
--0, KEY_RIGHTSHIFT, 0, 0, 0, 0, 0, 0,
--KEY_TAB, KEY_SLASH, KEY_H, KEY_M, TOSA_KEY_MENU, 0, KEY_UP, 0,
--0, 0, TOSA_KEY_FN, 0, 0, 0, 0, 0,
--KEY_X, KEY_F, KEY_SPACE, KEY_APOSTROPHE, TOSA_KEY_MAIL, KEY_LEFT,
-KEY_DOWN, KEY_RIGHT,
--0, 0, 0,
--};
+-#define GPIO_IN			0x000
+-#define GPIO_OUT		0x080
+-#define GPIO_ALT_FN_1_IN	0x100
+-#define GPIO_ALT_FN_1_OUT	0x180
+-#define GPIO_ALT_FN_2_IN	0x200
+-#define GPIO_ALT_FN_2_OUT	0x280
+-#define GPIO_ALT_FN_3_IN	0x300
+-#define GPIO_ALT_FN_3_OUT	0x380
+-#define GPIO_MD_MASK_NR		0x07f
+-#define GPIO_MD_MASK_DIR	0x080
+-#define GPIO_MD_MASK_FN		0x300
+-#define GPIO_DFLT_LOW		0x400
+-#define GPIO_DFLT_HIGH		0x800
 -
--struct tosakbd {
--	unsigned short keycode[ARRAY_SIZE(tosakbd_keycode)];
--	struct input_dev *input;
--	bool suspended;
--	spinlock_t lock; /* protect kbd scanning */
--	struct timer_list timer;
--};
+-#define GPIO1_RTS_MD		( 1 | GPIO_ALT_FN_1_IN)
+-#define GPIO6_MMCCLK_MD		( 6 | GPIO_ALT_FN_1_OUT)
+-#define GPIO7_48MHz_MD		( 7 | GPIO_ALT_FN_1_OUT)
+-#define GPIO8_MMCCS0_MD		( 8 | GPIO_ALT_FN_1_OUT)
+-#define GPIO9_MMCCS1_MD		( 9 | GPIO_ALT_FN_1_OUT)
+-#define GPIO10_RTCCLK_MD	(10 | GPIO_ALT_FN_1_OUT)
+-#define GPIO11_3_6MHz_MD	(11 | GPIO_ALT_FN_1_OUT)
+-#define GPIO12_32KHz_MD		(12 | GPIO_ALT_FN_1_OUT)
+-#define GPIO12_CIF_DD_7_MD	(12 | GPIO_ALT_FN_2_IN)
+-#define GPIO13_MBGNT_MD		(13 | GPIO_ALT_FN_2_OUT)
+-#define GPIO14_MBREQ_MD		(14 | GPIO_ALT_FN_1_IN)
+-#define GPIO15_nCS_1_MD		(15 | GPIO_ALT_FN_2_OUT)
+-#define GPIO16_PWM0_MD		(16 | GPIO_ALT_FN_2_OUT)
+-#define GPIO17_PWM1_MD		(17 | GPIO_ALT_FN_2_OUT)
+-#define GPIO17_CIF_DD_6_MD	(17 | GPIO_ALT_FN_2_IN)
+-#define GPIO18_RDY_MD		(18 | GPIO_ALT_FN_1_IN)
+-#define GPIO19_DREQ1_MD		(19 | GPIO_ALT_FN_1_IN)
+-#define GPIO20_DREQ0_MD		(20 | GPIO_ALT_FN_1_IN)
+-#define GPIO23_CIF_MCLK_MD	(23 | GPIO_ALT_FN_1_OUT)
+-#define GPIO23_SCLK_MD		(23 | GPIO_ALT_FN_2_OUT)
+-#define GPIO24_CIF_FV_MD	(24 | GPIO_ALT_FN_1_OUT)
+-#define GPIO24_SFRM_MD		(24 | GPIO_ALT_FN_2_OUT)
+-#define GPIO25_CIF_LV_MD	(25 | GPIO_ALT_FN_1_OUT)
+-#define GPIO25_STXD_MD		(25 | GPIO_ALT_FN_2_OUT)
+-#define GPIO26_SRXD_MD		(26 | GPIO_ALT_FN_1_IN)
+-#define GPIO26_CIF_PCLK_MD	(26 | GPIO_ALT_FN_2_IN)
+-#define GPIO27_SEXTCLK_MD	(27 | GPIO_ALT_FN_1_IN)
+-#define GPIO27_CIF_DD_0_MD	(27 | GPIO_ALT_FN_3_IN)
+-#define GPIO28_BITCLK_AC97_MD	(28 | GPIO_ALT_FN_1_IN)
+-#define GPIO28_BITCLK_IN_I2S_MD	(28 | GPIO_ALT_FN_2_IN)
+-#define GPIO28_BITCLK_OUT_I2S_MD	(28 | GPIO_ALT_FN_1_OUT)
+-#define GPIO29_SDATA_IN_AC97_MD	(29 | GPIO_ALT_FN_1_IN)
+-#define GPIO29_SDATA_IN_I2S_MD	(29 | GPIO_ALT_FN_2_IN)
+-#define GPIO30_SDATA_OUT_AC97_MD	(30 | GPIO_ALT_FN_2_OUT)
+-#define GPIO30_SDATA_OUT_I2S_MD	(30 | GPIO_ALT_FN_1_OUT)
+-#define GPIO31_SYNC_I2S_MD	(31 | GPIO_ALT_FN_1_OUT)
+-#define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
+-#define GPIO32_SDATA_IN1_AC97_MD	(32 | GPIO_ALT_FN_1_IN)
+-#define GPIO32_SYSCLK_I2S_MD	(32 | GPIO_ALT_FN_1_OUT)
+-#define GPIO32_MMCCLK_MD	(32 | GPIO_ALT_FN_2_OUT)
+-#define GPIO33_nCS_5_MD		(33 | GPIO_ALT_FN_2_OUT)
+-#define GPIO34_FFRXD_MD		(34 | GPIO_ALT_FN_1_IN)
+-#define GPIO34_MMCCS0_MD	(34 | GPIO_ALT_FN_2_OUT)
+-#define GPIO35_FFCTS_MD		(35 | GPIO_ALT_FN_1_IN)
+-#define GPIO35_KP_MKOUT6_MD	(35 | GPIO_ALT_FN_2_OUT)
+-#define GPIO36_FFDCD_MD		(36 | GPIO_ALT_FN_1_IN)
+-#define GPIO37_FFDSR_MD		(37 | GPIO_ALT_FN_1_IN)
+-#define GPIO38_FFRI_MD		(38 | GPIO_ALT_FN_1_IN)
+-#define GPIO39_MMCCS1_MD	(39 | GPIO_ALT_FN_1_OUT)
+-#define GPIO39_FFTXD_MD		(39 | GPIO_ALT_FN_2_OUT)
+-#define GPIO40_FFDTR_MD		(40 | GPIO_ALT_FN_2_OUT)
+-#define GPIO41_FFRTS_MD		(41 | GPIO_ALT_FN_2_OUT)
+-#define GPIO41_KP_MKOUT7_MD	(41 | GPIO_ALT_FN_1_OUT)
+-#define GPIO42_BTRXD_MD		(42 | GPIO_ALT_FN_1_IN)
+-#define GPIO42_HWRXD_MD		(42 | GPIO_ALT_FN_3_IN)
+-#define GPIO42_CIF_MCLK_MD	(42 | GPIO_ALT_FN_3_OUT)
+-#define GPIO43_BTTXD_MD		(43 | GPIO_ALT_FN_2_OUT)
+-#define GPIO43_HWTXD_MD		(43 | GPIO_ALT_FN_3_OUT)
+-#define GPIO43_CIF_FV_MD	(43 | GPIO_ALT_FN_3_OUT)
+-#define GPIO44_BTCTS_MD		(44 | GPIO_ALT_FN_1_IN)
+-#define GPIO44_HWCTS_MD		(44 | GPIO_ALT_FN_3_IN)
+-#define GPIO44_CIF_LV_MD	(44 | GPIO_ALT_FN_3_OUT)
+-#define GPIO45_CIF_PCLK_MD	(45 | GPIO_ALT_FN_3_IN)
+-#define GPIO45_BTRTS_MD		(45 | GPIO_ALT_FN_2_OUT)
+-#define GPIO45_HWRTS_MD		(45 | GPIO_ALT_FN_3_OUT)
+-#define GPIO45_SYSCLK_AC97_MD	(45 | GPIO_ALT_FN_1_OUT)
+-#define GPIO46_ICPRXD_MD	(46 | GPIO_ALT_FN_1_IN)
+-#define GPIO46_STRXD_MD		(46 | GPIO_ALT_FN_2_IN)
+-#define GPIO47_CIF_DD_0_MD	(47 | GPIO_ALT_FN_1_IN)
+-#define GPIO47_ICPTXD_MD	(47 | GPIO_ALT_FN_2_OUT)
+-#define GPIO47_STTXD_MD		(47 | GPIO_ALT_FN_1_OUT)
+-#define GPIO48_CIF_DD_5_MD	(48 | GPIO_ALT_FN_1_IN)
+-#define GPIO48_nPOE_MD		(48 | GPIO_ALT_FN_2_OUT)
+-#define GPIO48_HWTXD_MD		(48 | GPIO_ALT_FN_1_OUT)
+-#define GPIO48_nPOE_MD		(48 | GPIO_ALT_FN_2_OUT)
+-#define GPIO49_HWRXD_MD		(49 | GPIO_ALT_FN_1_IN)
+-#define GPIO49_nPWE_MD		(49 | GPIO_ALT_FN_2_OUT)
+-#define GPIO50_CIF_DD_3_MD	(50 | GPIO_ALT_FN_1_IN)
+-#define GPIO50_nPIOR_MD		(50 | GPIO_ALT_FN_2_OUT)
+-#define GPIO50_HWCTS_MD		(50 | GPIO_ALT_FN_1_IN)
+-#define GPIO50_CIF_DD_3_MD	(50 | GPIO_ALT_FN_1_IN)
+-#define GPIO51_CIF_DD_2_MD	(51 | GPIO_ALT_FN_1_IN)
+-#define GPIO51_nPIOW_MD		(51 | GPIO_ALT_FN_2_OUT)
+-#define GPIO51_HWRTS_MD		(51 | GPIO_ALT_FN_1_OUT)
+-#define GPIO51_CIF_DD_2_MD	(51 | GPIO_ALT_FN_1_IN)
+-#define GPIO52_nPCE_1_MD	(52 | GPIO_ALT_FN_2_OUT)
+-#define GPIO52_CIF_DD_4_MD	(52 | GPIO_ALT_FN_1_IN)
+-#define GPIO53_nPCE_2_MD	(53 | GPIO_ALT_FN_2_OUT)
+-#define GPIO53_MMCCLK_MD	(53 | GPIO_ALT_FN_1_OUT)
+-#define GPIO53_CIF_MCLK_MD	(53 | GPIO_ALT_FN_2_OUT)
+-#define GPIO54_MMCCLK_MD	(54 | GPIO_ALT_FN_1_OUT)
+-#define GPIO54_nPCE_2_MD	(54 | GPIO_ALT_FN_2_OUT)
+-#define GPIO54_pSKTSEL_MD	(54 | GPIO_ALT_FN_2_OUT)
+-#define GPIO54_CIF_PCLK_MD	(54 | GPIO_ALT_FN_3_IN)
+-#define GPIO55_nPREG_MD		(55 | GPIO_ALT_FN_2_OUT)
+-#define GPIO55_CIF_DD_1_MD	(55 | GPIO_ALT_FN_1_IN)
+-#define GPIO56_nPWAIT_MD	(56 | GPIO_ALT_FN_1_IN)
+-#define GPIO57_nIOIS16_MD	(57 | GPIO_ALT_FN_1_IN)
+-#define GPIO58_LDD_0_MD		(58 | GPIO_ALT_FN_2_OUT)
+-#define GPIO59_LDD_1_MD		(59 | GPIO_ALT_FN_2_OUT)
+-#define GPIO60_LDD_2_MD		(60 | GPIO_ALT_FN_2_OUT)
+-#define GPIO61_LDD_3_MD		(61 | GPIO_ALT_FN_2_OUT)
+-#define GPIO62_LDD_4_MD		(62 | GPIO_ALT_FN_2_OUT)
+-#define GPIO63_LDD_5_MD		(63 | GPIO_ALT_FN_2_OUT)
+-#define GPIO64_LDD_6_MD		(64 | GPIO_ALT_FN_2_OUT)
+-#define GPIO65_LDD_7_MD		(65 | GPIO_ALT_FN_2_OUT)
+-#define GPIO66_LDD_8_MD		(66 | GPIO_ALT_FN_2_OUT)
+-#define GPIO66_MBREQ_MD		(66 | GPIO_ALT_FN_1_IN)
+-#define GPIO67_LDD_9_MD		(67 | GPIO_ALT_FN_2_OUT)
+-#define GPIO67_MMCCS0_MD	(67 | GPIO_ALT_FN_1_OUT)
+-#define GPIO68_LDD_10_MD	(68 | GPIO_ALT_FN_2_OUT)
+-#define GPIO68_MMCCS1_MD	(68 | GPIO_ALT_FN_1_OUT)
+-#define GPIO69_LDD_11_MD	(69 | GPIO_ALT_FN_2_OUT)
+-#define GPIO69_MMCCLK_MD	(69 | GPIO_ALT_FN_1_OUT)
+-#define GPIO70_LDD_12_MD	(70 | GPIO_ALT_FN_2_OUT)
+-#define GPIO70_RTCCLK_MD	(70 | GPIO_ALT_FN_1_OUT)
+-#define GPIO71_LDD_13_MD	(71 | GPIO_ALT_FN_2_OUT)
+-#define GPIO71_3_6MHz_MD	(71 | GPIO_ALT_FN_1_OUT)
+-#define GPIO72_LDD_14_MD	(72 | GPIO_ALT_FN_2_OUT)
+-#define GPIO72_32kHz_MD		(72 | GPIO_ALT_FN_1_OUT)
+-#define GPIO73_LDD_15_MD	(73 | GPIO_ALT_FN_2_OUT)
+-#define GPIO73_MBGNT_MD		(73 | GPIO_ALT_FN_1_OUT)
+-#define GPIO74_LCD_FCLK_MD	(74 | GPIO_ALT_FN_2_OUT)
+-#define GPIO75_LCD_LCLK_MD	(75 | GPIO_ALT_FN_2_OUT)
+-#define GPIO76_LCD_PCLK_MD	(76 | GPIO_ALT_FN_2_OUT)
+-#define GPIO77_LCD_ACBIAS_MD	(77 | GPIO_ALT_FN_2_OUT)
+-#define GPIO78_nCS_2_MD		(78 | GPIO_ALT_FN_2_OUT)
+-#define GPIO78_nPCE_2_MD	(78 | GPIO_ALT_FN_1_OUT)
+-#define GPIO79_nCS_3_MD		(79 | GPIO_ALT_FN_2_OUT)
+-#define GPIO79_pSKTSEL_MD	(79 | GPIO_ALT_FN_1_OUT)
+-#define GPIO80_nCS_4_MD		(80 | GPIO_ALT_FN_2_OUT)
+-#define GPIO81_NSSP_CLK_OUT	(81 | GPIO_ALT_FN_1_OUT)
+-#define GPIO81_NSSP_CLK_IN	(81 | GPIO_ALT_FN_1_IN)
+-#define GPIO81_CIF_DD_0_MD	(81 | GPIO_ALT_FN_2_IN)
+-#define GPIO82_NSSP_FRM_OUT	(82 | GPIO_ALT_FN_1_OUT)
+-#define GPIO82_NSSP_FRM_IN	(82 | GPIO_ALT_FN_1_IN)
+-#define GPIO82_CIF_DD_5_MD	(82 | GPIO_ALT_FN_3_IN)
+-#define GPIO83_NSSP_TX		(83 | GPIO_ALT_FN_1_OUT)
+-#define GPIO83_NSSP_RX		(83 | GPIO_ALT_FN_2_IN)
+-#define GPIO83_CIF_DD_4_MD	(83 | GPIO_ALT_FN_3_IN)
+-#define GPIO84_NSSP_TX		(84 | GPIO_ALT_FN_1_OUT)
+-#define GPIO84_NSSP_RX		(84 | GPIO_ALT_FN_2_IN)
+-#define GPIO84_CIF_FV_MD	(84 | GPIO_ALT_FN_3_IN)
+-#define GPIO85_nPCE_1_MD	(85 | GPIO_ALT_FN_1_OUT)
+-#define GPIO85_CIF_LV_MD	(85 | GPIO_ALT_FN_3_IN)
+-#define GPIO86_nPCE_1_MD	(86 | GPIO_ALT_FN_1_OUT)
+-#define GPIO88_USBH1_PWR_MD	(88 | GPIO_ALT_FN_1_IN)
+-#define GPIO89_USBH1_PEN_MD	(89 | GPIO_ALT_FN_2_OUT)
+-#define GPIO90_CIF_DD_4_MD	(90 | GPIO_ALT_FN_3_IN)
+-#define GPIO91_CIF_DD_5_MD	(91 | GPIO_ALT_FN_3_IN)
+-#define GPIO92_MMCDAT0_MD	(92 | GPIO_ALT_FN_1_OUT)
+-#define GPIO93_CIF_DD_6_MD	(93 | GPIO_ALT_FN_2_IN)
+-#define GPIO94_CIF_DD_5_MD	(94 | GPIO_ALT_FN_2_IN)
+-#define GPIO95_CIF_DD_4_MD	(95 | GPIO_ALT_FN_2_IN)
+-#define GPIO95_KP_MKIN6_MD	(95 | GPIO_ALT_FN_3_IN)
+-#define GPIO96_KP_DKIN3_MD	(96 | GPIO_ALT_FN_1_IN)
+-#define GPIO96_FFRXD_MD		(96 | GPIO_ALT_FN_3_IN)
+-#define GPIO97_KP_MKIN3_MD	(97 | GPIO_ALT_FN_3_IN)
+-#define GPIO98_CIF_DD_0_MD	(98 | GPIO_ALT_FN_2_IN)
+-#define GPIO98_FFRTS_MD		(98 | GPIO_ALT_FN_3_OUT)
+-#define GPIO99_FFTXD_MD		(99 | GPIO_ALT_FN_3_OUT)
+-#define GPIO100_KP_MKIN0_MD	(100 | GPIO_ALT_FN_1_IN)
+-#define GPIO101_KP_MKIN1_MD	(101 | GPIO_ALT_FN_1_IN)
+-#define GPIO102_nPCE_1_MD	(102 | GPIO_ALT_FN_1_OUT)
+-#define GPIO102_KP_MKIN2_MD	(102 | GPIO_ALT_FN_1_IN)
+-#define GPIO103_CIF_DD_3_MD	(103 | GPIO_ALT_FN_1_IN)
+-#define GPIO103_KP_MKOUT0_MD	(103 | GPIO_ALT_FN_2_OUT)
+-#define GPIO104_CIF_DD_2_MD	(104 | GPIO_ALT_FN_1_IN)
+-#define GPIO104_pSKTSEL_MD	(104 | GPIO_ALT_FN_1_OUT)
+-#define GPIO104_KP_MKOUT1_MD	(104 | GPIO_ALT_FN_2_OUT)
+-#define GPIO105_CIF_DD_1_MD	(105 | GPIO_ALT_FN_1_IN)
+-#define GPIO105_KP_MKOUT2_MD	(105 | GPIO_ALT_FN_2_OUT)
+-#define GPIO106_CIF_DD_9_MD	(106 | GPIO_ALT_FN_1_IN)
+-#define GPIO106_KP_MKOUT3_MD	(106 | GPIO_ALT_FN_2_OUT)
+-#define GPIO107_CIF_DD_8_MD	(107 | GPIO_ALT_FN_1_IN)
+-#define GPIO107_KP_MKOUT4_MD	(107 | GPIO_ALT_FN_2_OUT)
+-#define GPIO108_CIF_DD_7_MD	(108 | GPIO_ALT_FN_1_IN)
+-#define GPIO108_KP_MKOUT5_MD	(108 | GPIO_ALT_FN_2_OUT)
+-#define GPIO109_MMCDAT1_MD	(109 | GPIO_ALT_FN_1_OUT)
+-#define GPIO110_MMCDAT2_MD	(110 | GPIO_ALT_FN_1_OUT)
+-#define GPIO110_MMCCS0_MD	(110 | GPIO_ALT_FN_1_OUT)
+-#define GPIO111_MMCDAT3_MD	(111 | GPIO_ALT_FN_1_OUT)
+-#define GPIO110_MMCCS1_MD	(111 | GPIO_ALT_FN_1_OUT)
+-#define GPIO112_MMCCMD_MD	(112 | GPIO_ALT_FN_1_OUT)
+-#define GPIO113_I2S_SYSCLK_MD	(113 | GPIO_ALT_FN_1_OUT)
+-#define GPIO113_AC97_RESET_N_MD	(113 | GPIO_ALT_FN_2_OUT)
+-#define GPIO117_I2CSCL_MD	(117 | GPIO_ALT_FN_1_IN)
+-#define GPIO118_I2CSDA_MD	(118 | GPIO_ALT_FN_1_IN)
 -
--
--/* Helper functions for reading the keyboard matrix
-- * Note: We should really be using the generic gpio functions to alter
-- *       GPDR but it requires a function call per GPIO bit which is
-- *       excessive when we need to access 12 bits@once, multiple times.
-- * These functions must be called within local_irq_save()/local_irq_restore()
-- * or similar.
-- */
--#define GET_ROWS_STATUS(c)	((GPLR2 & TOSA_GPIO_ALL_SENSE_BIT) >>
-TOSA_GPIO_ALL_SENSE_RSHIFT)
--
--static inline void tosakbd_discharge_all(void)
--{
--	/* STROBE All HiZ */
--	GPCR1  = TOSA_GPIO_HIGH_STROBE_BIT;
--	GPDR1 &= ~TOSA_GPIO_HIGH_STROBE_BIT;
--	GPCR2  = TOSA_GPIO_LOW_STROBE_BIT;
--	GPDR2 &= ~TOSA_GPIO_LOW_STROBE_BIT;
--}
--
--static inline void tosakbd_activate_all(void)
--{
--	/* STROBE ALL -> High */
--	GPSR1  = TOSA_GPIO_HIGH_STROBE_BIT;
--	GPDR1 |= TOSA_GPIO_HIGH_STROBE_BIT;
--	GPSR2  = TOSA_GPIO_LOW_STROBE_BIT;
--	GPDR2 |= TOSA_GPIO_LOW_STROBE_BIT;
--
--	udelay(KB_DISCHARGE_DELAY);
--
--	/* STATE CLEAR */
--	GEDR2 |= TOSA_GPIO_ALL_SENSE_BIT;
--}
--
--static inline void tosakbd_activate_col(int col)
--{
--	if (col <= 5) {
--		/* STROBE col -> High, not col -> HiZ */
--		GPSR1 = TOSA_GPIO_STROBE_BIT(col);
--		GPDR1 = (GPDR1 & ~TOSA_GPIO_HIGH_STROBE_BIT) | TOSA_GPIO_STROBE_BIT(col);
--	} else {
--		/* STROBE col -> High, not col -> HiZ */
--		GPSR2 = TOSA_GPIO_STROBE_BIT(col);
--		GPDR2 = (GPDR2 & ~TOSA_GPIO_LOW_STROBE_BIT) | TOSA_GPIO_STROBE_BIT(col);
--	}
--}
--
--static inline void tosakbd_reset_col(int col)
--{
--	if (col <= 5) {
--		/* STROBE col -> Low */
--		GPCR1 = TOSA_GPIO_STROBE_BIT(col);
--		/* STROBE col -> out, not col -> HiZ */
--		GPDR1 = (GPDR1 & ~TOSA_GPIO_HIGH_STROBE_BIT) | TOSA_GPIO_STROBE_BIT(col);
--	} else {
--		/* STROBE col -> Low */
--		GPCR2 = TOSA_GPIO_STROBE_BIT(col);
--		/* STROBE col -> out, not col -> HiZ */
--		GPDR2 = (GPDR2 & ~TOSA_GPIO_LOW_STROBE_BIT) | TOSA_GPIO_STROBE_BIT(col);
--	}
--}
 -/*
-- * The tosa keyboard only generates interrupts when a key is pressed.
-- * So when a key is pressed, we enable a timer.  This timer scans the
-- * keyboard, and this is how we detect when the key is released.
+- * Handy routine to set GPIO alternate functions
 - */
--
--/* Scan the hardware keyboard and push any changes up through the
-input layer */
--static void tosakbd_scankeyboard(struct platform_device *dev)
--{
--	struct tosakbd *tosakbd = platform_get_drvdata(dev);
--	unsigned int row, col, rowd;
--	unsigned long flags;
--	unsigned int num_pressed = 0;
--
--	spin_lock_irqsave(&tosakbd->lock, flags);
--
--	if (tosakbd->suspended)
--		goto out;
--
--	for (col = 0; col < TOSA_KEY_STROBE_NUM; col++) {
--		/*
--		 * Discharge the output driver capacitatance
--		 * in the keyboard matrix. (Yes it is significant..)
--		 */
--		tosakbd_discharge_all();
--		udelay(KB_DISCHARGE_DELAY);
--
--		tosakbd_activate_col(col);
--		udelay(KB_ACTIVATE_DELAY);
--
--		rowd = GET_ROWS_STATUS(col);
--
--		for (row = 0; row < TOSA_KEY_SENSE_NUM; row++) {
--			unsigned int scancode, pressed;
--			scancode = SCANCODE(row, col);
--			pressed = rowd & KB_ROWMASK(row);
--
--			if (pressed && !tosakbd->keycode[scancode])
--				dev_warn(&dev->dev,
--						"unhandled scancode: 0x%02x\n",
--						scancode);
--
--			input_report_key(tosakbd->input,
--					tosakbd->keycode[scancode],
--					pressed);
--			if (pressed)
--				num_pressed++;
--		}
--
--		tosakbd_reset_col(col);
--	}
--
--	tosakbd_activate_all();
--
--	input_sync(tosakbd->input);
--
--	/* if any keys are pressed, enable the timer */
--	if (num_pressed)
--		mod_timer(&tosakbd->timer, jiffies + SCAN_INTERVAL);
--
-- out:
--	spin_unlock_irqrestore(&tosakbd->lock, flags);
--}
--
--/*
-- * tosa keyboard interrupt handler.
-- */
--static irqreturn_t tosakbd_interrupt(int irq, void *__dev)
--{
--	struct platform_device *dev = __dev;
--	struct tosakbd *tosakbd = platform_get_drvdata(dev);
--
--	if (!timer_pending(&tosakbd->timer)) {
--		/** wait chattering delay **/
--		udelay(20);
--		tosakbd_scankeyboard(dev);
--	}
--
--	return IRQ_HANDLED;
--}
--
--/*
-- * tosa timer checking for released keys
-- */
--static void tosakbd_timer_callback(unsigned long __dev)
--{
--	struct platform_device *dev = (struct platform_device *)__dev;
--
--	tosakbd_scankeyboard(dev);
--}
--
--#ifdef CONFIG_PM
--static int tosakbd_suspend(struct platform_device *dev, pm_message_t state)
--{
--	struct tosakbd *tosakbd = platform_get_drvdata(dev);
--	unsigned long flags;
--
--	spin_lock_irqsave(&tosakbd->lock, flags);
--	tosakbd->suspended = true;
--	spin_unlock_irqrestore(&tosakbd->lock, flags);
--
--	del_timer_sync(&tosakbd->timer);
--
--	return 0;
--}
--
--static int tosakbd_resume(struct platform_device *dev)
--{
--	struct tosakbd *tosakbd = platform_get_drvdata(dev);
--
--	tosakbd->suspended = false;
--	tosakbd_scankeyboard(dev);
--
--	return 0;
--}
--#else
--#define tosakbd_suspend		NULL
--#define tosakbd_resume		NULL
--#endif
--
--static int __devinit tosakbd_probe(struct platform_device *pdev) {
--
--	int i;
--	struct tosakbd *tosakbd;
--	struct input_dev *input_dev;
--	int error;
--
--	tosakbd = kzalloc(sizeof(struct tosakbd), GFP_KERNEL);
--	if (!tosakbd)
--		return -ENOMEM;
--
--	input_dev = input_allocate_device();
--	if (!input_dev) {
--		kfree(tosakbd);
--		return -ENOMEM;
--	}
--
--	platform_set_drvdata(pdev, tosakbd);
--
--	spin_lock_init(&tosakbd->lock);
--
--	/* Init Keyboard rescan timer */
--	init_timer(&tosakbd->timer);
--	tosakbd->timer.function = tosakbd_timer_callback;
--	tosakbd->timer.data = (unsigned long) pdev;
--
--	tosakbd->input = input_dev;
--
--	input_set_drvdata(input_dev, tosakbd);
--	input_dev->name = "Tosa Keyboard";
--	input_dev->phys = "tosakbd/input0";
--	input_dev->dev.parent = &pdev->dev;
--
--	input_dev->id.bustype = BUS_HOST;
--	input_dev->id.vendor = 0x0001;
--	input_dev->id.product = 0x0001;
--	input_dev->id.version = 0x0100;
--
--	input_dev->evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
--	input_dev->keycode = tosakbd->keycode;
--	input_dev->keycodesize = sizeof(tosakbd->keycode[0]);
--	input_dev->keycodemax = ARRAY_SIZE(tosakbd_keycode);
--
--	memcpy(tosakbd->keycode, tosakbd_keycode, sizeof(tosakbd_keycode));
--
--	for (i = 0; i < ARRAY_SIZE(tosakbd_keycode); i++)
--		__set_bit(tosakbd->keycode[i], input_dev->keybit);
--	__clear_bit(KEY_RESERVED, input_dev->keybit);
--
--	/* Setup sense interrupts - RisingEdge Detect, sense lines as inputs */
--	for (i = 0; i < TOSA_KEY_SENSE_NUM; i++) {
--		int gpio = TOSA_GPIO_KEY_SENSE(i);
--		int irq;
--		error = gpio_request(gpio, "tosakbd");
--		if (error < 0) {
--			printk(KERN_ERR "tosakbd: failed to request GPIO %d, "
--				" error %d\n", gpio, error);
--			goto fail;
--		}
--
--		error = gpio_direction_input(TOSA_GPIO_KEY_SENSE(i));
--		if (error < 0) {
--			printk(KERN_ERR "tosakbd: failed to configure input"
--				" direction for GPIO %d, error %d\n",
--				gpio, error);
--			gpio_free(gpio);
--			goto fail;
--		}
--
--		irq = gpio_to_irq(gpio);
--		if (irq < 0) {
--			error = irq;
--			printk(KERN_ERR "gpio-keys: Unable to get irq number"
--				" for GPIO %d, error %d\n",
--				gpio, error);
--			gpio_free(gpio);
--			goto fail;
--		}
--
--		error = request_irq(irq, tosakbd_interrupt,
--					IRQF_DISABLED | IRQF_TRIGGER_RISING,
--					"tosakbd", pdev);
--
--		if (error) {
--			printk("tosakbd: Can't get IRQ: %d: error %d!\n",
--					irq, error);
--			gpio_free(gpio);
--			goto fail;
--		}
--	}
--
--	/* Set Strobe lines as outputs - set high */
--	for (i = 0; i < TOSA_KEY_STROBE_NUM; i++) {
--		int gpio = TOSA_GPIO_KEY_STROBE(i);
--		error = gpio_request(gpio, "tosakbd");
--		if (error < 0) {
--			printk(KERN_ERR "tosakbd: failed to request GPIO %d, "
--				" error %d\n", gpio, error);
--			goto fail2;
--		}
--
--		error = gpio_direction_output(gpio, 1);
--		if (error < 0) {
--			printk(KERN_ERR "tosakbd: failed to configure input"
--				" direction for GPIO %d, error %d\n",
--				gpio, error);
--			gpio_free(gpio);
--			goto fail2;
--		}
--
--	}
--
--	error = input_register_device(input_dev);
--	if (error) {
--		printk(KERN_ERR "tosakbd: Unable to register input device, "
--			"error: %d\n", error);
--		goto fail2;
--	}
--
--	printk(KERN_INFO "input: Tosa Keyboard Registered\n");
--
--	return 0;
--
--fail2:
--	while (--i >= 0)
--		gpio_free(TOSA_GPIO_KEY_STROBE(i));
--
--	i = TOSA_KEY_SENSE_NUM;
--fail:
--	while (--i >= 0) {
--		free_irq(gpio_to_irq(TOSA_GPIO_KEY_SENSE(i)), pdev);
--		gpio_free(TOSA_GPIO_KEY_SENSE(i));
--	}
--
--	platform_set_drvdata(pdev, NULL);
--	input_free_device(input_dev);
--	kfree(tosakbd);
--
--	return error;
--}
--
--static int __devexit tosakbd_remove(struct platform_device *dev)
--{
--	int i;
--	struct tosakbd *tosakbd = platform_get_drvdata(dev);
--
--	for (i = 0; i < TOSA_KEY_STROBE_NUM; i++)
--		gpio_free(TOSA_GPIO_KEY_STROBE(i));
--
--	for (i = 0; i < TOSA_KEY_SENSE_NUM; i++) {
--		free_irq(gpio_to_irq(TOSA_GPIO_KEY_SENSE(i)), dev);
--		gpio_free(TOSA_GPIO_KEY_SENSE(i));
--	}
--
--	del_timer_sync(&tosakbd->timer);
--
--	input_unregister_device(tosakbd->input);
--
--	kfree(tosakbd);
--
--	return 0;
--}
--
--static struct platform_driver tosakbd_driver = {
--	.probe		= tosakbd_probe,
--	.remove		= __devexit_p(tosakbd_remove),
--	.suspend	= tosakbd_suspend,
--	.resume		= tosakbd_resume,
--	.driver		= {
--		.name	= "tosa-keyboard",
--		.owner	= THIS_MODULE,
--	},
--};
--
--static int __devinit tosakbd_init(void)
--{
--	return platform_driver_register(&tosakbd_driver);
--}
--
--static void __exit tosakbd_exit(void)
--{
--	platform_driver_unregister(&tosakbd_driver);
--}
--
--module_init(tosakbd_init);
--module_exit(tosakbd_exit);
--
--MODULE_AUTHOR("Dirk Opfer <Dirk@Opfer-Online.de>");
--MODULE_DESCRIPTION("Tosa Keyboard Driver");
--MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:tosa-keyboard");
+-extern int pxa_gpio_mode( int gpio_mode );
+-
+-#endif /* __ASM_ARCH_PXA2XX_GPIO_H */
+diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+index 463d874..cb47672 100644
+--- a/arch/arm/mach-pxa/sharpsl_pm.c
++++ b/arch/arm/mach-pxa/sharpsl_pm.c
+@@ -28,7 +28,6 @@
+ #include <asm/mach-types.h>
+ #include <mach/pm.h>
+ #include <mach/pxa2xx-regs.h>
+-#include <mach/pxa2xx-gpio.h>
+ #include <mach/regs-rtc.h>
+ #include <mach/sharpsl.h>
+ #include <mach/sharpsl_pm.h>
