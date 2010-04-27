@@ -1,16 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 27 Apr 2010 10:37:02 +0800
-Subject: [PATCH] ARM: pxa/raumfeld: fix button name
-In-Reply-To: <20100426210332.GX30801@buzzloop.caiaq.de>
-References: <1271576129-16133-1-git-send-email-daniel@caiaq.de>
-	<20100422101956.GV30801@buzzloop.caiaq.de>
-	<20100426210332.GX30801@buzzloop.caiaq.de>
-Message-ID: <y2uf17812d71004261937i6c34e7a1m40ce8c8873488a5b@mail.gmail.com>
+From: hunterd42@gmail.com (David Hunter)
+Date: Mon, 26 Apr 2010 19:46:09 -0700
+Subject: [PATCH] pxa: Remove unused MFP LPM definition
+Message-ID: <4BD64FF1.2090007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 27, 2010 at 5:03 AM, Daniel Mack <daniel@caiaq.de> wrote:
-> Ping?
->
+MFP_LPM_INPUT snuck in some time ago as part of "[PATCH] pxa: better
+MFP low power state support for pxa25x/pxa27x", but went unused in the
+final revision of said patch. Using it on PXA3xx would cause an
+out-of-bounds access of mfpr_table[]. Let's remove it before someone
+gets hurt.
 
-Mind if I put it to the queue of the next merge window?
+Signed-off-by: David Hunter <hunterd42@gmail.com>
+---
+  arch/arm/plat-pxa/include/plat/mfp.h |    1 -
+  1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-pxa/include/plat/mfp.h 
+b/arch/arm/plat-pxa/include/plat/mfp.h
+index 857a683..c5d24e9 100644
+--- a/arch/arm/plat-pxa/include/plat/mfp.h
++++ b/arch/arm/plat-pxa/include/plat/mfp.h
+@@ -378,7 +378,6 @@ typedef unsigned long mfp_cfg_t;
+  #define MFP_LPM_PULL_LOW       (0x3 << 16)
+  #define MFP_LPM_PULL_HIGH      (0x4 << 16)
+  #define MFP_LPM_FLOAT          (0x5 << 16)
+-#define MFP_LPM_INPUT          (0x6 << 16)
+  #define MFP_LPM_STATE_MASK     (0x7 << 16)
+  #define MFP_LPM_STATE(x)       (((x) >> 16) & 0x7)
+
+--
+1.6.0.3
