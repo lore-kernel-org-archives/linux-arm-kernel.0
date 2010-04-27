@@ -1,61 +1,32 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Tue, 27 Apr 2010 16:14:12 +0300
-Subject: [PATCHv2 1/4] ARM: Introduce SoC Info into /proc/cpuinfo
-In-Reply-To: <1272374055-9656-1-git-send-email-eduardo.valentin@nokia.com>
-References: <1272374055-9656-1-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <1272374055-9656-2-git-send-email-eduardo.valentin@nokia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 27 Apr 2010 16:36:28 +0200
+Subject: [PATCH 3/4] MMC: atmel-mci: remove data error interrupt after xfer
+In-Reply-To: <1271671952-29204-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1271671952-29204-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <8b5493cebeb6b6fb11936940f708956e24b3c2a1.1272378853.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eduardo Valentin <eduardo.valentin@nokia.com>
+Disable data error interrupts while we are actually recording that there is not
+such errors. This will prevent, in some cases, the warning message printed at
+new request queuing (in atmci_start_request()).
 
-This patch extends the ARM /proc/cpuinfo to include soc info data.
-It is implemented via the same way which is done for
-system_rev, system_serial_low and system_serial_high.
-Then, now we have system_soc_info, which is printed only
-if there is something useful there.
-
-Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/include/asm/system.h |    2 ++
- arch/arm/kernel/setup.c       |    5 +++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+ drivers/mmc/host/atmel-mci.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 4ace45e..53a9645 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -71,6 +71,8 @@ struct task_struct;
- extern unsigned int system_rev;
- extern unsigned int system_serial_low;
- extern unsigned int system_serial_high;
-+#define SYSTEM_SOC_INFO_SIZE			128
-+extern char system_soc_info[SYSTEM_SOC_INFO_SIZE];
- extern unsigned int mem_fclk_21285;
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 12572e5..68b47cc 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1308,6 +1308,7 @@ static void atmci_tasklet_func(unsigned long priv)
+ 			} else {
+ 				data->bytes_xfered = data->blocks * data->blksz;
+ 				data->error = 0;
++				mci_writel(host, IDR, ATMCI_DATA_ERROR_FLAGS);
+ 			}
  
- struct pt_regs;
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c91c77b..025d795 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -85,6 +85,9 @@ EXPORT_SYMBOL(system_serial_low);
- unsigned int system_serial_high;
- EXPORT_SYMBOL(system_serial_high);
- 
-+char system_soc_info[SYSTEM_SOC_INFO_SIZE];
-+EXPORT_SYMBOL(system_soc_info);
-+
- unsigned int elf_hwcap;
- EXPORT_SYMBOL(elf_hwcap);
- 
-@@ -847,6 +850,8 @@ static int c_show(struct seq_file *m, void *v)
- 	seq_printf(m, "Revision\t: %04x\n", system_rev);
- 	seq_printf(m, "Serial\t\t: %08x%08x\n",
- 		   system_serial_high, system_serial_low);
-+	if (strlen(system_soc_info))
-+		seq_printf(m, "SoC Info\t: %s\n",  system_soc_info);
- 
- 	return 0;
- }
+ 			if (!data->stop) {
 -- 
-1.7.0.4.361.g8b5fe.dirty
+1.5.6.5
