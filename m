@@ -1,110 +1,80 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 27 Apr 2010 09:46:43 +0530
-Subject: [PATCH 05/14] ux500: move gpio macros to common header
+Date: Tue, 27 Apr 2010 09:46:50 +0530
+Subject: [PATCH 12/14] ux500: use UX500_* macros instead of U8500_*
 In-Reply-To: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
 References: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1272341812-4622-6-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1272341812-4622-13-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move GPIO macros to a common header, and allow them to use the correct
-macros for the appropriate SoC, and be named accordingly.
+So that the correct addresses get used on U5500.
 
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/mach-ux500/cpu-u8500.c         |   30 ------------------------
- arch/arm/mach-ux500/include/mach/gpio.h |   38 +++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+), 30 deletions(-)
+ arch/arm/mach-ux500/include/mach/entry-macro.S |    2 +-
+ arch/arm/mach-ux500/platsmp.c                  |   10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-u8500.c b/arch/arm/mach-ux500/cpu-u8500.c
-index 2c8aa93..c80beca 100644
---- a/arch/arm/mach-ux500/cpu-u8500.c
-+++ b/arch/arm/mach-ux500/cpu-u8500.c
-@@ -23,36 +23,6 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
+diff --git a/arch/arm/mach-ux500/include/mach/entry-macro.S b/arch/arm/mach-ux500/include/mach/entry-macro.S
+index eece330..60ea88d 100644
+--- a/arch/arm/mach-ux500/include/mach/entry-macro.S
++++ b/arch/arm/mach-ux500/include/mach/entry-macro.S
+@@ -17,7 +17,7 @@
+ 		.endm
  
--#define GPIO_RESOURCE(block)						\
--	{								\
--		.start	= U8500_GPIOBANK##block##_BASE,			\
--		.end	= U8500_GPIOBANK##block##_BASE + 127,		\
--		.flags	= IORESOURCE_MEM,				\
--	},								\
--	{								\
--		.start	= IRQ_GPIO##block,				\
--		.end	= IRQ_GPIO##block,				\
--		.flags	= IORESOURCE_IRQ,				\
--	}
--
--#define GPIO_DEVICE(block)						\
--	{								\
--		.name 		= "gpio",				\
--		.id		= block,				\
--		.num_resources 	= 2,					\
--		.resource	= &u8500_gpio_resources[block * 2],	\
--		.dev = {						\
--			.platform_data = &u8500_gpio_data[block],	\
--		},							\
--	}
--
--#define GPIO_DATA(_name, first)						\
--	{								\
--		.name 		= _name,				\
--		.first_gpio 	= first,				\
--		.first_irq 	= NOMADIK_GPIO_TO_IRQ(first),		\
--	}
--
- static struct nmk_gpio_platform_data u8500_gpio_data[] = {
- 	GPIO_DATA("GPIO-0-31", 0),
- 	GPIO_DATA("GPIO-32-63", 32), /* 37..63 not routed to pin */
-diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
-index 3c4cd31..d548a62 100644
---- a/arch/arm/mach-ux500/include/mach/gpio.h
-+++ b/arch/arm/mach-ux500/include/mach/gpio.h
-@@ -9,4 +9,42 @@
+ 		.macro  get_irqnr_preamble, base, tmp
+-		ldr     \base, =IO_ADDRESS(U8500_GIC_CPU_BASE)
++		ldr     \base, =IO_ADDRESS(UX500_GIC_CPU_BASE)
+ 		.endm
  
- #include <plat/gpio.h>
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 76dd935..438ef16 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -30,7 +30,7 @@ volatile int __cpuinitdata pen_release = -1;
  
-+#define __GPIO_RESOURCE(soc, block)					\
-+	{								\
-+		.start	= soc##_GPIOBANK##block##_BASE,			\
-+		.end	= soc##_GPIOBANK##block##_BASE + 127,		\
-+		.flags	= IORESOURCE_MEM,				\
-+	},								\
-+	{								\
-+		.start	= IRQ_GPIO##block,				\
-+		.end	= IRQ_GPIO##block,				\
-+		.flags	= IORESOURCE_IRQ,				\
-+	}
-+
-+#define __GPIO_DEVICE(soc, block)					\
-+	{								\
-+		.name		= "gpio",				\
-+		.id		= block,				\
-+		.num_resources	= 2,					\
-+		.resource	= &soc##_gpio_resources[block * 2],	\
-+		.dev = {						\
-+			.platform_data = &soc##_gpio_data[block],	\
-+		},							\
-+	}
-+
-+#define GPIO_DATA(_name, first)						\
-+	{								\
-+		.name		= _name,				\
-+		.first_gpio	= first,				\
-+		.first_irq	= NOMADIK_GPIO_TO_IRQ(first),		\
-+	}
-+
-+#ifdef CONFIG_UX500_SOC_DB8500
-+#define GPIO_RESOURCE(block)	__GPIO_RESOURCE(U8500, block)
-+#define GPIO_DEVICE(block)	__GPIO_DEVICE(u8500, block)
-+#elif defined(CONFIG_UX500_SOC_DB5500)
-+#define GPIO_RESOURCE(block)	__GPIO_RESOURCE(U5500, block)
-+#define GPIO_DEVICE(block)	__GPIO_DEVICE(u5500, block)
-+#endif
-+
- #endif /* __ASM_ARCH_GPIO_H */
+ static unsigned int __init get_core_count(void)
+ {
+-	return scu_get_core_count(__io_address(U8500_SCU_BASE));
++	return scu_get_core_count(__io_address(UX500_SCU_BASE));
+ }
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+@@ -44,7 +44,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	 * core (e.g. timer irq), then they will not have been enabled
+ 	 * for us: do so
+ 	 */
+-	gic_cpu_init(0, __io_address(U8500_GIC_CPU_BASE));
++	gic_cpu_init(0, __io_address(UX500_GIC_CPU_BASE));
+ 
+ 	/*
+ 	 * let the primary processor know we're out of the
+@@ -106,12 +106,12 @@ static void __init wakeup_secondary(void)
+ 	 */
+ #define U8500_CPU1_JUMPADDR_OFFSET 0x1FF4
+ 	__raw_writel(virt_to_phys(u8500_secondary_startup),
+-		(void __iomem *)IO_ADDRESS(U8500_BACKUPRAM0_BASE) +
++		__io_address(UX500_BACKUPRAM0_BASE) +
+ 		U8500_CPU1_JUMPADDR_OFFSET);
+ 
+ #define U8500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
+ 	__raw_writel(0xA1FEED01,
+-		(void __iomem *)IO_ADDRESS(U8500_BACKUPRAM0_BASE) +
++		__io_address(UX500_BACKUPRAM0_BASE) +
+ 		U8500_CPU1_WAKEMAGIC_OFFSET);
+ 
+ 	/* make sure write buffer is drained */
+@@ -172,7 +172,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		 * boot CPU, but only if we have more than one CPU.
+ 		 */
+ 		percpu_timer_setup();
+-		scu_enable(__io_address(U8500_SCU_BASE));
++		scu_enable(__io_address(UX500_SCU_BASE));
+ 		wakeup_secondary();
+ 	}
+ }
 -- 
 1.7.0
