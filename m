@@ -1,24 +1,55 @@
-From: shubhan@quicinc.com (Nagaraja Rao, Shubha)
-Date: Tue, 27 Apr 2010 06:28:51 -0700
-Subject: PPI interrupts on SMP
-Message-ID: <79454A0F7EEA2241B708369110370A9905E2FAA916@NASANEXMB12.na.qualcomm.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Tue, 27 Apr 2010 18:01:30 +0300
+Subject: [PATCHv2 2/4] mach-omap2: Add SoC info data for OMAP2,3,4 into
+	/proc/cpuinfo
+In-Reply-To: <1272374055-9656-3-git-send-email-eduardo.valentin@nokia.com>
+References: <1272374055-9656-1-git-send-email-eduardo.valentin@nokia.com>
+	<1272374055-9656-3-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <20100427150129.GA8600@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+On Tue, Apr 27, 2010 at 03:14:13PM +0200, Valentin Eduardo (Nokia-D/Helsinki) wrote:
+>From: Eduardo Valentin <eduardo.valentin@nokia.com>
+>
+>Report OMAP2,3,4 data into system_soc_info. Now we get omap
+>information under /proc/cpuinfo.
+>
+>Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+>---
+> arch/arm/mach-omap2/id.c |   21 +++++++++++++++------
+> 1 files changed, 15 insertions(+), 6 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>index 37b8a1a..75e36a5 100644
+>--- a/arch/arm/mach-omap2/id.c
+>+++ b/arch/arm/mach-omap2/id.c
+>@@ -152,10 +152,15 @@ void __init omap24xx_check_revision(void)
+> 		j = i;
+> 	}
+>
+>-	pr_info("OMAP%04x", omap_rev() >> 16);
+>-	if ((omap_rev() >> 8) & 0x0f)
+>-		pr_info("ES%x", (omap_rev() >> 12) & 0xf);
+>-	pr_info("\n");
+>+	snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
+>+							omap_rev() >> 16);
+>+	if ((omap_rev() >> 8) & 0x0f) {
+>+		int sz = strlen(system_soc_info);
 
+how about you use the return of the first snprintf instead of asking 
+strlen() here ? I mean:
 
-I am working on an ARMV7 SMP system with GIC.  One of the subsystems uses a peripheral interrupt that is local/private to each CPU core (PPI interrupt). The interrupt number is same on all CPU cores.
+int sz = snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
+		omap_rev() >> 16);
 
-The request_irq() call works for the first core the interrupt is requested on, however on the second core that it tries to request, it fails with the error "Unable to request IRQx for ARMv7".
+if ((omap_rev() >> 8) & 0x0f)
+	snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
+			"ES%x", (omap_rev() >> 12) & 0x0f);
 
-Is there any solution to get this interrupt working? I noticed that other similar private interrupts (timer, IPI) have special processing in entry-armv.S
+would that work ???
 
+-- 
+balbi
 
-
-Thanks
-
-Shubha
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100427/3ea36712/attachment-0001.htm>
+DefectiveByDesign.org
