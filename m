@@ -1,137 +1,496 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 27 Apr 2010 09:46:45 +0530
-Subject: [PATCH 07/14] ux500: put DB8500-specific devices in devices-db8500.c
+Date: Tue, 27 Apr 2010 09:46:40 +0530
+Subject: [PATCH 02/14] ux500: add per-SoC register definitions
 In-Reply-To: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
 References: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1272341812-4622-8-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1272341812-4622-3-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devices-db8500.c for DB8500-specific devices, starting
-with SSP0.
+Split up all the hardware register definitions previously found in
+hardware.h into per-SoC files db8500-regs.h and db5500-regs.h.  Rename a
+couple of macros to prepare for sharing code between the variants.
 
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/mach-ux500/Makefile               |    2 +-
- arch/arm/mach-ux500/board-mop500.c         |   21 +++---------------
- arch/arm/mach-ux500/devices-db8500.c       |   30 ++++++++++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/devices.h |    1 +
- 4 files changed, 36 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/mach-ux500/devices-db8500.c
+ arch/arm/mach-ux500/cpu-u8500.c                |    6 +-
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |  103 ++++++++++++++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |  135 ++++++++++++++++++
+ arch/arm/mach-ux500/include/mach/hardware.h    |  174 ++++++++---------------
+ 4 files changed, 302 insertions(+), 116 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/include/mach/db5500-regs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/db8500-regs.h
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index e5b9f74..55651e0 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- obj-y				:= clock.o cpu.o devices.o
--obj-$(CONFIG_ARCH_U8500)	+= cpu-u8500.o
-+obj-$(CONFIG_ARCH_U8500)	+= cpu-u8500.o devices-db8500.o
- obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o localtimer.o
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index cc52d53..6bb9a3d 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -24,6 +24,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/setup.h>
-+#include <mach/devices.h>
- 
- #define __MEM_4K_RESOURCE(x) \
- 	.res = {.start = (x), .end = (x) + SZ_4K - 1, .flags = IORESOURCE_MEM}
-@@ -91,22 +92,6 @@ static struct pl022_ssp_controller ssp0_platform_data = {
- 	.num_chipselect = 5,
+diff --git a/arch/arm/mach-ux500/cpu-u8500.c b/arch/arm/mach-ux500/cpu-u8500.c
+index 979f1c3..8919af4 100644
+--- a/arch/arm/mach-ux500/cpu-u8500.c
++++ b/arch/arm/mach-ux500/cpu-u8500.c
+@@ -124,10 +124,10 @@ static struct map_desc u8500_io_desc[] __initdata = {
+ 	__IO_DEV_DESC(U8500_CLKRST3_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_CLKRST5_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_CLKRST6_BASE, SZ_4K),
++	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO3_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_GPIO5_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_L2CC_BASE, SZ_4K),
  };
  
--static struct amba_device pl022_device = {
--	.dev = {
--		.coherent_dma_mask = ~0,
--		.init_name = "ssp0",
--		.platform_data = &ssp0_platform_data,
--	},
--	.res = {
--		.start = U8500_SSP0_BASE,
--		.end   = U8500_SSP0_BASE + SZ_4K - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	.irq = {IRQ_SSP0, NO_IRQ },
--	/* ST-Ericsson modified id */
--	.periphid = SSP_PER_ID,
--};
--
- #define U8500_I2C_RESOURCES(id, size)		\
- static struct resource u8500_i2c_resources_##id[] = {	\
- 	[0] = {					\
-@@ -175,7 +160,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&uart0_device,
- 	&uart1_device,
- 	&uart2_device,
--	&pl022_device,
-+	&u8500_ssp0_device,
+@@ -137,7 +137,7 @@ static struct map_desc u8500ed_io_desc[] __initdata = {
  };
  
- /* add any platform devices here - TODO */
-@@ -190,6 +175,8 @@ static void __init u8500_init_machine(void)
- {
- 	int i;
+ static struct map_desc u8500v1_io_desc[] __initdata = {
+-	__IO_DEV_DESC(U8500_MTU0_BASE_V1, SZ_4K),
++	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
+ };
  
-+	u8500_ssp0_device.dev.platform_data = &ssp0_platform_data;
-+
- 	/* Register the active AMBA devices on this board */
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
- 		amba_device_register(amba_devs[i], &iomem_resource);
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+ void __init u8500_map_io(void)
+@@ -177,7 +177,7 @@ static void __init u8500_timer_init(void)
+ 	if (cpu_is_u8500ed())
+ 		mtu_base = __io_address(U8500_MTU0_BASE_ED);
+ 	else
+-		mtu_base = __io_address(U8500_MTU0_BASE_V1);
++		mtu_base = __io_address(U8500_MTU0_BASE);
+ 
+ 	nmdk_timer_init();
+ }
+diff --git a/arch/arm/mach-ux500/include/mach/db5500-regs.h b/arch/arm/mach-ux500/include/mach/db5500-regs.h
 new file mode 100644
-index 0000000..f4a2dda
+index 0000000..545c80f
 --- /dev/null
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -0,0 +1,30 @@
++++ b/arch/arm/mach-ux500/include/mach/db5500-regs.h
+@@ -0,0 +1,103 @@
 +/*
 + * Copyright (C) ST-Ericsson SA 2010
 + *
-+ * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
 + * License terms: GNU General Public License (GPL) version 2
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/amba/bus.h>
++#ifndef __MACH_DB5500_REGS_H
++#define __MACH_DB5500_REGS_H
 +
-+#include <mach/hardware.h>
-+#include <mach/setup.h>
++#define U5500_PER1_BASE		0xA0020000
++#define U5500_PER2_BASE		0xA0010000
++#define U5500_PER3_BASE		0x80140000
++#define U5500_PER4_BASE		0x80150000
++#define U5500_PER5_BASE		0x80100000
++#define U5500_PER6_BASE		0x80120000
 +
-+struct amba_device u8500_ssp0_device = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+		.init_name = "ssp0",
-+	},
-+	.res = {
-+		.start = U8500_SSP0_BASE,
-+		.end   = U8500_SSP0_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	.irq = {IRQ_SSP0, NO_IRQ },
-+	/* ST-Ericsson modified id */
-+	.periphid = SSP_PER_ID,
-+};
-diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/include/mach/devices.h
-index 5bca7c6..90229b1 100644
---- a/arch/arm/mach-ux500/include/mach/devices.h
-+++ b/arch/arm/mach-ux500/include/mach/devices.h
-@@ -11,5 +11,6 @@ struct platform_device;
- struct amba_device;
++#define U5500_GIC_DIST_BASE	0xA0411000
++#define U5500_GIC_CPU_BASE	0xA0410100
++#define U5500_DMA_BASE		0x90030000
++#define U5500_MCDE_BASE		0xA0400000
++#define U5500_MODEM_BASE	0xB0000000
++#define U5500_L2CC_BASE		0xA0412000
++#define U5500_SCU_BASE		0xA0410000
++#define U5500_DSI1_BASE		0xA0401000
++#define U5500_DSI2_BASE		0xA0402000
++#define U5500_SIA_BASE		0xA0100000
++#define U5500_SVA_BASE		0x80200000
++#define U5500_HSEM_BASE		0xA0000000
++#define U5500_NAND0_BASE	0x60000000
++#define U5500_NAND1_BASE	0x70000000
++#define U5500_TWD_BASE		0xa0410600
++#define U5500_B2R2_BASE		0xa0200000
++
++#define U5500_FSMC_BASE		(U5500_PER1_BASE + 0x0000)
++#define U5500_SDI0_BASE		(U5500_PER1_BASE + 0x1000)
++#define U5500_SDI2_BASE		(U5500_PER1_BASE + 0x2000)
++#define U5500_UART0_BASE	(U5500_PER1_BASE + 0x3000)
++#define U5500_I2C1_BASE		(U5500_PER1_BASE + 0x4000)
++#define U5500_MSP0_BASE		(U5500_PER1_BASE + 0x5000)
++#define U5500_GPIO0_BASE	(U5500_PER1_BASE + 0xE000)
++#define U5500_CLKRST1_BASE	(U5500_PER1_BASE + 0xF000)
++
++#define U5500_USBOTG_BASE	(U5500_PER2_BASE + 0x0000)
++#define U5500_GPIO1_BASE	(U5500_PER2_BASE + 0xE000)
++#define U5500_CLKRST2_BASE	(U5500_PER2_BASE + 0xF000)
++
++#define U5500_KEYPAD_BASE	(U5500_PER3_BASE + 0x0000)
++#define U5500_PWM_BASE		(U5500_PER3_BASE + 0x1000)
++#define U5500_GPIO3_BASE	(U5500_PER3_BASE + 0xE000)
++#define U5500_CLKRST3_BASE	(U5500_PER3_BASE + 0xF000)
++
++#define U5500_BACKUPRAM0_BASE	(U5500_PER4_BASE + 0x0000)
++#define U5500_BACKUPRAM1_BASE	(U5500_PER4_BASE + 0x1000)
++#define U5500_RTT0_BASE		(U5500_PER4_BASE + 0x2000)
++#define U5500_RTT1_BASE		(U5500_PER4_BASE + 0x3000)
++#define U5500_RTC_BASE		(U5500_PER4_BASE + 0x4000)
++#define U5500_SCR_BASE		(U5500_PER4_BASE + 0x5000)
++#define U5500_DMC_BASE		(U5500_PER4_BASE + 0x6000)
++#define U5500_PRCMU_BASE	(U5500_PER4_BASE + 0x7000)
++#define U5500_MSP1_BASE		(U5500_PER4_BASE + 0x9000)
++#define U5500_GPIO2_BASE	(U5500_PER4_BASE + 0xA000)
++#define U5500_CDETECT_BASE	(U5500_PER4_BASE + 0xF000)
++
++#define U5500_SPI0_BASE		(U5500_PER5_BASE + 0x0000)
++#define U5500_SPI1_BASE		(U5500_PER5_BASE + 0x1000)
++#define U5500_SPI2_BASE		(U5500_PER5_BASE + 0x2000)
++#define U5500_SPI3_BASE		(U5500_PER5_BASE + 0x3000)
++#define U5500_UART1_BASE	(U5500_PER5_BASE + 0x4000)
++#define U5500_UART2_BASE	(U5500_PER5_BASE + 0x5000)
++#define U5500_UART3_BASE	(U5500_PER5_BASE + 0x6000)
++#define U5500_SDI1_BASE		(U5500_PER5_BASE + 0x7000)
++#define U5500_SDI3_BASE		(U5500_PER5_BASE + 0x8000)
++#define U5500_SDI4_BASE		(U5500_PER5_BASE + 0x9000)
++#define U5500_I2C2_BASE		(U5500_PER5_BASE + 0xA000)
++#define U5500_I2C3_BASE		(U5500_PER5_BASE + 0xB000)
++#define U5500_MSP2_BASE		(U5500_PER5_BASE + 0xC000)
++#define U5500_IRDA_BASE		(U5500_PER5_BASE + 0xD000)
++#define U5500_IRRC_BASE		(U5500_PER5_BASE + 0x10000)
++#define U5500_GPIO4_BASE	(U5500_PER5_BASE + 0x1E000)
++#define U5500_CLKRST5_BASE	(U5500_PER5_BASE + 0x1F000)
++
++#define U5500_RNG_BASE		(U5500_PER6_BASE + 0x0000)
++#define U5500_HASH0_BASE	(U5500_PER6_BASE + 0x1000)
++#define U5500_HASH1_BASE	(U5500_PER6_BASE + 0x2000)
++#define U5500_PKA_BASE		(U5500_PER6_BASE + 0x4000)
++#define U5500_PKAM_BASE		(U5500_PER6_BASE + 0x5000)
++#define U5500_MTU0_BASE		(U5500_PER6_BASE + 0x6000)
++#define U5500_MTU1_BASE		(U5500_PER6_BASE + 0x7000)
++#define U5500_CR_BASE		(U5500_PER6_BASE + 0x8000)
++#define U5500_CRYP0_BASE	(U5500_PER6_BASE + 0xA000)
++#define U5500_CRYP1_BASE	(U5500_PER6_BASE + 0xB000)
++#define U5500_CLKRST6_BASE	(U5500_PER6_BASE + 0xF000)
++
++#define U5500_GPIOBANK0_BASE	U5500_GPIO0_BASE
++#define U5500_GPIOBANK1_BASE	(U5500_GPIO0_BASE + 0x80)
++#define U5500_GPIOBANK2_BASE	U5500_GPIO1_BASE
++#define U5500_GPIOBANK3_BASE	U5500_GPIO2_BASE
++#define U5500_GPIOBANK4_BASE	U5500_GPIO3_BASE
++#define U5500_GPIOBANK5_BASE	U5500_GPIO4_BASE
++#define U5500_GPIOBANK6_BASE	(U5500_GPIO4_BASE + 0x80)
++#define U5500_GPIOBANK7_BASE	(U5500_GPIO4_BASE + 0x100)
++
++#endif
+diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+new file mode 100644
+index 0000000..9169e1e
+--- /dev/null
++++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+@@ -0,0 +1,135 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#ifndef __MACH_DB8500_REGS_H
++#define __MACH_DB8500_REGS_H
++
++#define U8500_PER3_BASE		0x80000000
++#define U8500_STM_BASE		0x80100000
++#define U8500_STM_REG_BASE	(U8500_STM_BASE + 0xF000)
++#define U8500_PER2_BASE		0x80110000
++#define U8500_PER1_BASE		0x80120000
++#define U8500_B2R2_BASE		0x80130000
++#define U8500_HSEM_BASE		0x80140000
++#define U8500_PER4_BASE		0x80150000
++#define U8500_ICN_BASE		0x81000000
++
++#define U8500_BOOT_ROM_BASE	0x90000000
++/* ASIC ID is at 0xff4 offset within this region */
++#define U8500_ASIC_ID_BASE	0x9001F000
++
++#define U8500_PER6_BASE		0xa03c0000
++#define U8500_PER5_BASE		0xa03e0000
++#define U8500_PER7_BASE_ED	0xa03d0000
++
++#define U8500_SVA_BASE		0xa0100000
++#define U8500_SIA_BASE		0xa0200000
++
++#define U8500_SGA_BASE		0xa0300000
++#define U8500_MCDE_BASE		0xa0350000
++#define U8500_DMA_BASE_ED	0xa0362000
++#define U8500_DMA_BASE		0x801C0000	/* v1 */
++
++#define U8500_SBAG_BASE		0xa0390000
++
++#define U8500_SCU_BASE		0xa0410000
++#define U8500_GIC_CPU_BASE	0xa0410100
++#define U8500_TWD_BASE		0xa0410600
++#define U8500_GIC_DIST_BASE	0xa0411000
++#define U8500_L2CC_BASE		0xa0412000
++
++#define U8500_MODEM_I2C		0xb7e02000
++
++#define U8500_GPIO0_BASE	(U8500_PER1_BASE + 0xE000)
++#define U8500_GPIO1_BASE	(U8500_PER3_BASE + 0xE000)
++#define U8500_GPIO2_BASE	(U8500_PER2_BASE + 0xE000)
++#define U8500_GPIO3_BASE	(U8500_PER5_BASE + 0x1E000)
++
++/* per7 base addressess */
++#define U8500_CR_BASE_ED	(U8500_PER7_BASE_ED + 0x8000)
++#define U8500_MTU0_BASE_ED	(U8500_PER7_BASE_ED + 0xa000)
++#define U8500_MTU1_BASE_ED	(U8500_PER7_BASE_ED + 0xb000)
++#define U8500_TZPC0_BASE_ED	(U8500_PER7_BASE_ED + 0xc000)
++#define U8500_CLKRST7_BASE_ED	(U8500_PER7_BASE_ED + 0xf000)
++
++#define U8500_UART0_BASE	(U8500_PER1_BASE + 0x0000)
++#define U8500_UART1_BASE	(U8500_PER1_BASE + 0x1000)
++
++/* per6 base addressess */
++#define U8500_RNG_BASE		(U8500_PER6_BASE + 0x0000)
++#define U8500_PKA_BASE		(U8500_PER6_BASE + 0x1000)
++#define U8500_PKAM_BASE		(U8500_PER6_BASE + 0x2000)
++#define U8500_MTU0_BASE		(U8500_PER6_BASE + 0x6000) /* v1 */
++#define U8500_MTU1_BASE		(U8500_PER6_BASE + 0x7000) /* v1 */
++#define U8500_CR_BASE		(U8500_PER6_BASE + 0x8000) /* v1 */
++#define U8500_CRYPTO0_BASE	(U8500_PER6_BASE + 0xa000)
++#define U8500_CRYPTO1_BASE	(U8500_PER6_BASE + 0xb000)
++#define U8500_CLKRST6_BASE	(U8500_PER6_BASE + 0xf000)
++
++/* per5 base addressess */
++#define U8500_USBOTG_BASE	(U8500_PER5_BASE + 0x00000)
++#define U8500_CLKRST5_BASE	(U8500_PER5_BASE + 0x1f000)
++
++/* per4 base addressess */
++#define U8500_BACKUPRAM0_BASE	(U8500_PER4_BASE + 0x00000)
++#define U8500_BACKUPRAM1_BASE	(U8500_PER4_BASE + 0x01000)
++#define U8500_RTT0_BASE		(U8500_PER4_BASE + 0x02000)
++#define U8500_RTT1_BASE		(U8500_PER4_BASE + 0x03000)
++#define U8500_RTC_BASE		(U8500_PER4_BASE + 0x04000)
++#define U8500_SCR_BASE		(U8500_PER4_BASE + 0x05000)
++#define U8500_DMC_BASE		(U8500_PER4_BASE + 0x06000)
++#define U8500_PRCMU_BASE	(U8500_PER4_BASE + 0x07000)
++#define U8500_PRCMU_TCDM_BASE	(U8500_PER4_BASE + 0x0f000)
++
++/* per3 base addresses */
++#define U8500_FSMC_BASE		(U8500_PER3_BASE + 0x0000)
++#define U8500_SSP0_BASE		(U8500_PER3_BASE + 0x2000)
++#define U8500_SSP1_BASE		(U8500_PER3_BASE + 0x3000)
++#define U8500_I2C0_BASE		(U8500_PER3_BASE + 0x4000)
++#define U8500_SDI2_BASE		(U8500_PER3_BASE + 0x5000)
++#define U8500_SKE_BASE		(U8500_PER3_BASE + 0x6000)
++#define U8500_UART2_BASE	(U8500_PER3_BASE + 0x7000)
++#define U8500_SDI5_BASE		(U8500_PER3_BASE + 0x8000)
++#define U8500_CLKRST3_BASE	(U8500_PER3_BASE + 0xf000)
++
++/* per2 base addressess */
++#define U8500_I2C3_BASE		(U8500_PER2_BASE + 0x0000)
++#define U8500_SPI2_BASE		(U8500_PER2_BASE + 0x1000)
++#define U8500_SPI1_BASE		(U8500_PER2_BASE + 0x2000)
++#define U8500_PWL_BASE		(U8500_PER2_BASE + 0x3000)
++#define U8500_SDI4_BASE		(U8500_PER2_BASE + 0x4000)
++#define U8500_MSP2_BASE		(U8500_PER2_BASE + 0x7000)
++#define U8500_SDI1_BASE		(U8500_PER2_BASE + 0x8000)
++#define U8500_SDI3_BASE		(U8500_PER2_BASE + 0x9000)
++#define U8500_SPI0_BASE		(U8500_PER2_BASE + 0xa000)
++#define U8500_HSIR_BASE		(U8500_PER2_BASE + 0xb000)
++#define U8500_HSIT_BASE		(U8500_PER2_BASE + 0xc000)
++#define U8500_CLKRST2_BASE	(U8500_PER2_BASE + 0xf000)
++
++/* per1 base addresses */
++#define U8500_I2C1_BASE		(U8500_PER1_BASE + 0x2000)
++#define U8500_MSP0_BASE		(U8500_PER1_BASE + 0x3000)
++#define U8500_MSP1_BASE		(U8500_PER1_BASE + 0x4000)
++#define U8500_SDI0_BASE		(U8500_PER1_BASE + 0x6000)
++#define U8500_I2C2_BASE		(U8500_PER1_BASE + 0x8000)
++#define U8500_SPI3_BASE		(U8500_PER1_BASE + 0x9000)
++#define U8500_I2C4_BASE		(U8500_PER1_BASE + 0xa000)
++#define U8500_SLIM0_BASE	(U8500_PER1_BASE + 0xb000)
++#define U8500_CLKRST1_BASE	(U8500_PER1_BASE + 0xf000)
++
++#define U8500_SHRM_GOP_INTERRUPT_BASE	0xB7C00040
++
++#define U8500_GPIOBANK0_BASE	U8500_GPIO0_BASE
++#define U8500_GPIOBANK1_BASE	(U8500_GPIO0_BASE + 0x80)
++#define U8500_GPIOBANK2_BASE	U8500_GPIO1_BASE
++#define U8500_GPIOBANK3_BASE	(U8500_GPIO1_BASE + 0x80)
++#define U8500_GPIOBANK4_BASE	(U8500_GPIO1_BASE + 0x100)
++#define U8500_GPIOBANK5_BASE	(U8500_GPIO1_BASE + 0x180)
++#define U8500_GPIOBANK6_BASE	U8500_GPIO2_BASE
++#define U8500_GPIOBANK7_BASE	(U8500_GPIO2_BASE + 0x80)
++#define U8500_GPIOBANK8_BASE	U8500_GPIO3_BASE
++
++#endif
+diff --git a/arch/arm/mach-ux500/include/mach/hardware.h b/arch/arm/mach-ux500/include/mach/hardware.h
+index d86b354..1353f17 100644
+--- a/arch/arm/mach-ux500/include/mach/hardware.h
++++ b/arch/arm/mach-ux500/include/mach/hardware.h
+@@ -26,119 +26,67 @@
+ /* used by some plat-nomadik code */
+ #define io_p2v(n)		__io_address(n)
  
- extern struct amba_device ux500_pl031_device;
-+extern struct amba_device u8500_ssp0_device;
+-/*
+- * Base address definitions for U8500 Onchip IPs. All the
+- * peripherals are contained in a single 1 Mbyte region, with
+- * AHB peripherals at the bottom and APB peripherals at the
+- * top of the region. PER stands for PERIPHERAL region which
+- * itself divided into sub regions.
+- */
+-#define U8500_PER3_BASE		0x80000000
+-#define U8500_PER2_BASE		0x80110000
+-#define U8500_PER1_BASE		0x80120000
+-#define U8500_PER4_BASE		0x80150000
+-
+-#define U8500_PER6_BASE		0xa03c0000
+-#define U8500_PER5_BASE		0xa03e0000
+-#define U8500_PER7_BASE		0xa03d0000
+-
+-#define U8500_SVA_BASE		0xa0100000
+-#define U8500_SIA_BASE		0xa0200000
+-
+-#define U8500_SGA_BASE		0xa0300000
+-#define U8500_MCDE_BASE		0xa0350000
+-#define U8500_DMA_BASE		0xa0362000
+-
+-#define U8500_SCU_BASE		0xa0410000
+-#define U8500_GIC_CPU_BASE	0xa0410100
+-#define U8500_TWD_BASE		0xa0410600
+-#define U8500_GIC_DIST_BASE	0xa0411000
+-#define U8500_L2CC_BASE		0xa0412000
+-
+-#define U8500_TWD_SIZE		0x100
+-
+-/* per7 base addressess */
+-#define U8500_CR_BASE_ED	(U8500_PER7_BASE + 0x8000)
+-#define U8500_MTU0_BASE_ED	(U8500_PER7_BASE + 0xa000)
+-#define U8500_MTU1_BASE_ED	(U8500_PER7_BASE + 0xb000)
+-#define U8500_TZPC0_BASE_ED	(U8500_PER7_BASE + 0xc000)
+-#define U8500_CLKRST7_BASE_ED	(U8500_PER7_BASE + 0xf000)
+-
+-/* per6 base addressess */
+-#define U8500_RNG_BASE		(U8500_PER6_BASE + 0x0000)
+-#define U8500_PKA_BASE		(U8500_PER6_BASE + 0x1000)
+-#define U8500_PKAM_BASE		(U8500_PER6_BASE + 0x2000)
+-#define U8500_MTU0_BASE_V1	(U8500_PER6_BASE + 0x6000)
+-#define U8500_MTU1_BASE_V1	(U8500_PER6_BASE + 0x7000)
+-#define U8500_CR_BASE_V1	(U8500_PER6_BASE + 0x8000)
+-#define U8500_CRYPTO0_BASE	(U8500_PER6_BASE + 0xa000)
+-#define U8500_CRYPTO1_BASE	(U8500_PER6_BASE + 0xb000)
+-#define U8500_CLKRST6_BASE	(U8500_PER6_BASE + 0xf000)
+-
+-/* per5 base addressess */
+-#define U8500_USBOTG_BASE	(U8500_PER5_BASE + 0x00000)
+-#define U8500_GPIO5_BASE	(U8500_PER5_BASE + 0x1e000)
+-#define U8500_CLKRST5_BASE	(U8500_PER5_BASE + 0x1f000)
+-
+-/* per4 base addressess */
+-#define U8500_BACKUPRAM0_BASE	(U8500_PER4_BASE + 0x0000)
+-#define U8500_BACKUPRAM1_BASE	(U8500_PER4_BASE + 0x1000)
+-#define U8500_RTT0_BASE		(U8500_PER4_BASE + 0x2000)
+-#define U8500_RTT1_BASE		(U8500_PER4_BASE + 0x3000)
+-#define U8500_RTC_BASE		(U8500_PER4_BASE + 0x4000)
+-#define U8500_SCR_BASE		(U8500_PER4_BASE + 0x5000)
+-#define U8500_DMC_BASE		(U8500_PER4_BASE + 0x6000)
+-#define U8500_PRCMU_BASE	(U8500_PER4_BASE + 0x7000)
+-
+-/* per3 base addressess */
+-#define U8500_FSMC_BASE		(U8500_PER3_BASE + 0x0000)
+-#define U8500_SSP0_BASE		(U8500_PER3_BASE + 0x2000)
+-#define U8500_SSP1_BASE		(U8500_PER3_BASE + 0x3000)
+-#define U8500_I2C0_BASE		(U8500_PER3_BASE + 0x4000)
+-#define U8500_SDI2_BASE		(U8500_PER3_BASE + 0x5000)
+-#define U8500_SKE_BASE		(U8500_PER3_BASE + 0x6000)
+-#define U8500_UART2_BASE	(U8500_PER3_BASE + 0x7000)
+-#define U8500_SDI5_BASE		(U8500_PER3_BASE + 0x8000)
+-#define U8500_GPIO3_BASE	(U8500_PER3_BASE + 0xe000)
+-#define U8500_CLKRST3_BASE	(U8500_PER3_BASE + 0xf000)
+-
+-/* per2 base addressess */
+-#define U8500_I2C3_BASE		(U8500_PER2_BASE + 0x0000)
+-#define U8500_SPI2_BASE		(U8500_PER2_BASE + 0x1000)
+-#define U8500_SPI1_BASE		(U8500_PER2_BASE + 0x2000)
+-#define U8500_PWL_BASE		(U8500_PER2_BASE + 0x3000)
+-#define U8500_SDI4_BASE		(U8500_PER2_BASE + 0x4000)
+-#define U8500_MSP2_BASE		(U8500_PER2_BASE + 0x7000)
+-#define U8500_SDI1_BASE		(U8500_PER2_BASE + 0x8000)
+-#define U8500_SDI3_BASE		(U8500_PER2_BASE + 0x9000)
+-#define U8500_SPI0_BASE		(U8500_PER2_BASE + 0xa000)
+-#define U8500_HSIR_BASE		(U8500_PER2_BASE + 0xb000)
+-#define U8500_HSIT_BASE		(U8500_PER2_BASE + 0xc000)
+-#define U8500_GPIO2_BASE	(U8500_PER2_BASE + 0xe000)
+-#define U8500_CLKRST2_BASE	(U8500_PER2_BASE + 0xf000)
+-
+-/* per1 base addresses */
+-#define U8500_UART0_BASE	(U8500_PER1_BASE + 0x0000)
+-#define U8500_UART1_BASE	(U8500_PER1_BASE + 0x1000)
+-#define U8500_I2C1_BASE		(U8500_PER1_BASE + 0x2000)
+-#define U8500_MSP0_BASE		(U8500_PER1_BASE + 0x3000)
+-#define U8500_MSP1_BASE		(U8500_PER1_BASE + 0x4000)
+-#define U8500_SDI0_BASE		(U8500_PER1_BASE + 0x6000)
+-#define U8500_I2C2_BASE		(U8500_PER1_BASE + 0x8000)
+-#define U8500_SPI3_BASE		(U8500_PER1_BASE + 0x9000)
+-#define U8500_SLIM0_BASE	(U8500_PER1_BASE + 0xa000)
+-#define U8500_GPIO1_BASE	(U8500_PER1_BASE + 0xe000)
+-#define U8500_CLKRST1_BASE	(U8500_PER1_BASE + 0xf000)
+-
+-#define U8500_GPIOBANK0_BASE	U8500_GPIO1_BASE
+-#define U8500_GPIOBANK1_BASE	(U8500_GPIO1_BASE + 0x80)
+-#define U8500_GPIOBANK2_BASE	U8500_GPIO3_BASE
+-#define U8500_GPIOBANK3_BASE	(U8500_GPIO3_BASE + 0x80)
+-#define U8500_GPIOBANK4_BASE	(U8500_GPIO3_BASE + 0x100)
+-#define U8500_GPIOBANK5_BASE	(U8500_GPIO3_BASE + 0x180)
+-#define U8500_GPIOBANK6_BASE	U8500_GPIO2_BASE
+-#define U8500_GPIOBANK7_BASE	(U8500_GPIO2_BASE + 0x80)
+-#define U8500_GPIOBANK8_BASE	U8500_GPIO5_BASE
++#include <mach/db8500-regs.h>
++#include <mach/db5500-regs.h>
++
++#ifdef CONFIG_UX500_SOC_DB8500
++#define UX500(periph)		U8500_##periph##_BASE
++#elif defined(CONFIG_UX500_SOC_DB5500)
++#define UX500(periph)		U5500_##periph##_BASE
++#endif
++
++#define UX500_BACKUPRAM0_BASE	UX500(BACKUPRAM0)
++#define UX500_BACKUPRAM1_BASE	UX500(BACKUPRAM1)
++#define UX500_B2R2_BASE		UX500(B2R2)
++
++#define UX500_CLKRST1_BASE	UX500(CLKRST1)
++#define UX500_CLKRST2_BASE	UX500(CLKRST2)
++#define UX500_CLKRST3_BASE	UX500(CLKRST3)
++#define UX500_CLKRST5_BASE	UX500(CLKRST5)
++#define UX500_CLKRST6_BASE	UX500(CLKRST6)
++
++#define UX500_DMA_BASE		UX500(DMA)
++#define UX500_FSMC_BASE		UX500(FSMC)
++
++#define UX500_GIC_CPU_BASE	UX500(GIC_CPU)
++#define UX500_GIC_DIST_BASE	UX500(GIC_DIST)
++
++#define UX500_I2C1_BASE		UX500(I2C1)
++#define UX500_I2C2_BASE		UX500(I2C2)
++#define UX500_I2C3_BASE		UX500(I2C3)
++
++#define UX500_L2CC_BASE		UX500(L2CC)
++#define UX500_MCDE_BASE		UX500(MCDE)
++#define UX500_MTU0_BASE		UX500(MTU0)
++#define UX500_MTU1_BASE		UX500(MTU1)
++#define UX500_PRCMU_BASE	UX500(PRCMU)
++
++#define UX500_RNG_BASE		UX500(RNG)
++#define UX500_RTC_BASE		UX500(RTC)
++
++#define UX500_SCU_BASE		UX500(SCU)
++
++#define UX500_SDI0_BASE		UX500(SDI0)
++#define UX500_SDI1_BASE		UX500(SDI1)
++#define UX500_SDI2_BASE		UX500(SDI2)
++#define UX500_SDI3_BASE		UX500(SDI3)
++#define UX500_SDI4_BASE		UX500(SDI4)
++
++#define UX500_SPI0_BASE		UX500(SPI0)
++#define UX500_SPI1_BASE		UX500(SPI1)
++#define UX500_SPI2_BASE		UX500(SPI2)
++#define UX500_SPI3_BASE		UX500(SPI3)
++
++#define UX500_SIA_BASE		UX500(SIA)
++#define UX500_SVA_BASE		UX500(SVA)
++
++#define UX500_TWD_BASE		UX500(TWD)
++
++#define UX500_UART0_BASE	UX500(UART0)
++#define UX500_UART1_BASE	UX500(UART1)
++#define UX500_UART2_BASE	UX500(UART2)
++
++#define UX500_USBOTG_BASE	UX500(USBOTG)
  
- #endif
+ /* ST-Ericsson modified pl022 id */
+ #define SSP_PER_ID		0x01080022
 -- 
 1.7.0
