@@ -1,122 +1,110 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 27 Apr 2010 09:46:49 +0530
-Subject: [PATCH 11/14] ux500: move sys_timer to cpu.c
+Date: Tue, 27 Apr 2010 09:46:43 +0530
+Subject: [PATCH 05/14] ux500: move gpio macros to common header
 In-Reply-To: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
 References: <1272341812-4622-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1272341812-4622-12-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1272341812-4622-6-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the common system timer setup code to cpu.c.
+Move GPIO macros to a common header, and allow them to use the correct
+macros for the appropriate SoC, and be named accordingly.
 
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/mach-ux500/board-mop500.c       |    2 +-
- arch/arm/mach-ux500/cpu-u8500.c          |   21 ---------------------
- arch/arm/mach-ux500/cpu.c                |   21 +++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/setup.h |    2 +-
- 4 files changed, 23 insertions(+), 23 deletions(-)
+ arch/arm/mach-ux500/cpu-u8500.c         |   30 ------------------------
+ arch/arm/mach-ux500/include/mach/gpio.h |   38 +++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index cd0bd36..072196c 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -145,6 +145,6 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
--	.timer		= &u8500_timer,
-+	.timer		= &ux500_timer,
- 	.init_machine	= u8500_init_machine,
- MACHINE_END
 diff --git a/arch/arm/mach-ux500/cpu-u8500.c b/arch/arm/mach-ux500/cpu-u8500.c
-index 51e9bf2..d04299f 100644
+index 2c8aa93..c80beca 100644
 --- a/arch/arm/mach-ux500/cpu-u8500.c
 +++ b/arch/arm/mach-ux500/cpu-u8500.c
-@@ -17,9 +17,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- 
--#include <asm/localtimer.h>
- #include <asm/mach/map.h>
--#include <plat/mtu.h>
+@@ -23,36 +23,6 @@
  #include <mach/hardware.h>
  #include <mach/setup.h>
- #include <mach/devices.h>
-@@ -78,22 +76,3 @@ void __init u8500_init_devices(void)
  
- 	return ;
- }
+-#define GPIO_RESOURCE(block)						\
+-	{								\
+-		.start	= U8500_GPIOBANK##block##_BASE,			\
+-		.end	= U8500_GPIOBANK##block##_BASE + 127,		\
+-		.flags	= IORESOURCE_MEM,				\
+-	},								\
+-	{								\
+-		.start	= IRQ_GPIO##block,				\
+-		.end	= IRQ_GPIO##block,				\
+-		.flags	= IORESOURCE_IRQ,				\
+-	}
 -
--static void __init u8500_timer_init(void)
--{
--#ifdef CONFIG_LOCAL_TIMERS
--	/* Setup the local timer base */
--	twd_base = __io_address(U8500_TWD_BASE);
--#endif
--	/* Setup the MTU base */
--	if (cpu_is_u8500ed())
--		mtu_base = __io_address(U8500_MTU0_BASE_ED);
--	else
--		mtu_base = __io_address(U8500_MTU0_BASE);
+-#define GPIO_DEVICE(block)						\
+-	{								\
+-		.name 		= "gpio",				\
+-		.id		= block,				\
+-		.num_resources 	= 2,					\
+-		.resource	= &u8500_gpio_resources[block * 2],	\
+-		.dev = {						\
+-			.platform_data = &u8500_gpio_data[block],	\
+-		},							\
+-	}
 -
--	nmdk_timer_init();
--}
+-#define GPIO_DATA(_name, first)						\
+-	{								\
+-		.name 		= _name,				\
+-		.first_gpio 	= first,				\
+-		.first_irq 	= NOMADIK_GPIO_TO_IRQ(first),		\
+-	}
 -
--struct sys_timer u8500_timer = {
--	.init	= u8500_timer_init,
--};
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 05615c0..d81ad02 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -13,7 +13,9 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
- #include <asm/mach/map.h>
-+#include <asm/localtimer.h>
+ static struct nmk_gpio_platform_data u8500_gpio_data[] = {
+ 	GPIO_DATA("GPIO-0-31", 0),
+ 	GPIO_DATA("GPIO-32-63", 32), /* 37..63 not routed to pin */
+diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
+index 3c4cd31..d548a62 100644
+--- a/arch/arm/mach-ux500/include/mach/gpio.h
++++ b/arch/arm/mach-ux500/include/mach/gpio.h
+@@ -9,4 +9,42 @@
  
-+#include <plat/mtu.h>
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
-@@ -76,3 +78,22 @@ static int ux500_l2x0_init(void)
- }
- early_initcall(ux500_l2x0_init);
- #endif
+ #include <plat/gpio.h>
+ 
++#define __GPIO_RESOURCE(soc, block)					\
++	{								\
++		.start	= soc##_GPIOBANK##block##_BASE,			\
++		.end	= soc##_GPIOBANK##block##_BASE + 127,		\
++		.flags	= IORESOURCE_MEM,				\
++	},								\
++	{								\
++		.start	= IRQ_GPIO##block,				\
++		.end	= IRQ_GPIO##block,				\
++		.flags	= IORESOURCE_IRQ,				\
++	}
 +
-+static void __init ux500_timer_init(void)
-+{
-+#ifdef CONFIG_LOCAL_TIMERS
-+	/* Setup the local timer base */
-+	twd_base = __io_address(UX500_TWD_BASE);
++#define __GPIO_DEVICE(soc, block)					\
++	{								\
++		.name		= "gpio",				\
++		.id		= block,				\
++		.num_resources	= 2,					\
++		.resource	= &soc##_gpio_resources[block * 2],	\
++		.dev = {						\
++			.platform_data = &soc##_gpio_data[block],	\
++		},							\
++	}
++
++#define GPIO_DATA(_name, first)						\
++	{								\
++		.name		= _name,				\
++		.first_gpio	= first,				\
++		.first_irq	= NOMADIK_GPIO_TO_IRQ(first),		\
++	}
++
++#ifdef CONFIG_UX500_SOC_DB8500
++#define GPIO_RESOURCE(block)	__GPIO_RESOURCE(U8500, block)
++#define GPIO_DEVICE(block)	__GPIO_DEVICE(u8500, block)
++#elif defined(CONFIG_UX500_SOC_DB5500)
++#define GPIO_RESOURCE(block)	__GPIO_RESOURCE(U5500, block)
++#define GPIO_DEVICE(block)	__GPIO_DEVICE(u5500, block)
 +#endif
-+	/* Setup the MTU base */
-+	if (cpu_is_u8500ed())
-+		mtu_base = __io_address(U8500_MTU0_BASE_ED);
-+	else
-+		mtu_base = __io_address(UX500_MTU0_BASE);
 +
-+	nmdk_timer_init();
-+}
-+
-+struct sys_timer ux500_timer = {
-+	.init	= ux500_timer_init,
-+};
-diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
-index 6187eff..c730d07 100644
---- a/arch/arm/mach-ux500/include/mach/setup.h
-+++ b/arch/arm/mach-ux500/include/mach/setup.h
-@@ -27,7 +27,7 @@ extern void nmdk_timer_init(void);
- extern void __init amba_add_devices(struct amba_device *devs[], int num);
- 
- struct sys_timer;
--extern struct sys_timer u8500_timer;
-+extern struct sys_timer ux500_timer;
- 
- #define __IO_DEV_DESC(x, sz)	{		\
- 	.virtual	= IO_ADDRESS(x),	\
+ #endif /* __ASM_ARCH_GPIO_H */
 -- 
 1.7.0
