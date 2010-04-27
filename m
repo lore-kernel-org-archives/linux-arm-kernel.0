@@ -1,34 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 27 Apr 2010 17:34:00 +0200
-Subject: [PATCH 1/4] MMC: atmel-mci: fix two parameters swapped
-In-Reply-To: <4BD70251.9060501@ru.mvista.com>
-References: <1271671952-29204-1-git-send-email-nicolas.ferre@atmel.com>
-	<bfa27c51250b39deeccbf6f3a656db4e0b73ce92.1272378853.git.nicolas.ferre@atmel.com>
-	<4BD70251.9060501@ru.mvista.com>
-Message-ID: <4BD703E8.4080307@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 Apr 2010 09:12:17 -0700
+Subject: [GIT PULL] omap fixes for v2.6.34-rc5
+In-Reply-To: <alpine.LFD.2.00.1004270831430.3739@i5.linux-foundation.org>
+References: <20100426190005.GJ7225@atomide.com>
+	<alpine.LFD.2.00.1004270831430.3739@i5.linux-foundation.org>
+Message-ID: <20100427161217.GB7225@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/04/2010 17:27, Sergei Shtylyov :
-> Hello.
+* Linus Torvalds <torvalds@linux-foundation.org> [100427 08:28]:
 > 
-> Nicolas Ferre wrote:
+> On Mon, 26 Apr 2010, Tony Lindgren wrote:
+> > 
+> > Please pull omap fixes from:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 > 
->> Two parameters were swapped in the calls to atmci_init_slot(). Two
->> parameters
->> were swapped in the calls to atmci_init_slot().
+> I pulled it this time, but I'm starting to get really irritated with you.
 > 
->  The same sentence is repeated twice.
+> These look like real fixes, but quite frankly, by -rc5, that IS NOT 
+> ENOUGH. 
 > 
->>  Their values
->>   
+> They need to be _regressions_, not just cleanups and fixes for things that 
+> have never worked. And this is starting to be a pattern with the omap 
+> tree: you're not honoring the merge window properly.
 > 
->   ???
+> Just "it's a bug-fix" or "it's deleting unused code" is not enough. The 
+> point of the late -rc series is to fix problems from the merge window, not 
+> add new changes. I realize that you think that all the new changes are 
+> obviously good, but the fact is, bugs happen even in "obvious bug-fixes". 
+> 
+> And that's why we have the rule about late-rc pulls being about 
+> _regressions_ and/or major oopses/security issues. Not just random 
+> development that are meant to improve things.
 
-indeed! I reposted a new patch message.
+OK point taken. I should have dealt with this earlier. Will only queue
+regressions after -rc3 or so.
 
-Sorry for the noise.
+Regards,
 
-Best regards,
--- 
-Nicolas Ferre
+Tony
