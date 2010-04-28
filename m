@@ -1,30 +1,20 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue, 6 Apr 2010 06:19:15 -0400
-Subject: [PATCH] regulator: fix enabling regulator issue on max8925
-Message-ID: <mailman.335.1272459566.2170.linux-arm-kernel@lists.infradead.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Apr 2010 14:01:03 +0100
+Subject: [PATCH 01/01] regulator: fix enabling regulator issue on max8925
+In-Reply-To: <k2u771cded01004280559s156ff50bnb172767893c89845@mail.gmail.com>
+References: <k2u771cded01004280559s156ff50bnb172767893c89845@mail.gmail.com>
+Message-ID: <20100428130103.GG31400@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix regulator enabling issue that is caused by typo error in is_enabled().
+On Wed, Apr 28, 2010 at 08:59:22AM -0400, Haojian Zhuang wrote:
+> From 9f421a29db78635210b29df1d5f83bdc523e3178 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Tue, 6 Apr 2010 06:19:15 -0400
+> Subject: [PATCH] regulator: fix enabling regulator issue on max8925
+> 
+> Fix regulator enabling issue that is caused by typo error in is_enabled().
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/regulator/max8925-regulator.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/regulator/max8925-regulator.c
-b/drivers/regulator/max8925-regulator.c
-index b6218f1..552cad8 100644
---- a/drivers/regulator/max8925-regulator.c
-+++ b/drivers/regulator/max8925-regulator.c
-@@ -109,7 +109,7 @@ static int max8925_is_enabled(struct regulator_dev *rdev)
- 	struct max8925_regulator_info *info = rdev_get_drvdata(rdev);
- 	int ret;
-
--	ret = max8925_reg_read(info->i2c, info->vol_reg);
-+	ret = max8925_reg_read(info->i2c, info->enable_reg);
- 	if (ret < 0)
- 		return ret;
-
--- 
-1.5.6.5
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
