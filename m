@@ -1,29 +1,70 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 28 Apr 2010 17:46:44 +0200
-Subject: [PATCH v2] Add support for Samsung SoC OneNAND controllers
-Message-ID: <1272469609-21876-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 28 Apr 2010 17:46:46 +0200
+Subject: [PATCH 2/5] drivers: mtd: onenand: allocate verify buffer in the core
+In-Reply-To: <1272469609-21876-1-git-send-email-m.szyprowski@samsung.com>
+References: <1272469609-21876-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1272469609-21876-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add support for Samsung SoC OneNAND controllers found
-on S3C64xx, S5PC100 and S5PC110 chips. A few extensions to OneNAND core
-were required to make the driver working properly on all supported SoCs.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-The required platform setup code has been posted to relevant mailing
-list (ARM Kernel: "[PATCH] ARM: Samsung: Add platform support code for
-OneNAND controller" thread).
+This patch extends OneNAND core code with support for OneNAND verify
+write check. This is done by allocating the buffer for verify read
+directly from the core code.
 
-Changes since v1:
-* addressed all coding style issues reported by Ben Dooks
-* moved all resource definitions to platform device resources
-* moved all resource definitions for different SoCs from regs-onenand.h to
-  arch/arm/mach-{s3c64xx,s5pc100,s5pv210}/include/mach/map.h
-* moved all #ifdef conditional code to separate functions
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/mtd/onenand/onenand_base.c |   13 ++++++++++++-
+ include/linux/mtd/onenand.h        |    3 +++
+ 2 files changed, 15 insertions(+), 1 deletions(-)
 
-This patch series includes:
-
-[PATCH 1/5] drivers: mtd: onenand: add support for chips with 4KB page size
-[PATCH 2/5] drivers: mtd: onenand: allocate verify buffer in the core
-[PATCH 3/5] drivers: mtd: onenand: add new callback for bufferram read
-[PATCH 4/5] drivers: mtd: onenand: add workaround for SYNC_WRITE mode
-[PATCH 5/5] drivers: mtd: add Samsung SoC OneNAND driver
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index 1b26f50..045811f 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -3932,6 +3932,13 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+ 				__func__);
+ 			return -ENOMEM;
+ 		}
++#ifdef CONFIG_MTD_ONENAND_VERIFY_WRITE
++		this->verify_buf = kzalloc(mtd->writesize, GFP_KERNEL);
++		if (!this->verify_buf) {
++			kfree(this->page_buf);
++			return -ENOMEM;
++		}
++#endif
+ 		this->options |= ONENAND_PAGEBUF_ALLOC;
+ 	}
+ 	if (!this->oob_buf) {
+@@ -4059,8 +4066,12 @@ void onenand_release(struct mtd_info *mtd)
+ 		kfree(this->bbm);
+ 	}
+ 	/* Buffers allocated by onenand_scan */
+-	if (this->options & ONENAND_PAGEBUF_ALLOC)
++	if (this->options & ONENAND_PAGEBUF_ALLOC) {
+ 		kfree(this->page_buf);
++#ifdef CONFIG_MTD_ONENAND_VERIFY_WRITE
++		kfree(this->verify_buf);
++#endif
++	}
+ 	if (this->options & ONENAND_OOBBUF_ALLOC)
+ 		kfree(this->oob_buf);
+ 	kfree(mtd->eraseregions);
+diff --git a/include/linux/mtd/onenand.h b/include/linux/mtd/onenand.h
+index c9a3c35..9b43268 100644
+--- a/include/linux/mtd/onenand.h
++++ b/include/linux/mtd/onenand.h
+@@ -125,6 +125,9 @@ struct onenand_chip {
+ 	flstate_t		state;
+ 	unsigned char		*page_buf;
+ 	unsigned char		*oob_buf;
++#ifdef CONFIG_MTD_ONENAND_VERIFY_WRITE
++	unsigned char		*verify_buf;
++#endif
+ 
+ 	int			subpagesize;
+ 	struct nand_ecclayout	*ecclayout;
+-- 
+1.6.4
