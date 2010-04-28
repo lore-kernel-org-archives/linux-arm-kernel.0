@@ -1,43 +1,52 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 28 Apr 2010 04:15:51 +0200
-Subject: [RESUBMIT] [PATCH v4 0.1/5(7)] OMAP: add missing FIQ_START definition
-	required for arch/arm/kernel/fiq.c compilation
-In-Reply-To: <201004280258.27281.jkrzyszt@tis.icnet.pl>
-References: <201004280252.58420.jkrzyszt@tis.icnet.pl>
-	<201004280258.27281.jkrzyszt@tis.icnet.pl>
-Message-ID: <201004280415.53609.jkrzyszt@tis.icnet.pl>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 28 Apr 2010 03:28:04 +0100
+Subject: [PATCH 3/5] S3C: Add S3C2416 detection to uncompress code
+In-Reply-To: <1250688667-15639-4-git-send-email-jekhor@gmail.com>
+References: <1250688667-15639-1-git-send-email-jekhor@gmail.com>
+	<1250688667-15639-2-git-send-email-jekhor@gmail.com>
+	<1250688667-15639-3-git-send-email-jekhor@gmail.com>
+	<1250688667-15639-4-git-send-email-jekhor@gmail.com>
+Message-ID: <20100428022804.GN6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several ARM platforms/machines that use FIQ define their value of FIQ_START. 
-Since FIQ is not implemented for OMAP yet, this definition is missing from 
-OMAP header files.
+On Wed, Aug 19, 2009 at 04:31:05PM +0300, Yauhen Kharuzhy wrote:
+> Add S3C2416 serial port setup to uncompress code.
 
-Put an arbitrary value for FIQ_START into plat/irqs.h for OMAP. Even if not 
-used by the FIQ handler for Amstrad Delta, this is required for successfull 
-compilation of arch/arm/kernel/fiq.c that provides several usefull functions.
-
-Created and tested against linux-omap master, 
-commit 104a77440f05430f29f9d3f4ecb88c1536819585 dated 2010-04-27.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
-Affected file name was still wrong in the changelog text, sorry.
-
-Provided as a separate patch since v3 of the patch set.
-v4 changes: none (refreshed)
-
- arch/arm/plat-omap/include/plat/irqs.h |    4 ++++
- 1 file changed, 4 insertions(+)
-
---- git.orig/arch/arm/plat-omap/include/plat/irqs.h	2010-04-27 21:40:24.000000000 +0200
-+++ git/arch/arm/plat-omap/include/plat/irqs.h	2010-04-27 22:20:18.000000000 +0200
-@@ -428,4 +428,8 @@ void omap3_intc_resume_idle(void);
+looks ok.
  
- #include <mach/hardware.h>
- 
-+#ifdef CONFIG_FIQ
-+#define FIQ_START		1024
-+#endif
-+
- #endif
+> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+> ---
+>  arch/arm/mach-s3c2410/include/mach/uncompress.h |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/include/mach/uncompress.h b/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> index c943210..0c431dd 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> @@ -41,7 +41,9 @@ static void arch_detect_cpu(void)
+>  	cpuid &= S3C2410_GSTATUS1_IDMASK;
+>  
+>  	if (is_arm926() || cpuid == S3C2410_GSTATUS1_2440 ||
+> -	    cpuid == S3C2410_GSTATUS1_2442) {
+> +	    cpuid == S3C2410_GSTATUS1_2442 ||
+> +	    cpuid == S3C2410_GSTATUS1_2416 ||
+> +	    cpuid == S3C2410_GSTATUS1_2450) {
+>  		fifo_mask = S3C2440_UFSTAT_TXMASK;
+>  		fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
+>  	} else {
+> -- 
+> 1.6.3.3
+> 
+> 
+> -------------------------------------------------------------------
+> List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-kernel
+> FAQ:        http://www.arm.linux.org.uk/mailinglists/faq.php
+> Etiquette:  http://www.arm.linux.org.uk/mailinglists/etiquette.php
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
