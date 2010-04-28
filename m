@@ -1,43 +1,31 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 28 Apr 2010 09:03:03 +0300
-Subject: [PATCH] [ARM] pxa/regs-u2d: add missing new line.
-In-Reply-To: <u2rf17812d71004271928y8881b6cfl22021c96e841f49@mail.gmail.com>
-References: <1270629637-3257-1-git-send-email-grinberg@compulab.co.il>
-	<j2hf17812d71004070150gfc53d63dh90581570b33aef23@mail.gmail.com>
-	<4BD6FFD9.7090806@compulab.co.il>
-	<u2rf17812d71004271928y8881b6cfl22021c96e841f49@mail.gmail.com>
-Message-ID: <4BD7CF97.7070602@compulab.co.il>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 28 Apr 2010 15:25:41 +0900
+Subject: CONSISTENT_DMA_SIZE limitations
+Message-ID: <v2taec7e5c31004272325x9e5958ddp34d7db1ff3477f4d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi everyone,
 
+Are there any special CONSISTENT_DMA_SIZE limitiations in the latest
+upstrem ARM kernel?
 
-On 04/28/10 05:28, Eric Miao wrote:
-> On Tue, Apr 27, 2010 at 11:16 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->   
->> On 04/07/10 11:50, Eric Miao wrote:
->>     
->>> On Wed, Apr 7, 2010 at 4:40 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>>
->>>       
->>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->>>>
->>>>         
->>> Applied to 'fix'.
->>>
->>>       
->> I can't see it at
->> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=shortlog;h=refs/heads/fix
->> Can you, please, update your git tree?
->>
->>     
-> I'm going to push the devel branch early this time, and to avoid the dependency
-> latency, I'd like to move this patch into -devel if you don't mind. Please check
-> -devel instead.
->
-> Thanks
->   
-I don't mind at all, as long as it makes to mainline.
+On SH-Mobile ARM a single 256 MB I/O window is mapped virt:phys 1:1 at
+0xe6000000 -> 0xf5ffffff at ->map_io() time.
 
-Thanks,
-Igor
+The virtual area on top of the I/O window at 0xf6000000 -> 0xffdfffff
+seems suitable for consistent dma mappings. Extending
+CONSISTENT_DMA_SIZE from the default 2MB to 158 MB makes efficient use
+of the entire range. Empty 2MB space is left at the top as usual.
+
+Extending CONSISTENT_DMA_SIZE seems like a good idea to me, but I'm
+not sure if doing so will break something else. Perhaps I need to
+rework some code in arch/arm/mm/dma-mapping.c?
+
+I'm asking because most platforms only export up to 14 MB, and
+Documentation/arm/memory.txt mentions 0xff000000 -> 0xffbfffff as
+reserved.
+
+Thanks!
+
+/ magnus
