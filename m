@@ -1,67 +1,61 @@
 From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Wed, 28 Apr 2010 08:43:34 +0300
-Subject: [PATCHv2 2/4] mach-omap2: Add SoC info data for OMAP2,3,4 into
-	/proc/cpuinfo
-In-Reply-To: <20100427150129.GA8600@nokia.com>
-References: <1272374055-9656-1-git-send-email-eduardo.valentin@nokia.com>
-	<1272374055-9656-3-git-send-email-eduardo.valentin@nokia.com>
-	<20100427150129.GA8600@nokia.com>
-Message-ID: <20100428054334.GD332@besouro.research.nokia.com>
+Date: Wed, 28 Apr 2010 08:51:40 +0300
+Subject: [PATCHv3 1/4] ARM: Introduce SoC Info into /proc/cpuinfo
+In-Reply-To: <1272433903-24003-1-git-send-email-eduardo.valentin@nokia.com>
+References: <1272433903-24003-1-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <1272433903-24003-2-git-send-email-eduardo.valentin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 27, 2010 at 05:01:30PM +0200, Balbi Felipe (Nokia-D/Helsinki) wrote:
-> On Tue, Apr 27, 2010 at 03:14:13PM +0200, Valentin Eduardo (Nokia-D/Helsinki) wrote:
-> >From: Eduardo Valentin <eduardo.valentin@nokia.com>
-> >
-> >Report OMAP2,3,4 data into system_soc_info. Now we get omap
-> >information under /proc/cpuinfo.
-> >
-> >Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
-> >---
-> > arch/arm/mach-omap2/id.c |   21 +++++++++++++++------
-> > 1 files changed, 15 insertions(+), 6 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> >index 37b8a1a..75e36a5 100644
-> >--- a/arch/arm/mach-omap2/id.c
-> >+++ b/arch/arm/mach-omap2/id.c
-> >@@ -152,10 +152,15 @@ void __init omap24xx_check_revision(void)
-> > 		j = i;
-> > 	}
-> >
-> >-	pr_info("OMAP%04x", omap_rev() >> 16);
-> >-	if ((omap_rev() >> 8) & 0x0f)
-> >-		pr_info("ES%x", (omap_rev() >> 12) & 0xf);
-> >-	pr_info("\n");
-> >+	snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
-> >+							omap_rev() >> 16);
-> >+	if ((omap_rev() >> 8) & 0x0f) {
-> >+		int sz = strlen(system_soc_info);
-> 
-> how about you use the return of the first snprintf instead of asking 
-> strlen() here ? I mean:
+From: Eduardo Valentin <eduardo.valentin@nokia.com>
 
-Yeah,
+This patch extends the ARM /proc/cpuinfo to include soc info data.
+It is implemented via the same way which is done for
+system_rev, system_serial_low and system_serial_high.
+Then, now we have system_soc_info, which is printed only
+if there is something useful there.
 
-> 
-> int sz = snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
-> 		omap_rev() >> 16);
-> 
-> if ((omap_rev() >> 8) & 0x0f)
-> 	snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
-> 			"ES%x", (omap_rev() >> 12) & 0x0f);
-> 
-> would that work ???
+Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+---
+ arch/arm/include/asm/system.h |    2 ++
+ arch/arm/kernel/setup.c       |    5 +++++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
-I think so, yeah. No need to recompute the string length twice. Will resend soon.
-
-> 
-> -- 
-> balbi
-> 
-> DefectiveByDesign.org
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 4ace45e..53a9645 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -71,6 +71,8 @@ struct task_struct;
+ extern unsigned int system_rev;
+ extern unsigned int system_serial_low;
+ extern unsigned int system_serial_high;
++#define SYSTEM_SOC_INFO_SIZE			128
++extern char system_soc_info[SYSTEM_SOC_INFO_SIZE];
+ extern unsigned int mem_fclk_21285;
+ 
+ struct pt_regs;
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..025d795 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -85,6 +85,9 @@ EXPORT_SYMBOL(system_serial_low);
+ unsigned int system_serial_high;
+ EXPORT_SYMBOL(system_serial_high);
+ 
++char system_soc_info[SYSTEM_SOC_INFO_SIZE];
++EXPORT_SYMBOL(system_soc_info);
++
+ unsigned int elf_hwcap;
+ EXPORT_SYMBOL(elf_hwcap);
+ 
+@@ -847,6 +850,8 @@ static int c_show(struct seq_file *m, void *v)
+ 	seq_printf(m, "Revision\t: %04x\n", system_rev);
+ 	seq_printf(m, "Serial\t\t: %08x%08x\n",
+ 		   system_serial_high, system_serial_low);
++	if (strlen(system_soc_info))
++		seq_printf(m, "SoC Info\t: %s\n",  system_soc_info);
+ 
+ 	return 0;
+ }
+-- 
+1.7.0.4.361.g8b5fe.dirty
