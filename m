@@ -1,599 +1,172 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 28 Apr 2010 17:46:07 +0200
-Subject: [PATCH v2] ARM: Samsung: Add platform support code for OneNAND
-	controller
-Message-ID: <1272469567-21512-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 28 Apr 2010 17:46:45 +0200
+Subject: [PATCH 1/5] drivers: mtd: onenand: add support for chips with 4KB page
+	size
+In-Reply-To: <1272469609-21876-1-git-send-email-m.szyprowski@samsung.com>
+References: <1272469609-21876-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1272469609-21876-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds setup code for Samsung OneNAND controller driver. The
-driver needs to be aware on which SoC it is running, so the actual
-device id is being changed in cpu init code. S3C64xx SoCs have 2 OneNAND
-controllers while S5PC100 and S5PC110 has only one.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This patch adds support for OneNAND chips that have 4KB page size.
+
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
+ drivers/mtd/onenand/onenand_base.c |   32 +++++++++++++++++++-------------
+ include/linux/mtd/onenand.h        |    4 ++++
+ 2 files changed, 23 insertions(+), 13 deletions(-)
 
-The patch has been prepared in assumtion that my previous patches for
-S5PC100 platform moves are applied. When these patches will be finally
-merged I will rebase it for the clean merge.
-
-Changes since v1:
-* addressed all coding style issues reported by Ben Dooks
-* moved all resource definitions to platform device resources
-* moved all resource definitions for different SoCs from regs-onenand.h to
-  arch/arm/mach-{s3c64xx,s5pc100,s5pv210}/include/mach/map.h
-* moved all #ifdef conditional code to separate functions
-
-Changes since first submission attempt (long time ago):
-* all cpu conditional code in the driver has been redesigned from cpu_is_xxx()
-macros to actual device ids.
-
-The Samsung OneNAND driver itself has been posted also to the Linux MTD
-mailing list (linux-mtd at lists.infradead.org).
-
- arch/arm/mach-s3c64xx/Kconfig                     |    5 ++
- arch/arm/mach-s3c64xx/Makefile                    |    1 +
- arch/arm/mach-s3c64xx/dev-onenand1.c              |   55 ++++++++++++++++++
- arch/arm/mach-s3c64xx/include/mach/irqs.h         |    4 +
- arch/arm/mach-s3c64xx/include/mach/map.h          |   13 ++++
- arch/arm/mach-s3c64xx/s3c6400.c                   |    4 +
- arch/arm/mach-s3c64xx/s3c6410.c                   |    4 +
- arch/arm/mach-s5pc100/cpu.c                       |    3 +
- arch/arm/mach-s5pc100/include/mach/map.h          |    7 ++
- arch/arm/mach-s5pv210/Kconfig                     |    5 ++
- arch/arm/mach-s5pv210/Makefile                    |    2 +
- arch/arm/mach-s5pv210/dev-onenand.c               |   50 ++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/map.h          |    3 +
- arch/arm/plat-samsung/Kconfig                     |    5 ++
- arch/arm/plat-samsung/Makefile                    |    1 +
- arch/arm/plat-samsung/dev-onenand.c               |   55 ++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h         |    3 +
- arch/arm/plat-samsung/include/plat/onenand-core.h |   37 ++++++++++++
- arch/arm/plat-samsung/include/plat/regs-onenand.h |   63 +++++++++++++++++++++
- 19 files changed, 320 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s3c64xx/dev-onenand1.c
- create mode 100644 arch/arm/mach-s5pv210/dev-onenand.c
- create mode 100644 arch/arm/plat-samsung/dev-onenand.c
- create mode 100644 arch/arm/plat-samsung/include/plat/onenand-core.h
- create mode 100644 arch/arm/plat-samsung/include/plat/regs-onenand.h
-
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 959df38..f9202c9 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -35,6 +35,11 @@ config S3C64XX_SETUP_SDHCI
- 	  Internal configuration for default SDHCI setup for S3C6400 and
- 	  S3C6410 SoCs.
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index 32f0ed3..1b26f50 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -397,7 +397,8 @@ static int onenand_command(struct mtd_info *mtd, int cmd, loff_t addr, size_t le
+ 		value = onenand_bufferram_address(this, block);
+ 		this->write_word(value, this->base + ONENAND_REG_START_ADDRESS2);
  
-+config S3C64XX_DEV_ONENAND1
-+	bool
-+	help
-+	  Compile in platform device definition for OneNAND1 controller
-+
- # platform specific device setup
+-		if (ONENAND_IS_MLC(this) || ONENAND_IS_2PLANE(this))
++		if (ONENAND_IS_MLC(this) || ONENAND_IS_2PLANE(this) ||
++		    ONENAND_IS_4KB_PAGE(this))
+ 			/* It is always BufferRAM0 */
+ 			ONENAND_SET_BUFFERRAM0(this);
+ 		else
+@@ -426,7 +427,7 @@ static int onenand_command(struct mtd_info *mtd, int cmd, loff_t addr, size_t le
+ 		case FLEXONENAND_CMD_RECOVER_LSB:
+ 		case ONENAND_CMD_READ:
+ 		case ONENAND_CMD_READOOB:
+-			if (ONENAND_IS_MLC(this))
++			if (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))
+ 				/* It is always BufferRAM0 */
+ 				dataram = ONENAND_SET_BUFFERRAM0(this);
+ 			else
+@@ -466,11 +467,11 @@ static inline int onenand_read_ecc(struct onenand_chip *this)
+ {
+ 	int ecc, i, result = 0;
  
- config S3C64XX_SETUP_I2C0
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 3758e15..c6d8c7c 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -60,3 +60,4 @@ obj-y				+= dev-rtc.o
- obj-y				+= dev-audio.o
- obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
-+obj-$(CONFIG_S3C64XX_DEV_ONENAND1)	+= dev-onenand1.o
-diff --git a/arch/arm/mach-s3c64xx/dev-onenand1.c b/arch/arm/mach-s3c64xx/dev-onenand1.c
-new file mode 100644
-index 0000000..92ffd5b
---- /dev/null
-+++ b/arch/arm/mach-s3c64xx/dev-onenand1.c
-@@ -0,0 +1,55 @@
-+/*
-+ * linux/arch/arm/mach-s3c64xx/dev-onenand1.c
-+ *
-+ *  Copyright (c) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * S3C64XX series device definition for OneNAND devices
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+static struct resource s3c64xx_onenand1_resources[] = {
-+	[0] = {
-+		.start	= S3C64XX_PA_ONENAND1,
-+		.end	= S3C64XX_PA_ONENAND1 + 0x400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= S3C64XX_PA_ONENAND1_BUF,
-+		.end	= S3C64XX_PA_ONENAND1_BUF + S3C64XX_SZ_ONENAND1_BUF - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[2] = {
-+		.start	= IRQ_ONENAND1,
-+		.end	= IRQ_ONENAND1,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device s3c64xx_device_onenand1 = {
-+	.name		= "samsung-onenand",
-+	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(s3c64xx_onenand1_resources),
-+	.resource	= s3c64xx_onenand1_resources,
-+};
-+
-+void s3c64xx_onenand1_set_platdata(struct onenand_platform_data *pdata)
-+{
-+	struct onenand_platform_data *pd;
-+
-+	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
-+	if (!pd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+	s3c64xx_device_onenand1.dev.platform_data = pd;
-+}
-diff --git a/arch/arm/mach-s3c64xx/include/mach/irqs.h b/arch/arm/mach-s3c64xx/include/mach/irqs.h
-index e9ab4ac..8e2df26 100644
---- a/arch/arm/mach-s3c64xx/include/mach/irqs.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/irqs.h
-@@ -212,5 +212,9 @@
+-	if (!FLEXONENAND(this))
++	if (!FLEXONENAND(this) && !ONENAND_IS_4KB_PAGE(this))
+ 		return this->read_word(this->base + ONENAND_REG_ECC_STATUS);
  
- #define NR_IRQS	(IRQ_BOARD_END + 1)
+ 	for (i = 0; i < 4; i++) {
+-		ecc = this->read_word(this->base + ONENAND_REG_ECC_STATUS + i);
++		ecc = this->read_word(this->base + ONENAND_REG_ECC_STATUS + i*2);
+ 		if (likely(!ecc))
+ 			continue;
+ 		if (ecc & FLEXONENAND_UNCORRECTABLE_ERROR)
+@@ -1425,7 +1426,7 @@ static int onenand_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	int ret;
  
-+/* Compatibility */
-+
-+#define IRQ_ONENAND	IRQ_ONENAND0
-+
- #endif /* __ASM_MACH_S3C64XX_IRQS_H */
+ 	onenand_get_device(mtd, FL_READING);
+-	ret = ONENAND_IS_MLC(this) ?
++	ret = ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this) ?
+ 		onenand_mlc_read_ops_nolock(mtd, from, &ops) :
+ 		onenand_read_ops_nolock(mtd, from, &ops);
+ 	onenand_release_device(mtd);
+@@ -1460,7 +1461,7 @@ static int onenand_read_oob(struct mtd_info *mtd, loff_t from,
  
-diff --git a/arch/arm/mach-s3c64xx/include/mach/map.h b/arch/arm/mach-s3c64xx/include/mach/map.h
-index 801c1c0..3edd63e 100644
---- a/arch/arm/mach-s3c64xx/include/mach/map.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/map.h
-@@ -52,6 +52,16 @@
+ 	onenand_get_device(mtd, FL_READING);
+ 	if (ops->datbuf)
+-		ret = ONENAND_IS_MLC(this) ?
++		ret = ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this) ?
+ 			onenand_mlc_read_ops_nolock(mtd, from, ops) :
+ 			onenand_read_ops_nolock(mtd, from, ops);
+ 	else
+@@ -1926,7 +1927,7 @@ static int onenand_write_ops_nolock(struct mtd_info *mtd, loff_t to,
+ 		 * 2 PLANE, MLC, and Flex-OneNAND do not support
+ 		 * write-while-program feature.
+ 		 */
+-		if (!ONENAND_IS_2PLANE(this) && !first) {
++		if (!ONENAND_IS_2PLANE(this) && !ONENAND_IS_4KB_PAGE(this) && !first) {
+ 			ONENAND_SET_PREV_BUFFERRAM(this);
  
- #define S3C64XX_PA_SROM		(0x70000000)
+ 			ret = this->wait(mtd, FL_WRITING);
+@@ -1957,7 +1958,7 @@ static int onenand_write_ops_nolock(struct mtd_info *mtd, loff_t to,
+ 		/*
+ 		 * 2 PLANE, MLC, and Flex-OneNAND wait here
+ 		 */
+-		if (ONENAND_IS_2PLANE(this)) {
++		if (ONENAND_IS_2PLANE(this) || ONENAND_IS_4KB_PAGE(this)) {
+ 			ret = this->wait(mtd, FL_WRITING);
  
-+#define S3C64XX_PA_ONENAND0	(0x70100000)
-+#define S3C64XX_PA_ONENAND0_BUF	(0x20000000)
-+#define S3C64XX_SZ_ONENAND0_BUF (SZ_64M)
-+
-+/* NAND and OneNAND1 controllers occupy the same register region
-+   (depending on SoC POP version) */
-+#define S3C64XX_PA_ONENAND1	(0x70200000)
-+#define S3C64XX_PA_ONENAND1_BUF	(0x28000000)
-+#define S3C64XX_SZ_ONENAND1_BUF	(SZ_64M)
-+
- #define S3C64XX_PA_NAND		(0x70200000)
- #define S3C64XX_PA_FB		(0x77100000)
- #define S3C64XX_PA_USB_HSOTG	(0x7C000000)
-@@ -99,6 +109,9 @@
- #define S3C_PA_IIC		S3C64XX_PA_IIC0
- #define S3C_PA_IIC1		S3C64XX_PA_IIC1
- #define S3C_PA_NAND		S3C64XX_PA_NAND
-+#define S3C_PA_ONENAND		S3C64XX_PA_ONENAND0
-+#define S3C_PA_ONENAND_BUF	S3C64XX_PA_ONENAND0_BUF
-+#define S3C_SZ_ONENAND_BUF	S3C64XX_SZ_ONENAND0_BUF
- #define S3C_PA_FB		S3C64XX_PA_FB
- #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
- #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
-diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
-index 707e34e..5e93fe3 100644
---- a/arch/arm/mach-s3c64xx/s3c6400.c
-+++ b/arch/arm/mach-s3c64xx/s3c6400.c
-@@ -37,6 +37,7 @@
- #include <plat/clock.h>
- #include <plat/sdhci.h>
- #include <plat/iic-core.h>
-+#include <plat/onenand-core.h>
- #include <mach/s3c6400.h>
+ 			/* In partial page write we don't update bufferram */
+@@ -2084,7 +2085,7 @@ static int onenand_write_oob_nolock(struct mtd_info *mtd, loff_t to,
+ 			memcpy(oobbuf + column, buf, thislen);
+ 		this->write_bufferram(mtd, ONENAND_SPARERAM, oobbuf, 0, mtd->oobsize);
  
- void __init s3c6400_map_io(void)
-@@ -51,6 +52,9 @@ void __init s3c6400_map_io(void)
- 	s3c_i2c0_setname("s3c2440-i2c");
+-		if (ONENAND_IS_MLC(this)) {
++		if (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this)) {
+ 			/* Set main area of DataRAM to 0xff*/
+ 			memset(this->page_buf, 0xff, mtd->writesize);
+ 			this->write_bufferram(mtd, ONENAND_DATARAM,
+@@ -3027,7 +3028,7 @@ static int do_otp_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	this->command(mtd, ONENAND_CMD_OTP_ACCESS, 0, 0);
+ 	this->wait(mtd, FL_OTPING);
  
- 	s3c_device_nand.name = "s3c6400-nand";
-+
-+	s3c_onenand_setname("s3c6400-onenand");
-+	s3c64xx_onenand1_setname("s3c6400-onenand");
+-	ret = ONENAND_IS_MLC(this) ?
++	ret = ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this) ?
+ 		onenand_mlc_read_ops_nolock(mtd, from, &ops) :
+ 		onenand_read_ops_nolock(mtd, from, &ops);
+ 
+@@ -3372,7 +3373,10 @@ static void onenand_check_features(struct mtd_info *mtd)
+ 	/* Lock scheme */
+ 	switch (density) {
+ 	case ONENAND_DEVICE_DENSITY_4Gb:
+-		this->options |= ONENAND_HAS_2PLANE;
++		if (ONENAND_IS_DDP(this))
++			this->options |= ONENAND_HAS_2PLANE;
++		else
++			this->options |= ONENAND_HAS_4KB_PAGE;
+ 
+ 	case ONENAND_DEVICE_DENSITY_2Gb:
+ 		/* 2Gb DDP does not have 2 plane */
+@@ -3393,7 +3397,7 @@ static void onenand_check_features(struct mtd_info *mtd)
+ 		break;
+ 	}
+ 
+-	if (ONENAND_IS_MLC(this))
++	if (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))
+ 		this->options &= ~ONENAND_HAS_2PLANE;
+ 
+ 	if (FLEXONENAND(this)) {
+@@ -3407,6 +3411,8 @@ static void onenand_check_features(struct mtd_info *mtd)
+ 		printk(KERN_DEBUG "Chip support all block unlock\n");
+ 	if (this->options & ONENAND_HAS_2PLANE)
+ 		printk(KERN_DEBUG "Chip has 2 plane\n");
++	if (this->options & ONENAND_HAS_4KB_PAGE)
++		printk(KERN_DEBUG "Chip has 4KiB pagesize\n");
  }
  
- void __init s3c6400_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
-index 59635d1..3f28f46 100644
---- a/arch/arm/mach-s3c64xx/s3c6410.c
-+++ b/arch/arm/mach-s3c64xx/s3c6410.c
-@@ -38,6 +38,7 @@
- #include <plat/clock.h>
- #include <plat/sdhci.h>
- #include <plat/iic-core.h>
-+#include <plat/onenand-core.h>
- #include <mach/s3c6400.h>
- #include <mach/s3c6410.h>
+ /**
+@@ -3799,7 +3805,7 @@ static int onenand_probe(struct mtd_info *mtd)
+ 	/* The data buffer size is equal to page size */
+ 	mtd->writesize = this->read_word(this->base + ONENAND_REG_DATA_BUFFER_SIZE);
+ 	/* We use the full BufferRAM */
+-	if (ONENAND_IS_MLC(this))
++	if (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))
+ 		mtd->writesize <<= 1;
  
-@@ -53,6 +54,9 @@ void __init s3c6410_map_io(void)
- 	s3c_i2c1_setname("s3c2440-i2c");
+ 	mtd->oobsize = mtd->writesize >> 5;
+diff --git a/include/linux/mtd/onenand.h b/include/linux/mtd/onenand.h
+index 5509eb0..c9a3c35 100644
+--- a/include/linux/mtd/onenand.h
++++ b/include/linux/mtd/onenand.h
+@@ -175,10 +175,14 @@ struct onenand_chip {
+ #define ONENAND_HAS_CONT_LOCK		(0x0001)
+ #define ONENAND_HAS_UNLOCK_ALL		(0x0002)
+ #define ONENAND_HAS_2PLANE		(0x0004)
++#define ONENAND_HAS_4KB_PAGE		(0x0008)
+ #define ONENAND_SKIP_UNLOCK_CHECK	(0x0100)
+ #define ONENAND_PAGEBUF_ALLOC		(0x1000)
+ #define ONENAND_OOBBUF_ALLOC		(0x2000)
  
- 	s3c_device_nand.name = "s3c6400-nand";
++#define ONENAND_IS_4KB_PAGE(this)					\
++	(this->options & ONENAND_HAS_4KB_PAGE)
 +
-+	s3c_onenand_setname("s3c6410-onenand");
-+	s3c64xx_onenand1_setname("s3c6410-onenand");
- }
- 
- void __init s3c6410_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
-index d424a9f..cc47c3a 100644
---- a/arch/arm/mach-s5pc100/cpu.c
-+++ b/arch/arm/mach-s5pc100/cpu.c
-@@ -39,6 +39,7 @@
- #include <plat/devs.h>
- #include <plat/clock.h>
- #include <plat/iic-core.h>
-+#include <plat/onenand-core.h>
- #include <plat/sdhci.h>
- #include <plat/s5pc100.h>
- 
-@@ -88,6 +89,8 @@ void __init s5pc100_map_io(void)
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
-+
-+	s3c_onenand_setname("s5pc100-onenand");
- }
- 
- void __init s5pc100_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
-index 9d672fa..deef75c 100644
---- a/arch/arm/mach-s5pc100/include/mach/map.h
-+++ b/arch/arm/mach-s5pc100/include/mach/map.h
-@@ -50,6 +50,10 @@
- #define S5P_PA_UART3		(S5PC100_PA_UART + 0xC00)
- #define S5P_SZ_UART		SZ_256
- 
-+#define S5PC100_PA_ONENAND	(0xE7100000)
-+#define S5PC100_PA_ONENAND_BUF	(0xB0000000)
-+#define S5PC100_SZ_ONENAND_BUF	(SZ_256M - SZ_32M)
-+
- #define S5PC100_PA_IIC0		(0xEC100000)
- #define S5PC100_PA_IIC1		(0xEC200000)
- 
-@@ -68,6 +72,9 @@
- #define S3C_PA_UART		S5PC100_PA_UART
- #define S3C_PA_IIC		S5PC100_PA_IIC0
- #define S3C_PA_IIC1		S5PC100_PA_IIC1
-+#define S3C_PA_ONENAND		S5PC100_PA_ONENAND
-+#define S3C_PA_ONENAND_BUF	S5PC100_PA_ONENAND_BUF
-+#define S3C_SZ_ONENAND_BUF	S5PC100_SZ_ONENAND_BUF
- #define S3C_PA_FB		S5PC100_PA_FB
- #define S3C_PA_HSMMC0		S5PC100_PA_HSMMC0
- #define S3C_PA_HSMMC1		S5PC100_PA_HSMMC1
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 16fbc06..6774f5e 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -41,6 +41,11 @@ config S5PV210_SETUP_SDHCI_GPIO
- 	help
- 	  Common setup code for SDHCI gpio.
- 
-+config S5PC110_DEV_ONENAND
-+	bool
-+	help
-+	  Compile in platform device definition for OneNAND1 controller
-+
- config MACH_SMDKV210
- 	bool "SMDKV210"
- 	select CPU_S5PV210
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 11b5ab6..f53b694 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -23,6 +23,8 @@ obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
- 
-+obj-$(CONFIG_S5PC110_DEV_ONENAND)	+= dev-onenand.o
-+
- # machine support
- 
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
-diff --git a/arch/arm/mach-s5pv210/dev-onenand.c b/arch/arm/mach-s5pv210/dev-onenand.c
-new file mode 100644
-index 0000000..34997b7
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/dev-onenand.c
-@@ -0,0 +1,50 @@
-+/*
-+ * linux/arch/arm/mach-s5pv210/dev-onenand.c
-+ *
-+ *  Copyright (c) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * S5PC110 series device definition for OneNAND devices
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+static struct resource s5pc110_onenand_resources[] = {
-+	[0] = {
-+		.start	= S5PC110_PA_ONENAND,
-+		.end	= S5PC110_PA_ONENAND + SZ_128K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= S5PC110_PA_ONENAND_DMA,
-+		.end	= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device s5pc110_device_onenand = {
-+	.name		= "s5pc110-onenand",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s5pc110_onenand_resources),
-+	.resource	= s5pc110_onenand_resources,
-+};
-+
-+void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
-+{
-+	struct onenand_platform_data *pd;
-+
-+	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
-+	if (!pd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+	s5pc110_device_onenand.dev.platform_data = pd;
-+}
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 63b983a..49b28e8 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -45,6 +45,9 @@
- 
- #define S5PV210_PA_SROMC	(0xE8000000)
- 
-+#define S5PC110_PA_ONENAND	(0xB0000000)
-+#define S5PC110_PA_ONENAND_DMA	(0xB0600000)
-+
- #define S5PV210_PA_FB		(0xF8000000)
- 
- #define S5PV210_PA_HSMMC(x)	(0xEB000000 + ((x) * 0x100000))
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 74fe5d6..c086bce 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -185,6 +185,11 @@ config S3C_DEV_NAND
- 	help
- 	  Compile in platform device definition for NAND controller
- 
-+config S3C_DEV_ONENAND
-+	bool
-+	help
-+	  Compile in platform device definition for OneNAND controller
-+
- config S3C64XX_DEV_SPI
- 	bool
- 	help
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 22c89d0..66f16e5 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -40,6 +40,7 @@ obj-y				+= dev-uart.o
- obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
- obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
- obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
-+obj-$(CONFIG_S3C_DEV_ONENAND)	+= dev-onenand.o
- 
- # DMA support
- 
-diff --git a/arch/arm/plat-samsung/dev-onenand.c b/arch/arm/plat-samsung/dev-onenand.c
-new file mode 100644
-index 0000000..45ec732
---- /dev/null
-+++ b/arch/arm/plat-samsung/dev-onenand.c
-@@ -0,0 +1,55 @@
-+/*
-+ * linux/arch/arm/plat-samsung/dev-onenand.c
-+ *
-+ *  Copyright (c) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * S3C64XX/S5PC100 series device definition for OneNAND devices
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+static struct resource s3c_onenand_resources[] = {
-+	[0] = {
-+		.start	= S3C_PA_ONENAND,
-+		.end	= S3C_PA_ONENAND + 0x400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= S3C_PA_ONENAND_BUF,
-+		.end	= S3C_PA_ONENAND_BUF + S3C_SZ_ONENAND_BUF - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[2] = {
-+		.start	= IRQ_ONENAND,
-+		.end	= IRQ_ONENAND,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device s3c_device_onenand = {
-+	.name		= "samsung-onenand",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(s3c_onenand_resources),
-+	.resource	= s3c_onenand_resources,
-+};
-+
-+void s3c_onenand_set_platdata(struct onenand_platform_data *pdata)
-+{
-+	struct onenand_platform_data *pd;
-+
-+	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
-+	if (!pd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+	s3c_device_onenand.dev.platform_data = pd;
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 796d242..42dc955 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -60,6 +60,9 @@ extern struct platform_device s3c_device_spi1;
- extern struct platform_device s3c_device_hwmon;
- 
- extern struct platform_device s3c_device_nand;
-+extern struct platform_device s3c_device_onenand;
-+extern struct platform_device s3c64xx_device_onenand1;
-+extern struct platform_device s5pc110_device_onenand;
- 
- extern struct platform_device s3c_device_usbgadget;
- extern struct platform_device s3c_device_usb_hsotg;
-diff --git a/arch/arm/plat-samsung/include/plat/onenand-core.h b/arch/arm/plat-samsung/include/plat/onenand-core.h
-new file mode 100644
-index 0000000..7701cb7
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/onenand-core.h
-@@ -0,0 +1,37 @@
-+/*
-+ * linux/arch/arm/plat-samsung/onenand-core.h
-+ *
-+ *  Copyright (c) 2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *  Marek Szyprowski <m.szyprowski@samsung.com>
-+ *
-+ * Samsung OneNAD Controller core functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_ONENAND_CORE_H
-+#define __ASM_ARCH_ONENAND_CORE_H __FILE__
-+
-+/* These functions are only for use with the core support code, such as
-+ * the cpu specific initialisation code
-+ */
-+
-+/* re-define device name depending on support. */
-+static inline void s3c_onenand_setname(char *name)
-+{
-+#ifdef CONFIG_S3C_DEV_ONENAND
-+	s3c_device_onenand.name = name;
-+#endif
-+}
-+
-+static inline void s3c64xx_onenand1_setname(char *name)
-+{
-+#ifdef CONFIG_S3C64XX_DEV_ONENAND1
-+	s3c64xx_device_onenand1.name = name;
-+#endif
-+}
-+
-+#endif /* __ASM_ARCH_ONENAND_CORE_H */
-diff --git a/arch/arm/plat-samsung/include/plat/regs-onenand.h b/arch/arm/plat-samsung/include/plat/regs-onenand.h
-new file mode 100644
-index 0000000..930ea8b
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/regs-onenand.h
-@@ -0,0 +1,63 @@
-+/*
-+ * linux/arch/arm/plat-s3c/include/plat/regs-onenand.h
-+ *
-+ *  Copyright (C) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __SAMSUNG_ONENAND_H__
-+#define __SAMSUNG_ONENAND_H__
-+
-+#include <mach/hardware.h>
-+
-+/*
-+ * OneNAND Controller
-+ */
-+#define MEM_CFG_OFFSET		0x0000
-+#define BURST_LEN_OFFSET	0x0010
-+#define MEM_RESET_OFFSET	0x0020
-+#define INT_ERR_STAT_OFFSET	0x0030
-+#define INT_ERR_MASK_OFFSET	0x0040
-+#define INT_ERR_ACK_OFFSET	0x0050
-+#define ECC_ERR_STAT_OFFSET	0x0060
-+#define MANUFACT_ID_OFFSET	0x0070
-+#define DEVICE_ID_OFFSET	0x0080
-+#define DATA_BUF_SIZE_OFFSET	0x0090
-+#define BOOT_BUF_SIZE_OFFSET	0x00A0
-+#define BUF_AMOUNT_OFFSET	0x00B0
-+#define TECH_OFFSET		0x00C0
-+#define FBA_WIDTH_OFFSET	0x00D0
-+#define FPA_WIDTH_OFFSET	0x00E0
-+#define FSA_WIDTH_OFFSET	0x00F0
-+#define TRANS_SPARE_OFFSET	0x0140
-+#define DBS_DFS_WIDTH_OFFSET	0x0160
-+#define INT_PIN_ENABLE_OFFSET	0x01A0
-+#define ACC_CLOCK_OFFSET	0x01C0
-+#define FLASH_VER_ID_OFFSET	0x01F0
-+#define FLASH_AUX_CNTRL_OFFSET	0x0300		/* s3c64xx only */
-+
-+#define ONENAND_MEM_RESET_HOT	0x3
-+#define ONENAND_MEM_RESET_COLD	0x2
-+#define ONENAND_MEM_RESET_WARM	0x1
-+
-+#define CACHE_OP_ERR		(1 << 13)
-+#define RST_CMP			(1 << 12)
-+#define RDY_ACT			(1 << 11)
-+#define INT_ACT			(1 << 10)
-+#define UNSUP_CMD		(1 << 9)
-+#define LOCKED_BLK		(1 << 8)
-+#define BLK_RW_CMP		(1 << 7)
-+#define ERS_CMP			(1 << 6)
-+#define PGM_CMP			(1 << 5)
-+#define LOAD_CMP		(1 << 4)
-+#define ERS_FAIL		(1 << 3)
-+#define PGM_FAIL		(1 << 2)
-+#define INT_TO			(1 << 1)
-+#define LD_FAIL_ECC_ERR		(1 << 0)
-+
-+#define TSRF			(1 << 0)
-+
-+#endif
+ /*
+  * OneNAND Flash Manufacturer ID Codes
+  */
 -- 
 1.6.4
