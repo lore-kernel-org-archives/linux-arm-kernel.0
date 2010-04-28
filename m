@@ -1,20 +1,21 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 28 Apr 2010 21:05:41 +0800
-Subject: [PATCH 08/10] mmp: add smc registers definition
-In-Reply-To: <r2h771cded01004280522w1fdf41bfude65ed08a5cf9883@mail.gmail.com>
-References: <r2h771cded01004280522w1fdf41bfude65ed08a5cf9883@mail.gmail.com>
-Message-ID: <r2gf17812d71004280605qb78df9ct8d92bcc4992bb9d8@mail.gmail.com>
+Date: Wed, 28 Apr 2010 21:10:07 +0800
+Subject: [PATCH 09/10] mmp: update twsi index
+In-Reply-To: <z2g771cded01004280522sb0206ea7qd8b916dc460f03e0@mail.gmail.com>
+References: <z2g771cded01004280522sb0206ea7qd8b916dc460f03e0@mail.gmail.com>
+Message-ID: <v2mf17812d71004280610n75b07803i19e02698222d1d65@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Apr 28, 2010 at 8:22 PM, Haojian Zhuang
 <haojian.zhuang@gmail.com> wrote:
-> From aa1eca2c7fcf012c3d1ddb59b3cea580e6b8252a Mon Sep 17 00:00:00 2001
-> From: Mingliang Hu <mhu4@marvell.com>
-> Date: Mon, 12 Apr 2010 18:14:18 +0800
-> Subject: [PATCH] [ARM] mmp: add smc registers definition
+> From bbd192210d3b882de1f6e60fa24f9040e4f3f245 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 28 Apr 2010 15:34:04 -0400
+> Subject: [PATCH] [ARM] mmp: update twsi index
 >
-> Signed-off-by: Mingliang Hu <mhu4@marvell.com>
+> Sync twsi index to register index. It's used to avoid typo error.
+>
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
 Applied.
