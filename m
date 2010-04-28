@@ -1,46 +1,51 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 28 Apr 2010 16:08:46 +0900
-Subject: CONSISTENT_DMA_SIZE limitations
-In-Reply-To: <n2rf17812d71004272347m63c1f3f3k71005f720110822e@mail.gmail.com>
-References: <v2taec7e5c31004272325x9e5958ddp34d7db1ff3477f4d@mail.gmail.com>
-	<n2rf17812d71004272347m63c1f3f3k71005f720110822e@mail.gmail.com>
-Message-ID: <k2jaec7e5c31004280008o85dbf9ffpbb4b1c2fd0eb7077@mail.gmail.com>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Wed, 28 Apr 2010 09:32:50 +0200
+Subject: U6/U6715 ARM architecture files, 1rst try
+Message-ID: <1272439976-24799-1-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 28, 2010 at 3:47 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Wed, Apr 28, 2010 at 2:25 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> Extending CONSISTENT_DMA_SIZE seems like a good idea to me, but I'm
->> not sure if doing so will break something else. Perhaps I need to
->> rework some code in arch/arm/mm/dma-mapping.c?
->>
->
-> Hi Magnus,
->
-> For a hackish way of enabling something, I don't think that's a bad idea
-> to extend CONSISTENT_DMA_SIZE. And it's often seen by framebuffer
-> and video/graphics related drivers, which is normally hungry for large
-> amount of consistent memory. However, I'm a little bit concerned about
-> such usage, (esp. I'm not sure how this is done in ARMv7), my preference
-> would be:
->
-> 1) either use the dma API
-> 2) or reserve a large chunk of memory during boot and get it remapped later
 
-Hi Eric,
+Hi,
 
-So we already have a bunch of multimedia-related drivers upstream for
-SH, and they often make use of dma_alloc_coherent() and friends.
-Chunks of physically contiguous memory are allocated during boot and
-passed on to the platform drivers as a struct resource. This is true
-for the LCDC fbdev and the CEU v4l2 code, as well as all the uio
-devices. To avoid fragmentation issues the v4l2 driver also creates a
-memory pool from the struct resource using
-dma_declare_coherent_memory().
+Here my first contribution, for ST-Ericsson U6715 & U6 familly ARM926ejs SoC.
+This patch series apply on version v2.6.33.
+Information on U6715 is here: http://www.stericsson.com/platforms/U6715.jsp
 
-Eventually I'd like to tie in the IOMMU, but first i'd like to enable
-the existing drivers by extending CONSISTENT_DMA_SIZE.
+Content:
 
-Thanks for your comments!
+U67xx reference board configuration
+arch/arm/mach-u67xx/board_u67xx_wavex.c
+- setup for pins multiplexing, padding and initial configuration.
+- machine definition
 
-/ magnus
+U67xx default configuration file:
+arch/arm/configs/u67xx_wavex_defconfig
+
+U67xx machine subdrivers, based on existing linux kernel code:
+arch/arm/mach-u67xx/
+- clock gating subdriver
+- U67xx devices definitions (only GPIO resources). 
+
+U6xxx platform drivers, based on existing linux kernel code:
+arch/arm/plat-u6xxx/ and arch/arm/plat-u6xxx/include/mach/
+- platform debugging macros (basic UART support)
+- IRQ helper macros
+- shared clock framework
+- gpio subdriver
+- I/O (chipset register) memory mapping
+- IRQ subdriver
+- serial driver registration, based on 8250 serial driver
+- timers subdriver
+- all related registers mapping definition.
+
+Modification of existing 8250 serial driver for U6xxx
+drivers/serial/8250.c
+drivers/serial/8250_u6.c
+include/linux/serial_8250.h
+- modifications of existing 8250 serial driver for U6xxx support.
+- clock gating specific support for 8250 serial driver for U6xxx
+
+Regards,
+
+Philippe.
