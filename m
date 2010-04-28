@@ -1,1669 +1,1102 @@
 From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Wed, 28 Apr 2010 09:32:53 +0200
-Subject: [PATCH 3/6] U6715 gpio platform driver This driver is U6 platform
-	generic (V2)
+Date: Wed, 28 Apr 2010 09:32:56 +0200
+Subject: [PATCH 6/6] U6715 Default configuration for ST-Ericsson reference
+	design boards
 In-Reply-To: <1272439976-24799-1-git-send-email-philippe.langlais@stericsson.com>
 References: <1272439976-24799-1-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <1272439976-24799-4-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <1272439976-24799-7-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It's a minimal configuration
+
 Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
 ---
- arch/arm/mach-u67xx/board_u67xx_wavex.c |  469 ++++++++++++++++++++
- arch/arm/mach-u67xx/devices.c           |   12 +-
- arch/arm/plat-u6xxx/Makefile            |    2 +-
- arch/arm/plat-u6xxx/gpio.c              |  716 +++++++++++++++++++++++++++++++
- arch/arm/plat-u6xxx/include/mach/gpio.h |  396 +++++++++++++++++
- 5 files changed, 1588 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/plat-u6xxx/gpio.c
- create mode 100644 arch/arm/plat-u6xxx/include/mach/gpio.h
+ arch/arm/configs/u67xx_wavex_defconfig | 1076 ++++++++++++++++++++++++++++++++
+ 1 files changed, 1076 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/u67xx_wavex_defconfig
 
-diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-index edfb983..d2f4db0 100644
---- a/arch/arm/mach-u67xx/board_u67xx_wavex.c
-+++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-@@ -24,6 +24,474 @@
- #include <asm/mach/arch.h>
- #include <mach/irqs.h>
- #include <mach/timer.h>
-+#include <mach/gpio.h>
-+
-+#include <mach/scon.h>
-+
-+/**
-+ * SCON initial settings
-+ * Allows to define the PIN multiplexing for all the platform (Linux and Modem)
-+ */
-+struct u6_scon_config u6_scon_init_config[SCON_REGISTER_NB] = {
-+ {
-+	(void __iomem *) SCON_SYSMUX0_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A0  & 0xF))) | /* FM IRQ */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A1  & 0xF))) | /* UART 2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A2  & 0xF))) | /* UART 2 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A3  & 0xF))) |
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_A4  & 0xF))) | /* SIMOFF_copy for modem */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A5  & 0xF))) | /* for AGPS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A6  & 0xF))) | /* LCD backlight
-+							-> ressource backligth*/
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A7  & 0xF))) | /* Bluetooth */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A8  & 0xF))) | /* Reserved for mode DPWS*/
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A9  & 0xF))) | /* Reserved for mode DPWS*/
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A10 & 0xF))) | /* UART2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A11 & 0xF))) | /* UART2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A12 & 0xF))) | /* UART 1, configured
-+							by boot, don't touch */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A13 & 0xF))) | /* free */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A14 & 0xF))) | /* PMU irq */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A15 & 0xF)))
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX1_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A16 & 0xF))) | /* FCI data 3 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A17 & 0xF))) | /* free */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A18 & 0xF))) | /* FCI data 2 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A19 & 0xF))) | /* FCI data 1 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A20 & 0xF))) | /* Cam Ligth copy */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A21 & 0xF))) | /* RF on -> GPIO */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_A22 & 0xF))) | /* RF RF_DPN */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A23 & 0xF))) | /* RF reset -> GPIO */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A24 & 0xF))) | /* AGPS reset */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A25 & 0xF))) | /* AGPS wake up */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A26 & 0xF))) | /* free */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A27 & 0xF))) | /* SPI1 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A28 & 0xF))) | /* SPI1 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_A29 & 0xF))) | /* Audio IIS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A30 & 0xF))) | /* AGPS pwr on */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_A31 & 0xF)))  /* free */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX2_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B0  & 0xF))) | /* RF DD */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B1  & 0xF))) | /* RF DU */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B2  & 0xF))) | /* RF FSC */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B3  & 0xF))) | /* RF DCL */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B4  & 0xF))) | /* UART RTS1 -> console */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B5  & 0xF))) | /* UART TXD1 -> console */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B6  & 0xF))) | /* NFI ready -> for NFI */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B7  & 0xF))) | /* VDE_EOFI -> VDE already
-+						configured by splashscreen */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B8  & 0xF))) | /* RFEN0 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_B9  & 0xF))) | /* FCICMD -> for FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_B10 & 0xF))) | /* FCICLK -> for FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_B11 & 0xF))) | /* FCIDATA0 -> for FCI */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B12 & 0xF))) | /* RFSIG6 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B13 & 0xF))) | /* RFSIG7 */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_B14 & 0xF))) |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_B15 & 0xF)))  /* RFDATA */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX3_REG,
-+	0
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX4_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C0  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C1  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C2  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C3  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C4  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C5  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C6  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C7  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C8  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C9  & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C10 & 0xF))) | /* VDE */
-+#ifdef CONFIG_EBI_BUS
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_C11 & 0xF))) | /* EBI_CS0 */
-+#else
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C11 & 0xF))) | /* VDE */
-+#endif
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C12 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C13 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C14 & 0xF))) | /* KCOL0 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C15 & 0xF)))  /* KCOL1 -> keypad */
-+
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX5_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C16 & 0xF))) | /* KCOL2 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C17 & 0xF))) | /* KCOL3 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C18 & 0xF))) | /* KCOL4 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C19 & 0xF))) | /* KROW0 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C20 & 0xF))) | /* KROW1 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C21 & 0xF))) | /* KROW2 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C22 & 0xF))) | /* KROW3 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C23 & 0xF))) | /* KROW4 -> keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C24 & 0xF))) | /* RF3GSPIEN0 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C25 & 0xF))) | /* RF3GSPIDATA */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C26 & 0xF))) | /* RF3GSPICLK */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C27 & 0xF))) | /* RFSM_OUT0 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C28 & 0xF))) | /* RFSM_OUT1 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_C29 & 0xF))) | /* RFSM_OUT2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_C30 & 0xF))) | /* I2C -> ressource */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_C31 & 0xF)))  /* I2C -> ressource */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX6_REG,
-+	0 |
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_D0  & 0xF))) | /* CAM PWRDN1 -> CAM */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D1  & 0xF))) | /* CAM DATA 0 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D2  & 0xF))) | /* CAM DATA 1 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D3  & 0xF))) | /* CAM DATA 2 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D4  & 0xF))) | /* CAM DATA 3 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D5  & 0xF))) | /* CAM DATA 4 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D6  & 0xF))) | /* CAM DATA 5 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D7  & 0xF))) | /* CAM DATA 6 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D8  & 0xF))) | /* CAM DATA 7 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D9  & 0xF))) | /* CAM DATA 8 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D10 & 0xF))) | /* CAM DATA 9 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D11 & 0xF))) | /* CAMVS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D12 & 0xF))) | /* CAMHS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D13 & 0xF))) | /* CAMCLKI */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D14 & 0xF))) | /* CAMCLKO */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_D15 & 0xF)))  /* VDDC2EN */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX7_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D16 & 0xF))) | /* RF3GGPO9 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D17 & 0xF))) | /* RF3GGPO8 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_D18 & 0xF))) | /* FCI card detect, FCI */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_D19 & 0xF))) | /* CAM_Prelight copy, CAM*/
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D20 & 0xF))) | /* UART1 RXD1 -> Console */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D21 & 0xF))) | /* DIISWS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D22 & 0xF))) | /* DIISSDO */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D23 & 0xF))) | /* DIISCK */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_D24 & 0xF))) | /* GPIOD24 ->FM Reset */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_D25 & 0xF))) | /* RFSIG3 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D26 & 0xF))) | /* RF3GGPO6 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D27 & 0xF))) | /* RF3GGPO7 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D28 & 0xF))) | /* RF3GGPO5 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_D29 & 0xF))) | /* GPIOD29 USB suspend */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D30 & 0xF))) | /* RF3GGPO4 */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_D31 & 0xF)))  /* RFCLK */
-+ },
-+#ifdef CONFIG_MACH_U67XX_V2_WAVEB_2GB
-+{
-+	(void __iomem *) SCON_SYSMUX8_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX9_REG,
-+	0 |
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
-+							-> FCI USB suspend */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
-+ },
-+#else
-+{
-+	(void __iomem *) SCON_SYSMUX8_REG,
-+	0 |
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX9_REG,
-+	0 |
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX2 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
-+							-> FCI USB suspend */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
-+ },
-+
-+#endif
-+ {
-+	(void __iomem *) SCON_SYSMUX10_REG,
-+	0 |
-+#ifdef CONFIG_EBI_BUS
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F0  & 0xF))) | /* EBI_IO0_copy */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F1  & 0xF))) | /* EBI_OE_RW_copy */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* EBI_WE_E_copy */
-+#else
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_F0  & 0xF))) | /* CAM_PWR_REG -> CAM */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_F1  & 0xF))) | /* AGPS FRAME_SYNC, AGPS */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* free */
-+#endif
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F3  & 0xF))) | /* KCOL5 -> Keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F4  & 0xF))) | /* KCOL6 -> Keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F5  & 0xF))) | /* KCOL7 -> Keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F6  & 0xF))) | /* KROW5 -> Keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F7  & 0xF))) | /* KROW6 -> Keypad */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F8  & 0xF))) | /* KROW7 -> Keypad */
-+	(GPIO_MODE_MUX1 << (2 * (GPIO_F9  & 0xF))) | /* eMMC_PDn -> FCI */
-+#ifdef CONFIG_EBI_BUS
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE_CS0_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F11 & 0xF))) | /* EBI_IO1_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F12 & 0xF))) | /* EBI_IO2_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F13 & 0xF))) | /* EBI_IO3_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F14 & 0xF))) | /* EBI_IO4_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F15 & 0xF)))  /* EBI_IO5_copy */
-+#else
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F11 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F12 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F13 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F14 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F15 & 0xF)))  /* VDE */
-+#endif
-+ },
-+ {
-+	(void __iomem *) SCON_SYSMUX11_REG,
-+	0 |
-+#ifdef CONFIG_EBI_BUS
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F16 & 0xF))) | /* EBI_IO6_copy */
-+	(GPIO_MODE_MUX3 << (2 * (GPIO_F17 & 0xF))) | /* EBI_IO7_copy */
-+#else
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F16 & 0xF))) | /* VDE */
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F17 & 0xF))) | /* VDE */
-+#endif
-+	(GPIO_MODE_MUX0 << (2 * (GPIO_F18 & 0xF)))  /* NFI_CE_n -> NFI */
-+ },
-+ /* Configure PAD Value */
-+ {
-+	(void __iomem *) SCON_SYSPAD0_REG,
-+	0 |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A0   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A1   & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A2   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A3   & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A4   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A5   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A6   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A7   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A8   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A9   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A10  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A11  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A12  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A13  & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A14  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A15  & 0xF)))
-+ },
-+ {
-+	(void __iomem *) SCON_SYSPAD1_REG,
-+	0 |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A16  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A17  & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A18  & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A19  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A20  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A21  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A22  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A23  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A24  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A25  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A26  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A27  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A28  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A29  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A30  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_A31  & 0xF)))
-+ },
-+ {
-+	(void __iomem *) SCON_SYSPAD2_REG,
-+	0 |
-+	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B0   & 0xF))) |
-+	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B1   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B2   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B3   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B4   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B5   & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B6   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B7   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B8   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B9   & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B10  & 0xF))) |
-+	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B11  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B12  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B13  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B14  & 0xF))) |
-+	(SCON_PAD_REPEATER    << (2 * (GPIO_B15  & 0xF)))
-+ },
-+};
-+
-+/* GPIO def settings to avoid HW issue */
-+struct u6_gpio_config u6_gpio_init_config[] = {
-+	/* GPIO A bank */
-+	{
-+		.gpio = GPIO_A5,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 1,
-+	},
-+	{
-+		.gpio = GPIO_A6,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 1,
-+	},
-+	{
-+		.gpio = GPIO_A7,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A8,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 1,
-+	},
-+	{
-+		.gpio = GPIO_A9,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 1,
-+	},
-+	{
-+		.gpio = GPIO_A13,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A17,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A21,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A23,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A24,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 1,
-+	},
-+	{
-+		.gpio = GPIO_A25,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_A30,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	/* GPIO B bank */
-+	/* GPIO C bank */
-+	/* GPIO D bank */
-+	{
-+		.gpio = GPIO_D0,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_D24,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_D29,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	/* GPIO E bank */
-+	{
-+		.gpio = GPIO_E31,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	/* GPIO F bank */
-+	{
-+		.gpio = GPIO_F0,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_F1,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_F2,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	},
-+	{
-+		.gpio = GPIO_F9,
-+		.dir = GPIO_DIR_OUTPUT	,
-+		.value = 0,
-+	}
-+};
-+
-+u32 gpio_to_configure = ARRAY_SIZE(u6_gpio_init_config);
- 
- /* List of board specific devices */
- static struct platform_device *devices[] __initdata = {
-@@ -31,6 +499,7 @@ static struct platform_device *devices[] __initdata = {
- 
- void __init u67xx_init(void)
- {
-+	u6_gpio_init();
- 	/* Add specific board devices */
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- }
-diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
-index 0ead380..8e812fb 100644
---- a/arch/arm/mach-u67xx/devices.c
-+++ b/arch/arm/mach-u67xx/devices.c
-@@ -48,12 +48,12 @@ unsigned char extint_to_gpio[NR_EXTINT] = {
- EXPORT_SYMBOL(extint_to_gpio);
- 
- struct gpio_bank u6_gpio_bank[6] = {
--	{(void __iomem *)GPIOA_PINS_REG, (void __iomem *)SCON_SYSMUX0_REG},
--	{(void __iomem *)GPIOB_PINS_REG, (void __iomem *)SCON_SYSMUX2_REG},
--	{(void __iomem *)GPIOC_PINS_REG, (void __iomem *)SCON_SYSMUX4_REG},
--	{(void __iomem *)GPIOD_PINS_REG, (void __iomem *)SCON_SYSMUX6_REG},
--	{(void __iomem *)GPIOE_PINS_REG, (void __iomem *)SCON_SYSMUX8_REG},
--	{(void __iomem *)GPIOF_PINS_REG, (void __iomem *)SCON_SYSMUX10_REG},
-+	{GPIOA_PINS_REG, SCON_SYSMUX0_REG},
-+	{GPIOB_PINS_REG, SCON_SYSMUX2_REG},
-+	{GPIOC_PINS_REG, SCON_SYSMUX4_REG},
-+	{GPIOD_PINS_REG, SCON_SYSMUX6_REG},
-+	{GPIOE_PINS_REG, SCON_SYSMUX8_REG},
-+	{GPIOF_PINS_REG, SCON_SYSMUX10_REG},
- };
- 
- static struct gpio_data u6_gpio_data = {
-diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
-index afdf82b..3d6898e 100644
---- a/arch/arm/plat-u6xxx/Makefile
-+++ b/arch/arm/plat-u6xxx/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- # Common support
--obj-y := io.o irq.o clock.o
-+obj-y := io.o irq.o clock.o gpio.o
- 
- obj-$(CONFIG_U6_MTU_TIMER) += timer.o
-diff --git a/arch/arm/plat-u6xxx/gpio.c b/arch/arm/plat-u6xxx/gpio.c
+diff --git a/arch/arm/configs/u67xx_wavex_defconfig b/arch/arm/configs/u67xx_wavex_defconfig
 new file mode 100644
-index 0000000..40e25fc
+index 0000000..b1b4250
 --- /dev/null
-+++ b/arch/arm/plat-u6xxx/gpio.c
-@@ -0,0 +1,716 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/gpio.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * Support functions for GPIO
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/sched.h>
-+#include <linux/interrupt.h>
-+#include <linux/ptrace.h>
-+#include <linux/sysdev.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <mach/irqs.h>
-+#include <mach/gpio.h>
-+#include <asm/mach/irq.h>
-+#include <mach/scon.h>
-+
-+/*
-+ * PN5220 GPIO/MUX registers
-+ * defined in asm/arch/registers.h
-+ */
-+
-+#define U6_GPIO_PINS_OFFSET	0
-+#define U6_GPIO_OUTPUT_OFFSET	4
-+#define U6_GPIO_DIR_OFFSET	8
-+
-+#define U6_MUX2_OFFSET		4
-+
-+static struct gpio_bank *gpio_bank_desc;
-+static int gpio_bank_count;
-+
-+static inline struct gpio_bank *get_gpio_bank(int gpio)
-+{
-+	/* 32 GPIOs per bank */
-+	return &(gpio_bank_desc[gpio >> 5]);
-+}
-+
-+static inline int get_gpio_index(int gpio)
-+{
-+	return gpio & 0x1f;
-+}
-+
-+static int check_gpio(int gpio)
-+{
-+	int retval = ((unsigned int)gpio) < GPIO_COUNT;
-+	if (unlikely(!retval)) {
-+		printk(KERN_ERR "u6-gpio: invalid GPIO %d\n", gpio);
-+		dump_stack();
-+	}
-+	return retval;
-+}
-+
-+static inline int gpio_is_requested(struct gpio_bank *bank, unsigned long mask)
-+{
-+	return bank->reserved_map & mask;
-+}
-+
-+static int check_gpio_requested(struct gpio_bank *bank, int index)
-+{
-+	int retval = gpio_is_requested(bank, 1 << index);
-+	if (unlikely(!retval)) {
-+		char c = 'A' + (bank - get_gpio_bank(0));
-+		printk(KERN_ERR "u6-gpio: GPIO %c%d is not requested yet\n",
-+		       c, index);
-+		dump_stack();
-+	}
-+	return retval;
-+}
-+
-+static int check_gpio_unrequested(struct gpio_bank *bank, int index)
-+{
-+	int retval = !gpio_is_requested(bank, 1 << index);
-+	if (unlikely(!retval)) {
-+		char c = 'A' + (bank - get_gpio_bank(0));
-+		printk(KERN_ERR "u6-gpio: GPIO %c%d is already requested\n",
-+		       c, index);
-+		dump_stack();
-+	}
-+	return retval;
-+}
-+
-+static int check_gpio_irq(int gpio_irq)
-+{
-+	int retval = ((unsigned int)gpio_irq) < NR_EXTINT;
-+	if (unlikely(!retval)) {
-+		printk(KERN_ERR "u6-gpio: invalid GPIO-IRQ %d\n", gpio_irq);
-+		dump_stack();
-+	}
-+	return retval;
-+}
-+
-+static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
-+{
-+	u32 reg = bank->gpio_base;
-+	u32 l;
-+
-+	/* select direction register */
-+	reg += U6_GPIO_DIR_OFFSET;
-+
-+	/* in register 0 = input, 1 = output */
-+	l = inl(reg);
-+	if (is_input)
-+		l &= ~(1 << gpio);
-+	else
-+		l |= (1 << gpio);
-+	outl(l, reg);
-+}
-+
-+int u6_gpio_set_direction(int gpio, int is_input)
-+{
-+	unsigned long flags, index;
-+	struct gpio_bank *bank;
-+
-+	if (!check_gpio(gpio))
-+		return -EINVAL;
-+
-+	bank = get_gpio_bank(gpio);
-+	index = get_gpio_index(gpio);
-+	if (!check_gpio_requested(bank, index))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&bank->lock, flags);
-+	_set_gpio_direction(bank, index, is_input);
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_set_direction);
-+
-+static void _set_gpio_mode(struct gpio_bank *bank, int gpio, int mode)
-+{
-+	u32 reg = bank->mux_base;
-+	unsigned long flags;
-+	unsigned long l;
-+
-+	/* select direction register */
-+	if (gpio >= 16) {
-+		reg += U6_MUX2_OFFSET;
-+		gpio -= 16;
-+	}
-+
-+	hw_raw_local_irq_save(flags);
-+	/* apply mux mode */
-+	/* width 2 bit */
-+	l = inl(reg);
-+	l &= ~(3 << (gpio * 2));
-+	l |= (mode << (gpio * 2));
-+	outl(l, reg);
-+	hw_raw_local_irq_restore(flags);
-+}
-+
-+int u6_gpio_set_mode(int gpio, int mode)
-+{
-+	struct gpio_bank *bank;
-+	int index;
-+
-+	if (!check_gpio(gpio))
-+		return -EINVAL;
-+
-+	bank = get_gpio_bank(gpio);
-+	index = get_gpio_index(gpio);
-+	if (!check_gpio_requested(bank, index))
-+		return -EINVAL;
-+
-+	spin_lock(&bank->lock);
-+	_set_gpio_mode(bank, get_gpio_index(gpio), mode);
-+	spin_unlock(&bank->lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_set_mode);
-+
-+int u6_gpio_set_mode_gpio(int gpio)
-+{
-+	int muxmode = gpio >= GPIO_B0 ? GPIO_MODE_MUX1 : GPIO_MODE_MUX0;
-+	return u6_gpio_set_mode(gpio, muxmode);
-+}
-+EXPORT_SYMBOL(u6_gpio_set_mode_gpio);
-+
-+static void _write_gpio_pin(struct gpio_bank *bank, int gpio, int gpio_value)
-+{
-+	u32 reg = bank->gpio_base;
-+	unsigned long flags;
-+	unsigned long l = 0;
-+
-+	reg += U6_GPIO_OUTPUT_OFFSET;
-+	hw_raw_local_irq_save(flags);
-+	l = inl(reg);
-+	if (gpio_value)
-+		l |= 1 << gpio;
-+	else
-+		l &= ~(1 << gpio);
-+	outl(l, reg);
-+	hw_raw_local_irq_restore(flags);
-+
-+}
-+
-+static int u6_gpio_to_extint(int gpio)
-+{
-+	int extint_idx;
-+
-+	for (extint_idx = 0; extint_idx < NR_EXTINT; extint_idx++)
-+		if (extint_to_gpio[extint_idx] == gpio)
-+			return extint_idx;
-+
-+	return -1;
-+}
-+
-+int u6_gpio_write_pin(int gpio, int gpio_value)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long index;
-+
-+	if (!check_gpio(gpio))
-+		return -EINVAL;
-+
-+	bank = get_gpio_bank(gpio);
-+	index = get_gpio_index(gpio);
-+	if (!check_gpio_requested(bank, index))
-+		return -EINVAL;
-+
-+	spin_lock(&bank->lock);
-+	_write_gpio_pin(bank, index, gpio_value);
-+	spin_unlock(&bank->lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_write_pin);
-+
-+int u6_gpio_read_pin(int gpio)
-+{
-+	struct gpio_bank *bank;
-+	u32 reg;
-+	u32 l = 0;
-+	int irq, index;
-+
-+	if (!check_gpio(gpio))
-+		return -EINVAL;
-+
-+	bank = get_gpio_bank(gpio);
-+	index = get_gpio_index(gpio);
-+	if (!check_gpio_requested(bank, index))
-+		return -EINVAL;
-+
-+	/* check if the GPIO is used as extint */
-+	irq = u6_gpio_to_extint(gpio);
-+	if (irq >= 0) {
-+		/* and if it's an alternate internal signal */
-+		/* (cf U67xx datasheet table 444) */
-+		reg = EXTINT_CFGx(irq);
-+		l = inl(reg);
-+		if (l & EXTINT_SEL_ALTERNATE) {
-+			reg = EXTINT_SIGNAL_REG;
-+			return (inl(reg) & (1 << irq)) != 0;
-+		}
-+	}
-+
-+	reg = bank->gpio_base;
-+	reg += U6_GPIO_PINS_OFFSET;
-+	return (inl(reg) & (1 << index)) != 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_read_pin);
-+
-+static int _u6_gpio_request(struct gpio_bank *bank, int index)
-+{
-+	int retval = 0;
-+	unsigned long mask = 1 << index;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&bank->lock, flags);
-+	if (unlikely(!check_gpio_unrequested(bank, index)))
-+		retval = -EINVAL;
-+	else
-+		bank->reserved_map |= mask;
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+
-+	return retval;
-+}
-+
-+static int u6_gpio_acquire(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
-+
-+	return _u6_gpio_request(bank, offset);
-+}
-+
-+int u6_gpio_request(int gpio)
-+{
-+	int index;
-+	struct gpio_bank *bank;
-+
-+	if (!check_gpio(gpio))
-+		return -EINVAL;
-+
-+	index = get_gpio_index(gpio);
-+	bank = get_gpio_bank(gpio);
-+
-+	return _u6_gpio_request(bank, index);
-+}
-+EXPORT_SYMBOL(u6_gpio_request);
-+
-+static void _u6_gpio_free(struct gpio_bank *bank, int index)
-+{
-+	unsigned long mask = 1 << index;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&bank->lock, flags);
-+	if (likely(check_gpio_requested(bank, index)))
-+		bank->reserved_map &= ~mask;
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+}
-+
-+static void u6_gpio_release(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
-+
-+	return _u6_gpio_free(bank, offset);
-+}
-+
-+void u6_gpio_free(int gpio)
-+{
-+	int index;
-+	struct gpio_bank *bank;
-+
-+	if (!check_gpio(gpio))
-+		return;
-+
-+	index = get_gpio_index(gpio);
-+	bank = get_gpio_bank(gpio);
-+	_u6_gpio_free(bank, index);
-+}
-+EXPORT_SYMBOL(u6_gpio_free);
-+
-+/* New GPIO_GENERIC interface */
-+
-+static int gpio_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long flags;
-+
-+	bank = container_of(chip, struct gpio_bank, chip);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	_set_gpio_direction(bank, offset, 1);
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	return 0;
-+}
-+
-+static int gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	return u6_gpio_read_pin(chip->base + offset);
-+}
-+
-+static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long flags;
-+
-+	bank = container_of(chip, struct gpio_bank, chip);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	_write_gpio_pin(bank, offset, value);
-+	_set_gpio_direction(bank, offset, 0);
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	return 0;
-+}
-+
-+static void gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long flags;
-+
-+	bank = container_of(chip, struct gpio_bank, chip);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	_write_gpio_pin(bank, offset, value);
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+}
-+
-+static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	return u6_gpio_to_extint(chip->base + offset);
-+}
-+
-+/*
-+ * U6 EXTINT : only EXTINT 3 is managed by Linux
-+ * We need to unmask the GPIO bank interrupt as soon as possible to
-+ * avoid missing GPIO interrupts for other lines in the bank.
-+ * Then we need to mask-read-clear-unmask the triggered GPIO lines
-+ * in the bank to avoid missing nested interrupts for a GPIO line.
-+ * If we wait to unmask individual GPIO lines in the bank after the
-+ * line's interrupt handler has been run, we may miss some nested
-+ * interrupts.
-+ */
-+static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned long isr;
-+	unsigned long flags;
-+	unsigned int gpio_irq;
-+
-+	/* LPA TBD */
-+	desc->chip->ack(irq);
-+
-+	/* read status */
-+	hw_raw_local_irq_save(flags);
-+	isr = inl(EXTINT_STATUS_REG) & inl(EXTINT_ENABLE3_REG);
-+	/* clear IRQ source(s) */
-+	outl(~isr, EXTINT_STATUS_REG);
-+	hw_raw_local_irq_restore(flags);
-+
-+	gpio_irq = IRQ_COUNT;
-+	for (; isr != 0; isr >>= 1, gpio_irq++) {
-+		struct irq_desc *d;
-+		if (!(isr & 1))
-+			continue;
-+		d = irq_desc + gpio_irq;
-+#ifdef CONFIG_DEBUG_EXTINT
-+		printk(KERN_ERR "got something from EXTINT#%i line\n",
-+		       gpio_irq - IRQ_COUNT);
-+#endif
-+		desc_handle_irq(gpio_irq, d);
-+	}
-+
-+}
-+
-+static void gpio_ack_irq(unsigned int irq)
-+{
-+	unsigned int gpio_irq = irq - IRQ_COUNT;
-+	unsigned long flags;
-+	hw_raw_local_irq_save(flags);
-+	outl(~(1 << gpio_irq), EXTINT_STATUS_REG);
-+	hw_raw_local_irq_restore(flags);
-+}
-+
-+static void gpio_mask_irq(unsigned int irq)
-+{
-+	unsigned int gpio_irq = irq - IRQ_COUNT;
-+	outl(inl(EXTINT_ENABLE3_REG) & ~(1 << gpio_irq),
-+		     EXTINT_ENABLE3_REG);
-+}
-+
-+static void gpio_unmask_irq(unsigned int irq)
-+{
-+	unsigned int gpio_irq = irq - IRQ_COUNT;
-+	outl(inl(EXTINT_ENABLE3_REG) | (1 << gpio_irq),
-+		     EXTINT_ENABLE3_REG);
-+}
-+
-+int u6_gpio_clear_irq(unsigned int irq)
-+{
-+	unsigned int gpio_irq;
-+	unsigned long flags;
-+	gpio_irq = irq - IRQ_COUNT;
-+	if (!check_gpio_irq(gpio_irq))
-+		return -EINVAL;
-+	hw_raw_local_irq_save(flags);
-+	outl(~(1 << gpio_irq), EXTINT_STATUS_REG);
-+	hw_raw_local_irq_restore(flags);
-+	return 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_clear_irq);
-+
-+int u6_gpio_set_irq_debounce(int irq, int cycles)
-+{
-+	int gpio;
-+	struct gpio_bank *bank;
-+	u32 reg;
-+	int mode;
-+	u32 l = 0;
-+
-+	gpio = EXTINT_TO_GPIO(irq);
-+	irq -= IRQ_COUNT;
-+	if (!check_gpio_irq(irq))
-+		goto err;
-+
-+	bank = get_gpio_bank(gpio);
-+	if (!check_gpio_requested(bank, get_gpio_index(gpio)))
-+		return -EINVAL;
-+
-+	reg = EXTINT_CFGx(irq);
-+	l = inl(reg);
-+
-+	mode = l & (3 << EXTINT_MODE_SHIFT);
-+	if (mode == EXTINT_MODE_BYPASS)
-+		goto err;
-+
-+	/* clear mode and set streching to debounce */
-+	if (mode == EXTINT_MODE_STRETCHING) {
-+		l &= ~(3 << EXTINT_MODE_SHIFT);
-+		l |= EXTINT_MODE_DEBOUNCE;
-+	}
-+	/* clear and set the debounce field */
-+	l &= ~(7 << EXTINT_DEBOUNCE_SHIFT);
-+	l |= ((cycles & 0x7) << EXTINT_DEBOUNCE_SHIFT);
-+	outl(l, reg);
-+
-+	return 0;
-+err:
-+	return -EINVAL;
-+}
-+EXPORT_SYMBOL(u6_gpio_set_irq_debounce);
-+
-+int u6_gpio_set_irq_selection(int irq, int selection)
-+{
-+	int gpio, index;
-+	struct gpio_bank *bank;
-+	u32 l = 0;
-+	u32 reg;
-+
-+	gpio = EXTINT_TO_GPIO(irq);
-+	irq -= IRQ_COUNT;
-+	if (!check_gpio_irq(irq))
-+		return -EINVAL;
-+
-+	bank = get_gpio_bank(gpio);
-+	index = get_gpio_index(gpio);
-+	if (!check_gpio_requested(bank, index))
-+		return -EINVAL;
-+
-+	reg = EXTINT_CFGx(irq);
-+	l = inl(reg);
-+
-+	if (selection == EXTINT_SEL_ALTERNATE)
-+		l |= EXTINT_SEL_ALTERNATE;
-+	else
-+		l &= ~EXTINT_SEL_ALTERNATE;
-+	outl(l, reg);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(u6_gpio_set_irq_selection);
-+
-+/*
-+ * -the level type set the bypass mode
-+ * -and by default the edge type select the stretching mode.
-+ * if you would a debounce you must defined your nb
-+ * cycle with u6_set_gpio_debounce
-+ */
-+static int _set_gpio_triggering(int gpio_irq, int trigger)
-+{
-+	u32 reg = EXTINT_CFGx(gpio_irq);
-+	u32 l = 0;
-+
-+	l = inl(reg);
-+	l &= ~(3 << 6 | 1 << 2);
-+
-+	if (trigger == IRQ_TYPE_LEVEL_LOW)
-+		l |= EXTINT_POL_NEGATIVE;
-+	else if (trigger == IRQ_TYPE_LEVEL_HIGH)
-+		l |= EXTINT_POL_POSITIVE;
-+	else if (trigger == IRQ_TYPE_EDGE_RISING)
-+		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_POSITIVE);
-+	else if (trigger == IRQ_TYPE_EDGE_FALLING)
-+		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_NEGATIVE);
-+	else if (trigger == IRQ_TYPE_EDGE_BOTH)
-+		l |= EXTINT_MODE_DUAL_EDGE;
-+	else
-+		goto err;
-+
-+	outl(l, reg);
-+
-+	return 0;
-+err:
-+	return -EINVAL;
-+}
-+
-+static int gpio_irq_type(unsigned irq, unsigned type)
-+{
-+	unsigned gpio_irq;
-+	int retval;
-+
-+	gpio_irq = irq - IRQ_COUNT;
-+
-+	if (!check_gpio_irq(gpio_irq))
-+		return -EINVAL;
-+
-+	if (type & (IRQF_TRIGGER_PROBE))
-+		return -EINVAL;
-+
-+	retval = _set_gpio_triggering(gpio_irq, type);
-+	return retval;
-+}
-+
-+static struct irq_chip gpio_irq_chip = {
-+	.ack = gpio_ack_irq,
-+	.disable = gpio_mask_irq,
-+	.enable = gpio_unmask_irq,
-+	.mask = gpio_mask_irq,
-+	.unmask = gpio_unmask_irq,
-+	.set_type = gpio_irq_type,
-+	/*.set_wake     = gpio_wake_enable, */
-+};
-+
-+static int initialized;
-+
-+static int __init u6_gpio_probe(struct platform_device *pdev)
-+{
-+	int i, j;
-+	int gpio = 0;
-+	struct gpio_bank *bank;
-+	struct gpio_data *data = pdev->dev.platform_data;
-+	unsigned long flags;
-+
-+	initialized = 1;
-+
-+	printk(KERN_INFO "U6 GPIO\n");
-+	gpio_bank_desc = data->gpio_bank_desc;
-+	gpio_bank_count = data->nb_banks;
-+
-+	for (i = 0; i < gpio_bank_count; i++) {
-+		int gpio_count = 32;	/* 32 GPIO per bank */
-+		bank = &gpio_bank_desc[i];
-+		bank->reserved_map = 0;
-+		spin_lock_init(&bank->lock);
-+
-+		bank->chip.request = u6_gpio_acquire;
-+		bank->chip.free = u6_gpio_release;
-+		bank->chip.direction_input = gpio_input;
-+		bank->chip.get = gpio_get;
-+		bank->chip.direction_output = gpio_output;
-+		bank->chip.set = gpio_set;
-+		bank->chip.to_irq = gpio_2irq;
-+		bank->chip.label = "gpio";
-+		bank->chip.base = gpio;
-+		gpio += gpio_count;
-+
-+		bank->chip.ngpio = gpio_count;
-+
-+		gpiochip_add(&bank->chip);
-+
-+	}
-+
-+	/* for extint */
-+	for (j = IRQ_COUNT; j < IRQ_COUNT + NR_EXTINT; j++) {
-+		set_irq_chip(j, &gpio_irq_chip);
-+		set_irq_handler(j, handle_simple_irq);
-+		set_irq_flags(j, IRQF_VALID);
-+	}
-+
-+	hw_raw_local_irq_save(flags);
-+	/* mask all EXT IRQ sources before registring handler */
-+	/* read status */
-+	j = inl(EXTINT_STATUS_REG) & inl(EXTINT_ENABLE3_REG);
-+	/* clear IRQ source(s) */
-+	outl(j, EXTINT_STATUS_REG);
-+
-+	outl(0, EXTINT_ENABLE3_REG);
-+
-+	/* set irq in low level */
-+	set_irq_type(IRQ_EXTINT3, IRQF_TRIGGER_LOW);
-+
-+	/* chained GPIO-IRQ on EXTINT3 */
-+	set_irq_chained_handler(IRQ_EXTINT3, gpio_irq_handler);
-+	hw_raw_local_irq_restore(flags);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver u6_gpio_driver = {
-+	.probe = u6_gpio_probe,
-+	.remove = NULL,
-+	.suspend = NULL,
-+	.resume = NULL,
-+	.driver = {
-+		   .name = "u6-gpio",
-+		   },
-+};
-+
-+static struct sysdev_class u6_gpio_sysclass = {
-+	.name = "gpio",
-+	.suspend = 0,		/*u6_gpio_suspend, */
-+	.resume = 0,		/*u6_gpio_resume, */
-+};
-+
-+static struct sys_device u6_gpio_device = {
-+	.id = 0,
-+	.cls = &u6_gpio_sysclass,
-+};
-+
-+/*
-+ * This may get called early from board specific init
-+ * for boards that have interrupts routed via FPGA.
-+ */
-+int u6_gpio_init(void)
-+{
-+	if (!initialized)
-+		return platform_driver_register(&u6_gpio_driver);
-+	else
-+		return 0;
-+}
-+
-+static int __init u6_gpio_sysinit(void)
-+{
-+	int ret = 0;
-+
-+	if (!initialized)
-+		ret = u6_gpio_init();
-+
-+	if (ret == 0) {
-+		ret = sysdev_class_register(&u6_gpio_sysclass);
-+		if (ret == 0)
-+			ret = sysdev_register(&u6_gpio_device);
-+	}
-+
-+	return ret;
-+}
-+
-+arch_initcall(u6_gpio_sysinit);
-diff --git a/arch/arm/plat-u6xxx/include/mach/gpio.h b/arch/arm/plat-u6xxx/include/mach/gpio.h
-new file mode 100644
-index 0000000..f69af5d
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/gpio.h
-@@ -0,0 +1,396 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/gpio.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * GPIO handling defines and functions
-+ */
-+
-+#ifndef __ASM_PLAT_U6_GPIO_H
-+#define __ASM_PLAT_U6_GPIO_H
-+
-+#include <linux/io.h>
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+#include <mach/gpio.h>
-+
-+#include <linux/errno.h>
-+#include <asm-generic/gpio.h>
-+
-+/* GPIO bank description */
-+struct gpio_bank {
-+	u32 gpio_base;
-+	u32 mux_base;
-+	u16 irq;
-+	u16 virtual_irq_start;
-+	int method;
-+	u32 reserved_map;
-+	u32 suspend_wakeup;
-+	u32 saved_wakeup;
-+	spinlock_t lock;
-+	struct gpio_chip chip;
-+};
-+
-+
-+struct gpio_data {
-+	u32 nb_banks;
-+	struct gpio_bank *gpio_bank_desc;
-+};
-+
-+
-+/* GPIO Init configuration */
-+
-+struct u6_gpio_config {
-+	u32 gpio;
-+	u32 dir;
-+	u32 value;
-+};
-+
-+
-+/* list of GPIO */
-+enum U6_GPIO_LIST {
-+	GPIO_A0 = 0,
-+	GPIO_A1,
-+	GPIO_A2,
-+	GPIO_A3,
-+	GPIO_A4,
-+	GPIO_A5,
-+	GPIO_A6,
-+	GPIO_A7,
-+	GPIO_A8,
-+	GPIO_A9,
-+	GPIO_A10,
-+	GPIO_A11,
-+	GPIO_A12,
-+	GPIO_A13,
-+	GPIO_A14,
-+	GPIO_A15,
-+	GPIO_A16,
-+	GPIO_A17,
-+	GPIO_A18,
-+	GPIO_A19,
-+	GPIO_A20,
-+	GPIO_A21,
-+	GPIO_A22,
-+	GPIO_A23,
-+	GPIO_A24,
-+	GPIO_A25,
-+	GPIO_A26,
-+	GPIO_A27,
-+	GPIO_A28,
-+	GPIO_A29,
-+	GPIO_A30,
-+	GPIO_A31,
-+	GPIO_B0,
-+	GPIO_B1,
-+	GPIO_B2,
-+	GPIO_B3,
-+	GPIO_B4,
-+	GPIO_B5,
-+	GPIO_B6,
-+	GPIO_B7,
-+	GPIO_B8,
-+	GPIO_B9,
-+	GPIO_B10,
-+	GPIO_B11,
-+	GPIO_B12,
-+	GPIO_B13,
-+	GPIO_B14,
-+	GPIO_B15,
-+	GPIO_B16,
-+	GPIO_B17,
-+	GPIO_B18,
-+	GPIO_B19,
-+	GPIO_B20,
-+	GPIO_B21,
-+	GPIO_B22,
-+	GPIO_B23,
-+	GPIO_B24,
-+	GPIO_B25,
-+	GPIO_B26,
-+	GPIO_B27,
-+	GPIO_B28,
-+	GPIO_B29,
-+	GPIO_B30,
-+	GPIO_B31,
-+	GPIO_C0,
-+	GPIO_C1,
-+	GPIO_C2,
-+	GPIO_C3,
-+	GPIO_C4,
-+	GPIO_C5,
-+	GPIO_C6,
-+	GPIO_C7,
-+	GPIO_C8,
-+	GPIO_C9,
-+	GPIO_C10,
-+	GPIO_C11,
-+	GPIO_C12,
-+	GPIO_C13,
-+	GPIO_C14,
-+	GPIO_C15,
-+	GPIO_C16,
-+	GPIO_C17,
-+	GPIO_C18,
-+	GPIO_C19,
-+	GPIO_C20,
-+	GPIO_C21,
-+	GPIO_C22,
-+	GPIO_C23,
-+	GPIO_C24,
-+	GPIO_C25,
-+	GPIO_C26,
-+	GPIO_C27,
-+	GPIO_C28,
-+	GPIO_C29,
-+	GPIO_C30,
-+	GPIO_C31,
-+	GPIO_D0,
-+	GPIO_D1,
-+	GPIO_D2,
-+	GPIO_D3,
-+	GPIO_D4,
-+	GPIO_D5,
-+	GPIO_D6,
-+	GPIO_D7,
-+	GPIO_D8,
-+	GPIO_D9,
-+	GPIO_D10,
-+	GPIO_D11,
-+	GPIO_D12,
-+	GPIO_D13,
-+	GPIO_D14,
-+	GPIO_D15,
-+	GPIO_D16,
-+	GPIO_D17,
-+	GPIO_D18,
-+	GPIO_D19,
-+	GPIO_D20,
-+	GPIO_D21,
-+	GPIO_D22,
-+	GPIO_D23,
-+	GPIO_D24,
-+	GPIO_D25,
-+	GPIO_D26,
-+	GPIO_D27,
-+	GPIO_D28,
-+	GPIO_D29,
-+	GPIO_D30,
-+	GPIO_D31,
-+	GPIO_E0,
-+	GPIO_E1,
-+	GPIO_E2,
-+	GPIO_E3,
-+	GPIO_E4,
-+	GPIO_E5,
-+	GPIO_E6,
-+	GPIO_E7,
-+	GPIO_E8,
-+	GPIO_E9,
-+	GPIO_E10,
-+	GPIO_E11,
-+	GPIO_E12,
-+	GPIO_E13,
-+	GPIO_E14,
-+	GPIO_E15,
-+	GPIO_E16,
-+	GPIO_E17,
-+	GPIO_E18,
-+	GPIO_E19,
-+	GPIO_E20,
-+	GPIO_E21,
-+	GPIO_E22,
-+	GPIO_E23,
-+	GPIO_E24,
-+	GPIO_E25,
-+	GPIO_E26,
-+	GPIO_E27,
-+	GPIO_E28,
-+	GPIO_E29,
-+	GPIO_E30,
-+	GPIO_E31,
-+	GPIO_F0,
-+	GPIO_F1,
-+	GPIO_F2,
-+	GPIO_F3,
-+	GPIO_F4,
-+	GPIO_F5,
-+	GPIO_F6,
-+	GPIO_F7,
-+	GPIO_F8,
-+	GPIO_F9,
-+	GPIO_F10,
-+	GPIO_F11,
-+	GPIO_F12,
-+	GPIO_F13,
-+	GPIO_F14,
-+	GPIO_F15,
-+	GPIO_F16,
-+	GPIO_F17,
-+	GPIO_F18,
-+	GPIO_F19,
-+	GPIO_F20,
-+	GPIO_F21,
-+	GPIO_F22,
-+	GPIO_F23,
-+	GPIO_F24,
-+	GPIO_F25,
-+	GPIO_F26,
-+	GPIO_F27,
-+	GPIO_F28,
-+	GPIO_F29,
-+	GPIO_F30,
-+	GPIO_F31,
-+	GPIO_COUNT,
-+};
-+
-+enum PMU_GPIO_LIST {
-+	PMU_GPIO1 = GPIO_COUNT,
-+	PMU_GPIO2,
-+	PMU_GPIO3,
-+	PMU_GPIO4,
-+};
-+
-+enum U6_GPIO_MODE {
-+	GPIO_MODE_MUX0 = 0,
-+	GPIO_MODE_MUX1,
-+	GPIO_MODE_MUX2,
-+	GPIO_MODE_MUX3
-+};
-+
-+
-+#define GPIO_DIR_INPUT  1
-+#define GPIO_DIR_OUTPUT 0
-+
-+
-+extern int  u6_gpio_init(void);	/* Call from board init only */
-+extern int  u6_gpio_request(int gpio);
-+extern void u6_gpio_free(int gpio);
-+extern int  u6_gpio_set_mode(int gpio, int mode);
-+extern int  u6_gpio_set_mode_gpio(int gpio);
-+extern int  u6_gpio_set_direction(int gpio, int is_input);
-+extern int  u6_gpio_write_pin(int gpio, int gpio_value);
-+extern int  u6_gpio_read_pin(int gpio);
-+extern int  u6_gpio_set_irq_debounce(int irq, int cycles);
-+extern int  u6_gpio_set_irq_selection(int irq, int selection);
-+extern int  u6_gpio_clear_irq(unsigned int irq);
-+
-+
-+/*
-+ * Wrappers for "new style" GPIO calls, using the new infrastructure
-+ * which lets us plug in FPGA, I2C, and other implementations.
-+ */
-+
-+static inline int gpio_get_value(unsigned gpio)
-+{
-+	return __gpio_get_value(gpio);
-+}
-+
-+static inline void gpio_set_value(unsigned gpio, int value)
-+{
-+	__gpio_set_value(gpio, value);
-+}
-+
-+static inline int gpio_cansleep(unsigned gpio)
-+{
-+	return __gpio_cansleep(gpio);
-+}
-+
-+static inline int gpio_to_irq(unsigned gpio)
-+{
-+	return __gpio_to_irq(gpio);
-+}
-+
-+static inline int irq_to_gpio(unsigned irq)
-+{
-+	return EXTINT_TO_GPIO(irq);
-+}
-+
-+/*****************************************************************************
-+* Hardware Register Definitions for EXTINT
-+*****************************************************************************/
-+
-+/* EXTINT ENABLE1 Register (32 bits) */
-+#define EXTINT_ENABLE1_OFFSET  0x60
-+#define EXTINT_ENABLE1_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE1_OFFSET)
-+
-+/* EXTINT ENABLE2 Register (32 bits) */
-+#define EXTINT_ENABLE2_OFFSET  0x64
-+#define EXTINT_ENABLE2_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE2_OFFSET)
-+
-+/* EXTINT ENABLE3 Register (32 bits) */
-+#define EXTINT_ENABLE3_OFFSET  0x68
-+#define EXTINT_ENABLE3_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE3_OFFSET)
-+
-+/* EXTINT STATUS Register (32 bits) */
-+#define EXTINT_STATUS_OFFSET   0x6C
-+#define EXTINT_STATUS_REG      IO_ADDRESS(EXTINT_BASE + EXTINT_STATUS_OFFSET)
-+
-+/* EXTINT SIGNAL Register (32 bits) */
-+#define EXTINT_SIGNAL_OFFSET   0x70
-+#define EXTINT_SIGNAL_REG      IO_ADDRESS(EXTINT_BASE + EXTINT_SIGNAL_OFFSET)
-+
-+/* Bits definition for register EXTINT_CFG[23:0] */
-+#define EXTINT_MODE_SHIFT      6
-+#define EXTINT_MODE_FIELD      (0xFFFFFFFF - (0x3UL<<EXTINT_MODE_SHIFT))
-+#define EXTINT_MODE_BYPASS     (0x0UL<<EXTINT_MODE_SHIFT)
-+#define EXTINT_MODE_STRETCHING (0x1UL<<EXTINT_MODE_SHIFT)
-+#define EXTINT_MODE_DEBOUNCE   (0x2UL<<EXTINT_MODE_SHIFT)
-+#define EXTINT_MODE_DUAL_EDGE  (0x3UL<<EXTINT_MODE_SHIFT)
-+#define EXTINT_DEBOUNCE_SHIFT  3
-+#define EXTINT_DEBOUNCE_FIELD  (0xFFFFFFFF - (0x7UL<<EXTINT_DEBOUNCE_SHIFT))
-+#define EXTINT_DEBOUNCE_0      (0x0UL<<EXTINT_DEBOUNCE_SHIFT)
-+#define EXTINT_DEBOUNCE_1      (0x1UL<<EXTINT_DEBOUNCE_SHIFT)
-+#define EXTINT_DEBOUNCE_2      (0x2UL<<EXTINT_DEBOUNCE_SHIFT)
-+#define EXTINT_DEBOUNCE_3      (0x3UL<<EXTINT_DEBOUNCE_SHIFT)
-+#define EXTINT_DEBOUNCE_7      (0x7UL<<EXTINT_DEBOUNCE_SHIFT)
-+#define EXTINT_POL_SHIFT       2
-+#define EXTINT_POL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_POL_SHIFT))
-+#define EXTINT_POL_NEGATIVE    (0x0UL<<EXTINT_POL_SHIFT)
-+#define EXTINT_POL_POSITIVE    (0x1UL<<EXTINT_POL_SHIFT)
-+#define EXTINT_POL             (0x1UL<<EXTINT_POL_SHIFT)
-+#define EXTINT_SEL_SHIFT       1
-+#define EXTINT_SEL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_SEL_SHIFT))
-+#define EXTINT_SEL_EXTINT      (0x0UL<<EXTINT_SEL_SHIFT)
-+#define EXTINT_SEL_ALTERNATE   (0x1UL<<EXTINT_SEL_SHIFT)
-+#define EXTINT_SEL             (0x1UL<<EXTINT_SEL_SHIFT)
-+
-+/*****************************************************************************/
-+/* Register description for ENABLE[3:1] */
-+
-+/* Bits definition for register EXTINT_ENABLE[3:1] */
-+#define EXTINT_ENABLE_SHIFT    0
-+#define EXTINT_ENABLE_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_ENABLE_SHIFT))
-+#define EXTINT_ENABLE_0        (0x0UL<<EXTINT_ENABLE_SHIFT)
-+#define EXTINT_ENABLE_1        (0x1UL<<EXTINT_ENABLE_SHIFT)
-+
-+/*****************************************************************************/
-+/* Register description for STATUS */
-+
-+/* Bits definition for register EXTINT_STATUS */
-+#define EXTINT_STATUS_SHIFT    0
-+#define EXTINT_STATUS_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_STATUS_SHIFT))
-+#define EXTINT_STATUS_0        (0x0UL<<EXTINT_STATUS_SHIFT)
-+#define EXTINT_STATUS_1        (0x1UL<<EXTINT_STATUS_SHIFT)
-+
-+/*****************************************************************************
-+* Hardware Register Definitions for GPIOx
-+*****************************************************************************/
-+/* Offsets */
-+#define GPIO_PINS_OFFSET       0x0
-+#define GPIO_OR_OFFSET         0x4
-+#define GPIO_DR_OFFSET         0x8
-+
-+/* GPIOx PINS Registers (32 bits) */
-+#define GPIOA_PINS_REG         IO_ADDRESS(GPIOA_BASE + GPIO_PINS_OFFSET)
-+#define GPIOB_PINS_REG         IO_ADDRESS(GPIOB_BASE + GPIO_PINS_OFFSET)
-+#define GPIOC_PINS_REG         IO_ADDRESS(GPIOC_BASE + GPIO_PINS_OFFSET)
-+#define GPIOD_PINS_REG         IO_ADDRESS(GPIOD_BASE + GPIO_PINS_OFFSET)
-+#define GPIOE_PINS_REG         IO_ADDRESS(GPIOE_BASE + GPIO_PINS_OFFSET)
-+#define GPIOF_PINS_REG         IO_ADDRESS(GPIOF_BASE + GPIO_PINS_OFFSET)
-+
-+/* GPIOx OR Registers (32 bits) */
-+#define GPIOA_OR_REG           IO_ADDRESS(GPIOC_BASE + GPIO_OR_OFFSET)
-+
-+#endif
++++ b/arch/arm/configs/u67xx_wavex_defconfig
+@@ -0,0 +1,1076 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.33
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_GPIO=y
++CONFIG_GENERIC_TIME=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
++
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_LOCK_KERNEL=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_LOCALVERSION=""
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_HAVE_KERNEL_GZIP=y
++CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_KERNEL_GZIP=y
++# CONFIG_KERNEL_BZIP2 is not set
++# CONFIG_KERNEL_LZMA is not set
++# CONFIG_KERNEL_LZO is not set
++CONFIG_SWAP=y
++CONFIG_SYSVIPC=y
++CONFIG_SYSVIPC_SYSCTL=y
++# CONFIG_POSIX_MQUEUE is not set
++# CONFIG_BSD_PROCESS_ACCT is not set
++# CONFIG_TASKSTATS is not set
++# CONFIG_AUDIT is not set
++
++#
++# RCU Subsystem
++#
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
++# CONFIG_TREE_RCU_TRACE is not set
++# CONFIG_IKCONFIG is not set
++CONFIG_LOG_BUF_SHIFT=14
++# CONFIG_GROUP_SCHED is not set
++# CONFIG_CGROUPS is not set
++# CONFIG_SYSFS_DEPRECATED_V2 is not set
++# CONFIG_RELAY is not set
++# CONFIG_NAMESPACES is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE=""
++CONFIG_RD_GZIP=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_LZO is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++CONFIG_EMBEDDED=y
++CONFIG_UID16=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS=y
++CONFIG_KALLSYMS_ALL=y
++# CONFIG_KALLSYMS_EXTRA_PASS is not set
++CONFIG_HOTPLUG=y
++CONFIG_PRINTK=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++CONFIG_SHMEM=y
++CONFIG_AIO=y
++
++#
++# Kernel Performance Events And Counters
++#
++CONFIG_VM_EVENT_COUNTERS=y
++# CONFIG_SLUB_DEBUG is not set
++CONFIG_COMPAT_BRK=y
++# CONFIG_SLAB is not set
++CONFIG_SLUB=y
++# CONFIG_SLOB is not set
++CONFIG_PROFILING=y
++CONFIG_TRACEPOINTS=y
++CONFIG_OPROFILE=y
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
++# CONFIG_SLOW_WORK is not set
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
++# CONFIG_MODVERSIONS is not set
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
++
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_DEADLINE=y
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_DEFAULT_DEADLINE=y
++# CONFIG_DEFAULT_CFQ is not set
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="deadline"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_SPIN_UNLOCK is not set
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_READ_UNLOCK is not set
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_WRITE_UNLOCK is not set
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
++# CONFIG_FREEZER is not set
++
++#
++# System Type
++#
++CONFIG_MMU=y
++# CONFIG_ARCH_AAEC2000 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_ARCH_VERSATILE is not set
++# CONFIG_ARCH_AT91 is not set
++# CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_NOMADIK is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP23XX is not set
++# CONFIG_ARCH_IXP2000 is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
++# CONFIG_ARCH_KIRKWOOD is not set
++# CONFIG_ARCH_LOKI is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++# CONFIG_ARCH_W90X900 is not set
++# CONFIG_ARCH_PNX4008 is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_MSM is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C2410 is not set
++# CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5PC1XX is not set
++# CONFIG_ARCH_SHARK is not set
++# CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP is not set
++# CONFIG_ARCH_BCMRING is not set
++CONFIG_PLAT_U6XXX=y
++# CONFIG_ARCH_U8500 is not set
++
++#
++# STE U6XXX Implementations
++#
++CONFIG_ARCH_U67XX=y
++CONFIG_U6_MTU_TIMER=y
++
++#
++# U67XX Board Type
++#
++CONFIG_MACH_U67XX_WAVEC_2GB=y
++
++#
++# U67XX Specific configuration
++#
++CONFIG_MACHINE_NAME="STE_U67xx_refd"
++
++#
++# Processor Type
++#
++CONFIG_CPU_ARM926T=y
++CONFIG_CPU_32v5=y
++CONFIG_CPU_ABRT_EV5TJ=y
++CONFIG_CPU_PABRT_LEGACY=y
++CONFIG_CPU_CACHE_VIVT=y
++CONFIG_CPU_COPY_V4WB=y
++CONFIG_CPU_TLB_V4WBI=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
++
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
++# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
++
++#
++# Bus support
++#
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
++
++#
++# Kernel Features
++#
++CONFIG_TICK_ONESHOT=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
++CONFIG_PREEMPT=y
++CONFIG_HZ=100
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_FLATMEM_MANUAL=y
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++# CONFIG_SPARSEMEM_MANUAL is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_PAGEFLAGS_EXTENDED=y
++CONFIG_SPLIT_PTLOCK_CPUS=999999
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
++
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0
++# CONFIG_ZBOOT_ROM is not set
++CONFIG_CMDLINE="console=ttyS0,115200n8 quiet initrd=0x26000000 rootfstype=ext2 root=/dev/ram0"
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
++
++#
++# CPU Power Management
++#
++# CONFIG_CPU_IDLE is not set
++
++#
++# Floating point emulation
++#
++
++#
++# At least one emulation must be selected
++#
++CONFIG_FPE_NWFPE=y
++# CONFIG_FPE_NWFPE_XP is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
++
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
++
++#
++# Power management options
++#
++# CONFIG_PM is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++CONFIG_NET=y
++
++#
++# Networking options
++#
++CONFIG_PACKET=y
++CONFIG_PACKET_MMAP=y
++CONFIG_UNIX=y
++CONFIG_XFRM=y
++# CONFIG_XFRM_USER is not set
++# CONFIG_XFRM_SUB_POLICY is not set
++# CONFIG_XFRM_MIGRATE is not set
++# CONFIG_XFRM_STATISTICS is not set
++# CONFIG_NET_KEY is not set
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++# CONFIG_IP_ADVANCED_ROUTER is not set
++CONFIG_IP_FIB_HASH=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_IP_PNP_BOOTP is not set
++# CONFIG_IP_PNP_RARP is not set
++# CONFIG_NET_IPIP is not set
++# CONFIG_NET_IPGRE is not set
++# CONFIG_IP_MROUTE is not set
++# CONFIG_ARPD is not set
++# CONFIG_SYN_COOKIES is not set
++# CONFIG_INET_AH is not set
++# CONFIG_INET_ESP is not set
++# CONFIG_INET_IPCOMP is not set
++# CONFIG_INET_XFRM_TUNNEL is not set
++# CONFIG_INET_TUNNEL is not set
++CONFIG_INET_XFRM_MODE_TRANSPORT=y
++CONFIG_INET_XFRM_MODE_TUNNEL=y
++CONFIG_INET_XFRM_MODE_BEET=y
++# CONFIG_INET_LRO is not set
++CONFIG_INET_DIAG=y
++CONFIG_INET_TCP_DIAG=y
++# CONFIG_TCP_CONG_ADVANCED is not set
++CONFIG_TCP_CONG_CUBIC=y
++CONFIG_DEFAULT_TCP_CONG="cubic"
++# CONFIG_TCP_MD5SIG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_NETWORK_SECMARK is not set
++# CONFIG_NETFILTER is not set
++# CONFIG_IP_DCCP is not set
++# CONFIG_IP_SCTP is not set
++# CONFIG_RDS is not set
++# CONFIG_TIPC is not set
++# CONFIG_ATM is not set
++# CONFIG_BRIDGE is not set
++# CONFIG_NET_DSA is not set
++# CONFIG_VLAN_8021Q is not set
++# CONFIG_DECNET is not set
++# CONFIG_LLC2 is not set
++# CONFIG_IPX is not set
++# CONFIG_ATALK is not set
++# CONFIG_X25 is not set
++# CONFIG_LAPB is not set
++# CONFIG_ECONET is not set
++# CONFIG_WAN_ROUTER is not set
++# CONFIG_PHONET is not set
++# CONFIG_IEEE802154 is not set
++# CONFIG_NET_SCHED is not set
++# CONFIG_DCB is not set
++
++#
++# Network testing
++#
++# CONFIG_NET_PKTGEN is not set
++# CONFIG_NET_DROP_MONITOR is not set
++# CONFIG_HAMRADIO is not set
++# CONFIG_CAN is not set
++# CONFIG_IRDA is not set
++# CONFIG_BT is not set
++# CONFIG_AF_RXRPC is not set
++# CONFIG_WIRELESS is not set
++# CONFIG_WIMAX is not set
++# CONFIG_RFKILL is not set
++# CONFIG_NET_9P is not set
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
++CONFIG_STANDALONE=y
++CONFIG_PREVENT_FIRMWARE_BUILD=y
++# CONFIG_FW_LOADER is not set
++# CONFIG_DEBUG_DRIVER is not set
++# CONFIG_DEBUG_DEVRES is not set
++# CONFIG_SYS_HYPERVISOR is not set
++# CONFIG_CONNECTOR is not set
++# CONFIG_MTD is not set
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_COW_COMMON is not set
++CONFIG_BLK_DEV_LOOP=y
++# CONFIG_BLK_DEV_CRYPTOLOOP is not set
++
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
++# CONFIG_BLK_DEV_NBD is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=2
++CONFIG_BLK_DEV_RAM_SIZE=32768
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_ATA_OVER_ETH is not set
++# CONFIG_MG_DISK is not set
++# CONFIG_MISC_DEVICES is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=m
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_TGT is not set
++# CONFIG_SCSI_NETLINK is not set
++CONFIG_SCSI_PROC_FS=y
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=m
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++# CONFIG_CHR_DEV_SG is not set
++# CONFIG_CHR_DEV_SCH is not set
++CONFIG_SCSI_MULTI_LUN=y
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++CONFIG_SCSI_WAIT_SCAN=m
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_FC_ATTRS is not set
++# CONFIG_SCSI_ISCSI_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_ISCSI_TCP is not set
++# CONFIG_LIBFC is not set
++# CONFIG_LIBFCOE is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++# CONFIG_NETDEVICES is not set
++# CONFIG_ISDN is not set
++# CONFIG_PHONE is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
++
++#
++# Userland interfaces
++#
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_JOYDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++CONFIG_INPUT_KEYBOARD=y
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_KEYBOARD_LKKBD is not set
++# CONFIG_KEYBOARD_GPIO is not set
++# CONFIG_KEYBOARD_MATRIX is not set
++# CONFIG_KEYBOARD_NEWTON is not set
++# CONFIG_KEYBOARD_OPENCORES is not set
++# CONFIG_KEYBOARD_STOWAWAY is not set
++# CONFIG_KEYBOARD_SUNKBD is not set
++# CONFIG_KEYBOARD_XTKBD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
++
++#
++# Hardware I/O ports
++#
++CONFIG_SERIO=y
++# CONFIG_SERIO_SERPORT is not set
++# CONFIG_SERIO_LIBPS2 is not set
++# CONFIG_SERIO_RAW is not set
++# CONFIG_SERIO_ALTERA_PS2 is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
++
++#
++# Serial drivers
++#
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=2
++CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_8250_EXTENDED=y
++# CONFIG_SERIAL_8250_MANY_PORTS is not set
++CONFIG_SERIAL_8250_U6XXX=y
++CONFIG_SERIAL_8250_CUSTOM_CLOCK=y
++CONFIG_SERIAL_8250_CUSTOM_MAX_BAUDRATE=3250000
++# CONFIG_SERIAL_8250_SHARE_IRQ is not set
++# CONFIG_SERIAL_8250_DETECT_IRQ is not set
++# CONFIG_SERIAL_8250_RSA is not set
++
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_UNIX98_PTYS=y
++# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_IPMI_HANDLER is not set
++CONFIG_HW_RANDOM=y
++# CONFIG_HW_RANDOM_TIMERIOMEM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_I2C is not set
++# CONFIG_SPI is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
++CONFIG_ARCH_REQUIRE_GPIOLIB=y
++CONFIG_GPIOLIB=y
++# CONFIG_DEBUG_GPIO is not set
++# CONFIG_GPIO_SYSFS is not set
++
++#
++# Memory mapped GPIO expanders:
++#
++
++#
++# I2C GPIO expanders:
++#
++
++#
++# PCI GPIO expanders:
++#
++
++#
++# SPI GPIO expanders:
++#
++
++#
++# AC97 GPIO expanders:
++#
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++CONFIG_FB=y
++# CONFIG_FIRMWARE_EDID is not set
++# CONFIG_FB_DDC is not set
++# CONFIG_FB_BOOT_VESA_SUPPORT is not set
++# CONFIG_FB_CFB_FILLRECT is not set
++# CONFIG_FB_CFB_COPYAREA is not set
++# CONFIG_FB_CFB_IMAGEBLIT is not set
++# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
++# CONFIG_FB_SYS_FILLRECT is not set
++# CONFIG_FB_SYS_COPYAREA is not set
++# CONFIG_FB_SYS_IMAGEBLIT is not set
++# CONFIG_FB_FOREIGN_ENDIAN is not set
++# CONFIG_FB_SYS_FOPS is not set
++# CONFIG_FB_SVGALIB is not set
++# CONFIG_FB_MACMODES is not set
++# CONFIG_FB_BACKLIGHT is not set
++# CONFIG_FB_MODE_HELPERS is not set
++# CONFIG_FB_TILEBLITTING is not set
++
++#
++# Frame buffer hardware drivers
++#
++# CONFIG_FB_S1D13XXX is not set
++# CONFIG_FB_VIRTUAL is not set
++# CONFIG_FB_METRONOME is not set
++# CONFIG_FB_MB862XX is not set
++# CONFIG_FB_BROADSHEET is not set
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
++# CONFIG_LCD_ILI9320 is not set
++CONFIG_LCD_PLATFORM=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_GENERIC=y
++
++#
++# Display device support
++#
++# CONFIG_DISPLAY_SUPPORT is not set
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_FRAMEBUFFER_CONSOLE is not set
++# CONFIG_LOGO is not set
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_MMC is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_RTC_LIB=y
++# CONFIG_RTC_CLASS is not set
++# CONFIG_DMADEVICES is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++
++#
++# TI VLYNQ
++#
++# CONFIG_STAGING is not set
++
++#
++# File systems
++#
++CONFIG_EXT2_FS=y
++# CONFIG_EXT2_FS_XATTR is not set
++# CONFIG_EXT2_FS_XIP is not set
++# CONFIG_EXT3_FS is not set
++# CONFIG_EXT4_FS is not set
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++CONFIG_FS_POSIX_ACL=y
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_OCFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
++CONFIG_DNOTIFY=y
++CONFIG_INOTIFY=y
++CONFIG_INOTIFY_USER=y
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS_FS is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_FUSE_FS is not set
++CONFIG_GENERIC_ACL=y
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-15"
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++# CONFIG_CRAMFS is not set
++CONFIG_SQUASHFS=y
++# CONFIG_SQUASHFS_EMBEDDED is not set
++CONFIG_SQUASHFS_FRAGMENT_CACHE_SIZE=3
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++# CONFIG_ROMFS_FS is not set
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++CONFIG_NETWORK_FILESYSTEMS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++# CONFIG_NFS_V3_ACL is not set
++# CONFIG_NFS_V4 is not set
++# CONFIG_ROOT_NFS is not set
++# CONFIG_NFSD is not set
++CONFIG_LOCKD=y
++CONFIG_LOCKD_V4=y
++CONFIG_NFS_COMMON=y
++CONFIG_SUNRPC=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
++# CONFIG_RPCSEC_GSS_SPKM3 is not set
++# CONFIG_SMB_FS is not set
++# CONFIG_CIFS is not set
++# CONFIG_NCP_FS is not set
++# CONFIG_CODA_FS is not set
++# CONFIG_AFS_FS is not set
++
++#
++# Partition Types
++#
++# CONFIG_PARTITION_ADVANCED is not set
++CONFIG_MSDOS_PARTITION=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-15"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++CONFIG_NLS_CODEPAGE_850=y
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++# CONFIG_NLS_ASCII is not set
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++CONFIG_NLS_ISO8859_15=y
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_UTF8 is not set
++# CONFIG_DLM is not set
++
++#
++# Kernel hacking
++#
++CONFIG_PRINTK_TIME=y
++CONFIG_ENABLE_WARN_DEPRECATED=y
++CONFIG_ENABLE_MUST_CHECK=y
++CONFIG_FRAME_WARN=1024
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_UNUSED_SYMBOLS is not set
++CONFIG_DEBUG_FS=y
++# CONFIG_HEADERS_CHECK is not set
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_DEBUG_SHIRQ is not set
++CONFIG_DETECT_SOFTLOCKUP=y
++# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
++CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
++CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_SCHEDSTATS is not set
++CONFIG_TIMER_STATS=y
++# CONFIG_DEBUG_OBJECTS is not set
++# CONFIG_DEBUG_KMEMLEAK is not set
++CONFIG_DEBUG_PREEMPT=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_PI_LIST=y
++# CONFIG_RT_MUTEX_TESTER is not set
++# CONFIG_DEBUG_SPINLOCK is not set
++CONFIG_DEBUG_MUTEXES=y
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_PROVE_LOCKING is not set
++# CONFIG_LOCK_STAT is not set
++# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
++# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
++CONFIG_STACKTRACE=y
++# CONFIG_DEBUG_KOBJECT is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_VM=y
++# CONFIG_DEBUG_WRITECOUNT is not set
++# CONFIG_DEBUG_MEMORY_INIT is not set
++# CONFIG_DEBUG_LIST is not set
++# CONFIG_DEBUG_SG is not set
++# CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_DEBUG_CREDENTIALS is not set
++CONFIG_FRAME_POINTER=y
++# CONFIG_BOOT_PRINTK_DELAY is not set
++# CONFIG_RCU_TORTURE_TEST is not set
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_BACKTRACE_SELF_TEST is not set
++# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
++# CONFIG_FAULT_INJECTION is not set
++# CONFIG_LATENCYTOP is not set
++# CONFIG_SYSCTL_SYSCALL_CHECK is not set
++# CONFIG_PAGE_POISONING is not set
++CONFIG_NOP_TRACER=y
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_RING_BUFFER=y
++CONFIG_EVENT_TRACING=y
++CONFIG_CONTEXT_SWITCH_TRACER=y
++CONFIG_RING_BUFFER_ALLOW_SWAP=y
++CONFIG_TRACING=y
++CONFIG_TRACING_SUPPORT=y
++CONFIG_FTRACE=y
++# CONFIG_FUNCTION_TRACER is not set
++# CONFIG_IRQSOFF_TRACER is not set
++# CONFIG_PREEMPT_TRACER is not set
++# CONFIG_SCHED_TRACER is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_BOOT_TRACER is not set
++CONFIG_BRANCH_PROFILE_NONE=y
++# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
++# CONFIG_PROFILE_ALL_BRANCHES is not set
++# CONFIG_STACK_TRACER is not set
++# CONFIG_KMEMTRACE is not set
++# CONFIG_WORKQUEUE_TRACER is not set
++# CONFIG_BLK_DEV_IO_TRACE is not set
++# CONFIG_RING_BUFFER_BENCHMARK is not set
++# CONFIG_DYNAMIC_DEBUG is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_KGDB is not set
++# CONFIG_ARM_UNWIND is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++# CONFIG_DEBUG_STACK_USAGE is not set
++# CONFIG_DEBUG_LL is not set
++# CONFIG_OC_ETM is not set
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
++CONFIG_CRYPTO=y
++
++#
++# Crypto core or helper
++#
++# CONFIG_CRYPTO_MANAGER is not set
++# CONFIG_CRYPTO_MANAGER2 is not set
++# CONFIG_CRYPTO_GF128MUL is not set
++# CONFIG_CRYPTO_NULL is not set
++# CONFIG_CRYPTO_CRYPTD is not set
++# CONFIG_CRYPTO_AUTHENC is not set
++# CONFIG_CRYPTO_TEST is not set
++
++#
++# Authenticated Encryption with Associated Data
++#
++# CONFIG_CRYPTO_CCM is not set
++# CONFIG_CRYPTO_GCM is not set
++# CONFIG_CRYPTO_SEQIV is not set
++
++#
++# Block modes
++#
++# CONFIG_CRYPTO_CBC is not set
++# CONFIG_CRYPTO_CTR is not set
++# CONFIG_CRYPTO_CTS is not set
++# CONFIG_CRYPTO_ECB is not set
++# CONFIG_CRYPTO_LRW is not set
++# CONFIG_CRYPTO_PCBC is not set
++# CONFIG_CRYPTO_XTS is not set
++
++#
++# Hash modes
++#
++# CONFIG_CRYPTO_HMAC is not set
++# CONFIG_CRYPTO_XCBC is not set
++# CONFIG_CRYPTO_VMAC is not set
++
++#
++# Digest
++#
++# CONFIG_CRYPTO_CRC32C is not set
++# CONFIG_CRYPTO_GHASH is not set
++# CONFIG_CRYPTO_MD4 is not set
++# CONFIG_CRYPTO_MD5 is not set
++# CONFIG_CRYPTO_MICHAEL_MIC is not set
++# CONFIG_CRYPTO_RMD128 is not set
++# CONFIG_CRYPTO_RMD160 is not set
++# CONFIG_CRYPTO_RMD256 is not set
++# CONFIG_CRYPTO_RMD320 is not set
++# CONFIG_CRYPTO_SHA1 is not set
++# CONFIG_CRYPTO_SHA256 is not set
++# CONFIG_CRYPTO_SHA512 is not set
++# CONFIG_CRYPTO_TGR192 is not set
++# CONFIG_CRYPTO_WP512 is not set
++
++#
++# Ciphers
++#
++# CONFIG_CRYPTO_AES is not set
++# CONFIG_CRYPTO_ANUBIS is not set
++# CONFIG_CRYPTO_ARC4 is not set
++# CONFIG_CRYPTO_BLOWFISH is not set
++# CONFIG_CRYPTO_CAMELLIA is not set
++# CONFIG_CRYPTO_CAST5 is not set
++# CONFIG_CRYPTO_CAST6 is not set
++# CONFIG_CRYPTO_DES is not set
++# CONFIG_CRYPTO_FCRYPT is not set
++# CONFIG_CRYPTO_KHAZAD is not set
++# CONFIG_CRYPTO_SALSA20 is not set
++# CONFIG_CRYPTO_SEED is not set
++# CONFIG_CRYPTO_SERPENT is not set
++# CONFIG_CRYPTO_TEA is not set
++# CONFIG_CRYPTO_TWOFISH is not set
++
++#
++# Compression
++#
++# CONFIG_CRYPTO_DEFLATE is not set
++# CONFIG_CRYPTO_ZLIB is not set
++# CONFIG_CRYPTO_LZO is not set
++
++#
++# Random Number Generation
++#
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_BINARY_PRINTF=y
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_FIND_LAST_BIT=y
++CONFIG_CRC_CCITT=y
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_IOPORT=y
++CONFIG_HAS_DMA=y
++CONFIG_NLATTR=y
 -- 
 1.7.0.4
