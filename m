@@ -1,83 +1,63 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Wed, 28 Apr 2010 07:50:07 +0900
-Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-In-Reply-To: <20100413142607V.fujita.tomonori@lab.ntt.co.jp>
-References: <20100405123847C.fujita.tomonori@lab.ntt.co.jp>
-	<20100412193536.GO3048@n2100.arm.linux.org.uk>
-	<20100413142607V.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100428075137J.fujita.tomonori@lab.ntt.co.jp>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 28 Apr 2010 01:06:52 +0100
+Subject: [PATCH 01/01] ARM: S3C2412: DMA: Remove I2S FIFO address
+In-Reply-To: <1272351118-29175-1-git-send-email-jassi.brar@samsung.com>
+References: <1272351118-29175-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20100428000652.GC24020@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Apr 2010 14:27:04 +0900
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+On Tue, Apr 27, 2010 at 03:51:58PM +0900, JassiBrar wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
+> 
+> The S3C DMA API doesn't make use of hw_addr.to/from and also
+> the FIFO addresses are provided from the I2S drivers. So these
+> fields are redundant.
+> This patch removes the hw_addr.to/from fields for I2S and the
+> inclusion of header, paving way for the header to be moved closer
+> to the I2S controller drivers.
 
-> On Mon, 12 Apr 2010 20:35:36 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Mon, Apr 05, 2010 at 12:39:32PM +0900, FUJITA Tomonori wrote:
-> > > I don't have arm hardware that uses dmabounce so I can't confirm the
-> > > problem but seems that dmabounce doesn't work for some drivers...
-> > 
-> > Patch reviews fine, except for one niggle.  I too don't have hardware
-> > I can test (well, I do except the kernel stopped supporting the UDA1341
-> > audio codec on the SA1110 Neponset.)
-> 
-> Thanks for reviewing.
-> 
-> > > @@ -171,10 +172,17 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
-> > >  	read_lock_irqsave(&device_info->lock, flags);
-> > >  
-> > >  	list_for_each_entry(b, &device_info->safe_buffers, node)
-> > > -		if (b->safe_dma_addr == safe_dma_addr) {
-> > > -			rb = b;
-> > > -			break;
-> > > -		}
-> > > +		if (for_sync) {
-> > > +			if (b->safe_dma_addr <= safe_dma_addr &&
-> > > +			    safe_dma_addr < b->safe_dma_addr + b->size) {
-> > > +				rb = b;
-> > > +				break;
-> > > +			}
-> > > +		} else
-> > > +			if (b->safe_dma_addr == safe_dma_addr) {
-> > > +				rb = b;
-> > > +				break;
-> > > +			}
-> > 
-> > This is the niggle; I don't like this indentation style.  If you want to
-> > indent this if () statement, then please format like this:
-> > 
-> > 		} else {
-> > 			if (b->safe...) {
-> > 				...
-> > 			}
-> > 		}
-> > 
-> > or format it as:
-> > 
-> > 		} else if (b->safe...) {
-> > 			...
-> > 		}
-> 
-> ok, here's the fixed patch.
-> 
-> =
-> From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-> Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-> 
-> Some network drivers do a partial sync with
-> dma_sync_single_for_{device|cpu}. The dma_addr argument might not be
-> the same as one as passed into the mapping API.
-> 
-> This adds some tricks to find_safe_buffer() for
-> dma_sync_single_for_{device|cpu}.
-> 
-> Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+Ok, if this works for -rc series then it may be something that could
+be merged before we get to the next merge window.
+ 
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 > ---
->  arch/arm/common/dmabounce.c |   30 +++++++++++++++++++++---------
->  1 files changed, 21 insertions(+), 9 deletions(-)
+>  arch/arm/mach-s3c2412/dma.c |    3 ---
+>  1 files changed, 0 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2412/dma.c b/arch/arm/mach-s3c2412/dma.c
+> index e880524..7abecfc 100644
+> --- a/arch/arm/mach-s3c2412/dma.c
+> +++ b/arch/arm/mach-s3c2412/dma.c
+> @@ -30,7 +30,6 @@
+>  #include <mach/regs-mem.h>
+>  #include <mach/regs-lcd.h>
+>  #include <mach/regs-sdi.h>
+> -#include <plat/regs-s3c2412-iis.h>
+>  #include <plat/regs-iis.h>
+>  #include <plat/regs-spi.h>
+>  
+> @@ -119,13 +118,11 @@ static struct s3c24xx_dma_map __initdata s3c2412_dma_mappings[] = {
+>  		.name		= "i2s-sdi",
+>  		.channels	= MAP(S3C2412_DMAREQSEL_I2SRX),
+>  		.channels_rx	= MAP(S3C2412_DMAREQSEL_I2SRX),
+> -		.hw_addr.from	= S3C2410_PA_IIS + S3C2412_IISRXD,
+>  	},
+>  	[DMACH_I2S_OUT] = {
+>  		.name		= "i2s-sdo",
+>  		.channels	= MAP(S3C2412_DMAREQSEL_I2STX),
+>  		.channels_rx	= MAP(S3C2412_DMAREQSEL_I2STX),
+> -		.hw_addr.to	= S3C2410_PA_IIS + S3C2412_IISTXD,
+>  	},
+>  	[DMACH_USB_EP1] = {
+>  		.name		= "usb-ep1",
+> -- 
+> 1.6.2.5
+> 
 
-Ping?
+-- 
+-- 
+Ben
 
-Is this going to be merged via the arm tree?
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
