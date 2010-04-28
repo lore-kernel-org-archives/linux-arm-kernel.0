@@ -1,65 +1,29 @@
-From: yauhen.kharuzhy@promwad.com (Yauhen Kharuzhy)
-Date: Thu, 29 Apr 2010 17:52:57 +0300
-Subject: S3C6410 power management support status
-In-Reply-To: <20100429140050.GA3410@sirena.org.uk>
-References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-	<20100429140050.GA3410@sirena.org.uk>
-Message-ID: <20100429145257.GA9592@jeknote.loshitsa1.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Apr 2010 22:36:19 +0100
+Subject: [PATCH 0/6] ARM: pmu: provide a registration mechanism for
+	IRQs [v3]
+In-Reply-To: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20100428213619.GA16525@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 03:00:51PM +0100, Mark Brown wrote:
-> On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
+On Thu, Mar 25, 2010 at 03:16:32PM +0000, Will Deacon wrote:
+> This is version 3 of the patch series originally posted here:
 > 
-> > Can anybody explain current status of S3C6410 power management support
-> > in mainline? Suspend-to-RAM looks completely broken in the current
-> > Linus's git tree.
-> 
-> What problems are you experiencing?
+> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011162.html
+> v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011339.html
 
-1. I enabled RTC driver for S3C6410 (it is cannot be enabled without
-modification of Kconfig) and CONFIG_SUSPEND.
-2. echo +10 > /sys/class/rtc0/wakealarm && echo mem > /sys/power/state.
+Unfortunately, these patches are inter-dependent - if I apply the
+realview patch to my 'versatile' branch without the first patch, then
+it breaks the realview build because ARM_PMU_DEVICE_CPU is not defined.
 
-System didn't go to sleep with messages:
+But if I apply the first patch initially, everything using the new
+PMU infrastructure breaks until the other patches are applied.
 
----
-s3c_pm_enter(3)
-s3c_pm_enter: No wake-up sources!
-s3c_pm_enter: Aborting sleep
----
+Please can we have an ordered set which doesn't break compilation.
+What I think should happen is the first patch should introduce the
+new definitions required for the platform data, and the rest of the
+first patch should come at the very end.
 
-This is caused by following code:
----
-#define any_allowed(mask, allow) (((mask) & (allow)) != (allow))
-
-        if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
-            !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow)) {
-                printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
-                printk(KERN_ERR "%s: Aborting sleep\n", __func__);
-                return -EINVAL;
-        }
----
-
-But s3c_irqwake_intallow is defined in arch/arm/mach-s3c64xx/include/mach/pm-core.h
-
----
-/* make these defines, we currently do not have any need to change
- * the IRQ wake controls depending on the CPU we are running on */
-
-#define s3c_irqwake_eintallow   ((1 << 28) - 1)
-#define s3c_irqwake_intallow    (0)
----
-
-
--- 
-Yauhen Kharuzhy
------------------------------------------------------------
-Promwad Innovation Company
-22, Olshevskogo St.
-Office 809
-220073, Minsk, Belarus
-Phone/Fax: +375 (17) 312-1246
-E-mail: yauhen.kharuzhy@promwad.com
-Skype: jekhor
-Web: www.promwad.com
+Thanks.
