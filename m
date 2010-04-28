@@ -1,20 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Apr 2010 14:01:03 +0100
-Subject: [PATCH 01/01] regulator: fix enabling regulator issue on max8925
-In-Reply-To: <k2u771cded01004280559s156ff50bnb172767893c89845@mail.gmail.com>
-References: <k2u771cded01004280559s156ff50bnb172767893c89845@mail.gmail.com>
-Message-ID: <20100428130103.GG31400@opensource.wolfsonmicro.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 28 Apr 2010 21:01:13 +0800
+Subject: [PATCH 05/10] mmp: fix clock tick rate in mmp2
+In-Reply-To: <z2hf17812d71004280526u6b6171a0rb0c47be480616b1@mail.gmail.com>
+References: <p2i771cded01004280520wc663c42bva8c270fbdfaf4ddc@mail.gmail.com>
+	<z2hf17812d71004280526u6b6171a0rb0c47be480616b1@mail.gmail.com>
+Message-ID: <m2rf17812d71004280601w2311d280o804eb4c16dda5276@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 28, 2010 at 08:59:22AM -0400, Haojian Zhuang wrote:
-> From 9f421a29db78635210b29df1d5f83bdc523e3178 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Tue, 6 Apr 2010 06:19:15 -0400
-> Subject: [PATCH] regulator: fix enabling regulator issue on max8925
-> 
-> Fix regulator enabling issue that is caused by typo error in is_enabled().
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Wed, Apr 28, 2010 at 8:26 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Wed, Apr 28, 2010 at 8:20 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> From 4d3bcaf4bd83886fe5d14be22bbc4baf2d51a543 Mon Sep 17 00:00:00 2001
+>> From: Mingliang Hu <mhu4@marvell.com>
+>> Date: Mon, 12 Apr 2010 17:55:21 +0800
+>> Subject: [PATCH] [ARM] mmp: fix clock tick rate in mmp2
+>>
+>> In MMP2, clock tick rate should be 6500000.
+>>
+>> Signed-off-by: Mingliang Hu <mhu4@marvell.com>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?arch/arm/mach-mmp/include/mach/timex.h | ? ?4 ++++
+>> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mmp/include/mach/timex.h
+>> b/arch/arm/mach-mmp/include/mach/timex.h
+>> index 6cebbd0..70c9f1d 100644
+>> --- a/arch/arm/mach-mmp/include/mach/timex.h
+>> +++ b/arch/arm/mach-mmp/include/mach/timex.h
+>> @@ -6,4 +6,8 @@
+>> ?* published by the Free Software Foundation.
+>> ?*/
+>>
+>> +#ifdef CONFIG_CPU_MMP2
+>> +#define CLOCK_TICK_RATE ? ? ? ? ? ? ? ?6500000
+>> +#else
+>
+> Actually we no longer depend on this macro, yet it's straightforward to
+> keep it here without side effect. So OK.
+>
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Applied.
