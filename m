@@ -1,26 +1,31 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 28 Apr 2010 08:35:12 -0400
-Subject: mmp: update mmp2 defconfig
-In-Reply-To: <i2lf17812d71004280531if4e6607ct780f6f7955c6fe21@mail.gmail.com>
-References: <t2l771cded01004280518p26c3ef8auec193ea8edca83e3@mail.gmail.com>
-	<i2lf17812d71004280531if4e6607ct780f6f7955c6fe21@mail.gmail.com>
-Message-ID: <z2l771cded01004280535x3f5f748ftab34b79b5de8da48@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 28 Apr 2010 20:53:38 +0800
+Subject: [02/10] mmp: enable L2 in mmp2
+In-Reply-To: <r2o771cded01004280533xdfbb4366q35350425ac73b348@mail.gmail.com>
+References: <z2m771cded01004280518ge227275h923782cecd738993@mail.gmail.com>
+	<t2of17812d71004280523sf8cd87aen8baa1762b0d1049a@mail.gmail.com>
+	<r2o771cded01004280533xdfbb4366q35350425ac73b348@mail.gmail.com>
+Message-ID: <s2hf17812d71004280553p8125af7cw18931579f3161c23@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 28, 2010 at 8:31 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Wed, Apr 28, 2010 at 8:18 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> From 0455ad1c54268a71c40caf6f788739b2fae1c4f9 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Wed, 28 Apr 2010 11:32:30 -0400
->> Subject: [PATCH] [ARM] mmp: update mmp2 defconfig
+On Wed, Apr 28, 2010 at 8:33 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Wed, Apr 28, 2010 at 8:23 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> On Wed, Apr 28, 2010 at 8:18 PM, Haojian Zhuang
+>> <haojian.zhuang@gmail.com> wrote:
+>>> ?config CACHE_TAUROS2
+>>> ? ? ? ?bool "Enable the Tauros2 L2 cache controller"
+>>> - ? ? ? depends on ARCH_DOVE
+>>> - ? ? ? default y
+>>> + ? ? ? depends on (ARCH_DOVE || ARCH_MMP)
+>>> + ? ? ? default n
+>>
+>> This also affects Dove by making default to 'n'. Is there any specific reason
+>> that MMP2 doesn't turn L2 on by default?
 >>
 >
-> Is this [PATCH 03/10] ?
+> Yes, you're right. It's my typo error. Now fix it in the attachment.
 >
 
-Yes, it's 03/10. Excuse me for missing the title.
-
-Thanks
-Haojian
+Applied.
