@@ -1,76 +1,48 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 29 Apr 2010 12:01:04 +0800
-Subject: [PATCH 10/10] mmp: append device support in jasper
-In-Reply-To: <n2h771cded01004282005j709b34dfq50c591bf8dc0defa@mail.gmail.com>
-References: <i2x771cded01004280523g5e3b567aled05b1fea293587a@mail.gmail.com>
-	<20100428135255.GB8960@sirena.org.uk>
-	<n2h771cded01004282005j709b34dfq50c591bf8dc0defa@mail.gmail.com>
-Message-ID: <h2nf17812d71004282101nf780329cq5ba0f50aa48dab5b@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Apr 2010 08:08:26 +0200
+Subject: [PATCH] arm/mach-msm: Add CONFIG conditional for board-trout
+In-Reply-To: <201004290241.23068.PeterHuewe@gmx.de>
+References: <201004290241.23068.PeterHuewe@gmx.de>
+Message-ID: <20100428060825.GE3721@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 11:05 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Wed, Apr 28, 2010 at 9:52 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Wed, Apr 28, 2010 at 08:23:24AM -0400, Haojian Zhuang wrote:
->>
->>> +static struct regulator_consumer_supply regulator_supply[] = {
->>
->> You shouldn't have all your consumer supplies in one big array, each
->> regulator should have its own set of supplies for the devices connected
->> to it.
->>
->>> + ? ? [MAX8925_ID_SD1] ? ? ? ?= REGULATOR_SUPPLY("v_sd1", NULL),
->>> + ? ? [MAX8925_ID_SD2] ? ? ? ?= REGULATOR_SUPPLY("v_sd2", NULL),
->>> + ? ? [MAX8925_ID_SD3] ? ? ? ?= REGULATOR_SUPPLY("v_sd3", NULL),
->>> + ? ? [MAX8925_ID_LDO1] ? ? ? = REGULATOR_SUPPLY("v_ldo1", NULL),
->>> + ? ? [MAX8925_ID_LDO2] ? ? ? = REGULATOR_SUPPLY("v_ldo2", NULL),
->>
->> None of these supplies should be being defined at all - the supplies
->> from regulators are for hooking up individual device supplies to the
->> regulators, you should only have supplies with null devices in
->> exceptional cases like CPUfreq where no usable struct device exists.
->>
->> I'm fairly sure this has been pointed out with regard to previous
->> machines you have submitted regulator support for, it is disappointing
->> to see the same issue coming up again.
->>
->>> +#define REG_INIT(_name, _min, _max, _always, _boot) ? ? ? ? ?\
->>> +{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? .constraints = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? ? ? ? ? .name ? ? ? ? ? = __stringify(_name), ? ? ? ? ? \
->>> + ? ? ? ? ? ? .min_uV ? ? ? ? = _min, ? ? ? ? ? ? ? ? ? ? ? ? \
->>> + ? ? ? ? ? ? .max_uV ? ? ? ? = _max, ? ? ? ? ? ? ? ? ? ? ? ? \
->>> + ? ? ? ? ? ? .always_on ? ? ?= _always, ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? ? ? ? ? .boot_on ? ? ? ?= _boot, ? ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE, ? ? \
->>> + ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? .num_consumer_supplies ?= 1, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>> + ? ? .consumer_supplies ? ? ?= &regulator_supply[MAX8925_ID_##_name], \
->>
->> This macro shouldn't be assuming that there are devices being supplied,
->> and definitely needs to be able to cope with more than one regulator
->> using the supply.
->>
->>> +static struct regulator_init_data regulator_data[] = {
->>> + ? ? [MAX8925_ID_SD1] = REG_INIT(SD1, 637500, 1425000, 0, 0),
->>> + ? ? [MAX8925_ID_SD2] = REG_INIT(SD2, 650000, 2225000, 1, 1),
->>> + ? ? [MAX8925_ID_SD3] = REG_INIT(SD3, 750000, 3900000, 1, 1),
->>> + ? ? [MAX8925_ID_LDO1] = REG_INIT(LDO1, 750000, 3900000, 1, 1),
->>> + ? ? [MAX8925_ID_LDO2] = REG_INIT(LDO2, 650000, 2250000, 1, 1),
->>
->> Have all the voltage ranges you're specifying here been audited against
->> the board design? ?It would be very unusual for every single supply on
->> the board have such wide voltage ranges - it looks awfully like the
->> ranges here are the supported ranges for the regulators themselves.
->>
->
-> OK. Update this patch by removing regulators in max8925. They'll be
-> contained in later patches. Whatever I think a big array is suitable
-> for unused regulators. Is it right?
->
+On Thu 2010-04-29 02:41:22, Peter Huewe wrote:
+> From: Peter Huewe <peterhuewe@gmx.de>
+> 
+> This patch adds a conditional for CONFIG_MSM_DEBUG_UART to prevent a
+> build failure[1], this is done the same way as for every board in mach-msm.
+> 
+> References:
+> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2448102/
+> 
+> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
 
-Mark,
+Ack.
 
-I need your Ack on this. Thanks.
+
+> ---
+> KernelVersion: linux-next-20100429
+> 
+>  arch/arm/mach-msm/board-trout.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+> index 9793ff4..b88aec2 100644
+> --- a/arch/arm/mach-msm/board-trout.c
+> +++ b/arch/arm/mach-msm/board-trout.c
+> @@ -82,8 +82,10 @@ static void __init trout_map_io(void)
+>  }
+>  
+>  MACHINE_START(TROUT, "HTC Dream")
+> +#ifdef CONFIG_MSM_DEBUG_UART
+>  	.phys_io	= MSM_DEBUG_UART_PHYS,
+>  	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
+> +#endif
+>  	.boot_params	= 0x10000100,
+>  	.fixup		= trout_fixup,
+>  	.map_io		= trout_map_io,
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
