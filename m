@@ -1,83 +1,62 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 29 Apr 2010 21:30:36 +0300
-Subject: [PATCH v4 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
-References: <cover.1271774845.git.mika.westerberg@iki.fi>
-	<e96939d18bcbfb7a28ba4a925d7788884566db8c.1271774845.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636D85BCCC@AUSP01VMBX24.collaborationhost.net>
-	<z2h56d259a01004201654y93f6c533j11b5accd7e2f46e7@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636D85BDD8@AUSP01VMBX24.collaborationhost.net>
-	<n2u56d259a01004201810j22c17bcfn9fee59e9c65c4d7f@mail.gmail.com>
-Message-ID: <20100429183036.GL26418@gw.healthdatacare.com>
+From: mboards@prograde.net (Michael Cashwell)
+Date: Thu, 29 Apr 2010 14:59:25 -0400
+Subject: Decompression failure in an inexplicable case
+In-Reply-To: <1272558886.15152.4.camel@e102109-lin.cambridge.arm.com>
+References: <A809F2C8-74CA-474E-92B0-08A5227B7C3F@prograde.net>
+	<1272558886.15152.4.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <355FF471-B747-4E3D-95A9-8D8A60D6CC83@prograde.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Apr 29, 2010, at 12:34 PM, Catalin Marinas wrote:
 
-On Wed, Apr 21, 2010 at 02:10:08AM +0100, Martin Guy wrote:
+> On Thu, 2010-04-29 at 16:27 +0100, Michael Cashwell wrote:
+>> If I omit CPUFreq support [CONFIG_CPU_FREQ is not set], or enable both it and its debugging support [CONFIG_CPU_FREQ_DEBUG=y], the kernel builds and runs seemingly fine.
+>> 
+>> But if I have CONFIG_CPU_FREQ enabled but NOT its debugging support then kernel builds OK (including full mrproper cleanings in between):
 > 
-> and the SDHC cards I have don't work at all, spewing tons of:
-> mmcblk0: error -38 sending status comand
-> mmcblk0: error -38 sending read/write command, response 0x4, card status 0xff04
-> end_request: I/O error, dev mmcblk0, sector 7744509
+> BTW, one of the suggestions at the time was to try this:
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 3dc2cf8..e12e382 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -316,7 +316,7 @@ LC0:		.word	LC0			@ r1
+> 		.word	_start			@ r5
+> 		.word	_got_start		@ r6
+> 		.word	_got_end		@ ip
+> -		.word	user_stack+4096		@ sp
+> +		.word	user_stack+8192		@ sp
+> LC1:		.word	reloc_end - reloc_start
+> 		.size	LC0, . - LC0
+> 
+> @@ -1086,4 +1086,4 @@ reloc_end:
+> 
+> 		.align
+> 		.section ".stack", "w"
+> -user_stack:	.space	4096
+> +user_stack:	.space	8192
 
-I bought today a new 4GB SDHC card and with that I get similar
-errors that you are getting. I hacked around quick fix which seems
-to work in my case. I'm wondering whether you could check if it
-helps with your SDHC card as well?
+OK, I tried this (with Uwe's other malloc heap size and decompress_flush() callback patches) and sadly my results were unchanged:
 
-This problem is easy to reproduce, just read last sector of the
-card (I wrote simple C program but running fdisk -l does the same).
+Bytes transferred = 1736932 (1a80e4 hex)
+## Booting image at a2000000 ...
+   Image Name:   2.6.33.2-gum1
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    1736868 Bytes =  1.7 MB
+   Load Address: a1000000
+   Entry Point:  a1000000
+   Verifying Checksum ... OK
+No initrd
 
-Patch is below.
+Starting kernel at address a1000000 ...
 
-Thanks,
-MW
+Uncompressing Linux..............................................................................................................
 
->From d98fcab5f26e3ee8185232b51baeaae66b1ac0f3 Mon Sep 17 00:00:00 2001
-From: Mika Westerberg <mika.westerberg@iki.fi>
-Date: Thu, 29 Apr 2010 21:14:32 +0300
-Subject: [PATCH] mmc_block: use single block reads for last block on SPI
+uncompression error
 
-Some SD-cards fail when doing multiblock read for last block with SPI host. Real
-reason is not known but as workaround we can perform this last read using
-multiple single block reads.
+ -- System halted
 
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- drivers/mmc/card/block.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+So there still seems to be some data-dependent issues in the kernel's gunzip decompressor.
 
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index cb9fbc8..acf3a88 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -277,6 +277,25 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
- 		if (brq.data.blocks > card->host->max_blk_count)
- 			brq.data.blocks = card->host->max_blk_count;
- 
-+		if (mmc_host_is_spi(card->host)) {
-+			/*
-+			 * Some SD-cards fail when we are reading last block
-+			 * with multiblock read. In these cases we automatically
-+			 * use single block reads. This only happens on SPI
-+			 * hosts.
-+			 */
-+			if (rq_data_dir(req) == READ && brq.data.blocks > 1) {
-+				sector_t s = blk_rq_pos(req) + brq.data.blocks;
-+
-+				if (s >= get_capacity(md->disk)) {
-+					disable_multi = 1;
-+					printk(KERN_DEBUG "%s: using single block "
-+					       "read for this request\n",
-+					       req->rq_disk->disk_name);
-+				}
-+			}
-+		}
-+
- 		/*
- 		 * After a read error, we redo the request one sector at a time
- 		 * in order to accurately determine which sectors can be read
--- 
-1.5.6.5
+-Mike
