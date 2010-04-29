@@ -1,22 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Apr 2010 12:34:29 +0100
-Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-In-Reply-To: <20100428075137J.fujita.tomonori@lab.ntt.co.jp>
-References: <20100405123847C.fujita.tomonori@lab.ntt.co.jp>
-	<20100412193536.GO3048@n2100.arm.linux.org.uk>
-	<20100413142607V.fujita.tomonori@lab.ntt.co.jp>
-	<20100428075137J.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100429113429.GA24531@n2100.arm.linux.org.uk>
+Date: Thu, 29 Apr 2010 14:00:35 +0100
+Subject: [PATCH] [ARM] Do not call flush_cache_user_range with mmap_sem
+	held
+In-Reply-To: <1272439931-12795-1-git-send-email-dima@android.com>
+References: <1272439931-12795-1-git-send-email-dima@android.com>
+Message-ID: <20100429130035.GB4877@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Ping?
-> 
-> Is this going to be merged via the arm tree?
+On Wed, Apr 28, 2010 at 12:32:11AM -0700, Dima Zavin wrote:
+> We can't be holding the mmap_sem while calling flush_cache_user_range
+> because the flush can fault. If we fault on a user address, the
+> page fault handler will try to take mmap_sem again. Since both places
+> acquire the read lock, most of the time it succeeds. However, if another
+> thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
+> between the call to flush_cache_user_range and the fault, the down_read
+> in do_page_fault will deadlock.
 
-Ping all you want; I've only just got back online after a week of no
-internet connectivity thanks to the carrier being unable to fix the
-problem (the faulty line is still faulty.)
+That's a non-issue.  If do_cache_op is holding a read lock, _nothing_
+_else_ can be holding that lock in write mode.  So, holding the lock in
+read mode ensures that when faults occur, the fault handler can be sure
+that its read lock will succeed.
 
-I'm now going to be catching up over the course of the next week, so
-please be patient.
+Other threads trying to get a write lock will be prevented from doing
+so until the entire cache flush operation has completed, which ensures
+that the mapping can not be altered via munmap/mmap - and that is
+completely desirable behaviour.
+
+Please explain why you think this leads to a deadlock.
