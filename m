@@ -1,38 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 29 Apr 2010 10:17:29 +0100
-Subject: [PATCH 10/10] mmp: append device support in jasper
-In-Reply-To: <n2h771cded01004282005j709b34dfq50c591bf8dc0defa@mail.gmail.com>
-References: <i2x771cded01004280523g5e3b567aled05b1fea293587a@mail.gmail.com>
-	<20100428135255.GB8960@sirena.org.uk>
-	<n2h771cded01004282005j709b34dfq50c591bf8dc0defa@mail.gmail.com>
-Message-ID: <20100429091729.GB2738@rakim.wolfsonmicro.main>
+From: PeterHuewe@gmx.de (Peter =?utf-8?q?H=C3=BCwe?=)
+Date: Thu, 29 Apr 2010 12:18:46 +0200
+Subject: [PATCH] arch/arm: Fix missing define for ARM_PMU_DEVICE_CPU
+In-Reply-To: <1272529580.24662.10.camel@e102144-lin.cambridge.arm.com>
+References: <201004290231.03440.PeterHuewe@gmx.de>
+	<20100429081218.GA14783@wear.picochip.com>
+	<1272529580.24662.10.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <201004291218.46341.PeterHuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 28, 2010 at 11:05:13PM -0400, Haojian Zhuang wrote:
+Am Donnerstag 29 April 2010 10:26:20 schrieb Will Deacon:
+> > This build error is due to the core patch of Will's "ARM: pmu: provide
+> > a registration mechanism for IRQs" patch series not being merged yet.
+> I submitted the series to Russell's patch system on 9 April.
+> However, as you know, he's currently without an internet connection and
+> the patch system has gone offline. 
 
-> OK. Update this patch by removing regulators in max8925. They'll be
+Ah, didn't know about this - then sorry to 'bug' you with my patch :)
+ 
+> Peter: if you're interested, the patch series I sent to the ARM
+> Linux list is archived here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012113.html
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Thanks for the Link - I'll have a look at it.
 
-> contained in later patches. Whatever I think a big array is suitable
-> for unused regulators. Is it right?
 
-No, not at all.  If the regulator has no consumers then there should not
-be any supplies set up from it.  The sole purpose of supplies is to
-connect the consumers and regulators to each other so if the regulator
-is unused there should be no supplies defined at all.  This is what I
-was saying about supplies with NULL devices being very suspicious.
-
-> +static struct regulator_consumer_supply max8649_supply[] = {
-> +	REGULATOR_SUPPLY("vcc_core", NULL),
-> +};
-> +
-> +static struct regulator_init_data max8649_init_data = {
-> +	.constraints	= {
-> +		.name		= "vcc_core range",
-
-You probably just want to call this vcc_core (the name is used when
-logging about the supply and provided to userspace so you want something
-that would make sense in a log message).  It doesn't really matter,
-though.
+Thanks,
+Peter
