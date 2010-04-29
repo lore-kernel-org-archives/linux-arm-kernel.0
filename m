@@ -1,14 +1,15 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
 Date: Thu, 29 Apr 2010 13:33:50 -0400
-Subject: [PATCH] regulator: make max8925 sharing one driver structure
-Message-ID: <mailman.354.1272957708.2170.linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH] regulator: make 88pm860x sharing one driver structure
+Message-ID: <mailman.357.1273037699.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove a lot of driver structures in max8925 driver. Make regulators share
+Remove a lot of driver structures in 88pm860x driver. Make regulators share
 one driver structure.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
  drivers/mfd/88pm860x-core.c  |   34 ++++++++++++++--------------
  drivers/regulator/88pm8607.c |   51 ++++++++---------------------------------
