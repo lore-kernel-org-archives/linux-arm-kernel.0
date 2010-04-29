@@ -1,117 +1,146 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 12:57:14 -0700
-Subject: [PATCH] omap2/3: Fix DEBUG_LL for omap zoom2/3
-Message-ID: <mailman.352.1272934723.2170.linux-arm-kernel@lists.infradead.org>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Thu, 29 Apr 2010 13:33:50 -0400
+Subject: [PATCH] regulator: make max8925 sharing one driver structure
+Message-ID: <mailman.354.1272957708.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zoom2 and 3 have UARTs only on the external debug board.
-GPMC needs to be mapped early to use it for DEBUG_LL.
+Remove a lot of driver structures in max8925 driver. Make regulators share
+one driver structure.
 
-Additionally, 0xfb000000 overlaps with other areas, so
-use 0xfa400000 for the virtual address instead.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ drivers/mfd/88pm860x-core.c  |   34 ++++++++++++++--------------
+ drivers/regulator/88pm8607.c |   51 ++++++++---------------------------------
+ 2 files changed, 27 insertions(+), 58 deletions(-)
 
-Note that with the pending serial.c patches you need to
-set console=ttyS0,115200n8 as it will be the only UART
-mapped. To use DEBUG_LL, you need to pass also earlyprintk
-in cmdline.
-
-Cc: Allen Pais <allen.pais@ti.com>
-Cc: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
-index e15d2e8..1d7f827 100644
---- a/arch/arm/mach-omap2/board-zoom-debugboard.c
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
-@@ -82,7 +82,7 @@ static inline void __init zoom_init_smsc911x(void)
- 
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
--		.mapbase	= 0x10000000,
-+		.mapbase	= ZOOM_UART_BASE,
- 		.irq		= OMAP_GPIO_IRQ(102),
- 		.flags		= UPF_BOOT_AUTOCONF|UPF_IOREMAP|UPF_SHARE_IRQ,
- 		.irqflags	= IRQF_SHARED | IRQF_TRIGGER_RISING,
-diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
-index 9a26f84..803ef14 100644
---- a/arch/arm/mach-omap2/board-zoom2.c
-+++ b/arch/arm/mach-omap2/board-zoom2.c
-@@ -91,8 +91,8 @@ static void __init omap_zoom2_map_io(void)
- }
- 
- MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
--	.phys_io	= 0x48000000,
--	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
-+	.phys_io	= ZOOM_UART_BASE,
-+	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
- 	.boot_params	= 0x80000100,
- 	.map_io		= omap_zoom2_map_io,
- 	.init_irq	= omap_zoom2_init_irq,
-diff --git a/arch/arm/mach-omap2/board-zoom3.c b/arch/arm/mach-omap2/board-zoom3.c
-index cd3e40c..3314704 100644
---- a/arch/arm/mach-omap2/board-zoom3.c
-+++ b/arch/arm/mach-omap2/board-zoom3.c
-@@ -73,8 +73,8 @@ static void __init omap_zoom_init(void)
- }
- 
- MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
--	.phys_io	= 0x48000000,
--	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
-+	.phys_io	= ZOOM_UART_BASE,
-+	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
- 	.boot_params	= 0x80000100,
- 	.map_io		= omap_zoom_map_io,
- 	.init_irq	= omap_zoom_init_irq,
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 4976169..35b2440 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -88,10 +88,10 @@ omap_uart_lsr:	.word	0
- 		b	98f
- 44:		mov	\rx, #UART_OFFSET(OMAP4_UART4_BASE)
- 		b	98f
--95:		mov	\rx, #ZOOM_UART_BASE
-+95:		ldr	\rx, =ZOOM_UART_BASE
- 		ldr	\tmp, =omap_uart_phys
- 		str	\rx, [\tmp, #0]
--		mov	\rx, #ZOOM_UART_VIRT
-+		ldr	\rx, =ZOOM_UART_VIRT
- 		ldr	\tmp, =omap_uart_virt
- 		str	\rx, [\tmp, #0]
- 		mov	\rx, #(UART_LSR << ZOOM_PORT_SHIFT)
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 87f676a..3cfb425 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -166,6 +166,15 @@ static struct map_desc omap34xx_io_desc[] __initdata = {
- 		.length		= L4_EMU_34XX_SIZE,
- 		.type		= MT_DEVICE
- 	},
-+#if defined(CONFIG_DEBUG_LL) &&							\
-+	(defined(CONFIG_MACH_OMAP_ZOOM2) || defined(CONFIG_MACH_OMAP_ZOOM3))
-+	{
-+		.virtual	= ZOOM_UART_VIRT,
-+		.pfn		= __phys_to_pfn(ZOOM_UART_BASE),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE
-+	},
-+#endif
+diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+index 6a14d2b..21de38d 100644
+--- a/drivers/mfd/88pm860x-core.c
++++ b/drivers/mfd/88pm860x-core.c
+@@ -176,30 +176,30 @@ static struct resource regulator_resources[] = {
+ 	PM8607_REG_RESOURCE(LDO14, LDO14),
  };
- #endif
- #ifdef	CONFIG_ARCH_OMAP4
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 42a6318..19145f5 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -53,7 +53,7 @@
- 
- /* External port on Zoom2/3 */
- #define ZOOM_UART_BASE		0x10000000
--#define ZOOM_UART_VIRT		0xfb000000
-+#define ZOOM_UART_VIRT		0xfa400000
- 
- #define OMAP_PORT_SHIFT		2
- #define OMAP7XX_PORT_SHIFT	0
 
---bpVaumkpfGNUagdU--
+-#define PM8607_REG_DEVS(_name, _id)					\
++#define PM8607_REG_DEVS(_id)						\
+ {									\
+-	.name		= "88pm8607-" #_name,				\
++	.name		= "88pm860x-regulator",				\
+ 	.num_resources	= 1,						\
+ 	.resources	= &regulator_resources[PM8607_ID_##_id],	\
+ 	.id		= PM8607_ID_##_id,				\
+ }
+
+ static struct mfd_cell regulator_devs[] = {
+-	PM8607_REG_DEVS(buck1, BUCK1),
+-	PM8607_REG_DEVS(buck2, BUCK2),
+-	PM8607_REG_DEVS(buck3, BUCK3),
+-	PM8607_REG_DEVS(ldo1,  LDO1),
+-	PM8607_REG_DEVS(ldo2,  LDO2),
+-	PM8607_REG_DEVS(ldo3,  LDO3),
+-	PM8607_REG_DEVS(ldo4,  LDO4),
+-	PM8607_REG_DEVS(ldo5,  LDO5),
+-	PM8607_REG_DEVS(ldo6,  LDO6),
+-	PM8607_REG_DEVS(ldo7,  LDO7),
+-	PM8607_REG_DEVS(ldo8,  LDO8),
+-	PM8607_REG_DEVS(ldo9,  LDO9),
+-	PM8607_REG_DEVS(ldo10, LDO10),
+-	PM8607_REG_DEVS(ldo12, LDO12),
+-	PM8607_REG_DEVS(ldo14, LDO14),
++	PM8607_REG_DEVS(BUCK1),
++	PM8607_REG_DEVS(BUCK2),
++	PM8607_REG_DEVS(BUCK3),
++	PM8607_REG_DEVS(LDO1),
++	PM8607_REG_DEVS(LDO2),
++	PM8607_REG_DEVS(LDO3),
++	PM8607_REG_DEVS(LDO4),
++	PM8607_REG_DEVS(LDO5),
++	PM8607_REG_DEVS(LDO6),
++	PM8607_REG_DEVS(LDO7),
++	PM8607_REG_DEVS(LDO8),
++	PM8607_REG_DEVS(LDO9),
++	PM8607_REG_DEVS(LDO10),
++	PM8607_REG_DEVS(LDO12),
++	PM8607_REG_DEVS(LDO14),
+ };
+
+ struct pm860x_irq_data {
+diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
+index 5fb83e2..121bab4 100644
+--- a/drivers/regulator/88pm8607.c
++++ b/drivers/regulator/88pm8607.c
+@@ -484,60 +484,29 @@ static int __devexit
+pm8607_regulator_remove(struct platform_device *pdev)
+ {
+ 	struct pm8607_regulator_info *info = platform_get_drvdata(pdev);
+
++	platform_set_drvdata(pdev, NULL);
+ 	regulator_unregister(info->regulator);
+ 	return 0;
+ }
+
+-#define PM8607_REGULATOR_DRIVER(_name)				\
+-{								\
+-	.driver		= {					\
+-		.name	= "88pm8607-" #_name,			\
+-		.owner	= THIS_MODULE,				\
+-	},							\
+-	.probe		= pm8607_regulator_probe,		\
+-	.remove		= __devexit_p(pm8607_regulator_remove),	\
+-}
+-
+-static struct platform_driver pm8607_regulator_driver[] = {
+-	PM8607_REGULATOR_DRIVER(buck1),
+-	PM8607_REGULATOR_DRIVER(buck2),
+-	PM8607_REGULATOR_DRIVER(buck3),
+-	PM8607_REGULATOR_DRIVER(ldo1),
+-	PM8607_REGULATOR_DRIVER(ldo2),
+-	PM8607_REGULATOR_DRIVER(ldo3),
+-	PM8607_REGULATOR_DRIVER(ldo4),
+-	PM8607_REGULATOR_DRIVER(ldo5),
+-	PM8607_REGULATOR_DRIVER(ldo6),
+-	PM8607_REGULATOR_DRIVER(ldo7),
+-	PM8607_REGULATOR_DRIVER(ldo8),
+-	PM8607_REGULATOR_DRIVER(ldo9),
+-	PM8607_REGULATOR_DRIVER(ldo10),
+-	PM8607_REGULATOR_DRIVER(ldo12),
+-	PM8607_REGULATOR_DRIVER(ldo14),
++static struct platform_driver pm8607_regulator_driver = {
++	.driver		= {
++		.name	= "88pm860x-regulator",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= pm8607_regulator_probe,
++	.remove		= __devexit_p(pm8607_regulator_remove),
+ };
+
+ static int __init pm8607_regulator_init(void)
+ {
+-	int i, count, ret;
+-
+-	count = ARRAY_SIZE(pm8607_regulator_driver);
+-	for (i = 0; i < count; i++) {
+-		ret = platform_driver_register(&pm8607_regulator_driver[i]);
+-		if (ret != 0)
+-			pr_err("Failed to register regulator driver: %d\n",
+-				ret);
+-	}
+-	return 0;
++	return platform_driver_register(&pm8607_regulator_driver);
+ }
+ subsys_initcall(pm8607_regulator_init);
+
+ static void __exit pm8607_regulator_exit(void)
+ {
+-	int i, count;
+-
+-	count = ARRAY_SIZE(pm8607_regulator_driver);
+-	for (i = 0; i < count; i++)
+-		platform_driver_unregister(&pm8607_regulator_driver[i]);
++	platform_driver_unregister(&pm8607_regulator_driver);
+ }
+ module_exit(pm8607_regulator_exit);
+
+-- 
+1.5.6.5
