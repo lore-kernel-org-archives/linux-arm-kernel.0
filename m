@@ -1,48 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 29 Apr 2010 10:24:33 +0200
-Subject: IMX Watchdog driver for machs MX2 up to MX51
-In-Reply-To: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
-References: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20100429082433.GD19742@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Apr 2010 09:26:20 +0100
+Subject: [PATCH] arch/arm: Fix missing define for ARM_PMU_DEVICE_CPU
+In-Reply-To: <20100429081218.GA14783@wear.picochip.com>
+References: <201004290231.03440.PeterHuewe@gmx.de>
+	<20100429081218.GA14783@wear.picochip.com>
+Message-ID: <1272529580.24662.10.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 10:03:16AM +0200, Wolfram Sang wrote:
-> Hello,
-> 
-> here is finally the watchdog driver for MX2 and later. It has been rewritten as
-> the changes from the last version are major:
-> 
-> - seperation from MX1-driver as discussed with Wim
-> - added the timer for petting a closed watchdog device
-> - switching to managed resources
-> - picking up ideas from Vladimir
-> - lots of simplification on the way
-> 
-> The MX1-driver is not included in this patchset. Mach-updates to affected machs
-> are included in this patchset. Some of the naming in there has grown
-> inconsistently (mxc_wdt vs imx_wdt_device0), but this happened to not only the
-> watchdog device, so the old names are kept for now, waiting for a general
-> cleanup-patch.
-> 
-> It has been tested on a mx27 and mx35 board. mx25 and mx51 were build-tested.
-> checkpatch is happy, too.
-> 
-> Please test, review and consider for inclusion.
-> 
-> Kind regards,
-> 
->    Wolfram
+Hi Jamie,
 
-Adding Wim to cc...
+Thanks for CC'ing me on this.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100429/cc2077e1/attachment-0001.sig>
+On Thu, 2010-04-29 at 09:12 +0100, Jamie Iles wrote:
+> On Thu, Apr 29, 2010 at 02:31:03AM +0200, Peter Huewe wrote:
+> > From: Peter Huewe <peterhuewe@gmx.de>
+> >
+> > This patch adds a define for ARM_PMU_DEVICE_CPU which seemed to be
+> > missing/undefined and caused some build failures [1-4].
+> >
+> > I defined ARM_PMU_DEVICE_CPU = -1 as stated in
+> > Documentation/driver_model/platform.txt to indicate there is only
+> one.
+> > I'm _not_ sure if this is correct, but due to the static nature of
+> the
+> > define I assume it is.
+> Hi Peter,
+> 
+> This build error is due to the core patch of Will's "ARM: pmu: provide
+> a
+> registration mechanism for IRQs" patch series not being merged yet.
+> I'm not
+> sure what the status of that patch is at the moment though.
+
+I submitted the series to Russell's patch system on 9 April.
+However, as you know, he's currently without an internet connection and
+the patch system has gone offline. He applied some of the series before
+he lost connectivity, so I expect he'll look at the others when he's
+back [although I imagine there are lots of other patches in the same
+situation].
+
+Peter: if you're interested, the patch series I sent to the ARM
+Linux list is archived here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012113.html
+
+Cheers,
+
+Will
