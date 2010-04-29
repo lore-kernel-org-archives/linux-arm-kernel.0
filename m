@@ -1,29 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Apr 2010 22:36:19 +0100
-Subject: [PATCH 0/6] ARM: pmu: provide a registration mechanism for
-	IRQs [v3]
-In-Reply-To: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
-References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20100428213619.GA16525@n2100.arm.linux.org.uk>
+Date: Thu, 29 Apr 2010 12:34:29 +0100
+Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
+In-Reply-To: <20100428075137J.fujita.tomonori@lab.ntt.co.jp>
+References: <20100405123847C.fujita.tomonori@lab.ntt.co.jp>
+	<20100412193536.GO3048@n2100.arm.linux.org.uk>
+	<20100413142607V.fujita.tomonori@lab.ntt.co.jp>
+	<20100428075137J.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100429113429.GA24531@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 25, 2010 at 03:16:32PM +0000, Will Deacon wrote:
-> This is version 3 of the patch series originally posted here:
+> Ping?
 > 
-> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011162.html
-> v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011339.html
+> Is this going to be merged via the arm tree?
 
-Unfortunately, these patches are inter-dependent - if I apply the
-realview patch to my 'versatile' branch without the first patch, then
-it breaks the realview build because ARM_PMU_DEVICE_CPU is not defined.
+Ping all you want; I've only just got back online after a week of no
+internet connectivity thanks to the carrier being unable to fix the
+problem (the faulty line is still faulty.)
 
-But if I apply the first patch initially, everything using the new
-PMU infrastructure breaks until the other patches are applied.
-
-Please can we have an ordered set which doesn't break compilation.
-What I think should happen is the first patch should introduce the
-new definitions required for the platform data, and the rest of the
-first patch should come at the very end.
-
-Thanks.
+I'm now going to be catching up over the course of the next week, so
+please be patient.
