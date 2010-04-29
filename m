@@ -1,56 +1,18 @@
-From: zoleooo@hotmail.com (zhangleo)
-Date: Thu, 29 Apr 2010 07:52:20 +0000
-Subject: Query about arch/arm/mach-realview ?
-In-Reply-To: <03188E53144143E28CE23F022510D8CE@dufan>
-References: <03188E53144143E28CE23F022510D8CE@dufan>
-Message-ID: <BLU135-W23CBAAD22C987537FB16A8BC010@phx.gbl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Apr 2010 17:20:35 +0100
+Subject: Add support for the 16-way L310 L2 cache controller
+Message-ID: <000701cae7b7$e61d45f0$b257d1d0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jason,
 
-take a look at wenku.baidu.com
- 
-> From: 914059751 at qq.com
-> To: linux-arm-kernel at lists.infradead.org; linux-kernel at zh-kernel.org
-> Subject: Query about arch/arm/mach-realview ?
-> Date: Thu, 29 Apr 2010 15:34:37 +0800
-> 
-> Hi, all
-> 
-> I?m looking for specification of realview board for
-> arch/arm/mach-realview ?
-> 
-> Cannt find it in arm site
-> 
-> Could anyone please give me some tips about realview board related
-> docs?
-> 
-> 
-> 
-> Thanks
-> 
-> 
-> 
-> rocky
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> Linux ??????????
-> Linux-kernel at zh-kernel.org
-> http://zh-kernel.org/mailman/listinfo/linux-kernel
-> Linux ????????? http://zh-kernel.org
- 		 	   		  
-_________________________________________________________________
-SkyDrive????????????????????????!
-http://www.windowslive.cn/campaigns/e-magazine/ngmchina/?a=c
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100429/1bb896d3/attachment-0001.htm>
+The patch entitled `Add support for the 16-way L310 L2 cache controller'
+which you submitted to RMK's patch system appears to perform a 16-way
+invalidation even when the ways might not be present. This results in
+writes to the reserved bits [15:8] of the invalidate-by-way ctrl register.
+
+You can check the associativity by reading bit 16 of the auxiliary ctrl
+register.
+
+Will
