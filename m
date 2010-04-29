@@ -1,99 +1,71 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 29 Apr 2010 23:07:41 +0800
-Subject: [Linux-arm-nuc900] NUC900 nand driver Patch
-In-Reply-To: <4BD99D4A.2020908@gmail.com>
-References: <4BD99D4A.2020908@gmail.com>
-Message-ID: <o2qe68bb3471004290807s9b3ae137p4a3d62e0e01f4530@mail.gmail.com>
+From: mboards@prograde.net (Michael Cashwell)
+Date: Thu, 29 Apr 2010 11:27:03 -0400
+Subject: Decompression failure in an inexplicable case
+Message-ID: <A809F2C8-74CA-474E-92B0-08A5227B7C3F@prograde.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks a lot, wait for me checking it.
+Greetings,
 
-? 2010?4?29? ??10:52?Wills Wang <wills.wang.cn@gmail.com> ???
-> There is a patch for NUC900 nand driver, it fix up the bug access for
-> incorrect register address and NULL pointer.
->
-> --- linux-2.6.34-rc5/drivers/mtd/nand/nuc900_nand.c 2010-04-29
-> 14:35:04.000000000 +0000
-> +++ linux-2.6.34-rc5/drivers/mtd/nand/nuc900_nand.c 2010-04-29
-> 14:42:22.000000000 +0000
-> @@ -132,7 +153,7 @@
-> {
-> unsigned int val;
-> spin_lock(&nand->lock);
-> - val = __raw_readl(REG_SMISR);
-> + val = __raw_readl(nand->reg + REG_SMISR);
-> val &= READYBUSY;
-> spin_unlock(&nand->lock);
->
-> @@ -150,6 +171,19 @@
-> return ready;
-> }
->
-> +static void nuc900_nand_select_chip(struct mtd_info *mtd, int chipnr)
-> +{
-> + switch (chipnr) {
-> + case -1:
-> + break;
-> + case 0:
-> + break;
-> +
-> + default:
-> + BUG();
-> + }
-> +}
-> +
-> static void nuc900_nand_command_lp(struct mtd_info *mtd, unsigned int
-> command,
-> int column, int page_addr)
-> {
-> @@ -240,7 +274,6 @@
-> ;
-> }
->
-> -
-> static void nuc900_nand_enable(struct nuc900_nand *nand)
-> {
-> unsigned int val;
-> @@ -250,7 +283,7 @@
-> val = __raw_readl(nand->reg + REG_FMICSR);
->
-> if (!(val & NAND_EN))
-> - __raw_writel(val | NAND_EN, REG_FMICSR);
-> + __raw_writel(val | NAND_EN, nand->reg + REG_FMICSR);
->
-> val = __raw_readl(nand->reg + REG_SMCSR);
->
-> @@ -286,7 +319,7 @@
-> goto fail1;
-> }
-> clk_enable(nuc900_nand->clk);
-> -
-> + chip->select_chip = nuc900_nand_select_chip;
-> chip->cmdfunc = nuc900_nand_command_lp;
-> chip->dev_ready = nuc900_nand_devready;
-> chip->read_byte = nuc900_nand_read_byte;
->
-> --
-> ????"NUC900 Linux BSP????".
-> NUC900 Linux????????????
-> NUC900 at googlegroups.com
-> ?????????
-> NUC900+unsubscribe at googlegroups.com
-> ??????????
-> https://groups.google.com/group/NUC900?hl=zh-CN
->
+I'm working on a custom 2.6.33.2 port to Gumstix Verdex XL6P (PXA270) that is exhibiting odd behavior.
 
+If I omit CPUFreq support [CONFIG_CPU_FREQ is not set], or enable both it and its debugging support [CONFIG_CPU_FREQ_DEBUG=y], the kernel builds and runs seemingly fine.
 
+But if I have CONFIG_CPU_FREQ enabled but NOT its debugging support then kernel builds OK (including full mrproper cleanings in between):
+...
+  LD      vmlinux
+  SYSMAP  System.map
+  SYSMAP  .tmp_System.map
+  OBJCOPY arch/arm/boot/Image
+  Kernel: arch/arm/boot/Image is ready
+  AS      arch/arm/boot/compressed/head.o
+  GZIP    arch/arm/boot/compressed/piggy.gzip
+  CC      arch/arm/boot/compressed/misc.o
+  AS      arch/arm/boot/compressed/head-xscale.o
+  SHIPPED arch/arm/boot/compressed/lib1funcs.S
+  AS      arch/arm/boot/compressed/lib1funcs.o
+  AS      arch/arm/boot/compressed/piggy.gzip.o
+  LD      arch/arm/boot/compressed/vmlinux
+  OBJCOPY arch/arm/boot/zImage
+  Kernel: arch/arm/boot/zImage is ready
+#### Exporting linux-2.6.33.2-arm-gum to netboot.
+Image Name:   2.6.33.2-gum1
+Created:      Wed Apr 28 16:12:14 2010
+Image Type:   ARM Linux Kernel Image (uncompressed)
+Data Size:    1736780 Bytes = 1696.07 kB = 1.66 MB
+Load Address: 0xA1000000
+Entry Point:  0xA1000000
 
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+but fails to run:
 
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+TFTP of 'GUM1/boot/uImage' from server 10.18.1.11; our IP address is 10.18.17.1 to address 0xa2000000
+Loading: #################################################################
+         ######################################################
+Bytes transferred = 1736844 (1a808c hex)
+## Booting image at a2000000 ...
+   Image Name:   2.6.33.2-gum1
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    1736780 Bytes =  1.7 MB
+   Load Address: a1000000
+   Entry Point:  a1000000
+   Verifying Checksum ... OK
+
+Starting kernel at address a1000000 ...
+
+Uncompressing Linux...
+
+uncompression error
+
+ -- System halted
+
+As noted on another thread, I'm working on cpufreq-pxa2xx.c but I can't see how anything done there could directly cause the decompression to fail. Surely decompression is way too early for any code in cpu-freq to be called. (Yes?)
+
+My hunch is that some subtle image/map linker issue is causing the non-cpufreq-debug case to lay the image out just so the decompressor gets confused but the cause and effect seem so random I'm not sure where to look.
+
+I've seen this sort of thing before on boards where SDRAM is flakey but again, this is an unmodified commercial Gumstix board (in fact, several of them) so this seems unlikely.
+
+I can leave cpufreq debugging compiled in and not pass a "cpufreq.debug=" kernel arg but I don't want to sweep this under the rug.
+
+Anyone have any ideas? Is there any way to get more info from the decompressor or tests I can conduct against the zImage to determine what's wrong?
+
+-Mike
