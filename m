@@ -1,39 +1,33 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 29 Apr 2010 21:58:42 +0400
-Subject: RMK back online - please resend anything requiring my attention
-In-Reply-To: <20100429135611.GD4877@n2100.arm.linux.org.uk>
-References: <20100429135611.GD4877@n2100.arm.linux.org.uk>
-Message-ID: <20100429175842.GA1254@oksana.dev.rtsoft.ru>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 29 Apr 2010 19:16:36 +0100
+Subject: [PATCH] [ARM] Do not call flush_cache_user_range with mmap_sem
+	held
+In-Reply-To: <20100429130035.GB4877@n2100.arm.linux.org.uk>
+References: <1272439931-12795-1-git-send-email-dima@android.com>
+	<20100429130035.GB4877@n2100.arm.linux.org.uk>
+Message-ID: <20100429181636.GA25894@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Apr 29, 2010 at 02:56:11PM +0100, Russell King - ARM Linux wrote:
-> Right, I'm back online, however I'm told by dwmw2 that infradead.org has
-> nothing pending for me.
+Russell King - ARM Linux wrote:
+> On Wed, Apr 28, 2010 at 12:32:11AM -0700, Dima Zavin wrote:
+> > We can't be holding the mmap_sem while calling flush_cache_user_range
+> > because the flush can fault. If we fault on a user address, the
+> > page fault handler will try to take mmap_sem again. Since both places
+> > acquire the read lock, most of the time it succeeds. However, if another
+> > thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
+> > between the call to flush_cache_user_range and the fault, the down_read
+> > in do_page_fault will deadlock.
 > 
-> I'm therefore going to assume that precisely nothing of any consequence
-> or significance has been discussed on this mailing list during the
-> preceding 7 days - if it has and you want a reply from me, you _will_
-> have to re-send it.
+> That's a non-issue.  If do_cache_op is holding a read lock, _nothing_
+> _else_ can be holding that lock in write mode.  So, holding the lock in
+> read mode ensures that when faults occur, the fault handler can be sure
+> that its read lock will succeed.
 
-Not exactly related to these network issues, but I actually
-postponed the question until you back: will there be another
-mach-types update (in the devel branch) before .34 release?
+read-write locks will block a reader when there is a already blocked
+writer.  Otherwise the writer can be permanently starved due to new
+readers always arriving so reader count doesn't reach zero.
 
-I'm asking because I'd like to (re)send you the CNS3xxx
-patches, but they depend on mach-types update. And of course
-I'd like the patches to breed in SFR's -next for some time,
-and thus hope that CNS3xxx can slip into .35.
+In other words, readers queue behind writers if there's a waiting writer.
 
-I do remember (like in 2008?) you once said that you tired
-of mach-types updates, but I thought it's worth asking anyway,
-maybe something changed.
-
-Thanks,
-
--- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+-- Jamie
