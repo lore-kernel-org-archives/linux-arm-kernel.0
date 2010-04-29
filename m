@@ -1,62 +1,48 @@
-From: mboards@prograde.net (Michael Cashwell)
-Date: Thu, 29 Apr 2010 14:59:25 -0400
-Subject: Decompression failure in an inexplicable case
-In-Reply-To: <1272558886.15152.4.camel@e102109-lin.cambridge.arm.com>
-References: <A809F2C8-74CA-474E-92B0-08A5227B7C3F@prograde.net>
-	<1272558886.15152.4.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <355FF471-B747-4E3D-95A9-8D8A60D6CC83@prograde.net>
+From: dima@android.com (Dima Zavin)
+Date: Thu, 29 Apr 2010 12:23:54 -0700
+Subject: [PATCH] [ARM] Do not call flush_cache_user_range with mmap_sem
+	held
+In-Reply-To: <20100429182455.GH4877@n2100.arm.linux.org.uk>
+References: <1272439931-12795-1-git-send-email-dima@android.com>
+	<20100429130035.GB4877@n2100.arm.linux.org.uk>
+	<20100429181636.GA25894@shareable.org>
+	<20100429182455.GH4877@n2100.arm.linux.org.uk>
+Message-ID: <h2s404ea8001004291223g32cd945bue3a78c6b5372cb92@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 29, 2010, at 12:34 PM, Catalin Marinas wrote:
+Jamie/Russell,
 
-> On Thu, 2010-04-29 at 16:27 +0100, Michael Cashwell wrote:
->> If I omit CPUFreq support [CONFIG_CPU_FREQ is not set], or enable both it and its debugging support [CONFIG_CPU_FREQ_DEBUG=y], the kernel builds and runs seemingly fine.
->> 
->> But if I have CONFIG_CPU_FREQ enabled but NOT its debugging support then kernel builds OK (including full mrproper cleanings in between):
-> 
-> BTW, one of the suggestions at the time was to try this:
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 3dc2cf8..e12e382 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -316,7 +316,7 @@ LC0:		.word	LC0			@ r1
-> 		.word	_start			@ r5
-> 		.word	_got_start		@ r6
-> 		.word	_got_end		@ ip
-> -		.word	user_stack+4096		@ sp
-> +		.word	user_stack+8192		@ sp
-> LC1:		.word	reloc_end - reloc_start
-> 		.size	LC0, . - LC0
-> 
-> @@ -1086,4 +1086,4 @@ reloc_end:
-> 
-> 		.align
-> 		.section ".stack", "w"
-> -user_stack:	.space	4096
-> +user_stack:	.space	8192
+Thanks for the feedback.
 
-OK, I tried this (with Uwe's other malloc heap size and decompress_flush() callback patches) and sadly my results were unchanged:
+>> read-write locks will block a reader when there is a already blocked
+>> writer. ?Otherwise the writer can be permanently starved due to new
+>> readers always arriving so reader count doesn't reach zero.
 
-Bytes transferred = 1736932 (1a80e4 hex)
-## Booting image at a2000000 ...
-   Image Name:   2.6.33.2-gum1
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    1736868 Bytes =  1.7 MB
-   Load Address: a1000000
-   Entry Point:  a1000000
-   Verifying Checksum ... OK
-No initrd
+That's precisely the problem.
 
-Starting kernel at address a1000000 ...
+> Hmm, true, and rather unfortunate.
+>
+> As I've already said, we can not do this cache maintainence outside of
+> the lock.
+>
+> The point of this code is to first validate that the region we're working
+> on is valid. ?As soon as we drop the lock, we lose the guarantee that
+> the region is valid while we operate on it - indeed, the region could be
+> unmapped and remapped by a different thread.
 
-Uncompressing Linux..............................................................................................................
+So what if it was remapped? The worst case scenario in this case is
+that we needlessly flush a region of memory, but its not "wrong". It
+can't be any worse than just doing a full cache flush. If another
+thread unmapped the region, then we should (and will) segfault the
+flushing thread, which is the correct behavior IMHO.
 
-uncompression error
+--Dima
 
- -- System halted
+> I think the only reasonable solution is to also walk the page tables
+> and do the cache handling on a per-page basis, which will make this
+> interface quite a bit slower - but that's the price we pay for
+> correctness.
 
-So there still seems to be some data-dependent issues in the kernel's gunzip decompressor.
 
--Mike
+>
