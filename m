@@ -1,32 +1,23 @@
-From: albin.tonnerre@gmail.com (Albin Tonnerre)
-Date: Thu, 29 Apr 2010 18:09:54 +0200
-Subject: Decompression failure in an inexplicable case
-In-Reply-To: <1272555653.15152.3.camel@e102109-lin.cambridge.arm.com>
-References: <A809F2C8-74CA-474E-92B0-08A5227B7C3F@prograde.net>
-	<1272555653.15152.3.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <t2kbbb699fe1004290909s568e9f74jb4100e91d5693952@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Apr 2010 17:15:59 +0100
+Subject: [PATCH 0/6] ARM: pmu: provide a registration mechanism for
+	IRQs	[v3]
+In-Reply-To: <20100429160540.GE4877@n2100.arm.linux.org.uk>
+References: <1269530198-19572-1-git-send-email-will.deacon@arm.com>
+	<20100428213619.GA16525@n2100.arm.linux.org.uk>
+	<000501cae7b5$97a76fb0$c6f64f10$@deacon@arm.com>
+	<20100429160540.GE4877@n2100.arm.linux.org.uk>
+Message-ID: <000601cae7b7$41e57a70$c5b06f50$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 5:40 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, 2010-04-29 at 16:27 +0100, Michael Cashwell wrote:
->> If I omit CPUFreq support [CONFIG_CPU_FREQ is not set], or enable both
->> it and its debugging support [CONFIG_CPU_FREQ_DEBUG=y], the kernel
->> builds and runs seemingly fine.
->>
->> But if I have CONFIG_CPU_FREQ enabled but NOT its debugging support
->> then kernel builds OK (including full mrproper cleanings in between):
->
-> I had some issues a few weeks ago with the decompressing:
->
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/73476
->
-> That seemed to do with the size of the Image file and randomly removing
-> parts of it made it work. Unfortunately, I couldn't reproduce it so that
-> others can try.
+Hello Russell,
 
-You might want to try using LZO instead of gzip, that one should work correctly.
+> Can you just deal with the single patch to be superseded; the rest are
+> fine.
 
-Cheers,
-Albin
+I've submitted the replacement patches as 6063/1 and 6064/1.
+
+Thanks,
+
+Will
