@@ -1,56 +1,97 @@
-From: hongjiujing@gmail.com (tommy.hong)
-Date: Thu, 29 Apr 2010 20:58:53 +0800
-Subject: S3C6410 power management support status
-In-Reply-To: <20100429124509.GA11290@jeknote.loshitsa1.net>
-References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-Message-ID: <h2z48cbf6bf1004290558mcd6b377az7267ce599f6e57fb@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 29 Apr 2010 15:08:52 +0200
+Subject: sharp c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1
+In-Reply-To: <f17812d71003072135wcc7165m31a302b7da75c36e@mail.gmail.com>
+References: <20100106071026.GD1382@ucw.cz>
+	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+	<20100107065230.GA1303@ucw.cz>
+	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
+	<20100305092338.GA32433@atrey.karlin.mff.cuni.cz>
+	<f17812d71003072135wcc7165m31a302b7da75c36e@mail.gmail.com>
+Message-ID: <20100429130852.GC1661@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,Sir.Please fix VFP Bug,who is exsited in Samsung 2.6.24.2 BSP relative.
+Hi!
 
-arch/arm/kerne/entry-armv.S (2.6.24.2 BSP)
+Okay, maybe this is better fix for the regression?
 
-B.R
+Simplify irq wakeup code, and fix ugly warning during resume on spitz
+as a result.
 
-Tommy
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-
-
-2010/4/29 Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
-
-> Hi.
->
-> Can anybody explain current status of S3C6410 power management support
-> in mainline? Suspend-to-RAM looks completely broken in the current
-> Linus's git tree.
->
->
-> --
-> Yauhen Kharuzhy         jekhor _at_ gmail.com
->                        JID: jek at jabber.ru
->
-> A: No
-> Q: Should I quote below my post?
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
+--- ./drivers/input/keyboard/pxa27x_keypad.c	2010-04-15 07:50:34.000000000 +0200
++++ ./drivers/input/keyboard/pxa27x_keypad.c	2010-04-27 15:38:02.000000000 +0200
+@@ -33,6 +33,8 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/pxa27x_keypad.h>
++#include <mach/mfp-pxa2xx.h>
++
+ /*
+  * Keypad Controller registers
+  */
+@@ -412,7 +416,7 @@
+ 	clk_disable(keypad->clk);
+ 
+ 	if (device_may_wakeup(&pdev->dev))
+-		enable_irq_wake(keypad->irq);
++		keypad_set_wake(1);
+ 
+ 	return 0;
+ }
+@@ -424,7 +428,7 @@
+ 	struct input_dev *input_dev = keypad->input_dev;
+ 
+ 	if (device_may_wakeup(&pdev->dev))
+-		disable_irq_wake(keypad->irq);
++		keypad_set_wake(0);
+ 
+ 	mutex_lock(&input_dev->mutex);
+ 
+--- ./arch/arm/mach-pxa/mfp-pxa2xx.c	2009-09-10 00:13:59.000000000 +0200
++++ ./arch/arm/mach-pxa/mfp-pxa2xx.c	2010-04-27 15:22:42.000000000 +0200
+@@ -34,7 +34,6 @@
+ struct gpio_desc {
+ 	unsigned	valid		: 1;
+ 	unsigned	can_wakeup	: 1;
+-	unsigned	keypad_gpio	: 1;
+ 	unsigned	dir_inverted	: 1;
+ 	unsigned int	mask; /* bit mask in PWER or PKWR */
+ 	unsigned int	mux_mask; /* bit mask of muxed gpio bits, 0 if no mux */
+@@ -178,9 +177,6 @@
+ 	if (!d->valid)
+ 		return -EINVAL;
+ 
+-	if (d->keypad_gpio)
+-		return -EINVAL;
+-
+ 	mux_taken = (PWER & d->mux_mask) & (~d->mask);
+ 	if (on && mux_taken)
+ 		return -EBUSY;
+@@ -291,7 +288,6 @@
+ 	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
+ 		gpio = pxa27x_pkwr_gpio[i];
+ 		gpio_desc[gpio].can_wakeup = 1;
+-		gpio_desc[gpio].keypad_gpio = 1;
+ 		gpio_desc[gpio].mask = 1 << i;
+ 	}
+ 
+--- ./arch/arm/mach-pxa/pxa27x.c	2010-03-21 22:09:12.000000000 +0100
++++ ./arch/arm/mach-pxa/pxa27x.c	2010-04-27 07:43:30.000000000 +0200
+@@ -342,9 +342,6 @@
+ 	if (gpio >= 0 && gpio < 128)
+ 		return gpio_set_wake(gpio, on);
+ 
+-	if (irq == IRQ_KEYPAD)
+-		return keypad_set_wake(on);
+-
+ 	switch (irq) {
+ 	case IRQ_RTCAlrm:
+ 		mask = PWER_RTC;
 
 
 -- 
-concentrate for work && keep calm and carry on,Achievement provides the only
-real pleasure in life!
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100429/d63a4be0/attachment-0001.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: entry-armv.S
-Type: application/octet-stream
-Size: 27895 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100429/d63a4be0/attachment-0001.obj>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
