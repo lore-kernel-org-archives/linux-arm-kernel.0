@@ -1,29 +1,47 @@
-From: PeterHuewe@gmx.de (Peter =?utf-8?q?H=C3=BCwe?=)
-Date: Thu, 29 Apr 2010 12:18:46 +0200
-Subject: [PATCH] arch/arm: Fix missing define for ARM_PMU_DEVICE_CPU
-In-Reply-To: <1272529580.24662.10.camel@e102144-lin.cambridge.arm.com>
-References: <201004290231.03440.PeterHuewe@gmx.de>
-	<20100429081218.GA14783@wear.picochip.com>
-	<1272529580.24662.10.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <201004291218.46341.PeterHuewe@gmx.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 29 Apr 2010 13:49:47 +0300
+Subject: [PATCH v5 0/2] spi: driver for Cirrus EP93xx SPI controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636DB622A3@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1272476431.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636DB622A3@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100429104947.GK26418@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag 29 April 2010 10:26:20 schrieb Will Deacon:
-> > This build error is due to the core patch of Will's "ARM: pmu: provide
-> > a registration mechanism for IRQs" patch series not being merged yet.
-> I submitted the series to Russell's patch system on 9 April.
-> However, as you know, he's currently without an internet connection and
-> the patch system has gone offline. 
+On Wed, Apr 28, 2010 at 05:30:25PM -0500, H Hartley Sweeten wrote:
+> On Wednesday, April 28, 2010 10:51 AM, Mika Westerberg wrote:
+> > 
+> > Hello,
+> > 
+> > This series implements SPI master driver for Cirrus Logic EP93xx SPI
+> > controllers.
+> > 
+> > This is fifth iteration of the driver.
+> > 
+> > Changes to the previous version:
+> > 	- addressed review comments
+> > 	- added priming the TX FIFO when transfer is started
+> > 	- in case of ROR interrupt we clear it
+> > 	- added documentation in Documentation/spi/ep93xx_spi which provides
+> > 	  sample code how the driver can be hooked into platform data
+> > 
+> > I tested this on TS-7260 board with at25 and mmc_spi drivers. Now that I have
+> > Sim.One board, which is EP9307 based, I also tested with that (I hacked the
+> > board a bit to get EGPIO9 as a chip select).
+> > 
+> > Note that patch 2/2 depends on patch that is already in Russell's patch
+> > tracking system:
+> > 	http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5998/1
+> > 
+> 
+> Mika,
+> 
+> Following is a patch to allow using built-in gpios, external gpio expanders
+> (spi/i2c/etc.) or really any other mechanism for the chip select.
 
-Ah, didn't know about this - then sorry to 'bug' you with my patch :)
- 
-> Peter: if you're interested, the patch series I sent to the ARM
-> Linux list is archived here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/012113.html
+Ok, thanks. I'll wait a bit if there are more comments and then
+incorporate your patch along with your review comments and post v6.
+I'm really hoping that v6 would be last revision.
 
-Thanks for the Link - I'll have a look at it.
-
-
-Thanks,
-Peter
+Regards,
+MW
