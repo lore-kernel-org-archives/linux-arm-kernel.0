@@ -1,33 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 29 Apr 2010 09:14:58 +0200
-Subject: MXC Pull request for -rc
-Message-ID: <20100429071458.GL7634@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 29 Apr 2010 10:03:16 +0200
+Subject: IMX Watchdog driver for machs MX2 up to MX51
+Message-ID: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello,
 
-Please pull the following for -rc. Only a single patch which prevents
-mx51_defconfig from building.
+here is finally the watchdog driver for MX2 and later. It has been rewritten as
+the changes from the last version are major:
 
-Sascha
+- seperation from MX1-driver as discussed with Wim
+- added the timer for petting a closed watchdog device
+- switching to managed resources
+- picking up ideas from Vladimir
+- lots of simplification on the way
 
-The following changes since commit 2ba3abd8186f24c7fb418927025b4e2120e3a362:
-  Linus Torvalds (1):
-        Merge branch 'pm-fixes' of git://git.kernel.org/.../rafael/suspend-2.6
+The MX1-driver is not included in this patchset. Mach-updates to affected machs
+are included in this patchset. Some of the naming in there has grown
+inconsistently (mxc_wdt vs imx_wdt_device0), but this happened to not only the
+watchdog device, so the old names are kept for now, waiting for a general
+cleanup-patch.
 
-are available in the git repository at:
+It has been tested on a mx27 and mx35 board. mx25 and mx51 were build-tested.
+checkpatch is happy, too.
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+Please test, review and consider for inclusion.
 
-Dinh Nguyen (1):
-      mx5: Fix build error for mx51_defconfig
+Kind regards,
 
- arch/arm/mach-mx5/clock-mx51.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+   Wolfram
