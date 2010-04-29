@@ -1,49 +1,65 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 29 Apr 2010 07:44:14 -0700
-Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
-In-Reply-To: <20100126201239.15382.34792.stgit@baageli.muru.com>
-References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-	<20100126201239.15382.34792.stgit@baageli.muru.com>
-Message-ID: <1272552254.3051.121.camel@localhost>
+From: yauhen.kharuzhy@promwad.com (Yauhen Kharuzhy)
+Date: Thu, 29 Apr 2010 17:52:57 +0300
+Subject: S3C6410 power management support status
+In-Reply-To: <20100429140050.GA3410@sirena.org.uk>
+References: <20100429124509.GA11290@jeknote.loshitsa1.net>
+	<20100429140050.GA3410@sirena.org.uk>
+Message-ID: <20100429145257.GA9592@jeknote.loshitsa1.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-26 at 12:12 -0800, Tony Lindgren wrote:
-> Define arch_decomp_setup() the same way as some other
-> architectures do. Use arch_id to configure the debug uart
-> based on the machine_is by storing it into the uart
-> scratchpad register for DEBUG_LL code to use.
+On Thu, Apr 29, 2010 at 03:00:51PM +0100, Mark Brown wrote:
+> On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
 > 
-> Note that to avoid merge conflicts, this patch is using
-> hardcoded register r1 until tmp register is being passed
-> for all addruart macros.
+> > Can anybody explain current status of S3C6410 power management support
+> > in mainline? Suspend-to-RAM looks completely broken in the current
+> > Linus's git tree.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> What problems are you experiencing?
 
-This has been working well, but has a couple serious limitations:
+1. I enabled RTC driver for S3C6410 (it is cannot be enabled without
+modification of Kconfig) and CONFIG_SUSPEND.
+2. echo +10 > /sys/class/rtc0/wakealarm && echo mem > /sys/power/state.
 
-1. assumes bootloader has enabled UART1 clocks
-2. assumes all SoCs supported have the same UART1 base
+System didn't go to sleep with messages:
 
-With more platforms using USB-based UARTs, assumption (1) may not be
-safe for very long, as bootloaders for these platforms don't really
-*need* to enable UART1.  Currently, they happen to mainly because of
-copied init code from other platforms. 
+---
+s3c_pm_enter(3)
+s3c_pm_enter: No wake-up sources!
+s3c_pm_enter: Aborting sleep
+---
 
-But more importantly, there are more OMAP derivative parts coming soon,
-and one in particular coming soon[1] breaks assumption 2 by having a
-different UART1 base (yes, it's branded as a DaVinci, but it's an OMAP
-core as far as linux is concerned.  Don't get me started on TI
-branding.)
+This is caused by following code:
+---
+#define any_allowed(mask, allow) (((mask) & (allow)) != (allow))
 
-To fix both problems, maybe we should just use a fixed memory location
-to pass this temporary data from uncompress to the kernel.  We've had a
-similar problem on DaVinci recently and a proposal has been made (and
-tested) to use memory just below the page tables[2].)
+        if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+            !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow)) {
+                printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
+                printk(KERN_ERR "%s: Aborting sleep\n", __func__);
+                return -EINVAL;
+        }
+---
 
-Any comments on this proposal?  or alternative suggestions?
+But s3c_irqwake_intallow is defined in arch/arm/mach-s3c64xx/include/mach/pm-core.h
 
-Kevin
+---
+/* make these defines, we currently do not have any need to change
+ * the IRQ wake controls depending on the CPU we are running on */
 
-[1] http://www.ti.com/ww/en/dsp/davinci-netra/index.shtml
-[2] https://patchwork.kernel.org/patch/94724/
+#define s3c_irqwake_eintallow   ((1 << 28) - 1)
+#define s3c_irqwake_intallow    (0)
+---
+
+
+-- 
+Yauhen Kharuzhy
+-----------------------------------------------------------
+Promwad Innovation Company
+22, Olshevskogo St.
+Office 809
+220073, Minsk, Belarus
+Phone/Fax: +375 (17) 312-1246
+E-mail: yauhen.kharuzhy@promwad.com
+Skype: jekhor
+Web: www.promwad.com
