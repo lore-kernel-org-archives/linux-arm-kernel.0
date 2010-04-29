@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 29 Apr 2010 04:20:04 -0400
-Subject: [PATCH 08/10] [ARM] pxa: reserve more irq for board
-Message-ID: <x2v771cded01004290120t9b1f38aetd66a6da1922ac7ac@mail.gmail.com>
+Date: Thu, 29 Apr 2010 04:20:48 -0400
+Subject: [PATCH 09/10] [ARM] pxa: enable pmic on tavorevb3
+Message-ID: <j2h771cded01004290120t1216c3f7r5f77226af4046f19@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
