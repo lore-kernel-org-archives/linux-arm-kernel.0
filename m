@@ -1,41 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 30 Apr 2010 16:32:02 +0200
-Subject: [PATCH] MMC: atmel-mci: fix in debugfs: response value printing
-In-Reply-To: <12c815b6060bc044238d63a686de517e43e90184.1272378853.git.nicolas.ferre@atmel.com>
-References: <12c815b6060bc044238d63a686de517e43e90184.1272378853.git.nicolas.ferre@atmel.com>
-Message-ID: <1272637922-31418-1-git-send-email-nicolas.ferre@atmel.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 30 Apr 2010 08:07:02 -0700
+Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <20100126201239.15382.34792.stgit@baageli.muru.com>
+References: <20100126200646.15382.52167.stgit@baageli.muru.com>
+	<20100126201239.15382.34792.stgit@baageli.muru.com>
+Message-ID: <1272640022.3051.1534.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In debugfs, printing of command response reports resp[2]
-twice: fix it to resp[3].
+[resend to include RMK]
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/mmc/host/atmel-mci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On Tue, 2010-01-26 at 12:12 -0800, Tony Lindgren wrote:
+> Define arch_decomp_setup() the same way as some other
+> architectures do. Use arch_id to configure the debug uart
+> based on the machine_is by storing it into the uart
+> scratchpad register for DEBUG_LL code to use.
+> 
+> Note that to avoid merge conflicts, this patch is using
+> hardcoded register r1 until tmp register is being passed
+> for all addruart macros.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index fd96ab9..1f0f30f 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -268,7 +268,7 @@ static int atmci_req_show(struct seq_file *s, void *v)
- 				"CMD%u(0x%x) flg %x rsp %x %x %x %x err %d\n",
- 				cmd->opcode, cmd->arg, cmd->flags,
- 				cmd->resp[0], cmd->resp[1], cmd->resp[2],
--				cmd->resp[2], cmd->error);
-+				cmd->resp[3], cmd->error);
- 		if (data)
- 			seq_printf(s, "DATA %u / %u * %u flg %x err %d\n",
- 				data->bytes_xfered, data->blocks,
-@@ -278,7 +278,7 @@ static int atmci_req_show(struct seq_file *s, void *v)
- 				"CMD%u(0x%x) flg %x rsp %x %x %x %x err %d\n",
- 				stop->opcode, stop->arg, stop->flags,
- 				stop->resp[0], stop->resp[1], stop->resp[2],
--				stop->resp[2], stop->error);
-+				stop->resp[3], stop->error);
- 	}
- 
- 	spin_unlock_bh(&slot->host->lock);
--- 
-1.5.6.5
+This patch (now in mainline[1]) has been working well, but has a couple
+serious limitations:
+
+1. assumes bootloader has enabled UART1 clocks
+2. assumes all OMAPs supported have the same UART1 base
+
+With more platforms using USB-based UARTs, assumption (1) may not be
+safe for very long, as bootloaders for these platforms don't really
+*need* to enable UART1.  Currently, they happen to mainly because of
+copied init code from other platforms. 
+
+But more importantly, there are more OMAP derivative parts coming soon,
+and one in particular coming soon[2] breaks assumption 2 by having a
+different UART1 base (yes, it's branded as a DaVinci, but it's an OMAP
+core as far as linux is concerned.  Don't get me started on TI
+branding.)
+
+To fix both problems, maybe we should just use a fixed memory location
+to pass this temporary data from uncompress to the kernel.  We've had a
+similar problem on DaVinci recently and a proposal has been made (and
+tested) to use memory just below the page tables[3].)
+
+Any comments on this proposal?  or alternative suggestions?
+
+Kevin
+
+[1] commit 0c8219f0302d0d27fda52c790d38406801e547ec
+[1] http://www.ti.com/ww/en/dsp/davinci-netra/index.shtml
+[2] https://patchwork.kernel.org/patch/94724/
