@@ -1,76 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 11:47:12 -0700
-Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
-In-Reply-To: <20100430171802.GB1639@n2100.arm.linux.org.uk>
-References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-	<20100126201239.15382.34792.stgit@baageli.muru.com>
-	<1272640022.3051.1534.camel@localhost> <4BDB0353.5090800@ti.com>
-	<20100430171802.GB1639@n2100.arm.linux.org.uk>
-Message-ID: <20100430184712.GF29604@atomide.com>
+From: jason.mcmullan@gmail.com (Jason S. McMullan)
+Date: Fri, 30 Apr 2010 14:54:11 -0400
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way PL310
+In-Reply-To: <1272653651-11590-1-git-send-email-jason.mcmullan@netronome.com>
+References: <1272653651-11590-1-git-send-email-jason.mcmullan@netronome.com>
+Message-ID: <1272653651-11590-2-git-send-email-jason.mcmullan@netronome.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100430 10:13]:
-> On Fri, Apr 30, 2010 at 12:20:35PM -0400, Cyril Chemparathy wrote:
-> > Hi,
-> > 
-> > [...]
-> > > To fix both problems, maybe we should just use a fixed memory location
-> > > to pass this temporary data from uncompress to the kernel.  We've had a
-> > > similar problem on DaVinci recently and a proposal has been made (and
-> > > tested) to use memory just below the page tables[3].)
-> > 
-> > Essentially both of these approaches (internal scratch register and
-> > fixed address) implement a weird back-channel communication scheme
-> > between the decompresser and the debug macros.
-> > 
-> > A more elegant solution may be as follows:
-> >     - pass machine_arch_type as an argument into addruart.
-> 
-> Unfortunately, that breaks addruart.  Firstly, addruart is used from
-> assembly code where very limited registers are available (the fewer
-> registers it clobbers the less likely debug is going to cause stuff
-> to break.)
+The L310 cache controller's interface is almost identical
+to the L210. One major difference is that the PL310 can
+have up to 16 ways.
 
-Right, this would be tricky.
+This change uses the cache's part ID and the Assciativity
+bits in the AUX_CTRL register to determine the number of ways.
+
+Signed-off-by: Jason S. McMullan <jason.mcmullan@netronome.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
+ arch/arm/mm/cache-l2x0.c                   |   30 ++++++++++++++++++++++++---
+ 2 files changed, 29 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index cdb9022..6bcba48 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -21,6 +21,9 @@
+ #define __ASM_ARM_HARDWARE_L2X0_H
  
-> Secondly, the places that addruart may be called from, the location
-> of the machine type number is indeterminent.  Remember that this
-> macro can be called when the MMU is on or off, and can be called
-> before the machine_arch_type has been initialized.
-
-Another good point here.
+ #define L2X0_CACHE_ID			0x000
++#define   L2X0_CACHE_ID_PART_MASK	(0xf << 6)
++#define   L2X0_CACHE_ID_PART_L210	(1 << 6)
++#define   L2X0_CACHE_ID_PART_L310	(3 << 6)
+ #define L2X0_CACHE_TYPE			0x004
+ #define L2X0_CTRL			0x100
+ #define L2X0_AUX_CTRL			0x104
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 21ad68b..32a70a7 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -27,6 +27,7 @@
  
-> >     - move the uart base lookup logic to addruart using macros similar
-> >       to DEBUG_LL_*, except that these expand to assembly code this
-> >       time.
-> >     - reuse these debug-macros in uncompress.h and implement putc() and
-> >       flush() using addruart(), senduart(), etc.
-> 
-> Given what I've said above about the debug macros, this is definitely the
-> wrong solution.
-> 
-> Having the decompressor macros work whatever the machine type is
-> reasonable, and the machine_is_xxx() macros already work at that point,
-> so there shouldn't be much of an issue there.
-
-Just to bring it up, there's one issue to consider here though.
-When the bootloader passes a wrong machine id, chances are things
-break with no debug output.
+ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
++static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
  
-> As far as the debug macros go, I think we're at the point where it's
-> basically just far easier to leave these macros as a developer debugging
-> tool and we'll just have to put up with it being something that an OMAP
-> developer has to edit according to his platform to make work.
-> 
-> After all, _NO_ production kernel what so ever should be using this
-> debug support.
-
-Things work now for mach-omap2, but we assume the first uart is always 
-in the same location. If this changes, then using some fixed memory
-location for storing the debug configuration is probably the best way
-to go considering the issues Russell mentioned.
-
-Regards,
-
-Tony
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ {
+@@ -106,10 +107,9 @@ static inline void l2x0_inv_all(void)
+ {
+ 	unsigned long flags;
+ 
+-	/* invalidate all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+-	writel(0xff, l2x0_base + L2X0_INV_WAY);
+-	cache_wait(l2x0_base + L2X0_INV_WAY, 0xff);
++	writel(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
++	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+@@ -217,10 +217,32 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	 * accessing the below registers will fault.
+ 	 */
+ 	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
++		int ways;
++		uint32_t cache_id;
+ 
+ 		/* l2x0 controller is disabled */
+-
++		cache_id = readl(l2x0_base + L2X0_CACHE_ID);
+ 		aux = readl(l2x0_base + L2X0_AUX_CTRL);
++
++		/* Determine the number of ways */
++		switch (cache_id) {
++		case L2X0_CACHE_ID_PART_L310:
++			if (aux & (1 << 16))
++				ways = 16;
++			else
++				ways = 8;
++			break;
++		case L2X0_CACHE_ID_PART_L210:
++			ways = (aux >> 13) & 0xf;
++			break;
++		default:
++			/* Assume unknown chips have 8 ways */
++			ways = 8;
++			break;
++		}
++
++		l2x0_way_mask = (1 << ways) - 1;
++
+ 		aux &= aux_mask;
+ 		aux |= aux_val;
+ 		writel(aux, l2x0_base + L2X0_AUX_CTRL);
+-- 
+1.7.0.4
