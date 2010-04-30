@@ -1,57 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 13:33:57 -0700
-Subject: [PATCH 05/11] omap4: Fix multiboot with CONFIG_PM and
-	CONFIG_ARCH_OMAP3 selected
+Date: Fri, 30 Apr 2010 13:33:59 -0700
+Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
 In-Reply-To: <20100430202603.25812.41834.stgit@baageli.muru.com>
 References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-Message-ID: <20100430203357.25812.11600.stgit@baageli.muru.com>
+Message-ID: <20100430203359.25812.56284.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We cannot use the omap34xx_sram_init(). It needs to be implemented
-for omap4. Otherwise we get an error and the system won't boot:
-
-Unhandled fault: imprecise external abort (0x1406) at 0xea963e94
-...
-
-Fix this by adding a dummy omap44xx_sram_init().
+In multi-omap configuration all the initcalls run. To avoid
+bad things from happening with 44xx specific initcalls on
+other omaps, we need to check that the booted system is
+omap4 before running.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/sram.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 51f4dfb..226b2e8 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -437,6 +437,20 @@ static inline int omap34xx_sram_init(void)
- }
- #endif
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index b88f28c..e603b00 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
+ 	extern void omap_smc1(u32 fn, u32 arg);
+ 	void __iomem *l2cache_base;
  
-+#ifdef CONFIG_ARCH_OMAP4
-+int __init omap44xx_sram_init(void)
-+{
-+	printk(KERN_ERR "FIXME: %s not implemented\n", __func__);
++	if (!cpu_is_omap44xx())
++		return -ENODEV;
 +
-+	return -ENODEV;
-+}
-+#else
-+static inline int omap44xx_sram_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- int __init omap_sram_init(void)
- {
- 	omap_detect_sram();
-@@ -451,7 +465,7 @@ int __init omap_sram_init(void)
- 	else if (cpu_is_omap34xx())
- 		omap34xx_sram_init();
- 	else if (cpu_is_omap44xx())
--		omap34xx_sram_init(); /* FIXME: */
-+		omap44xx_sram_init();
- 
- 	return 0;
- }
+ 	/* To avoid code running on other OMAPs in
+ 	 * multi-omap builds
+ 	 */
