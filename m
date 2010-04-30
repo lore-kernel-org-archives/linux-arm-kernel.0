@@ -1,40 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 13:34:01 -0700
-Subject: [PATCH 07/11] omap2/3/4: Add new boards to omap3_defconfig
+Date: Fri, 30 Apr 2010 13:34:03 -0700
+Subject: [PATCH 08/11] omap2/3/4: Make omap3_defconfig usable on Nokia boards
 In-Reply-To: <20100430202603.25812.41834.stgit@baageli.muru.com>
 References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-Message-ID: <20100430203401.25812.94179.stgit@baageli.muru.com>
+Message-ID: <20100430203403.25812.64363.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable 2430 omaps and the missing boards.
+The bootloader on Nokia boards does not support updating
+the kernel cmdline. For the other boards, the bootloader
+provided cmdline will be used instead.
+
+To mount root on n8x0, compile in also the MMC_OMAP.
+It seems that the best way to mount root with the
+new kernels on Nokia boards is to mount root on mmcblk0p2.
+
+Note that n8x0 current has several issues booting with
+omap3_defconfig: The bootloader has a 2MB limit for loading
+kernels, so you may want to use kexec. Also ARMv6 does
+not currently work with ARMv7 for VFP and TLS.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/omap3_defconfig |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/omap3_defconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
-index d6ad921..01e5986 100644
+index 01e5986..d2ab492 100644
 --- a/arch/arm/configs/omap3_defconfig
 +++ b/arch/arm/configs/omap3_defconfig
-@@ -264,7 +264,7 @@ CONFIG_MACH_OMAP_GENERIC=y
- # OMAP Core Type
+@@ -391,7 +391,7 @@ CONFIG_ALIGNMENT_TRAP=y
  #
- CONFIG_ARCH_OMAP2420=y
--# CONFIG_ARCH_OMAP2430 is not set
-+CONFIG_ARCH_OMAP2430=y
- CONFIG_ARCH_OMAP3430=y
- CONFIG_OMAP_PACKAGE_CBB=y
- CONFIG_OMAP_PACKAGE_CUS=y
-@@ -276,8 +276,9 @@ CONFIG_OMAP_PACKAGE_CBP=y
- CONFIG_MACH_OMAP2_TUSB6010=y
- CONFIG_MACH_OMAP_H4=y
- CONFIG_MACH_OMAP_APOLLON=y
--# CONFIG_MACH_OMAP_2430SDP is not set
-+CONFIG_MACH_OMAP_2430SDP=y
- CONFIG_MACH_OMAP3_BEAGLE=y
-+CONFIG_MACH_DEVKIT8000=y
- CONFIG_MACH_OMAP_LDP=y
- CONFIG_MACH_OVERO=y
- CONFIG_MACH_OMAP3EVM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="root=/dev/nfs nfsroot=192.168.0.1:/home/user/buildroot ip=192.168.0.2:192.168.0.1:192.168.0.1:255.255.255.0:tgt:eth0:off rw console=ttyS2,115200n8"
++CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyS2,115200"
+ # CONFIG_XIP_KERNEL is not set
+ CONFIG_KEXEC=y
+ CONFIG_ATAGS_PROC=y
+@@ -1687,7 +1687,7 @@ CONFIG_SDIO_UART=y
+ # MMC/SD/SDIO Host Controller Drivers
+ #
+ # CONFIG_MMC_SDHCI is not set
+-# CONFIG_MMC_OMAP is not set
++CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ # CONFIG_MMC_AT91 is not set
+ # CONFIG_MMC_ATMELMCI is not set
