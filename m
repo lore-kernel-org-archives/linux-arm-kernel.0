@@ -1,66 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 13:33:39 -0700
-Subject: [PATCH 00/11] omap2/3/4: Multi-omap updates to boot test with
-	omap3_defconfig
-Message-ID: <20100430202603.25812.41834.stgit@baageli.muru.com>
+Date: Fri, 30 Apr 2010 13:33:45 -0700
+Subject: [PATCH 01/11] omap2/3/4: Fix multi.h when omap3 and omap4 are
+	selected without omap2
+In-Reply-To: <20100430202603.25812.41834.stgit@baageli.muru.com>
+References: <20100430202603.25812.41834.stgit@baageli.muru.com>
+Message-ID: <20100430203345.25812.27528.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Otherwise we'll get an error about get_irqnr_and_base being defined
+twice. Add an entry for omap4, and use ARCH_OMAP3 for omap3 instead of
+ARCH_OMAP3430.
 
-This series makes the omap3_defconfig bootable on most mach-omap2
-boards. So far I've boot tested omap3_defconfig on:
+Also fix the check for omap1 to use ARCH_OMAP2PLUS to avoid having to
+add ARCH_OMAP4 separately there.
 
-BOARD	OMAP	ARM	NOTES
-n800	2420	ARMv6	Userspace won't boot because of TLS and VFP issues
-n900	3430	ARMV7
-zoom3	3630	ARMV7
-blaze	4430	ARMV7	CONFIG_SMP disabled
-
-I've pushed these into multi-omap branch in the linux omap tree,
-would like to hear status of other boards booting with omap3_defconfig
-with these patches.
-
-CONFIG_FB_OMAP is now disabled until some weirdness on at least zoom3
-is sorted out. And, you need to disable CONFIG_KPROBES on 2.6.34-rc6
-until that fix is in mainline.
-
-Anyways, let's use omap3_defconfing from now on to compile and boot
-test every patch as a sanity test.
-
-Regards,
-
-Tony
-
-
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/plat-omap/include/plat/multi.h |   16 ++++++++++++----
+ 1 files changed, 12 insertions(+), 4 deletions(-)
 
-Tony Lindgren (11):
-      omap2/3/4: Fix multi.h when omap3 and omap4 are selected without omap2
-      omap2/3: Fix DEBUG_LL for omap zoom2/3
-      omap3: Fix compile for board-cm-t35
-      omap3: Remove non-muxable ball entries for 3630
-      omap4: Fix multiboot with CONFIG_PM and CONFIG_ARCH_OMAP3 selected
-      omap4: Fix omap_l2_cache_init not to run for other omaps
-      omap2/3/4: Add new boards to omap3_defconfig
-      omap2/3/4: Make omap3_defconfig usable on Nokia boards
-      omap2/3/4: Update PMIC options for TWL and Menelaus chips
-      omap2/3/4: Dissable CONFIG_PM_VERBOSE in omap3_defconfig
-      omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig
-
-
- arch/arm/configs/omap3_defconfig               |   34 ++++-----
- arch/arm/kernel/head.S                         |   10 +++
- arch/arm/mach-omap2/board-4430sdp.c            |    3 +
- arch/arm/mach-omap2/board-cm-t35.c             |    1 
- arch/arm/mach-omap2/board-zoom-debugboard.c    |    2 -
- arch/arm/mach-omap2/include/mach/debug-macro.S |    4 +
- arch/arm/mach-omap2/io.c                       |    9 +++
- arch/arm/mach-omap2/mux34xx.c                  |   86 ------------------------
- arch/arm/plat-omap/include/plat/multi.h        |   16 +++-
- arch/arm/plat-omap/include/plat/serial.h       |    2 -
- arch/arm/plat-omap/sram.c                      |   16 ++++
- 11 files changed, 68 insertions(+), 115 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/plat-omap/include/plat/multi.h b/arch/arm/plat-omap/include/plat/multi.h
+index f235d32..ffd909f 100644
+--- a/arch/arm/plat-omap/include/plat/multi.h
++++ b/arch/arm/plat-omap/include/plat/multi.h
+@@ -61,9 +61,9 @@
+ #  define OMAP_NAME omap16xx
+ # endif
+ #endif
+-#if (defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
++#ifdef CONFIG_ARCH_OMAP2PLUS
+ # if (defined(OMAP_NAME) || defined(MULTI_OMAP1))
+-#  error "OMAP1 and OMAP2 can't be selected at the same time"
++#  error "OMAP1 and OMAP2PLUS can't be selected at the same time"
+ # endif
+ #endif
+ #ifdef CONFIG_ARCH_OMAP2420
+@@ -82,12 +82,20 @@
+ #  define OMAP_NAME omap2430
+ # endif
+ #endif
+-#ifdef CONFIG_ARCH_OMAP3430
++#ifdef CONFIG_ARCH_OMAP3
+ # ifdef OMAP_NAME
+ #  undef  MULTI_OMAP2
+ #  define MULTI_OMAP2
+ # else
+-#  define OMAP_NAME omap3430
++#  define OMAP_NAME omap3
++# endif
++#endif
++#ifdef CONFIG_ARCH_OMAP4
++# ifdef OMAP_NAME
++#  undef  MULTI_OMAP2
++#  define MULTI_OMAP2
++# else
++#  define OMAP_NAME omap4
+ # endif
+ #endif
+ 
