@@ -1,44 +1,76 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 30 Apr 2010 20:30:12 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-In-Reply-To: <20100422110025.GC20008@n2100.arm.linux.org.uk>
-References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
-	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
-	<t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
-	<q2o63386a3d1004162158v296379fat2b376d5c4c087378@mail.gmail.com>
-	<20100422110025.GC20008@n2100.arm.linux.org.uk>
-Message-ID: <n2k63386a3d1004301130udb419791p7ee48d109ab209b5@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Apr 2010 11:47:12 -0700
+Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <20100430171802.GB1639@n2100.arm.linux.org.uk>
+References: <20100126200646.15382.52167.stgit@baageli.muru.com>
+	<20100126201239.15382.34792.stgit@baageli.muru.com>
+	<1272640022.3051.1534.camel@localhost> <4BDB0353.5090800@ti.com>
+	<20100430171802.GB1639@n2100.arm.linux.org.uk>
+Message-ID: <20100430184712.GF29604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/4/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100430 10:13]:
+> On Fri, Apr 30, 2010 at 12:20:35PM -0400, Cyril Chemparathy wrote:
+> > Hi,
+> > 
+> > [...]
+> > > To fix both problems, maybe we should just use a fixed memory location
+> > > to pass this temporary data from uncompress to the kernel.  We've had a
+> > > similar problem on DaVinci recently and a proposal has been made (and
+> > > tested) to use memory just below the page tables[3].)
+> > 
+> > Essentially both of these approaches (internal scratch register and
+> > fixed address) implement a weird back-channel communication scheme
+> > between the decompresser and the debug macros.
+> > 
+> > A more elegant solution may be as follows:
+> >     - pass machine_arch_type as an argument into addruart.
+> 
+> Unfortunately, that breaks addruart.  Firstly, addruart is used from
+> assembly code where very limited registers are available (the fewer
+> registers it clobbers the less likely debug is going to cause stuff
+> to break.)
 
->> I'll keep working on getting the PL011 and PL180 DMA tested on the
->> RealView somehow so those can also be accepted.
->
-> So has this (which has now been applied to Dan's tree) been tested
-> as I asked on Versatile platforms, or do we have something that could
-> be incompatible with those platforms?
+Right, this would be tricky.
+ 
+> Secondly, the places that addruart may be called from, the location
+> of the machine type number is indeterminent.  Remember that this
+> macro can be called when the MMU is on or off, and can be called
+> before the machine_arch_type has been initialized.
 
-I tested them on U300 which has an unmodified PL011 block, both with
-and without DMA support compiled in. I have tested the Pl180 mods
-on the U300 as well, it has a slightly modified PL180 block.
-I have no other hardware...
+Another good point here.
+ 
+> >     - move the uart base lookup logic to addruart using macros similar
+> >       to DEBUG_LL_*, except that these expand to assembly code this
+> >       time.
+> >     - reuse these debug-macros in uncompress.h and implement putc() and
+> >       flush() using addruart(), senduart(), etc.
+> 
+> Given what I've said above about the debug macros, this is definitely the
+> wrong solution.
+> 
+> Having the decompressor macros work whatever the machine type is
+> reasonable, and the machine_is_xxx() macros already work at that point,
+> so there shouldn't be much of an issue there.
 
-I will try too boot it up in the QEMU emulator, it has an emulated
-PL011 atleast that should account for something? I don't think
-it emulates the PL180 though. :-(
+Just to bring it up, there's one issue to consider here though.
+When the bootloader passes a wrong machine id, chances are things
+break with no debug output.
+ 
+> As far as the debug macros go, I think we're at the point where it's
+> basically just far easier to leave these macros as a developer debugging
+> tool and we'll just have to put up with it being something that an OMAP
+> developer has to edit according to his platform to make work.
+> 
+> After all, _NO_ production kernel what so ever should be using this
+> debug support.
 
-> I'm basically not acking or applying these patches until something
-> along those lines has happened. ?(And unfortunately I don't have the
-> resources to apply to this at present.)
+Things work now for mach-omap2, but we assume the first uart is always 
+in the same location. If this changes, then using some fixed memory
+location for storing the debug configuration is probably the best way
+to go considering the issues Russell mentioned.
 
-I understand this. I will have to try to dig out some ARM reference
-design from somewhere, I cannot afford one sadly.
+Regards,
 
-ARM Ltd. people on this list: if you can send me a versatile
-machine, mail me in private for post address...
-
-Yours,
-Linus Walleij
+Tony
