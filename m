@@ -1,45 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 13:34:11 -0700
-Subject: [PATCH 11/11] omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig
-In-Reply-To: <20100430202603.25812.41834.stgit@baageli.muru.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-Message-ID: <20100430203411.25812.30019.stgit@baageli.muru.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 30 Apr 2010 15:48:27 -0500
+Subject: [PATCHv10 2.6.34-rc6 5/5] mx5: Add USB to Freescale MX51 defconfig
+In-Reply-To: <1272660507-5917-4-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1272660507-5917-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1272660507-5917-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1272660507-5917-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1272660507-5917-4-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1272660507-5917-5-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like CONFIG_FB_OMAP prevents somehow mounting root on MMC
-at least on zoom3 for multi-omap. Disable CONFIG_FB until the
-omap FB code is fixed.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-This allows booting omap3_defconfig on various omaps. Tested on
-2420-n8x0, 3430-n900, 3630-zoom3 and 4430-blaze. Note that n8x0
-still has issues with starting user space because of TLS and
-VFP.
+Update mx51_defconfig to include USB EHCI by default.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+This patch applies to 2.6.34-rc6.
+
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/configs/omap3_defconfig |   10 +---------
- 1 files changed, 1 insertions(+), 9 deletions(-)
+ arch/arm/configs/mx51_defconfig |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
-index 7855edb..1efb833 100644
---- a/arch/arm/configs/omap3_defconfig
-+++ b/arch/arm/configs/omap3_defconfig
-@@ -1359,16 +1359,8 @@ CONFIG_FB_TILEBLITTING=y
- # CONFIG_FB_METRONOME is not set
- # CONFIG_FB_MB862XX is not set
- # CONFIG_FB_BROADSHEET is not set
--CONFIG_FB_OMAP=y
-+# CONFIG_FB_OMAP is not set
- CONFIG_FB_OMAP_LCD_VGA=y
--# CONFIG_FB_OMAP_031M3R is not set
--# CONFIG_FB_OMAP_048M3R is not set
--CONFIG_FB_OMAP_079M3R=y
--# CONFIG_FB_OMAP_092M9R is not set
--# CONFIG_FB_OMAP_LCDC_EXTERNAL is not set
--# CONFIG_FB_OMAP_LCD_MIPID is not set
--# CONFIG_FB_OMAP_BOOTLOADER_INIT is not set
--CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE=2
- # CONFIG_OMAP2_DSS is not set
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+index c88e952..a708fd6 100644
+--- a/arch/arm/configs/mx51_defconfig
++++ b/arch/arm/configs/mx51_defconfig
+@@ -809,7 +809,22 @@ CONFIG_SSB_POSSIBLE=y
+ CONFIG_DUMMY_CONSOLE=y
+ # CONFIG_SOUND is not set
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB_SUPPORT=y
++CONFIG_USB_ARCH_HAS_HCD=y
++# CONFIG_USB_ARCH_HAS_OHCI is not set
++CONFIG_USB_ARCH_HAS_EHCI=y
++CONFIG_USB=y
++
++#
++# USB Host Controller Drivers
++#
++# CONFIG_USB_C67X00_HCD is not set
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_EHCI_MXC=y
++
++
+ CONFIG_MMC=y
+ # CONFIG_MMC_DEBUG is not set
+ # CONFIG_MMC_UNSAFE_RESUME is not set
+-- 
+1.6.0.4
