@@ -1,20 +1,57 @@
-From: jason.mcmullan@netronome.com (Jason McMullan)
-Date: Fri, 30 Apr 2010 13:17:39 -0400
-Subject: Add support for the 16-way L310 L2 cache controller
-In-Reply-To: <3756028016583358140@unknownmsgid>
-References: <3756028016583358140@unknownmsgid>
-Message-ID: <k2nd91d07041004301017s5663c595o62c22c2d47ce1153@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Apr 2010 18:18:02 +0100
+Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <4BDB0353.5090800@ti.com>
+References: <20100126200646.15382.52167.stgit@baageli.muru.com>
+	<20100126201239.15382.34792.stgit@baageli.muru.com>
+	<1272640022.3051.1534.camel@localhost> <4BDB0353.5090800@ti.com>
+Message-ID: <20100430171802.GB1639@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 12:20 PM, Will Deacon <will.deacon@arm.com> wrote:
-> The patch entitled `Add support for the 16-way L310 L2 cache controller'
-> which you submitted to RMK's patch system appears to perform a 16-way
-> invalidation even when the ways might not be present. This results in
-> writes to the reserved bits [15:8] of the invalidate-by-way ctrl register.
+On Fri, Apr 30, 2010 at 12:20:35PM -0400, Cyril Chemparathy wrote:
+> Hi,
+> 
+> [...]
+> > To fix both problems, maybe we should just use a fixed memory location
+> > to pass this temporary data from uncompress to the kernel.  We've had a
+> > similar problem on DaVinci recently and a proposal has been made (and
+> > tested) to use memory just below the page tables[3].)
+> 
+> Essentially both of these approaches (internal scratch register and
+> fixed address) implement a weird back-channel communication scheme
+> between the decompresser and the debug macros.
+> 
+> A more elegant solution may be as follows:
+>     - pass machine_arch_type as an argument into addruart.
 
-Good catch Will. I'll update it, and sent it to the list.
+Unfortunately, that breaks addruart.  Firstly, addruart is used from
+assembly code where very limited registers are available (the fewer
+registers it clobbers the less likely debug is going to cause stuff
+to break.)
 
---
-Jason S. McMullan
-jaosn.mcmullan at netronome.com
+Secondly, the places that addruart may be called from, the location
+of the machine type number is indeterminent.  Remember that this
+macro can be called when the MMU is on or off, and can be called
+before the machine_arch_type has been initialized.
+
+>     - move the uart base lookup logic to addruart using macros similar
+>       to DEBUG_LL_*, except that these expand to assembly code this
+>       time.
+>     - reuse these debug-macros in uncompress.h and implement putc() and
+>       flush() using addruart(), senduart(), etc.
+
+Given what I've said above about the debug macros, this is definitely the
+wrong solution.
+
+Having the decompressor macros work whatever the machine type is
+reasonable, and the machine_is_xxx() macros already work at that point,
+so there shouldn't be much of an issue there.
+
+As far as the debug macros go, I think we're at the point where it's
+basically just far easier to leave these macros as a developer debugging
+tool and we'll just have to put up with it being something that an OMAP
+developer has to edit according to his platform to make work.
+
+After all, _NO_ production kernel what so ever should be using this
+debug support.
