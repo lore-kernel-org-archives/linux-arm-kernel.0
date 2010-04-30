@@ -1,33 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 13:33:59 -0700
-Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
+Date: Fri, 30 Apr 2010 13:34:01 -0700
+Subject: [PATCH 07/11] omap2/3/4: Add new boards to omap3_defconfig
 In-Reply-To: <20100430202603.25812.41834.stgit@baageli.muru.com>
 References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-Message-ID: <20100430203359.25812.56284.stgit@baageli.muru.com>
+Message-ID: <20100430203401.25812.94179.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multi-omap configuration all the initcalls run. To avoid
-bad things from happening with 44xx specific initcalls on
-other omaps, we need to check that the booted system is
-omap4 before running.
+Enable 2430 omaps and the missing boards.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/configs/omap3_defconfig |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index b88f28c..e603b00 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
- 	extern void omap_smc1(u32 fn, u32 arg);
- 	void __iomem *l2cache_base;
- 
-+	if (!cpu_is_omap44xx())
-+		return -ENODEV;
-+
- 	/* To avoid code running on other OMAPs in
- 	 * multi-omap builds
- 	 */
+diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
+index d6ad921..01e5986 100644
+--- a/arch/arm/configs/omap3_defconfig
++++ b/arch/arm/configs/omap3_defconfig
+@@ -264,7 +264,7 @@ CONFIG_MACH_OMAP_GENERIC=y
+ # OMAP Core Type
+ #
+ CONFIG_ARCH_OMAP2420=y
+-# CONFIG_ARCH_OMAP2430 is not set
++CONFIG_ARCH_OMAP2430=y
+ CONFIG_ARCH_OMAP3430=y
+ CONFIG_OMAP_PACKAGE_CBB=y
+ CONFIG_OMAP_PACKAGE_CUS=y
+@@ -276,8 +276,9 @@ CONFIG_OMAP_PACKAGE_CBP=y
+ CONFIG_MACH_OMAP2_TUSB6010=y
+ CONFIG_MACH_OMAP_H4=y
+ CONFIG_MACH_OMAP_APOLLON=y
+-# CONFIG_MACH_OMAP_2430SDP is not set
++CONFIG_MACH_OMAP_2430SDP=y
+ CONFIG_MACH_OMAP3_BEAGLE=y
++CONFIG_MACH_DEVKIT8000=y
+ CONFIG_MACH_OMAP_LDP=y
+ CONFIG_MACH_OVERO=y
+ CONFIG_MACH_OMAP3EVM=y
