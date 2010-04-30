@@ -1,117 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Apr 2010 12:57:14 -0700
-Subject: [PATCH] omap2/3: Fix DEBUG_LL for omap zoom2/3
-Message-ID: <mailman.349.1272678664.2170.linux-arm-kernel@lists.infradead.org>
+From: jason.mcmullan@gmail.com (Jason S. McMullan)
+Date: Fri, 30 Apr 2010 15:13:05 -0400
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way PL310
+In-Reply-To: <1272654785-12779-1-git-send-email-jason.mcmullan@netronome.com>
+References: <1272654785-12779-1-git-send-email-jason.mcmullan@netronome.com>
+Message-ID: <1272654785-12779-2-git-send-email-jason.mcmullan@netronome.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zoom2 and 3 have UARTs only on the external debug board.
-GPMC needs to be mapped early to use it for DEBUG_LL.
+The L310 cache controller's interface is almost identical
+to the L210. One major difference is that the PL310 can
+have up to 16 ways.
 
-Additionally, 0xfb000000 overlaps with other areas, so
-use 0xfa400000 for the virtual address instead.
+This change uses the cache's part ID and the Assciativity
+bits in the AUX_CTRL register to determine the number of ways.
 
-Note that with the pending serial.c patches you need to
-set console=ttyS0,115200n8 as it will be the only UART
-mapped. To use DEBUG_LL, you need to pass also earlyprintk
-in cmdline.
+Signed-off-by: Jason S. McMullan <jason.mcmullan@netronome.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
+ arch/arm/mm/cache-l2x0.c                   |   30 ++++++++++++++++++++++++---
+ 2 files changed, 29 insertions(+), 4 deletions(-)
 
-Cc: Allen Pais <allen.pais@ti.com>
-Cc: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
-index e15d2e8..1d7f827 100644
---- a/arch/arm/mach-omap2/board-zoom-debugboard.c
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
-@@ -82,7 +82,7 @@ static inline void __init zoom_init_smsc911x(void)
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index cdb9022..6bcba48 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -21,6 +21,9 @@
+ #define __ASM_ARM_HARDWARE_L2X0_H
  
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
--		.mapbase	= 0x10000000,
-+		.mapbase	= ZOOM_UART_BASE,
- 		.irq		= OMAP_GPIO_IRQ(102),
- 		.flags		= UPF_BOOT_AUTOCONF|UPF_IOREMAP|UPF_SHARE_IRQ,
- 		.irqflags	= IRQF_SHARED | IRQF_TRIGGER_RISING,
-diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
-index 9a26f84..803ef14 100644
---- a/arch/arm/mach-omap2/board-zoom2.c
-+++ b/arch/arm/mach-omap2/board-zoom2.c
-@@ -91,8 +91,8 @@ static void __init omap_zoom2_map_io(void)
+ #define L2X0_CACHE_ID			0x000
++#define   L2X0_CACHE_ID_PART_MASK	(0xf << 6)
++#define   L2X0_CACHE_ID_PART_L210	(1 << 6)
++#define   L2X0_CACHE_ID_PART_L310	(3 << 6)
+ #define L2X0_CACHE_TYPE			0x004
+ #define L2X0_CTRL			0x100
+ #define L2X0_AUX_CTRL			0x104
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 21ad68b..88c6131 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -27,6 +27,7 @@
+ 
+ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
++static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+ 
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ {
+@@ -106,10 +107,9 @@ static inline void l2x0_inv_all(void)
+ {
+ 	unsigned long flags;
+ 
+-	/* invalidate all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+-	writel(0xff, l2x0_base + L2X0_INV_WAY);
+-	cache_wait(l2x0_base + L2X0_INV_WAY, 0xff);
++	writel(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
++	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
  }
+@@ -217,10 +217,32 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	 * accessing the below registers will fault.
+ 	 */
+ 	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
++		int ways;
++		uint32_t cache_id;
  
- MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
--	.phys_io	= 0x48000000,
--	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
-+	.phys_io	= ZOOM_UART_BASE,
-+	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
- 	.boot_params	= 0x80000100,
- 	.map_io		= omap_zoom2_map_io,
- 	.init_irq	= omap_zoom2_init_irq,
-diff --git a/arch/arm/mach-omap2/board-zoom3.c b/arch/arm/mach-omap2/board-zoom3.c
-index cd3e40c..3314704 100644
---- a/arch/arm/mach-omap2/board-zoom3.c
-+++ b/arch/arm/mach-omap2/board-zoom3.c
-@@ -73,8 +73,8 @@ static void __init omap_zoom_init(void)
- }
- 
- MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
--	.phys_io	= 0x48000000,
--	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
-+	.phys_io	= ZOOM_UART_BASE,
-+	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
- 	.boot_params	= 0x80000100,
- 	.map_io		= omap_zoom_map_io,
- 	.init_irq	= omap_zoom_init_irq,
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 4976169..35b2440 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -88,10 +88,10 @@ omap_uart_lsr:	.word	0
- 		b	98f
- 44:		mov	\rx, #UART_OFFSET(OMAP4_UART4_BASE)
- 		b	98f
--95:		mov	\rx, #ZOOM_UART_BASE
-+95:		ldr	\rx, =ZOOM_UART_BASE
- 		ldr	\tmp, =omap_uart_phys
- 		str	\rx, [\tmp, #0]
--		mov	\rx, #ZOOM_UART_VIRT
-+		ldr	\rx, =ZOOM_UART_VIRT
- 		ldr	\tmp, =omap_uart_virt
- 		str	\rx, [\tmp, #0]
- 		mov	\rx, #(UART_LSR << ZOOM_PORT_SHIFT)
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 87f676a..3cfb425 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -166,6 +166,15 @@ static struct map_desc omap34xx_io_desc[] __initdata = {
- 		.length		= L4_EMU_34XX_SIZE,
- 		.type		= MT_DEVICE
- 	},
-+#if defined(CONFIG_DEBUG_LL) &&							\
-+	(defined(CONFIG_MACH_OMAP_ZOOM2) || defined(CONFIG_MACH_OMAP_ZOOM3))
-+	{
-+		.virtual	= ZOOM_UART_VIRT,
-+		.pfn		= __phys_to_pfn(ZOOM_UART_BASE),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE
-+	},
-+#endif
- };
- #endif
- #ifdef	CONFIG_ARCH_OMAP4
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 20c27b9..a680715 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -41,7 +41,7 @@
- 
- /* External port on Zoom2/3 */
- #define ZOOM_UART_BASE		0x10000000
--#define ZOOM_UART_VIRT		0xfb000000
-+#define ZOOM_UART_VIRT		0xfa400000
- 
- #define OMAP_PORT_SHIFT		2
- #define OMAP7XX_PORT_SHIFT	0
-
---n/aVsWSeQ4JHkrmm--
+ 		/* l2x0 controller is disabled */
+-
++		cache_id = readl(l2x0_base + L2X0_CACHE_ID);
+ 		aux = readl(l2x0_base + L2X0_AUX_CTRL);
++
++		/* Determine the number of ways */
++		switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
++		case L2X0_CACHE_ID_PART_L310:
++			if (aux & (1 << 16))
++				ways = 16;
++			else
++				ways = 8;
++			break;
++		case L2X0_CACHE_ID_PART_L210:
++			ways = (aux >> 13) & 0xf;
++			break;
++		default:
++			/* Assume unknown chips have 8 ways */
++			ways = 8;
++			break;
++		}
++
++		l2x0_way_mask = (1 << ways) - 1;
++
+ 		aux &= aux_mask;
+ 		aux |= aux_val;
+ 		writel(aux, l2x0_base + L2X0_AUX_CTRL);
+-- 
+1.7.0.4
