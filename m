@@ -1,97 +1,66 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 30 Apr 2010 12:37:40 -0700
-Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
-In-Reply-To: <1272654736-28837-1-git-send-email-ccross@android.com>
-References: <1272654736-28837-1-git-send-email-ccross@android.com>
-Message-ID: <u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Apr 2010 13:33:39 -0700
+Subject: [PATCH 00/11] omap2/3/4: Multi-omap updates to boot test with
+	omap3_defconfig
+Message-ID: <20100430202603.25812.41834.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An alternative to this patch would be to add a config option to use
-sched_clock() to provide the counter instead of the cycle loop.  The
-same loops_per_jiffy calibration could be done to  determine the
-sched_clock frequency.  Any machine with an available constant tick
-rate counter, which is likely to be used for sched_clock() already,
-can enable CONFIG_UDELAY_USES_SCHED_CLOCK.
+Hi all,
 
-On Fri, Apr 30, 2010 at 12:12 PM, Colin Cross <ccross@android.com> wrote:
-> On SMP kernels, the loops_per_jiffy value is not scaled due to the
-> possibility of one CPU affecting the speed of another CPU while the
-> second CPU is in a udelay loop. ?Since loops_per_jiffy is calculated
-> once on boot for SMP kernels, udelays are too long if the CPU
-> frequency is scaled down from the boot frequency, or too short if the
-> frequency is scaled up. ?Some SOCs have a timer with a constant tick
-> rate that can be used to time udelays, similar to the TSC on x86.
-> Provide a config flag to allow these SOCs to override the default
-> ARM udelay implementation.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? | ? ?3 +++
-> ?arch/arm/include/asm/delay.h | ? ?4 ++++
-> ?arch/arm/lib/Makefile ? ? ? ?| ? ?6 +++++-
-> ?3 files changed, 12 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 33d2825..d9923b0 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -175,6 +175,9 @@ config ARM_L1_CACHE_SHIFT_6
-> ? ? ? ?help
-> ? ? ? ? ?Setting ARM L1 cache line size to 64 Bytes.
->
-> +config ARCH_PROVIDES_UDELAY
-> + ?bool
-> +
-> ?if OPROFILE
->
-> ?config OPROFILE_ARMV6
-> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-> index b2deda1..57f1fa0 100644
-> --- a/arch/arm/include/asm/delay.h
-> +++ b/arch/arm/include/asm/delay.h
-> @@ -8,6 +8,9 @@
->
-> ?#include <asm/param.h> /* HZ */
->
-> +#ifdef CONFIG_ARCH_PROVIDES_UDELAY
-> +#include <mach/delay.h>
-> +#else
-> ?extern void __delay(int loops);
->
-> ?/*
-> @@ -40,5 +43,6 @@ extern void __const_udelay(unsigned long);
-> ? ? ? ? ? ? ? ? ? ? ? ?__const_udelay((n) * ((2199023U*HZ)>>11))) : ? ?\
-> ? ? ? ? ?__udelay(n))
->
-> +#endif /* defined(ARCH_PROVIDES_UDELAY) */
-> ?#endif /* defined(_ARM_DELAY_H) */
->
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index 030ba72..aa449e3 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -6,7 +6,7 @@
->
-> ?lib-y ? ? ? ? ?:= backtrace.o changebit.o csumipv6.o csumpartial.o ? \
-> ? ? ? ? ? ? ? ? ? csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
-> - ? ? ? ? ? ? ? ? ?delay.o findbit.o memchr.o memcpy.o ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ?findbit.o memchr.o memcpy.o ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? memmove.o memset.o memzero.o setbit.o ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? strncpy_from_user.o strnlen_user.o ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? strchr.o strrchr.o ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> @@ -17,6 +17,10 @@ lib-y ? ? ? ? ? ? ? ?:= backtrace.o changebit.o csumipv6.o csumpartial.o ? \
->
-> ?mmu-y ?:= clear_user.o copy_page.o getuser.o putuser.o
->
-> +ifneq ($(CONFIG_ARCH_PROVIDES_UDELAY),y)
-> + ?lib-y += delay.o
-> +endif
-> +
-> ?# the code in uaccess.S is not preemption safe and
-> ?# probably faster on ARMv3 only
-> ?ifeq ($(CONFIG_PREEMPT),y)
-> --
-> 1.5.4.3
->
->
+This series makes the omap3_defconfig bootable on most mach-omap2
+boards. So far I've boot tested omap3_defconfig on:
+
+BOARD	OMAP	ARM	NOTES
+n800	2420	ARMv6	Userspace won't boot because of TLS and VFP issues
+n900	3430	ARMV7
+zoom3	3630	ARMV7
+blaze	4430	ARMV7	CONFIG_SMP disabled
+
+I've pushed these into multi-omap branch in the linux omap tree,
+would like to hear status of other boards booting with omap3_defconfig
+with these patches.
+
+CONFIG_FB_OMAP is now disabled until some weirdness on at least zoom3
+is sorted out. And, you need to disable CONFIG_KPROBES on 2.6.34-rc6
+until that fix is in mainline.
+
+Anyways, let's use omap3_defconfing from now on to compile and boot
+test every patch as a sanity test.
+
+Regards,
+
+Tony
+
+
+---
+
+Tony Lindgren (11):
+      omap2/3/4: Fix multi.h when omap3 and omap4 are selected without omap2
+      omap2/3: Fix DEBUG_LL for omap zoom2/3
+      omap3: Fix compile for board-cm-t35
+      omap3: Remove non-muxable ball entries for 3630
+      omap4: Fix multiboot with CONFIG_PM and CONFIG_ARCH_OMAP3 selected
+      omap4: Fix omap_l2_cache_init not to run for other omaps
+      omap2/3/4: Add new boards to omap3_defconfig
+      omap2/3/4: Make omap3_defconfig usable on Nokia boards
+      omap2/3/4: Update PMIC options for TWL and Menelaus chips
+      omap2/3/4: Dissable CONFIG_PM_VERBOSE in omap3_defconfig
+      omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig
+
+
+ arch/arm/configs/omap3_defconfig               |   34 ++++-----
+ arch/arm/kernel/head.S                         |   10 +++
+ arch/arm/mach-omap2/board-4430sdp.c            |    3 +
+ arch/arm/mach-omap2/board-cm-t35.c             |    1 
+ arch/arm/mach-omap2/board-zoom-debugboard.c    |    2 -
+ arch/arm/mach-omap2/include/mach/debug-macro.S |    4 +
+ arch/arm/mach-omap2/io.c                       |    9 +++
+ arch/arm/mach-omap2/mux34xx.c                  |   86 ------------------------
+ arch/arm/plat-omap/include/plat/multi.h        |   16 +++-
+ arch/arm/plat-omap/include/plat/serial.h       |    2 -
+ arch/arm/plat-omap/sram.c                      |   16 ++++
+ 11 files changed, 68 insertions(+), 115 deletions(-)
+
+-- 
+Signature
