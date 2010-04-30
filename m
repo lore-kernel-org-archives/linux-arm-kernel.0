@@ -1,99 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Apr 2010 11:12:54 +0100
-Subject: [PATCH] [ARM] Add ARCH_PROVIDES_UDELAY config option
-In-Reply-To: <4BDA4596.9060905@codeaurora.org>
-References: <> <1272532104-20074-1-git-send-email-ccross@android.com>
-	<4BDA4596.9060905@codeaurora.org>
-Message-ID: <20100430101254.GB30392@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 30 Apr 2010 14:05:12 +0100
+Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
+Message-ID: <1272632712-24935-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please re-post the entire series/thread; because the list server has
-a very short timeout on delivery of mail, I don't have anything that
-was discussed during the last week.
+The SMDK6410 has a WM9713 connected to the AC97 interface, by default
+on the GPD pins though this can be changed with a switch on the board.
 
-On Thu, Apr 29, 2010 at 07:51:02PM -0700, Saravana Kannan wrote:
-> You beat me to it :-) I was thinking of doing this for now before trying  
-> to find the *perfect* fix with the cpufreq maintainers.
->
-> If you want, you can also add in details about how using a constant freq  
-> counter would also avoid the issue of CPU freq switching while we are  
-> delay looping.
->
-> The current ARM implementation doesn't handle this either.
->
-> If my opinion matters, I think this is a good patch.
->
-> -Saravana
->
-> Colin Cross wrote:
->> On SMP kernels, the loops_per_jiffy value is not scaled, leading to
->> udelays that are too long if the CPU frequency is scaled down from
->> the frequency at loops_per_jiffy calibration, or too short if the
->> frequency is scaled up.  Some SOCs have a timer with a constant tick
->> rate that can be used to time udelays, similar to the TSC on x86.
->> Provide a config flag to allow these SOCs to override the default
->> ARM udelay implementation.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> ---
->>  arch/arm/Kconfig             |    3 +++
->>  arch/arm/include/asm/delay.h |    4 ++++
->>  arch/arm/lib/Makefile        |    6 +++++-
->>  3 files changed, 12 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 33d2825..d9923b0 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -175,6 +175,9 @@ config ARM_L1_CACHE_SHIFT_6
->>  	help
->>  	  Setting ARM L1 cache line size to 64 Bytes.
->>  +config ARCH_PROVIDES_UDELAY
->> +  bool
->> +
->>  if OPROFILE
->>   config OPROFILE_ARMV6
->> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
->> index b2deda1..57f1fa0 100644
->> --- a/arch/arm/include/asm/delay.h
->> +++ b/arch/arm/include/asm/delay.h
->> @@ -8,6 +8,9 @@
->>   #include <asm/param.h>	/* HZ */
->>  +#ifdef CONFIG_ARCH_PROVIDES_UDELAY
->> +#include <mach/delay.h>
->> +#else
->>  extern void __delay(int loops);
->>   /*
->> @@ -40,5 +43,6 @@ extern void __const_udelay(unsigned long);
->>  			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
->>  	  __udelay(n))
->>  +#endif /* defined(ARCH_PROVIDES_UDELAY) */
->>  #endif /* defined(_ARM_DELAY_H) */
->>  diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
->> index 030ba72..aa449e3 100644
->> --- a/arch/arm/lib/Makefile
->> +++ b/arch/arm/lib/Makefile
->> @@ -6,7 +6,7 @@
->>   lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
->>  		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
->> -		   delay.o findbit.o memchr.o memcpy.o		      \
->> +		   findbit.o memchr.o memcpy.o                        \
->>  		   memmove.o memset.o memzero.o setbit.o              \
->>  		   strncpy_from_user.o strnlen_user.o                 \
->>  		   strchr.o strrchr.o                                 \
->> @@ -17,6 +17,10 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
->>   mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
->>  +ifneq ($(CONFIG_ARCH_PROVIDES_UDELAY),y)
->> +  lib-y += delay.o
->> +endif
->> +
->>  # the code in uaccess.S is not preemption safe and
->>  # probably faster on ARMv3 only
->>  ifeq ($(CONFIG_PREEMPT),y)
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 2d5afd2..6878fbd 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -64,6 +64,7 @@
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
++#include <plat/audio.h>
+ 
+ #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+ #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
+@@ -254,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_ohci,
+ 	&s3c_device_usb_hsotg,
++	&s3c64xx_device_ac97,
+ 	&s3c64xx_device_iisv4,
+ 
+ #ifdef CONFIG_REGULATOR
+@@ -652,6 +654,9 @@ static void __init smdk6410_machine_init(void)
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+ 
++	/* Board defualt with CFG2.1 off */
++	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
++
+ 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
+ }
+ 
+-- 
+1.7.0.3
