@@ -1,47 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 30 Apr 2010 14:05:12 +0100
-Subject: [PATCH] ARM: SMDK6410: Register AC97 controller
-Message-ID: <1272632712-24935-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 30 Apr 2010 16:32:02 +0200
+Subject: [PATCH] MMC: atmel-mci: fix in debugfs: response value printing
+In-Reply-To: <12c815b6060bc044238d63a686de517e43e90184.1272378853.git.nicolas.ferre@atmel.com>
+References: <12c815b6060bc044238d63a686de517e43e90184.1272378853.git.nicolas.ferre@atmel.com>
+Message-ID: <1272637922-31418-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMDK6410 has a WM9713 connected to the AC97 interface, by default
-on the GPD pins though this can be changed with a switch on the board.
+In debugfs, printing of command response reports resp[2]
+twice: fix it to resp[3].
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/mmc/host/atmel-mci.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 2d5afd2..6878fbd 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -64,6 +64,7 @@
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/audio.h>
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index fd96ab9..1f0f30f 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -268,7 +268,7 @@ static int atmci_req_show(struct seq_file *s, void *v)
+ 				"CMD%u(0x%x) flg %x rsp %x %x %x %x err %d\n",
+ 				cmd->opcode, cmd->arg, cmd->flags,
+ 				cmd->resp[0], cmd->resp[1], cmd->resp[2],
+-				cmd->resp[2], cmd->error);
++				cmd->resp[3], cmd->error);
+ 		if (data)
+ 			seq_printf(s, "DATA %u / %u * %u flg %x err %d\n",
+ 				data->bytes_xfered, data->blocks,
+@@ -278,7 +278,7 @@ static int atmci_req_show(struct seq_file *s, void *v)
+ 				"CMD%u(0x%x) flg %x rsp %x %x %x %x err %d\n",
+ 				stop->opcode, stop->arg, stop->flags,
+ 				stop->resp[0], stop->resp[1], stop->resp[2],
+-				stop->resp[2], stop->error);
++				stop->resp[3], stop->error);
+ 	}
  
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
- #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-@@ -254,6 +255,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_ohci,
- 	&s3c_device_usb_hsotg,
-+	&s3c64xx_device_ac97,
- 	&s3c64xx_device_iisv4,
- 
- #ifdef CONFIG_REGULATOR
-@@ -652,6 +654,9 @@ static void __init smdk6410_machine_init(void)
- 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
-+	/* Board defualt with CFG2.1 off */
-+	s3c64xx_ac97_setup_gpio(S3C64XX_AC97_GPD);
-+
- 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
- }
- 
+ 	spin_unlock_bh(&slot->host->lock);
 -- 
-1.7.0.3
+1.5.6.5
