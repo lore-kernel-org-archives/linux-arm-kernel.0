@@ -1,43 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Apr 2010 19:19:40 +0100
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <20100430163356.GV2619@mvista.com>
-References: <20100423144058.GA11637@ZenIV.linux.org.uk>
-	<20100430163356.GV2619@mvista.com>
-Message-ID: <20100430181940.GC1639@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 30 Apr 2010 20:30:12 +0200
+Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
+In-Reply-To: <20100422110025.GC20008@n2100.arm.linux.org.uk>
+References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
+	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
+	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
+	<t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
+	<q2o63386a3d1004162158v296379fat2b376d5c4c087378@mail.gmail.com>
+	<20100422110025.GC20008@n2100.arm.linux.org.uk>
+Message-ID: <n2k63386a3d1004301130udb419791p7ee48d109ab209b5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 30, 2010 at 12:33:56PM -0400, George G. Davis wrote:
-> Hi,
-> 
-> On Fri, Apr 23, 2010 at 03:40:58PM +0100, Russell King wrote:
-> > > Above change is necessary but what an alternative approach is for this. 
-> > > There are many use case where ioremap* is needed.
-> > 
-> > This is a very difficult issue to answer; the only way we can safely
-> > remap RAM with different attributes is if we disable the existing
-> > mappings - but since we create those with 1MB sections, that's far
-> > from easy to achieve.
-> > 
-> > I think a viable safe solution is to set aside some RAM at boot (which
-> > the kernel doesn't manage at all) and then use ioremap on that; that
-> > approach will still work with this patch in place.
-> 
-> So cases such as the omapfb driver which use reserve_bootmem() (in
-> arch/arm/plat-omap/fb.c) and then later use ioremap_wc() to remap
-> reserved memory (in drivers/video/omap2/omapfb/omapfb-main.c)
-> will no longer work with this change.
+2010/4/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Correct; and there's two reasons why they'll break in the near future.
-The first is down to ioremap not wanting to allow remapping of already
-existing memory.
+>> I'll keep working on getting the PL011 and PL180 DMA tested on the
+>> RealView somehow so those can also be accepted.
+>
+> So has this (which has now been applied to Dan's tree) been tested
+> as I asked on Versatile platforms, or do we have something that could
+> be incompatible with those platforms?
 
-The second is that when we switch to using LMB instead of bootmem, this
-makes the use of reserve_bootmem() a problem in fb.c.
+I tested them on U300 which has an unmodified PL011 block, both with
+and without DMA support compiled in. I have tested the Pl180 mods
+on the U300 as well, it has a slightly modified PL180 block.
+I have no other hardware...
 
-There's really one option for this - in the machine's fixup handler, you
-can walk the meminfo array and kick out some memory from that.  This will
-prevent the kernel mapping that memory and make pfn_valid() fail for that
-memory range.  Another advantage of this is that it won't break when we
-switch to LMB.
+I will try too boot it up in the QEMU emulator, it has an emulated
+PL011 atleast that should account for something? I don't think
+it emulates the PL180 though. :-(
+
+> I'm basically not acking or applying these patches until something
+> along those lines has happened. ?(And unfortunately I don't have the
+> resources to apply to this at present.)
+
+I understand this. I will have to try to dig out some ARM reference
+design from somewhere, I cannot afford one sadly.
+
+ARM Ltd. people on this list: if you can send me a versatile
+machine, mail me in private for post address...
+
+Yours,
+Linus Walleij
