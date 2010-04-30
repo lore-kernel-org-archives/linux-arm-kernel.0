@@ -1,37 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Apr 2010 17:38:31 +0100
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <20100430163356.GV2619@mvista.com>
-References: <20100423144058.GA11637@ZenIV.linux.org.uk>
-	<20100430163356.GV2619@mvista.com>
-Message-ID: <1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Apr 2010 09:49:53 -0700
+Subject: [PATCH 02/14] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <4BDB0353.5090800@ti.com>
+References: <20100126200646.15382.52167.stgit@baageli.muru.com>
+	<20100126201239.15382.34792.stgit@baageli.muru.com>
+	<1272640022.3051.1534.camel@localhost> <4BDB0353.5090800@ti.com>
+Message-ID: <20100430164953.GD29604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-04-30 at 17:33 +0100, George G. Davis wrote:
+* Cyril Chemparathy <cyril@ti.com> [100430 09:22]:
 > Hi,
 > 
-> On Fri, Apr 23, 2010 at 03:40:58PM +0100, Russell King wrote:
-> > > Above change is necessary but what an alternative approach is for this.
-> > > There are many use case where ioremap* is needed.
-> >
-> > This is a very difficult issue to answer; the only way we can safely
-> > remap RAM with different attributes is if we disable the existing
-> > mappings - but since we create those with 1MB sections, that's far
-> > from easy to achieve.
-> >
-> > I think a viable safe solution is to set aside some RAM at boot (which
-> > the kernel doesn't manage at all) and then use ioremap on that; that
-> > approach will still work with this patch in place.
+> [...]
+> > To fix both problems, maybe we should just use a fixed memory location
+> > to pass this temporary data from uncompress to the kernel.  We've had a
+> > similar problem on DaVinci recently and a proposal has been made (and
+> > tested) to use memory just below the page tables[3].)
 > 
-> So cases such as the omapfb driver which use reserve_bootmem() (in
-> arch/arm/plat-omap/fb.c) and then later use ioremap_wc() to remap
-> reserved memory (in drivers/video/omap2/omapfb/omapfb-main.c)
-> will no longer work with this change.
+> Essentially both of these approaches (internal scratch register and
+> fixed address) implement a weird back-channel communication scheme
+> between the decompresser and the debug macros.
+> 
+> A more elegant solution may be as follows:
+>     - pass machine_arch_type as an argument into addruart.
+>     - move the uart base lookup logic to addruart using macros similar
+>       to DEBUG_LL_*, except that these expand to assembly code this
+>       time.
+>     - reuse these debug-macros in uncompress.h and implement putc() and
+>       flush() using addruart(), senduart(), etc.
+> 
+> This way, both the decompresser and the kernel debug macros end up using
+> machine_arch_type to get to the right debug uart, without resorting to
+> underhand back-channel tricks.
+> 
+> Any thoughts?
 
-Another solution would be to allow the unmapping of sections from the
-kernel linear mapping. I think x86 does this already for the AGP
-aperture.
+Sounds good to me. There's already the tmp register added to addruart
+that can be used for passing the machine id to addruart.
 
--- 
-Catalin
+Regards,
+
+Tony
