@@ -1,36 +1,50 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sat, 1 May 2010 14:21:10 +0200
-Subject: [PATCHv10 2.6.34-rc6 4/5] mxc: Add generic USB HW
-	initialization for MX51
-In-Reply-To: <1272660507-5917-4-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1272660507-5917-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1272660507-5917-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1272660507-5917-3-git-send-email-Dinh.Nguyen@freescale.com>
-	<1272660507-5917-4-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100501122110.GC30801@buzzloop.caiaq.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 1 May 2010 10:46:56 -0700
+Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for
+	other omaps
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
+References: <20100430202603.25812.41834.stgit@baageli.muru.com>
+	<20100430203359.25812.56284.stgit@baageli.muru.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
+Message-ID: <20100501174656.GN29604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 30, 2010 at 03:48:26PM -0500, Dinh.Nguyen at freescale.com wrote:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100430 23:13]:
+> Tony,
+> 
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> > bounces at lists.infradead.org] On Behalf Of Tony Lindgren
+> > Sent: Saturday, May 01, 2010 2:04 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-omap at vger.kernel.org
+> > Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
+> > 
+> > In multi-omap configuration all the initcalls run. To avoid
+> > bad things from happening with 44xx specific initcalls on
+> > other omaps, we need to check that the booted system is
+> > omap4 before running.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/board-4430sdp.c |    3 +++
+> >  1 files changed, 3 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> > index b88f28c..e603b00 100644
+> > --- a/arch/arm/mach-omap2/board-4430sdp.c
+> > +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> > @@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
+> >  	extern void omap_smc1(u32 fn, u32 arg);
+> >  	void __iomem *l2cache_base;
+> > 
+> > +	if (!cpu_is_omap44xx())
+> > +		return -ENODEV;
+> > +
+> 
+> This check is already present just 3 lines below.
 
-[...]
+Oops. Thanks for pointing that out, dropping this patch.
 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index ead59f4..544ccfd 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -199,8 +199,8 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
->  	mdelay(10);
->  
-> -	/* setup USBCONTROL. */
-> -	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
-> +	/* setup specific usb hw */
-> +	ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
->  	if (ret < 0)
->  		goto err_init;
-
-Ok - now we shouldn't have any possible regression.
-
-Thanks,
-Daniel
+Tony
