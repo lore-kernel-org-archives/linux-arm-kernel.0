@@ -1,54 +1,47 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 1 May 2010 11:48:13 +0530
-Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for
-	other omaps
-In-Reply-To: <20100430203359.25812.56284.stgit@baageli.muru.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-	<20100430203359.25812.56284.stgit@baageli.muru.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
+Date: Sat, 1 May 2010 11:54:55 +0530
+Subject: [RFC] Prohibit ioremap() on kernel managed RAM
+In-Reply-To: <1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
+References: <20100423144058.GA11637@ZenIV.linux.org.uk>
+	<20100430163356.GV2619@mvista.com>
+	<1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFF@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
 > -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Tony Lindgren
-> Sent: Saturday, May 01, 2010 2:04 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Friday, April 30, 2010 10:09 PM
+> To: George G. Davis
+> Cc: Russell King; Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC] Prohibit ioremap() on kernel managed RAM
 > 
-> In multi-omap configuration all the initcalls run. To avoid
-> bad things from happening with 44xx specific initcalls on
-> other omaps, we need to check that the booted system is
-> omap4 before running.
+> On Fri, 2010-04-30 at 17:33 +0100, George G. Davis wrote:
+> > Hi,
+> >
+> > On Fri, Apr 23, 2010 at 03:40:58PM +0100, Russell King wrote:
+> > > > Above change is necessary but what an alternative approach is for this.
+> > > > There are many use case where ioremap* is needed.
+> > >
+> > > This is a very difficult issue to answer; the only way we can safely
+> > > remap RAM with different attributes is if we disable the existing
+> > > mappings - but since we create those with 1MB sections, that's far
+> > > from easy to achieve.
+> > >
+> > > I think a viable safe solution is to set aside some RAM at boot (which
+> > > the kernel doesn't manage at all) and then use ioremap on that; that
+> > > approach will still work with this patch in place.
+> >
+> > So cases such as the omapfb driver which use reserve_bootmem() (in
+> > arch/arm/plat-omap/fb.c) and then later use ioremap_wc() to remap
+> > reserved memory (in drivers/video/omap2/omapfb/omapfb-main.c)
+> > will no longer work with this change.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/board-4430sdp.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index b88f28c..e603b00 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
->  	extern void omap_smc1(u32 fn, u32 arg);
->  	void __iomem *l2cache_base;
-> 
-> +	if (!cpu_is_omap44xx())
-> +		return -ENODEV;
-> +
+> Another solution would be to allow the unmapping of sections from the
+> kernel linear mapping. I think x86 does this already for the AGP
+> aperture.
+This seems to be good solution if it's doable. Reserving memory in the boot
+is not so flexible and might end up in waste of memory.
 
-This check is already present just 3 lines below.
-
->  	/* To avoid code running on other OMAPs in
->  	 * multi-omap builds
->  	 */
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Santosh
