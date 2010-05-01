@@ -1,47 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 May 2010 10:44:36 +0100
-Subject: [PATCH] ARM: Add support for 10 hardirq bits
-In-Reply-To: <u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
-References: <20100310111749.18521.9002.sendpatchset@t400s>
-	<u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
-Message-ID: <20100501094436.GC12172@n2100.arm.linux.org.uk>
+Date: Sat, 1 May 2010 10:19:43 +0100
+Subject: [RFC] Prohibit ioremap() on kernel managed RAM
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFF@dbde02.ent.ti.com>
+References: <20100423144058.GA11637@ZenIV.linux.org.uk>
+	<20100430163356.GV2619@mvista.com>
+	<1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFF@dbde02.ent.ti.com>
+Message-ID: <20100501091943.GA12172@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 30, 2010 at 01:02:04PM +0900, Magnus Damm wrote:
-> On Wed, Mar 10, 2010 at 8:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> >
-> > This patch adds support for 10 hardirq bits to
-> > the ARM architecture. Needed by the SH-Mobile
-> > ARM processor sh7372 that has more than 512 IRQs.
-> >
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
-> >
-> > ?arch/arm/include/asm/hardirq.h | ? ?4 +++-
-> > ?1 file changed, 3 insertions(+), 1 deletion(-)
-> >
-> > --- 0001/arch/arm/include/asm/hardirq.h
-> > +++ work/arch/arm/include/asm/hardirq.h 2010-03-09 21:08:10.000000000 +0900
-> > @@ -12,7 +12,9 @@ typedef struct {
-> >
-> > ?#include <linux/irq_cpustat.h> /* Standard mappings for irq_cpustat_t above */
-> >
-> > -#if NR_IRQS > 256
-> > +#if NR_IRQS > 512
-> > +#define HARDIRQ_BITS ? 10
-> > +#elif NR_IRQS > 256
-> > ?#define HARDIRQ_BITS ? 9
-> > ?#else
-> > ?#define HARDIRQ_BITS ? 8
-> >
-> 
-> Hi Russell,
-> 
-> Good to hear that you are back online. Do you want me to rework this
-> patch somehow, or is it ready to be queued for upstream merge? I'm
-> asking because I have a pile of patches that depend on this one.
+On Sat, May 01, 2010 at 11:54:55AM +0530, Shilimkar, Santosh wrote:
+> This seems to be good solution if it's doable. Reserving memory in the boot
+> is not so flexible and might end up in waste of memory.
 
-I guess it's ok; with 10 bits we're at the maximum which the generic
-kernel supports (see linux/hardirq.h)
+However, allocating large pages (larger than 4K) is unreliable due to
+fragmentation.  There's two factors here - the larger the allocation,
+and the longer the system has been running, the more likely such an
+allocation is to fail.
+
+Since we'd need to enforce a minimum allocation size of 1MB in order to
+unmap the direct mapping, we're asking for an order-8 page - and I think
+you'll find that'll be fairly unreliable if you want to keep allocating
+and freeing it.
+
+The DMA allocators can handle anything up to MAX_ORDER-order allocations
+provided it has enough virtual memory space available to it - so if you
+want to go down this route, you might as well switch to using that.
+(However, eventually the DMA allocator also needs fixing to avoid the
+dual-mappings that it creates.)
