@@ -1,104 +1,54 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  1 May 2010 06:54:36 +0200
-Subject: [PATCH] pxa/vpac270: Add OneNAND support
-Message-ID: <1272689676-20824-1-git-send-email-marek.vasut@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 1 May 2010 11:48:13 +0530
+Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for
+	other omaps
+In-Reply-To: <20100430203359.25812.56284.stgit@baageli.muru.com>
+References: <20100430202603.25812.41834.stgit@baageli.muru.com>
+	<20100430203359.25812.56284.stgit@baageli.muru.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/vpac270.c |   51 ++++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 48 insertions(+), 3 deletions(-)
+Tony,
 
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index a87bad5..8da22d4 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -21,6 +21,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/mtd/onenand.h>
- #include <linux/dm9000.h>
- #include <linux/ucb1400.h>
- #include <linux/ata_platform.h>
-@@ -149,7 +150,7 @@ static unsigned long vpac270_pin_config[] __initdata = {
-  * NOR Flash
-  ******************************************************************************/
- #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
--static struct mtd_partition vpac270_partitions[] = {
-+static struct mtd_partition vpac270_nor_partitions[] = {
- 	{
- 		.name		= "Flash",
- 		.offset		= 0x00000000,
-@@ -160,8 +161,8 @@ static struct mtd_partition vpac270_partitions[] = {
- static struct physmap_flash_data vpac270_flash_data[] = {
- 	{
- 		.width		= 2,	/* bankwidth in bytes */
--		.parts		= vpac270_partitions,
--		.nr_parts	= ARRAY_SIZE(vpac270_partitions)
-+		.parts		= vpac270_nor_partitions,
-+		.nr_parts	= ARRAY_SIZE(vpac270_nor_partitions)
- 	}
- };
- 
-@@ -189,6 +190,49 @@ static inline void vpac270_nor_init(void) {}
- #endif
- 
- /******************************************************************************
-+ * OneNAND Flash
-+ ******************************************************************************/
-+#if defined(CONFIG_MTD_ONENAND) || defined(CONFIG_MTD_ONENAND_MODULE)
-+static struct mtd_partition vpac270_onenand_partitions[] = {
-+	{
-+		.name		= "Flash",
-+		.offset		= 0x00000000,
-+		.size		= MTDPART_SIZ_FULL,
-+	}
-+};
-+
-+static struct onenand_platform_data vpac270_onenand_info = {
-+	.parts		= vpac270_onenand_partitions,
-+	.nr_parts	= ARRAY_SIZE(vpac270_onenand_partitions),
-+};
-+
-+static struct resource vpac270_onenand_resources[] = {
-+	[0] = {
-+		.start	= PXA_CS0_PHYS,
-+		.end	= PXA_CS0_PHYS + SZ_1M,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device vpac270_onenand = {
-+	.name		= "onenand-flash",
-+	.id		= -1,
-+	.resource	= vpac270_onenand_resources,
-+	.num_resources	= ARRAY_SIZE(vpac270_onenand_resources),
-+	.dev		= {
-+		.platform_data	= &vpac270_onenand_info,
-+	},
-+};
-+
-+static void __init vpac270_onenand_init(void)
-+{
-+	platform_device_register(&vpac270_onenand);
-+}
-+#else
-+static void __init vpac270_onenand_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * SD/MMC card controller
-  ******************************************************************************/
- #if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-@@ -549,6 +593,7 @@ static void __init vpac270_init(void)
- 	vpac270_lcd_init();
- 	vpac270_mmc_init();
- 	vpac270_nor_init();
-+	vpac270_onenand_init();
- 	vpac270_leds_init();
- 	vpac270_keys_init();
- 	vpac270_uhc_init();
--- 
-1.7.0
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Tony Lindgren
+> Sent: Saturday, May 01, 2010 2:04 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
+> 
+> In multi-omap configuration all the initcalls run. To avoid
+> bad things from happening with 44xx specific initcalls on
+> other omaps, we need to check that the booted system is
+> omap4 before running.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/board-4430sdp.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index b88f28c..e603b00 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
+>  	extern void omap_smc1(u32 fn, u32 arg);
+>  	void __iomem *l2cache_base;
+> 
+> +	if (!cpu_is_omap44xx())
+> +		return -ENODEV;
+> +
+
+This check is already present just 3 lines below.
+
+>  	/* To avoid code running on other OMAPs in
+>  	 * multi-omap builds
+>  	 */
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
