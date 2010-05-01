@@ -1,27 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 May 2010 10:20:48 +0100
-Subject: RMK back online - please resend anything requiring my attention
-In-Reply-To: <20100429175842.GA1254@oksana.dev.rtsoft.ru>
-References: <20100429135611.GD4877@n2100.arm.linux.org.uk>
-	<20100429175842.GA1254@oksana.dev.rtsoft.ru>
-Message-ID: <20100501092048.GB12172@n2100.arm.linux.org.uk>
+Date: Sat, 1 May 2010 10:44:36 +0100
+Subject: [PATCH] ARM: Add support for 10 hardirq bits
+In-Reply-To: <u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
+References: <20100310111749.18521.9002.sendpatchset@t400s>
+	<u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
+Message-ID: <20100501094436.GC12172@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 09:58:42PM +0400, Anton Vorontsov wrote:
-> Hello,
+On Fri, Apr 30, 2010 at 01:02:04PM +0900, Magnus Damm wrote:
+> On Wed, Mar 10, 2010 at 8:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> >
+> > This patch adds support for 10 hardirq bits to
+> > the ARM architecture. Needed by the SH-Mobile
+> > ARM processor sh7372 that has more than 512 IRQs.
+> >
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> >
+> > ?arch/arm/include/asm/hardirq.h | ? ?4 +++-
+> > ?1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > --- 0001/arch/arm/include/asm/hardirq.h
+> > +++ work/arch/arm/include/asm/hardirq.h 2010-03-09 21:08:10.000000000 +0900
+> > @@ -12,7 +12,9 @@ typedef struct {
+> >
+> > ?#include <linux/irq_cpustat.h> /* Standard mappings for irq_cpustat_t above */
+> >
+> > -#if NR_IRQS > 256
+> > +#if NR_IRQS > 512
+> > +#define HARDIRQ_BITS ? 10
+> > +#elif NR_IRQS > 256
+> > ?#define HARDIRQ_BITS ? 9
+> > ?#else
+> > ?#define HARDIRQ_BITS ? 8
+> >
 > 
-> On Thu, Apr 29, 2010 at 02:56:11PM +0100, Russell King - ARM Linux wrote:
-> > Right, I'm back online, however I'm told by dwmw2 that infradead.org has
-> > nothing pending for me.
-> > 
-> > I'm therefore going to assume that precisely nothing of any consequence
-> > or significance has been discussed on this mailing list during the
-> > preceding 7 days - if it has and you want a reply from me, you _will_
-> > have to re-send it.
+> Hi Russell,
 > 
-> Not exactly related to these network issues, but I actually
-> postponed the question until you back: will there be another
-> mach-types update (in the devel branch) before .34 release?
+> Good to hear that you are back online. Do you want me to rework this
+> patch somehow, or is it ready to be queued for upstream merge? I'm
+> asking because I have a pile of patches that depend on this one.
 
-Yes.
+I guess it's ok; with 10 bits we're at the maximum which the generic
+kernel supports (see linux/hardirq.h)
