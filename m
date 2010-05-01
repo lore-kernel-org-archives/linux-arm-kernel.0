@@ -1,47 +1,27 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 1 May 2010 11:54:55 +0530
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
-References: <20100423144058.GA11637@ZenIV.linux.org.uk>
-	<20100430163356.GV2619@mvista.com>
-	<1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFF@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 May 2010 10:20:48 +0100
+Subject: RMK back online - please resend anything requiring my attention
+In-Reply-To: <20100429175842.GA1254@oksana.dev.rtsoft.ru>
+References: <20100429135611.GD4877@n2100.arm.linux.org.uk>
+	<20100429175842.GA1254@oksana.dev.rtsoft.ru>
+Message-ID: <20100501092048.GB12172@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Friday, April 30, 2010 10:09 PM
-> To: George G. Davis
-> Cc: Russell King; Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] Prohibit ioremap() on kernel managed RAM
+On Thu, Apr 29, 2010 at 09:58:42PM +0400, Anton Vorontsov wrote:
+> Hello,
 > 
-> On Fri, 2010-04-30 at 17:33 +0100, George G. Davis wrote:
-> > Hi,
-> >
-> > On Fri, Apr 23, 2010 at 03:40:58PM +0100, Russell King wrote:
-> > > > Above change is necessary but what an alternative approach is for this.
-> > > > There are many use case where ioremap* is needed.
-> > >
-> > > This is a very difficult issue to answer; the only way we can safely
-> > > remap RAM with different attributes is if we disable the existing
-> > > mappings - but since we create those with 1MB sections, that's far
-> > > from easy to achieve.
-> > >
-> > > I think a viable safe solution is to set aside some RAM at boot (which
-> > > the kernel doesn't manage at all) and then use ioremap on that; that
-> > > approach will still work with this patch in place.
-> >
-> > So cases such as the omapfb driver which use reserve_bootmem() (in
-> > arch/arm/plat-omap/fb.c) and then later use ioremap_wc() to remap
-> > reserved memory (in drivers/video/omap2/omapfb/omapfb-main.c)
-> > will no longer work with this change.
+> On Thu, Apr 29, 2010 at 02:56:11PM +0100, Russell King - ARM Linux wrote:
+> > Right, I'm back online, however I'm told by dwmw2 that infradead.org has
+> > nothing pending for me.
+> > 
+> > I'm therefore going to assume that precisely nothing of any consequence
+> > or significance has been discussed on this mailing list during the
+> > preceding 7 days - if it has and you want a reply from me, you _will_
+> > have to re-send it.
 > 
-> Another solution would be to allow the unmapping of sections from the
-> kernel linear mapping. I think x86 does this already for the AGP
-> aperture.
-This seems to be good solution if it's doable. Reserving memory in the boot
-is not so flexible and might end up in waste of memory.
+> Not exactly related to these network issues, but I actually
+> postponed the question until you back: will there be another
+> mach-types update (in the devel branch) before .34 release?
 
-Regards,
-Santosh
+Yes.
