@@ -1,50 +1,150 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 1 May 2010 10:46:56 -0700
-Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for
-	other omaps
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-	<20100430203359.25812.56284.stgit@baageli.muru.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5217DFB@dbde02.ent.ti.com>
-Message-ID: <20100501174656.GN29604@atomide.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Sat, 1 May 2010 15:10:45 -0400
+Subject: [RFC PATCH] create generic alignment api (v5)
+In-Reply-To: <20100501183544.GC27062@shisha.kicks-ass.net>
+References: <20100328012247.GA17763@Krystal> <20100328154029.GA21061@localhost>
+	<20100329000900.GB27379@Krystal>
+	<20100501183544.GC27062@shisha.kicks-ass.net>
+Message-ID: <20100501191045.GA16710@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100430 23:13]:
-> Tony,
+* Alexander Shishkin (virtuoso at slind.org) wrote:
+> On Sun, Mar 28, 2010 at 08:09:00 -0400, Mathieu Desnoyers wrote:
+> > Rather than re-doing the "alignment on a type size" trick all over again at
+> > different levels, import the "ltt_align" from LTTng into kernel.h and make this
+> > available to everyone. Renaming to:
+> > 
+> > - object_align()
+> > - object_align_floor()
+> > - offset_align()
+> > - offset_align_floor()
 > 
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> > bounces at lists.infradead.org] On Behalf Of Tony Lindgren
-> > Sent: Saturday, May 01, 2010 2:04 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-omap at vger.kernel.org
-> > Subject: [PATCH 06/11] omap4: Fix omap_l2_cache_init not to run for other omaps
+> Do you plan to have this integrated to the mainline? I'd like to use one of
+> these in my next version of the __xchg patch. So, do you need any help or
+> feedback or whatnot with this one?
+
+Given that no one seems to oppose to this patch, I think I'll just re-submit it
+as-is for real this time.
+
+Thanks,
+
+Mathieu
+
+> 
+> > Changelog since v4:
+> > - add missing ( ) around parameters within object_align() and
+> >   object_align_floor().
+> > - More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
 > > 
-> > In multi-omap configuration all the initcalls run. To avoid
-> > bad things from happening with 44xx specific initcalls on
-> > other omaps, we need to check that the booted system is
-> > omap4 before running.
+> > Changelog since v3:
+> > - optimize object_align*() so fewer instructions are needed for alignment of
+> >   addresses known dynamically. Use the (already existing) "ALIGN()", and create
+> >   the "ALIGN_FLOOR()" macro.
+> > - While we are there, let's clean up the ALIGN() macros wrt coding style. e.g.
+> >   missing parenthesis around the first use of the "x" parameter in ALIGN().
 > > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Changelog since v2:
+> > - Fix object_align*(): should use object size alignment, not pointer alignment.
+> > 
+> > Changelog since v1:
+> > - Align on the object natural alignment
+> >     (rather than min(arch word alignment, natural alignment))
+> > 
+> > The advantage of separating the API in "object alignment" and "offset alignment"
+> > is that it gives more freedom to play with offset alignment. Very useful to
+> > implement a tracer ring-buffer alignment. (hint hint)
+> > 
+> > Typical users will use "object alignment", but infrastructures like tracers
+> > which need to perform alignment of statically known base+offsets will typically
+> > use "offset alignment", because it allows to align with respect to a base rather
+> > than to pass an absolute address.
+> > 
+> > We use "sizeof(object)" rather than "__alignof__()" object because alignof
+> > returns "recommended" object alignment for the architecture, which can be
+> > sub-optimal on some architectures. By ensuring alignment on the object size, we
+> > are sure to make the right choice.
+> > 
+> > Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+> > CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > Cc: Alexander Shishkin <virtuoso@slind.org>,
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: Imre Deak <imre.deak@nokia.com>
+> > CC: Jamie Lokier <jamie@shareable.org>
+> > CC: rostedt at goodmis.org
+> > CC: mingo at elte.hu
+> 
+> Acked-by: Alexander Shishkin <virtuoso@slind.org>
+> 
 > > ---
-> >  arch/arm/mach-omap2/board-4430sdp.c |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
+> >  include/linux/kernel.h |   45 +++++++++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 41 insertions(+), 4 deletions(-)
 > > 
-> > diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> > index b88f28c..e603b00 100644
-> > --- a/arch/arm/mach-omap2/board-4430sdp.c
-> > +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> > @@ -55,6 +55,9 @@ static int __init omap_l2_cache_init(void)
-> >  	extern void omap_smc1(u32 fn, u32 arg);
-> >  	void __iomem *l2cache_base;
-> > 
-> > +	if (!cpu_is_omap44xx())
-> > +		return -ENODEV;
+> > Index: linux-2.6-lttng/include/linux/kernel.h
+> > ===================================================================
+> > --- linux-2.6-lttng.orig/include/linux/kernel.h	2010-03-27 20:46:07.000000000 -0400
+> > +++ linux-2.6-lttng/include/linux/kernel.h	2010-03-28 20:06:27.000000000 -0400
+> > @@ -37,10 +37,47 @@ extern const char linux_proc_banner[];
+> >  
+> >  #define STACK_MAGIC	0xdeadbeef
+> >  
+> > -#define ALIGN(x,a)		__ALIGN_MASK(x,(typeof(x))(a)-1)
+> > -#define __ALIGN_MASK(x,mask)	(((x)+(mask))&~(mask))
+> > -#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+> > -#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
+> > +#define ALIGN(x, a)		__ALIGN_MASK((x), (typeof(x)) (a) - 1)
+> > +#define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+> > +#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), (a)))
+> > +#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK((x), (typeof(x)) (a) - 1)
+> > +#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
+> > +#define PTR_ALIGN_FLOOR(p, a) \
+> > +			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), (a)))
+> > +#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
 > > +
-> 
-> This check is already present just 3 lines below.
+> > +/*
+> > + * Align pointer on natural object alignment. Object size must be power of two.
+> > + */
+> > +#define object_align(obj)	PTR_ALIGN((obj), sizeof(*(obj)))
+> > +#define object_align_floor(obj)	PTR_ALIGN_FLOOR((obj), sizeof(*(obj)))
+> > +
+> > +/**
+> > + * offset_align - Calculate the offset needed to align an object on its natural
+> > + *                alignment towards higher addresses.
+> > + * @align_drift:  object offset from an "alignment"-aligned address.
+> > + * @alignment:    natural object alignment. Must be non-zero, power of 2.
+> > + *
+> > + * Returns the offset that must be added to align towards higher
+> > + * addresses.
+> > + */
+> > +static inline size_t offset_align(size_t align_drift, size_t alignment)
+> > +{
+> > +	return (alignment - align_drift) & (alignment - 1);
+> > +}
+> > +
+> > +/**
+> > + * offset_align_floor - Calculate the offset needed to align an object
+> > + *                      on its natural alignment towards lower addresses.
+> > + * @align_drift:  object offset from an "alignment"-aligned address.
+> > + * @alignment:    natural object alignment. Must be non-zero, power of 2.
+> > + *
+> > + * Returns the offset that must be substracted to align towards lower addresses.
+> > + */
+> > +static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
+> > +{
+> > +	return (align_drift - alignment) & (alignment - 1);
+> > +}
+> >  
+> >  #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+> >  
+> > 
+> > -- 
+> > Mathieu Desnoyers
+> > Operating System Efficiency R&D Consultant
+> > EfficiOS Inc.
+> > http://www.efficios.com
 
-Oops. Thanks for pointing that out, dropping this patch.
-
-Tony
+-- 
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
