@@ -1,31 +1,27 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Sat, 1 May 2010 17:45:50 -0700
-Subject: [PATCH 2/3] DMAENGINE: DMA40 logical channel fixes
-In-Reply-To: <1271481151-9589-1-git-send-email-linus.walleij@stericsson.com>
-References: <1271481151-9589-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <z2re9c3a7c21005011745te4a8de7fn16d26737c9fcd1af@mail.gmail.com>
+Date: Sat, 1 May 2010 17:48:01 -0700
+Subject: [PATCH 3/3] DMAENGINE: add PrimeCell generic DMA to PL022 v6
+In-Reply-To: <1271481165-9848-1-git-send-email-linus.walleij@stericsson.com>
+References: <1271481165-9848-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <h2te9c3a7c21005011748r234216a2o35c5a979e9e7f0ca@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 16, 2010 at 10:12 PM, Linus Walleij
 <linus.walleij@stericsson.com> wrote:
-> This fixes some small bugs relating to the handling of logical
-> channels in the DMA40 driver:
+> This extends the PL022 SSP/SPI driver with generic DMA engine
+> support using the PrimeCell DMA engine interface. Also fix up the
+> test code for the U300 platform.
 >
-> - Fix a bug when asking for paused status of a logical channel
-> ?would fail (bug found by Jonas Aaberg)
-> - Handle DMA channel request for logical channel 0 (bug found by
-> ?Marcin Mielczarczyk)
->
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Marcin Mielczarczyk <marcin.mielczarczyk@tieto.com>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 > Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 > ---
+> Changes from v5:
+> - Rebased on async_tx tree instead
 
-I appreciate the environmentally friendly aspect of combining two
-fixes into one patch :-).  But if there are two fixes with two
-changelogs can we have two patches?  Future developers looking to do
-reverts and bisects will appreciate the upfront effort.
+I just back-merged 2.6.34-rc4 into async-tx to pick up the
+gfp.h/slab.h conversion... prior to reading this patch.  Can I just
+use v5?
 
 --
 Dan
