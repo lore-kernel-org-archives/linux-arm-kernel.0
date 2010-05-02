@@ -1,27 +1,53 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 2 May 2010 13:58:12 +0200
-Subject: Versatile QEMU broken in -next
-In-Reply-To: <20100502100030.GA26601@debian>
-References: <r2r63386a3d1005011801v5ad139b9y5852700f0575544d@mail.gmail.com>
-	<20100502100030.GA26601@debian>
-Message-ID: <l2j63386a3d1005020458ta5e946bbke0ef56b9ed700ca2@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 2 May 2010 14:20:49 +0200
+Subject: [PATCH] arm: Fix .gitignore for boot/compressed folder
+In-Reply-To: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
+References: <1267113345-18426-1-git-send-email-saaguirre@ti.com>
+Message-ID: <20100502122049.GA5553@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/2 Rabin Vincent <rabin@rab.in>:
+On Thu, Feb 25, 2010 at 09:55:45AM -0600, Sergio Aguirre wrote:
+> This should complements changes done in:
+I think this should read "complement" only, that is, no 's' at the end.
+Other than that,
 
-> On Sun, May 02, 2010 at 03:01:48AM +0200, Linus Walleij wrote:
->> Notice: I have no Versatile board, so I cannot know
->> if it breaks on the actual hardware. I only know it
->> breaks in QEMU. I don't know why though.
->>
->> I guess these all work nicely on a real board, so
->> I suspect it's a case of "QEMU needs to emulate
->> better", no real bug on real hardware.
->
-> http://www.mail-archive.com/qemu-devel at nongnu.org/msg30785.html
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+>   commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
+>   Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+>   Date:   Fri Jan 8 14:42:43 2010 -0800
+> 
+>       arm: add support for LZO-compressed kernels
+> 
+> It missed to do the respective changes in '.gitignore' file.
+> 
+> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
+> ---
+>  arch/arm/boot/compressed/.gitignore |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+> index ab204db..bb984af 100644
+> --- a/arch/arm/boot/compressed/.gitignore
+> +++ b/arch/arm/boot/compressed/.gitignore
+> @@ -1,3 +1,5 @@
+>  font.c
+> -piggy.gz
+> +piggy.gzip
+> +piggy.lzo
+> +lib1funcs.S
+>  vmlinux.lds
+> -- 
+> 1.6.3.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Hey that's swift action Rabin, thanks a lot!
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
