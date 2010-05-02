@@ -1,74 +1,55 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 2 May 2010 02:21:13 +0200
-Subject: [PATCH 00/11] ARM: PrimeCell DMA Interface v5
-In-Reply-To: <20100501232823.GB17693@n2100.arm.linux.org.uk>
-References: <1270681920-4461-1-git-send-email-linus.walleij@stericsson.com>
-	<v2se9c3a7c21004071645u8180f4d7p3b4b1f96de11303e@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A03A50F78@EXDCVYMBSTM006.EQ1STM.local>
-	<t2qe9c3a7c21004141815x70ecf123p4364802681417da9@mail.gmail.com>
-	<q2o63386a3d1004162158v296379fat2b376d5c4c087378@mail.gmail.com>
-	<20100422110025.GC20008@n2100.arm.linux.org.uk>
-	<g2qe9c3a7c21005011500l11511d43i12d971775b139c3b@mail.gmail.com>
-	<20100501224429.GA17693@n2100.arm.linux.org.uk>
-	<x2u63386a3d1005011604kaee33364l880e90a4e2453e0f@mail.gmail.com>
-	<20100501232823.GB17693@n2100.arm.linux.org.uk>
-Message-ID: <r2u63386a3d1005011721v66d04172nc0e5163115006267@mail.gmail.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Sun, 2 May 2010 09:23:39 +0900
+Subject: [PATCH 1/7] PL330: Add common core driver\
+In-Reply-To: <j2he9c3a7c21005011401l7935e674k7a2cf67dfe51b165@mail.gmail.com>
+References: <1271834848-29179-1-git-send-email-jassisinghbrar@gmail.com>
+	<20100426045420.GH28105@trinity.fluff.org>
+	<o2m1b68c6791004252320j40360bc3x849eeeefe25fb49@mail.gmail.com>
+	<20100426070924.GH6684@trinity.fluff.org>
+	<j2he9c3a7c21005011401l7935e674k7a2cf67dfe51b165@mail.gmail.com>
+Message-ID: <p2u1b68c6791005011723g595c30abqe7236b3c4b4f07d9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
->> But the implementation of the DMA engine would be better of
->> handling the muxing dynamically I believe, so when the PL011
->> driver (say) requests a DMA channel, it doesn't mean it requests the
->> *physical* channel and holds it (unless the driver is very na?vely
->> implemented) it nominally means it reserves a placeholder in the
->> DMA engine.
+On Sun, May 2, 2010 at 6:01 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Mon, Apr 26, 2010 at 12:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+>> On Mon, Apr 26, 2010 at 03:20:59PM +0900, jassi brar wrote:
+>>> On Mon, Apr 26, 2010 at 1:54 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+>>> > On Wed, Apr 21, 2010 at 04:27:28PM +0900, jassisinghbrar at gmail.com wrote:
+>>> >> From: Jassi Brar <jassi.brar@samsung.com>
+>>> >> + * Mark a _pl330_req as free.
+>>> >> + * We do it by writing DMAEND as the first instruction
+>>> >> + * because no valid request is going to have DMAEND as
+>>> >> + * its first instruction to execute.
+>>> >> + */
+>>> >> +#define MARK_FREE(req) ? ? ? do { \
+>>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _emit_END(0, (req)->mc_cpu); \
+>>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (req)->mc_len = 0; \
+>>> >> + ? ? ? ? ? ? ? ? ? ? } while (0)
+>>> >
+>>> > I think inline functions for these would be easier to read.
+>>> you mean alignment that we see here? it's actually correctly
+>>> aligned in an editor.
+>>
+>> firstly, on the grounds it avoids the whole \
+>> and secondly on the grounds inline functions get checked by the compiler
+>> whether they're used or not.
 >
-> So what happens if we try to use DMA with the PL011 but the physical
-> channels are already in use? ?From what I can see, it assumes that it
-> always has access to the transmit channel, and there's no recovery if
-> it doesn't.
+> ...thirdly any macro that evaluates its arguments more than once is
+> potentially dangerous for cases like MARK_FREE(req++).
 >
-> Plus if we can't get DMA for the RX path, it _permanently_ disables
-> all DMA for the device.
-
-OK now I get it.. the point of crux is that you need the drivers to be
-coded to switch seamlessly back to interrupt mode and retry with
-DMA on next transaction nevertheless if possible.
-
-That is definately possible with the current API, so it's nothing blocking
-the stuff pending in Dan's tree.
-
-However when it comes to the PL011/PL180 drivers you got me there,
-it surely does assume you either have the channel and can use it
-or else there is some permanent error on it.
-
-I'll twist these patches around a bit, it shouldn't be too hard to come up
-with some convincing code.
-
-> Three physical channels shared between: AACI Tx, AACI Rx, MMCI 0, MMCI 1,
-> UART3 Tx, UART3 Rx.
-> (...)
-> All you need is to load both the AACI
-> and MMCI drivers, and if they want to use the DMA channels, you're
-> already wanting 4 channels with only 3 available.
-
-Yep, that's where it kicks in. (What's the name of this DMA controller
-BTW? Is that PL080?)
-
-(I read it as MMCI is bidirectional also on the Versatile, as it is
-on the U300.)
-
-However: this way of using the DMA dynamically instead of statically
-leads to the situation where a UART or two MMCs are using up the
-DMA channels and AACI cannot use it, and need to fall back to
-interrupts. Since the Audio traffic is likely to be more important, this
-is perhaps not so optimal, so a static assignment of DMA channels
-may be desired after all in a practical scenario.
-
-But I'll surely make a try to make all DMA allocation from the
-PrimeCells dynamic!
-
-Yours,
-Linus Walleij
+>>
+>> I belive any macro over a couple of lines is probably doing too much
+>> work.
+Well, the three points are valid and we might have even more against
+using macros _generally_. But just for the sake of clarification/learning..
+a) We do have many multi-line macros in the kernel
+b) The macro MARK_FREE does two independent things, where as a
+    function usually does a sequence of logical steps. The macro
+    MARK_FREE is clearly being used in our case.
+c) Since the driver uses exactly two requests and we always explicitly
+    free req[0] or req[1], I think we are in no danger of referencing invalid
+    memory here.
+Though having been asked by two maintainers, I will change it to
+inline func though.
+Thanks.
