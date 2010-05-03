@@ -1,27 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 May 2010 20:58:55 +0100
-Subject: [PATCH v3] arm: Fix .gitignore for boot/compressed folder
-In-Reply-To: <1272916286-7315-1-git-send-email-saaguirre@ti.com>
-References: <1272916286-7315-1-git-send-email-saaguirre@ti.com>
-Message-ID: <20100503195855.GA18647@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 May 2010 16:23:41 -0400 (EDT)
+Subject: [patch 0/2] Simtec kirkwood patches [resend]
+In-Reply-To: <20100429231253.465019575@fluff.org.uk>
+References: <20100429231253.465019575@fluff.org.uk>
+Message-ID: <alpine.LFD.2.00.1005031619090.14468@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 03, 2010 at 02:51:25PM -0500, Sergio Aguirre wrote:
-> This should complement changes done in:
-> 
->   commit e7db7b4270ed2a606b8c0b5f944a5f92ade0e84c
->   Author: Albin Tonnerre <albin.tonnerre@free-electrons.com>
->   Date:   Fri Jan 8 14:42:43 2010 -0800
-> 
->       arm: add support for LZO-compressed kernels
-> 
-> It missed to do the respective changes in '.gitignore' file.
-> 
-> Also, add vmlinux to the list, which is generated also during
-> the build.
-> 
-> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Thu, 29 Apr 2010, Ben Dooks wrote:
 
-Ok.
+> Simtec kirkwood patches, to the right list this time.
+
+Could you change the order of your patches so that the 
+kirkwood_nand_init_rnb is introduced last?
+
+This way your new machine support could be merged without depending on a 
+feature that is not yet merged through the MTD tree.
+
+
+Nicolas
