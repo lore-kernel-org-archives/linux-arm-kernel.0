@@ -1,105 +1,67 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon,  3 May 2010 14:41:11 -0700
-Subject: [PATCH 3/3] OMAP3: PM: Add milliseconds interface to suspend wakeup
-	timer
-In-Reply-To: <1272922871-18847-1-git-send-email-khilman@deeprootsystems.com>
-References: <1272922871-18847-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1272922871-18847-4-git-send-email-khilman@deeprootsystems.com>
+From: vikram.pandita@ti.com (Pandita, Vikram)
+Date: Tue, 4 May 2010 03:40:53 +0530
+Subject: [PATCH 02/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
+In-Reply-To: <20100501015050.GM29604@atomide.com>
+References: <20100430202603.25812.41834.stgit@baageli.muru.com>
+	<20100430203349.25812.64659.stgit@baageli.muru.com>
+	<87sk6cirt0.fsf@deeprootsystems.com>
+	<20100430210216.GI29604@atomide.com>
+	<87vdb8hc2d.fsf@deeprootsystems.com>
+	<FCCFB4CDC6E5564B9182F639FC3560870304E80F5F@dbde02.ent.ti.com>
+	<87y6g4d2ic.fsf@deeprootsystems.com>
+	<20100430233002.GJ29604@atomide.com>
+	<87sk6c8osn.fsf@deeprootsystems.com>
+	<20100501013751.GL29604@atomide.com>
+	<20100501015050.GM29604@atomide.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870304F5A672@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ari Kauppi <Ext-Ari.Kauppi@nokia.com>
 
-Millisecond resolution is possible and there are use cases for it
-(automatic testing).
 
-Seconds-based interface is preserved for compatibility.
+>-----Original Message-----
+>From: Tony Lindgren [mailto:tony at atomide.com]
+>Sent: Friday, April 30, 2010 8:51 PM
+>To: Kevin Hilman
+>Cc: Pandita, Vikram; linux-arm-kernel at lists.infradead.org; linux-
+>omap at vger.kernel.org; Pais, Allen
+>Subject: Re: [PATCH 02/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
+>
+>* Tony Lindgren <tony@atomide.com> [100430 18:33]:
+>>
+>> So far only tested on n900, will give it a try also on zoom3 after
+>> updating the zoom3 related patch.
+>
+>And here's the updated zoom debug_ll patch, seems to work.
 
-Signed-off-by: Ari Kauppi <Ext-Ari.Kauppi@nokia.com>
-Reviewed-by: Phil Carmody <ext-phil.2.carmody@nokia.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/pm-debug.c |    3 +++
- arch/arm/mach-omap2/pm.h       |    1 +
- arch/arm/mach-omap2/pm34xx.c   |   17 ++++++++++-------
- 3 files changed, 14 insertions(+), 7 deletions(-)
+For testing if I put this printk hack (the good old days patch), 
+Zoom3 does not boot after applying your patch.
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index c18f7f2..a895468 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -547,6 +547,9 @@ static int option_set(void *data, u64 val)
- {
- 	u32 *option = data;
- 
-+	if (option == &wakeup_timer_milliseconds && val >= 1000)
-+		return -EINVAL;
-+
- 	*option = val;
- 
- 	if (option == &enable_off_mode)
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index bd6466a..3de6ece 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -43,6 +43,7 @@ extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
- extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
- 
- extern u32 wakeup_timer_seconds;
-+extern u32 wakeup_timer_milliseconds;
- extern struct omap_dm_timer *gptimer_wakeup;
- 
- #ifdef CONFIG_PM_DEBUG
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index c38016b..ea13d3a 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -57,6 +57,7 @@
- u32 enable_off_mode;
- u32 sleep_while_idle;
- u32 wakeup_timer_seconds;
-+u32 wakeup_timer_milliseconds;
- 
- struct power_state {
- 	struct powerdomain *pwrdm;
-@@ -554,20 +555,21 @@ out:
- #ifdef CONFIG_SUSPEND
- static suspend_state_t suspend_state;
- 
--static void omap2_pm_wakeup_on_timer(u32 seconds)
-+static void omap2_pm_wakeup_on_timer(u32 seconds, u32 milliseconds)
- {
- 	u32 tick_rate, cycles;
- 
--	if (!seconds)
-+	if (!seconds && !milliseconds)
- 		return;
- 
- 	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gptimer_wakeup));
--	cycles = tick_rate * seconds;
-+	cycles = tick_rate * seconds + tick_rate * milliseconds / 1000;
- 	omap_dm_timer_stop(gptimer_wakeup);
- 	omap_dm_timer_set_load_start(gptimer_wakeup, 0, 0xffffffff - cycles);
- 
--	pr_info("PM: Resume timer in %d secs (%d ticks at %d ticks/sec.)\n",
--		seconds, cycles, tick_rate);
-+	pr_info("PM: Resume timer in %u.%03u secs"
-+		" (%d ticks at %d ticks/sec.)\n",
-+		seconds, milliseconds, cycles, tick_rate);
- }
- 
- static int omap3_pm_prepare(void)
-@@ -581,8 +583,9 @@ static int omap3_pm_suspend(void)
- 	struct power_state *pwrst;
- 	int state, ret = 0;
- 
--	if (wakeup_timer_seconds)
--		omap2_pm_wakeup_on_timer(wakeup_timer_seconds);
-+	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
-+		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
-+					 wakeup_timer_milliseconds);
- 
- 	/* Read current next_pwrsts */
- 	list_for_each_entry(pwrst, &pwrst_list, node)
--- 
-1.7.0.2
+So looks like we are still missing something for zoom2/3 to work.
+Can debug tomorrow.
+
+>
+>> --- a/arch/arm/plat-omap/include/plat/uncompress.h
+>> +++ b/arch/arm/plat-omap/include/plat/uncompress.h
+>> @@ -20,27 +20,22 @@
+>>  #include <linux/types.h>
+>>  #include <linux/serial_reg.h>
+>>
+>> +#include <asm/memory.h>
+>> +#include <asm/io.h>
+>>  #include <asm/mach-types.h>
+>>
+>>  #include <plat/serial.h>
+>
+>BTW, the include of asm/io.h is not needed, I'll remove that.
+>
+>Regards,
+>
+>Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: printk-dbg.patch
+Type: application/octet-stream
+Size: 570 bytes
+Desc: printk-dbg.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100504/5065861b/attachment.obj>
