@@ -1,181 +1,141 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 3 May 2010 12:00:32 -0500
-Subject: [spi-devel-general] [PATCH v6 1/2] spi: implemented driver for
-	Cirrus EP93xx SPI controller
-In-Reply-To: <h2r63386a3d1005021718k31125e4fz43a08025997b5c5c@mail.gmail.com>
-References: <cover.1272805161.git.mika.westerberg@iki.fi>
-	<0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
-	<h2r63386a3d1005021718k31125e4fz43a08025997b5c5c@mail.gmail.com>
-Message-ID: <0D753D10438DA54287A00B0270842697636E9BA5D3@AUSP01VMBX24.collaborationhost.net>
+From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
+Date: Mon, 3 May 2010 13:27:55 -0400
+Subject: [PATCH 2/2] [RFCv3] arm: add half-word __xchg
+In-Reply-To: <1272741897-30369-1-git-send-email-virtuoso@slind.org>
+References: <1272741800-30115-1-git-send-email-virtuoso@slind.org>
+	<1272741897-30369-1-git-send-email-virtuoso@slind.org>
+Message-ID: <20100503172755.GA4248@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, May 02, 2010 5:19 PM, Linus Walleij wrote:
-> 2010/5/2 Mika Westerberg <mika.westerberg@iki.fi>:
->> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
->> in EP93xx chips.
->(...)
->> +#define SSPCR0 ? ? ? ? ? ? ? ? 0x0000
->> +#define SSPCR0_MODE_SHIFT ? ? ?6
->> +#define SSPCR0_SCR_SHIFT ? ? ? 8
->> +
->> +#define SSPCR1 ? ? ? ? ? ? ? ? 0x0004
->> +#define SSPCR1_RIE ? ? ? ? ? ? BIT(0)
->> +#define SSPCR1_TIE ? ? ? ? ? ? BIT(1)
->> +#define SSPCR1_RORIE ? ? ? ? ? BIT(2)
->> +#define SSPCR1_LBM ? ? ? ? ? ? BIT(3)
->> +#define SSPCR1_SSE ? ? ? ? ? ? BIT(4)
->> +#define SSPCR1_MS ? ? ? ? ? ? ?BIT(5)
->> +#define SSPCR1_SOD ? ? ? ? ? ? BIT(6)
->> +
->> +#define SSPDR ? ? ? ? ? ? ? ? ?0x0008
->> +
->> +#define SSPSR ? ? ? ? ? ? ? ? ?0x000c
->> +#define SSPSR_TFE ? ? ? ? ? ? ?BIT(0)
->> +#define SSPSR_TNF ? ? ? ? ? ? ?BIT(1)
->> +#define SSPSR_RNE ? ? ? ? ? ? ?BIT(2)
->> +#define SSPSR_RFF ? ? ? ? ? ? ?BIT(3)
->> +#define SSPSR_BSY ? ? ? ? ? ? ?BIT(4)
->> +#define SSPCPSR ? ? ? ? ? ? ? ? ? ? ? ?0x0010
->> +
->> +#define SSPIIR ? ? ? ? ? ? ? ? 0x0014
->> +#define SSPIIR_RIS ? ? ? ? ? ? BIT(0)
->> +#define SSPIIR_TIS ? ? ? ? ? ? BIT(1)
->> +#define SSPIIR_RORIS ? ? ? ? ? BIT(2)
->> +#define SSPICR ? ? ? ? ? ? ? ? SSPIIR
->
-> When I look at this it's quite obvious that this is the same hardware or very
-> close (maybe a redux version) of the thing supported by
-> drivers/spi/amba-pl022.c.
->
-> What is the difference really? I suspect this is a PL022 PrimeCell straight off.
-> Even the CPSR algorithm is the same, just written differently.
->
-> Can you make a hexdump of the PrimeCell ID registers at offset
-> base+0xffe0..0xffff and post the contents?
+* Alexander Shishkin (virtuoso at slind.org) wrote:
+> On systems where ldrexh/strexh are not available,
+>   * for pre-v6 systems, use a generic local version,
+>   * for v6 without v6K, emulate xchg2 using 32-bit cmpxchg()
+>     (it is not yet clear if xchg1 has to be emulated on such
+>     systems as well, thus the "size" parameter).
+> 
+> The __xchg_generic() function is based on the code that Jamie
+> posted earlier.
+> 
+> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+> CC: linux-arm-kernel-bounces at lists.infradead.org
+> CC: Imre Deak <imre.deak@nokia.com>
+> CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
+> CC: Jamie Lokier <jamie@shareable.org>
+> ---
+>  arch/arm/include/asm/system.h |   56 +++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 56 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index d65b2f5..7a5983f 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -218,6 +218,39 @@ do {									\
+>  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+>  } while (0)
+>  
+> +#if __LINUX_ARM_ARCH__ >= 6
+> +
+> +#include <linux/align.h>
+> +
+> +static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+> +				      unsigned long new, int size);
+> +
+> +/*
+> + * emulate __xchg() using 32-bit __cmpxchg()
+> + */
+> +static inline unsigned long __xchg_generic(unsigned long x,
+> +						 volatile void *ptr, int size)
+> +{
+> +	unsigned long *ptrbig = object_align_floor((unsigned long *)ptr);
 
-Linus,
+ptrbig could be renamed to something more relevant. Maybe ptralign ?
 
-As Mika already pointed out, the ep93xx ssp peripheral does not have a valid
-PeripheralID or PrimeCellID to identify it as an AMBA PL022 peripheral.
+> +	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
 
-It probably was originally based on the PL022 but I think Cirrus hacked it
-enough that the generic amba-pl022 driver will not work with it, at least
-without a number of ugly #ifdef hacks.
+"unsigned int" everywhere above would be cleaner. Also, it's worth
+checking the generated assembly: does gcc perform the transformation:
 
-Or, I could be wrong.  It appears the amba-pl022 driver doesn't actually match
-the ARM spec for the PL022.
+  * 8   ->   << 3    automatically ?
 
-#define SSP_CR0(r)	(r + 0x000)
+> +	unsigned long mask, add, ret;
+> +
+> +	mask = ~(((1 << (size * 8)) - 1) << shift);
 
-/*
- * SSP Control Register 0  - SSP_CR0
- */
-#define SSP_CR0_MASK_DSS	(0x1FUL << 0)
-#define SSP_CR0_MASK_HALFDUP	(0x1UL << 5)
-#define SSP_CR0_MASK_SPO	(0x1UL << 6)
-#define SSP_CR0_MASK_SPH	(0x1UL << 7)
-#define SSP_CR0_MASK_SCR	(0xFFUL << 8)
-#define SSP_CR0_MASK_CSS	(0x1FUL << 16)
-#define SSP_CR0_MASK_FRF	(0x3UL << 21)
+Maybe better to do:
 
-The spec says that the DSS bits are only bits 3:0 (16-bit transfers), the
-driver has them as bits 4:0 (32-bit transfers).
-HALFDUP is not listed in the spec, and FRF is listed as bits 5:4.
-CSS is not listed in the spec.
++	mask = ~((((1UL << 3) << size) - 1) << shift);
 
-The PL022 spec actually matches the EP93xx usage.
+But, other question: what assumptions are you doing about endianness
+here ? I recall that ARM supports switchable endianness. Dunno about the
+Linux-specific case though.
 
-#define SSP_CR1(r)	(r + 0x004)
+Thanks,
 
-/*
- * SSP Control Register 0  - SSP_CR1
- */
-#define SSP_CR1_MASK_LBM	(0x1UL << 0)
-#define SSP_CR1_MASK_SSE	(0x1UL << 1)
-#define SSP_CR1_MASK_MS		(0x1UL << 2)
-#define SSP_CR1_MASK_SOD	(0x1UL << 3)
-#define SSP_CR1_MASK_RENDN	(0x1UL << 4)
-#define SSP_CR1_MASK_TENDN	(0x1UL << 5)
-#define SSP_CR1_MASK_MWAIT	(0x1UL << 6)
-#define SSP_CR1_MASK_RXIFLSEL	(0x7UL << 7)
-#define SSP_CR1_MASK_TXIFLSEL	(0x7UL << 10)
+Mathieu
 
-Bits 15:4 are listed as reserved in the spec, bits 3:0 match the spec. 
-The EP93xx usage of this register is different.
+> +	add = x << shift;
+> +
+> +	ret = *ptrbig;
+> +	while (1) {
+> +		unsigned long tmp = __cmpxchg(ptrbig, ret, (ret & mask) | add,
+> +					      4);
+> +		if (tmp == ret)
+> +			break;
+> +		ret = tmp;
+> +	}
+> +
+> +	return ret;
+> +}
+> +#endif
+> +
+>  #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
+>  /*
+>   * On the StrongARM, "swp" is terminally broken since it bypasses the
+> @@ -262,6 +295,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +#ifdef CONFIG_CPU_32v6K
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+> +#else
+> +	case 2:
+> +		ret = __xchg_generic(x, ptr, 2);
+> +		break;
+> +#endif
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
+> @@ -283,6 +332,13 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  		raw_local_irq_restore(flags);
+>  		break;
+>  
+> +	case 2:
+> +		raw_local_irq_save(flags);
+> +		ret = *(volatile unsigned short *)ptr;
+> +		*(volatile unsigned short *)ptr = x;
+> +		raw_local_irq_restore(flags);
+> +		break;
+> +
+>  	case 4:
+>  		raw_local_irq_save(flags);
+>  		ret = *(volatile unsigned long *)ptr;
+> -- 
+> 1.7.1.1.g15764
+> 
 
-0  RIE    Receive FIFO interrupt enable
-1  TIE    Transmit FIFO interrupt enable
-2  RORIE  Receive FIFO overrun interrupt enable
-3  LBM    Loop back mode
-4  SSE    Synchronous serial port enable
-5  MS     Master / Slave mode select
-6  SOD    Slave-mode output disable
-
-#define SSP_DR(r)	(r + 0x008)
-
-/*
- * SSP Data Register - SSP_DR
- */
-#define SSP_DR_MASK_DATA	0xFFFFFFFF
-
-The PL022 spec only shows the peripheral as supporting up to 16-bit transfers.
-This is the limit for the EP93xx also but the amba-pl022 driver actually supports
-up to 32-bit transfers.
-
-#define SSP_SR(r)	(r + 0x00C)
-
-/*
- * SSP Status Register - SSP_SR
- */
-#define SSP_SR_MASK_TFE		(0x1UL << 0) /* Transmit FIFO empty */
-#define SSP_SR_MASK_TNF		(0x1UL << 1) /* Transmit FIFO not full */
-#define SSP_SR_MASK_RNE		(0x1UL << 2) /* Receive FIFO not empty */
-#define SSP_SR_MASK_RFF 	(0x1UL << 3) /* Receive FIFO full */
-#define SSP_SR_MASK_BSY		(0x1UL << 4) /* Busy Flag */
-
-#define SSP_CPSR(r)	(r + 0x010)
-
-/*
- * SSP Clock Prescale Register  - SSP_CPSR
- */
-#define SSP_CPSR_MASK_CPSDVSR	(0xFFUL << 0)
-
-These match the spec and the EP93xx usage.
-
-#define SSP_IMSC(r)	(r + 0x014)
-
-/*
- * SSP Interrupt Mask Set/Clear Register - SSP_IMSC
- */
-#define SSP_IMSC_MASK_RORIM (0x1UL << 0) /* Receive Overrun Interrupt mask */
-#define SSP_IMSC_MASK_RTIM  (0x1UL << 1) /* Receive timeout Interrupt mask */
-#define SSP_IMSC_MASK_RXIM  (0x1UL << 2) /* Receive FIFO Interrupt mask */
-#define SSP_IMSC_MASK_TXIM  (0x1UL << 3) /* Transmit FIFO Interrupt mask */
-
-In the EP93xx this register is called SSPIIR / SSPICR.  It is the interrupt
-status register for reads and the interrupt clear register for writes.  For
-reads it is defined as:
-
-0  RIS    SSP Receive FIFO service request
-1  TIS    SSP Transmit FIFO service request
-2  RORIS  SSP Receive FIFO overrun interrupt status
-
-For writes, any value written clears the RORIS bit.
-
-The other registers listed for the amba-pl022 do not exist in the EP93xx
-implementation.
-
-The biggest problem I can see trying to use the amba-pl022 with the ep93xx
-are the missing Peripheral ID and PrimeCell ID registers.  The AMBA bus driver
-will not be able to match the driver to the device.
-
-Beyond that, once the amba-pl022 driver supports DMA transfers the implementation
-needed for the EP93xx will be completely different.
-
-I think it's best to leave these as separate drivers.  Cirrus has stopped
-development of their ARM processors so we have no hope of ever getting a full
-pl022 compatible version.
-
-Regards,
-Hartley
+-- 
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
