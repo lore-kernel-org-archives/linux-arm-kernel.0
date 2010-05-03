@@ -1,29 +1,24 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Sun, 02 May 2010 07:56:10 -0700
-Subject: [PATCH] arm/mach-msm: Add CONFIG conditional for board-trout
-In-Reply-To: <20100501101442.GH12172@n2100.arm.linux.org.uk>
-References: <201004290241.23068.PeterHuewe@gmx.de>
-	<20100501101442.GH12172@n2100.arm.linux.org.uk>
-Message-ID: <1272812170.23015.1.camel@desktop>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon,  3 May 2010 02:54:20 +0200
+Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+Message-ID: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-05-01 at 11:14 +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 29, 2010 at 02:41:22AM +0200, Peter Huewe wrote:
-> > From: Peter Huewe <peterhuewe@gmx.de>
-> > 
-> > This patch adds a conditional for CONFIG_MSM_DEBUG_UART to prevent a
-> > build failure[1], this is done the same way as for every board in mach-msm.
-> > 
-> > References:
-> > [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2448102/
-> > 
-> > Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Who's going to deal with getting this patch upstream?
+This patch set intended for Dan Williams tree includes:
 
-I am .. I have a similar patch in my next tree already.
+- A fixed up COH 901 318 PrimeCell extension (unless applied
+  to your tree already)
+- Two DMA40 bug fixes.
+- The latest iteration of the PrimeCell DMA extensions,
+  altered and tested to work as Russell wants them. The PL011
+  driver was tested:
+  - on Versatile QEMU after I got it working again - OK
+  - on U300 with DMA - OK
+  - on U300 without DMA - OK
+  - on U300 with fault injection, DMA always fail - OK
+  - on U300 with fault injection, DMA fails every second time - OK
+- Russell is this OK with you now?
 
-Daniel
+Yours,
+Linus Walleij
