@@ -1,57 +1,37 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 03 May 2010 12:13:16 -0700
-Subject: [GIT PULL] generic arm for MSM try 3
-In-Reply-To: <20100503104431.GA29919@n2100.arm.linux.org.uk>
-References: <1271787537.1986.10.camel@m0nster>
-	<1272323880.32741.7.camel@c-dwalke-linux.qualcomm.com>
-	<20100503104431.GA29919@n2100.arm.linux.org.uk>
-Message-ID: <1272913996.16935.50.camel@c-dwalke-linux.qualcomm.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 3 May 2010 22:15:16 +0300
+Subject: [PATCH v6 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <0D753D10438DA54287A00B0270842697636EADDB8E@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1272805161.git.mika.westerberg@iki.fi>
+	<0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636EADDB8E@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100503191516.GP26418@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-03 at 11:44 +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 26, 2010 at 04:18:00PM -0700, Daniel Walker wrote:
-> > On Tue, 2010-04-20 at 11:18 -0700, Daniel Walker wrote:
-> > > I dropped the copyright and rebased, but everything else is the same as
-> > > the prior pull request.
-> > > 
-> > > The following changes since commit 27ee8963708185b96bc84a149eb5336a249a7497:
-> > >   Linus Torvalds (1):
-> > >         Merge branch 'urgent' of git://git.kernel.org/.../brodo/pcmcia-2.6
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
-> > 
-> > Did I get this one wrong somehow, or are you not accepting pull requests
-> > right now?
+On Mon, May 03, 2010 at 01:45:01PM -0500, H Hartley Sweeten wrote:
+(...)
 > 
-> No.  In case you didn't notice, I've been offline from 22nd to 29th April
-> caused by BT planned engineering works going wrong.  However, I'm back
-> online for the time being using alternative arrangements, and I still
-> regard my 'net connection to be 'at risk'.
-
-Yeah, I noticed that after I sent this originally. It too bad about your
-BT troubles. I hope that get squared away soon.
-
-> Could you please tell me what is different in this pull request compared
-> to try 2?  I'm asking because it appears your tree is identical to try 2,
-> in spite of:
+> Overall this looks good.
 > 
-> On Tue, Mar 30, 2010 at 03:59:53PM -0700, Daniel Walker wrote:
-> > On Sun, 2010-03-28 at 22:49 +0100, Russell King - ARM Linux wrote:
-> > > Well, I don't think it's fair on those who created abort-ev7.S to go
-> > > throwing a boilerplate copyright on the file which makes it look like
-> > > "Code Aurora Forum." wrote the entire thing.
-> >
-> > Ok, I updated the same branch .. It's minus the copyright and license ,
-> > and I rebased it onto a more recent linus tree ..
+> For the modified chip select support, you have my:
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> 
+> For the ep93xx driver in general, you have my:
+> 
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> 
+> This driver should probably go through the spi tree.  You will need Grant Likely
+> to Ack this and pick it up.
 
-Yes, I must have mistakenly dropped the "-f" from the push. I did
-another rebase, and "push -f" just now. It should be as advertised
-above. The same as the original pull requests only with out the
-copyright.
+Thanks Hartley!
 
-Sorry for all the attempts ..
+I will incorporate your latest comments and submit v7.
 
-Daniel
+Grant: do you have any comments on this? Is it ok for you to cycle
+this through your spi tree?
+
+Thanks,
+MW
