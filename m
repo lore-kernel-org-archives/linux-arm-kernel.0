@@ -1,27 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 May 2010 23:34:24 +0100
-Subject: [at91] Save power by disabling the processor clock when CPU is
-	idle
-In-Reply-To: <j2ncd73a99e1005021310w1c6471et6c58ffce68a4137b@mail.gmail.com>
-References: <1271156732l.25331l.7l@i-dmzi_al.realan.de>
-	<j2ncd73a99e1005021310w1c6471et6c58ffce68a4137b@mail.gmail.com>
-Message-ID: <20100502223424.GA11466@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 3 May 2010 02:18:44 +0200
+Subject: [spi-devel-general] [PATCH v6 1/2] spi: implemented driver for
+	Cirrus EP93xx SPI controller
+In-Reply-To: <0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
+References: <cover.1272805161.git.mika.westerberg@iki.fi>
+	<0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
+Message-ID: <h2r63386a3d1005021718k31125e4fz43a08025997b5c5c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 02, 2010 at 10:10:29PM +0200, avictor.za at gmail.com wrote:
-> > Disable the processor clock when the CPU is idle.
-> >
-> > This saves much more power than merely entering 'Wait for Interrupt' mode.
-> > Since JTAG-debugging doesn't work when the processor clock is switched off,
-> > make it conditional on CONFIG_DEBUG_KERNEL.
-> >
-> > Signed-off-by: Anders Larsen <al@alarsen.net>
-> > Cc: Andrew Victor <avictor.za@gmail.com>
-> 
-> Acked-by: Andrew Victor <linux@maxim.org.za>
-> 
-> Russell:  It is patch 6053/1 in the patch-system.
+2010/5/2 Mika Westerberg <mika.westerberg@iki.fi>:
 
-Ok, thanks.  Where do we stand wrt the other two patches (5966/1 and
-5967/1) ?
+> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+> in EP93xx chips.
+(...)
+> +#define SSPCR0 ? ? ? ? ? ? ? ? 0x0000
+> +#define SSPCR0_MODE_SHIFT ? ? ?6
+> +#define SSPCR0_SCR_SHIFT ? ? ? 8
+> +
+> +#define SSPCR1 ? ? ? ? ? ? ? ? 0x0004
+> +#define SSPCR1_RIE ? ? ? ? ? ? BIT(0)
+> +#define SSPCR1_TIE ? ? ? ? ? ? BIT(1)
+> +#define SSPCR1_RORIE ? ? ? ? ? BIT(2)
+> +#define SSPCR1_LBM ? ? ? ? ? ? BIT(3)
+> +#define SSPCR1_SSE ? ? ? ? ? ? BIT(4)
+> +#define SSPCR1_MS ? ? ? ? ? ? ?BIT(5)
+> +#define SSPCR1_SOD ? ? ? ? ? ? BIT(6)
+> +
+> +#define SSPDR ? ? ? ? ? ? ? ? ?0x0008
+> +
+> +#define SSPSR ? ? ? ? ? ? ? ? ?0x000c
+> +#define SSPSR_TFE ? ? ? ? ? ? ?BIT(0)
+> +#define SSPSR_TNF ? ? ? ? ? ? ?BIT(1)
+> +#define SSPSR_RNE ? ? ? ? ? ? ?BIT(2)
+> +#define SSPSR_RFF ? ? ? ? ? ? ?BIT(3)
+> +#define SSPSR_BSY ? ? ? ? ? ? ?BIT(4)
+> +#define SSPCPSR ? ? ? ? ? ? ? ? ? ? ? ?0x0010
+> +
+> +#define SSPIIR ? ? ? ? ? ? ? ? 0x0014
+> +#define SSPIIR_RIS ? ? ? ? ? ? BIT(0)
+> +#define SSPIIR_TIS ? ? ? ? ? ? BIT(1)
+> +#define SSPIIR_RORIS ? ? ? ? ? BIT(2)
+> +#define SSPICR ? ? ? ? ? ? ? ? SSPIIR
+
+When I look at this it's quite obvious that this is the same hardware or very
+close (maybe a redux version) of the thing supported by
+drivers/spi/amba-pl022.c.
+
+What is the difference really? I suspect this is a PL022 PrimeCell straight off.
+Even the CPSR algorithm is the same, just written differently.
+
+Can you make a hexdump of the PrimeCell ID registers at offset
+base+0xffe0..0xffff and post the contents?
+
+Yours,
+Linus Walleij
