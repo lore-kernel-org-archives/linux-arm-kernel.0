@@ -1,50 +1,102 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 3 May 2010 15:18:09 +0200
-Subject: [spi-devel-general] [PATCH v6 1/2] spi: implemented driver for
-	Cirrus EP93xx SPI controller
-In-Reply-To: <20100503042123.GM26418@gw.healthdatacare.com>
-References: <cover.1272805161.git.mika.westerberg@iki.fi>
-	<0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
-	<h2r63386a3d1005021718k31125e4fz43a08025997b5c5c@mail.gmail.com>
-	<20100503042123.GM26418@gw.healthdatacare.com>
-Message-ID: <o2l63386a3d1005030618q1914e04x471ce544c6be82dc@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 3 May 2010 15:21:00 +0200
+Subject: [PATCHv10 2.6.34-rc6 1/5] mxc: Update GPIO for USB support on
+	Freescale MX51 Babbage HW
+In-Reply-To: <1272660507-5917-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1272660507-5917-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100503132100.GD31199@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/3 Mika Westerberg <mika.westerberg@iki.fi>:
+Series applied to mxc-master
 
-> Yeah. It looks pretty similar. Although there seems to be differences. Documentation
-> of the controller can be found in:
->
-> ? ? ? ?http://www.cirrus.com/en/pubs/manual/EP93xx_Users_Guide_UM1.pdf
->
-> It does not mention anything about AMBA PL022.
+Sascha
 
-They have surely based the hardware on the PL022. A diff document would
-surely be useful, can Cirrus answer that kind of questions for you?
+On Fri, Apr 30, 2010 at 03:48:23PM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> This patch is part of enabling USB for Freescale MX51 Babbage HW. This
+> patch updates the iomux pins for USB, and gpio line for reset the
+> USB hub on the MX51 Babbage HW.
+> 
+> This patch applies to 2.6.34-rc6.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   33 ++++++++++++++++----------
+>  1 files changed, 20 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> index b4f975e..80528cc 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc.
+>   *
+>   * The code contained herein is licensed under the GNU General Public
+>   * License. You may obtain a copy of the GNU General Public License
+> @@ -37,6 +38,11 @@ typedef enum iomux_config {
+>  				PAD_CTL_SRE_FAST)
+>  #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+>  				PAD_CTL_SRE_FAST)
+> +#define MX51_USBH1_PAD_CTRL	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
+> +				PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
+> +				PAD_CTL_PKE | PAD_CTL_HYS)
+> +#define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
+> +				PAD_CTL_SRE_FAST)
+>  
+>  /*
+>   * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+> @@ -208,18 +214,19 @@ typedef enum iomux_config {
+>  #define MX51_PAD_KEY_COL3__KEY_COL3	IOMUX_PAD(0x658, 0x268, 0, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_KEY_COL4__KEY_COL4	IOMUX_PAD(0x65C, 0x26C, 0, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_KEY_COL5__KEY_COL5	IOMUX_PAD(0x660, 0x270, 0, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_25__USBH1_CLK	IOMUX_PAD(0x678, 0x278, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_26__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_27__USBH1_STP	IOMUX_PAD(0x680, 0x280, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_28__USBH1_NXT	IOMUX_PAD(0x684, 0x284, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_11__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_12__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_13__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_14__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_15__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_16__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_17__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, 2, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_18__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, 2, 0x0, 0, NO_PAD_CTRL)
+> +#define MX51_PAD_USBH1_CLK__USBH1_CLK	IOMUX_PAD(0x678, 0x278, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DIR__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_STP__USBH1_STP	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_STP__GPIO_1_27	IOMUX_PAD(0x680, 0x280, IOMUX_CONFIG_GPIO, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_NXT__USBH1_NXT	IOMUX_PAD(0x684, 0x284, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA0__USBH1_DATA0	IOMUX_PAD(0x688, 0x288, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA1__USBH1_DATA1	IOMUX_PAD(0x68C, 0x28C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA2__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA3__USBH1_DATA3	IOMUX_PAD(0x694, 0x294, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA4__USBH1_DATA4	IOMUX_PAD(0x698, 0x298, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA5__USBH1_DATA5	IOMUX_PAD(0x69C, 0x29C, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA6__USBH1_DATA6	IOMUX_PAD(0x6A0, 0x2A0, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+> +#define MX51_PAD_USBH1_DATA7__USBH1_DATA7	IOMUX_PAD(0x6A4, 0x2A4, IOMUX_CONFIG_ALT0, 0x0, 0, MX51_USBH1_PAD_CTRL)
+>  #define MX51_PAD_GPIO_3_0__DI1_PIN11	IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_GPIO_3_1__DI1_PIN12	IOMUX_PAD(0x6AC, 0x2AC, 4, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_GPIO_3_2__DI1_PIN13	IOMUX_PAD(0x6B0, 0x2B0, 4, 0x0, 0, NO_PAD_CTRL)
+> @@ -299,7 +306,7 @@ typedef enum iomux_config {
+>  #define MX51_PAD_GPIO_1_4__GPIO1_4	IOMUX_PAD(0x804, 0x3D8, 0, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_GPIO_1_5__GPIO1_5	IOMUX_PAD(0x808, 0x3DC, 0, 0x0, 0, NO_PAD_CTRL)
+>  #define MX51_PAD_GPIO_1_6__GPIO1_6	IOMUX_PAD(0x80C, 0x3E0, 0, 0x0, 0, NO_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, NO_PAD_CTRL)
+> +#define MX51_PAD_GPIO_1_7__GPIO1_7	IOMUX_PAD(0x810, 0x3E4, 0, 0x0, 0, MX51_GPIO_PAD_CTRL)
+>  #define MX51_PAD_GPIO_1_8__GPIO1_8	IOMUX_PAD(0x814, 0x3E8, 0, 0x0, 1, \
+>  						(PAD_CTL_SRE_SLOW | PAD_CTL_DSE_MED | PAD_CTL_PUS_100K_UP |  PAD_CTL_HYS))
+>  #define MX51_PAD_GPIO_1_9__GPIO1_9	IOMUX_PAD(0x818, 0x3EC, 0, 0x0, 0, NO_PAD_CTRL)
+> -- 
+> 1.6.0.4
+> 
+> 
 
-Hm, it has to be *really* different to warrant a totally new driver
-duplicate code is never fun...
-
->> Can you make a hexdump of the PrimeCell ID registers at offset
->> base+0xffe0..0xffff and post the contents?
->
-> Here it is, you probably meant base + 0xfe0 .. 0xfff, right?
->
-> [ ? ?2.410000] 0xc6070fe0: 0x0
-> [ ? ?2.410000] 0xc6070fe4: 0x0
-> [ ? ?2.410000] 0xc6070fe8: 0x0
-> [ ? ?2.420000] 0xc6070fec: 0x0
-> [ ? ?2.420000] 0xc6070ff0: 0x0
-> [ ? ?2.420000] 0xc6070ff4: 0x0
-> [ ? ?2.430000] 0xc6070ff8: 0x0
-> [ ? ?2.430000] 0xc6070ffc: 0x0
-
-Looks like it's been blanked out so atleast it is not identifying itself as
-a PL022 anymore.
-
-It could also be that PL022 and the Cirrus controller has some common
-ancestor...
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
