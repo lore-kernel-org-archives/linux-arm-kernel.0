@@ -1,136 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon,  3 May 2010 02:54:45 +0200
-Subject: [PATCH 2/7] DMAENGINE: DMA40 bug when checking paused status
-Message-ID: <1272848085-28574-1-git-send-email-linus.walleij@stericsson.com>
+From: mostawesomedude@gmail.com (Corbin Simpson)
+Date: Sun, 2 May 2010 18:32:44 -0700
+Subject: Updating Didj for Modern Times
+Message-ID: <k2ve7bd23c31005021832xf3d90bd8q34dfbc2f8c4ef927@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+Hey,
 
-Fixed bug when asking for paused status of a logical
-channel would fail.
+So I appear to be the kernel guy in charge of the Leapfrog Didj code.
+It's a straightforward device based on the MagicEyes Pollux SoC. We
+have datasheets, breakouts, and a kernel tree based on v2.6.20 that
+builds, compiles, runs, and even brings up the proprietary userland.
 
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/dma/ste_dma40.c |   77 +++++++++++++++++++++++++++++++++++++---------
- 1 files changed, 62 insertions(+), 15 deletions(-)
+v2.6.20 is old. Jesus-and-dinosaurs old. I've been working on
+forwardporting stuff slowly but surely, see
+http://git.kernel.org/?p=linux/kernel/git/csimpson/linux-2.6.git;a=summary
+for the gory details. However, I've run into a fair number of
+problems, and frankly I'm not used to digging this deep into kernel
+internals.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index f86b99f..ed1a05c 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -663,7 +663,7 @@ static void d40_config_set_event(struct d40_chan *d40c, bool do_enable)
- 	spin_unlock_irqrestore(&d40c->phy_chan->lock, flags);
- }
- 
--static bool d40_chan_has_events(struct d40_chan *d40c)
-+static u32 d40_chan_has_events(struct d40_chan *d40c)
- {
- 	u32 val = 0;
- 
-@@ -678,7 +678,7 @@ static bool d40_chan_has_events(struct d40_chan *d40c)
- 		val = readl(d40c->base->virtbase + D40_DREG_PCBASE +
- 			    d40c->phy_chan->num * D40_DREG_PCDELTA +
- 			    D40_CHAN_REG_SDLNK);
--	return (bool) val;
-+	return val;
- }
- 
- static void d40_config_enable_lidx(struct d40_chan *d40c)
-@@ -1393,6 +1393,65 @@ static int d40_pause(struct dma_chan *chan)
- 	return res;
- }
- 
-+static bool d40_is_paused(struct d40_chan *d40c)
-+{
-+	bool is_paused = false;
-+	unsigned long flags;
-+	void __iomem *active_reg;
-+	u32 status;
-+	u32 event;
-+	int res;
-+
-+	spin_lock_irqsave(&d40c->lock, flags);
-+
-+	if (d40c->log_num == D40_PHY_CHAN) {
-+		if (d40c->phy_chan->num % 2 == 0)
-+			active_reg = d40c->base->virtbase + D40_DREG_ACTIVE;
-+		else
-+			active_reg = d40c->base->virtbase + D40_DREG_ACTIVO;
-+
-+		status = (readl(active_reg) &
-+			  D40_CHAN_POS_MASK(d40c->phy_chan->num)) >>
-+			D40_CHAN_POS(d40c->phy_chan->num);
-+		if (status == D40_DMA_SUSPENDED || status == D40_DMA_STOP)
-+			is_paused = true;
-+
-+		goto _exit;
-+	}
-+
-+	res = d40_channel_execute_command(d40c, D40_DMA_SUSPEND_REQ);
-+	if (res != 0)
-+		goto _exit;
-+
-+	if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
-+	    d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM)
-+		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dst_dev_type);
-+	else if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
-+		event = D40_TYPE_TO_EVENT(d40c->dma_cfg.src_dev_type);
-+	else {
-+		dev_err(&d40c->chan.dev->device,
-+			"[%s] Unknown direction\n", __func__);
-+		goto _exit;
-+	}
-+	status = d40_chan_has_events(d40c);
-+	status = (status & D40_EVENTLINE_MASK(event)) >>
-+		D40_EVENTLINE_POS(event);
-+
-+	if (status != D40_DMA_RUN)
-+		is_paused = true;
-+
-+	/* Resume the other logical channels if any */
-+	if (d40_chan_has_events(d40c))
-+		res = d40_channel_execute_command(d40c,
-+						  D40_DMA_RUN);
-+
-+_exit:
-+	spin_unlock_irqrestore(&d40c->lock, flags);
-+	return is_paused;
-+
-+}
-+
-+
- static bool d40_tx_is_linked(struct d40_chan *d40c)
- {
- 	bool is_link;
-@@ -1983,26 +2042,14 @@ static enum dma_status d40_tx_status(struct dma_chan *chan,
- 				     struct dma_tx_state *txstate)
- {
- 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
--	void __iomem *active_reg;
- 	dma_cookie_t last_used;
- 	dma_cookie_t last_complete;
--	u32 status;
- 	int ret;
- 
- 	last_complete = d40c->completed;
- 	last_used = chan->cookie;
- 
--	/* check for pause first */
--	if (d40c->phy_chan->num % 2 == 0)
--		active_reg = d40c->base->virtbase + D40_DREG_ACTIVE;
--	else
--		active_reg = d40c->base->virtbase + D40_DREG_ACTIVO;
--
--	status = (readl(active_reg) &
--		  D40_CHAN_POS_MASK(d40c->phy_chan->num)) >>
--		D40_CHAN_POS(d40c->phy_chan->num);
--
--	if (status == D40_DMA_SUSPENDED)
-+	if (d40_is_paused(d40c))
- 		ret = DMA_PAUSED;
- 	else
- 		ret = dma_async_is_complete(cookie, last_complete, last_used);
+~ Fragile code. Everything, from the MMU setup to the serial init, has
+little changes all over it, some of which are related and some aren't.
+I've slowly been splitting out patches, but some of them have been
+absolutely defiant in their resistance, and it feels like the smallest
+change results in something that hangs after decompress. It doesn't
+help that the LF guys made most of this code work by peppering the
+tree with #ifdef CONFIG_ARCH_LF1000.
+
+~ Custom drivers, lots of them. ADC, DMA engine, effectively the
+framebuffer and LCD, 3D accelerator (we have docs and no NDA! Whoo!),
+I2S, SPI, & I2C busses, iDCT, and a PWM. All custom, not using
+standard interfaces. Not even the framebuffer. :C To their credit,
+they backported just UBI, more or less intact, and that's it.
+
+Any hints would be highly appreciated. I'm largely stymied as to how to proceed.
+
+~ C.
+
 -- 
-1.6.3.3
+When the facts change, I change my mind. What do you do, sir? ~ Keynes
+
+Corbin Simpson
+<MostAwesomeDude@gmail.com>
