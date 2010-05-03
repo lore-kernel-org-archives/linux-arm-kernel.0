@@ -1,86 +1,50 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 3 May 2010 13:26:42 +0200
-Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
-In-Reply-To: <20100427102442.GD30801@buzzloop.caiaq.de>
-References: <20100427075012.GB30801@buzzloop.caiaq.de>
-	<20100427102442.GD30801@buzzloop.caiaq.de>
-Message-ID: <20100503112642.GI30807@buzzloop.caiaq.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 3 May 2010 15:18:09 +0200
+Subject: [spi-devel-general] [PATCH v6 1/2] spi: implemented driver for
+	Cirrus EP93xx SPI controller
+In-Reply-To: <20100503042123.GM26418@gw.healthdatacare.com>
+References: <cover.1272805161.git.mika.westerberg@iki.fi>
+	<0dce0e9fdb6af35854d26d7bd0d8af5a5ea8f76a.1272805161.git.mika.westerberg@iki.fi>
+	<h2r63386a3d1005021718k31125e4fz43a08025997b5c5c@mail.gmail.com>
+	<20100503042123.GM26418@gw.healthdatacare.com>
+Message-ID: <o2l63386a3d1005030618q1914e04x471ce544c6be82dc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha, can you take this to your tree?
+2010/5/3 Mika Westerberg <mika.westerberg@iki.fi>:
 
-On Tue, Apr 27, 2010 at 12:24:42PM +0200, Daniel Mack wrote:
-> From cefcdab08d1c9636c4a7290bc2bbe937d051bce4 Mon Sep 17 00:00:00 2001
-> From: Volker Ernst <volker.ernst@txtr.com>
-> Date: Mon, 26 Apr 2010 22:51:07 +0200
-> Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
-> 
-> This fixes a race condition regarding interrupt bits in the SDHC
-> controller driver code.
-> 
-> In case of PIO-transfer it does not clear SDHC-status bit#11/12
-> in the INT-handler anymore. INT-handler might be called during
-> an ongoing PIO-data-transfer (with some other INT-flag set) and
-> PIO-transfer depends on these bits being set to detect the end
-> of the data-transfer. This also means that at the end of PIO-
-> transfer that PIO-software has to clear these bits itself.
-> 
-> However in case of DMA-transfer these bits have to be cleared
-> in the INT-handler, because they are used to generate INTs then.
-> 
-> Works solid, no more problems here, can transfer big files.
-> 
-> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-> Acked-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Andy Green <andy@warmcat.com>
-> ---
->  drivers/mmc/host/mxcmmc.c |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> index 2c53024..ec18e3b 100644
-> --- a/drivers/mmc/host/mxcmmc.c
-> +++ b/drivers/mmc/host/mxcmmc.c
-> @@ -489,6 +489,9 @@ static void mxcmci_datawork(struct work_struct *work)
->  	struct mxcmci_host *host = container_of(work, struct mxcmci_host,
->  						  datawork);
->  	int datastat = mxcmci_transfer_data(host);
-> +
-> +	writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
-> +		host->base + MMC_REG_STATUS);
->  	mxcmci_finish_data(host, datastat);
->  
->  	if (host->req->stop) {
-> @@ -553,7 +556,8 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
->  	u32 stat;
->  
->  	stat = readl(host->base + MMC_REG_STATUS);
-> -	writel(stat & ~STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
-> +	writel(stat & ~(STATUS_SDIO_INT_ACTIVE | STATUS_DATA_TRANS_DONE |
-> +			STATUS_WRITE_OP_DONE), host->base + MMC_REG_STATUS);
->  
->  	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
->  
-> @@ -561,6 +565,13 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
->  	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
->  	spin_unlock_irqrestore(&host->lock, flags);
->  
-> +#ifdef HAS_DMA
-> +	if (mxcmci_use_dma(host) &&
-> +	    (stat & (STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE)))
-> +		writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
-> +			host->base + MMC_REG_STATUS);
-> +#endif
-> +
->  	if (sdio_irq) {
->  		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
->  		mmc_signal_sdio_irq(host->mmc);
-> -- 
-> 1.7.0.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Yeah. It looks pretty similar. Although there seems to be differences. Documentation
+> of the controller can be found in:
+>
+> ? ? ? ?http://www.cirrus.com/en/pubs/manual/EP93xx_Users_Guide_UM1.pdf
+>
+> It does not mention anything about AMBA PL022.
+
+They have surely based the hardware on the PL022. A diff document would
+surely be useful, can Cirrus answer that kind of questions for you?
+
+Hm, it has to be *really* different to warrant a totally new driver
+duplicate code is never fun...
+
+>> Can you make a hexdump of the PrimeCell ID registers at offset
+>> base+0xffe0..0xffff and post the contents?
+>
+> Here it is, you probably meant base + 0xfe0 .. 0xfff, right?
+>
+> [ ? ?2.410000] 0xc6070fe0: 0x0
+> [ ? ?2.410000] 0xc6070fe4: 0x0
+> [ ? ?2.410000] 0xc6070fe8: 0x0
+> [ ? ?2.420000] 0xc6070fec: 0x0
+> [ ? ?2.420000] 0xc6070ff0: 0x0
+> [ ? ?2.420000] 0xc6070ff4: 0x0
+> [ ? ?2.430000] 0xc6070ff8: 0x0
+> [ ? ?2.430000] 0xc6070ffc: 0x0
+
+Looks like it's been blanked out so atleast it is not identifying itself as
+a PL022 anymore.
+
+It could also be that PL022 and the Cirrus controller has some common
+ancestor...
+
+Yours,
+Linus Walleij
