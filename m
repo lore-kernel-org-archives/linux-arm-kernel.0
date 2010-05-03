@@ -1,48 +1,52 @@
 From: gdavis@mvista.com (George G. Davis)
-Date: Mon, 3 May 2010 11:59:00 -0400
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
-References: <20100423144058.GA11637@ZenIV.linux.org.uk>
-	<20100430163356.GV2619@mvista.com>
-	<1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100503155900.GA26552@mvista.com>
+Date: Mon, 3 May 2010 12:37:53 -0400
+Subject: Query about arch/arm/mach-realview ?
+In-Reply-To: <ACB158FF2D2340CF83C5D5A1BD60CFCE@dufan>
+References: <ACB158FF2D2340CF83C5D5A1BD60CFCE@dufan>
+Message-ID: <20100503163753.GB26552@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Apr 30, 2010 at 05:38:31PM +0100, Catalin Marinas wrote:
-> On Fri, 2010-04-30 at 17:33 +0100, George G. Davis wrote:
-> > Hi,
-> > 
-> > On Fri, Apr 23, 2010 at 03:40:58PM +0100, Russell King wrote:
-> > > > Above change is necessary but what an alternative approach is for this.
-> > > > There are many use case where ioremap* is needed.
-> > >
-> > > This is a very difficult issue to answer; the only way we can safely
-> > > remap RAM with different attributes is if we disable the existing
-> > > mappings - but since we create those with 1MB sections, that's far
-> > > from easy to achieve.
-> > >
-> > > I think a viable safe solution is to set aside some RAM at boot (which
-> > > the kernel doesn't manage at all) and then use ioremap on that; that
-> > > approach will still work with this patch in place.
-> > 
-> > So cases such as the omapfb driver which use reserve_bootmem() (in
-> > arch/arm/plat-omap/fb.c) and then later use ioremap_wc() to remap
-> > reserved memory (in drivers/video/omap2/omapfb/omapfb-main.c)
-> > will no longer work with this change.
+On Thu, Apr 29, 2010 at 03:34:37PM +0800, rocky wrote:
+> Hi, all
 > 
-> Another solution would be to allow the unmapping of sections from the
-> kernel linear mapping. I think x86 does this already for the AGP
-> aperture.
+>        I?m looking for specification of realview board for
+> arch/arm/mach-realview ?
+> 
+>        Cannt find it in arm site
+> 
+>        Could anyone please give me some tips about realview board related
+> docs?
 
-I've yet to grok that code but have been curious about how this is done
-for x86 graphics.  : )
+Can't you find the RealView board documentation online here?:
+
+http://infocenter.arm.com/help/topic/com.arm.doc.set.boards/index.html
 
 --
 Regards,
 George
+
 > 
-> -- 
-> Catalin
+>  
+> 
+> Thanks
+> 
+>  
+> 
+> rocky
+> 
+>        
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
