@@ -1,43 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 May 2010 11:44:31 +0100
-Subject: [GIT PULL] generic arm for MSM try 3
-In-Reply-To: <1272323880.32741.7.camel@c-dwalke-linux.qualcomm.com>
-References: <1271787537.1986.10.camel@m0nster>
-	<1272323880.32741.7.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100503104431.GA29919@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 3 May 2010 13:26:42 +0200
+Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
+In-Reply-To: <20100427102442.GD30801@buzzloop.caiaq.de>
+References: <20100427075012.GB30801@buzzloop.caiaq.de>
+	<20100427102442.GD30801@buzzloop.caiaq.de>
+Message-ID: <20100503112642.GI30807@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 26, 2010 at 04:18:00PM -0700, Daniel Walker wrote:
-> On Tue, 2010-04-20 at 11:18 -0700, Daniel Walker wrote:
-> > I dropped the copyright and rebased, but everything else is the same as
-> > the prior pull request.
-> > 
-> > The following changes since commit 27ee8963708185b96bc84a149eb5336a249a7497:
-> >   Linus Torvalds (1):
-> >         Merge branch 'urgent' of git://git.kernel.org/.../brodo/pcmcia-2.6
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
+Sascha, can you take this to your tree?
+
+On Tue, Apr 27, 2010 at 12:24:42PM +0200, Daniel Mack wrote:
+> From cefcdab08d1c9636c4a7290bc2bbe937d051bce4 Mon Sep 17 00:00:00 2001
+> From: Volker Ernst <volker.ernst@txtr.com>
+> Date: Mon, 26 Apr 2010 22:51:07 +0200
+> Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
 > 
-> Did I get this one wrong somehow, or are you not accepting pull requests
-> right now?
-
-No.  In case you didn't notice, I've been offline from 22nd to 29th April
-caused by BT planned engineering works going wrong.  However, I'm back
-online for the time being using alternative arrangements, and I still
-regard my 'net connection to be 'at risk'.
-
-Could you please tell me what is different in this pull request compared
-to try 2?  I'm asking because it appears your tree is identical to try 2,
-in spite of:
-
-On Tue, Mar 30, 2010 at 03:59:53PM -0700, Daniel Walker wrote:
-> On Sun, 2010-03-28 at 22:49 +0100, Russell King - ARM Linux wrote:
-> > Well, I don't think it's fair on those who created abort-ev7.S to go
-> > throwing a boilerplate copyright on the file which makes it look like
-> > "Code Aurora Forum." wrote the entire thing.
->
-> Ok, I updated the same branch .. It's minus the copyright and license ,
-> and I rebased it onto a more recent linus tree ..
+> This fixes a race condition regarding interrupt bits in the SDHC
+> controller driver code.
+> 
+> In case of PIO-transfer it does not clear SDHC-status bit#11/12
+> in the INT-handler anymore. INT-handler might be called during
+> an ongoing PIO-data-transfer (with some other INT-flag set) and
+> PIO-transfer depends on these bits being set to detect the end
+> of the data-transfer. This also means that at the end of PIO-
+> transfer that PIO-software has to clear these bits itself.
+> 
+> However in case of DMA-transfer these bits have to be cleared
+> in the INT-handler, because they are used to generate INTs then.
+> 
+> Works solid, no more problems here, can transfer big files.
+> 
+> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
+> Acked-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Andy Green <andy@warmcat.com>
+> ---
+>  drivers/mmc/host/mxcmmc.c |   13 ++++++++++++-
+>  1 files changed, 12 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> index 2c53024..ec18e3b 100644
+> --- a/drivers/mmc/host/mxcmmc.c
+> +++ b/drivers/mmc/host/mxcmmc.c
+> @@ -489,6 +489,9 @@ static void mxcmci_datawork(struct work_struct *work)
+>  	struct mxcmci_host *host = container_of(work, struct mxcmci_host,
+>  						  datawork);
+>  	int datastat = mxcmci_transfer_data(host);
+> +
+> +	writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
+> +		host->base + MMC_REG_STATUS);
+>  	mxcmci_finish_data(host, datastat);
+>  
+>  	if (host->req->stop) {
+> @@ -553,7 +556,8 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
+>  	u32 stat;
+>  
+>  	stat = readl(host->base + MMC_REG_STATUS);
+> -	writel(stat & ~STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
+> +	writel(stat & ~(STATUS_SDIO_INT_ACTIVE | STATUS_DATA_TRANS_DONE |
+> +			STATUS_WRITE_OP_DONE), host->base + MMC_REG_STATUS);
+>  
+>  	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
+>  
+> @@ -561,6 +565,13 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
+>  	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
+>  	spin_unlock_irqrestore(&host->lock, flags);
+>  
+> +#ifdef HAS_DMA
+> +	if (mxcmci_use_dma(host) &&
+> +	    (stat & (STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE)))
+> +		writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
+> +			host->base + MMC_REG_STATUS);
+> +#endif
+> +
+>  	if (sdio_irq) {
+>  		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
+>  		mmc_signal_sdio_irq(host->mmc);
+> -- 
+> 1.7.0.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
