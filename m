@@ -1,37 +1,64 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 4 May 2010 22:07:51 +0530
-Subject: U5500 patches
-In-Reply-To: <20100504162106.GF30601@n2100.arm.linux.org.uk>
-References: <20100504153730.GA30601@n2100.arm.linux.org.uk>
-	<20100504162106.GF30601@n2100.arm.linux.org.uk>
-Message-ID: <x2lc928c27e1005040937w7565a3e9t32fa7393f9508d29@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 04 May 2010 17:44:15 +0100
+Subject: [PATCH 0/8] Various patches for comments and upstream
+Message-ID: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 4, 2010 at 9:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, May 04, 2010 at 04:37:30PM +0100, Russell King - ARM Linux wrote:
->> Recently, a series of 14 Ux500 patches have appeared in the patch system
->> without appearing on the mailing list, and not all of them have an ack
->> from Linus.
->
-> Sorry, that's a little misleading; please ignore the above. ?Concerns
-> below still apply though.
->
->> Have they been reviewed on the mailing list?
+Hi,
 
-They were posted to the list last week:
+I've been posting most of these patches in the past (some of them for a
+long time, e.g. the domains removal) and I would like some comments on
+them. There were some previous discussion threads which seem to have
+died without a clear conclusion.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/013644.html
+A few of these patches are trivial fixes that could go upstream (during
+the upcoming merging window). For the other patches like domains
+removal, I would like to push them to linux-next if there are no
+(further :)) comments.
 
-It must have been during the time you were offline.  Would you like for them
-to be reposted?
+Thanks.
 
->> There's also no suggestion in the submitted patches concerning the right
->> order to apply this set.
 
-They apply in the same order in which they appear in the patch system
-(6077/1 to 6090/1).  I made sure the patch system registered each
-patch before I sent it the next.
+Catalin Marinas (8):
+      ARM: Improve the L2 cache performance when PL310 is used
+      ARM: Implement read/write for ownership in the ARMv6 DMA cache ops
+      ARM: Align machine_desc.phys_io to a 1MB section
+      ARM: Remove the domain switching on ARMv6k/v7 CPUs
+      ARM: Fix the __arm_ioremap_caller() definition in nommu.c
+      ARM: Implement copy_to_user_page() for noMMU
+      ARM: Use the Inner Shareable I-cache and BTB ops on ARMv7 SMP
+      ARM: Implement phys_mem_access_prot() to avoid attributes aliasing
 
-Rabin
+
+ arch/arm/include/asm/assembler.h  |   13 +++--
+ arch/arm/include/asm/cacheflush.h |    4 ++
+ arch/arm/include/asm/domain.h     |   31 ++++++++++++
+ arch/arm/include/asm/futex.h      |    9 ++--
+ arch/arm/include/asm/pgtable.h    |    3 +
+ arch/arm/include/asm/tlbflush.h   |   29 +++++++++++-
+ arch/arm/include/asm/uaccess.h    |   16 +++---
+ arch/arm/kernel/entry-armv.S      |    4 +-
+ arch/arm/kernel/head.S            |    2 +
+ arch/arm/kernel/setup.c           |    2 -
+ arch/arm/kernel/traps.c           |   17 +++++++
+ arch/arm/lib/getuser.S            |   13 +++--
+ arch/arm/lib/putuser.S            |   29 ++++++------
+ arch/arm/lib/uaccess.S            |   83 +++++++++++++++++----------------
+ arch/arm/mm/Kconfig               |   15 ++++++
+ arch/arm/mm/cache-l2x0.c          |   74 +++++++++++++++++++++---------
+ arch/arm/mm/cache-v6.S            |   17 +++++--
+ arch/arm/mm/cache-v7.S            |    4 ++
+ arch/arm/mm/init.c                |   14 ++----
+ arch/arm/mm/mmu.c                 |   14 ++++++
+ arch/arm/mm/nommu.c               |   13 ++++-
+ arch/arm/mm/proc-macros.S         |    7 +++
+ arch/arm/mm/proc-v7.S             |    5 +-
+ arch/arm/mm/tlb-v7.S              |    8 +++
+ drivers/net/smsc911x.c            |   92 +++++++++++++++++++++----------------
+ mm/bootmem.c                      |    2 +
+ mm/page_alloc.c                   |    1 
+ 27 files changed, 355 insertions(+), 166 deletions(-)
+
+-- 
+Catalin
