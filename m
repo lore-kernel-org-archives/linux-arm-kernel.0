@@ -1,65 +1,33 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 4 May 2010 11:17:44 +0900
-Subject: [PATCH] MAINTAINERS: arch/arm/s3c and arch/arm/s5p
-In-Reply-To: <20100504004623.GT6684@trinity.fluff.org>
-References: <cover.1269655208.git.joe@perches.com>
-	<0c97f736400ec243e71ba794ae7046a61d2449c1.1269655208.git.joe@perches.com>
-	<20100412194737.GS3048@n2100.arm.linux.org.uk>
-	<1271102450.2131.27.camel@Joe-Laptop.home>
-	<h2p9c9fda241004121653te938caa2u42e39c31f27e85e1@mail.gmail.com>
-	<1271126826.4631.7.camel@Joe-Laptop.home>
-	<p2y9c9fda241004161243p924e06f0rb1ff64d5ae258819@mail.gmail.com>
-	<20100504004623.GT6684@trinity.fluff.org>
-Message-ID: <q2m9c9fda241005031917gbe9236f3kd56bfdf9a76ae549@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 May 2010 22:30:22 -0400 (EDT)
+Subject: Git pull request: Orion/Kirkwood stuff for 2.6.35
+In-Reply-To: <20100504001723.GP6684@trinity.fluff.org>
+References: <alpine.LFD.2.00.1005031731010.14468@xanadu.home>
+	<20100504001723.GP6684@trinity.fluff.org>
+Message-ID: <alpine.LFD.2.00.1005032228210.14468@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 4, 2010 at 9:46 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Sat, Apr 17, 2010 at 04:43:34AM +0900, Kyungmin Park wrote:
->> Please add me and marek.
->> Ben how do you think? Marek is proper person since he posted a lot of s5p
->> series patches.
->> Note that byoungho min is no longer works on this series
->
-> I thought the System LSI group where wanting to maintain this, which is
-> why I've been holding off making any comment about what is going on.
->
-> Personally, I would like to see a co-maintainership between myself
-> and whoever at Samsung before completely handing over the responsibility.
+On Tue, 4 May 2010, Ben Dooks wrote:
 
-I agree. then how about the Marek, even though LSI want it. they don't
-have enough experience with open source works. you can see the recent
-their works at their git. but we are trying to modify and make a patch
-with open source style.
+> On Mon, May 03, 2010 at 07:14:23PM -0400, Nicolas Pitre wrote:
+> > 
+> > Russell, could you pull:
+> > 
+> >     git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git master
+> > 
+> > This contains what I have pending for Orion/Kirkwood so far.  Since I'm 
+> > not working at Marvell anymore, I'm using a different server for this 
+> > pull request.  If anyone at Marvell is willing to maintain this tree 
+> > I'll be happy to pass the baton.  Otherwise I'll just collect patches 
+> > but I don't expect to work much on it myself (this code is in 
+> > maintenance mode anyway).
+> 
+> Could the MAINTAINERS entry be updated, I know Lennert doesn't want to
+> receive kirkwood patches.
 
-Also we setup the public git for open source
+I'll confirm with him and include the update in a future pull request 
+(I've asked a few people to resend their patches).
 
-Thank you,
-Kyungmin Park
 
-P.S., when do you expect to hand-over responsibility to others?
->
->> Thank you,
->> Kyungmin Park
->>
->> On Apr 12, 2010 7:47 PM, "Joe Perches" <joe@perches.com> wrote:
->>
->> On Tue, 2010-04-13 at 08:53 +0900, Kyungmin Park wrote:
->> > No, s5p stubs are maintained by Samsung.
->> >...
->> So perhaps you'll add yourself and the correct entries to MAINTAINERS?
->
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
->
+Nicolas
