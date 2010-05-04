@@ -1,70 +1,55 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 4 May 2010 01:29:15 +0100
-Subject: S3C6410 power management support status
-In-Reply-To: <20100429145257.GA9592@jeknote.loshitsa1.net>
-References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-	<20100429140050.GA3410@sirena.org.uk>
-	<20100429145257.GA9592@jeknote.loshitsa1.net>
-Message-ID: <20100504002915.GS6684@trinity.fluff.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 3 May 2010 17:40:01 -0700
+Subject: [PATCH 02/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC3560870304F5A672@dbde02.ent.ti.com>
+References: <87sk6cirt0.fsf@deeprootsystems.com>
+	<20100430210216.GI29604@atomide.com>
+	<87vdb8hc2d.fsf@deeprootsystems.com>
+	<FCCFB4CDC6E5564B9182F639FC3560870304E80F5F@dbde02.ent.ti.com>
+	<87y6g4d2ic.fsf@deeprootsystems.com>
+	<20100430233002.GJ29604@atomide.com>
+	<87sk6c8osn.fsf@deeprootsystems.com>
+	<20100501013751.GL29604@atomide.com>
+	<20100501015050.GM29604@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC3560870304F5A672@dbde02.ent.ti.com>
+Message-ID: <20100504004001.GB29604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 05:52:57PM +0300, Yauhen Kharuzhy wrote:
-> On Thu, Apr 29, 2010 at 03:00:51PM +0100, Mark Brown wrote:
-> > On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
-> > 
-> > > Can anybody explain current status of S3C6410 power management support
-> > > in mainline? Suspend-to-RAM looks completely broken in the current
-> > > Linus's git tree.
-> > 
-> > What problems are you experiencing?
+* Pandita, Vikram <vikram.pandita@ti.com> [100503 15:06]:
 > 
-> 1. I enabled RTC driver for S3C6410 (it is cannot be enabled without
-> modification of Kconfig) and CONFIG_SUSPEND.
-> 2. echo +10 > /sys/class/rtc0/wakealarm && echo mem > /sys/power/state.
 > 
-> System didn't go to sleep with messages:
+> >-----Original Message-----
+> >From: Tony Lindgren [mailto:tony at atomide.com]
+> >Sent: Friday, April 30, 2010 8:51 PM
+> >To: Kevin Hilman
+> >Cc: Pandita, Vikram; linux-arm-kernel at lists.infradead.org; linux-
+> >omap at vger.kernel.org; Pais, Allen
+> >Subject: Re: [PATCH 02/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
+> >
+> >* Tony Lindgren <tony@atomide.com> [100430 18:33]:
+> >>
+> >> So far only tested on n900, will give it a try also on zoom3 after
+> >> updating the zoom3 related patch.
+> >
+> >And here's the updated zoom debug_ll patch, seems to work.
 > 
-> ---
-> s3c_pm_enter(3)
-> s3c_pm_enter: No wake-up sources!
-> s3c_pm_enter: Aborting sleep
-> ---
+> For testing if I put this printk hack (the good old days patch), 
+> Zoom3 does not boot after applying your patch.
 
-Ok, this is interesting, the system shouldn't have allowed the RTC as a
-wakeup soruce as the core currently doesn't deal with 64XX non-EINT
-sources. However, at-least the core code did the right thing and refused
-to go to sleep.
+You should not need that any longer if you have set
+CONFIG_DEBUG_LL and CONFIG_EARLY_PRINTK and have earlyprintk
+in the kernel cmdline.
+ 
+> So looks like we are still missing something for zoom2/3 to work.
+> Can debug tomorrow.
 
-I will look into the RTC/non-EINT wakeup sources for these SoCs today
-and see if the changes are easy enough to make.
+Hmm works just fine for me. Sounds like you only applied one of
+the two patches needed to make DEBUG_LL work on zoom?
 
-> This is caused by following code:
-> ---
-> #define any_allowed(mask, allow) (((mask) & (allow)) != (allow))
-> 
->         if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
->             !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow)) {
->                 printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
->                 printk(KERN_ERR "%s: Aborting sleep\n", __func__);
->                 return -EINVAL;
->         }
-> ---
-> 
-> But s3c_irqwake_intallow is defined in arch/arm/mach-s3c64xx/include/mach/pm-core.h
-> 
-> ---
-> /* make these defines, we currently do not have any need to change
->  * the IRQ wake controls depending on the CPU we are running on */
-> 
-> #define s3c_irqwake_eintallow   ((1 << 28) - 1)
-> #define s3c_irqwake_intallow    (0)
-> ---
+Anyways, I'll repost both patches needed for zoom as a reply to
+this mail.
 
-They'll get changed once we have support for the non-eint sources.
+Regards,
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Tony
