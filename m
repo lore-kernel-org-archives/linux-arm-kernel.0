@@ -1,23 +1,165 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 4 May 2010 11:27:32 +0100
-Subject: [PATCH 2/2] regulator: use array in 88pm860x
-In-Reply-To: <k2q771cded01005040022l59571796yde4d0480bd048d74@mail.gmail.com>
-References: <k2q771cded01005040022l59571796yde4d0480bd048d74@mail.gmail.com>
-Message-ID: <20100504102732.GC15454@rakim.wolfsonmicro.main>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 04 May 2010 13:12:32 +0200
+Subject: [PATCH] ARM: SAMSUNG: Move HWMON from plat-s3c24xx to plat-samsung
+Message-ID: <4BE00120.3040703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 04, 2010 at 03:22:40AM -0400, Haojian Zhuang wrote:
-> From a76bf9c3342babff2bff788651c09f54604b505d Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Tue, 4 May 2010 09:54:51 -0400
-> Subject: [PATCH] regulator: use array in 88pm860x
-> 
-> Replace condition comparision statement by array. Clean code with simpler way.
+Move HWMON platform definition from plat-s3c24xx to plat-samsung
+and adjust mach-bast to use the new s3c_hwmon_set_platdata().
+This allows usage of dev-hwmon by other Samsung SoCs.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ arch/arm/mach-s3c2410/Kconfig              |    1 +
+ arch/arm/mach-s3c2410/mach-bast.c          |    2 +-
+ arch/arm/plat-s3c24xx/devs.c               |    8 -----
+ arch/arm/plat-samsung/Kconfig              |    5 +++
+ arch/arm/plat-samsung/Makefile             |    1 +
+ arch/arm/plat-samsung/dev-hwmon.c          |   42 ++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/hwmon.h |   10 ++++++
+ 7 files changed, 60 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-hwmon.c
 
-but please try to make your changelogs include more high level
-information - which comparisons are being replaced by an array, and in
-what way is the code simpler?  Your changelog shouldn't just repeat
-information that's in the diff.
+diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
+index 5547318..ca5c3c6 100644
+--- a/arch/arm/mach-s3c2410/Kconfig
++++ b/arch/arm/mach-s3c2410/Kconfig
+@@ -110,6 +110,7 @@ config ARCH_BAST
+ 	select MACH_BAST_IDE
+ 	select S3C24XX_DCLK
+ 	select ISA
++	select S3C_DEV_HWMON
+ 	select S3C_DEV_USB_HOST
+ 	select S3C_DEV_NAND
+ 	help
+diff --git a/arch/arm/mach-s3c2410/mach-bast.c b/arch/arm/mach-s3c2410/mach-bast.c
+index 02b1b62..c8786df 100644
+--- a/arch/arm/mach-s3c2410/mach-bast.c
++++ b/arch/arm/mach-s3c2410/mach-bast.c
+@@ -634,7 +634,7 @@ static void __init bast_map_io(void)
+ 
+ 	s3c24xx_register_clocks(bast_clocks, ARRAY_SIZE(bast_clocks));
+ 
+-	s3c_device_hwmon.dev.platform_data = &bast_hwmon_info;
++	s3c_hwmon_set_platdata(&bast_hwmon_info);
+ 
+ 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
+ 	s3c24xx_init_clocks(0);
+diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+index 9265f09..3166f32 100644
+--- a/arch/arm/plat-s3c24xx/devs.c
++++ b/arch/arm/plat-s3c24xx/devs.c
+@@ -338,14 +338,6 @@ struct platform_device s3c_device_adc = {
+ 	.resource	  = s3c_adc_resource,
+ };
+ 
+-/* HWMON */
+-
+-struct platform_device s3c_device_hwmon = {
+-	.name		= "s3c-hwmon",
+-	.id		= -1,
+-	.dev.parent	= &s3c_device_adc.dev,
+-};
+-
+ /* SDI */
+ 
+ static struct resource s3c_sdi_resource[] = {
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index d552c65..7a36cf8 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -160,6 +160,11 @@ config S3C_DEV_HSMMC2
+ 	help
+ 	  Compile in platform device definitions for HSMMC channel 2
+ 
++config S3C_DEV_HWMON
++	bool
++	help
++	    Compile in platform device definitions for HWMON
++
+ config S3C_DEV_I2C1
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 22c89d0..0ad820a 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
+ obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
+ obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
+ obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
++obj-$(CONFIG_S3C_DEV_HWMON)	+= dev-hwmon.o
+ obj-y				+= dev-i2c0.o
+ obj-$(CONFIG_S3C_DEV_I2C1)	+= dev-i2c1.o
+ obj-$(CONFIG_S3C_DEV_FB)	+= dev-fb.o
+diff --git a/arch/arm/plat-samsung/dev-hwmon.c b/arch/arm/plat-samsung/dev-hwmon.c
+new file mode 100644
+index 0000000..b3ffb95
+--- /dev/null
++++ b/arch/arm/plat-samsung/dev-hwmon.c
+@@ -0,0 +1,42 @@
++/* linux/arch/arm/plat-samsung/dev-hwmon.c
++ *
++ * Copyright 2008 Simtec Electronics
++ *	Ben Dooks <ben@simtec.co.uk>
++ *	http://armlinux.simtec.co.uk/
++ *
++ * Adapted for HWMON by Maurus Cuelenaere
++ *
++ * Samsung series device definition for HWMON
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++#include <plat/devs.h>
++#include <plat/hwmon.h>
++
++struct platform_device s3c_device_hwmon = {
++	.name		= "s3c-hwmon",
++	.id		= -1,
++	.dev.parent	= &s3c_device_adc.dev,
++};
++
++void __init s3c_hwmon_set_platdata(struct s3c_hwmon_pdata *pd)
++{
++	struct s3c_hwmon_pdata *npd;
++
++	if (!pd) {
++		printk(KERN_ERR "%s: no platform data\n", __func__);
++		return;
++	}
++
++	npd = kmemdup(pd, sizeof(struct s3c_hwmon_pdata), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++
++	s3c_device_hwmon.dev.platform_data = npd;
++}
+diff --git a/arch/arm/plat-samsung/include/plat/hwmon.h b/arch/arm/plat-samsung/include/plat/hwmon.h
+index 1ba88ea..c167e44 100644
+--- a/arch/arm/plat-samsung/include/plat/hwmon.h
++++ b/arch/arm/plat-samsung/include/plat/hwmon.h
+@@ -37,5 +37,15 @@ struct s3c_hwmon_pdata {
+ 	struct s3c_hwmon_chcfg	*in[8];
+ };
+ 
++/**
++ * s3c_hwmon_set_platdata - Set platform data for S3C HWMON device
++ * @pd: Platform data to register to device.
++ *
++ * Register the given platform data for use with the S3C HWMON device.
++ * The call will copy the platform data, so the board definitions can
++ * make the structure itself __initdata.
++ */
++extern void __init s3c_hwmon_set_platdata(struct s3c_hwmon_pdata *pd);
++
+ #endif /* __ASM_ARCH_ADC_HWMON_H */
+ 
+-- 
+1.7.1
