@@ -1,33 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 May 2010 21:48:36 +0100
-Subject: [PATCH v4 4/5(7)] input: serio: add support for Amstrad Delta
-	serial keyboard port
-In-Reply-To: <20100504204041.GL29604@atomide.com>
-References: <201004280252.58420.jkrzyszt@tis.icnet.pl>
-	<201004280310.52678.jkrzyszt@tis.icnet.pl>
-	<20100504204041.GL29604@atomide.com>
-Message-ID: <20100504204836.GJ30601@n2100.arm.linux.org.uk>
+From: noodles@earth.li (Jonathan McDowell)
+Date: Tue, 4 May 2010 21:55:50 +0100
+Subject: [PATCH 1/2] pxa/vpac270: Enable SparseMEM for 256 MB of RAM
+In-Reply-To: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
+References: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100504205550.GP3292@earth.li>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 04, 2010 at 01:40:41PM -0700, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [100427 18:09]:
-> > The patch introduces a serio driver that supports a keyboard serial port found
-> > on the Amstrad Delta videophone board.
-> > 
-> > After initializing the hardware, the driver reads its input data from a buffer
-> > filled in by the board FIQ (Fast Interrupt Request) handler.
-> > 
-> > Standard AT keyboard driver (atkbd) will be used on top of the serio layer for 
-> > handling the E3 keyboard (called mailboard) connected to the port. Since the 
-> > device generated scancodes differ from what the atkbd expects, a custom key 
-> > code to scan code table must be loaded from userspace for the keyboard to be 
-> > useable.
+On Tue, May 04, 2010 at 06:57:08PM +0200, Marek Vasut wrote:
+> This patch enables SparseMEM for the Voipac PXA270 board. To work
+> around the PHYS_OFFSET being set to 0xa0000000 and disallowing us to
+> map the other partition at 0x80000000, the physical-to-virtual mapping
+> of SDRAM was altered and the partition at 0x80000000 was moved to
+> 0x10000000 in virtual memory (past the first SDRAM partition). As the
+> Voipac PXA270 is probably the only PXA270 device which utilizes 256 MB
+> of RAM, adding the following code into memory.h seems much less
+> painful than tinkering with PHYS_OFFSET.
+...
+> +/*
+> + * Voipac PXA270/PXA270M is probably the only board in the world with PXA27x
+> + * that uses more than 128MB or SDRAM (256MB in the 'max configuration'). This
 
-What's the rationale for this approach?  There's no requirement for the
-atkbd driver to be used for all keyboards.  It seems very obscure (and
-backward) way to do things.
+I think you mean "of SDRAM" here and the Balloon3 can be configured with
+up to 512M (I'm pretty sure there were a few boards that had 768M on
+them too, but I can't find any confirmation of that) and is a PXA270
+board.
 
-Why not implement the serio driver for the IO level, and a separate
-keyboard driver which can handle the protocol and interpret the
-scancodes?
+J.
+
+-- 
+Whatever the risk, NO one ever expects to get caught.
