@@ -1,117 +1,73 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue,  4 May 2010 18:57:09 +0200
-Subject: [PATCH 2/2] pxa/vpac270: Add PMIC support
-In-Reply-To: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
-References: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1272992229-29361-2-git-send-email-marek.vasut@gmail.com>
+Date: Tue, 4 May 2010 19:00:17 +0200
+Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
+In-Reply-To: <1272990536.15948.13.camel@e102109-lin.cambridge.arm.com>
+References: <20100504161829.GE30601@n2100.arm.linux.org.uk>
+	<1272990536.15948.13.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <201005041900.17228.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the MAX1587A used on Voipac PXA270 board.
+Dne ?t 4. kv?tna 2010 18:28:56 Catalin Marinas napsal(a):
+> On Tue, 2010-05-04 at 17:18 +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 04, 2010 at 06:13:28PM +0200, Marek Vasut wrote:
+> > > Dne ?t 25. b?ezna 2010 17:01:26 Catalin Marinas napsal(a):
+> > > > On Thu, 2010-03-25 at 15:30 +0000, Russell King - ARM Linux wrote:
+> > > > > On Thu, Mar 25, 2010 at 03:24:29PM +0000, Catalin Marinas wrote:
+> > > > > > On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
+> > > > > > > While this looks fine, I'd like to see a lot of Tested-by's
+> > > > > > > against this before it's merged - we've had similar code in
+> > > > > > > show_mem() which has proven to be quite problematical to get
+> > > > > > > right for all the various different combinations we have.
+> > > > > > > 
+> > > > > > > However, we also have the same method in show_mem() which we
+> > > > > > > know works fine, so I'd also like to see the problem with
+> > > > > > > using it in mem_init() fully analysed - rather than a
+> > > > > > > "possibly because".
+> > > > > > 
+> > > > > > I can remove the "possibly" part :). The page_count() is given a
+> > > > > > page with some random flags and it thinks it's a compound page.
+> > > > > > It than tries to access page->first which isn't set, hence the
+> > > > > > error.
+> > > > > > 
+> > > > > > The original code assumes that for a given node the map is
+> > > > > > contiguous and it calculates the page as (map + pfn). This is
+> > > > > > only true for flatmem. With sparsemem the page calculation is a
+> > > > > > bit more complicated but handled by pfn_to_page().
+> > > > > 
+> > > > > And show_mem() ?  It seems to suffer from the same problem.
+> > > > 
+> > > > And that's a patch which fixes both (but as you said, it would be
+> > > > good if more people test it on various platforms).
+> > > > 
+> > > > 
+> > > > ARM: Fix kernel memory printing for sparsemem
+> > > > 
+> > > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > > 
+> > > > The show_mem() and mem_init() function are assuming that the page map
+> > > > is contiguous and calculates the start and end page of a bank using
+> > > > (map + pfn). This fails with SPARSEMEM where pfn_to_page() must be
+> > > > used.
+> > > > 
+> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Cc: Will Deacon <Will.Deacon@arm.com>
+> > > > Cc: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
+> > > 
+> > > Works perfectly on my machine. I have a PXA270 based device where I
+> > > have to use sparsemem. Thanks, you can add my:
+> > > 
+> > > Tested-by: Marek Vasut <marek.vasut@gmail.com>
+> > > 
+> > > Russell, the patch looks fine, please apply, the stuff is really
+> > > broken.
+> > 
+> > It's great to see patches getting tested by others ;)
+> > 
+> > Catalin - mind submitting this with Marek's tested-by please?
+> 
+> Done (patch 6093/1).
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/vpac270.c |   59 +++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 57 insertions(+), 2 deletions(-)
+Thanks for the fast response. Catalin, thanks for the patch.
 
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index a87bad5..52e85cb 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -24,6 +24,7 @@
- #include <linux/dm9000.h>
- #include <linux/ucb1400.h>
- #include <linux/ata_platform.h>
-+#include <linux/regulator/max1586.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -420,7 +421,6 @@ static struct i2c_board_info __initdata vpac270_i2c_devs[] = {
- 
- static void __init vpac270_rtc_init(void)
- {
--	pxa_set_i2c_info(NULL);
- 	i2c_register_board_info(0, ARRAY_AND_SIZE(vpac270_i2c_devs));
- }
- #else
-@@ -494,7 +494,8 @@ static inline void vpac270_lcd_init(void) {}
- /******************************************************************************
-  * PATA IDE
-  ******************************************************************************/
--#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
-+#if defined(CONFIG_PATA_PLATFORM) || \
-+	defined(CONFIG_PATA_PLATFORM_MODULE)
- static struct pata_platform_info vpac270_pata_pdata = {
- 	.ioport_shift	= 1,
- 	.irq_flags	= IRQF_TRIGGER_RISING,
-@@ -536,6 +537,57 @@ static inline void vpac270_ide_init(void) {}
- #endif
- 
- /******************************************************************************
-+ * Core power regulator
-+ ******************************************************************************/
-+#if defined(CONFIG_REGULATOR_MAX1586) || defined(CONFIG_REGULATOR_MAX1586_MODULE)
-+static struct regulator_consumer_supply vpac270_max1587a_consumers[] = {
-+	{
-+		.supply	= "vcc_core",
-+	}
-+};
-+
-+static struct regulator_init_data vpac270_max1587a_v3_info = {
-+	.constraints = {
-+		.name		= "vcc_core range",
-+		.min_uV		= 900000,
-+		.max_uV		= 1705000,
-+		.always_on	= 1,
-+		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.consumer_supplies	= vpac270_max1587a_consumers,
-+	.num_consumer_supplies	= ARRAY_SIZE(vpac270_max1587a_consumers),
-+};
-+
-+static struct max1586_subdev_data vpac270_max1587a_subdevs[] = {
-+	{
-+		.name		= "vcc_core",
-+		.id		= MAX1586_V3,
-+		.platform_data	= &vpac270_max1587a_v3_info,
-+	}
-+};
-+
-+static struct max1586_platform_data vpac270_max1587a_info = {
-+	.subdevs     = vpac270_max1587a_subdevs,
-+	.num_subdevs = ARRAY_SIZE(vpac270_max1587a_subdevs),
-+	.v3_gain     = MAX1586_GAIN_R24_3k32, /* 730..1550 mV */
-+};
-+
-+static struct i2c_board_info __initdata vpac270_pi2c_board_info[] = {
-+	{
-+		I2C_BOARD_INFO("max1586", 0x14),
-+		.platform_data	= &vpac270_max1587a_info,
-+	},
-+};
-+
-+static void __init vpac270_pmic_init(void) {
-+	i2c_register_board_info(1, ARRAY_AND_SIZE(vpac270_pi2c_board_info));
-+}
-+#else
-+static inline void vpac270_pmic_init(void) {}
-+#endif
-+
-+
-+/******************************************************************************
-  * Machine init
-  ******************************************************************************/
- static void __init vpac270_init(void)
-@@ -545,7 +597,10 @@ static void __init vpac270_init(void)
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
-+	pxa_set_i2c_info(NULL);
-+	pxa27x_set_i2c_power_info(NULL);
- 
-+	vpac270_pmic_init();
- 	vpac270_lcd_init();
- 	vpac270_mmc_init();
- 	vpac270_nor_init();
--- 
-1.7.0
+Cheers
