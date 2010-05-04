@@ -1,27 +1,21 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 04 May 2010 13:48:18 +0400
-Subject: [PATCH 2.6.34-rc6] mxc: gadget: Fix bitfield for calculating
-	maximum	packet size
-In-Reply-To: <1272915663-21562-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1272915663-21562-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <4BDFED62.3050800@ru.mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 4 May 2010 11:14:58 +0100
+Subject: [PATCH 1/2] regulator: make max8925 sharing one driver structure
+In-Reply-To: <o2o771cded01005040021o74bb8c3cr22c7be427333774b@mail.gmail.com>
+References: <o2o771cded01005040021o74bb8c3cr22c7be427333774b@mail.gmail.com>
+Message-ID: <20100504101457.GB15454@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, May 04, 2010 at 03:21:42AM -0400, Haojian Zhuang wrote:
+> From 782297964a48a3b8547a99de3b5c24d8f02b99ec Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Thu, 29 Apr 2010 13:33:50 -0400
+> Subject: [PATCH] regulator: make max8925 sharing one driver structure
+> 
+> Remove a lot of driver structures in max8925 driver. Make regulators share
+> one driver structure.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Dinh.Nguyen at freescale.com wrote:
-
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->
-> The max packet length bit mask used for isochronous endpoints
-> should be 0x7FF instead of 0x8FF. 0x8FF will actually clear
-> higher-order bits in the max packet length field.
->
-> This patch applies to 2.6.34-rc6.
->
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-
-   You should send this to the linux-usb mailing list.
-
-WBR, Sergei
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
