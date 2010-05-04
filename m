@@ -1,28 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 04 May 2010 16:05:35 +0100
-Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way
-	PL310 (v3)
-In-Reply-To: <1272985254-5675-2-git-send-email-jason.mcmullan@netronome.com>
-References: <1272985254-5675-2-git-send-email-jason.mcmullan@netronome.com>
-Message-ID: <1272985535.15948.6.camel@e102109-lin.cambridge.arm.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Tue, 4 May 2010 20:36:06 +0530
+Subject: build error of v2.6.34-rc6
+In-Reply-To: <s2zf17812d71005040754o91791292vf137741a3c7956e2@mail.gmail.com>
+References: <s2zf17812d71005040754o91791292vf137741a3c7956e2@mail.gmail.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0322BA93EB@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-05-04 at 16:00 +0100, Jason S. McMullan wrote:
-> The L310 cache controller's interface is almost identical
-> to the L210. One major difference is that the PL310 can
-> have up to 16 ways.
+Eric Miao wrote:
 > 
-> This change uses the cache's part ID and the Assciativity
-> bits in the AUX_CTRL register to determine the number of ways.
+> Seems to be a regression introduced since v2.6.34-rc5, the latter I was
+> able to build without the error below:
 > 
-> Also prints out the # of ways, CACHE_ID and AUX_CTRL registers.
-> 
-> Signed-off-by: Jason S. McMullan <jason.mcmullan@netronome.com>
+> /home/ycmiao/linux-2.6/arch/arm/kernel/entry-armv.S: 
+> Assembler messages:
+> /home/ycmiao/linux-2.6/arch/arm/kernel/entry-armv.S:442: Error: symbol ret_from_exception is in a different section
+> /home/ycmiao/linux-2.6/arch/arm/kernel/entry-armv.S:490: Error: symbol ret_from_exception is in a different section
+> /home/ycmiao/linux-2.6/arch/arm/kernel/entry-armv.S:491: Error: symbol __und_usr_unknown is in a different section
+> make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
 
-Looks fine to me.
+Yup. Introduced by 4260415.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+You could temporarily revert that commit, or try this patch
+from Santosh.
 
--- 
-Catalin
+<http://marc.info/?l=linux-arm-kernel&m=127261970426449&w=2>
+
+- Anand
