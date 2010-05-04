@@ -1,35 +1,64 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 04 May 2010 10:26:03 +0300
-Subject: [PATCH 11/11] omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig
-In-Reply-To: <20100504005222.GD29604@atomide.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-	<20100430203411.25812.30019.stgit@baageli.muru.com>
-	<20100430205003.GG29604@atomide.com>
-	<20100504005222.GD29604@atomide.com>
-Message-ID: <1272957963.1978.25.camel@tubuntu.research.nokia.com>
+From: chripell@fsfe.org (christian pellegrin)
+Date: Tue, 4 May 2010 09:34:01 +0200
+Subject: [PATCH v2.6.34-rc2] s3c: Fix GPIOs bank H and J not being
+	preserved during suspend on S3C24XX
+In-Reply-To: <20100504070111.GC26401@trinity.fluff.org>
+References: <1269937386-7597-1-git-send-email-chripell@fsfe.org>
+	<20100504070111.GC26401@trinity.fluff.org>
+Message-ID: <i2lcabda6421005040034hf27d04f7m95ff2cda9333ff93@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 4, 2010 at 9:01 AM, Ben Dooks <ben-linux@fluff.org> wrote:
 
-On Tue, 2010-05-04 at 02:52 +0200, ext Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [100430 13:47]:
-> > * Tony Lindgren <tony@atomide.com> [100430 13:32]:
-> > > Looks like CONFIG_FB_OMAP prevents somehow mounting root on MMC
-> > > at least on zoom3 for multi-omap. Disable CONFIG_FB until the
-> > > omap FB code is fixed.
-> > 
-> > This one I'll drop as soon as the problem is sorted out with
-> > CONFIG_FB_OMAP.
-> 
-> This one seems to be something under drivers/video/omap, so
-> I'll change CONFIG_FB_OMAP to be a module now. Updated patch
-> below.
-> 
-> I'll update omap for-next accordingly, then Tomi can figure
-> it out :)
+>
+> could you send the gpio fix with the above change as a seperate patch
+> please?
+>
 
-This sounds... interesting... =) Any more info on what happens? Does it
-also affect new omapfb driver?
+Yes, no problem, I'll just wait for the "up-comming s3c2410_gpio
+fallout" patches so I can test everything with the new functions.
 
- Tomi
+BTW there is a nastiness in mixing old-style s3c24xx gpios and gpiolib
+ones for the J port found in the s3c2440. For the former you have to
+use S3C241?_GPJ* macros in regs-gpioj.h, for the later S3C2410_GPJ().
+The reason of this is the "hole" in GPIO registers address which
+breaks S3C2410_GPIO_BASE. So I'm looking forward for your
+reorganization of s3c24xx gpio to see if a patch is needed for this.
+Right now I'm using:
+
+diff --git a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
+b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
+index ebc85c6..a2eab90 100644
+--- a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
++++ b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
+@@ -37,7 +37,16 @@
+                                  S3C2400_BASEC2H(pin)+S3C24XX_VA_GPIO)
+
+
+-#define S3C2410_GPIO_BASE(pin)   ((((pin) & ~31) >> 1) + S3C24XX_VA_GPIO)
++#if !defined(__ASSEMBLER__) && defined(S3C24XX_VA_GPIO)
++static inline void *S3C2410_GPIO_BASE(unsigned int pin)
++{
++	unsigned int off = (pin & ~31) >> 1;
++
++	if ((pin & ~31) == S3C2410_GPIO_J_START)
++		off += 0x50;
++	return S3C24XX_VA_GPIO + off;
++}
++#endif
+ #define S3C2410_GPIO_OFFSET(pin) ((pin) & 31)
+
+so if I use, by mistake, S3C2410_GPJ() in s3c2410_gpio_cfgpin I don't
+shoot myself in the foot. If I understand you intentions S3C241?_GPJ*
+will go away after the mentioned patch series. Anyway I wait for your
+reorganization of s3c gpios to resubmit these patches if needed.
+
+Thanks,
+
+-- 
+Christian Pellegrin, see http://www.evolware.org/chri/
+"Real Programmers don't play tennis, or any other sport which requires
+you to change clothes. Mountain climbing is OK, and Real Programmers
+wear their climbing boots to work in case a mountain should suddenly
+spring up in the middle of the computer room."
