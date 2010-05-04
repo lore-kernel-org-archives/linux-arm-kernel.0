@@ -1,40 +1,41 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 4 May 2010 09:04:43 +0100
-Subject: Git pull request: Orion/Kirkwood stuff for 2.6.35
-In-Reply-To: <alpine.LFD.2.00.1005032228210.14468@xanadu.home>
-References: <alpine.LFD.2.00.1005031731010.14468@xanadu.home>
-	<20100504001723.GP6684@trinity.fluff.org>
-	<alpine.LFD.2.00.1005032228210.14468@xanadu.home>
-Message-ID: <20100504080443.GQ2589@trinity.fluff.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 04 May 2010 10:33:18 +0200
+Subject: [PATCH] Add support for Aquita board (Samsung S5PC110 based)
+In-Reply-To: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
+References: <1269515719-18519-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <011501caeb64$74eb38f0$5ec1aad0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 03, 2010 at 10:30:22PM -0400, Nicolas Pitre wrote:
-> On Tue, 4 May 2010, Ben Dooks wrote:
-> 
-> > On Mon, May 03, 2010 at 07:14:23PM -0400, Nicolas Pitre wrote:
-> > > 
-> > > Russell, could you pull:
-> > > 
-> > >     git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git master
-> > > 
-> > > This contains what I have pending for Orion/Kirkwood so far.  Since I'm 
-> > > not working at Marvell anymore, I'm using a different server for this 
-> > > pull request.  If anyone at Marvell is willing to maintain this tree 
-> > > I'll be happy to pass the baton.  Otherwise I'll just collect patches 
-> > > but I don't expect to work much on it myself (this code is in 
-> > > maintenance mode anyway).
-> > 
-> > Could the MAINTAINERS entry be updated, I know Lennert doesn't want to
-> > receive kirkwood patches.
-> 
-> I'll confirm with him and include the update in a future pull request 
-> (I've asked a few people to resend their patches).
+Hello,
 
-Ok, I will try and re-sort the dtcommod patches for tomorrrow.
+On Thursday, March 25, 2010 12:15 PM Marek Szyprowski wrote:
 
--- 
-Ben
+> This patch series add basic support for Samsung Aquila board. The board
+> is based on Samsung S5PC110 SoC. For the basic support of this board, the
+> S5PV210/S5PC110 platform core needs to be updated. This patch series
+> contains patches that add support for gpiolib, software reset and
+> framebuffer helpers. Please expect further extensions to the s5pv210
+> platform core soon.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Is there any progress or comments on merging these patches? What about
+other s5pv210/s5pc110 patches that were posted here?
+
+Some of them are really important bugfixes:
+ARM: S5P6440: Bug fix on PWM Timer
+ARM: S5P6442: Bug fix on PWM Timer
+ARM: S5PV210: Bug fix on PWM Timer
+ARM: Samsung: fix broken timer irq base
+
+The other add really important features to the platform:
+ARM: S5P: Add System Timer
+ARM: Samsung: S5PC100 platform cleanup
+Add S5PV210/S5PC110 platform helpers
+ARM: Samsung: Add platform support code for OneNAND controller
+
+How can I help merging new features and drivers to the Samsung SoC platform?
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
