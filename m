@@ -1,54 +1,34 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Tue, 4 May 2010 23:03:47 +0530
-Subject: [PATCH 02b/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
-In-Reply-To: <20100504005838.GF29604@atomide.com>
-References: <20100430210216.GI29604@atomide.com>
-	<87vdb8hc2d.fsf@deeprootsystems.com>
-	<FCCFB4CDC6E5564B9182F639FC3560870304E80F5F@dbde02.ent.ti.com>
-	<87y6g4d2ic.fsf@deeprootsystems.com>
-	<20100430233002.GJ29604@atomide.com>
-	<87sk6c8osn.fsf@deeprootsystems.com>
-	<20100501013751.GL29604@atomide.com>
-	<20100501015050.GM29604@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC3560870304F5A672@dbde02.ent.ti.com>
-	<20100504004001.GB29604@atomide.com>
-	<20100504005838.GF29604@atomide.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870304F5AC4F@dbde02.ent.ti.com>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
+Date: Tue, 4 May 2010 14:35:50 -0300
+Subject: Suspicious compilation warning
+In-Reply-To: <20100420230719.GB1432@n2100.arm.linux.org.uk>
+References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
+	<20100420155122.6f2c26eb.akpm@linux-foundation.org>
+	<20100420230719.GB1432@n2100.arm.linux.org.uk>
+Message-ID: <n2gcecb6d8f1005041035w51dac3c8ke829a4ae8bf7f408@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Tony
-
->-----Original Message-----
->From: Tony Lindgren [mailto:tony at atomide.com]
->Sent: Monday, May 03, 2010 7:59 PM
->To: Pandita, Vikram
->Cc: Kevin Hilman; linux-arm-kernel at lists.infradead.org; linux-
->omap at vger.kernel.org; Pais, Allen
->Subject: [PATCH 02b/11] omap2/3: Fix DEBUG_LL for omap zoom2/3
+On Tue, Apr 20, 2010 at 20:07, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 >
->And here's this patch one more time. Both 2a and 2b are needed
->for zoom debug uart to work.
-
-Test 1:
-Tested on Zoom3 with 02a and 02b applied. Enabled DEBUG_LL. 
-Booted fine.
-
-Test 2:
-Applied Hack printk.patch (attached)
-Booted fine and duplicate logs can be seen on console => printascii is working.
-
-Ack-by: Vikram Pandita <vikram.pandita@ti.com>
-
+> Well, it'll be about this number on everything using sparsemem extreme:
 >
->Regards,
+> #define SECTIONS_PER_ROOT ? ? ? (PAGE_SIZE / sizeof (struct mem_section))
 >
->Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: printk.patch
-Type: application/octet-stream
-Size: 570 bytes
-Desc: printk.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100504/023b8b66/attachment-0001.obj>
+> and with only 32 sections, this is going to give a NR_SECTION_ROOTS value
+> of zero. ?I think the calculation of NR_SECTIONS_ROOTS is wrong.
+>
+> #define NR_SECTION_ROOTS ? ? ? ?(NR_MEM_SECTIONS / SECTIONS_PER_ROOT)
+>
+> Clearly if we have 1 mem section, we want to have one section root, so
+> I think this division should round up any fractional part, thusly:
+>
+> #define NR_SECTION_ROOTS ? ? ? ?((NR_MEM_SECTIONS + SECTIONS_PER_ROOT - 1) / SECTIONS_PER_ROOT)
+
+Seems correct to me, Is there any idea when this gets committed?
+
+Regards,
+Marcelo.
