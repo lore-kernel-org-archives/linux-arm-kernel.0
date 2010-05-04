@@ -1,367 +1,347 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  4 May 2010 11:37:32 +0900
-Subject: [PATCH 2/2] ARM: S5PV210: Add GPIO register definitions
-Message-ID: <1272940652-31254-1-git-send-email-kgene.kim@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 4 May 2010 12:18:32 +0900
+Subject: [PATCH v2 1/2] ARM: S5PV210: Add S5PV210 GPIO support
+In-Reply-To: <1272940641-31220-1-git-send-email-kgene.kim@samsung.com>
+References: <1272940641-31220-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <t2n9c9fda241005032018odc1eb6beia07c6252f25ded2b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+Hi,
 
-This patch adds GPIO register definitions for group interrupt.
+On Tue, May 4, 2010 at 11:37 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch adds GPIOlib support for S5PV210.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-s5pv210/gpio.c ? ? ? ? ? ? ? ? ? | ?495 ++++++++++++++++++++++++
+> ?arch/arm/mach-s5pv210/include/mach/gpio.h ? ? ?| ? 97 +++++-
+> ?arch/arm/mach-s5pv210/include/mach/regs-gpio.h | ? 77 ++++
+> ?4 files changed, 667 insertions(+), 4 deletions(-)
+> ?create mode 100644 arch/arm/mach-s5pv210/gpio.c
+> ?create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+>
+> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+> index 7469d10..cb959ea 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -12,7 +12,7 @@ obj- ? ? ? ? ? ? ? ? ? ? ? ? ?:=
+>
+> ?# Core support for S5PV210 system
+>
+> -obj-$(CONFIG_CPU_S5PV210) ? ? ?+= cpu.o init.o clock.o
+> +obj-$(CONFIG_CPU_S5PV210) ? ? ?+= cpu.o init.o clock.o gpio.o
+>
+> ?# machine support
+>
+> diff --git a/arch/arm/mach-s5pv210/gpio.c b/arch/arm/mach-s5pv210/gpio.c
+> new file mode 100644
+> index 0000000..88f4802
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/gpio.c
+> @@ -0,0 +1,495 @@
+> +/* linux/arch/arm/mach-s5pv210/gpio.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + * ? ? ? ? ? ? http://www.samsung.com/
+> + *
+> + * S5PV210 - GPIOlib support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/irq.h>
+> +#include <linux/io.h>
+> +#include <mach/map.h>
+> +#include <mach/gpio.h>
+> +#include <mach/regs-gpio.h>
+> +#include <plat/gpio-core.h>
+> +#include <plat/gpio-cfg.h>
+> +#include <plat/gpio-cfg-helpers.h>
+> +
+> +static struct s3c_gpio_cfg gpio_cfg = {
+> + ? ? ? .cfg_eint ? ? ? = 0xf,
 
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5pv210/include/mach/regs-gpio.h |  338 ++++++++++++++++++++----
- 1 files changed, 282 insertions(+), 56 deletions(-)
+What's the purpose of 'cfg_eint'? As I know no place to use it.
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-index c78bbeb..4968b06 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-@@ -17,61 +17,287 @@
- 
- /* Base addresses for each of the banks */
- 
--#define S5PV210_GPA0_BASE	(S5P_VA_GPIO + 0x000)
--#define S5PV210_GPA1_BASE	(S5P_VA_GPIO + 0x020)
--#define S5PV210_GPB_BASE	(S5P_VA_GPIO + 0x040)
--#define S5PV210_GPC0_BASE	(S5P_VA_GPIO + 0x060)
--#define S5PV210_GPC1_BASE	(S5P_VA_GPIO + 0x080)
--#define S5PV210_GPD0_BASE	(S5P_VA_GPIO + 0x0A0)
--#define S5PV210_GPD1_BASE	(S5P_VA_GPIO + 0x0C0)
--#define S5PV210_GPE0_BASE	(S5P_VA_GPIO + 0x0E0)
--#define S5PV210_GPE1_BASE	(S5P_VA_GPIO + 0x100)
--#define S5PV210_GPF0_BASE	(S5P_VA_GPIO + 0x120)
--#define S5PV210_GPF1_BASE	(S5P_VA_GPIO + 0x140)
--#define S5PV210_GPF2_BASE	(S5P_VA_GPIO + 0x160)
--#define S5PV210_GPF3_BASE	(S5P_VA_GPIO + 0x180)
--#define S5PV210_GPG0_BASE	(S5P_VA_GPIO + 0x1A0)
--#define S5PV210_GPG1_BASE	(S5P_VA_GPIO + 0x1C0)
--#define S5PV210_GPG2_BASE	(S5P_VA_GPIO + 0x1E0)
--#define S5PV210_GPG3_BASE	(S5P_VA_GPIO + 0x200)
--#define S5PV210_GPH0_BASE	(S5P_VA_GPIO + 0xC00)
--#define S5PV210_GPH1_BASE	(S5P_VA_GPIO + 0xC20)
--#define S5PV210_GPH2_BASE	(S5P_VA_GPIO + 0xC40)
--#define S5PV210_GPH3_BASE	(S5P_VA_GPIO + 0xC60)
--#define S5PV210_GPI_BASE	(S5P_VA_GPIO + 0x220)
--#define S5PV210_GPJ0_BASE	(S5P_VA_GPIO + 0x240)
--#define S5PV210_GPJ1_BASE	(S5P_VA_GPIO + 0x260)
--#define S5PV210_GPJ2_BASE	(S5P_VA_GPIO + 0x280)
--#define S5PV210_GPJ3_BASE	(S5P_VA_GPIO + 0x2A0)
--#define S5PV210_GPJ4_BASE	(S5P_VA_GPIO + 0x2C0)
--#define S5PV210_MP01_BASE	(S5P_VA_GPIO + 0x2E0)
--#define S5PV210_MP02_BASE	(S5P_VA_GPIO + 0x300)
--#define S5PV210_MP03_BASE	(S5P_VA_GPIO + 0x320)
--#define S5PV210_MP04_BASE	(S5P_VA_GPIO + 0x340)
--#define S5PV210_MP05_BASE	(S5P_VA_GPIO + 0x360)
--#define S5PV210_MP06_BASE	(S5P_VA_GPIO + 0x380)
--#define S5PV210_MP07_BASE	(S5P_VA_GPIO + 0x3A0)
--#define S5PV210_MP10_BASE	(S5P_VA_GPIO + 0x3C0)
--#define S5PV210_MP11_BASE	(S5P_VA_GPIO + 0x3E0)
--#define S5PV210_MP12_BASE	(S5P_VA_GPIO + 0x400)
--#define S5PV210_MP13_BASE	(S5P_VA_GPIO + 0x420)
--#define S5PV210_MP14_BASE	(S5P_VA_GPIO + 0x440)
--#define S5PV210_MP15_BASE	(S5P_VA_GPIO + 0x460)
--#define S5PV210_MP16_BASE	(S5P_VA_GPIO + 0x480)
--#define S5PV210_MP17_BASE	(S5P_VA_GPIO + 0x4A0)
--#define S5PV210_MP18_BASE	(S5P_VA_GPIO + 0x4C0)
--#define S5PV210_MP20_BASE	(S5P_VA_GPIO + 0x4E0)
--#define S5PV210_MP21_BASE	(S5P_VA_GPIO + 0x500)
--#define S5PV210_MP22_BASE	(S5P_VA_GPIO + 0x520)
--#define S5PV210_MP23_BASE	(S5P_VA_GPIO + 0x540)
--#define S5PV210_MP24_BASE	(S5P_VA_GPIO + 0x560)
--#define S5PV210_MP25_BASE	(S5P_VA_GPIO + 0x580)
--#define S5PV210_MP26_BASE	(S5P_VA_GPIO + 0x5A0)
--#define S5PV210_MP27_BASE	(S5P_VA_GPIO + 0x5C0)
--#define S5PV210_MP28_BASE	(S5P_VA_GPIO + 0x5E0)
--#define S5PV210_ETC0_BASE	(S5P_VA_GPIO + 0x600)
--#define S5PV210_ETC1_BASE	(S5P_VA_GPIO + 0x620)
--#define S5PV210_ETC2_BASE	(S5P_VA_GPIO + 0x640)
--#define S5PV210_ETC4_BASE	(S5P_VA_GPIO + 0x660)
-+#define S5PV210_GPA0_BASE		(S5P_VA_GPIO + 0x000)
-+#define S5PV210_GPA1_BASE		(S5P_VA_GPIO + 0x020)
-+#define S5PV210_GPB_BASE 		(S5P_VA_GPIO + 0x040)
-+#define S5PV210_GPC0_BASE		(S5P_VA_GPIO + 0x060)
-+#define S5PV210_GPC1_BASE		(S5P_VA_GPIO + 0x080)
-+#define S5PV210_GPD0_BASE		(S5P_VA_GPIO + 0x0A0)
-+#define S5PV210_GPD1_BASE		(S5P_VA_GPIO + 0x0C0)
-+#define S5PV210_GPE0_BASE		(S5P_VA_GPIO + 0x0E0)
-+#define S5PV210_GPE1_BASE		(S5P_VA_GPIO + 0x100)
-+#define S5PV210_GPF0_BASE		(S5P_VA_GPIO + 0x120)
-+#define S5PV210_GPF1_BASE		(S5P_VA_GPIO + 0x140)
-+#define S5PV210_GPF2_BASE		(S5P_VA_GPIO + 0x160)
-+#define S5PV210_GPF3_BASE		(S5P_VA_GPIO + 0x180)
-+#define S5PV210_GPG0_BASE		(S5P_VA_GPIO + 0x1A0)
-+#define S5PV210_GPG1_BASE		(S5P_VA_GPIO + 0x1C0)
-+#define S5PV210_GPG2_BASE		(S5P_VA_GPIO + 0x1E0)
-+#define S5PV210_GPG3_BASE		(S5P_VA_GPIO + 0x200)
-+#define S5PV210_GPH0_BASE		(S5P_VA_GPIO + 0xC00)
-+#define S5PV210_GPH1_BASE		(S5P_VA_GPIO + 0xC20)
-+#define S5PV210_GPH2_BASE		(S5P_VA_GPIO + 0xC40)
-+#define S5PV210_GPH3_BASE		(S5P_VA_GPIO + 0xC60)
-+#define S5PV210_GPI_BASE 		(S5P_VA_GPIO + 0x220)
-+#define S5PV210_GPJ0_BASE		(S5P_VA_GPIO + 0x240)
-+#define S5PV210_GPJ1_BASE		(S5P_VA_GPIO + 0x260)
-+#define S5PV210_GPJ2_BASE		(S5P_VA_GPIO + 0x280)
-+#define S5PV210_GPJ3_BASE		(S5P_VA_GPIO + 0x2A0)
-+#define S5PV210_GPJ4_BASE		(S5P_VA_GPIO + 0x2C0)
-+#define S5PV210_MP01_BASE		(S5P_VA_GPIO + 0x2E0)
-+#define S5PV210_MP02_BASE		(S5P_VA_GPIO + 0x300)
-+#define S5PV210_MP03_BASE		(S5P_VA_GPIO + 0x320)
-+#define S5PV210_MP04_BASE		(S5P_VA_GPIO + 0x340)
-+#define S5PV210_MP05_BASE		(S5P_VA_GPIO + 0x360)
-+#define S5PV210_MP06_BASE		(S5P_VA_GPIO + 0x380)
-+#define S5PV210_MP07_BASE		(S5P_VA_GPIO + 0x3A0)
-+#define S5PV210_MP10_BASE		(S5P_VA_GPIO + 0x3C0)
-+#define S5PV210_MP11_BASE		(S5P_VA_GPIO + 0x3E0)
-+#define S5PV210_MP12_BASE		(S5P_VA_GPIO + 0x400)
-+#define S5PV210_MP13_BASE		(S5P_VA_GPIO + 0x420)
-+#define S5PV210_MP14_BASE		(S5P_VA_GPIO + 0x440)
-+#define S5PV210_MP15_BASE		(S5P_VA_GPIO + 0x460)
-+#define S5PV210_MP16_BASE		(S5P_VA_GPIO + 0x480)
-+#define S5PV210_MP17_BASE		(S5P_VA_GPIO + 0x4A0)
-+#define S5PV210_MP18_BASE		(S5P_VA_GPIO + 0x4C0)
-+#define S5PV210_MP20_BASE		(S5P_VA_GPIO + 0x4E0)
-+#define S5PV210_MP21_BASE		(S5P_VA_GPIO + 0x500)
-+#define S5PV210_MP22_BASE		(S5P_VA_GPIO + 0x520)
-+#define S5PV210_MP23_BASE		(S5P_VA_GPIO + 0x540)
-+#define S5PV210_MP24_BASE		(S5P_VA_GPIO + 0x560)
-+#define S5PV210_MP25_BASE		(S5P_VA_GPIO + 0x580)
-+#define S5PV210_MP26_BASE		(S5P_VA_GPIO + 0x5A0)
-+#define S5PV210_MP27_BASE		(S5P_VA_GPIO + 0x5C0)
-+#define S5PV210_MP28_BASE		(S5P_VA_GPIO + 0x5E0)
-+#define S5PV210_ETC0_BASE		(S5P_VA_GPIO + 0x600)
-+#define S5PV210_ETC1_BASE		(S5P_VA_GPIO + 0x620)
-+#define S5PV210_ETC2_BASE		(S5P_VA_GPIO + 0x640)
-+#define S5PV210_ETC4_BASE		(S5P_VA_GPIO + 0x660)
-+
-+#define S5PV210_GPA0_INT_CON		(S5P_VA_GPIO + 0x700)
-+#define S5PV210_GPA0_INTFLTCON0		(S5P_VA_GPIO + 0x800)
-+#define S5PV210_GPA0_INTFLTCON1		(S5P_VA_GPIO + 0x804)
-+#define S5PV210_GPA0_INT_MASK		(S5P_VA_GPIO + 0x900)
-+#define S5PV210_GPA0_INT_PEND		(S5P_VA_GPIO + 0xA00)
-+#define S5PV210_GPA0_INT_FIXPRI		(S5P_VA_GPIO + 0xB14)
-+
-+#define S5PV210_GPA1_INT_CON		(S5P_VA_GPIO + 0x704)
-+#define S5PV210_GPA1_INTFLTCON0		(S5P_VA_GPIO + 0x808)
-+#define S5PV210_GPA1_INTFLTCON1		(S5P_VA_GPIO + 0x80C)
-+#define S5PV210_GPA1_INT_MASK		(S5P_VA_GPIO + 0x904)
-+#define S5PV210_GPA1_INT_PEND		(S5P_VA_GPIO + 0xA04)
-+#define S5PV210_GPA1_INT_FIXPRI		(S5P_VA_GPIO + 0xB18)
-+
-+#define S5PV210_GPB_INT_CON		(S5P_VA_GPIO + 0x708)
-+#define S5PV210_GPB_INTFLTCON0		(S5P_VA_GPIO + 0x810)
-+#define S5PV210_GPB_INTFLTCON1		(S5P_VA_GPIO + 0x814)
-+#define S5PV210_GPB_INT_MASK		(S5P_VA_GPIO + 0x908)
-+#define S5PV210_GPB_INT_PEND		(S5P_VA_GPIO + 0xA08)
-+#define S5PV210_GPB_INT_FIXPRI		(S5P_VA_GPIO + 0xB1C)
-+
-+#define S5PV210_GPC0_INT_CON		(S5P_VA_GPIO + 0x70C)
-+#define S5PV210_GPC0_INTFLTCON0		(S5P_VA_GPIO + 0x818)
-+#define S5PV210_GPC0_INTFLTCON1		(S5P_VA_GPIO + 0x81C)
-+#define S5PV210_GPC0_INT_MASK		(S5P_VA_GPIO + 0x90C)
-+#define S5PV210_GPC0_INT_PEND		(S5P_VA_GPIO + 0xA0C)
-+#define S5PV210_GPC0_INT_FIXPRI		(S5P_VA_GPIO + 0xB20)
-+
-+#define S5PV210_GPC1_INT_CON		(S5P_VA_GPIO + 0x710)
-+#define S5PV210_GPC1_INTFLTCON0		(S5P_VA_GPIO + 0x820)
-+#define S5PV210_GPC1_INTFLTCON1		(S5P_VA_GPIO + 0x824)
-+#define S5PV210_GPC1_INT_MASK		(S5P_VA_GPIO + 0x910)
-+#define S5PV210_GPC1_INT_PEND		(S5P_VA_GPIO + 0xA10)
-+#define S5PV210_GPC1_INT_FIXPRI		(S5P_VA_GPIO + 0xB24)
-+
-+#define S5PV210_GPD0_INT_CON		(S5P_VA_GPIO + 0x714)
-+#define S5PV210_GPD0_INTFLTCON0		(S5P_VA_GPIO + 0x828)
-+#define S5PV210_GPD0_INTFLTCON1		(S5P_VA_GPIO + 0x82C)
-+#define S5PV210_GPD0_INT_MASK		(S5P_VA_GPIO + 0x914)
-+#define S5PV210_GPD0_INT_PEND		(S5P_VA_GPIO + 0xA14)
-+#define S5PV210_GPD0_INT_FIXPRI		(S5P_VA_GPIO + 0xB28)
-+
-+#define S5PV210_GPD1_INT_CON		(S5P_VA_GPIO + 0x718)
-+#define S5PV210_GPD1_INTFLTCON0		(S5P_VA_GPIO + 0x830)
-+#define S5PV210_GPD1_INTFLTCON1		(S5P_VA_GPIO + 0x834)
-+#define S5PV210_GPD1_INT_MASK		(S5P_VA_GPIO + 0x918)
-+#define S5PV210_GPD1_INT_PEND		(S5P_VA_GPIO + 0xA18)
-+#define S5PV210_GPD1_INT_FIXPRI		(S5P_VA_GPIO + 0xB2C)
-+
-+#define S5PV210_GPE0_INT_CON		(S5P_VA_GPIO + 0x71C)
-+#define S5PV210_GPE0_INTFLTCON0		(S5P_VA_GPIO + 0x838)
-+#define S5PV210_GPE0_INTFLTCON1		(S5P_VA_GPIO + 0x83C)
-+#define S5PV210_GPE0_INT_MASK		(S5P_VA_GPIO + 0x91C)
-+#define S5PV210_GPE0_INT_PEND		(S5P_VA_GPIO + 0xA1C)
-+#define S5PV210_GPE0_INT_FIXPRI		(S5P_VA_GPIO + 0xB30)
-+
-+#define S5PV210_GPE1_INT_CON		(S5P_VA_GPIO + 0x720)
-+#define S5PV210_GPE1_INTFLTCON0		(S5P_VA_GPIO + 0x840)
-+#define S5PV210_GPE1_INTFLTCON1		(S5P_VA_GPIO + 0x844)
-+#define S5PV210_GPE1_INT_MASK		(S5P_VA_GPIO + 0x920)
-+#define S5PV210_GPE1_INT_PEND		(S5P_VA_GPIO + 0xA20)
-+#define S5PV210_GPE1_INT_FIXPRI		(S5P_VA_GPIO + 0xB34)
-+
-+#define S5PV210_GPF0_INT_CON		(S5P_VA_GPIO + 0x724)
-+#define S5PV210_GPF0_INTFLTCON0		(S5P_VA_GPIO + 0x848)
-+#define S5PV210_GPF0_INTFLTCON1		(S5P_VA_GPIO + 0x84C)
-+#define S5PV210_GPF0_INT_MASK		(S5P_VA_GPIO + 0x924)
-+#define S5PV210_GPF0_INT_PEND		(S5P_VA_GPIO + 0xA24)
-+#define S5PV210_GPF0_INT_FIXPRI		(S5P_VA_GPIO + 0xB38)
-+
-+#define S5PV210_GPF1_INT_CON		(S5P_VA_GPIO + 0x728)
-+#define S5PV210_GPF1_INTFLTCON0		(S5P_VA_GPIO + 0x850)
-+#define S5PV210_GPF1_INTFLTCON1		(S5P_VA_GPIO + 0x854)
-+#define S5PV210_GPF1_INT_MASK		(S5P_VA_GPIO + 0x928)
-+#define S5PV210_GPF1_INT_PEND		(S5P_VA_GPIO + 0xA28)
-+#define S5PV210_GPF1_INT_FIXPRI		(S5P_VA_GPIO + 0xB3C)
-+
-+#define S5PV210_GPF2_INT_CON		(S5P_VA_GPIO + 0x72C)
-+#define S5PV210_GPF2_INTFLTCON0		(S5P_VA_GPIO + 0x858)
-+#define S5PV210_GPF2_INTFLTCON1		(S5P_VA_GPIO + 0x85C)
-+#define S5PV210_GPF2_INT_MASK		(S5P_VA_GPIO + 0x92C)
-+#define S5PV210_GPF2_INT_PEND		(S5P_VA_GPIO + 0xA2C)
-+#define S5PV210_GPF2_INT_FIXPRI		(S5P_VA_GPIO + 0xB40)
-+
-+#define S5PV210_GPF3_INT_CON		(S5P_VA_GPIO + 0x730)
-+#define S5PV210_GPF3_INTFLTCON0		(S5P_VA_GPIO + 0x860)
-+#define S5PV210_GPF3_INTFLTCON1		(S5P_VA_GPIO + 0x864)
-+#define S5PV210_GPF3_INT_MASK		(S5P_VA_GPIO + 0x930)
-+#define S5PV210_GPF3_INT_PEND		(S5P_VA_GPIO + 0xA30)
-+#define S5PV210_GPF3_INT_FIXPRI		(S5P_VA_GPIO + 0xB44)
-+
-+#define S5PV210_GPG0_INT_CON		(S5P_VA_GPIO + 0x734)
-+#define S5PV210_GPG0_INTFLTCON0		(S5P_VA_GPIO + 0x868)
-+#define S5PV210_GPG0_INTFLTCON1		(S5P_VA_GPIO + 0x86C)
-+#define S5PV210_GPG0_INT_MASK		(S5P_VA_GPIO + 0x934)
-+#define S5PV210_GPG0_INT_PEND		(S5P_VA_GPIO + 0xA34)
-+#define S5PV210_GPG0_INT_FIXPRI		(S5P_VA_GPIO + 0xB48)
-+
-+#define S5PV210_GPG1_INT_CON		(S5P_VA_GPIO + 0x738)
-+#define S5PV210_GPG1_INTFLTCON0		(S5P_VA_GPIO + 0x870)
-+#define S5PV210_GPG1_INTFLTCON1		(S5P_VA_GPIO + 0x874)
-+#define S5PV210_GPG1_INT_MASK		(S5P_VA_GPIO + 0x938)
-+#define S5PV210_GPG1_INT_PEND		(S5P_VA_GPIO + 0xA38)
-+#define S5PV210_GPG1_INT_FIXPRI		(S5P_VA_GPIO + 0xB4C)
-+
-+#define S5PV210_GPG2_INT_CON		(S5P_VA_GPIO + 0x73C)
-+#define S5PV210_GPG2_INTFLTCON0		(S5P_VA_GPIO + 0x878)
-+#define S5PV210_GPG2_INTFLTCON1		(S5P_VA_GPIO + 0x87C)
-+#define S5PV210_GPG2_INT_MASK		(S5P_VA_GPIO + 0x93C)
-+#define S5PV210_GPG2_INT_PEND		(S5P_VA_GPIO + 0xA3C)
-+#define S5PV210_GPG2_INT_FIXPRI		(S5P_VA_GPIO + 0xB50)
-+
-+#define S5PV210_GPG3_INT_CON		(S5P_VA_GPIO + 0x740)
-+#define S5PV210_GPG3_INTFLTCON0		(S5P_VA_GPIO + 0x880)
-+#define S5PV210_GPG3_INTFLTCON1		(S5P_VA_GPIO + 0x884)
-+#define S5PV210_GPG3_INT_MASK		(S5P_VA_GPIO + 0x940)
-+#define S5PV210_GPG3_INT_PEND		(S5P_VA_GPIO + 0xA40)
-+#define S5PV210_GPG3_INT_FIXPRI		(S5P_VA_GPIO + 0xB54)
-+
-+#define S5PV210_GPJ0_INT_CON		(S5P_VA_GPIO + 0x744)
-+#define S5PV210_GPJ0_INTFLTCON0		(S5P_VA_GPIO + 0x888)
-+#define S5PV210_GPJ0_INTFLTCON1		(S5P_VA_GPIO + 0x88C)
-+#define S5PV210_GPJ0_INT_MASK		(S5P_VA_GPIO + 0x944)
-+#define S5PV210_GPJ0_INT_PEND		(S5P_VA_GPIO + 0xA44)
-+#define S5PV210_GPJ0_INT_FIXPRI		(S5P_VA_GPIO + 0xB58)
-+
-+#define S5PV210_GPJ1_INT_CON		(S5P_VA_GPIO + 0x748)
-+#define S5PV210_GPJ1_INTFLTCON0		(S5P_VA_GPIO + 0x890)
-+#define S5PV210_GPJ1_INTFLTCON1		(S5P_VA_GPIO + 0x894)
-+#define S5PV210_GPJ1_INT_MASK		(S5P_VA_GPIO + 0x948)
-+#define S5PV210_GPJ1_INT_PEND		(S5P_VA_GPIO + 0xA48)
-+#define S5PV210_GPJ1_INT_FIXPRI		(S5P_VA_GPIO + 0xB5C)
-+
-+#define S5PV210_GPJ2_INT_CON		(S5P_VA_GPIO + 0x74C)
-+#define S5PV210_GPJ2_INTFLTCON0		(S5P_VA_GPIO + 0x898)
-+#define S5PV210_GPJ2_INTFLTCON1		(S5P_VA_GPIO + 0x89C)
-+#define S5PV210_GPJ2_INT_MASK		(S5P_VA_GPIO + 0x94C)
-+#define S5PV210_GPJ2_INT_PEND		(S5P_VA_GPIO + 0xA4C)
-+#define S5PV210_GPJ2_INT_FIXPRI		(S5P_VA_GPIO + 0xB60)
-+
-+#define S5PV210_GPJ3_INT_CON		(S5P_VA_GPIO + 0x750)
-+#define S5PV210_GPJ3_INTFLTCON0		(S5P_VA_GPIO + 0x8A0)
-+#define S5PV210_GPJ3_INTFLTCON1		(S5P_VA_GPIO + 0x8A4)
-+#define S5PV210_GPJ3_INT_MASK		(S5P_VA_GPIO + 0x950)
-+#define S5PV210_GPJ3_INT_PEND		(S5P_VA_GPIO + 0xA50)
-+#define S5PV210_GPJ3_INT_FIXPRI		(S5P_VA_GPIO + 0xB64)
-+
-+#define S5PV210_GPJ4_INT_CON		(S5P_VA_GPIO + 0x754)
-+#define S5PV210_GPJ4_INTFLTCON0		(S5P_VA_GPIO + 0x8A8)
-+#define S5PV210_GPJ4_INTFLTCON1		(S5P_VA_GPIO + 0x8AC)
-+#define S5PV210_GPJ4_INT_MASK		(S5P_VA_GPIO + 0x954)
-+#define S5PV210_GPJ4_INT_PEND		(S5P_VA_GPIO + 0xA54)
-+#define S5PV210_GPJ4_INT_FIXPRI		(S5P_VA_GPIO + 0xB68)
-+
-+#define S5PV210_EXT_INT_GRPPRI		(S5P_VA_GPIO + 0xB00)
-+#define S5PV210_EXT_INT_PRIO		(S5P_VA_GPIO + 0xB04)
-+#define S5PV210_EXT_INT_SVC		(S5P_VA_GPIO + 0xB08)
-+#define S5PV210_EXT_INT_SVC_PND		(S5P_VA_GPIO + 0xB0C)
-+#define S5PV210_EXT_INT_GRPFIXPRI	(S5P_VA_GPIO + 0xB10)
-+
-+#define S5PV210_EINT30CON		(S5P_VA_GPIO + 0xE00)
-+#define S5PV210_EINT31CON		(S5P_VA_GPIO + 0xE04)
-+#define S5PV210_EINT32CON		(S5P_VA_GPIO + 0xE08)
-+#define S5PV210_EINT33CON		(S5P_VA_GPIO + 0xE0C)
-+
-+#define S5P_EINT_CON(x)			(S5PV210_EINT30CON + ((x) * 0x4))
-+
-+#define S5PV210_EINT30FLTCON0		(S5P_VA_GPIO + 0xE80)
-+#define S5PV210_EINT30FLTCON1		(S5P_VA_GPIO + 0xE84)
-+#define S5PV210_EINT31FLTCON0		(S5P_VA_GPIO + 0xE88)
-+#define S5PV210_EINT31FLTCON1		(S5P_VA_GPIO + 0xE8C)
-+#define S5PV210_EINT32FLTCON0		(S5P_VA_GPIO + 0xE90)
-+#define S5PV210_EINT32FLTCON1		(S5P_VA_GPIO + 0xE94)
-+#define S5PV210_EINT33FLTCON0		(S5P_VA_GPIO + 0xE98)
-+#define S5PV210_EINT33FLTCON1		(S5P_VA_GPIO + 0xE9C)
-+
-+#define S5P_EINT_FLTCON(x)		(S5PV210_EINT30FLTCON0 + ((x) * 0x4))
-+
-+#define S5PV210_EINT30MASK		(S5P_VA_GPIO + 0xF00)
-+#define S5PV210_EINT31MASK		(S5P_VA_GPIO + 0xF04)
-+#define S5PV210_EINT32MASK		(S5P_VA_GPIO + 0xF08)
-+#define S5PV210_EINT33MASK		(S5P_VA_GPIO + 0xF0C)
-+
-+#define S5P_EINT_MASK(x)		(S5PV210_EINT30MASK + ((x) * 0x4))
-+
-+#define S5PV210_EINT30PEND		(S5P_VA_GPIO + 0xF40)
-+#define S5PV210_EINT31PEND		(S5P_VA_GPIO + 0xF44)
-+#define S5PV210_EINT32PEND		(S5P_VA_GPIO + 0xF48)
-+#define S5PV210_EINT33PEND		(S5P_VA_GPIO + 0xF4C)
-+
-+#define S5P_EINT_PEND(x)		(S5PV210_EINT30PEND + ((x) * 0x4))
-+
-+#define eint_offset(irq)		((irq) < IRQ_EINT16_31 ? ((irq)-IRQ_EINT0)	\
-+						: (irq-S5P_IRQ_EINT_BASE))
-+
-+#define eint_irq_to_bit(irq)		(1 << (eint_offset(irq) & 0x7))
-+
-+#define eint_conf_reg(irq)		((eint_offset(irq)) >> 3)
-+#define eint_filt_reg(irq)		((eint_offset(irq)) >> 2)
-+#define eint_mask_reg(irq)		((eint_offset(irq)) >> 3)
-+#define eint_pend_reg(irq)		((eint_offset(irq)) >> 3)
-+
-+#define S5P_EINT30CON			S5PV210_EINT30CON
-+#define S5P_EINT31CON			S5PV210_EINT31CON
-+#define S5P_EINT32CON			S5PV210_EINT32CON
-+#define S5P_EINT33CON			S5PV210_EINT33CON
-+#define S5P_EINT30FLTCON0		S5PV210_EINT30FLTCON0
-+#define S5P_EINT30FLTCON1		S5PV210_EINT30FLTCON1
-+#define S5P_EINT31FLTCON0		S5PV210_EINT31FLTCON0
-+#define S5P_EINT31FLTCON1		S5PV210_EINT31FLTCON1
-+#define S5P_EINT32FLTCON0		S5PV210_EINT32FLTCON0
-+#define S5P_EINT32FLTCON1		S5PV210_EINT32FLTCON1
-+#define S5P_EINT33FLTCON0		S5PV210_EINT33FLTCON0
-+#define S5P_EINT33FLTCON1		S5PV210_EINT33FLTCON1
-+#define S5P_EINT30MASK			S5PV210_EINT30MASK
-+#define S5P_EINT31MASK			S5PV210_EINT31MASK
-+#define S5P_EINT32MASK			S5PV210_EINT32MASK
-+#define S5P_EINT33MASK			S5PV210_EINT33MASK
-+
-+/* values for S5P_EXTINT0 */
-+#define S5P_EXTINT_LOWLEV		(0x00)
-+#define S5P_EXTINT_HILEV		(0x01)
-+#define S5P_EXTINT_FALLEDGE		(0x02)
-+#define S5P_EXTINT_RISEEDGE		(0x03)
-+#define S5P_EXTINT_BOTHEDGE		(0x04)
- 
- #endif /* __ASM_ARCH_REGS_GPIO_H */
--- 
-1.6.2.5
+> + ? ? ? .set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
+> + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
+> + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
+> +};
+> +
+> +static struct s3c_gpio_cfg gpio_cfg_noint = {
+> + ? ? ? .set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
+> + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
+> + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
+> +};
+> +
+> +static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPA0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPA0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_A0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPA0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPA1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPA1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_A1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPA1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPB_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPB(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_B_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPB",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPC0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPC0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_C0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPC0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPC1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPC1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_C1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPC1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPD0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPD0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_D0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPD0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPD1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPD1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_D1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPD1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPE0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPE0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_E0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPE0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPE1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPE1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_E1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPE1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPF0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPF0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_F0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPF0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPF1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPF1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_F1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPF1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPF2_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPF2(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_F2_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPF2",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPF3_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPF3(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_F3_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPF3",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPG0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPG0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_G0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPG0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPG1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPG1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_G1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPG1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPG2_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPG2(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_G2_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPG2",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPG3_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPG3(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_G3_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPG3",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPH0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPH0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_H0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPH0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPH1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPH1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_H1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPH1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPH2_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPH2(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_H2_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPH2",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPH3_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPH3(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_H3_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPH3",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPI_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPI(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_I_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPI",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPJ0_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPJ0(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_J0_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPJ0",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPJ1_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPJ1(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_J1_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPJ1",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPJ2_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPJ2(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_J2_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPJ2",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPJ3_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPJ3(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_J3_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPJ3",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_GPJ4_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_GPJ4(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_J4_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPJ4",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP01_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP01(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP01_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP01",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP02_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP02(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP02_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP02",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP03_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP03(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP03_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP03",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP04_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP04(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP04_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP04",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP05_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP05(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP05_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP05",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .base ? = S5PV210_MP06_BASE,
+> + ? ? ? ? ? ? ? .config = &gpio_cfg_noint,
+> + ? ? ? ? ? ? ? .chip ? = {
+> + ? ? ? ? ? ? ? ? ? ? ? .base ? = S5PV210_MP06(0),
+> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= S5PV210_GPIO_MP06_NR,
+> + ? ? ? ? ? ? ? ? ? ? ? .label ?= "MP06",
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
