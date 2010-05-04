@@ -1,66 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 04 May 2010 17:28:56 +0100
-Subject: [PATCH] ARM: Fix virtual kernel memory printing for sparsemem
-In-Reply-To: <20100504161829.GE30601@n2100.arm.linux.org.uk>
-References: <20100504161829.GE30601@n2100.arm.linux.org.uk>
-Message-ID: <1272990536.15948.13.camel@e102109-lin.cambridge.arm.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Tue, 4 May 2010 22:07:51 +0530
+Subject: U5500 patches
+In-Reply-To: <20100504162106.GF30601@n2100.arm.linux.org.uk>
+References: <20100504153730.GA30601@n2100.arm.linux.org.uk>
+	<20100504162106.GF30601@n2100.arm.linux.org.uk>
+Message-ID: <x2lc928c27e1005040937w7565a3e9t32fa7393f9508d29@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-05-04 at 17:18 +0100, Russell King - ARM Linux wrote:
-> On Tue, May 04, 2010 at 06:13:28PM +0200, Marek Vasut wrote:
-> > Dne ?t 25. b?ezna 2010 17:01:26 Catalin Marinas napsal(a):
-> > > On Thu, 2010-03-25 at 15:30 +0000, Russell King - ARM Linux wrote:
-> > > > On Thu, Mar 25, 2010 at 03:24:29PM +0000, Catalin Marinas wrote:
-> > > > > On Thu, 2010-03-25 at 15:10 +0000, Russell King - ARM Linux wrote:
-> > > > > > While this looks fine, I'd like to see a lot of Tested-by's against
-> > > > > > this before it's merged - we've had similar code in show_mem()
-> > > > > > which has proven to be quite problematical to get right for all the
-> > > > > > various different combinations we have.
-> > > > > >
-> > > > > > However, we also have the same method in show_mem() which we know
-> > > > > > works fine, so I'd also like to see the problem with using it in
-> > > > > > mem_init() fully analysed - rather than a "possibly because".
-> > > > >
-> > > > > I can remove the "possibly" part :). The page_count() is given a page
-> > > > > with some random flags and it thinks it's a compound page. It than
-> > > > > tries to access page->first which isn't set, hence the error.
-> > > > >
-> > > > > The original code assumes that for a given node the map is contiguous
-> > > > > and it calculates the page as (map + pfn). This is only true for
-> > > > > flatmem. With sparsemem the page calculation is a bit more complicated
-> > > > > but handled by pfn_to_page().
-> > > >
-> > > > And show_mem() ?  It seems to suffer from the same problem.
-> > >
-> > > And that's a patch which fixes both (but as you said, it would be good
-> > > if more people test it on various platforms).
-> > >
-> > >
-> > > ARM: Fix kernel memory printing for sparsemem
-> > >
-> > > From: Catalin Marinas <catalin.marinas@arm.com>
-> > >
-> > > The show_mem() and mem_init() function are assuming that the page map is
-> > > contiguous and calculates the start and end page of a bank using (map +
-> > > pfn). This fails with SPARSEMEM where pfn_to_page() must be used.
-> > >
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Will Deacon <Will.Deacon@arm.com>
-> > > Cc: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
-> >
-> > Works perfectly on my machine. I have a PXA270 based device where I have to use
-> > sparsemem. Thanks, you can add my:
-> >
-> > Tested-by: Marek Vasut <marek.vasut@gmail.com>
-> >
-> > Russell, the patch looks fine, please apply, the stuff is really broken.
-> 
-> It's great to see patches getting tested by others ;)
-> 
-> Catalin - mind submitting this with Marek's tested-by please?
+On Tue, May 4, 2010 at 9:51 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, May 04, 2010 at 04:37:30PM +0100, Russell King - ARM Linux wrote:
+>> Recently, a series of 14 Ux500 patches have appeared in the patch system
+>> without appearing on the mailing list, and not all of them have an ack
+>> from Linus.
+>
+> Sorry, that's a little misleading; please ignore the above. ?Concerns
+> below still apply though.
+>
+>> Have they been reviewed on the mailing list?
 
-Done (patch 6093/1).
+They were posted to the list last week:
 
--- 
-Catalin
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/013644.html
+
+It must have been during the time you were offline.  Would you like for them
+to be reposted?
+
+>> There's also no suggestion in the submitted patches concerning the right
+>> order to apply this set.
+
+They apply in the same order in which they appear in the patch system
+(6077/1 to 6090/1).  I made sure the patch system registered each
+patch before I sent it the next.
+
+Rabin
