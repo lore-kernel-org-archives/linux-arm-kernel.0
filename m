@@ -1,58 +1,47 @@
-From: madhu.cr@ti.com (Madhusudhan)
-Date: Tue, 4 May 2010 18:15:29 -0500
-Subject: [PATCH v8 0/2] sDMA descriptor autoloading feature
-In-Reply-To: <i2x618f0c911004291034g7f5b377ds5efaf74c901bc036@mail.gmail.com>
-References: <i2x618f0c911004291034g7f5b377ds5efaf74c901bc036@mail.gmail.com>
-Message-ID: <00ea01caebdf$affcb8d0$544ff780@am.dhcp.ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 5 May 2010 01:45:24 +0200
+Subject: How to allocate a new machine type?
+In-Reply-To: <i2ge7bd23c31005041517k33229b87g7f974d6642995706@mail.gmail.com>
+References: <x2xe7bd23c31005041432k6c846fc2p90afbd8ec370d3df@mail.gmail.com>
+	<20100504215328.GK30601@n2100.arm.linux.org.uk>
+	<i2ge7bd23c31005041517k33229b87g7f974d6642995706@mail.gmail.com>
+Message-ID: <201005050145.24273.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dne St 5. kv?tna 2010 00:17:48 Corbin Simpson napsal(a):
+> On Tue, May 4, 2010 at 2:53 PM, Russell King - ARM Linux
+> 
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, May 04, 2010 at 02:32:15PM -0700, Corbin Simpson wrote:
+> >> So, I noticed that there's a Pollux entry, POLLUX_WIZ (1950), in the
+> >> mach-types list already. Does anybody know if that covers all Pollux
+> >> devices, or just the Wiz? Also, what do I have to do to allocate a new
+> >> type?
+> > 
+> > It's for "GamePark Holdings GP2X Wiz".  So it seems its only for the Wiz.
+> > 
+> >   Machine name:     GamePark Holdings GP2X Wiz
+> >   Web site:         http://www.gp2xwiz.com/
+> >   Description:      The GP2X Wiz is a handheld video game machine using
+> > the MagicEyes Pollux SoC.
+> > 
+> > For information on machines, including registering new ones, etc, see
+> > the bottom of Documentation/arm/README in the kernel tree.
+> 
+> Russell,
+> 
+> Thank you for the quick reply. Type 2028 appears to be the Didj,
+> allocated by one of the OpenWiz guys. I will use that.
+> 
+> While the merge window is still open, is it kosher to send patches to
+> this list for upstream? I have a few patches that don't rely on the
+> arch-lf1000/arch-pollux code that I'd like to unload. I know that I'm
+> new to this part of the kernel, but I think I'm learning quickly.
+> 
+> ~ C.
+This is the right list for arm-related stuff. If it's for other parts of kernel, 
+check linux/MAINTAINERS . Also, if you are uncertain about some patches, be sure 
+to post them and get a feedback.
 
-
-> -----Original Message-----
-> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of
-> Venkatraman S
-> Sent: Thursday, April 29, 2010 12:35 PM
-> To: linux-omap at vger.kernel.org; linux-mmc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Madhusudhan Chikkature; Tony Lindgren; Adrian Hunter; Santosh
-> Shilimkar
-> Subject: [PATCH v8 0/2] sDMA descriptor autoloading feature
-> 
->     This patch series is the introduction of new sDMA feature: descriptor
-> autoloading (v8) and it's adoption by the OMAP HSMMC driver.
-> 
->    The previous version (v7) was blocked on achieving proper interrupt
-> syncronisation
-> between the MMC and DMA callback in the HSMMC driver.
->   Thanks to Adrian Hunter's patch,
-> https://patchwork.kernel.org/patch/94670/
-> this has been cleaned up.
-> 
-> Current version is based on for-next branch + Adrian Hunter's
-> interrupt syncronisation patch
-> (https://patchwork.kernel.org/patch/94670)
-> 
-> Changes since v7:
->   * Removed the 'fix race condition between DMA and HSMMC callback'
-> part of the series
->   * Added memory barries in start and resume sglist transfer for cpu
-> buffer syncronization
->   * Cleanup and comments
-> 
-> This has been tested on OMAP3430, OMAP3630 and OMAP4430 SDP
-> for MMC file transfer and as boot file system.
-> 
-
-The HSMMC driver changes look good to me. I can ACK that but am not a DMA
-expert to review your changes to the DMA driver.
-
-> Venkatraman S:
->     sDMA: descriptor autoloading feature
->     MMC: omap hsmmc adoption of descriptor autoloading feature
-> 
->  arch/arm/plat-omap/dma.c              |  289
-> ++++++++++++++++++++++++++++++++-
->  arch/arm/plat-omap/include/plat/dma.h |  170 +++++++++++++++++++
->  drivers/mmc/host/omap_hsmmc.c         |  148 ++++++++++++++---
->  3 files changed, 583 insertions(+), 24 deletions(-)
+Cheers
