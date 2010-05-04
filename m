@@ -1,48 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 May 2010 07:40:40 -0700
-Subject: [PATCH 11/11] omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig
-In-Reply-To: <1272957963.1978.25.camel@tubuntu.research.nokia.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-	<20100430203411.25812.30019.stgit@baageli.muru.com>
-	<20100430205003.GG29604@atomide.com>
-	<20100504005222.GD29604@atomide.com>
-	<1272957963.1978.25.camel@tubuntu.research.nokia.com>
-Message-ID: <20100504144040.GH29604@atomide.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 4 May 2010 22:44:40 +0800
+Subject: [PATCH] pxa/vpac270: PXAUDC init fix
+In-Reply-To: <1272773425-13454-1-git-send-email-marek.vasut@gmail.com>
+References: <1272773425-13454-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <v2lf17812d71005040744r7893368cxa31255a2fc6afb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@nokia.com> [100504 00:21]:
-> Hi,
-> 
-> On Tue, 2010-05-04 at 02:52 +0200, ext Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [100430 13:47]:
-> > > * Tony Lindgren <tony@atomide.com> [100430 13:32]:
-> > > > Looks like CONFIG_FB_OMAP prevents somehow mounting root on MMC
-> > > > at least on zoom3 for multi-omap. Disable CONFIG_FB until the
-> > > > omap FB code is fixed.
-> > > 
-> > > This one I'll drop as soon as the problem is sorted out with
-> > > CONFIG_FB_OMAP.
-> > 
-> > This one seems to be something under drivers/video/omap, so
-> > I'll change CONFIG_FB_OMAP to be a module now. Updated patch
-> > below.
-> > 
-> > I'll update omap for-next accordingly, then Tomi can figure
-> > it out :)
-> 
-> This sounds... interesting... =) Any more info on what happens? Does it
-> also affect new omapfb driver?
+On Sun, May 2, 2010 at 12:10 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> This patch removes write to UP2OCR[DMSTATE] (ex-UP2OCR_DPPUBE) which is invalid
+> on PXA270C5 and later.
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-Yeah this is interesting, it seems like the kernel cmdline gets
-somehow corrupted for zoom3 with the omap3_defconfig if CONFIG_FB_OMAP=y.
-Some options seem to be there, but for example rootwait option is
-ignored and the root on MMC never mounts. This is in the current
-omap for-next branch.
+Applied.
 
-Hmm, what do you mean with "new omapfb" driver, the stuff you have
-queued up?
-
-Regards,
-
-Tony
+> ---
+> ?arch/arm/mach-pxa/vpac270.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+> index 8da22d4..9884fa9 100644
+> --- a/arch/arm/mach-pxa/vpac270.c
+> +++ b/arch/arm/mach-pxa/vpac270.c
+> @@ -359,9 +359,9 @@ static struct platform_device vpac270_gpio_vbus = {
+> ?static void vpac270_udc_command(int cmd)
+> ?{
+> ? ? ? ?if (cmd == PXA2XX_UDC_CMD_CONNECT)
+> - ? ? ? ? ? ? ? UP2OCR |= UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE;
+> + ? ? ? ? ? ? ? UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
+> ? ? ? ?else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
+> - ? ? ? ? ? ? ? UP2OCR &= ~(UP2OCR_HXOE | UP2OCR_DPPUE | UP2OCR_DPPUBE);
+> + ? ? ? ? ? ? ? UP2OCR = UP2OCR_HXOE;
+> ?}
+>
+> ?static struct pxa2xx_udc_mach_info vpac270_udc_info __initdata = {
+> --
+> 1.7.0
+>
+>
