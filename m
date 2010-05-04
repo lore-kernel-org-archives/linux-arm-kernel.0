@@ -1,114 +1,44 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Tue, 04 May 2010 13:12:44 +0200
-Subject: [PATCH 2/2] ARM: S3C64XX: Add touchscreen platform device definition
-In-Reply-To: <2856f2f38f35862f102351991b3fdccf8f01adba.1272971522.git.mcuelenaere@gmail.com>
-References: <2856f2f38f35862f102351991b3fdccf8f01adba.1272971522.git.mcuelenaere@gmail.com>
-Message-ID: <4BE0012C.6040000@gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 04 May 2010 13:33:54 +0200
+Subject: 2.6.34-rc6 regression: pcmcia no longer compiles
+In-Reply-To: <20100504041448.GA2893@ucw.cz>
+References: <20100504041448.GA2893@ucw.cz>
+Message-ID: <c79eb84d24e70983f4422c89a35580ff@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the touchscreen platform device definition for S3C64XX boards.
+On Tue, 4 May 2010 06:14:48 +0200, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+> 
+> -rc5 compiled ok with similar config.
+> 
+> Now I get:
+> 
+>   CHK     include/linux/version.h
+>   CHK     include/generated/utsrelease.h
+> make[1]: `include/generated/mach-types.h' is up to date.
+>   CALL    scripts/checksyscalls.sh
+>   CHK     include/generated/compile.h
+>   CC      drivers/pcmcia/pcmcia_ioctl.o
+> drivers/pcmcia/pcmcia_ioctl.c: In function 'ds_open':
+> drivers/pcmcia/pcmcia_ioctl.c:714: error: 'struct <anonymous>' has no
+> member named 'present'
+> drivers/pcmcia/pcmcia_ioctl.c: In function 'ds_read':
+> drivers/pcmcia/pcmcia_ioctl.c:773: error: 'struct <anonymous>' has no
+> member named 'dead'
+> drivers/pcmcia/pcmcia_ioctl.c: In function 'ds_ioctl':
+> drivers/pcmcia/pcmcia_ioctl.c:841: error: 'struct <anonymous>' has no
+> member named 'dead'
+> make[2]: *** [drivers/pcmcia/pcmcia_ioctl.o] Error 1
+> make[1]: *** [drivers/pcmcia] Error 2
+> make: *** [drivers] Error 2
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/mach-s3c64xx/Makefile |    1 +
- arch/arm/mach-s3c64xx/dev-ts.c |   61 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/plat-samsung/Kconfig  |    6 ++++
- 3 files changed, 68 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s3c64xx/dev-ts.c
+Does the attached patch fix it (compile-tested only)?
 
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 3758e15..a690a9d 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -60,3 +60,4 @@ obj-y				+= dev-rtc.o
- obj-y				+= dev-audio.o
- obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
-+obj-$(CONFIG_S3C64XX_DEV_TS)	+= dev-ts.o
-diff --git a/arch/arm/mach-s3c64xx/dev-ts.c b/arch/arm/mach-s3c64xx/dev-ts.c
-new file mode 100644
-index 0000000..17cc793
---- /dev/null
-+++ b/arch/arm/mach-s3c64xx/dev-ts.c
-@@ -0,0 +1,61 @@
-+/* linux/arch/arm/mach-s3c64xx/dev-ts.c
-+ *
-+ * Copyright (c) 2008 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Ben Dooks <ben@simtec.co.uk>, <ben-linux@fluff.org>
-+ *
-+ * Adapted by Maurus Cuelenaere for s3c64xx
-+ *
-+ * S3C64XX series device definition for touchscreen device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+#include <plat/devs.h>
-+#include <plat/ts.h>
-+
-+static struct resource s3c_ts_resource[] = {
-+	[0] = {
-+		.start = S3C64XX_PA_ADC,
-+		.end   = S3C64XX_PA_ADC + SZ_256 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_TC,
-+		.end   = IRQ_TC,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device s3c_device_ts = {
-+	.name		= "s3c64xx-ts",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
-+	.resource	= s3c_ts_resource,
-+};
-+
-+void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
-+{
-+	struct s3c2410_ts_mach_info *npd;
-+
-+	if (!pd) {
-+		printk(KERN_ERR "%s: no platform data\n", __func__);
-+		return;
-+	}
-+
-+	npd = kmemdup(pd, sizeof(struct s3c2410_ts_mach_info), GFP_KERNEL);
-+	if (!npd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+
-+	s3c_device_ts.dev.platform_data = npd;
-+}
-+EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index d552c65..5d3ef35 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -191,6 +191,12 @@ config S3C64XX_DEV_SPI
- 	  Compile in platform device definitions for S3C64XX's type
- 	  SPI controllers.
- 
-+config S3C64XX_DEV_TS
-+	bool
-+	help
-+	    Common in platform device definitions for S3C64XX touchscreen
-+	    device
-+
- # DMA
- 
- config S3C_DMA
+        M.
 -- 
-1.7.1
+Who you jivin' with that Cosmik Debris?
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: 0001-pcmcia-fix-compilation-after-16bit-state-lockin" filename*1*="g-cha.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100504/757d0b59/attachment.el>
