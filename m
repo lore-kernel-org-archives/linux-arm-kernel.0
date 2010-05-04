@@ -1,68 +1,117 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue,  4 May 2010 18:57:08 +0200
-Subject: [PATCH 1/2] pxa/vpac270: Enable SparseMEM for 256 MB of RAM
-Message-ID: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
+Date: Tue,  4 May 2010 18:57:09 +0200
+Subject: [PATCH 2/2] pxa/vpac270: Add PMIC support
+In-Reply-To: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
+References: <1272992229-29361-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1272992229-29361-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables SparseMEM for the Voipac PXA270 board. To work around the
-PHYS_OFFSET being set to 0xa0000000 and disallowing us to map the other
-partition at 0x80000000, the physical-to-virtual mapping of SDRAM was altered
-and the partition at 0x80000000 was moved to 0x10000000 in virtual memory (past
-the first SDRAM partition). As the Voipac PXA270 is probably the only PXA270
-device which utilizes 256 MB of RAM, adding the following code into memory.h
-seems much less painful than tinkering with PHYS_OFFSET.
-
-NOTE: Once the PHYS_OFFSET can be dynamically configured, this code can
-probably be removed.
+This patch adds support for the MAX1587A used on Voipac PXA270 board.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig               |    1 +
- arch/arm/mach-pxa/include/mach/memory.h |   21 +++++++++++++++++++++
- 2 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/vpac270.c |   59 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 57 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 88e00db..ded9d64 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -253,6 +253,7 @@ config MACH_VPAC270
- 	bool "Voipac PXA270"
- 	select PXA27x
- 	select HAVE_PATA_PLATFORM
-+	select ARCH_SPARSEMEM_ENABLE
- 	help
- 	  PXA270 based Single Board Computer.
+diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+index a87bad5..52e85cb 100644
+--- a/arch/arm/mach-pxa/vpac270.c
++++ b/arch/arm/mach-pxa/vpac270.c
+@@ -24,6 +24,7 @@
+ #include <linux/dm9000.h>
+ #include <linux/ucb1400.h>
+ #include <linux/ata_platform.h>
++#include <linux/regulator/max1586.h>
  
-diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-pxa/include/mach/memory.h
-index f626730..705c7a0 100644
---- a/arch/arm/mach-pxa/include/mach/memory.h
-+++ b/arch/arm/mach-pxa/include/mach/memory.h
-@@ -40,4 +40,25 @@ void cmx2xx_pci_adjust_zones(int node, unsigned long *size,
- #define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_64M)
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -420,7 +421,6 @@ static struct i2c_board_info __initdata vpac270_i2c_devs[] = {
+ 
+ static void __init vpac270_rtc_init(void)
+ {
+-	pxa_set_i2c_info(NULL);
+ 	i2c_register_board_info(0, ARRAY_AND_SIZE(vpac270_i2c_devs));
+ }
+ #else
+@@ -494,7 +494,8 @@ static inline void vpac270_lcd_init(void) {}
+ /******************************************************************************
+  * PATA IDE
+  ******************************************************************************/
+-#if defined(CONFIG_PATA_PLATFORM) || defined(CONFIG_PATA_PLATFORM_MODULE)
++#if defined(CONFIG_PATA_PLATFORM) || \
++	defined(CONFIG_PATA_PLATFORM_MODULE)
+ static struct pata_platform_info vpac270_pata_pdata = {
+ 	.ioport_shift	= 1,
+ 	.irq_flags	= IRQF_TRIGGER_RISING,
+@@ -536,6 +537,57 @@ static inline void vpac270_ide_init(void) {}
  #endif
  
-+/*
-+ * Voipac PXA270/PXA270M is probably the only board in the world with PXA27x
-+ * that uses more than 128MB or SDRAM (256MB in the 'max configuration'). This
-+ * hack should be removed once the PHYS_OFFSET can be configured dynamically.
-+ *
-+ * The two 128MB SDRAM banks are at addresses 0xa0000000 and 0x80000000. The
-+ * following code moves the block of SDRAM at 0x80000000 past the block at
-+ * 0xa0000000 in virtual memory and vice versa. We use SparseMEM to map the
-+ * pages properly.
-+ */
-+#ifdef	CONFIG_MACH_VPAC270
-+#define	MAX_PHYSMEM_BITS	32
-+#define	SECTION_SIZE_BITS	28
-+#define	__phys_to_virt(p) \
-+	(((p) & 0x0fffffff) | \
-+	(((p) & 0x20000000) ? 0 : 0x10000000) | PAGE_OFFSET)
-+#define	__virt_to_phys(v) \
-+	(((v) & 0x0fffffff) | \
-+	(((v) & 0x10000000) ? 0x80000000 : 0xa0000000))
+ /******************************************************************************
++ * Core power regulator
++ ******************************************************************************/
++#if defined(CONFIG_REGULATOR_MAX1586) || defined(CONFIG_REGULATOR_MAX1586_MODULE)
++static struct regulator_consumer_supply vpac270_max1587a_consumers[] = {
++	{
++		.supply	= "vcc_core",
++	}
++};
++
++static struct regulator_init_data vpac270_max1587a_v3_info = {
++	.constraints = {
++		.name		= "vcc_core range",
++		.min_uV		= 900000,
++		.max_uV		= 1705000,
++		.always_on	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
++	},
++	.consumer_supplies	= vpac270_max1587a_consumers,
++	.num_consumer_supplies	= ARRAY_SIZE(vpac270_max1587a_consumers),
++};
++
++static struct max1586_subdev_data vpac270_max1587a_subdevs[] = {
++	{
++		.name		= "vcc_core",
++		.id		= MAX1586_V3,
++		.platform_data	= &vpac270_max1587a_v3_info,
++	}
++};
++
++static struct max1586_platform_data vpac270_max1587a_info = {
++	.subdevs     = vpac270_max1587a_subdevs,
++	.num_subdevs = ARRAY_SIZE(vpac270_max1587a_subdevs),
++	.v3_gain     = MAX1586_GAIN_R24_3k32, /* 730..1550 mV */
++};
++
++static struct i2c_board_info __initdata vpac270_pi2c_board_info[] = {
++	{
++		I2C_BOARD_INFO("max1586", 0x14),
++		.platform_data	= &vpac270_max1587a_info,
++	},
++};
++
++static void __init vpac270_pmic_init(void) {
++	i2c_register_board_info(1, ARRAY_AND_SIZE(vpac270_pi2c_board_info));
++}
++#else
++static inline void vpac270_pmic_init(void) {}
 +#endif
 +
- #endif
++
++/******************************************************************************
+  * Machine init
+  ******************************************************************************/
+ static void __init vpac270_init(void)
+@@ -545,7 +597,10 @@ static void __init vpac270_init(void)
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
++	pxa_set_i2c_info(NULL);
++	pxa27x_set_i2c_power_info(NULL);
+ 
++	vpac270_pmic_init();
+ 	vpac270_lcd_init();
+ 	vpac270_mmc_init();
+ 	vpac270_nor_init();
 -- 
 1.7.0
