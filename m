@@ -1,106 +1,90 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 4 May 2010 14:27:28 +0530
-Subject: [PATCH 1/2] nomadik: define clocks statically
-Message-ID: <1272963449-17657-1-git-send-email-rabin.vincent@stericsson.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 May 2010 10:10:06 +0100
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way PL310
+In-Reply-To: <1272654785-12779-2-git-send-email-jason.mcmullan@netronome.com>
+References: <1272654785-12779-1-git-send-email-jason.mcmullan@netronome.com>
+	<1272654785-12779-2-git-send-email-jason.mcmullan@netronome.com>
+Message-ID: <000001caeb69$9713a160$c53ae420$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a table for clocks to be defined statically, so that new clocks can
-be added without having to call nmdk_clk_create() for each of them.
-Remove the now unused nmdk_clk_create() function.
+Hi Jason,
 
-Acked-by: Alessandro Rubini <rubini@unipv.it>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/mach-nomadik/board-nhk8815.c |   10 +---------
- arch/arm/mach-nomadik/clock.c         |   28 ++++++++++++++++++++--------
- arch/arm/mach-nomadik/clock.h         |    1 -
- 3 files changed, 21 insertions(+), 18 deletions(-)
+This is looking good. Some pedantry:
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index ab3712c..841d459 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -32,7 +32,6 @@
- #include <mach/setup.h>
- #include <mach/nand.h>
- #include <mach/fsmc.h>
--#include "clock.h"
- 
- /* Initial value for SRC control register: all timers use MXTAL/8 source */
- #define SRC_CR_INIT_MASK	0x00007fff
-@@ -202,11 +201,6 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&uart1_device,
- };
- 
--/* We have a fixed clock alone, by now */
--static struct clk nhk8815_clk_48 = {
--	.rate = 48*1000*1000,
--};
--
- static struct resource nhk8815_eth_resources[] = {
- 	{
- 		.name = "smc91x-regs",
-@@ -276,10 +270,8 @@ static void __init nhk8815_platform_init(void)
- 	platform_add_devices(nhk8815_platform_devices,
- 			     ARRAY_SIZE(nhk8815_platform_devices));
- 
--	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
--		nmdk_clk_create(&nhk8815_clk_48, amba_devs[i]->dev.init_name);
-+	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
- 		amba_device_register(amba_devs[i], &iomem_resource);
--	}
- }
- 
- MACHINE_START(NOMADIK, "NHK8815")
-diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
-index 9f92502..7af7850 100644
---- a/arch/arm/mach-nomadik/clock.c
-+++ b/arch/arm/mach-nomadik/clock.c
-@@ -32,14 +32,26 @@ void clk_disable(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_disable);
- 
--/* Create a clock structure with the given name */
--int nmdk_clk_create(struct clk *clk, const char *dev_id)
--{
--	struct clk_lookup *clkdev;
-+/* We have a fixed clock alone, for now */
-+static struct clk clk_48 = {
-+	.rate = 48 * 1000 * 1000,
-+};
-+
-+#define CLK(_clk, dev)				\
-+	{					\
-+		.clk		= _clk,		\
-+		.dev_id		= dev,		\
-+	}
-+
-+static struct clk_lookup lookups[] = {
-+	CLK(&clk_48, "uart0"),
-+	CLK(&clk_48, "uart1"),
-+};
- 
--	clkdev = clkdev_alloc(clk, NULL, dev_id);
--	if (!clkdev)
--		return -ENOMEM;
--	clkdev_add(clkdev);
-+static int __init clk_init(void)
-+{
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 	return 0;
- }
-+
-+arch_initcall(clk_init);
-diff --git a/arch/arm/mach-nomadik/clock.h b/arch/arm/mach-nomadik/clock.h
-index 235faec..5563985 100644
---- a/arch/arm/mach-nomadik/clock.h
-+++ b/arch/arm/mach-nomadik/clock.h
-@@ -11,4 +11,3 @@
- struct clk {
- 	unsigned long		rate;
- };
--extern int nmdk_clk_create(struct clk *clk, const char *dev_id);
--- 
-1.7.0
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 21ad68b..88c6131 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -27,6 +27,7 @@
+> 
+>  static void __iomem *l2x0_base;
+>  static DEFINE_SPINLOCK(l2x0_lock);
+> +static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+> 
+>  static inline void cache_wait(void __iomem *reg, unsigned long mask)
+>  {
+> @@ -106,10 +107,9 @@ static inline void l2x0_inv_all(void)
+>  {
+>  	unsigned long flags;
+> 
+> -	/* invalidate all ways */
+>  	spin_lock_irqsave(&l2x0_lock, flags);
+> -	writel(0xff, l2x0_base + L2X0_INV_WAY);
+> -	cache_wait(l2x0_base + L2X0_INV_WAY, 0xff);
+> +	writel(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+> +	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+>  	cache_sync();
+>  	spin_unlock_irqrestore(&l2x0_lock, flags);
+>  }
+
+I think the comment can stay in the code as it's actually true now!
+
+> @@ -217,10 +217,32 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+>  	 * accessing the below registers will fault.
+>  	 */
+>  	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
+> +		int ways;
+> +		uint32_t cache_id;
+
+These declarations should probably be at the top of the function. Actually,
+you could just assign to l2x0_way_mask directly. Also, l2x0.c appears to use
+the __u32 datatype instead of uint32_t or u32, so it's probably best just to
+follow suit.
+
+>  		/* l2x0 controller is disabled */
+> -
+> +		cache_id = readl(l2x0_base + L2X0_CACHE_ID);
+>  		aux = readl(l2x0_base + L2X0_AUX_CTRL);
+> +
+> +		/* Determine the number of ways */
+> +		switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+> +		case L2X0_CACHE_ID_PART_L310:
+> +			if (aux & (1 << 16))
+> +				ways = 16;
+> +			else
+> +				ways = 8;
+> +			break;
+> +		case L2X0_CACHE_ID_PART_L210:
+> +			ways = (aux >> 13) & 0xf;
+> +			break;
+> +		default:
+> +			/* Assume unknown chips have 8 ways */
+> +			ways = 8;
+> +			break;
+> +		}
+> +
+> +		l2x0_way_mask = (1 << ways) - 1;
+> +
+>  		aux &= aux_mask;
+>  		aux |= aux_val;
+>  		writel(aux, l2x0_base + L2X0_AUX_CTRL);
+
+As Russell pointed out, it would be helpful to print out a message here [instead
+of "L2X0 cache controller enabled"], particularly if the chip is unknown and we
+assume an 8-way configuration. Printing out the part, number of ways and perhaps
+the auxiliary ctrl register would be useful.
+
+Cheers,
+
+Will
