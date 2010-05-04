@@ -1,36 +1,28 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Tue,  4 May 2010 10:03:01 -0500
-Subject: [PATCH 2.6.34-rc6] mxc: gadget: Fix bitfield for calculating maximum
-	packet size
-Message-ID: <1272985381-4454-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 04 May 2010 16:05:35 +0100
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way
+	PL310 (v3)
+In-Reply-To: <1272985254-5675-2-git-send-email-jason.mcmullan@netronome.com>
+References: <1272985254-5675-2-git-send-email-jason.mcmullan@netronome.com>
+Message-ID: <1272985535.15948.6.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On Tue, 2010-05-04 at 16:00 +0100, Jason S. McMullan wrote:
+> The L310 cache controller's interface is almost identical
+> to the L210. One major difference is that the PL310 can
+> have up to 16 ways.
+> 
+> This change uses the cache's part ID and the Assciativity
+> bits in the AUX_CTRL register to determine the number of ways.
+> 
+> Also prints out the # of ways, CACHE_ID and AUX_CTRL registers.
+> 
+> Signed-off-by: Jason S. McMullan <jason.mcmullan@netronome.com>
 
-The max packet length bit mask used for isochronous endpoints
-should be 0x7FF instead of 0x8FF. 0x8FF will actually clear
-higher-order bits in the max packet length field.
+Looks fine to me.
 
-This patch applies to 2.6.34-rc6.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- drivers/usb/gadget/fsl_udc_core.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-index fa3d142..08a9a62 100644
---- a/drivers/usb/gadget/fsl_udc_core.c
-+++ b/drivers/usb/gadget/fsl_udc_core.c
-@@ -489,7 +489,7 @@ static int fsl_ep_enable(struct usb_ep *_ep,
- 	case USB_ENDPOINT_XFER_ISOC:
- 		/* Calculate transactions needed for high bandwidth iso */
- 		mult = (unsigned char)(1 + ((max >> 11) & 0x03));
--		max = max & 0x8ff;	/* bit 0~10 */
-+		max = max & 0x7ff;	/* bit 0~10 */
- 		/* 3 transactions at most */
- 		if (mult > 3)
- 			goto en_done;
 -- 
-1.6.0.4
+Catalin
