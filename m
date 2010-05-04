@@ -1,25 +1,23 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 4 May 2010 01:24:20 +0100
+Date: Tue, 4 May 2010 01:26:05 +0100
 Subject: S3C6410 power management support status
-In-Reply-To: <20100429124509.GA11290@jeknote.loshitsa1.net>
+In-Reply-To: <h2z48cbf6bf1004290558mcd6b377az7267ce599f6e57fb@mail.gmail.com>
 References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-Message-ID: <20100504002420.GQ6684@trinity.fluff.org>
+	<h2z48cbf6bf1004290558mcd6b377az7267ce599f6e57fb@mail.gmail.com>
+Message-ID: <20100504002604.GR6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
-> Hi.
+On Thu, Apr 29, 2010 at 08:58:53PM +0800, tommy.hong wrote:
+> hi,Sir.Please fix VFP Bug,who is exsited in Samsung 2.6.24.2 BSP relative.
 > 
-> Can anybody explain current status of S3C6410 power management support
-> in mainline? Suspend-to-RAM looks completely broken in the current
-> Linus's git tree.
+> arch/arm/kerne/entry-armv.S (2.6.24.2 BSP)
 
-I'd prefer if you didn't make sweeping accusations about the state of
-a given piece of the kernel without having a good look first. From reading
-your second post, it seems that what is actually the problem is that the
-64XX support only currently handles wakeup configurations from the EINT
-pins.
+This isn't the samsung-inhouse kernel support list. I don't think many
+people here actually care about non-mainline kernels.
 
+Secondly, please don't tag new threads onto previous postings about a
+different subject.
 
 -- 
 Ben
