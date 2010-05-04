@@ -1,78 +1,35 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 4 May 2010 07:57:01 +0100
-Subject: [PATCH v2.6.34-rc2] s3c: Fix CONFIG_MTD_NAND_S3C2410_CLKSTOP
-In-Reply-To: <1269937323-7541-1-git-send-email-chripell@fsfe.org>
-References: <1269937323-7541-1-git-send-email-chripell@fsfe.org>
-Message-ID: <20100504065701.GB26401@trinity.fluff.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 4 May 2010 09:56:17 +0300
+Subject: [rtc-linux] Re: [PATCH v3] rtc: driver for the DryIce block
+	found in  i.MX25 chips
+In-Reply-To: <20100309112146.71202332@linux.lan.towertech.it>
+References: <20100202092220.26869dc4@linux.lan.towertech.it>
+	<7859d1571b6d772a9976ca3d53f8ee0e9851bb38.1265099368.git.baruch@tkos.co.il>
+	<20100309074114.GA3104@jasper.tkos.co.il>
+	<20100309112146.71202332@linux.lan.towertech.it>
+Message-ID: <20100504065616.GA20719@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 30, 2010 at 10:22:03AM +0200, Christian Pellegrin wrote:
-> Option CONFIG_MTD_NAND_S3C2410_CLKSTOP was broken by higher MTD layers
-> calling select_chip with -1 twice in a row. This patch fixes the problem
-> by making sure that clk_disable is not called too many times.
-> 
-> Signed-off-by: Christian Pellegrin <chripell@fsfe.org>
-> ---
->  drivers/mtd/nand/s3c2410.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> index fa6e9c7..9adecc6 100644
-> --- a/drivers/mtd/nand/s3c2410.c
-> +++ b/drivers/mtd/nand/s3c2410.c
-> @@ -37,6 +37,7 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/cpufreq.h>
-> +#include <linux/bitops.h>
->  
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/nand.h>
-> @@ -135,6 +136,9 @@ struct s3c2410_nand_info {
->  #ifdef CONFIG_CPU_FREQ
->  	struct notifier_block	freq_transition;
->  #endif
-> +#ifdef CONFIG_MTD_NAND_S3C2410_CLKSTOP
-> +	unsigned long                   clk_running;
-> +#endif
->  };
->  
->  /* conversion functions */
-> @@ -333,7 +337,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
->  	nmtd = this->priv;
->  	info = nmtd->info;
->  
-> -	if (chip != -1 && allow_clk_stop(info))
-> +	if (chip != -1 && allow_clk_stop(info) &&
-> +	    !test_and_set_bit(0, &info->clk_running))
->  		clk_enable(info->clk);
+Hi Alessandro,
 
-please let me know why you feel the need to use test_and_set_bit on
-a variable that is single use.
-  
->  	cur = readl(info->sel_reg);
-> @@ -356,7 +361,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
->  
->  	writel(cur, info->sel_reg);
->  
-> -	if (chip == -1 && allow_clk_stop(info))
-> +	if (chip == -1 && allow_clk_stop(info) &&
-> +	    test_and_clear_bit(0, &info->clk_running))
->  		clk_disable(info->clk);
->  }
->  
-> -- 
-> 1.5.6.5
+On Tue, Mar 09, 2010 at 11:21:46AM +0100, Alessandro Zummo wrote:
+> On Tue, 9 Mar 2010 09:41:14 +0200
+> Baruch Siach <baruch@tkos.co.il> wrote:
+> > Ping?
+> > 
+> > Since .34-rc1 has already been released, I guess this is not going to get into 
+> > 2.6.34. Are there any remaining issues to resolve in order to merge this 
+> > upstream?
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  I just have to find some time to review it. don't worry, since is a completely
+>  new driver it could go upstream at any time.
+
+Any news about this driver?
+
+baruch
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
