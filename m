@@ -1,10 +1,11 @@
 From: Jiri.Pinkava@vscht.cz (Pinkava J.)
-Date: Thu, 6 May 2010 00:17:48 +0200
-Subject: [PATCH 5/9] Add support for red flashing LED on Acer n35
-In-Reply-To: <4BE1EE5F.5090402@vscht.cz>
+Date: Thu, 6 May 2010 00:18:25 +0200
+Subject: [PATCH 6/9] Enable wake-up by Power button on Acer n35
+In-Reply-To: <4BE1EE8C.8040900@vscht.cz>
 References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
 	<4BE1ED86.3010506@vscht.cz> <4BE1EE5F.5090402@vscht.cz>
-Message-ID: <4BE1EE8C.8040900@vscht.cz>
+	<4BE1EE8C.8040900@vscht.cz>
+Message-ID: <4BE1EEB1.9060006@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +13,23 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
 ---
- arch/arm/mach-s3c2410/mach-n30.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/mach-n30.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index aeabbff..b83eabd 100644
+index b83eabd..d63b48f 100644
 --- a/arch/arm/mach-s3c2410/mach-n30.c
 +++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -283,6 +283,13 @@ static struct s3c24xx_led_platdata n30_warning_led_pdata = {
- 	.def_trigger	= "",
- };
-
-+static struct s3c24xx_led_platdata n35_warning_led_pdata = {
-+	.name		= "warning_led",
-+	.flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-+	.gpio		= S3C2410_GPD(9),
-+	.def_trigger	= "",
-+};
-+
- static struct platform_device n30_blue_led = {
- 	.name		= "s3c24xx_led",
- 	.id		= 1,
-@@ -307,6 +314,14 @@ static struct platform_device n30_warning_led = {
+@@ -172,8 +172,10 @@ static struct gpio_keys_button n35_buttons[] = {
+ 	{
+ 		.gpio		= S3C2410_GPF(0),
+ 		.code		= KEY_POWER,
++		.type		= EV_PWR,
+ 		.desc		= "Power",
+ 		.active_low	= 0,
++		.wakeup		= 1,
  	},
- };
-
-+static struct platform_device n35_warning_led = {
-+	.name		= "s3c24xx_led",
-+	.id		= 2,
-+	.dev		= {
-+		.platform_data	= &n35_warning_led_pdata,
-+	},
-+};
-+
- static struct s3c2410fb_display n30_display __initdata = {
- 	.type		= S3C2410_LCDCON1_TFT,
- 	.width		= 240,
-@@ -355,6 +370,7 @@ static struct platform_device *n35_devices[] __initdata = {
- 	&s3c_device_usbgadget,
- 	&n35_button_device,
- 	&n35_blue_led,
-+	&n35_warning_led,
- };
-
- static struct s3c2410_platform_i2c __initdata n30_i2ccfg = {
+ 	{
+ 		.gpio		= S3C2410_GPG(9),
 -- 
 1.7.1
