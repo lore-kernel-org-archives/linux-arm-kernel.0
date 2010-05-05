@@ -1,39 +1,23 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Wed, 5 May 2010 12:33:13 -0400
-Subject: [RFC] Prohibit ioremap() on kernel managed RAM
-In-Reply-To: <20100505163012.GA17678@n2100.arm.linux.org.uk>
-References: <20100423144058.GA11637@ZenIV.linux.org.uk>
-	<20100430163356.GV2619@mvista.com>
-	<1272645511.22683.1.camel@e102109-lin.cambridge.arm.com>
-	<20100503155900.GA26552@mvista.com>
-	<1272986997.15948.11.camel@e102109-lin.cambridge.arm.com>
-	<20100505162345.GB3169@mvista.com>
-	<20100505163012.GA17678@n2100.arm.linux.org.uk>
-Message-ID: <20100505163313.GC3169@mvista.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 05 May 2010 17:44:33 +0100
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way
+	PL310 (v3)
+In-Reply-To: <y2yd91d07041005050554qf0f5a2ddm499380004665a7a3@mail.gmail.com>
+References: <y2yd91d07041005050554qf0f5a2ddm499380004665a7a3@mail.gmail.com>
+Message-ID: <1273077873.27058.12.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 05, 2010 at 05:30:12PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 05, 2010 at 12:23:45PM -0400, George G. Davis wrote:
-> > So could we similarly we relax this "Prohibit ioremap() on kernel managed
-> > RAM" change for reserved pages?  Like so:
-> > 
-> > 	/*
-> > 	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> > 	 */
-> > 	if (WARN_ON(pfn_valid(pfn) && !PageReserved(pfn_to_page(pfn)))
-> > 		return NULL;
-> > 
+On Wed, 2010-05-05 at 13:54 +0100, Jason McMullan wrote:
+> With the following email from Will Deacon, and the comment period on
+> the list, is this patch ready to go into the ARM Linux
+> patch queue?
 > 
-> Only once the rest of the solution gets implemented; making this change
-> on its own doesn't mean very much or have very much effect.
+> Or, Catalin, do you want to integrate these changes into your
+> patch set for the l2x0 first?
 
-That's fine, I'm just (trying ; ) to think ahead.
+As I said in a previous e-mail, just push your patch and I'll adjust
+mine accordingly once I get feedback on the list. Thanks.
 
-Thanks!
-
---
-Regards,
-George
+-- 
+Catalin
