@@ -1,22 +1,73 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Wed, 5 May 2010 13:28:04 +0530
-Subject: adding pxa3xx_nand_flash to platform data
-Message-ID: <1273046285.29563.311.camel@pe-dt434>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Wed,  5 May 2010 11:42:06 +0300
+Subject: [RESEND PATCHv3 2/4] mach-omap2: Add SoC info data for OMAP2, 3,
+	4 into /proc/cpuinfo
+In-Reply-To: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+References: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <1273048928-6105-3-git-send-email-eduardo.valentin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric,
+From: Eduardo Valentin <eduardo.valentin@nokia.com>
 
-Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
-support for Aspenite DB board (pxa168). I have a patch ready to add
-pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
-field in it.
-Looks like it is the same for all boards (depending upon the page size).
-So should I add it to the board specific setup file or remove it from
-pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
+Report OMAP2,3,4 data into system_soc_info. Now we get omap
+information under /proc/cpuinfo.
 
-If there are boards which require a different cmdset then we have to go
-with first option, if not, we can use option two and save some code
-duplication.
+Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+---
+ arch/arm/mach-omap2/id.c |   18 ++++++++++++------
+ 1 files changed, 12 insertions(+), 6 deletions(-)
 
--siddarth
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 37b8a1a..4702ffe 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -104,7 +104,7 @@ static u16 tap_prod_id;
+ 
+ void __init omap24xx_check_revision(void)
+ {
+-	int i, j;
++	int i, j, sz;
+ 	u32 idcode, prod_id;
+ 	u16 hawkeye;
+ 	u8  dev_type, rev;
+@@ -152,10 +152,12 @@ void __init omap24xx_check_revision(void)
+ 		j = i;
+ 	}
+ 
+-	pr_info("OMAP%04x", omap_rev() >> 16);
++	sz = snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
++							omap_rev() >> 16);
+ 	if ((omap_rev() >> 8) & 0x0f)
+-		pr_info("ES%x", (omap_rev() >> 12) & 0xf);
+-	pr_info("\n");
++		snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
++				"ES%x",	(omap_rev() >> 12) & 0xf);
++	pr_info("%s\n", system_soc_info);
+ }
+ 
+ #define OMAP3_CHECK_FEATURE(status,feat)				\
+@@ -286,7 +288,9 @@ void __init omap4_check_revision(void)
+ 	if ((hawkeye == 0xb852) && (rev == 0x0)) {
+ 		omap_revision = OMAP4430_REV_ES1_0;
+ 		omap_chip.oc |= CHIP_IS_OMAP4430ES1;
+-		pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
++		snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x %s\n",
++				omap_rev() >> 16, rev_name);
++		pr_info("%s\n", system_soc_info);
+ 		return;
+ 	}
+ 
+@@ -356,7 +360,9 @@ void __init omap3_cpuinfo(void)
+ 	}
+ 
+ 	/* Print verbose information */
+-	pr_info("%s ES%s (", cpu_name, cpu_rev);
++	snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "%s ES%s", cpu_name,
++			cpu_rev);
++	pr_info("%s (", system_soc_info);
+ 
+ 	OMAP3_SHOW_FEATURE(l2cache);
+ 	OMAP3_SHOW_FEATURE(iva);
+-- 
+1.7.0.4.361.g8b5fe.dirty
