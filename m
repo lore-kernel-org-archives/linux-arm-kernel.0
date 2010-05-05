@@ -1,62 +1,53 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed,  5 May 2010 09:54:19 +0300
-Subject: [PATCH v2 7/8] arm: kdump: add support for elfcorehdr= parameter
+Date: Wed,  5 May 2010 09:54:14 +0300
+Subject: [PATCH v2 2/8] arm: kdump: implement crash_setup_regs()
 In-Reply-To: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <f91641c681cbb84872288bc0cfc3c423c3c6346e.1273041358.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <7001f1995cb0638d21558d12291a3d51f24ed8c2.1273041358.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This parameter is used by primary kernel to pass address of vmcore header to the
-dump capture kernel.
+Implement machine specific function crash_setup_regs() which is responsible for
+storing machine state when crash occured.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/setup.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/kexec.h |   22 +++++++++++++++++++---
+ 1 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 076454f..25a1664 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -20,6 +20,7 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -711,6 +712,30 @@ static void __init reserve_crashkernel(void)
- static inline void reserve_crashkernel(void) {}
- #endif /* CONFIG_KEXEC */
+diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
+index df15a0d..8ec9ef5 100644
+--- a/arch/arm/include/asm/kexec.h
++++ b/arch/arm/include/asm/kexec.h
+@@ -19,10 +19,26 @@
  
-+/*
-+ * Note: elfcorehdr_addr is not just limited to vmcore. It is also used by
-+ * is_kdump_kernel() to determine if we are booting after a panic. Hence
-+ * ifdef it under CONFIG_CRASH_DUMP and not CONFIG_PROC_VMCORE.
+ #ifndef __ASSEMBLY__
+ 
+-struct kimage;
+-/* Provide a dummy definition to avoid build failures. */
++/**
++ * crash_setup_regs() - save registers for the panic kernel
++ * @newregs: registers are saved here
++ * @oldregs: registers to be saved (may be %NULL)
++ *
++ * Function copies machine registers from @oldregs to @newregs. If @oldregs is
++ * %NULL then current registers are stored there.
 + */
-+
-+#ifdef CONFIG_CRASH_DUMP
-+/*
-+ * elfcorehdr= specifies the location of elf core header stored by the crashed
-+ * kernel. This option will be passed by kexec loader to the capture kernel.
-+ */
-+static int __init setup_elfcorehdr(char *arg)
+ static inline void crash_setup_regs(struct pt_regs *newregs,
+-                                        struct pt_regs *oldregs) { }
++				    struct pt_regs *oldregs)
 +{
-+	char *end;
-+
-+	if (!arg)
-+		return -EINVAL;
-+
-+	elfcorehdr_addr = memparse(arg, &end);
-+	return end > arg ? 0 : -EINVAL;
++	if (oldregs) {
++		memcpy(newregs, oldregs, sizeof(*newregs));
++	} else {
++		__asm__ __volatile__ ("stmia %0, {r0 - r15}"
++				      : : "r" (&newregs->ARM_r0));
++		__asm__ __volatile__ ("mrs %0, cpsr"
++				      : "=r" (newregs->ARM_cpsr));
++	}
 +}
-+early_param("elfcorehdr", setup_elfcorehdr);
-+#endif /* CONFIG_CRASH_DUMP */
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	struct tag *tags = (struct tag *)&init_tags;
+ 
+ #endif /* __ASSEMBLY__ */
+ 
 -- 
 1.5.6.5
