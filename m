@@ -1,20 +1,22 @@
-From: avictor.za@gmail.com (avictor.za at gmail.com)
-Date: Wed, 5 May 2010 10:05:38 +0200
-Subject: [at91] Save power by disabling the processor clock when CPU is
-	idle
-In-Reply-To: <20100502223424.GA11466@n2100.arm.linux.org.uk>
-References: <1271156732l.25331l.7l@i-dmzi_al.realan.de>
-	<j2ncd73a99e1005021310w1c6471et6c58ffce68a4137b@mail.gmail.com>
-	<20100502223424.GA11466@n2100.arm.linux.org.uk>
-Message-ID: <i2ucd73a99e1005050105kd9b66e90n7fc07561aeab53df@mail.gmail.com>
+From: gores@marvell.com (Siddarth Gore)
+Date: Wed, 5 May 2010 13:28:04 +0530
+Subject: adding pxa3xx_nand_flash to platform data
+Message-ID: <1273046285.29563.311.camel@pe-dt434>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Russell,
+Hello Eric,
 
-> Ok, thanks. ?Where do we stand wrt the other two patches (5966/1 and
-> 5967/1) ?
+Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
+support for Aspenite DB board (pxa168). I have a patch ready to add
+pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
+field in it.
+Looks like it is the same for all boards (depending upon the page size).
+So should I add it to the board specific setup file or remove it from
+pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
 
-They can be applied.  Thanks.
+If there are boards which require a different cmdset then we have to go
+with first option, if not, we can use option two and save some code
+duplication.
 
-Acked-by: Andrew Victor <linux@maxim.org.za>
+-siddarth
