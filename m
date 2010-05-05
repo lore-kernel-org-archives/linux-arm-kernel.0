@@ -1,34 +1,62 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed,  5 May 2010 09:54:15 +0300
-Subject: [PATCH v2 3/8] arm: kdump: implement machine_crash_shutdown()
+Date: Wed,  5 May 2010 09:54:19 +0300
+Subject: [PATCH v2 7/8] arm: kdump: add support for elfcorehdr= parameter
 In-Reply-To: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <25d1f9b22c9842e8f379e6cf6a526ccd99e301bc.1273041358.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <f91641c681cbb84872288bc0cfc3c423c3c6346e.1273041358.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement function machine_crash_shutdown() which disables IRQs and saves
-machine state to ELF notes structure.
+This parameter is used by primary kernel to pass address of vmcore header to the
+dump capture kernel.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/machine_kexec.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/kernel/setup.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 598ca61..81e9898 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -43,6 +43,10 @@ void machine_shutdown(void)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 076454f..25a1664 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -20,6 +20,7 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -711,6 +712,30 @@ static void __init reserve_crashkernel(void)
+ static inline void reserve_crashkernel(void) {}
+ #endif /* CONFIG_KEXEC */
  
- void machine_crash_shutdown(struct pt_regs *regs)
- {
-+	local_irq_disable();
-+	crash_save_cpu(regs, smp_processor_id());
++/*
++ * Note: elfcorehdr_addr is not just limited to vmcore. It is also used by
++ * is_kdump_kernel() to determine if we are booting after a panic. Hence
++ * ifdef it under CONFIG_CRASH_DUMP and not CONFIG_PROC_VMCORE.
++ */
 +
-+	printk(KERN_INFO "Loading crashdump kernel...\n");
- }
- 
- void machine_kexec(struct kimage *image)
++#ifdef CONFIG_CRASH_DUMP
++/*
++ * elfcorehdr= specifies the location of elf core header stored by the crashed
++ * kernel. This option will be passed by kexec loader to the capture kernel.
++ */
++static int __init setup_elfcorehdr(char *arg)
++{
++	char *end;
++
++	if (!arg)
++		return -EINVAL;
++
++	elfcorehdr_addr = memparse(arg, &end);
++	return end > arg ? 0 : -EINVAL;
++}
++early_param("elfcorehdr", setup_elfcorehdr);
++#endif /* CONFIG_CRASH_DUMP */
++
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
 -- 
 1.5.6.5
