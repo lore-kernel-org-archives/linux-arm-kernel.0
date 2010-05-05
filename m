@@ -1,137 +1,61 @@
 From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Wed,  5 May 2010 11:42:08 +0300
-Subject: [RESEND PATCHv3 4/4] OMAP3: export chip IDCODE,
-	Production ID and Die ID
+Date: Wed,  5 May 2010 11:42:05 +0300
+Subject: [RESEND PATCHv3 1/4] ARM: Introduce SoC Info into /proc/cpuinfo
 In-Reply-To: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
 References: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <1273048928-6105-5-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <1273048928-6105-2-git-send-email-eduardo.valentin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eduardo Valentin <eduardo.valentin@nokia.com>
 
-This patch exports the OMAP3 IDCODE and Production ID to userspace
-via /proc/cpuinfo using the system_soc_info.
-
-Die ID is also exported depending on what users pass as kernel
-parameter. It is same protection mechanism made for x86 product
-number. So, if user passes "omap3_die_id" parameter, it will append
-die id code into /proc/cpuinfo as well. A Kconfig option has been
-added as well, so it can be configurable during compilation time.
-
-This can be used to track down silicon specific issues. The info is
-exported via /proc/cpuinfo because then it can be possible to include this
-in corematic dumps.
-
-This is based on Peter De Schrijver patch, which export same info via sysfs.
+This patch extends the ARM /proc/cpuinfo to include soc info data.
+It is implemented via the same way which is done for
+system_rev, system_serial_low and system_serial_high.
+Then, now we have system_soc_info, which is printed only
+if there is something useful there.
 
 Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
 ---
- Documentation/kernel-parameters.txt |    2 +
- arch/arm/mach-omap2/Kconfig         |   10 +++++++++
- arch/arm/mach-omap2/id.c            |   37 +++++++++++++++++++++++++++++++++-
- 3 files changed, 47 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/system.h |    2 ++
+ arch/arm/kernel/setup.c       |    5 +++++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 839b21b..6a84e6c 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1809,6 +1809,8 @@ and is between 256 and 4096 characters. It is defined in the file
- 			waiting for the ACK, so if this is set too high
- 			interrupts *may* be lost!
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 4ace45e..53a9645 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -71,6 +71,8 @@ struct task_struct;
+ extern unsigned int system_rev;
+ extern unsigned int system_serial_low;
+ extern unsigned int system_serial_high;
++#define SYSTEM_SOC_INFO_SIZE			128
++extern char system_soc_info[SYSTEM_SOC_INFO_SIZE];
+ extern unsigned int mem_fclk_21285;
  
-+	omap3_die_id	[OMAP] Append DIE ID info under /proc/cpuinfo
-+
- 	omap_mux=	[OMAP] Override bootloader pin multiplexing.
- 			Format: <mux_mode0.mode_name=value>...
- 			For example, to override I2C bus2:
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 2455dcc..462c23a 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -169,3 +169,13 @@ config OMAP3_SDRC_AC_TIMING
- 	  wish to say no.  Selecting yes without understanding what is
- 	  going on could result in system crashes;
+ struct pt_regs;
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..025d795 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -85,6 +85,9 @@ EXPORT_SYMBOL(system_serial_low);
+ unsigned int system_serial_high;
+ EXPORT_SYMBOL(system_serial_high);
  
-+config OMAP3_EXPORT_DIE_ID
-+	bool "Export DIE ID code under /proc/cpuinfo"
-+	depends on ARCH_OMAP3
-+	default n
-+	help
-+	  Say Y here if you need DIE ID code to be exported via /proc/cpuinfo
-+	  in production systems. You will need also to explicitly flag it by
-+	  appending the "omap3_die_id" parameter to your boot command line.
++char system_soc_info[SYSTEM_SOC_INFO_SIZE];
++EXPORT_SYMBOL(system_soc_info);
 +
-+
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 4702ffe..6fe554b 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -76,6 +76,10 @@ EXPORT_SYMBOL(omap_type);
- /*----------------------------------------------------------------------------*/
+ unsigned int elf_hwcap;
+ EXPORT_SYMBOL(elf_hwcap);
  
- #define OMAP_TAP_IDCODE		0x0204
-+#define OMAP_TAP_PROD_ID_0      0x0208
-+#define OMAP_TAP_PROD_ID_1      0x020c
-+#define OMAP_TAP_PROD_ID_2      0x0210
-+#define OMAP_TAP_PROD_ID_3      0x0214
- #define OMAP_TAP_DIE_ID_0	0x0218
- #define OMAP_TAP_DIE_ID_1	0x021C
- #define OMAP_TAP_DIE_ID_2	0x0220
-@@ -303,6 +307,7 @@ void __init omap4_check_revision(void)
+@@ -847,6 +850,8 @@ static int c_show(struct seq_file *m, void *v)
+ 	seq_printf(m, "Revision\t: %04x\n", system_rev);
+ 	seq_printf(m, "Serial\t\t: %08x%08x\n",
+ 		   system_serial_high, system_serial_low);
++	if (strlen(system_soc_info))
++		seq_printf(m, "SoC Info\t: %s\n",  system_soc_info);
  
- void __init omap3_cpuinfo(void)
- {
-+	int sz;
- 	u8 rev = GET_OMAP_REVISION();
- 	char cpu_name[16], cpu_rev[16];
- 
-@@ -360,8 +365,8 @@ void __init omap3_cpuinfo(void)
- 	}
- 
- 	/* Print verbose information */
--	snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "%s ES%s", cpu_name,
--			cpu_rev);
-+	sz = snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "%s ES%s",
-+			cpu_name, cpu_rev);
- 	pr_info("%s (", system_soc_info);
- 
- 	OMAP3_SHOW_FEATURE(l2cache);
-@@ -372,7 +377,35 @@ void __init omap3_cpuinfo(void)
- 	OMAP3_SHOW_FEATURE(192mhz_clk);
- 
- 	printk(")\n");
-+
-+	/* Append OMAP3 IDCODE and Production ID to system_soc_info */
-+	snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
-+			"\n\tIDCODE\t: %08x\n\tPr. ID\t: %08x %08x %08x %08x",
-+			read_tap_reg(OMAP_TAP_IDCODE),
-+			read_tap_reg(OMAP_TAP_PROD_ID_0),
-+			read_tap_reg(OMAP_TAP_PROD_ID_1),
-+			read_tap_reg(OMAP_TAP_PROD_ID_2),
-+			read_tap_reg(OMAP_TAP_PROD_ID_3));
-+
-+}
-+
-+#ifdef CONFIG_OMAP3_EXPORT_DIE_ID
-+static int __init omap3_die_id_setup(char *s)
-+{
-+	int sz;
-+
-+	sz = strlen(system_soc_info);
-+	snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
-+			"\n\tDie ID\t: %08x %08x %08x %08x",
-+			read_tap_reg(OMAP_TAP_DIE_ID_0),
-+			read_tap_reg(OMAP_TAP_DIE_ID_1),
-+			read_tap_reg(OMAP_TAP_DIE_ID_2),
-+			read_tap_reg(OMAP_TAP_DIE_ID_3));
-+
-+	return 1;
+ 	return 0;
  }
-+__setup("omap3_die_id", omap3_die_id_setup);
-+#endif
- 
- /*
-  * Try to detect the exact revision of the omap we're running on
 -- 
 1.7.0.4.361.g8b5fe.dirty
