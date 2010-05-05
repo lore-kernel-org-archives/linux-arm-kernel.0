@@ -1,63 +1,55 @@
 From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Wed,  5 May 2010 11:42:04 +0300
-Subject: [RESEND PATCHv3 0/4] Adding soc related info into /proc/cpuinfo
-Message-ID: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+Date: Wed,  5 May 2010 11:42:07 +0300
+Subject: [RESEND PATCHv3 3/4] mach-omap1: Add SoC info data for OMAP1 into
+	/proc/cpuinfo
+In-Reply-To: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+References: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <1273048928-6105-4-git-send-email-eduardo.valentin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+From: Eduardo Valentin <eduardo.valentin@nokia.com>
 
-I'm resending this series with minor change in the subject prefix of patch 4/4.
-Removed the PM: prefix. Everything else is same. So, I kept the v3 prefix as well.
+Report OMAP data into system_soc_info. Now we get omap
+information under /proc/cpuinfo.
 
-v3:
-And now v3 of this series. Basically a minor change wrt string manipulation.
-No need to use strlen in so many places. Previous log for reference:
+Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+---
+ arch/arm/mach-omap1/id.c |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
 
-v2:
-
-Here is the version 2 of this series. Now die id is protected using
-same x86 protection mechanism to hide x86 product number. Besides,
-a compilation Kconfig option has been added for DIE ID as well.
-
-Here is previous PATCH 0/4 message:
-
-v1:
-
-This series is to continue what has been discussed several weeks ago
-wrt IDCODE patch. Original patch was made by Peter and discussion is here:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg17553.html
-
-So, the conclusion was that IDCODE info is useful even in production systems,
-and for that debugfs is not a good choice to export it. One suggestion was to
-add it under /proc/cpuinfo. However this entry nowadays exports only ARM related
-information.
-
-So this series does the trick by extending the ARM /proc/cpuinfo to include
-soc info data. There are a few ways to add a hook for soc specific data. But
-I've decided to implement it via the simplest way I found. Basically it is
-same thing which is done for system_rev, system_serial_low and system_serial_high.
-Then, now we have system_soc_info, which is printed only if there is something
-useful there.
-
-As usual, comments are welcome.
-
-BR,
-
- *** SUBJECT HERE ***
-
-*** BLURB HERE ***
-
-Eduardo Valentin (4):
-  ARM: Introduce SoC Info into /proc/cpuinfo
-  mach-omap2: Add SoC info data for OMAP2,3,4 into /proc/cpuinfo
-  mach-omap1: Add SoC info data for OMAP1 into /proc/cpuinfo
-  OMAP3: export chip IDCODE, Production ID and Die ID
-
- Documentation/kernel-parameters.txt |    2 +
- arch/arm/include/asm/system.h       |    2 +
- arch/arm/kernel/setup.c             |    5 +++
- arch/arm/mach-omap1/id.c            |   15 ++++++----
- arch/arm/mach-omap2/Kconfig         |   10 +++++++
- arch/arm/mach-omap2/id.c            |   51 ++++++++++++++++++++++++++++++----
- 6 files changed, 73 insertions(+), 12 deletions(-)
+diff --git a/arch/arm/mach-omap1/id.c b/arch/arm/mach-omap1/id.c
+index a0e3560..9a84347 100644
+--- a/arch/arm/mach-omap1/id.c
++++ b/arch/arm/mach-omap1/id.c
+@@ -120,7 +120,7 @@ static u8 __init omap_get_die_rev(void)
+ 
+ void __init omap_check_revision(void)
+ {
+-	int i;
++	int i, sz;
+ 	u16 jtag_id;
+ 	u8 die_rev;
+ 	u32 omap_id;
+@@ -194,11 +194,14 @@ void __init omap_check_revision(void)
+ 		printk(KERN_INFO "Unknown OMAP cpu type: 0x%02x\n", cpu_type);
+ 	}
+ 
+-	printk(KERN_INFO "OMAP%04x", omap_revision >> 16);
++	sz = snprintf(system_soc_info, SYSTEM_SOC_INFO_SIZE, "OMAP%04x",
++							 omap_revision >> 16);
+ 	if ((omap_revision >> 8) & 0xff)
+-		printk(KERN_INFO "%x", (omap_revision >> 8) & 0xff);
+-	printk(KERN_INFO " revision %i handled as %02xxx id: %08x%08x\n",
+-	       die_rev, omap_revision & 0xff, system_serial_low,
+-	       system_serial_high);
++		snprintf(system_soc_info + sz, SYSTEM_SOC_INFO_SIZE - sz,
++				"%x", (omap_revision >> 8) & 0xff);
++	pr_info("%s revision %i handled as %02xxx id: %08x%08x\n",
++		system_soc_info, die_rev, omap_revision & 0xff,
++		system_serial_low, system_serial_high);
++
+ }
+ 
+-- 
+1.7.0.4.361.g8b5fe.dirty
