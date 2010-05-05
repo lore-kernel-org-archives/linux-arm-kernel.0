@@ -1,98 +1,70 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed,  5 May 2010 09:54:17 +0300
-Subject: [PATCH v2 5/8] arm: kdump: implement copy_oldmem_page()
+Date: Wed,  5 May 2010 09:54:18 +0300
+Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to elf_check_arch()
 In-Reply-To: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <00e55f1fef09064ce54a0b44ff2492d6d4629045.1273041358.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is used by vmcore code to read a page from the old kernel memory.
+This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
+enabled:
+
+fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
+fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
+incompatible pointer type
+
+ELF32 and ELF64 headers have common fields of same size (namely e_ident and
+e_machine) which are checked in arm_elf_check_arch().
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/Makefile     |    1 +
- arch/arm/kernel/crash_dump.c |   60 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/crash_dump.c
+ arch/arm/include/asm/elf.h |    4 ++--
+ arch/arm/kernel/elf.c      |    6 ++++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 26d302c..ea023c6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
-+obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index bff0564..aa71815 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -92,8 +92,8 @@ struct elf32_hdr;
+ /*
+  * This is used to ensure we don't load something for the wrong architecture.
+  */
+-extern int elf_check_arch(const struct elf32_hdr *);
+-#define elf_check_arch elf_check_arch
++extern int arm_elf_check_arch(const struct elf32_hdr *);
++#define elf_check_arch(x) arm_elf_check_arch((const struct elf32_hdr *)(x))
  
- obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
- AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
-diff --git a/arch/arm/kernel/crash_dump.c b/arch/arm/kernel/crash_dump.c
-new file mode 100644
-index 0000000..cd3b853
---- /dev/null
-+++ b/arch/arm/kernel/crash_dump.c
-@@ -0,0 +1,60 @@
-+/*
-+ * arch/arm/kernel/crash_dump.c
-+ *
-+ * Copyright (C) 2010 Nokia Corporation.
-+ * Author: Mika Westerberg
-+ *
-+ * This code is taken from arch/x86/kernel/crash_dump_64.c
-+ *   Created by: Hariprasad Nellitheertha (hari at in.ibm.com)
-+ *   Copyright (C) IBM Corporation, 2004. All rights reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/crash_dump.h>
-+#include <linux/uaccess.h>
-+#include <linux/io.h>
-+
-+/* stores the physical address of elf header of crash image */
-+unsigned long long elfcorehdr_addr = ELFCORE_ADDR_MAX;
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is int he user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
+ extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
+ #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
+diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+index d4a0da1..14e501b 100644
+--- a/arch/arm/kernel/elf.c
++++ b/arch/arm/kernel/elf.c
+@@ -4,11 +4,13 @@
+ #include <linux/binfmts.h>
+ #include <linux/elf.h>
+ 
+-int elf_check_arch(const struct elf32_hdr *x)
++int arm_elf_check_arch(const struct elf32_hdr *x)
+ {
+ 	unsigned int eflags;
+ 
+ 	/* Make sure it's an ARM executable */
++	if (x->e_ident[EI_CLASS] != ELF_CLASS)
 +		return 0;
-+
-+	vaddr = ioremap(pfn << PAGE_SHIFT, PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	iounmap(vaddr);
-+	return csize;
-+}
+ 	if (x->e_machine != EM_ARM)
+ 		return 0;
+ 
+@@ -35,7 +37,7 @@ int elf_check_arch(const struct elf32_hdr *x)
+ 	}
+ 	return 1;
+ }
+-EXPORT_SYMBOL(elf_check_arch);
++EXPORT_SYMBOL(arm_elf_check_arch);
+ 
+ void elf_set_personality(const struct elf32_hdr *x)
+ {
 -- 
 1.5.6.5
