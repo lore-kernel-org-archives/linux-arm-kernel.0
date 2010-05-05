@@ -1,48 +1,51 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 05 May 2010 12:33:17 -0700
-Subject: [PATCH 15/18] omap: rx51: Change the TWL4030 VMMC2 voltage
-	constraints andsupply name
+Date: Wed, 05 May 2010 12:33:20 -0700
+Subject: [PATCH 16/18] omap: rx51: Add i2c2 board_info with tlv320aic3x
 In-Reply-To: <20100505192957.21568.19569.stgit@baageli.muru.com>
 References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-Message-ID: <20100505193317.21568.78824.stgit@baageli.muru.com>
+Message-ID: <20100505193320.21568.26640.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jarkko Nikula <jhnikula@gmail.com>
 
-I believe the VMMC2 constraints must be the same than with VAUX3. Older
-boards are using TWL4030 VMMC2 supply for internal MMC whereas newer are
-using VAUX3 that has more limited constraints defined in this same file.
+This makes possible to probe the audio codec and add another i2c2
+components in the future.
 
-More over, the VMMC2 supply is used also for analog audio domain and the
-miminum analog voltage of the TLV320AIC34 codec is 2.7 V.
-
-To combine these two facts, the patch changes supply name to V28_A as the
-newer boards register VMMC2_30 for VAUX3 and uses the same constraints than
-VAUX3 since those constraints are ok for the TLV320AIC34.
+Fix also indentation for the first omap_register_i2c_bus.
 
 Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Cc: Adrian Hunter <adrian.hunter@nokia.com>
-Cc: Eduardo Valentin <eduardo.valentin@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-rx51-peripherals.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 4377a4c..b803f47 100644
+index b803f47..3addfe6 100644
 --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
 +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -370,9 +370,9 @@ static struct regulator_init_data rx51_vmmc1 = {
+@@ -629,6 +629,12 @@ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_1[] = {
+ 	},
+ };
  
- static struct regulator_init_data rx51_vmmc2 = {
- 	.constraints = {
--		.name			= "VMMC2_30",
--		.min_uV			= 1850000,
--		.max_uV			= 3150000,
-+		.name			= "V28_A",
-+		.min_uV			= 2800000,
-+		.max_uV			= 3000000,
- 		.apply_uV		= true,
- 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
- 					| REGULATOR_MODE_STANDBY,
++static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
++	{
++		I2C_BOARD_INFO("tlv320aic3x", 0x18),
++	},
++};
++
+ static int __init rx51_i2c_init(void)
+ {
+ 	if ((system_rev >= SYSTEM_REV_S_USES_VAUX3 && system_rev < 0x100) ||
+@@ -639,8 +645,9 @@ static int __init rx51_i2c_init(void)
+ 		rx51_twldata.vmmc2 = &rx51_vmmc2;
+ 	}
+ 	omap_register_i2c_bus(1, 2200, rx51_peripherals_i2c_board_info_1,
+-			ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
+-	omap_register_i2c_bus(2, 100, NULL, 0);
++			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
++	omap_register_i2c_bus(2, 100, rx51_peripherals_i2c_board_info_2,
++			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_2));
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ 	return 0;
+ }
