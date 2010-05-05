@@ -1,44 +1,34 @@
 From: Dinh.Nguyen@freescale.com (Dinh Nguyen)
-Date: Wed,  5 May 2010 17:56:09 -0500
-Subject: [PATCHv1 2.6.34-rc6 1/3] mxc: gadget: remove 60mhz clock requirement
-	for freescale mx51 usb core
-In-Reply-To: <1273100171-3235-1-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Wed,  5 May 2010 17:56:10 -0500
+Subject: [PATCHv1 2.6.34-rc6 2/3] mx5: change usb clock source from pll3 to
+	pll2
+In-Reply-To: <1273100171-3235-2-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1273100171-3235-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1273100171-3235-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1273100171-3235-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1273100171-3235-3-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for mx51, usb core is clocked from sources that are not 60mhz.
+For power management reasons, pll2 should be used to source the USBOH3
+clock for mx51. PLL3 can be completely gated off when USB is not used.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- drivers/usb/gadget/fsl_mx3_udc.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/gadget/fsl_mx3_udc.c b/drivers/usb/gadget/fsl_mx3_udc.c
-index 20a802e..d0b8bde 100644
---- a/drivers/usb/gadget/fsl_mx3_udc.c
-+++ b/drivers/usb/gadget/fsl_mx3_udc.c
-@@ -50,12 +50,14 @@ int fsl_udc_clk_init(struct platform_device *pdev)
- 		goto egusb;
- 	}
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index dcca330..933c0d1 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -763,7 +763,7 @@ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
  
--	freq = clk_get_rate(mxc_usb_clk);
--	if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
--	    (freq < 59999000 || freq > 60001000)) {
--		dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
--		ret = -EINVAL;
--		goto eclkrate;
-+	if (!cpu_is_mx51()) {
-+		freq = clk_get_rate(mxc_usb_clk);
-+		if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
-+		    (freq < 59999000 || freq > 60001000)) {
-+			dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
-+			ret = -EINVAL;
-+			goto eclkrate;
-+		}
- 	}
+ /* USB */
+ DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
+-	NULL, NULL, &pll3_sw_clk, NULL);
++	NULL, NULL, &pll2_sw_clk, NULL);
  
- 	ret = clk_enable(mxc_usb_clk);
+ /* FEC */
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
 -- 
 1.6.0.4
