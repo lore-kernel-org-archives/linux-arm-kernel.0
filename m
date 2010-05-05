@@ -1,75 +1,55 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Wed, 12 May 2010 15:34:23 +0300
-Subject: [PATCHv5 2/3] OMAP: export OMAP info under /proc/socinfo
-In-Reply-To: <20100511165846.GA10609@besouro.research.nokia.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
-	<4BE9697F.80308@ti.com>
-	<20100511165846.GA10609@besouro.research.nokia.com>
-Message-ID: <20100512123423.GA11782@besouro.research.nokia.com>
+From: Bin.Shi@csr.com (Bin Shi)
+Date: Wed, 05 May 2010 09:46:54 +0800
+Subject: Linux Bluetooth HFP through usp pcm design questions
+Message-ID: <1273024014.9369.1.camel@ben-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi all,
 
-On Tue, May 11, 2010 at 06:58:46PM +0200, Valentin Eduardo (Nokia-D/Helsinki) wrote:
-> Hello Nishanth,
-> 
-> On Tue, May 11, 2010 at 04:28:15PM +0200, ext Nishanth Menon wrote:
-> > Eduardo Valentin had written, on 05/11/2010 09:15 AM, the following:
-> > > From: Eduardo Valentin <eduardo.valentin@nokia.com>
-> > > 
-> > > Export OMAP name and rev under /proc/socinfo node.
-> > > 
-> > > Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
-> > > ---
-> > >  arch/arm/Kconfig         |    1 +
-> > >  arch/arm/mach-omap1/id.c |   31 ++++++++++++++++++++++++-------
-> > >  arch/arm/mach-omap2/id.c |   32 ++++++++++++++++++++++++++------
-> > >  3 files changed, 51 insertions(+), 13 deletions(-)
-> > > 
-> > [..]
-> > 
-> > > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> > > index 37b8a1a..b67486b 100644
-> > > --- a/arch/arm/mach-omap2/id.c
-> > > +++ b/arch/arm/mach-omap2/id.c
-> > [..]
-> > 
-> > > @@ -356,7 +363,8 @@ void __init omap3_cpuinfo(void)
-> > >  	}
-> > >  
-> > >  	/* Print verbose information */
-> > > -	pr_info("%s ES%s (", cpu_name, cpu_rev);
-> > > +	snprintf(socinfo, SOCINFO_SZ, "%s ES%s", cpu_name, cpu_rev);
-> > > +	pr_info("%s (", socinfo);
-> > >  
-> > >  	OMAP3_SHOW_FEATURE(l2cache);
-> > >  	OMAP3_SHOW_FEATURE(iva);
-> > Just a minor comment -> is it a good idea to pushin the features to SOC 
-> > info as well? currently this is being displayed at bootlog and not 
-> > beyond.. might be a better approach to move it into socinfo..
-> 
-> Yeah. I would expect that someone would ask this. When I was writing this part
-> I also thought that would be nice to just duplicate all info which is printed
-> into kernel log buffer. But then I decided to proceed with only the info we are
-> needing from userspace. If you think that would be useful to know those as well,
-> then why not adding them.
+        
+        
 
-As discussed in #linux-omap IRC channel, we agreed that it would be nice and useful
-to export the OMAP FEATURES under this interface. But as the code to detect omap features is
-under re-work currently, for now we are going to leave it out of this patch set.
+I am working on vendor ARM1136 platform. Nowdays, I want to integrate
+CSR BC06 chip to my board with HFP profile, bluetooth chip connect its
+pcm interface with platform's usp interface. 
 
-> 
-> > 
-> > 
-> > [..]
-> > 
-> > -- 
-> > Regards,
-> > Nishanth Menon
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+        
+
+As I know, HFP profile should has at least two deamons, one for host and
+one for target(BC06). In low level, driver for usp pcm should be
+available, which is compatible with BC06 frame format. Now, audio path
+is OK for playback and capture with ALSA.
+
+        
+
+My questions are:
+1) How could I control stream path: eg headphone voice->BC06->usp
+interface->platform speaker?
+2) Should it be strictly sync for controlling this application?
+3) Data format between usp interface and headphone interface(bypass
+bluetooth) should be pcm stream?
+
+        
+        
+
+Any suggestion would be welcomed! Thanks.
+
+
+
+
+---
+Best Regards,
+Bin Shi
+
+
+
+
+
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100505/efcc9f18/attachment-0001.htm>
