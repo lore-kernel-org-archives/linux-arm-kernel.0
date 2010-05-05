@@ -1,23 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 05 May 2010 17:44:33 +0100
-Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the 16-way
-	PL310 (v3)
-In-Reply-To: <y2yd91d07041005050554qf0f5a2ddm499380004665a7a3@mail.gmail.com>
-References: <y2yd91d07041005050554qf0f5a2ddm499380004665a7a3@mail.gmail.com>
-Message-ID: <1273077873.27058.12.camel@e102109-lin.cambridge.arm.com>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Wed, 5 May 2010 12:32:44 -0500
+Subject: Old DSS code broken as module (was "RE: [PATCH 11/11] omap2/3/4:
+	Disable CONFIG_FB_OMAP in omap3_defconfig")
+In-Reply-To: <20100430203411.25812.30019.stgit@baageli.muru.com>
+References: <20100430202603.25812.41834.stgit@baageli.muru.com>
+	<20100430203411.25812.30019.stgit@baageli.muru.com>
+Message-ID: <A24693684029E5489D1D202277BE8944552579A3@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-05 at 13:54 +0100, Jason McMullan wrote:
-> With the following email from Will Deacon, and the comment period on
-> the list, is this patch ready to go into the ARM Linux
-> patch queue?
+Tony,
+
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> Sent: Friday, April 30, 2010 3:34 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Subject: [PATCH 11/11] omap2/3/4: Disable CONFIG_FB_OMAP in
+> omap3_defconfig
 > 
-> Or, Catalin, do you want to integrate these changes into your
-> patch set for the l2x0 first?
+> Looks like CONFIG_FB_OMAP prevents somehow mounting root on MMC
+> at least on zoom3 for multi-omap. Disable CONFIG_FB until the
+> omap FB code is fixed.
+> 
+> This allows booting omap3_defconfig on various omaps. Tested on
+> 2420-n8x0, 3430-n900, 3630-zoom3 and 4430-blaze. Note that n8x0
+> still has issues with starting user space because of TLS and
+> VFP.
 
-As I said in a previous e-mail, just push your patch and I'll adjust
-mine accordingly once I get feedback on the list. Thanks.
+(Looping Tomi)
 
--- 
-Catalin
+Unfortunately, your patch is uncovering an issue with old DSS code to
+compile it as module, which I think is caused by this:
+
+A single omapfb.ko is attempted to be created in drivers/video/omap/ folder,
+but the included source files (DSS code + lcd drivers), results in multiple
+module_init entries added in a single module, and therefore giving errors of
+duplicate init_module entries between omapfb_main.c and the lcd_*.c files.
+
+So, either you disable old DSS driver completely, or you have it as
+built-in.
+
+Regards,
+Sergio
