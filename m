@@ -1,43 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 5 May 2010 14:10:40 +0800
-Subject: [PATCH 05/10] [ARM] pxa: fix the cpu_is_pxa950
-In-Reply-To: <x2q771cded01004290118tc3639f59ga7b8760de91e911f@mail.gmail.com>
-References: <x2q771cded01004290118tc3639f59ga7b8760de91e911f@mail.gmail.com>
-Message-ID: <p2kf17812d71005042310s59667734r57cc208849b62ef8@mail.gmail.com>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Wed,  5 May 2010 09:54:12 +0300
+Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
+Message-ID: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 29, 2010 at 4:18 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From a4529b7e7e8b33d52106da10f04219d9e9b4f690 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 12 Mar 2010 08:51:54 -0500
-> Subject: [PATCH] [ARM] pxa: fix the cpu_is_pxa950
->
-> Fix the wrong variable used in cpu_is_pxa950().
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Hello,
 
-Applied.
+This is re-send of the series. I didn't receive any comments on this but we
+found few minor things during in-house review which are incorporated.
 
-> ---
-> ?arch/arm/mach-pxa/include/mach/hardware.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
-> b/arch/arm/mach-pxa/include/mach/hardware.h
-> index 7515757..3d8d8cb 100644
-> --- a/arch/arm/mach-pxa/include/mach/hardware.h
-> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
-> @@ -202,7 +202,7 @@
-> ?#define __cpu_is_pxa950(id) ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?unsigned int _id = (id) >> 4 & 0xfff; ? \
-> - ? ? ? ? ? ? ? id == 0x697; ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? _id == 0x697; ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? })
-> ?#else
-> ?#define __cpu_is_pxa950(id) ? ?(0)
-> --
-> 1.5.6.5
->
+Changes to v1:
+	- corrected kernel-doc for crash_setup_regs()
+	- check return value of ioremap() in copy_oldmem_page()
+
+Changes to RFC version:
+	- crash_setup_regs() uses Russell's suggestion for saving registers
+	- copy_oldmem_page() code is changed to use ioremap()
+	- there is no need for special 'mem=' parameters
+
+I've tested this on N900 and beagleboard.
+
+Thanks,
+Mw
+
+Mika Westerberg (8):
+  arm: kdump: reserve memory for crashkernel
+  arm: kdump: implement crash_setup_regs()
+  arm: kdump: implement machine_crash_shutdown()
+  arm: kdump: skip indirection page when crashing
+  arm: kdump: implement copy_oldmem_page()
+  arm: allow passing an ELF64 header to elf_check_arch()
+  arm: kdump: add support for elfcorehdr= parameter
+  arm: kdump: add CONFIG_CRASH_DUMP Kconfig option
+
+ arch/arm/Kconfig                  |   12 ++++++
+ arch/arm/include/asm/elf.h        |    4 +-
+ arch/arm/include/asm/kexec.h      |   22 +++++++++-
+ arch/arm/kernel/Makefile          |    1 +
+ arch/arm/kernel/crash_dump.c      |   60 +++++++++++++++++++++++++++++
+ arch/arm/kernel/elf.c             |    6 ++-
+ arch/arm/kernel/machine_kexec.c   |    4 ++
+ arch/arm/kernel/relocate_kernel.S |    6 +++
+ arch/arm/kernel/setup.c           |   76 +++++++++++++++++++++++++++++++++++++
+ 9 files changed, 184 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/kernel/crash_dump.c
