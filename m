@@ -1,118 +1,65 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 5 May 2010 02:41:42 +0200
-Subject: [PATCH] pxa: Remove unused MFP LPM definition
-In-Reply-To: <w2qf17812d71005041723h1f70de11w8e3bc85ea3bde682@mail.gmail.com>
-References: <4BD64FF1.2090007@gmail.com> <4BE09D3A.3040100@gmail.com>
-	<w2qf17812d71005041723h1f70de11w8e3bc85ea3bde682@mail.gmail.com>
-Message-ID: <201005050241.42871.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 5 May 2010 09:28:18 +0800
+Subject: [PATCH 01/10] [ARM] pxa: extend to support 96 IRQs
+In-Reply-To: <j2l771cded01004290115kf0c7b08m8dface1967d26752@mail.gmail.com>
+References: <j2l771cded01004290115kf0c7b08m8dface1967d26752@mail.gmail.com>
+Message-ID: <z2qf17812d71005041828ocd0ff0cfn33bf32ce9c1d46c3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 5. kv?tna 2010 02:23:27 Eric Miao napsal(a):
-> On Wed, May 5, 2010 at 6:18 AM, David Hunter <hunterd42@gmail.com> wrote:
-> > On 4/26/2010 8:16 PM, Eric Miao wrote:
-> >> Instead of removing this potentially useful low power mode pin status,
-> >> what
-> > 
-> >> about the following patch:
-> > I think the name itself is confusing. All of the other MFP_LPM_
-> > definitions state what the pin is going to do: drive high/low, pull
-> > high/low, or float. My (strictly document-derived) understanding of
-> > PXA27x is that you can only choose to drive or float a pin, while with
-> > PXA3xx you can do all of the above. What would MFP_LPM_INPUT do that
-> > MFP_LPM_FLOAT wouldn't?
-> 
-> I'm currently not sure of how input is implemented in pxa27x during
-> low power mode, but strictly, input != float. While float is usually a Hi-Z
-> without pull-up or pull-down, input could be different. That's why I still
-> intend to keep input there.
-> 
-> >> commit f5d406d50f924c82ddf469f120fa420f0499d901
-> >> Author: Eric Miao<eric.y.miao@gmail.com>
-> >> Date:   Tue Apr 27 11:14:24 2010 +0800
-> >> 
-> >>     [ARM] pxa: allow MFP_LPM_INPUT to be explicitly specified
-> >> 
-> >>     Signed-off-by: Eric Miao<eric.y.miao@gmail.com>
-> >> 
-> >> diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c
-> >> b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> >> index e5b7921..1d1419b 100644
-> >> --- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-> >> +++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> >> @@ -81,6 +81,7 @@ static int __mfp_config_gpio(unsigned gpio, unsigned
-> >> long c)
-> >>                PGSR(bank)&= ~mask;
-> >>                is_out = 1;
-> >>                break;
-> >> +       case MFP_LPM_INPUT:
-> >>        case MFP_LPM_DEFAULT:
-> >>                break;
-> > 
-> > If I read this correctly, _DEFAULT will, on entry to LPM, change the pin
-> > direction to the one implied by bit 23 (MFP_DIR_IN/MFP_DIR_OUT). For
-> > _INPUT
-> 
-> > to live up to its name, maybe it should always float the pin, like this:
-> Good catch.
-> 
-> > +       case MFP_LPM_INPUT:
-> > +               is_out = 0;
-> > +               break;
-> >        case MFP_LPM_DEFAULT:
-> >                break;
-> > 
-> > Also, I'm not sure what effect GAFR will have (if any) in LPM. Does the
-> > AF have to be set to GPIO to enable the PGSR/GPDR settings? Your
-> > original patch
-> 
-> > did just that:
-> My understanding is so. While PGSR will be loaded into GPSR or GPCR when
-> entering low power mode, and GPSR/GPCR is one of the mux input, which I'd
-> say making them to be GPIO will be safer to ensure the correct low power
-> value.
-> 
-> > [http://www.spinics.net/lists/arm-kernel/msg55842.html]
-> > 
-> >> diff --git a/arch/arm/plat-pxa/mfp.c b/arch/arm/plat-pxa/mfp.c
-> >> index be58f9f..b77e018 100644
-> >> --- a/arch/arm/plat-pxa/mfp.c
-> >> +++ b/arch/arm/plat-pxa/mfp.c
-> >> @@ -110,6 +110,7 @@ static const unsigned long mfpr_lpm[] = {
-> >>        MFPR_LPM_PULL_LOW,
-> >>        MFPR_LPM_PULL_HIGH,
-> >>        MFPR_LPM_FLOAT,
-> >> +       MFPR_LPM_INPUT,
-> >>  };
-> >> 
-> >>  /* mapping of MFP_PULL_* definitions to MFPR_PULL_* register bits */
-> > 
-> > This adds a bug, which I've been trying to find the right way to fix.
-> > It's the same case as MFPR_LPM_DEFAULT. Since MFPR_LPM_INPUT = 0,
-> > MFPR[SLEEP_OE_N] will be cleared at LPM, and the pin will be driven low.
-> > (Not a good idea for a "default".) Either MFPR_LPM_FLOAT, _PULL_LOW, or
-> > _PULL_HIGH should be used instead. And only the board code knows enough
-> > to pick the right one for each pin.
-> 
-> This looks odd to me as well, yet the setting is derived from some
-> piece of code long time ago, which I have no way to track. But yes,
-> feel free to submit patch for this. I'm yet not sure enough about which
-> low power state is most power conserving, before that's figured out,
-> I guess _FLOAT is a choice as it imposes minimum external effect
-> at least.
-> 
-> > I've been working to cobble together a patch to address this in my
-> > spare time, but don't have U-Boot running on Littleton yet. If you know
-> > of a way to get this going -- or something other way of loading the
-> > kernel -- I'd be grateful for the assist.
-> 
-> blob I'd say - but that's definitely not sexy. u-boot, on the other hand,
-> you can ask Marek for detail, he's managed to get it running on littleton
-> now. (I've got him CC'ed)
+On Thu, Apr 29, 2010 at 4:15 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From ea9bcffc52bb7ee542c3615530e1c8e87100c884 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Thu, 29 Apr 2010 10:22:12 -0400
+> Subject: [PATCH] [ARM] pxa: extend to support 96 IRQs
+>
+> Extend to support 96 IRQs for PXA950.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-pxa/irq.c ? ?| ? ?9 ++++++---
+> ?arch/arm/mach-pxa/pxa3xx.c | ? ?2 +-
+> ?2 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index 1beb40f..bb5a0c7 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -27,9 +27,12 @@
+>
+> ?#define MAX_INTERNAL_IRQS ? ? ?128
+>
+> -#define IRQ_BIT(n) ? ? (((n) - PXA_IRQ(0)) & 0x1f)
+> -#define _ICMR(n) ? ? ? (*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
+> -#define _ICLR(n) ? ? ? (*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
+> +#define _IDX(n) ? ? ? ? ? ? ? ?((n) - PXA_IRQ(0))
+> +#define IRQ_BIT(n) ? ? (_IDX(n) & 0x1f)
+> +#define _ICMR(n) ? ? ? (*((_IDX(n) < 32) ? &ICMR ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? : ((_IDX(n) < 64) ? &ICMR2 : &ICMR3)))
+> +#define _ICLR(n) ? ? ? (*((_IDX(n) < 32) ? &ICLR ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? : ((_IDX(n) < 64) ? &ICLR2 : &ICLR3)))
+>
 
-Hi, does the OBM2 give you problems still ? Or is it uboot that's buggy ?
-> 
-> > The difference between blob's idea
-> > of bad block management vs. Linux's has me avoiding blob at all costs.
-> > 
-> > -Dave
+Instead of making these macros more complicated, I'd prefer that
+we separate them as three IRQ register banks, with the base I/O
+address of these banks in irq_desc.chip_data or some where.
+
+> ?/*
+> ?* This is for peripheral IRQs internal to the PXA chip.
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 4d7c03e..6285951 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -581,7 +581,7 @@ void __init pxa3xx_init_irq(void)
+> ? ? ? ?value |= (1 << 6);
+> ? ? ? ?__asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
+>
+> - ? ? ? pxa_init_irq(56, pxa3xx_set_wake);
+> + ? ? ? pxa_init_irq(96, pxa3xx_set_wake);
+> ? ? ? ?pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
+> ? ? ? ?pxa_init_gpio(IRQ_GPIO_2_x, 2, 127, NULL);
+> ?}
+> --
+> 1.5.6.5
+>
