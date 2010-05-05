@@ -1,33 +1,38 @@
 From: Jiri.Pinkava@vscht.cz (Pinkava J.)
-Date: Thu, 6 May 2010 00:12:14 +0200
-Subject: [PATCH 2/9] fix: suspended wrong USB port on Acer n35
-In-Reply-To: <4BE1EBFE.9080601@vscht.cz>
-References: <4BE1EBFE.9080601@vscht.cz>
-Message-ID: <4BE1ED3E.1050201@vscht.cz>
+Date: Thu, 6 May 2010 00:13:26 +0200
+Subject: [PATCH 3/9] Add RTC platform device for Acer n30 / Acer n35
+In-Reply-To: <4BE1ED3E.1050201@vscht.cz>
+References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
+Message-ID: <4BE1ED86.3010506@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is bug in USB setup code for Acer n35 (it is related directly to s3c2410,
-see doc). We want suspend host port (is not connected) but device port should be
-active.
+
 
 Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
 ---
- arch/arm/mach-s3c2410/mach-n30.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c2410/mach-n30.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index 684710f..1b635fd 100644
+index 1b635fd..ce1172e 100644
 --- a/arch/arm/mach-s3c2410/mach-n30.c
 +++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -532,7 +532,7 @@ static void __init n30_init(void)
- 		s3c2410_modify_misccr(S3C2410_MISCCR_USBHOST |
- 				      S3C2410_MISCCR_USBSUSPND0 |
- 				      S3C2410_MISCCR_USBSUSPND1,
--				      S3C2410_MISCCR_USBSUSPND1);
-+				      S3C2410_MISCCR_USBSUSPND0);
-
- 		platform_add_devices(n35_devices, ARRAY_SIZE(n35_devices));
- 	}
+@@ -323,6 +323,7 @@ static struct platform_device *n30_devices[] __initdata = {
+ 	&s3c_device_i2c0,
+ 	&s3c_device_iis,
+ 	&s3c_device_ohci,
++	&s3c_device_rtc,
+ 	&s3c_device_usbgadget,
+ 	&n30_button_device,
+ 	&n30_blue_led,
+@@ -334,6 +335,7 @@ static struct platform_device *n35_devices[] __initdata = {
+ 	&s3c_device_wdt,
+ 	&s3c_device_i2c0,
+ 	&s3c_device_iis,
++	&s3c_device_rtc,
+ 	&s3c_device_usbgadget,
+ 	&n35_button_device,
+ };
 -- 
 1.7.1
