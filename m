@@ -1,47 +1,95 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed,  5 May 2010 09:54:12 +0300
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-Message-ID: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+Date: Wed,  5 May 2010 09:54:13 +0300
+Subject: [PATCH v2 1/8] arm: kdump: reserve memory for crashkernel
+In-Reply-To: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <2363da273253361141d269e5de1a761719f01fc0.1273041358.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Implemented ARM support for command line option "crashkernel=size at start" which
+allows user to reserve some memory for a dump capture kernel.
 
-This is re-send of the series. I didn't receive any comments on this but we
-found few minor things during in-house review which are incorporated.
+Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+---
+ arch/arm/kernel/setup.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-Changes to v1:
-	- corrected kernel-doc for crash_setup_regs()
-	- check return value of ioremap() in copy_oldmem_page()
-
-Changes to RFC version:
-	- crash_setup_regs() uses Russell's suggestion for saving registers
-	- copy_oldmem_page() code is changed to use ioremap()
-	- there is no need for special 'mem=' parameters
-
-I've tested this on N900 and beagleboard.
-
-Thanks,
-Mw
-
-Mika Westerberg (8):
-  arm: kdump: reserve memory for crashkernel
-  arm: kdump: implement crash_setup_regs()
-  arm: kdump: implement machine_crash_shutdown()
-  arm: kdump: skip indirection page when crashing
-  arm: kdump: implement copy_oldmem_page()
-  arm: allow passing an ELF64 header to elf_check_arch()
-  arm: kdump: add support for elfcorehdr= parameter
-  arm: kdump: add CONFIG_CRASH_DUMP Kconfig option
-
- arch/arm/Kconfig                  |   12 ++++++
- arch/arm/include/asm/elf.h        |    4 +-
- arch/arm/include/asm/kexec.h      |   22 +++++++++-
- arch/arm/kernel/Makefile          |    1 +
- arch/arm/kernel/crash_dump.c      |   60 +++++++++++++++++++++++++++++
- arch/arm/kernel/elf.c             |    6 ++-
- arch/arm/kernel/machine_kexec.c   |    4 ++
- arch/arm/kernel/relocate_kernel.S |    6 +++
- arch/arm/kernel/setup.c           |   76 +++++++++++++++++++++++++++++++++++++
- 9 files changed, 184 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/kernel/crash_dump.c
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..076454f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -19,6 +19,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
++#include <linux/kexec.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -661,6 +662,55 @@ static int __init customize_machine(void)
+ }
+ arch_initcall(customize_machine);
+ 
++#ifdef CONFIG_KEXEC
++static inline unsigned long long get_total_mem(void)
++{
++	unsigned long total;
++
++	total = max_low_pfn - min_low_pfn;
++	return total << PAGE_SHIFT;
++}
++
++/**
++ * reserve_crashkernel() - reserves memory are for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by a dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size, crash_base;
++	unsigned long long total_mem;
++	int ret;
++
++	total_mem = get_total_mem();
++	ret = parse_crashkernel(boot_command_line, total_mem,
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	ret = reserve_bootmem(crash_base, crash_size, BOOTMEM_EXCLUSIVE);
++	if (ret < 0) {
++		printk(KERN_WARNING "crashkernel reservation failed - "
++		       "memory is in use (0x%lx)\n", (unsigned long)crash_base);
++		return;
++	}
++
++	printk(KERN_INFO "Reserving %ldMB of memory@%ldMB "
++	       "for crashkernel (System RAM: %ldMB)\n",
++	       (unsigned long)(crash_size >> 20),
++	       (unsigned long)(crash_base >> 20),
++	       (unsigned long)(total_mem >> 20));
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++	insert_resource(&iomem_resource, &crashk_res);
++}
++#else
++static inline void reserve_crashkernel(void) {}
++#endif /* CONFIG_KEXEC */
++
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
+@@ -720,6 +770,7 @@ void __init setup_arch(char **cmdline_p)
+ #ifdef CONFIG_SMP
+ 	smp_init_cpus();
+ #endif
++	reserve_crashkernel();
+ 
+ 	cpu_init();
+ 	tcm_init();
+-- 
+1.5.6.5
