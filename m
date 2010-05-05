@@ -1,95 +1,34 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Wed,  5 May 2010 09:54:13 +0300
-Subject: [PATCH v2 1/8] arm: kdump: reserve memory for crashkernel
+Date: Wed,  5 May 2010 09:54:15 +0300
+Subject: [PATCH v2 3/8] arm: kdump: implement machine_crash_shutdown()
 In-Reply-To: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <2363da273253361141d269e5de1a761719f01fc0.1273041358.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <25d1f9b22c9842e8f379e6cf6a526ccd99e301bc.1273041358.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implemented ARM support for command line option "crashkernel=size at start" which
-allows user to reserve some memory for a dump capture kernel.
+Implement function machine_crash_shutdown() which disables IRQs and saves
+machine state to ELF notes structure.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- arch/arm/kernel/setup.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 51 insertions(+), 0 deletions(-)
+ arch/arm/kernel/machine_kexec.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c91c77b..076454f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -19,6 +19,7 @@
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
- #include <linux/init.h>
-+#include <linux/kexec.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -661,6 +662,55 @@ static int __init customize_machine(void)
- }
- arch_initcall(customize_machine);
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 598ca61..81e9898 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -43,6 +43,10 @@ void machine_shutdown(void)
  
-+#ifdef CONFIG_KEXEC
-+static inline unsigned long long get_total_mem(void)
-+{
-+	unsigned long total;
-+
-+	total = max_low_pfn - min_low_pfn;
-+	return total << PAGE_SHIFT;
-+}
-+
-+/**
-+ * reserve_crashkernel() - reserves memory are for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by a dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_size, crash_base;
-+	unsigned long long total_mem;
-+	int ret;
-+
-+	total_mem = get_total_mem();
-+	ret = parse_crashkernel(boot_command_line, total_mem,
-+				&crash_size, &crash_base);
-+	if (ret)
-+		return;
-+
-+	ret = reserve_bootmem(crash_base, crash_size, BOOTMEM_EXCLUSIVE);
-+	if (ret < 0) {
-+		printk(KERN_WARNING "crashkernel reservation failed - "
-+		       "memory is in use (0x%lx)\n", (unsigned long)crash_base);
-+		return;
-+	}
-+
-+	printk(KERN_INFO "Reserving %ldMB of memory@%ldMB "
-+	       "for crashkernel (System RAM: %ldMB)\n",
-+	       (unsigned long)(crash_size >> 20),
-+	       (unsigned long)(crash_base >> 20),
-+	       (unsigned long)(total_mem >> 20));
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+	insert_resource(&iomem_resource, &crashk_res);
-+}
-+#else
-+static inline void reserve_crashkernel(void) {}
-+#endif /* CONFIG_KEXEC */
-+
- void __init setup_arch(char **cmdline_p)
+ void machine_crash_shutdown(struct pt_regs *regs)
  {
- 	struct tag *tags = (struct tag *)&init_tags;
-@@ -720,6 +770,7 @@ void __init setup_arch(char **cmdline_p)
- #ifdef CONFIG_SMP
- 	smp_init_cpus();
- #endif
-+	reserve_crashkernel();
++	local_irq_disable();
++	crash_save_cpu(regs, smp_processor_id());
++
++	printk(KERN_INFO "Loading crashdump kernel...\n");
+ }
  
- 	cpu_init();
- 	tcm_init();
+ void machine_kexec(struct kimage *image)
 -- 
 1.5.6.5
