@@ -1,67 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 05 May 2010 12:32:39 -0700
-Subject: [PATCH 02/18] omap1: amsdelta: defconfig updates
+Date: Wed, 05 May 2010 12:32:43 -0700
+Subject: [PATCH 03/18] omap2: Add I2C bus 1 initialisation for 2430sdp
 In-Reply-To: <20100505192957.21568.19569.stgit@baageli.muru.com>
 References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-Message-ID: <20100505193239.21568.9650.stgit@baageli.muru.com>
+Message-ID: <20100505193243.21568.16796.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+From: Viral Mehta <viral.mehta@lntinfotech.com>
 
-The patch provides the following ams_delta_defconfig updates:
-- explicitly select preemptable RCU,
-- replace outdated CONFIG_LBD and CONFIG_LSF options with CONFIG_LBDAF,
-- activate support for LCD contrast setting (new in 2.6.34),
-- turn off verbose bug reporting for smaller kernel.
+Initialize isp1301 FS USB transceiver and
+add I2C bus1 initialization code for OMAP2430 SDP
 
-Created and tested against linux-2.6.34-rc3.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Signed-off-by: Viral Mehta <viral.mehta@lntinfotech.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/ams_delta_defconfig |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/board-2430sdp.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/ams_delta_defconfig b/arch/arm/configs/ams_delta_defconfig
-index ecf45fb..6d8a0c8 100644
---- a/arch/arm/configs/ams_delta_defconfig
-+++ b/arch/arm/configs/ams_delta_defconfig
-@@ -47,6 +47,7 @@ CONFIG_SYSVIPC_SYSCTL=y
- # CONFIG_TASKSTATS is not set
- # CONFIG_UTS_NS is not set
- # CONFIG_AUDIT is not set
-+CONFIG_TREE_PREEMPT_RCU=y
- # CONFIG_IKCONFIG is not set
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_SYSFS_DEPRECATED=y
-@@ -95,9 +96,8 @@ CONFIG_KMOD=y
- # Block layer
- #
- CONFIG_BLOCK=y
--# CONFIG_LBD is not set
-+# CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_IO_TRACE is not set
--# CONFIG_LSF is not set
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 01d113f..85f5f33 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -174,9 +174,18 @@ static struct i2c_board_info __initdata sdp2430_i2c_boardinfo[] = {
+ 	},
+ };
  
- #
- # IO Schedulers
-@@ -836,7 +836,8 @@ CONFIG_DAB=y
- #
- # Graphics support
- #
--# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
- 
- #
- # Display device support
-@@ -1284,7 +1285,7 @@ CONFIG_DEBUG_PREEMPT=y
- # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
- # CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
- # CONFIG_DEBUG_KOBJECT is not set
--CONFIG_DEBUG_BUGVERBOSE=y
-+# CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_DEBUG_INFO is not set
- # CONFIG_DEBUG_VM is not set
- # CONFIG_DEBUG_LIST is not set
++static struct i2c_board_info __initdata sdp2430_i2c1_boardinfo[] = {
++	{
++		I2C_BOARD_INFO("isp1301_omap", 0x2D),
++		.flags = I2C_CLIENT_WAKE,
++		.irq = OMAP_GPIO_IRQ(78),
++	},
++};
++
+ static int __init omap2430_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 400, NULL, 0);
++	omap_register_i2c_bus(1, 100, sdp2430_i2c1_boardinfo,
++			ARRAY_SIZE(sdp2430_i2c1_boardinfo));
+ 	omap_register_i2c_bus(2, 2600, sdp2430_i2c_boardinfo,
+ 			ARRAY_SIZE(sdp2430_i2c_boardinfo));
+ 	return 0;
