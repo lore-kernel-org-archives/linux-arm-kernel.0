@@ -1,44 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 05 May 2010 12:32:43 -0700
-Subject: [PATCH 03/18] omap2: Add I2C bus 1 initialisation for 2430sdp
+Date: Wed, 05 May 2010 12:32:46 -0700
+Subject: [PATCH 04/18] omap2: Add OHCI USB platform init for 2430 SDP
 In-Reply-To: <20100505192957.21568.19569.stgit@baageli.muru.com>
 References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-Message-ID: <20100505193243.21568.16796.stgit@baageli.muru.com>
+Message-ID: <20100505193246.21568.16641.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Viral Mehta <viral.mehta@lntinfotech.com>
 
-Initialize isp1301 FS USB transceiver and
-add I2C bus1 initialization code for OMAP2430 SDP
+Add platform init code for OHCI USB on OMAP2430 SDP
 
 Signed-off-by: Viral Mehta <viral.mehta@lntinfotech.com>
+[tony at atomide.com: Updated subject to mention the board name]
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-2430sdp.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-2430sdp.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index 01d113f..85f5f33 100644
+index 85f5f33..a11a575 100644
 --- a/arch/arm/mach-omap2/board-2430sdp.c
 +++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -174,9 +174,18 @@ static struct i2c_board_info __initdata sdp2430_i2c_boardinfo[] = {
- 	},
+@@ -207,6 +207,15 @@ static struct omap_musb_board_data musb_board_data = {
+ 	.mode			= MUSB_OTG,
+ 	.power			= 100,
  };
- 
-+static struct i2c_board_info __initdata sdp2430_i2c1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("isp1301_omap", 0x2D),
-+		.flags = I2C_CLIENT_WAKE,
-+		.irq = OMAP_GPIO_IRQ(78),
-+	},
++static struct omap_usb_config sdp2430_usb_config __initdata = {
++	.otg		= 1,
++#ifdef  CONFIG_USB_GADGET_OMAP
++	.hmc_mode	= 0x0,
++#elif   defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
++	.hmc_mode	= 0x1,
++#endif
++	.pins[0]	= 3,
 +};
-+
- static int __init omap2430_i2c_init(void)
+ 
+ static void __init omap_2430sdp_init(void)
  {
--	omap_register_i2c_bus(1, 400, NULL, 0);
-+	omap_register_i2c_bus(1, 100, sdp2430_i2c1_boardinfo,
-+			ARRAY_SIZE(sdp2430_i2c1_boardinfo));
- 	omap_register_i2c_bus(2, 2600, sdp2430_i2c_boardinfo,
- 			ARRAY_SIZE(sdp2430_i2c_boardinfo));
- 	return 0;
+@@ -217,6 +226,7 @@ static void __init omap_2430sdp_init(void)
+ 	platform_add_devices(sdp2430_devices, ARRAY_SIZE(sdp2430_devices));
+ 	omap_serial_init();
+ 	omap2_hsmmc_init(mmc);
++	omap_usb_init(&sdp2430_usb_config);
+ 	usb_musb_init(&musb_board_data);
+ 	board_smc91x_init();
+ 
