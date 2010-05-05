@@ -1,78 +1,53 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed,  5 May 2010 17:58:11 +0200
-Subject: [PATCH] plat-nomadik: use the MTU clocksrc for sched_clock
-Message-ID: <1273075091-2311-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 05 May 2010 17:07:53 +0100
+Subject: [PATCH 1/8] ARM: Improve the L2 cache performance when PL310
+	is used
+In-Reply-To: <w2zd91d07041005041002jfdc91901r97d01fc3b9a420d7@mail.gmail.com>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164421.26355.9656.stgit@e102109-lin.cambridge.arm.com>
+	<w2zd91d07041005041002jfdc91901r97d01fc3b9a420d7@mail.gmail.com>
+Message-ID: <1273075673.27058.1.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This provides some serious scheduling for the Nomadik family by
-introducing a sched_clock() using the MTU clock source in the
-same manner as e.g. OMAP or U300. This type of solutions has been
-discussed at no end in the past, however we need this resolution
-for making measurements and using HRTimers.
+On Tue, 2010-05-04 at 18:02 +0100, Jason McMullan wrote:
+> On Tue, May 4, 2010 at 12:44 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > With this L2 cache controller, the cache maintenance by PA and sync
+> > operations are atomic and do not require a "wait" loop or spinlocks.
+> > This patch conditionally defines the cache_wait() function and locking
+> > primitives (rather than duplicating the functions or file).
+> >
+> > Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
+> > automatically enables CACHE_PL310 when CPU_V7 is defined.
+> >
+> > [snip snip snip]
+> >  static inline void l2x0_inv_all(void)
+> > @@ -107,11 +134,11 @@ static inline void l2x0_inv_all(void)
+> >        unsigned long flags;
+> >
+> >        /* invalidate all ways */
+> > -       spin_lock_irqsave(&l2x0_lock, flags);
+> > +       _l2x0_lock(&l2x0_lock, flags);
+> >        writel(0xff, l2x0_base + L2X0_INV_WAY);
+> > -       cache_wait(l2x0_base + L2X0_INV_WAY, 0xff);
+> > +       cache_wait_always(l2x0_base + L2X0_INV_WAY, 0xff);
+> >        cache_sync();
+> > -       spin_unlock_irqrestore(&l2x0_lock, flags);
+> > +       _l2x0_unlock(&l2x0_lock, flags);
+> >  }
+> 
+> So, ah, shouldn't you be using a mask of 0xffff for 16-way PL310s?
+> 
+> And I think we have a potential patch collision in the near future.
+> 
+> Could you integrate in my [arm l2x0] patch I posted today on the list?
+> 
+> It supports 16-way PL310s, and PL210s with fewer than 7 ways.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/plat-nomadik/timer.c |   28 +++++++++++++++++++++++++++-
- 1 files changed, 27 insertions(+), 1 deletions(-)
+I think the best way is to just go ahead and push your patch to
+Russell's patch system, I'll update my patch based on yours once I get
+some feedback on this list.
 
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index db67402..0ff3798 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -20,6 +20,15 @@
- 
- void __iomem *mtu_base; /* ssigned by machine code */
- 
-+/*
-+ * Kernel assumes that sched_clock can be called early
-+ * but the MTU may not yet be initialized.
-+ */
-+static cycle_t nmdk_read_timer_dummy(struct clocksource *cs)
-+{
-+	return 0;
-+}
-+
- /* clocksource: MTU decrements, so we negate the value being read. */
- static cycle_t nmdk_read_timer(struct clocksource *cs)
- {
-@@ -29,12 +38,27 @@ static cycle_t nmdk_read_timer(struct clocksource *cs)
- static struct clocksource nmdk_clksrc = {
- 	.name		= "mtu_0",
- 	.rating		= 200,
--	.read		= nmdk_read_timer,
-+	.read		= nmdk_read_timer_dummy,
- 	.mask		= CLOCKSOURCE_MASK(32),
- 	.shift		= 20,
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+/*
-+ * Override the global weak sched_clock symbol with this
-+ * local implementation which uses the clocksource to get some
-+ * better resolution when scheduling the kernel. We accept that
-+ * this wraps around for now, since it is just a relative time
-+ * stamp. (Inspired by OMAP implementation.)
-+ */
-+unsigned long long notrace sched_clock(void)
-+{
-+	return clocksource_cyc2ns(nmdk_clksrc.read(
-+				  &nmdk_clksrc),
-+				  nmdk_clksrc.mult,
-+				  nmdk_clksrc.shift);
-+}
-+
- /* Clockevent device: use one-shot mode */
- static void nmdk_clkevt_mode(enum clock_event_mode mode,
- 			     struct clock_event_device *dev)
-@@ -121,6 +145,8 @@ void __init nmdk_timer_init(void)
- 	writel(cr | MTU_CRn_ENA, mtu_base + MTU_CR(0));
- 
- 	nmdk_clksrc.mult = clocksource_hz2mult(rate, nmdk_clksrc.shift);
-+	/* Now the scheduling clock is ready */
-+	nmdk_clksrc.read = nmdk_read_timer;
- 
- 	if (clocksource_register(&nmdk_clksrc))
- 		pr_err("timer: failed to initialize clock source %s\n",
 -- 
-1.6.3.3
+Catalin
