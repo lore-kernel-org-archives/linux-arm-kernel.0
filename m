@@ -1,26 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 5 May 2010 12:18:34 +0100
-Subject: [PATCH v2 2/2] regulator: use voltage number array in 88pm860x
-In-Reply-To: <h2n771cded01005042235o9acec456j2ebdb906861742ae@mail.gmail.com>
-References: <h2n771cded01005042235o9acec456j2ebdb906861742ae@mail.gmail.com>
-Message-ID: <20100505111834.GC5754@opensource.wolfsonmicro.com>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Wed, 5 May 2010 17:20:15 +0530
+Subject: [PATCH v8 1/2] sDMA: descriptor autoloading feature
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C52D16D1@dbde02.ent.ti.com>
+References: <l2i618f0c911004291035ja334efb0o5016c5cb70c4b5bc@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C52D16D1@dbde02.ent.ti.com>
+Message-ID: <k2l618f0c911005050450t75968621m61e3ff39e90d20ad@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 05, 2010 at 01:35:59AM -0400, Haojian Zhuang wrote:
-> From 5dbf0d4d5ad601b508730a8d0f5a41a1edb92561 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Tue, 4 May 2010 09:54:51 -0400
-> Subject: [PATCH] regulator: use voltage number array in 88pm860x
-> 
-> A lot of condition comparision statements are used in original driver. These
-> statements are used to check the boundary of voltage numbers since voltage
-> number isn't linear.
-> 
-> Now use array of voltage numbers instead. Clean code with simpler way.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-Again I'm not clear on the changes but this does actually still look OK
-for me.
+[Long sections have been trimmed to the context of the discussion]
+On Wed, May 5, 2010 at 3:02 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> +static int dma_sglist_set_phy_params(struct omap_dma_sglist_node *sghead,
+>> + ? ? ? ? ? ? dma_addr_t phyaddr, int nelem)
+>> +{
+>> + ? ? struct omap_dma_sglist_node *sgcurr, *sgprev;
+>> + ? ? dma_addr_t elem_paddr = phyaddr;
+>> +
+>> + ? ? for (sgprev = sghead;
+>> + ? ? ? ? ? ? sgprev < sghead + nelem;
+>> + ? ? ? ? ? ? sgprev++) {
+>> +
+>> + ? ? ? ? ? ? sgcurr = sgprev + 1;
+>> + ? ? ? ? ? ? sgprev->next = sgcurr;
+>> + ? ? ? ? ? ? elem_paddr += (int)sizeof(*sgcurr);
+>> + ? ? ? ? ? ? sgprev->next_desc_add_ptr = elem_paddr;
+>> +
+>> + ? ? ? ? ? ? switch (sgcurr->desc_type) {
+>> + ? ? ? ? ? ? case OMAP_DMA_SGLIST_DESCRIPTOR_TYPE1:
+>> + ? ? ? ? ? ? ? ? ? ? omap_dma_list_set_ntype(sgprev, 1);
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? case OMAP_DMA_SGLIST_DESCRIPTOR_TYPE2a:
+>> + ? ? ? ? ? ? /* intentional no break */
+>> + ? ? ? ? ? ? case OMAP_DMA_SGLIST_DESCRIPTOR_TYPE2b:
+>> + ? ? ? ? ? ? ? ? ? ? omap_dma_list_set_ntype(sgprev, 2);
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? case OMAP_DMA_SGLIST_DESCRIPTOR_TYPE3a:
+>> + ? ? ? ? ? ? ? ? ? ? /* intentional no break */
+>> + ? ? ? ? ? ? case OMAP_DMA_SGLIST_DESCRIPTOR_TYPE3b:
+>> + ? ? ? ? ? ? ? ? ? ? omap_dma_list_set_ntype(sgprev, 3);
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? default:
+>> + ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? ? ? ? ? }
+> Are we supporting all the descriptor types. I think only type2a is
+> supported. In that case please add FIXME, or WARN message here.
