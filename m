@@ -1,387 +1,250 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed,  5 May 2010 11:28:15 +0200
-Subject: [PATCH] SPI: fix up some PL022 confusion
-Message-ID: <1273051695-32251-1-git-send-email-linus.walleij@stericsson.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 5 May 2010 17:31:05 +0800
+Subject: [PATCH 01/10] [ARM] pxa: extend to support 96 IRQs
+In-Reply-To: <q2m771cded01005050052o51ffbe27jdd66d3117a33c9da@mail.gmail.com>
+References: <j2l771cded01004290115kf0c7b08m8dface1967d26752@mail.gmail.com>
+	<z2qf17812d71005041828ocd0ff0cfn33bf32ce9c1d46c3@mail.gmail.com>
+	<q2m771cded01005050052o51ffbe27jdd66d3117a33c9da@mail.gmail.com>
+Message-ID: <i2tf17812d71005050231wb5de37acl722f5d31876fbed2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL022 SPI driver did not cleanly separate between the
-original unmodified ARM version and the ST Microelectronics
-versions. Split this more cleanly and fix some whitespace
-moaning from checkpatch at the same time.
+>> Instead of making these macros more complicated, I'd prefer that
+>> we separate them as three IRQ register banks, with the base I/O
+>> address of these banks in irq_desc.chip_data or some where.
+>>
+>
+> If we use irq_desc.chip_data, we have to divide init_irq() into more
+> parts. Each part is focus on one interrupt bank registers. The
+> assignment of interrupt priority have to be divided into more parts.
+> And saving interrupt registers in suspend() may be more complex.
+>
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Cc: STEricsson_nomadik_linux at list.st.com
-Cc: Alessandro Rubini <rubini@unipv.it>
----
- drivers/spi/amba-pl022.c   |  178 ++++++++++++++++++++++++++++++--------------
- include/linux/amba/pl022.h |    4 +-
- 2 files changed, 125 insertions(+), 57 deletions(-)
+Haojian,
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 53f0acd..c97c5bb 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -105,13 +105,21 @@
- /*
-  * SSP Control Register 0  - SSP_CR0
-  */
--#define SSP_CR0_MASK_DSS	(0x1FUL << 0)
--#define SSP_CR0_MASK_HALFDUP	(0x1UL << 5)
-+#define SSP_CR0_MASK_DSS	(0x0FUL << 0)
-+#define SSP_CR0_MASK_FRF	(0x3UL << 4)
- #define SSP_CR0_MASK_SPO	(0x1UL << 6)
- #define SSP_CR0_MASK_SPH	(0x1UL << 7)
- #define SSP_CR0_MASK_SCR	(0xFFUL << 8)
--#define SSP_CR0_MASK_CSS	(0x1FUL << 16)
--#define SSP_CR0_MASK_FRF	(0x3UL << 21)
+Could you please help test a bit the following patch? Might be applicable
+only to my 'devel' branch. Thanks.
+
+commit c9d2b6b09297ac00e73289db38d692cc648619de
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date: ? Wed May 5 16:44:22 2010 +0800
+
+? ?[ARM] pxa: sanitize IRQ registers access based on offset
+
+? ?Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 1beb40f..7db9416 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -16,20 +16,36 @@
+#include <linux/module.h>
+#include <linux/interrupt.h>
+#include <linux/sysdev.h>
++#include <linux/io.h>
++#include <linux/irq.h>
+
+#include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
++#include <mach/irqs.h>
+#include <mach/gpio.h>
+-#include <mach/regs-intc.h>
+
+#include "generic.h"
+
++#define IRQ_BASE (void __iomem *)io_p2v(0x40d00000)
 +
-+/*
-+ * The ST version of this block moves som bits
-+ * in SSP_CR0 and extends it to 32 bits
-+ */
-+#define SSP_CR0_MASK_DSS_ST	(0x1FUL << 0)
-+#define SSP_CR0_MASK_HALFDUP_ST	(0x1UL << 5)
-+#define SSP_CR0_MASK_CSS_ST	(0x1FUL << 16)
-+#define SSP_CR0_MASK_FRF_ST	(0x3UL << 21)
++#define ICIP (0x000)
++#define ICMR (0x004)
++#define ICLR (0x008)
++#define ICFR (0x00c)
++#define ICPR (0x010)
++#define ICCR (0x014)
++#define ICHP (0x018)
++#define IPR(i) (((i) < 32) ? (0x01c + ((i) << 2)) : \
++ ((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) : \
++ ? ? ?(0x144 + (((i) - 64) << 2)))
++#define IPR_VALID (1 << 31)
 +
- 
- /*
-  * SSP Control Register 0  - SSP_CR1
-@@ -120,16 +128,16 @@
- #define SSP_CR1_MASK_SSE	(0x1UL << 1)
- #define SSP_CR1_MASK_MS		(0x1UL << 2)
- #define SSP_CR1_MASK_SOD	(0x1UL << 3)
--#define SSP_CR1_MASK_RENDN	(0x1UL << 4)
--#define SSP_CR1_MASK_TENDN	(0x1UL << 5)
--#define SSP_CR1_MASK_MWAIT	(0x1UL << 6)
--#define SSP_CR1_MASK_RXIFLSEL	(0x7UL << 7)
--#define SSP_CR1_MASK_TXIFLSEL	(0x7UL << 10)
- 
- /*
-- * SSP Data Register - SSP_DR
-+ * The ST version of this block adds some bits
-+ * in SSP_CR1
-  */
--#define SSP_DR_MASK_DATA	0xFFFFFFFF
-+#define SSP_CR1_MASK_RENDN_ST	(0x1UL << 4)
-+#define SSP_CR1_MASK_TENDN_ST	(0x1UL << 5)
-+#define SSP_CR1_MASK_MWAIT_ST	(0x1UL << 6)
-+#define SSP_CR1_MASK_RXIFLSEL_ST (0x7UL << 7)
-+#define SSP_CR1_MASK_TXIFLSEL_ST (0x7UL << 10)
- 
- /*
-  * SSP Status Register - SSP_SR
-@@ -137,7 +145,7 @@
- #define SSP_SR_MASK_TFE		(0x1UL << 0) /* Transmit FIFO empty */
- #define SSP_SR_MASK_TNF		(0x1UL << 1) /* Transmit FIFO not full */
- #define SSP_SR_MASK_RNE		(0x1UL << 2) /* Receive FIFO not empty */
--#define SSP_SR_MASK_RFF 	(0x1UL << 3) /* Receive FIFO full */
-+#define SSP_SR_MASK_RFF		(0x1UL << 3) /* Receive FIFO full */
- #define SSP_SR_MASK_BSY		(0x1UL << 4) /* Busy Flag */
- 
- /*
-@@ -230,7 +238,7 @@
- /*
-  * SSP Test Data Register - SSP_TDR
-  */
--#define TDR_MASK_TESTDATA 		(0xFFFFFFFF)
-+#define TDR_MASK_TESTDATA		(0xFFFFFFFF)
- 
- /*
-  * Message State
-@@ -238,33 +246,33 @@
-  * hold a single state value, that's why all this
-  * (void *) casting is done here.
-  */
--#define STATE_START                     ((void *) 0)
--#define STATE_RUNNING                   ((void *) 1)
--#define STATE_DONE                      ((void *) 2)
--#define STATE_ERROR                     ((void *) -1)
-+#define STATE_START			((void *) 0)
-+#define STATE_RUNNING			((void *) 1)
-+#define STATE_DONE			((void *) 2)
-+#define STATE_ERROR			((void *) -1)
- 
- /*
-  * Queue State
-  */
--#define QUEUE_RUNNING                   (0)
--#define QUEUE_STOPPED                   (1)
-+#define QUEUE_RUNNING			(0)
-+#define QUEUE_STOPPED			(1)
- /*
-  * SSP State - Whether Enabled or Disabled
-  */
--#define SSP_DISABLED 			(0)
--#define SSP_ENABLED 			(1)
-+#define SSP_DISABLED			(0)
-+#define SSP_ENABLED			(1)
- 
- /*
-  * SSP DMA State - Whether DMA Enabled or Disabled
-  */
--#define SSP_DMA_DISABLED 		(0)
--#define SSP_DMA_ENABLED 		(1)
-+#define SSP_DMA_DISABLED		(0)
-+#define SSP_DMA_ENABLED			(1)
- 
- /*
-  * SSP Clock Defaults
-  */
--#define NMDK_SSP_DEFAULT_CLKRATE 0x2
--#define NMDK_SSP_DEFAULT_PRESCALE 0x40
-+#define SSP_DEFAULT_CLKRATE 0x2
-+#define SSP_DEFAULT_PRESCALE 0x40
- 
- /*
-  * SSP Clock Parameter ranges
-@@ -310,16 +318,20 @@ enum ssp_writing {
-  * @fifodepth: depth of FIFOs (both)
-  * @max_bpw: maximum number of bits per word
-  * @unidir: supports unidirection transfers
-+ * @extended_cr: 32 bit wide control register 0 with extra
-+ * features and extra features in CR1 as found in the ST variants
-  */
- struct vendor_data {
- 	int fifodepth;
- 	int max_bpw;
- 	bool unidir;
-+	bool extended_cr;
- };
- 
- /**
-  * struct pl022 - This is the private SSP driver data structure
-  * @adev: AMBA device model hookup
-+ * @vendor: Vendor data for the IP block
-  * @phybase: The physical memory where the SSP device resides
-  * @virtbase: The virtual memory where the SSP is mapped
-  * @master: SPI framework hookup
-@@ -380,7 +392,8 @@ struct pl022 {
- 
- /**
-  * struct chip_data - To maintain runtime state of SSP for each client chip
-- * @cr0: Value of control register CR0 of SSP
-+ * @cr0: Value of control register CR0 of SSP - on later ST variants this
-+ *       register is 32 bits wide rather than just 16
-  * @cr1: Value of control register CR1 of SSP
-  * @dmacr: Value of DMA control Register of SSP
-  * @cpsr: Value of Clock prescale register
-@@ -395,7 +408,7 @@ struct pl022 {
-  * This would be set according to the current message that would be served
-  */
- struct chip_data {
--	u16 cr0;
-+	u32 cr0;
- 	u16 cr1;
- 	u16 dmacr;
- 	u16 cpsr;
-@@ -528,7 +541,10 @@ static void restore_state(struct pl022 *pl022)
- {
- 	struct chip_data *chip = pl022->cur_chip;
- 
--	writew(chip->cr0, SSP_CR0(pl022->virtbase));
-+	if (pl022->vendor->extended_cr)
-+		writel(chip->cr0, SSP_CR0(pl022->virtbase));
-+	else
-+		writew(chip->cr0, SSP_CR0(pl022->virtbase));
- 	writew(chip->cr1, SSP_CR1(pl022->virtbase));
- 	writew(chip->dmacr, SSP_DMACR(pl022->virtbase));
- 	writew(chip->cpsr, SSP_CPSR(pl022->virtbase));
-@@ -546,28 +562,43 @@ static void restore_state(struct pl022 *pl022)
-  */
- #define DEFAULT_SSP_REG_CR0 ( \
- 	GEN_MASK_BITS(SSP_DATA_BITS_12, SSP_CR0_MASK_DSS, 0)	| \
--	GEN_MASK_BITS(SSP_MICROWIRE_CHANNEL_FULL_DUPLEX, SSP_CR0_MASK_HALFDUP, 5) | \
-+	GEN_MASK_BITS(SSP_INTERFACE_MOTOROLA_SPI, SSP_CR0_MASK_FRF, 4) | \
-+	GEN_MASK_BITS(SSP_CLK_POL_IDLE_LOW, SSP_CR0_MASK_SPO, 6) | \
-+	GEN_MASK_BITS(SSP_CLK_SECOND_EDGE, SSP_CR0_MASK_SPH, 7) | \
-+	GEN_MASK_BITS(SSP_DEFAULT_CLKRATE, SSP_CR0_MASK_SCR, 8) \
-+)
+#define MAX_INTERNAL_IRQS 128
++#define IRQ_BIT(n) (((n) - PXA_IRQ(0)) & 0x1f)
+
+-#define IRQ_BIT(n) (((n) - PXA_IRQ(0)) & 0x1f)
+-#define _ICMR(n) (*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
+-#define _ICLR(n) (*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
++static inline int cpu_has_ipr(void)
++{
++ return cpu_is_pxa27x() || cpu_is_pxa3xx();
++}
+
+/*
+?* This is for peripheral IRQs internal to the PXA chip.
+@@ -39,12 +55,20 @@ static int pxa_internal_irq_nr;
+
+static void pxa_mask_irq(unsigned int irq)
+{
+- _ICMR(irq) &= ~(1 << IRQ_BIT(irq));
++ void __iomem *base = get_irq_chip_data(irq);
++ uint32_t icmr = __raw_readl(base + ICMR);
 +
-+/* ST versions have slightly different bit layout */
-+#define DEFAULT_SSP_REG_CR0_ST ( \
-+	GEN_MASK_BITS(SSP_DATA_BITS_12, SSP_CR0_MASK_DSS_ST, 0)	| \
-+	GEN_MASK_BITS(SSP_MICROWIRE_CHANNEL_FULL_DUPLEX, SSP_CR0_MASK_HALFDUP_ST, 5) | \
- 	GEN_MASK_BITS(SSP_CLK_POL_IDLE_LOW, SSP_CR0_MASK_SPO, 6) | \
- 	GEN_MASK_BITS(SSP_CLK_SECOND_EDGE, SSP_CR0_MASK_SPH, 7) | \
--	GEN_MASK_BITS(NMDK_SSP_DEFAULT_CLKRATE, SSP_CR0_MASK_SCR, 8) | \
--	GEN_MASK_BITS(SSP_BITS_8, SSP_CR0_MASK_CSS, 16)	| \
--	GEN_MASK_BITS(SSP_INTERFACE_MOTOROLA_SPI, SSP_CR0_MASK_FRF, 21) \
-+	GEN_MASK_BITS(SSP_DEFAULT_CLKRATE, SSP_CR0_MASK_SCR, 8) | \
-+	GEN_MASK_BITS(SSP_BITS_8, SSP_CR0_MASK_CSS_ST, 16)	| \
-+	GEN_MASK_BITS(SSP_INTERFACE_MOTOROLA_SPI, SSP_CR0_MASK_FRF_ST, 21) \
- )
- 
- #define DEFAULT_SSP_REG_CR1 ( \
- 	GEN_MASK_BITS(LOOPBACK_DISABLED, SSP_CR1_MASK_LBM, 0) | \
- 	GEN_MASK_BITS(SSP_DISABLED, SSP_CR1_MASK_SSE, 1) | \
- 	GEN_MASK_BITS(SSP_MASTER, SSP_CR1_MASK_MS, 2) | \
--	GEN_MASK_BITS(DO_NOT_DRIVE_TX, SSP_CR1_MASK_SOD, 3) | \
--	GEN_MASK_BITS(SSP_RX_MSB, SSP_CR1_MASK_RENDN, 4) | \
--	GEN_MASK_BITS(SSP_TX_MSB, SSP_CR1_MASK_TENDN, 5) | \
--	GEN_MASK_BITS(SSP_MWIRE_WAIT_ZERO, SSP_CR1_MASK_MWAIT, 6) |\
--	GEN_MASK_BITS(SSP_RX_1_OR_MORE_ELEM, SSP_CR1_MASK_RXIFLSEL, 7) | \
--	GEN_MASK_BITS(SSP_TX_1_OR_MORE_EMPTY_LOC, SSP_CR1_MASK_TXIFLSEL, 10) \
-+	GEN_MASK_BITS(DO_NOT_DRIVE_TX, SSP_CR1_MASK_SOD, 3) \
- )
- 
-+/* ST versions extend this register to use all 16 bits */
-+#define DEFAULT_SSP_REG_CR1_ST ( \
-+	DEFAULT_SSP_REG_CR1 | \
-+	GEN_MASK_BITS(SSP_RX_MSB, SSP_CR1_MASK_RENDN_ST, 4) | \
-+	GEN_MASK_BITS(SSP_TX_MSB, SSP_CR1_MASK_TENDN_ST, 5) | \
-+	GEN_MASK_BITS(SSP_MWIRE_WAIT_ZERO, SSP_CR1_MASK_MWAIT_ST, 6) |\
-+	GEN_MASK_BITS(SSP_RX_1_OR_MORE_ELEM, SSP_CR1_MASK_RXIFLSEL_ST, 7) | \
-+	GEN_MASK_BITS(SSP_TX_1_OR_MORE_EMPTY_LOC, SSP_CR1_MASK_TXIFLSEL_ST, 10) \
-+)
++ icmr &= ~(1 << IRQ_BIT(irq));
++ __raw_writel(icmr, base + ICMR);
+}
+
+static void pxa_unmask_irq(unsigned int irq)
+{
+- _ICMR(irq) |= 1 << IRQ_BIT(irq);
++ void __iomem *base = get_irq_chip_data(irq);
++ uint32_t icmr = __raw_readl(base + ICMR);
 +
++ icmr |= 1 << IRQ_BIT(irq);
++ __raw_writel(icmr, base + ICMR);
+}
+
+static struct irq_chip pxa_internal_irq_chip = {
+@@ -86,12 +110,16 @@ static void pxa_ack_low_gpio(unsigned int irq)
+
+static void pxa_mask_low_gpio(unsigned int irq)
+{
+- ICMR &= ~(1 << (irq - PXA_IRQ(0)));
++ struct irq_desc *desc = irq_to_desc(irq);
 +
- #define DEFAULT_SSP_REG_CPSR ( \
--	GEN_MASK_BITS(NMDK_SSP_DEFAULT_PRESCALE, SSP_CPSR_MASK_CPSDVSR, 0) \
-+	GEN_MASK_BITS(SSP_DEFAULT_PRESCALE, SSP_CPSR_MASK_CPSDVSR, 0) \
- )
- 
- #define DEFAULT_SSP_REG_DMACR (\
-@@ -578,8 +609,13 @@ static void restore_state(struct pl022 *pl022)
- 
- static void load_ssp_default_config(struct pl022 *pl022)
- {
--	writew(DEFAULT_SSP_REG_CR0, SSP_CR0(pl022->virtbase));
--	writew(DEFAULT_SSP_REG_CR1, SSP_CR1(pl022->virtbase));
-+	if (pl022->vendor->extended_cr) {
-+		writel(DEFAULT_SSP_REG_CR0_ST, SSP_CR0(pl022->virtbase));
-+		writew(DEFAULT_SSP_REG_CR1_ST, SSP_CR1(pl022->virtbase));
-+	} else {
-+		writew(DEFAULT_SSP_REG_CR0, SSP_CR0(pl022->virtbase));
-+		writew(DEFAULT_SSP_REG_CR1, SSP_CR1(pl022->virtbase));
-+	}
- 	writew(DEFAULT_SSP_REG_DMACR, SSP_DMACR(pl022->virtbase));
- 	writew(DEFAULT_SSP_REG_CPSR, SSP_CPSR(pl022->virtbase));
- 	writew(DISABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
-@@ -1352,7 +1388,7 @@ static void do_polling_transfer(struct pl022 *pl022)
- 		writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
- 		       SSP_CR1(pl022->virtbase));
- 
--		dev_dbg(&pl022->adev->dev, "POLLING TRANSFER ONGOING ... \n");
-+		dev_dbg(&pl022->adev->dev, "polling transfer ongoing ...\n");
- 		/* FIXME: insert a timeout so we don't hang here indefinately */
- 		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
- 			readwriter(pl022);
-@@ -1622,11 +1658,21 @@ static int verify_controller_parameters(struct pl022 *pl022,
- 				"Wait State is configured incorrectly\n");
- 			return -EINVAL;
- 		}
--		if ((chip_info->duplex != SSP_MICROWIRE_CHANNEL_FULL_DUPLEX)
--		    && (chip_info->duplex !=
--			SSP_MICROWIRE_CHANNEL_HALF_DUPLEX)) {
--			dev_err(chip_info->dev,
--				"DUPLEX is configured incorrectly\n");
-+		/* Half duplex is only available in the ST Micro version */
-+		if (pl022->vendor->extended_cr) {
-+			if ((chip_info->duplex !=
-+			     SSP_MICROWIRE_CHANNEL_FULL_DUPLEX)
-+			    && (chip_info->duplex !=
-+				SSP_MICROWIRE_CHANNEL_HALF_DUPLEX))
-+				dev_err(chip_info->dev,
-+					"Microwire duplex mode is configured incorrectly\n");
-+				return -EINVAL;
-+		} else {
-+			if (chip_info->duplex != SSP_MICROWIRE_CHANNEL_FULL_DUPLEX)
-+				dev_err(chip_info->dev,
-+					"Microwire half duplex mode requested,"
-+					" but this is only available in the"
-+					" ST version of PL022\n");
- 			return -EINVAL;
- 		}
- 	}
-@@ -1906,22 +1952,40 @@ static int pl022_setup(struct spi_device *spi)
- 
- 	chip->cpsr = chip_info->clk_freq.cpsdvsr;
- 
--	SSP_WRITE_BITS(chip->cr0, chip_info->data_size, SSP_CR0_MASK_DSS, 0);
--	SSP_WRITE_BITS(chip->cr0, chip_info->duplex, SSP_CR0_MASK_HALFDUP, 5);
-+	/* Special setup for the ST micro extended control registers */
-+	if (pl022->vendor->extended_cr) {
-+		SSP_WRITE_BITS(chip->cr0, chip_info->data_size,
-+			       SSP_CR0_MASK_DSS_ST, 0);
-+		SSP_WRITE_BITS(chip->cr0, chip_info->duplex,
-+			       SSP_CR0_MASK_HALFDUP_ST, 5);
-+		SSP_WRITE_BITS(chip->cr0, chip_info->ctrl_len,
-+			       SSP_CR0_MASK_CSS_ST, 16);
-+		SSP_WRITE_BITS(chip->cr0, chip_info->iface,
-+			       SSP_CR0_MASK_FRF_ST, 21);
-+		SSP_WRITE_BITS(chip->cr1, chip_info->endian_rx,
-+			       SSP_CR1_MASK_RENDN_ST, 4);
-+		SSP_WRITE_BITS(chip->cr1, chip_info->endian_tx,
-+			       SSP_CR1_MASK_TENDN_ST, 5);
-+		SSP_WRITE_BITS(chip->cr1, chip_info->wait_state,
-+			       SSP_CR1_MASK_MWAIT_ST, 6);
-+		SSP_WRITE_BITS(chip->cr1, chip_info->rx_lev_trig,
-+			       SSP_CR1_MASK_RXIFLSEL_ST, 7);
-+		SSP_WRITE_BITS(chip->cr1, chip_info->tx_lev_trig,
-+			       SSP_CR1_MASK_TXIFLSEL_ST, 10);
-+	} else {
-+		SSP_WRITE_BITS(chip->cr0, chip_info->data_size,
-+			       SSP_CR0_MASK_DSS, 0);
-+		SSP_WRITE_BITS(chip->cr0, chip_info->iface,
-+			       SSP_CR0_MASK_FRF, 4);
-+	}
-+	/* Stuff that is common for all versions */
- 	SSP_WRITE_BITS(chip->cr0, chip_info->clk_pol, SSP_CR0_MASK_SPO, 6);
- 	SSP_WRITE_BITS(chip->cr0, chip_info->clk_phase, SSP_CR0_MASK_SPH, 7);
- 	SSP_WRITE_BITS(chip->cr0, chip_info->clk_freq.scr, SSP_CR0_MASK_SCR, 8);
--	SSP_WRITE_BITS(chip->cr0, chip_info->ctrl_len, SSP_CR0_MASK_CSS, 16);
--	SSP_WRITE_BITS(chip->cr0, chip_info->iface, SSP_CR0_MASK_FRF, 21);
- 	SSP_WRITE_BITS(chip->cr1, chip_info->lbm, SSP_CR1_MASK_LBM, 0);
- 	SSP_WRITE_BITS(chip->cr1, SSP_DISABLED, SSP_CR1_MASK_SSE, 1);
- 	SSP_WRITE_BITS(chip->cr1, chip_info->hierarchy, SSP_CR1_MASK_MS, 2);
- 	SSP_WRITE_BITS(chip->cr1, chip_info->slave_tx_disable, SSP_CR1_MASK_SOD, 3);
--	SSP_WRITE_BITS(chip->cr1, chip_info->endian_rx, SSP_CR1_MASK_RENDN, 4);
--	SSP_WRITE_BITS(chip->cr1, chip_info->endian_tx, SSP_CR1_MASK_TENDN, 5);
--	SSP_WRITE_BITS(chip->cr1, chip_info->wait_state, SSP_CR1_MASK_MWAIT, 6);
--	SSP_WRITE_BITS(chip->cr1, chip_info->rx_lev_trig, SSP_CR1_MASK_RXIFLSEL, 7);
--	SSP_WRITE_BITS(chip->cr1, chip_info->tx_lev_trig, SSP_CR1_MASK_TXIFLSEL, 10);
- 
- 	/* Save controller_state */
- 	spi_set_ctldata(spi, chip);
-@@ -2146,6 +2210,7 @@ static struct vendor_data vendor_arm = {
- 	.fifodepth = 8,
- 	.max_bpw = 16,
- 	.unidir = false,
-+	.extended_cr = false,
- };
- 
- 
-@@ -2153,6 +2218,7 @@ static struct vendor_data vendor_st = {
- 	.fifodepth = 32,
- 	.max_bpw = 32,
- 	.unidir = false,
-+	.extended_cr = true,
- };
- 
- static struct amba_id pl022_ids[] = {
-diff --git a/include/linux/amba/pl022.h b/include/linux/amba/pl022.h
-index 95f8d17..1a83b61 100644
---- a/include/linux/amba/pl022.h
-+++ b/include/linux/amba/pl022.h
-@@ -71,6 +71,7 @@ struct ssp_clock_params {
- 
- /**
-  * enum ssp_rx_endian - endianess of Rx FIFO Data
-+ * this feature is only available in ST versionf of PL022
-  */
- enum ssp_rx_endian {
- 	SSP_RX_MSB,
-@@ -181,7 +182,8 @@ enum ssp_microwire_wait_state {
- };
- 
- /**
-- * enum Microwire - whether Full/Half Duplex
-+ * enum Microwire - whether Full/Half Duplex, only available
-+ * in the ST Micro variant.
-  * @SSP_MICROWIRE_CHANNEL_FULL_DUPLEX: SSPTXD becomes bi-directional,
-  *     SSPRXD not used
-  * @SSP_MICROWIRE_CHANNEL_HALF_DUPLEX: SSPTXD is an output, SSPRXD is
--- 
-1.6.3.3
++ desc->chip->mask(irq);
+}
+
+static void pxa_unmask_low_gpio(unsigned int irq)
+{
+- ICMR |= 1 << (irq - PXA_IRQ(0));
++ struct irq_desc *desc = irq_to_desc(irq);
++
++ desc->chip->unmask(irq);
+}
+
+static struct irq_chip pxa_low_gpio_chip = {
+@@ -120,34 +148,47 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+pxa_low_gpio_chip.set_wake = fn;
+}
+
++static inline void __iomem *irq_base(int i)
++{
++ static unsigned long phys_base[] = {
++ 0x40d00000,
++ 0x40d0009c,
++ 0x40d00130,
++ };
++
++ return (void __iomem *)io_p2v(phys_base[i >> 5]);
++}
++
+void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+{
+- int irq, i;
++ int irq, i, n;
+
+BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
+
+pxa_internal_irq_nr = irq_nr;
+
+- for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq += 32) {
+- _ICMR(irq) = 0; /* disable all IRQs */
+- _ICLR(irq) = 0; /* all IRQs are IRQ, not FIQ */
+- }
++ for (n = 0; n < irq_nr; n += 32) {
++ void __iomem *base = irq_base(n);
+
+- /* initialize interrupt priority */
+- if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
+- for (i = 0; i < irq_nr; i++)
+- IPR(i) = i | (1 << 31);
+- }
++ __raw_writel(0, base + ICMR); /* disable all IRQs */
++ __raw_writel(0, base + ICLR); /* all IRQs are IRQ, not FIQ */
+
+- /* only unmasked interrupts kick us out of idle */
+- ICCR = 1;
++ for (i = n; (i < (n + 32)) && (i < irq_nr); i++) {
++ /* initialize interrupt priority */
++ if (cpu_has_ipr())
++ __raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
+
+- for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
+- set_irq_chip(irq, &pxa_internal_irq_chip);
+- set_irq_handler(irq, handle_level_irq);
+- set_irq_flags(irq, IRQF_VALID);
++ irq = PXA_IRQ(i);
++ set_irq_chip(irq, &pxa_internal_irq_chip);
++ set_irq_chip_data(irq, base);
++ set_irq_handler(irq, handle_level_irq);
++ set_irq_flags(irq, IRQF_VALID);
++ }
+}
+
++ /* only unmasked interrupts kick us out of idle */
++ __raw_writel(1, irq_base(0) + ICCR);
++
+pxa_internal_irq_chip.set_wake = fn;
+pxa_init_low_gpio_irq(fn);
+}
+@@ -158,36 +199,38 @@ static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
+
+static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+{
+- int i, irq = PXA_IRQ(0);
++ int i;
+
+- for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+- saved_icmr[i] = _ICMR(irq);
+- _ICMR(irq) = 0;
++ for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++ void __iomem *base = irq_base(i);
++
++ saved_icmr[i] = __raw_readl(base + ICMR);
++ __raw_writel(0, base + ICMR);
+}
+
+- if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
++ if (cpu_has_ipr())
+for (i = 0; i < pxa_internal_irq_nr; i++)
+- saved_ipr[i] = IPR(i);
+- }
++ saved_ipr[i] = __raw_readl(IRQ_BASE + IPR(i));
+
+return 0;
+}
+
+static int pxa_irq_resume(struct sys_device *dev)
+{
+- int i, irq = PXA_IRQ(0);
++ int i;
+
+- if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
+- for (i = 0; i < pxa_internal_irq_nr; i++)
+- IPR(i) = saved_ipr[i];
+- }
++ for (i = 0; i < pxa_internal_irq_nr; i += 32) {
++ void __iomem *base = irq_base(i);
+
+- for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
+- _ICMR(irq) = saved_icmr[i];
+- _ICLR(irq) = 0;
++ __raw_writel(saved_icmr[i], base + ICMR);
++ __raw_writel(0, base + ICLR);
+}
+
+- ICCR = 1;
++ if (cpu_has_ipr())
++ for (i = 0; i < pxa_internal_irq_nr; i++)
++ __raw_writel(saved_ipr[i], IRQ_BASE + IPR(i));
++
++ __raw_writel(1, IRQ_BASE + ICCR);
+return 0;
+}
+#else
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-pxa-sanitize-IRQ-registers-access-based-on-offse.patch
+Type: text/x-patch
+Size: 5908 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100505/93698d1f/attachment.bin>
