@@ -1,130 +1,224 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:02 -0700
-Subject: [PATCH 11/34] Davinci: support LPSC SwRstDisable state
+Date: Thu,  6 May 2010 16:24:03 -0700
+Subject: [PATCH 12/34] Davinci: promote da8xx_pinmux_setup()
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-12-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-13-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyril Chemparathy <cyril@ti.com>
 
-The current clock control code always gates the clock (PSC state Disable = 2)
-on clk_disable().  Some on-chip peripherals (e.g. LCD controller on TNETV107X)
-need to be put into SwRstDisable = 0 on clock disable, to maintain
-hardware sanity.
-
-This patch extends the davinci_psc_config() arguments to pass in the desired
-module state instead of a boolean enable/disable.  Further, clk_disable() now
-checks for the PSC_SWRSTDISABLE clk flag before selecting the target state.
+Rename da8xx_pinmux_setup() to davinci_cfg_reg_list() and promote it for use in
+other SOCs that may need the ability to configure multiple pins in one shot.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/clock.c            |   12 +++++++++---
- arch/arm/mach-davinci/clock.h            |    7 ++++---
- arch/arm/mach-davinci/include/mach/psc.h |    8 +++++++-
- arch/arm/mach-davinci/psc.c              |    3 +--
- 4 files changed, 21 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c    |   14 +++++++-------
+ arch/arm/mach-davinci/board-da850-evm.c    |   18 +++++++++---------
+ arch/arm/mach-davinci/include/mach/da8xx.h |    6 ------
+ arch/arm/mach-davinci/include/mach/mux.h   |    5 +++++
+ arch/arm/mach-davinci/mux.c                |    3 +--
+ 5 files changed, 22 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index 058c77f..5de60ae 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -43,7 +43,8 @@ static void __clk_enable(struct clk *clk)
- 	if (clk->parent)
- 		__clk_enable(clk->parent);
- 	if (clk->usecount++ == 0 && (clk->flags & CLK_PSC))
--		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc, 1);
-+		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc,
-+				PSC_STATE_ENABLE);
- }
- 
- static void __clk_disable(struct clk *clk)
-@@ -52,7 +53,9 @@ static void __clk_disable(struct clk *clk)
- 		return;
- 	if (--clk->usecount == 0 && !(clk->flags & CLK_PLL) &&
- 	    (clk->flags & CLK_PSC))
--		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc, 0);
-+		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc,
-+				(clk->flags & PSC_SWRSTDISABLE) ?
-+				PSC_STATE_SWRSTDISABLE : PSC_STATE_DISABLE);
- 	if (clk->parent)
- 		__clk_disable(clk->parent);
- }
-@@ -234,7 +237,10 @@ static int __init clk_disable_unused(void)
- 			continue;
- 
- 		pr_info("Clocks: disable unused %s\n", ck->name);
--		davinci_psc_config(psc_domain(ck), ck->gpsc, ck->lpsc, 0);
-+
-+		davinci_psc_config(psc_domain(ck), ck->gpsc, ck->lpsc,
-+				(ck->flags & PSC_SWRSTDISABLE) ?
-+				PSC_STATE_SWRSTDISABLE : PSC_STATE_DISABLE);
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index db5ac0f..9257056 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -157,7 +157,7 @@ static __init void da830_evm_usb_init(void)
+ 				   __func__, ret);
  	}
- 	spin_unlock_irq(&clockfw_lock);
  
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index aa0a611..53a0f7b 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -101,10 +101,11 @@ struct clk {
+-	ret = da8xx_pinmux_setup(da830_evm_usb11_pins);
++	ret = davinci_cfg_reg_list(da830_evm_usb11_pins);
+ 	if (ret) {
+ 		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
+ 			   __func__, ret);
+@@ -254,7 +254,7 @@ static inline void da830_evm_init_mmc(void)
+ {
+ 	int ret;
  
- /* Clock flags: SoC-specific flags start at BIT(16) */
- #define ALWAYS_ENABLED		BIT(1)
--#define CLK_PSC                 BIT(2)
--#define PSC_DSP                 BIT(3) /* PSC uses DSP domain, not ARM */
-+#define CLK_PSC			BIT(2)
-+#define PSC_DSP			BIT(3) /* PSC uses DSP domain, not ARM */
- #define CLK_PLL			BIT(4) /* PLL-derived clock */
--#define PRE_PLL                 BIT(5) /* source is before PLL mult/div */
-+#define PRE_PLL			BIT(5) /* source is before PLL mult/div */
-+#define PSC_SWRSTDISABLE	BIT(6) /* Disable state is SwRstDisable */
+-	ret = da8xx_pinmux_setup(da830_evm_mmc_sd_pins);
++	ret = davinci_cfg_reg_list(da830_evm_mmc_sd_pins);
+ 	if (ret) {
+ 		pr_warning("da830_evm_init: mmc/sd mux setup failed: %d\n",
+ 				ret);
+@@ -407,7 +407,7 @@ static inline void da830_evm_init_nand(int mux_mode)
+ 		return;
+ 	}
  
- #define CLK(dev, con, ck) 	\
- 	{			\
-diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
-index 651f6d8..7dd2962 100644
---- a/arch/arm/mach-davinci/include/mach/psc.h
-+++ b/arch/arm/mach-davinci/include/mach/psc.h
-@@ -189,13 +189,19 @@
- #define MDSTAT		0x800
- #define MDCTL		0xA00
+-	ret = da8xx_pinmux_setup(da830_evm_emif25_pins);
++	ret = davinci_cfg_reg_list(da830_evm_emif25_pins);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: emif25 mux setup failed: %d\n",
+ 				ret);
+@@ -427,7 +427,7 @@ static inline void da830_evm_init_lcdc(int mux_mode)
+ {
+ 	int ret;
  
-+/* PSC module states */
-+#define PSC_STATE_SWRSTDISABLE	0
-+#define PSC_STATE_SYNCRST	1
-+#define PSC_STATE_DISABLE	2
-+#define PSC_STATE_ENABLE	3
-+
- #define MDSTAT_STATE_MASK 0x1f
+-	ret = da8xx_pinmux_setup(da830_lcdcntl_pins);
++	ret = davinci_cfg_reg_list(da830_lcdcntl_pins);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: lcdcntl mux setup failed: %d\n",
+ 				ret);
+@@ -507,7 +507,7 @@ static __init void da830_evm_init(void)
+ 		pr_warning("da830_evm_init: edma registration failed: %d\n",
+ 				ret);
  
- #ifndef __ASSEMBLER__
+-	ret = da8xx_pinmux_setup(da830_i2c0_pins);
++	ret = davinci_cfg_reg_list(da830_i2c0_pins);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: i2c0 mux setup failed: %d\n",
+ 				ret);
+@@ -523,7 +523,7 @@ static __init void da830_evm_init(void)
+ 	soc_info->emac_pdata->mdio_max_freq = DA830_EVM_MDIO_FREQUENCY;
+ 	soc_info->emac_pdata->rmii_en = 1;
  
- extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id);
- extern void davinci_psc_config(unsigned int domain, unsigned int ctlr,
--		unsigned int id, char enable);
-+		unsigned int id, u32 next_state);
+-	ret = da8xx_pinmux_setup(da830_cpgmac_pins);
++	ret = davinci_cfg_reg_list(da830_cpgmac_pins);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: cpgmac mux setup failed: %d\n",
+ 				ret);
+@@ -542,7 +542,7 @@ static __init void da830_evm_init(void)
+ 	i2c_register_board_info(1, da830_evm_i2c_devices,
+ 			ARRAY_SIZE(da830_evm_i2c_devices));
  
+-	ret = da8xx_pinmux_setup(da830_evm_mcasp1_pins);
++	ret = davinci_cfg_reg_list(da830_evm_mcasp1_pins);
+ 	if (ret)
+ 		pr_warning("da830_evm_init: mcasp1 mux setup failed: %d\n",
+ 				ret);
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index ef691ae..6c137e0 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -206,12 +206,12 @@ static __init void da850_evm_setup_nor_nand(void)
+ 	int ret = 0;
+ 
+ 	if (ui_card_detected & !HAS_MMC) {
+-		ret = da8xx_pinmux_setup(da850_nand_pins);
++		ret = davinci_cfg_reg_list(da850_nand_pins);
+ 		if (ret)
+ 			pr_warning("da850_evm_init: nand mux setup failed: "
+ 					"%d\n", ret);
+ 
+-		ret = da8xx_pinmux_setup(da850_nor_pins);
++		ret = davinci_cfg_reg_list(da850_nor_pins);
+ 		if (ret)
+ 			pr_warning("da850_evm_init: nor mux setup failed: %d\n",
+ 				ret);
+@@ -568,12 +568,12 @@ static int __init da850_evm_config_emac(void)
+ 
+ 	if (rmii_en) {
+ 		val |= BIT(8);
+-		ret = da8xx_pinmux_setup(da850_rmii_pins);
++		ret = davinci_cfg_reg_list(da850_rmii_pins);
+ 		pr_info("EMAC: RMII PHY configured, MII PHY will not be"
+ 							" functional\n");
+ 	} else {
+ 		val &= ~BIT(8);
+-		ret = da8xx_pinmux_setup(da850_cpgmac_pins);
++		ret = davinci_cfg_reg_list(da850_cpgmac_pins);
+ 		pr_info("EMAC: MII PHY configured, RMII PHY will not be"
+ 							" functional\n");
+ 	}
+@@ -626,7 +626,7 @@ static __init void da850_evm_init(void)
+ 		pr_warning("da850_evm_init: edma registration failed: %d\n",
+ 				ret);
+ 
+-	ret = da8xx_pinmux_setup(da850_i2c0_pins);
++	ret = davinci_cfg_reg_list(da850_i2c0_pins);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: i2c0 mux setup failed: %d\n",
+ 				ret);
+@@ -643,7 +643,7 @@ static __init void da850_evm_init(void)
+ 				ret);
+ 
+ 	if (HAS_MMC) {
+-		ret = da8xx_pinmux_setup(da850_mmcsd0_pins);
++		ret = davinci_cfg_reg_list(da850_mmcsd0_pins);
+ 		if (ret)
+ 			pr_warning("da850_evm_init: mmcsd0 mux setup failed:"
+ 					" %d\n", ret);
+@@ -679,20 +679,20 @@ static __init void da850_evm_init(void)
+ 	__raw_writel(0, IO_ADDRESS(DA8XX_UART1_BASE) + 0x30);
+ 	__raw_writel(0, IO_ADDRESS(DA8XX_UART0_BASE) + 0x30);
+ 
+-	ret = da8xx_pinmux_setup(da850_mcasp_pins);
++	ret = davinci_cfg_reg_list(da850_mcasp_pins);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: mcasp mux setup failed: %d\n",
+ 				ret);
+ 
+ 	da8xx_register_mcasp(0, &da850_evm_snd_data);
+ 
+-	ret = da8xx_pinmux_setup(da850_lcdcntl_pins);
++	ret = davinci_cfg_reg_list(da850_lcdcntl_pins);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
+ 				ret);
+ 
+ 	/* Handle board specific muxing for LCD here */
+-	ret = da8xx_pinmux_setup(da850_evm_lcdc_pins);
++	ret = davinci_cfg_reg_list(da850_evm_lcdc_pins);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: evm specific lcd mux setup "
+ 				"failed: %d\n",	ret);
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 03acfd3..33471c9 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -146,10 +146,4 @@ extern const short da850_mmcsd0_pins[];
+ extern const short da850_nand_pins[];
+ extern const short da850_nor_pins[];
+ 
+-#ifdef CONFIG_DAVINCI_MUX
+-int da8xx_pinmux_setup(const short pins[]);
+-#else
+-static inline int da8xx_pinmux_setup(const short pins[]) { return 0; }
+-#endif
+-
+ #endif /* __ASM_ARCH_DAVINCI_DA8XX_H */
+diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
+index 2a68c1d..48888db 100644
+--- a/arch/arm/mach-davinci/include/mach/mux.h
++++ b/arch/arm/mach-davinci/include/mach/mux.h
+@@ -907,9 +907,14 @@ enum davinci_da850_index {
+ #ifdef CONFIG_DAVINCI_MUX
+ /* setup pin muxing */
+ extern int davinci_cfg_reg(unsigned long reg_cfg);
++extern int davinci_cfg_reg_list(const short pins[]);
+ #else
+ /* boot loader does it all (no warnings from CONFIG_DAVINCI_MUX_WARNINGS) */
+ static inline int davinci_cfg_reg(unsigned long reg_cfg) { return 0; }
++static inline int davinci_cfg_reg_list(const short pins[])
++{
++	return 0;
++}
  #endif
  
-diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
-index adf6b5c..d7cb438 100644
---- a/arch/arm/mach-davinci/psc.c
-+++ b/arch/arm/mach-davinci/psc.c
-@@ -47,12 +47,11 @@ int __init davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id)
+ #endif /* __INC_MACH_MUX_H */
+diff --git a/arch/arm/mach-davinci/mux.c b/arch/arm/mach-davinci/mux.c
+index c942c89..e9d530a 100644
+--- a/arch/arm/mach-davinci/mux.c
++++ b/arch/arm/mach-davinci/mux.c
+@@ -21,7 +21,6 @@
  
- /* Enable or disable a PSC domain */
- void davinci_psc_config(unsigned int domain, unsigned int ctlr,
--		unsigned int id, char enable)
-+		unsigned int id, u32 next_state)
+ #include <mach/mux.h>
+ #include <mach/common.h>
+-#include <mach/da8xx.h>
+ 
+ /*
+  * Sets the DAVINCI MUX register based on the table
+@@ -92,7 +91,7 @@ int __init_or_module davinci_cfg_reg(const unsigned long index)
+ }
+ EXPORT_SYMBOL(davinci_cfg_reg);
+ 
+-int da8xx_pinmux_setup(const short pins[])
++int __init_or_module davinci_cfg_reg_list(const short pins[])
  {
- 	u32 epcpr, ptcmd, ptstat, pdstat, pdctl1, mdstat, mdctl;
- 	void __iomem *psc_base;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
--	u32 next_state = enable ? 0x3 : 0x2; /* 0x3 enables, 0x2 disables */
+ 	int i, error = -EINVAL;
  
- 	if (!soc_info->psc_bases || (ctlr >= soc_info->psc_bases_num)) {
- 		pr_warning("PSC: Bad psc data: 0x%x[%d]\n",
 -- 
 1.7.0.2
