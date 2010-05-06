@@ -1,107 +1,35 @@
-From: Jiri.Pinkava@vscht.cz (Pinkava J.)
-Date: Thu, 6 May 2010 15:24:15 +0200
-Subject: [PATCH 8/8] Add support for backlight regulation on Acer n35
-In-Reply-To: <4BE2C2CC.2010003@vscht.cz>
-References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
-	<4BE1ED86.3010506@vscht.cz> <4BE1EE5F.5090402@vscht.cz>
-	<4BE1EE8C.8040900@vscht.cz>
-	<20100506012258.GZ6684@trinity.fluff.org>
-	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
-	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
-	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
-	<4BE2C2CC.2010003@vscht.cz>
-Message-ID: <4BE2C2FF.8020404@vscht.cz>
+From: mroberto@cpti.cetuc.puc-rio.br (Marcelo Jimenez)
+Date: Thu, 6 May 2010 10:24:23 -0300
+Subject: Suspicious compilation warning
+In-Reply-To: <p2g9c9fda241005051824k54e70136v8324d135b44c71b5@mail.gmail.com>
+References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
+	<20100420155122.6f2c26eb.akpm@linux-foundation.org>
+	<20100420230719.GB1432@n2100.arm.linux.org.uk>
+	<4BE14335.10702@ru.mvista.com>
+	<p2g9c9fda241005051824k54e70136v8324d135b44c71b5@mail.gmail.com>
+Message-ID: <n2ycecb6d8f1005060624y8ada0c03yc4fab915b3d13a0a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kyungmin,
 
+On Wed, May 5, 2010 at 22:24, Kyungmin Park <kmpark@infradead.org> wrote:
+>
+> Hi,
+>
+> It tested with my board and working.
+> Just curious. If NR_SECTION_ROOTS is zero and uninitialized then
+> what's problem? Since we boot and working without patch.
 
-Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
----
- arch/arm/mach-s3c2410/mach-n30.c |   57 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 57 insertions(+), 0 deletions(-)
+The original compiler error message was:
 
-diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index f25275e..4c37c71 100644
---- a/arch/arm/mach-s3c2410/mach-n30.c
-+++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -23,6 +23,7 @@
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/pwm_backlight.h>
- #include <linux/serial_core.h>
- #include <linux/timer.h>
- #include <linux/io.h>
-@@ -352,6 +353,60 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
- 	.lpcsel		= 0x06,
- };
+mm/sparse.c: In function '__section_nr':
+mm/sparse.c:135: warning: 'root' is used uninitialized in this function
 
-+static int n35_backlight_init(struct device *dev)
-+{
-+	gpio_request(S3C2410_GPB(0), "Backlight PWM");
-+	gpio_request(S3C2410_GPB(1), "Backlight power driver");
-+
-+	/* set GPIO as output for timer */
-+	s3c2410_gpio_setpin(S3C2410_GPB(0), 0);
-+	s3c2410_gpio_pullup(S3C2410_GPB(0), 0);
-+	s3c2410_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
-+
-+	/* setup backlight power driving GPIO */
-+	s3c2410_gpio_pullup(S3C2410_GPB(1), 1);
-+	s3c2410_gpio_cfgpin(S3C2410_GPB(1), S3C2410_GPIO_OUTPUT);
-+
-+	return 0;
-+}
-+
-+static int n35_backlight_notify(struct device *dev, int brightness)
-+{
-+	/* power off backlight, values less than 12 ar useless */
-+	s3c2410_gpio_setpin(S3C2410_GPB(1), brightness > 12 ? 1 : 0);
-+	return (brightness > 12 ? brightness : 0);
-+}
-+
-+static void n35_backlight_exit(struct device *dev)
-+{
-+	s3c2410_gpio_cfgpin(S3C2410_GPB(0), 1/*S3C2410_GPB0_OUTP*/);
-+	s3c2410_gpio_setpin(S3C2410_GPB(1), 0); /* co stim */
-+	/* power off backlight */
-+	s3c2410_gpio_pullup(S3C2410_GPB(1), 0);
-+	gpio_free(S3C2410_GPB(1));
-+	gpio_free(S3C2410_GPB(0));
-+}
-+
-+static struct platform_pwm_backlight_data backlight_data = {
-+	.pwm_id         = 0,
-+	.max_brightness = 100,
-+	.dft_brightness = 50,
-+	/* tcnt = 0x31, FIXME: compute some nicer value */
-+	.pwm_period_ns  = 3*1000*1000,
-+	.init           = n35_backlight_init,
-+	.notify         = n35_backlight_notify,
-+	.exit           = n35_backlight_exit,
-+};
-+
-+static struct platform_device n35_backlight = {
-+	.name = "pwm-backlight",
-+	.dev  = {
-+		.parent = &s3c_device_timer[0].dev,
-+		.platform_data = &backlight_data,
-+	},
-+	.id   = -1,
-+};
-+
- static void n30_sdi_set_power(unsigned char power_mode, unsigned short vdd)
- {
- 	switch (power_mode) {
-@@ -395,6 +450,8 @@ static struct platform_device *n35_devices[] __initdata = {
- 	&s3c_device_rtc,
- 	&s3c_device_usbgadget,
- 	&s3c_device_sdi,
-+	&s3c_device_timer[0],
-+	&n35_backlight,
- 	&n35_button_device,
- 	&n35_blue_led,
- 	&n35_warning_led,
--- 
-1.7.1
+Leaving a variable to be used uninitialized is the issue here.
+
+> Thank you,
+> Kyungmin Park
+
+Regards,
+Marcelo.
