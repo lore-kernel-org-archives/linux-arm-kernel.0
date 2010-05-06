@@ -1,172 +1,130 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Thu, 6 May 2010 14:12:25 -0400
-Subject: [PATCH 1/2] create generic alignment api (v6)
-In-Reply-To: <1272741800-30115-1-git-send-email-virtuoso@slind.org>
-References: <20100329000900.GB27379@Krystal>
-	<1272741800-30115-1-git-send-email-virtuoso@slind.org>
-Message-ID: <20100506181225.GA27549@Krystal>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 6 May 2010 13:28:03 -0500
+Subject: [PATCH] mach-ep93xx: checkpatch.pl cleanup
+Message-ID: <0D753D10438DA54287A00B0270842697636ECB4F3D@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin (virtuoso at slind.org) wrote:
-> From: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> 
-> Rather than re-doing the "alignment on a type size" trick all over again at
-> different levels, import the "ltt_align" from LTTng into kernel.h and make this
-> available to everyone. Renaming to:
-> 
-> - object_align()
-> - object_align_floor()
-> - offset_align()
-> - offset_align_floor()
-> 
-> Changelog since v5:
-> - moved alignment apis to a separate header file so that it is possible
->   to use them from other header files which are, for example, included
->   from kernel.h.
-> 
-> Changelog since v4:
-> - add missing ( ) around parameters within object_align() and
->   object_align_floor().
-> - More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
-> 
-> Changelog since v3:
-> - optimize object_align*() so fewer instructions are needed for alignment of
->   addresses known dynamically. Use the (already existing) "ALIGN()", and create
->   the "ALIGN_FLOOR()" macro.
-> - While we are there, let's clean up the ALIGN() macros wrt coding style. e.g.
->   missing parenthesis around the first use of the "x" parameter in ALIGN().
-> 
-> Changelog since v2:
-> - Fix object_align*(): should use object size alignment, not pointer alignment.
-> 
-> Changelog since v1:
-> - Align on the object natural alignment
->     (rather than min(arch word alignment, natural alignment))
-> 
-> The advantage of separating the API in "object alignment" and "offset alignment"
-> is that it gives more freedom to play with offset alignment. Very useful to
-> implement a tracer ring-buffer alignment. (hint hint)
-> 
-> Typical users will use "object alignment", but infrastructures like tracers
-> which need to perform alignment of statically known base+offsets will typically
-> use "offset alignment", because it allows to align with respect to a base rather
-> than to pass an absolute address.
-> 
-> We use "sizeof(object)" rather than "__alignof__()" object because alignof
-> returns "recommended" object alignment for the architecture, which can be
-> sub-optimal on some architectures. By ensuring alignment on the object size, we
-> are sure to make the right choice.
+This cleans up most the checkpatch.pl issues in mach-ep93xx.
 
-Hrm... thinking about this again, maybe it's better to use __alignof__() for 
-object_align() and object_align_floor(), because using "sizeof()" will cause
-unexpected effects if a structure is passed as an object (you typically want to
-align on the size of the largest object in the structure (or bigger) rather than
-the structure size).
+  ERROR: space required after that ',' (ctx:VxV)
+  WARNING: line over 80 characters
+  WARNING: please, no space before tabs
 
-Thanks,
+The file core.c still produces this warning:
 
-Mathieu
+  WARNING: externs should be avoided in .c files
 
-> 
-> Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-> CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: Imre Deak <imre.deak@nokia.com>
-> CC: Jamie Lokier <jamie@shareable.org>
-> CC: rostedt at goodmis.org
-> CC: mingo at elte.hu
-> ---
->  include/linux/align.h  |   48 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/kernel.h |    6 +-----
->  2 files changed, 49 insertions(+), 5 deletions(-)
->  create mode 100644 include/linux/align.h
-> 
-> diff --git a/include/linux/align.h b/include/linux/align.h
-> new file mode 100644
-> index 0000000..8aa2967
-> --- /dev/null
-> +++ b/include/linux/align.h
-> @@ -0,0 +1,48 @@
-> +#ifndef _LINUX_ALIGN_H
-> +#define _LINUX_ALIGN_H
-> +
-> +#include <linux/types.h>
-> +
-> +#define ALIGN(x, a)		__ALIGN_MASK((x), (typeof(x)) (a) - 1)
-> +#define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
-> +#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), (a)))
-> +#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK((x), (typeof(x)) (a) - 1)
-> +#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
-> +#define PTR_ALIGN_FLOOR(p, a) \
-> +			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), (a)))
-> +#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
-> +
-> +/*
-> + * Align pointer on natural object alignment. Object size must be power of two.
-> + */
-> +#define object_align(obj)	PTR_ALIGN((obj), sizeof(*(obj)))
-> +#define object_align_floor(obj)	PTR_ALIGN_FLOOR((obj), sizeof(*(obj)))
-> +
-> +/**
-> + * offset_align - Calculate the offset needed to align an object on its natural
-> + *                alignment towards higher addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be added to align towards higher
-> + * addresses.
-> + */
-> +static inline size_t offset_align(size_t align_drift, size_t alignment)
-> +{
-> +	return (alignment - align_drift) & (alignment - 1);
-> +}
-> +
-> +/**
-> + * offset_align_floor - Calculate the offset needed to align an object
-> + *                      on its natural alignment towards lower addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be substracted to align towards lower addresses.
-> + */
-> +static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
-> +{
-> +	return (align_drift - alignment) & (alignment - 1);
-> +}
-> +
-> +#endif
-> diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-> index f4e3184..81d0d15 100644
-> --- a/include/linux/kernel.h
-> +++ b/include/linux/kernel.h
-> @@ -12,6 +12,7 @@
->  #include <linux/stddef.h>
->  #include <linux/types.h>
->  #include <linux/compiler.h>
-> +#include <linux/align.h>
->  #include <linux/bitops.h>
->  #include <linux/log2.h>
->  #include <linux/typecheck.h>
-> @@ -38,11 +39,6 @@ extern const char linux_proc_banner[];
->  
->  #define STACK_MAGIC	0xdeadbeef
->  
-> -#define ALIGN(x,a)		__ALIGN_MASK(x,(typeof(x))(a)-1)
-> -#define __ALIGN_MASK(x,mask)	(((x)+(mask))&~(mask))
-> -#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
-> -#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
-> -
->  #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
->  
->  #define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
-> -- 
-> 1.7.1.1.g15764
-> 
+Due to two externs declared for functions in located in gpio.c.
+Since these are __init functions, and not meant to be exposed,
+these warnings were not fixed.
 
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index 5f80092..31108d8 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -170,7 +170,7 @@ static struct clk clk_m2m1 = {
+ 	.enable_mask	= EP93XX_SYSCON_PWRCNT_DMA_M2M1,
+ };
+ 
+-#define INIT_CK(dev,con,ck)					\
++#define INIT_CK(dev, con, ck)					\
+ 	{ .dev_id = dev, .con_id = con, .clk = ck }
+ 
+ static struct clk_lookup clocks[] = {
+@@ -215,7 +215,8 @@ static void __clk_enable(struct clk *clk)
+ 			v = __raw_readl(clk->enable_reg);
+ 			v |= clk->enable_mask;
+ 			if (clk->sw_locked)
+-				ep93xx_syscon_swlocked_write(v, clk->enable_reg);
++				ep93xx_syscon_swlocked_write(v,
++						clk->enable_reg);
+ 			else
+ 				__raw_writel(v, clk->enable_reg);
+ 		}
+@@ -246,7 +247,8 @@ static void __clk_disable(struct clk *clk)
+ 			v = __raw_readl(clk->enable_reg);
+ 			v &= ~clk->enable_mask;
+ 			if (clk->sw_locked)
+-				ep93xx_syscon_swlocked_write(v, clk->enable_reg);
++				ep93xx_syscon_swlocked_write(v,
++						clk->enable_reg);
+ 			else
+ 				__raw_writel(v, clk->enable_reg);
+ 		}
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8d3f77e..295e513 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -337,8 +337,8 @@ static struct platform_device ep93xx_ohci_device = {
+ 	.name		= "ep93xx-ohci",
+ 	.id		= -1,
+ 	.dev		= {
+-		.dma_mask		= &ep93xx_ohci_device.dev.coherent_dma_mask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.dma_mask = &ep93xx_ohci_device.dev.coherent_dma_mask,
+ 	},
+ 	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
+ 	.resource	= ep93xx_ohci_resources,
+@@ -562,7 +562,7 @@ static struct platform_device ep93xx_fb_device = {
+ 	.dev			= {
+ 		.platform_data		= &ep93xxfb_data,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.dma_mask		= &ep93xx_fb_device.dev.coherent_dma_mask,
++		.dma_mask = &ep93xx_fb_device.dev.coherent_dma_mask,
+ 	},
+ 	.num_resources		= ARRAY_SIZE(ep93xx_fb_resource),
+ 	.resource		= ep93xx_fb_resource,
+diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+index cf547ad..68d72cd 100644
+--- a/arch/arm/mach-ep93xx/gpio.c
++++ b/arch/arm/mach-ep93xx/gpio.c
+@@ -118,7 +118,8 @@ static void ep93xx_gpio_irq_ack(unsigned int irq)
+ 	int port = line >> 3;
+ 	int port_mask = 1 << (line & 7);
+ 
+-	if ((irq_desc[irq].status & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
++	if ((irq_desc[irq].status & IRQ_TYPE_SENSE_MASK) ==
++					IRQ_TYPE_EDGE_BOTH) {
+ 		gpio_int_type2[port] ^= port_mask; /* switch edge direction */
+ 		ep93xx_gpio_update_int_params(port);
+ 	}
+diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
+index 38deaee..ed352ac 100644
+--- a/arch/arm/mach-ep93xx/snappercl15.c
++++ b/arch/arm/mach-ep93xx/snappercl15.c
+@@ -42,7 +42,7 @@
+ #define SNAPPERCL15_NAND_CEN	(1 << 11) /* Chip enable (active low) */
+ #define SNAPPERCL15_NAND_RDY	(1 << 14) /* Device ready */
+ 
+-#define NAND_CTRL_ADDR(chip) 	(chip->IO_ADDR_W + 0x40)
++#define NAND_CTRL_ADDR(chip)	(chip->IO_ADDR_W + 0x40)
+ 
+ static void snappercl15_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+ 				      unsigned int ctrl)
+@@ -167,6 +167,6 @@ MACHINE_START(SNAPPER_CL15, "Bluewater Systems Snapper CL15")
+ 	.boot_params	= EP93XX_SDCE0_PHYS_BASE + 0x100,
+ 	.map_io		= ep93xx_map_io,
+ 	.init_irq	= ep93xx_init_irq,
+-	.timer 		= &ep93xx_timer,
++	.timer		= &ep93xx_timer,
+ 	.init_machine	= snappercl15_init_machine,
+ MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 9553031..b981a71 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -182,7 +182,7 @@ static struct resource ts72xx_wdt_resources[] = {
+ static struct platform_device ts72xx_wdt_device = {
+ 	.name		= "ts72xx-wdt",
+ 	.id		= -1,
+-	.num_resources 	= ARRAY_SIZE(ts72xx_wdt_resources),
++	.num_resources	= ARRAY_SIZE(ts72xx_wdt_resources),
+ 	.resource	= ts72xx_wdt_resources,
+ };
+ 
