@@ -1,94 +1,130 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:01 -0700
-Subject: [PATCH 10/34] Davinci: cpintc host map configuration
+Date: Thu,  6 May 2010 16:24:02 -0700
+Subject: [PATCH 11/34] Davinci: support LPSC SwRstDisable state
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-11-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-12-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyril Chemparathy <cyril@ti.com>
 
-Host map configuration instructs the interrupt controller to route interrupt
-channels to FIQ or IRQ lines.  Currently, DA8xx family of devices leave these
-registers at their reset-default values.
+The current clock control code always gates the clock (PSC state Disable = 2)
+on clk_disable().  Some on-chip peripherals (e.g. LCD controller on TNETV107X)
+need to be put into SwRstDisable = 0 on clock disable, to maintain
+hardware sanity.
 
-TNETV107X however does not have sane reset defaults, and therefore this
-architecture needs to reconfigure the host-map such that channels 0 and 1
-go to FIQ, and the remaining channels raise IRQs.
-
-This patch adds an optional host map argument to cp_intc_init() for this.
+This patch extends the davinci_psc_config() arguments to pass in the desired
+module state instead of a boolean enable/disable.  Further, clk_disable() now
+checks for the PSC_SWRSTDISABLE clk flag before selecting the target state.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c      |    2 +-
- arch/arm/mach-davinci/board-da850-evm.c      |    2 +-
- arch/arm/mach-davinci/cp_intc.c              |    6 +++++-
- arch/arm/mach-davinci/include/mach/cp_intc.h |    2 +-
- 4 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/mach-davinci/clock.c            |   12 +++++++++---
+ arch/arm/mach-davinci/clock.h            |    7 ++++---
+ arch/arm/mach-davinci/include/mach/psc.h |    8 +++++++-
+ arch/arm/mach-davinci/psc.c              |    3 +--
+ 4 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index ea293b8..db5ac0f 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -569,7 +569,7 @@ static __init void da830_evm_irq_init(void)
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	cp_intc_init((void __iomem *)DA8XX_CP_INTC_VIRT, DA830_N_CP_INTC_IRQ,
--			soc_info->intc_irq_prios);
-+			soc_info->intc_irq_prios, NULL);
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index 058c77f..5de60ae 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -43,7 +43,8 @@ static void __clk_enable(struct clk *clk)
+ 	if (clk->parent)
+ 		__clk_enable(clk->parent);
+ 	if (clk->usecount++ == 0 && (clk->flags & CLK_PSC))
+-		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc, 1);
++		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc,
++				PSC_STATE_ENABLE);
  }
  
- static void __init da830_evm_map_io(void)
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 411284d..ef691ae 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -741,7 +741,7 @@ static __init void da850_evm_irq_init(void)
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
- 	cp_intc_init((void __iomem *)DA8XX_CP_INTC_VIRT, DA850_N_CP_INTC_IRQ,
--			soc_info->intc_irq_prios);
-+			soc_info->intc_irq_prios, NULL);
+ static void __clk_disable(struct clk *clk)
+@@ -52,7 +53,9 @@ static void __clk_disable(struct clk *clk)
+ 		return;
+ 	if (--clk->usecount == 0 && !(clk->flags & CLK_PLL) &&
+ 	    (clk->flags & CLK_PSC))
+-		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc, 0);
++		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc,
++				(clk->flags & PSC_SWRSTDISABLE) ?
++				PSC_STATE_SWRSTDISABLE : PSC_STATE_DISABLE);
+ 	if (clk->parent)
+ 		__clk_disable(clk->parent);
  }
+@@ -234,7 +237,10 @@ static int __init clk_disable_unused(void)
+ 			continue;
  
- static void __init da850_evm_map_io(void)
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 37311d1..2a8d26e 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -101,7 +101,7 @@ static struct irq_chip cp_intc_irq_chip = {
- };
- 
- void __init cp_intc_init(void __iomem *base, unsigned short num_irq,
--			 u8 *irq_prio)
-+			 u8 *irq_prio, u32 *host_map)
- {
- 	unsigned num_reg	= BITS_TO_LONGS(num_irq);
- 	int i;
-@@ -157,6 +157,10 @@ void __init cp_intc_init(void __iomem *base, unsigned short num_irq,
- 			cp_intc_write(0x0f0f0f0f, CP_INTC_CHAN_MAP(i));
- 	}
- 
-+	if (host_map)
-+		for (i = 0; host_map[i] != -1; i++)
-+			cp_intc_write(host_map[i], CP_INTC_HOST_MAP(i));
+ 		pr_info("Clocks: disable unused %s\n", ck->name);
+-		davinci_psc_config(psc_domain(ck), ck->gpsc, ck->lpsc, 0);
 +
- 	/* Set up genirq dispatching for cp_intc */
- 	for (i = 0; i < num_irq; i++) {
- 		set_irq_chip(i, &cp_intc_irq_chip);
-diff --git a/arch/arm/mach-davinci/include/mach/cp_intc.h b/arch/arm/mach-davinci/include/mach/cp_intc.h
-index c4d27ee..121b114 100644
---- a/arch/arm/mach-davinci/include/mach/cp_intc.h
-+++ b/arch/arm/mach-davinci/include/mach/cp_intc.h
-@@ -52,6 +52,6 @@
- #define CP_INTC_VECTOR_ADDR(n)		(0x2000 + (n << 2))
++		davinci_psc_config(psc_domain(ck), ck->gpsc, ck->lpsc,
++				(ck->flags & PSC_SWRSTDISABLE) ?
++				PSC_STATE_SWRSTDISABLE : PSC_STATE_DISABLE);
+ 	}
+ 	spin_unlock_irq(&clockfw_lock);
  
- void __init cp_intc_init(void __iomem *base, unsigned short num_irq,
--			 u8 *irq_prio);
-+			 u8 *irq_prio, u32 *host_map);
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index aa0a611..53a0f7b 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -101,10 +101,11 @@ struct clk {
  
- #endif	/* __ASM_HARDWARE_CP_INTC_H */
+ /* Clock flags: SoC-specific flags start at BIT(16) */
+ #define ALWAYS_ENABLED		BIT(1)
+-#define CLK_PSC                 BIT(2)
+-#define PSC_DSP                 BIT(3) /* PSC uses DSP domain, not ARM */
++#define CLK_PSC			BIT(2)
++#define PSC_DSP			BIT(3) /* PSC uses DSP domain, not ARM */
+ #define CLK_PLL			BIT(4) /* PLL-derived clock */
+-#define PRE_PLL                 BIT(5) /* source is before PLL mult/div */
++#define PRE_PLL			BIT(5) /* source is before PLL mult/div */
++#define PSC_SWRSTDISABLE	BIT(6) /* Disable state is SwRstDisable */
+ 
+ #define CLK(dev, con, ck) 	\
+ 	{			\
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index 651f6d8..7dd2962 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -189,13 +189,19 @@
+ #define MDSTAT		0x800
+ #define MDCTL		0xA00
+ 
++/* PSC module states */
++#define PSC_STATE_SWRSTDISABLE	0
++#define PSC_STATE_SYNCRST	1
++#define PSC_STATE_DISABLE	2
++#define PSC_STATE_ENABLE	3
++
+ #define MDSTAT_STATE_MASK 0x1f
+ 
+ #ifndef __ASSEMBLER__
+ 
+ extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id);
+ extern void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+-		unsigned int id, char enable);
++		unsigned int id, u32 next_state);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
+index adf6b5c..d7cb438 100644
+--- a/arch/arm/mach-davinci/psc.c
++++ b/arch/arm/mach-davinci/psc.c
+@@ -47,12 +47,11 @@ int __init davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id)
+ 
+ /* Enable or disable a PSC domain */
+ void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+-		unsigned int id, char enable)
++		unsigned int id, u32 next_state)
+ {
+ 	u32 epcpr, ptcmd, ptstat, pdstat, pdctl1, mdstat, mdctl;
+ 	void __iomem *psc_base;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+-	u32 next_state = enable ? 0x3 : 0x2; /* 0x3 enables, 0x2 disables */
+ 
+ 	if (!soc_info->psc_bases || (ctlr >= soc_info->psc_bases_num)) {
+ 		pr_warning("PSC: Bad psc data: 0x%x[%d]\n",
 -- 
 1.7.0.2
