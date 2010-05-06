@@ -1,52 +1,49 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 6 May 2010 12:29:34 -0500
-Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
-In-Reply-To: <20100412191506.GL3048@n2100.arm.linux.org.uk>
-References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
-	<20100412184904.GG3048@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
-	<20100412191506.GL3048@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 06 May 2010 13:35:43 -0400 (EDT)
+Subject: [PATCH] ARM: Declare __copy_to_user_std as a function using
+	ENDPROC
+In-Reply-To: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
+References: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1005061334190.14468@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 12, 2010 12:15 PM, Russell King wrote:
-> On Mon, Apr 12, 2010 at 02:01:17PM -0500, H Hartley Sweeten wrote:
-> On Monday, April 12, 2010 11:49 AM, Russell King wrote:
->>> On Thu, Apr 01, 2010 at 05:32:18PM -0500, H Hartley Sweeten wrote:
->>>> The ARCH_REQUIRE_GPIOLIB config option will select GPIOLIB which
->>>> in turn will select GENERIC_GPIO.  Because of this, there is no
->>>> reason to do the select GENERIC_GPIO in arch/arm/Kconfig for the
->>>> architectures that have ARCH_REQUIRE_GPIOLIB.
->>>
->>> This kind of patch normally causes regular merge conflicts, which
->>> historically have caused a repeated number of headaches - there's
->>> a similar patch for GENERIC_TIME which is pending.
->>>
->>> I suggest waiting until we're closer to the merge window than we
->>> are at present; I'll bring my devel stuff to a freeze state before
->>> hand so we can get these two patches merged - maybe around the
->>> -rc7 release.
->>>
->>> Please ping me closer to that.
->> 
->> Will do.
->> 
->> I just wanted to get this out there to make sure nobody saw any issues.
->> 
->> I will hold this until around -rc7 as you requested and just collect any
->> Ack's, etc., that show up.  Eric Miao has already sent an Acked-by that
->> I will add then.
->
-> Also please keep an eye for any new places in -next where GENERIC_GPIO
-> is selected as well as ARCH_REQUIRE_GPIOLIB - we're likely to see new
-> platforms being added which may continue the old mistake.
+On Thu, 6 May 2010, Catalin Marinas wrote:
 
-Russell,
+> This is needed for Thumb-2 kernel builds, otherwise the compiler
+> generates branches into ARM mode to this function.
+> 
+> Reported-by: Kyungmin Park <kmpark@infradead.org>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
--rc7 should be coming soon.  Would you like this patch rebased now or after
-Linus releases -rc7?  Also, I assume it should be rebased to linux-next or
-would you prefer it rebased to one of your branches?
+You need to do the same with __clear_user_std as well.  With that change 
+added:
 
-Regards,
-Hartley
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+
+
+
+
+> ---
+>  arch/arm/lib/copy_to_user.S |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+> index 1a71e15..5941fbc 100644
+> --- a/arch/arm/lib/copy_to_user.S
+> +++ b/arch/arm/lib/copy_to_user.S
+> @@ -93,6 +93,7 @@ WEAK(__copy_to_user)
+>  #include "copy_template.S"
+>  
+>  ENDPROC(__copy_to_user)
+> +ENDPROC(__copy_to_user_std)
+>  
+>  	.section .fixup,"ax"
+>  	.align 0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
