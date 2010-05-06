@@ -1,224 +1,301 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:03 -0700
-Subject: [PATCH 12/34] Davinci: promote da8xx_pinmux_setup()
+Date: Thu,  6 May 2010 16:24:04 -0700
+Subject: [PATCH 13/34] Davinci: tnetv107x pin list
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-13-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-14-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyril Chemparathy <cyril@ti.com>
 
-Rename da8xx_pinmux_setup() to davinci_cfg_reg_list() and promote it for use in
-other SOCs that may need the ability to configure multiple pins in one shot.
+Added list of muxed pins on the tnetv107x SOC.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c    |   14 +++++++-------
- arch/arm/mach-davinci/board-da850-evm.c    |   18 +++++++++---------
- arch/arm/mach-davinci/include/mach/da8xx.h |    6 ------
- arch/arm/mach-davinci/include/mach/mux.h   |    5 +++++
- arch/arm/mach-davinci/mux.c                |    3 +--
- 5 files changed, 22 insertions(+), 24 deletions(-)
+ arch/arm/mach-davinci/include/mach/mux.h |  269 ++++++++++++++++++++++++++++++
+ 1 files changed, 269 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index db5ac0f..9257056 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -157,7 +157,7 @@ static __init void da830_evm_usb_init(void)
- 				   __func__, ret);
- 	}
- 
--	ret = da8xx_pinmux_setup(da830_evm_usb11_pins);
-+	ret = davinci_cfg_reg_list(da830_evm_usb11_pins);
- 	if (ret) {
- 		pr_warning("%s: USB 1.1 PinMux setup failed: %d\n",
- 			   __func__, ret);
-@@ -254,7 +254,7 @@ static inline void da830_evm_init_mmc(void)
- {
- 	int ret;
- 
--	ret = da8xx_pinmux_setup(da830_evm_mmc_sd_pins);
-+	ret = davinci_cfg_reg_list(da830_evm_mmc_sd_pins);
- 	if (ret) {
- 		pr_warning("da830_evm_init: mmc/sd mux setup failed: %d\n",
- 				ret);
-@@ -407,7 +407,7 @@ static inline void da830_evm_init_nand(int mux_mode)
- 		return;
- 	}
- 
--	ret = da8xx_pinmux_setup(da830_evm_emif25_pins);
-+	ret = davinci_cfg_reg_list(da830_evm_emif25_pins);
- 	if (ret)
- 		pr_warning("da830_evm_init: emif25 mux setup failed: %d\n",
- 				ret);
-@@ -427,7 +427,7 @@ static inline void da830_evm_init_lcdc(int mux_mode)
- {
- 	int ret;
- 
--	ret = da8xx_pinmux_setup(da830_lcdcntl_pins);
-+	ret = davinci_cfg_reg_list(da830_lcdcntl_pins);
- 	if (ret)
- 		pr_warning("da830_evm_init: lcdcntl mux setup failed: %d\n",
- 				ret);
-@@ -507,7 +507,7 @@ static __init void da830_evm_init(void)
- 		pr_warning("da830_evm_init: edma registration failed: %d\n",
- 				ret);
- 
--	ret = da8xx_pinmux_setup(da830_i2c0_pins);
-+	ret = davinci_cfg_reg_list(da830_i2c0_pins);
- 	if (ret)
- 		pr_warning("da830_evm_init: i2c0 mux setup failed: %d\n",
- 				ret);
-@@ -523,7 +523,7 @@ static __init void da830_evm_init(void)
- 	soc_info->emac_pdata->mdio_max_freq = DA830_EVM_MDIO_FREQUENCY;
- 	soc_info->emac_pdata->rmii_en = 1;
- 
--	ret = da8xx_pinmux_setup(da830_cpgmac_pins);
-+	ret = davinci_cfg_reg_list(da830_cpgmac_pins);
- 	if (ret)
- 		pr_warning("da830_evm_init: cpgmac mux setup failed: %d\n",
- 				ret);
-@@ -542,7 +542,7 @@ static __init void da830_evm_init(void)
- 	i2c_register_board_info(1, da830_evm_i2c_devices,
- 			ARRAY_SIZE(da830_evm_i2c_devices));
- 
--	ret = da8xx_pinmux_setup(da830_evm_mcasp1_pins);
-+	ret = davinci_cfg_reg_list(da830_evm_mcasp1_pins);
- 	if (ret)
- 		pr_warning("da830_evm_init: mcasp1 mux setup failed: %d\n",
- 				ret);
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index ef691ae..6c137e0 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -206,12 +206,12 @@ static __init void da850_evm_setup_nor_nand(void)
- 	int ret = 0;
- 
- 	if (ui_card_detected & !HAS_MMC) {
--		ret = da8xx_pinmux_setup(da850_nand_pins);
-+		ret = davinci_cfg_reg_list(da850_nand_pins);
- 		if (ret)
- 			pr_warning("da850_evm_init: nand mux setup failed: "
- 					"%d\n", ret);
- 
--		ret = da8xx_pinmux_setup(da850_nor_pins);
-+		ret = davinci_cfg_reg_list(da850_nor_pins);
- 		if (ret)
- 			pr_warning("da850_evm_init: nor mux setup failed: %d\n",
- 				ret);
-@@ -568,12 +568,12 @@ static int __init da850_evm_config_emac(void)
- 
- 	if (rmii_en) {
- 		val |= BIT(8);
--		ret = da8xx_pinmux_setup(da850_rmii_pins);
-+		ret = davinci_cfg_reg_list(da850_rmii_pins);
- 		pr_info("EMAC: RMII PHY configured, MII PHY will not be"
- 							" functional\n");
- 	} else {
- 		val &= ~BIT(8);
--		ret = da8xx_pinmux_setup(da850_cpgmac_pins);
-+		ret = davinci_cfg_reg_list(da850_cpgmac_pins);
- 		pr_info("EMAC: MII PHY configured, RMII PHY will not be"
- 							" functional\n");
- 	}
-@@ -626,7 +626,7 @@ static __init void da850_evm_init(void)
- 		pr_warning("da850_evm_init: edma registration failed: %d\n",
- 				ret);
- 
--	ret = da8xx_pinmux_setup(da850_i2c0_pins);
-+	ret = davinci_cfg_reg_list(da850_i2c0_pins);
- 	if (ret)
- 		pr_warning("da850_evm_init: i2c0 mux setup failed: %d\n",
- 				ret);
-@@ -643,7 +643,7 @@ static __init void da850_evm_init(void)
- 				ret);
- 
- 	if (HAS_MMC) {
--		ret = da8xx_pinmux_setup(da850_mmcsd0_pins);
-+		ret = davinci_cfg_reg_list(da850_mmcsd0_pins);
- 		if (ret)
- 			pr_warning("da850_evm_init: mmcsd0 mux setup failed:"
- 					" %d\n", ret);
-@@ -679,20 +679,20 @@ static __init void da850_evm_init(void)
- 	__raw_writel(0, IO_ADDRESS(DA8XX_UART1_BASE) + 0x30);
- 	__raw_writel(0, IO_ADDRESS(DA8XX_UART0_BASE) + 0x30);
- 
--	ret = da8xx_pinmux_setup(da850_mcasp_pins);
-+	ret = davinci_cfg_reg_list(da850_mcasp_pins);
- 	if (ret)
- 		pr_warning("da850_evm_init: mcasp mux setup failed: %d\n",
- 				ret);
- 
- 	da8xx_register_mcasp(0, &da850_evm_snd_data);
- 
--	ret = da8xx_pinmux_setup(da850_lcdcntl_pins);
-+	ret = davinci_cfg_reg_list(da850_lcdcntl_pins);
- 	if (ret)
- 		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
- 				ret);
- 
- 	/* Handle board specific muxing for LCD here */
--	ret = da8xx_pinmux_setup(da850_evm_lcdc_pins);
-+	ret = davinci_cfg_reg_list(da850_evm_lcdc_pins);
- 	if (ret)
- 		pr_warning("da850_evm_init: evm specific lcd mux setup "
- 				"failed: %d\n",	ret);
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 03acfd3..33471c9 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -146,10 +146,4 @@ extern const short da850_mmcsd0_pins[];
- extern const short da850_nand_pins[];
- extern const short da850_nor_pins[];
- 
--#ifdef CONFIG_DAVINCI_MUX
--int da8xx_pinmux_setup(const short pins[]);
--#else
--static inline int da8xx_pinmux_setup(const short pins[]) { return 0; }
--#endif
--
- #endif /* __ASM_ARCH_DAVINCI_DA8XX_H */
 diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-index 2a68c1d..48888db 100644
+index 48888db..8638903 100644
 --- a/arch/arm/mach-davinci/include/mach/mux.h
 +++ b/arch/arm/mach-davinci/include/mach/mux.h
-@@ -907,9 +907,14 @@ enum davinci_da850_index {
+@@ -904,6 +904,275 @@ enum davinci_da850_index {
+ 	DA850_RTC_ALARM,
+ };
+ 
++enum davinci_tnetv107x_index {
++	TNETV107X_ASR_A00,
++	TNETV107X_GPIO32,
++	TNETV107X_ASR_A01,
++	TNETV107X_GPIO33,
++	TNETV107X_ASR_A02,
++	TNETV107X_GPIO34,
++	TNETV107X_ASR_A03,
++	TNETV107X_GPIO35,
++	TNETV107X_ASR_A04,
++	TNETV107X_GPIO36,
++	TNETV107X_ASR_A05,
++	TNETV107X_GPIO37,
++	TNETV107X_ASR_A06,
++	TNETV107X_GPIO38,
++	TNETV107X_ASR_A07,
++	TNETV107X_GPIO39,
++	TNETV107X_ASR_A08,
++	TNETV107X_GPIO40,
++	TNETV107X_ASR_A09,
++	TNETV107X_GPIO41,
++	TNETV107X_ASR_A10,
++	TNETV107X_GPIO42,
++	TNETV107X_ASR_A11,
++	TNETV107X_BOOT_STRP_0,
++	TNETV107X_ASR_A12,
++	TNETV107X_BOOT_STRP_1,
++	TNETV107X_ASR_A13,
++	TNETV107X_GPIO43,
++	TNETV107X_ASR_A14,
++	TNETV107X_GPIO44,
++	TNETV107X_ASR_A15,
++	TNETV107X_GPIO45,
++	TNETV107X_ASR_A16,
++	TNETV107X_GPIO46,
++	TNETV107X_ASR_A17,
++	TNETV107X_GPIO47,
++	TNETV107X_ASR_A18,
++	TNETV107X_GPIO48,
++	TNETV107X_SDIO1_DATA3_0,
++	TNETV107X_ASR_A19,
++	TNETV107X_GPIO49,
++	TNETV107X_SDIO1_DATA2_0,
++	TNETV107X_ASR_A20,
++	TNETV107X_GPIO50,
++	TNETV107X_SDIO1_DATA1_0,
++	TNETV107X_ASR_A21,
++	TNETV107X_GPIO51,
++	TNETV107X_SDIO1_DATA0_0,
++	TNETV107X_ASR_A22,
++	TNETV107X_GPIO52,
++	TNETV107X_SDIO1_CMD_0,
++	TNETV107X_ASR_A23,
++	TNETV107X_GPIO53,
++	TNETV107X_SDIO1_CLK_0,
++	TNETV107X_ASR_BA_1,
++	TNETV107X_GPIO54,
++	TNETV107X_SYS_PLL_CLK,
++	TNETV107X_ASR_CS0,
++	TNETV107X_ASR_CS1,
++	TNETV107X_ASR_CS2,
++	TNETV107X_TDM_PLL_CLK,
++	TNETV107X_ASR_CS3,
++	TNETV107X_ETH_PHY_CLK,
++	TNETV107X_ASR_D00,
++	TNETV107X_GPIO55,
++	TNETV107X_ASR_D01,
++	TNETV107X_GPIO56,
++	TNETV107X_ASR_D02,
++	TNETV107X_GPIO57,
++	TNETV107X_ASR_D03,
++	TNETV107X_GPIO58,
++	TNETV107X_ASR_D04,
++	TNETV107X_GPIO59_0,
++	TNETV107X_ASR_D05,
++	TNETV107X_GPIO60_0,
++	TNETV107X_ASR_D06,
++	TNETV107X_GPIO61_0,
++	TNETV107X_ASR_D07,
++	TNETV107X_GPIO62_0,
++	TNETV107X_ASR_D08,
++	TNETV107X_GPIO63_0,
++	TNETV107X_ASR_D09,
++	TNETV107X_GPIO64_0,
++	TNETV107X_ASR_D10,
++	TNETV107X_SDIO1_DATA3_1,
++	TNETV107X_ASR_D11,
++	TNETV107X_SDIO1_DATA2_1,
++	TNETV107X_ASR_D12,
++	TNETV107X_SDIO1_DATA1_1,
++	TNETV107X_ASR_D13,
++	TNETV107X_SDIO1_DATA0_1,
++	TNETV107X_ASR_D14,
++	TNETV107X_SDIO1_CMD_1,
++	TNETV107X_ASR_D15,
++	TNETV107X_SDIO1_CLK_1,
++	TNETV107X_ASR_OE,
++	TNETV107X_BOOT_STRP_2,
++	TNETV107X_ASR_RNW,
++	TNETV107X_GPIO29_0,
++	TNETV107X_ASR_WAIT,
++	TNETV107X_GPIO30_0,
++	TNETV107X_ASR_WE,
++	TNETV107X_BOOT_STRP_3,
++	TNETV107X_ASR_WE_DQM0,
++	TNETV107X_GPIO31,
++	TNETV107X_LCD_PD17_0,
++	TNETV107X_ASR_WE_DQM1,
++	TNETV107X_ASR_BA0_0,
++	TNETV107X_VLYNQ_CLK,
++	TNETV107X_GPIO14,
++	TNETV107X_LCD_PD19_0,
++	TNETV107X_VLYNQ_RXD0,
++	TNETV107X_GPIO15,
++	TNETV107X_LCD_PD20_0,
++	TNETV107X_VLYNQ_RXD1,
++	TNETV107X_GPIO16,
++	TNETV107X_LCD_PD21_0,
++	TNETV107X_VLYNQ_TXD0,
++	TNETV107X_GPIO17,
++	TNETV107X_LCD_PD22_0,
++	TNETV107X_VLYNQ_TXD1,
++	TNETV107X_GPIO18,
++	TNETV107X_LCD_PD23_0,
++	TNETV107X_SDIO0_CLK,
++	TNETV107X_GPIO19,
++	TNETV107X_SDIO0_CMD,
++	TNETV107X_GPIO20,
++	TNETV107X_SDIO0_DATA0,
++	TNETV107X_GPIO21,
++	TNETV107X_SDIO0_DATA1,
++	TNETV107X_GPIO22,
++	TNETV107X_SDIO0_DATA2,
++	TNETV107X_GPIO23,
++	TNETV107X_SDIO0_DATA3,
++	TNETV107X_GPIO24,
++	TNETV107X_EMU0,
++	TNETV107X_EMU1,
++	TNETV107X_RTCK,
++	TNETV107X_TRST_N,
++	TNETV107X_TCK,
++	TNETV107X_TDI,
++	TNETV107X_TDO,
++	TNETV107X_TMS,
++	TNETV107X_TDM1_CLK,
++	TNETV107X_TDM1_RX,
++	TNETV107X_TDM1_TX,
++	TNETV107X_TDM1_FS,
++	TNETV107X_KEYPAD_R0,
++	TNETV107X_KEYPAD_R1,
++	TNETV107X_KEYPAD_R2,
++	TNETV107X_KEYPAD_R3,
++	TNETV107X_KEYPAD_R4,
++	TNETV107X_KEYPAD_R5,
++	TNETV107X_KEYPAD_R6,
++	TNETV107X_GPIO12,
++	TNETV107X_KEYPAD_R7,
++	TNETV107X_GPIO10,
++	TNETV107X_KEYPAD_C0,
++	TNETV107X_KEYPAD_C1,
++	TNETV107X_KEYPAD_C2,
++	TNETV107X_KEYPAD_C3,
++	TNETV107X_KEYPAD_C4,
++	TNETV107X_KEYPAD_C5,
++	TNETV107X_KEYPAD_C6,
++	TNETV107X_GPIO13,
++	TNETV107X_TEST_CLK_IN,
++	TNETV107X_KEYPAD_C7,
++	TNETV107X_GPIO11,
++	TNETV107X_SSP0_0,
++	TNETV107X_SCC_DCLK,
++	TNETV107X_LCD_PD20_1,
++	TNETV107X_SSP0_1,
++	TNETV107X_SCC_CS_N,
++	TNETV107X_LCD_PD21_1,
++	TNETV107X_SSP0_2,
++	TNETV107X_SCC_D,
++	TNETV107X_LCD_PD22_1,
++	TNETV107X_SSP0_3,
++	TNETV107X_SCC_RESETN,
++	TNETV107X_LCD_PD23_1,
++	TNETV107X_SSP1_0,
++	TNETV107X_GPIO25,
++	TNETV107X_UART2_CTS,
++	TNETV107X_SSP1_1,
++	TNETV107X_GPIO26,
++	TNETV107X_UART2_RD,
++	TNETV107X_SSP1_2,
++	TNETV107X_GPIO27,
++	TNETV107X_UART2_RTS,
++	TNETV107X_SSP1_3,
++	TNETV107X_GPIO28,
++	TNETV107X_UART2_TD,
++	TNETV107X_UART0_CTS,
++	TNETV107X_UART0_RD,
++	TNETV107X_UART0_RTS,
++	TNETV107X_UART0_TD,
++	TNETV107X_UART1_RD,
++	TNETV107X_UART1_TD,
++	TNETV107X_LCD_AC_NCS,
++	TNETV107X_LCD_HSYNC_RNW,
++	TNETV107X_LCD_VSYNC_A0,
++	TNETV107X_LCD_MCLK,
++	TNETV107X_LCD_PD16_0,
++	TNETV107X_LCD_PCLK_E,
++	TNETV107X_LCD_PD00,
++	TNETV107X_LCD_PD01,
++	TNETV107X_LCD_PD02,
++	TNETV107X_LCD_PD03,
++	TNETV107X_LCD_PD04,
++	TNETV107X_LCD_PD05,
++	TNETV107X_LCD_PD06,
++	TNETV107X_LCD_PD07,
++	TNETV107X_LCD_PD08,
++	TNETV107X_GPIO59_1,
++	TNETV107X_LCD_PD09,
++	TNETV107X_GPIO60_1,
++	TNETV107X_LCD_PD10,
++	TNETV107X_ASR_BA0_1,
++	TNETV107X_GPIO61_1,
++	TNETV107X_LCD_PD11,
++	TNETV107X_GPIO62_1,
++	TNETV107X_LCD_PD12,
++	TNETV107X_GPIO63_1,
++	TNETV107X_LCD_PD13,
++	TNETV107X_GPIO64_1,
++	TNETV107X_LCD_PD14,
++	TNETV107X_GPIO29_1,
++	TNETV107X_LCD_PD15,
++	TNETV107X_GPIO30_1,
++	TNETV107X_EINT0,
++	TNETV107X_GPIO08,
++	TNETV107X_EINT1,
++	TNETV107X_GPIO09,
++	TNETV107X_GPIO00,
++	TNETV107X_LCD_PD20_2,
++	TNETV107X_TDM_CLK_IN_2,
++	TNETV107X_GPIO01,
++	TNETV107X_LCD_PD21_2,
++	TNETV107X_24M_CLK_OUT_1,
++	TNETV107X_GPIO02,
++	TNETV107X_LCD_PD22_2,
++	TNETV107X_GPIO03,
++	TNETV107X_LCD_PD23_2,
++	TNETV107X_GPIO04,
++	TNETV107X_LCD_PD16_1,
++	TNETV107X_USB0_RXERR,
++	TNETV107X_GPIO05,
++	TNETV107X_LCD_PD17_1,
++	TNETV107X_TDM_CLK_IN_1,
++	TNETV107X_GPIO06,
++	TNETV107X_LCD_PD18,
++	TNETV107X_24M_CLK_OUT_2,
++	TNETV107X_GPIO07,
++	TNETV107X_LCD_PD19_1,
++	TNETV107X_USB1_RXERR,
++	TNETV107X_ETH_PLL_CLK,
++	TNETV107X_MDIO,
++	TNETV107X_MDC,
++	TNETV107X_AIC_MUTE_STAT_N,
++	TNETV107X_TDM0_CLK,
++	TNETV107X_AIC_HNS_EN_N,
++	TNETV107X_TDM0_FS,
++	TNETV107X_AIC_HDS_EN_STAT_N,
++	TNETV107X_TDM0_TX,
++	TNETV107X_AIC_HNF_EN_STAT_N,
++	TNETV107X_TDM0_RX,
++};
++
  #ifdef CONFIG_DAVINCI_MUX
  /* setup pin muxing */
  extern int davinci_cfg_reg(unsigned long reg_cfg);
-+extern int davinci_cfg_reg_list(const short pins[]);
- #else
- /* boot loader does it all (no warnings from CONFIG_DAVINCI_MUX_WARNINGS) */
- static inline int davinci_cfg_reg(unsigned long reg_cfg) { return 0; }
-+static inline int davinci_cfg_reg_list(const short pins[])
-+{
-+	return 0;
-+}
- #endif
- 
- #endif /* __INC_MACH_MUX_H */
-diff --git a/arch/arm/mach-davinci/mux.c b/arch/arm/mach-davinci/mux.c
-index c942c89..e9d530a 100644
---- a/arch/arm/mach-davinci/mux.c
-+++ b/arch/arm/mach-davinci/mux.c
-@@ -21,7 +21,6 @@
- 
- #include <mach/mux.h>
- #include <mach/common.h>
--#include <mach/da8xx.h>
- 
- /*
-  * Sets the DAVINCI MUX register based on the table
-@@ -92,7 +91,7 @@ int __init_or_module davinci_cfg_reg(const unsigned long index)
- }
- EXPORT_SYMBOL(davinci_cfg_reg);
- 
--int da8xx_pinmux_setup(const short pins[])
-+int __init_or_module davinci_cfg_reg_list(const short pins[])
- {
- 	int i, error = -EINVAL;
- 
 -- 
 1.7.0.2
