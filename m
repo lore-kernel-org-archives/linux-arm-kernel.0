@@ -1,8 +1,8 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 6 May 2010 05:01:22 -0400
-Subject: [PATCH 01/20] pxa3xx_nand: refuse the flash definition get from
-	platform
-Message-ID: <u2l771cded01005060201ifacea1f9h8f5f9a1c068b31b@mail.gmail.com>
+Date: Thu, 6 May 2010 05:02:07 -0400
+Subject: [PATCH 02/20] pxa3xx_nand: introduce common timing to reduce read id
+	times
+Message-ID: <i2q771cded01005060202vefaec1d0t8d51782fe80108fe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
