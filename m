@@ -1,21 +1,34 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 06 May 2010 15:07:11 +0100
-Subject: arm926_dma_flush_range undefined!
-In-Reply-To: <4BE2C013.4040009@atmel.com>
-References: <4BE2C013.4040009@atmel.com>
-Message-ID: <1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+Date: Thu, 06 May 2010 15:12:33 +0100
+Subject: [PATCH] ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+Message-ID: <20100506141233.4396.12959.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-06 at 15:11 +0200, Nicolas Ferre wrote:
-> I am trying to compile a recent kernel 
-> (v2.6.34-rc6-201-g722154e) and I am 
-> having this kind of error:
-> 
-> ERROR: "arm926_dma_flush_range" [drivers/mmc/host/at91_mci.ko] undefined!
+This macro is not defined when !CONFIG_MMU.
 
-The driver seems to use dmac_flush_range() directly. That's not part of
-the DMA API. Could you not use one of the supported DMA API functions?
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/dma-mapping.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
--- 
-Catalin
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 13fa536..c4de90f 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -25,6 +25,7 @@
+ #include <asm/sizes.h>
+ 
+ /* Sanity check size */
++#ifdef CONFIG_MMU
+ #if (CONSISTENT_DMA_SIZE % SZ_2M)
+ #error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
+ #endif
+@@ -32,6 +33,7 @@
+ #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
+ #define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
+ #define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
++#endif
+ 
+ static u64 get_coherent_dma_mask(struct device *dev)
+ {
