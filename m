@@ -1,310 +1,246 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:13 -0700
-Subject: [PATCH 22/34] DaVinci: move IDE platform device to its proper place
+Date: Thu,  6 May 2010 16:24:15 -0700
+Subject: [PATCH 24/34] Davinci: gpio - structs and functions renamed
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-23-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-25-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+From: Cyril Chemparathy <cyril@ti.com>
 
-The IDE platform device is registered in three different places (2 board files
-for DM644x and in dm646x.c for DM646x) while both the IDE base address and the
-IDE IRQ are the same for both SoCs -- therefore,  the proper place for the IDE
-platform seems to be in devices.c. Merge the IDE platform data and registration
-code and create davinci_init_ide() in place of dm646x_init_ide()...
+Renamed gpio types to something more sensible:
+	struct gpio_controller	--> struct davinci_gpio_regs
+	struct davinci_gpio	--> struct davinci_gpio_controller
+	gpio2controller()	--> gpio2regs()
+	irq2controller()	--> irq2regs()
 
-Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+This change also moves davinci_gpio_controller definition to gpio.h.
+Eventually, the gpio registers structure will be moved to gpio.c and no longer
+a common cross-soc definition.
+
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Tested-by: Sandeep Paulraj <s-paulraj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c    |   33 +-------------------
- arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c   |   34 +-------------------
- arch/arm/mach-davinci/devices.c             |   44 +++++++++++++++++++++++++++
- arch/arm/mach-davinci/dm646x.c              |   32 -------------------
- arch/arm/mach-davinci/include/mach/common.h |    1 +
- arch/arm/mach-davinci/include/mach/dm646x.h |    3 --
- 7 files changed, 49 insertions(+), 100 deletions(-)
+ arch/arm/mach-davinci/gpio.c              |   50 +++++++++++++----------------
+ arch/arm/mach-davinci/include/mach/gpio.h |   14 ++++++--
+ 2 files changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index d028bab..73c0b04 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -41,8 +41,6 @@
- #define DM644X_EVM_PHY_MASK		(0x2)
- #define DM644X_EVM_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
+diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
+index 93f7c68..c77683c 100644
+--- a/arch/arm/mach-davinci/gpio.c
++++ b/arch/arm/mach-davinci/gpio.c
+@@ -22,28 +22,22 @@
  
--#define DAVINCI_CFC_ATA_BASE		  0x01C66000
--
- #define LXT971_PHY_ID	(0x001378e2)
- #define LXT971_PHY_MASK	(0xfffffff0)
+ static DEFINE_SPINLOCK(gpio_lock);
  
-@@ -252,32 +250,6 @@ static struct platform_device rtc_dev = {
- 	.id             = -1,
- };
- 
--static struct resource ide_resources[] = {
--	{
--		.start          = DAVINCI_CFC_ATA_BASE,
--		.end            = DAVINCI_CFC_ATA_BASE + 0x7ff,
--		.flags          = IORESOURCE_MEM,
--	},
--	{
--		.start          = IRQ_IDE,
--		.end            = IRQ_IDE,
--		.flags          = IORESOURCE_IRQ,
--	},
+-struct davinci_gpio {
+-	struct gpio_chip	chip;
+-	struct gpio_controller	__iomem *regs;
+-	int			irq_base;
 -};
 -
--static u64 ide_dma_mask = DMA_BIT_MASK(32);
--
--static struct platform_device ide_dev = {
--	.name           = "palm_bk3710",
--	.id             = -1,
--	.resource       = ide_resources,
--	.num_resources  = ARRAY_SIZE(ide_resources),
--	.dev = {
--		.dma_mask		= &ide_dma_mask,
--		.coherent_dma_mask      = DMA_BIT_MASK(32),
--	},
--};
--
- static struct snd_platform_data dm644x_evm_snd_data;
+ #define chip2controller(chip)	\
+-	container_of(chip, struct davinci_gpio, chip)
++	container_of(chip, struct davinci_gpio_controller, chip)
  
- /*----------------------------------------------------------------------*/
-@@ -698,10 +670,7 @@ static __init void davinci_evm_init(void)
- 			pr_warning("WARNING: both IDE and Flash are "
- 				"enabled, but they share AEMIF pins.\n"
- 				"\tDisable IDE for NAND/NOR support.\n");
--		davinci_cfg_reg(DM644X_HPIEN_DISABLE);
--		davinci_cfg_reg(DM644X_ATAEN);
--		davinci_cfg_reg(DM644X_HDIREN);
--		platform_device_register(&ide_dev);
-+		davinci_init_ide();
- 	} else if (HAS_NAND || HAS_NOR) {
- 		davinci_cfg_reg(DM644X_HPIEN_DISABLE);
- 		davinci_cfg_reg(DM644X_ATAEN_DISABLE);
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index b22e22c..e2ac06f 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -733,7 +733,7 @@ static __init void evm_init(void)
- 	platform_device_register(&davinci_nand_device);
+-static struct davinci_gpio chips[DIV_ROUND_UP(DAVINCI_N_GPIO, 32)];
++static struct davinci_gpio_controller chips[DIV_ROUND_UP(DAVINCI_N_GPIO, 32)];
  
- 	if (HAS_ATA)
--		dm646x_init_ide();
-+		davinci_init_ide();
- 
- 	soc_info->emac_pdata->phy_mask = DM646X_EVM_PHY_MASK;
- 	soc_info->emac_pdata->mdio_max_freq = DM646X_EVM_MDIO_FREQUENCY;
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 5afe37e..875770c 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -31,6 +31,7 @@
- #include <asm/mach/arch.h>
- 
- #include <mach/dm644x.h>
-+#include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
- #include <mach/mux.h>
-@@ -41,8 +42,6 @@
- #define NEUROS_OSD2_PHY_MASK		0x2
- #define NEUROS_OSD2_MDIO_FREQUENCY	2200000 /* PHY bus frequency */
- 
--#define DAVINCI_CFC_ATA_BASE		 0x01C66000
--
- #define LXT971_PHY_ID			0x001378e2
- #define LXT971_PHY_MASK			0xfffffff0
- 
-@@ -127,32 +126,6 @@ static struct platform_device davinci_fb_device = {
- 	.num_resources = 0,
- };
- 
--static struct resource ide_resources[] = {
--	{
--		.start		= DAVINCI_CFC_ATA_BASE,
--		.end		= DAVINCI_CFC_ATA_BASE + 0x7ff,
--		.flags		= IORESOURCE_MEM,
--	},
--	{
--		.start		= IRQ_IDE,
--		.end		= IRQ_IDE,
--		.flags		= IORESOURCE_IRQ,
--	},
--};
--
--static u64 ide_dma_mask = DMA_BIT_MASK(32);
--
--static struct platform_device ide_dev = {
--	.name		= "palm_bk3710",
--	.id		= -1,
--	.resource	= ide_resources,
--	.num_resources	= ARRAY_SIZE(ide_resources),
--	.dev = {
--		.dma_mask		= &ide_dma_mask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--};
--
- static struct snd_platform_data dm644x_ntosd2_snd_data;
- 
- static struct gpio_led ntosd2_leds[] = {
-@@ -256,10 +229,7 @@ static __init void davinci_ntosd2_init(void)
- 			pr_warning("WARNING: both IDE and Flash are "
- 				"enabled, but they share AEMIF pins.\n"
- 				"\tDisable IDE for NAND/NOR support.\n");
--		davinci_cfg_reg(DM644X_HPIEN_DISABLE);
--		davinci_cfg_reg(DM644X_ATAEN);
--		davinci_cfg_reg(DM644X_HDIREN);
--		platform_device_register(&ide_dev);
-+		davinci_init_ide();
- 	} else if (HAS_NAND) {
- 		davinci_cfg_reg(DM644X_HPIEN_DISABLE);
- 		davinci_cfg_reg(DM644X_ATAEN_DISABLE);
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index ef28080..d9c82ee 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -26,6 +26,7 @@
- #include "clock.h"
- 
- #define DAVINCI_I2C_BASE	     0x01C21000
-+#define DAVINCI_ATA_BASE	     0x01C66000
- #define DAVINCI_MMCSD0_BASE	     0x01E10000
- #define DM355_MMCSD0_BASE	     0x01E11000
- #define DM355_MMCSD1_BASE	     0x01E00000
-@@ -60,6 +61,49 @@ void __init davinci_init_i2c(struct davinci_i2c_platform_data *pdata)
- 	(void) platform_device_register(&davinci_i2c_device);
+ /* create a non-inlined version */
+-static struct gpio_controller __iomem __init *gpio2controller(unsigned gpio)
++static struct davinci_gpio_regs __iomem __init *gpio2regs(unsigned gpio)
+ {
+ 	return __gpio_to_controller(gpio);
  }
  
-+static struct resource ide_resources[] = {
-+	{
-+		.start		= DAVINCI_ATA_BASE,
-+		.end		= DAVINCI_ATA_BASE + 0x7ff,
-+		.flags		= IORESOURCE_MEM,
-+	},
-+	{
-+		.start		= IRQ_IDE,
-+		.end		= IRQ_IDE,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 ide_dma_mask = DMA_BIT_MASK(32);
-+
-+static struct platform_device ide_device = {
-+	.name           = "palm_bk3710",
-+	.id             = -1,
-+	.resource       = ide_resources,
-+	.num_resources  = ARRAY_SIZE(ide_resources),
-+	.dev = {
-+		.dma_mask		= &ide_dma_mask,
-+		.coherent_dma_mask      = DMA_BIT_MASK(32),
-+	},
-+};
-+
-+void __init davinci_init_ide(void)
-+{
-+	if (cpu_is_davinci_dm644x()) {
-+		davinci_cfg_reg(DM644X_HPIEN_DISABLE);
-+		davinci_cfg_reg(DM644X_ATAEN);
-+		davinci_cfg_reg(DM644X_HDIREN);
-+	} else if (cpu_is_davinci_dm646x()) {
-+		/* IRQ_DM646X_IDE is the same as IRQ_IDE */
-+		davinci_cfg_reg(DM646X_ATAEN);
-+	} else {
-+		WARN_ON(1);
-+		return;
-+	}
-+
-+	platform_device_register(&ide_device);
-+}
-+
- #if	defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
- 
- static u64 mmcsd0_dma_mask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index b67b997..a0b3739 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -596,32 +596,6 @@ static struct platform_device dm646x_edma_device = {
- 	.resource		= edma_resources,
- };
- 
--static struct resource ide_resources[] = {
--	{
--		.start          = DM646X_ATA_REG_BASE,
--		.end            = DM646X_ATA_REG_BASE + 0x7ff,
--		.flags          = IORESOURCE_MEM,
--	},
--	{
--		.start          = IRQ_DM646X_IDE,
--		.end            = IRQ_DM646X_IDE,
--		.flags          = IORESOURCE_IRQ,
--	},
--};
--
--static u64 ide_dma_mask = DMA_BIT_MASK(32);
--
--static struct platform_device ide_dev = {
--	.name           = "palm_bk3710",
--	.id             = -1,
--	.resource       = ide_resources,
--	.num_resources  = ARRAY_SIZE(ide_resources),
--	.dev = {
--		.dma_mask		= &ide_dma_mask,
--		.coherent_dma_mask      = DMA_BIT_MASK(32),
--	},
--};
--
- static struct resource dm646x_mcasp0_resources[] = {
- 	{
- 		.name	= "mcasp0",
-@@ -867,12 +841,6 @@ static struct davinci_soc_info davinci_soc_info_dm646x = {
- 	.sram_len		= SZ_32K,
- };
- 
--void __init dm646x_init_ide(void)
--{
--	davinci_cfg_reg(DM646X_ATAEN);
--	platform_device_register(&ide_dev);
--}
--
- void __init dm646x_init_mcasp0(struct snd_platform_data *pdata)
+-static inline struct gpio_controller __iomem *irq2controller(int irq)
++static inline struct davinci_gpio_regs __iomem *irq2regs(int irq)
  {
- 	dm646x_mcasp0_device.dev.platform_data = pdata;
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index d88104e..884dc72 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -70,6 +70,7 @@ struct davinci_soc_info {
- extern struct davinci_soc_info davinci_soc_info;
+-	struct gpio_controller __iomem *g;
++	struct davinci_gpio_regs __iomem *g;
  
- extern void davinci_common_init(struct davinci_soc_info *soc_info);
-+extern void davinci_init_ide(void);
+-	g = (__force struct gpio_controller __iomem *)get_irq_chip_data(irq);
++	g = (__force struct davinci_gpio_regs __iomem *)get_irq_chip_data(irq);
  
- /* standard place to map on-chip SRAMs; they *may* support DMA */
- #define SRAM_VIRT	0xfffe0000
-diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-index 4d62db7..add6f79 100644
---- a/arch/arm/mach-davinci/include/mach/dm646x.h
-+++ b/arch/arm/mach-davinci/include/mach/dm646x.h
-@@ -25,13 +25,10 @@
- #define DM646X_EMAC_MDIO_OFFSET		(0x4000)
- #define DM646X_EMAC_CNTRL_RAM_SIZE	(0x2000)
+ 	return g;
+ }
+@@ -60,8 +54,8 @@ static int __init davinci_gpio_irq_setup(void);
+ static inline int __davinci_direction(struct gpio_chip *chip,
+ 			unsigned offset, bool out, int value)
+ {
+-	struct davinci_gpio *d = chip2controller(chip);
+-	struct gpio_controller __iomem *g = d->regs;
++	struct davinci_gpio_controller *d = chip2controller(chip);
++	struct davinci_gpio_regs __iomem *g = d->regs;
+ 	u32 temp;
+ 	u32 mask = 1 << offset;
  
--#define DM646X_ATA_REG_BASE		(0x01C66000)
--
- #define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
- #define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
+@@ -99,8 +93,8 @@ davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+  */
+ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
+-	struct davinci_gpio *d = chip2controller(chip);
+-	struct gpio_controller __iomem *g = d->regs;
++	struct davinci_gpio_controller *d = chip2controller(chip);
++	struct davinci_gpio_regs __iomem *g = d->regs;
  
- void __init dm646x_init(void);
--void __init dm646x_init_ide(void);
- void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
- void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
- void __init dm646x_board_setup_refclk(struct clk *clk);
+ 	return (1 << offset) & __raw_readl(&g->in_data);
+ }
+@@ -111,8 +105,8 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+ static void
+ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+-	struct davinci_gpio *d = chip2controller(chip);
+-	struct gpio_controller __iomem *g = d->regs;
++	struct davinci_gpio_controller *d = chip2controller(chip);
++	struct davinci_gpio_regs __iomem *g = d->regs;
+ 
+ 	__raw_writel((1 << offset), value ? &g->set_data : &g->clr_data);
+ }
+@@ -150,7 +144,7 @@ static int __init davinci_gpio_setup(void)
+ 		if (chips[i].chip.ngpio > 32)
+ 			chips[i].chip.ngpio = 32;
+ 
+-		chips[i].regs = gpio2controller(base);
++		chips[i].regs = gpio2regs(base);
+ 
+ 		gpiochip_add(&chips[i].chip);
+ 	}
+@@ -174,7 +168,7 @@ pure_initcall(davinci_gpio_setup);
+ 
+ static void gpio_irq_disable(unsigned irq)
+ {
+-	struct gpio_controller __iomem *g = irq2controller(irq);
++	struct davinci_gpio_regs __iomem *g = irq2regs(irq);
+ 	u32 mask = (u32) get_irq_data(irq);
+ 
+ 	__raw_writel(mask, &g->clr_falling);
+@@ -183,7 +177,7 @@ static void gpio_irq_disable(unsigned irq)
+ 
+ static void gpio_irq_enable(unsigned irq)
+ {
+-	struct gpio_controller __iomem *g = irq2controller(irq);
++	struct davinci_gpio_regs __iomem *g = irq2regs(irq);
+ 	u32 mask = (u32) get_irq_data(irq);
+ 	unsigned status = irq_desc[irq].status;
+ 
+@@ -199,7 +193,7 @@ static void gpio_irq_enable(unsigned irq)
+ 
+ static int gpio_irq_type(unsigned irq, unsigned trigger)
+ {
+-	struct gpio_controller __iomem *g = irq2controller(irq);
++	struct davinci_gpio_regs __iomem *g = irq2regs(irq);
+ 	u32 mask = (u32) get_irq_data(irq);
+ 
+ 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
+@@ -228,7 +222,7 @@ static struct irq_chip gpio_irqchip = {
+ static void
+ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+-	struct gpio_controller __iomem *g = irq2controller(irq);
++	struct davinci_gpio_regs __iomem *g = irq2regs(irq);
+ 	u32 mask = 0xffff;
+ 
+ 	/* we only care about one bank */
+@@ -266,7 +260,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 
+ static int gpio_to_irq_banked(struct gpio_chip *chip, unsigned offset)
+ {
+-	struct davinci_gpio *d = chip2controller(chip);
++	struct davinci_gpio_controller *d = chip2controller(chip);
+ 
+ 	if (d->irq_base >= 0)
+ 		return d->irq_base + offset;
+@@ -289,7 +283,7 @@ static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
+ 
+ static int gpio_irq_type_unbanked(unsigned irq, unsigned trigger)
+ {
+-	struct gpio_controller __iomem *g = irq2controller(irq);
++	struct davinci_gpio_regs __iomem *g = irq2regs(irq);
+ 	u32 mask = (u32) get_irq_data(irq);
+ 
+ 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
+@@ -318,7 +312,7 @@ static int __init davinci_gpio_irq_setup(void)
+ 	u32		binten = 0;
+ 	unsigned	ngpio, bank_irq;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+-	struct gpio_controller	__iomem *g;
++	struct davinci_gpio_regs	__iomem *g;
+ 
+ 	ngpio = soc_info->gpio_num;
+ 
+@@ -367,7 +361,7 @@ static int __init davinci_gpio_irq_setup(void)
+ 		gpio_irqchip_unbanked.set_type = gpio_irq_type_unbanked;
+ 
+ 		/* default trigger: both edges */
+-		g = gpio2controller(0);
++		g = gpio2regs(0);
+ 		__raw_writel(~0, &g->set_falling);
+ 		__raw_writel(~0, &g->set_rising);
+ 
+@@ -392,7 +386,7 @@ static int __init davinci_gpio_irq_setup(void)
+ 		unsigned		i;
+ 
+ 		/* disabled by default, enabled only as needed */
+-		g = gpio2controller(gpio);
++		g = gpio2regs(gpio);
+ 		__raw_writel(~0, &g->clr_falling);
+ 		__raw_writel(~0, &g->clr_rising);
+ 
+diff --git a/arch/arm/mach-davinci/include/mach/gpio.h b/arch/arm/mach-davinci/include/mach/gpio.h
+index 0099e6e..bdab001 100644
+--- a/arch/arm/mach-davinci/include/mach/gpio.h
++++ b/arch/arm/mach-davinci/include/mach/gpio.h
+@@ -45,7 +45,7 @@
+ /* Convert GPIO signal to GPIO pin number */
+ #define GPIO_TO_PIN(bank, gpio)	(16 * (bank) + (gpio))
+ 
+-struct gpio_controller {
++struct davinci_gpio_regs {
+ 	u32	dir;
+ 	u32	out_data;
+ 	u32	set_data;
+@@ -58,6 +58,12 @@ struct gpio_controller {
+ 	u32	intstat;
+ };
+ 
++struct davinci_gpio_controller {
++	struct davinci_gpio_regs __iomem *regs;
++	struct gpio_chip	chip;
++	int			irq_base;
++};
++
+ /* The __gpio_to_controller() and __gpio_mask() functions inline to constants
+  * with constant parameters; or in outlined code they execute at runtime.
+  *
+@@ -67,7 +73,7 @@ struct gpio_controller {
+  *
+  * These are NOT part of the cross-platform GPIO interface
+  */
+-static inline struct gpio_controller __iomem *
++static inline struct davinci_gpio_regs __iomem *
+ __gpio_to_controller(unsigned gpio)
+ {
+ 	void __iomem *ptr;
+@@ -102,7 +108,7 @@ static inline u32 __gpio_mask(unsigned gpio)
+ static inline void gpio_set_value(unsigned gpio, int value)
+ {
+ 	if (__builtin_constant_p(value) && gpio < DAVINCI_N_GPIO) {
+-		struct gpio_controller	__iomem *g;
++		struct davinci_gpio_regs	__iomem *g;
+ 		u32			mask;
+ 
+ 		g = __gpio_to_controller(gpio);
+@@ -128,7 +134,7 @@ static inline void gpio_set_value(unsigned gpio, int value)
+  */
+ static inline int gpio_get_value(unsigned gpio)
+ {
+-	struct gpio_controller	__iomem *g;
++	struct davinci_gpio_regs	__iomem *g;
+ 
+ 	if (!__builtin_constant_p(gpio) || gpio >= DAVINCI_N_GPIO)
+ 		return __gpio_get_value(gpio);
 -- 
 1.7.0.2
