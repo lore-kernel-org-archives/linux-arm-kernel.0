@@ -1,102 +1,64 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 6 May 2010 02:23:57 +0100
-Subject: [PATCH 7/9] Add support for MMC card reader on Acer n30 / Acer n35
-In-Reply-To: <4BE1EF47.8030903@vscht.cz>
-References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
-	<4BE1ED86.3010506@vscht.cz> <4BE1EE5F.5090402@vscht.cz>
-	<4BE1EE8C.8040900@vscht.cz> <4BE1EEB1.9060006@vscht.cz>
-	<4BE1EF47.8030903@vscht.cz>
-Message-ID: <20100506012357.GA6684@trinity.fluff.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 6 May 2010 10:24:06 +0900
+Subject: Suspicious compilation warning
+In-Reply-To: <4BE14335.10702@ru.mvista.com>
+References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
+	<20100420155122.6f2c26eb.akpm@linux-foundation.org>
+	<20100420230719.GB1432@n2100.arm.linux.org.uk>
+	<4BE14335.10702@ru.mvista.com>
+Message-ID: <p2g9c9fda241005051824k54e70136v8324d135b44c71b5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 06, 2010 at 12:20:55AM +0200, Pinkava J. wrote:
-> There is MMC (SD) card reader. Works fine.
-> 
-> 
-> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
-> ---
->  arch/arm/mach-s3c2410/mach-n30.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-> index d63b48f..389b9f2 100644
-> --- a/arch/arm/mach-s3c2410/mach-n30.c
-> +++ b/arch/arm/mach-s3c2410/mach-n30.c
-> @@ -26,6 +26,7 @@
->  #include <linux/serial_core.h>
->  #include <linux/timer.h>
->  #include <linux/io.h>
-> +#include <linux/mmc/host.h>
-> 
->  #include <mach/hardware.h>
->  #include <asm/irq.h>
-> @@ -46,6 +47,7 @@
->  #include <plat/clock.h>
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
-> +#include <plat/mci.h>
->  #include <plat/s3c2410.h>
->  #include <plat/udc.h>
-> 
-> @@ -350,6 +352,15 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
->  	.lpcsel		= 0x06,
->  };
-> 
-> +static struct s3c24xx_mci_pdata n30_mci_cfg __initdata = {
-> +	.wprotect_invert = 0,
-> +	.detect_invert  = 0,
+On Wed, May 5, 2010 at 7:06 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+> Russell King - ARM Linux wrote:
+>
+>>>> I get this warning while compiling for ARM/SA1100:
+>>>>
+>>>> mm/sparse.c: In function '__section_nr':
+>>>> mm/sparse.c:135: warning: 'root' is used uninitialized in this function
+>>>>
+>>>> With a small patch in fs/proc/meminfo.c, I find that NR_SECTION_ROOTS
+>>>> is zero, which certainly explains the warning.
+>>>>
+>>>> # cat /proc/meminfo
+>>>> NR_SECTION_ROOTS=0
+>>>> NR_MEM_SECTIONS=32
+>>>> SECTIONS_PER_ROOT=512
+>>>> SECTIONS_SHIFT=5
+>>>> MAX_PHYSMEM_BITS=32
+>>>>
+>>>
+>>> hm, who owns sparsemem nowadays? Nobody identifiable.
+>>>
+>>> Does it make physical sense to have SECTIONS_PER_ROOT > NR_MEM_SECTIONS?
+>>>
+>>
+>> Well, it'll be about this number on everything using sparsemem extreme:
+>>
+>> #define SECTIONS_PER_ROOT ? ? ? (PAGE_SIZE / sizeof (struct mem_section))
+>>
+>> and with only 32 sections, this is going to give a NR_SECTION_ROOTS value
+>> of zero. ?I think the calculation of NR_SECTIONS_ROOTS is wrong.
+>>
+>> #define NR_SECTION_ROOTS ? ? ? ?(NR_MEM_SECTIONS / SECTIONS_PER_ROOT)
+>>
+>> Clearly if we have 1 mem section, we want to have one section root, so
+>> I think this division should round up any fractional part, thusly:
+>>
+>> #define NR_SECTION_ROOTS ? ? ? ?((NR_MEM_SECTIONS + SECTIONS_PER_ROOT - 1)
+>> / SECTIONS_PER_ROOT)
+>>
+>
+> ?There's DIV_ROUND_UP() macro for this kind of calculation.
 
-no need for '0' initialisers here.
+Hi,
 
-> +	.gpio_detect	= S3C2410_GPF(1),
-> +	.gpio_wprotect  = S3C2410_GPG(10),
-> +	.set_power	= NULL,
+It tested with my board and working.
+Just curious. If NR_SECTION_ROOTS is zero and uninitialized then
+what's problem? Since we boot and working without patch.
 
-no need to have 'NULL' here.
-
-> +	.ocr_avail	= MMC_VDD_32_33,
-> +};
-> +
->  static struct platform_device *n30_devices[] __initdata = {
->  	&s3c_device_lcd,
->  	&s3c_device_wdt,
-> @@ -358,6 +369,7 @@ static struct platform_device *n30_devices[] __initdata = {
->  	&s3c_device_ohci,
->  	&s3c_device_rtc,
->  	&s3c_device_usbgadget,
-> +	&s3c_device_sdi,
->  	&n30_button_device,
->  	&n30_blue_led,
->  	&n30_warning_led,
-> @@ -370,6 +382,7 @@ static struct platform_device *n35_devices[] __initdata = {
->  	&s3c_device_iis,
->  	&s3c_device_rtc,
->  	&s3c_device_usbgadget,
-> +	&s3c_device_sdi,
->  	&n35_button_device,
->  	&n35_blue_led,
->  	&n35_warning_led,
-> @@ -538,6 +551,7 @@ static void __init n30_init(void)
->  {
->  	s3c24xx_fb_set_platdata(&n30_fb_info);
->  	s3c24xx_udc_set_platdata(&n30_udc_cfg);
-> +	s3c24xx_mci_set_platdata(&n30_mci_cfg);
->  	s3c_i2c0_set_platdata(&n30_i2ccfg);
-> 
->  	/* Turn off suspend on both USB ports, and switch the
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Thank you,
+Kyungmin Park
