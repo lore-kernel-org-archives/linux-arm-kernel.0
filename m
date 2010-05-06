@@ -1,55 +1,27 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Thu, 06 May 2010 11:07:57 +0300
-Subject: Old DSS code broken as module (was "RE: [PATCH 11/11]
-	omap2/3/4: Disable CONFIG_FB_OMAP in omap3_defconfig")
-In-Reply-To: <A24693684029E5489D1D202277BE8944552579A3@dlee02.ent.ti.com>
-References: <20100430202603.25812.41834.stgit@baageli.muru.com>
-	<20100430203411.25812.30019.stgit@baageli.muru.com>
-	<A24693684029E5489D1D202277BE8944552579A3@dlee02.ent.ti.com>
-Message-ID: <1273133277.1978.136.camel@tubuntu.research.nokia.com>
+From: al@alarsen.net (Anders Larsen)
+Date: Thu, 06 May 2010 10:36:58 +0200
+Subject: [at91] Save power by disabling the processor clock when CPU is
+	idle
+In-Reply-To: <20100505202529.GB25037@pengutronix.de> (from
+	u.kleine-koenig@pengutronix.de on Wed May  5 22:25:29 2010)
+References: <20100505202529.GB25037@pengutronix.de>
+Message-ID: <1273135018l.10732l.0l@i-dmzi_al.realan.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-05 at 19:32 +0200, ext Aguirre, Sergio wrote:
-> Tony,
-> 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Friday, April 30, 2010 3:34 PM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-omap at vger.kernel.org
-> > Subject: [PATCH 11/11] omap2/3/4: Disable CONFIG_FB_OMAP in
-> > omap3_defconfig
-> > 
-> > Looks like CONFIG_FB_OMAP prevents somehow mounting root on MMC
-> > at least on zoom3 for multi-omap. Disable CONFIG_FB until the
-> > omap FB code is fixed.
-> > 
-> > This allows booting omap3_defconfig on various omaps. Tested on
-> > 2420-n8x0, 3430-n900, 3630-zoom3 and 4430-blaze. Note that n8x0
-> > still has issues with starting user space because of TLS and
-> > VFP.
-> 
-> (Looping Tomi)
-> 
-> Unfortunately, your patch is uncovering an issue with old DSS code to
-> compile it as module, which I think is caused by this:
-> 
-> A single omapfb.ko is attempted to be created in drivers/video/omap/ folder,
-> but the included source files (DSS code + lcd drivers), results in multiple
-> module_init entries added in a single module, and therefore giving errors of
-> duplicate init_module entries between omapfb_main.c and the lcd_*.c files.
-> 
-> So, either you disable old DSS driver completely, or you have it as
-> built-in.
+Hello,
 
-Ah, yes. I'm not sure if the older omapfb was ever really designed to be
-used as module... If this is the problem, then my suggestion is to
-either use it built-in, or use the new DSS2 which works well as modules.
+On 2010-05-05 22:25:29, Uwe Kleine-K?nig wrote:
+> There is a kernel parameter (IIRC "nohlt") that should take care of
+> this?!
 
-I guess the option to compile the older omapfb as a module should be
-removed? Or if some brave soul wants to start fixing omapfb, that's ok
-too =).
+I hadn't noticed that one (it's operating several layers above the piece
+of code I modified).
 
- Tomi
+So it seems we could do way with the #else clause completely (requiring
+the user to set 'nohlt' when debugging with JTAG)?
+
+Cheers
+Anders
+-- 
+happy 'ptxdist' user
