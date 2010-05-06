@@ -1,41 +1,156 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 May 2010 08:50:38 +0200
-Subject: SAMSUNG kernel tree merge plans
-In-Reply-To: <20100506054651.GL26401@trinity.fluff.org>
-References: <20100506054651.GL26401@trinity.fluff.org>
-Message-ID: <015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Thu, 6 May 2010 09:57:16 +0300
+Subject: [PATCH 17/18] omap: rx51: Add supplies for the tlv320aic3x
+	codec driver
+In-Reply-To: <20100505193323.21568.32626.stgit@baageli.muru.com>
+References: <20100505192957.21568.19569.stgit@baageli.muru.com>
+	<20100505193323.21568.32626.stgit@baageli.muru.com>
+Message-ID: <20100506065716.GA16262@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Jarkko,
 
-On Thursday, May 06, 2010 7:47 AM Ben Dooks wrote:
+Just minor comments on this one, sorry for being late for that.
 
-> I'm busy sorting out the trees for the next mege window, and should
-> have a new next-samsung out in the next two or three days.
+On Wed, May 05, 2010 at 09:33:23PM +0200, ext Tony Lindgren wrote:
+> From: Jarkko Nikula <jhnikula@gmail.com>
 > 
-> As such, if there is anything that needs to go via Russell's tree, then
-> it needs to be merged as soon as possible. I would like to send a pull
-> before Wednesday.
+> Upcoming change to tlv320aic3x codec driver require four supplies.
+> Implement this by connecting analogic supplies to TWL4030 VMMC2 and digital
+> supplies to TWL4030 VIO.
 > 
-> Anything else, if it is not merged into one of my trees by the end of
-> next week (May 14th) then there is no guarantees that it will be merged.
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> Cc: Eduardo Valentin <eduardo.valentin@nokia.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/board-rx51-peripherals.c |   60 +++++++++++++++++++++++---
+>  1 files changed, 53 insertions(+), 7 deletions(-)
 > 
-> If everyone interested in this could check my trees after the weekend and
-> make any reminders of other stuff to fix at that point as there is still
-> items being processed.
+> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> index 3addfe6..8179d55 100644
+> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> @@ -277,7 +277,7 @@ static struct regulator_consumer_supply rx51_vmmc1_supply = {
+>  	.dev_name = "mmci-omap-hs.0",
+>  };
+>  
+> -static struct regulator_consumer_supply rx51_vmmc2_supply = {
+> +static struct regulator_consumer_supply rx51_vaux3_supply = {
+>  	.supply   = "vmmc",
+>  	.dev_name = "mmci-omap-hs.1",
+>  };
+> @@ -287,6 +287,35 @@ static struct regulator_consumer_supply rx51_vsim_supply = {
+>  	.dev_name = "mmci-omap-hs.1",
+>  };
+>  
+> +static struct regulator_consumer_supply rx51_vmmc2_supplies[] = {
+> +	/* tlv320aic3x analog supplies */
+> +	{
+> +		.supply		= "AVDD",
+> +		.dev_name	= "2-0018",
+> +	},
+> +	{
+> +		.supply		= "DRVDD",
+> +		.dev_name	= "2-0018",
+> +	},
+> +	/* Keep vmmc as last item. It is not iterated for newer boards */
+> +	{
+> +		.supply		= "vmmc",
+> +		.dev_name	= "mmci-omap-hs.1",
+> +	},
+> +};
+> +
+> +static struct regulator_consumer_supply rx51_vio_supplies[] = {
+> +	/* tlv320aic3x digital supplies */
+> +	{
+> +		.supply		= "IOVDD",
+> +		.dev_name	= "2-0018"
+> +	},
+> +	{
+> +		.supply		= "DVDD",
+> +		.dev_name	= "2-0018"
+> +	},
+> +};
+
+
+This isn't mandatory, but I find the code more readable if you use the REGULATOR_SUPPLY macro,
+which kinda suitable for cases like yours, where you are passing the pair supply&dev_name.
+> +
+>  static struct regulator_init_data rx51_vaux1 = {
+>  	.constraints = {
+>  		.name			= "V28",
+> @@ -338,7 +367,7 @@ static struct regulator_init_data rx51_vaux3_mmc = {
+>  					| REGULATOR_CHANGE_STATUS,
+>  	},
+>  	.num_consumer_supplies	= 1,
+> -	.consumer_supplies	= &rx51_vmmc2_supply,
+> +	.consumer_supplies	= &rx51_vaux3_supply,
+>  };
+>  
+>  static struct regulator_init_data rx51_vaux4 = {
+> @@ -380,8 +409,8 @@ static struct regulator_init_data rx51_vmmc2 = {
+>  					| REGULATOR_CHANGE_MODE
+>  					| REGULATOR_CHANGE_STATUS,
+>  	},
+> -	.num_consumer_supplies	= 1,
+> -	.consumer_supplies	= &rx51_vmmc2_supply,
+> +	.num_consumer_supplies	= ARRAY_SIZE(rx51_vmmc2_supplies),
+> +	.consumer_supplies	= rx51_vmmc2_supplies,
+>  };
+>  
+>  static struct regulator_init_data rx51_vsim = {
+> @@ -411,6 +440,20 @@ static struct regulator_init_data rx51_vdac = {
+>  	},
+>  };
+>  
+> +static struct regulator_init_data rx51_vio = {
+> +	.constraints = {
+> +		.min_uV			= 1800000,
+> +		.max_uV			= 1800000,
+> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+
+I'm not sure if we would ever change voltage level in VIO in rx51 case.
+It could enter sleep mode. But even there it wouldn't change voltage level.
+Except, of cource, during off mode transition. But then, the regfw wouldn't care.
+
+
+> +					| REGULATOR_CHANGE_MODE
+> +					| REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies	= ARRAY_SIZE(rx51_vio_supplies),
+> +	.consumer_supplies	= rx51_vio_supplies,
+> +};
+> +
+>  static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
+>  {
+>  	/* FIXME this gpio setup is just a placeholder for now */
+> @@ -618,6 +661,7 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
+>  	.vmmc1			= &rx51_vmmc1,
+>  	.vsim			= &rx51_vsim,
+>  	.vdac			= &rx51_vdac,
+> +	.vio			= &rx51_vio,
+>  };
+>  
+>  static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_1[] = {
+> @@ -638,12 +682,14 @@ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
+>  static int __init rx51_i2c_init(void)
+>  {
+>  	if ((system_rev >= SYSTEM_REV_S_USES_VAUX3 && system_rev < 0x100) ||
+> -	    system_rev >= SYSTEM_REV_B_USES_VAUX3)
+> +	    system_rev >= SYSTEM_REV_B_USES_VAUX3) {
+>  		rx51_twldata.vaux3 = &rx51_vaux3_mmc;
+> -	else {
+> +		/* Only older boards use VMMC2 for internal MMC */
+> +		rx51_vmmc2.num_consumer_supplies--;
+> +	} else {
+>  		rx51_twldata.vaux3 = &rx51_vaux3_cam;
+> -		rx51_twldata.vmmc2 = &rx51_vmmc2;
+>  	}
+> +	rx51_twldata.vmmc2 = &rx51_vmmc2;
+>  	omap_register_i2c_bus(1, 2200, rx51_peripherals_i2c_board_info_1,
+>  			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
+>  	omap_register_i2c_bus(2, 100, rx51_peripherals_i2c_board_info_2,
 > 
-> http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=summary
-
-We would really like to merge as much as possible from our current
-development tree:
-http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/SPRC-2.6.34-rc5-opensource
-
-Some of the patches that we depend on are still in the review phase (s5p timer), some should be replaced by the ones that were
-posted recently. Especially most of our patches depend on S5PV210 GPIO support, so without it we cannot go further. Is there any
-chance to get it merged quickly? I will rebase our tree asap the mentioned patches get merged.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
