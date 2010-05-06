@@ -1,49 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 06 May 2010 13:35:43 -0400 (EDT)
-Subject: [PATCH] ARM: Declare __copy_to_user_std as a function using
-	ENDPROC
-In-Reply-To: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
-References: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1005061334190.14468@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 May 2010 18:59:07 +0100
+Subject: arm926_dma_flush_range undefined!
+In-Reply-To: <1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+References: <4BE2C013.4040009@atmel.com>
+	<1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100506175907.GA15797@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 May 2010, Catalin Marinas wrote:
-
-> This is needed for Thumb-2 kernel builds, otherwise the compiler
-> generates branches into ARM mode to this function.
+On Thu, May 06, 2010 at 03:07:11PM +0100, Catalin Marinas wrote:
+> On Thu, 2010-05-06 at 15:11 +0200, Nicolas Ferre wrote:
+> > I am trying to compile a recent kernel 
+> > (v2.6.34-rc6-201-g722154e) and I am 
+> > having this kind of error:
+> > 
+> > ERROR: "arm926_dma_flush_range" [drivers/mmc/host/at91_mci.ko] undefined!
 > 
-> Reported-by: Kyungmin Park <kmpark@infradead.org>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> The driver seems to use dmac_flush_range() directly. That's not part of
+> the DMA API. Could you not use one of the supported DMA API functions?
 
-You need to do the same with __clear_user_std as well.  With that change 
-added:
+Indeed; I've always said that I don't care about drivers directly using
+the internals of the DMA API, and drivers doing this will be constantly
+subjected to breakage.
 
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
-
-
-
-
-> ---
->  arch/arm/lib/copy_to_user.S |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-> index 1a71e15..5941fbc 100644
-> --- a/arch/arm/lib/copy_to_user.S
-> +++ b/arch/arm/lib/copy_to_user.S
-> @@ -93,6 +93,7 @@ WEAK(__copy_to_user)
->  #include "copy_template.S"
->  
->  ENDPROC(__copy_to_user)
-> +ENDPROC(__copy_to_user_std)
->  
->  	.section .fixup,"ax"
->  	.align 0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I really do not regard the above to be a regression; it's a latent
+programming error.  AT91 folk need to fix their driver(s) to use the
+proper interfaces rather than using internal functionality.
