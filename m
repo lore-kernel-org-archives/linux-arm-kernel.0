@@ -1,64 +1,81 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 6 May 2010 10:24:06 +0900
-Subject: Suspicious compilation warning
-In-Reply-To: <4BE14335.10702@ru.mvista.com>
-References: <k2ncecb6d8f1004191627w3cd36450xf797f746460abb09@mail.gmail.com>
-	<20100420155122.6f2c26eb.akpm@linux-foundation.org>
-	<20100420230719.GB1432@n2100.arm.linux.org.uk>
-	<4BE14335.10702@ru.mvista.com>
-Message-ID: <p2g9c9fda241005051824k54e70136v8324d135b44c71b5@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 6 May 2010 02:26:08 +0100
+Subject: [PATCH] ARM: S3C64XX: Add USB clock source frequency as driver
+	data to s3c-hsotg
+In-Reply-To: <4BE00124.7030702@gmail.com>
+References: <4BE00124.7030702@gmail.com>
+Message-ID: <20100506012608.GB6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 5, 2010 at 7:06 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> Russell King - ARM Linux wrote:
->
->>>> I get this warning while compiling for ARM/SA1100:
->>>>
->>>> mm/sparse.c: In function '__section_nr':
->>>> mm/sparse.c:135: warning: 'root' is used uninitialized in this function
->>>>
->>>> With a small patch in fs/proc/meminfo.c, I find that NR_SECTION_ROOTS
->>>> is zero, which certainly explains the warning.
->>>>
->>>> # cat /proc/meminfo
->>>> NR_SECTION_ROOTS=0
->>>> NR_MEM_SECTIONS=32
->>>> SECTIONS_PER_ROOT=512
->>>> SECTIONS_SHIFT=5
->>>> MAX_PHYSMEM_BITS=32
->>>>
->>>
->>> hm, who owns sparsemem nowadays? Nobody identifiable.
->>>
->>> Does it make physical sense to have SECTIONS_PER_ROOT > NR_MEM_SECTIONS?
->>>
->>
->> Well, it'll be about this number on everything using sparsemem extreme:
->>
->> #define SECTIONS_PER_ROOT ? ? ? (PAGE_SIZE / sizeof (struct mem_section))
->>
->> and with only 32 sections, this is going to give a NR_SECTION_ROOTS value
->> of zero. ?I think the calculation of NR_SECTIONS_ROOTS is wrong.
->>
->> #define NR_SECTION_ROOTS ? ? ? ?(NR_MEM_SECTIONS / SECTIONS_PER_ROOT)
->>
->> Clearly if we have 1 mem section, we want to have one section root, so
->> I think this division should round up any fractional part, thusly:
->>
->> #define NR_SECTION_ROOTS ? ? ? ?((NR_MEM_SECTIONS + SECTIONS_PER_ROOT - 1)
->> / SECTIONS_PER_ROOT)
->>
->
-> ?There's DIV_ROUND_UP() macro for this kind of calculation.
+On Tue, May 04, 2010 at 01:12:36PM +0200, Maurus Cuelenaere wrote:
+> The upcoming SmartQ machines use a different base clock frequency
+> for the USB block, this patch allows passing it as platform data
+> to the driver.
 
-Hi,
+When I merge thomas' patch for addign a clock for this crystal, it might
+be worth changing the driver to get this and see what rate the clock is
+at by that method.
 
-It tested with my board and working.
-Just curious. If NR_SECTION_ROOTS is zero and uninitialized then
-what's problem? Since we boot and working without patch.
+Will hold off on this patch, also going to do some woth on the hsotg
+driver anyway, since it could really do with some work on DMA support
+and some debugging.
+ 
+> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/udc-hs.h |    8 ++++++++
+>  drivers/usb/gadget/s3c-hsotg.c              |    1 +
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/udc-hs.h b/arch/arm/plat-samsung/include/plat/udc-hs.h
+> index a22a4f2..2905344 100644
+> --- a/arch/arm/plat-samsung/include/plat/udc-hs.h
+> +++ b/arch/arm/plat-samsung/include/plat/udc-hs.h
+> @@ -18,12 +18,20 @@ enum s3c_hsotg_dmamode {
+>  	S3C_HSOTG_DMA_DRV,	/* DMA is chosen by driver */
+>  };
+>  
+> +enum s3c_hsotg_clkfreq {
+> +	S3C_HSOTG_CLKFREQ_48MHZ = 0,
+> +	S3C_HSOTG_CLKFREQ_12MHZ = 2,
+> +	S3C_HSOTG_CLKFREQ_24MHZ = 3,
+> +};
+> +
+>  /**
+>   * struct s3c_hsotg_plat - platform data for high-speed otg/udc
+>   * @dma: Whether to use DMA or not.
+>   * @is_osc: The clock source is an oscillator, not a crystal
+> + * @clk_sel: Frequency of the clock source
+>   */
+>  struct s3c_hsotg_plat {
+>  	enum s3c_hsotg_dmamode	dma;
+>  	unsigned int		is_osc : 1;
+> +	enum s3c_hsotg_clkfreq	clk_sel;
+>  };
+> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> index 1f73b48..600b56d 100644
+> --- a/drivers/usb/gadget/s3c-hsotg.c
+> +++ b/drivers/usb/gadget/s3c-hsotg.c
+> @@ -2705,6 +2705,7 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
+>  	mdelay(1);
+>  
+>  	osc = hsotg->plat->is_osc ? S3C_PHYCLK_EXT_OSC : 0;
+> +	osc |= hsotg->plat->clk_sel;
+>  
+>  	writel(osc | 0x10, S3C_PHYCLK);
+>  
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thank you,
-Kyungmin Park
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
