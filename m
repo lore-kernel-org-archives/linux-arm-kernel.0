@@ -1,69 +1,31 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Thu, 6 May 2010 10:42:13 +0800
-Subject: [PATCH] pxa3xx_nand: add cmdline part parser support
-Message-ID: <mailman.393.1273137172.2170.linux-arm-kernel@lists.infradead.org>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Thu, 06 May 2010 10:13:18 +0100
+Subject: [PATCH v2 1/2] regulator: make 88pm860x sharing one driver
+	structure
+In-Reply-To: <k2h771cded01005042234v438edb71h5456bf19fdb474b9@mail.gmail.com>
+References: <k2h771cded01005042234v438edb71h5456bf19fdb474b9@mail.gmail.com>
+Message-ID: <1273137198.2992.22.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/mtd/nand/pxa3xx_nand.c |   26 ++++++++++++++++++++++++--
- 1 files changed, 24 insertions(+), 2 deletions(-)
+On Wed, 2010-05-05 at 01:34 -0400, Haojian Zhuang wrote:
+> From 782297964a48a3b8547a99de3b5c24d8f02b99ec Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Thu, 29 Apr 2010 13:33:50 -0400
+> Subject: [PATCH] regulator: make 88pm860x sharing one driver structure
+> 
+> Remove a lot of driver structures in 88pm860x driver. Make regulators share
+> one driver structure.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 2eebd20..793b64c 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -349,6 +349,9 @@ static struct pxa3xx_nand_flash __devinitdata
-builtin_flash_types[] = {
- 	{ 0, 10, 35, 15, 25, 15, 25, 25000, 0, 60, 10, }, },
- };
+Both applied with fixes for your mailer mangling the patches.
 
-+#ifdef CONFIG_MTD_CMDLINE_PARTS
-+static const char *part_probes[] = { "cmdlinepart", NULL };
-+#endif
- static const char *mtd_names[] = {"pxa3xx_nand-0", "pxa3xx_nand-1", NULL};
+Thanks.
 
- /* convert nano-seconds to nand flash controller clock cycles */
-@@ -1726,6 +1729,10 @@ static int __devinit pxa3xx_nand_probe(struct
-platform_device *pdev)
- 	struct pxa3xx_nand *nand;
- 	struct mtd_info *mtd;
- 	int ret, cs, probe_success = 0;
-+#ifdef CONFIG_MTD_PARTITIONS
-+	struct mtd_partition *partitions = NULL;
-+	int num_part = 0;
-+#endif
-
- 	pdata = pdev->dev.platform_data;
- 	if (!pdata) {
-@@ -1747,8 +1754,23 @@ static int __devinit pxa3xx_nand_probe(struct
-platform_device *pdev)
- 			dev_err(&pdev->dev, "failed to scan cs#%d nand\n", cs);
- 			continue;
- 		}
--		ret = add_mtd_partitions(mtd, pdata->parts[cs],
--				pdata->nr_parts[cs]);
-+		mtd->name = mtd_names[cs];
-+#ifdef CONFIG_MTD_PARTITIONS
-+#ifdef CONFIG_MTD_CMDLINE_PARTS
-+		num_part = parse_mtd_partitions(mtd, part_probes, &partitions, 0);
-+#endif
-+		if (num_part <= 0) {
-+			num_part = pdata->nr_parts[cs];
-+			partitions = pdata->parts[cs];
-+		}
-+
-+		if (partitions && num_part > 0)
-+			ret = add_mtd_partitions(mtd, partitions, num_part);
-+		else
-+			ret = add_mtd_device(mtd);
-+#else
-+		ret = add_mtd_device(mtd);
-+#endif
- 		if (!ret)
- 			probe_success = 1;
- 	}
+Liam
 -- 
-1.5.6.5
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
