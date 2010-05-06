@@ -1,81 +1,76 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 6 May 2010 02:26:08 +0100
-Subject: [PATCH] ARM: S3C64XX: Add USB clock source frequency as driver
-	data to s3c-hsotg
-In-Reply-To: <4BE00124.7030702@gmail.com>
-References: <4BE00124.7030702@gmail.com>
-Message-ID: <20100506012608.GB6684@trinity.fluff.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 5 May 2010 22:20:47 -0400
+Subject: [PATCH 1/1] mfd: delay to mask tsc irq in max8925
+In-Reply-To: <k2m771cded01004280555wd2df54d3j969ff5f1e3e5267b@mail.gmail.com>
+References: <k2m771cded01004280555wd2df54d3j969ff5f1e3e5267b@mail.gmail.com>
+Message-ID: <v2i771cded01005051920sb3c63b65y38d290b217925d0c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 04, 2010 at 01:12:36PM +0200, Maurus Cuelenaere wrote:
-> The upcoming SmartQ machines use a different base clock frequency
-> for the USB block, this patch allows passing it as platform data
-> to the driver.
-
-When I merge thomas' patch for addign a clock for this crystal, it might
-be worth changing the driver to get this and see what rate the clock is
-at by that method.
-
-Will hold off on this patch, also going to do some woth on the hsotg
-driver anyway, since it could really do with some work on DMA support
-and some debugging.
- 
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+On Wed, Apr 28, 2010 at 8:55 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 07243e51659a11946a149a5f4a74322cfd840c35 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Tue, 27 Apr 2010 14:55:28 -0400
+> Subject: [PATCH] mfd: delay to mask tsc irq in max8925
+>
+> There're two IRQ pins output from MAX8925. One is PMIC interrupt, the other
+> is TSC interrupt. But they're sharing one irq chip.
+>
+> After initializing MAX8925 interrupts, unexpected TSC interrupt may occur and
+> it can't be cleared if touch driver isn't loaded.
+>
+> Now move the operation of masking TSC interrupt behind requesting PMIC
+> interrupt. If touch driver isn't loaded, this interrupt is always masked.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
->  arch/arm/plat-samsung/include/plat/udc-hs.h |    8 ++++++++
->  drivers/usb/gadget/s3c-hsotg.c              |    1 +
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/udc-hs.h b/arch/arm/plat-samsung/include/plat/udc-hs.h
-> index a22a4f2..2905344 100644
-> --- a/arch/arm/plat-samsung/include/plat/udc-hs.h
-> +++ b/arch/arm/plat-samsung/include/plat/udc-hs.h
-> @@ -18,12 +18,20 @@ enum s3c_hsotg_dmamode {
->  	S3C_HSOTG_DMA_DRV,	/* DMA is chosen by driver */
->  };
->  
-> +enum s3c_hsotg_clkfreq {
-> +	S3C_HSOTG_CLKFREQ_48MHZ = 0,
-> +	S3C_HSOTG_CLKFREQ_12MHZ = 2,
-> +	S3C_HSOTG_CLKFREQ_24MHZ = 3,
-> +};
+> ?drivers/mfd/max8925-core.c | ? ?7 +++++--
+> ?1 files changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
+> index 85d63c0..f621bce 100644
+> --- a/drivers/mfd/max8925-core.c
+> +++ b/drivers/mfd/max8925-core.c
+> @@ -508,7 +508,7 @@ static int max8925_irq_init(struct max8925_chip
+> *chip, int irq,
+> ? ? ? ?max8925_reg_read(chip->i2c, MAX8925_ON_OFF_IRQ2);
+> ? ? ? ?max8925_reg_read(chip->rtc, MAX8925_RTC_IRQ);
+> ? ? ? ?max8925_reg_read(chip->adc, MAX8925_TSC_IRQ);
+> - ? ? ? /* mask all interrupts */
+> + ? ? ? /* mask all interrupts except for TSC */
+> ? ? ? ?max8925_reg_write(chip->rtc, MAX8925_ALARM0_CNTL, 0);
+> ? ? ? ?max8925_reg_write(chip->rtc, MAX8925_ALARM1_CNTL, 0);
+> ? ? ? ?max8925_reg_write(chip->i2c, MAX8925_CHG_IRQ1_MASK, 0xff);
+> @@ -516,7 +516,6 @@ static int max8925_irq_init(struct max8925_chip
+> *chip, int irq,
+> ? ? ? ?max8925_reg_write(chip->i2c, MAX8925_ON_OFF_IRQ1_MASK, 0xff);
+> ? ? ? ?max8925_reg_write(chip->i2c, MAX8925_ON_OFF_IRQ2_MASK, 0xff);
+> ? ? ? ?max8925_reg_write(chip->rtc, MAX8925_RTC_IRQ_MASK, 0xff);
+> - ? ? ? max8925_reg_write(chip->adc, MAX8925_TSC_IRQ_MASK, 0xff);
+>
+> ? ? ? ?mutex_init(&chip->irq_lock);
+> ? ? ? ?chip->core_irq = irq;
+> @@ -547,7 +546,11 @@ static int max8925_irq_init(struct max8925_chip
+> *chip, int irq,
+> ? ? ? ? ? ? ? ?dev_err(chip->dev, "Failed to request core IRQ: %d\n", ret);
+> ? ? ? ? ? ? ? ?chip->core_irq = 0;
+> ? ? ? ?}
 > +
->  /**
->   * struct s3c_hsotg_plat - platform data for high-speed otg/udc
->   * @dma: Whether to use DMA or not.
->   * @is_osc: The clock source is an oscillator, not a crystal
-> + * @clk_sel: Frequency of the clock source
->   */
->  struct s3c_hsotg_plat {
->  	enum s3c_hsotg_dmamode	dma;
->  	unsigned int		is_osc : 1;
-> +	enum s3c_hsotg_clkfreq	clk_sel;
->  };
-> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> index 1f73b48..600b56d 100644
-> --- a/drivers/usb/gadget/s3c-hsotg.c
-> +++ b/drivers/usb/gadget/s3c-hsotg.c
-> @@ -2705,6 +2705,7 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
->  	mdelay(1);
->  
->  	osc = hsotg->plat->is_osc ? S3C_PHYCLK_EXT_OSC : 0;
-> +	osc |= hsotg->plat->clk_sel;
->  
->  	writel(osc | 0x10, S3C_PHYCLK);
->  
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ?tsc_irq:
+> + ? ? ? /* mask TSC interrupt */
+> + ? ? ? max8925_reg_write(chip->adc, MAX8925_TSC_IRQ_MASK, 0x0f);
+> +
+> ? ? ? ?if (!pdata->tsc_irq) {
+> ? ? ? ? ? ? ? ?dev_warn(chip->dev, "No interrupt support on TSC IRQ\n");
+> ? ? ? ? ? ? ? ?return 0;
+> --
+> 1.5.6.5
+>
 
--- 
--- 
-Ben
+Hi Samuel,
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Do you have any comments on this patch?
+
+Thanks
+Haojian
