@@ -1,22 +1,17 @@
-From: albin.tonnerre@gmail.com (Albin Tonnerre)
-Date: Thu, 6 May 2010 15:30:22 +0200
-Subject: [PATCH v2] ARM: Add support for LZMA-compressed kernel images
-In-Reply-To: <x2nd1b08f941005060204j3bbf3fc9z11cc4325a20bdb82@mail.gmail.com>
-References: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<4BAB2552.9070704@gmail.com>
-	<x2nd1b08f941005060204j3bbf3fc9z11cc4325a20bdb82@mail.gmail.com>
-Message-ID: <x2vbbb699fe1005060630tab568c6aj2e23bb0665a1644a@mail.gmail.com>
+From: Jiri.Pinkava@vscht.cz (Pinkava J.)
+Date: Thu, 6 May 2010 15:39:20 +0200
+Subject: Acer n35 patches
+In-Reply-To: <4BE2C2FF.8020404@vscht.cz>
+References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
+	<4BE1ED86.3010506@vscht.cz> <4BE1EE5F.5090402@vscht.cz>
+	<4BE1EE8C.8040900@vscht.cz>
+	<20100506012258.GZ6684@trinity.fluff.org>
+	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
+	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
+	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
+	<4BE2C2CC.2010003@vscht.cz> <4BE2C2FF.8020404@vscht.cz>
+Message-ID: <4BE2C688.2070209@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 6, 2010 at 11:04 AM, Andrea Adami <andrea.adami@gmail.com> wrote:
-> Any reason to further delay the LZMA adoption?
-> It will not be the fastest decompressor, but gives the smallest kernel size.
-> Tested on various Zaurus models (pxa255, pxa270, armv4).
-
-It's in the devel branch of Russell's tree already, so it should find
-its way to mainline :)
-
-Regards,
-Albin
+All chenges are taken against 2.6.34-r6 kernel
