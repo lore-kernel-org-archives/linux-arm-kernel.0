@@ -1,110 +1,68 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:23:53 -0700
-Subject: [PATCH 02/34] davinci: sparse: gpio: void casting
+Date: Thu,  6 May 2010 16:23:54 -0700
+Subject: [PATCH 03/34] davinci: da830/omap-l137 evm: add support for GPIO
+	based MMC/SD card detection
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-3-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-4-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup usage of void pointers when using genirq.  genirq API
-takes and returns void *, where this GPIO API is using those
-as __iomem pointers.
+From: Vipin Bhandari <vipin.bhandari@ti.com>
 
+The DA830/OMAP-L137 EVM has GPIO based card detection logic, but the current
+code does not use it.
+
+Add support for GPIO based card detection to avoid reading the card to see
+if a card is present or not.
+
+Signed-off-by: Vipin Bhandari <vipin.bhandari@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/gpio.c |   27 ++++++++++++++++++---------
- 1 files changed, 18 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-index 3f77062..5476ad1 100644
---- a/arch/arm/mach-davinci/gpio.c
-+++ b/arch/arm/mach-davinci/gpio.c
-@@ -36,6 +36,15 @@ static struct gpio_controller __iomem __init *gpio2controller(unsigned gpio)
- 	return __gpio_to_controller(gpio);
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index dc19870..8e67037 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -229,14 +229,21 @@ static const short da830_evm_mmc_sd_pins[] = {
+ };
+ 
+ #define DA830_MMCSD_WP_PIN		GPIO_TO_PIN(2, 1)
++#define DA830_MMCSD_CD_PIN		GPIO_TO_PIN(2, 2)
+ 
+ static int da830_evm_mmc_get_ro(int index)
+ {
+ 	return gpio_get_value(DA830_MMCSD_WP_PIN);
  }
  
-+static inline struct gpio_controller __iomem *irq2controller(int irq)
++static int da830_evm_mmc_get_cd(int index)
 +{
-+	struct gpio_controller __iomem *g;
-+
-+	g = (__force struct gpio_controller __iomem *)get_irq_chip_data(irq);
-+
-+	return g;
++	return !gpio_get_value(DA830_MMCSD_CD_PIN);
 +}
 +
- static int __init davinci_gpio_irq_setup(void);
+ static struct davinci_mmc_config da830_evm_mmc_config = {
+ 	.get_ro			= da830_evm_mmc_get_ro,
++	.get_cd			= da830_evm_mmc_get_cd,
+ 	.wires			= 4,
+ 	.max_freq		= 50000000,
+ 	.caps			= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+@@ -262,6 +269,14 @@ static inline void da830_evm_init_mmc(void)
+ 	}
+ 	gpio_direction_input(DA830_MMCSD_WP_PIN);
  
- /*--------------------------------------------------------------------------*/
-@@ -161,7 +170,7 @@ pure_initcall(davinci_gpio_setup);
- 
- static void gpio_irq_disable(unsigned irq)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	__raw_writel(mask, &g->clr_falling);
-@@ -170,7 +179,7 @@ static void gpio_irq_disable(unsigned irq)
- 
- static void gpio_irq_enable(unsigned irq)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 	unsigned status = irq_desc[irq].status;
- 
-@@ -186,7 +195,7 @@ static void gpio_irq_enable(unsigned irq)
- 
- static int gpio_irq_type(unsigned irq, unsigned trigger)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-@@ -215,7 +224,7 @@ static struct irq_chip gpio_irqchip = {
- static void
- gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = 0xffff;
- 
- 	/* we only care about one bank */
-@@ -276,7 +285,7 @@ static int gpio_to_irq_unbanked(struct gpio_chip *chip, unsigned offset)
- 
- static int gpio_irq_type_unbanked(unsigned irq, unsigned trigger)
- {
--	struct gpio_controller __iomem *g = get_irq_chip_data(irq);
-+	struct gpio_controller __iomem *g = irq2controller(irq);
- 	u32 mask = (u32) get_irq_data(irq);
- 
- 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-@@ -362,7 +371,7 @@ static int __init davinci_gpio_irq_setup(void)
- 		for (gpio = 0; gpio < soc_info->gpio_unbanked; gpio++, irq++) {
- 			set_irq_chip(irq, &gpio_irqchip_unbanked);
- 			set_irq_data(irq, (void *) __gpio_mask(gpio));
--			set_irq_chip_data(irq, g);
-+			set_irq_chip_data(irq, (__force void *) g);
- 			irq_desc[irq].status |= IRQ_TYPE_EDGE_BOTH;
- 		}
- 
-@@ -385,12 +394,12 @@ static int __init davinci_gpio_irq_setup(void)
- 
- 		/* set up all irqs in this bank */
- 		set_irq_chained_handler(bank_irq, gpio_irq_handler);
--		set_irq_chip_data(bank_irq, g);
--		set_irq_data(bank_irq, (void *)irq);
-+		set_irq_chip_data(bank_irq, (__force void *) g);
-+		set_irq_data(bank_irq, (void *) irq);
- 
- 		for (i = 0; i < 16 && gpio < ngpio; i++, irq++, gpio++) {
- 			set_irq_chip(irq, &gpio_irqchip);
--			set_irq_chip_data(irq, g);
-+			set_irq_chip_data(irq, (__force void *) g);
- 			set_irq_data(irq, (void *) __gpio_mask(gpio));
- 			set_irq_handler(irq, handle_simple_irq);
- 			set_irq_flags(irq, IRQF_VALID);
++	ret = gpio_request(DA830_MMCSD_CD_PIN, "MMC CD\n");
++	if (ret) {
++		pr_warning("da830_evm_init: can not open GPIO %d\n",
++			   DA830_MMCSD_CD_PIN);
++		return;
++	}
++	gpio_direction_input(DA830_MMCSD_CD_PIN);
++
+ 	ret = da8xx_register_mmcsd0(&da830_evm_mmc_config);
+ 	if (ret) {
+ 		pr_warning("da830_evm_init: mmc/sd registration failed: %d\n",
 -- 
 1.7.0.2
