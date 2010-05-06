@@ -1,59 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 May 2010 08:38:59 +0200
-Subject: [PATCH 1/1] mx31smartbot: change the config of a gpio
-In-Reply-To: <1273052061-17147-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1273052061-17147-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20100506063859.GL31199@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 06 May 2010 08:50:38 +0200
+Subject: SAMSUNG kernel tree merge plans
+In-Reply-To: <20100506054651.GL26401@trinity.fluff.org>
+References: <20100506054651.GL26401@trinity.fluff.org>
+Message-ID: <015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 05, 2010 at 11:34:21AM +0200, Valentin Longchamp wrote:
-> Since it is finally used on the handbot as a configuration input for
-> the translator.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+Hello,
 
-Ok, added to mxc-master.
+On Thursday, May 06, 2010 7:47 AM Ben Dooks wrote:
 
-Sascha
+> I'm busy sorting out the trees for the next mege window, and should
+> have a new next-samsung out in the next two or three days.
+> 
+> As such, if there is anything that needs to go via Russell's tree, then
+> it needs to be merged as soon as possible. I would like to send a pull
+> before Wednesday.
+> 
+> Anything else, if it is not merged into one of my trees by the end of
+> next week (May 14th) then there is no guarantees that it will be merged.
+> 
+> If everyone interested in this could check my trees after the weekend and
+> make any reminders of other stuff to fix at that point as there is still
+> items being processed.
+> 
+> http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=summary
 
-> ---
->  arch/arm/mach-mx3/mx31moboard-smartbot.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
-> index 52a69fc..83d2b9f 100644
-> --- a/arch/arm/mach-mx3/mx31moboard-smartbot.c
-> +++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c
-> @@ -119,7 +119,7 @@ static int __init smartbot_cam_init(void)
->  #define POWER_EN IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
->  #define DSPIC_RST_B IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
->  #define TRSLAT_RST_B IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
-> -#define SEL3 IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1)
-> +#define TRSLAT_SRC_CHOICE IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1)
->  
->  static void smartbot_resets_init(void)
->  {
-> @@ -138,9 +138,9 @@ static void smartbot_resets_init(void)
->  		gpio_export(TRSLAT_RST_B, false);
->  	}
->  
-> -	if (!gpio_request(SEL3, "sel3")) {
-> -		gpio_direction_input(SEL3);
-> -		gpio_export(SEL3, true);
-> +	if (!gpio_request(TRSLAT_SRC_CHOICE, "translator-src-choice")) {
-> +		gpio_direction_output(TRSLAT_SRC_CHOICE, 0);
-> +		gpio_export(TRSLAT_SRC_CHOICE, false);
->  	}
->  }
->  /*
-> -- 
-> 1.7.0.4
-> 
-> 
+We would really like to merge as much as possible from our current
+development tree:
+http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/SPRC-2.6.34-rc5-opensource
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Some of the patches that we depend on are still in the review phase (s5p timer), some should be replaced by the ones that were
+posted recently. Especially most of our patches depend on S5PV210 GPIO support, so without it we cannot go further. Is there any
+chance to get it merged quickly? I will rebase our tree asap the mentioned patches get merged.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
