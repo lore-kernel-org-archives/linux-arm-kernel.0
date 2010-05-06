@@ -1,49 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 May 2010 09:14:15 +0200
-Subject: [PATCHv1 2.6.34-rc6 2/3] mx5: change usb clock source from
-	pll3 to pll2
-In-Reply-To: <1273100171-3235-3-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1273100171-3235-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1273100171-3235-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1273100171-3235-3-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100506071415.GO31199@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 6 May 2010 10:21:02 +0300
+Subject: SAMSUNG kernel tree merge plans
+In-Reply-To: <20100506054651.GL26401@trinity.fluff.org>
+References: <20100506054651.GL26401@trinity.fluff.org>
+Message-ID: <201005061021.06125.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 05, 2010 at 05:56:10PM -0500, Dinh Nguyen wrote:
-> For power management reasons, pll2 should be used to source the USBOH3
-> clock for mx51. PLL3 can be completely gated off when USB is not used.
+? ????????? ?? 6 ??? 2010 08:46:51 ????? Ben Dooks ???????:
+> I'm busy sorting out the trees for the next mege window, and should
+> have a new next-samsung out in the next two or three days.
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> As such, if there is anything that needs to go via Russell's tree, then
+> it needs to be merged as soon as possible. I would like to send a pull
+> before Wednesday.
 > 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index dcca330..933c0d1 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -763,7 +763,7 @@ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
->  
->  /* USB */
->  DEFINE_CLOCK(usboh3_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG14_OFFSET,
-> -	NULL, NULL, &pll3_sw_clk, NULL);
-> +	NULL, NULL, &pll2_sw_clk, NULL);
+> Anything else, if it is not merged into one of my trees by the end of
+> next week (May 14th) then there is no guarantees that it will be merged.
+> 
+> If everyone interested in this could check my trees after the weekend and
+> make any reminders of other stuff to fix at that point as there is still
+> items being processed.
+> 
+> http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=summary
 
-The commit message suggests that the parent is changed in this patch.
-The only thing this patch changes is that when usboh3_clk is enabled,
-pll2 instead of pll3 gets enabled. The real parent of this clock
-is defined by the status quo of the CSCMR1/usboh3_clk_sel bits.
+Is there any chance that my rx1950-support patch series will be merged? I've 
+almost finished moving to gpiolib and can send series after this weekend. What 
+branch of your tree should I use as base?
 
-So the solution here is to initialize the parent field during runtime
-according to the bits in hardware or to change the hardware bits
-according to the parent field. Either way, please make sure that
-hardware and state of the clock tree are consistent.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100506/7bd092b8/attachment.sig>
