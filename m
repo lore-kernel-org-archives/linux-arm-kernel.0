@@ -1,34 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 06 May 2010 15:12:33 +0100
-Subject: [PATCH] ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
-Message-ID: <20100506141233.4396.12959.stgit@e102109-lin.cambridge.arm.com>
+Date: Thu, 06 May 2010 15:12:38 +0100
+Subject: [PATCH] ARM: Declare __copy_to_user_std as a function using ENDPROC
+Message-ID: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro is not defined when !CONFIG_MMU.
+This is needed for Thumb-2 kernel builds, otherwise the compiler
+generates branches into ARM mode to this function.
 
+Reported-by: Kyungmin Park <kmpark@infradead.org>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/dma-mapping.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/lib/copy_to_user.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 13fa536..c4de90f 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -25,6 +25,7 @@
- #include <asm/sizes.h>
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index 1a71e15..5941fbc 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -93,6 +93,7 @@ WEAK(__copy_to_user)
+ #include "copy_template.S"
  
- /* Sanity check size */
-+#ifdef CONFIG_MMU
- #if (CONSISTENT_DMA_SIZE % SZ_2M)
- #error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
- #endif
-@@ -32,6 +33,7 @@
- #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
- #define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
- #define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
-+#endif
+ ENDPROC(__copy_to_user)
++ENDPROC(__copy_to_user_std)
  
- static u64 get_coherent_dma_mask(struct device *dev)
- {
+ 	.section .fixup,"ax"
+ 	.align 0
