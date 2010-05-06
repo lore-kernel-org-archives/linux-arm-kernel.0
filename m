@@ -1,252 +1,164 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:16 -0700
-Subject: [PATCH 25/34] Davinci: gpio - register layout invariant inlines
+Date: Thu,  6 May 2010 16:24:17 -0700
+Subject: [PATCH 26/34] Davinci: gpio - controller type support
 In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
 References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-26-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273188265-12782-27-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyril Chemparathy <cyril@ti.com>
 
-This patch renders the inlined gpio accessors in gpio.h independent of the
-underlying controller's register layout.  This is done by including three new
-fields in davinci_gpio_controller to hold the addresses of the set, clear, and
-in data registers.
+This patch allows for gpio controllers that deviate from those found on
+traditional davinci socs.  davinci_soc_info has an added field to indicate the
+soc-specific gpio controller type.  The gpio initialization code then bails
+out if necessary.
 
-Other changes:
-
-1. davinci_gpio_regs structure definition moved to gpio.c.  This structure is
-no longer common across all davinci socs (davinci_gpio_controller is).
-
-2. controller base address calculation code (gpio2controller()) moved to
-gpio.c as this was no longer necessary for the inline implementation.
-
-3. modified inline range checks to use davinci_soc_info.gpio_num instead of
-DAVINCI_N_GPIO.
+More elements (tnetv107x) to be added later into enum davinci_gpio_type.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Tested-by: Sandeep Paulraj <s-paulraj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/gpio.c                |   41 ++++++++++++++++-
- arch/arm/mach-davinci/include/mach/common.h |    4 ++
- arch/arm/mach-davinci/include/mach/gpio.h   |   65 +++++++++-----------------
- 3 files changed, 65 insertions(+), 45 deletions(-)
+ arch/arm/mach-davinci/da830.c               |    2 ++
+ arch/arm/mach-davinci/da850.c               |    2 ++
+ arch/arm/mach-davinci/dm355.c               |    1 +
+ arch/arm/mach-davinci/dm365.c               |    1 +
+ arch/arm/mach-davinci/dm644x.c              |    1 +
+ arch/arm/mach-davinci/dm646x.c              |    1 +
+ arch/arm/mach-davinci/gpio.c                |    3 +++
+ arch/arm/mach-davinci/include/mach/common.h |    1 +
+ arch/arm/mach-davinci/include/mach/gpio.h   |    4 ++++
+ 9 files changed, 16 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 122e61a..68e5233 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -19,6 +19,7 @@
+ #include <mach/common.h>
+ #include <mach/time.h>
+ #include <mach/da8xx.h>
++#include <mach/gpio.h>
+ 
+ #include "clock.h"
+ #include "mux.h"
+@@ -1199,6 +1200,7 @@ static struct davinci_soc_info davinci_soc_info_da830 = {
+ 	.intc_irq_prios		= da830_default_priorities,
+ 	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
+ 	.timer_info		= &da830_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DA8XX_GPIO_BASE),
+ 	.gpio_num		= 128,
+ 	.gpio_irq		= IRQ_DA8XX_GPIO0,
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index d0fd756..8aefcff 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -27,6 +27,7 @@
+ #include <mach/da8xx.h>
+ #include <mach/cpufreq.h>
+ #include <mach/pm.h>
++#include <mach/gpio.h>
+ 
+ #include "clock.h"
+ #include "mux.h"
+@@ -1084,6 +1085,7 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
+ 	.intc_irq_prios		= da850_default_priorities,
+ 	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
+ 	.timer_info		= &da850_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DA8XX_GPIO_BASE),
+ 	.gpio_num		= 144,
+ 	.gpio_irq		= IRQ_DA8XX_GPIO0,
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 5efce70..f9a54ff 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -859,6 +859,7 @@ static struct davinci_soc_info davinci_soc_info_dm355 = {
+ 	.intc_irq_prios		= dm355_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm355_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DAVINCI_GPIO_BASE),
+ 	.gpio_num		= 104,
+ 	.gpio_irq		= IRQ_DM355_GPIOBNK0,
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 1ee3fc8..0566675 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -1064,6 +1064,7 @@ static struct davinci_soc_info davinci_soc_info_dm365 = {
+ 	.intc_irq_prios		= dm365_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm365_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DAVINCI_GPIO_BASE),
+ 	.gpio_num		= 104,
+ 	.gpio_irq		= IRQ_DM365_GPIO0,
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 23cbe9d..4af349e 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -748,6 +748,7 @@ static struct davinci_soc_info davinci_soc_info_dm644x = {
+ 	.intc_irq_prios 	= dm644x_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm644x_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DAVINCI_GPIO_BASE),
+ 	.gpio_num		= 71,
+ 	.gpio_irq		= IRQ_GPIOBNK0,
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index a0b3739..bdb1ace 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -832,6 +832,7 @@ static struct davinci_soc_info davinci_soc_info_dm646x = {
+ 	.intc_irq_prios		= dm646x_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm646x_timer_info,
++	.gpio_type		= GPIO_TYPE_DAVINCI,
+ 	.gpio_base		= IO_ADDRESS(DAVINCI_GPIO_BASE),
+ 	.gpio_num		= 43, /* Only 33 usable */
+ 	.gpio_irq		= IRQ_DM646X_GPIOBNK0,
 diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-index c77683c..d241b4f 100644
+index d241b4f..e422cd3 100644
 --- a/arch/arm/mach-davinci/gpio.c
 +++ b/arch/arm/mach-davinci/gpio.c
-@@ -20,6 +20,19 @@
- 
- #include <asm/mach/irq.h>
- 
-+struct davinci_gpio_regs {
-+	u32	dir;
-+	u32	out_data;
-+	u32	set_data;
-+	u32	clr_data;
-+	u32	in_data;
-+	u32	set_rising;
-+	u32	clr_rising;
-+	u32	set_falling;
-+	u32	clr_falling;
-+	u32	intstat;
-+};
-+
- static DEFINE_SPINLOCK(gpio_lock);
- 
- #define chip2controller(chip)	\
-@@ -27,10 +40,24 @@ static DEFINE_SPINLOCK(gpio_lock);
- 
- static struct davinci_gpio_controller chips[DIV_ROUND_UP(DAVINCI_N_GPIO, 32)];
- 
--/* create a non-inlined version */
- static struct davinci_gpio_regs __iomem __init *gpio2regs(unsigned gpio)
- {
--	return __gpio_to_controller(gpio);
-+	void __iomem *ptr;
-+	void __iomem *base = davinci_soc_info.gpio_base;
-+
-+	if (gpio < 32 * 1)
-+		ptr = base + 0x10;
-+	else if (gpio < 32 * 2)
-+		ptr = base + 0x38;
-+	else if (gpio < 32 * 3)
-+		ptr = base + 0x60;
-+	else if (gpio < 32 * 4)
-+		ptr = base + 0x88;
-+	else if (gpio < 32 * 5)
-+		ptr = base + 0xb0;
-+	else
-+		ptr = NULL;
-+	return ptr;
- }
- 
- static inline struct davinci_gpio_regs __iomem *irq2regs(int irq)
-@@ -116,6 +143,7 @@ static int __init davinci_gpio_setup(void)
- 	int i, base;
- 	unsigned ngpio;
+@@ -145,6 +145,9 @@ static int __init davinci_gpio_setup(void)
  	struct davinci_soc_info *soc_info = &davinci_soc_info;
-+	struct davinci_gpio_regs *regs;
+ 	struct davinci_gpio_regs *regs;
  
++	if (soc_info->gpio_type != GPIO_TYPE_DAVINCI)
++		return 0;
++
  	/*
  	 * The gpio banks conceptually expose a segmented bitmap,
-@@ -144,11 +172,18 @@ static int __init davinci_gpio_setup(void)
- 		if (chips[i].chip.ngpio > 32)
- 			chips[i].chip.ngpio = 32;
- 
--		chips[i].regs = gpio2regs(base);
-+		regs = gpio2regs(base);
-+		chips[i].regs = regs;
-+		chips[i].set_data = &regs->set_data;
-+		chips[i].clr_data = &regs->clr_data;
-+		chips[i].in_data = &regs->in_data;
- 
- 		gpiochip_add(&chips[i].chip);
- 	}
- 
-+	soc_info->gpio_ctlrs = chips;
-+	soc_info->gpio_ctlrs_num = DIV_ROUND_UP(ngpio, 32);
-+
- 	davinci_gpio_irq_setup();
- 	return 0;
- }
+ 	 * and "ngpio" is one more than the largest zero-based
 diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 884dc72..1d72883 100644
+index 1d72883..8ffef5b 100644
 --- a/arch/arm/mach-davinci/include/mach/common.h
 +++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -37,6 +37,8 @@ struct davinci_timer_info {
- 	unsigned int			clocksource_id;
- };
- 
-+struct davinci_gpio_controller;
-+
- /* SoC specific init support */
- struct davinci_soc_info {
- 	struct map_desc			*io_desc;
-@@ -61,6 +63,8 @@ struct davinci_soc_info {
+@@ -59,6 +59,7 @@ struct davinci_soc_info {
+ 	u8				*intc_irq_prios;
+ 	unsigned long			intc_irq_num;
+ 	struct davinci_timer_info	*timer_info;
++	int				gpio_type;
+ 	void __iomem			*gpio_base;
  	unsigned			gpio_num;
  	unsigned			gpio_irq;
- 	unsigned			gpio_unbanked;
-+	struct davinci_gpio_controller	*gpio_ctlrs;
-+	int				gpio_ctlrs_num;
- 	struct platform_device		*serial_dev;
- 	struct emac_platform_data	*emac_pdata;
- 	dma_addr_t			sram_dma;
 diff --git a/arch/arm/mach-davinci/include/mach/gpio.h b/arch/arm/mach-davinci/include/mach/gpio.h
-index bdab001..82591d0 100644
+index 82591d0..9a71a26 100644
 --- a/arch/arm/mach-davinci/include/mach/gpio.h
 +++ b/arch/arm/mach-davinci/include/mach/gpio.h
-@@ -45,23 +45,13 @@
- /* Convert GPIO signal to GPIO pin number */
- #define GPIO_TO_PIN(bank, gpio)	(16 * (bank) + (gpio))
+@@ -21,6 +21,10 @@
  
--struct davinci_gpio_regs {
--	u32	dir;
--	u32	out_data;
--	u32	set_data;
--	u32	clr_data;
--	u32	in_data;
--	u32	set_rising;
--	u32	clr_rising;
--	u32	set_falling;
--	u32	clr_falling;
--	u32	intstat;
--};
--
- struct davinci_gpio_controller {
--	struct davinci_gpio_regs __iomem *regs;
- 	struct gpio_chip	chip;
- 	int			irq_base;
-+	void __iomem		*regs;
-+	void __iomem		*set_data;
-+	void __iomem		*clr_data;
-+	void __iomem		*in_data;
- };
+ #define DAVINCI_GPIO_BASE 0x01C67000
  
- /* The __gpio_to_controller() and __gpio_mask() functions inline to constants
-@@ -73,25 +63,16 @@ struct davinci_gpio_controller {
++enum davinci_gpio_type {
++	GPIO_TYPE_DAVINCI = 0,
++};
++
+ /*
+  * basic gpio routines
   *
-  * These are NOT part of the cross-platform GPIO interface
-  */
--static inline struct davinci_gpio_regs __iomem *
-+static inline struct davinci_gpio_controller *
- __gpio_to_controller(unsigned gpio)
- {
--	void __iomem *ptr;
--	void __iomem *base = davinci_soc_info.gpio_base;
--
--	if (gpio < 32 * 1)
--		ptr = base + 0x10;
--	else if (gpio < 32 * 2)
--		ptr = base + 0x38;
--	else if (gpio < 32 * 3)
--		ptr = base + 0x60;
--	else if (gpio < 32 * 4)
--		ptr = base + 0x88;
--	else if (gpio < 32 * 5)
--		ptr = base + 0xb0;
--	else
--		ptr = NULL;
--	return ptr;
-+	struct davinci_gpio_controller *ctlrs = davinci_soc_info.gpio_ctlrs;
-+	int index = gpio / 32;
-+
-+	if (!ctlrs || index >= davinci_soc_info.gpio_ctlrs_num)
-+		return NULL;
-+
-+	return ctlrs + index;
- }
- 
- static inline u32 __gpio_mask(unsigned gpio)
-@@ -107,16 +88,16 @@ static inline u32 __gpio_mask(unsigned gpio)
-  */
- static inline void gpio_set_value(unsigned gpio, int value)
- {
--	if (__builtin_constant_p(value) && gpio < DAVINCI_N_GPIO) {
--		struct davinci_gpio_regs	__iomem *g;
--		u32			mask;
-+	if (__builtin_constant_p(value) && gpio < davinci_soc_info.gpio_num) {
-+		struct davinci_gpio_controller *ctlr;
-+		u32				mask;
- 
--		g = __gpio_to_controller(gpio);
-+		ctlr = __gpio_to_controller(gpio);
- 		mask = __gpio_mask(gpio);
- 		if (value)
--			__raw_writel(mask, &g->set_data);
-+			__raw_writel(mask, ctlr->set_data);
- 		else
--			__raw_writel(mask, &g->clr_data);
-+			__raw_writel(mask, ctlr->clr_data);
- 		return;
- 	}
- 
-@@ -134,18 +115,18 @@ static inline void gpio_set_value(unsigned gpio, int value)
-  */
- static inline int gpio_get_value(unsigned gpio)
- {
--	struct davinci_gpio_regs	__iomem *g;
-+	struct davinci_gpio_controller *ctlr;
- 
--	if (!__builtin_constant_p(gpio) || gpio >= DAVINCI_N_GPIO)
-+	if (!__builtin_constant_p(gpio) || gpio >= davinci_soc_info.gpio_num)
- 		return __gpio_get_value(gpio);
- 
--	g = __gpio_to_controller(gpio);
--	return __gpio_mask(gpio) & __raw_readl(&g->in_data);
-+	ctlr = __gpio_to_controller(gpio);
-+	return __gpio_mask(gpio) & __raw_readl(ctlr->in_data);
- }
- 
- static inline int gpio_cansleep(unsigned gpio)
- {
--	if (__builtin_constant_p(gpio) && gpio < DAVINCI_N_GPIO)
-+	if (__builtin_constant_p(gpio) && gpio < davinci_soc_info.gpio_num)
- 		return 0;
- 	else
- 		return __gpio_cansleep(gpio);
 -- 
 1.7.0.2
