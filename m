@@ -1,51 +1,52 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 6 May 2010 11:47:16 -0500
-Subject: [PATCH 2/2] Remove now-defunct ts7250 nand driver
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909020893D4@mi8nycmail19.Mi8.com>
-References: <201001051459.58621.hartleys@visionengravers.com><1262784693.3181.8034.camel@macbook.infradead.org><BD79186B4FD85F4B8E60E381CAEE1909020893C9@mi8nycmail19.Mi8.com><1262799737.3181.8388.camel@macbook.infradead.org>
-	<BD79186B4FD85F4B8E60E381CAEE1909020893D4@mi8nycmail19.Mi8.com>
-Message-ID: <0D753D10438DA54287A00B0270842697636ECB4D36@AUSP01VMBX24.collaborationhost.net>
+Date: Thu, 6 May 2010 12:29:34 -0500
+Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
+In-Reply-To: <20100412191506.GL3048@n2100.arm.linux.org.uk>
+References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
+	<20100412184904.GG3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
+	<20100412191506.GL3048@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
+On Monday, April 12, 2010 12:15 PM, Russell King wrote:
+> On Mon, Apr 12, 2010 at 02:01:17PM -0500, H Hartley Sweeten wrote:
+> On Monday, April 12, 2010 11:49 AM, Russell King wrote:
+>>> On Thu, Apr 01, 2010 at 05:32:18PM -0500, H Hartley Sweeten wrote:
+>>>> The ARCH_REQUIRE_GPIOLIB config option will select GPIOLIB which
+>>>> in turn will select GENERIC_GPIO.  Because of this, there is no
+>>>> reason to do the select GENERIC_GPIO in arch/arm/Kconfig for the
+>>>> architectures that have ARCH_REQUIRE_GPIOLIB.
+>>>
+>>> This kind of patch normally causes regular merge conflicts, which
+>>> historically have caused a repeated number of headaches - there's
+>>> a similar patch for GENERIC_TIME which is pending.
+>>>
+>>> I suggest waiting until we're closer to the merge window than we
+>>> are at present; I'll bring my devel stuff to a freeze state before
+>>> hand so we can get these two patches merged - maybe around the
+>>> -rc7 release.
+>>>
+>>> Please ping me closer to that.
+>> 
+>> Will do.
+>> 
+>> I just wanted to get this out there to make sure nobody saw any issues.
+>> 
+>> I will hold this until around -rc7 as you requested and just collect any
+>> Ack's, etc., that show up.  Eric Miao has already sent an Acked-by that
+>> I will add then.
+>
+> Also please keep an eye for any new places in -next where GENERIC_GPIO
+> is selected as well as ARCH_REQUIRE_GPIOLIB - we're likely to see new
+> platforms being added which may continue the old mistake.
 
-Do you know the status of these two patches in linux-next:
+Russell,
 
-commit 7603757993e7ce3e63b2280ccf61d8058b7b2414
-Author: H Hartley Sweeten <hartleys@visionengravers.com>
-Date:   Tue Jan 5 14:59:58 2010 -0700
+-rc7 should be coming soon.  Would you like this patch rebased now or after
+Linus releases -rc7?  Also, I assume it should be rebased to linux-next or
+would you prefer it rebased to one of your branches?
 
-    mtd: Remove now-defunct ts7250 nand driver
-    
-    The ts72xx platform has been updated to use the generic platform nand
-    driver (plat_nand.c).  This removes the now-defunct ts7250.c nand driver.
-    
-    Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-    Cc: Matthieu Crapet <mcrapet@gmail.com>
-    Cc: Jesse Off <joff@embeddedARM.com>
-    Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-
-commit 030d2dd450a628b7a8e31e980af3d05854f68edb
-Author: H Hartley Sweeten <hartleys@visionengravers.com>
-Date:   Tue Jan 5 14:59:56 2010 -0700
-
-    mtd: Update ep93xx/ts72xx to use generic platform nand driver
-    
-    Update the ts72xx platform's nand driver support.
-    
-    This changes the ts72xx platform from using a custom nand driver
-    (ts7250.c) to the generic platform nand driver (plat_nand.c).
-    
-    Tested on TS-7250 with 32MiB NAND.
-    
-    Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-    Tested-by: Matthieu Crapet <mcrapet@gmail.com>
-    Cc: Jesse Off <joff@embeddedARM.com>
-    Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-
-I have some pending patches for arch/arm/mach-ep93xx/ts72xx.c that
-depend on these.
-
-Thanks,
+Regards,
 Hartley
