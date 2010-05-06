@@ -1,28 +1,46 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 06 May 2010 15:12:38 +0100
-Subject: [PATCH] ARM: Declare __copy_to_user_std as a function using ENDPROC
-Message-ID: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
+Date: Thu, 06 May 2010 15:40:32 +0100
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in the
+	ARMv6 DMA cache ops
+In-Reply-To: <20100505132641.GA3169@mvista.com>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<20100505132641.GA3169@mvista.com>
+Message-ID: <1273156832.2094.21.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed for Thumb-2 kernel builds, otherwise the compiler
-generates branches into ARM mode to this function.
+On Wed, 2010-05-05 at 14:26 +0100, George G. Davis wrote:
+> Definitely need this for stable DMA on ARM11 MPCore.
+> 
+> On Tue, May 04, 2010 at 05:44:26PM +0100, Catalin Marinas wrote:
+> > The Snoop Control Unit on the ARM11MPCore hardware does not detect the
+> > cache operations and the dma_cache_maint*() functions may leave stale
+> > cache entries on other CPUs. The solution implemented in this patch
+> > performs a Read or Write For Ownership in the ARMv6 DMA cache
+> > maintenance functions. These LDR/STR instructions change the cache line
+> > state to shared or exclusive so that the cache maintenance operation has
+> > the desired effect.
+> >
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Tested-by: George G. Davis <gdavis@mvista.com>
 
-Reported-by: Kyungmin Park <kmpark@infradead.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/lib/copy_to_user.S |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index 1a71e15..5941fbc 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -93,6 +93,7 @@ WEAK(__copy_to_user)
- #include "copy_template.S"
- 
- ENDPROC(__copy_to_user)
-+ENDPROC(__copy_to_user_std)
- 
- 	.section .fixup,"ax"
- 	.align 0
+> FWIW, lack of ARM11 MPCore DMA cache coherency has been a problem for
+> well over two years now and it would be good if we can finally get this
+> fixed in mainline.  Without this applied on current, I observe various
+> oopses and/or filesystem errors which are resolved by this patch.
+
+What platform was this tested on?
+
+> If there is some other testing that I can do to help getting this
+> or some other variation accepted for mainline, let me know.
+
+The more platforms tested, the better. Anyway, I don't think we have
+much choice in how this workaround is implemented, unless the hardware
+supports FIQs.
+
+-- 
+Catalin
