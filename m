@@ -1,45 +1,68 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 6 May 2010 02:22:08 +0100
-Subject: [PATCH] arch/arm: Use constants instead of magic numbers in
-	do_gettimeofday.
-In-Reply-To: <1273108792-8097-1-git-send-email-MostAwesomeDude@gmail.com>
-References: <1273108792-8097-1-git-send-email-MostAwesomeDude@gmail.com>
-Message-ID: <20100506012208.GY6684@trinity.fluff.org>
+Date: Thu, 6 May 2010 02:22:58 +0100
+Subject: [PATCH 5/9] Add support for red flashing LED on Acer n35
+In-Reply-To: <4BE1EE8C.8040900@vscht.cz>
+References: <4BE1EBFE.9080601@vscht.cz> <4BE1ED3E.1050201@vscht.cz>
+	<4BE1ED86.3010506@vscht.cz> <4BE1EE5F.5090402@vscht.cz>
+	<4BE1EE8C.8040900@vscht.cz>
+Message-ID: <20100506012258.GZ6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 05, 2010 at 06:19:52PM -0700, Corbin Simpson wrote:
-> Part of the Didj patch.
-
-how about a better description here please.
- 
-> Signed-off-by: Corbin Simpson <MostAwesomeDude@gmail.com>
-> ---
->  arch/arm/kernel/time.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+On Thu, May 06, 2010 at 12:17:48AM +0200, Pinkava J. wrote:
 > 
-> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-> index 2875380..5cb4ff9 100644
-> --- a/arch/arm/kernel/time.c
-> +++ b/arch/arm/kernel/time.c
-> @@ -104,12 +104,12 @@ void do_gettimeofday(struct timeval *tv)
->  		seq = read_seqbegin_irqsave(&xtime_lock, flags);
->  		usec = system_timer->offset();
->  		sec = xtime.tv_sec;
-> -		usec += xtime.tv_nsec / 1000;
-> +		usec += xtime.tv_nsec / NSEC_PER_USEC;
->  	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
->  
->  	/* usec may have gone up a lot: be safe */
-> -	while (usec >= 1000000) {
-> -		usec -= 1000000;
-> +	while (usec >=  USEC_PER_SEC) {
-> +		usec -= USEC_PER_SEC;
->  		sec++;
->  	}
->  
+
+how about one patch for all the leds?
+ 
+> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+> ---
+>  arch/arm/mach-s3c2410/mach-n30.c |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+> index aeabbff..b83eabd 100644
+> --- a/arch/arm/mach-s3c2410/mach-n30.c
+> +++ b/arch/arm/mach-s3c2410/mach-n30.c
+> @@ -283,6 +283,13 @@ static struct s3c24xx_led_platdata n30_warning_led_pdata = {
+>  	.def_trigger	= "",
+>  };
+> 
+> +static struct s3c24xx_led_platdata n35_warning_led_pdata = {
+> +	.name		= "warning_led",
+> +	.flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+> +	.gpio		= S3C2410_GPD(9),
+> +	.def_trigger	= "",
+> +};
+> +
+>  static struct platform_device n30_blue_led = {
+>  	.name		= "s3c24xx_led",
+>  	.id		= 1,
+> @@ -307,6 +314,14 @@ static struct platform_device n30_warning_led = {
+>  	},
+>  };
+> 
+> +static struct platform_device n35_warning_led = {
+> +	.name		= "s3c24xx_led",
+> +	.id		= 2,
+> +	.dev		= {
+> +		.platform_data	= &n35_warning_led_pdata,
+> +	},
+> +};
+> +
+>  static struct s3c2410fb_display n30_display __initdata = {
+>  	.type		= S3C2410_LCDCON1_TFT,
+>  	.width		= 240,
+> @@ -355,6 +370,7 @@ static struct platform_device *n35_devices[] __initdata = {
+>  	&s3c_device_usbgadget,
+>  	&n35_button_device,
+>  	&n35_blue_led,
+> +	&n35_warning_led,
+>  };
+> 
+>  static struct s3c2410_platform_i2c __initdata n30_i2ccfg = {
 > -- 
-> 1.6.6.1
+> 1.7.1
+> 
 > 
 > 
 > _______________________________________________
