@@ -1,54 +1,25 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 7 May 2010 10:48:25 +0900
-Subject: [PATCH] ARM: Declare __copy_to_user_std as a function using
-	ENDPROC
-In-Reply-To: <alpine.LFD.2.00.1005061334190.14468@xanadu.home>
-References: <20100506141238.4396.8055.stgit@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1005061334190.14468@xanadu.home>
-Message-ID: <s2h9c9fda241005061848l24e80fd5q1ddc71ad7006166d@mail.gmail.com>
+From: Jiri.Pinkava@vscht.cz (Pinkava J.)
+Date: Fri, 7 May 2010 04:36:58 +0200
+Subject: next-samsung: acer n30/n35 updates
+In-Reply-To: <20100507005050.GY2589@trinity.fluff.org>
+References: <20100507005050.GY2589@trinity.fluff.org>
+Message-ID: <4BE37CCA.30406@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+Dne 7.5.2010 02:50, Ben Dooks napsal(a):
+> Acer n35 support has been provisonally merged into the following branch:
+> 
+>   git://git.fluff.org/bjdooks/linux.git for-2635/acer-n35
+> 
+> If there are any objections, then let me know, otherwise this will be
+> merged into next-samsug this weekend ready to go in the next merge window.
+> 
+> Jiri, please confirm that you've read Section 12 'Sign your work' of
+> Documentation/SubmittingPatches and that you agree to the part on
+> "Developer's Certificate of Origin 1.1"
+I comfirming that I've read above mentioned.
 
-On Fri, May 7, 2010 at 2:35 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Thu, 6 May 2010, Catalin Marinas wrote:
->
->> This is needed for Thumb-2 kernel builds, otherwise the compiler
->> generates branches into ARM mode to this function.
->>
->> Reported-by: Kyungmin Park <kmpark@infradead.org>
->> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->
-> You need to do the same with __clear_user_std as well. ?With that change
-> added:
->
-> Acked-by: Nicolas Pitre <nico@fluxnic.net>
->
->
->
->
->> ---
->> ?arch/arm/lib/copy_to_user.S | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
->> index 1a71e15..5941fbc 100644
->> --- a/arch/arm/lib/copy_to_user.S
->> +++ b/arch/arm/lib/copy_to_user.S
->> @@ -93,6 +93,7 @@ WEAK(__copy_to_user)
->> ?#include "copy_template.S"
->>
->> ?ENDPROC(__copy_to_user)
->> +ENDPROC(__copy_to_user_std)
->>
->> ? ? ? .section .fixup,"ax"
->> ? ? ? .align 0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+In order to be absolutely clear I must mention that patches 4-7 are based on old
+patches from Christer Weinigel (author of current implementation of Samsung n30
+code in kernel). Is this OK?
