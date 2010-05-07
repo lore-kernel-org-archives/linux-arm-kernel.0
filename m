@@ -1,26 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 May 2010 19:03:34 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 May 2010 19:04:16 +0100
 Subject: MSM PMU Support in Commit ee3c454b
 In-Reply-To: <1273252359.3542.21.camel@c-dwalke-linux.qualcomm.com>
 References: <000101caee07$104acdc0$30e06940$@deacon@arm.com>
 	<1273252359.3542.21.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100507180334.GB7887@n2100.arm.linux.org.uk>
+Message-ID: <000201caee0f$b55a6200$200f2600$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 07, 2010 at 10:12:39AM -0700, Daniel Walker wrote:
-> On Fri, 2010-05-07 at 18:02 +0100, Will Deacon wrote:
-> > Hi Russell,
-> > 
-> > Commit ee3c454b `arm: msm: add oprofile pmu support' in your devel
-> > branch adds an IRQ to the static list in kernel/pmu.c. Patch 6064/1 in
-> > the patch system replaces this old functionality with runtime registration
-> > using a platform device, so this commit prevents that patch applying.
-> > The OProfile patches in the system also depend on the runtime registration
-> > patch, so they will become blocked too.
-> 
+Hi Daniel,
+
+Thanks for the quick reply.
+
 > Oh, sorry about that. I didn't realize a change like that was pending.
 > When are you planning to merge these changes?
 
-Very very soon; the old way oprofile stuff is being supported will be
-going away.
+I've put them in the patch system recently and Russell has been merging
+them since then.
+ 
+> > I can update the patch in the patch system so it applies cleanly, but
+> > the mach-msm bsp will need updating to register the IRQ using the new
+> > mechanism. Daniel: would you like me to submit a patch to do this, or
+> > would you rather do it [since I'm unfamiliar with the mach]?
+> 
+> Either, but your more motivated as it's blocking your progress ..
+
+I just posted a patch to the list. I've also superseded the outstanding PMU
+registration patch on the patch system with 6113/1 so that it applies cleanly
+to Russell's devel branch.
+
+Will
