@@ -1,22 +1,36 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 7 May 2010 01:37:26 +0100
-Subject: Acer n35 patches
-In-Reply-To: <4BE2C688.2070209@vscht.cz>
-References: <20100506012258.GZ6684@trinity.fluff.org>
-	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
-	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
-	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
-	<4BE2C2CC.2010003@vscht.cz> <4BE2C2FF.8020404@vscht.cz>
-	<4BE2C688.2070209@vscht.cz>
-Message-ID: <20100507003726.GW2589@trinity.fluff.org>
+Date: Fri, 7 May 2010 01:50:50 +0100
+Subject: next-samsung: acer n30/n35 updates
+Message-ID: <20100507005050.GY2589@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 06, 2010 at 03:39:20PM +0200, Pinkava J. wrote:
-> All chenges are taken against 2.6.34-r6 kernel
+Acer n35 support has been provisonally merged into the following branch:
 
-2.6.34-rc6 should still have working gpio_set_value/gpio_direction_output
-calls in it, please update patch 8 to at-least use these.
+  git://git.fluff.org/bjdooks/linux.git for-2635/acer-n35
+
+If there are any objections, then let me know, otherwise this will be
+merged into next-samsug this weekend ready to go in the next merge window.
+
+Jiri, please confirm that you've read Section 12 'Sign your work' of
+Documentation/SubmittingPatches and that you agree to the part on
+"Developer's Certificate of Origin 1.1"
+
+The following commits are in:
+
+Pinkava J (7):
+      ARM: n30: Enable Acer n35 if Acer n30 is selected
+      ARM: n30: fix: suspended wrong USB port on Acer n35
+      ARM: n30: Add RTC platform device for Acer n30 / Acer n35
+      ARM: n35: Add support for LEDs on Acer n35
+      ARM: n35: Enable wake-up by Power button on Acer n35
+      ARM: n30: Add support for MMC card reader on Acer n30 / Acer n35
+      ARM: n30: Add support for power on/off on Acer n30 / Acer n35 MMC card reader
+
+ arch/arm/mach-s3c2410/Kconfig    |    7 ++++
+ arch/arm/mach-s3c2410/mach-n30.c |   65 +++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 71 insertions(+), 1 deletions(-)
+
 
 -- 
 Ben
