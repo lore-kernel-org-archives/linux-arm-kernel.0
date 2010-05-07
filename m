@@ -1,28 +1,43 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Fri, 7 May 2010 12:24:07 +0530
-Subject: [PATCH v2] ARM: Add support for LZMA-compressed kernel images
-In-Reply-To: <v2zf17812d71005060854o2f24263bl33e5ea8e25921d6c@mail.gmail.com>
-References: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<4BAB2552.9070704@gmail.com>
-	<x2nd1b08f941005060204j3bbf3fc9z11cc4325a20bdb82@mail.gmail.com>
-	<x2vbbb699fe1005060630tab568c6aj2e23bb0665a1644a@mail.gmail.com>
-	<v2zf17812d71005060854o2f24263bl33e5ea8e25921d6c@mail.gmail.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0322C7EF6D@dbde02.ent.ti.com>
+From: jassi.brar@samsung.com (Jassi Brar)
+Date: Fri,  7 May 2010 16:00:12 +0900
+Subject: [PATCH 1/2] DMA ENGINE: Do not reset 'private' of channel
+Message-ID: <1273215612-3058-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> On Thu, May 6, 2010 at 9:30 PM, Albin Tonnerre <albin.tonnerre@gmail.com> wrote:
-> > On Thu, May 6, 2010 at 11:04 AM, Andrea Adami <andrea.adami@gmail.com> wrote:
-> >> Any reason to further delay the LZMA adoption?
-> >> It will not be the fastest decompressor, but gives the smallest kernel size.
-> >> Tested on various Zaurus models (pxa255, pxa270, armv4).
-> >
-> > It's in the devel branch of Russell's tree already, so it should find
-> > its way to mainline :)
-> >
-> 
-> Tested on my zaurus, worked just out of the box. Thanks.
+The member 'private' of 'struct dma_chan' is meant for passing
+data between client and the controller driver.
 
-And tested on a couple of OMAP3 boards too. Works great. Thanks!
+The DMA client driver may point it to platform specific stuff after
+acquiring the channel. So, it is the responsiblity of the same code
+to reset it, if it must.
+
+The DMA engine doesn't set it and hence, shouldn't reset it either.
+
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+---
+ drivers/dma/dmaengine.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index d18b5d0..3b4dab5 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -515,7 +515,6 @@ struct dma_chan *__dma_request_channel(dma_cap_mask_t *mask, dma_filter_fn fn, v
+ 				break;
+ 			if (--device->privatecnt == 0)
+ 				dma_cap_clear(DMA_PRIVATE, device->cap_mask);
+-			chan->private = NULL;
+ 			chan = NULL;
+ 		}
+ 	}
+@@ -537,7 +536,6 @@ void dma_release_channel(struct dma_chan *chan)
+ 	/* drop PRIVATE cap enabled by __dma_request_channel() */
+ 	if (--chan->device->privatecnt == 0)
+ 		dma_cap_clear(DMA_PRIVATE, chan->device->cap_mask);
+-	chan->private = NULL;
+ 	mutex_unlock(&dma_list_mutex);
+ }
+ EXPORT_SYMBOL_GPL(dma_release_channel);
+-- 
+1.6.2.5
