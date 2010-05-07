@@ -1,32 +1,30 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 07 May 2010 11:59:27 -0700
-Subject: MSM PMU Support in Commit ee3c454b
-In-Reply-To: <20100507182637.GE7887@n2100.arm.linux.org.uk>
-References: <000101caee07$104acdc0$30e06940$@deacon@arm.com>
-	<20100507181543.GC7887@n2100.arm.linux.org.uk>
-	<1273256647.3542.45.camel@c-dwalke-linux.qualcomm.com>
-	<20100507182637.GE7887@n2100.arm.linux.org.uk>
-Message-ID: <1273258767.3542.80.camel@c-dwalke-linux.qualcomm.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 7 May 2010 21:00:46 +0200
+Subject: [FOR RMK] PL330: Add common core driver
+In-Reply-To: <1272685028-14295-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1272685028-14295-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <q2r63386a3d1005071200lbf191c40r6efabbefbf93a353@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-05-07 at 19:26 +0100, Russell King - ARM Linux wrote:
-> On Fri, May 07, 2010 at 11:24:07AM -0700, Daniel Walker wrote:
-> > On Fri, 2010-05-07 at 19:15 +0100, Russell King - ARM Linux wrote:
-> > > Maybe I'll just keep the devel-stable branch entirely separate until
-> > > the devel stuff has been merged, and then MSM can be sorted at some
-> > > point later.  This unfortunately means that devel-stable drops out of
-> > > linux-next.  It also means that linux-next is at risk of missing the
-> > > merge window... again.
-> > 
-> > Would it matter if you just did a revert on the MSM pmu patch ?
-> 
-> No - and it might be better if you did it.  I could do it on my
-> devel-stable branch but then that'll cause you problems if you
-> apply a patch from Will for this (but I think you'll have problems
-> with that whichever way.)
+2010/5/1 Jassi Brar <jassisinghbrar@gmail.com>:
 
-I'll add a revert on my for-russell branch, then you can pull that. Is
-that what your thinking ?
+> From: Jassi Brar <jassi.brar@samsung.com>
+>
+> PL330 is a configurable DMA controller PrimeCell device.
+> The register map of the device is well defined.
+> The configuration of a particular implementation can be
+> read from the six configuration registers CR0-4,Dn.
+>
+> This patch implements a driver for the specification:-
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0424a/DDI0424A_dmac_pl330_r0p0_trm.pdf
+>
+> The exported interface should be sufficient to implement
+> a driver for any DMA API.
+>
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 
-Daniel
+Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
