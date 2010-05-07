@@ -1,33 +1,28 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 07 May 2010 09:01:09 +0300
-Subject: [PATCH 2/2] Remove now-defunct ts7250 nand driver
-In-Reply-To: <0D753D10438DA54287A00B0270842697636ECB4D36@AUSP01VMBX24.collaborationhost.net>
-References: <201001051459.58621.hartleys@visionengravers.com>
-	<1262784693.3181.8034.camel@macbook.infradead.org>
-	<BD79186B4FD85F4B8E60E381CAEE1909020893C9@mi8nycmail19.Mi8.com>
-	<1262799737.3181.8388.camel@macbook.infradead.org>
-	<BD79186B4FD85F4B8E60E381CAEE1909020893D4@mi8nycmail19.Mi8.com>
-	<0D753D10438DA54287A00B0270842697636ECB4D36@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <1273212069.2178.9.camel@localhost>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Fri, 7 May 2010 12:24:07 +0530
+Subject: [PATCH v2] ARM: Add support for LZMA-compressed kernel images
+In-Reply-To: <v2zf17812d71005060854o2f24263bl33e5ea8e25921d6c@mail.gmail.com>
+References: <1258729323-16318-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<1268335467-24223-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<4BAB2552.9070704@gmail.com>
+	<x2nd1b08f941005060204j3bbf3fc9z11cc4325a20bdb82@mail.gmail.com>
+	<x2vbbb699fe1005060630tab568c6aj2e23bb0665a1644a@mail.gmail.com>
+	<v2zf17812d71005060854o2f24263bl33e5ea8e25921d6c@mail.gmail.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0322C7EF6D@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-06 at 11:47 -0500, H Hartley Sweeten wrote:
-> Hello David,
+Eric Miao wrote:
+> On Thu, May 6, 2010 at 9:30 PM, Albin Tonnerre <albin.tonnerre@gmail.com> wrote:
+> > On Thu, May 6, 2010 at 11:04 AM, Andrea Adami <andrea.adami@gmail.com> wrote:
+> >> Any reason to further delay the LZMA adoption?
+> >> It will not be the fastest decompressor, but gives the smallest kernel size.
+> >> Tested on various Zaurus models (pxa255, pxa270, armv4).
+> >
+> > It's in the devel branch of Russell's tree already, so it should find
+> > its way to mainline :)
+> >
 > 
-> Do you know the status of these two patches in linux-next:
+> Tested on my zaurus, worked just out of the box. Thanks.
 
-I'm not David, but I think I know the answer. Last merge window was
-missed and the mtd tree was not merged, so the patches are waiting for
-the next merge window and will be merged.
-
-[snip]
-
-> I have some pending patches for arch/arm/mach-ep93xx/ts72xx.c that
-> depend on these.
-
-Just send your depending patches.
-
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+And tested on a couple of OMAP3 boards too. Works great. Thanks!
