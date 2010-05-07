@@ -1,91 +1,121 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu,  6 May 2010 16:24:25 -0700
-Subject: [PATCH 34/34] davinci: edma: fix coding style issue related to usage
-	of braces
-In-Reply-To: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273188265-12782-35-git-send-email-khilman@deeprootsystems.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 7 May 2010 01:35:04 +0100
+Subject: [PATCH 8/8] Add support for backlight regulation on Acer n35
+In-Reply-To: <4BE2C2FF.8020404@vscht.cz>
+References: <4BE1EE8C.8040900@vscht.cz>
+	<20100506012258.GZ6684@trinity.fluff.org>
+	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
+	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
+	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
+	<4BE2C2CC.2010003@vscht.cz> <4BE2C2FF.8020404@vscht.cz>
+Message-ID: <20100507003504.GV2589@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+On Thu, May 06, 2010 at 03:24:15PM +0200, Pinkava J. wrote:
+> 
 
-In the edma driver, there are couple of instances where braces
-are used for a single statement 'if' construct.
+would a description here hurt?
 
-There are other instances where 'else' part of the if-else construct
-does not use braces even if the 'if' part is a multi-line statement.
+ 
+> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+> ---
+>  arch/arm/mach-s3c2410/mach-n30.c |   57 ++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 57 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+> index f25275e..4c37c71 100644
+> --- a/arch/arm/mach-s3c2410/mach-n30.c
+> +++ b/arch/arm/mach-s3c2410/mach-n30.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/input.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pwm_backlight.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/timer.h>
+>  #include <linux/io.h>
+> @@ -352,6 +353,60 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
+>  	.lpcsel		= 0x06,
+>  };
+> 
+> +static int n35_backlight_init(struct device *dev)
+> +{
+> +	gpio_request(S3C2410_GPB(0), "Backlight PWM");
+> +	gpio_request(S3C2410_GPB(1), "Backlight power driver");
+> +
+> +	/* set GPIO as output for timer */
+> +	s3c2410_gpio_setpin(S3C2410_GPB(0), 0);
+> +	s3c2410_gpio_pullup(S3C2410_GPB(0), 0);
+> +	s3c2410_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
+> +
+> +	/* setup backlight power driving GPIO */
+> +	s3c2410_gpio_pullup(S3C2410_GPB(1), 1);
+> +	s3c2410_gpio_cfgpin(S3C2410_GPB(1), S3C2410_GPIO_OUTPUT);
 
-This patch fixes both.
+I'm going to hold this one pending the merge of the gpio updates, since
+these calls are going away.
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-davinci/dma.c |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
+> +	return 0;
+> +}
+> +
+> +static int n35_backlight_notify(struct device *dev, int brightness)
+> +{
+> +	/* power off backlight, values less than 12 ar useless */
+> +	s3c2410_gpio_setpin(S3C2410_GPB(1), brightness > 12 ? 1 : 0);
+> +	return (brightness > 12 ? brightness : 0);
+> +}
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index b705089..cc5fcda 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -310,10 +310,9 @@ setup_dma_interrupt(unsigned lch,
- 	ctlr = EDMA_CTLR(lch);
- 	lch = EDMA_CHAN_SLOT(lch);
- 
--	if (!callback) {
-+	if (!callback)
- 		edma_shadow0_write_array(ctlr, SH_IECR, lch >> 5,
- 				(1 << (lch & 0x1f)));
--	}
- 
- 	edma_cc[ctlr]->intr_data[lch].callback = callback;
- 	edma_cc[ctlr]->intr_data[lch].data = data;
-@@ -376,12 +375,11 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
- 				/* Clear the corresponding IPR bits */
- 				edma_shadow0_write_array(ctlr, SH_ICR, j,
- 							(1 << i));
--				if (edma_cc[ctlr]->intr_data[k].callback) {
-+				if (edma_cc[ctlr]->intr_data[k].callback)
- 					edma_cc[ctlr]->intr_data[k].callback(
- 						k, DMA_COMPLETE,
- 						edma_cc[ctlr]->intr_data[k].
- 						data);
--				}
- 			}
- 		}
- 		cnt++;
-@@ -473,9 +471,8 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
- 		if ((edma_read_array(ctlr, EDMA_EMR, 0) == 0)
- 		    && (edma_read_array(ctlr, EDMA_EMR, 1) == 0)
- 		    && (edma_read(ctlr, EDMA_QEMR) == 0)
--		    && (edma_read(ctlr, EDMA_CCERR) == 0)) {
-+		    && (edma_read(ctlr, EDMA_CCERR) == 0))
- 			break;
--		}
- 		cnt++;
- 		if (cnt > 10)
- 			break;
-@@ -531,8 +528,9 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
- 			if (id == EDMA_CONT_PARAMS_FIXED_EXACT) {
- 				stop_slot = i;
- 				break;
--			} else
-+			} else {
- 				count = num_slots;
-+			}
- 		}
- 	}
- 
-@@ -1402,8 +1400,9 @@ static int __init edma_probe(struct platform_device *pdev)
- 				break;
- 			else
- 				return -ENODEV;
--		} else
-+		} else {
- 			found = 1;
-+		}
- 
- 		len[j] = resource_size(r[j]);
- 
+gpiolib calls here please.
+
+> +static void n35_backlight_exit(struct device *dev)
+> +{
+> +	s3c2410_gpio_cfgpin(S3C2410_GPB(0), 1/*S3C2410_GPB0_OUTP*/);
+we have constants for generic output...
+
+> +	s3c2410_gpio_setpin(S3C2410_GPB(1), 0); /* co stim */
+gpio_set_value().
+
+> +	/* power off backlight */
+> +	s3c2410_gpio_pullup(S3C2410_GPB(1), 0);
+> +	gpio_free(S3C2410_GPB(1));
+> +	gpio_free(S3C2410_GPB(0));
+> +}
+> +
+> +static struct platform_pwm_backlight_data backlight_data = {
+> +	.pwm_id         = 0,
+> +	.max_brightness = 100,
+> +	.dft_brightness = 50,
+> +	/* tcnt = 0x31, FIXME: compute some nicer value */
+> +	.pwm_period_ns  = 3*1000*1000,
+> +	.init           = n35_backlight_init,
+> +	.notify         = n35_backlight_notify,
+> +	.exit           = n35_backlight_exit,
+> +};
+> +
+> +static struct platform_device n35_backlight = {
+> +	.name = "pwm-backlight",
+> +	.dev  = {
+> +		.parent = &s3c_device_timer[0].dev,
+> +		.platform_data = &backlight_data,
+> +	},
+> +	.id   = -1,
+> +};
+> +
+>  static void n30_sdi_set_power(unsigned char power_mode, unsigned short vdd)
+>  {
+>  	switch (power_mode) {
+> @@ -395,6 +450,8 @@ static struct platform_device *n35_devices[] __initdata = {
+>  	&s3c_device_rtc,
+>  	&s3c_device_usbgadget,
+>  	&s3c_device_sdi,
+> +	&s3c_device_timer[0],
+> +	&n35_backlight,
+>  	&n35_button_device,
+>  	&n35_blue_led,
+
 -- 
-1.7.0.2
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
