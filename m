@@ -1,38 +1,28 @@
 From: jassisinghbrar@gmail.com (jassi brar)
-Date: Fri, 7 May 2010 21:31:40 +0900
-Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
-	<i2t63386a3d1005070213u2ad32613w694be1ecbeb46856@mail.gmail.com>
-	<20100507093256.GB19936@n2100.arm.linux.org.uk>
-	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-Message-ID: <j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
+Date: Fri, 7 May 2010 21:50:50 +0900
+Subject: [PATCH 2/2] DMA: PL330: Add async dma api driver
+In-Reply-To: <i2r63386a3d1005070159tf0879839u24c1c1f11466970d@mail.gmail.com>
+References: <1273215671-3090-1-git-send-email-jassisinghbrar@gmail.com>
+	<i2r63386a3d1005070159tf0879839u24c1c1f11466970d@mail.gmail.com>
+Message-ID: <q2p1b68c6791005070550xc0a90815w6ff676c6c32235e1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 7, 2010 at 8:43 PM, Linus Walleij
+On Fri, May 7, 2010 at 5:59 PM, Linus Walleij
 <linus.ml.walleij@gmail.com> wrote:
-> 2010/5/7 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> Or let me put it another way - if people are happy for Linux to support
->> new ARM CPU architectures, but with very little attention given to DMA
->> support on those architectures, then feel free to box the ARM platforms
->> into a corner on DMA support - but on the understanding that _you_ will
->> have to deal with the DMA API breakage on those architectures yourself.
->> Because with ARM platforms not having DMA support, there's absolutely
->> no way to run any checks what so ever on DMA when the CPU architecture
->> support is created.
+> 2010/5/7 Jassi Brar <jassisinghbrar@gmail.com>:
 >
-> I'm doing the best I can to meet exactly this goal. The changes done in
-> the DMA engine were done towards the end of making the DMA
-> engine support *any* DMA controller for the PrimeCells,
-with due respect, I think DMA Engine API is very restricting. And it is not
-just the 'async' character of it but also some desirable features like
-Circular-Linked-Buffer are missing. It may be good enough for Mem->Mem
-but is found wanting for Mem<->Dev transfers.
-I would like to see some new API defined that address reasonable
-requirements of extant platform specific implementations.
+>> Add ASYNC DMA Engine API driver for the PL330 DMAC.
+>> This driver is supposed to be reusable by various
+>> platforms that have one or more PL330 DMACs.
+>> Atm, DMA_SLAVE and DMA_MEMCPY capabilities have been
+>> implemented.
+>>
+>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 
-> So now I guess I have to make it tick on the block known as PL080/PL081
-> as well, and I'll have a try at it.
-I always hoped the pl080 core would be segregated out of S3C implementation,
-but for some new common DMA API.
+.....
+
+> If you fix this and test it on async_tx it's:
+> Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+Will do.
+Thanks.
