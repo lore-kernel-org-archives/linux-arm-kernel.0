@@ -1,67 +1,44 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 7 May 2010 18:10:28 +0200
-Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
-References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
-	<i2t63386a3d1005070213u2ad32613w694be1ecbeb46856@mail.gmail.com>
-	<20100507093256.GB19936@n2100.arm.linux.org.uk>
-	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
-Message-ID: <k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 7 May 2010 11:37:58 -0500
+Subject: [PATCH 2/2] Remove now-defunct ts7250 nand driver
+In-Reply-To: <1273212069.2178.9.camel@localhost>
+References: <201001051459.58621.hartleys@visionengravers.com>
+	<1262784693.3181.8034.camel@macbook.infradead.org>
+	<BD79186B4FD85F4B8E60E381CAEE1909020893C9@mi8nycmail19.Mi8.com>
+	<1262799737.3181.8388.camel@macbook.infradead.org>
+	<BD79186B4FD85F4B8E60E381CAEE1909020893D4@mi8nycmail19.Mi8.com>
+	<0D753D10438DA54287A00B0270842697636ECB4D36@AUSP01VMBX24.collaborationhost.net>
+	<1273212069.2178.9.camel@localhost>
+Message-ID: <0D753D10438DA54287A00B0270842697636ED546A3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/7 jassi brar <jassisinghbrar@gmail.com>:
-> On Fri, May 7, 2010 at 8:43 PM, Linus Walleij
-> <linus.ml.walleij@gmail.com> wrote:
->> 2010/5/7 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->>>
->>> Or let me put it another way - if people are happy for Linux to support
->>> new ARM CPU architectures, but with very little attention given to DMA
->>> support on those architectures, then feel free to box the ARM platforms
->>> into a corner on DMA support - but on the understanding that _you_ will
->>> have to deal with the DMA API breakage on those architectures yourself.
->>> Because with ARM platforms not having DMA support, there's absolutely
->>> no way to run any checks what so ever on DMA when the CPU architecture
->>> support is created.
->>
->> I'm doing the best I can to meet exactly this goal. The changes done in
->> the DMA engine were done towards the end of making the DMA
->> engine support *any* DMA controller for the PrimeCells,
+On Thursday, May 06, 2010 11:01 PM, Artem Bityutskiy wrote:
+> On Thu, 2010-05-06 at 11:47 -0500, H Hartley Sweeten wrote:
+>> Hello David,
+>> 
+>> Do you know the status of these two patches in linux-next:
 >
-> with due respect, I think DMA Engine API is very restricting. And it is not
-> just the 'async' character of it but also some desirable features like
-> Circular-Linked-Buffer are missing. It may be good enough for Mem->Mem
-> but is found wanting for Mem<->Dev transfers.
-> I would like to see some new API defined that address reasonable
-> requirements of extant platform specific implementations.
+> I'm not David, but I think I know the answer. Last merge window was
+> missed and the mtd tree was not merged, so the patches are waiting for
+> the next merge window and will be merged.
 
-I understand these concerns, however I believe the DMAdevices/DMAengine
-API can surely be refactored towards this end. Dan Williams has proved
-*very* cooperative in doing changes and testing for regressions in the
-DMAengine, and I see no fundamental problem with it.
+Hello Artem,
 
-Surely circular linked buffers and other goodies can be retrofitted into the
-DMAengine without a complete redesign? I only see a new slave call
-to support that really, in addition to the existing sglist interface.
+Ah, thought that was the issue.  It did appear that the mtd tree didn't
+get merged.
 
-I remember we discussed circular buffer device->device transfers with
-Dan some while ago, and he was all for including that but wanted some
-real-world example to go along with it.
+> [snip]
 
->> So now I guess I have to make it tick on the block known as PL080/PL081
->> as well, and I'll have a try at it.
+>> I have some pending patches for arch/arm/mach-ep93xx/ts72xx.c that
+>> depend on these.
 >
-> I always hoped the pl080 core would be segregated out of S3C implementation,
-> but for some new common DMA API.
+> Just send your depending patches.
 
-Well, I don't see any fundamental problems with DMAengine, just wanted
-extensions really.
+I'll hold until this gets merged (or dropped if that happens).
 
-I don't know if I'll be able to provide the nice breakout of the PL080 core
-from S3C that you'd like to see but I will try to hack something up as
-a proof-of-concept that the DMAengine can support the PrimeCells
-found on the RealView.
+The patches are intended for the arm tree and I want to avoid any
+merge issues.
 
-Yours,
-Linus Walleij
+Thanks for the update,
+Hartley
