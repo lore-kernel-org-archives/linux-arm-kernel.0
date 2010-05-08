@@ -1,80 +1,97 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Sat, 8 May 2010 11:37:02 +0900
-Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
-References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
-	<i2t63386a3d1005070213u2ad32613w694be1ecbeb46856@mail.gmail.com>
-	<20100507093256.GB19936@n2100.arm.linux.org.uk>
-	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
-	<k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
-Message-ID: <m2u1b68c6791005071937s5b2bbb60p6de395a6c06a963e@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Sat, 8 May 2010 12:24:05 +0200
+Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
+In-Reply-To: <20100503112642.GI30807@buzzloop.caiaq.de>
+References: <20100427075012.GB30801@buzzloop.caiaq.de>
+	<20100427102442.GD30801@buzzloop.caiaq.de>
+	<20100503112642.GI30807@buzzloop.caiaq.de>
+Message-ID: <20100508102405.GJ30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 8, 2010 at 1:10 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> Surely circular linked buffers and other goodies can be retrofitted into the
-> DMAengine without a complete redesign? I only see a new slave call
-> to support that really, in addition to the existing sglist interface.
-well, before taking up the PL330 dma api driver, 'async' character of it
-was the only concern I had in mind. That still is, but I came across a
-a few more peculiarities while implementing the driver.
+Any comments on this one?
 
-a) Async:- For lazy transfers of mem to mem this may be ok.
-  But there might be devices the employ DMA to do extensive M2M transfers
-  (say dedicated multimedia oriented devices) the 'async' nature might be
-  a bottleneck. So too for M<=>D with a fast device with shallow FIFO.
-  There may be clients that don't wanna do much upon DMA done, but they
-  do need notifications ASAP.  By definition, this API forbids such
-expectations.
- IMHO, a DMA api should be as quick as possible - callbacks done in IRQ context.
- But since there maybe clients that need to do sleepable stuff in
-callbacks, the API
- may do two callbacks - 'quick' in irq context and 'lazy' from
-tasklets scheduled from
- the IRQ. Most clients will provide either, while some may provide
-both callback functions.
+Thanks,
+Daniel
 
-b) There seems to be no clear way of reporting failed transfers. The
-device_tx_status
-    can get FAIL/SUCSESS but the call is open ended and can be performed
-    without any time bound after tx_submit. It is not very optimal for
-DMAC drivers
-    to save descriptors of all failed transactions until the channel
-is released.
-    IMHO, provision of status checking by two mechanisms: cookie and dma-done
-   callbacks is complication more than a feature. Perhaps the dma
-engine could provide
-   a default callback, should the client doesn't do so, and track
-done/pending xfers
-  for such requests?
-
-c) Conceptually, the channels are tightly coupled with the DMACs,
-there seems to be
-   no way to be able to schedule a channel among more than one DMACs
-in the runtime,
-   that is if more then one DMAC support the same channel/peripheral.
-   For example, Samsung's S5Pxxxx have many channels available on more
-than 1 DMAC
-   but for this dma api we have to statically assign channels to
-DMACs, which may result in
-   a channel acquire request rejected just because the DMAC we chose
-for it is already
-   fully busy while another DMAC, which also supports the channel, is idling.
-   Unless we treat the same peripheral as, say, I2STX_viaDMAC1 and
-I2STX_viaDMAC2
-   and allocate double resources for these "mutually exclusive" channels.
-
-d) Something like circular-linked-request is highly desirable for one
-of the important DMA
-   clients i.e, audio.
-
-e) There seems to be no ScatterGather support for Mem to Mem transfers.
-
-Or these are just due to my cursory understanding of the DMA Engine core?...
-
-Of course, there are many good features of this API which any API
-should provide.
-
-regards.
+On Mon, May 03, 2010 at 01:26:42PM +0200, Daniel Mack wrote:
+> 
+> On Tue, Apr 27, 2010 at 12:24:42PM +0200, Daniel Mack wrote:
+> > From cefcdab08d1c9636c4a7290bc2bbe937d051bce4 Mon Sep 17 00:00:00 2001
+> > From: Volker Ernst <volker.ernst@txtr.com>
+> > Date: Mon, 26 Apr 2010 22:51:07 +0200
+> > Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
+> > 
+> > This fixes a race condition regarding interrupt bits in the SDHC
+> > controller driver code.
+> > 
+> > In case of PIO-transfer it does not clear SDHC-status bit#11/12
+> > in the INT-handler anymore. INT-handler might be called during
+> > an ongoing PIO-data-transfer (with some other INT-flag set) and
+> > PIO-transfer depends on these bits being set to detect the end
+> > of the data-transfer. This also means that at the end of PIO-
+> > transfer that PIO-software has to clear these bits itself.
+> > 
+> > However in case of DMA-transfer these bits have to be cleared
+> > in the INT-handler, because they are used to generate INTs then.
+> > 
+> > Works solid, no more problems here, can transfer big files.
+> > 
+> > Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
+> > Acked-by: Daniel Mack <daniel@caiaq.de>
+> > Cc: Andy Green <andy@warmcat.com>
+> > ---
+> >  drivers/mmc/host/mxcmmc.c |   13 ++++++++++++-
+> >  1 files changed, 12 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> > index 2c53024..ec18e3b 100644
+> > --- a/drivers/mmc/host/mxcmmc.c
+> > +++ b/drivers/mmc/host/mxcmmc.c
+> > @@ -489,6 +489,9 @@ static void mxcmci_datawork(struct work_struct *work)
+> >  	struct mxcmci_host *host = container_of(work, struct mxcmci_host,
+> >  						  datawork);
+> >  	int datastat = mxcmci_transfer_data(host);
+> > +
+> > +	writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
+> > +		host->base + MMC_REG_STATUS);
+> >  	mxcmci_finish_data(host, datastat);
+> >  
+> >  	if (host->req->stop) {
+> > @@ -553,7 +556,8 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
+> >  	u32 stat;
+> >  
+> >  	stat = readl(host->base + MMC_REG_STATUS);
+> > -	writel(stat & ~STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
+> > +	writel(stat & ~(STATUS_SDIO_INT_ACTIVE | STATUS_DATA_TRANS_DONE |
+> > +			STATUS_WRITE_OP_DONE), host->base + MMC_REG_STATUS);
+> >  
+> >  	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
+> >  
+> > @@ -561,6 +565,13 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
+> >  	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
+> >  	spin_unlock_irqrestore(&host->lock, flags);
+> >  
+> > +#ifdef HAS_DMA
+> > +	if (mxcmci_use_dma(host) &&
+> > +	    (stat & (STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE)))
+> > +		writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
+> > +			host->base + MMC_REG_STATUS);
+> > +#endif
+> > +
+> >  	if (sdio_irq) {
+> >  		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
+> >  		mmc_signal_sdio_irq(host->mmc);
+> > -- 
+> > 1.7.0.3
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
