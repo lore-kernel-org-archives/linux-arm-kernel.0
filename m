@@ -1,125 +1,80 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 7 May 2010 16:54:40 -0700
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Sat, 8 May 2010 11:37:02 +0900
 Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
+In-Reply-To: <k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
 References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
 	<i2t63386a3d1005070213u2ad32613w694be1ecbeb46856@mail.gmail.com>
 	<20100507093256.GB19936@n2100.arm.linux.org.uk>
 	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-Message-ID: <x2se9c3a7c21005071654hb73e7314racd1e8ab432aff4a@mail.gmail.com>
+	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
+	<k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
+Message-ID: <m2u1b68c6791005071937s5b2bbb60p6de395a6c06a963e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 7, 2010 at 4:43 AM, Linus Walleij
+On Sat, May 8, 2010 at 1:10 AM, Linus Walleij
 <linus.ml.walleij@gmail.com> wrote:
-> 2010/5/7 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->
->> I would have thought given the concerns that I stated, merely running
->> the drivers in PIO mode would not address those concerns. ?So no, I'm
->> not satisfied.
->
-> Sorry didn't get it, I understood it as it should be tested on the Versatile
-> without regressions.
->
-> So now I understand that you want the drivers to be tested in DMA mode
-> on the ARM reference HW. Right?
+> Surely circular linked buffers and other goodies can be retrofitted into the
+> DMAengine without a complete redesign? I only see a new slave call
+> to support that really, in addition to the existing sglist interface.
+well, before taking up the PL330 dma api driver, 'async' character of it
+was the only concern I had in mind. That still is, but I came across a
+a few more peculiarities while implementing the driver.
 
-Maybe I am also misunderstanding, but I think the concern is less
-about "does the dma driver work" and more about exposing an api to dma
-clients that is not expressive enough to handle architecture specific
-quirks.  The dma provider can always be fixed up.  The "boxed in"
-effect happens when there is non-trivial pile of dma client device
-drivers using an api that is not expressive enough for a new ARM
-platform
+a) Async:- For lazy transfers of mem to mem this may be ok.
+  But there might be devices the employ DMA to do extensive M2M transfers
+  (say dedicated multimedia oriented devices) the 'async' nature might be
+  a bottleneck. So too for M<=>D with a fast device with shallow FIFO.
+  There may be clients that don't wanna do much upon DMA done, but they
+  do need notifications ASAP.  By definition, this API forbids such
+expectations.
+ IMHO, a DMA api should be as quick as possible - callbacks done in IRQ context.
+ But since there maybe clients that need to do sleepable stuff in
+callbacks, the API
+ may do two callbacks - 'quick' in irq context and 'lazy' from
+tasklets scheduled from
+ the IRQ. Most clients will provide either, while some may provide
+both callback functions.
 
-That being said I think the interface tweaks for device_control and
-channel_status were relatively painless, and the one architecture
-specific call we added seems like something that could never be
-reconciled in a cross-architecture generic api.
+b) There seems to be no clear way of reporting failed transfers. The
+device_tx_status
+    can get FAIL/SUCSESS but the call is open ended and can be performed
+    without any time bound after tx_submit. It is not very optimal for
+DMAC drivers
+    to save descriptors of all failed transactions until the channel
+is released.
+    IMHO, provision of status checking by two mechanisms: cookie and dma-done
+   callbacks is complication more than a feature. Perhaps the dma
+engine could provide
+   a default callback, should the client doesn't do so, and track
+done/pending xfers
+  for such requests?
 
-> So in order for this to be accepted, I also have to implement
-> support for the DMA controller found in the reference platforms from
-> ARM, PL080 and PL081, since there is only this S3C-tilted driver
-> in the kernel so far:
-> arch/arm/mach-s3c64xx/dma.c
->
-> This is hard for me to do since I have to try to lend a device to
-> test it on.
+c) Conceptually, the channels are tightly coupled with the DMACs,
+there seems to be
+   no way to be able to schedule a channel among more than one DMACs
+in the runtime,
+   that is if more then one DMAC support the same channel/peripheral.
+   For example, Samsung's S5Pxxxx have many channels available on more
+than 1 DMAC
+   but for this dma api we have to statically assign channels to
+DMACs, which may result in
+   a channel acquire request rejected just because the DMAC we chose
+for it is already
+   fully busy while another DMAC, which also supports the channel, is idling.
+   Unless we treat the same peripheral as, say, I2STX_viaDMAC1 and
+I2STX_viaDMAC2
+   and allocate double resources for these "mutually exclusive" channels.
 
-I do not think this is a fair burden for you to carry, but it does
-sound like Russell will come looking for you when he finds a
-counter-example architecture that breaks the api assumptions.  The
-multiplexing case seems to be the most challenging to the existing
-model.  The idea to oversubscribe struct dma_chan's versus physical
-channels seems workable... Russell is this the implementation you
-would like to see pre-merge, or is a hand-wavy plan to address it
-enough to let this initial implementation through?
+d) Something like circular-linked-request is highly desirable for one
+of the important DMA
+   clients i.e, audio.
 
-> Anyway, I will see if I can lend the RealView machine again and
-> play around a bit with patching up Bens driver to work with the
-> DMAengine and show that it runs, in DMA mode, on the RealView,
-> as a proof of concept. Would that be OK then?
->
->> As I've said, I don't want the ARM platforms to be boxed into a corner
->> such that they can never have DMA support because this stuff hasn't been
->> properly thought out.
->
-> I'm thinking all I can, I promise. Perhaps I'm not smart enough all the
-> time, it's a known problem, I'm working on it.
->
->> Or let me put it another way - if people are happy for Linux to support
->> new ARM CPU architectures, but with very little attention given to DMA
->> support on those architectures, then feel free to box the ARM platforms
->> into a corner on DMA support - but on the understanding that _you_ will
->> have to deal with the DMA API breakage on those architectures yourself.
->> Because with ARM platforms not having DMA support, there's absolutely
->> no way to run any checks what so ever on DMA when the CPU architecture
->> support is created.
->
-> I'm doing the best I can to meet exactly this goal. The changes done in
-> the DMA engine were done towards the end of making the DMA
-> engine support *any* DMA controller for the PrimeCells, and I've proven
-> it to be possible for two different architectures: U300 and U8500. These
-> are totally different even though they're coming out of the same
-> company (we *weren't* the same company when they were created!).
-> One is ARM9 the other is Cortex A9 dualcore. One use a DMA silicon
-> called COH901318 the other use a DMA silicon named DMA40.
->
-> So now I guess I have to make it tick on the block known as PL080/PL081
-> as well, and I'll have a try at it.
->
->> This is why people like the OMAP folk end up doing a lot of the DMA
->> debugging; they tend to be the first group to pick up new architectures
->> with fully functional platforms.
->
-> Yep it seems we're going to have the same issue with Cortex A9 for
-> U8500.
->
-> Right now we're doing DMA debugging and testing on U300 and
-> U8500 to make sure neither break as a result of these patches,
-> and defining the API for the DMA engine.
->
+e) There seems to be no ScatterGather support for Mem to Mem transfers.
 
-Very reasonable and I am not seeing a merge blocking issue from the
-dmaengine perspective at this point.  The dma_request_channel()
-interface seems sufficient for all the needs to date as it basically
-allows architectures to develop their own dma-provider-to-client
-matching interface to override the generic memory-to-memory client
-matching interface.  The 'slave' interface and the ->private parameter
-of dma_chan (pending Jassi's recent fix) has proven sufficient for
-handling association specific data.  These new patches establish a
-model whereby once you know you are talking to your $ARCH dma driver
-you can make driver specific calls to pass information that would be
-too ugly to pass in a generic fashion.  I do not pretend that this is
-an elegant arrangement, but it has proven to be functional.
+Or these are just due to my cursory understanding of the DMA Engine core?...
 
-I do have concerns about mapping device-to-device dma into a generic
-api.  That's a whole new level of platform-specific crazy, but that is
-not what these patches are about.
+Of course, there are many good features of this API which any API
+should provide.
 
-At the end of the day I still need Russell's ack/acceptance of the
-platform_data infrastructure to move forward, but I'll get the
-dmaengine bits queued into -next so it's at least ready to be pulled.
-
---
-Dan
+regards.
