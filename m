@@ -1,97 +1,30 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sat, 8 May 2010 12:24:05 +0200
-Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
-In-Reply-To: <20100503112642.GI30807@buzzloop.caiaq.de>
-References: <20100427075012.GB30801@buzzloop.caiaq.de>
-	<20100427102442.GD30801@buzzloop.caiaq.de>
-	<20100503112642.GI30807@buzzloop.caiaq.de>
-Message-ID: <20100508102405.GJ30801@buzzloop.caiaq.de>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Sat, 8 May 2010 18:32:47 +0100
+Subject: [PATCH v7 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <3729cd3650f5af6aebfc5bae02ff6aad1b9b1e82.1273120206.git.mika.westerberg@iki.fi>
+References: <cover.1273120206.git.mika.westerberg@iki.fi>
+	<3729cd3650f5af6aebfc5bae02ff6aad1b9b1e82.1273120206.git.mika.westerberg@iki.fi>
+Message-ID: <AANLkTimZywbu5KVvnUouLUoY1GUxWGlYoSgIbUlRDT5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this one?
+On 5/6/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+>  in EP93xx chips.
 
-Thanks,
-Daniel
+Hi
+   I'm confused by the change in this version of the structure of the
+board setup code.
+   Can you post example patches for the board definitions of the
+ts72xx and maybe also the Sim.One?
+   I attach the board setup patches I had working with Sim.One v4, but
+no longer see how to register the S1's card detect IRQ (the necessary
+and the spi platform data.
+   For a definitive Sim.One board definition I'll need to hear whether
+they wish to assign a GPIO for the chip select (and which) in the next
+board revision.
 
-On Mon, May 03, 2010 at 01:26:42PM +0200, Daniel Mack wrote:
-> 
-> On Tue, Apr 27, 2010 at 12:24:42PM +0200, Daniel Mack wrote:
-> > From cefcdab08d1c9636c4a7290bc2bbe937d051bce4 Mon Sep 17 00:00:00 2001
-> > From: Volker Ernst <volker.ernst@txtr.com>
-> > Date: Mon, 26 Apr 2010 22:51:07 +0200
-> > Subject: [PATCH] ARM: mx3: Fix a race condition in mxcmmc
-> > 
-> > This fixes a race condition regarding interrupt bits in the SDHC
-> > controller driver code.
-> > 
-> > In case of PIO-transfer it does not clear SDHC-status bit#11/12
-> > in the INT-handler anymore. INT-handler might be called during
-> > an ongoing PIO-data-transfer (with some other INT-flag set) and
-> > PIO-transfer depends on these bits being set to detect the end
-> > of the data-transfer. This also means that at the end of PIO-
-> > transfer that PIO-software has to clear these bits itself.
-> > 
-> > However in case of DMA-transfer these bits have to be cleared
-> > in the INT-handler, because they are used to generate INTs then.
-> > 
-> > Works solid, no more problems here, can transfer big files.
-> > 
-> > Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-> > Acked-by: Daniel Mack <daniel@caiaq.de>
-> > Cc: Andy Green <andy@warmcat.com>
-> > ---
-> >  drivers/mmc/host/mxcmmc.c |   13 ++++++++++++-
-> >  1 files changed, 12 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> > index 2c53024..ec18e3b 100644
-> > --- a/drivers/mmc/host/mxcmmc.c
-> > +++ b/drivers/mmc/host/mxcmmc.c
-> > @@ -489,6 +489,9 @@ static void mxcmci_datawork(struct work_struct *work)
-> >  	struct mxcmci_host *host = container_of(work, struct mxcmci_host,
-> >  						  datawork);
-> >  	int datastat = mxcmci_transfer_data(host);
-> > +
-> > +	writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
-> > +		host->base + MMC_REG_STATUS);
-> >  	mxcmci_finish_data(host, datastat);
-> >  
-> >  	if (host->req->stop) {
-> > @@ -553,7 +556,8 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
-> >  	u32 stat;
-> >  
-> >  	stat = readl(host->base + MMC_REG_STATUS);
-> > -	writel(stat & ~STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
-> > +	writel(stat & ~(STATUS_SDIO_INT_ACTIVE | STATUS_DATA_TRANS_DONE |
-> > +			STATUS_WRITE_OP_DONE), host->base + MMC_REG_STATUS);
-> >  
-> >  	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
-> >  
-> > @@ -561,6 +565,13 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
-> >  	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
-> >  	spin_unlock_irqrestore(&host->lock, flags);
-> >  
-> > +#ifdef HAS_DMA
-> > +	if (mxcmci_use_dma(host) &&
-> > +	    (stat & (STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE)))
-> > +		writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
-> > +			host->base + MMC_REG_STATUS);
-> > +#endif
-> > +
-> >  	if (sdio_irq) {
-> >  		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
-> >  		mmc_signal_sdio_irq(host->mmc);
-> > -- 
-> > 1.7.0.3
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+
+     M
