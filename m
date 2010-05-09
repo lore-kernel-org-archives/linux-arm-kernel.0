@@ -1,29 +1,25 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 9 May 2010 23:28:11 +0200
-Subject: [PATCH 1/1] mfd: delay to mask tsc irq in max8925
-In-Reply-To: <k2m771cded01004280555wd2df54d3j969ff5f1e3e5267b@mail.gmail.com>
-References: <k2m771cded01004280555wd2df54d3j969ff5f1e3e5267b@mail.gmail.com>
-Message-ID: <20100509212810.GC3269@sortiz.org>
+Date: Mon, 10 May 2010 00:46:45 +0200
+Subject: [PATCH 1/2] regulator: make max8925 sharing one driver structure
+In-Reply-To: <o2o771cded01005040021o74bb8c3cr22c7be427333774b@mail.gmail.com>
+References: <o2o771cded01005040021o74bb8c3cr22c7be427333774b@mail.gmail.com>
+Message-ID: <20100509224644.GE3269@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Haojian,
 
-On Wed, Apr 28, 2010 at 08:55:53AM -0400, Haojian Zhuang wrote:
-> From 07243e51659a11946a149a5f4a74322cfd840c35 Mon Sep 17 00:00:00 2001
+On Tue, May 04, 2010 at 03:21:42AM -0400, Haojian Zhuang wrote:
+> From 782297964a48a3b8547a99de3b5c24d8f02b99ec Mon Sep 17 00:00:00 2001
 > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Tue, 27 Apr 2010 14:55:28 -0400
-> Subject: [PATCH] mfd: delay to mask tsc irq in max8925
+> Date: Thu, 29 Apr 2010 13:33:50 -0400
+> Subject: [PATCH] regulator: make max8925 sharing one driver structure
 > 
-> There're two IRQ pins output from MAX8925. One is PMIC interrupt, the other
-> is TSC interrupt. But they're sharing one irq chip.
-> 
-> After initializing MAX8925 interrupts, unexpected TSC interrupt may occur and
-> it can't be cleared if touch driver isn't loaded.
-> 
-> Now move the operation of masking TSC interrupt behind requesting PMIC
-> interrupt. If touch driver isn't loaded, this interrupt is always masked.
-Patch applied to my for-next branch, thanks.
+> Remove a lot of driver structures in max8925 driver. Make regulators share
+> one driver structure.
+Patch applied, thanks.
+
+Liam, I'll carry those 2 patches with my mfd tree if you're fine with it.
 
 Cheers,
 Samuel.
@@ -31,45 +27,138 @@ Samuel.
 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
->  drivers/mfd/max8925-core.c |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
+>  drivers/mfd/88pm860x-core.c  |   34 ++++++++++++++--------------
+>  drivers/regulator/88pm8607.c |   51 ++++++++---------------------------------
+>  2 files changed, 27 insertions(+), 58 deletions(-)
 > 
-> diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
-> index 85d63c0..f621bce 100644
-> --- a/drivers/mfd/max8925-core.c
-> +++ b/drivers/mfd/max8925-core.c
-> @@ -508,7 +508,7 @@ static int max8925_irq_init(struct max8925_chip
-> *chip, int irq,
->  	max8925_reg_read(chip->i2c, MAX8925_ON_OFF_IRQ2);
->  	max8925_reg_read(chip->rtc, MAX8925_RTC_IRQ);
->  	max8925_reg_read(chip->adc, MAX8925_TSC_IRQ);
-> -	/* mask all interrupts */
-> +	/* mask all interrupts except for TSC */
->  	max8925_reg_write(chip->rtc, MAX8925_ALARM0_CNTL, 0);
->  	max8925_reg_write(chip->rtc, MAX8925_ALARM1_CNTL, 0);
->  	max8925_reg_write(chip->i2c, MAX8925_CHG_IRQ1_MASK, 0xff);
-> @@ -516,7 +516,6 @@ static int max8925_irq_init(struct max8925_chip
-> *chip, int irq,
->  	max8925_reg_write(chip->i2c, MAX8925_ON_OFF_IRQ1_MASK, 0xff);
->  	max8925_reg_write(chip->i2c, MAX8925_ON_OFF_IRQ2_MASK, 0xff);
->  	max8925_reg_write(chip->rtc, MAX8925_RTC_IRQ_MASK, 0xff);
-> -	max8925_reg_write(chip->adc, MAX8925_TSC_IRQ_MASK, 0xff);
+> diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+> index 6a14d2b..21de38d 100644
+> --- a/drivers/mfd/88pm860x-core.c
+> +++ b/drivers/mfd/88pm860x-core.c
+> @@ -176,30 +176,30 @@ static struct resource regulator_resources[] = {
+>  	PM8607_REG_RESOURCE(LDO14, LDO14),
+>  };
 > 
->  	mutex_init(&chip->irq_lock);
->  	chip->core_irq = irq;
-> @@ -547,7 +546,11 @@ static int max8925_irq_init(struct max8925_chip
-> *chip, int irq,
->  		dev_err(chip->dev, "Failed to request core IRQ: %d\n", ret);
->  		chip->core_irq = 0;
->  	}
-> +
->  tsc_irq:
-> +	/* mask TSC interrupt */
-> +	max8925_reg_write(chip->adc, MAX8925_TSC_IRQ_MASK, 0x0f);
-> +
->  	if (!pdata->tsc_irq) {
->  		dev_warn(chip->dev, "No interrupt support on TSC IRQ\n");
->  		return 0;
+> -#define PM8607_REG_DEVS(_name, _id)					\
+> +#define PM8607_REG_DEVS(_id)						\
+>  {									\
+> -	.name		= "88pm8607-" #_name,				\
+> +	.name		= "88pm860x-regulator",				\
+>  	.num_resources	= 1,						\
+>  	.resources	= &regulator_resources[PM8607_ID_##_id],	\
+>  	.id		= PM8607_ID_##_id,				\
+>  }
+> 
+>  static struct mfd_cell regulator_devs[] = {
+> -	PM8607_REG_DEVS(buck1, BUCK1),
+> -	PM8607_REG_DEVS(buck2, BUCK2),
+> -	PM8607_REG_DEVS(buck3, BUCK3),
+> -	PM8607_REG_DEVS(ldo1,  LDO1),
+> -	PM8607_REG_DEVS(ldo2,  LDO2),
+> -	PM8607_REG_DEVS(ldo3,  LDO3),
+> -	PM8607_REG_DEVS(ldo4,  LDO4),
+> -	PM8607_REG_DEVS(ldo5,  LDO5),
+> -	PM8607_REG_DEVS(ldo6,  LDO6),
+> -	PM8607_REG_DEVS(ldo7,  LDO7),
+> -	PM8607_REG_DEVS(ldo8,  LDO8),
+> -	PM8607_REG_DEVS(ldo9,  LDO9),
+> -	PM8607_REG_DEVS(ldo10, LDO10),
+> -	PM8607_REG_DEVS(ldo12, LDO12),
+> -	PM8607_REG_DEVS(ldo14, LDO14),
+> +	PM8607_REG_DEVS(BUCK1),
+> +	PM8607_REG_DEVS(BUCK2),
+> +	PM8607_REG_DEVS(BUCK3),
+> +	PM8607_REG_DEVS(LDO1),
+> +	PM8607_REG_DEVS(LDO2),
+> +	PM8607_REG_DEVS(LDO3),
+> +	PM8607_REG_DEVS(LDO4),
+> +	PM8607_REG_DEVS(LDO5),
+> +	PM8607_REG_DEVS(LDO6),
+> +	PM8607_REG_DEVS(LDO7),
+> +	PM8607_REG_DEVS(LDO8),
+> +	PM8607_REG_DEVS(LDO9),
+> +	PM8607_REG_DEVS(LDO10),
+> +	PM8607_REG_DEVS(LDO12),
+> +	PM8607_REG_DEVS(LDO14),
+>  };
+> 
+>  struct pm860x_irq_data {
+> diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
+> index 5fb83e2..121bab4 100644
+> --- a/drivers/regulator/88pm8607.c
+> +++ b/drivers/regulator/88pm8607.c
+> @@ -484,60 +484,29 @@ static int __devexit
+> pm8607_regulator_remove(struct platform_device *pdev)
+>  {
+>  	struct pm8607_regulator_info *info = platform_get_drvdata(pdev);
+> 
+> +	platform_set_drvdata(pdev, NULL);
+>  	regulator_unregister(info->regulator);
+>  	return 0;
+>  }
+> 
+> -#define PM8607_REGULATOR_DRIVER(_name)				\
+> -{								\
+> -	.driver		= {					\
+> -		.name	= "88pm8607-" #_name,			\
+> -		.owner	= THIS_MODULE,				\
+> -	},							\
+> -	.probe		= pm8607_regulator_probe,		\
+> -	.remove		= __devexit_p(pm8607_regulator_remove),	\
+> -}
+> -
+> -static struct platform_driver pm8607_regulator_driver[] = {
+> -	PM8607_REGULATOR_DRIVER(buck1),
+> -	PM8607_REGULATOR_DRIVER(buck2),
+> -	PM8607_REGULATOR_DRIVER(buck3),
+> -	PM8607_REGULATOR_DRIVER(ldo1),
+> -	PM8607_REGULATOR_DRIVER(ldo2),
+> -	PM8607_REGULATOR_DRIVER(ldo3),
+> -	PM8607_REGULATOR_DRIVER(ldo4),
+> -	PM8607_REGULATOR_DRIVER(ldo5),
+> -	PM8607_REGULATOR_DRIVER(ldo6),
+> -	PM8607_REGULATOR_DRIVER(ldo7),
+> -	PM8607_REGULATOR_DRIVER(ldo8),
+> -	PM8607_REGULATOR_DRIVER(ldo9),
+> -	PM8607_REGULATOR_DRIVER(ldo10),
+> -	PM8607_REGULATOR_DRIVER(ldo12),
+> -	PM8607_REGULATOR_DRIVER(ldo14),
+> +static struct platform_driver pm8607_regulator_driver = {
+> +	.driver		= {
+> +		.name	= "88pm860x-regulator",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= pm8607_regulator_probe,
+> +	.remove		= __devexit_p(pm8607_regulator_remove),
+>  };
+> 
+>  static int __init pm8607_regulator_init(void)
+>  {
+> -	int i, count, ret;
+> -
+> -	count = ARRAY_SIZE(pm8607_regulator_driver);
+> -	for (i = 0; i < count; i++) {
+> -		ret = platform_driver_register(&pm8607_regulator_driver[i]);
+> -		if (ret != 0)
+> -			pr_err("Failed to register regulator driver: %d\n",
+> -				ret);
+> -	}
+> -	return 0;
+> +	return platform_driver_register(&pm8607_regulator_driver);
+>  }
+>  subsys_initcall(pm8607_regulator_init);
+> 
+>  static void __exit pm8607_regulator_exit(void)
+>  {
+> -	int i, count;
+> -
+> -	count = ARRAY_SIZE(pm8607_regulator_driver);
+> -	for (i = 0; i < count; i++)
+> -		platform_driver_unregister(&pm8607_regulator_driver[i]);
+> +	platform_driver_unregister(&pm8607_regulator_driver);
+>  }
+>  module_exit(pm8607_regulator_exit);
+> 
 > -- 
 > 1.5.6.5
 
