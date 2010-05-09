@@ -1,45 +1,77 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Mon, 10 May 2010 07:51:07 +0900
-Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <k2le9c3a7c21005091026y9140dd46i8020c49ebef7c06c@mail.gmail.com>
-References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
-	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
-	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
-	<k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
-	<m2u1b68c6791005071937s5b2bbb60p6de395a6c06a963e@mail.gmail.com>
-	<w2re9c3a7c21005081524z2a52a078nad8d316553dfde80@mail.gmail.com>
-	<l2j1b68c6791005082048j5deaf863g2887c968ff841f2f@mail.gmail.com>
-	<h2ie9c3a7c21005090047lf1157930t9a625073c87e8cea@mail.gmail.com>
-	<l2r1b68c6791005090306ld948bebfqa1e7d22321e302aa@mail.gmail.com>
-	<k2le9c3a7c21005091026y9140dd46i8020c49ebef7c06c@mail.gmail.com>
-Message-ID: <x2q1b68c6791005091551r6e5abe65l9887e2537a86cf2e@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 May 2010 08:03:27 +0900
+Subject: [PATCH] MAINTAINERS: arch/arm/s3c and arch/arm/s5p
+In-Reply-To: <q2m9c9fda241005031917gbe9236f3kd56bfdf9a76ae549@mail.gmail.com>
+References: <cover.1269655208.git.joe@perches.com>
+	<0c97f736400ec243e71ba794ae7046a61d2449c1.1269655208.git.joe@perches.com>
+	<20100412194737.GS3048@n2100.arm.linux.org.uk>
+	<1271102450.2131.27.camel@Joe-Laptop.home>
+	<h2p9c9fda241004121653te938caa2u42e39c31f27e85e1@mail.gmail.com>
+	<1271126826.4631.7.camel@Joe-Laptop.home>
+	<p2y9c9fda241004161243p924e06f0rb1ff64d5ae258819@mail.gmail.com>
+	<20100504004623.GT6684@trinity.fluff.org>
+	<q2m9c9fda241005031917gbe9236f3kd56bfdf9a76ae549@mail.gmail.com>
+Message-ID: <001901caefcb$d9b07460$8d115d20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 2:26 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Sun, May 9, 2010 at 3:06 AM, jassi brar <jassisinghbrar@gmail.com> wrote:
->> This discussion is purely about what the current DMA API misses and what
->> a generic DMA API should do. So, that the current DMA API fills up those
->> gap, if possible. I would love to get started implementing the generic
->> DMA API for reference but my priorities are decided by my employer.
->
-> Well, the only significant miss that has been identified so far is
-> dynamic channel allocation for the device-to-mem case. ?Everything
-> else can be done with small tweaks to the existing interface. ?But
-> some of this discussion reminds me of Section 2.4 of
-> Documentaion/SubmittingPatches:
->
-> 4) Don't over-design.
->
-> Don't try to anticipate nebulous future cases which may or may not
-> be useful: ?"Make it as simple as you can, and no simpler."
-There is a fine line between anticipating future requirements and
-over-designing.
+Kyungmin Park wrote:
+> On Tue, May 4, 2010 at 9:46 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > On Sat, Apr 17, 2010 at 04:43:34AM +0900, Kyungmin Park wrote:
+> >> Please add me and marek.
+> >> Ben how do you think? Marek is proper person since he posted a lot of
+s5p
+> >> series patches.
+> >> Note that byoungho min is no longer works on this series
+> >
+> > I thought the System LSI group where wanting to maintain this, which is
+> > why I've been holding off making any comment about what is going on.
+> >
+> > Personally, I would like to see a co-maintainership between myself
+> > and whoever at Samsung before completely handing over the responsibility.
+> 
+> I agree. then how about the Marek, even though LSI want it. they don't
+> have enough experience with open source works. you can see the recent
+> their works at their git. but we are trying to modify and make a patch
+> with open source style.
 
-We already have Samsung's and STM's SoC sharing a DMAC IP.
+Hi,
 
-Esp with PrimeCells, we are soon likely to see SoCs sharing a
-peripheral IP with possibly different DMACs.
+I don't agree with your opinion that System LSI doesn't have enough
+experience.
+What is 'enough experience' that you said? Is it about posting to mailing
+list ?
+I and my team members also have been posting Samsung SoC patches related to
+Samsung SoC more than you think, even though you argued you and Marek posted
+a lot of s5p series patches.
 
-Some elements may be ideal-design at the cost of over-design, but not all.
-Let us not simply brush aside all concerns as over-designing.
+> Also we setup the public git for open source
+
+When it comes to the public git, System LSI has setup the open git a few
+months earlier than you.
+I hope you stop criticizing us. :-)
+
+Anyway, we will continue to make much contributions as now.
+
+> Thank you,
+> Kyungmin Park
+> 
+> P.S., when do you expect to hand-over responsibility to others?
+> >
+> >> Thank you,
+> >> Kyungmin Park
+> >>
+> >> On Apr 12, 2010 7:47 PM, "Joe Perches" <joe@perches.com> wrote:
+> >>
+> >> On Tue, 2010-04-13 at 08:53 +0900, Kyungmin Park wrote:
+> >> > No, s5p stubs are maintained by Samsung.
+> >> >...
+> >> So perhaps you'll add yourself and the correct entries to MAINTAINERS?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
