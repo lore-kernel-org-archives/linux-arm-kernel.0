@@ -1,128 +1,135 @@
-From: mathieu.desnoyers@polymtl.ca (Mathieu Desnoyers)
-Date: Sat, 8 May 2010 19:30:50 -0400
-Subject: [PATCH 2/2] [RFCv3] arm: add half-word __xchg
-In-Reply-To: <20100505080155.GF27062@shisha.kicks-ass.net>
-References: <1272741800-30115-1-git-send-email-virtuoso@slind.org>
-	<1272741897-30369-1-git-send-email-virtuoso@slind.org>
-	<20100503172755.GA4248@Krystal>
-	<20100505080155.GF27062@shisha.kicks-ass.net>
-Message-ID: <20100508233050.GA32130@Krystal>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Sun, 9 May 2010 12:48:16 +0900
+Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+In-Reply-To: <w2re9c3a7c21005081524z2a52a078nad8d316553dfde80@mail.gmail.com>
+References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
+	<i2t63386a3d1005070213u2ad32613w694be1ecbeb46856@mail.gmail.com>
+	<20100507093256.GB19936@n2100.arm.linux.org.uk>
+	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
+	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
+	<k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
+	<m2u1b68c6791005071937s5b2bbb60p6de395a6c06a963e@mail.gmail.com>
+	<w2re9c3a7c21005081524z2a52a078nad8d316553dfde80@mail.gmail.com>
+Message-ID: <l2j1b68c6791005082048j5deaf863g2887c968ff841f2f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin (virtuoso at slind.org) wrote:
-> On Mon, May 03, 2010 at 01:27:55 -0400, Mathieu Desnoyers wrote:
-> > * Alexander Shishkin (virtuoso at slind.org) wrote:
-> > > On systems where ldrexh/strexh are not available,
-> > >   * for pre-v6 systems, use a generic local version,
-> > >   * for v6 without v6K, emulate xchg2 using 32-bit cmpxchg()
-> > >     (it is not yet clear if xchg1 has to be emulated on such
-> > >     systems as well, thus the "size" parameter).
-> > > 
-> > > The __xchg_generic() function is based on the code that Jamie
-> > > posted earlier.
-> > > 
-> > > Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-> > > CC: linux-arm-kernel-bounces at lists.infradead.org
-> > > CC: Imre Deak <imre.deak@nokia.com>
-> > > CC: Mathieu Desnoyers <mathieu.desnoyers@polymtl.ca>
-> > > CC: Jamie Lokier <jamie@shareable.org>
-> > > ---
-> > >  arch/arm/include/asm/system.h |   56 +++++++++++++++++++++++++++++++++++++++++
-> > >  1 files changed, 56 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> > > index d65b2f5..7a5983f 100644
-> > > --- a/arch/arm/include/asm/system.h
-> > > +++ b/arch/arm/include/asm/system.h
-> > > @@ -218,6 +218,39 @@ do {									\
-> > >  	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
-> > >  } while (0)
-> > >  
-> > > +#if __LINUX_ARM_ARCH__ >= 6
-> > > +
-> > > +#include <linux/align.h>
-> > > +
-> > > +static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-> > > +				      unsigned long new, int size);
-> > > +
-> > > +/*
-> > > + * emulate __xchg() using 32-bit __cmpxchg()
-> > > + */
-> > > +static inline unsigned long __xchg_generic(unsigned long x,
-> > > +						 volatile void *ptr, int size)
-> > > +{
-> > > +	unsigned long *ptrbig = object_align_floor((unsigned long *)ptr);
-> > 
-> > ptrbig could be renamed to something more relevant. Maybe ptralign ?
-> 
-> Well, yes, it's not any bigger than any other pointer here. :)
-> 
+On Sun, May 9, 2010 at 7:24 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Fri, May 7, 2010 at 7:37 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
+>> ?IMHO, a DMA api should be as quick as possible - callbacks done in IRQ context.
+>> ?But since there maybe clients that need to do sleepable stuff in
+>
+> None of the current clients sleep in the callback, it's done in
+> soft-irq context. ?The only expectation is that hard-irqs are enabled
+> during the callback just like timer callbacks. ?I also would like to
+> see numbers to quantify the claims of slowness.
+The clients evolve around the API so they don't do what the API doesn't
+allow. Any API should try to put as least contraints as possible - you never
+know what kinda clients are gonna arise.
+Lets say a protocol requires 'quick' ACK(within few usecs) on control bus after
+xfer'ing a large packet on data bus. All the client needs is to be
+able to toggle
+some bit of the device controller after the DMA done, which can very well be
+done in IRQ context but maybe too late if the callback is done from a tasklet
+scheduled from DMAC ISR.
+The point being, a DMA API should be able to do callbacks from the IRQ context
+too. That is, assuming the clients know what they do.
 
-:)
-
-> > > +	int shift = ((unsigned)ptr - (unsigned)ptrbig) * 8;
-> > 
-> > "unsigned int" everywhere above would be cleaner. Also, it's worth
-> > checking the generated assembly: does gcc perform the transformation:
-> > 
-> >   * 8   ->   << 3    automatically ?
-> 
-> Yes, it's such a basic optimisation that even tinycc will perform it without
-> asking. I've checked anyway, thought. It is indeed a shift instruction for
-> both << 3 and * 8.
-
-OK
-
-> 
-> > > +	unsigned long mask, add, ret;
-> > > +
-> > > +	mask = ~(((1 << (size * 8)) - 1) << shift);
-> > 
-> > Maybe better to do:
-> > 
-> > +	mask = ~((((1UL << 3) << size) - 1) << shift);
-> 
-> I think it's slightly less readable for little gain.
-
-I'm fine either way, as I expect the resulting code to be the same.
-
-> 
-> > But, other question: what assumptions are you doing about endianness
-> > here ? I recall that ARM supports switchable endianness. Dunno about the
-> > Linux-specific case though.
-> 
-
-[side-node: the variable "add" should be renamed to e.g. "new" in
-__xchg_generic]
-
-> Isn't the endiannes case dealt with by the object_align_floor() there?
-
-Pointer alignment and endianness are two completely separate issues.
-
-> The difference would be (for size==2 case, for example) whether shift is
-> 0 or 16 (for say, LE and BE), the mask should always be placed correctly
-> regardless.
-> Please correct me if I'm missing something here.
-> 
-
-Well, the __xchg_generic code seems broken on big endian at least in
-the size==2 case, because no shift is needed (but __xchg_generic is
-doing one). The mask is just selecting the rest of the bits, so if the
-shift is incorrect in the first place, I expect the mask to be similarly
-broken.
-
-Thanks,
-
-Mathieu
+Also, I think it is possible to have an API that allows request submission from
+callbacks, which will be a very useful feature.
+Of course, assuming the clients know what they can/can't do (just like current
+DMA API or any other API).
 
 
-> Regards,
-> --
-> Alex
+>> callbacks, the API
+>> ?may do two callbacks - 'quick' in irq context and 'lazy' from
+>> tasklets scheduled from
+>> ?the IRQ. Most clients will provide either, while some may provide
+>> both callback functions.
+>>
+>> b) There seems to be no clear way of reporting failed transfers. The
+>> device_tx_status
+>> ? ?can get FAIL/SUCSESS but the call is open ended and can be performed
+>> ? ?without any time bound after tx_submit. It is not very optimal for
+>> DMAC drivers
+>> ? ?to save descriptors of all failed transactions until the channel
+>> is released.
+>> ? ?IMHO, provision of status checking by two mechanisms: cookie and dma-done
+>> ? callbacks is complication more than a feature. Perhaps the dma
+>> engine could provide
+>> ? a default callback, should the client doesn't do so, and track
+>> done/pending xfers
+>> ?for such requests?
+>
+> I agree the error handling was designed around mem-to-mem assumptions
+> where failures are due to double-bit ECC errors and other rare events.
+well, neither have I ever seen DMA failure, but a good API shouldn't count
+upon h/w perfection.
 
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+
+>> c) Conceptually, the channels are tightly coupled with the DMACs,
+>> there seems to be
+>> ? no way to be able to schedule a channel among more than one DMACs
+>> in the runtime,
+>> ? that is if more then one DMAC support the same channel/peripheral.
+>> ? For example, Samsung's S5Pxxxx have many channels available on more
+>> than 1 DMAC
+>> ? but for this dma api we have to statically assign channels to
+>> DMACs, which may result in
+>> ? a channel acquire request rejected just because the DMAC we chose
+>> for it is already
+>> ? fully busy while another DMAC, which also supports the channel, is idling.
+>> ? Unless we treat the same peripheral as, say, I2STX_viaDMAC1 and
+>> I2STX_viaDMAC2
+>> ? and allocate double resources for these "mutually exclusive" channels.
+>
+> I am not understanding this example. ?If both DMACs are registered the
+> dma_filter function to dma_request_channel() can select between them,
+> right?
+Let me be precise. I2S_Tx fifo(I2S peripheral/channel) can be be reached
+by two DMACs but, of course, the channel can only be active with
+exactly one DMAC.
+So, it is desirable to be able to reach the peripheral via second DMAC should
+the first one is too busy to handle the request. Clearly this is a
+runtime decision.
+FWIHS, I can associate the channel with either of the DMACs and if that DMAC
+can't handle the I2S_Tx request (say due to its all h/w threads
+allocated to other
+request), I can't play audio even if the DMAC might be simply idling.
+
+
+>>
+>> d) Something like circular-linked-request is highly desirable for one
+>> of the important DMA
+>> ? clients i.e, audio.
+>
+> Is this a standing dma chain that periodically a client will say "go"
+> to re-run those operations? ?Please enlighten me, I've never played
+> with audio drivers.
+Yes, quite similar. Only alsa drivers will say "go" just once at playback start
+and the submitted xfer requests(called periods) are repeatedly transfered in
+circular manner.
+Just a quick snd_pcm_period_elapsed is called in dma-done callback for
+each request(which are usually the same length).
+That way, the client neither have to re-submit requests nor need to do sleepable
+stuff(allocating memory for new reqs and managing local state machine)
+The minimum period size depends on audio latency, which depends on the
+ability to do dma-done callbacks asap.
+This is another example, where the clients wud benefit from callback from IRQ
+context which is also perfectly safe.
+
+>> e) There seems to be no ScatterGather support for Mem to Mem transfers.
+>
+> There has never been a use case, what did you have in mind. ?If
+> multiple prep_memcpy commands is too inefficient we could always add
+> another operation.
+Just that I believe any API should be as exhaustive and generic as possible.
+I see it possible for multimedia devices/drivers to evolve to start needing
+such capabilities.
+Also, the way DMA API treats memcpy/memset and assume SG reqs to be
+equivalent to MEM<=>DEV request is not very impressive.
+IMHO, any submitted request should be a list of xfers. And an xfer is a
+'memset' with 'src_len' bytes from 'src_addr' to be copied 'n' times
+at 'dst_addr'.
+Memcpy is just a special case of memset, where n := 1
+This covers most possible use cases while being more compact and future-proof.
