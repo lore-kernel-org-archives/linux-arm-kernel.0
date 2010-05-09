@@ -1,65 +1,42 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 9 May 2010 20:17:42 +0300
-Subject: [PATCH v7 1/2] spi: implemented driver for Cirrus EP93xx SPI
-	controller
-In-Reply-To: <AANLkTiks2l9N1uXisctdI3aiNmFavIHzvwbOTcgeFGbZ@mail.gmail.com>
-References: <cover.1273120206.git.mika.westerberg@iki.fi>
-	<3729cd3650f5af6aebfc5bae02ff6aad1b9b1e82.1273120206.git.mika.westerberg@iki.fi>
-	<AANLkTimZywbu5KVvnUouLUoY1GUxWGlYoSgIbUlRDT5w@mail.gmail.com>
-	<20100509092917.GR26418@gw.healthdatacare.com>
-	<AANLkTiks2l9N1uXisctdI3aiNmFavIHzvwbOTcgeFGbZ@mail.gmail.com>
-Message-ID: <20100509171742.GS26418@gw.healthdatacare.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Sun, 9 May 2010 10:26:26 -0700
+Subject: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+In-Reply-To: <l2r1b68c6791005090306ld948bebfqa1e7d22321e302aa@mail.gmail.com>
+References: <1272848060-28049-1-git-send-email-linus.walleij@stericsson.com>
+	<20100507093256.GB19936@n2100.arm.linux.org.uk>
+	<x2j63386a3d1005070443yfadbaf3ct8686a8f7aae6412f@mail.gmail.com>
+	<j2r1b68c6791005070531u57b4b1basc56d45d0e06b1d04@mail.gmail.com>
+	<k2k63386a3d1005070910kcdb516dcga60c24043b1b44de@mail.gmail.com>
+	<m2u1b68c6791005071937s5b2bbb60p6de395a6c06a963e@mail.gmail.com>
+	<w2re9c3a7c21005081524z2a52a078nad8d316553dfde80@mail.gmail.com>
+	<l2j1b68c6791005082048j5deaf863g2887c968ff841f2f@mail.gmail.com>
+	<h2ie9c3a7c21005090047lf1157930t9a625073c87e8cea@mail.gmail.com>
+	<l2r1b68c6791005090306ld948bebfqa1e7d22321e302aa@mail.gmail.com>
+Message-ID: <k2le9c3a7c21005091026y9140dd46i8020c49ebef7c06c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 09, 2010 at 05:47:34PM +0100, Martin Guy wrote:
-> On 5/9/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> > On Sat, May 08, 2010 at 06:32:47PM +0100, Martin Guy wrote:
-> >  > On 5/6/10, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> >  > > This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
-> >  > >  in EP93xx chips.
-> >
-> > >    I'm confused by the change in this version of the structure of the
-> >  > board setup code.
-> >
-> >  For Sim.One, I modified your patches a bit and resulting patch is
-> >  included. Note that I have hooked EGPIO9 as a chip select but in
-> >  normal case (SFRMOUT) you can just do following (leave .controller_data
-> >  as NULL):
-> 
-> Many thanks. If you want to submit this to mainline there are just a
-> couple of changes to make:
-> 
-> > +#define MMC_CHIP_SELECT_GPIO EP93XX_GPIO_LINE_EGPIO9
-> 
-> EGPIO9 is part of the keyboard controller - I don't think we can
-> hijack that for a patch to the mainline kernel! I've used EGPIO15
-> which is unused and on TP17 just south of the CPU.
+On Sun, May 9, 2010 at 3:06 AM, jassi brar <jassisinghbrar@gmail.com> wrote:
+> This discussion is purely about what the current DMA API misses and what
+> a generic DMA API should do. So, that the current DMA API fills up those
+> gap, if possible. I would love to get started implementing the generic
+> DMA API for reference but my priorities are decided by my employer.
 
-It was just my own hack ;) Maybe I also use EGPIO15 for the chip select.
+Well, the only significant miss that has been identified so far is
+dynamic channel allocation for the device-to-mem case.  Everything
+else can be done with small tweaks to the existing interface.  But
+some of this discussion reminds me of Section 2.4 of
+Documentaion/SubmittingPatches:
 
-I think that we can submit this to mainline only after next Sim.One
-revision (is there going to be next one?) where we know what that
-GPIO line will be.
+4) Don't over-design.
 
-> >                 .mode                   = SPI_MODE_0,
-> 
-> Using SPI_MODE_3 increases the read speed from 319 kB/s to 367 kB/s -
-> even when using a GPIO as the chip select.
+Don't try to anticipate nebulous future cases which may or may not
+be useful:  "Make it as simple as you can, and no simpler."
 
-OK. So we will use MODE_3 in Sim.One (and maybe in TS-7260). Thanks.
+Let's just wait for the code before outlining what can and cannot be
+done, especially given where we started [1].
 
-> Your 4GB card fix works here too, though I'm seeing no difference in
-> anything between using SFRMOUT and a GPIO for the chip select. Did you
-> see any functionality or performance improvements using a GPIO for CS
-> with the SD cards you are testing?
+--
+Dan
 
-Actually no. But at least chipselect should work better so I guess
-it could help with cards that haven't previously worked.
-
-That 4GB hack is something that need to be further investigated;
-It shows that some SDHC cards (at least) will fail when reading
-last (Linux) block using multiblock read.
-
-Regards,
-MW
+[1]: http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=include/linux/dmaengine.h;hb=v2.6.18#l160
