@@ -1,29 +1,137 @@
-From: slapinid@gmail.com (Sergey Lapin)
-Date: Mon, 10 May 2010 05:33:44 +0400
-Subject: OTG implementation with external transceiver on PXA270
-Message-ID: <AANLkTim7lTbhu97hy3tiSXVpkQKr5X6YpU8zSUiVarca@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 10 May 2010 03:35:37 +0100
+Subject: S3C6410 power management support status
+In-Reply-To: <20100506144955.GA24641@jeknote.loshitsa1.net>
+References: <20100429124509.GA11290@jeknote.loshitsa1.net>
+	<20100504002420.GQ6684@trinity.fluff.org>
+	<20100506144955.GA24641@jeknote.loshitsa1.net>
+Message-ID: <20100510023537.GW26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all!
+On Thu, May 06, 2010 at 05:49:55PM +0300, Yauhen Kharuzhy wrote:
+> On Tue, May 04, 2010 at 01:24:20AM +0100, Ben Dooks wrote:
+> > On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
+> > > Hi.
+> > > 
+> > > Can anybody explain current status of S3C6410 power management support
+> > > in mainline? Suspend-to-RAM looks completely broken in the current
+> > > Linus's git tree.
+> > 
+> > I'd prefer if you didn't make sweeping accusations about the state of
+> > a given piece of the kernel without having a good look first. From reading
+> > your second post, it seems that what is actually the problem is that the
+> > 64XX support only currently handles wakeup configurations from the EINT
+> > pins.
+> 
+> I am sorry for my hasty opinion about StR.
+> 
+> But we have checked Suspend-to-RAM at our (custom, not SMDK) board just now
+> and it is not works with EINT too. Kernel goes to sleep and never
+> return. We found that XPWRRGTON pin isn't
+> changed at sleep instruction execution so CPU don't go to sleep state. If anybody
+> can say something about reasons of this, please say.
 
-I try to implement external OTG transceiver on PXA270.
-I just need basic device mode at the moment.
+Just tested 2.6.34-rc6-git and it works on the SMDK6410 with the
+addition of the gpio buttons for EINT9..11, and it worked.
 
-A problem is that PXA itself handles interrupt of external chip via
-UDC interrupt. But I need to read my chip-specific registers
-from there while I want to maintain pxa270_udc in a generic way
-without cluttering it with i2c calls, so I can implement it in the
-following ways:
+Can post the patches or git tree if you like.
+ 
+> Can anybody check suspend mode with SMDK6410 and confirm that StR works
+> on it? If it works, we will stop to ask stupid questions and will find
+> our hardware bugs :)
 
-* make chip-specific data struct global (like it is in isp1301_omap.c
-and make exported function in OTG driver, enable handling of OTG interrupts
-in pxa27x_udc and call that function from there.
-* add API function like otg_handle_interrupt, enable handling of OTG interrupts
-in pxa27x_udc and call it from there. Which seems to be less messy.
+It does seem to work on this SMDK, and the XPWRTGON line on TP7 definetly
+goes low during sleep.
 
-Any other suggestions? If that work is really being done somewhere,
-I'd like to help with testing.
+Note, not sure if I will post the buttons patches as the SMDK's single
+buttons share interrupts with the LAN and other devices, making them
+rather useless (my SMDK6410 has EINT10 held permanently active by the
+unused network devices...)
+ 
+> Below is log of sleeping procedure:
+> -----------------------------------------------------------------------
+> /sys/power # echo mem > state
+> s3c64xx_irq_pm_suspend: suspending IRQs
+> saved f4500280 value 000003ff
+> saved f4500900 value 00400000
+> saved f4500904 value 00000000
+> saved f4500910 value 00000000
+> saved f4500914 value 00000000
+> saved f4500918 value 00000000
+> saved f450091c value 00000000
+> saved f4500920 value 0ffff7ff
+> saved f4300044 value 00000210
+> s3c_pm_enter(3)
+> s3c_sleep_save_phys=0x503cac18
+> GPA: save 00000000,22222222,0000007a,00002955
+> GPB: save 00000000,02212222,0000007b,00002955
+> GPC: save 00000000,11331000,00000010,00005055
+> GPD: save 00000000,00000000,00000000,00000155
+> GPE: save 00000000,00000000,00000000,00000155
+> GPF: save 50000000,00008000,55555555,00000000
+> GPG: save 00000000,03222222,0000003e,00002000
+> GPH: save 33222222,00000033,000003fe,00000000
+> GPI: save aaaaaaaa,00000000,00000000,00000000
+> GPJ: save 00aaaaaa,00000f00,00000000,00000000
+> GPK: save 22222222,22222222,00000000,55555555
+> GPL: save 12121122,02222211,0000038c,15555555
+> GPM: save 00000000,00222222,0000001f,000002aa
+> GPN: save 55940454,0000f81a,55955555,00000000
+> GPO: save aaaaaaaa,0000003f,00000000,00000000
+> GPP: save 2aaaaaaa,000038e7,1011aaa0,00000000
+> GPQ: save 0002aaaa,00000018,00000000,00000000
+> UART[0]: ULCON=0007, UCON=0785, UFCON=0011, UBRDIV=0000
+> UART[1]: ULCON=002b, UCON=0385, UFCON=0011, UBRDIV=0003
+> UART[2]: ULCON=0003, UCON=0385, UFCON=0011, UBRDIV=001f
+> UART[3]: ULCON=0007, UCON=0785, UFCON=0011, UBRDIV=0000
+> saved f4100100 value 04000000
+> saved f4100104 value 00000000
+> saved f4100108 value 00000000
+> saved f45001a0 value ffcd1501
+> saved f45001b0 value 00000000
+> saved f45001b4 value 00000000
+> saved f45001c0 value 00000000
+> saved f45001c4 value 00000000
+> saved f45001c8 value 00000000
+> saved f4100000 value 0000ffff
+> saved f4100004 value 0000ffff
+> saved f4100008 value 0000ffff
+> saved f410001c value 00000007
+> saved f4100020 value 01043310
+> saved f4100024 value 00000000
+> saved f4100028 value 00000000
+> saved f410002c value 00000000
+> saved f4100030 value fffffff7
+> saved f4100034 value fb9e6fff
+> saved f4100038 value c73fffff
+> saved f410003c value ffffffff
+> saved f4100018 value 00000000
+> saved f4100014 value 00200203
+> saved f45001d0 value 10555551
+> saved f45001d4 value 00555555
+> sleep: irq wakeup masks: ffffffff,fffff7ff
+> ------------------------------------------------------------------------------
+> 
+> -- 
+> Yauhen Kharuzhy
+> -----------------------------------------------------------
+> Promwad Innovation Company
+> 22, Olshevskogo St.
+> Office 809
+> 220073, Minsk, Belarus
+> Phone/Fax: +375 (17) 312-1246
+> E-mail: yauhen.kharuzhy at promwad.com
+> Skype: jekhor
+> Web: www.promwad.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thanks a lot,
-S.
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
