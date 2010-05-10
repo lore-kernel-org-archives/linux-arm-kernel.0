@@ -1,158 +1,34 @@
-From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Mon, 10 May 2010 22:27:15 +0800
-Subject: [PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
-Message-ID: <1273501635-28403-1-git-send-email-tom.leiming@gmail.com>
+From: jekhor@gmail.com (Yauhen Kharuzhy)
+Date: Mon, 10 May 2010 17:27:22 +0300
+Subject: S3C6410 power management support status
+In-Reply-To: <20100510023537.GW26401@trinity.fluff.org>
+References: <20100429124509.GA11290@jeknote.loshitsa1.net>
+	<20100504002420.GQ6684@trinity.fluff.org>
+	<20100506144955.GA24641@jeknote.loshitsa1.net>
+	<20100510023537.GW26401@trinity.fluff.org>
+Message-ID: <20100510142721.GA32413@jeknote.loshitsa1.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ming Lei <tom.leiming@gmail.com>
+On Mon, May 10, 2010 at 03:35:37AM +0100, Ben Dooks wrote:
+> > Can anybody check suspend mode with SMDK6410 and confirm that StR works
+> > on it? If it works, we will stop to ask stupid questions and will find
+> > our hardware bugs :)
+> 
+> It does seem to work on this SMDK, and the XPWRTGON line on TP7 definetly
+> goes low during sleep.
+> 
+> Note, not sure if I will post the buttons patches as the SMDK's single
+> buttons share interrupts with the LAN and other devices, making them
+> rather useless (my SMDK6410 has EINT10 held permanently active by the
+> unused network devices...)
 
-This patch fixes the 'unannotated irqs-on' lockdep warning below:
+Thanks for your help. Last question: which U-Boot (or another
+bootloader) you use?
 
-	CPU: Testing write buffer coherency: ok
-	------------[ cut here ]------------
-	WARNING: at kernel/lockdep.c:3145 check_flags+0xcc/0x1dc()
-	Modules linked in:
-	[<c0035120>] (unwind_backtrace+0x0/0xf8) from [<c0355374>] (dump_stack+0x20/0x24)
-	[<c0355374>] (dump_stack+0x20/0x24) from [<c0060c04>] (warn_slowpath_common+0x58/0x70)
-	[<c0060c04>] (warn_slowpath_common+0x58/0x70) from [<c0060c3c>] (warn_slowpath_null+0x20/0x24)
-	[<c0060c3c>] (warn_slowpath_null+0x20/0x24) from [<c008f224>] (check_flags+0xcc/0x1dc)
-	[<c008f224>] (check_flags+0xcc/0x1dc) from [<c00945dc>] (lock_acquire+0x50/0x140)
-	[<c00945dc>] (lock_acquire+0x50/0x140) from [<c0358434>] (_raw_spin_lock+0x50/0x88)
-	[<c0358434>] (_raw_spin_lock+0x50/0x88) from [<c00fd114>] (set_task_comm+0x2c/0x60)
-	[<c00fd114>] (set_task_comm+0x2c/0x60) from [<c007e184>] (kthreadd+0x30/0x108)
-	[<c007e184>] (kthreadd+0x30/0x108) from [<c0030104>] (kernel_thread_exit+0x0/0x8)
-	---[ end trace 1b75b31a2719ed1c ]---
-	possible reason: unannotated irqs-on.
-	irq event stamp: 3
-	hardirqs last  enabled at (2): [<c0059bb0>] finish_task_switch+0x48/0xb0
-	hardirqs last disabled at (3): [<c002f0b0>] ret_slow_syscall+0xc/0x1c
-	softirqs last  enabled at (0): [<c005f3e0>] copy_process+0x394/0xe5c
-	softirqs last disabled at (0): [<(null)>] (null)
-
-This patch introduces macro of trace_ret_hardirqs_on, which will
-call trace_hardirqs_on if I flag in the stored CPSR is zero.
-
-In the path of returning to user-space, the patch replaces disable_irq
-with disable_irq_notrace in ret_to_user to avoid the 'unannotated irqs-on'
-lockdep warning since hardirqs is always enabled before returning to user.
-
-In the path of returning to kernel-space, the patch still replaces
-disable_irq with disable_irq_notrace in __xxx_svc handler and adds
-trace_hardirqs_on before calling svc_exit to trace the possible hardirqs on
-event for avoiding the possible 'unannotated irqs-on' lockdep warning.
-
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- arch/arm/kernel/entry-armv.S   |   31 +++++++++++++++++--------------
- arch/arm/kernel/entry-common.S |    2 +-
- arch/arm/kernel/entry-header.S |    7 +++++++
- 3 files changed, 25 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index e6a0fb0..7202adf 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -204,13 +204,15 @@ __dabt_svc:
- 	@
- 	@ IRQs off again before pulling preserved data off the stack
- 	@
--	disable_irq
-+	disable_irq_notrace
- 
- 	@
- 	@ restore SPSR and restart the instruction
-+	@ trace possible hardirqs on event before returning
- 	@
--	ldr	r2, [sp, #S_PSR]
--	svc_exit r2				@ return from exception
-+	ldr	r4, [sp, #S_PSR]
-+	trace_ret_hardirqs_on r4
-+	svc_exit r4				@ return from exception
-  UNWIND(.fnend		)
- ENDPROC(__dabt_svc)
- 
-@@ -235,10 +237,7 @@ __irq_svc:
- 	blne	svc_preempt
- #endif
- 	ldr	r4, [sp, #S_PSR]		@ irqs are already disabled
--#ifdef CONFIG_TRACE_IRQFLAGS
--	tst	r4, #PSR_I_BIT
--	bleq	trace_hardirqs_on
--#endif
-+	trace_ret_hardirqs_on r4
- 	svc_exit r4				@ return from exception
-  UNWIND(.fnend		)
- ENDPROC(__irq_svc)
-@@ -291,13 +290,15 @@ __und_svc:
- 	@
- 	@ IRQs off again before pulling preserved data off the stack
- 	@
--1:	disable_irq
-+1:	disable_irq_notrace
- 
- 	@
- 	@ restore SPSR and restart the instruction
-+	@ trace possible hardirqs on event before returning
- 	@
--	ldr	r2, [sp, #S_PSR]		@ Get SVC cpsr
--	svc_exit r2				@ return from exception
-+	ldr	r4, [sp, #S_PSR]		@ Get SVC cpsr
-+	trace_ret_hardirqs_on r4
-+	svc_exit r4				@ return from exception
-  UNWIND(.fnend		)
- ENDPROC(__und_svc)
- 
-@@ -327,13 +328,15 @@ __pabt_svc:
- 	@
- 	@ IRQs off again before pulling preserved data off the stack
- 	@
--	disable_irq
-+	disable_irq_notrace
- 
- 	@
- 	@ restore SPSR and restart the instruction
--	@
--	ldr	r2, [sp, #S_PSR]
--	svc_exit r2				@ return from exception
-+	@ trace possible hardirqs on event before returning
-+	@	
-+	ldr	r4, [sp, #S_PSR]
-+	trace_ret_hardirqs_on r4
-+	svc_exit r4				@ return from exception
-  UNWIND(.fnend		)
- ENDPROC(__pabt_svc)
- 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 2c1db77..ed471a7 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -58,7 +58,7 @@ work_resched:
-  */
- ENTRY(ret_to_user)
- ret_slow_syscall:
--	disable_irq				@ disable interrupts
-+	disable_irq_notrace				@ disable interrupts
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index d93f976..ac51ce3 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -30,6 +30,13 @@
- #error "Please fix"
- #endif
- 
-+	.macro trace_ret_hardirqs_on, rspsr
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	tst 	\rspsr, #PSR_I_BIT
-+	bleq	trace_hardirqs_on
-+#endif
-+	.endm
-+
- 	.macro	zero_fp
- #ifdef CONFIG_FRAME_POINTER
- 	mov	fp, #0
 -- 
-1.6.2.5
+Yauhen Kharuzhy		jekhor _at_ gmail.com
+			JID: jek at jabber.ru
+
+A: No
+Q: Should I quote below my post?
