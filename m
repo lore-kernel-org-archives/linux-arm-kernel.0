@@ -1,49 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 May 2010 13:21:56 +0100
-Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to
-	elf_check_arch()
-In-Reply-To: <20100510120920.GD11783@esdhcp04058.research.nokia.com>
-References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-	<3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
-	<20100510112036.GC14337@n2100.arm.linux.org.uk>
-	<20100510120920.GD11783@esdhcp04058.research.nokia.com>
-Message-ID: <20100510122156.GA7796@n2100.arm.linux.org.uk>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Mon, 10 May 2010 15:35:14 +0300
+Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
+In-Reply-To: <20100510111259.GA14680@linux-sh.org>
+References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
+	<20100510111259.GA14680@linux-sh.org>
+Message-ID: <20100510123514.GA11804@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 03:09:20PM +0300, Mika Westerberg wrote:
-> I believe that when passing ELF64 header, it fails in following checks:
+On Mon, May 10, 2010 at 01:13:00PM +0200, ext Paul Mundt wrote:
+> On Mon, May 10, 2010 at 01:37:34PM +0300, Eduardo Valentin wrote:
+> > + */
+> > +#include <linux/fs.h>
+> > +#include <linux/init.h>
+> > +#include <linux/proc_fs.h>
+> > +#include <linux/seq_file.h>
+> > +
+> > +extern const struct seq_operations socinfo_op;
 > 
-> 	/* Make sure it's an ARM executable */
-> 	if (x->e_ident[EI_CLASS] != ELF_CLASS)
-> 		return 0;
-> 	if (x->e_machine != EM_ARM)
-> 		return 0;
-> 
-> ELF_CLASS is defined in arch/arm/include/asm/elf.h:
-> 
-> #define ELF_CLASS       ELFCLASS32
-> 
-> So if class is different than ELFCLASS32 it returns 0 and never even try to
-> access other fields, right?
+> This doesn't look promising..
 
-Yes.
+Right.. as stated in patch description (maybe not that clear), this was
+basically same thing which you see under fs/proc/cpuinfo.c
 
-> > Now, here's the question: why does this crashkernel stuff want to
-> > parse a 64-bit ELF header on a 32-bit only platform where the crashing
-> > kernel will never generate a 64-bit ELF core file?
 > 
-> I really don't know but fs/proc/vmcore.c is coded in such way that it supports
-> both types of ELF headers. It however, passes the header to elf_check_arch()
-> which in our case should fail if it is something else than ELF32 header.
+> > +static int socinfo_open(struct inode *inode, struct file *file)
+> > +{
+> > +	return seq_open(file, &socinfo_op);
+> > +}
+> > +
+> If you use single_open() ..
+> 
+> > +static const struct file_operations proc_socinfo_operations = {
+> > +	.open		= socinfo_open,
+> > +	.read		= seq_read,
+> > +	.llseek		= seq_lseek,
+> > +	.release	= seq_release,
+> > +};
+> > +
+> .. and single_release(), then none of the seq_operations are necessary.
 
-There's other arches which want elf_check_arch to be a function call, so
-I think my question needs to be looked at more closely - and possibly
-the code changed such that we don't end up with this situation.
+Good! will replace than with single_[open,release].
 
-Maybe a cleaner solution would be for vmcore.c to split its calls to
-elf_check_arch() - to be elf32_check_arch() and elf64_check_arch() ?
-Platforms where it's just a macro can define both to be elf_check_arch()
-but those where only one flavour is supported should define the unsupported
-flavour to zero - which incidentally would allow the compiler to optimize
-away the unnecessary parts of parse_crash_elf*_headers().
+> 
+> > +static int __init proc_socinfo_init(void)
+> > +{
+> > +	proc_create("socinfo", 0, NULL, &proc_socinfo_operations);
+> > +	return 0;
+> > +}
+> > +module_init(proc_socinfo_init);
+> 
+> proc_create() can fail, so some error handling here would be nice.
+
+right. will add it.
+
+> 
+> On Mon, May 10, 2010 at 01:37:35PM +0300, Eduardo Valentin wrote:
+> > +static int c_show(struct seq_file *m, void *v)
+> > +{
+> > +	seq_printf(m, "SoC\t: %s\n", socinfo);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void *c_start(struct seq_file *m, loff_t *pos)
+> > +{
+> > +	return *pos < 1 ? (void *)1 : NULL;
+> > +}
+> > +
+> > +static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+> > +{
+> > +	++*pos;
+> > +	return NULL;
+> > +}
+> > +
+> > +static void c_stop(struct seq_file *m, void *v)
+> > +{
+> > +}
+> > +
+> > +const struct seq_operations socinfo_op = {
+> > +	.start	= c_start,
+> > +	.next	= c_next,
+> > +	.stop	= c_stop,
+> > +	.show	= c_show
+> > +};
+> 
+> You'll still need the show function, but all of the rest of this is just
+> duplicating what single_open() already does. If the socinfo string is
+> static you may also want to rework this a bit so you can just stash the
+> string in the proc_dir_entry private data. Combine this with something
+> like kstrdup() and you'll save yourself a bit of stack while you're at
+> it.
+
+yeah. will add those comments as well.
+
+
+Thanks for reviewing,
+
+--
+Eduardo Valentin
