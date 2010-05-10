@@ -1,30 +1,35 @@
-From: rk.raggit@gmail.com (RK Raggit)
-Date: Mon, 10 May 2010 12:18:05 +0530
-Subject: cortex-m3 booting failure
-In-Reply-To: <1273153908.2094.5.camel@e102109-lin.cambridge.arm.com>
-References: <h2zec1f3d401005060330n22178e21ve22265bd37006825@mail.gmail.com>
-	<1273153908.2094.5.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <o2hec1f3d401005092348rcbf5b3eayc31eca6e15963e8b@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 10 May 2010 08:33:31 +0100
+Subject: [PATCH 1/2] regulator: make max8925 sharing one driver structure
+In-Reply-To: <20100509224644.GE3269@sortiz.org>
+References: <o2o771cded01005040021o74bb8c3cr22c7be427333774b@mail.gmail.com>
+	<20100509224644.GE3269@sortiz.org>
+Message-ID: <1273476811.3288.2.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Mon, 2010-05-10 at 00:46 +0200, Samuel Ortiz wrote:
+> Hi Haojian,
+> 
+> On Tue, May 04, 2010 at 03:21:42AM -0400, Haojian Zhuang wrote:
+> > From 782297964a48a3b8547a99de3b5c24d8f02b99ec Mon Sep 17 00:00:00 2001
+> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> > Date: Thu, 29 Apr 2010 13:33:50 -0400
+> > Subject: [PATCH] regulator: make max8925 sharing one driver structure
+> > 
+> > Remove a lot of driver structures in max8925 driver. Make regulators share
+> > one driver structure.
+> Patch applied, thanks.
+> 
+> Liam, I'll carry those 2 patches with my mfd tree if you're fine with it.
 
+Both :-
 
->
-> I can't really tell what's happening but I'm going to release a new set
-> of patches against 2.6.33 sometime next week and there are some improved
-> error messages for Cortex-M3 support.
->
-> Do you have KALLSYMS enabled in the kernel?
+Signed-off-by: Liam Girdwood <lrg@slimlogic.co.uk>
 
-Yes. Debugging a bit further i enabled the hard fault processor
-exception catch in
-RVD. On doing this i notice that when running commands (like 'ls' or
-'date') on console
-the processor hard faults. The HFSR shows "0x40000000" while BFSR
-reads "0x04" indicating an imprecise data access fault. Other U/MMFSR are 0x0.
+Thanks
 
-I am wondering why an imprecise data access fault could happen at this stage ?
-
---RK
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
