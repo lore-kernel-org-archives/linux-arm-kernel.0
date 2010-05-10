@@ -1,44 +1,39 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 10 May 2010 21:39:02 +0900
-Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
-In-Reply-To: <20100510123514.GA11804@besouro.research.nokia.com>
-References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
-	<20100510111259.GA14680@linux-sh.org>
-	<20100510123514.GA11804@besouro.research.nokia.com>
-Message-ID: <20100510123902.GA15293@linux-sh.org>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Mon, 10 May 2010 21:50:27 +0900
+Subject: [FOR RMK] PL330: Add common core driver
+In-Reply-To: <q2r63386a3d1005071200lbf191c40r6efabbefbf93a353@mail.gmail.com>
+References: <1272685028-14295-1-git-send-email-jassisinghbrar@gmail.com>
+	<q2r63386a3d1005071200lbf191c40r6efabbefbf93a353@mail.gmail.com>
+Message-ID: <AANLkTimGXCuDmovVNJWNC-X_5ICCqUHI-Zi9N8U71qTL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 03:35:14PM +0300, Eduardo Valentin wrote:
-> On Mon, May 10, 2010 at 01:13:00PM +0200, ext Paul Mundt wrote:
-> > On Mon, May 10, 2010 at 01:37:34PM +0300, Eduardo Valentin wrote:
-> > > + */
-> > > +#include <linux/fs.h>
-> > > +#include <linux/init.h>
-> > > +#include <linux/proc_fs.h>
-> > > +#include <linux/seq_file.h>
-> > > +
-> > > +extern const struct seq_operations socinfo_op;
-> > 
-> > This doesn't look promising..
-> 
-> Right.. as stated in patch description (maybe not that clear), this was
-> basically same thing which you see under fs/proc/cpuinfo.c
-> 
-The cpuinfo case is a bit more complex since you have actual real work to
-do in the ->start op and you will iterate over the ->show op for each
-CPU. In your socinfo case you're just following the single_xxx()
-semantics so using those helpers there simplifies things quite a bit.
+On Sat, May 8, 2010 at 4:00 AM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/5/1 Jassi Brar <jassisinghbrar@gmail.com>:
+>
+>> From: Jassi Brar <jassi.brar@samsung.com>
+>>
+>> PL330 is a configurable DMA controller PrimeCell device.
+>> The register map of the device is well defined.
+>> The configuration of a particular implementation can be
+>> read from the six configuration registers CR0-4,Dn.
+>>
+>> This patch implements a driver for the specification:-
+>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0424a/DDI0424A_dmac_pl330_r0p0_trm.pdf
+>>
+>> The exported interface should be sufficient to implement
+>> a driver for any DMA API.
+>>
+>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+>
+> Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
 
-Architectures that do not support SMP technically employ single_open()
-semantics, but the fs/proc/cpuinfo.c abstraction requires the
-architecture to provide seq ops regardless.
+Hi Russell,
+ I was not sure if the patch is acceptable to you, I have
+submitted it to your patch tracking system.
 
-Note that in the cpuinfo case there is often special handling for the
-single (or boot CPU) case, such as printing out a descriptor for the
-machine type and so on. You might be better off just extending cpuinfo
-rather than introducing another /proc abstraction, presumably your
-socinfo string will be fixed regardless of whether it's SMP or not.
+Not sure if that's the right procedure, but I hope I get your
+opinion and some direction forward.
+
+Thanks
