@@ -1,85 +1,68 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 10 May 2010 20:13:00 +0900
-Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
-In-Reply-To: <1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
-References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <20100510111259.GA14680@linux-sh.org>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Mon, 10 May 2010 19:15:58 +0800
+Subject: adding pxa3xx_nand_flash to platform data
+In-Reply-To: <1273466610.6926.5.camel@pe-dt434>
+References: <1273046285.29563.311.camel@pe-dt434>
+	<x2mf17812d71005050156h8e23b9cfxb651d176ab8bfa89@mail.gmail.com>
+	<o2gf17812d71005050156y681feb36la0b26679bb074d7c@mail.gmail.com>
+	<p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
+	<1273466610.6926.5.camel@pe-dt434>
+Message-ID: <AANLkTinvEYwK7fH49LgjeyXLznCrTRtKTFs40HbIluuC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 01:37:34PM +0300, Eduardo Valentin wrote:
-> + */
-> +#include <linux/fs.h>
-> +#include <linux/init.h>
-> +#include <linux/proc_fs.h>
-> +#include <linux/seq_file.h>
-> +
-> +extern const struct seq_operations socinfo_op;
+Hi Siddarth,
 
-This doesn't look promising..
+This patch set is base on Eric's pxa-linux-2.6.git devel branch.
+http://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
 
-> +static int socinfo_open(struct inode *inode, struct file *file)
-> +{
-> +	return seq_open(file, &socinfo_op);
-> +}
-> +
-If you use single_open() ..
+You could try it on that git. If anything wrong, please let me know.
 
-> +static const struct file_operations proc_socinfo_operations = {
-> +	.open		= socinfo_open,
-> +	.read		= seq_read,
-> +	.llseek		= seq_lseek,
-> +	.release	= seq_release,
-> +};
-> +
-.. and single_release(), then none of the seq_operations are necessary.
+Thanks,
+Lei
 
-> +static int __init proc_socinfo_init(void)
-> +{
-> +	proc_create("socinfo", 0, NULL, &proc_socinfo_operations);
-> +	return 0;
-> +}
-> +module_init(proc_socinfo_init);
-
-proc_create() can fail, so some error handling here would be nice.
-
-On Mon, May 10, 2010 at 01:37:35PM +0300, Eduardo Valentin wrote:
-> +static int c_show(struct seq_file *m, void *v)
-> +{
-> +	seq_printf(m, "SoC\t: %s\n", socinfo);
-> +
-> +	return 0;
-> +}
-> +
-> +static void *c_start(struct seq_file *m, loff_t *pos)
-> +{
-> +	return *pos < 1 ? (void *)1 : NULL;
-> +}
-> +
-> +static void *c_next(struct seq_file *m, void *v, loff_t *pos)
-> +{
-> +	++*pos;
-> +	return NULL;
-> +}
-> +
-> +static void c_stop(struct seq_file *m, void *v)
-> +{
-> +}
-> +
-> +const struct seq_operations socinfo_op = {
-> +	.start	= c_start,
-> +	.next	= c_next,
-> +	.stop	= c_stop,
-> +	.show	= c_show
-> +};
-
-You'll still need the show function, but all of the rest of this is just
-duplicating what single_open() already does. If the socinfo string is
-static you may also want to rework this a bit so you can just stash the
-string in the proc_dir_entry private data. Combine this with something
-like kstrdup() and you'll save yourself a bit of stack while you're at
-it.
+On Mon, May 10, 2010 at 12:43 PM, Siddarth Gore <gores@marvell.com> wrote:
+> On Thu, 2010-05-06 at 02:20 -0700, Haojian Zhuang wrote:
+>> On Wed, May 5, 2010 at 4:56 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> > On Wed, May 5, 2010 at 4:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> >> On Wed, May 5, 2010 at 3:58 PM, Siddarth Gore <gores@marvell.com> wrote:
+>> >>> Hello Eric,
+>> >>>
+>> >>> Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
+>> >>> support for Aspenite DB board (pxa168). I have a patch ready to add
+>> >>> pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
+>> >>> field in it.
+>> >>> Looks like it is the same for all boards (depending upon the page size).
+>> >>> So should I add it to the board specific setup file or remove it from
+>> >>> pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
+>> >>>
+>> >>> If there are boards which require a different cmdset then we have to go
+>> >>> with first option, if not, we can use option two and save some code
+>> >>> duplication.
+>> >>>
+>> >>
+>> >> There are normally two sets of commands, yet the code derived from some
+>> >> previous work that there were several subtle different command sets.
+>> >>
+>>
+>> We already formated the patches of removing the duplication. Now it's
+>> put into mailist. Try these patches.
+>>
+> Thanks a lot Haojian. I have tried the whole patchset and it is working
+> fine on my Aspenite DB board. Did not get a chance to check individual
+> patches though.
+>
+> Also, some patches did not get applied with git-am. I had to manually
+> apply them.
+>
+> -siddarth
+>
+>> Thanks
+>> Haojian
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
