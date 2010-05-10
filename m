@@ -1,259 +1,40 @@
-From: Dinh.Nguyen@freescale.com (Dinh Nguyen)
-Date: Mon, 10 May 2010 11:21:57 -0500
-Subject: [PATCHv2 2.6.34-rc7 1/3] mxc: gadget: remove 60mhz clock requirement
-	for freescale mx51 usb core
-Message-ID: <1273508519-23033-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 10 May 2010 11:42:08 -0500
+Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
+In-Reply-To: <20100506204305.GB26818@n2100.arm.linux.org.uk>
+References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
+	<20100412184904.GG3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
+	<20100412191506.GL3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
+	<20100506204305.GB26818@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-renamed fsl_mx3_udc.c -> fsl_mxc_udc.c
-for mx51, usb core is clocked from sources that are not 60mhz.
+On Thursday, May 06, 2010 1:43 PM, Russell King wrote:
+> On Thu, May 06, 2010 at 12:29:34PM -0500, H Hartley Sweeten wrote:
+>> -rc7 should be coming soon.  Would you like this patch rebased now or after
+>> Linus releases -rc7?  Also, I assume it should be rebased to linux-next or
+>> would you prefer it rebased to one of your branches?
+>
+> Thanks for reminding me.
+>
+> This time around, there's a number of patches which can only sensibly
+> be applied once I've frozen most of the individual branches of my tree,
+> and this is one of them.  Essentually, these are:
+> - your 'select GPIOLIB' patch
+> - killing the 'select GENERIC_TIME' from the ARM Kconfig menus
+> - pmu/oprofile patch set
+>
+> Freezing it before -rc7 is released would be too early, so I think doing
+> so shortly after -rc7 (which is due this evening/tonight) would be the
+> right time.
 
-This patch applies to 2.6.34-rc7.
+Hello Russell,
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- drivers/usb/gadget/Makefile      |    2 +-
- drivers/usb/gadget/fsl_mx3_udc.c |  104 -------------------------------------
- drivers/usb/gadget/fsl_mxc_udc.c |  106 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 107 insertions(+), 105 deletions(-)
- delete mode 100644 drivers/usb/gadget/fsl_mx3_udc.c
- create mode 100644 drivers/usb/gadget/fsl_mxc_udc.c
+I see Linus released -rc7 over the weekend.  When will you be freezing your
+-devel tree?  I will rebase the 'select GPIOLIB' patch after that.
 
-diff --git a/drivers/usb/gadget/Makefile b/drivers/usb/gadget/Makefile
-index 43b51da..c922eef 100644
---- a/drivers/usb/gadget/Makefile
-+++ b/drivers/usb/gadget/Makefile
-@@ -20,7 +20,7 @@ obj-$(CONFIG_USB_ATMEL_USBA)	+= atmel_usba_udc.o
- obj-$(CONFIG_USB_FSL_USB2)	+= fsl_usb2_udc.o
- fsl_usb2_udc-objs		:= fsl_udc_core.o
- ifeq ($(CONFIG_ARCH_MXC),y)
--fsl_usb2_udc-objs		+= fsl_mx3_udc.o
-+fsl_usb2_udc-objs		+= fsl_mxc_udc.o
- endif
- obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
- obj-$(CONFIG_USB_R8A66597)	+= r8a66597-udc.o
-diff --git a/drivers/usb/gadget/fsl_mx3_udc.c b/drivers/usb/gadget/fsl_mx3_udc.c
-deleted file mode 100644
-index 20a802e..0000000
---- a/drivers/usb/gadget/fsl_mx3_udc.c
-+++ /dev/null
-@@ -1,104 +0,0 @@
--/*
-- * Copyright (C) 2009
-- * Guennadi Liakhovetski, DENX Software Engineering, <lg@denx.de>
-- *
-- * Description:
-- * Helper routines for i.MX3x SoCs from Freescale, needed by the fsl_usb2_udc.c
-- * driver to function correctly on these systems.
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
--#include <linux/clk.h>
--#include <linux/delay.h>
--#include <linux/err.h>
--#include <linux/fsl_devices.h>
--#include <linux/platform_device.h>
--
--#include <mach/hardware.h>
--
--static struct clk *mxc_ahb_clk;
--static struct clk *mxc_usb_clk;
--
--int fsl_udc_clk_init(struct platform_device *pdev)
--{
--	struct fsl_usb2_platform_data *pdata;
--	unsigned long freq;
--	int ret;
--
--	pdata = pdev->dev.platform_data;
--
--	if (!cpu_is_mx35()) {
--		mxc_ahb_clk = clk_get(&pdev->dev, "usb_ahb");
--		if (IS_ERR(mxc_ahb_clk))
--			return PTR_ERR(mxc_ahb_clk);
--
--		ret = clk_enable(mxc_ahb_clk);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "clk_enable(\"usb_ahb\") failed\n");
--			goto eenahb;
--		}
--	}
--
--	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
--	mxc_usb_clk = clk_get(&pdev->dev, "usb");
--	if (IS_ERR(mxc_usb_clk)) {
--		dev_err(&pdev->dev, "clk_get(\"usb\") failed\n");
--		ret = PTR_ERR(mxc_usb_clk);
--		goto egusb;
--	}
--
--	freq = clk_get_rate(mxc_usb_clk);
--	if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
--	    (freq < 59999000 || freq > 60001000)) {
--		dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
--		ret = -EINVAL;
--		goto eclkrate;
--	}
--
--	ret = clk_enable(mxc_usb_clk);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "clk_enable(\"usb_clk\") failed\n");
--		goto eenusb;
--	}
--
--	return 0;
--
--eenusb:
--eclkrate:
--	clk_put(mxc_usb_clk);
--	mxc_usb_clk = NULL;
--egusb:
--	if (!cpu_is_mx35())
--		clk_disable(mxc_ahb_clk);
--eenahb:
--	if (!cpu_is_mx35())
--		clk_put(mxc_ahb_clk);
--	return ret;
--}
--
--void fsl_udc_clk_finalize(struct platform_device *pdev)
--{
--	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
--
--	/* ULPI transceivers don't need usbpll */
--	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
--		clk_disable(mxc_usb_clk);
--		clk_put(mxc_usb_clk);
--		mxc_usb_clk = NULL;
--	}
--}
--
--void fsl_udc_clk_release(void)
--{
--	if (mxc_usb_clk) {
--		clk_disable(mxc_usb_clk);
--		clk_put(mxc_usb_clk);
--	}
--	if (!cpu_is_mx35()) {
--		clk_disable(mxc_ahb_clk);
--		clk_put(mxc_ahb_clk);
--	}
--}
-diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-new file mode 100644
-index 0000000..d0b8bde
---- /dev/null
-+++ b/drivers/usb/gadget/fsl_mxc_udc.c
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright (C) 2009
-+ * Guennadi Liakhovetski, DENX Software Engineering, <lg@denx.de>
-+ *
-+ * Description:
-+ * Helper routines for i.MX3x SoCs from Freescale, needed by the fsl_usb2_udc.c
-+ * driver to function correctly on these systems.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/fsl_devices.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/hardware.h>
-+
-+static struct clk *mxc_ahb_clk;
-+static struct clk *mxc_usb_clk;
-+
-+int fsl_udc_clk_init(struct platform_device *pdev)
-+{
-+	struct fsl_usb2_platform_data *pdata;
-+	unsigned long freq;
-+	int ret;
-+
-+	pdata = pdev->dev.platform_data;
-+
-+	if (!cpu_is_mx35()) {
-+		mxc_ahb_clk = clk_get(&pdev->dev, "usb_ahb");
-+		if (IS_ERR(mxc_ahb_clk))
-+			return PTR_ERR(mxc_ahb_clk);
-+
-+		ret = clk_enable(mxc_ahb_clk);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "clk_enable(\"usb_ahb\") failed\n");
-+			goto eenahb;
-+		}
-+	}
-+
-+	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
-+	mxc_usb_clk = clk_get(&pdev->dev, "usb");
-+	if (IS_ERR(mxc_usb_clk)) {
-+		dev_err(&pdev->dev, "clk_get(\"usb\") failed\n");
-+		ret = PTR_ERR(mxc_usb_clk);
-+		goto egusb;
-+	}
-+
-+	if (!cpu_is_mx51()) {
-+		freq = clk_get_rate(mxc_usb_clk);
-+		if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
-+		    (freq < 59999000 || freq > 60001000)) {
-+			dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
-+			ret = -EINVAL;
-+			goto eclkrate;
-+		}
-+	}
-+
-+	ret = clk_enable(mxc_usb_clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "clk_enable(\"usb_clk\") failed\n");
-+		goto eenusb;
-+	}
-+
-+	return 0;
-+
-+eenusb:
-+eclkrate:
-+	clk_put(mxc_usb_clk);
-+	mxc_usb_clk = NULL;
-+egusb:
-+	if (!cpu_is_mx35())
-+		clk_disable(mxc_ahb_clk);
-+eenahb:
-+	if (!cpu_is_mx35())
-+		clk_put(mxc_ahb_clk);
-+	return ret;
-+}
-+
-+void fsl_udc_clk_finalize(struct platform_device *pdev)
-+{
-+	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
-+
-+	/* ULPI transceivers don't need usbpll */
-+	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
-+		clk_disable(mxc_usb_clk);
-+		clk_put(mxc_usb_clk);
-+		mxc_usb_clk = NULL;
-+	}
-+}
-+
-+void fsl_udc_clk_release(void)
-+{
-+	if (mxc_usb_clk) {
-+		clk_disable(mxc_usb_clk);
-+		clk_put(mxc_usb_clk);
-+	}
-+	if (!cpu_is_mx35()) {
-+		clk_disable(mxc_ahb_clk);
-+		clk_put(mxc_ahb_clk);
-+	}
-+}
--- 
-1.6.0.4
+Regards,
+Hartley
