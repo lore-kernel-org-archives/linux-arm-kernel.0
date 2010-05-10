@@ -1,109 +1,158 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Mon, 10 May 2010 17:22:48 +0300
-Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
-In-Reply-To: <20100510111259.GA14680@linux-sh.org>
-References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
-	<20100510111259.GA14680@linux-sh.org>
-Message-ID: <20100510142248.GD11804@besouro.research.nokia.com>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Mon, 10 May 2010 22:27:15 +0800
+Subject: [PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
+Message-ID: <1273501635-28403-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+From: Ming Lei <tom.leiming@gmail.com>
 
-On Mon, May 10, 2010 at 01:13:00PM +0200, ext Paul Mundt wrote:
-> On Mon, May 10, 2010 at 01:37:34PM +0300, Eduardo Valentin wrote:
-> > + */
-> > +#include <linux/fs.h>
-> > +#include <linux/init.h>
-> > +#include <linux/proc_fs.h>
-> > +#include <linux/seq_file.h>
-> > +
-> > +extern const struct seq_operations socinfo_op;
-> 
-> This doesn't look promising..
-> 
-> > +static int socinfo_open(struct inode *inode, struct file *file)
-> > +{
-> > +	return seq_open(file, &socinfo_op);
-> > +}
-> > +
-> If you use single_open() ..
-> 
-> > +static const struct file_operations proc_socinfo_operations = {
-> > +	.open		= socinfo_open,
-> > +	.read		= seq_read,
-> > +	.llseek		= seq_lseek,
-> > +	.release	= seq_release,
-> > +};
-> > +
-> .. and single_release(), then none of the seq_operations are necessary.
-> 
-> > +static int __init proc_socinfo_init(void)
-> > +{
-> > +	proc_create("socinfo", 0, NULL, &proc_socinfo_operations);
-> > +	return 0;
-> > +}
-> > +module_init(proc_socinfo_init);
-> 
-> proc_create() can fail, so some error handling here would be nice.
-> 
-> On Mon, May 10, 2010 at 01:37:35PM +0300, Eduardo Valentin wrote:
-> > +static int c_show(struct seq_file *m, void *v)
-> > +{
-> > +	seq_printf(m, "SoC\t: %s\n", socinfo);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void *c_start(struct seq_file *m, loff_t *pos)
-> > +{
-> > +	return *pos < 1 ? (void *)1 : NULL;
-> > +}
-> > +
-> > +static void *c_next(struct seq_file *m, void *v, loff_t *pos)
-> > +{
-> > +	++*pos;
-> > +	return NULL;
-> > +}
-> > +
-> > +static void c_stop(struct seq_file *m, void *v)
-> > +{
-> > +}
-> > +
-> > +const struct seq_operations socinfo_op = {
-> > +	.start	= c_start,
-> > +	.next	= c_next,
-> > +	.stop	= c_stop,
-> > +	.show	= c_show
-> > +};
-> 
-> You'll still need the show function, but all of the rest of this is just
-> duplicating what single_open() already does. If the socinfo string is
-> static you may also want to rework this a bit so you can just stash the
-> string in the proc_dir_entry private data. Combine this with something
-> like kstrdup() and you'll save yourself a bit of stack while you're at
-> it.
+This patch fixes the 'unannotated irqs-on' lockdep warning below:
 
-While still here, about cleaning this, so, let me see if I got your point.
-Basically, the file under fs/proc/socinfo.c whould do the thing with single_open &
-single_release, as you stated. But then there is the .show and its data.
-One idea would then be to have a function:
+	CPU: Testing write buffer coherency: ok
+	------------[ cut here ]------------
+	WARNING: at kernel/lockdep.c:3145 check_flags+0xcc/0x1dc()
+	Modules linked in:
+	[<c0035120>] (unwind_backtrace+0x0/0xf8) from [<c0355374>] (dump_stack+0x20/0x24)
+	[<c0355374>] (dump_stack+0x20/0x24) from [<c0060c04>] (warn_slowpath_common+0x58/0x70)
+	[<c0060c04>] (warn_slowpath_common+0x58/0x70) from [<c0060c3c>] (warn_slowpath_null+0x20/0x24)
+	[<c0060c3c>] (warn_slowpath_null+0x20/0x24) from [<c008f224>] (check_flags+0xcc/0x1dc)
+	[<c008f224>] (check_flags+0xcc/0x1dc) from [<c00945dc>] (lock_acquire+0x50/0x140)
+	[<c00945dc>] (lock_acquire+0x50/0x140) from [<c0358434>] (_raw_spin_lock+0x50/0x88)
+	[<c0358434>] (_raw_spin_lock+0x50/0x88) from [<c00fd114>] (set_task_comm+0x2c/0x60)
+	[<c00fd114>] (set_task_comm+0x2c/0x60) from [<c007e184>] (kthreadd+0x30/0x108)
+	[<c007e184>] (kthreadd+0x30/0x108) from [<c0030104>] (kernel_thread_exit+0x0/0x8)
+	---[ end trace 1b75b31a2719ed1c ]---
+	possible reason: unannotated irqs-on.
+	irq event stamp: 3
+	hardirqs last  enabled at (2): [<c0059bb0>] finish_task_switch+0x48/0xb0
+	hardirqs last disabled at (3): [<c002f0b0>] ret_slow_syscall+0xc/0x1c
+	softirqs last  enabled at (0): [<c005f3e0>] copy_process+0x394/0xe5c
+	softirqs last disabled at (0): [<(null)>] (null)
 
-int register_socinfo_show(int (*show)(struct seq_file *, void *), void *data);
+This patch introduces macro of trace_ret_hardirqs_on, which will
+call trace_hardirqs_on if I flag in the stored CPSR is zero.
 
-Which would be exported to other parts of the kernel (something placed under
-include/linux/socinfo.h for instance). Then the soc core code
-(like arch/arm/mach-omap[1,2]) would then register its local show function and pass its data.
+In the path of returning to user-space, the patch replaces disable_irq
+with disable_irq_notrace in ret_to_user to avoid the 'unannotated irqs-on'
+lockdep warning since hardirqs is always enabled before returning to user.
 
-This way I think we can avoid the exports inside .c files (as in this patch)
-and also pass the static char * needed during the show.
+In the path of returning to kernel-space, the patch still replaces
+disable_irq with disable_irq_notrace in __xxx_svc handler and adds
+trace_hardirqs_on before calling svc_exit to trace the possible hardirqs on
+event for avoiding the possible 'unannotated irqs-on' lockdep warning.
 
-What do you think?
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ arch/arm/kernel/entry-armv.S   |   31 +++++++++++++++++--------------
+ arch/arm/kernel/entry-common.S |    2 +-
+ arch/arm/kernel/entry-header.S |    7 +++++++
+ 3 files changed, 25 insertions(+), 15 deletions(-)
 
-BR,
-
---
-Eduardo Valentin
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index e6a0fb0..7202adf 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -204,13 +204,15 @@ __dabt_svc:
+ 	@
+ 	@ IRQs off again before pulling preserved data off the stack
+ 	@
+-	disable_irq
++	disable_irq_notrace
+ 
+ 	@
+ 	@ restore SPSR and restart the instruction
++	@ trace possible hardirqs on event before returning
+ 	@
+-	ldr	r2, [sp, #S_PSR]
+-	svc_exit r2				@ return from exception
++	ldr	r4, [sp, #S_PSR]
++	trace_ret_hardirqs_on r4
++	svc_exit r4				@ return from exception
+  UNWIND(.fnend		)
+ ENDPROC(__dabt_svc)
+ 
+@@ -235,10 +237,7 @@ __irq_svc:
+ 	blne	svc_preempt
+ #endif
+ 	ldr	r4, [sp, #S_PSR]		@ irqs are already disabled
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	tst	r4, #PSR_I_BIT
+-	bleq	trace_hardirqs_on
+-#endif
++	trace_ret_hardirqs_on r4
+ 	svc_exit r4				@ return from exception
+  UNWIND(.fnend		)
+ ENDPROC(__irq_svc)
+@@ -291,13 +290,15 @@ __und_svc:
+ 	@
+ 	@ IRQs off again before pulling preserved data off the stack
+ 	@
+-1:	disable_irq
++1:	disable_irq_notrace
+ 
+ 	@
+ 	@ restore SPSR and restart the instruction
++	@ trace possible hardirqs on event before returning
+ 	@
+-	ldr	r2, [sp, #S_PSR]		@ Get SVC cpsr
+-	svc_exit r2				@ return from exception
++	ldr	r4, [sp, #S_PSR]		@ Get SVC cpsr
++	trace_ret_hardirqs_on r4
++	svc_exit r4				@ return from exception
+  UNWIND(.fnend		)
+ ENDPROC(__und_svc)
+ 
+@@ -327,13 +328,15 @@ __pabt_svc:
+ 	@
+ 	@ IRQs off again before pulling preserved data off the stack
+ 	@
+-	disable_irq
++	disable_irq_notrace
+ 
+ 	@
+ 	@ restore SPSR and restart the instruction
+-	@
+-	ldr	r2, [sp, #S_PSR]
+-	svc_exit r2				@ return from exception
++	@ trace possible hardirqs on event before returning
++	@	
++	ldr	r4, [sp, #S_PSR]
++	trace_ret_hardirqs_on r4
++	svc_exit r4				@ return from exception
+  UNWIND(.fnend		)
+ ENDPROC(__pabt_svc)
+ 
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 2c1db77..ed471a7 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -58,7 +58,7 @@ work_resched:
+  */
+ ENTRY(ret_to_user)
+ ret_slow_syscall:
+-	disable_irq				@ disable interrupts
++	disable_irq_notrace				@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]
+ 	tst	r1, #_TIF_WORK_MASK
+ 	bne	work_pending
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index d93f976..ac51ce3 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -30,6 +30,13 @@
+ #error "Please fix"
+ #endif
+ 
++	.macro trace_ret_hardirqs_on, rspsr
++#ifdef CONFIG_TRACE_IRQFLAGS
++	tst 	\rspsr, #PSR_I_BIT
++	bleq	trace_hardirqs_on
++#endif
++	.endm
++
+ 	.macro	zero_fp
+ #ifdef CONFIG_FRAME_POINTER
+ 	mov	fp, #0
+-- 
+1.6.2.5
