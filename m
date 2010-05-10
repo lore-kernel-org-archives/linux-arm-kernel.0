@@ -1,33 +1,38 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Mon, 10 May 2010 16:08:09 +0300
-Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
-In-Reply-To: <20100510125440.GA31721@nokia.com>
-References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
-	<20100510111259.GA14680@linux-sh.org>
-	<20100510125440.GA31721@nokia.com>
-Message-ID: <20100510130809.GC11804@besouro.research.nokia.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 10 May 2010 16:07:57 +0300
+Subject: [PATCH] Handle instruction cache maintenance fault properly
+Message-ID: <AANLkTikIbI6hKoYSZlo6QDlyi2Qjxg287i-ilHpz1FF9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 02:54:40PM +0200, Balbi Felipe (Nokia-D/Helsinki) wrote:
-> On Mon, May 10, 2010 at 01:13:00PM +0200, ext Paul Mundt wrote:
-> >You'll still need the show function, but all of the rest of this is just
-> >duplicating what single_open() already does. If the socinfo string is
-> >static you may also want to rework this a bit so you can just stash the
-> >string in the proc_dir_entry private data. Combine this with something
-> >like kstrdup() and you'll save yourself a bit of stack while you're at
-> >it.
-> 
-> doesn't ksrtdup() cause memleak ?? Or is it only when used with 
-> module parameters ??
+Between "clean D line..." and "invalidate I line" operations in
+v7_coherent_user_range(), the memory page may get swapped out.
+And the fault on "invalidate I line" could not be properly handled
+causing the oops.
 
-I'm not aware of the module parameter stuff.. but the leak might be other thing
-than kstrdup?
-> 
-> -- 
-> balbi
-> 
-> DefectiveByDesign.org
+The patch adds the missing handling for "instruction cache
+maintenance fault". Let's handle it as translation fault.
+
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/mm/fault.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 9d40c34..8924617 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -463,7 +463,7 @@ static struct fsr_info {
+ 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
+ 	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
+ 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPPER,	"I-cache maintenance
+fault"	   },
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation
+fault"	   },
+ 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+ 	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
+-- 
+1.7.0.4
