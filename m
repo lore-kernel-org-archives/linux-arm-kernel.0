@@ -1,30 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 May 2010 15:54:35 +0100
-Subject: [PATCH] Handle instruction cache maintenance fault properly
-In-Reply-To: <7529.1273503128@localhost>
-References: <AANLkTikIbI6hKoYSZlo6QDlyi2Qjxg287i-ilHpz1FF9@mail.gmail.com>
-	<20100510131519.GB7796@n2100.arm.linux.org.uk>
-	<AANLkTint0f2Ow2FM3jVAqGfPjolHvF-oBTGCmY7Jx7_d@mail.gmail.com>
-	<7529.1273503128@localhost>
-Message-ID: <1273503275.10282.63.camel@e102109-lin.cambridge.arm.com>
+From: peter.pearse@arm.com (Peter Pearse)
+Date: Mon, 10 May 2010 16:09:59 +0100
+Subject: FW: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+Message-ID: <000101caf052$db991e30$9446010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-10 at 15:52 +0100, Valdis.Kletnieks at vt.edu wrote:
-> On Mon, 10 May 2010 16:34:57 +0300, "Kirill A. Shutemov" said:
-> 
-> > It looks like cache maintenance fault was introduced in ARMv6.
-> > 
-> > So, what is the right way to fix it? Something like:
-> > 
-> > #if __LINUX_ARM_ARCH__ < 6
-> >         { do_bad,               SIGBUS,  0,             "external
-> 
-> This would need to be a runtime test, no?  Or does LINUX_ARM_ARCH not allow
-> it to run on other arch levels? (i.e. can an ARM kernel boot for v5 and v6?)
+ 
 
-v6 and v7 probably but I doubt v5 and v6 would work. There are other
-#ifdefs in arch/arm/include/asm/system.h like barriers.
-
--- 
-Catalin
+> -----Original Message-----
+> From: Peter Pearse [mailto:peter.pearse at arm.com] 
+> Sent: 07 May 2010 16:01
+> To: 'Linus Walleij'
+> Cc: linux-arm-kernel at lists.arm.linux.org.uk
+> Subject: RE: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+> 
+> Linus
+> 
+> I've applied 
+> 
+> [PATCH 04/11] ARM: define the PrimeCell DMA API v5
+> [PATCH 5/7] ARM: add PrimeCell generic DMA to PL011 v6		
+> [PATCH 6/7] ARM: add PrimeCell generic DMA to MMCI/PL180 v6	
+> 
+> to Russell's versatile tree.
+> 
+> A Versatile Express board running the resulting kernel image
+> 	boots with serial output
+> 	accepts serial input
+> 	reads & writes an MMC card
+> 
+> Regards
+> 
+> Peter
+> 
+> 
+> > -----Original Message-----
+> > From: linux-kernel-owner at vger.kernel.org
+> > [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of 
+> Linus Walleij
+> > Sent: 07 May 2010 10:14
+> > To: Dan Williams
+> > Cc: Russell King - ARM Linux;
+> > linux-arm-kernel at lists.infradead.org;
+> > linux-mmc at vger.kernel.org; linux-kernel at vger.kernel.org
+> > Subject: Re: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
+> > 
+> > Dan is this patch set OK?
+> > 
+> > Sorry if you're busy, just need to check...
+> > 
+> > Patches 1 thru 4 should be uncontroversial, only affects our 
+> > ST-Ericsson platforms and have been thorougly reviewed.
+> > 
+> > As posted elsewhere this is tested on an ARM reference 
+> design now as 
+> > well, which IMHO would make it OK to apply also the
+> > PL011 patch, nr 5.
+> > 
+> > (OK Russell?)
+> > 
+> > Nr 6 and 7 depend on changes in Russells -next branch so unless you 
+> > want to bring in the ARM next to your tree as well, you can 
+> wait with 
+> > these.
+> > 
+> > Yours,
+> > Linus Walleij
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe 
+> > linux-kernel" in the body of a message to majordomo at vger.kernel.org 
+> > More majordomo info at http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> > 
