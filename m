@@ -1,68 +1,68 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 10 May 2010 19:15:58 +0800
-Subject: adding pxa3xx_nand_flash to platform data
-In-Reply-To: <1273466610.6926.5.camel@pe-dt434>
-References: <1273046285.29563.311.camel@pe-dt434>
-	<x2mf17812d71005050156h8e23b9cfxb651d176ab8bfa89@mail.gmail.com>
-	<o2gf17812d71005050156y681feb36la0b26679bb074d7c@mail.gmail.com>
-	<p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
-	<1273466610.6926.5.camel@pe-dt434>
-Message-ID: <AANLkTinvEYwK7fH49LgjeyXLznCrTRtKTFs40HbIluuC@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 May 2010 12:20:36 +0100
+Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to
+	elf_check_arch()
+In-Reply-To: <3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+	<3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <20100510112036.GC14337@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Siddarth,
+On Wed, May 05, 2010 at 09:54:18AM +0300, Mika Westerberg wrote:
+> This is needed to shut following compiler warning when CONFIG_PROC_VMCORE is
+> enabled:
+> 
+> fs/proc/vmcore.c: In function 'parse_crash_elf64_headers':
+> fs/proc/vmcore.c:500: warning: passing argument 1 of 'elf_check_arch' from
+> incompatible pointer type
+> 
+> ELF32 and ELF64 headers have common fields of same size (namely e_ident and
+> e_machine) which are checked in arm_elf_check_arch().
 
-This patch set is base on Eric's pxa-linux-2.6.git devel branch.
-http://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+This patch is bogus - and shows the dangers of throwing casts into C code
+to shut up warnings without first analysing the code.
 
-You could try it on that git. If anything wrong, please let me know.
+Our elf_check_arch() uses:
+	e_machine
+	e_entry
+	e_flags
+thusly:
+        if (x->e_machine != EM_ARM)
+        if (x->e_entry & 1) {
+        } else if (x->e_entry & 3)
+        eflags = x->e_flags;
 
-Thanks,
-Lei
+Now, the Elf32 header looks like this:
 
-On Mon, May 10, 2010 at 12:43 PM, Siddarth Gore <gores@marvell.com> wrote:
-> On Thu, 2010-05-06 at 02:20 -0700, Haojian Zhuang wrote:
->> On Wed, May 5, 2010 at 4:56 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> > On Wed, May 5, 2010 at 4:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> >> On Wed, May 5, 2010 at 3:58 PM, Siddarth Gore <gores@marvell.com> wrote:
->> >>> Hello Eric,
->> >>>
->> >>> Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
->> >>> support for Aspenite DB board (pxa168). I have a patch ready to add
->> >>> pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
->> >>> field in it.
->> >>> Looks like it is the same for all boards (depending upon the page size).
->> >>> So should I add it to the board specific setup file or remove it from
->> >>> pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
->> >>>
->> >>> If there are boards which require a different cmdset then we have to go
->> >>> with first option, if not, we can use option two and save some code
->> >>> duplication.
->> >>>
->> >>
->> >> There are normally two sets of commands, yet the code derived from some
->> >> previous work that there were several subtle different command sets.
->> >>
->>
->> We already formated the patches of removing the duplication. Now it's
->> put into mailist. Try these patches.
->>
-> Thanks a lot Haojian. I have tried the whole patchset and it is working
-> fine on my Aspenite DB board. Did not get a chance to check individual
-> patches though.
->
-> Also, some patches did not get applied with git-am. I had to manually
-> apply them.
->
-> -siddarth
->
->> Thanks
->> Haojian
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+typedef struct elf32_hdr{
+  unsigned char e_ident[EI_NIDENT];	/* 0x00 - 0x0F */
+  Elf32_Half    e_type;			/* 0x10 - 0x11 */
+  Elf32_Half    e_machine;		/* 0x12 - 0x13 */
+  Elf32_Word    e_version;		/* 0x14 - 0x17 */
+  Elf32_Addr    e_entry;		/* 0x18 - 0x1b */
+  Elf32_Off     e_phoff;		/* 0x1c - 0x1f */
+  Elf32_Off     e_shoff;		/* 0x20 - 0x23 */
+  Elf32_Word    e_flags;		/* 0x24 - 0x27 */
+
+and Elf64 header:
+
+typedef struct elf64_hdr {
+  unsigned char e_ident[EI_NIDENT];	/* 0x00 - 0x0F */
+  Elf64_Half e_type;			/* 0x10 - 0x11 */
+  Elf64_Half e_machine;			/* 0x12 - 0x13 */
+  Elf64_Word e_version;			/* 0x14 - 0x17 */
+  Elf64_Addr e_entry;			/* 0x18 - 0x1f */
+  Elf64_Off e_phoff;			/* 0x20 - 0x27 */
+  Elf64_Off e_shoff;			/* 0x28 - 0x2f */
+  Elf64_Word e_flags;			/* 0x30 - 0x33 */
+
+Notice that e_entry and e_flags are different sizes and/or different
+offsets, so ARMs elf_check_arch can not work with elf64 headers.  So
+with an ELF64 header, accessing e_flags will result in actually
+accessing the top half of the 64-bit e_phoff, and accessing 32-bit
+e_entry will get us the lower half of the 64-bit e_entry.
+
+Now, here's the question: why does this crashkernel stuff want to
+parse a 64-bit ELF header on a 32-bit only platform where the crashing
+kernel will never generate a 64-bit ELF core file?
