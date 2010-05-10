@@ -1,41 +1,197 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 10 May 2010 23:43:14 +0300
-Subject: [PATCH 5/5] rx1950: configure GPG13-15 as input before suspend
-In-Reply-To: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
-References: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1273524194-13346-6-git-send-email-anarsoul@gmail.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Mon, 10 May 2010 22:57:05 +0200
+Subject: [PATCH 1/4] ARM: Gemini: add support for Wiligear WBD-111
+In-Reply-To: <1273522021-14436-2-git-send-email-ulli.kroll@googlemail.com>
+References: <1273522021-14436-1-git-send-email-ulli.kroll@googlemail.com>
+	<1273522021-14436-2-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <op.vcichfgh2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to datasheet GPG13-15 must be configured as input in NAND
-boot mode, otherwise device will not be able to wake up
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-s3c2410/pm.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+On Mon, 10 May 2010 22:06:58 +0200, Hans Ulli Kroll <ulli.kroll@googlemail.com> wrote:
 
-diff --git a/arch/arm/mach-s3c2410/pm.c b/arch/arm/mach-s3c2410/pm.c
-index 6a61486..725636f 100644
---- a/arch/arm/mach-s3c2410/pm.c
-+++ b/arch/arm/mach-s3c2410/pm.c
-@@ -79,6 +79,17 @@ static void s3c2410_pm_prepare(void)
- 	if ( machine_is_aml_m5900() )
- 		s3c2410_gpio_setpin(S3C2410_GPF(2), 1);
- 
-+	if (machine_is_rx1950()) {
-+		/* According to S3C2442 user's manual, page 7-17,
-+		 * when the system is operating in NAND boot mode,
-+		 * the hardware pin configuration - EINT[23:21] ???
-+		 * must be set as input for starting up after
-+		 * wakeup from sleep mode
-+		 */
-+		s3c_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPIO_INPUT);
-+		s3c_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPIO_INPUT);
-+		s3c_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPIO_INPUT);
-+	}
- }
- 
- static int s3c2410_pm_resume(struct sys_device *dev)
--- 
-1.7.0.4
+> From: Imre Kaloz <kaloz@openwrt.org>
+>
+> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> ---
+>  arch/arm/mach-gemini/Kconfig        |    7 ++
+>  arch/arm/mach-gemini/Makefile       |    1 +
+>  arch/arm/mach-gemini/board-wbd111.c |  143 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 151 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-gemini/board-wbd111.c
+>
+> diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
+> index 515b75c..4de67ce 100644
+> --- a/arch/arm/mach-gemini/Kconfig
+> +++ b/arch/arm/mach-gemini/Kconfig
+> @@ -9,6 +9,13 @@ config MACH_RUT100
+>  	  Say Y here if you intend to run this kernel on a
+>  	  Teltonika 3G Router RUT100.
+>+config MACH_WBD111
+> +	bool "Wiliboard WBD-111"
+> +	select GEMINI_MEM_SWAP
+> +	help
+> +	  Say Y here if you intend to run this kernel on a
+> +	  Wiliboard WBD-111.
+> +
+>  endmenu
+> config GEMINI_MEM_SWAP
+> diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
+> index 719505b..3997487 100644
+> --- a/arch/arm/mach-gemini/Makefile
+> +++ b/arch/arm/mach-gemini/Makefile
+> @@ -8,3 +8,4 @@ obj-y			:= irq.o mm.o time.o devices.o gpio.o
+> # Board-specific support
+>  obj-$(CONFIG_MACH_RUT100)	+= board-rut1xx.o
+> +obj-$(CONFIG_MACH_WBD111)	+= board-wbd111.o
+> diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
+> new file mode 100644
+> index 0000000..36538c1
+> --- /dev/null
+> +++ b/arch/arm/mach-gemini/board-wbd111.c
+> @@ -0,0 +1,143 @@
+> +/*
+> + *  Support for Wiliboard WBD-111
+> + *
+> + *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/leds.h>
+> +#include <linux/input.h>
+> +#include <linux/skbuff.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/mdio-gpio.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +
+> +#include "common.h"
+> +
+> +static struct gpio_keys_button wbd111_keys[] = {
+> +	{
+> +		.code		= KEY_SETUP,
+> +		.gpio		= 5,
+> +		.active_low	= 1,
+> +		.desc		= "reset",
+> +		.type		= EV_KEY,
+> +	},
+> +};
+> +
+> +static struct gpio_keys_platform_data wbd111_keys_data = {
+> +	.buttons	= wbd111_keys,
+> +	.nbuttons	= ARRAY_SIZE(wbd111_keys),
+> +};
+> +
+> +static struct platform_device wbd111_keys_device = {
+> +	.name	= "gpio-keys",
+> +	.id	= -1,
+> +	.dev	= {
+> +		.platform_data = &wbd111_keys_data,
+> +	},
+> +};
+> +
+> +static struct gpio_led wbd111_leds[] = {
+> +	{
+> +		.name			= "L3red",
+> +		.gpio			= 1,
+> +	},
+> +	{
+> +		.name			= "L4green",
+> +		.gpio			= 2,
+> +	},
+> +	{
+> +		.name			= "L4red",
+> +		.gpio			= 3,
+> +	},
+> +	{
+> +		.name			= "L3green",
+> +		.gpio			= 5,
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data wbd111_leds_data = {
+> +	.num_leds	= ARRAY_SIZE(wbd111_leds),
+> +	.leds		= wbd111_leds,
+> +};
+> +
+> +static struct platform_device wbd111_leds_device = {
+> +	.name	= "leds-gpio",
+> +	.id	= -1,
+> +	.dev	= {
+> +		.platform_data = &wbd111_leds_data,
+> +	},
+> +};
+> +
+> +static struct sys_timer wbd111_timer = {
+> +	.init	= gemini_timer_init,
+> +};
+> +
+> +#ifdef CONFIG_MTD_PARTITIONS
+> +static struct mtd_partition wbd111_partitions[] = {
+> +	{
+> +		.name		= "RedBoot",
+> +		.offset		= 0,
+> +		.size		= 0x020000,
+> +		.mask_flags	= MTD_WRITEABLE,
+> +	} , {
+> +		.name		= "kernel",
+> +		.offset		= 0x020000,
+> +		.size		= 0x100000,
+> +	} , {
+> +		.name		= "rootfs",
+> +		.offset		= 0x120000,
+> +		.size		= 0x6a0000,
+> +	} , {
+> +		.name		= "VCTL",
+> +		.offset		= 0x7c0000,
+> +		.size		= 0x010000,
+> +		.mask_flags	= MTD_WRITEABLE,
+> +	} , {
+> +		.name		= "cfg",
+> +		.offset		= 0x7d0000,
+> +		.size		= 0x010000,
+> +		.mask_flags	= MTD_WRITEABLE,
+> +	} , {
+> +		.name		= "FIS",
+> +		.offset		= 0x7e0000,
+> +		.size		= 0x010000,
+> +		.mask_flags	= MTD_WRITEABLE,
+> +	}
+> +};
+> +#define wbd111_num_partitions	ARRAY_SIZE(wbd111_partitions)
+> +#else
+> +#define wbd111_partitions	NULL
+> +#define wbd111_num_partitions	0
+> +#endif /* CONFIG_MTD_PARTITIONS */
+> +
+> +static void __init wbd111_init(void)
+> +{
+> +	gemini_gpio_init();
+> +	platform_register_uart();
+> +	platform_register_pflash(SZ_8M, wbd111_partitions,
+> +				 wbd111_num_partitions);
+> +	platform_device_register(&wbd111_leds_device);
+> +	platform_device_register(&wbd111_keys_device);
+> +}
+> +
+> +MACHINE_START(WBD111, "Wiliboard WBD-111")
+> +	.phys_io	= 0x7fffc000,
+> +	.io_pg_offst	= ((0xffffc000) >> 18) & 0xfffc,
+> +	.boot_params	= 0x100,
+> +	.map_io		= gemini_map_io,
+> +	.init_irq	= gemini_init_irq,
+> +	.timer		= &wbd111_timer,
+> +	.init_machine	= wbd111_init,
+> +MACHINE_END
