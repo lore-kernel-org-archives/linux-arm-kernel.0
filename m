@@ -1,142 +1,282 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 10 May 2010 20:35:09 +0200
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20100510183509.GP30801@buzzloop.caiaq.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 10 May 2010 20:43:12 +0200 (CEST)
+Subject: [PATCHv2 2.6.34-rc7 1/3] mxc: gadget: remove 60mhz clock
+	requirement for freescale mx51 usb core
+In-Reply-To: <1273508519-23033-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1273508519-23033-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <Pine.LNX.4.64.1005102041040.15250@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 08:13:40PM +0200, Philippe R?tornaz wrote:
-> On mx31 the OTG host initialisation fail if you need to have
-> an ULPI transfert to initialize the PHY.
+On Mon, 10 May 2010, Dinh Nguyen wrote:
+
+> renamed fsl_mx3_udc.c -> fsl_mxc_udc.c
+> for mx51, usb core is clocked from sources that are not 60mhz.
 > 
-> In order to be able to communicate with the PHY a complete reset
-> of the usb host is needed. After the PHY initialization the host
-> usb configuration registers need to be rewritten to avoid a host
-> controller lockup.
+> This patch applies to 2.6.34-rc7.
 
-Given that things are wired up correctly on the board, yes. Many boards
-don't, as they copy-pasted the schematics which got it wrong.
+For such patches it helps to use the "-M -C" options to "git format 
+patch," which would then make reviewing your changes easier...
 
-Anyway, if it helps you, it should go in. Some commenty below ...
+Thanks
+Guennadi
 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > ---
->  drivers/usb/host/ehci-mxc.c |   68 +++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 68 insertions(+), 0 deletions(-)
+>  drivers/usb/gadget/Makefile      |    2 +-
+>  drivers/usb/gadget/fsl_mx3_udc.c |  104 -------------------------------------
+>  drivers/usb/gadget/fsl_mxc_udc.c |  106 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 107 insertions(+), 105 deletions(-)
+>  delete mode 100644 drivers/usb/gadget/fsl_mx3_udc.c
+>  create mode 100644 drivers/usb/gadget/fsl_mxc_udc.c
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index 544ccfd..39d28da 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -29,6 +29,11 @@
->  #define PORTSC_OFFSET		0x184
->  #define USBMODE_OFFSET		0x1a8
->  #define USBMODE_CM_HOST		3
-> +#define USBCMD_OFFSET		0x140
-> +#define USBCMD_RS		(1 << 0)
-> +#define USBCMD_RST		(1 << 1)
-> +#define USBSTS_OFFSET		0x144
-> +#define USBSTS_HCH		(1 << 12)
->  
->  struct ehci_mxc_priv {
->  	struct clk *usbclk, *ahbclk;
-> @@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	int irq, ret, temp;
->  	struct ehci_mxc_priv *priv;
->  	struct device *dev = &pdev->dev;
-> +	int i;
->  
->  	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
->  
-> @@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		goto err_init;
->  
-> +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-> +	 * transfert timeout. */
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* Wait for the controller to go idle */
-> +		for (i = 0; i < 10000; i++) {
-> +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
-> +				break;
-> +			udelay(1);
-> +		}
-
-Please use a #defined value rather than the 10000 magic. Also, use
-cpu_relax() instead of the udelay(1).
-
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
+> diff --git a/drivers/usb/gadget/Makefile b/drivers/usb/gadget/Makefile
+> index 43b51da..c922eef 100644
+> --- a/drivers/usb/gadget/Makefile
+> +++ b/drivers/usb/gadget/Makefile
+> @@ -20,7 +20,7 @@ obj-$(CONFIG_USB_ATMEL_USBA)	+= atmel_usba_udc.o
+>  obj-$(CONFIG_USB_FSL_USB2)	+= fsl_usb2_udc.o
+>  fsl_usb2_udc-objs		:= fsl_udc_core.o
+>  ifeq ($(CONFIG_ARCH_MXC),y)
+> -fsl_usb2_udc-objs		+= fsl_mx3_udc.o
+> +fsl_usb2_udc-objs		+= fsl_mxc_udc.o
+>  endif
+>  obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
+>  obj-$(CONFIG_USB_R8A66597)	+= r8a66597-udc.o
+> diff --git a/drivers/usb/gadget/fsl_mx3_udc.c b/drivers/usb/gadget/fsl_mx3_udc.c
+> deleted file mode 100644
+> index 20a802e..0000000
+> --- a/drivers/usb/gadget/fsl_mx3_udc.c
+> +++ /dev/null
+> @@ -1,104 +0,0 @@
+> -/*
+> - * Copyright (C) 2009
+> - * Guennadi Liakhovetski, DENX Software Engineering, <lg@denx.de>
+> - *
+> - * Description:
+> - * Helper routines for i.MX3x SoCs from Freescale, needed by the fsl_usb2_udc.c
+> - * driver to function correctly on these systems.
+> - *
+> - * This program is free software; you can redistribute  it and/or modify it
+> - * under  the terms of  the GNU General  Public License as published by the
+> - * Free Software Foundation;  either version 2 of the  License, or (at your
+> - * option) any later version.
+> - */
+> -#include <linux/clk.h>
+> -#include <linux/delay.h>
+> -#include <linux/err.h>
+> -#include <linux/fsl_devices.h>
+> -#include <linux/platform_device.h>
+> -
+> -#include <mach/hardware.h>
+> -
+> -static struct clk *mxc_ahb_clk;
+> -static struct clk *mxc_usb_clk;
+> -
+> -int fsl_udc_clk_init(struct platform_device *pdev)
+> -{
+> -	struct fsl_usb2_platform_data *pdata;
+> -	unsigned long freq;
+> -	int ret;
+> -
+> -	pdata = pdev->dev.platform_data;
+> -
+> -	if (!cpu_is_mx35()) {
+> -		mxc_ahb_clk = clk_get(&pdev->dev, "usb_ahb");
+> -		if (IS_ERR(mxc_ahb_clk))
+> -			return PTR_ERR(mxc_ahb_clk);
+> -
+> -		ret = clk_enable(mxc_ahb_clk);
+> -		if (ret < 0) {
+> -			dev_err(&pdev->dev, "clk_enable(\"usb_ahb\") failed\n");
+> -			goto eenahb;
+> -		}
+> -	}
+> -
+> -	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
+> -	mxc_usb_clk = clk_get(&pdev->dev, "usb");
+> -	if (IS_ERR(mxc_usb_clk)) {
+> -		dev_err(&pdev->dev, "clk_get(\"usb\") failed\n");
+> -		ret = PTR_ERR(mxc_usb_clk);
+> -		goto egusb;
+> -	}
+> -
+> -	freq = clk_get_rate(mxc_usb_clk);
+> -	if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
+> -	    (freq < 59999000 || freq > 60001000)) {
+> -		dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
+> -		ret = -EINVAL;
+> -		goto eclkrate;
+> -	}
+> -
+> -	ret = clk_enable(mxc_usb_clk);
+> -	if (ret < 0) {
+> -		dev_err(&pdev->dev, "clk_enable(\"usb_clk\") failed\n");
+> -		goto eenusb;
+> -	}
+> -
+> -	return 0;
+> -
+> -eenusb:
+> -eclkrate:
+> -	clk_put(mxc_usb_clk);
+> -	mxc_usb_clk = NULL;
+> -egusb:
+> -	if (!cpu_is_mx35())
+> -		clk_disable(mxc_ahb_clk);
+> -eenahb:
+> -	if (!cpu_is_mx35())
+> -		clk_put(mxc_ahb_clk);
+> -	return ret;
+> -}
+> -
+> -void fsl_udc_clk_finalize(struct platform_device *pdev)
+> -{
+> -	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+> -
+> -	/* ULPI transceivers don't need usbpll */
+> -	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
+> -		clk_disable(mxc_usb_clk);
+> -		clk_put(mxc_usb_clk);
+> -		mxc_usb_clk = NULL;
+> -	}
+> -}
+> -
+> -void fsl_udc_clk_release(void)
+> -{
+> -	if (mxc_usb_clk) {
+> -		clk_disable(mxc_usb_clk);
+> -		clk_put(mxc_usb_clk);
+> -	}
+> -	if (!cpu_is_mx35()) {
+> -		clk_disable(mxc_ahb_clk);
+> -		clk_put(mxc_ahb_clk);
+> -	}
+> -}
+> diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+> new file mode 100644
+> index 0000000..d0b8bde
+> --- /dev/null
+> +++ b/drivers/usb/gadget/fsl_mxc_udc.c
+> @@ -0,0 +1,106 @@
+> +/*
+> + * Copyright (C) 2009
+> + * Guennadi Liakhovetski, DENX Software Engineering, <lg@denx.de>
+> + *
+> + * Description:
+> + * Helper routines for i.MX3x SoCs from Freescale, needed by the fsl_usb2_udc.c
+> + * driver to function correctly on these systems.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/fsl_devices.h>
+> +#include <linux/platform_device.h>
 > +
-> +		/* Stop the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
+> +#include <mach/hardware.h>
 > +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
-> +				break;
-> +			udelay(1);
-> +		}
+> +static struct clk *mxc_ahb_clk;
+> +static struct clk *mxc_usb_clk;
 > +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-
-This seems to be done all over the place. Wouldn't a static inline
-function simplify the code a lot here?
-
-Daniel
-
-
-> +		/* Reset the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
+> +int fsl_udc_clk_init(struct platform_device *pdev)
+> +{
+> +	struct fsl_usb2_platform_data *pdata;
+> +	unsigned long freq;
+> +	int ret;
 > +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
-> +				break;
-> +			udelay(1);
-> +		}
+> +	pdata = pdev->dev.platform_data;
 > +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while reseting USB controller\n");
-> +			goto err_init;
+> +	if (!cpu_is_mx35()) {
+> +		mxc_ahb_clk = clk_get(&pdev->dev, "usb_ahb");
+> +		if (IS_ERR(mxc_ahb_clk))
+> +			return PTR_ERR(mxc_ahb_clk);
+> +
+> +		ret = clk_enable(mxc_ahb_clk);
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev, "clk_enable(\"usb_ahb\") failed\n");
+> +			goto eenahb;
 > +		}
 > +	}
 > +
->  	/* Initialize the transceiver */
->  	if (pdata->otg) {
->  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
-> @@ -213,6 +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  			dev_err(dev, "unable to enable vbus on transceiver\n");
->  	}
->  
-> +	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
-> +	 * controller stay busy. Rewriting the register is enough to make it
-> +	 * working */
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* set USBMODE to host mode */
-> +		temp = readl(hcd->regs + USBMODE_OFFSET);
-> +		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-> +
-> +		/* set up the PORTSCx register */
-> +		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-> +
-> +		/* setup USBCONTROL. */
-> +		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-> +		if (ret < 0)
-> +			goto err_init;
+> +	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
+> +	mxc_usb_clk = clk_get(&pdev->dev, "usb");
+> +	if (IS_ERR(mxc_usb_clk)) {
+> +		dev_err(&pdev->dev, "clk_get(\"usb\") failed\n");
+> +		ret = PTR_ERR(mxc_usb_clk);
+> +		goto egusb;
 > +	}
 > +
->  	priv->hcd = hcd;
->  	platform_set_drvdata(pdev, priv);
->  
+> +	if (!cpu_is_mx51()) {
+> +		freq = clk_get_rate(mxc_usb_clk);
+> +		if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
+> +		    (freq < 59999000 || freq > 60001000)) {
+> +			dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
+> +			ret = -EINVAL;
+> +			goto eclkrate;
+> +		}
+> +	}
+> +
+> +	ret = clk_enable(mxc_usb_clk);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "clk_enable(\"usb_clk\") failed\n");
+> +		goto eenusb;
+> +	}
+> +
+> +	return 0;
+> +
+> +eenusb:
+> +eclkrate:
+> +	clk_put(mxc_usb_clk);
+> +	mxc_usb_clk = NULL;
+> +egusb:
+> +	if (!cpu_is_mx35())
+> +		clk_disable(mxc_ahb_clk);
+> +eenahb:
+> +	if (!cpu_is_mx35())
+> +		clk_put(mxc_ahb_clk);
+> +	return ret;
+> +}
+> +
+> +void fsl_udc_clk_finalize(struct platform_device *pdev)
+> +{
+> +	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+> +
+> +	/* ULPI transceivers don't need usbpll */
+> +	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
+> +		clk_disable(mxc_usb_clk);
+> +		clk_put(mxc_usb_clk);
+> +		mxc_usb_clk = NULL;
+> +	}
+> +}
+> +
+> +void fsl_udc_clk_release(void)
+> +{
+> +	if (mxc_usb_clk) {
+> +		clk_disable(mxc_usb_clk);
+> +		clk_put(mxc_usb_clk);
+> +	}
+> +	if (!cpu_is_mx35()) {
+> +		clk_disable(mxc_ahb_clk);
+> +		clk_put(mxc_ahb_clk);
+> +	}
+> +}
 > -- 
-> 1.6.3.3
+> 1.6.0.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
