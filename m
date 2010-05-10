@@ -1,28 +1,27 @@
-From: contact.aneesh@gmail.com (Aneesh Bhasin)
-Date: Mon, 10 May 2010 16:59:50 +0530
-Subject: ARM A9 MPCore support in OProfile ?
-Message-ID: <AANLkTimc70m7gVpPxf01qTD3O6Y63gGwrF76RBlABfsR@mail.gmail.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Mon, 10 May 2010 15:13:05 +0300
+Subject: [PATCHv4 3/4] mach-omap1: export omap1 info under /proc/socinfo
+In-Reply-To: <20100510105200.GA14337@n2100.arm.linux.org.uk>
+References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-4-git-send-email-eduardo.valentin@nokia.com>
+	<20100510105200.GA14337@n2100.arm.linux.org.uk>
+Message-ID: <20100510121305.GB8441@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Mon, May 10, 2010 at 12:52:00PM +0200, Russell King wrote:
+> On Mon, May 10, 2010 at 01:37:36PM +0300, Eduardo Valentin wrote:
+> > From: Eduardo Valentin <eduardo.valentin@nokia.com>
+> > 
+> > Report OMAP name and rev under /proc/socinfo node.
+> 
+> I think this needs to be combined with the previous patch.  The previous
+> patch enables the socinfo file, which means with patch 2 applied but not
+> patch 3, OMAP1 breaks.
 
-Had sent this to the oprofile-list too, but did not get any reply.
-Hopefully, someone here who has experience with this could help..
+yes, indeed. I will squash both.
 
-Can someone please tell what is the status of support for ARM A9
-MPCore PMU in OProfile ?
+Tks,
 
-I was browsing the linux-arm repository at
-
-http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=summary
-
-and could see that it has support for A9 MPCore but could not find
-anything related to it in the OProfile source-code (e.g .in
-events/arm). Is there any patch that needs to be applied to use A9
-MPCore PMU with OProfile ?
-
-Thanks in advance...
-
-Regards,
-Aneesh
+--
+Eduardo Valentin
