@@ -1,162 +1,43 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Tue, 11 May 2010 01:25:38 +0530
-Subject: [PATCH RESEND] update omap3 features bitmap and API to generic names
-Message-ID: <1273521338-2896-1-git-send-email-svenkatr@ti.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 10 May 2010 22:06:57 +0200
+Subject: [PATCH 0/4] ARM: Gemini: board/maintainer updates
+Message-ID: <1273522021-14436-1-git-send-email-ulli.kroll@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	OMAP3 features bitmap is used a method to check
-for SoC specific features. This patch renames the global variables
-and the accessor functions to use a generic name from omap3_* to
-omap_*
+Hello to all,
 
-Signed-off-by: Venkatraman S <svenkatr@ti.com>
-CC: Nishant Menon <nm@ti.com>
-CC: Tony Lindgren <tony@atomide.com>
-CC: Madhusudhan Chikkature <madhu.cr@ti.com>
----
- * Resent to CC Madhu
+Here are some board updates for the Gemini SoC
 
- arch/arm/mach-omap2/clock3xxx_data.c  |    2 +-
- arch/arm/mach-omap2/id.c              |   18 ++++++++--------
- arch/arm/plat-omap/include/plat/cpu.h |   34 ++++++++++++++++----------------
- 3 files changed, 27 insertions(+), 27 deletions(-)
+The sources are from the openwrt-team and Janos Laube.
+I've removed only parts that are not in Linus' tree, mainly drivers for 
+ethernet, usb and other stuff.
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 9cba556..afa481d 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3510,7 +3510,7 @@ int __init omap3xxx_clk_init(void)
- 			cpu_clkflg |= CK_3430ES2;
- 		}
- 	}
--	if (omap3_has_192mhz_clk())
-+	if (omap_has_192mhz_clk())
- 		omap_96m_alwon_fck = omap_96m_alwon_fck_3630;
- 
- 	if (cpu_is_omap3630()) {
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 37b8a1a..a095b87 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -28,7 +28,7 @@
- static struct omap_chip_id omap_chip;
- static unsigned int omap_revision;
- 
--u32 omap3_features;
-+u32 omap_features;
- 
- unsigned int omap_rev(void)
- {
-@@ -161,14 +161,14 @@ void __init omap24xx_check_revision(void)
- #define OMAP3_CHECK_FEATURE(status,feat)				\
- 	if (((status & OMAP3_ ##feat## _MASK) 				\
- 		>> OMAP3_ ##feat## _SHIFT) != FEAT_ ##feat## _NONE) { 	\
--		omap3_features |= OMAP3_HAS_ ##feat;			\
-+		omap_features |= OMAP_HAS_ ##feat;			\
- 	}
- 
- void __init omap3_check_features(void)
- {
- 	u32 status;
- 
--	omap3_features = 0;
-+	omap_features = 0;
- 
- 	status = omap_ctrl_readl(OMAP3_CONTROL_OMAP_STATUS);
- 
-@@ -178,7 +178,7 @@ void __init omap3_check_features(void)
- 	OMAP3_CHECK_FEATURE(status, NEON);
- 	OMAP3_CHECK_FEATURE(status, ISP);
- 	if (cpu_is_omap3630())
--		omap3_features |= OMAP3_HAS_192MHZ_CLK;
-+		omap_features |= OMAP_HAS_192MHZ_CLK;
- 
- 	/*
- 	 * TODO: Get additional info (where applicable)
-@@ -294,7 +294,7 @@ void __init omap4_check_revision(void)
- }
- 
- #define OMAP3_SHOW_FEATURE(feat)		\
--	if (omap3_has_ ##feat())		\
-+	if (omap_has_ ##feat())		\
- 		printk(#feat" ");
- 
- void __init omap3_cpuinfo(void)
-@@ -314,20 +314,20 @@ void __init omap3_cpuinfo(void)
- 		/*
- 		 * AM35xx devices
- 		 */
--		if (omap3_has_sgx()) {
-+		if (omap_has_sgx()) {
- 			omap_revision = OMAP3517_REV(rev);
- 			strcpy(cpu_name, "AM3517");
- 		} else {
- 			/* Already set in omap3_check_revision() */
- 			strcpy(cpu_name, "AM3505");
- 		}
--	} else if (omap3_has_iva() && omap3_has_sgx()) {
-+	} else if (omap_has_iva() && omap_has_sgx()) {
- 		/* OMAP3430, OMAP3525, OMAP3515, OMAP3503 devices */
- 		strcpy(cpu_name, "OMAP3430/3530");
--	} else if (omap3_has_iva()) {
-+	} else if (omap_has_iva()) {
- 		omap_revision = OMAP3525_REV(rev);
- 		strcpy(cpu_name, "OMAP3525");
--	} else if (omap3_has_sgx()) {
-+	} else if (omap_has_sgx()) {
- 		omap_revision = OMAP3515_REV(rev);
- 		strcpy(cpu_name, "OMAP3515");
- 	} else {
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 7514174..80dc8e0 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -434,28 +434,28 @@ int omap_chip_is(struct omap_chip_id oci);
- void omap2_check_revision(void);
- 
- /*
-- * Runtime detection of OMAP3 features
-+ * Runtime detection of OMAP features
-  */
--extern u32 omap3_features;
-+extern u32 omap_features;
- 
--#define OMAP3_HAS_L2CACHE		BIT(0)
--#define OMAP3_HAS_IVA			BIT(1)
--#define OMAP3_HAS_SGX			BIT(2)
--#define OMAP3_HAS_NEON			BIT(3)
--#define OMAP3_HAS_ISP			BIT(4)
--#define OMAP3_HAS_192MHZ_CLK		BIT(5)
-+#define OMAP_HAS_L2CACHE		BIT(0)
-+#define OMAP_HAS_IVA			BIT(1)
-+#define OMAP_HAS_SGX			BIT(2)
-+#define OMAP_HAS_NEON			BIT(3)
-+#define OMAP_HAS_ISP			BIT(4)
-+#define OMAP_HAS_192MHZ_CLK		BIT(5)
- 
--#define OMAP3_HAS_FEATURE(feat,flag)			\
--static inline unsigned int omap3_has_ ##feat(void)	\
-+#define OMAP_HAS_FEATURE(feat, flag)			\
-+static inline unsigned int omap_has_ ##feat(void)	\
- {							\
--	return (omap3_features & OMAP3_HAS_ ##flag);	\
-+	return (omap_features & OMAP_HAS_ ##flag);	\
- }							\
- 
--OMAP3_HAS_FEATURE(l2cache, L2CACHE)
--OMAP3_HAS_FEATURE(sgx, SGX)
--OMAP3_HAS_FEATURE(iva, IVA)
--OMAP3_HAS_FEATURE(neon, NEON)
--OMAP3_HAS_FEATURE(isp, ISP)
--OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
-+OMAP_HAS_FEATURE(l2cache, L2CACHE)
-+OMAP_HAS_FEATURE(sgx, SGX)
-+OMAP_HAS_FEATURE(iva, IVA)
-+OMAP_HAS_FEATURE(neon, NEON)
-+OMAP_HAS_FEATURE(isp, ISP)
-+OMAP_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
- 
- #endif
--- 
-1.6.3.3
+The the driver for watchdog and rtc are ready to ship.
+These will be added on the next round, avoiding some chicken and egg 
+problem ;-)
+
+Patches 1-3 _must_ be applied in order, due Kconfig and Makefile changes.
+
+Ulli
+
+Hans Ulli Kroll (1):
+      MAINTAINERS: update for ARM/Gemini
+
+Imre Kaloz (2):
+      ARM: Gemini: add support for Wiligear WBD-111
+      ARM: Gemini: add support for Wiliboard WBD-222
+
+Janos Laube (1):
+      ARM: Gemini: add support for Raidsonic IB4220
+
+ MAINTAINERS                           |   11 ++-
+ arch/arm/mach-gemini/Kconfig          |   21 +++++
+ arch/arm/mach-gemini/Makefile         |    3 +
+ arch/arm/mach-gemini/board-nas4220b.c |  111 +++++++++++++++++++++++++
+ arch/arm/mach-gemini/board-wbd111.c   |  143 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-gemini/board-wbd222.c   |  143 +++++++++++++++++++++++++++++++++
+ 6 files changed, 427 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-gemini/board-nas4220b.c
+ create mode 100644 arch/arm/mach-gemini/board-wbd111.c
+ create mode 100644 arch/arm/mach-gemini/board-wbd222.c
