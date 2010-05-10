@@ -1,50 +1,175 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Tue, 11 May 2010 00:32:58 +0300
-Subject: [PATCH 4/4] MAINTAINERS: update for ARM/Gemini
-In-Reply-To: <1273522021-14436-5-git-send-email-ulli.kroll@googlemail.com>
-References: <1273522021-14436-1-git-send-email-ulli.kroll@googlemail.com>
-	<1273522021-14436-5-git-send-email-ulli.kroll@googlemail.com>
-Message-ID: <4BE87B8A.9050006@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 10 May 2010 18:32:02 -0500
+Subject: [PATCH RESEND] update omap3 features bitmap and API to generic
+	names
+In-Reply-To: <1273521338-2896-1-git-send-email-svenkatr@ti.com>
+References: <1273521338-2896-1-git-send-email-svenkatr@ti.com>
+Message-ID: <AANLkTimNjnKG3WFK8mdpgHaLh-Xpv54fohFgEYYiVVcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2010 11:07 PM, Hans Ulli Kroll wrote:
-> Signed-off-by: Hans Ulli Kroll<ulli.kroll@googlemail.com>
+On Mon, May 10, 2010 at 2:55 PM, Venkatraman S <svenkatr@ti.com> wrote:
+> ? ? ? ?OMAP3 features bitmap is used a method to check
+> for SoC specific features. This patch renames the global variables
+> and the accessor functions to use a generic name from omap3_* to
+> omap_*
+>
+> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+> CC: Nishant Menon <nm@ti.com>
+Just for the patchworks
+NAK - discussed before - http://marc.info/?l=linux-omap&m=127349696800651&w=2
 
-Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Madhusudhan Chikkature <madhu.cr@ti.com>
 > ---
->   MAINTAINERS |   11 ++++++-----
->   1 files changed, 6 insertions(+), 5 deletions(-)
+> ?* Resent to CC Madhu
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 449d444..8a0fe7f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -620,10 +620,10 @@ M:	Richard Purdie<rpurdie@rpsys.net>
->   S:	Maintained
+> ?arch/arm/mach-omap2/clock3xxx_data.c ?| ? ?2 +-
+> ?arch/arm/mach-omap2/id.c ? ? ? ? ? ? ?| ? 18 ++++++++--------
+> ?arch/arm/plat-omap/include/plat/cpu.h | ? 34 ++++++++++++++++----------------
+> ?3 files changed, 27 insertions(+), 27 deletions(-)
 >
->   ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
-> -M:	Paulius Zaleckas<paulius.zaleckas@gmail.com>
-> +M:	Hans Ulli Kroll<ulli.kroll@googlemail.com>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -T:	git git://gitorious.org/linux-gemini/mainline.git
-> -S:	Odd Fixes
-> +T:	git git://git.berlios.de/gemini-board
-> +S:	Maintained
->   F:	arch/arm/mach-gemini/
+> diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+> index 9cba556..afa481d 100644
+> --- a/arch/arm/mach-omap2/clock3xxx_data.c
+> +++ b/arch/arm/mach-omap2/clock3xxx_data.c
+> @@ -3510,7 +3510,7 @@ int __init omap3xxx_clk_init(void)
+> ? ? ? ? ? ? ? ? ? ? ? ?cpu_clkflg |= CK_3430ES2;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+> - ? ? ? if (omap3_has_192mhz_clk())
+> + ? ? ? if (omap_has_192mhz_clk())
+> ? ? ? ? ? ? ? ?omap_96m_alwon_fck = omap_96m_alwon_fck_3630;
 >
->   ARM/EBSA110 MACHINE SUPPORT
-> @@ -645,9 +645,10 @@ T:	topgit git://git.openezx.org/openezx.git
->   F:	arch/arm/mach-pxa/ezx.c
+> ? ? ? ?if (cpu_is_omap3630()) {
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 37b8a1a..a095b87 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -28,7 +28,7 @@
+> ?static struct omap_chip_id omap_chip;
+> ?static unsigned int omap_revision;
 >
->   ARM/FARADAY FA526 PORT
-> -M:	Paulius Zaleckas<paulius.zaleckas@gmail.com>
-> +M:	Hans Ulli Kroll<ulli.kroll@googlemail.com>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -S:	Odd Fixes
-> +S:	Maintained
-> +T:	git://git.berlios.de/gemini-board
->   F:	arch/arm/mm/*-fa*
+> -u32 omap3_features;
+> +u32 omap_features;
 >
->   ARM/FOOTBRIDGE ARCHITECTURE
+> ?unsigned int omap_rev(void)
+> ?{
+> @@ -161,14 +161,14 @@ void __init omap24xx_check_revision(void)
+> ?#define OMAP3_CHECK_FEATURE(status,feat) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ?if (((status & OMAP3_ ##feat## _MASK) ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?>> OMAP3_ ##feat## _SHIFT) != FEAT_ ##feat## _NONE) { ? \
+> - ? ? ? ? ? ? ? omap3_features |= OMAP3_HAS_ ##feat; ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? omap_features |= OMAP_HAS_ ##feat; ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?}
+>
+> ?void __init omap3_check_features(void)
+> ?{
+> ? ? ? ?u32 status;
+>
+> - ? ? ? omap3_features = 0;
+> + ? ? ? omap_features = 0;
+>
+> ? ? ? ?status = omap_ctrl_readl(OMAP3_CONTROL_OMAP_STATUS);
+>
+> @@ -178,7 +178,7 @@ void __init omap3_check_features(void)
+> ? ? ? ?OMAP3_CHECK_FEATURE(status, NEON);
+> ? ? ? ?OMAP3_CHECK_FEATURE(status, ISP);
+> ? ? ? ?if (cpu_is_omap3630())
+> - ? ? ? ? ? ? ? omap3_features |= OMAP3_HAS_192MHZ_CLK;
+> + ? ? ? ? ? ? ? omap_features |= OMAP_HAS_192MHZ_CLK;
+>
+> ? ? ? ?/*
+> ? ? ? ? * TODO: Get additional info (where applicable)
+> @@ -294,7 +294,7 @@ void __init omap4_check_revision(void)
+> ?}
+>
+> ?#define OMAP3_SHOW_FEATURE(feat) ? ? ? ? ? ? ? \
+> - ? ? ? if (omap3_has_ ##feat()) ? ? ? ? ? ? ? ?\
+> + ? ? ? if (omap_has_ ##feat()) ? ? ? ? \
+> ? ? ? ? ? ? ? ?printk(#feat" ");
+>
+> ?void __init omap3_cpuinfo(void)
+> @@ -314,20 +314,20 @@ void __init omap3_cpuinfo(void)
+> ? ? ? ? ? ? ? ?/*
+> ? ? ? ? ? ? ? ? * AM35xx devices
+> ? ? ? ? ? ? ? ? */
+> - ? ? ? ? ? ? ? if (omap3_has_sgx()) {
+> + ? ? ? ? ? ? ? if (omap_has_sgx()) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_revision = OMAP3517_REV(rev);
+> ? ? ? ? ? ? ? ? ? ? ? ?strcpy(cpu_name, "AM3517");
+> ? ? ? ? ? ? ? ?} else {
+> ? ? ? ? ? ? ? ? ? ? ? ?/* Already set in omap3_check_revision() */
+> ? ? ? ? ? ? ? ? ? ? ? ?strcpy(cpu_name, "AM3505");
+> ? ? ? ? ? ? ? ?}
+> - ? ? ? } else if (omap3_has_iva() && omap3_has_sgx()) {
+> + ? ? ? } else if (omap_has_iva() && omap_has_sgx()) {
+> ? ? ? ? ? ? ? ?/* OMAP3430, OMAP3525, OMAP3515, OMAP3503 devices */
+> ? ? ? ? ? ? ? ?strcpy(cpu_name, "OMAP3430/3530");
+> - ? ? ? } else if (omap3_has_iva()) {
+> + ? ? ? } else if (omap_has_iva()) {
+> ? ? ? ? ? ? ? ?omap_revision = OMAP3525_REV(rev);
+> ? ? ? ? ? ? ? ?strcpy(cpu_name, "OMAP3525");
+> - ? ? ? } else if (omap3_has_sgx()) {
+> + ? ? ? } else if (omap_has_sgx()) {
+> ? ? ? ? ? ? ? ?omap_revision = OMAP3515_REV(rev);
+> ? ? ? ? ? ? ? ?strcpy(cpu_name, "OMAP3515");
+> ? ? ? ?} else {
+> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+> index 7514174..80dc8e0 100644
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -434,28 +434,28 @@ int omap_chip_is(struct omap_chip_id oci);
+> ?void omap2_check_revision(void);
+>
+> ?/*
+> - * Runtime detection of OMAP3 features
+> + * Runtime detection of OMAP features
+> ?*/
+> -extern u32 omap3_features;
+> +extern u32 omap_features;
+>
+> -#define OMAP3_HAS_L2CACHE ? ? ? ? ? ? ?BIT(0)
+> -#define OMAP3_HAS_IVA ? ? ? ? ? ? ? ? ?BIT(1)
+> -#define OMAP3_HAS_SGX ? ? ? ? ? ? ? ? ?BIT(2)
+> -#define OMAP3_HAS_NEON ? ? ? ? ? ? ? ? BIT(3)
+> -#define OMAP3_HAS_ISP ? ? ? ? ? ? ? ? ?BIT(4)
+> -#define OMAP3_HAS_192MHZ_CLK ? ? ? ? ? BIT(5)
+> +#define OMAP_HAS_L2CACHE ? ? ? ? ? ? ? BIT(0)
+> +#define OMAP_HAS_IVA ? ? ? ? ? ? ? ? ? BIT(1)
+> +#define OMAP_HAS_SGX ? ? ? ? ? ? ? ? ? BIT(2)
+> +#define OMAP_HAS_NEON ? ? ? ? ? ? ? ? ?BIT(3)
+> +#define OMAP_HAS_ISP ? ? ? ? ? ? ? ? ? BIT(4)
+> +#define OMAP_HAS_192MHZ_CLK ? ? ? ? ? ?BIT(5)
+>
+> -#define OMAP3_HAS_FEATURE(feat,flag) ? ? ? ? ? ? ? ? ? \
+> -static inline unsigned int omap3_has_ ##feat(void) ? ? \
+> +#define OMAP_HAS_FEATURE(feat, flag) ? ? ? ? ? ? ? ? ? \
+> +static inline unsigned int omap_has_ ##feat(void) ? ? ?\
+> ?{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? return (omap3_features & OMAP3_HAS_ ##flag); ? ?\
+> + ? ? ? return (omap_features & OMAP_HAS_ ##flag); ? ? ?\
+> ?} ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>
+> -OMAP3_HAS_FEATURE(l2cache, L2CACHE)
+> -OMAP3_HAS_FEATURE(sgx, SGX)
+> -OMAP3_HAS_FEATURE(iva, IVA)
+> -OMAP3_HAS_FEATURE(neon, NEON)
+> -OMAP3_HAS_FEATURE(isp, ISP)
+> -OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+> +OMAP_HAS_FEATURE(l2cache, L2CACHE)
+> +OMAP_HAS_FEATURE(sgx, SGX)
+> +OMAP_HAS_FEATURE(iva, IVA)
+> +OMAP_HAS_FEATURE(neon, NEON)
+> +OMAP_HAS_FEATURE(isp, ISP)
+> +OMAP_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+>
+> ?#endif
+> --
+> 1.6.3.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
