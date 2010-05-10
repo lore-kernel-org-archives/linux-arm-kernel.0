@@ -1,200 +1,50 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 10 May 2010 22:57:15 +0200
-Subject: [PATCH 2/4] ARM: Gemini: add support for Wiliboard WBD-222
-In-Reply-To: <1273522021-14436-3-git-send-email-ulli.kroll@googlemail.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Tue, 11 May 2010 00:32:58 +0300
+Subject: [PATCH 4/4] MAINTAINERS: update for ARM/Gemini
+In-Reply-To: <1273522021-14436-5-git-send-email-ulli.kroll@googlemail.com>
 References: <1273522021-14436-1-git-send-email-ulli.kroll@googlemail.com>
-	<1273522021-14436-3-git-send-email-ulli.kroll@googlemail.com>
-Message-ID: <op.vcichpr22s3iss@ecaz>
+	<1273522021-14436-5-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <4BE87B8A.9050006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+On 05/10/2010 11:07 PM, Hans Ulli Kroll wrote:
+> Signed-off-by: Hans Ulli Kroll<ulli.kroll@googlemail.com>
 
-On Mon, 10 May 2010 22:06:59 +0200, Hans Ulli Kroll <ulli.kroll@googlemail.com> wrote:
+Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
 
-> From: Imre Kaloz <kaloz@openwrt.org>
->
-> Add support for Wiliboard WBD-222.
->
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 > ---
->  arch/arm/mach-gemini/Kconfig        |    7 ++
->  arch/arm/mach-gemini/Makefile       |    1 +
->  arch/arm/mach-gemini/board-wbd222.c |  143 +++++++++++++++++++++++++++++++++++
->  3 files changed, 151 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-gemini/board-wbd222.c
+>   MAINTAINERS |   11 ++++++-----
+>   1 files changed, 6 insertions(+), 5 deletions(-)
 >
-> diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
-> index 4de67ce..7997500 100644
-> --- a/arch/arm/mach-gemini/Kconfig
-> +++ b/arch/arm/mach-gemini/Kconfig
-> @@ -16,6 +16,13 @@ config MACH_WBD111
->  	  Say Y here if you intend to run this kernel on a
->  	  Wiliboard WBD-111.
->+config MACH_WBD222
-> +        bool "Wiliboard WBD-222"
-> +        select GEMINI_MEM_SWAP
-> +        help
-> +          Say Y here if you intend to run this kernel on a
-> +          Wiliboard WBD-222.
-> +
->  endmenu
-> config GEMINI_MEM_SWAP
-> diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
-> index 3997487..8e02c47 100644
-> --- a/arch/arm/mach-gemini/Makefile
-> +++ b/arch/arm/mach-gemini/Makefile
-> @@ -9,3 +9,4 @@ obj-y			:= irq.o mm.o time.o devices.o gpio.o
->  # Board-specific support
->  obj-$(CONFIG_MACH_RUT100)	+= board-rut1xx.o
->  obj-$(CONFIG_MACH_WBD111)	+= board-wbd111.o
-> +obj-$(CONFIG_MACH_WBD222)	+= board-wbd222.o
-> diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
-> new file mode 100644
-> index 0000000..ece8b4c
-> --- /dev/null
-> +++ b/arch/arm/mach-gemini/board-wbd222.c
-> @@ -0,0 +1,143 @@
-> +/*
-> + *  Support for Wiliboard WBD-222
-> + *
-> + *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/leds.h>
-> +#include <linux/input.h>
-> +#include <linux/skbuff.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/mdio-gpio.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +
-> +#include "common.h"
-> +
-> +static struct gpio_keys_button wbd222_keys[] = {
-> +	{
-> +		.code		= KEY_SETUP,
-> +		.gpio		= 5,
-> +		.active_low	= 1,
-> +		.desc		= "reset",
-> +		.type		= EV_KEY,
-> +	},
-> +};
-> +
-> +static struct gpio_keys_platform_data wbd222_keys_data = {
-> +	.buttons	= wbd222_keys,
-> +	.nbuttons	= ARRAY_SIZE(wbd222_keys),
-> +};
-> +
-> +static struct platform_device wbd222_keys_device = {
-> +	.name	= "gpio-keys",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data = &wbd222_keys_data,
-> +	},
-> +};
-> +
-> +static struct gpio_led wbd222_leds[] = {
-> +	{
-> +		.name			= "L3red",
-> +		.gpio			= 1,
-> +	},
-> +	{
-> +		.name			= "L4green",
-> +		.gpio			= 2,
-> +	},
-> +	{
-> +		.name			= "L4red",
-> +		.gpio			= 3,
-> +	},
-> +	{
-> +		.name			= "L3green",
-> +		.gpio			= 5,
-> +	},
-> +};
-> +
-> +static struct gpio_led_platform_data wbd222_leds_data = {
-> +	.num_leds	= ARRAY_SIZE(wbd222_leds),
-> +	.leds		= wbd222_leds,
-> +};
-> +
-> +static struct platform_device wbd222_leds_device = {
-> +	.name	= "leds-gpio",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data = &wbd222_leds_data,
-> +	},
-> +};
-> +
-> +static struct sys_timer wbd222_timer = {
-> +	.init	= gemini_timer_init,
-> +};
-> +
-> +#ifdef CONFIG_MTD_PARTITIONS
-> +static struct mtd_partition wbd222_partitions[] = {
-> +	{
-> +		.name		= "RedBoot",
-> +		.offset		= 0,
-> +		.size		= 0x020000,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	} , {
-> +		.name		= "kernel",
-> +		.offset		= 0x020000,
-> +		.size		= 0x100000,
-> +	} , {
-> +		.name		= "rootfs",
-> +		.offset		= 0x120000,
-> +		.size		= 0x6a0000,
-> +	} , {
-> +		.name		= "VCTL",
-> +		.offset		= 0x7c0000,
-> +		.size		= 0x010000,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	} , {
-> +		.name		= "cfg",
-> +		.offset		= 0x7d0000,
-> +		.size		= 0x010000,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	} , {
-> +		.name		= "FIS",
-> +		.offset		= 0x7e0000,
-> +		.size		= 0x010000,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	}
-> +};
-> +#define wbd222_num_partitions	ARRAY_SIZE(wbd222_partitions)
-> +#else
-> +#define wbd222_partitions	NULL
-> +#define wbd222_num_partitions	0
-> +#endif /* CONFIG_MTD_PARTITIONS */
-> +
-> +static void __init wbd222_init(void)
-> +{
-> +	gemini_gpio_init();
-> +	platform_register_uart();
-> +	platform_register_pflash(SZ_8M, wbd222_partitions,
-> +		wbd222_num_partitions);
-> +	platform_device_register(&wbd222_leds_device);
-> +	platform_device_register(&wbd222_keys_device);
-> +}
-> +
-> +MACHINE_START(WBD222, "Wiliboard WBD-222")
-> +	.phys_io	= 0x7fffc000,
-> +	.io_pg_offst	= ((0xffffc000) >> 18) & 0xfffc,
-> +	.boot_params	= 0x100,
-> +	.map_io		= gemini_map_io,
-> +	.init_irq	= gemini_init_irq,
-> +	.timer		= &wbd222_timer,
-> +	.init_machine	= wbd222_init,
-> +MACHINE_END
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 449d444..8a0fe7f 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -620,10 +620,10 @@ M:	Richard Purdie<rpurdie@rpsys.net>
+>   S:	Maintained
+>
+>   ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
+> -M:	Paulius Zaleckas<paulius.zaleckas@gmail.com>
+> +M:	Hans Ulli Kroll<ulli.kroll@googlemail.com>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -T:	git git://gitorious.org/linux-gemini/mainline.git
+> -S:	Odd Fixes
+> +T:	git git://git.berlios.de/gemini-board
+> +S:	Maintained
+>   F:	arch/arm/mach-gemini/
+>
+>   ARM/EBSA110 MACHINE SUPPORT
+> @@ -645,9 +645,10 @@ T:	topgit git://git.openezx.org/openezx.git
+>   F:	arch/arm/mach-pxa/ezx.c
+>
+>   ARM/FARADAY FA526 PORT
+> -M:	Paulius Zaleckas<paulius.zaleckas@gmail.com>
+> +M:	Hans Ulli Kroll<ulli.kroll@googlemail.com>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Odd Fixes
+> +S:	Maintained
+> +T:	git://git.berlios.de/gemini-board
+>   F:	arch/arm/mm/*-fa*
+>
+>   ARM/FOOTBRIDGE ARCHITECTURE
