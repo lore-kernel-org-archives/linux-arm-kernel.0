@@ -1,137 +1,485 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 10 May 2010 03:35:37 +0100
-Subject: S3C6410 power management support status
-In-Reply-To: <20100506144955.GA24641@jeknote.loshitsa1.net>
-References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-	<20100504002420.GQ6684@trinity.fluff.org>
-	<20100506144955.GA24641@jeknote.loshitsa1.net>
-Message-ID: <20100510023537.GW26401@trinity.fluff.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 10 May 2010 05:02:05 +0200
+Subject: [PATCH] PXA DMA-capable PATA driver
+Message-ID: <1273460525-25662-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 06, 2010 at 05:49:55PM +0300, Yauhen Kharuzhy wrote:
-> On Tue, May 04, 2010 at 01:24:20AM +0100, Ben Dooks wrote:
-> > On Thu, Apr 29, 2010 at 03:45:09PM +0300, Yauhen Kharuzhy wrote:
-> > > Hi.
-> > > 
-> > > Can anybody explain current status of S3C6410 power management support
-> > > in mainline? Suspend-to-RAM looks completely broken in the current
-> > > Linus's git tree.
-> > 
-> > I'd prefer if you didn't make sweeping accusations about the state of
-> > a given piece of the kernel without having a good look first. From reading
-> > your second post, it seems that what is actually the problem is that the
-> > 64XX support only currently handles wakeup configurations from the EINT
-> > pins.
-> 
-> I am sorry for my hasty opinion about StR.
-> 
-> But we have checked Suspend-to-RAM at our (custom, not SMDK) board just now
-> and it is not works with EINT too. Kernel goes to sleep and never
-> return. We found that XPWRRGTON pin isn't
-> changed at sleep instruction execution so CPU don't go to sleep state. If anybody
-> can say something about reasons of this, please say.
+This patch adds a driver for a harddrive attached to PXA address and data bus.
+Unlike pata_platform, this driver allows usage of PXA DMA controller, making the
+transmission speed 3x higher.
 
-Just tested 2.6.34-rc6-git and it works on the SMDK6410 with the
-addition of the gpio buttons for EINT9..11, and it worked.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/pata_pxa.h |   33 +++
+ drivers/ata/Kconfig                       |   11 +
+ drivers/ata/Makefile                      |    1 +
+ drivers/ata/pata_pxa.c                    |  383 +++++++++++++++++++++++++++++
+ 4 files changed, 428 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pata_pxa.h
+ create mode 100644 drivers/ata/pata_pxa.c
 
-Can post the patches or git tree if you like.
+diff --git a/arch/arm/mach-pxa/include/mach/pata_pxa.h b/arch/arm/mach-pxa/include/mach/pata_pxa.h
+new file mode 100644
+index 0000000..6cf7df1
+--- /dev/null
++++ b/arch/arm/mach-pxa/include/mach/pata_pxa.h
+@@ -0,0 +1,33 @@
++/*
++ * Generic PXA PATA driver
++ *
++ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; see the file COPYING.  If not, write to
++ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifndef	__MACH_PATA_PXA_H__
++#define	__MACH_PATA_PXA_H__
++
++struct pata_pxa_pdata {
++	/* PXA DMA DREQ<0:2> pin */
++	uint32_t	dma_dreq;
++	/* Register shift */
++	uint32_t	reg_shift;
++	/* IRQ flags */
++	uint32_t	irq_flags;
++};
++
++#endif	/* __MACH_PATA_PXA_H__ */
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 01c52c4..5cd3e8c 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -684,6 +684,17 @@ config PATA_VIA
  
-> Can anybody check suspend mode with SMDK6410 and confirm that StR works
-> on it? If it works, we will stop to ask stupid questions and will find
-> our hardware bugs :)
-
-It does seem to work on this SMDK, and the XPWRTGON line on TP7 definetly
-goes low during sleep.
-
-Note, not sure if I will post the buttons patches as the SMDK's single
-buttons share interrupts with the LAN and other devices, making them
-rather useless (my SMDK6410 has EINT10 held permanently active by the
-unused network devices...)
+ 	  If unsure, say N.
  
-> Below is log of sleeping procedure:
-> -----------------------------------------------------------------------
-> /sys/power # echo mem > state
-> s3c64xx_irq_pm_suspend: suspending IRQs
-> saved f4500280 value 000003ff
-> saved f4500900 value 00400000
-> saved f4500904 value 00000000
-> saved f4500910 value 00000000
-> saved f4500914 value 00000000
-> saved f4500918 value 00000000
-> saved f450091c value 00000000
-> saved f4500920 value 0ffff7ff
-> saved f4300044 value 00000210
-> s3c_pm_enter(3)
-> s3c_sleep_save_phys=0x503cac18
-> GPA: save 00000000,22222222,0000007a,00002955
-> GPB: save 00000000,02212222,0000007b,00002955
-> GPC: save 00000000,11331000,00000010,00005055
-> GPD: save 00000000,00000000,00000000,00000155
-> GPE: save 00000000,00000000,00000000,00000155
-> GPF: save 50000000,00008000,55555555,00000000
-> GPG: save 00000000,03222222,0000003e,00002000
-> GPH: save 33222222,00000033,000003fe,00000000
-> GPI: save aaaaaaaa,00000000,00000000,00000000
-> GPJ: save 00aaaaaa,00000f00,00000000,00000000
-> GPK: save 22222222,22222222,00000000,55555555
-> GPL: save 12121122,02222211,0000038c,15555555
-> GPM: save 00000000,00222222,0000001f,000002aa
-> GPN: save 55940454,0000f81a,55955555,00000000
-> GPO: save aaaaaaaa,0000003f,00000000,00000000
-> GPP: save 2aaaaaaa,000038e7,1011aaa0,00000000
-> GPQ: save 0002aaaa,00000018,00000000,00000000
-> UART[0]: ULCON=0007, UCON=0785, UFCON=0011, UBRDIV=0000
-> UART[1]: ULCON=002b, UCON=0385, UFCON=0011, UBRDIV=0003
-> UART[2]: ULCON=0003, UCON=0385, UFCON=0011, UBRDIV=001f
-> UART[3]: ULCON=0007, UCON=0785, UFCON=0011, UBRDIV=0000
-> saved f4100100 value 04000000
-> saved f4100104 value 00000000
-> saved f4100108 value 00000000
-> saved f45001a0 value ffcd1501
-> saved f45001b0 value 00000000
-> saved f45001b4 value 00000000
-> saved f45001c0 value 00000000
-> saved f45001c4 value 00000000
-> saved f45001c8 value 00000000
-> saved f4100000 value 0000ffff
-> saved f4100004 value 0000ffff
-> saved f4100008 value 0000ffff
-> saved f410001c value 00000007
-> saved f4100020 value 01043310
-> saved f4100024 value 00000000
-> saved f4100028 value 00000000
-> saved f410002c value 00000000
-> saved f4100030 value fffffff7
-> saved f4100034 value fb9e6fff
-> saved f4100038 value c73fffff
-> saved f410003c value ffffffff
-> saved f4100018 value 00000000
-> saved f4100014 value 00200203
-> saved f45001d0 value 10555551
-> saved f45001d4 value 00555555
-> sleep: irq wakeup masks: ffffffff,fffff7ff
-> ------------------------------------------------------------------------------
-> 
-> -- 
-> Yauhen Kharuzhy
-> -----------------------------------------------------------
-> Promwad Innovation Company
-> 22, Olshevskogo St.
-> Office 809
-> 220073, Minsk, Belarus
-> Phone/Fax: +375 (17) 312-1246
-> E-mail: yauhen.kharuzhy at promwad.com
-> Skype: jekhor
-> Web: www.promwad.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
++config PATA_PXA
++	tristate "PXA DMA-capable PATA support"
++	depends on ARCH_PXA
++	help
++	  This option enables support for harddrive attached to PXA CPU's bus.
++	  
++	  NOTE: This driver utilizes PXA DMA controller, in case your hardware
++	        is not capable of doing MWDMA, use pata_platform instead.
++
++	  If unsure, say N.
++
+ config PATA_WINBOND
+ 	tristate "Winbond SL82C105 PATA support"
+ 	depends on PCI
+diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+index fc936d4..5ecf45a 100644
+--- a/drivers/ata/Makefile
++++ b/drivers/ata/Makefile
+@@ -79,6 +79,7 @@ obj-$(CONFIG_PATA_PLATFORM)	+= pata_platform.o
+ obj-$(CONFIG_PATA_AT91)	+= pata_at91.o
+ obj-$(CONFIG_PATA_OF_PLATFORM)	+= pata_of_platform.o
+ obj-$(CONFIG_PATA_ICSIDE)	+= pata_icside.o
++obj-$(CONFIG_PATA_PXA)		+= pata_pxa.o
+ # Should be last but two libata driver
+ obj-$(CONFIG_PATA_ACPI)		+= pata_acpi.o
+ # Should be last but one libata driver
+diff --git a/drivers/ata/pata_pxa.c b/drivers/ata/pata_pxa.c
+new file mode 100644
+index 0000000..66ab1ac
+--- /dev/null
++++ b/drivers/ata/pata_pxa.c
+@@ -0,0 +1,383 @@
++/*
++ * Generic PXA PATA driver
++ *
++ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; see the file COPYING.  If not, write to
++ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/blkdev.h>
++#include <linux/ata.h>
++#include <linux/libata.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/slab.h>
++#include <linux/completion.h>
++
++#include <scsi/scsi_host.h>
++
++#include <mach/pxa2xx-regs.h>
++#include <mach/pata_pxa.h>
++#include <mach/dma.h>
++
++#define DRV_NAME	"pata_pxa"
++#define DRV_VERSION	"0.1"
++
++struct pata_pxa_data {
++	uint32_t		dma_channel;
++	struct pxa_dma_desc	*dma_desc;
++	dma_addr_t		dma_desc_addr;
++	uint32_t		dma_desc_id;
++
++	/* DMA IO physical address */
++	uint32_t		dma_io_addr;
++	/* PXA DREQ<0:2> pin selector */
++	uint32_t		dma_dreq;
++
++	struct completion	dma_done;
++};
++
++/*
++ * Setup the DMA descriptors. The size is transfer capped at 4k per descriptor,
++ * if the transfer is longer, it is split into multiple chained descriptors.
++ */
++static void pxa_load_dmac(struct scatterlist *sg, struct ata_queued_cmd *qc)
++{
++	struct pata_pxa_data *pd = qc->ap->private_data;
++
++	uint32_t cpu_len, seg_len;
++	dma_addr_t cpu_addr;
++
++	cpu_addr = sg_dma_address(sg);
++	cpu_len = sg_dma_len(sg);
++
++	do {
++		seg_len = (cpu_len > 0x1000) ? 0x1000 : cpu_len;
++
++		pd->dma_desc[pd->dma_desc_id].ddadr = pd->dma_desc_addr +
++			((pd->dma_desc_id + 1) * sizeof(struct pxa_dma_desc));
++
++		pd->dma_desc[pd->dma_desc_id].dcmd = DCMD_BURST32 | DCMD_WIDTH2 |
++					(DCMD_LENGTH & seg_len);
++
++		if (qc->tf.flags & ATA_TFLAG_WRITE) {
++			pd->dma_desc[pd->dma_desc_id].dsadr = cpu_addr;
++			pd->dma_desc[pd->dma_desc_id].dtadr = pd->dma_io_addr;
++			pd->dma_desc[pd->dma_desc_id].dcmd |= DCMD_INCSRCADDR |
++						DCMD_FLOWTRG;
++		} else {
++			pd->dma_desc[pd->dma_desc_id].dsadr = pd->dma_io_addr;
++			pd->dma_desc[pd->dma_desc_id].dtadr = cpu_addr;
++			pd->dma_desc[pd->dma_desc_id].dcmd |= DCMD_INCTRGADDR |
++						DCMD_FLOWSRC;
++		}
++	
++		cpu_len -= seg_len;
++		cpu_addr += seg_len;
++		pd->dma_desc_id++;
++
++	} while(cpu_len);
++
++	/* Should not happen */
++	if (seg_len & 0x1f)
++		DALGN |= (1 << pd->dma_dreq);
++}
++
++/*
++ * Configure the DMA controller, load the DMA descriptors, but don't start the
++ * DMA controller yet. Only issue the ATA command.
++ */
++static void pxa_bmdma_setup(struct ata_queued_cmd *qc)
++{
++	struct pata_pxa_data *pd = qc->ap->private_data;
++	int si = 0;
++	struct scatterlist *sg;
++
++	pd->dma_desc_id = 0;
++
++	DCSR(pd->dma_channel) = 0;
++	DALGN &= ~(1 << pd->dma_dreq);
++
++	for_each_sg(qc->sg, sg, qc->n_elem, si)
++		pxa_load_dmac(sg, qc);
++
++	pd->dma_desc[pd->dma_desc_id - 1].ddadr = DDADR_STOP;
++
++	/* Fire IRQ only at the end of last block */
++	pd->dma_desc[pd->dma_desc_id - 1].dcmd |= DCMD_ENDIRQEN;
++
++	DDADR(pd->dma_channel) = pd->dma_desc_addr;
++	DRCMR(pd->dma_dreq) = DRCMR_MAPVLD | pd->dma_channel;
++	qc->ap->ops->sff_exec_command(qc->ap, &qc->tf);
++}
++
++/*
++ * Execute the DMA transfer.
++ */
++static void pxa_bmdma_start(struct ata_queued_cmd *qc)
++{
++	struct pata_pxa_data *pd = qc->ap->private_data;
++	init_completion(&pd->dma_done);
++	DCSR(pd->dma_channel) = DCSR_RUN;
++}
++
++/*
++ * Wait until the DMA transfer completes, then stop the DMA controller.
++ */
++static void pxa_bmdma_stop(struct ata_queued_cmd *qc)
++{
++	struct pata_pxa_data *pd = qc->ap->private_data;
++
++	if (DCSR(pd->dma_channel) & DCSR_RUN)
++		if (wait_for_completion_timeout(&pd->dma_done, HZ))
++			BUG();
++
++	DCSR(pd->dma_channel) = 0;
++}
++
++/*
++ * Read DMA status. The bmdma_stop() will take care of properly finishing the
++ * DMA transfer so we always have DMA-complete interrupt here.
++ */
++static unsigned char pxa_bmdma_status(struct ata_port *ap)
++{
++	return ATA_DMA_INTR;
++}
++
++/*
++ * No IRQ register present so we do nothing.
++ */
++static void pxa_irq_clear(struct ata_port *ap)
++{
++}
++
++/*
++ * Check for ATAPI DMA. ATAPI DMA is unsupported by this driver. It's still
++ * unclear why ATAPI has DMA issues.
++ */
++static int pxa_check_atapi_dma(struct ata_queued_cmd *qc)
++{
++	return -EOPNOTSUPP;
++}
++
++static struct scsi_host_template pxa_ata_sht = {
++	ATA_BMDMA_SHT(DRV_NAME),
++};
++
++static struct ata_port_operations pxa_ata_port_ops = {
++	.inherits		= &ata_bmdma_port_ops,
++	.cable_detect		= ata_cable_40wire,
++
++	.bmdma_setup		= pxa_bmdma_setup,
++	.bmdma_start		= pxa_bmdma_start,
++	.bmdma_stop		= pxa_bmdma_stop,
++	.bmdma_status		= pxa_bmdma_status,
++
++	.check_atapi_dma	= pxa_check_atapi_dma,
++
++	.sff_irq_clear		= pxa_irq_clear,
++};
++
++/*
++ * DMA interrupt handler.
++ */
++static void pxa_ata_dma_irq(int dma, void *port)
++{
++	uint32_t dcsr;
++	struct ata_port *ap = port;
++	struct pata_pxa_data *pd = ap->private_data;
++
++	dcsr = DCSR(dma);
++	DCSR(dma) = dcsr;
++	if (dcsr & DCSR_STOPSTATE)
++		complete(&pd->dma_done);
++}
++
++static int __devinit pxa_ata_probe(struct platform_device *pdev)
++{
++	struct ata_host *host;
++	struct ata_port *ap;
++	struct pata_pxa_data *data;
++	struct resource *cmd_res;
++	struct resource *ctl_res;
++	struct resource *dma_res;
++	struct resource *irq_res;
++	struct pata_pxa_pdata *pdata = pdev->dev.platform_data;
++
++	/*
++	 * Resource validation, three resources are needed:
++	 *  - CMD port base address
++	 *  - CTL port base address
++	 *  - DMA port base address
++	 *  - IRQ pin
++	 */
++	if (pdev->num_resources != 4) {
++		dev_err(&pdev->dev, "invalid number of resources\n");
++		return -EINVAL;
++	}
++
++	/*
++	 * CMD port base address
++	 */
++	cmd_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (unlikely(cmd_res == NULL))
++		return -EINVAL;
++
++	/*
++	 * CTL port base address
++	 */
++	ctl_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (unlikely(ctl_res == NULL))
++		return -EINVAL;
++
++	/*
++	 * DMA port base address
++	 */
++	dma_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (unlikely(dma_res == NULL))
++		return -EINVAL;
++
++	/*
++	 * IRQ pin
++	 */
++	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (unlikely(irq_res == NULL))
++		return -EINVAL;
++
++	/*
++	 * Allocate the host
++	 */
++	host = ata_host_alloc(&pdev->dev, 1);
++	if (!host)
++		return -ENOMEM;
++
++	ap		= host->ports[0];
++	ap->ops		= &pxa_ata_port_ops;
++	ap->pio_mask	= ATA_PIO4;
++	ap->mwdma_mask	= ATA_MWDMA2;
++	ap->flags	= ATA_FLAG_MMIO;
++
++	ap->ioaddr.cmd_addr	= devm_ioremap(&pdev->dev, cmd_res->start,
++						resource_size(cmd_res));
++	ap->ioaddr.ctl_addr	= devm_ioremap(&pdev->dev, ctl_res->start,
++						resource_size(ctl_res));
++	ap->ioaddr.bmdma_addr	= devm_ioremap(&pdev->dev, dma_res->start,
++						resource_size(dma_res));
++
++	/*
++	 * Adjust register offsets
++	 */
++	ap->ioaddr.altstatus_addr = ap->ioaddr.ctl_addr;
++	ap->ioaddr.data_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_DATA << pdata->reg_shift);
++	ap->ioaddr.error_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_ERR << pdata->reg_shift);
++	ap->ioaddr.feature_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_FEATURE << pdata->reg_shift);
++	ap->ioaddr.nsect_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_NSECT << pdata->reg_shift);
++	ap->ioaddr.lbal_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_LBAL << pdata->reg_shift);
++	ap->ioaddr.lbam_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_LBAM << pdata->reg_shift);
++	ap->ioaddr.lbah_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_LBAH << pdata->reg_shift);
++	ap->ioaddr.device_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_DEVICE << pdata->reg_shift);
++	ap->ioaddr.status_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_STATUS << pdata->reg_shift);
++	ap->ioaddr.command_addr	= ap->ioaddr.cmd_addr +
++					(ATA_REG_CMD << pdata->reg_shift);
++
++	/*
++	 * Allocate and load driver's internal data structure
++	 */
++	data = devm_kzalloc(&pdev->dev, sizeof(struct pata_pxa_data),
++								GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	ap->private_data = data;
++	data->dma_dreq = pdata->dma_dreq;
++	data->dma_io_addr = dma_res->start;
++
++	/*
++	 * Request the DMA channel
++	 */
++	data->dma_channel = pxa_request_dma(DRV_NAME, DMA_PRIO_LOW,
++						pxa_ata_dma_irq, ap);
++	if (data->dma_channel < 0)
++		return -EBUSY;
++
++	/*
++	 * Stop and clear the DMA channel
++	 */
++	DCSR(data->dma_channel) = 0;
++
++	/*
++	 * Allocate space for the DMA descriptors
++	 */
++	data->dma_desc = dmam_alloc_coherent(&pdev->dev, PAGE_SIZE,
++					&data->dma_desc_addr, GFP_KERNEL);
++
++	/*
++	 * Activate the ATA host
++	 */
++	return ata_host_activate(host, irq_res->start, ata_sff_interrupt,
++				pdata->irq_flags, &pxa_ata_sht);
++}
++
++static int __devexit pxa_ata_remove(struct platform_device *pdev)
++{
++	struct ata_host *host = dev_get_drvdata(&pdev->dev);
++	struct pata_pxa_data *data = host->ports[0]->private_data;
++
++	pxa_free_dma(data->dma_channel);
++
++	ata_host_detach(host);
++
++	return 0;
++}
++
++static struct platform_driver pxa_ata_driver = {
++	.probe		= pxa_ata_probe,
++	.remove		= __devexit_p(pxa_ata_remove),
++	.driver		= {
++		.name		= DRV_NAME,
++		.owner		= THIS_MODULE,
++	},
++};
++
++static int __init pxa_ata_init(void)
++{
++	return platform_driver_register(&pxa_ata_driver);
++}
++
++static void __exit pxa_ata_exit(void)
++{
++	platform_driver_unregister(&pxa_ata_driver);
++}
++
++module_init(pxa_ata_init);
++module_exit(pxa_ata_exit);
++
++MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
++MODULE_DESCRIPTION("DMA-capable driver for PATA on PXA CPU");
++MODULE_LICENSE("GPL");
++MODULE_VERSION(DRV_VERSION);
++MODULE_ALIAS("platform:" DRV_NAME);
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+1.7.0
