@@ -1,46 +1,41 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 10 May 2010 04:49:37 +0100
-Subject: SAMSUNG kernel tree merge plans
-In-Reply-To: <015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
-References: <20100506054651.GL26401@trinity.fluff.org>
-	<015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
-Message-ID: <20100510034937.GX26401@trinity.fluff.org>
+Date: Mon, 10 May 2010 05:05:21 +0100
+Subject: [alsa-devel] about ALC203 linux driver
+In-Reply-To: <AANLkTik0GudetGLF9hF56_VV_tNci8wX0S67gAWDIayq@mail.gmail.com>
+References: <AANLkTikvaFWOlapz9_HlHc1GBlky_FX1-5ml-iFNGGQW@mail.gmail.com>
+	<20100509144940.GA7457@sirena.org.uk>
+	<AANLkTik0GudetGLF9hF56_VV_tNci8wX0S67gAWDIayq@mail.gmail.com>
+Message-ID: <20100510040521.GF6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 06, 2010 at 08:50:38AM +0200, Marek Szyprowski wrote:
-> Hello,
+On Sun, May 09, 2010 at 11:34:28PM +0800, Wan ZongShun wrote:
+> Dear Mark,
 > 
-> On Thursday, May 06, 2010 7:47 AM Ben Dooks wrote:
 > 
-> > I'm busy sorting out the trees for the next mege window, and should
-> > have a new next-samsung out in the next two or three days.
-> > 
-> > As such, if there is anything that needs to go via Russell's tree, then
-> > it needs to be merged as soon as possible. I would like to send a pull
-> > before Wednesday.
-> > 
-> > Anything else, if it is not merged into one of my trees by the end of
-> > next week (May 14th) then there is no guarantees that it will be merged.
-> > 
-> > If everyone interested in this could check my trees after the weekend and
-> > make any reminders of other stuff to fix at that point as there is still
-> > items being processed.
-> > 
-> > http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=summary
+> 2010/5/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> > On Sun, May 09, 2010 at 10:40:07PM +0800, Wan ZongShun wrote:
+> >
+> >> At present, there is a ALC203 AC97 codec in my Winbond ARM board, and
+> >> I am programming
+> >> the audio driver based on ALSA, Who can tell me whether the current
+> >> ALSA is supporting
+> >> the ALC203 driver?how to enable it?
+> >
+> > You need a driver for the AC97 controller your system is using (for most
+> > ARM systems this is part of the CPU). ?Since AC97 provides a standard
+> > register interface for CODECs Linux does not require specific support
+> > for individual AC97 CODECs in order to get core functionality working.
+> >
 > 
-> We would really like to merge as much as possible from our current
-> development tree:
-> http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/SPRC-2.6.34-rc5-opensource
-> 
-> Some of the patches that we depend on are still in the review phase (s5p timer), some should be replaced by the ones that were
-> posted recently. Especially most of our patches depend on S5PV210 GPIO support, so without it we cannot go further. Is there any
-> chance to get it merged quickly? I will rebase our tree asap the mentioned patches get merged.
+> There is AC97 support for my chip, and I have implemented the nuc900_ac97.c
+> ,nuc900_pcm.c and machine board c file drivers.The three main
+> structure definitions
+> as following:
 
-I'll sort out what can be merged from the items on the list, but I'm
-not going git-tree diving just at the moment. The firstset will be
-stuff for Russell's tree, for linus' tree there is a ltitle more time
-to get prepared.
+does you SoC require any other configurations in other blocks that
+may aslo affect this, such as gpio configuratioon for the ac97 pins or
+some sort of clock setup?
 
 -- 
 Ben
