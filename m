@@ -1,34 +1,36 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Mon, 10 May 2010 17:27:22 +0300
-Subject: S3C6410 power management support status
-In-Reply-To: <20100510023537.GW26401@trinity.fluff.org>
-References: <20100429124509.GA11290@jeknote.loshitsa1.net>
-	<20100504002420.GQ6684@trinity.fluff.org>
-	<20100506144955.GA24641@jeknote.loshitsa1.net>
-	<20100510023537.GW26401@trinity.fluff.org>
-Message-ID: <20100510142721.GA32413@jeknote.loshitsa1.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 May 2010 15:41:12 +0100
+Subject: ARM A9 MPCore support in OProfile ?
+In-Reply-To: <AANLkTimc70m7gVpPxf01qTD3O6Y63gGwrF76RBlABfsR@mail.gmail.com>
+References: <AANLkTimc70m7gVpPxf01qTD3O6Y63gGwrF76RBlABfsR@mail.gmail.com>
+Message-ID: <1273502472.10282.60.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 03:35:37AM +0100, Ben Dooks wrote:
-> > Can anybody check suspend mode with SMDK6410 and confirm that StR works
-> > on it? If it works, we will stop to ask stupid questions and will find
-> > our hardware bugs :)
+On Mon, 2010-05-10 at 12:29 +0100, Aneesh Bhasin wrote:
+> Had sent this to the oprofile-list too, but did not get any reply.
+> Hopefully, someone here who has experience with this could help..
 > 
-> It does seem to work on this SMDK, and the XPWRTGON line on TP7 definetly
-> goes low during sleep.
+> Can someone please tell what is the status of support for ARM A9
+> MPCore PMU in OProfile ?
 > 
-> Note, not sure if I will post the buttons patches as the SMDK's single
-> buttons share interrupts with the LAN and other devices, making them
-> rather useless (my SMDK6410 has EINT10 held permanently active by the
-> unused network devices...)
+> I was browsing the linux-arm repository at
+> 
+> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=summary
+> 
+> and could see that it has support for A9 MPCore but could not find
+> anything related to it in the OProfile source-code (e.g .in
+> events/arm). Is there any patch that needs to be applied to use A9
+> MPCore PMU with OProfile ?
 
-Thanks for your help. Last question: which U-Boot (or another
-bootloader) you use?
+The Oprofile patches (by Will Deacon) are in Russell's devel tree and
+intended for upstream merge:
+
+http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/devel
+
+My stable repository has some old Oprofile implementation (it requires
+additional patches for user space - I can dig them out if you really
+need them but I would recommend Will's version).
 
 -- 
-Yauhen Kharuzhy		jekhor _at_ gmail.com
-			JID: jek at jabber.ru
-
-A: No
-Q: Should I quote below my post?
+Catalin
