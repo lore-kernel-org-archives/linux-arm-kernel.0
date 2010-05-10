@@ -1,49 +1,30 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Mon, 10 May 2010 10:13:29 +0530
-Subject: adding pxa3xx_nand_flash to platform data
-In-Reply-To: <p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
-References: <1273046285.29563.311.camel@pe-dt434>
-	<x2mf17812d71005050156h8e23b9cfxb651d176ab8bfa89@mail.gmail.com>
-	<o2gf17812d71005050156y681feb36la0b26679bb074d7c@mail.gmail.com>
-	<p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
-Message-ID: <1273466610.6926.5.camel@pe-dt434>
+From: rk.raggit@gmail.com (RK Raggit)
+Date: Mon, 10 May 2010 12:18:05 +0530
+Subject: cortex-m3 booting failure
+In-Reply-To: <1273153908.2094.5.camel@e102109-lin.cambridge.arm.com>
+References: <h2zec1f3d401005060330n22178e21ve22265bd37006825@mail.gmail.com>
+	<1273153908.2094.5.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <o2hec1f3d401005092348rcbf5b3eayc31eca6e15963e8b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-06 at 02:20 -0700, Haojian Zhuang wrote:
-> On Wed, May 5, 2010 at 4:56 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > On Wed, May 5, 2010 at 4:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> >> On Wed, May 5, 2010 at 3:58 PM, Siddarth Gore <gores@marvell.com> wrote:
-> >>> Hello Eric,
-> >>>
-> >>> Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
-> >>> support for Aspenite DB board (pxa168). I have a patch ready to add
-> >>> pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
-> >>> field in it.
-> >>> Looks like it is the same for all boards (depending upon the page size).
-> >>> So should I add it to the board specific setup file or remove it from
-> >>> pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
-> >>>
-> >>> If there are boards which require a different cmdset then we have to go
-> >>> with first option, if not, we can use option two and save some code
-> >>> duplication.
-> >>>
-> >>
-> >> There are normally two sets of commands, yet the code derived from some
-> >> previous work that there were several subtle different command sets.
-> >>
-> 
-> We already formated the patches of removing the duplication. Now it's
-> put into mailist. Try these patches.
-> 
-Thanks a lot Haojian. I have tried the whole patchset and it is working
-fine on my Aspenite DB board. Did not get a chance to check individual
-patches though.
+Hi Catalin,
 
-Also, some patches did not get applied with git-am. I had to manually
-apply them.
 
--siddarth
+>
+> I can't really tell what's happening but I'm going to release a new set
+> of patches against 2.6.33 sometime next week and there are some improved
+> error messages for Cortex-M3 support.
+>
+> Do you have KALLSYMS enabled in the kernel?
 
-> Thanks
-> Haojian
+Yes. Debugging a bit further i enabled the hard fault processor
+exception catch in
+RVD. On doing this i notice that when running commands (like 'ls' or
+'date') on console
+the processor hard faults. The HFSR shows "0x40000000" while BFSR
+reads "0x04" indicating an imprecise data access fault. Other U/MMFSR are 0x0.
+
+I am wondering why an imprecise data access fault could happen at this stage ?
+
+--RK
