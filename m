@@ -1,30 +1,38 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 10 May 2010 13:12:52 +0300
-Subject: [PATCH 1/4] omap: mailbox: convert rwlocks to spinlock
-In-Reply-To: <1273483013-5942-1-git-send-email-Hiroshi.DOYU@nokia.com>
-References: <1273483013-5942-1-git-send-email-Hiroshi.DOYU@nokia.com>
-Message-ID: <x2p94a0d4531005100312ocd30641ds7648e9a497e3dfd9@mail.gmail.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Mon, 10 May 2010 13:33:19 +0300
+Subject: [RESEND PATCHv3 0/4] Adding soc related info into /proc/cpuinfo
+In-Reply-To: <20100505085932.GA7703@n2100.arm.linux.org.uk>
+References: <1273048928-6105-1-git-send-email-eduardo.valentin@nokia.com>
+	<20100505085932.GA7703@n2100.arm.linux.org.uk>
+Message-ID: <20100510103319.GA8441@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 12:16 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> From: Ohad Ben-Cohen <ohad@wizery.com>
->
-> rwlocks are slower and have potential starvation issues
-> therefore spinlocks are generally preferred.
->
-> see also: http://lwn.net/Articles/364583/
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Kanigeri Hari <h-kanigeri2@ti.com>
-> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+Hello,
 
-There's no cover letter, so I'll comment here.
+So, back to this track.
 
-What about these patches?
-http://article.gmane.org/gmane.linux.ports.arm.omap/31208
+On Wed, May 05, 2010 at 10:59:32AM +0200, Russell King wrote:
+> On Wed, May 05, 2010 at 11:42:04AM +0300, Eduardo Valentin wrote:
+> > I'm resending this series with minor change in the subject prefix of patch 4/4.
+> > Removed the PM: prefix. Everything else is same. So, I kept the v3 prefix as well.
+> 
+> I'd much prefer to see a /proc/socinfo rather than extending
+> /proc/cpuinfo to further include stuff which isn't CPU related.
 
-They are needed for dspbridge... AFAIK the only real user for omap mailbox.
 
--- 
-Felipe Contreras
+Right. I agree that this is not CPU stuff. But I was trying to do not add new interfaces
+to export those bits.
+
+But the socinfo is actually a nice idea. I will resend this series, but now it will create the
+socinfo and use it.
+
+As it adds new stuff under /proc, I'll also cc lkml.
+
+Thanks for the suggestion.
+
+BR,
+
+
+--
+Eduardo Valentin
