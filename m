@@ -1,38 +1,21 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Mon, 10 May 2010 16:07:57 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 May 2010 14:15:20 +0100
 Subject: [PATCH] Handle instruction cache maintenance fault properly
-Message-ID: <AANLkTikIbI6hKoYSZlo6QDlyi2Qjxg287i-ilHpz1FF9@mail.gmail.com>
+In-Reply-To: <AANLkTikIbI6hKoYSZlo6QDlyi2Qjxg287i-ilHpz1FF9@mail.gmail.com>
+References: <AANLkTikIbI6hKoYSZlo6QDlyi2Qjxg287i-ilHpz1FF9@mail.gmail.com>
+Message-ID: <20100510131519.GB7796@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Between "clean D line..." and "invalidate I line" operations in
-v7_coherent_user_range(), the memory page may get swapped out.
-And the fault on "invalidate I line" could not be properly handled
-causing the oops.
+On Mon, May 10, 2010 at 04:07:57PM +0300, Kirill A. Shutemov wrote:
+> Between "clean D line..." and "invalidate I line" operations in
+> v7_coherent_user_range(), the memory page may get swapped out.
+> And the fault on "invalidate I line" could not be properly handled
+> causing the oops.
 
-The patch adds the missing handling for "instruction cache
-maintenance fault". Let's handle it as translation fault.
+You have to be very careful when doing this kind of change - you need to
+review the behaviour of previous ARMs to ensure that you don't throw the
+CPU into an infinite loop when an "external abort on linefetch" occurs.
 
-Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
-Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
----
- arch/arm/mm/fault.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 9d40c34..8924617 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -463,7 +463,7 @@ static struct fsr_info {
- 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
- 	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
- 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
--	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPPER,	"I-cache maintenance
-fault"	   },
- 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation
-fault"	   },
- 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
- 	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
--- 
-1.7.0.4
+With older CPUs, an "external abort on linefetch" is most probably fatal
+to the process and can never be recovered.
