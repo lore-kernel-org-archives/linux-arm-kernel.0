@@ -1,77 +1,49 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 10 May 2010 05:02:28 +0200
-Subject: [PATCH] pxa/vpac270: Convert to use PATA PXA driver
-Message-ID: <1273460548-25698-1-git-send-email-marek.vasut@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 10 May 2010 04:49:37 +0100
+Subject: SAMSUNG kernel tree merge plans
+In-Reply-To: <015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
+References: <20100506054651.GL26401@trinity.fluff.org>
+	<015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
+Message-ID: <20100510034937.GX26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/vpac270.c |   20 +++++++++++++-------
- 1 files changed, 13 insertions(+), 7 deletions(-)
+On Thu, May 06, 2010 at 08:50:38AM +0200, Marek Szyprowski wrote:
+> Hello,
+> 
+> On Thursday, May 06, 2010 7:47 AM Ben Dooks wrote:
+> 
+> > I'm busy sorting out the trees for the next mege window, and should
+> > have a new next-samsung out in the next two or three days.
+> > 
+> > As such, if there is anything that needs to go via Russell's tree, then
+> > it needs to be merged as soon as possible. I would like to send a pull
+> > before Wednesday.
+> > 
+> > Anything else, if it is not merged into one of my trees by the end of
+> > next week (May 14th) then there is no guarantees that it will be merged.
+> > 
+> > If everyone interested in this could check my trees after the weekend and
+> > make any reminders of other stuff to fix at that point as there is still
+> > items being processed.
+> > 
+> > http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=summary
+> 
+> We would really like to merge as much as possible from our current
+> development tree:
+> http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/SPRC-2.6.34-rc5-opensource
+> 
+> Some of the patches that we depend on are still in the review phase (s5p timer), some should be replaced by the ones that were
+> posted recently. Especially most of our patches depend on S5PV210 GPIO support, so without it we cannot go further. Is there any
+> chance to get it merged quickly? I will rebase our tree asap the mentioned patches get merged.
 
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index 52e85cb..3e37fc5 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -23,7 +23,6 @@
- #include <linux/mtd/physmap.h>
- #include <linux/dm9000.h>
- #include <linux/ucb1400.h>
--#include <linux/ata_platform.h>
- #include <linux/regulator/max1586.h>
- 
- #include <asm/mach-types.h>
-@@ -37,6 +36,7 @@
- #include <mach/ohci.h>
- #include <mach/pxa27x-udc.h>
- #include <mach/udc.h>
-+#include <mach/pata_pxa.h>
- 
- #include <plat/i2c.h>
- 
-@@ -494,10 +494,10 @@ static inline void vpac270_lcd_init(void) {}
- /******************************************************************************
-  * PATA IDE
-  ******************************************************************************/
--#if defined(CONFIG_PATA_PLATFORM) || \
--	defined(CONFIG_PATA_PLATFORM_MODULE)
--static struct pata_platform_info vpac270_pata_pdata = {
--	.ioport_shift	= 1,
-+#if defined(CONFIG_PATA_PXA) ||	defined(CONFIG_PATA_PXA_MODULE)
-+static struct pata_pxa_pdata vpac270_pata_pdata = {
-+	.reg_shift	= 1,
-+	.dma_dreq	= 1,
- 	.irq_flags	= IRQF_TRIGGER_RISING,
- };
- 
-@@ -512,7 +512,12 @@ static struct resource vpac270_ide_resources[] = {
- 	       .end	= PXA_CS3_PHYS + 0x15f,
- 	       .flags	= IORESOURCE_MEM
- 	},
--	[2] = {	/* IDE IRQ pin */
-+	[2] = {	/* DMA Base address */
-+	       .start	= PXA_CS3_PHYS + 0x20,
-+	       .end	= PXA_CS3_PHYS + 0x2f,
-+	       .flags	= IORESOURCE_DMA
-+	},
-+	[3] = {	/* IDE IRQ pin */
- 	       .start	= gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
- 	       .end	= gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
- 	       .flags	= IORESOURCE_IRQ
-@@ -520,11 +525,12 @@ static struct resource vpac270_ide_resources[] = {
- };
- 
- static struct platform_device vpac270_ide_device = {
--	.name		= "pata_platform",
-+	.name		= "pata_pxa",
- 	.num_resources	= ARRAY_SIZE(vpac270_ide_resources),
- 	.resource	= vpac270_ide_resources,
- 	.dev		= {
- 		.platform_data	= &vpac270_pata_pdata,
-+		.coherent_dma_mask	= 0xffffffff,
- 	}
- };
- 
+I'll sort out what can be merged from the items on the list, but I'm
+not going git-tree diving just at the moment. The firstset will be
+stuff for Russell's tree, for linus' tree there is a ltitle more time
+to get prepared.
+
 -- 
-1.7.0
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
