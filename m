@@ -1,44 +1,49 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 10 May 2010 05:05:21 +0100
-Subject: [alsa-devel] about ALC203 linux driver
-In-Reply-To: <AANLkTik0GudetGLF9hF56_VV_tNci8wX0S67gAWDIayq@mail.gmail.com>
-References: <AANLkTikvaFWOlapz9_HlHc1GBlky_FX1-5ml-iFNGGQW@mail.gmail.com>
-	<20100509144940.GA7457@sirena.org.uk>
-	<AANLkTik0GudetGLF9hF56_VV_tNci8wX0S67gAWDIayq@mail.gmail.com>
-Message-ID: <20100510040521.GF6684@trinity.fluff.org>
+From: gores@marvell.com (Siddarth Gore)
+Date: Mon, 10 May 2010 10:13:29 +0530
+Subject: adding pxa3xx_nand_flash to platform data
+In-Reply-To: <p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
+References: <1273046285.29563.311.camel@pe-dt434>
+	<x2mf17812d71005050156h8e23b9cfxb651d176ab8bfa89@mail.gmail.com>
+	<o2gf17812d71005050156y681feb36la0b26679bb074d7c@mail.gmail.com>
+	<p2u771cded01005060220vd3e9e3d6i4ecd581ef3ef12d4@mail.gmail.com>
+Message-ID: <1273466610.6926.5.camel@pe-dt434>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 09, 2010 at 11:34:28PM +0800, Wan ZongShun wrote:
-> Dear Mark,
+On Thu, 2010-05-06 at 02:20 -0700, Haojian Zhuang wrote:
+> On Wed, May 5, 2010 at 4:56 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> > On Wed, May 5, 2010 at 4:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> >> On Wed, May 5, 2010 at 3:58 PM, Siddarth Gore <gores@marvell.com> wrote:
+> >>> Hello Eric,
+> >>>
+> >>> Currently I need to enable the deprecated MTD_NAND_PXA3xx_BUILTIN
+> >>> support for Aspenite DB board (pxa168). I have a patch ready to add
+> >>> pxa3xx_nand_flash in aspenite.c but I was wondering about the cmdset
+> >>> field in it.
+> >>> Looks like it is the same for all boards (depending upon the page size).
+> >>> So should I add it to the board specific setup file or remove it from
+> >>> pxa3xx_nand_platform_data (and put it in say, pxa3xx_nand_info)?
+> >>>
+> >>> If there are boards which require a different cmdset then we have to go
+> >>> with first option, if not, we can use option two and save some code
+> >>> duplication.
+> >>>
+> >>
+> >> There are normally two sets of commands, yet the code derived from some
+> >> previous work that there were several subtle different command sets.
+> >>
 > 
+> We already formated the patches of removing the duplication. Now it's
+> put into mailist. Try these patches.
 > 
-> 2010/5/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> > On Sun, May 09, 2010 at 10:40:07PM +0800, Wan ZongShun wrote:
-> >
-> >> At present, there is a ALC203 AC97 codec in my Winbond ARM board, and
-> >> I am programming
-> >> the audio driver based on ALSA, Who can tell me whether the current
-> >> ALSA is supporting
-> >> the ALC203 driver?how to enable it?
-> >
-> > You need a driver for the AC97 controller your system is using (for most
-> > ARM systems this is part of the CPU). ?Since AC97 provides a standard
-> > register interface for CODECs Linux does not require specific support
-> > for individual AC97 CODECs in order to get core functionality working.
-> >
-> 
-> There is AC97 support for my chip, and I have implemented the nuc900_ac97.c
-> ,nuc900_pcm.c and machine board c file drivers.The three main
-> structure definitions
-> as following:
+Thanks a lot Haojian. I have tried the whole patchset and it is working
+fine on my Aspenite DB board. Did not get a chance to check individual
+patches though.
 
-does you SoC require any other configurations in other blocks that
-may aslo affect this, such as gpio configuratioon for the ac97 pins or
-some sort of clock setup?
+Also, some patches did not get applied with git-am. I had to manually
+apply them.
 
--- 
-Ben
+-siddarth
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> Thanks
+> Haojian
