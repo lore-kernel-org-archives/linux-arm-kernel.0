@@ -1,34 +1,40 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 10 May 2010 12:16:06 +0300
-Subject: [PATCH] omap iommu: missing check for TLB valid entry
+Date: Mon, 10 May 2010 12:16:09 +0300
+Subject: [PATCH] omap iommu: Make CONFIG_OMAP_IOMMU_DEBUG selectable
 In-Reply-To: <1273482972-5586-1-git-send-email-Hiroshi.DOYU@nokia.com>
 References: <1273482972-5586-1-git-send-email-Hiroshi.DOYU@nokia.com>
-Message-ID: <1273482972-5586-3-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1273482972-5586-6-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kanigeri, Hari <h-kanigeri2@ti.com>
+This CONFIG_OMAP_IOMMU_DEBUG option cannot be selected because it's
+not visible on menu. Make this option selectable.
 
-Added the missing TLB valid entry setting for cam register
-
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/mach-omap2/iommu2.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/Kconfig |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-index 4f63dc6..d29ebff 100644
---- a/arch/arm/mach-omap2/iommu2.c
-+++ b/arch/arm/mach-omap2/iommu2.c
-@@ -184,7 +184,7 @@ static struct cr_regs *omap2_alloc_cr(struct iommu *obj, struct iotlb_entry *e)
- 	if (!cr)
- 		return ERR_PTR(-ENOMEM);
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 6da796e..78b49a6 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -110,8 +110,13 @@ config OMAP_IOMMU
+ 	tristate
  
--	cr->cam = (e->da & MMU_CAM_VATAG_MASK) | e->prsvd | e->pgsz;
-+	cr->cam = (e->da & MMU_CAM_VATAG_MASK) | e->prsvd | e->pgsz | e->valid;
- 	cr->ram = e->pa | e->endian | e->elsz | e->mixed;
+ config OMAP_IOMMU_DEBUG
+-	depends on OMAP_IOMMU
+-	tristate
++       tristate "Export OMAP IOMMU internals in DebugFS"
++       depends on OMAP_IOMMU && DEBUG_FS
++       help
++         Select this to see extensive information about
++         the internal state of OMAP IOMMU in debugfs.
++
++         Say N unless you know you need this.
  
- 	return cr;
+ choice
+ 	prompt "System timer"
 -- 
 1.7.1.rc1
