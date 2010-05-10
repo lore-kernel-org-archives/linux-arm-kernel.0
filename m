@@ -1,50 +1,51 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 10 May 2010 23:43:12 +0300
-Subject: [PATCH 3/5] Locate kernel at 0x30108000 if PM_H1940 is enabled
+Date: Mon, 10 May 2010 23:43:13 +0300
+Subject: [PATCH 4/5] Add suspend/resume support for RX1950
 In-Reply-To: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
 References: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1273524194-13346-4-git-send-email-anarsoul@gmail.com>
+Message-ID: <1273524194-13346-5-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If PM_H1940 is enabled, kernel _must_ be located upper then 0x30008000,
-because this area (0x30000000-0x30100000) can be used by bootloader. If
-kernel is located at 0x30008000, bootloader will corrupt kernel's code during
-resume.
-
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/Makefile                   |    2 ++
- arch/arm/mach-s3c2410/Makefile.boot |   10 +++++++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c2410/pm.c |    4 ++--
+ arch/arm/mm/mmu.c          |    5 +++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ed820e7..eddcbba 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -110,6 +110,8 @@ CHECKFLAGS	+= -D__arm__
- head-y		:= arch/arm/kernel/head$(MMUEXT).o arch/arm/kernel/init_task.o
- textofs-y	:= 0x00008000
- textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
-+# We don't want the htc bootloader to corrupt kernel during resume
-+textofs-$(CONFIG_PM_H1940)      := 0x00108000
- # SA1111 DMA bug: we don't want the kernel to live in precious DMA-able memory
- ifeq ($(CONFIG_ARCH_SA1100),y)
- textofs-$(CONFIG_SA1111) := 0x00208000
-diff --git a/arch/arm/mach-s3c2410/Makefile.boot b/arch/arm/mach-s3c2410/Makefile.boot
-index 7dab2a0..58c1dd7 100644
---- a/arch/arm/mach-s3c2410/Makefile.boot
-+++ b/arch/arm/mach-s3c2410/Makefile.boot
-@@ -1,3 +1,7 @@
--   zreladdr-y	:= 0x30008000
--params_phys-y	:= 0x30000100
--
-+ifeq ($(CONFIG_PM_H1940),y)
-+	zreladdr-y		:= 0x30108000
-+	params_phys-y	:= 0x30100100
-+else
-+	zreladdr-y		:= 0x30008000
-+	params_phys-y	:= 0x30000100
-+endif
+diff --git a/arch/arm/mach-s3c2410/pm.c b/arch/arm/mach-s3c2410/pm.c
+index 966119c..6a61486 100644
+--- a/arch/arm/mach-s3c2410/pm.c
++++ b/arch/arm/mach-s3c2410/pm.c
+@@ -60,10 +60,10 @@ static void s3c2410_pm_prepare(void)
+ 		__raw_writel(calc, phys_to_virt(H1940_SUSPEND_CHECKSUM));
+ 	}
+ 
+-	/* the RX3715 uses similar code and the same H1940 and the
++	/* RX3715 and RX1950 use similar to H1940 code and the
+ 	 * same offsets for resume and checksum pointers */
+ 
+-	if (machine_is_rx3715()) {
++	if (machine_is_rx3715() || machine_is_rx1950()) {
+ 		void *base = phys_to_virt(H1940_SUSPEND_CHECK);
+ 		unsigned long ptr;
+ 		unsigned long calc = 0;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 241c24a..45a1bc2 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -869,9 +869,10 @@ void __init reserve_node_zero(pg_data_t *pgdat)
+ 	if (machine_is_p720t())
+ 		res_size = 0x00014000;
+ 
+-	/* H1940 and RX3715 need to reserve this for suspend */
++	/* H1940, RX3715 and RX1950 need to reserve this for suspend */
+ 
+-	if (machine_is_h1940() || machine_is_rx3715()) {
++	if (machine_is_h1940() || machine_is_rx3715()
++		|| machine_is_rx1950()) {
+ 		reserve_bootmem_node(pgdat, 0x30003000, 0x1000,
+ 				BOOTMEM_DEFAULT);
+ 		reserve_bootmem_node(pgdat, 0x30081000, 0x1000,
 -- 
 1.7.0.4
