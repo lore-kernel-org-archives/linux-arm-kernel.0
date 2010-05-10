@@ -1,40 +1,18 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 10 May 2010 13:40:14 +0300 (EEST)
-Subject: [PATCH 1/4] omap: mailbox: convert rwlocks to spinlock
-In-Reply-To: <x2p94a0d4531005100312ocd30641ds7648e9a497e3dfd9@mail.gmail.com>
-References: <1273483013-5942-1-git-send-email-Hiroshi.DOYU@nokia.com>
-	<x2p94a0d4531005100312ocd30641ds7648e9a497e3dfd9@mail.gmail.com>
-Message-ID: <20100510.134014.226801230.Hiroshi.DOYU@nokia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 May 2010 11:52:00 +0100
+Subject: [PATCHv4 3/4] mach-omap1: export omap1 info under /proc/socinfo
+In-Reply-To: <1273487857-32281-4-git-send-email-eduardo.valentin@nokia.com>
+References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-4-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <20100510105200.GA14337@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-From: ext Felipe Contreras <felipe.contreras@gmail.com>
-Subject: Re: [PATCH 1/4] omap: mailbox: convert rwlocks to spinlock
-Date: Mon, 10 May 2010 12:12:52 +0200
-
-> On Mon, May 10, 2010 at 12:16 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
->> From: Ohad Ben-Cohen <ohad@wizery.com>
->>
->> rwlocks are slower and have potential starvation issues
->> therefore spinlocks are generally preferred.
->>
->> see also: http://lwn.net/Articles/364583/
->>
->> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->> Signed-off-by: Kanigeri Hari <h-kanigeri2@ti.com>
->> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+On Mon, May 10, 2010 at 01:37:36PM +0300, Eduardo Valentin wrote:
+> From: Eduardo Valentin <eduardo.valentin@nokia.com>
 > 
-> There's no cover letter, so I'll comment here.
-> 
-> What about these patches?
-> http://article.gmane.org/gmane.linux.ports.arm.omap/31208
+> Report OMAP name and rev under /proc/socinfo node.
 
-OK, I'll incorporate them and send patches again.
-
-> 
-> They are needed for dspbridge... AFAIK the only real user for omap mailbox.
-> 
-> -- 
-> Felipe Contreras
+I think this needs to be combined with the previous patch.  The previous
+patch enables the socinfo file, which means with patch 2 applied but not
+patch 3, OMAP1 breaks.
