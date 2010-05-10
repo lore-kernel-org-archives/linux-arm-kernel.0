@@ -1,129 +1,45 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 10 May 2010 11:58:36 -0700
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 May 2010 20:10:38 +0100
+Subject: ARM A9 MPCore support in OProfile ?
+In-Reply-To: <1273502472.10282.60.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTimc70m7gVpPxf01qTD3O6Y63gGwrF76RBlABfsR@mail.gmail.com>
+	<1273502472.10282.60.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1273518638.25180.3.camel@e200755-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- -----Original Message-----
-From: Philippe R?tornaz [mailto:philippe.retornaz at epfl.ch] 
-Sent: Monday, May 10, 2010 1:14 PM
-To: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org
-Cc: s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; Nguyen Dinh-R00091; gregkh at suse.de; Philippe R?tornaz
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
+Hi Aneesh,
 
-On mx31 the OTG host initialisation fail if you need to have an ULPI transfert to initialize the PHY.
+On Mon, 2010-05-10 at 15:41 +0100, Catalin Marinas wrote:
+> On Mon, 2010-05-10 at 12:29 +0100, Aneesh Bhasin wrote:
+> > Had sent this to the oprofile-list too, but did not get any reply.
+> > Hopefully, someone here who has experience with this could help..
+> >
+> > Can someone please tell what is the status of support for ARM A9
+> > MPCore PMU in OProfile ?
+> >
+> > I was browsing the linux-arm repository at
+> >
+> > http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=summary
+> >
+> > and could see that it has support for A9 MPCore but could not find
+> > anything related to it in the OProfile source-code (e.g .in
+> > events/arm). Is there any patch that needs to be applied to use A9
+> > MPCore PMU with OProfile ?
+> 
+> The Oprofile patches (by Will Deacon) are in Russell's devel tree and
+> intended for upstream merge:
+> 
+> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/devel
+> 
+> My stable repository has some old Oprofile implementation (it requires
+> additional patches for user space - I can dig them out if you really
+> need them but I would recommend Will's version).
+> 
+As Catalin has pointed out, the Kernel patches are in Russell's tree now
+so should make their way upstream via the usual route. For OProfile,
+there is a trivial userspace patch to add A9 support which I plan to
+post to the OProfile mailing list next week. In the meantime, you could
+use perf events, which doesn't need any patches to the userspace tools.
 
-In order to be able to communicate with the PHY a complete reset of the usb host is needed. After the PHY initialization the host usb configuration registers need to be rewritten to avoid a host controller lockup.
-
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
----
- drivers/usb/host/ehci-mxc.c |   68 +++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c index 544ccfd..39d28da 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -29,6 +29,11 @@
- #define PORTSC_OFFSET		0x184
- #define USBMODE_OFFSET		0x1a8
- #define USBMODE_CM_HOST		3
-+#define USBCMD_OFFSET		0x140
-+#define USBCMD_RS		(1 << 0)
-+#define USBCMD_RST		(1 << 1)
-+#define USBSTS_OFFSET		0x144
-+#define USBSTS_HCH		(1 << 12)
- 
- struct ehci_mxc_priv {
- 	struct clk *usbclk, *ahbclk;
-@@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	int irq, ret, temp;
- 	struct ehci_mxc_priv *priv;
- 	struct device *dev = &pdev->dev;
-+	int i;
- 
- 	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
- 
-@@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_init;
- 
-+	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-+	 * transfert timeout. */
-+	if (cpu_is_mx31() && pdev->id == 0) {
-+		/* Wait for the controller to go idle */
-+		for (i = 0; i < 10000; i++) {
-+			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
-+				break;
-+			udelay(1);
-+		}
-+		if (i == 10000) {
-+			dev_err(dev, "Timeout while stopping USB controller\n");
-+			goto err_init;
-+		}
-+
-+		/* Stop the usb controller */
-+		temp = readl(hcd->regs + USBCMD_OFFSET);
-+		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
-+
-+		for (i = 0; i < 10000; i++) {
-+			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
-+				break;
-+			udelay(1);
-+		}
-+
-+		if (i == 10000) {
-+			dev_err(dev, "Timeout while stopping USB controller\n");
-+			goto err_init;
-+		}
-+
-+		/* Reset the usb controller */
-+		temp = readl(hcd->regs + USBCMD_OFFSET);
-+		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
-+
-+		for (i = 0; i < 10000; i++) {
-+			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
-+				break;
-+			udelay(1);
-+		}
-+
-+		if (i == 10000) {
-+			dev_err(dev, "Timeout while reseting USB controller\n");
-+			goto err_init;
-+		}
-+	}
-+
- 	/* Initialize the transceiver */
- 	if (pdata->otg) {
- 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET; @@ -213,6 +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 			dev_err(dev, "unable to enable vbus on transceiver\n");
- 	}
- 
-+	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
-+	 * controller stay busy. Rewriting the register is enough to make it
-+	 * working */
-+	if (cpu_is_mx31() && pdev->id == 0) {
-+		/* set USBMODE to host mode */
-+		temp = readl(hcd->regs + USBMODE_OFFSET);
-+		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-+
-+		/* set up the PORTSCx register */
-+		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-+
-+		/* setup USBCONTROL. */
-+		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-+		if (ret < 0)
-+			goto err_init;
-+	}
-+
-
-[Dinh Nguyen] - Should this be done in mxc_initialize_usb_hw() in ehci.c? The probe function gets kinda of ugly with this.
-
- 	priv->hcd = hcd;
- 	platform_set_drvdata(pdev, priv);
- 
---
-1.6.3.3
+Will
