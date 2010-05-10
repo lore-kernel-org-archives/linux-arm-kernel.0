@@ -1,41 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 May 2010 16:18:27 +0100
-Subject: FW: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-In-Reply-To: <000101caf052$db991e30$9446010a@Emea.Arm.com>
-References: <000101caf052$db991e30$9446010a@Emea.Arm.com>
-Message-ID: <20100510151827.GA4281@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 May 2010 18:45:00 +0200
+Subject: [PATCH] AT91: add new at91 chips in at91sam9g45 family
+Message-ID: <1273509900-30278-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 04:09:59PM +0100, Peter Pearse wrote:
->  
-> 
-> > -----Original Message-----
-> > From: Peter Pearse [mailto:peter.pearse at arm.com] 
-> > Sent: 07 May 2010 16:01
-> > To: 'Linus Walleij'
-> > Cc: linux-arm-kernel at lists.arm.linux.org.uk
-> > Subject: RE: [PATCH 0/7] DMAENGINE: fixes and PrimeCells
-> > 
-> > Linus
-> > 
-> > I've applied 
-> > 
-> > [PATCH 04/11] ARM: define the PrimeCell DMA API v5
-> > [PATCH 5/7] ARM: add PrimeCell generic DMA to PL011 v6		
-> > [PATCH 6/7] ARM: add PrimeCell generic DMA to MMCI/PL180 v6	
-> > 
-> > to Russell's versatile tree.
-> > 
-> > A Versatile Express board running the resulting kernel image
-> > 	boots with serial output
-> > 	accepts serial input
-> > 	reads & writes an MMC card
+This is the basic support for at91sam9g46, at91sam9m10 and at91sam9m11. Those
+are just very basic cpu macros and clock definition.
 
-To be clear, what I'm *not* interested in is whether the primecell
-drivers work without DMA support implemented on the platform.
+Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9g45.c      |   11 +++++++++++
+ arch/arm/mach-at91/include/mach/cpu.h |   10 ++++++++++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
 
-What I *am* interested in is whether Versatile _with_ DMA support
-implemented - with the added problems of the MUX in the system
-controller - can work sanely with this "generic Primecell DMA"
-implementation.
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 85166b7..753c0d3 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -20,6 +20,7 @@
+ #include <mach/at91_pmc.h>
+ #include <mach/at91_rstc.h>
+ #include <mach/at91_shdwc.h>
++#include <mach/cpu.h>
+ 
+ #include "generic.h"
+ #include "clock.h"
+@@ -176,6 +177,13 @@ static struct clk mmc1_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ 
++/* Video decoder clock - Only for sam9m10/sam9m11 */
++static struct clk vdec_clk = {
++	.name		= "vdec_clk",
++	.pmc_mask	= 1 << AT91SAM9G45_ID_VDEC,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++
+ /* One additional fake clock for ohci */
+ static struct clk ohci_clk = {
+ 	.name		= "ohci_clk",
+@@ -239,6 +247,9 @@ static void __init at91sam9g45_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	if (cpu_is_at91sam9m10() || cpu_is_at91sam9m11())
++		clk_register(&vdec_clk);
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ }
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+index 5a06501..fa74b0c 100644
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ b/arch/arm/mach-at91/include/mach/cpu.h
+@@ -52,6 +52,7 @@ static inline unsigned long at91_cpu_fully_identify(void)
+ 
+ #define ARCH_EXID_AT91SAM9M11	0x00000001
+ #define ARCH_EXID_AT91SAM9M10	0x00000002
++#define ARCH_EXID_AT91SAM9G46	0x00000003
+ #define ARCH_EXID_AT91SAM9G45	0x00000004
+ 
+ static inline unsigned long at91_exid_identify(void)
+@@ -128,9 +129,18 @@ static inline unsigned long at91cap9_rev_identify(void)
+ #ifdef CONFIG_ARCH_AT91SAM9G45
+ #define cpu_is_at91sam9g45()	(at91_cpu_identify() == ARCH_ID_AT91SAM9G45)
+ #define cpu_is_at91sam9g45es()	(at91_cpu_fully_identify() == ARCH_ID_AT91SAM9G45ES)
++#define cpu_is_at91sam9m10()    (cpu_is_at91sam9g45() && \
++                                (at91_exid_identify() == ARCH_EXID_AT91SAM9M10))
++#define cpu_is_at91sam9m46()    (cpu_is_at91sam9g45() && \
++                                (at91_exid_identify() == ARCH_EXID_AT91SAM9G46))
++#define cpu_is_at91sam9m11()    (cpu_is_at91sam9g45() && \
++                                (at91_exid_identify() == ARCH_EXID_AT91SAM9M11))
+ #else
+ #define cpu_is_at91sam9g45()	(0)
+ #define cpu_is_at91sam9g45es()	(0)
++#define cpu_is_at91sam9m10()	(0)
++#define cpu_is_at91sam9g46()	(0)
++#define cpu_is_at91sam9m11()	(0)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_AT91CAP9
+-- 
+1.5.6.5
