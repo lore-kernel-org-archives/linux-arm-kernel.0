@@ -1,131 +1,129 @@
-From: Dinh.Nguyen@freescale.com (Dinh Nguyen)
-Date: Mon, 10 May 2010 13:45:59 -0500
-Subject: [PATCHv3 2.6.34-rc7 3/3] mx5: enable usb gadget for freescale mx51
-	babbage board
-In-Reply-To: <1273517159-25173-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1273517159-25173-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1273517159-25173-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1273517159-25173-3-git-send-email-Dinh.Nguyen@freescale.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 10 May 2010 11:58:36 -0700
+Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables usb gadget for freescale mx51 babbage hw. By default,
-the OTG port will be in device mode. To put the OTG port into Host mode,
-pass "otg_mode=host" in the exec command.
+ -----Original Message-----
+From: Philippe R?tornaz [mailto:philippe.retornaz at epfl.ch] 
+Sent: Monday, May 10, 2010 1:14 PM
+To: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org
+Cc: s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; Nguyen Dinh-R00091; gregkh at suse.de; Philippe R?tornaz
+Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
 
-This patch applies to 2.6.34-rc7.
+On mx31 the OTG host initialisation fail if you need to have an ULPI transfert to initialize the PHY.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+In order to be able to communicate with the PHY a complete reset of the usb host is needed. After the PHY initialization the host usb configuration registers need to be rewritten to avoid a host controller lockup.
+
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 ---
- arch/arm/mach-mx5/board-mx51_babbage.c |   28 +++++++++++++++++++++++++++-
- arch/arm/mach-mx5/clock-mx51.c         |    2 ++
- arch/arm/mach-mx5/devices.c            |   12 ++++++++++++
- arch/arm/mach-mx5/devices.h            |    1 +
- 4 files changed, 42 insertions(+), 1 deletions(-)
+ drivers/usb/host/ehci-mxc.c |   68 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 68 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 99f7ea9..dacf506 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -15,6 +15,7 @@
- #include <linux/gpio.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/fsl_devices.h>
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c index 544ccfd..39d28da 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -29,6 +29,11 @@
+ #define PORTSC_OFFSET		0x184
+ #define USBMODE_OFFSET		0x1a8
+ #define USBMODE_CM_HOST		3
++#define USBCMD_OFFSET		0x140
++#define USBCMD_RS		(1 << 0)
++#define USBCMD_RST		(1 << 1)
++#define USBSTS_OFFSET		0x144
++#define USBSTS_HCH		(1 << 12)
  
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -179,12 +180,32 @@ static struct mxc_usbh_platform_data dr_utmi_config = {
- 	.flags	= MXC_EHCI_INTERNAL_PHY,
- };
+ struct ehci_mxc_priv {
+ 	struct clk *usbclk, *ahbclk;
+@@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	int irq, ret, temp;
+ 	struct ehci_mxc_priv *priv;
+ 	struct device *dev = &pdev->dev;
++	int i;
  
-+static struct fsl_usb2_platform_data usb_pdata = {
-+	.operating_mode	= FSL_USB2_DR_DEVICE,
-+	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
-+};
+ 	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
+ 
+@@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_init;
+ 
++	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
++	 * transfert timeout. */
++	if (cpu_is_mx31() && pdev->id == 0) {
++		/* Wait for the controller to go idle */
++		for (i = 0; i < 10000; i++) {
++			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
++				break;
++			udelay(1);
++		}
++		if (i == 10000) {
++			dev_err(dev, "Timeout while stopping USB controller\n");
++			goto err_init;
++		}
 +
- static struct mxc_usbh_platform_data usbh1_config = {
- 	.init		= initialize_usbh1_port,
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= (MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_ITC_NO_THRESHOLD),
- };
- 
-+static int otg_mode_host;
++		/* Stop the usb controller */
++		temp = readl(hcd->regs + USBCMD_OFFSET);
++		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
 +
-+static int __init babbage_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to device\n");
-+	return 0;
-+}
-+__setup("otg_mode=", babbage_otg_mode);
++		for (i = 0; i < 10000; i++) {
++			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
++				break;
++			udelay(1);
++		}
 +
- /*
-  * Board specific initialization.
-  */
-@@ -197,7 +218,12 @@ static void __init mxc_board_init(void)
- 	mxc_init_imx_uart();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-+	if (otg_mode_host)
-+		mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-+	else {
-+		initialize_otg_port(NULL);
-+		mxc_register_device(&mxc_usbdr_udc_device, &usb_pdata);
++		if (i == 10000) {
++			dev_err(dev, "Timeout while stopping USB controller\n");
++			goto err_init;
++		}
++
++		/* Reset the usb controller */
++		temp = readl(hcd->regs + USBCMD_OFFSET);
++		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
++
++		for (i = 0; i < 10000; i++) {
++			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
++				break;
++			udelay(1);
++		}
++
++		if (i == 10000) {
++			dev_err(dev, "Timeout while reseting USB controller\n");
++			goto err_init;
++		}
 +	}
- 
- 	gpio_usbh1_active();
- 	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index b63ba71..d9f612d 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -819,6 +819,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", ahb_clk)
- 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
-+	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
-+	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
- };
- 
- static void clk_tree_init(void)
-diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-index e6262f3..23850e6 100644
---- a/arch/arm/mach-mx5/devices.c
-+++ b/arch/arm/mach-mx5/devices.c
-@@ -107,6 +107,18 @@ static struct resource usbotg_resources[] = {
- 	},
- };
- 
-+/* OTG gadget device */
-+struct platform_device mxc_usbdr_udc_device = {
-+	.name		= "fsl-usb2-udc",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(usbotg_resources),
-+	.resource	= usbotg_resources,
-+	.dev		= {
-+		.dma_mask		= &usb_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
 +
- struct platform_device mxc_usbdr_host_device = {
- 	.name = "mxc-ehci",
- 	.id = 0,
-diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-index 95c45f9..0494d6b 100644
---- a/arch/arm/mach-mx5/devices.h
-+++ b/arch/arm/mach-mx5/devices.h
-@@ -4,3 +4,4 @@ extern struct platform_device mxc_uart_device2;
- extern struct platform_device mxc_fec_device;
- extern struct platform_device mxc_usbdr_host_device;
- extern struct platform_device mxc_usbh1_device;
-+extern struct platform_device mxc_usbdr_udc_device;
--- 
-1.6.0.4
+ 	/* Initialize the transceiver */
+ 	if (pdata->otg) {
+ 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET; @@ -213,6 +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 			dev_err(dev, "unable to enable vbus on transceiver\n");
+ 	}
+ 
++	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
++	 * controller stay busy. Rewriting the register is enough to make it
++	 * working */
++	if (cpu_is_mx31() && pdev->id == 0) {
++		/* set USBMODE to host mode */
++		temp = readl(hcd->regs + USBMODE_OFFSET);
++		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
++
++		/* set up the PORTSCx register */
++		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
++
++		/* setup USBCONTROL. */
++		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
++		if (ret < 0)
++			goto err_init;
++	}
++
+
+[Dinh Nguyen] - Should this be done in mxc_initialize_usb_hw() in ehci.c? The probe function gets kinda of ugly with this.
+
+ 	priv->hcd = hcd;
+ 	platform_set_drvdata(pdev, priv);
+ 
+--
+1.6.3.3
