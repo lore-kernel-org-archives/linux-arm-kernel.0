@@ -1,180 +1,166 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 11 May 2010 10:48:24 +0200
-Subject: [PATCH 1/4] pxa/colibri270: Refactor board definition file
-In-Reply-To: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-References: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100511084824.GQ30801@buzzloop.caiaq.de>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Tue, 11 May 2010 10:52:11 +0200
+Subject: [PATCH 1/3] mx31moboard: Fix usb PHY reset
+In-Reply-To: <1273513795-28247-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273513795-28247-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <4BE91ABB.40000@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 11, 2010 at 04:26:55AM +0200, Marek Vasut wrote:
-> This patch just moves code around and polishes it. Also, compile in only
-> selected pieces of hardware.
+On 05/10/2010 07:49 PM, Philippe R?tornaz wrote:
+> Setup the pad with correct pull-up/down before doing the reset.
+> Assert the PHY enable signal so the reset is really done.
 
-I couldn't test this yet, but all changes look fine to me. Especially
-the removal of the header file macros which only have one user makes
-sense.
+For Sascha and other people involved in mx31 support: as I am ending my 
+thesis and I will leave the lab afterwards, Philippe is replacing me for 
+the Linux support of the mx31moboard. We still discuss the patches 
+together, but he now is the one that writes and pushes them.
 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Acked-by: Valentin Longchamp<valentin.longchamp@epfl.ch>
 
-Acked-by: Daniel Mack <daniel@caiaq.de>
-
-Thanks,
-Daniel
-
-
+>
+> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
 > ---
->  arch/arm/mach-pxa/colibri-pxa270.c       |   69 ++++++++++++++++++------------
->  arch/arm/mach-pxa/include/mach/colibri.h |    9 +---
->  2 files changed, 43 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-> index 061c453..4519e89 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa270.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa270.c
-> @@ -3,6 +3,7 @@
->   *
->   *  Support for Toradex PXA270 based Colibri module
->   *  Daniel Mack <daniel@caiaq.de>
-> + *  Marek Vasut <marek.vasut@gmail.com>
->   *
->   *  This program is free software; you can redistribute it and/or modify
->   *  it under the terms of the GNU General Public License version 2 as
-> @@ -36,23 +37,25 @@
->  #include "generic.h"
->  #include "devices.h"
->  
-> -/*
-> - * GPIO configuration
-> - */
-> +/******************************************************************************
-> + * Pin configuration
-> + ******************************************************************************/
->  static mfp_cfg_t colibri_pxa270_pin_config[] __initdata = {
-> +	/* Ethernet */
->  	GPIO78_nCS_2,	/* Ethernet CS */
->  	GPIO114_GPIO,	/* Ethernet IRQ */
->  };
->  
-> -/*
-> - * NOR flash
-> - */
-> +/******************************************************************************
-> + * NOR Flash
-> + ******************************************************************************/
-> +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
->  static struct mtd_partition colibri_partitions[] = {
->  	{
->  		.name =		"Bootloader",
->  		.offset =	0x00000000,
->  		.size =		0x00040000,
-> -		.mask_flags =	MTD_WRITEABLE  /* force read-only */
-> +		.mask_flags =	MTD_WRITEABLE	/* force read-only */
->  	}, {
->  		.name =		"Kernel",
->  		.offset =	0x00040000,
-> @@ -90,42 +93,50 @@ static struct platform_device colibri_pxa270_flash_device = {
->  	.num_resources = 1,
->  };
->  
-> -/*
-> - * DM9000 Ethernet
-> - */
-> -#if defined(CONFIG_DM9000)
-> -static struct resource dm9000_resources[] = {
-> +static void __init colibri_pxa270_nor_init(void)
-> +{
-> +	platform_device_register(&colibri_pxa270_flash);
-> +}
-> +#else
-> +static inline void colibri_pxa270_nor_init(void) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * Ethernet
-> + ******************************************************************************/
-> +#if defined(CONFIG_DM9000) || defined(CONFIG_DM9000_MODULE)
-> +static struct resource colibri_pxa270_dm9000_resources[] = {
->  	[0] = {
-> -		.start	= COLIBRI_PXA270_ETH_PHYS,
-> -		.end	= COLIBRI_PXA270_ETH_PHYS + 3,
-> +		.start	= PXA_CS2_PHYS,
-> +		.end	= PXA_CS2_PHYS + 3,
->  		.flags	= IORESOURCE_MEM,
->  	},
->  	[1] = {
-> -		.start	= COLIBRI_PXA270_ETH_PHYS + 4,
-> -		.end	= COLIBRI_PXA270_ETH_PHYS + 4 + 500,
-> +		.start	= PXA_CS2_PHYS + 4,
-> +		.end	= PXA_CS2_PHYS + 4 + 500,
->  		.flags	= IORESOURCE_MEM,
->  	},
->  	[2] = {
-> -		.start	= COLIBRI_PXA270_ETH_IRQ,
-> -		.end	= COLIBRI_PXA270_ETH_IRQ,
-> +		.start	= gpio_to_irq(GPIO114_COLIBRI_PXA270_ETH_IRQ),
-> +		.end	= gpio_to_irq(GPIO114_COLIBRI_PXA270_ETH_IRQ),
->  		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_RISING,
->  	},
->  };
->  
-> -static struct platform_device dm9000_device = {
-> +static struct platform_device colibri_pxa270_dm9000_device = {
->  	.name		= "dm9000",
->  	.id		= -1,
-> -	.num_resources	= ARRAY_SIZE(dm9000_resources),
-> -	.resource	= dm9000_resources,
-> +	.num_resources	= ARRAY_SIZE(colibri_pxa270_dm9000_resources),
-> +	.resource	= colibri_pxa270_dm9000_resources,
->  };
-> -#endif /* CONFIG_DM9000 */
->  
-> -static struct platform_device *colibri_pxa270_devices[] __initdata = {
-> -	&colibri_pxa270_flash_device,
-> -#if defined(CONFIG_DM9000)
-> -	&dm9000_device,
-> +static void __init colibri_pxa270_eth_init(void)
-> +{
-> +	platform_device_register(&colibri_pxa270_dm9000_device);
-> +}
-> +#else
-> +static inline void colibri_pxa270_eth_init(void) {}
->  #endif
-> -};
->  
->  static void __init colibri_pxa270_init(void)
->  {
-> @@ -133,7 +144,9 @@ static void __init colibri_pxa270_init(void)
->  	pxa_set_ffuart_info(NULL);
->  	pxa_set_btuart_info(NULL);
->  	pxa_set_stuart_info(NULL);
-> -	platform_add_devices(ARRAY_AND_SIZE(colibri_pxa270_devices));
-> +
-> +	colibri_pxa270_nor_init();
-> +	colibri_pxa270_eth_init();
->  }
->  
->  MACHINE_START(COLIBRI, "Toradex Colibri PXA270")
-> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
-> index 811743c..0b24a20 100644
-> --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> @@ -32,13 +32,8 @@ static inline void colibri_pxa3xx_init_nand(void) {}
->  /* physical memory regions */
->  #define COLIBRI_SDRAM_BASE	0xa0000000      /* SDRAM region */
->  
-> -/* definitions for Colibri PXA270 */
+>   arch/arm/mach-mx3/mach-mx31moboard.c |   98 +++++++++++++---------------------
+>   1 files changed, 37 insertions(+), 61 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+> index fccb920..5c44489 100644
+> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
+> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+> @@ -306,37 +306,51 @@ static struct imxmmc_platform_data sdhc1_pdata = {
+>    * this pin is dedicated for all mx31moboard systems, so we do it here
+>    */
+>   #define USB_RESET_B	IOMUX_TO_GPIO(MX31_PIN_GPIO1_0)
 > -
-> -#define COLIBRI_PXA270_FLASH_PHYS	(PXA_CS0_PHYS)  /* Flash region */
-> -#define COLIBRI_PXA270_ETH_PHYS		(PXA_CS2_PHYS)  /* Ethernet */
-> -#define COLIBRI_PXA270_ETH_IRQ_GPIO	114
-> -#define COLIBRI_PXA270_ETH_IRQ		\
-> -	gpio_to_irq(mfp_to_gpio(COLIBRI_PXA270_ETH_IRQ_GPIO))
-> +/* GPIO definitions for Colibri PXA270 */
-> +#define GPIO114_COLIBRI_PXA270_ETH_IRQ	114
->  
->  #endif /* _COLIBRI_H_ */
->  
-> -- 
-> 1.7.0
-> 
+> -static void usb_xcvr_reset(void)
+> -{
+> -	gpio_request(USB_RESET_B, "usb-reset");
+> -	gpio_direction_output(USB_RESET_B, 0);
+> -	mdelay(1);
+> -	gpio_set_value(USB_RESET_B, 1);
+> -}
+> -
+>   #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
+> -			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
+> +		      PAD_CTL_ODE_CMOS)
+>
+>   #define OTG_EN_B IOMUX_TO_GPIO(MX31_PIN_USB_OC)
+> +#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
+>
+> -static void moboard_usbotg_init(void)
+> +static void usb_xcvr_reset(void)
+>   {
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +
+> +	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG | PAD_CTL_100K_PU);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG | PAD_CTL_100K_PD);
+> +	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG | PAD_CTL_100K_PD);
+>
+>   	gpio_request(OTG_EN_B, "usb-udc-en");
+>   	gpio_direction_output(OTG_EN_B, 0);
+> +	gpio_request(USBH2_EN_B, "usbh2-en");
+> +	gpio_direction_output(USBH2_EN_B, 0);
+> +
+> +	gpio_request(USB_RESET_B, "usb-reset");
+> +	gpio_direction_output(USB_RESET_B, 0);
+> +	mdelay(1);
+> +	gpio_set_value(USB_RESET_B, 1);
+> +	mdelay(1);
+>   }
+>
+>   static struct fsl_usb2_platform_data usb_pdata = {
+> @@ -346,44 +360,7 @@ static struct fsl_usb2_platform_data usb_pdata = {
+>
+>   #if defined(CONFIG_USB_ULPI)
+>
+> -#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
+> -
+> -static int moboard_usbh2_hw_init(struct platform_device *pdev)
+> -{
+> -	int ret;
+> -
+> -	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
+> -
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
+> -	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
+> -
+> -	ret = gpio_request(USBH2_EN_B, "usbh2-en");
+> -	if (ret)
+> -		return ret;
+> -	gpio_direction_output(USBH2_EN_B, 0);
+> -
+> -	return 0;
+> -}
+> -
+> -static int moboard_usbh2_hw_exit(struct platform_device *pdev)
+> -{
+> -	gpio_free(USBH2_EN_B);
+> -	return 0;
+> -}
+> -
+>   static struct mxc_usbh_platform_data usbh2_pdata = {
+> -	.init	= moboard_usbh2_hw_init,
+> -	.exit	= moboard_usbh2_hw_exit,
+>   	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+>   	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
+>   };
+> @@ -508,7 +485,6 @@ static void __init mxc_board_init(void)
+>
+>   	usb_xcvr_reset();
+>
+> -	moboard_usbotg_init();
+>   	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+>   	moboard_usbh2_init();
+>
+
+
+-- 
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEB3494, Station 9, CH-1015 Lausanne
