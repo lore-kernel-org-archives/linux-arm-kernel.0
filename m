@@ -1,40 +1,43 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue, 11 May 2010 09:13:02 +0300
-Subject: [PATCH v6 2/2] ep93xx: SPI driver platform support code
-In-Reply-To: <0D753D10438DA54287A00B0270842697636EE74B65@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1272805161.git.mika.westerberg@iki.fi>
-	<865b5d7ca0fae1977a1fadcdabdb715e3ea1604d.1272805161.git.mika.westerberg@iki.fi>
-	<0D753D10438DA54287A00B0270842697636EB838E1@AUSP01VMBX24.collaborationhost.net>
-	<20100505142625.GB2606@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636EE74B65@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100511061302.GW26418@gw.healthdatacare.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 May 2010 07:21:31 +0100
+Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
+In-Reply-To: <20100511031447.GB20453@linux-sh.org>
+References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
+	<20100510111259.GA14680@linux-sh.org>
+	<20100510123514.GA11804@besouro.research.nokia.com>
+	<20100510123902.GA15293@linux-sh.org>
+	<20100510125548.GB11804@besouro.research.nokia.com>
+	<20100511031447.GB20453@linux-sh.org>
+Message-ID: <20100511062131.GA24401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 07:24:24PM -0500, H Hartley Sweeten wrote:
-> On Wednesday, May 05, 2010 7:26 AM, Russell King wrote:
-> > On Tue, May 04, 2010 at 12:21:36PM -0500, H Hartley Sweeten wrote:
-> >> That patch is already present in linux-next.  If Russell think there might
-> >> be an issue you could rebase this patch on the linux-next tree.
-> >
-> > If this patch depends on 5998/1, then I'll take it via the ep93xx branch
-> > (which has 5998/1 on.)  It's only touching files in arch/arm so there
-> > shouldn't be any problem with that.
+On Tue, May 11, 2010 at 12:14:47PM +0900, Paul Mundt wrote:
+> On Mon, May 10, 2010 at 03:55:49PM +0300, Eduardo Valentin wrote:
+> > On Mon, May 10, 2010 at 02:39:02PM +0200, ext Paul Mundt wrote:
+> > > Note that in the cpuinfo case there is often special handling for the
+> > > single (or boot CPU) case, such as printing out a descriptor for the
+> > > machine type and so on. You might be better off just extending cpuinfo
+> > > rather than introducing another /proc abstraction, presumably your
+> > > socinfo string will be fixed regardless of whether it's SMP or not.
+> > 
+> > Yeah, I wouldn't expect it to change if it SMP or not. It should be fixed.
+> > Previous version of this change was actually extending ARM cpuinfo. The previous
+> > thread starts here:
+> > http://marc.info/?l=linux-omap&m=127304890312365&w=2
+> > 
+> > But, the point of moving that to specific file was that soc info is not really cpu info.
+> > 
+> It's up to you of course, but adding an extra file because of SoC/CPU
+> ambiguity seems pretty ugly. Almost all architectures already include
+> machine type descriptors in their cpuinfo output (as ARM does also) and
+> if you can justify that then certainly adding in some SoC-specific bits
+> isn't exactly much of a stretch.
 > 
-> 
-> Mika,
-> 
-> Any word from the spi group on PATCH v6 1/2?
+> These days you should have a pretty strong justification for adding new
+> procfs files, and this is certainly not one of them.
 
-Nothing yet.
-
-> Russell wants this patch (v6 2/2) to go through his tree, please add it to
-> his patch system.  It will not be a problem if this patch goes in before the
-> actual driver since nothing "breaks".  If the driver goes in first it will
-> not work due to the missing clock resource, even if a user were to hack in the
-> platform init code.
-
-OK, will do that later on today.
-
-Regards,
-MW
+I disagree.
