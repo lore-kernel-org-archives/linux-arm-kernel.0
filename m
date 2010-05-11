@@ -1,137 +1,82 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 11 May 2010 16:30:52 -0700
-Subject: [PATCH 6/6] OMAP: GPIO: remove duplicate debugfs interface
-In-Reply-To: <1273620652-15927-1-git-send-email-khilman@deeprootsystems.com>
-References: <1273620652-15927-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273620652-15927-7-git-send-email-khilman@deeprootsystems.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 12 May 2010 01:30:55 +0200
+Subject: [GIT PULL] pxa: patches for .35 merge window (34-rc7 based)
+In-Reply-To: <AANLkTimOqaAfg7QtoTBuV3ofVFnFIMHWHSx4L8aFWc1r@mail.gmail.com>
+References: <AANLkTimOqaAfg7QtoTBuV3ofVFnFIMHWHSx4L8aFWc1r@mail.gmail.com>
+Message-ID: <201005120130.55329.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic gpiolib provides a debugfs interface to GPIOs which
-provides identical (but nicer looking) data as the OMAP specific one.
-
-This patch completely drops the OMAP specific interface
-(/debug/omap_gpio) in favor of using the generic one (/debug/gpio.)
-
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/plat-omap/gpio.c |  107 ---------------------------------------------
- 1 files changed, 0 insertions(+), 107 deletions(-)
-
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index b895cc9..955597f 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -2310,110 +2310,3 @@ static int __init omap_gpio_sysinit(void)
- }
- 
- arch_initcall(omap_gpio_sysinit);
--
--
--#ifdef	CONFIG_DEBUG_FS
--
--#include <linux/debugfs.h>
--#include <linux/seq_file.h>
--
--static int dbg_gpio_show(struct seq_file *s, void *unused)
--{
--	unsigned	i, j, gpio;
--
--	for (i = 0, gpio = 0; i < gpio_bank_count; i++) {
--		struct gpio_bank	*bank = gpio_bank + i;
--		unsigned		bankwidth = 16;
--		u32			mask = 1;
--
--		if (bank_is_mpuio(bank))
--			gpio = OMAP_MPUIO(0);
--		else if (cpu_class_is_omap2() || cpu_is_omap7xx())
--			bankwidth = 32;
--
--		for (j = 0; j < bankwidth; j++, gpio++, mask <<= 1) {
--			unsigned	irq, value, is_in, irqstat;
--			const char	*label;
--
--			label = gpiochip_is_requested(&bank->chip, j);
--			if (!label)
--				continue;
--
--			irq = bank->virtual_irq_start + j;
--			value = gpio_get_value(gpio);
--			is_in = gpio_is_input(bank, mask);
--
--			if (bank_is_mpuio(bank))
--				seq_printf(s, "MPUIO %2d ", j);
--			else
--				seq_printf(s, "GPIO %3d ", gpio);
--			seq_printf(s, "(%-20.20s): %s %s",
--					label,
--					is_in ? "in " : "out",
--					value ? "hi"  : "lo");
--
--/* FIXME for at least omap2, show pullup/pulldown state */
--
--			irqstat = irq_desc[irq].status;
--#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
--			if (is_in && ((bank->suspend_wakeup & mask)
--					|| irqstat & IRQ_TYPE_SENSE_MASK)) {
--				char	*trigger = NULL;
--
--				switch (irqstat & IRQ_TYPE_SENSE_MASK) {
--				case IRQ_TYPE_EDGE_FALLING:
--					trigger = "falling";
--					break;
--				case IRQ_TYPE_EDGE_RISING:
--					trigger = "rising";
--					break;
--				case IRQ_TYPE_EDGE_BOTH:
--					trigger = "bothedge";
--					break;
--				case IRQ_TYPE_LEVEL_LOW:
--					trigger = "low";
--					break;
--				case IRQ_TYPE_LEVEL_HIGH:
--					trigger = "high";
--					break;
--				case IRQ_TYPE_NONE:
--					trigger = "(?)";
--					break;
--				}
--				seq_printf(s, ", irq-%d %-8s%s",
--						irq, trigger,
--						(bank->suspend_wakeup & mask)
--							? " wakeup" : "");
--			}
--#endif
--			seq_printf(s, "\n");
--		}
--
--		if (bank_is_mpuio(bank)) {
--			seq_printf(s, "\n");
--			gpio = 0;
--		}
--	}
--	return 0;
--}
--
--static int dbg_gpio_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, dbg_gpio_show, &inode->i_private);
--}
--
--static const struct file_operations debug_fops = {
--	.open		= dbg_gpio_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--};
--
--static int __init omap_gpio_debuginit(void)
--{
--	(void) debugfs_create_file("omap_gpio", S_IRUGO,
--					NULL, NULL, &debug_fops);
--	return 0;
--}
--late_initcall(omap_gpio_debuginit);
--#endif
--- 
-1.7.0.2
+Dne ?t 11. kv?tna 2010 17:34:49 Eric Miao napsal(a):
+> The following changes since commit
+> b57f95a38233a2e73b679bea4a5453a1cc2a1cc9: Linus Torvalds (1):
+>         Linux 2.6.34-rc7
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+> devel
+> 
+> Eric Miao (17):
+>       input: remove now deprecated corgi_ts.c touchscreen driver
+>       [ARM] pxa: remove now un-used corgi_ssp.c and corgi_lcd.c
+>       [ARM] pxa: remove the now legacy SSP API
+>       [ARM] pxa: correct SSCR0_SCR to support multiple SoCs
+>       [ARM] pxa: merge regs-ssp.h into ssp.h
+>       [ARM] pxa: remove unnecessary #include of <mach/ssp.h>
+>       [ARM] pxa: remove incorrect select PXA_SSP in Kconfig
+>       [ARM] pxa: add MFP_LPM_KEEP_OUTPUT flag to pin config
+>       [ARM] pxa: allow keypad GPIOs to wakeup when configured as generic
+>       [ARM] pxa: allow MFP_LPM_INPUT to be explicitly specified
+>       [ARM] pxa/spitz: use generic GPIO API and remove pxa_gpio_mode()
+>       [ARM] pxa/corgi: use generic GPIO API and remove pxa_gpio_mode()
+>       [ARM] pxa/corgi: cleanup GPIO configurations and low power mode
+> settings [ARM] pxa/tosa: move CONFIG_KEYBOARD_TOSA_USE_EXT_KEYCODES to
+> mach/Kconfig input: remove obsolete {corgi,spitz,tosa}kbd.c
+>       [ARM] pxa: remove pxa_gpio_mode() and files
+>       [ARM] pxa: make it clear by converting MMC 'delay_detect' to
+> millisecond
+> 
+> Haojian Zhuang (13):
+>       [ARM] pxa: move ssp into common plat-pxa
+>       [ARM] pxa: simplify ifdef in ssp.h
+>       [ARM] mmp: support ssp in pxa168
+>       [ARM] mmp: enable ssp in aspenite
+>       [ARM] mmp: update clock register function
+>       [ARM] mmp: enable L2 in mmp2
+>       [ARM] mmp: update mmp2 defconfig
+>       [ARM] mmp: configure gpio pins from 128 to 192
+>       [ARM] mmp: update mfp setting
+>       [ARM] mmp: add dma support to mmp2
+>       [ARM] mmp: update twsi index
+>       [ARM] mmp: append device support in jasper
+>       [ARM] pxa: add namespace on ssp
+> 
+> Igor Grinberg (5):
+>       [ARM] pxa/cm-x300.c: add battery charger support
+>       [ARM] pxa/cm-x300: da903x WLED is not connected on cm-x300
+>       [ARM] pxa/cm-x300: fix da903x IRQ line assignment
+>       [ARM] pxa/cm-x300: add regulator on vcc_core
+>       [ARM] pxa/cm-x300: update the memory fixup.
+> 
+> Julia Lawall (2):
+>       [ARM] pxa: avoid NULL dereferencing in error handling of ssp.c
+>       [ARM] pxa: use resource_size() in ssp.c
+> 
+> Marek (1):
+>       [ARM] pxa: add basic support for Voipac PXA270 SBC
+> 
+> Marek Vasut (11):
+>       [ARM] pxa: add basic support for the Aeronix Zipit Z2 handheld
+>       [ARM] pxa: add support for Voipac PXA270 PCMCIA
+>       [ARM] pxa/vpac270: UDC and UHC support
+>       [ARM] pxa/vpac270: add ethernet support
+>       [ARM] pxa/vpac270: Add touchscreen support
+>       [ARM] pxa/vpac270: Add DS1339 RTC support
+>       [ARM] pxa/vpac270: add ide support
+>       [ARM] pxa/vpac270: remove TS_IRQ magic number
+>       [ARM] pxa/vpac270: add OneNAND support
+>       [ARM] pxa/vpac270: fix now invalid bit of UP2OCR
+>       MAINTAINERS: New MAINTAINERS entries for Zipit Z2 and Voipac PXA270
+> 
+The's me ... twice ;-)
