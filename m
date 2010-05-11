@@ -1,41 +1,73 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 11 May 2010 09:55:11 +0300
-Subject: [PATCH v2 5/5] rx1950: configure GPG13-15 as input before suspend
-In-Reply-To: <1273560911-18153-1-git-send-email-anarsoul@gmail.com>
-References: <1273560911-18153-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1273560911-18153-6-git-send-email-anarsoul@gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 11 May 2010 12:28:34 +0530
+Subject: [PATCH 2/2] nomadik: Add rng clk to nomadik, RNG support to ux500
+Message-ID: <1273561114-16115-1-git-send-email-srinidhi.kasagar@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to datasheet GPG13-15 must be configured as input in NAND
-boot mode, otherwise device will not be able to wake up
+Add rng clock to nomadik lookup table, and add hardware
+RNG support to ux500 machine which uses nomadik RNG driver.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@dtericsson.com>
 ---
- arch/arm/mach-s3c2410/pm.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-nomadik/clock.c              |    1 +
+ arch/arm/mach-ux500/board-mop500.c         |    1 +
+ arch/arm/mach-ux500/devices.c              |    5 +++++
+ arch/arm/mach-ux500/include/mach/devices.h |    1 +
+ 4 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/pm.c b/arch/arm/mach-s3c2410/pm.c
-index 6a61486..725636f 100644
---- a/arch/arm/mach-s3c2410/pm.c
-+++ b/arch/arm/mach-s3c2410/pm.c
-@@ -79,6 +79,17 @@ static void s3c2410_pm_prepare(void)
- 	if ( machine_is_aml_m5900() )
- 		s3c2410_gpio_setpin(S3C2410_GPF(2), 1);
+diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
+index 60f5bee..2c471fc 100644
+--- a/arch/arm/mach-nomadik/clock.c
++++ b/arch/arm/mach-nomadik/clock.c
+@@ -56,6 +56,7 @@ static struct clk_lookup lookups[] = {
+ 	CLK(&clk_default, "gpio.1"),
+ 	CLK(&clk_default, "gpio.2"),
+ 	CLK(&clk_default, "gpio.3"),
++	CLK(&clk_default, "rng"),
+ };
  
-+	if (machine_is_rx1950()) {
-+		/* According to S3C2442 user's manual, page 7-17,
-+		 * when the system is operating in NAND boot mode,
-+		 * the hardware pin configuration - EINT[23:21] ???
-+		 * must be set as input for starting up after
-+		 * wakeup from sleep mode
-+		 */
-+		s3c_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPIO_INPUT);
-+		s3c_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPIO_INPUT);
-+		s3c_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPIO_INPUT);
-+	}
- }
+ static int __init clk_init(void)
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index fdcf0d4..602b999 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -124,6 +124,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&ux500_uart0_device,
+ 	&ux500_uart1_device,
+ 	&ux500_uart2_device,
++	&ux500_rng_device,
+ 	&u8500_ssp0_device,
+ };
  
- static int s3c2410_pm_resume(struct sys_device *dev)
+diff --git a/arch/arm/mach-ux500/devices.c b/arch/arm/mach-ux500/devices.c
+index 8a26889..65eb79a 100644
+--- a/arch/arm/mach-ux500/devices.c
++++ b/arch/arm/mach-ux500/devices.c
+@@ -29,6 +29,11 @@ struct amba_device ux500_pl031_device = {
+ 	.irq = {IRQ_RTC_RTT, NO_IRQ},
+ };
+ 
++struct amba_device ux500_rng_device = {
++	.dev = { .init_name = "rng" },
++	__MEM_4K_RESOURCE(UX500_RNG_BASE),
++};
++
+ struct amba_device ux500_uart0_device = {
+ 	.dev = { .init_name = "uart0" },
+ 	__MEM_4K_RESOURCE(UX500_UART0_BASE),
+diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/include/mach/devices.h
+index 0422af0..72fa6f7 100644
+--- a/arch/arm/mach-ux500/include/mach/devices.h
++++ b/arch/arm/mach-ux500/include/mach/devices.h
+@@ -18,6 +18,7 @@ extern struct amba_device u8500_ssp0_device;
+ extern struct amba_device ux500_uart0_device;
+ extern struct amba_device ux500_uart1_device;
+ extern struct amba_device ux500_uart2_device;
++extern struct amba_device ux500_rng_device;
+ 
+ extern struct platform_device ux500_i2c1_device;
+ extern struct platform_device ux500_i2c2_device;
 -- 
-1.7.0.4
+1.6.3.3
