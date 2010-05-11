@@ -1,107 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 May 2010 13:04:50 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 May 2010 22:27:19 +0100
 Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
 	support
 In-Reply-To: <AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
 References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
 	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
 	<AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
-Message-ID: <20100511200450.GG13931@atomide.com>
+Message-ID: <20100511212719.GC32186@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* ye janboe <janboe.ye@gmail.com> [100510 20:10]:
-> hi, Russell, Tony
-> 
+On Tue, May 11, 2010 at 11:15:13AM +0800, ye janboe wrote:
 > Is this patch ignored by you? I do not see any ack for this patch.
 
-I guess we're still waiting to hear from Russell. AFAIK, this is needed
-in addition to the three patches from Imre.
+Patch is fine, shame some of the people on the Cc haven't acked it though.
+Can we get acks from anyone of those, and then submit it to the patch
+system?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Thanks
-> 
-> Janboe Ye
-> 
-> 2009/12/3 Tero Kristo <tero.kristo@nokia.com>:
-> > From: Tero Kristo <tero.kristo@nokia.com>
-> >
-> > In some ARM architectures, like OMAP3, the VFP context can be lost during
-> > dynamic sleep cycle. For this purpose, there is now a function
-> > vfp_pm_save_context() that should be called before the VFP is assumed to
-> > lose context. Next VFP trap will then restore context automatically.
-> >
-> > We need to have the last_VFP_context[cpu] cleared after the save in idle,
-> > else the restore would fail to restore when it sees that the last_VFP_context
-> > is same as the current threads vfp_state. This happens when the same
-> > process/thread traps an exception post idle.
-> >
-> > This patch also fixes a potential problem with vfp_pm_suspend(), where
-> > VFP context can be lost if the current process does not have VFP enabled.
-> > Fixed by calling vfp_pm_save_context().
-> >
 > > Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
 > > Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
 > > Cc: Rajendra Nayak <rnayak@ti.com>
 > > Cc: Richard Woodruff <r-woodruff2@ti.com>
 > > Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
-> > ---
-> > ?arch/arm/vfp/vfpmodule.c | ? 28 ++++++++++++++++++++--------
-> > ?1 files changed, 20 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> > index 2d7423a..920a33b 100644
-> > --- a/arch/arm/vfp/vfpmodule.c
-> > +++ b/arch/arm/vfp/vfpmodule.c
-> > @@ -329,22 +329,34 @@ static void vfp_enable(void *unused)
-> > ?#ifdef CONFIG_PM
-> > ?#include <linux/sysdev.h>
-> >
-> > -static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
-> > +void vfp_pm_save_context(void)
-> > ?{
-> > - ? ? ? struct thread_info *ti = current_thread_info();
-> > ? ? ? ?u32 fpexc = fmrx(FPEXC);
-> > + ? ? ? unsigned int cpu = get_cpu();
-> > +
-> > + ? ? ? /* Save last_VFP_context if needed */
-> > + ? ? ? if (last_VFP_context[cpu]) {
-> > + ? ? ? ? ? ? ? /* Enable vfp to save context */
-> > + ? ? ? ? ? ? ? if (!(fpexc & FPEXC_EN)) {
-> > + ? ? ? ? ? ? ? ? ? ? ? vfp_enable(NULL);
-> > + ? ? ? ? ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
-> > + ? ? ? ? ? ? ? }
-> >
-> > - ? ? ? /* if vfp is on, then save state for resumption */
-> > - ? ? ? if (fpexc & FPEXC_EN) {
-> > ? ? ? ? ? ? ? ?printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
-> > - ? ? ? ? ? ? ? vfp_save_state(&ti->vfpstate, fpexc);
-> > + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[cpu], fpexc);
-> >
-> > ? ? ? ? ? ? ? ?/* disable, just in case */
-> > - ? ? ? ? ? ? ? fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> > + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc & ~FPEXC_EN);
-> > +
-> > + ? ? ? ? ? ? ? last_VFP_context[cpu] = NULL;
-> > ? ? ? ?}
-> >
-> > - ? ? ? /* clear any information we had about last context state */
-> > - ? ? ? memset(last_VFP_context, 0, sizeof(last_VFP_context));
-> > + ? ? ? put_cpu();
-> > +}
-> > +
-> > +static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
-> > +{
-> > + ? ? ? vfp_pm_save_context();
-> >
-> > ? ? ? ?return 0;
-> > ?}
-> > --
-> > 1.5.4.3
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> >
