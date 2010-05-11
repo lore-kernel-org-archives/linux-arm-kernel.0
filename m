@@ -1,152 +1,78 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Tue, 11 May 2010 16:57:49 +0200
-Subject: [PATCH 1/3] mx31moboard: Fix usb PHY reset
-In-Reply-To: <1273589871-25424-1-git-send-email-philippe.retornaz@epfl.ch>
-References: <1273589871-25424-1-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1273589871-25424-2-git-send-email-philippe.retornaz@epfl.ch>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 11 May 2010 18:27:52 +0300
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+Message-ID: <AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the pad with correct pull-up/down before doing the reset.
-Assert the PHY enable signal so the reset is really done.
+Jeff,
+seems that the libata do pio to buffer which was allocated with
+kmalloc, and under arm arch, the flush_dcache_page() is needed to
+prevent cache aliasing, the later function calls the page_mapping
+which falls on PageSlab(page)
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-Acked-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
----
- arch/arm/mach-mx3/mach-mx31moboard.c |   98 +++++++++++++---------------------
- 1 files changed, 37 insertions(+), 61 deletions(-)
+as the flush_dcache_page() is needed to prevent aliasing, it can be
+skipped if the page is Slab as such pages are used only by the kernel.
+here a suggested patch:
 
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index fccb920..5c44489 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -306,37 +306,51 @@ static struct imxmmc_platform_data sdhc1_pdata = {
-  * this pin is dedicated for all mx31moboard systems, so we do it here
-  */
- #define USB_RESET_B	IOMUX_TO_GPIO(MX31_PIN_GPIO1_0)
--
--static void usb_xcvr_reset(void)
--{
--	gpio_request(USB_RESET_B, "usb-reset");
--	gpio_direction_output(USB_RESET_B, 0);
--	mdelay(1);
--	gpio_set_value(USB_RESET_B, 1);
--}
--
- #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
--			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+		      PAD_CTL_ODE_CMOS)
- 
- #define OTG_EN_B IOMUX_TO_GPIO(MX31_PIN_USB_OC)
-+#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
- 
--static void moboard_usbotg_init(void)
-+static void usb_xcvr_reset(void)
- {
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG | PAD_CTL_100K_PU);
-+
-+	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG | PAD_CTL_100K_PD);
-+	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG | PAD_CTL_100K_PD);
- 
- 	gpio_request(OTG_EN_B, "usb-udc-en");
- 	gpio_direction_output(OTG_EN_B, 0);
-+	gpio_request(USBH2_EN_B, "usbh2-en");
-+	gpio_direction_output(USBH2_EN_B, 0);
-+
-+	gpio_request(USB_RESET_B, "usb-reset");
-+	gpio_direction_output(USB_RESET_B, 0);
-+	mdelay(1);
-+	gpio_set_value(USB_RESET_B, 1);
-+	mdelay(1);
- }
- 
- static struct fsl_usb2_platform_data usb_pdata = {
-@@ -346,44 +360,7 @@ static struct fsl_usb2_platform_data usb_pdata = {
- 
- #if defined(CONFIG_USB_ULPI)
- 
--#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
--
--static int moboard_usbh2_hw_init(struct platform_device *pdev)
--{
--	int ret;
--
--	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
--
--	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
--
--	ret = gpio_request(USBH2_EN_B, "usbh2-en");
--	if (ret)
--		return ret;
--	gpio_direction_output(USBH2_EN_B, 0);
--
--	return 0;
--}
--
--static int moboard_usbh2_hw_exit(struct platform_device *pdev)
--{
--	gpio_free(USBH2_EN_B);
--	return 0;
--}
--
- static struct mxc_usbh_platform_data usbh2_pdata = {
--	.init	= moboard_usbh2_hw_init,
--	.exit	= moboard_usbh2_hw_exit,
- 	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
- 	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
- };
-@@ -508,7 +485,6 @@ static void __init mxc_board_init(void)
- 
- 	usb_xcvr_reset();
- 
--	moboard_usbotg_init();
- 	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
- 	moboard_usbh2_init();
- 
--- 
-1.6.3.3
+--- a/drivers/ata/libata-sff.c
++++ b/drivers/ata/libata-sff.c
+@@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+                                       do_write);
+        }
+
+-       if (!do_write)
++       if (!do_write && !PageSlab(page))
+                flush_dcache_page(page);
+
+saeed
+
+
+On Mon, May 10, 2010 at 4:06 PM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> Hi,
+> ?I got the following bug when enabling the VM_DEBGU on 2.6.34-rc6:
+>
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = c0004000
+> [00000000] *pgd=00000000
+> Internal error: Oops: 805 [#1]
+> last sysfs file:
+> Modules linked in:
+> CPU: 0 ? ?Not tainted ?(2.6.34-rc6-00176-g00047b8-dirty #331)
+> PC is at flush_dcache_page+0x2c/0xc4
+> LR is at ata_pio_sector+0xd8/0x124
+> pc : [<c002d30c>] ? ?lr : [<c01c29d4>] ? ?psr: 20000013
+> sp : f5513ee8 ?ip : 79a50000 ?fp : 00001ee8
+> r10: 00000058 ?r9 : f54f0000 ?r8 : 00000000
+> r7 : f54f1358 ?r6 : c03e6b84 ?r5 : 00000000 ?r4 : 00000000
+> r3 : 00000000 ?r2 : 00000000 ?r1 : f54f17b8 ?r0 : c0ac4e20
+> Flags: nzCv ?IRQs on ?FIQs on ?Mode SVC_32 ?ISA ARM ?Segment kernel
+> Control: 10c5387d ?Table: 00004019 ?DAC: 00000017
+> Process ata/0 (pid: 145, stack limit = 0xf55122f0)
+> Stack: (0xf5513ee8 to 0xf5514000)
+> 3ee0: ? ? ? ? ? ? ? ? ? c0ac4e20 c01c29d4 00000009 f54f1358 f54f1358 00000001
+> 3f00: c040d18c c01c2ad8 00000005 00000009 f54f0000 c01c3204 c03cfe78 00000000
+> 3f20: 00200200 f54f13d4 c00446e4 00000001 f54f1424 00000000 00000000 00000000
+> 3f40: 00000000 00000000 ffffffff 00000009 f54f0000 f54f1358 00000001 c040d18c
+> 3f60: 00000005 0000000a 00001ee8 c01c46d8 f5413c70 f54b5b68 c01c45d4 f54b5b60
+> 3f80: f5512000 f5513f9c 00000000 00000000 00000000 c004b2c0 00000000 00000000
+> 3fa0: f54be0c0 c004e12c f5513fa8 f5513fa8 f5429ec8 f5513fd4 f5429ec8 f54b5b60
+> 3fc0: c004b1c8 00000000 00000000 c004e014 00000000 00000000 f5513fd8 f5513fd8
+> 3fe0: 00000000 00000000 00000000 00000000 00000000 c0026dec bc7e4afb 6a3a8a30
+> [<c002d30c>] (flush_dcache_page+0x2c/0xc4) from [<c01c29d4>]
+> (ata_pio_sector+0xd8/0x124)
+> [<c01c29d4>] (ata_pio_sector+0xd8/0x124) from [<c01c2ad8>]
+> (ata_pio_sectors+0xb8/0xc4)
+> [<c01c2ad8>] (ata_pio_sectors+0xb8/0xc4) from [<c01c3204>]
+> (ata_sff_hsm_move+0x618/0x76c)
+> [<c01c3204>] (ata_sff_hsm_move+0x618/0x76c) from [<c01c46d8>]
+> (ata_pio_task+0x104/0x124)
+> [<c01c46d8>] (ata_pio_task+0x104/0x124) from [<c004b2c0>]
+> (worker_thread+0xf8/0x170)
+> [<c004b2c0>] (worker_thread+0xf8/0x170) from [<c004e014>] (kthread+0x78/0x80)
+> [<c004e014>] (kthread+0x78/0x80) from [<c0026dec>] (kernel_thread_exit+0x0/0x8)
+> Code: e5904010 e3130080 0a000002 e3a03000 (e5833000)
+> ---[ end trace 8a7ce1ae66250005 ]---
+>
