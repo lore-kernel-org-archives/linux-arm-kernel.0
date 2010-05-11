@@ -1,24 +1,36 @@
-From: mboards@prograde.net (Michael Cashwell)
-Date: Tue, 11 May 2010 11:00:36 -0400
-Subject: PXA/8250 UART Conflicts
-Message-ID: <3117D78B-5443-48B5-88BC-83EEB8F709F9@prograde.net>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Tue, 11 May 2010 16:57:48 +0200
+Subject: [PATCH 0/3 v2] mx31moboard: OTG host support
+Message-ID: <1273589871-25424-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+Hello
 
-I'm using a PXA270-based Gumstix and a provisional 2.6.33.2 kernel to explore supporting a dual 8250-like UART chip over i2c for one of our hardware guys. But enabling both the 8250 and pxa2xx-uart drivers conflicts at the ttySn level. Both seem to do the following:
+This patch set add the OTG host support for the eyebot robot.
 
-serial_core: uart_register_driver() ->
-tty_io:      tty_register_driver() ->
-char_dev:    register_chrdev_region()
+The first patch fix the usb PHY reset so we really do reset and configure 
+the pad pull-up/down so the signal are stable while applying the reset 
+signal (observed with an oscilloscope).
 
-using the same starting minor number. Thus the first driver gets /dev/ttyS0 and up and the rest fail with -EBUSY.
+The last two patches are adding a new number to the mx31moboard_baseboard 
+bootparam so we can choose at boot if we want an usb device or host on the 
+smartbot board.
 
-Am I missing something? Are these drivers just incompatible and Kconfig shouldn't let me turn both on? (In fact, doing so kills the console if it's on an internal PXA uart because the 8250 driver loads first. That was "fun with JTAG".)
+v2: I've added Acked-by from Valentin on the first two patches, fixed
+some typo and modified the last patch according to Valentin comment.
 
-I'd like the tty layer to just assign the minor numbers in sequence, first come first served. But I don't see how to get that. Or is there some platform way to influence the tty range requested?
+Regards,
+Philippe
 
-Any pearls of wisdom would be welcome.
+Philippe R?tornaz (3):
+  mx31moboard: Fix usb PHY reset
+  mx31moboard: Move usb OTG device registration
+  mx31moboard: OTG host support for smartbot board
 
--Mike
+ arch/arm/mach-mx3/mach-mx31moboard.c               |  104 +++++++-------------
+ arch/arm/mach-mx3/mx31moboard-devboard.c           |    9 ++
+ arch/arm/mach-mx3/mx31moboard-marxbot.c            |    8 ++
+ arch/arm/mach-mx3/mx31moboard-smartbot.c           |   45 ++++++++-
+ arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    3 +-
+ 5 files changed, 100 insertions(+), 69 deletions(-)
