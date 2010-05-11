@@ -1,30 +1,50 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Tue, 11 May 2010 16:14:33 +0200
-Subject: [PATCH 0/1 v2] mx31: Fix usb otg host initialisation
-Message-ID: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 11 May 2010 09:28:15 -0500
+Subject: [PATCHv5 2/3] OMAP: export OMAP info under /proc/socinfo
+In-Reply-To: <1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
+Message-ID: <4BE9697F.80308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Eduardo Valentin had written, on 05/11/2010 09:15 AM, the following:
+> From: Eduardo Valentin <eduardo.valentin@nokia.com>
+> 
+> Export OMAP name and rev under /proc/socinfo node.
+> 
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+> ---
+>  arch/arm/Kconfig         |    1 +
+>  arch/arm/mach-omap1/id.c |   31 ++++++++++++++++++++++++-------
+>  arch/arm/mach-omap2/id.c |   32 ++++++++++++++++++++++++++------
+>  3 files changed, 51 insertions(+), 13 deletions(-)
+> 
+[..]
 
-This patch fix the usb otg host initialisation on imx31 platform.
-The ULPI access had timeout problem. This try to fix them by resetting 
-the host controller before accessing the PHY.
-With a such reset the configuration registers need to be rewritten after
-the ULPI access.
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 37b8a1a..b67486b 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+[..]
 
-Tested on 3 different board with an imx31.
+> @@ -356,7 +363,8 @@ void __init omap3_cpuinfo(void)
+>  	}
+>  
+>  	/* Print verbose information */
+> -	pr_info("%s ES%s (", cpu_name, cpu_rev);
+> +	snprintf(socinfo, SOCINFO_SZ, "%s ES%s", cpu_name, cpu_rev);
+> +	pr_info("%s (", socinfo);
+>  
+>  	OMAP3_SHOW_FEATURE(l2cache);
+>  	OMAP3_SHOW_FEATURE(iva);
+Just a minor comment -> is it a good idea to pushin the features to SOC 
+info as well? currently this is being displayed at bootlog and not 
+beyond.. might be a better approach to move it into socinfo..
 
-The v2 try to integrate all the comments. It defines new functions
-to reset the host and to poll the differents bits with a timeout but
-it should not change the general behavior of the code.
 
+[..]
 
+-- 
 Regards,
-Philippe
-
-Philippe R?tornaz (1):
-  ehci-mxc: Fix mx31 OTG host initialisation
-
- drivers/usb/host/ehci-mxc.c |   98 ++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 87 insertions(+), 11 deletions(-)
+Nishanth Menon
