@@ -1,105 +1,162 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Tue, 11 May 2010 17:15:28 +0300
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export OMAP
-	data
-Message-ID: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Tue, 11 May 2010 16:14:34 +0200
+Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On mx31 the OTG host initialisation fails if you need to have
+an ULPI transfert to initialize the PHY.
 
-Here is the version 5 of the change to export OMAP data to userspace
-(name, revision, id code, production id and die id).
+In order to be able to communicate with the PHY a complete reset
+of the usb host is needed. After the PHY initialization the host
+usb configuration registers need to be rewritten to avoid a host
+controller lockup.
 
-Basically, this version is still attempting to create a new file under /proc.
-It is the /proc/socinfo, which should be used to export bits which are SoC specific
-(not CPU related, nor machine related).
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+---
+ drivers/usb/host/ehci-mxc.c |   98 ++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 87 insertions(+), 11 deletions(-)
 
-So, differences between previous version are:
-- merged patch 02/04 with 03/04 to avoid compilation breakages.
-- simplified the seq_file usage by using the single_open and single_release functions
-- exported a function to register a seq_operation .show callback
-- adapted the changes accordingly
-
-As usual, comments are welcome.
-
-BR,
-
--------------------------------------------------------------------------------
-v4:
-
-Here is the patch set to export OMAP id code, production id and die id.
-The history of this change is as follows:
-
-1. First attempt tried adding those data under sysfs node. Original patch by
-Peter De Schrijver [1]. Then, it was suggested to move it to debugfs, which was
-rejected as this info is actually needed in production systems.
-
-2. Then it has been moved to /proc/cpuinfo [2]. Then, it was suggested to do
-not add this kind of info there, as it is not really CPU data.
-
-Now, I'm sending this version which will introduce first the /proc/socinfo.
-Then, following patches will add OMAP data into that node. And finally,
-will add OMAP id, production and die id code.
-
-Just for reference, I'm also pasting the previous 0/4 message:
-
--------------------------------------------------------------------------------
-v3:
-I'm resending this series with minor change in the subject prefix of patch 4/4.
-Removed the PM: prefix. Everything else is same. So, I kept the v3 prefix as well.
-
-And now v3 of this series. Basically a minor change wrt string manipulation.
-No need to use strlen in so many places. Previous log for reference:
-
--------------------------------------------------------------------------------
-v2:
-
-Here is the version 2 of this series. Now die id is protected using
-same x86 protection mechanism to hide x86 product number. Besides,
-a compilation Kconfig option has been added for DIE ID as well.
-
-Here is previous PATCH 0/4 message:
-
--------------------------------------------------------------------------------
-v1:
-
-This series is to continue what has been discussed several weeks ago
-wrt IDCODE patch. Original patch was made by Peter and discussion is here:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg17553.html
-
-So, the conclusion was that IDCODE info is useful even in production systems,
-and for that debugfs is not a good choice to export it. One suggestion was to
-add it under /proc/cpuinfo. However this entry nowadays exports only ARM related
-information.
-
-So this series does the trick by extending the ARM /proc/cpuinfo to include
-soc info data. There are a few ways to add a hook for soc specific data. But
-I've decided to implement it via the simplest way I found. Basically it is
-same thing which is done for system_rev, system_serial_low and system_serial_high.
-Then, now we have system_soc_info, which is printed only if there is something
-useful there.
-
-As usual, comments are welcome.
-
--------------------------------------------------------------------------------
-BR,
-
-Eduardo Valentin (3):
-  procfs: Introduce socinfo under /proc
-  OMAP: export OMAP info under /proc/socinfo
-  OMAP3: export chip IDCODE, Production ID and Die ID
-
- Documentation/filesystems/proc.txt  |    1 +
- Documentation/kernel-parameters.txt |    2 +
- arch/arm/Kconfig                    |    1 +
- arch/arm/mach-omap1/id.c            |   31 ++++++++++---
- arch/arm/mach-omap2/Kconfig         |   10 ++++
- arch/arm/mach-omap2/id.c            |   65 +++++++++++++++++++++++++---
- fs/proc/Kconfig                     |    7 +++
- fs/proc/Makefile                    |    1 +
- fs/proc/socinfo.c                   |   80 +++++++++++++++++++++++++++++++++++
- include/linux/socinfo.h             |   17 +++++++
- 10 files changed, 202 insertions(+), 13 deletions(-)
- create mode 100644 fs/proc/socinfo.c
- create mode 100644 include/linux/socinfo.h
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index 544ccfd..488a171 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -29,6 +29,11 @@
+ #define PORTSC_OFFSET		0x184
+ #define USBMODE_OFFSET		0x1a8
+ #define USBMODE_CM_HOST		3
++#define USBCMD_OFFSET		0x140
++#define USBCMD_RS		(1 << 0)
++#define USBCMD_RST		(1 << 1)
++#define USBSTS_OFFSET		0x144
++#define USBSTS_HCH		(1 << 12)
+ 
+ struct ehci_mxc_priv {
+ 	struct clk *usbclk, *ahbclk;
+@@ -112,12 +117,73 @@ static const struct hc_driver ehci_mxc_hc_driver = {
+ 	.port_handed_over = ehci_port_handed_over,
+ };
+ 
++static int ehci_mxc_poll(void __iomem *ptr, u32 mask, u32 done, int usec)
++{
++	int i;
++
++	for (i = 0; i < usec; i++) {
++		if ((readl(ptr) & mask) == done)
++			return 0;
++		udelay(1);
++	}
++	return -ETIMEDOUT;
++}
++
++#define MXC_POLL_TIMEOUT 10000
++static int ehci_mxc_reset(struct usb_hcd *hcd)
++{
++	int ret;
++	int temp;
++
++	/* Wait for the controller to go idle */
++	ret = ehci_mxc_poll(hcd->regs + USBSTS_OFFSET,
++			    USBSTS_HCH, USBSTS_HCH, MXC_POLL_TIMEOUT);
++	if (ret < 0)
++		return ret;
++
++	/* Stop the usb controller */
++	temp = readl(hcd->regs + USBCMD_OFFSET);
++	writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
++
++	ret = ehci_mxc_poll(hcd->regs + USBCMD_OFFSET, USBCMD_RS, 0,
++			    MXC_POLL_TIMEOUT);
++	if (ret < 0)
++		return ret;
++
++	/* Reset the usb controller */
++	temp = readl(hcd->regs + USBCMD_OFFSET);
++	writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
++
++	ret = ehci_mxc_poll(hcd->regs + USBCMD_OFFSET, USBCMD_RST, 0,
++			    MXC_POLL_TIMEOUT);
++
++	return ret;
++}
++
++static int ehci_mxc_setup_host_mode(struct platform_device *pdev,
++				  struct usb_hcd *hcd)
++{
++	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
++	int temp;
++
++	/* set USBMODE to host mode */
++	temp = readl(hcd->regs + USBMODE_OFFSET);
++	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
++
++	/* set up the PORTSCx register */
++	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
++	mdelay(10);
++
++	/* setup specific usb hw */
++	return mxc_initialize_usb_hw(pdev->id, pdata->flags);
++}
++
+ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ {
+ 	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+ 	struct usb_hcd *hcd;
+ 	struct resource *res;
+-	int irq, ret, temp;
++	int irq, ret;
+ 	struct ehci_mxc_priv *priv;
+ 	struct device *dev = &pdev->dev;
+ 
+@@ -191,19 +257,20 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		clk_enable(priv->ahbclk);
+ 	}
+ 
+-	/* set USBMODE to host mode */
+-	temp = readl(hcd->regs + USBMODE_OFFSET);
+-	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
+-
+-	/* set up the PORTSCx register */
+-	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
+-	mdelay(10);
+-
+-	/* setup specific usb hw */
+-	ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
++	ret =  ehci_mxc_setup_host_mode(pdev, hcd);
+ 	if (ret < 0)
+ 		goto err_init;
+ 
++	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
++	 * transfers timeout. */
++	if (cpu_is_mx31() && pdev->id == 0) {
++		ret = ehci_mxc_reset(hcd);
++		if (ret < 0) {
++			dev_err(dev, "Unable to reset USB controller");
++			goto err_init;
++		}
++	}
++
+ 	/* Initialize the transceiver */
+ 	if (pdata->otg) {
+ 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
+@@ -213,6 +280,15 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 			dev_err(dev, "unable to enable vbus on transceiver\n");
+ 	}
+ 
++	/* i.Mx31 OTG host has a bug, if you do an ULPI transfer then the host
++	 * controller stays busy. Rewriting the register is enough to make it
++	 * working */
++	if (cpu_is_mx31() && pdev->id == 0) {
++		ret = ehci_mxc_setup_host_mode(pdev, hcd);
++		if (ret < 0)
++			goto err_init;
++	}
++
+ 	priv->hcd = hcd;
+ 	platform_set_drvdata(pdev, priv);
+ 
+-- 
+1.6.3.3
