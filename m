@@ -1,56 +1,59 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 11 May 2010 02:03:26 +0100
-Subject: next-samsung: acer n30/n35 updates
-In-Reply-To: <4BE37CCA.30406@vscht.cz>
-References: <20100507005050.GY2589@trinity.fluff.org> <4BE37CCA.30406@vscht.cz>
-Message-ID: <20100511010326.GC26401@trinity.fluff.org>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Tue, 11 May 2010 02:10:48 +0100
+Subject: [PATCH 4/4] ARM: S3C6410: Declare IISv4 audio-bus clock
+In-Reply-To: <1268115034-5998-4-git-send-email-jassisinghbrar@gmail.com>
+References: <1268115034-5998-1-git-send-email-jassisinghbrar@gmail.com>
+	<1268115034-5998-2-git-send-email-jassisinghbrar@gmail.com>
+	<1268115034-5998-3-git-send-email-jassisinghbrar@gmail.com>
+	<1268115034-5998-4-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <20100511011048.GH6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 07, 2010 at 04:36:58AM +0200, Pinkava J. wrote:
-> Dne 7.5.2010 02:50, Ben Dooks napsal(a):
-> > Acer n35 support has been provisonally merged into the following branch:
-> > 
-> >   git://git.fluff.org/bjdooks/linux.git for-2635/acer-n35
-> > 
-> > If there are any objections, then let me know, otherwise this will be
-> > merged into next-samsug this weekend ready to go in the next merge window.
-> > 
-> > Jiri, please confirm that you've read Section 12 'Sign your work' of
-> > Documentation/SubmittingPatches and that you agree to the part on
-> > "Developer's Certificate of Origin 1.1"
-> I comfirming that I've read above mentioned.
+On Tue, Mar 09, 2010 at 03:10:34PM +0900, jassisinghbrar at gmail.com wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
 > 
-> In order to be absolutely clear I must mention that patches 4-7 are based on old
-> patches from Christer Weinigel (author of current implementation of Samsung n30
-> code in kernel). Is this OK?
+> Declare 'audio-bus' clock for IISv4 controller of S3C6410.
+> Even though the name is same as that for IISv3, the id is
+> set to -1(just one instance of the controller is available)
+> which helps always fetch the correct clock.
 
-I'd run this past Christer if he wasn't already copied in on them.
+merged onto for-2635/samsung-clock.
  
-> >From may point of view I can agree with the part "Developer's Certificate of
-> Origin 1.1"
-> > 
-> > The following commits are in:
-> > 
-> > Pinkava J (7):
-> >       ARM: n30: Enable Acer n35 if Acer n30 is selected
-> >       ARM: n30: fix: suspended wrong USB port on Acer n35
-> >       ARM: n30: Add RTC platform device for Acer n30 / Acer n35
-> >       ARM: n35: Add support for LEDs on Acer n35
-> >       ARM: n35: Enable wake-up by Power button on Acer n35
-> >       ARM: n30: Add support for MMC card reader on Acer n30 / Acer n35
-> >       ARM: n30: Add support for power on/off on Acer n30 / Acer n35 MMC card reader
-> > 
-> >  arch/arm/mach-s3c2410/Kconfig    |    7 ++++
-> >  arch/arm/mach-s3c2410/mach-n30.c |   65 +++++++++++++++++++++++++++++++++++++-
-> >  2 files changed, 71 insertions(+), 1 deletions(-)
-> > 
-> > 
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  arch/arm/mach-s3c64xx/clock.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+> index 6c286d5..da83595 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -670,6 +670,16 @@ static struct clksrc_clk clksrcs[] = {
+>  		.sources	= &clkset_audio1,
+>  	}, {
+>  		.clk	= {
+> +			.name		= "audio-bus",
+> +			.id		= -1,  /* There's only one IISv4 port */
+> +			.ctrlbit        = S3C6410_CLKCON_SCLK_AUDIO2,
+> +			.enable		= s3c64xx_sclk_ctrl,
+> +		},
+> +		.reg_src	= { .reg = S3C6410_CLK_SRC2, .shift = 0, .size = 3  },
+> +		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 24, .size = 4  },
+> +		.sources	= &clkset_audio2,
+> +	}, {
+> +		.clk	= {
+>  			.name		= "irda-bus",
+>  			.id		= 0,
+>  			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 -- 
