@@ -1,21 +1,36 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 11 May 2010 07:59:17 +0200
-Subject: [PATCH] SPI: fix up some PL022 confusion
-In-Reply-To: <1273051695-32251-1-git-send-email-linus.walleij@stericsson.com>
-References: <1273051695-32251-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTil25g0DEafaicc_fShwz9gpF8Dl9NgyG6E0wu-r@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 11 May 2010 14:04:22 +0800
+Subject: OTG implementation with external transceiver on PXA270
+In-Reply-To: <AANLkTim7lTbhu97hy3tiSXVpkQKr5X6YpU8zSUiVarca@mail.gmail.com>
+References: <AANLkTim7lTbhu97hy3tiSXVpkQKr5X6YpU8zSUiVarca@mail.gmail.com>
+Message-ID: <AANLkTikw_VJog3nxH6lcJT4mRJbBcEju-2u6HFpdH3cv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/5 Linus Walleij <linus.walleij@stericsson.com>:
+On Mon, May 10, 2010 at 9:33 AM, Sergey Lapin <slapinid@gmail.com> wrote:
+> Hi, all!
+>
+> I try to implement external OTG transceiver on PXA270.
+> I just need basic device mode at the moment.
+>
+> A problem is that PXA itself handles interrupt of external chip via
+> UDC interrupt. But I need to read my chip-specific registers
+> from there while I want to maintain pxa270_udc in a generic way
+> without cluttering it with i2c calls, so I can implement it in the
+> following ways:
+>
+> * make chip-specific data struct global (like it is in isp1301_omap.c
+> and make exported function in OTG driver, enable handling of OTG interrupts
+> in pxa27x_udc and call that function from there.
+> * add API function like otg_handle_interrupt, enable handling of OTG interrupts
+> in pxa27x_udc and call it from there. Which seems to be less messy.
+>
+> Any other suggestions? If that work is really being done somewhere,
+> I'd like to help with testing.
+>
 
-> The PL022 SPI driver did not cleanly separate between the
-> original unmodified ARM version and the ST Microelectronics
-> versions. Split this more cleanly and fix some whitespace
-> moaning from checkpatch at the same time.
-
-Grant/David have you had time to look at these two PL022
-patches?
-
-Yours,
-Linus Walleij
+The problem with isp1301_omap.c is that it's not separating the components
+into otg controller and otg transciever, which means at the moment the quickest
+way is to write something similar as isp1301_pxa27x.c, but apparently, the
+optimal way in my POV is to have a good abstraction, so the OTG transceiver
+and controller code can be re-used.
