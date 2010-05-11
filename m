@@ -1,72 +1,73 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 11 May 2010 20:57:58 +1000
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273569821.21352.19.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-Message-ID: <1273575478.21352.29.camel@pasglop>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-15?q?R=E9tornaz?=)
+Date: Tue, 11 May 2010 13:05:43 +0200
+Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <20100511063907.GU31199@pengutronix.de>
+References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
+	<20100511063907.GU31199@pengutronix.de>
+Message-ID: <201005111305.44029.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-05-11 at 19:23 +1000, Benjamin Herrenschmidt wrote:
-
-> Since I doubt ext3 is busted so dramatically in mainline for "normal" machines,
-> I tend to suspect things could be related to the infamous vivt caches. On the
-> other hand, it's pretty clearly metadata or journal corruption and I'm not
-> sure we ever do things that could cause aliases (such as vmap etc..) on
-> these things, and they shouldn't be mapped into userspace... unless it's fsck
-> itself that causes aliases to occur at the block device level ? (I do unmount
-> though before I run fsck).
+Le mardi, 11 mai 2010 08.39:07, Sascha Hauer a ?crit :
+> On Mon, May 10, 2010 at 08:13:40PM +0200, Philippe R?tornaz wrote:
 > 
-> On the other hand, it could also be a busticated marvell SATA driver :-)
+> > +	if (cpu_is_mx31() && pdev->id == 0) {
+> > +		/* Wait for the controller to go idle */
+> > +		for (i = 0; i < 10000; i++) {
+> > +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
+> > +				break;
+> > +			udelay(1);
+> > +		}
+> > +		if (i == 10000) {
+> > +			dev_err(dev, "Timeout while stopping USB controller\n");
+> > +			goto err_init;
+> > +		}
+> > +
+> > +		/* Stop the usb controller */
+> > +		temp = readl(hcd->regs + USBCMD_OFFSET);
+> > +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
+> > +
+> > +		for (i = 0; i < 10000; i++) {
+> > +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
+> > +				break;
+> > +			udelay(1);
+> > +		}
+> > +
+> > +		if (i == 10000) {
+> > +			dev_err(dev, "Timeout while stopping USB controller\n");
+> > +			goto err_init;
+> > +		}
+> > +
+> > +		/* Reset the usb controller */
+> > +		temp = readl(hcd->regs + USBCMD_OFFSET);
+> > +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
+> > +
+> > +		for (i = 0; i < 10000; i++) {
+> > +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
+> > +				break;
+> > +			udelay(1);
+> > +		}
+> > +
+> > +		if (i == 10000) {
+> > +			dev_err(dev, "Timeout while reseting USB controller\n");
+> > +			goto err_init;
+> > +		}
+> > +	}
 > 
-> I have no problem with the vendor kernel, but it's ancient (2.6.12) and based
-> on an out of tree variant of a Marvell originated BSP, so everything is
-> completely different, especially in the area of drivers for the chipset.
-> 
-> Anyways, I'll see if I can gather more data tomorrow as time, viruses and sick
-> kids permits.
-> 
-> In the meantime, any hint appreciated.
+> You add the resetting of the controller after setting up USBMODE/PORTSC
+> setup. Wouldn't it be possible to change the order so that we do not
+> have to do it twice?
 
-A quick other test which brings more infos, using a smaller (about 5GB)
-partition and no md or raid involved:
+I tried and it does work on host2, but not on OTG. 
 
- - Boot with NFS root
- - mkfs /dev/sdb2 (no md or raid involved)
- - mount /dev/sdb2 /mnt/test
- - rsync -avx /test-stuff /mnt/test
- - cd /mnt/test
- - md5sum -c ~/test-stuff-sums.txt
+I did it this way so I don't change the behavior on other SoC or even on 
+host2. 
 
-That gives me a whole bunch of:
+> Also, I think the whole reset functionality should be a seperate
+> function. I can imagine we'll need it elsewhere or on different SoCs in
+> which case the if clause above gets complicated.
 
-md5sum: ./usr/bin/debconf-escape: No such file or directory
-./usr/bin/debconf-escape: FAILED open or read
-./usr/bin/stat: OK
-md5sum: ./usr/bin/chrt: No such file or directory
-./usr/bin/chrt: FAILED open or read
+Ok.
 
-In fact, if I do ls /mnt/test/usr/bin/ I see debconf but if I do
-ls /mnt/test/usr/bin/chrt then I get No such file or directory.
-
-So something is badly wrong :-)
-
-Now, trying without the dir_index feature (mkfs.ext3 -O ^dir_index)
-and it works fine. All my md5sum's are correct and fsck passes.
-
-So there's what looks like a problem specific to htree's. I don't think
-it's a SATA driver problem (doesn't smell like it but we can't
-completely dismiss the possibility yet). Could be a VIVT issue but then
-why ? I don't see ext3 playing with virtual mappings and none of that
-should alias with userspace...
-
-Or is it incorrectly accessing pages while they are DMA'ed to or from ?
-IE. Accessing with the CPU pages between dma_map_* and dma_unmap_* ?
-That will break on a number of setups including swiotlb on x86 so I tend
-to doubt it but who knows...
-
-Anyways, enough for tonight.
-
-Cheers,
-Ben.
+Philippe
