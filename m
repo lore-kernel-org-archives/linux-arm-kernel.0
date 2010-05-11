@@ -1,135 +1,157 @@
 From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Tue, 11 May 2010 16:57:51 +0200
-Subject: [PATCH 3/3] mx31moboard: OTG host support for smartbot board
-In-Reply-To: <1273589871-25424-3-git-send-email-philippe.retornaz@epfl.ch>
+Date: Tue, 11 May 2010 16:57:50 +0200
+Subject: [PATCH 2/3] mx31moboard: Move usb OTG device registration
+In-Reply-To: <1273589871-25424-2-git-send-email-philippe.retornaz@epfl.ch>
 References: <1273589871-25424-1-git-send-email-philippe.retornaz@epfl.ch>
 	<1273589871-25424-2-git-send-email-philippe.retornaz@epfl.ch>
-	<1273589871-25424-3-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1273589871-25424-4-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1273589871-25424-3-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Eyebot robot needs the OTG port in host mode on the smartbot.
+In preparation for a new robot which needs the
+OTG port as host.
 
-Add a new board definition so we can select the usb host/device
-mode at boot with the mx31moboard_baseboard boot parameter.
+This moves the OTG device registration into board
+initialisation.
 
 Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+Acked-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx3/mach-mx31moboard.c               |    3 +-
- arch/arm/mach-mx3/mx31moboard-smartbot.c           |   39 +++++++++++++++++++-
- arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    3 +-
- 3 files changed, 41 insertions(+), 4 deletions(-)
+ arch/arm/mach-mx3/mach-mx31moboard.c     |    7 -------
+ arch/arm/mach-mx3/mx31moboard-devboard.c |    9 +++++++++
+ arch/arm/mach-mx3/mx31moboard-marxbot.c  |    8 ++++++++
+ arch/arm/mach-mx3/mx31moboard-smartbot.c |    8 ++++++++
+ 4 files changed, 25 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index 4bb011a..33a8d35 100644
+index 5c44489..4bb011a 100644
 --- a/arch/arm/mach-mx3/mach-mx31moboard.c
 +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -491,7 +491,8 @@ static void __init mxc_board_init(void)
- 		mx31moboard_marxbot_init();
- 		break;
- 	case MX31SMARTBOT:
--		mx31moboard_smartbot_init();
-+	case MX31EYEBOT:
-+		mx31moboard_smartbot_init(mx31moboard_baseboard);
- 		break;
- 	default:
- 		printk(KERN_ERR "Illegal mx31moboard_baseboard type %d\n",
-diff --git a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
-index ac1a163..293eea6 100644
---- a/arch/arm/mach-mx3/mx31moboard-smartbot.c
-+++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c
-@@ -25,10 +25,16 @@
+@@ -18,7 +18,6 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/fsl_devices.h>
+ #include <linux/gfp.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+@@ -353,11 +352,6 @@ static void usb_xcvr_reset(void)
+ 	mdelay(1);
+ }
+ 
+-static struct fsl_usb2_platform_data usb_pdata = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_ULPI,
+-};
+-
+ #if defined(CONFIG_USB_ULPI)
+ 
+ static struct mxc_usbh_platform_data usbh2_pdata = {
+@@ -485,7 +479,6 @@ static void __init mxc_board_init(void)
+ 
+ 	usb_xcvr_reset();
+ 
+-	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+ 	moboard_usbh2_init();
+ 
+ 	switch (mx31moboard_baseboard) {
+diff --git a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31moboard-devboard.c
+index 11b906c..582299c 100644
+--- a/arch/arm/mach-mx3/mx31moboard-devboard.c
++++ b/arch/arm/mach-mx3/mx31moboard-devboard.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
  #include <linux/types.h>
- #include <linux/fsl_devices.h>
++#include <linux/fsl_devices.h>
  
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
+ #include <linux/usb/otg.h>
+ 
+@@ -213,6 +214,12 @@ static int __init devboard_usbh1_init(void)
+ 	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+ }
+ 
 +
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx3.h>
-+#include <mach/board-mx31moboard.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
- 
- #include <media/soc_camera.h>
- 
-@@ -122,6 +128,24 @@ static struct fsl_usb2_platform_data usb_pdata = {
- 	.phy_mode	= FSL_USB2_PHY_ULPI,
- };
- 
-+#if defined(CONFIG_USB_ULPI)
-+
-+static struct mxc_usbh_platform_data otg_host_pdata = {
-+	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
-+	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
 +};
 +
-+static int __init smartbot_otg_host_init(void)
-+{
-+	otg_host_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-+			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+ /*
+  * system init for baseboard usage. Will be called by mx31moboard init.
+  */
+@@ -229,5 +236,7 @@ void __init mx31moboard_devboard_init(void)
+ 
+ 	devboard_init_sel_gpios();
+ 
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
 +
-+	return mxc_register_device(&mxc_otg_host, &otg_host_pdata);
-+}
-+#else
-+static inline int smartbot_otg_host_init(void) { return 0; }
-+#endif
+ 	devboard_usbh1_init();
+ }
+diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+index 8cf3ad2..a1dffcb 100644
+--- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
++++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+@@ -25,6 +25,7 @@
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/types.h>
++#include <linux/fsl_devices.h>
+ 
+ #include <linux/usb/otg.h>
+ 
+@@ -331,6 +332,11 @@ static int __init marxbot_usbh1_init(void)
+ 	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+ }
+ 
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
++};
++
+ /*
+  * system init for baseboard usage. Will be called by mx31moboard init.
+  */
+@@ -358,5 +364,7 @@ void __init mx31moboard_marxbot_init(void)
+ 	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_LCS0));
+ 	gpio_export(IOMUX_TO_GPIO(MX31_PIN_LCS0), false);
+ 
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++
+ 	marxbot_usbh1_init();
+ }
+diff --git a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+index 83d2b9f..ac1a163 100644
+--- a/arch/arm/mach-mx3/mx31moboard-smartbot.c
++++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+@@ -23,6 +23,7 @@
+ #include <linux/i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/types.h>
++#include <linux/fsl_devices.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -116,6 +117,11 @@ static int __init smartbot_cam_init(void)
+ 	return 0;
+ }
+ 
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
++};
 +
  #define POWER_EN IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
  #define DSPIC_RST_B IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
  #define TRSLAT_RST_B IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
-@@ -152,7 +176,7 @@ static void smartbot_resets_init(void)
- /*
-  * system init for baseboard usage. Will be called by mx31moboard init.
-  */
--void __init mx31moboard_smartbot_init(void)
-+void __init mx31moboard_smartbot_init(int board)
- {
- 	printk(KERN_INFO "Initializing mx31smartbot peripherals\n");
- 
-@@ -161,7 +185,18 @@ void __init mx31moboard_smartbot_init(void)
+@@ -155,6 +161,8 @@ void __init mx31moboard_smartbot_init(void)
  
  	mxc_register_device(&mxc_uart_device1, &uart_pdata);
  
--	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
 +
-+	switch (board) {
-+	case MX31SMARTBOT:
-+		mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
-+		break;
-+	case MX31EYEBOT:
-+		smartbot_otg_host_init();
-+		break;
-+	default:
-+		printk(KERN_WARNING "Unknown board %d, USB OTG not initialized",
-+			board);
-+	}
- 
  	smartbot_resets_init();
  
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-index fc5fec9..36ff3ce 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-@@ -26,6 +26,7 @@ enum mx31moboard_boards {
- 	MX31DEVBOARD	= 1,
- 	MX31MARXBOT	= 2,
- 	MX31SMARTBOT	= 3,
-+	MX31EYEBOT	= 4,
- };
- 
- /*
-@@ -35,7 +36,7 @@ enum mx31moboard_boards {
- 
- extern void mx31moboard_devboard_init(void);
- extern void mx31moboard_marxbot_init(void);
--extern void mx31moboard_smartbot_init(void);
-+extern void mx31moboard_smartbot_init(int board);
- 
- #endif
- 
+ 	smartbot_cam_init();
 -- 
 1.6.3.3
