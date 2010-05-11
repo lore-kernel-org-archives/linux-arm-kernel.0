@@ -1,149 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 May 2010 08:39:07 +0200
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20100511063907.GU31199@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 11 May 2010 09:50:22 +0300
+Subject: [PATCH 1/5] Add HP iPAQ RX1950 machine support
+In-Reply-To: <20100511001542.GG6684@trinity.fluff.org>
+References: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
+	<1273524194-13346-2-git-send-email-anarsoul@gmail.com>
+	<20100511001542.GG6684@trinity.fluff.org>
+Message-ID: <201005110950.27613.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 08:13:40PM +0200, Philippe R?tornaz wrote:
-> On mx31 the OTG host initialisation fail if you need to have
-> an ULPI transfert to initialize the PHY.
+? ????????? ?? 11 ??? 2010 03:15:42 ????? Ben Dooks ???????:
 > 
-> In order to be able to communicate with the PHY a complete reset
-> of the usb host is needed. After the PHY initialization the host
-> usb configuration registers need to be rewritten to avoid a host
-> controller lockup.
+> firstly, do you need this mapping for anything and secondly can
+> you check the indentation on it if it is staying.
+
+Ok, I don't need them.
+> > +static struct s3c2410fb_display rx1950_display __initdata = {
 > 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  drivers/usb/host/ehci-mxc.c |   68 +++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 68 insertions(+), 0 deletions(-)
+> don't think this is allowed to be __initdata at the moment.
+
+Ok
+> > +		/* Wait a bit here... */
+> > +		mdelay(100);
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index 544ccfd..39d28da 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -29,6 +29,11 @@
->  #define PORTSC_OFFSET		0x184
->  #define USBMODE_OFFSET		0x1a8
->  #define USBMODE_CM_HOST		3
-> +#define USBCMD_OFFSET		0x140
-> +#define USBCMD_RS		(1 << 0)
-> +#define USBCMD_RST		(1 << 1)
-> +#define USBSTS_OFFSET		0x144
-> +#define USBSTS_HCH		(1 << 12)
->  
->  struct ehci_mxc_priv {
->  	struct clk *usbclk, *ahbclk;
-> @@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	int irq, ret, temp;
->  	struct ehci_mxc_priv *priv;
->  	struct device *dev = &pdev->dev;
-> +	int i;
->  
->  	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
->  
-> @@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		goto err_init;
->  
-> +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-> +	 * transfert timeout. */
+> would msleep() be a better thing to do herer.
 
-s/transfert/transfers/
-Same below.
-
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* Wait for the controller to go idle */
-> +		for (i = 0; i < 10000; i++) {
-> +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
-> +				break;
-> +			udelay(1);
-> +		}
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Stop the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Reset the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while reseting USB controller\n");
-> +			goto err_init;
-> +		}
-> +	}
-
-You add the resetting of the controller after setting up USBMODE/PORTSC
-setup. Wouldn't it be possible to change the order so that we do not
-have to do it twice?
-Also, I think the whole reset functionality should be a seperate
-function. I can imagine we'll need it elsewhere or on different SoCs in
-which case the if clause above gets complicated.
-
-Sascha
-
-
-> +
->  	/* Initialize the transceiver */
->  	if (pdata->otg) {
->  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
-> @@ -213,6 +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  			dev_err(dev, "unable to enable vbus on transceiver\n");
->  	}
->  
-> +	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
-> +	 * controller stay busy. Rewriting the register is enough to make it
-> +	 * working */
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* set USBMODE to host mode */
-> +		temp = readl(hcd->regs + USBMODE_OFFSET);
-> +		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-> +
-> +		/* set up the PORTSCx register */
-> +		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-> +
-> +		/* setup USBCONTROL. */
-> +		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-> +		if (ret < 0)
-> +			goto err_init;
-> +	}
-> +
->  	priv->hcd = hcd;
->  	platform_set_drvdata(pdev, priv);
->  
-> -- 
-> 1.6.3.3
+Nope, I prefer to use mdelay here, msleep doesn't do well for
+some reason (there's a garbage on screen in case of msleep usage).
+And actually wait for hsync/vsync should replace
+this mdelay, but it isn't implemented at the moment.
+ 
 > 
-> 
+> i think S3C_GPIO_SFN(2) would do for all of these, and would allow
+> you to loop over the range.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ok
+
+> 
+> at-least get a space between { and KEY_
+> would prefer to see properly named initialisers.
+
+Ok
+ 
+> > +	s3c_irq_wake(IRQ_EINT0, 1);
+> > +}
+> 
+> surely this should be propertyu of a key in the keys table?
+
+Ok
+ 
+> > +	gpio_request(S3C2410_GPJ(1), "MMC power");
+> > +	gpio_direction_output(S3C2410_GPJ(1), 0);
+> 
+> you might want to WARN_ON() the result of gpio_request().
+
+Ok
+
+Thanks for review.
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100511/75e3d1ce/attachment.sig>
