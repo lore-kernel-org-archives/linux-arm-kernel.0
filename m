@@ -1,23 +1,51 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 11 May 2010 11:16:20 +0100
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273569821.21352.19.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-Message-ID: <20100511101620.GA18654@shareable.org>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 11 May 2010 13:33:14 +0300
+Subject: [PATCH v2] [RESEND] Handle instruction cache maintenance fault
+	properly
+Message-ID: <AANLkTilVp0xvAJNns3TEe4SzEUpN8hMC9DdwmwW7i9yX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin Herrenschmidt wrote:
-> On the other hand, it could also be a busticated marvell SATA driver :-)
+Between "clean D line..." and "invalidate I line" operations in
+v7_coherent_user_range(), the memory page may get swapped out.
+And the fault on "invalidate I line" could not be properly handled
+causing the oops.
 
-I've seen similar ext3 corruption errors with an IDE on a Sigma
-Designs EM8620 with ARM core.  It's completely unrelated :-) But the
-fault was in the IDE driver doing cache flushes too late after
-starting to set up DMA.  To diagnose it, we luckily found a
-reproducible test case, then sprinkled full cache flushes at various
-places to narrow it down, and eventually found that one full cache
-flush in the driver itself sorted it out, which told us where the
-fault was.  From there it was easy.
+In ARMv6 "external abort on linefetch" replaced by "instruction cache
+maintenance fault". Let's handle it as translation fault. It fixes the
+issue.
 
--- Jamie
+I'm not sure if it's reasonable to check arch version in run-time.
+Let's do it in compile time for now.
+
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+
+Sorry for resend. I've made mistake in maillist address.
+
+---
+ arch/arm/mm/fault.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 9d40c34..7f193ea 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -463,7 +463,12 @@ static struct fsr_info {
+ 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
+ 	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
+ 	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
++/* Do we need runtime check ? */
++#if __LINUX_ARM_ARCH__ < 6
+ 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
++#else
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPPER,	"I-cache maintenance
+fault"	   },
++#endif
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation
+fault"	   },
+ 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+ 	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
+-- 
+1.7.0.4
