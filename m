@@ -1,78 +1,107 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Tue, 11 May 2010 13:53:41 -0500
-Subject: [PATCH 2.6.34-rc7] mx5: bring usb ulpi phy out of reset on freescale
-	mx51 babbage hw
-In-Reply-To: <1273604021-857-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1273604021-857-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1273604021-857-2-git-send-email-Dinh.Nguyen@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 May 2010 13:04:50 -0700
+Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
+	support
+In-Reply-To: <AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
+References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
+	<AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
+Message-ID: <20100511200450.GG13931@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+* ye janboe <janboe.ye@gmail.com> [100510 20:10]:
+> hi, Russell, Tony
+> 
+> Is this patch ignored by you? I do not see any ack for this patch.
 
-This patch de-asserts the reset line that is connected to the USB
-ULPI PHY on USB Host1.
+I guess we're still waiting to hear from Russell. AFAIK, this is needed
+in addition to the three patches from Imre.
 
-This patch should be included with the original USB host enablement
-set of patches of mx51 babbage hw, but was accidentily left out.
-
-This patch applies to 2.6.34-rc7 and on top of USB enablement patches
-for Freescale MX51 Babbage HW.
-
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com
----
- arch/arm/mach-mx5/board-mx51_babbage.c      |   12 ++++++++++++
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |    1 +
- 2 files changed, 13 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 99f7ea9..f5c329b 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -32,6 +32,7 @@
+Acked-by: Tony Lindgren <tony@atomide.com>
  
- #define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
- #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
-+#define BABBAGE_PHY_RESET	(1*32 +5)	/* GPIO_2_5 */
- 
- /* USB_CTRL_1 */
- #define MX51_USB_CTRL_1_OFFSET			0x10
-@@ -100,6 +101,7 @@ static inline void mxc_init_imx_uart(void)
- static int gpio_usbh1_active(void)
- {
- 	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
-+	struct pad_desc phyreset_gpio = MX51_PAD_EIM_D21__GPIO_2_5;
- 	int ret;
- 
- 	/* Set USBH1_STP to GPIO and toggle it */
-@@ -114,6 +116,16 @@ static int gpio_usbh1_active(void)
- 	gpio_set_value(BABBAGE_USBH1_STP, 1);
- 	msleep(100);
- 	gpio_free(BABBAGE_USBH1_STP);
-+
-+	/* De-assert USB PHY RESETB */
-+	mxc_iomux_v3_setup_pad(&phyreset_gpio);
-+	ret = gpio_request(BABBAGE_PHY_RESET, "phy_reset");
-+
-+	if (ret) {
-+		pr_debug("failed to get MX51_PAD_EIM_D21__GPIO_2_5: %d\n", ret);
-+		return ret;
-+	}
-+	gpio_direction_output(BABBAGE_PHY_RESET, 1);
- 	return 0;
- }
- 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index 80528cc..ab0f95d 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -63,6 +63,7 @@ typedef enum iomux_config {
- #define MX51_PAD_GPIO_2_3__EIM_D19	IOMUX_PAD(0x3fc, 0x068, 1, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_2_4__EIM_D20	IOMUX_PAD(0x400, 0x06c, 1, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_2_5__EIM_D21	IOMUX_PAD(0x404, 0x070, 1, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_EIM_D21__GPIO_2_5	IOMUX_PAD(0x404, 0x070, IOMUX_CONFIG_ALT1, 0x0,   0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_2_6__EIM_D22	IOMUX_PAD(0x408, 0x074, 1, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_2_7__EIM_D23	IOMUX_PAD(0x40c, 0x078, 1, 0x0,   0, NO_PAD_CTRL)
- 
--- 
-1.6.0.4
+> Thanks
+> 
+> Janboe Ye
+> 
+> 2009/12/3 Tero Kristo <tero.kristo@nokia.com>:
+> > From: Tero Kristo <tero.kristo@nokia.com>
+> >
+> > In some ARM architectures, like OMAP3, the VFP context can be lost during
+> > dynamic sleep cycle. For this purpose, there is now a function
+> > vfp_pm_save_context() that should be called before the VFP is assumed to
+> > lose context. Next VFP trap will then restore context automatically.
+> >
+> > We need to have the last_VFP_context[cpu] cleared after the save in idle,
+> > else the restore would fail to restore when it sees that the last_VFP_context
+> > is same as the current threads vfp_state. This happens when the same
+> > process/thread traps an exception post idle.
+> >
+> > This patch also fixes a potential problem with vfp_pm_suspend(), where
+> > VFP context can be lost if the current process does not have VFP enabled.
+> > Fixed by calling vfp_pm_save_context().
+> >
+> > Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+> > Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+> > Cc: Rajendra Nayak <rnayak@ti.com>
+> > Cc: Richard Woodruff <r-woodruff2@ti.com>
+> > Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+> > ---
+> > ?arch/arm/vfp/vfpmodule.c | ? 28 ++++++++++++++++++++--------
+> > ?1 files changed, 20 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> > index 2d7423a..920a33b 100644
+> > --- a/arch/arm/vfp/vfpmodule.c
+> > +++ b/arch/arm/vfp/vfpmodule.c
+> > @@ -329,22 +329,34 @@ static void vfp_enable(void *unused)
+> > ?#ifdef CONFIG_PM
+> > ?#include <linux/sysdev.h>
+> >
+> > -static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+> > +void vfp_pm_save_context(void)
+> > ?{
+> > - ? ? ? struct thread_info *ti = current_thread_info();
+> > ? ? ? ?u32 fpexc = fmrx(FPEXC);
+> > + ? ? ? unsigned int cpu = get_cpu();
+> > +
+> > + ? ? ? /* Save last_VFP_context if needed */
+> > + ? ? ? if (last_VFP_context[cpu]) {
+> > + ? ? ? ? ? ? ? /* Enable vfp to save context */
+> > + ? ? ? ? ? ? ? if (!(fpexc & FPEXC_EN)) {
+> > + ? ? ? ? ? ? ? ? ? ? ? vfp_enable(NULL);
+> > + ? ? ? ? ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
+> > + ? ? ? ? ? ? ? }
+> >
+> > - ? ? ? /* if vfp is on, then save state for resumption */
+> > - ? ? ? if (fpexc & FPEXC_EN) {
+> > ? ? ? ? ? ? ? ?printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+> > - ? ? ? ? ? ? ? vfp_save_state(&ti->vfpstate, fpexc);
+> > + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[cpu], fpexc);
+> >
+> > ? ? ? ? ? ? ? ?/* disable, just in case */
+> > - ? ? ? ? ? ? ? fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> > + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc & ~FPEXC_EN);
+> > +
+> > + ? ? ? ? ? ? ? last_VFP_context[cpu] = NULL;
+> > ? ? ? ?}
+> >
+> > - ? ? ? /* clear any information we had about last context state */
+> > - ? ? ? memset(last_VFP_context, 0, sizeof(last_VFP_context));
+> > + ? ? ? put_cpu();
+> > +}
+> > +
+> > +static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+> > +{
+> > + ? ? ? vfp_pm_save_context();
+> >
+> > ? ? ? ?return 0;
+> > ?}
+> > --
+> > 1.5.4.3
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> >
