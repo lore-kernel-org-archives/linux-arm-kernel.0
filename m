@@ -1,34 +1,66 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 11 May 2010 16:47:05 -0700
-Subject: [PATCH 0/6] OMAP PM core updates for 2.6.35 [updated]
-Message-ID: <1273621631-9148-1-git-send-email-khilman@deeprootsystems.com>
+Date: Tue, 11 May 2010 16:47:06 -0700
+Subject: [PATCH 1/6] OMAP3: PRCM interrupt: only check and clear enabled PRCM
+	IRQs
+In-Reply-To: <1273621631-9148-1-git-send-email-khilman@deeprootsystems.com>
+References: <1273621631-9148-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1273621631-9148-2-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A small series of OMAP PM core updates for 2.6.35.
+While handling PRCM IRQs, mask out interrupts that are not enabled in
+PRM_IRQENABLE_MPU.  If these are not masked out, non-enabled
+interrupts are caught, a WARN() is printed due to no 'handler' and the
+events are cleared.  In addition to being noisy, this can also
+interfere with independent polling of this register by SR/VP code.
 
-Applies on v2.6.34-rc6.
+This was noticed using SmartReflex transitions which cause the VPx_*
+interrupts to be handled since they are set in PRM_IRQSTATUS_MPU even
+but not enabled in PRM_IRQENABLE_MPU.
 
-Also available here in my pm-next branch here:
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git pm-next
+Acked-by: Mike Turquette <mturquette@ti.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |   17 ++++++++++++-----
+ 1 files changed, 12 insertions(+), 5 deletions(-)
 
-Ari Kauppi (1):
-  OMAP3: PM: Add milliseconds interface to suspend wakeup timer
-
-Kevin Hilman (1):
-  OMAP3: PRCM interrupt: only check and clear enabled PRCM IRQs
-
-Mike Chan (2):
-  OMAP3: PM: Enable IO / IO-CHAIN wakeups for PER
-  OMAP3: PM: Remove PER wakeup dependency on CORE.
-
-Ranjith Lohithakshan (2):
-  OMAP3EVM: Update pad configuration for wakeup enabled pads
-  OMAP3: PM: Enable wakeup from ads7846 touchscreen
-
- arch/arm/mach-omap2/board-3430sdp.c  |    1 +
- arch/arm/mach-omap2/board-omap3evm.c |    6 ++--
- arch/arm/mach-omap2/pm-debug.c       |    3 ++
- arch/arm/mach-omap2/pm.h             |    1 +
- arch/arm/mach-omap2/pm34xx.c         |   58 +++++++++++++++++++--------------
- 5 files changed, 41 insertions(+), 28 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index ea0000b..a15aa92 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -267,13 +267,16 @@ static int _prcm_int_handle_wakeup(void)
+  */
+ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+ {
+-	u32 irqstatus_mpu;
++	u32 irqenable_mpu, irqstatus_mpu;
+ 	int c = 0;
+ 
+-	do {
+-		irqstatus_mpu = prm_read_mod_reg(OCP_MOD,
+-					OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++	irqenable_mpu = prm_read_mod_reg(OCP_MOD,
++					 OMAP3_PRM_IRQENABLE_MPU_OFFSET);
++	irqstatus_mpu = prm_read_mod_reg(OCP_MOD,
++					 OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++	irqstatus_mpu &= irqenable_mpu;
+ 
++	do {
+ 		if (irqstatus_mpu & (OMAP3430_WKUP_ST | OMAP3430_IO_ST)) {
+ 			c = _prcm_int_handle_wakeup();
+ 
+@@ -292,7 +295,11 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+ 		prm_write_mod_reg(irqstatus_mpu, OCP_MOD,
+ 					OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+ 
+-	} while (prm_read_mod_reg(OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET));
++		irqstatus_mpu = prm_read_mod_reg(OCP_MOD,
++					OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++		irqstatus_mpu &= irqenable_mpu;
++
++	} while (irqstatus_mpu);
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+1.7.0.2
