@@ -1,69 +1,66 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 11 May 2010 09:50:22 +0300
-Subject: [PATCH 1/5] Add HP iPAQ RX1950 machine support
-In-Reply-To: <20100511001542.GG6684@trinity.fluff.org>
-References: <1273524194-13346-1-git-send-email-anarsoul@gmail.com>
-	<1273524194-13346-2-git-send-email-anarsoul@gmail.com>
-	<20100511001542.GG6684@trinity.fluff.org>
-Message-ID: <201005110950.27613.anarsoul@gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 11 May 2010 12:25:44 +0530
+Subject: [PATCH 1/2] nomadik hwrng: Add clock support
+Message-ID: <1273560944-13243-1-git-send-email-srinidhi.kasagar@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 11 ??? 2010 03:15:42 ????? Ben Dooks ???????:
-> 
-> firstly, do you need this mapping for anything and secondly can
-> you check the indentation on it if it is staying.
+This adds the clock support to the Nomadik RNG driver
 
-Ok, I don't need them.
-> > +static struct s3c2410fb_display rx1950_display __initdata = {
-> 
-> don't think this is allowed to be __initdata at the moment.
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/char/hw_random/nomadik-rng.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-Ok
-> > +		/* Wait a bit here... */
-> > +		mdelay(100);
-> 
-> would msleep() be a better thing to do herer.
-
-Nope, I prefer to use mdelay here, msleep doesn't do well for
-some reason (there's a garbage on screen in case of msleep usage).
-And actually wait for hsync/vsync should replace
-this mdelay, but it isn't implemented at the moment.
+diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
+index a8b4c40..ae094c1 100644
+--- a/drivers/char/hw_random/nomadik-rng.c
++++ b/drivers/char/hw_random/nomadik-rng.c
+@@ -15,6 +15,10 @@
+ #include <linux/amba/bus.h>
+ #include <linux/hw_random.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++
++struct clk *rng_clk;
  
-> 
-> i think S3C_GPIO_SFN(2) would do for all of these, and would allow
-> you to loop over the range.
-
-Ok
-
-> 
-> at-least get a space between { and KEY_
-> would prefer to see properly named initialisers.
-
-Ok
+ static int nmk_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ {
+@@ -40,6 +44,15 @@ static int nmk_rng_probe(struct amba_device *dev, struct amba_id *id)
+ 	void __iomem *base;
+ 	int ret;
  
-> > +	s3c_irq_wake(IRQ_EINT0, 1);
-> > +}
-> 
-> surely this should be propertyu of a key in the keys table?
-
-Ok
++	rng_clk = clk_get(&dev->dev, NULL);
++	if (IS_ERR(rng_clk)) {
++		dev_err(&dev->dev, "could not get rng clock\n");
++		ret = PTR_ERR(rng_clk);
++		return ret;
++	}
++
++	clk_enable(rng_clk);
++
+ 	ret = amba_request_regions(dev, dev->dev.init_name);
+ 	if (ret)
+ 		return ret;
+@@ -57,6 +70,8 @@ out_unmap:
+ 	iounmap(base);
+ out_release:
+ 	amba_release_regions(dev);
++	clk_disable(rng_clk);
++	clk_put(rng_clk);
+ 	return ret;
+ }
  
-> > +	gpio_request(S3C2410_GPJ(1), "MMC power");
-> > +	gpio_direction_output(S3C2410_GPJ(1), 0);
-> 
-> you might want to WARN_ON() the result of gpio_request().
-
-Ok
-
-Thanks for review.
-
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100511/75e3d1ce/attachment.sig>
+@@ -66,6 +81,8 @@ static int nmk_rng_remove(struct amba_device *dev)
+ 	hwrng_unregister(&nmk_rng);
+ 	iounmap(base);
+ 	amba_release_regions(dev);
++	clk_disable(rng_clk);
++	clk_put(rng_clk);
+ 	return 0;
+ }
+ 
+-- 
+1.6.3.3
