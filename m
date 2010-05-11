@@ -1,51 +1,155 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 11 May 2010 09:57:49 +0200
-Subject: SAMSUNG kernel tree merge plans
-In-Reply-To: <20100510034937.GX26401@trinity.fluff.org>
-References: <20100506054651.GL26401@trinity.fluff.org>
-	<015f01caece8$723e1700$56ba4500$%szyprowski@samsung.com>
-	<20100510034937.GX26401@trinity.fluff.org>
-Message-ID: <001001caf0df$a920c1f0$fb6245d0$%szyprowski@samsung.com>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Tue, 11 May 2010 10:47:50 +0200
+Subject: [PATCH 3/3] mx31moboard: OTG host support for smartbot board
+In-Reply-To: <1273513795-28247-4-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273513795-28247-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-2-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-3-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-4-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <4BE919B6.8060201@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 05/10/2010 07:49 PM, Philippe R?tornaz wrote:
+> The Eyebot robot need the OTG port in host mode on the smartbot.
 
-On Monday, May 10, 2010 5:50 AM Ben Dooks wrote:
+s/need/needs/
 
-> > We would really like to merge as much as possible from our current
-> > development tree:
-> > http://git.infradead.org/users/kmpark/linux-2.6-
-> samsung/shortlog/refs/heads/SPRC-2.6.34-rc5-opensource
-> >
-> > Some of the patches that we depend on are still in the review phase (s5p
-> timer), some should be replaced by the ones that were
-> > posted recently. Especially most of our patches depend on S5PV210 GPIO
-> support, so without it we cannot go further. Is there any
-> > chance to get it merged quickly? I will rebase our tree asap the
-> mentioned patches get merged.
-> 
-> I'll sort out what can be merged from the items on the list, but I'm
-> not going git-tree diving just at the moment. The firstset will be
-> stuff for Russell's tree, for linus' tree there is a ltitle more time
-> to get prepared.
+You have forgotten all the 's at the end of the verbs in all your 
+patches (also in the previous series). Not so important, but change the 
+commit message if some have to be resent.
 
-Ok, I understand. I've separated the patches into different categories and
-rebased onto your next-samsung. I hope this will help sorting out these
-things.
+>
+> Add a new board definition so we can select the usb host/device
+> mode at boot with the mx31moboard_baseboard boot parameter.
 
-Patches are available at:
+Ok, one small thing still below.
 
-http://git.infradead.org/users/kmpark/linux-2.6-samsung
+>
+> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
+> ---
+>   arch/arm/mach-mx3/mach-mx31moboard.c               |    3 +-
+>   arch/arm/mach-mx3/mx31moboard-smartbot.c           |   36 ++++++++++++++++++-
+>   arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    3 +-
+>   3 files changed, 38 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+> index 4bb011a..33a8d35 100644
+> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
+> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+> @@ -491,7 +491,8 @@ static void __init mxc_board_init(void)
+>   		mx31moboard_marxbot_init();
+>   		break;
+>   	case MX31SMARTBOT:
+> -		mx31moboard_smartbot_init();
+> +	case MX31EYEBOT:
+> +		mx31moboard_smartbot_init(mx31moboard_baseboard);
+>   		break;
+>   	default:
+>   		printk(KERN_ERR "Illegal mx31moboard_baseboard type %d\n",
+> diff --git a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> index ac1a163..aee0a14 100644
+> --- a/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> +++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> @@ -25,10 +25,16 @@
+>   #include<linux/types.h>
+>   #include<linux/fsl_devices.h>
+>
+> +#include<linux/usb/otg.h>
+> +#include<linux/usb/ulpi.h>
+> +
+>   #include<mach/common.h>
+>   #include<mach/hardware.h>
+>   #include<mach/imx-uart.h>
+>   #include<mach/iomux-mx3.h>
+> +#include<mach/board-mx31moboard.h>
+> +#include<mach/mxc_ehci.h>
+> +#include<mach/ulpi.h>
+>
+>   #include<media/soc_camera.h>
+>
+> @@ -122,6 +128,24 @@ static struct fsl_usb2_platform_data usb_pdata = {
+>   	.phy_mode	= FSL_USB2_PHY_ULPI,
+>   };
+>
+> +#if defined(CONFIG_USB_ULPI)
+> +
+> +static struct mxc_usbh_platform_data otg_host_pdata = {
+> +	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+> +	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
+> +};
+> +
+> +static int __init smartbot_otg_host_init(void)
+> +{
+> +	otg_host_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> +			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +
+> +	return mxc_register_device(&mxc_otg_host,&otg_host_pdata);
+> +}
+> +#else
+> +static inline int smartbot_otg_host_init(void) { return 0; }
+> +#endif
+> +
+>   #define POWER_EN IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
+>   #define DSPIC_RST_B IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
+>   #define TRSLAT_RST_B IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
+> @@ -152,7 +176,7 @@ static void smartbot_resets_init(void)
+>   /*
+>    * system init for baseboard usage. Will be called by mx31moboard init.
+>    */
+> -void __init mx31moboard_smartbot_init(void)
+> +void __init mx31moboard_smartbot_init(int board)
+>   {
+>   	printk(KERN_INFO "Initializing mx31smartbot peripherals\n");
+>
+> @@ -161,7 +185,15 @@ void __init mx31moboard_smartbot_init(void)
+>
+>   	mxc_register_device(&mxc_uart_device1,&uart_pdata);
+>
+> -	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+> +
+> +	switch (board) {
+> +	case MX31SMARTBOT:
+> +		mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+> +		break;
+> +	case MX31EYEBOT:
+> +		smartbot_otg_host_init();
+> +		break;
 
-branches:
-next-samsung-s5p-fixes - various fixes for s5p SoCs
-next-samsung-s5pv210 - new features for s5pv210 SoCs
-next-samsung-s5pc1xx - s5pc1xx cleanup (to be discussed)
-next-samsung-onenand - platform patch for onenand driver (requires all
-above patches)
+I know it's never going to be called with anything different thant 
+MX31SMARTBOT or MX31EYEBOT, but a default clause here with a message 
+saying that we did not initialize anything (or to which of the two 
+configuration it was default) wouldn't hurt.
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+> +	}
+>
+>   	smartbot_resets_init();
+>
+> diff --git a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
+> index fc5fec9..36ff3ce 100644
+> --- a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
+> +++ b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
+> @@ -26,6 +26,7 @@ enum mx31moboard_boards {
+>   	MX31DEVBOARD	= 1,
+>   	MX31MARXBOT	= 2,
+>   	MX31SMARTBOT	= 3,
+> +	MX31EYEBOT	= 4,
+>   };
+>
+>   /*
+> @@ -35,7 +36,7 @@ enum mx31moboard_boards {
+>
+>   extern void mx31moboard_devboard_init(void);
+>   extern void mx31moboard_marxbot_init(void);
+> -extern void mx31moboard_smartbot_init(void);
+> +extern void mx31moboard_smartbot_init(int board);
+>
+>   #endif
+>
+
+
+-- 
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEB3494, Station 9, CH-1015 Lausanne
