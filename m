@@ -1,25 +1,28 @@
 From: greg@kroah.com (Greg KH)
-Date: Tue, 11 May 2010 16:32:21 -0700
-Subject: [PATCHv2 2.6.34-rc7 2/3] mx5: change usb clock source from
-	pll3 to pll2
-In-Reply-To: <1273508519-23033-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1273508519-23033-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1273508519-23033-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100511233221.GA31311@kroah.com>
+Date: Tue, 11 May 2010 16:38:12 -0700
+Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <20100511233811.GB31311@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 10, 2010 at 11:21:58AM -0500, Dinh Nguyen wrote:
-> For power management reasons, pll2 should be used to source the USBOH3
-> clock for mx51. PLL3 can be completely gated off when USB is not used.
+On Tue, May 11, 2010 at 04:14:34PM +0200, Philippe R?tornaz wrote:
+> On mx31 the OTG host initialisation fails if you need to have
+> an ULPI transfert to initialize the PHY.
 > 
-> This patch applies to 2.6.34-rc7.
+> In order to be able to communicate with the PHY a complete reset
+> of the usb host is needed. After the PHY initialization the host
+> usb configuration registers need to be rewritten to avoid a host
+> controller lockup.
+> 
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> ---
+>  drivers/usb/host/ehci-mxc.c |   98 ++++++++++++++++++++++++++++++++++++++-----
 
-Hm, no, it seems to conflict and does not apply :(
-
-I've taken the first one, shouldn't the two others go through some arm
+This patch doesn't apply anymore, can you redo it against the linux-next
 tree?
-
 
 thanks,
 
