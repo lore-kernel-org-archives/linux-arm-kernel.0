@@ -1,93 +1,49 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 11 May 2010 16:44:47 +0530
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273575478.21352.29.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 11 May 2010 15:32:04 +0200
+Subject: arm926_dma_flush_range undefined!
+In-Reply-To: <20100511094448.GB18828@n2100.arm.linux.org.uk>
+References: <4BE2C013.4040009@atmel.com>
+	<1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+	<20100506175907.GA15797@n2100.arm.linux.org.uk>
+	<4BE926B5.7090602@atmel.com>
+	<20100511094448.GB18828@n2100.arm.linux.org.uk>
+Message-ID: <4BE95C54.5070008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Benjamin Herrenschmidt
-> Sent: Tuesday, May 11, 2010 4:28 PM
-> To: linux-kernel at vger.kernel.org
-> Cc: Nicolas Pitre; Saeed Bishara; James E.J. Bottomley; Andrew Morton; linux-ext4 at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell 88f5182)
+Le 11/05/2010 11:44, Russell King - ARM Linux :
+> On Tue, May 11, 2010 at 11:43:17AM +0200, Nicolas Ferre wrote:
+>> Le 06/05/2010 19:59, Russell King - ARM Linux :
+>>> On Thu, May 06, 2010 at 03:07:11PM +0100, Catalin Marinas wrote:
+>>>> On Thu, 2010-05-06 at 15:11 +0200, Nicolas Ferre wrote:
+>>>>> I am trying to compile a recent kernel 
+>>>>> (v2.6.34-rc6-201-g722154e) and I am 
+>>>>> having this kind of error:
+>>>>>
+>>>>> ERROR: "arm926_dma_flush_range" [drivers/mmc/host/at91_mci.ko] undefined!
+>>>>
+>>>> The driver seems to use dmac_flush_range() directly. That's not part of
+>>>> the DMA API. Could you not use one of the supported DMA API functions?
+>>
+>> The difficult part for me is to choose the proper one ;-)
+>>
+>> And also, I am wondering if this call is needed as we do a
+>> kunmap_atomic() on the same scatterlist pointer just before. Does not
+>> kunmap_atomic() embed a cache flushing directive already?
 > 
-> On Tue, 2010-05-11 at 19:23 +1000, Benjamin Herrenschmidt wrote:
-> 
-> > Since I doubt ext3 is busted so dramatically in mainline for "normal" machines,
-> > I tend to suspect things could be related to the infamous vivt caches. On the
-> > other hand, it's pretty clearly metadata or journal corruption and I'm not
-> > sure we ever do things that could cause aliases (such as vmap etc..) on
-> > these things, and they shouldn't be mapped into userspace... unless it's fsck
-> > itself that causes aliases to occur at the block device level ? (I do unmount
-> > though before I run fsck).
-> >
-> > On the other hand, it could also be a busticated marvell SATA driver :-)
-> >
-> > I have no problem with the vendor kernel, but it's ancient (2.6.12) and based
-> > on an out of tree variant of a Marvell originated BSP, so everything is
-> > completely different, especially in the area of drivers for the chipset.
-> >
-> > Anyways, I'll see if I can gather more data tomorrow as time, viruses and sick
-> > kids permits.
-> >
-> > In the meantime, any hint appreciated.
-> 
-> A quick other test which brings more infos, using a smaller (about 5GB)
-> partition and no md or raid involved:
-> 
->  - Boot with NFS root
->  - mkfs /dev/sdb2 (no md or raid involved)
->  - mount /dev/sdb2 /mnt/test
->  - rsync -avx /test-stuff /mnt/test
->  - cd /mnt/test
->  - md5sum -c ~/test-stuff-sums.txt
-> 
-> That gives me a whole bunch of:
-> 
-> md5sum: ./usr/bin/debconf-escape: No such file or directory
-> ./usr/bin/debconf-escape: FAILED open or read
-> ./usr/bin/stat: OK
-> md5sum: ./usr/bin/chrt: No such file or directory
-> ./usr/bin/chrt: FAILED open or read
-> 
-> In fact, if I do ls /mnt/test/usr/bin/ I see debconf but if I do
-> ls /mnt/test/usr/bin/chrt then I get No such file or directory.
-> 
-> So something is badly wrong :-)
-> 
-> Now, trying without the dir_index feature (mkfs.ext3 -O ^dir_index)
-> and it works fine. All my md5sum's are correct and fsck passes.
-> 
-> So there's what looks like a problem specific to htree's. I don't think
-> it's a SATA driver problem (doesn't smell like it but we can't
-> completely dismiss the possibility yet). Could be a VIVT issue but then
-> why ? I don't see ext3 playing with virtual mappings and none of that
-> should alias with userspace...
-> 
-> Or is it incorrectly accessing pages while they are DMA'ed to or from ?
-> IE. Accessing with the CPU pages between dma_map_* and dma_unmap_* ?
-> That will break on a number of setups including swiotlb on x86 so I tend
-> to doubt it but who knows...
+> No it doesn't.  What are you trying to do here?
 
-Not sure if it is related but we saw similar issue with MMC driver on
-Cortex-A9 MP core. I was seeing similar weird issues with EXT3 and 
-everything use to be fine with EXT2.
+After a read with DMA from sd/mmc interface, a DMA buffer allocated by
+dma_alloc_coherent() is filled.
+This buffer is then copied to the scatterlist provided by the mmc
+request (from drivers/mmc/card/block.c it seems that sg buffers are
+alocacted via kmalloc()).
 
-All those errors you mentioned use to come and at times whole FS
-Use to get corrupted.
+For each buffer of the scatterlist, I do this dmac_flush_rage()...
 
-It was root-caused to MMC driver which uses DMA engine for TX/RX. The
-issue was mainly with writes and hence EXT3 was having issue which does
-journaling and hence more writes.
-There was a memory write barrier missing before the DMA descriptors 
-are handed over to DMA controller.
+As copy is done between a coherent and a kernel memory buffers, I guess
+that the flushing routine is not needed?
 
-Regards,
-Santosh
+Best regards,
+-- 
+Nicolas Ferre
