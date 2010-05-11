@@ -1,78 +1,146 @@
 From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Tue, 11 May 2010 13:06:39 +0200
+Date: Tue, 11 May 2010 13:06:45 +0200
 Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <20100510183509.GP30801@buzzloop.caiaq.de>
+In-Reply-To: <86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
 References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
 	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100510183509.GP30801@buzzloop.caiaq.de>
-Message-ID: <201005111306.40034.philippe.retornaz@epfl.ch>
+	<86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
+Message-ID: <201005111306.45813.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi, 10 mai 2010 20.35:09, Daniel Mack a ?crit :
-> On Mon, May 10, 2010 at 08:13:40PM +0200, Philippe R?tornaz wrote:
-> > On mx31 the OTG host initialisation fail if you need to have
-> > an ULPI transfert to initialize the PHY.
-> >
-> > In order to be able to communicate with the PHY a complete reset
-> > of the usb host is needed. After the PHY initialization the host
-> > usb configuration registers need to be rewritten to avoid a host
-> > controller lockup.
+>  -----Original Message-----
+> From: Philippe R?tornaz [mailto:philippe.retornaz at epfl.ch]
+> Sent: Monday, May 10, 2010 1:14 PM
+> To: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org
+> Cc: s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de;
+>  Nguyen Dinh-R00091; gregkh at suse.de; Philippe R?tornaz Subject: [PATCH 1/1]
+>  ehci-mxc: Fix mx31 OTG host initialisation
 > 
-> Given that things are wired up correctly on the board, yes. Many boards
-> don't, as they copy-pasted the schematics which got it wrong.
-
-Can you elaborate a bit more ? I don't see how you could do it another way 
-with an isp1504 and an external power switch.
-
+> On mx31 the OTG host initialisation fail if you need to have an ULPI
+>  transfert to initialize the PHY.
 > 
-> Anyway, if it helps you, it should go in. Some commenty below ...
+> In order to be able to communicate with the PHY a complete reset of the usb
+>  host is needed. After the PHY initialization the host usb configuration
+>  registers need to be rewritten to avoid a host controller lockup.
 > 
-> > +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-> > +	 * transfert timeout. */
-> > +	if (cpu_is_mx31() && pdev->id == 0) {
-> > +		/* Wait for the controller to go idle */
-> > +		for (i = 0; i < 10000; i++) {
-> > +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
-> > +				break;
-> > +			udelay(1);
-> > +		}
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> ---
+>  drivers/usb/host/ehci-mxc.c |   68
+>  +++++++++++++++++++++++++++++++++++++++++++ 1 files changed, 68
+>  insertions(+), 0 deletions(-)
 > 
-> Please use a #defined value rather than the 10000 magic.
-
-Ok.
-
-> Also, use cpu_relax() instead of the udelay(1).
-
-I don't argee because if I use cpu_relax() it will make the timeout cpu 
-frequency dependant. With the udelay it is clear that the timeout is about 
-10ms.
-But of course, I can do the change if this is really the way to do it.
-
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+>  index 544ccfd..39d28da 100644 --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -29,6 +29,11 @@
+>  #define PORTSC_OFFSET		0x184
+>  #define USBMODE_OFFSET		0x1a8
+>  #define USBMODE_CM_HOST		3
+> +#define USBCMD_OFFSET		0x140
+> +#define USBCMD_RS		(1 << 0)
+> +#define USBCMD_RST		(1 << 1)
+> +#define USBSTS_OFFSET		0x144
+> +#define USBSTS_HCH		(1 << 12)
 > 
-> > +		if (i == 10000) {
-> > +			dev_err(dev, "Timeout while stopping USB controller\n");
-> > +			goto err_init;
-> > +		}
-> > +
-> > +		/* Stop the usb controller */
-> > +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> > +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
-> > +
-> > +		for (i = 0; i < 10000; i++) {
-> > +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
-> > +				break;
-> > +			udelay(1);
-> > +		}
-> > +
-> > +		if (i == 10000) {
-> > +			dev_err(dev, "Timeout while stopping USB controller\n");
-> > +			goto err_init;
-> > +		}
+>  struct ehci_mxc_priv {
+>  	struct clk *usbclk, *ahbclk;
+> @@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device
+>  *pdev) int irq, ret, temp;
+>  	struct ehci_mxc_priv *priv;
+>  	struct device *dev = &pdev->dev;
+> +	int i;
 > 
-> This seems to be done all over the place. Wouldn't a static inline
-> function simplify the code a lot here?
+>  	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
+> 
+> @@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device
+>  *pdev) if (ret < 0)
+>  		goto err_init;
+> 
+> +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
+> +	 * transfert timeout. */
+> +	if (cpu_is_mx31() && pdev->id == 0) {
+> +		/* Wait for the controller to go idle */
+> +		for (i = 0; i < 10000; i++) {
+> +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
+> +				break;
+> +			udelay(1);
+> +		}
+> +		if (i == 10000) {
+> +			dev_err(dev, "Timeout while stopping USB controller\n");
+> +			goto err_init;
+> +		}
+> +
+> +		/* Stop the usb controller */
+> +		temp = readl(hcd->regs + USBCMD_OFFSET);
+> +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
+> +
+> +		for (i = 0; i < 10000; i++) {
+> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
+> +				break;
+> +			udelay(1);
+> +		}
+> +
+> +		if (i == 10000) {
+> +			dev_err(dev, "Timeout while stopping USB controller\n");
+> +			goto err_init;
+> +		}
+> +
+> +		/* Reset the usb controller */
+> +		temp = readl(hcd->regs + USBCMD_OFFSET);
+> +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
+> +
+> +		for (i = 0; i < 10000; i++) {
+> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
+> +				break;
+> +			udelay(1);
+> +		}
+> +
+> +		if (i == 10000) {
+> +			dev_err(dev, "Timeout while reseting USB controller\n");
+> +			goto err_init;
+> +		}
+> +	}
+> +
+>  	/* Initialize the transceiver */
+>  	if (pdata->otg) {
+>  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET; @@ -213,6
+>  +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>  dev_err(dev, "unable to enable vbus on transceiver\n");
+>  	}
+> 
+> +	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
+> +	 * controller stay busy. Rewriting the register is enough to make it
+> +	 * working */
+> +	if (cpu_is_mx31() && pdev->id == 0) {
+> +		/* set USBMODE to host mode */
+> +		temp = readl(hcd->regs + USBMODE_OFFSET);
+> +		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
+> +
+> +		/* set up the PORTSCx register */
+> +		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
+> +
+> +		/* setup USBCONTROL. */
+> +		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
+> +		if (ret < 0)
+> +			goto err_init;
+> +	}
+> +
+> 
+> [Dinh Nguyen] - Should this be done in mxc_initialize_usb_hw() in ehci.c?
+>  The probe function gets kinda of ugly with this.
 
-Ok.
+I cannot do this is mxc_initialize_usb_hw() because I really need to do the 
+reset before initializing the PHY which is done inside 
+otg_init()/otg_set_vbus().
+And the registers needs to be rewritten after the PHY initialisation. The 
+whole patch is a single fix for one problem.
+
+This is only needed on the usb OTG port, and I really suspect a hardware bug.
+Since you work at freescale, maybe you could get some information about why 
+the OTG port has a such strange behavior.
+
+I will repost a patch soon addressing all the feedback I got.
+
 
 Philippe
