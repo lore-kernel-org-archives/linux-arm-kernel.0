@@ -1,51 +1,34 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 12 May 2010 01:28:50 +0200
-Subject: [PATCH] s3c24xx: Fix handling of level irqs for external interrupts.
-Message-ID: <1273620530-20717-1-git-send-email-lars@metafoo.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 11 May 2010 16:30:46 -0700
+Subject: [PATCH 0/6] OMAP GPIO updates for 2.6.35
+Message-ID: <1273620652-15927-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the external interrupts support level and edge triggered irqs their
-handler is currently always set to handle_edge_irq().
-While being technically wrong for a level triggered irq to be handled by
-handle_edge_irq() it will cause serious problems in combination with a oneshot
-irq. handle_edge_irq() will unmask the irq immediately and as a result the irq
-will be triggered again before the threaded irq handler had a chance to run and
-clear the irq source.
+A series of OMAP GPIO updates for 2.6.35 from the OMAP PM branch.
 
-Thus level triggered irqs should be handled by handle_level_irq.
-According to the specs the irq controller will remember if an irq has been
-triggered while it had been masked and will issue it when the irq gets
-unmasked. Thus it is sufficient to use handle_level_irq() for edge triggered
-irqs as well. Hence handle_level_irq() can always be used for external
-interrupts.
+Series based on v2.6.34-rc6
 
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
----
- arch/arm/plat-s3c24xx/irq.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+Also available here:
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git gpio-2.6.35
 
-diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index ad0d44e..0bd7fc2 100644
---- a/arch/arm/plat-s3c24xx/irq.c
-+++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -631,15 +631,13 @@ void __init s3c24xx_init_irq(void)
- 
- 	for (irqno = IRQ_EINT0; irqno <= IRQ_EINT3; irqno++) {
- 		irqdbf("registering irq %d (ext int)\n", irqno);
--		set_irq_chip(irqno, &s3c_irq_eint0t4);
--		set_irq_handler(irqno, handle_edge_irq);
-+		set_irq_chip_and_handler(irqno, &s3c_irq_eint0t4, handle_level_irq);
- 		set_irq_flags(irqno, IRQF_VALID);
- 	}
- 
- 	for (irqno = IRQ_EINT4; irqno <= IRQ_EINT23; irqno++) {
- 		irqdbf("registering irq %d (extended s3c irq)\n", irqno);
--		set_irq_chip(irqno, &s3c_irqext_chip);
--		set_irq_handler(irqno, handle_edge_irq);
-+		set_irq_chip_and_handler(irqno, &s3c_irqext_chip, handle_level_irq);
- 		set_irq_flags(irqno, IRQF_VALID);
- 	}
- 
--- 
-1.5.6.5
+Kevin
+
+Chunqiu Wang (1):
+  OMAP3: GPIO: Only enable WAKEUPEN for edge detection GPIOs
+
+Kevin Hilman (3):
+  OMAP2/3: GPIO: generalize prepare for idle
+  OMAP3: GPIO: disable GPIO debounce clocks on idle
+  OMAP: GPIO: remove duplicate debugfs interface
+
+Tero Kristo (2):
+  OMAP3: GPIO fixes for off-mode
+  OMAP3: GPIO: Removed a couple of unneeded registers from context
+    save/restore
+
+ arch/arm/mach-omap2/pm24xx.c           |    4 +-
+ arch/arm/mach-omap2/pm34xx.c           |    4 +-
+ arch/arm/plat-omap/gpio.c              |  177 +++++++++-----------------------
+ arch/arm/plat-omap/include/plat/gpio.h |    4 +-
+ 4 files changed, 53 insertions(+), 136 deletions(-)
