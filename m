@@ -1,50 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 11 May 2010 09:28:15 -0500
-Subject: [PATCHv5 2/3] OMAP: export OMAP info under /proc/socinfo
-In-Reply-To: <1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-	<1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <4BE9697F.80308@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 May 2010 15:55:12 +0100
+Subject: [PATCH 1/1] silence a bogus sparse warning in unwind.c
+In-Reply-To: <1273586774-9604-1-git-send-email-virtuoso@slind.org>
+References: <1273586774-9604-1-git-send-email-virtuoso@slind.org>
+Message-ID: <20100511145512.GA32186@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo Valentin had written, on 05/11/2010 09:15 AM, the following:
-> From: Eduardo Valentin <eduardo.valentin@nokia.com>
+On Tue, May 11, 2010 at 05:06:14PM +0300, Alexander Shishkin wrote:
+> The check for compiler which is supposed to miscompile unwind tables
+> clearly has nothing to do with sparse (which does not define necessary
+> macros anyway), so simply silence it.
 > 
-> Export OMAP name and rev under /proc/socinfo node.
-> 
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
 > ---
->  arch/arm/Kconfig         |    1 +
->  arch/arm/mach-omap1/id.c |   31 ++++++++++++++++++++++++-------
->  arch/arm/mach-omap2/id.c |   32 ++++++++++++++++++++++++++------
->  3 files changed, 51 insertions(+), 13 deletions(-)
+>  arch/arm/kernel/unwind.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-[..]
-
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 37b8a1a..b67486b 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-[..]
-
-> @@ -356,7 +363,8 @@ void __init omap3_cpuinfo(void)
->  	}
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index 50292cd..dd81a91 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -26,6 +26,7 @@
+>   * http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
+>   */
 >  
->  	/* Print verbose information */
-> -	pr_info("%s ES%s (", cpu_name, cpu_rev);
-> +	snprintf(socinfo, SOCINFO_SZ, "%s ES%s", cpu_name, cpu_rev);
-> +	pr_info("%s (", socinfo);
->  
->  	OMAP3_SHOW_FEATURE(l2cache);
->  	OMAP3_SHOW_FEATURE(iva);
-Just a minor comment -> is it a good idea to pushin the features to SOC 
-info as well? currently this is being displayed at bootlog and not 
-beyond.. might be a better approach to move it into socinfo..
+> +#ifndef __CHECKER__
+>  #if !defined (__ARM_EABI__)
 
-
-[..]
-
--- 
-Regards,
-Nishanth Menon
+#if !defined(__ARM_EABI__) && !defined(__CHECKER__) ?
