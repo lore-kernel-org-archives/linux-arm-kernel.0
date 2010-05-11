@@ -1,73 +1,60 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Tue, 11 May 2010 12:28:34 +0530
-Subject: [PATCH 2/2] nomadik: Add rng clk to nomadik, RNG support to ux500
-Message-ID: <1273561114-16115-1-git-send-email-srinidhi.kasagar@stericsson.com>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Tue, 11 May 2010 10:17:35 +0300
+Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to
+	elf_check_arch()
+In-Reply-To: <20100510122156.GA7796@n2100.arm.linux.org.uk>
+References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+	<3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
+	<20100510112036.GC14337@n2100.arm.linux.org.uk>
+	<20100510120920.GD11783@esdhcp04058.research.nokia.com>
+	<20100510122156.GA7796@n2100.arm.linux.org.uk>
+Message-ID: <20100511071735.GF11783@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add rng clock to nomadik lookup table, and add hardware
-RNG support to ux500 machine which uses nomadik RNG driver.
+On Mon, May 10, 2010 at 02:21:56PM +0200, ext Russell King - ARM Linux wrote:
+> 
+> > > Now, here's the question: why does this crashkernel stuff want to
+> > > parse a 64-bit ELF header on a 32-bit only platform where the crashing
+> > > kernel will never generate a 64-bit ELF core file?
+> > 
+> > I really don't know but fs/proc/vmcore.c is coded in such way that it supports
+> > both types of ELF headers. It however, passes the header to elf_check_arch()
+> > which in our case should fail if it is something else than ELF32 header.
+> 
+> There's other arches which want elf_check_arch to be a function call, so
+> I think my question needs to be looked at more closely - and possibly
+> the code changed such that we don't end up with this situation.
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@dtericsson.com>
----
- arch/arm/mach-nomadik/clock.c              |    1 +
- arch/arm/mach-ux500/board-mop500.c         |    1 +
- arch/arm/mach-ux500/devices.c              |    5 +++++
- arch/arm/mach-ux500/include/mach/devices.h |    1 +
- 4 files changed, 8 insertions(+), 0 deletions(-)
+I quickly checked and it seems that only one arch in addition to ARM wants this
+to be a function:
 
-diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
-index 60f5bee..2c471fc 100644
---- a/arch/arm/mach-nomadik/clock.c
-+++ b/arch/arm/mach-nomadik/clock.c
-@@ -56,6 +56,7 @@ static struct clk_lookup lookups[] = {
- 	CLK(&clk_default, "gpio.1"),
- 	CLK(&clk_default, "gpio.2"),
- 	CLK(&clk_default, "gpio.3"),
-+	CLK(&clk_default, "rng"),
- };
- 
- static int __init clk_init(void)
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index fdcf0d4..602b999 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -124,6 +124,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&ux500_uart0_device,
- 	&ux500_uart1_device,
- 	&ux500_uart2_device,
-+	&ux500_rng_device,
- 	&u8500_ssp0_device,
- };
- 
-diff --git a/arch/arm/mach-ux500/devices.c b/arch/arm/mach-ux500/devices.c
-index 8a26889..65eb79a 100644
---- a/arch/arm/mach-ux500/devices.c
-+++ b/arch/arm/mach-ux500/devices.c
-@@ -29,6 +29,11 @@ struct amba_device ux500_pl031_device = {
- 	.irq = {IRQ_RTC_RTT, NO_IRQ},
- };
- 
-+struct amba_device ux500_rng_device = {
-+	.dev = { .init_name = "rng" },
-+	__MEM_4K_RESOURCE(UX500_RNG_BASE),
-+};
-+
- struct amba_device ux500_uart0_device = {
- 	.dev = { .init_name = "uart0" },
- 	__MEM_4K_RESOURCE(UX500_UART0_BASE),
-diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/include/mach/devices.h
-index 0422af0..72fa6f7 100644
---- a/arch/arm/mach-ux500/include/mach/devices.h
-+++ b/arch/arm/mach-ux500/include/mach/devices.h
-@@ -18,6 +18,7 @@ extern struct amba_device u8500_ssp0_device;
- extern struct amba_device ux500_uart0_device;
- extern struct amba_device ux500_uart1_device;
- extern struct amba_device ux500_uart2_device;
-+extern struct amba_device ux500_rng_device;
- 
- extern struct platform_device ux500_i2c1_device;
- extern struct platform_device ux500_i2c2_device;
--- 
-1.6.3.3
+arch/frv/include/asm/elf.h:
+...
+extern int elf_check_arch(const struct elf32_hdr *hdr);
+
+and they don't (yet) support kdump.
+
+> Maybe a cleaner solution would be for vmcore.c to split its calls to
+> elf_check_arch() - to be elf32_check_arch() and elf64_check_arch() ?
+
+True. However, there already is another macro in vmcore.c:
+vmcore_elf_check_arch() which is used by 64-bit code. So adding 32- and 64-bit
+versions of elf_check_arch() might be overkill.
+
+Also elf_check_arch() is used outside vmcore.c as well.
+
+> Platforms where it's just a macro can define both to be elf_check_arch()
+> but those where only one flavour is supported should define the unsupported
+> flavour to zero - which incidentally would allow the compiler to optimize
+> away the unnecessary parts of parse_crash_elf*_headers().
+
+I agree but changing these needs to be performed on every arch and it might
+cause regressions (at least because it is hard to test on archs that I don't
+have). So I'm not sure if it is worth a risk.
+
+It's up to you, I can implement it this way also if you don't accept the current
+version of the patch.
+
+Thanks again,
+MW
