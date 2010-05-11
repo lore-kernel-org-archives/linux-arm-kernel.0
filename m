@@ -1,144 +1,81 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Tue, 11 May 2010 11:11:45 +0200
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
-References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-	<86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
-Message-ID: <4BE91F51.6010006@epfl.ch>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 11 May 2010 19:23:41 +1000
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+Message-ID: <1273569821.21352.19.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2010 08:58 PM, Nguyen Dinh-R00091 wrote:
->   -----Original Message-----
-> From: Philippe R?tornaz [mailto:philippe.retornaz at epfl.ch]
-> Sent: Monday, May 10, 2010 1:14 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org
-> Cc: s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; Nguyen Dinh-R00091; gregkh at suse.de; Philippe R?tornaz
-> Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
->
-> On mx31 the OTG host initialisation fail if you need to have an ULPI transfert to initialize the PHY.
->
-> In order to be able to communicate with the PHY a complete reset of the usb host is needed. After the PHY initialization the host usb configuration registers need to be rewritten to avoid a host controller lockup.
->
-> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
-> ---
->   drivers/usb/host/ehci-mxc.c |   68 +++++++++++++++++++++++++++++++++++++++++++
->   1 files changed, 68 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c index 544ccfd..39d28da 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -29,6 +29,11 @@
->   #define PORTSC_OFFSET		0x184
->   #define USBMODE_OFFSET		0x1a8
->   #define USBMODE_CM_HOST		3
-> +#define USBCMD_OFFSET		0x140
-> +#define USBCMD_RS		(1<<  0)
-> +#define USBCMD_RST		(1<<  1)
-> +#define USBSTS_OFFSET		0x144
-> +#define USBSTS_HCH		(1<<  12)
->
->   struct ehci_mxc_priv {
->   	struct clk *usbclk, *ahbclk;
-> @@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->   	int irq, ret, temp;
->   	struct ehci_mxc_priv *priv;
->   	struct device *dev =&pdev->dev;
-> +	int i;
->
->   	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
->
-> @@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->   	if (ret<  0)
->   		goto err_init;
->
-> +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-> +	 * transfert timeout. */
-> +	if (cpu_is_mx31()&&  pdev->id == 0) {
-> +		/* Wait for the controller to go idle */
-> +		for (i = 0; i<  10000; i++) {
-> +			if (readl(hcd->regs + USBSTS_OFFSET)&  USBSTS_HCH)
-> +				break;
-> +			udelay(1);
-> +		}
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Stop the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp&  (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i<  10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET)&  USBCMD_RS))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Reset the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i<  10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET)&  USBCMD_RST))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while reseting USB controller\n");
-> +			goto err_init;
-> +		}
-> +	}
-> +
->   	/* Initialize the transceiver */
->   	if (pdata->otg) {
->   		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET; @@ -213,6 +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->   			dev_err(dev, "unable to enable vbus on transceiver\n");
->   	}
->
-> +	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
-> +	 * controller stay busy. Rewriting the register is enough to make it
-> +	 * working */
-> +	if (cpu_is_mx31()&&  pdev->id == 0) {
-> +		/* set USBMODE to host mode */
-> +		temp = readl(hcd->regs + USBMODE_OFFSET);
-> +		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-> +
-> +		/* set up the PORTSCx register */
-> +		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-> +
-> +		/* setup USBCONTROL. */
-> +		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-> +		if (ret<  0)
-> +			goto err_init;
-> +	}
-> +
->
-> [Dinh Nguyen] - Should this be done in mxc_initialize_usb_hw() in ehci.c? The probe function gets kinda of ugly with this.
->
->   	priv->hcd = hcd;
->   	platform_set_drvdata(pdev, priv);
+Hi folks !
 
- From what I seen in arch/arm/plat-mxc/ehci.c (at least for mx31 for 
-which we have the documentation), we do not write the hcd->regs. I think 
-it is clearer to write all the hcd->regs at the same place, and 
-ehci-mxc.c looks the correct place to do it.
+So I've been adapting upstream to my little D-Link DNS323 NAS box, which
+is based on a Marvell 88f5182 chipset, ie, orion5 family) and started
+hitting a problem with both ext3 and ext4 (on top of md/raid1). 
 
-Now the code could be cleaner with the help of a few additionnal 
-functions maybe, as already suggested by Sascha and Mark.
+First, the setup: This is a VIVT cache ARM CPU (so it -could- be some
+cache issues though it's a bit weird as I would expect metadata to be
+normal kernel pages and thus not hit cache aliases but then I'm no
+specialist of how we deal with those critters).
 
-Val
+Linux version 2.6.34-rc7-00019-g6c4f192-dirty (benh at pasglop) (gcc version 4.4.0 (GCC) ) #6 PREEMPT Tue May 11 17:02:04 EST 2010
+CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a0053177
+CPU: VIVT data cache, VIVT instruction cache
 
--- 
-Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
-valentin.longchamp at epfl.ch, Phone: +41216937827
-http://people.epfl.ch/valentin.longchamp
-MEB3494, Station 9, CH-1015 Lausanne
+There's two 1T disk using the built-in SATA chipset. There's an almost-1T
+partition on each (sda1 and sdb1) which are setup as a raid1 md.
+
+Then, I create a filesystem (I started with ext4 and mkfs'ed it back to ext3
+after I started having problems but things persist).
+
+I'm booted off an nfs root and basically the problem happens when I rsync over
+a pre-made root to the disks.
+
+On a freshly mkfs'ed ext3 or 4, mounted in /mnt/raid, I rsync the thing over,
+used it a bit and generally observe the first symptoms in the form of a few
+
+EXT3-fs (md0): warning: ext3_rename: Deleting old file (34103297), 2, error=-2
+EXT3-fs (md0): warning: ext3_rename: Deleting old file (34113314), 2, error=-2
+EXT3-fs (md0): warning: ext3_rename: Deleting old file (34127945), 2, error=-2
+
+in my kernel log. I had a very similar message with ext4 iirc.
+
+I unmount the filesystem and fsck it (it takes almost 1h) and I then get
+a bunch of:
+
+Problem in HTREE directory inode 5005385: node (12) has bad max hash
+Problem in HTREE directory inode 5005385: node (13) has bad max hash
+Problem in HTREE directory inode 5005385: node (14) has bad max hash
+Invalid HTREE directory inode 5005385 (/raid-foo/var/lib/dpkg/info).  Clear HTree index<y>? yes
+
+followed by a bunch of
+
+Inode 4981405 ref count is 1, should be 2.  Fix<y>? yes                        
+
+This is reasonably reproducable, as I have re-done it twice and I get similar
+errors.
+
+Tomorrow, if time permits, I'll see if I can reproduce on a smaller partition
+without md, and eventually narrow it to a smaller and more predictible set of
+operations.
+
+Since I doubt ext3 is busted so dramatically in mainline for "normal" machines,
+I tend to suspect things could be related to the infamous vivt caches. On the
+other hand, it's pretty clearly metadata or journal corruption and I'm not
+sure we ever do things that could cause aliases (such as vmap etc..) on
+these things, and they shouldn't be mapped into userspace... unless it's fsck
+itself that causes aliases to occur at the block device level ? (I do unmount
+though before I run fsck).
+
+On the other hand, it could also be a busticated marvell SATA driver :-)
+
+I have no problem with the vendor kernel, but it's ancient (2.6.12) and based
+on an out of tree variant of a Marvell originated BSP, so everything is
+completely different, especially in the area of drivers for the chipset.
+
+Anyways, I'll see if I can gather more data tomorrow as time, viruses and sick
+kids permits.
+
+In the meantime, any hint appreciated.
+
+Cheers,
+Ben.
