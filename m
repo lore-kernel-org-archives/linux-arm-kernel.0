@@ -1,146 +1,93 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Tue, 11 May 2010 13:06:45 +0200
-Subject: [PATCH 1/1] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
-References: <1273515220-18909-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273515220-18909-2-git-send-email-philippe.retornaz@epfl.ch>
-	<86A0E76937111F4C92FABEC0A20988510486FCD4@az33exm21>
-Message-ID: <201005111306.45813.philippe.retornaz@epfl.ch>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 11 May 2010 16:44:47 +0530
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <1273575478.21352.29.camel@pasglop>
+References: <1273569821.21352.19.camel@pasglop>
+	<1273575478.21352.29.camel@pasglop>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  -----Original Message-----
-> From: Philippe R?tornaz [mailto:philippe.retornaz at epfl.ch]
-> Sent: Monday, May 10, 2010 1:14 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org
-> Cc: s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de;
->  Nguyen Dinh-R00091; gregkh at suse.de; Philippe R?tornaz Subject: [PATCH 1/1]
->  ehci-mxc: Fix mx31 OTG host initialisation
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Benjamin Herrenschmidt
+> Sent: Tuesday, May 11, 2010 4:28 PM
+> To: linux-kernel at vger.kernel.org
+> Cc: Nicolas Pitre; Saeed Bishara; James E.J. Bottomley; Andrew Morton; linux-ext4 at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell 88f5182)
 > 
-> On mx31 the OTG host initialisation fail if you need to have an ULPI
->  transfert to initialize the PHY.
+> On Tue, 2010-05-11 at 19:23 +1000, Benjamin Herrenschmidt wrote:
 > 
-> In order to be able to communicate with the PHY a complete reset of the usb
->  host is needed. After the PHY initialization the host usb configuration
->  registers need to be rewritten to avoid a host controller lockup.
+> > Since I doubt ext3 is busted so dramatically in mainline for "normal" machines,
+> > I tend to suspect things could be related to the infamous vivt caches. On the
+> > other hand, it's pretty clearly metadata or journal corruption and I'm not
+> > sure we ever do things that could cause aliases (such as vmap etc..) on
+> > these things, and they shouldn't be mapped into userspace... unless it's fsck
+> > itself that causes aliases to occur at the block device level ? (I do unmount
+> > though before I run fsck).
+> >
+> > On the other hand, it could also be a busticated marvell SATA driver :-)
+> >
+> > I have no problem with the vendor kernel, but it's ancient (2.6.12) and based
+> > on an out of tree variant of a Marvell originated BSP, so everything is
+> > completely different, especially in the area of drivers for the chipset.
+> >
+> > Anyways, I'll see if I can gather more data tomorrow as time, viruses and sick
+> > kids permits.
+> >
+> > In the meantime, any hint appreciated.
 > 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  drivers/usb/host/ehci-mxc.c |   68
->  +++++++++++++++++++++++++++++++++++++++++++ 1 files changed, 68
->  insertions(+), 0 deletions(-)
+> A quick other test which brings more infos, using a smaller (about 5GB)
+> partition and no md or raid involved:
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
->  index 544ccfd..39d28da 100644 --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -29,6 +29,11 @@
->  #define PORTSC_OFFSET		0x184
->  #define USBMODE_OFFSET		0x1a8
->  #define USBMODE_CM_HOST		3
-> +#define USBCMD_OFFSET		0x140
-> +#define USBCMD_RS		(1 << 0)
-> +#define USBCMD_RST		(1 << 1)
-> +#define USBSTS_OFFSET		0x144
-> +#define USBSTS_HCH		(1 << 12)
+>  - Boot with NFS root
+>  - mkfs /dev/sdb2 (no md or raid involved)
+>  - mount /dev/sdb2 /mnt/test
+>  - rsync -avx /test-stuff /mnt/test
+>  - cd /mnt/test
+>  - md5sum -c ~/test-stuff-sums.txt
 > 
->  struct ehci_mxc_priv {
->  	struct clk *usbclk, *ahbclk;
-> @@ -120,6 +125,7 @@ static int ehci_mxc_drv_probe(struct platform_device
->  *pdev) int irq, ret, temp;
->  	struct ehci_mxc_priv *priv;
->  	struct device *dev = &pdev->dev;
-> +	int i;
+> That gives me a whole bunch of:
 > 
->  	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
+> md5sum: ./usr/bin/debconf-escape: No such file or directory
+> ./usr/bin/debconf-escape: FAILED open or read
+> ./usr/bin/stat: OK
+> md5sum: ./usr/bin/chrt: No such file or directory
+> ./usr/bin/chrt: FAILED open or read
 > 
-> @@ -204,6 +210,51 @@ static int ehci_mxc_drv_probe(struct platform_device
->  *pdev) if (ret < 0)
->  		goto err_init;
+> In fact, if I do ls /mnt/test/usr/bin/ I see debconf but if I do
+> ls /mnt/test/usr/bin/chrt then I get No such file or directory.
 > 
-> +	/* i.Mx31 OTG host has a bug, if you don't do a reset, then ULPI
-> +	 * transfert timeout. */
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* Wait for the controller to go idle */
-> +		for (i = 0; i < 10000; i++) {
-> +			if (readl(hcd->regs + USBSTS_OFFSET) & USBSTS_HCH)
-> +				break;
-> +			udelay(1);
-> +		}
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Stop the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp & (~USBCMD_RS), hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RS))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while stopping USB controller\n");
-> +			goto err_init;
-> +		}
-> +
-> +		/* Reset the usb controller */
-> +		temp = readl(hcd->regs + USBCMD_OFFSET);
-> +		writel(temp | USBCMD_RST, hcd->regs + USBCMD_OFFSET);
-> +
-> +		for (i = 0; i < 10000; i++) {
-> +			if (!(readl(hcd->regs + USBCMD_OFFSET) & USBCMD_RST))
-> +				break;
-> +			udelay(1);
-> +		}
-> +
-> +		if (i == 10000) {
-> +			dev_err(dev, "Timeout while reseting USB controller\n");
-> +			goto err_init;
-> +		}
-> +	}
-> +
->  	/* Initialize the transceiver */
->  	if (pdata->otg) {
->  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET; @@ -213,6
->  +264,23 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  dev_err(dev, "unable to enable vbus on transceiver\n");
->  	}
+> So something is badly wrong :-)
 > 
-> +	/* i.Mx31 OTG host has a bug, if you do an ULPI transfert then the host
-> +	 * controller stay busy. Rewriting the register is enough to make it
-> +	 * working */
-> +	if (cpu_is_mx31() && pdev->id == 0) {
-> +		/* set USBMODE to host mode */
-> +		temp = readl(hcd->regs + USBMODE_OFFSET);
-> +		writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-> +
-> +		/* set up the PORTSCx register */
-> +		writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-> +
-> +		/* setup USBCONTROL. */
-> +		ret = mxc_initialize_usb_hw(pdev->id, pdata->flags);
-> +		if (ret < 0)
-> +			goto err_init;
-> +	}
-> +
+> Now, trying without the dir_index feature (mkfs.ext3 -O ^dir_index)
+> and it works fine. All my md5sum's are correct and fsck passes.
 > 
-> [Dinh Nguyen] - Should this be done in mxc_initialize_usb_hw() in ehci.c?
->  The probe function gets kinda of ugly with this.
+> So there's what looks like a problem specific to htree's. I don't think
+> it's a SATA driver problem (doesn't smell like it but we can't
+> completely dismiss the possibility yet). Could be a VIVT issue but then
+> why ? I don't see ext3 playing with virtual mappings and none of that
+> should alias with userspace...
+> 
+> Or is it incorrectly accessing pages while they are DMA'ed to or from ?
+> IE. Accessing with the CPU pages between dma_map_* and dma_unmap_* ?
+> That will break on a number of setups including swiotlb on x86 so I tend
+> to doubt it but who knows...
 
-I cannot do this is mxc_initialize_usb_hw() because I really need to do the 
-reset before initializing the PHY which is done inside 
-otg_init()/otg_set_vbus().
-And the registers needs to be rewritten after the PHY initialisation. The 
-whole patch is a single fix for one problem.
+Not sure if it is related but we saw similar issue with MMC driver on
+Cortex-A9 MP core. I was seeing similar weird issues with EXT3 and 
+everything use to be fine with EXT2.
 
-This is only needed on the usb OTG port, and I really suspect a hardware bug.
-Since you work at freescale, maybe you could get some information about why 
-the OTG port has a such strange behavior.
+All those errors you mentioned use to come and at times whole FS
+Use to get corrupted.
 
-I will repost a patch soon addressing all the feedback I got.
+It was root-caused to MMC driver which uses DMA engine for TX/RX. The
+issue was mainly with writes and hence EXT3 was having issue which does
+journaling and hence more writes.
+There was a memory write barrier missing before the DMA descriptors 
+are handed over to DMA controller.
 
-
-Philippe
+Regards,
+Santosh
