@@ -1,107 +1,173 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 11 May 2010 10:52:16 +0200
-Subject: [PATCH 2/4] pxa/colibri270: Add MMC support
-In-Reply-To: <1273544818-22305-2-git-send-email-marek.vasut@gmail.com>
-References: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-	<1273544818-22305-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100511085216.GR30801@buzzloop.caiaq.de>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Tue, 11 May 2010 10:53:55 +0200
+Subject: [PATCH 2/3] mx31moboard: Move usb OTG device registration
+In-Reply-To: <1273513795-28247-3-git-send-email-philippe.retornaz@epfl.ch>
+References: <1273513795-28247-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-2-git-send-email-philippe.retornaz@epfl.ch>
+	<1273513795-28247-3-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <4BE91B23.5090404@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 11, 2010 at 04:26:56AM +0200, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+On 05/10/2010 07:49 PM, Philippe R?tornaz wrote:
+> In preparation for a new robot which need the
+> OTG port as host.
 
-The rest of this set also looks ok to me.
+s/need/needs/
 
-For the future, we should think about having a modularized aproach for
-these modules just like some mx31 boards have. We would need to split
-resources on the module from such on the baseboard, so peope can easily
-add support for a custom base board without touching the module code.
+>
+> This move the OTG device registration into board
+> initialisation.
 
+s/move/moves
 
-Daniel
+Othewise,
 
+Acked-by: Valentin Longchamp<valentin.longchamp@epfl.ch>
 
+>
+> Signed-off-by: Philippe R?tornaz<philippe.retornaz@epfl.ch>
 > ---
->  arch/arm/mach-pxa/colibri-pxa270.c       |   31 ++++++++++++++++++++++++++++++
->  arch/arm/mach-pxa/include/mach/colibri.h |    1 +
->  2 files changed, 32 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-> index 4519e89..5490c5f 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa270.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa270.c
-> @@ -33,6 +33,7 @@
->  
->  #include <mach/pxa27x.h>
->  #include <mach/colibri.h>
-> +#include <mach/mmc.h>
->  
->  #include "generic.h"
->  #include "devices.h"
-> @@ -44,6 +45,15 @@ static mfp_cfg_t colibri_pxa270_pin_config[] __initdata = {
->  	/* Ethernet */
->  	GPIO78_nCS_2,	/* Ethernet CS */
->  	GPIO114_GPIO,	/* Ethernet IRQ */
+>   arch/arm/mach-mx3/mach-mx31moboard.c     |    7 -------
+>   arch/arm/mach-mx3/mx31moboard-devboard.c |    9 +++++++++
+>   arch/arm/mach-mx3/mx31moboard-marxbot.c  |    8 ++++++++
+>   arch/arm/mach-mx3/mx31moboard-smartbot.c |    8 ++++++++
+>   4 files changed, 25 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+> index 5c44489..4bb011a 100644
+> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
+> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+> @@ -18,7 +18,6 @@
+>
+>   #include<linux/delay.h>
+>   #include<linux/dma-mapping.h>
+> -#include<linux/fsl_devices.h>
+>   #include<linux/gfp.h>
+>   #include<linux/gpio.h>
+>   #include<linux/init.h>
+> @@ -353,11 +352,6 @@ static void usb_xcvr_reset(void)
+>   	mdelay(1);
+>   }
+>
+> -static struct fsl_usb2_platform_data usb_pdata = {
+> -	.operating_mode	= FSL_USB2_DR_DEVICE,
+> -	.phy_mode	= FSL_USB2_PHY_ULPI,
+> -};
+> -
+>   #if defined(CONFIG_USB_ULPI)
+>
+>   static struct mxc_usbh_platform_data usbh2_pdata = {
+> @@ -485,7 +479,6 @@ static void __init mxc_board_init(void)
+>
+>   	usb_xcvr_reset();
+>
+> -	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+>   	moboard_usbh2_init();
+>
+>   	switch (mx31moboard_baseboard) {
+> diff --git a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31moboard-devboard.c
+> index 11b906c..582299c 100644
+> --- a/arch/arm/mach-mx3/mx31moboard-devboard.c
+> +++ b/arch/arm/mach-mx3/mx31moboard-devboard.c
+> @@ -22,6 +22,7 @@
+>   #include<linux/platform_device.h>
+>   #include<linux/slab.h>
+>   #include<linux/types.h>
+> +#include<linux/fsl_devices.h>
+>
+>   #include<linux/usb/otg.h>
+>
+> @@ -213,6 +214,12 @@ static int __init devboard_usbh1_init(void)
+>   	return mxc_register_device(&mxc_usbh1,&usbh1_pdata);
+>   }
+>
 > +
-> +	/* MMC */
-> +	GPIO32_MMC_CLK,
-> +	GPIO92_MMC_DAT_0,
-> +	GPIO109_MMC_DAT_1,
-> +	GPIO110_MMC_DAT_2,
-> +	GPIO111_MMC_DAT_3,
-> +	GPIO112_MMC_CMD,
-> +	GPIO0_GPIO,	/* SD detect */
->  };
->  
->  /******************************************************************************
-> @@ -138,6 +148,26 @@ static void __init colibri_pxa270_eth_init(void)
->  static inline void colibri_pxa270_eth_init(void) {}
->  #endif
->  
-> +/******************************************************************************
-> + * SD/MMC card controller
-> + ******************************************************************************/
-> +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-> +static struct pxamci_platform_data colibri_pxa270_mci_platform_data = {
-> +	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
-> +	.gpio_power		= -1,
-> +	.gpio_card_detect	= GPIO0_COLIBRI_PXA270_SD_DETECT,
-> +	.gpio_card_ro		= -1,
-> +	.detect_delay_ms	= 200,
+> +static struct fsl_usb2_platform_data usb_pdata = {
+> +	.operating_mode	= FSL_USB2_DR_DEVICE,
+> +	.phy_mode	= FSL_USB2_PHY_ULPI,
 > +};
 > +
-> +static void __init colibri_pxa270_mmc_init(void)
-> +{
-> +	pxa_set_mci_info(&colibri_pxa270_mci_platform_data);
-> +}
-> +#else
-> +static inline void colibri_pxa270_mmc_init(void) {}
-> +#endif
+>   /*
+>    * system init for baseboard usage. Will be called by mx31moboard init.
+>    */
+> @@ -229,5 +236,7 @@ void __init mx31moboard_devboard_init(void)
+>
+>   	devboard_init_sel_gpios();
+>
+> +	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
 > +
->  static void __init colibri_pxa270_init(void)
->  {
->  	pxa2xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa270_pin_config));
-> @@ -147,6 +177,7 @@ static void __init colibri_pxa270_init(void)
->  
->  	colibri_pxa270_nor_init();
->  	colibri_pxa270_eth_init();
-> +	colibri_pxa270_mmc_init();
->  }
->  
->  MACHINE_START(COLIBRI, "Toradex Colibri PXA270")
-> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
-> index 0b24a20..08bee63 100644
-> --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> @@ -34,6 +34,7 @@ static inline void colibri_pxa3xx_init_nand(void) {}
->  
->  /* GPIO definitions for Colibri PXA270 */
->  #define GPIO114_COLIBRI_PXA270_ETH_IRQ	114
-> +#define GPIO0_COLIBRI_PXA270_SD_DETECT	0
->  
->  #endif /* _COLIBRI_H_ */
->  
-> -- 
-> 1.7.0
-> 
+>   	devboard_usbh1_init();
+>   }
+> diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> index 8cf3ad2..a1dffcb 100644
+> --- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> +++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> @@ -25,6 +25,7 @@
+>   #include<linux/slab.h>
+>   #include<linux/platform_device.h>
+>   #include<linux/types.h>
+> +#include<linux/fsl_devices.h>
+>
+>   #include<linux/usb/otg.h>
+>
+> @@ -331,6 +332,11 @@ static int __init marxbot_usbh1_init(void)
+>   	return mxc_register_device(&mxc_usbh1,&usbh1_pdata);
+>   }
+>
+> +static struct fsl_usb2_platform_data usb_pdata = {
+> +	.operating_mode	= FSL_USB2_DR_DEVICE,
+> +	.phy_mode	= FSL_USB2_PHY_ULPI,
+> +};
+> +
+>   /*
+>    * system init for baseboard usage. Will be called by mx31moboard init.
+>    */
+> @@ -358,5 +364,7 @@ void __init mx31moboard_marxbot_init(void)
+>   	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_LCS0));
+>   	gpio_export(IOMUX_TO_GPIO(MX31_PIN_LCS0), false);
+>
+> +	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+> +
+>   	marxbot_usbh1_init();
+>   }
+> diff --git a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> index 83d2b9f..ac1a163 100644
+> --- a/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> +++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c
+> @@ -23,6 +23,7 @@
+>   #include<linux/i2c.h>
+>   #include<linux/platform_device.h>
+>   #include<linux/types.h>
+> +#include<linux/fsl_devices.h>
+>
+>   #include<mach/common.h>
+>   #include<mach/hardware.h>
+> @@ -116,6 +117,11 @@ static int __init smartbot_cam_init(void)
+>   	return 0;
+>   }
+>
+> +static struct fsl_usb2_platform_data usb_pdata = {
+> +	.operating_mode	= FSL_USB2_DR_DEVICE,
+> +	.phy_mode	= FSL_USB2_PHY_ULPI,
+> +};
+> +
+>   #define POWER_EN IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
+>   #define DSPIC_RST_B IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
+>   #define TRSLAT_RST_B IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
+> @@ -155,6 +161,8 @@ void __init mx31moboard_smartbot_init(void)
+>
+>   	mxc_register_device(&mxc_uart_device1,&uart_pdata);
+>
+> +	mxc_register_device(&mxc_otg_udc_device,&usb_pdata);
+> +
+>   	smartbot_resets_init();
+>
+>   	smartbot_cam_init();
+
+
+-- 
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEB3494, Station 9, CH-1015 Lausanne
