@@ -1,100 +1,39 @@
-From: janboe.ye@gmail.com (ye janboe)
-Date: Tue, 11 May 2010 11:15:13 +0800
-Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
-	support
-In-Reply-To: <1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
-References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
-	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
-Message-ID: <AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 11 May 2010 12:14:47 +0900
+Subject: [PATCHv4 1/4] procfs: Introduce socinfo under /proc
+In-Reply-To: <20100510125548.GB11804@besouro.research.nokia.com>
+References: <1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-3-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273487857-32281-2-git-send-email-eduardo.valentin@nokia.com>
+	<20100510111259.GA14680@linux-sh.org>
+	<20100510123514.GA11804@besouro.research.nokia.com>
+	<20100510123902.GA15293@linux-sh.org>
+	<20100510125548.GB11804@besouro.research.nokia.com>
+Message-ID: <20100511031447.GB20453@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Russell, Tony
+On Mon, May 10, 2010 at 03:55:49PM +0300, Eduardo Valentin wrote:
+> On Mon, May 10, 2010 at 02:39:02PM +0200, ext Paul Mundt wrote:
+> > Note that in the cpuinfo case there is often special handling for the
+> > single (or boot CPU) case, such as printing out a descriptor for the
+> > machine type and so on. You might be better off just extending cpuinfo
+> > rather than introducing another /proc abstraction, presumably your
+> > socinfo string will be fixed regardless of whether it's SMP or not.
+> 
+> Yeah, I wouldn't expect it to change if it SMP or not. It should be fixed.
+> Previous version of this change was actually extending ARM cpuinfo. The previous
+> thread starts here:
+> http://marc.info/?l=linux-omap&m=127304890312365&w=2
+> 
+> But, the point of moving that to specific file was that soc info is not really cpu info.
+> 
+It's up to you of course, but adding an extra file because of SoC/CPU
+ambiguity seems pretty ugly. Almost all architectures already include
+machine type descriptors in their cpuinfo output (as ARM does also) and
+if you can justify that then certainly adding in some SoC-specific bits
+isn't exactly much of a stretch.
 
-Is this patch ignored by you? I do not see any ack for this patch.
-
-Thanks
-
-Janboe Ye
-
-2009/12/3 Tero Kristo <tero.kristo@nokia.com>:
-> From: Tero Kristo <tero.kristo@nokia.com>
->
-> In some ARM architectures, like OMAP3, the VFP context can be lost during
-> dynamic sleep cycle. For this purpose, there is now a function
-> vfp_pm_save_context() that should be called before the VFP is assumed to
-> lose context. Next VFP trap will then restore context automatically.
->
-> We need to have the last_VFP_context[cpu] cleared after the save in idle,
-> else the restore would fail to restore when it sees that the last_VFP_context
-> is same as the current threads vfp_state. This happens when the same
-> process/thread traps an exception post idle.
->
-> This patch also fixes a potential problem with vfp_pm_suspend(), where
-> VFP context can be lost if the current process does not have VFP enabled.
-> Fixed by calling vfp_pm_save_context().
->
-> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-> Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Richard Woodruff <r-woodruff2@ti.com>
-> Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
-> ---
-> ?arch/arm/vfp/vfpmodule.c | ? 28 ++++++++++++++++++++--------
-> ?1 files changed, 20 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 2d7423a..920a33b 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -329,22 +329,34 @@ static void vfp_enable(void *unused)
-> ?#ifdef CONFIG_PM
-> ?#include <linux/sysdev.h>
->
-> -static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
-> +void vfp_pm_save_context(void)
-> ?{
-> - ? ? ? struct thread_info *ti = current_thread_info();
-> ? ? ? ?u32 fpexc = fmrx(FPEXC);
-> + ? ? ? unsigned int cpu = get_cpu();
-> +
-> + ? ? ? /* Save last_VFP_context if needed */
-> + ? ? ? if (last_VFP_context[cpu]) {
-> + ? ? ? ? ? ? ? /* Enable vfp to save context */
-> + ? ? ? ? ? ? ? if (!(fpexc & FPEXC_EN)) {
-> + ? ? ? ? ? ? ? ? ? ? ? vfp_enable(NULL);
-> + ? ? ? ? ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
-> + ? ? ? ? ? ? ? }
->
-> - ? ? ? /* if vfp is on, then save state for resumption */
-> - ? ? ? if (fpexc & FPEXC_EN) {
-> ? ? ? ? ? ? ? ?printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
-> - ? ? ? ? ? ? ? vfp_save_state(&ti->vfpstate, fpexc);
-> + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[cpu], fpexc);
->
-> ? ? ? ? ? ? ? ?/* disable, just in case */
-> - ? ? ? ? ? ? ? fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc & ~FPEXC_EN);
-> +
-> + ? ? ? ? ? ? ? last_VFP_context[cpu] = NULL;
-> ? ? ? ?}
->
-> - ? ? ? /* clear any information we had about last context state */
-> - ? ? ? memset(last_VFP_context, 0, sizeof(last_VFP_context));
-> + ? ? ? put_cpu();
-> +}
-> +
-> +static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
-> +{
-> + ? ? ? vfp_pm_save_context();
->
-> ? ? ? ?return 0;
-> ?}
-> --
-> 1.5.4.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+These days you should have a pretty strong justification for adding new
+procfs files, and this is certainly not one of them.
