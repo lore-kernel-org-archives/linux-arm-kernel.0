@@ -1,51 +1,34 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 11 May 2010 01:22:13 +0100
-Subject: [RFC] IDLE/DEEP IDLE scheduler modification for power savings
-In-Reply-To: <s2q1b68c6791004120555qb0ab21ffm9a641ec3f2423597@mail.gmail.com>
-References: <000001cada24$01a5ee90$04f1cbb0$%majewski@samsung.com>
-	<s2q1b68c6791004120555qb0ab21ffm9a641ec3f2423597@mail.gmail.com>
-Message-ID: <20100511002212.GA26401@trinity.fluff.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 10 May 2010 19:24:24 -0500
+Subject: [PATCH v6 2/2] ep93xx: SPI driver platform support code
+In-Reply-To: <20100505142625.GB2606@n2100.arm.linux.org.uk>
+References: <cover.1272805161.git.mika.westerberg@iki.fi>
+	<865b5d7ca0fae1977a1fadcdabdb715e3ea1604d.1272805161.git.mika.westerberg@iki.fi>
+	<0D753D10438DA54287A00B0270842697636EB838E1@AUSP01VMBX24.collaborationhost.net>
+	<20100505142625.GB2606@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B0270842697636EE74B65@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 12, 2010 at 09:55:28PM +0900, jassi brar wrote:
-> On Mon, Apr 12, 2010 at 6:39 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> > One approach to solve the problem, and therefore deliver power savings,
-> > is to modify the ALSA driver and provide a switch to inform the CPU IDLE
-> > framework that it should now use the DEEP IDLE instead of IDLE when entering
-> > the Low Power Audio playback mode is expected. ?This change may be performed
-> > by replacing the method for entering the IDLE mode to DEEP IDLE. Moreover
-> > some sources immune to power gating (like e.g. RTC timer) have to be used
-> > for waking up. The biggest problem for this approach is the kernel's policy
-> > violation, that no user program should directly change scheduling/idle
-> > policy.
-> Actually any power saving mode is transparent to the LPAM(LowPowerAudioMode).
-> "LPAM h/w" is simply an I2S controller with an additional 'overlay'
-> stereo channel
-> which is h/w-mix'ed with the first two of the 6 channels. And these overlay
-> channels works just as well in normal power mode. LPAM is but one
-> ramification of
-> of the platform using the interrupt as a wakeup source. It is also used for
-> low latency playback like 'alerts' and 'alarms'.
-> Our LPAM doesn't work right away not because of the power management stack
-> but because ASoC can't yet handle a
-> codec-active-in-system-suspended-mode scenario.
-> So, I too think it's a bad idea to hack core PM for things like LPAM.
-> 
-> > So what is your opinion about integrating use of the DEEP IDLE state mode
-> > in the scheduler (either as new scheduling policy or modifying scheduler
-> > code)?
-> imho, such 'variation' in suspend had better be implemented in
-> platform specific manner.
-> Just because samsung's manual call it deep-IDLE doesn't make it an 'IDLE' mode.
-> It is closer to suspend than idle, at least to me.
+On Wednesday, May 05, 2010 7:26 AM, Russell King wrote:
+> On Tue, May 04, 2010 at 12:21:36PM -0500, H Hartley Sweeten wrote:
+>> That patch is already present in linux-next.  If Russell think there might
+>> be an issue you could rebase this patch on the linux-next tree.
+>
+> If this patch depends on 5998/1, then I'll take it via the ep93xx branch
+> (which has 5998/1 on.)  It's only touching files in arch/arm so there
+> shouldn't be any problem with that.
 
-It does seem to be a form of suspend, as it halts the SDRAM and powers
-down the ARM core... this means that there's a whole pile of stuff that
-needs to be considered before allowing the system to go into such a state.
 
--- 
-Ben
+Mika,
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Any word from the spi group on PATCH v6 1/2?
+
+Russell wants this patch (v6 2/2) to go through his tree, please add it to
+his patch system.  It will not be a problem if this patch goes in before the
+actual driver since nothing "breaks".  If the driver goes in first it will
+not work due to the missing clock resource, even if a user were to hack in the
+platform init code.
+
+Regards,
+Hartley
