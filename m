@@ -1,34 +1,30 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 11 May 2010 12:48:03 +0200
-Subject: [PATCH 2/4] pxa/colibri270: Add MMC support
-In-Reply-To: <AANLkTinMixSxs0H-shm7E8OoB9ErZIcklqFuz_echLW3@mail.gmail.com>
-References: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-	<1273544818-22305-2-git-send-email-marek.vasut@gmail.com>
-	<20100511085216.GR30801@buzzloop.caiaq.de>
-	<AANLkTinMixSxs0H-shm7E8OoB9ErZIcklqFuz_echLW3@mail.gmail.com>
-Message-ID: <20100511104803.GU30801@buzzloop.caiaq.de>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 11 May 2010 20:47:58 +1000
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <20100511101620.GA18654@shareable.org>
+References: <1273569821.21352.19.camel@pasglop>
+	<20100511101620.GA18654@shareable.org>
+Message-ID: <1273574878.21352.25.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 11, 2010 at 06:46:21PM +0800, Eric Miao wrote:
-> On Tue, May 11, 2010 at 4:52 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> > On Tue, May 11, 2010 at 04:26:56AM +0200, Marek Vasut wrote:
-> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> >
-> > The rest of this set also looks ok to me.
-> >
-> > For the future, we should think about having a modularized aproach for
-> > these modules just like some mx31 boards have. We would need to split
-> > resources on the module from such on the baseboard, so peope can easily
-> > add support for a custom base board without touching the module code.
-> >
+On Tue, 2010-05-11 at 11:16 +0100, Jamie Lokier wrote:
 > 
-> Daniel,
-> 
-> So Ack for this patch or not?
+> I've seen similar ext3 corruption errors with an IDE on a Sigma
+> Designs EM8620 with ARM core.  It's completely unrelated :-) But the
+> fault was in the IDE driver doing cache flushes too late after
+> starting to set up DMA.  To diagnose it, we luckily found a
+> reproducible test case, then sprinkled full cache flushes at various
+> places to narrow it down, and eventually found that one full cache
+> flush in the driver itself sorted it out, which told us where the
+> fault was.  From there it was easy. 
 
-Yes, take my Ack for all of them. The idea I outlined is something TBD
-in the future :)
+Ok, well, that's -a- possibility... we'll see. I'm doing some more tests
+to try to characterize the problem a bit better, then we can play with
+the driver. I think it's also worth trying with earlier kernels in case
+it's some kind of regression, though that means I'll have to backport my
+board support for that little box :-)
 
-Thanks,
-Daniel
+Cheers,
+Ben.
