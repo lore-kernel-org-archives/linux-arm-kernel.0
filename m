@@ -1,52 +1,47 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 12 May 2010 15:24:24 -0700
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <20100512152424.803ea807.akpm@linux-foundation.org>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 12 May 2010 23:43:45 +0100
+Subject: [PATCH] h1940: framebuffer configuration fix
+In-Reply-To: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
+References: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
+Message-ID: <20100512224345.GK6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 May 2010 17:15:28 +0300
-Eduardo Valentin <eduardo.valentin@nokia.com> wrote:
+On Wed, May 12, 2010 at 11:20:29PM +0400, Mike Solovyev wrote:
+> Seems like a typo, wrong setup leads to broken image on ipaq screen.
 
-> Here is the version 5 of the change to export OMAP data to userspace
-> (name, revision, id code, production id and die id).
+arnaud, any comments here?
+ 
+> Signed-off-by: Mike Solovyev <ms@sk.2-ch.org>
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> ---
+>  arch/arm/mach-s3c2410/mach-h1940.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Basically, this version is still attempting to create a new file under /proc.
-> It is the /proc/socinfo, which should be used to export bits which are SoC specific
-> (not CPU related, nor machine related).
+> Index: linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-s3c2410/mach-h1940.c
+> +++ linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
+> @@ -162,8 +162,8 @@ static struct s3c2410fb_display h1940_lc
+>  	.xres =		240,
+>  	.yres =		320,
+>  	.bpp =		16,
+> -	.left_margin =	20,
+> -	.right_margin =	8,
+> +	.left_margin =	8,
+> +	.right_margin =	20,
+>  	.hsync_len =	4,
+>  	.upper_margin =	8,
+>  	.lower_margin = 7,
 > 
-> So, differences between previous version are:
-> - merged patch 02/04 with 03/04 to avoid compilation breakages.
-> - simplified the seq_file usage by using the single_open and single_release functions
-> - exported a function to register a seq_operation .show callback
-> - adapted the changes accordingly
-> 
-> As usual, comments are welcome.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-This changelog would be rather more useful if it was to show us some
-sample output from /proc/socinfo, perhaps accompanied with an
-explanation for people who aren't familar with this area of the kernel.
+-- 
+-- 
+Ben
 
-I'd have thought that sysfs was an appropriate place for this info. 
-Perhaps under /sys/devices/platform?  Or /sys/devices/system?  Peter's
-original patch didn't tell us where in the hierarchy the file was
-placed, nor why it was placed there, not what its contents look like. 
-But crappy changelogs are the norm :(
-
-The objections stated in this email:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg17630.html
-appear to still apply to this version of the patches?
-
-Kevin didn't explain why he said "Please export these via debugfs". 
-Tony didn't clearly explain why he said "I don't think we want to
-export unique chip identifiers by default".
-
-
-
-So apart from having certain opinions regarding communication skills
-and wondering why people cc me on stuff without vaguely providing
-enough info for me to understand what they're thinking, I don't know
-what to make of it all :(
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
