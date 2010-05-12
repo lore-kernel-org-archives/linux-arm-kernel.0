@@ -1,55 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 May 2010 13:55:15 +0900
-Subject: [PATCH 03/16] ARM: Samsung: plat-s5p - enable access to clk_27m
-	clock
-In-Reply-To: <1270190944-21644-4-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 12 May 2010 13:55:25 +0900
+Subject: [PATCH 04/16] ARM: S5PC100: copy clocks from plat-s5pc1xx
+In-Reply-To: <1270190944-21644-5-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001301caf18f$4fd6e060$ef84a120$%kim@samsung.com>
+	<1270190944-21644-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <001401caf18f$5932f6d0$0b98e470$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Clock clk_27m can be a source for other clocks in S5PC100 clocks.
-> This patch removes static attribute of it.
+> Prepare for moving support for S5PC100 SoC to plat-s5p framework (part 2).
+Copy
+> clocks definition to mach-s5pc100 directory.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/plat-s5p/clock.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  .../s5pc100-clock.c => mach-s5pc100/clock.c}       |    0
+>  1 files changed, 0 insertions(+), 0 deletions(-)
+>  copy arch/arm/{plat-s5pc1xx/s5pc100-clock.c => mach-s5pc100/clock.c}
+(100%)
 > 
-> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-> index aa96e33..519cdb4 100644
-> --- a/arch/arm/plat-s5p/clock.c
-> +++ b/arch/arm/plat-s5p/clock.c
-> @@ -33,7 +33,7 @@ struct clk clk_ext_xtal_mux = {
->  	.id		= -1,
->  };
-> 
-> -static struct clk s5p_clk_27m = {
-> +struct clk clk_27m = {
->  	.name		= "clk_27m",
->  	.id		= -1,
->  	.rate		= 27000000,
-> @@ -129,7 +129,7 @@ int s5p_gatectrl(void __iomem *reg, struct clk *clk,
-int
-> enable)
->  static struct clk *s5p_clks[] __initdata = {
->  	&clk_ext_xtal_mux,
->  	&clk_48m,
-> -	&s5p_clk_27m,
-> +	&clk_27m,
->  	&clk_fout_apll,
->  	&clk_fout_mpll,
->  	&clk_fout_epll,
+> diff --git a/arch/arm/plat-s5pc1xx/s5pc100-clock.c
+b/arch/arm/mach-s5pc100/clock.c
+> similarity index 100%
+> copy from arch/arm/plat-s5pc1xx/s5pc100-clock.c
+> copy to arch/arm/mach-s5pc100/clock.c
 > --
 
-Since clk_27m is now not static, it would be good to rename it as
-s5p_clk_27m.
-Do you have any reason for renaming?
+How about change the comment in the head of moving file.
 
+And where is the patch for arch/arm/plat-s5pc1xx/clock.c?
+I couldn't find it except 01_patch which just changes naming.
 
 Thanks.
 
