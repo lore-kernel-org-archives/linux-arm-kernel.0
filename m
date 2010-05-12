@@ -1,58 +1,79 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 12 May 2010 15:57:34 +0900
-Subject: [PATCH 06/16] ARM: Samsung: move S5PC100 support from
-	plat-s5pc1xx to plat-s5p framework
-In-Reply-To: <002e01caf19d$fc781c90$f56855b0$%szyprowski@samsung.com>
-References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-7-git-send-email-m.szyprowski@samsung.com>
-	<001801caf195$da9e9ed0$8fdbdc70$%kim@samsung.com>
-	<002b01caf197$a48bedf0$eda3c9d0$%szyprowski@samsung.com>
-	<AANLkTimA7o4YDQ8Lla1wJ0i8rDyX9dM7_z89aqPA6DkE@mail.gmail.com>
-	<002e01caf19d$fc781c90$f56855b0$%szyprowski@samsung.com>
-Message-ID: <AANLkTilgWjaHAEO4vx2yfDbLBbkVt9011b6_nZq6WuQo@mail.gmail.com>
+From: wolfgang.mues@auerswald.de (Wolfgang =?iso-8859-1?q?M=FCes?=)
+Date: Wed, 12 May 2010 08:48:51 +0200
+Subject: arm926_dma_flush_range undefined!
+In-Reply-To: <4BE95C54.5070008@atmel.com>
+References: <4BE95C54.5070008@atmel.com>
+Message-ID: <201005120848.52046.wolfgang.mues@auerswald.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 3:40 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> On Wednesday, May 12, 2010 8:32 AM jassi brar wrote:
->
->> On Wed, May 12, 2010 at 2:54 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->> >> > @@ -79,6 +77,7 @@ static struct s3c2410_uartcfg smdkc100_uartcfgs[]
->> >> __initdata
->> >> > = {
->> >> > ? ? },
->> >> > ?};
->> >> >
->> >> > +#if 0
->> >>
->> >> #if 0?
->> >
->> > I had to disable that part of code to make it compile. It is enabled
->> later
->> > in separate patch when the relevant functionality got moved from plat-
->> s5pc1xx
->> > to mach-s5pc100.
->> build break is just one thing to avoid, one should make sure the
->> functionality
->> doesn't break either during the changes.
->> Is the functionality affected during these changes?
->
-> It is, but I really see no way to preserve all functionality while moving
-> from one platform framework to another. Please note that some of the files
-> ?stay in the same directory, but they are being changed heavily.
->
-> The only possibility to preserve all functionality would be to squash all
-> these patches into a single large blob, what we really would like to avoid.
-The order of preference should be to avoid
-   build break -> functionality break -> big patches.
-Or is it just me?
+Hi,
 
-Btw, it is ok to submit extra patches that do nothing but prepare
-ground for a big change.
+Am Dienstag, 11. Mai 2010 schrieb Nicolas Ferre:
+> Le 11/05/2010 11:44, Russell King - ARM Linux :
+> > On Tue, May 11, 2010 at 11:43:17AM +0200, Nicolas Ferre wrote:
+> >> Le 06/05/2010 19:59, Russell King - ARM Linux :
+> >>> On Thu, May 06, 2010 at 03:07:11PM +0100, Catalin Marinas wrote:
+> >>>> On Thu, 2010-05-06 at 15:11 +0200, Nicolas Ferre wrote:
+> >>>>> I am trying to compile a recent kernel
+> >>>>> (v2.6.34-rc6-201-g722154e) and I am
+> >>>>> having this kind of error:
+> >>>>> 
+> >>>>> ERROR: "arm926_dma_flush_range" [drivers/mmc/host/at91_mci.ko]
+> >>>>> undefined!
+> >>>> 
+> >>>> The driver seems to use dmac_flush_range() directly. That's not part
+> >>>> of the DMA API. Could you not use one of the supported DMA API
+> >>>> functions?
+> >> 
+> >> The difficult part for me is to choose the proper one ;-)
+> >> 
+> >> And also, I am wondering if this call is needed as we do a
+> >> kunmap_atomic() on the same scatterlist pointer just before. Does not
+> >> kunmap_atomic() embed a cache flushing directive already?
+> > 
+> > No it doesn't.  What are you trying to do here?
+> 
+> After a read with DMA from sd/mmc interface, a DMA buffer allocated by
+> dma_alloc_coherent() is filled.
+> This buffer is then copied to the scatterlist provided by the mmc
+> request (from drivers/mmc/card/block.c it seems that sg buffers are
+> alocacted via kmalloc()).
+> 
+> For each buffer of the scatterlist, I do this dmac_flush_rage()...
+Yepp!
+ 
+> As copy is done between a coherent and a kernel memory buffers, I guess
+> that the flushing routine is not needed?
+Where do you get this wisdom?
 
-Having said that, I know perhaps practically no user would even notice/care
-the transient break.
+The coherent buffer does not need a cache flush, never.
+But the target buffer does need a flush(). If the loaded data from SD card is 
+an executable or library, the target buffer may be mapped into the text 
+segment of a process and be executed. And this will fail if parts of the
+data are only inside the data cache (especially on ARM architectures where
+data and instruction cache are separate).
+
+The basic assumption is that the scatterlist buffer is filled directly with a 
+DMA controller: data is in memory, not in the cache.
+If you fill the scatterlist buffer with the help of the CPU, you need a data 
+cache flush afterwards to fullfill this assumption.
+It's a shame that the function to do so is not available on all platforms. 
+IMHO it should.
+
+best regards
+ 
+i. A. Wolfgang M?es
+-- 
+Auerswald Gesellschaft f?r Datensysteme mbH
+Hardware Development
+Telefon: +49 (0)5306 9219 562
+Telefax: +49 (0)5306 9219 94 
+E-Mail: Wolfgang.Mues at Auerswald.de
+Web: http://www.auerswald.de
+ 
+--------------------------------------------------------------
+Auerswald Gesellschaft f?r Datensysteme mbH
+Vor den Grash?fen 1, 38162 Cremlingen
+Registriert beim AG Braunschweig HRB 7499
+Gesch?ftsf?hrer: Dipl-Ing. Gerhard Auerswald
