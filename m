@@ -1,70 +1,75 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Wed, 12 May 2010 10:25:21 +0300
-Subject: [PATCH 01/15] ARM: S3C: Add S3C2416 detection to uncompress code
-In-Reply-To: <20100512023845.GM2589@trinity.fluff.org>
-References: <1273631766-15693-1-git-send-email-ben-linux@fluff.org>
-	<20100512023845.GM2589@trinity.fluff.org>
-Message-ID: <20100512072521.GA24747@jeknote.loshitsa1.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 12 May 2010 16:34:21 +0900
+Subject: [PATCH 05/16] ARM: S5PC100: new clocks definition
+In-Reply-To: <002f01caf19e$655de6e0$3019b4a0$%szyprowski@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-6-git-send-email-m.szyprowski@samsung.com>
+	<001501caf18f$8bedb830$a3c92890$%kim@samsung.com>
+	<002f01caf19e$655de6e0$3019b4a0$%szyprowski@samsung.com>
+Message-ID: <002301caf1a5$8ccd40c0$a667c240$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 03:38:45AM +0100, Ben Dooks wrote:
-> On Wed, May 12, 2010 at 03:35:52AM +0100, Ben Dooks wrote:
-> > From: Yauhen Kharuzhy <jekhor@gmail.com>
-> > 
-> > Add S3C2416 serial port setup to uncompress code.
+Marek Szyprowski wrote:
 > 
-> Yahuen, let me know if you've any objection to this going upstrea.
-No, don't have.
+> Hello,
+> 
+> On Wednesday, May 12, 2010 6:57 AM Kukjin Kim wrote:
+> 
+> > Marek Szyprowski wrote:
+> > >
+> > > Prepare for moving support for S5PC100 SoC to plat-s5p framework (part
+3).
+> > > This patch adds all clocks from plat-s5pc1xx/clocks.c and removes all
+the
+> > > code that can be reused from plat-s5p/clock.c.
+> > >
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >  arch/arm/mach-s5pc100/clock.c                      |  841
+> > > ++++++++++++++++----
+> > >  .../include/mach}/regs-clock.h                     |    0
+> > >  2 files changed, 703 insertions(+), 138 deletions(-)
+> > >  copy arch/arm/{plat-s5pc1xx/include/plat =>
+> > mach-s5pc100/include/mach}/regs-
+> > > clock.h (100%)
+> > >
 
-> Forgot to add --compose to send-email, so here's what should have gone
-> into the first email of this series:
+(snip)
+
+> >
+> > Marek,
+> >
+> > Actually, need to modify many part to fit new clock scheme.
+> > For example, to use clksrc_clk is easily to handle clock.
 > 
-> S3C2416 support, mainly just processor core and a few peripheral setup
-> patches. Also has basic support for the S3C2450 which is very similar
-> SoC which will be updated later in the series.
+> I thought I covered most of the changes. Probably only the armclk
+> related functions and a cleanup in s5pc100/mach/regs-clock.h are
+> left and these can be easily fixed.
 > 
-> Currently based on the s3c24xx gpio series.
+> > S.LSI already made the patch for C100 clock changing which is using
+> > clksrc_clk structure. So may I submit it?
 > 
-> Russell, let me know if this is ok for the next merge window, and if so
-> I'll send a pull request.
-> 
-> > Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
-> > Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> > ---
-> >  arch/arm/mach-s3c2410/include/mach/uncompress.h |    4 +++-
-> >  1 files changed, 3 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-s3c2410/include/mach/uncompress.h b/arch/arm/mach-s3c2410/include/mach/uncompress.h
-> > index 72f756c..8b283f8 100644
-> > --- a/arch/arm/mach-s3c2410/include/mach/uncompress.h
-> > +++ b/arch/arm/mach-s3c2410/include/mach/uncompress.h
-> > @@ -40,7 +40,9 @@ static void arch_detect_cpu(void)
-> >  	cpuid &= S3C2410_GSTATUS1_IDMASK;
-> >  
-> >  	if (is_arm926() || cpuid == S3C2410_GSTATUS1_2440 ||
-> > -	    cpuid == S3C2410_GSTATUS1_2442) {
-> > +	    cpuid == S3C2410_GSTATUS1_2442 ||
-> > +	    cpuid == S3C2410_GSTATUS1_2416 ||
-> > +	    cpuid == S3C2410_GSTATUS1_2450) {
-> >  		fifo_mask = S3C2440_UFSTAT_TXMASK;
-> >  		fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
-> >  	} else {
-> > -- 
-> > 1.6.3.3
-> > 
-> 
-> -- 
-> -- 
-> Ben
-> 
-> Q:      What's a light-year?
-> A:      One-third less calories than a regular year.
+> Could you compare your version with the final version that is created
+> by my patch series? I don't think that there will be many differences
+> there.
 > 
 
--- 
-Yauhen Kharuzhy		jekhor _at_ gmail.com
-			JID: jek at jabber.ru
+There are defined clock source of C100 available clock in SYS.LSI patch like
+clocks defined by CLK_SRC1 register.
+SYS.LSI has covered all possible C100 clocks in our patch.
 
-A: No
-Q: Should I quote below my post?
+So I think SYS.LSI patch provides more functionality based on Ben Dooks' new
+clock scheme.
+
+How about check/review it after my submitting?
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
