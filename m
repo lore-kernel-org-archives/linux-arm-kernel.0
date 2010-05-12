@@ -1,47 +1,54 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 12 May 2010 23:43:45 +0100
-Subject: [PATCH] h1940: framebuffer configuration fix
-In-Reply-To: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
-References: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
-Message-ID: <20100512224345.GK6684@trinity.fluff.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 13 May 2010 08:47:11 +1000
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <20100512222154.GA6841@shareable.org>
+References: <1273569821.21352.19.camel@pasglop>
+	<1273575478.21352.29.camel@pasglop>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
+	<20100512222154.GA6841@shareable.org>
+Message-ID: <1273704431.21352.136.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 11:20:29PM +0400, Mike Solovyev wrote:
-> Seems like a typo, wrong setup leads to broken image on ipaq screen.
-
-arnaud, any comments here?
- 
-> Signed-off-by: Mike Solovyev <ms@sk.2-ch.org>
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> ---
->  arch/arm/mach-s3c2410/mach-h1940.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Wed, 2010-05-12 at 23:21 +0100, Jamie Lokier wrote:
+> Shilimkar, Santosh wrote:
+> > There was a memory write barrier missing before the DMA descriptors 
+> > are handed over to DMA controller.
 > 
-> Index: linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-s3c2410/mach-h1940.c
-> +++ linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
-> @@ -162,8 +162,8 @@ static struct s3c2410fb_display h1940_lc
->  	.xres =		240,
->  	.yres =		320,
->  	.bpp =		16,
-> -	.left_margin =	20,
-> -	.right_margin =	8,
-> +	.left_margin =	8,
-> +	.right_margin =	20,
->  	.hsync_len =	4,
->  	.upper_margin =	8,
->  	.lower_margin = 7,
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On that note, are the cache flush functions implicit memory barriers?
 
--- 
--- 
-Ben
+(Adding Fujita on CC)
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+That's a very good question. The generic inline implementation of
+dma_sync_* is:
+
+static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
+					   size_t size,
+					   enum dma_data_direction dir)
+{
+	struct dma_map_ops *ops = get_dma_ops(dev);
+
+	BUG_ON(!valid_dma_direction(dir));
+	if (ops->sync_single_for_cpu)
+		ops->sync_single_for_cpu(dev, addr, size, dir);
+	debug_dma_sync_single_for_cpu(dev, addr, size, dir);
+}
+
+Which means that for coherent architectures that do not implement
+the ops->sync_* hooks, we are probably missing a barrier here... 
+
+Thus if the above is expected to be a memory barrier, it's broken on
+cache coherent powerpc for example. On non-coherent powerpc, we do cache
+flushes and those are implicit barriers.
+
+Now, in the case at hand, which is my ARM based NAS, I believe this
+is non cache-coherent and thus uses cache flush ops. I don't know ARM
+well enough but I would expect these to be implicit barriers. Russell ?
+Nico ?
+
+IE. You may have found a bug here though I don't know whether it's the
+bug we are hitting right now :-)
+
+Cheers,
+Ben.
