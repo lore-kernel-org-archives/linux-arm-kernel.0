@@ -1,59 +1,25 @@
 From: Jiri.Pinkava@vscht.cz (Pinkava J.)
-Date: Wed, 12 May 2010 15:22:24 +0200
-Subject: next-samsung: acer n30/n35 updates
-In-Reply-To: <20100511010326.GC26401@trinity.fluff.org>
-References: <20100507005050.GY2589@trinity.fluff.org> <4BE37CCA.30406@vscht.cz>
-	<20100511010326.GC26401@trinity.fluff.org>
-Message-ID: <4BEAAB90.1000407@vscht.cz>
+Date: Wed, 12 May 2010 15:26:18 +0200
+Subject: Acer n35 patches
+In-Reply-To: <20100507003726.GW2589@trinity.fluff.org>
+References: <20100506012258.GZ6684@trinity.fluff.org>
+	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
+	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
+	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
+	<4BE2C2CC.2010003@vscht.cz> <4BE2C2FF.8020404@vscht.cz>
+	<4BE2C688.2070209@vscht.cz>
+	<20100507003726.GW2589@trinity.fluff.org>
+Message-ID: <4BEAAC7A.3000204@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 11.5.2010 03:03, Ben Dooks napsal(a):
-> On Fri, May 07, 2010 at 04:36:58AM +0200, Pinkava J. wrote:
->> Dne 7.5.2010 02:50, Ben Dooks napsal(a):
->>> Acer n35 support has been provisonally merged into the following branch:
->>>
->>>   git://git.fluff.org/bjdooks/linux.git for-2635/acer-n35
->>>
->>> If there are any objections, then let me know, otherwise this will be
->>> merged into next-samsug this weekend ready to go in the next merge window.
->>>
->>> Jiri, please confirm that you've read Section 12 'Sign your work' of
->>> Documentation/SubmittingPatches and that you agree to the part on
->>> "Developer's Certificate of Origin 1.1"
->> I comfirming that I've read above mentioned.
->>
->> In order to be absolutely clear I must mention that patches 4-7 are based on old
->> patches from Christer Weinigel (author of current implementation of Samsung n30
->> code in kernel). Is this OK?
+I might update patches to use new GPIO infrastructure for S3C already in
+samsung-next (genecit s3c calls instead of s3c2410 GPIO calls)
+
+Dne 7.5.2010 02:37, Ben Dooks napsal(a):
+> On Thu, May 06, 2010 at 03:39:20PM +0200, Pinkava J. wrote:
+>> All chenges are taken against 2.6.34-r6 kernel
 > 
-> I'd run this past Christer if he wasn't already copied in on them.
-
-I wos trying contact them before fewtimes but withought response.
-
->  
->> >From may point of view I can agree with the part "Developer's Certificate of
->> Origin 1.1"
->>>
->>> The following commits are in:
->>>
->>> Pinkava J (7):
->>>       ARM: n30: Enable Acer n35 if Acer n30 is selected
->>>       ARM: n30: fix: suspended wrong USB port on Acer n35
->>>       ARM: n30: Add RTC platform device for Acer n30 / Acer n35
->>>       ARM: n35: Add support for LEDs on Acer n35
->>>       ARM: n35: Enable wake-up by Power button on Acer n35
->>>       ARM: n30: Add support for MMC card reader on Acer n30 / Acer n35
->>>       ARM: n30: Add support for power on/off on Acer n30 / Acer n35 MMC card reader
->>>
->>>  arch/arm/mach-s3c2410/Kconfig    |    7 ++++
->>>  arch/arm/mach-s3c2410/mach-n30.c |   65 +++++++++++++++++++++++++++++++++++++-
->>>  2 files changed, 71 insertions(+), 1 deletions(-)
->>>
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.6.34-rc6 should still have working gpio_set_value/gpio_direction_output
+> calls in it, please update patch 8 to at-least use these.
 > 
