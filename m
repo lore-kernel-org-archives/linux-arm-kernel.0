@@ -1,211 +1,208 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 12 May 2010 08:02:15 +0200
-Subject: [PATCH 07/16] ARM: S5PC100: Move gpio support from plat-s5pc1xx to
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 12 May 2010 15:05:07 +0900
+Subject: [PATCH 10/16] ARM: S5PC100: Move i2c helpers from plat-s5pc1xx to
 	mach-s5pc100
-In-Reply-To: <001901caf197$045119a0$0cf34ce0$%kim@samsung.com>
+In-Reply-To: <1270190944-21644-11-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-8-git-send-email-m.szyprowski@samsung.com>
-	<001901caf197$045119a0$0cf34ce0$%kim@samsung.com>
-Message-ID: <002c01caf198$ae4fd170$0aef7450$%szyprowski@samsung.com>
+	<1270190944-21644-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <001d01caf199$15266ad0$3f734070$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Marek Szyprowski wrote:
+> 
+> Move i2c helpers from plat-s5pc1xx to mach-s5pc100.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pc100/Kconfig                      |    5 +++
+>  arch/arm/mach-s5pc100/Makefile                     |    1 +
+>  arch/arm/mach-s5pc100/cpu.c                        |    5 +++
+>  arch/arm/mach-s5pc100/include/mach/map.h           |    2 +
+>  arch/arm/mach-s5pc100/setup-i2c0.c                 |   13 ++++++--
+>  .../{plat-s5pc1xx => mach-s5pc100}/setup-i2c1.c    |    4 +-
+>  arch/arm/plat-s5pc1xx/setup-i2c0.c                 |   30
+--------------------
+>  7 files changed, 24 insertions(+), 36 deletions(-)
+>  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-i2c1.c (89%)
+>  delete mode 100644 arch/arm/plat-s5pc1xx/setup-i2c0.c
+> 
+> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+> index 1e7b9a7..03a51e2 100644
+> --- a/arch/arm/mach-s5pc100/Kconfig
+> +++ b/arch/arm/mach-s5pc100/Kconfig
+> @@ -19,6 +19,11 @@ config S5PC100_SETUP_FB_24BPP
+>  	help
+>            Common setup code for S5PC100 with an 24bpp RGB display helper.
+> 
+> +config S5PC100_SETUP_I2C1
+> +	bool
+> +	help
+> +	  Common setup code for i2c bus 1.
+> +
+>  config MACH_SMDKC100
+>  	bool "SMDKC100"
+>  	select CPU_S5PC100
+> diff --git a/arch/arm/mach-s5pc100/Makefile
+b/arch/arm/mach-s5pc100/Makefile
+> index 878dc61..522d8b7 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -17,6 +17,7 @@ obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
+>  # Device setup
+> 
+>  obj-$(CONFIG_S5PC100_SETUP_FB_24BPP) += setup-fb-24bpp.o
+> +obj-$(CONFIG_S5PC100_SETUP_I2C1) += setup-i2c1.o
+> 
+>  # machine support
+> 
+> diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+> index 7d65b61..ec92290 100644
+> --- a/arch/arm/mach-s5pc100/cpu.c
+> +++ b/arch/arm/mach-s5pc100/cpu.c
+> @@ -38,6 +38,7 @@
+>  #include <plat/cpu.h>
+>  #include <plat/devs.h>
+>  #include <plat/clock.h>
+> +#include <plat/iic-core.h>
+>  #include <plat/s5pc100.h>
+> 
+>  /* Initial IO mappings */
+> @@ -77,6 +78,10 @@ static void s5pc100_idle(void)
+>  void __init s5pc100_map_io(void)
+>  {
+>  	iotable_init(s5pc100_iodesc, ARRAY_SIZE(s5pc100_iodesc));
+> +
+> +	/* the i2c devices are directly compatible with s3c2440 */
+> +	s3c_i2c0_setname("s3c2440-i2c");
+> +	s3c_i2c1_setname("s3c2440-i2c");
+>  }
+> 
+>  void __init s5pc100_init_clocks(int xtal)
+> diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-
+> s5pc100/include/mach/map.h
+> index f08fd76..82a1c9d 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/map.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/map.h
+> @@ -51,6 +51,7 @@
+>  #define S5P_SZ_UART		SZ_256
+> 
+>  #define S5PC100_PA_IIC0		(0xEC100000)
+> +#define S5PC100_PA_IIC1		(0xEC200000)
+> 
+>  #define S5PC100_PA_FB		(0xEE000000)
+> 
+> @@ -61,6 +62,7 @@
+>  /* compatibiltiy defines. */
+>  #define S3C_PA_UART		S5PC100_PA_UART
+>  #define S3C_PA_IIC		S5PC100_PA_IIC0
+> +#define S3C_PA_IIC1		S5PC100_PA_IIC1
+>  #define S3C_PA_FB		S5PC100_PA_FB
+> 
+>  #endif /* __ASM_ARCH_MAP_H */
+> diff --git a/arch/arm/mach-s5pc100/setup-i2c0.c
+b/arch/arm/mach-s5pc100/setup-
+> i2c0.c
+> index 8f65e58..dd3174e 100644
+> --- a/arch/arm/mach-s5pc100/setup-i2c0.c
+> +++ b/arch/arm/mach-s5pc100/setup-i2c0.c
+> @@ -1,9 +1,9 @@
+>  /* linux/arch/arm/mach-s5pc100/setup-i2c0.c
+>   *
+> - * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> - *		http://www.samsung.com/
+> + * Copyright 2009 Samsung Electronics Co.
+> + *	Byungho Min <bhmin@samsung.com>
+>   *
+> - * I2C0 GPIO configuration.
+> + * Base S5PC100 I2C bus 0 gpio configuration
+>   *
+>   * Based on plat-s3c64xx/setup-i2c0.c
+>   *
+> @@ -17,9 +17,14 @@
+> 
+>  struct platform_device; /* don't need the contents */
+> 
+> +#include <linux/gpio.h>
+>  #include <plat/iic.h>
+> +#include <plat/gpio-cfg.h>
+> 
+>  void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+>  {
+> -	/* Will be populated later */
+> +	s3c_gpio_cfgpin(S5PC100_GPD(3), S3C_GPIO_SFN(2));
+> +	s3c_gpio_setpull(S5PC100_GPD(3), S3C_GPIO_PULL_UP);
+> +	s3c_gpio_cfgpin(S5PC100_GPD(4), S3C_GPIO_SFN(2));
+> +	s3c_gpio_setpull(S5PC100_GPD(4), S3C_GPIO_PULL_UP);
+>  }
+> diff --git a/arch/arm/plat-s5pc1xx/setup-i2c1.c
+b/arch/arm/mach-s5pc100/setup-
+> i2c1.c
+> similarity index 89%
+> rename from arch/arm/plat-s5pc1xx/setup-i2c1.c
+> rename to arch/arm/mach-s5pc100/setup-i2c1.c
+> index a0a8b4a..d1fec26 100644
+> --- a/arch/arm/plat-s5pc1xx/setup-i2c1.c
+> +++ b/arch/arm/mach-s5pc100/setup-i2c1.c
+> @@ -1,9 +1,9 @@
+> -/* linux/arch/arm/plat-s3c64xx/setup-i2c1.c
+> +/* linux/arch/arm/mach-s5pc100/setup-i2c1.c
+>   *
+>   * Copyright 2009 Samsung Electronics Co.
+>   *	Byungho Min <bhmin@samsung.com>
+>   *
+> - * Base S5PC1XX I2C bus 1 gpio configuration
+> + * Base S5PC100 I2C bus 1 gpio configuration
+>   *
+>   * Based on plat-s3c64xx/setup-i2c1.c
+>   *
+> diff --git a/arch/arm/plat-s5pc1xx/setup-i2c0.c
+b/arch/arm/plat-s5pc1xx/setup-i2c0.c
+> deleted file mode 100644
+> index 5e4a7c3..0000000
+> --- a/arch/arm/plat-s5pc1xx/setup-i2c0.c
+> +++ /dev/null
+> @@ -1,30 +0,0 @@
+> -/* linux/arch/arm/plat-s5pc1xx/setup-i2c0.c
+> - *
+> - * Copyright 2009 Samsung Electronics Co.
+> - *	Byungho Min <bhmin@samsung.com>
+> - *
+> - * Base S5PC1XX I2C bus 0 gpio configuration
+> - *
+> - * Based on plat-s3c64xx/setup-i2c0.c
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> -*/
+> -
+> -#include <linux/kernel.h>
+> -#include <linux/types.h>
+> -
+> -struct platform_device; /* don't need the contents */
+> -
+> -#include <linux/gpio.h>
+> -#include <plat/iic.h>
+> -#include <plat/gpio-cfg.h>
+> -
+> -void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+> -{
+> -	s3c_gpio_cfgpin(S5PC100_GPD(3), S3C_GPIO_SFN(2));
+> -	s3c_gpio_setpull(S5PC100_GPD(3), S3C_GPIO_PULL_UP);
+> -	s3c_gpio_cfgpin(S5PC100_GPD(4), S3C_GPIO_SFN(2));
+> -	s3c_gpio_setpull(S5PC100_GPD(4), S3C_GPIO_PULL_UP);
+> -}
+> --
+> 1.6.4
 
-On Wednesday, May 12, 2010 7:50 AM Kukjin Kim wrote:
+Looks good.
 
-> Marek Szyprowski wrote:
-> >
-> > Move gpio-lib support from plat-s5pc1xx to mach-s5pc100. Only basic gpio
-> > functionality is now supported. Gpio interrupts are disabled temporarly
-> > and will be added later.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pc100/Makefile                     |    2 +-
-> >  .../gpiolib.c => mach-s5pc100/gpio.c}              |   48
-> +++++++++++---------
-> >  .../plat => mach-s5pc100/include/mach}/regs-gpio.h |    2 +-
-> >  3 files changed, 28 insertions(+), 24 deletions(-)
-> >  rename arch/arm/{plat-s5pc1xx/gpiolib.c => mach-s5pc100/gpio.c} (90%)
-> >  rename arch/arm/{plat-s5pc1xx/include/plat =>
-> mach-s5pc100/include/mach}/regs-
-> > gpio.h (98%)
-> >
-> > diff --git a/arch/arm/mach-s5pc100/Makefile
-> b/arch/arm/mach-s5pc100/Makefile
-> > index 8371cfb..187b06d 100644
-> > --- a/arch/arm/mach-s5pc100/Makefile
-> > +++ b/arch/arm/mach-s5pc100/Makefile
-> > @@ -11,7 +11,7 @@ obj-				:=
-> >
-> >  # Core support for S5PC100 system
-> >
-> > -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
-> > +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpio.o
-> >  obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
-> >
-> >  # machine support
-> > diff --git a/arch/arm/plat-s5pc1xx/gpiolib.c b/arch/arm/mach-
-> s5pc100/gpio.c
-> > similarity index 90%
-> > rename from arch/arm/plat-s5pc1xx/gpiolib.c
-> > rename to arch/arm/mach-s5pc100/gpio.c
-> > index 1ffc57a..9f6fbe1 100644
-> > --- a/arch/arm/plat-s5pc1xx/gpiolib.c
-> > +++ b/arch/arm/mach-s5pc100/gpio.c
-> > @@ -4,7 +4,7 @@
-> >   *  Copyright 2009 Samsung Electronics Co
-> >   *  Kyungmin Park <kyungmin.park@samsung.com>
-> >   *
-> > - * S5PC1XX - GPIOlib support
-> > + * S5PC100 - GPIOlib support
-> >   *
-> >   * This program is free software; you can redistribute it and/or modify
-> >   * it under the terms of the GNU General Public License version 2 as
-> > @@ -17,11 +17,11 @@
-> >  #include <linux/gpio.h>
-> >
-> >  #include <mach/map.h>
-> > +#include <mach/regs-gpio.h>
-> >
-> >  #include <plat/gpio-core.h>
-> >  #include <plat/gpio-cfg.h>
-> >  #include <plat/gpio-cfg-helpers.h>
-> > -#include <plat/regs-gpio.h>
-> >
-> >  /* S5PC100 GPIO bank summary:
-> >   *
-> > @@ -72,7 +72,7 @@
-> >  #define gpio_dbg(x...) printk(KERN_DEBUG x)
-> >  #endif
-> >
-> > -/* The s5pc1xx_gpiolib routines are to control the gpio banks where
-> > +/* The s5pc100_gpiolib routines are to control the gpio banks where
-> >   * the gpio configuration register (GPxCON) has 4 bits per GPIO, as the
-> >   * following example:
-> >   *
-> > @@ -87,7 +87,7 @@
-> >   * the output.
-> >   */
-> >
-> > -static int s5pc1xx_gpiolib_input(struct gpio_chip *chip, unsigned offset)
-> > +static int s5pc100_gpiolib_input(struct gpio_chip *chip, unsigned offset)
-> 
-> If use the samsung gpiolib, no need this function.
-> 
-> >  {
-> >  	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
-> >  	void __iomem *base = ourchip->base;
-> > @@ -102,7 +102,7 @@ static int s5pc1xx_gpiolib_input(struct gpio_chip
-> *chip,
-> > unsigned offset)
-> >  	return 0;
-> >  }
-> >
-> > -static int s5pc1xx_gpiolib_output(struct gpio_chip *chip,
-> > +static int s5pc100_gpiolib_output(struct gpio_chip *chip,
-> >  				       unsigned offset, int value)
-> 
-> Same.
-> 
-> >  {
-> >  	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
-> > @@ -129,12 +129,14 @@ static int s5pc1xx_gpiolib_output(struct gpio_chip
-> *chip,
-> >  	return 0;
-> >  }
-> >
-> > -static int s5pc1xx_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
-> offset)
-> > +#if 0
-> > +static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
-> offset)
-> >  {
-> >  	return S3C_IRQ_GPIO(chip->base + offset);
-> >  }
-> > +#endif
-> >
-> > -static int s5pc1xx_gpiolib_to_eint(struct gpio_chip *chip, unsigned int
-> offset)
-> > +static int s5pc100_gpiolib_to_eint(struct gpio_chip *chip, unsigned int
-> offset)
-> >  {
-> >  	int base;
-> >
-> > @@ -449,33 +451,34 @@ static struct s3c_gpio_chip s5pc100_gpio_chips[] =
-> {
-> >  };
-> >
-> >  /* FIXME move from irq-gpio.c */
-> > -extern struct irq_chip s5pc1xx_gpioint;
-> > -extern void s5pc1xx_irq_gpioint_handler(unsigned int irq, struct
-> irq_desc
-> *desc);
-> > +extern struct irq_chip s5pc100_gpioint;
-> > +extern void s5pc100_irq_gpioint_handler(unsigned int irq, struct
-> irq_desc
-> *desc);
-> >
-> > -static __init void s5pc1xx_gpiolib_link(struct s3c_gpio_chip *chip)
-> > +static __init void s5pc100_gpiolib_link(struct s3c_gpio_chip *chip)
-> >  {
-> > -	chip->chip.direction_input = s5pc1xx_gpiolib_input;
-> > -	chip->chip.direction_output = s5pc1xx_gpiolib_output;
-> > +	chip->chip.direction_input = s5pc100_gpiolib_input;
-> > +	chip->chip.direction_output = s5pc100_gpiolib_output;
-> >  	chip->pm = __gpio_pm(&s3c_gpio_pm_4bit);
-> > -
-> > +#if 0
-> >  	/* Interrupt */
-> >  	if (chip->config == &gpio_cfg) {
-> >  		int i, irq;
-> >
-> > -		chip->chip.to_irq = s5pc1xx_gpiolib_to_irq;
-> > +		chip->chip.to_irq = s5pc100_gpiolib_to_irq;
-> >
-> >  		for (i = 0;  i < chip->chip.ngpio; i++) {
-> >  			irq = S3C_IRQ_GPIO_BASE + chip->chip.base + i;
-> > -			set_irq_chip(irq, &s5pc1xx_gpioint);
-> > +			set_irq_chip(irq, &s5pc100_gpioint);
-> >  			set_irq_data(irq, &chip->chip);
-> >  			set_irq_handler(irq, handle_level_irq);
-> >  			set_irq_flags(irq, IRQF_VALID);
-> >  		}
-> >  	} else if (chip->config == &gpio_cfg_eint)
-> > -		chip->chip.to_irq = s5pc1xx_gpiolib_to_eint;
-> > +		chip->chip.to_irq = s5pc100_gpiolib_to_eint;
-> > +#endif
-> >  }
-> >
-> > -static __init void s5pc1xx_gpiolib_add(struct s3c_gpio_chip *chips,
-> > +static __init void s5pc100_gpiolib_add(struct s3c_gpio_chip *chips,
-> >  				       int nr_chips,
-> >  				       void (*fn)(struct s3c_gpio_chip *))
-> >  {
-> > @@ -486,7 +489,7 @@ static __init void s5pc1xx_gpiolib_add(struct
-> > s3c_gpio_chip *chips,
-> >  	}
-> >  }
-> >
-> > -static __init int s5pc1xx_gpiolib_init(void)
-> > +static __init int s5pc100_gpiolib_init(void)
-> >  {
-> >  	struct s3c_gpio_chip *chips;
-> >  	int nr_chips;
-> > @@ -494,10 +497,11 @@ static __init int s5pc1xx_gpiolib_init(void)
-> >  		chips = s5pc100_gpio_chips;
-> >  		nr_chips = ARRAY_SIZE(s5pc100_gpio_chips);
-> >
-> > -	s5pc1xx_gpiolib_add(chips, nr_chips, s5pc1xx_gpiolib_link);
-> > +	s5pc100_gpiolib_add(chips, nr_chips, s5pc100_gpiolib_link);
-> 
-> How about using the samsung_gpiolib_add_4bit_chips in plat-samsung?
+Thanks.
 
-You are right, thanks for spotting this.
-
-Best regards
+Best regards,
+Kgene.
 --
-Marek Szyprowski
-Samsung Poland R&D Center
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
