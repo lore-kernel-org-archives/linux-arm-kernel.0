@@ -1,32 +1,43 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 May 2010 12:01:27 +0100
-Subject: [PATCH v2] [RESEND] Handle instruction cache maintenance fault
-	properly
-In-Reply-To: <AANLkTilVp0xvAJNns3TEe4SzEUpN8hMC9DdwmwW7i9yX@mail.gmail.com>
-References: <AANLkTilVp0xvAJNns3TEe4SzEUpN8hMC9DdwmwW7i9yX@mail.gmail.com>
-Message-ID: <1273662087.23818.63.camel@e102109-lin.cambridge.arm.com>
+Date: Wed, 12 May 2010 12:10:39 +0100
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <4BEA1559.9000107@gmail.com>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
+	<4BEA1559.9000107@gmail.com>
+Message-ID: <1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-05-11 at 11:33 +0100, Kirill A. Shutemov wrote:
-> Between "clean D line..." and "invalidate I line" operations in
-> v7_coherent_user_range(), the memory page may get swapped out.
-> And the fault on "invalidate I line" could not be properly handled
-> causing the oops.
+On Wed, 2010-05-12 at 03:41 +0100, Robert Hancock wrote:
+> On 05/11/2010 09:27 AM, saeed bishara wrote:
+> > Jeff,
+> > seems that the libata do pio to buffer which was allocated with
+> > kmalloc, and under arm arch, the flush_dcache_page() is needed to
+> > prevent cache aliasing, the later function calls the page_mapping
+> > which falls on PageSlab(page)
+> >
+> > as the flush_dcache_page() is needed to prevent aliasing, it can be
+> > skipped if the page is Slab as such pages are used only by the kernel.
+> > here a suggested patch:
+> >
+> > --- a/drivers/ata/libata-sff.c
+> > +++ b/drivers/ata/libata-sff.c
+> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+> >                                         do_write);
+> >          }
+> >
+> > -       if (!do_write)
+> > +       if (!do_write&&  !PageSlab(page))
+> >                  flush_dcache_page(page);
 > 
-> In ARMv6 "external abort on linefetch" replaced by "instruction cache
-> maintenance fault". Let's handle it as translation fault. It fixes the
-> issue.
-> 
-> I'm not sure if it's reasonable to check arch version in run-time.
-> Let's do it in compile time for now.
-> 
-> Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
-> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+> I would think that check belongs inside flush_dcache_page itself, rather
+> than forcing every driver to include it..
 
-FWIW:
+Sebastian (cc'ed) reported this as well for MIPS.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+I think it makes sense for this check to be done in the
+flush_dcache_page() function.
 
 -- 
 Catalin
