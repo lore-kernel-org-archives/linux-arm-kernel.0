@@ -1,443 +1,982 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 12 May 2010 10:58:13 +0530
-Subject: [PATCH] sdhci-spear: ST SPEAr based SDHCI controller glue
-In-Reply-To: <4BE77D23.7080705@st.com>
-References: <1273052118-15513-1-git-send-email-viresh.kumar@st.com>
-	<4BE77D23.7080705@st.com>
-Message-ID: <4BEA3C6D.7090208@st.com>
+From: jassi.brar@samsung.com (Jassi Brar)
+Date: Wed, 12 May 2010 14:23:18 +0900
+Subject: [PATCH] DMA: PL330: Add dma api driver
+Message-ID: <1273641798-26579-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/10/2010 8:57 AM, Viresh KUMAR wrote:
-> On 5/5/2010 3:05 PM, Viresh KUMAR wrote:
->> This patch adds glue layer for support of sdhci driver on ST SPEAr platform.
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
->>  MAINTAINERS                     |    6 +
->>  drivers/mmc/host/Kconfig        |   12 ++
->>  drivers/mmc/host/Makefile       |    1 +
->>  drivers/mmc/host/sdhci-spear.c  |  300 +++++++++++++++++++++++++++++++++++++++
->>  include/linux/mmc/sdhci-spear.h |   42 ++++++
->>  5 files changed, 361 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/mmc/host/sdhci-spear.c
->>  create mode 100644 include/linux/mmc/sdhci-spear.h
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 0369b22..bbff70a 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -4938,6 +4938,12 @@ L:	linux-mmc at vger.kernel.org
->>  S:	Maintained
->>  F:	drivers/mmc/host/sdhci-s3c.c
->>  
->> +SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) ST SPEAR DRIVER
->> +M:	Viresh Kumar <viresh.kumar@st.com>
->> +L:	linux-mmc at vger.kernel.org
->> +S:	Maintained
->> +F:	drivers/mmc/host/sdhci-spear.c
->> +
->>  SECURITY SUBSYSTEM
->>  M:	James Morris <jmorris@namei.org>
->>  L:	linux-security-module at vger.kernel.org (suggested Cc:)
->> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->> index 2e13b94..40eae7e 100644
->> --- a/drivers/mmc/host/Kconfig
->> +++ b/drivers/mmc/host/Kconfig
->> @@ -136,6 +136,18 @@ config MMC_SDHCI_S3C
->>  
->>  	  If unsure, say N.
->>  
->> +config MMC_SDHCI_SPEAR
->> +	tristate "SDHCI support on ST SPEAr platform"
->> +	depends on MMC_SDHCI && PLAT_SPEAR
->> +	help
->> +	  This selects the Secure Digital Host Controller Interface (SDHCI)
->> +	  often referrered to as the HSMMC block in some of the ST SPEAR range
->> +	  of SoC
->> +
->> +	  If you have a controller with this interface, say Y or M here.
->> +
->> +	  If unsure, say N.
->> +
->>  config MMC_SDHCI_S3C_DMA
->>  	bool "DMA support on S3C SDHCI"
->>  	depends on MMC_SDHCI_S3C && EXPERIMENTAL
->> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
->> index f480397..d00a9fa 100644
->> --- a/drivers/mmc/host/Makefile
->> +++ b/drivers/mmc/host/Makefile
->> @@ -14,6 +14,7 @@ obj-$(CONFIG_MMC_SDHCI)		+= sdhci.o
->>  obj-$(CONFIG_MMC_SDHCI_PCI)	+= sdhci-pci.o
->>  obj-$(CONFIG_MMC_SDHCI_PLTFM)	+= sdhci-pltfm.o
->>  obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
->> +obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
->>  obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
->>  obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
->>  obj-$(CONFIG_MMC_OMAP)		+= omap.o
->> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
->> new file mode 100644
->> index 0000000..6d3f740
->> --- /dev/null
->> +++ b/drivers/mmc/host/sdhci-spear.c
->> @@ -0,0 +1,300 @@
->> +/*
->> + * drivers/mmc/host/sdhci-spear.c
->> + *
->> + * Support of SDHCI platform devices for spear soc family
->> + *
->> + * Copyright (C) 2010 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * Inspired by sdhci-pltfm.c
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/gpio.h>
->> +#include <linux/highmem.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/mmc/host.h>
->> +#include <linux/mmc/sdhci-spear.h>
->> +#include <linux/io.h>
->> +#include "sdhci.h"
->> +
->> +struct spear_sdhci {
->> +	struct clk *clk;
->> +	struct sdhci_plat_data *data;
->> +};
->> +
->> +/* sdhci ops */
->> +static struct sdhci_ops sdhci_pltfm_ops = {
->> +	/* Nothing to do for now. */
->> +};
->> +
->> +/* gpio card detection interrupt handler */
->> +static irqreturn_t sdhci_gpio_irq(int irq, void *dev_id)
->> +{
->> +	struct platform_device *pdev = dev_id;
->> +	struct sdhci_host *host = platform_get_drvdata(pdev);
->> +	struct spear_sdhci *sdhci =
->> +		(struct spear_sdhci *)(pdev->dev.platform_data);
->> +	unsigned long gpio_irq_type;
->> +	int val;
->> +
->> +	val = gpio_get_value(sdhci->data->card_int_gpio);
->> +
->> +	/* val == 1 -> card removed, val == 0 -> card inserted */
->> +	/* if card removed - set irq for low level, else vice versa */
->> +	gpio_irq_type = val ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH;
->> +	set_irq_type(irq, gpio_irq_type);
->> +
->> +	if (sdhci->data->card_power_gpio >= 0) {
->> +		if (!sdhci->data->power_always_enb) {
->> +			/* if card inserted, give power, otherwise remove it */
->> +			val = sdhci->data->power_active_high ? !val : val ;
->> +			gpio_set_value(sdhci->data->card_power_gpio, val);
->> +		}
->> +	}
->> +
->> +	/* inform sdhci driver about card insertion/removal */
->> +	tasklet_schedule(&host->card_tasklet);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int __devinit sdhci_probe(struct platform_device *pdev)
->> +{
->> +	struct sdhci_host *host;
->> +	struct resource *iomem;
->> +	struct spear_sdhci *sdhci;
->> +	int ret;
->> +
->> +	BUG_ON(pdev == NULL);
->> +
->> +	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (!iomem) {
->> +		ret = -ENOMEM;
->> +		dev_dbg(&pdev->dev, "memory resource not defined\n");
->> +		goto err;
->> +	}
->> +
->> +	if (!request_mem_region(iomem->start, resource_size(iomem),
->> +				"spear-sdhci")) {
->> +		ret = -EBUSY;
->> +		dev_dbg(&pdev->dev, "cannot request region\n");
->> +		goto err;
->> +	}
->> +
->> +	sdhci = kzalloc(sizeof(*sdhci), GFP_KERNEL);
->> +	if (!sdhci) {
->> +		ret = -ENOMEM;
->> +		dev_dbg(&pdev->dev, "cannot allocate memory for sdhci\n");
->> +		goto err_kzalloc;
->> +	}
->> +
->> +	/* clk enable */
->> +	sdhci->clk = clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(sdhci->clk)) {
->> +		ret = PTR_ERR(sdhci->clk);
->> +		dev_dbg(&pdev->dev, "Error getting clock\n");
->> +		goto err_clk_get;
->> +	}
->> +
->> +	ret = clk_enable(sdhci->clk);
->> +	if (ret) {
->> +		dev_dbg(&pdev->dev, "Error enabling clock\n");
->> +		goto err_clk_enb;
->> +	}
->> +
->> +	/* overwrite platform_data */
->> +	sdhci->data = (struct sdhci_plat_data *)(pdev->dev.platform_data);
->> +	pdev->dev.platform_data = sdhci;
->> +
->> +	if (pdev->dev.parent)
->> +		host = sdhci_alloc_host(pdev->dev.parent, 0);
->> +	else
->> +		host = sdhci_alloc_host(&pdev->dev, 0);
->> +
->> +	if (IS_ERR(host)) {
->> +		ret = PTR_ERR(host);
->> +		dev_dbg(&pdev->dev, "error allocating host\n");
->> +		goto err_alloc_host;
->> +	}
->> +
->> +	host->hw_name = "sdhci";
->> +	host->ops = &sdhci_pltfm_ops;
->> +	host->irq = platform_get_irq(pdev, 0);
->> +	host->quirks = SDHCI_QUIRK_BROKEN_ADMA;
->> +
->> +	host->ioaddr = ioremap(iomem->start, resource_size(iomem));
->> +	if (!host->ioaddr) {
->> +		ret = -ENOMEM;
->> +		dev_dbg(&pdev->dev, "failed to remap registers\n");
->> +		goto err_ioremap;
->> +	}
->> +
->> +	ret = sdhci_add_host(host);
->> +	if (ret) {
->> +		dev_dbg(&pdev->dev, "error adding host\n");
->> +		goto err_add_host;
->> +	}
->> +
->> +	platform_set_drvdata(pdev, host);
->> +
->> +	/*
->> +	 * It is optional to use GPIOs for sdhci Power control & sdhci card
->> +	 * interrupt detection. If sdhci->data is NULL, then use original sdhci
->> +	 * lines otherwise GPIO lines.
->> +	 * If GPIO is selected for power control, then power should be disabled
->> +	 * after card removal and should be enabled when card insertion
->> +	 * interrupt occurs
->> +	 */
->> +	if (!sdhci->data)
->> +		return 0;
->> +
->> +	if (sdhci->data->card_power_gpio >= 0) {
->> +		int val = 0;
->> +
->> +		ret = gpio_request(sdhci->data->card_power_gpio, "sdhci");
->> +		if (ret < 0) {
->> +			dev_dbg(&pdev->dev, "gpio request fail: %d\n",
->> +					sdhci->data->card_power_gpio);
->> +			goto err_pgpio_request;
->> +		}
->> +
->> +		if (sdhci->data->power_always_enb)
->> +			val = sdhci->data->power_active_high;
->> +		else
->> +			val = !sdhci->data->power_active_high;
->> +
->> +		ret = gpio_direction_output(sdhci->data->card_power_gpio, val);
->> +		if (ret) {
->> +			dev_dbg(&pdev->dev, "gpio set direction fail: %d\n",
->> +					sdhci->data->card_power_gpio);
->> +			goto err_pgpio_direction;
->> +		}
->> +
->> +		gpio_set_value(sdhci->data->card_power_gpio, 1);
->> +	}
->> +
->> +	if (sdhci->data->card_int_gpio >= 0) {
->> +		ret = gpio_request(sdhci->data->card_int_gpio, "sdhci");
->> +		if (ret < 0) {
->> +			dev_dbg(&pdev->dev, "gpio request fail: %d\n",
->> +					sdhci->data->card_int_gpio);
->> +			goto err_igpio_request;
->> +		}
->> +
->> +		ret = gpio_direction_input(sdhci->data->card_int_gpio);
->> +		if (ret) {
->> +			dev_dbg(&pdev->dev, "gpio set direction fail: %d\n",
->> +					sdhci->data->card_int_gpio);
->> +			goto err_igpio_direction;
->> +		}
->> +		ret = request_irq(gpio_to_irq(sdhci->data->card_int_gpio),
->> +				sdhci_gpio_irq, IRQF_TRIGGER_LOW,
->> +				mmc_hostname(host->mmc), pdev);
->> +		if (ret) {
->> +			dev_dbg(&pdev->dev, "gpio request irq fail: %d\n",
->> +					sdhci->data->card_int_gpio);
->> +			goto err_igpio_request_irq;
->> +		}
->> +
->> +	}
->> +
->> +	return 0;
->> +
->> +err_igpio_request_irq:
->> +err_igpio_direction:
->> +	if (sdhci->data->card_int_gpio >= 0)
->> +		gpio_free(sdhci->data->card_int_gpio);
->> +err_igpio_request:
->> +err_pgpio_direction:
->> +	if (sdhci->data->card_power_gpio >= 0)
->> +		gpio_free(sdhci->data->card_power_gpio);
->> +err_pgpio_request:
->> +	platform_set_drvdata(pdev, NULL);
->> +	sdhci_remove_host(host, 1);
->> +err_add_host:
->> +	iounmap(host->ioaddr);
->> +err_ioremap:
->> +	sdhci_free_host(host);
->> +err_alloc_host:
->> +	clk_disable(sdhci->clk);
->> +err_clk_enb:
->> +	clk_put(sdhci->clk);
->> +err_clk_get:
->> +	kfree(sdhci);
->> +err_kzalloc:
->> +	release_mem_region(iomem->start, resource_size(iomem));
->> +err:
->> +	dev_err(&pdev->dev, "spear-sdhci probe failed: %d\n", ret);
->> +	return ret;
->> +}
->> +
->> +static int __devexit sdhci_remove(struct platform_device *pdev)
->> +{
->> +	struct sdhci_host *host = platform_get_drvdata(pdev);
->> +	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	struct spear_sdhci *sdhci =
->> +		(struct spear_sdhci *)(pdev->dev.platform_data);
->> +	int dead;
->> +	u32 scratch;
->> +
->> +	if (sdhci->data) {
->> +		if (sdhci->data->card_int_gpio >= 0) {
->> +			free_irq(gpio_to_irq(sdhci->data->card_int_gpio), pdev);
->> +			gpio_free(sdhci->data->card_int_gpio);
->> +		}
->> +
->> +		if (sdhci->data->card_power_gpio >= 0)
->> +			gpio_free(sdhci->data->card_power_gpio);
->> +	}
->> +
->> +	platform_set_drvdata(pdev, NULL);
->> +	dead = 0;
->> +	scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
->> +	if (scratch == (u32)-1)
->> +		dead = 1;
->> +
->> +	sdhci_remove_host(host, dead);
->> +	iounmap(host->ioaddr);
->> +	sdhci_free_host(host);
->> +	clk_disable(sdhci->clk);
->> +	clk_put(sdhci->clk);
->> +	kfree(sdhci);
->> +	if (iomem)
->> +		release_mem_region(iomem->start, resource_size(iomem));
->> +
->> +	return 0;
->> +}
->> +
->> +static struct platform_driver sdhci_driver = {
->> +	.driver = {
->> +		.name	= "sdhci",
->> +		.owner	= THIS_MODULE,
->> +	},
->> +	.probe		= sdhci_probe,
->> +	.remove		= __devexit_p(sdhci_remove),
->> +};
->> +
->> +static int __init sdhci_init(void)
->> +{
->> +	return platform_driver_register(&sdhci_driver);
->> +}
->> +module_init(sdhci_init);
->> +
->> +static void __exit sdhci_exit(void)
->> +{
->> +	platform_driver_unregister(&sdhci_driver);
->> +}
->> +module_exit(sdhci_exit);
->> +
->> +MODULE_DESCRIPTION("SPEAr Secure Digital Host Controller Interface driver");
->> +MODULE_AUTHOR("Viresh Kumar <viresh.kumar@st.com>");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/include/linux/mmc/sdhci-spear.h b/include/linux/mmc/sdhci-spear.h
->> new file mode 100644
->> index 0000000..9188c97
->> --- /dev/null
->> +++ b/include/linux/mmc/sdhci-spear.h
->> @@ -0,0 +1,42 @@
->> +/*
->> + * include/linux/mmc/sdhci-spear.h
->> + *
->> + * SDHCI declarations specific to ST SPEAr platform
->> + *
->> + * Copyright (C) 2010 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef MMC_SDHCI_SPEAR_H
->> +#define MMC_SDHCI_SPEAR_H
->> +
->> +#include <linux/platform_device.h>
->> +/*
->> + * struct sdhci_plat_data: spear sdhci platform data structure
->> + *
->> + * @card_power_gpio: gpio pin for enabling/disabling power to sdhci socket
->> + * @power_active_high: if set, enable power to sdhci socket by setting
->> + *			card_power_gpio
->> + * @power_always_enb: If set, then enable power on probe, otherwise enable only
->> + *			on card insertion and disable on card removal.
->> + * card_int_gpio: gpio pin used for card detection
->> + */
->> +struct sdhci_plat_data {
->> +	int card_power_gpio;
->> +	int power_active_high;
->> +	int power_always_enb;
->> +	int card_int_gpio;
->> +};
->> +
->> +/* This function is used to set platform_data field of pdev->dev */
->> +static inline void
->> +sdhci_set_plat_data(struct platform_device *pdev, struct sdhci_plat_data *data)
->> +{
->> +	pdev->dev.platform_data = data;
->> +}
->> +
->> +#endif /* MMC_SDHCI_SPEAR_H */
-> 
-> Pierre,
-> 
-> Is this patch fine? Or do i need to do some modifications?
-> 
-> regards,
-> viresh kumar.
-> 
+Add DMA Engine API driver for the PL330 DMAC.
+This driver is supposed to be reusable by various
+platforms that have one or more PL330 DMACs.
+Atm, DMA_SLAVE and DMA_MEMCPY capabilities have been
+implemented.
 
-Including linux-arm-kernel at lists.infradead.org in CC.
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+---
+Note:-
+a) This patch is revised to apply over 
+   async_tx of http://www.kernel.org/pub/scm/linux/kernel/git/djbw/async_tx.git
+b) This api driver depends upon the PL330 Core driver being merged.
+   http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6115/1
 
-viresh.
+ drivers/dma/Kconfig        |    9 +
+ drivers/dma/Makefile       |    1 +
+ drivers/dma/pl330.c        |  865 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/amba/pl330.h |   45 +++
+ 4 files changed, 920 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/dma/pl330.c
+ create mode 100644 include/linux/amba/pl330.h
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 1b88779..c55bdeb 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -166,6 +166,15 @@ config TIMB_DMA
+ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
+ 	bool
+ 
++config PL330_DMA
++	tristate "DMA API Driver for PL330"
++	select DMA_ENGINE
++	select PL330
++	help
++	  Select if your platform has one or more PL330 DMACs.
++	  You need to provide platform specific settings via
++	  platform_data for a dma-pl330 device.
++
+ config DMA_ENGINE
+ 	bool
+ 
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 2088142..0fe5ebb 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_COH901318) += coh901318.o coh901318_lli.o
+ obj-$(CONFIG_AMCC_PPC440SPE_ADMA) += ppc4xx/
+ obj-$(CONFIG_TIMB_DMA) += timb_dma.o
+ obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
++obj-$(CONFIG_PL330_DMA) += pl330.o
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+new file mode 100644
+index 0000000..303cfec
+--- /dev/null
++++ b/drivers/dma/pl330.c
+@@ -0,0 +1,865 @@
++/* linux/drivers/dma/pl330.c
++ *
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/dmaengine.h>
++#include <linux/interrupt.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/pl330.h>
++
++#define NR_DEFAULT_DESC	16
++
++enum desc_status {
++	/* In the DMAC pool */
++	FREE,
++	/*
++	 * Allocted to some channel during prep_xxx
++	 * Also may be sitting on the work_list.
++	 */
++	PREP,
++	/*
++	 * Sitting on the work_list and already submitted
++	 * to the PL330 core. Not more than two descriptors
++	 * of a channel can be BUSY at any time.
++	 */
++	BUSY,
++	/*
++	 * Sitting on the channel work_list but xfer done
++	 * by PL330 core
++	 */
++	DONE,
++};
++
++struct dma_pl330_chan {
++	/* Schedule desc completion */
++	struct tasklet_struct task;
++
++	/* DMA-Engine Channel */
++	struct dma_chan chan;
++
++	/* Last completed cookie */
++	dma_cookie_t completed;
++
++	/* List of to be xfered descriptors */
++	struct list_head work_list;
++
++	/* Pointer to the DMAC that manages this channel,
++	 * NULL if the channel is available to be acquired.
++	 * As the parent, this DMAC also provides descriptors
++	 * to the channel.
++	 */
++	struct dma_pl330_dmac *dmac;
++
++	/* To protect channel manipulation */
++	spinlock_t lock;
++
++	/* Token of a hardware channel thread of PL330 DMAC
++	 * NULL if the channel is available to be acquired.
++	 */
++	void *pl330_chid;
++};
++
++struct dma_pl330_dmac {
++	struct pl330_info pif;
++
++	/* DMA-Engine Device */
++	struct dma_device ddma;
++
++	/* Pool of descriptors available for the DMAC's channels */
++	struct list_head desc_pool;
++	/* To protect desc_pool manipulation */
++	spinlock_t pool_lock;
++
++	/* Peripheral channels connected to this DMAC */
++	struct dma_pl330_chan peripherals[0]; /* keep at end */
++};
++
++struct dma_pl330_desc {
++	/* To attach to a queue as child */
++	struct list_head node;
++
++	/* Descriptor for the DMA Engine API */
++	struct dma_async_tx_descriptor txd;
++
++	/* Xfer for PL330 core */
++	struct pl330_xfer px;
++
++	struct pl330_reqcfg rqcfg;
++	struct pl330_req req;
++
++	enum desc_status status;
++
++	/* The channel which currently holds this desc */
++	struct dma_pl330_chan *pchan;
++};
++
++static inline struct dma_pl330_chan *
++to_pchan(struct dma_chan *ch)
++{
++	if (!ch)
++		return NULL;
++
++	return container_of(ch, struct dma_pl330_chan, chan);
++}
++
++static inline struct dma_pl330_desc *
++to_desc(struct dma_async_tx_descriptor *tx)
++{
++	return container_of(tx, struct dma_pl330_desc, txd);
++}
++
++static inline void free_desc_list(struct list_head *list)
++{
++	struct dma_pl330_dmac *pdmac;
++	struct dma_pl330_desc *desc;
++	struct dma_pl330_chan *pch;
++	unsigned long flags;
++
++	if (list_empty(list))
++		return;
++
++	/* Finish off the work list */
++	list_for_each_entry(desc, list, node) {
++		dma_async_tx_callback callback;
++		void *param;
++
++		/* All desc in a list belong to same channel */
++		pch = desc->pchan;
++		callback = desc->txd.callback;
++		param = desc->txd.callback_param;
++
++		if (callback)
++			callback(param);
++
++		desc->pchan = NULL;
++	}
++
++	pdmac = pch->dmac;
++
++	spin_lock_irqsave(&pdmac->pool_lock, flags);
++	list_splice_tail_init(list, &pdmac->desc_pool);
++	spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++}
++
++static inline void fill_queue(struct dma_pl330_chan *pch)
++{
++	struct dma_pl330_desc *desc;
++	int ret;
++
++	list_for_each_entry(desc, &pch->work_list, node) {
++
++		/* If already submitted */
++		if (desc->status == BUSY)
++			break;
++
++		ret = pl330_submit_req(pch->pl330_chid,
++						&desc->req);
++		if (!ret) {
++			desc->status = BUSY;
++			break;
++		} else if (ret == -EAGAIN) {
++			/* QFull or DMAC Dying */
++			break;
++		} else {
++			/* Unacceptable request */
++			desc->status = DONE;
++			dev_err(pch->dmac->pif.dev, "%s:%d Bad Desc(%d)\n",
++					__func__, __LINE__, desc->txd.cookie);
++			tasklet_schedule(&pch->task);
++		}
++	}
++}
++
++static void pl330_tasklet(unsigned long data)
++{
++	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
++	struct dma_pl330_desc *desc, *_dt;
++	unsigned long flags;
++	LIST_HEAD(list);
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	/* Pick up ripe tomatoes */
++	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
++		if (desc->status == DONE) {
++			pch->completed = desc->txd.cookie;
++			list_move_tail(&desc->node, &list);
++		}
++
++	/* Try to submit a req imm. next to the last completed cookie */
++	fill_queue(pch);
++
++	/* Make sure the PL330 Channel thread is active */
++	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_START);
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++
++	free_desc_list(&list);
++}
++
++static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
++{
++	struct dma_pl330_desc *desc = token;
++	struct dma_pl330_chan *pch = desc->pchan;
++	unsigned long flags;
++
++	/* If desc aborted */
++	if (!pch)
++		return;
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	desc->status = DONE;
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++
++	tasklet_schedule(&pch->task);
++}
++
++static int pl330_alloc_chan_resources(struct dma_chan *chan)
++{
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct dma_pl330_dmac *pdmac = pch->dmac;
++	unsigned long flags;
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	pch->completed = chan->cookie = 1;
++
++	pch->pl330_chid = pl330_request_channel(&pdmac->pif);
++	if (!pch->pl330_chid) {
++		spin_unlock_irqrestore(&pch->lock, flags);
++		return 0;
++	}
++
++	tasklet_init(&pch->task, pl330_tasklet, (unsigned long) pch);
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++
++	return 1;
++}
++
++static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd)
++{
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct dma_pl330_desc *desc;
++	unsigned long flags;
++
++	/* Only supports DMA_TERMINATE_ALL */
++	if (cmd != DMA_TERMINATE_ALL)
++		return -ENXIO;
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	/* FLUSH the PL330 Channel thread */
++	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
++
++	/* Mark all desc done */
++	list_for_each_entry(desc, &pch->work_list, node)
++		desc->status = DONE;
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++
++	pl330_tasklet((unsigned long) pch);
++
++	return 0;
++}
++
++static void pl330_free_chan_resources(struct dma_chan *chan)
++{
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	tasklet_kill(&pch->task);
++
++	pl330_release_channel(pch->pl330_chid);
++	pch->pl330_chid = NULL;
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++}
++
++static enum dma_status
++pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
++		 struct dma_tx_state *txstate)
++{
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	dma_cookie_t last_done, last_used;
++	int ret;
++
++	last_done = pch->completed;
++	last_used = chan->cookie;
++
++	ret = dma_async_is_complete(cookie, last_done, last_used);
++
++	dma_set_tx_state(txstate, last_done, last_used, 0);
++
++	return ret;
++}
++
++static void pl330_issue_pending(struct dma_chan *chan)
++{
++	pl330_tasklet((unsigned long) to_pchan(chan));
++}
++
++/*
++ * We returned the last one of the circular list of descriptor(s)
++ * from prep_xxx, so the argument to submit corresponds to the last
++ * descriptor of the list.
++ */
++static dma_cookie_t pl330_tx_submit(struct dma_async_tx_descriptor *tx)
++{
++	struct dma_pl330_desc *desc, *last = to_desc(tx);
++	struct dma_pl330_chan *pch = to_pchan(tx->chan);
++	dma_cookie_t cookie;
++	unsigned long flags;
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	/* Assign cookies to all nodes */
++	cookie = tx->chan->cookie;
++
++	while (!list_empty(&last->node)) {
++		desc = list_entry(last->node.next, struct dma_pl330_desc, node);
++
++		if (++cookie < 0)
++			cookie = 1;
++		desc->txd.cookie = cookie;
++
++		list_move_tail(&desc->node, &pch->work_list);
++	}
++
++	if (++cookie < 0)
++		cookie = 1;
++	last->txd.cookie = cookie;
++
++	list_add_tail(&last->node, &pch->work_list);
++
++	tx->chan->cookie = cookie;
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++
++	return cookie;
++}
++
++static inline void _init_desc(struct dma_pl330_desc *desc)
++{
++	desc->pchan = NULL;
++	desc->req.x = &desc->px;
++	desc->req.token = desc;
++	desc->rqcfg.swap = SWAP_NO;
++	desc->rqcfg.privileged = 0;
++	desc->rqcfg.insnaccess = 0;
++	desc->rqcfg.scctl = SCCTRL0;
++	desc->rqcfg.dcctl = DCCTRL0;
++	desc->req.cfg = &desc->rqcfg;
++	desc->req.xfer_cb = dma_pl330_rqcb;
++	desc->txd.tx_submit = pl330_tx_submit;
++
++	INIT_LIST_HEAD(&desc->node);
++}
++
++/* Returns the number of descriptors added to the DMAC pool */
++int add_desc(struct dma_pl330_dmac *pdmac, gfp_t flg, int count)
++{
++	struct dma_pl330_desc *desc;
++	unsigned long flags;
++	int i;
++
++	if (!pdmac)
++		return 0;
++
++	desc = kmalloc(count * sizeof(*desc), flg);
++	if (!desc)
++		return 0;
++
++	spin_lock_irqsave(&pdmac->pool_lock, flags);
++
++	for (i = 0; i < count; i++) {
++		_init_desc(&desc[i]);
++		list_add_tail(&desc[i].node, &pdmac->desc_pool);
++	}
++
++	spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++
++	return count;
++}
++
++static struct dma_pl330_desc *
++pluck_desc(struct dma_pl330_dmac *pdmac)
++{
++	struct dma_pl330_desc *desc = NULL;
++	unsigned long flags;
++
++	if (!pdmac)
++		return NULL;
++
++	spin_lock_irqsave(&pdmac->pool_lock, flags);
++
++	if (!list_empty(&pdmac->desc_pool)) {
++		desc = list_entry(pdmac->desc_pool.next,
++				struct dma_pl330_desc, node);
++
++		list_del_init(&desc->node);
++
++		desc->status = PREP;
++		desc->txd.callback = NULL;
++	}
++
++	spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++
++	return desc;
++}
++
++static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
++{
++	struct dma_pl330_dmac *pdmac = pch->dmac;
++	struct dma_pl330_peri *peri = pch->chan.private;
++	struct dma_pl330_desc *desc;
++
++	/* Pluck one desc from the pool of DMAC */
++	desc = pluck_desc(pdmac);
++
++	/* If the DMAC pool is empty, alloc new */
++	if (!desc) {
++		if (!add_desc(pdmac, GFP_ATOMIC, 1))
++			return NULL;
++
++		/* Try again */
++		desc = pluck_desc(pdmac);
++		if (!desc) {
++			dev_err(pch->dmac->pif.dev,
++				"%s:%d ALERT!\n", __func__, __LINE__);
++			return NULL;
++		}
++	}
++
++	/* Initialize the descriptor */
++	desc->pchan = pch;
++	desc->txd.cookie = 0;
++	async_tx_ack(&desc->txd);
++
++	desc->req.rqtype = peri->rqtype;
++	desc->req.peri = peri->peri_id;
++
++	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
++
++	return desc;
++}
++
++static inline void fill_px(struct pl330_xfer *px,
++		dma_addr_t dst, dma_addr_t src, size_t len)
++{
++	px->next = NULL;
++	px->bytes = len;
++	px->dst_addr = dst;
++	px->src_addr = src;
++}
++
++static struct dma_pl330_desc *
++__pl330_prep_dma_memcpy(struct dma_pl330_chan *pch, dma_addr_t dst,
++		dma_addr_t src, size_t len)
++{
++	struct dma_pl330_desc *desc = pl330_get_desc(pch);
++
++	if (!desc) {
++		dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch desc\n",
++			__func__, __LINE__);
++		return NULL;
++	}
++
++	/*
++	 * Ideally we should lookout for reqs bigger than
++	 * those that can be programmed with 256 bytes of
++	 * MC buffer, but considering a req size is seldom
++	 * going to be word-unaligned and more than 200MB,
++	 * we take it easy.
++	 * Also, should the limit is reached we'd rather
++	 * have the platform increase MC buffer size than
++	 * complicating this API driver.
++	 */
++	fill_px(&desc->px, dst, src, len);
++
++	return desc;
++}
++
++/* Call after fixing burst size */
++static inline int get_burst_len(struct dma_pl330_desc *desc, size_t len)
++{
++	struct dma_pl330_chan *pch = desc->pchan;
++	struct pl330_info *pi = &pch->dmac->pif;
++	int burst_len;
++
++	burst_len = pi->pcfg.data_bus_width / 8;
++	burst_len *= pi->pcfg.data_buf_dep;
++	burst_len >>= desc->rqcfg.brst_size;
++
++	/* src/dst_burst_len can't be more than 16 */
++	if (burst_len > 16)
++		burst_len = 16;
++
++	while (burst_len > 1) {
++		if (!(len % (burst_len << desc->rqcfg.brst_size)))
++			break;
++		burst_len--;
++	}
++
++	return burst_len;
++}
++
++static struct dma_async_tx_descriptor *
++pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
++		dma_addr_t src, size_t len, unsigned long flags)
++{
++	struct dma_pl330_desc *desc;
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct dma_pl330_peri *peri = chan->private;
++	struct pl330_info *pi;
++	int burst;
++
++	if (unlikely(!pch || !len || !peri))
++		return NULL;
++
++	if (peri->rqtype != MEMTOMEM)
++		return NULL;
++
++	pi = &pch->dmac->pif;
++
++	desc = __pl330_prep_dma_memcpy(pch, dst, src, len);
++	if (!desc)
++		return NULL;
++
++	desc->rqcfg.src_inc = 1;
++	desc->rqcfg.dst_inc = 1;
++
++	/* Select max possible burst size */
++	burst = pi->pcfg.data_bus_width / 8;
++
++	while (burst > 1) {
++		if (!(len % burst))
++			break;
++		burst /= 2;
++	}
++
++	desc->rqcfg.brst_size = 0;
++	while (burst != (1 << desc->rqcfg.brst_size))
++		desc->rqcfg.brst_size++;
++
++	desc->rqcfg.brst_len = get_burst_len(desc, len);
++
++	desc->txd.flags = flags;
++
++	return &desc->txd;
++}
++
++static struct dma_async_tx_descriptor *
++pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
++		unsigned int sg_len, enum dma_data_direction direction,
++		unsigned long flg)
++{
++	struct dma_pl330_desc *first, *desc = NULL;
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct dma_pl330_peri *peri = chan->private;
++	struct scatterlist *sg;
++	unsigned long flags;
++	int i, burst_size;
++	dma_addr_t addr;
++
++	if (unlikely(!pch || !sgl || !sg_len))
++		return NULL;
++
++	/* Make sure the direction is consistent */
++	if ((direction == DMA_TO_DEVICE &&
++				peri->rqtype != MEMTODEV) ||
++			(direction == DMA_FROM_DEVICE &&
++				peri->rqtype != DEVTOMEM)) {
++		dev_err(pch->dmac->pif.dev, "%s:%d Invalid Direction\n",
++				__func__, __LINE__);
++		return NULL;
++	}
++
++	addr = peri->fifo_addr;
++	burst_size = peri->burst_sz;
++
++	first = NULL;
++
++	for_each_sg(sgl, sg, sg_len, i) {
++
++		desc = pl330_get_desc(pch);
++		if (!desc) {
++			struct dma_pl330_dmac *pdmac = pch->dmac;
++
++			dev_err(pch->dmac->pif.dev,
++				"%s:%d Unable to fetch desc\n",
++				__func__, __LINE__);
++			if (!first)
++				return NULL;
++
++			spin_lock_irqsave(&pdmac->pool_lock, flags);
++
++			while (!list_empty(&first->node)) {
++				desc = list_entry(first->node.next,
++						struct dma_pl330_desc, node);
++				list_move_tail(&desc->node, &pdmac->desc_pool);
++			}
++
++			list_move_tail(&first->node, &pdmac->desc_pool);
++
++			spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++
++			return NULL;
++		}
++
++		if (!first)
++			first = desc;
++		else
++			list_add_tail(&desc->node, &first->node);
++
++		if (direction == DMA_TO_DEVICE) {
++			desc->rqcfg.src_inc = 1;
++			desc->rqcfg.dst_inc = 0;
++			fill_px(&desc->px,
++				addr, sg_dma_address(sg), sg_dma_len(sg));
++		} else {
++			desc->rqcfg.src_inc = 0;
++			desc->rqcfg.dst_inc = 1;
++			fill_px(&desc->px,
++				sg_dma_address(sg), addr, sg_dma_len(sg));
++		}
++
++		desc->rqcfg.brst_size = burst_size;
++		desc->rqcfg.brst_len = 1;
++	}
++
++	/* Return the last desc in the chain */
++	desc->txd.flags = flg;
++	return &desc->txd;
++}
++
++static irqreturn_t pl330_irq_handler(int irq, void *data)
++{
++	if (pl330_update(data))
++		return IRQ_HANDLED;
++	else
++		return IRQ_NONE;
++}
++
++static int __devinit
++pl330_probe(struct amba_device *adev, struct amba_id *id)
++{
++	struct dma_pl330_platdata *pdat;
++	struct dma_pl330_dmac *pdmac;
++	struct dma_pl330_chan *pch;
++	struct pl330_info *pi;
++	struct dma_device *pd;
++	struct resource *res;
++	int i, ret, irq;
++
++	pdat = adev->dev.platform_data;
++
++	if (!pdat || !pdat->nr_valid_peri) {
++		dev_err(&adev->dev, "platform data missing\n");
++		return -ENODEV;
++	}
++
++	/* Allocate a new DMAC and its Channels */
++	pdmac = kzalloc(pdat->nr_valid_peri * sizeof(*pch)
++				+ sizeof(*pdmac), GFP_KERNEL);
++	if (!pdmac) {
++		dev_err(&adev->dev, "unable to allocate mem\n");
++		return -ENOMEM;
++	}
++
++	pi = &pdmac->pif;
++	pi->dev = &adev->dev;
++	pi->pl330_data = NULL;
++	pi->mcbufsz = pdat->mcbuf_sz;
++
++	res = &adev->res;
++	request_mem_region(res->start, resource_size(res), "dma-pl330");
++
++	pi->base = ioremap(res->start, resource_size(res));
++	if (!pi->base) {
++		ret = -ENXIO;
++		goto probe_err1;
++	}
++
++	irq = adev->irq[0];
++	ret = request_irq(irq, pl330_irq_handler, 0,
++			dev_name(&adev->dev), pi);
++	if (ret)
++		goto probe_err2;
++
++	ret = pl330_add(pi);
++	if (ret)
++		goto probe_err3;
++
++	INIT_LIST_HEAD(&pdmac->desc_pool);
++	spin_lock_init(&pdmac->pool_lock);
++
++	/* Create a descriptor pool of default size */
++	if (!add_desc(pdmac, GFP_KERNEL, NR_DEFAULT_DESC))
++		dev_warn(&adev->dev, "unable to allocate desc\n");
++
++	pd = &pdmac->ddma;
++	INIT_LIST_HEAD(&pd->channels);
++
++	/* Initialize channel parameters */
++	for (i = 0; i < pdat->nr_valid_peri; i++) {
++		struct dma_pl330_peri *peri = &pdat->peri[i];
++		pch = &pdmac->peripherals[i];
++
++		switch (peri->rqtype) {
++		case MEMTOMEM:
++			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
++			break;
++		case MEMTODEV:
++		case DEVTOMEM:
++			dma_cap_set(DMA_SLAVE, pd->cap_mask);
++			break;
++		default:
++			dev_err(&adev->dev, "DEVTODEV Not Supported\n");
++			continue;
++		}
++
++		INIT_LIST_HEAD(&pch->work_list);
++		spin_lock_init(&pch->lock);
++		pch->pl330_chid = NULL;
++		pch->chan.private = peri;
++		pch->chan.device = pd;
++		pch->chan.chan_id = i;
++		pch->dmac = pdmac;
++
++		/* Add the channel to the DMAC list */
++		pd->chancnt++;
++		list_add_tail(&pch->chan.device_node, &pd->channels);
++	}
++
++	pd->dev = &adev->dev;
++
++	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
++	pd->device_free_chan_resources = pl330_free_chan_resources;
++	pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
++	pd->device_tx_status = pl330_tx_status;
++	pd->device_prep_slave_sg = pl330_prep_slave_sg;
++	pd->device_control = pl330_control;
++	pd->device_issue_pending = pl330_issue_pending;
++
++	ret = dma_async_device_register(pd);
++	if (ret) {
++		dev_err(&adev->dev, "unable to register DMAC\n");
++		goto probe_err4;
++	}
++
++	amba_set_drvdata(adev, pdmac);
++
++	dev_info(&adev->dev,
++		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
++	dev_info(&adev->dev,
++		"\tDBUFF-%ux%ubytes Num_Chans-%u Num_Peri-%u Num_Events-%u\n",
++		pi->pcfg.data_buf_dep,
++		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
++		pi->pcfg.num_peri, pi->pcfg.num_events);
++
++	return 0;
++
++probe_err4:
++	pl330_del(pi);
++probe_err3:
++	free_irq(irq, pi);
++probe_err2:
++	iounmap(pi->base);
++probe_err1:
++	release_mem_region(res->start, resource_size(res));
++	kfree(pdmac);
++
++	return ret;
++}
++
++static int __devexit pl330_remove(struct amba_device *adev)
++{
++	struct dma_pl330_dmac *pdmac = amba_get_drvdata(adev);
++	struct dma_pl330_chan *pch, *_p;
++	struct pl330_info *pi;
++	struct resource *res;
++	int irq;
++
++	if (!pdmac)
++		return 0;
++
++	amba_set_drvdata(adev, NULL);
++
++	/* Idle the DMAC */
++	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
++			chan.device_node) {
++
++		/* Remove the channel */
++		list_del(&pch->chan.device_node);
++
++		/* Flush the channel */
++		pl330_control(&pch->chan, DMA_TERMINATE_ALL);
++		pl330_free_chan_resources(&pch->chan);
++	}
++
++	pi = &pdmac->pif;
++
++	pl330_del(pi);
++
++	irq = adev->irq[0];
++	free_irq(irq, pi);
++
++	iounmap(pi->base);
++
++	res = &adev->res;
++	release_mem_region(res->start, resource_size(res));
++
++	kfree(pdmac);
++
++	return 0;
++}
++
++static struct amba_id pl330_ids[] = {
++	{
++		.id	= 0x00041330,
++		.mask	= 0x000fffff,
++	},
++	{ 0, 0 },
++};
++
++static struct amba_driver pl330_driver = {
++	.drv = {
++		.owner = THIS_MODULE,
++		.name = "dma-pl330",
++	},
++	.id_table = pl330_ids,
++	.probe = pl330_probe,
++	.remove = pl330_remove,
++};
++
++static int __init pl330_init(void)
++{
++	return amba_driver_register(&pl330_driver);
++}
++module_init(pl330_init);
++
++static void __exit pl330_exit(void)
++{
++	amba_driver_unregister(&pl330_driver);
++	return;
++}
++module_exit(pl330_exit);
++
++MODULE_AUTHOR("Jaswinder Singh <jassi.brar@samsung.com>");
++MODULE_DESCRIPTION("API Driver for PL330 DMAC");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
+new file mode 100644
+index 0000000..cbee7de
+--- /dev/null
++++ b/include/linux/amba/pl330.h
+@@ -0,0 +1,45 @@
++/* linux/include/linux/amba/pl330.h
++ *
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef	__AMBA_PL330_H_
++#define	__AMBA_PL330_H_
++
++#include <asm/hardware/pl330.h>
++
++struct dma_pl330_peri {
++	/*
++	 * Peri_Req i/f of the DMAC that is
++	 * peripheral could be reached from.
++	 */
++	u8 peri_id; /* {0, 31} */
++	enum pl330_reqtype rqtype;
++
++	/* For M->D and D->M Channels */
++	int burst_sz; /* in power of 2 */
++	dma_addr_t fifo_addr;
++};
++
++struct dma_pl330_platdata {
++	/*
++	 * Number of valid peripherals connected to DMAC.
++	 * This may be different from the value read from
++	 * CR0, as the PL330 implementation might have 'holes'
++	 * in the peri list or the peri could also be reached
++	 * from another DMAC which the platform prefers.
++	 */
++	u8 nr_valid_peri;
++	/* Array of valid peripherals */
++	struct dma_pl330_peri *peri;
++	/* Bytes to allocate for MC buffer */
++	unsigned mcbuf_sz;
++};
++
++#endif	/* __AMBA_PL330_H_ */
+-- 
+1.6.2.5
