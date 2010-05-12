@@ -1,42 +1,30 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 12 May 2010 11:50:05 -0700
-Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <201005120923.48568.philippe.retornaz@epfl.ch>
-References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100511233811.GB31311@kroah.com>
-	<201005120923.48568.philippe.retornaz@epfl.ch>
-Message-ID: <20100512185005.GA28990@suse.de>
+From: ms@sk.2-ch.org (Mike Solovyev)
+Date: Wed, 12 May 2010 23:20:29 +0400
+Subject: [PATCH] h1940: framebuffer configuration fix
+Message-ID: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 09:23:48AM +0200, Philippe R?tornaz wrote:
-> Le mercredi, 12 mai 2010 01.38:12, Greg KH a ?crit :
-> > On Tue, May 11, 2010 at 04:14:34PM +0200, Philippe R?tornaz wrote:
-> > > On mx31 the OTG host initialisation fails if you need to have
-> > > an ULPI transfert to initialize the PHY.
-> > >
-> > > In order to be able to communicate with the PHY a complete reset
-> > > of the usb host is needed. After the PHY initialization the host
-> > > usb configuration registers need to be rewritten to avoid a host
-> > > controller lockup.
-> > >
-> > > Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> > > ---
-> > >  drivers/usb/host/ehci-mxc.c |   98
-> > > ++++++++++++++++++++++++++++++++++++++-----
-> > 
-> > This patch doesn't apply anymore, can you redo it against the linux-next
-> > tree?
-> > 
-> 
-> It apply cleanly on next-20100512. 
-> 
-> It needs commit 5a25ad84e01173bb225285eb50f9af48ed1a7598 to apply, but this 
-> one is in linux-next now.
+Seems like a typo, wrong setup leads to broken image on ipaq screen.
 
-Where is that patch from?  Some other tree?
+Signed-off-by: Mike Solovyev <ms@sk.2-ch.org>
+Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+---
+ arch/arm/mach-s3c2410/mach-h1940.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-confused,
-
-greg k-h
+Index: linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
+===================================================================
+--- linux-2.6.orig/arch/arm/mach-s3c2410/mach-h1940.c
++++ linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
+@@ -162,8 +162,8 @@ static struct s3c2410fb_display h1940_lc
+ 	.xres =		240,
+ 	.yres =		320,
+ 	.bpp =		16,
+-	.left_margin =	20,
+-	.right_margin =	8,
++	.left_margin =	8,
++	.right_margin =	20,
+ 	.hsync_len =	4,
+ 	.upper_margin =	8,
+ 	.lower_margin = 7,
