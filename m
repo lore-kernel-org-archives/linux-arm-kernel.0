@@ -1,22 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 May 2010 00:08:41 +0100
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273704431.21352.136.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
-	<20100512222154.GA6841@shareable.org>
-	<1273704431.21352.136.camel@pasglop>
-Message-ID: <20100512230841.GA10090@n2100.arm.linux.org.uk>
+From: hancockrwd@gmail.com (Robert Hancock)
+Date: Wed, 12 May 2010 17:22:35 -0600
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <20100512130638.GB19314@shareable.org>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
+	<4BEA1559.9000107@gmail.com>
+	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
+	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
+	<1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
+	<20100512130638.GB19314@shareable.org>
+Message-ID: <AANLkTilhIvv-knAVyivbo3o9LphUO4-j8-iVunlF2qcS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 08:47:11AM +1000, Benjamin Herrenschmidt wrote:
-> Now, in the case at hand, which is my ARM based NAS, I believe this
-> is non cache-coherent and thus uses cache flush ops. I don't know ARM
-> well enough but I would expect these to be implicit barriers. Russell ?
-> Nico ?
+On Wed, May 12, 2010 at 7:06 AM, Jamie Lokier <jamie@shareable.org> wrote:
+> Catalin Marinas wrote:
+>> On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
+>> > * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
+>> >
+>> > >> > --- a/drivers/ata/libata-sff.c
+>> > >> > +++ b/drivers/ata/libata-sff.c
+>> > >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+>> > >> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? do_write);
+>> > >> > ? ? ? ? ?}
+>> > >> >
+>> > >> > - ? ? ? if (!do_write)
+>> > >> > + ? ? ? if (!do_write&& ?!PageSlab(page))
+>> > >> > ? ? ? ? ? ? ? ? ?flush_dcache_page(page);
+>> > >>
+>> > >> I would think that check belongs inside flush_dcache_page itself, rather
+>> > >> than forcing every driver to include it..
+>> > >
+>> > >Sebastian (cc'ed) reported this as well for MIPS.
+>> > Thx. The patch above looks what I've sent a while ago. Jeff was going to
+>> > merge it afaik.
+>> >
+>> > >I think it makes sense for this check to be done in the
+>> > >flush_dcache_page() function.
+>> >
+>> > Why should flush_dcache_page() not flush pages you tell it?
+>> > From Documentation/cachetlb.txt:
+>> > | ? NOTE: This routine need only be called for page cache pages
+>> > | ? ? ? ? ?which can potentially ever be mapped into the address
+>> > | ? ? ? ? ?space of a user process. ?So for example, VFS layer code
+>> > | ? ? ? ? ?handling vfs symlinks in the page cache need not call
+>> > | ? ? ? ? ?this interface at all.
+>> >
+>> > A page from slab or stack is not going to see the sky of user land and
+>> > therefore it should not be fed into flush_dcache_page().
+>>
+>> You are right :), so fixing the driver is the best approach.
+>
+> It worries me that a driver has any knowledge of the PageSlab() flag,
+> though. ?Especially uncommented knowledge. ?That flag seems VM
+> internal, and it's conceptually iffy: Kernel code using
+> get_free_pages() and using that for I/O also does not see the sky of
+> user land.
+>
+> If all the PIO drivers have to be changed, I'd be happier with:
+>
+> ? ?flush_dcache_page_for_pio()
+>
+> which wraps the check, explains it, and provides a single place to
+> change if needed.
 
-ARMv5 doesn't have a weak memory ordering model, and doesn't have any
-memory barrier instructions.
+Indeed.. It's obscure enough for drivers to need to worry about these
+details of cache flushing/invalidation at all, let alone for them to
+have to worry about even more obscure details..
