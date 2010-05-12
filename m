@@ -1,46 +1,30 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 11 May 2010 16:47:11 -0700
-Subject: [PATCH 6/6] OMAP3: PM: Remove PER wakeup dependency on CORE.
-In-Reply-To: <1273621631-9148-1-git-send-email-khilman@deeprootsystems.com>
-References: <1273621631-9148-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1273621631-9148-7-git-send-email-khilman@deeprootsystems.com>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Wed, 12 May 2010 01:48:41 +0100
+Subject: [PATCH v2 0/5] HP iPAQ RX1950 patch series
+In-Reply-To: <1273560911-18153-1-git-send-email-anarsoul@gmail.com>
+References: <1273560911-18153-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100512004841.GJ6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Chan <mike@android.com>
+On Tue, May 11, 2010 at 09:55:06AM +0300, Vasily Khoruzhick wrote:
+> Following patch series add suport for iPAQ RX1950 PDA - another s3c2442-based
+> machine. Almost all drivers for this machine are included in mainline kernel,
+> and port only lacks battery, LED, WiFi and sound support, they will be added
+> later.
+> 
+> v2: removed unnecessary mappings
+> 	use loop for gpio pin configuration
+> 	fix key table formating
+> 	WARN_ON() the result of gpio_request()
 
-We can remove this wakeup dependency since now, when
-GPIO2-6 are enabled for IO-pad wakeup, PER domain is gauranteed
-to be awake or be woken up to service.
+Merged into for-2635/rx1950 and into next-samsung from there.
 
-The previous dependency did not handle all corner cases. Since there
-was no sleep dependency between CORE and PER domains, if PER enters
-RET and CORE is ON, PER will not be active for GPIO handling.
+Have not merged the mainatainers update as it should probably go
+to linux-kernel list.
 
-Signed-off-by: Mike Chan <mike@android.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/pm34xx.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index eec0916..1d71698 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -1096,14 +1096,6 @@ static int __init omap3_pm_init(void)
- 	omap3_idle_init();
- 
- 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
--	/*
--	 * REVISIT: This wkdep is only necessary when GPIO2-6 are enabled for
--	 * IO-pad wakeup.  Otherwise it will unnecessarily waste power
--	 * waking up PER with every CORE wakeup - see
--	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
--	*/
--	clkdm_add_wkdep(per_clkdm, core_clkdm);
--
- 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
- 		omap3_secure_ram_storage =
- 			kmalloc(0x803F, GFP_KERNEL);
 -- 
-1.7.0.2
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
