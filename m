@@ -1,35 +1,26 @@
-From: hancockrwd@gmail.com (Robert Hancock)
-Date: Tue, 11 May 2010 20:41:29 -0600
-Subject: [BUG] bug when enabling VM DEBUG
-In-Reply-To: <AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
-References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
-	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
-Message-ID: <4BEA1559.9000107@gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Tue, 11 May 2010 20:44:42 -0700
+Subject: [PATCHv2 2.6.34-rc7 2/3] mx5: change usb clock source from pll3
+	to pll2
+In-Reply-To: <20100511233221.GA31311@kroah.com>
+References: <1273508519-23033-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1273508519-23033-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<20100511233221.GA31311@kroah.com>
+Message-ID: <86A0E76937111F4C92FABEC0A2098851048701E6@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2010 09:27 AM, saeed bishara wrote:
-> Jeff,
-> seems that the libata do pio to buffer which was allocated with
-> kmalloc, and under arm arch, the flush_dcache_page() is needed to
-> prevent cache aliasing, the later function calls the page_mapping
-> which falls on PageSlab(page)
->
-> as the flush_dcache_page() is needed to prevent aliasing, it can be
-> skipped if the page is Slab as such pages are used only by the kernel.
-> here a suggested patch:
->
-> --- a/drivers/ata/libata-sff.c
-> +++ b/drivers/ata/libata-sff.c
-> @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
->                                         do_write);
->          }
->
-> -       if (!do_write)
-> +       if (!do_write&&  !PageSlab(page))
->                  flush_dcache_page(page);
->
-> saeed
+On Mon, May 10, 2010 at 11:21:58AM -0500, Dinh Nguyen wrote:
+> For power management reasons, pll2 should be used to source the USBOH3
 
-I would think that check belongs inside flush_dcache_page itself, rather 
-than forcing every driver to include it..
+> clock for mx51. PLL3 can be completely gated off when USB is not used.
+> 
+> This patch applies to 2.6.34-rc7.
+
+On Tuesday, May 11, 2010 6:32 PM , Greg KH wroe:
+> Hm, no, it seems to conflict and does not apply :(
+
+>I've taken the first one, shouldn't the two others go through some arm
+tree?
+
+It looks like Sascha has taken the patch 2/3 and 3/3. Thanks, Dinh
