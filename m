@@ -1,155 +1,199 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 12 May 2010 03:35:56 +0100
-Subject: [PATCH 05/15] ARM: SAMSUNG: Add s3c_disable_clocks() and tidy
-	init+disable usage
+Date: Wed, 12 May 2010 03:35:58 +0100
+Subject: [PATCH 07/15] ARM: S3C2416: Add initial support of SMDK2416
 In-Reply-To: <1273631766-15693-1-git-send-email-ben-linux@fluff.org>
 References: <1273631766-15693-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1273631766-15693-5-git-send-email-ben-linux@fluff.org>
+Message-ID: <1273631766-15693-7-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add s3c_disable_clocks() and change the clock registration code to use
-the s3c_register_clocks() followed by s3c_disable_clocks() instead of
-the loops it was using.
+From: Yauhen Kharuzhy <jekhor@gmail.com>
 
+Add support of SMDK2416 development board.
+
+Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2443/clock.c              |   27 ++++-----------------------
- arch/arm/plat-s3c24xx/s3c2410-clock.c      |   15 +++------------
- arch/arm/plat-samsung/clock.c              |   15 +++++++++++++++
- arch/arm/plat-samsung/include/plat/clock.h |    1 +
- 4 files changed, 23 insertions(+), 35 deletions(-)
+ arch/arm/mach-s3c2416/Kconfig         |    6 ++
+ arch/arm/mach-s3c2416/Makefile        |    1 +
+ arch/arm/mach-s3c2416/mach-smdk2416.c |  144 +++++++++++++++++++++++++++++++++
+ 3 files changed, 151 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s3c2416/mach-smdk2416.c
 
-diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-index 62cd4ea..76d8d66 100644
---- a/arch/arm/mach-s3c2443/clock.c
-+++ b/arch/arm/mach-s3c2443/clock.c
-@@ -492,7 +492,7 @@ static struct clk clk_prediv = {
+diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
+index cc320f6..528f273 100644
+--- a/arch/arm/mach-s3c2416/Kconfig
++++ b/arch/arm/mach-s3c2416/Kconfig
+@@ -21,5 +21,11 @@ config S3C2416_DMA
  
- /* standard clock definitions */
+ menu "S3C2416 Machines"
  
--static struct clk init_clocks_disable[] = {
-+static struct clk init_clocks_off[] = {
- 	{
- 		.name		= "nand",
- 		.id		= -1,
-@@ -761,9 +761,7 @@ void __init_or_cpufreq s3c2443_setup_clocks(void)
++config MACH_SMDK2416
++	bool "SMDK2416"
++	select CPU_S3C2416
++	select S3C_DEV_HSMMC
++	help
++	  Say Y here if you are using an SMDK2416
  
- void __init s3c2443_init_clocks(int xtal)
- {
--	struct clk *clkp;
- 	unsigned long epllcon = __raw_readl(S3C2443_EPLLCON);
--	int ret;
- 	int ptr;
+ endmenu
+diff --git a/arch/arm/mach-s3c2416/Makefile b/arch/arm/mach-s3c2416/Makefile
+index 34bb70d..9183e81 100644
+--- a/arch/arm/mach-s3c2416/Makefile
++++ b/arch/arm/mach-s3c2416/Makefile
+@@ -16,3 +16,4 @@ obj-$(CONFIG_CPU_S3C2416)	+= irq.o
  
- 	/* s3c2443 parents h and p clocks from prediv */
-@@ -774,15 +772,7 @@ void __init s3c2443_init_clocks(int xtal)
- 	s3c2443_setup_clocks();
- 	s3c2443_clk_initparents();
+ # Machine support
  
--	for (ptr = 0; ptr < ARRAY_SIZE(clks); ptr++) {
--		clkp = clks[ptr];
--
--		ret = s3c24xx_register_clock(clkp);
--		if (ret < 0) {
--			printk(KERN_ERR "Failed to register clock %s (%d)\n",
--			       clkp->name, ret);
--		}
--	}
-+	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
- 
- 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
- 		s3c_register_clksrc(clksrcs[ptr], 1);
-@@ -819,17 +809,8 @@ void __init s3c2443_init_clocks(int xtal)
- 
- 	/* install (and disable) the clocks we do not need immediately */
- 
--	clkp = init_clocks_disable;
--	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks_disable); ptr++, clkp++) {
--
--		ret = s3c24xx_register_clock(clkp);
--		if (ret < 0) {
--			printk(KERN_ERR "Failed to register clock %s (%d)\n",
--			       clkp->name, ret);
--		}
--
--		(clkp->enable)(clkp, 0);
--	}
-+	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
-+	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 
- 	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/plat-s3c24xx/s3c2410-clock.c b/arch/arm/plat-s3c24xx/s3c2410-clock.c
-index b61bdb7..9ecc5d9 100644
---- a/arch/arm/plat-s3c24xx/s3c2410-clock.c
-+++ b/arch/arm/plat-s3c24xx/s3c2410-clock.c
-@@ -87,7 +87,7 @@ static int s3c2410_upll_enable(struct clk *clk, int enable)
- 
- /* standard clock definitions */
- 
--static struct clk init_clocks_disable[] = {
-+static struct clk init_clocks_off[] = {
- 	{
- 		.name		= "nand",
- 		.id		= -1,
-@@ -249,17 +249,8 @@ int __init s3c2410_baseclk_add(void)
- 
- 	/* install (and disable) the clocks we do not need immediately */
- 
--	clkp = init_clocks_disable;
--	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks_disable); ptr++, clkp++) {
--
--		ret = s3c24xx_register_clock(clkp);
--		if (ret < 0) {
--			printk(KERN_ERR "Failed to register clock %s (%d)\n",
--			       clkp->name, ret);
--		}
--
--		s3c2410_clkcon_enable(clkp, 0);
--	}
-+	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
-+	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 
- 	/* show the clock-slow value */
- 
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index 1b25c9d..8bf79f3 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -376,6 +376,21 @@ void __init s3c_register_clocks(struct clk *clkp, int nr_clks)
- 	}
- }
- 
-+/**
-+ * s3c_disable_clocks() - disable an array of clocks
-+ * @clkp: Pointer to the first clock in the array.
-+ * @nr_clks: Number of clocks to register.
++obj-$(CONFIG_MACH_SMDK2416)	+= mach-smdk2416.o
+diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
+new file mode 100644
+index 0000000..8c9aed6
+--- /dev/null
++++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
+@@ -0,0 +1,144 @@
++/* linux/arch/arm/mach-s3c2416/mach-hanlin_v3c.c
 + *
-+ * for internal use only at initialisation time. disable the clocks in the
-+ * @clkp array.
-+ */
++ * Copyright (c) 2009 Yauhen Kharuzhy <jekhor@gmail.com>,
++ *	as part of OpenInkpot project
++ * Copyright (c) 2009 Promwad Innovation Company
++ *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
 +
-+void __init s3c_disable_clocks(struct clk *clkp, int nr_clks)
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/list.h>
++#include <linux/timer.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/mtd/partitions.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/irq.h>
++
++#include <mach/hardware.h>
++#include <asm/irq.h>
++#include <asm/mach-types.h>
++
++#include <plat/regs-serial.h>
++#include <mach/regs-gpio.h>
++#include <mach/regs-lcd.h>
++
++#include <mach/idle.h>
++#include <mach/fb.h>
++#include <mach/leds-gpio.h>
++#include <plat/iic.h>
++
++#include <plat/s3c2416.h>
++#include <plat/clock.h>
++#include <plat/devs.h>
++#include <plat/cpu.h>
++#include <plat/nand.h>
++
++#include <plat/common-smdk.h>
++
++static struct map_desc smdk2416_iodesc[] __initdata = {
++	/* ISA IO Space map (memory space selected by A24) */
++
++	{
++		.virtual	= (u32)S3C24XX_VA_ISA_WORD,
++		.pfn		= __phys_to_pfn(S3C2410_CS2),
++		.length		= 0x10000,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (u32)S3C24XX_VA_ISA_WORD + 0x10000,
++		.pfn		= __phys_to_pfn(S3C2410_CS2 + (1<<24)),
++		.length		= SZ_4M,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (u32)S3C24XX_VA_ISA_BYTE,
++		.pfn		= __phys_to_pfn(S3C2410_CS2),
++		.length		= 0x10000,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (u32)S3C24XX_VA_ISA_BYTE + 0x10000,
++		.pfn		= __phys_to_pfn(S3C2410_CS2 + (1<<24)),
++		.length		= SZ_4M,
++		.type		= MT_DEVICE,
++	}
++};
++
++#define UCON (S3C2410_UCON_DEFAULT	| \
++		S3C2440_UCON_PCLK	| \
++		S3C2443_UCON_RXERR_IRQEN)
++
++#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE)
++
++#define UFCON (S3C2410_UFCON_RXTRIG8	| \
++		S3C2410_UFCON_FIFOMODE	| \
++		S3C2440_UFCON_TXTRIG16)
++
++static struct s3c2410_uartcfg smdk2416_uartcfgs[] __initdata = {
++	[0] = {
++		.hwport	     = 0,
++		.flags	     = 0,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
++	},
++	[1] = {
++		.hwport	     = 1,
++		.flags	     = 0,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
++	},
++	/* IR port */
++	[2] = {
++		.hwport	     = 2,
++		.flags	     = 0,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON | 0x50,
++		.ufcon	     = UFCON,
++	}
++};
++
++static struct platform_device *smdk2416_devices[] __initdata = {
++	&s3c_device_wdt,
++	&s3c_device_i2c0,
++	&s3c_device_hsmmc0,
++};
++
++static void __init smdk2416_map_io(void)
 +{
-+	for (; nr_clks > 0; nr_clks--, clkp++)
-+		(clkp->enable)(clkp, 0);
++
++	s3c24xx_init_io(smdk2416_iodesc, ARRAY_SIZE(smdk2416_iodesc));
++	s3c24xx_init_clocks(12000000);
++	s3c24xx_init_uarts(smdk2416_uartcfgs, ARRAY_SIZE(smdk2416_uartcfgs));
++
 +}
 +
- /* initalise all the clocks */
- 
- int __init s3c24xx_register_baseclocks(unsigned long xtal)
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index 60b6269..12caf48 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -91,6 +91,7 @@ extern int s3c24xx_register_clock(struct clk *clk);
- extern int s3c24xx_register_clocks(struct clk **clk, int nr_clks);
- 
- extern void s3c_register_clocks(struct clk *clk, int nr_clks);
-+extern void s3c_disable_clocks(struct clk *clkp, int nr_clks);
- 
- extern int s3c24xx_register_baseclocks(unsigned long xtal);
- 
++static void __init smdk2416_machine_init(void)
++{
++	s3c_i2c0_set_platdata(NULL);
++
++	platform_add_devices(smdk2416_devices, ARRAY_SIZE(smdk2416_devices));
++	smdk_machine_init();
++}
++
++MACHINE_START(SMDK2416, "SMDK2416")
++	/* Maintainer: Yauhen Kharuzhy <jekhor@gmail.com> */
++	.phys_io	= S3C2410_PA_UART,
++	.io_pg_offst	= (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
++	.boot_params	= S3C2410_SDRAM_PA + 0x100,
++
++	.init_irq	= s3c24xx_init_irq,
++	.map_io		= smdk2416_map_io,
++	.init_machine	= smdk2416_machine_init,
++	.timer		= &s3c24xx_timer,
++MACHINE_END
 -- 
 1.6.3.3
