@@ -1,178 +1,289 @@
-From: janos.dev@gmail.com (Janos Laube)
-Date: Wed, 12 May 2010 19:20:52 +0200
-Subject: [PATCH 3/4] ARM: Gemini: add support for Raidsonic IB4220
-In-Reply-To: <1273522021-14436-4-git-send-email-ulli.kroll@googlemail.com>
-References: <1273522021-14436-1-git-send-email-ulli.kroll@googlemail.com>
-	<1273522021-14436-4-git-send-email-ulli.kroll@googlemail.com>
-Message-ID: <AANLkTinN72g2fdISEyYevS2QDeXtmK_8sGE9R1H2U245@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 12 May 2010 19:48:52 +0200
+Subject: [PATCH 05/16] ARM: S5PC100: new clocks definition
+In-Reply-To: <001501caf18f$8bedb830$a3c92890$%kim@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-6-git-send-email-m.szyprowski@samsung.com>
+	<001501caf18f$8bedb830$a3c92890$%kim@samsung.com>
+Message-ID: <003001caf1fb$64b5ecd0$2e21c670$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Janos Laube <janos.dev@gmail.com>
+Hello,
 
-On Mon, May 10, 2010 at 10:07 PM, Hans Ulli Kroll
-<ulli.kroll@googlemail.com> wrote:
-> From: Janos Laube <janos.dev@gmail.com>
->
-> Add support for Nasbox IB4220 from Raidsonic.
->
-> Signed-off-by: Janos Laube <janos.dev@gmail.com>
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> ---
-> ?arch/arm/mach-gemini/Kconfig ? ? ? ? ?| ? ?7 ++
-> ?arch/arm/mach-gemini/Makefile ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-gemini/board-nas4220b.c | ?111 +++++++++++++++++++++++++++++++++
-> ?3 files changed, 119 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-gemini/board-nas4220b.c
->
-> diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
-> index 7997500..6f066ee 100644
-> --- a/arch/arm/mach-gemini/Kconfig
-> +++ b/arch/arm/mach-gemini/Kconfig
-> @@ -2,6 +2,13 @@ if ARCH_GEMINI
->
-> ?menu "Cortina Systems Gemini Implementations"
->
-> +config MACH_NAS4220B
-> + ? ? ? bool "Raidsonic NAS-4220-B"
-> + ? ? ? select GEMINI_MEM_SWAP
-> + ? ? ? help
-> + ? ? ? ? Say Y here if you intend to run this kernel on a
-> + ? ? ? ? Raidsonic NAS-4220-B.
-> +
-> ?config MACH_RUT100
-> ? ? ? ?bool "Teltonika RUT100"
-> ? ? ? ?select GEMINI_MEM_SWAP
-> diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
-> index 8e02c47..c5b24b9 100644
-> --- a/arch/arm/mach-gemini/Makefile
-> +++ b/arch/arm/mach-gemini/Makefile
-> @@ -7,6 +7,7 @@
-> ?obj-y ? ? ? ? ? ? ? ? ?:= irq.o mm.o time.o devices.o gpio.o
->
-> ?# Board-specific support
-> +obj-$(CONFIG_MACH_NAS4220B) ? ?+= board-nas4220b.o
-> ?obj-$(CONFIG_MACH_RUT100) ? ? ?+= board-rut1xx.o
-> ?obj-$(CONFIG_MACH_WBD111) ? ? ?+= board-wbd111.o
-> ?obj-$(CONFIG_MACH_WBD222) ? ? ?+= board-wbd222.o
-> diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
-> new file mode 100644
-> index 0000000..01f1d6d
-> --- /dev/null
-> +++ b/arch/arm/mach-gemini/board-nas4220b.c
-> @@ -0,0 +1,111 @@
-> +/*
-> + * ?Support for Raidsonic NAS-4220-B
-> + *
-> + * ?Copyright (C) 2009 Janos Laube <janos.dev@gmail.com>
-> + *
-> + * based on rut1xx.c
-> + * ?Copyright (C) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/leds.h>
-> +#include <linux/input.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/mdio-gpio.h>
-> +#include <linux/io.h>
-> +
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/global_reg.h>
-> +
-> +#include "common.h"
-> +
-> +static struct sys_timer ib4220b_timer = {
-> + ? ? ? .init ? = gemini_timer_init,
-> +};
-> +
-> +static struct gpio_led ib4220b_leds[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "nas4220b:orange:hdd",
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "none",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = 60,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "nas4220b:green:os",
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "heartbeat",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = 62,
-> + ? ? ? },
-> +};
-> +
-> +static struct gpio_led_platform_data ib4220b_leds_data = {
-> + ? ? ? .num_leds ? ? ? = ARRAY_SIZE(ib4220b_leds),
-> + ? ? ? .leds ? ? ? ? ? = ib4220b_leds,
-> +};
-> +
-> +static struct platform_device ib4220b_led_device = {
-> + ? ? ? .name ? = "leds-gpio",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &ib4220b_leds_data,
-> + ? ? ? },
-> +};
-> +
-> +static struct gpio_keys_button ib4220b_keys[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? = KEY_SETUP,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = 61,
-> + ? ? ? ? ? ? ? .active_low ? ? = 1,
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? = "Backup Button",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = EV_KEY,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? = KEY_RESTART,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = 63,
-> + ? ? ? ? ? ? ? .active_low ? ? = 1,
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? = "Softreset Button",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = EV_KEY,
-> + ? ? ? },
-> +};
-> +
-> +static struct gpio_keys_platform_data ib4220b_keys_data = {
-> + ? ? ? .buttons ? ? ? ?= ib4220b_keys,
-> + ? ? ? .nbuttons ? ? ? = ARRAY_SIZE(ib4220b_keys),
-> +};
-> +
-> +static struct platform_device ib4220b_key_device = {
-> + ? ? ? .name ? = "gpio-keys",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &ib4220b_keys_data,
-> + ? ? ? },
-> +};
-> +
-> +static void __init ib4220b_init(void)
-> +{
-> + ? ? ? gemini_gpio_init();
-> + ? ? ? platform_register_uart();
-> + ? ? ? platform_register_pflash(SZ_16M, NULL, 0);
-> + ? ? ? platform_device_register(&ib4220b_led_device);
-> + ? ? ? platform_device_register(&ib4220b_key_device);
-> +}
-> +
-> +MACHINE_START(NAS4220B, "Raidsonic NAS IB-4220-B")
-> + ? ? ? .phys_io ? ? ? ?= 0x7fffc000,
-> + ? ? ? .io_pg_offst ? ?= ((0xffffc000) >> 18) & 0xfffc,
-> + ? ? ? .boot_params ? ?= 0x100,
-> + ? ? ? .map_io ? ? ? ? = gemini_map_io,
-> + ? ? ? .init_irq ? ? ? = gemini_init_irq,
-> + ? ? ? .timer ? ? ? ? ?= &ib4220b_timer,
-> + ? ? ? .init_machine ? = ib4220b_init,
-> +MACHINE_END
-> --
-> 1.7.0.3
->
->
+On Wednesday, May 12, 2010 6:57 AM Kukjin Kim wrote:
+
+> Marek Szyprowski wrote:
+> >
+> > Prepare for moving support for S5PC100 SoC to plat-s5p framework (part 3).
+> > This patch adds all clocks from plat-s5pc1xx/clocks.c and removes all the
+> > code that can be reused from plat-s5p/clock.c.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pc100/clock.c                      |  841
+> > ++++++++++++++++----
+> >  .../include/mach}/regs-clock.h                     |    0
+> >  2 files changed, 703 insertions(+), 138 deletions(-)
+> >  copy arch/arm/{plat-s5pc1xx/include/plat =>
+> mach-s5pc100/include/mach}/regs-
+> > clock.h (100%)
+> >
+> > diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-
+> s5pc100/clock.c
+> > index c391c61..75fa9be 100644
+> > --- a/arch/arm/mach-s5pc100/clock.c
+> > +++ b/arch/arm/mach-s5pc100/clock.c
+> > @@ -16,59 +16,22 @@
+> >  #include <linux/module.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/list.h>
+> > -#include <linux/errno.h>
+> >  #include <linux/err.h>
+> >  #include <linux/clk.h>
+> > -#include <linux/sysdev.h>
+> >  #include <linux/io.h>
+> >
+> > -#include <mach/hardware.h>
+> >  #include <mach/map.h>
+> >
+> >  #include <plat/cpu-freq.h>
+> > -
+> > -#include <plat/regs-clock.h>
+> > +#include <mach/regs-clock.h>
+> >  #include <plat/clock.h>
+> > -#include <plat/clock-clksrc.h>
+> >  #include <plat/cpu.h>
+> >  #include <plat/pll.h>
+> > -#include <plat/devs.h>
+> > +#include <plat/s5p-clock.h>
+> > +#include <plat/clock-clksrc.h>
+> >  #include <plat/s5pc100.h>
+> >
+> > -/* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
+> > - * ext_xtal_mux for want of an actual name from the manual.
+> > -*/
+> > -
+> > -static struct clk clk_ext_xtal_mux = {
+> > -	.name		= "ext_xtal",
+> > -	.id		= -1,
+> > -};
+> > -
+> > -#define clk_fin_apll clk_ext_xtal_mux
+> > -#define clk_fin_mpll clk_ext_xtal_mux
+> > -#define clk_fin_epll clk_ext_xtal_mux
+> > -#define clk_fin_hpll clk_ext_xtal_mux
+> > -
+> > -#define clk_fout_mpll	clk_mpll
+> > -#define clk_vclk_54m	clk_54m
+> > -
+> > -/* APLL */
+> > -static struct clk clk_fout_apll = {
+> > -	.name		= "fout_apll",
+> > -	.id		= -1,
+> > -	.rate		= 27000000,
+> > -};
+> > -
+> > -static struct clk *clk_src_apll_list[] = {
+> > -	[0] = &clk_fin_apll,
+> > -	[1] = &clk_fout_apll,
+> > -};
+> > -
+> > -static struct clksrc_sources clk_src_apll = {
+> > -	.sources	= clk_src_apll_list,
+> > -	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
+> > -};
+> > -
+> > +/* APLL Mux output clock */
+> >  static struct clksrc_clk clk_mout_apll = {
+> >  	.clk	= {
+> >  		.name		= "mout_apll",
+> > @@ -98,63 +61,6 @@ static struct clk clk_dout_apll = {
+> >  	},
+> >  };
+> >
+> > -static unsigned long s5pc100_clk_arm_get_rate(struct clk *clk)
+> > -{
+> > -	unsigned long rate = clk_get_rate(clk->parent);
+> > -	unsigned int ratio;
+> > -
+> > -	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_ARM_MASK;
+> > -	ratio >>= S5P_CLK_DIV0_ARM_SHIFT;
+> > -
+> > -	return rate / (ratio + 1);
+> > -}
+> > -
+> > -static unsigned long s5pc100_clk_arm_round_rate(struct clk *clk,
+> > -						unsigned long rate)
+> > -{
+> > -	unsigned long parent = clk_get_rate(clk->parent);
+> > -	u32 div;
+> > -
+> > -	if (parent < rate)
+> > -		return rate;
+> > -
+> > -	div = (parent / rate) - 1;
+> > -	if (div > S5P_CLK_DIV0_ARM_MASK)
+> > -		div = S5P_CLK_DIV0_ARM_MASK;
+> > -
+> > -	return parent / (div + 1);
+> > -}
+> > -
+> > -static int s5pc100_clk_arm_set_rate(struct clk *clk, unsigned long rate)
+> > -{
+> > -	unsigned long parent = clk_get_rate(clk->parent);
+> > -	u32 div;
+> > -	u32 val;
+> > -
+> > -	if (rate < parent / (S5P_CLK_DIV0_ARM_MASK + 1))
+> > -		return -EINVAL;
+> > -
+> > -	rate = clk_round_rate(clk, rate);
+> > -	div = clk_get_rate(clk->parent) / rate;
+> > -
+> > -	val = __raw_readl(S5P_CLK_DIV0);
+> > -	val &= S5P_CLK_DIV0_ARM_MASK;
+> > -	val |= (div - 1);
+> > -	__raw_writel(val, S5P_CLK_DIV0);
+> > -
+> > -	return 0;
+> > -}
+> > -
+> > -static struct clk clk_arm = {
+> > -	.name		= "armclk",
+> > -	.id		= -1,
+> > -	.parent		= &clk_dout_apll,
+> > -	.ops		= &(struct clk_ops) {
+> > -		.get_rate	= s5pc100_clk_arm_get_rate,
+> > -		.set_rate	= s5pc100_clk_arm_set_rate,
+> > -		.round_rate	= s5pc100_clk_arm_round_rate,
+> > -	},
+> > -};
+> >
+> >  static unsigned long s5pc100_clk_dout_d0_bus_get_rate(struct clk *clk)
+> >  {
+> > @@ -217,16 +123,6 @@ static struct clk clk_dout_apll2 = {
+> >  };
+> >
+> >  /* MPLL */
+> > -static struct clk *clk_src_mpll_list[] = {
+> > -	[0] = &clk_fin_mpll,
+> > -	[1] = &clk_fout_mpll,
+> > -};
+> > -
+> > -static struct clksrc_sources clk_src_mpll = {
+> > -	.sources	= clk_src_mpll_list,
+> > -	.nr_sources	= ARRAY_SIZE(clk_src_mpll_list),
+> > -};
+> > -
+> >  static struct clksrc_clk clk_mout_mpll = {
+> >  	.clk = {
+> >  		.name		= "mout_mpll",
+> > @@ -385,21 +281,6 @@ static struct clk clk_dout_mpll = {
+> >  };
+> >
+> >  /* EPLL */
+> > -static struct clk clk_fout_epll = {
+> > -	.name		= "fout_epll",
+> > -	.id		= -1,
+> > -};
+> > -
+> > -static struct clk *clk_src_epll_list[] = {
+> > -	[0] = &clk_fin_epll,
+> > -	[1] = &clk_fout_epll,
+> > -};
+> > -
+> > -static struct clksrc_sources clk_src_epll = {
+> > -	.sources	= clk_src_epll_list,
+> > -	.nr_sources	= ARRAY_SIZE(clk_src_epll_list),
+> > -};
+> > -
+> >  static struct clksrc_clk clk_mout_epll = {
+> >  	.clk	= {
+> >  		.name		= "mout_epll",
+> > @@ -471,6 +352,164 @@ static struct clk clk_pcm_cd1 = {
+> >  	.id		= -1,
+> >  };
+> >
+> > +static struct clk clk_hd0 = {
+> > +	.name		= "hclkd0",
+> > +	.id		= -1,
+> > +	.rate		= 0,
+> > +	.parent		= NULL,
+> > +	.ctrlbit	= 0,
+> > +	.ops		= &clk_ops_def_setrate,
+> > +};
+> > +
+> > +static struct clk clk_pd0 = {
+> > +	.name		= "pclkd0",
+> > +	.id		= -1,
+> > +	.rate		= 0,
+> > +	.parent		= NULL,
+> > +	.ctrlbit	= 0,
+> > +	.ops		= &clk_ops_def_setrate,
+> > +};
+> > +
+> > +static struct clk clk_54m = {
+> > +	.name		= "clk_54m",
+> > +	.id		= -1,
+> > +	.rate		= 54000000,
+> > +};
+> > +
+> > +
+> > +static int s5pc100_clk_48m_ctrl(struct clk *clk, int enable)
+> > +{
+> > +	unsigned long flags;
+> > +	u32 val;
+> > +
+> > +	/* can't rely on clock lock, this register has other usages */
+> > +	local_irq_save(flags);
+> > +
+> > +	val = __raw_readl(S5P_CLK_SRC1);
+> > +	if (enable)
+> > +		val |= S5P_CLK_SRC1_CLK48M_MASK;
+> > +	else
+> > +		val &= ~S5P_CLK_SRC1_CLK48M_MASK;
+> > +
+> > +	__raw_writel(val, S5P_CLK_SRC1);
+> > +	local_irq_restore(flags);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static unsigned long s5pc100_clk_arm_get_rate(struct clk *clk)
+> > +{
+> > +	unsigned long rate = clk_get_rate(clk->parent);
+> > +	unsigned int ratio;
+> > +
+> > +	ratio = __raw_readl(S5P_CLK_DIV0) & S5P_CLK_DIV0_ARM_MASK;
+> > +	ratio >>= S5P_CLK_DIV0_ARM_SHIFT;
+> > +
+> > +	return rate / (ratio + 1);
+> > +}
+> 
+> This is not correct. If you use structure of clksrc_clk, you can handle
+> this
+> easily. So no need this function.
+
+clksrc_clk cannot be used for armclk. You define it in a similar way in
+mach-s5p6440/clock.c
+
+> ...
+
+> > @@ -773,6 +812,11 @@ void __init_or_cpufreq s5pc100_setup_clocks(void)
+> >  	unsigned int ptr;
+> >  	u32 clkdiv0, clkdiv1;
+> >
+> > +	/* Hook callbacks to base clocks */
+> > +	clk_48m.enable = s5pc100_clk_48m_ctrl;
+> > +	clk_arm.ops = &s5pc100_armclk_ops;
+> 
+> No need to register ops member.
+
+Please check mach-s5p6440/clock.c, it is done exactly the same way.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
