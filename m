@@ -1,51 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 May 2010 13:24:59 +0100
-Subject: [BUG] bug when enabling VM DEBUG
-In-Reply-To: <20100512115340.GA11261@Chamillionaire.breakpoint.cc>
-References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
-	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
-	<4BEA1559.9000107@gmail.com>
-	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
-	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
-Message-ID: <1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Wed, 12 May 2010 15:34:23 +0300
+Subject: [PATCHv5 2/3] OMAP: export OMAP info under /proc/socinfo
+In-Reply-To: <20100511165846.GA10609@besouro.research.nokia.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
+	<4BE9697F.80308@ti.com>
+	<20100511165846.GA10609@besouro.research.nokia.com>
+Message-ID: <20100512123423.GA11782@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
-> * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
-> 
-> >> > --- a/drivers/ata/libata-sff.c
-> >> > +++ b/drivers/ata/libata-sff.c
-> >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
-> >> >                                         do_write);
-> >> >          }
-> >> >
-> >> > -       if (!do_write)
-> >> > +       if (!do_write&&  !PageSlab(page))
-> >> >                  flush_dcache_page(page);
-> >>
-> >> I would think that check belongs inside flush_dcache_page itself, rather
-> >> than forcing every driver to include it..
-> >
-> >Sebastian (cc'ed) reported this as well for MIPS.
-> Thx. The patch above looks what I've sent a while ago. Jeff was going to
-> merge it afaik.
-> 
-> >I think it makes sense for this check to be done in the
-> >flush_dcache_page() function.
-> 
-> Why should flush_dcache_page() not flush pages you tell it?
-> From Documentation/cachetlb.txt:
-> |   NOTE: This routine need only be called for page cache pages
-> |          which can potentially ever be mapped into the address
-> |          space of a user process.  So for example, VFS layer code
-> |          handling vfs symlinks in the page cache need not call
-> |          this interface at all.
-> 
-> A page from slab or stack is not going to see the sky of user land and
-> therefore it should not be fed into flush_dcache_page().
+Hello,
 
-You are right :), so fixing the driver is the best approach.
+On Tue, May 11, 2010 at 06:58:46PM +0200, Valentin Eduardo (Nokia-D/Helsinki) wrote:
+> Hello Nishanth,
+> 
+> On Tue, May 11, 2010 at 04:28:15PM +0200, ext Nishanth Menon wrote:
+> > Eduardo Valentin had written, on 05/11/2010 09:15 AM, the following:
+> > > From: Eduardo Valentin <eduardo.valentin@nokia.com>
+> > > 
+> > > Export OMAP name and rev under /proc/socinfo node.
+> > > 
+> > > Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+> > > ---
+> > >  arch/arm/Kconfig         |    1 +
+> > >  arch/arm/mach-omap1/id.c |   31 ++++++++++++++++++++++++-------
+> > >  arch/arm/mach-omap2/id.c |   32 ++++++++++++++++++++++++++------
+> > >  3 files changed, 51 insertions(+), 13 deletions(-)
+> > > 
+> > [..]
+> > 
+> > > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> > > index 37b8a1a..b67486b 100644
+> > > --- a/arch/arm/mach-omap2/id.c
+> > > +++ b/arch/arm/mach-omap2/id.c
+> > [..]
+> > 
+> > > @@ -356,7 +363,8 @@ void __init omap3_cpuinfo(void)
+> > >  	}
+> > >  
+> > >  	/* Print verbose information */
+> > > -	pr_info("%s ES%s (", cpu_name, cpu_rev);
+> > > +	snprintf(socinfo, SOCINFO_SZ, "%s ES%s", cpu_name, cpu_rev);
+> > > +	pr_info("%s (", socinfo);
+> > >  
+> > >  	OMAP3_SHOW_FEATURE(l2cache);
+> > >  	OMAP3_SHOW_FEATURE(iva);
+> > Just a minor comment -> is it a good idea to pushin the features to SOC 
+> > info as well? currently this is being displayed at bootlog and not 
+> > beyond.. might be a better approach to move it into socinfo..
+> 
+> Yeah. I would expect that someone would ask this. When I was writing this part
+> I also thought that would be nice to just duplicate all info which is printed
+> into kernel log buffer. But then I decided to proceed with only the info we are
+> needing from userspace. If you think that would be useful to know those as well,
+> then why not adding them.
 
--- 
-Catalin
+As discussed in #linux-omap IRC channel, we agreed that it would be nice and useful
+to export the OMAP FEATURES under this interface. But as the code to detect omap features is
+under re-work currently, for now we are going to leave it out of this patch set.
+
+> 
+> > 
+> > 
+> > [..]
+> > 
+> > -- 
+> > Regards,
+> > Nishanth Menon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
