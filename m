@@ -1,146 +1,115 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 May 2010 14:52:42 +0900
-Subject: [PATCH 08/16] ARM: S5PC100: Move frame buffer helpers from
-	plat-s5pc1xx to mach-s5pc100
-In-Reply-To: <1270190944-21644-9-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 12 May 2010 14:55:05 +0900
+Subject: [PATCH 09/16] ARM: SMDKC100: enable frame buffer again
+In-Reply-To: <1270190944-21644-10-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001a01caf197$59187050$0b4950f0$%kim@samsung.com>
+	<1270190944-21644-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <001b01caf197$aed79480$0c86bd80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Move frame buffer helpers from plat-s5pc1xx to mach-s5pc100.
+> This patch enables support for s3c frame buffer driver on SMDKC100 machine.
+> It also fixes the wrongly defined pixel clock value (it worked only before
+> commit eb29a5cc0b601).
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pc100/Kconfig                      |    7 +++++++
->  arch/arm/mach-s5pc100/Makefile                     |    4 ++++
->  arch/arm/mach-s5pc100/include/mach/irqs.h          |    5 +++++
->  arch/arm/mach-s5pc100/include/mach/map.h           |    5 ++++-
->  .../setup-fb-24bpp.c                               |    4 ++--
->  5 files changed, 22 insertions(+), 3 deletions(-)
->  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-fb-24bpp.c (91%)
+>  arch/arm/mach-s5pc100/Kconfig         |    2 ++
+>  arch/arm/mach-s5pc100/mach-smdkc100.c |   13 +++++--------
+>  2 files changed, 7 insertions(+), 8 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-> index 54c83a4..26e0028 100644
+> index 26e0028..1e7b9a7 100644
 > --- a/arch/arm/mach-s5pc100/Kconfig
 > +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -12,6 +12,13 @@ config CPU_S5PC100
->  	help
->  	  Enable S5PC100 CPU support
-> 
-> +# platform specific device setup
-
-I think 'machine' is better in your comment than 'platform'
-
-> +
-> +config S5PC100_SETUP_FB_24BPP
-> +	bool
-> +	help
-> +          Common setup code for S5PC100 with an 24bpp RGB display helper.
-> +
+> @@ -22,6 +22,8 @@ config S5PC100_SETUP_FB_24BPP
 >  config MACH_SMDKC100
 >  	bool "SMDKC100"
 >  	select CPU_S5PC100
-> diff --git a/arch/arm/mach-s5pc100/Makefile
-b/arch/arm/mach-s5pc100/Makefile
-> index 187b06d..878dc61 100644
-> --- a/arch/arm/mach-s5pc100/Makefile
-> +++ b/arch/arm/mach-s5pc100/Makefile
-> @@ -14,6 +14,10 @@ obj-				:=
->  obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpio.o
->  obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
+> +	select S5PC100_SETUP_FB_24BPP
+> +	select S3C_DEV_FB
+>  	help
+>  	  Machine support for the Samsung SMDKC100
 > 
-> +# Device setup
-> +
-> +obj-$(CONFIG_S5PC100_SETUP_FB_24BPP) += setup-fb-24bpp.o
-> +
->  # machine support
-> 
->  obj-$(CONFIG_MACH_SMDKC100)	+= mach-smdkc100.o
-> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
-> s5pc100/include/mach/irqs.h
-> index 6789eeb..c0747f1 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-> @@ -105,4 +105,9 @@
-> 
->  #define NR_IRQS		(IRQ_EINT(31) + 1)
-> 
-> +/* Compatibility */
-> +#define IRQ_LCD_FIFO		IRQ_LCD0
-> +#define IRQ_LCD_VSYNC		IRQ_LCD1
-> +#define IRQ_LCD_SYSTEM		IRQ_LCD2
-> +
-
-I found above code in the mainline.
-Please check commit edd6e3f89d7fe245149669400bd213140c16d6e4 that is from
-Pawel Osciak.
-
->  #endif /* __ASM_ARCH_IRQS_H */
-> diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-
-> s5pc100/include/mach/map.h
-> index a79b09f..f08fd76 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/map.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/map.h
-> @@ -25,7 +25,6 @@
->  #define S5PC100_PA_OTHERS	(0xE0200000)
->  #define S5PC100_VA_OTHERS	(S3C_VA_SYS + 0x10000)
-> 
+> diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-
+> s5pc100/mach-smdkc100.c
+> index 8dec25f..44984be 100644
+> --- a/arch/arm/mach-s5pc100/mach-smdkc100.c
+> +++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+> @@ -85,7 +85,7 @@ static struct i2c_board_info i2c_devs0[] __initdata = {
+>  /* I2C1 */
+>  static struct i2c_board_info i2c_devs1[] __initdata = {
+>  };
 > -
->  #define S5PC100_PA_GPIO		(0xE0300000)
->  #define S5P_PA_GPIO		S5PC100_PA_GPIO
-> 
-> @@ -53,11 +52,15 @@
-> 
->  #define S5PC100_PA_IIC0		(0xEC100000)
-> 
-> +#define S5PC100_PA_FB		(0xEE000000)
-> +
->  #define S5PC100_PA_SDRAM	(0x20000000)
-> +
+> +#endif
 
-Don't need empty line.
+What's the pair of the above '#endif'?
 
->  #define S5P_PA_SDRAM		S5PC100_PA_SDRAM
+>  /* LCD power controller */
+>  static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
+>  				   unsigned int power)
+> @@ -118,8 +118,7 @@ static struct platform_device smdkc100_lcd_powerdev = {
+>  static struct s3c_fb_pd_win smdkc100_fb_win0 = {
+>  	/* this is to ensure we use win0 */
+>  	.win_mode	= {
+> -		.refresh	= 70,
+> -		.pixclock	= (8+13+3+800)*(7+5+1+480),
+> +		.pixclock = 1000000000000ULL / ((8+13+3+800)*(7+5+1+480)*80),
+
+Too many 0 :-(
+And how about using the definition in the related LCD driver than hard
+coding.
+
+>  		.left_margin	= 8,
+>  		.right_margin	= 13,
+>  		.upper_margin	= 7,
+> @@ -139,17 +138,16 @@ static struct s3c_fb_platdata smdkc100_lcd_pdata
+> __initdata = {
+>  	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+>  	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
+>  };
+> -#endif
 > 
->  /* compatibiltiy defines. */
->  #define S3C_PA_UART		S5PC100_PA_UART
->  #define S3C_PA_IIC		S5PC100_PA_IIC0
-> +#define S3C_PA_FB		S5PC100_PA_FB
+>  static struct platform_device *smdkc100_devices[] __initdata = {
+> +	&s3c_device_fb,
+> +	&smdkc100_lcd_powerdev,
+>  #if 0
+>  	&s3c_device_i2c0,
+>  	&s3c_device_i2c1,
+> -	&s3c_device_fb,
+>  	&s3c_device_hsmmc0,
+>  	&s3c_device_hsmmc1,
+>  	&s3c_device_hsmmc2,
+> -	&smdkc100_lcd_powerdev,
+>  #endif
+>  };
 > 
->  #endif /* __ASM_ARCH_MAP_H */
-> diff --git a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-b/arch/arm/mach-s5pc100/setup-
-> fb-24bpp.c
-> similarity index 91%
-> rename from arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-> rename to arch/arm/mach-s5pc100/setup-fb-24bpp.c
-> index b02c36f..6eba6cb 100644
-> --- a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-> +++ b/arch/arm/mach-s5pc100/setup-fb-24bpp.c
-> @@ -1,9 +1,9 @@
->  /*
-> - * linux/arch/arm/plat-s5pc100/setup-fb-24bpp.c
-> + * linux/arch/arm/mach-s5pc100/setup-fb-24bpp.c
->   *
->   * Copyright 2009 Samsung Electronics
->   *
-> - * Base S5PC1XX setup information for 24bpp LCD framebuffer
-> + * Base S5PC100 setup information for 24bpp LCD framebuffer
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
+
+In the above code, need #if 0?
+
+> @@ -168,7 +166,7 @@ static void __init smdkc100_machine_init(void)
+>  	s3c_i2c1_set_platdata(NULL);
+>  	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+>  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+> -
+> +#endif
+>  	s3c_fb_set_platdata(&smdkc100_lcd_pdata);
+> 
+>  	/* LCD init */
+> @@ -176,7 +174,6 @@ static void __init smdkc100_machine_init(void)
+>  	gpio_request(S5PC100_GPH0(6), "GPH0");
+>  	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+>  	platform_add_devices(smdkc100_devices,
+> ARRAY_SIZE(smdkc100_devices));
+> -#endif
+>  }
+> 
+>  MACHINE_START(SMDKC100, "SMDKC100")
 > --
 
-In your setup-fb-24bpp.c,
-- No need DISR_OFFSET definition that is not used.
-
-And I can't apply this patch to my branches which are based on Ben's
-next-samsung or Linus' 34-rc7 also.
 
 Thanks.
 
