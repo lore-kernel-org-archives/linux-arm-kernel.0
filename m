@@ -1,201 +1,209 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 12 May 2010 07:54:50 +0200
-Subject: [PATCH 06/16] ARM: Samsung: move S5PC100 support from plat-s5pc1xx
-	to plat-s5p framework
-In-Reply-To: <001801caf195$da9e9ed0$8fdbdc70$%kim@samsung.com>
+Date: Wed, 12 May 2010 08:02:15 +0200
+Subject: [PATCH 07/16] ARM: S5PC100: Move gpio support from plat-s5pc1xx to
+	mach-s5pc100
+In-Reply-To: <001901caf197$045119a0$0cf34ce0$%kim@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-7-git-send-email-m.szyprowski@samsung.com>
-	<001801caf195$da9e9ed0$8fdbdc70$%kim@samsung.com>
-Message-ID: <002b01caf197$a48bedf0$eda3c9d0$%szyprowski@samsung.com>
+	<1270190944-21644-8-git-send-email-m.szyprowski@samsung.com>
+	<001901caf197$045119a0$0cf34ce0$%kim@samsung.com>
+Message-ID: <002c01caf198$ae4fd170$0aef7450$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Wednesday, May 12, 2010 7:42 AM Kukjin Kim wrote:
+On Wednesday, May 12, 2010 7:50 AM Kukjin Kim wrote:
 
 > Marek Szyprowski wrote:
 > >
-> > This patch moves S5PC100 SoC support to plat-s5p framework. Only cpu,
-> clocks
-> > and basic interrupts are supported. Other peripherals will be moved by
-> separate
-> > patches.
+> > Move gpio-lib support from plat-s5pc1xx to mach-s5pc100. Only basic gpio
+> > functionality is now supported. Gpio interrupts are disabled temporarly
+> > and will be added later.
 > >
 > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > ---
-> >  arch/arm/Kconfig                                   |    9 +-
-> >  arch/arm/Makefile                                  |    3 +-
-> >  arch/arm/mach-s5pc100/Kconfig                      |   23 +---
-> >  arch/arm/mach-s5pc100/Makefile                     |    8 +-
-> >  arch/arm/mach-s5pc100/cpu.c                        |   65 ++++-----
-> >  arch/arm/mach-s5pc100/include/mach/debug-macro.S   |    6 +-
-> >  arch/arm/mach-s5pc100/include/mach/entry-macro.S   |    8 +-
-> >  arch/arm/mach-s5pc100/include/mach/irqs.h          |   99 ++++++++++++-
-> >  arch/arm/mach-s5pc100/include/mach/map.h           |  151
-> ++++---------------
-> >  arch/arm/mach-s5pc100/include/mach/regs-clock.h    |    7 +-
-> >  arch/arm/mach-s5pc100/include/mach/regs-irq.h      |    5 -
-> >  arch/arm/mach-s5pc100/include/mach/system.h        |    7 +-
-> >  arch/arm/mach-s5pc100/include/mach/tick.h          |    4 +-
-> >  .../s5pc100-init.c => mach-s5pc100/init.c}         |    5 +-
-> >  arch/arm/mach-s5pc100/mach-smdkc100.c              |   19 ++--
-> >  arch/arm/mach-s5pc100/setup-i2c0.c                 |   25 ++++
-> >  arch/arm/plat-s5p/Kconfig                          |    2 +-
-> >  arch/arm/plat-s5p/cpu.c                            |   10 ++
-> >  arch/arm/plat-s5p/include/plat/s5pc100.h           |   33 +++++
-> >  arch/arm/plat-samsung/Kconfig                      |    2 +-
-> >  20 files changed, 267 insertions(+), 224 deletions(-)
-
-> ...
-
-> > diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
-> > index d79e757..7d65b61 100644
-> > --- a/arch/arm/mach-s5pc100/cpu.c
-> > +++ b/arch/arm/mach-s5pc100/cpu.c
-
-> ...
-
-> > @@ -73,35 +77,27 @@ static void s5pc100_idle(void)
-> >  void __init s5pc100_map_io(void)
-> >  {
-> >  	iotable_init(s5pc100_iodesc, ARRAY_SIZE(s5pc100_iodesc));
-> > -
-> > -	/* initialise device information early */
-> > -	s5pc100_default_sdhci0();
-> > -	s5pc100_default_sdhci1();
-> > -	s5pc100_default_sdhci2();
-> > -
-> > -	/* the i2c devices are directly compatible with s3c2440 */
-> > -	s3c_i2c0_setname("s3c2440-i2c");
-> > -	s3c_i2c1_setname("s3c2440-i2c");
-> >  }
+> >  arch/arm/mach-s5pc100/Makefile                     |    2 +-
+> >  .../gpiolib.c => mach-s5pc100/gpio.c}              |   48
+> +++++++++++---------
+> >  .../plat => mach-s5pc100/include/mach}/regs-gpio.h |    2 +-
+> >  3 files changed, 28 insertions(+), 24 deletions(-)
+> >  rename arch/arm/{plat-s5pc1xx/gpiolib.c => mach-s5pc100/gpio.c} (90%)
+> >  rename arch/arm/{plat-s5pc1xx/include/plat =>
+> mach-s5pc100/include/mach}/regs-
+> > gpio.h (98%)
 > >
-> >  void __init s5pc100_init_clocks(int xtal)
-> >  {
-> > -	printk(KERN_DEBUG "%s: initialising clocks\n", __func__);
-> > +	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
-> > +
-> >  	s3c24xx_register_baseclocks(xtal);
-> > -	s5pc1xx_register_clocks();
-> > +	s5p_register_clocks(xtal);
-> >  	s5pc100_register_clocks();
-> >  	s5pc100_setup_clocks();
-> >  }
+> > diff --git a/arch/arm/mach-s5pc100/Makefile
+> b/arch/arm/mach-s5pc100/Makefile
+> > index 8371cfb..187b06d 100644
+> > --- a/arch/arm/mach-s5pc100/Makefile
+> > +++ b/arch/arm/mach-s5pc100/Makefile
+> > @@ -11,7 +11,7 @@ obj-				:=
 > >
-> >  void __init s5pc100_init_irq(void)
-> >  {
-> > -	u32 vic_valid[] = {~0, ~0, ~0};
-> > +	u32 vic[] = {~0, ~0, ~0};
+> >  # Core support for S5PC100 system
 > >
-> >  	/* VIC0, VIC1, and VIC2 are fully populated. */
-> > -	s5pc1xx_init_irq(vic_valid, ARRAY_SIZE(vic_valid));
-> > +	s5p_init_irq(vic, ARRAY_SIZE(vic));
-> >  }
+> > -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
+> > +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpio.o
+> >  obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
 > >
-> > -struct sysdev_class s5pc100_sysclass = {
-> > +static struct sysdev_class s5pc100_sysclass = {
-> >  	.name	= "s5pc100-core",
-> >  };
-> 
-> No need to add static attribute for other driver.
-
-Is there any reason to keep this global? It is not used anywhere
-else and just pollutes the kernel name space.
-
-> ...
-
-> > diff --git a/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-> b/arch/arm/mach-
-> > s5pc100/include/mach/debug-macro.S
-> > index e181f57..70e02e9 100644
-> > --- a/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-> > @@ -22,12 +22,14 @@
-> >  	 * aligned and add in the offset when we load the value here.
-> >  	 */
+> >  # machine support
+> > diff --git a/arch/arm/plat-s5pc1xx/gpiolib.c b/arch/arm/mach-
+> s5pc100/gpio.c
+> > similarity index 90%
+> > rename from arch/arm/plat-s5pc1xx/gpiolib.c
+> > rename to arch/arm/mach-s5pc100/gpio.c
+> > index 1ffc57a..9f6fbe1 100644
+> > --- a/arch/arm/plat-s5pc1xx/gpiolib.c
+> > +++ b/arch/arm/mach-s5pc100/gpio.c
+> > @@ -4,7 +4,7 @@
+> >   *  Copyright 2009 Samsung Electronics Co
+> >   *  Kyungmin Park <kyungmin.park@samsung.com>
+> >   *
+> > - * S5PC1XX - GPIOlib support
+> > + * S5PC100 - GPIOlib support
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 as
+> > @@ -17,11 +17,11 @@
+> >  #include <linux/gpio.h>
 > >
-> > -	.macro addruart, rx, tmp
-> > +	.macro addruart, rx, rtmp
-> >  		mrc	p15, 0, \rx, c1, c0
-> >  		tst	\rx, #1
-> >  		ldreq	\rx, = S3C_PA_UART
-> > -		ldrne	\rx, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
-> > +		ldrne	\rx, = S3C_VA_UART
-> > +#if CONFIG_DEBUG_S3C_UART != 0
-> >  		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-> > +#endif
-> >  	.endm
+> >  #include <mach/map.h>
+> > +#include <mach/regs-gpio.h>
 > >
-> >  /* include the reset of the code which will do the work, we're only
-> > diff --git a/arch/arm/mach-s5pc100/include/mach/entry-macro.S
-> b/arch/arm/mach-
-> > s5pc100/include/mach/entry-macro.S
-> > index 6713193..ba76af0 100644
-> > --- a/arch/arm/mach-s5pc100/include/mach/entry-macro.S
-> > +++ b/arch/arm/mach-s5pc100/include/mach/entry-macro.S
-> 
-> How about changing S5PC100 from S5PC1XX the header in this entry-macro.S
-
-I must have missed that. I will check again if there are any S5PC1XX references
-left.
-
-> > diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-
-> > s5pc100/mach-smdkc100.c
-> > index ae3c52c..8dec25f 100644
-> > --- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-> > +++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-> > @@ -34,8 +34,6 @@
-> >  #include <asm/mach-types.h>
-> >
-> >  #include <plat/regs-serial.h>
-> > -#include <plat/gpio-cfg.h>
+> >  #include <plat/gpio-core.h>
+> >  #include <plat/gpio-cfg.h>
+> >  #include <plat/gpio-cfg-helpers.h>
 > > -#include <plat/regs-gpio.h>
 > >
-> >  #include <plat/clock.h>
-> >  #include <plat/devs.h>
-> 
-> There are definitions like UCON for UART in this file.
-> But those are not used.
-
-Well, right, I will fix this.
-
-> > @@ -79,6 +77,7 @@ static struct s3c2410_uartcfg smdkc100_uartcfgs[]
-> __initdata
-> > = {
-> >  	},
-> >  };
+> >  /* S5PC100 GPIO bank summary:
+> >   *
+> > @@ -72,7 +72,7 @@
+> >  #define gpio_dbg(x...) printk(KERN_DEBUG x)
+> >  #endif
 > >
-> > +#if 0
+> > -/* The s5pc1xx_gpiolib routines are to control the gpio banks where
+> > +/* The s5pc100_gpiolib routines are to control the gpio banks where
+> >   * the gpio configuration register (GPxCON) has 4 bits per GPIO, as the
+> >   * following example:
+> >   *
+> > @@ -87,7 +87,7 @@
+> >   * the output.
+> >   */
+> >
+> > -static int s5pc1xx_gpiolib_input(struct gpio_chip *chip, unsigned offset)
+> > +static int s5pc100_gpiolib_input(struct gpio_chip *chip, unsigned offset)
 > 
-> #if 0?
-
-I had to disable that part of code to make it compile. It is enabled later
-in separate patch when the relevant functionality got moved from plat-s5pc1xx
-to mach-s5pc100.
-
-> >  /* I2C0 */
-> >  static struct i2c_board_info i2c_devs0[] __initdata = {
-> >  };
-> > @@ -140,10 +139,10 @@ static struct s3c_fb_platdata smdkc100_lcd_pdata
-> > __initdata = {
-> >  	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-> >  	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
-> >  };
-> > -
-> > -static struct map_desc smdkc100_iodesc[] = {};
+> If use the samsung gpiolib, no need this function.
+> 
+> >  {
+> >  	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
+> >  	void __iomem *base = ourchip->base;
+> > @@ -102,7 +102,7 @@ static int s5pc1xx_gpiolib_input(struct gpio_chip
+> *chip,
+> > unsigned offset)
+> >  	return 0;
+> >  }
+> >
+> > -static int s5pc1xx_gpiolib_output(struct gpio_chip *chip,
+> > +static int s5pc100_gpiolib_output(struct gpio_chip *chip,
+> >  				       unsigned offset, int value)
+> 
+> Same.
+> 
+> >  {
+> >  	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
+> > @@ -129,12 +129,14 @@ static int s5pc1xx_gpiolib_output(struct gpio_chip
+> *chip,
+> >  	return 0;
+> >  }
+> >
+> > -static int s5pc1xx_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
+> offset)
+> > +#if 0
+> > +static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
+> offset)
+> >  {
+> >  	return S3C_IRQ_GPIO(chip->base + offset);
+> >  }
 > > +#endif
 > >
-> >  static struct platform_device *smdkc100_devices[] __initdata = {
+> > -static int s5pc1xx_gpiolib_to_eint(struct gpio_chip *chip, unsigned int
+> offset)
+> > +static int s5pc100_gpiolib_to_eint(struct gpio_chip *chip, unsigned int
+> offset)
+> >  {
+> >  	int base;
+> >
+> > @@ -449,33 +451,34 @@ static struct s3c_gpio_chip s5pc100_gpio_chips[] =
+> {
+> >  };
+> >
+> >  /* FIXME move from irq-gpio.c */
+> > -extern struct irq_chip s5pc1xx_gpioint;
+> > -extern void s5pc1xx_irq_gpioint_handler(unsigned int irq, struct
+> irq_desc
+> *desc);
+> > +extern struct irq_chip s5pc100_gpioint;
+> > +extern void s5pc100_irq_gpioint_handler(unsigned int irq, struct
+> irq_desc
+> *desc);
+> >
+> > -static __init void s5pc1xx_gpiolib_link(struct s3c_gpio_chip *chip)
+> > +static __init void s5pc100_gpiolib_link(struct s3c_gpio_chip *chip)
+> >  {
+> > -	chip->chip.direction_input = s5pc1xx_gpiolib_input;
+> > -	chip->chip.direction_output = s5pc1xx_gpiolib_output;
+> > +	chip->chip.direction_input = s5pc100_gpiolib_input;
+> > +	chip->chip.direction_output = s5pc100_gpiolib_output;
+> >  	chip->pm = __gpio_pm(&s3c_gpio_pm_4bit);
+> > -
 > > +#if 0
+> >  	/* Interrupt */
+> >  	if (chip->config == &gpio_cfg) {
+> >  		int i, irq;
+> >
+> > -		chip->chip.to_irq = s5pc1xx_gpiolib_to_irq;
+> > +		chip->chip.to_irq = s5pc100_gpiolib_to_irq;
+> >
+> >  		for (i = 0;  i < chip->chip.ngpio; i++) {
+> >  			irq = S3C_IRQ_GPIO_BASE + chip->chip.base + i;
+> > -			set_irq_chip(irq, &s5pc1xx_gpioint);
+> > +			set_irq_chip(irq, &s5pc100_gpioint);
+> >  			set_irq_data(irq, &chip->chip);
+> >  			set_irq_handler(irq, handle_level_irq);
+> >  			set_irq_flags(irq, IRQF_VALID);
+> >  		}
+> >  	} else if (chip->config == &gpio_cfg_eint)
+> > -		chip->chip.to_irq = s5pc1xx_gpiolib_to_eint;
+> > +		chip->chip.to_irq = s5pc100_gpiolib_to_eint;
+> > +#endif
+> >  }
+> >
+> > -static __init void s5pc1xx_gpiolib_add(struct s3c_gpio_chip *chips,
+> > +static __init void s5pc100_gpiolib_add(struct s3c_gpio_chip *chips,
+> >  				       int nr_chips,
+> >  				       void (*fn)(struct s3c_gpio_chip *))
+> >  {
+> > @@ -486,7 +489,7 @@ static __init void s5pc1xx_gpiolib_add(struct
+> > s3c_gpio_chip *chips,
+> >  	}
+> >  }
+> >
+> > -static __init int s5pc1xx_gpiolib_init(void)
+> > +static __init int s5pc100_gpiolib_init(void)
+> >  {
+> >  	struct s3c_gpio_chip *chips;
+> >  	int nr_chips;
+> > @@ -494,10 +497,11 @@ static __init int s5pc1xx_gpiolib_init(void)
+> >  		chips = s5pc100_gpio_chips;
+> >  		nr_chips = ARRAY_SIZE(s5pc100_gpio_chips);
+> >
+> > -	s5pc1xx_gpiolib_add(chips, nr_chips, s5pc1xx_gpiolib_link);
+> > +	s5pc100_gpiolib_add(chips, nr_chips, s5pc100_gpiolib_link);
 > 
-> ?
+> How about using the samsung_gpiolib_add_4bit_chips in plat-samsung?
 
-Same as above. I just didn't want to remove code in one patch and add it
-a few patches later.
-
-> ...
+You are right, thanks for spotting this.
 
 Best regards
 --
