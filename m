@@ -1,14 +1,11 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 12 May 2010 14:45:40 -0700
-Subject: [PATCH 11/25] msm: add devices-qsd8x50.c
+Date: Wed, 12 May 2010 14:45:41 -0700
+Subject: [PATCH 12/25] msm: add extern for 8x50 clock list.
 In-Reply-To: <>
 References: <>
-Message-ID: <1273700754-10256-12-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1273700754-10256-13-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This adds a clock list, and common resource structures
-for QSD8x50.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
@@ -16,107 +13,20 @@ Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-qsd8x50.c |   92 +++++++++++++++++++++++++++++++++++
- 1 files changed, 92 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/devices-qsd8x50.c
+ arch/arm/mach-msm/devices.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-new file mode 100644
-index 0000000..4d4a507
---- /dev/null
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2008 Google, Inc.
-+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index 19c5de9..d209554 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -38,4 +38,7 @@ extern struct platform_device msm_device_nand;
+ extern struct clk msm_clocks_7x01a[];
+ extern unsigned msm_num_clocks_7x01a;
+ 
++extern struct clk msm_clocks_8x50[];
++extern unsigned msm_num_clocks_8x50;
 +
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+#include <linux/dma-mapping.h>
-+#include <mach/irqs.h>
-+#include <mach/msm_iomap.h>
-+#include <mach/dma.h>
-+#include <mach/board.h>
-+
-+#include "devices.h"
-+
-+#include <asm/mach/flash.h>
-+
-+#include <mach/mmc.h>
-+
-+static struct resource resources_uart3[] = {
-+	{
-+		.start	= INT_UART3,
-+		.end	= INT_UART3,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= MSM_UART3_PHYS,
-+		.end	= MSM_UART3_PHYS + MSM_UART3_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device msm_device_uart3 = {
-+	.name	= "msm_serial",
-+	.id	= 2,
-+	.num_resources	= ARRAY_SIZE(resources_uart3),
-+	.resource	= resources_uart3,
-+};
-+
-+struct clk msm_clocks_8x50[] = {
-+	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
-+	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
-+	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
-+	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
-+	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
-+	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
-+	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
-+	CLK_PCOM("icodec_rx_clk",	ICODEC_RX_CLK,	NULL, 0),
-+	CLK_PCOM("icodec_tx_clk",	ICODEC_TX_CLK,	NULL, 0),
-+	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
-+	CLK_PCOM("mdc_clk",	MDC_CLK,	NULL, 0),
-+	CLK_PCOM("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
-+	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
-+	CLK_PCOM("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
-+	CLK_PCOM("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
-+	CLK_PCOM("mdp_vsync_clk",	MDP_VSYNC_CLK,	NULL, 0),
-+	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, CLK_MIN),
-+	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
-+	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
-+	CLK_PCOM("spi_clk",	SPI_CLK,	NULL, 0),
-+	CLK_PCOM("tsif_clk",	TSIF_CLK,	NULL, 0),
-+	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
-+	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
-+	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-+	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
-+	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
-+	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MIN),
-+	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, OFF),
-+	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, OFF),
-+	CLK_PCOM("vfe_axi_clk",	VFE_AXI_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs2_clk",	USB_HS2_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs3_clk",	USB_HS3_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
-+};
-+
-+unsigned msm_num_clocks_8x50 = ARRAY_SIZE(msm_clocks_8x50);
-+
+ #endif
 -- 
 1.6.2.3
