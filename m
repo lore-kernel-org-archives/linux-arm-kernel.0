@@ -1,65 +1,120 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 12 May 2010 14:06:38 +0100
-Subject: [BUG] bug when enabling VM DEBUG
-In-Reply-To: <1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
-References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
-	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
-	<4BEA1559.9000107@gmail.com>
-	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
-	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
-	<1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100512130638.GB19314@shareable.org>
+From: Jiri.Pinkava@vscht.cz (Pinkava J.)
+Date: Wed, 12 May 2010 15:18:36 +0200
+Subject: [PATCH 8/8] Add support for backlight regulation on Acer n35
+In-Reply-To: <20100507003504.GV2589@trinity.fluff.org>
+References: <4BE1EE8C.8040900@vscht.cz>
+	<20100506012258.GZ6684@trinity.fluff.org>
+	<4BE2C18E.6080207@vscht.cz> <4BE2C1D7.4030408@vscht.cz>
+	<4BE2C224.7080907@vscht.cz> <4BE2C24C.9050008@vscht.cz>
+	<4BE2C26E.2080508@vscht.cz> <4BE2C294.7030300@vscht.cz>
+	<4BE2C2CC.2010003@vscht.cz> <4BE2C2FF.8020404@vscht.cz>
+	<20100507003504.GV2589@trinity.fluff.org>
+Message-ID: <4BEAAAAC.9070003@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
-> > * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
-> > 
-> > >> > --- a/drivers/ata/libata-sff.c
-> > >> > +++ b/drivers/ata/libata-sff.c
-> > >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
-> > >> >                                         do_write);
-> > >> >          }
-> > >> >
-> > >> > -       if (!do_write)
-> > >> > +       if (!do_write&&  !PageSlab(page))
-> > >> >                  flush_dcache_page(page);
-> > >>
-> > >> I would think that check belongs inside flush_dcache_page itself, rather
-> > >> than forcing every driver to include it..
-> > >
-> > >Sebastian (cc'ed) reported this as well for MIPS.
-> > Thx. The patch above looks what I've sent a while ago. Jeff was going to
-> > merge it afaik.
-> > 
-> > >I think it makes sense for this check to be done in the
-> > >flush_dcache_page() function.
-> > 
-> > Why should flush_dcache_page() not flush pages you tell it?
-> > From Documentation/cachetlb.txt:
-> > |   NOTE: This routine need only be called for page cache pages
-> > |          which can potentially ever be mapped into the address
-> > |          space of a user process.  So for example, VFS layer code
-> > |          handling vfs symlinks in the page cache need not call
-> > |          this interface at all.
-> > 
-> > A page from slab or stack is not going to see the sky of user land and
-> > therefore it should not be fed into flush_dcache_page().
-> 
-> You are right :), so fixing the driver is the best approach.
+Add support for backlight regulation on Acer n35 using generic PWM driver.
 
-It worries me that a driver has any knowledge of the PageSlab() flag,
-though.  Especially uncommented knowledge.  That flag seems VM
-internal, and it's conceptually iffy: Kernel code using
-get_free_pages() and using that for I/O also does not see the sky of
-user land.
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+ arch/arm/mach-s3c2410/mach-n30.c |   71 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
-If all the PIO drivers have to be changed, I'd be happier with:
+diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+index f25275e..efa7fa8 100644
+--- a/arch/arm/mach-s3c2410/mach-n30.c
++++ b/arch/arm/mach-s3c2410/mach-n30.c
+@@ -23,6 +23,7 @@
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/serial_core.h>
+ #include <linux/timer.h>
+ #include <linux/io.h>
+@@ -352,6 +353,74 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
+ 	.lpcsel		= 0x06,
+ };
 
-    flush_dcache_page_for_pio()
-
-which wraps the check, explains it, and provides a single place to
-change if needed.
-
--- Jamie
++static int n35_backlight_init(struct device *dev)
++{
++	int ret;
++
++	ret = gpio_request(S3C2410_GPB(0), "Backlight PWM output");
++	if(ret)
++		goto request_gpb0_fail;
++	ret = gpio_request(S3C2410_GPB(1), "Backlight power");
++	if(ret)
++		goto request_gpb1_fail;
++
++	/* set GPB0 as output of PWM timer */
++	gpio_set_value(S3C2410_GPB(0), 0);
++	s3c2410_gpio_pullup(S3C2410_GPB(0), 0);
++	s3c2410_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
++
++	/* backlight power */
++	ret = gpio_direction_output(S3C2410_GPB(1), 1);
++	if(ret)
++		goto direction_gpb1_fail;
++	s3c2410_gpio_pullup(S3C2410_GPB(1), 1);
++
++	return 0;
++
++direction_gpb1_fail:
++	gpio_free(S3C2410_GPB(1));
++request_gpb1_fail:
++	gpio_free(S3C2410_GPB(0));
++request_gpb0_fail:
++	return ret;
++}
++
++static int n35_backlight_notify(struct device *dev, int brightness)
++{
++	/* power off backlight, values less than 12 are useless */
++	gpio_set_value(S3C2410_GPB(1), brightness > 12 ? 1 : 0);
++	return (brightness > 12 ? brightness : 0);
++}
++
++static void n35_backlight_exit(struct device *dev)
++{
++	gpio_direction_output(S3C2410_GPB(0), 0);
++	gpio_free(S3C2410_GPB(0));
++
++	gpio_set_value(S3C2410_GPB(1), 0);
++	s3c2410_gpio_pullup(S3C2410_GPB(1), 0);
++	gpio_free(S3C2410_GPB(1));
++}
++
++static struct platform_pwm_backlight_data backlight_data = {
++	.pwm_id         = 0,
++	.max_brightness = 100,
++	.dft_brightness = 50,
++	.pwm_period_ns  = 3*1000*1000,
++	.init           = n35_backlight_init,
++	.notify         = n35_backlight_notify,
++	.exit           = n35_backlight_exit,
++};
++
++static struct platform_device n35_backlight = {
++	.name = "pwm-backlight",
++	.dev  = {
++		.parent = &s3c_device_timer[0].dev,
++		.platform_data = &backlight_data,
++	},
++	.id   = -1,
++};
++
+ static void n30_sdi_set_power(unsigned char power_mode, unsigned short vdd)
+ {
+ 	switch (power_mode) {
+@@ -395,6 +464,8 @@ static struct platform_device *n35_devices[] __initdata = {
+ 	&s3c_device_rtc,
+ 	&s3c_device_usbgadget,
+ 	&s3c_device_sdi,
++	&s3c_device_timer[0],
++	&n35_backlight,
+ 	&n35_button_device,
+ 	&n35_blue_led,
+ 	&n35_warning_led,
+-- 
+1.7.1
