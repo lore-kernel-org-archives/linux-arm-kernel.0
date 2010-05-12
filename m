@@ -1,68 +1,90 @@
-From: jack@suse.cz (Jan Kara)
-Date: Wed, 12 May 2010 17:00:57 +0200
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273575478.21352.29.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-Message-ID: <20100512150057.GA29867@atrey.karlin.mff.cuni.cz>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Wed, 12 May 2010 18:03:05 +0300
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in the
+	ARMv6	DMA cache ops
+In-Reply-To: <1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <309002C0DA137042828828FC53D7A93492FA312C4E@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, 2010-05-11 at 19:23 +1000, Benjamin Herrenschmidt wrote:
-> 
-> > Since I doubt ext3 is busted so dramatically in mainline for "normal" machines,
-> > I tend to suspect things could be related to the infamous vivt caches. On the
-> > other hand, it's pretty clearly metadata or journal corruption and I'm not
-> > sure we ever do things that could cause aliases (such as vmap etc..) on
-> > these things, and they shouldn't be mapped into userspace... unless it's fsck
-> > itself that causes aliases to occur at the block device level ? (I do unmount
-> > though before I run fsck).
-> > 
-> > On the other hand, it could also be a busticated marvell SATA driver :-)
-> > 
-> > I have no problem with the vendor kernel, but it's ancient (2.6.12) and based
-> > on an out of tree variant of a Marvell originated BSP, so everything is
-> > completely different, especially in the area of drivers for the chipset.
-> > 
-> > Anyways, I'll see if I can gather more data tomorrow as time, viruses and sick
-> > kids permits.
-> > 
-> > In the meantime, any hint appreciated.
-> 
-> A quick other test which brings more infos, using a smaller (about 5GB)
-> partition and no md or raid involved:
-> 
->  - Boot with NFS root
->  - mkfs /dev/sdb2 (no md or raid involved)
->  - mount /dev/sdb2 /mnt/test
->  - rsync -avx /test-stuff /mnt/test
->  - cd /mnt/test
->  - md5sum -c ~/test-stuff-sums.txt
-> 
-> That gives me a whole bunch of:
-> 
-> md5sum: ./usr/bin/debconf-escape: No such file or directory
-> ./usr/bin/debconf-escape: FAILED open or read
-> ./usr/bin/stat: OK
-> md5sum: ./usr/bin/chrt: No such file or directory
-> ./usr/bin/chrt: FAILED open or read
-  Could you get the filesystem image with: e2image -r /dev/sdb2 buggy-image
-bzip2 it and make it available somewhere? Maybe I could guess something
-from the way the filesystem gets corrupted.
-  Oh, and also overwrite the partition with zeros before calling mkfs to make
-the analysis simpler.
+Thanks for the fast response.
+The kernel doesn't hang but the NFS can't complete loading the FS, seems like DMA data corruption...
+The patch below seems to solve the issue :)
+I guess we can't assure that the 2nd scenario below won't happen...
 
-> In fact, if I do ls /mnt/test/usr/bin/ I see debconf but if I do
-> ls /mnt/test/usr/bin/chrt then I get No such file or directory.
-> 
-> So something is badly wrong :-)
-> 
-> Now, trying without the dir_index feature (mkfs.ext3 -O ^dir_index)
-> and it works fine. All my md5sum's are correct and fsck passes.
-  Funny. Not sure how that could happen...
+Regards
+Ronen Shitrit
 
-								Honza
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Wednesday, May 12, 2010 4:56 PM
+To: Ronen Shitrit
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: RE: [PATCH 2/8] ARM: Implement read/write for ownership in the ARMv6 DMA cache ops
+
+On Wed, 2010-05-12 at 15:51 +0300, Ronen Shitrit wrote:
+> I'm using ARM v6 MP core.
+> I have applied this patch above 2.6.34-rc7 and my system hang while
+> booting from NFS (through e1000 nic).
+
+Does the whole kernel hang or it's just user space?
+
+> Previously I used 2.6.32 with the cache broadcast IPI mask and it
+> worked just fine for me.
+> I have noticed that if I remove the str, write for ownership, in the
+> dma_inv the system boot just fine.
+
+The only way to invalidate the caches on all the CPUs is to force a
+write so that the cache line is moved to modified/exclusive mode (no
+other CPUs has the cache line) and then invalidate.
+
+Drivers shouldn't call dma_inv_range if they have valid date in that
+buffer (that's why I removed the dma_inv_range call from
+dma_unmap_area).
+
+Could try the patch below:
+
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index e46ecd8..332b48c 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -212,7 +212,8 @@ v6_dma_inv_range:
+ #endif
+ 1:
+ #ifdef CONFIG_SMP
+-	str	r0, [r0]			@ write for ownership
++	ldr	r2, [r0]			@ read for ownership
++	str	r2, [r0]			@ write for ownership
+ #endif
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
+
+> - Why was the IPI solution dropped?
+
+It can cause deadlock in some circumstances (there was a thread some
+time ago).
+
+> - I can think of few cases the above str might be problematic:
+> 1) CPU 0 is doing inv, after the str cpu 1 change the line and then
+> cpu 0 inv the line... probably won't happen since the dma buffer
+> shouldn't be used by more the one CPU...
+
+This shouldn't happen. Even without my patch, doing a cache line
+invalidation would erase the data written by CPU1, so the same
+corruption.
+
+> 2) CPU 0 is doing inv, the str write garbage which get to the DRAM
+> because of eviction and break the assumption that inv shouldn't change
+> the DRAM...
+
+This may be the case but is there such situation? The above patch should
+fix it but it slows down the invalidate operation further.
+
+Thanks.
+
 -- 
-Jan Kara <jack@suse.cz>
-SuSE CR Labs
+Catalin
