@@ -1,14 +1,11 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 12 May 2010 14:45:47 -0700
-Subject: [PATCH 18/25] msm: add devices-msm7x30.c
+Date: Wed, 12 May 2010 14:45:48 -0700
+Subject: [PATCH 19/25] msm: update basic board layout for MSM7x30
 In-Reply-To: <>
 References: <>
-Message-ID: <1273700754-10256-19-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1273700754-10256-20-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This adds a clock list, and common resource structures
-for MSM7x30.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
@@ -16,143 +13,165 @@ Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-msm7x30.c |  128 +++++++++++++++++++++++++++++++++++
- 1 files changed, 128 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/devices-msm7x30.c
+ arch/arm/mach-msm/board-msm7x30.c |  116 ++++++------------------------------
+ 1 files changed, 20 insertions(+), 96 deletions(-)
 
-diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-new file mode 100644
-index 0000000..b449e8a
---- /dev/null
-+++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright (C) 2008 Google, Inc.
-+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index af132eb..bac1f3c 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -30,96 +30,37 @@
+ 
+ #include <mach/gpio.h>
+ #include <mach/board.h>
+-#include <mach/camera.h>
+ #include <mach/memory.h>
+ #include <mach/msm_iomap.h>
+-#include <mach/msm_hsusb.h>
+ #include <mach/dma.h>
+ 
+ #include <mach/vreg.h>
+-
+ #include "devices.h"
+-#include "timer.h"
+-#include "socinfo.h"
+-
+-static struct resource smc91x_resources[] = {
+-	[0] = {
+-		.start = 0x8A000300,
+-		.end = 0x8A0003ff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = MSM_GPIO_TO_INT(156),
+-		.end = MSM_GPIO_TO_INT(156),
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
++#include "proc_comm.h"
+ 
+-static struct platform_device smc91x_device = {
+-	.name           = "smc91x",
+-	.id             = 0,
+-	.num_resources  = ARRAY_SIZE(smc91x_resources),
+-	.resource       = smc91x_resources,
+-};
+-
+-static struct smsc911x_platform_config smsc911x_config = {
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-	.flags		= SMSC911X_USE_32BIT,
+-};
+-
+-static struct resource smsc911x_resources[] = {
+-	[0] = {
+-		.start		= 0x8D000000,
+-		.end		= 0x8D000100,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start		= MSM_GPIO_TO_INT(88),
+-		.end		= MSM_GPIO_TO_INT(88),
+-		.flags		= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device smsc911x_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+-	.resource	= smsc911x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_config,
+-	},
+-};
++extern struct sys_timer msm_timer;
+ 
+-static struct msm_gpio smsc911x_gpios[] = {
+-    { GPIO_CFG(172, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr6" },
+-    { GPIO_CFG(173, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr5" },
+-    { GPIO_CFG(174, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr4" },
+-    { GPIO_CFG(175, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr3" },
+-    { GPIO_CFG(176, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr2" },
+-    { GPIO_CFG(177, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr1" },
+-    { GPIO_CFG(178, 2, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_2MA), "ebi2_addr0" },
+-    { GPIO_CFG(88, 2, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), "smsc911x_irq"  },
++#ifdef CONFIG_SERIAL_MSM_CONSOLE
++static struct msm_gpio uart2_config_data[] = {
++	{ GPIO_CFG(49, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_RFR"},
++	{ GPIO_CFG(50, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_CTS"},
++	{ GPIO_CFG(51, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_Rx"},
++	{ GPIO_CFG(52, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_Tx"},
+ };
+ 
+-static void msm7x30_cfg_smsc911x(void)
++static void msm7x30_init_uart2(void)
+ {
+-	int rc;
++	msm_gpios_request_enable(uart2_config_data,
++			ARRAY_SIZE(uart2_config_data));
+ 
+-	rc = msm_gpios_request_enable(smsc911x_gpios,
+-			ARRAY_SIZE(smsc911x_gpios));
+-	if (rc)
+-		pr_err("%s: unable to enable gpios\n", __func__);
+ }
++#endif
+ 
+ static struct platform_device *devices[] __initdata = {
+-	&msm_device_smd,
+-	&msm_device_dmov,
+-	&smc91x_device,
+-	&smsc911x_device,
+-	&msm_device_nand,
+-	&msm_device_uart_dm1,
++#if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
++        &msm_device_uart2,
++#endif
 +
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
+ };
+ 
+ static void __init msm7x30_init_irq(void)
+@@ -127,35 +68,18 @@ static void __init msm7x30_init_irq(void)
+ 	msm_init_irq();
+ }
+ 
+-static void __init msm_7x30_init_nand(void)
+-{
+-	int rc;
+-	/* Enable GPIO 86 & 115 */
+-	rc = msm_gpios_request_enable(msm_nand_ebi2_cfg_data,
+-				ARRAY_SIZE(msm_nand_ebi2_cfg_data));
+-	if (rc)
+-		printk(KERN_ERR "%s: Failed to enable GPIO 86 & 115\n",
+-			 __func__);
+-}
+-
+ static void __init msm7x30_init(void)
+ {
+-	if (socinfo_init() < 0)
+-		printk(KERN_ERR "%s: socinfo_init() failed!\n",
+-		       __func__);
+-	msm_acpu_clock_init(&msm7x30_clock_data);
+-	if (machine_is_msm7x30_surf() || machine_is_msm7x30_fluid())
+-		msm7x30_cfg_smsc911x();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+-	msm_7x30_init_nand();
+-	buses_init();
++#ifdef CONFIG_SERIAL_MSM_CONSOLE
++	msm7x30_init_uart2();
++#endif
 +
-+#include <linux/dma-mapping.h>
-+#include <mach/irqs.h>
-+#include <mach/msm_iomap.h>
-+#include <mach/dma.h>
-+#include <mach/board.h>
-+
-+#include "devices.h"
-+#include "smd_private.h"
-+
-+#include <asm/mach/flash.h>
-+
-+#include "clock-pcom.h"
-+
-+#include <mach/mmc.h>
-+
-+static struct resource resources_uart2[] = {
-+	{
-+		.start	= INT_UART2,
-+		.end	= INT_UART2,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= MSM_UART2_PHYS,
-+		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device msm_device_uart2 = {
-+	.name	= "msm_serial",
-+	.id	= 1,
-+	.num_resources	= ARRAY_SIZE(resources_uart2),
-+	.resource	= resources_uart2,
-+};
-+
-+struct clk msm_clocks_7x30[] = {
-+	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
-+	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
-+	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
-+	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
-+	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
-+	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
-+	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
-+	CLK_PCOM("emdh_pclk",	EMDH_P_CLK,	NULL, OFF),
-+	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
-+	CLK_PCOM("grp_2d_clk",	GRP_2D_CLK,	NULL, 0),
-+	CLK_PCOM("grp_2d_pclk",	GRP_2D_P_CLK,	NULL, 0),
-+	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
-+	CLK_PCOM("grp_pclk",	GRP_3D_P_CLK,	NULL, 0),
-+	CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,	NULL, 0),
-+	CLK_PCOM("hdmi_clk",	HDMI_CLK,	NULL, 0),
-+	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
-+	CLK_PCOM("jpeg_clk",	JPEG_CLK,	NULL, OFF),
-+	CLK_PCOM("jpeg_pclk",	JPEG_P_CLK,	NULL, OFF),
-+	CLK_PCOM("lpa_codec_clk",	LPA_CODEC_CLK,		NULL, 0),
-+	CLK_PCOM("lpa_core_clk",	LPA_CORE_CLK,		NULL, 0),
-+	CLK_PCOM("lpa_pclk",		LPA_P_CLK,		NULL, 0),
-+	CLK_PCOM("mdc_clk",	MDC_CLK,	NULL, 0),
-+	CLK_PCOM("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
-+	CLK_PCOM("mddi_pclk",	PMDH_P_CLK,	NULL, 0),
-+	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
-+	CLK_PCOM("mdp_pclk",	MDP_P_CLK,	NULL, 0),
-+	CLK_PCOM("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
-+	CLK_PCOM("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
-+	CLK_PCOM("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, 0),
-+	CLK_PCOM("mfc_clk",		MFC_CLK,		NULL, 0),
-+	CLK_PCOM("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
-+	CLK_PCOM("mfc_pclk",		MFC_P_CLK,		NULL, 0),
-+	CLK_PCOM("mi2s_m_clk",		MI2S_M_CLK,  		NULL, 0),
-+	CLK_PCOM("mi2s_s_clk",		MI2S_S_CLK,  		NULL, 0),
-+	CLK_PCOM("mi2s_codec_rx_m_clk",	MI2S_CODEC_RX_M_CLK,  NULL, 0),
-+	CLK_PCOM("mi2s_codec_rx_s_clk",	MI2S_CODEC_RX_S_CLK,  NULL, 0),
-+	CLK_PCOM("mi2s_codec_tx_m_clk",	MI2S_CODEC_TX_M_CLK,  NULL, 0),
-+	CLK_PCOM("mi2s_codec_tx_s_clk",	MI2S_CODEC_TX_S_CLK,  NULL, 0),
-+	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, CLK_MIN),
-+	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
-+	CLK_PCOM("rotator_clk",	AXI_ROTATOR_CLK,		NULL, 0),
-+	CLK_PCOM("rotator_imem_clk",	ROTATOR_IMEM_CLK,	NULL, OFF),
-+	CLK_PCOM("rotator_pclk",	ROTATOR_P_CLK,		NULL, OFF),
-+	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
-+	CLK_PCOM("spi_clk",	SPI_CLK,	NULL, 0),
-+	CLK_PCOM("spi_pclk",	SPI_P_CLK,	NULL, 0),
-+	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
-+	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
-+	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-+	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, 0),
-+	CLK_PCOM("usb_hs_clk",		USB_HS_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs_pclk",		USB_HS_P_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs_core_clk",	USB_HS_CORE_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs2_clk",		USB_HS2_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs2_core_clk",	USB_HS2_CORE_CLK,	NULL, OFF),
-+	CLK_PCOM("usb_hs3_clk",		USB_HS3_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,		NULL, OFF),
-+	CLK_PCOM("usb_hs3_core_clk",	USB_HS3_CORE_CLK,	NULL, OFF),
-+	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MIN),
-+	CLK_PCOM("vfe_camif_clk",	VFE_CAMIF_CLK, 	NULL, 0),
-+	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, 0),
-+	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, 0),
-+	CLK_PCOM("vfe_pclk",	VFE_P_CLK,	NULL, OFF),
-+	CLK_PCOM("vpe_clk",	VPE_CLK,	NULL, 0),
-+
-+	/* 7x30 v2 hardware only. */
-+	CLK_PCOM("csi_clk",	CSI0_CLK,	NULL, 0),
-+	CLK_PCOM("csi_pclk",	CSI0_P_CLK,	NULL, 0),
-+	CLK_PCOM("csi_vfe_clk",	CSI0_VFE_CLK,	NULL, 0),
-+};
-+
-+unsigned msm_num_clocks_7x30 = ARRAY_SIZE(msm_clocks_7x30);
-+
+ }
+ 
+ static void __init msm7x30_map_io(void)
+ {
+-	msm_shared_ram_phys = 0x00000000;
+ 	msm_map_msm7x30_io();
+-	msm7x30_allocate_memory_regions();
+ 	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
+ }
+ 
 -- 
 1.6.2.3
