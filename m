@@ -1,79 +1,83 @@
-From: zswan@marvell.com (Vincent Wan)
-Date: Sun, 9 May 2010 18:24:49 -0700
-Subject: [alsa-devel] about ALC203 linux driver
-In-Reply-To: <20100509175202.GA5826@sirena.org.uk>
-References: <AANLkTikvaFWOlapz9_HlHc1GBlky_FX1-5ml-iFNGGQW@mail.gmail.com>
-	<20100509144940.GA7457@sirena.org.uk>
-	<AANLkTik0GudetGLF9hF56_VV_tNci8wX0S67gAWDIayq@mail.gmail.com>
-	<20100509175202.GA5826@sirena.org.uk>
-Message-ID: <4737A960563B524DA805CA602BE04B305E4B5E450A@SC-VEXCH2.marvell.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 12 May 2010 07:36:22 -0500
+Subject: [PATCHv5 2/3] OMAP: export OMAP info under /proc/socinfo
+In-Reply-To: <20100512123423.GA11782@besouro.research.nokia.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
+	<1273587331-24604-3-git-send-email-eduardo.valentin@nokia.com>
+	<4BE9697F.80308@ti.com>
+	<20100511165846.GA10609@besouro.research.nokia.com>
+	<20100512123423.GA11782@besouro.research.nokia.com>
+Message-ID: <4BEAA0C6.3020100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark,
+Eduardo Valentin had written, on 05/12/2010 07:34 AM, the following:
+> Hello,
+> 
+> On Tue, May 11, 2010 at 06:58:46PM +0200, Valentin Eduardo (Nokia-D/Helsinki) wrote:
+>> Hello Nishanth,
+>>
+>> On Tue, May 11, 2010 at 04:28:15PM +0200, ext Nishanth Menon wrote:
+>>> Eduardo Valentin had written, on 05/11/2010 09:15 AM, the following:
+>>>> From: Eduardo Valentin <eduardo.valentin@nokia.com>
+>>>>
+>>>> Export OMAP name and rev under /proc/socinfo node.
+>>>>
+>>>> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+>>>> ---
+>>>>  arch/arm/Kconfig         |    1 +
+>>>>  arch/arm/mach-omap1/id.c |   31 ++++++++++++++++++++++++-------
+>>>>  arch/arm/mach-omap2/id.c |   32 ++++++++++++++++++++++++++------
+>>>>  3 files changed, 51 insertions(+), 13 deletions(-)
+>>>>
+>>> [..]
+>>>
+>>>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>>>> index 37b8a1a..b67486b 100644
+>>>> --- a/arch/arm/mach-omap2/id.c
+>>>> +++ b/arch/arm/mach-omap2/id.c
+>>> [..]
+>>>
+>>>> @@ -356,7 +363,8 @@ void __init omap3_cpuinfo(void)
+>>>>  	}
+>>>>  
+>>>>  	/* Print verbose information */
+>>>> -	pr_info("%s ES%s (", cpu_name, cpu_rev);
+>>>> +	snprintf(socinfo, SOCINFO_SZ, "%s ES%s", cpu_name, cpu_rev);
+>>>> +	pr_info("%s (", socinfo);
+>>>>  
+>>>>  	OMAP3_SHOW_FEATURE(l2cache);
+>>>>  	OMAP3_SHOW_FEATURE(iva);
+>>> Just a minor comment -> is it a good idea to pushin the features to SOC 
+>>> info as well? currently this is being displayed at bootlog and not 
+>>> beyond.. might be a better approach to move it into socinfo..
+>> Yeah. I would expect that someone would ask this. When I was writing this part
+>> I also thought that would be nice to just duplicate all info which is printed
+>> into kernel log buffer. But then I decided to proceed with only the info we are
+>> needing from userspace. If you think that would be useful to know those as well,
+>> then why not adding them.
+> 
+> As discussed in #linux-omap IRC channel, we agreed that it would be nice and useful
+> to export the OMAP FEATURES under this interface. But as the code to detect omap features is
+> under re-work currently, for now we are going to leave it out of this patch set.
+> 
+Agreed. other than this, I dont see an issue :) thanks for the work..
+
+Acked-by: Nishanth Menon <nm@ti.com>
+
+>>>
+>>> [..]
+>>>
+>>> -- 
+>>> Regards,
+>>> Nishanth Menon
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
 
 
-
-Thanks for your help, and I think that is a true direction.
-
-I will re-check my driver as soon as I come back to home.
-
-
-
-Wan.
-
-
-
------Original Message-----
-From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-Sent: 2010?5?10? 1:52
-To: Wan ZongShun
-Cc: Vincent Wan; alsa-devel at alsa-project.org; linux-arm-kernel
-Subject: Re: [alsa-devel] about ALC203 linux driver
-
-
-
-On Sun, May 09, 2010 at 11:34:28PM +0800, Wan ZongShun wrote:
-
-
-
-> here, I used the file named ac97.c which is located in
-
-> linux-2.6\sound\soc\codecs.
-
-> I am sure that it can call the '\sound\pci\ac97ac97_codec.c' file and
-
-> identify the
-
-> ALC203 (like the log file shows 'nuc900 AC'97 codec is  ALC203',but sometimes
-
-> the return value by reading one AC97 register, which is not same as
-
-> the writing value to the
-
-> AC97 register, that is not my expected result, but sometimes they are same.
-
-
-
-> any suggestions?
-
-
-
-Not all AC97 registers are writable so check that you're writing to
-
-registers that the CODEC supports writing to but in general you're going
-
-to need to debug your controller driver here.  Make sure you're
-
-interacting well with any cache the controller has and that you are
-
-properly synchronising with the controller during reads (which are
-
-fairly slow operations on AC97).
-
-
-
-Also make sure that the CODEC is properly clocked.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100509/c08c03fb/attachment-0001.htm>
+-- 
+Regards,
+Nishanth Menon
