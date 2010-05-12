@@ -1,25 +1,60 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 12 May 2010 10:37:57 +0200
-Subject: [PATCH] DMA: PL330: Add dma api driver
-In-Reply-To: <1273641798-26579-1-git-send-email-jassi.brar@samsung.com>
-References: <1273641798-26579-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <AANLkTilsUyp4a-mnWLAVXXg6iMFwvBg5d58aViX6umSO@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 12 May 2010 10:37:59 +0200
+Subject: [PATCH 05/16] ARM: S5PC100: new clocks definition
+In-Reply-To: <002301caf1a5$8ccd40c0$a667c240$%kim@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-6-git-send-email-m.szyprowski@samsung.com>
+	<001501caf18f$8bedb830$a3c92890$%kim@samsung.com>
+	<002f01caf19e$655de6e0$3019b4a0$%szyprowski@samsung.com>
+	<002301caf1a5$8ccd40c0$a667c240$%kim@samsung.com>
+Message-ID: <000301caf1ae$72b04a80$5810df80$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/12 Jassi Brar <jassi.brar@samsung.com>:
+Hello,
 
-> Add DMA Engine API driver for the PL330 DMAC.
-> This driver is supposed to be reusable by various
-> platforms that have one or more PL330 DMACs.
-> Atm, DMA_SLAVE and DMA_MEMCPY capabilities have been
-> implemented.
->
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+On Wednesday, May 12, 2010 9:34 AM Kukjin Kim wrote:
 
-Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+> ...
+> > >
+> > > Marek,
+> > >
+> > > Actually, need to modify many part to fit new clock scheme.
+> > > For example, to use clksrc_clk is easily to handle clock.
+> >
+> > I thought I covered most of the changes. Probably only the armclk
+> > related functions and a cleanup in s5pc100/mach/regs-clock.h are
+> > left and these can be easily fixed.
+> >
+> > > S.LSI already made the patch for C100 clock changing which is using
+> > > clksrc_clk structure. So may I submit it?
+> >
+> > Could you compare your version with the final version that is created
+> > by my patch series? I don't think that there will be many differences
+> > there.
+> >
+> 
+> There are defined clock source of C100 available clock in SYS.LSI patch
+> like
+> clocks defined by CLK_SRC1 register.
+> SYS.LSI has covered all possible C100 clocks in our patch.
 
-Really looking good now!
+So this is rather a question of general policy about the clocks. Do we
+really need to define them even if no driver would use it? I'm not
+convinced. On the other hand defining all clocks now may reduce the driver
+development time in the future. 
+ 
+> So I think SYS.LSI patch provides more functionality based on Ben Dooks'
+> new clock scheme.
+> 
+> How about check/review it after my submitting?
 
-Yours,
-Linus Walleij
+Maybe it would be possible to adapt it in such a way that it would be an
+extension to the clocks defined by my patch series?
+
+Ben, what do you think? Which way should we go?
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
