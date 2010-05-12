@@ -1,79 +1,152 @@
-From: wolfgang.mues@auerswald.de (Wolfgang =?iso-8859-1?q?M=FCes?=)
-Date: Wed, 12 May 2010 08:48:51 +0200
-Subject: arm926_dma_flush_range undefined!
-In-Reply-To: <4BE95C54.5070008@atmel.com>
-References: <4BE95C54.5070008@atmel.com>
-Message-ID: <201005120848.52046.wolfgang.mues@auerswald.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 12 May 2010 16:04:58 +0900
+Subject: [PATCH 12/16] ARM: S5PC100: Move sdhci helpers from plat-s5pc1xx
+	to mach-s5pc100
+In-Reply-To: <1270190944-21644-13-git-send-email-m.szyprowski@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-13-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <001f01caf1a1$724c4470$56e4cd50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Dienstag, 11. Mai 2010 schrieb Nicolas Ferre:
-> Le 11/05/2010 11:44, Russell King - ARM Linux :
-> > On Tue, May 11, 2010 at 11:43:17AM +0200, Nicolas Ferre wrote:
-> >> Le 06/05/2010 19:59, Russell King - ARM Linux :
-> >>> On Thu, May 06, 2010 at 03:07:11PM +0100, Catalin Marinas wrote:
-> >>>> On Thu, 2010-05-06 at 15:11 +0200, Nicolas Ferre wrote:
-> >>>>> I am trying to compile a recent kernel
-> >>>>> (v2.6.34-rc6-201-g722154e) and I am
-> >>>>> having this kind of error:
-> >>>>> 
-> >>>>> ERROR: "arm926_dma_flush_range" [drivers/mmc/host/at91_mci.ko]
-> >>>>> undefined!
-> >>>> 
-> >>>> The driver seems to use dmac_flush_range() directly. That's not part
-> >>>> of the DMA API. Could you not use one of the supported DMA API
-> >>>> functions?
-> >> 
-> >> The difficult part for me is to choose the proper one ;-)
-> >> 
-> >> And also, I am wondering if this call is needed as we do a
-> >> kunmap_atomic() on the same scatterlist pointer just before. Does not
-> >> kunmap_atomic() embed a cache flushing directive already?
-> > 
-> > No it doesn't.  What are you trying to do here?
+Marek Szyprowski wrote:
 > 
-> After a read with DMA from sd/mmc interface, a DMA buffer allocated by
-> dma_alloc_coherent() is filled.
-> This buffer is then copied to the scatterlist provided by the mmc
-> request (from drivers/mmc/card/block.c it seems that sg buffers are
-> alocacted via kmalloc()).
+> Move sdhci helpers from plat-s5pc1xx to mach-s5pc100.
 > 
-> For each buffer of the scatterlist, I do this dmac_flush_rage()...
-Yepp!
- 
-> As copy is done between a coherent and a kernel memory buffers, I guess
-> that the flushing routine is not needed?
-Where do you get this wisdom?
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pc100/Kconfig                      |   11 +++++++++++
+>  arch/arm/mach-s5pc100/Makefile                     |    2 ++
+>  arch/arm/mach-s5pc100/cpu.c                        |    6 ++++++
+>  arch/arm/mach-s5pc100/include/mach/map.h           |    8 ++++++++
+>  .../setup-sdhci-gpio.c                             |    2 +-
+>  5 files changed, 28 insertions(+), 1 deletions(-)
+>  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-sdhci-gpio.c (97%)
+> 
+> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+> index f2d5c23..af64da3 100644
+> --- a/arch/arm/mach-s5pc100/Kconfig
+> +++ b/arch/arm/mach-s5pc100/Kconfig
+> @@ -24,6 +24,17 @@ config S5PC100_SETUP_I2C1
+>  	help
+>  	  Common setup code for i2c bus 1.
+> 
+> +config S5PC100_SETUP_SDHCI
+> +        bool
+> +        select S5PC100_SETUP_SDHCI_GPIO
+> +        help
+> +          Internal helper functions for S5PC100 based SDHCI systems
+> +
 
-The coherent buffer does not need a cache flush, never.
-But the target buffer does need a flush(). If the loaded data from SD card is 
-an executable or library, the target buffer may be mapped into the text 
-segment of a process and be executed. And this will fail if parts of the
-data are only inside the data cache (especially on ARM architectures where
-data and instruction cache are separate).
+Not aligned.
+Please fix it.
 
-The basic assumption is that the scatterlist buffer is filled directly with a 
-DMA controller: data is in memory, not in the cache.
-If you fill the scatterlist buffer with the help of the CPU, you need a data 
-cache flush afterwards to fullfill this assumption.
-It's a shame that the function to do so is not available on all platforms. 
-IMHO it should.
+> +config S5PC100_SETUP_SDHCI_GPIO
+> +	bool
+> +	help
+> +	  Common setup code for SDHCI gpio.
+> +
+>  config MACH_SMDKC100
+>  	bool "SMDKC100"
+>  	select CPU_S5PC100
+> diff --git a/arch/arm/mach-s5pc100/Makefile
+b/arch/arm/mach-s5pc100/Makefile
+> index 522d8b7..9242f14 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -18,6 +18,8 @@ obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
+> 
+>  obj-$(CONFIG_S5PC100_SETUP_FB_24BPP) += setup-fb-24bpp.o
+>  obj-$(CONFIG_S5PC100_SETUP_I2C1) += setup-i2c1.o
+> +obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
+> +obj-$(CONFIG_S5PC100_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
 
-best regards
- 
-i. A. Wolfgang M?es
--- 
-Auerswald Gesellschaft f?r Datensysteme mbH
-Hardware Development
-Telefon: +49 (0)5306 9219 562
-Telefax: +49 (0)5306 9219 94 
-E-Mail: Wolfgang.Mues at Auerswald.de
-Web: http://www.auerswald.de
- 
---------------------------------------------------------------
-Auerswald Gesellschaft f?r Datensysteme mbH
-Vor den Grash?fen 1, 38162 Cremlingen
-Registriert beim AG Braunschweig HRB 7499
-Gesch?ftsf?hrer: Dipl-Ing. Gerhard Auerswald
+How about union the setup-sdhci-gpio.c to setup-sdhci file?
+I think don't need to separate setup-sdhci and setup-sdhci-gpio file.
+
+> 
+>  # machine support
+> 
+> diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+> index ec92290..d424a9f 100644
+> --- a/arch/arm/mach-s5pc100/cpu.c
+> +++ b/arch/arm/mach-s5pc100/cpu.c
+> @@ -39,6 +39,7 @@
+>  #include <plat/devs.h>
+>  #include <plat/clock.h>
+>  #include <plat/iic-core.h>
+> +#include <plat/sdhci.h>
+>  #include <plat/s5pc100.h>
+> 
+>  /* Initial IO mappings */
+> @@ -79,6 +80,11 @@ void __init s5pc100_map_io(void)
+>  {
+>  	iotable_init(s5pc100_iodesc, ARRAY_SIZE(s5pc100_iodesc));
+> 
+> +	/* initialise device information early */
+> +	s5pc100_default_sdhci0();
+> +	s5pc100_default_sdhci1();
+> +	s5pc100_default_sdhci2();
+> +
+>  	/* the i2c devices are directly compatible with s3c2440 */
+>  	s3c_i2c0_setname("s3c2440-i2c");
+>  	s3c_i2c1_setname("s3c2440-i2c");
+> diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-
+> s5pc100/include/mach/map.h
+> index 82a1c9d..9d672fa 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/map.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/map.h
+> @@ -55,6 +55,11 @@
+> 
+>  #define S5PC100_PA_FB		(0xEE000000)
+> 
+> +#define S5PC100_PA_HSMMC(x)	(0xED800000 + ((x) * 0x100000))
+> +#define S5PC100_PA_HSMMC0	S5PC100_PA_HSMMC(0)
+> +#define S5PC100_PA_HSMMC1	S5PC100_PA_HSMMC(1)
+> +#define S5PC100_PA_HSMMC2	S5PC100_PA_HSMMC(2)
+> +
+>  #define S5PC100_PA_SDRAM	(0x20000000)
+> 
+>  #define S5P_PA_SDRAM		S5PC100_PA_SDRAM
+> @@ -64,5 +69,8 @@
+>  #define S3C_PA_IIC		S5PC100_PA_IIC0
+>  #define S3C_PA_IIC1		S5PC100_PA_IIC1
+>  #define S3C_PA_FB		S5PC100_PA_FB
+> +#define S3C_PA_HSMMC0		S5PC100_PA_HSMMC0
+> +#define S3C_PA_HSMMC1		S5PC100_PA_HSMMC1
+> +#define S3C_PA_HSMMC2		S5PC100_PA_HSMMC2
+
+The S5PC100_PA_HSMMC0/1/2 definitions are used only here.
+It seems better to define S3C_PA_HSMMC0/1/2 using directly
+S5PC100_PA_HSMMC(x) instead of S5PC100_PA_HSMMC0/1/2.
+
+> 
+>  #endif /* __ASM_ARCH_MAP_H */
+> diff --git a/arch/arm/plat-s5pc1xx/setup-sdhci-gpio.c b/arch/arm/mach-
+> s5pc100/setup-sdhci-gpio.c
+> similarity index 97%
+> rename from arch/arm/plat-s5pc1xx/setup-sdhci-gpio.c
+> rename to arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+> index 185c894..0248150 100644
+> --- a/arch/arm/plat-s5pc1xx/setup-sdhci-gpio.c
+> +++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+> @@ -2,7 +2,7 @@
+>   *
+>   * Copyright 2009 Samsung Eletronics
+>   *
+> - * S5PC1XX - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
+> + * S5PC100 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> --
+> 1.6.4
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
