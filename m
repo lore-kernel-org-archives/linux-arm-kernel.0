@@ -1,15 +1,15 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 12 May 2010 14:45:32 -0700
-Subject: [PATCH 03/25] msm: generialize iomap to support multiple SOCs.
+Date: Wed, 12 May 2010 14:45:31 -0700
+Subject: [PATCH 02/25] msm: generialize IRQ to support multiple SOCs.
 In-Reply-To: <>
 References: <>
-Message-ID: <1273700754-10256-4-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1273700754-10256-3-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory Bean <gbean@codeaurora.org>
 
-msm_iomap.h is specific to the MSM7x00 series devices.  Generalize
+irqs.h is specific to the MSM7x00 series devices.  Generalize
 this in preparation to support more devices.
 
 Signed-off-by: Gregory Bean <gbean@codeaurora.org>
@@ -18,162 +18,98 @@ Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |  139 +++++++++++++++++++++++
- arch/arm/mach-msm/include/mach/msm_iomap.h      |   97 +---------------
- 2 files changed, 142 insertions(+), 94 deletions(-)
- create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+ arch/arm/mach-msm/include/mach/irqs-7x00.h |   75 +++++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs.h      |   76 +++------------------------
+ 2 files changed, 84 insertions(+), 67 deletions(-)
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-7x00.h
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+diff --git a/arch/arm/mach-msm/include/mach/irqs-7x00.h b/arch/arm/mach-msm/include/mach/irqs-7x00.h
 new file mode 100644
-index 0000000..cfff0e7
+index 0000000..f1fe706
 --- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
-@@ -0,0 +1,139 @@
-+/* arch/arm/mach-msm/include/mach/msm_iomap.h
-+ *
++++ b/arch/arm/mach-msm/include/mach/irqs-7x00.h
+@@ -0,0 +1,75 @@
++/*
 + * Copyright (C) 2007 Google, Inc.
++ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 + * Author: Brian Swetland <swetland@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ *
-+ * The MSM peripherals are spread all over across 768MB of physical
-+ * space, which makes just having a simple IO_ADDRESS macro to slide
-+ * them into the right virtual location rough.  Instead, we will
-+ * provide a master phys->virt mapping for peripherals here.
-+ *
 + */
 +
-+#ifndef __ASM_ARCH_MSM_IOMAP_7X00_H
-+#define __ASM_ARCH_MSM_IOMAP_7X00_H
++#ifndef __ASM_ARCH_MSM_IRQS_7X00_H
++#define __ASM_ARCH_MSM_IRQS_7X00_H
 +
-+#include <asm/sizes.h>
++/* MSM ARM11 Interrupt Numbers */
++/* See 80-VE113-1 A, pp219-221     */
 +
-+/* Physical base address and size of peripherals.
-+ * Ordered by the virtual base addresses they will be mapped at.
-+ *
-+ * MSM_VIC_BASE must be an value that can be loaded via a "mov"
-+ * instruction, otherwise entry-macro.S will not compile.
-+ *
-+ * If you add or remove entries here, you'll want to edit the
-+ * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
-+ * changes.
-+ *
-+ */
++#define INT_A9_M2A_0         0
++#define INT_A9_M2A_1         1
++#define INT_A9_M2A_2         2
++#define INT_A9_M2A_3         3
++#define INT_A9_M2A_4         4
++#define INT_A9_M2A_5         5
++#define INT_A9_M2A_6         6
++#define INT_GP_TIMER_EXP     7
++#define INT_DEBUG_TIMER_EXP  8
++#define INT_UART1            9
++#define INT_UART2            10
++#define INT_UART3            11
++#define INT_UART1_RX         12
++#define INT_UART2_RX         13
++#define INT_UART3_RX         14
++#define INT_USB_OTG          15
++#define INT_MDDI_PRI         16
++#define INT_MDDI_EXT         17
++#define INT_MDDI_CLIENT      18
++#define INT_MDP              19
++#define INT_GRAPHICS         20
++#define INT_ADM_AARM         21
++#define INT_ADSP_A11         22
++#define INT_ADSP_A9_A11      23
++#define INT_SDC1_0           24
++#define INT_SDC1_1           25
++#define INT_SDC2_0           26
++#define INT_SDC2_1           27
++#define INT_KEYSENSE         28
++#define INT_TCHSCRN_SSBI     29
++#define INT_TCHSCRN1         30
++#define INT_TCHSCRN2         31
 +
-+#ifdef __ASSEMBLY__
-+#define IOMEM(x)	x
-+#else
-+#define IOMEM(x)	((void __force __iomem *)(x))
-+#endif
++#define INT_GPIO_GROUP1      (32 + 0)
++#define INT_GPIO_GROUP2      (32 + 1)
++#define INT_PWB_I2C          (32 + 2)
++#define INT_SOFTRESET        (32 + 3)
++#define INT_NAND_WR_ER_DONE  (32 + 4)
++#define INT_NAND_OP_DONE     (32 + 5)
++#define INT_PBUS_ARM11       (32 + 6)
++#define INT_AXI_MPU_SMI      (32 + 7)
++#define INT_AXI_MPU_EBI1     (32 + 8)
++#define INT_AD_HSSD          (32 + 9)
++#define INT_ARM11_PMU        (32 + 10)
++#define INT_ARM11_DMA        (32 + 11)
++#define INT_TSIF_IRQ         (32 + 12)
++#define INT_UART1DM_IRQ      (32 + 13)
++#define INT_UART1DM_RX       (32 + 14)
++#define INT_USB_HS           (32 + 15)
++#define INT_SDC3_0           (32 + 16)
++#define INT_SDC3_1           (32 + 17)
++#define INT_SDC4_0           (32 + 18)
++#define INT_SDC4_1           (32 + 19)
++#define INT_UART2DM_RX       (32 + 20)
++#define INT_UART2DM_IRQ      (32 + 21)
 +
-+#define MSM_VIC_BASE          IOMEM(0xE0000000)
-+#define MSM_VIC_PHYS          0xC0000000
-+#define MSM_VIC_SIZE          SZ_4K
++/* 22-31 are reserved */
 +
-+#define MSM_CSR_BASE          IOMEM(0xE0001000)
-+#define MSM_CSR_PHYS          0xC0100000
-+#define MSM_CSR_SIZE          SZ_4K
-+
-+#define MSM_GPT_PHYS          MSM_CSR_PHYS
-+#define MSM_GPT_BASE          MSM_CSR_BASE
-+#define MSM_GPT_SIZE          SZ_4K
-+
-+#define MSM_DMOV_BASE         IOMEM(0xE0002000)
-+#define MSM_DMOV_PHYS         0xA9700000
-+#define MSM_DMOV_SIZE         SZ_4K
-+
-+#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
-+#define MSM_GPIO1_PHYS        0xA9200000
-+#define MSM_GPIO1_SIZE        SZ_4K
-+
-+#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
-+#define MSM_GPIO2_PHYS        0xA9300000
-+#define MSM_GPIO2_SIZE        SZ_4K
-+
-+#define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
-+#define MSM_CLK_CTL_PHYS      0xA8600000
-+#define MSM_CLK_CTL_SIZE      SZ_4K
-+
-+#define MSM_SHARED_RAM_BASE   IOMEM(0xE0100000)
-+#define MSM_SHARED_RAM_PHYS   0x01F00000
-+#define MSM_SHARED_RAM_SIZE   SZ_1M
-+
-+#define MSM_UART1_PHYS        0xA9A00000
-+#define MSM_UART1_SIZE        SZ_4K
-+
-+#define MSM_UART2_PHYS        0xA9B00000
-+#define MSM_UART2_SIZE        SZ_4K
-+
-+#define MSM_UART3_PHYS        0xA9C00000
-+#define MSM_UART3_SIZE        SZ_4K
-+
-+#ifdef CONFIG_MSM_DEBUG_UART
-+#define MSM_DEBUG_UART_BASE   0xE1000000
-+#if CONFIG_MSM_DEBUG_UART == 1
-+#define MSM_DEBUG_UART_PHYS   MSM_UART1_PHYS
-+#elif CONFIG_MSM_DEBUG_UART == 2
-+#define MSM_DEBUG_UART_PHYS   MSM_UART2_PHYS
-+#elif CONFIG_MSM_DEBUG_UART == 3
-+#define MSM_DEBUG_UART_PHYS   MSM_UART3_PHYS
-+#endif
-+#define MSM_DEBUG_UART_SIZE   SZ_4K
-+#endif
-+
-+#define MSM_SDC1_PHYS         0xA0400000
-+#define MSM_SDC1_SIZE         SZ_4K
-+
-+#define MSM_SDC2_PHYS         0xA0500000
-+#define MSM_SDC2_SIZE         SZ_4K
-+
-+#define MSM_SDC3_PHYS         0xA0600000
-+#define MSM_SDC3_SIZE         SZ_4K
-+
-+#define MSM_SDC4_PHYS         0xA0700000
-+#define MSM_SDC4_SIZE         SZ_4K
-+
-+#define MSM_I2C_PHYS          0xA9900000
-+#define MSM_I2C_SIZE          SZ_4K
-+
-+#define MSM_HSUSB_PHYS        0xA0800000
-+#define MSM_HSUSB_SIZE        SZ_4K
-+
-+#define MSM_PMDH_PHYS         0xAA600000
-+#define MSM_PMDH_SIZE         SZ_4K
-+
-+#define MSM_EMDH_PHYS         0xAA700000
-+#define MSM_EMDH_SIZE         SZ_4K
-+
-+#define MSM_MDP_PHYS          0xAA200000
-+#define MSM_MDP_SIZE          0x000F0000
-+
-+#define MSM_MDC_PHYS	      0xAA500000
-+#define MSM_MDC_SIZE	      SZ_1M
-+
-+#define MSM_AD5_PHYS          0xAC000000
-+#define MSM_AD5_SIZE          (SZ_1M*13)
-+
-+
-+#if defined(CONFIG_ARCH_MSM7X30)
-+#define MSM_GCC_BASE          IOMEM(0xF8009000)
-+#define MSM_GCC_PHYS          0xC0182000
-+#define MSM_GCC_SIZE          SZ_4K
-+#endif
++#define NR_MSM_IRQS 64
++#define NR_GPIO_IRQS 122
++#define NR_BOARD_IRQS 64
 +
 +#endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
-index ce1effe..81da6b8 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
+diff --git a/arch/arm/mach-msm/include/mach/irqs.h b/arch/arm/mach-msm/include/mach/irqs.h
+index 9dd4cf8..b899560 100644
+--- a/arch/arm/mach-msm/include/mach/irqs.h
++++ b/arch/arm/mach-msm/include/mach/irqs.h
 @@ -1,6 +1,6 @@
--/* arch/arm/mach-msm/include/mach/msm_iomap.h
+-/* arch/arm/mach-msm/include/mach/irqs.h
 - *
 +/*
   * Copyright (C) 2007 Google, Inc.
@@ -181,103 +117,86 @@ index ce1effe..81da6b8 100644
   * Author: Brian Swetland <swetland@google.com>
   *
   * This software is licensed under the terms of the GNU General Public
-@@ -43,97 +43,6 @@
- #define IOMEM(x)	((void __force __iomem *)(x))
- #endif
+@@ -17,74 +17,16 @@
+ #ifndef __ASM_ARCH_MSM_IRQS_H
+ #define __ASM_ARCH_MSM_IRQS_H
  
--#define MSM_VIC_BASE          IOMEM(0xE0000000)
--#define MSM_VIC_PHYS          0xC0000000
--#define MSM_VIC_SIZE          SZ_4K
+-/* MSM ARM11 Interrupt Numbers */
+-/* See 80-VE113-1 A, pp219-221     */
 -
--#define MSM_CSR_BASE          IOMEM(0xE0001000)
--#define MSM_CSR_PHYS          0xC0100000
--#define MSM_CSR_SIZE          SZ_4K
+-#define INT_A9_M2A_0         0
+-#define INT_A9_M2A_1         1
+-#define INT_A9_M2A_2         2
+-#define INT_A9_M2A_3         3
+-#define INT_A9_M2A_4         4
+-#define INT_A9_M2A_5         5
+-#define INT_A9_M2A_6         6
+-#define INT_GP_TIMER_EXP     7
+-#define INT_DEBUG_TIMER_EXP  8
+-#define INT_UART1            9
+-#define INT_UART2            10
+-#define INT_UART3            11
+-#define INT_UART1_RX         12
+-#define INT_UART2_RX         13
+-#define INT_UART3_RX         14
+-#define INT_USB_OTG          15
+-#define INT_MDDI_PRI         16
+-#define INT_MDDI_EXT         17
+-#define INT_MDDI_CLIENT      18
+-#define INT_MDP              19
+-#define INT_GRAPHICS         20
+-#define INT_ADM_AARM         21
+-#define INT_ADSP_A11         22
+-#define INT_ADSP_A9_A11      23
+-#define INT_SDC1_0           24
+-#define INT_SDC1_1           25
+-#define INT_SDC2_0           26
+-#define INT_SDC2_1           27
+-#define INT_KEYSENSE         28
+-#define INT_TCHSCRN_SSBI     29
+-#define INT_TCHSCRN1         30
+-#define INT_TCHSCRN2         31
 -
--#define MSM_GPT_PHYS          MSM_CSR_PHYS
--#define MSM_GPT_BASE          MSM_CSR_BASE
--#define MSM_GPT_SIZE          SZ_4K
+-#define INT_GPIO_GROUP1      (32 + 0)
+-#define INT_GPIO_GROUP2      (32 + 1)
+-#define INT_PWB_I2C          (32 + 2)
+-#define INT_SOFTRESET        (32 + 3)
+-#define INT_NAND_WR_ER_DONE  (32 + 4)
+-#define INT_NAND_OP_DONE     (32 + 5)
+-#define INT_PBUS_ARM11       (32 + 6)
+-#define INT_AXI_MPU_SMI      (32 + 7)
+-#define INT_AXI_MPU_EBI1     (32 + 8)
+-#define INT_AD_HSSD          (32 + 9)
+-#define INT_ARM11_PMU        (32 + 10)
+-#define INT_ARM11_DMA        (32 + 11)
+-#define INT_TSIF_IRQ         (32 + 12)
+-#define INT_UART1DM_IRQ      (32 + 13)
+-#define INT_UART1DM_RX       (32 + 14)
+-#define INT_USB_HS           (32 + 15)
+-#define INT_SDC3_0           (32 + 16)
+-#define INT_SDC3_1           (32 + 17)
+-#define INT_SDC4_0           (32 + 18)
+-#define INT_SDC4_1           (32 + 19)
+-#define INT_UART2DM_RX       (32 + 20)
+-#define INT_UART2DM_IRQ      (32 + 21)
 -
--#define MSM_DMOV_BASE         IOMEM(0xE0002000)
--#define MSM_DMOV_PHYS         0xA9700000
--#define MSM_DMOV_SIZE         SZ_4K
+-/* 22-31 are reserved */
 -
--#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
--#define MSM_GPIO1_PHYS        0xA9200000
--#define MSM_GPIO1_SIZE        SZ_4K
--
--#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
--#define MSM_GPIO2_PHYS        0xA9300000
--#define MSM_GPIO2_SIZE        SZ_4K
--
--#define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
--#define MSM_CLK_CTL_PHYS      0xA8600000
--#define MSM_CLK_CTL_SIZE      SZ_4K
--
--#define MSM_SHARED_RAM_BASE   IOMEM(0xE0100000)
--#define MSM_SHARED_RAM_PHYS   0x01F00000
--#define MSM_SHARED_RAM_SIZE   SZ_1M
--
--#define MSM_UART1_PHYS        0xA9A00000
--#define MSM_UART1_SIZE        SZ_4K
--
--#define MSM_UART2_PHYS        0xA9B00000
--#define MSM_UART2_SIZE        SZ_4K
--
--#define MSM_UART3_PHYS        0xA9C00000
--#define MSM_UART3_SIZE        SZ_4K
--
--#ifdef CONFIG_MSM_DEBUG_UART
--#define MSM_DEBUG_UART_BASE   0xE1000000
--#if CONFIG_MSM_DEBUG_UART == 1
--#define MSM_DEBUG_UART_PHYS   MSM_UART1_PHYS
--#elif CONFIG_MSM_DEBUG_UART == 2
--#define MSM_DEBUG_UART_PHYS   MSM_UART2_PHYS
--#elif CONFIG_MSM_DEBUG_UART == 3
--#define MSM_DEBUG_UART_PHYS   MSM_UART3_PHYS
--#endif
--#define MSM_DEBUG_UART_SIZE   SZ_4K
--#endif
--
--#define MSM_SDC1_PHYS         0xA0400000
--#define MSM_SDC1_SIZE         SZ_4K
--
--#define MSM_SDC2_PHYS         0xA0500000
--#define MSM_SDC2_SIZE         SZ_4K
--
--#define MSM_SDC3_PHYS         0xA0600000
--#define MSM_SDC3_SIZE         SZ_4K
--
--#define MSM_SDC4_PHYS         0xA0700000
--#define MSM_SDC4_SIZE         SZ_4K
--
--#define MSM_I2C_PHYS          0xA9900000
--#define MSM_I2C_SIZE          SZ_4K
--
--#define MSM_HSUSB_PHYS        0xA0800000
--#define MSM_HSUSB_SIZE        SZ_4K
--
--#define MSM_PMDH_PHYS         0xAA600000
--#define MSM_PMDH_SIZE         SZ_4K
--
--#define MSM_EMDH_PHYS         0xAA700000
--#define MSM_EMDH_SIZE         SZ_4K
--
--#define MSM_MDP_PHYS          0xAA200000
--#define MSM_MDP_SIZE          0x000F0000
--
--#define MSM_MDC_PHYS	      0xAA500000
--#define MSM_MDC_SIZE	      SZ_1M
--
--#define MSM_AD5_PHYS          0xAC000000
--#define MSM_AD5_SIZE          (SZ_1M*13)
--
--
--#if defined(CONFIG_ARCH_MSM7X30)
--#define MSM_GCC_BASE          IOMEM(0xF8009000)
--#define MSM_GCC_PHYS          0xC0182000
--#define MSM_GCC_SIZE          SZ_4K
--#endif
-+#include "msm_iomap-7x00.h"
+ #define MSM_IRQ_BIT(irq)     (1 << ((irq) & 31))
+ 
+-#define NR_MSM_IRQS 64
+-#define NR_GPIO_IRQS 122
+-#define NR_BOARD_IRQS 64
+-#define NR_IRQS (NR_MSM_IRQS + NR_GPIO_IRQS + NR_BOARD_IRQS)
++#if defined(CONFIG_ARCH_MSM_ARM11)
++#include "irqs-7x00.h"
++#else
++#error "Unknown architecture specification"
++#endif
+ 
++#define NR_IRQS (NR_MSM_IRQS + NR_GPIO_IRQS + NR_BOARD_IRQS)
+ #define MSM_GPIO_TO_INT(n) (NR_MSM_IRQS + (n))
++#define MSM_INT_TO_REG(base, irq) (base + irq / 32)
  
  #endif
 -- 
