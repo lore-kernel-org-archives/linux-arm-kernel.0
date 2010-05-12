@@ -1,85 +1,70 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 12 May 2010 09:24:08 +0200
-Subject: [PATCH 12/16] ARM: S5PC100: Move sdhci helpers from plat-s5pc1xx
-	to mach-s5pc100
-In-Reply-To: <001f01caf1a1$724c4470$56e4cd50$%kim@samsung.com>
-References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-13-git-send-email-m.szyprowski@samsung.com>
-	<001f01caf1a1$724c4470$56e4cd50$%kim@samsung.com>
-Message-ID: <003001caf1a4$1e8629c0$5b927d40$%szyprowski@samsung.com>
+From: jekhor@gmail.com (Yauhen Kharuzhy)
+Date: Wed, 12 May 2010 10:25:21 +0300
+Subject: [PATCH 01/15] ARM: S3C: Add S3C2416 detection to uncompress code
+In-Reply-To: <20100512023845.GM2589@trinity.fluff.org>
+References: <1273631766-15693-1-git-send-email-ben-linux@fluff.org>
+	<20100512023845.GM2589@trinity.fluff.org>
+Message-ID: <20100512072521.GA24747@jeknote.loshitsa1.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, May 12, 2010 at 03:38:45AM +0100, Ben Dooks wrote:
+> On Wed, May 12, 2010 at 03:35:52AM +0100, Ben Dooks wrote:
+> > From: Yauhen Kharuzhy <jekhor@gmail.com>
+> > 
+> > Add S3C2416 serial port setup to uncompress code.
+> 
+> Yahuen, let me know if you've any objection to this going upstrea.
+No, don't have.
 
-On Wednesday, May 12, 2010 9:05 AM Kukjin Kim wrote:
-
-> Marek Szyprowski wrote:
-> >
-> > Move sdhci helpers from plat-s5pc1xx to mach-s5pc100.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Forgot to add --compose to send-email, so here's what should have gone
+> into the first email of this series:
+> 
+> S3C2416 support, mainly just processor core and a few peripheral setup
+> patches. Also has basic support for the S3C2450 which is very similar
+> SoC which will be updated later in the series.
+> 
+> Currently based on the s3c24xx gpio series.
+> 
+> Russell, let me know if this is ok for the next merge window, and if so
+> I'll send a pull request.
+> 
+> > Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+> > Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 > > ---
-> >  arch/arm/mach-s5pc100/Kconfig                      |   11 +++++++++++
-> >  arch/arm/mach-s5pc100/Makefile                     |    2 ++
-> >  arch/arm/mach-s5pc100/cpu.c                        |    6 ++++++
-> >  arch/arm/mach-s5pc100/include/mach/map.h           |    8 ++++++++
-> >  .../setup-sdhci-gpio.c                             |    2 +-
-> >  5 files changed, 28 insertions(+), 1 deletions(-)
-> >  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-sdhci-gpio.c (97%)
-> >
-> > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-
-> s5pc100/Kconfig
-> > index f2d5c23..af64da3 100644
-> > --- a/arch/arm/mach-s5pc100/Kconfig
-> > +++ b/arch/arm/mach-s5pc100/Kconfig
-> > @@ -24,6 +24,17 @@ config S5PC100_SETUP_I2C1
-> >  	help
-> >  	  Common setup code for i2c bus 1.
-> >
-> > +config S5PC100_SETUP_SDHCI
-> > +        bool
-> > +        select S5PC100_SETUP_SDHCI_GPIO
-> > +        help
-> > +          Internal helper functions for S5PC100 based SDHCI systems
-> > +
+> >  arch/arm/mach-s3c2410/include/mach/uncompress.h |    4 +++-
+> >  1 files changed, 3 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-s3c2410/include/mach/uncompress.h b/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> > index 72f756c..8b283f8 100644
+> > --- a/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> > +++ b/arch/arm/mach-s3c2410/include/mach/uncompress.h
+> > @@ -40,7 +40,9 @@ static void arch_detect_cpu(void)
+> >  	cpuid &= S3C2410_GSTATUS1_IDMASK;
+> >  
+> >  	if (is_arm926() || cpuid == S3C2410_GSTATUS1_2440 ||
+> > -	    cpuid == S3C2410_GSTATUS1_2442) {
+> > +	    cpuid == S3C2410_GSTATUS1_2442 ||
+> > +	    cpuid == S3C2410_GSTATUS1_2416 ||
+> > +	    cpuid == S3C2410_GSTATUS1_2450) {
+> >  		fifo_mask = S3C2440_UFSTAT_TXMASK;
+> >  		fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
+> >  	} else {
+> > -- 
+> > 1.6.3.3
+> > 
 > 
-> Not aligned.
-> Please fix it.
-
-ok
-
+> -- 
+> -- 
+> Ben
 > 
-> > +config S5PC100_SETUP_SDHCI_GPIO
-> > +	bool
-> > +	help
-> > +	  Common setup code for SDHCI gpio.
-> > +
-> >  config MACH_SMDKC100
-> >  	bool "SMDKC100"
-> >  	select CPU_S5PC100
-> > diff --git a/arch/arm/mach-s5pc100/Makefile
-> b/arch/arm/mach-s5pc100/Makefile
-> > index 522d8b7..9242f14 100644
-> > --- a/arch/arm/mach-s5pc100/Makefile
-> > +++ b/arch/arm/mach-s5pc100/Makefile
-> > @@ -18,6 +18,8 @@ obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
-> >
-> >  obj-$(CONFIG_S5PC100_SETUP_FB_24BPP) += setup-fb-24bpp.o
-> >  obj-$(CONFIG_S5PC100_SETUP_I2C1) += setup-i2c1.o
-> > +obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
-> > +obj-$(CONFIG_S5PC100_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+> Q:      What's a light-year?
+> A:      One-third less calories than a regular year.
 > 
-> How about union the setup-sdhci-gpio.c to setup-sdhci file?
-> I think don't need to separate setup-sdhci and setup-sdhci-gpio file.
 
-I just followed the style of other Samsung machines (s3c64xx mainly).
-If required I can merge these two files together.
+-- 
+Yauhen Kharuzhy		jekhor _at_ gmail.com
+			JID: jek at jabber.ru
 
-> ...
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+A: No
+Q: Should I quote below my post?
