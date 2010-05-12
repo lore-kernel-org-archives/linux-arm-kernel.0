@@ -1,77 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 12 May 2010 14:09:22 +0200
-Subject: [PATCH 3/4] mx25: fix time accounting
-In-Reply-To: <20100512104523.GB19283@jasper.tkos.co.il>
-References: <20100125105439.GE6724@jasper.tkos.co.il>
-	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
-	<20100511154349.GZ31199@pengutronix.de>
-	<20100512050627.GA19283@jasper.tkos.co.il>
-	<20100512094642.GB31199@pengutronix.de>
-	<20100512104523.GB19283@jasper.tkos.co.il>
-Message-ID: <20100512120922.GC31199@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 May 2010 13:24:59 +0100
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <20100512115340.GA11261@Chamillionaire.breakpoint.cc>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
+	<4BEA1559.9000107@gmail.com>
+	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
+	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
+Message-ID: <1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 01:45:23PM +0300, Baruch Siach wrote:
-> Hi Sascha,
+On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
+> * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
 > 
-> On Wed, May 12, 2010 at 11:46:42AM +0200, Sascha Hauer wrote:
-> > On Wed, May 12, 2010 at 08:06:28AM +0300, Baruch Siach wrote:
-> > > On Tue, May 11, 2010 at 05:43:49PM +0200, Sascha Hauer wrote:
-> > > > On Mon, Jan 25, 2010 at 12:58:21PM +0200, Baruch Siach wrote:
-> > > > > The gpt_clk rate function doesn't consider the PER divider. This causes a
-> > > > > significant drift in time accounting. Fix this by introducing the correct rate
-> > > > > calculation function.
-> > > > 
-> > > > Should have tested this one. In fact with this patch applied my clock
-> > > > goes wrong.
-> > > > 
-> > > > The i.MX Timer code makes sure the gpt clock is sourced from the ipg
-> > > > clock (GPTCR[6:8] = 1), so the behaviour should be correct the way it
-> > > > was before this patch. Any idea why it was wrong on your hardware? Have
-> > > > you changed the GPTCR bits?
-> > > 
-> > > No. My current platform is the i.MX25 PDK. I've added the following to my 
-> > > mx25pdk_init():
-> > > 
-> > > debugfs_create_x32("gptcr", 0444, NULL,
-> > >     (u32*)MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR));
-> > > 
-> > > When the system is running I get:
-> > > 
-> > > # cat /debugfs/gptcr 
-> > > 0x00000249
-> > > 
-> > > That is GPTCR[6:8] = 1.
-> > > 
-> > > The same clock calculation is being done in the platform code of the Freescale 
-> > > supplied kernel (now based on 2.6.31).  Can you get this one running on your 
-> > > platform?
-> > 
-> > I just checked the fsl 2.6.31 source. They really pass the per_clk to
-> > the timer, but they also change the timer source to MX3_TCTL_CLK_PER
-> > (2<<6).
+> >> > --- a/drivers/ata/libata-sff.c
+> >> > +++ b/drivers/ata/libata-sff.c
+> >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+> >> >                                         do_write);
+> >> >          }
+> >> >
+> >> > -       if (!do_write)
+> >> > +       if (!do_write&&  !PageSlab(page))
+> >> >                  flush_dcache_page(page);
+> >>
+> >> I would think that check belongs inside flush_dcache_page itself, rather
+> >> than forcing every driver to include it..
+> >
+> >Sebastian (cc'ed) reported this as well for MIPS.
+> Thx. The patch above looks what I've sent a while ago. Jeff was going to
+> merge it afaik.
 > 
-> Strange. The i.MX25 Reference Manual says nothing about PER in the CLKSRC 
-> field of GPTCR. The relevant text from 28.5.2.1 "GPT Control Register (GPTCR)" 
-> is:
+> >I think it makes sense for this check to be done in the
+> >flush_dcache_page() function.
 > 
-> 000 No clock
-> 001 ipg_clk
-> 010 ipg_clk_highfreq
-> 011 ipp_ind_clkin (external clock from pad)
-> 1xx ipg_clk_32k
+> Why should flush_dcache_page() not flush pages you tell it?
+> From Documentation/cachetlb.txt:
+> |   NOTE: This routine need only be called for page cache pages
+> |          which can potentially ever be mapped into the address
+> |          space of a user process.  So for example, VFS layer code
+> |          handling vfs symlinks in the page cache need not call
+> |          this interface at all.
 > 
-> So ipg_clk_highfreq == PER clock?
+> A page from slab or stack is not going to see the sky of user land and
+> therefore it should not be fed into flush_dcache_page().
 
-I think so, yes. I'm fairly used to the fact that the clock names in the
-peripherals do not match the ones mentioned in the clock chapter, this
-has a long tradition :(
-
-Sascha
+You are right :), so fixing the driver is the best approach.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
