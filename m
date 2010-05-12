@@ -1,13 +1,14 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 12 May 2010 14:45:46 -0700
-Subject: [PATCH 17/25] msm: add msm_iomap-7x30.h for MSM7x30 support
+Date: Wed, 12 May 2010 14:45:47 -0700
+Subject: [PATCH 18/25] msm: add devices-msm7x30.c
 In-Reply-To: <>
 References: <>
-Message-ID: <1273700754-10256-18-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1273700754-10256-19-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a header describing the io regions for MSM7x30.
+This adds a clock list, and common resource structures
+for MSM7x30.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
@@ -15,21 +16,19 @@ Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |  122 +++++++++++++++++++++++
- arch/arm/mach-msm/include/mach/msm_iomap.h      |    4 +-
- 2 files changed, 125 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+ arch/arm/mach-msm/devices-msm7x30.c |  128 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 128 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/devices-msm7x30.c
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
 new file mode 100644
-index 0000000..8a00c2d
+index 0000000..b449e8a
 --- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
-@@ -0,0 +1,122 @@
++++ b/arch/arm/mach-msm/devices-msm7x30.c
+@@ -0,0 +1,128 @@
 +/*
-+ * Copyright (C) 2007 Google, Inc.
++ * Copyright (C) 2008 Google, Inc.
 + * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-+ * Author: Brian Swetland <swetland@google.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -40,128 +39,120 @@ index 0000000..8a00c2d
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
-+ *
-+ * The MSM peripherals are spread all over across 768MB of physical
-+ * space, which makes just having a simple IO_ADDRESS macro to slide
-+ * them into the right virtual location rough.  Instead, we will
-+ * provide a master phys->virt mapping for peripherals here.
-+ *
 + */
 +
-+#ifndef __ASM_ARCH_MSM_IOMAP_7X30_H
-+#define __ASM_ARCH_MSM_IOMAP_7X30_H
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
 +
-+/* Physical base address and size of peripherals.
-+ * Ordered by the virtual base addresses they will be mapped at.
-+ *
-+ * MSM_VIC_BASE must be an value that can be loaded via a "mov"
-+ * instruction, otherwise entry-macro.S will not compile.
-+ *
-+ * If you add or remove entries here, you'll want to edit the
-+ * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
-+ * changes.
-+ *
-+ */
++#include <linux/dma-mapping.h>
++#include <mach/irqs.h>
++#include <mach/msm_iomap.h>
++#include <mach/dma.h>
++#include <mach/board.h>
 +
-+#define MSM_VIC_BASE          IOMEM(0xE0000000)
-+#define MSM_VIC_PHYS          0xC0080000
-+#define MSM_VIC_SIZE          SZ_4K
++#include "devices.h"
++#include "smd_private.h"
 +
-+#define MSM_CSR_BASE          IOMEM(0xE0001000)
-+#define MSM_CSR_PHYS          0xC0100000
-+#define MSM_CSR_SIZE          SZ_4K
++#include <asm/mach/flash.h>
 +
-+#define MSM_TMR_PHYS          MSM_CSR_PHYS
-+#define MSM_TMR_BASE          MSM_CSR_BASE
-+#define MSM_TMR_SIZE          SZ_4K
++#include "clock-pcom.h"
 +
-+#define MSM_GPT_BASE 	      (MSM_TMR_BASE + 0x4)
-+#define MSM_DGT_BASE 	      (MSM_TMR_BASE + 0x24)
++#include <mach/mmc.h>
 +
-+#define MSM_DMOV_BASE         IOMEM(0xE0002000)
-+#define MSM_DMOV_PHYS         0xAC400000
-+#define MSM_DMOV_SIZE         SZ_4K
++static struct resource resources_uart2[] = {
++	{
++		.start	= INT_UART2,
++		.end	= INT_UART2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= MSM_UART2_PHYS,
++		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
 +
-+#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
-+#define MSM_GPIO1_PHYS        0xAC001000
-+#define MSM_GPIO1_SIZE        SZ_4K
++struct platform_device msm_device_uart2 = {
++	.name	= "msm_serial",
++	.id	= 1,
++	.num_resources	= ARRAY_SIZE(resources_uart2),
++	.resource	= resources_uart2,
++};
 +
-+#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
-+#define MSM_GPIO2_PHYS        0xAC101000
-+#define MSM_GPIO2_SIZE        SZ_4K
++struct clk msm_clocks_7x30[] = {
++	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
++	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
++	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
++	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
++	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
++	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
++	CLK_PCOM("emdh_pclk",	EMDH_P_CLK,	NULL, OFF),
++	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
++	CLK_PCOM("grp_2d_clk",	GRP_2D_CLK,	NULL, 0),
++	CLK_PCOM("grp_2d_pclk",	GRP_2D_P_CLK,	NULL, 0),
++	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
++	CLK_PCOM("grp_pclk",	GRP_3D_P_CLK,	NULL, 0),
++	CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,	NULL, 0),
++	CLK_PCOM("hdmi_clk",	HDMI_CLK,	NULL, 0),
++	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
++	CLK_PCOM("jpeg_clk",	JPEG_CLK,	NULL, OFF),
++	CLK_PCOM("jpeg_pclk",	JPEG_P_CLK,	NULL, OFF),
++	CLK_PCOM("lpa_codec_clk",	LPA_CODEC_CLK,		NULL, 0),
++	CLK_PCOM("lpa_core_clk",	LPA_CORE_CLK,		NULL, 0),
++	CLK_PCOM("lpa_pclk",		LPA_P_CLK,		NULL, 0),
++	CLK_PCOM("mdc_clk",	MDC_CLK,	NULL, 0),
++	CLK_PCOM("mddi_clk",	PMDH_CLK,	NULL, OFF | CLK_MINMAX),
++	CLK_PCOM("mddi_pclk",	PMDH_P_CLK,	NULL, 0),
++	CLK_PCOM("mdp_clk",	MDP_CLK,	NULL, OFF),
++	CLK_PCOM("mdp_pclk",	MDP_P_CLK,	NULL, 0),
++	CLK_PCOM("mdp_lcdc_pclk_clk", MDP_LCDC_PCLK_CLK, NULL, 0),
++	CLK_PCOM("mdp_lcdc_pad_pclk_clk", MDP_LCDC_PAD_PCLK_CLK, NULL, 0),
++	CLK_PCOM("mdp_vsync_clk",	MDP_VSYNC_CLK,  NULL, 0),
++	CLK_PCOM("mfc_clk",		MFC_CLK,		NULL, 0),
++	CLK_PCOM("mfc_div2_clk",	MFC_DIV2_CLK,		NULL, 0),
++	CLK_PCOM("mfc_pclk",		MFC_P_CLK,		NULL, 0),
++	CLK_PCOM("mi2s_m_clk",		MI2S_M_CLK,  		NULL, 0),
++	CLK_PCOM("mi2s_s_clk",		MI2S_S_CLK,  		NULL, 0),
++	CLK_PCOM("mi2s_codec_rx_m_clk",	MI2S_CODEC_RX_M_CLK,  NULL, 0),
++	CLK_PCOM("mi2s_codec_rx_s_clk",	MI2S_CODEC_RX_S_CLK,  NULL, 0),
++	CLK_PCOM("mi2s_codec_tx_m_clk",	MI2S_CODEC_TX_M_CLK,  NULL, 0),
++	CLK_PCOM("mi2s_codec_tx_s_clk",	MI2S_CODEC_TX_S_CLK,  NULL, 0),
++	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, CLK_MIN),
++	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
++	CLK_PCOM("rotator_clk",	AXI_ROTATOR_CLK,		NULL, 0),
++	CLK_PCOM("rotator_imem_clk",	ROTATOR_IMEM_CLK,	NULL, OFF),
++	CLK_PCOM("rotator_pclk",	ROTATOR_P_CLK,		NULL, OFF),
++	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
++	CLK_PCOM("spi_clk",	SPI_CLK,	NULL, 0),
++	CLK_PCOM("spi_pclk",	SPI_P_CLK,	NULL, 0),
++	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
++	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
++	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
++	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, 0),
++	CLK_PCOM("usb_hs_clk",		USB_HS_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs_pclk",		USB_HS_P_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs_core_clk",	USB_HS_CORE_CLK,	NULL, OFF),
++	CLK_PCOM("usb_hs2_clk",		USB_HS2_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs2_core_clk",	USB_HS2_CORE_CLK,	NULL, OFF),
++	CLK_PCOM("usb_hs3_clk",		USB_HS3_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,		NULL, OFF),
++	CLK_PCOM("usb_hs3_core_clk",	USB_HS3_CORE_CLK,	NULL, OFF),
++	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MIN),
++	CLK_PCOM("vfe_camif_clk",	VFE_CAMIF_CLK, 	NULL, 0),
++	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, 0),
++	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, 0),
++	CLK_PCOM("vfe_pclk",	VFE_P_CLK,	NULL, OFF),
++	CLK_PCOM("vpe_clk",	VPE_CLK,	NULL, 0),
 +
-+#define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
-+#define MSM_CLK_CTL_PHYS      0xAB800000
-+#define MSM_CLK_CTL_SIZE      SZ_4K
++	/* 7x30 v2 hardware only. */
++	CLK_PCOM("csi_clk",	CSI0_CLK,	NULL, 0),
++	CLK_PCOM("csi_pclk",	CSI0_P_CLK,	NULL, 0),
++	CLK_PCOM("csi_vfe_clk",	CSI0_VFE_CLK,	NULL, 0),
++};
 +
-+#define MSM_CLK_CTL_SH2_BASE  IOMEM(0xE0006000)
-+#define MSM_CLK_CTL_SH2_PHYS  0xABA01000
-+#define MSM_CLK_CTL_SH2_SIZE  SZ_4K
++unsigned msm_num_clocks_7x30 = ARRAY_SIZE(msm_clocks_7x30);
 +
-+#define MSM_ACC_BASE          IOMEM(0xE0007000)
-+#define MSM_ACC_PHYS          0xC0101000
-+#define MSM_ACC_SIZE          SZ_4K
-+
-+#define MSM_SAW_BASE          IOMEM(0xE0008000)
-+#define MSM_SAW_PHYS          0xC0102000
-+#define MSM_SAW_SIZE          SZ_4K
-+
-+#define MSM_GCC_BASE	      IOMEM(0xE0009000)
-+#define MSM_GCC_PHYS	      0xC0182000
-+#define MSM_GCC_SIZE	      SZ_4K
-+
-+#define MSM_TCSR_BASE	      IOMEM(0xE000A000)
-+#define MSM_TCSR_PHYS	      0xAB600000
-+#define MSM_TCSR_SIZE	      SZ_4K
-+
-+#define MSM_SHARED_RAM_BASE   IOMEM(0xE0100000)
-+#define MSM_SHARED_RAM_PHYS   0x00100000
-+#define MSM_SHARED_RAM_SIZE   SZ_1M
-+
-+#define MSM_UART1_PHYS        0xACA00000
-+#define MSM_UART1_SIZE        SZ_4K
-+
-+#define MSM_UART2_PHYS        0xACB00000
-+#define MSM_UART2_SIZE        SZ_4K
-+
-+#define MSM_UART3_PHYS        0xACC00000
-+#define MSM_UART3_SIZE        SZ_4K
-+
-+#ifdef CONFIG_MSM_DEBUG_UART
-+#define MSM_DEBUG_UART_BASE   0xE1000000
-+#if CONFIG_MSM_DEBUG_UART == 1
-+#define MSM_DEBUG_UART_PHYS   MSM_UART1_PHYS
-+#elif CONFIG_MSM_DEBUG_UART == 2
-+#define MSM_DEBUG_UART_PHYS   MSM_UART2_PHYS
-+#elif CONFIG_MSM_DEBUG_UART == 3
-+#define MSM_DEBUG_UART_PHYS   MSM_UART3_PHYS
-+#endif
-+#define MSM_DEBUG_UART_SIZE   SZ_4K
-+#endif
-+
-+#define MSM_MDC_BASE	      IOMEM(0xE0200000)
-+#define MSM_MDC_PHYS	      0xAA500000
-+#define MSM_MDC_SIZE	      SZ_1M
-+
-+#define MSM_AD5_BASE          IOMEM(0xE0300000)
-+#define MSM_AD5_PHYS          0xA7000000
-+#define MSM_AD5_SIZE          (SZ_1M*13)
-+
-+#endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
-index 7043d7a..e6b1821 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
-@@ -43,7 +43,9 @@
- #define IOMEM(x)	((void __force __iomem *)(x))
- #endif
- 
--#if defined(CONFIG_ARCH_QSD8X50)
-+#if defined(CONFIG_ARCH_MSM7X30)
-+#include "msm_iomap-7x30.h"
-+#elif defined(CONFIG_ARCH_QSD8X50)
- #include "msm_iomap-8x50.h"
- #else
- #include "msm_iomap-7x00.h"
 -- 
 1.6.2.3
