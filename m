@@ -1,32 +1,38 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 12 May 2010 10:18:11 +0300
-Subject: [PATCH v2 0/5] HP iPAQ RX1950 patch series
-In-Reply-To: <20100512004841.GJ6684@trinity.fluff.org>
-References: <1273560911-18153-1-git-send-email-anarsoul@gmail.com>
-	<20100512004841.GJ6684@trinity.fluff.org>
-Message-ID: <201005121018.18885.anarsoul@gmail.com>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
+Date: Wed, 12 May 2010 09:23:48 +0200
+Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <20100511233811.GB31311@kroah.com>
+References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
+	<20100511233811.GB31311@kroah.com>
+Message-ID: <201005120923.48568.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 12 ??? 2010 03:48:41 ????? Ben Dooks ???????:
-> Have not merged the mainatainers update as it should probably go
-> to linux-kernel list.
+Le mercredi, 12 mai 2010 01.38:12, Greg KH a ?crit :
+> On Tue, May 11, 2010 at 04:14:34PM +0200, Philippe R?tornaz wrote:
+> > On mx31 the OTG host initialisation fails if you need to have
+> > an ULPI transfert to initialize the PHY.
+> >
+> > In order to be able to communicate with the PHY a complete reset
+> > of the usb host is needed. After the PHY initialization the host
+> > usb configuration registers need to be rewritten to avoid a host
+> > controller lockup.
+> >
+> > Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> > ---
+> >  drivers/usb/host/ehci-mxc.c |   98
+> > ++++++++++++++++++++++++++++++++++++++-----
+> 
+> This patch doesn't apply anymore, can you redo it against the linux-next
+> tree?
+> 
 
-Hmmm, but I saw maintainers patches [1] to linux-arm-kernel list only that was 
-merged through rmk's tree without a problem. Btw, it's OK for me, I'll resend 
-it to lkml :)
+It apply cleanly on next-20100512. 
 
-Thank you.
+It needs commit 5a25ad84e01173bb225285eb50f9af48ed1a7598 to apply, but this 
+one is in linux-next now.
 
-Regards
-Vasily
+Regards,
 
-[1] 
-http://lists.arm.linux.org.uk/lurker/message/20090528.050714.03c6dfec.en.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100512/9e09e144/attachment.sig>
+Philippe
