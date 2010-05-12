@@ -1,108 +1,65 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Wed, 12 May 2010 15:51:57 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in the
-	ARMv6	DMA cache ops
-In-Reply-To: <20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
-	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 12 May 2010 14:06:38 +0100
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
+	<4BEA1559.9000107@gmail.com>
+	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
+	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
+	<1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100512130638.GB19314@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+Catalin Marinas wrote:
+> On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
+> > * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
+> > 
+> > >> > --- a/drivers/ata/libata-sff.c
+> > >> > +++ b/drivers/ata/libata-sff.c
+> > >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+> > >> >                                         do_write);
+> > >> >          }
+> > >> >
+> > >> > -       if (!do_write)
+> > >> > +       if (!do_write&&  !PageSlab(page))
+> > >> >                  flush_dcache_page(page);
+> > >>
+> > >> I would think that check belongs inside flush_dcache_page itself, rather
+> > >> than forcing every driver to include it..
+> > >
+> > >Sebastian (cc'ed) reported this as well for MIPS.
+> > Thx. The patch above looks what I've sent a while ago. Jeff was going to
+> > merge it afaik.
+> > 
+> > >I think it makes sense for this check to be done in the
+> > >flush_dcache_page() function.
+> > 
+> > Why should flush_dcache_page() not flush pages you tell it?
+> > From Documentation/cachetlb.txt:
+> > |   NOTE: This routine need only be called for page cache pages
+> > |          which can potentially ever be mapped into the address
+> > |          space of a user process.  So for example, VFS layer code
+> > |          handling vfs symlinks in the page cache need not call
+> > |          this interface at all.
+> > 
+> > A page from slab or stack is not going to see the sky of user land and
+> > therefore it should not be fed into flush_dcache_page().
+> 
+> You are right :), so fixing the driver is the best approach.
 
-I'm using ARM v6 MP core.
-I have applied this patch above 2.6.34-rc7 and my system hang while booting from NFS (through e1000 nic).
-Previously I used 2.6.32 with the cache broadcast IPI mask and it worked just fine for me.
-I have noticed that if I remove the str, write for ownership, in the dma_inv the system boot just fine.
+It worries me that a driver has any knowledge of the PageSlab() flag,
+though.  Especially uncommented knowledge.  That flag seems VM
+internal, and it's conceptually iffy: Kernel code using
+get_free_pages() and using that for I/O also does not see the sky of
+user land.
 
-- Why was the IPI solution dropped?
-- I can think of few cases the above str might be problematic:
-1) CPU 0 is doing inv, after the str cpu 1 change the line and then cpu 0 inv the line... probably won't happen since the dma buffer shouldn't be used by more the one CPU...
-2) CPU 0 is doing inv, the str write garbage which get to the DRAM because of eviction and break the assumption that inv shouldn't change the DRAM...
+If all the PIO drivers have to be changed, I'd be happier with:
 
-Regards
-Ronen Shitrit
+    flush_dcache_page_for_pio()
 
+which wraps the check, explains it, and provides a single place to
+change if needed.
 
------Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-Sent: Tuesday, May 04, 2010 7:44 PM
-To: linux-arm-kernel at lists.infradead.org
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in the ARMv6 DMA cache ops
-
-The Snoop Control Unit on the ARM11MPCore hardware does not detect the
-cache operations and the dma_cache_maint*() functions may leave stale
-cache entries on other CPUs. The solution implemented in this patch
-performs a Read or Write For Ownership in the ARMv6 DMA cache
-maintenance functions. These LDR/STR instructions change the cache line
-state to shared or exclusive so that the cache maintenance operation has
-the desired effect.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/cache-v6.S |   17 +++++++++++++----
- 1 files changed, 13 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 9d89c67..e46ecd8 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -211,6 +211,9 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
- #endif
- 1:
-+#ifdef CONFIG_SMP
-+	str	r0, [r0]			@ write for ownership
-+#endif
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
- #else
-@@ -231,6 +234,9 @@ v6_dma_inv_range:
- v6_dma_clean_range:
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
-+#ifdef CONFIG_SMP
-+	ldr	r2, [r0]			@ read for ownership
-+#endif
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c10, 1		@ clean D line
- #else
-@@ -251,6 +257,10 @@ v6_dma_clean_range:
- ENTRY(v6_dma_flush_range)
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
-+#ifdef CONFIG_SMP
-+	ldr	r2, [r0]			@ read for ownership
-+	str	r2, [r0]			@ write for ownership
-+#endif
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
- #else
-@@ -273,7 +283,9 @@ ENTRY(v6_dma_map_area)
- 	add	r1, r1, r0
- 	teq	r2, #DMA_FROM_DEVICE
- 	beq	v6_dma_inv_range
--	b	v6_dma_clean_range
-+	teq	r2, #DMA_TO_DEVICE
-+	beq	v6_dma_clean_range
-+	b	v6_dma_flush_range
- ENDPROC(v6_dma_map_area)
- 
- /*
-@@ -283,9 +295,6 @@ ENDPROC(v6_dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v6_dma_unmap_area)
--	add	r1, r1, r0
--	teq	r2, #DMA_TO_DEVICE
--	bne	v6_dma_inv_range
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
- 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- Jamie
