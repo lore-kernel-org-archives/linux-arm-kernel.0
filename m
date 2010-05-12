@@ -1,35 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 May 2010 22:30:59 +0100
-Subject: [PATCH] MMC: at91_mci: modify cache flush routines
-In-Reply-To: <20100512141929.80c13953.akpm@linux-foundation.org>
-References: <20100511134409.GB27201@n2100.arm.linux.org.uk>
-	<1273597793-28104-1-git-send-email-nicolas.ferre@atmel.com>
-	<20100512141929.80c13953.akpm@linux-foundation.org>
-Message-ID: <20100512213059.GF22371@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 May 2010 22:39:54 +0100
+Subject: arm926_dma_flush_range undefined!
+In-Reply-To: <20100512184256.GB22371@n2100.arm.linux.org.uk>
+References: <4BE2C013.4040009@atmel.com>
+	<1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+	<20100506175907.GA15797@n2100.arm.linux.org.uk>
+	<4BE926B5.7090602@atmel.com>
+	<20100511094448.GB18828@n2100.arm.linux.org.uk>
+	<4BE95C54.5070008@atmel.com>
+	<20100511134409.GB27201@n2100.arm.linux.org.uk>
+	<1273663120.23818.72.camel@e102109-lin.cambridge.arm.com>
+	<20100512184256.GB22371@n2100.arm.linux.org.uk>
+Message-ID: <1273700394.16677.22.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 02:19:29PM -0700, Andrew Morton wrote:
-> The flush_kernel_dcache_page() documentation specifically says that
-> thou shalt run flush_kernel_dcache_page() _prior_ to kunmapping the
-> page.
+On Wed, 2010-05-12 at 19:42 +0100, Russell King - ARM Linux wrote:
+> On Wed, May 12, 2010 at 12:18:40PM +0100, Catalin Marinas wrote:
+> > For non-aliasing VIPT hardware we still have the option of doing what
+> > the IA-64 and PowerPC guys have done (flushing in set_pte_at with
+> > PG_arch_1 meaning "clean"). It may even work for VIVT caches if we take
+> > care to also flush the kernel alias in set_pte_at.
+> 
+> It should work for VIVT as well, so lets just go ahead and negate the
+> PG_arch_1 meaning.  I was rather expecting this to be done a month or
+> so ago while we still had plenty of time before the next merge window -
+> and given where we are now (maybe 2 weeks away) I think it's too risky
+> to push into the upcoming window.
 
-Hmm, interesting - I can't see why that would be, but it doesn't make
-any difference for ARM (and this is an ARM only driver).
+Well, I started and then I had to go on holiday (and drive back ~1500
+miles because of the volcanic ash).
 
-> I don't know if that makes a difference in the real world, but heck why
-> not:
+> I'm already planning on scheduling the ioremap and LMB changes for the
+> following window, and I think this should be scheduled likewise.
 
-In the interests of stopping cut'n'paste bugs into other drivers, I'd
-say this is a good idea even if it makes no difference to ARM.
+The cache flushing change would need some wider testing, so maybe 6-8
+weeks should be enough. I'll try to get some rfc patches by the end of
+this week.
 
-> However, I'm wondering why you chose flush_kernel_dcache_page() instead
-> of plain old flush_dcache_page().  Is this a pagecache or possibly
-> direct-io page we're dealing with here?
+> > If you are ok with this approach, I'll prepare some patches (it seems
+> > that trying to get an agreement with other architectures isn't very
+> > productive).
+> 
+> That's what I've always found with this issue; whenever I've talked
+> with the mainline community about PIO cache coherency, the result has
+> always been non-productive.  Hence why it's always remained a problem
+> for us.
 
-It's whatever the block layers hand us - which would be page cache pages,
-and I'd assume also DIO pages (I'm not up on DIO stuff though.)
+The good thing is that I found out how PowerPC deals with it :)
 
-It's also my understanding that the preferred interface for drivers which
-write to page cache pages is flush_kernel_dcache_page() rather than
-flush_dcache_page().
+-- 
+Catalin
