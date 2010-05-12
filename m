@@ -1,92 +1,54 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 12 May 2010 08:06:28 +0300
-Subject: [PATCH 3/4] mx25: fix time accounting
-In-Reply-To: <20100511154349.GZ31199@pengutronix.de>
-References: <20100125105439.GE6724@jasper.tkos.co.il>
-	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
-	<20100511154349.GZ31199@pengutronix.de>
-Message-ID: <20100512050627.GA19283@jasper.tkos.co.il>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 12 May 2010 07:22:11 +0200
+Subject: [PATCH 04/16] ARM: S5PC100: copy clocks from plat-s5pc1xx
+In-Reply-To: <001401caf18f$5932f6d0$0b98e470$%kim@samsung.com>
+References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
+	<1270190944-21644-5-git-send-email-m.szyprowski@samsung.com>
+	<001401caf18f$5932f6d0$0b98e470$%kim@samsung.com>
+Message-ID: <002901caf193$15120730$3f361590$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hello,
 
-On Tue, May 11, 2010 at 05:43:49PM +0200, Sascha Hauer wrote:
-> On Mon, Jan 25, 2010 at 12:58:21PM +0200, Baruch Siach wrote:
-> > The gpt_clk rate function doesn't consider the PER divider. This causes a
-> > significant drift in time accounting. Fix this by introducing the correct rate
-> > calculation function.
-> 
-> Should have tested this one. In fact with this patch applied my clock
-> goes wrong.
-> 
-> The i.MX Timer code makes sure the gpt clock is sourced from the ipg
-> clock (GPTCR[6:8] = 1), so the behaviour should be correct the way it
-> was before this patch. Any idea why it was wrong on your hardware? Have
-> you changed the GPTCR bits?
+On Wednesday, May 12, 2010 6:55 AM Kukjin Kim wrote:
 
-No. My current platform is the i.MX25 PDK. I've added the following to my 
-mx25pdk_init():
-
-debugfs_create_x32("gptcr", 0444, NULL,
-    (u32*)MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR));
-
-When the system is running I get:
-
-# cat /debugfs/gptcr 
-0x00000249
-
-That is GPTCR[6:8] = 1.
-
-The same clock calculation is being done in the platform code of the Freescale 
-supplied kernel (now based on 2.6.31).  Can you get this one running on your 
-platform?
-
-baruch
-
-> > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Marek Szyprowski wrote:
+> >
+> > Prepare for moving support for S5PC100 SoC to plat-s5p framework (part 2).
+> Copy
+> > clocks definition to mach-s5pc100 directory.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > ---
-> >  arch/arm/mach-mx25/clock.c |    7 ++++++-
-> >  1 files changed, 6 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> > index 08aaa38..c003ac4 100644
-> > --- a/arch/arm/mach-mx25/clock.c
-> > +++ b/arch/arm/mach-mx25/clock.c
-> > @@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
-> >  	return get_rate_per(8);
-> >  }
-> >  
-> > +static unsigned long get_rate_gpt(struct clk *clk)
-> > +{
-> > +	return get_rate_per(5);
-> > +}
-> > +
-> >  static unsigned long get_rate_otg(struct clk *clk)
-> >  {
-> >  	return 48000000; /* FIXME */
-> > @@ -156,7 +161,7 @@ static void clk_cgcr_disable(struct clk *clk)
-> >  		.secondary	= s,			\
-> >  	}
-> >  
-> > -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
-> > +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
-> >  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
-> >  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
-> >  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
-> > -- 
-> > 1.6.5
-> > 
-> > 
+> >  .../s5pc100-clock.c => mach-s5pc100/clock.c}       |    0
+> >  1 files changed, 0 insertions(+), 0 deletions(-)
+> >  copy arch/arm/{plat-s5pc1xx/s5pc100-clock.c => mach-s5pc100/clock.c}
+> (100%)
+> >
+> > diff --git a/arch/arm/plat-s5pc1xx/s5pc100-clock.c
+> b/arch/arm/mach-s5pc100/clock.c
+> > similarity index 100%
+> > copy from arch/arm/plat-s5pc1xx/s5pc100-clock.c
+> > copy to arch/arm/mach-s5pc100/clock.c
+> > --
 > 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> How about change the comment in the head of moving file.
+> 
+> And where is the patch for arch/arm/plat-s5pc1xx/clock.c?
+> I couldn't find it except 01_patch which just changes naming.
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+arch/arm/plat-s5pc1xx/clock.c file is removed in the last patch of this
+series ("ARM: remove obsolete plat-s5pc1xx directory"). Again I split
+this into separate patches to generate diffs that are easier to follow.
+This also made it possible not to break compilation of the kernel between
+the patches.
+
+The real changes to that code is performed in the "ARM: S5PC100: new
+clocks definition" patch.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
