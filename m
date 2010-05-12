@@ -1,43 +1,19 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 13 May 2010 08:13:59 +1000
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 12 May 2010 23:21:54 +0100
 Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
 	88f5182)
-In-Reply-To: <20100512150057.GA29867@atrey.karlin.mff.cuni.cz>
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
 References: <1273569821.21352.19.camel@pasglop>
 	<1273575478.21352.29.camel@pasglop>
-	<20100512150057.GA29867@atrey.karlin.mff.cuni.cz>
-Message-ID: <1273702439.21352.128.camel@pasglop>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
+Message-ID: <20100512222154.GA6841@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Shilimkar, Santosh wrote:
+> There was a memory write barrier missing before the DMA descriptors 
+> are handed over to DMA controller.
 
->   Could you get the filesystem image with: e2image -r /dev/sdb2 buggy-image
-> bzip2 it and make it available somewhere? Maybe I could guess something
-> from the way the filesystem gets corrupted.
->   Oh, and also overwrite the partition with zeros before calling mkfs to make
-> the analysis simpler.
+On that note, are the cache flush functions implicit memory barriers?
 
-Will do asap.
-
-> > In fact, if I do ls /mnt/test/usr/bin/ I see debconf but if I do
-> > ls /mnt/test/usr/bin/chrt then I get No such file or directory.
-> > 
-> > So something is badly wrong :-)
-> > 
-> > Now, trying without the dir_index feature (mkfs.ext3 -O ^dir_index)
-> > and it works fine. All my md5sum's are correct and fsck passes.
->   Funny. Not sure how that could happen...
-
-Yeah, strange. I looked at the code a bit and I don't see anything
-obvious, ext3 seems to be using the same standard buffer head access
-methods for the htree as for the rest of the metadata, and I see no
-fancy playing with virtual addresses that could explain a VIVT problem.
-
-I could be an issue with the SATA controller that gets more easily
-triggered by the access patterns caused by htree, though that's a bit
-strange.
-
-I'll let you know when I have something to look at.
-
-Cheers,
-Ben.
+-- Jamie
