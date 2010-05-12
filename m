@@ -1,203 +1,101 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 May 2010 15:05:07 +0900
-Subject: [PATCH 10/16] ARM: S5PC100: Move i2c helpers from plat-s5pc1xx to
-	mach-s5pc100
-In-Reply-To: <1270190944-21644-11-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 12 May 2010 15:06:15 +0900
+Subject: [PATCH 11/16] ARM: SMDKC100: enable i2c support again
+In-Reply-To: <1270190944-21644-12-git-send-email-m.szyprowski@samsung.com>
 References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-11-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001d01caf199$15266ad0$3f734070$%kim@samsung.com>
+	<1270190944-21644-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <001e01caf199$3de2bb40$b9a831c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Move i2c helpers from plat-s5pc1xx to mach-s5pc100.
+> This patch enables support for i2c busses on SMDKC100 machine.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pc100/Kconfig                      |    5 +++
->  arch/arm/mach-s5pc100/Makefile                     |    1 +
->  arch/arm/mach-s5pc100/cpu.c                        |    5 +++
->  arch/arm/mach-s5pc100/include/mach/map.h           |    2 +
->  arch/arm/mach-s5pc100/setup-i2c0.c                 |   13 ++++++--
->  .../{plat-s5pc1xx => mach-s5pc100}/setup-i2c1.c    |    4 +-
->  arch/arm/plat-s5pc1xx/setup-i2c0.c                 |   30
---------------------
->  7 files changed, 24 insertions(+), 36 deletions(-)
->  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-i2c1.c (89%)
->  delete mode 100644 arch/arm/plat-s5pc1xx/setup-i2c0.c
+>  arch/arm/mach-s5pc100/Kconfig         |    2 ++
+>  arch/arm/mach-s5pc100/mach-smdkc100.c |    8 +++-----
+>  2 files changed, 5 insertions(+), 5 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-> index 1e7b9a7..03a51e2 100644
+> index 03a51e2..f2d5c23 100644
 > --- a/arch/arm/mach-s5pc100/Kconfig
 > +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -19,6 +19,11 @@ config S5PC100_SETUP_FB_24BPP
->  	help
->            Common setup code for S5PC100 with an 24bpp RGB display helper.
-> 
-> +config S5PC100_SETUP_I2C1
-> +	bool
-> +	help
-> +	  Common setup code for i2c bus 1.
-> +
->  config MACH_SMDKC100
+> @@ -28,7 +28,9 @@ config MACH_SMDKC100
 >  	bool "SMDKC100"
 >  	select CPU_S5PC100
-> diff --git a/arch/arm/mach-s5pc100/Makefile
-b/arch/arm/mach-s5pc100/Makefile
-> index 878dc61..522d8b7 100644
-> --- a/arch/arm/mach-s5pc100/Makefile
-> +++ b/arch/arm/mach-s5pc100/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
->  # Device setup
+>  	select S5PC100_SETUP_FB_24BPP
+> +	select S5PC100_SETUP_I2C1
+>  	select S3C_DEV_FB
+> +	select S3C_DEV_I2C1
+>  	help
+>  	  Machine support for the Samsung SMDKC100
 > 
->  obj-$(CONFIG_S5PC100_SETUP_FB_24BPP) += setup-fb-24bpp.o
-> +obj-$(CONFIG_S5PC100_SETUP_I2C1) += setup-i2c1.o
+> diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-
+> s5pc100/mach-smdkc100.c
+> index 44984be..93af963 100644
+> --- a/arch/arm/mach-s5pc100/mach-smdkc100.c
+> +++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+> @@ -77,7 +77,6 @@ static struct s3c2410_uartcfg smdkc100_uartcfgs[]
+__initdata
+> = {
+>  	},
+>  };
 > 
->  # machine support
-> 
-> diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
-> index 7d65b61..ec92290 100644
-> --- a/arch/arm/mach-s5pc100/cpu.c
-> +++ b/arch/arm/mach-s5pc100/cpu.c
-> @@ -38,6 +38,7 @@
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/clock.h>
-> +#include <plat/iic-core.h>
->  #include <plat/s5pc100.h>
-> 
->  /* Initial IO mappings */
-> @@ -77,6 +78,10 @@ static void s5pc100_idle(void)
->  void __init s5pc100_map_io(void)
->  {
->  	iotable_init(s5pc100_iodesc, ARRAY_SIZE(s5pc100_iodesc));
+> -#if 0
+
+Ok.
+
+>  /* I2C0 */
+>  static struct i2c_board_info i2c_devs0[] __initdata = {
+>  };
+> @@ -85,7 +84,7 @@ static struct i2c_board_info i2c_devs0[] __initdata = {
+>  /* I2C1 */
+>  static struct i2c_board_info i2c_devs1[] __initdata = {
+>  };
+> -#endif
 > +
-> +	/* the i2c devices are directly compatible with s3c2440 */
-> +	s3c_i2c0_setname("s3c2440-i2c");
-> +	s3c_i2c1_setname("s3c2440-i2c");
->  }
+>  /* LCD power controller */
+>  static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
+>  				   unsigned int power)
+> @@ -142,9 +141,9 @@ static struct s3c_fb_platdata smdkc100_lcd_pdata
+> __initdata = {
+>  static struct platform_device *smdkc100_devices[] __initdata = {
+>  	&s3c_device_fb,
+>  	&smdkc100_lcd_powerdev,
+> -#if 0
+>  	&s3c_device_i2c0,
+>  	&s3c_device_i2c1,
+> +#if 0
+
+Aha ;-)
+
+>  	&s3c_device_hsmmc0,
+>  	&s3c_device_hsmmc1,
+>  	&s3c_device_hsmmc2,
+> @@ -160,13 +159,12 @@ static void __init smdkc100_map_io(void)
 > 
->  void __init s5pc100_init_clocks(int xtal)
-> diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-
-> s5pc100/include/mach/map.h
-> index f08fd76..82a1c9d 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/map.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/map.h
-> @@ -51,6 +51,7 @@
->  #define S5P_SZ_UART		SZ_256
-> 
->  #define S5PC100_PA_IIC0		(0xEC100000)
-> +#define S5PC100_PA_IIC1		(0xEC200000)
-> 
->  #define S5PC100_PA_FB		(0xEE000000)
-> 
-> @@ -61,6 +62,7 @@
->  /* compatibiltiy defines. */
->  #define S3C_PA_UART		S5PC100_PA_UART
->  #define S3C_PA_IIC		S5PC100_PA_IIC0
-> +#define S3C_PA_IIC1		S5PC100_PA_IIC1
->  #define S3C_PA_FB		S5PC100_PA_FB
-> 
->  #endif /* __ASM_ARCH_MAP_H */
-> diff --git a/arch/arm/mach-s5pc100/setup-i2c0.c
-b/arch/arm/mach-s5pc100/setup-
-> i2c0.c
-> index 8f65e58..dd3174e 100644
-> --- a/arch/arm/mach-s5pc100/setup-i2c0.c
-> +++ b/arch/arm/mach-s5pc100/setup-i2c0.c
-> @@ -1,9 +1,9 @@
->  /* linux/arch/arm/mach-s5pc100/setup-i2c0.c
->   *
-> - * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com/
-> + * Copyright 2009 Samsung Electronics Co.
-> + *	Byungho Min <bhmin@samsung.com>
->   *
-> - * I2C0 GPIO configuration.
-> + * Base S5PC100 I2C bus 0 gpio configuration
->   *
->   * Based on plat-s3c64xx/setup-i2c0.c
->   *
-> @@ -17,9 +17,14 @@
-> 
->  struct platform_device; /* don't need the contents */
-> 
-> +#include <linux/gpio.h>
->  #include <plat/iic.h>
-> +#include <plat/gpio-cfg.h>
-> 
->  void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+>  static void __init smdkc100_machine_init(void)
 >  {
-> -	/* Will be populated later */
-> +	s3c_gpio_cfgpin(S5PC100_GPD(3), S3C_GPIO_SFN(2));
-> +	s3c_gpio_setpull(S5PC100_GPD(3), S3C_GPIO_PULL_UP);
-> +	s3c_gpio_cfgpin(S5PC100_GPD(4), S3C_GPIO_SFN(2));
-> +	s3c_gpio_setpull(S5PC100_GPD(4), S3C_GPIO_PULL_UP);
->  }
-> diff --git a/arch/arm/plat-s5pc1xx/setup-i2c1.c
-b/arch/arm/mach-s5pc100/setup-
-> i2c1.c
-> similarity index 89%
-> rename from arch/arm/plat-s5pc1xx/setup-i2c1.c
-> rename to arch/arm/mach-s5pc100/setup-i2c1.c
-> index a0a8b4a..d1fec26 100644
-> --- a/arch/arm/plat-s5pc1xx/setup-i2c1.c
-> +++ b/arch/arm/mach-s5pc100/setup-i2c1.c
-> @@ -1,9 +1,9 @@
-> -/* linux/arch/arm/plat-s3c64xx/setup-i2c1.c
-> +/* linux/arch/arm/mach-s5pc100/setup-i2c1.c
->   *
->   * Copyright 2009 Samsung Electronics Co.
->   *	Byungho Min <bhmin@samsung.com>
->   *
-> - * Base S5PC1XX I2C bus 1 gpio configuration
-> + * Base S5PC100 I2C bus 1 gpio configuration
->   *
->   * Based on plat-s3c64xx/setup-i2c1.c
->   *
-> diff --git a/arch/arm/plat-s5pc1xx/setup-i2c0.c
-b/arch/arm/plat-s5pc1xx/setup-i2c0.c
-> deleted file mode 100644
-> index 5e4a7c3..0000000
-> --- a/arch/arm/plat-s5pc1xx/setup-i2c0.c
-> +++ /dev/null
-> @@ -1,30 +0,0 @@
-> -/* linux/arch/arm/plat-s5pc1xx/setup-i2c0.c
-> - *
-> - * Copyright 2009 Samsung Electronics Co.
-> - *	Byungho Min <bhmin@samsung.com>
-> - *
-> - * Base S5PC1XX I2C bus 0 gpio configuration
-> - *
-> - * Based on plat-s3c64xx/setup-i2c0.c
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> -*/
-> -
-> -#include <linux/kernel.h>
-> -#include <linux/types.h>
-> -
-> -struct platform_device; /* don't need the contents */
-> -
-> -#include <linux/gpio.h>
-> -#include <plat/iic.h>
-> -#include <plat/gpio-cfg.h>
-> -
-> -void s3c_i2c0_cfg_gpio(struct platform_device *dev)
-> -{
-> -	s3c_gpio_cfgpin(S5PC100_GPD(3), S3C_GPIO_SFN(2));
-> -	s3c_gpio_setpull(S5PC100_GPD(3), S3C_GPIO_PULL_UP);
-> -	s3c_gpio_cfgpin(S5PC100_GPD(4), S3C_GPIO_SFN(2));
-> -	s3c_gpio_setpull(S5PC100_GPD(4), S3C_GPIO_PULL_UP);
-> -}
+> -#if 0
+>  	/* I2C */
+>  	s3c_i2c0_set_platdata(NULL);
+>  	s3c_i2c1_set_platdata(NULL);
+>  	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+>  	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+> -#endif
+> +
+>  	s3c_fb_set_platdata(&smdkc100_lcd_pdata);
+> 
+>  	/* LCD init */
 > --
 > 1.6.4
+> 
 
-Looks good.
+Looks good except remaining if 0 :-)
+I understand your intention.
 
 Thanks.
 
