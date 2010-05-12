@@ -1,9 +1,9 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 12 May 2010 14:45:42 -0700
-Subject: [PATCH 13/25] msm: io: add io support for 8x50
+Date: Wed, 12 May 2010 14:45:37 -0700
+Subject: [PATCH 08/25] msm: irqs: add irqs-8x50.h for QSD8x50 support
 In-Reply-To: <>
 References: <>
-Message-ID: <1273700754-10256-14-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1273700754-10256-9-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,95 +13,137 @@ Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/io.h |    3 ++
- arch/arm/mach-msm/io.c              |   39 ++++++++++++++++++++++++++++++++--
- 2 files changed, 39 insertions(+), 3 deletions(-)
+ arch/arm/mach-msm/include/mach/irqs-8x50.h |  105 ++++++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs.h      |    5 +-
+ 2 files changed, 109 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-8x50.h
 
-diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
-index aab9645..dbfb013 100644
---- a/arch/arm/mach-msm/include/mach/io.h
-+++ b/arch/arm/mach-msm/include/mach/io.h
-@@ -26,4 +26,7 @@ void __iomem *__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int m
- #define __io(a)		__typesafe_io(a)
- #define __mem_pci(a)    (a)
- 
-+void msm_map_qsd8x50_io(void);
-+extern unsigned int msm_shared_ram_phys;
+diff --git a/arch/arm/mach-msm/include/mach/irqs-8x50.h b/arch/arm/mach-msm/include/mach/irqs-8x50.h
+new file mode 100644
+index 0000000..de3d8fe
+--- /dev/null
++++ b/arch/arm/mach-msm/include/mach/irqs-8x50.h
+@@ -0,0 +1,105 @@
++/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above
++ *       copyright notice, this list of conditions and the following
++ *       disclaimer in the documentation and/or other materials provided
++ *       with the distribution.
++ *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
++ *       contributors may be used to endorse or promote products derived
++ *       from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
 +
- #endif
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index fde5e58..c94ba33 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -1,8 +1,9 @@
- /* arch/arm/mach-msm/io.c
-  *
-- * MSM7K io support
-+ * MSM7K, QSD io support
-  *
-  * Copyright (C) 2007 Google, Inc.
-+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-  * Author: Brian Swetland <swetland@google.com>
-  *
-  * This software is licensed under the terms of the GNU General Public
-@@ -34,6 +35,8 @@
- 		.type = MT_DEVICE_NONSHARED, \
- 	 }
- 
-+#if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27) \
-+	|| defined(CONFIG_ARCH_MSM7X25)
- static struct map_desc msm_io_desc[] __initdata = {
- 	MSM_DEVICE(VIC),
- 	MSM_DEVICE(CSR),
-@@ -50,7 +53,7 @@ static struct map_desc msm_io_desc[] __initdata = {
- #endif
- 	{
- 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
--		.pfn =      __phys_to_pfn(MSM_SHARED_RAM_PHYS),
-+		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
- 		.length =   MSM_SHARED_RAM_SIZE,
- 		.type =     MT_DEVICE,
- 	},
-@@ -63,9 +66,39 @@ void __init msm_map_common_io(void)
- 	 * pages are peripheral interface or not.
- 	 */
- 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
--
- 	iotable_init(msm_io_desc, ARRAY_SIZE(msm_io_desc));
- }
++#ifndef __ASM_ARCH_MSM_IRQS_8XXX_H
++#define __ASM_ARCH_MSM_IRQS_8XXX_H
++
++/* MSM ACPU Interrupt Numbers */
++
++#define INT_A9_M2A_0         0
++#define INT_A9_M2A_1         1
++#define INT_A9_M2A_2         2
++#define INT_A9_M2A_3         3
++#define INT_A9_M2A_4         4
++#define INT_A9_M2A_5         5
++#define INT_A9_M2A_6         6
++#define INT_GP_TIMER_EXP     7
++#define INT_DEBUG_TIMER_EXP  8
++#define INT_SIRC_0           9
++#define INT_SDC3_0           10
++#define INT_SDC3_1           11
++#define INT_SDC4_0           12
++#define INT_SDC4_1           13
++#define INT_AD6_EXT_VFR      14
++#define INT_USB_OTG          15
++#define INT_MDDI_PRI         16
++#define INT_MDDI_EXT         17
++#define INT_MDDI_CLIENT      18
++#define INT_MDP              19
++#define INT_GRAPHICS         20
++#define INT_ADM_AARM         21
++#define INT_ADSP_A11         22
++#define INT_ADSP_A9_A11      23
++#define INT_SDC1_0           24
++#define INT_SDC1_1           25
++#define INT_SDC2_0           26
++#define INT_SDC2_1           27
++#define INT_KEYSENSE         28
++#define INT_TCHSCRN_SSBI     29
++#define INT_TCHSCRN1         30
++#define INT_TCHSCRN2         31
++
++#define INT_TCSR_MPRPH_SC1   (32 + 0)
++#define INT_USB_FS2          (32 + 1)
++#define INT_PWB_I2C          (32 + 2)
++#define INT_SOFTRESET        (32 + 3)
++#define INT_NAND_WR_ER_DONE  (32 + 4)
++#define INT_NAND_OP_DONE     (32 + 5)
++#define INT_TCSR_MPRPH_SC2   (32 + 6)
++#define INT_OP_PEN           (32 + 7)
++#define INT_AD_HSSD          (32 + 8)
++#define INT_ARM11_PM         (32 + 9)
++#define INT_SDMA_NON_SECURE  (32 + 10)
++#define INT_TSIF_IRQ         (32 + 11)
++#define INT_UART1DM_IRQ      (32 + 12)
++#define INT_UART1DM_RX       (32 + 13)
++#define INT_SDMA_SECURE      (32 + 14)
++#define INT_SI2S_SLAVE       (32 + 15)
++#define INT_SC_I2CPU         (32 + 16)
++#define INT_SC_DBG_RDTRFULL  (32 + 17)
++#define INT_SC_DBG_WDTRFULL  (32 + 18)
++#define INT_SCPLL_CTL_DONE   (32 + 19)
++#define INT_UART2DM_IRQ      (32 + 20)
++#define INT_UART2DM_RX       (32 + 21)
++#define INT_VDC_MEC          (32 + 22)
++#define INT_VDC_DB           (32 + 23)
++#define INT_VDC_AXI          (32 + 24)
++#define INT_VFE              (32 + 25)
++#define INT_USB_HS           (32 + 26)
++#define INT_AUDIO_OUT0       (32 + 27)
++#define INT_AUDIO_OUT1       (32 + 28)
++#define INT_CRYPTO           (32 + 29)
++#define INT_AD6M_IDLE        (32 + 30)
++#define INT_SIRC_1           (32 + 31)
++
++#define NR_GPIO_IRQS 165
++#define NR_MSM_IRQS 64
++#define NR_BOARD_IRQS 64
++
 +#endif
-+
-+#ifdef CONFIG_ARCH_QSD8X50
-+static struct map_desc qsd8x50_io_desc[] __initdata = {
-+	MSM_DEVICE(VIC),
-+	MSM_DEVICE(CSR),
-+	MSM_DEVICE(TMR),
-+	MSM_DEVICE(DMOV),
-+	MSM_DEVICE(GPIO1),
-+	MSM_DEVICE(GPIO2),
-+	MSM_DEVICE(CLK_CTL),
-+	MSM_DEVICE(SIRC),
-+	MSM_DEVICE(SCPLL),
-+	MSM_DEVICE(AD5),
-+	MSM_DEVICE(MDC),
-+#ifdef CONFIG_MSM_DEBUG_UART
-+	MSM_DEVICE(DEBUG_UART),
-+#endif
-+	{
-+		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
-+		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
-+		.length =   MSM_SHARED_RAM_SIZE,
-+		.type =     MT_DEVICE,
-+	},
-+};
-+
-+void __init msm_map_qsd8x50_io(void)
-+{
-+	iotable_init(qsd8x50_io_desc, ARRAY_SIZE(qsd8x50_io_desc));
-+}
-+#endif /* CONFIG_ARCH_QSD8X50 */
+diff --git a/arch/arm/mach-msm/include/mach/irqs.h b/arch/arm/mach-msm/include/mach/irqs.h
+index b899560..38a3528 100644
+--- a/arch/arm/mach-msm/include/mach/irqs.h
++++ b/arch/arm/mach-msm/include/mach/irqs.h
+@@ -19,7 +19,10 @@
  
- void __iomem *
- __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+ #define MSM_IRQ_BIT(irq)     (1 << ((irq) & 31))
+ 
+-#if defined(CONFIG_ARCH_MSM_ARM11)
++#if defined(CONFIG_ARCH_QSD8X50)
++#include "irqs-8x50.h"
++#include "sirc.h"
++#elif defined(CONFIG_ARCH_MSM_ARM11)
+ #include "irqs-7x00.h"
+ #else
+ #error "Unknown architecture specification"
 -- 
 1.6.2.3
