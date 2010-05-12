@@ -1,65 +1,53 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 12 May 2010 11:35:21 -0700
-Subject: [PATCH 1/7] DMAENGINE: add generic PrimeCell interface to COH 901
-	318 v6
-In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A025A6DE803@EXDCVYMBSTM006.EQ1STM.local>
-References: <1272848076-28315-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTinAVhnpjgVTtbZYYKb1t_DInVwTKkkJRzcO97RX@mail.gmail.com>
-	<AANLkTim7Tp8lCwMbQwW5QiQ49j7idFFUWdU3x8azIlok@mail.gmail.com>
-	<CEE6BB42CAD6E947908279175AF8470A025A6DE803@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <AANLkTilwcXmNjiuosbmaBudH965dNg3C7VIwlxNWkbzd@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 May 2010 19:42:56 +0100
+Subject: arm926_dma_flush_range undefined!
+In-Reply-To: <1273663120.23818.72.camel@e102109-lin.cambridge.arm.com>
+References: <4BE2C013.4040009@atmel.com>
+	<1273154831.2094.11.camel@e102109-lin.cambridge.arm.com>
+	<20100506175907.GA15797@n2100.arm.linux.org.uk>
+	<4BE926B5.7090602@atmel.com>
+	<20100511094448.GB18828@n2100.arm.linux.org.uk>
+	<4BE95C54.5070008@atmel.com>
+	<20100511134409.GB27201@n2100.arm.linux.org.uk>
+	<1273663120.23818.72.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100512184256.GB22371@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 12:39 AM, Linus WALLEIJ
-<linus.walleij@stericsson.com> wrote:
-> [Dan]
->
->> >> +void dma_set_ambaconfig(struct dma_chan *chan,
->> >> + ? ? ? ? ? ? ? ? ? ? ? struct amba_dma_channel_config *config)
->> >
->> > What happens when two primecell dma devices are present on one soc?
->> > Can that happen? ?In that case we'll have conflicting providers of
->> > dma_set_ambaconfig().
->> >
->>
->> ...the ->device_control() method is already approaching an ioctl()
->> let's just add the argument parameter to complete the capability,
->> i.e.:
->>
->> int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->> unsigned long arg);
->
-> So the unsigned long arg is to match an ioctl? Okidoki...
->
-> If it was only for in-kernel use a void* would be preferred
-> I believe since assuming unsigned long to be == bus width
-> is ... well, disturbing, since we'll be casting this into
-> a struct pointer.
+On Wed, May 12, 2010 at 12:18:40PM +0100, Catalin Marinas wrote:
+> For non-aliasing VIPT hardware we still have the option of doing what
+> the IA-64 and PowerPC guys have done (flushing in set_pte_at with
+> PG_arch_1 meaning "clean"). It may even work for VIVT caches if we take
+> care to also flush the kernel alias in set_pte_at.
 
-It's safe to assume that Linux does not run on any architecture where
-sizeof(unsigned long) < sizeof(void *).
+It should work for VIVT as well, so lets just go ahead and negate the
+PG_arch_1 meaning.  I was rather expecting this to be done a month or
+so ago while we still had plenty of time before the next merge window -
+and given where we are now (maybe 2 weeks away) I think it's too risky
+to push into the upcoming window.
 
-> So this should also be used for the AMBA configuration stuff
-> then, so I have to make first a patch to convert all the
-> device_control functions and then a patch on top of that to
-> implement the AMBA call as a device_control() thingie?
->
-> (Should work out...)
->
-> Just a bit of work, so will take some more hours :-)
+I'm already planning on scheduling the ioremap and LMB changes for the
+following window, and I think this should be scheduled likewise.
 
-Apologies for not discovering this earlier in the review process, but
-it gets rid of the last bit of 'specialness' of the Primecell api and
-I can see it allowing other weird commands to be implemented
-generically down the road.  Just let me know if you want to run any
-compile tests for you.
+> If you are ok with this approach, I'll prepare some patches (it seems
+> that trying to get an agreement with other architectures isn't very
+> productive).
 
-> I will just have to make a proof-of-concept for the AMBA config
-> interface for Russell first, then I'll be on the ioctl-like API.
+That's what I've always found with this issue; whenever I've talked
+with the mainline community about PIO cache coherency, the result has
+always been non-productive.  Hence why it's always remained a problem
+for us.
 
-Ok, I really appreciate your patience, I'll see what I can do to push
-this post-rc1 if things turn out that way.
+The issue is that too many people have their own strong ideas about
+how "we" should fix the problem - and each idea is different, and they
+don't accept each other's ideas.  They won't even talk to each other
+and discuss their differences to resolve it either, presumably because
+they see that it's not their problem to resolve.
 
-Regards,
-Dan
+I'm rather heartened by the outcome of your attempts to discuss this;
+it has illustrated that there's no possibility of an agreement being
+reached, which although sad, merely confirms my conclusion formed over
+the past years.
+
+However, thanks for making the effort; it's a shame it wasn't more
+productive in the end.
