@@ -1,59 +1,46 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 12 May 2010 14:19:29 -0700
-Subject: [PATCH] MMC: at91_mci: modify cache flush routines
-In-Reply-To: <1273597793-28104-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20100511134409.GB27201@n2100.arm.linux.org.uk>
-	<1273597793-28104-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20100512141929.80c13953.akpm@linux-foundation.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 May 2010 22:21:15 +0100
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in
+	theARMv6 DMA cache ops
+In-Reply-To: <20100512185903.GD22371@n2100.arm.linux.org.uk>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+Message-ID: <1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 May 2010 19:09:53 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> As we were using an internal dma flushing routine, this patch changes to the
-> DMA API flush_kernel_dcache_page(). Driver is able to compile now.
+On Wed, 2010-05-12 at 19:59 +0100, Russell King - ARM Linux wrote:
+> On Wed, May 12, 2010 at 07:48:52PM +0100, Russell King - ARM Linux wrote:
+> > Aren't there CPUs which speculatively prefetch _and_ which don't have
+> > broadcast cache ops?  If yes, then we can't use the "read/write to
+> > gain ownership" approach - and since we can't use IPIs either, I think
+> > we're sadly boxed in by hardware restrictions to the point of not being
+> > able to run with DMA on these CPUs.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/mmc/host/at91_mci.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> I just had a second thought that what I wrote above was tosh, but then
+> had a third thought which reconfirmed it as a valid point...
 > 
-> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-> index a6dd7da..813d208 100644
-> --- a/drivers/mmc/host/at91_mci.c
-> +++ b/drivers/mmc/host/at91_mci.c
-> @@ -315,7 +315,7 @@ static void at91_mci_post_dma_read(struct at91mci_host *host)
->  		}
->  
->  		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
-> -		dmac_flush_range((void *)sgbuffer, ((void *)sgbuffer) + amount);
-> +		flush_kernel_dcache_page(sg_page(sg));
->  		data->bytes_xfered += amount;
->  		if (size == 0)
->  			break;
+> Consider if the CPU speculatively prefetches the line you're going to
+> read before the DMA has completed, and it prefetches the pre-DMA data.
 
-The flush_kernel_dcache_page() documentation specifically says that
-thou shalt run flush_kernel_dcache_page() _prior_ to kunmapping the
-page.
+I won't consider this scenario :). For such cores there isn't an easy
+workaround to the DMA cache operations. Even with IPI via FIQ, you may
+still have the risk of cache lines migrating around CPUs and missing the
+cache flushing.
 
-I don't know if that makes a difference in the real world, but heck why
-not:
+AFAICT, ARM11MPCore doesn't do this.
+> 
+Since my implementation of v6_dma_inv_range is destructive, I removed it
+from dma_unmap_area() with the precondition that the CPU doesn't do
+speculative accesses. With my patch, the dma_unmap_area() doesn't change
+the content of the SDRAM.
 
---- a/drivers/mmc/host/at91_mci.c~mmc-at91_mci-modify-cache-flush-routines-fix
-+++ a/drivers/mmc/host/at91_mci.c
-@@ -314,8 +314,8 @@ static void at91_mci_post_dma_read(struc
- 			dmabuf = (unsigned *)tmpv;
- 		}
- 
--		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
- 		flush_kernel_dcache_page(sg_page(sg));
-+		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
- 		data->bytes_xfered += amount;
- 		if (size == 0)
- 			break;
-_
+I don't entirely understand why corruption happens with the e1000 driver
+(looking at the e1000.c code it uses consistent memory).
 
-However, I'm wondering why you chose flush_kernel_dcache_page() instead
-of plain old flush_dcache_page().  Is this a pagecache or possibly
-direct-io page we're dealing with here?
+-- 
+Catalin
