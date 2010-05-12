@@ -1,38 +1,28 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Wed, 12 May 2010 09:23:48 +0200
-Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <20100511233811.GB31311@kroah.com>
-References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1273587274-8045-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100511233811.GB31311@kroah.com>
-Message-ID: <201005120923.48568.philippe.retornaz@epfl.ch>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Wed, 12 May 2010 09:24:06 +0200
+Subject: [PATCH 1/7] DMAENGINE: add generic PrimeCell interface to COH
+	901 	318 v6
+In-Reply-To: <AANLkTinAVhnpjgVTtbZYYKb1t_DInVwTKkkJRzcO97RX@mail.gmail.com>
+References: <1272848076-28315-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTinAVhnpjgVTtbZYYKb1t_DInVwTKkkJRzcO97RX@mail.gmail.com>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A025A6DE7DA@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi, 12 mai 2010 01.38:12, Greg KH a ?crit :
-> On Tue, May 11, 2010 at 04:14:34PM +0200, Philippe R?tornaz wrote:
-> > On mx31 the OTG host initialisation fails if you need to have
-> > an ULPI transfert to initialize the PHY.
-> >
-> > In order to be able to communicate with the PHY a complete reset
-> > of the usb host is needed. After the PHY initialization the host
-> > usb configuration registers need to be rewritten to avoid a host
-> > controller lockup.
-> >
-> > Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> > ---
-> >  drivers/usb/host/ehci-mxc.c |   98
-> > ++++++++++++++++++++++++++++++++++++++-----
-> 
-> This patch doesn't apply anymore, can you redo it against the linux-next
-> tree?
-> 
+[Dan]
 
-It apply cleanly on next-20100512. 
+> What happens when two primecell dma devices are present on one soc?
+> Can that happen?
 
-It needs commit 5a25ad84e01173bb225285eb50f9af48ed1a7598 to apply, but this 
-one is in linux-next now.
+Of course it can happen. In theory... There is no such system that
+I'm aware of.
 
-Regards,
+Peter's PL08x driver even model the PL08x as a singleton, i.e. a
+static struct in the driver file.
 
-Philippe
+> In that case we'll have conflicting providers of
+> dma_set_ambaconfig().
+
+Yes...
+
+Linus
