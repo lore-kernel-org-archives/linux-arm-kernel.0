@@ -1,75 +1,73 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 May 2010 09:22:14 +0900
-Subject: [PATCH 05/16] ARM: S5PC100: new clocks definition
-In-Reply-To: <003001caf1fb$64b5ecd0$2e21c670$%szyprowski@samsung.com>
-References: <1270190944-21644-1-git-send-email-m.szyprowski@samsung.com>
-	<1270190944-21644-6-git-send-email-m.szyprowski@samsung.com>
-	<001501caf18f$8bedb830$a3c92890$%kim@samsung.com>
-	<003001caf1fb$64b5ecd0$2e21c670$%szyprowski@samsung.com>
-Message-ID: <003a01caf232$59cb6930$0d623b90$%kim@samsung.com>
+Date: Thu, 13 May 2010 09:26:49 +0900
+Subject: [PATCH 01/11] ARM: S5P6440: Register apll/mpll/epll mout clocks.
+Message-ID: <1273710409-14525-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-> On Wednesday, May 12, 2010 6:57 AM Kukjin Kim wrote:
-> 
-> > Marek Szyprowski wrote:
-> > >
-> > > Prepare for moving support for S5PC100 SoC to plat-s5p framework (part
-3).
-> > > This patch adds all clocks from plat-s5pc1xx/clocks.c and removes all
-the
-> > > code that can be reused from plat-s5p/clock.c.
-> > >
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > ---
-> > >  arch/arm/mach-s5pc100/clock.c                      |  841
-> > > ++++++++++++++++----
-> > >  .../include/mach}/regs-clock.h                     |    0
-> > >  2 files changed, 703 insertions(+), 138 deletions(-)
-> > >  copy arch/arm/{plat-s5pc1xx/include/plat =>
-> > mach-s5pc100/include/mach}/regs-
-> > > clock.h (100%)
-> > >
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-(snip)
+This patch modifies the following.
 
-> >
-> > This is not correct. If you use structure of clksrc_clk, you can handle
-> > this
-> > easily. So no need this function.
-> 
-> clksrc_clk cannot be used for armclk. You define it in a similar way in
-> mach-s5p6440/clock.c
-> 
-> > ...
-> 
-> > > @@ -773,6 +812,11 @@ void __init_or_cpufreq s5pc100_setup_clocks(void)
-> > >  	unsigned int ptr;
-> > >  	u32 clkdiv0, clkdiv1;
-> > >
-> > > +	/* Hook callbacks to base clocks */
-> > > +	clk_48m.enable = s5pc100_clk_48m_ctrl;
-> > > +	clk_arm.ops = &s5pc100_armclk_ops;
-> >
-> > No need to register ops member.
-> 
-> Please check mach-s5p6440/clock.c, it is done exactly the same way.
-> 
+1. Registers the mout_apll clksrc_clk clock.
 
-Hi, 
+2. The mout_mpll and mout_epll were registered as 'struct clk'
+   types and then their parents were setup using the s3c_set_clksrc
+   function. This patch reduces the two steps into one by registering
+   the mout_mpll and mout_epll clocks using the s3c_register_clksrc
+   function.
 
-The new 6440 clock patches use clksrc_clk struct.
-For armclk also. And many other clocks also.
+3. As per point 2 above, the init_parents array is no longer required.
+   So the mout clocks are now put together in a new array named 'sysclks'.
+   The sysclks array will list the system level clocks and more
+   clocks will be added to it in the subsequent patches.
 
-Thanks.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5p6440/clock.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-s5p6440/clock.c b/arch/arm/mach-s5p6440/clock.c
+index b2672e1..3ad63f4 100644
+--- a/arch/arm/mach-s5p6440/clock.c
++++ b/arch/arm/mach-s5p6440/clock.c
+@@ -574,7 +574,7 @@ static struct clksrc_clk clksrcs[] = {
+ };
+ 
+ /* Clock initialisation code */
+-static struct clksrc_clk *init_parents[] = {
++static struct clksrc_clk *sysclks[] = {
+ 	&clk_mout_apll,
+ 	&clk_mout_epll,
+ 	&clk_mout_mpll,
+@@ -652,17 +652,12 @@ void __init_or_cpufreq s5p6440_setup_clocks(void)
+ 	clk_h_low.rate = hclk_low;
+ 	clk_p_low.rate = pclk_low;
+ 
+-	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
+-		s3c_set_clksrc(init_parents[ptr], true);
+-
+ 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+ 		s3c_set_clksrc(&clksrcs[ptr], true);
+ }
+ 
+ static struct clk *clks[] __initdata = {
+ 	&clk_ext,
+-	&clk_mout_epll.clk,
+-	&clk_mout_mpll.clk,
+ 	&clk_dout_mpll,
+ 	&clk_iis_cd_v40,
+ 	&clk_pcm_cd,
+@@ -680,6 +675,9 @@ void __init s5p6440_register_clocks(void)
+ 	if (ret > 0)
+ 		printk(KERN_ERR "Failed to register %u clocks\n", ret);
+ 
++	for (ptr = 0; ptr < ARRAY_SIZE(sysclks); ptr++)
++		s3c_register_clksrc(sysclks[ptr], 1);
++
+ 	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
+ 	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+ 
+-- 
+1.6.2.5
