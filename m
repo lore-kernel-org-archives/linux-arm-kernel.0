@@ -1,32 +1,34 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 13 May 2010 08:57:06 +0200 (CEST)
-Subject: [PATCH 9/9] ARM: add DMA support to sh7372, enable DMA for SDHI
-In-Reply-To: <20100512155224.65eba9ee.akpm@linux-foundation.org>
-References: <Pine.LNX.4.64.1005041318200.4925@axis700.grange>
-	<Pine.LNX.4.64.1005041424330.4925@axis700.grange>
-	<20100512155224.65eba9ee.akpm@linux-foundation.org>
-Message-ID: <Pine.LNX.4.64.1005130851030.4671@axis700.grange>
+From: janboe.ye@gmail.com (ye janboe)
+Date: Thu, 13 May 2010 14:59:44 +0800
+Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
+	support
+In-Reply-To: <20100511212719.GC32186@n2100.arm.linux.org.uk>
+References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
+	<AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
+	<20100511212719.GC32186@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimKKwe-_kjiSlr3fVVy0Bi1krK8rmyT8-0L3B0d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 May 2010, Andrew Morton wrote:
+Thanks for Russell and Tony.
 
-> On Tue, 4 May 2010 16:07:15 +0200 (CEST)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> 
-> > This patch depends on patch series from Magnus for shmobile, adding INTC 
-> > and clock support. This patch wasn't there in the first version of this 
-> > series.
-> 
-> Where is that patch series now?
+I think this patch is needed when MPU support OFF mode, special on
+omap. Otherwise, VFP state will be lost.
 
-AFAIU, these are two patch series - for the interrupt controller and for 
-the clock framework, and they are not upstream yet. So, I think, we can 
-leave patch 9/9 for later to be merged via the respective platform tree.
+Reviewed-by: Janboe Ye <janboe.ye@gmail.com>
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+2010/5/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, May 11, 2010 at 11:15:13AM +0800, ye janboe wrote:
+>> Is this patch ignored by you? I do not see any ack for this patch.
+>
+> Patch is fine, shame some of the people on the Cc haven't acked it though.
+> Can we get acks from anyone of those, and then submit it to the patch
+> system?
+>
+>> > Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+>> > Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+>> > Cc: Rajendra Nayak <rnayak@ti.com>
+>> > Cc: Richard Woodruff <r-woodruff2@ti.com>
+>> > Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+>
