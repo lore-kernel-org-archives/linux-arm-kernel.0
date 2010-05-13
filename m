@@ -1,34 +1,33 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 14 May 2010 01:28:44 +0400
-Subject: [PATCH v2 2/9] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
-In-Reply-To: <008001caf29d$9a2f9f80$ce8ede80$%kim@samsung.com>
-References: <008001caf29d$9a2f9f80$ce8ede80$%kim@samsung.com>
-Message-ID: <4BEC6F0C.2030202@ru.mvista.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 14 May 2010 07:33:45 +1000
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <20100513151245.GA21251@quack.suse.cz>
+References: <1273569821.21352.19.camel@pasglop>
+	<1273575478.21352.29.camel@pasglop>
+	<20100512150057.GA29867@atrey.karlin.mff.cuni.cz>
+	<1273709714.21352.138.camel@pasglop>
+	<20100513151245.GA21251@quack.suse.cz>
+Message-ID: <1273786425.21352.191.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2010-05-13 at 17:12 +0200, Jan Kara wrote:
 
-Kukjin Kim wrote:
+> If you look at the array more in detail, you'll notice that 'offs' part of
+> structure is sometimes identical. That should never happen because 'offs'
+> contains offset of the corresponding directory entry in a block. So when
+> offsets are identical in this array, subsequent move will copy some entries
+> several times and leave entries that should be moved in the old block,
+> resulting in a corruption we see.
+>   The question is, how could offsets be the same? dx_make_map seems to get
+> it right and dx_sort_map as well. Maybe I'd peek into disassembly of
+> dx_sort_map to see whether swap() macro does what it should... If that
+> looks OK, you could try adding some debug checks into dx_sort_map and try
+> to catch the moment when duplicate offsets are created...
 
-> This patch has been merged into Ben Dooks' tree, for-2635/s3c64xx-ts.
-> So need to rebase this commit.
+Thanks. I'll have a look. It could be a miscompile indeed. My cross-gcc
+is a 4.4.0, maybe that's the root of the problem.
 
-> ---
-> commit 34b01740be6e010976a2f5aa8f343d3b5dd6d278
-> Author: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> Date:   Tue May 4 13:12:41 2010 +0200
-
->     ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
-
->     This moves mach-s3c2410/include/mach/ts.h to
-> plat-samsung/include/plat/ts.h in
->     order to prepare for s3c64xx support in the touchscreen driver.
-
->     Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
->     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> ---
-
-   Where's the patch?
-
-WBR, Sergei
+Cheers,
+Ben.
