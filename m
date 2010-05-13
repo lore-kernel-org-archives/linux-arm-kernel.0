@@ -1,57 +1,80 @@
-From: vishwanath.bs@ti.com (Sripathy, Vishwanath)
-Date: Thu, 13 May 2010 17:15:57 +0530
-Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
-	support
-In-Reply-To: <AANLkTilErBCyRab33tfRfLouudkP3iRmgsKX58Z5CRM_@mail.gmail.com>
-References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
-	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
-	<AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
-	<20100511212719.GC32186@n2100.arm.linux.org.uk>
-	<AANLkTimKKwe-_kjiSlr3fVVy0Bi1krK8rmyT8-0L3B0d@mail.gmail.com>
-	<AANLkTilErBCyRab33tfRfLouudkP3iRmgsKX58Z5CRM_@mail.gmail.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703050DED97@dbde02.ent.ti.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Thu, 13 May 2010 18:09:16 +0530
+Subject: [PATCH v2 1/2] nomadik hwrng: Add clock support
+Message-ID: <1273754356-23523-1-git-send-email-srinidhi.kasagar@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ack.
+This adds the clock support to the Nomadik RNG driver
 
-Regards
-Vishwa
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus walleij <linus.walleij@stericsson.com>
+Acked-by: Alessandro Rubini <rubini@unipv.it>
+---
+ arch/arm/mach-nomadik/clock.c        |    1 +
+ drivers/char/hw_random/nomadik-rng.c |   17 +++++++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-> -----Original Message-----
-> From: ye janboe [mailto:janboe.ye at gmail.com]
-> Sent: Thursday, May 13, 2010 2:44 PM
-> To: Tero Kristo; Sripathy, Vishwanath; Nayak, Rajendra; Woodruff, Richard; peter.de-
-> schrijver at nokia.com
-> Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org; linux-
-> omap at vger.kernel.org; Russell King - ARM Linux
-> Subject: Re: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
-> support
-> 
-> + peoples who are in CC list.
-> 
-> Janboe Ye
-> 
-> 2010/5/13 ye janboe <janboe.ye@gmail.com>:
-> > Thanks for Russell and Tony.
-> >
-> > I think this patch is needed when MPU support OFF mode, special on
-> > omap. Otherwise, VFP state will be lost.
-> >
-> > Reviewed-by: Janboe Ye <janboe.ye@gmail.com>
-> >
-> > 2010/5/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> On Tue, May 11, 2010 at 11:15:13AM +0800, ye janboe wrote:
-> >>> Is this patch ignored by you? I do not see any ack for this patch.
-> >>
-> >> Patch is fine, shame some of the people on the Cc haven't acked it though.
-> >> Can we get acks from anyone of those, and then submit it to the patch
-> >> system?
-> >>
-> >>> > Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-> >>> > Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
-> >>> > Cc: Rajendra Nayak <rnayak@ti.com>
-> >>> > Cc: Richard Woodruff <r-woodruff2@ti.com>
-> >>> > Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
-> >>
-> >
+diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
+index 60f5bee..2c471fc 100644
+--- a/arch/arm/mach-nomadik/clock.c
++++ b/arch/arm/mach-nomadik/clock.c
+@@ -56,6 +56,7 @@ static struct clk_lookup lookups[] = {
+ 	CLK(&clk_default, "gpio.1"),
+ 	CLK(&clk_default, "gpio.2"),
+ 	CLK(&clk_default, "gpio.3"),
++	CLK(&clk_default, "rng"),
+ };
+ 
+ static int __init clk_init(void)
+diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
+index a8b4c40..a348c7e 100644
+--- a/drivers/char/hw_random/nomadik-rng.c
++++ b/drivers/char/hw_random/nomadik-rng.c
+@@ -15,6 +15,10 @@
+ #include <linux/amba/bus.h>
+ #include <linux/hw_random.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++
++static struct clk *rng_clk;
+ 
+ static int nmk_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ {
+@@ -40,6 +44,15 @@ static int nmk_rng_probe(struct amba_device *dev, struct amba_id *id)
+ 	void __iomem *base;
+ 	int ret;
+ 
++	rng_clk = clk_get(&dev->dev, NULL);
++	if (IS_ERR(rng_clk)) {
++		dev_err(&dev->dev, "could not get rng clock\n");
++		ret = PTR_ERR(rng_clk);
++		return ret;
++	}
++
++	clk_enable(rng_clk);
++
+ 	ret = amba_request_regions(dev, dev->dev.init_name);
+ 	if (ret)
+ 		return ret;
+@@ -57,6 +70,8 @@ out_unmap:
+ 	iounmap(base);
+ out_release:
+ 	amba_release_regions(dev);
++	clk_disable(rng_clk);
++	clk_put(rng_clk);
+ 	return ret;
+ }
+ 
+@@ -66,6 +81,8 @@ static int nmk_rng_remove(struct amba_device *dev)
+ 	hwrng_unregister(&nmk_rng);
+ 	iounmap(base);
+ 	amba_release_regions(dev);
++	clk_disable(rng_clk);
++	clk_put(rng_clk);
+ 	return 0;
+ }
+ 
+-- 
+1.6.3.3
