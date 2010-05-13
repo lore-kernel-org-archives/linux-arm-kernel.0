@@ -1,122 +1,118 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 13 May 2010 20:47:22 +0300
-Subject: [PATCH 01/15] omap: mailbox: trivial cleanups
+Date: Thu, 13 May 2010 20:47:23 +0300
+Subject: [PATCH 02/15] omap: mailbox: reorganize structures
 In-Reply-To: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
 References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1273772856-10881-2-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1273772856-10881-3-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And fix a few compilation warnings.
+OMAP4 ones messed up the organization.
 
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/devices.c |    6 ++----
- arch/arm/mach-omap1/mailbox.c |    3 +--
- arch/arm/mach-omap2/mailbox.c |    7 +++----
- arch/arm/plat-omap/mailbox.c  |    2 --
- 4 files changed, 6 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/mailbox.c |   68 +++++++++++++++++++++--------------------
+ 1 files changed, 35 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index a2d07aa..462b59c 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -73,12 +73,10 @@ static inline void omap_init_rtc(void) {}
- #  define INT_DSP_MAILBOX1	INT_1610_DSP_MAILBOX1
- #endif
- 
--#define OMAP1_MBOX_BASE		OMAP1_IO_ADDRESS(OMAP16XX_MAILBOX_BASE)
--
- static struct resource mbox_resources[] = {
- 	{
--		.start		= OMAP1_MBOX_BASE,
--		.end		= OMAP1_MBOX_BASE + OMAP1_MBOX_SIZE,
-+		.start		= OMAP16XX_MAILBOX_BASE,
-+		.end		= OMAP16XX_MAILBOX_BASE + OMAP1_MBOX_SIZE,
- 		.flags		= IORESOURCE_MEM,
- 	},
- 	{
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index caf889a..f3266dd 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -146,7 +146,6 @@ EXPORT_SYMBOL(mbox_dsp_info);
- static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
--	int ret = 0;
- 
- 	if (pdev->num_resources != 2) {
- 		dev_err(&pdev->dev, "invalid number of resources: %d\n",
-@@ -160,7 +159,7 @@ static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "invalid mem resource\n");
- 		return -ENODEV;
- 	}
--	mbox_base = res->start;
-+	mbox_base = OMAP1_IO_ADDRESS(res->start);
- 
- 	/* DSP IRQ */
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 281ab63..7263b9b 100644
+index 7263b9b..252e53b 100644
 --- a/arch/arm/mach-omap2/mailbox.c
 +++ b/arch/arm/mach-omap2/mailbox.c
-@@ -93,7 +93,7 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
+@@ -262,6 +262,7 @@ static struct omap_mbox_ops omap2_mbox_ops = {
+  */
  
- 	mbox_ick_handle = clk_get(NULL, "mailboxes_ick");
- 	if (IS_ERR(mbox_ick_handle)) {
--		printk(KERN_ERR "Could not get mailboxes_ick: %d\n",
-+		printk(KERN_ERR "Could not get mailboxes_ick: %ld\n",
- 			PTR_ERR(mbox_ick_handle));
- 		return PTR_ERR(mbox_ick_handle);
- 	}
-@@ -279,8 +279,6 @@ static struct omap_mbox2_priv omap2_mbox_dsp_priv = {
+ /* FIXME: the following structs should be filled automatically by the user id */
++
+ /* DSP */
+ static struct omap_mbox2_priv omap2_mbox_dsp_priv = {
+ 	.tx_fifo = {
+@@ -279,8 +280,40 @@ static struct omap_mbox2_priv omap2_mbox_dsp_priv = {
  	.irqdisable	= MAILBOX_IRQENABLE(0),
  };
  
--
--
- /* OMAP4 specific data structure. Use the cpu_is_omap4xxx()
- to use this*/
+-/* OMAP4 specific data structure. Use the cpu_is_omap4xxx()
+-to use this*/
++struct omap_mbox mbox_dsp_info = {
++	.name	= "dsp",
++	.ops	= &omap2_mbox_ops,
++	.priv	= &omap2_mbox_dsp_priv,
++};
++EXPORT_SYMBOL(mbox_dsp_info);
++
++#if defined(CONFIG_ARCH_OMAP2420)
++
++/* IVA */
++static struct omap_mbox2_priv omap2_mbox_iva_priv = {
++	.tx_fifo = {
++		.msg		= MAILBOX_MESSAGE(2),
++		.fifo_stat	= MAILBOX_FIFOSTATUS(2),
++	},
++	.rx_fifo = {
++		.msg		= MAILBOX_MESSAGE(3),
++		.msg_stat	= MAILBOX_MSGSTATUS(3),
++	},
++	.irqenable	= MAILBOX_IRQENABLE(3),
++	.irqstatus	= MAILBOX_IRQSTATUS(3),
++	.notfull_bit	= MAILBOX_IRQ_NOTFULL(2),
++	.newmsg_bit	= MAILBOX_IRQ_NEWMSG(3),
++	.irqdisable	= MAILBOX_IRQENABLE(3),
++};
++
++static struct omap_mbox mbox_iva_info = {
++	.name	= "iva",
++	.ops	= &omap2_mbox_ops,
++	.priv	= &omap2_mbox_iva_priv,
++};
++#endif
++
++/* OMAP4 */
  static struct omap_mbox2_priv omap2_mbox_1_priv = {
-@@ -336,7 +334,6 @@ struct omap_mbox mbox_2_info = {
+ 	.tx_fifo = {
+ 		.msg		= MAILBOX_MESSAGE(0),
+@@ -304,13 +337,6 @@ struct omap_mbox mbox_1_info = {
+ };
+ EXPORT_SYMBOL(mbox_1_info);
+ 
+-struct omap_mbox mbox_dsp_info = {
+-	.name	= "dsp",
+-	.ops	= &omap2_mbox_ops,
+-	.priv	= &omap2_mbox_dsp_priv,
+-};
+-EXPORT_SYMBOL(mbox_dsp_info);
+-
+ static struct omap_mbox2_priv omap2_mbox_2_priv = {
+ 	.tx_fifo = {
+ 		.msg		= MAILBOX_MESSAGE(3),
+@@ -334,30 +360,6 @@ struct omap_mbox mbox_2_info = {
  };
  EXPORT_SYMBOL(mbox_2_info);
  
+-#if defined(CONFIG_ARCH_OMAP2420) /* IVA */
+-static struct omap_mbox2_priv omap2_mbox_iva_priv = {
+-	.tx_fifo = {
+-		.msg		= MAILBOX_MESSAGE(2),
+-		.fifo_stat	= MAILBOX_FIFOSTATUS(2),
+-	},
+-	.rx_fifo = {
+-		.msg		= MAILBOX_MESSAGE(3),
+-		.msg_stat	= MAILBOX_MSGSTATUS(3),
+-	},
+-	.irqenable	= MAILBOX_IRQENABLE(3),
+-	.irqstatus	= MAILBOX_IRQSTATUS(3),
+-	.notfull_bit	= MAILBOX_IRQ_NOTFULL(2),
+-	.newmsg_bit	= MAILBOX_IRQ_NEWMSG(3),
+-	.irqdisable	= MAILBOX_IRQENABLE(3),
+-};
 -
- #if defined(CONFIG_ARCH_OMAP2420) /* IVA */
- static struct omap_mbox2_priv omap2_mbox_iva_priv = {
- 	.tx_fifo = {
-@@ -419,8 +416,10 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
- #endif
- 	return 0;
- 
-+#if defined(CONFIG_ARCH_OMAP2420) /* IVA */
- err_iva1:
- 	omap_mbox_unregister(&mbox_dsp_info);
-+#endif
- 
- err_dsp:
- 	iounmap(mbox_base);
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 8d86b0b..822c377 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -82,7 +82,6 @@ static int __mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
- 	return ret;
- }
- 
+-static struct omap_mbox mbox_iva_info = {
+-	.name	= "iva",
+-	.ops	= &omap2_mbox_ops,
+-	.priv	= &omap2_mbox_iva_priv,
+-};
+-#endif
 -
- int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
+ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
  {
- 
-@@ -108,7 +107,6 @@ static void mbox_tx_tasklet(unsigned long tx_data)
- 	struct request_queue *q = mbox->txq->queue;
- 
- 	while (1) {
--
- 		rq = blk_fetch_request(q);
- 
- 		if (!rq)
+ 	struct resource *res;
 -- 
 1.7.1
