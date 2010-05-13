@@ -1,79 +1,174 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 May 2010 10:15:54 +0100
-Subject: [PATCH 07/34] rtc: omap: let device wakeup capability be
-	configured from chip init logic
-In-Reply-To: <1273188265-12782-8-git-send-email-khilman@deeprootsystems.com>
-References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
-	<1273188265-12782-8-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20100513091554.GC5382@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 13 May 2010 11:16:13 +0200
+Subject: [PATCH] ARM: S5PC100: Modified the clock code to conform to
+	Samsung clock API.
+In-Reply-To: <1273713001-15028-1-git-send-email-kgene.kim@samsung.com>
+References: <1273713001-15028-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <005b01caf27c$f3ab5980$db020c80$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--> rtc people
+Hello,
 
-On Thu, May 06, 2010 at 04:23:58PM -0700, Kevin Hilman wrote:
-> From: Sekhar Nori <nsekhar@ti.com>
+On Thursday, May 13, 2010 3:10 AM Kukjin Kim wrote:
+
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> The rtc-omap driver currently hardcodes the RTC wakeup capability
-> to be "not capable". While this seems to be true for existing OMAP1
-> boards which are not wired for this, the DA850/OMAP-L138 SoC, the
-> RTC can always be wake up source from its "deep sleep" mode.
+> Re-worked the existing clock code for Samsung's S5PC100 SoC to be in
+> sync with new clock API.
 > 
-> This patch lets the wakeup capability to be set from platform data and
-> does not override the setting from the driver. For DA850/OMAP-L138, this
-> is done from arch/arm/mach-davinci/devices-da8xx.c:da8xx_register_rtc()
-> 
-> Note that this patch does not change the behavior on any existing OMAP1
-> board since the platform device registration sets the wakeup capability
-> to 0 by default.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  drivers/rtc/rtc-omap.c |   12 +++++++-----
->  1 files changed, 7 insertions(+), 5 deletions(-)
+>  arch/arm/mach-s5pc100/Makefile                  |    2 +-
+>  arch/arm/mach-s5pc100/clock.c                   | 1368
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5pc100/include/mach/regs-clock.h |   71 ++
+>  arch/arm/plat-s5p/clock.c                       |    2 +-
+>  arch/arm/plat-s5p/include/plat/pll.h            |   22 +
+>  arch/arm/plat-s5p/include/plat/s5p-clock.h      |    2 +
+>  6 files changed, 1465 insertions(+), 2 deletions(-)
+>  create mode 100755 arch/arm/mach-s5pc100/clock.c
+>  create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-clock.h
 > 
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 64d9727..73377b0 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -34,7 +34,8 @@
->   * Board-specific wiring options include using split power mode with
->   * RTC_OFF_NOFF used as the reset signal (so the RTC won't be reset),
->   * and wiring RTC_WAKE_INT (so the RTC alarm can wake the system from
-> - * low power modes).  See the BOARD-SPECIFIC CUSTOMIZATION comment.
-> + * low power modes) for OMAP1 boards (OMAP-L138 has this built into
-> + * the SoC). See the BOARD-SPECIFIC CUSTOMIZATION comment.
->   */
->  
->  #define OMAP_RTC_BASE			0xfffb4800
-> @@ -401,16 +402,17 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->  
->  	/* BOARD-SPECIFIC CUSTOMIZATION CAN GO HERE:
->  	 *
-> -	 *  - Boards wired so that RTC_WAKE_INT does something, and muxed
-> -	 *    right (W13_1610_RTC_WAKE_INT is the default after chip reset),
-> -	 *    should initialize the device wakeup flag appropriately.
-> +	 *  - Device wake-up capability setting should come through chip
-> +	 *    init logic. OMAP1 boards should initialize the "wakeup capable"
-> +	 *    flag in the platform device if the board is wired right for
-> +	 *    being woken up by RTC alarm. For OMAP-L138, this capability
-> +	 *    is built into the SoC by the "Deep Sleep" capability.
->  	 *
->  	 *  - Boards wired so RTC_ON_nOFF is used as the reset signal,
->  	 *    rather than nPWRON_RESET, should forcibly enable split
->  	 *    power mode.  (Some chip errata report that RTC_CTRL_SPLIT
->  	 *    is write-only, and always reads as zero...)
->  	 */
-> -	device_init_wakeup(&pdev->dev, 0);
->  
->  	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
->  		pr_info("%s: split power mode\n", pdev->name);
-> -- 
-> 1.7.0.2
+> diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-
+> s5pc100/Makefile
+> index 809ff10..8540509 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -11,7 +11,7 @@ obj-				:=
 > 
+>  # Core support for S5PC100 system
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
+> +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o clock.o
+> 
+>  # Helper and device support
+> 
+> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+> new file mode 100755
+> index 0000000..fac8ff0
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pc100/clock.c
+> @@ -0,0 +1,1368 @@
+
+> ...
+
+> +static struct clk init_clocks_disable[] = {
+> +	{
+> +		.name		= "cssys",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_0_ctrl,
+> +		.ctrlbit	= (1 << 6),
+> +	}, {
+> +		.name		= "secss",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_0_ctrl,
+> +		.ctrlbit	= (1 << 5),
+> +	}, {
+> +		.name		= "g2d",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_0_ctrl,
+> +		.ctrlbit	= (1 << 4),
+> +	}, {
+> +		.name		= "mdma",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_0_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	}, {
+> +		.name		= "cfcon",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_0_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "nfcon",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_1_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	}, {
+> +		.name		= "onenandc",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_1_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "sdm",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_2_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "seckey",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d0_bus.clk,
+> +		.enable		= s5pc100_d0_2_ctrl,
+> +		.ctrlbit	= (1 << 1),
+> +	}, {
+> +		.name		= "hsmmc",
+> +		.id		= 2,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 7),
+> +	}, {
+> +		.name		= "hsmmc",
+> +		.id		= 1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 6),
+> +	}, {
+> +		.name		= "hsmmc",
+> +		.id		= 0,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 5),
+> +	}, {
+> +		.name		= "modemif",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 4),
+> +	}, {
+> +		.name		= "usbotg",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	}, {
+> +		.name		= "usbhost",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "pdma",
+> +		.id		= 1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 1),
+> +	}, {
+> +		.name		= "pdma",
+> +		.id		= 0,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_0_ctrl,
+> +		.ctrlbit	= (1 << 0),
+> +	}, {
+> +		.name		= "fimd",
+> +		.id		= -1,
+> +		.parent		= &clk_div_d1_bus.clk,
+> +		.enable		= s5pc100_d1_1_ctrl,
+> +		.ctrlbit	= (1 << 0),
+
+Use 'lcd' name for this clock. Current s3c-fb driver uses it to get the value
+of HCLK clock to calculate the pixel clock value.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
