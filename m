@@ -1,77 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 May 2010 12:30:33 +0100
-Subject: [BUG] bug when enabling VM DEBUG
-In-Reply-To: <20100512130638.GB19314@shareable.org>
-References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
-	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
-	<4BEA1559.9000107@gmail.com>
-	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
-	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
-	<1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
-	<20100512130638.GB19314@shareable.org>
-Message-ID: <1273750233.30713.39.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 May 2010 12:32:15 +0100
+Subject: [RFC PATCH 1/3] ARM: Use lazy cache flushing on ARMv7 SMP systems
+In-Reply-To: <20100513111555.21178.63776.stgit@e102109-lin.cambridge.arm.com>
+References: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+	<20100513111555.21178.63776.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100513113215.GA13001@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-12 at 14:06 +0100, Jamie Lokier wrote:
-> Catalin Marinas wrote:
-> > On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
-> > > * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
-> > >
-> > > >> > --- a/drivers/ata/libata-sff.c
-> > > >> > +++ b/drivers/ata/libata-sff.c
-> > > >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
-> > > >> >                                         do_write);
-> > > >> >          }
-> > > >> >
-> > > >> > -       if (!do_write)
-> > > >> > +       if (!do_write&&  !PageSlab(page))
-> > > >> >                  flush_dcache_page(page);
-> > > >>
-> > > >> I would think that check belongs inside flush_dcache_page itself, rather
-> > > >> than forcing every driver to include it..
-> > > >
-> > > >Sebastian (cc'ed) reported this as well for MIPS.
-> > > Thx. The patch above looks what I've sent a while ago. Jeff was going to
-> > > merge it afaik.
-> > >
-> > > >I think it makes sense for this check to be done in the
-> > > >flush_dcache_page() function.
-> > >
-> > > Why should flush_dcache_page() not flush pages you tell it?
-> > > From Documentation/cachetlb.txt:
-> > > |   NOTE: This routine need only be called for page cache pages
-> > > |          which can potentially ever be mapped into the address
-> > > |          space of a user process.  So for example, VFS layer code
-> > > |          handling vfs symlinks in the page cache need not call
-> > > |          this interface at all.
-> > >
-> > > A page from slab or stack is not going to see the sky of user land and
-> > > therefore it should not be fed into flush_dcache_page().
-> >
-> > You are right :), so fixing the driver is the best approach.
-> 
-> It worries me that a driver has any knowledge of the PageSlab() flag,
-> though.  Especially uncommented knowledge.  That flag seems VM
-> internal, and it's conceptually iffy: Kernel code using
-> get_free_pages() and using that for I/O also does not see the sky of
-> user land.
-> 
-> If all the PIO drivers have to be changed, I'd be happier with:
-> 
->     flush_dcache_page_for_pio()
-> 
-> which wraps the check, explains it, and provides a single place to
-> change if needed.
+On Thu, May 13, 2010 at 12:15:55PM +0100, Catalin Marinas wrote:
+> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+> index 0d414c2..a415dc0 100644
+> --- a/arch/arm/mm/fault-armv.c
+> +++ b/arch/arm/mm/fault-armv.c
+> @@ -170,10 +170,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+>  		return;
+>  
+>  	mapping = page_mapping(page);
+> -#ifndef CONFIG_SMP
+>  	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+>  		__flush_dcache_page(mapping, page);
+> -#endif
+>  	if (mapping) {
+>  		if (cache_is_vivt())
+>  			make_coherent(mapping, vma, addr, ptep, pfn);
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index c6844cb..5ad8711 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -17,6 +17,7 @@
+>  #include <asm/smp_plat.h>
+>  #include <asm/system.h>
+>  #include <asm/tlbflush.h>
+> +#include <asm/smp_plat.h>
+>  
+>  #include "mm.h"
+>  
+> @@ -93,12 +94,10 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+>  #define flush_pfn_alias(pfn,vaddr)	do { } while (0)
+>  #endif
+>  
+> -#ifdef CONFIG_SMP
+>  static void flush_ptrace_access_other(void *args)
+>  {
+>  	__flush_icache_all();
+>  }
+> -#endif
+>  
+>  static
+>  void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+> @@ -122,11 +121,9 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+>  	if (vma->vm_flags & VM_EXEC) {
+>  		unsigned long addr = (unsigned long)kaddr;
+>  		__cpuc_coherent_kern_range(addr, addr + len);
+> -#ifdef CONFIG_SMP
+>  		if (cache_ops_need_broadcast())
+>  			smp_call_function(flush_ptrace_access_other,
+>  					  NULL, 1);
+> -#endif
 
-I already proposed a PIO cache flushing API on linux-arch. I tried to
-revive the discussion with another patch for cachetlb.txt but it hasn't
-drawn much interest.
+Err.  __cpuc_coherent_kern_range() makes the cache lines coherent between
+the data and instruction threads.  So what you're doing is:
 
-On ARM we are trying to change the I/D cache handling similar to IA-64
-and PowerPC (PG_arch_1 would mean "clean" rather than "dirty"). With
-this change, my original patch to libata-sff.c can be dropped (well,
-other architectures may still be broken).
+1. flush the D and I caches for the affected cache lines on the local
+   processor
+2. flush the entire I cache on the local processor
 
--- 
-Catalin
+Why?
+
+This has absolutely nothing to do with the rest of the patch.
