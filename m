@@ -1,65 +1,57 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Thu, 13 May 2010 08:27:02 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
-	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 13 May 2010 08:47:10 +0200
+Subject: [PATCH] ARM: S5PC100: Modified the clock code to conform to
+	Samsung clock API.
+In-Reply-To: <1273713001-15028-1-git-send-email-kgene.kim@samsung.com>
+References: <1273713001-15028-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <005101caf268$1f852320$5e8f6960$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our ARM v6 does have speculative prefetch...
+Hello,
 
-Sent from my phone
+On Thursday, May 13, 2010 3:10 AM Kukjin Kim wrote:
 
-On 13/05/2010, at 00:21, "Catalin Marinas" <catalin.marinas@arm.com>  
-wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> Re-worked the existing clock code for Samsung's S5PC100 SoC to be in
+> sync with new clock API.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5pc100/Makefile                  |    2 +-
+>  arch/arm/mach-s5pc100/clock.c                   | 1368
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5pc100/include/mach/regs-clock.h |   71 ++
+>  arch/arm/plat-s5p/clock.c                       |    2 +-
+>  arch/arm/plat-s5p/include/plat/pll.h            |   22 +
+>  arch/arm/plat-s5p/include/plat/s5p-clock.h      |    2 +
+>  6 files changed, 1465 insertions(+), 2 deletions(-)
+>  create mode 100755 arch/arm/mach-s5pc100/clock.c
+>  create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-clock.h
+> 
+> diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-
+> s5pc100/Makefile
+> index 809ff10..8540509 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -11,7 +11,7 @@ obj-				:=
+> 
+>  # Core support for S5PC100 system
+> 
+> -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
+> +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o clock.o
 
-> On Wed, 2010-05-12 at 19:59 +0100, Russell King - ARM Linux wrote:
->> On Wed, May 12, 2010 at 07:48:52PM +0100, Russell King - ARM Linux  
->> wrote:
->>> Aren't there CPUs which speculatively prefetch _and_ which don't  
->>> have
->>> broadcast cache ops?  If yes, then we can't use the "read/write to
->>> gain ownership" approach - and since we can't use IPIs either, I  
->>> think
->>> we're sadly boxed in by hardware restrictions to the point of not  
->>> being
->>> able to run with DMA on these CPUs.
->>
->> I just had a second thought that what I wrote above was tosh, but  
->> then
->> had a third thought which reconfirmed it as a valid point...
->>
->> Consider if the CPU speculatively prefetches the line you're going to
->> read before the DMA has completed, and it prefetches the pre-DMA  
->> data.
->
-> I won't consider this scenario :). For such cores there isn't an easy
-> workaround to the DMA cache operations. Even with IPI via FIQ, you may
-> still have the risk of cache lines migrating around CPUs and missing  
-> the
-> cache flushing.
->
-> AFAICT, ARM11MPCore doesn't do this.
->>
-> Since my implementation of v6_dma_inv_range is destructive, I  
-> removed it
-> from dma_unmap_area() with the precondition that the CPU doesn't do
-> speculative accesses. With my patch, the dma_unmap_area() doesn't  
-> change
-> the content of the SDRAM.
->
-> I don't entirely understand why corruption happens with the e1000  
-> driver
-> (looking at the e1000.c code it uses consistent memory).
->
-> -- 
-> Catalin
->
+This currently causes a build break. 
+
+Anyway, I will try to use this patch as a base for my s5pc100 patch
+series.
+
+> ...
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
