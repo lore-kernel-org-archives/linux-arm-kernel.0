@@ -1,32 +1,33 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 13 May 2010 09:54:56 -0400
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
-	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100513135456.GH18984@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 13 May 2010 15:00:03 +0100
+Subject: OTG implementation with external transceiver on PXA270
+In-Reply-To: <87mxw5yo6e.fsf@free.fr>
+References: <AANLkTim7lTbhu97hy3tiSXVpkQKr5X6YpU8zSUiVarca@mail.gmail.com>
+	<AANLkTikw_VJog3nxH6lcJT4mRJbBcEju-2u6HFpdH3cv@mail.gmail.com>
+	<87mxw5yo6e.fsf@free.fr>
+Message-ID: <20100513140003.GA23183@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 12, 2010 at 08:23:21PM +0200, Robert Jarzmik wrote:
+> Eric Miao <eric.y.miao@gmail.com> writes:
 
-On Thu, May 13, 2010 at 09:26:57AM +0100, Catalin Marinas wrote:
-> On Thu, 2010-05-13 at 06:27 +0100, Ronen Shitrit wrote:
-> > Our ARM v6 does have speculative prefetch...
-> 
-> That's the I-cache and we should be ok with it. What may affect this
-> patch is speculative fetches into the D-cache.
+> That seems a good idea.
+> If you expand it further, you could design the full OTG framework :
+>  - extend otg.c, add the OTG state machine
+>  - extend otg.h and otg.c with new calls :
+>    - otg_set_state()
+>    - otg_get_state()
+>    - otg_signal_udc()
+>  - extend otg.h, with callbacks like :
+>    - otg_handle_interrupt()
 
-prefetch()?
+> Separate the isp1301 driver from pxa270. The link will be done through the OTG
+> framework. Remember the pxa270 has taken the udc IO space, so no access can be
+> done from the isp1301 side (it should not actually for clean separation).
 
---
-Regards,
-George
+> But that could be more or less what you were thinking about.
+
+This would be really good, not just for OTG but for USB in general -
+there's other devices which could make use of information like PMICs
+doing regulation of power draw from/to USB.
