@@ -1,44 +1,66 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 13 May 2010 08:25:33 +0100
-Subject: [PATCH] h1940: framebuffer configuration fix
-In-Reply-To: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
-References: <20100512232029.a5ce9d0f.ms@sk.2-ch.org>
-Message-ID: <20100513072533.GU6684@trinity.fluff.org>
+Date: Thu, 13 May 2010 08:28:29 +0100
+Subject: [PATCH] ARM: S5PC100: Modified the clock code to conform to
+	Samsung clock API.
+In-Reply-To: <005101caf268$1f852320$5e8f6960$%szyprowski@samsung.com>
+References: <1273713001-15028-1-git-send-email-kgene.kim@samsung.com>
+	<005101caf268$1f852320$5e8f6960$%szyprowski@samsung.com>
+Message-ID: <20100513072829.GA27571@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 11:20:29PM +0400, Mike Solovyev wrote:
-> Seems like a typo, wrong setup leads to broken image on ipaq screen.
+On Thu, May 13, 2010 at 08:47:10AM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
-> Signed-off-by: Mike Solovyev <ms@sk.2-ch.org>
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> On Thursday, May 13, 2010 3:10 AM Kukjin Kim wrote:
+> 
+> > From: Thomas Abraham <thomas.ab@samsung.com>
+> > 
+> > Re-worked the existing clock code for Samsung's S5PC100 SoC to be in
+> > sync with new clock API.
+> > 
+> > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pc100/Makefile                  |    2 +-
+> >  arch/arm/mach-s5pc100/clock.c                   | 1368
+> > +++++++++++++++++++++++
+> >  arch/arm/mach-s5pc100/include/mach/regs-clock.h |   71 ++
+> >  arch/arm/plat-s5p/clock.c                       |    2 +-
+> >  arch/arm/plat-s5p/include/plat/pll.h            |   22 +
+> >  arch/arm/plat-s5p/include/plat/s5p-clock.h      |    2 +
+> >  6 files changed, 1465 insertions(+), 2 deletions(-)
+> >  create mode 100755 arch/arm/mach-s5pc100/clock.c
+> >  create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-clock.h
+> > 
+> > diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-
+> > s5pc100/Makefile
+> > index 809ff10..8540509 100644
+> > --- a/arch/arm/mach-s5pc100/Makefile
+> > +++ b/arch/arm/mach-s5pc100/Makefile
+> > @@ -11,7 +11,7 @@ obj-				:=
+> > 
+> >  # Core support for S5PC100 system
+> > 
+> > -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
+> > +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o clock.o
+> 
+> This currently causes a build break. 
 
-surely this should be an acked-by or similar?
-
-> ---
->  arch/arm/mach-s3c2410/mach-h1940.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+would be nice to show what the build break is...
+ 
+> Anyway, I will try to use this patch as a base for my s5pc100 patch
+> series.
 > 
-> Index: linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-s3c2410/mach-h1940.c
-> +++ linux-2.6/arch/arm/mach-s3c2410/mach-h1940.c
-> @@ -162,8 +162,8 @@ static struct s3c2410fb_display h1940_lc
->  	.xres =		240,
->  	.yres =		320,
->  	.bpp =		16,
-> -	.left_margin =	20,
-> -	.right_margin =	8,
-> +	.left_margin =	8,
-> +	.right_margin =	20,
->  	.hsync_len =	4,
->  	.upper_margin =	8,
->  	.lower_margin = 7,
+> > ...
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> 
 
 -- 
 -- 
