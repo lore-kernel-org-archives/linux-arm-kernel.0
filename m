@@ -1,33 +1,47 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 14 May 2010 07:33:45 +1000
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <20100513151245.GA21251@quack.suse.cz>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-	<20100512150057.GA29867@atrey.karlin.mff.cuni.cz>
-	<1273709714.21352.138.camel@pasglop>
-	<20100513151245.GA21251@quack.suse.cz>
-Message-ID: <1273786425.21352.191.camel@pasglop>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Fri, 14 May 2010 01:40:58 +0400
+Subject: PXA/8250 UART Conflicts
+In-Reply-To: <20100511161206.GB32186@n2100.arm.linux.org.uk>
+References: <3117D78B-5443-48B5-88BC-83EEB8F709F9@prograde.net>
+	<20100511161206.GB32186@n2100.arm.linux.org.uk>
+Message-ID: <20100513214057.GA18868@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-13 at 17:12 +0200, Jan Kara wrote:
+On 17:12 Tue 11 May     , Russell King - ARM Linux wrote:
+> On Tue, May 11, 2010 at 11:00:36AM -0400, Michael Cashwell wrote:
+> > I'd like the tty layer to just assign the minor numbers in sequence,
+> > first come first served. But I don't see how to get that. Or is there
+> > some platform way to influence the tty range requested?
+> 
+> It's just plain not supported.  You can't have two different tty drivers
+> using the same namespace and have it work.
+> 
+> Unfortunately, earlier on it was the opinion that "ttyS" means "serial
+> driver" and therefore "we shall use the ttyS namespace for our SoC
+> driver".  And this is the resulting mess that it causes.
 
-> If you look at the array more in detail, you'll notice that 'offs' part of
-> structure is sometimes identical. That should never happen because 'offs'
-> contains offset of the corresponding directory entry in a block. So when
-> offsets are identical in this array, subsequent move will copy some entries
-> several times and leave entries that should be moved in the old block,
-> resulting in a corruption we see.
->   The question is, how could offsets be the same? dx_make_map seems to get
-> it right and dx_sort_map as well. Maybe I'd peek into disassembly of
-> dx_sort_map to see whether swap() macro does what it should... If that
-> looks OK, you could try adding some debug checks into dx_sort_map and try
-> to catch the moment when duplicate offsets are created...
+Yup, that's a long standing bug (and still not fixed). I remember I first
+happened to stumble upon it about three years ago and it's already been old
+back then. In fact it's a general PITA on any PXA board with PCMCIA/CF
+slot (handhelds, for example, but not only) when you trying to use some
+serial PCMCIA peripherals (e.g. GPSes, wired and wireless modems,
+RS232 converters, maybe even bluetooth dongles). With 8250 enabled as a module 
+and PXA serial built-in it simply doesn't works.
 
-Thanks. I'll have a look. It could be a miscompile indeed. My cross-gcc
-is a 4.4.0, maybe that's the root of the problem.
+Openembedded guys for ages have patched kernel with hacks like these to solve
+this problem:
+http://git.openembedded.org/cgit.cgi/openembedded/plain/recipes/linux/linux-rp-2.6.26/pxa-serial-hack.patch
 
-Cheers,
-Ben.
+Though, personally I'm preferring solution with moving PXA ports into
+another namespace (be it ttySA, or ttyPXA, or whatever). So maybe it's
+time to finally make a first step and apply something like Russell's patch now,
+and then gradually deprecate usage of old ttyS namespace for PXA, or maybe
+even left it as a non-default config option (so users who can't reconfigure
+their userspace/bootloader can still use newer kernels with old behaviour).
+
+I'd like to hear some comments on the subject from Eric (adding him to Cc:)
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
