@@ -1,18 +1,79 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 13 May 2010 10:15:40 +0100
-Subject: approaching last call for updatyes
-Message-ID: <20100513091540.GK26401@trinity.fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 May 2010 10:15:54 +0100
+Subject: [PATCH 07/34] rtc: omap: let device wakeup capability be
+	configured from chip init logic
+In-Reply-To: <1273188265-12782-8-git-send-email-khilman@deeprootsystems.com>
+References: <1273188265-12782-1-git-send-email-khilman@deeprootsystems.com>
+	<1273188265-12782-8-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <20100513091554.GC5382@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right, it is gettign towards the time where the trees need to
-be finalised for submission, and testing done.
+-> rtc people
 
-Please let me know what items are currently outstanding and
-anything that is nearing the completion of development.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Thu, May 06, 2010 at 04:23:58PM -0700, Kevin Hilman wrote:
+> From: Sekhar Nori <nsekhar@ti.com>
+> 
+> The rtc-omap driver currently hardcodes the RTC wakeup capability
+> to be "not capable". While this seems to be true for existing OMAP1
+> boards which are not wired for this, the DA850/OMAP-L138 SoC, the
+> RTC can always be wake up source from its "deep sleep" mode.
+> 
+> This patch lets the wakeup capability to be set from platform data and
+> does not override the setting from the driver. For DA850/OMAP-L138, this
+> is done from arch/arm/mach-davinci/devices-da8xx.c:da8xx_register_rtc()
+> 
+> Note that this patch does not change the behavior on any existing OMAP1
+> board since the platform device registration sets the wakeup capability
+> to 0 by default.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> ---
+>  drivers/rtc/rtc-omap.c |   12 +++++++-----
+>  1 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index 64d9727..73377b0 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -34,7 +34,8 @@
+>   * Board-specific wiring options include using split power mode with
+>   * RTC_OFF_NOFF used as the reset signal (so the RTC won't be reset),
+>   * and wiring RTC_WAKE_INT (so the RTC alarm can wake the system from
+> - * low power modes).  See the BOARD-SPECIFIC CUSTOMIZATION comment.
+> + * low power modes) for OMAP1 boards (OMAP-L138 has this built into
+> + * the SoC). See the BOARD-SPECIFIC CUSTOMIZATION comment.
+>   */
+>  
+>  #define OMAP_RTC_BASE			0xfffb4800
+> @@ -401,16 +402,17 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>  
+>  	/* BOARD-SPECIFIC CUSTOMIZATION CAN GO HERE:
+>  	 *
+> -	 *  - Boards wired so that RTC_WAKE_INT does something, and muxed
+> -	 *    right (W13_1610_RTC_WAKE_INT is the default after chip reset),
+> -	 *    should initialize the device wakeup flag appropriately.
+> +	 *  - Device wake-up capability setting should come through chip
+> +	 *    init logic. OMAP1 boards should initialize the "wakeup capable"
+> +	 *    flag in the platform device if the board is wired right for
+> +	 *    being woken up by RTC alarm. For OMAP-L138, this capability
+> +	 *    is built into the SoC by the "Deep Sleep" capability.
+>  	 *
+>  	 *  - Boards wired so RTC_ON_nOFF is used as the reset signal,
+>  	 *    rather than nPWRON_RESET, should forcibly enable split
+>  	 *    power mode.  (Some chip errata report that RTC_CTRL_SPLIT
+>  	 *    is write-only, and always reads as zero...)
+>  	 */
+> -	device_init_wakeup(&pdev->dev, 0);
+>  
+>  	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
+>  		pr_info("%s: split power mode\n", pdev->name);
+> -- 
+> 1.7.0.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
