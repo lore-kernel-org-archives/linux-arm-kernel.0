@@ -1,26 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 May 2010 00:02:51 +0100
-Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
-In-Reply-To: <0D753D10438DA54287A00B0270842697636EFDBD17@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
-	<20100412184904.GG3048@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
-	<20100412191506.GL3048@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
-	<20100506204305.GB26818@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
-	<0D753D10438DA54287A00B0270842697636EFDBD17@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100513230251.GB26822@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 14 May 2010 08:22:48 +0900
+Subject: [PATCH 2.6.35] ARM: S3C6410: Add missing definitions for the
+	IISv4 clock
+In-Reply-To: <1273771379-5729-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1273771379-5729-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTik-y2JU4w1m6muo6pez97nE_XY4fQPRuQkwExza@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 05:53:10PM -0500, H Hartley Sweeten wrote:
-> Russell,
-> 
-> Ping... ;-)
-> 
-> Are you ready for this patch to be rebased, and to what tree?
+On Fri, May 14, 2010 at 2:22 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> Commit 301176 ("Declare IISv4 audio-bus clock") requires both the
+> register S3C6410_CLK_SRC2 and the clkset for the IISv4 audio bus but
+> neither of those is defined in mainline. ?Add definitions, including the
+> addition of the PCMCDCLK[1] and the CDCLK for the IISv4 block both of
+> which are first used by this clock.
+Hi Ben,
+  Seems you missed the first three in the series?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011036.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011039.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011038.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011037.html
 
-I've not forgotten; I've just posted the notice about closing my tree
-down this weekend, and once that's been done I'll be dealing with this
-and another lose end.
+I am ok with this Mark's single patch too though.
+
+Thanks.
