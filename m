@@ -1,82 +1,86 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 May 2010 22:07:24 +0900
-Subject: [PATCH v2 7/9] ARM: S5P6440: Adds Touchscreen support for S5P6440
-Message-ID: <1273756044-3230-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 13 May 2010 22:07:32 +0900
+Subject: [PATCH v2 9/9] ARM: S5PV210: Adds Touchscreen support for S5PV210
+Message-ID: <1273756052-3296-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naveen Krishna <ch.naveen@samsung.com>
 
-This patch adds touchscreen support for S5P6440.
+This patch adds touchscreen support for S5PV210.
 
-Signed-off-by: Naveen Krishna Ch <ch.naveen at samsung.com
+Note: TSADC in S5PV210 support 2 touchscreen interfaces,
+Only 1 is implemented as of now.
+
+Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5p6440/Kconfig            |    2 ++
- arch/arm/mach-s5p6440/cpu.c              |    2 ++
- arch/arm/mach-s5p6440/include/mach/map.h |    3 +++
- arch/arm/mach-s5p6440/mach-smdk6440.c    |   12 ++++++++++++
+ arch/arm/mach-s5pv210/Kconfig            |    2 ++
+ arch/arm/mach-s5pv210/cpu.c              |    3 +++
+ arch/arm/mach-s5pv210/include/mach/map.h |    3 +++
+ arch/arm/mach-s5pv210/mach-smdkv210.c    |   11 +++++++++++
  4 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
-index 4c29ff8..597e1a9 100644
---- a/arch/arm/mach-s5p6440/Kconfig
-+++ b/arch/arm/mach-s5p6440/Kconfig
-@@ -15,6 +15,8 @@ config CPU_S5P6440
- config MACH_SMDK6440
- 	bool "SMDK6440"
- 	select CPU_S5P6440
-+	select SAMSUNG_DEV_TS
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index af33a1a..3870012 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -24,6 +24,8 @@ config MACH_SMDKV210
+ 	bool "SMDKV210"
+ 	select CPU_S5PV210
+ 	select ARCH_SPARSEMEM_ENABLE
 +	select SAMSUNG_DEV_ADC
++	select SAMSUNG_DEV_TS
  	help
- 	  Machine support for the Samsung SMDK6440
+ 	  Machine support for Samsung SMDKV210
  
-diff --git a/arch/arm/mach-s5p6440/cpu.c b/arch/arm/mach-s5p6440/cpu.c
-index 1794131..e461955 100644
---- a/arch/arm/mach-s5p6440/cpu.c
-+++ b/arch/arm/mach-s5p6440/cpu.c
-@@ -61,6 +61,8 @@ static void s5p6440_idle(void)
- void __init s5p6440_map_io(void)
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 0e0f8fd..5f0675d 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -74,6 +74,9 @@ static void s5pv210_idle(void)
+ 
+ void __init s5pv210_map_io(void)
  {
- 	/* initialize any device information early */
-+	s3c_device_ts.name      = "s3c64xx-ts";
++	s3c_device_ts.name      = "s5pv2xx-ts";
 +	s3c_device_adc.name	= "s3c64xx-adc";
++
+ 	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
  }
  
- void __init s5p6440_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5p6440/include/mach/map.h b/arch/arm/mach-s5p6440/include/mach/map.h
-index 8924e5a..52e7930 100644
---- a/arch/arm/mach-s5p6440/include/mach/map.h
-+++ b/arch/arm/mach-s5p6440/include/mach/map.h
-@@ -61,8 +61,11 @@
- #define S5P6440_PA_SDRAM	(0x20000000)
- #define S5P_PA_SDRAM		S5P6440_PA_SDRAM
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index c22694c..29355ee 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -58,8 +58,11 @@
+ #define S5PV210_PA_SDRAM	(0x20000000)
+ #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
  
-+#define S5P6440_PA_ADC		(0xF3000000)
++#define S5PV210_PA_ADC		(0xE1700000)
 +
  /* compatibiltiy defines. */
- #define S3C_PA_UART		S5P6440_PA_UART
- #define S3C_PA_IIC		S5P6440_PA_IIC0
-+#define SAMSUNG_PA_ADC		S5P6440_PA_ADC
+ #define S3C_PA_UART		S5PV210_PA_UART
+ #define S3C_PA_IIC		S5PV210_PA_IIC0
++#define SAMSUNG_PA_ADC		S5PV210_PA_ADC
  
  #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
-index 3ae88f2..177701b 100644
---- a/arch/arm/mach-s5p6440/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
-@@ -38,6 +38,8 @@
+diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+index a278832..1440cb2 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+@@ -25,6 +25,8 @@
+ #include <plat/s5pv210.h>
  #include <plat/devs.h>
  #include <plat/cpu.h>
- #include <plat/pll.h>
 +#include <plat/adc.h>
 +#include <plat/ts.h>
  
- #define S5P6440_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -84,6 +86,14 @@ static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -72,6 +74,14 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
  };
  
- static struct platform_device *smdk6440_devices[] __initdata = {
+ static struct platform_device *smdkv210_devices[] __initdata = {
 +	&s3c_device_adc,
 +	&s3c_device_ts,
 +};
@@ -87,14 +91,13 @@ index 3ae88f2..177701b 100644
 +	.oversampling_shift	= 2,
  };
  
- static void __init smdk6440_map_io(void)
-@@ -95,6 +105,8 @@ static void __init smdk6440_map_io(void)
+ static void __init smdkv210_map_io(void)
+@@ -83,6 +93,7 @@ static void __init smdkv210_map_io(void)
  
- static void __init smdk6440_machine_init(void)
+ static void __init smdkv210_machine_init(void)
  {
 +	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-+
- 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
+ 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
  }
  
 -- 
