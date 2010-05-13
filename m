@@ -1,80 +1,60 @@
 From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Thu, 13 May 2010 18:09:16 +0530
-Subject: [PATCH v2 1/2] nomadik hwrng: Add clock support
-Message-ID: <1273754356-23523-1-git-send-email-srinidhi.kasagar@stericsson.com>
+Date: Thu, 13 May 2010 18:17:39 +0530
+Subject: [PATCH v2 2/2] ux500: Add hardware rng support
+Message-ID: <1273754859-26365-1-git-send-email-srinidhi.kasagar@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the clock support to the Nomadik RNG driver
+This adds the hardware RNG support to ux500 machine
+which uses nomadik RNG driver.
 
 Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus walleij <linus.walleij@stericsson.com>
-Acked-by: Alessandro Rubini <rubini@unipv.it>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/mach-nomadik/clock.c        |    1 +
- drivers/char/hw_random/nomadik-rng.c |   17 +++++++++++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c         |    1 +
+ arch/arm/mach-ux500/devices.c              |    5 +++++
+ arch/arm/mach-ux500/include/mach/devices.h |    1 +
+ 3 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
-index 60f5bee..2c471fc 100644
---- a/arch/arm/mach-nomadik/clock.c
-+++ b/arch/arm/mach-nomadik/clock.c
-@@ -56,6 +56,7 @@ static struct clk_lookup lookups[] = {
- 	CLK(&clk_default, "gpio.1"),
- 	CLK(&clk_default, "gpio.2"),
- 	CLK(&clk_default, "gpio.3"),
-+	CLK(&clk_default, "rng"),
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index fdcf0d4..602b999 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -124,6 +124,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&ux500_uart0_device,
+ 	&ux500_uart1_device,
+ 	&ux500_uart2_device,
++	&ux500_rng_device,
+ 	&u8500_ssp0_device,
  };
  
- static int __init clk_init(void)
-diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
-index a8b4c40..a348c7e 100644
---- a/drivers/char/hw_random/nomadik-rng.c
-+++ b/drivers/char/hw_random/nomadik-rng.c
-@@ -15,6 +15,10 @@
- #include <linux/amba/bus.h>
- #include <linux/hw_random.h>
- #include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
+diff --git a/arch/arm/mach-ux500/devices.c b/arch/arm/mach-ux500/devices.c
+index 8a26889..65eb79a 100644
+--- a/arch/arm/mach-ux500/devices.c
++++ b/arch/arm/mach-ux500/devices.c
+@@ -29,6 +29,11 @@ struct amba_device ux500_pl031_device = {
+ 	.irq = {IRQ_RTC_RTT, NO_IRQ},
+ };
+ 
++struct amba_device ux500_rng_device = {
++	.dev = { .init_name = "rng" },
++	__MEM_4K_RESOURCE(UX500_RNG_BASE),
++};
 +
-+static struct clk *rng_clk;
+ struct amba_device ux500_uart0_device = {
+ 	.dev = { .init_name = "uart0" },
+ 	__MEM_4K_RESOURCE(UX500_UART0_BASE),
+diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/include/mach/devices.h
+index 0422af0..72fa6f7 100644
+--- a/arch/arm/mach-ux500/include/mach/devices.h
++++ b/arch/arm/mach-ux500/include/mach/devices.h
+@@ -18,6 +18,7 @@ extern struct amba_device u8500_ssp0_device;
+ extern struct amba_device ux500_uart0_device;
+ extern struct amba_device ux500_uart1_device;
+ extern struct amba_device ux500_uart2_device;
++extern struct amba_device ux500_rng_device;
  
- static int nmk_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- {
-@@ -40,6 +44,15 @@ static int nmk_rng_probe(struct amba_device *dev, struct amba_id *id)
- 	void __iomem *base;
- 	int ret;
- 
-+	rng_clk = clk_get(&dev->dev, NULL);
-+	if (IS_ERR(rng_clk)) {
-+		dev_err(&dev->dev, "could not get rng clock\n");
-+		ret = PTR_ERR(rng_clk);
-+		return ret;
-+	}
-+
-+	clk_enable(rng_clk);
-+
- 	ret = amba_request_regions(dev, dev->dev.init_name);
- 	if (ret)
- 		return ret;
-@@ -57,6 +70,8 @@ out_unmap:
- 	iounmap(base);
- out_release:
- 	amba_release_regions(dev);
-+	clk_disable(rng_clk);
-+	clk_put(rng_clk);
- 	return ret;
- }
- 
-@@ -66,6 +81,8 @@ static int nmk_rng_remove(struct amba_device *dev)
- 	hwrng_unregister(&nmk_rng);
- 	iounmap(base);
- 	amba_release_regions(dev);
-+	clk_disable(rng_clk);
-+	clk_put(rng_clk);
- 	return 0;
- }
- 
+ extern struct platform_device ux500_i2c1_device;
+ extern struct platform_device ux500_i2c2_device;
 -- 
 1.6.3.3
