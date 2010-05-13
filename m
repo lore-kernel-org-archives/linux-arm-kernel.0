@@ -1,92 +1,57 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 13 May 2010 20:47:34 +0300
-Subject: [PATCH 13/15] omap: mailbox: reorganize headers
+Date: Thu, 13 May 2010 20:47:35 +0300
+Subject: [PATCH 14/15] omap: mailbox: don't export unecessary symbols
 In-Reply-To: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
 References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1273772856-10881-14-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1273772856-10881-15-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/mailbox.c             |    5 +----
- arch/arm/mach-omap2/mailbox.c             |    7 +++----
- arch/arm/plat-omap/include/plat/mailbox.h |    3 ---
- arch/arm/plat-omap/mailbox.c              |    6 +++---
- 4 files changed, 7 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap1/mailbox.c |    1 -
+ arch/arm/mach-omap2/mailbox.c |    3 ---
+ 2 files changed, 0 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index 036e159..8eea651 100644
+index 8eea651..b01d3c3 100644
 --- a/arch/arm/mach-omap1/mailbox.c
 +++ b/arch/arm/mach-omap1/mailbox.c
-@@ -9,13 +9,10 @@
-  * for more details.
-  */
+@@ -140,7 +140,6 @@ struct omap_mbox mbox_dsp_info = {
+ 	.ops	= &omap1_mbox_ops,
+ 	.priv	= &omap1_mbox_dsp_priv,
+ };
+-EXPORT_SYMBOL(mbox_dsp_info);
  
--#include <linux/kernel.h>
--#include <linux/resource.h>
--#include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+
- #include <plat/mailbox.h>
--#include <mach/irqs.h>
+ struct omap_mbox *omap1_mboxes[] = { &mbox_dsp_info, NULL };
  
- #define MAILBOX_ARM2DSP1		0x00
- #define MAILBOX_ARM2DSP1b		0x04
 diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 7abd159..2817103 100644
+index 2817103..b0d7740 100644
 --- a/arch/arm/mach-omap2/mailbox.c
 +++ b/arch/arm/mach-omap2/mailbox.c
-@@ -10,13 +10,12 @@
-  * for more details.
-  */
+@@ -285,7 +285,6 @@ struct omap_mbox mbox_dsp_info = {
+ 	.ops	= &omap2_mbox_ops,
+ 	.priv	= &omap2_mbox_dsp_priv,
+ };
+-EXPORT_SYMBOL(mbox_dsp_info);
+ #endif
  
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/err.h>
- #include <linux/platform_device.h>
-+#include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/err.h>
-+
- #include <plat/mailbox.h>
--#include <mach/irqs.h>
+ #if defined(CONFIG_ARCH_OMAP3430)
+@@ -342,7 +341,6 @@ struct omap_mbox mbox_1_info = {
+ 	.ops	= &omap2_mbox_ops,
+ 	.priv	= &omap2_mbox_1_priv,
+ };
+-EXPORT_SYMBOL(mbox_1_info);
  
- #define MAILBOX_REVISION		0x000
- #define MAILBOX_SYSCONFIG		0x010
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index cfbe221..fe30dc5 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -3,9 +3,6 @@
- #ifndef MAILBOX_H
- #define MAILBOX_H
+ static struct omap_mbox2_priv omap2_mbox_2_priv = {
+ 	.tx_fifo = {
+@@ -365,7 +363,6 @@ struct omap_mbox mbox_2_info = {
+ 	.ops	= &omap2_mbox_ops,
+ 	.priv	= &omap2_mbox_2_priv,
+ };
+-EXPORT_SYMBOL(mbox_2_info);
  
--#include <linux/wait.h>
--#include <linux/workqueue.h>
--#include <linux/blkdev.h>
- #include <linux/interrupt.h>
- 
- typedef u32 mbox_msg_t;
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 7ccd1e7..2727e52 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -21,11 +21,11 @@
-  *
-  */
- 
--#include <linux/module.h>
--#include <linux/interrupt.h>
--#include <linux/device.h>
-+#include <linux/spinlock_types.h>
-+#include <linux/mutex.h>
- #include <linux/delay.h>
- #include <linux/platform_device.h>
-+#include <linux/blkdev.h>
- 
- #include <plat/mailbox.h>
- 
+ struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
+ #endif
 -- 
 1.7.1
