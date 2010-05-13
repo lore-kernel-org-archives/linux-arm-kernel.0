@@ -1,142 +1,104 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 May 2010 22:07:12 +0900
-Subject: [PATCH v2 3/9] ARM: SAMSUNG: Implements cfg_gpio function for Samsung
-	touchscreen
-Message-ID: <1273756032-3098-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 13 May 2010 22:11:58 +0900
+Subject: [PATCH v3 9/9] ARM: S5PV210: Adds Touchscreen support for S5PV210
+Message-ID: <1273756318-3350-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naveen Krishna <ch.naveen@samsung.com>
 
-This patch implements cfg_gpio function for Samsung touchscreen.
-And also modifies the H1940 machine respectively.
+This patch adds touchscreen support for S5PV210.
+
+Note: TSADC in S5PV210 support 2 touchscreen interfaces,
+Only 1 is implemented as of now.
 
 Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/Kconfig           |    1 +
- arch/arm/mach-s3c2410/mach-h1940.c      |    1 +
- arch/arm/plat-s3c24xx/Kconfig           |    6 +++++
- arch/arm/plat-s3c24xx/Makefile          |    1 +
- arch/arm/plat-s3c24xx/setup-ts.c        |   34 +++++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/ts.h |    4 +++
- 6 files changed, 47 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s3c24xx/setup-ts.c
+ arch/arm/mach-s5pv210/Kconfig            |    2 ++
+ arch/arm/mach-s5pv210/cpu.c              |    3 +++
+ arch/arm/mach-s5pv210/include/mach/map.h |    3 +++
+ arch/arm/mach-s5pv210/mach-smdkv210.c    |   11 +++++++++++
+ 4 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
-index 5547318..460ba78 100644
---- a/arch/arm/mach-s3c2410/Kconfig
-+++ b/arch/arm/mach-s3c2410/Kconfig
-@@ -76,6 +76,7 @@ config ARCH_H1940
- 	select PM_H1940 if PM
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_NAND
-+	select SAMSUNG_SETUP_TS
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index af33a1a..3870012 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -24,6 +24,8 @@ config MACH_SMDKV210
+ 	bool "SMDKV210"
+ 	select CPU_S5PV210
+ 	select ARCH_SPARSEMEM_ENABLE
++	select SAMSUNG_DEV_ADC
++	select SAMSUNG_DEV_TS
  	help
- 	  Say Y here if you are using the HP IPAQ H1940
+ 	  Machine support for Samsung SMDKV210
  
-diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
-index 75e3ffb..e8583ec 100644
---- a/arch/arm/mach-s3c2410/mach-h1940.c
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -145,6 +145,7 @@ static struct s3c2410_ts_mach_info h1940_ts_cfg __initdata = {
- 		.delay = 10000,
- 		.presc = 49,
- 		.oversampling_shift = 2,
-+		.cfg_gpio = s3c24xx_ts_cfg_gpio,
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 0e0f8fd..5f0675d 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -74,6 +74,9 @@ static void s5pv210_idle(void)
+ 
+ void __init s5pv210_map_io(void)
+ {
++	s3c_device_ts.name      = "s5pv210-ts";
++	s3c_device_adc.name	= "s3c64xx-adc";
++
+ 	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
+ }
+ 
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index c22694c..29355ee 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -58,8 +58,11 @@
+ #define S5PV210_PA_SDRAM	(0x20000000)
+ #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
+ 
++#define S5PV210_PA_ADC		(0xE1700000)
++
+ /* compatibiltiy defines. */
+ #define S3C_PA_UART		S5PV210_PA_UART
+ #define S3C_PA_IIC		S5PV210_PA_IIC0
++#define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+ 
+ #endif /* __ASM_ARCH_MAP_H */
+diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+index a278832..1440cb2 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+@@ -25,6 +25,8 @@
+ #include <plat/s5pv210.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
++#include <plat/adc.h>
++#include <plat/ts.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -72,6 +74,14 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
  };
  
- /**
-diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-index 6e93ef8..ed6f294 100644
---- a/arch/arm/plat-s3c24xx/Kconfig
-+++ b/arch/arm/plat-s3c24xx/Kconfig
-@@ -9,6 +9,7 @@ config PLAT_S3C24XX
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_DEVICE_NAND
-+	select SAMSUNG_SETUP_TS if TOUCHSCREEN_S3C2410
- 	help
- 	  Base platform code for any Samsung S3C24XX device
- 
-@@ -157,4 +158,9 @@ config S3C24XX_SIMTEC_AUDIO
- 	help
- 	  Add audio devices for common Simtec S3C24XX boards
- 
-+config SAMSUNG_SETUP_TS
-+	bool
-+	help
-+	  Compile in platform device definition for Samsung TouchScreen.
+ static struct platform_device *smdkv210_devices[] __initdata = {
++	&s3c_device_adc,
++	&s3c_device_ts,
++};
 +
- endif
-diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index c2237c4..0fecbc3 100644
---- a/arch/arm/plat-s3c24xx/Makefile
-+++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += s3c2410-cpufreq-utils.o
- 
- # device specific setup and/or initialisation
- obj-$(CONFIG_ARCH_S3C2410)	+= setup-i2c.o
-+obj-$(CONFIG_SAMSUNG_SETUP_TS)	+= setup-ts.o
- 
- # SPI gpio central GPIO functions
- 
-diff --git a/arch/arm/plat-s3c24xx/setup-ts.c b/arch/arm/plat-s3c24xx/setup-ts.c
-new file mode 100644
-index 0000000..ed26386
---- /dev/null
-+++ b/arch/arm/plat-s3c24xx/setup-ts.c
-@@ -0,0 +1,34 @@
-+/* linux/arch/arm/plat-s3c24xx/setup-ts.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *                     http://www.samsung.com/
-+ *
-+ * Based on S3C24XX setup for i2c device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/gpio.h>
-+
-+struct platform_device; /* don't need the contents */
-+
-+#include <mach/hardware.h>
-+#include <mach/regs-gpio.h>
-+
-+/**
-+ * s3c24xx_ts_cfg_gpio - configure gpio for s3c2410 systems
-+ *
-+ * Configure the GPIO for the S3C2410 system, where we have external FETs
-+ * connected to the device (later systems such as the S3C2440 integrate
-+ * these into the device).
-+ */
-+void s3c24xx_ts_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/ts.h b/arch/arm/plat-samsung/include/plat/ts.h
-index 8a51675..26fdb22 100644
---- a/arch/arm/plat-samsung/include/plat/ts.h
-+++ b/arch/arm/plat-samsung/include/plat/ts.h
-@@ -14,8 +14,12 @@ struct s3c2410_ts_mach_info {
-        int             delay;
-        int             presc;
-        int             oversampling_shift;
-+	void    (*cfg_gpio)(struct platform_device *dev);
++static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
++	.delay			= 10000,
++	.presc			= 49,
++	.oversampling_shift	= 2,
  };
  
- extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
+ static void __init smdkv210_map_io(void)
+@@ -83,6 +93,7 @@ static void __init smdkv210_map_io(void)
  
-+/* defined by architecture to configure gpio */
-+extern void s3c24xx_ts_cfg_gpio(struct platform_device *dev);
-+
- #endif /* __ASM_ARM_TS_H */
+ static void __init smdkv210_machine_init(void)
+ {
++	s3c24xx_ts_set_platdata(&s3c_ts_platform);
+ 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
+ }
+ 
 -- 
 1.6.2.5
