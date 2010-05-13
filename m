@@ -1,404 +1,352 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 May 2010 20:13:29 +0900
-Subject: [PATCH v3 2/2] ARM: S5PV210: Add Ext interrupt support
-Message-ID: <1273749209-32461-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 13 May 2010 20:13:21 +0900
+Subject: [PATCH v3 1/2] ARM: S5PV210: Add S5PV210 GPIO support.
+Message-ID: <1273749201-32426-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+From: Pannaga Bhushan <p.bhushan@samsung.com>
 
-Add support for external interrupts on v210.
+Adds GPIOlib support for S5PV210.
 
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig                  |    1 +
- arch/arm/mach-s5pv210/include/mach/irqs.h      |    5 +
- arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   84 +++++++++
- arch/arm/plat-s5p/Kconfig                      |    5 +
- arch/arm/plat-s5p/Makefile                     |    1 +
- arch/arm/plat-s5p/irq-eint.c                   |  230 ++++++++++++++++++++++++
- 6 files changed, 326 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
- create mode 100644 arch/arm/plat-s5p/irq-eint.c
+ arch/arm/mach-s5pv210/Makefile            |    2 +-
+ arch/arm/mach-s5pv210/gpiolib.c           |  257 +++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/gpio.h |   18 ++-
+ 3 files changed, 273 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/gpiolib.c
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index af33a1a..c4c2a7f 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -12,6 +12,7 @@ if ARCH_S5PV210
- config CPU_S5PV210
- 	bool
- 	select PLAT_S5P
-+	select S5P_EXT_INT
- 	help
- 	  Enable S5PV210 CPU support
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 8ebf51c..0acbdb3 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -12,7 +12,7 @@ obj-				:=
  
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 62c5175..1714be2 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -139,6 +139,11 @@
- #define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
- #define IRQ_EINT(x)		S5P_EINT(x)
+ # Core support for S5PV210 system
  
-+#define S5P_EINT_SET0(x)	S5PV210_GPH0(x)
-+#define S5P_EINT_SET1(x)	S5PV210_GPH1(x)
-+#define S5P_EINT_SET2(x)	S5PV210_GPH2(x)
-+#define S5P_EINT_SET3(x)	S5PV210_GPH3(x)
-+
- /* Set the default NR_IRQS */
+-obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
++obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o gpiolib.o
  
- #define NR_IRQS 		(IRQ_EINT(31) + 1)
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+ # machine support
+ 
+diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
 new file mode 100644
-index 0000000..86fb6a4
+index 0000000..99dad92
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-@@ -0,0 +1,84 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
++++ b/arch/arm/mach-s5pv210/gpiolib.c
+@@ -0,0 +1,257 @@
++/* linux/arch/arm/mach-s5pv210/gpiolib.c
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
 + *
-+ * S5PV210 - GPIO (including EINT) register definitions
++ * S5PV210 - GPIOlib support
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_GPIO_H
-+#define __ASM_ARCH_REGS_GPIO_H __FILE__
-+
-+#include <mach/map.h>
-+
-+#define S5PV210_EINT30CON		(S5P_VA_GPIO + 0xE00)
-+#define S5PV210_EINT31CON		(S5P_VA_GPIO + 0xE04)
-+#define S5PV210_EINT32CON		(S5P_VA_GPIO + 0xE08)
-+#define S5PV210_EINT33CON		(S5P_VA_GPIO + 0xE0C)
-+
-+#define S5P_EINT_CON(x)			(S5PV210_EINT30CON + ((x) * 0x4))
-+
-+#define S5PV210_EINT30FLTCON0		(S5P_VA_GPIO + 0xE80)
-+#define S5PV210_EINT30FLTCON1		(S5P_VA_GPIO + 0xE84)
-+#define S5PV210_EINT31FLTCON0		(S5P_VA_GPIO + 0xE88)
-+#define S5PV210_EINT31FLTCON1		(S5P_VA_GPIO + 0xE8C)
-+#define S5PV210_EINT32FLTCON0		(S5P_VA_GPIO + 0xE90)
-+#define S5PV210_EINT32FLTCON1		(S5P_VA_GPIO + 0xE94)
-+#define S5PV210_EINT33FLTCON0		(S5P_VA_GPIO + 0xE98)
-+#define S5PV210_EINT33FLTCON1		(S5P_VA_GPIO + 0xE9C)
-+
-+#define S5P_EINT_FLTCON(x)		(S5PV210_EINT30FLTCON0 + ((x) * 0x4))
-+
-+#define S5PV210_EINT30MASK		(S5P_VA_GPIO + 0xF00)
-+#define S5PV210_EINT31MASK		(S5P_VA_GPIO + 0xF04)
-+#define S5PV210_EINT32MASK		(S5P_VA_GPIO + 0xF08)
-+#define S5PV210_EINT33MASK		(S5P_VA_GPIO + 0xF0C)
-+
-+#define S5P_EINT_MASK(x)		(S5PV210_EINT30MASK + ((x) * 0x4))
-+
-+#define S5PV210_EINT30PEND		(S5P_VA_GPIO + 0xF40)
-+#define S5PV210_EINT31PEND		(S5P_VA_GPIO + 0xF44)
-+#define S5PV210_EINT32PEND		(S5P_VA_GPIO + 0xF48)
-+#define S5PV210_EINT33PEND		(S5P_VA_GPIO + 0xF4C)
-+
-+#define S5P_EINT_PEND(x)		(S5PV210_EINT30PEND + ((x) * 0x4))
-+
-+#define eint_offset(irq)	((irq) < IRQ_EINT16_31 ? ((irq)-IRQ_EINT0) \
-+						: (irq-S5P_IRQ_EINT_BASE))
-+
-+#define eint_irq_to_bit(irq)		(1 << (eint_offset(irq) & 0x7))
-+
-+#define eint_conf_reg(irq)		((eint_offset(irq)) >> 3)
-+#define eint_filt_reg(irq)		((eint_offset(irq)) >> 2)
-+#define eint_mask_reg(irq)		((eint_offset(irq)) >> 3)
-+#define eint_pend_reg(irq)		((eint_offset(irq)) >> 3)
-+
-+#define S5P_EINT30CON			S5PV210_EINT30CON
-+#define S5P_EINT31CON			S5PV210_EINT31CON
-+#define S5P_EINT32CON			S5PV210_EINT32CON
-+#define S5P_EINT33CON			S5PV210_EINT33CON
-+#define S5P_EINT30FLTCON0		S5PV210_EINT30FLTCON0
-+#define S5P_EINT30FLTCON1		S5PV210_EINT30FLTCON1
-+#define S5P_EINT31FLTCON0		S5PV210_EINT31FLTCON0
-+#define S5P_EINT31FLTCON1		S5PV210_EINT31FLTCON1
-+#define S5P_EINT32FLTCON0		S5PV210_EINT32FLTCON0
-+#define S5P_EINT32FLTCON1		S5PV210_EINT32FLTCON1
-+#define S5P_EINT33FLTCON0		S5PV210_EINT33FLTCON0
-+#define S5P_EINT33FLTCON1		S5PV210_EINT33FLTCON1
-+#define S5P_EINT30MASK			S5PV210_EINT30MASK
-+#define S5P_EINT31MASK			S5PV210_EINT31MASK
-+#define S5P_EINT32MASK			S5PV210_EINT32MASK
-+#define S5P_EINT33MASK			S5PV210_EINT33MASK
-+
-+/* values for S5P_EXTINT0 */
-+#define S5P_EXTINT_LOWLEV		(0x00)
-+#define S5P_EXTINT_HILEV		(0x01)
-+#define S5P_EXTINT_FALLEDGE		(0x02)
-+#define S5P_EXTINT_RISEEDGE		(0x03)
-+#define S5P_EXTINT_BOTHEDGE		(0x04)
-+
-+#endif /* __ASM_ARCH_REGS_GPIO_H */
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index d400a6a..7d1fc40 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -23,3 +23,8 @@ config PLAT_S5P
- 	select SAMSUNG_IRQ_UART
- 	help
- 	  Base platform code for Samsung's S5P series SoC.
-+
-+config S5P_EXT_INT
-+	bool
-+	help
-+	  Use the external interrupts (other than GPIO interrupts.)
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index a7c54b3..25941a5 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -16,4 +16,5 @@ obj-y				+= dev-uart.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
- obj-y				+= irq.o
-+obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
- obj-y				+= setup-i2c0.o
-diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-new file mode 100644
-index 0000000..84f1016
---- /dev/null
-+++ b/arch/arm/plat-s5p/irq-eint.c
-@@ -0,0 +1,230 @@
-+/* linux/arch/arm/plat-s5p/irq-eint.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P - IRQ EINT support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++ */
 +
 +#include <linux/kernel.h>
-+#include <linux/interrupt.h>
 +#include <linux/irq.h>
 +#include <linux/io.h>
-+#include <linux/sysdev.h>
 +#include <linux/gpio.h>
-+
-+#include <asm/bitops.h>
-+#include <asm/hardware/vic.h>
-+
-+#include <plat/regs-irqtype.h>
-+
-+#include <mach/map.h>
-+#include <plat/cpu.h>
-+#include <plat/pm.h>
-+
++#include <plat/gpio-core.h>
 +#include <plat/gpio-cfg.h>
-+#include <mach/regs-gpio.h>
++#include <plat/gpio-cfg-helpers.h>
++#include <mach/map.h>
 +
-+static inline void s5p_irq_eint_mask(unsigned int irq)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-+	mask |= eint_irq_to_bit(irq);
-+	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-+}
-+
-+static void s5p_irq_eint_unmask(unsigned int irq)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-+	mask &= ~(eint_irq_to_bit(irq));
-+	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-+}
-+
-+static inline void s5p_irq_eint_ack(unsigned int irq)
-+{
-+	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
-+}
-+
-+static void s5p_irq_eint_maskack(unsigned int irq)
-+{
-+	/* compiler should in-line these */
-+	s5p_irq_eint_mask(irq);
-+	s5p_irq_eint_ack(irq);
-+}
-+
-+static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
-+{
-+	int offs = eint_offset(irq);
-+	int shift;
-+	u32 ctrl, mask;
-+	u32 newvalue = 0;
-+
-+	switch (type) {
-+	case IRQ_TYPE_NONE:
-+		printk(KERN_WARNING "No edge setting!\n");
-+		break;
-+
-+	case IRQ_TYPE_EDGE_RISING:
-+		newvalue = S5P_EXTINT_RISEEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_FALLING:
-+		newvalue = S5P_EXTINT_RISEEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_BOTH:
-+		newvalue = S5P_EXTINT_BOTHEDGE;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_LOW:
-+		newvalue = S5P_EXTINT_LOWLEV;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		newvalue = S5P_EXTINT_HILEV;
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "No such irq type %d", type);
-+		return -1;
-+	}
-+
-+	shift = (offs & 0x7) * 4;
-+	mask = 0x7 << shift;
-+
-+	ctrl = __raw_readl(S5P_EINT_CON(eint_conf_reg(irq)));
-+	ctrl &= ~mask;
-+	ctrl |= newvalue << shift;
-+	__raw_writel(ctrl, S5P_EINT_CON(eint_conf_reg(irq)));
-+
-+	if ((0 <= offs) && (offs < 8))
-+		s3c_gpio_cfgpin(S5P_EINT_SET0(offs&0x7), 0xf<<((offs&0x7)*4));
-+
-+	else if ((8 <= offs) && (offs < 16))
-+		s3c_gpio_cfgpin(S5P_EINT_SET1(offs&0x7), 0xf<<((offs&0x7)*4));
-+
-+	else if ((16 <= offs) && (offs < 24))
-+		s3c_gpio_cfgpin(S5P_EINT_SET2(offs&0x7), 0xf<<((offs&0x7)*4));
-+
-+	else if ((24 <= offs) && (offs < 32))
-+		s3c_gpio_cfgpin(S5P_EINT_SET3(offs&0x7), 0xf<<((offs&0x7)*4));
-+
-+	else
-+		printk(KERN_ERR "No such irq number %d", offs);
-+
-+	return 0;
-+}
-+
-+static struct irq_chip s5p_irq_eint = {
-+	.name		= "s5p-eint",
-+	.mask		= s5p_irq_eint_mask,
-+	.unmask		= s5p_irq_eint_unmask,
-+	.mask_ack	= s5p_irq_eint_maskack,
-+	.ack		= s5p_irq_eint_ack,
-+	.set_type	= s5p_irq_eint_set_type,
-+#ifdef CONFIG_PM
-+	.set_wake	= s3c_irqext_wake,
-+#endif
++static struct s3c_gpio_cfg gpio_cfg = {
++	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
++	.set_pull	= s3c_gpio_setpull_updown,
++	.get_pull	= s3c_gpio_getpull_updown,
 +};
 +
-+/* s5p_irq_demux_eint
-+ *
-+ * This function demuxes the IRQ from the group0 external interrupts,
-+ * from IRQ_EINT(16) to IRQ_EINT(31). It is designed to be inlined into
-+ * the specific handlers s5p_irq_demux_eintX_Y.
++static struct s3c_gpio_cfg gpio_cfg_noint = {
++	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
++	.set_pull	= s3c_gpio_setpull_updown,
++	.get_pull	= s3c_gpio_getpull_updown,
++};
++
++/* GPIO bank's base address given the index of the bank in the
++ * list of all gpio banks.
 + */
-+static inline void s5p_irq_demux_eint(unsigned int start, unsigned int end)
-+{
-+	u32 status;
-+	u32 mask = __raw_readl(S5P_EINT_MASK((start >> 3)));
-+	unsigned int irq;
++#define S5PV210_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
 +
-+	status = __raw_readl(S5P_EINT_PEND((start >> 3)));
-+	status &= ~mask;
-+	status &= (1 << (end - start + 1)) - 1;
-+
-+	while (status) {
-+		irq = fls(status);
-+		generic_handle_irq(irq - 1 + IRQ_EINT(start));
-+		clear_bit(irq, (long unsigned int *)&status);
-+	}
-+}
-+
-+static void s5p_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
-+{
-+	s5p_irq_demux_eint(16, 23);
-+	s5p_irq_demux_eint(24, 31);
-+}
-+
-+/* EINT0 ~ EINT15 */
-+
-+static void s5p_irq_vic_eint_mask(unsigned int irq)
-+{
-+	void __iomem *base = get_irq_chip_data(irq);
-+
-+	s5p_irq_eint_mask(irq);
-+
-+	irq &= 31;
-+	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
-+}
-+
-+static void s5p_irq_vic_eint_unmask(unsigned int irq)
-+{
-+	void __iomem *base = get_irq_chip_data(irq);
-+
-+	s5p_irq_eint_unmask(irq);
-+
-+	irq &= 31;
-+	writel(1 << irq, base + VIC_INT_ENABLE);
-+}
-+
-+static inline void s5p_irq_vic_eint_ack(unsigned int irq)
-+{
-+	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
-+}
-+
-+static void s5p_irq_vic_eint_maskack(unsigned int irq)
-+{
-+	/* compiler should in-line these */
-+	s5p_irq_vic_eint_mask(irq);
-+	s5p_irq_vic_eint_ack(irq);
-+}
-+
-+static struct irq_chip s5p_irq_vic_eint = {
-+	.name		= "s5p_vic_eint",
-+	.mask		= s5p_irq_vic_eint_mask,
-+	.unmask		= s5p_irq_vic_eint_unmask,
-+	.mask_ack	= s5p_irq_vic_eint_maskack,
-+	.ack		= s5p_irq_vic_eint_ack,
-+	.set_type	= s5p_irq_eint_set_type,
-+#ifdef CONFIG_PM
-+	.set_wake	= s3c_irqext_wake,
-+#endif
-+
++/*
++ * Following are the gpio banks in v210.
++ *
++ * The 'config' member when left to NULL, is initialized to the default
++ * structure gpio_cfg in the init function below.
++ *
++ * The 'base' member is also initialized in the init function below.
++ * Note: The initialization of 'base' member of s3c_gpio_chip structure
++ * uses the above macro and depends on the banks being listed in order here.
++ */
++static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
++	{
++		.chip	= {
++			.base	= S5PV210_GPA0(0),
++			.ngpio	= S5PV210_GPIO_A0_NR,
++			.label	= "GPA0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPA1(0),
++			.ngpio	= S5PV210_GPIO_A1_NR,
++			.label	= "GPA1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPB(0),
++			.ngpio	= S5PV210_GPIO_B_NR,
++			.label	= "GPB",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPC0(0),
++			.ngpio	= S5PV210_GPIO_C0_NR,
++			.label	= "GPC0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPC1(0),
++			.ngpio	= S5PV210_GPIO_C1_NR,
++			.label	= "GPC1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPD0(0),
++			.ngpio	= S5PV210_GPIO_D0_NR,
++			.label	= "GPD0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPD1(0),
++			.ngpio	= S5PV210_GPIO_D1_NR,
++			.label	= "GPD1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPE0(0),
++			.ngpio	= S5PV210_GPIO_E0_NR,
++			.label	= "GPE0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPE1(0),
++			.ngpio	= S5PV210_GPIO_E1_NR,
++			.label	= "GPE1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPF0(0),
++			.ngpio	= S5PV210_GPIO_F0_NR,
++			.label	= "GPF0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPF1(0),
++			.ngpio	= S5PV210_GPIO_F1_NR,
++			.label	= "GPF1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPF2(0),
++			.ngpio	= S5PV210_GPIO_F2_NR,
++			.label	= "GPF2",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPF3(0),
++			.ngpio	= S5PV210_GPIO_F3_NR,
++			.label	= "GPF3",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPG0(0),
++			.ngpio	= S5PV210_GPIO_G0_NR,
++			.label	= "GPG0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPG1(0),
++			.ngpio	= S5PV210_GPIO_G1_NR,
++			.label	= "GPG1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPG2(0),
++			.ngpio	= S5PV210_GPIO_G2_NR,
++			.label	= "GPG2",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPG3(0),
++			.ngpio	= S5PV210_GPIO_G3_NR,
++			.label	= "GPG3",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_GPH0(0),
++			.ngpio	= S5PV210_GPIO_H0_NR,
++			.label	= "GPH0",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_GPH1(0),
++			.ngpio	= S5PV210_GPIO_H1_NR,
++			.label	= "GPH1",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_GPH2(0),
++			.ngpio	= S5PV210_GPIO_H2_NR,
++			.label	= "GPH2",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_GPH3(0),
++			.ngpio	= S5PV210_GPIO_H3_NR,
++			.label	= "GPH3",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPI(0),
++			.ngpio	= S5PV210_GPIO_I_NR,
++			.label	= "GPI",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPJ0(0),
++			.ngpio	= S5PV210_GPIO_J0_NR,
++			.label	= "GPJ0",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPJ1(0),
++			.ngpio	= S5PV210_GPIO_J1_NR,
++			.label	= "GPJ1",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPJ2(0),
++			.ngpio	= S5PV210_GPIO_J2_NR,
++			.label	= "GPJ2",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPJ3(0),
++			.ngpio	= S5PV210_GPIO_J3_NR,
++			.label	= "GPJ3",
++		},
++	}, {
++		.chip	= {
++			.base	= S5PV210_GPJ4(0),
++			.ngpio	= S5PV210_GPIO_J4_NR,
++			.label	= "GPJ4",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_MP01(0),
++			.ngpio	= S5PV210_GPIO_MP01_NR,
++			.label	= "MP01",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_MP02(0),
++			.ngpio	= S5PV210_GPIO_MP02_NR,
++			.label	= "MP02",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV210_MP03(0),
++			.ngpio	= S5PV210_GPIO_MP03_NR,
++			.label	= "MP03",
++		},
++	},
 +};
 +
-+int __init s5p_init_irq_eint(void)
++static __init int s5pv210_gpiolib_init(void)
 +{
-+	int irq;
++	struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
++	int nr_chips = ARRAY_SIZE(s5pv210_gpio_4bit);
++	int i = 0;
 +
-+	for (irq = IRQ_EINT0; irq <= IRQ_EINT15; irq++)
-+		set_irq_chip(irq, &s5p_irq_vic_eint);
-+
-+	for (irq = IRQ_EINT(16); irq <= IRQ_EINT(31); irq++) {
-+		set_irq_chip(irq, &s5p_irq_eint);
-+		set_irq_handler(irq, handle_level_irq);
-+		set_irq_flags(irq, IRQF_VALID);
++	for (i = 0; i < nr_chips; i++, chip++) {
++		if (chip->config == NULL)
++			chip->config = &gpio_cfg;
++		if (chip->base == NULL)
++			chip->base = S5PV210_BANK_BASE(i);
 +	}
 +
-+	set_irq_chained_handler(IRQ_EINT16_31, s5p_irq_demux_eint16_31);
++	samsung_gpiolib_add_4bit_chips(s5pv210_gpio_4bit, nr_chips);
++
 +	return 0;
 +}
++core_initcall(s5pv210_gpiolib_init);
+diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
+index 533b020..4dd417c 100644
+--- a/arch/arm/mach-s5pv210/include/mach/gpio.h
++++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+@@ -18,6 +18,8 @@
+ #define gpio_cansleep	__gpio_cansleep
+ #define gpio_to_irq	__gpio_to_irq
+ 
++/* Practically, GPIO banks upto MP03 are the configurable gpio banks */
 +
-+arch_initcall(s5p_init_irq_eint);
+ /* GPIO bank sizes */
+ #define S5PV210_GPIO_A0_NR	(8)
+ #define S5PV210_GPIO_A1_NR	(4)
+@@ -47,6 +49,10 @@
+ #define S5PV210_GPIO_J3_NR	(8)
+ #define S5PV210_GPIO_J4_NR	(5)
+ 
++#define S5PV210_GPIO_MP01_NR	(8)
++#define S5PV210_GPIO_MP02_NR	(4)
++#define S5PV210_GPIO_MP03_NR	(8)
++
+ /* GPIO bank numbers */
+ 
+ /* CONFIG_S3C_GPIO_SPACE allows the user to select extra
+@@ -85,6 +91,9 @@ enum s5p_gpio_number {
+ 	S5PV210_GPIO_J2_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J1),
+ 	S5PV210_GPIO_J3_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J2),
+ 	S5PV210_GPIO_J4_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J3),
++	S5PV210_GPIO_MP01_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
++	S5PV210_GPIO_MP02_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
++	S5PV210_GPIO_MP03_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
+ };
+ 
+ /* S5PV210 GPIO number definitions */
+@@ -115,13 +124,16 @@ enum s5p_gpio_number {
+ #define S5PV210_GPJ2(_nr)	(S5PV210_GPIO_J2_START + (_nr))
+ #define S5PV210_GPJ3(_nr)	(S5PV210_GPIO_J3_START + (_nr))
+ #define S5PV210_GPJ4(_nr)	(S5PV210_GPIO_J4_START + (_nr))
++#define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
++#define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
++#define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
+ 
+ /* the end of the S5PV210 specific gpios */
+-#define S5PV210_GPIO_END	(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) + 1)
++#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) + 1)
+ #define S3C_GPIO_END		S5PV210_GPIO_END
+ 
+-/* define the number of gpios we need to the one after the GPJ4() range */
+-#define ARCH_NR_GPIOS		(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) +	\
++/* define the number of gpios we need to the one after the MP03() range */
++#define ARCH_NR_GPIOS		(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
+ 				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+ 
+ #include <asm-generic/gpio.h>
 -- 
 1.6.2.5
