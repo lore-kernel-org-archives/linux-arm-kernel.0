@@ -1,42 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 May 2010 23:12:29 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100513220139.GO3428@atomide.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100505150209.GC2606@n2100.arm.linux.org.uk>
-	<20100513174023.GB13001@n2100.arm.linux.org.uk>
-	<20100513211951.GH3428@atomide.com>
-	<20100513215825.GC13001@n2100.arm.linux.org.uk>
-	<20100513220139.GO3428@atomide.com>
-Message-ID: <20100513221229.GD13001@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 13 May 2010 17:53:10 -0500
+Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
+In-Reply-To: <0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
+	<20100412184904.GG3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
+	<20100412191506.GL3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
+	<20100506204305.GB26818@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <0D753D10438DA54287A00B0270842697636EFDBD17@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 03:01:39PM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 14:53]:
-> > On Thu, May 13, 2010 at 02:19:51PM -0700, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 10:35]:
-> > > > And here's a patch which converts the OMAP FB code to use lmb_reserve
-> > > > instead of poking about with bootmem stuff.  Untested, so I'd like to
-> > > > hear back whether it works.
-> > > 
-> > > Did a quick test with the following patches picked from your lmb
-> > > branch on top of omap for-next branch:
-> > > 
-> > > ARM: Remove useless linux/bootmem.h includes
-> > > ARM: Ensure meminfo is sorted prior to sanity_check_meminfo
-> > > ARM: initial LMB trial
-> > > ARM: Move platform LMB memory reservations out of generic code
-> > > 
-> > > and then this patch.
-> > > 
-> > > It does not boot.. It seems to be related to the patch
-> > > "ARM: initial LMB trial". If I only apply the first two patches
-> > > above the system boots.
-> > 
-> > Hmm, I'm sure it worked for me when I tested it out.  Could you try
-> > booting with lmb=debug please?
-> 
-> No other output with that it seems.
+On Monday, May 10, 2010 9:42 AM, H Hartley Sweeten wrote:
+> On Thursday, May 06, 2010 1:43 PM, Russell King wrote:
+>> On Thu, May 06, 2010 at 12:29:34PM -0500, H Hartley Sweeten wrote:
+>>> -rc7 should be coming soon.  Would you like this patch rebased now or after
+>>> Linus releases -rc7?  Also, I assume it should be rebased to linux-next or
+>>> would you prefer it rebased to one of your branches?
+>>
+>> Thanks for reminding me.
+>>
+>> This time around, there's a number of patches which can only sensibly
+>> be applied once I've frozen most of the individual branches of my tree,
+>> and this is one of them.  Essentually, these are:
+>> - your 'select GPIOLIB' patch
+>> - killing the 'select GENERIC_TIME' from the ARM Kconfig menus
+>> - pmu/oprofile patch set
+>>
+>> Freezing it before -rc7 is released would be too early, so I think doing
+>> so shortly after -rc7 (which is due this evening/tonight) would be the
+>> right time.
+>
+> Hello Russell,
+>
+> I see Linus released -rc7 over the weekend.  When will you be freezing your
+> -devel tree?  I will rebase the 'select GPIOLIB' patch after that.
 
-Hang on, you didn't pick up ARM: Move memory mapping into mmu.c ?
+Russell,
+
+Ping... ;-)
+
+Are you ready for this patch to be rebased, and to what tree?
+
+Regards,
+Hartley
