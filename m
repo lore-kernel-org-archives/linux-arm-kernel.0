@@ -1,49 +1,83 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Thu, 13 May 2010 21:59:32 +0200 (CEST)
-Subject: [PATCH 4/20] arch/arm/mach-davinci: Use kzalloc
-Message-ID: <Pine.LNX.4.64.1005132159170.6282@ask.diku.dk>
+From: gdavis@mvista.com (George G. Davis)
+Date: Thu, 13 May 2010 16:34:23 -0400
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
+	DMA cache ops
+In-Reply-To: <1273760120.30713.67.camel@e102109-lin.cambridge.arm.com>
+References: <20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<20100513135456.GH18984@mvista.com>
+	<1273760120.30713.67.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100513203423.GQ18984@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+Hi,
 
-Use kzalloc rather than the combination of kmalloc and memset.
+On Thu, May 13, 2010 at 03:15:20PM +0100, Catalin Marinas wrote:
+> On Thu, 2010-05-13 at 14:54 +0100, George G. Davis wrote:
+> > Hi,
+> > 
+> > On Thu, May 13, 2010 at 09:26:57AM +0100, Catalin Marinas wrote:
+> > > On Thu, 2010-05-13 at 06:27 +0100, Ronen Shitrit wrote:
+> > > > Our ARM v6 does have speculative prefetch...
+> > >
+> > > That's the I-cache and we should be ok with it. What may affect this
+> > > patch is speculative fetches into the D-cache.
+> > 
+> > prefetch()?
+> 
+> Drivers should not use prefetch (PLD) on memory handed over to a device
+> for DMA transfers. To me this is like explicitly accessing such memory
+> during a DMA transfer.
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
+I agree and was merely speculating that prefetch() may be a case where
+D-Cache lines are explicitly prefetched and may be the cause of this
+problem, e.g. from e1000_clean_rx_irq() in drivers/net/e1000e/netdev.c:
 
-// <smpl>
-@@
-expression x,size,flags;
-statement S;
-@@
+	while (rx_desc->status & E1000_RXD_STAT_DD) {
+		struct sk_buff *skb;
+		u8 status;
 
--x = kmalloc(size,flags);
-+x = kzalloc(size,flags);
- if (x == NULL) S
--memset(x, 0, size);
-// </smpl>
+		if (*work_done >= work_to_do)
+			break;
+		(*work_done)++;
 
-Signed-off-by: Julia Lawall <julia@diku.dk>
+		status = rx_desc->status;
+		skb = buffer_info->skb;
+		buffer_info->skb = NULL;
 
----
- arch/arm/mach-davinci/dma.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+		prefetch(skb->data - NET_IP_ALIGN);
 
-diff -u -p a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -1419,12 +1419,11 @@ static int __init edma_probe(struct plat
- 			goto fail1;
- 		}
- 
--		edma_cc[j] = kmalloc(sizeof(struct edma), GFP_KERNEL);
-+		edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
- 		if (!edma_cc[j]) {
- 			status = -ENOMEM;
- 			goto fail1;
- 		}
--		memset(edma_cc[j], 0, sizeof(struct edma));
- 
- 		edma_cc[j]->num_channels = min_t(unsigned, info[j].n_channel,
- 							EDMA_MAX_DMACH);
+		i++;
+		if (i == rx_ring->count)
+			i = 0;
+		next_rxd = E1000_RX_DESC(*rx_ring, i);
+		prefetch(next_rxd);
+
+		next_buffer = &rx_ring->buffer_info[i];
+
+		cleaned = 1;
+		cleaned_count++;
+		pci_unmap_single(pdev,
+				 buffer_info->dma,
+				 adapter->rx_buffer_len,
+				 PCI_DMA_FROMDEVICE);
+
+
+I'm to lazy^Wbusy to drill down but could the above prefetch(skb->data...)
+before pci_unmap_single() or similar cases be causing the problem reported
+by Ronen?
+
+I think the above may be one of those "if drivers are expecting data in
+the cache to be preserved over a dma_unmap_area() call, they are buggy
+and need fixing." Russell noted in a previous post, no?
+
+--
+Regards,
+George
