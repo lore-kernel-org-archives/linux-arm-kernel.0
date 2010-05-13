@@ -1,75 +1,77 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 May 2010 12:22:36 +0100
-Subject: [RFC PATCH] ARM: Allow lazy cache flushing on ARM11MPCore
-In-Reply-To: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
-References: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <1273749756.30713.33.camel@e102109-lin.cambridge.arm.com>
+Date: Thu, 13 May 2010 12:30:33 +0100
+Subject: [BUG] bug when enabling VM DEBUG
+In-Reply-To: <20100512130638.GB19314@shareable.org>
+References: <AANLkTikkSRI6u_mp6mNQReECB84t3oh-_MPVzAYEQULN@mail.gmail.com>
+	<AANLkTikoNc6oAY5JthYX1jWx1w2KeJ1fGab72Z-OvIVG@mail.gmail.com>
+	<4BEA1559.9000107@gmail.com>
+	<1273662639.23818.67.camel@e102109-lin.cambridge.arm.com>
+	<20100512115340.GA11261@Chamillionaire.breakpoint.cc>
+	<1273667099.23818.86.camel@e102109-lin.cambridge.arm.com>
+	<20100512130638.GB19314@shareable.org>
+Message-ID: <1273750233.30713.39.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        (we could actually go a step further for ARM11MPCore as well.
-        This patch is not part of the initial cache flush reworking
-        series but I'm posting it for comments as well)
+On Wed, 2010-05-12 at 14:06 +0100, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > On Wed, 2010-05-12 at 12:53 +0100, Sebastian Andrzej Siewior wrote:
+> > > * Catalin Marinas | 2010-05-12 12:10:39 [+0100]:
+> > >
+> > > >> > --- a/drivers/ata/libata-sff.c
+> > > >> > +++ b/drivers/ata/libata-sff.c
+> > > >> > @@ -894,7 +894,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
+> > > >> >                                         do_write);
+> > > >> >          }
+> > > >> >
+> > > >> > -       if (!do_write)
+> > > >> > +       if (!do_write&&  !PageSlab(page))
+> > > >> >                  flush_dcache_page(page);
+> > > >>
+> > > >> I would think that check belongs inside flush_dcache_page itself, rather
+> > > >> than forcing every driver to include it..
+> > > >
+> > > >Sebastian (cc'ed) reported this as well for MIPS.
+> > > Thx. The patch above looks what I've sent a while ago. Jeff was going to
+> > > merge it afaik.
+> > >
+> > > >I think it makes sense for this check to be done in the
+> > > >flush_dcache_page() function.
+> > >
+> > > Why should flush_dcache_page() not flush pages you tell it?
+> > > From Documentation/cachetlb.txt:
+> > > |   NOTE: This routine need only be called for page cache pages
+> > > |          which can potentially ever be mapped into the address
+> > > |          space of a user process.  So for example, VFS layer code
+> > > |          handling vfs symlinks in the page cache need not call
+> > > |          this interface at all.
+> > >
+> > > A page from slab or stack is not going to see the sky of user land and
+> > > therefore it should not be fed into flush_dcache_page().
+> >
+> > You are right :), so fixing the driver is the best approach.
+> 
+> It worries me that a driver has any knowledge of the PageSlab() flag,
+> though.  Especially uncommented knowledge.  That flag seems VM
+> internal, and it's conceptually iffy: Kernel code using
+> get_free_pages() and using that for I/O also does not see the sky of
+> user land.
+> 
+> If all the PIO drivers have to be changed, I'd be happier with:
+> 
+>     flush_dcache_page_for_pio()
+> 
+> which wraps the check, explains it, and provides a single place to
+> change if needed.
 
-The ARM11MPCore doesn't broadcast the cache maintenance operations in
-hardware, therefore the flush_dcache_page() currently performs the cache
-flushing non-lazily. But since not all drivers call this function after
-writing to a page cache page, the kernel needs a different approach like
-using read-for-ownership on the CPU flushing the cache to force the
-dirty cache lines migration from other CPUs. This way the cache flushing
-operation can be done lazily in update_mmu_cache().
+I already proposed a PIO cache flushing API on linux-arch. I tried to
+revive the discussion with another patch for cachetlb.txt but it hasn't
+drawn much interest.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/smp_plat.h |    9 ---------
- arch/arm/mm/cache-v6.S          |    4 ++++
- arch/arm/mm/flush.c             |    3 +--
- 3 files changed, 5 insertions(+), 11 deletions(-)
+On ARM we are trying to change the I/D cache handling similar to IA-64
+and PowerPC (PG_arch_1 would mean "clean" rather than "dirty"). With
+this change, my original patch to libata-sff.c can be dropped (well,
+other architectures may still be broken).
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 963a338..59303e2 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -13,13 +13,4 @@ static inline int tlb_ops_need_broadcast(void)
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
- }
- 
--#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
--#define cache_ops_need_broadcast()	0
--#else
--static inline int cache_ops_need_broadcast(void)
--{
--	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
--}
--#endif
--
- #endif
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index e46ecd8..a4a6840 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -170,6 +170,10 @@ ENDPROC(v6_coherent_kern_range)
- ENTRY(v6_flush_kern_dcache_area)
- 	add	r1, r0, r1
- 1:
-+#ifdef CONFIG_SMP
-+	/* no cache maintenance broadcasting on ARM11MPCore */
-+	ldr	r2, [r0]			@ read for ownership
-+#endif
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
- #else
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 5abab9a..7d8b261 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -243,8 +243,7 @@ void flush_dcache_page(struct page *page)
- 
- 	mapping = page_mapping(page);
- 
--	if (!cache_ops_need_broadcast() &&
--	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
-+	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
- 		clear_bit(PG_dcache_clean, &page->flags);
- 	else {
- 		__flush_dcache_page(mapping, page);
+-- 
+Catalin
