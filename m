@@ -1,77 +1,59 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 13 May 2010 03:08:59 +0100
-Subject: next-samsung: acer n30/n35 updates
-In-Reply-To: <4BEAAB90.1000407@vscht.cz>
-References: <20100507005050.GY2589@trinity.fluff.org> <4BE37CCA.30406@vscht.cz>
-	<20100511010326.GC26401@trinity.fluff.org>
-	<4BEAAB90.1000407@vscht.cz>
-Message-ID: <20100513020859.GJ26401@trinity.fluff.org>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 13 May 2010 12:12:33 +0900
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <1273704431.21352.136.camel@pasglop>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
+	<20100512222154.GA6841@shareable.org>
+	<1273704431.21352.136.camel@pasglop>
+Message-ID: <20100513121302Z.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 12, 2010 at 03:22:24PM +0200, Pinkava J. wrote:
-> Dne 11.5.2010 03:03, Ben Dooks napsal(a):
-> > On Fri, May 07, 2010 at 04:36:58AM +0200, Pinkava J. wrote:
-> >> Dne 7.5.2010 02:50, Ben Dooks napsal(a):
-> >>> Acer n35 support has been provisonally merged into the following branch:
-> >>>
-> >>>   git://git.fluff.org/bjdooks/linux.git for-2635/acer-n35
-> >>>
-> >>> If there are any objections, then let me know, otherwise this will be
-> >>> merged into next-samsug this weekend ready to go in the next merge window.
-> >>>
-> >>> Jiri, please confirm that you've read Section 12 'Sign your work' of
-> >>> Documentation/SubmittingPatches and that you agree to the part on
-> >>> "Developer's Certificate of Origin 1.1"
-> >> I comfirming that I've read above mentioned.
-> >>
-> >> In order to be absolutely clear I must mention that patches 4-7 are based on old
-> >> patches from Christer Weinigel (author of current implementation of Samsung n30
-> >> code in kernel). Is this OK?
+On Thu, 13 May 2010 08:47:11 +1000
+Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+
+> On Wed, 2010-05-12 at 23:21 +0100, Jamie Lokier wrote:
+> > Shilimkar, Santosh wrote:
+> > > There was a memory write barrier missing before the DMA descriptors 
+> > > are handed over to DMA controller.
 > > 
-> > I'd run this past Christer if he wasn't already copied in on them.
+> > On that note, are the cache flush functions implicit memory barriers?
 > 
-> I wos trying contact them before fewtimes but withought response.
-
-So long as either direct patches are attributed to their original
-authour, or any modified patches keep some form of note about where
-they came from, it should be possible to get them merged.
- 
-> >  
-> >> >From may point of view I can agree with the part "Developer's Certificate of
-> >> Origin 1.1"
-> >>>
-> >>> The following commits are in:
-> >>>
-> >>> Pinkava J (7):
-> >>>       ARM: n30: Enable Acer n35 if Acer n30 is selected
-> >>>       ARM: n30: fix: suspended wrong USB port on Acer n35
-> >>>       ARM: n30: Add RTC platform device for Acer n30 / Acer n35
-> >>>       ARM: n35: Add support for LEDs on Acer n35
-> >>>       ARM: n35: Enable wake-up by Power button on Acer n35
-> >>>       ARM: n30: Add support for MMC card reader on Acer n30 / Acer n35
-> >>>       ARM: n30: Add support for power on/off on Acer n30 / Acer n35 MMC card reader
-> >>>
-> >>>  arch/arm/mach-s3c2410/Kconfig    |    7 ++++
-> >>>  arch/arm/mach-s3c2410/mach-n30.c |   65 +++++++++++++++++++++++++++++++++++++-
-> >>>  2 files changed, 71 insertions(+), 1 deletions(-)
-> >>>
-> >>>
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+> (Adding Fujita on CC)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> That's a very good question. The generic inline implementation of
+> dma_sync_* is:
+> 
+> static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
+> 					   size_t size,
+> 					   enum dma_data_direction dir)
+> {
+> 	struct dma_map_ops *ops = get_dma_ops(dev);
+> 
+> 	BUG_ON(!valid_dma_direction(dir));
+> 	if (ops->sync_single_for_cpu)
+> 		ops->sync_single_for_cpu(dev, addr, size, dir);
+> 	debug_dma_sync_single_for_cpu(dev, addr, size, dir);
+> }
+> 
+> Which means that for coherent architectures that do not implement
+> the ops->sync_* hooks, we are probably missing a barrier here... 
+> 
+> Thus if the above is expected to be a memory barrier, it's broken on
+> cache coherent powerpc for example. On non-coherent powerpc, we do cache
+> flushes and those are implicit barriers.
 
--- 
--- 
-Ben
+X86 OOSTORE uses a memory barrier dma_sync_single_for_device (seems
+that some mips archs also use it and do cache operations).
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+I think that the DMA-API says that
+
+- dma_sync_single_for_device() makes sure the data ready for DMA.
+
+- dma_sync_single_for_cpu() makes sure that drivers doesn't get the
+  stale data after DMA.
+
+I guess, it means if an architecture need a memory barrier (not only
+cache operations) to guarantee the above, the architecture needs to
+take care of it.
