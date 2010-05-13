@@ -1,29 +1,34 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 13 May 2010 12:20:28 +0300
-Subject: approaching last call for updatyes
-In-Reply-To: <20100513091540.GK26401@trinity.fluff.org>
-References: <20100513091540.GK26401@trinity.fluff.org>
-Message-ID: <201005131220.39448.anarsoul@gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 13 May 2010 11:35:18 +0200
+Subject: [PATCH 2/2] pxa/income: Add Income SBC support
+In-Reply-To: <201005130646.32880.marek.vasut@gmail.com>
+References: <1273628122-24635-1-git-send-email-marek.vasut@gmail.com>
+	<1273628122-24635-2-git-send-email-marek.vasut@gmail.com>
+	<20100512073420.GN30801@buzzloop.caiaq.de>
+	<201005130646.32880.marek.vasut@gmail.com>
+Message-ID: <20100513093518.GF30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 13 ??? 2010 12:15:40 ????? Ben Dooks ???????:
-> Right, it is gettign towards the time where the trees need to
-> be finalised for submission, and testing done.
-> 
-> Please let me know what items are currently outstanding and
-> anything that is nearing the completion of development.
+On Thu, May 13, 2010 at 06:46:32AM +0200, Marek Vasut wrote:
+> Dne St 12. kv?tna 2010 09:34:20 Daniel Mack napsal(a):
+> > On Wed, May 12, 2010 at 03:35:22AM +0200, Marek Vasut wrote:
+> > > This is support for custom design based on Toradex Colibri PXA270 CPU
+> > > card. Initial patch was by Pavel Revak.
+> >
+> > Hmm, so this is exactly what a module/board split would make sense for
+> > now, as this patch duplicates tons of lines from one file to another.
+> >
+> > Marek, what do you think - is it worth giving that approach a try?
+>
+> I replied from the cellphone,but it probably didn't arrive. Anyway, I'm all for
+> it. Should be do it after or before this goes in ?
 
-It seems that you missed my patch to fix GPIOJ bank registering on s3c244x,
-here it is:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014824.html
+I would rather not commit the support as it is right now, mainly because
+with the new aproach of separated module and board code, there will be
+need for another boot parameter. Things get too confusing if they're
+changed too often.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100513/a858bf2f/attachment.sig>
+The split should be easy though.
+
+Daniel
