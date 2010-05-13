@@ -1,83 +1,43 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 13 May 2010 16:34:23 -0400
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <1273760120.30713.67.camel@e102109-lin.cambridge.arm.com>
-References: <20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<20100513135456.GH18984@mvista.com>
-	<1273760120.30713.67.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100513203423.GQ18984@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 May 2010 14:19:51 -0700
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100513174023.GB13001@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100505150209.GC2606@n2100.arm.linux.org.uk>
+	<20100513174023.GB13001@n2100.arm.linux.org.uk>
+Message-ID: <20100513211951.GH3428@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 10:35]:
+> And here's a patch which converts the OMAP FB code to use lmb_reserve
+> instead of poking about with bootmem stuff.  Untested, so I'd like to
+> hear back whether it works.
 
-On Thu, May 13, 2010 at 03:15:20PM +0100, Catalin Marinas wrote:
-> On Thu, 2010-05-13 at 14:54 +0100, George G. Davis wrote:
-> > Hi,
-> > 
-> > On Thu, May 13, 2010 at 09:26:57AM +0100, Catalin Marinas wrote:
-> > > On Thu, 2010-05-13 at 06:27 +0100, Ronen Shitrit wrote:
-> > > > Our ARM v6 does have speculative prefetch...
-> > >
-> > > That's the I-cache and we should be ok with it. What may affect this
-> > > patch is speculative fetches into the D-cache.
-> > 
-> > prefetch()?
-> 
-> Drivers should not use prefetch (PLD) on memory handed over to a device
-> for DMA transfers. To me this is like explicitly accessing such memory
-> during a DMA transfer.
+Did a quick test with the following patches picked from your lmb
+branch on top of omap for-next branch:
 
-I agree and was merely speculating that prefetch() may be a case where
-D-Cache lines are explicitly prefetched and may be the cause of this
-problem, e.g. from e1000_clean_rx_irq() in drivers/net/e1000e/netdev.c:
+ARM: Remove useless linux/bootmem.h includes
+ARM: Ensure meminfo is sorted prior to sanity_check_meminfo
+ARM: initial LMB trial
+ARM: Move platform LMB memory reservations out of generic code
 
-	while (rx_desc->status & E1000_RXD_STAT_DD) {
-		struct sk_buff *skb;
-		u8 status;
+and then this patch.
 
-		if (*work_done >= work_to_do)
-			break;
-		(*work_done)++;
+It does not boot.. It seems to be related to the patch
+"ARM: initial LMB trial". If I only apply the first two patches
+above the system boots.
 
-		status = rx_desc->status;
-		skb = buffer_info->skb;
-		buffer_info->skb = NULL;
+Otherwise it only boots to:
 
-		prefetch(skb->data - NET_IP_ALIGN);
+Linux version 2.6.34-rc7-08102-ga1a6e35 ...
+CPU: ARMv7 Processor [411fc083] revision 3 (ARMv7), cr=10c53c7f  
+CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+Machine: Nokia RX-51 board                                       
+Ignoring unrecognised tag 0x414f4d50                             
+bootconsole [earlycon0] enabled                                  
+Memory policy: ECC disabled, Data cache writeback
 
-		i++;
-		if (i == rx_ring->count)
-			i = 0;
-		next_rxd = E1000_RX_DESC(*rx_ring, i);
-		prefetch(next_rxd);
-
-		next_buffer = &rx_ring->buffer_info[i];
-
-		cleaned = 1;
-		cleaned_count++;
-		pci_unmap_single(pdev,
-				 buffer_info->dma,
-				 adapter->rx_buffer_len,
-				 PCI_DMA_FROMDEVICE);
-
-
-I'm to lazy^Wbusy to drill down but could the above prefetch(skb->data...)
-before pci_unmap_single() or similar cases be causing the problem reported
-by Ronen?
-
-I think the above may be one of those "if drivers are expecting data in
-the cache to be preserved over a dma_unmap_area() call, they are buggy
-and need fixing." Russell noted in a previous post, no?
-
---
 Regards,
-George
+
+Tony
