@@ -1,296 +1,50 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 13 May 2010 20:47:32 +0300
-Subject: [PATCH 11/15] omap: mailbox: split platform driver
+Date: Thu, 13 May 2010 20:47:33 +0300
+Subject: [PATCH 12/15] omap: mailbox: always built-in platform data
 In-Reply-To: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
 References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1273772856-10881-12-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1273772856-10881-13-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow the current 'mailbox_mach' to be built-in.
-
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/mailbox.c             |   50 +++++------------------------
- arch/arm/mach-omap2/mailbox.c             |   50 +++++------------------------
- arch/arm/plat-omap/include/plat/mailbox.h |    4 ++
- arch/arm/plat-omap/mailbox.c              |   45 +++++++++++++++++++++++++-
- 4 files changed, 64 insertions(+), 85 deletions(-)
+ arch/arm/mach-omap1/Makefile |    6 +++---
+ arch/arm/mach-omap2/Makefile |    5 +++--
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index 64c1dc2..036e159 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -161,51 +161,13 @@ static struct resource omap1_mbox_resources[] = {
- };
- #endif
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index 9ce17f1..af2b2ea 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -14,9 +14,9 @@ obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
+ # Power Management
+ obj-$(CONFIG_PM) += pm.o sleep.o
  
--static int __devinit omap1_mbox_probe(struct platform_device *pdev)
--{
--	struct resource *res;
--	int ret;
--	int i;
--
--	res = pdev->resource;
--
--	for (i = 0; list[i]; i++) {
--		ret = omap_mbox_register(&pdev->dev, list[i]);
--		if (ret)
--			goto err_out;
--	}
--	return 0;
--
--err_out:
--	while (i--)
--		omap_mbox_unregister(list[i]);
--	return ret;
--}
--
--static int __devexit omap1_mbox_remove(struct platform_device *pdev)
--{
--	int i;
--
--	for (i = 0; list[i]; i++)
--		omap_mbox_unregister(list[i]);
--
--	return 0;
--}
--
--static struct platform_driver omap1_mbox_driver = {
--	.probe	= omap1_mbox_probe,
--	.remove	= __devexit_p(omap1_mbox_remove),
--	.driver	= {
--		.name	= "omap1-mailbox",
--	},
--};
--
- static int __init omap1_mbox_init(void)
- {
- 	int err;
- 	struct platform_device *pdev;
- 	struct resource *res;
- 	unsigned num;
-+	struct omap_mbox_platform_data pdata;
+-# DSP
+-obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
+-mailbox_mach-objs		:= mailbox.o
++ifneq ($(CONFIG_OMAP_MBOX_FWK),)
++obj-y					+= mailbox.o
++endif
  
- 	if (false) {
- 	}
-@@ -234,7 +196,7 @@ static int __init omap1_mbox_init(void)
- 		return -ENODEV;
- 	}
+ i2c-omap-$(CONFIG_I2C_OMAP)		:= i2c.o
+ obj-y					+= $(i2c-omap-m) $(i2c-omap-y)
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 307f8b0..9fcd87b 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -56,8 +56,9 @@ obj-$(CONFIG_ARCH_OMAP4)		+= clock44xx.o clock44xx_data.o
+ # EMU peripherals
+ obj-$(CONFIG_OMAP3_EMU)		+= emu.o
  
--	pdev = platform_device_alloc("omap1-mailbox", -1);
-+	pdev = platform_device_alloc("omap-mailbox", -1);
- 	if (!pdev) {
- 		err = -ENOMEM;
- 		goto err_out;
-@@ -244,6 +206,11 @@ static int __init omap1_mbox_init(void)
- 	if (err)
- 		goto err_out;
+-obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
+-mailbox_mach-objs			:= mailbox.o
++ifneq ($(CONFIG_OMAP_MBOX_FWK),)
++obj-y					+= mailbox.o
++endif
  
-+	pdata.list = list;
-+	err = platform_device_add_data(pdev, &pdata, sizeof(pdata));
-+	if (err)
-+		goto err_out;
-+
- 	err = platform_device_add(pdev);
- 	if (err)
- 		goto err_out;
-@@ -254,7 +221,7 @@ static int __init omap1_mbox_init(void)
- 		return -ENOMEM;
- 	}
- 
--	return platform_driver_register(&omap1_mbox_driver);
-+	return 0;
- 
- err_out:
- 	return err;
-@@ -262,7 +229,6 @@ err_out:
- 
- static void __exit omap1_mbox_exit(void)
- {
--	platform_driver_unregister(&omap1_mbox_driver);
- 	iounmap(mbox_base);
- }
- 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 941ee30..7abd159 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -417,51 +417,13 @@ static struct resource omap4_mbox_resources[] = {
- };
- #endif
- 
--static int __devinit omap2_mbox_probe(struct platform_device *pdev)
--{
--	struct resource *res;
--	int ret;
--	int i;
--
--	res = pdev->resource;
--
--	for (i = 0; list[i]; i++) {
--		ret = omap_mbox_register(&pdev->dev, list[i]);
--		if (ret)
--			goto err_out;
--	}
--	return 0;
--
--err_out:
--	while (i--)
--		omap_mbox_unregister(list[i]);
--	return ret;
--}
--
--static int __devexit omap2_mbox_remove(struct platform_device *pdev)
--{
--	int i;
--
--	for (i = 0; list[i]; i++)
--		omap_mbox_unregister(list[i]);
--
--	return 0;
--}
--
--static struct platform_driver omap2_mbox_driver = {
--	.probe = omap2_mbox_probe,
--	.remove = __devexit_p(omap2_mbox_remove),
--	.driver = {
--		.name = "omap2-mailbox",
--	},
--};
--
- static int __init omap2_mbox_init(void)
- {
- 	int err;
- 	struct platform_device *pdev;
- 	struct resource *res;
- 	unsigned num;
-+	struct omap_mbox_platform_data pdata;
- 
- 	if (false) {
- 	}
-@@ -499,7 +461,7 @@ static int __init omap2_mbox_init(void)
- 		return -ENODEV;
- 	}
- 
--	pdev = platform_device_alloc("omap2-mailbox", -1);
-+	pdev = platform_device_alloc("omap-mailbox", -1);
- 	if (!pdev) {
- 		err = -ENOMEM;
- 		goto err_out;
-@@ -509,6 +471,11 @@ static int __init omap2_mbox_init(void)
- 	if (err)
- 		goto err_out;
- 
-+	pdata.list = list;
-+	err = platform_device_add_data(pdev, &pdata, sizeof(pdata));
-+	if (err)
-+		goto err_out;
-+
- 	err = platform_device_add(pdev);
- 	if (err)
- 		goto err_out;
-@@ -519,7 +486,7 @@ static int __init omap2_mbox_init(void)
- 		return -ENOMEM;
- 	}
- 
--	return platform_driver_register(&omap2_mbox_driver);
-+	return 0;
- 
- err_out:
- 	return err;
-@@ -527,7 +494,6 @@ err_out:
- 
- static void __exit omap2_mbox_exit(void)
- {
--	platform_driver_unregister(&omap2_mbox_driver);
- 	iounmap(mbox_base);
- }
- 
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index 729166b..cfbe221 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -67,6 +67,10 @@ struct omap_mbox {
- 	void			(*err_notify)(void);
- };
- 
-+struct omap_mbox_platform_data {
-+	struct omap_mbox **list;
-+};
-+
- int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
- void omap_mbox_init_seq(struct omap_mbox *);
- 
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 822c377..7ccd1e7 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -25,6 +25,7 @@
- #include <linux/interrupt.h>
- #include <linux/device.h>
- #include <linux/delay.h>
-+#include <linux/platform_device.h>
- 
- #include <plat/mailbox.h>
- 
-@@ -408,14 +409,56 @@ int omap_mbox_unregister(struct omap_mbox *mbox)
- }
- EXPORT_SYMBOL(omap_mbox_unregister);
- 
--static int __init omap_mbox_init(void)
-+static int __devinit omap_mbox_probe(struct platform_device *pdev)
-+{
-+	struct omap_mbox_platform_data *pdata = pdev->dev.platform_data;
-+	struct resource *res;
-+	int ret;
-+	int i;
-+
-+	res = pdev->resource;
-+
-+	for (i = 0; pdata->list[i]; i++) {
-+		ret = omap_mbox_register(&pdev->dev, pdata->list[i]);
-+		if (ret)
-+			goto err_out;
-+	}
-+	return 0;
-+
-+err_out:
-+	while (i--)
-+		omap_mbox_unregister(pdata->list[i]);
-+	return ret;
-+}
-+
-+static int __devexit omap_mbox_remove(struct platform_device *pdev)
- {
-+	struct omap_mbox_platform_data *pdata = pdev->dev.platform_data;
-+	int i;
-+
-+	for (i = 0; pdata->list[i]; i++)
-+		omap_mbox_unregister(pdata->list[i]);
-+
- 	return 0;
- }
-+
-+static struct platform_driver omap_mbox_driver = {
-+	.probe = omap_mbox_probe,
-+	.remove = __devexit_p(omap_mbox_remove),
-+	.driver = {
-+		.name = "omap-mailbox",
-+	},
-+};
-+
-+static int __init omap_mbox_init(void)
-+{
-+	return platform_driver_register(&omap_mbox_driver);
-+}
- module_init(omap_mbox_init);
- 
- static void __exit omap_mbox_exit(void)
- {
-+	platform_driver_unregister(&omap_mbox_driver);
- }
- module_exit(omap_mbox_exit);
- 
+ iommu-y					+= iommu2.o
+ iommu-$(CONFIG_ARCH_OMAP3)		+= omap3-iommu.o
 -- 
 1.7.1
