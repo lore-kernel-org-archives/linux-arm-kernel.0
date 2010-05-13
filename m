@@ -1,44 +1,107 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 May 2010 12:15:49 +0100
-Subject: [RFC PATCH 0/3] ARM: flush_dcache_page/update_mmu_cache
-	reimplementation
-Message-ID: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+Date: Thu, 13 May 2010 12:15:55 +0100
+Subject: [RFC PATCH 1/3] ARM: Use lazy cache flushing on ARMv7 SMP systems
+In-Reply-To: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+References: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100513111555.21178.63776.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ARMv7 processors like Cortex-A9 broadcast the cache maintenance
+operations in hardware. This patch allows the
+flush_dcache_page/update_mmu_cache pair to work in lazy flushing mode
+similar to the UP case.
 
-These patches are meant to fix several cache coherency issues with PIO
-drivers on the ARM implementation. The code change is relatively small.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/smp_plat.h |    4 ++++
+ arch/arm/mm/fault-armv.c        |    2 --
+ arch/arm/mm/flush.c             |   13 ++++---------
+ 3 files changed, 8 insertions(+), 11 deletions(-)
 
-It follows some ideas from the IA-64 and PowerPC implementations where
-the PG_arch_1 bit means "clean" rather than "dirty" D-cache for a given
-page. The main difference is the that we do not do the cache flushing in
-set_pte_at() but keep it in update_mmu_cache() and deferring the
-L_PTE_EXEC attribute setting (the NX hardware bit clearing).
-
-Even if cache flushing would be done in set_pte_at(), on SMP systems we
-would still have a small window between setting the PTE and flushing the
-caches so the same NX/no-NX pte setting would need to be followed.
-
-
-Catalin Marinas (3):
-      ARM: Use lazy cache flushing on ARMv7 SMP systems
-      ARM: Assume new page cache pages have dirty D-cache
-      ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP
-
-
- arch/arm/include/asm/cacheflush.h |    6 +++---
- arch/arm/include/asm/pgtable.h    |   12 ++++++++++++
- arch/arm/include/asm/smp_plat.h   |    4 ++++
- arch/arm/include/asm/tlbflush.h   |    2 +-
- arch/arm/mm/copypage-v4mc.c       |    2 +-
- arch/arm/mm/copypage-v6.c         |    2 +-
- arch/arm/mm/copypage-xscale.c     |    2 +-
- arch/arm/mm/dma-mapping.c         |    6 ++++++
- arch/arm/mm/fault-armv.c          |   21 +++++++++++++--------
- arch/arm/mm/flush.c               |   15 +++++----------
- 10 files changed, 47 insertions(+), 25 deletions(-)
-
--- 
-Catalin
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index e621530..963a338 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -13,9 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+ }
+ 
++#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
++#define cache_ops_need_broadcast()	0
++#else
+ static inline int cache_ops_need_broadcast(void)
+ {
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+ }
++#endif
+ 
+ #endif
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index 0d414c2..a415dc0 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -170,10 +170,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 		return;
+ 
+ 	mapping = page_mapping(page);
+-#ifndef CONFIG_SMP
+ 	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+-#endif
+ 	if (mapping) {
+ 		if (cache_is_vivt())
+ 			make_coherent(mapping, vma, addr, ptep, pfn);
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index c6844cb..5ad8711 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -17,6 +17,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/system.h>
+ #include <asm/tlbflush.h>
++#include <asm/smp_plat.h>
+ 
+ #include "mm.h"
+ 
+@@ -93,12 +94,10 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+ #define flush_pfn_alias(pfn,vaddr)	do { } while (0)
+ #endif
+ 
+-#ifdef CONFIG_SMP
+ static void flush_ptrace_access_other(void *args)
+ {
+ 	__flush_icache_all();
+ }
+-#endif
+ 
+ static
+ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+@@ -122,11 +121,9 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+ 	if (vma->vm_flags & VM_EXEC) {
+ 		unsigned long addr = (unsigned long)kaddr;
+ 		__cpuc_coherent_kern_range(addr, addr + len);
+-#ifdef CONFIG_SMP
+ 		if (cache_ops_need_broadcast())
+ 			smp_call_function(flush_ptrace_access_other,
+ 					  NULL, 1);
+-#endif
+ 	}
+ }
+ 
+@@ -246,12 +243,10 @@ void flush_dcache_page(struct page *page)
+ 
+ 	mapping = page_mapping(page);
+ 
+-#ifndef CONFIG_SMP
+-	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
++	if (!cache_ops_need_broadcast() &&
++	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
+ 		set_bit(PG_dcache_dirty, &page->flags);
+-	else
+-#endif
+-	{
++	else {
+ 		__flush_dcache_page(mapping, page);
+ 		if (mapping && cache_is_vivt())
+ 			__flush_dcache_aliases(mapping, page);
