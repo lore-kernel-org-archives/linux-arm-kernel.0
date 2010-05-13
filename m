@@ -1,29 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 May 2010 10:06:08 +0100
-Subject: [PATCH 11/11] ARM: S5P6440: Remove redundant defines
-In-Reply-To: <AANLkTilIvm2AlZeh_1cdcgZFFL5YuJUnYiytXA2tZktB@mail.gmail.com>
-References: <1273710481-14856-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimTm_Vxvb2xvJnVxTxUaYguFgGeaWGypzA1yjwM@mail.gmail.com>
-	<20100513020236.GS6684@trinity.fluff.org>
-	<AANLkTilIvm2AlZeh_1cdcgZFFL5YuJUnYiytXA2tZktB@mail.gmail.com>
-Message-ID: <20100513090608.GA5382@n2100.arm.linux.org.uk>
+From: janboe.ye@gmail.com (ye janboe)
+Date: Thu, 13 May 2010 17:13:53 +0800
+Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save
+	support
+In-Reply-To: <AANLkTimKKwe-_kjiSlr3fVVy0Bi1krK8rmyT8-0L3B0d@mail.gmail.com>
+References: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
+	<AANLkTilyji16JTT1Oe8fOT6Oz5tzopQNc-3AIQ3UprCO@mail.gmail.com>
+	<20100511212719.GC32186@n2100.arm.linux.org.uk>
+	<AANLkTimKKwe-_kjiSlr3fVVy0Bi1krK8rmyT8-0L3B0d@mail.gmail.com>
+Message-ID: <AANLkTilErBCyRab33tfRfLouudkP3iRmgsKX58Z5CRM_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 01:54:12PM +0900, Kyungmin Park wrote:
-> On Thu, May 13, 2010 at 11:02 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > 1) It takes two lines of code, where one is sufficient.
-> >
-> > 2) You only have to look in the relevant .c file to find out the
-> > ? value instead of tracking down a header. This makes it easier
-> > ? to verify the value against the manual and easier to compare
-> > ? against simialr code.
-> 
-> Then define it at c code and use the macro. I also don't like the
-> hard-coded values.
++ peoples who are in CC list.
 
-I'm almost with Ben on this; but we can do better to satisfy both camps.
+Janboe Ye
 
-	.ctrlbit	= 1 << 2, /* CLKCON_MEM0_HCLK_NFCON */
-
-It's now documented what the magic constant is.
+2010/5/13 ye janboe <janboe.ye@gmail.com>:
+> Thanks for Russell and Tony.
+>
+> I think this patch is needed when MPU support OFF mode, special on
+> omap. Otherwise, VFP state will be lost.
+>
+> Reviewed-by: Janboe Ye <janboe.ye@gmail.com>
+>
+> 2010/5/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> On Tue, May 11, 2010 at 11:15:13AM +0800, ye janboe wrote:
+>>> Is this patch ignored by you? I do not see any ack for this patch.
+>>
+>> Patch is fine, shame some of the people on the Cc haven't acked it though.
+>> Can we get acks from anyone of those, and then submit it to the patch
+>> system?
+>>
+>>> > Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+>>> > Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+>>> > Cc: Rajendra Nayak <rnayak@ti.com>
+>>> > Cc: Richard Woodruff <r-woodruff2@ti.com>
+>>> > Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+>>
+>
