@@ -1,43 +1,39 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 13 May 2010 13:54:12 +0900
-Subject: [PATCH 11/11] ARM: S5P6440: Remove redundant defines
-In-Reply-To: <20100513020236.GS6684@trinity.fluff.org>
-References: <1273710481-14856-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimTm_Vxvb2xvJnVxTxUaYguFgGeaWGypzA1yjwM@mail.gmail.com>
-	<20100513020236.GS6684@trinity.fluff.org>
-Message-ID: <AANLkTilIvm2AlZeh_1cdcgZFFL5YuJUnYiytXA2tZktB@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 13 May 2010 08:21:05 +0300
+Subject: [PATCH 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <Pine.LNX.4.64.1005090045230.10524@axis700.grange>
+References: <cover.1273150585.git.baruch@tkos.co.il>
+	<a029bab8fcb3273df4a1d98f779f110b127742bd.1273150585.git.baruch@tkos.co.il>
+	<Pine.LNX.4.64.1005090045230.10524@axis700.grange>
+Message-ID: <20100513052105.GA18678@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 11:02 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Thu, May 13, 2010 at 10:49:29AM +0900, Jassi Brar wrote:
->> On Thu, May 13, 2010 at 9:28 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > From: Thomas Abraham <thomas.ab@samsung.com>
->> > --- a/arch/arm/mach-s5p6440/clock.c
->> > +++ b/arch/arm/mach-s5p6440/clock.c
->> > @@ -357,121 +357,121 @@ static struct clk init_clocks_disable[] = {
->> > ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = -1,
->> > ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_hclk.clk,
->> > ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5p6440_mem_ctrl,
->> > - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= S5P_CLKCON_MEM0_HCLK_NFCON,
->> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 2),
->> Peculiar. I have never seen defines dropped in favor of magic numbers.
->
-> I know it seems a little odd at first, but people seem to be clinging
-> on to writing it down in a header file and then using it once as some
-> form of high law of programming. Whilst talking with Kukjin and others
-> last year and looking at this, we came to the following conclusions
-> about single-use defines:
->
-> 1) It takes two lines of code, where one is sufficient.
->
-> 2) You only have to look in the relevant .c file to find out the
-> ? value instead of tracking down a header. This makes it easier
-> ? to verify the value against the manual and easier to compare
-> ? against simialr code.
+Hi Guennadi,
+On Wed, May 12, 2010 at 09:02:29PM +0200, Guennadi Liakhovetski wrote:
+> Thanks for eventually mainlining this driver! A couple of comments below.  
+> Sascha, would be great, if you could get it tested on imx27 with and without 
+> emma. BTW, if you say, that you use emma to avoid using the standard DMA 
+> controller, why would anyone want not to use emma? Resource conflict? There 
+> is also a question for you down in the comments, please, skim over.
 
-Then define it at c code and use the macro. I also don't like the
-hard-coded values.
+Thank you very much for your detailed review and informative comments. I'll 
+fix the problems that you've found, and post up updated patch after getting 
+Sascha comments on the mx27 specific code.
 
-Thank you,
-Kyungmin Park
+baruch
+
+> On Thu, 6 May 2010, Baruch Siach wrote:
+> 
+> > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> > Carvalho de Assis modified the original driver to get it working on more recent
+> > kernels. I modified it further to add support for i.MX25. This driver has only
+> > been tested on the i.MX25 platform.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
