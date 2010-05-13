@@ -1,54 +1,45 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 13 May 2010 10:39:53 -0500
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273709890.21352.141.camel@pasglop>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
-	<20100512222154.GA6841@shareable.org>
-	<1273704431.21352.136.camel@pasglop>
-	<1273707708.15428.4.camel@mulgrave.site>
-	<1273709890.21352.141.camel@pasglop>
-Message-ID: <1273765193.4353.157.camel@mulgrave.site>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
+Date: Thu, 13 May 2010 19:04:42 +0200
+Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
+In-Reply-To: <20100512185005.GA28990@suse.de>
+References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
+	<201005120923.48568.philippe.retornaz@epfl.ch>
+	<20100512185005.GA28990@suse.de>
+Message-ID: <201005131904.42319.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-13 at 10:18 +1000, Benjamin Herrenschmidt wrote:
-> On Wed, 2010-05-12 at 18:41 -0500, James Bottomley wrote:
-> > > Which means that for coherent architectures that do not implement
-> > > the ops->sync_* hooks, we are probably missing a barrier here... 
-> > > 
-> > > Thus if the above is expected to be a memory barrier, it's broken on
-> > > cache coherent powerpc for example. On non-coherent powerpc, we do
-> > cache
-> > > flushes and those are implicit barriers.
-> > 
-> > Can you explain this a little more.  On a cache coherent machine, the
-> > sync is a nop ... why would you want a nop to be any type of barrier?
+Le mercredi, 12 mai 2010 20.50:05, Greg KH a ?crit :
+> On Wed, May 12, 2010 at 09:23:48AM +0200, Philippe R?tornaz wrote:
+> > Le mercredi, 12 mai 2010 01.38:12, Greg KH a ?crit :
+> > > On Tue, May 11, 2010 at 04:14:34PM +0200, Philippe R?tornaz wrote:
+> > > > On mx31 the OTG host initialisation fails if you need to have
+> > > > an ULPI transfert to initialize the PHY.
+> > > >
+> > > > In order to be able to communicate with the PHY a complete reset
+> > > > of the usb host is needed. After the PHY initialization the host
+> > > > usb configuration registers need to be rewritten to avoid a host
+> > > > controller lockup.
+> > > >
+> > > > Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> > > > ---
+> > > >  drivers/usb/host/ehci-mxc.c |   98
+> > > > ++++++++++++++++++++++++++++++++++++++-----
+> > >
+> > > This patch doesn't apply anymore, can you redo it against the
+> > > linux-next tree?
+> >
+> > It apply cleanly on next-20100512.
+> >
+> > It needs commit 5a25ad84e01173bb225285eb50f9af48ed1a7598 to apply, but
+> > this one is in linux-next now.
 > 
-> Well if the driver can peek at the data after the sync, and have any
-> kind of ordering guarantee that it doesn't get stale data (the load
-> isn't prefetched or speculated early), that would require an mb() or at
-> least rmb().
+> Where is that patch from?  Some other tree?
 
-So the guarantee that it doesn't look at stale data after the sync on a
-cache coherent machine means ordering the dma write to physical memory
-with the subsequent cpu read ... no memory barrier can actually do that.
-Usually this is done externally, by making sure the memory change is
-visible before sending the irq that tells the driver it is there ... on
-some numa systems, this can be a problem (hence the mmiowb/relaxed read
-thing).
+Yes, it looks like it's from the mxc-master tree:
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commitdiff;h=5a25ad84e01173bb225285eb50f9af48ed1a7598
 
-> It would seem sensible for drivers to assume that something like
-> dma_cache_sync_for_cpu() thus has the semantics of an rmb() at least,
-> no ?
+Which has been merged inside linux-next.
 
-I still don't see why ... I don't see how you'd ever get a read of the
-area speculated before the event that tells the driver its OK to read
-the memory.  In theory, I agree that it looks logical to require the
-read never be speculated before the sync ... but in practice, I don't
-see there ever being a problem with this since the sync isn't the event
-that says the memory is safe to read.
-
-James
+Regards,
+Philippe
