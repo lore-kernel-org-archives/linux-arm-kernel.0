@@ -1,43 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 May 2010 14:19:51 -0700
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100513174023.GB13001@n2100.arm.linux.org.uk>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100505150209.GC2606@n2100.arm.linux.org.uk>
-	<20100513174023.GB13001@n2100.arm.linux.org.uk>
-Message-ID: <20100513211951.GH3428@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 14 May 2010 01:28:44 +0400
+Subject: [PATCH v2 2/9] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
+In-Reply-To: <008001caf29d$9a2f9f80$ce8ede80$%kim@samsung.com>
+References: <008001caf29d$9a2f9f80$ce8ede80$%kim@samsung.com>
+Message-ID: <4BEC6F0C.2030202@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 10:35]:
-> And here's a patch which converts the OMAP FB code to use lmb_reserve
-> instead of poking about with bootmem stuff.  Untested, so I'd like to
-> hear back whether it works.
+Hello.
 
-Did a quick test with the following patches picked from your lmb
-branch on top of omap for-next branch:
+Kukjin Kim wrote:
 
-ARM: Remove useless linux/bootmem.h includes
-ARM: Ensure meminfo is sorted prior to sanity_check_meminfo
-ARM: initial LMB trial
-ARM: Move platform LMB memory reservations out of generic code
+> This patch has been merged into Ben Dooks' tree, for-2635/s3c64xx-ts.
+> So need to rebase this commit.
 
-and then this patch.
+> ---
+> commit 34b01740be6e010976a2f5aa8f343d3b5dd6d278
+> Author: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Date:   Tue May 4 13:12:41 2010 +0200
 
-It does not boot.. It seems to be related to the patch
-"ARM: initial LMB trial". If I only apply the first two patches
-above the system boots.
+>     ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
 
-Otherwise it only boots to:
+>     This moves mach-s3c2410/include/mach/ts.h to
+> plat-samsung/include/plat/ts.h in
+>     order to prepare for s3c64xx support in the touchscreen driver.
 
-Linux version 2.6.34-rc7-08102-ga1a6e35 ...
-CPU: ARMv7 Processor [411fc083] revision 3 (ARMv7), cr=10c53c7f  
-CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-Machine: Nokia RX-51 board                                       
-Ignoring unrecognised tag 0x414f4d50                             
-bootconsole [earlycon0] enabled                                  
-Memory policy: ECC disabled, Data cache writeback
+>     Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+>     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> ---
 
-Regards,
+   Where's the patch?
 
-Tony
+WBR, Sergei
