@@ -1,352 +1,75 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 May 2010 20:13:21 +0900
-Subject: [PATCH v3 1/2] ARM: S5PV210: Add S5PV210 GPIO support.
-Message-ID: <1273749201-32426-1-git-send-email-kgene.kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 May 2010 12:22:36 +0100
+Subject: [RFC PATCH] ARM: Allow lazy cache flushing on ARM11MPCore
+In-Reply-To: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+References: <20100513110609.21178.39630.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <1273749756.30713.33.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pannaga Bhushan <p.bhushan@samsung.com>
+        (we could actually go a step further for ARM11MPCore as well.
+        This patch is not part of the initial cache flush reworking
+        series but I'm posting it for comments as well)
 
-Adds GPIOlib support for S5PV210.
+The ARM11MPCore doesn't broadcast the cache maintenance operations in
+hardware, therefore the flush_dcache_page() currently performs the cache
+flushing non-lazily. But since not all drivers call this function after
+writing to a page cache page, the kernel needs a different approach like
+using read-for-ownership on the CPU flushing the cache to force the
+dirty cache lines migration from other CPUs. This way the cache flushing
+operation can be done lazily in update_mmu_cache().
 
-Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-s5pv210/Makefile            |    2 +-
- arch/arm/mach-s5pv210/gpiolib.c           |  257 +++++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/gpio.h |   18 ++-
- 3 files changed, 273 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/gpiolib.c
+ arch/arm/include/asm/smp_plat.h |    9 ---------
+ arch/arm/mm/cache-v6.S          |    4 ++++
+ arch/arm/mm/flush.c             |    3 +--
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 8ebf51c..0acbdb3 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -12,7 +12,7 @@ obj-				:=
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 963a338..59303e2 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -13,13 +13,4 @@ static inline int tlb_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+ }
  
- # Core support for S5PV210 system
+-#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
+-#define cache_ops_need_broadcast()	0
+-#else
+-static inline int cache_ops_need_broadcast(void)
+-{
+-	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+-}
+-#endif
+-
+ #endif
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index e46ecd8..a4a6840 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -170,6 +170,10 @@ ENDPROC(v6_coherent_kern_range)
+ ENTRY(v6_flush_kern_dcache_area)
+ 	add	r1, r0, r1
+ 1:
++#ifdef CONFIG_SMP
++	/* no cache maintenance broadcasting on ARM11MPCore */
++	ldr	r2, [r0]			@ read for ownership
++#endif
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
+ #else
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 5abab9a..7d8b261 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -243,8 +243,7 @@ void flush_dcache_page(struct page *page)
  
--obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
-+obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o gpiolib.o
+ 	mapping = page_mapping(page);
  
- # machine support
- 
-diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-new file mode 100644
-index 0000000..99dad92
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/gpiolib.c
-@@ -0,0 +1,257 @@
-+/* linux/arch/arm/mach-s5pv210/gpiolib.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - GPIOlib support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <plat/gpio-core.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/gpio-cfg-helpers.h>
-+#include <mach/map.h>
-+
-+static struct s3c_gpio_cfg gpio_cfg = {
-+	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-+	.set_pull	= s3c_gpio_setpull_updown,
-+	.get_pull	= s3c_gpio_getpull_updown,
-+};
-+
-+static struct s3c_gpio_cfg gpio_cfg_noint = {
-+	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-+	.set_pull	= s3c_gpio_setpull_updown,
-+	.get_pull	= s3c_gpio_getpull_updown,
-+};
-+
-+/* GPIO bank's base address given the index of the bank in the
-+ * list of all gpio banks.
-+ */
-+#define S5PV210_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
-+
-+/*
-+ * Following are the gpio banks in v210.
-+ *
-+ * The 'config' member when left to NULL, is initialized to the default
-+ * structure gpio_cfg in the init function below.
-+ *
-+ * The 'base' member is also initialized in the init function below.
-+ * Note: The initialization of 'base' member of s3c_gpio_chip structure
-+ * uses the above macro and depends on the banks being listed in order here.
-+ */
-+static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
-+	{
-+		.chip	= {
-+			.base	= S5PV210_GPA0(0),
-+			.ngpio	= S5PV210_GPIO_A0_NR,
-+			.label	= "GPA0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPA1(0),
-+			.ngpio	= S5PV210_GPIO_A1_NR,
-+			.label	= "GPA1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPB(0),
-+			.ngpio	= S5PV210_GPIO_B_NR,
-+			.label	= "GPB",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPC0(0),
-+			.ngpio	= S5PV210_GPIO_C0_NR,
-+			.label	= "GPC0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPC1(0),
-+			.ngpio	= S5PV210_GPIO_C1_NR,
-+			.label	= "GPC1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPD0(0),
-+			.ngpio	= S5PV210_GPIO_D0_NR,
-+			.label	= "GPD0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPD1(0),
-+			.ngpio	= S5PV210_GPIO_D1_NR,
-+			.label	= "GPD1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPE0(0),
-+			.ngpio	= S5PV210_GPIO_E0_NR,
-+			.label	= "GPE0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPE1(0),
-+			.ngpio	= S5PV210_GPIO_E1_NR,
-+			.label	= "GPE1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPF0(0),
-+			.ngpio	= S5PV210_GPIO_F0_NR,
-+			.label	= "GPF0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPF1(0),
-+			.ngpio	= S5PV210_GPIO_F1_NR,
-+			.label	= "GPF1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPF2(0),
-+			.ngpio	= S5PV210_GPIO_F2_NR,
-+			.label	= "GPF2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPF3(0),
-+			.ngpio	= S5PV210_GPIO_F3_NR,
-+			.label	= "GPF3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPG0(0),
-+			.ngpio	= S5PV210_GPIO_G0_NR,
-+			.label	= "GPG0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPG1(0),
-+			.ngpio	= S5PV210_GPIO_G1_NR,
-+			.label	= "GPG1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPG2(0),
-+			.ngpio	= S5PV210_GPIO_G2_NR,
-+			.label	= "GPG2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPG3(0),
-+			.ngpio	= S5PV210_GPIO_G3_NR,
-+			.label	= "GPG3",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_GPH0(0),
-+			.ngpio	= S5PV210_GPIO_H0_NR,
-+			.label	= "GPH0",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_GPH1(0),
-+			.ngpio	= S5PV210_GPIO_H1_NR,
-+			.label	= "GPH1",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_GPH2(0),
-+			.ngpio	= S5PV210_GPIO_H2_NR,
-+			.label	= "GPH2",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_GPH3(0),
-+			.ngpio	= S5PV210_GPIO_H3_NR,
-+			.label	= "GPH3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPI(0),
-+			.ngpio	= S5PV210_GPIO_I_NR,
-+			.label	= "GPI",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPJ0(0),
-+			.ngpio	= S5PV210_GPIO_J0_NR,
-+			.label	= "GPJ0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPJ1(0),
-+			.ngpio	= S5PV210_GPIO_J1_NR,
-+			.label	= "GPJ1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPJ2(0),
-+			.ngpio	= S5PV210_GPIO_J2_NR,
-+			.label	= "GPJ2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPJ3(0),
-+			.ngpio	= S5PV210_GPIO_J3_NR,
-+			.label	= "GPJ3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PV210_GPJ4(0),
-+			.ngpio	= S5PV210_GPIO_J4_NR,
-+			.label	= "GPJ4",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP01(0),
-+			.ngpio	= S5PV210_GPIO_MP01_NR,
-+			.label	= "MP01",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP02(0),
-+			.ngpio	= S5PV210_GPIO_MP02_NR,
-+			.label	= "MP02",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP03(0),
-+			.ngpio	= S5PV210_GPIO_MP03_NR,
-+			.label	= "MP03",
-+		},
-+	},
-+};
-+
-+static __init int s5pv210_gpiolib_init(void)
-+{
-+	struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
-+	int nr_chips = ARRAY_SIZE(s5pv210_gpio_4bit);
-+	int i = 0;
-+
-+	for (i = 0; i < nr_chips; i++, chip++) {
-+		if (chip->config == NULL)
-+			chip->config = &gpio_cfg;
-+		if (chip->base == NULL)
-+			chip->base = S5PV210_BANK_BASE(i);
-+	}
-+
-+	samsung_gpiolib_add_4bit_chips(s5pv210_gpio_4bit, nr_chips);
-+
-+	return 0;
-+}
-+core_initcall(s5pv210_gpiolib_init);
-diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
-index 533b020..4dd417c 100644
---- a/arch/arm/mach-s5pv210/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
-@@ -18,6 +18,8 @@
- #define gpio_cansleep	__gpio_cansleep
- #define gpio_to_irq	__gpio_to_irq
- 
-+/* Practically, GPIO banks upto MP03 are the configurable gpio banks */
-+
- /* GPIO bank sizes */
- #define S5PV210_GPIO_A0_NR	(8)
- #define S5PV210_GPIO_A1_NR	(4)
-@@ -47,6 +49,10 @@
- #define S5PV210_GPIO_J3_NR	(8)
- #define S5PV210_GPIO_J4_NR	(5)
- 
-+#define S5PV210_GPIO_MP01_NR	(8)
-+#define S5PV210_GPIO_MP02_NR	(4)
-+#define S5PV210_GPIO_MP03_NR	(8)
-+
- /* GPIO bank numbers */
- 
- /* CONFIG_S3C_GPIO_SPACE allows the user to select extra
-@@ -85,6 +91,9 @@ enum s5p_gpio_number {
- 	S5PV210_GPIO_J2_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J1),
- 	S5PV210_GPIO_J3_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J2),
- 	S5PV210_GPIO_J4_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J3),
-+	S5PV210_GPIO_MP01_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
-+	S5PV210_GPIO_MP02_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
-+	S5PV210_GPIO_MP03_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
- };
- 
- /* S5PV210 GPIO number definitions */
-@@ -115,13 +124,16 @@ enum s5p_gpio_number {
- #define S5PV210_GPJ2(_nr)	(S5PV210_GPIO_J2_START + (_nr))
- #define S5PV210_GPJ3(_nr)	(S5PV210_GPIO_J3_START + (_nr))
- #define S5PV210_GPJ4(_nr)	(S5PV210_GPIO_J4_START + (_nr))
-+#define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
-+#define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
-+#define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
- 
- /* the end of the S5PV210 specific gpios */
--#define S5PV210_GPIO_END	(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) + 1)
-+#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) + 1)
- #define S3C_GPIO_END		S5PV210_GPIO_END
- 
--/* define the number of gpios we need to the one after the GPJ4() range */
--#define ARCH_NR_GPIOS		(S5PV210_GPJ4(S5PV210_GPIO_J4_NR) +	\
-+/* define the number of gpios we need to the one after the MP03() range */
-+#define ARCH_NR_GPIOS		(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
- 				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
- 
- #include <asm-generic/gpio.h>
--- 
-1.6.2.5
+-	if (!cache_ops_need_broadcast() &&
+-	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
++	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
+ 		clear_bit(PG_dcache_clean, &page->flags);
+ 	else {
+ 		__flush_dcache_page(mapping, page);
