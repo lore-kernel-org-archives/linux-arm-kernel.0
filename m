@@ -1,61 +1,49 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 13 May 2010 20:47:36 +0300
-Subject: [PATCH 15/15] omap: mailbox: mark some resources as __initdata
-In-Reply-To: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1273772856-10881-16-git-send-email-felipe.contreras@gmail.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Thu, 13 May 2010 21:59:32 +0200 (CEST)
+Subject: [PATCH 4/20] arch/arm/mach-davinci: Use kzalloc
+Message-ID: <Pine.LNX.4.64.1005132159170.6282@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- arch/arm/mach-omap1/mailbox.c |    2 +-
- arch/arm/mach-omap2/mailbox.c |    6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+From: Julia Lawall <julia@diku.dk>
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index b01d3c3..74d2677 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -144,7 +144,7 @@ struct omap_mbox mbox_dsp_info = {
- struct omap_mbox *omap1_mboxes[] = { &mbox_dsp_info, NULL };
+Use kzalloc rather than the combination of kmalloc and memset.
+
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@@
+expression x,size,flags;
+statement S;
+@@
+
+-x = kmalloc(size,flags);
++x = kzalloc(size,flags);
+ if (x == NULL) S
+-memset(x, 0, size);
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+ arch/arm/mach-davinci/dma.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff -u -p a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -1419,12 +1419,11 @@ static int __init edma_probe(struct plat
+ 			goto fail1;
+ 		}
  
- #if defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX)
--static struct resource omap1_mbox_resources[] = {
-+static struct resource __initdata omap1_mbox_resources[] = {
- 	{
- 		.start		= OMAP16XX_MAILBOX_BASE,
- 		.end		= OMAP16XX_MAILBOX_BASE, /* to be updated */
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index b0d7740..a2fa784 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -368,7 +368,7 @@ struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
- #endif
+-		edma_cc[j] = kmalloc(sizeof(struct edma), GFP_KERNEL);
++		edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
+ 		if (!edma_cc[j]) {
+ 			status = -ENOMEM;
+ 			goto fail1;
+ 		}
+-		memset(edma_cc[j], 0, sizeof(struct edma));
  
- #ifdef CONFIG_ARCH_OMAP2420
--static struct resource omap2_mbox_resources[] = {
-+static struct resource __initdata omap2_mbox_resources[] = {
- 	{
- 		.start		= OMAP24XX_MAILBOX_BASE,
- 		.end		= OMAP24XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
-@@ -386,7 +386,7 @@ static struct resource omap2_mbox_resources[] = {
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3430
--static struct resource omap3_mbox_resources[] = {
-+static struct resource __initdata omap3_mbox_resources[] = {
- 	{
- 		.start		= OMAP34XX_MAILBOX_BASE,
- 		.end		= OMAP34XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
-@@ -400,7 +400,7 @@ static struct resource omap3_mbox_resources[] = {
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static struct resource omap4_mbox_resources[] = {
-+static struct resource __initdata omap4_mbox_resources[] = {
- 	{
- 		.start          = OMAP44XX_MAILBOX_BASE,
- 		.end            = OMAP44XX_MAILBOX_BASE + OMAP4_MBOX_REG_SIZE - 1,
--- 
-1.7.1
+ 		edma_cc[j]->num_channels = min_t(unsigned, info[j].n_channel,
+ 							EDMA_MAX_DMACH);
