@@ -1,35 +1,112 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 May 2010 12:53:42 +0100
-Subject: PIPT cache handling on s5pv210 chip
-In-Reply-To: <00ca01caf359$643defa0$2cb9cee0$%kim@samsung.com>
-References: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
-	<00bc01caf351$5daf71c0$190e5540$%kim@samsung.com>
-	<20100514104843.GG10339@n2100.arm.linux.org.uk>
-	<00ca01caf359$643defa0$2cb9cee0$%kim@samsung.com>
-Message-ID: <20100514115342.GA15405@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 14 May 2010 21:30:24 +0900
+Subject: [PATCH v2 11/11] Input: s3c24xx_ts - Uses Feature field instead
+	TYPE for Samsung SoCs
+In-Reply-To: <1273821927-17585-1-git-send-email-kgene.kim@samsung.com>
+References: <1273821927-17585-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTikoeAccwaRclasmr9Ez8yzEeJoB71dCpHeOB5on@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 08:34:14PM +0900, Kukjin Kim wrote:
-> In case a driver starts the Memory_To_Peripheral DMA operation with the
-> memory area allotted by __vmalloc(,,no-cacheable), the driver can face some
-> problems caused by cache victims.
+On Fri, May 14, 2010 at 4:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Naveen Krishna <ch.naveen@samsung.com>
+>
+> This patch removes teh TYPE from touchscreen driver for Samsung SoCs
+> and uses a Feature bit field instead.
+>
+> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?drivers/input/touchscreen/s3c2410_ts.c | ? 23 +++++------------------
+> ?1 files changed, 5 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+> index 8a970ea..aa43f93 100644
+> --- a/drivers/input/touchscreen/s3c2410_ts.c
+> +++ b/drivers/input/touchscreen/s3c2410_ts.c
+> @@ -55,6 +55,8 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_ADCTSC_AUTO_PST | \
+> ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_ADCTSC_XY_PST(0))
+>
+> +#define FEAT_PEN_IRQ ? (1 << 0) ? ? ? ?/* HAS ADCCLRINTPNDNUP */
 
-That's its own lookout - all the time that there's the kernel mapping
-present, the cache can be loaded with data via that mapping - and being
-PIPT, that means the data _could_ be hit by accesses via the __vmalloc
-mapping.
+It should be go header file for board files to use?
 
-As I've already explained, __vmalloc() with differing memory types on
-ARMv6 and above is unpredictable, period.  The same is true for different
-sharability settings for the same physical memory.  No amount of
-discussing will change this; it's a fact of the hardware.  If you
-create them, your system will have unpredictable behaviour.
+> +
+> ?/* Per-touchscreen data. */
+>
+> ?/**
+> @@ -81,17 +83,11 @@ struct s3c2410ts {
+> ? ? ? ?int irq_tc;
+> ? ? ? ?int count;
+> ? ? ? ?int shift;
+> + ? ? ? int feat;
+> ?};
 
-With different cache attributes, it's unpredictable to the word of the
-architecture spec, and eventually it will become unpredictable according
-to the hardware as well.
+What's the 'feat'? How about to write 'features' exactly.
+It's for plurals for future.
 
-So the message is: using __vmalloc() with _any_ differing attributes
-from the main memory mapping is unpredictable and must not be used on
-ARM.
+Thank you,
+Kyungmin Park
+>
+> ?static struct s3c2410ts ts;
+>
+> -enum s3c_cpu_type {
+> - ? ? ? TYPE_S3C2410,
+> - ? ? ? TYPE_S3C2440,
+> - ? ? ? TYPE_S3C64XX, ? /* S3C64XX, S5P64XX Series */
+> - ? ? ? TYPE_S5PV210, ? /* S5PV210 */
+> -};
+> -
+> ?/**
+> ?* get_down - return the down state of the pen
+> ?* @data0: The data read from ADCDAT0 register.
+> @@ -179,7 +175,7 @@ static irqreturn_t stylus_irq(int irq, void *dev_id)
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
+>
+> - ? ? ? if (platform_get_device_id(pdev)->driver_data >= TYPE_S3C64XX) {
+> + ? ? ? if (ts.feat & FEAT_PEN_IRQ) {
+> ? ? ? ? ? ? ? ?/* Clear pen down/up interrupt */
+> ? ? ? ? ? ? ? ?writel(0x0, ts.io + S3C64XX_ADCCLRINTPNDNUP);
+> ? ? ? ?}
+> @@ -330,6 +326,7 @@ static int __devinit s3c2410ts_probe(struct platform_device *pdev)
+> ? ? ? ?ts.input->id.version = 0x0102;
+>
+> ? ? ? ?ts.shift = info->oversampling_shift;
+> + ? ? ? ts.feat = info->feature;
+>
+> ? ? ? ?ret = request_irq(ts.irq_tc, stylus_irq, IRQF_DISABLED,
+> ? ? ? ? ? ? ? ? ? ? ? ? ?"s3c2410_ts_pen", ts.input);
+> @@ -415,15 +412,6 @@ static struct dev_pm_ops s3c_ts_pmops = {
+> ?};
+> ?#endif
+>
+> -static struct platform_device_id s3cts_driver_ids[] = {
+> - ? ? ? { "s3c2410-ts", TYPE_S3C2410 },
+> - ? ? ? { "s3c2440-ts", TYPE_S3C2440 },
+> - ? ? ? { "s3c64xx-ts", TYPE_S3C64XX },
+> - ? ? ? { "s5pv210-ts", TYPE_S5PV210 },
+> - ? ? ? { }
+> -};
+> -MODULE_DEVICE_TABLE(platform, s3cts_driver_ids);
+> -
+> ?static struct platform_driver s3c_ts_driver = {
+> ? ? ? ?.driver ? ? ? ? = {
+> ? ? ? ? ? ? ? ?.name ? = "samsung-ts",
+> @@ -432,7 +420,6 @@ static struct platform_driver s3c_ts_driver = {
+> ? ? ? ? ? ? ? ?.pm ? ? = &s3c_ts_pmops,
+> ?#endif
+> ? ? ? ?},
+> - ? ? ? .id_table ? ? ? = s3cts_driver_ids,
+> ? ? ? ?.probe ? ? ? ? ?= s3c2410ts_probe,
+> ? ? ? ?.remove ? ? ? ? = __devexit_p(s3c2410ts_remove),
+> ?};
+> --
+> 1.6.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
