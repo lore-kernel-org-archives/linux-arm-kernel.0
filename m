@@ -1,66 +1,52 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 14 May 2010 09:53:50 +1000
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <1273765193.4353.157.camel@mulgrave.site>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
-	<20100512222154.GA6841@shareable.org>
-	<1273704431.21352.136.camel@pasglop>
-	<1273707708.15428.4.camel@mulgrave.site>
-	<1273709890.21352.141.camel@pasglop>
-	<1273765193.4353.157.camel@mulgrave.site>
-Message-ID: <1273794830.21352.202.camel@pasglop>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 May 2010 09:11:29 +0900
+Subject: [PATCH v2 2/9] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
+In-Reply-To: <4BEC6F0C.2030202@ru.mvista.com>
+References: <008001caf29d$9a2f9f80$ce8ede80$%kim@samsung.com>
+	<4BEC6F0C.2030202@ru.mvista.com>
+Message-ID: <009601caf2fa$037e6000$0a7b2000$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Well if the driver can peek at the data after the sync, and have any
-> > kind of ordering guarantee that it doesn't get stale data (the load
-> > isn't prefetched or speculated early), that would require an mb() or at
-> > least rmb().
+Sergei Shtylyov wrote:
 > 
-> So the guarantee that it doesn't look at stale data after the sync on a
-> cache coherent machine means ordering the dma write to physical memory
-> with the subsequent cpu read ... no memory barrier can actually do that.
-> Usually this is done externally, by making sure the memory change is
-> visible before sending the irq that tells the driver it is there ... on
-> some numa systems, this can be a problem (hence the mmiowb/relaxed read
-> thing).
-
-Right. I was more thinking about something along the lines of the device
-writes to some descriptor and then queues it up in a list. So we have
-two different DMA data structures with a data dependency.
-
-The question is whether the driver can expect to just do the sync, read
-the queue, then sync again, then read the descriptor, or does it also
-need an explicit rmb in between ?
-
-Let's assume that the ordering is maintained at the DMA -> coherency
-domain level, the question is will the sync op be guaranteed to toss
-prefetch / speculative loads ? (IE. Guarantee the order of the two loads
-done by the CPU) or do we need an explicit rmb.
-
-> > It would seem sensible for drivers to assume that something like
-> > dma_cache_sync_for_cpu() thus has the semantics of an rmb() at least,
-> > no ?
+> Hello.
 > 
-> I still don't see why ... I don't see how you'd ever get a read of the
-> area speculated before the event that tells the driver its OK to read
-> the memory.  In theory, I agree that it looks logical to require the
-> read never be speculated before the sync ... but in practice, I don't
-> see there ever being a problem with this since the sync isn't the event
-> that says the memory is safe to read.
+> Kukjin Kim wrote:
+> 
+> > This patch has been merged into Ben Dooks' tree, for-2635/s3c64xx-ts.
+> > So need to rebase this commit.
+> 
+> > ---
+> > commit 34b01740be6e010976a2f5aa8f343d3b5dd6d278
+> > Author: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> > Date:   Tue May 4 13:12:41 2010 +0200
+> 
+> >     ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
+> 
+> >     This moves mach-s3c2410/include/mach/ts.h to
+> > plat-samsung/include/plat/ts.h in
+> >     order to prepare for s3c64xx support in the touchscreen driver.
+> 
+> >     Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> >     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> > ---
+> 
+>    Where's the patch?
 
-Cheers,
-Ben.
 
-> James
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi,
+
+The patch is in branch 'for-2635/s3c64xx-ts' of
+git://git.fluff.org/bjdooks/linux
+
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014148.html)
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
