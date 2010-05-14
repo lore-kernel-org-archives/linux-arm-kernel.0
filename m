@@ -1,114 +1,82 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Fri, 14 May 2010 17:08:29 +0200
-Subject: [PATCH] MXC: Add USB OTG (device) for i.MX31 PDK (3DS) board.
-Message-ID: <1273849709-870-1-git-send-email-lilja.magnus@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 14 May 2010 18:09:30 +0300
+Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
+In-Reply-To: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
+References: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <AANLkTildHTovAq6DZa2nPgYwX3BHsHuvM9oKGFssFH6-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on actual hardware using the g_ether and g_serial gadget drivers.
+Hi Felipe,
 
-Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
----
+On Fri, May 14, 2010 at 6:01 PM, Felipe Contreras
+<felipe.contreras@gmail.com> wrote:
+> Hi,
+>
+> The main purpose of this patch series is to be able to compile mach platform
+> data as built-in. Otherwise, client modules such as bridgedriver will load the
+> platform code, but not the mach code when mailbox is built as a module.
+>
+> Unfortunately, there's no easy way to do that since plat and mach code are
+> deepely interrelated. So the first patches try to separate the mailbox
+> registering through a defined omap_mbox_platform_data.
 
-Applies on top of Linus' git tree.
-To test this the mx3_defconfig was used but with USB gadget activated.
 
- arch/arm/mach-mx3/mach-mx31_3ds.c |   55 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 55 insertions(+), 0 deletions(-)
+Have you considered converting mailbox to hwmod + omap_device ?
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index f54af1e..55d6117 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -16,6 +16,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- 
-+#include <linux/delay.h>
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/clk.h>
-@@ -26,6 +27,7 @@
- #include <linux/mfd/mc13783.h>
- #include <linux/spi/spi.h>
- #include <linux/regulator/machine.h>
-+#include <linux/fsl_devices.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -65,6 +67,21 @@ static int mx31_3ds_pins[] = {
- 	MX31_PIN_CSPI2_SS2__SS2, /*CS for MC13783 */
- 	/* MC13783 IRQ */
- 	IOMUX_MODE(MX31_PIN_GPIO1_3, IOMUX_CONFIG_GPIO),
-+	/* USB OTG reset */
-+	IOMUX_MODE(MX31_PIN_USB_PWR, IOMUX_CONFIG_GPIO),
-+	/* USB OTG */
-+	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
-+	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
-+	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
-+	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
-+	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
-+	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
-+	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
-+	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
-+	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
-+	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
-+	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
-+	MX31_PIN_USBOTG_STP__USBOTG_STP,
- };
- 
- /* Regulators */
-@@ -126,6 +143,41 @@ static struct mxc_nand_platform_data imx31_3ds_nand_flash_pdata = {
- #endif
- };
- 
-+/*
-+ * USB OTG
-+ */
-+
-+#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
-+		     PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+
-+#define USBOTG_RST_B IOMUX_TO_GPIO(MX31_PIN_USB_PWR)
-+
-+static void mx31_3ds_usbotg_init(void)
-+{
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
-+
-+	gpio_request(USBOTG_RST_B, "otgusb-reset");
-+	gpio_direction_output(USBOTG_RST_B, 0);
-+	mdelay(1);
-+	gpio_set_value(USBOTG_RST_B, 1);
-+}
-+
-+static struct fsl_usb2_platform_data usbotg_pdata = {
-+	.operating_mode = FSL_USB2_DR_DEVICE,
-+	.phy_mode	= FSL_USB2_PHY_ULPI,
-+};
-+
- static struct imxuart_platform_data uart_pdata = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -315,6 +367,9 @@ static void __init mxc_board_init(void)
- 	spi_register_board_info(mx31_3ds_spi_devs,
- 						ARRAY_SIZE(mx31_3ds_spi_devs));
- 
-+	mx31_3ds_usbotg_init();
-+	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
-+
- 	if (!mx31_3ds_init_expio())
- 		platform_device_register(&smsc911x_device);
- }
--- 
-1.6.4.2
+
+Thanks,
+Ohad.
+
+>
+> Also, it's worth noting that mailboxes are not a one-to-one mapping to
+> resources; that is, some resources belong to multiple mboxes. So it's best to
+> think of mailboxes as fake devices. That is why custom platform_data is required.
+>
+> Finally, a bunch of cleaning up is done in the very first patches, specially for
+> OMAP1.
+>
+> The initial RFC included comments from Felipe Balbi, and this proposal includes
+> comments from Tony Lindgren.
+>
+> v2:
+> ?* Rebased on top of Hiroshi's v2.6.34-rc7.mailbox
+> ?* A bit more extra cleanups
+>
+> v1 was tested on OMAP3 (beagleboard), and compiled-tested for OMAP1.
+> v2 was compile-tested for OMAP3 and 1.
+>
+> Felipe Contreras (17):
+> ?omap: mailbox: trivial whitespace cleanups
+> ?omap: mailbox: trivial cleanups
+> ?omap: mailbox: reorganize structures
+> ?omap: mailbox: 2420 should be detected at run-time
+> ?omap: mailbox: use correct config for omap1
+> ?omap: mailbox: update omap1 probing
+> ?omap: mailbox: reorganize registering
+> ?omap: mailbox: only compile for configured archs
+> ?omap: mailbox: reorganize omap platform_device
+> ?omap: mailbox: move more stuff to omap_mbox_init()
+> ?omap: mailbox: trivial sync between omap1 and 2
+> ?omap: mailbox: split platform driver
+> ?omap: mailbox: always built-in platform data
+> ?omap: mailbox: reorganize headers
+> ?omap: mailbox: don't export unecessary symbols
+> ?omap: mailbox: mark some resources as __initdata
+> ?omap: mailbox: don't export register/unregister
+>
+> ?arch/arm/mach-omap1/Makefile ? ? ? ? ? ? ?| ? ?6 +-
+> ?arch/arm/mach-omap1/devices.c ? ? ? ? ? ? | ? 40 -----
+> ?arch/arm/mach-omap1/mailbox.c ? ? ? ? ? ? | ?118 ++++++++------
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ?| ? ?5 +-
+> ?arch/arm/mach-omap2/devices.c ? ? ? ? ? ? | ? 92 -----------
+> ?arch/arm/mach-omap2/mailbox.c ? ? ? ? ? ? | ?254 ++++++++++++++++-------------
+> ?arch/arm/plat-omap/include/plat/mailbox.h | ? 10 +-
+> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? 89 +++++++---
+> ?8 files changed, 290 insertions(+), 324 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
