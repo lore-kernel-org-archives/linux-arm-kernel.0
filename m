@@ -1,33 +1,39 @@
-From: mboards@prograde.net (Michael Cashwell)
-Date: Fri, 14 May 2010 14:51:19 -0400
-Subject: PXA/8250 UART Conflicts
-In-Reply-To: <23b656b0c689be0c7ec0faaf37b6a9e6@localhost>
-References: <3117D78B-5443-48B5-88BC-83EEB8F709F9@prograde.net>
-	<23b656b0c689be0c7ec0faaf37b6a9e6@localhost>
-Message-ID: <21152027-3FF3-462E-ADE1-4801CDD251D0@prograde.net>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Fri, 14 May 2010 20:56:48 +0200
+Subject: [PATCH 7/8] MXC: mach-mx31_3ds: Add support for the keypad.
+In-Reply-To: <1273860763.3241.10.camel@realization>
+References: <1269369741.3276.162.camel@realization>	
+	<1269370017.3276.165.camel@realization>	
+	<1269370175.3276.168.camel@realization>	
+	<1269370228.3276.169.camel@realization>	
+	<1269370305.3276.171.camel@realization>	
+	<1269370438.3276.173.camel@realization>	
+	<1269370499.3276.174.camel@realization>	
+	<1269370655.3276.177.camel@realization>
+	<4BED42EA.2080604@gmail.com> <1273860763.3241.10.camel@realization>
+Message-ID: <4BED9CF0.4040709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 11, 2010, at 12:29 PM, Marc Zyngier wrote:
+Hi
 
-> On Tue, 11 May 2010 11:00:36 -0400, Michael Cashwell wrote:
->> 
->> Am I missing something? Are these drivers just incompatible ... ?
+On 2010-05-14 20:12, Alberto Panizzo wrote:
+> On ven, 2010-05-14 at 14:32 +0200, Magnus Lilja wrote:
+>> Hi
+>>
+>>
+>> Sascha, perhaps it's time to apply this patch now? I was very close to submit a very similar patch a few moments ago (based on the current Linus git tree) but found this post in the archive.
+>>
+>>
+>> Regrds, Magnus
 > 
-> Both Viper and Zeus platforms faced the exact same problem. On the Viper, either we let the 8250 driver manage all the serial ports (including the PXA ports) ...
+> I apologize for my delay in serving the issues raised in this thread.
+> Mangus, if you solve the problem (regulators handling support in imxmmc
+> as pxamci do) you could then post an acceptable version of this patch.
+> It is easy, really a bit of lines, but I do not have time now...
 
-Thanks to all who responded. For my UART eval I when with this approach.
 
-Not to hijack my own thread, but I have the 8250 via i2c working in pio mode. (DMA mode calls a wait_ function and gave me a flood of "scheduling while atomic" BUGs.)
+I had only the keypad-patch in mind, I have not worked with, or plan to do so, with SD-card or MMC.
+The keypad patch should be ready to be appled, I didn't see any comments on that.
 
-But alas, trying to do this via SPI is not working. It seems that even without DMA the SPI layer uses interrupts and a tasklet to keep the transfers going and the 8250 driver does most of its work at atomic time (either directly in the top-half or inside a spin_lock_irqsave).
-
-Thus, the sync SPI calls hit the same "scheduling while atomic" problem as non-PIO i2c and the async calls (followed by a cpu_relax() waiting for my completion function to run) never complete. I've seen some messages about an SPI functions that would allow for scheduling but no clear resolution.
-
-This has me wondering why the 8250 driver needs to globally disable interrupts so much. In fact, other than the special case where it shares IRQs with other drivers I don't see why it needs to globally stop interrupts at all. If it has sole possession of its IRQs it would seem to me that the top-half could just run the bottom half at task-time and have it service the hardware. If it did that calling into SPI would be OK.
-
-I may just be confused at this point. I'm still pondering my (few apparent) options, but at least it works with i2c.
-
-Thanks for the assistance.
-
--Mike
+Regards, Magnus
