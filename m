@@ -1,31 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 May 2010 18:59:27 +0100
-Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
-	88f5182)
-In-Reply-To: <20100514174153.GB10133@shareable.org>
-References: <1273569821.21352.19.camel@pasglop>
-	<1273575478.21352.29.camel@pasglop>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
-	<20100512222154.GA6841@shareable.org>
-	<1273704431.21352.136.camel@pasglop>
-	<20100512230841.GA10090@n2100.arm.linux.org.uk>
-	<20100514174153.GB10133@shareable.org>
-Message-ID: <20100514175927.GA18107@n2100.arm.linux.org.uk>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 14 May 2010 20:12:43 +0200
+Subject: [PATCH 7/8] MXC: mach-mx31_3ds: Add support for the keypad.
+In-Reply-To: <4BED42EA.2080604@gmail.com>
+References: <1269369741.3276.162.camel@realization>
+	<1269370017.3276.165.camel@realization>
+	<1269370175.3276.168.camel@realization>
+	<1269370228.3276.169.camel@realization>
+	<1269370305.3276.171.camel@realization>
+	<1269370438.3276.173.camel@realization>
+	<1269370499.3276.174.camel@realization>
+	<1269370655.3276.177.camel@realization>  <4BED42EA.2080604@gmail.com>
+Message-ID: <1273860763.3241.10.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 06:41:53PM +0100, Jamie Lokier wrote:
-> Russell King - ARM Linux wrote:
-> > On Thu, May 13, 2010 at 08:47:11AM +1000, Benjamin Herrenschmidt wrote:
-> > > Now, in the case at hand, which is my ARM based NAS, I believe this
-> > > is non cache-coherent and thus uses cache flush ops. I don't know ARM
-> > > well enough but I would expect these to be implicit barriers. Russell ?
-> > > Nico ?
-> > 
-> > ARMv5 doesn't have a weak memory ordering model, and doesn't have any
-> > memory barrier instructions.
+On ven, 2010-05-14 at 14:32 +0200, Magnus Lilja wrote:
+> Hi
 > 
-> It does have buffered writes, doesn't it?  Are they always flushed by
-> the cache flush ops?
+> 
+> Sascha, perhaps it's time to apply this patch now? I was very close to submit a very similar patch a few moments ago (based on the current Linus git tree) but found this post in the archive.
+> 
+> 
+> Regrds, Magnus
 
-Surprisingly, for DMA it's something we've always done.  Odd that.
+I apologize for my delay in serving the issues raised in this thread.
+Mangus, if you solve the problem (regulators handling support in imxmmc
+as pxamci do) you could then post an acceptable version of this patch.
+It is easy, really a bit of lines, but I do not have time now...
+
+Then the rest of the thread can be rebased and applied.
+
+Regards,
+Alberto!
