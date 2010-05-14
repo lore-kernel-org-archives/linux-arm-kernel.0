@@ -1,136 +1,382 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 14 May 2010 09:40:03 +0100
-Subject: [PATCH] ARM: S5P: Dynamicly numbered GPIO interrupt support
-Message-ID: <1273826403-28976-1-git-send-email-ben-linux@fluff.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 May 2010 17:36:00 +0900
+Subject: [PATCH v4] ARM: S5PV210: Add Ext interrupt support.
+Message-ID: <1273826160-17999-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for GPIO interrupts where the interrupt number
-is dynamically allocated at first request from gpiolib.
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-This method is employed as the newer SoCs have a large number
-of possible interrupt numbers which are very rarely heavily
-used. However, the classic code has always registered all
-possible interrupts, using a large amount of memory for the
-irq_desc[] table.
+Add support for external interrupts on v210.
 
-For example, S5PV210 has 178 possible GPIO interrupt sources
-of which few boards actually use any of these. The current
-size of a single irq_desc entry is 80 bytes, meaing to fully
-support GPIO interrupts on the V210 we use 14240 bytes when
-a board may only need a few of these.
-
-NOTE: This code is not tested, and not even booted. it is
-offered here as an example and if people think it is a good
-idea, I will do the necessary run testing and checking.
-
-not-quite-signed-off-by: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/gpiolib.c                |   10 +++++++++-
- arch/arm/mach-s5pv210/include/mach/irqs.h      |    5 ++++-
- arch/arm/plat-s5p/Kconfig                      |    5 +++++
+ arch/arm/mach-s5pv210/Kconfig                  |    1 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h      |   26 +--
+ arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   46 +++++
+ arch/arm/plat-s5p/Kconfig                      |    5 +
  arch/arm/plat-s5p/Makefile                     |    1 +
- arch/arm/plat-samsung/include/plat/gpio-core.h |    5 +++++
- 5 files changed, 24 insertions(+), 2 deletions(-)
+ arch/arm/plat-s5p/irq-eint.c                   |  216 ++++++++++++++++++++++++
+ 6 files changed, 277 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+ create mode 100644 arch/arm/plat-s5p/irq-eint.c
 
-diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-index 99dad92..68972ea 100644
---- a/arch/arm/mach-s5pv210/gpiolib.c
-+++ b/arch/arm/mach-s5pv210/gpiolib.c
-@@ -237,6 +237,12 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
- 	},
- };
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index af33a1a..c4c2a7f 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -12,6 +12,7 @@ if ARCH_S5PV210
+ config CPU_S5PV210
+ 	bool
+ 	select PLAT_S5P
++	select S5P_EXT_INT
+ 	help
+ 	  Enable S5PV210 CPU support
  
-+static int to_gpio_irq_bank(int nr)
-+{
-+	if (nr >= 17)
-+		return nr - 4;
-+}
-+
- static __init int s5pv210_gpiolib_init(void)
- {
- 	struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
-@@ -244,8 +250,10 @@ static __init int s5pv210_gpiolib_init(void)
- 	int i = 0;
- 
- 	for (i = 0; i < nr_chips; i++, chip++) {
--		if (chip->config == NULL)
-+		if (chip->config == NULL) {
- 			chip->config = &gpio_cfg;
-+			s5p_gpio_irq_register(chip, to_gpio_irq_bank(i));
-+		}
- 		if (chip->base == NULL)
- 			chip->base = S5PV210_BANK_BASE(i);
- 	}
 diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 1714be2..dca0067 100644
+index 62c5175..823789c 100644
 --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
 +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -144,8 +144,11 @@
- #define S5P_EINT_SET2(x)	S5PV210_GPH2(x)
- #define S5P_EINT_SET3(x)	S5PV210_GPH3(x)
+@@ -17,22 +17,9 @@
  
-+#define IRQ_GPIO_BASE		IRQ_EINT(31) + 1
-+#define NR_GPIO_IRQS		(24)
+ /* VIC0: System, DMA, Timer */
+ 
+-#define IRQ_EINT0		S5P_IRQ_VIC0(0)
+-#define IRQ_EINT1		S5P_IRQ_VIC0(1)
+-#define IRQ_EINT2		S5P_IRQ_VIC0(2)
+-#define IRQ_EINT3		S5P_IRQ_VIC0(3)
+-#define IRQ_EINT4		S5P_IRQ_VIC0(4)
+-#define IRQ_EINT5		S5P_IRQ_VIC0(5)
+-#define IRQ_EINT6		S5P_IRQ_VIC0(6)
+-#define IRQ_EINT7		S5P_IRQ_VIC0(7)
+-#define IRQ_EINT8		S5P_IRQ_VIC0(8)
+-#define IRQ_EINT9		S5P_IRQ_VIC0(9)
+-#define IRQ_EINT10		S5P_IRQ_VIC0(10)
+-#define IRQ_EINT11		S5P_IRQ_VIC0(11)
+-#define IRQ_EINT12		S5P_IRQ_VIC0(12)
+-#define IRQ_EINT13		S5P_IRQ_VIC0(13)
+-#define IRQ_EINT14		S5P_IRQ_VIC0(14)
+-#define IRQ_EINT15		S5P_IRQ_VIC0(15)
++/* Can be used for EINTs 0 to 15 */
++#define IRQ_EINT(x)		((x) + S5P_IRQ_VIC0(0))
 +
+ #define IRQ_EINT16_31		S5P_IRQ_VIC0(16)
+ #define IRQ_BATF		S5P_IRQ_VIC0(17)
+ #define IRQ_MDMA		S5P_IRQ_VIC0(18)
+@@ -137,10 +124,13 @@
+ #define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
+ 
+ #define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
+-#define IRQ_EINT(x)		S5P_EINT(x)
++/* Can be used for EINTs 16 to 31 */
++#define IRQ_EINT_GRP(x)		S5P_EINT(x)
++
++#define EINT_MODE		S3C_GPIO_SFN(0xf)
+ 
  /* Set the default NR_IRQS */
  
 -#define NR_IRQS 		(IRQ_EINT(31) + 1)
-+#define NR_IRQS 		(IRQ_GPIO_BASE + NR_GPIO_IRQS)
++#define NR_IRQS			(IRQ_EINT_GRP(31) + 1)
  
  #endif /* ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+new file mode 100644
+index 0000000..fe16292
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+@@ -0,0 +1,46 @@
++/* linux/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * S5PV210 - GPIO (including EINT) register definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_REGS_GPIO_H
++#define __ASM_ARCH_REGS_GPIO_H __FILE__
++
++#include <mach/map.h>
++
++#define S5PV210_EINT30CON		(S5P_VA_GPIO + 0xE00)
++#define S5P_EINT_CON(x)			(S5PV210_EINT30CON + ((x) * 0x4))
++
++#define S5PV210_EINT30FLTCON0		(S5P_VA_GPIO + 0xE80)
++#define S5P_EINT_FLTCON(x)		(S5PV210_EINT30FLTCON0 + ((x) * 0x4))
++
++#define S5PV210_EINT30MASK		(S5P_VA_GPIO + 0xF00)
++#define S5P_EINT_MASK(x)		(S5PV210_EINT30MASK + ((x) * 0x4))
++
++#define S5PV210_EINT30PEND		(S5P_VA_GPIO + 0xF40)
++#define S5P_EINT_PEND(x)		(S5PV210_EINT30PEND + ((x) * 0x4))
++
++#define eint_offset(irq)	((irq) < IRQ_EINT16_31 ? ((irq) - IRQ_EINT(0)) \
++						: ((irq) - S5P_IRQ_EINT_BASE))
++
++#define eint_irq_to_bit(irq)		(1 << (eint_offset(irq) & 0x7))
++
++#define eint_conf_reg(irq)		((eint_offset(irq)) >> 3)
++#define eint_mask_reg(irq)		((eint_offset(irq)) >> 3)
++#define eint_pend_reg(irq)		((eint_offset(irq)) >> 3)
++
++/* values for S5P_EXTINT0 */
++#define S5P_EXTINT_LOWLEV		(0x00)
++#define S5P_EXTINT_HILEV		(0x01)
++#define S5P_EXTINT_FALLEDGE		(0x02)
++#define S5P_EXTINT_RISEEDGE		(0x03)
++#define S5P_EXTINT_BOTHEDGE		(0x04)
++
++#endif /* __ASM_ARCH_REGS_GPIO_H */
 diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 7d1fc40..c6be4c0 100644
+index d400a6a..7d1fc40 100644
 --- a/arch/arm/plat-s5p/Kconfig
 +++ b/arch/arm/plat-s5p/Kconfig
-@@ -28,3 +28,8 @@ config S5P_EXT_INT
- 	bool
+@@ -23,3 +23,8 @@ config PLAT_S5P
+ 	select SAMSUNG_IRQ_UART
  	help
- 	  Use the external interrupts (other than GPIO interrupts.)
+ 	  Base platform code for Samsung's S5P series SoC.
 +
-+config S5P_GPIO_INT
-+	bool "Support GPIO based interrupts"
++config S5P_EXT_INT
++	bool
 +	help
-+	  Enable support for GPIO interrupts
++	  Use the external interrupts (other than GPIO interrupts.)
 diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 25941a5..826f8a6 100644
+index a7c54b3..25941a5 100644
 --- a/arch/arm/plat-s5p/Makefile
 +++ b/arch/arm/plat-s5p/Makefile
-@@ -17,4 +17,5 @@ obj-y				+= cpu.o
+@@ -16,4 +16,5 @@ obj-y				+= dev-uart.o
+ obj-y				+= cpu.o
  obj-y				+= clock.o
  obj-y				+= irq.o
- obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
-+obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpio.o
++obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
  obj-y				+= setup-i2c0.o
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
-index 49ff406..8c246ce 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-@@ -38,6 +38,7 @@ struct s3c_gpio_pm {
- };
- 
- struct s3c_gpio_cfg;
-+struct s3c_gpio_irq;	/* irq implementation information */
- 
- /**
-  * struct s3c_gpio_chip - wrapper for specific implementation of gpio
-@@ -53,6 +54,7 @@ struct s3c_gpio_chip {
- 	struct gpio_chip	chip;
- 	struct s3c_gpio_cfg	*config;
- 	struct s3c_gpio_pm	*pm;
-+	struct s3c_gpio_irq	*irq;
- 	void __iomem		*base;
- #ifdef CONFIG_PM
- 	u32			pm_save[4];
-@@ -108,6 +110,9 @@ extern void samsung_gpiolib_add_4bit2_chips(struct s3c_gpio_chip *chip,
- extern void samsung_gpiolib_add_4bit(struct s3c_gpio_chip *chip);
- extern void samsung_gpiolib_add_4bit2(struct s3c_gpio_chip *chip);
- 
-+extern void s5p_gpio_irq_register(struct s3c_gpio_chip *chip,
-+				  unsigned int bank_nr);
+diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
+new file mode 100644
+index 0000000..040e271
+--- /dev/null
++++ b/arch/arm/plat-s5p/irq-eint.c
+@@ -0,0 +1,216 @@
++/* linux/arch/arm/plat-s5p/irq-eint.c
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * S5P - IRQ EINT support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
- #ifdef CONFIG_S3C_GPIO_TRACK
- extern struct s3c_gpio_chip *s3c_gpios[S3C_GPIO_END];
- 
++#include <linux/kernel.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/sysdev.h>
++#include <linux/gpio.h>
++
++#include <asm/bitops.h>
++#include <asm/hardware/vic.h>
++
++#include <plat/regs-irqtype.h>
++
++#include <mach/map.h>
++#include <plat/cpu.h>
++#include <plat/pm.h>
++
++#include <plat/gpio-cfg.h>
++#include <mach/regs-gpio.h>
++
++static inline void s5p_irq_eint_mask(unsigned int irq)
++{
++	u32 mask;
++
++	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
++	mask |= eint_irq_to_bit(irq);
++	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
++}
++
++static void s5p_irq_eint_unmask(unsigned int irq)
++{
++	u32 mask;
++
++	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
++	mask &= ~(eint_irq_to_bit(irq));
++	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
++}
++
++static inline void s5p_irq_eint_ack(unsigned int irq)
++{
++	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
++}
++
++static void s5p_irq_eint_maskack(unsigned int irq)
++{
++	/* compiler should in-line these */
++	s5p_irq_eint_mask(irq);
++	s5p_irq_eint_ack(irq);
++}
++
++static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
++{
++	int offs = eint_offset(irq);
++	int shift;
++	u32 ctrl, mask;
++	u32 newvalue = 0;
++
++	switch (type) {
++	case IRQ_TYPE_NONE:
++		printk(KERN_WARNING "No edge setting!\n");
++		break;
++
++	case IRQ_TYPE_EDGE_RISING:
++		newvalue = S5P_EXTINT_RISEEDGE;
++		break;
++
++	case IRQ_TYPE_EDGE_FALLING:
++		newvalue = S5P_EXTINT_RISEEDGE;
++		break;
++
++	case IRQ_TYPE_EDGE_BOTH:
++		newvalue = S5P_EXTINT_BOTHEDGE;
++		break;
++
++	case IRQ_TYPE_LEVEL_LOW:
++		newvalue = S5P_EXTINT_LOWLEV;
++		break;
++
++	case IRQ_TYPE_LEVEL_HIGH:
++		newvalue = S5P_EXTINT_HILEV;
++		break;
++
++	default:
++		printk(KERN_ERR "No such irq type %d", type);
++		return -EINVAL;
++	}
++
++	shift = (offs & 0x7) * 4;
++	mask = 0x7 << shift;
++
++	ctrl = __raw_readl(S5P_EINT_CON(eint_conf_reg(irq)));
++	ctrl &= ~mask;
++	ctrl |= newvalue << shift;
++	__raw_writel(ctrl, S5P_EINT_CON(eint_conf_reg(irq)));
++
++	if ((0 <= offs) && (offs < 8))
++		s3c_gpio_cfgpin(S5PV210_GPH0(offs & 0x7), EINT_MODE);
++
++	else if ((8 <= offs) && (offs < 16))
++		s3c_gpio_cfgpin(S5PV210_GPH1(offs & 0x7), EINT_MODE);
++
++	else if ((16 <= offs) && (offs < 24))
++		s3c_gpio_cfgpin(S5PV210_GPH2(offs & 0x7), EINT_MODE);
++
++	else if ((24 <= offs) && (offs < 32))
++		s3c_gpio_cfgpin(S5PV210_GPH3(offs & 0x7), EINT_MODE);
++
++	else
++		printk(KERN_ERR "No such irq number %d", offs);
++
++	return 0;
++}
++
++static struct irq_chip s5p_irq_eint = {
++	.name		= "s5p-eint",
++	.mask		= s5p_irq_eint_mask,
++	.unmask		= s5p_irq_eint_unmask,
++	.mask_ack	= s5p_irq_eint_maskack,
++	.ack		= s5p_irq_eint_ack,
++	.set_type	= s5p_irq_eint_set_type,
++#ifdef CONFIG_PM
++	.set_wake	= s3c_irqext_wake,
++#endif
++};
++
++/* s5p_irq_demux_eint
++ *
++ * This function demuxes the IRQ from the group0 external interrupts,
++ * from IRQ_EINT(16) to IRQ_EINT(31). It is designed to be inlined into
++ * the specific handlers s5p_irq_demux_eintX_Y.
++ */
++static inline void s5p_irq_demux_eint(unsigned int start, unsigned int end)
++{
++	u32 status;
++	u32 mask = __raw_readl(S5P_EINT_MASK((start >> 3)));
++	unsigned int irq;
++
++	status = __raw_readl(S5P_EINT_PEND((start >> 3)));
++	status &= ~mask;
++	status &= (1 << (end - start + 1)) - 1;
++
++	while (status) {
++		irq = fls(status);
++		generic_handle_irq(irq - 1 + IRQ_EINT(start));
++		status &= ~(1 << irq);
++	}
++}
++
++static void s5p_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_eint(16, 23);
++	s5p_irq_demux_eint(24, 31);
++}
++
++static inline void s5p_irq_vic_eint_mask(unsigned int irq)
++{
++	s5p_irq_eint_mask(irq);
++}
++
++static void s5p_irq_vic_eint_unmask(unsigned int irq)
++{
++	s5p_irq_eint_unmask(irq);
++}
++
++static inline void s5p_irq_vic_eint_ack(unsigned int irq)
++{
++	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
++}
++
++static void s5p_irq_vic_eint_maskack(unsigned int irq)
++{
++	s5p_irq_vic_eint_mask(irq);
++	s5p_irq_vic_eint_ack(irq);
++}
++
++static struct irq_chip s5p_irq_vic_eint = {
++	.name		= "s5p_vic_eint",
++	.mask		= s5p_irq_vic_eint_mask,
++	.unmask		= s5p_irq_vic_eint_unmask,
++	.mask_ack	= s5p_irq_vic_eint_maskack,
++	.ack		= s5p_irq_vic_eint_ack,
++	.set_type	= s5p_irq_eint_set_type,
++#ifdef CONFIG_PM
++	.set_wake	= s3c_irqext_wake,
++#endif
++};
++
++int __init s5p_init_irq_eint(void)
++{
++	int irq;
++
++	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++)
++		set_irq_chip(irq, &s5p_irq_vic_eint);
++
++	for (irq = IRQ_EINT_GRP(16); irq <= IRQ_EINT_GRP(31); irq++) {
++		set_irq_chip(irq, &s5p_irq_eint);
++		set_irq_handler(irq, handle_level_irq);
++		set_irq_flags(irq, IRQF_VALID);
++	}
++
++	set_irq_chained_handler(IRQ_EINT16_31, s5p_irq_demux_eint16_31);
++	return 0;
++}
++
++arch_initcall(s5p_init_irq_eint);
 -- 
-1.6.3.3
+1.6.2.5
