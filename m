@@ -1,41 +1,31 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 14 May 2010 13:47:06 +0300
-Subject: [PATCH 03/15] omap: mailbox: 2420 should be detected at run-time
-In-Reply-To: <4BED2326.4090302@ru.mvista.com>
-References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
-	<1273772856-10881-4-git-send-email-felipe.contreras@gmail.com>
-	<4BED2326.4090302@ru.mvista.com>
-Message-ID: <AANLkTimcw0MNZdXjM6K6HJw02qlmggXqeQXHG64HYyUX@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 May 2010 11:48:43 +0100
+Subject: PIPT cache handling on s5pv210 chip
+In-Reply-To: <00bc01caf351$5daf71c0$190e5540$%kim@samsung.com>
+References: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+	<00bc01caf351$5daf71c0$190e5540$%kim@samsung.com>
+Message-ID: <20100514104843.GG10339@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 14, 2010 at 07:36:47PM +0900, Kukjin Kim wrote:
+> In case of __vmalloc() with non-cacheable option, there may come some
+> malfunctions related to cache.
 
-On Fri, May 14, 2010 at 1:17 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Felipe Contreras wrote:
->
->> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
->> ---
->> ?arch/arm/mach-omap2/mailbox.c | ? ?3 ++-
->> ?1 files changed, 2 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
->> index 252e53b..6d17da8 100644
->> --- a/arch/arm/mach-omap2/mailbox.c
->> +++ b/arch/arm/mach-omap2/mailbox.c
->> @@ -431,7 +431,8 @@ err_dsp:
->> ?static int __devexit omap2_mbox_remove(struct platform_device *pdev)
->> ?{
->> ?#if defined(CONFIG_ARCH_OMAP2420)
->> - ? ? ? omap_mbox_unregister(&mbox_iva_info);
->> + ? ? ? if (cpu_is_omap2420())
->> + ? ? ? ? ? ? ? omap_mbox_unregister(&mbox_iva_info);
->> ?#endif
->
-> ? Shouldn't #ifdef be remove then?
+Practically, you are not allowed on ARMv6 or ARMv7 to create mappings
+which alias with differing memory types; that is 100% outlawed by the
+architecture spec, and there is NO mitigation for this.
 
-My first patch did that, but now mbox_iva_info is only available when
-ARCH_OMAP2420=y to save space when building for a specific OMAP.
+It means that it is _illegal_ to use __vmalloc() with anything but a
+memory-like mapping protection.
 
--- 
-Felipe Contreras
+There is mitigation for having different cacheability, but this is just
+a work-around while OSes like Linux work to remove the creation of
+aliases with differing cacheability attributes.  There's no guarantee
+that later ARMv7 or future CPUs will continue to operate predictably.
+
+The same applies for ioremap() being used on SDRAM - and those who look
+at what's in my tree will notice that ioremap() has recently been made
+to fail when used on SDRAM for this very reason.
+
+Therefore, the above hack isn't going near mainline.
