@@ -1,148 +1,90 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 May 2010 14:28:10 -0700
-Subject: [PATCH 09/10] omap: GPIO: Fix OMAP4 GPIO reg access issues
+Date: Fri, 14 May 2010 14:28:12 -0700
+Subject: [PATCH 10/10] AM3517: rename the i2c boardinfo to make it more
+	readable
 In-Reply-To: <20100514212506.25599.98073.stgit@baageli.muru.com>
 References: <20100514212506.25599.98073.stgit@baageli.muru.com>
-Message-ID: <20100514212810.25599.99703.stgit@baageli.muru.com>
+Message-ID: <20100514212812.25599.79124.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tony Lindgren <charu@ti.com>
+From: stanley.miao <stanley.miao@windriver.com>
 
-Access to some of the OMAP4 GPIO registers are not properly handled.
-This patch fixes it.
+There are three i2c buses on am3517, and each i2c bus has several devices
+on it, so we can't name the i2c boardinfo structures with one of these
+devices. In order to make it more readable, now rename these three boardinfo
+structures based on i2c indexes.
 
-This patch is tested on 3430SDP and 4430SDP boards
-
-Signed-off-by: Charulatha V <charu@ti.com>
-cc: Kevin Hilman <khilman@deeprootsystems.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
+Acked-By: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/gpio.c |   59 ++++++++++++++++++++++++++++++++++++---------
- 1 files changed, 47 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/board-am3517evm.c |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 955597f..dc2ac42 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -138,7 +138,11 @@
- #define OMAP4_GPIO_IRQSTATUSCLR1	0x0040
- #define OMAP4_GPIO_IRQWAKEN0		0x0044
- #define OMAP4_GPIO_IRQWAKEN1		0x0048
--#define OMAP4_GPIO_SYSSTATUS		0x0104
-+#define OMAP4_GPIO_SYSSTATUS		0x0114
-+#define OMAP4_GPIO_IRQENABLE1		0x011c
-+#define OMAP4_GPIO_WAKE_EN		0x0120
-+#define OMAP4_GPIO_IRQSTATUS2		0x0128
-+#define OMAP4_GPIO_IRQENABLE2		0x012c
- #define OMAP4_GPIO_CTRL			0x0130
- #define OMAP4_GPIO_OE			0x0134
- #define OMAP4_GPIO_DATAIN		0x0138
-@@ -149,6 +153,10 @@
- #define OMAP4_GPIO_FALLINGDETECT	0x014c
- #define OMAP4_GPIO_DEBOUNCENABLE	0x0150
- #define OMAP4_GPIO_DEBOUNCINGTIME	0x0154
-+#define OMAP4_GPIO_CLEARIRQENABLE1	0x0160
-+#define OMAP4_GPIO_SETIRQENABLE1	0x0164
-+#define OMAP4_GPIO_CLEARWKUENA		0x0180
-+#define OMAP4_GPIO_SETWKUENA		0x0184
- #define OMAP4_GPIO_CLEARDATAOUT		0x0190
- #define OMAP4_GPIO_SETDATAOUT		0x0194
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index 19b9e41..af383a8 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -136,7 +136,7 @@ void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
+ #define LCD_PANEL_BKLIGHT_PWR	182
+ #define LCD_PANEL_PWM		181
+ 
+-static struct i2c_board_info __initdata am3517evm_i2c_boardinfo[] = {
++static struct i2c_board_info __initdata am3517evm_i2c1_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("s35390a", 0x30),
+ 		.type		= "s35390a",
+@@ -166,7 +166,7 @@ static void __init am3517_evm_rtc_init(void)
+ 		gpio_free(GPIO_RTCS35390A_IRQ);
+ 		return;
+ 	}
+-	am3517evm_i2c_boardinfo[0].irq = gpio_to_irq(GPIO_RTCS35390A_IRQ);
++	am3517evm_i2c1_boardinfo[0].irq = gpio_to_irq(GPIO_RTCS35390A_IRQ);
+ }
+ 
  /*
-@@ -591,12 +599,16 @@ static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
- 		reg += OMAP7XX_GPIO_DATA_OUTPUT;
- 		break;
- #endif
--#ifdef CONFIG_ARCH_OMAP2PLUS
-+#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
- 	case METHOD_GPIO_24XX:
--	case METHOD_GPIO_44XX:
- 		reg += OMAP24XX_GPIO_DATAOUT;
- 		break;
- #endif
-+#ifdef CONFIG_ARCH_OMAP4
-+	case METHOD_GPIO_44XX:
-+		reg += OMAP4_GPIO_DATAOUT;
-+		break;
-+#endif
- 	default:
- 		return -EINVAL;
- 	}
-@@ -1213,11 +1225,17 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- #endif
- 	if (!cpu_class_is_omap1()) {
- 		if (!bank->mod_usage) {
-+			void __iomem *reg = bank->base;
- 			u32 ctrl;
--			ctrl = __raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
--			ctrl &= 0xFFFFFFFE;
-+
-+			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+				reg += OMAP24XX_GPIO_CTRL;
-+			else if (cpu_is_omap44xx())
-+				reg += OMAP4_GPIO_CTRL;
-+			ctrl = __raw_readl(reg);
- 			/* Module is enabled, clocks are not gated */
--			__raw_writel(ctrl, bank->base + OMAP24XX_GPIO_CTRL);
-+			ctrl &= 0xFFFFFFFE;
-+			__raw_writel(ctrl, reg);
- 		}
- 		bank->mod_usage |= 1 << offset;
- 	}
-@@ -1239,22 +1257,34 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 		__raw_writel(1 << offset, reg);
- 	}
- #endif
--#ifdef CONFIG_ARCH_OMAP2PLUS
--	if ((bank->method == METHOD_GPIO_24XX) ||
--			(bank->method == METHOD_GPIO_44XX)) {
-+#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
-+	if (bank->method == METHOD_GPIO_24XX) {
- 		/* Disable wake-up during idle for dynamic tick */
- 		void __iomem *reg = bank->base + OMAP24XX_GPIO_CLEARWKUENA;
- 		__raw_writel(1 << offset, reg);
- 	}
- #endif
-+#ifdef CONFIG_ARCH_OMAP4
-+	if (bank->method == METHOD_GPIO_44XX) {
-+		/* Disable wake-up during idle for dynamic tick */
-+		void __iomem *reg = bank->base + OMAP4_GPIO_IRQWAKEN0;
-+		__raw_writel(1 << offset, reg);
-+	}
-+#endif
- 	if (!cpu_class_is_omap1()) {
- 		bank->mod_usage &= ~(1 << offset);
- 		if (!bank->mod_usage) {
-+			void __iomem *reg = bank->base;
- 			u32 ctrl;
--			ctrl = __raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
-+
-+			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+				reg += OMAP24XX_GPIO_CTRL;
-+			else if (cpu_is_omap44xx())
-+				reg += OMAP4_GPIO_CTRL;
-+			ctrl = __raw_readl(reg);
- 			/* Module is disabled, clocks are gated */
- 			ctrl |= 1;
--			__raw_writel(ctrl, bank->base + OMAP24XX_GPIO_CTRL);
-+			__raw_writel(ctrl, reg);
- 		}
- 	}
- 	_reset_gpio(bank, bank->chip.base + offset);
-@@ -1583,9 +1613,14 @@ static int gpio_is_input(struct gpio_bank *bank, int mask)
- 		reg += OMAP7XX_GPIO_DIR_CONTROL;
- 		break;
- 	case METHOD_GPIO_24XX:
--	case METHOD_GPIO_44XX:
- 		reg += OMAP24XX_GPIO_OE;
- 		break;
-+	case METHOD_GPIO_44XX:
-+		reg += OMAP4_GPIO_OE;
-+		break;
-+	default:
-+		WARN_ONCE(1, "gpio_is_input: incorrect OMAP GPIO method");
-+		return -EINVAL;
- 	}
- 	return __raw_readl(reg) & mask;
+@@ -177,7 +177,7 @@ static void __init am3517_evm_rtc_init(void)
+ static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
+ 	.gpio_base	= OMAP_MAX_GPIO_LINES,
+ };
+-static struct i2c_board_info __initdata am3517evm_tca6416_info_0[] = {
++static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("tca6416", 0x21),
+ 		.platform_data = &am3517evm_gpio_expander_info_0,
+@@ -191,7 +191,7 @@ static struct pca953x_platform_data am3517evm_ui_gpio_expander_info_1 = {
+ static struct pca953x_platform_data am3517evm_ui_gpio_expander_info_2 = {
+ 	.gpio_base	= OMAP_MAX_GPIO_LINES + 32,
+ };
+-static struct i2c_board_info __initdata am3517evm_ui_tca6416_info[] = {
++static struct i2c_board_info __initdata am3517evm_i2c3_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("tca6416", 0x20),
+ 		.platform_data = &am3517evm_ui_gpio_expander_info_1,
+@@ -205,10 +205,10 @@ static struct i2c_board_info __initdata am3517evm_ui_tca6416_info[] = {
+ static int __init am3517_evm_i2c_init(void)
+ {
+ 	omap_register_i2c_bus(1, 400, NULL, 0);
+-	omap_register_i2c_bus(2, 400, am3517evm_tca6416_info_0,
+-			ARRAY_SIZE(am3517evm_tca6416_info_0));
+-	omap_register_i2c_bus(3, 400, am3517evm_ui_tca6416_info,
+-			ARRAY_SIZE(am3517evm_ui_tca6416_info));
++	omap_register_i2c_bus(2, 400, am3517evm_i2c2_boardinfo,
++			ARRAY_SIZE(am3517evm_i2c2_boardinfo));
++	omap_register_i2c_bus(3, 400, am3517evm_i2c3_boardinfo,
++			ARRAY_SIZE(am3517evm_i2c3_boardinfo));
+ 
+ 	return 0;
+ }
+@@ -455,8 +455,8 @@ static void __init am3517_evm_init(void)
+ 	/* RTC - S35390A */
+ 	am3517_evm_rtc_init();
+ 
+-	i2c_register_board_info(1, am3517evm_i2c_boardinfo,
+-				ARRAY_SIZE(am3517evm_i2c_boardinfo));
++	i2c_register_board_info(1, am3517evm_i2c1_boardinfo,
++				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
+ 	/*Ethernet*/
+ 	am3517_evm_ethernet_init(&am3517_evm_emac_pdata);
  }
