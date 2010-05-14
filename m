@@ -1,126 +1,93 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Fri, 14 May 2010 14:32:42 +0200
-Subject: [PATCH 7/8] MXC: mach-mx31_3ds: Add support for the keypad.
-In-Reply-To: <1269370655.3276.177.camel@realization>
-References: <1269369741.3276.162.camel@realization>	<1269370017.3276.165.camel@realization>	<1269370175.3276.168.camel@realization>	<1269370228.3276.169.camel@realization>	<1269370305.3276.171.camel@realization>	<1269370438.3276.173.camel@realization>	<1269370499.3276.174.camel@realization>
-	<1269370655.3276.177.camel@realization>
-Message-ID: <4BED42EA.2080604@gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 14 May 2010 15:52:09 +0300
+Subject: [PATCH] ARM: fix spinlock recursion in adjust_pte()
+Message-ID: <1273841529-29711-1-git-send-email-mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+When running following code in a machine which has VIVT caches and
+USE_SPLIT_PTLOCKS is not defined:
 
+  fd = open("/etc/passwd", O_RDONLY);
+  addr = mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, 0);
+  addr2 = mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, 0);
 
-Sascha, perhaps it's time to apply this patch now? I was very close to submit a very similar patch a few moments ago (based on the current Linus git tree) but found this post in the archive.
+  v = *((int *)addr);
 
+we will hang in spinlock recursion in the page fault handler:
 
-Regrds, Magnus
+  BUG: spinlock recursion on CPU#0, mmap_test/717
+  lock: c5e295d8, .magic: dead4ead, .owner: mmap_test/717,
+                  .owner_cpu: 0
+  [<c0026604>] (unwind_backtrace+0x0/0xec)
+  [<c014ee48>] (do_raw_spin_lock+0x40/0x140)
+  [<c0027f68>] (update_mmu_cache+0x208/0x250)
+  [<c0079db4>] (__do_fault+0x320/0x3ec)
+  [<c007af7c>] (handle_mm_fault+0x2f0/0x6d8)
+  [<c0027834>] (do_page_fault+0xdc/0x1cc)
+  [<c00202d0>] (do_DataAbort+0x34/0x94)
 
-On 2010-03-23 19:57, Alberto Panizzo wrote:
-> The kpp device is not a board private one, so it have to be defined
-> in devices.c
-> 
-> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> ---
->  arch/arm/mach-mx3/devices.c       |   19 +++++++++++++++++++
->  arch/arm/mach-mx3/devices.h       |    1 +
->  arch/arm/mach-mx3/mach-mx31_3ds.c |   32 ++++++++++++++++++++++++++++++++
->  3 files changed, 52 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-> index 6adb586..539a08d 100644
-> --- a/arch/arm/mach-mx3/devices.c
-> +++ b/arch/arm/mach-mx3/devices.c
-> @@ -575,6 +575,25 @@ struct platform_device imx_ssi_device1 = {
->  	.resource = imx_ssi_resources1,
->  };
->  
-> +static struct resource imx_kpp_resources[] = {
-> +	{
-> +		.start	= MX3x_KPP_BASE_ADDR,
-> +		.end	= MX3x_KPP_BASE_ADDR + 0xf,
-> +		.flags	= IORESOURCE_MEM
-> +	}, {
-> +		.start	= MX3x_INT_KPP,
-> +		.end	= MX3x_INT_KPP,
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device imx_kpp_device = {
-> +	.name = "imx-keypad",
-> +	.id = -1,
-> +	.num_resources = ARRAY_SIZE(imx_kpp_resources),
-> +	.resource = imx_kpp_resources,
-> +};
-> +
->  static int mx3_devices_init(void)
->  {
->  	if (cpu_is_mx31()) {
-> diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
-> index 42cf175..4ca2a18 100644
-> --- a/arch/arm/mach-mx3/devices.h
-> +++ b/arch/arm/mach-mx3/devices.h
-> @@ -25,4 +25,5 @@ extern struct platform_device mxc_spi_device1;
->  extern struct platform_device mxc_spi_device2;
->  extern struct platform_device imx_ssi_device0;
->  extern struct platform_device imx_ssi_device1;
-> +extern struct platform_device imx_kpp_device;
->  
-> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> index 46ccb6c..258e8d1 100644
-> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> @@ -30,6 +30,7 @@
->  #include <linux/regulator/consumer.h>
->  #include <linux/log2.h>
->  #include <linux/err.h>
-> +#include <linux/input/matrix_keypad.h>
->  
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
-> @@ -109,6 +110,35 @@ static int mx31_3ds_pins[] = {
->  	MX31_PIN_HSYNC__HSYNC,
->  	MX31_PIN_FPSHIFT__FPSHIFT,
->  	MX31_PIN_CONTRAST__CONTRAST,
-> +	/*Keyboard*/
-> +	IOMUX_MODE(MX31_PIN_KEY_ROW0, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_ROW1, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_COL0, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_COL1, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_COL2, IOMUX_CONFIG_FUNC),
-> +	IOMUX_MODE(MX31_PIN_KEY_COL3, IOMUX_CONFIG_FUNC),
-> +};
-> +
-> +/*
-> + * Matrix keyboard
-> + */
-> +
-> +static const uint32_t mx31_3ds_keymap[] = {
-> +	KEY(0, 0, KEY_UP),
-> +	KEY(0, 1, KEY_DOWN),
-> +	KEY(1, 0, KEY_RIGHT),
-> +	KEY(1, 1, KEY_LEFT),
-> +	KEY(1, 2, KEY_ENTER),
-> +	KEY(2, 0, KEY_F6),
-> +	KEY(2, 1, KEY_F8),
-> +	KEY(2, 2, KEY_F9),
-> +	KEY(2, 3, KEY_F10),
-> +};
-> +
-> +static struct matrix_keymap_data mx31_3ds_keymap_data = {
-> +	.keymap		= mx31_3ds_keymap,
-> +	.keymap_size	= ARRAY_SIZE(mx31_3ds_keymap),
->  };
->  
->  /*
-> @@ -609,6 +639,8 @@ static void __init mxc_board_init(void)
->  	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
->  	mxc_register_device(&mx3_fb, &mx3fb_pdata);
->  
-> +	mxc_register_device(&imx_kpp_device, &mx31_3ds_keymap_data);
-> +
->  	if (!mx31_3ds_init_expio())
->  		platform_device_register(&smsc911x_device);
->  }
+Same thing can be achieved by running:
+
+  # useradd dummy
+
+This comes from the fact that when USE_SPLIT_PTLOCKS is not defined,
+the only lock protecting the page tables is mm->page_table_lock
+which is already locked before update_mmu_cache() is called.
+
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+---
+ arch/arm/mm/fault-armv.c |   28 ++++++++++++++++++++++++++--
+ 1 files changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index 0d414c2..8a43563 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -65,6 +65,30 @@ static int do_adjust_pte(struct vm_area_struct *vma, unsigned long address,
+ 	return ret;
+ }
+ 
++#if USE_SPLIT_PTLOCKS
++/*
++ * If we are using split PTE locks, then we need to take the page
++ * lock here.  Otherwise we are using shared mm->page_table_lock
++ * which is already locked, thus cannot take it.
++ */
++static inline void do_pte_lock(spinlock_t *ptl)
++{
++	/*
++	 * Use nested version here to indicate that we are already
++	 * holding one similar spinlock.
++	 */
++	spin_lock_nested(ptl, SINGLE_DEPTH_NESTING);
++}
++
++static inline void do_pte_unlock(spinlock_t *ptl)
++{
++	spin_unlock(ptl);
++}
++#else /* !USE_SPLIT_PTLOCKS */
++static inline void do_pte_lock(spinlock_t *ptl) {}
++static inline void do_pte_unlock(spinlock_t *ptl) {}
++#endif /* USE_SPLIT_PTLOCKS */
++
+ static int adjust_pte(struct vm_area_struct *vma, unsigned long address,
+ 	unsigned long pfn)
+ {
+@@ -89,11 +113,11 @@ static int adjust_pte(struct vm_area_struct *vma, unsigned long address,
+ 	 */
+ 	ptl = pte_lockptr(vma->vm_mm, pmd);
+ 	pte = pte_offset_map_nested(pmd, address);
+-	spin_lock(ptl);
++	do_pte_lock(ptl);
+ 
+ 	ret = do_adjust_pte(vma, address, pfn, pte);
+ 
+-	spin_unlock(ptl);
++	do_pte_unlock(ptl);
+ 	pte_unmap_nested(pte);
+ 
+ 	return ret;
+-- 
+1.5.6.5
