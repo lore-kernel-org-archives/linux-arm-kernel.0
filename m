@@ -1,35 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 May 2010 08:43:43 -0700
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C558B316@dbde02.ent.ti.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100505150209.GC2606@n2100.arm.linux.org.uk>
-	<20100513174023.GB13001@n2100.arm.linux.org.uk>
-	<20100513211951.GH3428@atomide.com>
-	<20100513215825.GC13001@n2100.arm.linux.org.uk>
-	<20100513220139.GO3428@atomide.com>
-	<20100513221229.GD13001@n2100.arm.linux.org.uk>
-	<20100514152208.GU3428@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C558B316@dbde02.ent.ti.com>
-Message-ID: <20100514154343.GX3428@atomide.com>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Fri, 14 May 2010 17:56:31 +0200
+Subject: [PATCH 1/6] Driver for the watchdog timer on Freescale IMX2
+	(and later) processors.
+In-Reply-To: <20100514024915.GE30794@pengutronix.de>
+References: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
+	<1272528202-24159-2-git-send-email-w.sang@pengutronix.de>
+	<20100514024915.GE30794@pengutronix.de>
+Message-ID: <20100514155631.GG4008@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100514 08:28]:
-> > 
-> > Yeah, that missing patch was it. Compiles and boots now:
-> > 
-> > Tested-by: Tony Lindgren <tony@atomide.com>
+Hi Wolfram,
+
+> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > Cc: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Wim Van Sebroeck <wim@iguana.be>
 > 
-> Did you get the frame buffer with lmb ??
+> Ping. Wim, did you notice this one? Shall the driver go via your tree or via
+> the imx-tree along with the resource updates (with your ack)?
 
-I've never gotten a DSS2 frame buffer yet with the code that's
-in omap for-next, but I believe Tomi has the missing pieces queued up.
+Yes, I saw this one. I started reviewing it, but didn't finish it yet.
+Will let you know something when it's done.
 
-My tested-by was for the patch not breaking the current behaviour,
-basically to make sure things boot. So since it's really half
-tested, maybe acked-by would be more suitable.
+Driver can go via my tree but since it's part of a series of other patches, it can also
+go via the imx tree (which is probably preferred).
 
-Regards,
-
-Tony
+Kind regards,
+Wim.
