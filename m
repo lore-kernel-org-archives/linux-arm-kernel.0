@@ -1,28 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 May 2010 15:25:19 +0100
-Subject: Should we pass amba device peripheral id with device structure
-	or not?
-In-Reply-To: <4BECF57A.4050802@st.com>
-References: <4BECF57A.4050802@st.com>
-Message-ID: <1273847119.28312.30.camel@e102109-lin.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 14 May 2010 09:46:19 -0400 (EDT)
+Subject: Git pull request: Orion/Kirkwood stuff for 2.6.35
+In-Reply-To: <alpine.LFD.2.00.1005031731010.14468@xanadu.home>
+References: <alpine.LFD.2.00.1005031731010.14468@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1005140945410.31272@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-05-14 at 08:02 +0100, Viresh KUMAR wrote:
-> amba_device_register function reads and updates peripheral id from hardware
-> registers, whenever we register any amba device. If clock to device is disabled,
-> then amba_device_register will not be able to read and update this value.
+Ping.
+
+On Mon, 3 May 2010, Nicolas Pitre wrote:
+
 > 
-> Thus device registration will fail. Now we can also pass peripheral
-> id with the device structure, which will let it pass.
-> But i remember in SPEAr patches review, i got this comment to remove
-> peripheral id from device structure as it will be populated
-> automatically.
-
-The peripheral id is usually only present in PrimeCell devices and it's
-not a feature of the AMBA bus. So if your device doesn't have such id
-(or it isn't readable) I think it makes sense to pass one in the
-amba_device structure.
-
--- 
-Catalin
+> Russell, could you pull:
+> 
+>     git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git master
+> 
+> This contains what I have pending for Orion/Kirkwood so far.  Since I'm 
+> not working at Marvell anymore, I'm using a different server for this 
+> pull request.  If anyone at Marvell is willing to maintain this tree 
+> I'll be happy to pass the baton.  Otherwise I'll just collect patches 
+> but I don't expect to work much on it myself (this code is in 
+> maintenance mode anyway).
+> 
+> Arnaud Patard (1):
+>       [ARM] dns323-setup.c: fix WARN() when booting
+> 
+> Nicolas Pitre (1):
+>       update MAINTAINERS file
+> 
+> Siddarth Gore (1):
+>       [ARM] Kirkwood: Marvell GuruPlug support
+> 
+> Simon Guinot (3):
+>       [ARM] Kirkwood: add LaCie 2Big Network v2 support
+>       [ARM] Kirkwood: add LaCie 5Big Network v2 support
+>       [ARM] Kirkwood: merge net2big_v2 and net5big_v2 board setups
+> 
+>  MAINTAINERS                               |   12 +-
+>  arch/arm/mach-kirkwood/Kconfig            |   18 +
+>  arch/arm/mach-kirkwood/Makefile           |    3 +
+>  arch/arm/mach-kirkwood/guruplug-setup.c   |  131 +++++++
+>  arch/arm/mach-kirkwood/netxbig_v2-setup.c |  415 +++++++++++++++++++++++
+>  arch/arm/mach-orion5x/dns323-setup.c      |    1 +
+>  6 files changed, 574 insertions(+), 6 deletions(-)
+> 
+> 
+> Nicolas
+> 
