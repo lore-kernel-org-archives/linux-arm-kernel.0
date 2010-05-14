@@ -1,60 +1,49 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 14 May 2010 13:11:12 +0200
-Subject: [PATCH 17/20] pxa3xx_nand: add cmdline part parser support
-In-Reply-To: <AANLkTikzToO-hd0b2o_Ikzess1pwFwO4vdshDTfn7Twc@mail.gmail.com>
-References: <h2l771cded01005060212k39b41e4aqa57cc6e5072bfe3b@mail.gmail.com>	
-	<1273804364.9999.881.camel@macbook.infradead.org>	
-	<AANLkTikMrVigamYF8VAiEB3_JXGr6LAFliOmw9CJr8mz@mail.gmail.com>	
-	<1273824971.9999.1582.camel@macbook.infradead.org>	
-	<20100514084149.GJ30801@buzzloop.caiaq.de>
-	<AANLkTikzToO-hd0b2o_Ikzess1pwFwO4vdshDTfn7Twc@mail.gmail.com>
-Message-ID: <4BED2FD0.5010308@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 May 2010 20:34:14 +0900
+Subject: PIPT cache handling on s5pv210 chip
+In-Reply-To: <20100514104843.GG10339@n2100.arm.linux.org.uk>
+References: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+	<00bc01caf351$5daf71c0$190e5540$%kim@samsung.com>
+	<20100514104843.GG10339@n2100.arm.linux.org.uk>
+Message-ID: <00ca01caf359$643defa0$2cb9cee0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang wrote:
-> On Fri, May 14, 2010 at 4:41 PM, Daniel Mack <daniel@caiaq.de> wrote:
->> On Fri, May 14, 2010 at 09:16:11AM +0100, David Woodhouse wrote:
->>> On Fri, 2010-05-14 at 14:08 +0800, Haojian Zhuang wrote:
->>>> New patches are rebased for mtd-2.6 master branch. There're contained
->>>> in another mail loop.
->>> Hm, please test these by sending to yourself first, saving the patches
->>> and checking that they apply.
->>>
->>> [dwmw2 at macbook mtd-2.6]$ git describe HEAD
->>> v2.6.34-rc7-142-gf6b173c
->>>
->>> [dwmw2 at macbook mtd-2.6]$ for a in `seq -w 1 20` ; do echo Patch $a ; patch -p1 < pxa$a.patch ; done
->>> Patch 01
->>> patching file arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
->>> patching file drivers/mtd/nand/Kconfig
->>> patching file drivers/mtd/nand/pxa3xx_nand.c
->>> patch: **** malformed patch at line 203: transfering to/from NAND HW");
->> Jep, they're line-wrapped, just like the version before.
->>
->> Haojian, you can avoid this to happen by using 'git send-email'.
->>
->> Thanks,
->> Daniel
->>
+Russell King wrote:
 > 
-> Now I attach these patches directly. Only 0011 patch is changed to
-> using dev_dbg for debug print.
+> On Fri, May 14, 2010 at 07:36:47PM +0900, Kukjin Kim wrote:
+> > In case of __vmalloc() with non-cacheable option, there may come some
+> > malfunctions related to cache.
+> 
+> Practically, you are not allowed on ARMv6 or ARMv7 to create mappings
+> which alias with differing memory types; that is 100% outlawed by the
+> architecture spec, and there is NO mitigation for this.
+> 
+> It means that it is _illegal_ to use __vmalloc() with anything but a
+> memory-like mapping protection.
+> 
+> There is mitigation for having different cacheability, but this is just
+> a work-around while OSes like Linux work to remove the creation of
+> aliases with differing cacheability attributes.  There's no guarantee
+> that later ARMv7 or future CPUs will continue to operate predictably.
+> 
+> The same applies for ioremap() being used on SDRAM - and those who look
+> at what's in my tree will notice that ioremap() has recently been made
+> to fail when used on SDRAM for this very reason.
 
-I NACK patches 1 and 17. See my reply to these individual patches.
+In case a driver starts the Memory_To_Peripheral DMA operation with the
+memory area allotted by __vmalloc(,,no-cacheable), the driver can face some
+problems caused by cache victims.
 
-Cheers, Marc
+> Therefore, the above hack isn't going near mainline.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Nevertheless, I think so too.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 260 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100514/f0167d1c/attachment.sig>
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
