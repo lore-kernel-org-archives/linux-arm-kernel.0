@@ -1,55 +1,54 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 14 May 2010 12:49:22 +0900
-Subject: PIPT cache handling on s5pv210 chip
-Message-ID: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 14 May 2010 07:22:03 +0200
+Subject: [PATCH v3] ARM: S5PC100: Pre-requisite clock patch for
+	plat-s5pc1xx to plat-s5p move.
+In-Reply-To: <1273797327-5342-1-git-send-email-kgene.kim@samsung.com>
+References: <1273797327-5342-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <008501caf325$65716430$30542c90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-In s5pv210 code, there's some strange comments. Does anyone who know
-why does it required or more fancy way?
+On Friday, May 14, 2010 2:35 AM Kukjin Kim wrote:
 
-Thank you,
-Kyungmin Park
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> This is a pre-requisite clock patch for the plat-s5pc1xx to plat-s5p
+> movement. The patches that perform the movement of the code from
+> plat-s5pc1xx to plat-s5p (and mach-s5pc100) should also enable the
+> build for the mach-s5pc100/clock.c code.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5pc100/clock.c                   | 1362
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5pc100/include/mach/regs-clock.h |   71 ++
+>  arch/arm/plat-s5p/clock.c                       |    2 +-
+>  arch/arm/plat-s5p/include/plat/pll.h            |   22 +
+>  arch/arm/plat-s5p/include/plat/s5p-clock.h      |    2 +
+>  5 files changed, 1459 insertions(+), 1 deletions(-)
+>  create mode 100755 arch/arm/mach-s5pc100/clock.c
+>  create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-clock.h
+> 
+> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+> new file mode 100755
 
+Please use 0644 mode for new files, no need to set the 'execute' bit.
 
-/*
- * flush_cache_vmap() is used when creating mappings (eg, via vmap,
- * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
- * caches, since the direct-mappings of these pages may contain cached
- * data, we need to do a full cache flush to ensure that writebacks
- * don't corrupt data placed into these pages via the new mappings.
- */
-static inline void flush_cache_vmap(unsigned long start, unsigned long end)
-{
-#if defined(CONFIG_ARCH_S5PV210)
-/*
- * SAMSUNG SoC(S5PV210) has a L2 cache. L2 cache type is
- * VIPT type but L2 is PIPT type cache. If disabling L2 cache, this
- * code works well. But enabling L2 cache, there is data corruption
- * problem. In case of S5PV210, just call flush_cache_all() function
- * like as 2.6.28 kernel.
- */
-        flush_cache_all();
-#else
-        if (!cache_is_vipt_nonaliasing())
-                flush_cache_all();
-        else
-                /*
-                 * set_pte_at() called from vmap_pte_range() does not
-                 * have a DSB after cleaning the cache line.
-                 */
-                dsb();
-#endif
-}
+> ...
 
-static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
-{
-#if defined(CONFIG_ARCH_S5PV210)
-        flush_cache_all();
-#else
-        if (!cache_is_vipt_nonaliasing())
-                flush_cache_all();
-#endif
-}
+I also got the following compilation warnings:
+
+arch/arm/mach-s5pc100/clock.c:47: warning: 'clk_mout_href' defined but not used
+arch/arm/mach-s5pc100/clock.c:400: warning: 's5pc100_d2_0_ctrl' defined but not
+used
+
+Besides the above this patch works fine. I will post my redesigned s5pc100 patch
+series in a few minutes.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
