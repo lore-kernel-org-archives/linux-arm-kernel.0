@@ -1,36 +1,25 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 14 May 2010 09:32:00 -0700
-Subject: [PATCH] gic: implement set_type
-In-Reply-To: <1273574921-25714-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1273574921-25714-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <4BED7B00.5080405@codeaurora.org>
+From: jeff@garzik.org (Jeff Garzik)
+Date: Fri, 14 May 2010 13:42:14 -0400
+Subject: [PATCH] PXA DMA-capable PATA driver
+In-Reply-To: <201005141551.55066.marek.vasut@gmail.com>
+References: <1273460525-25662-1-git-send-email-marek.vasut@gmail.com>
+	<201005141551.55066.marek.vasut@gmail.com>
+Message-ID: <4BED8B76.5010701@garzik.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static int gic_set_type(unsigned int irq, unsigned int type)
-> +{
-> +	void __iomem *base = gic_dist_base(irq);
-> +	unsigned int gicirq = gic_irq(irq);
-> +	u32 enablemask = 1 << (gicirq % 32);
-> +	u32 enableoff = (gicirq / 32) * 4;
-> +	u32 confmask = 0x2 << ((gicirq % 16) * 2);
-> +	u32 confoff = (gicirq / 16) * 4;
-> +	bool enabled = false;
-> +	u32 val;
-> +
-> +	/* Only SPIs' interrupt configuration can be changed */
-> +	if (gicirq < 32)
-> +		return -EINVAL;
+On 05/14/2010 09:51 AM, Marek Vasut wrote:
+> Dne Po 10. kv?tna 2010 05:02:05 Marek Vasut napsal(a):
+>> This patch adds a driver for a harddrive attached to PXA address and data
+>> bus. Unlike pata_platform, this driver allows usage of PXA DMA controller,
+>> making the transmission speed 3x higher.
+>>
+>> Signed-off-by: Marek Vasut<marek.vasut@gmail.com>
+>
+> Hey, any updates on this ?
 
+It's queued for #upstream review, should get merged today or tomorrow.
 
-This causes drivers who are requesting PPI's with IRQF_TRIGGER_* flags 
-to fail.
+Typically I wait a while, for comments from PATA-interested folks.
 
-
-Note that it is "Implementation Defined" whether PPI's are programmable 
-.http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ihi0048a/index.html
-
-I would request to change gicirq < 32 to gicirq < 16 , the writes will 
-be ignored if PPI's are not programmable.
-
-Abhijeet
+	Jeff
