@@ -1,167 +1,574 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 14 May 2010 13:03:56 +0200
-Subject: [PATCH v4] ARM: S5PV210: Add Ext interrupt support.
-In-Reply-To: <1273826160-17999-1-git-send-email-kgene.kim@samsung.com>
-References: <1273826160-17999-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <008f01caf355$2ba713a0$82f53ae0$%szyprowski@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 14 May 2010 13:09:00 +0200
+Subject: [PATCH 01/20] mtd: pxa3xx_nand: refuse the flash definition get
+	from 	platform
+In-Reply-To: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>
+References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>
+Message-ID: <4BED2F4C.8040300@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-On Friday, May 14, 2010 10:36 AM Kukjin Kim wrote:
+Hello Haojian,
 
-> From: Jongpill Lee <boyko.lee@samsung.com>
+Haojian Zhuang wrote:
+>>From 16057e690aa4a2fd8a9c07c70ab48ffc2f76204f Mon Sep 17 00:00:00 2001
+> From: Lei Wen <leiwen@marvell.com>
+> Date: Sat, 20 Mar 2010 19:01:23 +0800
+> Subject: [PATCH] mtd: pxa3xx_nand: refuse the flash definition get from platform
 > 
-> Add support for external interrupts on v210.
+> For current usage, it is little reason to use a platform defined flash info
+> for the flash detection. Flash timing through platform should be the same.
+> And allow multiple platform to define the same flash chip would be a waste.
 > 
-> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Also condense the flash definition way in the c file to simplify adding a
+> new chip.
+> 
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+
+NACK, see inline
+
 > ---
->  arch/arm/mach-s5pv210/Kconfig                  |    1 +
->  arch/arm/mach-s5pv210/include/mach/irqs.h      |   26 +--
->  arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   46 +++++
->  arch/arm/plat-s5p/Kconfig                      |    5 +
->  arch/arm/plat-s5p/Makefile                     |    1 +
->  arch/arm/plat-s5p/irq-eint.c                   |  216
-> ++++++++++++++++++++++++
->  6 files changed, 277 insertions(+), 18 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
->  create mode 100644 arch/arm/plat-s5p/irq-eint.c
+>  arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   40 ----
+>  drivers/mtd/nand/Kconfig                     |    7 -
+>  drivers/mtd/nand/pxa3xx_nand.c               |  262 ++++++--------------------
+>  3 files changed, 60 insertions(+), 249 deletions(-)
+> 
+> diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> index 3478eae..c494f68 100644
+> --- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> +++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> @@ -4,43 +4,6 @@
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/partitions.h>
+> 
+> -struct pxa3xx_nand_timing {
+> -	unsigned int	tCH;  /* Enable signal hold time */
+> -	unsigned int	tCS;  /* Enable signal setup time */
+> -	unsigned int	tWH;  /* ND_nWE high duration */
+> -	unsigned int	tWP;  /* ND_nWE pulse time */
+> -	unsigned int	tRH;  /* ND_nRE high duration */
+> -	unsigned int	tRP;  /* ND_nRE pulse width */
+> -	unsigned int	tR;   /* ND_nWE high to ND_nRE low for read */
+> -	unsigned int	tWHR; /* ND_nWE high to ND_nRE low for status read */
+> -	unsigned int	tAR;  /* ND_ALE low to ND_nRE low delay */
+> -};
+> -
+> -struct pxa3xx_nand_cmdset {
+> -	uint16_t	read1;
+> -	uint16_t	read2;
+> -	uint16_t	program;
+> -	uint16_t	read_status;
+> -	uint16_t	read_id;
+> -	uint16_t	erase;
+> -	uint16_t	reset;
+> -	uint16_t	lock;
+> -	uint16_t	unlock;
+> -	uint16_t	lock_status;
+> -};
+> -
+> -struct pxa3xx_nand_flash {
+> -	const struct pxa3xx_nand_timing *timing; /* NAND Flash timing */
+> -	const struct pxa3xx_nand_cmdset *cmdset;
+> -
+> -	uint32_t page_per_block;/* Pages per block (PG_PER_BLK) */
+> -	uint32_t page_size;	/* Page size in bytes (PAGE_SZ) */
+> -	uint32_t flash_width;	/* Width of Flash memory (DWIDTH_M) */
+> -	uint32_t dfc_width;	/* Width of flash controller(DWIDTH_C) */
+> -	uint32_t num_blocks;	/* Number of physical blocks in Flash */
+> -	uint32_t chip_id;
+> -};
+> -
+>  struct pxa3xx_nand_platform_data {
+> 
+>  	/* the data flash bus is shared between the Static Memory
+> @@ -54,9 +17,6 @@ struct pxa3xx_nand_platform_data {
+> 
+>  	const struct mtd_partition		*parts;
+>  	unsigned int				nr_parts;
+> -
+> -	const struct pxa3xx_nand_flash * 	flash;
+> -	size_t					num_flash;
+>  };
+> 
+>  extern void pxa3xx_set_nand_info(struct pxa3xx_nand_platform_data *info);
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 98a04b3..9a35d92 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -399,13 +399,6 @@ config MTD_NAND_PXA3xx
+>  	  This enables the driver for the NAND flash device found on
+>  	  PXA3xx processors
+> 
+> -config MTD_NAND_PXA3xx_BUILTIN
+> -	bool "Use builtin definitions for some NAND chips (deprecated)"
+> -	depends on MTD_NAND_PXA3xx
+> -	help
+> -	  This enables builtin definitions for some NAND chips. This
+> -	  is deprecated in favor of platform specific data.
+> -
+>  config MTD_NAND_CM_X270
+>  	tristate "Support for NAND Flash on CM-X270 modules"
+>  	depends on MTD_NAND && MACH_ARMCORE
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index e02fa4f..da40b9a 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -113,6 +113,41 @@ enum {
+>  	STATE_PIO_WRITING,
+>  };
+> 
+> +struct pxa3xx_nand_timing {
+> +	uint32_t	tCH;  /* Enable signal hold time */
+> +	uint32_t	tCS;  /* Enable signal setup time */
+> +	uint32_t	tWH;  /* ND_nWE high duration */
+> +	uint32_t	tWP;  /* ND_nWE pulse time */
+> +	uint32_t	tRH;  /* ND_nRE high duration */
+> +	uint32_t	tRP;  /* ND_nRE pulse width */
+> +	uint32_t	tAR;  /* ND_ALE low to ND_nRE low delay */
+> +	uint32_t	tWHR; /* ND_nWE high to ND_nRE low for status read */
+> +	uint32_t	tR;   /* ND_nWE high to ND_nRE low for read */
+> +};
+> +
+> +struct pxa3xx_nand_cmdset {
+> +	uint16_t	read1;
+> +	uint16_t	read2;
+> +	uint16_t	program;
+> +	uint16_t	read_status;
+> +	uint16_t	read_id;
+> +	uint16_t	erase;
+> +	uint16_t	reset;
+> +	uint16_t	lock;
+> +	uint16_t	unlock;
+> +	uint16_t	lock_status;
+> +};
+> +
+> +struct pxa3xx_nand_flash {
+> +	uint32_t	chip_id;
+> +	uint16_t	page_per_block; /* Pages per block (PG_PER_BLK) */
+> +	uint16_t 	page_size;	/* Page size in bytes (PAGE_SZ) */
+> +	uint8_t		flash_width;	/* Width of Flash memory (DWIDTH_M) */
+> +	uint8_t 	dfc_width;	/* Width of flash controller(DWIDTH_C) */
+> +	uint32_t	num_blocks;	/* Number of physical blocks in Flash */
+> +	struct pxa3xx_nand_timing timing;	/* NAND Flash timing */
+> +};
+> +
+>  struct pxa3xx_nand_info {
+>  	struct nand_chip	nand_chip;
+> 
+> @@ -177,20 +212,7 @@ MODULE_PARM_DESC(use_dma, "enable DMA for data
+> transfering to/from NAND HW");
+>  static struct pxa3xx_nand_timing default_timing;
+>  static struct pxa3xx_nand_flash default_flash;
+> 
+> -static struct pxa3xx_nand_cmdset smallpage_cmdset = {
+> -	.read1		= 0x0000,
+> -	.read2		= 0x0050,
+> -	.program	= 0x1080,
+> -	.read_status	= 0x0070,
+> -	.read_id	= 0x0090,
+> -	.erase		= 0xD060,
+> -	.reset		= 0x00FF,
+> -	.lock		= 0x002A,
+> -	.unlock		= 0x2423,
+> -	.lock_status	= 0x007A,
+> -};
+> -
+> -static struct pxa3xx_nand_cmdset largepage_cmdset = {
+> +const static struct pxa3xx_nand_cmdset cmdset = {
+>  	.read1		= 0x3000,
+>  	.read2		= 0x0050,
+>  	.program	= 0x1080,
+> @@ -203,143 +225,17 @@ static struct pxa3xx_nand_cmdset largepage_cmdset = {
+>  	.lock_status	= 0x007A,
+>  };
+> 
+> -#ifdef CONFIG_MTD_NAND_PXA3xx_BUILTIN
+> -static struct pxa3xx_nand_timing samsung512MbX16_timing = {
+> -	.tCH	= 10,
+> -	.tCS	= 0,
+> -	.tWH	= 20,
+> -	.tWP	= 40,
+> -	.tRH	= 30,
+> -	.tRP	= 40,
+> -	.tR	= 11123,
+> -	.tWHR	= 110,
+> -	.tAR	= 10,
+> -};
+> -
+> -static struct pxa3xx_nand_flash samsung512MbX16 = {
+> -	.timing		= &samsung512MbX16_timing,
+> -	.cmdset		= &smallpage_cmdset,
+> -	.page_per_block	= 32,
+> -	.page_size	= 512,
+> -	.flash_width	= 16,
+> -	.dfc_width	= 16,
+> -	.num_blocks	= 4096,
+> -	.chip_id	= 0x46ec,
+> -};
+> -
+> -static struct pxa3xx_nand_flash samsung2GbX8 = {
+> -	.timing		= &samsung512MbX16_timing,
+> -	.cmdset		= &smallpage_cmdset,
+> -	.page_per_block	= 64,
+> -	.page_size	= 2048,
+> -	.flash_width	= 8,
+> -	.dfc_width	= 8,
+> -	.num_blocks	= 2048,
+> -	.chip_id	= 0xdaec,
+> -};
+> -
+> -static struct pxa3xx_nand_flash samsung32GbX8 = {
+> -	.timing		= &samsung512MbX16_timing,
+> -	.cmdset		= &smallpage_cmdset,
+> -	.page_per_block	= 128,
+> -	.page_size	= 4096,
+> -	.flash_width	= 8,
+> -	.dfc_width	= 8,
+> -	.num_blocks	= 8192,
+> -	.chip_id	= 0xd7ec,
+> +static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
+> +{ 0x46ec, 32, 512, 16, 16, 4096, { 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
+> +{ 0xdaec, 64, 2048, 8, 8, 2048, { 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
+> +{ 0xd7ec, 128, 4096, 8, 8, 8192, { 10, 0, 20, 40, 30, 40, 11123, 110, 10, }, },
+> +{ 0xa12c, 64, 2048, 8, 8, 1024, { 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
+> +{ 0xb12c, 64, 2048, 16, 16, 1024, { 10, 25, 15, 25, 15, 30, 25000,
+> 60, 10, }, },
+> +{ 0xdc2c, 64, 2048, 8, 8, 4096, { 10, 25, 15, 25, 15, 30, 25000, 60, 10, }, },
+> +{ 0xcc2c, 64, 2048, 16, 16, 4096, { 10, 25, 15, 25, 15, 30, 25000,
+> 60, 10, }, },
+> +{ 0xba20, 64, 2048, 16, 16, 2048, { 10, 35, 15, 25, 15, 25, 25000,
+> 60, 10, }, },
+>  };
+> 
+> -static struct pxa3xx_nand_timing micron_timing = {
+> -	.tCH	= 10,
+> -	.tCS	= 25,
+> -	.tWH	= 15,
+> -	.tWP	= 25,
+> -	.tRH	= 15,
+> -	.tRP	= 30,
+> -	.tR	= 25000,
+> -	.tWHR	= 60,
+> -	.tAR	= 10,
+> -};
+> -
+> -static struct pxa3xx_nand_flash micron1GbX8 = {
+> -	.timing		= &micron_timing,
+> -	.cmdset		= &largepage_cmdset,
+> -	.page_per_block	= 64,
+> -	.page_size	= 2048,
+> -	.flash_width	= 8,
+> -	.dfc_width	= 8,
+> -	.num_blocks	= 1024,
+> -	.chip_id	= 0xa12c,
+> -};
+> -
+> -static struct pxa3xx_nand_flash micron1GbX16 = {
+> -	.timing		= &micron_timing,
+> -	.cmdset		= &largepage_cmdset,
+> -	.page_per_block	= 64,
+> -	.page_size	= 2048,
+> -	.flash_width	= 16,
+> -	.dfc_width	= 16,
+> -	.num_blocks	= 1024,
+> -	.chip_id	= 0xb12c,
+> -};
+> -
+> -static struct pxa3xx_nand_flash micron4GbX8 = {
+> -	.timing		= &micron_timing,
+> -	.cmdset		= &largepage_cmdset,
+> -	.page_per_block	= 64,
+> -	.page_size	= 2048,
+> -	.flash_width	= 8,
+> -	.dfc_width	= 8,
+> -	.num_blocks	= 4096,
+> -	.chip_id	= 0xdc2c,
+> -};
+> -
+> -static struct pxa3xx_nand_flash micron4GbX16 = {
+> -	.timing		= &micron_timing,
+> -	.cmdset		= &largepage_cmdset,
+> -	.page_per_block	= 64,
+> -	.page_size	= 2048,
+> -	.flash_width	= 16,
+> -	.dfc_width	= 16,
+> -	.num_blocks	= 4096,
+> -	.chip_id	= 0xcc2c,
+> -};
+> -
+> -static struct pxa3xx_nand_timing stm2GbX16_timing = {
+> -	.tCH = 10,
+> -	.tCS = 35,
+> -	.tWH = 15,
+> -	.tWP = 25,
+> -	.tRH = 15,
+> -	.tRP = 25,
+> -	.tR = 25000,
+> -	.tWHR = 60,
+> -	.tAR = 10,
+> -};
+> -
+> -static struct pxa3xx_nand_flash stm2GbX16 = {
+> -	.timing = &stm2GbX16_timing,
+> -	.cmdset	= &largepage_cmdset,
+> -	.page_per_block = 64,
+> -	.page_size = 2048,
+> -	.flash_width = 16,
+> -	.dfc_width = 16,
+> -	.num_blocks = 2048,
+> -	.chip_id = 0xba20,
+> -};
+> -
+> -static struct pxa3xx_nand_flash *builtin_flash_types[] = {
+> -	&samsung512MbX16,
+> -	&samsung2GbX8,
+> -	&samsung32GbX8,
+> -	&micron1GbX8,
+> -	&micron1GbX16,
+> -	&micron4GbX8,
+> -	&micron4GbX16,
+> -	&stm2GbX16,
+> -};
+> -#endif /* CONFIG_MTD_NAND_PXA3xx_BUILTIN */
+> -
+>  #define NDTR0_tCH(c)	(min((c), 7) << 19)
+>  #define NDTR0_tCS(c)	(min((c), 7) << 16)
+>  #define NDTR0_tWH(c)	(min((c), 7) << 11)
+> @@ -412,7 +308,6 @@ static int prepare_read_prog_cmd(struct
+> pxa3xx_nand_info *info,
+>  			uint16_t cmd, int column, int page_addr)
+>  {
+>  	const struct pxa3xx_nand_flash *f = info->flash_info;
+> -	const struct pxa3xx_nand_cmdset *cmdset = f->cmdset;
+> 
+>  	/* calculate data size */
+>  	switch (f->page_size) {
+> @@ -445,7 +340,7 @@ static int prepare_read_prog_cmd(struct
+> pxa3xx_nand_info *info,
+>  		 */
+>  		info->ndcb1 = page_addr << 8;
+> 
+> -	if (cmd == cmdset->program)
+> +	if (cmd == cmdset.program)
+>  		info->ndcb0 |= NDCB0_CMD_TYPE(1) | NDCB0_AUTO_RS;
+> 
+>  	return 0;
+> @@ -463,20 +358,18 @@ static int prepare_erase_cmd(struct
+> pxa3xx_nand_info *info,
+> 
+>  static int prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
+>  {
+> -	const struct pxa3xx_nand_cmdset *cmdset = info->flash_info->cmdset;
+> -
+>  	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
+>  	info->ndcb1 = 0;
+>  	info->ndcb2 = 0;
+> 
+> -	if (cmd == cmdset->read_id) {
+> +	if (cmd == cmdset.read_id) {
+>  		info->ndcb0 |= NDCB0_CMD_TYPE(3);
+>  		info->data_size = 8;
+> -	} else if (cmd == cmdset->read_status) {
+> +	} else if (cmd == cmdset.read_status) {
+>  		info->ndcb0 |= NDCB0_CMD_TYPE(4);
+>  		info->data_size = 8;
+> -	} else if (cmd == cmdset->reset || cmd == cmdset->lock ||
+> -		   cmd == cmdset->unlock) {
+> +	} else if (cmd == cmdset.reset || cmd == cmdset.lock ||
+> +		   cmd == cmdset.unlock) {
+>  		info->ndcb0 |= NDCB0_CMD_TYPE(5);
+>  	} else
+>  		return -EINVAL;
+> @@ -700,8 +593,6 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+> *mtd, unsigned command,
+>  				int column, int page_addr)
+>  {
+>  	struct pxa3xx_nand_info *info = mtd->priv;
+> -	const struct pxa3xx_nand_flash *flash_info = info->flash_info;
+> -	const struct pxa3xx_nand_cmdset *cmdset = flash_info->cmdset;
+>  	int ret;
+> 
+>  	info->use_dma = (use_dma) ? 1 : 0;
+> @@ -718,7 +609,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+> *mtd, unsigned command,
+>  		info->buf_start = mtd->writesize + column;
+>  		memset(info->data_buff, 0xFF, info->buf_count);
+> 
+> -		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
+> +		if (prepare_read_prog_cmd(info, cmdset.read1, column, page_addr))
+>  			break;
+> 
+>  		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+> @@ -735,7 +626,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+> *mtd, unsigned command,
+>  		info->buf_count = mtd->writesize + mtd->oobsize;
+>  		memset(info->data_buff, 0xFF, info->buf_count);
+> 
+> -		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
+> +		if (prepare_read_prog_cmd(info, cmdset.read1, column, page_addr))
+>  			break;
+> 
+>  		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+> @@ -761,14 +652,14 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+> *mtd, unsigned command,
+>  	case NAND_CMD_PAGEPROG:
+>  		info->use_ecc = (info->seqin_column >= mtd->writesize) ? 0 : 1;
+> 
+> -		if (prepare_read_prog_cmd(info, cmdset->program,
+> +		if (prepare_read_prog_cmd(info, cmdset.program,
+>  				info->seqin_column, info->seqin_page_addr))
+>  			break;
+> 
+>  		pxa3xx_nand_do_cmd(info, NDSR_WRDREQ);
+>  		break;
+>  	case NAND_CMD_ERASE1:
+> -		if (prepare_erase_cmd(info, cmdset->erase, page_addr))
+> +		if (prepare_erase_cmd(info, cmdset.erase, page_addr))
+>  			break;
+> 
+>  		pxa3xx_nand_do_cmd(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+> @@ -783,13 +674,13 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+> *mtd, unsigned command,
+>  				info->read_id_bytes : 1;
+> 
+>  		if (prepare_other_cmd(info, (command == NAND_CMD_READID) ?
+> -				cmdset->read_id : cmdset->read_status))
+> +				cmdset.read_id : cmdset.read_status))
+>  			break;
+> 
+>  		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ);
+>  		break;
+>  	case NAND_CMD_RESET:
+> -		if (prepare_other_cmd(info, cmdset->reset))
+> +		if (prepare_other_cmd(info, cmdset.reset))
+>  			break;
+> 
+>  		ret = pxa3xx_nand_do_cmd(info, NDSR_CS0_CMDD);
+> @@ -925,12 +816,10 @@ static int pxa3xx_nand_ecc_correct(struct mtd_info *mtd,
+> 
+>  static int __readid(struct pxa3xx_nand_info *info, uint32_t *id)
+>  {
+> -	const struct pxa3xx_nand_flash *f = info->flash_info;
+> -	const struct pxa3xx_nand_cmdset *cmdset = f->cmdset;
+>  	uint32_t ndcr;
+>  	uint8_t  id_buff[8];
+> 
+> -	if (prepare_other_cmd(info, cmdset->read_id)) {
+> +	if (prepare_other_cmd(info, cmdset.read_id)) {
+>  		printk(KERN_ERR "failed to prepare command\n");
+>  		return -EINVAL;
+>  	}
+> @@ -991,7 +880,7 @@ static int pxa3xx_nand_config_flash(struct
+> pxa3xx_nand_info *info,
+> 
+>  	info->reg_ndcr = ndcr;
+> 
+> -	pxa3xx_nand_set_timing(info, f->timing);
+> +	pxa3xx_nand_set_timing(info, &f->timing);
+>  	info->flash_info = f;
+>  	return 0;
+>  }
+> @@ -1027,11 +916,6 @@ static int pxa3xx_nand_detect_config(struct
+> pxa3xx_nand_info *info)
+>  	default_flash.flash_width = ndcr & NDCR_DWIDTH_M ? 16 : 8;
+>  	default_flash.dfc_width = ndcr & NDCR_DWIDTH_C ? 16 : 8;
+> 
+> -	if (default_flash.page_size == 2048)
+> -		default_flash.cmdset = &largepage_cmdset;
+> -	else
+> -		default_flash.cmdset = &smallpage_cmdset;
+> -
+>  	/* set info fields needed to __readid */
+>  	info->flash_info = &default_flash;
+>  	info->read_id_bytes = (default_flash.page_size == 2048) ? 4 : 2;
+> @@ -1067,7 +951,7 @@ static int pxa3xx_nand_detect_config(struct
+> pxa3xx_nand_info *info)
+>  		info->row_addr_cycles = 2;
+> 
+>  	pxa3xx_nand_detect_timing(info, &default_timing);
+> -	default_flash.timing = &default_timing;
+> +	memcpy(&default_flash.timing, &default_timing, sizeof(default_timing));
+> 
+>  	return 0;
+>  }
+> @@ -1083,23 +967,9 @@ static int pxa3xx_nand_detect_flash(struct
+> pxa3xx_nand_info *info,
+>  		if (pxa3xx_nand_detect_config(info) == 0)
+>  			return 0;
+> 
+> -	for (i = 0; i<pdata->num_flash; ++i) {
+> -		f = pdata->flash + i;
+> -
+> -		if (pxa3xx_nand_config_flash(info, f))
+> -			continue;
+> -
+> -		if (__readid(info, &id))
+> -			continue;
+> -
+> -		if (id == f->chip_id)
+> -			return 0;
+> -	}
+> -
+> -#ifdef CONFIG_MTD_NAND_PXA3xx_BUILTIN
+>  	for (i = 0; i < ARRAY_SIZE(builtin_flash_types); i++) {
+> 
+> -		f = builtin_flash_types[i];
+> +		f = &builtin_flash_types[i];
+> 
+>  		if (pxa3xx_nand_config_flash(info, f))
+>  			continue;
+> @@ -1110,7 +980,6 @@ static int pxa3xx_nand_detect_flash(struct
+> pxa3xx_nand_info *info,
+>  		if (id == f->chip_id)
+>  			return 0;
+>  	}
+> -#endif
+> 
+>  	dev_warn(&info->pdev->dev,
+>  		 "failed to detect configured nand flash; found %04x instead of\n",
+> @@ -1320,17 +1189,6 @@ static int pxa3xx_nand_probe(struct
+> platform_device *pdev)
+>  		goto fail_free_irq;
+>  	}
+> 
+> -	if (mtd_has_cmdlinepart()) {
+> -		static const char *probes[] = { "cmdlinepart", NULL };
+> -		struct mtd_partition *parts;
+> -		int nr_parts;
+> -
+> -		nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+> -
+> -		if (nr_parts)
+> -			return add_mtd_partitions(mtd, parts, nr_parts);
+> -	}
+> -
 
-> ...
+Why are you removing this? It already works, has the same functionality
+as your patch 17 and works without ugly defines.
 
-> diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-> new file mode 100644
-> index 0000000..040e271
-> --- /dev/null
-> +++ b/arch/arm/plat-s5p/irq-eint.c
-> @@ -0,0 +1,216 @@
-> +/* linux/arch/arm/plat-s5p/irq-eint.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * S5P - IRQ EINT support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/io.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/gpio.h>
-> +
-> +#include <asm/bitops.h>
-> +#include <asm/hardware/vic.h>
-> +
-> +#include <plat/regs-irqtype.h>
-> +
-> +#include <mach/map.h>
-> +#include <plat/cpu.h>
-> +#include <plat/pm.h>
-> +
-> +#include <plat/gpio-cfg.h>
-> +#include <mach/regs-gpio.h>
-> +
-> +static inline void s5p_irq_eint_mask(unsigned int irq)
-> +{
-> +	u32 mask;
-> +
-> +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-> +	mask |= eint_irq_to_bit(irq);
-> +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-> +}
-> +
-> +static void s5p_irq_eint_unmask(unsigned int irq)
-> +{
-> +	u32 mask;
-> +
-> +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-> +	mask &= ~(eint_irq_to_bit(irq));
-> +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-> +}
-> +
-> +static inline void s5p_irq_eint_ack(unsigned int irq)
-> +{
-> +	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
-> +}
-> +
-> +static void s5p_irq_eint_maskack(unsigned int irq)
-> +{
-> +	/* compiler should in-line these */
-> +	s5p_irq_eint_mask(irq);
-> +	s5p_irq_eint_ack(irq);
-> +}
-> +
-> +static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
-> +{
-> +	int offs = eint_offset(irq);
-> +	int shift;
-> +	u32 ctrl, mask;
-> +	u32 newvalue = 0;
-> +
-> +	switch (type) {
-> +	case IRQ_TYPE_NONE:
-> +		printk(KERN_WARNING "No edge setting!\n");
-> +		break;
-> +
-> +	case IRQ_TYPE_EDGE_RISING:
-> +		newvalue = S5P_EXTINT_RISEEDGE;
-> +		break;
-> +
-> +	case IRQ_TYPE_EDGE_FALLING:
-> +		newvalue = S5P_EXTINT_RISEEDGE;
-> +		break;
-> +
-> +	case IRQ_TYPE_EDGE_BOTH:
-> +		newvalue = S5P_EXTINT_BOTHEDGE;
-> +		break;
-> +
-> +	case IRQ_TYPE_LEVEL_LOW:
-> +		newvalue = S5P_EXTINT_LOWLEV;
-> +		break;
-> +
-> +	case IRQ_TYPE_LEVEL_HIGH:
-> +		newvalue = S5P_EXTINT_HILEV;
-> +		break;
-> +
-> +	default:
-> +		printk(KERN_ERR "No such irq type %d", type);
-> +		return -EINVAL;
-> +	}
-> +
-> +	shift = (offs & 0x7) * 4;
-> +	mask = 0x7 << shift;
-> +
-> +	ctrl = __raw_readl(S5P_EINT_CON(eint_conf_reg(irq)));
-> +	ctrl &= ~mask;
-> +	ctrl |= newvalue << shift;
-> +	__raw_writel(ctrl, S5P_EINT_CON(eint_conf_reg(irq)));
-> +
-> +	if ((0 <= offs) && (offs < 8))
-> +		s3c_gpio_cfgpin(S5PV210_GPH0(offs & 0x7), EINT_MODE);
-> +
-> +	else if ((8 <= offs) && (offs < 16))
-> +		s3c_gpio_cfgpin(S5PV210_GPH1(offs & 0x7), EINT_MODE);
-> +
-> +	else if ((16 <= offs) && (offs < 24))
-> +		s3c_gpio_cfgpin(S5PV210_GPH2(offs & 0x7), EINT_MODE);
-> +
-> +	else if ((24 <= offs) && (offs < 32))
-> +		s3c_gpio_cfgpin(S5PV210_GPH3(offs & 0x7), EINT_MODE);
+Please don't remove this and drop your patch 17
 
-When the code is put into plat-s5p directory then please don't use
-S5PV210_GPH3 defines. If makes it hardly reusable with other SoCs.
+>  	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
+> 
+>  fail_free_irq:
 
-> ...
+cheers Marc
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+- --
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org
+
+iEYEARECAAYFAkvtL0wACgkQjTAFq1RaXHOWgACdFRMRw1ywiDYcm1CqYKgJErUu
+NX8AoIHPVxVPVLB+U9l6c0Umk4nGbdH4
+=0Dv/
+-----END PGP SIGNATURE-----
