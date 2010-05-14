@@ -1,82 +1,61 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 14 May 2010 18:01:47 +0300
-Subject: [PATCH v2 14/17] omap: mailbox: reorganize headers
+Date: Fri, 14 May 2010 18:01:49 +0300
+Subject: [PATCH v2 16/17] omap: mailbox: mark some resources as __initdata
 In-Reply-To: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
 References: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1273849310-32169-15-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1273849310-32169-17-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/mailbox.c             |    3 ---
- arch/arm/mach-omap2/mailbox.c             |    1 -
- arch/arm/plat-omap/include/plat/mailbox.h |    3 ++-
- arch/arm/plat-omap/mailbox.c              |    5 ++---
- 4 files changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap1/mailbox.c |    2 +-
+ arch/arm/mach-omap2/mailbox.c |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index f29ba8e..f6376b9 100644
+index 7e6aea3..aa661a1 100644
 --- a/arch/arm/mach-omap1/mailbox.c
 +++ b/arch/arm/mach-omap1/mailbox.c
-@@ -9,13 +9,10 @@
-  * for more details.
-  */
+@@ -144,7 +144,7 @@ struct omap_mbox mbox_dsp_info = {
+ struct omap_mbox *omap1_mboxes[] = { &mbox_dsp_info, NULL };
  
--#include <linux/kernel.h>
--#include <linux/resource.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <plat/mailbox.h>
--#include <mach/irqs.h>
- 
- #define MAILBOX_ARM2DSP1		0x00
- #define MAILBOX_ARM2DSP1b		0x04
+ #if defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX)
+-static struct resource omap1_mbox_resources[] = {
++static struct resource __initdata omap1_mbox_resources[] = {
+ 	{
+ 		.start		= OMAP16XX_MAILBOX_BASE,
+ 		.end		= OMAP16XX_MAILBOX_BASE, /* to be updated */
 diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index a54898a..c1a732e 100644
+index f230edb..ddaf7f0 100644
 --- a/arch/arm/mach-omap2/mailbox.c
 +++ b/arch/arm/mach-omap2/mailbox.c
-@@ -10,7 +10,6 @@
-  * for more details.
-  */
+@@ -389,7 +389,7 @@ struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
+ #endif
  
--#include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index b68fdc3..cbde52a 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -3,9 +3,10 @@
- #ifndef MAILBOX_H
- #define MAILBOX_H
+ #ifdef CONFIG_ARCH_OMAP2420
+-static struct resource omap2_mbox_resources[] = {
++static struct resource __initdata omap2_mbox_resources[] = {
+ 	{
+ 		.start		= OMAP24XX_MAILBOX_BASE,
+ 		.end		= OMAP24XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+@@ -407,7 +407,7 @@ static struct resource omap2_mbox_resources[] = {
+ #endif
  
--#include <linux/wait.h>
-+#include <linux/spinlock.h>
- #include <linux/workqueue.h>
- #include <linux/interrupt.h>
-+#include <linux/device.h>
- #include <linux/kfifo.h>
+ #ifdef CONFIG_ARCH_OMAP3430
+-static struct resource omap3_mbox_resources[] = {
++static struct resource __initdata omap3_mbox_resources[] = {
+ 	{
+ 		.start		= OMAP34XX_MAILBOX_BASE,
+ 		.end		= OMAP34XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+@@ -421,7 +421,7 @@ static struct resource omap3_mbox_resources[] = {
+ #endif
  
- typedef u32 mbox_msg_t;
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 6b2f3b3..c7d28fa 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -21,10 +21,9 @@
-  *
-  */
- 
--#include <linux/kernel.h>
--#include <linux/module.h>
- #include <linux/interrupt.h>
--#include <linux/device.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
- #include <linux/kfifo.h>
+ #ifdef CONFIG_ARCH_OMAP4
+-static struct resource omap4_mbox_resources[] = {
++static struct resource __initdata omap4_mbox_resources[] = {
+ 	{
+ 		.start          = OMAP44XX_MAILBOX_BASE,
+ 		.end            = OMAP44XX_MAILBOX_BASE + OMAP4_MBOX_REG_SIZE - 1,
 -- 
 1.7.1
