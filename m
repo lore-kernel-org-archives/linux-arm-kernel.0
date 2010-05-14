@@ -1,41 +1,16 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 14 May 2010 11:10:19 +0200
-Subject: [PATCH] ARM: S5P: Dynamicly numbered GPIO interrupt support
-In-Reply-To: <1273826403-28976-1-git-send-email-ben-linux@fluff.org>
-References: <1273826403-28976-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <008e01caf345$50ad0610$f2071230$%szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 May 2010 10:11:16 +0100
+Subject: PIPT cache handling on s5pv210 chip
+In-Reply-To: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+References: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+Message-ID: <20100514091116.GB10339@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, May 14, 2010 at 12:49:22PM +0900, Kyungmin Park wrote:
+> In s5pv210 code, there's some strange comments. Does anyone who know
+> why does it required or more fancy way?
 
-On Friday, May 14, 2010 10:40 AM Ben Dooks wrote:
-
-> Add support for GPIO interrupts where the interrupt number
-> is dynamically allocated at first request from gpiolib.
-> 
-> This method is employed as the newer SoCs have a large number
-> of possible interrupt numbers which are very rarely heavily
-> used. However, the classic code has always registered all
-> possible interrupts, using a large amount of memory for the
-> irq_desc[] table.
-
-I like this idea, however I already see some problems. This solves
-only gpio to irq mappings, but what about reverse mappings? There
-are many i2c/spi/whatever drivers that requires a irq number to be
-passed with platform data. With static gpio-irq mappings this is
-trivial. However with dynamic gpio2irq mappings this becomes more
-complicated. 
-
-Machine startup code would need to:
-1. request the gpio pin used for interrupt (ok)
-2. convert it to irq number (ok)
-3. put it in driver specific platform data (ok)
-4. release the gpio pin (?)
-
-Would request_irq() work after release of that gpio pin?
- 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+The comments look wrong and don't particularly match the code.  I'd
+suggest ignoring this patch until someone reports a problem, and
+please ensure that such a report is to LAKML.
