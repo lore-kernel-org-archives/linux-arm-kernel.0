@@ -1,25 +1,29 @@
-From: jeff@garzik.org (Jeff Garzik)
-Date: Fri, 14 May 2010 13:42:14 -0400
-Subject: [PATCH] PXA DMA-capable PATA driver
-In-Reply-To: <201005141551.55066.marek.vasut@gmail.com>
-References: <1273460525-25662-1-git-send-email-marek.vasut@gmail.com>
-	<201005141551.55066.marek.vasut@gmail.com>
-Message-ID: <4BED8B76.5010701@garzik.org>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Fri, 14 May 2010 18:41:53 +0100
+Subject: Rampant ext3/4 corruption on 2.6.34-rc7 with VIVT ARM (Marvell
+	88f5182)
+In-Reply-To: <20100512230841.GA10090@n2100.arm.linux.org.uk>
+References: <1273569821.21352.19.camel@pasglop>
+	<1273575478.21352.29.camel@pasglop>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C545537F@dbde02.ent.ti.com>
+	<20100512222154.GA6841@shareable.org>
+	<1273704431.21352.136.camel@pasglop>
+	<20100512230841.GA10090@n2100.arm.linux.org.uk>
+Message-ID: <20100514174153.GB10133@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2010 09:51 AM, Marek Vasut wrote:
-> Dne Po 10. kv?tna 2010 05:02:05 Marek Vasut napsal(a):
->> This patch adds a driver for a harddrive attached to PXA address and data
->> bus. Unlike pata_platform, this driver allows usage of PXA DMA controller,
->> making the transmission speed 3x higher.
->>
->> Signed-off-by: Marek Vasut<marek.vasut@gmail.com>
->
-> Hey, any updates on this ?
+Russell King - ARM Linux wrote:
+> On Thu, May 13, 2010 at 08:47:11AM +1000, Benjamin Herrenschmidt wrote:
+> > Now, in the case at hand, which is my ARM based NAS, I believe this
+> > is non cache-coherent and thus uses cache flush ops. I don't know ARM
+> > well enough but I would expect these to be implicit barriers. Russell ?
+> > Nico ?
+> 
+> ARMv5 doesn't have a weak memory ordering model, and doesn't have any
+> memory barrier instructions.
 
-It's queued for #upstream review, should get merged today or tomorrow.
+It does have buffered writes, doesn't it?  Are they always flushed by
+the cache flush ops?
 
-Typically I wait a while, for comments from PATA-interested folks.
-
-	Jeff
+-- Jamie
