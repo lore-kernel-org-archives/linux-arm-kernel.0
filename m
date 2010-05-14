@@ -1,55 +1,167 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 14 May 2010 18:56:44 +0800
-Subject: [PATCH 17/20] pxa3xx_nand: add cmdline part parser support
-In-Reply-To: <20100514084149.GJ30801@buzzloop.caiaq.de>
-References: <h2l771cded01005060212k39b41e4aqa57cc6e5072bfe3b@mail.gmail.com>
-	<1273804364.9999.881.camel@macbook.infradead.org>
-	<AANLkTikMrVigamYF8VAiEB3_JXGr6LAFliOmw9CJr8mz@mail.gmail.com>
-	<1273824971.9999.1582.camel@macbook.infradead.org>
-	<20100514084149.GJ30801@buzzloop.caiaq.de>
-Message-ID: <AANLkTikzToO-hd0b2o_Ikzess1pwFwO4vdshDTfn7Twc@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 14 May 2010 13:03:56 +0200
+Subject: [PATCH v4] ARM: S5PV210: Add Ext interrupt support.
+In-Reply-To: <1273826160-17999-1-git-send-email-kgene.kim@samsung.com>
+References: <1273826160-17999-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <008f01caf355$2ba713a0$82f53ae0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 4:41 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> On Fri, May 14, 2010 at 09:16:11AM +0100, David Woodhouse wrote:
->> On Fri, 2010-05-14 at 14:08 +0800, Haojian Zhuang wrote:
->> > New patches are rebased for mtd-2.6 master branch. There're contained
->> > in another mail loop.
->>
->> Hm, please test these by sending to yourself first, saving the patches
->> and checking that they apply.
->>
->> [dwmw2 at macbook mtd-2.6]$ git describe HEAD
->> v2.6.34-rc7-142-gf6b173c
->>
->> [dwmw2 at macbook mtd-2.6]$ for a in `seq -w 1 20` ; do echo Patch $a ; patch -p1 < pxa$a.patch ; done
->> Patch 01
->> patching file arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
->> patching file drivers/mtd/nand/Kconfig
->> patching file drivers/mtd/nand/pxa3xx_nand.c
->> patch: **** malformed patch at line 203: transfering to/from NAND HW");
->
-> Jep, they're line-wrapped, just like the version before.
->
-> Haojian, you can avoid this to happen by using 'git send-email'.
->
-> Thanks,
-> Daniel
->
+Hello,
 
-Now I attach these patches directly. Only 0011 patch is changed to
-using dev_dbg for debug print.
+On Friday, May 14, 2010 10:36 AM Kukjin Kim wrote:
 
-Daniel,
-Thanks for your advice.
+> From: Jongpill Lee <boyko.lee@samsung.com>
+> 
+> Add support for external interrupts on v210.
+> 
+> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+> Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig                  |    1 +
+>  arch/arm/mach-s5pv210/include/mach/irqs.h      |   26 +--
+>  arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   46 +++++
+>  arch/arm/plat-s5p/Kconfig                      |    5 +
+>  arch/arm/plat-s5p/Makefile                     |    1 +
+>  arch/arm/plat-s5p/irq-eint.c                   |  216
+> ++++++++++++++++++++++++
+>  6 files changed, 277 insertions(+), 18 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
+>  create mode 100644 arch/arm/plat-s5p/irq-eint.c
 
-Best Regards
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: nand_update_mtd2.6.tgz
-Type: application/x-gzip
-Size: 43854 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100514/b09c789a/attachment-0001.tgz>
+> ...
+
+> diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
+> new file mode 100644
+> index 0000000..040e271
+> --- /dev/null
+> +++ b/arch/arm/plat-s5p/irq-eint.c
+> @@ -0,0 +1,216 @@
+> +/* linux/arch/arm/plat-s5p/irq-eint.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * S5P - IRQ EINT support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/io.h>
+> +#include <linux/sysdev.h>
+> +#include <linux/gpio.h>
+> +
+> +#include <asm/bitops.h>
+> +#include <asm/hardware/vic.h>
+> +
+> +#include <plat/regs-irqtype.h>
+> +
+> +#include <mach/map.h>
+> +#include <plat/cpu.h>
+> +#include <plat/pm.h>
+> +
+> +#include <plat/gpio-cfg.h>
+> +#include <mach/regs-gpio.h>
+> +
+> +static inline void s5p_irq_eint_mask(unsigned int irq)
+> +{
+> +	u32 mask;
+> +
+> +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
+> +	mask |= eint_irq_to_bit(irq);
+> +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
+> +}
+> +
+> +static void s5p_irq_eint_unmask(unsigned int irq)
+> +{
+> +	u32 mask;
+> +
+> +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
+> +	mask &= ~(eint_irq_to_bit(irq));
+> +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
+> +}
+> +
+> +static inline void s5p_irq_eint_ack(unsigned int irq)
+> +{
+> +	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
+> +}
+> +
+> +static void s5p_irq_eint_maskack(unsigned int irq)
+> +{
+> +	/* compiler should in-line these */
+> +	s5p_irq_eint_mask(irq);
+> +	s5p_irq_eint_ack(irq);
+> +}
+> +
+> +static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
+> +{
+> +	int offs = eint_offset(irq);
+> +	int shift;
+> +	u32 ctrl, mask;
+> +	u32 newvalue = 0;
+> +
+> +	switch (type) {
+> +	case IRQ_TYPE_NONE:
+> +		printk(KERN_WARNING "No edge setting!\n");
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		newvalue = S5P_EXTINT_RISEEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		newvalue = S5P_EXTINT_RISEEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_BOTH:
+> +		newvalue = S5P_EXTINT_BOTHEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_LOW:
+> +		newvalue = S5P_EXTINT_LOWLEV;
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_HIGH:
+> +		newvalue = S5P_EXTINT_HILEV;
+> +		break;
+> +
+> +	default:
+> +		printk(KERN_ERR "No such irq type %d", type);
+> +		return -EINVAL;
+> +	}
+> +
+> +	shift = (offs & 0x7) * 4;
+> +	mask = 0x7 << shift;
+> +
+> +	ctrl = __raw_readl(S5P_EINT_CON(eint_conf_reg(irq)));
+> +	ctrl &= ~mask;
+> +	ctrl |= newvalue << shift;
+> +	__raw_writel(ctrl, S5P_EINT_CON(eint_conf_reg(irq)));
+> +
+> +	if ((0 <= offs) && (offs < 8))
+> +		s3c_gpio_cfgpin(S5PV210_GPH0(offs & 0x7), EINT_MODE);
+> +
+> +	else if ((8 <= offs) && (offs < 16))
+> +		s3c_gpio_cfgpin(S5PV210_GPH1(offs & 0x7), EINT_MODE);
+> +
+> +	else if ((16 <= offs) && (offs < 24))
+> +		s3c_gpio_cfgpin(S5PV210_GPH2(offs & 0x7), EINT_MODE);
+> +
+> +	else if ((24 <= offs) && (offs < 32))
+> +		s3c_gpio_cfgpin(S5PV210_GPH3(offs & 0x7), EINT_MODE);
+
+When the code is put into plat-s5p directory then please don't use
+S5PV210_GPH3 defines. If makes it hardly reusable with other SoCs.
+
+> ...
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
