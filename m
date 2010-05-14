@@ -1,30 +1,35 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 14 May 2010 17:56:31 +0200
-Subject: [PATCH 1/6] Driver for the watchdog timer on Freescale IMX2
-	(and later) processors.
-In-Reply-To: <20100514024915.GE30794@pengutronix.de>
-References: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
-	<1272528202-24159-2-git-send-email-w.sang@pengutronix.de>
-	<20100514024915.GE30794@pengutronix.de>
-Message-ID: <20100514155631.GG4008@infomag.iguana.be>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Fri, 14 May 2010 09:00:10 -0700 (PDT)
+Subject: [PATCH] MXC: Add USB OTG (device) for i.MX31 PDK (3DS) board.
+In-Reply-To: <1273849709-870-1-git-send-email-lilja.magnus@gmail.com>
+Message-ID: <337730.29882.qm@web51003.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi Magnus,
 
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Wim Van Sebroeck <wim@iguana.be>
+--- On Fri, 5/14/10, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+
+> From: Magnus Lilja <lilja.magnus@gmail.com>
+> Subject: [PATCH] MXC: Add USB OTG (device) for i.MX31 PDK (3DS) board.
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: s.hauer at pengutronix.de
+> Date: Friday, May 14, 2010, 12:08 PM
+> Tested on actual hardware using the
+> g_ether and g_serial gadget drivers.
 > 
-> Ping. Wim, did you notice this one? Shall the driver go via your tree or via
-> the imx-tree along with the resource updates (with your ack)?
+> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+> ---
+> 
+> Applies on top of Linus' git tree.
+> To test this the mx3_defconfig was used but with USB gadget
+> activated.
 
-Yes, I saw this one. I started reviewing it, but didn't finish it yet.
-Will let you know something when it's done.
+Would be good to send a patch for updating the mx3_defconfig with the USB gadget support.
 
-Driver can go via my tree but since it's part of a series of other patches, it can also
-go via the imx tree (which is probably preferred).
+Regards,
 
-Kind regards,
-Wim.
+Fabio Estevam
+
+
+      
