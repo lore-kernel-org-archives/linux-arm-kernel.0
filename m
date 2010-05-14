@@ -1,99 +1,60 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 14 May 2010 13:09:57 +0200
-Subject: [PATCH 17/20] mtd: pxa3xx_nand: add cmdline part parser support
-In-Reply-To: <AANLkTikiu_k9ZcbR0jFOKGzAUvqJwE7hPwg3PlV7piLm@mail.gmail.com>
-References: <AANLkTikiu_k9ZcbR0jFOKGzAUvqJwE7hPwg3PlV7piLm@mail.gmail.com>
-Message-ID: <4BED2F85.9080004@pengutronix.de>
+Date: Fri, 14 May 2010 13:11:12 +0200
+Subject: [PATCH 17/20] pxa3xx_nand: add cmdline part parser support
+In-Reply-To: <AANLkTikzToO-hd0b2o_Ikzess1pwFwO4vdshDTfn7Twc@mail.gmail.com>
+References: <h2l771cded01005060212k39b41e4aqa57cc6e5072bfe3b@mail.gmail.com>	
+	<1273804364.9999.881.camel@macbook.infradead.org>	
+	<AANLkTikMrVigamYF8VAiEB3_JXGr6LAFliOmw9CJr8mz@mail.gmail.com>	
+	<1273824971.9999.1582.camel@macbook.infradead.org>	
+	<20100514084149.GJ30801@buzzloop.caiaq.de>
+	<AANLkTikzToO-hd0b2o_Ikzess1pwFwO4vdshDTfn7Twc@mail.gmail.com>
+Message-ID: <4BED2FD0.5010308@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
 Haojian Zhuang wrote:
->>From aeab6a19eeb5ff8715ba16497124fae539641e46 Mon Sep 17 00:00:00 2001
-> From: Lei Wen <leiwen@marvell.com>
-> Date: Thu, 6 May 2010 10:42:13 +0800
-> Subject: [PATCH] mtd: pxa3xx_nand: add cmdline part parser support
+> On Fri, May 14, 2010 at 4:41 PM, Daniel Mack <daniel@caiaq.de> wrote:
+>> On Fri, May 14, 2010 at 09:16:11AM +0100, David Woodhouse wrote:
+>>> On Fri, 2010-05-14 at 14:08 +0800, Haojian Zhuang wrote:
+>>>> New patches are rebased for mtd-2.6 master branch. There're contained
+>>>> in another mail loop.
+>>> Hm, please test these by sending to yourself first, saving the patches
+>>> and checking that they apply.
+>>>
+>>> [dwmw2 at macbook mtd-2.6]$ git describe HEAD
+>>> v2.6.34-rc7-142-gf6b173c
+>>>
+>>> [dwmw2 at macbook mtd-2.6]$ for a in `seq -w 1 20` ; do echo Patch $a ; patch -p1 < pxa$a.patch ; done
+>>> Patch 01
+>>> patching file arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+>>> patching file drivers/mtd/nand/Kconfig
+>>> patching file drivers/mtd/nand/pxa3xx_nand.c
+>>> patch: **** malformed patch at line 203: transfering to/from NAND HW");
+>> Jep, they're line-wrapped, just like the version before.
+>>
+>> Haojian, you can avoid this to happen by using 'git send-email'.
+>>
+>> Thanks,
+>> Daniel
+>>
 > 
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Now I attach these patches directly. Only 0011 patch is changed to
+> using dev_dbg for debug print.
 
-NACK, you remove already working cmdline support in you patch 1. Please
-drop this patch.
+I NACK patches 1 and 17. See my reply to these individual patches.
 
-cheers, Marc
+Cheers, Marc
 
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c |   26 ++++++++++++++++++++++++--
->  1 files changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 2eebd20..793b64c 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -349,6 +349,9 @@ static struct pxa3xx_nand_flash __devinitdata
-> builtin_flash_types[] = {
->  	{ 0, 10, 35, 15, 25, 15, 25, 25000, 0, 60, 10, }, },
->  };
-> 
-> +#ifdef CONFIG_MTD_CMDLINE_PARTS
-> +static const char *part_probes[] = { "cmdlinepart", NULL };
-> +#endif
->  static const char *mtd_names[] = {"pxa3xx_nand-0", "pxa3xx_nand-1", NULL};
-> 
->  /* convert nano-seconds to nand flash controller clock cycles */
-> @@ -1726,6 +1729,10 @@ static int __devinit pxa3xx_nand_probe(struct
-> platform_device *pdev)
->  	struct pxa3xx_nand *nand;
->  	struct mtd_info *mtd;
->  	int ret, cs, probe_success = 0;
-> +#ifdef CONFIG_MTD_PARTITIONS
-> +	struct mtd_partition *partitions = NULL;
-> +	int num_part = 0;
-> +#endif
-> 
->  	pdata = pdev->dev.platform_data;
->  	if (!pdata) {
-> @@ -1747,8 +1754,23 @@ static int __devinit pxa3xx_nand_probe(struct
-> platform_device *pdev)
->  			dev_err(&pdev->dev, "failed to scan cs#%d nand\n", cs);
->  			continue;
->  		}
-> -		ret = add_mtd_partitions(mtd, pdata->parts[cs],
-> -				pdata->nr_parts[cs]);
-> +		mtd->name = mtd_names[cs];
-> +#ifdef CONFIG_MTD_PARTITIONS
-> +#ifdef CONFIG_MTD_CMDLINE_PARTS
-> +		num_part = parse_mtd_partitions(mtd, part_probes, &partitions, 0);
-> +#endif
-> +		if (num_part <= 0) {
-> +			num_part = pdata->nr_parts[cs];
-> +			partitions = pdata->parts[cs];
-> +		}
-> +
-> +		if (partitions && num_part > 0)
-> +			ret = add_mtd_partitions(mtd, partitions, num_part);
-> +		else
-> +			ret = add_mtd_device(mtd);
-> +#else
-> +		ret = add_mtd_device(mtd);
-> +#endif
->  		if (!ret)
->  			probe_success = 1;
->  	}
-
-
-- --
+-- 
 Pengutronix e.K.                  | Marc Kleine-Budde           |
 Industrial Linux Solutions        | Phone: +49-231-2826-924     |
 Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
 Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.9 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org
 
-iEYEARECAAYFAkvtL4UACgkQjTAFq1RaXHNwjQCfS/U6+ZQoq8J/CpNpurWppigf
-PNIAn2jzOk/bi2XjTMCP4M1nDFkX87Er
-=4//G
------END PGP SIGNATURE-----
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100514/f0167d1c/attachment.sig>
