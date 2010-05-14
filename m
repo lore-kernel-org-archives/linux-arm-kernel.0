@@ -1,59 +1,41 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 14 May 2010 12:37:57 +0200
-Subject: [PATCH 1/4] pxa/colibri270: Refactor board definition file
-In-Reply-To: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-References: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100514103757.GN30807@buzzloop.caiaq.de>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 14 May 2010 13:47:06 +0300
+Subject: [PATCH 03/15] omap: mailbox: 2420 should be detected at run-time
+In-Reply-To: <4BED2326.4090302@ru.mvista.com>
+References: <1273772856-10881-1-git-send-email-felipe.contreras@gmail.com>
+	<1273772856-10881-4-git-send-email-felipe.contreras@gmail.com>
+	<4BED2326.4090302@ru.mvista.com>
+Message-ID: <AANLkTimcw0MNZdXjM6K6HJw02qlmggXqeQXHG64HYyUX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 11, 2010 at 04:26:55AM +0200, Marek Vasut wrote:
+Hi,
 
-[...]
+On Fri, May 14, 2010 at 1:17 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Felipe Contreras wrote:
+>
+>> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+>> ---
+>> ?arch/arm/mach-omap2/mailbox.c | ? ?3 ++-
+>> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+>> index 252e53b..6d17da8 100644
+>> --- a/arch/arm/mach-omap2/mailbox.c
+>> +++ b/arch/arm/mach-omap2/mailbox.c
+>> @@ -431,7 +431,8 @@ err_dsp:
+>> ?static int __devexit omap2_mbox_remove(struct platform_device *pdev)
+>> ?{
+>> ?#if defined(CONFIG_ARCH_OMAP2420)
+>> - ? ? ? omap_mbox_unregister(&mbox_iva_info);
+>> + ? ? ? if (cpu_is_omap2420())
+>> + ? ? ? ? ? ? ? omap_mbox_unregister(&mbox_iva_info);
+>> ?#endif
+>
+> ? Shouldn't #ifdef be remove then?
 
-> -/*
-> - * NOR flash
-> - */
-> +/******************************************************************************
-> + * NOR Flash
-> + ******************************************************************************/
-> +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
->  static struct mtd_partition colibri_partitions[] = {
->  	{
->  		.name =		"Bootloader",
->  		.offset =	0x00000000,
->  		.size =		0x00040000,
-> -		.mask_flags =	MTD_WRITEABLE  /* force read-only */
-> +		.mask_flags =	MTD_WRITEABLE	/* force read-only */
->  	}, {
->  		.name =		"Kernel",
->  		.offset =	0x00040000,
-> @@ -90,42 +93,50 @@ static struct platform_device colibri_pxa270_flash_device = {
->  	.num_resources = 1,
->  };
->  
-> -/*
-> - * DM9000 Ethernet
-> - */
-> -#if defined(CONFIG_DM9000)
-> -static struct resource dm9000_resources[] = {
-> +static void __init colibri_pxa270_nor_init(void)
-> +{
-> +	platform_device_register(&colibri_pxa270_flash);
+My first patch did that, but now mbox_iva_info is only available when
+ARCH_OMAP2420=y to save space when building for a specific OMAP.
 
-Erm ...
-
-arch/arm/mach-pxa/colibri-pxa270.c: In function 'colibri_pxa270_nor_init':
-arch/arm/mach-pxa/colibri-pxa270.c:131: error: 'colibri_pxa270_flash' undeclared (first use in this function)
-arch/arm/mach-pxa/colibri-pxa270.c:131: error: (Each undeclared identifier is reported only once
-arch/arm/mach-pxa/colibri-pxa270.c:131: error: for each function it appears in.)
-make[1]: *** [arch/arm/mach-pxa/colibri-pxa270.o] Error 1
-make: *** [arch/arm/mach-pxa] Error 2
-make: *** Waiting for unfinished jobs....
-
-Eric, is that patch already queued?
-
-I can send a trivial fix up - or should Marek send a new version of this
-patch?
-
-Daniel
+-- 
+Felipe Contreras
