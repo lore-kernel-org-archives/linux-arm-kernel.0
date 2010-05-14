@@ -1,49 +1,66 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 May 2010 12:09:27 +0200
-Subject: PXA/8250 UART Conflicts
-In-Reply-To: <20100513214057.GA18868@rainbow>
-References: <3117D78B-5443-48B5-88BC-83EEB8F709F9@prograde.net>
-	<20100511161206.GB32186@n2100.arm.linux.org.uk>
-	<20100513214057.GA18868@rainbow>
-Message-ID: <AANLkTiluX0mpeSi4TzBMCPhMzIjXEEx5mwvavFmRqNy4@mail.gmail.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 14 May 2010 13:11:43 +0300
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100505150209.GC2606@n2100.arm.linux.org.uk>
+	<20100513174023.GB13001@n2100.arm.linux.org.uk>
+	<20100513211951.GH3428@atomide.com>
+	<20100513215825.GC13001@n2100.arm.linux.org.uk>
+	<20100513220139.GO3428@atomide.com>
+	<20100513221229.GD13001@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
+Message-ID: <AANLkTikZvfvjY9e2QNWRwVcJcTvn58Ly_DgzrcXKu2iJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 13, 2010 at 11:40 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> On 17:12 Tue 11 May ? ? , Russell King - ARM Linux wrote:
->> On Tue, May 11, 2010 at 11:00:36AM -0400, Michael Cashwell wrote:
->> > I'd like the tty layer to just assign the minor numbers in sequence,
->> > first come first served. But I don't see how to get that. Or is there
->> > some platform way to influence the tty range requested?
+On Fri, May 14, 2010 at 10:24 AM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+>> On Thu, May 13, 2010 at 03:01:39PM -0700, Tony Lindgren wrote:
+>> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 14:53]:
+>> > > On Thu, May 13, 2010 at 02:19:51PM -0700, Tony Lindgren wrote:
+>> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100513 10:35]:
+>> > > > > And here's a patch which converts the OMAP FB code to use lmb_reserve
+>> > > > > instead of poking about with bootmem stuff. ?Untested, so I'd like to
+>> > > > > hear back whether it works.
+>> > > >
+>> > > > Did a quick test with the following patches picked from your lmb
+>> > > > branch on top of omap for-next branch:
+>> > > >
+>> > > > ARM: Remove useless linux/bootmem.h includes
+>> > > > ARM: Ensure meminfo is sorted prior to sanity_check_meminfo
+>> > > > ARM: initial LMB trial
+>> > > > ARM: Move platform LMB memory reservations out of generic code
+>> > > >
+>> > > > and then this patch.
+>> > > >
+>> > > > It does not boot.. It seems to be related to the patch
+>> > > > "ARM: initial LMB trial". If I only apply the first two patches
+>> > > > above the system boots.
+>> > >
+>> > > Hmm, I'm sure it worked for me when I tested it out. ?Could you try
+>> > > booting with lmb=debug please?
+>> >
+>> > No other output with that it seems.
 >>
->> It's just plain not supported. ?You can't have two different tty drivers
->> using the same namespace and have it work.
->>
->> Unfortunately, earlier on it was the opinion that "ttyS" means "serial
->> driver" and therefore "we shall use the ttyS namespace for our SoC
->> driver". ?And this is the resulting mess that it causes.
+>> Hang on, you didn't pick up ARM: Move memory mapping into mmu.c ?
 >
-> Yup, that's a long standing bug (and still not fixed). I remember I first
-> happened to stumble upon it about three years ago and it's already been old
-> back then. In fact it's a general PITA on any PXA board with PCMCIA/CF
-> slot (handhelds, for example, but not only) when you trying to use some
-> serial PCMCIA peripherals (e.g. GPSes, wired and wireless modems,
-> RS232 converters, maybe even bluetooth dongles). With 8250 enabled as a module
-> and PXA serial built-in it simply doesn't works.
+> I just gave a try on OMAP3430 and it does boot for me. But fb doesn't
+> seems to be working. I have tried this on Tony's "omap-testing"
+> branch where the LMB support is pulled in
 >
-> Openembedded guys for ages have patched kernel with hacks like these to solve
-> this problem:
-> http://git.openembedded.org/cgit.cgi/openembedded/plain/recipes/linux/linux-rp-2.6.26/pxa-serial-hack.patch
->
-> Though, personally I'm preferring solution with moving PXA ports into
-> another namespace (be it ttySA, or ttyPXA, or whatever). So maybe it's
-> time to finally make a first step and apply something like Russell's patch now,
-> and then gradually deprecate usage of old ttyS namespace for PXA, or maybe
-> even left it as a non-default config option (so users who can't reconfigure
-> their userspace/bootloader can still use newer kernels with old behaviour).
->
-> I'd like to hear some comments on the subject from Eric (adding him to Cc:)
->
+> *********************************************************
+> omapfb omapfb: failed to allocate framebuffer
+> omapfb omapfb: failed to allocate fbmem
+> omapfb omapfb: failed to setup omapfb
+> omapfb: probe of omapfb failed with error -12
+> twl_rtc twl_rtc: setting system clock to 2000-01-01 00:00:
+> ***********************************************************
 
-No comment so far. Though I'm not sure if it might be time to bring pxa back
-to 8250 :-)
+It seems you are using DSS2/CONFIG_FB_OMAP2, looks like this patch is
+for DSS1/CONFIG_FB_OMAP.
+
+DSS2 does have a problem on linux-next after 'ARM: Prohibit ioremap()
+on kernel managed RAM' because it also uses reserve_bootmem() in
+drivers/video/omap2/vram.c and later ioremap on RAM. Perhaps LMB can
+be used to fix that too?
