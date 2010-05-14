@@ -1,63 +1,122 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 14 May 2010 08:18:55 +0200
-Subject: [PATCH 04/15] drivers: serial: S5PC100 serial driver cleanup
+Date: Fri, 14 May 2010 08:18:53 +0200
+Subject: [PATCH 02/15] ARM: Samsung: move common I2C0 device helpers to machine
+	directories
 In-Reply-To: <1273817946-29404-1-git-send-email-m.szyprowski@samsung.com>
 References: <1273817946-29404-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1273817946-29404-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1273817946-29404-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Remove unnecessary Kconfig entry. S5PC100 has exactly the same driver as
-S3C6400/S3C6410/S5P6440.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/serial/Kconfig  |   16 ++++------------
- drivers/serial/Makefile |    1 -
- 2 files changed, 4 insertions(+), 13 deletions(-)
+ arch/arm/mach-s5p6440/Makefile                   |    1 +
+ arch/arm/{plat-s5p => mach-s5p6440}/setup-i2c0.c |    2 +-
+ arch/arm/mach-s5p6442/Makefile                   |    1 +
+ arch/arm/{plat-s5p => mach-s5p6442}/setup-i2c0.c |    2 +-
+ arch/arm/mach-s5pv210/Makefile                   |    1 +
+ arch/arm/{plat-s5p => mach-s5pv210}/setup-i2c0.c |   10 +++++-----
+ arch/arm/plat-s5p/Makefile                       |    1 -
+ 7 files changed, 10 insertions(+), 8 deletions(-)
+ copy arch/arm/{plat-s5p => mach-s5p6440}/setup-i2c0.c (92%)
+ copy arch/arm/{plat-s5p => mach-s5p6442}/setup-i2c0.c (92%)
+ rename arch/arm/{plat-s5p => mach-s5pv210}/setup-i2c0.c (69%)
 
-diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
-index 5f3f03d..302836a 100644
---- a/drivers/serial/Kconfig
-+++ b/drivers/serial/Kconfig
-@@ -534,21 +534,13 @@ config SERIAL_S3C24A0
- 	  Serial port support for the Samsung S3C24A0 SoC
+diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
+index 1ad894b..9646cdf 100644
+--- a/arch/arm/mach-s5p6440/Makefile
++++ b/arch/arm/mach-s5p6440/Makefile
+@@ -13,6 +13,7 @@ obj-				:=
+ # Core support for S5P6440 system
  
- config SERIAL_S3C6400
--	tristate "Samsung S3C6400/S3C6410/S5P6440 Seria port support"
--	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440)
-+	tristate "Samsung S3C6400/S3C6410/S5P6440/S5PC100 Serial port support"
-+	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5PC100)
- 	select SERIAL_SAMSUNG_UARTS_4
- 	default y
- 	help
--	  Serial port support for the Samsung S3C6400, S3C6410 and S5P6440
--	  SoCs
--
--config SERIAL_S5PC100
--	tristate "Samsung S5PC100 Serial port support"
--	depends on SERIAL_SAMSUNG && CPU_S5PC100
--	select SERIAL_SAMSUNG_UARTS_4
--	default y
--	help
--	  Serial port support for the Samsung S5PC100 SoCs
-+	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440
-+	  and S5PC100 SoCs
+ obj-$(CONFIG_CPU_S5P6440)	+= cpu.o init.o clock.o gpio.o
++obj-$(CONFIG_CPU_S5P6440)	+= setup-i2c0.o
  
- config SERIAL_S5PV210
- 	tristate "Samsung S5PV210 Serial port support"
-diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
-index 6aa4723..328f107 100644
---- a/drivers/serial/Makefile
-+++ b/drivers/serial/Makefile
-@@ -44,7 +44,6 @@ obj-$(CONFIG_SERIAL_S3C2412) += s3c2412.o
- obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
- obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
- obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
--obj-$(CONFIG_SERIAL_S5PC100) += s3c6400.o
- obj-$(CONFIG_SERIAL_S5PV210) += s5pv210.o
- obj-$(CONFIG_SERIAL_MAX3100) += max3100.o
- obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
+ # machine support
+ 
+diff --git a/arch/arm/plat-s5p/setup-i2c0.c b/arch/arm/mach-s5p6440/setup-i2c0.c
+similarity index 92%
+copy from arch/arm/plat-s5p/setup-i2c0.c
+copy to arch/arm/mach-s5p6440/setup-i2c0.c
+index 67a66e0..69e8a66 100644
+--- a/arch/arm/plat-s5p/setup-i2c0.c
++++ b/arch/arm/mach-s5p6440/setup-i2c0.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5p/setup-i2c0.c
++/* linux/arch/arm/mach-s5p6440/setup-i2c0.c
+  *
+  * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+diff --git a/arch/arm/mach-s5p6442/Makefile b/arch/arm/mach-s5p6442/Makefile
+index dde39a6..4942c14 100644
+--- a/arch/arm/mach-s5p6442/Makefile
++++ b/arch/arm/mach-s5p6442/Makefile
+@@ -13,6 +13,7 @@ obj-				:=
+ # Core support for S5P6442 system
+ 
+ obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o clock.o
++obj-$(CONFIG_CPU_S5P6442)	+= setup-i2c0.o
+ 
+ # machine support
+ 
+diff --git a/arch/arm/plat-s5p/setup-i2c0.c b/arch/arm/mach-s5p6442/setup-i2c0.c
+similarity index 92%
+copy from arch/arm/plat-s5p/setup-i2c0.c
+copy to arch/arm/mach-s5p6442/setup-i2c0.c
+index 67a66e0..662695d 100644
+--- a/arch/arm/plat-s5p/setup-i2c0.c
++++ b/arch/arm/mach-s5p6442/setup-i2c0.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5p/setup-i2c0.c
++/* linux/arch/arm/mach-s5p6442/setup-i2c0.c
+  *
+  * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 8ebf51c..1a972a5 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -13,6 +13,7 @@ obj-				:=
+ # Core support for S5PV210 system
+ 
+ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o
++obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+ 
+ # machine support
+ 
+diff --git a/arch/arm/plat-s5p/setup-i2c0.c b/arch/arm/mach-s5pv210/setup-i2c0.c
+similarity index 69%
+rename from arch/arm/plat-s5p/setup-i2c0.c
+rename to arch/arm/mach-s5pv210/setup-i2c0.c
+index 67a66e0..27de0c1 100644
+--- a/arch/arm/plat-s5p/setup-i2c0.c
++++ b/arch/arm/mach-s5pv210/setup-i2c0.c
+@@ -1,11 +1,11 @@
+-/* linux/arch/arm/plat-s5p/setup-i2c0.c
++/*
++ * linux/arch/arm/mach-s5pv210/setup-i2c2.c
+  *
+- * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
++ * Copyright 2009 Samsung Electronics Co.
+  *
+- * I2C0 GPIO configuration.
++ * Base S5PV210 I2C bus 0 gpio configuration
+  *
+- * Based on plat-s3c64xx/setup-i2c0.c
++ * Based on mach-s3c64xx/setup-i2c0.c
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index a7c54b3..0ec09a9 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -16,4 +16,3 @@ obj-y				+= dev-uart.o
+ obj-y				+= cpu.o
+ obj-y				+= clock.o
+ obj-y				+= irq.o
+-obj-y				+= setup-i2c0.o
 -- 
 1.6.4
