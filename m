@@ -1,353 +1,456 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 14 May 2010 06:48:02 +0100
-Subject: [PATCH v3 2/2] ARM: S5PV210: Add Ext interrupt support
-In-Reply-To: <008601caf326$a1ba5310$e52ef930$%szyprowski@samsung.com>
-References: <1273749209-32461-1-git-send-email-kgene.kim@samsung.com>
-	<008601caf326$a1ba5310$e52ef930$%szyprowski@samsung.com>
-Message-ID: <20100514054802.GB27571@trinity.fluff.org>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Fri, 14 May 2010 11:30:31 +0530
+Subject: [PATCH] sdhci-spear: ST SPEAr based SDHCI controller glue
+In-Reply-To: <4BEA3C6D.7090208@st.com>
+References: <1273052118-15513-1-git-send-email-viresh.kumar@st.com>
+	<4BE77D23.7080705@st.com> <4BEA3C6D.7090208@st.com>
+Message-ID: <4BECE6FF.8000303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 07:30:53AM +0200, Marek Szyprowski wrote:
-> Hello,
+On 5/12/2010 10:58 AM, Viresh KUMAR wrote:
+> On 5/10/2010 8:57 AM, Viresh KUMAR wrote:
+>> On 5/5/2010 3:05 PM, Viresh KUMAR wrote:
+>>> This patch adds glue layer for support of sdhci driver on ST SPEAr platform.
+>>>
+>>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+>>> ---
+>>>  MAINTAINERS                     |    6 +
+>>>  drivers/mmc/host/Kconfig        |   12 ++
+>>>  drivers/mmc/host/Makefile       |    1 +
+>>>  drivers/mmc/host/sdhci-spear.c  |  300 +++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/mmc/sdhci-spear.h |   42 ++++++
+>>>  5 files changed, 361 insertions(+), 0 deletions(-)
+>>>  create mode 100644 drivers/mmc/host/sdhci-spear.c
+>>>  create mode 100644 include/linux/mmc/sdhci-spear.h
+>>>
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>> index 0369b22..bbff70a 100644
+>>> --- a/MAINTAINERS
+>>> +++ b/MAINTAINERS
+>>> @@ -4938,6 +4938,12 @@ L:	linux-mmc at vger.kernel.org
+>>>  S:	Maintained
+>>>  F:	drivers/mmc/host/sdhci-s3c.c
+>>>  
+>>> +SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) ST SPEAR DRIVER
+>>> +M:	Viresh Kumar <viresh.kumar@st.com>
+>>> +L:	linux-mmc at vger.kernel.org
+>>> +S:	Maintained
+>>> +F:	drivers/mmc/host/sdhci-spear.c
+>>> +
+>>>  SECURITY SUBSYSTEM
+>>>  M:	James Morris <jmorris@namei.org>
+>>>  L:	linux-security-module at vger.kernel.org (suggested Cc:)
+>>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>>> index 2e13b94..40eae7e 100644
+>>> --- a/drivers/mmc/host/Kconfig
+>>> +++ b/drivers/mmc/host/Kconfig
+>>> @@ -136,6 +136,18 @@ config MMC_SDHCI_S3C
+>>>  
+>>>  	  If unsure, say N.
+>>>  
+>>> +config MMC_SDHCI_SPEAR
+>>> +	tristate "SDHCI support on ST SPEAr platform"
+>>> +	depends on MMC_SDHCI && PLAT_SPEAR
+>>> +	help
+>>> +	  This selects the Secure Digital Host Controller Interface (SDHCI)
+>>> +	  often referrered to as the HSMMC block in some of the ST SPEAR range
+>>> +	  of SoC
+>>> +
+>>> +	  If you have a controller with this interface, say Y or M here.
+>>> +
+>>> +	  If unsure, say N.
+>>> +
+>>>  config MMC_SDHCI_S3C_DMA
+>>>  	bool "DMA support on S3C SDHCI"
+>>>  	depends on MMC_SDHCI_S3C && EXPERIMENTAL
+>>> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+>>> index f480397..d00a9fa 100644
+>>> --- a/drivers/mmc/host/Makefile
+>>> +++ b/drivers/mmc/host/Makefile
+>>> @@ -14,6 +14,7 @@ obj-$(CONFIG_MMC_SDHCI)		+= sdhci.o
+>>>  obj-$(CONFIG_MMC_SDHCI_PCI)	+= sdhci-pci.o
+>>>  obj-$(CONFIG_MMC_SDHCI_PLTFM)	+= sdhci-pltfm.o
+>>>  obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
+>>> +obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
+>>>  obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
+>>>  obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
+>>>  obj-$(CONFIG_MMC_OMAP)		+= omap.o
+>>> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+>>> new file mode 100644
+>>> index 0000000..6d3f740
+>>> --- /dev/null
+>>> +++ b/drivers/mmc/host/sdhci-spear.c
+>>> @@ -0,0 +1,300 @@
+>>> +/*
+>>> + * drivers/mmc/host/sdhci-spear.c
+>>> + *
+>>> + * Support of SDHCI platform devices for spear soc family
+>>> + *
+>>> + * Copyright (C) 2010 ST Microelectronics
+>>> + * Viresh Kumar<viresh.kumar@st.com>
+>>> + *
+>>> + * Inspired by sdhci-pltfm.c
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2. This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/delay.h>
+>>> +#include <linux/gpio.h>
+>>> +#include <linux/highmem.h>
+>>> +#include <linux/interrupt.h>
+>>> +#include <linux/irq.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/mmc/host.h>
+>>> +#include <linux/mmc/sdhci-spear.h>
+>>> +#include <linux/io.h>
+>>> +#include "sdhci.h"
+>>> +
+>>> +struct spear_sdhci {
+>>> +	struct clk *clk;
+>>> +	struct sdhci_plat_data *data;
+>>> +};
+>>> +
+>>> +/* sdhci ops */
+>>> +static struct sdhci_ops sdhci_pltfm_ops = {
+>>> +	/* Nothing to do for now. */
+>>> +};
+>>> +
+>>> +/* gpio card detection interrupt handler */
+>>> +static irqreturn_t sdhci_gpio_irq(int irq, void *dev_id)
+>>> +{
+>>> +	struct platform_device *pdev = dev_id;
+>>> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+>>> +	struct spear_sdhci *sdhci =
+>>> +		(struct spear_sdhci *)(pdev->dev.platform_data);
+>>> +	unsigned long gpio_irq_type;
+>>> +	int val;
+>>> +
+>>> +	val = gpio_get_value(sdhci->data->card_int_gpio);
+>>> +
+>>> +	/* val == 1 -> card removed, val == 0 -> card inserted */
+>>> +	/* if card removed - set irq for low level, else vice versa */
+>>> +	gpio_irq_type = val ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH;
+>>> +	set_irq_type(irq, gpio_irq_type);
+>>> +
+>>> +	if (sdhci->data->card_power_gpio >= 0) {
+>>> +		if (!sdhci->data->power_always_enb) {
+>>> +			/* if card inserted, give power, otherwise remove it */
+>>> +			val = sdhci->data->power_active_high ? !val : val ;
+>>> +			gpio_set_value(sdhci->data->card_power_gpio, val);
+>>> +		}
+>>> +	}
+>>> +
+>>> +	/* inform sdhci driver about card insertion/removal */
+>>> +	tasklet_schedule(&host->card_tasklet);
+>>> +
+>>> +	return IRQ_HANDLED;
+>>> +}
+>>> +
+>>> +static int __devinit sdhci_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct sdhci_host *host;
+>>> +	struct resource *iomem;
+>>> +	struct spear_sdhci *sdhci;
+>>> +	int ret;
+>>> +
+>>> +	BUG_ON(pdev == NULL);
+>>> +
+>>> +	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	if (!iomem) {
+>>> +		ret = -ENOMEM;
+>>> +		dev_dbg(&pdev->dev, "memory resource not defined\n");
+>>> +		goto err;
+>>> +	}
+>>> +
+>>> +	if (!request_mem_region(iomem->start, resource_size(iomem),
+>>> +				"spear-sdhci")) {
+>>> +		ret = -EBUSY;
+>>> +		dev_dbg(&pdev->dev, "cannot request region\n");
+>>> +		goto err;
+>>> +	}
+>>> +
+>>> +	sdhci = kzalloc(sizeof(*sdhci), GFP_KERNEL);
+>>> +	if (!sdhci) {
+>>> +		ret = -ENOMEM;
+>>> +		dev_dbg(&pdev->dev, "cannot allocate memory for sdhci\n");
+>>> +		goto err_kzalloc;
+>>> +	}
+>>> +
+>>> +	/* clk enable */
+>>> +	sdhci->clk = clk_get(&pdev->dev, NULL);
+>>> +	if (IS_ERR(sdhci->clk)) {
+>>> +		ret = PTR_ERR(sdhci->clk);
+>>> +		dev_dbg(&pdev->dev, "Error getting clock\n");
+>>> +		goto err_clk_get;
+>>> +	}
+>>> +
+>>> +	ret = clk_enable(sdhci->clk);
+>>> +	if (ret) {
+>>> +		dev_dbg(&pdev->dev, "Error enabling clock\n");
+>>> +		goto err_clk_enb;
+>>> +	}
+>>> +
+>>> +	/* overwrite platform_data */
+>>> +	sdhci->data = (struct sdhci_plat_data *)(pdev->dev.platform_data);
+>>> +	pdev->dev.platform_data = sdhci;
+>>> +
+>>> +	if (pdev->dev.parent)
+>>> +		host = sdhci_alloc_host(pdev->dev.parent, 0);
+>>> +	else
+>>> +		host = sdhci_alloc_host(&pdev->dev, 0);
+>>> +
+>>> +	if (IS_ERR(host)) {
+>>> +		ret = PTR_ERR(host);
+>>> +		dev_dbg(&pdev->dev, "error allocating host\n");
+>>> +		goto err_alloc_host;
+>>> +	}
+>>> +
+>>> +	host->hw_name = "sdhci";
+>>> +	host->ops = &sdhci_pltfm_ops;
+>>> +	host->irq = platform_get_irq(pdev, 0);
+>>> +	host->quirks = SDHCI_QUIRK_BROKEN_ADMA;
+>>> +
+>>> +	host->ioaddr = ioremap(iomem->start, resource_size(iomem));
+>>> +	if (!host->ioaddr) {
+>>> +		ret = -ENOMEM;
+>>> +		dev_dbg(&pdev->dev, "failed to remap registers\n");
+>>> +		goto err_ioremap;
+>>> +	}
+>>> +
+>>> +	ret = sdhci_add_host(host);
+>>> +	if (ret) {
+>>> +		dev_dbg(&pdev->dev, "error adding host\n");
+>>> +		goto err_add_host;
+>>> +	}
+>>> +
+>>> +	platform_set_drvdata(pdev, host);
+>>> +
+>>> +	/*
+>>> +	 * It is optional to use GPIOs for sdhci Power control & sdhci card
+>>> +	 * interrupt detection. If sdhci->data is NULL, then use original sdhci
+>>> +	 * lines otherwise GPIO lines.
+>>> +	 * If GPIO is selected for power control, then power should be disabled
+>>> +	 * after card removal and should be enabled when card insertion
+>>> +	 * interrupt occurs
+>>> +	 */
+>>> +	if (!sdhci->data)
+>>> +		return 0;
+>>> +
+>>> +	if (sdhci->data->card_power_gpio >= 0) {
+>>> +		int val = 0;
+>>> +
+>>> +		ret = gpio_request(sdhci->data->card_power_gpio, "sdhci");
+>>> +		if (ret < 0) {
+>>> +			dev_dbg(&pdev->dev, "gpio request fail: %d\n",
+>>> +					sdhci->data->card_power_gpio);
+>>> +			goto err_pgpio_request;
+>>> +		}
+>>> +
+>>> +		if (sdhci->data->power_always_enb)
+>>> +			val = sdhci->data->power_active_high;
+>>> +		else
+>>> +			val = !sdhci->data->power_active_high;
+>>> +
+>>> +		ret = gpio_direction_output(sdhci->data->card_power_gpio, val);
+>>> +		if (ret) {
+>>> +			dev_dbg(&pdev->dev, "gpio set direction fail: %d\n",
+>>> +					sdhci->data->card_power_gpio);
+>>> +			goto err_pgpio_direction;
+>>> +		}
+>>> +
+>>> +		gpio_set_value(sdhci->data->card_power_gpio, 1);
+>>> +	}
+>>> +
+>>> +	if (sdhci->data->card_int_gpio >= 0) {
+>>> +		ret = gpio_request(sdhci->data->card_int_gpio, "sdhci");
+>>> +		if (ret < 0) {
+>>> +			dev_dbg(&pdev->dev, "gpio request fail: %d\n",
+>>> +					sdhci->data->card_int_gpio);
+>>> +			goto err_igpio_request;
+>>> +		}
+>>> +
+>>> +		ret = gpio_direction_input(sdhci->data->card_int_gpio);
+>>> +		if (ret) {
+>>> +			dev_dbg(&pdev->dev, "gpio set direction fail: %d\n",
+>>> +					sdhci->data->card_int_gpio);
+>>> +			goto err_igpio_direction;
+>>> +		}
+>>> +		ret = request_irq(gpio_to_irq(sdhci->data->card_int_gpio),
+>>> +				sdhci_gpio_irq, IRQF_TRIGGER_LOW,
+>>> +				mmc_hostname(host->mmc), pdev);
+>>> +		if (ret) {
+>>> +			dev_dbg(&pdev->dev, "gpio request irq fail: %d\n",
+>>> +					sdhci->data->card_int_gpio);
+>>> +			goto err_igpio_request_irq;
+>>> +		}
+>>> +
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +
+>>> +err_igpio_request_irq:
+>>> +err_igpio_direction:
+>>> +	if (sdhci->data->card_int_gpio >= 0)
+>>> +		gpio_free(sdhci->data->card_int_gpio);
+>>> +err_igpio_request:
+>>> +err_pgpio_direction:
+>>> +	if (sdhci->data->card_power_gpio >= 0)
+>>> +		gpio_free(sdhci->data->card_power_gpio);
+>>> +err_pgpio_request:
+>>> +	platform_set_drvdata(pdev, NULL);
+>>> +	sdhci_remove_host(host, 1);
+>>> +err_add_host:
+>>> +	iounmap(host->ioaddr);
+>>> +err_ioremap:
+>>> +	sdhci_free_host(host);
+>>> +err_alloc_host:
+>>> +	clk_disable(sdhci->clk);
+>>> +err_clk_enb:
+>>> +	clk_put(sdhci->clk);
+>>> +err_clk_get:
+>>> +	kfree(sdhci);
+>>> +err_kzalloc:
+>>> +	release_mem_region(iomem->start, resource_size(iomem));
+>>> +err:
+>>> +	dev_err(&pdev->dev, "spear-sdhci probe failed: %d\n", ret);
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +static int __devexit sdhci_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+>>> +	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	struct spear_sdhci *sdhci =
+>>> +		(struct spear_sdhci *)(pdev->dev.platform_data);
+>>> +	int dead;
+>>> +	u32 scratch;
+>>> +
+>>> +	if (sdhci->data) {
+>>> +		if (sdhci->data->card_int_gpio >= 0) {
+>>> +			free_irq(gpio_to_irq(sdhci->data->card_int_gpio), pdev);
+>>> +			gpio_free(sdhci->data->card_int_gpio);
+>>> +		}
+>>> +
+>>> +		if (sdhci->data->card_power_gpio >= 0)
+>>> +			gpio_free(sdhci->data->card_power_gpio);
+>>> +	}
+>>> +
+>>> +	platform_set_drvdata(pdev, NULL);
+>>> +	dead = 0;
+>>> +	scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
+>>> +	if (scratch == (u32)-1)
+>>> +		dead = 1;
+>>> +
+>>> +	sdhci_remove_host(host, dead);
+>>> +	iounmap(host->ioaddr);
+>>> +	sdhci_free_host(host);
+>>> +	clk_disable(sdhci->clk);
+>>> +	clk_put(sdhci->clk);
+>>> +	kfree(sdhci);
+>>> +	if (iomem)
+>>> +		release_mem_region(iomem->start, resource_size(iomem));
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct platform_driver sdhci_driver = {
+>>> +	.driver = {
+>>> +		.name	= "sdhci",
+>>> +		.owner	= THIS_MODULE,
+>>> +	},
+>>> +	.probe		= sdhci_probe,
+>>> +	.remove		= __devexit_p(sdhci_remove),
+>>> +};
+>>> +
+>>> +static int __init sdhci_init(void)
+>>> +{
+>>> +	return platform_driver_register(&sdhci_driver);
+>>> +}
+>>> +module_init(sdhci_init);
+>>> +
+>>> +static void __exit sdhci_exit(void)
+>>> +{
+>>> +	platform_driver_unregister(&sdhci_driver);
+>>> +}
+>>> +module_exit(sdhci_exit);
+>>> +
+>>> +MODULE_DESCRIPTION("SPEAr Secure Digital Host Controller Interface driver");
+>>> +MODULE_AUTHOR("Viresh Kumar <viresh.kumar@st.com>");
+>>> +MODULE_LICENSE("GPL v2");
+>>> diff --git a/include/linux/mmc/sdhci-spear.h b/include/linux/mmc/sdhci-spear.h
+>>> new file mode 100644
+>>> index 0000000..9188c97
+>>> --- /dev/null
+>>> +++ b/include/linux/mmc/sdhci-spear.h
+>>> @@ -0,0 +1,42 @@
+>>> +/*
+>>> + * include/linux/mmc/sdhci-spear.h
+>>> + *
+>>> + * SDHCI declarations specific to ST SPEAr platform
+>>> + *
+>>> + * Copyright (C) 2010 ST Microelectronics
+>>> + * Viresh Kumar<viresh.kumar@st.com>
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2. This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#ifndef MMC_SDHCI_SPEAR_H
+>>> +#define MMC_SDHCI_SPEAR_H
+>>> +
+>>> +#include <linux/platform_device.h>
+>>> +/*
+>>> + * struct sdhci_plat_data: spear sdhci platform data structure
+>>> + *
+>>> + * @card_power_gpio: gpio pin for enabling/disabling power to sdhci socket
+>>> + * @power_active_high: if set, enable power to sdhci socket by setting
+>>> + *			card_power_gpio
+>>> + * @power_always_enb: If set, then enable power on probe, otherwise enable only
+>>> + *			on card insertion and disable on card removal.
+>>> + * card_int_gpio: gpio pin used for card detection
+>>> + */
+>>> +struct sdhci_plat_data {
+>>> +	int card_power_gpio;
+>>> +	int power_active_high;
+>>> +	int power_always_enb;
+>>> +	int card_int_gpio;
+>>> +};
+>>> +
+>>> +/* This function is used to set platform_data field of pdev->dev */
+>>> +static inline void
+>>> +sdhci_set_plat_data(struct platform_device *pdev, struct sdhci_plat_data *data)
+>>> +{
+>>> +	pdev->dev.platform_data = data;
+>>> +}
+>>> +
+>>> +#endif /* MMC_SDHCI_SPEAR_H */
+>>
+>> Pierre,
+>>
+>> Is this patch fine? Or do i need to do some modifications?
+>>
+>> regards,
+>> viresh kumar.
+>>
 > 
-> On Thursday, May 13, 2010 1:13 PM Kukjin Kim wrote:
+> Including linux-arm-kernel at lists.infradead.org in CC.
 > 
-> > From: Jongpill Lee <boyko.lee@samsung.com>
-> > 
-> > Add support for external interrupts on v210.
-> > 
-> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> > Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pv210/Kconfig                  |    1 +
-> >  arch/arm/mach-s5pv210/include/mach/irqs.h      |    5 +
-> >  arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   84 +++++++++
-> >  arch/arm/plat-s5p/Kconfig                      |    5 +
-> >  arch/arm/plat-s5p/Makefile                     |    1 +
-> >  arch/arm/plat-s5p/irq-eint.c                   |  230
-> > ++++++++++++++++++++++++
-> >  6 files changed, 326 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-> >  create mode 100644 arch/arm/plat-s5p/irq-eint.c
-> > 
-> > diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> > index af33a1a..c4c2a7f 100644
-> > --- a/arch/arm/mach-s5pv210/Kconfig
-> > +++ b/arch/arm/mach-s5pv210/Kconfig
-> > @@ -12,6 +12,7 @@ if ARCH_S5PV210
-> >  config CPU_S5PV210
-> >  	bool
-> >  	select PLAT_S5P
-> > +	select S5P_EXT_INT
-> >  	help
-> >  	  Enable S5PV210 CPU support
-> > 
-> > diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
-> > s5pv210/include/mach/irqs.h
-> > index 62c5175..1714be2 100644
-> > --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-> > +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-> > @@ -139,6 +139,11 @@
-> >  #define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
-> >  #define IRQ_EINT(x)		S5P_EINT(x)
-> > 
-> > +#define S5P_EINT_SET0(x)	S5PV210_GPH0(x)
-> > +#define S5P_EINT_SET1(x)	S5PV210_GPH1(x)
-> > +#define S5P_EINT_SET2(x)	S5PV210_GPH2(x)
-> > +#define S5P_EINT_SET3(x)	S5PV210_GPH3(x)
-> > +
-> >  /* Set the default NR_IRQS */
-> > 
-> >  #define NR_IRQS 		(IRQ_EINT(31) + 1)
-> > diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-> > b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-> > new file mode 100644
-> > index 0000000..86fb6a4
-> > --- /dev/null
-> > +++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-> > @@ -0,0 +1,84 @@
-> > +/* linux/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-> > + *
-> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com/
-> > + *
-> > + * S5PV210 - GPIO (including EINT) register definitions
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +#ifndef __ASM_ARCH_REGS_GPIO_H
-> > +#define __ASM_ARCH_REGS_GPIO_H __FILE__
-> > +
-> > +#include <mach/map.h>
-> > +
-> > +#define S5PV210_EINT30CON		(S5P_VA_GPIO + 0xE00)
-> > +#define S5PV210_EINT31CON		(S5P_VA_GPIO + 0xE04)
-> > +#define S5PV210_EINT32CON		(S5P_VA_GPIO + 0xE08)
-> > +#define S5PV210_EINT33CON		(S5P_VA_GPIO + 0xE0C)
-> > +
-> > +#define S5P_EINT_CON(x)			(S5PV210_EINT30CON + ((x) *
-> 0x4))
-> > +
-> > +#define S5PV210_EINT30FLTCON0		(S5P_VA_GPIO + 0xE80)
-> > +#define S5PV210_EINT30FLTCON1		(S5P_VA_GPIO + 0xE84)
-> > +#define S5PV210_EINT31FLTCON0		(S5P_VA_GPIO + 0xE88)
-> > +#define S5PV210_EINT31FLTCON1		(S5P_VA_GPIO + 0xE8C)
-> > +#define S5PV210_EINT32FLTCON0		(S5P_VA_GPIO + 0xE90)
-> > +#define S5PV210_EINT32FLTCON1		(S5P_VA_GPIO + 0xE94)
-> > +#define S5PV210_EINT33FLTCON0		(S5P_VA_GPIO + 0xE98)
-> > +#define S5PV210_EINT33FLTCON1		(S5P_VA_GPIO + 0xE9C)
-> > +
-> > +#define S5P_EINT_FLTCON(x)		(S5PV210_EINT30FLTCON0 + ((x) * 0x4))
-> > +
-> > +#define S5PV210_EINT30MASK		(S5P_VA_GPIO + 0xF00)
-> > +#define S5PV210_EINT31MASK		(S5P_VA_GPIO + 0xF04)
-> > +#define S5PV210_EINT32MASK		(S5P_VA_GPIO + 0xF08)
-> > +#define S5PV210_EINT33MASK		(S5P_VA_GPIO + 0xF0C)
-> > +
-> > +#define S5P_EINT_MASK(x)		(S5PV210_EINT30MASK + ((x) * 0x4))
-> > +
-> > +#define S5PV210_EINT30PEND		(S5P_VA_GPIO + 0xF40)
-> > +#define S5PV210_EINT31PEND		(S5P_VA_GPIO + 0xF44)
-> > +#define S5PV210_EINT32PEND		(S5P_VA_GPIO + 0xF48)
-> > +#define S5PV210_EINT33PEND		(S5P_VA_GPIO + 0xF4C)
-> > +
-> > +#define S5P_EINT_PEND(x)		(S5PV210_EINT30PEND + ((x) * 0x4))
-> > +
-> > +#define eint_offset(irq)	((irq) < IRQ_EINT16_31 ? ((irq)-IRQ_EINT0) \
-> > +						: (irq-S5P_IRQ_EINT_BASE))
-> > +
-> > +#define eint_irq_to_bit(irq)		(1 << (eint_offset(irq) & 0x7))
-> > +
-> > +#define eint_conf_reg(irq)		((eint_offset(irq)) >> 3)
-> > +#define eint_filt_reg(irq)		((eint_offset(irq)) >> 2)
-> > +#define eint_mask_reg(irq)		((eint_offset(irq)) >> 3)
-> > +#define eint_pend_reg(irq)		((eint_offset(irq)) >> 3)
-> > +
-> > +#define S5P_EINT30CON			S5PV210_EINT30CON
-> > +#define S5P_EINT31CON			S5PV210_EINT31CON
-> > +#define S5P_EINT32CON			S5PV210_EINT32CON
-> > +#define S5P_EINT33CON			S5PV210_EINT33CON
-> > +#define S5P_EINT30FLTCON0		S5PV210_EINT30FLTCON0
-> > +#define S5P_EINT30FLTCON1		S5PV210_EINT30FLTCON1
-> > +#define S5P_EINT31FLTCON0		S5PV210_EINT31FLTCON0
-> > +#define S5P_EINT31FLTCON1		S5PV210_EINT31FLTCON1
-> > +#define S5P_EINT32FLTCON0		S5PV210_EINT32FLTCON0
-> > +#define S5P_EINT32FLTCON1		S5PV210_EINT32FLTCON1
-> > +#define S5P_EINT33FLTCON0		S5PV210_EINT33FLTCON0
-> > +#define S5P_EINT33FLTCON1		S5PV210_EINT33FLTCON1
-> > +#define S5P_EINT30MASK			S5PV210_EINT30MASK
-> > +#define S5P_EINT31MASK			S5PV210_EINT31MASK
-> > +#define S5P_EINT32MASK			S5PV210_EINT32MASK
-> > +#define S5P_EINT33MASK			S5PV210_EINT33MASK
-> > +
-> > +/* values for S5P_EXTINT0 */
-> > +#define S5P_EXTINT_LOWLEV		(0x00)
-> > +#define S5P_EXTINT_HILEV		(0x01)
-> > +#define S5P_EXTINT_FALLEDGE		(0x02)
-> > +#define S5P_EXTINT_RISEEDGE		(0x03)
-> > +#define S5P_EXTINT_BOTHEDGE		(0x04)
-> > +
-> > +#endif /* __ASM_ARCH_REGS_GPIO_H */
-> > diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-> > index d400a6a..7d1fc40 100644
-> > --- a/arch/arm/plat-s5p/Kconfig
-> > +++ b/arch/arm/plat-s5p/Kconfig
-> > @@ -23,3 +23,8 @@ config PLAT_S5P
-> >  	select SAMSUNG_IRQ_UART
-> >  	help
-> >  	  Base platform code for Samsung's S5P series SoC.
-> > +
-> > +config S5P_EXT_INT
-> > +	bool
-> > +	help
-> > +	  Use the external interrupts (other than GPIO interrupts.)
-> > diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-> > index a7c54b3..25941a5 100644
-> > --- a/arch/arm/plat-s5p/Makefile
-> > +++ b/arch/arm/plat-s5p/Makefile
-> > @@ -16,4 +16,5 @@ obj-y				+= dev-uart.o
-> >  obj-y				+= cpu.o
-> >  obj-y				+= clock.o
-> >  obj-y				+= irq.o
-> > +obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
-> >  obj-y				+= setup-i2c0.o
-> > diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-> > new file mode 100644
-> > index 0000000..84f1016
-> > --- /dev/null
-> > +++ b/arch/arm/plat-s5p/irq-eint.c
-> > @@ -0,0 +1,230 @@
-> > +/* linux/arch/arm/plat-s5p/irq-eint.c
-> > + *
-> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com/
-> > + *
-> > + * S5P - IRQ EINT support
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/io.h>
-> > +#include <linux/sysdev.h>
-> > +#include <linux/gpio.h>
-> > +
-> > +#include <asm/bitops.h>
-> > +#include <asm/hardware/vic.h>
-> > +
-> > +#include <plat/regs-irqtype.h>
-> > +
-> > +#include <mach/map.h>
-> > +#include <plat/cpu.h>
-> > +#include <plat/pm.h>
-> > +
-> > +#include <plat/gpio-cfg.h>
-> > +#include <mach/regs-gpio.h>
-> > +
-> > +static inline void s5p_irq_eint_mask(unsigned int irq)
-> > +{
-> > +	u32 mask;
-> > +
-> > +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-> > +	mask |= eint_irq_to_bit(irq);
-> > +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-> > +}
-> > +
-> > +static void s5p_irq_eint_unmask(unsigned int irq)
-> > +{
-> > +	u32 mask;
-> > +
-> > +	mask = __raw_readl(S5P_EINT_MASK(eint_mask_reg(irq)));
-> > +	mask &= ~(eint_irq_to_bit(irq));
-> > +	__raw_writel(mask, S5P_EINT_MASK(eint_mask_reg(irq)));
-> > +}
-> > +
-> > +static inline void s5p_irq_eint_ack(unsigned int irq)
-> > +{
-> > +	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(eint_pend_reg(irq)));
-> > +}
-> > +
-> > +static void s5p_irq_eint_maskack(unsigned int irq)
-> > +{
-> > +	/* compiler should in-line these */
-> > +	s5p_irq_eint_mask(irq);
-> > +	s5p_irq_eint_ack(irq);
-> > +}
-> > +
-> > +static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
-> > +{
-> > +	int offs = eint_offset(irq);
-> > +	int shift;
-> > +	u32 ctrl, mask;
-> > +	u32 newvalue = 0;
-> > +
-> > +	switch (type) {
-> > +	case IRQ_TYPE_NONE:
-> > +		printk(KERN_WARNING "No edge setting!\n");
-> > +		break;
-> > +
-> > +	case IRQ_TYPE_EDGE_RISING:
-> > +		newvalue = S5P_EXTINT_RISEEDGE;
-> > +		break;
-> > +
-> > +	case IRQ_TYPE_EDGE_FALLING:
-> > +		newvalue = S5P_EXTINT_RISEEDGE;
-> > +		break;
-> > +
-> > +	case IRQ_TYPE_EDGE_BOTH:
-> > +		newvalue = S5P_EXTINT_BOTHEDGE;
-> > +		break;
-> > +
-> > +	case IRQ_TYPE_LEVEL_LOW:
-> > +		newvalue = S5P_EXTINT_LOWLEV;
-> > +		break;
-> > +
-> > +	case IRQ_TYPE_LEVEL_HIGH:
-> > +		newvalue = S5P_EXTINT_HILEV;
-> > +		break;
-> > +
-> > +	default:
-> > +		printk(KERN_ERR "No such irq type %d", type);
-> > +		return -1;
-> > +	}
-> > +
-> > +	shift = (offs & 0x7) * 4;
-> > +	mask = 0x7 << shift;
-> > +
-> > +	ctrl = __raw_readl(S5P_EINT_CON(eint_conf_reg(irq)));
-> > +	ctrl &= ~mask;
-> > +	ctrl |= newvalue << shift;
-> > +	__raw_writel(ctrl, S5P_EINT_CON(eint_conf_reg(irq)));
-> > +
-> > +	if ((0 <= offs) && (offs < 8))
-> > +		s3c_gpio_cfgpin(S5P_EINT_SET0(offs&0x7), 0xf<<((offs&0x7)*4));
-> > +
-> > +	else if ((8 <= offs) && (offs < 16))
-> > +		s3c_gpio_cfgpin(S5P_EINT_SET1(offs&0x7), 0xf<<((offs&0x7)*4));
-> > +
-> > +	else if ((16 <= offs) && (offs < 24))
-> > +		s3c_gpio_cfgpin(S5P_EINT_SET2(offs&0x7), 0xf<<((offs&0x7)*4));
-> > +
-> > +	else if ((24 <= offs) && (offs < 32))
-> > +		s3c_gpio_cfgpin(S5P_EINT_SET3(offs&0x7), 0xf<<((offs&0x7)*4));
-> > +
-> > +	else
-> > +		printk(KERN_ERR "No such irq number %d", offs);
-> > +
-> 
-> This code will be reused for other s5p SoCs - at least s5pc100 should also
-> use the common external interrupt code.
-> 
-> IMHO it would be better to use some common s5p defines to hide these magic
-> numbers. What about the similar code from my "[PATCH 14/16] ARM: Samsung:
-> Move external interrupts support from plat-s5pc1xx to plat-s5p" patch?
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012618.html
-> 
-> I will be something like this:
-> 
->         switch (offs) {
->         case 0 ... 7:
->                         gpio = S5P_GPH0(gpio);
->                 break;
->         case 8 ... 15:
->                         gpio = S5P_GPH1(gpio);
->                 break;
->         case 16 ... 23:
->                         gpio = S5P_GPH2(gpio);
->                 break;
->         case 24 ... 31:
->                         gpio = S5P_GPH3(gpio);
->                 break;
->         default:
->                 return -EINVAL;
->         }
-> 
->         sfn = S3C_GPIO_SFN_EINT;
->         s3c_gpio_cfgpin(gpio, sfn);
-> 
-> Please note that the gpio special function value for EINT is different
-> on s5pc100 and s5pv210 (0x2 vs. 0xf), so hiding this behind a define is
-> much more convenient.
 
-or even better, use the gpio chip to lookup the configuration structure
-which provides the configuration setting, so we could do
+Hello,
 
-      struct s3c_gpio_chip *chip = s3c_gpio_getchip(gpio);
-      struct s3c_gpio_cfg *cfg = chip->cfg;
+MAINTAINER of SDHCI is Orphan in MAINTAINERS file,
+and i am not sure whom should i redirect this patch to.
 
-      s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(cfg->cfg_eint));
+Show this be reviewed and pushed through arch specific list (ARM in
+our case) or should it be done through linux-mmc at vger.kernel.org
 
--- 
-Ben
+Can somebody please help?
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+regards,
+viresh kumar.
