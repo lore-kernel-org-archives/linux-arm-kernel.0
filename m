@@ -1,32 +1,26 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 14 May 2010 22:03:20 +0300
-Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
-In-Reply-To: <AANLkTildHTovAq6DZa2nPgYwX3BHsHuvM9oKGFssFH6-@mail.gmail.com>
+From: h-kanigeri2@ti.com (Kanigeri, Hari)
+Date: Fri, 14 May 2010 16:27:22 -0500
+Subject: [PATCH v2 08/17] omap: mailbox: only compile for configured archs
+In-Reply-To: <1273849310-32169-9-git-send-email-felipe.contreras@gmail.com>
 References: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
-	<AANLkTildHTovAq6DZa2nPgYwX3BHsHuvM9oKGFssFH6-@mail.gmail.com>
-Message-ID: <AANLkTinzSJjupRMGWmlB6cyGpYMm5tpPvhcMFdROZNCL@mail.gmail.com>
+	<1273849310-32169-9-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <8F7AF80515AF0D4D93307E594F3CB40E4BBC5C8A@dlee03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 6:09 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Felipe,
->
-> On Fri, May 14, 2010 at 6:01 PM, Felipe Contreras
-> <felipe.contreras@gmail.com> wrote:
->> The main purpose of this patch series is to be able to compile mach platform
->> data as built-in. Otherwise, client modules such as bridgedriver will load the
->> platform code, but not the mach code when mailbox is built as a module.
->>
->> Unfortunately, there's no easy way to do that since plat and mach code are
->> deepely interrelated. So the first patches try to separate the mailbox
->> registering through a defined omap_mbox_platform_data.
->
-> Have you considered converting mailbox to hwmod + omap_device ?
+> 
+> -	if (cpu_is_omap3430()) {
+> +	if (false);
 
-I don't know what's that... so no. Is there any good source of
-information, or a good example? I think there is further tidying up
-possible after this patch series independent of that, but I would like
-to concentrate on getting this in first.
+-- Is this statement needed ?
 
--- 
-Felipe Contreras
+> +#if defined(CONFIG_ARCH_OMAP3430)
+> +	else if (cpu_is_omap3430()) {
+>  		list = omap3_mboxes;
+> 
+>  		list[0]->irq = res[1].start;
+
+Thank you,
+Best regards,
+Hari
+  	
