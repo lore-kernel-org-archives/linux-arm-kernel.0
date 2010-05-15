@@ -1,23 +1,24 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 15 May 2010 02:26:52 +0200
-Subject: [PATCH] sdhci-spear: ST SPEAr based SDHCI controller glue
-In-Reply-To: <4BECE6FF.8000303@st.com>
-References: <1273052118-15513-1-git-send-email-viresh.kumar@st.com>
-	<4BE77D23.7080705@st.com> <4BEA3C6D.7090208@st.com>
-	<4BECE6FF.8000303@st.com>
-Message-ID: <AANLkTilBRugtiV-ls-4DCUyOpOHgDr1PwTrk6VeEzDCo@mail.gmail.com>
+Date: Sat, 15 May 2010 02:36:36 +0200
+Subject: Anyone knows abot the DMA status on the PB1176JZF-S baseboard?
+Message-ID: <AANLkTim4Y5vkPYUWSNigIL72-f9jfTLq-nEKD_apaD0p@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/14 Viresh KUMAR <viresh.kumar@st.com>:
+I got hold of a baseboard for ARM RealView Versatile 1176JZF-S.
 
-> Show this be reviewed and pushed through arch specific list (ARM in
-> our case) or should it be done through linux-mmc at vger.kernel.org
+However in the manual that comes with the board the DMA PL081
+controller is listed but in recent manuals it has been removed.
+It's device entry was commented out in
+arch/arm/mach-realview/realview_pb1176.c
+when the support was submitted.
 
-linux-mmc is correct.
+When I test it, the hardware is there and responding at
+the listed address. However it doesn't seem to work so well,
+all kind of odd behaviour... Like loosing bits on the bus.
 
-I think Andrew will pick up and queue you patch as soon as the?e's
-some consensus on it.
+Is the PL081 instance in the PB1176 known to be broken and is that
+the reason for it being removed from the manual?
 
 Yours,
 Linus Walleij
