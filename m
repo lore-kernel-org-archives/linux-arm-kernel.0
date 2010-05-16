@@ -1,44 +1,24 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sun, 16 May 2010 23:58:24 +0800
-Subject: [PATCH] MAINTAINERS: Add Files and directories entry for NUC900
-	platform
-Message-ID: <4BF01620.6000708@gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 17 May 2010 00:53:13 +0200
+Subject: [PATCH] mx21/devices: fix USBOTG resource
+In-Reply-To: <20100515101118.GB17080@n2100.arm.linux.org.uk>
+References: <1273889324-29720-1-git-send-email-w.sang@pengutronix.de>
+	<20100515101118.GB17080@n2100.arm.linux.org.uk>
+Message-ID: <20100516225313.GA27301@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+> However, please send your patch to the patch system.
 
-I want to add MAINTIANERS Files and directories of mine,
-Can I submit the patch to your mail list for this?
+Done, btw (6135).
 
-Thanks!
-
-Signed-off-by: Wan ZongShun<mcuos.com@gmail.com>
-
----
- MAINTAINERS |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1838875..6861818 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -970,6 +970,16 @@ M:	Wan ZongShun <mcuos.com@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.mcuos.com
- S:	Maintained
-+F:	arch/arm/mach-w90x900/
-+F:	arch/arm/mach-nuc93x/
-+F:	drivers/input/keyboard/w90p910_keypad.c
-+F:	drivers/input/touchscreen/w90p910_ts.c
-+F:	drivers/watchdog/nuc900_wdt.c
-+F:	drivers/net/arm/w90p910_ether.c
-+F:	drivers/mtd/nand/w90p910_nand.c
-+F:	drivers/rtc/rtc-nuc900.c
-+F:	drivers/spi/spi_nuc900.c
-+F:	drivers/usb/host/ehci-w90x900.c
-
- ARM/U300 MACHINE SUPPORT
- M:	Linus Walleij <linus.walleij@stericsson.com>
 -- 
-1.6.3.3
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100517/4a225356/attachment.sig>
