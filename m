@@ -1,18 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 May 2010 15:57:19 +0100
-Subject: Patch 6127
-Message-ID: <20100516145719.GB23961@n2100.arm.linux.org.uk>
+Date: Sun, 16 May 2010 16:01:17 +0100
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in
+	theARMv6 DMA cache ops
+In-Reply-To: <309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+Message-ID: <20100516150117.GC23961@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As I said on May 13th in the patch system:
-> Note that this patch misses an 'unsigned long flags;' from at91_udc_irq().
+On Sun, May 16, 2010 at 09:29:47AM +0300, Ronen Shitrit wrote:
+> Our ARMv6 do speculative rd for both I and D cache...
 
-To which there's been silence.  As I'm now freezing my tree so I can apply
-other patches on top of this, I have no option but to drop this build-
-breaking patch.
+That means doing this read-write for ownership trick can lead to
+corrupted data on your CPU, since the CPU may prefetch data from
+the DMA buffer before the unmap has happened.
 
-Please resubmit after the 2.6.35 merge window has happened (iow, once
-2.6.35-rc1 has been released.)
-
-Thanks.
+This means Catalin's patch is unsafe for your situation.
