@@ -1,526 +1,310 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 17 May 2010 10:27:29 +1000
-Subject: [PATCH] arm/orion5x: Base support for DNS-323 rev C1
-Message-ID: <1274056049.21352.692.camel@pasglop>
+Date: Mon, 17 May 2010 10:27:37 +1000
+Subject: [PATCH] hwmon: DNS323 rev C1 fan support
+Message-ID: <1274056057.21352.696.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the base support for this new HW revision to the existing
-dns323-setup.c file. The SoC seems to be the same as rev B1, the GPIOs
-are all wired differently though and the fan control isn't i2c based
-anymore.
+The hardware only supports 3 settings: off, slow and fast.
 
-A followup patch adds a simple fan control driver.
+In order to have a chance to work with existing fan control systems,
+we emulate a PWM device with the following mapping:
+
+   0.. 15  off
+  16..127  slow
+ 128..255  fast
 
 Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
- arch/arm/mach-orion5x/dns323-setup.c |  347 ++++++++++++++++++++++++++++------
- 1 files changed, 288 insertions(+), 59 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index 421b82f..b9bf72a 100644
---- a/arch/arm/mach-orion5x/dns323-setup.c
-+++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -3,6 +3,10 @@
-  *
-  * Copyright (C) 2007 Herbert Valerio Riedel <hvr@gnu.org>
-  *
-+ * Support for HW Rev C1:
-+ *
-+ * Copyright (C) 2010 Benjamin Herrenschmidt <benh@kernel.crashing.org>
-+ *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU Lesser General Public License as
-  * published by the Free Software Foundation; either version 2 of the
-@@ -31,6 +35,7 @@
- #include "common.h"
- #include "mpp.h"
+Note: These numbers have been picked up pretty randomly and I haven't
+had a chance yet to check how fancontrol copes with them. However,
+at least we get reasonable "manual" control, and it should at least
+be able to pump the fans to full speed if the temperature is too high
+so we can always adjust the thresholds later on.
+
+---
+ drivers/hwmon/Kconfig       |   12 ++
+ drivers/hwmon/Makefile      |    1 +
+ drivers/hwmon/dns323c-fan.c |  237 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 250 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/hwmon/dns323c-fan.c
+
+diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+index 9be8e17..5f55735 100644
+--- a/drivers/hwmon/Kconfig
++++ b/drivers/hwmon/Kconfig
+@@ -1087,6 +1087,18 @@ config SENSORS_MC13783_ADC
+         help
+           Support for the A/D converter on MC13783 PMIC.
  
-+/* Rev A1 and B1 */
- #define DNS323_GPIO_LED_RIGHT_AMBER	1
- #define DNS323_GPIO_LED_LEFT_AMBER	2
- #define DNS323_GPIO_SYSTEM_UP		3
-@@ -42,6 +47,23 @@
- #define DNS323_GPIO_KEY_POWER		9
- #define DNS323_GPIO_KEY_RESET		10
++config SENSORS_DNS323C_FAN
++       tristate "D-Link DNS323 rev C1 Fan"
++       depends on MACH_DNS323
++       help
++         Support for the GPIO based fan control on the D-Link DNS323
++	 HW revision C1. This exposes a pseudo pwm device with the
++	 following values supported:
++
++	 	    0..15	: Fan off
++		   16..127	: Fan on low speed
++		  128..255	: Fan on high speed
++	 
+ if ACPI
  
-+/* Rev C1 */
-+#define DNS323C_GPIO_KEY_POWER		1
-+#define DNS323C_GPIO_POWER_OFF		2
-+#define DNS323C_GPIO_LED_RIGHT_AMBER	8
-+#define DNS323C_GPIO_LED_LEFT_AMBER	9
-+#define DNS323C_GPIO_LED_POWER		17
+ comment "ACPI drivers"
+diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+index 4aa1a3d..15bcdef 100644
+--- a/drivers/hwmon/Makefile
++++ b/drivers/hwmon/Makefile
+@@ -100,6 +100,7 @@ obj-$(CONFIG_SENSORS_W83L785TS)	+= w83l785ts.o
+ obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l786ng.o
+ obj-$(CONFIG_SENSORS_WM831X)	+= wm831x-hwmon.o
+ obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
++obj-$(CONFIG_SENSORS_DNS323C_FAN)+= dns323c-fan.o
+ 
+ ifeq ($(CONFIG_HWMON_DEBUG_CHIP),y)
+ EXTRA_CFLAGS += -DDEBUG
+diff --git a/drivers/hwmon/dns323c-fan.c b/drivers/hwmon/dns323c-fan.c
+new file mode 100644
+index 0000000..c10c58e
+--- /dev/null
++++ b/drivers/hwmon/dns323c-fan.c
+@@ -0,0 +1,237 @@
++/*
++ *  dns323c_fan - Driver for the D-LINK DNS-323 rev C1 fan control
++ *
++ *  Copyright 2010 Benjamin Herrenschmidt
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/gpio.h>
++#include <linux/hwmon.h>
++#include <linux/hwmon-sysfs.h>
++#include <linux/gfp.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/sysfs.h>
++#include <linux/platform_device.h>
++
++enum fan_speed {
++	FAN_OFF,
++	FAN_LOW	,
++	FAN_FAST,
++	FAN_FAST_LOCK,
++};
++
 +#define DNS323C_GPIO_FAN_BIT1		18
 +#define DNS323C_GPIO_FAN_BIT0		19
 +
-+/* Exposed to userspace, do not change */
-+enum {
-+	DNS323_REV_A1,	/* 0 */
-+	DNS323_REV_B1,	/* 1 */
-+	DNS323_REV_C1,	/* 2 */
++struct dns323c_fan {
++	struct device	*hwmon;
++	struct mutex	lock;
++	enum fan_speed	speed;
 +};
 +
-+
- /****************************************************************************
-  * PCI setup
-  */
-@@ -68,21 +90,12 @@ static struct hw_pci dns323_pci __initdata = {
- 	.map_irq	= dns323_pci_map_irq,
- };
- 
--static int __init dns323_dev_id(void)
--{
--	u32 dev, rev;
--
--	orion5x_pcie_id(&dev, &rev);
--
--	return dev;
--}
--
- static int __init dns323_pci_init(void)
- {
--	/* The 5182 doesn't really use its PCI bus, and initialising PCI
-+	/* Rev B1 and C1 doesn't really use its PCI bus, and initialising PCI
- 	 * gets in the way of initialising the SATA controller.
- 	 */
--	if (machine_is_dns323() && dns323_dev_id() != MV88F5182_DEV_ID)
-+	if (machine_is_dns323() && system_rev == DNS323_REV_A1)
- 		pci_common_init(&dns323_pci);
- 
- 	return 0;
-@@ -221,7 +234,7 @@ static int __init dns323_read_mac_addr(void)
- 	}
- 
- 	iounmap(mac_page);
--	printk("DNS323: Found ethernet MAC address: ");
-+	printk("DNS-323: Found ethernet MAC address: ");
- 	for (i = 0; i < 6; i++)
- 		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
- 
-@@ -258,7 +271,7 @@ static int dns323_gpio_blink_set(unsigned gpio,
- 	return -EINVAL;
- }
- 
--static struct gpio_led dns323_leds[] = {
-+static struct gpio_led dns323ab_leds[] = {
- 	{
- 		.name = "power:blue",
- 		.gpio = DNS323_GPIO_LED_POWER2,
-@@ -274,9 +287,33 @@ static struct gpio_led dns323_leds[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data dns323_led_data = {
--	.num_leds	= ARRAY_SIZE(dns323_leds),
--	.leds		= dns323_leds,
-+
-+static struct gpio_led dns323c_leds[] = {
-+	{
-+		.name = "power:blue",
-+		.gpio = DNS323C_GPIO_LED_POWER,
-+		.default_trigger = "timer",
-+	}, {
-+		.name = "right:amber",
-+		.gpio = DNS323C_GPIO_LED_RIGHT_AMBER,
-+		.active_low = 1,
-+	}, {
-+		.name = "left:amber",
-+		.gpio = DNS323C_GPIO_LED_LEFT_AMBER,
-+		.active_low = 1,
-+	},
-+};
-+
-+
-+static struct gpio_led_platform_data dns323ab_led_data = {
-+	.num_leds	= ARRAY_SIZE(dns323ab_leds),
-+	.leds		= dns323ab_leds,
-+	.gpio_blink_set = dns323_gpio_blink_set,
-+};
-+
-+static struct gpio_led_platform_data dns323c_led_data = {
-+	.num_leds	= ARRAY_SIZE(dns323c_leds),
-+	.leds		= dns323c_leds,
- 	.gpio_blink_set = dns323_gpio_blink_set,
- };
- 
-@@ -284,7 +321,7 @@ static struct platform_device dns323_gpio_leds = {
- 	.name		= "leds-gpio",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data	= &dns323_led_data,
-+		.platform_data	= &dns323ab_led_data,
- 	},
- };
- 
-@@ -292,7 +329,7 @@ static struct platform_device dns323_gpio_leds = {
-  * GPIO Attached Keys
-  */
- 
--static struct gpio_keys_button dns323_buttons[] = {
-+static struct gpio_keys_button dns323ab_buttons[] = {
- 	{
- 		.code		= KEY_RESTART,
- 		.gpio		= DNS323_GPIO_KEY_RESET,
-@@ -306,9 +343,23 @@ static struct gpio_keys_button dns323_buttons[] = {
- 	},
- };
- 
--static struct gpio_keys_platform_data dns323_button_data = {
--	.buttons	= dns323_buttons,
--	.nbuttons	= ARRAY_SIZE(dns323_buttons),
-+static struct gpio_keys_platform_data dns323ab_button_data = {
-+	.buttons	= dns323ab_buttons,
-+	.nbuttons	= ARRAY_SIZE(dns323ab_buttons),
-+};
-+
-+static struct gpio_keys_button dns323c_buttons[] = {
-+	{
-+		.code		= KEY_POWER,
-+		.gpio		= DNS323C_GPIO_KEY_POWER,
-+		.desc		= "Power Button",
-+		.active_low	= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data dns323c_button_data = {
-+	.buttons	= dns323c_buttons,
-+	.nbuttons	= ARRAY_SIZE(dns323c_buttons),
- };
- 
- static struct platform_device dns323_button_device = {
-@@ -316,7 +367,7 @@ static struct platform_device dns323_button_device = {
- 	.id		= -1,
- 	.num_resources	= 0,
- 	.dev		= {
--		.platform_data	= &dns323_button_data,
-+		.platform_data	= &dns323ab_button_data,
- 	},
- };
- 
-@@ -330,7 +381,7 @@ static struct mv_sata_platform_data dns323_sata_data = {
- /****************************************************************************
-  * General Setup
-  */
--static struct orion5x_mpp_mode dns323_mv88f5181_mpp_modes[] __initdata = {
-+static struct orion5x_mpp_mode dns323a_mpp_modes[] __initdata = {
- 	{  0, MPP_PCIE_RST_OUTn },
- 	{  1, MPP_GPIO },		/* right amber LED (sata ch0) */
- 	{  2, MPP_GPIO },		/* left amber LED (sata ch1) */
-@@ -354,7 +405,7 @@ static struct orion5x_mpp_mode dns323_mv88f5181_mpp_modes[] __initdata = {
- 	{ -1 },
- };
- 
--static struct orion5x_mpp_mode dns323_mv88f5182_mpp_modes[] __initdata = {
-+static struct orion5x_mpp_mode dns323b_mpp_modes[] __initdata = {
- 	{  0, MPP_UNUSED },
- 	{  1, MPP_GPIO },		/* right amber LED (sata ch0) */
- 	{  2, MPP_GPIO },		/* left amber LED (sata ch1) */
-@@ -378,15 +429,57 @@ static struct orion5x_mpp_mode dns323_mv88f5182_mpp_modes[] __initdata = {
- 	{ -1 },
- };
- 
-+static struct orion5x_mpp_mode dns323c_mpp_modes[] __initdata = {
-+	{  0, MPP_GPIO },		/* ? input */
-+	{  1, MPP_GPIO },		/* input power switch (0 = pressed) */
-+	{  2, MPP_GPIO },		/* output power off */
-+	{  3, MPP_UNUSED },		/* ? output */
-+	{  4, MPP_UNUSED },		/* ? output */
-+	{  5, MPP_UNUSED },		/* ? output */
-+	{  6, MPP_UNUSED },		/* ? output */
-+	{  7, MPP_UNUSED },		/* ? output */
-+	{  8, MPP_GPIO },		/* i/o right amber LED */
-+	{  9, MPP_GPIO },		/* i/o left amber LED */
-+	{ 10, MPP_GPIO },		/* input */
-+	{ 11, MPP_UNUSED },
-+	{ 12, MPP_SATA_LED },
-+	{ 13, MPP_SATA_LED },
-+	{ 14, MPP_SATA_LED },
-+	{ 15, MPP_SATA_LED },
-+	{ 16, MPP_UNUSED },
-+	{ 17, MPP_GPIO },		/* power button LED */
-+	{ 18, MPP_GPIO },		/* fan speed bit 0 */
-+	{ 19, MPP_GPIO },		/* fan speed bit 1 */
-+	{ -1 },
-+};
-+
-+/* Rev C1 Fan speed notes:
-+ *
-+ * The fan is controlled by 2 GPIOs on this board. The settings
-+ * of the bits is as follow:
-+ *
-+ *  GPIO 18    GPIO 19    Fan
-+ *
-+ *    0          0        stopped
-+ *    0          1        low speed
-+ *    1          0        high speed
-+ *    1          1        don't do that (*)
-+ *
-+ * (*) I think the two bits control two feed-in resistors into a fixed
-+ *     PWN circuit, setting both bits will basically go a 'bit' faster
-+ *     than high speed, but d-link doesn't do it and you may get out of
-+ *     HW spec so don't do it.
-+ */
-+
- /*
-- * On the DNS-323 the following devices are attached via I2C:
-+ * On the DNS-323 A1 and B1 the following devices are attached via I2C:
-  *
-  *  i2c addr | chip        | description
-  *  0x3e     | GMT G760Af  | fan speed PWM controller
-  *  0x48     | GMT G751-2f | temp. sensor and therm. watchdog (LM75 compatible)
-  *  0x68     | ST M41T80   | RTC w/ alarm
-  */
--static struct i2c_board_info __initdata dns323_i2c_devices[] = {
-+static struct i2c_board_info __initdata dns323ab_i2c_devices[] = {
- 	{
- 		I2C_BOARD_INFO("g760a", 0x3e),
- 	}, {
-@@ -396,6 +489,21 @@ static struct i2c_board_info __initdata dns323_i2c_devices[] = {
- 	},
- };
- 
-+/*
-+ * On the DNS-323 C1 the following devices are attached via I2C:
-+ *
-+ *  i2c addr | chip        | description
-+ *  0x48     | GMT G751-2f | temp. sensor and therm. watchdog (LM75 compatible)
-+ *  0x68     | ST M41T80   | RTC w/ alarm
-+ */
-+static struct i2c_board_info __initdata dns323c_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("lm75", 0x48),
-+	}, {
-+		I2C_BOARD_INFO("m41t80", 0x68),
-+	},
-+};
-+
- /* DNS-323 rev. A specific power off method */
- static void dns323a_power_off(void)
- {
-@@ -413,19 +521,103 @@ static void dns323b_power_off(void)
- 	gpio_set_value(DNS323_GPIO_POWER_OFF, 0);
- }
- 
-+/* DNS-323 rev. C specific power off method */
-+static void dns323c_power_off(void)
++static void __set_fan_speed(struct dns323c_fan *fan, enum fan_speed speed)
 +{
-+	pr_info("%s: triggering power-off...\n", __func__);
-+	gpio_set_value(DNS323C_GPIO_POWER_OFF, 1);
-+}
++	if (speed == fan->speed)
++		return;
 +
-+static int __init dns323_identify_rev(void)
-+{
-+	u32 dev, rev, i, reg;
-+
-+	pr_debug("DNS-323: Identifying board ... \n");
-+
-+	/* Rev A1 has a 5181 */
-+	orion5x_pcie_id(&dev, &rev);
-+	if (dev == MV88F5181_DEV_ID) {
-+		pr_debug("DNS-323: 5181 found, board is A1\n");
-+		return DNS323_REV_A1;
-+	}
-+	pr_debug("DNS-323: 5182 found, board is B1 or C1, checking PHY...\n");
-+
-+	/* Rev B1 and C1 both have 5182, let's poke at the eth PHY. This is
-+	 * a bit gross but we want to do that without links into the eth
-+	 * driver so let's poke@it directly. We default to rev B1 in
-+	 * case the accesses fail
-+	 */
-+
-+#define ETH_SMI_REG		(ORION5X_ETH_VIRT_BASE + 0x2000 + 0x004)
-+#define  SMI_BUSY		0x10000000
-+#define  SMI_READ_VALID		0x08000000
-+#define  SMI_OPCODE_READ	0x04000000
-+#define  SMI_OPCODE_WRITE	0x00000000
-+
-+	for (i = 0; i < 1000; i++) {
-+		reg = readl(ETH_SMI_REG);
-+		if (!(reg & SMI_BUSY))
-+			break;
-+	}
-+	if (i >= 1000) {
-+		pr_warning("DNS-323: Timeout accessing PHY, assuming rev B1\n");
-+		return DNS323_REV_B1;
-+	}
-+	writel((3 << 21)	/* phy ID reg */ |
-+	       (8 << 16)	/* phy addr */ |
-+	       SMI_OPCODE_READ, ETH_SMI_REG);
-+	for (i = 0; i < 1000; i++) {
-+		reg = readl(ETH_SMI_REG);
-+		if (reg & SMI_READ_VALID)
-+			break;
-+	}
-+	if (i >= 1000) {
-+		pr_warning("DNS-323: Timeout reading PHY, assuming rev B1\n");
-+		return DNS323_REV_B1;
-+	}
-+	pr_debug("DNS-323: Ethernet PHY ID 0x%x\n", reg & 0xffff);
-+
-+	/* Note: the Marvell tools mask the ID with 0x3f0 before comparison
-+	 * but I don't see that making a difference here, at least with
-+	 * any known Marvell PHY ID
-+	 */
-+	switch(reg & 0xfff0) {
-+	case 0x0cc0: /* MV88E1111 */
-+		return DNS323_REV_B1;
-+	case 0x0e10: /* MV88E1118 */
-+		return DNS323_REV_C1;
++	switch(speed) {
++	case FAN_OFF:
++		gpio_set_value(DNS323C_GPIO_FAN_BIT1, 0);
++		gpio_set_value(DNS323C_GPIO_FAN_BIT0, 0);
++		break;
++	case FAN_LOW:
++		gpio_set_value(DNS323C_GPIO_FAN_BIT1, 0);
++		gpio_set_value(DNS323C_GPIO_FAN_BIT0, 1);
++		break;
 +	default:
-+		pr_warning("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
-+			   reg & 0xffff);
-+	}
-+	return DNS323_REV_B1;
++		gpio_set_value(DNS323C_GPIO_FAN_BIT0, 0);
++		gpio_set_value(DNS323C_GPIO_FAN_BIT1, 1);
++	};
++	fan->speed = speed;
 +}
 +
- static void __init dns323_init(void)
- {
-+        console_loglevel = 10;
++static ssize_t show_pwm(struct device *dev, struct device_attribute *da,
++			char *buf)
++{
++	struct dns323c_fan *fan = dev_get_drvdata(dev);
++	int pseudo_pwm;
 +
- 	/* Setup basic Orion functions. Need to be called early. */
- 	orion5x_init();
- 
-+	/* Identify revision */
-+	system_rev = dns323_identify_rev();
-+	pr_info("DNS-323: Identified HW revision %c1\n", 'A' + system_rev);
-+
- 	/* Just to be tricky, the 5182 has a completely different
- 	 * set of MPP modes to the 5181.
- 	 */
--	if (dns323_dev_id() == MV88F5182_DEV_ID)
--		orion5x_mpp_conf(dns323_mv88f5182_mpp_modes);
--	else {
--		orion5x_mpp_conf(dns323_mv88f5181_mpp_modes);
-+	switch(system_rev) {
-+	case DNS323_REV_A1:
-+		orion5x_mpp_conf(dns323a_mpp_modes);
- 		writel(0, MPP_DEV_CTRL);		/* DEV_D[31:16] */
++	switch(fan->speed) {
++	case FAN_OFF:
++		pseudo_pwm = 0;
 +		break;
-+	case DNS323_REV_B1:
-+		orion5x_mpp_conf(dns323b_mpp_modes);
++	case FAN_LOW:
++		pseudo_pwm = 63;
 +		break;
-+	case DNS323_REV_C1:
-+		orion5x_mpp_conf(dns323c_mpp_modes);
-+		break;
- 	}
- 
- 	/* setup flash mapping
-@@ -434,52 +626,89 @@ static void __init dns323_init(void)
- 	orion5x_setup_dev_boot_win(DNS323_NOR_BOOT_BASE, DNS323_NOR_BOOT_SIZE);
- 	platform_device_register(&dns323_nor_flash);
- 
--	/* The 5181 power LED is active low and requires
--	 * DNS323_GPIO_LED_POWER1 to also be low.
--	 */
--	if (dns323_dev_id() == MV88F5181_DEV_ID) {
--		dns323_leds[0].active_low = 1;
--		gpio_direction_output(DNS323_GPIO_LED_POWER1, 0);
-+	/* Sort out LEDs, Buttons and i2c devices */
-+	switch(system_rev) {
-+	case DNS323_REV_A1:
-+		/* The 5181 power LED is active low and requires
-+		 * DNS323_GPIO_LED_POWER1 to also be low.
-+		 */
-+		 dns323ab_leds[0].active_low = 1;
-+		 gpio_direction_output(DNS323_GPIO_LED_POWER1, 0);
-+		/* Fall through */
-+	case DNS323_REV_B1:
-+		i2c_register_board_info(0, dns323ab_i2c_devices,
-+				ARRAY_SIZE(dns323ab_i2c_devices));
-+		break;
-+	case DNS323_REV_C1:
-+		/* Hookup LEDs & Buttons */
-+		dns323_gpio_leds.dev.platform_data = &dns323c_led_data;
-+		dns323_button_device.dev.platform_data = &dns323c_button_data;
-+		/* Hookup i2c devices and fan driver */
-+		i2c_register_board_info(0, dns323c_i2c_devices,
-+				ARRAY_SIZE(dns323c_i2c_devices));
-+		platform_device_register_simple("dns323c-fan", 0, NULL, 0);
- 	}
- 
- 	platform_device_register(&dns323_gpio_leds);
--
- 	platform_device_register(&dns323_button_device);
- 
--	i2c_register_board_info(0, dns323_i2c_devices,
--				ARRAY_SIZE(dns323_i2c_devices));
--
- 	/*
- 	 * Configure peripherals.
- 	 */
- 	if (dns323_read_mac_addr() < 0)
--		printk("DNS323: Failed to read MAC address\n");
--
-+		printk("DNS-323: Failed to read MAC address\n");
- 	orion5x_ehci0_init();
- 	orion5x_eth_init(&dns323_eth_data);
- 	orion5x_i2c_init();
- 	orion5x_uart0_init();
- 
--	/* The 5182 has its SATA controller on-chip, and needs its own little
--	 * init routine.
--	 */
--	if (dns323_dev_id() == MV88F5182_DEV_ID)
-+	/* Remaining GPIOs */
-+	switch(system_rev) {
-+	case DNS323_REV_A1:
-+		/* Poweroff GPIO */
-+		if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
-+		    gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
-+			pr_err("DNS-323: failed to setup power-off GPIO\n");
-+		pm_power_off = dns323a_power_off;
-+		break;
-+	case DNS323_REV_B1:
-+		/* 5182 built-in SATA init */
- 		orion5x_sata_init(&dns323_sata_data);
- 
--	/* The 5182 has flag to indicate the system is up. Without this flag
--	 * set, power LED will flash and cannot be controlled via leds-gpio.
--	 */
--	if (dns323_dev_id() == MV88F5182_DEV_ID)
--		gpio_set_value(DNS323_GPIO_SYSTEM_UP, 1);
--
--	/* Register dns323 specific power-off method */
--	if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
--	    gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
--		pr_err("DNS323: failed to setup power-off GPIO\n");
--	if (dns323_dev_id() == MV88F5182_DEV_ID)
-+		/* The DNS323 rev B1 has flag to indicate the system is up.
-+		 * Without this flag set, power LED will flash and cannot be
-+		 * controlled via leds-gpio.
-+		 */
-+		if (gpio_request(DNS323_GPIO_SYSTEM_UP, "SYS_READY") == 0)
-+			gpio_direction_output(DNS323_GPIO_SYSTEM_UP, 1);
-+
-+		/* Poweroff GPIO */
-+		if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
-+		    gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
-+			pr_err("DNS-323: failed to setup power-off GPIO\n");
- 		pm_power_off = dns323b_power_off;
--	else
--		pm_power_off = dns323a_power_off;
-+		break;
-+	case DNS323_REV_C1:
-+		/* 5182 built-in SATA init */
-+		orion5x_sata_init(&dns323_sata_data);
-+
-+		/* Poweroff GPIO */
-+		if (gpio_request(DNS323C_GPIO_POWER_OFF, "POWEROFF") != 0 ||
-+		    gpio_direction_output(DNS323C_GPIO_POWER_OFF, 0) != 0)
-+			pr_err("DNS-323: failed to setup power-off GPIO\n");
-+		pm_power_off = dns323c_power_off;
-+
-+		/* Now, -this- should theorically be done by the sata_mv driver
-+		 * once I figure out what's going on there. Maybe the behaviour
-+		 * of the LEDs should be somewhat passed via the platform_data.
-+		 * for now, just whack the register and make the LEDs happy
-+		 *
-+		 * Note: AFAIK, rev B1 needs the same treatement but I'll let
-+		 * somebody else test it.
-+		 */
-+		writel(0x5, ORION5X_SATA_VIRT_BASE | 0x2c);
-+		break;
++	default:
++		pseudo_pwm = 255;
 +	}
- }
- 
- /* Warning: D-Link uses a wrong mach-type (=526) in their bootloader */
++	return sprintf(buf, "%d\n", pseudo_pwm);
++}
++
++static ssize_t set_pwm(struct device *dev, struct device_attribute *da,
++		       const char *buf, size_t count)
++{
++	struct dns323c_fan *fan = dev_get_drvdata(dev);
++	enum fan_speed speed;
++	unsigned long val;
++
++	if (strict_strtoul(buf, 10, &val))
++		return -EINVAL;
++	if (fan->speed == FAN_FAST_LOCK)
++		return count;
++
++	mutex_lock(&fan->lock);
++	if (val < 16)
++		speed = FAN_OFF;
++	else if (val < 128)
++		speed = FAN_LOW;
++	else
++		speed = FAN_FAST;
++	__set_fan_speed(fan, speed);
++	mutex_unlock(&fan->lock);
++
++	return count;
++}
++
++static ssize_t show_pwm_en(struct device *dev, struct device_attribute *da,
++			   char *buf)
++{
++	struct dns323c_fan *fan = dev_get_drvdata(dev);
++
++	if (fan->speed == FAN_FAST_LOCK)
++		return sprintf(buf, "0\n");
++	else
++		return sprintf(buf, "1\n");
++}
++
++static ssize_t set_pwm_en(struct device *dev, struct device_attribute *da,
++			  const char *buf, size_t count)
++{
++	struct dns323c_fan *fan = dev_get_drvdata(dev);
++	enum fan_speed speed;
++	unsigned long val;
++
++	if (strict_strtoul(buf, 10, &val))
++		return -EINVAL;
++	if (val != 0 && val != 1)
++		return -EINVAL;
++
++	mutex_lock(&fan->lock);
++	if (val == 0 && fan->speed != FAN_FAST_LOCK)
++		speed = FAN_FAST_LOCK;
++	else if (val != 0 && fan->speed == FAN_FAST_LOCK)
++		speed = FAN_FAST;
++	else
++		speed = fan->speed;
++	__set_fan_speed(fan, speed);
++	mutex_unlock(&fan->lock);
++
++	return count;
++}
++
++static DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, show_pwm, set_pwm);
++static DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR, show_pwm_en, set_pwm_en);
++
++static int dns323c_fan_probe(struct platform_device *pdev)
++{
++	struct dns323c_fan *fan = NULL;
++	int ret = -ENXIO;
++
++	/* Get the GPIOs */
++	if (gpio_request(DNS323C_GPIO_FAN_BIT0, "FAN0") != 0) {
++		pr_err("dns323c_fan: Failed to request fan GPIO 0 !\n");
++		return -ENXIO;
++	}
++	if (gpio_request(DNS323C_GPIO_FAN_BIT1, "FAN1") != 0) {
++		pr_err("dns323c_fan: Failed to request fan GPIO 1 !\n");
++		goto err_gpio;
++	}
++
++	/* Set directions to output and medium speed. We write bit 1 first
++	 * since it contains 0 to avoid having a transitory 11 state which
++	 * isn't supported
++	 */
++	gpio_direction_output(DNS323C_GPIO_FAN_BIT1, 0);
++	gpio_direction_output(DNS323C_GPIO_FAN_BIT0, 1);
++
++	/* Grab some memory for our state */
++	fan = kzalloc(sizeof(struct dns323c_fan), GFP_KERNEL);
++	if (!fan) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++	fan->speed = FAN_LOW;
++	mutex_init(&fan->lock);
++	platform_set_drvdata(pdev, fan);
++
++	ret = device_create_file(&pdev->dev, &dev_attr_pwm1);
++	ret |= device_create_file(&pdev->dev, &dev_attr_pwm1_enable);
++	if (ret)
++		goto err_file;
++
++	fan->hwmon = hwmon_device_register(&pdev->dev);
++	if (IS_ERR(fan->hwmon)) {
++		ret = PTR_ERR(fan->hwmon);
++		goto err_dev;
++	}
++	return 0;
++
++ err_dev:
++	device_remove_file(&pdev->dev, &dev_attr_pwm1);
++	device_remove_file(&pdev->dev, &dev_attr_pwm1_enable);
++ err_file:
++	kfree(fan);
++ err_alloc:
++	gpio_free(DNS323C_GPIO_FAN_BIT1);
++ err_gpio:
++	gpio_free(DNS323C_GPIO_FAN_BIT0);
++	return ret;
++}
++
++static int __devexit dns323c_fan_remove(struct platform_device *pdev)
++{
++	struct dns323c_fan *fan = platform_get_drvdata(pdev);
++
++	hwmon_device_unregister(fan->hwmon);
++	device_remove_file(&pdev->dev, &dev_attr_pwm1);
++	device_remove_file(&pdev->dev, &dev_attr_pwm1_enable);
++	kfree(fan);
++	gpio_free(DNS323C_GPIO_FAN_BIT1);
++	gpio_free(DNS323C_GPIO_FAN_BIT0);
++	return 0;
++}
++
++static struct platform_driver dns323c_fan_driver = {
++	.probe = dns323c_fan_probe,
++	.remove = __devexit_p(dns323c_fan_remove),
++	.driver = {
++		.name = "dns323c-fan",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init dns323c_fan_init(void)
++{
++	return platform_driver_register(&dns323c_fan_driver);
++}
++
++static void __exit dns323c_fan_exit(void)
++{
++	platform_driver_unregister(&dns323c_fan_driver);
++}
++
++MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
++MODULE_DESCRIPTION("DNS323 RevC1 Fan control");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:dns323c-fan");
++
++module_init(dns323c_fan_init);
++module_exit(dns323c_fan_exit);
