@@ -1,41 +1,32 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Mon, 17 May 2010 15:04:36 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <1274096577.6053.46.camel@e102109-lin.cambridge.arm.com>
-References: <309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<20100516150117.GC23961@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
-	<20100517065712.GA23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
-	<1274090432.6053.4.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA313858@IL-MB01.marvell.com>
-	<1274096577.6053.46.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <309002C0DA137042828828FC53D7A93492FA313892@IL-MB01.marvell.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 17 May 2010 22:08:17 +1000
+Subject: [PATCH] phy/marvell: Add special settings for D-Link DNS-323
+	rev C1
+In-Reply-To: <20100517120032.GI22781@pengutronix.de>
+References: <1274056058.21352.697.camel@pasglop>
+	<20100517005942.GB27301@pengutronix.de>
+	<1274058457.21352.711.camel@pasglop>
+	<1274096214.21352.735.camel@pasglop>
+	<20100517120032.GI22781@pengutronix.de>
+Message-ID: <1274098097.21352.737.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> As I said in a previous e-mail, it's the sync operation that does an
-> invalidate and this would affect the data in the buffer. Hence the patch
-> to make the invalidate operation non-destructive (as long as your CPU
-> doesn't do speculative loads into the D-cache or they can be disabled).
+On Mon, 2010-05-17 at 14:00 +0200, Wolfram Sang wrote:
+> > The problem is that the fixups are called -after- the config_init()
+> > callback of the PHY driver. However, the marvell m88e1118 PHY driver
+> > will unconditionally reset the LEDs setting.
 > 
-> [Ronen Shitrit] What about I-cache prefetch? Unified cache?
+> Haven't checked, just an idea: Is it possible to change the init of
+> the driver to use Read-Modify-Write and thus keep your settings?
 
-The "sync_for_cpu" operation (from device case) first invalidates the L2
-cache and then invalidates the L1 using a LDR/STR pair and cache op.
-[Ronen Shitrit] So for v6-MP, if no D-cache spec pref, why do you need to inv the L1 at all?
+Well, the driver just unconditionally blasts the whole register and
+the value I want to put there is also a "raw" value of the whole
+register based on what the vendor code puts in there (in their old
+2.6.12 based port).
 
+So with only that at hand and no documentation for the actual PHY chip,
+I don't see a simple solution here.
 
-
--- 
-Catalin
+Cheers,
+Ben.
