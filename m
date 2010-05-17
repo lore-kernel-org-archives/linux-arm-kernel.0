@@ -1,114 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 May 2010 15:35:13 +0100
-Subject: [PATCH] ARM: Add a config option for the ARM11MPCore DMA cache
-	maintenance workaround
-Message-ID: <20100517143513.20087.84634.stgit@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 May 2010 16:10:36 +0100
+Subject: RMK closing tree to patches *this* weekend
+In-Reply-To: <alpine.LFD.2.00.1005170858290.12758@xanadu.home>
+References: <20100513230201.GA26822@n2100.arm.linux.org.uk>
+	<20100517090310.GE23118@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1005170858290.12758@xanadu.home>
+Message-ID: <20100517151036.GE29422@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f4d6477f introduced a workaround for the lack of hardware
-broadcasting of the cache maintenance operations on ARM11MPCore.
-However, the workaround is only valid on CPUs that do not do speculative
-loads into the D-cache.
+On Mon, May 17, 2010 at 09:04:53AM -0400, Nicolas Pitre wrote:
+> I don't mind not seeing it in your tree for your initial batch to
+> Linus as long as I know you'll accept it sometimes for this merge window.
 
-This patch adds a Kconfig option with the corresponding help to make the
-above clear. When the DMA_CACHE_RWFO option is disabled, the kernel
-behaviour is that prior to the f4d6477f commit. This also allows ARMv6
-UP processors with speculative loads to work correctly.
+The other thing to point out is that the merge windows are now much
+more unpredictable.
 
-For other processors, a different workaround may be needed.
+The last merge window was 12 days long, rather than the usual 14.  With
+Linus' statement about the two week window being too predictable, I would
+not be surprised if this merge window was about 7 days instead.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ronen Shitrit <rshitrit@marvell.com>
----
- arch/arm/mm/Kconfig    |   19 +++++++++++++++++++
- arch/arm/mm/cache-v6.S |   15 ++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
+What this means overall is that it becomes much harder to sanely plan
+stuff either for the lead up to the merge window, or during the merge
+window itself.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 755e081..c4694fc 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -741,6 +741,25 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
- 	  Forget about fast user space cmpxchg support.
- 	  It is just not possible.
- 
-+config DMA_CACHE_RWFO
-+	bool "Enable read/write for ownership DMA cache maintenance"
-+	depends on CPU_V6 && SMP
-+	default y
-+	help
-+	  The Snoop Control Unit on ARM11MPCore does not detect the
-+	  cache maintenance operations and the dma_{map,unmap}_area()
-+	  functions may leave stale cache entries on other CPUs. By
-+	  enabling this option, Read or Write For Ownership in the ARMv6
-+	  DMA cache maintenance functions is performed. These LDR/STR
-+	  instructions change the cache line state to shared or modified
-+	  so that the cache operation has the desired effect.
-+
-+	  Note that the workaround is only valid on processors that do
-+	  not perform speculative loads into the D-cache. For such
-+	  processors, if cache maintenance operations are not broadcast
-+	  in hardware, other workarounds are needed (e.g. cache
-+	  maintenance broadcasting in software via FIQ).
-+
- config OUTER_CACHE
- 	bool
- 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 332b48c..86aa689 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -211,7 +211,7 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
- #endif
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- 	str	r2, [r0]			@ write for ownership
- #endif
-@@ -235,7 +235,7 @@ v6_dma_inv_range:
- v6_dma_clean_range:
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- #endif
- #ifdef HARVARD_CACHE
-@@ -258,7 +258,7 @@ v6_dma_clean_range:
- ENTRY(v6_dma_flush_range)
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- 	str	r2, [r0]			@ write for ownership
- #endif
-@@ -284,9 +284,13 @@ ENTRY(v6_dma_map_area)
- 	add	r1, r1, r0
- 	teq	r2, #DMA_FROM_DEVICE
- 	beq	v6_dma_inv_range
-+#ifndef CONFIG_DMA_CACHE_RWFO
-+	b	v6_dma_clean_range
-+#else
- 	teq	r2, #DMA_TO_DEVICE
- 	beq	v6_dma_clean_range
- 	b	v6_dma_flush_range
-+#endif
- ENDPROC(v6_dma_map_area)
- 
- /*
-@@ -296,6 +300,11 @@ ENDPROC(v6_dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v6_dma_unmap_area)
-+#ifndef CONFIG_DMA_CACHE_RWFO
-+	add	r1, r1, r0
-+	teq	r2, #DMA_TO_DEVICE
-+	bne	v6_dma_inv_range
-+#endif
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
- 
+Therefore, this "initial batch" is most likely to become "only batch"
+since it's no longer possible to be reasonably ensure that there will
+be a merge window open in the second week.
