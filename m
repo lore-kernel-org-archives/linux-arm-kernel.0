@@ -1,254 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 20:48:49 +0900
-Subject: [PATCH 07/15] ARM: S5PC100: rename gpio registers from s5pc1xx to
-	s5pc100
-In-Reply-To: <1273817946-29404-8-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 17 May 2010 20:52:51 +0900
+Subject: [PATCH 01/15] ARM: Samsung: fix broken timer irq base
+In-Reply-To: <1273817946-29404-2-git-send-email-m.szyprowski@samsung.com>
 References: <1273817946-29404-1-git-send-email-m.szyprowski@samsung.com>
-	<1273817946-29404-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <003c01caf5b6$ecc18940$c6449bc0$%kim@samsung.com>
+	<1273817946-29404-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <003e01caf5b7$7d5a9870$780fc950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> This patch renames gpio related registers from s5pc1xx to s5pc100 to
-> better match the plat-s5p framework style.
+> Timer interrupts range was defined as 43-47, what overlaps with VIC0 range
+> (32-64). This was caused probably by a typo while the common interrupts
+> definition was refactored. This patch moves timer interrupt range to safe
+> area of 11-15 (just before uart range).
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pc100/include/mach/gpio.h      |   82
-++++++++++++------------
->  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    8 +-
->  2 files changed, 45 insertions(+), 45 deletions(-)
+>  arch/arm/plat-s5p/include/plat/irqs.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
-> s5pc100/include/mach/gpio.h
-> index 2c4cbe8..fb2f40a 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
-
-It would be nice that to add following for avoid duplication including.
-
-#ifndef __ASM_ARCH_GPIO_H
-#define __ASM_ARCH_GPIO_H __FILE__
-
-> @@ -65,50 +65,50 @@
->   * change from one gpio bank to another can be caught.
->  */
+> diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-
+> s5p/include/plat/irqs.h
+> index 42e757f..9ff3d71 100644
+> --- a/arch/arm/plat-s5p/include/plat/irqs.h
+> +++ b/arch/arm/plat-s5p/include/plat/irqs.h
+> @@ -79,7 +79,7 @@
+>  #define S5P_IRQ_VIC2(x)		(S5P_VIC2_BASE + (x))
+>  #define S5P_IRQ_VIC3(x)		(S5P_VIC3_BASE + (x))
 > 
-> -#define S5PC1XX_GPIO_NEXT(__gpio) \
-> +#define S5PC100_GPIO_NEXT(__gpio) \
->  	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
+> -#define S5P_TIMER_IRQ(x)	S5P_IRQ(11 + (x))
+> +#define S5P_TIMER_IRQ(x)	(11 + (x))
 > 
->  enum s3c_gpio_number {
-
-How about s5p_gpio_number instead of s3c_...
-
->  	S5PC100_GPIO_A0_START	= 0,
-> -	S5PC100_GPIO_A1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_A0),
-> -	S5PC100_GPIO_B_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_A1),
-> -	S5PC100_GPIO_C_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_B),
-> -	S5PC100_GPIO_D_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_C),
-> -	S5PC100_GPIO_E0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_D),
-> -	S5PC100_GPIO_E1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_E0),
-> -	S5PC100_GPIO_F0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_E1),
-> -	S5PC100_GPIO_F1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F0),
-> -	S5PC100_GPIO_F2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F1),
-> -	S5PC100_GPIO_F3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F2),
-> -	S5PC100_GPIO_G0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F3),
-> -	S5PC100_GPIO_G1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G0),
-> -	S5PC100_GPIO_G2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G1),
-> -	S5PC100_GPIO_G3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G2),
-> -	S5PC100_GPIO_H0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G3),
-> -	S5PC100_GPIO_H1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H0),
-> -	S5PC100_GPIO_H2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H1),
-> -	S5PC100_GPIO_H3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H2),
-> -	S5PC100_GPIO_I_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H3),
-> -	S5PC100_GPIO_J0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_I),
-> -	S5PC100_GPIO_J1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J0),
-> -	S5PC100_GPIO_J2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J1),
-> -	S5PC100_GPIO_J3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J2),
-> -	S5PC100_GPIO_J4_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J3),
-> -	S5PC100_GPIO_K0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J4),
-> -	S5PC100_GPIO_K1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K0),
-> -	S5PC100_GPIO_K2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K1),
-> -	S5PC100_GPIO_K3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K2),
-> -	S5PC100_GPIO_L0_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K3),
-> -	S5PC100_GPIO_L1_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L0),
-> -	S5PC100_GPIO_L2_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L1),
-> -	S5PC100_GPIO_L3_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L2),
-> -	S5PC100_GPIO_L4_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L3),
-> -	S5PC100_GPIO_MP00_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L4),
-> -	S5PC100_GPIO_MP01_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP00),
-> -	S5PC100_GPIO_MP02_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP01),
-> -	S5PC100_GPIO_MP03_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP02),
-> -	S5PC100_GPIO_MP04_START	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP03),
-> -	S5PC100_GPIO_END	=
-> S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP04),
-> +	S5PC100_GPIO_A1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_A0),
-> +	S5PC100_GPIO_B_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_A1),
-> +	S5PC100_GPIO_C_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_B),
-> +	S5PC100_GPIO_D_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_C),
-> +	S5PC100_GPIO_E0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_D),
-> +	S5PC100_GPIO_E1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_E0),
-> +	S5PC100_GPIO_F0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_E1),
-> +	S5PC100_GPIO_F1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_F0),
-> +	S5PC100_GPIO_F2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_F1),
-> +	S5PC100_GPIO_F3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_F2),
-> +	S5PC100_GPIO_G0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_F3),
-> +	S5PC100_GPIO_G1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_G0),
-> +	S5PC100_GPIO_G2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_G1),
-> +	S5PC100_GPIO_G3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_G2),
-> +	S5PC100_GPIO_H0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_G3),
-> +	S5PC100_GPIO_H1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_H0),
-> +	S5PC100_GPIO_H2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_H1),
-> +	S5PC100_GPIO_H3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_H2),
-> +	S5PC100_GPIO_I_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_H3),
-> +	S5PC100_GPIO_J0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_I),
-> +	S5PC100_GPIO_J1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_J0),
-> +	S5PC100_GPIO_J2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_J1),
-> +	S5PC100_GPIO_J3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_J2),
-> +	S5PC100_GPIO_J4_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_J3),
-> +	S5PC100_GPIO_K0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_J4),
-> +	S5PC100_GPIO_K1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_K0),
-> +	S5PC100_GPIO_K2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_K1),
-> +	S5PC100_GPIO_K3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_K2),
-> +	S5PC100_GPIO_L0_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_K3),
-> +	S5PC100_GPIO_L1_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_L0),
-> +	S5PC100_GPIO_L2_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_L1),
-> +	S5PC100_GPIO_L3_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_L2),
-> +	S5PC100_GPIO_L4_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_L3),
-> +	S5PC100_GPIO_MP00_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_L4),
-> +	S5PC100_GPIO_MP01_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_MP00),
-> +	S5PC100_GPIO_MP02_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_MP01),
-> +	S5PC100_GPIO_MP03_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_MP02),
-> +	S5PC100_GPIO_MP04_START	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_MP03),
-> +	S5PC100_GPIO_END	=
-> S5PC100_GPIO_NEXT(S5PC100_GPIO_MP04),
->  };
-> 
->  /* S5PC100 GPIO number definitions. */
-> @@ -153,7 +153,7 @@ enum s3c_gpio_number {
->  #define S5PC100_MP04(_nr)	(S5PC100_GPIO_MP04_START + (_nr))
->  #define S5PC100_MP05(_nr)	(S5PC100_GPIO_MP05_START + (_nr))
-> 
-> -/* It used the end of the S5PC1XX gpios */
-> +/* It used the end of the S5PC100 gpios */
->  #define S3C_GPIO_END		S5PC100_GPIO_END
-> 
->  /* define the number of gpios we need to the one after the MP04() range */
-
-Last is MP04 or MP05?
-
-In the s3c_gpio_number, MP04 is last one.
-And there is S5PC100_MP05 definition also.
-
-> diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-b/arch/arm/mach-
-> s5pc100/include/mach/regs-gpio.h
-> index 43c7bc8..6866691 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-> @@ -3,11 +3,11 @@
->   * Copyright 2009 Samsung Electronics Co.
->   *      Byungho Min <bhmin@samsung.com>
->   *
-> - * S5PC1XX - GPIO register definitions
-> + * S5PC100 - GPIO register definitions
->   */
-> 
-> -#ifndef __ASM_PLAT_S5PC1XX_REGS_GPIO_H
-> -#define __ASM_PLAT_S5PC1XX_REGS_GPIO_H __FILE__
-> +#ifndef __ASM_MACH_S5PC100_REGS_GPIO_H
-> +#define __ASM_MACH_S5PC100_REGS_GPIO_H __FILE__
-> 
->  #include <mach/map.h>
-> 
-> @@ -66,5 +66,5 @@
->  #define S5PC100_GPx_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
->  #define S5PC100_GPx_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
-> 
-> -#endif /* __ASM_PLAT_S5PC1XX_REGS_GPIO_H */
-> +#endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
-> 
+>  #define IRQ_TIMER0		S5P_TIMER_IRQ(0)
+>  #define IRQ_TIMER1		S5P_TIMER_IRQ(1)
 > --
 
-It is better that above chages is in the your previous patch.
-Because the file already moved in the [PATCH 06/15].
+Ok, you're right.
 
-And how about __ASM_ARCH_REGS_GPIO_H instead of __ASM_MACH_S5PC100_xxx
-That makes unitified look and feel for a same Samsung SoC.
+Had to move to ISA IRQ space not VIC area for avoid conflicting.
 
 Thanks.
 
