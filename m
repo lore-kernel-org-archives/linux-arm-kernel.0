@@ -1,149 +1,217 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 13 May 2010 19:26:01 +0800
-Subject: [PATCH 4/6] pxa: enable pmic on tavorevb3
-Message-ID: <mailman.175.1281709716.27306.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 17 May 2010 18:58:12 +0800
+Subject: [PATCH 6/6] ARM: pxa: support more i2c devices on PXA95x
+Message-ID: <mailman.177.1281709746.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable 88pm860x PMIC on tavorevb3. Enable backlight, led, touch component of
-88pm860x PMIC.
+In PXA95x, I2C #2 & #3 devices are added. Add IRQ and clock support of these
+two I2C devices.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-pxa/Kconfig     |    1 +
- arch/arm/mach-pxa/tavorevb3.c |   86 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/devices.c                  |   39 ++++++++++++++++++++++++++
+ arch/arm/mach-pxa/devices.h                  |    2 +
+ arch/arm/mach-pxa/include/mach/irqs.h        |    2 +
+ arch/arm/mach-pxa/include/mach/mfp-pxa930.h  |    6 ++++
+ arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    4 ++
+ arch/arm/mach-pxa/pxa3xx.c                   |    2 +-
+ arch/arm/mach-pxa/pxa930.c                   |   15 +++++++++-
+ arch/arm/mach-pxa/saarb.c                    |    3 ++
+ drivers/i2c/busses/i2c-pxa.c                 |    1 +
+ 9 files changed, 72 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index ec49466..39bed5d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -47,6 +47,7 @@ config MACH_TAVOREVB
- config MACH_TAVOREVB3
- 	bool "PXA95x Development Platform (aka TavorEVB III)"
- 	select CPU_PXA950
-+	select PXA_HAVE_BOARD_IRQS
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 65447dc..60437fe 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -335,6 +335,45 @@ struct platform_device pxa3xx_device_i2c_power = {
+ };
+ #endif
 
- config MACH_SAAR
- 	bool "PXA930 Handheld Platform (aka SAAR)"
-diff --git a/arch/arm/mach-pxa/tavorevb3.c b/arch/arm/mach-pxa/tavorevb3.c
-index 501a271..cf6e71c 100644
---- a/arch/arm/mach-pxa/tavorevb3.c
-+++ b/arch/arm/mach-pxa/tavorevb3.c
-@@ -13,13 +13,18 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/i2c.h>
- #include <linux/gpio.h>
-+#include <linux/mfd/88pm860x.h>
++static struct resource pxa95x_resources_i2c2[] = {
++	{
++		.start	= 0x40401680,
++		.end	= 0x404016e3,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= IRQ_I2C2,
++		.end	= IRQ_I2C2,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++/* pxa95x_device_i2c2 doesn't co-exist with pxa3xx_device_i2c_power */
++struct platform_device pxa95x_device_i2c2 = {
++	.name		= "pxa95x-i2c",
++	.id		= 1,
++	.resource	= pxa95x_resources_i2c2,
++	.num_resources	= ARRAY_SIZE(pxa95x_resources_i2c2),
++};
++
++static struct resource pxa95x_resources_i2c3[] = {
++	{
++		.start	= 0x40801680,
++		.end	= 0x408016e3,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= IRQ_I2C3,
++		.end	= IRQ_I2C3,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device pxa95x_device_i2c3 = {
++	.name		= "pxa95x-i2c",
++	.id		= 2,
++	.resource	= pxa95x_resources_i2c3,
++	.num_resources	= ARRAY_SIZE(pxa95x_resources_i2c3),
++};
++
+ static struct resource pxai2s_resources[] = {
+ 	{
+ 		.start	= 0x40400000,
+diff --git a/arch/arm/mach-pxa/devices.h b/arch/arm/mach-pxa/devices.h
+index 50353ea..d229d05 100644
+--- a/arch/arm/mach-pxa/devices.h
++++ b/arch/arm/mach-pxa/devices.h
+@@ -35,6 +35,8 @@ extern struct platform_device pxa27x_device_pwm1;
 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+ extern struct platform_device pxa3xx_device_nand;
+ extern struct platform_device pxa3xx_device_i2c_power;
++extern struct platform_device pxa95x_device_i2c2;
++extern struct platform_device pxa95x_device_i2c3;
+
+ extern struct platform_device pxa3xx_device_gcu;
+
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
+b/arch/arm/mach-pxa/include/mach/irqs.h
+index 010c205..c4785b8 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -102,7 +102,9 @@
+ #endif
+
+ #ifdef CONFIG_CPU_PXA950
++#define IRQ_I2C3	PXA_IRQ(61)	/* I2C #3 */
+ #define IRQ_GC500	PXA_IRQ(70)	/* Graphics Controller (PXA950) */
++#define IRQ_I2C2	PXA_IRQ(78)	/* I2C #2 */
+ #endif
+
+ #define PXA_GPIO_IRQ_BASE	PXA_IRQ(96)
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
+b/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
+index 04f7c97..60c50c0 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
+@@ -108,6 +108,12 @@
+ #define GPIO97_CI2C_SCL		MFP_CFG_LPM(GPIO97, AF3, PULL_HIGH)
+ #define GPIO98_CI2C_SDA		MFP_CFG_LPM(GPIO98, AF3, PULL_HIGH)
+
++#define GPIO98_CI2C_SCL		MFP_CFG_LPM(GPIO98, AF1, PULL_HIGH)
++#define GPIO99_CI2C_SDA		MFP_CFG_LPM(GPIO99, AF1, PULL_HIGH)
++
++#define GPIO98_HS2_I2C_SCL	MFP_CFG_LPM(GPIO98, AF2, PULL_HIGH)
++#define GPIO99_HS2_I2C_SDA	MFP_CFG_LPM(GPIO99, AF2, PULL_HIGH)
++
+ /* QCI */
+ #define GPIO63_CI_DD_9		MFP_CFG_LPM(GPIO63, AF1, PULL_LOW)
+ #define GPIO64_CI_DD_8		MFP_CFG_LPM(GPIO64, AF1, PULL_LOW)
+diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+index e91d63c..a606021 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+@@ -211,4 +211,8 @@
+ #define CKEN_PXA300_GCU		42	/* Graphics controller clock enable */
+ #define CKEN_PXA320_GCU		7	/* Graphics controller clock enable */
+
++/* Note: I2C2/I2C3 is used in PXA95x */
++#define CKEN_I2C2	87	/* I2C2 clock enable */
++#define CKEN_I2C3	88	/* I2C3 clock enable */
++
+ #endif /* __ASM_ARCH_PXA3XX_REGS_H */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index fa00148..47b7bea 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -592,7 +592,7 @@ void __init pxa3xx_init_irq(void)
+ 	value |= (1 << 6);
+ 	__asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
+
+-	pxa_init_irq(56, pxa3xx_set_wake);
++	pxa_init_irq(96, pxa3xx_set_wake);
+ 	pxa_init_ext_wakeup_irq(pxa3xx_set_wake);
+ 	pxa_init_gpio(IRQ_GPIO_2_x, 2, 127, NULL);
+ }
+diff --git a/arch/arm/mach-pxa/pxa930.c b/arch/arm/mach-pxa/pxa930.c
+index 7d29dd3..560dbfb 100644
+--- a/arch/arm/mach-pxa/pxa930.c
++++ b/arch/arm/mach-pxa/pxa930.c
+@@ -18,6 +18,8 @@
 
  #include <mach/pxa930.h>
 
-+#include <plat/i2c.h>
++#include "clock.h"
 +
- #include "devices.h"
- #include "generic.h"
+ static struct mfp_addr_map pxa930_mfp_addr_map[] __initdata = {
 
-@@ -27,14 +32,95 @@ static mfp_cfg_t evb3_mfp_cfg[] __initdata = {
- 	/* UART */
- 	GPIO53_UART1_TXD,
- 	GPIO54_UART1_RXD,
-+
-+	/* PMIC */
-+	PMIC_INT_GPIO83,
+ 	MFP_ADDR(GPIO0, 0x02e0),
+@@ -190,6 +192,14 @@ static struct mfp_addr_map pxa935_mfp_addr_map[]
+__initdata = {
+ 	MFP_ADDR_END,
  };
 
-+#if defined(CONFIG_I2C_PXA) || defined(CONFIG_I2C_PXA_MODULE)
-+static struct pm860x_touch_pdata evb3_touch = {
-+	.gpadc_prebias	= 1,
-+	.slot_cycle	= 1,
-+	.tsi_prebias	= 6,
-+	.pen_prebias	= 16,
-+	.pen_prechg	= 2,
-+	.res_x		= 300,
++static DEFINE_PXA3_CKEN(pxa95x_i2c2, I2C2, 32842000, 0);
++static DEFINE_PXA3_CKEN(pxa95x_i2c3, I2C3, 32842000, 0);
++
++static struct clk_lookup pxa95x_clkregs[] = {
++	INIT_CLKREG(&clk_pxa95x_i2c2, "pxa95x-i2c.1", NULL),
++	INIT_CLKREG(&clk_pxa95x_i2c3, "pxa95x-i2c.2", NULL),
 +};
 +
-+static struct pm860x_backlight_pdata evb3_backlight[] = {
-+	{
-+		.id	= PM8606_ID_BACKLIGHT,
-+		.iset	= PM8606_WLED_CURRENT(24),
-+		.flags	= PM8606_BACKLIGHT1,
-+	},
-+	{},
-+};
-+
-+static struct pm860x_led_pdata evb3_led[] = {
-+	{
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED1_BLUE,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_RED,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_GREEN,
-+	}, {
-+		.id	= PM8606_ID_LED,
-+		.iset	= PM8606_LED_CURRENT(12),
-+		.flags	= PM8606_LED2_BLUE,
-+	},
-+};
-+
-+static struct pm860x_platform_data evb3_pm8607_info = {
-+	.touch				= &evb3_touch,
-+	.backlight			= &evb3_backlight[0],
-+	.led				= &evb3_led[0],
-+	.companion_addr			= 0x10,
-+	.irq_mode			= 0,
-+	.irq_base			= IRQ_BOARD_START,
-+
-+	.i2c_port			= GI2C_PORT,
-+};
-+
-+static struct i2c_board_info evb3_i2c_info[] = {
-+	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &evb3_pm8607_info,
-+		.irq		= gpio_to_irq(mfp_to_gpio(MFP_PIN_GPIO83)),
-+	},
-+};
-+
-+static void __init evb3_init_i2c(void)
-+{
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(evb3_i2c_info));
-+}
-+#else
-+static inline void evb3_init_i2c(void) {}
-+#endif
-+
- static void __init evb3_init(void)
+ static int __init pxa930_init(void)
  {
- 	/* initialize MFP configurations */
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(evb3_mfp_cfg));
+ 	if (cpu_is_pxa930() || cpu_is_pxa935() || cpu_is_pxa950()) {
+@@ -197,9 +207,12 @@ static int __init pxa930_init(void)
+ 		mfp_init_addr(pxa930_mfp_addr_map);
+ 	}
 
- 	pxa_set_ffuart_info(NULL);
+-	if (cpu_is_pxa935())
++	if (cpu_is_pxa935() || cpu_is_pxa950())
+ 		mfp_init_addr(pxa935_mfp_addr_map);
+
++	if (cpu_is_pxa950())
++		clkdev_add_table(pxa95x_clkregs, ARRAY_SIZE(pxa95x_clkregs));
 +
-+	evb3_init_i2c();
+ 	return 0;
  }
 
- MACHINE_START(TAVOREVB3, "PXA950 Evaluation Board (aka TavorEVB3)")
+diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
+index 20438a7..bb90ff1 100644
+--- a/arch/arm/mach-pxa/saarb.c
++++ b/arch/arm/mach-pxa/saarb.c
+@@ -38,6 +38,9 @@ static mfp_cfg_t saarb_mfp_cfg[] __initdata = {
+ 	GPIO73_CI2C_SCL,
+ 	GPIO74_CI2C_SDA,
+
++	GPIO98_HS2_I2C_SCL,
++	GPIO99_HS2_I2C_SDA,
++
+ 	/* PMIC */
+ 	PMIC_INT_GPIO83,
+ };
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 020ff23..5069794 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -49,6 +49,7 @@
+
+ static const struct platform_device_id i2c_pxa_id_table[] = {
+ 	{ "pxa2xx-i2c",		REG_SHIFT_1 },
++	{ "pxa95x-i2c",		REG_SHIFT_1 },
+ 	{ "pxa3xx-pwri2c",	REG_SHIFT_0 },
+ 	{ },
+ };
 -- 
 1.5.6.5
