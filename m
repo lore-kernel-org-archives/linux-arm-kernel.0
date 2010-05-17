@@ -1,141 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 09:39:08 +0900
-Subject: [PATCH 18/18] ARM: S5PV210: Add clocks of type 'struct clk'
-Message-ID: <1274056748-14779-1-git-send-email-kgene.kim@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 17 May 2010 02:59:42 +0200
+Subject: [PATCH] phy/marvell: Add special settings for D-Link DNS-323
+	rev C1
+In-Reply-To: <1274056058.21352.697.camel@pasglop>
+References: <1274056058.21352.697.camel@pasglop>
+Message-ID: <20100517005942.GB27301@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+On Mon, May 17, 2010 at 10:27:38AM +1000, Benjamin Herrenschmidt wrote:
+> Without this change, the network LED doesn't work on the device. The
+> value itself comes from the vendor kernel.
+> 
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+>  drivers/net/phy/marvell.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
+> index 64c7fbe..22b1efa 100644
+> --- a/drivers/net/phy/marvell.c
+> +++ b/drivers/net/phy/marvell.c
+> @@ -34,6 +34,10 @@
+>  #include <asm/irq.h>
+>  #include <asm/uaccess.h>
+>  
+> +#ifdef CONFIG_ARM
+> +#include <asm/mach-types.h>
+> +#endif
+> +
+>  #define MII_M1011_IEVENT		0x13
+>  #define MII_M1011_IEVENT_CLEAR		0x0000
+>  
+> @@ -350,7 +354,14 @@ static int m88e1118_config_init(struct phy_device *phydev)
+>  		return err;
+>  
+>  	/* Adjust LED Control */
+> +#ifdef CONFIG_MACH_DNS323
+> +	/* The DNS-323 needs a special value in here for the LED to work */
+> +	if (machine_is_dns323())
+> +		err = phy_write(phydev, 0x10, 0x1100);
+> +	else
+> +#else
+>  	err = phy_write(phydev, 0x10, 0x021e);
+> +#endif
 
-Add peripheral device clocks of type of type 'struct clk'
+There is a fixup()-callback to prevent boardcode in the drivers. See
+Documentation/networking/phy.txt, last chapter.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5pv210/clock.c |  104 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 103 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index a2c3ab5..438b4e5 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -418,7 +418,79 @@ static struct clk init_clocks_disable[] = {
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1<<4),
--	}
-+	}, {
-+		.name		= "jpeg",
-+		.id		= 1,
-+		.parent		= &clk_hclk_dsys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 28),
-+	}, {
-+		.name		= "pdma",
-+		.id		= 1,
-+		.parent		= &clk_hclk_psys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 4),
-+	}, {
-+		.name		= "pdma",
-+		.id		= 0,
-+		.parent		= &clk_hclk_psys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 3),
-+	}, {
-+		.name		= "mdma",
-+		.id		= -1,
-+		.parent		= &clk_hclk_dsys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 2),
-+	}, {
-+		.name		= "nfcon",
-+		.id		= -1,
-+		.parent		= &clk_hclk_psys.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 28),
-+	}, {
-+		.name		= "nandxl",
-+		.id		= -1,
-+		.parent		= &clk_hclk_psys.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 24),
-+	}, {
-+		.name		= "vp",
-+		.id		= -1,
-+		.parent		= &clk_hclk_dsys.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 8),
-+	}, {
-+		.name		= "dsim",
-+		.id		= -1,
-+		.parent		= &clk_hclk_dsys.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 2),
-+	}, {
-+		.name		= "pcm",
-+		.id		= 2,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 30),
-+	}, {
-+		.name		= "pcm",
-+		.id		= 1,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 29),
-+	}, {
-+		.name		= "pcm",
-+		.id		= 0,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 28),
-+	}, {
-+		.name		= "ac97",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 1),
-+	},
- };
- 
- static struct clk init_clocks[] = {
-@@ -454,6 +526,36 @@ static struct clk init_clocks[] = {
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1<<10),
- 	}, {
-+		.name		= "syscon",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 27),
-+	}, {
-+		.name		= "gpio",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 26),
-+	}, {
-+		.name		= "sromc",
-+		.id		= -1,
-+		.parent		= &clk_hclk_psys.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 26),
-+	}, {
-+		.name		= "dmc",
-+		.id		= 1,
-+		.parent		= &clk_hclk_msys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 1),
-+	}, {
-+		.name		= "dmc",
-+		.id		= 0,
-+		.parent		= &clk_hclk_msys.clk,
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
- 		.name		= "mout_hdmi",
- 		.id		= -1,
- 		.enable		= s5pv210_clk_mask0_ctrl,
 -- 
-1.6.2.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100517/d2b6bf79/attachment.sig>
