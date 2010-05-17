@@ -1,68 +1,51 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Mon, 17 May 2010 13:26:18 +0300
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100517094421.GG23118@n2100.arm.linux.org.uk>
-References: <20100505150209.GC2606@n2100.arm.linux.org.uk>
-	<20100513174023.GB13001@n2100.arm.linux.org.uk>
-	<20100513211951.GH3428@atomide.com>
-	<20100513215825.GC13001@n2100.arm.linux.org.uk>
-	<20100513220139.GO3428@atomide.com>
-	<20100513221229.GD13001@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
-	<AANLkTikZvfvjY9e2QNWRwVcJcTvn58Ly_DgzrcXKu2iJ@mail.gmail.com>
-	<20100514101615.GF10339@n2100.arm.linux.org.uk>
-	<AANLkTinY9M2cHKw86hTLaMUCvBX57o8AioBtrENB-JhK@mail.gmail.com>
-	<20100517094421.GG23118@n2100.arm.linux.org.uk>
-Message-ID: <1274091978.2307.49.camel@tubuntu.research.nokia.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 17 May 2010 16:02:49 +0530
+Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with
+	ARM	CortexA9
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
+References: <1274090321-14665-1-git-send-email-viresh.kumar@st.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
+Message-ID: <4BF11B51.7000808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, 2010-05-17 at 11:44 +0200, ext Russell King - ARM Linux wrote:
-> On Mon, May 17, 2010 at 12:38:55PM +0300, Grazvydas Ignotas wrote:
-> > On Fri, May 14, 2010 at 1:16 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > >> because it also uses reserve_bootmem() in
-> > >> drivers/video/omap2/vram.c and later ioremap on RAM. Perhaps LMB can
-> > >> be used to fix that too?
-> > >
-> > > WTF is reserve_bootmem doing in a driver?
-> > 
-> > IIRC Tony refused any new fb related code in arch/arm/*omap* so it
-> > ended up there (or maybe because of something else, not that I had
-> > anything to do with this).
+On 5/17/2010 3:49 PM, Shilimkar, Santosh wrote:
+> <snip>
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+>> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
+>> Sent: Monday, May 17, 2010 3:29 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: armando.visconti at st.com; shiraz.hashim at st.com; Viresh Kumar; linus.walleij at stericsson.com
+>> Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with ARM CortexA9
+>>
+>> Watchdog details can be found in ARM Cortex A9 reference manual at:
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/indix.html
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+>> ---
+>>  drivers/watchdog/Kconfig        |    7 +
+>>  drivers/watchdog/Makefile       |    1 +
+>>  drivers/watchdog/cortexa9_wdt.c |  414 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 422 insertions(+), 0 deletions(-)
+>>  create mode 100644 drivers/watchdog/cortexa9_wdt.c
+>>
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index 0bf5020..b5c0f6f 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -73,6 +73,13 @@ config WM8350_WATCHDOG
+>>
+>>  # ARM Architecture
+>>
+>> +config ARM_CORTEXA9_WATCHDOG
+>> +	tristate "ARM CortexA9 Watchdog"
+>> +	depends on ARM_AMBA
 > 
-> Can someone please answer these questions:
-> 
-> 1. why does the framebuffer need to _reserve_ a set of specific sections
->    of SDRAM rather than _allocate_ a set of sections?
-> 2. what range of sizes of SDRAM does the framebuffer driver need?
+> What is the ARM_AMBA dependency with CA-9 watchdog?
 
-Yep, vram.c was first located in arch/arm/plat-omap/ but was moved under
-drivers/video/omap2 by request from Tony. vram.c is not really a driver,
-so in that sense I think it'd fit better into arch/arm/plat-omap/.
+Not really on amba, rather on ARM. Or CPU_V7 (cortex related)?
+Maybe some other ARM core also have similar design,
+so can keep it dependent on ARM. Does this looks fine?
 
-To question 1:
-
-- The bootloader may use a certain area of memory to display to boot
-image, and the kernel needs to use this same memory area for the
-framebuffer, so that we don't get any glitches on the display during
-boot. If this is not required, then the memory areas can be allocated.
-
-- OMAP display hardware requires a continuous memory area for the
-framebuffer. Allocating such a large continuous memory area later seemed
-to be next to impossible, probably because of memory fragmentation.
-
-- Originally I used dma_alloc_*, but that doesn't support the
-bootloader-init case, and I also wanted to support having the
-framebuffer in OMAP's SRAM. Also, if I recall right, dma_alloc_* didn't
-support the huge allocations that are needed for the framebuffer.
-
-To 2:
-It varies a lot on the use case. One can configure the reserved VRAM
-area, and I would imagine that the smallest would be something like
-~150kB (320x240x2) and the largest in extreme case ~40MB (1600x1200*4,
-x2 for double buffering and x3 for each overlay).
-
- Tomi
+viresh
