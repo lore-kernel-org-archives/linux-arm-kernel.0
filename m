@@ -1,47 +1,120 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 22:36:19 +0900
-Subject: [PATCH 12/15] ARM: SMDKC100: fix frame buffer definitions
-In-Reply-To: <1273817946-29404-13-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 17 May 2010 22:45:24 +0900
+Subject: [PATCH 08/15] ARM: S5PC100: Move frame buffer helpers from
+	plat-s5pc1xx to mach-s5pc100
+In-Reply-To: <1273817946-29404-9-git-send-email-m.szyprowski@samsung.com>
 References: <1273817946-29404-1-git-send-email-m.szyprowski@samsung.com>
-	<1273817946-29404-13-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <004c01caf5c5$f0eae9d0$d2c0bd70$%kim@samsung.com>
+	<1273817946-29404-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <004d01caf5c7$369f3160$a3dd9420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Fix incorrectly defined pixel clock value for the default framebuffer
-> window.
-
-It is better that separate this patch from c100 clean up patch set.
-As you know, this patch is unrelated to that.
-
+> Move frame buffer helpers from plat-s5pc1xx to mach-s5pc100.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pc100/mach-smdkc100.c |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
+>  arch/arm/mach-s5pc100/Kconfig                      |    7 ++++++-
+>  arch/arm/mach-s5pc100/Makefile                     |    1 +
+>  .../setup-fb-24bpp.c                               |    4 ++--
+>  arch/arm/plat-s5pc1xx/Kconfig                      |    5 -----
+>  arch/arm/plat-s5pc1xx/Makefile                     |    1 -
+>  5 files changed, 9 insertions(+), 9 deletions(-)
+>  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-fb-24bpp.c (91%)
 > 
-> diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-
-> s5pc100/mach-smdkc100.c
-> index 9155564..7df8ed0 100644
-> --- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-> +++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-> @@ -118,8 +118,7 @@ static struct platform_device smdkc100_lcd_powerdev = {
->  static struct s3c_fb_pd_win smdkc100_fb_win0 = {
->  	/* this is to ensure we use win0 */
->  	.win_mode	= {
-> -		.refresh	= 70,
-> -		.pixclock	= (8+13+3+800)*(7+5+1+480),
-> +		.pixclock = 1000000000000ULL / ((8+13+3+800)*(7+5+1+480)*80),
+> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+> index 27ec167..b24c66d 100644
+> --- a/arch/arm/mach-s5pc100/Kconfig
+> +++ b/arch/arm/mach-s5pc100/Kconfig
+> @@ -12,6 +12,11 @@ config CPU_S5PC100
+>  	help
+>  	  Enable S5PC100 CPU support
+> 
+> +config S5PC100_SETUP_FB_24BPP
+> +	bool
+> +	help
+> +          Common setup code for S5PC1XX with an 24bpp RGB display helper.
 
-As I've commented, how about moving to related LCD driver than hard coding
-here.
+Double tab and 2 white spaces.
 
->  		.left_margin	= 8,
->  		.right_margin	= 13,
->  		.upper_margin	= 7,
+> +
+>  config S5PC100_SETUP_SDHCI
+>          bool
+>          select S5PC1XX_SETUP_SDHCI_GPIO
+> @@ -28,7 +33,7 @@ config MACH_SMDKC100
+>  	select S3C_DEV_HSMMC2
+>  	select S5PC1XX_SETUP_I2C0
+>  	select S5PC1XX_SETUP_I2C1
+> -	select S5PC1XX_SETUP_FB_24BPP
+> +	select S5PC100_SETUP_FB_24BPP
+>  	select S5PC100_SETUP_SDHCI
+>  	help
+>  	  Machine support for the Samsung SMDKC100
+> diff --git a/arch/arm/mach-s5pc100/Makefile
+b/arch/arm/mach-s5pc100/Makefile
+> index e1afdbf..ccf0dca 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -15,6 +15,7 @@ obj-$(CONFIG_CPU_S5PC100)	+= cpu.o gpio.o
+> 
+>  # Helper and device support
+> 
+> +obj-$(CONFIG_S5PC100_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+>  obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
+> 
+>  # machine support
+> diff --git a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
+b/arch/arm/mach-s5pc100/setup-
+> fb-24bpp.c
+> similarity index 91%
+> rename from arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
+> rename to arch/arm/mach-s5pc100/setup-fb-24bpp.c
+> index b02c36f..6eba6cb 100644
+> --- a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
+> +++ b/arch/arm/mach-s5pc100/setup-fb-24bpp.c
+> @@ -1,9 +1,9 @@
+>  /*
+> - * linux/arch/arm/plat-s5pc100/setup-fb-24bpp.c
+> + * linux/arch/arm/mach-s5pc100/setup-fb-24bpp.c
+>   *
+>   * Copyright 2009 Samsung Electronics
+>   *
+> - * Base S5PC1XX setup information for 24bpp LCD framebuffer
+> + * Base S5PC100 setup information for 24bpp LCD framebuffer
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
+> index 98bbaf9..708f7a0 100644
+> --- a/arch/arm/plat-s5pc1xx/Kconfig
+> +++ b/arch/arm/plat-s5pc1xx/Kconfig
+> @@ -39,11 +39,6 @@ config CPU_S5PC100_CLOCK
+> 
+>  # platform specific device setup
+> 
+> -config S5PC1XX_SETUP_FB_24BPP
+> -	bool
+> -	help
+> -          Common setup code for S5PC1XX with an 24bpp RGB display helper.
+> -
+>  config S5PC1XX_SETUP_I2C0
+>  	bool
+>  	default y
+> diff --git a/arch/arm/plat-s5pc1xx/Makefile
+b/arch/arm/plat-s5pc1xx/Makefile
+> index 540fca5..a5b90c0 100644
+> --- a/arch/arm/plat-s5pc1xx/Makefile
+> +++ b/arch/arm/plat-s5pc1xx/Makefile
+> @@ -23,7 +23,6 @@ obj-$(CONFIG_CPU_S5PC100_CLOCK)	+= s5pc100-clock.o
+> 
+>  # Device setup
+> 
+> -obj-$(CONFIG_S5PC1XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
+>  obj-$(CONFIG_S5PC1XX_SETUP_I2C0) += setup-i2c0.o
+>  obj-$(CONFIG_S5PC1XX_SETUP_I2C1) += setup-i2c1.o
+>  obj-$(CONFIG_S5PC1XX_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
 > --
 
 
