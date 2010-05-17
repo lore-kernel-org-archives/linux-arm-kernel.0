@@ -1,7 +1,7 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 18 May 2010 01:05:13 +0200
-Subject: [PATCH v2] PXA DMA-capable PATA driver
-Message-ID: <1274137513-27625-1-git-send-email-marek.vasut@gmail.com>
+Date: Tue, 18 May 2010 01:09:28 +0200
+Subject: [PATCH v3] PXA DMA-capable PATA driver
+Message-ID: <1274137768-27707-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
