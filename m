@@ -1,25 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 May 2010 10:03:10 +0100
-Subject: RMK closing tree to patches *this* weekend
-In-Reply-To: <20100513230201.GA26822@n2100.arm.linux.org.uk>
-References: <20100513230201.GA26822@n2100.arm.linux.org.uk>
-Message-ID: <20100517090310.GE23118@n2100.arm.linux.org.uk>
+From: hans.huebner@gmail.com (=?ISO-8859-1?Q?Hans_H=FCbner?=)
+Date: Mon, 17 May 2010 11:04:09 +0200
+Subject: Physical address access / Temporary MMU disable
+Message-ID: <AANLkTinERP4BJFMXWtQqrwxPBtvb1lpJ73yQzO-Wb5zp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 12:02:01AM +0100, Russell King - ARM Linux wrote:
-> As of the end of this coming weekend, I'll stop taking patches for the
-> next merge window.  I want to tidy up the lose ends which need sorting
-> out and give it a decent outing in linux-next for about a week before
-> the merge window opens.
+Hi,
 
-So 2.6.34 has happened, so much for having a week for things to settle
-down.
+I'm working with Linux 2.6.22 on an AT91SAM9260 based system.
 
-Right, my tree is now frozen for new patches; I won't be taking any
-more patches into the devel side from the patch system, and I won't
-be pulling any further trees into my tree either.
+I am implementing a device driver that has very strict timing and
+jitter requirements.  It uses a FIQ handler, written in assembly, that
+transfers data from the on-chip SRAM to GPIO ports.  In the default
+configuration, it appears that the FIQ handler is invoked with the MMU
+enabled, so the SRAM (and I/O) accesses are undergoing virtual address
+translation.  If there is a TLB miss, this means that the MMU tables
+in SDRAM are consulted, which violates the timing requirements of my
+driver.
 
-I'm waiting for two additional patches which go on top of everything
-that's been merged so far (which have dependencies on previously merged
-stuff), and then I'll push out the final version.
+In order to reduce FIQ response time jitter, I would like to not use
+virtual addresses in the FIQ handler.  Is disabling the MMU for the
+duration of the FIQ handler through the CP15 coprocessor register the
+right way to do this, or is there another way to make some section of
+code use physical addresses?
+
+Thanks,
+Hans
