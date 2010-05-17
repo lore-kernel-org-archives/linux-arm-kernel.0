@@ -1,7 +1,7 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 17 May 2010 11:20:02 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 May 2010 17:29:27 +0100
 Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
-In-Reply-To: <20100516144932.GA23961@n2100.arm.linux.org.uk>
+In-Reply-To: <0D753D10438DA54287A00B0270842697636F0E0A5F@AUSP01VMBX24.collaborationhost.net>
 References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
 	<20100412184904.GG3048@n2100.arm.linux.org.uk>
 	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
@@ -11,26 +11,16 @@ References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborati
 	<0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
 	<0D753D10438DA54287A00B0270842697636EFDBD17@AUSP01VMBX24.collaborationhost.net>
 	<20100516144932.GA23961@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B0270842697636F0E0A5F@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697636F0E0A5F@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100517162927.GB9304@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added to patch system as Patch #6136.
+On Mon, May 17, 2010 at 11:20:02AM -0500, H Hartley Sweeten wrote:
+> Added to patch system as Patch #6136.
 
-Thanks,
-Hartley 
+Thanks, all merged and pushed out, with everything back that was dropped.
 
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Sunday, May 16, 2010 7:50 AM
-To: H Hartley Sweeten
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
+Now just need John's GENERIC_TIME patch and we're all set.
 
-On Thu, May 13, 2010 at 05:53:10PM -0500, H Hartley Sweeten wrote:
-> Are you ready for this patch to be rebased, and to what tree?
-
-Can you rebase onto what's currently in the devel tree, and send the
-resulting patch to the patch system please?
-
-(for others, I've temporarily dropped some merges on the devel tree.)
+Thanks.
