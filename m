@@ -1,69 +1,42 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Mon, 17 May 2010 12:50:01 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in	theARMv6
-	DMA cache ops
-In-Reply-To: <20100517085751.GD23118@n2100.arm.linux.org.uk>
-References: <1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<20100516150117.GC23961@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
-	<20100517065712.GA23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
-	<20100517074329.GB23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA313710@IL-MB01.marvell.com>
-	<20100517085751.GD23118@n2100.arm.linux.org.uk>
-Message-ID: <309002C0DA137042828828FC53D7A93492FA3137A1@IL-MB01.marvell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 May 2010 11:50:58 +0200
+Subject: [PATCH 1/6] Driver for the watchdog timer on Freescale IMX2
+	(and later) processors.
+In-Reply-To: <20100514155631.GG4008@infomag.iguana.be>
+References: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
+	<1272528202-24159-2-git-send-email-w.sang@pengutronix.de>
+	<20100514024915.GE30794@pengutronix.de>
+	<20100514155631.GG4008@infomag.iguana.be>
+Message-ID: <20100517095058.GU31199@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Monday, May 17, 2010 11:58 AM
-To: Ronen Shitrit
-Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6 DMA cache ops
-
-On Mon, May 17, 2010 at 11:29:53AM +0300, Ronen Shitrit wrote:
-> On Mon, May 17, 2010 at 10:34:36AM +0300, Ronen Shitrit wrote:
-> > I can only think of one problematic scenario:
-> > - After 1 and before 2: 
-> > 	CPU0 did spec prefetch for address x 
-> > - After 2: 
-> > 	CPU0 is doing inv: lock int, ldr x, 
-> > 		str x (addr x is marked dirty with wrong data).
+On Fri, May 14, 2010 at 05:56:31PM +0200, Wim Van Sebroeck wrote:
+> Hi Wolfram,
 > 
-> The data has been corrupted at this point; you don't need a second CPU.
->
-> [Ronen Shitrit] Why? If the second CPU doesn't exist an invalidate will
-> come just after the str inst and the wrong data will not get anywhere...
-> (interrupts are locked so I assume no eviction...)
-
-If a speculative prefetch occurs (eg, to prefetch the next ldr) it
-could evict the dirty cache line that the str just wrote to.  Cache
-replacement algorithms aren't always round-robin.
-[Ronen Shitrit] only ldr around is the next line, which shouldn't evict the current line, so I don't see any issue.
-
-> 
-> > 	CPU1 at this time doing spec prefetch for x which 
-> > 		will snoop CPU0 and will cause data corruption... :(
+> > > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > > Cc: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Wim Van Sebroeck <wim@iguana.be>
 > > 
-> > I can assume that if I count on the Soc IO cache coherency support all
-> > this isn't relevant, right? Or there are some issues hiding with v6 +
-> > IO coherency?
+> > Ping. Wim, did you notice this one? Shall the driver go via your tree or via
+> > the imx-tree along with the resource updates (with your ack)?
 > 
-> What "IO cache coherency" ?  Are you saying that your SoC has a mode
-> where the DMA controller can snoop the CPU caches?
+> Yes, I saw this one. I started reviewing it, but didn't finish it yet.
+> Will let you know something when it's done.
 > 
-> [Ronen Shitrit] Yes. 
+> Driver can go via my tree but since it's part of a series of other patches, it can also
+> go via the imx tree (which is probably preferred).
 
-That suggests to me that your SoC manufacturer intended the system to run
-with DMA coherency enabled - maybe to avoid these problems.
+They are ortogonal, so feel free to apply the driver once you finished
+reviewing it.
+Meanwhile I'll take care of the platform patches.
 
-We have a macro in the kernel to avoid unnecessary cache handling as a
-result of that - arch_is_coherent().  Maybe you should enable the hardware
-DMA coherency and ensure arch_is_coherent() returns true for your SoC.
-[Ronen Shitrit] I know, I just wanted to make sure we have fall back for case of some HW malfunctioning.
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
