@@ -1,29 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 May 2010 11:36:52 +0200
-Subject: i.MX EHCI initialization
-Message-ID: <20100517093652.GP31199@pengutronix.de>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 17 May 2010 12:38:55 +0300
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100514101615.GF10339@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100505150209.GC2606@n2100.arm.linux.org.uk>
+	<20100513174023.GB13001@n2100.arm.linux.org.uk>
+	<20100513211951.GH3428@atomide.com>
+	<20100513215825.GC13001@n2100.arm.linux.org.uk>
+	<20100513220139.GO3428@atomide.com>
+	<20100513221229.GD13001@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
+	<AANLkTikZvfvjY9e2QNWRwVcJcTvn58Ly_DgzrcXKu2iJ@mail.gmail.com>
+	<20100514101615.GF10339@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinY9M2cHKw86hTLaMUCvBX57o8AioBtrENB-JhK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 14, 2010 at 1:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> because it also uses reserve_bootmem() in
+>> drivers/video/omap2/vram.c and later ioremap on RAM. Perhaps LMB can
+>> be used to fix that too?
+>
+> WTF is reserve_bootmem doing in a driver?
 
-Hi Daniel et all,
-
-I see an increasing number of patches trying to change the
-initialization sequence of the i.MX ehci controller. It's getting harder
-and harder to keep track what the changes are, what other boards
-and SoCs a single patch affects and whether it just reverts another
-patch.
-
-I thought about making the initialization completely board specific and
-creating a set of helper functions which the board can call if it wants
-to to prevent too much code duplication.
-
-What do you think?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+IIRC Tony refused any new fb related code in arch/arm/*omap* so it
+ended up there (or maybe because of something else, not that I had
+anything to do with this).
