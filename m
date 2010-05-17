@@ -1,83 +1,91 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 17 May 2010 08:22:37 +0100
-Subject: [PATCH 5/6] ARM: S3C24XX: Remove macros mapping GPIO number to base
+Date: Mon, 17 May 2010 08:22:36 +0100
+Subject: [PATCH 4/6] ARM: S3C24XX: Update missed gpio calls to use gpiolib
 In-Reply-To: <1274080958-369-1-git-send-email-ben-linux@fluff.org>
 References: <1274080958-369-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1274080958-369-5-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274080958-369-4-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of the cleanup, remove the old macros mapping GPIO numbers
-to the base of the register now we have gpiolib to manage the GPIO
-mappings for us.
+Update a couple of S3C24XX and S3C2412 files that are still
+using the GPIO number to register mapping calls to get the
+s3c_gpio_chip and use the base field from that.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2410/include/mach/gpio-nrs.h   |    1 -
- arch/arm/mach-s3c2410/include/mach/gpio-track.h |    2 +-
- arch/arm/mach-s3c2410/include/mach/regs-gpio.h  |   22 ++--------------------
- 3 files changed, 3 insertions(+), 22 deletions(-)
+ arch/arm/mach-s3c2412/gpio.c |   12 +++++++-----
+ arch/arm/plat-s3c24xx/gpio.c |    8 +++++---
+ 2 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-index ad94e1a..ad4a04a 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-@@ -16,7 +16,6 @@
+diff --git a/arch/arm/mach-s3c2412/gpio.c b/arch/arm/mach-s3c2412/gpio.c
+index 71c5793..3404a87 100644
+--- a/arch/arm/mach-s3c2412/gpio.c
++++ b/arch/arm/mach-s3c2412/gpio.c
+@@ -16,18 +16,20 @@
+ #include <linux/types.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
++#include <linux/gpio.h>
  
- #define S3C2410_GPIONO(bank,offset) ((bank) + (offset))
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
  
--#define S3C2410_GPIO_BANKC   (32*2)
- #define S3C2410_GPIO_BANKG   (32*6)
- #define S3C2410_GPIO_BANKH   (32*7)
+ #include <mach/regs-gpio.h>
+-
+ #include <mach/hardware.h>
  
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-track.h b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
-index 6371eaa..d67819d 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio-track.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
-@@ -27,7 +27,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
- 		return NULL;
++#include <plat/gpio-core.h>
++
+ int s3c2412_gpio_set_sleepcfg(unsigned int pin, unsigned int state)
+ {
+-	void __iomem *base = S3C24XX_GPIO_BASE(pin);
+-	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
++	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
++	unsigned long offs = pin - chip->chip.base;
+ 	unsigned long flags;
+ 	unsigned long slpcon;
  
- 	chip = &s3c24xx_gpios[pin/32];
--	return (S3C2410_GPIO_OFFSET(pin) < chip->chip.ngpio) ? chip : NULL;
-+	return ((pin - chip->chip.base) < chip->chip.ngpio) ? chip : NULL;
+@@ -45,12 +47,12 @@ int s3c2412_gpio_set_sleepcfg(unsigned int pin, unsigned int state)
+ 
+ 	local_irq_save(flags);
+ 
+-	slpcon = __raw_readl(base + 0x0C);
++	slpcon = __raw_readl(chip->base + 0x0C);
+ 
+ 	slpcon &= ~(3 << offs);
+ 	slpcon |= state << offs;
+ 
+-	__raw_writel(slpcon, base + 0x0C);
++	__raw_writel(slpcon, chip->base + 0x0C);
+ 
+ 	local_irq_restore(flags);
+ 
+diff --git a/arch/arm/plat-s3c24xx/gpio.c b/arch/arm/plat-s3c24xx/gpio.c
+index 45126d3..2f3d7c0 100644
+--- a/arch/arm/plat-s3c24xx/gpio.c
++++ b/arch/arm/plat-s3c24xx/gpio.c
+@@ -34,6 +34,8 @@
+ 
+ #include <mach/regs-gpio.h>
+ 
++#include <plat/gpio-core.h>
++
+ /* gpiolib wrappers until these are totally eliminated */
+ 
+ void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
+@@ -68,10 +70,10 @@ EXPORT_SYMBOL(s3c2410_gpio_setpin);
+ 
+ unsigned int s3c2410_gpio_getpin(unsigned int pin)
+ {
+-	void __iomem *base = S3C24XX_GPIO_BASE(pin);
+-	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
++	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
++	unsigned long offs = pin - chip->chip.base;
+ 
+-	return __raw_readl(base + 0x04) & (1<< offs);
++	return __raw_readl(chip->base + 0x04) & (1<< offs);
  }
  
- #endif /* __ASM_ARCH_GPIO_CORE_H */
-diff --git a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
-index 821b966..95e29fe 100644
---- a/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s3c2410/include/mach/regs-gpio.h
-@@ -17,29 +17,11 @@
- #include <mach/gpio-nrs.h>
- 
- #ifdef CONFIG_CPU_S3C2400
--#define S3C24XX_GPIO_BASE(x)  S3C2400_GPIO_BASE(x)
--#define S3C24XX_MISCCR        S3C2400_MISCCR
-+#define S3C24XX_MISCCR		S3C2400_MISCCR
- #else
--#define S3C24XX_GPIO_BASE(x)  S3C2410_GPIO_BASE(x)
--#define S3C24XX_MISCCR	      S3C24XX_GPIOREG2(0x80)
-+#define S3C24XX_MISCCR		S3C24XX_GPIOREG2(0x80)
- #endif /* CONFIG_CPU_S3C2400 */
- 
--
--/* S3C2400 doesn't have a 1:1 mapping to S3C2410 gpio base pins */
--
--#define S3C2400_BANKNUM(pin)     (((pin) & ~31) / 32)
--#define S3C2400_BASEA2B(pin)     ((((pin) & ~31) >> 2))
--#define S3C2400_BASEC2H(pin)     ((S3C2400_BANKNUM(pin) * 10) + \
--                                 (2 * (S3C2400_BANKNUM(pin)-2)))
--
--#define S3C2400_GPIO_BASE(pin)   (pin < S3C2410_GPIO_BANKC ? \
--                                 S3C2400_BASEA2B(pin)+S3C24XX_VA_GPIO : \
--                                 S3C2400_BASEC2H(pin)+S3C24XX_VA_GPIO)
--
--
--#define S3C2410_GPIO_BASE(pin)   ((((pin) & ~31) >> 1) + S3C24XX_VA_GPIO)
--#define S3C2410_GPIO_OFFSET(pin) ((pin) & 31)
--
- /* general configuration options */
- 
- #define S3C2410_GPIO_LEAVE   (0xFFFFFFFF)
+ EXPORT_SYMBOL(s3c2410_gpio_getpin);
 -- 
 1.6.3.3
