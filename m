@@ -1,17 +1,20 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 17 May 2010 19:23:13 +0800
-Subject: [PATCH 0/6] pxa95x update
-Message-ID: <AANLkTilsPh7zapA0hrdpHiKNHZoNgmkvPP9GomQjIZcS@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 17 May 2010 16:54:23 +0530
+Subject: [PATCH] Watchdog: Adding support for Watchdog found with ARM
+	CortexA9
+In-Reply-To: <AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>
+References: <1274090044-10236-1-git-send-email-viresh.kumar@st.com>
+	<AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>
+Message-ID: <4BF12767.4010402@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support  evb3/saarb.
-Enable more i2c devices.
-Support more IRQs.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: pxa_update.tgz
-Type: application/x-gzip
-Size: 7768 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100517/251ccad6/attachment.tgz>
+On 5/17/2010 4:14 PM, Jassi Brar wrote:
+> On Mon, May 17, 2010 at 6:54 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>> Watchdog details can be found in ARM Cortex A9 reference manual at:
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/indix.html
+> The link doesn't work.
+> 
+
+Sorry!! i will correct it in V2.
+till then replace indix.html with index.html.
