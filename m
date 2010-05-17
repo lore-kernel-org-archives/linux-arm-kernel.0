@@ -1,29 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 May 2010 11:03:42 +0100
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <309002C0DA137042828828FC53D7A93492FA3137A1@IL-MB01.marvell.com>
-References: <1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<20100516150117.GC23961@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
-	<20100517065712.GA23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
-	<20100517074329.GB23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA313710@IL-MB01.marvell.com>
-	<20100517085751.GD23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA3137A1@IL-MB01.marvell.com>
-Message-ID: <20100517100342.GA29422@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 17 May 2010 15:49:33 +0530
+Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with
+	ARM	CortexA9
+In-Reply-To: <1274090321-14665-1-git-send-email-viresh.kumar@st.com>
+References: <1274090321-14665-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 12:50:01PM +0300, Ronen Shitrit wrote:
-> If a speculative prefetch occurs (eg, to prefetch the next ldr) it
-> could evict the dirty cache line that the str just wrote to.  Cache
-> replacement algorithms aren't always round-robin.
->
-> [Ronen Shitrit] only ldr around is the next line, which shouldn't
-> evict the current line, so I don't see any issue.
+<snip>
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
+> Sent: Monday, May 17, 2010 3:29 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: armando.visconti at st.com; shiraz.hashim at st.com; Viresh Kumar; linus.walleij at stericsson.com
+> Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with ARM CortexA9
+> 
+> Watchdog details can be found in ARM Cortex A9 reference manual at:
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/indix.html
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/watchdog/Kconfig        |    7 +
+>  drivers/watchdog/Makefile       |    1 +
+>  drivers/watchdog/cortexa9_wdt.c |  414 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 422 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/watchdog/cortexa9_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 0bf5020..b5c0f6f 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -73,6 +73,13 @@ config WM8350_WATCHDOG
+> 
+>  # ARM Architecture
+> 
+> +config ARM_CORTEXA9_WATCHDOG
+> +	tristate "ARM CortexA9 Watchdog"
+> +	depends on ARM_AMBA
 
-How can you say that the current line won't be evicted?  Do you know
-the cache replacement algorithm for your CPU that well?
+What is the ARM_AMBA dependency with CA-9 watchdog?
+> +	help
+> +	  Watchdog timer present with ARM Cortex A9 processor. This will reboot
+> +	  your system when the timeout is reached.
+> +
+>  config AT91RM9200_WATCHDOG
+>  	tristate "AT91RM9200 watchdog"
+>  	depends on ARCH_AT91RM9200
