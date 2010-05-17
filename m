@@ -1,56 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 May 2010 17:18:20 +0100
-Subject: RMK closing tree to patches *this* weekend
-In-Reply-To: <000301caf5d7$d15bab60$74130220$@deacon@arm.com>
-References: <20100513230201.GA26822@n2100.arm.linux.org.uk>
-	<20100517090310.GE23118@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1005170858290.12758@xanadu.home>
-	<20100517151036.GE29422@n2100.arm.linux.org.uk>
-	<000301caf5d7$d15bab60$74130220$@deacon@arm.com>
-Message-ID: <20100517161820.GA9304@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 17 May 2010 11:20:02 -0500
+Subject: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
+In-Reply-To: <20100516144932.GA23961@n2100.arm.linux.org.uk>
+References: <0D753D10438DA54287A00B0270842697636A7E9494@AUSP01VMBX24.collaborationhost.net>
+	<20100412184904.GG3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636D4B70AD@AUSP01VMBX24.collaborationhost.net>
+	<20100412191506.GL3048@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636ECB4E08@AUSP01VMBX24.collaborationhost.net>
+	<20100506204305.GB26818@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B0270842697636EDF5797@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697636EFDBD17@AUSP01VMBX24.collaborationhost.net>
+	<20100516144932.GA23961@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B0270842697636F0E0A5F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 04:44:20PM +0100, Will Deacon wrote:
-> Hi Russell,
-> 
-> > Therefore, this "initial batch" is most likely to become "only batch"
-> > since it's no longer possible to be reasonably ensure that there will
-> > be a merge window open in the second week.
-> 
-> If this is likely to be the case, will the OProfile patches be merged
-> during this batch? The reason I ask is because they have been applied to
-> the `devel-pmu' branch, but I can't find this in your repository. I also
-> can't see the patches in any of your other branches.
-> 
-> Knowing when the Kernel patches will be going in helps me to co-ordinate
-> submission of the accompanying userspace patches.
+Added to patch system as Patch #6136.
 
-As I've already pointed out:
+Thanks,
+Hartley 
 
-http://lists.arm.linux.org.uk/lurker/message/20100516.144933.63587837.en.html
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Sunday, May 16, 2010 7:50 AM
+To: H Hartley Sweeten
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] arm: ARCH_REQUIRE_GPIOLIB selects GENERIC_GPIO
 
-As I've said repeatedly over the last few weeks, there's three patch
-"series" which depend on lots of other stuff in the tree, and merging
-it out of order will result in build breakage or stuff being missed.
-These are:
+On Thu, May 13, 2010 at 05:53:10PM -0500, H Hartley Sweeten wrote:
+> Are you ready for this patch to be rebased, and to what tree?
 
-1. Hartley's removal of 'select GENERIC_GPIO'
-2. Your PMU patches
-3. John Stultz removal of 'select GENERIC_TIME'
+Can you rebase onto what's currently in the devel tree, and send the
+resulting patch to the patch system please?
 
-I'm waiting for (1) at the moment, then I'll re-merge (2) and devel-stable,
-and then I can ask John to redo his patch - which will depend on
-everything in my tree - it will touch stuff which only exists in both
-the existing 'devel' and 'devel-stable' branches.
-
-This is why I really wanted to close my tree a week before the merge
-window - to give a reasonable time to get these patches sorted out and
-properly tested.  We don't have that choice now - instead, what we have
-is a panic to get this all sorted.  So we'll all do the testing of the
-result after it's in Linus tree.
-
-Now, should Hartley for whatever reason not be able to sort his patch out
-by tomorrow morning (my time), I shall be taking the view that the patch
-is not important, and we can play this lottery again for the following
-merge window...
+(for others, I've temporarily dropped some merges on the devel tree.)
