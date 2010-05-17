@@ -1,54 +1,32 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 17 May 2010 20:17:42 +0200
-Subject: [PATCH 1/2] ARM: S3C64XX: Add USB external clock definition
-Message-ID: <4BF18846.9030809@gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 17 May 2010 19:42:56 +0200
+Subject: [PATCH 7/8] MXC: mach-mx31_3ds: Add support for the keypad.
+In-Reply-To: <20100517094339.GR31199@pengutronix.de>
+References: <1269369741.3276.162.camel@realization>
+	<1269370017.3276.165.camel@realization>
+	<1269370175.3276.168.camel@realization>
+	<1269370228.3276.169.camel@realization>
+	<1269370305.3276.171.camel@realization>
+	<1269370438.3276.173.camel@realization>
+	<1269370499.3276.174.camel@realization>
+	<1269370655.3276.177.camel@realization> <4BED42EA.2080604@gmail.com>
+	<20100517094339.GR31199@pengutronix.de>
+Message-ID: <1274118176.3578.2.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the xusbxti clock to S3C64XX platform.
+On lun, 2010-05-17 at 11:43 +0200, Sascha Hauer wrote:
+> This patch combines 3ds platform support with the mx3 support. Can you
+> please send a patch with mx3 support only?
+> 
+> Sascha
+> 
+> 
+Sorry for overlaps.
+Soon the two divided patches.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/mach-s3c64xx/clock.c              |    7 +++++++
- arch/arm/plat-samsung/include/plat/clock.h |    1 +
- 2 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 2ac2e7d..6830bb7 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -88,6 +88,12 @@ struct clk clk_48m = {
- 	.enable		= clk_48m_ctrl,
- };
- 
-+struct clk clk_xusbxti = {
-+	.name		= "xusbxti",
-+	.id		= -1,
-+	.rate		= 48000000,
-+};
-+
- static int inline s3c64xx_gate(void __iomem *reg,
- 				struct clk *clk,
- 				int enable)
-@@ -762,6 +768,7 @@ static struct clk *clks[] __initdata = {
- 	&clk_27m,
- 	&clk_48m,
- 	&clk_h2,
-+	&clk_xusbxti,
- };
- 
- /**
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index 60b6269..efbc984 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -74,6 +74,7 @@ extern struct clk clk_ext;
- extern struct clk clk_h2;
- extern struct clk clk_27m;
- extern struct clk clk_48m;
-+extern struct clk clk_xusbxti;
- 
- extern int clk_default_setrate(struct clk *clk, unsigned long rate);
- extern struct clk_ops clk_ops_def_setrate;
 -- 
-1.7.1
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
