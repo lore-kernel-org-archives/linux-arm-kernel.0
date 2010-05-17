@@ -1,70 +1,63 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 17 May 2010 12:55:33 +0900
-Subject: [PATCH 2/6] S3C: DMA: Add api driver for PL330
-In-Reply-To: <AANLkTikZBVbddY247lYWwfqmslvWiooxO2rCw0gEGB2-@mail.gmail.com>
-References: <1274060104-14224-1-git-send-email-jassi.brar@samsung.com>
-	<1274060139-14290-1-git-send-email-jassi.brar@samsung.com>
-	<AANLkTikZBVbddY247lYWwfqmslvWiooxO2rCw0gEGB2-@mail.gmail.com>
-Message-ID: <AANLkTin56HFIrKyXqEt7eUTxE3JYbdfLJRG2Q-r8UMQT@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 17 May 2010 05:03:25 +0100
+Subject: PIPT cache handling on s5pv210 chip
+In-Reply-To: <00ca01caf359$643defa0$2cb9cee0$%kim@samsung.com>
+References: <AANLkTilN-B_hvIPWFC8Q02wIcO7nJLmodSj0RyBYZKuk@mail.gmail.com>
+	<00bc01caf351$5daf71c0$190e5540$%kim@samsung.com>
+	<20100514104843.GG10339@n2100.arm.linux.org.uk>
+	<00ca01caf359$643defa0$2cb9cee0$%kim@samsung.com>
+Message-ID: <20100517040325.GX6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 12:44 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Mon, May 17, 2010 at 10:35 AM, Jassi Brar <jassi.brar@samsung.com> wrote:
->> Latest Samsung SoCs have one or more PL330 as their DMACs. This patch
->> implements the S3C DMA API for PL330 core driver.
->>
->> The design has been kept as generic as possible while keeping effort to
->> add support for new SoCs to the minimum possible level.
->>
->> Some of the salient features of this driver are:-
->> ?o ?Automatic scheduling of client requests onto DMAC if more than
->> ? ?one DMAC can reach the peripheral. Factors, such as current load
->> ? ?and number of exclusive but inactive peripherals that are
->> ? ?supported by the DMAC, are used to decide suitability of a DMAC
->> ? ?for a particular client.
->> ?o ?CIRCULAR buffer option is supported.
->> ?o ?The driver scales transparently with the number of DMACs and total
->> ? ?peripherals in the platform, since all peripherals are added to
->> ? ?the peripheral pool and DMACs to the controller pool.
->>
->> For most conservative use of memory, smallest driver size and best
->> performance, we don't employ legacy data structures of the S3C DMA API.
->> That should not have any affect since those data structures are completely
->> invisible to the DMA clients.
->>
->> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/plat-samsung/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +
->> ?arch/arm/plat-samsung/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?2 +
->> ?arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h | ? 87 ++
->> ?.../plat-samsung/include/plat/s3c-pl330-pdata.h ? ?| ? 34 +
->> ?arch/arm/plat-samsung/s3c-pl330.c ? ? ? ? ? ? ? ? ?| 1229 ++++++++++++++++++++
->> ?5 files changed, 1358 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
->> ?create mode 100644 arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
->> ?create mode 100644 arch/arm/plat-samsung/s3c-pl330.c
->>
->> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
->> index d552c65..78b8b89 100644
->> --- a/arch/arm/plat-samsung/Kconfig
->> +++ b/arch/arm/plat-samsung/Kconfig
->> @@ -198,6 +198,12 @@ config S3C_DMA
->> ? ? ? ?help
->> ? ? ? ? ?Internal configuration for S3C DMA core
->>
->> +config S3C_PL330_DMA
->> + ? ? ? bool
->> + ? ? ? select PL330
->> + ? ? ? help
->> + ? ? ? ? S3C DMA API Driver for PL330 DMAC.
->> +
->
-> It's not functional comment. just suggestion. At least plat-samsung
-> directory, How about to use 'SAMUSNG' prefix instead of 'S3C'. We
-> don't know next chip name start S7, S9, and so on. which one can be
-> possible.
-> So future use and reduce the confusion, we start the use the 'SAMSUNG' prefix.
-This DMA API driver has nothing to do with S3Cxxxx, S5Pxxxx, S7Pxxxx etc SoCs.
-The "S3C" prefix specifies the DMA API version. And the DMA API remains same
-as that used for S3C24xx SoCs.
+On Fri, May 14, 2010 at 08:34:14PM +0900, Kukjin Kim wrote:
+> Russell King wrote:
+> > 
+> > On Fri, May 14, 2010 at 07:36:47PM +0900, Kukjin Kim wrote:
+> > > In case of __vmalloc() with non-cacheable option, there may come some
+> > > malfunctions related to cache.
+> > 
+> > Practically, you are not allowed on ARMv6 or ARMv7 to create mappings
+> > which alias with differing memory types; that is 100% outlawed by the
+> > architecture spec, and there is NO mitigation for this.
+
+Unfortunately, just because something is outlawed doesn't mean that people
+will try and do it.
+ 
+> > It means that it is _illegal_ to use __vmalloc() with anything but a
+> > memory-like mapping protection.
+> > 
+> > There is mitigation for having different cacheability, but this is just
+> > a work-around while OSes like Linux work to remove the creation of
+> > aliases with differing cacheability attributes.  There's no guarantee
+> > that later ARMv7 or future CPUs will continue to operate predictably.
+> > 
+> > The same applies for ioremap() being used on SDRAM - and those who look
+> > at what's in my tree will notice that ioremap() has recently been made
+> > to fail when used on SDRAM for this very reason.
+> 
+> In case a driver starts the Memory_To_Peripheral DMA operation with the
+> memory area allotted by __vmalloc(,,no-cacheable), the driver can face some
+> problems caused by cache victims.
+
+This would seem to indicate either the driver needs to allocate the
+memory differently, or that it is not following the correct procedure
+to hande the memory area to the hardware or that there it is a problem
+with how the L2 cache has been integrated into the kernel.
+
+I'm not sure what kernel this is based on, or what drivers are being
+affected by this as I suspect this is from one of the for-vendor branches
+that tends to pop-up because something needs to be shipped ASAP.
+ 
+> > Therefore, the above hack isn't going near mainline.
+> 
+> Nevertheless, I think so too.
+
+This is the kind of thing that makes me want to go and find the
+perpitrators and uise the ogg-cavetech-super-pointy-stick on them.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
