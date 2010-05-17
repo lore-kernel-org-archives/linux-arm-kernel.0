@@ -1,86 +1,66 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 17 May 2010 09:25:06 +0100
-Subject: [PATCH 2/6] S3C: DMA: Add api driver for PL330
-In-Reply-To: <AANLkTin56HFIrKyXqEt7eUTxE3JYbdfLJRG2Q-r8UMQT@mail.gmail.com>
-References: <1274060104-14224-1-git-send-email-jassi.brar@samsung.com>
-	<1274060139-14290-1-git-send-email-jassi.brar@samsung.com>
-	<AANLkTikZBVbddY247lYWwfqmslvWiooxO2rCw0gEGB2-@mail.gmail.com>
-	<AANLkTin56HFIrKyXqEt7eUTxE3JYbdfLJRG2Q-r8UMQT@mail.gmail.com>
-Message-ID: <20100517082506.GB6684@trinity.fluff.org>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Mon, 17 May 2010 11:29:53 +0300
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in	theARMv6
+	DMA cache ops
+In-Reply-To: <20100517074329.GB23118@n2100.arm.linux.org.uk>
+References: <20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+	<20100516150117.GC23961@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
+	<20100517065712.GA23118@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
+	<20100517074329.GB23118@n2100.arm.linux.org.uk>
+Message-ID: <309002C0DA137042828828FC53D7A93492FA313710@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 12:55:33PM +0900, Jassi Brar wrote:
-> On Mon, May 17, 2010 at 12:44 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> > On Mon, May 17, 2010 at 10:35 AM, Jassi Brar <jassi.brar@samsung.com> wrote:
-> >> Latest Samsung SoCs have one or more PL330 as their DMACs. This patch
-> >> implements the S3C DMA API for PL330 core driver.
-> >>
-> >> The design has been kept as generic as possible while keeping effort to
-> >> add support for new SoCs to the minimum possible level.
-> >>
-> >> Some of the salient features of this driver are:-
-> >> ?o ?Automatic scheduling of client requests onto DMAC if more than
-> >> ? ?one DMAC can reach the peripheral. Factors, such as current load
-> >> ? ?and number of exclusive but inactive peripherals that are
-> >> ? ?supported by the DMAC, are used to decide suitability of a DMAC
-> >> ? ?for a particular client.
-> >> ?o ?CIRCULAR buffer option is supported.
-> >> ?o ?The driver scales transparently with the number of DMACs and total
-> >> ? ?peripherals in the platform, since all peripherals are added to
-> >> ? ?the peripheral pool and DMACs to the controller pool.
-> >>
-> >> For most conservative use of memory, smallest driver size and best
-> >> performance, we don't employ legacy data structures of the S3C DMA API.
-> >> That should not have any affect since those data structures are completely
-> >> invisible to the DMA clients.
-> >>
-> >> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> >> ---
-> >> ?arch/arm/plat-samsung/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +
-> >> ?arch/arm/plat-samsung/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> >> ?arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h | ? 87 ++
-> >> ?.../plat-samsung/include/plat/s3c-pl330-pdata.h ? ?| ? 34 +
-> >> ?arch/arm/plat-samsung/s3c-pl330.c ? ? ? ? ? ? ? ? ?| 1229 ++++++++++++++++++++
-> >> ?5 files changed, 1358 insertions(+), 0 deletions(-)
-> >> ?create mode 100644 arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-> >> ?create mode 100644 arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-> >> ?create mode 100644 arch/arm/plat-samsung/s3c-pl330.c
-> >>
-> >> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> >> index d552c65..78b8b89 100644
-> >> --- a/arch/arm/plat-samsung/Kconfig
-> >> +++ b/arch/arm/plat-samsung/Kconfig
-> >> @@ -198,6 +198,12 @@ config S3C_DMA
-> >> ? ? ? ?help
-> >> ? ? ? ? ?Internal configuration for S3C DMA core
-> >>
-> >> +config S3C_PL330_DMA
-> >> + ? ? ? bool
-> >> + ? ? ? select PL330
-> >> + ? ? ? help
-> >> + ? ? ? ? S3C DMA API Driver for PL330 DMAC.
-> >> +
-> >
-> > It's not functional comment. just suggestion. At least plat-samsung
-> > directory, How about to use 'SAMUSNG' prefix instead of 'S3C'. We
-> > don't know next chip name start S7, S9, and so on. which one can be
-> > possible.
-> > So future use and reduce the confusion, we start the use the 'SAMSUNG' prefix.
-> This DMA API driver has nothing to do with S3Cxxxx, S5Pxxxx, S7Pxxxx etc SoCs.
-> The "S3C" prefix specifies the DMA API version. And the DMA API remains same
-> as that used for S3C24xx SoCs.
 
-I'm siding with Jassi on this.
 
-Does this really matter, especially as this is really internal Kconfig
-to select support that is compiled in.
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Monday, May 17, 2010 10:43 AM
+To: Ronen Shitrit
+Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6 DMA cache ops
 
-Unless anyone else can come up with a reasonable objection, this'll get
-merged tomorrow.
+On Mon, May 17, 2010 at 10:34:36AM +0300, Ronen Shitrit wrote:
+> After some more thinking, I think I found the problem...
+> 
+> DMA for receive should operate as follows:
+> 1) CPU will map (invalidate) the buffers for the DMA
+> 2) DMA will place the buffers and ack the CPU
+> 3) The CPU will call unmap which will invalidate the buffers again
+> 
+> 
+> I can only think of one problematic scenario:
+> - After 1 and before 2: 
+> 	CPU0 did spec prefetch for address x 
+> - After 2: 
+> 	CPU0 is doing inv: lock int, ldr x, 
+> 		str x (addr x is marked dirty with wrong data).
 
--- 
-Ben
+The data has been corrupted at this point; you don't need a second CPU.
+[Ronen Shitrit] Why? If the second CPU doesn't exist an invalidate will come just after the str inst and the wrong data will not get anywhere... (interrupts are locked so I assume no eviction...)
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> 	CPU1 at this time doing spec prefetch for x which 
+> 		will snoop CPU0 and will cause data corruption... :(
+> 
+> I can assume that if I count on the Soc IO cache coherency support all
+> this isn't relevant, right? Or there are some issues hiding with v6 +
+> IO coherency?
+
+What "IO cache coherency" ?  Are you saying that your SoC has a mode
+where the DMA controller can snoop the CPU caches?
+
+
+[Ronen Shitrit] Yes. 
+I also found that I can disable D-cache spec prefetch.
+However I-cache prefetch still exist and we have unified shared L2, so I think the ldr/str WA is still not valid since it might load garbage from the L2 as a result of I-cache spec pref... right?
+
+
+I guess that for machines that has only I-cache spec pref, unmap should invalidate only the unified caches (in my case the L2).
+And for machines that has also D-cache spec pref, unmap should invalidate all caches.
