@@ -1,40 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 May 2010 14:46:49 +0100
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership intheARMv6
-	DMA cache ops
-In-Reply-To: <1274096843.6053.51.camel@e102109-lin.cambridge.arm.com>
-References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
-	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<1274089860.6053.0.camel@e102109-lin.cambridge.arm.com>
-	<1274090255.6053.2.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3137B8@IL-MB01.marvell.com>
-	<1274094491.6053.32.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA313852@IL-MB01.marvell.com>
-	<1274096843.6053.51.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1274104009.6053.55.camel@e102109-lin.cambridge.arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 17 May 2010 16:58:00 +0300
+Subject: [PATCH 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <20100517072720.GD31199@pengutronix.de>
+References: <cover.1273150585.git.baruch@tkos.co.il>
+	<a029bab8fcb3273df4a1d98f779f110b127742bd.1273150585.git.baruch@tkos.co.il>
+	<Pine.LNX.4.64.1005090045230.10524@axis700.grange>
+	<20100517072720.GD31199@pengutronix.de>
+Message-ID: <20100517135800.GB30927@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-17 at 12:47 +0100, Catalin Marinas wrote:
-> On Mon, 2010-05-17 at 14:27 +0300, Ronen Shitrit wrote:
-> > Performance wise we prefer to enable it...
-> > But it seems to be on the safe side we will disable it.
-> 
-> It's worth doing some benchmarking.
-> 
-> Anyway, if it's a new SoC, you may have the option of implementing IPI
-> via FIQ and you could broadcast the cache maintenance operations via FIQ
-> (and avoid potential deadlocks in the kernel).
+Hi Sascha,
 
-Or even better - implement cache broadcasting in hardware.
+Thanks for your comments.
+
+On Mon, May 17, 2010 at 09:27:20AM +0200, Sascha Hauer wrote:
+> On Wed, May 12, 2010 at 09:02:29PM +0200, Guennadi Liakhovetski wrote:
+> > Hi Baruch
+> > 
+> > Thanks for eventually mainlining this driver! A couple of comments below. 
+> > Sascha, would be great, if you could get it tested on imx27 with and 
+> > without emma.
+> 
+> I will see what I can do. Testing and probably breathing life into a
+> camera driver usually takes me two days given that the platform support
+> is very outdated. I hope our customer is interested in this, then it
+> would be possible to test it.
+> 
+> > BTW, if you say, that you use emma to avoid using the 
+> > standard DMA controller, why would anyone want not to use emma? Resource 
+> > conflict? There is also a question for you down in the comments, please, 
+> > skim over.
+> 
+> I originally did not know how all the components should work together.
+> Now I think it's the right way to use the EMMA to be able to scale
+> images and to do colour conversions (which does not work with our Bayer
+> format cameras, so I cannot test it).
+
+So can I remove the non EMMA code from this driver? This will simplify the 
+code quite a bit.
+
+[snip]
+
+> > > +static int mclk_get_divisor(struct mx2_camera_dev *pcdev)
+> > > +{
+> > > +	dev_info(pcdev->dev, "%s not implemented. Running at max speed\n",
+> > > +			__func__);
+> > 
+> > Hm, why is this unimplemented?
+> > 
+> > > +
+> > > +#if 0
+> > > +	unsigned int mclk = pcdev->pdata->clk_csi;
+> > > +	unsigned int pclk = clk_get_rate(pcdev->clk_csi);
+> > > +	int i;
+> > > +
+> > > +	dev_dbg(pcdev->dev, "%s: %ld %ld\n", __func__, mclk, pclk);
+> > > +
+> > > +	for (i = 0; i < 0xf; i++)
+> > > +		if ((i + 1) * 2 * mclk <= pclk)
+> > > +			break;
+> > 
+> > This doesn't look right. You increment the counter i, and terminate the
+> > loop as soon as "(i + 1) * 2 * mclk <= pclk". Obviously, if 2 * mclk <= pclk,
+> > this will terminate immediately, otherwise it will run until the end and
+> > return 0xf without satisfying the condition. What exactly are you trying to
+> > achieve? Find the _largest_ i, such that "(i + 1) * 2 * mclk <= pclk"? Then
+> > why not just do "i = pclk / 2 / mclk - 1"?
+> > 
+> > > +	return i;
+> > > +#endif
+> > > +	return 0;
+> > > +}
+
+Can you shed some light on this?
+
+Thanks,
+baruch
 
 -- 
-Catalin
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
