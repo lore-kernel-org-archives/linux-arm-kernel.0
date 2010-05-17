@@ -1,31 +1,41 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 17 May 2010 14:00:32 +0200
-Subject: [PATCH] phy/marvell: Add special settings for D-Link DNS-323
-	rev C1
-In-Reply-To: <1274096214.21352.735.camel@pasglop>
-References: <1274056058.21352.697.camel@pasglop>
-	<20100517005942.GB27301@pengutronix.de>
-	<1274058457.21352.711.camel@pasglop>
-	<1274096214.21352.735.camel@pasglop>
-Message-ID: <20100517120032.GI22781@pengutronix.de>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Mon, 17 May 2010 15:04:36 +0300
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
+	DMA cache ops
+In-Reply-To: <1274096577.6053.46.camel@e102109-lin.cambridge.arm.com>
+References: <309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+	<20100516150117.GC23961@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
+	<20100517065712.GA23118@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
+	<1274090432.6053.4.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA313858@IL-MB01.marvell.com>
+	<1274096577.6053.46.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <309002C0DA137042828828FC53D7A93492FA313892@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> The problem is that the fixups are called -after- the config_init()
-> callback of the PHY driver. However, the marvell m88e1118 PHY driver
-> will unconditionally reset the LEDs setting.
 
-Haven't checked, just an idea: Is it possible to change the init of the driver
-to use Read-Modify-Write and thus keep your settings?
+> As I said in a previous e-mail, it's the sync operation that does an
+> invalidate and this would affect the data in the buffer. Hence the patch
+> to make the invalidate operation non-destructive (as long as your CPU
+> doesn't do speculative loads into the D-cache or they can be disabled).
+> 
+> [Ronen Shitrit] What about I-cache prefetch? Unified cache?
+
+The "sync_for_cpu" operation (from device case) first invalidates the L2
+cache and then invalidates the L1 using a LDR/STR pair and cache op.
+[Ronen Shitrit] So for v6-MP, if no D-cache spec pref, why do you need to inv the L1 at all?
+
+
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100517/98bf2188/attachment.sig>
+Catalin
