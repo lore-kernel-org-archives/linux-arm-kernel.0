@@ -1,53 +1,66 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 17 May 2010 12:33:43 +0200
-Subject: [PATCH V2 6/6] arm/mx51: add watchdog device
-In-Reply-To: <20100517094925.GT31199@pengutronix.de>
-References: <20100517094925.GT31199@pengutronix.de>
-Message-ID: <1274092423-16644-2-git-send-email-w.sang@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 17 May 2010 16:10:52 +0530
+Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with
+	ARM	CortexA9
+In-Reply-To: <4BF11B51.7000808@st.com>
+References: <1274090321-14665-1-git-send-email-viresh.kumar@st.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
+	<4BF11B51.7000808@st.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C558B870@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx5/devices.c |   15 +++++++++++++++
- arch/arm/mach-mx5/devices.h |    1 +
- 2 files changed, 16 insertions(+), 0 deletions(-)
+> -----Original Message-----
+> From: Viresh KUMAR [mailto:viresh.kumar at st.com]
+> Sent: Monday, May 17, 2010 4:03 PM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; armando.visconti at st.com; shiraz.hashim at st.com;
+> linus.walleij at stericsson.com
+> Subject: Re: [PATCH Resend] Watchdog: Adding support for Watchdog found with ARM CortexA9
+> 
+> On 5/17/2010 3:49 PM, Shilimkar, Santosh wrote:
+> > <snip>
+> >> -----Original Message-----
+> >> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> >> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
+> >> Sent: Monday, May 17, 2010 3:29 PM
+> >> To: linux-arm-kernel at lists.infradead.org
+> >> Cc: armando.visconti at st.com; shiraz.hashim at st.com; Viresh Kumar; linus.walleij at stericsson.com
+> >> Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with ARM CortexA9
+> >>
+> >> Watchdog details can be found in ARM Cortex A9 reference manual at:
+> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/indix.html
+> >>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> >> ---
+> >>  drivers/watchdog/Kconfig        |    7 +
+> >>  drivers/watchdog/Makefile       |    1 +
+> >>  drivers/watchdog/cortexa9_wdt.c |  414 +++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 422 insertions(+), 0 deletions(-)
+> >>  create mode 100644 drivers/watchdog/cortexa9_wdt.c
+> >>
+> >> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> >> index 0bf5020..b5c0f6f 100644
+> >> --- a/drivers/watchdog/Kconfig
+> >> +++ b/drivers/watchdog/Kconfig
+> >> @@ -73,6 +73,13 @@ config WM8350_WATCHDOG
+> >>
+> >>  # ARM Architecture
+> >>
+> >> +config ARM_CORTEXA9_WATCHDOG
+> >> +	tristate "ARM CortexA9 Watchdog"
+> >> +	depends on ARM_AMBA
+> >
+> > What is the ARM_AMBA dependency with CA-9 watchdog?
+> 
+> Not really on amba, rather on ARM. Or CPU_V7 (cortex related)?
+> Maybe some other ARM core also have similar design,
+> so can keep it dependent on ARM. Does this looks fine?
+> 
+Thanks for clarification. Even CPU_V7 isn't correct dependency
+because CA8 is based on V7 as well where the WDT isn't there.
+So not sure about it. May be V7 + SMP might fit but not necessarily
+correct again. Or you just leave it as "depends on ARM"
 
-diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-index 23850e6..7130449 100644
---- a/arch/arm/mach-mx5/devices.c
-+++ b/arch/arm/mach-mx5/devices.c
-@@ -153,6 +153,21 @@ struct platform_device mxc_usbh1_device = {
- 	},
- };
- 
-+static struct resource mxc_wdt_resources[] = {
-+	{
-+		.start = MX51_WDOG_BASE_ADDR,
-+		.end = MX51_WDOG_BASE_ADDR + SZ_16K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device mxc_wdt = {
-+	.name = "imx2-wdt",
-+	.id = 0,
-+	.num_resources = ARRAY_SIZE(mxc_wdt_resources),
-+	.resource = mxc_wdt_resources,
-+};
-+
- static struct mxc_gpio_port mxc_gpio_ports[] = {
- 	{
- 		.chip.label = "gpio-0",
-diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-index 0494d6b..c879ae7 100644
---- a/arch/arm/mach-mx5/devices.h
-+++ b/arch/arm/mach-mx5/devices.h
-@@ -5,3 +5,4 @@ extern struct platform_device mxc_fec_device;
- extern struct platform_device mxc_usbdr_host_device;
- extern struct platform_device mxc_usbh1_device;
- extern struct platform_device mxc_usbdr_udc_device;
-+extern struct platform_device mxc_wdt;
--- 
-1.7.0
+Regards,
+Santosh
