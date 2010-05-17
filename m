@@ -1,178 +1,183 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 09:39:00 +0900
-Subject: [PATCH 15/18] ARM: S5PV210: Add sclk_audio and sclk_spdif clocks.
-Message-ID: <1274056740-14680-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 17 May 2010 09:38:52 +0900
+Subject: [PATCH 12/18] ARM: S5PV210: Add support for VPLL
+Message-ID: <1274056732-14581-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-Add the sclk_audio(0/1/2) clocks and sclk_spdif clock of type
-'struct clksrc_clk' clock. Also, add clk_pcmcdclk(0/1/2) clocks
-of type 'struct clk' clock.
+This patch adds the following.
+
+1. Adds 'clk_sclk_hdmi27m' clock to represent the HDMI 27MHz clock.
+2. Adds 'clk_vpllsrc; clock of type clksrc_clk to represent the
+   input clock for VPLL.
+3. Adds 'clk_sclk_vpll' clock of type clksrc_clk to represent the
+   output of the MUX_VPLL mux.
+4. Add clk_sclk_hdmi27m, clk_vpllsrc and clk_sclk_vpll to the list
+   of clocks to be registered.
+5. Adds boot time print of 'clk_sclk_vpll' clock rate.
+6. Adds 'clk_fout_vpll' clock to plat-s5p such that it is reusable
+   on other s5p platforms.
 
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/clock.c |  125 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 125 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/clock.c              |   63 +++++++++++++++++++++++++++-
+ arch/arm/plat-s5p/clock.c                  |    8 ++++
+ arch/arm/plat-s5p/include/plat/s5p-clock.h |    1 +
+ 3 files changed, 70 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index c03e288..0154710 100644
+index 315955d..c86bff5 100644
 --- a/arch/arm/mach-s5pv210/clock.c
 +++ b/arch/arm/mach-s5pv210/clock.c
-@@ -199,6 +199,21 @@ static struct clk clk_sclk_usbphy1 = {
- 	.id		= -1,
+@@ -173,6 +173,57 @@ static int s5pv210_clk_ip3_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
+ }
+ 
++static int s5pv210_clk_mask0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
++}
++
++static struct clk clk_sclk_hdmi27m = {
++	.name		= "sclk_hdmi27m",
++	.id		= -1,
++	.rate		= 27000000,
++};
++
++static struct clk *clkset_vpllsrc_list[] = {
++	[0] = &clk_fin_vpll,
++	[1] = &clk_sclk_hdmi27m,
++};
++
++static struct clksrc_sources clkset_vpllsrc = {
++	.sources	= clkset_vpllsrc_list,
++	.nr_sources	= ARRAY_SIZE(clkset_vpllsrc_list),
++};
++
++static struct clksrc_clk clk_vpllsrc = {
++	.clk	= {
++		.name		= "vpll_src",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 7),
++	},
++	.sources	= &clkset_vpllsrc,
++	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 28, .size = 1 },
++};
++
++static struct clk *clkset_sclk_vpll_list[] = {
++	[0] = &clk_vpllsrc.clk,
++	[1] = &clk_fout_vpll,
++};
++
++static struct clksrc_sources clkset_sclk_vpll = {
++	.sources	= clkset_sclk_vpll_list,
++	.nr_sources	= ARRAY_SIZE(clkset_sclk_vpll_list),
++};
++
++static struct clksrc_clk clk_sclk_vpll = {
++	.clk	= {
++		.name		= "sclk_vpll",
++		.id		= -1,
++	},
++	.sources	= &clkset_sclk_vpll,
++	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1 },
++};
++
+ static unsigned long s5pv210_clk_imem_get_rate(struct clk *clk)
+ {
+ 	return clk_get_rate(clk->parent) / 2;
+@@ -402,12 +453,15 @@ static struct clksrc_clk *sysclks[] = {
+ 	&clk_pclk_msys,
+ 	&clk_pclk_dsys,
+ 	&clk_pclk_psys,
++	&clk_vpllsrc,
++	&clk_sclk_vpll,
  };
  
-+static struct clk clk_pcmcdclk0 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk clk_pcmcdclk1 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk clk_pcmcdclk2 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
- static struct clk *clkset_vpllsrc_list[] = {
- 	[0] = &clk_fin_vpll,
- 	[1] = &clk_sclk_hdmi27m,
-@@ -524,6 +539,104 @@ static struct clksrc_sources clkset_sclk_mixer = {
- 	.nr_sources	= ARRAY_SIZE(clkset_sclk_mixer_list),
- };
+ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ {
+ 	struct clk *xtal_clk;
+ 	unsigned long xtal;
++	unsigned long vpllsrc;
+ 	unsigned long armclk;
+ 	unsigned long hclk_msys;
+ 	unsigned long hclk_dsys;
+@@ -418,6 +472,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 	unsigned long apll;
+ 	unsigned long mpll;
+ 	unsigned long epll;
++	unsigned long vpll;
+ 	unsigned int ptr;
+ 	u32 clkdiv0, clkdiv1;
  
-+static struct clk *clkset_sclk_audio0_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk0,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio0 = {
-+	.sources	= clkset_sclk_audio0_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio0_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio0 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
-+		.id		= 0,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 4),
-+	},
-+	.sources = &clkset_sclk_audio0,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 0, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 0, .size = 4 },
-+};
-+
-+static struct clk *clkset_sclk_audio1_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk1,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio1 = {
-+	.sources	= clkset_sclk_audio1_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio1_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio1 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
-+		.id		= 1,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 5),
-+	},
-+	.sources = &clkset_sclk_audio1,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 4, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 4, .size = 4 },
-+};
-+
-+static struct clk *clkset_sclk_audio2_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk0,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio2 = {
-+	.sources	= clkset_sclk_audio2_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio2_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio2 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
-+		.id		= 2,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 6),
-+	},
-+	.sources = &clkset_sclk_audio2,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 8, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 8, .size = 4 },
-+};
-+
-+static struct clk *clkset_sclk_spdif_list[] = {
-+	[0] = &clk_sclk_audio0.clk,
-+	[1] = &clk_sclk_audio1.clk,
-+	[2] = &clk_sclk_audio2.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_spdif = {
-+	.sources	= clkset_sclk_spdif_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_spdif_list),
-+};
-+
- static struct clksrc_clk clksrcs[] = {
- 	{
- 		.clk	= {
-@@ -560,6 +673,15 @@ static struct clksrc_clk clksrcs[] = {
- 		},
- 		.sources = &clkset_sclk_mixer,
- 		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 4, .size = 1 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_spdif",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 27),
-+		},
-+		.sources = &clkset_sclk_spdif,
-+		.reg_src = { .reg = S5P_CLK_SRC6, .shift = 12, .size = 2 },
- 	},
- };
+@@ -440,13 +495,16 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
+ 	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
+ 	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
++	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
++	vpll = s5p_get_pll45xx(vpllsrc, __raw_readl(S5P_VPLL_CON), pll_4502);
  
-@@ -658,6 +780,9 @@ static struct clk *clks[] __initdata = {
- 	&clk_sclk_hdmiphy,
- 	&clk_sclk_usbphy0,
- 	&clk_sclk_usbphy1,
-+	&clk_pcmcdclk0,
-+	&clk_pcmcdclk1,
-+	&clk_pcmcdclk2,
+ 	clk_fout_apll.rate = apll;
+ 	clk_fout_mpll.rate = mpll;
+ 	clk_fout_epll.rate = epll;
++	clk_fout_vpll.rate = vpll;
+ 
+-	printk(KERN_INFO "S5PV210: PLL settings, A=%ld, M=%ld, E=%ld",
+-			apll, mpll, epll);
++	printk(KERN_INFO "S5PV210: PLL settings, A=%ld, M=%ld, E=%ld V=%ld",
++			apll, mpll, epll, vpll);
+ 
+ 	armclk = clk_get_rate(&clk_armclk.clk);
+ 	hclk_msys = clk_get_rate(&clk_hclk_msys.clk);
+@@ -470,6 +528,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ }
+ 
+ static struct clk *clks[] __initdata = {
++	&clk_sclk_hdmi27m,
  };
  
  void __init s5pv210_register_clocks(void)
+diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
+index 3fef951..a8bfabf 100644
+--- a/arch/arm/plat-s5p/clock.c
++++ b/arch/arm/plat-s5p/clock.c
+@@ -74,6 +74,13 @@ struct clk clk_fout_epll = {
+ 	.ctrlbit	= (1 << 31),
+ };
+ 
++/* VPLL clock output */
++struct clk clk_fout_vpll = {
++	.name		= "fout_vpll",
++	.id		= -1,
++	.ctrlbit	= (1 << 31),
++};
++
+ /* ARM clock */
+ struct clk clk_arm = {
+ 	.name		= "armclk",
+@@ -138,6 +145,7 @@ static struct clk *s5p_clks[] __initdata = {
+ 	&clk_fout_apll,
+ 	&clk_fout_mpll,
+ 	&clk_fout_epll,
++	&clk_fout_vpll,
+ 	&clk_arm,
+ 	&clk_vpll,
+ };
+diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-s5p/include/plat/s5p-clock.h
+index a476a9f..aa0447a 100644
+--- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
++++ b/arch/arm/plat-s5p/include/plat/s5p-clock.h
+@@ -28,6 +28,7 @@ extern struct clk clk_48m;
+ extern struct clk clk_fout_apll;
+ extern struct clk clk_fout_mpll;
+ extern struct clk clk_fout_epll;
++extern struct clk clk_fout_vpll;
+ extern struct clk clk_arm;
+ extern struct clk clk_vpll;
+ 
 -- 
 1.6.2.5
