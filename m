@@ -1,34 +1,18 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 May 2010 21:00:18 +0100
-Subject: [PATCH 1/2] mc13783: add LED support
-In-Reply-To: <20100517190242.GA17604@pengutronix.de>
-References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100517190242.GA17604@pengutronix.de>
-Message-ID: <20100517200017.GA25262@sirena.org.uk>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Mon, 17 May 2010 22:42:39 +0200
+Subject: async_tx.git updated
+In-Reply-To: <1274124234.24802.18.camel@dwillia2-linux>
+References: <1274124234.24802.18.camel@dwillia2-linux>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A025A726241@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 09:02:42PM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, May 17, 2010 at 06:40:22PM +0200, Philippe R?tornaz wrote:
+[Dan]
 
-> > +static void mc13783_led_set(struct led_classdev *led_cdev,
-> > +			   enum led_brightness value)
-> > +{
-> > +	struct mc13783_led *led;
-> > +
-> > +	led = container_of(led_cdev, struct mc13783_led, cdev);
-> > +	led->new_brightness = value;
-> > +	schedule_work(&led->work);
-> > +}
+> Linus note the two fixes you sent for the dma40 driver rely on the
+> primecell reworks so are not included below.
 
-> I wonder why you don't set the registers directly here, but use a work
-> struct instead.
+OK I'll post async_tx-fixed versions ASAP.
 
-The LED API allows clients to configure the LEDs from interrupt context
-so for devices on blocking buses (like this) the driver needs to defer
-the actual implementation of the change.
-
-It'd be nice to add helpers for this to the LED core, there's quite a
-few drivers implementing this idiom now - a flag that does the deferring
-of the set() for example.
+Yours,
+Linus Walleij
