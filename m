@@ -1,25 +1,34 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Mon, 17 May 2010 10:50:22 +0530
-Subject: [PATCH] gic: implement set_type
-In-Reply-To: <4BED7B00.5080405@codeaurora.org>
-References: <1273574921-25714-1-git-send-email-rabin.vincent@stericsson.com>
-	<4BED7B00.5080405@codeaurora.org>
-Message-ID: <20100517052021.GA4597@bnru02.bnr.st.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 17 May 2010 08:23:31 +0300
+Subject: [alsa-devel] [patch 5/6] orion/kirkwood: Add i2s support
+In-Reply-To: <20100515153130.937921459@mandriva.com>
+References: <20100515152958.899927802@mandriva.com>
+	<20100515153130.937921459@mandriva.com>
+Message-ID: <AANLkTim31zMgvsSdcidDvmD-Q3124w48PVxMnT3nL5O6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 14, 2010 at 06:32:00PM +0200, Abhijeet Dharmapurikar wrote:
-> > +	/* Only SPIs' interrupt configuration can be changed */
-> > +	if (gicirq < 32)
-> > +		return -EINVAL;
-> 
-> This causes drivers who are requesting PPI's with IRQF_TRIGGER_* flags 
-> to fail.
-> 
-> Note that it is "Implementation Defined" whether PPI's are programmable 
-> .http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ihi0048a/index.html
-> 
-> I would request to change gicirq < 32 to gicirq < 16 , the writes will 
-> be ignored if PPI's are not programmable.
-
-New patch below:
+> + ? ? ? /* First disable and clear windows */
+> + ? ? ? for (win_num = 0; win_num < ORION_MAX_AUDIO_WIN; win_num++) {
+> + ? ? ? ? ? ? ? writel(0, base + ORION_AUDIO_WIN_CTRL_REG(win_num));
+> + ? ? ? ? ? ? ? writel(0, base + ORION_AUDIO_WIN_BASE_REG(win_num));
+> + ? ? ? }
+> +
+> + ? ? ? /* Setup windows for DDR */
+> + ? ? ? for (win_num = 0; win_num < ORION_MAX_AUDIO_WIN; win_num++) {
+> + ? ? ? ? ? ? ? /* We will set the Window to DRAM_CS1 in default */
+> + ? ? ? ? ? ? ? struct mbus_dram_window *cs = &dram->cs[1];
+> + ? ? ? ? ? ? ? writel(cs->base & 0xffff0000,
+> + ? ? ? ? ? ? ? ? ? ? ?base + ORION_AUDIO_WIN_BASE_REG(win_num));
+> + ? ? ? ? ? ? ? writel(((cs->size - 1) & 0xffff0000) |
+> + ? ? ? ? ? ? ? ? ? ? ?(cs->mbus_attr << 8) |
+> + ? ? ? ? ? ? ? ? ? ? ?(dram->mbus_dram_target_id << 4) | 1,
+> + ? ? ? ? ? ? ? ? ? ? ? base + ORION_AUDIO_WIN_CTRL_REG(win_num));
+> + ? ? ? }
+> +}
+The i2s controller has one window for playback, so that window must be
+set according to the current dma address, i.e, if the dma address
+falls into csX then the window should be configured to csX. same for
+record.
+sorry for the late comment.
+saeed
