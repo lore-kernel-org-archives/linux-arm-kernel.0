@@ -1,183 +1,125 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 09:38:52 +0900
-Subject: [PATCH 12/18] ARM: S5PV210: Add support for VPLL
-Message-ID: <1274056732-14581-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 17 May 2010 09:38:34 +0900
+Subject: [PATCH 05/18] ARM: S5PV210: Remove usage of clk_h200 clock and add
+	clk_hclk_msys clock
+Message-ID: <1274056714-14350-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-This patch adds the following.
+The clk_h200 represents the HCLK for the MSYS domain. This clock
+is of type 'struct clk' but on V210, it is more suitable to be of
+type 'struct clksrc_clk' (since it is a divided version of the
+armclk). The replacement clock is renamed as clk_hclk_msys to
+indicate that it represents the HCLK for MSYS domain.
 
-1. Adds 'clk_sclk_hdmi27m' clock to represent the HDMI 27MHz clock.
-2. Adds 'clk_vpllsrc; clock of type clksrc_clk to represent the
-   input clock for VPLL.
-3. Adds 'clk_sclk_vpll' clock of type clksrc_clk to represent the
-   output of the MUX_VPLL mux.
-4. Add clk_sclk_hdmi27m, clk_vpllsrc and clk_sclk_vpll to the list
-   of clocks to be registered.
-5. Adds boot time print of 'clk_sclk_vpll' clock rate.
-6. Adds 'clk_fout_vpll' clock to plat-s5p such that it is reusable
-   on other s5p platforms.
+This patch modifies the following.
+
+1. Removes the usage of the clk_h200 clock.
+2. Adds the new clock 'clk_hclk_msys'.
+3. Adds clk_hclk_msys to the list of sysclks to be registered.
+4. Modifies the hclk_msys clock rate calculation procedure to
+   be based on the new clk_hclk_msys clock.
 
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/clock.c              |   63 +++++++++++++++++++++++++++-
- arch/arm/plat-s5p/clock.c                  |    8 ++++
- arch/arm/plat-s5p/include/plat/s5p-clock.h |    1 +
- 3 files changed, 70 insertions(+), 2 deletions(-)
+ arch/arm/mach-s5pv210/clock.c |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index 315955d..c86bff5 100644
+index f57fa1e..d5acd26 100644
 --- a/arch/arm/mach-s5pv210/clock.c
 +++ b/arch/arm/mach-s5pv210/clock.c
-@@ -173,6 +173,57 @@ static int s5pv210_clk_ip3_ctrl(struct clk *clk, int enable)
+@@ -78,6 +78,15 @@ static struct clksrc_clk clk_armclk = {
+ 	.reg_div	= { .reg = S5P_CLK_DIV0, .shift = 0, .size = 3 },
+ };
+ 
++static struct clksrc_clk clk_hclk_msys = {
++	.clk	= {
++		.name		= "hclk_msys",
++		.id		= -1,
++		.parent		= &clk_armclk.clk,
++	},
++	.reg_div	= { .reg = S5P_CLK_DIV0, .shift = 8, .size = 3 },
++};
++
+ static int s5pv210_clk_ip0_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_CLKGATE_IP0, clk, enable);
+@@ -98,11 +107,6 @@ static int s5pv210_clk_ip3_ctrl(struct clk *clk, int enable)
  	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
  }
  
-+static int s5pv210_clk_mask0_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
-+}
-+
-+static struct clk clk_sclk_hdmi27m = {
-+	.name		= "sclk_hdmi27m",
-+	.id		= -1,
-+	.rate		= 27000000,
-+};
-+
-+static struct clk *clkset_vpllsrc_list[] = {
-+	[0] = &clk_fin_vpll,
-+	[1] = &clk_sclk_hdmi27m,
-+};
-+
-+static struct clksrc_sources clkset_vpllsrc = {
-+	.sources	= clkset_vpllsrc_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_vpllsrc_list),
-+};
-+
-+static struct clksrc_clk clk_vpllsrc = {
-+	.clk	= {
-+		.name		= "vpll_src",
-+		.id		= -1,
-+		.enable		= s5pv210_clk_mask0_ctrl,
-+		.ctrlbit	= (1 << 7),
-+	},
-+	.sources	= &clkset_vpllsrc,
-+	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 28, .size = 1 },
-+};
-+
-+static struct clk *clkset_sclk_vpll_list[] = {
-+	[0] = &clk_vpllsrc.clk,
-+	[1] = &clk_fout_vpll,
-+};
-+
-+static struct clksrc_sources clkset_sclk_vpll = {
-+	.sources	= clkset_sclk_vpll_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_vpll_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_vpll = {
-+	.clk	= {
-+		.name		= "sclk_vpll",
-+		.id		= -1,
-+	},
-+	.sources	= &clkset_sclk_vpll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1 },
-+};
-+
- static unsigned long s5pv210_clk_imem_get_rate(struct clk *clk)
- {
- 	return clk_get_rate(clk->parent) / 2;
-@@ -402,12 +453,15 @@ static struct clksrc_clk *sysclks[] = {
- 	&clk_pclk_msys,
- 	&clk_pclk_dsys,
- 	&clk_pclk_psys,
-+	&clk_vpllsrc,
-+	&clk_sclk_vpll,
+-static struct clk clk_h200 = {
+-	.name		= "hclk200",
+-	.id		= -1,
+-};
+-
+ static struct clk clk_h100 = {
+ 	.name		= "hclk100",
+ 	.id		= -1,
+@@ -134,7 +138,6 @@ static struct clk clk_p66 = {
  };
  
- void __init_or_cpufreq s5pv210_setup_clocks(void)
- {
+ static struct clk *sys_clks[] = {
+-	&clk_h200,
+ 	&clk_h100,
+ 	&clk_h166,
+ 	&clk_h133,
+@@ -349,6 +352,7 @@ static struct clksrc_clk *sysclks[] = {
+ 	&clk_mout_epll,
+ 	&clk_mout_mpll,
+ 	&clk_armclk,
++	&clk_hclk_msys,
+ };
+ 
+ #define GET_DIV(clk, field) ((((clk) & field##_MASK) >> field##_SHIFT) + 1)
+@@ -358,7 +362,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
  	struct clk *xtal_clk;
  	unsigned long xtal;
-+	unsigned long vpllsrc;
  	unsigned long armclk;
- 	unsigned long hclk_msys;
- 	unsigned long hclk_dsys;
-@@ -418,6 +472,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
- 	unsigned long apll;
- 	unsigned long mpll;
- 	unsigned long epll;
-+	unsigned long vpll;
- 	unsigned int ptr;
- 	u32 clkdiv0, clkdiv1;
- 
-@@ -440,13 +495,16 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
- 	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
- 	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
- 	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-+	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
-+	vpll = s5p_get_pll45xx(vpllsrc, __raw_readl(S5P_VPLL_CON), pll_4502);
- 
- 	clk_fout_apll.rate = apll;
- 	clk_fout_mpll.rate = mpll;
- 	clk_fout_epll.rate = epll;
-+	clk_fout_vpll.rate = vpll;
- 
--	printk(KERN_INFO "S5PV210: PLL settings, A=%ld, M=%ld, E=%ld",
--			apll, mpll, epll);
-+	printk(KERN_INFO "S5PV210: PLL settings, A=%ld, M=%ld, E=%ld V=%ld",
-+			apll, mpll, epll, vpll);
+-	unsigned long hclk200;
++	unsigned long hclk_msys;
+ 	unsigned long hclk166;
+ 	unsigned long hclk133;
+ 	unsigned long pclk100;
+@@ -398,10 +402,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 			apll, mpll, epll);
  
  	armclk = clk_get_rate(&clk_armclk.clk);
- 	hclk_msys = clk_get_rate(&clk_hclk_msys.clk);
-@@ -470,6 +528,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
- }
+-	if (__raw_readl(S5P_CLK_SRC0) & S5P_CLKSRC0_MUX200_MASK)
+-		hclk200 = mpll / GET_DIV(clkdiv0, S5P_CLKDIV0_HCLK200);
+-	else
+-		hclk200 = armclk / GET_DIV(clkdiv0, S5P_CLKDIV0_HCLK200);
++	hclk_msys = clk_get_rate(&clk_hclk_msys.clk);
  
- static struct clk *clks[] __initdata = {
-+	&clk_sclk_hdmi27m,
- };
+ 	if (__raw_readl(S5P_CLK_SRC0) & S5P_CLKSRC0_MUX166_MASK) {
+ 		hclk166 = apll / GET_DIV(clkdiv0, S5P_CLKDIV0_A2M);
+@@ -415,13 +416,13 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 	} else
+ 		hclk133 = mpll / GET_DIV(clkdiv0, S5P_CLKDIV0_HCLK133);
  
- void __init s5pv210_register_clocks(void)
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index 3fef951..a8bfabf 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -74,6 +74,13 @@ struct clk clk_fout_epll = {
- 	.ctrlbit	= (1 << 31),
- };
+-	pclk100 = hclk200 / GET_DIV(clkdiv0, S5P_CLKDIV0_PCLK100);
++	pclk100 = hclk_msys / GET_DIV(clkdiv0, S5P_CLKDIV0_PCLK100);
+ 	pclk83 = hclk166 / GET_DIV(clkdiv0, S5P_CLKDIV0_PCLK83);
+ 	pclk66 = hclk133 / GET_DIV(clkdiv0, S5P_CLKDIV0_PCLK66);
  
-+/* VPLL clock output */
-+struct clk clk_fout_vpll = {
-+	.name		= "fout_vpll",
-+	.id		= -1,
-+	.ctrlbit	= (1 << 31),
-+};
-+
- /* ARM clock */
- struct clk clk_arm = {
- 	.name		= "armclk",
-@@ -138,6 +145,7 @@ static struct clk *s5p_clks[] __initdata = {
- 	&clk_fout_apll,
- 	&clk_fout_mpll,
- 	&clk_fout_epll,
-+	&clk_fout_vpll,
- 	&clk_arm,
- 	&clk_vpll,
- };
-diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-s5p/include/plat/s5p-clock.h
-index a476a9f..aa0447a 100644
---- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
-+++ b/arch/arm/plat-s5p/include/plat/s5p-clock.h
-@@ -28,6 +28,7 @@ extern struct clk clk_48m;
- extern struct clk clk_fout_apll;
- extern struct clk clk_fout_mpll;
- extern struct clk clk_fout_epll;
-+extern struct clk clk_fout_vpll;
- extern struct clk clk_arm;
- extern struct clk clk_vpll;
+ 	printk(KERN_INFO "S5PV210: ARMCLK=%ld, HCLKM=%ld, HCLKD=%ld, \
+ 			HCLKP=%ld, PCLKM=%ld, PCLKD=%ld, PCLKP=%ld\n",
+-	       armclk, hclk200, hclk166, hclk133, pclk100, pclk83, pclk66);
++	       armclk, hclk_msys, hclk166, hclk133, pclk100, pclk83, pclk66);
  
+ 	clk_f.rate = armclk;
+ 	clk_h.rate = hclk133;
+@@ -430,7 +431,6 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 	clk_p83.rate = pclk83;
+ 	clk_h133.rate = hclk133;
+ 	clk_h166.rate = hclk166;
+-	clk_h200.rate = hclk200;
+ 
+ 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+ 		s3c_set_clksrc(&clksrcs[ptr], true);
 -- 
 1.6.2.5
