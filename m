@@ -1,66 +1,43 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Mon, 17 May 2010 11:29:53 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in	theARMv6
-	DMA cache ops
-In-Reply-To: <20100517074329.GB23118@n2100.arm.linux.org.uk>
-References: <20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<20100516150117.GC23961@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
-	<20100517065712.GA23118@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
-	<20100517074329.GB23118@n2100.arm.linux.org.uk>
-Message-ID: <309002C0DA137042828828FC53D7A93492FA313710@IL-MB01.marvell.com>
+From: Colin.Tuckley@arm.com (Colin Tuckley)
+Date: Mon, 17 May 2010 09:33:21 +0100
+Subject: Anyone knows abot the DMA status on the PB1176JZF-S baseboard?
+In-Reply-To: <AANLkTim4Y5vkPYUWSNigIL72-f9jfTLq-nEKD_apaD0p@mail.gmail.com>
+References: <AANLkTim4Y5vkPYUWSNigIL72-f9jfTLq-nEKD_apaD0p@mail.gmail.com>
+Message-ID: <F01D8B85CFF58440B2A13965FBA90CA42DA36A9C40@GEORGE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Linus Walleij
+> Sent: 15 May 2010 01:37
+
+Note that Bahadir doesn't work for ARM anymore.
+
+> I got hold of a baseboard for ARM RealView Versatile 1176JZF-S.
+>
+> However in the manual that comes with the board the DMA PL081
+> controller is listed but in recent manuals it has been removed.
+> It's device entry was commented out in
+> arch/arm/mach-realview/realview_pb1176.c
+> when the support was submitted.
+>
+> When I test it, the hardware is there and responding at
+> the listed address. However it doesn't seem to work so well,
+> all kind of odd behaviour... Like loosing bits on the bus.
+>
+> Is the PL081 instance in the PB1176 known to be broken and is that
+> the reason for it being removed from the manual?
+
+Early images did include DMA support but it was found to be broken and was removed from later images and from the documentation.
+
+Regards,
+Colin
+
+--
+Colin Tuckley - ARM Ltd.
+110 Fulbourn Rd
+Cambridge, CB1 9NJ
+Tel: +44 1223 400536
 
 
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Monday, May 17, 2010 10:43 AM
-To: Ronen Shitrit
-Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6 DMA cache ops
-
-On Mon, May 17, 2010 at 10:34:36AM +0300, Ronen Shitrit wrote:
-> After some more thinking, I think I found the problem...
-> 
-> DMA for receive should operate as follows:
-> 1) CPU will map (invalidate) the buffers for the DMA
-> 2) DMA will place the buffers and ack the CPU
-> 3) The CPU will call unmap which will invalidate the buffers again
-> 
-> 
-> I can only think of one problematic scenario:
-> - After 1 and before 2: 
-> 	CPU0 did spec prefetch for address x 
-> - After 2: 
-> 	CPU0 is doing inv: lock int, ldr x, 
-> 		str x (addr x is marked dirty with wrong data).
-
-The data has been corrupted at this point; you don't need a second CPU.
-[Ronen Shitrit] Why? If the second CPU doesn't exist an invalidate will come just after the str inst and the wrong data will not get anywhere... (interrupts are locked so I assume no eviction...)
-
-> 	CPU1 at this time doing spec prefetch for x which 
-> 		will snoop CPU0 and will cause data corruption... :(
-> 
-> I can assume that if I count on the Soc IO cache coherency support all
-> this isn't relevant, right? Or there are some issues hiding with v6 +
-> IO coherency?
-
-What "IO cache coherency" ?  Are you saying that your SoC has a mode
-where the DMA controller can snoop the CPU caches?
-
-
-[Ronen Shitrit] Yes. 
-I also found that I can disable D-cache spec prefetch.
-However I-cache prefetch still exist and we have unified shared L2, so I think the ldr/str WA is still not valid since it might load garbage from the L2 as a result of I-cache spec pref... right?
-
-
-I guess that for machines that has only I-cache spec pref, unmap should invalidate only the unified caches (in my case the L2).
-And for machines that has also D-cache spec pref, unmap should invalidate all caches.
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
