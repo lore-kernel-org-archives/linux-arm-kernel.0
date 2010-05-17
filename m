@@ -1,80 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 May 2010 10:37:16 -0700
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <1274091978.2307.49.camel@tubuntu.research.nokia.com>
-References: <20100513211951.GH3428@atomide.com>
-	<20100513215825.GC13001@n2100.arm.linux.org.uk>
-	<20100513220139.GO3428@atomide.com>
-	<20100513221229.GD13001@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
-	<AANLkTikZvfvjY9e2QNWRwVcJcTvn58Ly_DgzrcXKu2iJ@mail.gmail.com>
-	<20100514101615.GF10339@n2100.arm.linux.org.uk>
-	<AANLkTinY9M2cHKw86hTLaMUCvBX57o8AioBtrENB-JhK@mail.gmail.com>
-	<20100517094421.GG23118@n2100.arm.linux.org.uk>
-	<1274091978.2307.49.camel@tubuntu.research.nokia.com>
-Message-ID: <20100517173715.GA5818@atomide.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 17 May 2010 20:17:42 +0200
+Subject: [PATCH 1/2] ARM: S3C64XX: Add USB external clock definition
+Message-ID: <4BF18846.9030809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@nokia.com> [100517 03:21]:
-> Hi,
-> 
-> On Mon, 2010-05-17 at 11:44 +0200, ext Russell King - ARM Linux wrote:
-> > On Mon, May 17, 2010 at 12:38:55PM +0300, Grazvydas Ignotas wrote:
-> > > On Fri, May 14, 2010 at 1:16 PM, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > >> because it also uses reserve_bootmem() in
-> > > >> drivers/video/omap2/vram.c and later ioremap on RAM. Perhaps LMB can
-> > > >> be used to fix that too?
-> > > >
-> > > > WTF is reserve_bootmem doing in a driver?
-> > > 
-> > > IIRC Tony refused any new fb related code in arch/arm/*omap* so it
-> > > ended up there (or maybe because of something else, not that I had
-> > > anything to do with this).
-> > 
-> > Can someone please answer these questions:
-> > 
-> > 1. why does the framebuffer need to _reserve_ a set of specific sections
-> >    of SDRAM rather than _allocate_ a set of sections?
-> > 2. what range of sizes of SDRAM does the framebuffer driver need?
-> 
-> Yep, vram.c was first located in arch/arm/plat-omap/ but was moved under
-> drivers/video/omap2 by request from Tony. vram.c is not really a driver,
-> so in that sense I think it'd fit better into arch/arm/plat-omap/.
-> 
-> To question 1:
-> 
-> - The bootloader may use a certain area of memory to display to boot
-> image, and the kernel needs to use this same memory area for the
-> framebuffer, so that we don't get any glitches on the display during
-> boot. If this is not required, then the memory areas can be allocated.
-> 
-> - OMAP display hardware requires a continuous memory area for the
-> framebuffer. Allocating such a large continuous memory area later seemed
-> to be next to impossible, probably because of memory fragmentation.
-> 
-> - Originally I used dma_alloc_*, but that doesn't support the
-> bootloader-init case, and I also wanted to support having the
-> framebuffer in OMAP's SRAM. Also, if I recall right, dma_alloc_* didn't
-> support the huge allocations that are needed for the framebuffer.
-> 
-> To 2:
-> It varies a lot on the use case. One can configure the reserved VRAM
-> area, and I would imagine that the smallest would be something like
-> ~150kB (320x240x2) and the largest in extreme case ~40MB (1600x1200*4,
-> x2 for double buffering and x3 for each overlay).
+This adds the xusbxti clock to S3C64XX platform.
 
-Sorry if I've been confused about what vram.c is doing.
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ arch/arm/mach-s3c64xx/clock.c              |    7 +++++++
+ arch/arm/plat-samsung/include/plat/clock.h |    1 +
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-How about change vram.c to use dma_alloc_coherent for now? That would
-break the non-standard behaviour to preserve the log set by the
-bootloader, but that should be OK until we know how to deal with that
-properly.
-
-After that you could just optionally reserve the bootloader memory
-area using LMB based on some flags in the platform init data.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+index 2ac2e7d..6830bb7 100644
+--- a/arch/arm/mach-s3c64xx/clock.c
++++ b/arch/arm/mach-s3c64xx/clock.c
+@@ -88,6 +88,12 @@ struct clk clk_48m = {
+ 	.enable		= clk_48m_ctrl,
+ };
+ 
++struct clk clk_xusbxti = {
++	.name		= "xusbxti",
++	.id		= -1,
++	.rate		= 48000000,
++};
++
+ static int inline s3c64xx_gate(void __iomem *reg,
+ 				struct clk *clk,
+ 				int enable)
+@@ -762,6 +768,7 @@ static struct clk *clks[] __initdata = {
+ 	&clk_27m,
+ 	&clk_48m,
+ 	&clk_h2,
++	&clk_xusbxti,
+ };
+ 
+ /**
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index 60b6269..efbc984 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -74,6 +74,7 @@ extern struct clk clk_ext;
+ extern struct clk clk_h2;
+ extern struct clk clk_27m;
+ extern struct clk clk_48m;
++extern struct clk clk_xusbxti;
+ 
+ extern int clk_default_setrate(struct clk *clk, unsigned long rate);
+ extern struct clk_ops clk_ops_def_setrate;
+-- 
+1.7.1
