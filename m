@@ -1,127 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 22:45:24 +0900
-Subject: [PATCH 08/15] ARM: S5PC100: Move frame buffer helpers from
-	plat-s5pc1xx to mach-s5pc100
-In-Reply-To: <1273817946-29404-9-git-send-email-m.szyprowski@samsung.com>
-References: <1273817946-29404-1-git-send-email-m.szyprowski@samsung.com>
-	<1273817946-29404-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <004d01caf5c7$369f3160$a3dd9420$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 May 2010 14:45:49 +0100
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in
+	theARMv6 DMA cache ops
+In-Reply-To: <309002C0DA137042828828FC53D7A93492FA313892@IL-MB01.marvell.com>
+References: <309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+	<20100516150117.GC23961@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
+	<20100517065712.GA23118@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A93492FA3136B1@IL-MB01.marvell.com>
+	<1274090432.6053.4.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA313858@IL-MB01.marvell.com>
+	<1274096577.6053.46.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA313892@IL-MB01.marvell.com>
+Message-ID: <1274103949.6053.54.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+On Mon, 2010-05-17 at 13:04 +0100, Ronen Shitrit wrote:
+> > As I said in a previous e-mail, it's the sync operation that does an
+> > invalidate and this would affect the data in the buffer. Hence the patch
+> > to make the invalidate operation non-destructive (as long as your CPU
+> > doesn't do speculative loads into the D-cache or they can be disabled).
+> >
+> > [Ronen Shitrit] What about I-cache prefetch? Unified cache?
 > 
-> Move frame buffer helpers from plat-s5pc1xx to mach-s5pc100.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pc100/Kconfig                      |    7 ++++++-
->  arch/arm/mach-s5pc100/Makefile                     |    1 +
->  .../setup-fb-24bpp.c                               |    4 ++--
->  arch/arm/plat-s5pc1xx/Kconfig                      |    5 -----
->  arch/arm/plat-s5pc1xx/Makefile                     |    1 -
->  5 files changed, 9 insertions(+), 9 deletions(-)
->  rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/setup-fb-24bpp.c (91%)
-> 
-> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-> index 27ec167..b24c66d 100644
-> --- a/arch/arm/mach-s5pc100/Kconfig
-> +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -12,6 +12,11 @@ config CPU_S5PC100
->  	help
->  	  Enable S5PC100 CPU support
-> 
-> +config S5PC100_SETUP_FB_24BPP
-> +	bool
-> +	help
-> +          Common setup code for S5PC1XX with an 24bpp RGB display helper.
+> The "sync_for_cpu" operation (from device case) first invalidates the L2
+> cache and then invalidates the L1 using a LDR/STR pair and cache op.
+> [Ronen Shitrit] So for v6-MP, if no D-cache spec pref, why do you need to inv the L1 at all?
 
-Double tab and 2 white spaces.
+No, you are correct. The ___dma_single_dev_to_cpu(FROM_DEVICE) function
+calls outer_inv_range() followed by dmac_unmap_area(). The latter,
+however, is a no-op with my DMA workaround patch.
 
-> +
->  config S5PC100_SETUP_SDHCI
->          bool
->          select S5PC1XX_SETUP_SDHCI_GPIO
-> @@ -28,7 +33,7 @@ config MACH_SMDKC100
->  	select S3C_DEV_HSMMC2
->  	select S5PC1XX_SETUP_I2C0
->  	select S5PC1XX_SETUP_I2C1
-> -	select S5PC1XX_SETUP_FB_24BPP
-> +	select S5PC100_SETUP_FB_24BPP
->  	select S5PC100_SETUP_SDHCI
->  	help
->  	  Machine support for the Samsung SMDKC100
-> diff --git a/arch/arm/mach-s5pc100/Makefile
-b/arch/arm/mach-s5pc100/Makefile
-> index e1afdbf..ccf0dca 100644
-> --- a/arch/arm/mach-s5pc100/Makefile
-> +++ b/arch/arm/mach-s5pc100/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_CPU_S5PC100)	+= cpu.o gpio.o
-> 
->  # Helper and device support
-> 
-> +obj-$(CONFIG_S5PC100_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
->  obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
-> 
->  # machine support
-> diff --git a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-b/arch/arm/mach-s5pc100/setup-
-> fb-24bpp.c
-> similarity index 91%
-> rename from arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-> rename to arch/arm/mach-s5pc100/setup-fb-24bpp.c
-> index b02c36f..6eba6cb 100644
-> --- a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-> +++ b/arch/arm/mach-s5pc100/setup-fb-24bpp.c
-> @@ -1,9 +1,9 @@
->  /*
-> - * linux/arch/arm/plat-s5pc100/setup-fb-24bpp.c
-> + * linux/arch/arm/mach-s5pc100/setup-fb-24bpp.c
->   *
->   * Copyright 2009 Samsung Electronics
->   *
-> - * Base S5PC1XX setup information for 24bpp LCD framebuffer
-> + * Base S5PC100 setup information for 24bpp LCD framebuffer
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
-> index 98bbaf9..708f7a0 100644
-> --- a/arch/arm/plat-s5pc1xx/Kconfig
-> +++ b/arch/arm/plat-s5pc1xx/Kconfig
-> @@ -39,11 +39,6 @@ config CPU_S5PC100_CLOCK
-> 
->  # platform specific device setup
-> 
-> -config S5PC1XX_SETUP_FB_24BPP
-> -	bool
-> -	help
-> -          Common setup code for S5PC1XX with an 24bpp RGB display helper.
-> -
->  config S5PC1XX_SETUP_I2C0
->  	bool
->  	default y
-> diff --git a/arch/arm/plat-s5pc1xx/Makefile
-b/arch/arm/plat-s5pc1xx/Makefile
-> index 540fca5..a5b90c0 100644
-> --- a/arch/arm/plat-s5pc1xx/Makefile
-> +++ b/arch/arm/plat-s5pc1xx/Makefile
-> @@ -23,7 +23,6 @@ obj-$(CONFIG_CPU_S5PC100_CLOCK)	+= s5pc100-clock.o
-> 
->  # Device setup
-> 
-> -obj-$(CONFIG_S5PC1XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
->  obj-$(CONFIG_S5PC1XX_SETUP_I2C0) += setup-i2c0.o
->  obj-$(CONFIG_S5PC1XX_SETUP_I2C1) += setup-i2c1.o
->  obj-$(CONFIG_S5PC1XX_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Catalin
