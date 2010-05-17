@@ -1,167 +1,421 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 17 May 2010 08:53:10 +0200
-Subject: [PATCH 2/7] ARM: S5PV210: add Aquila board
+Date: Mon, 17 May 2010 08:53:11 +0200
+Subject: [PATCH 3/7] ARM: Samsung: move common framebuffer regs to common
+	platform directory
 In-Reply-To: <1274079195-18105-1-git-send-email-m.szyprowski@samsung.com>
 References: <1274079195-18105-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1274079195-18105-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1274079195-18105-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for Samsung Aquila board. This board is based
-on S5PC110 SoC.
+From: Pawel Osciak <p.osciak@samsung.com>
 
+The framebuffer register blocks on S5PC100 and S5PV210/S5PC110 differ
+only slightly. This patch extracts all register definitions that are
+common to S5PC100 and S5PC110 into plat-samsung/plat/regs-fb-v5.h and
+adds a new file with C110-specific register definitions to the
+mach-s5pv210/include/mach directory.
+
+Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig       |   12 ++--
- arch/arm/mach-s5pv210/Makefile      |    1 +
- arch/arm/mach-s5pv210/mach-aquila.c |  100 +++++++++++++++++++++++++++++++++++
- 3 files changed, 107 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/mach-aquila.c
+ arch/arm/mach-s5pc100/include/mach/regs-fb.h    |  130 +--------------------
+ arch/arm/mach-s5pv210/include/mach/regs-fb.h    |   91 +++++++++++++++
+ arch/arm/plat-samsung/include/plat/regs-fb-v5.h |  138 +++++++++++++++++++++++
+ 3 files changed, 236 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-fb.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v5.h
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index af33a1a..c42bcba 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -15,11 +15,6 @@ config CPU_S5PV210
- 	help
- 	  Enable S5PV210 CPU support
- 
--choice
--	prompt "Select machine type"
--	depends on ARCH_S5PV210
--	default MACH_SMDKV210
+diff --git a/arch/arm/mach-s5pc100/include/mach/regs-fb.h b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
+index 1732cd2..c5d75c5 100644
+--- a/arch/arm/mach-s5pc100/include/mach/regs-fb.h
++++ b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
+@@ -3,137 +3,21 @@
+  * Copyright 2009 Samsung Electronics Co.
+  *   Pawel Osciak <p.osciak@samsung.com>
+  *
+- * Framebuffer register definitions for Samsung S5PC100.
++ * Machine-specific framebuffer definitions for Samsung S5PC100.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+-*/
 -
- config MACH_SMDKV210
- 	bool "SMDKV210"
- 	select CPU_S5PV210
-@@ -35,6 +30,11 @@ config MACH_SMDKC110
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
+-#ifndef __ASM_ARCH_REGS_FB_H
+-#define __ASM_ARCH_REGS_FB_H __FILE__
+-
+-#include <plat/regs-fb-v4.h>
+-
+-/* VP1 interface timing control */
+-#define VP1CON0						(0x118)
+-#define VP1_RATECON_EN					(1 << 31)
+-#define VP1_CLKRATE_MASK				(0xff)
+-
+-#define VP1CON1						(0x11c)
+-#define VP1_VTREGCON_EN					(1 << 31)
+-#define VP1_VBPD_MASK					(0xfff)
+-#define VP1_VBPD_SHIFT					(16)
+-
+-
+-#define WPALCON_H					(0x19c)
+-#define WPALCON_L					(0x1a0)
+-
+-/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
+- * different for WPAL2-4
+- */
+-/* In WPALCON_L (aka WPALCON) */
+-#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
+-#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
+-
+-/* To set W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
+- * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
+- */
+-#define WPALCON_L_WxPAL_L_MASK				(0x1)
+-#define WPALCON_L_W2PAL_L_SHIFT				(6)
+-#define WPALCON_L_W3PAL_L_SHIFT				(7)
+-#define WPALCON_L_W4PAL_L_SHIFT				(8)
+-
+-#define WPALCON_L_WxPAL_H_MASK				(0x3)
+-#define WPALCON_H_W2PAL_H_SHIFT				(9)
+-#define WPALCON_H_W3PAL_H_SHIFT				(13)
+-#define WPALCON_H_W4PAL_H_SHIFT				(17)
+-
+-/* Per-window alpha value registers */
+-/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
+- * for windows 1-4 alpha values consist of two parts, the 4 low bits are
+- * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
+- * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
+- */
+-#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
+-#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
+-
+-/* Only for window 0 in VIDW0ALPHAx. */
+-#define VIDW0ALPHAx_R(_x)				((_x) << 16)
+-#define VIDW0ALPHAx_R_MASK				(0xff << 16)
+-#define VIDW0ALPHAx_R_SHIFT				(16)
+-#define VIDW0ALPHAx_G(_x)				((_x) << 8)
+-#define VIDW0ALPHAx_G_MASK				(0xff << 8)
+-#define VIDW0ALPHAx_G_SHIFT				(8)
+-#define VIDW0ALPHAx_B(_x)				((_x) << 0)
+-#define VIDW0ALPHAx_B_MASK				(0xff << 0)
+-#define VIDW0ALPHAx_B_SHIFT				(0)
+-
+-/* Low 4 bits of alpha0-1 for windows 1-4 */
+-#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
+-#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
+-#define VIDW14ALPHAx_R_L_SHIFT				(16)
+-#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
+-#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
+-#define VIDW14ALPHAx_G_L_SHIFT				(8)
+-#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
+-#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
+-#define VIDW14ALPHAx_B_L_SHIFT				(0)
+-
+-
+-/* Per-window blending equation control registers */
+-#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
+-#define BLENDEQ1					(0x244)
+-#define BLENDEQ2					(0x248)
+-#define BLENDEQ3					(0x24c)
+-#define BLENDEQ4					(0x250)
+-
+-#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
+-#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
+-#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
+-#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
+-#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
+-#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
+-#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
+-#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
+-
+-#define BLENDCON					(0x260)
+-#define BLENDCON_8BIT_ALPHA				(1 << 0)
+-
+-/* Per-window palette base addresses (start of palette memory).
+- * Each window palette area consists of 256 32-bit entries.
+- * START is the first address (entry 0th), END is the address of 255th entry.
+  */
+-#define WIN0_PAL_BASE					(0x2400)
+-#define WIN0_PAL_END					(0x27fc)
+-#define WIN1_PAL_BASE					(0x2800)
+-#define WIN1_PAL_END					(0x2bfc)
+-#define WIN2_PAL_BASE					(0x2c00)
+-#define WIN2_PAL_END					(0x2ffc)
+-#define WIN3_PAL_BASE					(0x3000)
+-#define WIN3_PAL_END					(0x33fc)
+-#define WIN4_PAL_BASE					(0x3400)
+-#define WIN4_PAL_END					(0x37fc)
  
--endchoice
-+config MACH_AQUILA
-+	bool "Samsung Aquila"
-+	select CPU_S5PV210
-+	select ARCH_SPARSEMEM_ENABLE
-+	help
-+	  Machine support for the Samsung Aquila target based on S5PC110 SoC
+-#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
+-#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
+-#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
+-#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
+-#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
++#ifndef __ASM_ARCH_MACH_REGS_FB_H
++#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
  
- endif
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 370aac6..0bb1680 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -19,3 +19,4 @@ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+-static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
+-{
+-	switch (window) {
+-	case 0: return WIN0_PAL(reg);
+-	case 1: return WIN1_PAL(reg);
+-	case 2: return WIN2_PAL(reg);
+-	case 3: return WIN3_PAL(reg);
+-	case 4: return WIN4_PAL(reg);
+-	}
++#include <plat/regs-fb-v5.h>
  
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
- obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
-+obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+-	BUG();
+-}
++#define PRTCON						(0xc)
++#define PRTCON_PROTECT					(1 << 11)
+ 
+ 
+-#endif /* __ASM_ARCH_REGS_FB_H */
++#endif /* __ASM_ARCH_MACH_REGS_FB_H */
+ 
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-fb.h b/arch/arm/mach-s5pv210/include/mach/regs-fb.h
 new file mode 100644
-index 0000000..6a1db39
+index 0000000..27fa497
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -0,0 +1,100 @@
-+/* linux/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/include/mach/regs-fb.h
+@@ -0,0 +1,91 @@
++/*
++ * Copyright 2009 Samsung Electronics Co.
++ *   Pawel Osciak <p.osciak@samsung.com>
 + *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
++ * Machine-specific framebuffer definitions for Samsung S5PC110.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+*/
++ */
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
++#ifndef __ASM_ARCH_MACH_REGS_FB_H
++#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
++#include <plat/regs-fb-v5.h>
 +
-+#include <mach/map.h>
-+#include <mach/regs-clock.h>
++/* WINCONx */
++#define WINCONx_BUFSTATUS_H				(1 << 31)
++#define WINCONx_BUFSEL_H				(1 << 30)
++#define WINCONx_LIMIT_ON				(1 << 29)
++#define WINCONx_EQ709					(1 << 28)
 +
-+#include <plat/regs-serial.h>
-+#include <plat/s5pv210.h>
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
 +
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
++/* VIDCON3 */
++#define VIDCON3						(0x0c)
++#define VIDCON3_VE_ON					(1 << 20)
++#define VIDCON3_CG_ON					(1 << 18)
++#define VIDCON3_GM_ON					(1 << 16)
++#define VIDCON3_HU_CSC_F_NARROW				(1 << 14)
++#define VIDCON3_HU_CSC_F_EQ709				(1 << 13)
++#define VIDCON3_HU_CSC_F_EN				(1 << 12)
++#define VIDCON3_HU_CSC_B_NARROW				(1 << 10)
++#define VIDCON3_HU_CSC_B_EQ709				(1 << 9)
++#define VIDCON3_HU_CSC_B_EN				(1 << 8)
++#define VIDCON3_HUE_EN					(1 << 7)
++#define VIDCON3_PC_DIR_NEG				(1 << 1)
++#define VIDCON3_PC_EN					(1 << 0)
 +
-+#define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
 +
-+#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				 S5PV210_UFCON_TXTRIG4 |	\
-+				 S5PV210_UFCON_RXTRIG4)
++/* VIDTCON3 */
++#define VIDTCON3					(0x1c)
++#define VIDTCON3_VSYNC_EN				(1 << 31)
++#define VIDTCON3_FRM_EN					(1 << 29)
++#define VIDTCON3_INVFRM_LOW				(1 << 28)
++#define VIDTCON3_FRMVRATE_MASK				0xf
++#define VIDTCON3_FRMVRATE_SHIFT				(24)
++#define VIDTCON3_FRMVFPD_MASK				0xff
++#define VIDTCON3_FRMVFPD_SHIFT				(8)
++#define VIDTCON3_FRMVSPW_MASK				0xff
++#define VIDTCON3_FRMVSPW_SHIFT				(0)
 +
-+static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
-+	[0] = {
-+		.hwport		= 0,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[1] = {
-+		.hwport		= 1,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[2] = {
-+		.hwport		= 2,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+	[3] = {
-+		.hwport		= 3,
-+		.flags		= 0,
-+		.ucon		= S5PV210_UCON_DEFAULT,
-+		.ulcon		= S5PV210_ULCON_DEFAULT,
-+		.ufcon		= S5PV210_UFCON_DEFAULT,
-+	},
-+};
 +
-+static struct platform_device *aquila_devices[] __initdata = {
-+};
++#define SHADOWCON					(0x34)
++/* Set to disable window 4-0 shadow registers' update */
++#define SHADOWCON_W4_PROTECT				(1 << 14)
++#define SHADOWCON_W3_PROTECT				(1 << 13)
++#define SHADOWCON_W2_PROTECT				(1 << 12)
++#define SHADOWCON_W1_PROTECT				(1 << 11)
++#define SHADOWCON_W0_PROTECT				(1 << 10)
 +
-+static void __init aquila_map_io(void)
++
++/* Video buffer address shadow registers (read-only) */
++#define VIDW_BUF_START_SHADOW(_buf)			(0x20a0 + ((_buf) * 8))
++#define VIDW_BUF_END_SHADOW(_buf)			(0x20d0 + ((_buf) * 8))
++
++/* For windows 1-4 */
++#define WxKEY_ALPHA(_win)				(0x160 + ((_win) * 4))
++
++#define COLORGAINCON					(0x1c0)
++#define VESFRCON0					(0x1c4)
++#define VESFRCON1					(0x1c8)
++#define VESFRCON2					(0x1cc)
++
++/* Hue matrix coefficients */
++#define HUECOEF00					(0x1ec)
++#define HUECOEF01					(0x1f0)
++#define HUECOEF10					(0x1f4)
++#define HUECOEF11					(0x1f8)
++#define HUEOFFSET					(0x1fc)
++
++/* RTQOS control for windows 0-4*/
++#define WxRTQOSCON(_win)				(0x264 + ((_win) * 4))
++
++/* Gamma LUT data for index I1 and I0, where
++ * I0 = _index, I1 = _index + 1.
++ */
++#define GAMMALUT_BASE					(0x37c)
++#define GAMMALUT_I1I0(_index)			(GAMMALUT_BASE + ((_index) * 4))
++
++#endif /* __ASM_ARCH_MACH_REGS_FB_H */
++
+diff --git a/arch/arm/plat-samsung/include/plat/regs-fb-v5.h b/arch/arm/plat-samsung/include/plat/regs-fb-v5.h
+new file mode 100644
+index 0000000..0e0686d
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-fb-v5.h
+@@ -0,0 +1,138 @@
++/*
++ * Copyright 2009 Samsung Electronics Co.
++ *   Pawel Osciak <p.osciak@samsung.com>
++ *
++ * Common framebuffer register definitions for Samsung S5PC1xx family.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_REGS_FB_V5_H
++#define __ASM_ARCH_REGS_FB_V5_H __FILE__
++
++#include <plat/regs-fb-v4.h>
++
++/* VP1 interface timing control */
++#define VP1CON0						(0x118)
++#define VP1_RATECON_EN					(1 << 31)
++#define VP1_CLKRATE_MASK				(0xff)
++
++#define VP1CON1						(0x11c)
++#define VP1_VTREGCON_EN					(1 << 31)
++#define VP1_VBPD_MASK					(0xfff)
++#define VP1_VBPD_SHIFT					(16)
++
++
++#define WPALCON_H					(0x19c)
++#define WPALCON_L					(0x1a0)
++
++/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
++ * different for WPAL2-4
++ */
++/* In WPALCON_L (aka WPALCON) */
++#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
++#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
++
++/* W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
++ * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
++ */
++#define WPALCON_L_WxPAL_L_MASK				(0x1)
++#define WPALCON_L_W2PAL_L_SHIFT				(6)
++#define WPALCON_L_W3PAL_L_SHIFT				(7)
++#define WPALCON_L_W4PAL_L_SHIFT				(8)
++
++#define WPALCON_L_WxPAL_H_MASK				(0x3)
++#define WPALCON_H_W2PAL_H_SHIFT				(9)
++#define WPALCON_H_W3PAL_H_SHIFT				(13)
++#define WPALCON_H_W4PAL_H_SHIFT				(17)
++
++/* Per-window alpha value registers */
++/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
++ * for windows 1-4 alpha values consist of two parts, the 4 low bits are
++ * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
++ * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
++ */
++#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
++#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
++
++/* Only for window 0 in VIDW0ALPHAx. */
++#define VIDW0ALPHAx_R(_x)				((_x) << 16)
++#define VIDW0ALPHAx_R_MASK				(0xff << 16)
++#define VIDW0ALPHAx_R_SHIFT				(16)
++#define VIDW0ALPHAx_G(_x)				((_x) << 8)
++#define VIDW0ALPHAx_G_MASK				(0xff << 8)
++#define VIDW0ALPHAx_G_SHIFT				(8)
++#define VIDW0ALPHAx_B(_x)				((_x) << 0)
++#define VIDW0ALPHAx_B_MASK				(0xff << 0)
++#define VIDW0ALPHAx_B_SHIFT				(0)
++
++/* Low 4 bits of alpha0-1 for windows 1-4 */
++#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
++#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
++#define VIDW14ALPHAx_R_L_SHIFT				(16)
++#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
++#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
++#define VIDW14ALPHAx_G_L_SHIFT				(8)
++#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
++#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
++#define VIDW14ALPHAx_B_L_SHIFT				(0)
++
++
++/* Per-window blending equation control registers */
++#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
++#define BLENDEQ1					(0x244)
++#define BLENDEQ2					(0x248)
++#define BLENDEQ3					(0x24c)
++#define BLENDEQ4					(0x250)
++
++#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
++#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
++#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
++#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
++#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
++#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
++#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
++#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
++
++#define BLENDCON					(0x260)
++#define BLENDCON_8BIT_ALPHA				(1 << 0)
++
++/* Per-window palette base addresses (start of palette memory).
++ * Each window palette area consists of 256 32-bit entries.
++ * START is the first address (entry 0th), END is the address of 255th entry.
++ */
++#define WIN0_PAL_BASE					(0x2400)
++#define WIN0_PAL_END					(0x27fc)
++#define WIN1_PAL_BASE					(0x2800)
++#define WIN1_PAL_END					(0x2bfc)
++#define WIN2_PAL_BASE					(0x2c00)
++#define WIN2_PAL_END					(0x2ffc)
++#define WIN3_PAL_BASE					(0x3000)
++#define WIN3_PAL_END					(0x33fc)
++#define WIN4_PAL_BASE					(0x3400)
++#define WIN4_PAL_END					(0x37fc)
++
++#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
++#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
++#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
++#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
++#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
++
++static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
 +{
-+	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-+	s3c24xx_init_clocks(24000000);
-+	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
++	switch (window) {
++	case 0: return WIN0_PAL(reg);
++	case 1: return WIN1_PAL(reg);
++	case 2: return WIN2_PAL(reg);
++	case 3: return WIN3_PAL(reg);
++	case 4: return WIN4_PAL(reg);
++	}
++
++	BUG();
 +}
 +
-+static void __init aquila_machine_init(void)
-+{
-+	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
-+}
 +
-+MACHINE_START(AQUILA, "Aquila")
-+	/* Maintainers:
-+	   Marek Szyprowski <m.szyprowski@samsung.com>
-+	   Kyungmin Park <kyungmin.park@samsung.com> */
-+	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.init_irq	= s5pv210_init_irq,
-+	.map_io		= aquila_map_io,
-+	.init_machine	= aquila_machine_init,
-+	.timer		= &s3c24xx_timer,
-+MACHINE_END
++#endif /* __ASM_ARCH_REGS_FB_V5_H */
++
 -- 
 1.6.4
