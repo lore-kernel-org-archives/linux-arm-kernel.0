@@ -1,50 +1,31 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Mon, 17 May 2010 12:59:18 +0300
-Subject: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6
-	DMA cache ops
-In-Reply-To: <1274090255.6053.2.camel@e102109-lin.cambridge.arm.com>
-References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
-	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
-	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
-	<20100512184852.GC22371@n2100.arm.linux.org.uk>
-	<20100512185903.GD22371@n2100.arm.linux.org.uk>
-	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
-	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
-	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
-	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
-	<1274089860.6053.0.camel@e102109-lin.cambridge.arm.com>
-	<1274090255.6053.2.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <309002C0DA137042828828FC53D7A93492FA3137B8@IL-MB01.marvell.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 17 May 2010 11:59:55 +0200
+Subject: i.MX EHCI initialization
+In-Reply-To: <20100517093652.GP31199@pengutronix.de>
+References: <20100517093652.GP31199@pengutronix.de>
+Message-ID: <20100517095954.GQ30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sascha,
 
-
------Original Message-----
-From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
-Sent: Monday, May 17, 2010 12:58 PM
-To: Ronen Shitrit
-Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
-Subject: RE: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6 DMA cache ops
-
-On Mon, 2010-05-17 at 10:51 +0100, Catalin Marinas wrote:
-> On Sun, 2010-05-16 at 07:29 +0100, Ronen Shitrit wrote:
-> > Our ARMv6 do speculative rd for both I and D cache...
+On Mon, May 17, 2010 at 11:36:52AM +0200, Sascha Hauer wrote:
+> I see an increasing number of patches trying to change the
+> initialization sequence of the i.MX ehci controller. It's getting harder
+> and harder to keep track what the changes are, what other boards
+> and SoCs a single patch affects and whether it just reverts another
+> patch.
 > 
-> I'll check with the hardware guys here in ARM and get back to you.
+> I thought about making the initialization completely board specific and
+> creating a set of helper functions which the board can call if it wants
+> to to prevent too much code duplication.
 
-Just for clarification - is your ARMv6 MP processor an ARM11MPCore or
-your own MP variant?
-[Ronen Shitrit] our own.
+If we really need this, I'm pro adding that kind of interface, sure.
+However, at least for the MX51 stuff, altering the init order wasn't
+necessary at all eventually, and I'm not sure about other SoCs.
 
-In case of Cortex-A9 (ARMv7), the TRM states clearly that it can do
-speculative loads into the L1 D-cache and this can be disabled via a bit
-in the auxiliary control register. Do you have a similar bit on your
-ARMv6 MP processor?
-[Ronen Shitrit] Yes.
+I also didn't follow all patches in this area I fear - could you
+summarize which SoC wants it differently than the current code does it?
 
-Thanks.
-
--- 
-Catalin
+Thanks,
+Daniel
