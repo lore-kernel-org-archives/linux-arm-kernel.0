@@ -1,110 +1,72 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 17 May 2010 14:26:12 +0800
-Subject: [PATCH] NUC900/audio: add nuc900 audio driver support
-In-Reply-To: <20100517024425.GA2485@opensource.wolfsonmicro.com>
-References: <4BF01069.6060102@gmail.com>
-	<20100517024425.GA2485@opensource.wolfsonmicro.com>
-Message-ID: <4BF0E184.204@gmail.com>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Mon, 17 May 2010 09:29:35 +0300
+Subject: [PATCH 2/8] ARM: Implement read/write for ownership in	theARMv6
+	DMA cache ops
+In-Reply-To: <20100516150117.GC23961@n2100.arm.linux.org.uk>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164426.26355.19161.stgit@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA312B64@IL-MB01.marvell.com>
+	<1273672539.23818.96.camel@e102109-lin.cambridge.arm.com>
+	<20100512184852.GC22371@n2100.arm.linux.org.uk>
+	<20100512185903.GD22371@n2100.arm.linux.org.uk>
+	<1273699275.16677.10.camel@e102109-lin.cambridge.arm.com>
+	<093A0EAA-42DF-4C72-BAC2-617B25A9165F@marvell.com>
+	<1273739217.30713.6.camel@e102109-lin.cambridge.arm.com>
+	<309002C0DA137042828828FC53D7A93492FA3132B2@IL-MB01.marvell.com>
+	<20100516150117.GC23961@n2100.arm.linux.org.uk>
+Message-ID: <309002C0DA137042828828FC53D7A93492FA31362D@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Got it, thanks.
 
-Dear Mark,
+This is my patch over Catalin original patch for v6_dma_inv_range
 
-Thanks a lot for your help, and I have other questions needed your help below.
+--- cache-v6.S	2010-05-17 08:12:18.000000000 +0300
++++ cache-v6.S	2010-05-17 08:16:16.000000000 +0300
+@@ -210,9 +210,15 @@
+ #else
+ 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
+ #endif
+-1:
+ #ifdef CONFIG_SMP
+-	str	r0, [r0]			@ write for ownership
++	mrs	r2, cpsr
++	orr	r3, r2, #PSR_F_BIT | PSR_I_BIT
++	msr	cpsr_c, r3                      @ Disable interrupts
++1:
++	ldr	r2, [r0]                        @ read for ownership
++	str	r2, [r0]                        @ write for ownership
++#else
++1:
+ #endif
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
+@@ -222,6 +228,9 @@
+ 	add	r0, r0, #D_CACHE_LINE_SIZE
+ 	cmp	r0, r1
+ 	blo	1b
++#ifdef CONFIG_SMP
++	msr	cpsr_c, r2                      @ Restore interrupts
++#endif
+ 	mov	r0, #0
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+ 	mov	pc, lr
 
-> On Sun, May 16, 2010 at 11:34:01PM +0800, Wan ZongShun wrote:
-> 
-> This all looks pretty good.  A few comments below but they're all fairly
-> minor and should be easy to address.
-> 
->> index b1749bc..81d4848 100644
->> --- a/sound/soc/Kconfig
->> +++ b/sound/soc/Kconfig
->> @@ -36,6 +36,7 @@ source "sound/soc/s3c24xx/Kconfig"
->>  source "sound/soc/s6000/Kconfig"
->>  source "sound/soc/sh/Kconfig"
->>  source "sound/soc/txx9/Kconfig"
->> +source "sound/soc/nuc900/Kconfig"
-> 
-> Please keep the Kconfig and Makefile sorted, this helps avoid merge
-> issues.
-> 
->> +#define NUC900_AC97_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
->> +			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |\
->> +				SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
-> 
-> SNDRV_PCM_RATE_8000_48000.
-> 
->> +	if (!timeout)
->> +		dev_err(nuc900_audio->dev, "AC97 read register time out !\n");
->> +
->> +	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACOS0) ;
-> 
-> If the read timed out shouldn't we be returning rather than continuing?
-> 
->> +	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACCON);
->> +	val &= (~AC_C_RES);
->> +	AUDIO_WRITE(nuc900_audio->mmio + ACTL_ACCON, val);
-> 
->> +	udelay(1000);
-> 
->> +	if (!(AUDIO_READ(nuc900_audio->mmio + ACTL_ACIS0) & CODEC_READY))
->> +		dev_err(nuc900_audio->dev, "AC97 codec cold reset failed!\n");
-> 
-> What is this actually checking in the hardware?  Not all CODECs enable
-> the AC97 link by default after a cold reset, the standard allows them to
-> power up in a low power state which will
 
-The bit 'CODEC_READY' indicates the external AC97 audio CODEC is ready,
-I just forget to implement the warm reset operation, if need, I will do
-it. In addition, Can I add the checking CODEC_READY operation to warm reset 
-function?
 
-> On the other hand, given that there's no warm reset operation perhaps
-> this isn't a big deal.
-> 
->> +static void nuc900_ac97_remove(struct platform_device *pdev,
->> +						struct snd_soc_dai *dai)
->> +{
->> +	struct nuc900_audio *nuc900_audio = nuc900_ac97_data;
->> +
->> +	/* Enable unit clock */
->> +	clk_disable(nuc900_audio->clk);
-> 
-> Bit rot in the comments here.
-> 
->> +/* bit definition of REG_ACTL_CON register */
->> +#define	AUDCLK_EN		0x8000
->> +#define	PFIFO_EN		0x4000
->> +#define	RFIFO_EN		0x2000
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Sunday, May 16, 2010 6:01 PM
+To: Ronen Shitrit
+Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 2/8] ARM: Implement read/write for ownership in theARMv6 DMA cache ops
 
-I rechecked the latest datasheet, and I find above bits has been removed,
-so I delete them here.
+On Sun, May 16, 2010 at 09:29:47AM +0300, Ronen Shitrit wrote:
+> Our ARMv6 do speculative rd for both I and D cache...
 
-> These constants (and the rest) really should be namespaced - they're
-> likely to collide with other definitions in, for example, CODEC drivers
-> used by machines.
-> 
->> +#define	IIS_EN			0x0002
->
-> Looks like there's I2S support to come?
-> 
+That means doing this read-write for ownership trick can lead to
+corrupted data on your CPU, since the CPU may prefetch data from
+the DMA buffer before the unmap has happened.
 
-Yes,nuc900 supports both IIS and AC97,but my board only enable AC97 support,
-what's up here?
-
->> +static irqreturn_t nuc900_dma_interrupt(int irq, void *dev_id)
->> +{
-> 
->> +
->> +	snd_pcm_period_elapsed(substream);
->> +
->> +	return IRQ_HANDLED;
-> 
-> This is done unconditionally - are you sure there can't be any spurious
-> interrupts (eg, error interrupts).  It shouldn't cause any harm, of
-> course.
-> 
-
-Wan .(Vincent)
+This means Catalin's patch is unsafe for your situation.
