@@ -1,26 +1,110 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 17 May 2010 08:21:45 +0200
-Subject: [PATCH] SPI: fix up some PL022 confusion
-In-Reply-To: <AANLkTil25g0DEafaicc_fShwz9gpF8Dl9NgyG6E0wu-r@mail.gmail.com>
-References: <1273051695-32251-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTil25g0DEafaicc_fShwz9gpF8Dl9NgyG6E0wu-r@mail.gmail.com>
-Message-ID: <AANLkTinsCSb_k3y8iqk4nJ5793SNeg-uBA7Ac95nuNsu@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Mon, 17 May 2010 14:26:12 +0800
+Subject: [PATCH] NUC900/audio: add nuc900 audio driver support
+In-Reply-To: <20100517024425.GA2485@opensource.wolfsonmicro.com>
+References: <4BF01069.6060102@gmail.com>
+	<20100517024425.GA2485@opensource.wolfsonmicro.com>
+Message-ID: <4BF0E184.204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/11 Linus Walleij <linus.ml.walleij@gmail.com>:
-> 2010/5/5 Linus Walleij <linus.walleij@stericsson.com>:
->
->> The PL022 SPI driver did not cleanly separate between the
->> original unmodified ARM version and the ST Microelectronics
->> versions. Split this more cleanly and fix some whitespace
->> moaning from checkpatch at the same time.
->
-> Grant/David have you had time to look at these two PL022
-> patches?
 
-Still travelling? I'm just worrying that if I have to make any updates
-for the merge tree I need some slack... sorry for hammering.
+Dear Mark,
 
-Yours,
-Linus Walleij
+Thanks a lot for your help, and I have other questions needed your help below.
+
+> On Sun, May 16, 2010 at 11:34:01PM +0800, Wan ZongShun wrote:
+> 
+> This all looks pretty good.  A few comments below but they're all fairly
+> minor and should be easy to address.
+> 
+>> index b1749bc..81d4848 100644
+>> --- a/sound/soc/Kconfig
+>> +++ b/sound/soc/Kconfig
+>> @@ -36,6 +36,7 @@ source "sound/soc/s3c24xx/Kconfig"
+>>  source "sound/soc/s6000/Kconfig"
+>>  source "sound/soc/sh/Kconfig"
+>>  source "sound/soc/txx9/Kconfig"
+>> +source "sound/soc/nuc900/Kconfig"
+> 
+> Please keep the Kconfig and Makefile sorted, this helps avoid merge
+> issues.
+> 
+>> +#define NUC900_AC97_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+>> +			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |\
+>> +				SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
+> 
+> SNDRV_PCM_RATE_8000_48000.
+> 
+>> +	if (!timeout)
+>> +		dev_err(nuc900_audio->dev, "AC97 read register time out !\n");
+>> +
+>> +	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACOS0) ;
+> 
+> If the read timed out shouldn't we be returning rather than continuing?
+> 
+>> +	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACCON);
+>> +	val &= (~AC_C_RES);
+>> +	AUDIO_WRITE(nuc900_audio->mmio + ACTL_ACCON, val);
+> 
+>> +	udelay(1000);
+> 
+>> +	if (!(AUDIO_READ(nuc900_audio->mmio + ACTL_ACIS0) & CODEC_READY))
+>> +		dev_err(nuc900_audio->dev, "AC97 codec cold reset failed!\n");
+> 
+> What is this actually checking in the hardware?  Not all CODECs enable
+> the AC97 link by default after a cold reset, the standard allows them to
+> power up in a low power state which will
+
+The bit 'CODEC_READY' indicates the external AC97 audio CODEC is ready,
+I just forget to implement the warm reset operation, if need, I will do
+it. In addition, Can I add the checking CODEC_READY operation to warm reset 
+function?
+
+> On the other hand, given that there's no warm reset operation perhaps
+> this isn't a big deal.
+> 
+>> +static void nuc900_ac97_remove(struct platform_device *pdev,
+>> +						struct snd_soc_dai *dai)
+>> +{
+>> +	struct nuc900_audio *nuc900_audio = nuc900_ac97_data;
+>> +
+>> +	/* Enable unit clock */
+>> +	clk_disable(nuc900_audio->clk);
+> 
+> Bit rot in the comments here.
+> 
+>> +/* bit definition of REG_ACTL_CON register */
+>> +#define	AUDCLK_EN		0x8000
+>> +#define	PFIFO_EN		0x4000
+>> +#define	RFIFO_EN		0x2000
+
+I rechecked the latest datasheet, and I find above bits has been removed,
+so I delete them here.
+
+> These constants (and the rest) really should be namespaced - they're
+> likely to collide with other definitions in, for example, CODEC drivers
+> used by machines.
+> 
+>> +#define	IIS_EN			0x0002
+>
+> Looks like there's I2S support to come?
+> 
+
+Yes,nuc900 supports both IIS and AC97,but my board only enable AC97 support,
+what's up here?
+
+>> +static irqreturn_t nuc900_dma_interrupt(int irq, void *dev_id)
+>> +{
+> 
+>> +
+>> +	snd_pcm_period_elapsed(substream);
+>> +
+>> +	return IRQ_HANDLED;
+> 
+> This is done unconditionally - are you sure there can't be any spurious
+> interrupts (eg, error interrupts).  It shouldn't cause any harm, of
+> course.
+> 
+
+Wan .(Vincent)
