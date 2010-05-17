@@ -1,51 +1,51 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 17 May 2010 16:02:49 +0530
-Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with
-	ARM	CortexA9
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
-References: <1274090321-14665-1-git-send-email-viresh.kumar@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C558B841@dbde02.ent.ti.com>
-Message-ID: <4BF11B51.7000808@st.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 17 May 2010 12:33:42 +0200
+Subject: [PATCH V2 5/6] arm/mx25: add watchdog device
+In-Reply-To: <20100517094925.GT31199@pengutronix.de>
+References: <20100517094925.GT31199@pengutronix.de>
+Message-ID: <1274092423-16644-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/17/2010 3:49 PM, Shilimkar, Santosh wrote:
-> <snip>
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
->> Sent: Monday, May 17, 2010 3:29 PM
->> To: linux-arm-kernel at lists.infradead.org
->> Cc: armando.visconti at st.com; shiraz.hashim at st.com; Viresh Kumar; linus.walleij at stericsson.com
->> Subject: [PATCH Resend] Watchdog: Adding support for Watchdog found with ARM CortexA9
->>
->> Watchdog details can be found in ARM Cortex A9 reference manual at:
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407e/indix.html
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
->>  drivers/watchdog/Kconfig        |    7 +
->>  drivers/watchdog/Makefile       |    1 +
->>  drivers/watchdog/cortexa9_wdt.c |  414 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 422 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/watchdog/cortexa9_wdt.c
->>
->> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->> index 0bf5020..b5c0f6f 100644
->> --- a/drivers/watchdog/Kconfig
->> +++ b/drivers/watchdog/Kconfig
->> @@ -73,6 +73,13 @@ config WM8350_WATCHDOG
->>
->>  # ARM Architecture
->>
->> +config ARM_CORTEXA9_WATCHDOG
->> +	tristate "ARM CortexA9 Watchdog"
->> +	depends on ARM_AMBA
-> 
-> What is the ARM_AMBA dependency with CA-9 watchdog?
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Tested-by: Juergen Beisert <jbe@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx25/devices.c |   15 +++++++++++++++
+ arch/arm/mach-mx25/devices.h |    1 +
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-Not really on amba, rather on ARM. Or CPU_V7 (cortex related)?
-Maybe some other ARM core also have similar design,
-so can keep it dependent on ARM. Does this looks fine?
-
-viresh
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index 3f4b8a0..3a405fa 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -500,3 +500,18 @@ struct platform_device mx25_fb_device = {
+ 		.coherent_dma_mask = 0xFFFFFFFF,
+ 	},
+ };
++
++static struct resource mxc_wdt_resources[] = {
++	{
++		.start = MX25_WDOG_BASE_ADDR,
++		.end = MX25_WDOG_BASE_ADDR + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++};
++
++struct platform_device mxc_wdt = {
++	.name = "imx2-wdt",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_wdt_resources),
++	.resource = mxc_wdt_resources,
++};
+diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
+index 39560e1..cee12c0 100644
+--- a/arch/arm/mach-mx25/devices.h
++++ b/arch/arm/mach-mx25/devices.h
+@@ -21,3 +21,4 @@ extern struct platform_device mx25_fec_device;
+ extern struct platform_device mxc_nand_device;
+ extern struct platform_device mx25_rtc_device;
+ extern struct platform_device mx25_fb_device;
++extern struct platform_device mxc_wdt;
+-- 
+1.7.0
