@@ -1,61 +1,74 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 17 May 2010 08:22:35 +0100
-Subject: [PATCH 3/6] ARM: S3C24XX: Start cleanup of GPIO numbering
+Date: Mon, 17 May 2010 08:22:34 +0100
+Subject: [PATCH 2/6] ARM: S3C244X: fix gpiolib port J support
 In-Reply-To: <1274080958-369-1-git-send-email-ben-linux@fluff.org>
 References: <1274080958-369-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1274080958-369-3-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274080958-369-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Start cleaning up the numbering of GPIO banks by removing the old
-bank start definitions currently being used by some of the header
-files.
+From: Vasily Khoruzhick <anarsoul@gmail.com>
 
+Increase GPIOs number for S3C244X, and make S3C_GPIO_END
+point to BANKJ end, otherwise gpiolib refuses to register
+BANKJ
+
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2410/include/mach/gpio-nrs.h |    5 -----
- arch/arm/mach-s3c2412/gpio.c                  |    8 ++++----
- 2 files changed, 4 insertions(+), 9 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/gpio-track.h |    2 +-
+ arch/arm/mach-s3c2410/include/mach/gpio.h       |    8 ++++++++
+ arch/arm/plat-samsung/pm-gpio.c                 |    2 +-
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-index f3182ff..ad94e1a 100644
---- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-+++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
-@@ -16,12 +16,7 @@
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-track.h b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+index acb2591..6371eaa 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio-track.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio-track.h
+@@ -23,7 +23,7 @@ static inline struct s3c_gpio_chip *s3c_gpiolib_getchip(unsigned int pin)
+ {
+ 	struct s3c_gpio_chip *chip;
  
- #define S3C2410_GPIONO(bank,offset) ((bank) + (offset))
+-	if (pin > S3C2410_GPG(10))
++	if (pin > S3C_GPIO_END)
+ 		return NULL;
  
--#define S3C2410_GPIO_BANKA   (32*0)
--#define S3C2410_GPIO_BANKB   (32*1)
- #define S3C2410_GPIO_BANKC   (32*2)
--#define S3C2410_GPIO_BANKD   (32*3)
--#define S3C2410_GPIO_BANKE   (32*4)
--#define S3C2410_GPIO_BANKF   (32*5)
- #define S3C2410_GPIO_BANKG   (32*6)
- #define S3C2410_GPIO_BANKH   (32*7)
+ 	chip = &s3c24xx_gpios[pin/32];
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-s3c2410/include/mach/gpio.h
+index 15f0b3e..b649bf2 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+@@ -20,10 +20,18 @@
+  * devices that need GPIO.
+  */
  
-diff --git a/arch/arm/mach-s3c2412/gpio.c b/arch/arm/mach-s3c2412/gpio.c
-index f7afece..71c5793 100644
---- a/arch/arm/mach-s3c2412/gpio.c
-+++ b/arch/arm/mach-s3c2412/gpio.c
-@@ -33,14 +33,14 @@ int s3c2412_gpio_set_sleepcfg(unsigned int pin, unsigned int state)
++#ifdef CONFIG_CPU_S3C244X
++#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
++#else
+ #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
++#endif
  
- 	offs *= 2;
+ #include <asm-generic/gpio.h>
+ #include <mach/gpio-nrs.h>
+ #include <mach/gpio-fns.h>
  
--	if (pin < S3C2410_GPIO_BANKB)
-+	if (pin < S3C2410_GPB(0))
- 		return -EINVAL;
++#ifdef CONFIG_CPU_S3C24XX
++#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
++#else
+ #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
++#endif
+diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+index 69a4c7f..1aac746 100644
+--- a/arch/arm/plat-samsung/pm-gpio.c
++++ b/arch/arm/plat-samsung/pm-gpio.c
+@@ -343,7 +343,7 @@ void s3c_pm_save_gpios(void)
+ 			  ourchip->pm_save[2],
+ 			  ourchip->pm_save[3]);
  
--	if (pin >= S3C2410_GPIO_BANKF &&
--	    pin <= S3C2410_GPIO_BANKG)
-+	if (pin >= S3C2410_GPF(0) &&
-+	    pin <= S3C2410_GPG(16))
- 		return -EINVAL;
- 
--	if (pin > (S3C2410_GPIO_BANKH + 32))
-+	if (pin > S3C2410_GPH(16))
- 		return -EINVAL;
- 
- 	local_irq_save(flags);
+-		gpio_nr += ourchip->chip.ngpio;
++		gpio_nr += ourchip->chip.ngpio - 1;
+ 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+ 	}
+ }
 -- 
 1.6.3.3
