@@ -1,86 +1,185 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 May 2010 09:38:44 +0900
-Subject: [PATCH 09/18] ARM: S5PV210: Fix clk_get_rate issue with the clk_h100
-	clock
-Message-ID: <1274056724-14482-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 17 May 2010 09:39:05 +0900
+Subject: [PATCH 17/18] ARM: S5PV210: Add 'clock source gate' clock definitions
+Message-ID: <1274056745-14746-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-The clk_h100 clock represents the IMEM clock for the MSYS domain.
-This clock rate of this clock is always half of the hclk_msys clock.
-There is an issue when getting the clock rate of the clk_h100 clock
-(clock get_rate hclk_h100 always returns clock rate that is equal to
-the hclk_msys clock rate).
+The non-glitch-free clock muxes can suffer from glitches when changing
+clock sources. It is recommended to disable the output of non-glitch-
+free muxes before trying to change the clock source. After clock change
+is complete, the non-glitch-free clock can be re-enabled.
 
-This patch modifies the following.
-
-1. Moves the definition of the clk_h100 clock into the 'init_clocks'
-   list with the appropriate parent, ctrlbit, enable and ops fields.
-
-2. The name of the clock is changed from 'clk_h100' to 'hclk_imem'
-   to represent more clearly that is represents the IMEM clock in
-   the MSYS domain.
-
-3. The function to get the clock rate of the hclk_imem clock is added.
+These clocks are added to the list of clocks to be enabled at boot time.
+Device drivers that need to disable the non-glitch-free mux output clock
+can 'clk_get' these clocks, disable them, change the clock selection
+of the mux and then re-enable the non-glitch-free mux output.
 
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/clock.c |   22 ++++++++++++++++------
- 1 files changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/mach-s5pv210/clock.c |  140 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 140 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index 4791642..527c9c4 100644
+index 154bca4..a2c3ab5 100644
 --- a/arch/arm/mach-s5pv210/clock.c
 +++ b/arch/arm/mach-s5pv210/clock.c
-@@ -155,11 +155,6 @@ static int s5pv210_clk_ip3_ctrl(struct clk *clk, int enable)
- 	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
+@@ -183,6 +183,11 @@ static int s5pv210_clk_mask0_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
  }
  
--static struct clk clk_h100 = {
--	.name		= "hclk100",
--	.id		= -1,
--};
--
- static struct clk clk_p83 = {
- 	.name		= "pclk83",
- 	.id		= -1,
-@@ -171,11 +166,19 @@ static struct clk clk_p66 = {
- };
- 
- static struct clk *sys_clks[] = {
--	&clk_h100,
- 	&clk_p83,
- 	&clk_p66
- };
- 
-+static unsigned long s5pv210_clk_imem_get_rate(struct clk *clk)
++static int s5pv210_clk_mask1_ctrl(struct clk *clk, int enable)
 +{
-+	return clk_get_rate(clk->parent) / 2;
++	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
 +}
 +
-+static struct clk_ops clk_hclk_imem_ops = {
-+	.get_rate	= s5pv210_clk_imem_get_rate,
-+};
-+
- static struct clk init_clocks_disable[] = {
- 	{
- 		.name		= "rot",
-@@ -326,6 +329,13 @@ static struct clk init_clocks_disable[] = {
- 
- static struct clk init_clocks[] = {
- 	{
-+		.name		= "hclk_imem",
-+		.id		= -1,
-+		.parent		= &clk_hclk_msys.clk,
-+		.ctrlbit	= (1 << 5),
-+		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ops		= &clk_hclk_imem_ops,
+ static struct clk clk_sclk_hdmi27m = {
+ 	.name		= "sclk_hdmi27m",
+ 	.id		= -1,
+@@ -448,6 +453,141 @@ static struct clk init_clocks[] = {
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<10),
 +	}, {
- 		.name		= "uart",
- 		.id		= 0,
- 		.parent		= &clk_p66,
++		.name		= "mout_hdmi",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "mout_mixer",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "mout_dac",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "mout_cam",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "mout_cam",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= "mout_fimd",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 5),
++	}, {
++		.name		= "mout_csis",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 6),
++	}, {
++		.name		= "mout_finvpll",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 7),
++	}, {
++		.name		= "mout_mmc",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= "mout_mmc",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
++		.name		= "mout_mmc",
++		.id		= 2,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= "mout_mmc",
++		.id		= 3,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= "mout_uart",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 12),
++	}, {
++		.name		= "mout_uart",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 13),
++	}, {
++		.name		= "mout_uart",
++		.id		= 2,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 14),
++	}, {
++		.name		= "mout_uart",
++		.id		= 3,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 15),
++	}, {
++		.name		= "mout_spi",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 16),
++	}, {
++		.name		= "mout_spi",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 17),
++	}, {
++		.name		= "mout_pwm",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 19),
++	}, {
++		.name		= "mout_audio",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "mout_audio",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 25),
++	}, {
++		.name		= "mout_audio",
++		.id		= 2,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
++		.name		= "mout_spdif",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 27),
++	}, {
++		.name		= "mout_pwi",
++		.id		= -1,
++		.enable		= s5pv210_clk_mask0_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "mout_fimc",
++		.id		= 0,
++		.enable		= s5pv210_clk_mask1_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "mout_fimc",
++		.id		= 1,
++		.enable		= s5pv210_clk_mask1_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "mout_fimc",
++		.id		= 2,
++		.enable		= s5pv210_clk_mask1_ctrl,
++		.ctrlbit	= (1 << 4),
+ 	},
+ };
+ 
 -- 
 1.6.2.5
