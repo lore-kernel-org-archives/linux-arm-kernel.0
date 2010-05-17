@@ -1,26 +1,209 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 17 May 2010 11:07:37 +1000
-Subject: [PATCH] phy/marvell: Add special settings for D-Link DNS-323
-	rev C1
-In-Reply-To: <20100517005942.GB27301@pengutronix.de>
-References: <1274056058.21352.697.camel@pasglop>
-	<20100517005942.GB27301@pengutronix.de>
-Message-ID: <1274058457.21352.711.camel@pasglop>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 17 May 2010 02:09:20 +0100
+Subject: [PATCH 17/18] ARM: S5PV210: Add 'clock source gate' clock
+	definitions
+In-Reply-To: <1274056745-14746-1-git-send-email-kgene.kim@samsung.com>
+References: <1274056745-14746-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100517010920.GW6684@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-17 at 02:59 +0200, Wolfram Sang wrote:
-> There is a fixup()-callback to prevent boardcode in the drivers. See
-> Documentation/networking/phy.txt, last chapter.
+On Mon, May 17, 2010 at 09:39:05AM +0900, Kukjin Kim wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> The non-glitch-free clock muxes can suffer from glitches when changing
+> clock sources. It is recommended to disable the output of non-glitch-
+> free muxes before trying to change the clock source. After clock change
+> is complete, the non-glitch-free clock can be re-enabled.
+> 
+> These clocks are added to the list of clocks to be enabled at boot time.
+> Device drivers that need to disable the non-glitch-free mux output clock
+> can 'clk_get' these clocks, disable them, change the clock selection
+> of the mux and then re-enable the non-glitch-free mux output.
 
-Ah nice ! I missed that bit. I'll add a fixup and see if it works.
+Hmm, this is something we may have to get into the clock layer itself
+and keep away from the drivers involved. Can these clocks be hard connected
+to their sources?
 
-The problem is that writing to this register seems to be part of a
-specific initialization sequence, which is done one way in the linux
-driver and differently in the vendor kernel. I don't know whether
-I can just 'override' the value and I have no docs for that part.
+At least putting some form of comment in with the clock addition to note
+that there is this problem would be useful.
 
-But I'll definitely give it a go tonight.
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/clock.c |  140 +++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 140 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index 154bca4..a2c3ab5 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -183,6 +183,11 @@ static int s5pv210_clk_mask0_ctrl(struct clk *clk, int enable)
+>  	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
+>  }
+>  
+> +static int s5pv210_clk_mask1_ctrl(struct clk *clk, int enable)
+> +{
+> +	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
+> +}
+> +
+>  static struct clk clk_sclk_hdmi27m = {
+>  	.name		= "sclk_hdmi27m",
+>  	.id		= -1,
+> @@ -448,6 +453,141 @@ static struct clk init_clocks[] = {
+>  		.parent		= &clk_pclk_psys.clk,
+>  		.enable		= s5pv210_clk_ip3_ctrl,
+>  		.ctrlbit	= (1<<10),
+> +	}, {
+> +		.name		= "mout_hdmi",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 0),
+> +	}, {
+> +		.name		= "mout_mixer",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 1),
+> +	}, {
+> +		.name		= "mout_dac",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "mout_cam",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	}, {
+> +		.name		= "mout_cam",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 4),
+> +	}, {
+> +		.name		= "mout_fimd",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 5),
+> +	}, {
+> +		.name		= "mout_csis",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 6),
+> +	}, {
+> +		.name		= "mout_finvpll",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 7),
+> +	}, {
+> +		.name		= "mout_mmc",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 8),
+> +	}, {
+> +		.name		= "mout_mmc",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 9),
+> +	}, {
+> +		.name		= "mout_mmc",
+> +		.id		= 2,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 10),
+> +	}, {
+> +		.name		= "mout_mmc",
+> +		.id		= 3,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 11),
+> +	}, {
+> +		.name		= "mout_uart",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 12),
+> +	}, {
+> +		.name		= "mout_uart",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 13),
+> +	}, {
+> +		.name		= "mout_uart",
+> +		.id		= 2,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 14),
+> +	}, {
+> +		.name		= "mout_uart",
+> +		.id		= 3,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 15),
+> +	}, {
+> +		.name		= "mout_spi",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 16),
+> +	}, {
+> +		.name		= "mout_spi",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 17),
+> +	}, {
+> +		.name		= "mout_pwm",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 19),
+> +	}, {
+> +		.name		= "mout_audio",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 24),
+> +	}, {
+> +		.name		= "mout_audio",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 25),
+> +	}, {
+> +		.name		= "mout_audio",
+> +		.id		= 2,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 26),
+> +	}, {
+> +		.name		= "mout_spdif",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 27),
+> +	}, {
+> +		.name		= "mout_pwi",
+> +		.id		= -1,
+> +		.enable		= s5pv210_clk_mask0_ctrl,
+> +		.ctrlbit	= (1 << 29),
+> +	}, {
+> +		.name		= "mout_fimc",
+> +		.id		= 0,
+> +		.enable		= s5pv210_clk_mask1_ctrl,
+> +		.ctrlbit	= (1 << 2),
+> +	}, {
+> +		.name		= "mout_fimc",
+> +		.id		= 1,
+> +		.enable		= s5pv210_clk_mask1_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	}, {
+> +		.name		= "mout_fimc",
+> +		.id		= 2,
+> +		.enable		= s5pv210_clk_mask1_ctrl,
+> +		.ctrlbit	= (1 << 4),
+>  	},
+>  };
+>  
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Cheers,
-Ben.
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
