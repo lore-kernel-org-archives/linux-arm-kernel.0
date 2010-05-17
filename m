@@ -1,57 +1,79 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 17 May 2010 20:14:52 +0200
-Subject: [PATCH 1/2] MX3X: Add Keypad device definition for MX3X arch
-Message-ID: <1274120092.3578.34.camel@realization>
+Date: Mon, 17 May 2010 20:20:14 +0200
+Subject: [PATCH 2/2] mx31_3ds: Support the keypad situated in the
+	personality board
+In-Reply-To: <1274120092.3578.34.camel@realization>
+References: <1274120092.3578.34.camel@realization>
+Message-ID: <1274120414.3578.36.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+
 Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
 ---
-This patch is against the today mxc-master HEAD
 
- arch/arm/mach-mx3/devices.c |   19 +++++++++++++++++++
- arch/arm/mach-mx3/devices.h |    1 +
- 2 files changed, 20 insertions(+), 0 deletions(-)
+this patch is built over the today mxc-master branch 
 
-diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-index 1ffed28..57b0541 100644
---- a/arch/arm/mach-mx3/devices.c
-+++ b/arch/arm/mach-mx3/devices.c
-@@ -607,6 +607,25 @@ struct platform_device imx_rtc_device0 = {
- 	.resource       = imx_rtc_resources,
+ arch/arm/mach-mx3/mach-mx31_3ds.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index 55d6117..745675b 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -28,6 +28,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/fsl_devices.h>
++#include <linux/input/matrix_keypad.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -82,6 +83,35 @@ static int mx31_3ds_pins[] = {
+ 	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+ 	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
+ 	MX31_PIN_USBOTG_STP__USBOTG_STP,
++	/*Keyboard*/
++	IOMUX_MODE(MX31_PIN_KEY_ROW0, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_ROW1, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_COL0, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_COL1, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_COL2, IOMUX_CONFIG_FUNC),
++	IOMUX_MODE(MX31_PIN_KEY_COL3, IOMUX_CONFIG_FUNC),
++};
++
++/*
++ * Matrix keyboard
++ */
++
++static const uint32_t mx31_3ds_keymap[] = {
++	KEY(0, 0, KEY_UP),
++	KEY(0, 1, KEY_DOWN),
++	KEY(1, 0, KEY_RIGHT),
++	KEY(1, 1, KEY_LEFT),
++	KEY(1, 2, KEY_ENTER),
++	KEY(2, 0, KEY_F6),
++	KEY(2, 1, KEY_F8),
++	KEY(2, 2, KEY_F9),
++	KEY(2, 3, KEY_F10),
++};
++
++static struct matrix_keymap_data mx31_3ds_keymap_data = {
++	.keymap		= mx31_3ds_keymap,
++	.keymap_size	= ARRAY_SIZE(mx31_3ds_keymap),
  };
  
-+static struct resource imx_kpp_resources[] = {
-+	{
-+		.start	= MX3x_KPP_BASE_ADDR,
-+		.end	= MX3x_KPP_BASE_ADDR + 0xf,
-+		.flags	= IORESOURCE_MEM
-+	}, {
-+		.start	= MX3x_INT_KPP,
-+		.end	= MX3x_INT_KPP,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
+ /* Regulators */
+@@ -367,6 +397,8 @@ static void __init mxc_board_init(void)
+ 	spi_register_board_info(mx31_3ds_spi_devs,
+ 						ARRAY_SIZE(mx31_3ds_spi_devs));
+ 
++	mxc_register_device(&imx_kpp_device, &mx31_3ds_keymap_data);
 +
-+struct platform_device imx_kpp_device = {
-+	.name = "imx-keypad",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(imx_kpp_resources),
-+	.resource = imx_kpp_resources,
-+};
-+
- static int __init mx3_devices_init(void)
- {
- 	if (cpu_is_mx31()) {
-diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
-index b1687ad..2c3c864 100644
---- a/arch/arm/mach-mx3/devices.h
-+++ b/arch/arm/mach-mx3/devices.h
-@@ -28,3 +28,4 @@ extern struct platform_device imx_ssi_device1;
- extern struct platform_device imx_ssi_device1;
- extern struct platform_device imx_wdt_device0;
- extern struct platform_device imx_rtc_device0;
-+extern struct platform_device imx_kpp_device;
+ 	mx31_3ds_usbotg_init();
+ 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
+ 
 -- 
 1.6.3.3
