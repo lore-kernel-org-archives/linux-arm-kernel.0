@@ -1,546 +1,362 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 May 2010 21:02:42 +0200
-Subject: [PATCH 1/2] mc13783: add LED support
-In-Reply-To: <1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20100517190242.GA17604@pengutronix.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 17 May 2010 12:23:54 -0700
+Subject: async_tx.git updated
+Message-ID: <1274124234.24802.18.camel@dwillia2-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+Below is my current patch queue.  The primary standouts are Linus'
+primecell api patches (pending an evaluation of their suitability for
+Versatile-muxing and the conversion of dma_set_amba_config() to use an
+extended version of the ->device_control() method) and Jassi's pl330 dma
+driver (pending the merge of Russell's queue which has the base
+infrastructure).
 
-On Mon, May 17, 2010 at 06:40:22PM +0200, Philippe R?tornaz wrote:
-> This adds basic led support for Freescale MC13783 PMIC.
-> 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  drivers/leds/Kconfig        |    7 +
->  drivers/leds/Makefile       |    1 +
->  drivers/leds/leds-mc13783.c |  375 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/mfd/mc13783-core.c  |    4 +
->  include/linux/mfd/mc13783.h |   68 ++++++++
->  5 files changed, 455 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/leds/leds-mc13783.c
-> 
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 505eb64..706386c 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -285,6 +285,13 @@ config LEDS_DELL_NETBOOKS
->  	  This adds support for the Latitude 2100 and similar
->  	  notebooks that have an external LED.
->  
-> +config LEDS_MC13783
-> +	tristate "LED Support for MC13783 PMIC"
-> +	depends on MFD_MC13783
-> +	help
-> +	  This option enable support for on-chip LED drivers found
-> +	  on Freescale Semiconductor MC13783 PMIC.
-> +
->  config LEDS_TRIGGERS
->  	bool "LED Trigger support"
->  	help
-> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-> index 0cd8b99..d084e3b 100644
-> --- a/drivers/leds/Makefile
-> +++ b/drivers/leds/Makefile
-> @@ -35,6 +35,7 @@ obj-$(CONFIG_LEDS_INTEL_SS4200)		+= leds-ss4200.o
->  obj-$(CONFIG_LEDS_LT3593)		+= leds-lt3593.o
->  obj-$(CONFIG_LEDS_ADP5520)		+= leds-adp5520.o
->  obj-$(CONFIG_LEDS_DELL_NETBOOKS)	+= dell-led.o
-> +obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
->  
->  # LED SPI Drivers
->  obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
-> diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13783.c
-> new file mode 100644
-> index 0000000..c0427fd
-> --- /dev/null
-> +++ b/drivers/leds/leds-mc13783.c
-> @@ -0,0 +1,375 @@
-> +/*
-> + * LEDs driver for Freescale MC13783
-> + *
-> + * Copyright (C) 2010 Philippe R?tornaz
-> + *
-> + * Based on leds-da903x:
-> + * Copyright (C) 2008 Compulab, Ltd.
-> + *      Mike Rapoport <mike@compulab.co.il>
-> + *
-> + * Copyright (C) 2006-2008 Marvell International Ltd.
-> + *      Eric Miao <eric.miao@marvell.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/leds.h>
-> +#include <linux/workqueue.h>
-> +#include <linux/mfd/mc13783.h>
-> +#include <linux/mfd/mc13783-private.h>
-please don't use mc13783-private.h.
+Linus note the two fixes you sent for the dma40 driver rely on the
+primecell reworks so are not included below.
 
-> +#include <linux/slab.h>
-> +
-> +struct mc13783_led {
-> +	struct led_classdev	cdev;
-> +	struct work_struct	work;
-> +	struct mc13783		*master;
-> +	enum led_brightness	new_brightness;
-> +	int			id;
-> +};
-> +
-> +#define BL_P_MASK 0xf
-> +#define MD_P_SHIFT 9
-> +#define AD_P_SHIFT 13
-> +#define KP_P_SHIFT 17
-> +#define TC_P_BASE_SHIFT 6
-> +#define TC_P_MASK 0x1f
-> +static void mc13783_led_work(struct work_struct *work)
-> +{
-> +	struct mc13783_led *led = container_of(work, struct mc13783_led, work);
-> +	int off;
-> +	int shift;
-> +	int bank;
-> +	int o;
-> +
-> +	mc13783_lock(led->master);
-> +	switch (led->id) {
-> +	case MC13783_LED_MD:
-> +		mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +			BL_P_MASK << MD_P_SHIFT,
-> +			(led->new_brightness >> 4) << MD_P_SHIFT);
-> +		break;
-> +	case MC13783_LED_AD:
-> +		mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +			BL_P_MASK << AD_P_SHIFT,
-> +			(led->new_brightness >> 4) << AD_P_SHIFT);
-> +		break;
-> +	case MC13783_LED_KP:
-> +		mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +			BL_P_MASK << KP_P_SHIFT,
-> +			(led->new_brightness >> 4) << KP_P_SHIFT);
-> +		break;
-> +	case MC13783_LED_R1:
-> +	case MC13783_LED_G1:
-> +	case MC13783_LED_B1:
-> +	case MC13783_LED_R2:
-> +	case MC13783_LED_G2:
-> +	case MC13783_LED_B2:
-> +	case MC13783_LED_R3:
-> +	case MC13783_LED_G3:
-> +	case MC13783_LED_B3:
-> +		o = led->id - MC13783_LED_R1;
-> +		bank = o/3;
-> +		off = MC13783_REG_LED_CONTROL_3 + o/3;
-> +		shift = (o - bank * 3) * 5 + TC_P_BASE_SHIFT;
-> +		mc13783_reg_rmw(led->master, off, TC_P_MASK << shift,
-> +				(led->new_brightness >> 3) << shift);
-> +
-> +		break;
-> +	}
-> +	mc13783_unlock(led->master);
-> +}
-> +
-> +static void mc13783_led_set(struct led_classdev *led_cdev,
-> +			   enum led_brightness value)
-> +{
-> +	struct mc13783_led *led;
-> +
-> +	led = container_of(led_cdev, struct mc13783_led, cdev);
-> +	led->new_brightness = value;
-> +	schedule_work(&led->work);
-> +}
-I wonder why you don't set the registers directly here, but use a work
-struct instead.
+Also, the new patch "async_tx: trim dma_async_tx_descriptor in 'no
+channel switch' case" may be of interest to dma platforms that want to
+eliminate some of the overhead of struct dma_async_tx_descriptor by
+selecting ASYNC_TX_DISABLE_CHANNEL_SWITCH, see below.
 
-> +#define BL_C_MASK 0x7
-> +#define MD_C_SHIFT 0
-> +#define AD_C_SHIFT 3
-> +#define KP_C_SHIFT 6
-> +#define TC_C_MASK 0x3
-> +static int __devinit mc13783_led_setup(struct mc13783_led *led, int max_current)
-> +{
-> +	int off;
-> +	int shift;
-> +	int ret;
-> +	int bank;
-> +	mc13783_lock(led->master);
-> +
-> +	switch (led->id) {
-> +	case MC13783_LED_MD:
-> +		ret = mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +				BL_C_MASK << MD_C_SHIFT,
-> +				(max_current & BL_C_MASK) << MD_C_SHIFT);
-> +		break;
-> +	case MC13783_LED_AD:
-> +		ret = mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +				BL_C_MASK << AD_C_SHIFT,
-> +				(max_current & BL_C_MASK) << AD_C_SHIFT);
-> +		break;
-> +	case MC13783_LED_KP:
-> +		ret = mc13783_reg_rmw(led->master, MC13783_REG_LED_CONTROL_2,
-> +				BL_C_MASK << KP_C_SHIFT,
-> +				(max_current & BL_C_MASK) << KP_C_SHIFT);
-> +		break;
-> +	case MC13783_LED_R1:
-> +	case MC13783_LED_G1:
-> +	case MC13783_LED_B1:
-> +	case MC13783_LED_R2:
-> +	case MC13783_LED_G2:
-> +	case MC13783_LED_B2:
-> +	case MC13783_LED_R3:
-> +	case MC13783_LED_G3:
-> +	case MC13783_LED_B3:
-> +		bank = (led->id - MC13783_LED_R1)/3;
-> +		off = MC13783_REG_LED_CONTROL_3 + bank;
-> +		shift = ((led->id - MC13783_LED_R1) - bank * 3) * 2;
-> +
-> +		ret = mc13783_reg_rmw(led->master, off, TC_C_MASK << shift,
-> +					(max_current & TC_C_MASK) << shift);
-> +		break;
-> +	}
-> +
-> +	mc13783_unlock(led->master);
-> +	return ret;
-> +}
-> +
-> +#define TC1HALF_BIT 18
-> +#define SLEWLIM_BIT 23
-> +#define TRIODE_TC_BIT 23
-> +#define TRIODE_MD_BIT 7
-> +#define TRIODE_AD_BIT 8
-> +#define TRIODE_KP_BIT 9
-> +#define BOOST_BIT 10
-> +#define PERIOD_MASK 0x3
-> +#define PERIOD_SHIFT 21
-> +#define ABMODE_MASK 0x7
-> +#define ABMODE_SHIFT 11
-> +#define ABREF_MASK 0x3
-> +#define ABREF_SHIFT 14
-Why not group the defines at the beginning of the file and properly
-namespace them?
+--
+Dan
 
-> +static int __devinit mc13783_leds_prepare(struct platform_device *pdev)
-> +{
-> +	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> +	struct mc13783 *dev = dev_get_drvdata(pdev->dev.parent);
-> +	int ret = 0;
-> +	int reg = 0;
-> +
-> +	mc13783_lock(dev);
-> +
-> +	if (pdata->flags & MC13783_LED_TC1HALF)
-> +		reg |= 1 << TC1HALF_BIT;
-> +
-> +	if (pdata->flags & MC13783_LED_SLEWLIMTC)
-> +		reg |= 1 << SLEWLIM_BIT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_1, reg);
-> +	if (ret)
-> +		goto out;
-> +
-> +	reg = (pdata->bl_period & PERIOD_MASK) << PERIOD_SHIFT;
-> +
-> +	if (pdata->flags & MC13783_LED_SLEWLIMBL)
-> +		reg |= 1 << SLEWLIM_BIT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_2, reg);
-> +	if (ret)
-> +		goto out;
-> +
-> +
-only one empty line please.
 
-> +	reg = (pdata->tc1_period & PERIOD_MASK) << PERIOD_SHIFT;
-> +	if (pdata->flags & MC13783_LED_TRIODE_TC1)
-> +		reg |= 1 << TRIODE_TC_BIT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_3, reg);
-> +	if (ret)
-> +		goto out;
-> +
-> +	reg = (pdata->tc2_period & PERIOD_MASK) << PERIOD_SHIFT;
-> +	if (pdata->flags & MC13783_LED_TRIODE_TC2)
-> +		reg |= 1 << TRIODE_TC_BIT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_4, reg);
-> +	if (ret)
-> +		goto out;
-> +
-> +	reg = (pdata->tc3_period & PERIOD_MASK) << PERIOD_SHIFT;
-> +	if (pdata->flags & MC13783_LED_TRIODE_TC3)
-> +		reg |= 1 << TRIODE_TC_BIT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_5, reg);
-> +	if (ret)
-> +		goto out;
-> +
-> +	reg = 1;
-> +	if (pdata->flags & MC13783_LED_TRIODE_MD)
-> +		reg |= 1 << TRIODE_MD_BIT;
-> +	if (pdata->flags & MC13783_LED_TRIODE_AD)
-> +		reg |= 1 << TRIODE_AD_BIT;
-> +	if (pdata->flags & MC13783_LED_TRIODE_KP)
-> +		reg |= 1 << TRIODE_KP_BIT;
-> +	if (pdata->flags & MC13783_LED_BOOST_EN)
-> +		reg |= 1 << BOOST_BIT;
-> +
-> +	reg |= (pdata->abmode & ABMODE_MASK) << ABMODE_SHIFT;
-> +	reg |= (pdata->abref & ABREF_MASK) << ABREF_SHIFT;
-> +
-> +	ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_0, reg);
-> +
-> +out:
-> +	mc13783_unlock(dev);
-> +	return ret;
-> +}
-> +
-> +static int __devinit mc13783_led_probe(struct platform_device *pdev)
-> +{
-> +	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> +	struct mc13783_led_platform_data *led_cur;
-> +	struct mc13783_led *led, *led_dat;
-> +	int ret, i;
-> +	int init_led = 0;
-> +
-> +	if (pdata == NULL) {
-> +		dev_err(&pdev->dev, "missing platform data\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (pdata->num_leds < 1 || pdata->num_leds > MC13783_LED_MAX) {
-> +		dev_err(&pdev->dev, "Invalid led count %d\n", pdata->num_leds);
-> +		return -EINVAL;
-> +	}
-> +
-> +	led = kzalloc(sizeof(*led) * pdata->num_leds, GFP_KERNEL);
-> +	if (led == NULL) {
-> +		dev_err(&pdev->dev, "failed to alloc memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = mc13783_leds_prepare(pdev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to init led driver\n");
-> +		goto err_free;
-> +	}
-> +
-> +	for (i = 0; i < pdata->num_leds; i++) {
-> +		led_dat = &led[i];
-> +		led_cur = &pdata->led[i];
-> +
-> +		if (led_cur->id > MC13783_LED_MAX || led_cur->id < 0) {
-> +			dev_err(&pdev->dev, "invalid id %d\n", led_cur->id);
-> +			ret = -EINVAL;
-> +			goto err_register;
-> +		}
-> +
-> +		if (init_led & (1 << led_cur->id)) {
-> +			dev_err(&pdev->dev, "led %d already initialized\n",
-> +					led_cur->id);
-> +			ret = -EINVAL;
-> +			goto err_register;
-> +		}
-> +
-> +		init_led |= 1 << led_cur->id;
-> +		led_dat->cdev.name = led_cur->name;
-> +		led_dat->cdev.default_trigger = led_cur->default_trigger;
-> +		led_dat->cdev.brightness_set = mc13783_led_set;
-> +		led_dat->cdev.brightness = LED_OFF;
-> +		led_dat->id = led_cur->id;
-> +		led_dat->master = dev_get_drvdata(pdev->dev.parent);
-> +
-> +		INIT_WORK(&led_dat->work, mc13783_led_work);
-> +
-> +		ret = led_classdev_register(pdev->dev.parent, &led_dat->cdev);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "failed to register led %d\n",
-> +					led_dat->id);
-> +			goto err_register;
-> +		}
-> +
-> +		ret = mc13783_led_setup(led_dat, led_cur->max_current);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "unable to init led %d\n",
-> +					led_dat->id);
-> +			i++;
-> +			goto err_register;
-> +		}
-> +	}
-> +
-> +	platform_set_drvdata(pdev, led);
-> +	return 0;
-> +
-> +err_register:
-> +	if (i > 0) {
-> +		for (i = i - 1; i >= 0; i--) {
-> +			led_classdev_unregister(&led[i].cdev);
-> +			cancel_work_sync(&led[i].work);
-> +		}
-> +	}
-the if isn't necessary, just doing for(...) is enough.
+The following changes since commit e40152ee1e1c7a63f4777791863215e3faa37a86:
+  Linus Torvalds (1):
+        Linus 2.6.34
 
-> +
-> +err_free:
-> +	kfree(led);
-> +	return ret;
-> +}
-> +
-> +static int __devexit mc13783_led_remove(struct platform_device *pdev)
-> +{
-> +	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> +	struct mc13783_led *led = platform_get_drvdata(pdev);
-> +	struct mc13783 *dev = dev_get_drvdata(pdev->dev.parent);
-> +	int i;
-> +
-> +	for (i = 0; i < pdata->num_leds; i++) {
-> +		led_classdev_unregister(&led[i].cdev);
-> +		cancel_work_sync(&led[i].work);
-> +	}
-> +
-> +	mc13783_lock(dev);
-> +
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_0, 0);
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_1, 0);
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_2, 0);
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_3, 0);
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_4, 0);
-> +	mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_5, 0);
-> +
-> +	mc13783_unlock(dev);
-> +
-> +	kfree(led);
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver mc13783_led_driver = {
-> +	.driver	= {
-> +		.name	= "mc13783-led",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= mc13783_led_probe,
-> +	.remove		= __devexit_p(mc13783_led_remove),
-> +};
-> +
-> +static int __init mc13783_led_init(void)
-> +{
-> +	return platform_driver_register(&mc13783_led_driver);
-> +}
-> +module_init(mc13783_led_init);
-> +
-> +static void __exit mc13783_led_exit(void)
-> +{
-> +	platform_driver_unregister(&mc13783_led_driver);
-> +}
-> +module_exit(mc13783_led_exit);
-> +
-> +MODULE_DESCRIPTION("LEDs driver for Freescale MC13783 PMIC");
-> +MODULE_AUTHOR("Philipe R?tornaz <philippe.retorna@epfl.ch>");
-Philippe with two p?  I'm not sure if non-ASCII chars are allowed here.
+are available in the git repository at:
 
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:mc13783-led");
-> diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
-> index 1f68eca..fecf38a 100644
-> --- a/drivers/mfd/mc13783-core.c
-> +++ b/drivers/mfd/mc13783-core.c
-> @@ -679,6 +679,10 @@ err_revision:
->  	if (pdata->flags & MC13783_USE_TOUCHSCREEN)
->  		mc13783_add_subdevice(mc13783, "mc13783-ts");
->  
-> +	if (pdata->flags & MC13783_USE_LED)
-> +		mc13783_add_subdevice_pdata(mc13783, "mc13783-led",
-> +					pdata->leds, sizeof(*pdata->leds));
-> +
->  	return 0;
->  }
->  
-> diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
-> index 8895d9d..95aa8b6 100644
-> --- a/include/linux/mfd/mc13783.h
-> +++ b/include/linux/mfd/mc13783.h
-> @@ -64,6 +64,72 @@ static inline int mc13783_ackirq(struct mc13783 *mc13783, int irq)
->  					MC13783_ADC0_TSMOD1 | \
->  					MC13783_ADC0_TSMOD2)
->  
-> +struct mc13783_led_platform_data {
-> +#define MC13783_LED_MD		0
-> +#define MC13783_LED_AD		1
-> +#define MC13783_LED_KP		2
-> +#define MC13783_LED_R1		3
-> +#define MC13783_LED_G1		4
-> +#define MC13783_LED_B1		5
-> +#define MC13783_LED_R2		6
-> +#define MC13783_LED_G2		7
-> +#define MC13783_LED_B2		8
-> +#define MC13783_LED_R3		9
-> +#define MC13783_LED_G3		10
-> +#define MC13783_LED_B3		11
-> +#define MC13783_LED_MAX MC13783_LED_B3
-> +	int id;
-> +	const char *name;
-> +	const char *default_trigger;
-> +
-> +/* Three or two bits current selection depending on the led */
-> +	char max_current;
-> +};
-> +
-> +struct mc13783_leds_platform_data {
-> +	int num_leds;
-> +	struct mc13783_led_platform_data *led;
-> +
-> +#define MC13783_LED_TRIODE_MD	(1 << 0)
-> +#define MC13783_LED_TRIODE_AD	(1 << 1)
-> +#define MC13783_LED_TRIODE_KP	(1 << 2)
-> +#define MC13783_LED_BOOST_EN	(1 << 3)
-> +#define MC13783_LED_TC1HALF	(1 << 4)
-> +#define MC13783_LED_SLEWLIMTC	(1 << 5)
-> +#define MC13783_LED_SLEWLIMBL	(1 << 6)
-> +#define MC13783_LED_TRIODE_TC1	(1 << 7)
-> +#define MC13783_LED_TRIODE_TC2	(1 << 8)
-> +#define MC13783_LED_TRIODE_TC3	(1 << 9)
-> +	int flags;
-> +
-> +#define MC13783_LED_AB_DISABLED		0
-> +#define MC13783_LED_AB_MD1		1
-> +#define MC13783_LED_AB_MD12		2
-> +#define MC13783_LED_AB_MD123		3
-> +#define MC13783_LED_AB_MD1234		4
-> +#define MC13783_LED_AB_MD1234_AD1	5
-> +#define MC13783_LED_AB_MD1234_AD12	6
-> +#define MC13783_LED_AB_MD1_AD		7
-> +	char abmode;
-> +
-> +#define MC13783_LED_ABREF_200MV	0
-> +#define MC13783_LED_ABREF_400MV	1
-> +#define MC13783_LED_ABREF_600MV	2
-> +#define MC13783_LED_ABREF_800MV	3
-> +	char abref;
-> +
-> +#define MC13783_LED_PERIOD_10MS		0
-> +#define MC13783_LED_PERIOD_100MS	1
-> +#define MC13783_LED_PERIOD_500MS	2
-> +#define MC13783_LED_PERIOD_2S		3
-> +	char bl_period;
-> +	char tc1_period;
-> +	char tc2_period;
-> +	char tc3_period;
-> +};
-> +
-> +
-> +
-too many empty lines
+  git://git.kernel.org/pub/scm/linux/kernel/git/djbw/async_tx.git next
 
-Best regards
-Uwe
+Dan Williams (6):
+      dmaengine: provide helper for setting txstate
+      ioat: convert to circ_buf
+      ioat2,3: convert to producer/consumer locking
+      ioat3: disable cacheline-unaligned transfers for raid operations
+      async_tx: trim dma_async_tx_descriptor in 'no channel switch' case
+      Merge branch 'ioat' into dmaengine
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jassi Brar (1):
+      DMA ENGINE: Do not reset 'private' of channel
+
+Linus Walleij (5):
+      DMAENGINE: COH 901 318 rename confusing vars
+      DMAENGINE: COH 901 318 fix bytesleft
+      DMAENGINE: generic slave control v2
+      DMAENGINE: generic channel status v2
+      DMAENGINE: Support for ST-Ericssons DMA40 block v3
+
+Minskey Guo (1):
+      ioat: Remove duplicated devm_kzalloc() calls for ioatdma_device
+
+Richard R?jfors (2):
+      dma: Add timb-dma
+      dma: timb-dma: Update comment and fix compiler warning
+
+Stephen Rothwell (1):
+      async_tx: use of kzalloc/kfree requires the include of slab.h
+
+Tobias Klauser (1):
+      dmaengine: mpc512x: Use resource_size
+
+ arch/arm/mach-u300/include/mach/coh901318.h    |   21 -
+ arch/arm/plat-nomadik/include/plat/ste_dma40.h |  239 +++
+ crypto/async_tx/async_tx.c                     |   46 +-
+ drivers/dma/Kconfig                            |   14 +
+ drivers/dma/Makefile                           |    2 +
+ drivers/dma/at_hdmac.c                         |   34 +-
+ drivers/dma/coh901318.c                        |  262 ++-
+ drivers/dma/dmaengine.c                        |   22 +-
+ drivers/dma/dw_dmac.c                          |   23 +-
+ drivers/dma/fsldma.c                           |   28 +-
+ drivers/dma/ioat/dma.c                         |   12 +-
+ drivers/dma/ioat/dma.h                         |   19 +-
+ drivers/dma/ioat/dma_v2.c                      |  186 +-
+ drivers/dma/ioat/dma_v2.h                      |   33 +-
+ drivers/dma/ioat/dma_v3.c                      |  143 +-
+ drivers/dma/ioat/pci.c                         |    7 +-
+ drivers/dma/iop-adma.c                         |   39 +-
+ drivers/dma/ipu/ipu_idmac.c                    |   32 +-
+ drivers/dma/mpc512x_dma.c                      |   15 +-
+ drivers/dma/mv_xor.c                           |   25 +-
+ drivers/dma/ppc4xx/adma.c                      |   19 +-
+ drivers/dma/shdma.c                            |   26 +-
+ drivers/dma/ste_dma40.c                        | 2596 ++++++++++++++++++++++++
+ drivers/dma/ste_dma40_ll.c                     |  454 +++++
+ drivers/dma/ste_dma40_ll.h                     |  354 ++++
+ drivers/dma/timb_dma.c                         |  859 ++++++++
+ drivers/dma/txx9dmac.c                         |   22 +-
+ drivers/mmc/host/atmel-mci.c                   |    2 +-
+ drivers/serial/sh-sci.c                        |    2 +-
+ drivers/video/mx3fb.c                          |    3 +-
+ include/linux/dmaengine.h                      |  127 ++-
+ include/linux/timb_dma.h                       |   55 +
+ sound/soc/txx9/txx9aclc.c                      |    6 +-
+ 33 files changed, 5216 insertions(+), 511 deletions(-)
+ create mode 100644 arch/arm/plat-nomadik/include/plat/ste_dma40.h
+ create mode 100644 drivers/dma/ste_dma40.c
+ create mode 100644 drivers/dma/ste_dma40_ll.c
+ create mode 100644 drivers/dma/ste_dma40_ll.h
+ create mode 100644 drivers/dma/timb_dma.c
+ create mode 100644 include/linux/timb_dma.h
+
+--
+async_tx: trim dma_async_tx_descriptor in 'no channel switch' case
+
+From: Dan Williams <dan.j.williams@intel.com>
+
+Saves 24 bytes per descriptor (64-bit) when the channel-switching
+capabilities of async_tx are not required.
+
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+---
+
+ crypto/async_tx/async_tx.c |   46 ++++++++++++++-------------------
+ drivers/dma/dmaengine.c    |   16 ++++++------
+ include/linux/dmaengine.h  |   61 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 89 insertions(+), 34 deletions(-)
+
+
+diff --git a/crypto/async_tx/async_tx.c b/crypto/async_tx/async_tx.c
+index f9cdf04..7f2c00a 100644
+--- a/crypto/async_tx/async_tx.c
++++ b/crypto/async_tx/async_tx.c
+@@ -81,18 +81,13 @@ async_tx_channel_switch(struct dma_async_tx_descriptor *depend_tx,
+ 	struct dma_device *device = chan->device;
+ 	struct dma_async_tx_descriptor *intr_tx = (void *) ~0;
+ 
+-	#ifdef CONFIG_ASYNC_TX_DISABLE_CHANNEL_SWITCH
+-	BUG();
+-	#endif
+-
+ 	/* first check to see if we can still append to depend_tx */
+-	spin_lock_bh(&depend_tx->lock);
+-	if (depend_tx->parent && depend_tx->chan == tx->chan) {
+-		tx->parent = depend_tx;
+-		depend_tx->next = tx;
++	txd_lock(depend_tx);
++	if (txd_parent(depend_tx) && depend_tx->chan == tx->chan) {
++		txd_chain(depend_tx, tx);
+ 		intr_tx = NULL;
+ 	}
+-	spin_unlock_bh(&depend_tx->lock);
++	txd_unlock(depend_tx);
+ 
+ 	/* attached dependency, flush the parent channel */
+ 	if (!intr_tx) {
+@@ -111,24 +106,22 @@ async_tx_channel_switch(struct dma_async_tx_descriptor *depend_tx,
+ 	if (intr_tx) {
+ 		intr_tx->callback = NULL;
+ 		intr_tx->callback_param = NULL;
+-		tx->parent = intr_tx;
+-		/* safe to set ->next outside the lock since we know we are
++		/* safe to chain outside the lock since we know we are
+ 		 * not submitted yet
+ 		 */
+-		intr_tx->next = tx;
++		txd_chain(intr_tx, tx);
+ 
+ 		/* check if we need to append */
+-		spin_lock_bh(&depend_tx->lock);
+-		if (depend_tx->parent) {
+-			intr_tx->parent = depend_tx;
+-			depend_tx->next = intr_tx;
++		txd_lock(depend_tx);
++		if (txd_parent(depend_tx)) {
++			txd_chain(depend_tx, intr_tx);
+ 			async_tx_ack(intr_tx);
+ 			intr_tx = NULL;
+ 		}
+-		spin_unlock_bh(&depend_tx->lock);
++		txd_unlock(depend_tx);
+ 
+ 		if (intr_tx) {
+-			intr_tx->parent = NULL;
++			txd_clear_parent(intr_tx);
+ 			intr_tx->tx_submit(intr_tx);
+ 			async_tx_ack(intr_tx);
+ 		}
+@@ -176,21 +169,20 @@ async_tx_submit(struct dma_chan *chan, struct dma_async_tx_descriptor *tx,
+ 		 * 2/ dependencies are 1:1 i.e. two transactions can
+ 		 * not depend on the same parent
+ 		 */
+-		BUG_ON(async_tx_test_ack(depend_tx) || depend_tx->next ||
+-		       tx->parent);
++		BUG_ON(async_tx_test_ack(depend_tx) || txd_next(depend_tx) ||
++		       txd_parent(tx));
+ 
+ 		/* the lock prevents async_tx_run_dependencies from missing
+ 		 * the setting of ->next when ->parent != NULL
+ 		 */
+-		spin_lock_bh(&depend_tx->lock);
+-		if (depend_tx->parent) {
++		txd_lock(depend_tx);
++		if (txd_parent(depend_tx)) {
+ 			/* we have a parent so we can not submit directly
+ 			 * if we are staying on the same channel: append
+ 			 * else: channel switch
+ 			 */
+ 			if (depend_tx->chan == chan) {
+-				tx->parent = depend_tx;
+-				depend_tx->next = tx;
++				txd_chain(depend_tx, tx);
+ 				s = ASYNC_TX_SUBMITTED;
+ 			} else
+ 				s = ASYNC_TX_CHANNEL_SWITCH;
+@@ -203,7 +195,7 @@ async_tx_submit(struct dma_chan *chan, struct dma_async_tx_descriptor *tx,
+ 			else
+ 				s = ASYNC_TX_CHANNEL_SWITCH;
+ 		}
+-		spin_unlock_bh(&depend_tx->lock);
++		txd_unlock(depend_tx);
+ 
+ 		switch (s) {
+ 		case ASYNC_TX_SUBMITTED:
+@@ -212,12 +204,12 @@ async_tx_submit(struct dma_chan *chan, struct dma_async_tx_descriptor *tx,
+ 			async_tx_channel_switch(depend_tx, tx);
+ 			break;
+ 		case ASYNC_TX_DIRECT_SUBMIT:
+-			tx->parent = NULL;
++			txd_clear_parent(tx);
+ 			tx->tx_submit(tx);
+ 			break;
+ 		}
+ 	} else {
+-		tx->parent = NULL;
++		txd_clear_parent(tx);
+ 		tx->tx_submit(tx);
+ 	}
+ 
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index d18b5d0..fcfe1a6 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -978,7 +978,9 @@ void dma_async_tx_descriptor_init(struct dma_async_tx_descriptor *tx,
+ 	struct dma_chan *chan)
+ {
+ 	tx->chan = chan;
++	#ifndef CONFIG_ASYNC_TX_DISABLE_CHANNEL_SWITCH
+ 	spin_lock_init(&tx->lock);
++	#endif
+ }
+ EXPORT_SYMBOL(dma_async_tx_descriptor_init);
+ 
+@@ -1011,7 +1013,7 @@ EXPORT_SYMBOL_GPL(dma_wait_for_async_tx);
+  */
+ void dma_run_dependencies(struct dma_async_tx_descriptor *tx)
+ {
+-	struct dma_async_tx_descriptor *dep = tx->next;
++	struct dma_async_tx_descriptor *dep = txd_next(tx);
+ 	struct dma_async_tx_descriptor *dep_next;
+ 	struct dma_chan *chan;
+ 
+@@ -1019,7 +1021,7 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx)
+ 		return;
+ 
+ 	/* we'll submit tx->next now, so clear the link */
+-	tx->next = NULL;
++	txd_clear_next(tx);
+ 	chan = dep->chan;
+ 
+ 	/* keep submitting up until a channel switch is detected
+@@ -1027,14 +1029,14 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx)
+ 	 * processing the interrupt from async_tx_channel_switch
+ 	 */
+ 	for (; dep; dep = dep_next) {
+-		spin_lock_bh(&dep->lock);
+-		dep->parent = NULL;
+-		dep_next = dep->next;
++		txd_lock(dep);
++		txd_clear_parent(dep);
++		dep_next = txd_next(dep);
+ 		if (dep_next && dep_next->chan == chan)
+-			dep->next = NULL; /* ->next will be submitted */
++			txd_clear_next(dep); /* ->next will be submitted */
+ 		else
+ 			dep_next = NULL; /* submit current dep and terminate */
+-		spin_unlock_bh(&dep->lock);
++		txd_unlock(dep);
+ 
+ 		dep->tx_submit(dep);
+ 	}
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 20ea12c..fa35164 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -230,11 +230,72 @@ struct dma_async_tx_descriptor {
+ 	dma_cookie_t (*tx_submit)(struct dma_async_tx_descriptor *tx);
+ 	dma_async_tx_callback callback;
+ 	void *callback_param;
++#ifndef CONFIG_ASYNC_TX_DISABLE_CHANNEL_SWITCH
+ 	struct dma_async_tx_descriptor *next;
+ 	struct dma_async_tx_descriptor *parent;
+ 	spinlock_t lock;
++#endif
+ };
+ 
++#ifdef CONFIG_ASYNC_TX_DISABLE_CHANNEL_SWITCH
++static inline void txd_lock(struct dma_async_tx_descriptor *txd)
++{
++	BUG();
++}
++static inline void txd_unlock(struct dma_async_tx_descriptor *txd)
++{
++}
++static inline void txd_chain(struct dma_async_tx_descriptor *txd, struct dma_async_tx_descriptor *next)
++{
++	BUG();
++}
++static inline void txd_clear_parent(struct dma_async_tx_descriptor *txd)
++{
++}
++static inline void txd_clear_next(struct dma_async_tx_descriptor *txd)
++{
++}
++static inline struct dma_async_tx_descriptor *txd_next(struct dma_async_tx_descriptor *txd)
++{
++	return NULL;
++}
++static inline struct dma_async_tx_descriptor *txd_parent(struct dma_async_tx_descriptor *txd)
++{
++	return NULL;
++}
++
++#else
++static inline void txd_lock(struct dma_async_tx_descriptor *txd)
++{
++	spin_lock_bh(&txd->lock);
++}
++static inline void txd_unlock(struct dma_async_tx_descriptor *txd)
++{
++	spin_unlock_bh(&txd->lock);
++}
++static inline void txd_chain(struct dma_async_tx_descriptor *txd, struct dma_async_tx_descriptor *next)
++{
++	txd->next = next;
++	next->parent = txd;
++}
++static inline void txd_clear_parent(struct dma_async_tx_descriptor *txd)
++{
++	txd->parent = NULL;
++}
++static inline void txd_clear_next(struct dma_async_tx_descriptor *txd)
++{
++	txd->next = NULL;
++}
++static inline struct dma_async_tx_descriptor *txd_parent(struct dma_async_tx_descriptor *txd)
++{
++	return txd->parent;
++}
++static inline struct dma_async_tx_descriptor *txd_next(struct dma_async_tx_descriptor *txd)
++{
++	return txd->next;
++}
++#endif
++
+ /**
+  * struct dma_device - info on the entity supplying DMA services
+  * @chancnt: how many DMA channels are supported
