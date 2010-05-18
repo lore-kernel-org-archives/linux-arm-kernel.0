@@ -1,107 +1,89 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:34:54 +0300
-Subject: [PATCH 03/23] OMAP: DSS2: Add Kconfig option for DPI display type
+Date: Tue, 18 May 2010 15:34:57 +0300
+Subject: [PATCH 06/23] OMAP: DSS2: fix lock_fb_info() and omapfb_lock()
+	locking order
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-4-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-7-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Quadros <roger.quadros@nokia.com>
+From: Jani Nikula <ext-jani.1.nikula@nokia.com>
 
-This allows us to disable DPI on systems that do not have it
+Framebuffer ioctl processing forces lock_fb_info() -> omapfb_lock()
+locking order. Follow that order to avoid possible circular locking
+dependency, detected by lockdep.
 
-Signed-off-by: Roger Quadros <roger.quadros@nokia.com>
+Signed-off-by: Jani Nikula <ext-jani.1.nikula@nokia.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/Kconfig   |    6 ++++++
- drivers/video/omap2/dss/Makefile  |    3 ++-
- drivers/video/omap2/dss/core.c    |    4 ++++
- drivers/video/omap2/dss/display.c |    4 ++++
- 4 files changed, 16 insertions(+), 1 deletions(-)
+ drivers/video/omap2/omapfb/omapfb-ioctl.c |    4 ++--
+ drivers/video/omap2/omapfb/omapfb-sysfs.c |    8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/Kconfig b/drivers/video/omap2/dss/Kconfig
-index 87afb81..43b6440 100644
---- a/drivers/video/omap2/dss/Kconfig
-+++ b/drivers/video/omap2/dss/Kconfig
-@@ -36,6 +36,12 @@ config OMAP2_DSS_COLLECT_IRQ_STATS
- 	  <debugfs>/omapdss/dispc_irq for DISPC interrupts, and
- 	  <debugfs>/omapdss/dsi_irq for DSI interrupts.
- 
-+config OMAP2_DSS_DPI
-+	bool "DPI support"
-+	default y
-+	help
-+	  DPI Interface. This is the Parallel Display Interface.
-+
- config OMAP2_DSS_RFBI
- 	bool "RFBI support"
-         default n
-diff --git a/drivers/video/omap2/dss/Makefile b/drivers/video/omap2/dss/Makefile
-index 980c72c..d71b5d9 100644
---- a/drivers/video/omap2/dss/Makefile
-+++ b/drivers/video/omap2/dss/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_OMAP2_DSS) += omapdss.o
--omapdss-y := core.o dss.o dispc.o dpi.o display.o manager.o overlay.o
-+omapdss-y := core.o dss.o dispc.o display.o manager.o overlay.o
-+omapdss-$(CONFIG_OMAP2_DSS_DPI) += dpi.o
- omapdss-$(CONFIG_OMAP2_DSS_RFBI) += rfbi.o
- omapdss-$(CONFIG_OMAP2_DSS_VENC) += venc.o
- omapdss-$(CONFIG_OMAP2_DSS_SDI) += sdi.o
-diff --git a/drivers/video/omap2/dss/core.c b/drivers/video/omap2/dss/core.c
-index 7ebe50b..6d54467 100644
---- a/drivers/video/omap2/dss/core.c
-+++ b/drivers/video/omap2/dss/core.c
-@@ -526,11 +526,13 @@ static int omap_dss_probe(struct platform_device *pdev)
- 	}
- #endif
- 
-+#ifdef CONFIG_OMAP2_DSS_DPI
- 	r = dpi_init(pdev);
- 	if (r) {
- 		DSSERR("Failed to initialize dpi\n");
- 		goto fail0;
- 	}
-+#endif
- 
- 	r = dispc_init();
- 	if (r) {
-@@ -601,7 +603,9 @@ static int omap_dss_remove(struct platform_device *pdev)
- 	venc_exit();
- #endif
- 	dispc_exit();
-+#ifdef CONFIG_OMAP2_DSS_DPI
- 	dpi_exit();
-+#endif
- #ifdef CONFIG_OMAP2_DSS_RFBI
- 	rfbi_exit();
- #endif
-diff --git a/drivers/video/omap2/dss/display.c b/drivers/video/omap2/dss/display.c
-index 6a74ea1..7138963 100644
---- a/drivers/video/omap2/dss/display.c
-+++ b/drivers/video/omap2/dss/display.c
-@@ -392,7 +392,9 @@ void dss_init_device(struct platform_device *pdev,
+diff --git a/drivers/video/omap2/omapfb/omapfb-ioctl.c b/drivers/video/omap2/omapfb/omapfb-ioctl.c
+index 1ffa760..2c0f01c 100644
+--- a/drivers/video/omap2/omapfb/omapfb-ioctl.c
++++ b/drivers/video/omap2/omapfb/omapfb-ioctl.c
+@@ -183,13 +183,13 @@ int omapfb_update_window(struct fb_info *fbi,
+ 	struct omapfb2_device *fbdev = ofbi->fbdev;
  	int r;
  
- 	switch (dssdev->type) {
-+#ifdef CONFIG_OMAP2_DSS_DPI
- 	case OMAP_DISPLAY_TYPE_DPI:
-+#endif
- #ifdef CONFIG_OMAP2_DSS_RFBI
- 	case OMAP_DISPLAY_TYPE_DBI:
- #endif
-@@ -413,9 +415,11 @@ void dss_init_device(struct platform_device *pdev,
- 	}
+-	omapfb_lock(fbdev);
+ 	lock_fb_info(fbi);
++	omapfb_lock(fbdev);
  
- 	switch (dssdev->type) {
-+#ifdef CONFIG_OMAP2_DSS_DPI
- 	case OMAP_DISPLAY_TYPE_DPI:
- 		r = dpi_init_display(dssdev);
- 		break;
-+#endif
- #ifdef CONFIG_OMAP2_DSS_RFBI
- 	case OMAP_DISPLAY_TYPE_DBI:
- 		r = rfbi_init_display(dssdev);
+ 	r = omapfb_update_window_nolock(fbi, x, y, w, h);
+ 
+-	unlock_fb_info(fbi);
+ 	omapfb_unlock(fbdev);
++	unlock_fb_info(fbi);
+ 
+ 	return r;
+ }
+diff --git a/drivers/video/omap2/omapfb/omapfb-sysfs.c b/drivers/video/omap2/omapfb/omapfb-sysfs.c
+index 62bb88f..e104450 100644
+--- a/drivers/video/omap2/omapfb/omapfb-sysfs.c
++++ b/drivers/video/omap2/omapfb/omapfb-sysfs.c
+@@ -137,8 +137,8 @@ static ssize_t show_overlays(struct device *dev,
+ 	ssize_t l = 0;
+ 	int t;
+ 
+-	omapfb_lock(fbdev);
+ 	lock_fb_info(fbi);
++	omapfb_lock(fbdev);
+ 
+ 	for (t = 0; t < ofbi->num_overlays; t++) {
+ 		struct omap_overlay *ovl = ofbi->overlays[t];
+@@ -154,8 +154,8 @@ static ssize_t show_overlays(struct device *dev,
+ 
+ 	l += snprintf(buf + l, PAGE_SIZE - l, "\n");
+ 
+-	unlock_fb_info(fbi);
+ 	omapfb_unlock(fbdev);
++	unlock_fb_info(fbi);
+ 
+ 	return l;
+ }
+@@ -195,8 +195,8 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
+ 	if (buf[len - 1] == '\n')
+ 		len = len - 1;
+ 
+-	omapfb_lock(fbdev);
+ 	lock_fb_info(fbi);
++	omapfb_lock(fbdev);
+ 
+ 	if (len > 0) {
+ 		char *p = (char *)buf;
+@@ -303,8 +303,8 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
+ 
+ 	r = count;
+ out:
+-	unlock_fb_info(fbi);
+ 	omapfb_unlock(fbdev);
++	unlock_fb_info(fbi);
+ 
+ 	return r;
+ }
 -- 
 1.7.0.4
