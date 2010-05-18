@@ -1,27 +1,40 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 10:43:24 +0100
-Subject: [PATCHv2] SAMSUNG: Audio support
-In-Reply-To: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
-References: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20100518094324.GA4720@trinity.fluff.org>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Tue, 18 May 2010 19:44:25 +1000
+Subject: i.MX27 Clock sources
+In-Reply-To: <19442.22529.98355.153495@ipc1.ka-ro>
+References: <20100518075109.GC1749@www.longlandclan.yi.org>
+	<19442.22529.98355.153495@ipc1.ka-ro>
+Message-ID: <20100518094420.GA11009@www.longlandclan.yi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 04:02:08PM +0900, Jassi Brar wrote:
+On Tue, May 18, 2010 at 11:04:01AM +0200, Lothar Wa?mann wrote:
 > Hi,
->  Following are few patches to define and add audio devices' support
-> for latest Samsung SoCs, namely S5P6440, S5P6442, S5PC100, S5PC110
-> and S5PV210 on respective SMDK board.
->  The device drivers will be enabled to run these via ASoC tree.
 > 
-> Changes since v1:
-> 	o Drop EXPORT_SYMBOL for platform device definitions
+> > 	Ideally I'd like to adjust MPLL/SPLL and/or the SSI clocks so
+> > that the clock rate is some multiple of the I?S bit rate.  So far I can
+> > get it close; but not close enough.  Does anyone have any pointers as to
+> > where I can look in the Linux kernel for this information?
+> > 
+> Can't you use the codec in master mode, instead of fiddling with the
+> CPU clocks?
 
-I've applied everything bar the C100 changes, since we still need
-to sort out what is going on there.
+I think we will do this -- but the issue is still faced since the CODEC
+derives its clocks from a clock supplied on a separate SSI bus.  (This
+was done to avoid the need of a separate oscillator.)
 
+I haven't succeeded in getting the CODEC's onboard PLL to generate the
+required clocks either -- I'll be doing some further investigation on
+this tomorrow.  However, the other way of achieving this is to tweak the
+CPU to run its clocks at the required rate... and this is the other
+possibility I'm exploring.
+
+Regards,
 -- 
-Ben
+Stuart Longland (aka Redhatter, VK4MSL)      .'''.
+Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
+. . . . . . . . . . . . . . . . . . . . . .   .'.'
+http://dev.gentoo.org/~redhatter             :.'
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
