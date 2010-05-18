@@ -1,42 +1,77 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 18 May 2010 12:09:25 +0900
-Subject: Samsung SoCs framebuffer re-work
-In-Reply-To: <20100518025058.GL27571@trinity.fluff.org>
-References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-	<20100518025058.GL27571@trinity.fluff.org>
-Message-ID: <AANLkTimfbcYLyiuErIMcDqfAzz2L76J3j2IxlWS0b333@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 May 2010 19:42:39 -0700
+Subject: [PATCH 00/13] More omap platform init code for 2.6.35 merge window
+Message-ID: <20100518023707.21705.26205.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 11:50 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
->> Hi Ben,
->>
->> Currently there's only one fb drivers for samsung SocS. but it's based
->> on s3c24xx and a part of s3c64xx.
->
-> Your statement is incorrect, we have the s3c2410-fb driver which deals
-> with the 2410/2440/2412 style hardware and s3c-fb which is for the newer
-> devices.
+Hi all,
 
-Yes it's working on s5pc110. I mean it's not fit the platform requirement.
+Here are few more patches for review. These
+patches have been posted earlier to linux-omap list,
+but have not quite been ready to go until now.
 
->
->> As you can see the s5pc110 (aka s5pv210) spec, It has more features
->> and interconnection between FIMC and FIMD.
->> So current fb driver can't handle these features well. So LSI make a
->> own fb drivers and use it. You can see the code at their git repo.
->>
->> Now we are re-implement or change it for s5pc110 and for future usages.
->> How do you think?
->
-> I've already got updates for s3c-fb to work on 2416,2443 and the c110/v210
-> systems. I am talking with the relevant people at System.LSI to get our
-> drivers closers together, possibly we can get this done for the current
-> merge window.
+The series adds omap4 I2C and MMC support, and adds
+a new omap3 board Stalker.
 
-You mean you want to use the current fb drivers for s5pc110 also?
-Then how to do implement features mentioned by Kukjin?
+Please note that that the omap4 MMC support depends
+on two other patches already queued up:
 
-Thank you,
-Kyungmin Park
+https://patchwork.kernel.org/patch/98799/
+https://patchwork.kernel.org/patch/94054/
+
+Also, I noticed that the MMC card is detected
+using omap_4430sdp_defconfig, but not detected
+with omap3_defconfig.
+
+Regards,
+
+Tony
+
+---
+
+Anand Gadiyar (1):
+      omap3: update omap3_defconfig
+
+Balaji T K (2):
+      omap4: add i2c1 peripherals data
+      omap4: Enable RTC and regulator support
+
+Jason (1):
+      omap3: Add support for OMAP3Stalker boards
+
+Jason Lam (1):
+      omap3: Add OMAP3 Stalker board LK-S defconfig
+
+Santosh Shilimkar (1):
+      omap4: Add i2c board support on omap4430 sdp platform
+
+Tony Lindgren (3):
+      omap: Fix i2c platform init code for omap4
+      omap4: Add support for i2c init
+      omap3: Add stalker board to omap3_defconfig
+
+kishore kadiyala (4):
+      omap4: Adds Dummy Interface clock's for MMC controllers
+      omap4: Adding hsmmc support to board file
+      omap4: Adding PBIAS Configuration for MMC1 Controller
+      omap4: Enable HSMMC support
+
+
+ arch/arm/configs/omap3_defconfig             |  117 +-
+ arch/arm/configs/omap3_stalker_lks_defconfig | 1691 ++++++++++++++++++++++++++
+ arch/arm/configs/omap_4430sdp_defconfig      |  395 ++++++
+ arch/arm/mach-omap2/Kconfig                  |    6 
+ arch/arm/mach-omap2/Makefile                 |    5 
+ arch/arm/mach-omap2/board-4430sdp.c          |  232 ++++
+ arch/arm/mach-omap2/board-omap3stalker.c     |  672 ++++++++++
+ arch/arm/mach-omap2/clock44xx_data.c         |    5 
+ arch/arm/mach-omap2/hsmmc.c                  |   97 +
+ arch/arm/plat-omap/i2c.c                     |   92 +
+ arch/arm/plat-omap/include/plat/control.h    |   20 
+ 11 files changed, 3230 insertions(+), 102 deletions(-)
+ create mode 100644 arch/arm/configs/omap3_stalker_lks_defconfig
+ create mode 100644 arch/arm/mach-omap2/board-omap3stalker.c
+
+-- 
+Signature
