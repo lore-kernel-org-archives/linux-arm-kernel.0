@@ -1,131 +1,182 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 May 2010 12:38:48 +0200
-Subject: [PATCH 10/11] ARM: S5PC100: use common plat-s5p external interrupt
-	code
+Date: Tue, 18 May 2010 12:38:42 +0200
+Subject: [PATCH 04/11] ARM: S5PC100: gpio.h cleanup
 In-Reply-To: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
 References: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1274179129-14659-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1274179129-14659-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-s5pc100/Kconfig                  |    1 +
- arch/arm/mach-s5pc100/gpiolib.c                |    3 +-
- arch/arm/mach-s5pc100/include/mach/irqs.h      |   15 ++++++++--
- arch/arm/mach-s5pc100/include/mach/regs-gpio.h |   36 ++++++++++++++---------
- 4 files changed, 36 insertions(+), 19 deletions(-)
+This patch renames gpio related registers from s5pc1xx to s5pc100 to
+better match the plat-s5p framework style. GPIO_MP* defines now used
+anywhere thus has been removed.
 
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index fe1216b..2eb9497 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -10,6 +10,7 @@ if ARCH_S5PC100
- config CPU_S5PC100
- 	bool
- 	select PLAT_S5P
-+	select S5P_EXT_INT
- 	help
- 	  Enable S5PC100 CPU support
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pc100/include/mach/gpio.h      |   95 +++++++++++-------------
+ arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    8 +-
+ 2 files changed, 46 insertions(+), 57 deletions(-)
+
+diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-s5pc100/include/mach/gpio.h
+index 2c4cbe8..29a8a12 100644
+--- a/arch/arm/mach-s5pc100/include/mach/gpio.h
++++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+@@ -12,6 +12,9 @@
+  * published by the Free Software Foundation.
+ */
  
-diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-s5pc100/gpiolib.c
-index 88dd913..0fab7f2 100644
---- a/arch/arm/mach-s5pc100/gpiolib.c
-+++ b/arch/arm/mach-s5pc100/gpiolib.c
-@@ -61,7 +61,6 @@
-  * L3	8	4Bit	None
-  */
- 
--#if 0
- static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int offset)
- {
- 	return S3C_IRQ_GPIO(chip->base + offset);
-@@ -85,7 +84,7 @@ static int s5pc100_gpiolib_to_eint(struct gpio_chip *chip, unsigned int offset)
- 		return IRQ_EINT(24 + offset);
- 	return -EINVAL;
- }
--#endif
++#ifndef __ASM_ARCH_GPIO_H
++#define __ASM_ARCH_GPIO_H __FILE__
 +
- static struct s3c_gpio_cfg gpio_cfg = {
- 	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
- 	.set_pull	= s3c_gpio_setpull_updown,
-diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
-index 84c74ac..f26c4d9 100644
---- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-@@ -97,10 +97,19 @@
- #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
- #define IRQ_VIC_END		S5P_IRQ_VIC2(31)
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
+ #define gpio_cansleep	__gpio_cansleep
+@@ -52,11 +55,6 @@
+ #define S5PC100_GPIO_L2_NR	(8)
+ #define S5PC100_GPIO_L3_NR	(8)
+ #define S5PC100_GPIO_L4_NR	(8)
+-#define S5PC100_GPIO_MP00_NR	(8)
+-#define S5PC100_GPIO_MP01_NR	(8)
+-#define S5PC100_GPIO_MP02_NR	(8)
+-#define S5PC100_GPIO_MP03_NR	(8)
+-#define S5PC100_GPIO_MP04_NR	(5)
  
--#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
-+#define S5P_EINT_16_31_BASE	(IRQ_VIC_END + 1)
+ /* GPIO bank numbes */
  
--#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
--					(S5P_IRQ_EINT_BASE + (x)-16))
-+#define S3C_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
-+
-+#define EINT_MODE		S3C_GPIO_SFN(0x2)
-+
-+#define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_IRQ_VIC0(0)) \
-+					: ((x) + S5P_EINT_16_31_BASE))
-+
-+#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
-+#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
-+#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
-+#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+@@ -65,50 +63,45 @@
+  * change from one gpio bank to another can be caught.
+ */
  
- #define S3C_IRQ_GPIO_BASE	(IRQ_EINT(31) + 1)
- #define S3C_IRQ_GPIO(x)		(S3C_IRQ_GPIO_BASE + (x))
+-#define S5PC1XX_GPIO_NEXT(__gpio) \
++#define S5PC100_GPIO_NEXT(__gpio) \
+ 	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
+ 
+-enum s3c_gpio_number {
++enum s5p_gpio_number {
+ 	S5PC100_GPIO_A0_START	= 0,
+-	S5PC100_GPIO_A1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_A0),
+-	S5PC100_GPIO_B_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_A1),
+-	S5PC100_GPIO_C_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_B),
+-	S5PC100_GPIO_D_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_C),
+-	S5PC100_GPIO_E0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_D),
+-	S5PC100_GPIO_E1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_E0),
+-	S5PC100_GPIO_F0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_E1),
+-	S5PC100_GPIO_F1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F0),
+-	S5PC100_GPIO_F2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F1),
+-	S5PC100_GPIO_F3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F2),
+-	S5PC100_GPIO_G0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_F3),
+-	S5PC100_GPIO_G1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G0),
+-	S5PC100_GPIO_G2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G1),
+-	S5PC100_GPIO_G3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G2),
+-	S5PC100_GPIO_H0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_G3),
+-	S5PC100_GPIO_H1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H0),
+-	S5PC100_GPIO_H2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H1),
+-	S5PC100_GPIO_H3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H2),
+-	S5PC100_GPIO_I_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_H3),
+-	S5PC100_GPIO_J0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_I),
+-	S5PC100_GPIO_J1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J0),
+-	S5PC100_GPIO_J2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J1),
+-	S5PC100_GPIO_J3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J2),
+-	S5PC100_GPIO_J4_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J3),
+-	S5PC100_GPIO_K0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_J4),
+-	S5PC100_GPIO_K1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K0),
+-	S5PC100_GPIO_K2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K1),
+-	S5PC100_GPIO_K3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K2),
+-	S5PC100_GPIO_L0_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_K3),
+-	S5PC100_GPIO_L1_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L0),
+-	S5PC100_GPIO_L2_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L1),
+-	S5PC100_GPIO_L3_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L2),
+-	S5PC100_GPIO_L4_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L3),
+-	S5PC100_GPIO_MP00_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_L4),
+-	S5PC100_GPIO_MP01_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP00),
+-	S5PC100_GPIO_MP02_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP01),
+-	S5PC100_GPIO_MP03_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP02),
+-	S5PC100_GPIO_MP04_START	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP03),
+-	S5PC100_GPIO_END	= S5PC1XX_GPIO_NEXT(S5PC100_GPIO_MP04),
++	S5PC100_GPIO_A1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_A0),
++	S5PC100_GPIO_B_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_A1),
++	S5PC100_GPIO_C_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_B),
++	S5PC100_GPIO_D_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_C),
++	S5PC100_GPIO_E0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_D),
++	S5PC100_GPIO_E1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_E0),
++	S5PC100_GPIO_F0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_E1),
++	S5PC100_GPIO_F1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_F0),
++	S5PC100_GPIO_F2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_F1),
++	S5PC100_GPIO_F3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_F2),
++	S5PC100_GPIO_G0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_F3),
++	S5PC100_GPIO_G1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_G0),
++	S5PC100_GPIO_G2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_G1),
++	S5PC100_GPIO_G3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_G2),
++	S5PC100_GPIO_H0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_G3),
++	S5PC100_GPIO_H1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_H0),
++	S5PC100_GPIO_H2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_H1),
++	S5PC100_GPIO_H3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_H2),
++	S5PC100_GPIO_I_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_H3),
++	S5PC100_GPIO_J0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_I),
++	S5PC100_GPIO_J1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_J0),
++	S5PC100_GPIO_J2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_J1),
++	S5PC100_GPIO_J3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_J2),
++	S5PC100_GPIO_J4_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_J3),
++	S5PC100_GPIO_K0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_J4),
++	S5PC100_GPIO_K1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_K0),
++	S5PC100_GPIO_K2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_K1),
++	S5PC100_GPIO_K3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_K2),
++	S5PC100_GPIO_L0_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_K3),
++	S5PC100_GPIO_L1_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_L0),
++	S5PC100_GPIO_L2_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_L1),
++	S5PC100_GPIO_L3_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_L2),
++	S5PC100_GPIO_L4_START	= S5PC100_GPIO_NEXT(S5PC100_GPIO_L3),
++	S5PC100_GPIO_END	= S5PC100_GPIO_NEXT(S5PC100_GPIO_L4),
+ };
+ 
+ /* S5PC100 GPIO number definitions. */
+@@ -146,17 +139,13 @@ enum s3c_gpio_number {
+ #define S5PC100_GPL2(_nr)	(S5PC100_GPIO_L2_START + (_nr))
+ #define S5PC100_GPL3(_nr)	(S5PC100_GPIO_L3_START + (_nr))
+ #define S5PC100_GPL4(_nr)	(S5PC100_GPIO_L4_START + (_nr))
+-#define S5PC100_MP00(_nr)	(S5PC100_GPIO_MP00_START + (_nr))
+-#define S5PC100_MP01(_nr)	(S5PC100_GPIO_MP01_START + (_nr))
+-#define S5PC100_MP02(_nr)	(S5PC100_GPIO_MP02_START + (_nr))
+-#define S5PC100_MP03(_nr)	(S5PC100_GPIO_MP03_START + (_nr))
+-#define S5PC100_MP04(_nr)	(S5PC100_GPIO_MP04_START + (_nr))
+-#define S5PC100_MP05(_nr)	(S5PC100_GPIO_MP05_START + (_nr))
+ 
+-/* It used the end of the S5PC1XX gpios */
++/* It used the end of the S5PC100 gpios */
+ #define S3C_GPIO_END		S5PC100_GPIO_END
+ 
+ /* define the number of gpios we need to the one after the MP04() range */
+ #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
+ 
+ #include <asm-generic/gpio.h>
++
++#endif /* __ASM_ARCH_GPIO_H */
 diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-index cd6200a..57a884f 100644
+index 43c7bc8..6866691 100644
 --- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
 +++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-@@ -47,24 +47,32 @@
- #define S5PC100_GPL2_BASE	(S5PC100_GPIO_BASE + 0x0360)
- #define S5PC100_GPL3_BASE	(S5PC100_GPIO_BASE + 0x0380)
- #define S5PC100_GPL4_BASE	(S5PC100_GPIO_BASE + 0x03A0)
--#define S5PC100_EINT_BASE	(S5PC100_GPIO_BASE + 0x0E00)
+@@ -3,11 +3,11 @@
+  * Copyright 2009 Samsung Electronics Co.
+  *      Byungho Min <bhmin@samsung.com>
+  *
+- * S5PC1XX - GPIO register definitions
++ * S5PC100 - GPIO register definitions
+  */
  
--#define S5PC100_UHOST		(S5PC100_GPIO_BASE + 0x0B68)
--#define S5PC100_PDNEN		(S5PC100_GPIO_BASE + 0x0F80)
-+#define S5PC100_EINT30CON		(S5PC100_GPIO_BASE + 0xE00)
-+#define S5P_EINT_CON(x)			(S5PC100_EINT30CON + ((x) * 0x4))
+-#ifndef __ASM_PLAT_S5PC1XX_REGS_GPIO_H
+-#define __ASM_PLAT_S5PC1XX_REGS_GPIO_H __FILE__
++#ifndef __ASM_MACH_S5PC100_REGS_GPIO_H
++#define __ASM_MACH_S5PC100_REGS_GPIO_H __FILE__
  
--/* PDNEN */
--#define S5PC100_PDNEN_CFG_PDNEN	(1 << 1)
--#define S5PC100_PDNEN_CFG_AUTO	(0 << 1)
--#define S5PC100_PDNEN_POWERDOWN	(1 << 0)
--#define S5PC100_PDNEN_NORMAL	(0 << 0)
-+#define S5PC100_EINT30FLTCON0		(S5PC100_GPIO_BASE + 0xE80)
-+#define S5P_EINT_FLTCON(x)		(S5PC100_EINT30FLTCON0 + ((x) * 0x4))
+ #include <mach/map.h>
  
--/* Common part */
--/* External interrupt base is same@both s5pc100 and s5pc110 */
--#define S5P_EINT_BASE			(S5PC100_EINT_BASE)
-+#define S5PC100_EINT30MASK		(S5PC100_GPIO_BASE + 0xF00)
-+#define S5P_EINT_MASK(x)		(S5PC100_EINT30MASK + ((x) * 0x4))
+@@ -66,5 +66,5 @@
+ #define S5PC100_GPx_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+ #define S5PC100_GPx_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
  
--#define S5PC100_GPx_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
--#define S5PC100_GPx_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
--#define S5PC100_GPx_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
-+#define S5PC100_EINT30PEND		(S5PC100_GPIO_BASE + 0xF40)
-+#define S5P_EINT_PEND(x)		(S5PC100_EINT30PEND + ((x) * 0x4))
-+
-+#define eint_offset(irq)	((irq) < IRQ_EINT16_31 ? ((irq) - IRQ_EINT(0)) \
-+						: ((irq) - S5P_EINT_16_31_BASE))
-+
-+#define EINT_REG_NR(x)			(eint_offset(x) >> 3)
-+
-+#define eint_irq_to_bit(irq)		(1 << (eint_offset(irq) & 0x7))
-+
-+/* values for S5P_EXTINT0 */
-+#define S5P_EXTINT_LOWLEV		(0x00)
-+#define S5P_EXTINT_HILEV		(0x01)
-+#define S5P_EXTINT_FALLEDGE		(0x02)
-+#define S5P_EXTINT_RISEEDGE		(0x03)
-+#define S5P_EXTINT_BOTHEDGE		(0x04)
- 
- #endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
+-#endif /* __ASM_PLAT_S5PC1XX_REGS_GPIO_H */
++#endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
  
 -- 
 1.6.4
