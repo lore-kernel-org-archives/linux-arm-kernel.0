@@ -1,16 +1,16 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 18 May 2010 17:10:40 +0800
+Date: Tue, 18 May 2010 17:24:02 +0800
 Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
-Message-ID: <4BF25990.6070602@gmail.com>
+In-Reply-To: <4BF25990.6070602@gmail.com>
+References: <4BF25990.6070602@gmail.com>
+Message-ID: <4BF25CB2.3020801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alessandro,
+Dear sir,
 
-This patch is to change the waiting for device ready implement
-for winbond nuc900 platform.
+Re-submitting the patch to fix careless bug.
 
-Thanks!
 
 Signed-off-by:Wan ZongShun<mcuos.com@gmail.com>
 
@@ -19,7 +19,7 @@ Signed-off-by:Wan ZongShun<mcuos.com@gmail.com>
  1 files changed, 7 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
-index a351bd5..8684051 100644
+index a351bd5..21d1330 100644
 --- a/drivers/rtc/rtc-nuc900.c
 +++ b/drivers/rtc/rtc-nuc900.c
 @@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
@@ -27,7 +27,7 @@ index a351bd5..8684051 100644
  static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
  {
 -	unsigned int i;
-+	unsigned int i, timeout = 0x1000, val;
++	unsigned int i, timeout = 0x1000;
  	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
 
  	mdelay(10);
@@ -44,7 +44,7 @@ index a351bd5..8684051 100644
 
 -	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
 -		return ERR_PTR(-ENODEV);
-+	if (timeout == 0x1000)
++	if (!timeout)
 +		return ERR_PTR(-EPERM);
 
 -	return ERR_PTR(-EPERM);
