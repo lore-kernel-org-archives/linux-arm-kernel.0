@@ -1,138 +1,175 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Tue, 18 May 2010 14:06:24 +0530
-Subject: [PATCH 1/3] ux500: Add cpu hotplug suport for ux500 platform
+Date: Tue, 18 May 2010 14:06:26 +0530
+Subject: [PATCH 3/3] ux500: Add CPUFreq support
 In-Reply-To: <1274171786-22990-1-git-send-email-sundar.iyer@stericsson.com>
 References: <1274171786-22990-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1274171786-22990-2-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1274171786-22990-4-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sundar R Iyer <sundar.iyer@stericsson.com>
 
-Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Sundar R Iyer <sundar.iyer@stericsson.com>
 ---
- arch/arm/mach-ux500/Makefile  |    1 +
- arch/arm/mach-ux500/hotplug.c |   87 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/platsmp.c |    2 +
- 3 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-ux500/hotplug.c
+ arch/arm/mach-ux500/Kconfig                       |    1 +
+ arch/arm/mach-ux500/Makefile                      |    2 +
+ arch/arm/mach-ux500/include/mach/u8500-prcm-api.h |   21 ++++++
+ arch/arm/mach-ux500/u8500-prcm.c                  |   74 +++++++++++++++++++++
+ 4 files changed, 98 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 6625e5b..2df43be 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -6,6 +6,7 @@ config UX500_SOC_COMMON
+ 	select ARM_GIC
+ 	select HAS_MTU
+ 	select NOMADIK_GPIO
++	select ARCH_HAS_CPUFREQ
+ 
+ config UX500_SOC_DB8500
+ 	bool
 diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index c7bc419..3c1ac87 100644
+index d3613ca..5afcd97 100644
 --- a/arch/arm/mach-ux500/Makefile
 +++ b/arch/arm/mach-ux500/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
- obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o
+@@ -9,3 +9,5 @@ obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o
  obj-$(CONFIG_MACH_U5500)	+= board-u5500.o
  obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o localtimer.o
-+obj-$(CONFIG_HOTPLUG_CPU)       += hotplug.o
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-new file mode 100644
-index 0000000..86ba11a
---- /dev/null
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -0,0 +1,87 @@
-+/*
-+ * Copyright (C) 2002 ARM Ltd.
-+ * Copyright (C) STMicroelectronics 2009
-+ * Copyright (C) ST-Ericsson SA 2010
+ obj-$(CONFIG_HOTPLUG_CPU)       += hotplug.o
++obj-$(CONFIG_CPU_FREQ)		+= cpufreq-ux500.o
++
+diff --git a/arch/arm/mach-ux500/include/mach/u8500-prcm-api.h b/arch/arm/mach-ux500/include/mach/u8500-prcm-api.h
+index 5f113c1..60a4281 100644
+--- a/arch/arm/mach-ux500/include/mach/u8500-prcm-api.h
++++ b/arch/arm/mach-ux500/include/mach/u8500-prcm-api.h
+@@ -9,13 +9,34 @@
+  * U8500 PRCMU APIs
+  */
+ 
++#ifndef __U8500_PRCM_API_H
++#define __U8500_PRCM_API_H
++
++/* PRCM take care to populate the frequencies */
++#include <linux/cpufreq.h>
++
++struct ux500_cpufreq_config {
++	int scaling_available_freqs;
++	struct cpufreq_frequency_table *cpu_freq_table;
++};
++
+ /* ux500 subsystem */
+ enum ux500_subsys {
+ 	SUBSYS_ARM,
+ 	SUBSYS_APE,
+ };
+ 
++/* suported ARM OPPs */
++enum ux500_arm_opp {
++	ARM_OPP_INIT = 0x00,
++	ARM_NO_CHANGE = 0x01,
++	ARM_100_OPP = 0x02,
++	ARM_50_OPP = 0x03,
++	ARM_EXTCLK = 0x07
++};
++
+ int prcm_set_subsys_opp(unsigned int subsys_opp_idx,
+ 		unsigned int subsys);
+ int prcm_get_subsys_opp(unsigned int subsys);
+ 
++#endif /* __U8500_PRCM_API_H */
+diff --git a/arch/arm/mach-ux500/u8500-prcm.c b/arch/arm/mach-ux500/u8500-prcm.c
+index 2703768..b5be8aa 100644
+--- a/arch/arm/mach-ux500/u8500-prcm.c
++++ b/arch/arm/mach-ux500/u8500-prcm.c
+@@ -129,6 +129,71 @@ static irqreturn_t prcm_irq_handler (int irq, void *ctrlr)
+ }
+ 
+ /**
++ * ux500_prcm_register_device() - Register a device like cpufreq/cpuidle
++ * @dev_name: name of device to be registered
++ * @id: device id
++ * @priv_data: any private data for device
 + *
-+ * License Terms: GNU General Public License v2
-+ *
-+ * Author: Sundar Iyer <sundar.iyer@stericsson.com>
-+ *
-+ * CPU Hotplug support for ux500
++ * This function creates and registers a platform device according to the
++ * name and id passed. The device can also be passed platform specific data
++ * this is very needed when client drivers handling SoC specific power mgmnt
++ * are dependent on this PRCM unit for operations.
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
-+#include <linux/io.h>
-+
-+#include <asm/cacheflush.h>
-+
-+extern volatile int pen_release;
-+
-+static DECLARE_COMPLETION(cpu_killed);
-+
-+static inline void platform_do_lowpower(unsigned int cpu)
++static int prcm_register_device(const char *dev_name, int id,
++		void *priv_data)
 +{
-+	/* flush cache */
-+	flush_cache_all();
-+	dsb();
++	int ret = 0;
++	struct platform_device *pdev;
 +
-+	/* go into WFI */
-+	for (;;) {
-+		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
-+				: : : "memory");
-+		if (pen_release == cpu) {
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		}
++	pdev = platform_device_alloc(dev_name, id);
++	if (!pdev)
++		return -ENOMEM;
 +
++	pdev->dev.platform_data = priv_data;
++
++	ret = platform_device_add(pdev);
++	if (ret != 0) {
++		printk(KERN_WARNING "Failed to register %s device\n",
++					 dev_name);
++		platform_device_put(pdev);
++		return ret;
 +	}
++
++	return ret;
 +}
 +
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return wait_for_completion_timeout(&cpu_killed, 5000);
-+}
-+
++#ifdef CONFIG_CPU_FREQ
 +/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
++ * We make a frequency table until we get the PRCM
++ * supporting us the dynamic table detection
 + */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+#ifdef DEBUG
-+	unsigned int this_cpu = hard_smp_processor_id();
++struct cpufreq_frequency_table db8500_freq_table[] = {
++	{
++		.index          = 0,
++		.frequency      = 200000,
++	},
++	{
++		.index          = 1,
++		.frequency      = 300000,
++	},
++	{
++		.index          = 2,
++		.frequency      = 600000,
++	},
++	{
++		.index          = 3,
++		.frequency      = CPUFREQ_TABLE_END,
++	},
++};
 +
-+	if (cpu != this_cpu) {
-+		printk(KERN_CRIT
-+			"Eek! platform_cpu_die running on %u, should be %u\n",
-+			this_cpu, cpu);
-+		BUG();
-+	}
++/* wrap it up into a platform data */
++static struct ux500_cpufreq_config db8500_cpufreq_info = {
++	.scaling_available_freqs = ARRAY_SIZE(db8500_freq_table),
++	.cpu_freq_table = db8500_freq_table,
++};
 +#endif
 +
-+	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-+	complete(&cpu_killed);
-+
-+	/*
-+	 * we do not touch secure regs which configure
-+	 * coherency; go to low power clearing off caches
-+	 */
-+	platform_do_lowpower(cpu);
-+}
-+
-+int mach_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-+
-+
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 438ef16..9e4c678 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -78,6 +78,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
- 	outer_clean_range(__pa(&pen_release), __pa(&pen_release) + 1);
++/**
+  * u8500_prcm_init() - U8500 PRCM driver init
+  */
+ static int u8500_prcm_init(void)
+@@ -146,6 +211,15 @@ static int u8500_prcm_init(void)
+ 		return -ENODEV;
+ 	}
  
-+	smp_cross_call(cpumask_of(cpu));
++#ifdef CONFIG_CPU_FREQ
++	/* register cpufreq device */
++	err = prcm_register_device("cpufreq-ux500", 0,
++			&db8500_cpufreq_info);
++	if (err < 0)
++		printk(KERN_ERR
++			"ux500-prcm: failed to register cpufreq-ux500\n");
++#endif
 +
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
- 		if (pen_release == -1)
+ 	/*
+ 	 * clear all prcm interrupts.
+ 	 * possibly some transaction can happen (from u-boot)
 -- 
 1.6.3.3
