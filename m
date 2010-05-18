@@ -1,53 +1,36 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 06:53:19 +0100
-Subject: Samsung SoCs framebuffer re-work
-In-Reply-To: <AANLkTimfbcYLyiuErIMcDqfAzz2L76J3j2IxlWS0b333@mail.gmail.com>
-References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-	<20100518025058.GL27571@trinity.fluff.org>
-	<AANLkTimfbcYLyiuErIMcDqfAzz2L76J3j2IxlWS0b333@mail.gmail.com>
-Message-ID: <20100518055319.GP27571@trinity.fluff.org>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Tue, 18 May 2010 15:00:26 +0900
+Subject: [PATCH] serial: SAMSUNG: Fix dev_name and driver_name
+In-Reply-To: <20100518053645.GN27571@trinity.fluff.org>
+References: <4BF13ABA.3090504@samsung.com>
+	<20100518024820.GK27571@trinity.fluff.org>
+	<4BF20EED.5040306@samsung.com>
+	<20100518053645.GN27571@trinity.fluff.org>
+Message-ID: <4BF22CFA.8070701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 12:09:25PM +0900, Kyungmin Park wrote:
-> On Tue, May 18, 2010 at 11:50 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
-> >> Hi Ben,
-> >>
-> >> Currently there's only one fb drivers for samsung SocS. but it's based
-> >> on s3c24xx and a part of s3c64xx.
-> >
-> > Your statement is incorrect, we have the s3c2410-fb driver which deals
-> > with the 2410/2440/2412 style hardware and s3c-fb which is for the newer
-> > devices.
+On 5/18/2010 2:36 PM, Ben Dooks wrote:
+> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
+>> On 5/18/2010 11:48 AM, Ben Dooks wrote:
+>>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
+>>>> Thd dev_name and driver_name should be switched each other.
+>>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
+>>>  
+>>> Please provide some information about what problem that this is fixing
+>>> and the impact on any existing systems.
+>>>
+>> The serial device nodes are created to s3c2410_serial* on android 
+>> platform instead of ttySAC*.
 > 
-> Yes it's working on s5pc110. I mean it's not fit the platform requirement.
-
-?
- 
-> >
-> >> As you can see the s5pc110 (aka s5pv210) spec, It has more features
-> >> and interconnection between FIMC and FIMD.
-> >> So current fb driver can't handle these features well. So LSI make a
-> >> own fb drivers and use it. You can see the code at their git repo.
-> >>
-> >> Now we are re-implement or change it for s5pc110 and for future usages.
-> >> How do you think?
-> >
-> > I've already got updates for s3c-fb to work on 2416,2443 and the c110/v210
-> > systems. I am talking with the relevant people at System.LSI to get our
-> > drivers closers together, possibly we can get this done for the current
-> > merge window.
+> This has been how they've been for ages, surely the android device node
+> creation sytstem supports symlinking /dev/SACx -> /dev/s3c2410_serialx,
+> like many other operating sysyerms that can already do this.
 > 
-> You mean you want to use the current fb drivers for s5pc110 also?
-> Then how to do implement features mentioned by Kukjin?
+> Changing this just because android (something as-yet unmerged into mainline)
+> does not like it. I'm not even happy with an #ifdef around this.
+> 
 
-Well, apart from the fact that quite a lot of them are actually features
-that are in all versions of this block, we intend to create some patches
-and send them to the relevant lists...
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+I don't want this too. I wonder if "s3c2410_serial" dev_name is correct?
+Most serial drivers have tty prefix to dev_name, so i think ttySACx is more proper.
+Please see other serial drivers.
