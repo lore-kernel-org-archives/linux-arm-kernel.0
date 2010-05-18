@@ -1,58 +1,59 @@
 From: jassi.brar@samsung.com (Jassi Brar)
-Date: Tue, 18 May 2010 11:59:20 +0900
-Subject: [PATCH 4/6] S5P6440: DMA: Add platform devices for PL330 DMACs
+Date: Tue, 18 May 2010 11:59:13 +0900
+Subject: [PATCH 3/6] S5PC100: DMA: Add platform devices for PL330 DMACs
 In-Reply-To: <1274151523-21345-1-git-send-email-jassi.brar@samsung.com>
 References: <1274151523-21345-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <1274151560-21474-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <1274151553-21441-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung's Soc S5P6440 has one PL330 DMAC.
-Define and add the PL330 DMAC as platform device on the
-S5P6440 platform.
+Samsung's Soc S5PC100 has three PL330 DMACs. First is dedicated for
+Memory->Memory data transfer while the other two meant for data
+transfer with peripherals.
+Define and add latter two PL330 DMACs as platform devices on the
+S5PC100 platform.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s5p6440/Kconfig            |    1 +
- arch/arm/mach-s5p6440/Makefile           |    2 +-
- arch/arm/mach-s5p6440/dma.c              |  105 ++++++++++++++++++++++++++++++
- arch/arm/mach-s5p6440/include/mach/dma.h |   26 +++++++
- arch/arm/mach-s5p6440/include/mach/map.h |    2 +
- 5 files changed, 135 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-s5p6440/dma.c
- create mode 100644 arch/arm/mach-s5p6440/include/mach/dma.h
+ arch/arm/mach-s5pc100/Kconfig            |    1 +
+ arch/arm/mach-s5pc100/Makefile           |    2 +-
+ arch/arm/mach-s5pc100/dma.c              |  167 ++++++++++++++++++++++++++++++
+ arch/arm/mach-s5pc100/include/mach/dma.h |   26 +++++
+ 4 files changed, 195 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc100/dma.c
+ create mode 100644 arch/arm/mach-s5pc100/include/mach/dma.h
 
-diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
-index 4c29ff8..77aeffd 100644
---- a/arch/arm/mach-s5p6440/Kconfig
-+++ b/arch/arm/mach-s5p6440/Kconfig
-@@ -9,6 +9,7 @@ if ARCH_S5P6440
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 27ec167..0b157b0 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -7,6 +7,7 @@
  
- config CPU_S5P6440
+ config CPU_S5PC100
  	bool
 +	select S3C_PL330_DMA
+ 	select CPU_S5PC100_INIT
+ 	select CPU_S5PC100_CLOCK
  	help
- 	  Enable S5P6440 CPU support
+diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+index 809ff10..c32801e 100644
+--- a/arch/arm/mach-s5pc100/Makefile
++++ b/arch/arm/mach-s5pc100/Makefile
+@@ -11,7 +11,7 @@ obj-				:=
  
-diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
-index 1ad894b..3f243dd 100644
---- a/arch/arm/mach-s5p6440/Makefile
-+++ b/arch/arm/mach-s5p6440/Makefile
-@@ -12,7 +12,7 @@ obj-				:=
+ # Core support for S5PC100 system
  
- # Core support for S5P6440 system
+-obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
++obj-$(CONFIG_CPU_S5PC100)	+= cpu.o dma.o
  
--obj-$(CONFIG_CPU_S5P6440)	+= cpu.o init.o clock.o gpio.o
-+obj-$(CONFIG_CPU_S5P6440)	+= cpu.o init.o clock.o gpio.o dma.o
+ # Helper and device support
  
- # machine support
- 
-diff --git a/arch/arm/mach-s5p6440/dma.c b/arch/arm/mach-s5p6440/dma.c
+diff --git a/arch/arm/mach-s5pc100/dma.c b/arch/arm/mach-s5pc100/dma.c
 new file mode 100644
-index 0000000..07606ad
+index 0000000..8e7af46
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/dma.c
-@@ -0,0 +1,105 @@
++++ b/arch/arm/mach-s5pc100/dma.c
+@@ -0,0 +1,167 @@
 +/*
 + * Copyright (C) 2010 Samsung Electronics Co. Ltd.
 + *	Jaswinder Singh <jassi.brar@samsung.com>
@@ -79,26 +80,25 @@ index 0000000..07606ad
 +#include <plat/irqs.h>
 +
 +#include <mach/map.h>
-+#include <mach/irqs.h>
 +
 +#include <plat/s3c-pl330-pdata.h>
 +
 +static u64 dma_dmamask = DMA_BIT_MASK(32);
 +
-+static struct resource s5p6440_pdma_resource[] = {
++static struct resource s5pc100_pdma0_resource[] = {
 +	[0] = {
-+		.start  = S5P6440_PA_PDMA,
-+		.end    = S5P6440_PA_PDMA + SZ_4K,
++		.start  = S5PC100_PA_PDMA0,
++		.end    = S5PC100_PA_PDMA0 + SZ_4K,
 +		.flags = IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.start	= IRQ_DMA0,
-+		.end	= IRQ_DMA0,
++		.start	= IRQ_PDMA0,
++		.end	= IRQ_PDMA0,
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+static struct s3c_pl330_platdata s5p6440_pdma_pdata = {
++static struct s3c_pl330_platdata s5pc100_pdma0_pdata = {
 +	.peri = {
 +		[0] = DMACH_UART0_RX,
 +		[1] = DMACH_UART0_TX,
@@ -108,61 +108,124 @@ index 0000000..07606ad
 +		[5] = DMACH_UART2_TX,
 +		[6] = DMACH_UART3_RX,
 +		[7] = DMACH_UART3_TX,
-+		[8] = DMACH_MAX,
-+		[9] = DMACH_MAX,
-+		[10] = DMACH_PCM0_TX,
-+		[11] = DMACH_PCM0_RX,
-+		[12] = DMACH_I2S0_TX,
-+		[13] = DMACH_I2S0_RX,
-+		[14] = DMACH_SPI0_TX,
-+		[15] = DMACH_SPI0_RX,
-+		[16] = DMACH_MAX,
-+		[17] = DMACH_MAX,
-+		[18] = DMACH_MAX,
-+		[19] = DMACH_MAX,
-+		[20] = DMACH_SPI1_TX,
-+		[21] = DMACH_SPI1_RX,
-+		[22] = DMACH_MAX,
-+		[23] = DMACH_MAX,
-+		[24] = DMACH_MAX,
-+		[25] = DMACH_MAX,
-+		[26] = DMACH_MAX,
-+		[27] = DMACH_MAX,
-+		[28] = DMACH_MAX,
-+		[29] = DMACH_PWM,
++		[8] = DMACH_IRDA,
++		[9] = DMACH_I2S0_RX,
++		[10] = DMACH_I2S0_TX,
++		[11] = DMACH_I2S0S_TX,
++		[12] = DMACH_I2S1_RX,
++		[13] = DMACH_I2S1_TX,
++		[14] = DMACH_I2S2_RX,
++		[15] = DMACH_I2S2_TX,
++		[16] = DMACH_SPI0_RX,
++		[17] = DMACH_SPI0_TX,
++		[18] = DMACH_SPI1_RX,
++		[19] = DMACH_SPI1_TX,
++		[20] = DMACH_SPI2_RX,
++		[21] = DMACH_SPI2_TX,
++		[22] = DMACH_AC97_MICIN,
++		[23] = DMACH_AC97_PCMIN,
++		[24] = DMACH_AC97_PCMOUT,
++		[25] = DMACH_EXTERNAL,
++		[26] = DMACH_PWM,
++		[27] = DMACH_SPDIF,
++		[28] = DMACH_HSI_RX,
++		[29] = DMACH_HSI_TX,
 +		[30] = DMACH_MAX,
 +		[31] = DMACH_MAX,
 +	},
 +};
 +
-+static struct platform_device s5p6440_device_pdma = {
++static struct platform_device s5pc100_device_pdma0 = {
 +	.name		= "s3c-pl330",
 +	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(s5p6440_pdma_resource),
-+	.resource	= s5p6440_pdma_resource,
++	.num_resources	= ARRAY_SIZE(s5pc100_pdma0_resource),
++	.resource	= s5pc100_pdma0_resource,
 +	.dev		= {
 +		.dma_mask = &dma_dmamask,
 +		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s5p6440_pdma_pdata,
++		.platform_data = &s5pc100_pdma0_pdata,
 +	},
 +};
 +
-+static struct platform_device *s5p6440_dmacs[] __initdata = {
-+	&s5p6440_device_pdma,
++static struct resource s5pc100_pdma1_resource[] = {
++	[0] = {
++		.start  = S5PC100_PA_PDMA1,
++		.end    = S5PC100_PA_PDMA1 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_PDMA1,
++		.end	= IRQ_PDMA1,
++		.flags	= IORESOURCE_IRQ,
++	},
 +};
 +
-+static int __init s5p6440_dma_init(void)
++static struct s3c_pl330_platdata s5pc100_pdma1_pdata = {
++	.peri = {
++		[0] = DMACH_UART0_RX,
++		[1] = DMACH_UART0_TX,
++		[2] = DMACH_UART1_RX,
++		[3] = DMACH_UART1_TX,
++		[4] = DMACH_UART2_RX,
++		[5] = DMACH_UART2_TX,
++		[6] = DMACH_UART3_RX,
++		[7] = DMACH_UART3_TX,
++		[8] = DMACH_IRDA,
++		[9] = DMACH_I2S0_RX,
++		[10] = DMACH_I2S0_TX,
++		[11] = DMACH_I2S0S_TX,
++		[12] = DMACH_I2S1_RX,
++		[13] = DMACH_I2S1_TX,
++		[14] = DMACH_I2S2_RX,
++		[15] = DMACH_I2S2_TX,
++		[16] = DMACH_SPI0_RX,
++		[17] = DMACH_SPI0_TX,
++		[18] = DMACH_SPI1_RX,
++		[19] = DMACH_SPI1_TX,
++		[20] = DMACH_SPI2_RX,
++		[21] = DMACH_SPI2_TX,
++		[22] = DMACH_PCM0_RX,
++		[23] = DMACH_PCM0_TX,
++		[24] = DMACH_PCM1_RX,
++		[25] = DMACH_PCM1_TX,
++		[26] = DMACH_MSM_REQ0,
++		[27] = DMACH_MSM_REQ1,
++		[28] = DMACH_MSM_REQ2,
++		[29] = DMACH_MSM_REQ3,
++		[30] = DMACH_MAX,
++		[31] = DMACH_MAX,
++	},
++};
++
++static struct platform_device s5pc100_device_pdma1 = {
++	.name		= "s3c-pl330",
++	.id		= 2,
++	.num_resources	= ARRAY_SIZE(s5pc100_pdma1_resource),
++	.resource	= s5pc100_pdma1_resource,
++	.dev		= {
++		.dma_mask = &dma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s5pc100_pdma1_pdata,
++	},
++};
++
++static struct platform_device *s5pc100_dmacs[] __initdata = {
++	&s5pc100_device_pdma0,
++	&s5pc100_device_pdma1,
++};
++
++static int __init s5pc100_dma_init(void)
 +{
-+	platform_add_devices(s5p6440_dmacs, ARRAY_SIZE(s5p6440_dmacs));
++	platform_add_devices(s5pc100_dmacs, ARRAY_SIZE(s5pc100_dmacs));
 +
 +	return 0;
 +}
-+arch_initcall(s5p6440_dma_init);
-diff --git a/arch/arm/mach-s5p6440/include/mach/dma.h b/arch/arm/mach-s5p6440/include/mach/dma.h
++arch_initcall(s5pc100_dma_init);
+diff --git a/arch/arm/mach-s5pc100/include/mach/dma.h b/arch/arm/mach-s5pc100/include/mach/dma.h
 new file mode 100644
 index 0000000..81209eb
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/include/mach/dma.h
++++ b/arch/arm/mach-s5pc100/include/mach/dma.h
 @@ -0,0 +1,26 @@
 +/*
 + * Copyright (C) 2010 Samsung Electronics Co. Ltd.
@@ -190,18 +253,5 @@ index 0000000..81209eb
 +#include <plat/s3c-dma-pl330.h>
 +
 +#endif /* __MACH_DMA_H */
-diff --git a/arch/arm/mach-s5p6440/include/mach/map.h b/arch/arm/mach-s5p6440/include/mach/map.h
-index 8924e5a..0275784 100644
---- a/arch/arm/mach-s5p6440/include/mach/map.h
-+++ b/arch/arm/mach-s5p6440/include/mach/map.h
-@@ -29,6 +29,8 @@
- #define S5P6440_PA_VIC0		(0xE4000000)
- #define S5P_PA_VIC0		S5P6440_PA_VIC0
- 
-+#define S5P6440_PA_PDMA		0xE9000000
-+
- #define S5P6440_PA_VIC1		(0xE4100000)
- #define S5P_PA_VIC1		S5P6440_PA_VIC1
- 
 -- 
 1.6.2.5
