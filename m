@@ -1,180 +1,142 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:12 +0300
-Subject: [PATCH 21/23] board-omap3-beagle: add DSS2 support
+Date: Tue, 18 May 2010 15:35:14 +0300
+Subject: [PATCH 23/23] OMAP: DSS2: Fix omap_dss_probe() error path
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-22-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-24-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Koen Kooi <koen.kooi@gmail.com>
+From: Jani Nikula <ext-jani.1.nikula@nokia.com>
 
-This patch adds DSS2 support to the beagleboard boardfile. DVI and
-TV-out are supported.
+Perform graceful cleanup on errors instead of just bailing out.
 
-Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+Signed-off-by: Jani Nikula <ext-jani.1.nikula@nokia.com>
+Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |  101 +++++++++++++++++++++++--------
- 1 files changed, 75 insertions(+), 26 deletions(-)
+ drivers/video/omap2/dss/core.c |   54 ++++++++++++++++++++++++++++++---------
+ 1 files changed, 41 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 962d377..69b154c 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -39,6 +39,7 @@
+diff --git a/drivers/video/omap2/dss/core.c b/drivers/video/omap2/dss/core.c
+index 92ee067..b3a498f 100644
+--- a/drivers/video/omap2/dss/core.c
++++ b/drivers/video/omap2/dss/core.c
+@@ -507,7 +507,7 @@ static int omap_dss_probe(struct platform_device *pdev)
  
- #include <plat/board.h>
- #include <plat/common.h>
-+#include <plat/display.h>
- #include <plat/gpmc.h>
- #include <plat/nand.h>
- #include <plat/usb.h>
-@@ -106,6 +107,77 @@ static struct platform_device omap3beagle_nand_device = {
- 	.resource	= &omap3beagle_nand_resource,
- };
+ 	r = dss_get_clocks();
+ 	if (r)
+-		goto fail0;
++		goto err_clocks;
  
-+/* DSS */
-+
-+static int beagle_enable_dvi(struct omap_dss_device *dssdev)
-+{
-+	if (gpio_is_valid(dssdev->reset_gpio))
-+		gpio_set_value(dssdev->reset_gpio, 1);
-+
-+	return 0;
-+}
-+
-+static void beagle_disable_dvi(struct omap_dss_device *dssdev)
-+{
-+	if (gpio_is_valid(dssdev->reset_gpio))
-+		gpio_set_value(dssdev->reset_gpio, 0);
-+}
-+
-+static struct omap_dss_device beagle_dvi_device = {
-+	.type = OMAP_DISPLAY_TYPE_DPI,
-+	.name = "dvi",
-+	.driver_name = "generic_panel",
-+	.phy.dpi.data_lines = 24,
-+	.reset_gpio = 170,
-+	.platform_enable = beagle_enable_dvi,
-+	.platform_disable = beagle_disable_dvi,
-+};
-+
-+static struct omap_dss_device beagle_tv_device = {
-+	.name = "tv",
-+	.driver_name = "venc",
-+	.type = OMAP_DISPLAY_TYPE_VENC,
-+	.phy.venc.type = OMAP_DSS_VENC_TYPE_SVIDEO,
-+};
-+
-+static struct omap_dss_device *beagle_dss_devices[] = {
-+	&beagle_dvi_device,
-+	&beagle_tv_device,
-+};
-+
-+static struct omap_dss_board_info beagle_dss_data = {
-+	.num_devices = ARRAY_SIZE(beagle_dss_devices),
-+	.devices = beagle_dss_devices,
-+	.default_device = &beagle_dvi_device,
-+};
-+
-+static struct platform_device beagle_dss_device = {
-+	.name          = "omapdss",
-+	.id            = -1,
-+	.dev            = {
-+		.platform_data = &beagle_dss_data,
-+	},
-+};
-+
-+static struct regulator_consumer_supply beagle_vdac_supply =
-+	REGULATOR_SUPPLY("vdda_dac", "omapdss");
-+
-+static struct regulator_consumer_supply beagle_vdvi_supply =
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss");
-+
-+static void __init beagle_display_init(void)
-+{
-+	int r;
-+
-+	r = gpio_request(beagle_dvi_device.reset_gpio, "DVI reset");
-+	if (r < 0) {
-+		printk(KERN_ERR "Unable to get DVI reset GPIO\n");
-+		return;
-+	}
-+
-+	gpio_direction_output(beagle_dvi_device.reset_gpio, 0);
-+}
-+
- #include "sdram-micron-mt46h32m32lf-6.h"
+ 	dss_clk_enable_all_no_ctx();
  
- static struct omap2_hsmmc_info mmc[] = {
-@@ -117,15 +189,6 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{}	/* Terminator */
- };
+@@ -523,57 +523,64 @@ static int omap_dss_probe(struct platform_device *pdev)
+ 	r = dss_init(skip_init);
+ 	if (r) {
+ 		DSSERR("Failed to initialize DSS\n");
+-		goto fail0;
++		goto err_dss;
+ 	}
  
--static struct platform_device omap3_beagle_lcd_device = {
--	.name		= "omap3beagle_lcd",
--	.id		= -1,
--};
--
--static struct omap_lcd_config omap3_beagle_lcd_config __initdata = {
--	.ctrl_name	= "internal",
--};
--
- static struct regulator_consumer_supply beagle_vmmc1_supply = {
- 	.supply			= "vmmc",
- };
-@@ -181,16 +244,6 @@ static struct twl4030_gpio_platform_data beagle_gpio_data = {
- 	.setup		= beagle_twl_gpio_setup,
- };
+ 	r = rfbi_init();
+ 	if (r) {
+ 		DSSERR("Failed to initialize rfbi\n");
+-		goto fail0;
++		goto err_rfbi;
+ 	}
  
--static struct regulator_consumer_supply beagle_vdac_supply = {
--	.supply		= "vdac",
--	.dev		= &omap3_beagle_lcd_device.dev,
--};
--
--static struct regulator_consumer_supply beagle_vdvi_supply = {
--	.supply		= "vdvi",
--	.dev		= &omap3_beagle_lcd_device.dev,
--};
--
- /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
- static struct regulator_init_data beagle_vmmc1 = {
- 	.constraints = {
-@@ -349,14 +402,8 @@ static struct platform_device keys_gpio = {
- 	},
- };
+ 	r = dpi_init(pdev);
+ 	if (r) {
+ 		DSSERR("Failed to initialize dpi\n");
+-		goto fail0;
++		goto err_dpi;
+ 	}
  
--static struct omap_board_config_kernel omap3_beagle_config[] __initdata = {
--	{ OMAP_TAG_LCD,		&omap3_beagle_lcd_config },
--};
--
- static void __init omap3_beagle_init_irq(void)
- {
--	omap_board_config = omap3_beagle_config;
--	omap_board_config_size = ARRAY_SIZE(omap3_beagle_config);
- 	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
- 			     mt46h32m32lf6_sdrc_params);
- 	omap_init_irq();
-@@ -367,9 +414,9 @@ static void __init omap3_beagle_init_irq(void)
+ 	r = dispc_init();
+ 	if (r) {
+ 		DSSERR("Failed to initialize dispc\n");
+-		goto fail0;
++		goto err_dispc;
+ 	}
+ 
+ 	r = venc_init(pdev);
+ 	if (r) {
+ 		DSSERR("Failed to initialize venc\n");
+-		goto fail0;
++		goto err_venc;
+ 	}
+ 
+ 	if (cpu_is_omap34xx()) {
+ 		r = sdi_init(skip_init);
+ 		if (r) {
+ 			DSSERR("Failed to initialize SDI\n");
+-			goto fail0;
++			goto err_sdi;
+ 		}
+ 
+ 		r = dsi_init(pdev);
+ 		if (r) {
+ 			DSSERR("Failed to initialize DSI\n");
+-			goto fail0;
++			goto err_dsi;
+ 		}
+ 	}
+ 
+ 	r = dss_initialize_debugfs();
+ 	if (r)
+-		goto fail0;
++		goto err_debugfs;
+ 
+ 	for (i = 0; i < pdata->num_devices; ++i) {
+ 		struct omap_dss_device *dssdev = pdata->devices[i];
+ 
+ 		r = omap_dss_register_device(dssdev);
+-		if (r)
+-			DSSERR("device reg failed %d\n", i);
++		if (r) {
++			DSSERR("device %d %s register failed %d\n", i,
++				dssdev->name ?: "unnamed", r);
++
++			while (--i >= 0)
++				omap_dss_unregister_device(pdata->devices[i]);
++
++			goto err_register;
++		}
+ 
+ 		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
+ 			pdata->default_device = dssdev;
+@@ -583,8 +590,29 @@ static int omap_dss_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-	/* XXX fail correctly */
+-fail0:
++err_register:
++	dss_uninitialize_debugfs();
++err_debugfs:
++	if (cpu_is_omap34xx())
++		dsi_exit();
++err_dsi:
++	if (cpu_is_omap34xx())
++		sdi_exit();
++err_sdi:
++	venc_exit();
++err_venc:
++	dispc_exit();
++err_dispc:
++	dpi_exit();
++err_dpi:
++	rfbi_exit();
++err_rfbi:
++	dss_exit();
++err_dss:
++	dss_clk_disable_all_no_ctx();
++	dss_put_clocks();
++err_clocks:
++
+ 	return r;
  }
  
- static struct platform_device *omap3_beagle_devices[] __initdata = {
--	&omap3_beagle_lcd_device,
- 	&leds_gpio,
- 	&keys_gpio,
-+	&beagle_dss_device,
- };
- 
- static void __init omap3beagle_flash_init(void)
-@@ -456,6 +503,8 @@ static void __init omap3_beagle_init(void)
- 	/* Ensure SDRC pins are mux'd for self-refresh */
- 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
- 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
-+
-+	beagle_display_init();
- }
- 
- static void __init omap3_beagle_map_io(void)
 -- 
 1.7.0.4
