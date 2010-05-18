@@ -1,41 +1,41 @@
 From: jassi.brar@samsung.com (Jassi Brar)
-Date: Tue, 18 May 2010 16:02:50 +0900
-Subject: [PATCH 6/9] ARM: S5P6442: Add audio platform devices
+Date: Tue, 18 May 2010 16:02:39 +0900
+Subject: [PATCH 4/9] ARM: S5PC100: Add audio platform devices
 In-Reply-To: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
 References: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <1274166170-8193-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <1274166159-6960-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define platform devices for all audio devices found on S5P6442
+Define platform devices for all audio devices found on S5PC100
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s5p6442/Makefile            |    3 +
- arch/arm/mach-s5p6442/dev-audio.c         |  201 +++++++++++++++++++++++++++++
- arch/arm/mach-s5p6442/include/mach/map.h  |    8 +
- arch/arm/plat-samsung/include/plat/devs.h |    5 +
- 4 files changed, 217 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5p6442/dev-audio.c
+ arch/arm/mach-s5pc100/Makefile            |    3 +
+ arch/arm/mach-s5pc100/dev-audio.c         |  293 +++++++++++++++++++++++++++++
+ arch/arm/mach-s5pc100/include/mach/map.h  |    7 +
+ arch/arm/plat-samsung/include/plat/devs.h |    7 +
+ 4 files changed, 310 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc100/dev-audio.c
 
-diff --git a/arch/arm/mach-s5p6442/Makefile b/arch/arm/mach-s5p6442/Makefile
-index 17bd22e..bf30550 100644
---- a/arch/arm/mach-s5p6442/Makefile
-+++ b/arch/arm/mach-s5p6442/Makefile
-@@ -17,3 +17,6 @@ obj-$(CONFIG_CPU_S5P6442)	+= cpu.o init.o clock.o dma.o
- # machine support
+diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+index c32801e..a81abef 100644
+--- a/arch/arm/mach-s5pc100/Makefile
++++ b/arch/arm/mach-s5pc100/Makefile
+@@ -19,3 +19,6 @@ obj-$(CONFIG_S5PC100_SETUP_SDHCI)       += setup-sdhci.o
  
- obj-$(CONFIG_MACH_SMDK6442)	+= mach-smdk6442.o
+ # machine support
+ obj-$(CONFIG_MACH_SMDKC100)	+= mach-smdkc100.o
 +
 +# device support
 +obj-y				+= dev-audio.o
-diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
+diff --git a/arch/arm/mach-s5pc100/dev-audio.c b/arch/arm/mach-s5pc100/dev-audio.c
 new file mode 100644
-index 0000000..17cdd82
+index 0000000..194b825
 --- /dev/null
-+++ b/arch/arm/mach-s5p6442/dev-audio.c
-@@ -0,0 +1,197 @@
-+/* linux/arch/arm/mach-s5p6442/dev-audio.c
++++ b/arch/arm/mach-s5pc100/dev-audio.c
+@@ -0,0 +1,287 @@
++/* linux/arch/arm/mach-s5pc100/dev-audio.c
 + *
 + * Copyright (c) 2010 Samsung Electronics Co. Ltd
 + *	Jaswinder Singh <jassi.brar@samsung.com>
@@ -56,24 +56,27 @@ index 0000000..17cdd82
 +#include <mach/dma.h>
 +#include <mach/irqs.h>
 +
-+static int s5p6442_cfg_i2s(struct platform_device *pdev)
++static int s5pc100_cfg_i2s(struct platform_device *pdev)
 +{
 +	/* configure GPIO for i2s port */
 +	switch (pdev->id) {
 +	case 1:
-+		s3c_gpio_cfgpin(S5P6442_GPC1(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(4), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PC100_GPC(0), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PC100_GPC(1), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PC100_GPC(2), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PC100_GPC(3), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PC100_GPC(4), S3C_GPIO_SFN(2));
 +		break;
 +
-+	case -1:
-+		s3c_gpio_cfgpin(S5P6442_GPC0(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(4), S3C_GPIO_SFN(2));
++	case 2:
++		s3c_gpio_cfgpin(S5PC100_GPG3(0), S3C_GPIO_SFN(4));
++		s3c_gpio_cfgpin(S5PC100_GPG3(1), S3C_GPIO_SFN(4));
++		s3c_gpio_cfgpin(S5PC100_GPG3(2), S3C_GPIO_SFN(4));
++		s3c_gpio_cfgpin(S5PC100_GPG3(3), S3C_GPIO_SFN(4));
++		s3c_gpio_cfgpin(S5PC100_GPG3(4), S3C_GPIO_SFN(4));
++		break;
++
++	case -1: /* Dedicated pins */
 +		break;
 +
 +	default:
@@ -85,13 +88,13 @@ index 0000000..17cdd82
 +}
 +
 +static struct s3c_audio_pdata s3c_i2s_pdata = {
-+	.cfg_gpio = s5p6442_cfg_i2s,
++	.cfg_gpio = s5pc100_cfg_i2s,
 +};
 +
-+static struct resource s5p6442_iis0_resource[] = {
++static struct resource s5pc100_iis0_resource[] = {
 +	[0] = {
-+		.start = S5P6442_PA_I2S0,
-+		.end   = S5P6442_PA_I2S0 + 0x100 - 1,
++		.start = S5PC100_PA_I2S0,
++		.end   = S5PC100_PA_I2S0 + 0x100 - 1,
 +		.flags = IORESOURCE_MEM,
 +	},
 +	[1] = {
@@ -106,20 +109,20 @@ index 0000000..17cdd82
 +	},
 +};
 +
-+struct platform_device s5p6442_device_iis0 = {
++struct platform_device s5pc100_device_iis0 = {
 +	.name		  = "s3c64xx-iis-v4",
 +	.id		  = -1,
-+	.num_resources	  = ARRAY_SIZE(s5p6442_iis0_resource),
-+	.resource	  = s5p6442_iis0_resource,
++	.num_resources	  = ARRAY_SIZE(s5pc100_iis0_resource),
++	.resource	  = s5pc100_iis0_resource,
 +	.dev = {
 +		.platform_data = &s3c_i2s_pdata,
 +	},
 +};
 +
-+static struct resource s5p6442_iis1_resource[] = {
++static struct resource s5pc100_iis1_resource[] = {
 +	[0] = {
-+		.start = S5P6442_PA_I2S1,
-+		.end   = S5P6442_PA_I2S1 + 0x100 - 1,
++		.start = S5PC100_PA_I2S1,
++		.end   = S5PC100_PA_I2S1 + 0x100 - 1,
 +		.flags = IORESOURCE_MEM,
 +	},
 +	[1] = {
@@ -134,11 +137,39 @@ index 0000000..17cdd82
 +	},
 +};
 +
-+struct platform_device s5p6442_device_iis1 = {
++struct platform_device s5pc100_device_iis1 = {
 +	.name		  = "s3c64xx-iis",
 +	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5p6442_iis1_resource),
-+	.resource	  = s5p6442_iis1_resource,
++	.num_resources	  = ARRAY_SIZE(s5pc100_iis1_resource),
++	.resource	  = s5pc100_iis1_resource,
++	.dev = {
++		.platform_data = &s3c_i2s_pdata,
++	},
++};
++
++static struct resource s5pc100_iis2_resource[] = {
++	[0] = {
++		.start = S5PC100_PA_I2S2,
++		.end   = S5PC100_PA_I2S2 + 0x100 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = DMACH_I2S2_TX,
++		.end   = DMACH_I2S2_TX,
++		.flags = IORESOURCE_DMA,
++	},
++	[2] = {
++		.start = DMACH_I2S2_RX,
++		.end   = DMACH_I2S2_RX,
++		.flags = IORESOURCE_DMA,
++	},
++};
++
++struct platform_device s5pc100_device_iis2 = {
++	.name		  = "s3c64xx-iis",
++	.id		  = 2,
++	.num_resources	  = ARRAY_SIZE(s5pc100_iis2_resource),
++	.resource	  = s5pc100_iis2_resource,
 +	.dev = {
 +		.platform_data = &s3c_i2s_pdata,
 +	},
@@ -146,23 +177,23 @@ index 0000000..17cdd82
 +
 +/* PCM Controller platform_devices */
 +
-+static int s5p6442_pcm_cfg_gpio(struct platform_device *pdev)
++static int s5pc100_pcm_cfg_gpio(struct platform_device *pdev)
 +{
 +	switch (pdev->id) {
 +	case 0:
-+		s3c_gpio_cfgpin(S5P6442_GPC0(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC0(4), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPG3(0), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5PC100_GPG3(1), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5PC100_GPG3(2), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5PC100_GPG3(3), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5PC100_GPG3(4), S3C_GPIO_SFN(5));
 +		break;
 +
 +	case 1:
-+		s3c_gpio_cfgpin(S5P6442_GPC1(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5P6442_GPC1(4), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPC(0), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPC(1), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPC(2), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPC(3), S3C_GPIO_SFN(3));
++		s3c_gpio_cfgpin(S5PC100_GPC(4), S3C_GPIO_SFN(3));
 +		break;
 +
 +	default:
@@ -174,13 +205,13 @@ index 0000000..17cdd82
 +}
 +
 +static struct s3c_audio_pdata s3c_pcm_pdata = {
-+	.cfg_gpio = s5p6442_pcm_cfg_gpio,
++	.cfg_gpio = s5pc100_pcm_cfg_gpio,
 +};
 +
-+static struct resource s5p6442_pcm0_resource[] = {
++static struct resource s5pc100_pcm0_resource[] = {
 +	[0] = {
-+		.start = S5P6442_PA_PCM0,
-+		.end   = S5P6442_PA_PCM0 + 0x100 - 1,
++		.start = S5PC100_PA_PCM0,
++		.end   = S5PC100_PA_PCM0 + 0x100 - 1,
 +		.flags = IORESOURCE_MEM,
 +	},
 +	[1] = {
@@ -195,20 +226,20 @@ index 0000000..17cdd82
 +	},
 +};
 +
-+struct platform_device s5p6442_device_pcm0 = {
++struct platform_device s5pc100_device_pcm0 = {
 +	.name		  = "samsung-pcm",
 +	.id		  = 0,
-+	.num_resources	  = ARRAY_SIZE(s5p6442_pcm0_resource),
-+	.resource	  = s5p6442_pcm0_resource,
++	.num_resources	  = ARRAY_SIZE(s5pc100_pcm0_resource),
++	.resource	  = s5pc100_pcm0_resource,
 +	.dev = {
 +		.platform_data = &s3c_pcm_pdata,
 +	},
 +};
 +
-+static struct resource s5p6442_pcm1_resource[] = {
++static struct resource s5pc100_pcm1_resource[] = {
 +	[0] = {
-+		.start = S5P6442_PA_PCM1,
-+		.end   = S5P6442_PA_PCM1 + 0x100 - 1,
++		.start = S5PC100_PA_PCM1,
++		.end   = S5PC100_PA_PCM1 + 0x100 - 1,
 +		.flags = IORESOURCE_MEM,
 +	},
 +	[1] = {
@@ -223,46 +254,106 @@ index 0000000..17cdd82
 +	},
 +};
 +
-+struct platform_device s5p6442_device_pcm1 = {
++struct platform_device s5pc100_device_pcm1 = {
 +	.name		  = "samsung-pcm",
 +	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5p6442_pcm1_resource),
-+	.resource	  = s5p6442_pcm1_resource,
++	.num_resources	  = ARRAY_SIZE(s5pc100_pcm1_resource),
++	.resource	  = s5pc100_pcm1_resource,
 +	.dev = {
 +		.platform_data = &s3c_pcm_pdata,
 +	},
 +};
-diff --git a/arch/arm/mach-s5p6442/include/mach/map.h b/arch/arm/mach-s5p6442/include/mach/map.h
-index a263d77..7568dc0 100644
---- a/arch/arm/mach-s5p6442/include/mach/map.h
-+++ b/arch/arm/mach-s5p6442/include/mach/map.h
-@@ -54,6 +54,14 @@
- #define S5P6442_PA_SDRAM	(0x20000000)
- #define S5P_PA_SDRAM		S5P6442_PA_SDRAM
++
++/* AC97 Controller platform devices */
++
++static int s5pc100_ac97_cfg_gpio(struct platform_device *pdev)
++{
++	s3c_gpio_cfgpin(S5PC100_GPC(0), S3C_GPIO_SFN(4));
++	s3c_gpio_cfgpin(S5PC100_GPC(1), S3C_GPIO_SFN(4));
++	s3c_gpio_cfgpin(S5PC100_GPC(2), S3C_GPIO_SFN(4));
++	s3c_gpio_cfgpin(S5PC100_GPC(3), S3C_GPIO_SFN(4));
++	s3c_gpio_cfgpin(S5PC100_GPC(4), S3C_GPIO_SFN(4));
++
++	return 0;
++}
++
++static struct resource s5pc100_ac97_resource[] = {
++	[0] = {
++		.start = S5PC100_PA_AC97,
++		.end   = S5PC100_PA_AC97 + 0x100 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = DMACH_AC97_PCMOUT,
++		.end   = DMACH_AC97_PCMOUT,
++		.flags = IORESOURCE_DMA,
++	},
++	[2] = {
++		.start = DMACH_AC97_PCMIN,
++		.end   = DMACH_AC97_PCMIN,
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = DMACH_AC97_MICIN,
++		.end   = DMACH_AC97_MICIN,
++		.flags = IORESOURCE_DMA,
++	},
++	[4] = {
++		.start = IRQ_AC97,
++		.end   = IRQ_AC97,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c_audio_pdata s3c_ac97_pdata = {
++	.cfg_gpio = s5pc100_ac97_cfg_gpio,
++};
++
++static u64 s5pc100_ac97_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device s5pc100_device_ac97 = {
++	.name		  = "s3c-ac97",
++	.id		  = -1,
++	.num_resources	  = ARRAY_SIZE(s5pc100_ac97_resource),
++	.resource	  = s5pc100_ac97_resource,
++	.dev = {
++		.platform_data = &s3c_ac97_pdata,
++		.dma_mask = &s5pc100_ac97_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index 4681ebe..de3891c 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -106,6 +106,13 @@
+ #define S5PC100_PA_I2S1		(0xF2100000)
+ #define S5PC100_PA_I2S2		(0xF2200000)
  
-+/* I2S */
-+#define S5P6442_PA_I2S0		0xC0B00000
-+#define S5P6442_PA_I2S1		0xF2200000
++/* AC97 */
++#define S5PC100_PA_AC97		0xF2300000
 +
 +/* PCM */
-+#define S5P6442_PA_PCM0		0xF2400000
-+#define S5P6442_PA_PCM1		0xF2500000
++#define S5PC100_PA_PCM0		0xF2400000
++#define S5PC100_PA_PCM1		0xF2500000
 +
- /* compatibiltiy defines. */
- #define S3C_PA_UART		S5P6442_PA_UART
- #define S3C_PA_IIC		S5P6442_PA_IIC0
+ /* KEYPAD */
+ #define S5PC100_PA_KEYPAD	(0xF3100000)
+ 
 diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 10cfcbb..17c8ff8 100644
+index d8fda3a..10cfcbb 100644
 --- a/arch/arm/plat-samsung/include/plat/devs.h
 +++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -79,6 +79,11 @@ extern struct platform_device s5pc100_device_iis0;
- extern struct platform_device s5pc100_device_iis1;
- extern struct platform_device s5pc100_device_iis2;
+@@ -72,6 +72,13 @@ extern struct platform_device s5pv210_device_iis0;
+ extern struct platform_device s5pv210_device_iis1;
+ extern struct platform_device s5pv210_device_iis2;
  
-+extern struct platform_device s5p6442_device_pcm0;
-+extern struct platform_device s5p6442_device_pcm1;
-+extern struct platform_device s5p6442_device_iis0;
-+extern struct platform_device s5p6442_device_iis1;
++extern struct platform_device s5pc100_device_ac97;
++extern struct platform_device s5pc100_device_pcm0;
++extern struct platform_device s5pc100_device_pcm1;
++extern struct platform_device s5pc100_device_iis0;
++extern struct platform_device s5pc100_device_iis1;
++extern struct platform_device s5pc100_device_iis2;
 +
  /* s3c2440 specific devices */
  
