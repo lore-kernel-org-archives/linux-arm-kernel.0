@@ -1,36 +1,69 @@
-From: redhatter@gentoo.org (Stuart Longland)
-Date: Tue, 18 May 2010 17:51:09 +1000
-Subject: i.MX27 Clock sources
-Message-ID: <20100518075109.GC1749@www.longlandclan.yi.org>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Tue, 18 May 2010 09:58:43 +0200
+Subject: Samsung SoCs framebuffer re-work
+In-Reply-To: <20100518071608.GQ27571@trinity.fluff.org>
+References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
+	<20100518025058.GL27571@trinity.fluff.org>
+	<AANLkTimfbcYLyiuErIMcDqfAzz2L76J3j2IxlWS0b333@mail.gmail.com>
+	<20100518055319.GP27571@trinity.fluff.org>
+	<000101caf656$ff21b560$fd652020$%osciak@samsung.com>
+	<20100518071608.GQ27571@trinity.fluff.org>
+Message-ID: <000c01caf65f$efda0810$cf8e1830$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-	Firstly, I'm new to this list, so hopefully this is not offtopic
--- if it is, I'm happy to be redirected.  I'm working on a device based
-on the Freescale i.MX27 MCU; specifically, a Ka-Ro TX27-4030 module.
-I'm using Ka-Ro's Linux kernel; although I'm looking into whether a port
-of their patches to the current Linux kernel is feasible -- but that's
-another story.
 
-	For our application, it is necessary to interface this device to
-a Texas Instruments TLV320AIC3204 CODEC.  The i.MX27 provides the clock
-via SSI3_CLK, and communicates using I?S and I?C.  I understand that the
-clock divider for the SSIs is driven from either MPLL or SPLL; but what
-I'm not certain on is where those are configured in the Linux kernel, or
-what the implications are for tinkering with these.
+>Ben Dooks <mailto:ben-linux@fluff.org> wrote:
+>On Tue, May 18, 2010 at 08:54:44AM +0200, Pawel Osciak wrote:
+>>
+>> > Ben Dooks wrote:
+>> >On Tue, May 18, 2010 at 12:09:25PM +0900, Kyungmin Park wrote:
+>> >> On Tue, May 18, 2010 at 11:50 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+>> >> > On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
+>> >> >
+>> >> >> As you can see the s5pc110 (aka s5pv210) spec, It has more features
+>> >> >> and interconnection between FIMC and FIMD.
+>> >> >> So current fb driver can't handle these features well. So LSI make a
+>> >> >> own fb drivers and use it. You can see the code at their git repo.
+>> >> >>
+>> >> >> Now we are re-implement or change it for s5pc110 and for future
+>usages.
+>> >> >> How do you think?
+>> >> >
+>> >> > I've already got updates for s3c-fb to work on 2416,2443 and the
+>> >c110/v210
+>> >> > systems. I am talking with the relevant people at System.LSI to get
+>our
+>> >> > drivers closers together, possibly we can get this done for the
+>current
+>> >> > merge window.
+>> >>
+>> >> You mean you want to use the current fb drivers for s5pc110 also?
+>> >> Then how to do implement features mentioned by Kukjin?
+>> >
+>> >Well, apart from the fact that quite a lot of them are actually features
+>> >that are in all versions of this block, we intend to create some patches
+>> >and send them to the relevant lists...
+>>
+>> I posted patches for s3c-fb back in September (Sep. 3rd and 11th), which
+>> added some of the abovementioned features, including VSYNC, double-
+>buffering
+>> support, color-keying, alpha blending and more. Are there any plans for
+>> those?
+>
+>Either not seen them or missed them completely.
+>
+>Do you have URLs to have a look at them?
 
-	Ideally I'd like to adjust MPLL/SPLL and/or the SSI clocks so
-that the clock rate is some multiple of the I?S bit rate.  So far I can
-get it close; but not close enough.  Does anyone have any pointers as to
-where I can look in the Linux kernel for this information?
+[PATCH v2 0/3] v2: s3c-fb panning and vsync support:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/000370.html
 
-Regards,
--- 
-Stuart Longland (aka Redhatter, VK4MSL)      .'''.
-Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
-. . . . . . . . . . . . . . . . . . . . . .   .'.'
-http://dev.gentoo.org/~redhatter             :.'
+[PATCH 0/7] [ARM] s3c-fb: Various s3c-fb updates:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/000600.html
 
-I haven't lost my mind...
-  ...it's backed up on a tape somewhere.
+
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
