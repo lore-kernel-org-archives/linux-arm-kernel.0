@@ -1,88 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 May 2010 11:30:49 +0200
-Subject: [PATCH 2/2] ARM: SMDKC100: remove magic values from uart setup
-	structures
-In-Reply-To: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
-References: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1274175049-21847-3-git-send-email-m.szyprowski@samsung.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 18 May 2010 13:00:26 +0300
+Subject: [PATCH 17/18] omap: rx51: Add supplies for the tlv320aic3x
+	codec driver
+In-Reply-To: <20100506070018.GB16262@besouro.research.nokia.com>
+References: <20100505192957.21568.19569.stgit@baageli.muru.com>
+	<20100505193323.21568.32626.stgit@baageli.muru.com>
+	<20100506065716.GA16262@besouro.research.nokia.com>
+	<20100506070018.GB16262@besouro.research.nokia.com>
+Message-ID: <20100518130026.a979ac51.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces nice defines for the initial values for UART devices
-on SMDKC100.
+On Thu, 6 May 2010 10:00:18 +0300
+Eduardo Valentin <eduardo.valentin@nokia.com> wrote:
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-s5pc100/mach-smdkc100.c |   40 ++++++++++++++++++++------------
- 1 files changed, 25 insertions(+), 15 deletions(-)
+> > > +static struct regulator_consumer_supply rx51_vio_supplies[] = {
+> > > +	/* tlv320aic3x digital supplies */
+> > > +	{
+> > > +		.supply		= "IOVDD",
+> > > +		.dev_name	= "2-0018"
+> > > +	},
+> > > +	{
+> > > +		.supply		= "DVDD",
+> > > +		.dev_name	= "2-0018"
+> > > +	},
+> > > +};
+> > 
+> > 
+> > This isn't mandatory, but I find the code more readable if you use the REGULATOR_SUPPLY macro,
+> > which kinda suitable for cases like yours, where you are passing the pair supply&dev_name.
+>
+Yeah, I was just following how the MMC supplies were defined in this
+file and it's better to convert all of these to use REGULATOR_SUPPLY
+macro. I'll send conversion patch on top of this + one adding couple
+supplies more I would like to get in during this merge window.
 
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index dd8c154..3a7dc3e 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -44,38 +44,48 @@
- #include <plat/fb.h>
- #include <plat/iic.h>
- 
--#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
--#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
--#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define S5PC100_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define S5PC100_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define S5PC100_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				 S3C2440_UFCON_RXTRIG8 |	\
-+				 S3C2440_UFCON_TXTRIG16)
- 
- static struct s3c2410_uartcfg smdkc100_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport	     = 0,
- 		.flags	     = 0,
--		.ucon	     = 0x3c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = S5PC100_UCON_DEFAULT,
-+		.ulcon	     = S5PC100_ULCON_DEFAULT,
-+		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport	     = 1,
- 		.flags	     = 0,
--		.ucon	     = 0x3c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = S5PC100_UCON_DEFAULT,
-+		.ulcon	     = S5PC100_ULCON_DEFAULT,
-+		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport	     = 2,
- 		.flags	     = 0,
--		.ucon	     = 0x3c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = S5PC100_UCON_DEFAULT,
-+		.ulcon	     = S5PC100_ULCON_DEFAULT,
-+		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport	     = 3,
- 		.flags	     = 0,
--		.ucon	     = 0x3c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = S5PC100_UCON_DEFAULT,
-+		.ulcon	     = S5PC100_ULCON_DEFAULT,
-+		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- };
- 
+> > > +static struct regulator_init_data rx51_vio = {
+> > > +	.constraints = {
+> > > +		.min_uV			= 1800000,
+> > > +		.max_uV			= 1800000,
+> > > +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+> > > +					| REGULATOR_MODE_STANDBY,
+> > > +		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+> > 
+> > I'm not sure if we would ever change voltage level in VIO in rx51 case.
+> > It could enter sleep mode. But even there it wouldn't change voltage level.
+> > Except, of cource, during off mode transition. But then, the regfw wouldn't care.
+> 
+> Actually, one correction here, even during off mode transition I believe we need to
+> keep it, otherwise some wake up source would be screwed.
+> > 
+What do you think about those other TWL regulators, do they have valid
+mask bits so would it make sense to correct all of them at once? I'm
+not expert with TWL & RX51 HW but I'm thinking if there are also other
+regulators which should not change. At least many regulators have the
+same min_uV and max_uV defined.
+
+
 -- 
-1.6.4
+Jarkko
