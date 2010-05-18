@@ -1,90 +1,103 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 18 May 2010 10:59:27 +0900
-Subject: [PATCH 2/6] S3C: DMA: Add api driver for PL330
-In-Reply-To: <20100517084021.GC6684@trinity.fluff.org>
-References: <1274060104-14224-1-git-send-email-jassi.brar@samsung.com>
-	<1274060139-14290-1-git-send-email-jassi.brar@samsung.com>
-	<20100517084021.GC6684@trinity.fluff.org>
-Message-ID: <AANLkTik76NKK3tOeFSDoRK5MrT8pd68yn78I0ZO4KTNd@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 May 2010 19:42:46 -0700
+Subject: [PATCH 02/13] omap4: Add support for i2c init
+In-Reply-To: <20100518023707.21705.26205.stgit@baageli.muru.com>
+References: <20100518023707.21705.26205.stgit@baageli.muru.com>
+Message-ID: <20100518024246.21705.71913.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 5:40 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Mon, May 17, 2010 at 10:35:39AM +0900, Jassi Brar wrote:
+Add support for i2c init for omap4.
 
->> +/*
->> + * The platforms just need to provide this info
->> + * to the S3C DMA API driver for PL330.
->
-> would be heklpful to describe what this information actually
-> means, including how it helps to configure the hardware appropriately.
+This patch is based on and earlier patch by
+Santosh Shilimkar <santosh.shilimkar@ti.com>.
 
-Ok
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/i2c.c |   33 ++++++++++++++++++++++++++-------
+ 1 files changed, 26 insertions(+), 7 deletions(-)
 
-......
-
->> +struct s3c_pl330_dmac {
->> + ? ? struct pl330_info *pi;
->> + ? ? /* Number of channels currently busy */
->> + ? ? unsigned busy_chan;
->> + ? ? /* To attach to the global list of DMACs */
->> + ? ? struct list_head node;
->> + ? ? /* List of IDs of peripherals this DMAC can work with */
->> + ? ? enum dma_ch *peri;
->> + ? ? /* Pool to quickly allocate xfers for all channels in the dmac */
->> + ? ? struct kmem_cache *kmcache;
->> +};
->
-> I would prefer to see kerneldoc style documentation for this
-> if possible.
-Ok.
-
-......
-
->> + ? ? ch = kmalloc(sizeof(*ch), GFP_KERNEL);
->> + ? ? /* Return silently to work with other channels */
->> + ? ? if (!ch)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? ch->id = id;
->> + ? ? ch->dmac = NULL;
->> +
->
-> should you init the list entry before adding it?
-sorry, I am unable to see any problem with what I do.
-Am I overlooking something?
-
-.....
-
->> +/*
->> + * Measure of suitability of 'dmac' handling 'ch'
->> + *
->> + * 0 indicates 'dmac' can not handle 'ch' either
->> + * because it is not supported by the hardware or
->> + * because all dmac channels are currently busy.
->> + *
->> + * >0 vlaue indicates 'dmac' has the capability.
->> + * The bigger the value the more suitable the dmac.
->> + */
->> +typedef u8 suit;
->> +#define MAX_SUIT ? ? 255
->> +#define MIN_SUIT ? ? 0
->
-> hmm, would oprfer to see this as a simple integer.
-Ok.
-
-......
-
->> + ? ? /* If there was only one node left */
->> + ? ? if (t == xfer)
->> + ? ? ? ? ? ? ch->xfer_head = NULL;
->> + ? ? else if (ch->xfer_head == xfer)
->> + ? ? ? ? ? ? ch->xfer_head = t;
->> +
->> + ? ? list_del(&xfer->node);
->> +}
->
-> couldn't xfer_head be infered from the transfer list?
-Not if we are to support S3C2410_DMAF_CIRCULAR.
-
-thanks
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index 484a4f0..4281bb6 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -35,6 +35,7 @@
+ #define OMAP2_I2C_BASE1		0x48070000
+ #define OMAP2_I2C_BASE2		0x48072000
+ #define OMAP2_I2C_BASE3		0x48060000
++#define OMAP4_I2C_BASE4		0x48350000
+ 
+ static const char name[] = "i2c_omap";
+ 
+@@ -51,11 +52,14 @@ static const char name[] = "i2c_omap";
+ 
+ static struct resource i2c_resources[][2] = {
+ 	{ I2C_RESOURCE_BUILDER(0, 0) },
+-#if	defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-	{ I2C_RESOURCE_BUILDER(OMAP2_I2C_BASE2, INT_24XX_I2C2_IRQ) },
++#if	defined(CONFIG_ARCH_OMAP2PLUS)
++	{ I2C_RESOURCE_BUILDER(OMAP2_I2C_BASE2, 0) },
+ #endif
+-#if	defined(CONFIG_ARCH_OMAP3)
+-	{ I2C_RESOURCE_BUILDER(OMAP2_I2C_BASE3, INT_34XX_I2C3_IRQ) },
++#if	defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
++	{ I2C_RESOURCE_BUILDER(OMAP2_I2C_BASE3, 0) },
++#endif
++#if	defined(CONFIG_ARCH_OMAP4)
++	{ I2C_RESOURCE_BUILDER(OMAP4_I2C_BASE4, 0) },
+ #endif
+ };
+ 
+@@ -73,12 +77,15 @@ static struct resource i2c_resources[][2] = {
+ static u32 i2c_rate[ARRAY_SIZE(i2c_resources)];
+ static struct platform_device omap_i2c_devices[] = {
+ 	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_rate[0]),
+-#if	defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
++#if	defined(CONFIG_ARCH_OMAP2PLUS)
+ 	I2C_DEV_BUILDER(2, i2c_resources[1], &i2c_rate[1]),
+ #endif
+-#if	defined(CONFIG_ARCH_OMAP3)
++#if	defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+ 	I2C_DEV_BUILDER(3, i2c_resources[2], &i2c_rate[2]),
+ #endif
++#if	defined(CONFIG_ARCH_OMAP4)
++	I2C_DEV_BUILDER(4, i2c_resources[3], &i2c_rate[3]),
++#endif
+ };
+ 
+ #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+@@ -93,6 +100,8 @@ static int __init omap_i2c_nr_ports(void)
+ 		ports = 2;
+ 	else if (cpu_is_omap34xx())
+ 		ports = 3;
++	else if (cpu_is_omap44xx())
++		ports = 4;
+ 
+ 	return ports;
+ }
+@@ -104,6 +113,13 @@ static resource_size_t omap2_i2c_irq[3] __initdata = {
+ 	INT_34XX_I2C3_IRQ,
+ };
+ 
++static resource_size_t omap4_i2c_irq[4] __initdata = {
++	OMAP44XX_IRQ_I2C1,
++	OMAP44XX_IRQ_I2C2,
++	OMAP44XX_IRQ_I2C3,
++	OMAP44XX_IRQ_I2C4,
++};
++
+ static inline int omap1_i2c_add_bus(struct platform_device *pdev, int bus_id)
+ {
+ 	struct resource *res;
+@@ -124,7 +140,10 @@ static inline int omap2_i2c_add_bus(struct platform_device *pdev, int bus_id)
+ 
+ 	res = pdev->resource;
+ 
+-	irq = omap2_i2c_irq;
++	if (!cpu_is_omap44xx())
++		irq = omap2_i2c_irq;
++	else
++		irq = omap4_i2c_irq;
+ 
+ 	if (bus_id == 1) {
+ 		res[0].start = OMAP2_I2C_BASE1;
