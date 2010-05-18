@@ -1,70 +1,84 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:01 +0300
-Subject: [PATCH 10/23] OMAP: DSS2: Make partial update width even
+Date: Tue, 18 May 2010 15:34:56 +0300
+Subject: [PATCH 05/23] OMAP: DSS2: Use vdds_sdi regulator supply in SDI
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-11-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-6-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some strange problems with DSI and updates with odd widths. One
-particular problem is that HS TX timeout triggers easily with updates with
-odd widths.
+From: Roger Quadros <roger.quadros@nokia.com>
 
-This patch makes the updates widths even, circumventing the problem. There
-should be no ill side effects with increasing the update area slightly to
-make the width even.
+This patch enables the use of vdds_sdi regulator in SDI subsystem.
+We can disable the vdds_sdi voltage when not in use to save
+power.
 
-Signed-off-by: Ville Syrj?l? <ville.syrjala@nokia.com>
+Signed-off-by: Roger Quadros <roger.quadros@nokia.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/manager.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ drivers/video/omap2/dss/sdi.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/manager.c b/drivers/video/omap2/dss/manager.c
-index 0820986..32ec2ff 100644
---- a/drivers/video/omap2/dss/manager.c
-+++ b/drivers/video/omap2/dss/manager.c
-@@ -940,6 +940,22 @@ static int configure_dispc(void)
- 	return r;
+diff --git a/drivers/video/omap2/dss/sdi.c b/drivers/video/omap2/dss/sdi.c
+index 3de3c1e..ee07a3c 100644
+--- a/drivers/video/omap2/dss/sdi.c
++++ b/drivers/video/omap2/dss/sdi.c
+@@ -23,13 +23,16 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <plat/display.h>
++#include <plat/cpu.h>
+ #include "dss.h"
+ 
+ static struct {
+ 	bool skip_init;
+ 	bool update_enabled;
++	struct regulator *vdds_sdi_reg;
+ } sdi;
+ 
+ static void sdi_basic_init(void)
+@@ -57,6 +60,10 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
+ 		goto err0;
+ 	}
+ 
++	r = regulator_enable(sdi.vdds_sdi_reg);
++	if (r)
++		goto err1;
++
+ 	/* In case of skip_init sdi_init has already enabled the clocks */
+ 	if (!sdi.skip_init)
+ 		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+@@ -120,6 +127,7 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
+ 	return 0;
+ err2:
+ 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
++	regulator_disable(sdi.vdds_sdi_reg);
+ err1:
+ 	omap_dss_stop_device(dssdev);
+ err0:
+@@ -135,6 +143,8 @@ void omapdss_sdi_display_disable(struct omap_dss_device *dssdev)
+ 
+ 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+ 
++	regulator_disable(sdi.vdds_sdi_reg);
++
+ 	omap_dss_stop_device(dssdev);
  }
+ EXPORT_SYMBOL(omapdss_sdi_display_disable);
+@@ -151,6 +161,11 @@ int sdi_init(bool skip_init)
+ 	/* we store this for first display enable, then clear it */
+ 	sdi.skip_init = skip_init;
  
-+/* Make the coordinates even. There are some strange problems with OMAP and
-+ * partial DSI update when the update widths are odd. */
-+static void make_even(u16 *x, u16 *w)
-+{
-+	u16 x1, x2;
-+
-+	x1 = *x;
-+	x2 = *x + *w;
-+
-+	x1 &= ~1;
-+	x2 = ALIGN(x2, 2);
-+
-+	*x = x1;
-+	*w = x2 - x1;
-+}
-+
- /* Configure dispc for partial update. Return possibly modified update
-  * area */
- void dss_setup_partial_planes(struct omap_dss_device *dssdev,
-@@ -968,6 +984,8 @@ void dss_setup_partial_planes(struct omap_dss_device *dssdev,
- 		return;
- 	}
- 
-+	make_even(&x, &w);
-+
- 	spin_lock_irqsave(&dss_cache.lock, flags);
- 
- 	/* We need to show the whole overlay if it is scaled. So look for
-@@ -1029,6 +1047,8 @@ void dss_setup_partial_planes(struct omap_dss_device *dssdev,
- 		w = x2 - x1;
- 		h = y2 - y1;
- 
-+		make_even(&x, &w);
-+
- 		DSSDBG("changing upd area due to ovl(%d) scaling %d,%d %dx%d\n",
- 				i, x, y, w, h);
- 	}
++	sdi.vdds_sdi_reg = dss_get_vdds_sdi();
++	if (IS_ERR(sdi.vdds_sdi_reg)) {
++		DSSERR("can't get VDDS_SDI regulator\n");
++		return PTR_ERR(sdi.vdds_sdi_reg);
++	}
+ 	/*
+ 	 * Enable clocks already here, otherwise there would be a toggle
+ 	 * of them until sdi_display_enable is called.
 -- 
 1.7.0.4
