@@ -1,321 +1,209 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 May 2010 12:23:36 +0200
-Subject: [PATCH 2/2] ARM: Samsung: move driver strength gpio configuration
-	helper to common dir
-In-Reply-To: <1274178216-12003-1-git-send-email-m.szyprowski@samsung.com>
-References: <1274178216-12003-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1274178216-12003-3-git-send-email-m.szyprowski@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 18 May 2010 18:34:49 +0800
+Subject: [RFC PATCH v2] preliminary support for sparse IRQ
+Message-ID: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver strength parameter can be changed not only on S5PC100 but also
-on S5PV210/S5PC110 platforms, so move the helper functions to the common
-plat-samsung directory.
+commit 2e2e087d96630c95dbce57036680cf917e906cf1
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Mon Dec 28 12:59:59 2009 +0800
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-s5p/Kconfig                          |    1 +
- arch/arm/plat-s5pc1xx/Kconfig                      |    2 +-
- arch/arm/plat-s5pc1xx/Makefile                     |    1 -
- arch/arm/plat-s5pc1xx/gpio-config.c                |   62 --------------------
- .../plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h   |   32 ----------
- arch/arm/plat-s5pc1xx/setup-fb-24bpp.c             |    1 -
- arch/arm/plat-samsung/Kconfig                      |   12 ++--
- arch/arm/plat-samsung/gpio-config.c                |   48 +++++++++++++++
- arch/arm/plat-samsung/include/plat/gpio-cfg.h      |   30 ++++++++++
- 9 files changed, 86 insertions(+), 103 deletions(-)
- delete mode 100644 arch/arm/plat-s5pc1xx/gpio-config.c
- delete mode 100644 arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
+    [ARM] preliminary support for sparse IRQ
 
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index d400a6a..92bd756 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -13,6 +13,7 @@ config PLAT_S5P
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_GPIO_TRACK
-+	select S5P_GPIO_DRVSTR
- 	select SAMSUNG_GPIOLIB_4BIT
- 	select S3C_GPIO_CFG_S3C64XX
- 	select S3C_GPIO_PULL_UPDOWN
-diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
-index c7ccdf2..79d3be7 100644
---- a/arch/arm/plat-s5pc1xx/Kconfig
-+++ b/arch/arm/plat-s5pc1xx/Kconfig
-@@ -16,9 +16,9 @@ config PLAT_S5PC1XX
- 	select SAMSUNG_IRQ_VIC_TIMER
- 	select S3C_GPIO_TRACK
- 	select S3C_GPIO_PULL_UPDOWN
-+	select S5P_GPIO_DRVSTR
- 	select S3C_GPIO_CFG_S3C24XX
- 	select S3C_GPIO_CFG_S3C64XX
--	select S5P_GPIO_CFG_S5PC1XX
- 	help
- 	  Base platform code for any Samsung S5PC1XX device
- 
-diff --git a/arch/arm/plat-s5pc1xx/Makefile b/arch/arm/plat-s5pc1xx/Makefile
-index 278f268..66a8f3e 100644
---- a/arch/arm/plat-s5pc1xx/Makefile
-+++ b/arch/arm/plat-s5pc1xx/Makefile
-@@ -24,7 +24,6 @@ obj-$(CONFIG_CPU_S5PC100_CLOCK)	+= s5pc100-clock.o
- 
- # Device setup
- 
--obj-$(CONFIG_S5P_GPIO_CFG_S5PC1XX) += gpio-config.o
- obj-$(CONFIG_S5PC1XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
- obj-$(CONFIG_S5PC1XX_SETUP_I2C0) += setup-i2c0.o
- obj-$(CONFIG_S5PC1XX_SETUP_I2C1) += setup-i2c1.o
-diff --git a/arch/arm/plat-s5pc1xx/gpio-config.c b/arch/arm/plat-s5pc1xx/gpio-config.c
-deleted file mode 100644
-index a4f67e8..0000000
---- a/arch/arm/plat-s5pc1xx/gpio-config.c
-+++ /dev/null
-@@ -1,62 +0,0 @@
--/* linux/arch/arm/plat-s5pc1xx/gpio-config.c
-- *
-- * Copyright 2009 Samsung Electronics
-- *
-- * S5PC1XX GPIO Configuration.
-- *
-- * Based on plat-s3c64xx/gpio-config.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/gpio.h>
--#include <linux/io.h>
--
--#include <plat/gpio-core.h>
--#include <plat/gpio-cfg-s5pc1xx.h>
--
--s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin, unsigned int off)
--{
--	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
--	void __iomem *reg;
--	int shift = off * 2;
--	u32 drvstr;
--
--	if (!chip)
--		return -EINVAL;
--
--	reg = chip->base + 0x0C;
--
--	drvstr = __raw_readl(reg);
--	drvstr = 0xffff & (0x3 << shift);
--	drvstr = drvstr >> shift;
--
--	return (__force s5p_gpio_drvstr_t)drvstr;
--}
--EXPORT_SYMBOL(s5p_gpio_get_drvstr);
--
--int s5p_gpio_set_drvstr(unsigned int pin, unsigned int off,
--			s5p_gpio_drvstr_t drvstr)
--{
--	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
--	void __iomem *reg;
--	int shift = off * 2;
--	u32 tmp;
--
--	if (!chip)
--		return -EINVAL;
--
--	reg = chip->base + 0x0C;
--
--	tmp = __raw_readl(reg);
--	tmp |= drvstr << shift;
--
--	__raw_writel(tmp, reg);
--
--	return 0;
--}
--EXPORT_SYMBOL(s5p_gpio_set_drvstr);
-diff --git a/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h b/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
-deleted file mode 100644
-index 72ad59f..0000000
---- a/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg-s5pc1xx.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/* linux/arch/arm/plat-s5pc1xx/include/plat/gpio-cfg.h
-- *
-- * Copyright 2009 Samsung Electronic
-- *
-- * S5PC1XX Platform - GPIO pin configuration
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/* This file contains the necessary definitions to get the basic gpio
-- * pin configuration done such as setting a pin to input or output or
-- * changing the pull-{up,down} configurations.
-- */
--
--#ifndef __GPIO_CFG_S5PC1XX_H
--#define __GPIO_CFG_S5PC1XX_H __FILE__
--
--typedef unsigned int __bitwise__ s5p_gpio_drvstr_t;
--
--#define S5P_GPIO_DRVSTR_LV1	0x00
--#define S5P_GPIO_DRVSTR_LV2	0x01
--#define S5P_GPIO_DRVSTR_LV3	0x10
--#define S5P_GPIO_DRVSTR_LV4	0x11
--
--extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin, unsigned int off);
--
--extern int s5p_gpio_set_drvstr(unsigned int pin, unsigned int off,
--			s5p_gpio_drvstr_t drvstr);
--
--#endif /* __GPIO_CFG_S5PC1XX_H */
-diff --git a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c b/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-index 1a63768..b02c36f 100644
---- a/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-+++ b/arch/arm/plat-s5pc1xx/setup-fb-24bpp.c
-@@ -19,7 +19,6 @@
- #include <mach/map.h>
- #include <plat/fb.h>
- #include <plat/gpio-cfg.h>
--#include <plat/gpio-cfg-s5pc1xx.h>
- 
- #define DISR_OFFSET	0x7008
- 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 287e6f7..6ccfd60 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -90,12 +90,6 @@ config S3C_GPIO_CFG_S3C64XX
- 	  Internal configuration to enable S3C64XX style GPIO configuration
- 	  functions.
- 
--config S5P_GPIO_CFG_S5PC1XX
--	bool
--	help
--	  Internal configuration to enable S5PC1XX style GPIO configuration
--	  functions.
--
- config S3C_GPIO_PULL_UPDOWN
- 	bool
- 	help
-@@ -111,6 +105,12 @@ config S3C_GPIO_PULL_UP
- 	help
- 	  Internal configuration to enable the correct GPIO pull helper
- 
-+config S5P_GPIO_DRVSTR
-+	bool
+    So to allow NR_IRQS to be dynamic and platforms to specify the number
+    of IRQs really needed.
+
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5408bf..727703c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1282,6 +1282,18 @@ config HW_PERF_EVENTS
+ 	  Enable hardware performance counter support for perf events. If
+ 	  disabled, perf events will use software events only.
+
++config SPARSE_IRQ
++	bool "Support sparse irq numbering"
++	depends on EXPERIMENTAL
 +	help
-+	  Internal configuration to get and set correct GPIO driver strength
-+	  helper
++	  This enables support for sparse irqs. This is useful in general
++	  as most CPUs have a fairly sparse array of IRQ vectors, which
++	  the irq_desc then maps directly on to. Systems with a high
++	  number of off-chip IRQs will want to treat this as
++	  experimental until they have been independently verified.
 +
- config SAMSUNG_GPIO_EXTRA
- 	int "Number of additional GPIO pins"
- 	default 0
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index 3282db3..d0e67a2 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -261,3 +261,51 @@ s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
++	  If you don't know what to do here, say N.
++
+ source "mm/Kconfig"
+
+ config LEDS
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 237282f..2721a58 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -7,6 +7,8 @@
+ #define irq_canonicalize(i)	(i)
+ #endif
+
++#define NR_IRQS_LEGACY	16
++
+ /*
+  * Use this value to indicate lack of interrupt
+  * capability
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index c59842d..5ee6f85 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -20,6 +20,7 @@ struct machine_desc {
+ 	 * by assembler code in head.S, head-common.S
+ 	 */
+ 	unsigned int		nr;		/* architecture number	*/
++	unsigned int		nr_irqs;	/* number of IRQs */
+ 	unsigned int		phys_io;	/* start of physical io	*/
+ 	unsigned int		io_pg_offst;	/* byte offset for io
+ 						 * page tabe entry	*/
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index 8920b2d..ce3eee9 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -17,6 +17,7 @@ struct seq_file;
+ /*
+  * This is internal.  Do not use it.
+  */
++extern unsigned int arch_nr_irqs;
+ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+ extern int show_fiq_list(struct seq_file *, void *);
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 3b3d2c8..c0d5c3b 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -47,12 +47,14 @@
+ #define irq_finish(irq) do { } while (0)
+ #endif
+
++unsigned int arch_nr_irqs;
+ void (*init_arch_irq)(void) __initdata = NULL;
+ unsigned long irq_err_count;
+
+ int show_interrupts(struct seq_file *p, void *v)
+ {
+ 	int i = *(loff_t *) v, cpu;
++	struct irq_desc *desc;
+ 	struct irqaction * action;
+ 	unsigned long flags;
+
+@@ -67,24 +69,25 @@ int show_interrupts(struct seq_file *p, void *v)
+ 		seq_putc(p, '\n');
+ 	}
+
+-	if (i < NR_IRQS) {
+-		raw_spin_lock_irqsave(&irq_desc[i].lock, flags);
+-		action = irq_desc[i].action;
++	if (i < nr_irqs) {
++		desc = irq_to_desc(i);
++		raw_spin_lock_irqsave(&desc->lock, flags);
++		action = desc->action;
+ 		if (!action)
+ 			goto unlock;
+
+ 		seq_printf(p, "%3d: ", i);
+ 		for_each_present_cpu(cpu)
+ 			seq_printf(p, "%10u ", kstat_irqs_cpu(i, cpu));
+-		seq_printf(p, " %10s", irq_desc[i].chip->name ? : "-");
++		seq_printf(p, " %10s", desc->chip->name ? : "-");
+ 		seq_printf(p, "  %s", action->name);
+ 		for (action = action->next; action; action = action->next)
+ 			seq_printf(p, ", %s", action->name);
+
+ 		seq_putc(p, '\n');
+ unlock:
+-		raw_spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+-	} else if (i == NR_IRQS) {
++		raw_spin_unlock_irqrestore(&desc->lock, flags);
++	} else if (i == nr_irqs) {
+ #ifdef CONFIG_FIQ
+ 		show_fiq_list(p, v);
+ #endif
+@@ -112,7 +115,7 @@ asmlinkage void __exception asm_do_IRQ(unsigned
+int irq, struct pt_regs *regs)
+ 	 * Some hardware gives randomly wrong interrupts.  Rather
+ 	 * than crashing, do something sensible.
+ 	 */
+-	if (unlikely(irq >= NR_IRQS)) {
++	if (unlikely(irq >= nr_irqs)) {
+ 		if (printk_ratelimit())
+ 			printk(KERN_WARNING "Bad IRQ%u\n", irq);
+ 		ack_bad_irq(irq);
+@@ -132,12 +135,12 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
+ 	struct irq_desc *desc;
+ 	unsigned long flags;
+
+-	if (irq >= NR_IRQS) {
++	if (irq >= nr_irqs) {
+ 		printk(KERN_ERR "Trying to set irq flags for IRQ%d\n", irq);
+ 		return;
+ 	}
+
+-	desc = irq_desc + irq;
++	desc = irq_to_desc(irq);
+ 	raw_spin_lock_irqsave(&desc->lock, flags);
+ 	desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+ 	if (iflags & IRQF_VALID)
+@@ -151,14 +154,25 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
+
+ void __init init_IRQ(void)
+ {
++	struct irq_desc *desc;
+ 	int irq;
+
+-	for (irq = 0; irq < NR_IRQS; irq++)
+-		irq_desc[irq].status |= IRQ_NOREQUEST | IRQ_NOPROBE;
++	for (irq = 0; irq < nr_irqs; irq++) {
++		desc = irq_to_desc_alloc_node(irq, 0);
++		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
++	}
+
+ 	init_arch_irq();
  }
- #endif /* CONFIG_S3C_GPIO_PULL_UP */
- 
-+#ifdef CONFIG_S5P_GPIO_DRVSTR
-+s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
+
++#ifdef CONFIG_SPARSE_IRQ
++int __init arch_probe_nr_irqs(void)
 +{
-+	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-+	unsigned int off;
-+	void __iomem *reg;
-+	int shift;
-+	u32 drvstr;
-+
-+	if (!chip)
-+		return -EINVAL;
-+
-+	off = chip->chip.base - pin;
-+	shift = off * 2;
-+	reg = chip->base + 0x0C;
-+
-+	drvstr = __raw_readl(reg);
-+	drvstr = 0xffff & (0x3 << shift);
-+	drvstr = drvstr >> shift;
-+
-+	return (__force s5p_gpio_drvstr_t)drvstr;
-+}
-+EXPORT_SYMBOL(s5p_gpio_get_drvstr);
-+
-+int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr)
-+{
-+	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-+	unsigned int off;
-+	void __iomem *reg;
-+	int shift;
-+	u32 tmp;
-+
-+	if (!chip)
-+		return -EINVAL;
-+
-+	off = chip->chip.base - pin;
-+	shift = off * 2;
-+	reg = chip->base + 0x0C;
-+
-+	tmp = __raw_readl(reg);
-+	tmp |= drvstr << shift;
-+
-+	__raw_writel(tmp, reg);
-+
++	nr_irqs = arch_nr_irqs ? arch_nr_irqs : NR_IRQS;
 +	return 0;
 +}
-+EXPORT_SYMBOL(s5p_gpio_set_drvstr);
-+#endif	/* CONFIG_S5P_GPIO_DRVSTR */
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-index 8d01e85..34efdd2 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-@@ -25,6 +25,7 @@
- #define __PLAT_GPIO_CFG_H __FILE__
- 
- typedef unsigned int __bitwise__ s3c_gpio_pull_t;
-+typedef unsigned int __bitwise__ s5p_gpio_drvstr_t;
- 
- /* forward declaration if gpio-core.h hasn't been included */
- struct s3c_gpio_chip;
-@@ -118,4 +119,33 @@ extern int s3c_gpio_setpull(unsigned int pin, s3c_gpio_pull_t pull);
- */
- extern s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin);
- 
-+/* Define values for the drvstr available for each gpio pin.
-+ *
-+ * These values control the value of the output signal driver strength,
-+ * configurable on most pins on the S5C series.
-+ */
-+#define S5P_GPIO_DRVSTR_LV1	((__force s5p_gpio_drvstr_t)0x00)
-+#define S5P_GPIO_DRVSTR_LV2	((__force s5p_gpio_drvstr_t)0x01)
-+#define S5P_GPIO_DRVSTR_LV3	((__force s5p_gpio_drvstr_t)0x10)
-+#define S5P_GPIO_DRVSTR_LV4	((__force s5p_gpio_drvstr_t)0x11)
++#endif
 +
-+/**
-+ * s5c_gpio_get_drvstr() - get the driver streght value of a gpio pin
-+ * @pin: The pin number to get the settings for
-+ *
-+ * Read the driver streght value for the specified pin.
-+*/
-+extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin);
-+
-+/**
-+ * s3c_gpio_set_drvstr() - set the driver streght value of a gpio pin
-+ * @pin: The pin number to configure the driver streght value
-+ * @drvstr: The new value of the driver strength
-+ *
-+ * This function sets the driver strength value for the specified pin.
-+ * It will return 0 if successfull, or a negative error code if the pin
-+ * cannot support the requested setting.
-+*/
-+extern int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr);
-+
- #endif /* __PLAT_GPIO_CFG_H */
--- 
-1.6.4
+ #ifdef CONFIG_HOTPLUG_CPU
+
+ static void route_irq(struct irq_desc *desc, unsigned int irq,
+unsigned int cpu)
+@@ -178,10 +192,9 @@ static void route_irq(struct irq_desc *desc,
+unsigned int irq, unsigned int cpu)
+ void migrate_irqs(void)
+ {
+ 	unsigned int i, cpu = smp_processor_id();
++	struct irq_desc *desc;
+
+-	for (i = 0; i < NR_IRQS; i++) {
+-		struct irq_desc *desc = irq_desc + i;
+-
++	for_each_irq_desc(i, desc) {
+ 		if (desc->node == cpu) {
+ 			unsigned int newcpu = cpumask_any_and(desc->affinity,
+ 							      cpu_online_mask);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c91c77b..112cd1b 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -727,6 +727,7 @@ void __init setup_arch(char **cmdline_p)
+ 	/*
+ 	 * Set up various architecture-specific pointers
+ 	 */
++	arch_nr_irqs = mdesc->nr_irqs;
+ 	init_arch_irq = mdesc->init_irq;
+ 	system_timer = mdesc->timer;
+ 	init_machine = mdesc->init_machine;
