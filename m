@@ -1,65 +1,111 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:34:59 +0300
-Subject: [PATCH 08/23] OMAP: DSS2: VENC: don't call platform_enable/disable()
-	twice
+Date: Tue, 18 May 2010 15:34:58 +0300
+Subject: [PATCH 07/23] OMAP: DSS2: check lock_fb_info() return value
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-9-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-8-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jani Nikula <ext-jani.1.nikula@nokia.com>
 
-platform_enable/disable() is already called in venc_power_on/off(), so
-don't do it again in venc_panel_enable/disable().
+Give up if lock_fb_info() fails, following the same convention as other
+lock_fb_info() users.
 
 Signed-off-by: Jani Nikula <ext-jani.1.nikula@nokia.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/venc.c |   15 +--------------
- 1 files changed, 1 insertions(+), 14 deletions(-)
+ drivers/video/omap2/omapfb/omapfb-ioctl.c |    3 ++-
+ drivers/video/omap2/omapfb/omapfb-sysfs.c |   21 ++++++++++++++-------
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/venc.c b/drivers/video/omap2/dss/venc.c
-index f0ba573..eff3505 100644
---- a/drivers/video/omap2/dss/venc.c
-+++ b/drivers/video/omap2/dss/venc.c
-@@ -479,12 +479,6 @@ static int venc_panel_enable(struct omap_dss_device *dssdev)
- 		goto err1;
- 	}
+diff --git a/drivers/video/omap2/omapfb/omapfb-ioctl.c b/drivers/video/omap2/omapfb/omapfb-ioctl.c
+index 2c0f01c..9c73618 100644
+--- a/drivers/video/omap2/omapfb/omapfb-ioctl.c
++++ b/drivers/video/omap2/omapfb/omapfb-ioctl.c
+@@ -183,7 +183,8 @@ int omapfb_update_window(struct fb_info *fbi,
+ 	struct omapfb2_device *fbdev = ofbi->fbdev;
+ 	int r;
  
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err2;
--	}
--
- 	venc_power_on(dssdev);
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 	omapfb_lock(fbdev);
  
- 	venc.wss_data = 0;
-@@ -494,13 +488,9 @@ static int venc_panel_enable(struct omap_dss_device *dssdev)
- 	/* wait couple of vsyncs until enabling the LCD */
- 	msleep(50);
+ 	r = omapfb_update_window_nolock(fbi, x, y, w, h);
+diff --git a/drivers/video/omap2/omapfb/omapfb-sysfs.c b/drivers/video/omap2/omapfb/omapfb-sysfs.c
+index e104450..5179219 100644
+--- a/drivers/video/omap2/omapfb/omapfb-sysfs.c
++++ b/drivers/video/omap2/omapfb/omapfb-sysfs.c
+@@ -57,7 +57,8 @@ static ssize_t store_rotate_type(struct device *dev,
+ 	if (rot_type != OMAP_DSS_ROT_DMA && rot_type != OMAP_DSS_ROT_VRFB)
+ 		return -EINVAL;
  
--	mutex_unlock(&venc.venc_lock);
--
--	return r;
--err2:
--	venc_power_off(dssdev);
- err1:
- 	mutex_unlock(&venc.venc_lock);
-+
- 	return r;
- }
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
  
-@@ -524,9 +514,6 @@ static void venc_panel_disable(struct omap_dss_device *dssdev)
- 	/* wait at least 5 vsyncs after disabling the LCD */
- 	msleep(100);
+ 	r = 0;
+ 	if (rot_type == ofbi->rotation_type)
+@@ -105,7 +106,8 @@ static ssize_t store_mirror(struct device *dev,
+ 	if (mirror != 0 && mirror != 1)
+ 		return -EINVAL;
  
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
- 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
- end:
- 	mutex_unlock(&venc.venc_lock);
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 
+ 	ofbi->mirror = mirror;
+ 
+@@ -137,7 +139,8 @@ static ssize_t show_overlays(struct device *dev,
+ 	ssize_t l = 0;
+ 	int t;
+ 
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 	omapfb_lock(fbdev);
+ 
+ 	for (t = 0; t < ofbi->num_overlays; t++) {
+@@ -195,7 +198,8 @@ static ssize_t store_overlays(struct device *dev, struct device_attribute *attr,
+ 	if (buf[len - 1] == '\n')
+ 		len = len - 1;
+ 
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 	omapfb_lock(fbdev);
+ 
+ 	if (len > 0) {
+@@ -317,7 +321,8 @@ static ssize_t show_overlays_rotate(struct device *dev,
+ 	ssize_t l = 0;
+ 	int t;
+ 
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 
+ 	for (t = 0; t < ofbi->num_overlays; t++) {
+ 		l += snprintf(buf + l, PAGE_SIZE - l, "%s%d",
+@@ -345,7 +350,8 @@ static ssize_t store_overlays_rotate(struct device *dev,
+ 	if (buf[len - 1] == '\n')
+ 		len = len - 1;
+ 
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 
+ 	if (len > 0) {
+ 		char *p = (char *)buf;
+@@ -416,7 +422,8 @@ static ssize_t store_size(struct device *dev, struct device_attribute *attr,
+ 
+ 	size = PAGE_ALIGN(simple_strtoul(buf, NULL, 0));
+ 
+-	lock_fb_info(fbi);
++	if (!lock_fb_info(fbi))
++		return -ENODEV;
+ 
+ 	for (i = 0; i < ofbi->num_overlays; i++) {
+ 		if (ofbi->overlays[i]->info.enabled) {
 -- 
 1.7.0.4
