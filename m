@@ -1,51 +1,90 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 May 2010 10:41:20 +0900
-Subject: Samsung SoCs framebuffer re-work
-In-Reply-To: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-Message-ID: <005c01caf62b$3c1d72f0$b45858d0$%kim@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 18 May 2010 10:59:27 +0900
+Subject: [PATCH 2/6] S3C: DMA: Add api driver for PL330
+In-Reply-To: <20100517084021.GC6684@trinity.fluff.org>
+References: <1274060104-14224-1-git-send-email-jassi.brar@samsung.com>
+	<1274060139-14290-1-git-send-email-jassi.brar@samsung.com>
+	<20100517084021.GC6684@trinity.fluff.org>
+Message-ID: <AANLkTik76NKK3tOeFSDoRK5MrT8pd68yn78I0ZO4KTNd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi Ben,
-> 
-> Currently there's only one fb drivers for samsung SocS. but it's based
-> on s3c24xx and a part of s3c64xx.
-> As you can see the s5pc110 (aka s5pv210) spec, It has more features
-> and interconnection between FIMC and FIMD.
-> So current fb driver can't handle these features well. So LSI make a
-> own fb drivers and use it. You can see the code at their git repo.
-> 
-> Now we are re-implement or change it for s5pc110 and for future usages.
-> How do you think?
+On Mon, May 17, 2010 at 5:40 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Mon, May 17, 2010 at 10:35:39AM +0900, Jassi Brar wrote:
 
-Hi,
+>> +/*
+>> + * The platforms just need to provide this info
+>> + * to the S3C DMA API driver for PL330.
+>
+> would be heklpful to describe what this information actually
+> means, including how it helps to configure the hardware appropriately.
 
-As you commented, System LSI has own S5PV210/S5PC110 FB driver which is
-different from s3c24xx and s3c64xx.
+Ok
 
-Samsung S.LSI FB driver for S5PV210/S5PC110 has:
-- IRQ support for underrun
-- VSYNC interrupt
-- Configuration variables for virtual screen support
-- Change default window from zero
-- Double buffering support
-- Private IOCTL support
-  => control data sources
-  => move window positions
-  => alpha blending support
-- Direct ioctl for FIMD and 3D
-- sysfs files for window control
+......
 
-So S.LSI is modifying it to be relatively easy to merge.
-And will be submitted soon.
+>> +struct s3c_pl330_dmac {
+>> + ? ? struct pl330_info *pi;
+>> + ? ? /* Number of channels currently busy */
+>> + ? ? unsigned busy_chan;
+>> + ? ? /* To attach to the global list of DMACs */
+>> + ? ? struct list_head node;
+>> + ? ? /* List of IDs of peripherals this DMAC can work with */
+>> + ? ? enum dma_ch *peri;
+>> + ? ? /* Pool to quickly allocate xfers for all channels in the dmac */
+>> + ? ? struct kmem_cache *kmcache;
+>> +};
+>
+> I would prefer to see kerneldoc style documentation for this
+> if possible.
+Ok.
 
-Thanks.
+......
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> + ? ? ch = kmalloc(sizeof(*ch), GFP_KERNEL);
+>> + ? ? /* Return silently to work with other channels */
+>> + ? ? if (!ch)
+>> + ? ? ? ? ? ? return;
+>> +
+>> + ? ? ch->id = id;
+>> + ? ? ch->dmac = NULL;
+>> +
+>
+> should you init the list entry before adding it?
+sorry, I am unable to see any problem with what I do.
+Am I overlooking something?
+
+.....
+
+>> +/*
+>> + * Measure of suitability of 'dmac' handling 'ch'
+>> + *
+>> + * 0 indicates 'dmac' can not handle 'ch' either
+>> + * because it is not supported by the hardware or
+>> + * because all dmac channels are currently busy.
+>> + *
+>> + * >0 vlaue indicates 'dmac' has the capability.
+>> + * The bigger the value the more suitable the dmac.
+>> + */
+>> +typedef u8 suit;
+>> +#define MAX_SUIT ? ? 255
+>> +#define MIN_SUIT ? ? 0
+>
+> hmm, would oprfer to see this as a simple integer.
+Ok.
+
+......
+
+>> + ? ? /* If there was only one node left */
+>> + ? ? if (t == xfer)
+>> + ? ? ? ? ? ? ch->xfer_head = NULL;
+>> + ? ? else if (ch->xfer_head == xfer)
+>> + ? ? ? ? ? ? ch->xfer_head = t;
+>> +
+>> + ? ? list_del(&xfer->node);
+>> +}
+>
+> couldn't xfer_head be infered from the transfer list?
+Not if we are to support S3C2410_DMAF_CIRCULAR.
+
+thanks
