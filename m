@@ -1,209 +1,63 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 18 May 2010 18:34:49 +0800
-Subject: [RFC PATCH v2] preliminary support for sparse IRQ
-Message-ID: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 18 May 2010 12:38:39 +0200
+Subject: [PATCH 01/11] drivers: serial: S5PC100 serial driver cleanup
+In-Reply-To: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
+References: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1274179129-14659-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2e2e087d96630c95dbce57036680cf917e906cf1
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Mon Dec 28 12:59:59 2009 +0800
+Remove unnecessary Kconfig entry. S5PC100 has exactly the same driver as
+S3C6400/S3C6410/S5P6440.
 
-    [ARM] preliminary support for sparse IRQ
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/serial/Kconfig  |   16 ++++------------
+ drivers/serial/Makefile |    1 -
+ 2 files changed, 4 insertions(+), 13 deletions(-)
 
-    So to allow NR_IRQS to be dynamic and platforms to specify the number
-    of IRQs really needed.
-
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c5408bf..727703c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1282,6 +1282,18 @@ config HW_PERF_EVENTS
- 	  Enable hardware performance counter support for perf events. If
- 	  disabled, perf events will use software events only.
-
-+config SPARSE_IRQ
-+	bool "Support sparse irq numbering"
-+	depends on EXPERIMENTAL
-+	help
-+	  This enables support for sparse irqs. This is useful in general
-+	  as most CPUs have a fairly sparse array of IRQ vectors, which
-+	  the irq_desc then maps directly on to. Systems with a high
-+	  number of off-chip IRQs will want to treat this as
-+	  experimental until they have been independently verified.
-+
-+	  If you don't know what to do here, say N.
-+
- source "mm/Kconfig"
-
- config LEDS
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 237282f..2721a58 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -7,6 +7,8 @@
- #define irq_canonicalize(i)	(i)
- #endif
-
-+#define NR_IRQS_LEGACY	16
-+
- /*
-  * Use this value to indicate lack of interrupt
-  * capability
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index c59842d..5ee6f85 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -20,6 +20,7 @@ struct machine_desc {
- 	 * by assembler code in head.S, head-common.S
- 	 */
- 	unsigned int		nr;		/* architecture number	*/
-+	unsigned int		nr_irqs;	/* number of IRQs */
- 	unsigned int		phys_io;	/* start of physical io	*/
- 	unsigned int		io_pg_offst;	/* byte offset for io
- 						 * page tabe entry	*/
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 8920b2d..ce3eee9 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -17,6 +17,7 @@ struct seq_file;
- /*
-  * This is internal.  Do not use it.
-  */
-+extern unsigned int arch_nr_irqs;
- extern void (*init_arch_irq)(void);
- extern void init_FIQ(void);
- extern int show_fiq_list(struct seq_file *, void *);
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 3b3d2c8..c0d5c3b 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -47,12 +47,14 @@
- #define irq_finish(irq) do { } while (0)
- #endif
-
-+unsigned int arch_nr_irqs;
- void (*init_arch_irq)(void) __initdata = NULL;
- unsigned long irq_err_count;
-
- int show_interrupts(struct seq_file *p, void *v)
- {
- 	int i = *(loff_t *) v, cpu;
-+	struct irq_desc *desc;
- 	struct irqaction * action;
- 	unsigned long flags;
-
-@@ -67,24 +69,25 @@ int show_interrupts(struct seq_file *p, void *v)
- 		seq_putc(p, '\n');
- 	}
-
--	if (i < NR_IRQS) {
--		raw_spin_lock_irqsave(&irq_desc[i].lock, flags);
--		action = irq_desc[i].action;
-+	if (i < nr_irqs) {
-+		desc = irq_to_desc(i);
-+		raw_spin_lock_irqsave(&desc->lock, flags);
-+		action = desc->action;
- 		if (!action)
- 			goto unlock;
-
- 		seq_printf(p, "%3d: ", i);
- 		for_each_present_cpu(cpu)
- 			seq_printf(p, "%10u ", kstat_irqs_cpu(i, cpu));
--		seq_printf(p, " %10s", irq_desc[i].chip->name ? : "-");
-+		seq_printf(p, " %10s", desc->chip->name ? : "-");
- 		seq_printf(p, "  %s", action->name);
- 		for (action = action->next; action; action = action->next)
- 			seq_printf(p, ", %s", action->name);
-
- 		seq_putc(p, '\n');
- unlock:
--		raw_spin_unlock_irqrestore(&irq_desc[i].lock, flags);
--	} else if (i == NR_IRQS) {
-+		raw_spin_unlock_irqrestore(&desc->lock, flags);
-+	} else if (i == nr_irqs) {
- #ifdef CONFIG_FIQ
- 		show_fiq_list(p, v);
- #endif
-@@ -112,7 +115,7 @@ asmlinkage void __exception asm_do_IRQ(unsigned
-int irq, struct pt_regs *regs)
- 	 * Some hardware gives randomly wrong interrupts.  Rather
- 	 * than crashing, do something sensible.
- 	 */
--	if (unlikely(irq >= NR_IRQS)) {
-+	if (unlikely(irq >= nr_irqs)) {
- 		if (printk_ratelimit())
- 			printk(KERN_WARNING "Bad IRQ%u\n", irq);
- 		ack_bad_irq(irq);
-@@ -132,12 +135,12 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
- 	struct irq_desc *desc;
- 	unsigned long flags;
-
--	if (irq >= NR_IRQS) {
-+	if (irq >= nr_irqs) {
- 		printk(KERN_ERR "Trying to set irq flags for IRQ%d\n", irq);
- 		return;
- 	}
-
--	desc = irq_desc + irq;
-+	desc = irq_to_desc(irq);
- 	raw_spin_lock_irqsave(&desc->lock, flags);
- 	desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
- 	if (iflags & IRQF_VALID)
-@@ -151,14 +154,25 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
-
- void __init init_IRQ(void)
- {
-+	struct irq_desc *desc;
- 	int irq;
-
--	for (irq = 0; irq < NR_IRQS; irq++)
--		irq_desc[irq].status |= IRQ_NOREQUEST | IRQ_NOPROBE;
-+	for (irq = 0; irq < nr_irqs; irq++) {
-+		desc = irq_to_desc_alloc_node(irq, 0);
-+		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
-+	}
-
- 	init_arch_irq();
- }
-
-+#ifdef CONFIG_SPARSE_IRQ
-+int __init arch_probe_nr_irqs(void)
-+{
-+	nr_irqs = arch_nr_irqs ? arch_nr_irqs : NR_IRQS;
-+	return 0;
-+}
-+#endif
-+
- #ifdef CONFIG_HOTPLUG_CPU
-
- static void route_irq(struct irq_desc *desc, unsigned int irq,
-unsigned int cpu)
-@@ -178,10 +192,9 @@ static void route_irq(struct irq_desc *desc,
-unsigned int irq, unsigned int cpu)
- void migrate_irqs(void)
- {
- 	unsigned int i, cpu = smp_processor_id();
-+	struct irq_desc *desc;
-
--	for (i = 0; i < NR_IRQS; i++) {
--		struct irq_desc *desc = irq_desc + i;
+diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+index 5f3f03d..302836a 100644
+--- a/drivers/serial/Kconfig
++++ b/drivers/serial/Kconfig
+@@ -534,21 +534,13 @@ config SERIAL_S3C24A0
+ 	  Serial port support for the Samsung S3C24A0 SoC
+ 
+ config SERIAL_S3C6400
+-	tristate "Samsung S3C6400/S3C6410/S5P6440 Seria port support"
+-	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440)
++	tristate "Samsung S3C6400/S3C6410/S5P6440/S5PC100 Serial port support"
++	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5PC100)
+ 	select SERIAL_SAMSUNG_UARTS_4
+ 	default y
+ 	help
+-	  Serial port support for the Samsung S3C6400, S3C6410 and S5P6440
+-	  SoCs
 -
-+	for_each_irq_desc(i, desc) {
- 		if (desc->node == cpu) {
- 			unsigned int newcpu = cpumask_any_and(desc->affinity,
- 							      cpu_online_mask);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c91c77b..112cd1b 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -727,6 +727,7 @@ void __init setup_arch(char **cmdline_p)
- 	/*
- 	 * Set up various architecture-specific pointers
- 	 */
-+	arch_nr_irqs = mdesc->nr_irqs;
- 	init_arch_irq = mdesc->init_irq;
- 	system_timer = mdesc->timer;
- 	init_machine = mdesc->init_machine;
+-config SERIAL_S5PC100
+-	tristate "Samsung S5PC100 Serial port support"
+-	depends on SERIAL_SAMSUNG && CPU_S5PC100
+-	select SERIAL_SAMSUNG_UARTS_4
+-	default y
+-	help
+-	  Serial port support for the Samsung S5PC100 SoCs
++	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440
++	  and S5PC100 SoCs
+ 
+ config SERIAL_S5PV210
+ 	tristate "Samsung S5PV210 Serial port support"
+diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
+index 6aa4723..328f107 100644
+--- a/drivers/serial/Makefile
++++ b/drivers/serial/Makefile
+@@ -44,7 +44,6 @@ obj-$(CONFIG_SERIAL_S3C2412) += s3c2412.o
+ obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
+ obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
+ obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
+-obj-$(CONFIG_SERIAL_S5PC100) += s3c6400.o
+ obj-$(CONFIG_SERIAL_S5PV210) += s5pv210.o
+ obj-$(CONFIG_SERIAL_MAX3100) += max3100.o
+ obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
+-- 
+1.6.4
