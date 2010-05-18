@@ -1,75 +1,106 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 May 2010 14:59:23 +0900
-Subject: [PATCH 4/8] rtc: rtc-s3c: Add alarm_irq_enable RTC class operation
-Message-ID: <1274162363-1911-1-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 18 May 2010 14:59:07 +0900
+Subject: [PATCH 2/8] ARM: SAMSUNG: Fixed coding style issue
+Message-ID: <1274162347-557-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Taekgyun Ko <taeggyun.ko@samsung.com>
 
-This patch updates rtc-s3c driver to support
-'alarm_irq_enable' RTC class operation.
+Fixed a coding style issue.
 
 Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/rtc/rtc-s3c.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+ arch/arm/plat-samsung/include/plat/regs-rtc.h |   68 ++++++++++++-------------
+ 1 files changed, 33 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index 4969b60..9364dc2 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -59,18 +59,20 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
- }
+diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+index d5837cf..5b547ce 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+@@ -13,49 +13,47 @@
+ #ifndef __ASM_ARCH_REGS_RTC_H
+ #define __ASM_ARCH_REGS_RTC_H __FILE__
  
- /* Update control registers */
--static void s3c_rtc_setaie(int to)
-+static int s3c_rtc_setaie(struct device *dev, unsigned int enabled)
- {
- 	unsigned int tmp;
- 
--	pr_debug("%s: aie=%d\n", __func__, to);
-+	pr_debug("%s: aie=%d\n", __func__, enabled);
- 
- 	tmp = readb(s3c_rtc_base + S3C2410_RTCALM) & ~S3C2410_RTCALM_ALMEN;
- 
--	if (to)
-+	if (enabled)
- 		tmp |= S3C2410_RTCALM_ALMEN;
- 
- 	writeb(tmp, s3c_rtc_base + S3C2410_RTCALM);
+-#define S3C2410_RTCREG(x) (x)
+-
+-#define S3C2410_RTCCON	      S3C2410_RTCREG(0x40)
+-#define S3C2410_RTCCON_RTCEN  (1<<0)
+-#define S3C2410_RTCCON_CLKSEL (1<<1)
+-#define S3C2410_RTCCON_CNTSEL (1<<2)
+-#define S3C2410_RTCCON_CLKRST (1<<3)
+-
+-#define S3C2410_TICNT	      S3C2410_RTCREG(0x44)
+-#define S3C2410_TICNT_ENABLE  (1<<7)
+-
+-#define S3C2410_RTCALM	      S3C2410_RTCREG(0x50)
+-#define S3C2410_RTCALM_ALMEN  (1<<6)
+-#define S3C2410_RTCALM_YEAREN (1<<5)
+-#define S3C2410_RTCALM_MONEN  (1<<4)
+-#define S3C2410_RTCALM_DAYEN  (1<<3)
+-#define S3C2410_RTCALM_HOUREN (1<<2)
+-#define S3C2410_RTCALM_MINEN  (1<<1)
+-#define S3C2410_RTCALM_SECEN  (1<<0)
++#define S3C2410_RTCREG(x)	(x)
 +
-+	return 0;
- }
++#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
++#define S3C2410_RTCCON_RTCEN	(1 << 0)
++#define S3C2410_RTCCON_CLKSEL	(1 << 1)
++#define S3C2410_RTCCON_CNTSEL	(1 << 2)
++#define S3C2410_RTCCON_CLKRST	(1 << 3)
++
++#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
++#define S3C2410_TICNT_ENABLE	(1 << 7)
++
++#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
++#define S3C2410_RTCALM_ALMEN	(1 << 6)
++#define S3C2410_RTCALM_YEAREN	(1 << 5)
++#define S3C2410_RTCALM_MONEN	(1 << 4)
++#define S3C2410_RTCALM_DAYEN	(1 << 3)
++#define S3C2410_RTCALM_HOUREN	(1 << 2)
++#define S3C2410_RTCALM_MINEN	(1 << 1)
++#define S3C2410_RTCALM_SECEN	(1 << 0)
  
- static int s3c_rtc_setpie(struct device *dev, int enabled)
-@@ -271,7 +273,7 @@ static int s3c_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ #define S3C2410_RTCALM_ALL \
+   S3C2410_RTCALM_ALMEN | S3C2410_RTCALM_YEAREN | S3C2410_RTCALM_MONEN |\
+   S3C2410_RTCALM_DAYEN | S3C2410_RTCALM_HOUREN | S3C2410_RTCALM_MINEN |\
+   S3C2410_RTCALM_SECEN
  
- 	writeb(alrm_en, base + S3C2410_RTCALM);
++#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
++#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
++#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
  
--	s3c_rtc_setaie(alrm->enabled);
-+	s3c_rtc_setaie(0, alrm->enabled);
+-#define S3C2410_ALMSEC	      S3C2410_RTCREG(0x54)
+-#define S3C2410_ALMMIN	      S3C2410_RTCREG(0x58)
+-#define S3C2410_ALMHOUR	      S3C2410_RTCREG(0x5c)
++#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
++#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
++#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
  
- 	if (alrm->enabled)
- 		enable_irq_wake(s3c_rtc_alarmno);
-@@ -340,6 +342,7 @@ static const struct rtc_class_ops s3c_rtcops = {
- 	.set_alarm	= s3c_rtc_setalarm,
- 	.irq_set_freq	= s3c_rtc_setfreq,
- 	.irq_set_state	= s3c_rtc_setpie,
-+	.alarm_irq_enable = s3c_rtc_setaie,
- 	.proc	        = s3c_rtc_proc,
- };
+-#define S3C2410_ALMDATE	      S3C2410_RTCREG(0x60)
+-#define S3C2410_ALMMON	      S3C2410_RTCREG(0x64)
+-#define S3C2410_ALMYEAR	      S3C2410_RTCREG(0x68)
+-
+-#define S3C2410_RTCRST	      S3C2410_RTCREG(0x6c)
+-
+-#define S3C2410_RTCSEC	      S3C2410_RTCREG(0x70)
+-#define S3C2410_RTCMIN	      S3C2410_RTCREG(0x74)
+-#define S3C2410_RTCHOUR	      S3C2410_RTCREG(0x78)
+-#define S3C2410_RTCDATE	      S3C2410_RTCREG(0x7c)
+-#define S3C2410_RTCDAY	      S3C2410_RTCREG(0x80)
+-#define S3C2410_RTCMON	      S3C2410_RTCREG(0x84)
+-#define S3C2410_RTCYEAR	      S3C2410_RTCREG(0x88)
++#define S3C2410_RTCRST		S3C2410_RTCREG(0x6c)
  
-@@ -391,7 +394,7 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
- 	rtc_device_unregister(rtc);
++#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
++#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
++#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
++#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
++#define S3C2410_RTCDAY		S3C2410_RTCREG(0x80)
++#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
++#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
  
- 	s3c_rtc_setpie(&dev->dev, 0);
--	s3c_rtc_setaie(0);
-+	s3c_rtc_setaie(0, 0);
- 
- 	iounmap(s3c_rtc_base);
- 	release_resource(s3c_rtc_mem);
+ #endif /* __ASM_ARCH_REGS_RTC_H */
 -- 
 1.6.2.5
