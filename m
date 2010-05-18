@@ -1,46 +1,35 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 03:48:20 +0100
-Subject: [PATCH] serial: SAMSUNG: Fix dev_name and driver_name
-In-Reply-To: <4BF13ABA.3090504@samsung.com>
-References: <4BF13ABA.3090504@samsung.com>
-Message-ID: <20100518024820.GK27571@trinity.fluff.org>
+Date: Tue, 18 May 2010 03:50:58 +0100
+Subject: Samsung SoCs framebuffer re-work
+In-Reply-To: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
+References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
+Message-ID: <20100518025058.GL27571@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
-> Thd dev_name and driver_name should be switched each other.
-
-Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
- 
-Please provide some information about what problem that this is fixing
-and the impact on any existing systems.
-
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> ---
->  drivers/serial/samsung.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
+> Hi Ben,
 > 
-> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
-> index a9d6c56..6f3cf70 100644
-> --- a/drivers/serial/samsung.c
-> +++ b/drivers/serial/samsung.c
-> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
->  
->  static struct uart_driver s3c24xx_uart_drv = {
->  	.owner		= THIS_MODULE,
-> -	.dev_name	= "s3c2410_serial",
-> +	.dev_name	= S3C24XX_SERIAL_NAME,
->  	.nr		= CONFIG_SERIAL_SAMSUNG_UARTS,
->  	.cons		= S3C24XX_SERIAL_CONSOLE,
-> -	.driver_name	= S3C24XX_SERIAL_NAME,
-> +	.driver_name	= "s3c2410_serial",
->  	.major		= S3C24XX_SERIAL_MAJOR,
->  	.minor		= S3C24XX_SERIAL_MINOR,
->  };
-> -- 
-> 1.7.0.4
+> Currently there's only one fb drivers for samsung SocS. but it's based
+> on s3c24xx and a part of s3c64xx.
 
--- 
+Your statement is incorrect, we have the s3c2410-fb driver which deals
+with the 2410/2440/2412 style hardware and s3c-fb which is for the newer
+devices.
+
+> As you can see the s5pc110 (aka s5pv210) spec, It has more features
+> and interconnection between FIMC and FIMD.
+> So current fb driver can't handle these features well. So LSI make a
+> own fb drivers and use it. You can see the code at their git repo.
+> 
+> Now we are re-implement or change it for s5pc110 and for future usages.
+> How do you think?
+
+I've already got updates for s3c-fb to work on 2416,2443 and the c110/v210
+systems. I am talking with the relevant people at System.LSI to get our
+drivers closers together, possibly we can get this done for the current
+merge window.
+
 -- 
 Ben
 
