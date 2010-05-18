@@ -1,38 +1,56 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Tue, 18 May 2010 11:04:01 +0200
-Subject: i.MX27 Clock sources
-In-Reply-To: <20100518075109.GC1749@www.longlandclan.yi.org>
-References: <20100518075109.GC1749@www.longlandclan.yi.org>
-Message-ID: <19442.22529.98355.153495@ipc1.ka-ro>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 18 May 2010 17:10:40 +0800
+Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
+Message-ID: <4BF25990.6070602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Alessandro,
 
-> 	For our application, it is necessary to interface this device to
-> a Texas Instruments TLV320AIC3204 CODEC.  The i.MX27 provides the clock
-> via SSI3_CLK, and communicates using I?S and I?C.  I understand that the
-> clock divider for the SSIs is driven from either MPLL or SPLL; but what
-> I'm not certain on is where those are configured in the Linux kernel, or
-> what the implications are for tinkering with these.
-> 
-> 	Ideally I'd like to adjust MPLL/SPLL and/or the SSI clocks so
-> that the clock rate is some multiple of the I?S bit rate.  So far I can
-> get it close; but not close enough.  Does anyone have any pointers as to
-> where I can look in the Linux kernel for this information?
-> 
-Can't you use the codec in master mode, instead of fiddling with the
-CPU clocks?
+This patch is to change the waiting for device ready implement
+for winbond nuc900 platform.
 
+Thanks!
 
-Lothar Wa?mann
+Signed-off-by:Wan ZongShun<mcuos.com@gmail.com>
+
+---
+ drivers/rtc/rtc-nuc900.c |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+index a351bd5..8684051 100644
+--- a/drivers/rtc/rtc-nuc900.c
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
+
+ static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
+ {
+-	unsigned int i;
++	unsigned int i, timeout = 0x1000, val;
+ 	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
+
+ 	mdelay(10);
+
+ 	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
+
+-	for (i = 0; i < 1000; i++) {
+-		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+-			return 0;
+-	}
++	while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
++								&& timeout--)
++		mdelay(1);
+
+-	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
+-		return ERR_PTR(-ENODEV);
++	if (timeout == 0x1000)
++		return ERR_PTR(-EPERM);
+
+-	return ERR_PTR(-EPERM);
++	return 0;
+ }
+
+ static void nuc900_rtc_bcd2bin(unsigned int timereg,
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.6.3.3
