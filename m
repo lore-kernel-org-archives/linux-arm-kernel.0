@@ -1,74 +1,70 @@
-From: sakoman@gmail.com (Steve Sakoman)
-Date: Tue, 18 May 2010 06:41:39 -0700
-Subject: [PATCH 14/18] omap: Overo: Add support for second ethernet port
-In-Reply-To: <20100505193315.21568.55530.stgit@baageli.muru.com>
-References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-	<20100505193315.21568.55530.stgit@baageli.muru.com>
-Message-ID: <AANLkTinxHaxG89pUhD7nmMjQSF-p-FB1FWj_w-de9y1r@mail.gmail.com>
+From: jason.mcmullan@netronome.com (Jason McMullan)
+Date: Tue, 18 May 2010 10:06:38 -0400
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <alpine.LFD.2.00.1005180802010.12758@xanadu.home>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<201005181324.45701.jeremy.kerr@canonical.com>
+	<20100518084954.GC25892@yookeroo>
+	<alpine.LFD.2.00.1005180802010.12758@xanadu.home>
+Message-ID: <AANLkTikg4rQdnbFxBOUkGc_0DrKqRkp9raZ8Ck5xkLG4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 5, 2010 at 12:33 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: Steve Sakoman <steve@sakoman.com>
->
-> Some Overo add-on boards include a second ethernet port. ?This patch
-> adds support for that second port.
->
-> Signed-off-by: Steve Sakoman <steve@sakoman.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> ?arch/arm/mach-omap2/board-overo.c | ? 14 +++++++++++++-
-> ?1 files changed, 13 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-> index 8848c7c..79ac414 100644
-> --- a/arch/arm/mach-omap2/board-overo.c
-> +++ b/arch/arm/mach-omap2/board-overo.c
-> @@ -63,6 +63,8 @@
->
-> ?#define OVERO_SMSC911X_CS ? ? ?5
-> ?#define OVERO_SMSC911X_GPIO ? ?176
-> +#define OVERO_SMSC911X2_CS ? ? 4
-> +#define OVERO_SMSC911X2_GPIO ? 65
->
-> ?#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
-> ? ? ? ?defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
-> @@ -137,6 +139,16 @@ static struct resource overo_smsc911x_resources[] = {
-> ? ? ? ?},
-> ?};
->
-> +static struct resource overo_smsc911x2_resources[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? = "smsc911x2-memory",
-> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
-> + ? ? ? },
-> +};
-> +
-> ?static struct smsc911x_platform_config overo_smsc911x_config = {
-> ? ? ? ?.irq_polarity ? = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-> ? ? ? ?.irq_type ? ? ? = SMSC911X_IRQ_TYPE_OPEN_DRAIN,
-> @@ -146,7 +158,7 @@ static struct smsc911x_platform_config overo_smsc911x_config = {
->
-> ?static struct platform_device overo_smsc911x_device = {
-> ? ? ? ?.name ? ? ? ? ? = "smsc911x",
-> - ? ? ? .id ? ? ? ? ? ? = -1,
-> + ? ? ? .id ? ? ? ? ? ? = 0,
-> ? ? ? ?.num_resources ?= ARRAY_SIZE(overo_smsc911x_resources),
-> ? ? ? ?.resource ? ? ? = overo_smsc911x_resources,
-> ? ? ? ?.dev ? ? ? ? ? ?= {
->
-> --
+With respect to machine IDs, why not have our cake and eat it too?
 
-I just noticed that somehow a good portion of my original patch got
-dropped in this version!
+(NOTE: This proposal assumes that the boot code has already
+       determined whether ATAGs or a DT has been passed to
+       the kernel, and that ATAG and DT machine IDs are in
+       the same namespace)
 
-Original:
+1) We already have machine names in the mach-types file, and we
+can propose that those are used as the top-level 'compatible'
+tags for the DTs.
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26350.html
+...
+   compatible = "openrd\000kirkwood\000armv6\000arm"
+...
 
-How would you like to handle getting the missing chuncks?
 
-Steve
+2) We can trivially generate a name-to-machine ID hash table from
+the mach-types file (CRC32 of the name, or some other hash)
+
+3) Allocate per-SoC machine IDs for DT names, and a
+global generic machine ID as a catch-all:
+
+dt_arm        MACH_DT_ARM       DT_ARM       xxxx
+dt_armv6      MACH_DT_ARMV6     DT_ARMV6     xxxx
+dt_kirkwood   MACH_DT_KIRKWOOD  DT_KIRKWOOD  xxxx
+dt_at91       MACH_DT_AT91      DT_AT91      xxxx
+
+4) Each machine type that cares about DTs could register a
+callback function, that would be placed in a linker-assembled
+table mapping machine IDs (or the name hashes) to callbacks:
+
+void at91_setup_from_dt(struct device_tree_node *dt)
+{
+  ...
+}
+
+DECLARE_DT_CALLBACK(at91, at91_setup_from_dt)
+
+5) The 'arm' callback would handle common-code devices,
+such as NOR flash, memory areas, etc. and would be called
+after the machine-specific callbacks.
+
+6) So, for the openrd case above, the DT parser callback
+would call on, for each object in the DT:
+
+  a) The MACH_DT_OPENRD callback, if it exists. If not, or
+     if it returns -ENOTSUP:
+  b) The MACH_DT_KIRKWOOD callback, if it exists. If not, or
+     if it returns -ENOTSUP:
+  c) The MACH_DT_ARMV6 callback, if it exists. If not, or
+     if it returns -ENOTSUP:
+  d) The MACH_DT_ARM callback, if it exists. If not, or
+     if it returns -ENOTSUP:
+
+-- 
+Jason S. McMullan
+Netronome Systems, Inc.
