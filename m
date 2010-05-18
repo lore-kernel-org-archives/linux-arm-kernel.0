@@ -1,70 +1,95 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 18 May 2010 07:57:43 -0400 (EDT)
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <201005181324.45701.jeremy.kerr@canonical.com>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<201005181324.45701.jeremy.kerr@canonical.com>
-Message-ID: <alpine.LFD.2.00.1005180742500.12758@xanadu.home>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 18 May 2010 15:03:26 +0300
+Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
+In-Reply-To: <20100518.114642.35020415.Hiroshi.DOYU@nokia.com>
+References: <1273849310-32169-1-git-send-email-felipe.contreras@gmail.com>
+	<20100518.114642.35020415.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTim5SxEb64QbBQgBhufhgpQ33MNFBhuHixfUeVKp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 May 2010, Jeremy Kerr wrote:
+On Tue, May 18, 2010 at 11:46 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: ext Felipe Contreras <felipe.contreras@gmail.com>
+> Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
+> Date: Fri, 14 May 2010 17:01:33 +0200
+>
+>> Hi,
+>>
+>> The main purpose of this patch series is to be able to compile mach platform
+>> data as built-in. Otherwise, client modules such as bridgedriver will load the
+>> platform code, but not the mach code when mailbox is built as a module.
+>
+> I think that this is the *udev* responsibility. The udev should take
+> care of loading mailbox_mach.ko since the mailbox platform device was
+> registered by devices.ko at bootup. devices.ko is built in earlier
+> than dspbridge.ko, so the mailbox platform device is registered
+> earlier than the dsp device, "C6410". this registration ordering
+> should take care of the dependency if the udevd works correctly.
 
-> Hi Nicolas,
-> 
-> > I think that, for the moment, it is best if the bootloader on already 
-> > existing subarchitectures where DT is introduced still preserve the 
-> > already existing ability to boot using ATAGs.  This allows for the 
-> > testing and validation of the DT concept against the legacy ATAG method 
-> > more easily.
-> 
-> Just to clarify - by "still preserve the existing ability to use ATAGs" you 
-> mean only for non-DT boot, right?
+I'm not familiar with this kind of module loading, but certainly not
+all systems have udev.
 
-Exact.  Once a particular SOC family has no non-DT support anymore (due 
-to being entirely new, or because people get really enthusiastic and 
-fade out legacy machine specific init code completely) then and only 
-then it might be logical to remove ATAG from the concerned bootloaders.
+I realized the problem because I have a bare-bones system in my
+beagleboard where I had to manually load mailbox_mach.
 
+>> Unfortunately, there's no easy way to do that since plat and mach code are
+>> deepely interrelated. So the first patches try to separate the mailbox
+>> registering through a defined omap_mbox_platform_data.
+>>
+>> Also, it's worth noting that mailboxes are not a one-to-one mapping to
+>> resources; that is, some resources belong to multiple mboxes. So it's best to
+>> think of mailboxes as fake devices. That is why custom platform_data
+>> is required.
+>
+> Actually there were logical mailbox devices/instances implemented, but
+> it was broken partially when dropping mailbox class support by
+> accident(*1). This is the reason whey omap_mbox struct has unused dev
+> pointer now. At that time, the sysfs interface was not necessary but
+> the device creation itself should not have been removed. I'll get this
+> code back again soon.
+>
+> The role of each modules were/should be:
+>
+> ?- devices.ko: ? ? ? ? a platform device, based on its resource.
+> ?- mailbox_mach.ko: ? ?a platform driver to register multiple logical mboxes/devices.
+> ?- mailbox.ko: ? ? ? ? a kind of framework which holds multiple logical mboxes/devices.
+>
+> The sysfs structure is like below:
+>
+> ?~# tree -d -L 2 /sys/devices/platform/omap2-mailbox/
 
-> This proposal still does not require ATAG_DEVTREE?
+I don't see the point of having 'omap2' there, at best it should be
+'omap-mailbox', or perhaps even just 'mailbox'.
 
-No.
+> The platform device omap2-mailbox accomodatess logical mboxes.
 
-> > Why one DT machine ID per subarchitecture?  Simply because a significant
-> > part of the DT handling code will have to be subarchitecture specific
-> > anyway.  The timer hardware, the GPIO configuration and muxing, SOC
-> > specific platform data handling, power management config, and many other
-> > things are simply too different from one SOC family to another and
-> > trying to have a single global DT support code to rule them all is
-> > insane.
-> 
-> The code for DT boot will be still subarch-specific, but I don't think we need 
-> IDs for that. There is enough information in the device tree to select the 
-> subarch-specific code to use for early init, without needing to parameterise 
-> every element of the machine.
+Wouldn't it be better the way my patches handle them?
+ * devices.ko:  doesn't care about mbox
+ * mach_omap1/mailbox.ko:  registers "omap-mailbox" platform device
+with a list of logical mboxes for OMAP1
+ * mach_omap2/mailbox.ko:  registers "omap-mailbox" platform device
+with a list of logical mboxes for OMAP2
+ * plat-omap/mailbox.ko: creates platform driver based on logical list
+of mboxes from platform device and handles the list internally
 
-You can't do that without shifting the World Order on ARM.  And _that_ 
-is going to create resistance for merging DT support.
+The end result would be the exactly same, except that there's no hard
+dependency between the mach, and plat code.
 
-> The machine-level "compatible" property allows 
-> us to do this.
-> 
-> Therefore, I don't think we need the machine ID at all: once the DT is 
-> available, we can use that for any machine-specific stuff. Even though we're 
-> not *configuring* it from the device tree, we can *select* it from there 
-> instead.
+>> Finally, a bunch of cleaning up is done in the very first patches, specially for
+>> OMAP1.
+>
+> Most of the cleanups are quite ok.
+>
+> Would it be possible to rebase them on the top of my coming patch to
+> get back logical device entry?
 
-This is just added complexity, especially in the early boot code which 
-for now simply has to compare r1 against well known constants.  We have 
-that ID passed by the bootloader already.  I don't see the advantage of 
-ignoring it and relying solely on DT for that.
+Where is that?
 
-Furthermore, if you're interested only in, say, OMAP5 (let's say you're 
-doing U-Boot for it) then you need no bother about anything else than 
-passing the ID number for OMAP5_DEVICE_TREE into r1 and manage 
-*everything else* in the device tree.
+> Sorry for the late reply, it took some time to recall my bad memory...
 
+No worries.
 
-Nicolas
+Cheers.
+
+-- 
+Felipe Contreras
