@@ -1,148 +1,53 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 08:12:57 +0100
-Subject: [PATCH 1/8] ARM: SAMSUNG: Move RTC device definitions in
-	plat-samsung
-In-Reply-To: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
-References: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100518071257.GD26401@trinity.fluff.org>
+Date: Tue, 18 May 2010 08:16:08 +0100
+Subject: Samsung SoCs framebuffer re-work
+In-Reply-To: <000101caf656$ff21b560$fd652020$%osciak@samsung.com>
+References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
+	<20100518025058.GL27571@trinity.fluff.org>
+	<AANLkTimfbcYLyiuErIMcDqfAzz2L76J3j2IxlWS0b333@mail.gmail.com>
+	<20100518055319.GP27571@trinity.fluff.org>
+	<000101caf656$ff21b560$fd652020$%osciak@samsung.com>
+Message-ID: <20100518071608.GQ27571@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 02:58:56PM +0900, Kukjin Kim wrote:
-> From: Atul Dahiya <atul.dahiya@samsung.com>
+On Tue, May 18, 2010 at 08:54:44AM +0200, Pawel Osciak wrote:
 > 
-> This patch moves RTC device definitions from mach-s3c64xx
-> to plat-samsung, to enable the other SoCs to use same device
-> definition.
+> > Ben Dooks wrote:
+> >On Tue, May 18, 2010 at 12:09:25PM +0900, Kyungmin Park wrote:
+> >> On Tue, May 18, 2010 at 11:50 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> >> > On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
+> >> >
+> >> >> As you can see the s5pc110 (aka s5pv210) spec, It has more features
+> >> >> and interconnection between FIMC and FIMD.
+> >> >> So current fb driver can't handle these features well. So LSI make a
+> >> >> own fb drivers and use it. You can see the code at their git repo.
+> >> >>
+> >> >> Now we are re-implement or change it for s5pc110 and for future usages.
+> >> >> How do you think?
+> >> >
+> >> > I've already got updates for s3c-fb to work on 2416,2443 and the
+> >c110/v210
+> >> > systems. I am talking with the relevant people at System.LSI to get our
+> >> > drivers closers together, possibly we can get this done for the current
+> >> > merge window.
+> >>
+> >> You mean you want to use the current fb drivers for s5pc110 also?
+> >> Then how to do implement features mentioned by Kukjin?
+> >
+> >Well, apart from the fact that quite a lot of them are actually features
+> >that are in all versions of this block, we intend to create some patches
+> >and send them to the relevant lists...
 > 
-> Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> I posted patches for s3c-fb back in September (Sep. 3rd and 11th), which
+> added some of the abovementioned features, including VSYNC, double-buffering
+> support, color-keying, alpha blending and more. Are there any plans for
+> those?
 
-ok, will apply to a branch.
+Either not seen them or missed them completely.
 
-> ---
->  arch/arm/mach-s3c64xx/Makefile                    |    1 -
->  arch/arm/mach-s3c64xx/include/mach/map.h          |    1 +
->  arch/arm/plat-samsung/Kconfig                     |    5 +++
->  arch/arm/plat-samsung/Makefile                    |    1 +
->  arch/arm/{mach-s3c64xx => plat-samsung}/dev-rtc.c |   28 ++++++++++----------
->  5 files changed, 21 insertions(+), 15 deletions(-)
->  rename arch/arm/{mach-s3c64xx => plat-samsung}/dev-rtc.c (58%)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-> index a690a9d..e7ac812 100644
-> --- a/arch/arm/mach-s3c64xx/Makefile
-> +++ b/arch/arm/mach-s3c64xx/Makefile
-> @@ -56,7 +56,6 @@ obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
->  # device support
->  
->  obj-y				+= dev-uart.o
-> -obj-y				+= dev-rtc.o
->  obj-y				+= dev-audio.o
->  obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
->  obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/map.h b/arch/arm/mach-s3c64xx/include/mach/map.h
-> index 801c1c0..cce28a9 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/map.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/map.h
-> @@ -103,5 +103,6 @@
->  #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
->  #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
->  #define S3C_VA_USB_HSPHY	S3C64XX_VA_USB_HSPHY
-> +#define S3C_PA_RTC		S3C64XX_PA_RTC
->  
->  #endif /* __ASM_ARCH_6400_MAP_H */
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 287e6f7..29e2800 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -190,6 +190,11 @@ config S3C_DEV_NAND
->  	help
->  	  Compile in platform device definition for NAND controller
->  
-> +config S3C_DEV_RTC
-> +	bool
-> +	help
-> +	  Complie in platform device definition for RTC
-> +
->  config S3C64XX_DEV_SPI
->  	bool
->  	help
-> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-> index 0ad820a..af17434 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -41,6 +41,7 @@ obj-y				+= dev-uart.o
->  obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
->  obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
->  obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
-> +obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
->  
->  # DMA support
->  
-> diff --git a/arch/arm/mach-s3c64xx/dev-rtc.c b/arch/arm/plat-samsung/dev-rtc.c
-> similarity index 58%
-> rename from arch/arm/mach-s3c64xx/dev-rtc.c
-> rename to arch/arm/plat-samsung/dev-rtc.c
-> index b9e7a05..bf4e226 100644
-> --- a/arch/arm/mach-s3c64xx/dev-rtc.c
-> +++ b/arch/arm/plat-samsung/dev-rtc.c
-> @@ -1,4 +1,4 @@
-> -/* linux/arch/arm/plat-s3c64xx/dev-rtc.c
-> +/* linux/arch/arm/plat-samsung/dev-rtc.c
->   *
->   * Copyright 2009 by Maurus Cuelenaere <mcuelenaere@gmail.com>
->   *
-> @@ -18,26 +18,26 @@
->  
->  static struct resource s3c_rtc_resource[] = {
->  	[0] = {
-> -		.start = S3C64XX_PA_RTC,
-> -		.end   = S3C64XX_PA_RTC + 0xff,
-> -		.flags = IORESOURCE_MEM,
-> +		.start	= S3C_PA_RTC,
-> +		.end	= S3C_PA_RTC + 0xff,
-> +		.flags	= IORESOURCE_MEM,
->  	},
->  	[1] = {
-> -		.start = IRQ_RTC_ALARM,
-> -		.end   = IRQ_RTC_ALARM,
-> -		.flags = IORESOURCE_IRQ,
-> +		.start	= IRQ_RTC_ALARM,
-> +		.end	= IRQ_RTC_ALARM,
-> +		.flags	= IORESOURCE_IRQ,
->  	},
->  	[2] = {
-> -		.start = IRQ_RTC_TIC,
-> -		.end   = IRQ_RTC_TIC,
-> -		.flags = IORESOURCE_IRQ
-> +		.start	= IRQ_RTC_TIC,
-> +		.end	= IRQ_RTC_TIC,
-> +		.flags	= IORESOURCE_IRQ
->  	}
->  };
->  
->  struct platform_device s3c_device_rtc = {
-> -	.name		  = "s3c64xx-rtc",
-> -	.id		  = -1,
-> -	.num_resources	  = ARRAY_SIZE(s3c_rtc_resource),
-> -	.resource	  = s3c_rtc_resource,
-> +	.name		= "s3c64xx-rtc",
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(s3c_rtc_resource),
-> +	.resource	= s3c_rtc_resource,
->  };
->  EXPORT_SYMBOL(s3c_device_rtc);
-> -- 
-> 1.6.2.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Do you have URLs to have a look at them?
 
--- 
 -- 
 Ben
 
