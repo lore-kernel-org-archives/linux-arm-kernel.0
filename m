@@ -1,35 +1,27 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 11:23:12 +0100
-Subject: [PATCH] SMDKC100 fixes
-In-Reply-To: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
-References: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100518102312.GJ26401@trinity.fluff.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 18 May 2010 12:23:34 +0200
+Subject: [PATCH] Common plat-s5p updates
+Message-ID: <1274178216-12003-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 11:30:47AM +0200, Marek Szyprowski wrote:
-> Hello,
-> 
-> This patch series introduces 2 fixes to SMDKC100 board setup code. On
-> request I've separated them from the s5pc1xx cleanup patch series.
+Hello,
 
-ok, will apply.
- 
-> This patch series includes:
-> 
-> [PATCH 1/2] ARM: SMDKC100: fix frame buffer definitions
-> [PATCH 2/2] ARM: SMDKC100: remove magic values from uart setup structures
-> 
-> Best regards,
-> Marek Szyprowski
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This patch series contains some core plat-s5p updates, required for both
+plat-s5pc1xx cleanup series as well as patches that add Samsung Aquila
+board support. This patch series has been rebased onto next-samsung git
+tree.
 
--- 
--- 
-Ben
+Changes since the previous version:
+- updated copyright header in mach-s5pv210/setup-i2c0.c
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+This patch series has been sent earlier under the 'Common plat-s5p
+fixes' thread.
+
+The series contain the following patches:
+
+[PATCH 1/2] ARM: Samsung: copy common I2C0 device helpers to machine directories
+[PATCH 2/2] ARM: Samsung: move driver strength gpio configuration helper to common dir
+
+Best regards,
+Marek Szyprowski
