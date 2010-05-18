@@ -1,38 +1,83 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:11 +0300
-Subject: [PATCH 20/23] OMAP2: DSS: Add missing line for update bg color
+Date: Tue, 18 May 2010 15:34:53 +0300
+Subject: [PATCH 02/23] OMAP: AM3517: Enable DSS2 in AM3517EVM defconfig
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-21-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-3-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlos Lopez <carlos.cruz@sasken.com>
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-The driver set the background color canvas but never writes it in
-DISPC_DEFAULT_COLOR_m register, which changes the background color
-on the LCD or TV.
-
-This patch adds a line to call to dispc_set_default_color() which is
-the function in charge to write the DISPC_DEFAULT_COLOR_m register.
-
-Signed-off-by: Carlos Lopez <carlos.cruz@sasken.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+[tomi.valkeinen at nokia.com: removed the board file changes]
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/manager.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/configs/am3517_evm_defconfig |   52 ++++++++++++++++++++++++++++++++-
+ 1 files changed, 51 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/manager.c b/drivers/video/omap2/dss/manager.c
-index 32ec2ff..9e1fbe5 100644
---- a/drivers/video/omap2/dss/manager.c
-+++ b/drivers/video/omap2/dss/manager.c
-@@ -843,6 +843,7 @@ static void configure_manager(enum omap_channel channel)
+diff --git a/arch/arm/configs/am3517_evm_defconfig b/arch/arm/configs/am3517_evm_defconfig
+index 66a10b5..214ef42 100644
+--- a/arch/arm/configs/am3517_evm_defconfig
++++ b/arch/arm/configs/am3517_evm_defconfig
+@@ -692,7 +692,57 @@ CONFIG_SSB_POSSIBLE=y
+ #
+ # CONFIG_VGASTATE is not set
+ # CONFIG_VIDEO_OUTPUT_CONTROL is not set
+-# CONFIG_FB is not set
++CONFIG_FB=y
++# CONFIG_FIRMWARE_EDID is not set
++# CONFIG_FB_DDC is not set
++# CONFIG_FB_BOOT_VESA_SUPPORT is not set
++CONFIG_FB_CFB_FILLRECT=y
++CONFIG_FB_CFB_COPYAREA=y
++CONFIG_FB_CFB_IMAGEBLIT=y
++# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
++# CONFIG_FB_SYS_FILLRECT is not set
++# CONFIG_FB_SYS_COPYAREA is not set
++# CONFIG_FB_SYS_IMAGEBLIT is not set
++# CONFIG_FB_FOREIGN_ENDIAN is not set
++# CONFIG_FB_SYS_FOPS is not set
++# CONFIG_FB_SVGALIB is not set
++# CONFIG_FB_MACMODES is not set
++# CONFIG_FB_BACKLIGHT is not set
++# CONFIG_FB_MODE_HELPERS is not set
++# CONFIG_FB_TILEBLITTING is not set
++
++#
++# Frame buffer hardware drivers
++#
++# CONFIG_FB_ARMCLCD is not set
++# CONFIG_FB_S1D13XXX is not set
++# CONFIG_FB_VIRTUAL is not set
++# CONFIG_FB_METRONOME is not set
++# CONFIG_FB_MB862XX is not set
++# CONFIG_FB_BROADSHEET is not set
++# CONFIG_FB_OMAP_BOOTLOADER_INIT is not set
++CONFIG_OMAP2_VRAM=y
++CONFIG_OMAP2_VRFB=y
++CONFIG_OMAP2_DSS=y
++CONFIG_OMAP2_VRAM_SIZE=4
++CONFIG_OMAP2_DSS_DEBUG_SUPPORT=y
++# CONFIG_OMAP2_DSS_RFBI is not set
++CONFIG_OMAP2_DSS_VENC=y
++# CONFIG_OMAP2_DSS_SDI is not set
++# CONFIG_OMAP2_DSS_DSI is not set
++# CONFIG_OMAP2_DSS_FAKE_VSYNC is not set
++CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK=4
++CONFIG_FB_OMAP2=y
++CONFIG_FB_OMAP2_DEBUG_SUPPORT=y
++# CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE is not set
++CONFIG_FB_OMAP2_NUM_FBS=3
++
++#
++# OMAP2/3 Display Device Drivers
++#
++CONFIG_PANEL_GENERIC=y
++# CONFIG_PANEL_SHARP_LS037V7DW01 is not set
++CONFIG_PANEL_SHARP_LQ043T1DG01=y
+ # CONFIG_BACKLIGHT_LCD_SUPPORT is not set
  
- 	c = &dss_cache.manager_cache[channel];
- 
-+	dispc_set_default_color(channel, c->default_color);
- 	dispc_set_trans_key(channel, c->trans_key_type, c->trans_key);
- 	dispc_enable_trans_key(channel, c->trans_enabled);
- 	dispc_enable_alpha_blending(channel, c->alpha_enabled);
+ #
 -- 
 1.7.0.4
