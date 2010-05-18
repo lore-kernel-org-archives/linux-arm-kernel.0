@@ -1,67 +1,32 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Tue, 18 May 2010 22:58:35 +0300 (EEST)
-Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
-In-Reply-To: <AANLkTik_FL2keLD9mdBcg8Rm9n8uYDElg1NdyeT2yy6B@mail.gmail.com>
-References: <AANLkTim5SxEb64QbBQgBhufhgpQ33MNFBhuHixfUeVKp@mail.gmail.com>
-	<20100518.163145.232774311.Hiroshi.DOYU@nokia.com>
-	<AANLkTik_FL2keLD9mdBcg8Rm9n8uYDElg1NdyeT2yy6B@mail.gmail.com>
-Message-ID: <20100518.225835.116348725.Hiroshi.DOYU@nokia.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 19 May 2010 09:04:59 +1200
+Subject: [RFC PATCH 0/3] ep93xx i2s audio
+In-Reply-To: <20100518184627.GF22554@sirena.org.uk>
+References: <4BF21B67.8090404@bluewatersys.com>
+	<20100518184627.GF22554@sirena.org.uk>
+Message-ID: <4BF300FB.4020509@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Felipe Contreras <felipe.contreras@gmail.com>
-Subject: Re: [PATCH v2 00/17] omap: mailbox: reorganize init
-Date: Tue, 18 May 2010 18:57:55 +0200
-
-> On Tue, May 18, 2010 at 4:31 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
->> From: ext Felipe Contreras <felipe.contreras@gmail.com>
->>> I'm not familiar with this kind of module loading, but certainly not
->>> all systems have udev.
->>>
->>> I realized the problem because I have a bare-bones system in my
->>> beagleboard where I had to manually load mailbox_mach.
->>
->> With udev or something equivalent, it should work fine.
+Mark Brown wrote:
+> On Tue, May 18, 2010 at 04:45:27PM +1200, Ryan Mallon wrote:
 > 
-> But still, you are relying on udev. I don't think we should, and I
-> don't think there's any need.
-
-Some expert may give some comment here.....
-
->>>> The platform device omap2-mailbox accomodatess logical mboxes.
->>>
->>> Wouldn't it be better the way my patches handle them?
->>> ?* devices.ko: ?doesn't care about mbox
->>> ?* mach_omap1/mailbox.ko: ?registers "omap-mailbox" platform device
->>> with a list of logical mboxes for OMAP1
->>> ?* mach_omap2/mailbox.ko: ?registers "omap-mailbox" platform device
->>> with a list of logical mboxes for OMAP2
->>> ?* plat-omap/mailbox.ko: creates platform driver based on logical list
->>> of mboxes from platform device and handles the list internally
->>>
->>> The end result would be the exactly same, except that there's no hard
->>> dependency between the mach, and plat code.
->>
->> With the attachemnt, which is just 17 lines of code, you will get the
->> structure of logical mbox devices, which are located under the single
->> platform device, "omap2-mailbox". This is more _descriptive_ since
->> it displays the connection of a platform device and logical devices,
->> IOW, where these logical ones come. I don't see any point of not using
->> this struture.
+>>  - Sometimes playback (ie aplay) results in noise. Killing the process
+>> and trying again will result in correct playback.
 > 
-> That's neat. Am I understanding correctly that that's not an argument
-> against the split of mailbox_mach and plat mailbox?
+> What does the output data look like in a scope, is it bit shifted
+> relative to the clocks for example?
 
-I may not get your point. That's just 17 lines of code, nothing else.
+I haven't looked into this too closely yet, but on a scope it is just
+complete noise. It doesn't appear to be shifted or anything like that.
 
->>>> Would it be possible to rebase them on the top of my coming patch to
->>>> get back logical device entry?
->>>
->>> Where is that?
->>
->> Attached. Would it be possible to rebase the cleanups on this one?
-> 
-> I think it would be easier to apply the patch on top of my patch
-> series... specially since it's so small. Would that be acceptable?
+~Ryan
 
-I can pick up some of your cleanups if applied on the previous attachemnt.
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
