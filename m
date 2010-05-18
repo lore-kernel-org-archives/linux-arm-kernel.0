@@ -1,148 +1,84 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:04 +0300
-Subject: [PATCH 13/23] OMAP: LCD LS037V7DW01: Add Backlight driver support
+Date: Tue, 18 May 2010 15:35:10 +0300
+Subject: [PATCH 19/23] OMAP3630: DSS2: Updating MAX divider value
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-14-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-20-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+From: Kishore Y <kishore.y@ti.com>
 
-Tested on OMAP3EVM for OMAP3530 and AM/DM 3730.
+In DPLL4 M3, M4, M5 and M6 field width has been increased by 1 bit in 3630.
+So the max divider value that can be achived will be 32 and not 16.
+In 3630 the functional clock is x1 of DPLL4 and not x2. Hence multiplier 2
+is removed.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-[tomi.valkeinen at nokia.com: added slab.h include]
-[tomi.valkeinen at nokia.com: added dependency to BACKLIGHT_CLASS_DEVICE]
+Signed-off-by: Sudeep Basavaraj <sudeep.basavaraj@ti.com>
+Signed-off-by: Mukund Mittal <mmittal@ti.com>
+Signed-off-by: Kishore Y <kishore.y@ti.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/displays/Kconfig               |    1 +
- .../video/omap2/displays/panel-sharp-ls037v7dw01.c |   78 ++++++++++++++++++++
- 2 files changed, 79 insertions(+), 0 deletions(-)
+ drivers/video/omap2/dss/dss.c |   24 +++++++++++++++++++-----
+ 1 files changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/video/omap2/displays/Kconfig b/drivers/video/omap2/displays/Kconfig
-index dfb57ee..ea8ccd3 100644
---- a/drivers/video/omap2/displays/Kconfig
-+++ b/drivers/video/omap2/displays/Kconfig
-@@ -10,6 +10,7 @@ config PANEL_GENERIC
- config PANEL_SHARP_LS037V7DW01
-         tristate "Sharp LS037V7DW01 LCD Panel"
-         depends on OMAP2_DSS
-+        select BACKLIGHT_CLASS_DEVICE
-         help
-           LCD Panel used in TI's SDP3430 and EVM boards
+diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+index 5434418..24b1825 100644
+--- a/drivers/video/omap2/dss/dss.c
++++ b/drivers/video/omap2/dss/dss.c
+@@ -223,7 +223,13 @@ void dss_dump_clocks(struct seq_file *s)
  
-diff --git a/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c b/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
-index 8d51a5e..7d9eb2b 100644
---- a/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
-+++ b/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
-@@ -20,10 +20,17 @@
- #include <linux/module.h>
- #include <linux/delay.h>
- #include <linux/device.h>
-+#include <linux/backlight.h>
-+#include <linux/fb.h>
- #include <linux/err.h>
-+#include <linux/slab.h>
+ 	seq_printf(s, "dpll4_ck %lu\n", dpll4_ck_rate);
  
- #include <plat/display.h>
- 
-+struct sharp_data {
-+	struct backlight_device *bl;
-+};
-+
- static struct omap_video_timings sharp_ls_timings = {
- 	.x_res = 480,
- 	.y_res = 640,
-@@ -39,18 +46,89 @@ static struct omap_video_timings sharp_ls_timings = {
- 	.vbp		= 1,
- };
- 
-+static int sharp_ls_bl_update_status(struct backlight_device *bl)
-+{
-+	struct omap_dss_device *dssdev = dev_get_drvdata(&bl->dev);
-+	int level;
-+
-+	if (!dssdev->set_backlight)
-+		return -EINVAL;
-+
-+	if (bl->props.fb_blank == FB_BLANK_UNBLANK &&
-+			bl->props.power == FB_BLANK_UNBLANK)
-+		level = bl->props.brightness;
+-	seq_printf(s, "dss1_alwon_fclk = %lu / %lu * 2 = %lu\n",
++	if (cpu_is_omap3630())
++		seq_printf(s, "dss1_alwon_fclk = %lu / %lu  = %lu\n",
++			dpll4_ck_rate,
++			dpll4_ck_rate / dpll4_m4_ck_rate,
++			dss_clk_get_rate(DSS_CLK_FCK1));
 +	else
-+		level = 0;
-+
-+	return dssdev->set_backlight(dssdev, level);
-+}
-+
-+static int sharp_ls_bl_get_brightness(struct backlight_device *bl)
-+{
-+	if (bl->props.fb_blank == FB_BLANK_UNBLANK &&
-+			bl->props.power == FB_BLANK_UNBLANK)
-+		return bl->props.brightness;
-+
-+	return 0;
-+}
-+
-+static const struct backlight_ops sharp_ls_bl_ops = {
-+	.get_brightness = sharp_ls_bl_get_brightness,
-+	.update_status  = sharp_ls_bl_update_status,
-+};
-+
-+
-+
- static int sharp_ls_panel_probe(struct omap_dss_device *dssdev)
++		seq_printf(s, "dss1_alwon_fclk = %lu / %lu * 2 = %lu\n",
+ 			dpll4_ck_rate,
+ 			dpll4_ck_rate / dpll4_m4_ck_rate,
+ 			dss_clk_get_rate(DSS_CLK_FCK1));
+@@ -293,7 +299,8 @@ int dss_calc_clock_rates(struct dss_clock_info *cinfo)
  {
-+	struct backlight_properties props;
-+	struct backlight_device *bl;
-+	struct sharp_data *sd;
-+	int r;
-+
- 	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
- 		OMAP_DSS_LCD_IHS;
- 	dssdev->panel.acb = 0x28;
- 	dssdev->panel.timings = sharp_ls_timings;
+ 	unsigned long prate;
  
-+	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
-+	if (!sd)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&dssdev->dev, sd);
-+
-+	memset(&props, 0, sizeof(struct backlight_properties));
-+	props.max_brightness = dssdev->max_backlight_level;
-+
-+	bl = backlight_device_register("sharp-ls", &dssdev->dev, dssdev,
-+			&sharp_ls_bl_ops, &props);
-+	if (IS_ERR(bl)) {
-+		r = PTR_ERR(bl);
-+		kfree(sd);
-+		return r;
-+	}
-+	sd->bl = bl;
-+
-+	bl->props.fb_blank = FB_BLANK_UNBLANK;
-+	bl->props.power = FB_BLANK_UNBLANK;
-+	bl->props.brightness = dssdev->max_backlight_level;
-+	r = sharp_ls_bl_update_status(bl);
-+	if (r < 0)
-+		dev_err(&dssdev->dev, "failed to set lcd brightness\n");
-+
- 	return 0;
- }
+-	if (cinfo->fck_div > 16 || cinfo->fck_div == 0)
++	if (cinfo->fck_div > (cpu_is_omap3630() ? 32 : 16) ||
++						cinfo->fck_div == 0)
+ 		return -EINVAL;
  
- static void sharp_ls_panel_remove(struct omap_dss_device *dssdev)
- {
-+	struct sharp_data *sd = dev_get_drvdata(&dssdev->dev);
-+	struct backlight_device *bl = sd->bl;
-+
-+	bl->props.power = FB_BLANK_POWERDOWN;
-+	sharp_ls_bl_update_status(bl);
-+	backlight_device_unregister(bl);
-+
-+	kfree(sd);
- }
+ 	prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+@@ -329,7 +336,10 @@ int dss_get_clock_div(struct dss_clock_info *cinfo)
+ 	if (cpu_is_omap34xx()) {
+ 		unsigned long prate;
+ 		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+-		cinfo->fck_div = prate / (cinfo->fck / 2);
++		if (cpu_is_omap3630())
++			cinfo->fck_div = prate / (cinfo->fck);
++		else
++			cinfo->fck_div = prate / (cinfo->fck / 2);
+ 	} else {
+ 		cinfo->fck_div = 0;
+ 	}
+@@ -402,10 +412,14 @@ retry:
  
- static int sharp_ls_power_on(struct omap_dss_device *dssdev)
+ 		goto found;
+ 	} else if (cpu_is_omap34xx()) {
+-		for (fck_div = 16; fck_div > 0; --fck_div) {
++		for (fck_div = (cpu_is_omap3630() ? 32 : 16);
++					fck_div > 0; --fck_div) {
+ 			struct dispc_clock_info cur_dispc;
+ 
+-			fck = prate / fck_div * 2;
++			if (cpu_is_omap3630())
++				fck = prate / fck_div;
++			else
++				fck = prate / fck_div * 2;
+ 
+ 			if (fck > DISPC_MAX_FCK)
+ 				continue;
 -- 
 1.7.0.4
