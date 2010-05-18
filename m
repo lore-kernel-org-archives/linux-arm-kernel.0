@@ -1,84 +1,55 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:10 +0300
-Subject: [PATCH 19/23] OMAP3630: DSS2: Updating MAX divider value
+Date: Tue, 18 May 2010 15:34:55 +0300
+Subject: [PATCH 04/23] OMAP: DSS2: Remove redundant enable/disable calls from
+	SDI
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-20-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-5-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kishore Y <kishore.y@ti.com>
+From: Roger Quadros <roger.quadros@nokia.com>
 
-In DPLL4 M3, M4, M5 and M6 field width has been increased by 1 bit in 3630.
-So the max divider value that can be achived will be 32 and not 16.
-In 3630 the functional clock is x1 of DPLL4 and not x2. Hence multiplier 2
-is removed.
+Panel enable/disable is now done via the panel driver, so we should not
+call the panel driver again
 
-Signed-off-by: Sudeep Basavaraj <sudeep.basavaraj@ti.com>
-Signed-off-by: Mukund Mittal <mmittal@ti.com>
-Signed-off-by: Kishore Y <kishore.y@ti.com>
+Signed-off-by: Roger Quadros <roger.quadros@nokia.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/dss.c |   24 +++++++++++++++++++-----
- 1 files changed, 19 insertions(+), 5 deletions(-)
+ drivers/video/omap2/dss/sdi.c |   11 -----------
+ 1 files changed, 0 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
-index 5434418..24b1825 100644
---- a/drivers/video/omap2/dss/dss.c
-+++ b/drivers/video/omap2/dss/dss.c
-@@ -223,7 +223,13 @@ void dss_dump_clocks(struct seq_file *s)
+diff --git a/drivers/video/omap2/dss/sdi.c b/drivers/video/omap2/dss/sdi.c
+index 12eb404..3de3c1e 100644
+--- a/drivers/video/omap2/dss/sdi.c
++++ b/drivers/video/omap2/dss/sdi.c
+@@ -115,17 +115,9 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
  
- 	seq_printf(s, "dpll4_ck %lu\n", dpll4_ck_rate);
+ 	dssdev->manager->enable(dssdev->manager);
  
--	seq_printf(s, "dss1_alwon_fclk = %lu / %lu * 2 = %lu\n",
-+	if (cpu_is_omap3630())
-+		seq_printf(s, "dss1_alwon_fclk = %lu / %lu  = %lu\n",
-+			dpll4_ck_rate,
-+			dpll4_ck_rate / dpll4_m4_ck_rate,
-+			dss_clk_get_rate(DSS_CLK_FCK1));
-+	else
-+		seq_printf(s, "dss1_alwon_fclk = %lu / %lu * 2 = %lu\n",
- 			dpll4_ck_rate,
- 			dpll4_ck_rate / dpll4_m4_ck_rate,
- 			dss_clk_get_rate(DSS_CLK_FCK1));
-@@ -293,7 +299,8 @@ int dss_calc_clock_rates(struct dss_clock_info *cinfo)
+-	if (dssdev->driver->enable) {
+-		r = dssdev->driver->enable(dssdev);
+-		if (r)
+-			goto err3;
+-	}
+-
+ 	sdi.skip_init = 0;
+ 
+ 	return 0;
+-err3:
+-	dssdev->manager->disable(dssdev->manager);
+ err2:
+ 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+ err1:
+@@ -137,9 +129,6 @@ EXPORT_SYMBOL(omapdss_sdi_display_enable);
+ 
+ void omapdss_sdi_display_disable(struct omap_dss_device *dssdev)
  {
- 	unsigned long prate;
+-	if (dssdev->driver->disable)
+-		dssdev->driver->disable(dssdev);
+-
+ 	dssdev->manager->disable(dssdev->manager);
  
--	if (cinfo->fck_div > 16 || cinfo->fck_div == 0)
-+	if (cinfo->fck_div > (cpu_is_omap3630() ? 32 : 16) ||
-+						cinfo->fck_div == 0)
- 		return -EINVAL;
- 
- 	prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
-@@ -329,7 +336,10 @@ int dss_get_clock_div(struct dss_clock_info *cinfo)
- 	if (cpu_is_omap34xx()) {
- 		unsigned long prate;
- 		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
--		cinfo->fck_div = prate / (cinfo->fck / 2);
-+		if (cpu_is_omap3630())
-+			cinfo->fck_div = prate / (cinfo->fck);
-+		else
-+			cinfo->fck_div = prate / (cinfo->fck / 2);
- 	} else {
- 		cinfo->fck_div = 0;
- 	}
-@@ -402,10 +412,14 @@ retry:
- 
- 		goto found;
- 	} else if (cpu_is_omap34xx()) {
--		for (fck_div = 16; fck_div > 0; --fck_div) {
-+		for (fck_div = (cpu_is_omap3630() ? 32 : 16);
-+					fck_div > 0; --fck_div) {
- 			struct dispc_clock_info cur_dispc;
- 
--			fck = prate / fck_div * 2;
-+			if (cpu_is_omap3630())
-+				fck = prate / fck_div;
-+			else
-+				fck = prate / fck_div * 2;
- 
- 			if (fck > DISPC_MAX_FCK)
- 				continue;
+ 	dss_sdi_disable();
 -- 
 1.7.0.4
