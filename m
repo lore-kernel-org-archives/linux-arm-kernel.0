@@ -1,83 +1,148 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:34:53 +0300
-Subject: [PATCH 02/23] OMAP: AM3517: Enable DSS2 in AM3517EVM defconfig
+Date: Tue, 18 May 2010 15:35:04 +0300
+Subject: [PATCH 13/23] OMAP: LCD LS037V7DW01: Add Backlight driver support
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-3-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-14-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vaibhav Hiremath <hvaibhav@ti.com>
 
+Tested on OMAP3EVM for OMAP3530 and AM/DM 3730.
+
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-[tomi.valkeinen at nokia.com: removed the board file changes]
+[tomi.valkeinen at nokia.com: added slab.h include]
+[tomi.valkeinen at nokia.com: added dependency to BACKLIGHT_CLASS_DEVICE]
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- arch/arm/configs/am3517_evm_defconfig |   52 ++++++++++++++++++++++++++++++++-
- 1 files changed, 51 insertions(+), 1 deletions(-)
+ drivers/video/omap2/displays/Kconfig               |    1 +
+ .../video/omap2/displays/panel-sharp-ls037v7dw01.c |   78 ++++++++++++++++++++
+ 2 files changed, 79 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/am3517_evm_defconfig b/arch/arm/configs/am3517_evm_defconfig
-index 66a10b5..214ef42 100644
---- a/arch/arm/configs/am3517_evm_defconfig
-+++ b/arch/arm/configs/am3517_evm_defconfig
-@@ -692,7 +692,57 @@ CONFIG_SSB_POSSIBLE=y
- #
- # CONFIG_VGASTATE is not set
- # CONFIG_VIDEO_OUTPUT_CONTROL is not set
--# CONFIG_FB is not set
-+CONFIG_FB=y
-+# CONFIG_FIRMWARE_EDID is not set
-+# CONFIG_FB_DDC is not set
-+# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-+CONFIG_FB_CFB_FILLRECT=y
-+CONFIG_FB_CFB_COPYAREA=y
-+CONFIG_FB_CFB_IMAGEBLIT=y
-+# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
-+# CONFIG_FB_SYS_FILLRECT is not set
-+# CONFIG_FB_SYS_COPYAREA is not set
-+# CONFIG_FB_SYS_IMAGEBLIT is not set
-+# CONFIG_FB_FOREIGN_ENDIAN is not set
-+# CONFIG_FB_SYS_FOPS is not set
-+# CONFIG_FB_SVGALIB is not set
-+# CONFIG_FB_MACMODES is not set
-+# CONFIG_FB_BACKLIGHT is not set
-+# CONFIG_FB_MODE_HELPERS is not set
-+# CONFIG_FB_TILEBLITTING is not set
-+
-+#
-+# Frame buffer hardware drivers
-+#
-+# CONFIG_FB_ARMCLCD is not set
-+# CONFIG_FB_S1D13XXX is not set
-+# CONFIG_FB_VIRTUAL is not set
-+# CONFIG_FB_METRONOME is not set
-+# CONFIG_FB_MB862XX is not set
-+# CONFIG_FB_BROADSHEET is not set
-+# CONFIG_FB_OMAP_BOOTLOADER_INIT is not set
-+CONFIG_OMAP2_VRAM=y
-+CONFIG_OMAP2_VRFB=y
-+CONFIG_OMAP2_DSS=y
-+CONFIG_OMAP2_VRAM_SIZE=4
-+CONFIG_OMAP2_DSS_DEBUG_SUPPORT=y
-+# CONFIG_OMAP2_DSS_RFBI is not set
-+CONFIG_OMAP2_DSS_VENC=y
-+# CONFIG_OMAP2_DSS_SDI is not set
-+# CONFIG_OMAP2_DSS_DSI is not set
-+# CONFIG_OMAP2_DSS_FAKE_VSYNC is not set
-+CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK=4
-+CONFIG_FB_OMAP2=y
-+CONFIG_FB_OMAP2_DEBUG_SUPPORT=y
-+# CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE is not set
-+CONFIG_FB_OMAP2_NUM_FBS=3
-+
-+#
-+# OMAP2/3 Display Device Drivers
-+#
-+CONFIG_PANEL_GENERIC=y
-+# CONFIG_PANEL_SHARP_LS037V7DW01 is not set
-+CONFIG_PANEL_SHARP_LQ043T1DG01=y
- # CONFIG_BACKLIGHT_LCD_SUPPORT is not set
+diff --git a/drivers/video/omap2/displays/Kconfig b/drivers/video/omap2/displays/Kconfig
+index dfb57ee..ea8ccd3 100644
+--- a/drivers/video/omap2/displays/Kconfig
++++ b/drivers/video/omap2/displays/Kconfig
+@@ -10,6 +10,7 @@ config PANEL_GENERIC
+ config PANEL_SHARP_LS037V7DW01
+         tristate "Sharp LS037V7DW01 LCD Panel"
+         depends on OMAP2_DSS
++        select BACKLIGHT_CLASS_DEVICE
+         help
+           LCD Panel used in TI's SDP3430 and EVM boards
  
- #
+diff --git a/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c b/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
+index 8d51a5e..7d9eb2b 100644
+--- a/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
++++ b/drivers/video/omap2/displays/panel-sharp-ls037v7dw01.c
+@@ -20,10 +20,17 @@
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/backlight.h>
++#include <linux/fb.h>
+ #include <linux/err.h>
++#include <linux/slab.h>
+ 
+ #include <plat/display.h>
+ 
++struct sharp_data {
++	struct backlight_device *bl;
++};
++
+ static struct omap_video_timings sharp_ls_timings = {
+ 	.x_res = 480,
+ 	.y_res = 640,
+@@ -39,18 +46,89 @@ static struct omap_video_timings sharp_ls_timings = {
+ 	.vbp		= 1,
+ };
+ 
++static int sharp_ls_bl_update_status(struct backlight_device *bl)
++{
++	struct omap_dss_device *dssdev = dev_get_drvdata(&bl->dev);
++	int level;
++
++	if (!dssdev->set_backlight)
++		return -EINVAL;
++
++	if (bl->props.fb_blank == FB_BLANK_UNBLANK &&
++			bl->props.power == FB_BLANK_UNBLANK)
++		level = bl->props.brightness;
++	else
++		level = 0;
++
++	return dssdev->set_backlight(dssdev, level);
++}
++
++static int sharp_ls_bl_get_brightness(struct backlight_device *bl)
++{
++	if (bl->props.fb_blank == FB_BLANK_UNBLANK &&
++			bl->props.power == FB_BLANK_UNBLANK)
++		return bl->props.brightness;
++
++	return 0;
++}
++
++static const struct backlight_ops sharp_ls_bl_ops = {
++	.get_brightness = sharp_ls_bl_get_brightness,
++	.update_status  = sharp_ls_bl_update_status,
++};
++
++
++
+ static int sharp_ls_panel_probe(struct omap_dss_device *dssdev)
+ {
++	struct backlight_properties props;
++	struct backlight_device *bl;
++	struct sharp_data *sd;
++	int r;
++
+ 	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
+ 		OMAP_DSS_LCD_IHS;
+ 	dssdev->panel.acb = 0x28;
+ 	dssdev->panel.timings = sharp_ls_timings;
+ 
++	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
++	if (!sd)
++		return -ENOMEM;
++
++	dev_set_drvdata(&dssdev->dev, sd);
++
++	memset(&props, 0, sizeof(struct backlight_properties));
++	props.max_brightness = dssdev->max_backlight_level;
++
++	bl = backlight_device_register("sharp-ls", &dssdev->dev, dssdev,
++			&sharp_ls_bl_ops, &props);
++	if (IS_ERR(bl)) {
++		r = PTR_ERR(bl);
++		kfree(sd);
++		return r;
++	}
++	sd->bl = bl;
++
++	bl->props.fb_blank = FB_BLANK_UNBLANK;
++	bl->props.power = FB_BLANK_UNBLANK;
++	bl->props.brightness = dssdev->max_backlight_level;
++	r = sharp_ls_bl_update_status(bl);
++	if (r < 0)
++		dev_err(&dssdev->dev, "failed to set lcd brightness\n");
++
+ 	return 0;
+ }
+ 
+ static void sharp_ls_panel_remove(struct omap_dss_device *dssdev)
+ {
++	struct sharp_data *sd = dev_get_drvdata(&dssdev->dev);
++	struct backlight_device *bl = sd->bl;
++
++	bl->props.power = FB_BLANK_POWERDOWN;
++	sharp_ls_bl_update_status(bl);
++	backlight_device_unregister(bl);
++
++	kfree(sd);
+ }
+ 
+ static int sharp_ls_power_on(struct omap_dss_device *dssdev)
 -- 
 1.7.0.4
