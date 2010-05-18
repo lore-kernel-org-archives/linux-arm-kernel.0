@@ -1,36 +1,70 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 May 2010 20:45:06 +0900
-Subject: [PATCH v3 9/9] Input: s3c24xx_ts - Modify touchscreen Kconfig for
-	Support Samsung SoCs
-Message-ID: <1274183106-16203-1-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 18 May 2010 20:44:38 +0900
+Subject: [PATCH v3 4/9] Input: s3c24xx_ts - Implements generic GPIO
+	configuration function
+Message-ID: <1274183078-16028-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naveen Krishna <ch.naveen@samsung.com>
 
-This patch adds in touchscreen Kconfig the support for Samsung S3C6410,
-S5P6440, and S5PV210/s5PC110 SoCs.
+This patch implements generic GPIO configuration function in Samsung
+touchscreen driver. And makes the touchscreen driver s3c24xx-ts.c
+generic to all the Samsung SoCs.
 
 Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/input/touchscreen/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/input/touchscreen/s3c2410_ts.c |   23 +++--------------------
+ 1 files changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index 8a8fa4d..a90a5bb 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -159,8 +159,8 @@ config TOUCHSCREEN_FUJITSU
+diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+index a2e1228..86086a4 100644
+--- a/drivers/input/touchscreen/s3c2410_ts.c
++++ b/drivers/input/touchscreen/s3c2410_ts.c
+@@ -39,8 +39,6 @@
+ #include <plat/regs-adc.h>
+ #include <plat/ts.h>
  
- config TOUCHSCREEN_S3C2410
- 	tristate "Samsung S3C2410 touchscreen input driver"
--	depends on ARCH_S3C2410
--	select S3C24XX_ADC
-+	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5P6440 || ARCH_S5PV210
-+	select S3C_ADC
- 	help
- 	  Say Y here if you have the s3c2410 touchscreen.
+-#include <mach/regs-gpio.h>
+-
+ #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
  
+ #define INT_DOWN	(0)
+@@ -88,21 +86,6 @@ struct s3c2410ts {
+ static struct s3c2410ts ts;
+ 
+ /**
+- * s3c2410_ts_connect - configure gpio for s3c2410 systems
+- *
+- * Configure the GPIO for the S3C2410 system, where we have external FETs
+- * connected to the device (later systems such as the S3C2440 integrate
+- * these into the device).
+-*/
+-static inline void s3c2410_ts_connect(void)
+-{
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
+-}
+-
+-/**
+  * get_down - return the down state of the pen
+  * @data0: The data read from ADCDAT0 register.
+  * @data1: The data read from ADCDAT1 register.
+@@ -296,9 +279,9 @@ static int __devinit s3c2410ts_probe(struct platform_device *pdev)
+ 		goto err_clk;
+ 	}
+ 
+-	/* Configure the touchscreen external FETs on the S3C2410 */
+-	if (!platform_get_device_id(pdev)->driver_data)
+-		s3c2410_ts_connect();
++	/* inititalise the gpio */
++	if (info->cfg_gpio)
++		info->cfg_gpio(to_platform_device(ts.dev));
+ 
+ 	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
+ 				     s3c24xx_ts_conversion, 1);
 -- 
 1.6.2.5
