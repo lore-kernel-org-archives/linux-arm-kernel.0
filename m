@@ -1,84 +1,400 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:34:56 +0300
-Subject: [PATCH 05/23] OMAP: DSS2: Use vdds_sdi regulator supply in SDI
+Date: Tue, 18 May 2010 15:35:02 +0300
+Subject: [PATCH 11/23] OMAP: DSS2: Taal: add mutex to protect panel data
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-6-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-12-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Quadros <roger.quadros@nokia.com>
-
-This patch enables the use of vdds_sdi regulator in SDI subsystem.
-We can disable the vdds_sdi voltage when not in use to save
-power.
-
-Signed-off-by: Roger Quadros <roger.quadros@nokia.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- drivers/video/omap2/dss/sdi.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/video/omap2/displays/panel-taal.c |  140 ++++++++++++++++++++++++-----
+ 1 files changed, 119 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/sdi.c b/drivers/video/omap2/dss/sdi.c
-index 3de3c1e..ee07a3c 100644
---- a/drivers/video/omap2/dss/sdi.c
-+++ b/drivers/video/omap2/dss/sdi.c
-@@ -23,13 +23,16 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/err.h>
-+#include <linux/regulator/consumer.h>
+diff --git a/drivers/video/omap2/displays/panel-taal.c b/drivers/video/omap2/displays/panel-taal.c
+index 4f3988a..1799096 100644
+--- a/drivers/video/omap2/displays/panel-taal.c
++++ b/drivers/video/omap2/displays/panel-taal.c
+@@ -31,6 +31,7 @@
+ #include <linux/completion.h>
+ #include <linux/workqueue.h>
+ #include <linux/slab.h>
++#include <linux/mutex.h>
  
  #include <plat/display.h>
-+#include <plat/cpu.h>
- #include "dss.h"
  
- static struct {
- 	bool skip_init;
- 	bool update_enabled;
-+	struct regulator *vdds_sdi_reg;
- } sdi;
+@@ -67,6 +68,8 @@
+ static int _taal_enable_te(struct omap_dss_device *dssdev, bool enable);
  
- static void sdi_basic_init(void)
-@@ -57,6 +60,10 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
- 		goto err0;
+ struct taal_data {
++	struct mutex lock;
++
+ 	struct backlight_device *bldev;
+ 
+ 	unsigned long	hw_guard_end;	/* next value of jiffies when we can
+@@ -510,6 +513,8 @@ static int taal_probe(struct omap_dss_device *dssdev)
+ 	}
+ 	td->dssdev = dssdev;
+ 
++	mutex_init(&td->lock);
++
+ 	td->esd_wq = create_singlethread_workqueue("taal_esd");
+ 	if (td->esd_wq == NULL) {
+ 		dev_err(&dssdev->dev, "can't create ESD workqueue\n");
+@@ -733,54 +738,96 @@ static void taal_power_off(struct omap_dss_device *dssdev)
+ 
+ static int taal_enable(struct omap_dss_device *dssdev)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+ 	int r;
++
+ 	dev_dbg(&dssdev->dev, "enable\n");
+ 
+-	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
+-		return -EINVAL;
++	mutex_lock(&td->lock);
++
++	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
++		r = -EINVAL;
++		goto err;
++	}
+ 
+ 	r = taal_power_on(dssdev);
+ 	if (r)
+-		return r;
++		goto err;
+ 
+ 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+ 
++	mutex_unlock(&td->lock);
++
++	return 0;
++err:
++	dev_dbg(&dssdev->dev, "enable failed\n");
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+ static void taal_disable(struct omap_dss_device *dssdev)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
++
+ 	dev_dbg(&dssdev->dev, "disable\n");
+ 
++	mutex_lock(&td->lock);
++
+ 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+ 		taal_power_off(dssdev);
+ 
+ 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
++
++	mutex_unlock(&td->lock);
+ }
+ 
+ static int taal_suspend(struct omap_dss_device *dssdev)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
++	int r;
++
+ 	dev_dbg(&dssdev->dev, "suspend\n");
+ 
+-	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+-		return -EINVAL;
++	mutex_lock(&td->lock);
++
++	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
++		r = -EINVAL;
++		goto err;
++	}
+ 
+ 	taal_power_off(dssdev);
+ 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
+ 
++	mutex_unlock(&td->lock);
++
+ 	return 0;
++err:
++	mutex_unlock(&td->lock);
++	return r;
+ }
+ 
+ static int taal_resume(struct omap_dss_device *dssdev)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+ 	int r;
++
+ 	dev_dbg(&dssdev->dev, "resume\n");
+ 
+-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+-		return -EINVAL;
++	mutex_lock(&td->lock);
++
++	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
++		r = -EINVAL;
++		goto err;
++	}
+ 
+ 	r = taal_power_on(dssdev);
+ 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
++
++	mutex_unlock(&td->lock);
++
++	return r;
++err:
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+@@ -799,6 +846,7 @@ static int taal_update(struct omap_dss_device *dssdev,
+ 
+ 	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 
+ 	if (!td->enabled) {
+@@ -820,18 +868,24 @@ static int taal_update(struct omap_dss_device *dssdev,
+ 		goto err;
+ 
+ 	/* note: no bus_unlock here. unlock is in framedone_cb */
++	mutex_unlock(&td->lock);
+ 	return 0;
+ err:
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+ static int taal_sync(struct omap_dss_device *dssdev)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
++
+ 	dev_dbg(&dssdev->dev, "sync\n");
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 
+ 	dev_dbg(&dssdev->dev, "sync done\n");
+ 
+@@ -861,13 +915,16 @@ static int _taal_enable_te(struct omap_dss_device *dssdev, bool enable)
+ 
+ static int taal_enable_te(struct omap_dss_device *dssdev, bool enable)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+ 	int r;
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 
+ 	r = _taal_enable_te(dssdev, enable);
+ 
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 
+ 	return r;
+ }
+@@ -875,7 +932,13 @@ static int taal_enable_te(struct omap_dss_device *dssdev, bool enable)
+ static int taal_get_te(struct omap_dss_device *dssdev)
+ {
+ 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+-	return td->te_enabled;
++	int r;
++
++	mutex_lock(&td->lock);
++	r = td->te_enabled;
++	mutex_unlock(&td->lock);
++
++	return r;
+ }
+ 
+ static int taal_rotate(struct omap_dss_device *dssdev, u8 rotate)
+@@ -885,6 +948,7 @@ static int taal_rotate(struct omap_dss_device *dssdev, u8 rotate)
+ 
+ 	dev_dbg(&dssdev->dev, "rotate %d\n", rotate);
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 
+ 	if (td->enabled) {
+@@ -896,16 +960,24 @@ static int taal_rotate(struct omap_dss_device *dssdev, u8 rotate)
+ 	td->rotate = rotate;
+ 
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return 0;
+ err:
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+ static u8 taal_get_rotate(struct omap_dss_device *dssdev)
+ {
+ 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+-	return td->rotate;
++	int r;
++
++	mutex_lock(&td->lock);
++	r = td->rotate;
++	mutex_unlock(&td->lock);
++
++	return r;
+ }
+ 
+ static int taal_mirror(struct omap_dss_device *dssdev, bool enable)
+@@ -915,6 +987,7 @@ static int taal_mirror(struct omap_dss_device *dssdev, bool enable)
+ 
+ 	dev_dbg(&dssdev->dev, "mirror %d\n", enable);
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 	if (td->enabled) {
+ 		r = taal_set_addr_mode(td->rotate, enable);
+@@ -925,23 +998,33 @@ static int taal_mirror(struct omap_dss_device *dssdev, bool enable)
+ 	td->mirror = enable;
+ 
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return 0;
+ err:
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+ static bool taal_get_mirror(struct omap_dss_device *dssdev)
+ {
+ 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+-	return td->mirror;
++	int r;
++
++	mutex_lock(&td->lock);
++	r = td->mirror;
++	mutex_unlock(&td->lock);
++
++	return r;
+ }
+ 
+ static int taal_run_test(struct omap_dss_device *dssdev, int test_num)
+ {
++	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+ 	u8 id1, id2, id3;
+ 	int r;
+ 
++	mutex_lock(&td->lock);
+ 	dsi_bus_lock();
+ 
+ 	r = taal_dcs_read_1(DCS_GET_ID1, &id1);
+@@ -955,9 +1038,11 @@ static int taal_run_test(struct omap_dss_device *dssdev, int test_num)
+ 		goto err;
+ 
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return 0;
+ err:
+ 	dsi_bus_unlock();
++	mutex_unlock(&td->lock);
+ 	return r;
+ }
+ 
+@@ -971,12 +1056,16 @@ static int taal_memory_read(struct omap_dss_device *dssdev,
+ 	unsigned buf_used = 0;
+ 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+ 
+-	if (!td->enabled)
+-		return -ENODEV;
+-
+ 	if (size < w * h * 3)
+ 		return -ENOMEM;
+ 
++	mutex_lock(&td->lock);
++
++	if (!td->enabled) {
++		r = -ENODEV;
++		goto err1;
++	}
++
+ 	size = min(w * h * 3,
+ 			dssdev->panel.timings.x_res *
+ 			dssdev->panel.timings.y_res * 3);
+@@ -995,7 +1084,7 @@ static int taal_memory_read(struct omap_dss_device *dssdev,
+ 
+ 	r = dsi_vc_set_max_rx_packet_size(TCH, plen);
+ 	if (r)
+-		goto err0;
++		goto err2;
+ 
+ 	while (buf_used < size) {
+ 		u8 dcs_cmd = first ? 0x2e : 0x3e;
+@@ -1006,7 +1095,7 @@ static int taal_memory_read(struct omap_dss_device *dssdev,
+ 
+ 		if (r < 0) {
+ 			dev_err(&dssdev->dev, "read error\n");
+-			goto err;
++			goto err3;
+ 		}
+ 
+ 		buf_used += r;
+@@ -1020,16 +1109,18 @@ static int taal_memory_read(struct omap_dss_device *dssdev,
+ 			dev_err(&dssdev->dev, "signal pending, "
+ 					"aborting memory read\n");
+ 			r = -ERESTARTSYS;
+-			goto err;
++			goto err3;
+ 		}
  	}
  
-+	r = regulator_enable(sdi.vdds_sdi_reg);
-+	if (r)
-+		goto err1;
-+
- 	/* In case of skip_init sdi_init has already enabled the clocks */
- 	if (!sdi.skip_init)
- 		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
-@@ -120,6 +127,7 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
- 	return 0;
- err2:
- 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
-+	regulator_disable(sdi.vdds_sdi_reg);
- err1:
- 	omap_dss_stop_device(dssdev);
- err0:
-@@ -135,6 +143,8 @@ void omapdss_sdi_display_disable(struct omap_dss_device *dssdev)
+ 	r = buf_used;
  
- 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
- 
-+	regulator_disable(sdi.vdds_sdi_reg);
-+
- 	omap_dss_stop_device(dssdev);
+-err:
++err3:
+ 	dsi_vc_set_max_rx_packet_size(TCH, 1);
+-err0:
++err2:
+ 	dsi_bus_unlock();
++err1:
++	mutex_unlock(&td->lock);
+ 	return r;
  }
- EXPORT_SYMBOL(omapdss_sdi_display_disable);
-@@ -151,6 +161,11 @@ int sdi_init(bool skip_init)
- 	/* we store this for first display enable, then clear it */
- 	sdi.skip_init = skip_init;
  
-+	sdi.vdds_sdi_reg = dss_get_vdds_sdi();
-+	if (IS_ERR(sdi.vdds_sdi_reg)) {
-+		DSSERR("can't get VDDS_SDI regulator\n");
-+		return PTR_ERR(sdi.vdds_sdi_reg);
+@@ -1041,8 +1132,12 @@ static void taal_esd_work(struct work_struct *work)
+ 	u8 state1, state2;
+ 	int r;
+ 
+-	if (!td->enabled)
++	mutex_lock(&td->lock);
++
++	if (!td->enabled) {
++		mutex_unlock(&td->lock);
+ 		return;
 +	}
- 	/*
- 	 * Enable clocks already here, otherwise there would be a toggle
- 	 * of them until sdi_display_enable is called.
+ 
+ 	dsi_bus_lock();
+ 
+@@ -1084,16 +1179,19 @@ static void taal_esd_work(struct work_struct *work)
+ 
+ 	queue_delayed_work(td->esd_wq, &td->esd_work, TAAL_ESD_CHECK_PERIOD);
+ 
++	mutex_unlock(&td->lock);
+ 	return;
+ err:
+ 	dev_err(&dssdev->dev, "performing LCD reset\n");
+ 
+-	taal_disable(dssdev);
+-	taal_enable(dssdev);
++	taal_power_off(dssdev);
++	taal_power_on(dssdev);
+ 
+ 	dsi_bus_unlock();
+ 
+ 	queue_delayed_work(td->esd_wq, &td->esd_work, TAAL_ESD_CHECK_PERIOD);
++
++	mutex_unlock(&td->lock);
+ }
+ 
+ static int taal_set_update_mode(struct omap_dss_device *dssdev,
 -- 
 1.7.0.4
