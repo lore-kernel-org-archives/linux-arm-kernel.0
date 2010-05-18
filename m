@@ -1,37 +1,73 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 18 May 2010 03:50:58 +0100
-Subject: Samsung SoCs framebuffer re-work
-In-Reply-To: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-References: <AANLkTinThrLrsxBYHs-1xPqIaRiK1HH-YZkcloKHnzkx@mail.gmail.com>
-Message-ID: <20100518025058.GL27571@trinity.fluff.org>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 18 May 2010 10:54:29 +0800
+Subject: Boot interface for device trees on ARM
+Message-ID: <201005181054.32325.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 08:59:29AM +0900, Kyungmin Park wrote:
-> Hi Ben,
-> 
-> Currently there's only one fb drivers for samsung SocS. but it's based
-> on s3c24xx and a part of s3c64xx.
+Hi all,
 
-Your statement is incorrect, we have the s3c2410-fb driver which deals
-with the 2410/2440/2412 style hardware and s3c-fb which is for the newer
-devices.
+As we're getting closer to device tree support on ARM, I'd like to get some 
+input on our proposed boot interface.
 
-> As you can see the s5pc110 (aka s5pv210) spec, It has more features
-> and interconnection between FIMC and FIMD.
-> So current fb driver can't handle these features well. So LSI make a
-> own fb drivers and use it. You can see the code at their git repo.
-> 
-> Now we are re-implement or change it for s5pc110 and for future usages.
-> How do you think?
+Basically, I'd like to define how we pass the device tree from the bootloader 
+to the kernel.
 
-I've already got updates for s3c-fb to work on 2416,2443 and the c110/v210
-systems. I am talking with the relevant people at System.LSI to get our
-drivers closers together, possibly we can get this done for the current
-merge window.
+My current method of doing this is through a new atag. It looks like this:
 
--- 
-Ben
+	/* flattened device tree blob pointer */
+	#define ATAG_DEVTREE	0x5441000a
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+	struct tag_devtree {
+		__u32 start;	/* physical start address */
+		__u32 size;	/* size of dtb image in bytes */
+	};
+
+With ATAG_DEVTREE, we keep the existing boot interface the same (ie, machine 
+number in r1, atags pointer r2).
+
+Some notes about this scheme:
+
+ + We can easily keep compatibility with the existing boot interface; both DT 
+and non-DT kernels will be supported if a bootloader uses this.
+
+ - It's a little more complex, as the bootloader has to initialise the atags 
+structure.
+
+ - If we end up in a situation where most machines are DT-enabled, then we'll 
+be carrying a seldom-used structure (ie, a mostly-empty atags block) just to 
+provide one pointer to the kernel.
+
+ - We are now potentially carrying data in two different places - atags and 
+the device tree. For example, the physical memory layout and kernel command 
+line may be present in both.
+
+Nicolas Pitre has suggested that we make it simpler, and specify the device 
+tree blob directly instead (and remove the atags). In this case, r2 would 
+point to the device tree blob, and r1 would be ignored.
+
+Fortunately, both structures (atags list and device tree blob) begin with a 
+magic number, so it is trivial to determine whether the pointer is to an atags 
+list or a device tree blob.
+
+Some notes about this scheme:
+
+ - This would break compatibility with the existing boot interface: 
+bootloaders that expect a DT kernel will not be able to boot a non-DT kernel. 
+However, does this matter? Once the machine support (ie, bootloader and 
+kernel) is done, we don't expect to have to enable both methods.
+
+ + A simpler boot interface, so less to do (and get wrong) in the bootloader
+
+ + We don't have two potential sources of boot information
+
+Although I have been using the atag for a while, I have not pushed it to an 
+upstream (either qemu or the kernel), as I would like to get a firm decision 
+on the best method before making any commitment.
+
+Comments and questions most welcome.
+
+Cheers,
+
+
+Jeremy
