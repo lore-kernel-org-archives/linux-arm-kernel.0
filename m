@@ -1,26 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 May 2010 09:40:13 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <1274168877.2307.70.camel@tubuntu.research.nokia.com>
-References: <20100513220139.GO3428@atomide.com>
-	<20100513221229.GD13001@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C54F0247@dbde02.ent.ti.com>
-	<AANLkTikZvfvjY9e2QNWRwVcJcTvn58Ly_DgzrcXKu2iJ@mail.gmail.com>
-	<20100514101615.GF10339@n2100.arm.linux.org.uk>
-	<AANLkTinY9M2cHKw86hTLaMUCvBX57o8AioBtrENB-JhK@mail.gmail.com>
-	<20100517094421.GG23118@n2100.arm.linux.org.uk>
-	<1274091978.2307.49.camel@tubuntu.research.nokia.com>
-	<20100517173715.GA5818@atomide.com>
-	<1274168877.2307.70.camel@tubuntu.research.nokia.com>
-Message-ID: <20100518084013.GA13832@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (MXC Sascha Hauer)
+Date: Tue, 18 May 2010 10:45:39 +0200
+Subject: [PATCH 2/2] mx31_3ds: Support the keypad situated in the
+	personality board
+In-Reply-To: <1274120414.3578.36.camel@realization>
+References: <1274120092.3578.34.camel@realization>
+	<1274120414.3578.36.camel@realization>
+Message-ID: <20100518084539.GC31199@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 10:47:57AM +0300, Tomi Valkeinen wrote:
-> Allocating without ioremapping... dma_alloc_* always ioremaps the
-> allocated area, even though it's never used (in some cases).
+Hi Alberto,
 
-What do you mean by that?  Are you suggesting that something does
-phys_to_virt() on the returned DMA pointer?
+On Mon, May 17, 2010 at 08:20:14PM +0200, Alberto Panizzo wrote:
+> 
+> 
+> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> ---
+> 
+> this patch is built over the today mxc-master branch 
+> 
+>  arch/arm/mach-mx3/mach-mx31_3ds.c |   32 ++++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> index 55d6117..745675b 100644
+> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/spi/spi.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/fsl_devices.h>
+> +#include <linux/input/matrix_keypad.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/mach-types.h>
+> @@ -82,6 +83,35 @@ static int mx31_3ds_pins[] = {
+>  	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+>  	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
+>  	MX31_PIN_USBOTG_STP__USBOTG_STP,
+> +	/*Keyboard*/
+> +	IOMUX_MODE(MX31_PIN_KEY_ROW0, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_ROW1, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_COL0, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_COL1, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_COL2, IOMUX_CONFIG_FUNC),
+> +	IOMUX_MODE(MX31_PIN_KEY_COL3, IOMUX_CONFIG_FUNC),
+> +};
 
-Why is it that OMAP seems to do all these _wrong_ things?
+Care to add these values to iomux-mx3.h and use them?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
