@@ -1,36 +1,50 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Tue, 18 May 2010 15:00:26 +0900
-Subject: [PATCH] serial: SAMSUNG: Fix dev_name and driver_name
-In-Reply-To: <20100518053645.GN27571@trinity.fluff.org>
-References: <4BF13ABA.3090504@samsung.com>
-	<20100518024820.GK27571@trinity.fluff.org>
-	<4BF20EED.5040306@samsung.com>
-	<20100518053645.GN27571@trinity.fluff.org>
-Message-ID: <4BF22CFA.8070701@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 May 2010 14:59:15 +0900
+Subject: [PATCH 3/8] ARM: SAMSUNG: Add S3C64XX RTC register definitions
+Message-ID: <1274162355-1876-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/18/2010 2:36 PM, Ben Dooks wrote:
-> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
->> On 5/18/2010 11:48 AM, Ben Dooks wrote:
->>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
->>>> Thd dev_name and driver_name should be switched each other.
->>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
->>>  
->>> Please provide some information about what problem that this is fixing
->>> and the impact on any existing systems.
->>>
->> The serial device nodes are created to s3c2410_serial* on android 
->> platform instead of ttySAC*.
-> 
-> This has been how they've been for ages, surely the android device node
-> creation sytstem supports symlinking /dev/SACx -> /dev/s3c2410_serialx,
-> like many other operating sysyerms that can already do this.
-> 
-> Changing this just because android (something as-yet unmerged into mainline)
-> does not like it. I'm not even happy with an #ifdef around this.
-> 
+From: Taekgyun Ko <taeggyun.ko@samsung.com>
 
-I don't want this too. I wonder if "s3c2410_serial" dev_name is correct?
-Most serial drivers have tty prefix to dev_name, so i think ttySACx is more proper.
-Please see other serial drivers.
+This patch adds S3C64XX RTC register definitions.
+
+Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/regs-rtc.h |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+index 5b547ce..82c3aab 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+@@ -1,5 +1,8 @@
+ /* arch/arm/mach-s3c2410/include/mach/regs-rtc.h
+  *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
+  * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
+  *		      http://www.simtec.co.uk/products/SWLINUX/
+  *
+@@ -15,11 +18,16 @@
+ 
+ #define S3C2410_RTCREG(x)	(x)
+ 
++#define S3C64XX_INTP		S3C2410_RTCREG(0x30)
++#define S3C64XX_INTP_TIC	(1 << 0)
++#define S3C64XX_INTP_ALM	(1 << 1)
++
+ #define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
+ #define S3C2410_RTCCON_RTCEN	(1 << 0)
+ #define S3C2410_RTCCON_CLKSEL	(1 << 1)
+ #define S3C2410_RTCCON_CNTSEL	(1 << 2)
+ #define S3C2410_RTCCON_CLKRST	(1 << 3)
++#define S3C64XX_RTCCON_TICEN	(1 << 8)
+ 
+ #define S3C2410_TICNT		S3C2410_RTCREG(0x44)
+ #define S3C2410_TICNT_ENABLE	(1 << 7)
+-- 
+1.6.2.5
