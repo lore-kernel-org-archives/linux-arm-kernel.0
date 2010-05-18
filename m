@@ -1,93 +1,38 @@
 From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 18 May 2010 15:35:09 +0300
-Subject: [PATCH 18/23] OMAP: RX51: Update board defconfig
+Date: Tue, 18 May 2010 15:35:11 +0300
+Subject: [PATCH 20/23] OMAP2: DSS: Add missing line for update bg color
 In-Reply-To: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
 References: <1274186114-26951-1-git-send-email-tomi.valkeinen@nokia.com>
-Message-ID: <1274186114-26951-19-git-send-email-tomi.valkeinen@nokia.com>
+Message-ID: <1274186114-26951-21-git-send-email-tomi.valkeinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Quadros <roger.quadros@nokia.com>
+From: Carlos Lopez <carlos.cruz@sasken.com>
 
-Add LCD, Boot-up logo, framebuffer console, Keypad
-and Power button support
+The driver set the background color canvas but never writes it in
+DISPC_DEFAULT_COLOR_m register, which changes the background color
+on the LCD or TV.
 
-Signed-off-by: Roger Quadros <roger.quadros@nokia.com>
+This patch adds a line to call to dispc_set_default_color() which is
+the function in charge to write the DISPC_DEFAULT_COLOR_m register.
+
+Signed-off-by: Carlos Lopez <carlos.cruz@sasken.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
 ---
- arch/arm/configs/rx51_defconfig |   39 ++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 38 insertions(+), 1 deletions(-)
+ drivers/video/omap2/dss/manager.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/rx51_defconfig b/arch/arm/configs/rx51_defconfig
-index 473f9e1..56d4928 100644
---- a/arch/arm/configs/rx51_defconfig
-+++ b/arch/arm/configs/rx51_defconfig
-@@ -784,6 +784,7 @@ CONFIG_INPUT_KEYBOARD=y
- # CONFIG_KEYBOARD_NEWTON is not set
- # CONFIG_KEYBOARD_STOWAWAY is not set
- CONFIG_KEYBOARD_GPIO=m
-+CONFIG_KEYBOARD_TWL4030=y
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_INPUT_JOYSTICK is not set
- # CONFIG_INPUT_TABLET is not set
-@@ -809,6 +810,7 @@ CONFIG_INPUT_MISC=y
- # CONFIG_INPUT_POWERMATE is not set
- # CONFIG_INPUT_YEALINK is not set
- # CONFIG_INPUT_CM109 is not set
-+CONFIG_INPUT_TWL4030_PWRBUTTON=y
- CONFIG_INPUT_UINPUT=m
+diff --git a/drivers/video/omap2/dss/manager.c b/drivers/video/omap2/dss/manager.c
+index 32ec2ff..9e1fbe5 100644
+--- a/drivers/video/omap2/dss/manager.c
++++ b/drivers/video/omap2/dss/manager.c
+@@ -843,6 +843,7 @@ static void configure_manager(enum omap_channel channel)
  
- #
-@@ -1110,7 +1112,40 @@ CONFIG_RADIO_ADAPTERS=y
- #
- # CONFIG_VGASTATE is not set
- # CONFIG_VIDEO_OUTPUT_CONTROL is not set
--# CONFIG_FB is not set
-+CONFIG_FB=y
-+CONFIG_FB_CFB_FILLRECT=y
-+CONFIG_FB_CFB_COPYAREA=y
-+CONFIG_FB_CFB_IMAGEBLIT=y
-+
-+# Frame buffer hardware drivers
-+#
-+CONFIG_OMAP2_VRAM=y
-+CONFIG_OMAP2_VRFB=y
-+CONFIG_OMAP2_DSS=y
-+CONFIG_OMAP2_VRAM_SIZE=0
-+# CONFIG_OMAP2_DSS_DEBUG_SUPPORT is not set
-+# CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS is not set
-+# CONFIG_OMAP2_DSS_DPI is not set
-+# CONFIG_OMAP2_DSS_RFBI is not set
-+# CONFIG_OMAP2_DSS_VENC is not set
-+CONFIG_OMAP2_DSS_SDI=y
-+# CONFIG_OMAP2_DSS_DSI is not set
-+# CONFIG_OMAP2_DSS_FAKE_VSYNC is not set
-+CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK=0
-+CONFIG_FB_OMAP2=y
-+CONFIG_FB_OMAP2_DEBUG_SUPPORT=y
-+CONFIG_FB_OMAP2_NUM_FBS=3
-+
-+#
-+# OMAP2/3 Display Device Drivers
-+#
-+# CONFIG_PANEL_GENERIC is not set
-+# CONFIG_PANEL_SHARP_LS037V7DW01 is not set
-+# CONFIG_PANEL_SHARP_LQ043T1DG01 is not set
-+# CONFIG_PANEL_TOPPOLY_TDO35S is not set
-+# CONFIG_PANEL_TPO_TD043MTEA1 is not set
-+CONFIG_PANEL_ACX565AKM=y
-+
- # CONFIG_BACKLIGHT_LCD_SUPPORT is not set
+ 	c = &dss_cache.manager_cache[channel];
  
- #
-@@ -1127,6 +1162,8 @@ CONFIG_DISPLAY_SUPPORT=y
- #
- # CONFIG_VGA_CONSOLE is not set
- CONFIG_DUMMY_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
- CONFIG_SOUND=y
- # CONFIG_SOUND_OSS_CORE is not set
- CONFIG_SND=y
++	dispc_set_default_color(channel, c->default_color);
+ 	dispc_set_trans_key(channel, c->trans_key_type, c->trans_key);
+ 	dispc_enable_trans_key(channel, c->trans_enabled);
+ 	dispc_enable_alpha_blending(channel, c->alpha_enabled);
 -- 
 1.7.0.4
