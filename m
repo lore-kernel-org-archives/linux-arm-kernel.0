@@ -1,19 +1,21 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 18 May 2010 19:47:49 +0100
-Subject: [PATCH] SAMSUNG: Audio support
-In-Reply-To: <1274159402-19265-1-git-send-email-jassi.brar@samsung.com>
-References: <1274159402-19265-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20100518184749.GG22554@sirena.org.uk>
+Date: Tue, 18 May 2010 20:13:01 +0100
+Subject: [PATCH 1/8] ARM: SAMSUNG: Move RTC device definitions in
+	plat-samsung
+In-Reply-To: <20100518080304.GG26401@trinity.fluff.org>
+References: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
+	<20100518080304.GG26401@trinity.fluff.org>
+Message-ID: <20100518191300.GH22554@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 02:10:02PM +0900, Jassi Brar wrote:
-> Hi,
->  Following are few patches to define and add audio devices' support
-> for latest Samsung SoCs, namely S5P6440, S5P6442, S5PC100, S5PC110
-> and S5PV210 on respective SMDK board.
->  The device drivers will be enabled to run these via ASoC tree.
+On Tue, May 18, 2010 at 09:03:04AM +0100, Ben Dooks wrote:
 
-All of these look good to me, FWIW
+> it would be really helpful if you composed a covering message
+> for patch series so that any general comments can be attached
+> there... also it means the series doesn't end up getting
+> fragmeneted in my mailbox.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+There's more going on here - none of the messages are threaded with
+each other, which git send-mail does by default even if there isn't a
+cover letter.
