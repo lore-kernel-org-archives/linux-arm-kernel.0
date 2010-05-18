@@ -1,61 +1,35 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 18 May 2010 13:00:26 +0300
-Subject: [PATCH 17/18] omap: rx51: Add supplies for the tlv320aic3x
-	codec driver
-In-Reply-To: <20100506070018.GB16262@besouro.research.nokia.com>
-References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-	<20100505193323.21568.32626.stgit@baageli.muru.com>
-	<20100506065716.GA16262@besouro.research.nokia.com>
-	<20100506070018.GB16262@besouro.research.nokia.com>
-Message-ID: <20100518130026.a979ac51.jhnikula@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 18 May 2010 11:23:12 +0100
+Subject: [PATCH] SMDKC100 fixes
+In-Reply-To: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
+References: <1274175049-21847-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100518102312.GJ26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 May 2010 10:00:18 +0300
-Eduardo Valentin <eduardo.valentin@nokia.com> wrote:
-
-> > > +static struct regulator_consumer_supply rx51_vio_supplies[] = {
-> > > +	/* tlv320aic3x digital supplies */
-> > > +	{
-> > > +		.supply		= "IOVDD",
-> > > +		.dev_name	= "2-0018"
-> > > +	},
-> > > +	{
-> > > +		.supply		= "DVDD",
-> > > +		.dev_name	= "2-0018"
-> > > +	},
-> > > +};
-> > 
-> > 
-> > This isn't mandatory, but I find the code more readable if you use the REGULATOR_SUPPLY macro,
-> > which kinda suitable for cases like yours, where you are passing the pair supply&dev_name.
->
-Yeah, I was just following how the MMC supplies were defined in this
-file and it's better to convert all of these to use REGULATOR_SUPPLY
-macro. I'll send conversion patch on top of this + one adding couple
-supplies more I would like to get in during this merge window.
-
-> > > +static struct regulator_init_data rx51_vio = {
-> > > +	.constraints = {
-> > > +		.min_uV			= 1800000,
-> > > +		.max_uV			= 1800000,
-> > > +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-> > > +					| REGULATOR_MODE_STANDBY,
-> > > +		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-> > 
-> > I'm not sure if we would ever change voltage level in VIO in rx51 case.
-> > It could enter sleep mode. But even there it wouldn't change voltage level.
-> > Except, of cource, during off mode transition. But then, the regfw wouldn't care.
+On Tue, May 18, 2010 at 11:30:47AM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
-> Actually, one correction here, even during off mode transition I believe we need to
-> keep it, otherwise some wake up source would be screwed.
-> > 
-What do you think about those other TWL regulators, do they have valid
-mask bits so would it make sense to correct all of them at once? I'm
-not expert with TWL & RX51 HW but I'm thinking if there are also other
-regulators which should not change. At least many regulators have the
-same min_uV and max_uV defined.
+> This patch series introduces 2 fixes to SMDKC100 board setup code. On
+> request I've separated them from the s5pc1xx cleanup patch series.
 
+ok, will apply.
+ 
+> This patch series includes:
+> 
+> [PATCH 1/2] ARM: SMDKC100: fix frame buffer definitions
+> [PATCH 2/2] ARM: SMDKC100: remove magic values from uart setup structures
+> 
+> Best regards,
+> Marek Szyprowski
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Jarkko
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
