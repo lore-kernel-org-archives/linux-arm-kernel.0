@@ -1,16 +1,19 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 18 May 2010 19:46:27 +0100
-Subject: [RFC PATCH 0/3] ep93xx i2s audio
-In-Reply-To: <4BF21B67.8090404@bluewatersys.com>
-References: <4BF21B67.8090404@bluewatersys.com>
-Message-ID: <20100518184627.GF22554@sirena.org.uk>
+Date: Tue, 18 May 2010 19:47:49 +0100
+Subject: [PATCH] SAMSUNG: Audio support
+In-Reply-To: <1274159402-19265-1-git-send-email-jassi.brar@samsung.com>
+References: <1274159402-19265-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20100518184749.GG22554@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 04:45:27PM +1200, Ryan Mallon wrote:
+On Tue, May 18, 2010 at 02:10:02PM +0900, Jassi Brar wrote:
+> Hi,
+>  Following are few patches to define and add audio devices' support
+> for latest Samsung SoCs, namely S5P6440, S5P6442, S5PC100, S5PC110
+> and S5PV210 on respective SMDK board.
+>  The device drivers will be enabled to run these via ASoC tree.
 
->  - Sometimes playback (ie aplay) results in noise. Killing the process
-> and trying again will result in correct playback.
+All of these look good to me, FWIW
 
-What does the output data look like in a scope, is it bit shifted
-relative to the clocks for example?
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
