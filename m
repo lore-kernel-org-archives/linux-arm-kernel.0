@@ -1,73 +1,127 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Tue, 18 May 2010 18:49:54 +1000
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <201005181324.45701.jeremy.kerr@canonical.com>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<201005181324.45701.jeremy.kerr@canonical.com>
-Message-ID: <20100518084954.GC25892@yookeroo>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
+Date: Tue, 18 May 2010 13:27:29 +0200
+Subject: [PATCH 1/2] mc13783: add LED support
+In-Reply-To: <20100517190242.GA17604@pengutronix.de>
+References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
+	<20100517190242.GA17604@pengutronix.de>
+Message-ID: <201005181327.29529.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 01:24:43PM +0800, Jeremy Kerr wrote:
-> Hi Nicolas,
+Le lundi, 17 mai 2010 21.02:42, Uwe Kleine-K?nig a ?crit :
+> Hi Philippe,
 > 
-> > I think that, for the moment, it is best if the bootloader on already 
-> > existing subarchitectures where DT is introduced still preserve the 
-> > already existing ability to boot using ATAGs.  This allows for the 
-> > testing and validation of the DT concept against the legacy ATAG method 
-> > more easily.
+> On Mon, May 17, 2010 at 06:40:22PM +0200, Philippe R?tornaz wrote:
+> > This adds basic led support for Freescale MC13783 PMIC.
+> >
+> > Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> > ---
+> >  drivers/leds/Kconfig        |    7 +
+> >  drivers/leds/Makefile       |    1 +
+> >  drivers/leds/leds-mc13783.c |  375
+> > +++++++++++++++++++++++++++++++++++++++++++ drivers/mfd/mc13783-core.c  |
+> >    4 +
+> >  include/linux/mfd/mc13783.h |   68 ++++++++
+> >  5 files changed, 455 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/leds/leds-mc13783.c
+> >
+> > +++ b/drivers/leds/leds-mc13783.c
+> > @@ -0,0 +1,375 @@
+> > +#include <linux/module.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/leds.h>
+> > +#include <linux/workqueue.h>
+> > +#include <linux/mfd/mc13783.h>
+> > +#include <linux/mfd/mc13783-private.h>
 > 
-> Just to clarify - by "still preserve the existing ability to use ATAGs" you 
-> mean only for non-DT boot, right? This proposal still does not require 
-> ATAG_DEVTREE?
+> please don't use mc13783-private.h.
+
+I use some register macro defined in mc13783-private.h
+Do you perfer I redefine them inside leds-mc13783.c ? 
+
+
+> > +static void mc13783_led_set(struct led_classdev *led_cdev,
+> > +                        enum led_brightness value)
+> > +{
+> > +     struct mc13783_led *led;
+> > +
+> > +     led = container_of(led_cdev, struct mc13783_led, cdev);
+> > +     led->new_brightness = value;
+> > +     schedule_work(&led->work);
+> > +}
 > 
-> > Why one DT machine ID per subarchitecture?  Simply because a significant
-> > part of the DT handling code will have to be subarchitecture specific
-> > anyway.  The timer hardware, the GPIO configuration and muxing, SOC
-> > specific platform data handling, power management config, and many other
-> > things are simply too different from one SOC family to another and
-> > trying to have a single global DT support code to rule them all is
-> > insane.
+> I wonder why you don't set the registers directly here, but use a work
+> struct instead.
+
+As Marc explained, it can be called from interrupt context.
+
+> > +#define BL_C_MASK 0x7
+> > +#define MD_C_SHIFT 0
+> > +#define AD_C_SHIFT 3
+> > +#define KP_C_SHIFT 6
+> > +#define TC_C_MASK 0x3
+[...]
+> > +#define TC1HALF_BIT 18
+> > +#define SLEWLIM_BIT 23
+> > +#define TRIODE_TC_BIT 23
+> > +#define TRIODE_MD_BIT 7
+> > +#define TRIODE_AD_BIT 8
+> > +#define TRIODE_KP_BIT 9
+> > +#define BOOST_BIT 10
+> > +#define PERIOD_MASK 0x3
+> > +#define PERIOD_SHIFT 21
+> > +#define ABMODE_MASK 0x7
+> > +#define ABMODE_SHIFT 11
+> > +#define ABREF_MASK 0x3
+> > +#define ABREF_SHIFT 14
 > 
-> The code for DT boot will be still subarch-specific, but I don't
-> think we need IDs for that. There is enough information in the
-> device tree to select the subarch-specific code to use for early
-> init, without needing to parameterise every element of the
-> machine. The machine-level "compatible" property allows us to do
-> this.
+> Why not group the defines at the beginning of the file and properly
+> namespace them?
 
-That's right.  On PowerPC currently we don't have any real concept of
-sub-architecture, but we do have platform level code to cover exactly
-the sorts of messy things you mention, and it is selected on the basis
-of the device tree's top-level compatible property.  Well, usually on
-the compatible property, the platform probe routines can use other
-information if, for example, firmware has screwed up the compatible
-property.
+Ok, I will define it with the register definition I must add to remove mc13783-
+private.h inclusion.
 
-One of the nice features that makes using the flat device tree quite
-robust, is that even when firmware (or whoever) totally and utterly
-stuffs up the device tree, there's nearly always *something* in there
-that's sufficient to identify the board (by accident, if nothing
-else).  A suitable platform probe routine can look for that, and claw
-its way back to sanity from there (in the worst case, it could even
-substitute an entire new corrected device tree, though I don't think
-that's been necessary yet).
+[...]
+> > +     ret = mc13783_reg_write(dev, MC13783_REG_LED_CONTROL_2, reg);
+> > +     if (ret)
+> > +             goto out;
+> > +
+> > +
+> 
+> only one empty line please.
 
-The only reason you'd need a subarchitecture number or equivalent is
-if you need to do things differently in the very, very early asm boot
-code.  We may need a minimal form of this on PowerPC if we ever
-support multiple MMU families in the same kernel binary.
+Ok.
 
-> Therefore, I don't think we need the machine ID at all: once the DT is 
-> available, we can use that for any machine-specific stuff. Even though we're 
-> not *configuring* it from the device tree, we can *select* it from there 
-> instead.
+[...]
+> > +err_register:
+> > +     if (i > 0) {
+> > +             for (i = i - 1; i >= 0; i--) {
+> > +                     led_classdev_unregister(&led[i].cdev);
+> > +                     cancel_work_sync(&led[i].work);
+> > +             }
+> > +     }
+> 
+> the if isn't necessary, just doing for(...) is enough.
 
-Yes, absolutely.
+You're right i is signed. I will remove it.
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+> > +MODULE_DESCRIPTION("LEDs driver for Freescale MC13783 PMIC");
+> > +MODULE_AUTHOR("Philipe R?tornaz <philippe.retorna@epfl.ch>");
+> 
+> Philippe with two p?  I'm not sure if non-ASCII chars are allowed here.
+
+What a shame, I'm not able to write my own name ! 
+
+Thank you for the review, I will post a v2 patch with the appropriates fixes 
+soon.
+
+BTW, should I split this patch in 2 ? One for the mfd device, and one which 
+adds the led driver ? 
+Who will merge this ?
+
+Regards,
+
+Philippe
