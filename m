@@ -1,91 +1,221 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 19 May 2010 09:34:37 +1200
-Subject: [RFC PATCH 1/3] ep93xx i2s driver
-In-Reply-To: <0D753D10438DA54287A00B0270842697636F14EB75@AUSP01VMBX24.collaborationhost.net>
-References: <4BF21B67.8090404@bluewatersys.com>
-	<4BF21D48.3020005@bluewatersys.com>
-	<0D753D10438DA54287A00B0270842697636F14EB75@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4BF307ED.2060701@bluewatersys.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 18 May 2010 23:45:07 +0200
+Subject: [RFC PATCH v2] preliminary support for sparse IRQ
+In-Reply-To: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
+References: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
+Message-ID: <201005182345.07740.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> On Monday, May 17, 2010 9:53 PM, Ryan Mallon wrote:
->> Add ep93xx i2s audio driver
->>
->> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
->> ---
->>
-
->> +config SND_EP93XX_SOC_SNAPPERCL15
->> +        tristate "SoC Audio support for Bluewater Systems Snapper CL15 module"
->> +        depends on SND_EP93XX_SOC && MACH_SNAPPER_CL15
->> +        select SND_EP93XX_SOC_I2S
->> +        select SND_SOC_TLV320AIC23
+Dne ?t 18. kv?tna 2010 12:34:49 Eric Miao napsal(a):
+> commit 2e2e087d96630c95dbce57036680cf917e906cf1
+> Author: Eric Miao <eric.y.miao@gmail.com>
+> Date:   Mon Dec 28 12:59:59 2009 +0800
 > 
-> Missing help text?
-
-Thanks. Fixed.
-
->> +     struct ep93xx_pcm_dma_params    *dma_params[2];
->> +     struct resource                 *mem;
->> +     void __iomem                    *regs;
->> +};
+>     [ARM] preliminary support for sparse IRQ
 > 
-> Also, I saw Chase Douglas' comment on this struct and the defines.
+>     So to allow NR_IRQS to be dynamic and platforms to specify the number
+>     of IRQs really needed.
 > 
-> If they are "only" used in this source file please leave them here.  If there
-> is not a reason to expose the information globally, keep it private to the
-> driver.
-
-Yes, I'm also inclined to leave this all here since it keeps the file
-self contained.
-
->> +static inline void ep93xx_i2s_enable_fifos(struct ep93xx_i2s_info *info,
->> +                                        int enable)
+>     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 > 
-> Not sure if this should be 'inline'
-
-Removed.
-
->> +
->> +     ep93xx_syscon_swlocked_write(val, EP93XX_SYSCON_I2SCLKDIV);
->> +     return 0;
->> +}
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c5408bf..727703c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1282,6 +1282,18 @@ config HW_PERF_EVENTS
+>  	  Enable hardware performance counter support for perf events. If
+>  	  disabled, perf events will use software events only.
 > 
-> As you noted, this is a bit ugly.
+> +config SPARSE_IRQ
+> +	bool "Support sparse irq numbering"
+> +	depends on EXPERIMENTAL
+> +	help
+> +	  This enables support for sparse irqs. This is useful in general
+> +	  as most CPUs have a fairly sparse array of IRQ vectors, which
+> +	  the irq_desc then maps directly on to. Systems with a high
+> +	  number of off-chip IRQs will want to treat this as
+> +	  experimental until they have been independently verified.
+> +
+> +	  If you don't know what to do here, say N.
+> +
+>  source "mm/Kconfig"
 > 
-> If you create two pseudo clocks in clock.c for the sclk and lrclk this can
-> all be changed to:
-
-I'm going to try and rework this a little. I think the pseudo clock
-approach is the way to go. As Mark pointed out, the clkdiv function can
-probably be removed and the sdiv/lrdiv calculation done as part of
-ep93xx_i2s_hw_params.
-
->> diff --git a/sound/soc/ep93xx/ep93xx-pcm.c b/sound/soc/ep93xx/ep93xx-pcm.c
->> new file mode 100644
->> index 0000000..c071b5c
->> --- /dev/null
->> +++ b/sound/soc/ep93xx/ep93xx-pcm.c
+>  config LEDS
+> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+> index 237282f..2721a58 100644
+> --- a/arch/arm/include/asm/irq.h
+> +++ b/arch/arm/include/asm/irq.h
+> @@ -7,6 +7,8 @@
+>  #define irq_canonicalize(i)	(i)
+>  #endif
 > 
-> Is this pcm driver generic enough to work with an AC97 driver?  Looking at
-> some of the other soc drivers it appears there are different pcm drivers for
-> different codec interfaces.  If it's not completely generic please rename this
-> file as appropriate.
+> +#define NR_IRQS_LEGACY	16
+> +
+>  /*
+>   * Use this value to indicate lack of interrupt
+>   * capability
+> diff --git a/arch/arm/include/asm/mach/arch.h
+> b/arch/arm/include/asm/mach/arch.h index c59842d..5ee6f85 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -20,6 +20,7 @@ struct machine_desc {
+>  	 * by assembler code in head.S, head-common.S
+>  	 */
+>  	unsigned int		nr;		/* architecture number	*/
+> +	unsigned int		nr_irqs;	/* number of IRQs */
+>  	unsigned int		phys_io;	/* start of physical io	*/
+>  	unsigned int		io_pg_offst;	/* byte offset for io
+>  						 * page tabe entry	*/
+> diff --git a/arch/arm/include/asm/mach/irq.h
+> b/arch/arm/include/asm/mach/irq.h index 8920b2d..ce3eee9 100644
+> --- a/arch/arm/include/asm/mach/irq.h
+> +++ b/arch/arm/include/asm/mach/irq.h
+> @@ -17,6 +17,7 @@ struct seq_file;
+>  /*
+>   * This is internal.  Do not use it.
+>   */
+> +extern unsigned int arch_nr_irqs;
+>  extern void (*init_arch_irq)(void);
+>  extern void init_FIQ(void);
+>  extern int show_fiq_list(struct seq_file *, void *);
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 3b3d2c8..c0d5c3b 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -47,12 +47,14 @@
+>  #define irq_finish(irq) do { } while (0)
+>  #endif
+> 
+> +unsigned int arch_nr_irqs;
+>  void (*init_arch_irq)(void) __initdata = NULL;
+>  unsigned long irq_err_count;
+> 
+>  int show_interrupts(struct seq_file *p, void *v)
+>  {
+>  	int i = *(loff_t *) v, cpu;
+> +	struct irq_desc *desc;
+>  	struct irqaction * action;
+>  	unsigned long flags;
+> 
+> @@ -67,24 +69,25 @@ int show_interrupts(struct seq_file *p, void *v)
+>  		seq_putc(p, '\n');
+>  	}
+> 
+> -	if (i < NR_IRQS) {
+> -		raw_spin_lock_irqsave(&irq_desc[i].lock, flags);
+> -		action = irq_desc[i].action;
+> +	if (i < nr_irqs) {
+> +		desc = irq_to_desc(i);
+> +		raw_spin_lock_irqsave(&desc->lock, flags);
+> +		action = desc->action;
 
-I don't actually know, I think it is. The PCM driver is originally
-written by Lennert and the only changes I have really made are to update
-it for the alsa soc interface. IIRC, Lennert was using it with an ac97
-driver.
+Possibly stupid question, but shouldn't you asign 'desc' after locking ?
 
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+>  		if (!action)
+>  			goto unlock;
+> 
+>  		seq_printf(p, "%3d: ", i);
+>  		for_each_present_cpu(cpu)
+>  			seq_printf(p, "%10u ", kstat_irqs_cpu(i, cpu));
+> -		seq_printf(p, " %10s", irq_desc[i].chip->name ? : "-");
+> +		seq_printf(p, " %10s", desc->chip->name ? : "-");
+>  		seq_printf(p, "  %s", action->name);
+>  		for (action = action->next; action; action = action->next)
+>  			seq_printf(p, ", %s", action->name);
+> 
+>  		seq_putc(p, '\n');
+>  unlock:
+> -		raw_spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+> -	} else if (i == NR_IRQS) {
+> +		raw_spin_unlock_irqrestore(&desc->lock, flags);
+> +	} else if (i == nr_irqs) {
+>  #ifdef CONFIG_FIQ
+>  		show_fiq_list(p, v);
+>  #endif
+> @@ -112,7 +115,7 @@ asmlinkage void __exception asm_do_IRQ(unsigned
+> int irq, struct pt_regs *regs)
+>  	 * Some hardware gives randomly wrong interrupts.  Rather
+>  	 * than crashing, do something sensible.
+>  	 */
+> -	if (unlikely(irq >= NR_IRQS)) {
+> +	if (unlikely(irq >= nr_irqs)) {
+>  		if (printk_ratelimit())
+>  			printk(KERN_WARNING "Bad IRQ%u\n", irq);
+>  		ack_bad_irq(irq);
+> @@ -132,12 +135,12 @@ void set_irq_flags(unsigned int irq, unsigned int
+> iflags) struct irq_desc *desc;
+>  	unsigned long flags;
+> 
+> -	if (irq >= NR_IRQS) {
+> +	if (irq >= nr_irqs) {
+>  		printk(KERN_ERR "Trying to set irq flags for IRQ%d\n", irq);
+>  		return;
+>  	}
+> 
+> -	desc = irq_desc + irq;
+> +	desc = irq_to_desc(irq);
+>  	raw_spin_lock_irqsave(&desc->lock, flags);
+>  	desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+>  	if (iflags & IRQF_VALID)
+> @@ -151,14 +154,25 @@ void set_irq_flags(unsigned int irq, unsigned int
+> iflags)
+> 
+>  void __init init_IRQ(void)
+>  {
+> +	struct irq_desc *desc;
+>  	int irq;
+> 
+> -	for (irq = 0; irq < NR_IRQS; irq++)
+> -		irq_desc[irq].status |= IRQ_NOREQUEST | IRQ_NOPROBE;
+> +	for (irq = 0; irq < nr_irqs; irq++) {
+> +		desc = irq_to_desc_alloc_node(irq, 0);
+> +		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
+> +	}
+> 
+>  	init_arch_irq();
+>  }
+> 
+> +#ifdef CONFIG_SPARSE_IRQ
+> +int __init arch_probe_nr_irqs(void)
+> +{
+> +	nr_irqs = arch_nr_irqs ? arch_nr_irqs : NR_IRQS;
+> +	return 0;
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_HOTPLUG_CPU
+> 
+>  static void route_irq(struct irq_desc *desc, unsigned int irq,
+> unsigned int cpu)
+> @@ -178,10 +192,9 @@ static void route_irq(struct irq_desc *desc,
+> unsigned int irq, unsigned int cpu)
+>  void migrate_irqs(void)
+>  {
+>  	unsigned int i, cpu = smp_processor_id();
+> +	struct irq_desc *desc;
+> 
+> -	for (i = 0; i < NR_IRQS; i++) {
+> -		struct irq_desc *desc = irq_desc + i;
+> -
+> +	for_each_irq_desc(i, desc) {
+>  		if (desc->node == cpu) {
+>  			unsigned int newcpu = cpumask_any_and(desc->affinity,
+>  							      cpu_online_mask);
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index c91c77b..112cd1b 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -727,6 +727,7 @@ void __init setup_arch(char **cmdline_p)
+>  	/*
+>  	 * Set up various architecture-specific pointers
+>  	 */
+> +	arch_nr_irqs = mdesc->nr_irqs;
+>  	init_arch_irq = mdesc->init_irq;
+>  	system_timer = mdesc->timer;
+>  	init_machine = mdesc->init_machine;
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
