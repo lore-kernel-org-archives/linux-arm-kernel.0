@@ -1,45 +1,31 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 18 May 2010 13:24:43 +0800
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-Message-ID: <201005181324.45701.jeremy.kerr@canonical.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 18 May 2010 14:34:21 +0900
+Subject: [PATCH 1/9] ARM: S5PV210: Add audio platform devices
+In-Reply-To: <20100518052419.GM27571@trinity.fluff.org>
+References: <1274159402-19265-1-git-send-email-jassi.brar@samsung.com>
+	<1274159414-19297-1-git-send-email-jassi.brar@samsung.com>
+	<20100518052419.GM27571@trinity.fluff.org>
+Message-ID: <AANLkTinKcpaxhThIkUXCNgrYoXSaZUGhxkTe1u8Px6QJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Tue, May 18, 2010 at 2:24 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Tue, May 18, 2010 at 02:10:14PM +0900, Jassi Brar wrote:
 
-> I think that, for the moment, it is best if the bootloader on already 
-> existing subarchitectures where DT is introduced still preserve the 
-> already existing ability to boot using ATAGs.  This allows for the 
-> testing and validation of the DT concept against the legacy ATAG method 
-> more easily.
+.....
 
-Just to clarify - by "still preserve the existing ability to use ATAGs" you 
-mean only for non-DT boot, right? This proposal still does not require 
-ATAG_DEVTREE?
-
-> Why one DT machine ID per subarchitecture?  Simply because a significant
-> part of the DT handling code will have to be subarchitecture specific
-> anyway.  The timer hardware, the GPIO configuration and muxing, SOC
-> specific platform data handling, power management config, and many other
-> things are simply too different from one SOC family to another and
-> trying to have a single global DT support code to rule them all is
-> insane.
-
-The code for DT boot will be still subarch-specific, but I don't think we need 
-IDs for that. There is enough information in the device tree to select the 
-subarch-specific code to use for early init, without needing to parameterise 
-every element of the machine. The machine-level "compatible" property allows 
-us to do this.
-
-Therefore, I don't think we need the machine ID at all: once the DT is 
-available, we can use that for any machine-specific stuff. Even though we're 
-not *configuring* it from the device tree, we can *select* it from there 
-instead.
-
-Cheers,
-
-
-Jeremy
+>> +struct platform_device s5pv210_device_iis0 = {
+>> + ? ? .name ? ? ? ? ? ? = "s3c64xx-iis-v4",
+>> + ? ? .id ? ? ? ? ? ? ? = -1,
+>> + ? ? .num_resources ? ?= ARRAY_SIZE(s5pv210_iis0_resource),
+>> + ? ? .resource ? ? ? ? = s5pv210_iis0_resource,
+>> + ? ? .dev = {
+>> + ? ? ? ? ? ? .platform_data = &s3c_i2s_pdata,
+>> + ? ? },
+>> +}; EXPORT_SYMBOL(s5pv210_device_iis0);
+>
+> do we really need to be exporting these devices like this,
+> how much is needed otuside of machine support?
+Not used except by machine code. Every platform device of
+Samsung has been declared that way and I just don't wanna
+stick my neck out where I can do without :)
