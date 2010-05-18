@@ -1,142 +1,158 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 May 2010 20:44:27 +0900
-Subject: [PATCH v3 3/9] ARM: SAMSUNG: Implements cfg_gpio function for Samsung
-	touchscreen
-Message-ID: <1274183067-15993-1-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 18 May 2010 20:44:09 +0900
+Subject: [PATCH v3 1/9] ARM: SAMSUNG: Moving ADC device definitions to
+	plat-samsung
+Message-ID: <1274183049-15957-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naveen Krishna <ch.naveen@samsung.com>
 
-This patch implements cfg_gpio function for Samsung touchscreen.
-And also modifies the H1940 machine respectively.
+This patch moves ADC device definitions from mach-s3c64xx
+to plat-samsung. Because that is generic to the S3C64XX and
+S5P Series SoCs.
 
 Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/Kconfig           |    1 +
- arch/arm/mach-s3c2410/mach-h1940.c      |    1 +
- arch/arm/plat-s3c24xx/Kconfig           |    6 +++++
- arch/arm/plat-s3c24xx/Makefile          |    1 +
- arch/arm/plat-s3c24xx/setup-ts.c        |   34 +++++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/ts.h |    4 +++
- 6 files changed, 47 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s3c24xx/setup-ts.c
+ arch/arm/mach-s3c64xx/Kconfig                     |    1 +
+ arch/arm/mach-s3c64xx/Makefile                    |    1 -
+ arch/arm/mach-s3c64xx/include/mach/map.h          |    1 +
+ arch/arm/mach-s3c64xx/s3c6410.c                   |    2 +
+ arch/arm/plat-samsung/Kconfig                     |    5 ++++
+ arch/arm/plat-samsung/Makefile                    |    1 +
+ arch/arm/{mach-s3c64xx => plat-samsung}/dev-adc.c |   22 ++++++++++----------
+ 7 files changed, 21 insertions(+), 12 deletions(-)
+ rename arch/arm/{mach-s3c64xx => plat-samsung}/dev-adc.c (70%)
 
-diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
-index 5547318..6b9665c 100644
---- a/arch/arm/mach-s3c2410/Kconfig
-+++ b/arch/arm/mach-s3c2410/Kconfig
-@@ -76,6 +76,7 @@ config ARCH_H1940
- 	select PM_H1940 if PM
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_NAND
-+	select S3C2410_SETUP_TS
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 959df38..69e9fbf 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -85,6 +85,7 @@ config MACH_ANW6410
+ config MACH_SMDK6410
+ 	bool "SMDK6410"
+ 	select CPU_S3C6410
++	select SAMSUNG_DEV_ADC
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_I2C1
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 3758e15..da66278 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -58,5 +58,4 @@ obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+ obj-y				+= dev-uart.o
+ obj-y				+= dev-rtc.o
+ obj-y				+= dev-audio.o
+-obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+diff --git a/arch/arm/mach-s3c64xx/include/mach/map.h b/arch/arm/mach-s3c64xx/include/mach/map.h
+index 801c1c0..869c8e0 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/map.h
++++ b/arch/arm/mach-s3c64xx/include/mach/map.h
+@@ -103,5 +103,6 @@
+ #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
+ #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
+ #define S3C_VA_USB_HSPHY	S3C64XX_VA_USB_HSPHY
++#define SAMSUNG_PA_ADC		S3C64XX_PA_ADC
+ 
+ #endif /* __ASM_ARCH_6400_MAP_H */
+diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
+index 59635d1..31e53fa 100644
+--- a/arch/arm/mach-s3c64xx/s3c6410.c
++++ b/arch/arm/mach-s3c64xx/s3c6410.c
+@@ -38,6 +38,7 @@
+ #include <plat/clock.h>
+ #include <plat/sdhci.h>
+ #include <plat/iic-core.h>
++#include <plat/adc.h>
+ #include <mach/s3c6400.h>
+ #include <mach/s3c6410.h>
+ 
+@@ -52,6 +53,7 @@ void __init s3c6410_map_io(void)
+ 	s3c_i2c0_setname("s3c2440-i2c");
+ 	s3c_i2c1_setname("s3c2440-i2c");
+ 
++	s3c_device_adc.name      = "s3c64xx-adc";
+ 	s3c_device_nand.name = "s3c6400-nand";
+ }
+ 
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index d552c65..641649f 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -185,6 +185,11 @@ config S3C_DEV_NAND
  	help
- 	  Say Y here if you are using the HP IPAQ H1940
+ 	  Compile in platform device definition for NAND controller
  
-diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
-index 75e3ffb..e8583ec 100644
---- a/arch/arm/mach-s3c2410/mach-h1940.c
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -145,6 +145,7 @@ static struct s3c2410_ts_mach_info h1940_ts_cfg __initdata = {
- 		.delay = 10000,
- 		.presc = 49,
- 		.oversampling_shift = 2,
-+		.cfg_gpio = s3c24xx_ts_cfg_gpio,
- };
- 
- /**
-diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-index 6e93ef8..d29c08c 100644
---- a/arch/arm/plat-s3c24xx/Kconfig
-+++ b/arch/arm/plat-s3c24xx/Kconfig
-@@ -9,6 +9,7 @@ config PLAT_S3C24XX
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_DEVICE_NAND
-+	select S3C2410_SETUP_TS if TOUCHSCREEN_S3C2410
- 	help
- 	  Base platform code for any Samsung S3C24XX device
- 
-@@ -157,4 +158,9 @@ config S3C24XX_SIMTEC_AUDIO
- 	help
- 	  Add audio devices for common Simtec S3C24XX boards
- 
-+config S3C2410_SETUP_TS
++config SAMSUNG_DEV_ADC
 +	bool
 +	help
-+	  Compile in platform device definition for Samsung TouchScreen.
++	  Compile in platform device definition for ADC controller
 +
- endif
-diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index c2237c4..6dd4e0a 100644
---- a/arch/arm/plat-s3c24xx/Makefile
-+++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += s3c2410-cpufreq-utils.o
+ config S3C64XX_DEV_SPI
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 22c89d0..3cf30a4 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -40,6 +40,7 @@ obj-y				+= dev-uart.o
+ obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
+ obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
+ obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
++obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
  
- # device specific setup and/or initialisation
- obj-$(CONFIG_ARCH_S3C2410)	+= setup-i2c.o
-+obj-$(CONFIG_S3C2410_SETUP_TS)	+= setup-ts.o
+ # DMA support
  
- # SPI gpio central GPIO functions
+diff --git a/arch/arm/mach-s3c64xx/dev-adc.c b/arch/arm/plat-samsung/dev-adc.c
+similarity index 70%
+rename from arch/arm/mach-s3c64xx/dev-adc.c
+rename to arch/arm/plat-samsung/dev-adc.c
+index fafef9b..c164821 100644
+--- a/arch/arm/mach-s3c64xx/dev-adc.c
++++ b/arch/arm/plat-samsung/dev-adc.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s3c64xx/dev-adc.c
++/* linux/arch/arm/plat-samsung/dev-adc.c
+  *
+  * Copyright 2010 Maurus Cuelenaere
+  *
+@@ -22,24 +22,24 @@
  
-diff --git a/arch/arm/plat-s3c24xx/setup-ts.c b/arch/arm/plat-s3c24xx/setup-ts.c
-new file mode 100644
-index 0000000..ed26386
---- /dev/null
-+++ b/arch/arm/plat-s3c24xx/setup-ts.c
-@@ -0,0 +1,34 @@
-+/* linux/arch/arm/plat-s3c24xx/setup-ts.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *                     http://www.samsung.com/
-+ *
-+ * Based on S3C24XX setup for i2c device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/gpio.h>
-+
-+struct platform_device; /* don't need the contents */
-+
-+#include <mach/hardware.h>
-+#include <mach/regs-gpio.h>
-+
-+/**
-+ * s3c24xx_ts_cfg_gpio - configure gpio for s3c2410 systems
-+ *
-+ * Configure the GPIO for the S3C2410 system, where we have external FETs
-+ * connected to the device (later systems such as the S3C2440 integrate
-+ * these into the device).
-+ */
-+void s3c24xx_ts_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
-+	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/ts.h b/arch/arm/plat-samsung/include/plat/ts.h
-index 28a80ad..f53cbc7 100644
---- a/arch/arm/plat-samsung/include/plat/ts.h
-+++ b/arch/arm/plat-samsung/include/plat/ts.h
-@@ -14,8 +14,12 @@ struct s3c2410_ts_mach_info {
-        int             delay;
-        int             presc;
-        int             oversampling_shift;
-+	void    (*cfg_gpio)(struct platform_device *dev);
+ static struct resource s3c_adc_resource[] = {
+ 	[0] = {
+-		.start = S3C64XX_PA_ADC,
+-		.end   = S3C64XX_PA_ADC + SZ_256 - 1,
+-		.flags = IORESOURCE_MEM,
++		.start	= SAMSUNG_PA_ADC,
++		.end	= SAMSUNG_PA_ADC + SZ_256 - 1,
++		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start = IRQ_TC,
+-		.end   = IRQ_TC,
+-		.flags = IORESOURCE_IRQ,
++		.start	= IRQ_TC,
++		.end	= IRQ_TC,
++		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	[2] = {
+-		.start = IRQ_ADC,
+-		.end   = IRQ_ADC,
+-		.flags = IORESOURCE_IRQ,
++		.start	= IRQ_ADC,
++		.end	= IRQ_ADC,
++		.flags	= IORESOURCE_IRQ,
+ 	},
  };
  
- extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
- 
-+/* defined by architecture to configure gpio */
-+extern void s3c24xx_ts_cfg_gpio(struct platform_device *dev);
-+
- #endif /* __ASM_ARM_TS_H */
+ struct platform_device s3c_device_adc = {
+-	.name		= "s3c64xx-adc",
++	.name		= "samsung-adc",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s3c_adc_resource),
+ 	.resource	= s3c_adc_resource,
 -- 
 1.6.2.5
