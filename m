@@ -1,106 +1,131 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 May 2010 14:59:07 +0900
-Subject: [PATCH 2/8] ARM: SAMSUNG: Fixed coding style issue
-Message-ID: <1274162347-557-1-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 18 May 2010 14:58:56 +0900
+Subject: [PATCH 1/8] ARM: SAMSUNG: Move RTC device definitions in plat-samsung
+Message-ID: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Taekgyun Ko <taeggyun.ko@samsung.com>
+From: Atul Dahiya <atul.dahiya@samsung.com>
 
-Fixed a coding style issue.
+This patch moves RTC device definitions from mach-s3c64xx
+to plat-samsung, to enable the other SoCs to use same device
+definition.
 
-Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/regs-rtc.h |   68 ++++++++++++-------------
- 1 files changed, 33 insertions(+), 35 deletions(-)
+ arch/arm/mach-s3c64xx/Makefile                    |    1 -
+ arch/arm/mach-s3c64xx/include/mach/map.h          |    1 +
+ arch/arm/plat-samsung/Kconfig                     |    5 +++
+ arch/arm/plat-samsung/Makefile                    |    1 +
+ arch/arm/{mach-s3c64xx => plat-samsung}/dev-rtc.c |   28 ++++++++++----------
+ 5 files changed, 21 insertions(+), 15 deletions(-)
+ rename arch/arm/{mach-s3c64xx => plat-samsung}/dev-rtc.c (58%)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/arch/arm/plat-samsung/include/plat/regs-rtc.h
-index d5837cf..5b547ce 100644
---- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
-@@ -13,49 +13,47 @@
- #ifndef __ASM_ARCH_REGS_RTC_H
- #define __ASM_ARCH_REGS_RTC_H __FILE__
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index a690a9d..e7ac812 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -56,7 +56,6 @@ obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+ # device support
  
--#define S3C2410_RTCREG(x) (x)
--
--#define S3C2410_RTCCON	      S3C2410_RTCREG(0x40)
--#define S3C2410_RTCCON_RTCEN  (1<<0)
--#define S3C2410_RTCCON_CLKSEL (1<<1)
--#define S3C2410_RTCCON_CNTSEL (1<<2)
--#define S3C2410_RTCCON_CLKRST (1<<3)
--
--#define S3C2410_TICNT	      S3C2410_RTCREG(0x44)
--#define S3C2410_TICNT_ENABLE  (1<<7)
--
--#define S3C2410_RTCALM	      S3C2410_RTCREG(0x50)
--#define S3C2410_RTCALM_ALMEN  (1<<6)
--#define S3C2410_RTCALM_YEAREN (1<<5)
--#define S3C2410_RTCALM_MONEN  (1<<4)
--#define S3C2410_RTCALM_DAYEN  (1<<3)
--#define S3C2410_RTCALM_HOUREN (1<<2)
--#define S3C2410_RTCALM_MINEN  (1<<1)
--#define S3C2410_RTCALM_SECEN  (1<<0)
-+#define S3C2410_RTCREG(x)	(x)
+ obj-y				+= dev-uart.o
+-obj-y				+= dev-rtc.o
+ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+diff --git a/arch/arm/mach-s3c64xx/include/mach/map.h b/arch/arm/mach-s3c64xx/include/mach/map.h
+index 801c1c0..cce28a9 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/map.h
++++ b/arch/arm/mach-s3c64xx/include/mach/map.h
+@@ -103,5 +103,6 @@
+ #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
+ #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
+ #define S3C_VA_USB_HSPHY	S3C64XX_VA_USB_HSPHY
++#define S3C_PA_RTC		S3C64XX_PA_RTC
+ 
+ #endif /* __ASM_ARCH_6400_MAP_H */
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 287e6f7..29e2800 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -190,6 +190,11 @@ config S3C_DEV_NAND
+ 	help
+ 	  Compile in platform device definition for NAND controller
+ 
++config S3C_DEV_RTC
++	bool
++	help
++	  Complie in platform device definition for RTC
 +
-+#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
-+#define S3C2410_RTCCON_RTCEN	(1 << 0)
-+#define S3C2410_RTCCON_CLKSEL	(1 << 1)
-+#define S3C2410_RTCCON_CNTSEL	(1 << 2)
-+#define S3C2410_RTCCON_CLKRST	(1 << 3)
-+
-+#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
-+#define S3C2410_TICNT_ENABLE	(1 << 7)
-+
-+#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
-+#define S3C2410_RTCALM_ALMEN	(1 << 6)
-+#define S3C2410_RTCALM_YEAREN	(1 << 5)
-+#define S3C2410_RTCALM_MONEN	(1 << 4)
-+#define S3C2410_RTCALM_DAYEN	(1 << 3)
-+#define S3C2410_RTCALM_HOUREN	(1 << 2)
-+#define S3C2410_RTCALM_MINEN	(1 << 1)
-+#define S3C2410_RTCALM_SECEN	(1 << 0)
+ config S3C64XX_DEV_SPI
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 0ad820a..af17434 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -41,6 +41,7 @@ obj-y				+= dev-uart.o
+ obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
+ obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
+ obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
++obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
  
- #define S3C2410_RTCALM_ALL \
-   S3C2410_RTCALM_ALMEN | S3C2410_RTCALM_YEAREN | S3C2410_RTCALM_MONEN |\
-   S3C2410_RTCALM_DAYEN | S3C2410_RTCALM_HOUREN | S3C2410_RTCALM_MINEN |\
-   S3C2410_RTCALM_SECEN
+ # DMA support
  
-+#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
-+#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
-+#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
+diff --git a/arch/arm/mach-s3c64xx/dev-rtc.c b/arch/arm/plat-samsung/dev-rtc.c
+similarity index 58%
+rename from arch/arm/mach-s3c64xx/dev-rtc.c
+rename to arch/arm/plat-samsung/dev-rtc.c
+index b9e7a05..bf4e226 100644
+--- a/arch/arm/mach-s3c64xx/dev-rtc.c
++++ b/arch/arm/plat-samsung/dev-rtc.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s3c64xx/dev-rtc.c
++/* linux/arch/arm/plat-samsung/dev-rtc.c
+  *
+  * Copyright 2009 by Maurus Cuelenaere <mcuelenaere@gmail.com>
+  *
+@@ -18,26 +18,26 @@
  
--#define S3C2410_ALMSEC	      S3C2410_RTCREG(0x54)
--#define S3C2410_ALMMIN	      S3C2410_RTCREG(0x58)
--#define S3C2410_ALMHOUR	      S3C2410_RTCREG(0x5c)
-+#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
-+#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
-+#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
+ static struct resource s3c_rtc_resource[] = {
+ 	[0] = {
+-		.start = S3C64XX_PA_RTC,
+-		.end   = S3C64XX_PA_RTC + 0xff,
+-		.flags = IORESOURCE_MEM,
++		.start	= S3C_PA_RTC,
++		.end	= S3C_PA_RTC + 0xff,
++		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start = IRQ_RTC_ALARM,
+-		.end   = IRQ_RTC_ALARM,
+-		.flags = IORESOURCE_IRQ,
++		.start	= IRQ_RTC_ALARM,
++		.end	= IRQ_RTC_ALARM,
++		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	[2] = {
+-		.start = IRQ_RTC_TIC,
+-		.end   = IRQ_RTC_TIC,
+-		.flags = IORESOURCE_IRQ
++		.start	= IRQ_RTC_TIC,
++		.end	= IRQ_RTC_TIC,
++		.flags	= IORESOURCE_IRQ
+ 	}
+ };
  
--#define S3C2410_ALMDATE	      S3C2410_RTCREG(0x60)
--#define S3C2410_ALMMON	      S3C2410_RTCREG(0x64)
--#define S3C2410_ALMYEAR	      S3C2410_RTCREG(0x68)
--
--#define S3C2410_RTCRST	      S3C2410_RTCREG(0x6c)
--
--#define S3C2410_RTCSEC	      S3C2410_RTCREG(0x70)
--#define S3C2410_RTCMIN	      S3C2410_RTCREG(0x74)
--#define S3C2410_RTCHOUR	      S3C2410_RTCREG(0x78)
--#define S3C2410_RTCDATE	      S3C2410_RTCREG(0x7c)
--#define S3C2410_RTCDAY	      S3C2410_RTCREG(0x80)
--#define S3C2410_RTCMON	      S3C2410_RTCREG(0x84)
--#define S3C2410_RTCYEAR	      S3C2410_RTCREG(0x88)
-+#define S3C2410_RTCRST		S3C2410_RTCREG(0x6c)
- 
-+#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
-+#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
-+#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
-+#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
-+#define S3C2410_RTCDAY		S3C2410_RTCREG(0x80)
-+#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
-+#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
- 
- #endif /* __ASM_ARCH_REGS_RTC_H */
+ struct platform_device s3c_device_rtc = {
+-	.name		  = "s3c64xx-rtc",
+-	.id		  = -1,
+-	.num_resources	  = ARRAY_SIZE(s3c_rtc_resource),
+-	.resource	  = s3c_rtc_resource,
++	.name		= "s3c64xx-rtc",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s3c_rtc_resource),
++	.resource	= s3c_rtc_resource,
+ };
+ EXPORT_SYMBOL(s3c_device_rtc);
 -- 
 1.6.2.5
