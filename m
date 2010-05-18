@@ -1,410 +1,345 @@
-From: jassi.brar@samsung.com (Jassi Brar)
-Date: Tue, 18 May 2010 16:02:26 +0900
-Subject: [PATCH 1/9] ARM: S5PV210: Add audio platform devices
-In-Reply-To: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
-References: <1274166128-6429-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <1274166146-6462-1-git-send-email-jassi.brar@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 18 May 2010 08:10:30 +0100
+Subject: [PATCH 5/8] rtc: rtc-s3c: Add RTC support for Samsung S3C64XX
+In-Reply-To: <1274162369-1946-1-git-send-email-kgene.kim@samsung.com>
+References: <1274162369-1946-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100518071030.GC26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define platform devices for all audio devices found on S5PV210
+On Tue, May 18, 2010 at 02:59:29PM +0900, Kukjin Kim wrote:
+> From: Taekgyun Ko <taeggyun.ko@samsung.com>
+> 
+> This patch adds support for Samsung S3C64XX.
+> 
+> Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  drivers/rtc/rtc-s3c.c |  153 +++++++++++++++++++++++++++++++++++++++++-------
+>  1 files changed, 130 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index 9364dc2..77f33df 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -1,5 +1,8 @@
+>  /* drivers/rtc/rtc-s3c.c
+>   *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+>   * Copyright (c) 2004,2006 Simtec Electronics
+>   *	Ben Dooks, <ben@simtec.co.uk>
+>   *	http://armlinux.simtec.co.uk/
+> @@ -8,7 +11,7 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   *
+> - * S3C2410/S3C2440/S3C24XX Internal RTC Driver
+> + * S3C2410/S3C2440/S3C24XX/S3C64XX Internal RTC Driver
+>  */
+>  
+>  #include <linux/module.h>
+> @@ -28,16 +31,24 @@
+>  #include <asm/io.h>
+>  #include <asm/irq.h>
+>  #include <plat/regs-rtc.h>
+> +#include <plat/clock.h>
+>  
+>  /* I have yet to find an S3C implementation with more than one
+>   * of these rtc blocks in */
+>  
+> +enum s3c_cpu_type {
+> +	TYPE_S3C2410,
+> +	TYPE_S3C64XX,
+> +};
+> +
+>  static struct resource *s3c_rtc_mem;
+>  
+>  static void __iomem *s3c_rtc_base;
+>  static int s3c_rtc_alarmno = NO_IRQ;
+>  static int s3c_rtc_tickno  = NO_IRQ;
+>  
+> +static enum s3c_cpu_type s3c_rtc_cpu_type;
+> +
+>  static DEFINE_SPINLOCK(s3c_rtc_pie_lock);
+>  
+>  /* IRQ Handlers */
+> @@ -47,6 +58,10 @@ static irqreturn_t s3c_rtc_alarmirq(int irq, void *id)
+>  	struct rtc_device *rdev = id;
+>  
+>  	rtc_update_irq(rdev, 1, RTC_AF | RTC_IRQF);
+> +
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+> +		writeb(S3C64XX_INTP_ALM, s3c_rtc_base + S3C64XX_INTP);
+> +
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -55,6 +70,10 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+>  	struct rtc_device *rdev = id;
+>  
+>  	rtc_update_irq(rdev, 1, RTC_PF | RTC_IRQF);
+> +
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+> +		writeb(S3C64XX_INTP_TIC, s3c_rtc_base + S3C64XX_INTP);
+> +
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -82,12 +101,25 @@ static int s3c_rtc_setpie(struct device *dev, int enabled)
+>  	pr_debug("%s: pie=%d\n", __func__, enabled);
+>  
+>  	spin_lock_irq(&s3c_rtc_pie_lock);
+> -	tmp = readb(s3c_rtc_base + S3C2410_TICNT) & ~S3C2410_TICNT_ENABLE;
+>  
+> -	if (enabled)
+> -		tmp |= S3C2410_TICNT_ENABLE;
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
+> +		tmp &= ~S3C64XX_RTCCON_TICEN;
+> +
+> +		if (enabled)
+> +			tmp |= S3C64XX_RTCCON_TICEN;
+> +
+> +		writew(tmp, s3c_rtc_base + S3C2410_RTCCON);
+> +	} else {
+> +		tmp = readb(s3c_rtc_base + S3C2410_TICNT);
+> +		tmp &= ~S3C2410_TICNT_ENABLE;
+> +
+> +		if (enabled)
+> +			tmp |= S3C2410_TICNT_ENABLE;
+> +
+> +		writeb(tmp, s3c_rtc_base + S3C2410_TICNT);
+> +	}
+>  
+> -	writeb(tmp, s3c_rtc_base + S3C2410_TICNT);
+>  	spin_unlock_irq(&s3c_rtc_pie_lock);
+>  
+>  	return 0;
+> @@ -102,10 +134,16 @@ static int s3c_rtc_setfreq(struct device *dev, int freq)
+>  
+>  	spin_lock_irq(&s3c_rtc_pie_lock);
+>  
+> -	tmp = readb(s3c_rtc_base + S3C2410_TICNT) & S3C2410_TICNT_ENABLE;
+> -	tmp |= (128 / freq)-1;
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		tmp = (32768 / freq) - 1;
+> +		writel(tmp, s3c_rtc_base + S3C2410_TICNT);
+> +	} else {
+> +		tmp = readb(s3c_rtc_base + S3C2410_TICNT);
+> +		tmp &= S3C2410_TICNT_ENABLE;
+> +		tmp |= (128 / freq) - 1;
+> +		writeb(tmp, s3c_rtc_base + S3C2410_TICNT);
+> +	}
+>  
+> -	writeb(tmp, s3c_rtc_base + S3C2410_TICNT);
+>  	spin_unlock_irq(&s3c_rtc_pie_lock);
+>  
+>  	return 0;
+> @@ -275,20 +313,29 @@ static int s3c_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  
+>  	s3c_rtc_setaie(0, alrm->enabled);
+>  
+> -	if (alrm->enabled)
+> -		enable_irq_wake(s3c_rtc_alarmno);
+> -	else
+> -		disable_irq_wake(s3c_rtc_alarmno);
+> +	if (s3c_rtc_cpu_type == TYPE_S3C2410) {
+> +		if (alrm->enabled)
+> +			enable_irq_wake(s3c_rtc_alarmno);
+> +		else
+> +			disable_irq_wake(s3c_rtc_alarmno);
+> +	}
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/mach-s5pv210/Makefile            |    4 +
- arch/arm/mach-s5pv210/dev-audio.c         |  334 +++++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/map.h  |   13 ++
- arch/arm/plat-samsung/include/plat/devs.h |    8 +
- 4 files changed, 359 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/dev-audio.c
 
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index f7f1cdc..6ecfa9d 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -18,3 +18,7 @@ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
- 
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
- obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
-+
-+# device support
-+
-+obj-y				+= dev-audio.o
-diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
-new file mode 100644
-index 0000000..bdaa926
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/dev-audio.c
-@@ -0,0 +1,327 @@
-+/* linux/arch/arm/mach-s5pv210/dev-audio.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co. Ltd
-+ *	Jaswinder Singh <jassi.brar@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <plat/audio.h>
-+
-+#include <mach/gpio.h>
-+#include <mach/map.h>
-+#include <mach/dma.h>
-+#include <mach/irqs.h>
-+
-+static int s5pv210_cfg_i2s(struct platform_device *pdev)
-+{
-+	/* configure GPIO for i2s port */
-+	switch (pdev->id) {
-+	case 1:
-+		s3c_gpio_cfgpin(S5PV210_GPC0(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(4), S3C_GPIO_SFN(2));
-+		break;
-+
-+	case 2:
-+		s3c_gpio_cfgpin(S5PV210_GPC1(0), S3C_GPIO_SFN(4));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(1), S3C_GPIO_SFN(4));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(2), S3C_GPIO_SFN(4));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(3), S3C_GPIO_SFN(4));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(4), S3C_GPIO_SFN(4));
-+		break;
-+
-+	case -1:
-+		s3c_gpio_cfgpin(S5PV210_GPI(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(4), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(5), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPI(6), S3C_GPIO_SFN(2));
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct s3c_audio_pdata s3c_i2s_pdata = {
-+	.cfg_gpio = s5pv210_cfg_i2s,
-+};
-+
-+static struct resource s5pv210_iis0_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_IIS0,
-+		.end   = S5PV210_PA_IIS0 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S0_TX,
-+		.end   = DMACH_I2S0_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S0_RX,
-+		.end   = DMACH_I2S0_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_iis0 = {
-+	.name		  = "s3c64xx-iis-v4",
-+	.id		  = -1,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_iis0_resource),
-+	.resource	  = s5pv210_iis0_resource,
-+	.dev = {
-+		.platform_data = &s3c_i2s_pdata,
-+	},
-+};
-+
-+static struct resource s5pv210_iis1_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_IIS1,
-+		.end   = S5PV210_PA_IIS1 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S1_TX,
-+		.end   = DMACH_I2S1_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S1_RX,
-+		.end   = DMACH_I2S1_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_iis1 = {
-+	.name		  = "s3c64xx-iis",
-+	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_iis1_resource),
-+	.resource	  = s5pv210_iis1_resource,
-+	.dev = {
-+		.platform_data = &s3c_i2s_pdata,
-+	},
-+};
-+
-+static struct resource s5pv210_iis2_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_IIS2,
-+		.end   = S5PV210_PA_IIS2 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S2_TX,
-+		.end   = DMACH_I2S2_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S2_RX,
-+		.end   = DMACH_I2S2_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_iis2 = {
-+	.name		  = "s3c64xx-iis",
-+	.id		  = 2,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_iis2_resource),
-+	.resource	  = s5pv210_iis2_resource,
-+	.dev = {
-+		.platform_data = &s3c_i2s_pdata,
-+	},
-+};
-+
-+/* PCM Controller platform_devices */
-+
-+static int s5pv210_pcm_cfg_gpio(struct platform_device *pdev)
-+{
-+	switch (pdev->id) {
-+	case 0:
-+		s3c_gpio_cfgpin(S5PV210_GPI(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPI(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPI(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPI(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPI(4), S3C_GPIO_SFN(3));
-+		break;
-+	case 1:
-+		s3c_gpio_cfgpin(S5PV210_GPC0(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S5PV210_GPC0(4), S3C_GPIO_SFN(3));
-+		break;
-+	case 2:
-+		s3c_gpio_cfgpin(S5PV210_GPC1(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S5PV210_GPC1(4), S3C_GPIO_SFN(2));
-+		break;
-+	default:
-+		printk(KERN_DEBUG "Invalid PCM Controller number!");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct s3c_audio_pdata s3c_pcm_pdata = {
-+	.cfg_gpio = s5pv210_pcm_cfg_gpio,
-+};
-+
-+static struct resource s5pv210_pcm0_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_PCM0,
-+		.end   = S5PV210_PA_PCM0 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM0_TX,
-+		.end   = DMACH_PCM0_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM0_RX,
-+		.end   = DMACH_PCM0_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_pcm0 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 0,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_pcm0_resource),
-+	.resource	  = s5pv210_pcm0_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+static struct resource s5pv210_pcm1_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_PCM1,
-+		.end   = S5PV210_PA_PCM1 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM1_TX,
-+		.end   = DMACH_PCM1_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM1_RX,
-+		.end   = DMACH_PCM1_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_pcm1 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_pcm1_resource),
-+	.resource	  = s5pv210_pcm1_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+static struct resource s5pv210_pcm2_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_PCM2,
-+		.end   = S5PV210_PA_PCM2 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM2_TX,
-+		.end   = DMACH_PCM2_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM2_RX,
-+		.end   = DMACH_PCM2_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv210_device_pcm2 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 2,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_pcm2_resource),
-+	.resource	  = s5pv210_pcm2_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+/* AC97 Controller platform devices */
-+
-+static int s5pv210_ac97_cfg_gpio(struct platform_device *pdev)
-+{
-+	s3c_gpio_cfgpin(S5PV210_GPC0(0), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S5PV210_GPC0(1), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S5PV210_GPC0(2), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S5PV210_GPC0(3), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S5PV210_GPC0(4), S3C_GPIO_SFN(4));
-+
-+	return 0;
-+}
-+
-+static struct resource s5pv210_ac97_resource[] = {
-+	[0] = {
-+		.start = S5PV210_PA_AC97,
-+		.end   = S5PV210_PA_AC97 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_AC97_PCMOUT,
-+		.end   = DMACH_AC97_PCMOUT,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_AC97_PCMIN,
-+		.end   = DMACH_AC97_PCMIN,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[3] = {
-+		.start = DMACH_AC97_MICIN,
-+		.end   = DMACH_AC97_MICIN,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[4] = {
-+		.start = IRQ_AC97,
-+		.end   = IRQ_AC97,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct s3c_audio_pdata s3c_ac97_pdata = {
-+	.cfg_gpio = s5pv210_ac97_cfg_gpio,
-+};
-+
-+static u64 s5pv210_ac97_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device s5pv210_device_ac97 = {
-+	.name		  = "s3c-ac97",
-+	.id		  = -1,
-+	.num_resources	  = ARRAY_SIZE(s5pv210_ac97_resource),
-+	.resource	  = s5pv210_ac97_resource,
-+	.dev = {
-+		.platform_data = &s3c_ac97_pdata,
-+		.dma_mask = &s5pv210_ac97_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+	},
-+};
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index c038585..5adcb9f 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -62,6 +62,19 @@
- #define S5PV210_PA_SDRAM	(0x20000000)
- #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
- 
-+/* I2S */
-+#define S5PV210_PA_IIS0		0xEEE30000
-+#define S5PV210_PA_IIS1		0xE2100000
-+#define S5PV210_PA_IIS2		0xE2A00000
-+
-+/* PCM */
-+#define S5PV210_PA_PCM0		0xE2300000
-+#define S5PV210_PA_PCM1		0xE1200000
-+#define S5PV210_PA_PCM2		0xE2B00000
-+
-+/* AC97 */
-+#define S5PV210_PA_AC97		0xE2200000
-+
- /* compatibiltiy defines. */
- #define S3C_PA_UART		S5PV210_PA_UART
- #define S3C_PA_IIC		S5PV210_PA_IIC0
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 796d242..d8fda3a 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -64,6 +64,14 @@ extern struct platform_device s3c_device_nand;
- extern struct platform_device s3c_device_usbgadget;
- extern struct platform_device s3c_device_usb_hsotg;
- 
-+extern struct platform_device s5pv210_device_ac97;
-+extern struct platform_device s5pv210_device_pcm0;
-+extern struct platform_device s5pv210_device_pcm1;
-+extern struct platform_device s5pv210_device_pcm2;
-+extern struct platform_device s5pv210_device_iis0;
-+extern struct platform_device s5pv210_device_iis1;
-+extern struct platform_device s5pv210_device_iis2;
-+
- /* s3c2440 specific devices */
- 
- #ifdef CONFIG_CPU_S3C2440
+Hmm, why are you removing the enable/disable irq_wake for non s3c2410?
+  
+>  	return 0;
+>  }
+>  
+>  static int s3c_rtc_proc(struct device *dev, struct seq_file *seq)
+>  {
+> -	unsigned int ticnt = readb(s3c_rtc_base + S3C2410_TICNT);
+> +	unsigned int ticnt;
+>  
+> -	seq_printf(seq, "periodic_IRQ\t: %s\n",
+> -		     (ticnt & S3C2410_TICNT_ENABLE) ? "yes" : "no" );
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		ticnt = readw(s3c_rtc_base + S3C2410_RTCCON);
+> +		ticnt &= S3C64XX_RTCCON_TICEN;
+> +	} else {
+> +		ticnt = readb(s3c_rtc_base + S3C2410_TICNT);
+> +		ticnt &= S3C2410_TICNT_ENABLE;
+> +	}
+> +
+> +	seq_printf(seq, "periodic_IRQ\t: %s\n", ticnt ? "yes" : "no");
+>  	return 0;
+>  }
+>  
+> @@ -355,11 +402,20 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
+>  		return;
+>  
+>  	if (!en) {
+> -		tmp = readb(base + S3C2410_RTCCON);
+> -		writeb(tmp & ~S3C2410_RTCCON_RTCEN, base + S3C2410_RTCCON);
+> +		if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +			tmp = readw(base + S3C2410_RTCCON);
+> +			tmp &= ~S3C64XX_RTCCON_TICEN;
+> +			tmp &= ~S3C2410_RTCCON_RTCEN;
+> +			writew(tmp, base + S3C2410_RTCCON);
+> +		} else {
+> +			tmp = readb(base + S3C2410_RTCCON);
+> +			writeb(tmp & ~S3C2410_RTCCON_RTCEN,
+> +				base + S3C2410_RTCCON);
+>  
+> -		tmp = readb(base + S3C2410_TICNT);
+> -		writeb(tmp & ~S3C2410_TICNT_ENABLE, base + S3C2410_TICNT);
+> +			tmp = readb(base + S3C2410_TICNT);
+> +			writeb(tmp & ~S3C2410_TICNT_ENABLE,
+> +				base + S3C2410_TICNT);
+> +		}
+>  	} else {
+>  		/* re-enable the device, and check it is ok */
+>  
+> @@ -407,12 +463,16 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>  {
+>  	struct rtc_device *rtc;
+>  	struct resource *res;
+> +	struct clk *clk_rtc;
+> +	unsigned char tmp, i;
+>  	int ret;
+>  
+>  	pr_debug("%s: probe=%p\n", __func__, pdev);
+>  
+>  	/* find the IRQs */
+>  
+> +	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
+> +
+>  	s3c_rtc_tickno = platform_get_irq(pdev, 1);
+>  	if (s3c_rtc_tickno < 0) {
+>  		dev_err(&pdev->dev, "no irq for rtc tick\n");
+> @@ -453,6 +513,11 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>  		goto err_nomap;
+>  	}
+>  
+> +	clk_rtc = clk_get(NULL, "rtc");
+> +	if (IS_ERR(clk_rtc))
+> +		dev_err(&pdev->dev, "failed to get clock for RTC\n");
+> +	clk_enable(clk_rtc);
+> +
+
+this really shgould have been a seperate patch.
+also, why not return an error if no clock?
+
+>  	/* check to see if everything is setup correctly */
+>  
+>  	s3c_rtc_enable(pdev, 1);
+> @@ -475,7 +540,18 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>  		goto err_nortc;
+>  	}
+>  
+> -	rtc->max_user_freq = 128;
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		rtc->max_user_freq = 32768;
+> +
+> +		/* check rtc time */
+> +		for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
+> +			tmp = readb(s3c_rtc_base + i);
+> +			if (((tmp & 0xf) > 0x9) || (((tmp >> 4) & 0xf) > 0x9))
+> +				writeb(0, s3c_rtc_base + i);
+> +		}
+
+hmm, a 'valid_bcd' function would have been useful here.
+also, this is secondary to the puprose of the patch (you could easily
+do this for all rtc ases)
+also, a dev_warn() would have been useful here
+
+> +	} else {
+> +		rtc->max_user_freq = 128;
+> +	}
+>  
+>  	platform_set_drvdata(pdev, rtc);
+>  	return 0;
+> @@ -495,20 +571,37 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>  
+>  /* RTC Power management control */
+>  
+> -static int ticnt_save;
+> +static unsigned int ticnt_save;
+> +static int ticnt_en_save;
+>  
+>  static int s3c_rtc_suspend(struct platform_device *pdev, pm_message_t state)
+>  {
+>  	/* save TICNT for anyone using periodic interrupts */
+> -	ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		ticnt_save = readl(s3c_rtc_base + S3C2410_TICNT);
+> +		ticnt_en_save = readw(s3c_rtc_base + S3C2410_RTCCON) &
+> +			S3C64XX_RTCCON_TICEN;
+> +	} else {
+> +		ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
+> +	}
+>  	s3c_rtc_enable(pdev, 0);
+>  	return 0;
+>  }
+>  
+>  static int s3c_rtc_resume(struct platform_device *pdev)
+>  {
+> +	unsigned int tmp;
+> +
+>  	s3c_rtc_enable(pdev, 1);
+> -	writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
+> +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+> +		writel(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
+> +		if (ticnt_en_save) {
+> +			tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
+> +			writew(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
+> +		}
+> +	} else {
+> +		writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
+> +	}
+>  	return 0;
+>  }
+>  #else
+> @@ -516,11 +609,25 @@ static int s3c_rtc_resume(struct platform_device *pdev)
+>  #define s3c_rtc_resume  NULL
+>  #endif
+>  
+> +static struct platform_device_id s3c_rtc_driver_ids[] = {
+> +	{
+> +		.name		= "s3c2410-rtc",
+> +		.driver_data	= TYPE_S3C2410,
+> +	}, {
+> +		.name		= "s3c64xx-rtc",
+> +		.driver_data	= TYPE_S3C64XX,
+> +	},
+> +	{}
+> +}
+> +
+> +MODULE_DEVICE_TABLE(platform, s3c_rtc_driver_ids);
+> +
+>  static struct platform_driver s3c2410_rtc_driver = {
+>  	.probe		= s3c_rtc_probe,
+>  	.remove		= __devexit_p(s3c_rtc_remove),
+>  	.suspend	= s3c_rtc_suspend,
+>  	.resume		= s3c_rtc_resume,
+> +	.id_table	= s3c_rtc_driver_ids,
+>  	.driver		= {
+>  		.name	= "s3c2410-rtc",
+>  		.owner	= THIS_MODULE,
+> -- 
+> 1.6.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.6.2.5
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
