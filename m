@@ -1,514 +1,115 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 19 May 2010 15:10:38 +0200
-Subject: [PATCH v4] PXA DMA-capable PATA driver
-Message-ID: <1274274638-10094-1-git-send-email-marek.vasut@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 19 May 2010 15:26:37 +0200
+Subject: Please pull mxc branch
+Message-ID: <20100519132637.GQ31199@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a driver for a harddrive attached to PXA address and data bus.
-Unlike pata_platform, this driver allows usage of PXA DMA controller, making the
-transmission speed 3x higher.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Jeff Garzik <jgarzik@redhat.com>
----
- arch/arm/mach-pxa/include/mach/pata_pxa.h |   33 +++
- drivers/ata/Kconfig                       |   11 +
- drivers/ata/Makefile                      |    1 +
- drivers/ata/pata_pxa.c                    |  411 +++++++++++++++++++++++++++++
- 4 files changed, 456 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/pata_pxa.h
- create mode 100644 drivers/ata/pata_pxa.c
+Hi Russell,
 
-diff --git a/arch/arm/mach-pxa/include/mach/pata_pxa.h b/arch/arm/mach-pxa/include/mach/pata_pxa.h
-new file mode 100644
-index 0000000..6cf7df1
---- /dev/null
-+++ b/arch/arm/mach-pxa/include/mach/pata_pxa.h
-@@ -0,0 +1,33 @@
-+/*
-+ * Generic PXA PATA driver
-+ *
-+ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2, or (at your option)
-+ *  any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; see the file COPYING.  If not, write to
-+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#ifndef	__MACH_PATA_PXA_H__
-+#define	__MACH_PATA_PXA_H__
-+
-+struct pata_pxa_pdata {
-+	/* PXA DMA DREQ<0:2> pin */
-+	uint32_t	dma_dreq;
-+	/* Register shift */
-+	uint32_t	reg_shift;
-+	/* IRQ flags */
-+	uint32_t	irq_flags;
-+};
-+
-+#endif	/* __MACH_PATA_PXA_H__ */
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 01c52c4..5cd3e8c 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -684,6 +684,17 @@ config PATA_VIA
- 
- 	  If unsure, say N.
- 
-+config PATA_PXA
-+	tristate "PXA DMA-capable PATA support"
-+	depends on ARCH_PXA
-+	help
-+	  This option enables support for harddrive attached to PXA CPU's bus.
-+	  
-+	  NOTE: This driver utilizes PXA DMA controller, in case your hardware
-+	        is not capable of doing MWDMA, use pata_platform instead.
-+
-+	  If unsure, say N.
-+
- config PATA_WINBOND
- 	tristate "Winbond SL82C105 PATA support"
- 	depends on PCI
-diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-index fc936d4..5ecf45a 100644
---- a/drivers/ata/Makefile
-+++ b/drivers/ata/Makefile
-@@ -79,6 +79,7 @@ obj-$(CONFIG_PATA_PLATFORM)	+= pata_platform.o
- obj-$(CONFIG_PATA_AT91)	+= pata_at91.o
- obj-$(CONFIG_PATA_OF_PLATFORM)	+= pata_of_platform.o
- obj-$(CONFIG_PATA_ICSIDE)	+= pata_icside.o
-+obj-$(CONFIG_PATA_PXA)		+= pata_pxa.o
- # Should be last but two libata driver
- obj-$(CONFIG_PATA_ACPI)		+= pata_acpi.o
- # Should be last but one libata driver
-diff --git a/drivers/ata/pata_pxa.c b/drivers/ata/pata_pxa.c
-new file mode 100644
-index 0000000..df552a3
---- /dev/null
-+++ b/drivers/ata/pata_pxa.c
-@@ -0,0 +1,411 @@
-+/*
-+ * Generic PXA PATA driver
-+ *
-+ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2, or (at your option)
-+ *  any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; see the file COPYING.  If not, write to
-+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/blkdev.h>
-+#include <linux/ata.h>
-+#include <linux/libata.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/slab.h>
-+#include <linux/completion.h>
-+
-+#include <scsi/scsi_host.h>
-+
-+#include <mach/pxa2xx-regs.h>
-+#include <mach/pata_pxa.h>
-+#include <mach/dma.h>
-+
-+#define DRV_NAME	"pata_pxa"
-+#define DRV_VERSION	"0.1"
-+
-+struct pata_pxa_data {
-+	uint32_t		dma_channel;
-+	struct pxa_dma_desc	*dma_desc;
-+	dma_addr_t		dma_desc_addr;
-+	uint32_t		dma_desc_id;
-+
-+	/* DMA IO physical address */
-+	uint32_t		dma_io_addr;
-+	/* PXA DREQ<0:2> pin selector */
-+	uint32_t		dma_dreq;
-+	/* DMA DCSR register value */
-+	uint32_t		dma_dcsr;
-+
-+	struct completion	dma_done;
-+};
-+
-+/*
-+ * Setup the DMA descriptors. The size is transfer capped at 4k per descriptor,
-+ * if the transfer is longer, it is split into multiple chained descriptors.
-+ */
-+static void pxa_load_dmac(struct scatterlist *sg, struct ata_queued_cmd *qc)
-+{
-+	struct pata_pxa_data *pd = qc->ap->private_data;
-+
-+	uint32_t cpu_len, seg_len;
-+	dma_addr_t cpu_addr;
-+
-+	cpu_addr = sg_dma_address(sg);
-+	cpu_len = sg_dma_len(sg);
-+
-+	do {
-+		seg_len = (cpu_len > 0x1000) ? 0x1000 : cpu_len;
-+
-+		pd->dma_desc[pd->dma_desc_id].ddadr = pd->dma_desc_addr +
-+			((pd->dma_desc_id + 1) * sizeof(struct pxa_dma_desc));
-+
-+		pd->dma_desc[pd->dma_desc_id].dcmd = DCMD_BURST32 | DCMD_WIDTH2 |
-+					(DCMD_LENGTH & seg_len);
-+
-+		if (qc->tf.flags & ATA_TFLAG_WRITE) {
-+			pd->dma_desc[pd->dma_desc_id].dsadr = cpu_addr;
-+			pd->dma_desc[pd->dma_desc_id].dtadr = pd->dma_io_addr;
-+			pd->dma_desc[pd->dma_desc_id].dcmd |= DCMD_INCSRCADDR |
-+						DCMD_FLOWTRG;
-+		} else {
-+			pd->dma_desc[pd->dma_desc_id].dsadr = pd->dma_io_addr;
-+			pd->dma_desc[pd->dma_desc_id].dtadr = cpu_addr;
-+			pd->dma_desc[pd->dma_desc_id].dcmd |= DCMD_INCTRGADDR |
-+						DCMD_FLOWSRC;
-+		}
-+	
-+		cpu_len -= seg_len;
-+		cpu_addr += seg_len;
-+		pd->dma_desc_id++;
-+
-+	} while(cpu_len);
-+
-+	/* Should not happen */
-+	if (seg_len & 0x1f)
-+		DALGN |= (1 << pd->dma_dreq);
-+}
-+
-+/*
-+ * Prepare taskfile for submission.
-+ */
-+static void pxa_qc_prep(struct ata_queued_cmd *qc)
-+{
-+	struct pata_pxa_data *pd = qc->ap->private_data;
-+	int si = 0;
-+	struct scatterlist *sg;
-+
-+	if (!(qc->flags & ATA_QCFLAG_DMAMAP))
-+		return;
-+
-+	pd->dma_desc_id = 0;
-+
-+	DCSR(pd->dma_channel) = 0;
-+	DALGN &= ~(1 << pd->dma_dreq);
-+
-+	for_each_sg(qc->sg, sg, qc->n_elem, si)
-+		pxa_load_dmac(sg, qc);
-+
-+	pd->dma_desc[pd->dma_desc_id - 1].ddadr = DDADR_STOP;
-+
-+	/* Fire IRQ only at the end of last block */
-+	pd->dma_desc[pd->dma_desc_id - 1].dcmd |= DCMD_ENDIRQEN;
-+
-+	DDADR(pd->dma_channel) = pd->dma_desc_addr;
-+	DRCMR(pd->dma_dreq) = DRCMR_MAPVLD | pd->dma_channel;
-+
-+}
-+
-+/*
-+ * Configure the DMA controller, load the DMA descriptors, but don't start the
-+ * DMA controller yet. Only issue the ATA command.
-+ */
-+static void pxa_bmdma_setup(struct ata_queued_cmd *qc)
-+{
-+	qc->ap->ops->sff_exec_command(qc->ap, &qc->tf);
-+}
-+
-+/*
-+ * Execute the DMA transfer.
-+ */
-+static void pxa_bmdma_start(struct ata_queued_cmd *qc)
-+{
-+	struct pata_pxa_data *pd = qc->ap->private_data;
-+	init_completion(&pd->dma_done);
-+	DCSR(pd->dma_channel) = DCSR_RUN;
-+}
-+
-+/*
-+ * Wait until the DMA transfer completes, then stop the DMA controller.
-+ */
-+static void pxa_bmdma_stop(struct ata_queued_cmd *qc)
-+{
-+	struct pata_pxa_data *pd = qc->ap->private_data;
-+
-+	if ((DCSR(pd->dma_channel) & DCSR_RUN) &&
-+		wait_for_completion_timeout(&pd->dma_done, HZ))
-+		dev_err(qc->ap->dev, "Timeout waiting for DMA completion!");
-+
-+	DCSR(pd->dma_channel) = 0;
-+}
-+
-+/*
-+ * Read DMA status. The bmdma_stop() will take care of properly finishing the
-+ * DMA transfer so we always have DMA-complete interrupt here.
-+ */
-+static unsigned char pxa_bmdma_status(struct ata_port *ap)
-+{
-+	struct pata_pxa_data *pd = ap->private_data;
-+	unsigned char ret = ATA_DMA_INTR;
-+
-+	if (pd->dma_dcsr & DCSR_BUSERR)
-+		ret |= ATA_DMA_ERR;
-+
-+	return ret;
-+}
-+
-+/*
-+ * No IRQ register present so we do nothing.
-+ */
-+static void pxa_irq_clear(struct ata_port *ap)
-+{
-+}
-+
-+/*
-+ * Check for ATAPI DMA. ATAPI DMA is unsupported by this driver. It's still
-+ * unclear why ATAPI has DMA issues.
-+ */
-+static int pxa_check_atapi_dma(struct ata_queued_cmd *qc)
-+{
-+	return -EOPNOTSUPP;
-+}
-+
-+static struct scsi_host_template pxa_ata_sht = {
-+	ATA_BMDMA_SHT(DRV_NAME),
-+};
-+
-+static struct ata_port_operations pxa_ata_port_ops = {
-+	.inherits		= &ata_bmdma_port_ops,
-+	.cable_detect		= ata_cable_40wire,
-+
-+	.bmdma_setup		= pxa_bmdma_setup,
-+	.bmdma_start		= pxa_bmdma_start,
-+	.bmdma_stop		= pxa_bmdma_stop,
-+	.bmdma_status		= pxa_bmdma_status,
-+
-+	.check_atapi_dma	= pxa_check_atapi_dma,
-+
-+	.sff_irq_clear		= pxa_irq_clear,
-+
-+	.qc_prep		= pxa_qc_prep,
-+};
-+
-+/*
-+ * DMA interrupt handler.
-+ */
-+static void pxa_ata_dma_irq(int dma, void *port)
-+{
-+	struct ata_port *ap = port;
-+	struct pata_pxa_data *pd = ap->private_data;
-+
-+	pd->dma_dcsr = DCSR(dma);
-+	DCSR(dma) = pd->dma_dcsr;
-+
-+	if (pd->dma_dcsr & DCSR_STOPSTATE)
-+		complete(&pd->dma_done);
-+}
-+
-+static int __devinit pxa_ata_probe(struct platform_device *pdev)
-+{
-+	struct ata_host *host;
-+	struct ata_port *ap;
-+	struct pata_pxa_data *data;
-+	struct resource *cmd_res;
-+	struct resource *ctl_res;
-+	struct resource *dma_res;
-+	struct resource *irq_res;
-+	struct pata_pxa_pdata *pdata = pdev->dev.platform_data;
-+	int ret = 0;
-+
-+	/*
-+	 * Resource validation, three resources are needed:
-+	 *  - CMD port base address
-+	 *  - CTL port base address
-+	 *  - DMA port base address
-+	 *  - IRQ pin
-+	 */
-+	if (pdev->num_resources != 4) {
-+		dev_err(&pdev->dev, "invalid number of resources\n");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * CMD port base address
-+	 */
-+	cmd_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (unlikely(cmd_res == NULL))
-+		return -EINVAL;
-+
-+	/*
-+	 * CTL port base address
-+	 */
-+	ctl_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (unlikely(ctl_res == NULL))
-+		return -EINVAL;
-+
-+	/*
-+	 * DMA port base address
-+	 */
-+	dma_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+	if (unlikely(dma_res == NULL))
-+		return -EINVAL;
-+
-+	/*
-+	 * IRQ pin
-+	 */
-+	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (unlikely(irq_res == NULL))
-+		return -EINVAL;
-+
-+	/*
-+	 * Allocate the host
-+	 */
-+	host = ata_host_alloc(&pdev->dev, 1);
-+	if (!host)
-+		return -ENOMEM;
-+
-+	ap		= host->ports[0];
-+	ap->ops		= &pxa_ata_port_ops;
-+	ap->pio_mask	= ATA_PIO4;
-+	ap->mwdma_mask	= ATA_MWDMA2;
-+	ap->flags	= ATA_FLAG_MMIO;
-+
-+	ap->ioaddr.cmd_addr	= devm_ioremap(&pdev->dev, cmd_res->start,
-+						resource_size(cmd_res));
-+	ap->ioaddr.ctl_addr	= devm_ioremap(&pdev->dev, ctl_res->start,
-+						resource_size(ctl_res));
-+	ap->ioaddr.bmdma_addr	= devm_ioremap(&pdev->dev, dma_res->start,
-+						resource_size(dma_res));
-+
-+	/*
-+	 * Adjust register offsets
-+	 */
-+	ap->ioaddr.altstatus_addr = ap->ioaddr.ctl_addr;
-+	ap->ioaddr.data_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_DATA << pdata->reg_shift);
-+	ap->ioaddr.error_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_ERR << pdata->reg_shift);
-+	ap->ioaddr.feature_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_FEATURE << pdata->reg_shift);
-+	ap->ioaddr.nsect_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_NSECT << pdata->reg_shift);
-+	ap->ioaddr.lbal_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_LBAL << pdata->reg_shift);
-+	ap->ioaddr.lbam_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_LBAM << pdata->reg_shift);
-+	ap->ioaddr.lbah_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_LBAH << pdata->reg_shift);
-+	ap->ioaddr.device_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_DEVICE << pdata->reg_shift);
-+	ap->ioaddr.status_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_STATUS << pdata->reg_shift);
-+	ap->ioaddr.command_addr	= ap->ioaddr.cmd_addr +
-+					(ATA_REG_CMD << pdata->reg_shift);
-+
-+	/*
-+	 * Allocate and load driver's internal data structure
-+	 */
-+	data = devm_kzalloc(&pdev->dev, sizeof(struct pata_pxa_data),
-+								GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	ap->private_data = data;
-+	data->dma_dreq = pdata->dma_dreq;
-+	data->dma_io_addr = dma_res->start;
-+
-+	/*
-+	 * Allocate space for the DMA descriptors
-+	 */
-+	data->dma_desc = dmam_alloc_coherent(&pdev->dev, PAGE_SIZE,
-+					&data->dma_desc_addr, GFP_KERNEL);
-+	if (!data->dma_desc)
-+		return -EINVAL;
-+
-+	/*
-+	 * Request the DMA channel
-+	 */
-+	data->dma_channel = pxa_request_dma(DRV_NAME, DMA_PRIO_LOW,
-+						pxa_ata_dma_irq, ap);
-+	if (data->dma_channel < 0)
-+		return -EBUSY;
-+
-+	/*
-+	 * Stop and clear the DMA channel
-+	 */
-+	DCSR(data->dma_channel) = 0;
-+
-+	/*
-+	 * Activate the ATA host
-+	 */
-+	ret = ata_host_activate(host, irq_res->start, ata_sff_interrupt,
-+				pdata->irq_flags, &pxa_ata_sht);
-+	if (ret)
-+		pxa_free_dma(data->dma_channel);
-+
-+	return ret;
-+}
-+
-+static int __devexit pxa_ata_remove(struct platform_device *pdev)
-+{
-+	struct ata_host *host = dev_get_drvdata(&pdev->dev);
-+	struct pata_pxa_data *data = host->ports[0]->private_data;
-+
-+	pxa_free_dma(data->dma_channel);
-+
-+	ata_host_detach(host);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver pxa_ata_driver = {
-+	.probe		= pxa_ata_probe,
-+	.remove		= __devexit_p(pxa_ata_remove),
-+	.driver		= {
-+		.name		= DRV_NAME,
-+		.owner		= THIS_MODULE,
-+	},
-+};
-+
-+static int __init pxa_ata_init(void)
-+{
-+	return platform_driver_register(&pxa_ata_driver);
-+}
-+
-+static void __exit pxa_ata_exit(void)
-+{
-+	platform_driver_unregister(&pxa_ata_driver);
-+}
-+
-+module_init(pxa_ata_init);
-+module_exit(pxa_ata_exit);
-+
-+MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
-+MODULE_DESCRIPTION("DMA-capable driver for PATA on PXA CPU");
-+MODULE_LICENSE("GPL");
-+MODULE_VERSION(DRV_VERSION);
-+MODULE_ALIAS("platform:" DRV_NAME);
+Please pull the following. I know I'm a bit late, sorry for this.
+
+Sascha
+
+The following changes since commit 537b60d17894b7c19a6060feae40299d7109d6e7:
+  Linus Torvalds (1):
+        Merge branch 'x86-uv-for-linus' of git://git.kernel.org/.../tip/linux-2.6-tip
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6 for-rmk
+
+Alberto Panizzo (2):
+      MX3X: Add Keypad device definition for MX3X arch
+      mx31_3ds: Support the keypad situated in the personality board
+
+Amit Kucheria (1):
+      mxc: Change gpt timer code to be more generic by using V2 instead of MX3
+
+Daniel Mack (5):
+      ARM: mx3/lilly1131: add USB support
+      ARM: MXC: mxcmmc: misc cleanups
+      ARM: MXC: mxcmmc: Teach the driver SDIO operations
+      ARM: MXC: mxcmmc: work around a bug in the SDHC busy line handling
+      ARM: mx3: Fix a race condition in mxcmmc
+
+Dinh Nguyen (9):
+      mx5: Add registration of GPIOs for MX5 devices
+      mxc: Update GPIO for USB support on Freescale MX51 Babbage HW
+      mx5: Add USB device definitions for Freescale MX51 Babbage HW
+      mx5: Enable board specific functions for enabling USB host on Babbage
+      mxc: Add generic USB HW initialization for MX51
+      mx5: Add USB to Freescale MX51 defconfig
+      mx5: change usb clock source from pll3 to pll2
+      mx5: enable usb gadget for freescale mx51 babbage board
+      mx5: bring usb phy out of reset on freescale mx51 babbage hw
+
+Ivo Clarysse (2):
+      MXC: mxc_nand: set NFC registers after reset
+      MXC: mxc_nand: support i.MX21
+
+Magnus Lilja (1):
+      MXC: Add USB OTG (device) for i.MX31 PDK (3DS) board.
+
+Philippe R?tornaz (3):
+      mx31moboard: Fix usb PHY reset
+      mx31moboard: Move usb OTG device registration
+      mx31moboard: OTG host support for smartbot board
+
+Valentin Longchamp (1):
+      mx31smartbot: change the config of a gpio
+
+Vladimir Zapolskiy (2):
+      imx3: Add rtc platform device support
+      imx31: add rtc device on litekit board.
+
+Wolfram Sang (6):
+      arm/plat-mxc: Fix forgotten renaming in timer.c
+      arm/mach-mx2/3: Fix watchdog-devices to match the current driver
+      arm/mach-mx3: add watchdog device to Phytec-boards
+      arm/mach-mx2: add watchdog device to Phytec-boards
+      arm/mx25: add watchdog device
+      arm/mx51: add watchdog device
+
+ arch/arm/configs/mx51_defconfig                    |   17 ++-
+ arch/arm/mach-mx2/devices.c                        |    9 +-
+ arch/arm/mach-mx2/mach-pca100.c                    |    1 +
+ arch/arm/mach-mx2/mach-pcm038.c                    |    1 +
+ arch/arm/mach-mx25/devices.c                       |   15 ++
+ arch/arm/mach-mx25/devices.h                       |    1 +
+ arch/arm/mach-mx3/Kconfig                          |    1 +
+ arch/arm/mach-mx3/devices.c                        |   40 +++++-
+ arch/arm/mach-mx3/devices.h                        |    2 +
+ arch/arm/mach-mx3/mach-mx31_3ds.c                  |   87 ++++++++++
+ arch/arm/mach-mx3/mach-mx31lilly.c                 |  145 +++++++++++++++++
+ arch/arm/mach-mx3/mach-mx31moboard.c               |  104 +++++--------
+ arch/arm/mach-mx3/mach-pcm037.c                    |    1 +
+ arch/arm/mach-mx3/mach-pcm043.c                    |    1 +
+ arch/arm/mach-mx3/mx31lite-db.c                    |    1 +
+ arch/arm/mach-mx3/mx31moboard-devboard.c           |    9 +
+ arch/arm/mach-mx3/mx31moboard-marxbot.c            |    8 +
+ arch/arm/mach-mx3/mx31moboard-smartbot.c           |   53 ++++++-
+ arch/arm/mach-mx5/board-mx51_babbage.c             |  167 ++++++++++++++++++++
+ arch/arm/mach-mx5/clock-mx51.c                     |   45 ++++++
+ arch/arm/mach-mx5/devices.c                        |  109 +++++++++++++-
+ arch/arm/mach-mx5/devices.h                        |    4 +
+ arch/arm/plat-mxc/ehci.c                           |  100 ++++++++++++-
+ arch/arm/plat-mxc/gpio.c                           |    5 +-
+ arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    3 +-
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h         |   17 ++
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h        |   34 +++--
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h          |   14 ++-
+ arch/arm/plat-mxc/time.c                           |   46 +++---
+ arch/arm/plat-mxc/tzic.c                           |    4 +-
+ drivers/mmc/core/sdio.c                            |    6 +
+ drivers/mmc/host/mxcmmc.c                          |  114 ++++++++++++--
+ drivers/mtd/nand/mxc_nand.c                        |  125 ++++++++-------
+ drivers/usb/host/ehci-mxc.c                        |    4 +-
+ include/linux/mmc/host.h                           |    3 +
+ 35 files changed, 1097 insertions(+), 199 deletions(-)
 -- 
-1.7.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
