@@ -1,32 +1,22 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 03:04:30 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 18 May 2010 19:15:46 -0700
 Subject: [PATCH 1/8] ARM: SAMSUNG: Move RTC device definitions in
 	plat-samsung
-In-Reply-To: <20100518191300.GH22554@sirena.org.uk>
+In-Reply-To: <20100519020430.GL26401@trinity.fluff.org>
+	(sfid-20100519_030501_644923_B65A7834)
 References: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
 	<20100518080304.GG26401@trinity.fluff.org>
 	<20100518191300.GH22554@sirena.org.uk>
-Message-ID: <20100519020430.GL26401@trinity.fluff.org>
+	<20100519020430.GL26401@trinity.fluff.org>
+	(sfid-20100519_030501_644923_B65A7834)
+Message-ID: <1274235346.2698.734.camel@finisterre.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 08:13:01PM +0100, Mark Brown wrote:
-> On Tue, May 18, 2010 at 09:03:04AM +0100, Ben Dooks wrote:
-> 
-> > it would be really helpful if you composed a covering message
-> > for patch series so that any general comments can be attached
-> > there... also it means the series doesn't end up getting
-> > fragmeneted in my mailbox.
-> 
-> There's more going on here - none of the messages are threaded with
-> each other, which git send-mail does by default even if there isn't a
-> cover letter.
+On Wed, 2010-05-19 at 03:04 +0100, Ben Dooks wrote:
 
-git send-email has a --no-thread option as well, so if possible it would
-be really helpful to ensure that this isn't set either...
+> git send-email has a --no-thread option as well, so if possible it would
+> be really helpful to ensure that this isn't set either...
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Yup. As of v1.7 this is the default, which means it's much more likely
+that people will do the right thing.
