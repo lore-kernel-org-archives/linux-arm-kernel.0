@@ -1,34 +1,44 @@
-From: s.hauer@pengutronix.de (MXC Sascha Hauer)
-Date: Wed, 19 May 2010 14:23:16 +0200
-Subject: [PATCH 0/2 v2] MX3X: Architecture specific mx3 keypad support
-In-Reply-To: <1274261512.3123.6.camel@realization>
-References: <1274261512.3123.6.camel@realization>
-Message-ID: <20100519122316.GP31199@pengutronix.de>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Wed, 19 May 2010 18:05:47 +0530
+Subject: [PATCH v2] ARMv7: Use the Inner Shareable I-cache on MP
+In-Reply-To: <1274271062-30807-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1274271062-30807-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <AANLkTim03PQYiNGNzxNfs-MkyFSZgc2DKMxVMoJzxSnR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 11:31:52AM +0200, Alberto Panizzo wrote:
-> This two patches add the support for the keypad device
-> over the recent merge of the imx-keypad driver and shows
-> how to support this device into the machine file.
-> 
-> v2: Pin definition helpers are placed in iomux-mx3.h
-> 
-> Alberto Panizzo (2):
->   MX3X: Add Keypad device definition for MX3X arch
->   mx31_3ds: Support the keypad situated in the personality board
-> 
->  arch/arm/mach-mx3/devices.c                |   19 ++++++++++++++++
->  arch/arm/mach-mx3/devices.h                |    1 +
->  arch/arm/mach-mx3/mach-mx31_3ds.c          |   32 ++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/iomux-mx3.h |   17 ++++++++++++++
+Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> This patch fixes the flush_cache_all for ARMv7 SMP. It was
+> missing from commit b8349b569aae661dea9d59d7d2ee587ccea3336c
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> Updated version after removing the not necessary second hunk
+>
+> arch/arm/mm/cache-v7.S | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index 06a90dc..5009635 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -91,7 +91,11 @@ ENTRY(v7_flush_kern_cache_all)
+> ?THUMB( ? ? ? ?stmfd ? sp!, {r4-r7, r9-r11, lr} ? ? ? ?)
+> ? ? ? ?bl ? ? ?v7_flush_dcache_all
+> ? ? ? ?mov ? ? r0, #0
+> +#ifdef CONFIG_SMP
+> + ? ? ? mcr ? ? p15, 0, r0, c7, c1, 0 ? ? ? ? ? @ invalidate I-cache inner shareable
+> +#elese
 
-Ok, applied.
+s/elese/else
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c5, 0 ? ? ? ? ? @ I+BTB cache invalidate
+> +#endif
+> ?ARM( ?ldmfd ? sp!, {r4-r5, r7, r9-r11, lr} ? ?)
+> ?THUMB( ? ? ? ?ldmfd ? sp!, {r4-r7, r9-r11, lr} ? ? ? ?)
+> ? ? ? ?mov ? ? pc, lr
+> --
+> 1.6.0.4
+>
+> --
