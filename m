@@ -1,29 +1,46 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 18 May 2010 19:22:12 -0500
-Subject: Known issues with amba-pl010.c driver?
-Message-ID: <0D753D10438DA54287A00B0270842697636F1BC928@AUSP01VMBX24.collaborationhost.net>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 19 May 2010 01:45:19 +0100
+Subject: s3c-fb updates
+In-Reply-To: <AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
+References: <1274180045-14645-1-git-send-email-ben-linux@fluff.org>
+	<AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
+Message-ID: <20100519004519.GB4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Tue, May 18, 2010 at 11:35:00PM +0900, Kyungmin Park wrote:
+> Hi,
+> 
+> On Tue, May 18, 2010 at 7:54 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > Updates for the s3c-fb to improbe the build and update support
+> > for s5pv210 and s3c2416 devices.
+> >
+> > The dependency on Inki Dae's patches have been removed since they've
+> > not been reposted, and at-least one causes build failures.
+> 
+> Ben please check your mailbox again. He sent it after your reply.
 
-Are there any known issues with the amba-pl010.c driver?
+no, what he sent was three patch files attached to a mail[1] which
+Andrew Morton replied to saying that these needed to be sent as proper
+patches with descriptions and other such things that patches have.
+ 
+> Anyway, how do you integrate the FIMD and FIMC features in current
+> driver? Any plans?
 
-I have an application running on an ep93xx based system that uses one
-of the serial ports to communicate with another board.  I am seeing
-pauses while sending data from the ep93xx to the other board.
+I've been discussiong things with the engineers here. However, the first
+thing is to get the driver closer aligned to the one that Sys.LSI have
+been shipping, which means getting some missing features sorted out.
 
-I see a similar pause when using one of the other serial ports as a
-console.  When doing something that spews a lot of data to the port
-the delays are very noticeable.  For instance the command:
+By the way, which is the FIMC block? I've not seen any documentation
+referencing this as an block in the SoC.
 
-/ # du
+As such I will try and see if Pawel's previous patcehs that got missed
+can be merged into this tree and into the kernel this round.
 
-Spews the correct output but there are a number of pauses.
+[1] http://lkml.org/lkml/2010/5/7/63
 
-Both ports are running at a baud rate of 57600 if that matters.
+-- 
+Ben
 
-Is there any way to debug this?
-
-Thanks,
-Hartley
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
