@@ -1,48 +1,36 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 19 May 2010 18:09:07 +0530
-Subject: [PATCH v2] ARMv7: Use the Inner Shareable I-cache on MP
-In-Reply-To: <AANLkTim03PQYiNGNzxNfs-MkyFSZgc2DKMxVMoJzxSnR@mail.gmail.com>
-References: <1274271062-30807-1-git-send-email-santosh.shilimkar@ti.com>
-	<AANLkTim03PQYiNGNzxNfs-MkyFSZgc2DKMxVMoJzxSnR@mail.gmail.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C566661F@dbde02.ent.ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 19 May 2010 14:44:37 +0200
+Subject: [PATCH v3] PXA DMA-capable PATA driver
+In-Reply-To: <87pr0s6swd.fsf@free.fr>
+References: <1274137768-27707-1-git-send-email-marek.vasut@gmail.com>
+	<201005180112.30792.marek.vasut@gmail.com> <87pr0s6swd.fsf@free.fr>
+Message-ID: <201005191444.37376.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of S, Venkatraman
-> Sent: Wednesday, May 19, 2010 6:06 PM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; Catalin Marinas
-> Subject: Re: [PATCH v2] ARMv7: Use the Inner Shareable I-cache on MP
+Dne St 19. kv?tna 2010 13:19:14 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > Dne ?t 18. kv?tna 2010 01:09:28 Marek Vasut napsal(a):
+> >> This patch adds a driver for a harddrive attached to PXA address and
+> >> data bus. Unlike pata_platform, this driver allows usage of PXA DMA
+> >> controller, making the transmission speed 3x higher.
+> > 
+> > Hey guys, all the issues pointed out should be addressed. See below.
+> > Cheers!
 > 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> > This patch fixes the flush_cache_all for ARMv7 SMP. It was
-> > missing from commit b8349b569aae661dea9d59d7d2ee587ccea3336c
-> >
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> > Updated version after removing the not necessary second hunk
-> >
-> > arch/arm/mm/cache-v7.S | ? ?4 ++++
-> > ?1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> > index 06a90dc..5009635 100644
-> > --- a/arch/arm/mm/cache-v7.S
-> > +++ b/arch/arm/mm/cache-v7.S
-> > @@ -91,7 +91,11 @@ ENTRY(v7_flush_kern_cache_all)
-> > ?THUMB( ? ? ? ?stmfd ? sp!, {r4-r7, r9-r11, lr} ? ? ? ?)
-> > ? ? ? ?bl ? ? ?v7_flush_dcache_all
-> > ? ? ? ?mov ? ? r0, #0
-> > +#ifdef CONFIG_SMP
-> > + ? ? ? mcr ? ? p15, 0, r0, c7, c1, 0 ? ? ? ? ? @ invalidate I-cache inner shareable
-> > +#elese
+> For the first iteration, you can have my :
+> Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > 
-> s/elese/else
+> For the next iteration, it would be good to :
+>  - fix the error path in pxa_ata_probe()
+>    => if dmam_alloc_coherent() fails
+>    => if pxa_request_dma() fails
+>  - in pxa_ata_remove()
+>    => maybe call devm_iounmap()
 > 
-oops ... Will correct this while submitting to the patch
-system
 
-Regards,
-Santosh 
+It'd be awesome if you could just point out all the issues at once ... about 
+devm_x(), you probably don't need to, it's 'managed'.
+
+> --
+> Robert
