@@ -1,108 +1,84 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 19 May 2010 09:30:41 -0700
-Subject: [PATCH 03/05] input: enable onkey driver of max8925
-In-Reply-To: <AANLkTim0nDQ9oGfKY3ccf7P1bC3pJreInsMrmxRDl4xm@mail.gmail.com>
-References: <AANLkTim0nDQ9oGfKY3ccf7P1bC3pJreInsMrmxRDl4xm@mail.gmail.com>
-Message-ID: <20100519163041.GA18753@core.coreip.homeip.net>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 19 May 2010 17:45:34 +0100
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <AANLkTinsOSI_TIc7Jyy4QFuFaS2d-fi0y3LMuITLyG3N@mail.gmail.com>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<201005181324.45701.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005180742500.12758@xanadu.home>
+	<AANLkTinsOSI_TIc7Jyy4QFuFaS2d-fi0y3LMuITLyG3N@mail.gmail.com>
+Message-ID: <20100519164534.GE1693@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+Grant Likely wrote:
+> On Tue, May 18, 2010 at 5:57 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Tue, 18 May 2010, Jeremy Kerr wrote:
+> >
+> >> Hi Nicolas,
+> >>
+> >> > I think that, for the moment, it is best if the bootloader on already
+> >> > existing subarchitectures where DT is introduced still preserve the
+> >> > already existing ability to boot using ATAGs. ?This allows for the
+> >> > testing and validation of the DT concept against the legacy ATAG method
+> >> > more easily.
+> >>
+> >> Just to clarify - by "still preserve the existing ability to use ATAGs" you
+> >> mean only for non-DT boot, right?
+> >
+> > Exact. ?Once a particular SOC family has no non-DT support anymore (due
+> > to being entirely new, or because people get really enthusiastic and
+> > fade out legacy machine specific init code completely) then and only
+> > then it might be logical to remove ATAG from the concerned bootloaders.
+> >
+> >
+> >> This proposal still does not require ATAG_DEVTREE?
+> >
+> > No.
+> 
+> Hmmm...  I misunderstood then.  I don't agree that this is the best way forward.
+> 
+> Doing it this way means a non-compatible break in the interface.  It
+> means that the bootloader needs to know what interface the kernel is
+> expecting for boot; information that is not readily available from the
+> image type.  The user then needs to tell the boot loader which
+> interface to use rather than a backwards compatible addition of a blob
+> of data.
 
-On Wed, May 19, 2010 at 02:58:07PM +0800, Haojian Zhuang wrote:
-> +
-> +/* MAX8925 gives us an interrupt when ONKEY is held for 3 seconds. */
-> +static irqreturn_t max8925_onkey_handler(int irq, void *data)
-> +{
-> +	struct max8925_onkey_info *info = data;
-> +
-> +	input_report_key(info->idev, KEY_POWER, 1);
-> +	input_sync(info->idev);
-> +
-> +	/* Enable hardreset to halt if system isn't shutdown on time */
+Also the other way around: Sometimes you want to install the same
+kernel on systems with old and new bootloaders, without touching the
+bootloaders (due to that not being powerfail-safe, say).  The kernel
+needs to know if it's passed a DT from a newer bootloader or not.
 
-A comment mentioning that max8925_set_bits() may sleep would instantly
-remove all concerns why threaded IRQ is being used here.
+And sometimes you'd like to install a newer, tested kernel (that uses
+DTs) on systems with old bootloaders.
 
-> +	max8925_set_bits(info->i2c, MAX8925_SYSENSEL,
-> +			 HARDRESET_EN, HARDRESET_EN);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int __devinit max8925_onkey_probe(struct platform_device *pdev)
-> +{
-> +	struct max8925_chip *chip = dev_get_drvdata(pdev->dev.parent);
-> +	struct max8925_onkey_info *info;
-> +	int irq, ret;
-> +
-> +	info = kzalloc(sizeof(struct max8925_onkey_info), GFP_KERNEL);
-> +	if (!info)
-> +		return -ENOMEM;
-> +	info->chip = chip;
-> +	info->i2c = chip->i2c;
-> +	info->dev = &pdev->dev;
-> +	irq = chip->irq_base + MAX8925_IRQ_GPM_SW_3SEC;
-> +
-> +	ret = request_threaded_irq(irq, NULL, max8925_onkey_handler,
-> +				   IRQF_ONESHOT, "onkey", info);
-> +	if (ret < 0) {
-> +		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
-> +			irq, ret);
-> +		goto out;
-> +	}
-> +
-> +	info->idev = input_allocate_device();
-> +	if (!info->idev) {
-> +		dev_err(chip->dev, "Failed to allocate input dev\n");
-> +		ret = -ENOMEM;
-> +		goto out_input;
-> +	}
-> +
+> You mention below "shifting the World Order on ARM" and it creating
+> resistance for merging DT support.  Isn't this much the same thing as
+> it creates a non backwards compatible change in the way bootloaders
+> pass data to the kernel.  The cutover in powerpc from the old
+> interface to the new caused no end of confusion and people who could
+> no longer get their systems to boot.  On PowerPC is was necessary
+> because the old method was completely broken, but ATAGs are clean,
+> simple and well implemented.
 
-You need to allocate device before requesting IRQ otherwise it may crash
-and burn.
+You can't always update the boot loader.  Sometimes you're stuck with
+what's there for the life of a device.  Either it's ROM, or it's too
+risky to modify in place.
 
-> +	info->idev->name = "max8925_on";
-> +	info->idev->phys = "max8925_on/input0";
-> +	info->idev->id.bustype = BUS_I2C;
-> +	info->idev->dev.parent = &pdev->dev;
-> +	info->irq = irq;
-> +	info->idev->evbit[0] = BIT_MASK(EV_KEY);
-> +	info->idev->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-> +
-> +	ret = input_register_device(info->idev);
-> +	if (ret) {
-> +		dev_err(chip->dev, "Can't register input device: %d\n", ret);
-> +		goto out_reg;
-> +	}
-> +	platform_set_drvdata(pdev, info);
-> +
-> +	return 0;
-> +
-> +out_reg:
-> +	input_free_device(info->idev);
-> +out_input:
-> +	free_irq(info->irq, info);
-> +out:
-> +	kfree(info);
-> +	return ret;
-> +}
-> +
-> +static int __devexit max8925_onkey_remove(struct platform_device *pdev)
-> +{
-> +	struct max8925_onkey_info *info = platform_get_drvdata(pdev);
-> +
-> +	if (info) {
+> It also means teaching every boot loader two separate methods for
+> booting and exposing those differences to the user.
 
-How can info be NULL?
+Embedded devices usually don't have any way for the "user" to choose
+from a boot menu ;-)
 
-> +		free_irq(info->irq, info);
-> +		input_unregister_device(info->idev);
-> +		kfree(info);
+ATAG_DEVTREE sounds good to me for mix'n'match systems.
 
-platform_set_drvdata(pdev, NULL); - please clean up after yourself.
+New systems that always use DTs could use _just_ ATAG_DEVTREE, to
+avoid questions of conflicting info.  They could also settle on a
+fixed R1 value meaning "devtree platform".
 
-Thanks.
+Or if a fixed "devtree platform" R1 is used, R2 could point directly
+at the DT, no atag list in that specific case.
 
--- 
-Dmitry
+-- Jamie
