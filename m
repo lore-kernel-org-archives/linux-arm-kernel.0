@@ -1,26 +1,29 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 19 May 2010 15:44:29 -0700
-Subject: [RFC/PATCH] arm: oprofile: remove locking from suspend/resume
-In-Reply-To: <20100519070459.GA22212@n2100.arm.linux.org.uk> (Russell King's
-	message of "Wed\, 19 May 2010 08\:04\:59 +0100")
-References: <1274227981-20130-1-git-send-email-khilman@deeprootsystems.com>
-	<20100519070459.GA22212@n2100.arm.linux.org.uk>
-Message-ID: <8739xnjyuq.fsf@deeprootsystems.com>
+From: weiyi.huang@gmail.com (Huang Weiyi)
+Date: Thu, 20 May 2010 07:11:58 +0800
+Subject: [PATCH 1/3] [ARM] remove duplicated #include
+Message-ID: <1274310718-4840-1-git-send-email-weiyi.huang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Remove duplicated #include('s) in
+  arch/arm/mach-spear6xx/spear6xx.c
 
-> On Tue, May 18, 2010 at 05:13:01PM -0700, Kevin Hilman wrote:
->> Since oprofile is a sysdev, its suspend/resume methods are called with
->> interrupts disabled.  Using a mutex (which might sleep) in this atomic
->> context is not safe.
->
-> It isn't a sysdev anymore.  Suggest you take a look at the ARM tree once
-> in a while.
+Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
+---
+ arch/arm/mach-spear6xx/spear6xx.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Indeed, I see it is fixed already there.
-
-Sorry for the noise,
-
-Kevin
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index b67e571..baf6bcc 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -13,7 +13,6 @@
+ 
+ #include <linux/types.h>
+ #include <linux/amba/pl061.h>
+-#include <linux/types.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
+ #include <asm/hardware/vic.h>
+-- 
+1.6.1.3
