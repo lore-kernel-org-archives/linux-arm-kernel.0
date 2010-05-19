@@ -1,111 +1,86 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 May 2010 20:18:45 -0600
-Subject: [PATCH 06/22] OMAP: hwmod: Remove IS_ERR check with
-	omap_clk_get_by_name return value
-In-Reply-To: <20100519021800.19716.8938.stgit@localhost.localdomain>
-References: <20100519021800.19716.8938.stgit@localhost.localdomain>
-Message-ID: <20100519021844.19716.95358.stgit@localhost.localdomain>
+Date: Tue, 18 May 2010 20:18:36 -0600
+Subject: [PATCH 00/22] OMAP PRCM/clock/powerdomain/hwmod: remaining patches
+	for 2.6.35
+Message-ID: <20100519021800.19716.8938.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+Hi,
 
-The previous clock API was returning a standard linux error code in
-case of failure. This is not the case anymore with the new
-omap_clk_get_by_name API. A NULL value means that the clock node
-does not exist.
-Replace all the IS_ERR check by a !clk check.
+here are some remaining patches intended for 2.6.35, in case
+anyone has comments.  The series consists almost entirely of fixes:
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+- hwmod infrastructure fixes from Beno?t,
+
+- OMAP4 PRCM macro fixes from Beno?t,
+
+- OMAP4 clock/powerdomain fixes from Rajendra,
+
+- and some miscellaneous patches.
+
+
+- Paul
+
+
+size:
+   text    data     bss     dec     hex filename
+3130596  195296   93248 3419140  342c04 vmlinux.omap3beagle.old
+3130600  195296   93248 3419144  342c08 vmlinux.omap3beagle
+
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index a280ccc..a62920b 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -411,9 +411,9 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 		return 0;
- 
- 	c = omap_clk_get_by_name(oh->main_clk);
--	WARN(IS_ERR(c), "omap_hwmod: %s: cannot clk_get main_clk %s\n",
-+	WARN(!c, "omap_hwmod: %s: cannot clk_get main_clk %s\n",
- 	     oh->name, oh->main_clk);
--	if (IS_ERR(c))
-+	if (!c)
- 		ret = -EINVAL;
- 	oh->_clk = c;
- 
-@@ -446,9 +446,9 @@ static int _init_interface_clks(struct omap_hwmod *oh)
- 			continue;
- 
- 		c = omap_clk_get_by_name(os->clk);
--		WARN(IS_ERR(c), "omap_hwmod: %s: cannot clk_get "
--		     "interface_clk %s\n", oh->name, os->clk);
--		if (IS_ERR(c))
-+		WARN(!c, "omap_hwmod: %s: cannot clk_get interface_clk %s\n",
-+		     oh->name, os->clk);
-+		if (!c)
- 			ret = -EINVAL;
- 		os->_clk = c;
- 	}
-@@ -472,9 +472,9 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 
- 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
- 		c = omap_clk_get_by_name(oc->clk);
--		WARN(IS_ERR(c), "omap_hwmod: %s: cannot clk_get opt_clk "
--		     "%s\n", oh->name, oc->clk);
--		if (IS_ERR(c))
-+		WARN(!c, "omap_hwmod: %s: cannot clk_get opt_clk %s\n",
-+		     oh->name, oc->clk);
-+		if (!c)
- 			ret = -EINVAL;
- 		oc->_clk = c;
- 	}
-@@ -495,7 +495,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: enabling clocks\n", oh->name);
- 
--	if (oh->_clk && !IS_ERR(oh->_clk))
-+	if (oh->_clk)
- 		clk_enable(oh->_clk);
- 
- 	if (oh->slaves_cnt > 0) {
-@@ -503,7 +503,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
- 			struct omap_hwmod_ocp_if *os = oh->slaves[i];
- 			struct clk *c = os->_clk;
- 
--			if (c && !IS_ERR(c) && (os->flags & OCPIF_SWSUP_IDLE))
-+			if (c && (os->flags & OCPIF_SWSUP_IDLE))
- 				clk_enable(c);
- 		}
- 	}
-@@ -525,7 +525,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
- 
--	if (oh->_clk && !IS_ERR(oh->_clk))
-+	if (oh->_clk)
- 		clk_disable(oh->_clk);
- 
- 	if (oh->slaves_cnt > 0) {
-@@ -533,7 +533,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
- 			struct omap_hwmod_ocp_if *os = oh->slaves[i];
- 			struct clk *c = os->_clk;
- 
--			if (c && !IS_ERR(c) && (os->flags & OCPIF_SWSUP_IDLE))
-+			if (c && (os->flags & OCPIF_SWSUP_IDLE))
- 				clk_disable(c);
- 		}
- 	}
-@@ -1013,7 +1013,7 @@ static int _setup(struct omap_hwmod *oh)
- 			struct omap_hwmod_ocp_if *os = oh->slaves[i];
- 			struct clk *c = os->_clk;
- 
--			if (!c || IS_ERR(c))
-+			if (!c)
- 				continue;
- 
- 			if (os->flags & OCPIF_SWSUP_IDLE) {
+Benoit Cousson (13):
+      OMAP4: hwmod: Replace module & device offsets by absolute clkctrl address
+      OMAP: CM: Move MAX_MODULE_READY_TIME to cm.h
+      OMAP4: hwmod & CM: Implement the omap4_cm_wait_module_ready function
+      OMAP4: hwmod: Replace OCPIF_HAS_IDLEST by HWMOD_NO_IDLEST
+      OMAP: hwmod: Fix wrong pointer iteration in oh->slaves
+      OMAP: hwmod: Remove IS_ERR check with omap_clk_get_by_name return value
+      OMAP: hwmod: Replace WARN by pr_warning if clock lookup failed
+      OMAP: hwmod: Do not exit the iteration if one clock init failed
+      OMAP: hwmod: Rename hwmod name for the MPU
+      OMAP: hwmod: Replace WARN by pr_warning for clockdomain check
+      OMAP4: CM: Remove non-functional registers in ES1.0
+      OMAP4: PRM: Remove MPU internal code name and apply PRCM naming convention
+      OMAP4: PRCM: Remove duplicate definition of base addresses
+
+Laine Walker-Avina (1):
+      OMAP3 clock: add support for setting the divider for sys_clkout2 using clk_set_rate
+
+Paul Walmsley (2):
+      OMAP powerdomain, hwmod, omap_device: add some credits
+      OMAP2 clock: fix recursive spinlock attempt when CONFIG_CPU_FREQ=y
+
+Rajendra Nayak (6):
+      OMAP4: PRCM: Add offset defines for all PRM registers
+      OMAP4: PRCM: Add offset defines for all CM registers
+      OMAP4 clock: Support clk_set_parent
+      OMAP: timers: Fix clock source names for OMAP4
+      OMAP4 powerdomain: Fix pwrsts flags for ALWAYS ON domains
+      OMAP4 powerdomain: Support LOWPOWERSTATECHANGE for powerdomains
+
+
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c  |   17 -
+ arch/arm/mach-omap2/clock3xxx_data.c          |    2 
+ arch/arm/mach-omap2/clockdomains44xx.h        |    4 
+ arch/arm/mach-omap2/cm.c                      |    3 
+ arch/arm/mach-omap2/cm.h                      |   11 +
+ arch/arm/mach-omap2/cm44xx.h                  |  301 +++++++++++++++++--
+ arch/arm/mach-omap2/cm4xxx.c                  |   54 ++-
+ arch/arm/mach-omap2/omap_hwmod.c              |  121 ++++----
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c    |    2 
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c    |    2 
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |    2 
+ arch/arm/mach-omap2/powerdomain.c             |   30 ++
+ arch/arm/mach-omap2/powerdomains44xx.h        |   23 +
+ arch/arm/mach-omap2/prcm-common.h             |   18 -
+ arch/arm/mach-omap2/prm.h                     |    4 
+ arch/arm/mach-omap2/prm44xx.h                 |  389 +++++++++++++++++++++++--
+ arch/arm/plat-omap/clock.c                    |    5 
+ arch/arm/plat-omap/dmtimer.c                  |    4 
+ arch/arm/plat-omap/include/plat/omap44xx.h    |    1 
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |   16 +
+ arch/arm/plat-omap/include/plat/powerdomain.h |    7 
+ arch/arm/plat-omap/omap_device.c              |    4 
+ 22 files changed, 814 insertions(+), 206 deletions(-)
