@@ -1,47 +1,33 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 18 May 2010 17:13:01 -0700
-Subject: [RFC/PATCH] arm: oprofile: remove locking from suspend/resume
-Message-ID: <1274227981-20130-1-git-send-email-khilman@deeprootsystems.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 May 2010 17:15:33 -0700
+Subject: [PATCH 01/13] omap: Fix i2c platform init code for omap4
+In-Reply-To: <20100518024243.21705.45209.stgit@baageli.muru.com>
+References: <20100518023707.21705.26205.stgit@baageli.muru.com>
+	<20100518024243.21705.45209.stgit@baageli.muru.com>
+Message-ID: <20100519001533.GY5818@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since oprofile is a sysdev, its suspend/resume methods are called with
-interrupts disabled.  Using a mutex (which might sleep) in this atomic
-context is not safe.
+* Tony Lindgren <tony@atomide.com> [100517 19:37]:
+> Add separate omap_i2c_add_bus functions for mach-omap1
+> and mach-omap2. Make the mach-omap2 init set the interrupt
+> dynamically to support.
+> 
+> This is needed to add support for omap4 in a way that
+> works with multi-omap builds. This will eventually get
+> fixed with the omap hwmods.
 
-Since these methods are already called in atomic context, simply
-remove the locking in the suspend/resume methods.
+Looks like these first two patches cause a self-created merge
+conflict with Ben's i2c branch. Reposting the first two patches
+rebased on what's in for-next.
 
-Found using lockdep on OMAP3 (Cortex-A8)
+Regards,
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/oprofile/common.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 3fcd752..ea005d8 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -79,19 +79,15 @@ static void op_arm_stop(void)
- #ifdef CONFIG_PM
- static int op_arm_suspend(struct sys_device *dev, pm_message_t state)
- {
--	mutex_lock(&op_arm_mutex);
- 	if (op_arm_enabled)
- 		op_arm_model->stop();
--	mutex_unlock(&op_arm_mutex);
- 	return 0;
- }
- 
- static int op_arm_resume(struct sys_device *dev)
- {
--	mutex_lock(&op_arm_mutex);
- 	if (op_arm_enabled && op_arm_model->start())
- 		op_arm_enabled = 0;
--	mutex_unlock(&op_arm_mutex);
- 	return 0;
- }
- 
--- 
-1.7.0.2
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: omap-i2c-multiboot.patch
+Type: text/x-diff
+Size: 2971 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100518/1de7ff10/attachment-0001.bin>
