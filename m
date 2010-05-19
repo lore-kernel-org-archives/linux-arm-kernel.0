@@ -1,30 +1,29 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 02:57:00 +0100
-Subject: s3c-fb updates
-In-Reply-To: <AANLkTil9VFeNtsYGgUljdMo4x4McC7CA9HEcwycyXlWP@mail.gmail.com>
-References: <1274180045-14645-1-git-send-email-ben-linux@fluff.org>
-	<AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
-	<20100519004519.GB4720@trinity.fluff.org>
-	<AANLkTil9VFeNtsYGgUljdMo4x4McC7CA9HEcwycyXlWP@mail.gmail.com>
-Message-ID: <20100519015700.GE4720@trinity.fluff.org>
+Date: Wed, 19 May 2010 03:04:30 +0100
+Subject: [PATCH 1/8] ARM: SAMSUNG: Move RTC device definitions in
+	plat-samsung
+In-Reply-To: <20100518191300.GH22554@sirena.org.uk>
+References: <1274162336-32667-1-git-send-email-kgene.kim@samsung.com>
+	<20100518080304.GG26401@trinity.fluff.org>
+	<20100518191300.GH22554@sirena.org.uk>
+Message-ID: <20100519020430.GL26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 10:53:09AM +0900, InKi Dae wrote:
-> Hi, Ben
+On Tue, May 18, 2010 at 08:13:01PM +0100, Mark Brown wrote:
+> On Tue, May 18, 2010 at 09:03:04AM +0100, Ben Dooks wrote:
 > 
-> I sent patch series corrected as Andrew requested yesterday.
-> I was busy so I conformed your answer late.
+> > it would be really helpful if you composed a covering message
+> > for patch series so that any general comments can be attached
+> > there... also it means the series doesn't end up getting
+> > fragmeneted in my mailbox.
 > 
-> Sorry but please review my patch series again.
+> There's more going on here - none of the messages are threaded with
+> each other, which git send-mail does by default even if there isn't a
+> cover letter.
 
-I've merged the 24/32BPP fix onto my tree and the window selection,
-the S5PV210 shadowcon stuff is pending partly due to the fact it breaks
-the build on the old hardware and secondly I'd like to put that after
-the current work on multi-hardware support that was done for the s3c2443.
-
-I've updated git.fluff.org's dev/s3c-fb branch which these and rebased
-it onto the first pull set for mainline.
+git send-email has a --no-thread option as well, so if possible it would
+be really helpful to ensure that this isn't set either...
 
 -- 
 Ben
