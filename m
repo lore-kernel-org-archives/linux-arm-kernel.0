@@ -1,91 +1,89 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 19 May 2010 11:10:01 -0600
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <20100519164534.GE1693@shareable.org>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<201005181324.45701.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005180742500.12758@xanadu.home>
-	<AANLkTinsOSI_TIc7Jyy4QFuFaS2d-fi0y3LMuITLyG3N@mail.gmail.com>
-	<20100519164534.GE1693@shareable.org>
-Message-ID: <AANLkTinzTKkSIwGemGJ-gI0DSD-ANOSePkdwFZhMwFnM@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 19 May 2010 19:11:41 +0200
+Subject: [PATCH 09/13] mxcmmc: add card detect through DAT3 possibility
+In-Reply-To: <1274287568-30253-9-git-send-email-eric@eukrea.com>
+References: <1274287568-30253-1-git-send-email-eric@eukrea.com>
+	<1274287568-30253-2-git-send-email-eric@eukrea.com>
+	<1274287568-30253-3-git-send-email-eric@eukrea.com>
+	<1274287568-30253-4-git-send-email-eric@eukrea.com>
+	<1274287568-30253-5-git-send-email-eric@eukrea.com>
+	<1274287568-30253-6-git-send-email-eric@eukrea.com>
+	<1274287568-30253-7-git-send-email-eric@eukrea.com>
+	<1274287568-30253-8-git-send-email-eric@eukrea.com>
+	<1274287568-30253-9-git-send-email-eric@eukrea.com>
+Message-ID: <20100519171141.GW30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+On Wed, May 19, 2010 at 06:46:04PM +0200, Eric B?nard wrote:
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  arch/arm/plat-mxc/include/mach/mmc.h |    3 +++
+>  drivers/mmc/host/mxcmmc.c            |   16 +++++++++++++---
+>  2 files changed, 16 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/mmc.h b/arch/arm/plat-mxc/include/mach/mmc.h
+> index de2128d..29115f4 100644
+> --- a/arch/arm/plat-mxc/include/mach/mmc.h
+> +++ b/arch/arm/plat-mxc/include/mach/mmc.h
+> @@ -31,6 +31,9 @@ struct imxmmc_platform_data {
+>  
+>  	/* adjust slot voltage */
+>  	void (*setpower)(struct device *, unsigned int vdd);
+> +
+> +	/* enable card detect using DAT3 */
+> +	int dat3_card_detect;
+>  };
+>  
+>  #endif
+> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> index ec18e3b..74c87e0 100644
+> --- a/drivers/mmc/host/mxcmmc.c
+> +++ b/drivers/mmc/host/mxcmmc.c
+> @@ -119,6 +119,7 @@ struct mxcmci_host {
+>  	int			detect_irq;
+>  	int			dma;
+>  	int			do_dma;
+> +	int			default_irq_mask;
+>  	int			use_sdio;
+>  	unsigned int		power_mode;
+>  	struct imxmmc_platform_data *pdata;
+> @@ -228,7 +229,7 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
+>  static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+>  		unsigned int cmdat)
+>  {
+> -	u32 int_cntr;
+> +	u32 int_cntr = host->default_irq_mask;
+>  	unsigned long flags;
+>  
+>  	WARN_ON(host->cmd != NULL);
+> @@ -275,7 +276,7 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+>  static void mxcmci_finish_request(struct mxcmci_host *host,
+>  		struct mmc_request *req)
+>  {
+> -	u32 int_cntr = 0;
+> +	u32 int_cntr = host->default_irq_mask;
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&host->lock, flags);
+> @@ -585,6 +586,9 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
+>  		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
+>  		mxcmci_data_done(host, stat);
+>  #endif
+> +	if (host->default_irq_mask &&
+> +		  (stat & (STATUS_CARD_INSERTION | STATUS_CARD_REMOVAL)))
+> +		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -809,6 +813,12 @@ static int mxcmci_probe(struct platform_device *pdev)
+>  	else
+>  		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+>  
+> +	if (host->pdata && host->pdata->dat3_card_detect)
 
-On Wed, May 19, 2010 at 10:45 AM, Jamie Lokier <jamie@shareable.org> wrote:
-> Grant Likely wrote:
->> Doing it this way means a non-compatible break in the interface. ?It
->> means that the bootloader needs to know what interface the kernel is
->> expecting for boot; information that is not readily available from the
->> image type. ?The user then needs to tell the boot loader which
->> interface to use rather than a backwards compatible addition of a blob
->> of data.
->
-> Also the other way around: Sometimes you want to install the same
-> kernel on systems with old and new bootloaders, without touching the
-> bootloaders (due to that not being powerfail-safe, say). ?The kernel
-> needs to know if it's passed a DT from a newer bootloader or not.
->
-> And sometimes you'd like to install a newer, tested kernel (that uses
-> DTs) on systems with old bootloaders.
+As 0 is a valid GPIO, so you should use gpio_is_valid() here, and update
+all users' pdata to set dat3_card_detect = -1, so it will fail this
+test.
 
-Which will be an issue regardless of which approach is chosen.  Either
-way, this case does require the use of a boot shim or wrapper.
-
->> You mention below "shifting the World Order on ARM" and it creating
->> resistance for merging DT support. ?Isn't this much the same thing as
->> it creates a non backwards compatible change in the way bootloaders
->> pass data to the kernel. ?The cutover in powerpc from the old
->> interface to the new caused no end of confusion and people who could
->> no longer get their systems to boot. ?On PowerPC is was necessary
->> because the old method was completely broken, but ATAGs are clean,
->> simple and well implemented.
->
-> You can't always update the boot loader. ?Sometimes you're stuck with
-> what's there for the life of a device. ?Either it's ROM, or it's too
-> risky to modify in place.
-
-Yes.  Though this is a bit of a side issue when talking about the boot
-interface.  We're still going to have cases where the bootloader
-passes bad data and we may need a shim or wrapper (not part of
-firmware) to adapt or fix it up.  Just like with booting new kernels
-on old (no-dt-support) firmware.
-
-There is a larger issue w.r.t. what the overall boot architecture is,
-and what recommendations distributions (like Ubuntu) should make to
-device manufactures to ensure firmware is reliable and can boot a
-distribution OS image.  That's a topic for a different email.
-
->> It also means teaching every boot loader two separate methods for
->> booting and exposing those differences to the user.
->
-> Embedded devices usually don't have any way for the "user" to choose
-> from a boot menu ;-)
->
-> ATAG_DEVTREE sounds good to me for mix'n'match systems.
->
-> New systems that always use DTs could use _just_ ATAG_DEVTREE, to
-> avoid questions of conflicting info.
-
-Yes, this is trivial to do.
-
-> ?They could also settle on a
-> fixed R1 value meaning "devtree platform".
->
-> Or if a fixed "devtree platform" R1 is used, R2 could point directly
-> at the DT, no atag list in that specific case.
-
-My sticking point is I want there to be exactly one method of passing
-the device tree blob.  I don't see any advantage in having more than
-one mechanism for passing the dtb pointer.  Whether it be ATAG or bare
-DT pointer, we should be able to choose a single method now that is
-suitable for the foreseeable future.
-
-Thanks,
-g.
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Daniel
