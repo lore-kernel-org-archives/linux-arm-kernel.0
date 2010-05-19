@@ -1,55 +1,133 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 19 May 2010 12:15:07 +0530
-Subject: [PATCH] Watchdog: Adding support for Watchdog found with ARM
-	CortexA9
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5666270@dbde02.ent.ti.com>
-References: <1274090044-10236-1-git-send-email-viresh.kumar@st.com>	<AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>	<4BF12767.4010402@st.com>	<AANLkTikCC108eWniEBwzYsbkEUYQocICaLtd7FD_vMQ1@mail.gmail.com>	<20100518132050.GA8748@mvista.com>
-	<4BF362F1.5070100@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5666270@dbde02.ent.ti.com>
-Message-ID: <4BF388F3.6060500@st.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 19 May 2010 07:46:36 +0100
+Subject: [PATCH 10/11] ARM: S5PC100: use common plat-s5p external
+	interrupt code
+In-Reply-To: <011d01caf714$40ceed30$c26cc790$%szyprowski@samsung.com>
+References: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
+	<1274179129-14659-11-git-send-email-m.szyprowski@samsung.com>
+	<20100519040212.GP26401@trinity.fluff.org>
+	<011d01caf714$40ceed30$c26cc790$%szyprowski@samsung.com>
+Message-ID: <20100519064636.GU26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/19/2010 11:02 AM, Shilimkar, Santosh wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Viresh KUMAR
->> Sent: Wednesday, May 19, 2010 9:33 AM
->> To: George G. Davis; srinidhi kasagar; alan at lxorguk.ukuu.org.uk
->> Cc: armando.visconti at st.com; shiraz.hashim at st.com; Jassi Brar; linus.walleij at stericsson.com; linux-
->> arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] Watchdog: Adding support for Watchdog found with ARM CortexA9
->>
->> On 5/18/2010 6:50 PM, George G. Davis wrote:
->>> Hi,
->>>
->>> On Tue, May 18, 2010 at 02:55:21PM +0530, srinidhi kasagar wrote:
->>>> I do not understand why a new driver is required while having similar one
->>>> for MPCore watchdog.
->>>> Please have a look at drivers/watchdog/mpcore_wdt.c
->>>
->>> The same thought occurred to me.  Based on a cursory glance at the Cortex-A9
->>> MPCore and ARM11 MPCore, the per-CPU watchdogs do appear to be the same
->>> and could use the same driver.
->>>
->>> Any reason for creating a new driver rather than reusing the ARM11
->>> MPCore driver?
->>>
->>
->> Sorry Guys!!! Earlier I tried to find existing driver, but couldn't found one.
->> So sent a new one.
->>
->> I went through this driver and found some shortcomings in it:
->>  - It looks it is not used by anyone now, as it required
->>    asm/hardware/arm_twd.h and it was removed in v2.6.31.
->>    So it would never compile.
->>  - It doesn't support clock framework, and works on fixed rate.
->>  - It works on fixed prescale value (256).
->>  - It doesn't support WDIOC_GETBOOTSTATUS.
->>
->> So, please suggest how to proceed as my patch contains all these features.
->>
-> Can the existing driver be upgraded with all above missing pieces?
+On Wed, May 19, 2010 at 07:29:24AM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
+> On Wednesday, May 19, 2010 6:02 AM Ben Dooks wrote:
+> 
+> > On Tue, May 18, 2010 at 12:38:48PM +0200, Marek Szyprowski wrote:
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > ---
+> > >  arch/arm/mach-s5pc100/Kconfig                  |    1 +
+> > >  arch/arm/mach-s5pc100/gpiolib.c                |    3 +-
+> > >  arch/arm/mach-s5pc100/include/mach/irqs.h      |   15 ++++++++--
+> > >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |   36 ++++++++++++++----
+> > -----
+> > >  4 files changed, 36 insertions(+), 19 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-
+> > s5pc100/Kconfig
+> > > index fe1216b..2eb9497 100644
+> > > --- a/arch/arm/mach-s5pc100/Kconfig
+> > > +++ b/arch/arm/mach-s5pc100/Kconfig
+> > > @@ -10,6 +10,7 @@ if ARCH_S5PC100
+> > >  config CPU_S5PC100
+> > >  	bool
+> > >  	select PLAT_S5P
+> > > +	select S5P_EXT_INT
+> > >  	help
+> > >  	  Enable S5PC100 CPU support
+> > >
+> > > diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-
+> > s5pc100/gpiolib.c
+> > > index 88dd913..0fab7f2 100644
+> > > --- a/arch/arm/mach-s5pc100/gpiolib.c
+> > > +++ b/arch/arm/mach-s5pc100/gpiolib.c
+> > > @@ -61,7 +61,6 @@
+> > >   * L3	8	4Bit	None
+> > >   */
+> > >
+> > > -#if 0
+> > >  static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
+> > offset)
+> > >  {
+> > >  	return S3C_IRQ_GPIO(chip->base + offset);
+> > > @@ -85,7 +84,7 @@ static int s5pc100_gpiolib_to_eint(struct gpio_chip
+> > *chip, unsigned int offset)
+> > >  		return IRQ_EINT(24 + offset);
+> > >  	return -EINVAL;
+> > >  }
+> > > -#endif
+> > > +
+> > >  static struct s3c_gpio_cfg gpio_cfg = {
+> > >  	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+> > >  	.set_pull	= s3c_gpio_setpull_updown,
+> > > diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
+> > s5pc100/include/mach/irqs.h
+> > > index 84c74ac..f26c4d9 100644
+> > > --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
+> > > +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+> > > @@ -97,10 +97,19 @@
+> > >  #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
+> > >  #define IRQ_VIC_END		S5P_IRQ_VIC2(31)
+> > >
+> > > -#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
+> > > +#define S5P_EINT_16_31_BASE	(IRQ_VIC_END + 1)
+> > >
+> > > -#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
+> > > -					(S5P_IRQ_EINT_BASE + (x)-16))
+> > > +#define S3C_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
+> > 
+> > we seem to have this and S5P_EINT_16_31_BASE? Let's use just the one.
+> > 
+> > > +#define EINT_MODE		S3C_GPIO_SFN(0x2)
+> > > +
+> > > +#define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_IRQ_VIC0(0)) \
+> > > +					: ((x) + S5P_EINT_16_31_BASE))
+> > 
+> > ok, could we put this in arch/arm/plat-s5p/include/plat/irqs.h and
+> > just have the per-platform files defining the base?
+> 
+> I'm not sure if this is a good idea. Although this code works for s5pc100
+> and s5pv210, there might be problems with s5p6440, which has external
+> interrupts designed like s3c6410. But I'm not sure if this would cause
+> the problems. If so then we can always just move it from plat/irqs.h to
+> mach/irqs.h again.
 
-yes. will be done.
+I've just had a look, and whilst the S5P6440 is similar to the 64XX
+case, it only has 16 EINTs and the rest are gpio-style ones.
+
+So, we could define S5P_IRQ_EINT_LOW_BASE for all cases and use the
+S5P_EINT_16_31_BASE for the higher ones and have it all in plat/irqs.h
+ 
+> > > +#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
+> > > +#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
+> > > +#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
+> > > +#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+> > >
+> > >  #define S3C_IRQ_GPIO_BASE	(IRQ_EINT(31) + 1)
+> > >  #define S3C_IRQ_GPIO(x)		(S3C_IRQ_GPIO_BASE + (x))
+> 
+> What about moving these to mach/gpio.h? IMHO mach/irqs.h is not the
+> best place for them.
+> 
+> > ...
+> 
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
