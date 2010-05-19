@@ -1,7 +1,7 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 19 May 2010 19:11:41 +0200
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 19 May 2010 19:21:09 +0200
 Subject: [PATCH 09/13] mxcmmc: add card detect through DAT3 possibility
-In-Reply-To: <1274287568-30253-9-git-send-email-eric@eukrea.com>
+In-Reply-To: <20100519171141.GW30801@buzzloop.caiaq.de>
 References: <1274287568-30253-1-git-send-email-eric@eukrea.com>
 	<1274287568-30253-2-git-send-email-eric@eukrea.com>
 	<1274287568-30253-3-git-send-email-eric@eukrea.com>
@@ -11,79 +11,20 @@ References: <1274287568-30253-1-git-send-email-eric@eukrea.com>
 	<1274287568-30253-7-git-send-email-eric@eukrea.com>
 	<1274287568-30253-8-git-send-email-eric@eukrea.com>
 	<1274287568-30253-9-git-send-email-eric@eukrea.com>
-Message-ID: <20100519171141.GW30801@buzzloop.caiaq.de>
+	<20100519171141.GW30801@buzzloop.caiaq.de>
+Message-ID: <4BF41E05.3050107@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 06:46:04PM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  arch/arm/plat-mxc/include/mach/mmc.h |    3 +++
->  drivers/mmc/host/mxcmmc.c            |   16 +++++++++++++---
->  2 files changed, 16 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/mmc.h b/arch/arm/plat-mxc/include/mach/mmc.h
-> index de2128d..29115f4 100644
-> --- a/arch/arm/plat-mxc/include/mach/mmc.h
-> +++ b/arch/arm/plat-mxc/include/mach/mmc.h
-> @@ -31,6 +31,9 @@ struct imxmmc_platform_data {
->  
->  	/* adjust slot voltage */
->  	void (*setpower)(struct device *, unsigned int vdd);
-> +
-> +	/* enable card detect using DAT3 */
-> +	int dat3_card_detect;
->  };
->  
->  #endif
-> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> index ec18e3b..74c87e0 100644
-> --- a/drivers/mmc/host/mxcmmc.c
-> +++ b/drivers/mmc/host/mxcmmc.c
-> @@ -119,6 +119,7 @@ struct mxcmci_host {
->  	int			detect_irq;
->  	int			dma;
->  	int			do_dma;
-> +	int			default_irq_mask;
->  	int			use_sdio;
->  	unsigned int		power_mode;
->  	struct imxmmc_platform_data *pdata;
-> @@ -228,7 +229,7 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
->  static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
->  		unsigned int cmdat)
->  {
-> -	u32 int_cntr;
-> +	u32 int_cntr = host->default_irq_mask;
->  	unsigned long flags;
->  
->  	WARN_ON(host->cmd != NULL);
-> @@ -275,7 +276,7 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
->  static void mxcmci_finish_request(struct mxcmci_host *host,
->  		struct mmc_request *req)
->  {
-> -	u32 int_cntr = 0;
-> +	u32 int_cntr = host->default_irq_mask;
->  	unsigned long flags;
->  
->  	spin_lock_irqsave(&host->lock, flags);
-> @@ -585,6 +586,9 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
->  		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
->  		mxcmci_data_done(host, stat);
->  #endif
-> +	if (host->default_irq_mask &&
-> +		  (stat & (STATUS_CARD_INSERTION | STATUS_CARD_REMOVAL)))
-> +		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
->  	return IRQ_HANDLED;
->  }
->  
-> @@ -809,6 +813,12 @@ static int mxcmci_probe(struct platform_device *pdev)
->  	else
->  		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->  
-> +	if (host->pdata && host->pdata->dat3_card_detect)
+Le 19/05/2010 19:11, Daniel Mack a ?crit :
+>> +	if (host->pdata &&  host->pdata->dat3_card_detect)
+>
+> As 0 is a valid GPIO, so you should use gpio_is_valid() here, and update
+> all users' pdata to set dat3_card_detect = -1, so it will fail this
+> test.
+>
+dat3_card_detect is not a GPIO number, it's just a flag to indicate that 
+we want to use the internal detection feature provided by the mxcmci on 
+DAT3 gpio (which is not used in GPIO mux).
 
-As 0 is a valid GPIO, so you should use gpio_is_valid() here, and update
-all users' pdata to set dat3_card_detect = -1, so it will fail this
-test.
-
-Daniel
+Eric
