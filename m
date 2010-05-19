@@ -1,133 +1,78 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 07:46:36 +0100
-Subject: [PATCH 10/11] ARM: S5PC100: use common plat-s5p external
-	interrupt code
-In-Reply-To: <011d01caf714$40ceed30$c26cc790$%szyprowski@samsung.com>
-References: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
-	<1274179129-14659-11-git-send-email-m.szyprowski@samsung.com>
-	<20100519040212.GP26401@trinity.fluff.org>
-	<011d01caf714$40ceed30$c26cc790$%szyprowski@samsung.com>
-Message-ID: <20100519064636.GU26401@trinity.fluff.org>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 19 May 2010 16:50:15 +1000
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <alpine.LFD.2.00.1005182109180.12758@xanadu.home>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<201005181324.45701.jeremy.kerr@canonical.com>
+	<20100518084954.GC25892@yookeroo>
+	<alpine.LFD.2.00.1005180802010.12758@xanadu.home>
+	<20100519002826.GG25892@yookeroo>
+	<alpine.LFD.2.00.1005182109180.12758@xanadu.home>
+Message-ID: <20100519065015.GQ25892@yookeroo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 07:29:24AM +0200, Marek Szyprowski wrote:
-> Hello,
+On Tue, May 18, 2010 at 09:28:38PM -0400, Nicolas Pitre wrote:
+> On Wed, 19 May 2010, David Gibson wrote:
 > 
-> On Wednesday, May 19, 2010 6:02 AM Ben Dooks wrote:
+> > On Tue, May 18, 2010 at 08:24:06AM -0400, Nicolas Pitre wrote:
+> > > On Tue, 18 May 2010, David Gibson wrote:
+> > > > On Tue, May 18, 2010 at 01:24:43PM +0800, Jeremy Kerr wrote:
+> > > > > Nicolas Pitre wrote:
+> > [snip]
+> > > > The only reason you'd need a subarchitecture number or equivalent is
+> > > > if you need to do things differently in the very, very early asm boot
+> > > > code.  We may need a minimal form of this on PowerPC if we ever
+> > > > support multiple MMU families in the same kernel binary.
+> > > 
+> > > Exact.  For example, on ARM the machine ID is also used to figure out 
+> > > the MMU mapping needed to be able to simply be able to debug the very 
+> > > early assembly boot stage when there isn't even a stack available. While 
+> > > this info is stored in the machine record, it is actually 
+> > > subarchitecture specific and already half-digested for easy usage by 
+> > > that initial MMU setup.  I just don't want to imagine what the 
+> > > equivalent functionality with DT would look like.
+> > 
+> > Well, it wouldn't be *that* bad - you'd need a minimal asm-only tree
+> > walker to find and look up the compatible property.  Quite possible
+> > but, yes, fairly awkward.
+> > 
+> > Yeah, if you have to make really early MMU decisions based on
+> > subarchitecture it probbaly makes sense to have a simple ID for
+> > those.  So one thing to consider here is that we've contemplated
+> > adding an "MMU family" ID to the device tree blob header for this
+> > purpose on PowerPC.  If we did such a thing, it could also be used on
+> > ARM for a similar purpose.  Then all the relevant machine information
+> > is in one block, and it's just a simple fixed dereference to extract
+> > the MMU type from the early asm.
+> > 
+> > I'd have to talk to Ben et al, but I think we'd be happy enough to
+> > create a new dtb v18 which included that field, as well as a couple of
+> > other small improvements to the header and blob internals.  ARM could
+> > standardize on that as the minimum acceptable dtb version.
 > 
-> > On Tue, May 18, 2010 at 12:38:48PM +0200, Marek Szyprowski wrote:
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > ---
-> > >  arch/arm/mach-s5pc100/Kconfig                  |    1 +
-> > >  arch/arm/mach-s5pc100/gpiolib.c                |    3 +-
-> > >  arch/arm/mach-s5pc100/include/mach/irqs.h      |   15 ++++++++--
-> > >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |   36 ++++++++++++++----
-> > -----
-> > >  4 files changed, 36 insertions(+), 19 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-
-> > s5pc100/Kconfig
-> > > index fe1216b..2eb9497 100644
-> > > --- a/arch/arm/mach-s5pc100/Kconfig
-> > > +++ b/arch/arm/mach-s5pc100/Kconfig
-> > > @@ -10,6 +10,7 @@ if ARCH_S5PC100
-> > >  config CPU_S5PC100
-> > >  	bool
-> > >  	select PLAT_S5P
-> > > +	select S5P_EXT_INT
-> > >  	help
-> > >  	  Enable S5PC100 CPU support
-> > >
-> > > diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-
-> > s5pc100/gpiolib.c
-> > > index 88dd913..0fab7f2 100644
-> > > --- a/arch/arm/mach-s5pc100/gpiolib.c
-> > > +++ b/arch/arm/mach-s5pc100/gpiolib.c
-> > > @@ -61,7 +61,6 @@
-> > >   * L3	8	4Bit	None
-> > >   */
-> > >
-> > > -#if 0
-> > >  static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
-> > offset)
-> > >  {
-> > >  	return S3C_IRQ_GPIO(chip->base + offset);
-> > > @@ -85,7 +84,7 @@ static int s5pc100_gpiolib_to_eint(struct gpio_chip
-> > *chip, unsigned int offset)
-> > >  		return IRQ_EINT(24 + offset);
-> > >  	return -EINVAL;
-> > >  }
-> > > -#endif
-> > > +
-> > >  static struct s3c_gpio_cfg gpio_cfg = {
-> > >  	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-> > >  	.set_pull	= s3c_gpio_setpull_updown,
-> > > diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
-> > s5pc100/include/mach/irqs.h
-> > > index 84c74ac..f26c4d9 100644
-> > > --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-> > > +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-> > > @@ -97,10 +97,19 @@
-> > >  #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
-> > >  #define IRQ_VIC_END		S5P_IRQ_VIC2(31)
-> > >
-> > > -#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
-> > > +#define S5P_EINT_16_31_BASE	(IRQ_VIC_END + 1)
-> > >
-> > > -#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
-> > > -					(S5P_IRQ_EINT_BASE + (x)-16))
-> > > +#define S3C_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
-> > 
-> > we seem to have this and S5P_EINT_16_31_BASE? Let's use just the one.
-> > 
-> > > +#define EINT_MODE		S3C_GPIO_SFN(0x2)
-> > > +
-> > > +#define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_IRQ_VIC0(0)) \
-> > > +					: ((x) + S5P_EINT_16_31_BASE))
-> > 
-> > ok, could we put this in arch/arm/plat-s5p/include/plat/irqs.h and
-> > just have the per-platform files defining the base?
-> 
-> I'm not sure if this is a good idea. Although this code works for s5pc100
-> and s5pv210, there might be problems with s5p6440, which has external
-> interrupts designed like s3c6410. But I'm not sure if this would cause
-> the problems. If so then we can always just move it from plat/irqs.h to
-> mach/irqs.h again.
+> I still don't get it.  Why on earth would you insist on replacing the 
+> already existing ID value that is _already_ passed to the kernel by all 
+> ARM bootloaders with something evidently far more complex?
 
-I've just had a look, and whilst the S5P6440 is similar to the 64XX
-case, it only has 16 EINTs and the rest are gpio-style ones.
+Um.. no.  It's not more complex at all.  We're talking about this ID
+in the dt blob's header, not in the device tree itself.  As I said,
+it's one dereference to get to the ID, from the DT address which is
+being passed in.  i.e. *one* more instruction than having it passed in
+register.
 
-So, we could define S5P_IRQ_EINT_LOW_BASE for all cases and use the
-S5P_EINT_16_31_BASE for the higher ones and have it all in plat/irqs.h
- 
-> > > +#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
-> > > +#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
-> > > +#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
-> > > +#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
-> > >
-> > >  #define S3C_IRQ_GPIO_BASE	(IRQ_EINT(31) + 1)
-> > >  #define S3C_IRQ_GPIO(x)		(S3C_IRQ_GPIO_BASE + (x))
-> 
-> What about moving these to mach/gpio.h? IMHO mach/irqs.h is not the
-> best place for them.
-> 
-> > ...
-> 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+There are two advantages, both small, but contrary to your assertion
+it's not significantly more complex, so they don't need to be big.
+	1) It means the DT blob contains *all* the information you
+need about the machine.  If you have multi-stage bootloaders, you can
+copy that blob and know you've got everything.
+	2) It means we could have information with a similar purpose
+in the same place for both PowerPC and ARM (and maybe others in
+future).
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
