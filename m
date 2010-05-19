@@ -1,56 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 19 May 2010 10:55:35 +0200
-Subject: [PATCH 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <20100517135800.GB30927@jasper.tkos.co.il>
-References: <cover.1273150585.git.baruch@tkos.co.il>
-	<a029bab8fcb3273df4a1d98f779f110b127742bd.1273150585.git.baruch@tkos.co.il>
-	<Pine.LNX.4.64.1005090045230.10524@axis700.grange>
-	<20100517072720.GD31199@pengutronix.de>
-	<20100517135800.GB30927@jasper.tkos.co.il>
-Message-ID: <20100519085534.GI31199@pengutronix.de>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Wed, 19 May 2010 10:58:28 +0200
+Subject: [PATCH 2/2] mx31_3ds: Support the keypad situated in the
+	personality board
+In-Reply-To: <20100518084539.GC31199@pengutronix.de>
+References: <1274120092.3578.34.camel@realization>
+	<1274120414.3578.36.camel@realization>
+	<20100518084539.GC31199@pengutronix.de>
+Message-ID: <1274259508.3123.0.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 04:58:00PM +0300, Baruch Siach wrote:
-> Hi Sascha,
+On mar, 2010-05-18 at 10:45 +0200, MXC Sascha Hauer wrote:
+> Hi Alberto,
 > 
-> Thanks for your comments.
+> On Mon, May 17, 2010 at 08:20:14PM +0200, Alberto Panizzo wrote:
+> > 
+> > 
+> > Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> > ---
+> > 
+> > this patch is built over the today mxc-master branch 
+> > 
+> >  arch/arm/mach-mx3/mach-mx31_3ds.c |   32 ++++++++++++++++++++++++++++++++
+> >  1 files changed, 32 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > index 55d6117..745675b 100644
+> > --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > @@ -28,6 +28,7 @@
+> >  #include <linux/spi/spi.h>
+> >  #include <linux/regulator/machine.h>
+> >  #include <linux/fsl_devices.h>
+> > +#include <linux/input/matrix_keypad.h>
+> >  
+> >  #include <mach/hardware.h>
+> >  #include <asm/mach-types.h>
+> > @@ -82,6 +83,35 @@ static int mx31_3ds_pins[] = {
+> >  	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+> >  	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
+> >  	MX31_PIN_USBOTG_STP__USBOTG_STP,
+> > +	/*Keyboard*/
+> > +	IOMUX_MODE(MX31_PIN_KEY_ROW0, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_ROW1, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_ROW2, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_COL0, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_COL1, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_COL2, IOMUX_CONFIG_FUNC),
+> > +	IOMUX_MODE(MX31_PIN_KEY_COL3, IOMUX_CONFIG_FUNC),
+> > +};
 > 
-> On Mon, May 17, 2010 at 09:27:20AM +0200, Sascha Hauer wrote:
-> > On Wed, May 12, 2010 at 09:02:29PM +0200, Guennadi Liakhovetski wrote:
-> > > Hi Baruch
-> > > 
-> > > Thanks for eventually mainlining this driver! A couple of comments below. 
-> > > Sascha, would be great, if you could get it tested on imx27 with and 
-> > > without emma.
-> > 
-> > I will see what I can do. Testing and probably breathing life into a
-> > camera driver usually takes me two days given that the platform support
-> > is very outdated. I hope our customer is interested in this, then it
-> > would be possible to test it.
-> > 
-> > > BTW, if you say, that you use emma to avoid using the 
-> > > standard DMA controller, why would anyone want not to use emma? Resource 
-> > > conflict? There is also a question for you down in the comments, please, 
-> > > skim over.
-> > 
-> > I originally did not know how all the components should work together.
-> > Now I think it's the right way to use the EMMA to be able to scale
-> > images and to do colour conversions (which does not work with our Bayer
-> > format cameras, so I cannot test it).
+> Care to add these values to iomux-mx3.h and use them?
 > 
-> So can I remove the non EMMA code from this driver? This will simplify the 
-> code quite a bit.
-
-Please don't. I had a talk with our customer and it seems I can put some
-effort into the i.MX27 part. That's good news because I also want this
-driver mainline.
-
-Sascha
+> Sascha
+> 
+Well, that should be in the platform patch right?
+Soon a new version.
 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
