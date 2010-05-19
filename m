@@ -1,33 +1,39 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 19 May 2010 19:23:57 +0200
-Subject: [PATCH 09/13] mxcmmc: add card detect through DAT3 possibility
-In-Reply-To: <4BF41E05.3050107@eukrea.com>
-References: <1274287568-30253-2-git-send-email-eric@eukrea.com>
-	<1274287568-30253-3-git-send-email-eric@eukrea.com>
-	<1274287568-30253-4-git-send-email-eric@eukrea.com>
-	<1274287568-30253-5-git-send-email-eric@eukrea.com>
-	<1274287568-30253-6-git-send-email-eric@eukrea.com>
-	<1274287568-30253-7-git-send-email-eric@eukrea.com>
-	<1274287568-30253-8-git-send-email-eric@eukrea.com>
-	<1274287568-30253-9-git-send-email-eric@eukrea.com>
-	<20100519171141.GW30801@buzzloop.caiaq.de>
-	<4BF41E05.3050107@eukrea.com>
-Message-ID: <20100519172357.GX30801@buzzloop.caiaq.de>
+From: imp@bsdimp.com (M. Warner Losh)
+Date: Wed, 19 May 2010 11:32:01 -0600 (MDT)
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <AANLkTinzTKkSIwGemGJ-gI0DSD-ANOSePkdwFZhMwFnM@mail.gmail.com>
+References: <AANLkTinsOSI_TIc7Jyy4QFuFaS2d-fi0y3LMuITLyG3N@mail.gmail.com>
+	<20100519164534.GE1693@shareable.org>
+	<AANLkTinzTKkSIwGemGJ-gI0DSD-ANOSePkdwFZhMwFnM@mail.gmail.com>
+Message-ID: <20100519.113201.411418020318963143.imp@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 07:21:09PM +0200, Eric B?nard wrote:
-> Le 19/05/2010 19:11, Daniel Mack a ?crit :
-> >>+	if (host->pdata &&  host->pdata->dat3_card_detect)
-> >
-> >As 0 is a valid GPIO, so you should use gpio_is_valid() here, and update
-> >all users' pdata to set dat3_card_detect = -1, so it will fail this
-> >test.
-> >
-> dat3_card_detect is not a GPIO number, it's just a flag to indicate
-> that we want to use the internal detection feature provided by the
-> mxcmci on DAT3 gpio (which is not used in GPIO mux).
+In message: <AANLkTinzTKkSIwGemGJ-gI0DSD-ANOSePkdwFZhMwFnM@mail.gmail.com>
+            Grant Likely <grant.likely@secretlab.ca> writes:
+: > ?They could also settle on a
+: > fixed R1 value meaning "devtree platform".
+: >
+: > Or if a fixed "devtree platform" R1 is used, R2 could point directly
+: > at the DT, no atag list in that specific case.
+: 
+: My sticking point is I want there to be exactly one method of passing
+: the device tree blob.  I don't see any advantage in having more than
+: one mechanism for passing the dtb pointer.  Whether it be ATAG or bare
+: DT pointer, we should be able to choose a single method now that is
+: suitable for the foreseeable future.
 
-I'm sorry. I should have had a closer look. Ignore me :)
+The gain from having a shortcut is small (maybe a dozen instructions
+at most saved).  I'd rather see an interface compatible with old ATAG
+boot loaders that would allow for easy selection, inside the kernel,
+of which information to believe.
 
-Daniel
+The biggest concern that I have with this is to make sure that it is
+unambiguous what the kernel should do with the data.  Eg, the DT takes
+precedence over the rest of the ATAG list, but the two are required to
+be 100% consistent (with all the mappings between ATAG and DT well
+defined).  The only time things should vary is when DT is more
+expressive than ATAG, and even then kernels relying on the old
+interface should do a sensible thing...
+
+Warner
