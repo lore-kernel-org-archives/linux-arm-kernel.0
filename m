@@ -1,33 +1,52 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 19 May 2010 13:19:14 +0200
-Subject: [PATCH v3] PXA DMA-capable PATA driver
-In-Reply-To: <201005180112.30792.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Tue\, 18 May 2010 01\:12\:30 +0200")
-References: <1274137768-27707-1-git-send-email-marek.vasut@gmail.com>
-	<201005180112.30792.marek.vasut@gmail.com>
-Message-ID: <87pr0s6swd.fsf@free.fr>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 19 May 2010 05:45:50 -0600
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <201005181054.32325.jeremy.kerr@canonical.com>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+Message-ID: <AANLkTimIUgIdMUY0WKH4OXpOATtGbW2bgtT0hhF0HujF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
-
-> Dne ?t 18. kv?tna 2010 01:09:28 Marek Vasut napsal(a):
->> This patch adds a driver for a harddrive attached to PXA address and data
->> bus. Unlike pata_platform, this driver allows usage of PXA DMA controller,
->> making the transmission speed 3x higher.
+On Mon, May 17, 2010 at 8:54 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+> Hi all,
 >
-> Hey guys, all the issues pointed out should be addressed. See below.
-> Cheers!
+> As we're getting closer to device tree support on ARM, I'd like to get some
+> input on our proposed boot interface.
+>
+> Basically, I'd like to define how we pass the device tree from the bootloader
+> to the kernel.
+>
+> My current method of doing this is through a new atag. It looks like this:
+>
+> ? ? ? ?/* flattened device tree blob pointer */
+> ? ? ? ?#define ATAG_DEVTREE ? ?0x5441000a
+>
+> ? ? ? ?struct tag_devtree {
+> ? ? ? ? ? ? ? ?__u32 start; ? ?/* physical start address */
+> ? ? ? ? ? ? ? ?__u32 size; ? ? /* size of dtb image in bytes */
+> ? ? ? ?};
+>
+> With ATAG_DEVTREE, we keep the existing boot interface the same (ie, machine
+> number in r1, atags pointer r2).
 
-For the first iteration, you can have my :
-Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+For the reference of those new to this discussion, here is a link to
+the previous thread and the link to the draft boot interface document.
 
-For the next iteration, it would be good to :
- - fix the error path in pxa_ata_probe()
-   => if dmam_alloc_coherent() fails
-   => if pxa_request_dma() fails
- - in pxa_ata_remove()
-   => maybe call devm_iounmap()
+http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg00884.html
+http://devicetree.org/Boot_Environment
 
---
-Robert
+[...]
+
+> ?- We are now potentially carrying data in two different places - atags and
+> the device tree. For example, the physical memory layout and kernel command
+> line may be present in both.
+
+I've tried to explicitly addresses this in the draft document.  the DT
+blob always supersedes ATAG information.
+
+Cheers,
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
