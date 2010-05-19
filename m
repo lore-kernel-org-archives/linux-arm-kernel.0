@@ -1,30 +1,68 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 18 May 2010 23:34:51 -0700
-Subject: Samsung touchscreen updates
-In-Reply-To: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
-References: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <888AB3A0-262F-4603-9B83-B8B6A4D25DC1@gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 19 May 2010 08:36:21 +0200
+Subject: [PATCH 1/4] pxa/colibri270: Refactor board definition file
+In-Reply-To: <20100514103757.GN30807@buzzloop.caiaq.de>
+References: <1273544818-22305-1-git-send-email-marek.vasut@gmail.com>
+	<20100514103757.GN30807@buzzloop.caiaq.de>
+Message-ID: <20100519063621.GL30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 18, 2010, at 11:12 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+Any update on this?
 
-> Dimitry, this is a set of updates for the Samsung platform support for
-> touchscreen devices and the drivers/input/touchscreen items for the
-> s3c2410_ts driver.
->
-> Since the changes have some interedependency, I would like permission
-> to merge this via the Samsung platform tree with your acknowledgement
-> for the drivers/input/touchscreen items.
->
-> The arch/arm/* portions of this patchset have been included as FYI and
-> to show other interested parties what is goign on.
->
-> Please let me know what you think.
-
-Yeah, it all looks Ok, please merge through your tree.
-
-Thanks.
-
--- 
-Dmitry
+On Fri, May 14, 2010 at 12:37:57PM +0200, Daniel Mack wrote:
+> On Tue, May 11, 2010 at 04:26:55AM +0200, Marek Vasut wrote:
+> 
+> [...]
+> 
+> > -/*
+> > - * NOR flash
+> > - */
+> > +/******************************************************************************
+> > + * NOR Flash
+> > + ******************************************************************************/
+> > +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+> >  static struct mtd_partition colibri_partitions[] = {
+> >  	{
+> >  		.name =		"Bootloader",
+> >  		.offset =	0x00000000,
+> >  		.size =		0x00040000,
+> > -		.mask_flags =	MTD_WRITEABLE  /* force read-only */
+> > +		.mask_flags =	MTD_WRITEABLE	/* force read-only */
+> >  	}, {
+> >  		.name =		"Kernel",
+> >  		.offset =	0x00040000,
+> > @@ -90,42 +93,50 @@ static struct platform_device colibri_pxa270_flash_device = {
+> >  	.num_resources = 1,
+> >  };
+> >  
+> > -/*
+> > - * DM9000 Ethernet
+> > - */
+> > -#if defined(CONFIG_DM9000)
+> > -static struct resource dm9000_resources[] = {
+> > +static void __init colibri_pxa270_nor_init(void)
+> > +{
+> > +	platform_device_register(&colibri_pxa270_flash);
+> 
+> Erm ...
+> 
+> arch/arm/mach-pxa/colibri-pxa270.c: In function 'colibri_pxa270_nor_init':
+> arch/arm/mach-pxa/colibri-pxa270.c:131: error: 'colibri_pxa270_flash' undeclared (first use in this function)
+> arch/arm/mach-pxa/colibri-pxa270.c:131: error: (Each undeclared identifier is reported only once
+> arch/arm/mach-pxa/colibri-pxa270.c:131: error: for each function it appears in.)
+> make[1]: *** [arch/arm/mach-pxa/colibri-pxa270.o] Error 1
+> make: *** [arch/arm/mach-pxa] Error 2
+> make: *** Waiting for unfinished jobs....
+> 
+> Eric, is that patch already queued?
+> 
+> I can send a trivial fix up - or should Marek send a new version of this
+> patch?
+> 
+> Daniel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
