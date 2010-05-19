@@ -1,25 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 May 2010 17:16:12 -0700
-Subject: [PATCH 02/13] omap4: Add support for i2c init
-In-Reply-To: <20100518024246.21705.71913.stgit@baageli.muru.com>
-References: <20100518023707.21705.26205.stgit@baageli.muru.com>
-	<20100518024246.21705.71913.stgit@baageli.muru.com>
-Message-ID: <20100519001612.GZ5818@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 18 May 2010 19:22:12 -0500
+Subject: Known issues with amba-pl010.c driver?
+Message-ID: <0D753D10438DA54287A00B0270842697636F1BC928@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100517 19:37]:
-> Add support for i2c init for omap4.
+Hello all,
 
-Below is this one rebased to apply on current for-next.
+Are there any known issues with the amba-pl010.c driver?
 
-Regards,
+I have an application running on an ep93xx based system that uses one
+of the serial ports to communicate with another board.  I am seeing
+pauses while sending data from the ep93xx to the other board.
 
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap-i2c-omap4.patch
-Type: text/x-diff
-Size: 2900 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100518/943d4a32/attachment.bin>
+I see a similar pause when using one of the other serial ports as a
+console.  When doing something that spews a lot of data to the port
+the delays are very noticeable.  For instance the command:
+
+/ # du
+
+Spews the correct output but there are a number of pauses.
+
+Both ports are running at a baud rate of 57600 if that matters.
+
+Is there any way to debug this?
+
+Thanks,
+Hartley
