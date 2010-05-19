@@ -1,161 +1,113 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 05:42:56 +0100
-Subject: [PATCH v3 3/9] ARM: SAMSUNG: Implements cfg_gpio function for
-	Samsung touchscreen
-In-Reply-To: <1274183067-15993-1-git-send-email-kgene.kim@samsung.com>
-References: <1274183067-15993-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100519044256.GR26401@trinity.fluff.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 19 May 2010 07:29:24 +0200
+Subject: [PATCH 10/11] ARM: S5PC100: use common plat-s5p external interrupt
+	code
+In-Reply-To: <20100519040212.GP26401@trinity.fluff.org>
+References: <1274179129-14659-1-git-send-email-m.szyprowski@samsung.com>
+	<1274179129-14659-11-git-send-email-m.szyprowski@samsung.com>
+	<20100519040212.GP26401@trinity.fluff.org>
+Message-ID: <011d01caf714$40ceed30$c26cc790$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 08:44:27PM +0900, Kukjin Kim wrote:
-> From: Naveen Krishna <ch.naveen@samsung.com>
-> 
-> This patch implements cfg_gpio function for Samsung touchscreen.
-> And also modifies the H1940 machine respectively.
-> 
-> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s3c2410/Kconfig           |    1 +
->  arch/arm/mach-s3c2410/mach-h1940.c      |    1 +
->  arch/arm/plat-s3c24xx/Kconfig           |    6 +++++
->  arch/arm/plat-s3c24xx/Makefile          |    1 +
->  arch/arm/plat-s3c24xx/setup-ts.c        |   34 +++++++++++++++++++++++++++++++
->  arch/arm/plat-samsung/include/plat/ts.h |    4 +++
->  6 files changed, 47 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-s3c24xx/setup-ts.c
-> 
-> diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
-> index 5547318..6b9665c 100644
-> --- a/arch/arm/mach-s3c2410/Kconfig
-> +++ b/arch/arm/mach-s3c2410/Kconfig
-> @@ -76,6 +76,7 @@ config ARCH_H1940
->  	select PM_H1940 if PM
->  	select S3C_DEV_USB_HOST
->  	select S3C_DEV_NAND
-> +	select S3C2410_SETUP_TS
->  	help
->  	  Say Y here if you are using the HP IPAQ H1940
->  
-> diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
-> index 75e3ffb..e8583ec 100644
-> --- a/arch/arm/mach-s3c2410/mach-h1940.c
-> +++ b/arch/arm/mach-s3c2410/mach-h1940.c
-> @@ -145,6 +145,7 @@ static struct s3c2410_ts_mach_info h1940_ts_cfg __initdata = {
->  		.delay = 10000,
->  		.presc = 49,
->  		.oversampling_shift = 2,
-> +		.cfg_gpio = s3c24xx_ts_cfg_gpio,
->  };
->  
->  /**
-> diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-> index 6e93ef8..d29c08c 100644
-> --- a/arch/arm/plat-s3c24xx/Kconfig
-> +++ b/arch/arm/plat-s3c24xx/Kconfig
-> @@ -9,6 +9,7 @@ config PLAT_S3C24XX
->  	select NO_IOPORT
->  	select ARCH_REQUIRE_GPIOLIB
->  	select S3C_DEVICE_NAND
-> +	select S3C2410_SETUP_TS if TOUCHSCREEN_S3C2410
+Hello,
 
-this isn't needed, the only user is currently the h1940 and it is already
-selecting the relevant setup code.
+On Wednesday, May 19, 2010 6:02 AM Ben Dooks wrote:
 
->  	help
->  	  Base platform code for any Samsung S3C24XX device
->  
-> @@ -157,4 +158,9 @@ config S3C24XX_SIMTEC_AUDIO
->  	help
->  	  Add audio devices for common Simtec S3C24XX boards
->  
-> +config S3C2410_SETUP_TS
-> +	bool
-> +	help
-> +	  Compile in platform device definition for Samsung TouchScreen.
-> +
->  endif
-> diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-> index c2237c4..6dd4e0a 100644
-> --- a/arch/arm/plat-s3c24xx/Makefile
-> +++ b/arch/arm/plat-s3c24xx/Makefile
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += s3c2410-cpufreq-utils.o
->  
->  # device specific setup and/or initialisation
->  obj-$(CONFIG_ARCH_S3C2410)	+= setup-i2c.o
-> +obj-$(CONFIG_S3C2410_SETUP_TS)	+= setup-ts.o
->  
->  # SPI gpio central GPIO functions
->  
-> diff --git a/arch/arm/plat-s3c24xx/setup-ts.c b/arch/arm/plat-s3c24xx/setup-ts.c
-> new file mode 100644
-> index 0000000..ed26386
-> --- /dev/null
-> +++ b/arch/arm/plat-s3c24xx/setup-ts.c
-> @@ -0,0 +1,34 @@
-> +/* linux/arch/arm/plat-s3c24xx/setup-ts.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *                     http://www.samsung.com/
-> + *
-> + * Based on S3C24XX setup for i2c device
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/gpio.h>
-> +
-> +struct platform_device; /* don't need the contents */
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/regs-gpio.h>
-> +
-> +/**
-> + * s3c24xx_ts_cfg_gpio - configure gpio for s3c2410 systems
-> + *
-> + * Configure the GPIO for the S3C2410 system, where we have external FETs
-> + * connected to the device (later systems such as the S3C2440 integrate
-> + * these into the device).
-> + */
-> +void s3c24xx_ts_cfg_gpio(struct platform_device *dev)
-> +{
-> +	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
-> +	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
-> +	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
-> +	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
-> +}
-> diff --git a/arch/arm/plat-samsung/include/plat/ts.h b/arch/arm/plat-samsung/include/plat/ts.h
-> index 28a80ad..f53cbc7 100644
-> --- a/arch/arm/plat-samsung/include/plat/ts.h
-> +++ b/arch/arm/plat-samsung/include/plat/ts.h
-> @@ -14,8 +14,12 @@ struct s3c2410_ts_mach_info {
->         int             delay;
->         int             presc;
->         int             oversampling_shift;
-> +	void    (*cfg_gpio)(struct platform_device *dev);
->  };
->  
->  extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
->  
-> +/* defined by architecture to configure gpio */
-> +extern void s3c24xx_ts_cfg_gpio(struct platform_device *dev);
-> +
->  #endif /* __ASM_ARM_TS_H */
-> -- 
-> 1.6.2.5
+> On Tue, May 18, 2010 at 12:38:48PM +0200, Marek Szyprowski wrote:
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pc100/Kconfig                  |    1 +
+> >  arch/arm/mach-s5pc100/gpiolib.c                |    3 +-
+> >  arch/arm/mach-s5pc100/include/mach/irqs.h      |   15 ++++++++--
+> >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |   36 ++++++++++++++----
+> -----
+> >  4 files changed, 36 insertions(+), 19 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-
+> s5pc100/Kconfig
+> > index fe1216b..2eb9497 100644
+> > --- a/arch/arm/mach-s5pc100/Kconfig
+> > +++ b/arch/arm/mach-s5pc100/Kconfig
+> > @@ -10,6 +10,7 @@ if ARCH_S5PC100
+> >  config CPU_S5PC100
+> >  	bool
+> >  	select PLAT_S5P
+> > +	select S5P_EXT_INT
+> >  	help
+> >  	  Enable S5PC100 CPU support
+> >
+> > diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-
+> s5pc100/gpiolib.c
+> > index 88dd913..0fab7f2 100644
+> > --- a/arch/arm/mach-s5pc100/gpiolib.c
+> > +++ b/arch/arm/mach-s5pc100/gpiolib.c
+> > @@ -61,7 +61,6 @@
+> >   * L3	8	4Bit	None
+> >   */
+> >
+> > -#if 0
+> >  static int s5pc100_gpiolib_to_irq(struct gpio_chip *chip, unsigned int
+> offset)
+> >  {
+> >  	return S3C_IRQ_GPIO(chip->base + offset);
+> > @@ -85,7 +84,7 @@ static int s5pc100_gpiolib_to_eint(struct gpio_chip
+> *chip, unsigned int offset)
+> >  		return IRQ_EINT(24 + offset);
+> >  	return -EINVAL;
+> >  }
+> > -#endif
+> > +
+> >  static struct s3c_gpio_cfg gpio_cfg = {
+> >  	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+> >  	.set_pull	= s3c_gpio_setpull_updown,
+> > diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
+> s5pc100/include/mach/irqs.h
+> > index 84c74ac..f26c4d9 100644
+> > --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
+> > +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+> > @@ -97,10 +97,19 @@
+> >  #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
+> >  #define IRQ_VIC_END		S5P_IRQ_VIC2(31)
+> >
+> > -#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
+> > +#define S5P_EINT_16_31_BASE	(IRQ_VIC_END + 1)
+> >
+> > -#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
+> > -					(S5P_IRQ_EINT_BASE + (x)-16))
+> > +#define S3C_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> we seem to have this and S5P_EINT_16_31_BASE? Let's use just the one.
+> 
+> > +#define EINT_MODE		S3C_GPIO_SFN(0x2)
+> > +
+> > +#define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_IRQ_VIC0(0)) \
+> > +					: ((x) + S5P_EINT_16_31_BASE))
+> 
+> ok, could we put this in arch/arm/plat-s5p/include/plat/irqs.h and
+> just have the per-platform files defining the base?
 
--- 
--- 
-Ben
+I'm not sure if this is a good idea. Although this code works for s5pc100
+and s5pv210, there might be problems with s5p6440, which has external
+interrupts designed like s3c6410. But I'm not sure if this would cause
+the problems. If so then we can always just move it from plat/irqs.h to
+mach/irqs.h again.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> 
+> > +#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
+> > +#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
+> > +#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
+> > +#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+> >
+> >  #define S3C_IRQ_GPIO_BASE	(IRQ_EINT(31) + 1)
+> >  #define S3C_IRQ_GPIO(x)		(S3C_IRQ_GPIO_BASE + (x))
+
+What about moving these to mach/gpio.h? IMHO mach/irqs.h is not the
+best place for them.
+
+> ...
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
