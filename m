@@ -1,46 +1,30 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Wed, 19 May 2010 09:25:02 +0300
-Subject: s3c-fb updates
-In-Reply-To: <20100519004519.GB4720@trinity.fluff.org>
-References: <1274180045-14645-1-git-send-email-ben-linux@fluff.org>
-	<AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
-	<20100519004519.GB4720@trinity.fluff.org>
-Message-ID: <20100519062501.GA1429@jeknote.loshitsa1.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 18 May 2010 23:34:51 -0700
+Subject: Samsung touchscreen updates
+In-Reply-To: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
+References: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <888AB3A0-262F-4603-9B83-B8B6A4D25DC1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 01:45:19AM +0100, Ben Dooks wrote:
-> On Tue, May 18, 2010 at 11:35:00PM +0900, Kyungmin Park wrote:
-> > Hi,
-> > 
-> > On Tue, May 18, 2010 at 7:54 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > > Updates for the s3c-fb to improbe the build and update support
-> > > for s5pv210 and s3c2416 devices.
-> > >
-> > > The dependency on Inki Dae's patches have been removed since they've
-> > > not been reposted, and at-least one causes build failures.
-> > 
-> > Ben please check your mailbox again. He sent it after your reply.
-> 
-> no, what he sent was three patch files attached to a mail[1] which
-> Andrew Morton replied to saying that these needed to be sent as proper
-> patches with descriptions and other such things that patches have.
->  
-> > Anyway, how do you integrate the FIMD and FIMC features in current
-> > driver? Any plans?
-> 
-> I've been discussiong things with the engineers here. However, the first
-> thing is to get the driver closer aligned to the one that Sys.LSI have
-> been shipping, which means getting some missing features sorted out.
-> 
-> By the way, which is the FIMC block? I've not seen any documentation
-> referencing this as an block in the SoC.
-FIMC is a camera interface block. It can output video stream directly to
-display controller FIFO.
+On May 18, 2010, at 11:12 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+
+> Dimitry, this is a set of updates for the Samsung platform support for
+> touchscreen devices and the drivers/input/touchscreen items for the
+> s3c2410_ts driver.
+>
+> Since the changes have some interedependency, I would like permission
+> to merge this via the Samsung platform tree with your acknowledgement
+> for the drivers/input/touchscreen items.
+>
+> The arch/arm/* portions of this patchset have been included as FYI and
+> to show other interested parties what is goign on.
+>
+> Please let me know what you think.
+
+Yeah, it all looks Ok, please merge through your tree.
+
+Thanks.
 
 -- 
-Yauhen Kharuzhy		jekhor _at_ gmail.com
-			JID: jek at jabber.ru
-
-A: No
-Q: Should I quote below my post?
+Dmitry
