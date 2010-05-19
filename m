@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 19 May 2010 14:58:07 +0800
-Subject: [PATCH 03/05] input: enable onkey driver of max8925
-Message-ID: <AANLkTim0nDQ9oGfKY3ccf7P1bC3pJreInsMrmxRDl4xm@mail.gmail.com>
+Date: Wed, 19 May 2010 14:58:49 +0800
+Subject: [PATCH 04/05] mfd: fix led resource in 88pm860x
+Message-ID: <AANLkTinsJdF2b78Bodc_HqNsjbt5st33DkIClEFevctX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
