@@ -1,33 +1,52 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 19 May 2010 18:02:10 +0800
-Subject: [PATCH] ARM: Add support for 10 hardirq bits
-In-Reply-To: <AANLkTinVmwrp8Xi7Bos1nJe5Rrs1UcxZSwGrZuqnWY4M@mail.gmail.com>
-References: <20100310111749.18521.9002.sendpatchset@t400s>
-	<u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
-	<20100501094436.GC12172@n2100.arm.linux.org.uk>
-	<AANLkTil63uNv-S3D4ECYwT500w9sZd_8TE_T-SX0cqxv@mail.gmail.com>
-	<AANLkTikTCvOIbrr4TDt2OfHrHWHIFE4Cha8YhwtLrvc7@mail.gmail.com>
-	<20100519083749.GA24520@n2100.arm.linux.org.uk>
-	<AANLkTinVmwrp8Xi7Bos1nJe5Rrs1UcxZSwGrZuqnWY4M@mail.gmail.com>
-Message-ID: <AANLkTilcUS0rPUIReGV25w9946eEKqMdIwXXvw9nkPOL@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Wed, 19 May 2010 13:03:46 +0300
+Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
+In-Reply-To: <20100518.225835.116348725.Hiroshi.DOYU@nokia.com>
+References: <AANLkTim5SxEb64QbBQgBhufhgpQ33MNFBhuHixfUeVKp@mail.gmail.com>
+	<20100518.163145.232774311.Hiroshi.DOYU@nokia.com>
+	<AANLkTik_FL2keLD9mdBcg8Rm9n8uYDElg1NdyeT2yy6B@mail.gmail.com>
+	<20100518.225835.116348725.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTinpqitfuw3vuDhqXaQH6uHal1nbonVaUg1a2ewt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> This is probably the patch I was referring to in my notice of closure
->> when I said:
->> | I know there was someone who was complaining a week or so ago that I
->> | hadn't applied their patch, which was only sent to the mailing list.
->> | Unfortunately, it being only on the mailing list and not in the patch
->> | system means I can't find it, nor the complaint about it not being
->> | applied.
->> |
->> | Whoever it was, sorry.
+On Tue, May 18, 2010 at 10:58 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: ext Felipe Contreras <felipe.contreras@gmail.com>
+> Subject: Re: [PATCH v2 00/17] omap: mailbox: reorganize init
+> Date: Tue, 18 May 2010 18:57:55 +0200
+>
+>> On Tue, May 18, 2010 at 4:31 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+>>> From: ext Felipe Contreras <felipe.contreras@gmail.com>
+>>>> I'm not familiar with this kind of module loading, but certainly not
+>>>> all systems have udev.
+>>>>
+>>>> I realized the problem because I have a bare-bones system in my
+>>>> beagleboard where I had to manually load mailbox_mach.
+>>>
+>>> With udev or something equivalent, it should work fine.
 >>
->> Especially as it's 4000 messages back in this mailbox!
+>> But still, you are relying on udev. I don't think we should, and I
+>> don't think there's any need.
 >
-> Sounds painful. =)
->
+> Some expert may give some comment here.....
 
-I don't mean to push, and I fully understand that workload due to such a
-short -rc phase this time. Just wondering this can actually be made into
-the .35-rc phase?
+Russell, Tony: should mailbox_mach, a module that checks for logical
+devices be always built-in?
+
+I think that's the easiest... in my patches I moved the
+architecture-specific code from mach-omapX/devices.c to
+mach-omapX/mailbox.c, so both the logical devices and real platform
+devices are in the same code, and can be built-in.
+
+This way, there's no need to rely on services like udev to load
+mailbox, then mailbox_mach, then bridgedriver. After all, all
+mailbox_mach is doing is calling functions in mailbox to register the
+logical devices.
+
+Judging from:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/58555
+
+The answer is yes.
+
+-- 
+Felipe Contreras
