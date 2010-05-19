@@ -1,46 +1,27 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 01:45:19 +0100
-Subject: s3c-fb updates
-In-Reply-To: <AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
-References: <1274180045-14645-1-git-send-email-ben-linux@fluff.org>
-	<AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
-Message-ID: <20100519004519.GB4720@trinity.fluff.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 19 May 2010 09:47:14 +0900
+Subject: [PATCH v2 0/2] kexec-tools: ARM kernel crashdump support
+In-Reply-To: <cover.1273041787.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1273041787.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <20100519004714.GK8536@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 11:35:00PM +0900, Kyungmin Park wrote:
-> Hi,
+On Wed, May 05, 2010 at 09:58:31AM +0300, Mika Westerberg wrote:
+> Hello,
 > 
-> On Tue, May 18, 2010 at 7:54 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > Updates for the s3c-fb to improbe the build and update support
-> > for s5pv210 and s3c2416 devices.
-> >
-> > The dependency on Inki Dae's patches have been removed since they've
-> > not been reposted, and at-least one causes build failures.
+> These patches bring ARM kernel crashdump support for kexec-tools. Only zImage
+> format is currently supported.
 > 
-> Ben please check your mailbox again. He sent it after your reply.
+> Changes to v1:
+> 	- removed virtual address calculation based on phys_offset and moved
+> 	  this to a separate function (phys_to_virt()) which can then be
+> 	  redefined by archs if needed.
+> 	- ARM version redefines this function and uses phys_offset for
+> 	  calculating virtual addresses for kernel direct mapped region.
+> 
+> In addition, I have modified sample gdb macros from
+> kernel/Documentation/kdump/gdbmacrox.txt to work with ARM crashdumps. They are
+> included in the end of this email in case someone finds them useful.
 
-no, what he sent was three patch files attached to a mail[1] which
-Andrew Morton replied to saying that these needed to be sent as proper
-patches with descriptions and other such things that patches have.
- 
-> Anyway, how do you integrate the FIMD and FIMC features in current
-> driver? Any plans?
-
-I've been discussiong things with the engineers here. However, the first
-thing is to get the driver closer aligned to the one that Sys.LSI have
-been shipping, which means getting some missing features sorted out.
-
-By the way, which is the FIMC block? I've not seen any documentation
-referencing this as an block in the SoC.
-
-As such I will try and see if Pawel's previous patcehs that got missed
-can be merged into this tree and into the kernel this round.
-
-[1] http://lkml.org/lkml/2010/5/7/63
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Thanks, both patches applied.
