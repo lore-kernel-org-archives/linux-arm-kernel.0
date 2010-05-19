@@ -1,35 +1,42 @@
-From: error27@gmail.com (Dan Carpenter)
-Date: Wed, 19 May 2010 21:48:54 +0200
-Subject: [patch] nuc900fb: release correct mem region
-In-Reply-To: <20100325105408.GD5069@bicker>
-References: <20100325105408.GD5069@bicker>
-Message-ID: <20100519194854.GB22515@bicker>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 19 May 2010 21:08:19 +0100
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <alpine.LFD.2.00.1005191055180.12758@xanadu.home>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<AANLkTilJl9_NHiT1LITG7UbA9S7OYsnGMcDAsFEEx5Ob@mail.gmail.com>
+	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
+Message-ID: <20100519200819.GF1693@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.  Any feedback on this patch?
+Nicolas Pitre wrote:
+> It is not up to the bootloader to "adjust" to the kernel.  But rather 
+> for the kernel to cope with the bootloader's provided information.  If 
+> the bootloader passes a specific machine ID with the ATAG list then the 
+> kernel will use that, and if the bootloader passes a DT machine ID with 
+> a DT blob then the kernel will use that.  You just have to configure 
+> your kernel with both "machine types" at the same time.
 
-regards,
-dan carpenter
+Scenario:
 
-On Thu, Mar 25, 2010 at 01:54:08PM +0300, Dan Carpenter wrote:
-> We should be releasing "res->start" here.
-> 
-> Signed-off-by: Dan Carpenter <error27@gmail.com>
-> ---
-> BTW.  Congratulations on being an official driver maintainer now.  :)  Can
-> you add yourself to the MAINTAINERS file?
-> 
-> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-> index 6bf0d46..d4cde79 100644
-> --- a/drivers/video/nuc900fb.c
-> +++ b/drivers/video/nuc900fb.c
-> @@ -667,7 +667,7 @@ release_irq:
->  release_regs:
->  	iounmap(fbi->io);
->  release_mem_region:
-> -	release_mem_region((unsigned long)fbi->mem, size);
-> +	release_mem_region(res->start, size);
->  free_fb:
->  	framebuffer_release(fbinfo);
->  	return ret;
+You upgrade your systems to a new DT-capable kernel and DT-capable
+bootloader.  It works great.  You ship new instances of your device with this.
+
+Once they're in the field, someone reports a bug that doesn't happen
+with the older device instances.  It's not a bug you can reproduce,
+but you suspect the newer of kernel.  So you remote-update some of the
+newly shipped devices with an old, pre-DT kernel binary that's been
+stable on the older devices, to see if the bug goes away.
+
+Problem: The newer shipped devices have a DT-capable bootloader, and
+it can't boot old kernels, because they don't understand the DT format.
+
+You could remote-downgrade the bootloaders, but that's risky.  You
+could try building the old kernel with DT support, but that adds
+another variable to your testing.
+
+Anticipating this well in advance, you of course built your DT-capable
+bootloader with the ability to boot old and new style kernels...
+
+-- Jamie
