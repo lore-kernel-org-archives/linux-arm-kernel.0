@@ -1,79 +1,33 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Wed, 19 May 2010 11:34:43 +0200
-Subject: [PATCH 2/2 v2] mx31_3ds: Support the keypad situated in the
-	personality board
-In-Reply-To: <1274261623.3123.8.camel@realization>
-References: <1274261512.3123.6.camel@realization>
-	<1274261623.3123.8.camel@realization>
-Message-ID: <1274261683.3123.9.camel@realization>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 19 May 2010 18:02:10 +0800
+Subject: [PATCH] ARM: Add support for 10 hardirq bits
+In-Reply-To: <AANLkTinVmwrp8Xi7Bos1nJe5Rrs1UcxZSwGrZuqnWY4M@mail.gmail.com>
+References: <20100310111749.18521.9002.sendpatchset@t400s>
+	<u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
+	<20100501094436.GC12172@n2100.arm.linux.org.uk>
+	<AANLkTil63uNv-S3D4ECYwT500w9sZd_8TE_T-SX0cqxv@mail.gmail.com>
+	<AANLkTikTCvOIbrr4TDt2OfHrHWHIFE4Cha8YhwtLrvc7@mail.gmail.com>
+	<20100519083749.GA24520@n2100.arm.linux.org.uk>
+	<AANLkTinVmwrp8Xi7Bos1nJe5Rrs1UcxZSwGrZuqnWY4M@mail.gmail.com>
+Message-ID: <AANLkTilcUS0rPUIReGV25w9946eEKqMdIwXXvw9nkPOL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>> This is probably the patch I was referring to in my notice of closure
+>> when I said:
+>> | I know there was someone who was complaining a week or so ago that I
+>> | hadn't applied their patch, which was only sent to the mailing list.
+>> | Unfortunately, it being only on the mailing list and not in the patch
+>> | system means I can't find it, nor the complaint about it not being
+>> | applied.
+>> |
+>> | Whoever it was, sorry.
+>>
+>> Especially as it's 4000 messages back in this mailbox!
+>
+> Sounds painful. =)
+>
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
-
-This patch is built against the today mxc-master branch
-
- arch/arm/mach-mx3/mach-mx31_3ds.c |   32 ++++++++++++++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 55d6117..58e5729 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/regulator/machine.h>
- #include <linux/fsl_devices.h>
-+#include <linux/input/matrix_keypad.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -82,6 +83,35 @@ static int mx31_3ds_pins[] = {
- 	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
- 	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
- 	MX31_PIN_USBOTG_STP__USBOTG_STP,
-+	/*Keyboard*/
-+	MX31_PIN_KEY_ROW0_KEY_ROW0,
-+	MX31_PIN_KEY_ROW1_KEY_ROW1,
-+	MX31_PIN_KEY_ROW2_KEY_ROW2,
-+	MX31_PIN_KEY_COL0_KEY_COL0,
-+	MX31_PIN_KEY_COL1_KEY_COL1,
-+	MX31_PIN_KEY_COL2_KEY_COL2,
-+	MX31_PIN_KEY_COL3_KEY_COL3,
-+};
-+
-+/*
-+ * Matrix keyboard
-+ */
-+
-+static const uint32_t mx31_3ds_keymap[] = {
-+	KEY(0, 0, KEY_UP),
-+	KEY(0, 1, KEY_DOWN),
-+	KEY(1, 0, KEY_RIGHT),
-+	KEY(1, 1, KEY_LEFT),
-+	KEY(1, 2, KEY_ENTER),
-+	KEY(2, 0, KEY_F6),
-+	KEY(2, 1, KEY_F8),
-+	KEY(2, 2, KEY_F9),
-+	KEY(2, 3, KEY_F10),
-+};
-+
-+static struct matrix_keymap_data mx31_3ds_keymap_data = {
-+	.keymap		= mx31_3ds_keymap,
-+	.keymap_size	= ARRAY_SIZE(mx31_3ds_keymap),
- };
- 
- /* Regulators */
-@@ -367,6 +397,8 @@ static void __init mxc_board_init(void)
- 	spi_register_board_info(mx31_3ds_spi_devs,
- 						ARRAY_SIZE(mx31_3ds_spi_devs));
- 
-+	mxc_register_device(&imx_kpp_device, &mx31_3ds_keymap_data);
-+
- 	mx31_3ds_usbotg_init();
- 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
- 
--- 
-1.6.3.3
+I don't mean to push, and I fully understand that workload due to such a
+short -rc phase this time. Just wondering this can actually be made into
+the .35-rc phase?
