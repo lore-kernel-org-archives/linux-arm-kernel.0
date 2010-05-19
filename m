@@ -1,88 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 May 2010 20:19:04 -0600
-Subject: [PATCH 22/22] OMAP2 clock: fix recursive spinlock attempt when
-	CONFIG_CPU_FREQ=y
+Date: Tue, 18 May 2010 20:18:50 -0600
+Subject: [PATCH 10/22] OMAP: hwmod: Replace WARN by pr_warning for clockdomain
+	check
 In-Reply-To: <20100519021800.19716.8938.stgit@localhost.localdomain>
 References: <20100519021800.19716.8938.stgit@localhost.localdomain>
-Message-ID: <20100519021902.19716.41518.stgit@localhost.localdomain>
+Message-ID: <20100519021848.19716.50002.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP2 MPU virtual clock node code attempted to call clk_get_rate()
-while the clockfw_lock spinlock was held.  Fix by reading the sys_ck
-rate directly.
+From: Benoit Cousson <b-cousson@ti.com>
 
+Most of the clock nodes belong to a clock domain, but it is perfectly valid
+to have clock without clock domain.
+Root clocks for example does not belong to any clock domain.
+Keep the warning but reduce the verbosity.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   17 ++++-------------
- 1 files changed, 4 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index e60ca4e..aef6291 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -68,16 +68,13 @@ long omap2_round_to_table_rate(struct clk *clk, unsigned long rate)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index b6031e4..2fff39f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -404,21 +404,20 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+  */
+ static int _init_main_clk(struct omap_hwmod *oh)
  {
- 	const struct prcm_config *ptr;
- 	long highest_rate;
--	long sys_ck_rate;
--
--	sys_ck_rate = clk_get_rate(sclk);
+-	struct clk *c;
+ 	int ret = 0;
  
- 	highest_rate = -EINVAL;
+ 	if (!oh->main_clk)
+ 		return 0;
  
- 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
- 		if (!(ptr->flags & cpu_mask))
- 			continue;
--		if (ptr->xtal_speed != sys_ck_rate)
-+		if (ptr->xtal_speed != sclk->rate)
- 			continue;
+-	c = omap_clk_get_by_name(oh->main_clk);
+-	if (!c)
++	oh->_clk = omap_clk_get_by_name(oh->main_clk);
++	if (!oh->_clk)
+ 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			   oh->name, oh->main_clk);
+-		ret = -EINVAL;
+-	oh->_clk = c;
++		return -EINVAL;
  
- 		highest_rate = ptr->mpu_speed;
-@@ -96,15 +93,12 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- 	const struct prcm_config *prcm;
- 	unsigned long found_speed = 0;
- 	unsigned long flags;
--	long sys_ck_rate;
--
--	sys_ck_rate = clk_get_rate(sclk);
+-	WARN(!c->clkdm, "omap_hwmod: %s: missing clockdomain for %s.\n",
+-	     oh->main_clk, c->name);
++	if (!oh->_clk->clkdm)
++		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
++			   oh->main_clk, oh->_clk->name);
  
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
- 
--		if (prcm->xtal_speed != sys_ck_rate)
-+		if (prcm->xtal_speed != sclk->rate)
- 			continue;
- 
- 		if (prcm->mpu_speed <= rate) {
-@@ -181,19 +175,16 @@ static struct cpufreq_frequency_table *freq_table;
- void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- {
- 	const struct prcm_config *prcm;
--	long sys_ck_rate;
- 	int i = 0;
- 	int tbl_sz = 0;
- 
- 	if (!cpu_is_omap24xx())
- 		return;
- 
--	sys_ck_rate = clk_get_rate(sclk);
--
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
--		if (prcm->xtal_speed != sys_ck_rate)
-+		if (prcm->xtal_speed != sclk->rate)
- 			continue;
- 
- 		/* don't put bypass rates in table */
-@@ -226,7 +217,7 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
--		if (prcm->xtal_speed != sys_ck_rate)
-+		if (prcm->xtal_speed != sclk->rate)
- 			continue;
- 
- 		/* don't put bypass rates in table */
+ 	return ret;
+ }
