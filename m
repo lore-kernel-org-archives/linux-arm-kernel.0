@@ -1,90 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 May 2010 11:27:27 -0700
-Subject: [PATCH 14/18] omap: Overo: Add support for second ethernet port
-In-Reply-To: <AANLkTinxHaxG89pUhD7nmMjQSF-p-FB1FWj_w-de9y1r@mail.gmail.com>
-References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-	<20100505193315.21568.55530.stgit@baageli.muru.com>
-	<AANLkTinxHaxG89pUhD7nmMjQSF-p-FB1FWj_w-de9y1r@mail.gmail.com>
-Message-ID: <20100519182727.GG5818@atomide.com>
+From: error27@gmail.com (Dan Carpenter)
+Date: Wed, 19 May 2010 21:48:54 +0200
+Subject: [patch] nuc900fb: release correct mem region
+In-Reply-To: <20100325105408.GD5069@bicker>
+References: <20100325105408.GD5069@bicker>
+Message-ID: <20100519194854.GB22515@bicker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Steve Sakoman <sakoman@gmail.com> [100518 06:36]:
-> On Wed, May 5, 2010 at 12:33 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > From: Steve Sakoman <steve@sakoman.com>
-> >
-> > Some Overo add-on boards include a second ethernet port. ?This patch
-> > adds support for that second port.
-> >
-> > Signed-off-by: Steve Sakoman <steve@sakoman.com>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> > ?arch/arm/mach-omap2/board-overo.c | ? 14 +++++++++++++-
-> > ?1 files changed, 13 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-> > index 8848c7c..79ac414 100644
-> > --- a/arch/arm/mach-omap2/board-overo.c
-> > +++ b/arch/arm/mach-omap2/board-overo.c
-> > @@ -63,6 +63,8 @@
-> >
-> > ?#define OVERO_SMSC911X_CS ? ? ?5
-> > ?#define OVERO_SMSC911X_GPIO ? ?176
-> > +#define OVERO_SMSC911X2_CS ? ? 4
-> > +#define OVERO_SMSC911X2_GPIO ? 65
-> >
-> > ?#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
-> > ? ? ? ?defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
-> > @@ -137,6 +139,16 @@ static struct resource overo_smsc911x_resources[] = {
-> > ? ? ? ?},
-> > ?};
-> >
-> > +static struct resource overo_smsc911x2_resources[] = {
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .name ? = "smsc911x2-memory",
-> > + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> > + ? ? ? },
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
-> > + ? ? ? },
-> > +};
-> > +
-> > ?static struct smsc911x_platform_config overo_smsc911x_config = {
-> > ? ? ? ?.irq_polarity ? = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-> > ? ? ? ?.irq_type ? ? ? = SMSC911X_IRQ_TYPE_OPEN_DRAIN,
-> > @@ -146,7 +158,7 @@ static struct smsc911x_platform_config overo_smsc911x_config = {
-> >
-> > ?static struct platform_device overo_smsc911x_device = {
-> > ? ? ? ?.name ? ? ? ? ? = "smsc911x",
-> > - ? ? ? .id ? ? ? ? ? ? = -1,
-> > + ? ? ? .id ? ? ? ? ? ? = 0,
-> > ? ? ? ?.num_resources ?= ARRAY_SIZE(overo_smsc911x_resources),
-> > ? ? ? ?.resource ? ? ? = overo_smsc911x_resources,
-> > ? ? ? ?.dev ? ? ? ? ? ?= {
-> >
-> > --
+Ping.  Any feedback on this patch?
+
+regards,
+dan carpenter
+
+On Thu, Mar 25, 2010 at 01:54:08PM +0300, Dan Carpenter wrote:
+> We should be releasing "res->start" here.
 > 
-> I just noticed that somehow a good portion of my original patch got
-> dropped in this version!
-
-It seems to be a patchwork issue, note how some of that got into the commit
-message:
-
-https://patchwork.kernel.org/patch/91277/
-
-Might be worth investigating further, there's the mbox link there, maybe
-that contains some clues.
- 
-> Original:
+> Signed-off-by: Dan Carpenter <error27@gmail.com>
+> ---
+> BTW.  Congratulations on being an official driver maintainer now.  :)  Can
+> you add yourself to the MAINTAINERS file?
 > 
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26350.html
-> 
-> How would you like to handle getting the missing chuncks?
-
-Can you please post your fix as a reply to this thread? I've already
-merged the original patch into omap-for-linus, this is too late to
-start messing with that.
-
-Regards,
-
-Tony
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index 6bf0d46..d4cde79 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -667,7 +667,7 @@ release_irq:
+>  release_regs:
+>  	iounmap(fbi->io);
+>  release_mem_region:
+> -	release_mem_region((unsigned long)fbi->mem, size);
+> +	release_mem_region(res->start, size);
+>  free_fb:
+>  	framebuffer_release(fbinfo);
+>  	return ret;
