@@ -1,131 +1,74 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 19 May 2010 07:12:15 +0100
-Subject: [PATCH 1/8] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
+Date: Wed, 19 May 2010 07:12:19 +0100
+Subject: [PATCH 5/8] Input: s3c24xx_ts - Implement generic GPIO configuration
+	callback
 In-Reply-To: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
 References: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1274249542-28795-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274249542-28795-6-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+From: Naveen Krishna <ch.naveen@samsung.com>
 
-This moves mach-s3c2410/include/mach/ts.h to plat-samsung/include/plat/ts.h in
-order to prepare for s3c64xx support in the touchscreen driver.
+This patch implements generic GPIO configuration function in Samsung
+touchscreen driver. And makes the touchscreen driver s3c24xx-ts.c
+generic to all the Samsung SoCs.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+[ben-linux at fluff.org: fixed title ]
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2410/include/mach/ts.h |   21 ---------------------
- arch/arm/mach-s3c2410/mach-h1940.c      |    2 +-
- arch/arm/plat-s3c24xx/devs.c            |    3 +--
- arch/arm/plat-samsung/include/plat/ts.h |   21 +++++++++++++++++++++
- drivers/input/touchscreen/s3c2410_ts.c  |    2 +-
- 5 files changed, 24 insertions(+), 25 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/ts.h
- create mode 100644 arch/arm/plat-samsung/include/plat/ts.h
+ drivers/input/touchscreen/s3c2410_ts.c |   23 +++--------------------
+ 1 files changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/ts.h b/arch/arm/mach-s3c2410/include/mach/ts.h
-deleted file mode 100644
-index dc36170..0000000
---- a/arch/arm/mach-s3c2410/include/mach/ts.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/* linux/include/asm/arch-s3c2410/ts.h
-- *
-- * Copyright (c) 2005 Arnaud Patard <arnaud.patard@rtp-net.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARM_TS_H
--#define __ASM_ARM_TS_H
--
--struct s3c2410_ts_mach_info {
--       int             delay;
--       int             presc;
--       int             oversampling_shift;
--};
--
--extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
--
--#endif /* __ASM_ARM_TS_H */
-diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
-index d2a2fad..b1f7dbb 100644
---- a/arch/arm/mach-s3c2410/mach-h1940.c
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -46,7 +46,6 @@
- #include <mach/h1940.h>
- #include <mach/h1940-latch.h>
- #include <mach/fb.h>
--#include <mach/ts.h>
- #include <plat/udc.h>
- #include <plat/iic.h>
- 
-@@ -57,6 +56,7 @@
- #include <plat/pll.h>
- #include <plat/pm.h>
- #include <plat/mci.h>
-+#include <plat/ts.h>
- 
- static struct map_desc h1940_iodesc[] __initdata = {
- 	[0] = {
-diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
-index cd5b41d..5858373 100644
---- a/arch/arm/plat-s3c24xx/devs.c
-+++ b/arch/arm/plat-s3c24xx/devs.c
-@@ -39,8 +39,7 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/regs-spi.h>
--
--#include <mach/ts.h>
-+#include <plat/ts.h>
- 
- /* Serial port registrations */
- 
-diff --git a/arch/arm/plat-samsung/include/plat/ts.h b/arch/arm/plat-samsung/include/plat/ts.h
-new file mode 100644
-index 0000000..8a51675
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/ts.h
-@@ -0,0 +1,21 @@
-+/* arch/arm/plat-samsung/include/plat/ts.h
-+ *
-+ * Copyright (c) 2005 Arnaud Patard <arnaud.patard@rtp-net.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARM_TS_H
-+#define __ASM_ARM_TS_H
-+
-+struct s3c2410_ts_mach_info {
-+       int             delay;
-+       int             presc;
-+       int             oversampling_shift;
-+};
-+
-+extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
-+
-+#endif /* __ASM_ARM_TS_H */
 diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-index 98a7d12..a2e1228 100644
+index a2e1228..86086a4 100644
 --- a/drivers/input/touchscreen/s3c2410_ts.c
 +++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -37,9 +37,9 @@
- 
- #include <plat/adc.h>
+@@ -39,8 +39,6 @@
  #include <plat/regs-adc.h>
-+#include <plat/ts.h>
+ #include <plat/ts.h>
  
- #include <mach/regs-gpio.h>
--#include <mach/ts.h>
- 
+-#include <mach/regs-gpio.h>
+-
  #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
  
+ #define INT_DOWN	(0)
+@@ -88,21 +86,6 @@ struct s3c2410ts {
+ static struct s3c2410ts ts;
+ 
+ /**
+- * s3c2410_ts_connect - configure gpio for s3c2410 systems
+- *
+- * Configure the GPIO for the S3C2410 system, where we have external FETs
+- * connected to the device (later systems such as the S3C2440 integrate
+- * these into the device).
+-*/
+-static inline void s3c2410_ts_connect(void)
+-{
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
+-	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
+-}
+-
+-/**
+  * get_down - return the down state of the pen
+  * @data0: The data read from ADCDAT0 register.
+  * @data1: The data read from ADCDAT1 register.
+@@ -296,9 +279,9 @@ static int __devinit s3c2410ts_probe(struct platform_device *pdev)
+ 		goto err_clk;
+ 	}
+ 
+-	/* Configure the touchscreen external FETs on the S3C2410 */
+-	if (!platform_get_device_id(pdev)->driver_data)
+-		s3c2410_ts_connect();
++	/* inititalise the gpio */
++	if (info->cfg_gpio)
++		info->cfg_gpio(to_platform_device(ts.dev));
+ 
+ 	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
+ 				     s3c24xx_ts_conversion, 1);
 -- 
 1.6.3.3
