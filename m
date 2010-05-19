@@ -1,49 +1,64 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 19 May 2010 02:41:18 +0100
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <20100519002826.GG25892@yookeroo>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<201005181324.45701.jeremy.kerr@canonical.com>
-	<20100518084954.GC25892@yookeroo>
-	<alpine.LFD.2.00.1005180802010.12758@xanadu.home>
-	<20100519002826.GG25892@yookeroo>
-Message-ID: <20100519014118.GD2318@shareable.org>
+From: daeinki@gmail.com (InKi Dae)
+Date: Wed, 19 May 2010 10:53:09 +0900
+Subject: s3c-fb updates
+In-Reply-To: <20100519004519.GB4720@trinity.fluff.org>
+References: <1274180045-14645-1-git-send-email-ben-linux@fluff.org>
+	<AANLkTinXI9Fgqk8juRNpAA4nxsDnL82CMXwYThZo6y1l@mail.gmail.com>
+	<20100519004519.GB4720@trinity.fluff.org>
+Message-ID: <AANLkTil9VFeNtsYGgUljdMo4x4McC7CA9HEcwycyXlWP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Gibson wrote:
-> On Tue, May 18, 2010 at 08:24:06AM -0400, Nicolas Pitre wrote:
-> > On Tue, 18 May 2010, David Gibson wrote:
-> > > On Tue, May 18, 2010 at 01:24:43PM +0800, Jeremy Kerr wrote:
-> > > > Nicolas Pitre wrote:
-> [snip]
-> > > The only reason you'd need a subarchitecture number or equivalent is
-> > > if you need to do things differently in the very, very early asm boot
-> > > code.  We may need a minimal form of this on PowerPC if we ever
-> > > support multiple MMU families in the same kernel binary.
-> > 
-> > Exact.  For example, on ARM the machine ID is also used to figure out 
-> > the MMU mapping needed to be able to simply be able to debug the very 
-> > early assembly boot stage when there isn't even a stack available. While 
-> > this info is stored in the machine record, it is actually 
-> > subarchitecture specific and already half-digested for easy usage by 
-> > that initial MMU setup.  I just don't want to imagine what the 
-> > equivalent functionality with DT would look like.
-> 
-> Well, it wouldn't be *that* bad - you'd need a minimal asm-only tree
-> walker to find and look up the compatible property.  Quite possible
-> but, yes, fairly awkward.
+Hi, Ben
 
-I'm not entirely clear, is the DT intended to replace the command line
-for saying things like "console=XXX"?
+I sent patch series corrected as Andrew requested yesterday.
+I was busy so I conformed your answer late.
 
-Real example: I have a device where the bootloader decides which
-serial port will be the diagnostic boot console, if any, based on a
-specially wired serial cable detected at boot time, and it passes the
-decision to the kernel.
+Sorry but please review my patch series again.
 
-In that case, does the console selection need to be easily accessible
-to that early asm code, for early printks?
+thank you.
 
--- Jamie
+2010/5/19 Ben Dooks <ben-linux@fluff.org>:
+> On Tue, May 18, 2010 at 11:35:00PM +0900, Kyungmin Park wrote:
+>> Hi,
+>>
+>> On Tue, May 18, 2010 at 7:54 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+>> > Updates for the s3c-fb to improbe the build and update support
+>> > for s5pv210 and s3c2416 devices.
+>> >
+>> > The dependency on Inki Dae's patches have been removed since they've
+>> > not been reposted, and at-least one causes build failures.
+>>
+>> Ben please check your mailbox again. He sent it after your reply.
+>
+> no, what he sent was three patch files attached to a mail[1] which
+> Andrew Morton replied to saying that these needed to be sent as proper
+> patches with descriptions and other such things that patches have.
+>
+>> Anyway, how do you integrate the FIMD and FIMC features in current
+>> driver? Any plans?
+>
+> I've been discussiong things with the engineers here. However, the first
+> thing is to get the driver closer aligned to the one that Sys.LSI have
+> been shipping, which means getting some missing features sorted out.
+>
+> By the way, which is the FIMC block? I've not seen any documentation
+> referencing this as an block in the SoC.
+>
+> As such I will try and see if Pawel's previous patcehs that got missed
+> can be merged into this tree and into the kernel this round.
+>
+> [1] http://lkml.org/lkml/2010/5/7/63
+>
+> --
+> Ben
+>
+> Q: ? ? ?What's a light-year?
+> A: ? ? ?One-third less calories than a regular year.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
