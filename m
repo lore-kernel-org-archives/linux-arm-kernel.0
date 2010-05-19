@@ -1,157 +1,88 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 May 2010 20:19:01 -0600
-Subject: [PATCH 20/22] OMAP4 powerdomain: Support LOWPOWERSTATECHANGE for
-	powerdomains
+Date: Tue, 18 May 2010 20:19:04 -0600
+Subject: [PATCH 22/22] OMAP2 clock: fix recursive spinlock attempt when
+	CONFIG_CPU_FREQ=y
 In-Reply-To: <20100519021800.19716.8938.stgit@localhost.localdomain>
 References: <20100519021800.19716.8938.stgit@localhost.localdomain>
-Message-ID: <20100519021900.19716.68006.stgit@localhost.localdomain>
+Message-ID: <20100519021902.19716.41518.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+The OMAP2 MPU virtual clock node code attempted to call clk_get_rate()
+while the clockfw_lock spinlock was held.  Fix by reading the sys_ck
+rate directly.
 
-Some powerdomains in OMAP4 support a direct transition from one sleep
-state to another deeper sleep state without having to wakeup the
-powerdomain. This patch adds an api in the powerdomain framework to
-set the LOWPOWERSTATECHANGE bit in PWRSTCTRL register.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c             |   28 +++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomains44xx.h        |    9 ++++++++
- arch/arm/plat-omap/include/plat/powerdomain.h |    6 +++++
- 3 files changed, 43 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   17 ++++-------------
+ 1 files changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 4a91d38..f9f0bca 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -980,6 +980,34 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
- }
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index e60ca4e..aef6291 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -68,16 +68,13 @@ long omap2_round_to_table_rate(struct clk *clk, unsigned long rate)
+ {
+ 	const struct prcm_config *ptr;
+ 	long highest_rate;
+-	long sys_ck_rate;
+-
+-	sys_ck_rate = clk_get_rate(sclk);
  
- /**
-+ * pwrdm_set_lowpwrstchange - Request a low power state change
-+ * @pwrdm: struct powerdomain *
-+ *
-+ * Allows a powerdomain to transtion to a lower power sleep state
-+ * from an existing sleep state without waking up the powerdomain.
-+ * Returns -EINVAL if the powerdomain pointer is null or if the
-+ * powerdomain does not support LOWPOWERSTATECHANGE, or returns 0
-+ * upon success.
-+ */
-+int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
-+{
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE))
-+		return -EINVAL;
-+
-+	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
-+		 pwrdm->name);
-+
-+	prm_rmw_mod_reg_bits(OMAP4430_LOWPOWERSTATECHANGE_MASK,
-+			     (1 << OMAP4430_LOWPOWERSTATECHANGE_SHIFT),
-+			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
-+
-+	return 0;
-+}
-+
-+/**
-  * pwrdm_wait_transition - wait for powerdomain power transition to finish
-  * @pwrdm: struct powerdomain * to wait for
-  *
-diff --git a/arch/arm/mach-omap2/powerdomains44xx.h b/arch/arm/mach-omap2/powerdomains44xx.h
-index ad5a265..c721951 100644
---- a/arch/arm/mach-omap2/powerdomains44xx.h
-+++ b/arch/arm/mach-omap2/powerdomains44xx.h
-@@ -54,6 +54,7 @@ static struct powerdomain core_44xx_pwrdm = {
- 		[3] = PWRDM_POWER_ON,	/* ducati_l2ram */
- 		[4] = PWRDM_POWER_ON,	/* ducati_unicache */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 	highest_rate = -EINVAL;
  
- /* gfx_44xx_pwrdm: 3D accelerator power domain */
-@@ -69,6 +70,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRDM_POWER_ON,	/* gfx_mem */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
+ 		if (!(ptr->flags & cpu_mask))
+ 			continue;
+-		if (ptr->xtal_speed != sys_ck_rate)
++		if (ptr->xtal_speed != sclk->rate)
+ 			continue;
  
- /* abe_44xx_pwrdm: Audio back end power domain */
-@@ -87,6 +89,7 @@ static struct powerdomain abe_44xx_pwrdm = {
- 		[0] = PWRDM_POWER_ON,	/* aessmem */
- 		[1] = PWRDM_POWER_ON,	/* periphmem */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 		highest_rate = ptr->mpu_speed;
+@@ -96,15 +93,12 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
+ 	const struct prcm_config *prcm;
+ 	unsigned long found_speed = 0;
+ 	unsigned long flags;
+-	long sys_ck_rate;
+-
+-	sys_ck_rate = clk_get_rate(sclk);
  
- /* dss_44xx_pwrdm: Display subsystem power domain */
-@@ -103,6 +106,7 @@ static struct powerdomain dss_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRDM_POWER_ON,	/* dss_mem */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+ 		if (!(prcm->flags & cpu_mask))
+ 			continue;
  
- /* tesla_44xx_pwrdm: Tesla processor power domain */
-@@ -123,6 +127,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
- 		[1] = PWRDM_POWER_ON,	/* tesla_l1 */
- 		[2] = PWRDM_POWER_ON,	/* tesla_l2 */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+-		if (prcm->xtal_speed != sys_ck_rate)
++		if (prcm->xtal_speed != sclk->rate)
+ 			continue;
  
- /* wkup_44xx_pwrdm: Wake-up power domain */
-@@ -227,6 +232,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
- 		[2] = PWRDM_POWER_ON,	/* tcm1_mem */
- 		[3] = PWRDM_POWER_ON,	/* tcm2_mem */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 		if (prcm->mpu_speed <= rate) {
+@@ -181,19 +175,16 @@ static struct cpufreq_frequency_table *freq_table;
+ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ {
+ 	const struct prcm_config *prcm;
+-	long sys_ck_rate;
+ 	int i = 0;
+ 	int tbl_sz = 0;
  
- /* cam_44xx_pwrdm: Camera subsystem power domain */
-@@ -242,6 +248,7 @@ static struct powerdomain cam_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRDM_POWER_ON,	/* cam_mem */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 	if (!cpu_is_omap24xx())
+ 		return;
  
- /* l3init_44xx_pwrdm: L3 initators pheripherals power domain  */
-@@ -258,6 +265,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRDM_POWER_ON,	/* l3init_bank1 */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+-	sys_ck_rate = clk_get_rate(sclk);
+-
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+ 		if (!(prcm->flags & cpu_mask))
+ 			continue;
+-		if (prcm->xtal_speed != sys_ck_rate)
++		if (prcm->xtal_speed != sclk->rate)
+ 			continue;
  
- /* l4per_44xx_pwrdm: Target peripherals power domain */
-@@ -276,6 +284,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
- 		[0] = PWRDM_POWER_ON,	/* nonretained_bank */
- 		[1] = PWRDM_POWER_ON,	/* retained_bank */
- 	},
-+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+ 		/* don't put bypass rates in table */
+@@ -226,7 +217,7 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+ 		if (!(prcm->flags & cpu_mask))
+ 			continue;
+-		if (prcm->xtal_speed != sys_ck_rate)
++		if (prcm->xtal_speed != sclk->rate)
+ 			continue;
  
- /*
-diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
-index e7cc7e6..fb6ec74 100644
---- a/arch/arm/plat-omap/include/plat/powerdomain.h
-+++ b/arch/arm/plat-omap/include/plat/powerdomain.h
-@@ -50,6 +50,12 @@
- 					  * in MEM bank 1 position. This is
- 					  * true for OMAP3430
- 					  */
-+#define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2) /*
-+						  * support to transition from a
-+						  * sleep state to a lower sleep
-+						  * state without waking up the
-+						  * powerdomain
-+						  */
- 
- /*
-  * Number of memory banks that are power-controllable.	On OMAP4430, the
+ 		/* don't put bypass rates in table */
