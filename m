@@ -1,25 +1,79 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 18 May 2010 21:25:38 -1000
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <alpine.LFD.2.00.1005180802010.12758@xanadu.home>
-References: <201005181054.32325.jeremy.kerr@canonical.com>	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>	<201005181324.45701.jeremy.kerr@canonical.com>	<20100518084954.GC25892@yookeroo>
-	<alpine.LFD.2.00.1005180802010.12758@xanadu.home>
-Message-ID: <4BF39272.7070909@firmworks.com>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Wed, 19 May 2010 09:24:32 +0200
+Subject: [PATCH 2/2 v2] mx31moboard: Add MC13783 led support
+In-Reply-To: <1274253872-20881-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1274253872-20881-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1274253872-20881-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1274253872-20881-3-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> ...
-> Exact.  For example, on ARM the machine ID is also used to figure out 
-> the MMU mapping needed to be able to simply be able to debug the very 
-> early assembly boot stage when there isn't even a stack available. While 
-> this info is stored in the machine record, it is actually 
-> subarchitecture specific and already half-digested for easy usage by 
-> that initial MMU setup.  I just don't want to imagine what the 
-> equivalent functionality with DT would look like.
->
->
->   
+Add two RGB led on mx31moboard using MC13783 led subsystem
 
-Under what circumstances would the Linux startup code not have a stack - 
-or not be able to set up one easily?
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+---
+ arch/arm/mach-mx3/mach-mx31moboard.c |   45 +++++++++++++++++++++++++++++++++-
+ 1 files changed, 44 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+index 33a8d35..62b5e40 100644
+--- a/arch/arm/mach-mx3/mach-mx31moboard.c
++++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+@@ -220,11 +220,54 @@ static struct mc13783_regulator_init_data moboard_regulators[] = {
+ 	},
+ };
+ 
++static struct mc13783_led_platform_data moboard_led[] = {
++	{
++		.id = MC13783_LED_R1,
++		.name = "coreboard-led-4:red",
++		.max_current = 2,
++	},
++	{
++		.id = MC13783_LED_G1,
++		.name = "coreboard-led-4:green",
++		.max_current = 2,
++	},
++	{
++		.id = MC13783_LED_B1,
++		.name = "coreboard-led-4:blue",
++		.max_current = 2,
++	},
++	{
++		.id = MC13783_LED_R2,
++		.name = "coreboard-led-5:red",
++		.max_current = 3,
++	},
++	{
++		.id = MC13783_LED_G2,
++		.name = "coreboard-led-5:green",
++		.max_current = 3,
++	},
++	{
++		.id = MC13783_LED_B2,
++		.name = "coreboard-led-5:blue",
++		.max_current = 3,
++	},
++};
++
++static struct mc13783_leds_platform_data moboard_leds = {
++	.num_leds = ARRAY_SIZE(moboard_led),
++	.led = moboard_led,
++	.flags = MC13783_LED_SLEWLIMTC,
++	.abmode = MC13783_LED_AB_DISABLED,
++	.tc1_period = MC13783_LED_PERIOD_10MS,
++	.tc2_period = MC13783_LED_PERIOD_10MS,
++};
++
+ static struct mc13783_platform_data moboard_pmic = {
+ 	.regulators = moboard_regulators,
+ 	.num_regulators = ARRAY_SIZE(moboard_regulators),
++	.leds = &moboard_leds,
+ 	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
+-		MC13783_USE_ADC,
++		MC13783_USE_ADC | MC13783_USE_LED,
+ };
+ 
+ static struct spi_board_info moboard_spi_board_info[] __initdata = {
+-- 
+1.6.3.3
