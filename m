@@ -1,55 +1,34 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 19 May 2010 17:51:10 +0900
-Subject: [PATCH] ARM: Add support for 10 hardirq bits
-In-Reply-To: <AANLkTikTCvOIbrr4TDt2OfHrHWHIFE4Cha8YhwtLrvc7@mail.gmail.com>
-References: <20100310111749.18521.9002.sendpatchset@t400s>
-	<u2yaec7e5c31004292102rd561d7detc73e9fd2a5570ab0@mail.gmail.com>
-	<20100501094436.GC12172@n2100.arm.linux.org.uk>
-	<AANLkTil63uNv-S3D4ECYwT500w9sZd_8TE_T-SX0cqxv@mail.gmail.com>
-	<AANLkTikTCvOIbrr4TDt2OfHrHWHIFE4Cha8YhwtLrvc7@mail.gmail.com>
-Message-ID: <AANLkTim8ir9rfgHNdGqNDIoiRVyKzdpZmTyPIFy6qtG5@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 19 May 2010 16:50:53 +0800
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <alpine.LFD.2.00.1005180802010.12758@xanadu.home>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<20100518084954.GC25892@yookeroo>
+	<alpine.LFD.2.00.1005180802010.12758@xanadu.home>
+Message-ID: <201005191650.55978.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 4:16 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, May 13, 2010 at 3:30 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> On Sat, May 1, 2010 at 6:44 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Fri, Apr 30, 2010 at 01:02:04PM +0900, Magnus Damm wrote:
->>>> On Wed, Mar 10, 2010 at 8:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>> > From: Magnus Damm <damm@opensource.se>
->>>> >
->>>> > This patch adds support for 10 hardirq bits to
->>>> > the ARM architecture. Needed by the SH-Mobile
->>>> > ARM processor sh7372 that has more than 512 IRQs.
->>>> >
->>>> > Signed-off-by: Magnus Damm <damm@opensource.se>
->>>> > ---
->>>> >
->>>
->>> I guess it's ok; with 10 bits we're at the maximum which the generic
->>> kernel supports (see linux/hardirq.h)
->>
->> Hi again Russell,
->>
->> Will you pick up this one in your tree as-is, or would you like me to
->> resubmit it somehow?
->>
->
-> Russell,
->
-> I don't seem to find this patch in your -devel branch. I posted a same
-> version of patch earlier, so I'd also like to see this get merged.
->
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Nicolas,
 
-Thanks, Eric!
+> Exact.  For example, on ARM the machine ID is also used to figure out
+> the MMU mapping needed to be able to simply be able to debug the very
+> early assembly boot stage when there isn't even a stack available.
 
-> Magnus,
->
-> I guess you may please help submit this to rmk's patch tracking system?
+I get the impression that this is the only thing that we need the io_pg_offset 
+for - setting up the debug page mapping, for very early printk output.
 
-I've been trying to, but I guess I must have formatted it incorrectly
-since I don't hear anything back from the mail robot.
+If this is the case, I would much rather have it as a compile-time constant 
+when doing this early debug; this is what I have been doing for DT boot in my 
+tree (however, I would like to move it to something more configurable).
 
-/ magnus
+In the cases where we need to debug the pre-C stuff (ie, machine bringup), I 
+think we can live with a compile-time constant, rather than having to define a 
+special 'exception' in the DT boot interface to handle this.
+
+Or is there another early use of the mdesc that I'm not aware of?
+
+Cheers,
+
+
+Jeremy
