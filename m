@@ -1,185 +1,49 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 May 2010 06:50:55 +0100
-Subject: [PATCH 2/7] ARM: S5PV210: add Aquila board
-In-Reply-To: <1274079195-18105-3-git-send-email-m.szyprowski@samsung.com>
-References: <1274079195-18105-1-git-send-email-m.szyprowski@samsung.com>
-	<1274079195-18105-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100520055055.GZ26401@trinity.fluff.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 20 May 2010 07:51:07 +0200
+Subject: [PATCH v4] ARM: Samsung: plat-s5pc1xx cleanup
+Message-ID: <1274334671-21838-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 08:53:10AM +0200, Marek Szyprowski wrote:
-> Add basic support for Samsung Aquila board. This board is based
-> on S5PC110 SoC.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/Kconfig       |   12 ++--
->  arch/arm/mach-s5pv210/Makefile      |    1 +
->  arch/arm/mach-s5pv210/mach-aquila.c |  100 +++++++++++++++++++++++++++++++++++
->  3 files changed, 107 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv210/mach-aquila.c
-> 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index af33a1a..c42bcba 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -15,11 +15,6 @@ config CPU_S5PV210
->  	help
->  	  Enable S5PV210 CPU support
->  
-> -choice
-> -	prompt "Select machine type"
-> -	depends on ARCH_S5PV210
-> -	default MACH_SMDKV210
-> -
+This patch series perform a general cleanup in Samsung S5PC100 SoC support.
+This chip is moved from custom s5pc1xx platform framework to new plat-s5p
+framework, so more common code can be easily reused in upcomming extensions
+for S5PV210/S5PC110 SoCs.
 
-hmm, didn't notice that little gem in there. will build seperate patch
-and then apply this one.
+This patch series is prepared against for-linus/samsung4 tree, with
+assumption that the "[PATCH v6] ARM: S5P: Add Ext interrupt support" and
+"ARM: S5PC100: Move sdhci helpers from plat-s5pc1xx to mach-s5pc100"
+patches has been previously applied.
 
->  config MACH_SMDKV210
->  	bool "SMDKV210"
->  	select CPU_S5PV210
-> @@ -35,6 +30,11 @@ config MACH_SMDKC110
->  	  Machine support for Samsung SMDKC110
->  	  S5PC110(MCP) is one of package option of S5PV210
->  
-> -endchoice
-> +config MACH_AQUILA
-> +	bool "Samsung Aquila"
-> +	select CPU_S5PV210
-> +	select ARCH_SPARSEMEM_ENABLE
-> +	help
-> +	  Machine support for the Samsung Aquila target based on S5PC110 SoC
->  
->  endif
-> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-> index 370aac6..0bb1680 100644
-> --- a/arch/arm/mach-s5pv210/Makefile
-> +++ b/arch/arm/mach-s5pv210/Makefile
-> @@ -19,3 +19,4 @@ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
->  
->  obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
->  obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
-> +obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
-> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-> new file mode 100644
-> index 0000000..6a1db39
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
-> @@ -0,0 +1,100 @@
-> +/* linux/arch/arm/mach-s5pv210/mach-aquila.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include <mach/map.h>
-> +#include <mach/regs-clock.h>
-> +
-> +#include <plat/regs-serial.h>
-> +#include <plat/s5pv210.h>
-> +#include <plat/devs.h>
-> +#include <plat/cpu.h>
-> +
-> +/* Following are default values for UCON, ULCON and UFCON UART registers */
-> +#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> +				 S3C2410_UCON_RXILEVEL |	\
-> +				 S3C2410_UCON_TXIRQMODE |	\
-> +				 S3C2410_UCON_RXIRQMODE |	\
-> +				 S3C2410_UCON_RXFIFO_TOI |	\
-> +				 S3C2443_UCON_RXERR_IRQEN)
-> +
-> +#define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
-> +
-> +#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-> +				 S5PV210_UFCON_TXTRIG4 |	\
-> +				 S5PV210_UFCON_RXTRIG4)
-> +
-> +static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
-> +	[0] = {
-> +		.hwport		= 0,
-> +		.flags		= 0,
-> +		.ucon		= S5PV210_UCON_DEFAULT,
-> +		.ulcon		= S5PV210_ULCON_DEFAULT,
-> +		.ufcon		= S5PV210_UFCON_DEFAULT,
-> +	},
-> +	[1] = {
-> +		.hwport		= 1,
-> +		.flags		= 0,
-> +		.ucon		= S5PV210_UCON_DEFAULT,
-> +		.ulcon		= S5PV210_ULCON_DEFAULT,
-> +		.ufcon		= S5PV210_UFCON_DEFAULT,
-> +	},
-> +	[2] = {
-> +		.hwport		= 2,
-> +		.flags		= 0,
-> +		.ucon		= S5PV210_UCON_DEFAULT,
-> +		.ulcon		= S5PV210_ULCON_DEFAULT,
-> +		.ufcon		= S5PV210_UFCON_DEFAULT,
-> +	},
-> +	[3] = {
-> +		.hwport		= 3,
-> +		.flags		= 0,
-> +		.ucon		= S5PV210_UCON_DEFAULT,
-> +		.ulcon		= S5PV210_ULCON_DEFAULT,
-> +		.ufcon		= S5PV210_UFCON_DEFAULT,
-> +	},
-> +};
-> +
-> +static struct platform_device *aquila_devices[] __initdata = {
-> +};
-> +
-> +static void __init aquila_map_io(void)
-> +{
-> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> +	s3c24xx_init_clocks(24000000);
-> +	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
-> +}
-> +
-> +static void __init aquila_machine_init(void)
-> +{
-> +	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
-> +}
-> +
-> +MACHINE_START(AQUILA, "Aquila")
-> +	/* Maintainers:
-> +	   Marek Szyprowski <m.szyprowski@samsung.com>
-> +	   Kyungmin Park <kyungmin.park@samsung.com> */
-> +	.phys_io	= S3C_PA_UART & 0xfff00000,
-> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-> +	.boot_params	= S5P_PA_SDRAM + 0x100,
-> +	.init_irq	= s5pv210_init_irq,
-> +	.map_io		= aquila_map_io,
-> +	.init_machine	= aquila_machine_init,
-> +	.timer		= &s3c24xx_timer,
-> +MACHINE_END
-> -- 
-> 1.6.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I've tried to split my changes as much as possible to clearly show how the
+transition from plat-s5pc1xx to plat-s5p is being done.
 
+Changes since v3:
+- use common external interrupt code from plat-s5p
+- rebased onto git://git.fluff.org/bjdooks/linux for-linus/samsung4
+
+Changes since v2:
+- fixed some whitespace/tabs errors
+- removed external interrupt code, a common code from plat-s5p will be used
+- moved SMDKC100 fixes to separate patch series
+
+Changes since v1:
+- bases on completely new clock code provided by Kukjin Kim
+- added some plat-s5p fixes required for transition
+- removed custom functions from gpiolib implementation (now uses common
+  code from plat-samsung)
+- restructured the changes to avoid breaking the functionality beteen the
+  patches
+- some other minor cleanups (mainly c1xx to c100 renames)
+
+This patch series includes:
+
+[PATCH 1/4] ARM: Samsung: move S5PC100 support from plat-s5pc1xx to plat-s5p framework
+[PATCH 2/4] ARM: S5PC100: Add support for gpio interrupt
+[PATCH 3/4] ARM: S5PC100: use common plat-s5p external interrupt code
+[PATCH 4/4] ARM: remove obsolete plat-s5pc1xx directory
+
+Best regards
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Marek Szyprowski
+Samsung Poland R&D Center
