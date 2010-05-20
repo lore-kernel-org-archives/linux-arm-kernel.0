@@ -1,446 +1,185 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 May 2010 14:40:11 +0900
-Subject: [PATCH v6 RE-SEND] ARM: S5P: Add Ext interrupt support.
-Message-ID: <1274334011-16790-1-git-send-email-kgene.kim@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 20 May 2010 06:50:55 +0100
+Subject: [PATCH 2/7] ARM: S5PV210: add Aquila board
+In-Reply-To: <1274079195-18105-3-git-send-email-m.szyprowski@samsung.com>
+References: <1274079195-18105-1-git-send-email-m.szyprowski@samsung.com>
+	<1274079195-18105-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100520055055.GZ26401@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+On Mon, May 17, 2010 at 08:53:10AM +0200, Marek Szyprowski wrote:
+> Add basic support for Samsung Aquila board. This board is based
+> on S5PC110 SoC.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig       |   12 ++--
+>  arch/arm/mach-s5pv210/Makefile      |    1 +
+>  arch/arm/mach-s5pv210/mach-aquila.c |  100 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 107 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/mach-aquila.c
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index af33a1a..c42bcba 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -15,11 +15,6 @@ config CPU_S5PV210
+>  	help
+>  	  Enable S5PV210 CPU support
+>  
+> -choice
+> -	prompt "Select machine type"
+> -	depends on ARCH_S5PV210
+> -	default MACH_SMDKV210
+> -
 
-This patch adds the following:
+hmm, didn't notice that little gem in there. will build seperate patch
+and then apply this one.
 
-1. Adds external interrupt support for S5PV210.
-2. Adds common defines related to external interrupt support for plat-s5p
-   based platforms.
-3. Based on the new common defines, corresponding changes are made in the
-   affected platforms (S5P6440 and S5P6442).
+>  config MACH_SMDKV210
+>  	bool "SMDKV210"
+>  	select CPU_S5PV210
+> @@ -35,6 +30,11 @@ config MACH_SMDKC110
+>  	  Machine support for Samsung SMDKC110
+>  	  S5PC110(MCP) is one of package option of S5PV210
+>  
+> -endchoice
+> +config MACH_AQUILA
+> +	bool "Samsung Aquila"
+> +	select CPU_S5PV210
+> +	select ARCH_SPARSEMEM_ENABLE
+> +	help
+> +	  Machine support for the Samsung Aquila target based on S5PC110 SoC
+>  
+>  endif
+> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+> index 370aac6..0bb1680 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -19,3 +19,4 @@ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+>  
+>  obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
+>  obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
+> +obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
+> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+> new file mode 100644
+> index 0000000..6a1db39
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
+> @@ -0,0 +1,100 @@
+> +/* linux/arch/arm/mach-s5pv210/mach-aquila.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/init.h>
+> +#include <linux/serial_core.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
+> +
+> +#include <mach/map.h>
+> +#include <mach/regs-clock.h>
+> +
+> +#include <plat/regs-serial.h>
+> +#include <plat/s5pv210.h>
+> +#include <plat/devs.h>
+> +#include <plat/cpu.h>
+> +
+> +/* Following are default values for UCON, ULCON and UFCON UART registers */
+> +#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> +				 S3C2410_UCON_RXILEVEL |	\
+> +				 S3C2410_UCON_TXIRQMODE |	\
+> +				 S3C2410_UCON_RXIRQMODE |	\
+> +				 S3C2410_UCON_RXFIFO_TOI |	\
+> +				 S3C2443_UCON_RXERR_IRQEN)
+> +
+> +#define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
+> +
+> +#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+> +				 S5PV210_UFCON_TXTRIG4 |	\
+> +				 S5PV210_UFCON_RXTRIG4)
+> +
+> +static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport		= 0,
+> +		.flags		= 0,
+> +		.ucon		= S5PV210_UCON_DEFAULT,
+> +		.ulcon		= S5PV210_ULCON_DEFAULT,
+> +		.ufcon		= S5PV210_UFCON_DEFAULT,
+> +	},
+> +	[1] = {
+> +		.hwport		= 1,
+> +		.flags		= 0,
+> +		.ucon		= S5PV210_UCON_DEFAULT,
+> +		.ulcon		= S5PV210_ULCON_DEFAULT,
+> +		.ufcon		= S5PV210_UFCON_DEFAULT,
+> +	},
+> +	[2] = {
+> +		.hwport		= 2,
+> +		.flags		= 0,
+> +		.ucon		= S5PV210_UCON_DEFAULT,
+> +		.ulcon		= S5PV210_ULCON_DEFAULT,
+> +		.ufcon		= S5PV210_UFCON_DEFAULT,
+> +	},
+> +	[3] = {
+> +		.hwport		= 3,
+> +		.flags		= 0,
+> +		.ucon		= S5PV210_UCON_DEFAULT,
+> +		.ulcon		= S5PV210_ULCON_DEFAULT,
+> +		.ufcon		= S5PV210_UFCON_DEFAULT,
+> +	},
+> +};
+> +
+> +static struct platform_device *aquila_devices[] __initdata = {
+> +};
+> +
+> +static void __init aquila_map_io(void)
+> +{
+> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> +	s3c24xx_init_clocks(24000000);
+> +	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
+> +}
+> +
+> +static void __init aquila_machine_init(void)
+> +{
+> +	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
+> +}
+> +
+> +MACHINE_START(AQUILA, "Aquila")
+> +	/* Maintainers:
+> +	   Marek Szyprowski <m.szyprowski@samsung.com>
+> +	   Kyungmin Park <kyungmin.park@samsung.com> */
+> +	.phys_io	= S3C_PA_UART & 0xfff00000,
+> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> +	.boot_params	= S5P_PA_SDRAM + 0x100,
+> +	.init_irq	= s5pv210_init_irq,
+> +	.map_io		= aquila_map_io,
+> +	.init_machine	= aquila_machine_init,
+> +	.timer		= &s3c24xx_timer,
+> +MACHINE_END
+> -- 
+> 1.6.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5p6440/include/mach/irqs.h      |    9 +-
- arch/arm/mach-s5p6442/include/mach/irqs.h      |    5 +-
- arch/arm/mach-s5pv210/Kconfig                  |    1 +
- arch/arm/mach-s5pv210/include/mach/irqs.h      |   25 +---
- arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   48 +++++
- arch/arm/plat-s5p/Kconfig                      |    6 +
- arch/arm/plat-s5p/Makefile                     |    1 +
- arch/arm/plat-s5p/include/plat/irqs.h          |    7 +
- arch/arm/plat-s5p/irq-eint.c                   |  218 ++++++++++++++++++++++++
- 9 files changed, 295 insertions(+), 25 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
- create mode 100644 arch/arm/plat-s5p/irq-eint.c
-
-diff --git a/arch/arm/mach-s5p6440/include/mach/irqs.h b/arch/arm/mach-s5p6440/include/mach/irqs.h
-index a4b9b40..911854d 100644
---- a/arch/arm/mach-s5p6440/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p6440/include/mach/irqs.h
-@@ -72,7 +72,14 @@
- #define S5P_IRQ_EINT_BASE	(S5P_IRQ_VIC1(31) + 6)
- 
- #define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
--#define IRQ_EINT(x)		S5P_EINT(x)
-+
-+#define S5P_EINT_BASE1		(S5P_IRQ_EINT_BASE)
-+/*
-+ * S5P6440 has 0-15 external interrupts in group 0. Only these can be used
-+ * to wake up from sleep. If request is beyond this range by mistake, a large
-+ * return value for an irq number should be indication of something amiss.
-+ */
-+#define S5P_EINT_BASE2		(0xf0000000)
- 
- /*
-  * Next the external interrupt groups. These are similar to the IRQ_EINT(x)
-diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-s5p6442/include/mach/irqs.h
-index da66580..02c2374 100644
---- a/arch/arm/mach-s5p6442/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
-@@ -77,8 +77,9 @@
- 
- #define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
- 
--#define IRQ_EINT(x)             ((x) < 16 ? S5P_IRQ_VIC0(x) : \
--					(S5P_IRQ_EINT_BASE + (x)-16))
-+#define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
-+#define S5P_EINT_BASE2		(S5P_IRQ_EINT_BASE)
-+
- /* Set the default NR_IRQS */
- 
- #define NR_IRQS 		(IRQ_EINT(31) + 1)
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index af33a1a..c4c2a7f 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -12,6 +12,7 @@ if ARCH_S5PV210
- config CPU_S5PV210
- 	bool
- 	select PLAT_S5P
-+	select S5P_EXT_INT
- 	help
- 	  Enable S5PV210 CPU support
- 
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 62c5175..69712bb 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -17,22 +17,6 @@
- 
- /* VIC0: System, DMA, Timer */
- 
--#define IRQ_EINT0		S5P_IRQ_VIC0(0)
--#define IRQ_EINT1		S5P_IRQ_VIC0(1)
--#define IRQ_EINT2		S5P_IRQ_VIC0(2)
--#define IRQ_EINT3		S5P_IRQ_VIC0(3)
--#define IRQ_EINT4		S5P_IRQ_VIC0(4)
--#define IRQ_EINT5		S5P_IRQ_VIC0(5)
--#define IRQ_EINT6		S5P_IRQ_VIC0(6)
--#define IRQ_EINT7		S5P_IRQ_VIC0(7)
--#define IRQ_EINT8		S5P_IRQ_VIC0(8)
--#define IRQ_EINT9		S5P_IRQ_VIC0(9)
--#define IRQ_EINT10		S5P_IRQ_VIC0(10)
--#define IRQ_EINT11		S5P_IRQ_VIC0(11)
--#define IRQ_EINT12		S5P_IRQ_VIC0(12)
--#define IRQ_EINT13		S5P_IRQ_VIC0(13)
--#define IRQ_EINT14		S5P_IRQ_VIC0(14)
--#define IRQ_EINT15		S5P_IRQ_VIC0(15)
- #define IRQ_EINT16_31		S5P_IRQ_VIC0(16)
- #define IRQ_BATF		S5P_IRQ_VIC0(17)
- #define IRQ_MDMA		S5P_IRQ_VIC0(18)
-@@ -134,13 +118,10 @@
- #define IRQ_MDNIE3		S5P_IRQ_VIC3(8)
- #define IRQ_VIC_END		S5P_IRQ_VIC3(31)
- 
--#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
--
--#define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
--#define IRQ_EINT(x)		S5P_EINT(x)
-+#define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
-+#define S5P_EINT_BASE2		(IRQ_VIC_END + 1)
- 
- /* Set the default NR_IRQS */
--
--#define NR_IRQS 		(IRQ_EINT(31) + 1)
-+#define NR_IRQS			(IRQ_EINT(31) + 1)
- 
- #endif /* ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-gpio.h b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-new file mode 100644
-index 0000000..49e029b
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-@@ -0,0 +1,48 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * S5PV210 - GPIO (including EINT) register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_GPIO_H
-+#define __ASM_ARCH_REGS_GPIO_H __FILE__
-+
-+#include <mach/map.h>
-+
-+#define S5PV210_EINT30CON		(S5P_VA_GPIO + 0xE00)
-+#define S5P_EINT_CON(x)			(S5PV210_EINT30CON + ((x) * 0x4))
-+
-+#define S5PV210_EINT30FLTCON0		(S5P_VA_GPIO + 0xE80)
-+#define S5P_EINT_FLTCON(x)		(S5PV210_EINT30FLTCON0 + ((x) * 0x4))
-+
-+#define S5PV210_EINT30MASK		(S5P_VA_GPIO + 0xF00)
-+#define S5P_EINT_MASK(x)		(S5PV210_EINT30MASK + ((x) * 0x4))
-+
-+#define S5PV210_EINT30PEND		(S5P_VA_GPIO + 0xF40)
-+#define S5P_EINT_PEND(x)		(S5PV210_EINT30PEND + ((x) * 0x4))
-+
-+#define EINT_REG_NR(x)			(EINT_OFFSET(x) >> 3)
-+
-+#define eint_irq_to_bit(irq)		(1 << (EINT_OFFSET(irq) & 0x7))
-+
-+/* values for S5P_EXTINT0 */
-+#define S5P_EXTINT_LOWLEV		(0x00)
-+#define S5P_EXTINT_HILEV		(0x01)
-+#define S5P_EXTINT_FALLEDGE		(0x02)
-+#define S5P_EXTINT_RISEEDGE		(0x03)
-+#define S5P_EXTINT_BOTHEDGE		(0x04)
-+
-+#define EINT_MODE		S3C_GPIO_SFN(0xf)
-+
-+#define EINT_GPIO_0(x)		S5PV210_GPH0(x)
-+#define EINT_GPIO_1(x)		S5PV210_GPH1(x)
-+#define EINT_GPIO_2(x)		S5PV210_GPH2(x)
-+#define EINT_GPIO_3(x)		S5PV210_GPH3(x)
-+
-+#endif /* __ASM_ARCH_REGS_GPIO_H */
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index d400a6a..b10e2ab 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -23,3 +23,9 @@ config PLAT_S5P
- 	select SAMSUNG_IRQ_UART
- 	help
- 	  Base platform code for Samsung's S5P series SoC.
-+
-+config S5P_EXT_INT
-+	bool
-+	help
-+	  Use the external interrupts (other than GPIO interrupts.)
-+	  Note: Do not choose this for S5P6440.
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index a7c54b3..25941a5 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -16,4 +16,5 @@ obj-y				+= dev-uart.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
- obj-y				+= irq.o
-+obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
- obj-y				+= setup-i2c0.o
-diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-s5p/include/plat/irqs.h
-index 9ff3d71..3fb3a3a 100644
---- a/arch/arm/plat-s5p/include/plat/irqs.h
-+++ b/arch/arm/plat-s5p/include/plat/irqs.h
-@@ -87,4 +87,11 @@
- #define IRQ_TIMER3		S5P_TIMER_IRQ(3)
- #define IRQ_TIMER4		S5P_TIMER_IRQ(4)
- 
-+#define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_EINT_BASE1) \
-+					: ((x) - 16 + S5P_EINT_BASE2))
-+
-+#define EINT_OFFSET(irq)	((irq) < S5P_EINT_BASE2 ? \
-+						((irq) - S5P_EINT_BASE1) : \
-+						((irq) + 16 - S5P_EINT_BASE2))
-+
- #endif /* __ASM_PLAT_S5P_IRQS_H */
-diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-new file mode 100644
-index 0000000..e56c807
---- /dev/null
-+++ b/arch/arm/plat-s5p/irq-eint.c
-@@ -0,0 +1,218 @@
-+/* linux/arch/arm/plat-s5p/irq-eint.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * S5P - IRQ EINT support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/sysdev.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/hardware/vic.h>
-+
-+#include <plat/regs-irqtype.h>
-+
-+#include <mach/map.h>
-+#include <plat/cpu.h>
-+#include <plat/pm.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <mach/regs-gpio.h>
-+
-+static inline void s5p_irq_eint_mask(unsigned int irq)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(irq)));
-+	mask |= eint_irq_to_bit(irq);
-+	__raw_writel(mask, S5P_EINT_MASK(EINT_REG_NR(irq)));
-+}
-+
-+static void s5p_irq_eint_unmask(unsigned int irq)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(irq)));
-+	mask &= ~(eint_irq_to_bit(irq));
-+	__raw_writel(mask, S5P_EINT_MASK(EINT_REG_NR(irq)));
-+}
-+
-+static inline void s5p_irq_eint_ack(unsigned int irq)
-+{
-+	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(EINT_REG_NR(irq)));
-+}
-+
-+static void s5p_irq_eint_maskack(unsigned int irq)
-+{
-+	/* compiler should in-line these */
-+	s5p_irq_eint_mask(irq);
-+	s5p_irq_eint_ack(irq);
-+}
-+
-+static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
-+{
-+	int offs = EINT_OFFSET(irq);
-+	int shift;
-+	u32 ctrl, mask;
-+	u32 newvalue = 0;
-+
-+	switch (type) {
-+	case IRQ_TYPE_EDGE_RISING:
-+		newvalue = S5P_EXTINT_RISEEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_FALLING:
-+		newvalue = S5P_EXTINT_RISEEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_BOTH:
-+		newvalue = S5P_EXTINT_BOTHEDGE;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_LOW:
-+		newvalue = S5P_EXTINT_LOWLEV;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		newvalue = S5P_EXTINT_HILEV;
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "No such irq type %d", type);
-+		return -EINVAL;
-+	}
-+
-+	shift = (offs & 0x7) * 4;
-+	mask = 0x7 << shift;
-+
-+	ctrl = __raw_readl(S5P_EINT_CON(EINT_REG_NR(irq)));
-+	ctrl &= ~mask;
-+	ctrl |= newvalue << shift;
-+	__raw_writel(ctrl, S5P_EINT_CON(EINT_REG_NR(irq)));
-+
-+	if ((0 <= offs) && (offs < 8))
-+		s3c_gpio_cfgpin(EINT_GPIO_0(offs & 0x7), EINT_MODE);
-+
-+	else if ((8 <= offs) && (offs < 16))
-+		s3c_gpio_cfgpin(EINT_GPIO_1(offs & 0x7), EINT_MODE);
-+
-+	else if ((16 <= offs) && (offs < 24))
-+		s3c_gpio_cfgpin(EINT_GPIO_2(offs & 0x7), EINT_MODE);
-+
-+	else if ((24 <= offs) && (offs < 32))
-+		s3c_gpio_cfgpin(EINT_GPIO_3(offs & 0x7), EINT_MODE);
-+
-+	else
-+		printk(KERN_ERR "No such irq number %d", offs);
-+
-+	return 0;
-+}
-+
-+static struct irq_chip s5p_irq_eint = {
-+	.name		= "s5p-eint",
-+	.mask		= s5p_irq_eint_mask,
-+	.unmask		= s5p_irq_eint_unmask,
-+	.mask_ack	= s5p_irq_eint_maskack,
-+	.ack		= s5p_irq_eint_ack,
-+	.set_type	= s5p_irq_eint_set_type,
-+#ifdef CONFIG_PM
-+	.set_wake	= s3c_irqext_wake,
-+#endif
-+};
-+
-+/* s5p_irq_demux_eint
-+ *
-+ * This function demuxes the IRQ from the group0 external interrupts,
-+ * from EINTs 16 to 31. It is designed to be inlined into the specific
-+ * handler s5p_irq_demux_eintX_Y.
-+ *
-+ * Each EINT pend/mask registers handle eight of them.
-+ */
-+static inline void s5p_irq_demux_eint(unsigned int start)
-+{
-+	u32 status = __raw_readl(S5P_EINT_PEND(EINT_REG_NR(start)));
-+	u32 mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(start)));
-+	unsigned int irq;
-+
-+	status &= ~mask;
-+	status &= 0xff;
-+
-+	while (status) {
-+		irq = fls(status) - 1;
-+		generic_handle_irq(irq + start);
-+		status &= ~(1 << irq);
-+	}
-+}
-+
-+static void s5p_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
-+{
-+	s5p_irq_demux_eint(IRQ_EINT(16));
-+	s5p_irq_demux_eint(IRQ_EINT(24));
-+}
-+
-+static inline void s5p_irq_vic_eint_mask(unsigned int irq)
-+{
-+	void __iomem *base = get_irq_chip_data(irq);
-+
-+	s5p_irq_eint_mask(irq);
-+	writel(1 << EINT_OFFSET(irq), base + VIC_INT_ENABLE_CLEAR);
-+}
-+
-+static void s5p_irq_vic_eint_unmask(unsigned int irq)
-+{
-+	void __iomem *base = get_irq_chip_data(irq);
-+
-+	s5p_irq_eint_unmask(irq);
-+	writel(1 << EINT_OFFSET(irq), base + VIC_INT_ENABLE);
-+}
-+
-+static inline void s5p_irq_vic_eint_ack(unsigned int irq)
-+{
-+	__raw_writel(eint_irq_to_bit(irq), S5P_EINT_PEND(EINT_REG_NR(irq)));
-+}
-+
-+static void s5p_irq_vic_eint_maskack(unsigned int irq)
-+{
-+	s5p_irq_vic_eint_mask(irq);
-+	s5p_irq_vic_eint_ack(irq);
-+}
-+
-+static struct irq_chip s5p_irq_vic_eint = {
-+	.name		= "s5p_vic_eint",
-+	.mask		= s5p_irq_vic_eint_mask,
-+	.unmask		= s5p_irq_vic_eint_unmask,
-+	.mask_ack	= s5p_irq_vic_eint_maskack,
-+	.ack		= s5p_irq_vic_eint_ack,
-+	.set_type	= s5p_irq_eint_set_type,
-+#ifdef CONFIG_PM
-+	.set_wake	= s3c_irqext_wake,
-+#endif
-+};
-+
-+int __init s5p_init_irq_eint(void)
-+{
-+	int irq;
-+
-+	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++)
-+		set_irq_chip(irq, &s5p_irq_vic_eint);
-+
-+	for (irq = IRQ_EINT(16); irq <= IRQ_EINT(31); irq++) {
-+		set_irq_chip(irq, &s5p_irq_eint);
-+		set_irq_handler(irq, handle_level_irq);
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
-+
-+	set_irq_chained_handler(IRQ_EINT16_31, s5p_irq_demux_eint16_31);
-+	return 0;
-+}
-+
-+arch_initcall(s5p_init_irq_eint);
 -- 
-1.6.3.3
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
