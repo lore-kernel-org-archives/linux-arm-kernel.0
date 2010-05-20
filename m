@@ -1,43 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 20 May 2010 12:26:13 +0200
-Subject: [PATCH 01/11] [ARM] pxa: Storage class should be before const
-	qualifier
-In-Reply-To: <1274344306-8735-1-git-send-email-tklauser@distanz.ch>
-References: <1274344306-8735-1-git-send-email-tklauser@distanz.ch>
-Message-ID: <201005201226.13337.marek.vasut@gmail.com>
+From: gores@marvell.com (Siddarth Gore)
+Date: Thu, 20 May 2010 15:47:56 +0530
+Subject: L2 cache support for pxa16x
+In-Reply-To: <AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
+References: <1273658181.6926.27.camel@pe-dt434>
+	<AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
+Message-ID: <1274350676.6926.58.camel@pe-dt434>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 20. kv?tna 2010 10:31:46 Tobias Klauser napsal(a):
-> The C99 specification states in section 6.11.5:
-> 
-> The placement of a storage-class specifier other than at the beginning
-> of the declaration specifiers in a declaration is an obsolescent
-> feature.
-> 
-> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
-> ---
->  arch/arm/mach-pxa/palmtc.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-> index 033b567..ce1104d 100644
-> --- a/arch/arm/mach-pxa/palmtc.c
-> +++ b/arch/arm/mach-pxa/palmtc.c
-> @@ -263,11 +263,11 @@ const struct matrix_keymap_data palmtc_keymap_data =
-> { .keymap_size		= ARRAY_SIZE(palmtc_matrix_keys),
->  };
-> 
-> -const static unsigned int palmtc_keypad_row_gpios[] = {
-> +static const unsigned int palmtc_keypad_row_gpios[] = {
->  	0, 9, 10, 11
->  };
-> 
-> -const static unsigned int palmtc_keypad_col_gpios[] = {
-> +static const unsigned int palmtc_keypad_col_gpios[] = {
->  	18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 79, 80
->  };
+On Wed, 2010-05-12 at 03:11 -0700, Eric Miao wrote:
+> On Wed, May 12, 2010 at 11:56 AM, Siddarth Gore <gores@marvell.com> wrote:
+> > Hi Eric/Haojian,
+> >
+> > Can the Tauros2 support be used for pxa168 as well? The one difference I
+> > can see is that L2 Enable is in control register instead of extra
+> > feature register. But rest of the things look very similar to me.
+> >
 
-Ok, if that's the case, you have my ack:
+I tried doing this. It works when I enable L2 before turning the MMU on,
+i.e. in __mohawk_setup
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+But when I do the following in tauros2_init(), the kernel crashes.
+1. flush and disable dcache
+2. invalidate and disable icache
+3. drain write buffer
+4. invalidate TLB
+5. invalidate L2
+6. enable L2
+7. enable icache
+8. enable dcache
+
+I think the right place to enable L2 is in tauros2_init, so any idea
+what I am doing wrong here?
+
+-siddarth
