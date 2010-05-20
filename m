@@ -1,96 +1,140 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 May 2010 10:34:52 +0100
-Subject: [PATCH 1/4] ARM: S5P6440: Add locking to GPIO calls
-Message-ID: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
+Date: Thu, 20 May 2010 10:34:53 +0100
+Subject: [PATCH 2/4] ARM: SAMSUNG: Make ADC client SMP safe
+In-Reply-To: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
+References: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274348095-9390-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new locking calls to ensure that these are always exclusively
-accessing the GPIO registers.
+Change local_irq disable calls to use spinlocks to ensure that the
+ADC driver data is protected against multiple access..
 
-Fixes a possible race between two threads modifying the same GPIO bank,
+Note, this does not protect the client's data, and the client should
+ensure it does not make multiple calls to the ADC driver.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s5p6440/gpio.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/adc.c |   26 ++++++++++++++++++++------
+ 1 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s5p6440/gpio.c b/arch/arm/mach-s5p6440/gpio.c
-index 262dc75..92efc05 100644
---- a/arch/arm/mach-s5p6440/gpio.c
-+++ b/arch/arm/mach-s5p6440/gpio.c
-@@ -46,6 +46,7 @@ static int s5p6440_gpiolib_rbank_4bit2_input(struct gpio_chip *chip,
- 	void __iomem *base = ourchip->base;
- 	void __iomem *regcon = base;
- 	unsigned long con;
-+	unsigned long flags;
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index 210030d..04d9521 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -66,6 +66,7 @@ struct adc_device {
+ 	struct s3c_adc_client	*cur;
+ 	struct s3c_adc_client	*ts_pend;
+ 	void __iomem		*regs;
++	spinlock_t		 lock;
  
- 	switch (offset) {
- 	case 6:
-@@ -63,10 +64,14 @@ static int s5p6440_gpiolib_rbank_4bit2_input(struct gpio_chip *chip,
- 		break;
- 	}
+ 	unsigned int		 prescale;
  
-+	s3c_gpio_lock(ourchip, flags);
+@@ -74,7 +75,7 @@ struct adc_device {
+ 
+ static struct adc_device *adc_dev;
+ 
+-static LIST_HEAD(adc_pending);
++static LIST_HEAD(adc_pending);	/* protected by adc_device.lock */
+ 
+ #define adc_dbg(_adc, msg...) dev_dbg(&(_adc)->pdev->dev, msg)
+ 
+@@ -145,7 +146,7 @@ int s3c_adc_start(struct s3c_adc_client *client,
+ 	if (client->is_ts && adc->ts_pend)
+ 		return -EAGAIN;
+ 
+-	local_irq_save(flags);
++	spin_lock_irqsave(&adc->lock, flags);
+ 
+ 	client->channel = channel;
+ 	client->nr_samples = nr_samples;
+@@ -157,7 +158,8 @@ int s3c_adc_start(struct s3c_adc_client *client,
+ 
+ 	if (!adc->cur)
+ 		s3c_adc_try(adc);
+-	local_irq_restore(flags);
 +
- 	con = __raw_readl(regcon);
- 	con &= ~(0xf << con_4bit_shift(offset));
- 	__raw_writel(con, regcon);
++	spin_unlock_irqrestore(&adc->lock, flags);
  
-+	s3c_gpio_unlock(ourchip, flags);
-+
  	return 0;
  }
+@@ -237,6 +239,10 @@ EXPORT_SYMBOL_GPL(s3c_adc_register);
  
-@@ -78,6 +83,7 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
- 	void __iomem *regcon = base;
- 	unsigned long con;
- 	unsigned long dat;
-+	unsigned long flags;
- 	unsigned con_offset  = offset;
- 
- 	switch (con_offset) {
-@@ -96,6 +102,8 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
- 		break;
- 	}
- 
-+	s3c_gpio_lock(ourchip, flags);
-+
- 	con = __raw_readl(regcon);
- 	con &= ~(0xf << con_4bit_shift(con_offset));
- 	con |= 0x1 << con_4bit_shift(con_offset);
-@@ -109,6 +117,8 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
- 	__raw_writel(con, regcon);
- 	__raw_writel(dat, base + GPIODAT_OFF);
- 
-+	s3c_gpio_unlock(ourchip, flags);
-+
- 	return 0;
- }
- 
-@@ -117,6 +127,7 @@ int s5p6440_gpio_setcfg_4bit_rbank(struct s3c_gpio_chip *chip,
+ void s3c_adc_release(struct s3c_adc_client *client)
  {
- 	void __iomem *reg = chip->base;
- 	unsigned int shift;
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc_dev->lock, flags);
++
+ 	/* We should really check that nothing is in progress. */
+ 	if (adc_dev->cur == client)
+ 		adc_dev->cur = NULL;
+@@ -255,6 +261,8 @@ void s3c_adc_release(struct s3c_adc_client *client)
+ 
+ 	if (adc_dev->cur == NULL)
+ 		s3c_adc_try(adc_dev);
++
++	spin_unlock_irqrestore(&adc_dev->lock, flags);
+ 	kfree(client);
+ }
+ EXPORT_SYMBOL_GPL(s3c_adc_release);
+@@ -264,7 +272,6 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 	struct adc_device *adc = pw;
+ 	struct s3c_adc_client *client = adc->cur;
+ 	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
+-	unsigned long flags;
+ 	unsigned data0, data1;
+ 
+ 	if (!client) {
+@@ -296,12 +303,12 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 		client->select_cb(client, 1);
+ 		s3c_adc_convert(adc);
+ 	} else {
+-		local_irq_save(flags);
++		spin_lock(&adc->lock);
+ 		(client->select_cb)(client, 0);
+ 		adc->cur = NULL;
+ 
+ 		s3c_adc_try(adc);
+-		local_irq_restore(flags);
++		spin_unlock(&adc->lock);
+ 	}
+ 
+ exit:
+@@ -326,6 +333,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	spin_lock_init(&adc->lock);
++
+ 	adc->pdev = pdev;
+ 	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
+ 
+@@ -407,13 +416,17 @@ static int __devexit s3c_adc_remove(struct platform_device *pdev)
+ static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
+ {
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
 +	unsigned long flags;
  	u32 con;
  
- 	switch (off) {
-@@ -142,11 +153,15 @@ int s5p6440_gpio_setcfg_4bit_rbank(struct s3c_gpio_chip *chip,
- 		cfg <<= shift;
- 	}
- 
-+	s3c_gpio_lock(chip, flags);
++	spin_lock_irqsave(&adc->lock, flags);
 +
- 	con = __raw_readl(reg);
- 	con &= ~(0xf << shift);
- 	con |= cfg;
- 	__raw_writel(con, reg);
+ 	con = readl(adc->regs + S3C2410_ADCCON);
+ 	con |= S3C2410_ADCCON_STDBM;
+ 	writel(con, adc->regs + S3C2410_ADCCON);
  
-+	s3c_gpio_unlock(chip, flags);
-+
+ 	disable_irq(adc->irq);
++	spin_unlock_irqrestore(&adc->lock, flags);
+ 	clk_disable(adc->clk);
+ 
  	return 0;
- }
+@@ -422,6 +435,7 @@ static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
+ static int s3c_adc_resume(struct platform_device *pdev)
+ {
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
++	unsigned long flags;
  
+ 	clk_enable(adc->clk);
+ 	enable_irq(adc->irq);
 -- 
 1.6.3.3
