@@ -1,76 +1,38 @@
-From: srinidhikasagar@gmail.com (srinidhi kasagar)
-Date: Wed, 19 May 2010 10:47:41 +0530
-Subject: [PATCH] Watchdog: Adding support for Watchdog found with ARM
-	CortexA9
-In-Reply-To: <4BF362F1.5070100@st.com>
-References: <1274090044-10236-1-git-send-email-viresh.kumar@st.com>
-	<AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>
-	<4BF12767.4010402@st.com>
-	<AANLkTikCC108eWniEBwzYsbkEUYQocICaLtd7FD_vMQ1@mail.gmail.com>
-	<20100518132050.GA8748@mvista.com> <4BF362F1.5070100@st.com>
-Message-ID: <AANLkTinQ34da0F0Xp_Rqh0F8fbh0lbSmD2Q68RLNDlIC@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 May 2010 15:11:56 +0200
+Subject: Support Question
+In-Reply-To: <AANLkTin9qYxhbKe_ZDFvPbteM6Zn1H2M5jY6mAaH_Jxu@mail.gmail.com>
+References: <1274199223.1763.0.camel@ubuntu.ubuntu-domain>
+	<AANLkTin9qYxhbKe_ZDFvPbteM6Zn1H2M5jY6mAaH_Jxu@mail.gmail.com>
+Message-ID: <4BF5351C.80306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh,
+Le 19/05/2010 19:06, Amit kumar :
+> Dear Experts,
+> 
+> I am using SBC 9260 for development of a data acquisition platform. I am
+> using the SPI for data acquisition through 14 bit ADC slave. Currently
+> my board has debian 5.0 kernel version 2.6.30. I am using the spidriver
+> (spidev )for using the SPI on the board in master mode . Everything is
+> working fine and I am able to send and receive data . The only problem
+> is between the activation and deactivation of chip select.It takes
+> around 70microseconds for chipselect deactivation and then activation .
+> Since speed of my 4 channel ADC is 1MSPS so i need to bring down delay
+> as minimum as possible. I checked out the value of the registers
+> DLYBCS , DLYBCT , DLYBS and all are indicating the values 0.
+> 
+> Therefore I don;t have any idea from where the delay is being
+> introduced. Is it a problem of OS or there is nythng else involved .
+> Kindly guide me through this . I need urgent help .... any information
+> abt delay is welcome.
 
-Recently I have sent two patches which are already queued in Russell's
-tracker
+In the atmel SPI driver, chipselect are managed by GPIO and not
+automatically by the IP. I think that this is why you experience such
+delays.
+I am not totally aware about the reasons for this hand-made management
+but I guess that you can find information on this mailing-list...
 
-6125/1      ARM TWD: move TWD registers to common header
-6126/1      ARM mpcore_wdt: fix build failure and other fixes
-
-which addresses the following:
-1) fix build failure
-2) movement of the MPCore TWD registers.
-
-And currently, Ux500 machine uses this.
-
-What I feel is to patch this existing driver if you think it is missing some
-functionality.
-
-regards,
-Srinidhi
-
-
-
-On Wed, May 19, 2010 at 9:32 AM, Viresh KUMAR <viresh.kumar@st.com> wrote:
-
-> On 5/18/2010 6:50 PM, George G. Davis wrote:
-> > Hi,
-> >
-> > On Tue, May 18, 2010 at 02:55:21PM +0530, srinidhi kasagar wrote:
-> >> I do not understand why a new driver is required while having similar
-> one
-> >> for MPCore watchdog.
-> >> Please have a look at drivers/watchdog/mpcore_wdt.c
-> >
-> > The same thought occurred to me.  Based on a cursory glance at the
-> Cortex-A9
-> > MPCore and ARM11 MPCore, the per-CPU watchdogs do appear to be the same
-> > and could use the same driver.
-> >
-> > Any reason for creating a new driver rather than reusing the ARM11
-> > MPCore driver?
-> >
->
-> Sorry Guys!!! Earlier I tried to find existing driver, but couldn't found
-> one.
-> So sent a new one.
->
-> I went through this driver and found some shortcomings in it:
->  - It looks it is not used by anyone now, as it required
->   asm/hardware/arm_twd.h and it was removed in v2.6.31.
->   So it would never compile.
->  - It doesn't support clock framework, and works on fixed rate.
->  - It works on fixed prescale value (256).
->  - It doesn't support WDIOC_GETBOOTSTATUS.
->
-> So, please suggest how to proceed as my patch contains all these features.
->
-> regards,
-> viresh kumar.
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100519/0438244b/attachment.htm>
+Best regards,
+-- 
+Nicolas Ferre
