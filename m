@@ -1,36 +1,32 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Thu, 20 May 2010 15:47:56 +0530
-Subject: L2 cache support for pxa16x
-In-Reply-To: <AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
-References: <1273658181.6926.27.camel@pe-dt434>
-	<AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
-Message-ID: <1274350676.6926.58.camel@pe-dt434>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 20 May 2010 12:28:42 +0200
+Subject: [PATCH] PXA DMA-capable PATA driver
+In-Reply-To: <4BF4F773.102@gmail.com>
+References: <1273460525-25662-1-git-send-email-marek.vasut@gmail.com>
+	<201005180053.54248.marek.vasut@gmail.com> <4BF4F773.102@gmail.com>
+Message-ID: <201005201228.42325.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-12 at 03:11 -0700, Eric Miao wrote:
-> On Wed, May 12, 2010 at 11:56 AM, Siddarth Gore <gores@marvell.com> wrote:
-> > Hi Eric/Haojian,
-> >
-> > Can the Tauros2 support be used for pxa168 as well? The one difference I
-> > can see is that L2 Enable is in control register instead of extra
-> > feature register. But rest of the things look very similar to me.
-> >
+Dne ?t 20. kv?tna 2010 10:48:51 Tejun Heo napsal(a):
+> On 05/18/2010 12:53 AM, Marek Vasut wrote:
+> > 4766 /**
+> > 4767  *      atapi_check_dma - Check whether ATAPI DMA can be supported
+> > 4768  *      @qc: Metadata associated with taskfile to check
+> > 4769  *
+> > 4770  *      Allow low-level driver to filter ATA PACKET commands,
+> > returning 4771  *      a status indicating whether or not it is OK to
+> > use DMA for the 4772  *      supplied PACKET command.
+> > 4773  *
+> > 4774  *      LOCKING:
+> > 4775  *      spin_lock_irqsave(host lock)
+> > 4776  *
+> > 4777  *      RETURNS: 0 when ATAPI DMA can be used
+> > 4778  *               nonzero otherwise
+> > 4779  */
+> > 
+> > this is from libata-core.c FYI and -EOPNOTSUPP is non-zero.
+> 
+> Argh... that method needs to be changed to return bool.
 
-I tried doing this. It works when I enable L2 before turning the MMU on,
-i.e. in __mohawk_setup
-
-But when I do the following in tauros2_init(), the kernel crashes.
-1. flush and disable dcache
-2. invalidate and disable icache
-3. drain write buffer
-4. invalidate TLB
-5. invalidate L2
-6. enable L2
-7. enable icache
-8. enable dcache
-
-I think the right place to enable L2 is in tauros2_init, so any idea
-what I am doing wrong here?
-
--siddarth
+That'd make sense.
