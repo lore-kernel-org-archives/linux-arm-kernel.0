@@ -1,41 +1,88 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 20 May 2010 00:15:59 -0700
-Subject: Samsung touchscreen updates
-In-Reply-To: <20100519064138.GG4720@trinity.fluff.org>
-References: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
-	<888AB3A0-262F-4603-9B83-B8B6A4D25DC1@gmail.com>
-	<20100519064138.GG4720@trinity.fluff.org>
-Message-ID: <20100520071559.GD8080@core.coreip.homeip.net>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 20 May 2010 09:22:28 +0200
+Subject: [PATCH v2] eukrea_mbimx27: fix ADS7846 support
+In-Reply-To: <20100520063934.GS31199@pengutronix.de>
+References: <20100520063934.GS31199@pengutronix.de>
+Message-ID: <1274340148-4681-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 19, 2010 at 07:41:38AM +0100, Ben Dooks wrote:
-> On Tue, May 18, 2010 at 11:34:51PM -0700, Dmitry Torokhov wrote:
-> > On May 18, 2010, at 11:12 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> >
-> >> Dimitry, this is a set of updates for the Samsung platform support for
-> >> touchscreen devices and the drivers/input/touchscreen items for the
-> >> s3c2410_ts driver.
-> >>
-> >> Since the changes have some interedependency, I would like permission
-> >> to merge this via the Samsung platform tree with your acknowledgement
-> >> for the drivers/input/touchscreen items.
-> >>
-> >> The arch/arm/* portions of this patchset have been included as FYI and
-> >> to show other interested parties what is goign on.
-> >>
-> >> Please let me know what you think.
-> >
-> > Yeah, it all looks Ok, please merge through your tree.
-> 
-> Just rememberred I acked Maurus' original 64xx patch, did that get
-> merged anywhere as I couldn't find it in the tree listed in MAINTAINERS?
-> 
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v2 : fix type in comments
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |   19 ++++++++++++-------
+ 1 files changed, 12 insertions(+), 7 deletions(-)
 
-It looks like it got lost in my queue. The patch looks sane, would you
-mind merging it with the rest of changes for s3c2140?
-
-Thanks.
-
+diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+index fff6c8d..385abd1 100644
+--- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+@@ -35,6 +35,7 @@
+ #include <mach/hardware.h>
+ #include <mach/mmc.h>
+ #include <mach/imx-uart.h>
++#include <mach/spi.h>
+ 
+ #include "devices.h"
+ 
+@@ -88,7 +89,6 @@ static int eukrea_mbimx27_pins[] = {
+ 	PA30_PF_CONTRAST,
+ 	PA31_PF_OE_ACD,
+ 	/* SPI1 */
+-	PD28_PF_CSPI1_SS0,
+ 	PD29_PF_CSPI1_SCLK,
+ 	PD30_PF_CSPI1_MISO,
+ 	PD31_PF_CSPI1_MOSI,
+@@ -236,7 +236,7 @@ static struct imxuart_platform_data uart_pdata[] = {
+ 	},
+ };
+ 
+-#if defined(CONFIG_TOUCHSCREEN_ADS7846)
++#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 
+ #define ADS7846_PENDOWN (GPIO_PORTD | 25)
+@@ -247,7 +247,6 @@ static void ads7846_dev_init(void)
+ 		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
+ 		return;
+ 	}
+-
+ 	gpio_direction_input(ADS7846_PENDOWN);
+ }
+ 
+@@ -260,7 +259,9 @@ static struct ads7846_platform_data ads7846_config __initdata = {
+ 	.get_pendown_state	= ads7846_get_pendown_state,
+ 	.keep_vref_on		= 1,
+ };
++#endif
+ 
++#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
+ static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
+ 	[0] = {
+ 		.modalias	= "ads7846",
+@@ -305,15 +306,19 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_register_device(&mxc_fb_device, &eukrea_mbimx27_fb_data);
+ 	mxc_register_device(&mxc_sdhc_device0, NULL);
+ 
+-#if defined(CONFIG_TOUCHSCREEN_ADS7846)
++#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+-	/* SPI and ADS7846 Touchscreen controler init */
+-	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
++	/* ADS7846 Touchscreen controller init */
+ 	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
++	ads7846_dev_init();
++#endif
++
++#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
++	/* SPI_CS0 init */
++	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
+ 	mxc_register_device(&mxc_spi_device0, &eukrea_mbimx27_spi_0_data);
+ 	spi_register_board_info(eukrea_mbimx27_spi_board_info,
+ 			ARRAY_SIZE(eukrea_mbimx27_spi_board_info));
+-	ads7846_dev_init();
+ #endif
+ 
+ 	/* Leds configuration */
 -- 
-Dmitry
+1.6.3.3
