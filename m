@@ -1,40 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 May 2010 11:33:30 +0200
-Subject: [PATCH] ARM: Samsung: Add platform support code for OneNAND
-	controller
-In-Reply-To: <20100520084848.GO4720@trinity.fluff.org>
-References: <1274338745-1745-1-git-send-email-m.szyprowski@samsung.com>
-	<20100520084848.GO4720@trinity.fluff.org>
-Message-ID: <014f01caf7ff$84d456f0$8e7d04d0$%szyprowski@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 20 May 2010 10:34:55 +0100
+Subject: [PATCH 4/4] ARM: S3C64XX: PM: Synchronise wakeup mask on suspend
+In-Reply-To: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
+References: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274348095-9390-4-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use the new wakeup mask synchronisation code to set the
+relevant wakeup mask bits.
 
-On Thursday, May 20, 2010 10:49 AM Ben Dooks wrote:
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/mach-s3c64xx/Kconfig |    1 +
+ arch/arm/mach-s3c64xx/pm.c    |   20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
 
-> On Thu, May 20, 2010 at 08:59:05AM +0200, Marek Szyprowski wrote:
-> > This patch adds setup code for Samsung OneNAND controller driver. The
-> > driver needs to be aware on which SoC it is running, so the actual
-> > device id is being changed in cpu init code. S3C64xx SoCs have 2 OneNAND
-> > controllers while S5PC100 and S5PC110 has only one.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Ok, in future please try and keep a core and then have the architecture
-> additions seperate, it makes it very difficult to deal with any problems
-> whilst merging and means there is a higher possibility of a problem during
-> this.
-
-Ok, but I'm still not 100% sure how should I handle case like this properly.
-I thought that separating platform files from the driver itself would help
-merging it, because each part (the driver and platform setup code/register
-definitions) can be merged separately by the respective maintainers. Was it
-wrong that the platform patch was prepared for the tree after plat-s5pc1xx
-moves? 
-
-Best regards
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 69e9fbf..d026bf4 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -7,6 +7,7 @@
+ config PLAT_S3C64XX
+ 	bool
+ 	depends on ARCH_S3C64XX
++	select SAMSUNG_WAKEMASK
+ 	default y
+ 	help
+ 	  Base platform code for any Samsung S3C64XX device
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index b8ac459..79412f7 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -18,8 +18,11 @@
+ #include <linux/io.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ 
+ #include <plat/pm.h>
++#include <plat/wakeup-mask.h>
++
+ #include <mach/regs-sys.h>
+ #include <mach/regs-gpio.h>
+ #include <mach/regs-clock.h>
+@@ -153,8 +156,25 @@ static void s3c64xx_cpu_suspend(void)
+ 	panic("sleep resumed to originator?");
+ }
+ 
++/* mapping of interrupts to parts of the wakeup mask */
++static struct samsung_wakeup_mask wake_irqs[] = {
++	{ .irq = IRQ_RTC_ALARM,	.bit = S3C64XX_PWRCFG_RTC_ALARM_DISABLE, },
++	{ .irq = IRQ_RTC_TIC,	.bit = S3C64XX_PWRCFG_RTC_TICK_DISABLE, },
++	{ .irq = IRQ_PENDN,	.bit = S3C64XX_PWRCFG_TS_DISABLE, },
++	{ .irq = IRQ_HSMMC0,	.bit = S3C64XX_PWRCFG_MMC0_DISABLE, },
++	{ .irq = IRQ_HSMMC1,	.bit = S3C64XX_PWRCFG_MMC1_DISABLE, },
++	{ .irq = IRQ_HSMMC2,	.bit = S3C64XX_PWRCFG_MMC2_DISABLE, },
++	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_BATF_DISABLE},
++	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_MSM_DISABLE },
++	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_HSI_DISABLE },
++	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_MSM_DISABLE },
++};
++
+ static void s3c64xx_pm_prepare(void)
+ {
++	samsung_sync_wakemask(S3C64XX_PWR_CFG,
++			      wake_irqs, ARRAY_SIZE(wake_irqs));
++
+ 	/* store address of resume. */
+ 	__raw_writel(virt_to_phys(s3c_cpu_resume), S3C64XX_INFORM0);
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.6.3.3
