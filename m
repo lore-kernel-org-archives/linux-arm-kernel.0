@@ -1,45 +1,33 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 20 May 2010 14:00:05 +0400
-Subject: [PATCH 2/5] [WATCHDOG] s3c2410_wdt - Avoid freeing memory,	if
-	memory region could not be allocated
-In-Reply-To: <1274340092-10706-3-git-send-email-kgene.kim@samsung.com>
-References: <1274340092-10706-1-git-send-email-kgene.kim@samsung.com>
-	<1274340092-10706-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4BF50825.2060403@ru.mvista.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 20 May 2010 18:10:11 +0800
+Subject: [RFC PATCH v2] preliminary support for sparse IRQ
+In-Reply-To: <AANLkTimvwmdYobnycek2qGxIX0MZFWNOVD-0pIxUB7cH@mail.gmail.com>
+References: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
+	<3319586236559971954@unknownmsgid>
+	<AANLkTimvwmdYobnycek2qGxIX0MZFWNOVD-0pIxUB7cH@mail.gmail.com>
+Message-ID: <AANLkTinJAVNlAGZFysLiJEkrUv0XAjBcF3uZKy89DIk2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, May 20, 2010 at 5:25 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Thu, May 20, 2010 at 5:21 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Eric,
+>>
+>>> +#ifdef CONFIG_SPARSE_IRQ
+>>> +int __init arch_probe_nr_irqs(void)
+>>> +{
+>>> + ? ? nr_irqs = arch_nr_irqs ? arch_nr_irqs : NR_IRQS;
+>>> + ? ? return 0;
+>>> +}
+>>> +#endif
+>>
+>> Possibly a daft question, but if CONFIG_SPARSE_IRQ is
+>> not set, where does nr_irqs get assigned to?
+>>
+>> Other than that, looks good to me.
+>>
+>
+> It's defined as NR_IRQS then.
+>
 
-Kukjin Kim wrote:
-
-> From: Banajit Goswami <banajit.g@samsung.com>
-
-> In case the WDT device memory allocation fails, this patch modifies the
-
-    This is not memory allocation.
-
-> driver such that, it does not try to free the memory on exit.
-
-> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/watchdog/s3c2410_wdt.c |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index e4cebef..d421258 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -426,8 +426,7 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
->  	wdt_mem = request_mem_region(res->start, size, pdev->name);
->  	if (wdt_mem == NULL) {
->  		dev_err(dev, "failed to get memory region\n");
-> -		ret = -ENOENT;
-> -		goto err_req;
-> +		return -ENOMEM;
-
-    It should be EBUSY actually...
-
-
-WBR, Sergei
+Sorry, initialized to NR_IRQS. In kernel/irq/handle.c, around line 72.
