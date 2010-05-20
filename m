@@ -1,25 +1,31 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Thu, 20 May 2010 20:29:02 +0200
-Subject: [PATCH 1/1 v2] ehci-mxc: Fix mx31 OTG host initialisation
-In-Reply-To: <20100520181812.GB11256@suse.de>
-References: <1273587274-8045-1-git-send-email-philippe.retornaz@epfl.ch>
-	<201005201932.48425.philippe.retornaz@epfl.ch>
-	<20100520181812.GB11256@suse.de>
-Message-ID: <201005202029.02283.philippe.retornaz@epfl.ch>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Thu, 20 May 2010 20:41:27 +0200
+Subject: [PATCH] MXC: Add USB OTG (device) for i.MX31 PDK (3DS) board.
+In-Reply-To: <628190.11983.qm@web51006.mail.re2.yahoo.com>
+References: <628190.11983.qm@web51006.mail.re2.yahoo.com>
+Message-ID: <4BF58257.8020603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi, 20 mai 2010 20.18:12, Greg KH a ?crit :
-> On Thu, May 20, 2010 at 07:32:48PM +0200, Philippe R?tornaz wrote:
-> > Hello
-> >
-> > Any news on this patch ? Will it be merged in 2.6.35 ?
+Hi Fabio
+
+On 2010-05-20 19:36, Fabio Estevam wrote:
+> Hi Magnus,
 > 
-> I don't have it in my tree, sorry.  Is it somewhere else?  Last I
-> recall, I couldn't apply it as it depended on some other tree, right?
+> --- On Fri, 5/14/10, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+> 
+> ...
+> 
+>>> Would be good to send a patch for updating the
+>> mx3_defconfig with the USB gadget support.
+>>
+>> Yes, perhaps that can be done later when bringing the
+>> defconfig
+>> uptodate (also awaiting inclusion of Alberto Panizzo's
+>> keypad patch).
+> 
+> Alberto's keypad patches are in mxc-master now. Would you care to update the mx3_defconfig ?
 
-Yes, it depend on Sascha tree. Maybe Sascha should merge it by his tree ? 
+Sure, I'll give it a try.
 
-Thanks,
-
-Philippe
+/Magnus
