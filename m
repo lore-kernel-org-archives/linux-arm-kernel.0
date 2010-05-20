@@ -1,23 +1,39 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 20 May 2010 17:28:53 +0900
-Subject: [RFC PATCH v2] preliminary support for sparse IRQ
-In-Reply-To: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
-References: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
-Message-ID: <20100520082853.GA18885@linux-sh.org>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Thu, 20 May 2010 10:31:46 +0200
+Subject: [PATCH 01/11] [ARM] pxa: Storage class should be before const
+	qualifier
+Message-ID: <1274344306-8735-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 18, 2010 at 06:34:49PM +0800, Eric Miao wrote:
-> commit 2e2e087d96630c95dbce57036680cf917e906cf1
-> Author: Eric Miao <eric.y.miao@gmail.com>
-> Date:   Mon Dec 28 12:59:59 2009 +0800
-> 
->     [ARM] preliminary support for sparse IRQ
-> 
->     So to allow NR_IRQS to be dynamic and platforms to specify the number
->     of IRQs really needed.
-> 
->     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> 
-It would be nice to see this applied, we plan to use sparseirq
-unconditionally for shmobile (as sh already does).
+The C99 specification states in section 6.11.5:
+
+The placement of a storage-class specifier other than at the beginning
+of the declaration specifiers in a declaration is an obsolescent
+feature.
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ arch/arm/mach-pxa/palmtc.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+index 033b567..ce1104d 100644
+--- a/arch/arm/mach-pxa/palmtc.c
++++ b/arch/arm/mach-pxa/palmtc.c
+@@ -263,11 +263,11 @@ const struct matrix_keymap_data palmtc_keymap_data = {
+ 	.keymap_size		= ARRAY_SIZE(palmtc_matrix_keys),
+ };
+ 
+-const static unsigned int palmtc_keypad_row_gpios[] = {
++static const unsigned int palmtc_keypad_row_gpios[] = {
+ 	0, 9, 10, 11
+ };
+ 
+-const static unsigned int palmtc_keypad_col_gpios[] = {
++static const unsigned int palmtc_keypad_col_gpios[] = {
+ 	18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 79, 80
+ };
+ 
+-- 
+1.6.3.3
