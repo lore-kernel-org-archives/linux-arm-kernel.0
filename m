@@ -1,38 +1,53 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 May 2010 19:28:31 +0900
-Subject: [PATCH v2 3/3] [WATCHDOG] s3c2410_wdt - Fix on handling of the
-	request_mem_region fail
+Date: Thu, 20 May 2010 19:28:29 +0900
+Subject: [PATCH v2 1/3] [WATCHDOG] s3c2410_wdt - Add extra option to include
+	watchdog for Samsung SoCs
 In-Reply-To: <1274351311-6879-1-git-send-email-kgene.kim@samsung.com>
 References: <1274351311-6879-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1274351311-6879-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1274351311-6879-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Banajit Goswami <banajit.g@samsung.com>
 
-If the request for wdt_mem region fails, this patch modifies the driver
-such that, it does not try to release the wdt_mem region on exit.
+This patch adds HAVE_S3C2410_WATCHDOG to control inclusion of watchdog driver
+for Samsung SoCs. This option will help to include the driver only for the
+necessary machines and not for all for any given arch.
 
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Acked-by: Ben Dooks <ben-linux@fluff.org>
 ---
- drivers/watchdog/s3c2410_wdt.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ drivers/watchdog/Kconfig |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index e4cebef..d421258 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -426,8 +426,7 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 	wdt_mem = request_mem_region(res->start, size, pdev->name);
- 	if (wdt_mem == NULL) {
- 		dev_err(dev, "failed to get memory region\n");
--		ret = -ENOENT;
--		goto err_req;
-+		return -EBUSY;
- 	}
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 0bf5020..c232146 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -145,13 +145,19 @@ config KS8695_WATCHDOG
+ 	  Watchdog timer embedded into KS8695 processor. This will reboot your
+ 	  system when the timeout is reached.
  
- 	wdt_base = ioremap(res->start, size);
++config HAVE_S3C2410_WATCHDOG
++	bool
++	help
++	  This will include watchdog timer support for Samsung SoCs. If
++	  you want to include watchdog support for any machine, kindly
++	  select this in the respective mach-XXXX/Kconfig file.
++
+ config S3C2410_WATCHDOG
+ 	tristate "S3C2410 Watchdog"
+-	depends on ARCH_S3C2410
++	depends on ARCH_S3C2410 || HAVE_S3C2410_WATCHDOG
+ 	help
+-	  Watchdog timer block in the Samsung S3C2410 chips. This will
+-	  reboot the system when the timer expires with the watchdog
+-	  enabled.
++	  Watchdog timer block in the Samsung SoCs. This will reboot
++	  the system when the timer expires with the watchdog enabled.
+ 
+ 	  The driver is limited by the speed of the system's PCLK
+ 	  signal, so with reasonably fast systems (PCLK around 50-66MHz)
 -- 
-1.6.2.5
+1.6.5.2
