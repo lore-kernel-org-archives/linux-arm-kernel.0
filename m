@@ -1,28 +1,16 @@
-From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sun, 23 May 2010 22:09:58 +0200
-Subject: [PATCH 003/199] ARM mach-at91: duplicated include
-Message-ID: <1274645401-27734-1-git-send-email-andrea.gelmini@gelma.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 May 2010 19:28:28 +0900
+Subject: [PATCH 0/3] [WATCHDOG] s3c2410_wdt - Support for Samsung SoCs and Bug
+	fix on
+Message-ID: <1274351311-6879-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-at91/board-sam9m10g45ek.c: mach/hardware.h is included more than once
+This patches add Watchdog support for Samsung SoCs.
 
-Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
----
- arch/arm/mach-at91/board-sam9m10g45ek.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+- Add HAVE_S3C2410_WATCHDOG to control inclusion of watchdog driver
+- Fix on handling of the request_mem_region fail
 
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 98f9f4b..ee80059 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -25,7 +25,6 @@
- #include <linux/leds.h>
- #include <linux/clk.h>
- 
--#include <mach/hardware.h>
- #include <video/atmel_lcdc.h>
- 
- #include <asm/setup.h>
--- 
-1.7.1.251.gf80a2
+[PATCH v2 1/3] [WATCHDOG] s3c2410_wdt - Add extra option to include watchdog for Samsung SoCs
+[PATCH v2 2/3] ARM: SAMSUNG: Move WDT device definitions in plat-samsung
+[PATCH v2 3/3] [WATCHDOG] s3c2410_wdt - Fix on handling of the request_mem_region fail
