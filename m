@@ -1,140 +1,159 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 May 2010 10:34:53 +0100
-Subject: [PATCH 2/4] ARM: SAMSUNG: Make ADC client SMP safe
+Date: Thu, 20 May 2010 10:34:54 +0100
+Subject: [PATCH 3/4] ARM: SAMSUNG: Add support for interrupt wakeup-sources
 In-Reply-To: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
 References: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1274348095-9390-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1274348095-9390-3-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change local_irq disable calls to use spinlocks to ensure that the
-ADC driver data is protected against multiple access..
-
-Note, this does not protect the client's data, and the client should
-ensure it does not make multiple calls to the ADC driver.
+Add support for wakeup-mask style interrupts that share a
+single mask register for various different interrupts. This
+registers a set of interrupt->bit mappings and the register
+they belong to.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/adc.c |   26 ++++++++++++++++++++------
- 1 files changed, 20 insertions(+), 6 deletions(-)
+ arch/arm/plat-samsung/Kconfig                    |    8 ++++
+ arch/arm/plat-samsung/Makefile                   |    2 +
+ arch/arm/plat-samsung/include/plat/wakeup-mask.h |   44 ++++++++++++++++++++
+ arch/arm/plat-samsung/wakeup-mask.c              |   47 ++++++++++++++++++++++
+ 4 files changed, 101 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/wakeup-mask.h
+ create mode 100644 arch/arm/plat-samsung/wakeup-mask.c
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index 210030d..04d9521 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -66,6 +66,7 @@ struct adc_device {
- 	struct s3c_adc_client	*cur;
- 	struct s3c_adc_client	*ts_pend;
- 	void __iomem		*regs;
-+	spinlock_t		 lock;
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 229919e..75f1142 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -269,4 +269,12 @@ config SAMSUNG_PM_CHECK_CHUNKSIZE
  
- 	unsigned int		 prescale;
+ 	  See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
  
-@@ -74,7 +75,7 @@ struct adc_device {
- 
- static struct adc_device *adc_dev;
- 
--static LIST_HEAD(adc_pending);
-+static LIST_HEAD(adc_pending);	/* protected by adc_device.lock */
- 
- #define adc_dbg(_adc, msg...) dev_dbg(&(_adc)->pdev->dev, msg)
- 
-@@ -145,7 +146,7 @@ int s3c_adc_start(struct s3c_adc_client *client,
- 	if (client->is_ts && adc->ts_pend)
- 		return -EAGAIN;
- 
--	local_irq_save(flags);
-+	spin_lock_irqsave(&adc->lock, flags);
- 
- 	client->channel = channel;
- 	client->nr_samples = nr_samples;
-@@ -157,7 +158,8 @@ int s3c_adc_start(struct s3c_adc_client *client,
- 
- 	if (!adc->cur)
- 		s3c_adc_try(adc);
--	local_irq_restore(flags);
++config SAMSUNG_WAKEMASK
++	bool "Support for wakeup mask to irq mapping"
++	depends on PM
++	help
++	  Compile support for wakeup-mask controls found on the S3C6400
++	  and above. This code allows a set of interrupt to wakeup-mask
++	  mappings. See <plat/wakeup-mask.h>
 +
-+	spin_unlock_irqrestore(&adc->lock, flags);
+ endif
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 4828849..fbd5d1c 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -58,6 +58,8 @@ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_PM)		+= pm-gpio.o
+ obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
  
- 	return 0;
- }
-@@ -237,6 +239,10 @@ EXPORT_SYMBOL_GPL(s3c_adc_register);
- 
- void s3c_adc_release(struct s3c_adc_client *client)
- {
-+	unsigned long flags;
++obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
 +
-+	spin_lock_irqsave(&adc_dev->lock, flags);
+ # PWM support
+ 
+ obj-$(CONFIG_HAVE_PWM)		+= pwm.o
+diff --git a/arch/arm/plat-samsung/include/plat/wakeup-mask.h b/arch/arm/plat-samsung/include/plat/wakeup-mask.h
+new file mode 100644
+index 0000000..43e4acd
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/wakeup-mask.h
+@@ -0,0 +1,44 @@
++/* arch/arm/plat-samsung/include/plat/wakeup-mask.h
++ *
++ * Copyright 2010 Ben Dooks <ben-linux@fluff.org>
++ *
++ * Support for wakeup mask interrupts on newer SoCs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
 +
- 	/* We should really check that nothing is in progress. */
- 	if (adc_dev->cur == client)
- 		adc_dev->cur = NULL;
-@@ -255,6 +261,8 @@ void s3c_adc_release(struct s3c_adc_client *client)
- 
- 	if (adc_dev->cur == NULL)
- 		s3c_adc_try(adc_dev);
++#ifndef __PLAT_WAKEUP_MASK_H
++#define __PLAT_WAKEUP_MASK_H __file__
 +
-+	spin_unlock_irqrestore(&adc_dev->lock, flags);
- 	kfree(client);
- }
- EXPORT_SYMBOL_GPL(s3c_adc_release);
-@@ -264,7 +272,6 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
- 	struct adc_device *adc = pw;
- 	struct s3c_adc_client *client = adc->cur;
- 	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
--	unsigned long flags;
- 	unsigned data0, data1;
- 
- 	if (!client) {
-@@ -296,12 +303,12 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
- 		client->select_cb(client, 1);
- 		s3c_adc_convert(adc);
- 	} else {
--		local_irq_save(flags);
-+		spin_lock(&adc->lock);
- 		(client->select_cb)(client, 0);
- 		adc->cur = NULL;
- 
- 		s3c_adc_try(adc);
--		local_irq_restore(flags);
-+		spin_unlock(&adc->lock);
- 	}
- 
- exit:
-@@ -326,6 +333,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	spin_lock_init(&adc->lock);
++/* if no irq yet defined, but still want to mask */
++#define NO_WAKEUP_IRQ (0x90000000)
 +
- 	adc->pdev = pdev;
- 	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
- 
-@@ -407,13 +416,17 @@ static int __devexit s3c_adc_remove(struct platform_device *pdev)
- static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
-+	unsigned long flags;
- 	u32 con;
- 
-+	spin_lock_irqsave(&adc->lock, flags);
++/**
++ * struct samsung_wakeup_mask - wakeup mask information
++ * @irq: The interrupt associated with this wakeup.
++ * @bit: The bit, as a (1 << bitno) controlling this source.
++ */ 
++struct samsung_wakeup_mask {
++	unsigned int	irq;
++	u32		bit;
++};
 +
- 	con = readl(adc->regs + S3C2410_ADCCON);
- 	con |= S3C2410_ADCCON_STDBM;
- 	writel(con, adc->regs + S3C2410_ADCCON);
- 
- 	disable_irq(adc->irq);
-+	spin_unlock_irqrestore(&adc->lock, flags);
- 	clk_disable(adc->clk);
- 
- 	return 0;
-@@ -422,6 +435,7 @@ static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
- static int s3c_adc_resume(struct platform_device *pdev)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
-+	unsigned long flags;
- 
- 	clk_enable(adc->clk);
- 	enable_irq(adc->irq);
++/**
++ * samsung_sync_wakemask - sync wakeup mask information for pm
++ * @reg: The register that is used.
++ * @masks: The list of masks to use.
++ * @nr_masks: The number of entries pointed to buy @masks.
++ *
++ * Synchronise the wakeup mask information at suspend time from the list
++ * of interrupts and control bits in @masks. We do this at suspend time
++ * as overriding the relevant irq chips is harder and the register is only
++ * required to be correct before we enter sleep.
++ */
++extern void samsung_sync_wakemask(void __iomem *reg,
++				  struct samsung_wakeup_mask *masks,
++				  int nr_masks);
++
++#endif /* __PLAT_WAKEUP_MASK_H */
+diff --git a/arch/arm/plat-samsung/wakeup-mask.c b/arch/arm/plat-samsung/wakeup-mask.c
+new file mode 100644
+index 0000000..2e09b6a
+--- /dev/null
++++ b/arch/arm/plat-samsung/wakeup-mask.c
+@@ -0,0 +1,47 @@
++/* arch/arm/plat-samsung/wakeup-mask.c
++ *
++ * Copyright 2010 Ben Dooks <ben-linux@fluff.org>
++ *
++ * Support for wakeup mask interrupts on newer SoCs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/spinlock.h>
++#include <linux/sysdev.h>
++#include <linux/types.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++
++#include <plat/wakeup-mask.h>
++#include <plat/pm.h>
++
++void samsung_sync_wakemask(void __iomem *reg,
++			   struct samsung_wakeup_mask *mask, int nr_mask)
++{
++	struct irq_desc *desc;
++	u32 val;
++
++	val = __raw_readl(reg);
++
++	for (; nr_mask > 0; nr_mask--, mask++) {
++		if (mask->irq == NO_WAKEUP_IRQ) {
++			val |= mask->bit;
++			continue;
++		}
++
++		desc = irq_to_desc(mask->irq);
++
++		/* bit of a liberty to read this directly from irq_desc. */
++		if (desc->wake_depth > 0)
++			val &= ~mask->bit;
++		else
++			val |= mask->bit;
++	}
++
++	printk(KERN_INFO "wakemask %08x => %08x\n", __raw_readl(reg), val);
++	__raw_writel(val, reg);
++}
 -- 
 1.6.3.3
