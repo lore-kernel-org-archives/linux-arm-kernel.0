@@ -1,75 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 May 2010 15:30:21 +0100
-Subject: [PATCH 4/4] ARM: Defer the L_PTE_EXEC flag setting to
-	update_mmu_cache() on SMP
-In-Reply-To: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
-References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100520143021.22202.52811.stgit@e102109-lin.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 20 May 2010 23:05:06 +0800
+Subject: [PATCH 01/11] [ARM] pxa: Storage class should be before const
+	qualifier
+In-Reply-To: <201005201226.13337.marek.vasut@gmail.com>
+References: <1274344306-8735-1-git-send-email-tklauser@distanz.ch>
+	<201005201226.13337.marek.vasut@gmail.com>
+Message-ID: <AANLkTinQaa2HYk1TF5P_P3yMmBpMgxS5WzOgqGvojINx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SMP systems, there is a small chance of a PTE becoming visible to a
-different CPU before the cache maintenance operations in
-update_mmu_cache(). This patch clears the L_PTE_EXEC bit in set_pte_at()
-but sets it later in update_mmu_cache() if vm_flags & VM_EXEC.
+On Thu, May 20, 2010 at 6:26 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne ?t 20. kv?tna 2010 10:31:46 Tobias Klauser napsal(a):
+>> The C99 specification states in section 6.11.5:
+>>
+>> The placement of a storage-class specifier other than at the beginning
+>> of the declaration specifiers in a declaration is an obsolescent
+>> feature.
+>>
+>> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+>> ---
+>> ?arch/arm/mach-pxa/palmtc.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+>> index 033b567..ce1104d 100644
+>> --- a/arch/arm/mach-pxa/palmtc.c
+>> +++ b/arch/arm/mach-pxa/palmtc.c
+>> @@ -263,11 +263,11 @@ const struct matrix_keymap_data palmtc_keymap_data =
+>> { .keymap_size ? ? ? ? ? ? ? ?= ARRAY_SIZE(palmtc_matrix_keys),
+>> ?};
+>>
+>> -const static unsigned int palmtc_keypad_row_gpios[] = {
+>> +static const unsigned int palmtc_keypad_row_gpios[] = {
+>> ? ? ? 0, 9, 10, 11
+>> ?};
+>>
+>> -const static unsigned int palmtc_keypad_col_gpios[] = {
+>> +static const unsigned int palmtc_keypad_col_gpios[] = {
+>> ? ? ? 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 79, 80
+>> ?};
+>
+> Ok, if that's the case, you have my ack:
+>
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
+>
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/pgtable.h |   12 ++++++++++++
- arch/arm/mm/fault-armv.c       |   17 ++++++++++++-----
- 2 files changed, 24 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index ab68cf1..c50691f 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -278,9 +278,21 @@ extern struct page *empty_zero_page;
- 
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
- 
-+#ifndef CONFIG_SMP
- #define set_pte_at(mm,addr,ptep,pteval) do { \
- 	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-  } while (0)
-+#else
-+/*
-+ * The L_PTE_EXEC attribute is later be set in update_mmu_cache() to avoid a
-+ * race with SMP systems executing from the new mapping before the cache
-+ * flushing took place.
-+ */
-+#define set_pte_at(mm,addr,ptep,pteval) do { \
-+	set_pte_ext(ptep, __pte(pte_val(pteval) & ~L_PTE_EXEC), \
-+		    (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-+ } while (0)
-+#endif
- 
- /*
-  * The following only work if pte_present() is true.
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 91a691f..f2b2fa4 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -170,11 +170,18 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 	mapping = page_mapping(page);
- 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
- 		__flush_dcache_page(mapping, page);
--	if (mapping) {
--		if (cache_is_vivt())
--			make_coherent(mapping, vma, addr, ptep, pfn);
--		else if (vma->vm_flags & VM_EXEC)
--			__flush_icache_all();
-+	if (!mapping)
-+		return;
-+
-+	if (cache_is_vivt())
-+		make_coherent(mapping, vma, addr, ptep, pfn);
-+	else if (vma->vm_flags & VM_EXEC) {
-+		__flush_icache_all();
-+#ifdef CONFIG_SMP
-+		set_pte_ext(ptep, __pte(pte_val(*ptep) | L_PTE_EXEC),
-+			    addr >= TASK_SIZE ? 0 : PTE_EXT_NG);
-+		flush_tlb_page(vma, addr);
-+#endif
- 	}
- }
- 
+Applied.
