@@ -1,88 +1,20 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 20 May 2010 09:22:28 +0200
-Subject: [PATCH v2] eukrea_mbimx27: fix ADS7846 support
-In-Reply-To: <20100520063934.GS31199@pengutronix.de>
-References: <20100520063934.GS31199@pengutronix.de>
-Message-ID: <1274340148-4681-1-git-send-email-eric@eukrea.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 May 2010 16:21:27 +0900
+Subject: [PATCH 0/0] Add Watchdog support for Samsung SMDK6410,
+	S5P6440 and S5Pv210
+Message-ID: <1274340092-10706-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
-v2 : fix type in comments
- arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |   19 ++++++++++++-------
- 1 files changed, 12 insertions(+), 7 deletions(-)
+This patches add Watchdog support for SMDK6410, S5P6440 and S5PV210.
 
-diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-index fff6c8d..385abd1 100644
---- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-@@ -35,6 +35,7 @@
- #include <mach/hardware.h>
- #include <mach/mmc.h>
- #include <mach/imx-uart.h>
-+#include <mach/spi.h>
- 
- #include "devices.h"
- 
-@@ -88,7 +89,6 @@ static int eukrea_mbimx27_pins[] = {
- 	PA30_PF_CONTRAST,
- 	PA31_PF_OE_ACD,
- 	/* SPI1 */
--	PD28_PF_CSPI1_SS0,
- 	PD29_PF_CSPI1_SCLK,
- 	PD30_PF_CSPI1_MISO,
- 	PD31_PF_CSPI1_MOSI,
-@@ -236,7 +236,7 @@ static struct imxuart_platform_data uart_pdata[] = {
- 	},
- };
- 
--#if defined(CONFIG_TOUCHSCREEN_ADS7846)
-+#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
- 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
- 
- #define ADS7846_PENDOWN (GPIO_PORTD | 25)
-@@ -247,7 +247,6 @@ static void ads7846_dev_init(void)
- 		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
- 		return;
- 	}
--
- 	gpio_direction_input(ADS7846_PENDOWN);
- }
- 
-@@ -260,7 +259,9 @@ static struct ads7846_platform_data ads7846_config __initdata = {
- 	.get_pendown_state	= ads7846_get_pendown_state,
- 	.keep_vref_on		= 1,
- };
-+#endif
- 
-+#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
- static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
- 	[0] = {
- 		.modalias	= "ads7846",
-@@ -305,15 +306,19 @@ void __init eukrea_mbimx27_baseboard_init(void)
- 	mxc_register_device(&mxc_fb_device, &eukrea_mbimx27_fb_data);
- 	mxc_register_device(&mxc_sdhc_device0, NULL);
- 
--#if defined(CONFIG_TOUCHSCREEN_ADS7846)
-+#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
- 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
--	/* SPI and ADS7846 Touchscreen controler init */
--	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
-+	/* ADS7846 Touchscreen controller init */
- 	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
-+	ads7846_dev_init();
-+#endif
-+
-+#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-+	/* SPI_CS0 init */
-+	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
- 	mxc_register_device(&mxc_spi_device0, &eukrea_mbimx27_spi_0_data);
- 	spi_register_board_info(eukrea_mbimx27_spi_board_info,
- 			ARRAY_SIZE(eukrea_mbimx27_spi_board_info));
--	ads7846_dev_init();
- #endif
- 
- 	/* Leds configuration */
--- 
-1.6.3.3
+- Add HAVE_S3C2410_WATCHDOG for selecting watchgog driver compile in each machine
+- Add S3C_DEV_WDT for watchdog device definitions
+- Fix freeing memory part when memory region could not be allocated s3c2410_wdt
+- Add machine dependent part for watchdog support
+
+[PATCH 1/5] ARM: SAMSUNG: Move WDT device definitions in plat-samsung
+[PATCH 2/5] [WATCHDOG] s3c2410_wdt - Avoid freeing memory, if memory region could not be allocated
+[PATCH 3/5] ARM: SMDK6410: Add Watchdog support for SMDK6410
+[PATCH 4/5] ARM: S5P6440: Add Watchdog support for S5P6440
+[PATCH 5/5] ARM: S5PV210: Add Watchdog support for S5PV210
