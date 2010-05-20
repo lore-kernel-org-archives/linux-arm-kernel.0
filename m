@@ -1,10 +1,125 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 May 2010 11:58:23 +0100
-Subject: Samsung watchdog driver updates
-Message-ID: <1274353105-17774-1-git-send-email-ben-linux@fluff.org>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Thu, 20 May 2010 15:06:10 +0300
+Subject: [PATCH] ARM: Add a config option for the ARM11MPCore DMA cache
+	maintenance workaround
+In-Reply-To: <20100517143513.20087.84634.stgit@e102109-lin.cambridge.arm.com>
+References: <20100517143513.20087.84634.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <309002C0DA137042828828FC53D7A93492FA3AF1AA@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-two updates for samsung watchdog driver, one bugfix and one kconfig.
+Works for me...
 
-please apply for this merge window.
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Monday, May 17, 2010 5:35 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Ronen Shitrit
+Subject: [PATCH] ARM: Add a config option for the ARM11MPCore DMA cache maintenance workaround
+
+Commit f4d6477f introduced a workaround for the lack of hardware
+broadcasting of the cache maintenance operations on ARM11MPCore.
+However, the workaround is only valid on CPUs that do not do speculative
+loads into the D-cache.
+
+This patch adds a Kconfig option with the corresponding help to make the
+above clear. When the DMA_CACHE_RWFO option is disabled, the kernel
+behaviour is that prior to the f4d6477f commit. This also allows ARMv6
+UP processors with speculative loads to work correctly.
+
+For other processors, a different workaround may be needed.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ronen Shitrit <rshitrit@marvell.com>
+---
+ arch/arm/mm/Kconfig    |   19 +++++++++++++++++++
+ arch/arm/mm/cache-v6.S |   15 ++++++++++++---
+ 2 files changed, 31 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 755e081..c4694fc 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -741,6 +741,25 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
+ 	  Forget about fast user space cmpxchg support.
+ 	  It is just not possible.
+ 
++config DMA_CACHE_RWFO
++	bool "Enable read/write for ownership DMA cache maintenance"
++	depends on CPU_V6 && SMP
++	default y
++	help
++	  The Snoop Control Unit on ARM11MPCore does not detect the
++	  cache maintenance operations and the dma_{map,unmap}_area()
++	  functions may leave stale cache entries on other CPUs. By
++	  enabling this option, Read or Write For Ownership in the ARMv6
++	  DMA cache maintenance functions is performed. These LDR/STR
++	  instructions change the cache line state to shared or modified
++	  so that the cache operation has the desired effect.
++
++	  Note that the workaround is only valid on processors that do
++	  not perform speculative loads into the D-cache. For such
++	  processors, if cache maintenance operations are not broadcast
++	  in hardware, other workarounds are needed (e.g. cache
++	  maintenance broadcasting in software via FIQ).
++
+ config OUTER_CACHE
+ 	bool
+ 
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index 332b48c..86aa689 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -211,7 +211,7 @@ v6_dma_inv_range:
+ 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
+ #endif
+ 1:
+-#ifdef CONFIG_SMP
++#ifdef CONFIG_DMA_CACHE_RWFO
+ 	ldr	r2, [r0]			@ read for ownership
+ 	str	r2, [r0]			@ write for ownership
+ #endif
+@@ -235,7 +235,7 @@ v6_dma_inv_range:
+ v6_dma_clean_range:
+ 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+ 1:
+-#ifdef CONFIG_SMP
++#ifdef CONFIG_DMA_CACHE_RWFO
+ 	ldr	r2, [r0]			@ read for ownership
+ #endif
+ #ifdef HARVARD_CACHE
+@@ -258,7 +258,7 @@ v6_dma_clean_range:
+ ENTRY(v6_dma_flush_range)
+ 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+ 1:
+-#ifdef CONFIG_SMP
++#ifdef CONFIG_DMA_CACHE_RWFO
+ 	ldr	r2, [r0]			@ read for ownership
+ 	str	r2, [r0]			@ write for ownership
+ #endif
+@@ -284,9 +284,13 @@ ENTRY(v6_dma_map_area)
+ 	add	r1, r1, r0
+ 	teq	r2, #DMA_FROM_DEVICE
+ 	beq	v6_dma_inv_range
++#ifndef CONFIG_DMA_CACHE_RWFO
++	b	v6_dma_clean_range
++#else
+ 	teq	r2, #DMA_TO_DEVICE
+ 	beq	v6_dma_clean_range
+ 	b	v6_dma_flush_range
++#endif
+ ENDPROC(v6_dma_map_area)
+ 
+ /*
+@@ -296,6 +300,11 @@ ENDPROC(v6_dma_map_area)
+  *	- dir	- DMA direction
+  */
+ ENTRY(v6_dma_unmap_area)
++#ifndef CONFIG_DMA_CACHE_RWFO
++	add	r1, r1, r0
++	teq	r2, #DMA_TO_DEVICE
++	bne	v6_dma_inv_range
++#endif
+ 	mov	pc, lr
+ ENDPROC(v6_dma_unmap_area)
+ 
