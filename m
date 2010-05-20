@@ -1,36 +1,37 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 May 2010 14:21:47 +0100
-Subject: [PATCH 3/7] ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+Date: Thu, 20 May 2010 14:21:52 +0100
+Subject: [PATCH 4/7] ARM: The v6_dma_inv_range() function must preserve data
+	on SMP
 In-Reply-To: <20100520131833.7521.66668.stgit@e102109-lin.cambridge.arm.com>
 References: <20100520131833.7521.66668.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100520132147.7521.71018.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100520132152.7521.95985.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro is not defined when !CONFIG_MMU.
+A recent patch for DMA cache maintenance on ARM11MPCore added a write
+for ownership trick to the v6_dma_inv_range() function. Such operation
+destroys data already present in the buffer. However, this function is
+used with with dma_sync_single_for_device() which is supposed to
+preserve the existing data transfered into the buffer. This patch adds a
+combination of read/write for ownership to preserve the original data.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Ronen Shitrit <rshitrit@marvell.com>
 ---
- arch/arm/mm/dma-mapping.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-v6.S |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 13fa536..c4de90f 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -25,6 +25,7 @@
- #include <asm/sizes.h>
- 
- /* Sanity check size */
-+#ifdef CONFIG_MMU
- #if (CONSISTENT_DMA_SIZE % SZ_2M)
- #error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index e46ecd8..332b48c 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -212,7 +212,8 @@ v6_dma_inv_range:
  #endif
-@@ -32,6 +33,7 @@
- #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
- #define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
- #define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
-+#endif
- 
- static u64 get_coherent_dma_mask(struct device *dev)
- {
+ 1:
+ #ifdef CONFIG_SMP
+-	str	r0, [r0]			@ write for ownership
++	ldr	r2, [r0]			@ read for ownership
++	str	r2, [r0]			@ write for ownership
+ #endif
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
