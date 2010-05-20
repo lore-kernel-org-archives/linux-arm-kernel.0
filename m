@@ -1,38 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 May 2010 15:11:56 +0200
-Subject: Support Question
-In-Reply-To: <AANLkTin9qYxhbKe_ZDFvPbteM6Zn1H2M5jY6mAaH_Jxu@mail.gmail.com>
-References: <1274199223.1763.0.camel@ubuntu.ubuntu-domain>
-	<AANLkTin9qYxhbKe_ZDFvPbteM6Zn1H2M5jY6mAaH_Jxu@mail.gmail.com>
-Message-ID: <4BF5351C.80306@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 May 2010 14:21:30 +0100
+Subject: [PATCH 0/7] Patches for 2.6.35
+Message-ID: <20100520131833.7521.66668.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/05/2010 19:06, Amit kumar :
-> Dear Experts,
-> 
-> I am using SBC 9260 for development of a data acquisition platform. I am
-> using the SPI for data acquisition through 14 bit ADC slave. Currently
-> my board has debian 5.0 kernel version 2.6.30. I am using the spidriver
-> (spidev )for using the SPI on the board in master mode . Everything is
-> working fine and I am able to send and receive data . The only problem
-> is between the activation and deactivation of chip select.It takes
-> around 70microseconds for chipselect deactivation and then activation .
-> Since speed of my 4 channel ADC is 1MSPS so i need to bring down delay
-> as minimum as possible. I checked out the value of the registers
-> DLYBCS , DLYBCT , DLYBS and all are indicating the values 0.
-> 
-> Therefore I don;t have any idea from where the delay is being
-> introduced. Is it a problem of OS or there is nythng else involved .
-> Kindly guide me through this . I need urgent help .... any information
-> abt delay is welcome.
+Hi,
 
-In the atmel SPI driver, chipselect are managed by GPIO and not
-automatically by the IP. I think that this is why you experience such
-delays.
-I am not totally aware about the reasons for this hand-made management
-but I guess that you can find information on this mailing-list...
+These are a set of patches I'd like to get merged for 2.6.35 (during the
+-rc) period.
 
-Best regards,
+The first one was posted some time ago but deferred because of other
+conflicting patch (the 16-way PL310).
+
+Some of the other patches are necessary fixes plus a few trivial ones.
+
+Thanks.
+
+
+Catalin Marinas (7):
+      ARM: Improve the L2 cache performance when PL310 is used
+      ARM: Align machine_desc.phys_io to a 1MB section
+      ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+      ARM: The v6_dma_inv_range() function must preserve data on SMP
+      ARM: Add a config option for the ARM11MPCore DMA cache maintenance workaround
+      ARM: Add support for the MOVW/MOVT relocations in Thumb-2
+      ARM: Remove dummy loads from the original relocation address
+
+
+ arch/arm/include/asm/elf.h |    2 +
+ arch/arm/kernel/head.S     |    2 +
+ arch/arm/kernel/module.c   |   30 ++++++++++++++++++++
+ arch/arm/mm/Kconfig        |   26 ++++++++++++++++++
+ arch/arm/mm/cache-l2x0.c   |   65 ++++++++++++++++++++++++++++++--------------
+ arch/arm/mm/cache-v6.S     |   18 +++++++++---
+ arch/arm/mm/dma-mapping.c  |    2 +
+ 7 files changed, 120 insertions(+), 25 deletions(-)
+
 -- 
-Nicolas Ferre
+Catalin
