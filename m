@@ -1,74 +1,96 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 May 2010 10:34:55 +0100
-Subject: [PATCH 4/4] ARM: S3C64XX: PM: Synchronise wakeup mask on suspend
-In-Reply-To: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
-References: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1274348095-9390-4-git-send-email-ben-linux@fluff.org>
+Date: Thu, 20 May 2010 10:34:52 +0100
+Subject: [PATCH 1/4] ARM: S5P6440: Add locking to GPIO calls
+Message-ID: <1274348095-9390-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new wakeup mask synchronisation code to set the
-relevant wakeup mask bits.
+Add the new locking calls to ensure that these are always exclusively
+accessing the GPIO registers.
+
+Fixes a possible race between two threads modifying the same GPIO bank,
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c64xx/Kconfig |    1 +
- arch/arm/mach-s3c64xx/pm.c    |   20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p6440/gpio.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 69e9fbf..d026bf4 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -7,6 +7,7 @@
- config PLAT_S3C64XX
- 	bool
- 	depends on ARCH_S3C64XX
-+	select SAMSUNG_WAKEMASK
- 	default y
- 	help
- 	  Base platform code for any Samsung S3C64XX device
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index b8ac459..79412f7 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -18,8 +18,11 @@
- #include <linux/io.h>
+diff --git a/arch/arm/mach-s5p6440/gpio.c b/arch/arm/mach-s5p6440/gpio.c
+index 262dc75..92efc05 100644
+--- a/arch/arm/mach-s5p6440/gpio.c
++++ b/arch/arm/mach-s5p6440/gpio.c
+@@ -46,6 +46,7 @@ static int s5p6440_gpiolib_rbank_4bit2_input(struct gpio_chip *chip,
+ 	void __iomem *base = ourchip->base;
+ 	void __iomem *regcon = base;
+ 	unsigned long con;
++	unsigned long flags;
  
- #include <mach/map.h>
-+#include <mach/irqs.h>
+ 	switch (offset) {
+ 	case 6:
+@@ -63,10 +64,14 @@ static int s5p6440_gpiolib_rbank_4bit2_input(struct gpio_chip *chip,
+ 		break;
+ 	}
  
- #include <plat/pm.h>
-+#include <plat/wakeup-mask.h>
++	s3c_gpio_lock(ourchip, flags);
 +
- #include <mach/regs-sys.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-clock.h>
-@@ -153,8 +156,25 @@ static void s3c64xx_cpu_suspend(void)
- 	panic("sleep resumed to originator?");
+ 	con = __raw_readl(regcon);
+ 	con &= ~(0xf << con_4bit_shift(offset));
+ 	__raw_writel(con, regcon);
+ 
++	s3c_gpio_unlock(ourchip, flags);
++
+ 	return 0;
  }
  
-+/* mapping of interrupts to parts of the wakeup mask */
-+static struct samsung_wakeup_mask wake_irqs[] = {
-+	{ .irq = IRQ_RTC_ALARM,	.bit = S3C64XX_PWRCFG_RTC_ALARM_DISABLE, },
-+	{ .irq = IRQ_RTC_TIC,	.bit = S3C64XX_PWRCFG_RTC_TICK_DISABLE, },
-+	{ .irq = IRQ_PENDN,	.bit = S3C64XX_PWRCFG_TS_DISABLE, },
-+	{ .irq = IRQ_HSMMC0,	.bit = S3C64XX_PWRCFG_MMC0_DISABLE, },
-+	{ .irq = IRQ_HSMMC1,	.bit = S3C64XX_PWRCFG_MMC1_DISABLE, },
-+	{ .irq = IRQ_HSMMC2,	.bit = S3C64XX_PWRCFG_MMC2_DISABLE, },
-+	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_BATF_DISABLE},
-+	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_MSM_DISABLE },
-+	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_HSI_DISABLE },
-+	{ .irq = NO_WAKEUP_IRQ,	.bit = S3C64XX_PWRCFG_MSM_DISABLE },
-+};
+@@ -78,6 +83,7 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
+ 	void __iomem *regcon = base;
+ 	unsigned long con;
+ 	unsigned long dat;
++	unsigned long flags;
+ 	unsigned con_offset  = offset;
+ 
+ 	switch (con_offset) {
+@@ -96,6 +102,8 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
+ 		break;
+ 	}
+ 
++	s3c_gpio_lock(ourchip, flags);
 +
- static void s3c64xx_pm_prepare(void)
+ 	con = __raw_readl(regcon);
+ 	con &= ~(0xf << con_4bit_shift(con_offset));
+ 	con |= 0x1 << con_4bit_shift(con_offset);
+@@ -109,6 +117,8 @@ static int s5p6440_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
+ 	__raw_writel(con, regcon);
+ 	__raw_writel(dat, base + GPIODAT_OFF);
+ 
++	s3c_gpio_unlock(ourchip, flags);
++
+ 	return 0;
+ }
+ 
+@@ -117,6 +127,7 @@ int s5p6440_gpio_setcfg_4bit_rbank(struct s3c_gpio_chip *chip,
  {
-+	samsung_sync_wakemask(S3C64XX_PWR_CFG,
-+			      wake_irqs, ARRAY_SIZE(wake_irqs));
+ 	void __iomem *reg = chip->base;
+ 	unsigned int shift;
++	unsigned long flags;
+ 	u32 con;
+ 
+ 	switch (off) {
+@@ -142,11 +153,15 @@ int s5p6440_gpio_setcfg_4bit_rbank(struct s3c_gpio_chip *chip,
+ 		cfg <<= shift;
+ 	}
+ 
++	s3c_gpio_lock(chip, flags);
 +
- 	/* store address of resume. */
- 	__raw_writel(virt_to_phys(s3c_cpu_resume), S3C64XX_INFORM0);
+ 	con = __raw_readl(reg);
+ 	con &= ~(0xf << shift);
+ 	con |= cfg;
+ 	__raw_writel(con, reg);
+ 
++	s3c_gpio_unlock(chip, flags);
++
+ 	return 0;
+ }
  
 -- 
 1.6.3.3
