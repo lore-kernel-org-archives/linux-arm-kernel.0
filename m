@@ -1,46 +1,51 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 20 May 2010 22:06:34 +0800
-Subject: L2 cache support for pxa16x
-In-Reply-To: <1274350676.6926.58.camel@pe-dt434>
-References: <1273658181.6926.27.camel@pe-dt434>
-	<AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
-	<1274350676.6926.58.camel@pe-dt434>
-Message-ID: <AANLkTil839_xcOATFEFyQH5YVgWPwJcf31Wo1ZqmJ7Z6@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 May 2010 15:29:58 +0100
+Subject: [PATCH 0/4] Patches for -next
+Message-ID: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 20, 2010 at 6:17 PM, Siddarth Gore <gores@marvell.com> wrote:
-> On Wed, 2010-05-12 at 03:11 -0700, Eric Miao wrote:
->> On Wed, May 12, 2010 at 11:56 AM, Siddarth Gore <gores@marvell.com> wrote:
->> > Hi Eric/Haojian,
->> >
->> > Can the Tauros2 support be used for pxa168 as well? The one difference I
->> > can see is that L2 Enable is in control register instead of extra
->> > feature register. But rest of the things look very similar to me.
->> >
->
-> I tried doing this. It works when I enable L2 before turning the MMU on,
-> i.e. in __mohawk_setup
->
-> But when I do the following in tauros2_init(), the kernel crashes.
-> 1. flush and disable dcache
-> 2. invalidate and disable icache
-> 3. drain write buffer
-> 4. invalidate TLB
-> 5. invalidate L2
-> 6. enable L2
-> 7. enable icache
-> 8. enable dcache
->
-> I think the right place to enable L2 is in tauros2_init, so any idea
-> what I am doing wrong here?
->
+Hi,
 
-I believe that was the reason why I didn't put tauros2 support to pxa168
-at the first place. And enabling L2 after MMU is enabled is supposed to
-be unsafe, which is mentioned in xscale3 manual, though not sure if that's
-the case for pxa168 as well.
+I would like to get these patches in the linux-next tree for this
+release cycle and aim to submit them for upstream 2.6.36-rc1 (next
+merging window).
 
-> -siddarth
->
->
+Please let me know if you have any objections.
+
+Thanks.
+
+
+Catalin Marinas (4):
+      ARM: Remove the domain switching on ARMv6k/v7 CPUs
+      ARM: Use lazy cache flushing on ARMv7 SMP systems
+      ARM: Assume new page cache pages have dirty D-cache
+      ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP
+
+
+ arch/arm/include/asm/assembler.h  |   13 +++---
+ arch/arm/include/asm/cacheflush.h |    6 +--
+ arch/arm/include/asm/domain.h     |   31 +++++++++++++-
+ arch/arm/include/asm/futex.h      |    9 ++--
+ arch/arm/include/asm/pgtable.h    |   12 +++++
+ arch/arm/include/asm/smp_plat.h   |    4 ++
+ arch/arm/include/asm/tlbflush.h   |    2 -
+ arch/arm/include/asm/uaccess.h    |   16 ++++---
+ arch/arm/kernel/entry-armv.S      |    4 +-
+ arch/arm/kernel/traps.c           |   17 ++++++++
+ arch/arm/lib/getuser.S            |   13 +++---
+ arch/arm/lib/putuser.S            |   29 +++++++------
+ arch/arm/lib/uaccess.S            |   83 +++++++++++++++++++------------------
+ arch/arm/mm/Kconfig               |    8 ++++
+ arch/arm/mm/copypage-v4mc.c       |    2 -
+ arch/arm/mm/copypage-v6.c         |    2 -
+ arch/arm/mm/copypage-xscale.c     |    2 -
+ arch/arm/mm/dma-mapping.c         |    6 +++
+ arch/arm/mm/fault-armv.c          |   21 ++++++---
+ arch/arm/mm/flush.c               |   15 ++-----
+ arch/arm/mm/proc-macros.S         |    7 +++
+ arch/arm/mm/proc-v7.S             |    5 +-
+ 22 files changed, 197 insertions(+), 110 deletions(-)
+
+-- 
+Catalin
