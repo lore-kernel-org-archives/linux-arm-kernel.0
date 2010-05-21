@@ -1,26 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 May 2010 20:04:57 +0100
-Subject: [PATCH 0/4] Patches for -next
-In-Reply-To: <1274435541.11965.18.camel@e102109-lin.cambridge.arm.com>
-References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5667016@dbde02.ent.ti.com>
-	<1274435541.11965.18.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100521190456.GB11042@n2100.arm.linux.org.uk>
+Date: Fri, 21 May 2010 20:10:25 +0100
+Subject: [PATCH] ARM: S5PV210: Add GONI board support
+In-Reply-To: <AANLkTikKmNSqLwvpvj3DQVEoKgE6gvt0eBLxiwRswx09@mail.gmail.com>
+References: <4BF3F284.5090505@samsung.com>
+	<20100520004856.GK4720@trinity.fluff.org>
+	<AANLkTikKmNSqLwvpvj3DQVEoKgE6gvt0eBLxiwRswx09@mail.gmail.com>
+Message-ID: <20100521191025.GC11042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 10:52:21AM +0100, Catalin Marinas wrote:
-> +	if (cache_is_vivt())
-> +		make_coherent(mapping, vma, addr, ptep, pfn);
-> +	else if (vma->vm_flags & VM_EXEC) {
-> +		__flush_icache_all();
-> +#ifdef CONFIG_SMP
-> +		set_pte_ext(ptep, __pte(pte_val(*ptep) | L_PTE_EXEC),
-> +			    addr >= TASK_SIZE ? 0 : PTE_EXT_NG);
+On Thu, May 20, 2010 at 10:10:33AM +0900, Kyungmin Park wrote:
+> In the previous time, Marek sent the s5pv210 patch including the
+> aquila board support.
+> But in this merge cycle, it doesn't included. of course all s5pv210 patches too,
+> Please find the patch subject "ARM: S5PV210: add Aquila board" and
+> check it again.
 
-You don't need this test - pages which have VMAs are userspace pages,
-and therefore the address is always < TASK_SIZE.  Therefore, they're
-always non-global:
+The merge windows are not for people to send their patches which they've
+been sitting on to mailing lists.  The merge window is for the patches
+prepared and reviewed _prior_ to the merge window opening, and which
+have been tested in the linux-next tree to be merged into Linus' tree.
 
-		set_pte_ext(ptep, __pte(pte_val(*ptep) | L_PTE_EXEC),
-			    PTE_EXT_NG);
+I make this comment because it seems to me that as soon as the merge
+window opened, this mailing list immediately got flooded with Samsung
+patches.  This is not the way it works.
+
+In future, please prepare your patches before the merge window, and
+submit them to the mailing list for review as soon as they're prepared.
+Once they've been reviewed, they can be queued and sit in linux-next
+for a while for the following merge window.
