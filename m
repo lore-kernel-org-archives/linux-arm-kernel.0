@@ -1,67 +1,73 @@
 From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 21 May 2010 13:41:12 +0200
-Subject: [PATCH 2/5] mxc_nand: fix PM
-In-Reply-To: <1274440363-435-2-git-send-email-eric@eukrea.com>
+Date: Fri, 21 May 2010 14:02:44 +0200
+Subject: [PATCH 1/5] i.MX27: add suspend to RAM support
+In-Reply-To: <1274440363-435-1-git-send-email-eric@eukrea.com>
 References: <1274440363-435-1-git-send-email-eric@eukrea.com>
-	<1274440363-435-2-git-send-email-eric@eukrea.com>
-Message-ID: <19446.29016.956006.230105@ipc1.ka-ro>
+Message-ID: <19446.30308.103514.313301@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
->  drivers/mtd/nand/mxc_nand.c |   27 ++++++++++-----------------
->  1 files changed, 10 insertions(+), 17 deletions(-)
+Eric B?nard writes:
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  arch/arm/mach-mx2/Makefile   |    2 +-
+>  arch/arm/mach-mx2/pm-imx27.c |   46 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-mx2/pm-imx27.c
 > 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index fb03aff..5e51d4d 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -895,16 +895,13 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
->  #ifdef CONFIG_PM
->  static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
->  {
-> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
-> -	struct nand_chip *nand_chip = mtd->priv;
-> -	struct mxc_nand_host *host = nand_chip->priv;
-> +	struct mxc_nand_host *host = platform_get_drvdata(pdev);
->  	int ret = 0;
+> diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
+> index e3254fa..27d496c 100644
+> --- a/arch/arm/mach-mx2/Makefile
+> +++ b/arch/arm/mach-mx2/Makefile
+> @@ -8,7 +8,7 @@ obj-y	:=  devices.o serial.o
 >  
->  	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND suspend\n");
-> -	if (mtd) {
-> -		ret = mtd->suspend(mtd);
-> -		/* Disable the NFC clock */
-> +	if (host->clk_act) {
->  		clk_disable(host->clk);
-> +		host->clk_act = 0;
-[...]
-> @@ -912,31 +909,27 @@ static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+>  obj-$(CONFIG_MACH_MX21) += clock_imx21.o mm-imx21.o
 >  
->  static int mxcnd_resume(struct platform_device *pdev)
->  {
-> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
-> -	struct nand_chip *nand_chip = mtd->priv;
-> -	struct mxc_nand_host *host = nand_chip->priv;
-> +	struct mxc_nand_host *host = platform_get_drvdata(pdev);
->  	int ret = 0;
+> -obj-$(CONFIG_MACH_MX27) += cpu_imx27.o
+> +obj-$(CONFIG_MACH_MX27) += cpu_imx27.o pm-imx27.o
+>  obj-$(CONFIG_MACH_MX27) += clock_imx27.o mm-imx27.o
 >  
->  	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
-> -
-> -	if (mtd) {
-> -		/* Enable the NFC clock */
-> +	if (!host->clk_act) {
->  		clk_enable(host->clk);
-> -		mtd->resume(mtd);
-> +		host->clk_act = 1;
->  	}
+>  obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+> diff --git a/arch/arm/mach-mx2/pm-imx27.c b/arch/arm/mach-mx2/pm-imx27.c
+> new file mode 100644
+> index 0000000..a82fb6d
+> --- /dev/null
+> +++ b/arch/arm/mach-mx2/pm-imx27.c
+> @@ -0,0 +1,46 @@
+> +/*
+> + * i.MX27 Power Management Routines
+> + *
+> + * Based on Freescale's BSP
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/suspend.h>
+> +#include <asm/io.h>
+> +#include <mach/system.h>
+> +#include <mach/mx27.h>
+> +
+> +static int mx27_suspend_enter(suspend_state_t state)
+> +{
+> +	u32 cscr;
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		/* Clear MPEN and SPEN to disable MPLL/SPLL */
+> +		cscr = __raw_readl(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR));
+> +		cscr &= 0xFFFFFFFC;
+> +		__raw_writel(cscr, MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR));
+> +		/* Executes WFI */
+> +		arch_idle();
+> +		break;
+> +
+> +	default:
+> +		return -1;
 >
-Since you are clearing host->clk_act during suspend, this will
-unconditionally enable the clock no matter what state it had before
-suspend (in case that's intended, the check for !host->clk_act is
-useless, since it will always yield true).
-I think it's more sensible to leave host->clk_act alone, and reenable
-the clock only if host->clk_act is set, so that the clock is left in
-the same state after resume in which it was before suspend.
+an errno value would be more appropriate here.
 
 
 Lothar Wa?mann
