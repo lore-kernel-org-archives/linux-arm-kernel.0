@@ -1,78 +1,109 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 21 May 2010 10:19:43 +0200
-Subject: Samsung watchdog driver updates
-In-Reply-To: <1274353105-17774-1-git-send-email-ben-linux@fluff.org>
-References: <1274353105-17774-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <20100521081943.GO3972@infomag.iguana.be>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 May 2010 10:52:21 +0100
+Subject: [PATCH 0/4] Patches for -next
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5667016@dbde02.ent.ti.com>
+References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5667016@dbde02.ent.ti.com>
+Message-ID: <1274435541.11965.18.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Santosh,
 
-> two updates for samsung watchdog driver, one bugfix and one kconfig.
-> 
-> please apply for this merge window.
+On Fri, 2010-05-21 at 06:59 +0100, Shilimkar, Santosh wrote:
+> > Catalin Marinas (4):
+> >       ARM: Remove the domain switching on ARMv6k/v7 CPUs
+> >       ARM: Use lazy cache flushing on ARMv7 SMP systems
+> >       ARM: Assume new page cache pages have dirty D-cache
+> >       ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP
+> >
+> >
+> I just gave quick try with these patches on OMAP4 yesterday.
+> "ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP"
+> patch is creating regression when loading the module.
 
-I added them to the linux-2.6-watchdog tree so that they can be included
-in this merge window.
+Thanks for testing and reporting this. I missed the fact the modules
+allocation uses set_pte_at(). Below is an updated patch which makes sure
+that L_PTE_EXEC is set for addresses greater than TASK_SIZE. We
+shouldn't have a race for modules as initialisation only happens on a
+single CPU.
 
-I also created a fix for the removal of the driver (the misc_deregister
-needs to happen first so that userspace access is removed before removing
-the rest of the driver).
-Can you test and give feedback?
+Could you please try the updated patch below?
 
-Thanks,
-Wim.
 
-commit c41e5d25f3d82d1b048f8dc156f057d0deba093a
-Author: Wim Van Sebroeck <wim@iguana.be>
-Date:   Fri May 21 08:11:42 2010 +0000
+ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP
 
-    watchdog: s3c2410_wdt - Fix removing of platform device
-    
-    When removing the watchdog platform device, we need to
-    disable the access to userspace first. It makes no sense
-    to remove the drivers clock, irq's, ... and then disable
-    usersapce access.
-    the order of removal has also been changed so that it
-    is the reverse of probing (this way the clock is also
-    disabled sooner).
-    
-    Cc: Ben Dooks <ben-linux@fluff.org>
-    Signed-off-by: Wim Van Sebroeck <wim@iguana.be>
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 3009325..ae53662 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -532,21 +532,22 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+On SMP systems, there is a small chance of a PTE becoming visible to a
+different CPU before the cache maintenance operations in
+update_mmu_cache(). This patch clears the L_PTE_EXEC bit in set_pte_at()
+but sets it later in update_mmu_cache() if vm_flags & VM_EXEC.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/pgtable.h |   15 +++++++++++++++
+ arch/arm/mm/fault-armv.c       |   17 ++++++++++++-----
+ 2 files changed, 27 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 1139768..ee8cc13 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -278,9 +278,24 @@ extern struct page *empty_zero_page;
  
- static int __devexit s3c2410wdt_remove(struct platform_device *dev)
- {
--	s3c2410wdt_cpufreq_deregister();
--
--	release_resource(wdt_mem);
--	kfree(wdt_mem);
--	wdt_mem = NULL;
-+	misc_deregister(&s3c2410wdt_miscdev);
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
  
--	free_irq(wdt_irq->start, dev);
--	wdt_irq = NULL;
-+	s3c2410wdt_cpufreq_deregister();
++#ifndef CONFIG_SMP
+ #define set_pte_at(mm,addr,ptep,pteval) do { \
+ 	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
+  } while (0)
++#else
++/*
++ * The L_PTE_EXEC attribute is later set in update_mmu_cache() to avoid a
++ * race with SMP systems executing from the new mapping before the cache
++ * flushing took place.
++ */
++#define set_pte_at(mm,addr,ptep,pteval) do { \
++	if ((addr) >= TASK_SIZE) \
++		set_pte_ext(ptep, pteval, 0); \
++	else \
++		set_pte_ext(ptep, __pte(pte_val(pteval) & ~L_PTE_EXEC), \
++			    PTE_EXT_NG); \
++ } while (0)
++#endif
  
- 	clk_disable(wdt_clock);
- 	clk_put(wdt_clock);
- 	wdt_clock = NULL;
- 
-+	free_irq(wdt_irq->start, dev);
-+	wdt_irq = NULL;
+ /*
+  * The following only work if pte_present() is true.
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index f9e9cbb..c01356d 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -172,11 +172,18 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 	mapping = page_mapping(page);
+ 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+-	if (mapping) {
+-		if (cache_is_vivt())
+-			make_coherent(mapping, vma, addr, ptep, pfn);
+-		else if (vma->vm_flags & VM_EXEC)
+-			__flush_icache_all();
++	if (!mapping)
++		return;
 +
- 	iounmap(wdt_base);
--	misc_deregister(&s3c2410wdt_miscdev);
-+
-+	release_resource(wdt_mem);
-+	kfree(wdt_mem);
-+	wdt_mem = NULL;
- 	return 0;
++	if (cache_is_vivt())
++		make_coherent(mapping, vma, addr, ptep, pfn);
++	else if (vma->vm_flags & VM_EXEC) {
++		__flush_icache_all();
++#ifdef CONFIG_SMP
++		set_pte_ext(ptep, __pte(pte_val(*ptep) | L_PTE_EXEC),
++			    addr >= TASK_SIZE ? 0 : PTE_EXT_NG);
++		flush_tlb_page(vma, addr);
++#endif
+ 	}
  }
  
+
+
+-- 
+Catalin
