@@ -1,28 +1,26 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 21 May 2010 22:27:05 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 May 2010 21:43:43 +0100
 Subject: Initrd and 2.6.33 curious behaviour
-Message-ID: <874oi157c6.fsf@free.fr>
+In-Reply-To: <874oi157c6.fsf@free.fr>
+References: <874oi157c6.fsf@free.fr>
+Message-ID: <20100521204343.GA18032@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I pulled the 2.6.33 kernel and tried my mainboard with it (mioa701). My kernel
-boots fine, but initrd load always fails.
+On Fri, May 21, 2010 at 10:27:05PM +0200, Robert Jarzmik wrote:
+> I pulled the 2.6.33 kernel and tried my mainboard with it (mioa701). My
+> kernel boots fine, but initrd load always fails.
 
-After digging a bit in arch/arm/mm/init.c, I find that :
- - phys_initrd_start = 0xa0508000
- - phys_initrd_size = 3 759 480
- - initrd_start = 0 and initrd_end = 0
+Please post all the kernel messages.
 
-I'm a bit puzzled why initrd_start is null. I would expect it to be the virtual
-address where the initrd is to be found.
+> After digging a bit in arch/arm/mm/init.c, I find that :
+>  - phys_initrd_start = 0xa0508000
+>  - phys_initrd_size = 3 759 480
+>  - initrd_start = 0 and initrd_end = 0
 
-Am I the only one with initrd problems on 2.6.34 kernels ?
+It's unclear where you're checking this.  The virtual pointers are only
+setup if we're satisfied that the phys_* are within RAM, and we can
+exclusively reserve the region.
 
-For the record, the bootloader is the same I had before (haret), and the ATAGS
-list passed to the kernel is correct. The initrd is the same I've been using
-since 2.6.29 kernel. I have not tested since 2.6.32 I think.
-
-Cheers.
-
---
-Robert
+If we can't reserve the region, that means something's overwritten it
+during kernel boot and it's become unusable.
