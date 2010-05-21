@@ -1,94 +1,77 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 21 May 2010 19:37:42 +0800
-Subject: L2 cache support for pxa16x
-In-Reply-To: <AANLkTilYrgroqxaL0uGnpmTXmUznkijtFmNmkSuFL89V@mail.gmail.com>
-References: <1273658181.6926.27.camel@pe-dt434>
-	<AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
-	<1274350676.6926.58.camel@pe-dt434>
-	<AANLkTilYrgroqxaL0uGnpmTXmUznkijtFmNmkSuFL89V@mail.gmail.com>
-Message-ID: <AANLkTilmSM0n-k-KhcMQRLMiBF21LRSZAbluLWjxmvKf@mail.gmail.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Fri, 21 May 2010 13:41:12 +0200
+Subject: [PATCH 2/5] mxc_nand: fix PM
+In-Reply-To: <1274440363-435-2-git-send-email-eric@eukrea.com>
+References: <1274440363-435-1-git-send-email-eric@eukrea.com>
+	<1274440363-435-2-git-send-email-eric@eukrea.com>
+Message-ID: <19446.29016.956006.230105@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 7:05 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Thu, May 20, 2010 at 6:17 PM, Siddarth Gore <gores@marvell.com> wrote:
->> On Wed, 2010-05-12 at 03:11 -0700, Eric Miao wrote:
->>> On Wed, May 12, 2010 at 11:56 AM, Siddarth Gore <gores@marvell.com> wrote:
->>> > Hi Eric/Haojian,
->>> >
->>> > Can the Tauros2 support be used for pxa168 as well? The one difference I
->>> > can see is that L2 Enable is in control register instead of extra
->>> > feature register. But rest of the things look very similar to me.
->>> >
->>
->> I tried doing this. It works when I enable L2 before turning the MMU on,
->> i.e. in __mohawk_setup
->>
->> But when I do the following in tauros2_init(), the kernel crashes.
->> 1. flush and disable dcache
->> 2. invalidate and disable icache
->> 3. drain write buffer
->> 4. invalidate TLB
->> 5. invalidate L2
->> 6. enable L2
->> 7. enable icache
->> 8. enable dcache
->>
->> I think the right place to enable L2 is in tauros2_init, so any idea
->> what I am doing wrong here?
->>
->> -siddarth
->>
->>
->
-> I didn't meet any failure on enabling L2. What I do is in below. Which
-> kernel version are you using?
->
->
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 652ae66..689e0d5 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -15,6 +15,7 @@
-> ?#include <linux/io.h>
-> ?#include <linux/clk.h>
->
-> +#include <asm/hardware/cache-tauros2.h>
-> ?#include <asm/mach/time.h>
-> ?#include <mach/addr-map.h>
-> ?#include <mach/cputype.h>
-> @@ -101,6 +102,7 @@ static struct clk_lookup pxa168_clkregs[] = {
-> ?static int __init pxa168_init(void)
-> ?{
-> ? ? ? ?if (cpu_is_pxa168()) {
-> + ? ? ? ? ? ? ? tauros2_init();
-> ? ? ? ? ? ? ? ?mfp_init_base(MFPR_VIRT_BASE);
-> ? ? ? ? ? ? ? ?mfp_init_addr(pxa168_mfp_addr_map);
-> ? ? ? ? ? ? ? ?pxa_init_dma(IRQ_PXA168_DMA_INT0, 32);
-> diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
-> index 5086865..79f49f5 100644
-> --- a/arch/arm/mm/cache-tauros2.c
-> +++ b/arch/arm/mm/cache-tauros2.c
-> @@ -120,7 +120,11 @@ static inline u32 __init read_extra_features(void)
->
-> ?static inline void __init write_extra_features(u32 u)
-> ?{
-> + ? ? ? volatile u32 cp15;
-> ? ? ? ?__asm__("mcr p15, 1, %0, c15, c1, 0" : : "r" (u));
-> + ? ? ? __asm__("mrc p15, 0, %0, c1, c0, 0" : "=r" (cp15));
-> + ? ? ? cp15 |= (1 << 26);
-> + ? ? ? __asm__("mcr p15, 0, %0, c1, c0, 0" : : "r" (cp15));
-> ?}
->
+Hi,
 
-The feature register existing on other v5 cores is actually co-processor
-enable register in PJ1. I doubt that's going to cause no side effect, we don't
-likely need to use this extra feature register at all. A more preferable way
-would be to have something like below in tauros2_init:
+>  drivers/mtd/nand/mxc_nand.c |   27 ++++++++++-----------------
+>  1 files changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index fb03aff..5e51d4d 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -895,16 +895,13 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM
+>  static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+>  {
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> +	struct mxc_nand_host *host = platform_get_drvdata(pdev);
+>  	int ret = 0;
+>  
+>  	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND suspend\n");
+> -	if (mtd) {
+> -		ret = mtd->suspend(mtd);
+> -		/* Disable the NFC clock */
+> +	if (host->clk_act) {
+>  		clk_disable(host->clk);
+> +		host->clk_act = 0;
+[...]
+> @@ -912,31 +909,27 @@ static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+>  
+>  static int mxcnd_resume(struct platform_device *pdev)
+>  {
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> +	struct mxc_nand_host *host = platform_get_drvdata(pdev);
+>  	int ret = 0;
+>  
+>  	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+> -
+> -	if (mtd) {
+> -		/* Enable the NFC clock */
+> +	if (!host->clk_act) {
+>  		clk_enable(host->clk);
+> -		mtd->resume(mtd);
+> +		host->clk_act = 1;
+>  	}
+>
+Since you are clearing host->clk_act during suspend, this will
+unconditionally enable the clock no matter what state it had before
+suspend (in case that's intended, the check for !host->clk_act is
+useless, since it will always yield true).
+I think it's more sensible to leave host->clk_act alone, and reenable
+the clock only if host->clk_act is set, so that the clock is left in
+the same state after resume in which it was before suspend.
 
-if (cpu_is_pj1()) {
-        enable_l2_bit();
-        outer_cache.inv_range = ....
-        ....
-}
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
