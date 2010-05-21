@@ -1,58 +1,48 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 22 May 2010 01:09:12 +0300
-Subject: [PATCH v2t2 00/17] omap: mailbox:
-In-Reply-To: <20100521215730.GK11042@n2100.arm.linux.org.uk>
-References: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
-	<20100521215730.GK11042@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin03gFY1uc9__lGO8lHiKMjuSBRSYcFDhLYDIMD@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 21 May 2010 15:10:55 -0700
+Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
+In-Reply-To: <20100521220653.GL11042@n2100.arm.linux.org.uk>
+References: <1272654736-28837-1-git-send-email-ccross@android.com>
+	<u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
+	<87d3xgd20n.fsf@deeprootsystems.com>
+	<20100501100148.GE12172@n2100.arm.linux.org.uk>
+	<4BF702CC.5000401@codeaurora.org>
+	<20100521220653.GL11042@n2100.arm.linux.org.uk>
+Message-ID: <4BF704EF.8000605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 22, 2010 at 12:57 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, May 22, 2010 at 12:44:32AM +0300, Felipe Contreras wrote:
->> [no changes since the last v2, just rebased on top of the latest
->> git://gitorious.org/~doyu/lk/mainline.git for-tony-mailbox]
+Russell King - ARM Linux wrote:
+> On Fri, May 21, 2010 at 03:01:48PM -0700, Saravana Kannan wrote:
+>> Russell King - ARM Linux wrote:
+>>> We may be running into the same problem which we did with the printk
+>>> clock - that is using a machine provided sched_clock() or clocksource
+>>> requires MMIO accesses, which can only be done after the IO mappings
+>>> have been initialized.
+>>>
+>>> Let's hope no one ever uses udelay() before the necessary IO mappings
+>>> are present.
+>> Is the patch that uses CONFIG_ARCH_PROVIDES_UDELAY acceptable? I don't  
+>> care much for how each arch decides to implement it, but I think we  
+>> should have this config to let each arch decide how they want to handle  
+>> udelay.
 >>
->> Currently, the code is split into three places:
->> 1) mach-omapX/devices.c: for platform_device_register() the resources
->> 2) mach-omapX/mailbox.c: do platform_driver_register(), fetch the resources,
->> ? ?and register logical mailboxes with omap_mbox_register()
->> 3) plat-omap/mailbox.c: implement omap_mbox_register() to add the mbox
->> ? ?to an internal linked list (static struct omap_mbox *mboxes)
->>
->> So, obviously 1) is always built-in, but 2) can't be because of the
->> dependency of omap_mbox_register(), which is in 3) and cannot be taken
->> out.
->>
->> Users of mailbox will load 3) due to omap_mbox_get(), but not 2),
->> therefore, no mailboxes will be registered.
->
-> This doesn't make sense - why would 3 be loaded due to the dependency
-> which comes from 2, but not 2?
+>> I personally prefer not to use the sched clock source due to the  
+>> unnecessary complexities. If you have a some kind of constant counter,  
+>> it sounds much simpler to just use it instead of adding dependencies  
+>> between udelay and sched clock.
+> 
+> My point is not specific to sched_clock, but to counters which on ARM
+> are 99.9% always memory mapped, and therefore inaccessible during the
+> very early kernel boot.  sched_clock was merely an illustration of the
+> problem.
 
-All the exported functions, including omap_mbox_get(), are in 3).
+Agree with the point about the counters being memory mapped. But does 
+any of the really early init code use udelay? AFAIK, udelay is mostly 
+used when talking to devices at which point IO mapping needs to have 
+been completed to be able to talk to the device in the first place.
 
-2) depends on 3) because 3) implements omap_mbox_register(). 3)
-doesn't depend on 2).
+Even otherwise, a given arch might not need udelay during early init 
+code. So, we could still give them that option. No?
 
-> The only reason 3 would be loaded due to that dependency is if 2 were
-> being modprobed, which means it's going to be inserted after 3 anyway.
->
-> I don't see anything else in 3 which would trigger it to be loaded.
->
-> The "platform:omap2-mailbox" module alias of 2 should result in 2
-> being modprobed,
-
-I see, at initialization?
-
-> causing 3 to be loaded to satisfy the dependency.
-> As already pointed out, this should happen as a result of udev or
-> (older) hotplug initialization.
-
-Well, in the minimal system I have in my beagleboard it doesn't
-happen. I load bridgedriver, which loads mailbox, but fails
-immediately because mailbox_mach is not there.
-
--- 
-Felipe Contreras
+-Saravana
