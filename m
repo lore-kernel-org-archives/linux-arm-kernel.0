@@ -1,31 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 May 2010 20:46:54 +0100
-Subject: [RFC PATCH v2] preliminary support for sparse IRQ
-In-Reply-To: <20100520082853.GA18885@linux-sh.org>
-References: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
-	<20100520082853.GA18885@linux-sh.org>
-Message-ID: <20100521194654.GH11042@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 21 May 2010 12:56:04 -0700
+Subject: [patch] nuc900fb: release correct mem region
+In-Reply-To: <AANLkTimDYkjTEVMFl8Vrbwblg46-ErGEaUV3M9-DWbCu@mail.gmail.com>
+References: <20100325105408.GD5069@bicker> <20100519194854.GB22515@bicker>
+	<AANLkTimDYkjTEVMFl8Vrbwblg46-ErGEaUV3M9-DWbCu@mail.gmail.com>
+Message-ID: <20100521125604.3065ca0e.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 20, 2010 at 05:28:53PM +0900, Paul Mundt wrote:
-> On Tue, May 18, 2010 at 06:34:49PM +0800, Eric Miao wrote:
-> > commit 2e2e087d96630c95dbce57036680cf917e906cf1
-> > Author: Eric Miao <eric.y.miao@gmail.com>
-> > Date:   Mon Dec 28 12:59:59 2009 +0800
-> > 
-> >     [ARM] preliminary support for sparse IRQ
-> > 
-> >     So to allow NR_IRQS to be dynamic and platforms to specify the number
-> >     of IRQs really needed.
-> > 
-> >     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> > 
-> It would be nice to see this applied, we plan to use sparseirq
-> unconditionally for shmobile (as sh already does).
+On Thu, 20 May 2010 10:36:59 +0800
+Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-However, it's a little late in the day for patches for this merge
-window - which could be over as early as Sunday.
+> Hi Dan,
+> 
+> Qiang brother have a busy doing business, so I can maintain the
+> nuc900fb driver instead.
 
-However, if Eric wants to submit it to the patch system, I'll see
-about queuing it, but I can't make any promises that it'll get in.
+Feel free to send an update to the MAINTAINERS file.
+
+> It looks good to me.
+> 
+> Andrew , Could you help merge this patch? thanks a lot!
+> 
+> Acked-by: Wan ZongShun<mcuos.com@gmail.com>
+> 
+> 
+> 2010/5/20 Dan Carpenter <error27@gmail.com>:
+> > Ping. __Any feedback on this patch?
+> >
+> > regards,
+> > dan carpenter
+> >
+> > On Thu, Mar 25, 2010 at 01:54:08PM +0300, Dan Carpenter wrote:
+> >> We should be releasing "res->start" here.
+> >>
+> >> Signed-off-by: Dan Carpenter <error27@gmail.com>
+> >> ---
+> >> BTW. __Congratulations on being an official driver maintainer now. __:) __Can
+> >> you add yourself to the MAINTAINERS file?
+> >>
+> >> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> >> index 6bf0d46..d4cde79 100644
+> >> --- a/drivers/video/nuc900fb.c
+> >> +++ b/drivers/video/nuc900fb.c
+> >> @@ -667,7 +667,7 @@ release_irq:
+> >> __release_regs:
+> >> __ __ __ iounmap(fbi->io);
+> >> __release_mem_region:
+> >> - __ __ release_mem_region((unsigned long)fbi->mem, size);
+> >> + __ __ release_mem_region(res->start, size);
+> >> __free_fb:
+> >> __ __ __ framebuffer_release(fbinfo);
+> >> __ __ __ return ret;
+> >
+
+I don't think I ever received a copy of this patch.  I reconstructed it.
