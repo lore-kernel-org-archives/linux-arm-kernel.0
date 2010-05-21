@@ -1,21 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 May 2010 20:59:04 +0100
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<AANLkTilJl9_NHiT1LITG7UbA9S7OYsnGMcDAsFEEx5Ob@mail.gmail.com>
-	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
-	<20100519200819.GF1693@shareable.org>
-	<alpine.LFD.2.00.1005191614580.12758@xanadu.home>
-	<AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
-Message-ID: <20100521195904.GI11042@n2100.arm.linux.org.uk>
+From: sakoman@gmail.com (Steve Sakoman)
+Date: Fri, 21 May 2010 13:15:58 -0700
+Subject: [PATCH 14/18 FIX] omap: Overo: Add support for second ethernet
+	port
+In-Reply-To: <20100519182727.GG5818@atomide.com>
+References: <20100505192957.21568.19569.stgit@baageli.muru.com>
+	<20100505193315.21568.55530.stgit@baageli.muru.com>
+	<AANLkTinxHaxG89pUhD7nmMjQSF-p-FB1FWj_w-de9y1r@mail.gmail.com>
+	<20100519182727.GG5818@atomide.com>
+Message-ID: <AANLkTin8FdLGx1UOwFrbxHwjkwK3DgeC95YbpniSR_HN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 10:24:27AM -0600, John Rigby wrote:
-> Wow, no responses for almost two days, does that mean consensus has
-> been reached?
+Previous patch was truncated by patchwork, this patch supplies the
+missing chunks
 
-Probably not; I've not read much of the thread so far yet - I've been
-mostly avoiding the ARM mailing list since the merge window has opened!
+Signed-off-by: Steve Sakoman <sakoman@gmail.com>
+---
+
+diff --git a/arch/arm/mach-omap2/board-overo.c
+b/arch/arm/mach-omap2/board-overo.c
+index 24b32d7..035eb35 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -166,9 +166,26 @@ static struct platform_device overo_smsc911x_device = {
+ 	},
+ };
+
++static struct platform_device overo_smsc911x2_device = {
++	.name		= "smsc911x",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(overo_smsc911x2_resources),
++	.resource	= overo_smsc911x2_resources,
++	.dev		= {
++		.platform_data = &overo_smsc911x_config,
++	},
++};
++
++static struct platform_device *smsc911x_devices[] = {
++	&overo_smsc911x_device,
++	&overo_smsc911x2_device,
++};
++
+ static inline void __init overo_init_smsc911x(void)
+ {
+-	unsigned long cs_mem_base;
++	unsigned long cs_mem_base, cs_mem_base2;
++
++	/* set up first smsc911x chip */
+
+ 	if (gpmc_cs_request(OVERO_SMSC911X_CS, SZ_16M, &cs_mem_base) < 0) {
+ 		printk(KERN_ERR "Failed request for GPMC mem for smsc911x\n");
+@@ -189,7 +206,28 @@ static inline void __init overo_init_smsc911x(void)
+ 	overo_smsc911x_resources[1].start = OMAP_GPIO_IRQ(OVERO_SMSC911X_GPIO);
+ 	overo_smsc911x_resources[1].end	  = 0;
+
+-	platform_device_register(&overo_smsc911x_device);
++	/* set up second smsc911x chip */
++
++	if (gpmc_cs_request(OVERO_SMSC911X2_CS, SZ_16M, &cs_mem_base2) < 0) {
++		printk(KERN_ERR "Failed request for GPMC mem for smsc911x2\n");
++		return;
++	}
++
++	overo_smsc911x2_resources[0].start = cs_mem_base2 + 0x0;
++	overo_smsc911x2_resources[0].end   = cs_mem_base2 + 0xff;
++
++	if ((gpio_request(OVERO_SMSC911X2_GPIO, "SMSC911X2 IRQ") == 0) &&
++	    (gpio_direction_input(OVERO_SMSC911X2_GPIO) == 0)) {
++		gpio_export(OVERO_SMSC911X2_GPIO, 0);
++	} else {
++		printk(KERN_ERR "could not obtain gpio for SMSC911X2 IRQ\n");
++		return;
++	}
++
++	overo_smsc911x2_resources[1].start = OMAP_GPIO_IRQ(OVERO_SMSC911X2_GPIO);
++	overo_smsc911x2_resources[1].end   = 0;
++
++	platform_add_devices(smsc911x_devices, ARRAY_SIZE(smsc911x_devices));
+ }
+
+ #else
