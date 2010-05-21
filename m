@@ -1,56 +1,71 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Sat, 22 May 2010 08:24:24 +0900
-Subject: [PATCH] ARM: S5PV210: Add GONI board support
-In-Reply-To: <20100521191025.GC11042@n2100.arm.linux.org.uk>
-References: <4BF3F284.5090505@samsung.com>
-	<20100520004856.GK4720@trinity.fluff.org>
-	<AANLkTikKmNSqLwvpvj3DQVEoKgE6gvt0eBLxiwRswx09@mail.gmail.com>
-	<20100521191025.GC11042@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTilciiUkFo_qmErxuAw8DL7EPd_jHCDK4vxDi1i6@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 22 May 2010 02:34:52 +0300
+Subject: [PATCH v2t2 00/17] omap: mailbox:
+In-Reply-To: <20100521221557.GM11042@n2100.arm.linux.org.uk>
+References: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
+	<20100521215730.GK11042@n2100.arm.linux.org.uk>
+	<AANLkTin03gFY1uc9__lGO8lHiKMjuSBRSYcFDhLYDIMD@mail.gmail.com>
+	<20100521221557.GM11042@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinMFJTlbXYiS9G87VSQyRuGxJfJGHkVejOEfgVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 22, 2010 at 4:10 AM, Russell King - ARM Linux
+On Sat, May 22, 2010 at 1:15 AM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Thu, May 20, 2010 at 10:10:33AM +0900, Kyungmin Park wrote:
->> In the previous time, Marek sent the s5pv210 patch including the
->> aquila board support.
->> But in this merge cycle, it doesn't included. of course all s5pv210 patches too,
->> Please find the patch subject "ARM: S5PV210: add Aquila board" and
->> check it again.
+> On Sat, May 22, 2010 at 01:09:12AM +0300, Felipe Contreras wrote:
+>> On Sat, May 22, 2010 at 12:57 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > The only reason 3 would be loaded due to that dependency is if 2 were
+>> > being modprobed, which means it's going to be inserted after 3 anyway.
+>> >
+>> > I don't see anything else in 3 which would trigger it to be loaded.
+>> >
+>> > The "platform:omap2-mailbox" module alias of 2 should result in 2
+>> > being modprobed,
+>>
+>> I see, at initialization?
 >
-> The merge windows are not for people to send their patches which they've
-> been sitting on to mailing lists. ?The merge window is for the patches
-> prepared and reviewed _prior_ to the merge window opening, and which
-> have been tested in the linux-next tree to be merged into Linus' tree.
-
-Right, I know that. but please note that the aquila board support mail
-is posted it at Mar 25. 2 month ago!!!. the May 20 is updated version
-with recent samsung patches.
-
+> That's the theory - and it should be that same mechanism which allows
+> things like already plugged in PCMCIA and the like cards to be properly
+> dealt with at boot time.
 >
-> I make this comment because it seems to me that as soon as the merge
-> window opened, this mailing list immediately got flooded with Samsung
-> patches. ?This is not the way it works.
-
-
+>> > causing 3 to be loaded to satisfy the dependency.
+>> > As already pointed out, this should happen as a result of udev or
+>> > (older) hotplug initialization.
+>>
+>> Well, in the minimal system I have in my beagleboard it doesn't
+>> happen. I load bridgedriver, which loads mailbox, but fails
+>> immediately because mailbox_mach is not there.
 >
-> In future, please prepare your patches before the merge window, and
-> submit them to the mailing list for review as soon as they're prepared.
-> Once they've been reviewed, they can be queued and sit in linux-next
-> for a while for the following merge window.
+> I assume that having the MMC host driver built in, but the MMC block
+> driver as a module also doesn't work on your setup?
 
-I also ask please talk to ben how to merge samsung patches in the future
-I proper send the patches and request to pull too.
+I wouldn't know because my file-system is on the MMC.
 
-Thank you,
-Kyungmin Park
+> I don't see this as something that should be worked around in the
+> kernel by making things non-modular - I view the missing userspace
+> functionality causing the problem.
 
+First of all, most of the cleanups are independent of the built-in
+option, although that was my motivation, the patches are good by
+themselves: there's no need to export
+omap_mbox_register()/_unregister() unnecessarily when the platform
+data can be used, right?
 
+Now, regarding the built-in mode; for the iommu case you said it
+should be built-in:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/58555
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Apparently it's not, so it's not clear to me how omap3-iommu would be
+loaded since there's no "platform:" alias.
+
+Moreover, Tony says that anything that registers platform devices
+should be built-in, but omap3-iommu does register devices and is not
+built-in. We could make it built-in as you suggested, but according to
+you, things should be modular.
+
+So, I have a bunch of questions:
+1) should platform devices be built-in?
+2) should platform modules like omap3-iommu and mailbox-mach have a
+"platform:" alias?
+3) should such modules follow a guideline like foo-mach, or $mach-foo?
