@@ -1,62 +1,69 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 21 May 2010 20:22:25 +0530
-Subject: [PATCH 0/4] Patches for -next
-In-Reply-To: <1274453375.7246.49.camel@e102109-lin.cambridge.arm.com>
-References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5667016@dbde02.ent.ti.com>
-	<1274435541.11965.18.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C56FF34E@dbde02.ent.ti.com>
-	<1274453375.7246.49.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C56FF4A9@dbde02.ent.ti.com>
+From: jcrigby@gmail.com (John Rigby)
+Date: Fri, 21 May 2010 10:24:27 -0600
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <alpine.LFD.2.00.1005191614580.12758@xanadu.home>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<AANLkTilJl9_NHiT1LITG7UbA9S7OYsnGMcDAsFEEx5Ob@mail.gmail.com>
+	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
+	<20100519200819.GF1693@shareable.org>
+	<alpine.LFD.2.00.1005191614580.12758@xanadu.home>
+Message-ID: <AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Friday, May 21, 2010 8:20 PM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 0/4] Patches for -next
-> 
-> On Fri, 2010-05-21 at 11:57 +0100, Shilimkar, Santosh wrote:
-> > Catalin,
-> >
-> > > -----Original Message-----
-> > > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > > Sent: Friday, May 21, 2010 3:22 PM
-> > > To: Shilimkar, Santosh
-> > > Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
-> > > Subject: RE: [PATCH 0/4] Patches for -next
-> > >
-> > > Santosh,
-> > >
-> > > On Fri, 2010-05-21 at 06:59 +0100, Shilimkar, Santosh wrote:
-> > > > > Catalin Marinas (4):
-> > > > >       ARM: Remove the domain switching on ARMv6k/v7 CPUs
-> > > > >       ARM: Use lazy cache flushing on ARMv7 SMP systems
-> > > > >       ARM: Assume new page cache pages have dirty D-cache
-> > > > >       ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP
-> > > > >
-> > > > >
-> > > > I just gave quick try with these patches on OMAP4 yesterday.
-> > > > "ARM: Defer the L_PTE_EXEC flag setting to update_mmu_cache() on SMP"
-> > > > patch is creating regression when loading the module.
-> > >
-> > > Thanks for testing and reporting this. I missed the fact the modules
-> > > allocation uses set_pte_at(). Below is an updated patch which makes sure
-> > > that L_PTE_EXEC is set for addresses greater than TASK_SIZE. We
-> > > shouldn't have a race for modules as initialisation only happens on a
-> > > single CPU.
-> > >
-> > > Could you please try the updated patch below?
-> > >
-> > This one works fine!!
-> > You can add, Tested-by: Santosh Shilimkar <Santosh.shilimkar@ti.com>
-> 
-> Thanks for testing.
-> 
-> Have you tried the whole series or just this one?
-Whole series.
+Wow, no responses for almost two days, does that mean consensus has
+been reached?
 
-Regards
-Santosh
+On Wed, May 19, 2010 at 2:22 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 19 May 2010, Jamie Lokier wrote:
+>
+>> Nicolas Pitre wrote:
+>> > It is not up to the bootloader to "adjust" to the kernel. ?But rather
+>> > for the kernel to cope with the bootloader's provided information. ?If
+>> > the bootloader passes a specific machine ID with the ATAG list then the
+>> > kernel will use that, and if the bootloader passes a DT machine ID with
+>> > a DT blob then the kernel will use that. ?You just have to configure
+>> > your kernel with both "machine types" at the same time.
+>>
+>> Scenario:
+>>
+>> You upgrade your systems to a new DT-capable kernel and DT-capable
+>> bootloader. ?It works great. ?You ship new instances of your device with this.
+>>
+>> Once they're in the field, someone reports a bug that doesn't happen
+>> with the older device instances. ?It's not a bug you can reproduce,
+>> but you suspect the newer of kernel. ?So you remote-update some of the
+>> newly shipped devices with an old, pre-DT kernel binary that's been
+>> stable on the older devices, to see if the bug goes away.
+>>
+>> Problem: The newer shipped devices have a DT-capable bootloader, and
+>> it can't boot old kernels, because they don't understand the DT format.
+>>
+>> You could remote-downgrade the bootloaders, but that's risky. ?You
+>> could try building the old kernel with DT support, but that adds
+>> another variable to your testing.
+>>
+>> Anticipating this well in advance, you of course built your DT-capable
+>> bootloader with the ability to boot old and new style kernels...
+>
+> Exact. ?Quoting myself:
+>
+> |I think that, for the moment, it is best if the bootloader on already
+> |existing subarchitectures where DT is introduced still preserve the
+> |already existing ability to boot using ATAGs. ?This allows for the
+> |testing and validation of the DT concept against the legacy ATAG method
+> |more easily.
+> |
+> |On new subarchitectures, it might make sense to go with DT from the
+> |start instead of creating setup code for every single machine. ?In that
+> |case the bootloader for those machines would only need to care about DT
+> |and forget about ATAGs.
+>
+>
+> Nicolas
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>
