@@ -1,53 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 May 2010 22:35:29 +0100
-Subject: Known issues with amba-pl010.c driver?
-In-Reply-To: <0D753D10438DA54287A00B0270842697636F32378A@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B0270842697636F1BC928@AUSP01VMBX24.collaborationhost.net>
-	<20100521193150.GF11042@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636F32378A@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100521213529.GJ11042@n2100.arm.linux.org.uk>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 22 May 2010 00:44:33 +0300
+Subject: [PATCH v2t2 01/17] omap: mailbox: trivial whitespace cleanups
+In-Reply-To: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
+References: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1274478289-22188-2-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 04:17:28PM -0500, H Hartley Sweeten wrote:
-> Hard to tell, but it is very noticeable just doing something like 'dmesg'
-> on the console.
-> 
-> I first get some random number of characters, anywhere from none to something
-> less than a full line (80 characters).  Then there is a noticeable pause.  This
-> is followed by some random length block of data, another pause, then the
-> remainder of the output.
-> 
-> I'm not sure if it will help but the 'dmesg' output on my system is 7,472
-> bytes.
-> 
-> It might have nothing to do with the pl010 driver itself.  I just don't know
-> where to start digging in the driver stack to figure out where the pauses are
-> coming from.
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+---
+ arch/arm/plat-omap/mailbox.c |   32 ++++++++++++++++----------------
+ 1 files changed, 16 insertions(+), 16 deletions(-)
 
-I assume that this isn't a new problem, but something that's always
-happened?
-
-The function in pl010 which loads the characters into the TX fifo is
-pl010_tx_chars().  Note that without XON/XOFF flow control,
-uap->port.x_char will always be zero.
-
-The loop which loads the FIFO is:
-
-        count = uap->port.fifosize >> 1;
-        do {
-                writel(xmit->buf[xmit->tail], uap->port.membase + UART01x_DR);
-                xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-                uap->port.icount.tx++;
-                if (uart_circ_empty(xmit))
-                        break;
-        } while (--count > 0);
-
-and the thinking here is that the hardware gives us an interrupt when the
-FIFO drops below half-full, so we load the FIFO up with up to half the
-maximum number of characters at each interrupt.
-
-In the case of ARM's PL010, that's a 16 byte FIFO - but yours may be
-a different depth.  If it's smaller, the driver needs to know that so
-it doesn't overrun the FIFO.  I'd suggest ensuring that 'fifosize' is
-correct for your implementation.
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 36b3aa2..7877bbb 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -142,14 +142,14 @@ static void mbox_rx_work(struct work_struct *work)
+ 	struct omap_mbox_queue *mq =
+ 			container_of(work, struct omap_mbox_queue, work);
+ 	mbox_msg_t msg;
+- 	int len;
+-  
+- 	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
+- 		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+- 		WARN_ON(len != sizeof(msg));
+-
+- 		if (mq->callback)
+- 			mq->callback((void *)msg);
++	int len;
++
++	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
++		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
++		WARN_ON(len != sizeof(msg));
++
++		if (mq->callback)
++			mq->callback((void *)msg);
+ 	}
+ }
+ 
+@@ -165,12 +165,12 @@ static void __mbox_tx_interrupt(struct omap_mbox *mbox)
+ 
+ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ {
+- 	struct omap_mbox_queue *mq = mbox->rxq;
++	struct omap_mbox_queue *mq = mbox->rxq;
+ 	mbox_msg_t msg;
+- 	int len;
++	int len;
+ 
+ 	while (!mbox_fifo_empty(mbox)) {
+- 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
++		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+ 			rq_full = true;
+ 			goto nomem;
+@@ -178,8 +178,8 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 
+ 		msg = mbox_fifo_read(mbox);
+ 
+- 		len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+- 		WARN_ON(len != sizeof(msg));
++		len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
++		WARN_ON(len != sizeof(msg));
+ 
+ 		if (mbox->ops->type == OMAP_MBOX_TYPE1)
+ 			break;
+@@ -278,11 +278,11 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+ 
+ 	return 0;
+ 
+- fail_alloc_rxq:
++fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+- fail_alloc_txq:
++fail_alloc_txq:
+ 	free_irq(mbox->irq, mbox);
+- fail_request_irq:
++fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
+ 
+-- 
+1.7.1
