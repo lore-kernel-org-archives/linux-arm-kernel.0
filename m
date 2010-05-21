@@ -1,58 +1,72 @@
-From: gores@marvell.com (Siddarth Gore)
-Date: Fri, 21 May 2010 15:14:06 +0530
-Subject: L2 cache support for pxa16x
-In-Reply-To: <AANLkTil839_xcOATFEFyQH5YVgWPwJcf31Wo1ZqmJ7Z6@mail.gmail.com>
-References: <1273658181.6926.27.camel@pe-dt434>
-	<AANLkTiky2tG7-n5bmMBqhKBIn7tq1tIT0KeWpkUee5YK@mail.gmail.com>
-	<1274350676.6926.58.camel@pe-dt434>
-	<AANLkTil839_xcOATFEFyQH5YVgWPwJcf31Wo1ZqmJ7Z6@mail.gmail.com>
-Message-ID: <1274435046.6926.69.camel@pe-dt434>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 21 May 2010 14:00:43 +0400
+Subject: [PATCH 07/22] OMAP: hwmod: Replace WARN by pr_warning if clock
+	lookup	failed
+In-Reply-To: <20100519021845.19716.65638.stgit@localhost.localdomain>
+References: <20100519021800.19716.8938.stgit@localhost.localdomain>
+	<20100519021845.19716.65638.stgit@localhost.localdomain>
+Message-ID: <4BF659CB.6010605@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-20 at 07:06 -0700, Eric Miao wrote:
-> On Thu, May 20, 2010 at 6:17 PM, Siddarth Gore <gores@marvell.com> wrote:
-> > On Wed, 2010-05-12 at 03:11 -0700, Eric Miao wrote:
-> >> On Wed, May 12, 2010 at 11:56 AM, Siddarth Gore <gores@marvell.com> wrote:
-> >> > Hi Eric/Haojian,
-> >> >
-> >> > Can the Tauros2 support be used for pxa168 as well? The one difference I
-> >> > can see is that L2 Enable is in control register instead of extra
-> >> > feature register. But rest of the things look very similar to me.
-> >> >
-> >
-> > I tried doing this. It works when I enable L2 before turning the MMU on,
-> > i.e. in __mohawk_setup
-> >
-> > But when I do the following in tauros2_init(), the kernel crashes.
-> > 1. flush and disable dcache
-> > 2. invalidate and disable icache
-> > 3. drain write buffer
-> > 4. invalidate TLB
-> > 5. invalidate L2
-> > 6. enable L2
-> > 7. enable icache
-> > 8. enable dcache
-> >
-> > I think the right place to enable L2 is in tauros2_init, so any idea
-> > what I am doing wrong here?
-> >
-> 
-> I believe that was the reason why I didn't put tauros2 support to pxa168
-> at the first place. And enabling L2 after MMU is enabled is supposed to
-> be unsafe, which is mentioned in xscale3 manual, though not sure if that's
-> the case for pxa168 as well.
-> 
-I did not find it mentioned anywhere in the mohawk (PJ1) datasheet. Also
-any idea why is this unsafe? I clean and disable the L1 cache first so
-all the page tables, etc. will be backed up in main memory before
-turning L2 on. plus invalidate the entire L2, so all the fetches will
-first go to main memory.
+Hello.
 
-other CPUs using tauros2 (also feroceon) turn L2 on after MMU, and they
-work fine.
+Paul Walmsley wrote:
+> From: Benoit Cousson <b-cousson@ti.com>
 
--siddarth
-> > -siddarth
-> >
-> >
+> The WARN is a little bit too verbose and is not providing
+> usefull information in that case.
+
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+
+[...]
+
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index a62920b..5d3a3ea 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -411,9 +411,9 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>  		return 0;
+>  
+>  	c = omap_clk_get_by_name(oh->main_clk);
+> -	WARN(!c, "omap_hwmod: %s: cannot clk_get main_clk %s\n",
+> -	     oh->name, oh->main_clk);
+>  	if (!c)
+> +		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+> +			   oh->name, oh->main_clk);
+>  		ret = -EINVAL;
+
+    Don't you need {} around the statements here?
+
+>  	oh->_clk = c;
+>  
+> @@ -446,9 +446,9 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+>  			continue;
+>  
+>  		c = omap_clk_get_by_name(os->clk);
+> -		WARN(!c, "omap_hwmod: %s: cannot clk_get interface_clk %s\n",
+> -		     oh->name, os->clk);
+>  		if (!c)
+> +			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
+> +				   oh->name, os->clk);
+>  			ret = -EINVAL;
+
+    Likewise here...
+
+>  		os->_clk = c;
+>  	}
+> @@ -472,9 +472,9 @@ static int _init_opt_clks(struct omap_hwmod *oh)
+>  
+>  	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
+>  		c = omap_clk_get_by_name(oc->clk);
+> -		WARN(!c, "omap_hwmod: %s: cannot clk_get opt_clk %s\n",
+> -		     oh->name, oc->clk);
+>  		if (!c)
+> +			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
+> +				   oh->name, oc->clk);
+>  			ret = -EINVAL;
+
+    ... and here.
+
+WBR, Sergei
