@@ -1,64 +1,45 @@
-From: bahadir@l4dev.org (Bahadir Balban)
-Date: Fri, 21 May 2010 15:14:08 +0300
-Subject: Function for revised cpuid format
-Message-ID: <4BF67910.1080108@l4dev.org>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Fri, 21 May 2010 14:32:01 +0200
+Subject: [PATCH 2/5] mxc_nand: fix PM
+In-Reply-To: <19446.29016.956006.230105@ipc1.ka-ro>
+References: <1274440363-435-1-git-send-email-eric@eukrea.com>	<1274440363-435-2-git-send-email-eric@eukrea.com>
+	<19446.29016.956006.230105@ipc1.ka-ro>
+Message-ID: <4BF67D41.1020204@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Below is a patch for this. What do you think?
+Hi Lothar,
 
+Le 21/05/2010 13:41, Lothar Wa?mann a ?crit :
+>> -	if (mtd) {
+>> -		/* Enable the NFC clock */
+>> +	if (!host->clk_act) {
+>>   		clk_enable(host->clk);
+>> -		mtd->resume(mtd);
+>> +		host->clk_act = 1;
+>>   	}
+>>
+> Since you are clearing host->clk_act during suspend, this will
+> unconditionally enable the clock no matter what state it had before
+> suspend (in case that's intended, the check for !host->clk_act is
+> useless, since it will always yield true).
 
- From 30ed7d843d61a9663b7fe8d2f8c67ede3d819e50 Mon Sep 17 00:00:00 2001
-From: Bahadir Balban <bbalban@b-labs.co.uk>
-Date: Fri, 21 May 2010 14:39:56 +0300
-Subject: [PATCH] Define revised cpuid function and convert assembler to use that.
+Yes, you're right.
+In fact, the clock is turned on & off by mxc_nand_select_chip so when 
+clk_enable & clk_disable are called in suspend & resume without checking 
+it the clock is already active, I had log complaining for the clock 
+already being off as mxc_nand_select_chip hard already turned it off, so 
+I put the checks in both functions.
 
-This patch defines a minor function to read the revised cpuid
-format and converts an assembler statement to use this function.
+ > I think it's more sensible to leave host->clk_act alone, and reenable
+ > the clock only if host->clk_act is set, so that the clock is left in
+ > the same state after resume in which it was before suspend.
+ >
+OK I'll try this. In fact, I think the clock is always off when we reach 
+suspend & resume as nand_base has already deselected the chip and thus 
+the NFC's clock is turned off.
 
-Signed-off-by: Bahadir Balban <bbalban@b-labs.co.uk>
----
-  arch/codezero/include/asm/cputype.h |    5 +++++
-  arch/codezero/kernel/setup.c        |    5 ++---
-  2 files changed, 7 insertions(+), 3 deletions(-)
+While we're at this : is there a good reason to select/deselect the chip 
+at every access and turn on/off the clock at the same time ?
 
-diff --git a/arch/codezero/include/asm/cputype.h b/arch/codezero/include/asm/cputype.h
-index 20ae96c..60071d8 100644
---- a/arch/codezero/include/asm/cputype.h
-+++ b/arch/codezero/include/asm/cputype.h
-@@ -58,6 +58,11 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
-  	return read_cpuid(CPUID_ID);
-  }
-
-+static inline unsigned int __attribute_const__ read_cpuid_revised_id(void)
-+{
-+	return read_cpuid_ext(CPUID_EXT_MMFR0);
-+}
-+
-  static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
-  {
-  	return read_cpuid(CPUID_CACHETYPE);
-diff --git a/arch/codezero/kernel/setup.c b/arch/codezero/kernel/setup.c
-index c91c77b..c64b029 100644
---- a/arch/codezero/kernel/setup.c
-+++ b/arch/codezero/kernel/setup.c
-@@ -213,12 +213,11 @@ int cpu_architecture(void)
-  		if (cpu_arch)
-  			cpu_arch += CPU_ARCH_ARMv3;
-  	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
--		unsigned int mmfr0;
-
-  		/* Revised CPUID format. Read the Memory Model Feature
-  		 * Register 0 and check for VMSAv7 or PMSAv7 */
--		asm("mrc	p15, 0, %0, c0, c1, 4"
--		    : "=r" (mmfr0));
-+		unsigned int mmfr0 = read_cpuid_revised_id();
-+
-  		if ((mmfr0 & 0x0000000f) == 0x00000003 ||
-  		    (mmfr0 & 0x000000f0) == 0x00000030)
-  			cpu_arch = CPU_ARCH_ARMv7;
--- 
-1.6.3.3
-
--- 
-Bahadir
+Eric
