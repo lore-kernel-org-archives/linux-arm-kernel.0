@@ -1,82 +1,37 @@
-From: sakoman@gmail.com (Steve Sakoman)
-Date: Fri, 21 May 2010 13:15:58 -0700
-Subject: [PATCH 14/18 FIX] omap: Overo: Add support for second ethernet
-	port
-In-Reply-To: <20100519182727.GG5818@atomide.com>
-References: <20100505192957.21568.19569.stgit@baageli.muru.com>
-	<20100505193315.21568.55530.stgit@baageli.muru.com>
-	<AANLkTinxHaxG89pUhD7nmMjQSF-p-FB1FWj_w-de9y1r@mail.gmail.com>
-	<20100519182727.GG5818@atomide.com>
-Message-ID: <AANLkTin8FdLGx1UOwFrbxHwjkwK3DgeC95YbpniSR_HN@mail.gmail.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Fri, 21 May 2010 22:22:55 +0200
+Subject: RFC: fix misplaced .note.gnu.build-id section
+In-Reply-To: <20100521184339.GA11042@n2100.arm.linux.org.uk>
+References: <20100521133612.GA30171@sig21.net>
+	<20100521184339.GA11042@n2100.arm.linux.org.uk>
+Message-ID: <20100521202255.GB3629@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous patch was truncated by patchwork, this patch supplies the
-missing chunks
+On Fri, May 21, 2010 at 07:43:39PM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 21, 2010 at 03:36:12PM +0200, Johannes Stezenbach wrote:
+> > when building with a binutils version which supports --build-id
+> > the .note.gnu.build-id section is placed at address 0 in the
+> > resulting vmlinux ELF file:
+> > 
+> > Program Header:
+> >     LOAD off    0x00008000 vaddr 0x00000000 paddr 0x00000000 align 2**15
+> >          filesz 0x00000024 memsz 0x00000024 flags r--
+> >     LOAD off    0x00010000 vaddr 0xc0008000 paddr 0xc0008000 align 2**15
+> >          filesz 0x0033cb60 memsz 0x0036df04 flags rwx
+> >     NOTE off    0x00008000 vaddr 0x00000000 paddr 0x00000000 align 2**2
+> >          filesz 0x00000024 memsz 0x00000024 flags r--
+> 
+> There seems to be little reason for the note to be loaded into memory -
+> maybe the right fix is to ensure that the note doesn't get placed into
+> a loadable output section.
 
-Signed-off-by: Steve Sakoman <sakoman@gmail.com>
----
+That's what I thought, too.  But it seems x86 explicitly
+puts NOTES into both :text and :note.  Maybe the intention
+is that the build-id is contained in crash dump images?
+But I'm not sure if this is of relevance for ARM, it
+would indeed be easier to just discard .note.gnu.build-id.
+Shall I prepare a patch to do that?
 
-diff --git a/arch/arm/mach-omap2/board-overo.c
-b/arch/arm/mach-omap2/board-overo.c
-index 24b32d7..035eb35 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -166,9 +166,26 @@ static struct platform_device overo_smsc911x_device = {
- 	},
- };
-
-+static struct platform_device overo_smsc911x2_device = {
-+	.name		= "smsc911x",
-+	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(overo_smsc911x2_resources),
-+	.resource	= overo_smsc911x2_resources,
-+	.dev		= {
-+		.platform_data = &overo_smsc911x_config,
-+	},
-+};
-+
-+static struct platform_device *smsc911x_devices[] = {
-+	&overo_smsc911x_device,
-+	&overo_smsc911x2_device,
-+};
-+
- static inline void __init overo_init_smsc911x(void)
- {
--	unsigned long cs_mem_base;
-+	unsigned long cs_mem_base, cs_mem_base2;
-+
-+	/* set up first smsc911x chip */
-
- 	if (gpmc_cs_request(OVERO_SMSC911X_CS, SZ_16M, &cs_mem_base) < 0) {
- 		printk(KERN_ERR "Failed request for GPMC mem for smsc911x\n");
-@@ -189,7 +206,28 @@ static inline void __init overo_init_smsc911x(void)
- 	overo_smsc911x_resources[1].start = OMAP_GPIO_IRQ(OVERO_SMSC911X_GPIO);
- 	overo_smsc911x_resources[1].end	  = 0;
-
--	platform_device_register(&overo_smsc911x_device);
-+	/* set up second smsc911x chip */
-+
-+	if (gpmc_cs_request(OVERO_SMSC911X2_CS, SZ_16M, &cs_mem_base2) < 0) {
-+		printk(KERN_ERR "Failed request for GPMC mem for smsc911x2\n");
-+		return;
-+	}
-+
-+	overo_smsc911x2_resources[0].start = cs_mem_base2 + 0x0;
-+	overo_smsc911x2_resources[0].end   = cs_mem_base2 + 0xff;
-+
-+	if ((gpio_request(OVERO_SMSC911X2_GPIO, "SMSC911X2 IRQ") == 0) &&
-+	    (gpio_direction_input(OVERO_SMSC911X2_GPIO) == 0)) {
-+		gpio_export(OVERO_SMSC911X2_GPIO, 0);
-+	} else {
-+		printk(KERN_ERR "could not obtain gpio for SMSC911X2 IRQ\n");
-+		return;
-+	}
-+
-+	overo_smsc911x2_resources[1].start = OMAP_GPIO_IRQ(OVERO_SMSC911X2_GPIO);
-+	overo_smsc911x2_resources[1].end   = 0;
-+
-+	platform_add_devices(smsc911x_devices, ARRAY_SIZE(smsc911x_devices));
- }
-
- #else
+Thanks,
+Johannes
