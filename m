@@ -1,67 +1,55 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 21 May 2010 16:50:09 -0500
-Subject: Known issues with amba-pl010.c driver?
-In-Reply-To: <20100521213529.GJ11042@n2100.arm.linux.org.uk>
-References: <0D753D10438DA54287A00B0270842697636F1BC928@AUSP01VMBX24.collaborationhost.net>
-	<20100521193150.GF11042@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B0270842697636F32378A@AUSP01VMBX24.collaborationhost.net>
-	<20100521213529.GJ11042@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B0270842697636F323806@AUSP01VMBX24.collaborationhost.net>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 22 May 2010 00:51:23 +0300
+Subject: [PATCH v2 00/17] omap: mailbox: reorganize init
+In-Reply-To: <20100519181348.GE5818@atomide.com>
+References: <AANLkTim5SxEb64QbBQgBhufhgpQ33MNFBhuHixfUeVKp@mail.gmail.com>
+	<20100518.163145.232774311.Hiroshi.DOYU@nokia.com>
+	<AANLkTik_FL2keLD9mdBcg8Rm9n8uYDElg1NdyeT2yy6B@mail.gmail.com>
+	<20100518.225835.116348725.Hiroshi.DOYU@nokia.com>
+	<AANLkTinpqitfuw3vuDhqXaQH6uHal1nbonVaUg1a2ewt@mail.gmail.com>
+	<20100519181348.GE5818@atomide.com>
+Message-ID: <AANLkTinr-FOPC7q22l-i-2S3GeEwPSrV3UeTzTKhS2zj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 21, 2010 2:35 PM, Russell King wrote:
-> On Fri, May 21, 2010 at 04:17:28PM -0500, H Hartley Sweeten wrote:
->> Hard to tell, but it is very noticeable just doing something like 'dmesg'
->> on the console.
->> 
->> I first get some random number of characters, anywhere from none to something
->> less than a full line (80 characters).  Then there is a noticeable pause.  This
->> is followed by some random length block of data, another pause, then the
->> remainder of the output.
->> 
->> I'm not sure if it will help but the 'dmesg' output on my system is 7,472
->> bytes.
->> 
->> It might have nothing to do with the pl010 driver itself.  I just don't know
->> where to start digging in the driver stack to figure out where the pauses are
->> coming from.
+On Wed, May 19, 2010 at 9:13 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Felipe Contreras <felipe.contreras@gmail.com> [100519 02:58]:
+>> Russell, Tony: should mailbox_mach, a module that checks for logical
+>> devices be always built-in?
+>>
+>> I think that's the easiest... in my patches I moved the
+>> architecture-specific code from mach-omapX/devices.c to
+>> mach-omapX/mailbox.c, so both the logical devices and real platform
+>> devices are in the same code, and can be built-in.
+>>
+>> This way, there's no need to rely on services like udev to load
+>> mailbox, then mailbox_mach, then bridgedriver. After all, all
+>> mailbox_mach is doing is calling functions in mailbox to register the
+>> logical devices.
+>>
+>> Judging from:
+>> http://article.gmane.org/gmane.linux.ports.arm.kernel/58555
+>>
+>> The answer is yes.
 >
-> I assume that this isn't a new problem, but something that's always
-> happened?
-
-Not really sure.  I have always used the serial port as a console and never really
-noticed the problem.  But, now that I'm trying to actually use one of the ports
-in a user app to send data it's very apparent.  That's when I noticed it on the
-console also.
-
-> The function in pl010 which loads the characters into the TX fifo is
-> pl010_tx_chars().  Note that without XON/XOFF flow control,
-> uap->port.x_char will always be zero.
+> Maybe try using the tested good old criteria: What works the best
+> for "standard Linux behaviour" out of the box? :)
 >
-> The loop which loads the FIFO is:
->
->         count = uap->port.fifosize >> 1;
->         do {
->                 writel(xmit->buf[xmit->tail], uap->port.membase + UART01x_DR);
->                 xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
->                 uap->port.icount.tx++;
->                 if (uart_circ_empty(xmit))
->                         break;
->         } while (--count > 0);
-> 
-> and the thinking here is that the hardware gives us an interrupt when the
-> FIFO drops below half-full, so we load the FIFO up with up to half the
-> maximum number of characters at each interrupt.
-> 
-> In the case of ARM's PL010, that's a 16 byte FIFO - but yours may be
-> a different depth.  If it's smaller, the driver needs to know that so
-> it doesn't overrun the FIFO.  I'd suggest ensuring that 'fifosize' is
-> correct for your implementation.
+> Anything that registers platform devices should be built in.
+> Also anything that's needed to boot the device into a sane operating
+> mode should be built in. For example, the DSP should be powered
+> down (or idled on some earlier omaps) even if no bridge is being used.
 
-The ep93xx pl010 uarts have 16 byte transmit and receive FIFOs.  Also, the 
-interrupt does occur when the transmit FIFO is at least half empty.  I also
-verified that the FIFOs are enabled.
+I think both approaches go into a sane operating mode, the difference is that:
+a) requires two modules: mailbox_mach, and mailbox, and udev to figure
+out that mailbox depends on mailbox_mach
+b) one module, no need for udev
 
-Regards,
-Hartley
+Anyway, I sent a rebased patch series with a longer introduction in
+the hopes that the issue is better explained.
+
+FWIW there were no conflicts in the rebasing (except on the last patch
+which was trivial, and not really important in the series).
+
+-- 
+Felipe Contreras
