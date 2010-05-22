@@ -1,29 +1,40 @@
-From: weiyi.huang@gmail.com (Huang Weiyi)
-Date: Sun, 23 May 2010 01:12:34 +0800
-Subject: [PATCH 07/12] arm: remove duplicated #include
-Message-ID: <1274548354-2088-1-git-send-email-weiyi.huang@gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 22 May 2010 20:14:11 +0300
+Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
+Message-ID: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicated #include('s) in
-  arch/arm/plat-nomadik/include/plat/ste_dma40.h
+Hi,
 
-Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
----
- arch/arm/plat-nomadik/include/plat/ste_dma40.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+These are hopefully non-functional changes. Just shuffling code around, and
+removing unecessary stuff.
 
-diff --git a/arch/arm/plat-nomadik/include/plat/ste_dma40.h b/arch/arm/plat-nomadik/include/plat/ste_dma40.h
-index 4d12ea4..0aff0fe 100644
---- a/arch/arm/plat-nomadik/include/plat/ste_dma40.h
-+++ b/arch/arm/plat-nomadik/include/plat/ste_dma40.h
-@@ -14,7 +14,6 @@
- #include <linux/dmaengine.h>
- #include <linux/workqueue.h>
- #include <linux/interrupt.h>
--#include <linux/dmaengine.h>
- 
- /* dev types for memcpy */
- #define STEDMA40_DEV_DST_MEMORY (-1)
--- 
-1.6.1.3
+In v2 I tried to split platform_device and also make mailbox_mach built-in. Not
+any more.
+
+Comments from Felipe Balbi, Tony Lindgren, Hiroshi DOYU, and Russell King.
+
+Felipe Contreras (14):
+  omap: mailbox: trivial whitespace cleanups
+  omap: mailbox: trivial cleanups
+  omap: mailbox: reorganize structures
+  omap: mailbox: 2420 should be detected at run-time
+  omap: mailbox: use correct config for omap1
+  omap: mailbox: update omap1 probing
+  omap: mailbox: don't export unecessary symbols
+  omap: mailbox: remove unecessary fields
+  omap: mailbox: add IRQ names
+  omap: mailbox: reorganize registering
+  omap: mailbox: only compile for configured archs
+  omap: mailbox: standarize on 'omap-mailbox'
+  omap: mailbox: simplify omap_mbox_register()
+  omap: mailbox: reorganize headers
+
+ arch/arm/mach-omap1/devices.c             |   11 +-
+ arch/arm/mach-omap1/mailbox.c             |   52 ++++-----
+ arch/arm/mach-omap2/devices.c             |    6 +-
+ arch/arm/mach-omap2/mailbox.c             |  177 +++++++++++++----------------
+ arch/arm/plat-omap/include/plat/mailbox.h |   16 +--
+ arch/arm/plat-omap/mailbox.c              |  136 +++++++++-------------
+ 6 files changed, 168 insertions(+), 230 deletions(-)
