@@ -1,128 +1,186 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 22 May 2010 12:23:29 +0800
-Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ handlers
-	at run-time
-Message-ID: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
+Date: Sat, 22 May 2010 12:24:23 +0800
+Subject: [RFC PATCH 2/2] pxa: preliminary support for MULTI_IRQ_HANDLER
+Message-ID: <AANLkTini_6iqbWX0vVtNdrnq8BdQQYaprc5yqJey99G8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit edec494b3dbf52a61a18b484dd05cce6a9d90e2f
+commit 4cbce4923d528c9de8556bad8b935efe6170842b
 Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Sat May 22 11:58:01 2010 +0800
+Date:   Sat May 22 12:22:52 2010 +0800
 
-    [ARM] allow each machine to specify it's own IRQ handlers at run-time
-
-    Normally different ARM platform has different way to decode the IRQ
-    hardware status and demultiplex to the corresponding IRQ handler.
-    This is highly optimized by macro irq_handler in entry-armv.S, and
-    each machine class defines their own macro to decode the IRQ number.
-    However, this prevents multiple machine classes to be built into a
-    single kernel.
-
-    By allowing each machine to specify thier own handler, and making
-    function pointer 'handle_arch_irq' to point to it at run time, this
-    can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
-    solutions to work.
-
-    Comparing with the highly optimized macro of irq_handler, the new
-    function must be written with care not to lose too much performance.
+    [ARM] pxa: preliminary support for MULTI_IRQ_HANDLER
 
     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ddf5676..a8f5f78 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -958,6 +958,11 @@ config CPU_HAS_PMU
- 	default y
- 	bool
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 3b51741..bec042d 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -470,6 +470,7 @@ config MACH_CORGI
+ 	depends on PXA_SHARPSL
+ 	select PXA25x
+ 	select PXA_SHARP_C7xx
++	select MULTI_IRQ_HANDLER
 
-+config MULTI_IRQ_HANDLER
-+	bool
-+	help
-+	  Allow each machine to specify it's own IRQ handler at run time.
+ config MACH_SHEPHERD
+ 	bool "Enable Sharp SL-C750 (Shepherd) Support"
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 3d1dcb9..c910d2b 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -729,6 +729,7 @@ MACHINE_START(CORGI, "SHARP Corgi")
+ 	.fixup		= fixup_corgi,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa25x_init_irq,
++	.handle_irq	= pxa25x_handle_irq,
+ 	.init_machine	= corgi_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
+@@ -741,6 +742,7 @@ MACHINE_START(SHEPHERD, "SHARP Shepherd")
+ 	.fixup		= fixup_corgi,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa25x_init_irq,
++	.handle_irq	= pxa25x_handle_irq,
+ 	.init_machine	= corgi_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
+@@ -753,6 +755,7 @@ MACHINE_START(HUSKY, "SHARP Husky")
+ 	.fixup		= fixup_corgi,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa25x_init_irq,
++	.handle_irq	= pxa25x_handle_irq,
+ 	.init_machine	= corgi_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
+index 890fb90..437e9a3 100644
+--- a/arch/arm/mach-pxa/generic.h
++++ b/arch/arm/mach-pxa/generic.h
+@@ -22,6 +22,9 @@ extern void __init pxa27x_init_irq(void);
+ extern void __init pxa3xx_init_irq(void);
+ extern void __init pxa_map_io(void);
+
++extern void pxa25x_handle_irq(struct pt_regs *);
++extern void pxa27x_handle_irq(struct pt_regs *);
 +
- if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 5ee6f85..b611895 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -42,6 +42,9 @@ struct machine_desc {
- 	void			(*init_irq)(void);
- 	struct sys_timer	*timer;		/* system tick timer	*/
- 	void			(*init_machine)(void);
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	void			(*handle_irq)(struct pt_regs *);
+ extern unsigned int get_clk_frequency_khz(int info);
+
+ #define SET_BANK(__nr,__start,__size) \
+diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S
+b/arch/arm/mach-pxa/include/mach/entry-macro.S
+index a73bc86..1ee5368 100644
+--- a/arch/arm/mach-pxa/include/mach/entry-macro.S
++++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+@@ -13,10 +13,11 @@
+ 		.macro	disable_fiq
+ 		.endm
+
+-		.macro  get_irqnr_preamble, base, tmp
++		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+
+-		.macro  arch_ret_to_user, tmp1, tmp2
++#ifndef CONFIG_MULTI_IRQ_HANDLER
++		.macro  get_irqnr_preamble, base, tmp
+ 		.endm
+
+ 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+@@ -49,3 +50,4 @@
+ 		add	\irqnr, \irqnr, #(PXA_IRQ(0))
+ 1001:
+ 		.endm
 +#endif
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index a9396a9..24934de 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -37,6 +37,7 @@
+ #define IPR(i)		(((i) < 32) ? (0x01c + ((i) << 2)) :		\
+ 			 ((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
+ 				      (0x144 + (((i) - 64) << 2)))
++#define ICHP_VAL_IRQ	(1 << 31)
+ #define IPR_VALID	(1 << 31)
+
+ #define MAX_INTERNAL_IRQS	128
+@@ -75,6 +76,7 @@ static struct irq_chip pxa_internal_irq_chip = {
+ 	.name		= "SC",
+ 	.ack		= pxa_mask_irq,
+ 	.mask		= pxa_mask_irq,
++	.mask_ack	= pxa_mask_irq,
+ 	.unmask		= pxa_unmask_irq,
  };
 
- /*
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index ce3eee9..6ecdad9 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
- extern void init_FIQ(void);
- extern int show_fiq_list(struct seq_file *, void *);
+@@ -148,6 +150,44 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+ 	pxa_low_gpio_chip.set_wake = fn;
+ }
 
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+extern void (*handle_arch_irq)(struct pt_regs *);
++#ifdef CONFIG_PXA25x
++asmlinkage void pxa25x_handle_irq(struct pt_regs *reg)
++{
++	uint32_t icip, icmr, mask;
++	unsigned int irq;
++
++	do {
++		icip = __raw_readl(IRQ_BASE + ICIP);
++		icmr = __raw_readl(IRQ_BASE + ICMR);
++		mask = icip & icmr;
++
++		if (mask == 0)
++			break;
++
++		irq = fls(mask) - 1;
++		asm_do_IRQ(irq, reg);
++	} while (1);
++}
 +#endif
 +
- /*
-  * This is for easy migration, but should be changed in the source
-  */
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 7ee48e7..ecb8492 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -28,6 +28,7 @@
- /*
-  * Interrupt handling.  Preserves r7, r8, r9
-  */
-+#ifndef CONFIG_MULTI_IRQ_HANDLER
- 	.macro	irq_handler
- 	get_irqnr_preamble r5, lr
- 1:	get_irqnr_and_base r0, r6, r5, lr
-@@ -59,6 +60,14 @@
- #endif
-
- 	.endm
-+#else
-+	.macro	irq_handler
-+	ldr	r4, =handle_arch_irq
-+	mov	r0, sp
-+	mov	lr, pc
-+	ldr	pc, [r4]
-+	.endm
-+#endif	/* CONFIG_MULTI_IRQ_HANDLER */
-
- #ifdef CONFIG_KPROBES
- 	.section	.kprobes.text,"ax",%progbits
-@@ -1251,3 +1260,9 @@ cr_alignment:
- 	.space	4
- cr_no_alignment:
- 	.space	4
++#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
++asmlinkage void pxa27x_handle_irq(struct pt_regs *reg)
++{
++	uint32_t ichp;
++	unsigned int irq;
 +
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	.globl	handle_arch_irq
-+handle_arch_irq:
-+	.long	0
-+#endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index f1aee0d..61d5f8d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -732,6 +732,10 @@ void __init setup_arch(char **cmdline_p)
- 	system_timer = mdesc->timer;
- 	init_machine = mdesc->init_machine;
-
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	handle_arch_irq = mdesc->handle_irq;
++	do {
++		__asm__ __volatile__("mrc p6, 0, %0, c5, c0, 0\n": "=r"(ichp));
++
++		if ((ichp & ICHP_VAL_IRQ) == 0)
++			break;
++
++		irq = PXA_IRQ((ichp & ~ICHP_VAL_IRQ) >> 16);
++		asm_do_IRQ(irq, reg);
++	} while (1);
++}
 +#endif
 +
- #ifdef CONFIG_VT
- #if defined(CONFIG_VGA_CONSOLE)
- 	conswitchp = &vga_con;
+ static inline void __iomem *irq_base(int i)
+ {
+ 	static unsigned long phys_base[] = {
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 4d2413e..e8bdf16 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -855,6 +855,7 @@ MACHINE_START(SPITZ, "SHARP Spitz")
+ 	.fixup		= fixup_spitz,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
++	.handle_irq	= pxa27x_handle_irq,
+ 	.init_machine	= spitz_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
+@@ -867,6 +868,7 @@ MACHINE_START(BORZOI, "SHARP Borzoi")
+ 	.fixup		= fixup_spitz,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
++	.handle_irq	= pxa27x_handle_irq,
+ 	.init_machine	= spitz_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
+@@ -879,6 +881,7 @@ MACHINE_START(AKITA, "SHARP Akita")
+ 	.fixup		= fixup_spitz,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
++	.handle_irq	= pxa27x_handle_irq,
+ 	.init_machine	= akita_init,
+ 	.timer		= &pxa_timer,
+ MACHINE_END
