@@ -1,11 +1,11 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 22 May 2010 11:36:27 +0200
+Date: Sat, 22 May 2010 11:37:43 +0200
 Subject: Initrd and 2.6.33 curious behaviour
 In-Reply-To: <20100521204343.GA18032@n2100.arm.linux.org.uk> (Russell King's
 	message of "Fri\, 21 May 2010 21\:43\:43 +0100")
 References: <874oi157c6.fsf@free.fr>
 	<20100521204343.GA18032@n2100.arm.linux.org.uk>
-Message-ID: <87r5l446sk.fsf@free.fr>
+Message-ID: <87fx1k46qg.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
