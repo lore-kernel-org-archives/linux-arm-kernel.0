@@ -1,41 +1,30 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Sat, 22 May 2010 08:40:40 +0300 (EEST)
-Subject: [PATCH v2t2 00/17] omap: mailbox: 
-In-Reply-To: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
-References: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <20100522.084040.233704306.Hiroshi.DOYU@nokia.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sat, 22 May 2010 10:27:55 +0300
+Subject: [PATCH v7 1/2] spi: implemented driver for Cirrus EP93xx SPI
+	controller
+In-Reply-To: <3729cd3650f5af6aebfc5bae02ff6aad1b9b1e82.1273120206.git.mika.westerberg@iki.fi>
+References: <cover.1273120206.git.mika.westerberg@iki.fi>
+	<3729cd3650f5af6aebfc5bae02ff6aad1b9b1e82.1273120206.git.mika.westerberg@iki.fi>
+Message-ID: <20100522072755.GB18613@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Felipe Contreras <felipe.contreras@gmail.com>
-Subject: [PATCH v2t2 00/17] omap: mailbox: 
-Date: Fri, 21 May 2010 23:44:32 +0200
+On Thu, May 06, 2010 at 07:47:04AM +0300, Mika Westerberg wrote:
+> This patch adds an SPI master driver for the Cirrus EP93xx SPI controller found
+> in EP93xx chips.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Cc: David Brownell <dbrownell@users.sourceforge.net>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Martin Guy <martinwguy@gmail.com>
 
-> From: Felipe Contreras <felipe.contreras@nokia.com>
-> 
-> Hi,
-> 
-> The main purpose of this patch series is to be able to compile mailbox
-> mach platform data as built-in.
-> 
-> [no changes since the last v2, just rebased on top of the latest
-> git://gitorious.org/~doyu/lk/mainline.git for-tony-mailbox]
-> 
-> Currently, the code is split into three places:
-> 1) mach-omapX/devices.c: for platform_device_register() the resources
-> 2) mach-omapX/mailbox.c: do platform_driver_register(), fetch the resources,
->    and register logical mailboxes with omap_mbox_register()
-> 3) plat-omap/mailbox.c: implement omap_mbox_register() to add the mbox
->    to an internal linked list (static struct omap_mbox *mboxes)
-> 
-> So, obviously 1) is always built-in, but 2) can't be because of the
-> dependency of omap_mbox_register(), which is in 3) and cannot be taken
-> out.
-> 
-> Users of mailbox will load 3) due to omap_mbox_get(), but not 2),
-> therefore, no mailboxes will be registered.
+Hi Grant,
 
-How are the above user of mailbox loaded at present?
+Ping. Any change getting this driver into .35? Platform side code
+is already in linux-next.
 
-I think that "bridgedriver.ko" is the user of it and it is also
-a platform driver. Someone would have to load it without udev, right?
+Thanks,
+MW
