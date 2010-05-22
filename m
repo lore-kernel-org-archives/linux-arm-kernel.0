@@ -1,216 +1,128 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 22 May 2010 12:22:08 +0800
-Subject: [ARM] pxa: sanitize IRQ register access based on offset
-Message-ID: <AANLkTinWgJhB42OcIpi_PCO2sCXvHRJvyqBkI4gReknK@mail.gmail.com>
+Date: Sat, 22 May 2010 12:23:29 +0800
+Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ handlers
+	at run-time
+Message-ID: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2772230d8a9e31f4a11e3dc6f78c78c1d5ad48b8
+commit edec494b3dbf52a61a18b484dd05cce6a9d90e2f
 Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Fri May 21 18:29:35 2010 +0800
+Date:   Sat May 22 11:58:01 2010 +0800
 
-    [ARM] pxa: sanitize IRQ register access based on offset
+    [ARM] allow each machine to specify it's own IRQ handlers at run-time
+
+    Normally different ARM platform has different way to decode the IRQ
+    hardware status and demultiplex to the corresponding IRQ handler.
+    This is highly optimized by macro irq_handler in entry-armv.S, and
+    each machine class defines their own macro to decode the IRQ number.
+    However, this prevents multiple machine classes to be built into a
+    single kernel.
+
+    By allowing each machine to specify thier own handler, and making
+    function pointer 'handle_arch_irq' to point to it at run time, this
+    can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
+    solutions to work.
+
+    Comparing with the highly optimized macro of irq_handler, the new
+    function must be written with care not to lose too much performance.
 
     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 1beb40f..a9396a9 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -16,20 +16,36 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/sysdev.h>
-+#include <linux/io.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ddf5676..a8f5f78 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -958,6 +958,11 @@ config CPU_HAS_PMU
+ 	default y
+ 	bool
 
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/mach/irq.h>
- #include <mach/gpio.h>
--#include <mach/regs-intc.h>
-
- #include "generic.h"
-
-+#define IRQ_BASE	(void __iomem *)io_p2v(0x40d00000)
++config MULTI_IRQ_HANDLER
++	bool
++	help
++	  Allow each machine to specify it's own IRQ handler at run time.
 +
-+#define ICIP		(0x000)
-+#define ICMR		(0x004)
-+#define ICLR		(0x008)
-+#define ICFR		(0x00c)
-+#define ICPR		(0x010)
-+#define ICCR		(0x014)
-+#define ICHP		(0x018)
-+#define IPR(i)		(((i) < 32) ? (0x01c + ((i) << 2)) :		\
-+			 ((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
-+				      (0x144 + (((i) - 64) << 2)))
-+#define IPR_VALID	(1 << 31)
-+
- #define MAX_INTERNAL_IRQS	128
-+#define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
-
--#define IRQ_BIT(n)	(((n) - PXA_IRQ(0)) & 0x1f)
--#define _ICMR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
--#define _ICLR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
-+static inline int cpu_has_ipr(void)
-+{
-+	return cpu_is_pxa27x() || cpu_is_pxa3xx();
-+}
+ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 5ee6f85..b611895 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -42,6 +42,9 @@ struct machine_desc {
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+ 	void			(*init_machine)(void);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	void			(*handle_irq)(struct pt_regs *);
++#endif
+ };
 
  /*
-  * This is for peripheral IRQs internal to the PXA chip.
-@@ -39,12 +55,20 @@ static int pxa_internal_irq_nr;
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index ce3eee9..6ecdad9 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
+ extern void init_FIQ(void);
+ extern int show_fiq_list(struct seq_file *, void *);
 
- static void pxa_mask_irq(unsigned int irq)
- {
--	_ICMR(irq) &= ~(1 << IRQ_BIT(irq));
-+	void __iomem *base = get_irq_chip_data(irq);
-+	uint32_t icmr = __raw_readl(base + 4);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++extern void (*handle_arch_irq)(struct pt_regs *);
++#endif
 +
-+	icmr &= ~(1 << IRQ_BIT(irq));
-+	__raw_writel(icmr, base + ICMR);
- }
+ /*
+  * This is for easy migration, but should be changed in the source
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 7ee48e7..ecb8492 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -28,6 +28,7 @@
+ /*
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
++#ifndef CONFIG_MULTI_IRQ_HANDLER
+ 	.macro	irq_handler
+ 	get_irqnr_preamble r5, lr
+ 1:	get_irqnr_and_base r0, r6, r5, lr
+@@ -59,6 +60,14 @@
+ #endif
 
- static void pxa_unmask_irq(unsigned int irq)
- {
--	_ICMR(irq) |= 1 << IRQ_BIT(irq);
-+	void __iomem *base = get_irq_chip_data(irq);
-+	uint32_t icmr = __raw_readl(base + 4);
+ 	.endm
++#else
++	.macro	irq_handler
++	ldr	r4, =handle_arch_irq
++	mov	r0, sp
++	mov	lr, pc
++	ldr	pc, [r4]
++	.endm
++#endif	/* CONFIG_MULTI_IRQ_HANDLER */
+
+ #ifdef CONFIG_KPROBES
+ 	.section	.kprobes.text,"ax",%progbits
+@@ -1251,3 +1260,9 @@ cr_alignment:
+ 	.space	4
+ cr_no_alignment:
+ 	.space	4
 +
-+	icmr |= 1 << IRQ_BIT(irq);
-+	__raw_writel(icmr, base + ICMR);
- }
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	.globl	handle_arch_irq
++handle_arch_irq:
++	.long	0
++#endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index f1aee0d..61d5f8d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -732,6 +732,10 @@ void __init setup_arch(char **cmdline_p)
+ 	system_timer = mdesc->timer;
+ 	init_machine = mdesc->init_machine;
 
- static struct irq_chip pxa_internal_irq_chip = {
-@@ -86,12 +110,16 @@ static void pxa_ack_low_gpio(unsigned int irq)
-
- static void pxa_mask_low_gpio(unsigned int irq)
- {
--	ICMR &= ~(1 << (irq - PXA_IRQ(0)));
-+	struct irq_desc *desc = irq_to_desc(irq);
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	handle_arch_irq = mdesc->handle_irq;
++#endif
 +
-+	desc->chip->mask(irq);
- }
-
- static void pxa_unmask_low_gpio(unsigned int irq)
- {
--	ICMR |= 1 << (irq - PXA_IRQ(0));
-+	struct irq_desc *desc = irq_to_desc(irq);
-+
-+	desc->chip->unmask(irq);
- }
-
- static struct irq_chip pxa_low_gpio_chip = {
-@@ -120,6 +148,17 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
- 	pxa_low_gpio_chip.set_wake = fn;
- }
-
-+static inline void __iomem *irq_base(int i)
-+{
-+	static unsigned long phys_base[] = {
-+		0x40d00000,
-+		0x40d0009c,
-+		0x40d00130,
-+	};
-+
-+	return (void __iomem *)io_p2v(phys_base[i >> 5]);
-+}
-+
- void __init pxa_init_irq(int irq_nr, set_wake_t fn)
- {
- 	int irq, i;
-@@ -128,25 +167,28 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
-
- 	pxa_internal_irq_nr = irq_nr;
-
--	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq += 32) {
--		_ICMR(irq) = 0;	/* disable all IRQs */
--		_ICLR(irq) = 0;	/* all IRQs are IRQ, not FIQ */
-+	for (i = 0; i < irq_nr; i += 32) {
-+		void __iomem *base = irq_base(i);
-+		int max_irq = min(i + 32, irq_nr);
-+
-+		__raw_writel(0, base + ICMR);	/* disable all IRQs */
-+		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
-+
-+		for (irq = PXA_IRQ(i); irq < PXA_IRQ(max_irq); irq++) {
-+			set_irq_chip(irq, &pxa_internal_irq_chip);
-+			set_irq_chip_data(irq, irq_base(irq));
-+			set_irq_handler(irq, handle_level_irq);
-+			set_irq_flags(irq, IRQF_VALID);
-+		}
- 	}
-
- 	/* initialize interrupt priority */
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+	if (cpu_has_ipr())
- 		for (i = 0; i < irq_nr; i++)
--			IPR(i) = i | (1 << 31);
--	}
-+			__raw_writel(i | IPR_VALID, IRQ_BASE + IPR(i));
-
- 	/* only unmasked interrupts kick us out of idle */
--	ICCR = 1;
--
--	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
--		set_irq_chip(irq, &pxa_internal_irq_chip);
--		set_irq_handler(irq, handle_level_irq);
--		set_irq_flags(irq, IRQF_VALID);
--	}
-+	__raw_writel(1, IRQ_BASE + ICCR);
-
- 	pxa_internal_irq_chip.set_wake = fn;
- 	pxa_init_low_gpio_irq(fn);
-@@ -158,36 +200,37 @@ static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
-
- static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- {
--	int i, irq = PXA_IRQ(0);
-+	int i;
-
--	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
--		saved_icmr[i] = _ICMR(irq);
--		_ICMR(irq) = 0;
--	}
-+	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-+		void __iomem *base = irq_base(i);
-
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
--		for (i = 0; i < pxa_internal_irq_nr; i++)
--			saved_ipr[i] = IPR(i);
-+		saved_icmr[i] = __raw_readl(base + ICMR);
-+		__raw_writel(0, base + ICMR);
- 	}
-
-+	if (cpu_has_ipr())
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
-+			saved_ipr[i] = __raw_readl(IRQ_BASE + IPR(i));
- 	return 0;
- }
-
- static int pxa_irq_resume(struct sys_device *dev)
- {
--	int i, irq = PXA_IRQ(0);
-+	int i;
-
--	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+	if (cpu_has_ipr())
- 		for (i = 0; i < pxa_internal_irq_nr; i++)
--			IPR(i) = saved_ipr[i];
--	}
-+			__raw_writel(saved_ipr[i], IRQ_BASE + IPR(i));
-+
-+	for (i = 0; i < pxa_internal_irq_nr; i += 32) {
-+		void __iomem *base = irq_base(i);
-
--	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
--		_ICMR(irq) = saved_icmr[i];
--		_ICLR(irq) = 0;
-+		__raw_writel(saved_icmr[i], base + ICMR);
-+		__raw_writel(0, base + ICLR);
- 	}
-
--	ICCR = 1;
-+	__raw_writel(1, IRQ_BASE + ICCR);
- 	return 0;
- }
- #else
+ #ifdef CONFIG_VT
+ #if defined(CONFIG_VGA_CONSOLE)
+ 	conswitchp = &vga_con;
