@@ -1,186 +1,116 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 22 May 2010 12:24:23 +0800
-Subject: [RFC PATCH 2/2] pxa: preliminary support for MULTI_IRQ_HANDLER
-Message-ID: <AANLkTini_6iqbWX0vVtNdrnq8BdQQYaprc5yqJey99G8@mail.gmail.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Sat, 22 May 2010 08:14:15 +0300 (EEST)
+Subject: [PATCH v2t2 00/17] omap: mailbox:
+In-Reply-To: <AANLkTinMFJTlbXYiS9G87VSQyRuGxJfJGHkVejOEfgVQ@mail.gmail.com>
+References: <AANLkTin03gFY1uc9__lGO8lHiKMjuSBRSYcFDhLYDIMD@mail.gmail.com>
+	<20100521221557.GM11042@n2100.arm.linux.org.uk>
+	<AANLkTinMFJTlbXYiS9G87VSQyRuGxJfJGHkVejOEfgVQ@mail.gmail.com>
+Message-ID: <20100522.081415.258113387.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 4cbce4923d528c9de8556bad8b935efe6170842b
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Sat May 22 12:22:52 2010 +0800
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: Re: [PATCH v2t2 00/17] omap: mailbox:
+Date: Sat, 22 May 2010 01:34:52 +0200
 
-    [ARM] pxa: preliminary support for MULTI_IRQ_HANDLER
+> On Sat, May 22, 2010 at 1:15 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Sat, May 22, 2010 at 01:09:12AM +0300, Felipe Contreras wrote:
+>>> On Sat, May 22, 2010 at 12:57 AM, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>> > The only reason 3 would be loaded due to that dependency is if 2 were
+>>> > being modprobed, which means it's going to be inserted after 3 anyway.
+>>> >
+>>> > I don't see anything else in 3 which would trigger it to be loaded.
+>>> >
+>>> > The "platform:omap2-mailbox" module alias of 2 should result in 2
+>>> > being modprobed,
+>>>
+>>> I see, at initialization?
+>>
+>> That's the theory - and it should be that same mechanism which allows
+>> things like already plugged in PCMCIA and the like cards to be properly
+>> dealt with at boot time.
+>>
+>>> > causing 3 to be loaded to satisfy the dependency.
+>>> > As already pointed out, this should happen as a result of udev or
+>>> > (older) hotplug initialization.
+>>>
+>>> Well, in the minimal system I have in my beagleboard it doesn't
+>>> happen. I load bridgedriver, which loads mailbox, but fails
+>>> immediately because mailbox_mach is not there.
+>>
+>> I assume that having the MMC host driver built in, but the MMC block
+>> driver as a module also doesn't work on your setup?
+> 
+> I wouldn't know because my file-system is on the MMC.
 
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+I guess that your other platform drivers wouldn't work as dynamic module.
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 3b51741..bec042d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -470,6 +470,7 @@ config MACH_CORGI
- 	depends on PXA_SHARPSL
- 	select PXA25x
- 	select PXA_SHARP_C7xx
-+	select MULTI_IRQ_HANDLER
+>> I don't see this as something that should be worked around in the
+>> kernel by making things non-modular - I view the missing userspace
+>> functionality causing the problem.
+> 
+> First of all, most of the cleanups are independent of the built-in
+> option, although that was my motivation, the patches are good by
 
- config MACH_SHEPHERD
- 	bool "Enable Sharp SL-C750 (Shepherd) Support"
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 3d1dcb9..c910d2b 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -729,6 +729,7 @@ MACHINE_START(CORGI, "SHARP Corgi")
- 	.fixup		= fixup_corgi,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa25x_init_irq,
-+	.handle_irq	= pxa25x_handle_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -741,6 +742,7 @@ MACHINE_START(SHEPHERD, "SHARP Shepherd")
- 	.fixup		= fixup_corgi,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa25x_init_irq,
-+	.handle_irq	= pxa25x_handle_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -753,6 +755,7 @@ MACHINE_START(HUSKY, "SHARP Husky")
- 	.fixup		= fixup_corgi,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa25x_init_irq,
-+	.handle_irq	= pxa25x_handle_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index 890fb90..437e9a3 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -22,6 +22,9 @@ extern void __init pxa27x_init_irq(void);
- extern void __init pxa3xx_init_irq(void);
- extern void __init pxa_map_io(void);
+Your cleanup patches are ok.
 
-+extern void pxa25x_handle_irq(struct pt_regs *);
-+extern void pxa27x_handle_irq(struct pt_regs *);
-+
- extern unsigned int get_clk_frequency_khz(int info);
+> themselves: there's no need to export
+> omap_mbox_register()/_unregister() unnecessarily when the platform
+> data can be used, right?
 
- #define SET_BANK(__nr,__start,__size) \
-diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S
-b/arch/arm/mach-pxa/include/mach/entry-macro.S
-index a73bc86..1ee5368 100644
---- a/arch/arm/mach-pxa/include/mach/entry-macro.S
-+++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
-@@ -13,10 +13,11 @@
- 		.macro	disable_fiq
- 		.endm
+This is not the point.
 
--		.macro  get_irqnr_preamble, base, tmp
-+		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
+> Now, regarding the built-in mode; for the iommu case you said it
+> should be built-in:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/58555
 
--		.macro  arch_ret_to_user, tmp1, tmp2
-+#ifndef CONFIG_MULTI_IRQ_HANDLER
-+		.macro  get_irqnr_preamble, base, tmp
- 		.endm
+Right.
 
- 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-@@ -49,3 +50,4 @@
- 		add	\irqnr, \irqnr, #(PXA_IRQ(0))
- 1001:
- 		.endm
-+#endif
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index a9396a9..24934de 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -37,6 +37,7 @@
- #define IPR(i)		(((i) < 32) ? (0x01c + ((i) << 2)) :		\
- 			 ((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
- 				      (0x144 + (((i) - 64) << 2)))
-+#define ICHP_VAL_IRQ	(1 << 31)
- #define IPR_VALID	(1 << 31)
+> Apparently it's not, so it's not clear to me how omap3-iommu would be
+> loaded since there's no "platform:" alias.
 
- #define MAX_INTERNAL_IRQS	128
-@@ -75,6 +76,7 @@ static struct irq_chip pxa_internal_irq_chip = {
- 	.name		= "SC",
- 	.ack		= pxa_mask_irq,
- 	.mask		= pxa_mask_irq,
-+	.mask_ack	= pxa_mask_irq,
- 	.unmask		= pxa_unmask_irq,
- };
+This alias is only necessary for platform drivers.
 
-@@ -148,6 +150,44 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
- 	pxa_low_gpio_chip.set_wake = fn;
- }
+> Moreover, Tony says that anything that registers platform devices
+> should be built-in, but omap3-iommu does register devices and is not
+> built-in.
 
-+#ifdef CONFIG_PXA25x
-+asmlinkage void pxa25x_handle_irq(struct pt_regs *reg)
-+{
-+	uint32_t icip, icmr, mask;
-+	unsigned int irq;
-+
-+	do {
-+		icip = __raw_readl(IRQ_BASE + ICIP);
-+		icmr = __raw_readl(IRQ_BASE + ICMR);
-+		mask = icip & icmr;
-+
-+		if (mask == 0)
-+			break;
-+
-+		irq = fls(mask) - 1;
-+		asm_do_IRQ(irq, reg);
-+	} while (1);
-+}
-+#endif
-+
-+#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
-+asmlinkage void pxa27x_handle_irq(struct pt_regs *reg)
-+{
-+	uint32_t ichp;
-+	unsigned int irq;
-+
-+	do {
-+		__asm__ __volatile__("mrc p6, 0, %0, c5, c0, 0\n": "=r"(ichp));
-+
-+		if ((ichp & ICHP_VAL_IRQ) == 0)
-+			break;
-+
-+		irq = PXA_IRQ((ichp & ~ICHP_VAL_IRQ) >> 16);
-+		asm_do_IRQ(irq, reg);
-+	} while (1);
-+}
-+#endif
-+
- static inline void __iomem *irq_base(int i)
- {
- 	static unsigned long phys_base[] = {
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 4d2413e..e8bdf16 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -855,6 +855,7 @@ MACHINE_START(SPITZ, "SHARP Spitz")
- 	.fixup		= fixup_spitz,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
-+	.handle_irq	= pxa27x_handle_irq,
- 	.init_machine	= spitz_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -867,6 +868,7 @@ MACHINE_START(BORZOI, "SHARP Borzoi")
- 	.fixup		= fixup_spitz,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
-+	.handle_irq	= pxa27x_handle_irq,
- 	.init_machine	= spitz_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -879,6 +881,7 @@ MACHINE_START(AKITA, "SHARP Akita")
- 	.fixup		= fixup_spitz,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
-+	.handle_irq	= pxa27x_handle_irq,
- 	.init_machine	= akita_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
+It seems that this makes you confused. It should have been
+build-in;). This is going to be integrated into omap hwmod framework
+soon.
+
+> We could make it built-in as you suggested, but according to
+> you, things should be modular.
+> 
+> So, I have a bunch of questions:
+> 1) should platform devices be built-in?
+
+Yes.
+
+> 2) should platform modules like omap3-iommu and mailbox-mach have a
+> "platform:" alias?
+
+No.
+
+> 3) should such modules follow a guideline like foo-mach, or $mach-foo?
+
+No, this is not a guideline. Just to avoid the module name cofliction.
+
+> From what I can see there's already a lot of code that adds platform
+> data at registering time, which is built-in, but I guess you object
+> because of the size of all the extra data and code that would come by
+> making mach-omapX/mailbox.c as built-in. Am I right?
+
+Yes.
+
+> If that's the case I agree, although I have the feeling that the
+> platform-specific data can be reduced a lot.
+
+Then, eventually the code would result in the one which the current
+"devices.ko" has at present.
+
+The point is that, only 17 lines of patch does the same, more
+simply. The conversion of your fake platform device doesn't make
+much sense.
