@@ -1,296 +1,82 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 22 May 2010 20:14:24 +0300
-Subject: [PATCH v3 13/14] omap: mailbox: simplify omap_mbox_register()
+Date: Sat, 22 May 2010 20:14:25 +0300
+Subject: [PATCH v3 14/14] omap: mailbox: reorganize headers
 In-Reply-To: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
 References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1274548465-20208-14-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1274548465-20208-15-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to dynamically register mailboxes one by one.
-
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/mailbox.c             |   25 ++------
- arch/arm/mach-omap2/mailbox.c             |   22 ++-----
- arch/arm/plat-omap/include/plat/mailbox.h |    5 +-
- arch/arm/plat-omap/mailbox.c              |   95 +++++++++++------------------
- 4 files changed, 50 insertions(+), 97 deletions(-)
+ arch/arm/mach-omap1/mailbox.c             |    3 ---
+ arch/arm/mach-omap2/mailbox.c             |    1 -
+ arch/arm/plat-omap/include/plat/mailbox.h |    3 ++-
+ arch/arm/plat-omap/mailbox.c              |    5 ++---
+ 4 files changed, 4 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index 4210896..e50b3c2 100644
+index e50b3c2..fdd6cc9 100644
 --- a/arch/arm/mach-omap1/mailbox.c
 +++ b/arch/arm/mach-omap1/mailbox.c
-@@ -29,8 +29,6 @@
+@@ -9,13 +9,10 @@
+  * for more details.
+  */
  
- static void __iomem *mbox_base;
+-#include <linux/kernel.h>
+-#include <linux/resource.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <plat/mailbox.h>
+-#include <mach/irqs.h>
  
--static struct omap_mbox **list;
--
- struct omap_mbox1_fifo {
- 	unsigned long cmd;
- 	unsigned long data;
-@@ -151,38 +149,29 @@ static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int ret;
- 	int i;
-+	struct omap_mbox **list;
- 
- 	res = pdev->resource;
- 
- 	list = omap1_mboxes;
--
- 	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
- 
- 	mbox_base = ioremap(res[0].start, resource_size(&res[0]));
- 	if (!mbox_base)
- 		return -ENOMEM;
- 
--	for (i = 0; list[i]; i++) {
--		ret = omap_mbox_register(&pdev->dev, list[i]);
--		if (ret)
--			goto err_out;
-+	ret = omap_mbox_register(&pdev->dev, list);
-+	if (ret) {
-+		iounmap(mbox_base);
-+		return ret;
- 	}
--	return 0;
- 
--err_out:
--	while (i--)
--		omap_mbox_unregister(list[i]);
--	iounmap(mbox_base);
--	return ret;
-+	return 0;
- }
- 
- static int __devexit omap1_mbox_remove(struct platform_device *pdev)
- {
--	int i;
--
--	for (i = 0; list[i]; i++)
--		omap_mbox_unregister(list[i]);
--
-+	omap_mbox_unregister();
- 	iounmap(mbox_base);
- 	return 0;
- }
+ #define MAILBOX_ARM2DSP1		0x00
+ #define MAILBOX_ARM2DSP1b		0x04
 diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index a433ca7..66d366d 100644
+index 66d366d..d46e439 100644
 --- a/arch/arm/mach-omap2/mailbox.c
 +++ b/arch/arm/mach-omap2/mailbox.c
-@@ -54,8 +54,6 @@
+@@ -10,7 +10,6 @@
+  * for more details.
+  */
  
- static void __iomem *mbox_base;
- 
--static struct omap_mbox **list;
--
- struct omap_mbox2_fifo {
- 	unsigned long msg;
- 	unsigned long fifo_stat;
-@@ -393,7 +391,7 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	int ret;
--	int i;
-+	struct omap_mbox **list;
- 
- 	res = pdev->resource;
- 
-@@ -430,27 +428,19 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
- 	if (!mbox_base)
- 		return -ENOMEM;
- 
--	for (i = 0; list[i]; i++) {
--		ret = omap_mbox_register(&pdev->dev, list[i]);
--		if (ret)
--			goto err_out;
-+	ret = omap_mbox_register(&pdev->dev, list);
-+	if (ret) {
-+		iounmap(mbox_base);
-+		return ret;
- 	}
- 	return 0;
- 
--err_out:
--	while (i--)
--		omap_mbox_unregister(list[i]);
--	iounmap(mbox_base);
- 	return ret;
- }
- 
- static int __devexit omap2_mbox_remove(struct platform_device *pdev)
- {
--	int i;
--
--	for (i = 0; list[i]; i++)
--		omap_mbox_unregister(list[i]);
--
-+	omap_mbox_unregister();
- 	iounmap(mbox_base);
- 	return 0;
- }
+-#include <linux/kernel.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/platform_device.h>
 diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index aad8bf8..c44fde3 100644
+index c44fde3..9976565 100644
 --- a/arch/arm/plat-omap/include/plat/mailbox.h
 +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -55,7 +55,6 @@ struct omap_mbox {
- 	struct omap_mbox_queue	*txq, *rxq;
- 	struct omap_mbox_ops	*ops;
- 	struct device		*dev;
--	struct omap_mbox	*next;
- 	void			*priv;
- };
+@@ -3,9 +3,10 @@
+ #ifndef MAILBOX_H
+ #define MAILBOX_H
  
-@@ -65,8 +64,8 @@ void omap_mbox_init_seq(struct omap_mbox *);
- struct omap_mbox *omap_mbox_get(const char *);
- void omap_mbox_put(struct omap_mbox *);
+-#include <linux/wait.h>
++#include <linux/spinlock.h>
+ #include <linux/workqueue.h>
+ #include <linux/interrupt.h>
++#include <linux/device.h>
+ #include <linux/kfifo.h>
  
--int omap_mbox_register(struct device *parent, struct omap_mbox *);
--int omap_mbox_unregister(struct omap_mbox *);
-+int omap_mbox_register(struct device *parent, struct omap_mbox **);
-+int omap_mbox_unregister(void);
- 
- static inline void omap_mbox_save_ctx(struct omap_mbox *mbox)
- {
+ typedef u32 mbox_msg_t;
 diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 38a6cb1..a8e22e1 100644
+index a8e22e1..8d4c7be 100644
 --- a/arch/arm/plat-omap/mailbox.c
 +++ b/arch/arm/plat-omap/mailbox.c
-@@ -33,8 +33,7 @@
- #include <plat/mailbox.h>
+@@ -21,10 +21,9 @@
+  *
+  */
  
- static struct workqueue_struct *mboxd;
--static struct omap_mbox *mboxes;
--static DEFINE_SPINLOCK(mboxes_lock);
-+static struct omap_mbox **mboxes;
- static bool rq_full;
- 
- static int mbox_configured;
-@@ -307,31 +306,20 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
- 	}
- }
- 
--static struct omap_mbox **find_mboxes(const char *name)
--{
--	struct omap_mbox **p;
--
--	for (p = &mboxes; *p; p = &(*p)->next) {
--		if (strcmp((*p)->name, name) == 0)
--			break;
--	}
--
--	return p;
--}
--
- struct omap_mbox *omap_mbox_get(const char *name)
- {
- 	struct omap_mbox *mbox;
- 	int ret;
- 
--	spin_lock(&mboxes_lock);
--	mbox = *(find_mboxes(name));
--	if (mbox == NULL) {
--		spin_unlock(&mboxes_lock);
--		return ERR_PTR(-ENOENT);
--	}
-+	if (!mboxes)
-+		return ERR_PTR(-EINVAL);
- 
--	spin_unlock(&mboxes_lock);
-+	for (mbox = *mboxes; mbox; mbox++)
-+		if (!strcmp(mbox->name, name))
-+			break;
-+
-+	if (!mbox)
-+		return ERR_PTR(-ENOENT);
- 
- 	ret = omap_mbox_startup(mbox);
- 	if (ret)
-@@ -349,57 +337,44 @@ EXPORT_SYMBOL(omap_mbox_put);
- 
- static struct class omap_mbox_class = { .name = "mbox", };
- 
--int omap_mbox_register(struct device *parent, struct omap_mbox *mbox)
-+int omap_mbox_register(struct device *parent, struct omap_mbox **list)
- {
--	int ret = 0;
--	struct omap_mbox **tmp;
-+	int ret;
-+	int i;
- 
--	if (!mbox)
-+	mboxes = list;
-+	if (!mboxes)
- 		return -EINVAL;
--	if (mbox->next)
--		return -EBUSY;
--
--	mbox->dev = device_create(&omap_mbox_class,
--				  parent, 0, mbox, "%s", mbox->name);
--	if (IS_ERR(mbox->dev))
--		return PTR_ERR(mbox->dev);
--
--	spin_lock(&mboxes_lock);
--	tmp = find_mboxes(mbox->name);
--	if (*tmp) {
--		ret = -EBUSY;
--		spin_unlock(&mboxes_lock);
--		goto err_find;
--	}
--	*tmp = mbox;
--	spin_unlock(&mboxes_lock);
- 
-+	for (i = 0; mboxes[i]; i++) {
-+		struct omap_mbox *mbox = mboxes[i];
-+		mbox->dev = device_create(&omap_mbox_class,
-+				parent, 0, mbox, "%s", mbox->name);
-+		if (IS_ERR(mbox->dev)) {
-+			ret = PTR_ERR(mbox->dev);
-+			goto err_out;
-+		}
-+	}
- 	return 0;
- 
--err_find:
-+err_out:
-+	while (i--)
-+		device_unregister(mboxes[i]->dev);
- 	return ret;
- }
- EXPORT_SYMBOL(omap_mbox_register);
- 
--int omap_mbox_unregister(struct omap_mbox *mbox)
-+int omap_mbox_unregister(void)
- {
--	struct omap_mbox **tmp;
--
--	spin_lock(&mboxes_lock);
--	tmp = &mboxes;
--	while (*tmp) {
--		if (mbox == *tmp) {
--			*tmp = mbox->next;
--			mbox->next = NULL;
--			spin_unlock(&mboxes_lock);
--			device_unregister(mbox->dev);
--			return 0;
--		}
--		tmp = &(*tmp)->next;
--	}
--	spin_unlock(&mboxes_lock);
-+	int i;
- 
--	return -EINVAL;
-+	if (!mboxes)
-+		return -EINVAL;
-+
-+	for (i = 0; mboxes[i]; i++)
-+		device_unregister(mboxes[i]->dev);
-+	mboxes = NULL;
-+	return 0;
- }
- EXPORT_SYMBOL(omap_mbox_unregister);
- 
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+ #include <linux/interrupt.h>
+-#include <linux/device.h>
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+ #include <linux/kfifo.h>
 -- 
 1.7.1
