@@ -1,30 +1,40 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 22 May 2010 22:51:36 +1000
-Subject: [PATCH 2/5] arm/orion5x: Base support for DNS-323 rev C1
-In-Reply-To: <20100522110446.GB954@n2100.arm.linux.org.uk>
-References: <1274525686.1931.140.camel@pasglop>
-	<20100522110446.GB954@n2100.arm.linux.org.uk>
-Message-ID: <1274532696.1931.146.camel@pasglop>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 22 May 2010 15:06:24 +0200
+Subject: [PATCH 1/5] net/phy/marvell: Expose IDs and flags in a .h and
+	add dns323 LEDs setup flag
+In-Reply-To: <1274525683.1931.139.camel@pasglop>
+References: <1274525683.1931.139.camel@pasglop>
+Message-ID: <20100522130624.GA28561@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-05-22 at 12:04 +0100, Russell King - ARM Linux wrote:
-> On Sat, May 22, 2010 at 08:54:46PM +1000, Benjamin Herrenschmidt wrote:
-> >  static void __init dns323_init(void)
-> >  {
-> > +        console_loglevel = 10;
-> > +
-> 
-> Did you mean to leave this in?
+On Sat, May 22, 2010 at 08:54:43PM +1000, Benjamin Herrenschmidt wrote:
+> This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
+> along with dev_flags definitions for use by the driver.
 
-Oops :-)
+I think this one from the driver should go there, too:
 
-This isn't my neatest patch set, I must say. I spotted (too late) a
-couple of typos and a crap hunk as well. Sorry about that, it's getting
-hard to find time to hack at home with the kids :-)
+#define M1145_DEV_FLAGS_RESISTANCE      0x00000001
 
-In any case, let's see what other comments come in and if nothing else
-is wrong, I'll post a cleaned up set some time next week.
+(which makes me wonder how this flag was set as it was not exported before)
 
-Cheers,
-Ben.
+and thus yours could be maybe like
+
+#define M1118_DEV_FLAGS_ALT_LED_INIT	0x00000001
+
+(or 1 << 0)
+
+?
+
+Otherwise looks good enough to me.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100522/e497ef54/attachment.sig>
