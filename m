@@ -1,57 +1,42 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 22 May 2010 20:14:18 +0300
-Subject: [PATCH v3 07/14] omap: mailbox: don't export unecessary symbols
+Date: Sat, 22 May 2010 20:14:19 +0300
+Subject: [PATCH v3 08/14] omap: mailbox: remove unecessary fields
 In-Reply-To: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
 References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1274548465-20208-8-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <1274548465-20208-9-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nobody is using them.
+
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap1/mailbox.c |    1 -
- arch/arm/mach-omap2/mailbox.c |    3 ---
- 2 files changed, 0 insertions(+), 4 deletions(-)
+ arch/arm/plat-omap/include/plat/mailbox.h |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index 211b9fc..590ac66 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -141,7 +141,6 @@ struct omap_mbox mbox_dsp_info = {
- 	.ops	= &omap1_mbox_ops,
- 	.priv	= &omap1_mbox_dsp_priv,
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 0c3c4a5..aad8bf8 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -52,19 +52,11 @@ struct omap_mbox_queue {
+ struct omap_mbox {
+ 	char			*name;
+ 	unsigned int		irq;
+-
+ 	struct omap_mbox_queue	*txq, *rxq;
+-
+ 	struct omap_mbox_ops	*ops;
+-
+-	mbox_msg_t		seq_snd, seq_rcv;
+-
+ 	struct device		*dev;
+-
+ 	struct omap_mbox	*next;
+ 	void			*priv;
+-
+-	void			(*err_notify)(void);
  };
--EXPORT_SYMBOL(mbox_dsp_info);
  
- static int __devinit omap1_mbox_probe(struct platform_device *pdev)
- {
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index f67cb2c..3ff1ad5 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -306,7 +306,6 @@ struct omap_mbox mbox_dsp_info = {
- 	.ops	= &omap2_mbox_ops,
- 	.priv	= &omap2_mbox_dsp_priv,
- };
--EXPORT_SYMBOL(mbox_dsp_info);
- 
- #if defined(CONFIG_ARCH_OMAP2420)
- 
-@@ -356,7 +355,6 @@ struct omap_mbox mbox_1_info = {
- 	.ops	= &omap2_mbox_ops,
- 	.priv	= &omap2_mbox_1_priv,
- };
--EXPORT_SYMBOL(mbox_1_info);
- 
- static struct omap_mbox2_priv omap2_mbox_2_priv = {
- 	.tx_fifo = {
-@@ -379,7 +377,6 @@ struct omap_mbox mbox_2_info = {
- 	.ops	= &omap2_mbox_ops,
- 	.priv	= &omap2_mbox_2_priv,
- };
--EXPORT_SYMBOL(mbox_2_info);
- 
- static int __devinit omap2_mbox_probe(struct platform_device *pdev)
- {
+ int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
 -- 
 1.7.1
