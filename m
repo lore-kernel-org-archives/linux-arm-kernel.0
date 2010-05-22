@@ -1,82 +1,147 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 22 May 2010 20:14:25 +0300
-Subject: [PATCH v3 14/14] omap: mailbox: reorganize headers
-In-Reply-To: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1274548465-20208-15-git-send-email-felipe.contreras@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 May 2010 22:58:48 +0100
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+Message-ID: <20100522215848.GB29889@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- arch/arm/mach-omap1/mailbox.c             |    3 ---
- arch/arm/mach-omap2/mailbox.c             |    1 -
- arch/arm/plat-omap/include/plat/mailbox.h |    3 ++-
- arch/arm/plat-omap/mailbox.c              |    5 ++---
- 4 files changed, 4 insertions(+), 8 deletions(-)
+I'm going to take a slightly different approach to LMB given the
+(unique) problems that OMAP has with converting over to LMB.  I've
+been re-ordering my patchset so that we do as many changes as
+possible to sanitize the code before introducing LMB.
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index e50b3c2..fdd6cc9 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -9,13 +9,10 @@
-  * for more details.
+So, below is a patch to sanitize the code in arch/arm/plat-omap/fb.c.
+The logic in this file is rather convoluted, but essentially:
+
+1. region type 0 is SDRAM
+2. referring to the code fragment
+                if (set_fbmem_region_type(&rg, OMAPFB_MEMTYPE_SDRAM,
+                                          sdram_start, sdram_size) < 0 ||
+                    (rg.type != OMAPFB_MEMTYPE_SDRAM))
+                        continue;
+   - if rg.type is not OMAPFB_MEMTYPE_SDRAM, set_fbmem_region_type()
+     returns zero immediately (since rg.type is non-zero), and so we
+     'continue'.
+   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and rg.paddr is zero,
+     we fall through.
+   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and the region lies within
+     SDRAM, we fall through.
+   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and the region is not within
+     SDRAM, we 'continue'.
+3. check_fbmem_region seems unnecessary.
+   - we know rg.type is OMAPFB_MEMTYPE_SDRAM
+   - we can check rg.size independently
+   - bootmem_reserve() can check for overlapping reservations itself
+   - we've already validated that the requested region lies within SDRAM.
+4. avoid BUG()ing if the region entry is already set; print an error,
+   and mark the configuration invalid -@least we'll continue booting
+   so the error message has a chance of being logged/visible via serial
+   console.
+
+With these changes in place, it makes the code much easier to understand
+and hence easier to convert to LMB.  I suggest this should be validated
+well before the next merge window.
+
+I'm sure with the SDRAM code simplified like this, the SRAM code can be
+cleaned up and some of the complex helper functions killed off.
+
+diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
+index d3eea4f..97db493 100644
+--- a/arch/arm/plat-omap/fb.c
++++ b/arch/arm/plat-omap/fb.c
+@@ -171,49 +171,76 @@ static int check_fbmem_region(int region_idx, struct omapfb_mem_region *rg,
+ 	return 0;
+ }
+ 
++static int valid_sdram(unsigned long addr, unsigned long size)
++{
++	struct bootmem_data *bdata = NODE_DATA(0)->bdata;
++	unsigned long sdram_start, sdram_end;
++
++	sdram_start = bdata->node_min_pfn << PAGE_SHIFT;
++	sdram_end = bdata->node_low_pfn << PAGE_SHIFT;
++
++	return addr >= sdram_start && sdram_end - addr >= size;
++}
++
++static int reserve_sdram(unsigned long addr, unsigned long size)
++{
++	return reserve_bootmem(addr, size, BOOTMEM_EXCLUSIVE);
++}
++
+ /*
+  * Called from map_io. We need to call to this early enough so that we
+  * can reserve the fixed SDRAM regions before VM could get hold of them.
   */
+ void __init omapfb_reserve_sdram(void)
+ {
+-	struct bootmem_data	*bdata;
+-	unsigned long		sdram_start, sdram_size;
+-	unsigned long		reserved;
+-	int			i;
++	unsigned long reserved = 0;
++	int i;
  
--#include <linux/kernel.h>
--#include <linux/resource.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <plat/mailbox.h>
--#include <mach/irqs.h>
+ 	if (config_invalid)
+ 		return;
  
- #define MAILBOX_ARM2DSP1		0x00
- #define MAILBOX_ARM2DSP1b		0x04
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 66d366d..d46e439 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -10,7 +10,6 @@
-  * for more details.
-  */
+-	bdata = NODE_DATA(0)->bdata;
+-	sdram_start = bdata->node_min_pfn << PAGE_SHIFT;
+-	sdram_size = (bdata->node_low_pfn << PAGE_SHIFT) - sdram_start;
+-	reserved = 0;
+ 	for (i = 0; ; i++) {
+-		struct omapfb_mem_region	rg;
++		struct omapfb_mem_region rg;
  
--#include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index c44fde3..9976565 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -3,9 +3,10 @@
- #ifndef MAILBOX_H
- #define MAILBOX_H
- 
--#include <linux/wait.h>
-+#include <linux/spinlock.h>
- #include <linux/workqueue.h>
- #include <linux/interrupt.h>
-+#include <linux/device.h>
- #include <linux/kfifo.h>
- 
- typedef u32 mbox_msg_t;
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index a8e22e1..8d4c7be 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -21,10 +21,9 @@
-  *
-  */
- 
--#include <linux/kernel.h>
--#include <linux/module.h>
- #include <linux/interrupt.h>
--#include <linux/device.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
- #include <linux/kfifo.h>
--- 
-1.7.1
+ 		if (get_fbmem_region(i, &rg) < 0)
+ 			break;
++
+ 		if (i == OMAPFB_PLANE_NUM) {
+-			printk(KERN_ERR
+-				"Extraneous FB mem configuration entries\n");
++			pr_err("Extraneous FB mem configuration entries\n");
+ 			config_invalid = 1;
+ 			return;
+ 		}
++
+ 		/* Check if it's our memory type. */
+-		if (set_fbmem_region_type(&rg, OMAPFB_MEMTYPE_SDRAM,
+-				          sdram_start, sdram_size) < 0 ||
+-		    (rg.type != OMAPFB_MEMTYPE_SDRAM))
++		if (rg.type != OMAPFB_MEMTYPE_SDRAM)
+ 			continue;
+-		BUG_ON(omapfb_config.mem_desc.region[i].size);
+-		if (check_fbmem_region(i, &rg, sdram_start, sdram_size) < 0) {
++
++		/* Check if the region falls within SDRAM */
++		if (rg.paddr && !valid_sdram(rg.paddr, rg.size))
++			continue;
++
++		if (rg.size == 0) {
++			pr_err("Zero size for FB region %d\n", i);
+ 			config_invalid = 1;
+ 			return;
+ 		}
++
+ 		if (rg.paddr) {
+-			reserve_bootmem(rg.paddr, rg.size, BOOTMEM_DEFAULT);
++			if (reserve_sdram(rg.paddr, rg.size)) {
++				pr_err("Trying to use reserved memory for FB region %d\n",
++					i);
++				config_invalid = 1;
++				return;
++			}
+ 			reserved += rg.size;
+ 		}
++
++		if (omapfb_config.mem_desc.region[i].size) {
++			pr_err("FB region %d already set\n", i);
++			config_invalid = 1;
++			return;
++		}
++
+ 		omapfb_config.mem_desc.region[i] = rg;
+ 		configured_regions++;
+ 	}
