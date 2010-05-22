@@ -1,147 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 May 2010 22:58:48 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-Message-ID: <20100522215848.GB29889@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 23 May 2010 08:53:34 +1000
+Subject: [PATCH 1/5] net/phy/marvell: Expose IDs and flags in a .h and
+	add dns323 LEDs setup flag
+In-Reply-To: <20100522130624.GA28561@pengutronix.de>
+References: <1274525683.1931.139.camel@pasglop>
+	<20100522130624.GA28561@pengutronix.de>
+Message-ID: <1274568814.1931.148.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm going to take a slightly different approach to LMB given the
-(unique) problems that OMAP has with converting over to LMB.  I've
-been re-ordering my patchset so that we do as many changes as
-possible to sanitize the code before introducing LMB.
+On Sat, 2010-05-22 at 15:06 +0200, Wolfram Sang wrote:
+> On Sat, May 22, 2010 at 08:54:43PM +1000, Benjamin Herrenschmidt wrote:
+> > This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
+> > along with dev_flags definitions for use by the driver.
+> 
+> I think this one from the driver should go there, too:
+> 
+> #define M1145_DEV_FLAGS_RESISTANCE      0x00000001
+> 
+> (which makes me wonder how this flag was set as it was not exported before)
 
-So, below is a patch to sanitize the code in arch/arm/plat-omap/fb.c.
-The logic in this file is rather convoluted, but essentially:
+I missed that one indeed.
 
-1. region type 0 is SDRAM
-2. referring to the code fragment
-                if (set_fbmem_region_type(&rg, OMAPFB_MEMTYPE_SDRAM,
-                                          sdram_start, sdram_size) < 0 ||
-                    (rg.type != OMAPFB_MEMTYPE_SDRAM))
-                        continue;
-   - if rg.type is not OMAPFB_MEMTYPE_SDRAM, set_fbmem_region_type()
-     returns zero immediately (since rg.type is non-zero), and so we
-     'continue'.
-   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and rg.paddr is zero,
-     we fall through.
-   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and the region lies within
-     SDRAM, we fall through.
-   - if rg.type is OMAPFB_MEMTYPE_SDRAM, and the region is not within
-     SDRAM, we 'continue'.
-3. check_fbmem_region seems unnecessary.
-   - we know rg.type is OMAPFB_MEMTYPE_SDRAM
-   - we can check rg.size independently
-   - bootmem_reserve() can check for overlapping reservations itself
-   - we've already validated that the requested region lies within SDRAM.
-4. avoid BUG()ing if the region entry is already set; print an error,
-   and mark the configuration invalid -@least we'll continue booting
-   so the error message has a chance of being logged/visible via serial
-   console.
+> and thus yours could be maybe like
+> 
+> #define M1118_DEV_FLAGS_ALT_LED_INIT	0x00000001
+> 
+> (or 1 << 0)
 
-With these changes in place, it makes the code much easier to understand
-and hence easier to convert to LMB.  I suggest this should be validated
-well before the next merge window.
+Right, it should be 2. I'd rather keep the "DNS323" name in there
+since the LED setup is specific to that NAS and somebody else might
+need a different one. If we end up in the long run with too many
+of them, we'll find a better solution, but we aren't there yet.
 
-I'm sure with the SDRAM code simplified like this, the SRAM code can be
-cleaned up and some of the complex helper functions killed off.
+> Otherwise looks good enough to me.
 
-diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
-index d3eea4f..97db493 100644
---- a/arch/arm/plat-omap/fb.c
-+++ b/arch/arm/plat-omap/fb.c
-@@ -171,49 +171,76 @@ static int check_fbmem_region(int region_idx, struct omapfb_mem_region *rg,
- 	return 0;
- }
- 
-+static int valid_sdram(unsigned long addr, unsigned long size)
-+{
-+	struct bootmem_data *bdata = NODE_DATA(0)->bdata;
-+	unsigned long sdram_start, sdram_end;
-+
-+	sdram_start = bdata->node_min_pfn << PAGE_SHIFT;
-+	sdram_end = bdata->node_low_pfn << PAGE_SHIFT;
-+
-+	return addr >= sdram_start && sdram_end - addr >= size;
-+}
-+
-+static int reserve_sdram(unsigned long addr, unsigned long size)
-+{
-+	return reserve_bootmem(addr, size, BOOTMEM_EXCLUSIVE);
-+}
-+
- /*
-  * Called from map_io. We need to call to this early enough so that we
-  * can reserve the fixed SDRAM regions before VM could get hold of them.
-  */
- void __init omapfb_reserve_sdram(void)
- {
--	struct bootmem_data	*bdata;
--	unsigned long		sdram_start, sdram_size;
--	unsigned long		reserved;
--	int			i;
-+	unsigned long reserved = 0;
-+	int i;
- 
- 	if (config_invalid)
- 		return;
- 
--	bdata = NODE_DATA(0)->bdata;
--	sdram_start = bdata->node_min_pfn << PAGE_SHIFT;
--	sdram_size = (bdata->node_low_pfn << PAGE_SHIFT) - sdram_start;
--	reserved = 0;
- 	for (i = 0; ; i++) {
--		struct omapfb_mem_region	rg;
-+		struct omapfb_mem_region rg;
- 
- 		if (get_fbmem_region(i, &rg) < 0)
- 			break;
-+
- 		if (i == OMAPFB_PLANE_NUM) {
--			printk(KERN_ERR
--				"Extraneous FB mem configuration entries\n");
-+			pr_err("Extraneous FB mem configuration entries\n");
- 			config_invalid = 1;
- 			return;
- 		}
-+
- 		/* Check if it's our memory type. */
--		if (set_fbmem_region_type(&rg, OMAPFB_MEMTYPE_SDRAM,
--				          sdram_start, sdram_size) < 0 ||
--		    (rg.type != OMAPFB_MEMTYPE_SDRAM))
-+		if (rg.type != OMAPFB_MEMTYPE_SDRAM)
- 			continue;
--		BUG_ON(omapfb_config.mem_desc.region[i].size);
--		if (check_fbmem_region(i, &rg, sdram_start, sdram_size) < 0) {
-+
-+		/* Check if the region falls within SDRAM */
-+		if (rg.paddr && !valid_sdram(rg.paddr, rg.size))
-+			continue;
-+
-+		if (rg.size == 0) {
-+			pr_err("Zero size for FB region %d\n", i);
- 			config_invalid = 1;
- 			return;
- 		}
-+
- 		if (rg.paddr) {
--			reserve_bootmem(rg.paddr, rg.size, BOOTMEM_DEFAULT);
-+			if (reserve_sdram(rg.paddr, rg.size)) {
-+				pr_err("Trying to use reserved memory for FB region %d\n",
-+					i);
-+				config_invalid = 1;
-+				return;
-+			}
- 			reserved += rg.size;
- 		}
-+
-+		if (omapfb_config.mem_desc.region[i].size) {
-+			pr_err("FB region %d already set\n", i);
-+			config_invalid = 1;
-+			return;
-+		}
-+
- 		omapfb_config.mem_desc.region[i] = rg;
- 		configured_regions++;
- 	}
+Ok, thanks. I'll respin the whole lot soon.
+
+Cheers,
+Ben.
