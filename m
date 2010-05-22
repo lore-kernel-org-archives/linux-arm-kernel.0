@@ -1,71 +1,61 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 22 May 2010 02:34:52 +0300
-Subject: [PATCH v2t2 00/17] omap: mailbox:
-In-Reply-To: <20100521221557.GM11042@n2100.arm.linux.org.uk>
-References: <1274478289-22188-1-git-send-email-felipe.contreras@gmail.com>
-	<20100521215730.GK11042@n2100.arm.linux.org.uk>
-	<AANLkTin03gFY1uc9__lGO8lHiKMjuSBRSYcFDhLYDIMD@mail.gmail.com>
-	<20100521221557.GM11042@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinMFJTlbXYiS9G87VSQyRuGxJfJGHkVejOEfgVQ@mail.gmail.com>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Sat, 22 May 2010 11:02:17 +1000
+Subject: i.MX27 GPIOs -- how to define the default output?
+Message-ID: <20100522010210.GA18017@www.longlandclan.yi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 22, 2010 at 1:15 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, May 22, 2010 at 01:09:12AM +0300, Felipe Contreras wrote:
->> On Sat, May 22, 2010 at 12:57 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > The only reason 3 would be loaded due to that dependency is if 2 were
->> > being modprobed, which means it's going to be inserted after 3 anyway.
->> >
->> > I don't see anything else in 3 which would trigger it to be loaded.
->> >
->> > The "platform:omap2-mailbox" module alias of 2 should result in 2
->> > being modprobed,
->>
->> I see, at initialization?
->
-> That's the theory - and it should be that same mechanism which allows
-> things like already plugged in PCMCIA and the like cards to be properly
-> dealt with at boot time.
->
->> > causing 3 to be loaded to satisfy the dependency.
->> > As already pointed out, this should happen as a result of udev or
->> > (older) hotplug initialization.
->>
->> Well, in the minimal system I have in my beagleboard it doesn't
->> happen. I load bridgedriver, which loads mailbox, but fails
->> immediately because mailbox_mach is not there.
->
-> I assume that having the MMC host driver built in, but the MMC block
-> driver as a module also doesn't work on your setup?
+Hi all,
 
-I wouldn't know because my file-system is on the MMC.
+I'm in the process of porting Ka-Ro's TX27 kernel patch over from kernel
+2.6.28 to current git HEAD[1].  In the process of doing this, I note that
+the old definitions GPIO_DFLT_HIGH and GPIO_DFLT_LOW have disappeared.
 
-> I don't see this as something that should be worked around in the
-> kernel by making things non-modular - I view the missing userspace
-> functionality causing the problem.
+I can't seem to find their replacements anywhere.
 
-First of all, most of the cleanups are independent of the built-in
-option, although that was my motivation, the patches are good by
-themselves: there's no need to export
-omap_mbox_register()/_unregister() unnecessarily when the platform
-data can be used, right?
+The code I'm porting defines a heap of GPIO pins for use with the LCD
+controller:
 
-Now, regarding the built-in mode; for the iommu case you said it
-should be built-in:
-http://article.gmane.org/gmane.linux.ports.arm.kernel/58555
+static unsigned int mx27_lcdc_gpios[] = {
+	MXC_PIN(F, 12, GPIO, GPIO_OUT | GPIO_DFLT_LOW), /* LCD reset
+(active LOW) */
+	MXC_PIN(E,  5, GPIO, GPIO_OUT | GPIO_DFLT_HIGH), /* LCD
+backlight (PWM: 0: off 1: max brightness */
+	MXC_PIN(A, 30, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA30 */
+	MXC_PIN(A, 25, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA25 */
+	MXC_PIN(A, 26, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA26 */
+	MXC_PIN(A, 24, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA24 */
+	MXC_PIN(A, 27, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA27 */
+	PA5_PF_LSCLK,
+	PA6_PF_LD0,
+	PA7_PF_LD1,
+	... etc
 
-Apparently it's not, so it's not clear to me how omap3-iommu would be
-loaded since there's no "platform:" alias.
+then later; calls mxc_gpio_setup_multiple_pins on it:
 
-Moreover, Tony says that anything that registers platform devices
-should be built-in, but omap3-iommu does register devices and is not
-built-in. We could make it built-in as you suggested, but according to
-you, things should be modular.
+	ret = mxc_gpio_setup_multiple_pins(mx27_lcdc_gpios,
+					ARRAY_SIZE(mx27_lcdc_gpios),
+"LCD");
 
-So, I have a bunch of questions:
-1) should platform devices be built-in?
-2) should platform modules like omap3-iommu and mailbox-mach have a
-"platform:" alias?
-3) should such modules follow a guideline like foo-mach, or $mach-foo?
+While a glitch probably will do little more than cause the LCD backlight
+to flicker momentarily, and maybe reset the LCD itself, I'd still like
+to have the signals driven the right way from the outset.  Does anyone
+have any pointers as to where I could look for where this default is
+set?
+
+On a related note; we have a small audio amplifier on our board.  Its
+mute signal is wired up to one of the keypad column outputs on the
+i.MX27 keypad controller, which can be driven as a GPIO.  Is there a
+means of accessing this cleanly within the GPIO framework of the kernel?
+-- 
+Stuart Longland (aka Redhatter, VK4MSL)      .'''.
+Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
+. . . . . . . . . . . . . . . . . . . . . .   .'.'
+http://dev.gentoo.org/~redhatter             :.'
+
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
+
+1. This hasn't been an easy task; reasoning is so that we can leverage
+the i.MX27 I?S SSI code in the current Linux-ASoC tree, not present in
+kernel 2.6.28.  Backporting this proved to be a huge mess.
