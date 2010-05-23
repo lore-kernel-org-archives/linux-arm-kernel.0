@@ -1,85 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 May 2010 20:47:46 +0100
-Subject: [RESEND PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
-In-Reply-To: <AANLkTinV9Na9zxYMIfTr893Ynnc0YOk2B6uPKEa9s4R1@mail.gmail.com>
-References: <1274615328-27953-1-git-send-email-tom.leiming@gmail.com>
-	<20100523123801.GC950@n2100.arm.linux.org.uk>
-	<AANLkTikRp0EHxshKYq39p18ymoRNAtyHrNm3yq6A49-r@mail.gmail.com>
-	<20100523141300.GD950@n2100.arm.linux.org.uk>
-	<AANLkTinV9Na9zxYMIfTr893Ynnc0YOk2B6uPKEa9s4R1@mail.gmail.com>
-Message-ID: <20100523194746.GE950@n2100.arm.linux.org.uk>
+From: andrea.gelmini@gelma.net (Andrea Gelmini)
+Date: Sun, 23 May 2010 21:55:42 +0200
+Subject: [PATCH 133/199] arch/arm/boot/bootp/bootp.lds: Checkpatch cleanup
+In-Reply-To: <1274644549-24952-1-git-send-email-andrea.gelmini@gelma.net>
+References: <1274644549-24952-1-git-send-email-andrea.gelmini@gelma.net>
+Message-ID: <1274644549-24952-6-git-send-email-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 23, 2010 at 11:07:50PM +0800, Ming Lei wrote:
-> 2010/5/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Sun, May 23, 2010 at 09:44:20PM +0800, Ming Lei wrote:
-> >> 2010/5/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> >> ?ENTRY(ret_to_user)
-> >> >> ?ret_slow_syscall:
-> >> >> - ? ? disable_irq ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ disable interrupts
-> >> >> + ? ? disable_irq_notrace ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ disable interrupts
-> >> >
-> >> > I think this one does need to be traced - the pending work functions are
-> >> > all C code which could call back into lockdep.
-> >>
-> >> If there are pending works, schedule will be called to give cpu to it,
-> >> I wonder why the work function to be scheduled will be run with irq
-> >> disabled. Seems we should enable irq again before calling schedule,
-> >> not sure.
-> >
-> > No. ?I'm talking about things like do_notify_resume().
-> >
-> > I think the above should be left as-is, so that as far as lockdep is
-> > concerned, IRQs are off while userspace runs. ?What happens between
-> > returning to userspace and re-entering the kernel has no bearing what
-> > so ever on lockdep.
-> >
-> 
-> Oh, trace_ret_hardirqs_on has to be added before returning to user-space to
-> remove the warning, like x86 and mips. If you agree, I'd like to post
-> a new version patch.
+arch/arm/boot/bootp/bootp.lds:22: ERROR: trailing whitespace
 
-Let me explain again.  We have this series of actions:
+Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+---
+ arch/arm/boot/bootp/bootp.lds |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-- in userspace
-- exception happens
-- cpu disables interrupts itself
-- save state
-- enable interrupts, and tell lockdep that IRQs are unmasked
-- we process the exception, and ultimately call ret_fast_syscall or
-  ret_slow_syscall
-
-Now, what was happening in existing kernels is:
-
-POINT A.
-- disable interrupts, and tell lockdep that IRQs are masked
-- check for any work pending
-  - if work pending, call function - with IRQs still masked
-  - go back to point A.
-- restore state
-- resume userspace, which implicitly re-enables IRQs
-
-This results in a balanced and afaics correct setup.  Lockdep doesn't
-care about the state of userspace - it only cares about state (and its
-code only ever runs) when we're in kernel mode.
-
-With your change above, what's happening is the above is replaced by:
-
-POINT A.
-- disable interrupts, but don't tell lockdep that IRQs are masked
-- check for any work pending
-  - if work pending, call function - with IRQs still masked
-	*but* lockdep believes IRQs are enabled.  Therefore, I believe
-	false warnings are probable from things like the scheduler,
-	signal handling paths, etc.
-  - go back to point A.
-- restore state
-- resume userspace, which implicitly re-enables IRQs
-
-So can you now see why I believe the above change I've quoted is wrong?
-
-Moreover, I put to you that it's utterly pointless - and a waste of CPU
-time - telling lockdep about the IRQ masking when an exception occurs,
-and it's also pointless telling lockdep about the IRQ unmasking when we
-resume userspace.
+diff --git a/arch/arm/boot/bootp/bootp.lds b/arch/arm/boot/bootp/bootp.lds
+index 8e3d81c..fc54394 100644
+--- a/arch/arm/boot/bootp/bootp.lds
++++ b/arch/arm/boot/bootp/bootp.lds
+@@ -19,7 +19,7 @@ SECTIONS
+    initrd_size = initrd_end - initrd_start;
+    _etext = .;
+   }
+-  
++
+   .stab 0 : { *(.stab) }
+   .stabstr 0 : { *(.stabstr) }
+   .stab.excl 0 : { *(.stab.excl) }
+-- 
+1.7.1.251.gf80a2
