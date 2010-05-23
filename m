@@ -1,31 +1,32 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sun, 23 May 2010 21:55:42 +0200
-Subject: [PATCH 133/199] arch/arm/boot/bootp/bootp.lds: Checkpatch cleanup
+Date: Sun, 23 May 2010 21:55:43 +0200
+Subject: [PATCH 134/199] arch/arm/mach-clps711x/Makefile.boot: Checkpatch
+	cleanup
 In-Reply-To: <1274644549-24952-1-git-send-email-andrea.gelmini@gelma.net>
 References: <1274644549-24952-1-git-send-email-andrea.gelmini@gelma.net>
-Message-ID: <1274644549-24952-6-git-send-email-andrea.gelmini@gelma.net>
+Message-ID: <1274644549-24952-7-git-send-email-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/boot/bootp/bootp.lds:22: ERROR: trailing whitespace
+arch/arm/mach-clps711x/Makefile.boot:2: ERROR: trailing whitespace
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/boot/bootp/bootp.lds |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-clps711x/Makefile.boot |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/bootp/bootp.lds b/arch/arm/boot/bootp/bootp.lds
-index 8e3d81c..fc54394 100644
---- a/arch/arm/boot/bootp/bootp.lds
-+++ b/arch/arm/boot/bootp/bootp.lds
-@@ -19,7 +19,7 @@ SECTIONS
-    initrd_size = initrd_end - initrd_start;
-    _etext = .;
-   }
--  
-+
-   .stab 0 : { *(.stab) }
-   .stabstr 0 : { *(.stabstr) }
-   .stab.excl 0 : { *(.stab.excl) }
+diff --git a/arch/arm/mach-clps711x/Makefile.boot b/arch/arm/mach-clps711x/Makefile.boot
+index d3d2933..a51fcef 100644
+--- a/arch/arm/mach-clps711x/Makefile.boot
++++ b/arch/arm/mach-clps711x/Makefile.boot
+@@ -1,7 +1,6 @@
+ # The standard locations for stuff on CLPS711x type processors
+-   zreladdr-y				:= 0xc0028000 
++   zreladdr-y				:= 0xc0028000
+ params_phys-y				:= 0xc0000100
+ # Should probably have some agreement on these...
+ initrd_phys-$(CONFIG_ARCH_P720T)	:= 0xc0400000
+ initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
+-
 -- 
 1.7.1.251.gf80a2
