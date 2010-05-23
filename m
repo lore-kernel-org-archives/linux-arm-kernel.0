@@ -1,59 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 May 2010 10:42:20 +0100
-Subject: [PATCH] ARM: Continue removing useless bootmem.h includes
-Message-ID: <20100523094220.GB950@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 23 May 2010 12:09:25 +0200
+Subject: Initrd and 2.6.33 curious behaviour
+In-Reply-To: <20100523090139.GA950@n2100.arm.linux.org.uk> (Russell King's
+	message of "Sun\, 23 May 2010 10\:01\:39 +0100")
+References: <874oi157c6.fsf@free.fr>
+	<20100521204343.GA18032@n2100.arm.linux.org.uk>
+	<87fx1k46qg.fsf@free.fr> <20100522094637.GA954@n2100.arm.linux.org.uk>
+	<87pr0n31q2.fsf@free.fr> <20100523090139.GA950@n2100.arm.linux.org.uk>
+Message-ID: <87hblz2alm.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catch those which have been missed by 6262c92f because they were
-submitted via other routes.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-I'm working towards reducing ARM's usage of the bootmem code, with a
-view to eventually removing it entirely.  As nothing in these files
-uses bootmem, we can kill off the include.
+> On Sun, May 23, 2010 at 02:23:33AM +0200, Robert Jarzmik wrote:
+> The reason that initrd_start is zero at rd_load_ramdisk is that in
+> populate_rootfs(), the initrd is written into the ramfs root as a
+> /initrd.image file.  Then the original initrd image is freed, resulting
+> in both initrd_start and initrd_end being zeroed.
+I understand better now.
 
-Ack would be preferable.
+> Do you have CONFIG_BLK_DEV_RAM enabled?  Try some debugging (using
+> pr_err() and booting with 'quiet' so you can see the output) in
+> populate_rootfs().
+CONFIG_BLK_DEV_RAM is enabled. I'll add some debugging now and will try again.
 
- arch/arm/mach-msm/board-msm7x27.c |    1 -
- arch/arm/mach-msm/board-msm7x30.c |    1 -
- arch/arm/mach-msm/board-qsd8x50.c |    1 -
- 3 files changed, 0 insertions(+), 3 deletions(-)
+Thanks for the help.
 
-diff --git a/arch/arm/mach-msm/board-msm7x27.c b/arch/arm/mach-msm/board-msm7x27.c
-index cccb9f3..db9381b 100644
---- a/arch/arm/mach-msm/board-msm7x27.c
-+++ b/arch/arm/mach-msm/board-msm7x27.c
-@@ -20,7 +20,6 @@
- #include <linux/input.h>
- #include <linux/io.h>
- #include <linux/delay.h>
--#include <linux/bootmem.h>
- #include <linux/power_supply.h>
- 
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index bac1f3c..e329819 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -20,7 +20,6 @@
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
--#include <linux/bootmem.h>
- #include <linux/io.h>
- #include <linux/smsc911x.h>
- 
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index ec46066..e3cc807 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -19,7 +19,6 @@
- #include <linux/irq.h>
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
--#include <linux/bootmem.h>
- #include <linux/delay.h>
- 
- #include <asm/mach-types.h>
+--
+Robert
