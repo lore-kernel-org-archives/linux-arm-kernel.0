@@ -1,41 +1,21 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 23 May 2010 08:53:34 +1000
-Subject: [PATCH 1/5] net/phy/marvell: Expose IDs and flags in a .h and
-	add dns323 LEDs setup flag
-In-Reply-To: <20100522130624.GA28561@pengutronix.de>
-References: <1274525683.1931.139.camel@pasglop>
-	<20100522130624.GA28561@pengutronix.de>
-Message-ID: <1274568814.1931.148.camel@pasglop>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 23 May 2010 02:23:33 +0200
+Subject: Initrd and 2.6.33 curious behaviour
+In-Reply-To: <20100522094637.GA954@n2100.arm.linux.org.uk> (Russell King's
+	message of "Sat\, 22 May 2010 10\:46\:37 +0100")
+References: <874oi157c6.fsf@free.fr>
+	<20100521204343.GA18032@n2100.arm.linux.org.uk>
+	<87fx1k46qg.fsf@free.fr> <20100522094637.GA954@n2100.arm.linux.org.uk>
+Message-ID: <87pr0n31q2.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-05-22 at 15:06 +0200, Wolfram Sang wrote:
-> On Sat, May 22, 2010 at 08:54:43PM +1000, Benjamin Herrenschmidt wrote:
-> > This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
-> > along with dev_flags definitions for use by the driver.
-> 
-> I think this one from the driver should go there, too:
-> 
-> #define M1145_DEV_FLAGS_RESISTANCE      0x00000001
-> 
-> (which makes me wonder how this flag was set as it was not exported before)
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> You could boot with 'quiet' so that the kernel shuts up most of the
+> noisy kernel messages.
 
-I missed that one indeed.
+With "quiet" option, the kernel console outputs only 1 line :
+"Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)"
 
-> and thus yours could be maybe like
-> 
-> #define M1118_DEV_FLAGS_ALT_LED_INIT	0x00000001
-> 
-> (or 1 << 0)
-
-Right, it should be 2. I'd rather keep the "DNS323" name in there
-since the LED setup is specific to that NAS and somebody else might
-need a different one. If we end up in the long run with too many
-of them, we'll find a better solution, but we aren't there yet.
-
-> Otherwise looks good enough to me.
-
-Ok, thanks. I'll respin the whole lot soon.
-
-Cheers,
-Ben.
+--
+Robert
