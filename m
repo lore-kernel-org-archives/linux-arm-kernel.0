@@ -1,25 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 22 May 2010 20:55:07 -0400 (EDT)
-Subject: [PATCH 2/5] arm/orion5x: Base support for DNS-323 rev C1
-In-Reply-To: <1274532696.1931.146.camel@pasglop>
-References: <1274525686.1931.140.camel@pasglop>
-	<20100522110446.GB954@n2100.arm.linux.org.uk>
-	<1274532696.1931.146.camel@pasglop>
-Message-ID: <alpine.LFD.2.00.1005222052040.15227@xanadu.home>
+From: Jiri.Pinkava@vscht.cz (Pinkava J.)
+Date: Sun, 23 May 2010 06:42:26 +0200
+Subject: [PATCH] s3c24xx fix: freeze during suspend/resume on s3c24xx if some
+	GPIO banks not present
+Message-ID: <4BF8B232.9020903@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 May 2010, Benjamin Herrenschmidt wrote:
+When saving GPIOs during suspend/resume we need skip missing GPIO banks, not
+trying get corresponding chip again and again in infinite loop.
 
-> Oops :-)
-> 
-> This isn't my neatest patch set, I must say. I spotted (too late) a
-> couple of typos and a crap hunk as well. Sorry about that, it's getting
-> hard to find time to hack at home with the kids :-)
-> 
-> In any case, let's see what other comments come in and if nothing else
-> is wrong, I'll post a cleaned up set some time next week.
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+ arch/arm/plat-samsung/pm-gpio.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-I don't have more comments to add to those already posted.
+diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+index d50ab9d..7df03f8 100644
+--- a/arch/arm/plat-samsung/pm-gpio.c
++++ b/arch/arm/plat-samsung/pm-gpio.c
+@@ -331,8 +331,10 @@ void s3c_pm_save_gpios(void)
 
-Nicolas
+ 	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+ 		ourchip = s3c_gpiolib_getchip(gpio_nr);
+-		if (!ourchip)
++		if (!ourchip) {
++			gpio_nr++;
+ 			continue;
++		}
+
+ 		s3c_pm_save_gpio(ourchip);
+
+@@ -369,8 +371,10 @@ void s3c_pm_restore_gpios(void)
+
+ 	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+ 		ourchip = s3c_gpiolib_getchip(gpio_nr);
+-		if (!ourchip)
++		if (!ourchip) {
++			gpio_nr++;
+ 			continue;
++		}
+
+ 		s3c_pm_resume_gpio(ourchip);
+
+-- 
+1.7.1
