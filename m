@@ -1,32 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 May 2010 10:01:39 +0100
-Subject: Initrd and 2.6.33 curious behaviour
-In-Reply-To: <87pr0n31q2.fsf@free.fr>
-References: <874oi157c6.fsf@free.fr>
-	<20100521204343.GA18032@n2100.arm.linux.org.uk>
-	<87fx1k46qg.fsf@free.fr>
-	<20100522094637.GA954@n2100.arm.linux.org.uk>
-	<87pr0n31q2.fsf@free.fr>
-Message-ID: <20100523090139.GA950@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 23 May 2010 13:19:07 +0400
+Subject: [PATCH] s3c24xx fix: freeze during suspend/resume on s3c24xx
+	if some	GPIO banks not present
+In-Reply-To: <4BF8B232.9020903@vscht.cz>
+References: <4BF8B232.9020903@vscht.cz>
+Message-ID: <4BF8F30B.9040704@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 23, 2010 at 02:23:33AM +0200, Robert Jarzmik wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > You could boot with 'quiet' so that the kernel shuts up most of the
-> > noisy kernel messages.
+Hello.
+
+Pinkava J. wrote:
+
+> When saving GPIOs during suspend/resume we need skip missing GPIO banks, not
+> trying get corresponding chip again and again in infinite loop.
+
+    I didn't see any infinite loops there -- *continue* itself leads to 
+incrementing 'gpio_nr', no?
+
+> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+> ---
+>  arch/arm/plat-samsung/pm-gpio.c |    8 ++++++--
+>  1 files changed, 6 insertions(+), 2 deletions(-)
 > 
-> With "quiet" option, the kernel console outputs only 1 line :
-> "Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)"
+> diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+> index d50ab9d..7df03f8 100644
+> --- a/arch/arm/plat-samsung/pm-gpio.c
+> +++ b/arch/arm/plat-samsung/pm-gpio.c
+> @@ -331,8 +331,10 @@ void s3c_pm_save_gpios(void)
+> 
+>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
+> -		if (!ourchip)
+> +		if (!ourchip) {
+> +			gpio_nr++;
+>  			continue;
+> +		}
+> 
+>  		s3c_pm_save_gpio(ourchip);
+> 
+> @@ -369,8 +371,10 @@ void s3c_pm_restore_gpios(void)
+> 
+>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
+> -		if (!ourchip)
+> +		if (!ourchip) {
+> +			gpio_nr++;
+>  			continue;
+> +		}
+> 
+>  		s3c_pm_resume_gpio(ourchip);
 
-Right, so none of the errors in the ARM MM initialization are being
-triggered, so the initrd image isn't being corrupted.
-
-The reason that initrd_start is zero at rd_load_ramdisk is that in
-populate_rootfs(), the initrd is written into the ramfs root as a
-/initrd.image file.  Then the original initrd image is freed, resulting
-in both initrd_start and initrd_end being zeroed.
-
-Do you have CONFIG_BLK_DEV_RAM enabled?  Try some debugging (using
-pr_err() and booting with 'quiet' so you can see the output) in
-populate_rootfs().
+WBR, Sergei
