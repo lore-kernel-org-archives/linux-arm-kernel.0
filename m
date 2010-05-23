@@ -1,24 +1,45 @@
-From: rbairva@gmail.com (rd bairva)
-Date: Fri, 21 May 2010 14:14:14 +0530
-Subject: Dmaengine query
-In-Reply-To: <m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-References: <v2mdbb048f61004132326r8ac75382k1e42321ff0ed484a@mail.gmail.com>
-	<v2he9c3a7c21004141730vcc79dd58t5478c9d83af9816@mail.gmail.com>
-	<m2vdbb048f61004190326ve4220de6za13c94eed059ec2@mail.gmail.com>
-Message-ID: <AANLkTikpI9hK24jjk5hwdVtWUlwQyllAeGhLxjtW5TPH@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sun, 23 May 2010 23:07:50 +0800
+Subject: [RESEND PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
+In-Reply-To: <20100523141300.GD950@n2100.arm.linux.org.uk>
+References: <1274615328-27953-1-git-send-email-tom.leiming@gmail.com>
+	<20100523123801.GC950@n2100.arm.linux.org.uk>
+	<AANLkTikRp0EHxshKYq39p18ymoRNAtyHrNm3yq6A49-r@mail.gmail.com>
+	<20100523141300.GD950@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinV9Na9zxYMIfTr893Ynnc0YOk2B6uPKEa9s4R1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+2010/5/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sun, May 23, 2010 at 09:44:20PM +0800, Ming Lei wrote:
+>> 2010/5/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> >> ?ENTRY(ret_to_user)
+>> >> ?ret_slow_syscall:
+>> >> - ? ? disable_irq ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ disable interrupts
+>> >> + ? ? disable_irq_notrace ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ disable interrupts
+>> >
+>> > I think this one does need to be traced - the pending work functions are
+>> > all C code which could call back into lockdep.
+>>
+>> If there are pending works, schedule will be called to give cpu to it,
+>> I wonder why the work function to be scheduled will be run with irq
+>> disabled. Seems we should enable irq again before calling schedule,
+>> not sure.
+>
+> No. ?I'm talking about things like do_notify_resume().
+>
+> I think the above should be left as-is, so that as far as lockdep is
+> concerned, IRQs are off while userspace runs. ?What happens between
+> returning to userspace and re-entering the kernel has no bearing what
+> so ever on lockdep.
+>
 
-? ?My DMA controller supports device to device DMA transfers and we
-need it in some of our drivers. Existing DMA engine framework doesn't
-have support for device to device transfers.
+Oh, trace_ret_hardirqs_on has to be added before returning to user-space to
+remove the warning, like x86 and mips. If you agree, I'd like to post
+a new version
+patch.
 
-Do you have any plans for device to device support in DMA engine?
+Thanks,
 
-Can you suggest me some other suggestion for doing this?
-
-
-Regards
-Ramdayal
+-- 
+Lei Ming
