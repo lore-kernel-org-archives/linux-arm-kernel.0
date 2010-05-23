@@ -1,38 +1,25 @@
-From: redhatter@gentoo.org (Stuart Longland)
-Date: Sun, 23 May 2010 11:40:56 +1000
-Subject: [PATCH] Ignore generated files in arch/arm/boot/compressed
-Message-ID: <20100523014056.GF18017@www.longlandclan.yi.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 22 May 2010 20:55:07 -0400 (EDT)
+Subject: [PATCH 2/5] arm/orion5x: Base support for DNS-323 rev C1
+In-Reply-To: <1274532696.1931.146.camel@pasglop>
+References: <1274525686.1931.140.camel@pasglop>
+	<20100522110446.GB954@n2100.arm.linux.org.uk>
+	<1274532696.1931.146.camel@pasglop>
+Message-ID: <alpine.LFD.2.00.1005222052040.15227@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This tells git to ignore files produced when compiling kernels for ARM, fixing
-this annoying message:
+On Sat, 22 May 2010, Benjamin Herrenschmidt wrote:
 
-	stuartl at zhouman ~/jacques/linux $ git status
-	# On branch experiment
-	# Untracked files:
-	#   (use "git add <file>..." to include in what will be committed)
-	#
-	#       arch/arm/boot/compressed/lib1funcs.S
-	#       arch/arm/boot/compressed/piggy.gzip
-	#       arch/arm/boot/compressed/vmlinux
-	nothing added to commit but untracked files present (use "git add" to track)
+> Oops :-)
+> 
+> This isn't my neatest patch set, I must say. I spotted (too late) a
+> couple of typos and a crap hunk as well. Sorry about that, it's getting
+> hard to find time to hack at home with the kids :-)
+> 
+> In any case, let's see what other comments come in and if nothing else
+> is wrong, I'll post a cleaned up set some time next week.
 
-Signed-off-by: Stuart Longland <redhatter@gentoo.org>
----
- arch/arm/boot/compressed/.gitignore |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+I don't have more comments to add to those already posted.
 
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index ab204db..7ce0ce9 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -1,3 +1,5 @@
- font.c
--piggy.gz
-+lib1funcs.S
-+piggy.*
- vmlinux.lds
-+vmlinux
--- 
-1.6.4
+Nicolas
