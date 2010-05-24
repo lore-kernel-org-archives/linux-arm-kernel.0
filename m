@@ -1,38 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 May 2010 22:00:50 +0100
-Subject: [PATCH v3 11/14] omap: mailbox: only compile for configured archs
-In-Reply-To: <AANLkTim7Jxlx3Owyn2IM_TjUWxS72I7h9H5d0evbCsVQ@mail.gmail.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<1274548465-20208-12-git-send-email-felipe.contreras@gmail.com>
-	<20100524.174205.22049047.Hiroshi.DOYU@nokia.com>
-	<AANLkTim7Jxlx3Owyn2IM_TjUWxS72I7h9H5d0evbCsVQ@mail.gmail.com>
-Message-ID: <20100524210050.GG21117@n2100.arm.linux.org.uk>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Mon, 24 May 2010 23:08:46 +0200
+Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes
+	with	CONFIG_TOUCHSCREEN_ADS7846=y
+In-Reply-To: <20100524203428.GB29092@pengutronix.de>
+References: <20100524195430.GA28403@pengutronix.de>	<1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>	<4BFADD4F.80309@eukrea.com>
+	<20100524203428.GB29092@pengutronix.de>
+Message-ID: <4BFAEADE.5040000@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 24, 2010 at 10:29:01PM +0300, Felipe Contreras wrote:
-> On Mon, May 24, 2010 at 5:42 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> > From: ext Felipe Contreras <felipe.contreras@gmail.com>
-> 
-> >> +     if (false);
-> >
-> > nitpcik:
-> > The above may look better as below:
-> >
-> > ? ? ? ?if (false)
-> > ? ? ? ? ? ? ? ?;
-> >
-> > "checkpatch.pl" also doesn't complain.
-> 
-> Personally I think it looks weird and it's a checkpatch bug, but fine by me.
+Hi Uwe,
 
-No, I'd say it's intentional.
+Le 24/05/2010 22:34, Uwe Kleine-K?nig a ?crit :
+> What do you think about adding TOUCHSCREEN_ADS7846=m to mx27_defconfig?
+>
+in fact I also sent a patch to update the defconfig for our boards's 
+peripherals (for our board : 8250, ADS7846, libertas, LEDs, keyboard + 
+for most iMX27 boards : SPI, LCD, USB host + Gadget) :
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015833.html
 
-	if (false);
+As a default, I put +CONFIG_TOUCHSCREEN_ADS7846=y : is it a problem to 
+have it integrated and not configured as a module in the defconfig ?
 
-looks too much like an error - think about:
-
-	if (false);
-		do_something();
-
-which would be very easy to miss while reviewing.
+Thanks,
+Eric
