@@ -1,50 +1,74 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 May 2010 21:55:48 +0200
-Subject: [PATCH 13/16] arm/mx3/qong: get rid of nearly empty header
+Date: Mon, 24 May 2010 21:55:43 +0200
+Subject: [PATCH 08/16] arm/imx: remove empty and unused board headers
 In-Reply-To: <20100524195430.GA28403@pengutronix.de>
 References: <20100524195430.GA28403@pengutronix.de>
-Message-ID: <1274730951-29106-13-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1274730951-29106-8-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-board-qong.h only defined a single symbol that was used only once.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-qong.c               |    3 +--
- arch/arm/plat-mxc/include/mach/board-qong.h |   17 -----------------
- 2 files changed, 1 insertions(+), 19 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/board-qong.h
+ arch/arm/mach-mx2/mach-imx27lite.c                 |    1 -
+ arch/arm/mach-mx3/mach-armadillo5x0.c              |    1 -
+ arch/arm/mach-mx3/mach-pcm037.c                    |    1 -
+ .../arm/plat-mxc/include/mach/board-armadillo5x0.h |   15 -------------
+ arch/arm/plat-mxc/include/mach/board-mx27lite.h    |   14 ------------
+ arch/arm/plat-mxc/include/mach/board-mx35pdk.h     |   22 --------------------
+ arch/arm/plat-mxc/include/mach/board-pcm037.h      |   22 --------------------
+ arch/arm/plat-mxc/include/mach/board-pcm043.h      |   22 --------------------
+ 8 files changed, 0 insertions(+), 98 deletions(-)
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-armadillo5x0.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx27lite.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx35pdk.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-pcm037.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-pcm043.h
 
-diff --git a/arch/arm/mach-mx3/mach-qong.c b/arch/arm/mach-mx3/mach-qong.c
-index e5b5b83..62281ad 100644
---- a/arch/arm/mach-mx3/mach-qong.c
-+++ b/arch/arm/mach-mx3/mach-qong.c
-@@ -34,7 +34,6 @@
+diff --git a/arch/arm/mach-mx2/mach-imx27lite.c b/arch/arm/mach-mx2/mach-imx27lite.c
+index b5710bf..fd1dddb 100644
+--- a/arch/arm/mach-mx2/mach-imx27lite.c
++++ b/arch/arm/mach-mx2/mach-imx27lite.c
+@@ -28,7 +28,6 @@
  #include <mach/common.h>
- #include <asm/page.h>
- #include <asm/setup.h>
--#include <mach/board-qong.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx27.h>
+-#include <mach/board-mx27lite.h>
+ 
+ #include "devices.h"
+ 
+diff --git a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
+index 5f72ec9..2a8de89 100644
+--- a/arch/arm/mach-mx3/mach-armadillo5x0.c
++++ b/arch/arm/mach-mx3/mach-armadillo5x0.c
+@@ -50,7 +50,6 @@
+ #include <mach/common.h>
  #include <mach/imx-uart.h>
  #include <mach/iomux-mx3.h>
- #include "devices.h"
-@@ -116,7 +115,7 @@ static struct physmap_flash_data qong_flash_data = {
- 
- static struct resource qong_flash_resource = {
- 	.start = MX31_CS0_BASE_ADDR,
--	.end = MX31_CS0_BASE_ADDR + QONG_NOR_SIZE - 1,
-+	.end = MX31_CS0_BASE_ADDR + SZ_128M - 1,
- 	.flags = IORESOURCE_MEM,
- };
- 
-diff --git a/arch/arm/plat-mxc/include/mach/board-qong.h b/arch/arm/plat-mxc/include/mach/board-qong.h
+-#include <mach/board-armadillo5x0.h>
+ #include <mach/mmc.h>
+ #include <mach/ipu.h>
+ #include <mach/mx3fb.h>
+diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
+index 2df1ec5..86321b8 100644
+--- a/arch/arm/mach-mx3/mach-pcm037.c
++++ b/arch/arm/mach-mx3/mach-pcm037.c
+@@ -43,7 +43,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+-#include <mach/board-pcm037.h>
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <mach/i2c.h>
+diff --git a/arch/arm/plat-mxc/include/mach/board-armadillo5x0.h b/arch/arm/plat-mxc/include/mach/board-armadillo5x0.h
 deleted file mode 100644
-index 6d88c7a..0000000
---- a/arch/arm/plat-mxc/include/mach/board-qong.h
+index 0376c13..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-armadillo5x0.h
 +++ /dev/null
-@@ -1,17 +0,0 @@
+@@ -1,15 +0,0 @@
 -/*
-- * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, <yanok@emcraft.com>
+- * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>.
+- * All Rights Reserved.
 - */
 -
 -/*
@@ -53,12 +77,113 @@ index 6d88c7a..0000000
 - * published by the Free Software Foundation.
 - */
 -
--#ifndef __ASM_ARCH_MXC_BOARD_QONG_H__
--#define __ASM_ARCH_MXC_BOARD_QONG_H__
+-#ifndef __ASM_ARCH_MXC_BOARD_ARMADILLO5X0_H__
+-#define __ASM_ARCH_MXC_BOARD_ARMADILLO5X0_H__
 -
--/* NOR FLASH */
--#define QONG_NOR_SIZE		(128*1024*1024)
+-#endif
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx27lite.h b/arch/arm/plat-mxc/include/mach/board-mx27lite.h
+deleted file mode 100644
+index ea87551..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-mx27lite.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-/*
+- * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
+- */
 -
--#endif /* __ASM_ARCH_MXC_BOARD_QONG_H__ */
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_MX27LITE_H__
+-#define __ASM_ARCH_MXC_BOARD_MX27LITE_H__
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_MX27LITE_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx35pdk.h b/arch/arm/plat-mxc/include/mach/board-mx35pdk.h
+deleted file mode 100644
+index 383f1c0..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-mx35pdk.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_MX35PDK_H__
+-#define __ASM_ARCH_MXC_BOARD_MX35PDK_H__
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_MX35PDK_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/board-pcm037.h b/arch/arm/plat-mxc/include/mach/board-pcm037.h
+deleted file mode 100644
+index 1341170..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-pcm037.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  Copyright (C) 2008 Sascha Hauer, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_PCM037_H__
+-#define __ASM_ARCH_MXC_BOARD_PCM037_H__
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_PCM037_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/board-pcm043.h b/arch/arm/plat-mxc/include/mach/board-pcm043.h
+deleted file mode 100644
+index 1ac4e16..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-pcm043.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  Copyright (C) 2008 Sascha Hauer, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_PCM043_H__
+-#define __ASM_ARCH_MXC_BOARD_PCM043_H__
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_PCM043_H__ */
 -- 
 1.7.0
