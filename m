@@ -1,83 +1,184 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 24 May 2010 16:43:08 +0300
-Subject: [PATCH v2 0/3] Driver for the i.MX2x CMOS Sensor Interface
-In-Reply-To: <Pine.LNX.4.64.1005241528410.2611@axis700.grange>
-References: <cover.1274706733.git.baruch@tkos.co.il>
-	<Pine.LNX.4.64.1005241528410.2611@axis700.grange>
-Message-ID: <20100524134308.GD3865@jasper.tkos.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 May 2010 14:52:52 +0100
+Subject: [PATCH 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
+In-Reply-To: <1274707518.4720.53.camel@e102109-lin.cambridge.arm.com>
+References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
+	<20100520143004.22202.71701.stgit@e102109-lin.cambridge.arm.com>
+	<20100524114546.GB21117@n2100.arm.linux.org.uk>
+	<1274707518.4720.53.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1274709172.4720.57.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-On Mon, May 24, 2010 at 03:34:32PM +0200, Guennadi Liakhovetski wrote:
-> On Mon, 24 May 2010, Baruch Siach wrote:
+On Mon, 2010-05-24 at 14:25 +0100, Catalin Marinas wrote:
+> On Mon, 2010-05-24 at 12:45 +0100, Russell King - ARM Linux wrote:
+> > On Thu, May 20, 2010 at 03:30:04PM +0100, Catalin Marinas wrote:
+> > > The user pages access rights are also modified for kernel read-only
+> > > access rather than read/write so that the copy-on-write mechanism still
+> > > works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
+> > > since writing the TLS value to the high vectors page isn't possible.
+> >
+> > When FIQ handlers are installed/removed, the vector page is also written,
+> > so the above restriction is incompatible with FIQ support.
+> >
+> > Do we want to tell people that they can't use FIQs without domain support?
 > 
-> > This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
-> > platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
-> > driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
-> > posted in linux-media last December[1]. I tested the mx2_camera driver on the 
-> > i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
-> > i.MX27 based board. I included in this version some fixes from Sascha that 
-> > enable i.MX27 support.
-> > 
-> > [1] https://patchwork.kernel.org/patch/67636/
+> They could still be used (with an additional patch). At first, I thought
+> that we could do something similar to early_trap_init() but
+> set_fiq_handler() could be called from a module at run-time and it may
+> temporarily enable write access to the vectors page (without an
+> additional L_PTE_ bit we can't make the vectors page user RO, kernel R/W
+> and I wouldn't do this anyway, for other reasons).
 > 
-> Thanks for the patches! I'll have a look at them in the next couple of 
-> days. I presume, you do not expect this driver to make it into 2.6.35? rc1 
-> is expected any time now, so, we'll take our time and prepare it for 
-> 2.6.36, right?
+> What about making a global vectors_page variable (initialised in
+> devicemaps_init) that can be written directly when !CPU_USE_DOMAINS? On
+> such CPUs, we have a non-aliasing VIPT cache anyway.
 
-I don't expect this driver to be in 2.6.35. It's not that urgent. This code 
-should also do some time in -next.
+That's the additional diff which allows FIQs when !CPU_USE_DOMAINS
+(assuming VIPT non-aliasing caches). I also modified the
+early_trap_init() to make use of the vectors page rather than setting
+the PTE as in the original patch.
 
-Thanks for your continued support.
 
-baruch
+diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
+index 491960b..af5d5d1 100644
+--- a/arch/arm/include/asm/traps.h
++++ b/arch/arm/include/asm/traps.h
+@@ -27,4 +27,6 @@ static inline int in_exception_text(unsigned long ptr)
+ extern void __init early_trap_init(void);
+ extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
+ 
++extern void *vectors_page;
++
+ #endif
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 6ff7919..fb1a640 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -45,6 +45,7 @@
+ #include <asm/fiq.h>
+ #include <asm/irq.h>
+ #include <asm/system.h>
++#include <asm/traps.h>
+ 
+ static unsigned long no_fiq_insn;
+ 
+@@ -77,7 +78,11 @@ int show_fiq_list(struct seq_file *p, void *v)
+ 
+ void set_fiq_handler(void *start, unsigned int length)
+ {
++#if defined(CONFIG_CPU_USE_DOMAINS)
+ 	memcpy((void *)0xffff001c, start, length);
++#else
++	memcpy(vectors_page + 0x1c, start, length);
++#endif
+ 	flush_icache_range(0xffff001c, 0xffff001c + length);
+ 	if (!vectors_high())
+ 		flush_icache_range(0x1c, 0x1c + length);
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 6571e19..6bc57c5 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -30,13 +30,14 @@
+ #include <asm/unistd.h>
+ #include <asm/traps.h>
+ #include <asm/unwind.h>
+-#include <asm/tlbflush.h>
+ 
+ #include "ptrace.h"
+ #include "signal.h"
+ 
+ static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+ 
++void *vectors_page;
++
+ #ifdef CONFIG_DEBUG_USER
+ unsigned int user_debug;
+ 
+@@ -746,21 +747,15 @@ void __init trap_init(void)
+ 
+ void __init early_trap_init(void)
+ {
++#if defined(CONFIG_CPU_USE_DOMAINS)
+ 	unsigned long vectors = CONFIG_VECTORS_BASE;
++#else
++	unsigned long vectors = (unsigned long)vectors_page;
++#endif
+ 	extern char __stubs_start[], __stubs_end[];
+ 	extern char __vectors_start[], __vectors_end[];
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
+ 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
+-#if !defined(CONFIG_CPU_USE_DOMAINS) && defined(CONFIG_MMU)
+-	pgd_t *pgd = pgd_offset_k(vectors);
+-	pmd_t *pmd = pmd_offset(pgd, vectors);
+-	pte_t *pte = pte_offset_kernel(pmd, vectors);
+-	pte_t entry = *pte;
+-
+-	/* allow writing to the vectors page */
+-	set_pte_ext(pte, pte_mkwrite(entry), 0);
+-	local_flush_tlb_kernel_page(vectors);
+-#endif
+ 
+ 	/*
+ 	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
+@@ -775,16 +770,10 @@ void __init early_trap_init(void)
+ 	 * Copy signal return handlers into the vector page, and
+ 	 * set sigreturn to be a pointer to these.
+ 	 */
+-	memcpy((void *)KERN_SIGRETURN_CODE, sigreturn_codes,
+-	       sizeof(sigreturn_codes));
+-	memcpy((void *)KERN_RESTART_CODE, syscall_restart_code,
+-	       sizeof(syscall_restart_code));
+-
+-#if !defined(CONFIG_CPU_USE_DOMAINS) && defined(CONFIG_MMU)
+-	/* restore the vectors page permissions */
+-	set_pte_ext(pte, entry, 0);
+-	local_flush_tlb_kernel_page(vectors);
+-#endif
++	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
++	       sigreturn_codes, sizeof(sigreturn_codes));
++	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
++	       syscall_restart_code, sizeof(syscall_restart_code));
+ 
+ 	flush_icache_range(vectors, vectors + PAGE_SIZE);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 2858941..499e22d 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -25,6 +25,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/tlb.h>
+ #include <asm/highmem.h>
++#include <asm/traps.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -935,12 +936,11 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ {
+ 	struct map_desc map;
+ 	unsigned long addr;
+-	void *vectors;
+ 
+ 	/*
+ 	 * Allocate the vector page early.
+ 	 */
+-	vectors = alloc_bootmem_low_pages(PAGE_SIZE);
++	vectors_page = alloc_bootmem_low_pages(PAGE_SIZE);
+ 
+ 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+@@ -980,7 +980,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	 * location (0xffff0000).  If we aren't using high-vectors, also
+ 	 * create a mapping at the low-vectors virtual address.
+ 	 */
+-	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
++	map.pfn = __phys_to_pfn(virt_to_phys(vectors_page));
+ 	map.virtual = 0xffff0000;
+ 	map.length = PAGE_SIZE;
+ 	map.type = MT_HIGH_VECTORS;
 
-> > 
-> > Changes v1 -> v2
-> >     Addressed the comments of Guennadi Liakhovetski except from the following:
-> > 
-> >     1. The mclk_get_divisor implementation, since I don't know what this code 
-> >        is good for
-> > 
-> >     2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
-> >        mx27_camera_frame_done needs this pointer
-> > 
-> >     3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
-> >        coded magic numbers
-> > 
-> >     Applied i.MX27 fixes from Sascha.
-> > 
-> > Baruch Siach (3):
-> >   mx2_camera: Add soc_camera support for i.MX25/i.MX27
-> >   mx27: add support for the CSI device
-> >   mx25: add support for the CSI device
-> > 
-> >  arch/arm/mach-mx2/clock_imx27.c          |    2 +-
-> >  arch/arm/mach-mx2/devices.c              |   31 +
-> >  arch/arm/mach-mx2/devices.h              |    1 +
-> >  arch/arm/mach-mx25/clock.c               |   14 +-
-> >  arch/arm/mach-mx25/devices.c             |   22 +
-> >  arch/arm/mach-mx25/devices.h             |    1 +
-> >  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
-> >  arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
-> >  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
-> >  drivers/media/video/Kconfig              |   13 +
-> >  drivers/media/video/Makefile             |    1 +
-> >  drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
-> >  12 files changed, 1603 insertions(+), 5 deletions(-)
-> >  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
-> >  create mode 100644 drivers/media/video/mx2_camera.c
-> > 
-> 
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Catalin
