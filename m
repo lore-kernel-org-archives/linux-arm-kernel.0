@@ -1,25 +1,20 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Mon, 24 May 2010 12:23:41 +0200
-Subject: i.MX27 GPIOs -- how to define the default output?
-In-Reply-To: <20100522010210.GA18017@www.longlandclan.yi.org>
-References: <20100522010210.GA18017@www.longlandclan.yi.org>
-Message-ID: <20100524102341.GK28820@pengutronix.de>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Mon, 24 May 2010 13:56:20 +0300 (EEST)
+Subject: [PATCH v3 01/14] omap: mailbox: trivial whitespace cleanups
+In-Reply-To: <1274548465-20208-2-git-send-email-felipe.contreras@gmail.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<1274548465-20208-2-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20100524.135620.214209275.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 22, 2010 at 11:02:17AM +1000, Stuart Longland wrote:
-> I'm in the process of porting Ka-Ro's TX27 kernel patch over from
-> kernel 2.6.28 to current git HEAD[1]. In the process of doing this, I
-> note that the old definitions GPIO_DFLT_HIGH and GPIO_DFLT_LOW have
-> disappeared.
->
-> I can't seem to find their replacements anywhere.
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: [PATCH v3 01/14] omap: mailbox: trivial whitespace cleanups
+Date: Sat, 22 May 2010 19:14:12 +0200
 
-Check for example mach-pcm038.c, it shows how to do the pin setup.
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> ---
+> 
+> Hiroshi: I think there's something wrong with your editor =/
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hm...I did something wrong to save them. I'll fix. Thanks.
