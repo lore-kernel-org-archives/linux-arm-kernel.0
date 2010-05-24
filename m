@@ -1,53 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 24 May 2010 14:41:02 +0800
-Subject: [PATCH 3/6] [ARM] pxa: reserve more irq for board
-In-Reply-To: <AANLkTinoQ9IU_gaJPI2nPl8mXLu3Ss_qMc8bP-gM4Ahh@mail.gmail.com>
-References: <AANLkTinoQ9IU_gaJPI2nPl8mXLu3Ss_qMc8bP-gM4Ahh@mail.gmail.com>
-Message-ID: <AANLkTinN9OiJIVc5Y2s4ET5-aERcBQLi_ZCh-VFHw9nO@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 May 2010 08:19:21 +0100
+Subject: [RESEND PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
+In-Reply-To: <20100524112355.18424622@tom-lei>
+References: <1274615328-27953-1-git-send-email-tom.leiming@gmail.com>
+	<20100523123801.GC950@n2100.arm.linux.org.uk>
+	<AANLkTikRp0EHxshKYq39p18ymoRNAtyHrNm3yq6A49-r@mail.gmail.com>
+	<20100523141300.GD950@n2100.arm.linux.org.uk>
+	<AANLkTinV9Na9zxYMIfTr893Ynnc0YOk2B6uPKEa9s4R1@mail.gmail.com>
+	<20100523194746.GE950@n2100.arm.linux.org.uk>
+	<20100524112355.18424622@tom-lei>
+Message-ID: <20100524071921.GA17528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 17, 2010 at 7:19 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From ab34824f36731dc1b1c49e1daa18abd0137c9c0e Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 12 Mar 2010 12:26:03 -0500
-> Subject: [PATCH] [ARM] pxa: reserve more irq for board
->
-> By default, only 16 IRQs are reserved for board IRQ. While genirq is used,
-> more board IRQs should be reserved. Now update the default BOARD IRQs to 64.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Mon, May 24, 2010 at 11:23:55AM +0800, Ming Lei wrote:
+> On Sun, 23 May 2010 20:47:46 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > Moreover, I put to you that it's utterly pointless - and a waste of
+> > CPU time - telling lockdep about the IRQ masking when an exception
+> 
+> Yes, the patch still tries to remove the pointless trace of IRQ masking,
+> such as: replace disable_irq with disable_irq_notrace.
+> 
+> > occurs, and it's also pointless telling lockdep about the IRQ
+> > unmasking when we resume userspace.
+> 
+> Even it is pointless, but if lockdep doesn't see the IRQ unmasking, the 
+> warning "unannotated irqs-on" will be triggered and lockdep doe not work
+> any longer, so we have to remove the warning to make lockdep workable on
+> ARM, could you agree on it?  It is the main purpose of the patch.
 
-Haojian,
+I'm sorry, I think we have a communication issue; you're not understanding
+the points that I'm making.  I feel I'm wasting my time trying to explain
+it.
 
-Please see my irq_cleanup branch for reserving board IRQs, basically
-a macro can be assigned to .nr_irqs in the machine_desc structure.
-That branch is target for next merge window.
-
-> ---
-> ?arch/arm/mach-pxa/include/mach/irqs.h | ? ?6 +-----
-> ?1 files changed, 1 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
-> b/arch/arm/mach-pxa/include/mach/irqs.h
-> index ffc8314..010c205 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -127,12 +127,8 @@
->
-> ?#if defined(CONFIG_MACH_H4700)
-> ?#define IRQ_BOARD_END ? ? ? ? ?(IRQ_BOARD_START + 70)
-> -#elif defined(CONFIG_MACH_ZYLONITE)
-> -#define IRQ_BOARD_END ? ? ? ? ?(IRQ_BOARD_START + 32)
-> -#elif defined(CONFIG_PXA_EZX)
-> -#define IRQ_BOARD_END ? ? ? ? ?(IRQ_BOARD_START + 23)
-> ?#else
-> -#define IRQ_BOARD_END ? ? ? ? ?(IRQ_BOARD_START + 16)
-> +#define IRQ_BOARD_END ? ? ? ? ?(IRQ_BOARD_START + 64)
-> ?#endif
->
-> ?/*
-> --
-> 1.5.6.5
->
+I'm not merging your patch as-is because I believe it to be wrong.
