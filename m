@@ -1,46 +1,30 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 25 May 2010 00:17:02 +0200
-Subject: Should we pass amba device peripheral id with device structure or
-	not?
-In-Reply-To: <20100524213237.GH21117@n2100.arm.linux.org.uk>
-References: <4BECF57A.4050802@st.com>
-	<20100521193802.GG11042@n2100.arm.linux.org.uk>
-	<4BFA02DC.6090906@st.com>
-	<20100524213237.GH21117@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinQqEIs3PDWJGFwYqsBZxANmrbH_xOtOchK5Nlh@mail.gmail.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 24 May 2010 15:20:59 -0700 (PDT)
+Subject: [PATCH 01/16] arm/mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c
+	matching its arch number
+In-Reply-To: <1274730951-29106-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <663004.37933.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Russell]
+Uwe,
 
-> So... that must mean your hardware gates both the peripheral clock and
-> the per-primecell bus clock together. ?Let's hope that the bus clock
-> control takes notice of any in-progress bus transaction...
->
-> However, I'm still concerned - the driver's use of clk_enable/clk_disable
-> is based on the assumption that these calls do not affect the bus clock -
-> we expect to be able to write to registers before the first clk_enable()
-> call.
->
-> And as I've said (and you cut off of the quote) if we have SoCs where the
-> bus clock is controllable, we need amba/bus.c to deal with that situation.
+--- On Mon, 5/24/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-This is an interesting thing.
+> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Subject: [PATCH 01/16] arm/mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c matching its arch number
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: kernel at pengutronix.de
+> Date: Monday, May 24, 2010, 4:55 PM
+> Additional document all known names
+> of that machine.
+...
 
-In the U300 the bus clock is gated by one control bit per block.
+To make it consistent across other i.MX boards: shouldn't mach-mx5/board-mx51_babbage.c be also renamed?
 
-However we cannot gate the peripheral clock. (Or it's just wired
-up to be gated by the same control bit, I'd have to check.)
+Regards,
 
-So through the clock framework we enable/disable the bus
-clock, and if we issue get_rate() we return the rate of the peripheral
-clock.
+Fabio Estevam
 
-Thus clk enable/disable and get_rate are actually orthogonal in
-our implementation which is not so nice.
 
-We'd have to add a proper bus clock to all PrimeCells to have this in
-some sane state I believe.
-
-Yours,
-Linus Walleij
+      
