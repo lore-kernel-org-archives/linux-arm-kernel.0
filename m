@@ -1,24 +1,46 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 24 May 2010 23:51:11 +0200
+Date: Tue, 25 May 2010 00:17:02 +0200
 Subject: Should we pass amba device peripheral id with device structure or
 	not?
-In-Reply-To: <4BFA02DC.6090906@st.com>
+In-Reply-To: <20100524213237.GH21117@n2100.arm.linux.org.uk>
 References: <4BECF57A.4050802@st.com>
 	<20100521193802.GG11042@n2100.arm.linux.org.uk>
 	<4BFA02DC.6090906@st.com>
-Message-ID: <AANLkTill9wh_8PqLAoWEpQtKhV-7Yc0zWs870EVJLtBb@mail.gmail.com>
+	<20100524213237.GH21117@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinQqEIs3PDWJGFwYqsBZxANmrbH_xOtOchK5Nlh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Viresh]
+[Russell]
 
-2010/5/24 Viresh KUMAR <viresh.kumar@st.com>:
+> So... that must mean your hardware gates both the peripheral clock and
+> the per-primecell bus clock together. ?Let's hope that the bus clock
+> control takes notice of any in-progress bus transaction...
+>
+> However, I'm still concerned - the driver's use of clk_enable/clk_disable
+> is based on the assumption that these calls do not affect the bus clock -
+> we expect to be able to write to registers before the first clk_enable()
+> call.
+>
+> And as I've said (and you cut off of the quote) if we have SoCs where the
+> bus clock is controllable, we need amba/bus.c to deal with that situation.
 
-> There is only one bit per peripheral to enable/disable clock.
-> So with clocks disabled, we get 0x00000000 on read from device registers.
+This is an interesting thing.
 
-You're lucky to get zero, I get an AHB bus error and everything
-locks up.
+In the U300 the bus clock is gated by one control bit per block.
+
+However we cannot gate the peripheral clock. (Or it's just wired
+up to be gated by the same control bit, I'd have to check.)
+
+So through the clock framework we enable/disable the bus
+clock, and if we issue get_rate() we return the rate of the peripheral
+clock.
+
+Thus clk enable/disable and get_rate are actually orthogonal in
+our implementation which is not so nice.
+
+We'd have to add a proper bus clock to all PrimeCells to have this in
+some sane state I believe.
 
 Yours,
 Linus Walleij
