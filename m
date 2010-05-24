@@ -1,88 +1,47 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 24 May 2010 22:14:30 +0200
-Subject: Should we pass amba device peripheral id with device structure or
-	not?
-In-Reply-To: <4BECF57A.4050802@st.com>
-References: <4BECF57A.4050802@st.com>
-Message-ID: <AANLkTimIDuNPo0t-GNIODjz-rpMvlEYqmUq7PbilxIhv@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 May 2010 22:34:28 +0200
+Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes with
+	CONFIG_TOUCHSCREEN_ADS7846=y
+In-Reply-To: <4BFADD4F.80309@eukrea.com>
+References: <20100524195430.GA28403@pengutronix.de>
+	<1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4BFADD4F.80309@eukrea.com>
+Message-ID: <20100524203428.GB29092@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/14 Viresh KUMAR <viresh.kumar@st.com>:
+Hi Eric,
 
-> amba_device_register function reads and updates peripheral id from hardware
-> registers, whenever we register any amba device. If clock to device is disabled,
-> then amba_device_register will not be able to read and update this value.
+On Mon, May 24, 2010 at 10:10:55PM +0200, Eric B?nard wrote:
+> Hi Uwe,
 >
-> Thus device registration will fail.
-> (...)
+> Le 24/05/2010 21:55, Uwe Kleine-K?nig a ?crit :
+>> This fixes:
+>>
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:166: error: expected identifier or '(' before '||' token
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:204: error: variable 'eukrea_mbimx27_spi_0_data' has initializer but incomplete type
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: error: unknown field 'chipselect' specified in initializer
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: excess elements in struct initializer
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: error: unknown field 'num_chipselect' specified in initializer
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: excess elements in struct initializer
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c: In function 'eukrea_mbimx27_baseboard_init':
+>> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:239: error: implicit declaration of function 'ads7846_dev_init'
+>>
+>> While at it add TOUCHSCREEN_ADS7846=m to mx27_defconfig.
+>>
+> I already fixed this in my patchset for this board :
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015826.html
 
-In the U300 arch/arm/mach-u300/clock.c we have this code:
+What do you think about adding TOUCHSCREEN_ADS7846=m to mx27_defconfig?
 
-/*
- * These are the clocks for cells registered as primecell drivers
- * on the AMBA bus. These must be on during AMBA device registration
- * since the bus probe will attempt to read magic configuration
- * registers for these devices. If they are deactivated these probes
- * will fail.
- *
- *
- * Please note that on emif, both RAM and NAND is connected in dual
- * RAM phones. On single RAM phones, ram is on semi and NAND on emif.
- *
- */
-void u300_clock_primecells(void)
-{
-        clk_enable(&intcon_clk);
-        clk_enable(&uart_clk);
-#ifdef CONFIG_MACH_U300_BS335
-        clk_enable(&uart1_clk);
-#endif
-        clk_enable(&spi_clk);
+Other than that I'm OK with your patch, too.  I will remove this patch
+from my queue.
 
-        clk_enable(&mmcsd_clk);
+Best regards and thanks
+Uwe
 
-}
-EXPORT_SYMBOL(u300_clock_primecells);
-
-void u300_unclock_primecells(void)
-{
-
-        clk_disable(&intcon_clk);
-        clk_disable(&uart_clk);
-#ifdef CONFIG_MACH_U300_BS335
-        clk_disable(&uart1_clk);
-#endif
-        clk_disable(&spi_clk);
-        clk_disable(&mmcsd_clk);
-
-}
-EXPORT_SYMBOL(u300_unclock_primecells);
-
-
-When we add the primecells we have this piece:
-
-        /* Register the AMBA devices in the AMBA bus abstraction layer */
-        u300_clock_primecells();
-        for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-                struct amba_device *d = amba_devs[i];
-                amba_device_register(d, &iomem_resource);
-        }
-        u300_unclock_primecells();
-
-This way the reference counter is still zero and the clocks are off
-when the drivers probe, so they need to enable their own clocks
-at the latter stage.
-
-It's a bit brutal but it works. (And yes, we shouldn't be exporting the
-symbols, no point, will fix it someday.) However it messes with the
-internals of your clock implementation indeed.
-
-One more elegant way would be to pass the master clock along
-in struct amba_device like we do with IRQs, so the probe code in
-drivers/amba/bus.c know how to clock the device before attempting
-to read the PrimeCell IDs. I don't know if that's particularly elegant
-though.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
