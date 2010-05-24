@@ -1,62 +1,35 @@
-From: dwalker@codeaurora.org (dwalker at codeaurora.org)
-Date: Mon, 24 May 2010 12:20:23 -0700 (PDT)
-Subject: [PATCH 05/25] msm: generalize clock support.
-In-Reply-To: <20100524185540.GA1292@ucw.cz>
-References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
-	<20100524185540.GA1292@ucw.cz>
-Message-ID: <aadad45c7c0ed342eac9bce381486c88.squirrel@www.codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 24 May 2010 21:22:17 +0200
+Subject: Initrd and 2.6.33 curious behaviour
+In-Reply-To: <87hblz2alm.fsf@free.fr> (Robert Jarzmik's message of "Sun\,
+	23 May 2010 12\:09\:25 +0200")
+References: <874oi157c6.fsf@free.fr>
+	<20100521204343.GA18032@n2100.arm.linux.org.uk>
+	<87fx1k46qg.fsf@free.fr> <20100522094637.GA954@n2100.arm.linux.org.uk>
+	<87pr0n31q2.fsf@free.fr> <20100523090139.GA950@n2100.arm.linux.org.uk>
+	<87hblz2alm.fsf@free.fr>
+Message-ID: <87r5l114wm.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi!
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> CONFIG_BLK_DEV_RAM is enabled. I'll add some debugging now and will try again.
 >
->> --- /dev/null
->> +++ b/arch/arm/mach-msm/clock-pcom.h
->> @@ -0,0 +1,153 @@
->> +/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
->> + *
->> + * Redistribution and use in source and binary forms, with or without
->> + * modification, are permitted provided that the following conditions
->> are
->> + * met:
->> + *     * Redistributions of source code must retain the above copyright
->> + *       notice, this list of conditions and the following disclaimer.
->> + *     * Redistributions in binary form must reproduce the above
->> + *       copyright notice, this list of conditions and the following
->> + *       disclaimer in the documentation and/or other materials
->> provided
->> + *       with the distribution.
->> + *     * Neither the name of Code Aurora Forum, Inc. nor the names of
->> its
->> + *       contributors may be used to endorse or promote products
->> derived
->> + *       from this software without specific prior written permission.
->
-> Is this even GPL compatible?
+OK, found out the culprit.
+My bootloader(haret) is to be blamed : the first 6 bytes of initrd as the kernel
+sees them are totally different from the actual 6 first bytes of initrd file.
 
-It's a modified BSD type license, so yeah I think it would be
-compatible. However, it's all suppose to be GPL'd so I think we'll want
-to remove this.
+The long story is that when haret stops wince MMU, it "reorders" the pages to
+create a physically contiguous kernel and initrd, from the scattered pages
+allocated in wince. The relocation algorithm is faulty, as it doesn't cope with
+the cases where there is a double dependency (ie. a kernel page should be moved
+to the page occupied by a initrd page, and the initrd page should be moved to
+where resides the kernel page).
 
->> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
->> index 3b1ce36..34c6a52 100644
->> --- a/arch/arm/mach-msm/clock.c
->> +++ b/arch/arm/mach-msm/clock.c
->> @@ -1,7 +1,7 @@
->>  /* arch/arm/mach-msm/clock.c
->>   *
->>   * Copyright (C) 2007 Google, Inc.
->> - * Copyright (c) 2007 QUALCOMM Incorporated
->> + * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
->>   *
->>   * This software is licensed under the terms of the GNU General Public
->>   * License version 2, as published by the Free Software Foundation, and
->
-> So... what is the relationship between qualcomm and Code Aurora?
+It's funny how people want to solve the hanoi towers problem without a spare
+slot ...
 
-My understanding of it is that Code Aurora is an external entity which
-is operated by multiple other companies. We use Code Aurora to
-distribute the source code .. The line above is just assigning the
-copyright to Code Aurora which is part of how we distribute the source.
+Cheers.
 
-Daniel
+--
+Robert
