@@ -1,49 +1,43 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 May 2010 21:55:38 +0200
-Subject: [PATCH 03/16] arm/mx1: add CONFIG_VIDEO_MX1 to defconfig
+Date: Mon, 24 May 2010 21:55:40 +0200
+Subject: [PATCH 05/16] arm/mx2/pca100: add #ifdef to fix compiler warning
 In-Reply-To: <20100524195430.GA28403@pengutronix.de>
 References: <20100524195430.GA28403@pengutronix.de>
-Message-ID: <1274730951-29106-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1274730951-29106-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx1 is the only machine type that can have this device, so add it to
-its defconfig to get more compile coverage.
+This fixes:
+
+	arch/arm/mach-mx2/mach-pca100.c:261: warning: 'otg_pdata' defined but not used
+	arch/arm/mach-mx2/mach-pca100.c:273: warning: 'usbh2_pdata' defined but not used
+
+for build having USB_ULPI disabled.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/configs/mx1_defconfig |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx2/mach-pca100.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mx1_defconfig b/arch/arm/configs/mx1_defconfig
-index f575070..208060e 100644
---- a/arch/arm/configs/mx1_defconfig
-+++ b/arch/arm/configs/mx1_defconfig
-@@ -697,6 +697,7 @@ CONFIG_SSB_POSSIBLE=y
- # CONFIG_MFD_WM8400 is not set
- # CONFIG_MFD_WM8350_I2C is not set
- # CONFIG_MFD_PCF50633 is not set
-+CONFIG_MEDIA_SUPPORT=m
+diff --git a/arch/arm/mach-mx2/mach-pca100.c b/arch/arm/mach-mx2/mach-pca100.c
+index 778fff2..da94279 100644
+--- a/arch/arm/mach-mx2/mach-pca100.c
++++ b/arch/arm/mach-mx2/mach-pca100.c
+@@ -252,6 +252,7 @@ static struct imxmmc_platform_data sdhc_pdata = {
+ 	.exit = pca100_sdhc2_exit,
+ };
  
- #
- # Multimedia devices
-@@ -705,13 +706,16 @@ CONFIG_SSB_POSSIBLE=y
- #
- # Multimedia core support
- #
--# CONFIG_VIDEO_DEV is not set
-+CONFIG_VIDEO_DEV=m
- # CONFIG_DVB_CORE is not set
- # CONFIG_VIDEO_MEDIA is not set
++#if defined(CONFIG_USB_ULPI)
+ static int otg_phy_init(struct platform_device *pdev)
+ {
+ 	gpio_set_value(OTG_PHY_CS_GPIO, 0);
+@@ -275,6 +276,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
+ 	.portsc	= MXC_EHCI_MODE_ULPI,
+ 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
+ };
++#endif
  
- #
- # Multimedia drivers
- #
-+CONFIG_VIDEO_V4L2=m
-+CONFIG_SOC_CAMERA=m
-+CONFIG_VIDEO_MX1=m
- # CONFIG_DAB is not set
- 
- #
+ static struct fsl_usb2_platform_data otg_device_pdata = {
+ 	.operating_mode = FSL_USB2_DR_DEVICE,
 -- 
 1.7.0
