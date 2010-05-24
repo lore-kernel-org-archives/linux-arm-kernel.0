@@ -1,30 +1,31 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Mon, 24 May 2010 15:20:59 -0700 (PDT)
-Subject: [PATCH 01/16] arm/mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c
-	matching its arch number
-In-Reply-To: <1274730951-29106-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <663004.37933.qm@web51008.mail.re2.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 May 2010 23:32:02 +0100
+Subject: Should we pass amba device peripheral id with device structure
+	or not?
+In-Reply-To: <AANLkTinQqEIs3PDWJGFwYqsBZxANmrbH_xOtOchK5Nlh@mail.gmail.com>
+References: <4BECF57A.4050802@st.com>
+	<20100521193802.GG11042@n2100.arm.linux.org.uk>
+	<4BFA02DC.6090906@st.com>
+	<20100524213237.GH21117@n2100.arm.linux.org.uk>
+	<AANLkTinQqEIs3PDWJGFwYqsBZxANmrbH_xOtOchK5Nlh@mail.gmail.com>
+Message-ID: <20100524223202.GA21923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
+On Tue, May 25, 2010 at 12:17:02AM +0200, Linus Walleij wrote:
+> [Russell]
+> We'd have to add a proper bus clock to all PrimeCells to have this in
+> some sane state I believe.
 
---- On Mon, 5/24/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+That's basically what I'm saying.  At the bus/driver level, we need to
+deal with the bus clock dependency separately from the peripheral clock
+if the bus clock can be shut off.
 
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Subject: [PATCH 01/16] arm/mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c matching its arch number
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: kernel at pengutronix.de
-> Date: Monday, May 24, 2010, 4:55 PM
-> Additional document all known names
-> of that machine.
-...
+I had originally anticipated that all primecells on a bus would have
+their bus clock fed from a common unmaskable source, and that shutting
+off the bus clock to the primecell would be a very bad thing to happen
+to the bus - but it seems that it's permitted after all.
 
-To make it consistent across other i.MX boards: shouldn't mach-mx5/board-mx51_babbage.c be also renamed?
-
-Regards,
-
-Fabio Estevam
-
-
-      
+This will be trivial to deal with for clkdev-based platforms...  The
+non-clkdev are an entirely separate proposition - but I don't think we
+have any primecell-using platforms which don't use clkdev.
