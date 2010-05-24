@@ -1,89 +1,72 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Mon, 24 May 2010 18:57:19 +0530
-Subject: [PATCH 7/7] mop500: add basic pin configuration
-In-Reply-To: <1274707639-28285-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1274707639-28285-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1274707639-28285-7-git-send-email-rabin.vincent@stericsson.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 24 May 2010 15:34:32 +0200 (CEST)
+Subject: [PATCH v2 0/3] Driver for the i.MX2x CMOS Sensor Interface
+In-Reply-To: <cover.1274706733.git.baruch@tkos.co.il>
+References: <cover.1274706733.git.baruch@tkos.co.il>
+Message-ID: <Pine.LNX.4.64.1005241528410.2611@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the newly added infrastructure to configure the SSP0 and I2C[0-3]
-pins on the MOP500 board.
+Hi Baruch
 
-The u8500_init_devices() call needed to be moved up in order to register
-the GPIO device first.
+On Mon, 24 May 2010, Baruch Siach wrote:
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
+> platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
+> driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
+> posted in linux-media last December[1]. I tested the mx2_camera driver on the 
+> i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
+> i.MX27 based board. I included in this version some fixes from Sascha that 
+> enable i.MX27 support.
+> 
+> [1] https://patchwork.kernel.org/patch/67636/
+
+Thanks for the patches! I'll have a look at them in the next couple of 
+days. I presume, you do not expect this driver to make it into 2.6.35? rc1 
+is expected any time now, so, we'll take our time and prepare it for 
+2.6.36, right?
+
+Thanks
+Guennadi
+
+> 
+> Changes v1 -> v2
+>     Addressed the comments of Guennadi Liakhovetski except from the following:
+> 
+>     1. The mclk_get_divisor implementation, since I don't know what this code 
+>        is good for
+> 
+>     2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
+>        mx27_camera_frame_done needs this pointer
+> 
+>     3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
+>        coded magic numbers
+> 
+>     Applied i.MX27 fixes from Sascha.
+> 
+> Baruch Siach (3):
+>   mx2_camera: Add soc_camera support for i.MX25/i.MX27
+>   mx27: add support for the CSI device
+>   mx25: add support for the CSI device
+> 
+>  arch/arm/mach-mx2/clock_imx27.c          |    2 +-
+>  arch/arm/mach-mx2/devices.c              |   31 +
+>  arch/arm/mach-mx2/devices.h              |    1 +
+>  arch/arm/mach-mx25/clock.c               |   14 +-
+>  arch/arm/mach-mx25/devices.c             |   22 +
+>  arch/arm/mach-mx25/devices.h             |    1 +
+>  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+>  arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
+>  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+>  drivers/media/video/Kconfig              |   13 +
+>  drivers/media/video/Makefile             |    1 +
+>  drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
+>  12 files changed, 1603 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+>  create mode 100644 drivers/media/video/mx2_camera.c
+> 
+
 ---
- arch/arm/mach-ux500/board-mop500.c |   27 +++++++++++++++++++++++++--
- 1 files changed, 25 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 072196c..b36dbe8 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -13,6 +13,7 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
- #include <linux/spi/spi.h>
-@@ -20,12 +21,32 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+#include <plat/pincfg.h>
- #include <plat/i2c.h>
- 
-+#include "db8500-pins.h"
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
- 
-+static pin_cfg_t mop500_pins[] = {
-+	/* SSP0 */
-+	GPIO143_SSP0_CLK,
-+	GPIO144_SSP0_FRM,
-+	GPIO145_SSP0_RXD,
-+	GPIO146_SSP0_TXD,
-+
-+	/* I2C */
-+	GPIO147_I2C0_SCL,
-+	GPIO148_I2C0_SDA,
-+	GPIO16_I2C1_SCL,
-+	GPIO17_I2C1_SDA,
-+	GPIO10_I2C2_SDA,
-+	GPIO11_I2C2_SCL,
-+	GPIO229_I2C3_SDA,
-+	GPIO230_I2C3_SCL,
-+};
-+
- static void ab4500_spi_cs_control(u32 command)
- {
- 	/* set the FRM signal, which is CS  - TODO */
-@@ -118,6 +139,10 @@ static void __init u8500_init_machine(void)
- {
- 	int i;
- 
-+	u8500_init_devices();
-+
-+	nmk_config_pins(mop500_pins, ARRAY_SIZE(mop500_pins));
-+
- 	u8500_i2c0_device.dev.platform_data = &u8500_i2c0_data;
- 	ux500_i2c1_device.dev.platform_data = &u8500_i2c1_data;
- 	ux500_i2c2_device.dev.platform_data = &u8500_i2c2_data;
-@@ -133,8 +158,6 @@ static void __init u8500_init_machine(void)
- 
- 	spi_register_board_info(u8500_spi_devices,
- 			ARRAY_SIZE(u8500_spi_devices));
--
--	u8500_init_devices();
- }
- 
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
--- 
-1.7.0
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
