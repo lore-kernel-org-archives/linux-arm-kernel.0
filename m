@@ -1,36 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 May 2010 14:25:18 +0100
-Subject: [PATCH 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
-In-Reply-To: <20100524114546.GB21117@n2100.arm.linux.org.uk>
-References: <20100520142715.22202.33516.stgit@e102109-lin.cambridge.arm.com>
-	<20100520143004.22202.71701.stgit@e102109-lin.cambridge.arm.com>
-	<20100524114546.GB21117@n2100.arm.linux.org.uk>
-Message-ID: <1274707518.4720.53.camel@e102109-lin.cambridge.arm.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Mon, 24 May 2010 18:57:13 +0530
+Subject: [PATCH 1/7] nomadik-gpio: add function to configure pullup/pulldown
+Message-ID: <1274707639-28285-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-24 at 12:45 +0100, Russell King - ARM Linux wrote:
-> On Thu, May 20, 2010 at 03:30:04PM +0100, Catalin Marinas wrote:
-> > The user pages access rights are also modified for kernel read-only
-> > access rather than read/write so that the copy-on-write mechanism still
-> > works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
-> > since writing the TLS value to the high vectors page isn't possible.
-> 
-> When FIQ handlers are installed/removed, the vector page is also written,
-> so the above restriction is incompatible with FIQ support.
-> 
-> Do we want to tell people that they can't use FIQs without domain support?
+Cc: Alessandro Rubini <rubini@unipv.it>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/plat-nomadik/gpio.c              |   48 +++++++++++++++++++++++++++++
+ arch/arm/plat-nomadik/include/plat/gpio.h |    8 +++++
+ 2 files changed, 56 insertions(+), 0 deletions(-)
 
-They could still be used (with an additional patch). At first, I thought
-that we could do something similar to early_trap_init() but
-set_fiq_handler() could be called from a module at run-time and it may
-temporarily enable write access to the vectors page (without an
-additional L_PTE_ bit we can't make the vectors page user RO, kernel R/W
-and I wouldn't do this anyway, for other reasons).
-
-What about making a global vectors_page variable (initialised in
-devicemaps_init) that can be written directly when !CPU_USE_DOMAINS? On
-such CPUs, we have a non-aliasing VIPT cache anyway.
-
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index 5a6ef25..2045998 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -46,6 +46,54 @@ struct nmk_gpio_chip {
+ 	u32 edge_falling;
+ };
+ 
++static void __nmk_gpio_set_pull(struct nmk_gpio_chip *nmk_chip,
++				unsigned offset, enum nmk_gpio_pull pull)
++{
++	u32 bit = 1 << offset;
++	u32 pdis;
++
++	pdis = readl(nmk_chip->addr + NMK_GPIO_PDIS);
++	if (pull == NMK_GPIO_PULL_NONE)
++		pdis |= bit;
++	else
++		pdis &= ~bit;
++	writel(pdis, nmk_chip->addr + NMK_GPIO_PDIS);
++
++	if (pull == NMK_GPIO_PULL_UP)
++		writel(bit, nmk_chip->addr + NMK_GPIO_DATS);
++	else if (pull == NMK_GPIO_PULL_DOWN)
++		writel(bit, nmk_chip->addr + NMK_GPIO_DATC);
++}
++
++/**
++ * nmk_gpio_set_pull() - enable/disable pull up/down on a gpio
++ * @gpio: pin number
++ * @pull: one of NMK_GPIO_PULL_DOWN, NMK_GPIO_PULL_UP, and NMK_GPIO_PULL_NONE
++ *
++ * Enables/disables pull up/down on a specified pin.  This only takes effect if
++ * the pin is configured as an input (either explicitly or by the alternate
++ * function).
++ *
++ * NOTE: If enabling the pull up/down, the caller must ensure that the GPIO is
++ * configured as an input.  Otherwise, due to the way the controller registers
++ * work, this function will change the value output on the pin.
++ */
++int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull)
++{
++	struct nmk_gpio_chip *nmk_chip;
++	unsigned long flags;
++
++	nmk_chip = get_irq_chip_data(NOMADIK_GPIO_TO_IRQ(gpio));
++	if (!nmk_chip)
++		return -EINVAL;
++
++	spin_lock_irqsave(&nmk_chip->lock, flags);
++	__nmk_gpio_set_pull(nmk_chip, gpio - nmk_chip->chip.base, pull);
++	spin_unlock_irqrestore(&nmk_chip->lock, flags);
++
++	return 0;
++}
++
+ /* Mode functions */
+ int nmk_gpio_set_mode(int gpio, int gpio_mode)
+ {
+diff --git a/arch/arm/plat-nomadik/include/plat/gpio.h b/arch/arm/plat-nomadik/include/plat/gpio.h
+index 4200811..1d97e96 100644
+--- a/arch/arm/plat-nomadik/include/plat/gpio.h
++++ b/arch/arm/plat-nomadik/include/plat/gpio.h
+@@ -55,6 +55,14 @@
+ #define NMK_GPIO_ALT_B	2
+ #define NMK_GPIO_ALT_C	(NMK_GPIO_ALT_A | NMK_GPIO_ALT_B)
+ 
++/* Pull up/down values */
++enum nmk_gpio_pull {
++	NMK_GPIO_PULL_NONE,
++	NMK_GPIO_PULL_UP,
++	NMK_GPIO_PULL_DOWN,
++};
++
++extern int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull);
+ extern int nmk_gpio_set_mode(int gpio, int gpio_mode);
+ extern int nmk_gpio_get_mode(int gpio);
+ 
 -- 
-Catalin
+1.7.0
