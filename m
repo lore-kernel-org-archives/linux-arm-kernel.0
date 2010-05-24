@@ -1,74 +1,82 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 24 May 2010 10:33:37 +0300
-Subject: [PATCH 6/6] [ARM] pxa/cm-x2xx: encode IRQ number into .nr_irqs
-In-Reply-To: <1274682949-25915-7-git-send-email-eric.y.miao@gmail.com>
-References: <1274682949-25915-1-git-send-email-eric.y.miao@gmail.com>
-	<1274682949-25915-7-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <4BFA2BD1.5040005@compulab.co.il>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 24 May 2010 11:57:16 +0400
+Subject: [PATCH] s3c24xx fix: freeze during suspend/resume on s3c24xx
+	if some	GPIO banks not present
+In-Reply-To: <4BF920EF.2050800@vscht.cz>
+References: <4BF8B232.9020903@vscht.cz> <4BF8F30B.9040704@ru.mvista.com>
+	<4BF920EF.2050800@vscht.cz>
+Message-ID: <4BFA315C.5040806@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hello.
 
-Eric Miao wrote:
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> ---
->  arch/arm/mach-pxa/cm-x2xx-pci.h       |    6 ++++++
->  arch/arm/mach-pxa/cm-x2xx.c           |    1 +
->  arch/arm/mach-pxa/include/mach/irqs.h |   11 -----------
->  3 files changed, 7 insertions(+), 11 deletions(-)
+Pinkava J. wrote:
 
-Looks Ok to me. Do you have a tree I can pull to test your changes?
+>>> When saving GPIOs during suspend/resume we need skip missing GPIO banks, not
+>>> trying get corresponding chip again and again in infinite loop.
+>>     I didn't see any infinite loops there -- *continue* itself leads to 
+>> incrementing 'gpio_nr', no?
 
-> diff --git a/arch/arm/mach-pxa/cm-x2xx-pci.h b/arch/arm/mach-pxa/cm-x2xx-pci.h
-> index e24aad2..9a87134 100644
-> --- a/arch/arm/mach-pxa/cm-x2xx-pci.h
-> +++ b/arch/arm/mach-pxa/cm-x2xx-pci.h
-> @@ -11,3 +11,9 @@ extern void __cmx2xx_pci_resume(void);
->  #define cmx2xx_pci_suspend(x) do {} while (0)
->  #define cmx2xx_pci_resume(x) do {} while (0)
->  #endif
-> +
-> +#ifdef CONFIG_PCI
-> +#define CMX2XX_NR_IRQS	(IRQ_BOARD_START + 41)
-> +#else
-> +#define CMX2XX_NR_IRQS	IRQ_BOARD_START
-> +#endif
-> diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
-> index bff6e78..d10b733 100644
-> --- a/arch/arm/mach-pxa/cm-x2xx.c
-> +++ b/arch/arm/mach-pxa/cm-x2xx.c
-> @@ -514,6 +514,7 @@ MACHINE_START(ARMCORE, "Compulab CM-X2XX")
->  	.phys_io	= 0x40000000,
->  	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
->  	.map_io		= cmx2xx_map_io,
-> +	.nr_irqs	= CMX2XX_NR_IRQS,
->  	.init_irq	= cmx2xx_init_irq,
->  	.timer		= &pxa_timer,
->  	.init_machine	= cmx2xx_init,
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-> index 145fe1d..62d148c 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -138,15 +138,4 @@
->  #define NR_IRQS			(IRQ_BOARD_START)
->  #endif
->  
-> -/* add IT8152 IRQs beyond BOARD_END */
-> -#ifdef CONFIG_PCI_HOST_ITE8152
-> -#define IT8152_LAST_IRQ         (IRQ_BOARD_END + 40)
-> -
-> -#if NR_IRQS < (IT8152_LAST_IRQ+1)
-> -#undef NR_IRQS
-> -#define NR_IRQS (IT8152_LAST_IRQ+1)
-> -#endif
-> -
-> -#endif /* CONFIG_PCI_HOST_ITE8152 */
-> -
->  #endif /* __ASM_MACH_IRQS_H */
+> No, it would have to be:
 
+> for (gpio_nr = 0; gpio_nr < S3C_GPIO_END; gpio_nr++) {
+> ...
 
--- 
-Sincerely yours,
-Mike.
+> try create simple test program for your self
+
+> /* test.c */
+> main()
+> {
+> 	int x;
+> 	for(x = 0; x < 10; /* x++ */ )
+> 	{
+> 		printf("x  = %d", x);
+> 	}
+> }
+
+> Compile usign:
+
+> gcc test.c
+
+> Run
+
+ > ./a.out
+
+    Ah, I missed the empty 3rd expression in *for*, sorry. :-<
+Strange loop though...
+
+>>> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+>>> ---
+>>>  arch/arm/plat-samsung/pm-gpio.c |    8 ++++++--
+>>>  1 files changed, 6 insertions(+), 2 deletions(-)
+
+>>> diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+>>> index d50ab9d..7df03f8 100644
+>>> --- a/arch/arm/plat-samsung/pm-gpio.c
+>>> +++ b/arch/arm/plat-samsung/pm-gpio.c
+>>> @@ -331,8 +331,10 @@ void s3c_pm_save_gpios(void)
+>>>
+>>>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+>>>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
+>>> -		if (!ourchip)
+>>> +		if (!ourchip) {
+>>> +			gpio_nr++;
+>>>  			continue;
+>>> +		}
+>>>
+>>>  		s3c_pm_save_gpio(ourchip);
+>>>
+>>> @@ -369,8 +371,10 @@ void s3c_pm_restore_gpios(void)
+>>>
+>>>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
+>>>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
+>>> -		if (!ourchip)
+>>> +		if (!ourchip) {
+>>> +			gpio_nr++;
+>>>  			continue;
+>>> +		}
+>>>
+>>>  		s3c_pm_resume_gpio(ourchip);
+
+WBR, Sergei
