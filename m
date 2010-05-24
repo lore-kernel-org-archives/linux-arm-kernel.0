@@ -1,74 +1,44 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 24 May 2010 04:32:23 +0100
-Subject: [PATCH] s3c24xx fix: freeze during suspend/resume on s3c24xx
-	if some GPIO banks not present
-In-Reply-To: <4BF8F30B.9040704@ru.mvista.com>
-References: <4BF8B232.9020903@vscht.cz> <4BF8F30B.9040704@ru.mvista.com>
-Message-ID: <20100524033223.GC7248@trinity.fluff.org>
+From: shiraz.hashim@st.com (Shiraz HASHIM)
+Date: Mon, 24 May 2010 09:13:55 +0530
+Subject: facing undefined inconsistent cache issues on cortex-a9
+Message-ID: <4BF9F5FB.6020306@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 23, 2010 at 01:19:07PM +0400, Sergei Shtylyov wrote:
-> Hello.
->
-> Pinkava J. wrote:
->
->> When saving GPIOs during suspend/resume we need skip missing GPIO banks, not
->> trying get corresponding chip again and again in infinite loop.
->
->    I didn't see any infinite loops there -- *continue* itself leads to  
-> incrementing 'gpio_nr', no?
+Hi,
+I am using linux-2.6.32 port on spear1300 platform, the port is largely based
+on realview code.
 
-no, I made a bit of a mess playing with this patch, so this should fix
-it (now applied).
+SPEAr1300 has a Cortex A9 dual core, both cores configured as participating in
+SMP, but we are currently configuring Linux in non SMP mode, running Linux on
+the first core only, while second core is spinning  forever in a tight loop.
 
-Really I could do with a list of all registered s3c_gpio_chips to allow
-for a more efficient implementation, but it is a bit late for that for
-this merge window.
+Linux is running with default configuration w.r.t. cache and other things on
+core1. Since SMP is not enabled this means that SCU and local timers are off, L2
+cache is also disabled.  While on core2 only instruction cache is on and both
+MMU and Data cache is off.
 
->> Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
->> ---
->>  arch/arm/plat-samsung/pm-gpio.c |    8 ++++++--
->>  1 files changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
->> index d50ab9d..7df03f8 100644
->> --- a/arch/arm/plat-samsung/pm-gpio.c
->> +++ b/arch/arm/plat-samsung/pm-gpio.c
->> @@ -331,8 +331,10 @@ void s3c_pm_save_gpios(void)
->>
->>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
->>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
->> -		if (!ourchip)
->> +		if (!ourchip) {
->> +			gpio_nr++;
->>  			continue;
->> +		}
->>
->>  		s3c_pm_save_gpio(ourchip);
->>
->> @@ -369,8 +371,10 @@ void s3c_pm_restore_gpios(void)
->>
->>  	for (gpio_nr = 0; gpio_nr < S3C_GPIO_END;) {
->>  		ourchip = s3c_gpiolib_getchip(gpio_nr);
->> -		if (!ourchip)
->> +		if (!ourchip) {
->> +			gpio_nr++;
->>  			continue;
->> +		}
->>
->>  		s3c_pm_resume_gpio(ourchip);
->
-> WBR, Sergei
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+We observed a crash while booting. Investigating on the crash we found that this
+was caused by a wrong value read by the core.  Strangely enough, the new value
+was written few instruction before, but the core was still reading the old one.
 
--- 
--- 
-Ben
+What happens is someting like this:
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+r0 = X ; /* X is the address of a Linux variable */
+
+str r5, [r0]; /* write new value */
+...  
+ldr r5, [r0]; /* read back value - we get the old one (???) */
+
+The value read here, just few lines later the new value was written, is the old
+one. Obviously we are expecting to find the new one.
+
+Moreover, using the jtag debugger it looks clear that the new value is indeed in
+the memory, but surprisingly NOT in the data-cache. 
+If we put a read of X, before the store in order to avoid the write miss when
+doing 'str r5, [r0]', we see that the problem doesn't appear.
+
+We are completely lost, any pointers would really help, thanks
+
+regards
+Shiraz
