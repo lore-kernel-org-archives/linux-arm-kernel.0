@@ -1,29 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 May 2010 19:32:49 +0100
-Subject: [PATCH v3 10/14] omap: mailbox: reorganize registering
-In-Reply-To: <20100524.182407.67910029.Hiroshi.DOYU@nokia.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<1274548465-20208-11-git-send-email-felipe.contreras@gmail.com>
-	<20100524.182407.67910029.Hiroshi.DOYU@nokia.com>
-Message-ID: <20100524183249.GF21117@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 24 May 2010 20:55:40 +0200
+Subject: [PATCH 05/25] msm: generalize clock support.
+In-Reply-To: <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
+References: <>
+ <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100524185540.GA1292@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 24, 2010 at 06:24:07PM +0300, Hiroshi DOYU wrote:
-> From: ext Felipe Contreras <felipe.contreras@gmail.com>
-> Subject: [PATCH v3 10/14] omap: mailbox: reorganize registering
-> Date: Sat, 22 May 2010 19:14:21 +0200
-> 
-> > platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > -	if (unlikely(!res)) {
-> > -		dev_err(&pdev->dev, "invalid mem resource\n");
-> > -		return -ENODEV;
-> > -	}
-> > +	res = pdev->resource;
-> 
-> why not?
-> 
-> 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+Hi!
 
-I agree - always use the accessors provided rather than going beneath
-the covers and fiddling directly with stuff inside objects.
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/clock-pcom.h
+> @@ -0,0 +1,153 @@
+> +/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+> + *
+> + * Redistribution and use in source and binary forms, with or without
+> + * modification, are permitted provided that the following conditions are
+> + * met:
+> + *     * Redistributions of source code must retain the above copyright
+> + *       notice, this list of conditions and the following disclaimer.
+> + *     * Redistributions in binary form must reproduce the above
+> + *       copyright notice, this list of conditions and the following
+> + *       disclaimer in the documentation and/or other materials provided
+> + *       with the distribution.
+> + *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
+> + *       contributors may be used to endorse or promote products derived
+> + *       from this software without specific prior written permission.
+
+Is this even GPL compatible?
+
+> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+> index 3b1ce36..34c6a52 100644
+> --- a/arch/arm/mach-msm/clock.c
+> +++ b/arch/arm/mach-msm/clock.c
+> @@ -1,7 +1,7 @@
+>  /* arch/arm/mach-msm/clock.c
+>   *
+>   * Copyright (C) 2007 Google, Inc.
+> - * Copyright (c) 2007 QUALCOMM Incorporated
+> + * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
+>   *
+>   * This software is licensed under the terms of the GNU General Public
+>   * License version 2, as published by the Free Software Foundation, and
+
+So... what is the relationship between qualcomm and Code Aurora?
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
