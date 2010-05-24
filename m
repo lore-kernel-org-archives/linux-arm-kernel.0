@@ -1,43 +1,64 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 May 2010 21:55:40 +0200
-Subject: [PATCH 05/16] arm/mx2/pca100: add #ifdef to fix compiler warning
+Date: Mon, 24 May 2010 21:55:42 +0200
+Subject: [PATCH 07/16] arm/mx2/mx27_3ds: document alternative names and remove
+	empty header
 In-Reply-To: <20100524195430.GA28403@pengutronix.de>
 References: <20100524195430.GA28403@pengutronix.de>
-Message-ID: <1274730951-29106-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1274730951-29106-7-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
-
-	arch/arm/mach-mx2/mach-pca100.c:261: warning: 'otg_pdata' defined but not used
-	arch/arm/mach-mx2/mach-pca100.c:273: warning: 'usbh2_pdata' defined but not used
-
-for build having USB_ULPI disabled.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx2/mach-pca100.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx2/mach-mx27_3ds.c              |    7 ++++++-
+ arch/arm/plat-mxc/include/mach/board-mx27pdk.h |   14 --------------
+ 2 files changed, 6 insertions(+), 15 deletions(-)
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx27pdk.h
 
-diff --git a/arch/arm/mach-mx2/mach-pca100.c b/arch/arm/mach-mx2/mach-pca100.c
-index 778fff2..da94279 100644
---- a/arch/arm/mach-mx2/mach-pca100.c
-+++ b/arch/arm/mach-mx2/mach-pca100.c
-@@ -252,6 +252,7 @@ static struct imxmmc_platform_data sdhc_pdata = {
- 	.exit = pca100_sdhc2_exit,
- };
+diff --git a/arch/arm/mach-mx2/mach-mx27_3ds.c b/arch/arm/mach-mx2/mach-mx27_3ds.c
+index b2f4e0d..a45df59 100644
+--- a/arch/arm/mach-mx2/mach-mx27_3ds.c
++++ b/arch/arm/mach-mx2/mach-mx27_3ds.c
+@@ -18,6 +18,12 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
  
-+#if defined(CONFIG_USB_ULPI)
- static int otg_phy_init(struct platform_device *pdev)
- {
- 	gpio_set_value(OTG_PHY_CS_GPIO, 0);
-@@ -275,6 +276,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
- };
-+#endif
++/*
++ * This machine is known as:
++ *  - i.MX27 3-Stack Development System
++ *  - i.MX27 Platform Development Kit (i.MX27 PDK)
++ */
++
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <asm/mach-types.h>
+@@ -27,7 +33,6 @@
+ #include <mach/common.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx27.h>
+-#include <mach/board-mx27pdk.h>
  
- static struct fsl_usb2_platform_data otg_device_pdata = {
- 	.operating_mode = FSL_USB2_DR_DEVICE,
+ #include "devices.h"
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx27pdk.h b/arch/arm/plat-mxc/include/mach/board-mx27pdk.h
+deleted file mode 100644
+index fec1bcf..0000000
+--- a/arch/arm/plat-mxc/include/mach/board-mx27pdk.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-/*
+- * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_MX27PDK_H__
+-#define __ASM_ARCH_MXC_BOARD_MX27PDK_H__
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_MX27PDK_H__ */
 -- 
 1.7.0
