@@ -1,51 +1,85 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 24 May 2010 16:20:38 +0300
-Subject: [PATCH v2 0/3] Driver for the i.MX2x CMOS Sensor Interface
-Message-ID: <cover.1274706733.git.baruch@tkos.co.il>
+Date: Mon, 24 May 2010 16:20:40 +0300
+Subject: [PATCH v2 2/3] mx27: add support for the CSI device
+In-Reply-To: <cover.1274706733.git.baruch@tkos.co.il>
+References: <cover.1274706733.git.baruch@tkos.co.il>
+Message-ID: <009e44968586b0d010a8a56227e4cae12f9f6703.1274706733.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
-platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
-driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
-posted in linux-media last December[1]. I tested the mx2_camera driver on the 
-i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
-i.MX27 based board. I included in this version some fixes from Sascha that 
-enable i.MX27 support.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/mach-mx2/clock_imx27.c |    2 +-
+ arch/arm/mach-mx2/devices.c     |   31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mx2/devices.h     |    1 +
+ 3 files changed, 33 insertions(+), 1 deletions(-)
 
-[1] https://patchwork.kernel.org/patch/67636/
-
-Changes v1 -> v2
-    Addressed the comments of Guennadi Liakhovetski except from the following:
-
-    1. The mclk_get_divisor implementation, since I don't know what this code 
-       is good for
-
-    2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
-       mx27_camera_frame_done needs this pointer
-
-    3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
-       coded magic numbers
-
-    Applied i.MX27 fixes from Sascha.
-
-Baruch Siach (3):
-  mx2_camera: Add soc_camera support for i.MX25/i.MX27
-  mx27: add support for the CSI device
-  mx25: add support for the CSI device
-
- arch/arm/mach-mx2/clock_imx27.c          |    2 +-
- arch/arm/mach-mx2/devices.c              |   31 +
- arch/arm/mach-mx2/devices.h              |    1 +
- arch/arm/mach-mx25/clock.c               |   14 +-
- arch/arm/mach-mx25/devices.c             |   22 +
- arch/arm/mach-mx25/devices.h             |    1 +
- arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
- arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
- arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
- drivers/media/video/Kconfig              |   13 +
- drivers/media/video/Makefile             |    1 +
- drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
- 12 files changed, 1603 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
- create mode 100644 drivers/media/video/mx2_camera.c
+diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+index 0f0823c..5a1aa15 100644
+--- a/arch/arm/mach-mx2/clock_imx27.c
++++ b/arch/arm/mach-mx2/clock_imx27.c
+@@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
+ 	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
+ 	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
+-	_REGISTER_CLOCK(NULL, "csi", csi_clk)
++	_REGISTER_CLOCK("mx2-camera.0", NULL, csi_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usb_clk1)
+ 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usb_clk)
+diff --git a/arch/arm/mach-mx2/devices.c b/arch/arm/mach-mx2/devices.c
+index b91e412..6a49c79 100644
+--- a/arch/arm/mach-mx2/devices.c
++++ b/arch/arm/mach-mx2/devices.c
+@@ -40,6 +40,37 @@
+ 
+ #include "devices.h"
+ 
++#ifdef CONFIG_MACH_MX27
++static struct resource mx27_camera_resources[] = {
++	{
++	       .start = MX27_CSI_BASE_ADDR,
++	       .end = MX27_CSI_BASE_ADDR + 0x1f,
++	       .flags = IORESOURCE_MEM,
++	}, {
++	       .start = MX27_EMMA_PRP_BASE_ADDR,
++	       .end = MX27_EMMA_PRP_BASE_ADDR + 0x1f,
++	       .flags = IORESOURCE_MEM,
++	}, {
++	       .start = MX27_INT_CSI,
++	       .end = MX27_INT_CSI,
++	       .flags = IORESOURCE_IRQ,
++	},{
++	       .start = MX27_INT_EMMAPRP,
++	       .end = MX27_INT_EMMAPRP,
++	       .flags = IORESOURCE_IRQ,
++	},
++};
++struct platform_device mx27_camera_device = {
++	.name = "mx2-camera",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mx27_camera_resources),
++	.resource = mx27_camera_resources,
++	.dev = {
++		.coherent_dma_mask = 0xffffffff,
++	},
++};
++#endif
++
+ /*
+  * SPI master controller
+  *
+diff --git a/arch/arm/mach-mx2/devices.h b/arch/arm/mach-mx2/devices.h
+index 84ed513..8bdf018 100644
+--- a/arch/arm/mach-mx2/devices.h
++++ b/arch/arm/mach-mx2/devices.h
+@@ -29,6 +29,7 @@ extern struct platform_device mxc_i2c_device1;
+ extern struct platform_device mxc_sdhc_device0;
+ extern struct platform_device mxc_sdhc_device1;
+ extern struct platform_device mxc_otg_udc_device;
++extern struct platform_device mx27_camera_device;
+ extern struct platform_device mxc_otg_host;
+ extern struct platform_device mxc_usbh1;
+ extern struct platform_device mxc_usbh2;
+-- 
+1.7.1
