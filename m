@@ -1,188 +1,65 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 24 May 2010 16:43:18 +0800
-Subject: [PATCH 04/20] mtd: pxa3xx_nand: make scan procedure more clear
-In-Reply-To: <4BFA29FE.9020001@compulab.co.il>
-References: <AANLkTinGQFS93yulT3SxF-K7XdM8SPH_85ZPhVCbiCMw@mail.gmail.com>
-	<4BFA29FE.9020001@compulab.co.il>
-Message-ID: <AANLkTin5wNaHGUlHvj0YsjNFD0W-UQ6mVRqObpq72M8b@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 24 May 2010 11:58:31 +0300
+Subject: [PATCH v2t2 00/17] omap: mailbox:
+In-Reply-To: <20100524.093625.241440026.Hiroshi.DOYU@nokia.com>
+References: <20100521221557.GM11042@n2100.arm.linux.org.uk>
+	<AANLkTinMFJTlbXYiS9G87VSQyRuGxJfJGHkVejOEfgVQ@mail.gmail.com>
+	<20100522.081415.258113387.Hiroshi.DOYU@nokia.com>
+	<20100524.093625.241440026.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTinVKTmI6PCwTFwfSgvkmv0K1QLATj1xwKEng4hD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 24, 2010 at 3:25 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Haojian Zhuang wrote:
+On Mon, May 24, 2010 at 9:36 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+>>> Moreover, Tony says that anything that registers platform devices
+>>> should be built-in, but omap3-iommu does register devices and is not
+>>> built-in.
 >>
->> From 3c64457df23b222c7f53b7d8f0601606b95b1ad6 Mon Sep 17 00:00:00 2001
->> From: Lei Wen <leiwen@marvell.com>
->> Date: Mon, 22 Mar 2010 10:35:49 +0800
->> Subject: [PATCH] mtd: pxa3xx_nand: make scan procedure more clear
+>> It seems that this makes you confused. It should have been
+>> build-in;). This is going to be integrated into omap hwmod framework
+>> soon.
 >
-> The changes below are related mostly to _probe reorganization than to
-> nand scan...
+> For built-in part, it could be something like:
 >
+> From a09c2040e083f23a43232f97cb29b9aefc9c0d11 Mon Sep 17 00:00:00 2001
+> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> Date: Mon, 24 May 2010 09:35:11 +0300
+> Subject: [PATCH 1/1] omap iommu: Make omap-iommu.o built-in
 >
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> ---
->> ?drivers/mtd/nand/pxa3xx_nand.c | ? 66
->> +++++++++++++++++++++++----------------
->> ?1 files changed, 39 insertions(+), 27 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/pxa3xx_nand.c
->> b/drivers/mtd/nand/pxa3xx_nand.c
->> index 2dfe6d9..0ef9bf9 100644
->> --- a/drivers/mtd/nand/pxa3xx_nand.c
->> +++ b/drivers/mtd/nand/pxa3xx_nand.c
->> @@ -160,6 +160,7 @@ struct pxa3xx_nand_info {
->> ? ? ? ?unsigned int ? ? ? ? ? ?buf_start;
->> ? ? ? ?unsigned int ? ? ? ? ? ?buf_count;
->>
->> + ? ? ? struct mtd_info ? ? ? ? *mtd;
->> ? ? ? ?/* DMA information */
->> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_dat;
->> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_cmd;
->> @@ -1096,21 +1097,13 @@ static void pxa3xx_nand_init_mtd(struct mtd_info
->> *mtd,
->> ? ? ? ?this->chip_delay = 25;
->> ?}
->>
->> -static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
->> +static int alloc_nand_resource(struct platform_device *pdev)
->> ?{
->> - ? ? ? struct pxa3xx_nand_platform_data *pdata;
->> + ? ? ? struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
->> ? ? ? ?struct pxa3xx_nand_info *info;
->> - ? ? ? struct nand_chip *this;
->> ? ? ? ?struct mtd_info *mtd;
->> ? ? ? ?struct resource *r;
->> - ? ? ? int ret = 0, irq;
->> -
->> - ? ? ? pdata = pdev->dev.platform_data;
->> -
->> - ? ? ? if (!pdata) {
->> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
->> - ? ? ? ? ? ? ? return -ENODEV;
->> - ? ? ? }
->> + ? ? ? int ret, irq;
->>
->> ? ? ? ?mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct
->> pxa3xx_nand_info),
->> ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
->> @@ -1122,8 +1115,8 @@ static int __devinit pxa3xx_nand_probe(struct
->> platform_device *pdev)
->> ? ? ? ?info = (struct pxa3xx_nand_info *)(&mtd[1]);
->> ? ? ? ?info->pdev = pdev;
->>
->> - ? ? ? this = &info->nand_chip;
->> ? ? ? ?mtd->priv = info;
->> + ? ? ? info->mtd = mtd;
->> ? ? ? ?mtd->owner = THIS_MODULE;
->>
->> ? ? ? ?info->clk = clk_get(&pdev->dev, NULL);
->> @@ -1201,16 +1194,9 @@ static int __devinit pxa3xx_nand_probe(struct
->> platform_device *pdev)
->> ? ? ? ?}
->>
->> ? ? ? ?pxa3xx_nand_init_mtd(mtd, info);
+> This is a platform device registration.
 >
-> This, and the pxa3xx_nand_detect_flash call not shown in the patch does
-> not really belong to resource allocation. I'd move it back to the _probe
-> method.
+> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> ---
+> ?arch/arm/mach-omap2/Makefile | ? ?5 ++++-
+> ?1 files changed, 4 insertions(+), 1 deletions(-)
 >
->> + ? ? ? platform_set_drvdata(pdev, info);
->>
->> - ? ? ? platform_set_drvdata(pdev, mtd);
->> -
->> - ? ? ? if (nand_scan(mtd, 1)) {
->> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
->> - ? ? ? ? ? ? ? ret = -ENXIO;
->> - ? ? ? ? ? ? ? goto fail_free_irq;
->> - ? ? ? }
->> -
->> - ? ? ? return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
->> + ? ? ? return 0;
->>
->> ?fail_free_irq:
->> ? ? ? ?free_irq(irq, info);
->> @@ -1235,8 +1221,8 @@ fail_free_mtd:
->>
->> ?static int pxa3xx_nand_remove(struct platform_device *pdev)
->> ?{
->> - ? ? ? struct mtd_info *mtd = platform_get_drvdata(pdev);
->> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
->> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->> + ? ? ? struct mtd_info *mtd = info->mtd;
->> ? ? ? ?struct resource *r;
->> ? ? ? ?int irq;
->>
->> @@ -1265,11 +1251,37 @@ static int pxa3xx_nand_remove(struct
->> platform_device *pdev)
->> ? ? ? ?return 0;
->> ?}
->>
->> +static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
->> +{
->> + ? ? ? struct pxa3xx_nand_platform_data *pdata;
->> + ? ? ? struct pxa3xx_nand_info *info;
->> + ? ? ? int ret;
->> +
->> + ? ? ? pdata = pdev->dev.platform_data;
->> + ? ? ? if (!pdata) {
->> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
->> + ? ? ? ? ? ? ? return -ENODEV;
->> + ? ? ? }
->> +
->> + ? ? ? ret = alloc_nand_resource(pdev);
->> + ? ? ? if (ret)
->> + ? ? ? ? ? ? ? return ret;
->> +
->> + ? ? ? info = platform_get_drvdata(pdev);
->> + ? ? ? if (nand_scan(info->mtd, 1)) {
->> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
->> + ? ? ? ? ? ? ? pxa3xx_nand_remove(pdev);
->> + ? ? ? ? ? ? ? return -ENODEV;
->> + ? ? ? }
->> +
->> + ? ? ? return add_mtd_partitions(info->mtd, pdata->parts,
->> pdata->nr_parts);
->> +}
->> +
->> ?#ifdef CONFIG_PM
->> ?static int pxa3xx_nand_suspend(struct platform_device *pdev,
->> pm_message_t state)
->> ?{
->> - ? ? ? struct mtd_info *mtd = (struct mtd_info
->> *)platform_get_drvdata(pdev);
->> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
->> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->> + ? ? ? struct mtd_info *mtd = info->mtd;
->>
->> ? ? ? ?if (info->state != STATE_READY) {
->> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "driver busy, state = %d\n",
->> info->state);
->> @@ -1281,8 +1293,8 @@ static int pxa3xx_nand_suspend(struct
->> platform_device *pdev, pm_message_t state)
->>
->> ?static int pxa3xx_nand_resume(struct platform_device *pdev)
->> ?{
->> - ? ? ? struct mtd_info *mtd = (struct mtd_info
->> *)platform_get_drvdata(pdev);
->> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
->> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->> + ? ? ? struct mtd_info *mtd = info->mtd;
->>
->> ? ? ? ?nand_writel(info, NDTR0CS0, info->ndtr0cs0);
->> ? ? ? ?nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 7d2cf0f..4d754f6 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -89,7 +89,10 @@ obj-$(CONFIG_OMAP3_EMU) ? ? ? ? ? ? ? ? ? ? ?+= emu.o
+> ?obj-$(CONFIG_OMAP_MBOX_FWK) ? ? ? ? ? ?+= mailbox_mach.o
+> ?mailbox_mach-objs ? ? ? ? ? ? ? ? ? ? ?:= mailbox.o
 >
+> -obj-$(CONFIG_OMAP_IOMMU) ? ? ? ? ? ? ? := iommu2.o omap-iommu.o
+> +obj-$(CONFIG_OMAP_IOMMU) ? ? ? ? ? ? ? := iommu2.o
+> +
+> +iommu-$(CONFIG_OMAP_IOMMU) ? ? ? ? ? ? := omap-iommu.o
+> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= $(iommu-m) $(iommu-y)
 >
+> ?i2c-omap-$(CONFIG_I2C_OMAP) ? ? ? ? ? ?:= i2c.o
+> ?obj-y                                 ?+= $(i2c-omap-m) $(i2c-omap-y)
 > --
-> Sincerely yours,
-> Mike.
->
->
-Like I said in last mail, the resource allocation need to be done with
-the judgement of the status of nand chip in both chip select.
-Current our nand driver support two chip select, not the only one in
-the past, so the code logic is also changed.
 
-Thanks,
-Lei
+I would prefer this:
+-obj-$(CONFIG_OMAP_IOMMU) ? ? ? ? ? ? ? := iommu2.o omap-iommu.o
++obj-$(CONFIG_OMAP_IOMMU) ? ? ? ? ? ? ? := iommu2.o
++
++ifneq ($(CONFIG_OMAP_IOMMU),)
++obj-y                                  += omap-iommu.o
++endif
+
+Much clearer, and easier to understand.
+
+-- 
+Felipe Contreras
