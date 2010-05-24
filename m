@@ -1,33 +1,84 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 24 May 2010 10:08:52 +0530
-Subject: Should we pass amba device peripheral id with device structure
-	or not?
-In-Reply-To: <20100521193802.GG11042@n2100.arm.linux.org.uk>
-References: <4BECF57A.4050802@st.com>
-	<20100521193802.GG11042@n2100.arm.linux.org.uk>
-Message-ID: <4BFA02DC.6090906@st.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 24 May 2010 14:35:43 +0800
+Subject: [PATCH 0/6] pxa: encode IRQ number into .nr_irqs (SPARSE IRQ)
+Message-ID: <1274682949-25915-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/22/2010 1:08 AM, Russell King - ARM Linux wrote:
-> On Fri, May 14, 2010 at 12:32:18PM +0530, Viresh KUMAR wrote:
->> amba_device_register function reads and updates peripheral id from
->> hardware registers, whenever we register any amba device. If clock
->> to device is disabled, then amba_device_register will not be able
->> to read and update this value.
-> 
-> This is a potential problem - if the drivers are already initialized
-> in the kernel, then the drivers will try to initialize as soon as
-> amba_device_register() is called.  If the registers aren't accessible
-> at amba_device_register() time, the driver initialization could fail.
-> 
-> I think it's better to understand what's going on here before making
-> suggestions.
-> 
-> The clks in the primecell drivers are for the external side clocks
-> only; these drivers all make the assumption that the AMBA bus clock
-> is always enabled.  Does your SoC turn the AMBA bus clock to peripherals
-> on and off?
+With the introduction of SPARSE_IRQ, the total number of IRQs (NR_IRQS)
+can be made as a variable now. Conversion of most platforms looks to be
+quite straight forward (as illustrated with the subsequent patches).
+However, the platforms below select PXA_HAVE_BOARD_IRQS yet I feel hard
+to find clues in the code if any of the board IRQs are used and how many.
+Please advise:
 
-There is only one bit per peripheral to enable/disable clock.
-So with clocks disabled, we get 0x00000000 on read from device registers.
+$ git grep -B 5 PXA_HAVE_BOARD_IRQS arch/arm/mach-pxa/Kconfig
+
+arch/arm/mach-pxa/Kconfig-	bool "Arcom/Eurotech VIPER SBC"
+arch/arm/mach-pxa/Kconfig-	select PXA25x
+arch/arm/mach-pxa/Kconfig-	select ISA
+arch/arm/mach-pxa/Kconfig-	select I2C_GPIO
+arch/arm/mach-pxa/Kconfig-	select HAVE_PWM
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_ARCOM_ZEUS
+arch/arm/mach-pxa/Kconfig-	bool "Arcom/Eurotech ZEUS SBC"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select ISA
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_INTELMOTE2
+arch/arm/mach-pxa/Kconfig-	bool "Intel Mote 2 Platform"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select IWMMXT
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_STARGATE2
+arch/arm/mach-pxa/Kconfig-	bool "Intel Stargate 2 Platform"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select IWMMXT
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_PCM027
+arch/arm/mach-pxa/Kconfig-	bool "Phytec phyCORE-PXA270 CPU module (PCM-027)"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select IWMMXT
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-config MACH_MAGICIAN
+arch/arm/mach-pxa/Kconfig-	bool "Enable HTC Magician Support"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select IWMMXT
+arch/arm/mach-pxa/Kconfig-	select HAVE_PWM
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_TOSA
+arch/arm/mach-pxa/Kconfig-	bool "Enable Sharp SL-6000x (Tosa) Support"
+arch/arm/mach-pxa/Kconfig-	depends on PXA_SHARPSL
+arch/arm/mach-pxa/Kconfig-	select PXA25x
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-	select PXA3xx
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config ARCH_PXA_ESERIES
+arch/arm/mach-pxa/Kconfig-	bool "PXA based Toshiba e-series PDAs"
+arch/arm/mach-pxa/Kconfig-	select PXA25x
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-config MACH_ZIPIT2
+arch/arm/mach-pxa/Kconfig-	bool "Zipit Z2 Handheld"
+arch/arm/mach-pxa/Kconfig-	select PXA27x
+arch/arm/mach-pxa/Kconfig-	select HAVE_PWM
+arch/arm/mach-pxa/Kconfig:	select PXA_HAVE_BOARD_IRQS
+--
+arch/arm/mach-pxa/Kconfig-	  by either console keyboard driver or by Kdrive keybd driver.
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-	  Say Y only if you know, what you are doing!
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig-
+arch/arm/mach-pxa/Kconfig:config PXA_HAVE_BOARD_IRQS
