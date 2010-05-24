@@ -1,29 +1,58 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 24 May 2010 23:19:48 +0800
-Subject: [RESEND PATCH] ARM: fix 'unannotated irqs-on' lockdep warning
-In-Reply-To: <20100524144539.GE21117@n2100.arm.linux.org.uk>
-References: <1274615328-27953-1-git-send-email-tom.leiming@gmail.com>
-	<AANLkTikRp0EHxshKYq39p18ymoRNAtyHrNm3yq6A49-r@mail.gmail.com>
-	<20100523141300.GD950@n2100.arm.linux.org.uk>
-	<AANLkTinV9Na9zxYMIfTr893Ynnc0YOk2B6uPKEa9s4R1@mail.gmail.com>
-	<20100523194746.GE950@n2100.arm.linux.org.uk>
-	<20100524112355.18424622@tom-lei>
-	<20100524071921.GA17528@n2100.arm.linux.org.uk>
-	<20100524101416.GA21117@n2100.arm.linux.org.uk>
-	<20100524222033.12b25f2a@tom-lei>
-	<20100524144539.GE21117@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikGwEVtnGb5KdJb0GzWDpu-zk9bWwa3JAgwy1v3@mail.gmail.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Mon, 24 May 2010 18:24:07 +0300 (EEST)
+Subject: [PATCH v3 10/14] omap: mailbox: reorganize registering
+In-Reply-To: <1274548465-20208-11-git-send-email-felipe.contreras@gmail.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<1274548465-20208-11-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20100524.182407.67910029.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> which needs to be redone with a little more understanding, like the
-> following patch. ?Note: you will need the previous patch as well,
-> which is separate because it addresses a *different* issue.
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: [PATCH v3 10/14] omap: mailbox: reorganize registering
+Date: Sat, 22 May 2010 19:14:21 +0200
 
-OK, the two patches do fix the 'unannotated irqs-on' lockdep warning.
+> platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (unlikely(!res)) {
+> -		dev_err(&pdev->dev, "invalid mem resource\n");
+> -		return -ENODEV;
+> -	}
+> +	res = pdev->resource;
 
-Thanks,
+why not?
 
--- 
-Lei Ming
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+> +
+> +	list = omap1_mboxes;
+>  
+> -	mbox_base = ioremap(res->start, resource_size(res));
+> +	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
+> +
+> +	mbox_base = ioremap(res[0].start, resource_size(&res[0]));
+>  	if (!mbox_base)
+>  		return -ENOMEM;
+>  
+> -	/* DSP IRQ */
+> -	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> -	if (unlikely(!res)) {
+> -		dev_err(&pdev->dev, "invalid irq resource\n");
+> -		ret = -ENODEV;
+> -		goto err_out;
+> +	for (i = 0; list[i]; i++) {
+> +		ret = omap_mbox_register(&pdev->dev, list[i]);
+> +		if (ret)
+> +			goto err_out;
+>  	}
+> -	mbox_dsp_info.irq = res->start;
+> -
+> -	ret = omap_mbox_register(&pdev->dev, &mbox_dsp_info);
+> -	if (ret)
+> -		goto err_out;
+>  	return 0;
+>  
+>  err_out:
+> +	while (i--)
+> +		omap_mbox_unregister(list[i]);
+>  	iounmap(mbox_base);
+>  	return ret;
