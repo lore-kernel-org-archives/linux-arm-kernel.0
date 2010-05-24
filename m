@@ -1,35 +1,59 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 24 May 2010 21:22:17 +0200
-Subject: Initrd and 2.6.33 curious behaviour
-In-Reply-To: <87hblz2alm.fsf@free.fr> (Robert Jarzmik's message of "Sun\,
-	23 May 2010 12\:09\:25 +0200")
-References: <874oi157c6.fsf@free.fr>
-	<20100521204343.GA18032@n2100.arm.linux.org.uk>
-	<87fx1k46qg.fsf@free.fr> <20100522094637.GA954@n2100.arm.linux.org.uk>
-	<87pr0n31q2.fsf@free.fr> <20100523090139.GA950@n2100.arm.linux.org.uk>
-	<87hblz2alm.fsf@free.fr>
-Message-ID: <87r5l114wm.fsf@free.fr>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 24 May 2010 22:29:01 +0300
+Subject: [PATCH v3 11/14] omap: mailbox: only compile for configured archs
+In-Reply-To: <20100524.174205.22049047.Hiroshi.DOYU@nokia.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<1274548465-20208-12-git-send-email-felipe.contreras@gmail.com>
+	<20100524.174205.22049047.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTim7Jxlx3Owyn2IM_TjUWxS72I7h9H5d0evbCsVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
-> CONFIG_BLK_DEV_RAM is enabled. I'll add some debugging now and will try again.
+On Mon, May 24, 2010 at 5:42 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: ext Felipe Contreras <felipe.contreras@gmail.com>
+
+>> +     if (false);
 >
-OK, found out the culprit.
-My bootloader(haret) is to be blamed : the first 6 bytes of initrd as the kernel
-sees them are totally different from the actual 6 first bytes of initrd file.
+> nitpcik:
+> The above may look better as below:
+>
+> ? ? ? ?if (false)
+> ? ? ? ? ? ? ? ?;
+>
+> "checkpatch.pl" also doesn't complain.
 
-The long story is that when haret stops wince MMU, it "reorders" the pages to
-create a physically contiguous kernel and initrd, from the scattered pages
-allocated in wince. The relocation algorithm is faulty, as it doesn't cope with
-the cases where there is a double dependency (ie. a kernel page should be moved
-to the page occupied by a initrd page, and the initrd page should be moved to
-where resides the kernel page).
+Personally I think it looks weird and it's a checkpatch bug, but fine by me.
 
-It's funny how people want to solve the hanoi towers problem without a spare
-slot ...
+>> +#if defined(CONFIG_ARCH_OMAP3430)
+>> + ? ? else if (cpu_is_omap3430()) {
+>> ? ? ? ? ? ? ? list = omap3_mboxes;
+>>
+>> ? ? ? ? ? ? ? list[0]->irq = platform_get_irq_byname(pdev, "dsp");
+>> ? ? ? }
+>> +#endif
+>> ?#if defined(CONFIG_ARCH_OMAP2420)
+>> ? ? ? else if (cpu_is_omap2420()) {
+>> ? ? ? ? ? ? ? list = omap2_mboxes;
+>> @@ -407,12 +415,14 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+>> ? ? ? ? ? ? ? list[1]->irq = platform_get_irq_byname(pdev, "iva");
+>> ? ? ? }
+>> ?#endif
+>> +#if defined(CONFIG_ARCH_OMAP4)
+>> ? ? ? else if (cpu_is_omap44xx()) {
+>> ? ? ? ? ? ? ? list = omap4_mboxes;
+>>
+>> ? ? ? ? ? ? ? list[0]->irq = list[1]->irq =
+>> ? ? ? ? ? ? ? ? ? ? ? platform_get_irq_byname(pdev, "mbox");
+>
+> For checkpatch.pl,
+>
+> ? ? ? ? ? ? ? ?list[0]->irq =
+> ? ? ? ? ? ? ? ? ? ? ? ?platform_get_irq_byname(pdev, "mbox");
+> ? ? ? ? ? ? ? ?list[1]->irq = list[0]->irq;
+
+I don't see checkpatch (0.30) complaining about that.
 
 Cheers.
 
---
-Robert
+-- 
+Felipe Contreras
