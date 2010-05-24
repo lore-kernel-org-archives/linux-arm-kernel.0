@@ -1,70 +1,76 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 May 2010 21:55:49 +0200
-Subject: [PATCH 14/16] arm/mx3/mx31_3ds: fold board header in its only user
+Date: Mon, 24 May 2010 21:55:44 +0200
+Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes with
+	CONFIG_TOUCHSCREEN_ADS7846=y
 In-Reply-To: <20100524195430.GA28403@pengutronix.de>
 References: <20100524195430.GA28403@pengutronix.de>
-Message-ID: <1274730951-29106-14-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moreover remove unused definitions.
+This fixes:
+
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:166: error: expected identifier or '(' before '||' token
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:204: error: variable 'eukrea_mbimx27_spi_0_data' has initializer but incomplete type
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: error: unknown field 'chipselect' specified in initializer
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: excess elements in struct initializer
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: error: unknown field 'num_chipselect' specified in initializer
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: excess elements in struct initializer
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c: In function 'eukrea_mbimx27_baseboard_init':
+	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:239: error: implicit declaration of function 'ads7846_dev_init'
+
+While at it add TOUCHSCREEN_ADS7846=m to mx27_defconfig.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-mx31_3ds.c |   41 +++++++++++++++++++++++++++++++-----
- 1 files changed, 35 insertions(+), 6 deletions(-)
+ arch/arm/configs/mx27_defconfig              |    2 +-
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |    5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index f54af1e..7ec2e81 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -41,12 +41,41 @@
- #include <mach/spi.h>
+diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
+index b4c1366..ceab3f9 100644
+--- a/arch/arm/configs/mx27_defconfig
++++ b/arch/arm/configs/mx27_defconfig
+@@ -623,7 +623,7 @@ CONFIG_INPUT_EVDEV=y
+ # CONFIG_INPUT_JOYSTICK is not set
+ # CONFIG_INPUT_TABLET is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+-# CONFIG_TOUCHSCREEN_ADS7846 is not set
++CONFIG_TOUCHSCREEN_ADS7846=m
+ # CONFIG_TOUCHSCREEN_AD7877 is not set
+ # CONFIG_TOUCHSCREEN_AD7879_I2C is not set
+ # CONFIG_TOUCHSCREEN_AD7879_SPI is not set
+diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+index f3b169d..9e607a2 100644
+--- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+@@ -33,6 +33,7 @@
+ #include <mach/hardware.h>
+ #include <mach/mmc.h>
+ #include <mach/imx-uart.h>
++#include <mach/spi.h>
+ 
  #include "devices.h"
  
--/*!
-- * @file mx31_3ds.c
-- *
-- * @brief This file contains the board-specific initialization routines.
-- *
-- * @ingroup System
-+/* Definitions for components on the Debug board */
-+
-+/* Base address of CPLD controller on the Debug board */
-+#define DEBUG_BASE_ADDRESS		CS5_IO_ADDRESS(MX3x_CS5_BASE_ADDR)
-+
-+/* LAN9217 ethernet base address */
-+#define LAN9217_BASE_ADDR		MX3x_CS5_BASE_ADDR
-+
-+/* CPLD config and interrupt base address */
-+#define CPLD_ADDR			(DEBUG_BASE_ADDRESS + 0x20000)
-+
-+/* status, interrupt */
-+#define CPLD_INT_STATUS_REG		(CPLD_ADDR + 0x10)
-+#define CPLD_INT_MASK_REG		(CPLD_ADDR + 0x38)
-+#define CPLD_INT_RESET_REG		(CPLD_ADDR + 0x20)
-+/* magic word for debug CPLD */
-+#define CPLD_MAGIC_NUMBER1_REG		(CPLD_ADDR + 0x40)
-+#define CPLD_MAGIC_NUMBER2_REG		(CPLD_ADDR + 0x48)
-+/* CPLD code version */
-+#define CPLD_CODE_VER_REG		(CPLD_ADDR + 0x50)
-+/* magic word for debug CPLD */
-+#define CPLD_MAGIC_NUMBER3_REG		(CPLD_ADDR + 0x58)
-+
-+/* CPLD IRQ line for external uart, external ethernet etc */
-+#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_1)
-+
-+#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
-+#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
-+
-+#define EXPIO_INT_ENET		(MXC_EXP_IO_BASE + 0)
-+
-+#define MXC_MAX_EXP_IO_LINES	16
-+
-+/*
-+ * This file contains the board-specific initialization routines.
-  */
+@@ -162,7 +163,7 @@ static struct imxuart_platform_data uart_pdata[] = {
+ 	},
+ };
  
- static int mx31_3ds_pins[] = {
+-#if defined(CONFIG_TOUCHSCREEN_ADS7846)
++#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 
+ #define ADS7846_PENDOWN (GPIO_PORTD | 25)
+@@ -228,7 +229,7 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_register_device(&mxc_fb_device, &eukrea_mbimx27_fb_data);
+ 	mxc_register_device(&mxc_sdhc_device0, NULL);
+ 
+-#if defined(CONFIG_TOUCHSCREEN_ADS7846)
++#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 	/* SPI and ADS7846 Touchscreen controler init */
+ 	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
 -- 
 1.7.0
