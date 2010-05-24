@@ -1,347 +1,272 @@
 From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 24 May 2010 16:36:13 +0800
-Subject: [PATCH 07/20] mtd: pxa3xx_nand: mtd scan id process could be
-	defined by driver itself
-In-Reply-To: <4BFA2A91.1080406@compulab.co.il>
-References: <AANLkTikUkMDK80ay16KPiftNpszGKtiZVDC42zI08gxv@mail.gmail.com>
-	<4BFA2A91.1080406@compulab.co.il>
-Message-ID: <AANLkTim4mc0kYwhpMagfbPhAElZUCWkixMeoDiNQwSpw@mail.gmail.com>
+Date: Mon, 24 May 2010 16:41:03 +0800
+Subject: [PATCH 03/20] mtd: pxa3xx_nand: remove the flash info in driver
+	structure
+In-Reply-To: <4BFA2A02.2040605@compulab.co.il>
+References: <AANLkTikU9yabdwx_a5SzpC11v9nowW_zglNHLaswaToB@mail.gmail.com>
+	<4BFA2A02.2040605@compulab.co.il>
+Message-ID: <AANLkTil9Toz4DU7YJ2B3Qtw3S1LCr90R7tlri7KC_NCC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 24, 2010 at 3:28 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+On Mon, May 24, 2010 at 3:25 PM, Mike Rapoport <mike@compulab.co.il> wrote:
 > Haojian Zhuang wrote:
 >>
->> From f2010885a9d5cebfd3cca63b59fff941502f78b3 Mon Sep 17 00:00:00 2001
+>> From dd45d508745edb24e9e4129077e9f5bd20415a23 Mon Sep 17 00:00:00 2001
 >> From: Lei Wen <leiwen@marvell.com>
->> Date: Thu, 6 May 2010 09:48:30 +0800
->> Subject: [PATCH] mtd: pxa3xx_nand: mtd scan id process could be
->> defined by driver itself
+>> Date: Mon, 22 Mar 2010 10:33:49 +0800
+>> Subject: [PATCH] mtd: pxa3xx_nand: remove the flash info in driver
+>> structure
 >>
->> Different NAND driver may require its unique detection. For pxa3xx_nand,
->> it use its self id database to get the necessary info.
+>> After probe, all info already transfer to driver structure.
+>> There is no need to keep the original flash info.
+>> So that we could safely free the flash info in memory, which may grows
+>> larger when more flash is suported.
 >>
 >> Signed-off-by: Lei Wen <leiwen@marvell.com>
 >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 >> ---
->> ?drivers/mtd/nand/pxa3xx_nand.c | ?257
->> +++++++++++++++++++++++++++++-----------
->> ?1 files changed, 185 insertions(+), 72 deletions(-)
+>> ?drivers/mtd/nand/pxa3xx_nand.c | ? 70
+>> ++++++++++++++++++++++++++--------------
+>> ?1 files changed, 46 insertions(+), 24 deletions(-)
 >>
 >> diff --git a/drivers/mtd/nand/pxa3xx_nand.c
 >> b/drivers/mtd/nand/pxa3xx_nand.c
->> index 854adad..7a8ff38 100644
+>> index 5658398..2dfe6d9 100644
 >> --- a/drivers/mtd/nand/pxa3xx_nand.c
 >> +++ b/drivers/mtd/nand/pxa3xx_nand.c
->> @@ -255,6 +255,8 @@ static struct pxa3xx_nand_flash __devinitdata
->> builtin_flash_types[] = {
->> ?{ 0xba20, 64, 2048, 16, 16, 2048, { 10, 35, 15, 25, 15, 25, 25000,
->> 60, 10, }, },
->> ?};
+>> @@ -152,7 +152,6 @@ struct pxa3xx_nand_info {
+>> ? ? ? ?struct nand_chip ? ? ? ?nand_chip;
 >>
->> +static const char *mtd_names[] = {"pxa3xx_nand-0", NULL};
+>> ? ? ? ?struct platform_device ? *pdev;
+>> - ? ? ? const struct pxa3xx_nand_flash *flash_info;
+>>
+>> ? ? ? ?struct clk ? ? ? ? ? ? ?*clk;
+>> ? ? ? ?void __iomem ? ? ? ? ? ?*mmio_base;
+>> @@ -166,6 +165,7 @@ struct pxa3xx_nand_info {
+>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_cmd;
+>>
+>> ? ? ? ?unsigned char ? ? ? ? ? *data_buff;
+>> + ? ? ? unsigned char ? ? ? ? ? *oob_buff;
+>> ? ? ? ?dma_addr_t ? ? ? ? ? ? ?data_buff_phys;
+>> ? ? ? ?size_t ? ? ? ? ? ? ? ? ?data_buff_size;
+>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? data_dma_ch;
+>> @@ -184,7 +184,8 @@ struct pxa3xx_nand_info {
+>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? use_ecc; ? ? ? ?/* use HW ECC ? */
+>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? use_dma; ? ? ? ?/* use DMA ? */
+>>
+>> - ? ? ? size_t ? ? ? ? ? ? ? ? ?data_size; ? ? ?/* data size in FIFO */
+>> + ? ? ? unsigned int ? ? ? ? ? ?page_size; ? ? ?/* page size of attached
+>> chip */
+>> + ? ? ? unsigned int ? ? ? ? ? ?data_size; ? ? ?/* data size in FIFO */
+>> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? retcode;
+>> ? ? ? ?struct completion ? ? ? cmd_complete;
+>>
+>> @@ -193,6 +194,10 @@ struct pxa3xx_nand_info {
+>> ? ? ? ?uint32_t ? ? ? ? ? ? ? ?ndcb1;
+>> ? ? ? ?uint32_t ? ? ? ? ? ? ? ?ndcb2;
+>>
+>> + ? ? ? /* timing calcuted from setting */
+>> + ? ? ? uint32_t ? ? ? ? ? ? ? ?ndtr0cs0;
+>> + ? ? ? uint32_t ? ? ? ? ? ? ? ?ndtr1cs0;
 >> +
->> ?#define NDTR0_tCH(c) ? (min((c), 7) << 19)
->> ?#define NDTR0_tCS(c) ? (min((c), 7) << 16)
->> ?#define NDTR0_tWH(c) ? (min((c), 7) << 11)
->> @@ -893,37 +895,6 @@ static int pxa3xx_nand_detect_config(struct
->> pxa3xx_nand_info *info)
+>> ? ? ? ?/* calculated from pxa3xx_nand_flash data */
+>> ? ? ? ?size_t ? ? ? ? ?oob_size;
+>> ? ? ? ?size_t ? ? ? ? ?read_id_bytes;
+>> @@ -287,6 +292,8 @@ static void pxa3xx_nand_set_timing(struct
+>> pxa3xx_nand_info *info,
+>> ? ? ? ? ? ? ? ?NDTR1_tWHR(ns2cycle(t->tWHR, nand_clk)) |
+>> ? ? ? ? ? ? ? ?NDTR1_tAR(ns2cycle(t->tAR, nand_clk));
+>>
+>> + ? ? ? info->ndtr0cs0 = ndtr0;
+>> + ? ? ? info->ndtr1cs0 = ndtr1;
+>> ? ? ? ?nand_writel(info, NDTR0CS0, ndtr0);
+>> ? ? ? ?nand_writel(info, NDTR1CS0, ndtr1);
+>> ?}
+>> @@ -310,22 +317,29 @@ static int wait_for_event(struct
+>> pxa3xx_nand_info *info, uint32_t event)
+>> ? ? ? ?return -ETIMEDOUT;
+>> ?}
+>>
+>> -static int prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
+>> - ? ? ? ? ? ? ? ? ? ? ? uint16_t cmd, int column, int page_addr)
+>> +static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
+>> ?{
+>> - ? ? ? const struct pxa3xx_nand_flash *f = info->flash_info;
+>> + ? ? ? int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+>>
+>> - ? ? ? /* calculate data size */
+>> - ? ? ? switch (f->page_size) {
+>> - ? ? ? case 2048:
+>> - ? ? ? ? ? ? ? info->data_size = (info->use_ecc) ? 2088 : 2112;
+>> - ? ? ? ? ? ? ? break;
+>> - ? ? ? case 512:
+>> - ? ? ? ? ? ? ? info->data_size = (info->use_ecc) ? 520 : 528;
+>> - ? ? ? ? ? ? ? break;
+>> - ? ? ? default:
+>> - ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? ? info->data_size = info->page_size;
+>> + ? ? ? if (!oob_enable) {
+>> + ? ? ? ? ? ? ? info->oob_size = 0;
+>> + ? ? ? ? ? ? ? return;
+>> ? ? ? ?}
+>> + ? ? ? switch (info->page_size) {
+>> + ? ? ? ? ? ? ? case 2048:
+>> + ? ? ? ? ? ? ? ? ? ? ? info->oob_size = (info->use_ecc) ? 40 : 64;
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? case 512:
+>> + ? ? ? ? ? ? ? ? ? ? ? info->oob_size = (info->use_ecc) ? 8 : 16;
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? }
+>
+> The OOB-related changes do not seem related to the $SUBJ.
+>
+>> +}
+>> +
+>> +static int prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
+>> + ? ? ? ? ? ? ? uint16_t cmd, int column, int page_addr)
+>> +{
+>> + ? ? ? pxa3xx_set_datasize(info);
+>>
+>> ? ? ? ?/* generate values for NDCBx registers */
+>> ? ? ? ?info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
+>> @@ -436,6 +450,9 @@ static int handle_data_pio(struct pxa3xx_nand_info
+>> *info)
+>> ? ? ? ?case STATE_PIO_WRITING:
+>> ? ? ? ? ? ? ? ?__raw_writesl(info->mmio_base + NDDB, info->data_buff,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DIV_ROUND_UP(info->data_size, 4));
+>> + ? ? ? ? ? ? ? if (info->oob_size > 0)
+>> + ? ? ? ? ? ? ? ? ? ? ? __raw_writesl(info->mmio_base + NDDB,
+>> info->oob_buff,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DIV_ROUND_UP(info->oob_size, 4));
+>
+> The same here.
+>
+>> ? ? ? ? ? ? ? ?enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+>>
+>> @@ -448,6 +465,10 @@ static int handle_data_pio(struct pxa3xx_nand_info
+>> *info)
+>> ? ? ? ?case STATE_PIO_READING:
+>> ? ? ? ? ? ? ? ?__raw_readsl(info->mmio_base + NDDB, info->data_buff,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DIV_ROUND_UP(info->data_size, 4));
+>> + ? ? ? ? ? ? ? if (info->oob_size > 0)
+>> + ? ? ? ? ? ? ? ? ? ? ? __raw_readsl(info->mmio_base + NDDB,
+>> info->oob_buff,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DIV_ROUND_UP(info->oob_size, 4));
+>> +
+>
+> Ditto.
+>
+>> ? ? ? ? ? ? ? ?break;
+>> ? ? ? ?default:
+>> ? ? ? ? ? ? ? ?printk(KERN_ERR "%s: invalid state %d\n", __func__,
+>> @@ -462,7 +483,7 @@ static int handle_data_pio(struct pxa3xx_nand_info
+>> *info)
+>> ?static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
+>> ?{
+>> ? ? ? ?struct pxa_dma_desc *desc = info->data_desc;
+>> - ? ? ? int dma_len = ALIGN(info->data_size, 32);
+>> + ? ? ? int dma_len = ALIGN(info->data_size + info->oob_size, 32);
+>
+> ditto
+>
+>> ? ? ? ?desc->ddadr = DDADR_STOP;
+>> ? ? ? ?desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
+>> @@ -857,6 +878,8 @@ static int pxa3xx_nand_config_flash(struct
+>> pxa3xx_nand_info *info,
+>> ? ? ? ?uint32_t ndcr = 0x00000FFF; /* disable all interrupts */
+>>
+>> ? ? ? ?/* calculate flash information */
+>> + ? ? ? info->page_size = f->page_size;
+>> + ? ? ? info->oob_buff = info->data_buff + f->page_size;
+>
+> And here as well
+>
+>> ? ? ? ?info->oob_size = (f->page_size == 2048) ? 64 : 16;
+>> ? ? ? ?info->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
+>>
+>> @@ -881,7 +904,6 @@ static int pxa3xx_nand_config_flash(struct
+>> pxa3xx_nand_info *info,
+>> ? ? ? ?info->reg_ndcr = ndcr;
+>>
+>> ? ? ? ?pxa3xx_nand_set_timing(info, &f->timing);
+>> - ? ? ? info->flash_info = f;
 >> ? ? ? ?return 0;
 >> ?}
 >>
->> -static int pxa3xx_nand_detect_flash(struct pxa3xx_nand_info *info,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct pxa3xx_nand_platform_data
->> *pdata)
->> -{
->> - ? ? ? const struct pxa3xx_nand_flash *f;
->> - ? ? ? uint32_t id = -1;
->> - ? ? ? int i;
->> -
->> - ? ? ? if (pdata->keep_config)
->> - ? ? ? ? ? ? ? if (pxa3xx_nand_detect_config(info) == 0)
->> - ? ? ? ? ? ? ? ? ? ? ? return 0;
->
-> NAK. You're breaking platforms that rely on this feature.
->
->> - ? ? ? f = &builtin_flash_types[0];
->> - ? ? ? pxa3xx_nand_config_flash(info, f);
->> - ? ? ? pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
->> - ? ? ? id = *((uint16_t *)(info->data_buff));
->> -
->> - ? ? ? for (i = 1; i < ARRAY_SIZE(builtin_flash_types); i++) {
->> - ? ? ? ? ? ? ? f = &builtin_flash_types[i];
->> - ? ? ? ? ? ? ? if (f->chip_id == id) {
->> - ? ? ? ? ? ? ? ? ? ? ? dev_info(&info->pdev->dev, "detect chip id:
->> 0x%x\n", id);
->> - ? ? ? ? ? ? ? ? ? ? ? pxa3xx_nand_config_flash(info, f);
->> - ? ? ? ? ? ? ? ? ? ? ? return 0;
->> - ? ? ? ? ? ? ? }
->> - ? ? ? }
->> -
->> - ? ? ? dev_warn(&info->pdev->dev,
->> - ? ? ? ? ? ? ? ? ? ? ? "failed to detect configured nand flash; found
->> %04x instead of\n",
->> - ? ? ? ? ? ? ? ?id);
->> - ? ? ? return -ENODEV;
->> -}
->> -
->> ?/* the maximum possible buffer size for large page with OOB data
->> ?* is: 2048 + 64 = 2112 bytes, allocate a page here for both the
->> ?* data buffer and the DMA descriptor
->> @@ -980,41 +951,174 @@ static struct nand_ecclayout hw_largepage_ecclayout
+>> @@ -917,7 +939,6 @@ static int pxa3xx_nand_detect_config(struct
+>> pxa3xx_nand_info *info)
+>> ? ? ? ?default_flash.dfc_width = ndcr & NDCR_DWIDTH_C ? 16 : 8;
+>>
+>> ? ? ? ?/* set info fields needed to __readid */
+>> - ? ? ? info->flash_info = &default_flash;
+>> ? ? ? ?info->read_id_bytes = (default_flash.page_size == 2048) ? 4 : 2;
+>> ? ? ? ?info->reg_ndcr = ndcr;
+>>
+>> @@ -1047,10 +1068,9 @@ static struct nand_ecclayout hw_largepage_ecclayout
 >> = {
->> ? ? ? ?.oobfree = { {2, 38} }
->> ?};
->>
->> -static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pxa3xx_nand_info *info)
->
-> why are you removing the pxa3xx_nand_init_mtd? moving it's entire contents
-> into alloc_nand_resource would make the latter overgrown....
->
->> +static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
->> + ? ? ? ? ? ? ? struct nand_chip *chip, uint8_t *buf, int page)
->> +{
->> + ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
->> +
->> + ? ? ? chip->read_buf(mtd, buf, mtd->writesize);
->> + ? ? ? chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
->> +
->> + ? ? ? if (info->retcode == ERR_SBERR) {
->> + ? ? ? ? ? ? ? switch (info->use_ecc) {
->> + ? ? ? ? ? ? ? ? ? ? ? case 1:
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mtd->ecc_stats.corrected ++;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? case 0:
->> + ? ? ? ? ? ? ? ? ? ? ? default:
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? ? }
->> + ? ? ? }
->> + ? ? ? else if (info->retcode == ERR_DBERR) {
->> + ? ? ? ? ? ? ? int buf_blank;
->> +
->> + ? ? ? ? ? ? ? buf_blank = is_buf_blank(buf, mtd->writesize);
->> + ? ? ? ? ? ? ? if (!buf_blank)
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->ecc_stats.failed++;
->> + ? ? ? }
->> +
->> + ? ? ? return 0;
->> +}
->> +
->> +static void pxa3xx_nand_write_page_hwecc(struct mtd_info *mtd,
->> + ? ? ? ? ? ? ? struct nand_chip *chip, const uint8_t *buf)
->> +{
->> + ? ? ? chip->write_buf(mtd, buf, mtd->writesize);
->> + ? ? ? chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
->> +}
->> +
->> +static void pxa3xx_nand_erase_cmd(struct mtd_info *mtd, int page)
+>> ?static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pxa3xx_nand_info *info)
 >> ?{
->> - ? ? ? struct nand_chip *this = &info->nand_chip;
->> -
->> - ? ? ? this->options = (info->reg_ndcr & NDCR_DWIDTH_C) ?
->> NAND_BUSWIDTH_16: 0;
->> -
->> - ? ? ? this->waitfunc ? ? ? ? ?= pxa3xx_nand_waitfunc;
->> - ? ? ? this->select_chip ? ? ? = pxa3xx_nand_select_chip;
->> - ? ? ? this->dev_ready ? ? ? ? = pxa3xx_nand_dev_ready;
->> - ? ? ? this->cmdfunc ? ? ? ? ? = pxa3xx_nand_cmdfunc;
->> - ? ? ? this->read_word ? ? ? ? = pxa3xx_nand_read_word;
->> - ? ? ? this->read_byte ? ? ? ? = pxa3xx_nand_read_byte;
->> - ? ? ? this->read_buf ? ? ? ? ?= pxa3xx_nand_read_buf;
->> - ? ? ? this->write_buf ? ? ? ? = pxa3xx_nand_write_buf;
->> - ? ? ? this->verify_buf ? ? ? ?= pxa3xx_nand_verify_buf;
->> -
->> - ? ? ? this->ecc.mode ? ? ? ? ?= NAND_ECC_HW;
->> - ? ? ? this->ecc.hwctl ? ? ? ? = pxa3xx_nand_ecc_hwctl;
->> - ? ? ? this->ecc.calculate ? ? = pxa3xx_nand_ecc_calculate;
->> - ? ? ? this->ecc.correct ? ? ? = pxa3xx_nand_ecc_correct;
->> - ? ? ? this->ecc.size ? ? ? ? ?= info->page_size;
->> -
->> - ? ? ? if (info->page_size == 2048)
->> - ? ? ? ? ? ? ? this->ecc.layout = &hw_largepage_ecclayout;
->> + ? ? ? struct nand_chip *chip = mtd->priv;
->> + ? ? ? /* Send commands to erase a block */
->> + ? ? ? chip->cmdfunc(mtd, NAND_CMD_ERASE1, -1, page);
->> +}
->> +
->> +static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
->> +{
->> + ? ? ? struct mtd_info *mtd = info->mtd;
->> + ? ? ? struct nand_chip *chip = mtd->priv;
->> +
->> + ? ? ? /* use the common timing to make a try */
->> + ? ? ? pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
->> + ? ? ? chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
->> + ? ? ? if (info->state & STATE_READY)
->> + ? ? ? ? ? ? ? return 1;
->> ? ? ? ?else
->> - ? ? ? ? ? ? ? this->ecc.layout = &hw_smallpage_ecclayout;
->> + ? ? ? ? ? ? ? return 0;
->> +}
->> +
->> +static int pxa3xx_nand_scan(struct mtd_info *mtd)
->> +{
->> + ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
->> + ? ? ? struct pxa3xx_nand_flash *f;
->> + ? ? ? struct nand_chip *chip = mtd->priv;
->> + ? ? ? uint32_t id = -1;
->> + ? ? ? int i, ret;
+>> - ? ? ? const struct pxa3xx_nand_flash *f = info->flash_info;
+>> ? ? ? ?struct nand_chip *this = &info->nand_chip;
 >>
->> - ? ? ? this->chip_delay = 25;
->> + ? ? ? ret = pxa3xx_nand_sensing(info);
->> + ? ? ? if (!ret) {
->> + ? ? ? ? ? ? ? kfree(mtd);
->> + ? ? ? ? ? ? ? info->mtd = NULL;
->> + ? ? ? ? ? ? ? printk(KERN_INFO "There is no nand chip on cs 0!\n");
->> +
->> + ? ? ? ? ? ? ? return -EINVAL;
->> + ? ? ? }
->> +
->> + ? ? ? chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
->> + ? ? ? id = *((uint16_t *)(info->data_buff));
->> + ? ? ? if (id != 0)
->> + ? ? ? ? ? ? ? printk(KERN_INFO "Detect a flash id %x\n", id);
->> + ? ? ? else {
->> + ? ? ? ? ? ? ? kfree(mtd);
->> + ? ? ? ? ? ? ? info->mtd = NULL;
->> + ? ? ? ? ? ? ? printk(KERN_WARNING "Read out ID 0, potential timing set
->> wrong!!\n");
->> +
->> + ? ? ? ? ? ? ? return -EINVAL;
->> + ? ? ? }
->> +
->> + ? ? ? for (i = 1; i < ARRAY_SIZE(builtin_flash_types); i++) {
->> +
->> + ? ? ? ? ? ? ? f = &builtin_flash_types[i];
->> +
->> + ? ? ? ? ? ? ? /* find the chip in default list */
->> + ? ? ? ? ? ? ? if (f->chip_id == id) {
->> + ? ? ? ? ? ? ? ? ? ? ? pxa3xx_nand_config_flash(info, f);
->> + ? ? ? ? ? ? ? ? ? ? ? chip->cellinfo = info->data_buff[2];
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->writesize = f->page_size;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->writesize_shift = ffs(mtd->writesize) - 1;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->writesize_mask = (1 << mtd->writesize_shift)
->> - 1;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->oobsize = mtd->writesize / 32;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->erasesize = f->page_size * f->page_per_block;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->erasesize_shift = ffs(mtd->erasesize) - 1;
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->erasesize_mask = (1 << mtd->erasesize_shift)
->> - 1;
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->name = mtd_names[0];
->> + ? ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? ? }
->> + ? ? ? }
->> +
->> + ? ? ? if (i == ARRAY_SIZE(builtin_flash_types)) {
->> + ? ? ? ? ? ? ? kfree(mtd);
->> + ? ? ? ? ? ? ? info->mtd = NULL;
->> + ? ? ? ? ? ? ? printk(KERN_ERR "ERROR!! flash not defined!!!\n");
->> +
->> + ? ? ? ? ? ? ? return -EINVAL;
->> + ? ? ? }
->> +
->> + ? ? ? chip->ecc.mode ? ? ? ? ?= NAND_ECC_HW;
->> + ? ? ? chip->ecc.size ? ? ? ? ?= f->page_size;
->> + ? ? ? if (f->page_size == 2048)
->> + ? ? ? ? ? ? ? chip->ecc.layout = &hw_largepage_ecclayout;
->> + ? ? ? else
->> + ? ? ? ? ? ? ? chip->ecc.layout = &hw_smallpage_ecclayout;
->> +
->> + ? ? ? chip->chipsize ? ? ? ? ?= (uint64_t)f->num_blocks ? ? ? * \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? f->page_per_block ? ? ? ? ? ? * \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? f->page_size;
->> +
->> + ? ? ? chip->chip_shift ? ? ? ?= ffs(chip->chipsize) - 1;
->> + ? ? ? mtd->size ? ? ? ? ? ? ? = chip->chipsize;
->> +
->> + ? ? ? /* Calculate the address shift from the page size */
->> + ? ? ? chip->page_shift = ffs(mtd->writesize) - 1;
->> + ? ? ? chip->pagemask = mtd_div_by_ws(chip->chipsize, mtd) - 1;
->> + ? ? ? chip->numchips ? ? ? ? ?= 1;
->> + ? ? ? chip->chip_delay ? ? ? ?= 25;
->> + ? ? ? chip->bbt_erase_shift = chip->phys_erase_shift =
->> ffs(mtd->erasesize) - 1;
->> +
->> + ? ? ? /* Set the bad block position */
->> + ? ? ? chip->badblockpos = mtd->writesize > 512 ?
->> + ? ? ? ? ? ? ? NAND_LARGE_BADBLOCK_POS : NAND_SMALL_BADBLOCK_POS;
->> +
->> + ? ? ? chip->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16: 0;
->> + ? ? ? chip->options |= NAND_NO_AUTOINCR;
->> + ? ? ? chip->options |= NAND_NO_READRDY;
->> + ? ? ? chip->options |= NAND_USE_FLASH_BBT;
->> +
->> + ? ? ? return nand_scan_tail(mtd);
->> +}
->> +
->> +static int pxa3xx_nand_default_block_markbad(struct mtd_info *mtd, loff_t
->> ofs)
->> +{
->> + ? ? ? struct nand_chip *chip = mtd->priv;
->> + ? ? ? int block;
->> +
->> + ? ? ? block = (int)(ofs >> chip->bbt_erase_shift);
->> + ? ? ? chip->bbt[block >> 2] |= 0x01 << ((block & 0x03) << 1);
->> + ? ? ? return nand_update_bbt(mtd, ofs);
->> +}
->> +
->> +static int pxa3xx_nand_block_bad(struct mtd_info *mtd, loff_t ofs, int
->> getchip)
->> +{
->> + ? ? ? return 0;
+>> - ? ? ? this->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16: 0;
+>> + ? ? ? this->options = (info->reg_ndcr & NDCR_DWIDTH_C) ?
+>> NAND_BUSWIDTH_16: 0;
+>>
+>> ? ? ? ?this->waitfunc ? ? ? ? ?= pxa3xx_nand_waitfunc;
+>> ? ? ? ?this->select_chip ? ? ? = pxa3xx_nand_select_chip;
+>> @@ -1066,9 +1086,9 @@ static void pxa3xx_nand_init_mtd(struct mtd_info
+>> *mtd,
+>> ? ? ? ?this->ecc.hwctl ? ? ? ? = pxa3xx_nand_ecc_hwctl;
+>> ? ? ? ?this->ecc.calculate ? ? = pxa3xx_nand_ecc_calculate;
+>> ? ? ? ?this->ecc.correct ? ? ? = pxa3xx_nand_ecc_correct;
+>> - ? ? ? this->ecc.size ? ? ? ? ?= f->page_size;
+>> + ? ? ? this->ecc.size ? ? ? ? ?= info->page_size;
+>>
+>> - ? ? ? if (f->page_size == 2048)
+>> + ? ? ? if (info->page_size == 2048)
+>> ? ? ? ? ? ? ? ?this->ecc.layout = &hw_largepage_ecclayout;
+>> ? ? ? ?else
+>> ? ? ? ? ? ? ? ?this->ecc.layout = &hw_smallpage_ecclayout;
+>> @@ -1076,7 +1096,7 @@ static void pxa3xx_nand_init_mtd(struct mtd_info
+>> *mtd,
+>> ? ? ? ?this->chip_delay = 25;
 >> ?}
 >>
->> ?static int alloc_nand_resource(struct platform_device *pdev)
+>> -static int pxa3xx_nand_probe(struct platform_device *pdev)
+>> +static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
 >> ?{
->> - ? ? ? struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+>> ? ? ? ?struct pxa3xx_nand_platform_data *pdata;
 >> ? ? ? ?struct pxa3xx_nand_info *info;
->> + ? ? ? struct nand_chip *chip;
->> ? ? ? ?struct mtd_info *mtd;
->> ? ? ? ?struct resource *r;
->> ? ? ? ?int ret, irq;
->> @@ -1027,12 +1131,31 @@ static int alloc_nand_resource(struct
+>> @@ -1264,9 +1284,11 @@ static int pxa3xx_nand_resume(struct
 >> platform_device *pdev)
->> ? ? ? ?}
+>> ? ? ? ?struct mtd_info *mtd = (struct mtd_info
+>> *)platform_get_drvdata(pdev);
+>> ? ? ? ?struct pxa3xx_nand_info *info = mtd->priv;
 >>
->> ? ? ? ?info = (struct pxa3xx_nand_info *)(&mtd[1]);
->> + ? ? ? chip = (struct nand_chip *)(&mtd[1]);
->> ? ? ? ?info->pdev = pdev;
->> -
->> - ? ? ? mtd->priv = info;
->> ? ? ? ?info->mtd = mtd;
->> + ? ? ? mtd->priv = info;
->> ? ? ? ?mtd->owner = THIS_MODULE;
+>> + ? ? ? nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+>> + ? ? ? nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+>> ? ? ? ?clk_enable(info->clk);
 >>
->> + ? ? ? chip->ecc.read_page ? ? = pxa3xx_nand_read_page_hwecc;
->> + ? ? ? chip->ecc.write_page ? ?= pxa3xx_nand_write_page_hwecc;
->> + ? ? ? chip->ecc.hwctl ? ? ? ? = pxa3xx_nand_ecc_hwctl;
->> + ? ? ? chip->ecc.calculate ? ? = pxa3xx_nand_ecc_calculate;
->> + ? ? ? chip->ecc.correct ? ? ? = pxa3xx_nand_ecc_correct;
->> + ? ? ? chip->waitfunc ? ? ? ? ?= pxa3xx_nand_waitfunc;
->> + ? ? ? chip->select_chip ? ? ? = pxa3xx_nand_select_chip;
->> + ? ? ? chip->dev_ready ? ? ? ? = pxa3xx_nand_dev_ready;
->> + ? ? ? chip->cmdfunc ? ? ? ? ? = pxa3xx_nand_cmdfunc;
->> + ? ? ? chip->read_word ? ? ? ? = pxa3xx_nand_read_word;
->> + ? ? ? chip->read_byte ? ? ? ? = pxa3xx_nand_read_byte;
->> + ? ? ? chip->read_buf ? ? ? ? ?= pxa3xx_nand_read_buf;
->> + ? ? ? chip->write_buf ? ? ? ? = pxa3xx_nand_write_buf;
->> + ? ? ? chip->verify_buf ? ? ? ?= pxa3xx_nand_verify_buf;
->> + ? ? ? chip->block_markbad ? ? = pxa3xx_nand_default_block_markbad;
->> + ? ? ? chip->block_bad ? ? ? ? = pxa3xx_nand_block_bad;
->> + ? ? ? chip->scan_bbt ? ? ? ? ?= nand_default_bbt;
->> + ? ? ? chip->erase_cmd ? ? ? ? = pxa3xx_nand_erase_cmd;
->> +
+>> - ? ? ? return pxa3xx_nand_config_flash(info, info->flash_info);
+>> + ? ? ? return 0;
+>> ?}
+>> ?#else
+>> ?#define pxa3xx_nand_suspend ? ?NULL
 >
-> this definitely has nothing to do with resource allocation.
 >
-This patch is just a code clean. In theory, alloc_nand_resource would
-not overgrow for from whole code aspect, the most complex part is in
-command handling.
-Also we need know the status of nand chip in two chip select. Only by
-this, than we can alloc proper resource.
+> --
+> Sincerely yours,
+> Mike.
 
-Thanks,
+
+For this patch set change the original c file greatly, more than half
+of original code is changed,
+I cannot create a patch for each change. (If so, this patch set would
+grow to be a very large one. Maybe 30+?)
+So some of code change is not exactly follow the patch subject...
+
+Best regards,
 Lei
