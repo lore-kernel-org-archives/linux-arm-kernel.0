@@ -1,34 +1,53 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Tue, 25 May 2010 13:57:33 -0500
-Subject: facing undefined inconsistent cache issues on cortex-a9
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C57A5FC6@dbde02.ent.ti.com>
-References: <4BF9F5FB.6020306@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C57001F3@dbde02.ent.ti.com>
-	<4BFBBD83.5080302@st.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C57A5FC6@dbde02.ent.ti.com>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203BB37005A@dlee02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 May 2010 19:57:41 +0100
+Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+References: <tarun.kanti@ti.com>
+	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+Message-ID: <20100525185741.GB16204@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 25, 2010 at 02:39:17PM +0530, DebBarma, Tarun Kanti wrote:
+>  #ifdef CONFIG_VFPv3
+>  	@ d16 - d31 registers
+> -	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+> -1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
+> +	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+> +1:	fmrrd	r0, r1, d\dr
 
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Shilimkar, Santosh
+The existing code is correct.
 
-> > > Does this work if disable L1D as well on the processor you are running
-> Linux ??
-> > >
-> > If we disable the L1 DCache we are never able to boot.
-> > But this might be a different problem.
-> >
-> > If we disable ICache and leave DCache on it is much more stable, and
-> > I think it might be related to timing issue in the data path.
-> >
-> For me, it seems that Cache isn't invalidated properly which leads to this
-> issue.
-> May be you can report the complete crash-log which can give more idea on the
-> issue.
+For every fmrrd instruction, there is a corresponding mrrc version which
+assembles to exactly the same opcode.
 
-If you are unable to boot with dcache off then maybe your memory controller or memory part has timing issues.  Cache on will trigger burst accesses using different timings.  Such an early failure is more likely an issue outside of the arm unless you are doing something really odd.
+mrrc instructions take:
 
-Regards,
-Richard W.
+1. Co-processor number, range 0-15.
+2. Opcode number N, range 0-15.
+3. Destination register 1, range 0-15.
+4. Destination register 2, range 0-15.
+5. Co-processor register number R, range 0-15.
+
+For fmrrd encodings, the first 16 registers are encoded using N=1 with
+R=0 to 15.  The second 16 registers are encoded using N=3 with R=0 to 15.
+Specifying a co-processor register number greater than 15 is illegal,
+hence why the 'irp' specifies the numbers 0 to 15.
+
+If we look at the instruction encodings, for MRRC:
+
+ 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |CP Num |   N   |   R   |
+
+For FMRRD:
+
+ 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |1 0 1 1 0 0 M 1|   R   |
+
+where "M" and "R" together define the register.
+
+As I said above, the existing code is correct.  What problem are you
+actually trying to solve here?
