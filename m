@@ -1,36 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 May 2010 14:52:29 +0900
-Subject: samsung merge window over
-In-Reply-To: <20100525044214.GE7248@trinity.fluff.org>
-References: <20100525044214.GE7248@trinity.fluff.org>
-Message-ID: <004b01cafbce$7b249430$716dbc90$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 May 2010 08:38:05 +0200
+Subject: [PATCH v2 0/3] Driver for the i.MX2x CMOS Sensor Interface
+In-Reply-To: <cover.1274706733.git.baruch@tkos.co.il>
+References: <cover.1274706733.git.baruch@tkos.co.il>
+Message-ID: <20100525063805.GE17272@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
+On Mon, May 24, 2010 at 04:20:38PM +0300, Baruch Siach wrote:
+> This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
+> platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
+> driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
+> posted in linux-media last December[1]. I tested the mx2_camera driver on the 
+> i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
+> i.MX27 based board. I included in this version some fixes from Sascha that 
+> enable i.MX27 support.
 > 
-> Thankyou to all who contributed to this round of updates, I am officially
-> calling the end of any new development work for this merge window.
+> [1] https://patchwork.kernel.org/patch/67636/
 > 
-> Special thanks to all at Samsung for their help.
+> Changes v1 -> v2
+>     Addressed the comments of Guennadi Liakhovetski except from the following:
 > 
-> I will now be preparing a defconfig, documentation and any other bugfixes
-> tree to send to Linus as soon as possible.
-> 
-> As a note, this is the shortlog of the patches merged via my tree:
+>     1. The mclk_get_divisor implementation, since I don't know what this code 
+>        is good for
 
-Thanks for your review and merging.
+I'll have a look at this soon.
 
-And ok, we will continue our development and submit patches for the next
-merge window. Also, if we find any issues, we will submit patches for those
-also.
+Sascha
 
-Thanks.
 
-(snip)
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
