@@ -1,28 +1,32 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Tue, 25 May 2010 21:04:25 +0300
-Subject: [PATCH v3 14/14] omap: mailbox: reorganize headers
-In-Reply-To: <20100525054947.GA26007@nokia.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<1274548465-20208-15-git-send-email-felipe.contreras@gmail.com>
-	<20100524171634.GA23202@nokia.com>
-	<AANLkTimEtI3pDJKJOCyiBK8f0y1p0nyyIeptcS2eyy_v@mail.gmail.com>
-	<20100525054947.GA26007@nokia.com>
-Message-ID: <AANLkTik3wBTU4fiGdG7E_axF7gquYHzLI4Rx8EIQmpUw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 25 May 2010 20:36:35 +0200
+Subject: [PATCH 05/16] arm/mx2/pca100: add #ifdef to fix compiler warning
+In-Reply-To: <20100525105730.GD25521@pengutronix.de>
+References: <20100524195430.GA28403@pengutronix.de>
+	<1274730951-29106-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20100525000656.GA11887@pengutronix.de>
+	<20100525090431.GA16160@pengutronix.de>
+	<20100525105730.GD25521@pengutronix.de>
+Message-ID: <20100525183635.GA17633@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, May 25, 2010 at 12:57:30PM +0200, Wolfram Sang wrote:
+> On Tue, May 25, 2010 at 11:04:31AM +0200, Uwe Kleine-K?nig wrote:
+> 
+> > ah, OK, your patch looks more complete.  I dropped my patch and took
+> > your's instead.  While at it I took "[PATCH] pcm037: fix build warning",
+> > too.
+> 
+> Hmm, your patches are for 2.6.36; I think these build-fixes should go to
+> 2.6.35 (if Sascha's pull request for mxc-master will be accepted, that is).
+> Otherwise, OK.
+They only fix warnings but shouldn't make any difference for the
+generated code.  So I think 2.6.36 is OK.
 
-On Tue, May 25, 2010 at 8:49 AM, Felipe Balbi <felipe.balbi@nokia.com> wrote:
-> On Mon, May 24, 2010 at 09:14:24PM +0200, ext Felipe Contreras wrote:
->> Now, I am pretty sure that platform_device.h will always depend on
->> device.h that's why I removed them, but I can add them again if
->> somebody wants to, but again, the situation is already bad.
->
-> so there's platform_device.h on that file, a little comment on the changelog
-> would suffice to avoid this kind of mis-understanding.
-
-Sure, will do.
+Best regards
+Uwe
 
 -- 
-Felipe Contreras
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
