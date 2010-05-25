@@ -1,97 +1,55 @@
-From: rumjantsev@papillon.ru (237 Rumjantsev Egor (PROG))
-Date: Tue, 25 May 2010 21:35:18 +0600
-Subject: vpack270 and sleep mode
-In-Reply-To: <201005251702.21204.marek.vasut@gmail.com>
-References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
-	<201005251439.50508.marek.vasut@gmail.com>
-	<4BFBD01E.8010101@papillon.ru>
-	<201005251702.21204.marek.vasut@gmail.com>
-Message-ID: <4BFBEE36.6000004@papillon.ru>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Tue, 25 May 2010 11:43:17 -0400
+Subject: zImage works, but not vmlinux
+Message-ID: <4BFBF015.6000008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-25.05.2010 21:02, Marek Vasut ?????:
-> Dne ?t 25. kv?tna 2010 15:26:54 237 Rumjantsev Egor (PROG) napsal(a):
->> 25.05.2010 18:39, Marek Vasut ?????:
->>> Dne ?t 25. kv?tna 2010 14:38:09 Marek Vasut napsal(a):
->>>> Dne ?t 25. kv?tna 2010 14:13:01 237 Rumjantsev Egor (PROG) napsal(a):
->>>>> Hello, Marek
->>>>
->>>> Hi,
->>>>
->>>>> Could you help to solve the following problem:
->>>>> I try to move my board based on Voipac PXA270 module to sleep state.
->>>>> I'm running kernel 2.6.28.10 on it.
->>>>
->>>> CCed Voipac and linux-arm-kernel. Btw. that's not Voipac official
->>>> kernel, is it?
->>
->> Yes it isn't. I patched vanilla kernel to get basic Voipac module
->> support and add some my code for our board.
->
-> Please, use what's in mainline then. (git.kernel.org, search for ycmiao, use -
-> devel branch).
+Hi,
+I have tried to send this message some part of it was ignored, resending
+sorry ...
 
-i did so. I downloaded 2.6.28.10 sources, patched it to get basic 
-support for Voipac module and add some my platform devices.
+greetings,
+I'm newbie to arm linux, so pls if my issue is already addressed just
+point me to that reference. I'm trying to learn, but couldn't pass the
+following stage:
+I have a s3c245 based board, I have a working compressed kernel image
+zImage, this image boots properly via u-boot-1.1.6, however I simply
+failed to load (i.e., boot vmlinux) via u-boot directly from SDRAM.
 
+more details:
 
->>
->>> My bad, CCed wrong linux-arm-kernel, fixed now :)
->>>
->>>>> When i try echo mem>   /sys/power/state i see messages that system goes
->>>>> to sleep state but after pushing wake-up button (GPIO0) i don't see
->>>>> that a bootloader is running (i set up some GPIOs as flags in
->>>>> bootloader and see on them whith oscilloscope).
->>>>
->>>> The bootloader checks RCSR once you wake it up and it sets-up SDRAM. If
->>>> there's a sleep-wakeup bit, it branches to location in PSPR and there's
->>>> linux kernel already.
->>
->> i know that as i have to use U-boot 1.3.0 for my board. It's also not
->> Voipac's u-boot version.
->
-> Can't you use u-boot-pxa from git.denx.de ?
+   1. I let the target boot until the message of "  Hit any key to stop
+      autoboot: " for which I hit enter, (this initialized the board
+      enables MMU, I-Cache, .. etc);
+   2. board info as seen by u-boot
+      # bdinfo
+      arch_number = 0x00000648
+      env_t       = 0x00000000
+      boot_params = 0x30000100
+      DRAM bank   = 0x00000000
+      -> start    = 0x30000000
+      -> size     = 0x04000000
+      DRAM bank   = 0x00000001
+      -> start    = 0x38000000
+      -> size     = 0x04000000
+      ethaddr     = ...:5B
+      ip_addr     = ...200
+      baudrate    = 115200 bps
+   3. laod vmlinux to SDRAM :
+      tftp 30008000 vmlinux
+      TFTP from server ...210; our IP address is ...200
+      Filename 'vmlinux'.
+      Load address: 0x30008000
+      Loading: T ############ .....
+   4. # bootm 30008000
+      ## Booting image at 30008000 ...
+      Boot with Image
+      do not support this address : 30008000
 
-u-boot-2009.11.1 haven't Voipac or Toradex Colibri support.
+      Starting kernel ...
 
->>>>>
->>>>> but if i type command echo standby>   /sys/power/state
->>>>> the system reacts on wake-up button but hangs after some messages about
->>>>> null dereferencing pointers.
->>>>>
->>>>> is there any possibility to trace such problem?
->>>>
->>>> Try CONFIG_PM_ADVANCED_DEBUG.
->>
->> i've looked through kernel sources and didn't such identifer
->>
-> Maybe you need newer kernel, see above.
-
-May be....but then i need to rewrite some of hardware drivers as drivers 
-api for some kind of devices has changed since 2.6.28.
-When i run 2.6.24 kernel on Toradex Colibri module i haven't such 
-troubles so i hope that 2.6.28 can work with sleep mode.
-
->
-> What's pxa_reg module? Does it have proper suspend/resume functions?
-
-No, it doesn't. I unloaded it but all the same - kernel hangs
-
->>
->>>> There was also a way to keep the console enabled until the kernel didn't
->>>> totally suspend, but I can't find that option now, maybe someone will be
->>>> more successful. And maybe I'm mistaking this with an option to don't
->>>> blank consoles until then, it's been some time since I needed that.
->>>>
->>>>> P.S.: sorry if i disturb you, but you the only man in ARM linux mailing
->>>>> list who posted messages about Voipac modules.
->>>>
->>>> You're welcome.
->>>>
->>>>> Best regards !!!
->
-
-
--- 
-Rumjantsev Egor
+and nothing happens it probably crashed somewhere, why zImage works
+while vmlinux does not?
+thanks,
+ferar
