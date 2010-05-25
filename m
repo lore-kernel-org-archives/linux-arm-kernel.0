@@ -1,46 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 25 May 2010 07:45:43 +0200
-Subject: [PATCH] ARM: S5P: Fix the platform external interrupt issues.
-In-Reply-To: <1274687063-748-1-git-send-email-kgene.kim@samsung.com>
-References: <1274687063-748-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <019e01cafbcd$8640c6a0$92c253e0$%szyprowski@samsung.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Tue, 25 May 2010 08:49:47 +0300
+Subject: [PATCH v3 14/14] omap: mailbox: reorganize headers
+In-Reply-To: <AANLkTimEtI3pDJKJOCyiBK8f0y1p0nyyIeptcS2eyy_v@mail.gmail.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<1274548465-20208-15-git-send-email-felipe.contreras@gmail.com>
+	<20100524171634.GA23202@nokia.com>
+	<AANLkTimEtI3pDJKJOCyiBK8f0y1p0nyyIeptcS2eyy_v@mail.gmail.com>
+Message-ID: <20100525054947.GA26007@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Monday, May 24, 2010 9:44 AM Kukjin Kim wrote:
+On Mon, May 24, 2010 at 09:14:24PM +0200, ext Felipe Contreras wrote:
+>Now, regarding device.h:
 
-> From: Pannaga Bhushan <p.bhushan@samsung.com>
-> 
-> This patch does the following:
-> 
-> 1. Corrects the common platform code for external interrupts for using the
->    VIC mask/unmask bits also.
-> 2. Moves the common defines related to external interrupt for plat-s5p
->    to common files.
-> 3. Based on the new common defines, corresponding changes are made in the
->    affected platforms (S5P6440, S5P6442 and S5PC100).
-> 
-> Signed-off-by: Pannaga Bhushan <p.bhushan@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s5p6440/include/mach/irqs.h      |    9 ++++++++-
->  arch/arm/mach-s5p6442/include/mach/irqs.h      |    5 +++--
->  arch/arm/mach-s5pc100/include/mach/irqs.h      |    3 ---
->  arch/arm/mach-s5pv210/include/mach/irqs.h      |   14 ++------------
->  arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   14 +++++++++-----
->  arch/arm/plat-s5p/Kconfig                      |    1 +
->  arch/arm/plat-s5p/include/plat/irqs.h          |    7 +++++++
->  arch/arm/plat-s5p/irq-eint.c                   |   15 ++++++++++-----
->  8 files changed, 40 insertions(+), 28 deletions(-)
+which was my only concern
 
-This patch lacks a fix for arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-file. It should revert the changes from commit 45c79433c02b8fe7b8a1cbf6054
-to that file. Without it the external interrupt 16..31 does not work on
-S5PC100.
+>Now, I am pretty sure that platform_device.h will always depend on
+>device.h that's why I removed them, but I can add them again if
+>somebody wants to, but again, the situation is already bad.
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+so there's platform_device.h on that file, a little comment on the 
+changelog would suffice to avoid this kind of mis-understanding.
+
+-- 
+balbi
+
+DefectiveByDesign.org
