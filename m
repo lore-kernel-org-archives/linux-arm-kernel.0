@@ -1,88 +1,87 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Tue, 25 May 2010 15:26:51 +0300
-Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-References: <Tarun Kanti DebBarma <tarun.kanti@ti.com>
-	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-Message-ID: <201005251526.52041.siarhei.siamashka@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 25 May 2010 14:39:50 +0200
+Subject: vpack270 and sleep mode
+In-Reply-To: <201005251438.09494.marek.vasut@gmail.com>
+References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
+	<4BFBBECD.70803@papillon.ru>
+	<201005251438.09494.marek.vasut@gmail.com>
+Message-ID: <201005251439.50508.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 May 2010, DebBarma, Tarun Kanti wrote:
-> (Including ARM mailing list)
->
-> From: Tarun Kanti Debbarma <a0876346@a0876346-desktop.(none)>
->
-> This patch attempts to fix two related problems:
->
-> (1) vfp_get_double(), vfp_put_double() functions have VFPv3 specific
-> implementation guarded within CONFIG_VFPv3 macro. The intent is to access
-> {d16-d31} additional registers provided in VFPv3. However, it still wrongly
-> refers to {d0-d15}. This has been corrected.
+Dne ?t 25. kv?tna 2010 14:38:09 Marek Vasut napsal(a):
+> Dne ?t 25. kv?tna 2010 14:13:01 237 Rumjantsev Egor (PROG) napsal(a):
+> > Hello, Marek
+> 
+> Hi,
+> 
+> > Could you help to solve the following problem:
+> > I try to move my board based on Voipac PXA270 module to sleep state.
+> > I'm running kernel 2.6.28.10 on it.
+> 
+> CCed Voipac and linux-arm-kernel. Btw. that's not Voipac official kernel,
+> is it?
 
-This does not seem to be the case, see below.
-
-> (2) While compiling the above changes, it produced compilation error
-> because arch/arm/vfp/Makefile had the -mfpu=vfp option which could not
-> recognize VFPv3 registers. This has been corrected to -mfpu=vfp3. With this
-> option we are also able to compile pre-VFPv3 code.
->
-> Signed-off-by: Tarun Kanti Debbarma <tarun.kanti@ti.com>
-> ---
->  arch/arm/vfp/Makefile |    2 +-
->  arch/arm/vfp/vfphw.S  |    8 ++++----
->  2 files changed, 5 insertions(+), 5 deletions(-)
->  mode change 100644 => 100755 arch/arm/vfp/vfphw.S
->
-> diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
-> index 39f6d8e..75855c0 100644
-> --- a/arch/arm/vfp/Makefile
-> +++ b/arch/arm/vfp/Makefile
-> @@ -7,7 +7,7 @@
->  # EXTRA_CFLAGS := -DDEBUG
->  # EXTRA_AFLAGS := -DDEBUG
->
-> -KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
-> +KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=vfp3
-> -mfloat-abi=softfp) LDFLAGS		+=--no-warn-mismatch
->
->  obj-y			+= vfp.o
-> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-> old mode 100644
-> new mode 100755
-> index 66dc2d0..b034076
-> --- a/arch/arm/vfp/vfphw.S
-> +++ b/arch/arm/vfp/vfphw.S
-> @@ -254,8 +254,8 @@ ENTRY(vfp_get_double)
->  	.endr
->  #ifdef CONFIG_VFPv3
->  	@ d16 - d31 registers
-> -	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-> -1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
-> +	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-> +1:	fmrrd	r0, r1, d\dr
-
-The existing code does exactly the same, but avoids the need to
-specify -mfpu=vfp3 option. It's quite easy to verify:
-
-/**** test.S *******/
-test:
-    mrrc  p11, 3, r0, r1, c0
-    fmrrd r0, r1, d16
-/*******************/
-
-gcc -c test.S
-objdump -d test.o
-
-Disassembly of section .text:
-
-00000000 <test>:
-   0:   ec510b30        vmov    r0, r1, d16
-   4:   ec510b30        vmov    r0, r1, d16
-
-The comment in the existing code is a bit misleading though.
-
--- 
-Best regards,
-Siarhei Siamashka
+My bad, CCed wrong linux-arm-kernel, fixed now :)
+> 
+> > When i try echo mem > /sys/power/state i see messages that system goes
+> > to sleep state but after pushing wake-up button (GPIO0) i don't see that
+> > a bootloader is running (i set up some GPIOs as flags in bootloader and
+> > see on them whith oscilloscope).
+> 
+> The bootloader checks RCSR once you wake it up and it sets-up SDRAM. If
+> there's a sleep-wakeup bit, it branches to location in PSPR and there's
+> linux kernel already.
+> 
+> > This is a part of kernel output when the system goes to sleep mode:
+> > 
+> > dm9000 dm9000.0: LATE suspend
+> > platform pxa27x-pwm.1: LATE suspend
+> > platform pxa27x-pwm.0: LATE suspend
+> > platform pxa27x-ssp.2: LATE suspend
+> > platform pxa27x-ssp.1: LATE suspend
+> > platform pxa27x-ssp.0: LATE suspend
+> > pxa2xx-i2c pxa2xx-i2c.1: LATE suspend
+> > platform sa1100-rtc: LATE suspend
+> > platform pxa2xx-i2s: LATE suspend
+> > pxa2xx-uart pxa2xx-uart.2: LATE suspend
+> > pxa2xx-uart pxa2xx-uart.1: LATE suspend
+> > pxa2xx-uart pxa2xx-uart.0: LATE suspend
+> > platform pxa27x-udc: LATE suspend
+> > pxa_pm_enter(): RCSR value: 0x00000000
+> > pxa_pm_enter(): state: 3
+> > pxa_pm_enter(): Power regs:
+> > pxa_pm_enter(): GPDR0: 0x0070E200
+> > pxa_pm_enter(): PWER: 0x00000001
+> > pxa_pm_enter(): PFER: 0x00000000
+> > pxa_pm_enter(): PRER: 0x00000001
+> > pxa_pm_enter(): PGSR0: 0x00010000
+> > pxa_pm_enter(): PGSR1: 0x000F2000
+> > pxa_pm_enter(): PGSR2: 0x0404C000
+> > pxa_pm_enter(): PGSR3: 0x00000020
+> > pxa27x_cpu_pm_enter(): go to suspend : 3
+> > pxa27x_cpu_pm_enter(): PCFR : 0x61
+> > pxa27x_cpu_pm_enter(): PSSR : 0x0
+> > pxa27x_cpu_pm_enter(): PSLR : 0xCC100004
+> > pxa27x_cpu_pm_enter(): OSCC : 0x3
+> > 
+> > but if i type command echo standby > /sys/power/state
+> > the system reacts on wake-up button but hangs after some messages about
+> > null dereferencing pointers.
+> > 
+> > is there any possibility to trace such problem?
+> 
+> Try CONFIG_PM_ADVANCED_DEBUG. Enable that and check if the tests work, one
+> by one. What are the messages you get once the kernel crashes?
+> 
+> There was also a way to keep the console enabled until the kernel didn't
+> totally suspend, but I can't find that option now, maybe someone will be
+> more successful. And maybe I'm mistaking this with an option to don't
+> blank consoles until then, it's been some time since I needed that.
+> 
+> > P.S.: sorry if i disturb you, but you the only man in ARM linux mailing
+> > list who posted messages about Voipac modules.
+> 
+> You're welcome.
+> 
+> > Best regards !!!
