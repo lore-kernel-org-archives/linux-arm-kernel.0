@@ -1,78 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 May 2010 09:59:02 +0200
-Subject: i.MX27 GPIOs -- how to define the default output?
-In-Reply-To: <20100522010210.GA18017@www.longlandclan.yi.org>
-References: <20100522010210.GA18017@www.longlandclan.yi.org>
-Message-ID: <20100525075902.GK17272@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 May 2010 09:00:31 +0100
+Subject: WARNING about next merge window (Re: samsung merge window over)
+In-Reply-To: <20100525073454.GF7248@trinity.fluff.org>
+References: <20100525044214.GE7248@trinity.fluff.org>
+	<004b01cafbce$7b249430$716dbc90$%kim@samsung.com>
+	<20100525073124.GA11051@n2100.arm.linux.org.uk>
+	<20100525073454.GF7248@trinity.fluff.org>
+Message-ID: <20100525080031.GA11543@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
-
-On Sat, May 22, 2010 at 11:02:17AM +1000, Stuart Longland wrote:
-> Hi all,
+On Tue, May 25, 2010 at 08:34:54AM +0100, Ben Dooks wrote:
+> On Tue, May 25, 2010 at 08:31:24AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 25, 2010 at 02:52:29PM +0900, Kukjin Kim wrote:
+> > > Ben Dooks wrote:
+> > > > 
+> > > > Thankyou to all who contributed to this round of updates, I am officially
+> > > > calling the end of any new development work for this merge window.
+> > > > 
+> > > > Special thanks to all at Samsung for their help.
+> > > > 
+> > > > I will now be preparing a defconfig, documentation and any other bugfixes
+> > > > tree to send to Linus as soon as possible.
+> > > > 
+> > > > As a note, this is the shortlog of the patches merged via my tree:
+> > > 
+> > > Thanks for your review and merging.
+> > > 
+> > > And ok, we will continue our development and submit patches for the next
+> > > merge window. Also, if we find any issues, we will submit patches for those
+> > > also.
+> > 
+> > The impression I have is that Samsung folk waited for the merge window
+> > before sending their patches to the mailing list - there have been
+> > about 320 messages attributable to 'samsung' or 's3' subjects since the
+> > merge window opened.
+> > 
+> > This is excessive, and isn't really practical - it swamps the mailing
+> > list and makes it very easy to miss more relevant stuff during the
+> > merge window.
 > 
-> I'm in the process of porting Ka-Ro's TX27 kernel patch over from kernel
-> 2.6.28 to current git HEAD[1].  In the process of doing this, I note that
-> the old definitions GPIO_DFLT_HIGH and GPIO_DFLT_LOW have disappeared.
+> Yes, agreed. I have made the point to them again that this is too late
+> in the development cycle. Unforunately due to the 'fun' with uk airspace
+> my visit here was dealyed by nearly three weeks, which has left us with
+> too little time.
 
-These have never been in the mainline kernel. It must be something Ka-Ro
-introduced in their kernel.
+Volcanic ash doesn't stop email working - or patches being reviewed.
 
+> > So, please send the majority of patches *before* the merge window and
+> > try to avoid sending anything but fixes during the merge window itself.
+> > The merge window is for code which has _already_ been merged and has
+> > been in linux-next to be merged into Linus' tree.  It's not for new
+> > code to be reviewed.
 > 
-> I can't seem to find their replacements anywhere.
-> 
-> The code I'm porting defines a heap of GPIO pins for use with the LCD
-> controller:
-> 
-> static unsigned int mx27_lcdc_gpios[] = {
-> 	MXC_PIN(F, 12, GPIO, GPIO_OUT | GPIO_DFLT_LOW), /* LCD reset
-> (active LOW) */
-> 	MXC_PIN(E,  5, GPIO, GPIO_OUT | GPIO_DFLT_HIGH), /* LCD
-> backlight (PWM: 0: off 1: max brightness */
-> 	MXC_PIN(A, 30, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA30 */
-> 	MXC_PIN(A, 25, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA25 */
-> 	MXC_PIN(A, 26, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA26 */
-> 	MXC_PIN(A, 24, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA24 */
-> 	MXC_PIN(A, 27, GPIO, GPIO_OUT | GPIO_DFLT_LOW),	/* PA27 */
-> 	PA5_PF_LSCLK,
-> 	PA6_PF_LD0,
-> 	PA7_PF_LD1,
-> 	... etc
-> 
-> then later; calls mxc_gpio_setup_multiple_pins on it:
-> 
-> 	ret = mxc_gpio_setup_multiple_pins(mx27_lcdc_gpios,
-> 					ARRAY_SIZE(mx27_lcdc_gpios),
-> "LCD");
-> 
-> While a glitch probably will do little more than cause the LCD backlight
-> to flicker momentarily, and maybe reset the LCD itself, I'd still like
-> to have the signals driven the right way from the outset.  Does anyone
-> have any pointers as to where I could look for where this default is
-> set?
+> Next merge window, which will probably be the last I will handle for the
+> S5P range, will have an earlier cut-off point. It was a big rush to get
+> this lot reviewed and merged.
 
-The actual value of a gpio is not written in
-mxc_gpio_setup_multiple_pins(). So if your bootloader has left the gpios
-correctly everything will work. You could also pass the GPIO_IN flag in
-which case the gpios will be configured as an input and a
-pullup/pulldown should pull them into the right direction. As a third
-possibility you could do a gpio_request/gpio_direction_output before
-changing the muxer.
+It also means that *NONE* of the stuff in your second pull request was
+in linux-next for *any* time.  It also conflicted with my tree.  The
+result of that is I'm expecting mainline to be dead for all ARM with:
 
-> 
-> On a related note; we have a small audio amplifier on our board.  Its
-> mute signal is wired up to one of the keypad column outputs on the
-> i.MX27 keypad controller, which can be driven as a GPIO.  Is there a
-> means of accessing this cleanly within the GPIO framework of the kernel?
+arch/arm/Kconfig:883: can't open file "arch/arm/plat-s5pc1xx/Kconfig"
 
-When the muxer is configured the gpios work with the standard gpio api.
+because of a mis-merge - and since that conflict was not picked up by
+linux-next, it could not have been previously published.
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+For the next merge window, I will avoid reading email for the duration
+of the window - which means those who are late for the merge window will
+simply not have their patches and trees pulled.  This means we _will_
+have time to resolve conflicts and find problems _before_ the merge
+window.
