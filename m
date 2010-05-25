@@ -1,53 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 May 2010 19:57:41 +0100
-Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-References: <tarun.kanti@ti.com>
-	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-Message-ID: <20100525185741.GB16204@n2100.arm.linux.org.uk>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Tue, 25 May 2010 20:04:46 +0100
+Subject: [PATCH] orion5x: Set links to solid on D-Link DNS-323
+In-Reply-To: <20100326112030.GA29585@jirafa.cyrius.com>
+References: <20100326112030.GA29585@jirafa.cyrius.com>
+Message-ID: <20100525190446.GA27367@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 25, 2010 at 02:39:17PM +0530, DebBarma, Tarun Kanti wrote:
->  #ifdef CONFIG_VFPv3
->  	@ d16 - d31 registers
-> -	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-> -1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
-> +	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-> +1:	fmrrd	r0, r1, d\dr
+* Martin Michlmayr <tbm@cyrius.com> [2010-03-26 11:20]:
+> Among other changes, commit b2a731aa ("D-link DNS-323 revision A1 power
+> LED") changed the default behaviour of the power LED from solid to
+> blinking.  This was done to match the original DNS-323 firmware which
+> blinks during the boot process and sets the LED to solid when booting
+> has completed.  However, the downside of this behaviour is that it
+> requires userland code to change the LED, even for those who don't
+> care about the behaviour of the original firmware.  Therefore, change
+> it to solid again and let those who care about the original behaviour
+> change the behaviour from userland.
 
-The existing code is correct.
+*ping*
 
-For every fmrrd instruction, there is a corresponding mrrc version which
-assembles to exactly the same opcode.
+> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+> 
+> --- a/arch/arm/mach-orion5x/dns323-setup.c
+> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+> @@ -262,7 +262,7 @@ static struct gpio_led dns323_leds[] = {
+>  	{
+>  		.name = "power:blue",
+>  		.gpio = DNS323_GPIO_LED_POWER2,
+> -		.default_trigger = "timer",
+> +		.default_trigger = "default-on",
+>  	}, {
+>  		.name = "right:amber",
+>  		.gpio = DNS323_GPIO_LED_RIGHT_AMBER,
+> 
+> -- 
+> Martin Michlmayr
+> http://www.cyrius.com/
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-mrrc instructions take:
-
-1. Co-processor number, range 0-15.
-2. Opcode number N, range 0-15.
-3. Destination register 1, range 0-15.
-4. Destination register 2, range 0-15.
-5. Co-processor register number R, range 0-15.
-
-For fmrrd encodings, the first 16 registers are encoded using N=1 with
-R=0 to 15.  The second 16 registers are encoded using N=3 with R=0 to 15.
-Specifying a co-processor register number greater than 15 is illegal,
-hence why the 'irp' specifies the numbers 0 to 15.
-
-If we look at the instruction encodings, for MRRC:
-
- 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
- 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |CP Num |   N   |   R   |
-
-For FMRRD:
-
- 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
- 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |1 0 1 1 0 0 M 1|   R   |
-
-where "M" and "R" together define the register.
-
-As I said above, the existing code is correct.  What problem are you
-actually trying to solve here?
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
