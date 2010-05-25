@@ -1,58 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 May 2010 09:20:04 +0200
-Subject: [PATCH 0/3] Driver for the i.MX2x CMOS Sensor Interface
-In-Reply-To: <Pine.LNX.4.64.1005212023400.8450@axis700.grange>
-References: <cover.1273150585.git.baruch@tkos.co.il>
-	<20100521072045.GD17272@pengutronix.de>
-	<20100521072737.GA6967@tarshish>
-	<Pine.LNX.4.64.1005212023400.8450@axis700.grange>
-Message-ID: <20100525072004.GI17272@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 May 2010 08:31:24 +0100
+Subject: samsung merge window over
+In-Reply-To: <004b01cafbce$7b249430$716dbc90$%kim@samsung.com>
+References: <20100525044214.GE7248@trinity.fluff.org>
+	<004b01cafbce$7b249430$716dbc90$%kim@samsung.com>
+Message-ID: <20100525073124.GA11051@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 08:33:40PM +0200, Guennadi Liakhovetski wrote:
-> On Fri, 21 May 2010, Baruch Siach wrote:
-> 
-> > Hi Sascha,
+On Tue, May 25, 2010 at 02:52:29PM +0900, Kukjin Kim wrote:
+> Ben Dooks wrote:
 > > 
-> > On Fri, May 21, 2010 at 09:20:45AM +0200, Sascha Hauer wrote:
-> > > On Thu, May 06, 2010 at 04:09:38PM +0300, Baruch Siach wrote:
-> > > > This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and 
-> > > > platform code for the i.MX25 and i.MX27 chips. This driver is based on a driver 
-> > > > for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has posted in 
-> > > > linux-media last December[1]. Since all I have is a i.MX25 PDK paltform I can't 
-> > > > test the mx27 specific code. Testers and comment are welcome.
-> > > > 
-> > > > [1] https://patchwork.kernel.org/patch/67636/
-> > > > 
-> > > > Baruch Siach (3):
-> > > >   mx2_camera: Add soc_camera support for i.MX25/i.MX27
-> > > >   mx27: add support for the CSI device
-> > > >   mx25: add support for the CSI device
-> > > 
-> > > With the two additions I sent I can confirm this working on i.MX27, so
-> > > no need to remove the related code.
+> > Thankyou to all who contributed to this round of updates, I am officially
+> > calling the end of any new development work for this merge window.
 > > 
-> > Thanks. I'll add your patches to my queue and resend the series next week.
+> > Special thanks to all at Samsung for their help.
+> > 
+> > I will now be preparing a defconfig, documentation and any other bugfixes
+> > tree to send to Linus as soon as possible.
+> > 
+> > As a note, this is the shortlog of the patches merged via my tree:
 > 
-> Firstly, Sascha, unfortunately, you've forgotten to CC the maintainer, 
-> that will have to deal with these patches.
+> Thanks for your review and merging.
 > 
-> Secondly, I don't think that's a good idea to submit mx27 fixes as 
-> incremental patches. I'd prefer to have them rolled into the actual driver 
-> submission patches, where Sascha would just add his Sob / acked-by / 
-> tested-by / whatever... Or you can first submit an mx25-only driver and 
-> let Sascha add mx27 to it, in which case this would be a functionality 
-> extension, but not a fix of a broken driver.
+> And ok, we will continue our development and submit patches for the next
+> merge window. Also, if we find any issues, we will submit patches for those
+> also.
 
-My intention with these fixes was that Baruch integrates them into his
-patch (which he did).
+The impression I have is that Samsung folk waited for the merge window
+before sending their patches to the mailing list - there have been
+about 320 messages attributable to 'samsung' or 's3' subjects since the
+merge window opened.
 
-Sascha
+This is excessive, and isn't really practical - it swamps the mailing
+list and makes it very easy to miss more relevant stuff during the
+merge window.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So, please send the majority of patches *before* the merge window and
+try to avoid sending anything but fixes during the merge window itself.
+The merge window is for code which has _already_ been merged and has
+been in linux-next to be merged into Linus' tree.  It's not for new
+code to be reviewed.
