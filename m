@@ -1,73 +1,33 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Tue, 25 May 2010 13:07:27 -0400
-Subject: zImage works, but not vmlinux
-In-Reply-To: <20100525165445.GB3085@boggieman>
-References: <4BFBF015.6000008@gmail.com> <20100525165445.GB3085@boggieman>
-Message-ID: <4BFC03CF.4070305@gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 25 May 2010 19:09:13 +0200
+Subject: [PATCH 2/2] ixp4xx/vulcan: add PCI support
+In-Reply-To: <m3ochke5i5.fsf@intrepid.localdomain>
+References: <1270931559-9414-1-git-send-email-maz@misterjones.org>
+	<1270931559-9414-2-git-send-email-maz@misterjones.org>
+	<m3ochke5i5.fsf@intrepid.localdomain>
+Message-ID: <972e12f2334879228a443b21905389cd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2010 12:54 PM, Kristoffer Ericson wrote:
-> On Tue, May 25, 2010 at 11:43:17AM -0400, f. achkar wrote:
->   
->> Hi,
->> I have tried to send this message some part of it was ignored, resending
->> sorry ...
->>
->> greetings,
->> I'm newbie to arm linux, so pls if my issue is already addressed just
->> point me to that reference. I'm trying to learn, but couldn't pass the
->> following stage:
->> I have a s3c245 based board, I have a working compressed kernel image
->> zImage, this image boots properly via u-boot-1.1.6, however I simply
->> failed to load (i.e., boot vmlinux) via u-boot directly from SDRAM.
->>
->> more details:
->>
->>    1. I let the target boot until the message of "  Hit any key to stop
->>       autoboot: " for which I hit enter, (this initialized the board
->>       enables MMU, I-Cache, .. etc);
->>    2. board info as seen by u-boot
->>       # bdinfo
->>       arch_number = 0x00000648
->>       env_t       = 0x00000000
->>       boot_params = 0x30000100
->>       DRAM bank   = 0x00000000
->>       -> start    = 0x30000000
->>       -> size     = 0x04000000
->>       DRAM bank   = 0x00000001
->>       -> start    = 0x38000000
->>       -> size     = 0x04000000
->>       ethaddr     = ...:5B
->>       ip_addr     = ...200
->>       baudrate    = 115200 bps
->>    3. laod vmlinux to SDRAM :
->>       tftp 30008000 vmlinux
->>       TFTP from server ...210; our IP address is ...200
->>       Filename 'vmlinux'.
->>       Load address: 0x30008000
->>       Loading: T ############ .....
->>    4. # bootm 30008000
->>       ## Booting image at 30008000 ...
->>       Boot with Image
->>       do not support this address : 30008000
->>
->>       Starting kernel ...
->>     
-> Is that kernel compiled with early printk? 
->   
-the kernel version is 2.6.21-1, and there is no early_printk support yet
-for that version!
-thanks
->   
->> and nothing happens it probably crashed somewhere, why zImage works
->> while vmlinux does not?
->> thanks,
->> ferar
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>     
+
+On Fri, 16 Apr 2010 00:05:22 +0200, Krzysztof Halasa <khc@pm.waw.pl>
+wrote:
+> Marc Zyngier <maz@misterjones.org> writes:
+> 
+>> Add PCI support for the Vulcan board, supporting USB and CF ports.
+>> The PC/104 bus (actually a hack on the second CarBus slot) is not
+>> currently supported.
+> 
+> Thanks, I've applied both of them.
+
+Krzysztof,
+
+Is there any plan for this to be merged while the window is still opened?
+I have some other patches that depend on these first two, but if it's going
+to be delayed until 2.6.36, I'll simply repost the whole thing for review.
+
+Cheers,
+
+        M.
+-- 
+Who you jivin' with that Cosmik Debris?
