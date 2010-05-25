@@ -1,82 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 May 2010 09:10:51 +0200
-Subject: [PATCH 14/16] arm/mx3/mx31_3ds: fold board header in its only user
-In-Reply-To: <1274730951-29106-14-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100524195430.GA28403@pengutronix.de>
-	<1274730951-29106-14-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100525071051.GH17272@pengutronix.de>
+Date: Tue, 25 May 2010 09:20:04 +0200
+Subject: [PATCH 0/3] Driver for the i.MX2x CMOS Sensor Interface
+In-Reply-To: <Pine.LNX.4.64.1005212023400.8450@axis700.grange>
+References: <cover.1273150585.git.baruch@tkos.co.il>
+	<20100521072045.GD17272@pengutronix.de>
+	<20100521072737.GA6967@tarshish>
+	<Pine.LNX.4.64.1005212023400.8450@axis700.grange>
+Message-ID: <20100525072004.GI17272@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 24, 2010 at 09:55:49PM +0200, Uwe Kleine-K?nig wrote:
-> Moreover remove unused definitions.
+On Fri, May 21, 2010 at 08:33:40PM +0200, Guennadi Liakhovetski wrote:
+> On Fri, 21 May 2010, Baruch Siach wrote:
+> 
+> > Hi Sascha,
+> > 
+> > On Fri, May 21, 2010 at 09:20:45AM +0200, Sascha Hauer wrote:
+> > > On Thu, May 06, 2010 at 04:09:38PM +0300, Baruch Siach wrote:
+> > > > This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and 
+> > > > platform code for the i.MX25 and i.MX27 chips. This driver is based on a driver 
+> > > > for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has posted in 
+> > > > linux-media last December[1]. Since all I have is a i.MX25 PDK paltform I can't 
+> > > > test the mx27 specific code. Testers and comment are welcome.
+> > > > 
+> > > > [1] https://patchwork.kernel.org/patch/67636/
+> > > > 
+> > > > Baruch Siach (3):
+> > > >   mx2_camera: Add soc_camera support for i.MX25/i.MX27
+> > > >   mx27: add support for the CSI device
+> > > >   mx25: add support for the CSI device
+> > > 
+> > > With the two additions I sent I can confirm this working on i.MX27, so
+> > > no need to remove the related code.
+> > 
+> > Thanks. I'll add your patches to my queue and resend the series next week.
+> 
+> Firstly, Sascha, unfortunately, you've forgotten to CC the maintainer, 
+> that will have to deal with these patches.
+> 
+> Secondly, I don't think that's a good idea to submit mx27 fixes as 
+> incremental patches. I'd prefer to have them rolled into the actual driver 
+> submission patches, where Sascha would just add his Sob / acked-by / 
+> tested-by / whatever... Or you can first submit an mx25-only driver and 
+> let Sascha add mx27 to it, in which case this would be a functionality 
+> extension, but not a fix of a broken driver.
 
-The patch does not match the subject. Are there hunks missing?
+My intention with these fixes was that Baruch integrates them into his
+patch (which he did).
 
-Sascah
+Sascha
 
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/mach-mx31_3ds.c |   41 +++++++++++++++++++++++++++++++-----
->  1 files changed, 35 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> index f54af1e..7ec2e81 100644
-> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> @@ -41,12 +41,41 @@
->  #include <mach/spi.h>
->  #include "devices.h"
->  
-> -/*!
-> - * @file mx31_3ds.c
-> - *
-> - * @brief This file contains the board-specific initialization routines.
-> - *
-> - * @ingroup System
-> +/* Definitions for components on the Debug board */
-> +
-> +/* Base address of CPLD controller on the Debug board */
-> +#define DEBUG_BASE_ADDRESS		CS5_IO_ADDRESS(MX3x_CS5_BASE_ADDR)
-> +
-> +/* LAN9217 ethernet base address */
-> +#define LAN9217_BASE_ADDR		MX3x_CS5_BASE_ADDR
-> +
-> +/* CPLD config and interrupt base address */
-> +#define CPLD_ADDR			(DEBUG_BASE_ADDRESS + 0x20000)
-> +
-> +/* status, interrupt */
-> +#define CPLD_INT_STATUS_REG		(CPLD_ADDR + 0x10)
-> +#define CPLD_INT_MASK_REG		(CPLD_ADDR + 0x38)
-> +#define CPLD_INT_RESET_REG		(CPLD_ADDR + 0x20)
-> +/* magic word for debug CPLD */
-> +#define CPLD_MAGIC_NUMBER1_REG		(CPLD_ADDR + 0x40)
-> +#define CPLD_MAGIC_NUMBER2_REG		(CPLD_ADDR + 0x48)
-> +/* CPLD code version */
-> +#define CPLD_CODE_VER_REG		(CPLD_ADDR + 0x50)
-> +/* magic word for debug CPLD */
-> +#define CPLD_MAGIC_NUMBER3_REG		(CPLD_ADDR + 0x58)
-> +
-> +/* CPLD IRQ line for external uart, external ethernet etc */
-> +#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_1)
-> +
-> +#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
-> +#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
-> +
-> +#define EXPIO_INT_ENET		(MXC_EXP_IO_BASE + 0)
-> +
-> +#define MXC_MAX_EXP_IO_LINES	16
-> +
-> +/*
-> + * This file contains the board-specific initialization routines.
->   */
->  
->  static int mx31_3ds_pins[] = {
-> -- 
-> 1.7.0
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
